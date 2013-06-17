@@ -19,7 +19,7 @@ The files have a fixed length, around just 3k for 60 seconds of graphs.
 2. On your web page, you add a few javascript lines and a DIV for every graph you need.
 Your browser will hit the web server to fetch the JSON data and refresh the graphs.
 
-3. Graphs are generated using Google Charts API - they are pretty eye candy!
+3. Graphs are generated using Google Charts API.
 
 
 
@@ -51,6 +51,9 @@ All these files are updated once per second.
 
 ### edit index.html
 Set in index.html the interfaces you would like to monitor on the web page.
+
+** REMEMBER: there are 2 sections in index.html to edit. A javascript section and an HTML section. **
+
 
 ### hit index.html from a web browser
 Enjoy real time monitor web graphs for your interfaces.
