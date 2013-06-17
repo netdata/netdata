@@ -5,6 +5,8 @@ linux network traffic web monitoring
 
 This little program will allow you to create embedable live monitoring charts on any web page.
 
+![image](https://f.cloud.github.com/assets/2662304/664777/3dad6c32-d78d-11e2-9ecf-b921afebfb0b.png)
+
 # How it works
 
 1. You run a daemon on your linux: netdata.
