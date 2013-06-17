@@ -1,0 +1,50 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<style>
+        * {font-family:Arial}
+        div {float: left; margin: 0 0 0 0; }
+</style>
+<title>netdata</title>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+
+	<!--Load the AJAX API-->
+	<script type="text/javascript" src="https://www.google.com/jsapi"></script>
+	<script type="text/javascript" src="jquery-1.10.1.min.js"></script>
+	<script type="text/javascript" src="netdata.js"></script>
+	<script type="text/javascript">
+	
+	// Set a callback to run when the Google Visualization API is loaded.
+	google.setOnLoadCallback(drawCharts);
+
+	function drawCharts() {
+		var width = (window.innerWidth - 50) / 2;
+		var height = 260;
+		
+		if(width < height) width = height; //>
+		
+		// EDIT: add one line per interface you have
+		// EDIT: 
+		// EDIT:   name    div id                    json data    graph title
+		// EDIT: --------------------------------------------------------------------------------
+		drawChart('eth0', 'eth0_div', width, height, "eth0.json", "Live Network Usage for eth0");
+		drawChart('tun0', 'tun0_div', width, height, "tun0.json", "Live Network Usage for tun0");
+		drawChart('ppp0', 'ppp0_div', width, height, "ppp0.json", "Live Network Usage for ppp0");
+	}
+	
+	// EDIT: how often the charts are updated, in milliseconds
+	setInterval(drawCharts, 1000);
+	</script>
+</head>
+
+<body>
+ 	<!--
+		EDIT: add one div per interface you have
+		EDIT: use the same id above and bellow!
+	-->
+
+	<div id="eth0_div"></div>
+	<div id="tun0_div"></div>
+	<div id="ppp0_div"></div>
+ </body>
+</html>
