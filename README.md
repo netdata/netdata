@@ -37,7 +37,7 @@ gcc -O3 -o netdata netdata.c
 Run netdata and instruct it to create json files in the current directory.
 
 ```sh
-./netdata -d -l 60 -u 1 -o `pwd`
+./netdata -d -l 60 -u 1 -o "`pwd`"
 ```
  - -d says to go daemon mode
  - -l 60 says to show 60 seconds of history
