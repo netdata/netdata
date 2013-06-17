@@ -3,6 +3,24 @@ netdata
 
 linux network traffic web monitoring
 
+This little program will allow you to create embedable live monitoring charts on any web page.
+
+# How it works
+
+1. You run a daemon on your linux: netdata.
+This deamon is written in C and is extremely lightweight.
+What it does is that it reads /proc/net/dev and for every interface present there, it creates a JSON data file.
+This JSON file contains all the data needed for the web graphs.
+
+Since these files are created too often (e.g. once per second) it is adviced to put them on tmpfs.
+The files have a fixed length, around just 4k for 60 seconds of graphs.
+
+2. On your web page, you add a few javascript lines and a DIV for every graph you need.
+Your browser will hit the web server to fetch the JSON data and refresh the graphs.
+
+3. Graphs are generated using Google Charts API - they are pretty eye candy!
+
+
 
 # Installation
 
