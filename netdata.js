@@ -4,9 +4,11 @@
 	// Load the Visualization API and the piechart package.
 	google.load('visualization', '1', {'packages':['corechart']});
 	
-	function refreshChart(index, div, width, height, jsonurl, title) {
+	function refreshChart(index) {
+		if(index >= charts.length) return;
+		
 		var jsonData = $.ajax({
-			url: jsonurl,
+			url: charts_urls[index],
 			dataType:"json",
 			async: false,
 			cache: false
@@ -17,16 +19,26 @@
 		
 		// Instantiate and draw our chart, passing in some options.
 		if(!charts[index]) {
-			console.log('Creating new chart for ' + jsonurl);
-			charts[index] = new google.visualization.AreaChart(document.getElementById(div));
+			console.log('Creating new chart for ' + charts_urls[index]);
+			charts[index] = new google.visualization.AreaChart(document.getElementById(charts_divs[index]));
 		}
-		if(charts[index]) charts[index].draw(charts_data[index], {width: width, height: height, title: title, hAxis: {title: "Time of Day"}, vAxis: {title: "Bandwidth in kbps", minValue: 200}});
-		else console.log('Cannot create chart for ' + jsonurl);
+		
+		var width = charts_widths[index];
+		if(width == 0) width = (window.innerWidth - 50) / 2;
+		if(width < 10) width = (window.innerWidth - 50) / width;
+		
+		if(charts[index]) charts[index].draw(charts_data[index], {width: width, height: charts_heights[index], title: charts_titles[index], hAxis: {title: "Time of Day"}, vAxis: {title: "Bandwidth in kbps", minValue: 200}});
+		else console.log('Cannot create chart for ' + charts_urls[index]);
 	}
 	
 	var charts = new Array();
 	var charts_data = new Array();
 	var charts_names = new Array();
+	var charts_divs = new Array();
+	var charts_widths = new Array();
+	var charts_heights = new Array();
+	var charts_urls = new Array();
+	var charts_titles = new Array();
 	
 	function drawChart(name, div, width, height, jsonurl, title) {
 		var i;
@@ -39,13 +51,42 @@
 			charts[i] = null;
 			charts_data[i] = null;
 			charts_names[i] = name;
+			charts_divs[i] = div;
+			charts_widths[i] = width;
+			charts_heights[i] = height;
+			charts_urls[i] = jsonurl;
+			charts_titles[i] = title;
 		}
 		
 		try {
-			refreshChart(i, div, width, height, jsonurl, title);
+			refreshChart(i);
 		}
 		catch(err) {
 			console.log('Cannot create chart for ' + jsonurl);
 		}
 	}
-
+	
+	var charts_last_drawn = 99;
+	function refreshCharts(howmany) {
+		
+		if(charts.length == 0) return;
+		
+		var h = howmany;
+		if(h == 0) h = 1;
+		if(h > charts.length) h = charts.length;
+		console.log('Will run for ' + h + ' charts');
+		
+		var i;
+		for(i = 0; i < h; i++) {
+			charts_last_drawn++;
+			if(charts_last_drawn >= charts.length) charts_last_drawn = 0;
+			
+			try {
+				refreshChart(charts_last_drawn);
+			}
+			catch(err) {
+				console.log('Cannot refresh chart for ' + jsonurl);
+			}
+		}
+		return 0;
+	}
