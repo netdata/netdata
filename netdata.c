@@ -11,6 +11,7 @@
 #define SAVE_PATH "/tmp"
 
 // configuration
+#define MAX_LINE 4096
 #define MAX_IFACE_NAME 1024
 char save_path[FILENAME_MAX+1] = SAVE_PATH;
 int update_every = UPDATE_EVERY;
@@ -71,7 +72,8 @@ void update_iface_history(char *name, unsigned long long rbytes, unsigned long l
 
 void save_stats() {
 	struct iface_stats *iface = NULL;
-
+	int r;
+	
 	for(iface = interfaces; iface != NULL; iface = iface->next) {
 		char tmp[FILENAME_MAX+1];
 		char filename[FILENAME_MAX+1];
@@ -128,12 +130,13 @@ void save_stats() {
 		fprintf(fp, "	]\n}\n");
 		fclose(fp);
 		unlink(filename);
-		link(tmp, filename);
+		r = link(tmp, filename);
 		unlink(tmp);
 	}
 }
 
 int main(int argc, char **argv) {
+	char buffer[MAX_LINE+1] = "";
 	char iface[MAX_IFACE_NAME + 1] = "";
 	unsigned long long rbytes, rpackets, rerrors, rdrops, rfifo, rframe, rcompressed, rmulticast;
 	unsigned long long tbytes, tpackets, terrors, tdrops, tfifo, tcollisions, tcarrier, tcompressed;
@@ -200,6 +203,7 @@ int main(int argc, char **argv) {
 	for(;1;) {
 		FILE *fp = fopen("/proc/net/dev", "r");
 		int r;
+		char *p;
 
 		if(!fp) {
 			perror("/proc/net/dev");
@@ -208,23 +212,28 @@ int main(int argc, char **argv) {
 		}
 
 		// skip the first two lines
-		fgets(iface, MAX_IFACE_NAME, fp);
-		fgets(iface, MAX_IFACE_NAME, fp);
-
+		p = fgets(buffer, MAX_LINE, fp);
+		p = fgets(buffer, MAX_LINE, fp);
+		
+		printf("ok\n");
 		// read the rest of the lines
 		for(;1;) {
-			r = fscanf(fp, "%s\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\n",
+			char *c;
+			p = fgets(buffer, MAX_LINE, fp);
+			if(!p) break;
+
+			c = strchr(buffer, ':');
+			if(c) *c = '\t';
+			
+			printf("%s\n", buffer);
+			r = sscanf(buffer, "%s\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\n",
 				iface,
 				&rbytes, &rpackets, &rerrors, &rdrops, &rfifo, &rframe, &rcompressed, &rmulticast,
 				&tbytes, &tpackets, &terrors, &tdrops, &tfifo, &tcollisions, &tcarrier, &tcompressed);
 			if(r == EOF) break;
-			if(r != 17) printf("Cannot read line\n");
+			if(r != 17) printf("Cannot read line. Expected 17 params, read %d\n", r);
 			else {
 				// printf("Read %d items\n", r);
-
-				// remove the ':' from the end of the name
-				int l = strlen(iface);
-				if(l > 0) iface[l-1] = '\0';
 
 				// update our data
 				update_iface_history(iface, rbytes, tbytes);
