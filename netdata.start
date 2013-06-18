@@ -95,23 +95,37 @@ cat >all.html <<EOF
 EOF
 
 all=`ls "${data}" | grep .json$ | sed "s/\.json$//g"`
+count=0
 for x in $all
 do
+	count=$[count + 1]
 	cat >>all.html <<EOF2
 		drawChart('${x}', '${x}_div', width, height, "data/${x}.json", "Live Network Usage for ${x}");
 EOF2
 done
+
+ref=4
+tim=1000
+if [ $count -gt 4 ]
+then
+	ref=1
+	tim=$[1000 / count]
+	if [ $tim -lt 100 ]
+	then
+		tim=100
+	fi
+fi
 
 cat >>all.html <<EOF3
 	}
 	
         function myChartsRefresh() {
 		// refresh up to 4 charts per second
-                refreshCharts(4);
+                refreshCharts($ref);
         }
 
         // EDIT: how often the charts are updated, in milliseconds
-        setInterval(myChartsRefresh, 1000);
+        setInterval(myChartsRefresh, $tim);
 	</script>
 </head>
 
