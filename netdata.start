@@ -1,0 +1,115 @@
+#!/bin/bash
+
+base="`dirname "$0"`"
+
+if [ ! -d "$base" -o ! -f "$base/netdata.c" ]
+then
+	echo >&2 "Cannot find my home directory '${base}'."
+	exit 1
+fi
+cd "$base" || exit 1
+
+echo "Creating a directory for netdata in /run"
+if [ ! -d /run/netdata ]
+then
+	mkdir /run/netdata || exit 1
+fi
+
+echo "Stopping a (possibly) running netdata..."
+killall netdata 2>/dev/null
+
+echo "Compiling netdata"
+gcc -O3 -o netdata netdata.c || exit 1
+
+echo "Starting netdata"
+./netdata -d -u 1 -l 60 -o /run/netdata || exit 1
+
+echo "Waiting 2 seconds for the JSON files"
+# wait 2 seconds for the JSON files to be generated
+sleep 2
+
+if [ -h data ]
+then
+	echo "Removing existing $base/data link"
+	rm data || exit 1
+fi
+
+if [ ! -d data ]
+then
+	echo "Linking /run/netdata to $base/data"
+	ln -s /run/netdata data || exit 1
+else
+	echo >&2 "Directory $base/data already exists. Not touching it, however it should be a link /run/netdata."
+fi
+
+echo "Generating all.html"
+cat >all.html <<EOF
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<style>
+        * {font-family:Arial}
+        div {float: left; margin: 0 0 0 0; }
+</style>
+<title>netdata</title>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+
+	<!--Load the AJAX API-->
+	<script type="text/javascript" src="https://www.google.com/jsapi"></script>
+	<script type="text/javascript" src="jquery-1.10.1.min.js"></script>
+	<script type="text/javascript" src="netdata.js"></script>
+	<script type="text/javascript">
+	
+	// Set a callback to run when the Google Visualization API is loaded.
+	google.setOnLoadCallback(drawCharts);
+
+	function drawCharts() {
+		var width = (window.innerWidth - 50) / 2;
+		var height = 260;
+		
+		if(width < height) width = height; //>
+		
+		// EDIT: add one line per interface you have
+		// EDIT: 
+		// EDIT:   name    div id                    json data           graph title
+		// EDIT: --------------------------------------------------------------------------------
+EOF
+
+all=`ls /tmp/interfaces/ | grep .json$ | sed "s/\.json$//g"`
+for x in $all
+do
+	cat >>all.html <<EOF2
+		drawChart('${x}', '${x}_div', width, height, "data/${x}.json", "Live Network Usage for ${x}");
+EOF2
+done
+
+cat >>all.html <<EOF3
+	}
+	
+	// EDIT: how often the charts are updated, in milliseconds
+	setInterval(drawCharts, 1000);
+	</script>
+</head>
+
+<body>
+ 	<!--
+		EDIT: add one div per interface you have
+		EDIT: use the same id above and bellow!
+	-->
+EOF3
+
+for x in $all
+do
+	cat >>all.html <<EOF4
+	<div id="${x}_div"></div>
+EOF4
+done
+
+cat >>all.html <<EOF5
+ </body>
+</html>
+EOF5
+
+echo "All Done."
+echo "Just hit all.html from your browser."
+

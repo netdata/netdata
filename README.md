@@ -25,6 +25,23 @@ Your browser will hit the web server to fetch the JSON data and refresh the grap
 
 # Installation
 
+## Automatic installation
+
+1. Download everything in a directory inside your web server.
+2. cd to that directory
+3. run:
+
+```sh
+./netdata.start
+```
+
+For this to work, you need to have persmission to create a directory in /run.
+If you run into problems, try to become root to verify it works.
+
+---
+
+## Installation by hand
+
 ### download everything in a directory inside your web docs.
 You don't need apache. Any web server able to provide static files will do the job fine.
 
