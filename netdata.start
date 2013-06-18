@@ -75,7 +75,7 @@ cat >all.html <<EOF
 		// EDIT: --------------------------------------------------------------------------------
 EOF
 
-all=`ls /tmp/interfaces/ | grep .json$ | sed "s/\.json$//g"`
+all=`ls /run/netdata | grep .json$ | sed "s/\.json$//g"`
 for x in $all
 do
 	cat >>all.html <<EOF2
