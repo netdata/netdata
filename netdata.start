@@ -9,10 +9,31 @@ then
 fi
 cd "$base" || exit 1
 
-echo "Creating a directory for netdata in /run"
-if [ ! -d /run/netdata ]
+echo "Creating a directory for netdata..."
+data=
+for x in /run/netdata /var/run/netdata /tmp/netdata
+do
+	echo "	Trying '${x}'..."
+	if [ ! -d "${x}" ]
+	then
+		mkdir "${x}"
+		if [ $? -eq 0 ]
+		then
+			echo "	OK. '${x}' works."
+			data="${x}"
+			break
+		fi
+	else
+		echo "	OK. '${x}' works."
+		data="${x}"
+		break
+	fi
+done
+
+if [ -z "${data}" ]
 then
-	mkdir /run/netdata || exit 1
+	echo >&2 "Cannot find where to put JSON files."
+	exit 1
 fi
 
 echo "Stopping a (possibly) running netdata..."
@@ -22,7 +43,7 @@ echo "Compiling netdata"
 gcc -O3 -o netdata netdata.c || exit 1
 
 echo "Starting netdata"
-./netdata -d -u 1 -l 60 -o /run/netdata || exit 1
+./netdata -d -u 1 -l 60 -o "${data}" || exit 1
 
 echo "Waiting 2 seconds for the JSON files"
 # wait 2 seconds for the JSON files to be generated
@@ -36,10 +57,10 @@ fi
 
 if [ ! -d data ]
 then
-	echo "Linking /run/netdata to $base/data"
-	ln -s /run/netdata data || exit 1
+	echo "Linking '${data}' to $base/data"
+	ln -s "${data}" data || exit 1
 else
-	echo >&2 "Directory $base/data already exists. Not touching it, however it should be a link /run/netdata."
+	echo >&2 "Directory $base/data already exists. Not touching it, however it should be a link '${data}'."
 fi
 
 echo "Generating all.html"
@@ -75,7 +96,7 @@ cat >all.html <<EOF
 		// EDIT: --------------------------------------------------------------------------------
 EOF
 
-all=`ls /run/netdata | grep .json$ | sed "s/\.json$//g"`
+all=`ls "${data}" | grep .json$ | sed "s/\.json$//g"`
 for x in $all
 do
 	cat >>all.html <<EOF2
