@@ -85,10 +85,8 @@ cat >all.html <<EOF
 	google.setOnLoadCallback(drawCharts);
 
 	function drawCharts() {
-		var width = (window.innerWidth - 50) / 2;
+		var width = 0; // if zero, auto-adjusts to 50% of screen, 1-10 goes 1/width of screen
 		var height = 260;
-		
-		if(width < height) width = height; //>
 		
 		// EDIT: add one line per interface you have
 		// EDIT: 
@@ -107,8 +105,13 @@ done
 cat >>all.html <<EOF3
 	}
 	
-	// EDIT: how often the charts are updated, in milliseconds
-	setInterval(drawCharts, 1000);
+        function myChartsRefresh() {
+		// refresh up to 4 charts per second
+                refreshCharts(4);
+        }
+
+        // EDIT: how often the charts are updated, in milliseconds
+        setInterval(myChartsRefresh, 1000);
 	</script>
 </head>
 
