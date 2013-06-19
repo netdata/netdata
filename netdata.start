@@ -65,6 +65,7 @@ fi
 
 echo "Finding proper parameters for dashboard..."
 
+# count all JSON files
 all=`ls "${data}" | grep .json$ | sed "s/\.json$//g"`
 count=0
 for x in $all
@@ -72,6 +73,7 @@ do
 	count=$[count + 1]
 done
 
+# find the optimal graphs per page
 w=1
 h=1
 a=1
@@ -86,6 +88,15 @@ do
 	fi
 	a=$[w*h]
 done
+
+# prefer to have wider graphs
+if [ $w -gt $h ]
+then
+	w=$[w-1]
+	h=$[h+1]
+fi
+
+# make sure we don't display too small graphs
 if [ $w -gt 10 ]
 then
 	w=10
