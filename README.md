@@ -35,8 +35,12 @@ Your browser will hit the web server to fetch the JSON data and refresh the grap
 ./netdata.start
 ```
 
-For this to work, you need to have persmission to create a directory in /run.
+For this to work, you need to have persmission to create a directory in /run or /var/run or /tmp.
 If you run into problems, try to become root to verify it works.
+
+Once you run it, the file all.config will be created. You can edit this file to set options for each graph.
+To apply the changes you made, you have to run netdata.start again.
+
 
 ---
 

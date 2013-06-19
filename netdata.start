@@ -126,12 +126,20 @@ cat >all.html <<EOF
 		// EDIT: --------------------------------------------------------------------------------
 EOF
 
+if [ -f all.config ]
+then
+	source all.config
+fi
+
 for x in $all
 do
+	eval "NETDATA_TITLE_${x}=\${NETDATA_TITLE_${x}:-Live Network Usage for ${x}}"
+	eval "t=\${NETDATA_TITLE_${x}}"
 	cat >>all.html <<EOF2
-		drawChart('${x}', '${x}_div', width, height, "data/${x}.json", "Live Network Usage for ${x}");
+		drawChart('${x}', '${x}_div', width, height, "data/${x}.json", "${t}");
 EOF2
 done
+set|grep ^NETDATA_TITLE_ >all.config
 
 ref=4
 tim=1000
