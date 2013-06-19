@@ -63,6 +63,38 @@ else
 	echo >&2 "Directory $base/data already exists. Not touching it, however it should be a link '${data}'."
 fi
 
+echo "Finding proper parameters for dashboard..."
+
+all=`ls "${data}" | grep .json$ | sed "s/\.json$//g"`
+count=0
+for x in $all
+do
+	count=$[count + 1]
+done
+
+w=1
+h=1
+a=1
+while [ $a -lt $count ]
+do
+	if [ $[h+1] -le $w ]
+	then
+		h=$[h+1]
+	else
+		w=$[w+1]
+		h=$[h-1]
+	fi
+	a=$[w*h]
+done
+if [ $w -gt 10 ]
+then
+	w=10
+fi
+if [ $h -gt 10 ]
+then
+	h=10
+fi
+
 echo "Generating all.html"
 cat >all.html <<EOF
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -85,8 +117,8 @@ cat >all.html <<EOF
 	google.setOnLoadCallback(drawCharts);
 
 	function drawCharts() {
-		var width = 0; // if zero, auto-adjusts to 50% of screen, 1-10 goes 1/width of screen
-		var height = 260;
+		var width = $w; // if zero, auto-adjusts to 50% of screen, 1-10 goes 1/width of screen
+		var height = $h;
 		
 		// EDIT: add one line per interface you have
 		// EDIT: 
@@ -94,11 +126,8 @@ cat >all.html <<EOF
 		// EDIT: --------------------------------------------------------------------------------
 EOF
 
-all=`ls "${data}" | grep .json$ | sed "s/\.json$//g"`
-count=0
 for x in $all
 do
-	count=$[count + 1]
 	cat >>all.html <<EOF2
 		drawChart('${x}', '${x}_div', width, height, "data/${x}.json", "Live Network Usage for ${x}");
 EOF2

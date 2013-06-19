@@ -25,9 +25,15 @@
 		
 		var width = charts_widths[index];
 		if(width == 0) width = (window.innerWidth - 50) / 2;
-		if(width < 10) width = (window.innerWidth - 50) / width;
+		if(width <= 10) width = (window.innerWidth - 50) / width;
+		if(width < 200) width = 200;
 		
-		if(charts[index]) charts[index].draw(charts_data[index], {width: width, height: charts_heights[index], title: charts_titles[index], hAxis: {title: "Time of Day"}, vAxis: {title: "Bandwidth in kbps", minValue: 200}});
+		var height = charts_heights[index];
+		if(height == 0) height = (window.innerHeight - 50) / 2;
+		if(height <= 10) height = (window.innerHeight - 50) / height;
+		if(height < 100) height = 100;
+		
+		if(charts[index]) charts[index].draw(charts_data[index], {width: width, height: height, title: charts_titles[index], hAxis: {title: "Time of Day"}, vAxis: {title: "Bandwidth in kbps", minValue: 200}});
 		else console.log('Cannot create chart for ' + charts_urls[index]);
 	}
 	
