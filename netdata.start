@@ -151,7 +151,6 @@ do
 		drawChart('${x}', '${x}_div', width, height, "data/${x}.json", "${t}");
 EOF2
 done
-set|grep ^NETDATA_TITLE_ >all.config
 
 ref=4
 tim=1000
@@ -185,17 +184,29 @@ cat >>all.html <<EOF3
 	-->
 EOF3
 
+tmp="/tmp/$RANDOM.netdata.$$.$RANDOM"
 for x in $all
 do
+	eval "NETDATA_PRIORITY_${x}=\${NETDATA_PRIORITY_${x}:-${x}}"
+	eval "t=\${NETDATA_PRIORITY_${x}}"
+	echo "${t}.${x}"
+done >"${tmp}"
+
+for x in `cat "${tmp}" | sort`
+do
+	n="`echo "$x" | cut -d '.' -f 2-`"
 	cat >>all.html <<EOF4
-	<div id="${x}_div"></div>
+	<div id="${n}_div"></div>
 EOF4
 done
+rm -f "${tmp}"
 
 cat >>all.html <<EOF5
  </body>
 </html>
 EOF5
+
+set|grep ^NETDATA_ >all.config
 
 echo "All Done."
 echo "Just hit all.html from your browser."
