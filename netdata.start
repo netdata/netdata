@@ -107,6 +107,7 @@ then
 fi
 
 echo "Generating all.html"
+host="`hostname`"
 cat >all.html <<EOF
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -114,7 +115,7 @@ cat >all.html <<EOF
         * {font-family:Arial}
         div {float: left; margin: 0 0 0 0; }
 </style>
-<title>netdata</title>
+<title>${host} netdata</title>
 <head>
 	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
 
