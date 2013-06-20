@@ -138,9 +138,12 @@ void save_proc_net_dev() {
 		}
 		fprintf(fp, "	]\n}\n");
 		fclose(fp);
-		unlink(filename);
-		r = link(tmp, filename);
-		unlink(tmp);
+		
+		r = rename(tmp, filename);
+		if(r == -1) perror("Cannot rename JSON file.");
+		//unlink(filename);
+		//r = link(tmp, filename);
+		//unlink(tmp);
 	}
 }
 
