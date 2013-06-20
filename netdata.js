@@ -35,7 +35,7 @@
 		
 		var hAxisTitle = null;
 		var vAxisTitle = null;
-		if(height >= 150) hAxisTitle = "Time of Day";
+		if(height >= 200) hAxisTitle = "Time of Day";
 		if(width >= 400) vAxisTitle = "Bandwidth in kbps";
 		
 		if(charts[index]) charts[index].draw(charts_data[index], {width: width, height: height, title: charts_titles[index], hAxis: {title: hAxisTitle}, vAxis: {title: vAxisTitle, minValue: 10}});
