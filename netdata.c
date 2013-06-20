@@ -4,11 +4,14 @@
 #include <time.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/time.h>
 
 // internal defaults
 #define UPDATE_EVERY 1
 #define HISTORY 3600
 #define SAVE_PATH "/tmp"
+
+#define DEBUG 0
 
 // configuration
 #define MAX_LINE 4096
@@ -19,6 +22,8 @@ int save_history = 60;
 
 struct iface_history {
 	time_t time;
+	unsigned long long usec;
+	
 	unsigned long long rbytes;
 	unsigned long long tbytes;
 };
@@ -32,7 +37,7 @@ struct iface_stats {
 	struct iface_stats *next;
 } *interfaces = NULL;
 
-void update_iface_history(char *name, unsigned long long rbytes, unsigned long long tbytes) {
+void update_iface_history(unsigned long long usec, char *name, unsigned long long rbytes, unsigned long long tbytes) {
 	struct iface_stats *iface = NULL;
 
 	for(iface = interfaces; iface != NULL; iface = iface->next)
@@ -41,7 +46,7 @@ void update_iface_history(char *name, unsigned long long rbytes, unsigned long l
 	if(!iface) {
 		int i;
 
-		// printf("Creating new interface for %s\n", name);
+		if(DEBUG) printf("Creating new interface for %s\n", name);
 
 		iface = malloc(sizeof(struct iface_stats));
 		if(!iface) return;
@@ -56,21 +61,23 @@ void update_iface_history(char *name, unsigned long long rbytes, unsigned long l
 			iface->history[i].time = time(NULL) - HISTORY + (i * update_every);
 			iface->history[i].rbytes = rbytes;
 			iface->history[i].tbytes = tbytes;
+			iface->history[i].usec = usec;
 		}
 	}
 
 	iface->last_history_id++;
 	if(iface->last_history_id >= HISTORY) iface->last_history_id = 0;
 
-	// printf("Updating values for interface %s at position %d, rbytes = %llu, tbytes = %llu\n", iface->name, iface->last_history_id, rbytes, tbytes);
+	if(DEBUG) printf("Updating values for interface %s at position %d, rbytes = %llu, tbytes = %llu\n", iface->name, iface->last_history_id, rbytes, tbytes);
 
 	strcpy(iface->name, name);
 	iface->history[iface->last_history_id].time = time(NULL);
 	iface->history[iface->last_history_id].rbytes = rbytes;
 	iface->history[iface->last_history_id].tbytes = tbytes;
+	iface->history[iface->last_history_id].usec = usec;
 }
 
-void save_stats() {
+void save_proc_net_dev() {
 	struct iface_stats *iface = NULL;
 	int r;
 	
@@ -107,8 +114,10 @@ void save_stats() {
 
 			dt = iface->history[ld].time - iface->history[d].time;
 			if(dt == 0) dt = 1;
-			rb = (iface->history[ld].rbytes - iface->history[d].rbytes) * 8 / dt / 1024;
-			tb = (iface->history[ld].tbytes - iface->history[d].tbytes) * 8 / dt / 1024;
+			//rb = (iface->history[ld].rbytes - iface->history[d].rbytes) * 8 / dt / 1024;
+			//tb = (iface->history[ld].tbytes - iface->history[d].tbytes) * 8 / dt / 1024;
+			rb = (iface->history[ld].rbytes - iface->history[d].rbytes) * 1000000 * 8 / iface->history[ld].usec / 1024;
+			tb = (iface->history[ld].tbytes - iface->history[d].tbytes) * 1000000 * 8 / iface->history[ld].usec / 1024;
 
 			s = time(NULL) - iface->history[ld].time;
 
@@ -135,11 +144,62 @@ void save_stats() {
 	}
 }
 
-int main(int argc, char **argv) {
+int do_proc_net_dev(unsigned long long usec) {
 	char buffer[MAX_LINE+1] = "";
 	char iface[MAX_IFACE_NAME + 1] = "";
 	unsigned long long rbytes, rpackets, rerrors, rdrops, rfifo, rframe, rcompressed, rmulticast;
 	unsigned long long tbytes, tpackets, terrors, tdrops, tfifo, tcollisions, tcarrier, tcompressed;
+	
+	int r;
+	char *p;
+	
+	FILE *fp = fopen("/proc/net/dev", "r");
+	if(!fp) {
+		perror("/proc/net/dev");
+		return 1;
+	}
+	
+	// skip the first two lines
+	p = fgets(buffer, MAX_LINE, fp);
+	p = fgets(buffer, MAX_LINE, fp);
+	
+	// read the rest of the lines
+	for(;1;) {
+		char *c;
+		p = fgets(buffer, MAX_LINE, fp);
+		if(!p) break;
+		
+		c = strchr(buffer, ':');
+		if(c) *c = '\t';
+		
+		// if(DEBUG) printf("%s\n", buffer);
+		r = sscanf(buffer, "%s\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\n",
+			iface,
+			&rbytes, &rpackets, &rerrors, &rdrops, &rfifo, &rframe, &rcompressed, &rmulticast,
+			&tbytes, &tpackets, &terrors, &tdrops, &tfifo, &tcollisions, &tcarrier, &tcompressed);
+		if(r == EOF) break;
+		if(r != 17) fprintf(stderr, "Cannot read line. Expected 17 params, read %d\n", r);
+		else {
+			// update our data
+			update_iface_history(usec, iface, rbytes, tbytes);
+		}
+	}
+	
+	// done reading, close it
+	fclose(fp);
+	
+	// save statistics
+	save_proc_net_dev();
+	
+	return 0;
+}
+
+unsigned long long usecdiff(struct timeval *now, struct timeval *last) {
+		return ((((now->tv_sec * 1000000) + now->tv_usec) - ((last->tv_sec * 1000000) + last->tv_usec)));
+}
+
+int main(int argc, char **argv) {
+	struct timeval last, now, tmp;
 	int i;
 	int daemon = 0;
 	
@@ -200,54 +260,38 @@ int main(int argc, char **argv) {
 		close(2);
 	}
 	
+	// main loop
+	gettimeofday(&last, NULL);
+	last.tv_sec -= update_every;
+	
 	for(;1;) {
-		FILE *fp = fopen("/proc/net/dev", "r");
-		int r;
-		char *p;
-
-		if(!fp) {
-			perror("/proc/net/dev");
-			sleep(1);
-			continue;
-		}
-
-		// skip the first two lines
-		p = fgets(buffer, MAX_LINE, fp);
-		p = fgets(buffer, MAX_LINE, fp);
+		unsigned long long usec, susec;
+		gettimeofday(&now, NULL);
 		
-		printf("ok\n");
-		// read the rest of the lines
-		for(;1;) {
-			char *c;
-			p = fgets(buffer, MAX_LINE, fp);
-			if(!p) break;
-
-			c = strchr(buffer, ':');
-			if(c) *c = '\t';
-			
-			printf("%s\n", buffer);
-			r = sscanf(buffer, "%s\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\n",
-				iface,
-				&rbytes, &rpackets, &rerrors, &rdrops, &rfifo, &rframe, &rcompressed, &rmulticast,
-				&tbytes, &tpackets, &terrors, &tdrops, &tfifo, &tcollisions, &tcarrier, &tcompressed);
-			if(r == EOF) break;
-			if(r != 17) printf("Cannot read line. Expected 17 params, read %d\n", r);
-			else {
-				// printf("Read %d items\n", r);
-
-				// update our data
-				update_iface_history(iface, rbytes, tbytes);
-			}
-		}
-
-		// done reading, close it
-		fclose(fp);
-
-		// save statistics
-		save_stats();
-
-		// printf("Received bytes = %llu, Transmit bytes = %llu\n", rbytes, tbytes);
-		sleep(update_every);
+		// calculate the time it took for a full loop
+		usec = usecdiff(&now, &last);
+		if(DEBUG) printf("Last loop took %llu usec\n", usec);
+		
+		do_proc_net_dev(usec);
+		
+		// find the time to sleep in order to wait exactly update_every seconds
+		gettimeofday(&tmp, NULL);
+		usec = usecdiff(&tmp, &now);
+		if(DEBUG) printf("This loop took %llu usec\n", usec);
+		
+		if(usec < (update_every * 1000000)) susec = (update_every * 1000000) - usec;
+		else susec = 0;
+		
+		// make sure we will wait at least 100ms
+		if(susec < 100000) susec = 100000;
+		
+		if(DEBUG) printf("Sleeping for %llu usec\n", susec);
+		usleep(susec);
+		
+		// copy now to last
+		last.tv_sec = now.tv_sec;
+		last.tv_usec = now.tv_usec;
+		
+		//exit(1);
 	}
 }
-
