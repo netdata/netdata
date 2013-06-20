@@ -14,6 +14,8 @@
 			cache: false
 		}).responseText;
 		
+		if(!jsonData || jsonData.length == 0) return;
+		
 		// Create our data table out of JSON data loaded from server.
 		charts_data[index] = new google.visualization.DataTable(jsonData);
 		
