@@ -7,6 +7,9 @@ This little program will allow you to create embedable live monitoring charts on
 
 ![image](https://f.cloud.github.com/assets/2662304/664777/3dad6c32-d78d-11e2-9ecf-b921afebfb0b.png)
 
+![image](https://f.cloud.github.com/assets/2662304/689979/807dfb4e-dac6-11e2-8546-6d83fdb05866.png)
+
+
 # How it works
 
 1. You run a daemon on your linux: netdata.
