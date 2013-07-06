@@ -36,6 +36,17 @@ then
 	exit 1
 fi
 
+cat <<EOFHTACCESS >"${data}/.htaccess"
+
+ExpiresActive on
+ExpiresDefault A0 
+ExpiresByType application/json A0
+
+Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+Header set Pragma "no-cache"
+
+EOFHTACCESS
+
 echo "Stopping a (possibly) running netdata..."
 killall netdata 2>/dev/null
 
