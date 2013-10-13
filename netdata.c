@@ -58,7 +58,7 @@ void update_iface_history(unsigned long long usec, char *name, unsigned long lon
 		interfaces = iface;
 
 		for(i = 0; i < HISTORY ;i++) {
-			iface->history[i].time = time(NULL) - HISTORY + (i * update_every);
+			iface->history[i].time = time(NULL) - (HISTORY * update_every) + (i * update_every);
 			iface->history[i].rbytes = rbytes;
 			iface->history[i].tbytes = tbytes;
 			iface->history[i].usec = usec;
