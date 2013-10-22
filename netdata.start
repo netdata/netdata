@@ -134,13 +134,13 @@ cat >all.html <<EOF
 
 	<!--Load the AJAX API-->
 	<script type="text/javascript" src="https://www.google.com/jsapi"></script>
-	<script type="text/javascript" src="jquery-1.10.1.min.js"></script>
+	<script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
 	<script type="text/javascript" src="netdata.js"></script>
 	<script type="text/javascript">
 	
 	// Set a callback to run when the Google Visualization API is loaded.
 	google.setOnLoadCallback(drawCharts);
-
+	
 	function drawCharts() {
 		var width = $w; // if zero, auto-adjusts to 50% of screen, 1-10 goes 1/width of screen
 		var height = $h;
