@@ -161,9 +161,14 @@ do
 	y=`echo "$x" | tr "-" "_"`
 	eval "NETDATA_TITLE_${y}=\${NETDATA_TITLE_${y}:-Live Network Usage for ${x}}"
 	eval "t=\${NETDATA_TITLE_${y}}"
-	cat >>all.html <<EOF2
+	
+	eval "p=\${NETDATA_PRIORITY_${y}}"
+	if [ ! "$p" = "IGNORE" ]
+	then
+		cat >>all.html <<EOF2
 		drawChart('${x}', '${x}_div', width, height, "data/${x}.json", "${t}");
 EOF2
+	fi
 done
 
 ref=4
@@ -204,7 +209,10 @@ do
 	y=`echo "$x" | tr "-" "_"`
 	eval "NETDATA_PRIORITY_${y}=\${NETDATA_PRIORITY_${y}:-${x}}"
 	eval "t=\${NETDATA_PRIORITY_${y}}"
-	echo "${t}.${x}"
+	if [ ! "$t" = "IGNORE" ]
+	then
+		echo "${t}.${x}"
+	fi
 done >"${tmp}"
 
 for x in `cat "${tmp}" | sort`
