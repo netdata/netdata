@@ -113,11 +113,11 @@ do
 done
 
 # prefer to have wider graphs
-if [ $w -gt $h ]
-then
+while [ $w -ge $h ]
+do
 	w=$[w-1]
 	h=$[h+1]
-fi
+done
 
 # make sure we don't display too small graphs
 if [ $w -gt 10 ]
