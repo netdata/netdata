@@ -193,11 +193,15 @@ fi
 cat >>all.html <<EOF3
 	}
 	
+	var refreshCount = 0;
         function myChartsRefresh() {
-		// refresh up to 4 charts per second
+		refreshCount++;
+		if(refreshCount > 1000) location.reload();
+		
+		// refresh up to $ref charts per second
                 refreshCharts($ref);
         }
-
+	
         // EDIT: how often the charts are updated, in milliseconds
         setInterval(myChartsRefresh, $tim);
 	</script>
