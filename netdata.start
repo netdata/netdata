@@ -1,6 +1,5 @@
 #!/bin/bash
 
-NETDATA_UPDATE_EVERY=1
 
 base="`dirname "$0"`"
 
@@ -10,6 +9,12 @@ then
 	exit 1
 fi
 cd "$base" || exit 1
+
+NETDATA_UPDATE_EVERY=1
+if [ -f all.config ]
+then
+	source all.config
+fi
 
 echo "Creating a directory for netdata..."
 data=
@@ -76,11 +81,6 @@ then
 	ln -s "${data}" data || exit 1
 else
 	echo >&2 "Directory $base/data already exists. Not touching it, however it should be a link '${data}'."
-fi
-
-if [ -f all.config ]
-then
-	source all.config
 fi
 
 echo "Finding proper parameters for dashboard..."
