@@ -1,5 +1,7 @@
 #!/bin/bash
 
+NETDATA_UPDATE_EVERY=1
+
 base="`dirname "$0"`"
 
 if [ ! -d "$base" -o ! -f "$base/netdata.c" ]
@@ -56,7 +58,7 @@ echo "Compiling netdata"
 gcc -O3 -o netdata netdata.c || exit 1
 
 echo "Starting netdata"
-./netdata -d -u 1 -l 120 -o "${data}" || exit 1
+./netdata -d -u $NETDATA_UPDATE_EVERY -l $[60*NETDATA_UPDATE_EVERY] -o "${data}" || exit 1
 
 echo "Waiting 2 seconds for the JSON files"
 # wait 2 seconds for the JSON files to be generated
@@ -176,15 +178,15 @@ EOF2
 	fi
 done
 
-ref=4
-tim=1000
+ref=$[4 * NETDATA_UPDATE_EVERY]
+tim=$[1000 * NETDATA_UPDATE_EVERY]
 if [ $count -gt 4 ]
 then
 	ref=1
-	tim=$[1000 / count]
-	if [ $tim -lt 100 ]
+	tim=$[1000 * NETDATA_UPDATE_EVERY / count]
+	if [ $tim -lt $[100 * NETDATA_UPDATE_EVERY] ]
 	then
-		tim=100
+		tim=$[100 * NETDATA_UPDATE_EVERY]
 	fi
 fi
 
