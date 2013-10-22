@@ -17,6 +17,7 @@
 		if(!jsonData || jsonData.length == 0) return;
 		
 		// Create our data table out of JSON data loaded from server.
+		charts_data[index] = null;
 		charts_data[index] = new google.visualization.DataTable(jsonData);
 		
 		// Instantiate and draw our chart, passing in some options.
@@ -87,7 +88,7 @@
 		var h = howmany;
 		if(h == 0) h = 1;
 		if(h > charts.length) h = charts.length;
-		console.log('Will run for ' + h + ' charts');
+		//console.log('Will run for ' + h + ' charts');
 		
 		var i;
 		for(i = 0; i < h; i++) {

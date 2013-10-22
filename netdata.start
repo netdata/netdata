@@ -39,13 +39,15 @@ fi
 cat <<EOFHTACCESS >"${data}/.htaccess"
 
 ExpiresActive on
-ExpiresDefault A0 
+ExpiresDefault A0
 ExpiresByType application/json A0
 
 Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
 Header set Pragma "no-cache"
 
 EOFHTACCESS
+
+rm "${data}"/*.json
 
 echo "Stopping a (possibly) running netdata..."
 killall netdata 2>/dev/null
@@ -156,8 +158,9 @@ fi
 
 for x in $all
 do
-	eval "NETDATA_TITLE_${x}=\${NETDATA_TITLE_${x}:-Live Network Usage for ${x}}"
-	eval "t=\${NETDATA_TITLE_${x}}"
+	y=`echo "$x" | tr "-" "_"`
+	eval "NETDATA_TITLE_${y}=\${NETDATA_TITLE_${y}:-Live Network Usage for ${x}}"
+	eval "t=\${NETDATA_TITLE_${y}}"
 	cat >>all.html <<EOF2
 		drawChart('${x}', '${x}_div', width, height, "data/${x}.json", "${t}");
 EOF2
@@ -198,8 +201,9 @@ EOF3
 tmp="/tmp/$RANDOM.netdata.$$.$RANDOM"
 for x in $all
 do
-	eval "NETDATA_PRIORITY_${x}=\${NETDATA_PRIORITY_${x}:-${x}}"
-	eval "t=\${NETDATA_PRIORITY_${x}}"
+	y=`echo "$x" | tr "-" "_"`
+	eval "NETDATA_PRIORITY_${y}=\${NETDATA_PRIORITY_${y}:-${x}}"
+	eval "t=\${NETDATA_PRIORITY_${y}}"
 	echo "${t}.${x}"
 done >"${tmp}"
 

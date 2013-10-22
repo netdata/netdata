@@ -32,8 +32,13 @@
 		drawChart('ppp0', 'ppp0_div', width, height, "ppp0.json", "Live Network Usage for ppp0");
 	}
 	
-	// EDIT: how often the charts are updated, in milliseconds
-	setInterval(drawCharts, 1000);
+        function myRefresh() {
+		// refresh up to 4 charts every time
+                refreshCharts(4);
+        }
+	
+        // EDIT: how often the charts are updated, in milliseconds
+        setInterval(myRefresh, 1000);
 	</script>
 </head>
 
