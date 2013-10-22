@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 base="`dirname "$0"`"
 
 if [ ! -d "$base" -o ! -f "$base/netdata.c" ]
@@ -10,11 +9,20 @@ then
 fi
 cd "$base" || exit 1
 
-NETDATA_UPDATE_EVERY=1
-NETDATA_HISTORY_POINTS=60
-if [ -f all.config ]
+# every how many seconds to update the JSON files
+NETDATA_CONFIG_UPDATE_EVERY=1
+
+# how many points should the graphs have
+NETDATA_CONFIG_HISTORY_POINTS=60
+
+# every how many graph refreshes, the page should be reloaded
+# this fixes a bug in the google graphs API which leaks memory
+# when refreshes graphs
+NETDATA_CONFIG_RELOAD_EVERY=500
+
+if [ -f netdata.conf ]
 then
-	source all.config
+	source netdata.conf
 fi
 
 echo "Creating a directory for netdata..."
@@ -24,7 +32,7 @@ do
 	echo "	Trying '${x}'..."
 	if [ ! -d "${x}" ]
 	then
-		mkdir "${x}"
+		mkdir "${x}" 2>/dev/null
 		if [ $? -eq 0 ]
 		then
 			echo "	OK. '${x}' works."
@@ -55,16 +63,17 @@ Header set Pragma "no-cache"
 
 EOFHTACCESS
 
-rm "${data}"/*.json
-
 echo "Stopping a (possibly) running netdata..."
 killall netdata 2>/dev/null
+
+sleep 1
+rm "${data}"/*.json
 
 echo "Compiling netdata"
 gcc -O3 -o netdata netdata.c || exit 1
 
 echo "Starting netdata"
-./netdata -d -u $NETDATA_UPDATE_EVERY -l $NETDATA_HISTORY_POINTS -o "${data}" || exit 1
+./netdata -d -u $NETDATA_CONFIG_UPDATE_EVERY -l $NETDATA_CONFIG_HISTORY_POINTS -o "${data}" || exit 1
 
 echo "Waiting 2 seconds for the JSON files"
 # wait 2 seconds for the JSON files to be generated
@@ -132,9 +141,11 @@ then
 	h=10
 fi
 
-echo "Generating all.html"
+cp "${base}/netdata.js" "${data}/"
+
+echo "Generating ${data}/index.html"
 host="`hostname`"
-cat >all.html <<EOF
+cat >${data}/index.html <<EOF
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <style>
@@ -173,31 +184,31 @@ do
 	eval "p=\${NETDATA_PRIORITY_${y}}"
 	if [ ! "$p" = "IGNORE" ]
 	then
-		cat >>all.html <<EOF2
+		cat >>${data}/index.html <<EOF2
 		drawChart('${x}', '${x}_div', width, height, "data/${x}.json", "${t}");
 EOF2
 	fi
 done
 
-ref=$[4 * NETDATA_UPDATE_EVERY]
-tim=$[1000 * NETDATA_UPDATE_EVERY]
+ref=$[4 * NETDATA_CONFIG_UPDATE_EVERY]
+tim=$[1000 * NETDATA_CONFIG_UPDATE_EVERY]
 if [ $count -gt 4 ]
 then
 	ref=1
-	tim=$[1000 * NETDATA_UPDATE_EVERY / count]
-	if [ $tim -lt $[100 * NETDATA_UPDATE_EVERY] ]
+	tim=$[1000 * NETDATA_CONFIG_UPDATE_EVERY / count]
+	if [ $tim -lt $[100 * NETDATA_CONFIG_UPDATE_EVERY] ]
 	then
-		tim=$[100 * NETDATA_UPDATE_EVERY]
+		tim=$[100 * NETDATA_CONFIG_UPDATE_EVERY]
 	fi
 fi
 
-cat >>all.html <<EOF3
+cat >>${data}/index.html <<EOF3
 	}
 	
 	var refreshCount = 0;
         function myChartsRefresh() {
 		refreshCount++;
-		if(refreshCount > 1000) location.reload();
+		if(refreshCount > $NETDATA_CONFIG_RELOAD_EVERY) location.reload();
 		
 		// refresh up to $ref charts per second
                 refreshCharts($ref);
@@ -230,19 +241,25 @@ done >"${tmp}"
 for x in `cat "${tmp}" | sort`
 do
 	n="`echo "$x" | cut -d '.' -f 2-`"
-	cat >>all.html <<EOF4
+	cat >>${data}/index.html <<EOF4
 	<div id="${n}_div"></div>
 EOF4
 done
 rm -f "${tmp}"
 
-cat >>all.html <<EOF5
+cat >>${data}/index.html <<EOF5
  </body>
 </html>
 EOF5
 
-set|grep ^NETDATA_ >all.config
+set|grep ^NETDATA_ >netdata.conf
+
+if [ ! -h "${data}/data" ]
+then
+	cd "${data}"
+	ln -s . data
+fi
 
 echo "All Done."
-echo "Just hit all.html from your browser."
+echo "Just hit netdata/ from your browser."
 
