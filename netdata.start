@@ -76,6 +76,11 @@ else
 	echo >&2 "Directory $base/data already exists. Not touching it, however it should be a link '${data}'."
 fi
 
+if [ -f all.config ]
+then
+	source all.config
+fi
+
 echo "Finding proper parameters for dashboard..."
 
 # count all JSON files
@@ -83,7 +88,12 @@ all=`ls "${data}" | grep .json$ | sed "s/\.json$//g"`
 count=0
 for x in $all
 do
-	count=$[count + 1]
+	y=`echo "$x" | tr "-" "_"`
+	eval "t=\${NETDATA_PRIORITY_${y}}"
+	if [ ! "$t" = "IGNORE" ]
+	then
+		count=$[count + 1]
+	fi
 done
 
 # find the optimal graphs per page
@@ -150,11 +160,6 @@ cat >all.html <<EOF
 		// EDIT:   name    div id                    json data           graph title
 		// EDIT: --------------------------------------------------------------------------------
 EOF
-
-if [ -f all.config ]
-then
-	source all.config
-fi
 
 for x in $all
 do
