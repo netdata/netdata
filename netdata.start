@@ -11,6 +11,7 @@ fi
 cd "$base" || exit 1
 
 NETDATA_UPDATE_EVERY=1
+NETDATA_HISTORY_POINTS=60
 if [ -f all.config ]
 then
 	source all.config
@@ -63,7 +64,7 @@ echo "Compiling netdata"
 gcc -O3 -o netdata netdata.c || exit 1
 
 echo "Starting netdata"
-./netdata -d -u $NETDATA_UPDATE_EVERY -l $[60*NETDATA_UPDATE_EVERY] -o "${data}" || exit 1
+./netdata -d -u $NETDATA_UPDATE_EVERY -l $NETDATA_HISTORY_POINTS -o "${data}" || exit 1
 
 echo "Waiting 2 seconds for the JSON files"
 # wait 2 seconds for the JSON files to be generated
