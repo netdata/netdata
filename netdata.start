@@ -10,10 +10,13 @@ fi
 cd "$base" || exit 1
 
 # every how many seconds to update the JSON files
-NETDATA_CONFIG_UPDATE_EVERY=1
+NETDATA_CONFIG_UPDATE_EVERY=2
 
 # how many points should the graphs have
-NETDATA_CONFIG_HISTORY_POINTS=60
+NETDATA_CONFIG_HISTORY_POINTS=120
+
+# how many points should be kept in memory
+NETDATA_CONFIG_HISTORY_DATA=3600
 
 # every how many graph refreshes, the page should be reloaded
 # this fixes a bug in the google graphs API which leaks memory
@@ -48,36 +51,9 @@ done
 
 if [ -z "${data}" ]
 then
-	echo >&2 "Cannot find where to put JSON files."
+	echo >&2 "Cannot find where to put netdata files."
 	exit 1
 fi
-
-cat <<EOFHTACCESS >"${data}/.htaccess"
-
-ExpiresActive on
-ExpiresDefault A0
-ExpiresByType application/json A0
-
-Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
-Header set Pragma "no-cache"
-
-EOFHTACCESS
-
-echo "Stopping a (possibly) running netdata..."
-killall netdata 2>/dev/null
-
-sleep 1
-rm "${data}"/*.json
-
-echo "Compiling netdata"
-gcc -O3 -o netdata netdata.c || exit 1
-
-echo "Starting netdata"
-./netdata -d -u $NETDATA_CONFIG_UPDATE_EVERY -l $NETDATA_CONFIG_HISTORY_POINTS -o "${data}" || exit 1
-
-echo "Waiting 2 seconds for the JSON files"
-# wait 2 seconds for the JSON files to be generated
-sleep 2
 
 if [ -h data ]
 then
@@ -95,12 +71,26 @@ fi
 
 echo "Finding proper parameters for dashboard..."
 
+echo "Stopping a (possibly) running netdata..."
+killall netdata 2>/dev/null
+
+echo "Compiling netdata"
+gcc -Wall -O3 -o netdata netdata.c -lpthread || exit 1
+
+echo "Starting netdata"
+p=`pwd`
+cd data
+$p/netdata -d -u $NETDATA_CONFIG_UPDATE_EVERY -l $NETDATA_CONFIG_HISTORY_DATA || exit 1
+cd "$p"
+
+sleep 1
+
 # count all JSON files
-all=`ls "${data}" | grep .json$ | sed "s/\.json$//g"`
+all=`wget http://127.0.0.1:19999/list -O - 2>/dev/null`
 count=0
 for x in $all
 do
-	y=`echo "$x" | tr "-" "_"`
+	y=`echo "$x" | tr ".-" "__"`
 	eval "t=\${NETDATA_PRIORITY_${y}}"
 	if [ ! "$t" = "IGNORE" ]
 	then
@@ -177,7 +167,7 @@ EOF
 
 for x in $all
 do
-	y=`echo "$x" | tr "-" "_"`
+	y=`echo "$x" | tr ".-" "__"`
 	eval "NETDATA_TITLE_${y}=\${NETDATA_TITLE_${y}:-Live Network Usage for ${x}}"
 	eval "t=\${NETDATA_TITLE_${y}}"
 	
@@ -185,7 +175,7 @@ do
 	if [ ! "$p" = "IGNORE" ]
 	then
 		cat >>${data}/index.html <<EOF2
-		drawChart('${x}', '${x}_div', width, height, "data/${x}.json", "${t}");
+		drawChart('${x}', '${y}_div', width, height, "data/${x}/${NETDATA_CONFIG_HISTORY_POINTS}", "${t}");
 EOF2
 	fi
 done
@@ -196,9 +186,9 @@ if [ $count -gt 4 ]
 then
 	ref=1
 	tim=$[1000 * NETDATA_CONFIG_UPDATE_EVERY / count]
-	if [ $tim -lt $[100 * NETDATA_CONFIG_UPDATE_EVERY] ]
+	if [ $tim -lt $[333 * NETDATA_CONFIG_UPDATE_EVERY] ]
 	then
-		tim=$[100 * NETDATA_CONFIG_UPDATE_EVERY]
+		tim=$[333 * NETDATA_CONFIG_UPDATE_EVERY]
 	fi
 fi
 
@@ -229,18 +219,18 @@ EOF3
 tmp="/tmp/$RANDOM.netdata.$$.$RANDOM"
 for x in $all
 do
-	y=`echo "$x" | tr "-" "_"`
+	y=`echo "$x" | tr ".-" "__"`
 	eval "NETDATA_PRIORITY_${y}=\${NETDATA_PRIORITY_${y}:-${x}}"
 	eval "t=\${NETDATA_PRIORITY_${y}}"
 	if [ ! "$t" = "IGNORE" ]
 	then
-		echo "${t}.${x}"
+		echo "${t}|${y}"
 	fi
 done >"${tmp}"
 
 for x in `cat "${tmp}" | sort`
 do
-	n="`echo "$x" | cut -d '.' -f 2-`"
+	n="`echo "$x" | cut -d '|' -f 2-`"
 	cat >>${data}/index.html <<EOF4
 	<div id="${n}_div"></div>
 EOF4
@@ -261,5 +251,5 @@ then
 fi
 
 echo "All Done."
-echo "Just hit netdata/ from your browser."
+echo "Just hit http://127.0.0.1:19999/ from your browser."
 
