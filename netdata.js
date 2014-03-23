@@ -7,17 +7,17 @@
 	function refreshChart(index) {
 		if(index >= charts.length) return;
 		
-		var jsonData = $.ajax({
+		charts[index].jsondata = $.ajax({
 			url: charts[index].url,
 			dataType:"json",
 			async: false,
 			cache: false
 		}).responseText;
 		
-		if(!jsonData || jsonData.length == 0) return;
+		if(!charts[index].jsondata || charts[index].jsondata.length == 0) return;
 		
 		// Create our data table out of JSON data loaded from server.
-		charts[index].data = new google.visualization.DataTable(jsonData);
+		charts[index].datatable = new google.visualization.DataTable(charts[index].jsondata);
 		
 		// Instantiate and draw our chart, passing in some options.
 		if(!charts[index].chart) {
@@ -40,7 +40,16 @@
 		if(height >= 200) hAxisTitle = "Time of Day";
 		if(width >= 400) vAxisTitle = charts[index].vtitle;
 		
-		if(charts[index].chart) charts[index].chart.draw(charts[index].data, {width: width, height: height, title: charts[index].title, hAxis: {title: hAxisTitle}, vAxis: {title: vAxisTitle, minValue: 10}});
+		var options = {
+			width: width,
+			height: height,
+			title: charts[index].title,
+			hAxis: {title: hAxisTitle},
+			vAxis: {title: vAxisTitle, minValue: 10},
+			// animation: {duration: 1000, easing: 'inAndOut'},
+		};
+
+		if(charts[index].chart) charts[index].chart.draw(charts[index].datatable, options);
 		else console.log('Cannot create chart for ' + charts[index].url);
 	}
 	
@@ -55,7 +64,8 @@
 			console.log('Creating new objects for chart ' + name);
 			charts[i] = [];
 			charts[i].chart = null;
-			charts[i].data = null;
+			charts[i].jsondata = null;
+			charts[i].datatable = null;
 			charts[i].name = name;
 			charts[i].div = div;
 			charts[i].width = width;
@@ -73,7 +83,7 @@
 		}
 	}
 	
-	var charts_last_drawn = 99;
+	var charts_last_drawn = 999999999;
 	function refreshCharts(howmany) {
 		
 		if(charts.length == 0) return;
@@ -93,7 +103,7 @@
 				refreshChart(charts_last_drawn);
 			}
 			catch(err) {
-				console.log('Cannot refresh chart for ' + jsonurl);
+				console.log('Cannot refresh chart for ' + charts[charts_last_drawn].url);
 			}
 		}
 		return 0;

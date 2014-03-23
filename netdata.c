@@ -499,7 +499,7 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 		group_values[c] = group_counts[c] = 0;
 
 	i += sprintf(&b[i], "{\n	\"cols\":\n	[\n");
-	i += sprintf(&b[i], "		{\"id\":\"\",\"label\":\"time\",\"pattern\":\"\",\"type\":\"timeofday\"},\n");
+	i += sprintf(&b[i], "		{\"id\":\"\",\"label\":\"time\",\"pattern\":\"\",\"type\":\"datetime\"},\n");
 
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
 		i += sprintf(&b[i], "		{\"id\":\"\",\"label\":\"%s\",\"pattern\":\"\",\"type\":\"number\"}%s\n", rd->name, rd->next?",":"");
@@ -548,8 +548,8 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 			struct tm *tm = localtime(&st->times[t].tv_sec);
 			if(!tm) { error("localtime() failed."); continue; }
 
-			// strftime(dtm, 200, "[%Y, %m, %d, %H, %M, %S, 0]", tm); // datetime
-			strftime(dtm, 200, "[%H, %M, %S, 0]", tm); // timeofday
+			strftime(dtm, 200, "\"Date(%Y, %m, %d, %H, %M, %S)\"", tm); // datetime
+			// strftime(dtm, 200, "[%H, %M, %S, 0]", tm); // timeofday
  			i += sprintf(&b[i], "%s		{\"c\":[{\"v\":%s},", printed?"]},\n":"", dtm);
 
  			printed++;
