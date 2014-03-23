@@ -15,14 +15,34 @@ Example server with 20 interfaces:
 # How it works
 
 1. You run a daemon on your linux: netdata.
-This deamon is written in C and is extremely lightweight.
-What it does is that it reads /proc/net/dev and for every interface present there, it creates a JSON data file.
-This JSON file contains all the data needed for the web graphs.
-Since these files are created too often (e.g. once per second) it is adviced to put them on tmpfs.
-The files have a fixed length, around just 3k for 60 seconds of graphs.
+ This deamon is written in C and is extremely lightweight.
+ 
+ netdata:
+
+  - reads /proc/net/dev and for every interface present there it keeps in its memory a short history of its received and sent bytes.
+  - generates JSON HTTP responses containing all the data needed for the web graphs.
+  - is a web server. You can access JSON data by using:
+ 
+ ```
+ http://127.0.0.1:19999/data/net.eth0
+ ```
+ 
+ This will give you the JSON file for traffic on eth0.
+ The above is equivalent to:
+ 
+ ```
+ http://127.0.0.1:19999/data/net.eth0/3600/1/average
+ ```
+ 
+ where:
+
+  - 3600 is the number of entries to generate (3600 is a default which can be overwritten by -l).
+  - 1 is grouping count, 1 = every single entry, 2 = half the entries, 3 = one every 3 entries, etc
+  - `average` is the grouping method. It can also be `max`.
+
 
 2. On your web page, you add a few javascript lines and a DIV for every graph you need.
-Your browser will hit the web server to fetch the JSON data and refresh the graphs.
+ Your browser will hit the web server to fetch the JSON data and refresh the graphs.
 
 3. Graphs are generated using Google Charts API.
 
@@ -41,48 +61,51 @@ Your browser will hit the web server to fetch the JSON data and refresh the grap
 ```
 
 For this to work, you need to have persmission to create a directory in /run or /var/run or /tmp.
-If you run into problems, try to become root to verify it works.
+If you run into problems, try to become root to verify it works. Please, do not run netdata are root permanently.
+Since netdata is a web server, the right thing to do, is to have a special user for it.
 
 Once you run it, the file netdata.conf will be created. You can edit this file to set options for each graph.
 To apply the changes you made, you have to run netdata.start again.
 
-The directory /run/netdata (or /var/run/netdata, or /tmp/netdata depending on your distro) is ready to be
-served by a web server (it contains all files needed). Just link it to your htdocs and access it from your web browser.
+To access the panel for all graphs, go to:
+
+ ```
+ http://127.0.0.1:19999/
+ ```
+
+
 
 ---
 
 ## Installation by hand
 
-### download everything in a directory inside your web docs.
-You don't need apache. Any web server able to provide static files will do the job fine.
-
 ### Compile netdata
 step into the directory you downloaded everything and compile netdata
 
 ```sh
-gcc -O3 -o netdata netdata.c
+gcc -Wall -O3 -o netdata netdata.c -lpthread
 ```
 
 ### run netdata
-Run netdata and instruct it to create json files in the current directory.
+Run netdata:
 
 ```sh
-./netdata -d -l 60 -u 1 -o "`pwd`"
+./netdata -d -l 60 -u 1 -p 19999
 ```
  - -d says to go daemon mode
- - -l 60 says to show 60 seconds of history
- - -u 1 says to create json files every second
- - -o sets the save path for the json files
-
-You should now have one .json file per interface you have active, in the current directory.
-All these files are updated once per second.
+ - -l 60 says to keep 60 history entries
+ - -u 1 says to add a new history entry every second
+ - -p 19999 is the port to listen for web clients
 
 ### edit index.html
 Set in index.html the interfaces you would like to monitor on the web page.
 
 ** REMEMBER: there are 2 sections in index.html to edit. A javascript section and an HTML section. **
 
+### open a web browser
 
-### hit index.html from a web browser
-Enjoy real time monitor web graphs for your interfaces.
+ ```
+ http://127.0.0.1:19999/
+ ```
+
 
