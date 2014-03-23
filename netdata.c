@@ -76,6 +76,10 @@
 #define MAX_PROC_NET_DEV_LINE 4096
 #define MAX_PROC_NET_DEV_IFACE_NAME 1024
 
+#define MAX_PROC_DISKSTATS_LINE 4096
+#define MAX_PROC_DISKSTATS_DISK_NAME 1024
+
+
 int silent = 0;
 int save_history = HISTORY;
 int update_every = UPDATE_EVERY;
@@ -293,6 +297,8 @@ struct rrd_dimension {
 typedef struct rrd_dimension RRD_DIMENSION;
 
 struct rrd_stats {
+	pthread_mutex_t mutex;
+
 	char name[RRD_STATS_NAME_MAX + 1];
 
 	size_t entries;
@@ -305,6 +311,7 @@ struct rrd_stats {
 typedef struct rrd_stats RRD_STATS;
 
 RRD_STATS *root = NULL;
+pthread_mutex_t root_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 RRD_STATS *rrd_stats_create(const char *name, unsigned long entries)
 {
@@ -327,10 +334,17 @@ RRD_STATS *rrd_stats_create(const char *name, unsigned long entries)
 
 	st->entries = entries;
 	st->last_entry = 0;
-
 	st->dimensions = NULL;
+
+	pthread_mutex_init(&st->mutex, NULL);
+	pthread_mutex_lock(&st->mutex);
+	pthread_mutex_lock(&root_mutex);
+
 	st->next = root;
 	root = st;
+
+	pthread_mutex_unlock(&root_mutex);
+	// leave st->mutex locked
 
 	return(st);
 }
@@ -366,12 +380,15 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *name, size_t b
 
 RRD_STATS *rrd_stats_find(const char *name)
 {
+	pthread_mutex_lock(&root_mutex);
+
 	RRD_STATS *st = root;
 
 	for ( ; st ; st = st->next ) {
 		if(strcmp(st->name, name) == 0) break;
 	}
 
+	pthread_mutex_unlock(&root_mutex);
 	return(st);
 }
 
@@ -390,12 +407,21 @@ void rrd_stats_next(RRD_STATS *st)
 {
 	struct timeval *now;
 
+	pthread_mutex_lock(&st->mutex);
+
 	// st->last_entry should never be outside the array
 	// or, the parallel threads may end up crashing
 	st->last_entry = ((st->last_entry + 1) >= st->entries) ? 0 : st->last_entry + 1;
 
 	now = &st->times[st->last_entry];
 	gettimeofday(now, NULL);
+
+	// leave mutex locked
+}
+
+void rrd_stats_done(RRD_STATS *st)
+{
+	pthread_mutex_unlock(&st->mutex);
 }
 
 void rrd_stats_dimension_set(RRD_STATS *st, const char *dimension, void *data)
@@ -434,6 +460,8 @@ void rrd_stats_dimension_set(RRD_STATS *st, const char *dimension, void *data)
 
 size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_show, size_t group_count, int group_method)
 {
+	pthread_mutex_lock(&st->mutex);
+
 	// check the options
 	if(entries_to_show <= 0) entries_to_show = 1;
 	if(group_count <= 0) group_count = 1;
@@ -459,8 +487,10 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 	for( rd = st->dimensions ; rd ; rd = rd->next)
 		dimensions++;
 
-	if(!dimensions)
+	if(!dimensions) {
+		pthread_mutex_unlock(&st->mutex);
 		return sprintf(b, "No dimensions yet.");
+	}
 
 	// temporary storage to keep track of group values and counts
 	long long group_values[dimensions];
@@ -518,7 +548,8 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 			struct tm *tm = localtime(&st->times[t].tv_sec);
 			if(!tm) { error("localtime() failed."); continue; }
 
-			strftime(dtm, 200, "[%H, %M, %S, 0]", tm);
+			// strftime(dtm, 200, "[%Y, %m, %d, %H, %M, %S, 0]", tm); // datetime
+			strftime(dtm, 200, "[%H, %M, %S, 0]", tm); // timeofday
  			i += sprintf(&b[i], "%s		{\"c\":[{\"v\":%s},", printed?"]},\n":"", dtm);
 
  			printed++;
@@ -567,6 +598,7 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 	if(printed) i += sprintf(&b[i], "]}");
  	i += sprintf(&b[i], "\n	]\n}\n");
 
+	pthread_mutex_unlock(&st->mutex);
  	return(i);
 }
 
@@ -1307,35 +1339,9 @@ void *socket_listen_main(void *ptr)
 // ----------------------------------------------------------------------------
 // /proc/net/dev processor
 
-void update_iface_history(char *name, unsigned long long rbytes, unsigned long long tbytes) {
-
-	RRD_STATS *st = rrd_stats_find(name);
-	if(!st) {
-		st = rrd_stats_create(name, save_history);
-		if(!st) {
-			error("Cannot create RRD_STATS for interface %s.", name);
-			return;
-		}
-
-		if(!rrd_stats_dimension_add(st, "received", sizeof(unsigned long long), 8, 1024)) {
-			error("Cannot add RRD_STATS dimension %s.", "received");
-			return;
-		}
-
-		if(!rrd_stats_dimension_add(st, "sent", sizeof(unsigned long long), 8, 1024)) {
-			error("Cannot add RRD_STATS dimension %s.", "sent");
-			return;
-		}
-	}
-
-	rrd_stats_next(st);
-	rrd_stats_dimension_set(st, "received", &rbytes);
-	rrd_stats_dimension_set(st, "sent", &tbytes);
-}
-
 int do_proc_net_dev() {
 	char buffer[MAX_PROC_NET_DEV_LINE+1] = "";
-	char iface[MAX_PROC_NET_DEV_IFACE_NAME + 1] = "net.";
+	char name[MAX_PROC_NET_DEV_IFACE_NAME + 1] = "net.";
 	unsigned long long rbytes, rpackets, rerrors, rdrops, rfifo, rframe, rcompressed, rmulticast;
 	unsigned long long tbytes, tpackets, terrors, tdrops, tfifo, tcollisions, tcarrier, tcompressed;
 	
@@ -1363,19 +1369,139 @@ int do_proc_net_dev() {
 		
 		// if(DEBUG) printf("%s\n", buffer);
 		r = sscanf(buffer, "%s\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\n",
-			&iface[4],
+			&name[4],
 			&rbytes, &rpackets, &rerrors, &rdrops, &rfifo, &rframe, &rcompressed, &rmulticast,
 			&tbytes, &tpackets, &terrors, &tdrops, &tfifo, &tcollisions, &tcarrier, &tcompressed);
 		if(r == EOF) break;
 		if(r != 17) error("Cannot read /proc/net/dev line. Expected 17 params, read %d.", r);
-		else update_iface_history(iface, rbytes, tbytes);
+		else {
+			RRD_STATS *st = rrd_stats_find(name);
+
+			if(!st) {
+				st = rrd_stats_create(name, save_history);
+				if(!st) {
+					error("Cannot create RRD_STATS for interface %s.", name);
+					continue;
+				}
+
+				if(!rrd_stats_dimension_add(st, "sent", sizeof(unsigned long long), 8, 1024))
+					error("Cannot add RRD_STATS dimension %s.", "sent");
+
+				if(!rrd_stats_dimension_add(st, "received", sizeof(unsigned long long), 8, 1024))
+					error("Cannot add RRD_STATS dimension %s.", "received");
+
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "received", &rbytes);
+			rrd_stats_dimension_set(st, "sent", &tbytes);
+			rrd_stats_done(st);
+		}
 	}
 	
 	fclose(fp);
 	return 0;
 }
 
-void *proc_net_dev_main(void *ptr)
+int do_proc_diskstats() {
+	char buffer[MAX_PROC_DISKSTATS_LINE+1] = "";
+	char name[MAX_PROC_DISKSTATS_DISK_NAME + 1] = "disk.";
+	//                               1      2             3            4       5       6              7             8        9           10     11
+	unsigned long long major, minor, reads, reads_merged, readsectors, readms, writes, writes_merged, writesectors, writems, currentios, iosms, wiosms;
+	
+	int r;
+	char *p;
+	
+	FILE *fp = fopen("/proc/diskstats", "r");
+	if(!fp) {
+		error("Cannot read /proc/diskstats.");
+		return 1;
+	}
+	
+	for(;1;) {
+		p = fgets(buffer, MAX_PROC_DISKSTATS_LINE, fp);
+		if(!p) break;
+		
+		// if(DEBUG) printf("%s\n", buffer);
+		r = sscanf(buffer, "%llu %llu %s %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu\n",
+			&major, &minor, &name[5],
+			&reads, &reads_merged, &readsectors, &readms, &writes, &writes_merged, &writesectors, &writems, &currentios, &iosms, &wiosms
+		);
+		if(r == EOF) break;
+		if(r != 14) error("Cannot read /proc/diskstats line. Expected 14 params, read %d.", r);
+		else {
+			switch(major) {
+				case 1: // ram drives
+					continue;
+
+				case 7: // loops
+					continue;
+
+				case 8: // disks
+					if(minor % 16) continue; // partitions
+					break;
+
+				case 9: // MDs
+					break;
+
+				case 11: // CDs
+					continue;
+
+				default:
+					continue;
+			}
+
+			RRD_STATS *st = rrd_stats_find(name);
+
+			if(!st) {
+				char ssfilename[FILENAME_MAX + 1];
+				int sector_size = 512;
+
+				sprintf(ssfilename, "/sys/block/%s/queue/hw_sector_size", &name[5]);
+				FILE *fpss = fopen(ssfilename, "r");
+				if(fpss) {
+					char ssbuffer[1025];
+					char *tmp = fgets(ssbuffer, 1024, fpss);
+
+					if(tmp) {
+						sector_size = atoi(tmp);
+						if(sector_size <= 0) {
+							error("Invalid sector size %d for device %s in %s. Assuming 512.", sector_size, name, ssfilename);
+							sector_size = 512;
+						}
+					}
+					else error("Cannot read data for sector size for device %s from %s. Assuming 512.", name, ssfilename);
+
+					fclose(fpss);
+				}
+				else error("Cannot read sector size for device %s from %s. Assuming 512.", name, ssfilename);
+
+				st = rrd_stats_create(name, save_history);
+				if(!st) {
+					error("Cannot create RRD_STATS for disk %s.", name);
+					continue;
+				}
+
+				if(!rrd_stats_dimension_add(st, "reads", sizeof(unsigned long long), sector_size, 1024))
+					error("Cannot add RRD_STATS dimension %s.", "reads");
+
+				if(!rrd_stats_dimension_add(st, "writes", sizeof(unsigned long long), sector_size, 1024))
+					error("Cannot add RRD_STATS dimension %s.", "writes");
+
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "reads", &readsectors);
+			rrd_stats_dimension_set(st, "writes", &writesectors);
+			rrd_stats_done(st);
+		}
+	}
+	
+	fclose(fp);
+	return 0;
+}
+
+void *proc_main(void *ptr)
 {
 	struct timeval last, now, tmp;
 
@@ -1391,6 +1517,7 @@ void *proc_net_dev_main(void *ptr)
 		debug(D_PROCNETDEV_LOOP, "PROCNETDEV: Last loop took %llu usec.", usec);
 		
 		do_proc_net_dev(usec);
+		do_proc_diskstats(usec);
 		
 		// find the time to sleep in order to wait exactly update_every seconds
 		gettimeofday(&tmp, NULL);
@@ -1481,20 +1608,20 @@ int main(int argc, char **argv)
 		silent = 1;
 	}
 
-	pthread_t p_proc_net_dev;
-	int r_proc_net_dev;
+	pthread_t p_proc;
+	int r_proc;
 
 	// spawn a child to collect data
-	r_proc_net_dev  = pthread_create(&p_proc_net_dev, NULL, proc_net_dev_main, NULL);
+	r_proc  = pthread_create(&p_proc, NULL, proc_main, NULL);
 
 	// the main process - the web server listener
 	//sleep(1);
 	socket_listen_main(NULL);
 
 	// wait for the childs to finish
-	pthread_join(p_proc_net_dev,  NULL);
+	pthread_join(p_proc,  NULL);
 
-	printf("PROC NET DEV  thread returns: %d\n", r_proc_net_dev);
+	printf("PROC NET DEV  thread returns: %d\n", r_proc);
 
 	exit(0);
 }

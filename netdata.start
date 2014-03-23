@@ -167,21 +167,37 @@ cat >${data}/index.html <<EOF
 		
 		// EDIT: add one line per interface you have
 		// EDIT: 
-		// EDIT:   name    div id                    json data           graph title
-		// EDIT: --------------------------------------------------------------------------------
+		// EDIT:   name    div id                    json data           graph 					vertical axis title
+		// EDIT: --------------------------------------------------------------------------------------------------
 EOF
 
 for x in $all
 do
 	y=`echo "$x" | tr ".-" "__"`
-	eval "NETDATA_TITLE_${y}=\${NETDATA_TITLE_${y}:-Live Network Usage for ${x}}"
+
+	title=
+	vtitle=
+	case "$x" in
+		net.*)
+			title="Live Network Usage for "
+			vtitle="bandwidth in kilobits/s"
+			;;
+
+		disk.*)
+			title="Live Disk I/O for "
+			vtitle="I/O in kilobytes/s"
+			;;
+
+	esac
+
+	eval "NETDATA_TITLE_${y}=\${NETDATA_TITLE_${y}:-${x}}"
 	eval "t=\${NETDATA_TITLE_${y}}"
 	
 	eval "p=\${NETDATA_PRIORITY_${y}}"
 	if [ ! "$p" = "IGNORE" ]
 	then
 		cat >>${data}/index.html <<EOF2
-		drawChart('${x}', '${y}_div', width, height, "data/${x}/${NETDATA_CONFIG_HISTORY_POINTS}/${NETDATA_CONFIG_UPDATE_EVERY}/average/", "${t}");
+		drawChart('${x}', '${y}_div', width, height, "data/${x}/${NETDATA_CONFIG_HISTORY_POINTS}/${NETDATA_CONFIG_UPDATE_EVERY}/average/", "${title}${t} (${x})", "${vtitle}");
 EOF2
 	fi
 done
@@ -192,9 +208,9 @@ if [ $count -gt 4 ]
 then
 	ref=1
 	tim=$[1000 * NETDATA_CONFIG_UPDATE_EVERY / count]
-	if [ $tim -lt $[333 * NETDATA_CONFIG_UPDATE_EVERY] ]
+	if [ $tim -lt $[200 * NETDATA_CONFIG_UPDATE_EVERY] ]
 	then
-		tim=$[333 * NETDATA_CONFIG_UPDATE_EVERY]
+		tim=$[200 * NETDATA_CONFIG_UPDATE_EVERY]
 	fi
 fi
 
@@ -202,18 +218,22 @@ cat >>${data}/index.html <<EOF3
 	}
 	
 	var refreshCount = 0;
-        function myChartsRefresh() {
+	function myChartsRefresh() {
 		refreshCount++;
 		if(refreshCount > $NETDATA_CONFIG_RELOAD_EVERY) location.reload();
-		
+
 		// refresh up to $ref charts per second
-                refreshCharts($ref);
-        }
+		refreshCharts($ref);
+	}
 	
-        // EDIT: how often the charts are updated, in milliseconds
-        setInterval(myChartsRefresh, $tim);
+	setInterval(myChartsRefresh, $tim);
+
+	window.onresize = function(event) {
+		refreshCharts(999999);
+	};
 	</script>
-</head>
+
+	</head>
 
 <body>
  	<!--
