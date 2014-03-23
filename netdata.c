@@ -59,6 +59,7 @@
 
 // configuration
 #define DEBUG (D_WEB_CLIENT_ACCESS|D_LISTENER|D_RRD_STATS)
+//#define DEBUG 0xffffffff
 //#define DEBUG (0)
 
 #define EXIT_FAILURE 1
@@ -311,7 +312,7 @@ RRD_STATS *rrd_stats_create(const char *name, unsigned long entries)
 
 	debug(D_RRD_STATS, "Creating RRD_STATS for '%s'.", name);
 
-	st = malloc(sizeof(RRD_STATS));
+	st = calloc(sizeof(RRD_STATS), 1);
 	if(!st) return NULL;
 
 	st->times = calloc(entries, sizeof(struct timeval));
@@ -325,7 +326,7 @@ RRD_STATS *rrd_stats_create(const char *name, unsigned long entries)
 	st->name[RRD_STATS_NAME_MAX] = '\0';
 
 	st->entries = entries;
-	st->last_entry = entries;
+	st->last_entry = 0;
 
 	st->dimensions = NULL;
 	st->next = root;
@@ -340,7 +341,7 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *name, size_t b
 
 	debug(D_RRD_STATS, "Adding dimension '%s' to RRD_STATS '%s'.", name, st->name);
 
-	rd = malloc(sizeof(RRD_DIMENSION));
+	rd = calloc(sizeof(RRD_DIMENSION), 1);
 	if(!rd) return NULL;
 
 	rd->bytes = bytes;
@@ -389,8 +390,9 @@ void rrd_stats_next(RRD_STATS *st)
 {
 	struct timeval *now;
 
-	st->last_entry++;
-	if(st->last_entry >= st->entries) st->last_entry = 0;
+	// st->last_entry should never be outside the array
+	// or, the parallel threads may end up crashing
+	st->last_entry = ((st->last_entry + 1) >= st->entries) ? 0 : st->last_entry + 1;
 
 	now = &st->times[st->last_entry];
 	gettimeofday(now, NULL);
@@ -450,7 +452,7 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 	// keep track of group values and counts
 	long long group_values[dimensions];
 	long long group_counts[dimensions];
-	for( rd = st->dimensions, c = 0 ; rd ; rd = rd->next, c++)
+	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
 		group_values[c] = group_counts[c] = 0;
 
 	i += sprintf(&b[i], "{\n	\"cols\":\n	[\n");
@@ -502,11 +504,7 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
  			printed++;
  		}
 
-		for( rd = st->dimensions, c = 0 ; rd ; rd = rd->next, c++) {
-			// check if new dimensions have been added since we started
-			if(c >= dimensions)
-				return sprintf(b, "New dimensions added while we were working on them. Try again later.");
-
+		for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 			if(rd->bytes == sizeof(unsigned long long)) {
 				long long *dimension = rd->values;
 				value = (dimension[t] - dimension[lt]) * 1000000 * rd->multiplier / usec / rd->divisor;
@@ -841,21 +839,24 @@ void web_client_process(struct web_client *w)
 				int group_method = GROUP_AVERAGE;
 
 				if(url) {
+					// parse the lines required
 					tok = mystrsep(&url, "/?");
 					if(tok) lines = atoi(tok);
 					if(lines < 5) lines = save_history;
 				}
 				if(url) {
+					// parse the group count required
 					tok = mystrsep(&url, "/?");
 					if(tok) group_count = atoi(tok);
 					if(group_count < 1) group_count = 1;
 					if(group_count > save_history / 20) group_count = save_history / 20;
 				}
 				if(url) {
+					// parse the grouping method required
 					tok = mystrsep(&url, "/?");
 					if(strcmp(tok, "max") == 0) group_method = GROUP_MAX;
 					else if(strcmp(tok, "average") == 0) group_method = GROUP_AVERAGE;
-					else debug(D_WEB_CLIENT, "%llu: Unknown group method '%s'", tok);
+					else debug(D_WEB_CLIENT, "%llu: Unknown group method '%s'", w->id, tok);
 				}
 
 				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (%d lines, %d group_count, %d group_method).", w->id, st->name, lines, group_count, group_method);
@@ -1462,6 +1463,7 @@ int main(int argc, char **argv)
 	r_proc_net_dev  = pthread_create(&p_proc_net_dev, NULL, proc_net_dev_main, NULL);
 
 	// the main process - the web server listener
+	//sleep(1);
 	socket_listen_main(NULL);
 
 	// wait for the childs to finish
