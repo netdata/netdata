@@ -25,16 +25,16 @@
 		// EDIT: 
 		// EDIT:   name    div id                    json data           graph 					vertical axis title
 		// EDIT: --------------------------------------------------------------------------------------------------
-		drawChart('disk.sde', 'disk_sde_div', width, height, "data/disk.sde/120/2/average/", "Live Disk I/O for USB HD (disk.sde)", "I/O in kilobytes/s");
-		drawChart('disk.md125', 'disk_md125_div', width, height, "data/disk.md125/120/2/average/", "Live Disk I/O for rootfs (disk.md125)", "I/O in kilobytes/s");
-		drawChart('disk.md126', 'disk_md126_div', width, height, "data/disk.md126/120/2/average/", "Live Disk I/O for swap (disk.md126)", "I/O in kilobytes/s");
-		drawChart('disk.md127', 'disk_md127_div', width, height, "data/disk.md127/120/2/average/", "Live Disk I/O for /data (disk.md127)", "I/O in kilobytes/s");
-		drawChart('net.dsl0', 'net_dsl0_div', width, height, "data/net.dsl0/120/2/average/", "Live Network Usage for ADSL (net.dsl0)", "bandwidth in kilobits/s");
-		drawChart('net.eth3', 'net_eth3_div', width, height, "data/net.eth3/120/2/average/", "Live Network Usage for AWMN (net.eth3)", "bandwidth in kilobits/s");
-		drawChart('net.eth0', 'net_eth0_div', width, height, "data/net.eth0/120/2/average/", "Live Network Usage for LAN (net.eth0)", "bandwidth in kilobits/s");
-		drawChart('net.exohiko', 'net_exohiko_div', width, height, "data/net.exohiko/120/2/average/", "Live Network Usage for Exohiko (net.exohiko)", "bandwidth in kilobits/s");
-		drawChart('net.tun2', 'net_tun2_div', width, height, "data/net.tun2/120/2/average/", "Live Network Usage for Gregory (net.tun2)", "bandwidth in kilobits/s");
-		drawChart('net.tun0', 'net_tun0_div', width, height, "data/net.tun0/120/2/average/", "Live Network Usage for Realize (net.tun0)", "bandwidth in kilobits/s");
+		drawChart('disk.sde', 'disk_sde_div', width, height, "data/disk.sde/120/2/average/", "Disk I/O for USB HD (disk.sde)", "I/O in kilobytes/s");
+		drawChart('disk.md125', 'disk_md125_div', width, height, "data/disk.md125/120/2/average/", "Disk I/O for rootfs (disk.md125)", "I/O in kilobytes/s");
+		drawChart('disk.md126', 'disk_md126_div', width, height, "data/disk.md126/120/2/average/", "Disk I/O for swap (disk.md126)", "I/O in kilobytes/s");
+		drawChart('disk.md127', 'disk_md127_div', width, height, "data/disk.md127/120/2/average/", "Disk I/O for /data (disk.md127)", "I/O in kilobytes/s");
+		drawChart('net.dsl0', 'net_dsl0_div', width, height, "data/net.dsl0/120/2/average/", "Network Usage for ADSL (net.dsl0)", "bandwidth in kilobits/s");
+		drawChart('net.eth3', 'net_eth3_div', width, height, "data/net.eth3/120/2/average/", "Network Usage for AWMN (net.eth3)", "bandwidth in kilobits/s");
+		drawChart('net.eth0', 'net_eth0_div', width, height, "data/net.eth0/120/2/average/", "Network Usage for LAN (net.eth0)", "bandwidth in kilobits/s");
+		drawChart('net.exohiko', 'net_exohiko_div', width, height, "data/net.exohiko/120/2/average/", "Network Usage for Exohiko (net.exohiko)", "bandwidth in kilobits/s");
+		drawChart('net.tun2', 'net_tun2_div', width, height, "data/net.tun2/120/2/average/", "Network Usage for Gregory (net.tun2)", "bandwidth in kilobits/s");
+		drawChart('net.tun0', 'net_tun0_div', width, height, "data/net.tun0/120/2/average/", "Network Usage for Realize (net.tun0)", "bandwidth in kilobits/s");
 	}
 	
 	var refreshCount = 0;
@@ -66,9 +66,9 @@
 	<div id="net_exohiko_div"></div>
 	<div id="net_tun0_div"></div>
 	<div id="net_tun2_div"></div>
+	<div id="disk_sde_div"></div>
 	<div id="disk_md125_div"></div>
 	<div id="disk_md126_div"></div>
 	<div id="disk_md127_div"></div>
-	<div id="disk_sde_div"></div>
  </body>
 </html>
