@@ -48,10 +48,10 @@
 	function drawChart(name, div, width, height, jsonurl, title, vtitle) {
 		var i;
 		
-		for(i = 0; i < charts.length; i++) //>
+		for(i = 0; i < charts.length; i++)
 			if(charts[i].name == name) break;
 		
-		if(i >= charts.length) { //>
+		if(i >= charts.length) {
 			console.log('Creating new objects for chart ' + name);
 			charts[i] = [];
 			charts[i].chart = null;
@@ -89,6 +89,7 @@
 			if(charts_last_drawn >= charts.length) charts_last_drawn = 0;
 			
 			try {
+				console.log('Refreshing chart ' + charts[charts_last_drawn].name);
 				refreshChart(charts_last_drawn);
 			}
 			catch(err) {

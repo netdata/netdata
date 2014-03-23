@@ -91,7 +91,7 @@ cd "$p"
 
 sleep 1
 
-# count all JSON files
+# count all graphs
 all=`wget http://127.0.0.1:19999/list -O - 2>/dev/null`
 count=0
 for x in $all
@@ -103,6 +103,8 @@ do
 		count=$[count + 1]
 	fi
 done
+
+echo "We have $count graphs..."
 
 # find the optimal graphs per page
 w=1
@@ -117,15 +119,23 @@ do
 		w=$[w+1]
 		h=$[h-1]
 	fi
+
 	a=$[w*h]
 done
+
+echo "Optimal size is $w x $h..."
 
 # prefer to have wider graphs
 while [ $w -ge $h ]
 do
 	w=$[w-1]
 	h=$[h+1]
+	a=$[w*h]
 done
+if [ $a -lt $count ]
+then
+	h=$[h+1]
+fi
 
 # make sure we don't display too small graphs
 if [ $w -gt 10 ]
@@ -136,6 +146,7 @@ if [ $h -gt 10 ]
 then
 	h=10
 fi
+echo "Final screen size is $w x $h..."
 
 cp "${base}/netdata.js" "${data}/"
 
@@ -179,12 +190,12 @@ do
 	vtitle=
 	case "$x" in
 		net.*)
-			title="Live Network Usage for "
+			title="Network Usage for "
 			vtitle="bandwidth in kilobits/s"
 			;;
 
 		disk.*)
-			title="Live Disk I/O for "
+			title="Disk I/O for "
 			vtitle="I/O in kilobytes/s"
 			;;
 
