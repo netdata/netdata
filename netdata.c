@@ -726,6 +726,12 @@ int mysendfile(struct web_client *w, char *filename)
 {
 	debug(D_WEB_CLIENT, "%llu: Looking for file '%s'...", w->id, filename);
 
+	if(strstr(filename, "/") != 0 || strstr(filename, "..") != 0) {
+		debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not acceptable.", w->id, filename);
+		w->data->bytes = sprintf(w->data->buffer, "File '%s' is not acceptable. Filenames cannot contain / or ..", filename);
+		return 404;
+	}
+
 	// check if the file exists
 	struct stat stat;
 	if(lstat(filename, &stat) != 0) {
