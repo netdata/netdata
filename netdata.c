@@ -47,6 +47,7 @@
 #define D_PROCNETDEV_LOOP   0x00000020
 #define D_RRD_STATS 		0x00000040
 #define D_WEB_CLIENT_ACCESS	0x00000080
+#define D_TC_LOOP           0x00000100
 
 #define CT_APPLICATION_JSON				1
 #define CT_TEXT_PLAIN					2
@@ -58,7 +59,7 @@
 #define CT_TEXT_XSL						8
 
 // configuration
-#define DEBUG (D_WEB_CLIENT_ACCESS|D_LISTENER|D_RRD_STATS)
+#define DEBUG (D_WEB_CLIENT_ACCESS|D_LISTENER|D_RRD_STATS|D_TC_LOOP)
 //#define DEBUG 0xffffffff
 //#define DEBUG (0)
 
@@ -1516,8 +1517,10 @@ void *proc_main(void *ptr)
 		usec = usecdiff(&now, &last);
 		debug(D_PROCNETDEV_LOOP, "PROCNETDEV: Last loop took %llu usec.", usec);
 		
+		// BEGIN -- the job to be done
 		do_proc_net_dev(usec);
 		do_proc_diskstats(usec);
+		// END -- the job is done
 		
 		// find the time to sleep in order to wait exactly update_every seconds
 		gettimeofday(&tmp, NULL);
@@ -1540,6 +1543,126 @@ void *proc_main(void *ptr)
 
 	return NULL;
 }
+
+#define PIPE_READ 0
+#define PIPE_WRITE 1
+#define TC_SHOW_MAX 65536
+
+void *tc_main(void *ptr)
+{
+	return NULL;
+	
+	char buffer[TC_SHOW_MAX+1] = "";
+	struct timeval last, now, tmp;
+	int pipefd[2];
+	long i, len;
+
+	gettimeofday(&last, NULL);
+	last.tv_sec -= update_every;
+
+	for(;1;) {
+		unsigned long long usec, susec;
+		gettimeofday(&now, NULL);
+
+		// calculate the time it took for a full loop
+		usec = usecdiff(&now, &last);
+		debug(D_TC_LOOP, "TC: Last loop took %llu usec.", usec);
+
+
+
+		// BEGIN -- the job to be done
+
+		/* --- BEGIN OF OLD VERSION ---
+		// this works!
+		// it is simpler...
+		// but it is 2-3 times slower than the current implementation!
+		// I guess the difference is that popen first runs /bin/sh.
+
+		FILE *fp = popen("/sbin/tc -s -d qdisc show", "r");
+
+		char *p;
+		while((p = fgets(buffer, TC_SHOW_MAX, fp))) {
+			buffer[TC_SHOW_MAX] = '\0';
+			debug(D_TC_LOOP, "TC: read '%s'", p);
+		}
+		pclose(fp);
+
+		--- END OF OLD VERSION --- */
+
+		if(pipe(pipefd) != 0) {
+			error("TC: Cannot create pipe for tc. TC will be disabled.");
+			return NULL;
+		}
+
+		pid_t pid = fork();
+		if(pid == -1) {
+			error("TC: cannot fork child. TC will be disabled.");
+			return NULL;
+		}
+		else if(pid == 0) {
+			// the child
+
+			// close the read fd of the pipe
+			close(pipefd[PIPE_READ]);
+
+			// attach the pipe to stdout and stderr
+			if(dup2(pipefd[PIPE_WRITE], STDOUT_FILENO) == -1) {
+				error("TC: cannot attach pipe write to stdout.");
+				exit(1);
+			}
+			if(dup2(pipefd[PIPE_WRITE], STDERR_FILENO) == -1) {
+				error("TC: cannot attach pipe write to stderr.");
+				exit(1);
+			}
+
+			// execute tc to get the output
+			execl("/sbin/tc", "-s", "-d", "qdisc", "show", NULL);
+			exit(0);
+		}
+		// the parent
+
+		// close the write fd of the pipe
+		close(pipefd[PIPE_WRITE]);
+
+		// read data from the pipe
+		i = 1;
+		len = 0;
+		while(i > 0 && len < TC_SHOW_MAX) {
+			debug(D_TC_LOOP, "TC: Reading from pipe...");
+			i = read(pipefd[PIPE_READ], &buffer[len], TC_SHOW_MAX - len);
+			if(i > 0) len += i;
+			// debug(D_TC_LOOP, "TC READ: '%s'", buffer);
+		}
+		buffer[len] = '\0';
+		debug(D_TC_LOOP, "TC: Completed reading %d bytes.", len);
+		close(pipefd[PIPE_READ]);
+
+		// END -- the job is done
+
+
+
+		// find the time to sleep in order to wait exactly update_every seconds
+		gettimeofday(&tmp, NULL);
+		usec = usecdiff(&tmp, &now);
+		debug(D_TC_LOOP, "TC: This loop took %llu usec.", usec);
+		
+		if(usec < (update_every * 1000000)) susec = (update_every * 1000000) - usec;
+		else susec = 0;
+		
+		// make sure we will wait at least 100ms
+		if(susec < 100000) susec = 100000;
+		
+		debug(D_TC_LOOP, "TC: Sleeping for %llu usec.", susec);
+		usleep(susec);
+		
+		// copy now to last
+		last.tv_sec = now.tv_sec;
+		last.tv_usec = now.tv_usec;
+	}
+
+	return NULL;
+}
+
 
 int main(int argc, char **argv)
 {
@@ -1608,19 +1731,22 @@ int main(int argc, char **argv)
 		silent = 1;
 	}
 
-	pthread_t p_proc;
-	int r_proc;
+	pthread_t p_proc, p_tc;
+	int r_proc, r_tc;
 
 	// spawn a child to collect data
 	r_proc  = pthread_create(&p_proc, NULL, proc_main, NULL);
+	r_tc    = pthread_create(&p_tc,   NULL, tc_main,   NULL);
 
 	// the main process - the web server listener
 	//sleep(1);
 	socket_listen_main(NULL);
 
 	// wait for the childs to finish
+	pthread_join(p_tc,  NULL);
 	pthread_join(p_proc,  NULL);
 
+	printf("TC            thread returns: %d\n", r_tc);
 	printf("PROC NET DEV  thread returns: %d\n", r_proc);
 
 	exit(0);
