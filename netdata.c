@@ -434,13 +434,26 @@ void rrd_stats_dimension_set(RRD_STATS *st, const char *dimension, void *data)
 
 size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_show, size_t group_count, int group_method)
 {
-	size_t i = 0, c, t, lt, printed = 0, dimensions = 0, last_entry = st->last_entry;
-	int pad = 0;
-	long count = st->entries;
+	// check the options
+	if(entries_to_show <= 0) entries_to_show = 1;
+	if(group_count <= 0) group_count = 1;
+	if(group_count > st->entries / 20) group_count = st->entries / 20;
+
+	size_t i = 0;				// the bytes of JSON output we have generated so far
+	size_t printed = 0;			// the lines of JSON data we have generated so far
+
+	size_t last_entry = st->last_entry;
+	size_t t, lt;				// t = the current entry, lt = the lest entry of data
+	long count = st->entries;	// count down of the entries examined so far
+	int pad = 0;				// align the entries when grouping values together
+
 	RRD_DIMENSION *rd;
-	unsigned long long usec = 0;
-	long long value;
-	char dtm[1025];
+	size_t c = 0;				// counter for dimension loops
+	size_t dimensions = 0;		// the total number of dimensions present
+
+	unsigned long long usec = 0;// usec between the entries
+	long long value;			// temp variable for storing data values
+	char dtm[201];				// temp variable for storing dates
 
 	// find how many dimensions we have
 	for( rd = st->dimensions ; rd ; rd = rd->next)
@@ -449,7 +462,7 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 	if(!dimensions)
 		return sprintf(b, "No dimensions yet.");
 
-	// keep track of group values and counts
+	// temporary storage to keep track of group values and counts
 	long long group_values[dimensions];
 	long long group_counts[dimensions];
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
@@ -458,13 +471,16 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 	i += sprintf(&b[i], "{\n	\"cols\":\n	[\n");
 	i += sprintf(&b[i], "		{\"id\":\"\",\"label\":\"time\",\"pattern\":\"\",\"type\":\"timeofday\"},\n");
 
-	for( rd = st->dimensions ; rd ; rd = rd->next) 
+	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
 		i += sprintf(&b[i], "		{\"id\":\"\",\"label\":\"%s\",\"pattern\":\"\",\"type\":\"number\"}%s\n", rd->name, rd->next?",":"");
 
 	i += sprintf(&b[i], "	],\n	\"rows\":\n	[\n");
 
 	// to allow grouping on the same values, we need a pad
 	pad = last_entry % group_count;
+
+	// make sure last_entry is within limits
+	if(last_entry < 0 || last_entry >= st->entries) last_entry = 0;
 
 	// find the old entry of the round-robin
 	t = last_entry + 1;
@@ -477,8 +493,8 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 
 	// the loop in dimension data
 	count -= 2;
-	for ( ; t != last_entry ; lt = t++, count--) {
-		if(t  >= st->entries) t = 0;
+	for ( ; t != last_entry && count >= 0 ; lt = t++, count--) {
+		if(t >= st->entries) t = 0;
 
 		// if the last is empty, loop again
 		if(!st->times[lt].tv_sec) continue;
@@ -486,9 +502,13 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 		// check if we may exceed the buffer provided
 		if((length - i) < 1024) break;
 
+		// prefer the most recent last entries
 		if(((count-pad) / group_count) > entries_to_show) continue;
 
+
+		// ok. we will use this entry!
 		// find how much usec since the previous entry
+
 		usec = usecdiff(&st->times[t], &st->times[lt]);
 
 		if(((count-pad) % group_count) == 0) {
@@ -498,7 +518,7 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 			struct tm *tm = localtime(&st->times[t].tv_sec);
 			if(!tm) { error("localtime() failed."); continue; }
 
-			strftime(dtm, 1024, "[%H, %M, %S, 0]", tm);
+			strftime(dtm, 200, "[%H, %M, %S, 0]", tm);
  			i += sprintf(&b[i], "%s		{\"c\":[{\"v\":%s},", printed?"]},\n":"", dtm);
 
  			printed++;
@@ -547,7 +567,6 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 	if(printed) i += sprintf(&b[i], "]}");
  	i += sprintf(&b[i], "\n	]\n}\n");
 
- 	if(count != 0) error("RRD count should be zero, but found to be %d.", count);
  	return(i);
 }
 
