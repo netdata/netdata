@@ -1482,11 +1482,11 @@ int do_proc_diskstats() {
 					continue;
 				}
 
-				if(!rrd_stats_dimension_add(st, "reads", sizeof(unsigned long long), sector_size, 1024))
-					error("Cannot add RRD_STATS dimension %s.", "reads");
-
 				if(!rrd_stats_dimension_add(st, "writes", sizeof(unsigned long long), sector_size, 1024))
 					error("Cannot add RRD_STATS dimension %s.", "writes");
+
+				if(!rrd_stats_dimension_add(st, "reads", sizeof(unsigned long long), sector_size, 1024))
+					error("Cannot add RRD_STATS dimension %s.", "reads");
 
 			}
 			else rrd_stats_next(st);
