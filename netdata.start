@@ -9,8 +9,11 @@ then
 fi
 cd "$base" || exit 1
 
-# every how many seconds to update the JSON files
+# every how many seconds to show the graphs
 NETDATA_CONFIG_UPDATE_EVERY=2
+
+# the detail of the data that will be kept in netdata
+NETDATA_CONFIG_INTERNAL_UPDATE_EVERY=1
 
 # how many points should the graphs have
 NETDATA_CONFIG_HISTORY_POINTS=120
@@ -27,6 +30,9 @@ if [ -f netdata.conf ]
 then
 	source netdata.conf
 fi
+
+# how many history lines to keep in netdata
+NETDATA_HISTORY_LINES=$[NETDATA_CONFIG_UPDATE_EVERY * NETDATA_CONFIG_HISTORY_POINTS / NETDATA_CONFIG_INTERNAL_UPDATE_EVERY]
 
 echo "Creating a directory for netdata..."
 data=
@@ -80,7 +86,7 @@ gcc -Wall -O3 -o netdata netdata.c -lpthread || exit 1
 echo "Starting netdata"
 p=`pwd`
 cd data
-$p/netdata -d -u $NETDATA_CONFIG_UPDATE_EVERY -l $NETDATA_CONFIG_HISTORY_DATA || exit 1
+$p/netdata -d -u $NETDATA_CONFIG_INTERNAL_UPDATE_EVERY -l $NETDATA_HISTORY_LINES || exit 1
 cd "$p"
 
 sleep 1
@@ -175,7 +181,7 @@ do
 	if [ ! "$p" = "IGNORE" ]
 	then
 		cat >>${data}/index.html <<EOF2
-		drawChart('${x}', '${y}_div', width, height, "data/${x}/${NETDATA_CONFIG_HISTORY_POINTS}", "${t}");
+		drawChart('${x}', '${y}_div', width, height, "data/${x}/${NETDATA_CONFIG_HISTORY_POINTS}/${NETDATA_CONFIG_UPDATE_EVERY}/average/", "${t}");
 EOF2
 	fi
 done

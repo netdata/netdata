@@ -32,11 +32,11 @@
 
 
 // internal defaults
-#define UPDATE_EVERY 2
+#define UPDATE_EVERY 1
 #define UPDATE_EVERY_MAX 3600
 #define LISTEN_PORT 19999
-#define HISTORY 120
-#define HISTORY_MAX 86400
+#define HISTORY 3600
+#define HISTORY_MAX (86400*10)
 #define SAVE_PATH "/tmp"
 
 #define D_WEB_BUFFER 		0x00000001
@@ -405,35 +405,53 @@ void rrd_stats_dimension_set(RRD_STATS *st, const char *dimension, void *data)
 	}
 
 	if(rd->bytes == sizeof(unsigned long long)) {
-		unsigned long long *dimension = rd->values, *value = data;
+		long long *dimension = rd->values, *value = data;
 
 		dimension[st->last_entry] = (*value);
 	}
 	else if(rd->bytes == sizeof(unsigned long)) {
-		unsigned long *dimension = rd->values, *value = data;
+		long *dimension = rd->values, *value = data;
 
 		dimension[st->last_entry] = (*value);
 	}
 	else if(rd->bytes == sizeof(unsigned int)) {
-		unsigned int *dimension = rd->values, *value = data;
+		int *dimension = rd->values, *value = data;
 
 		dimension[st->last_entry] = (*value);
 	}
 	else if(rd->bytes == sizeof(unsigned char)) {
-		unsigned char *dimension = rd->values, *value = data;
+		char *dimension = rd->values, *value = data;
 
 		dimension[st->last_entry] = (*value);
 	}
 	else fatal("I don't know how to handle data of length %d bytes.", rd->bytes);
 }
 
-size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_show)
+#define GROUP_AVERAGE	0
+#define GROUP_MAX 		1
+
+size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_show, size_t group_count, int group_method)
 {
-	size_t i = 0, t, lt, c;
+	size_t i = 0, c, t, lt, printed = 0, dimensions = 0, last_entry = st->last_entry;
+	int pad = 0;
 	long count = st->entries;
 	RRD_DIMENSION *rd;
 	unsigned long long usec = 0;
+	long long value;
 	char dtm[1025];
+
+	// find how many dimensions we have
+	for( rd = st->dimensions ; rd ; rd = rd->next)
+		dimensions++;
+
+	if(!dimensions)
+		return sprintf(b, "No dimensions yet.");
+
+	// keep track of group values and counts
+	long long group_values[dimensions];
+	long long group_counts[dimensions];
+	for( rd = st->dimensions, c = 0 ; rd ; rd = rd->next, c++)
+		group_values[c] = group_counts[c] = 0;
 
 	i += sprintf(&b[i], "{\n	\"cols\":\n	[\n");
 	i += sprintf(&b[i], "		{\"id\":\"\",\"label\":\"time\",\"pattern\":\"\",\"type\":\"timeofday\"},\n");
@@ -443,8 +461,11 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 
 	i += sprintf(&b[i], "	],\n	\"rows\":\n	[\n");
 
-	// find the old entry
-	t = st->last_entry + 1;
+	// to allow grouping on the same values, we need a pad
+	pad = last_entry % group_count;
+
+	// find the old entry of the round-robin
+	t = last_entry + 1;
 	if(t >= st->entries) t = 0;
 	lt = t;
 
@@ -452,9 +473,9 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 	t++;
 	if(t >= st->entries) t = 0;
 
-	count -= 2;
 	// the loop in dimension data
-	for ( c = 0 ; t != st->last_entry ; lt = t++, count--) {
+	count -= 2;
+	for ( ; t != last_entry ; lt = t++, count--) {
 		if(t  >= st->entries) t = 0;
 
 		// if the last is empty, loop again
@@ -463,48 +484,69 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 		// check if we may exceed the buffer provided
 		if((length - i) < 1024) break;
 
-		if(count > entries_to_show) continue;
+		if(((count-pad) / group_count) > entries_to_show) continue;
 
 		// find how much usec since the previous entry
 		usec = usecdiff(&st->times[t], &st->times[lt]);
 
-		// generate the local date time
-		struct tm *tm = localtime(&st->times[t].tv_sec);
-		if(!tm) { error("localtime() failed."); continue; }
+		if(((count-pad) % group_count) == 0) {
+			if(printed >= entries_to_show) break;
 
-		strftime(dtm, 1024, "[%H, %M, %S, 0]", tm);
- 		i += sprintf(&b[i], "%s		{\"c\":[{\"v\":%s},", c?",\n":"", dtm);
+			// generate the local date time
+			struct tm *tm = localtime(&st->times[t].tv_sec);
+			if(!tm) { error("localtime() failed."); continue; }
 
-		for( rd = st->dimensions ; rd ; rd = rd->next) {
+			strftime(dtm, 1024, "[%H, %M, %S, 0]", tm);
+ 			i += sprintf(&b[i], "%s		{\"c\":[{\"v\":%s},", printed?"]},\n":"", dtm);
+
+ 			printed++;
+ 		}
+
+		for( rd = st->dimensions, c = 0 ; rd ; rd = rd->next, c++) {
+			// check if new dimensions have been added since we started
+			if(c >= dimensions)
+				return sprintf(b, "New dimensions added while we were working on them. Try again later.");
+
 			if(rd->bytes == sizeof(unsigned long long)) {
-				unsigned long long *dimension = rd->values, v;
-				v = (dimension[t] - dimension[lt]) * 1000000 * rd->multiplier / usec / rd->divisor;
-
- 				i += sprintf(&b[i], "{\"v\":%lld}%s", v, rd->next?",":"");
+				long long *dimension = rd->values;
+				value = (dimension[t] - dimension[lt]) * 1000000 * rd->multiplier / usec / rd->divisor;
 			}
 			else if(rd->bytes == sizeof(unsigned long)) {
-				unsigned long *dimension = rd->values, v;
-				v = (dimension[t] - dimension[lt]) * 1000000 * rd->multiplier / usec / rd->divisor;
-
- 				i += sprintf(&b[i], "{\"v\":%ld}%s", v, rd->next?",":"");
+				long *dimension = rd->values;
+				value = (dimension[t] - dimension[lt]) * 1000000 * rd->multiplier / usec / rd->divisor;
 			}
 			else if(rd->bytes == sizeof(unsigned int)) {
-				unsigned int *dimension = rd->values, v;
-				v = (dimension[t] - dimension[lt]) * 1000000 * rd->multiplier / usec / rd->divisor;
-
- 				i += sprintf(&b[i], "{\"v\":%d}%s", v, rd->next?",":"");
+				int *dimension = rd->values;
+				value = (dimension[t] - dimension[lt]) * 1000000 * rd->multiplier / usec / rd->divisor;
 			}
 			else if(rd->bytes == sizeof(unsigned char)) {
-				unsigned char *dimension = rd->values, v;
-				v = (dimension[t] - dimension[lt]) * 1000000 * rd->multiplier / usec / rd->divisor;
-
- 				i += sprintf(&b[i], "{\"v\":%d}%s", (int)v, rd->next?",":"");
+				char *dimension = rd->values;
+				value = (dimension[t] - dimension[lt]) * 1000000 * rd->multiplier / usec / rd->divisor;
 			}
-			else fatal("Cannot produce JSON for size %d bytes data.", rd->bytes);
+			else fatal("Cannot produce JSON for size %d bytes dimension.", rd->bytes);
+
+			switch(group_method) {
+				case GROUP_MAX:
+					if(value > group_values[c]) group_values[c] = value;
+					break;
+
+				default:
+				case GROUP_AVERAGE:
+					group_values[c] += value;
+					break;
+			}
+			group_counts[c]++;
+
+			if(((count-pad) % group_count) == 0) {
+				if(group_method == GROUP_AVERAGE) group_values[c] /= group_counts[c];
+
+				i += sprintf(&b[i], "{\"v\":%lld}%s", group_values[c], rd->next?",":"");
+
+				group_values[c] = group_counts[c] = 0;
+			}
 		}
- 		i += sprintf(&b[i], "]}");
-		c++;
 	}
+	if(printed) i += sprintf(&b[i], "]}");
  	i += sprintf(&b[i], "\n	]\n}\n");
 
  	if(count != 0) error("RRD count should be zero, but found to be %d.", count);
@@ -795,17 +837,32 @@ void web_client_process(struct web_client *w)
 
 				// how many entries does the client want?
 				size_t lines = save_history;
+				size_t group_count = 1;
+				int group_method = GROUP_AVERAGE;
+
 				if(url) {
 					tok = mystrsep(&url, "/?");
 					if(tok) lines = atoi(tok);
 					if(lines < 5) lines = save_history;
 				}
+				if(url) {
+					tok = mystrsep(&url, "/?");
+					if(tok) group_count = atoi(tok);
+					if(group_count < 1) group_count = 1;
+					if(group_count > save_history / 20) group_count = save_history / 20;
+				}
+				if(url) {
+					tok = mystrsep(&url, "/?");
+					if(strcmp(tok, "max") == 0) group_method = GROUP_MAX;
+					else if(strcmp(tok, "average") == 0) group_method = GROUP_AVERAGE;
+					else debug(D_WEB_CLIENT, "%llu: Unknown group method '%s'", tok);
+				}
 
-				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (%d lines).", w->id, st->name, lines);
+				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (%d lines, %d group_count, %d group_method).", w->id, st->name, lines, group_count, group_method);
 
 				code = 200;
 				w->data->contenttype = CT_APPLICATION_JSON;
-				w->data->bytes = rrd_stats_json(st, w->data->buffer, w->data->size, lines);
+				w->data->bytes = rrd_stats_json(st, w->data->buffer, w->data->size, lines, group_count, group_method);
 			}
 		}
 		else if(strcmp(tok, "mirror") == 0) {
