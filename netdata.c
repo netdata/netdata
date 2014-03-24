@@ -549,7 +549,8 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 			struct tm *tm = localtime(&st->times[t].tv_sec);
 			if(!tm) { error("localtime() failed."); continue; }
 
-			strftime(dtm, 200, "\"Date(%Y, %m, %d, %H, %M, %S)\"", tm); // datetime
+			sprintf(dtm, "\"Date(%d, %d, %d, %d, %d, %d)\"", tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec); // datetime
+			// strftime(dtm, 200, "\"Date(%Y, %m, %d, %H, %M, %S)\"", tm); // datetime
 			// strftime(dtm, 200, "[%H, %M, %S, 0]", tm); // timeofday
  			i += sprintf(&b[i], "%s		{\"c\":[{\"v\":%s},", printed?"]},\n":"", dtm);
 
