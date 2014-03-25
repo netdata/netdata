@@ -885,6 +885,9 @@ int mysendfile(struct web_client *w, char *filename)
 	debug(D_WEB_CLIENT, "%llu: Looking for file '%s'...", w->id, filename);
 
 	if(filename[0] == '/') filename = &filename[1];
+	if(strncmp(filename, "data/", 5) == 0) filename = &filename[5];
+	else if(strncmp(filename, "graph/", 5) == 0) filename = &filename[6];
+	else if(strncmp(filename, "file/", 5) == 0) filename = &filename[5];
 
 	if(strstr(filename, "/") != 0 || strstr(filename, "..") != 0) {
 		debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not acceptable.", w->id, filename);
