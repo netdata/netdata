@@ -99,12 +99,15 @@
 		if(width * height < charts.length) height++;
 		// console.log('final: width = ' + width + ', height = ' + height);
 
-		if(width == 0) width = (document.documentElement.clientWidth - 40) / 2;
-		if(width <= 10) width = (document.documentElement.clientWidth - 40) / width;
+		ww = (window.innerWidth < document.documentElement.clientWidth)?window.innerWidth:document.documentElement.clientWidth;
+		wh = (window.innerHeight < document.documentElement.clientHeight)?window.innerHeight:document.documentElement.clientHeight;
+
+		if(width == 0) width = (ww - 40) / 2;
+		if(width <= 10) width = (ww - 40) / width;
 		if(width < 200) width = 200;
 		
-		if(height == 0) height = (document.documentElement.clientHeight - 20) / 2;
-		if(height <= 10) height = (document.documentElement.clientHeight - 20) / height;
+		if(height == 0) height = (wh - 20) / 2;
+		if(height <= 10) height = (wh - 20) / height;
 		if(height < 100) height = 100;
 
 		// console.log('width = ' + width + ', height = ' + height);

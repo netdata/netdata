@@ -536,29 +536,47 @@ void rrd_stats_dimension_set(RRD_STATS *st, const char *id, void *data)
 #define GROUP_AVERAGE	0
 #define GROUP_MAX 		1
 
+size_t rrd_stats_one_xml(RRD_STATS *st, char *buffer, size_t len)
+{
+	size_t i = 0;
+	if(i + 200 > len) return(0);
+
+	i += sprintf(&buffer[i], "\t<graph>\n");
+	i += sprintf(&buffer[i], "\t\t<id>%s</id>\n", st->id);
+	i += sprintf(&buffer[i], "\t\t<name>%s</name>\n", st->name);
+	i += sprintf(&buffer[i], "\t\t<type>%s</type>\n", st->type);
+	i += sprintf(&buffer[i], "\t\t<title>%s%s</title>\n", st->title, st->name);
+	i += sprintf(&buffer[i], "\t\t<vtitle>%s</vtitle>\n", st->vtitle);
+	i += sprintf(&buffer[i], "\t\t<dataurl>/data/%s</dataurl>\n", st->name);
+	i += sprintf(&buffer[i], "\t\t<entries>%ld</entries>\n", st->entries);
+	i += sprintf(&buffer[i], "\t</graph>\n");
+
+	return(i);
+}
+
+#define RRD_GRAPH_XML_HEADER "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<?xml-stylesheet type=\"text/xsl\" href=\"/file/all.xsl\"?>\n\n<catalog>\n"
+#define RRD_GRAPH_XML_FOOTER "</catalog>\n"
+
+size_t rrd_stats_graph_xml(RRD_STATS *st, char *buffer, size_t len)
+{
+	size_t i = 0;
+	i += sprintf(&buffer[i], RRD_GRAPH_XML_HEADER);
+	i += rrd_stats_one_xml(st, &buffer[i], len - i);
+	i += sprintf(&buffer[i], RRD_GRAPH_XML_FOOTER);
+	return(i);
+}
+
 size_t rrd_stats_all_xml(char *buffer, size_t len)
 {
-	RRD_STATS *st;
 	size_t i = 0;
+	RRD_STATS *st;
 
-	i += sprintf(&buffer[i], "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<?xml-stylesheet type=\"text/xsl\" href=\"all.xsl\"?>\n\n<catalog>\n");
+	i += sprintf(&buffer[i], RRD_GRAPH_XML_HEADER);
 
-	for(st = root; st ; st = st->next) {
-		if(i+ 200 > len) break;
-
-		i += sprintf(&buffer[i], "\t<graph>\n");
-		i += sprintf(&buffer[i], "\t\t<id>%s</id>\n", st->id);
-		i += sprintf(&buffer[i], "\t\t<name>%s</name>\n", st->name);
-		i += sprintf(&buffer[i], "\t\t<type>%s</type>\n", st->type);
-		i += sprintf(&buffer[i], "\t\t<title>%s%s</title>\n", st->title, st->name);
-		i += sprintf(&buffer[i], "\t\t<vtitle>%s</vtitle>\n", st->vtitle);
-		i += sprintf(&buffer[i], "\t\t<dataurl>/data/%s</dataurl>\n", st->name);
-		i += sprintf(&buffer[i], "\t\t<entries>%ld</entries>\n", st->entries);
-		i += sprintf(&buffer[i], "\t</graph>\n");
-	}
-
-	i += sprintf(&buffer[i], "</catalog>\n");
-
+	for(st = root; st ; st = st->next)
+		i += rrd_stats_one_xml(st, &buffer[i], len - i);
+	
+	i += sprintf(&buffer[i], RRD_GRAPH_XML_FOOTER);
 	return(i);
 }
 
@@ -866,6 +884,8 @@ int mysendfile(struct web_client *w, char *filename)
 {
 	debug(D_WEB_CLIENT, "%llu: Looking for file '%s'...", w->id, filename);
 
+	if(filename[0] == '/') filename = &filename[1];
+
 	if(strstr(filename, "/") != 0 || strstr(filename, "..") != 0) {
 		debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not acceptable.", w->id, filename);
 		w->data->bytes = sprintf(w->data->buffer, "File '%s' is not acceptable. Filenames cannot contain / or ..", filename);
@@ -1036,6 +1056,27 @@ void web_client_process(struct web_client *w)
 				code = 200;
 				w->data->contenttype = CT_APPLICATION_JSON;
 				w->data->bytes = rrd_stats_json(st, w->data->buffer, w->data->size, lines, group_count, group_method);
+			}
+		}
+		else if(strcmp(tok, "graph") == 0) {
+			// the client is requesting an rrd graph
+
+			// get the name of the data to show
+			tok = mystrsep(&url, "/?");
+			debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
+
+			// do we have such a data set?
+			RRD_STATS *st = rrd_stats_find_byname(tok);
+			if(!st) {
+				// we don't have it
+				code = 404;
+				w->data->bytes = sprintf(w->data->buffer, "There are not statistics for '%s'\r\n", tok);
+			}
+			else {
+				code = 200;
+				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending %s.xml of RRD_STATS...", w->id, st->name);
+				w->data->contenttype = CT_TEXT_XML;
+				w->data->bytes = rrd_stats_graph_xml(st, w->data->buffer, w->data->size);
 			}
 		}
 		else if(strcmp(tok, "mirror") == 0) {
