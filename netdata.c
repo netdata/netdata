@@ -59,7 +59,7 @@
 #define CT_TEXT_XSL						8
 
 // configuration
-#define DEBUG (D_WEB_CLIENT_ACCESS|D_LISTENER|D_RRD_STATS|D_TC_LOOP)
+#define DEBUG (D_WEB_CLIENT_ACCESS|D_LISTENER|D_RRD_STATS)
 //#define DEBUG 0xffffffff
 //#define DEBUG (0)
 
@@ -294,6 +294,8 @@ struct rrd_dimension {
 
 	void *values;
 	
+	time_t last_updated;
+
 	struct rrd_dimension *next;
 };
 typedef struct rrd_dimension RRD_DIMENSION;
@@ -301,10 +303,17 @@ typedef struct rrd_dimension RRD_DIMENSION;
 struct rrd_stats {
 	pthread_mutex_t mutex;
 
+	char id[RRD_STATS_NAME_MAX + 1];
 	char name[RRD_STATS_NAME_MAX + 1];
+	char title[RRD_STATS_NAME_MAX + 1];
+	char vtitle[RRD_STATS_NAME_MAX + 1];
+
+	char type[RRD_STATS_NAME_MAX + 1];
 
 	size_t entries;
 	size_t last_entry;
+
+	time_t last_updated;
 
 	struct timeval *times;
 	RRD_DIMENSION *dimensions;
@@ -315,7 +324,7 @@ typedef struct rrd_stats RRD_STATS;
 RRD_STATS *root = NULL;
 pthread_mutex_t root_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-RRD_STATS *rrd_stats_create(const char *name, unsigned long entries)
+RRD_STATS *rrd_stats_create(const char *id, const char *name, unsigned long entries, const char *title, const char *vtitle, const char *type)
 {
 	RRD_STATS *st = NULL;
 
@@ -331,12 +340,25 @@ RRD_STATS *rrd_stats_create(const char *name, unsigned long entries)
 		return NULL;
 	}
 	
+	strncpy(st->id, id, RRD_STATS_NAME_MAX);
+	st->id[RRD_STATS_NAME_MAX] = '\0';
+
 	strncpy(st->name, name, RRD_STATS_NAME_MAX);
 	st->name[RRD_STATS_NAME_MAX] = '\0';
+
+	strncpy(st->title, title, RRD_STATS_NAME_MAX);
+	st->title[RRD_STATS_NAME_MAX] = '\0';
+
+	strncpy(st->vtitle, vtitle, RRD_STATS_NAME_MAX);
+	st->vtitle[RRD_STATS_NAME_MAX] = '\0';
+
+	strncpy(st->type, type, RRD_STATS_NAME_MAX);
+	st->type[RRD_STATS_NAME_MAX] = '\0';
 
 	st->entries = entries;
 	st->last_entry = 0;
 	st->dimensions = NULL;
+	st->last_updated = time(NULL);
 
 	pthread_mutex_init(&st->mutex, NULL);
 	pthread_mutex_lock(&st->mutex);
@@ -355,7 +377,7 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 {
 	RRD_DIMENSION *rd = NULL;
 
-	debug(D_RRD_STATS, "Adding dimension '%s' to RRD_STATS '%s'.", name, st->name);
+	debug(D_RRD_STATS, "Adding dimension '%s' (%s) to RRD_STATS '%s' (%s).", name, id, st->name, st->id);
 
 	rd = calloc(sizeof(RRD_DIMENSION), 1);
 	if(!rd) return NULL;
@@ -372,6 +394,8 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 	}
 
 	strncpy(rd->id, id, RRD_STATS_NAME_MAX);
+	rd->id[RRD_STATS_NAME_MAX] = '\0';
+
 	strncpy(rd->name, name, RRD_STATS_NAME_MAX);
 	rd->name[RRD_STATS_NAME_MAX] = '\0';
 
@@ -381,7 +405,29 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 	return(rd);
 }
 
-RRD_STATS *rrd_stats_find(const char *name)
+void rrd_stats_dimension_free(RRD_DIMENSION *rd)
+{
+	if(rd->next) rrd_stats_dimension_free(rd->next);
+	debug(D_RRD_STATS, "Removing dimension '%s'.", rd->name);
+	free(rd->values);
+	free(rd);
+}
+
+RRD_STATS *rrd_stats_find(const char *id)
+{
+	pthread_mutex_lock(&root_mutex);
+
+	RRD_STATS *st = root;
+
+	for ( ; st ; st = st->next ) {
+		if(strcmp(st->id, id) == 0) break;
+	}
+
+	pthread_mutex_unlock(&root_mutex);
+	return(st);
+}
+
+RRD_STATS *rrd_stats_find_byname(const char *name)
 {
 	pthread_mutex_lock(&root_mutex);
 
@@ -424,6 +470,33 @@ void rrd_stats_next(RRD_STATS *st)
 
 void rrd_stats_done(RRD_STATS *st)
 {
+	RRD_DIMENSION *rd, *last;
+
+	// find if there are any obsolete dimensions (not updated recently)
+	for( rd = st->dimensions, last = NULL ; rd ; ) {
+		if(rd->last_updated < st->last_updated) {
+			debug(D_RRD_STATS, "Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
+
+			if(!last) {
+				st->dimensions = rd->next;
+				rd->next = NULL;
+				rrd_stats_dimension_free(rd);
+				rd = st->dimensions;
+				continue;
+			}
+			else {
+				last->next = rd->next;
+				rd->next = NULL;
+				rrd_stats_dimension_free(rd);
+				rd = last->next;
+				continue;
+			}
+		}
+
+		last = rd;
+		rd = rd->next;
+	}
+
 	pthread_mutex_unlock(&st->mutex);
 }
 
@@ -431,9 +504,11 @@ void rrd_stats_dimension_set(RRD_STATS *st, const char *id, void *data)
 {
 	RRD_DIMENSION *rd = rrd_stats_dimension_find(st, id);
 	if(!rd) {
-		error("Cannot find dimension with id '%s' on stats '%s'.", id, st->name);
+		error("Cannot find dimension with id '%s' on stats '%s' (%s).", id, st->name, st->id);
 		return;
 	}
+
+	rd->last_updated = st->last_updated;
 
 	if(rd->bytes == sizeof(long long)) {
 		long long *dimension = rd->values, *value = data;
@@ -460,6 +535,32 @@ void rrd_stats_dimension_set(RRD_STATS *st, const char *id, void *data)
 
 #define GROUP_AVERAGE	0
 #define GROUP_MAX 		1
+
+size_t rrd_stats_all_xml(char *buffer, size_t len)
+{
+	RRD_STATS *st;
+	size_t i = 0;
+
+	i += sprintf(&buffer[i], "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<?xml-stylesheet type=\"text/xsl\" href=\"all.xsl\"?>\n\n<catalog>\n");
+
+	for(st = root; st ; st = st->next) {
+		if(i+ 200 > len) break;
+
+		i += sprintf(&buffer[i], "\t<graph>\n");
+		i += sprintf(&buffer[i], "\t\t<id>%s</id>\n", st->id);
+		i += sprintf(&buffer[i], "\t\t<name>%s</name>\n", st->name);
+		i += sprintf(&buffer[i], "\t\t<type>%s</type>\n", st->type);
+		i += sprintf(&buffer[i], "\t\t<title>%s%s</title>\n", st->title, st->name);
+		i += sprintf(&buffer[i], "\t\t<vtitle>%s</vtitle>\n", st->vtitle);
+		i += sprintf(&buffer[i], "\t\t<dataurl>/data/%s</dataurl>\n", st->name);
+		i += sprintf(&buffer[i], "\t\t<entries>%ld</entries>\n", st->entries);
+		i += sprintf(&buffer[i], "\t</graph>\n");
+	}
+
+	i += sprintf(&buffer[i], "</catalog>\n");
+
+	return(i);
+}
 
 size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_show, size_t group_count, int group_method)
 {
@@ -785,9 +886,16 @@ int mysendfile(struct web_client *w, char *filename)
 		return 404;
 	}
 
-	w->ifd = open(filename, O_NONBLOCK, O_RDONLY);
+	int failcount = 0;
+	while(failcount < 100) {
+		w->ifd = open(filename, O_NONBLOCK, O_RDONLY);
+		if(w->ifd != -1 || (errno != EBUSY && errno != EAGAIN)) break;
+		failcount++;
+		error("%llu: file '%s' is busy, trying again...", w->id, filename);
+		usleep(500);
+	}
 	if(w->ifd < 0) {
-		debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot open file '%s'.", w->id, filename);
+		error("%llu: Cannot open file '%s'.", w->id, filename);
 		w->data->bytes = sprintf(w->data->buffer, "Cannot open file '%s'.", filename);
 		w->ifd = w->ofd;
 		return 404;
@@ -887,7 +995,7 @@ void web_client_process(struct web_client *w)
 			debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
 
 			// do we have such a data set?
-			RRD_STATS *st = rrd_stats_find(tok);
+			RRD_STATS *st = rrd_stats_find_byname(tok);
 			if(!st) {
 				// we don't have it
 				code = 404;
@@ -923,7 +1031,7 @@ void web_client_process(struct web_client *w)
 					else debug(D_WEB_CLIENT, "%llu: Unknown group method '%s'", w->id, tok);
 				}
 
-				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (%d lines, %d group_count, %d group_method).", w->id, st->name, lines, group_count, group_method);
+				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group_count, %d group_method).", w->id, st->name, st->id, lines, group_count, group_method);
 
 				code = 200;
 				w->data->contenttype = CT_APPLICATION_JSON;
@@ -948,6 +1056,12 @@ void web_client_process(struct web_client *w)
 
 			for ( ; st ; st = st->next )
 				w->data->bytes += sprintf(&w->data->buffer[w->data->bytes], "%s\n", st->name);
+		}
+		else if(strcmp(tok, "all.xml") == 0) {
+			code = 200;
+			debug(D_WEB_CLIENT_ACCESS, "%llu: Sending all.xml of RRD_STATS...", w->id);
+			w->data->contenttype = CT_TEXT_XML;
+			w->data->bytes = rrd_stats_all_xml(w->data->buffer, w->data->size);
 		}
 		else if(strcmp(tok, "file") == 0) {
 			code = mysendfile(w, url);
@@ -1385,7 +1499,7 @@ int do_proc_net_dev() {
 			RRD_STATS *st = rrd_stats_find(name);
 
 			if(!st) {
-				st = rrd_stats_create(name, save_history);
+				st = rrd_stats_create(name, name, save_history, "Network usage for ", "Bandwidth in kilobits/s", "net");
 				if(!st) {
 					error("Cannot create RRD_STATS for interface %s.", name);
 					continue;
@@ -1486,7 +1600,7 @@ int do_proc_diskstats() {
 				}
 				else error("Cannot read sector size for device %s from %s. Assuming 512.", name, ssfilename);
 
-				st = rrd_stats_create(name, save_history);
+				st = rrd_stats_create(name, name, save_history, "Disk usage for ", "I/O in kilobytes/s", "disk");
 				if(!st) {
 					error("Cannot create RRD_STATS for disk %s.", name);
 					continue;
@@ -1578,6 +1692,7 @@ struct tc_class {
 };
 
 struct tc_device {
+	char id[RRD_STATS_NAME_MAX + 1];
 	char name[RRD_STATS_NAME_MAX + 1];
 
 	struct tc_class *classes;
@@ -1614,9 +1729,9 @@ void tc_device_commit(struct tc_device *d)
 
 	debug(D_TC_LOOP, "Committing TC device '%s'", d->name);
 
-	RRD_STATS *st = rrd_stats_find(d->name);
+	RRD_STATS *st = rrd_stats_find(d->id);
 	if(!st) {
-		st = rrd_stats_create(d->name, save_history);
+		st = rrd_stats_create(d->id, d->name, save_history, "Class usage for ", "Bandwidth in kilobits/s", "tc");
 		if(!st) {
 			error("Cannot create RRD_STATS for interface %s.", d->name);
 			return;
@@ -1644,9 +1759,17 @@ void tc_device_set_class_name(struct tc_device *d, char *id, char *name)
 	for ( c = d->classes ; c ; c = c->next) {
 		if(strcmp(c->id, id) == 0) {
 			strncpy(c->name, name, RRD_STATS_NAME_MAX);
+			c->name[RRD_STATS_NAME_MAX] = '\0';
 			break;
 		}
 	}
+}
+
+void tc_device_set_device_name(struct tc_device *d, char *name)
+{
+	strcpy(d->name, "tc.");
+	strncpy(&d->name[3], name, RRD_STATS_NAME_MAX - 3);
+	d->name[RRD_STATS_NAME_MAX] = '\0';
 }
 
 struct tc_device *tc_device_create(char *name)
@@ -1658,6 +1781,9 @@ struct tc_device *tc_device_create(char *name)
 
 	strcpy(d->name, "tc.");
 	strncpy(&d->name[3], name, RRD_STATS_NAME_MAX - 3);
+	d->name[RRD_STATS_NAME_MAX] = '\0';
+
+	strcpy(d->id, d->name);
 
 	return(d);
 }
@@ -1749,10 +1875,14 @@ void *tc_main(void *ptr)
 				p = strsep(&b, " \n");
 				if(p && *p) class->bytes = atoll(p);
 			}
+			else if(device && (strcmp(p, "SETDEVICENAME") == 0)) {
+				char *name = strsep(&b, " |\n");
+				if(name && *name) tc_device_set_device_name(device, name);
+			}
 			else if(device && (strcmp(p, "SETCLASSNAME") == 0)) {
 				char *name = strsep(&b, " |\n");
 				char *id = strsep(&b, " |\n");
-				tc_device_set_class_name(device, id, name);
+				if(id && *id && name && *name) tc_device_set_class_name(device, id, name);
 			}
 			else if((strcmp(p, "MYPID") == 0)) {
 				char *id = strsep(&b, " \n");

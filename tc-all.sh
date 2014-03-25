@@ -18,7 +18,7 @@ do
 		if [ -f /var/run/fireqos/ifaces/$x ]
 		then
 			name=`cat /var/run/fireqos/ifaces/$x`
-			# echo "SETDEVICENAME $name"
+			echo "SETDEVICENAME $name"
 			interface_classes=
 			source /var/run/fireqos/$name.conf
 			for x in $interface_classes

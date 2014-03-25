@@ -75,6 +75,7 @@ else
 	echo >&2 "Directory $base/data already exists. Not touching it, however it should be a link '${data}'."
 fi
 
+cp "${base}/all.xsl" "${data}/"
 cp "${base}/netdata.js" "${data}/"
 cp "${base}/tc-all.sh" "${data}/"
 chmod 700 "${data}/tc-all.sh"
@@ -86,11 +87,13 @@ killall netdata 2>/dev/null
 killall tc-all.sh 2>/dev/null
 
 echo "Compiling netdata"
-gcc -Wall -O3 -o netdata netdata.c -lpthread || exit 1
+# gcc -Wall -O3 -o netdata netdata.c -lpthread || exit 1
+gcc -Wall -ggdb -o netdata netdata.c -lpthread || exit 1
 
 echo "Starting netdata"
 p=`pwd`
 cd data
+ulimit -c unlimited
 $p/netdata -d -u $NETDATA_CONFIG_INTERNAL_UPDATE_EVERY -l $NETDATA_HISTORY_LINES || exit 1
 cd "$p"
 
@@ -110,48 +113,6 @@ do
 done
 
 echo "We have $count graphs..."
-
-# find the optimal graphs per page
-w=1
-h=1
-a=1
-while [ $a -lt $count ]
-do
-	if [ $[h+1] -le $w ]
-	then
-		h=$[h+1]
-	else
-		w=$[w+1]
-		h=$[h-1]
-	fi
-
-	a=$[w*h]
-done
-
-echo "Optimal size is $w x $h..."
-
-# prefer to have wider graphs
-while [ $w -ge $h ]
-do
-	w=$[w-1]
-	h=$[h+1]
-	a=$[w*h]
-done
-if [ $a -lt $count ]
-then
-	h=$[h+1]
-fi
-
-# make sure we don't display too small graphs
-if [ $w -gt 10 ]
-then
-	w=10
-fi
-if [ $h -gt 10 ]
-then
-	h=10
-fi
-echo "Final screen size is $w x $h..."
 
 echo "Generating ${data}/index.html"
 host="`hostname`"
@@ -176,9 +137,6 @@ cat >${data}/index.html <<EOF
 	google.setOnLoadCallback(drawCharts);
 	
 	function drawCharts() {
-		var width = $w; // if zero, auto-adjusts to 50% of screen, 1-10 goes 1/width of screen
-		var height = $h;
-		
 		// EDIT: add one line per interface you have
 		// EDIT: 
 		// EDIT:   name    div id                    json data           graph 					vertical axis title
@@ -216,7 +174,7 @@ do
 	if [ ! "$p" = "IGNORE" ]
 	then
 		cat >>${data}/index.html <<EOF2
-		drawChart('${x}', '${y}_div', width, height, "data/${x}/${NETDATA_CONFIG_HISTORY_POINTS}/${NETDATA_CONFIG_UPDATE_EVERY}/average/", "${title}${t} (${x})", "${vtitle}");
+		addChart('${x}', '${y}_div', 0, 0, "data/${x}/${NETDATA_CONFIG_HISTORY_POINTS}/${NETDATA_CONFIG_UPDATE_EVERY}/average/", "${title}${t} (${x})", "${vtitle}");
 EOF2
 	fi
 done
@@ -234,6 +192,7 @@ then
 fi
 
 cat >>${data}/index.html <<EOF3
+		refreshCharts(999999);
 	}
 	
 	var refreshCount = 0;
@@ -247,9 +206,9 @@ cat >>${data}/index.html <<EOF3
 	
 	setInterval(myChartsRefresh, $tim);
 
-	window.onresize = function(event) {
-		refreshCharts(999999);
-	};
+	//window.onresize = function(event) {
+	//	refreshCharts(999999);
+	//};
 	</script>
 
 	</head>
