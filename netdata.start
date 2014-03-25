@@ -75,10 +75,15 @@ else
 	echo >&2 "Directory $base/data already exists. Not touching it, however it should be a link '${data}'."
 fi
 
+cp "${base}/netdata.js" "${data}/"
+cp "${base}/tc-all.sh" "${data}/"
+chmod 700 "${data}/tc-all.sh"
+
 echo "Finding proper parameters for dashboard..."
 
 echo "Stopping a (possibly) running netdata..."
 killall netdata 2>/dev/null
+killall tc-all.sh 2>/dev/null
 
 echo "Compiling netdata"
 gcc -Wall -O3 -o netdata netdata.c -lpthread || exit 1
@@ -89,7 +94,7 @@ cd data
 $p/netdata -d -u $NETDATA_CONFIG_INTERNAL_UPDATE_EVERY -l $NETDATA_HISTORY_LINES || exit 1
 cd "$p"
 
-sleep 1
+sleep 2
 
 # count all graphs
 all=`wget http://127.0.0.1:19999/list -O - 2>/dev/null`
@@ -148,8 +153,6 @@ then
 fi
 echo "Final screen size is $w x $h..."
 
-cp "${base}/netdata.js" "${data}/"
-
 echo "Generating ${data}/index.html"
 host="`hostname`"
 cat >${data}/index.html <<EOF
@@ -197,6 +200,11 @@ do
 		disk.*)
 			title="Disk I/O for "
 			vtitle="I/O in kilobytes/s"
+			;;
+
+		tc.*)
+			title="Class utilization for "
+			vtitle="bandwidth in kilobits/s"
 			;;
 
 	esac

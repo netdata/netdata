@@ -40,10 +40,19 @@
 		if(height >= 200) hAxisTitle = "Time of Day";
 		if(width >= 400) vAxisTitle = charts[index].vtitle;
 		
+		var title = charts[index].title;
+
+		var isStacked = false;
+		if(charts[index].name.substring(0, 3) == "tc.") {
+			isStacked = true;
+			title += " [stacked]";
+		}
+
 		var options = {
 			width: width,
 			height: height,
-			title: charts[index].title,
+			title: title,
+			isStacked: isStacked,
 			hAxis: {title: hAxisTitle},
 			vAxis: {title: vAxisTitle, minValue: 10},
 			// animation: {duration: 1000, easing: 'inAndOut'},

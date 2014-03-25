@@ -284,6 +284,7 @@ int create_listen_socket(int port)
 #define RRD_STATS_NAME_MAX 1024
 
 struct rrd_dimension {
+	char id[RRD_STATS_NAME_MAX + 1];
 	char name[RRD_STATS_NAME_MAX + 1];
 	size_t bytes;
 	size_t entries;
@@ -350,7 +351,7 @@ RRD_STATS *rrd_stats_create(const char *name, unsigned long entries)
 	return(st);
 }
 
-RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *name, size_t bytes, size_t multiplier, size_t divisor)
+RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char *name, size_t bytes, long multiplier, long divisor)
 {
 	RRD_DIMENSION *rd = NULL;
 
@@ -370,6 +371,7 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *name, size_t b
 		return NULL;
 	}
 
+	strncpy(rd->id, id, RRD_STATS_NAME_MAX);
 	strncpy(rd->name, name, RRD_STATS_NAME_MAX);
 	rd->name[RRD_STATS_NAME_MAX] = '\0';
 
@@ -393,12 +395,12 @@ RRD_STATS *rrd_stats_find(const char *name)
 	return(st);
 }
 
-RRD_DIMENSION *rrd_stats_dimension_find(RRD_STATS *st, const char *dimension)
+RRD_DIMENSION *rrd_stats_dimension_find(RRD_STATS *st, const char *id)
 {
 	RRD_DIMENSION *rd = st->dimensions;
 
 	for ( ; rd ; rd = rd->next ) {
-		if(strcmp(rd->name, dimension) == 0) break;
+		if(strcmp(rd->id, id) == 0) break;
 	}
 
 	return(rd);
@@ -425,30 +427,30 @@ void rrd_stats_done(RRD_STATS *st)
 	pthread_mutex_unlock(&st->mutex);
 }
 
-void rrd_stats_dimension_set(RRD_STATS *st, const char *dimension, void *data)
+void rrd_stats_dimension_set(RRD_STATS *st, const char *id, void *data)
 {
-	RRD_DIMENSION *rd = rrd_stats_dimension_find(st, dimension);
+	RRD_DIMENSION *rd = rrd_stats_dimension_find(st, id);
 	if(!rd) {
-		error("Cannot find dimension '%s' on stats '%s'.", dimension, st->name);
+		error("Cannot find dimension with id '%s' on stats '%s'.", id, st->name);
 		return;
 	}
 
-	if(rd->bytes == sizeof(unsigned long long)) {
+	if(rd->bytes == sizeof(long long)) {
 		long long *dimension = rd->values, *value = data;
 
 		dimension[st->last_entry] = (*value);
 	}
-	else if(rd->bytes == sizeof(unsigned long)) {
+	else if(rd->bytes == sizeof(long)) {
 		long *dimension = rd->values, *value = data;
 
 		dimension[st->last_entry] = (*value);
 	}
-	else if(rd->bytes == sizeof(unsigned int)) {
+	else if(rd->bytes == sizeof(int)) {
 		int *dimension = rd->values, *value = data;
 
 		dimension[st->last_entry] = (*value);
 	}
-	else if(rd->bytes == sizeof(unsigned char)) {
+	else if(rd->bytes == sizeof(char)) {
 		char *dimension = rd->values, *value = data;
 
 		dimension[st->last_entry] = (*value);
@@ -549,7 +551,7 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 			struct tm *tm = localtime(&st->times[t].tv_sec);
 			if(!tm) { error("localtime() failed."); continue; }
 
-			sprintf(dtm, "\"Date(%d, %d, %d, %d, %d, %d)\"", tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec); // datetime
+			sprintf(dtm, "\"Date(%d, %d, %d, %d, %d, %d, %d)\"", tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(st->times[t].tv_usec / 1000)); // datetime
 			// strftime(dtm, 200, "\"Date(%Y, %m, %d, %H, %M, %S)\"", tm); // datetime
 			// strftime(dtm, 200, "[%H, %M, %S, 0]", tm); // timeofday
  			i += sprintf(&b[i], "%s		{\"c\":[{\"v\":%s},", printed?"]},\n":"", dtm);
@@ -558,27 +560,30 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
  		}
 
 		for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
-			if(rd->bytes == sizeof(unsigned long long)) {
+			if(rd->bytes == sizeof(long long)) {
 				long long *dimension = rd->values;
-				value = (dimension[t] - dimension[lt]) * 1000000 * rd->multiplier / usec / rd->divisor;
+				value = dimension[t] - dimension[lt];
 			}
-			else if(rd->bytes == sizeof(unsigned long)) {
+			else if(rd->bytes == sizeof(long)) {
 				long *dimension = rd->values;
-				value = (dimension[t] - dimension[lt]) * 1000000 * rd->multiplier / usec / rd->divisor;
+				value = dimension[t] - dimension[lt];
 			}
-			else if(rd->bytes == sizeof(unsigned int)) {
+			else if(rd->bytes == sizeof(int)) {
 				int *dimension = rd->values;
-				value = (dimension[t] - dimension[lt]) * 1000000 * rd->multiplier / usec / rd->divisor;
+				value = dimension[t] - dimension[lt];
 			}
-			else if(rd->bytes == sizeof(unsigned char)) {
+			else if(rd->bytes == sizeof(char)) {
 				char *dimension = rd->values;
-				value = (dimension[t] - dimension[lt]) * 1000000 * rd->multiplier / usec / rd->divisor;
+				value = dimension[t] - dimension[lt];
 			}
 			else fatal("Cannot produce JSON for size %d bytes dimension.", rd->bytes);
 
+			value = value * 1000000L / usec;
+			value = value * rd->multiplier / rd->divisor;
+
 			switch(group_method) {
 				case GROUP_MAX:
-					if(value > group_values[c]) group_values[c] = value;
+					if(abs(value) > abs(group_values[c])) group_values[c] = value;
 					break;
 
 				default:
@@ -1386,10 +1391,10 @@ int do_proc_net_dev() {
 					continue;
 				}
 
-				if(!rrd_stats_dimension_add(st, "sent", sizeof(unsigned long long), 8, 1024))
+				if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), -8, 1024))
 					error("Cannot add RRD_STATS dimension %s.", "sent");
 
-				if(!rrd_stats_dimension_add(st, "received", sizeof(unsigned long long), 8, 1024))
+				if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 8, 1024))
 					error("Cannot add RRD_STATS dimension %s.", "received");
 
 			}
@@ -1404,6 +1409,9 @@ int do_proc_net_dev() {
 	fclose(fp);
 	return 0;
 }
+
+// ----------------------------------------------------------------------------
+// /proc/diskstats processor
 
 int do_proc_diskstats() {
 	char buffer[MAX_PROC_DISKSTATS_LINE+1] = "";
@@ -1484,10 +1492,10 @@ int do_proc_diskstats() {
 					continue;
 				}
 
-				if(!rrd_stats_dimension_add(st, "writes", sizeof(unsigned long long), sector_size, 1024))
+				if(!rrd_stats_dimension_add(st, "writes", "writes", sizeof(unsigned long long), sector_size * -1, 1024))
 					error("Cannot add RRD_STATS dimension %s.", "writes");
 
-				if(!rrd_stats_dimension_add(st, "reads", sizeof(unsigned long long), sector_size, 1024))
+				if(!rrd_stats_dimension_add(st, "reads", "reads", sizeof(unsigned long long), sector_size, 1024))
 					error("Cannot add RRD_STATS dimension %s.", "reads");
 
 			}
@@ -1502,6 +1510,9 @@ int do_proc_diskstats() {
 	fclose(fp);
 	return 0;
 }
+
+// ----------------------------------------------------------------------------
+// /proc processor
 
 void *proc_main(void *ptr)
 {
@@ -1545,125 +1556,240 @@ void *proc_main(void *ptr)
 	return NULL;
 }
 
+// ----------------------------------------------------------------------------
+// /sbin/tc processor
+// this requires the script tc-all.sh
+
 #define PIPE_READ 0
 #define PIPE_WRITE 1
-#define TC_SHOW_MAX 65536
+#define TC_LINE_MAX 1024
 
+struct tc_class {
+	char id[RRD_STATS_NAME_MAX + 1];
+	char name[RRD_STATS_NAME_MAX + 1];
+
+	char parentid[RRD_STATS_NAME_MAX + 1];
+
+	int hasparent;
+	int isleaf;
+	unsigned long long bytes;
+
+	struct tc_class *next;
+};
+
+struct tc_device {
+	char name[RRD_STATS_NAME_MAX + 1];
+
+	struct tc_class *classes;
+};
+
+void tc_device_commit(struct tc_device *d)
+{
+	// we only need to add leaf classes
+	struct tc_class *c, *x;
+	for ( c = d->classes ; c ; c = c->next) {
+		c->isleaf = 1;
+
+		for ( x = d->classes ; x ; x = x->next) {
+			if(strcmp(c->id, x->parentid) == 0) {
+				c->isleaf = 0;
+				x->hasparent = 1;
+			}
+		}
+	}
+	
+	// debugging:
+	// for ( c = d->classes ; c ; c = c->next) {
+	//	if(c->isleaf && c->hasparent) debug(D_TC_LOOP, "Device %s, class %s, OK", d->name, c->id);
+	//	else debug(D_TC_LOOP, "Device %s, class %s, IGNORE (isleaf: %d, hasparent: %d, parent: %s)", d->name, c->id, c->isleaf, c->hasparent, c->parentid);
+	// }
+
+	for ( c = d->classes ; c ; c = c->next) {
+		if(c->isleaf && c->hasparent) break;
+	}
+	if(!c) {
+		debug(D_TC_LOOP, "Ignoring TC device '%s'. No leaf classes.", d->name);
+		return;
+	}
+
+	debug(D_TC_LOOP, "Committing TC device '%s'", d->name);
+
+	RRD_STATS *st = rrd_stats_find(d->name);
+	if(!st) {
+		st = rrd_stats_create(d->name, save_history);
+		if(!st) {
+			error("Cannot create RRD_STATS for interface %s.", d->name);
+			return;
+		}
+
+		for ( c = d->classes ; c ; c = c->next) {
+			if(c->isleaf && c->hasparent) {
+				if(!rrd_stats_dimension_add(st, c->id, c->name, sizeof(unsigned long long), 8, 1024))
+					error("Cannot add RRD_STATS dimension %s.", c->name);
+			}
+		}
+	}
+	else rrd_stats_next(st);
+
+	for ( c = d->classes ; c ; c = c->next) {
+		if(c->isleaf && c->hasparent)
+			rrd_stats_dimension_set(st, c->id, &c->bytes);
+	}
+	rrd_stats_done(st);
+}
+
+void tc_device_set_class_name(struct tc_device *d, char *id, char *name)
+{
+	struct tc_class *c;
+	for ( c = d->classes ; c ; c = c->next) {
+		if(strcmp(c->id, id) == 0) {
+			strncpy(c->name, name, RRD_STATS_NAME_MAX);
+			break;
+		}
+	}
+}
+
+struct tc_device *tc_device_create(char *name)
+{
+	struct tc_device *d;
+
+	d = calloc(sizeof(struct tc_device), 1);
+	if(!d) return NULL;
+
+	strcpy(d->name, "tc.");
+	strncpy(&d->name[3], name, RRD_STATS_NAME_MAX - 3);
+
+	return(d);
+}
+
+struct tc_class *tc_class_add(struct tc_device *n, char *id, char *parentid)
+{
+	struct tc_class *c;
+
+	c = calloc(sizeof(struct tc_class), 1);
+	if(!c) return NULL;
+
+	c->next = n->classes;
+	n->classes = c;
+
+	strncpy(c->id, id, RRD_STATS_NAME_MAX);
+	strcpy(c->name, c->id);
+	if(parentid) strncpy(c->parentid, parentid, RRD_STATS_NAME_MAX);
+
+	return(c);
+}
+
+void tc_class_free(struct tc_class *c)
+{
+	if(c->next) tc_class_free(c->next);
+	free(c);
+}
+
+void tc_device_free(struct tc_device *n)
+{
+	if(n->classes) tc_class_free(n->classes);
+	free(n);
+}
+
+pid_t tc_child_pid = 0;
 void *tc_main(void *ptr)
 {
-	return NULL;
-	
-	char buffer[TC_SHOW_MAX+1] = "";
-	struct timeval last, now, tmp;
-	int pipefd[2];
-	long i, len;
-
-	gettimeofday(&last, NULL);
-	last.tv_sec -= update_every;
+	char buffer[TC_LINE_MAX+1] = "";
 
 	for(;1;) {
-		unsigned long long usec, susec;
-		gettimeofday(&now, NULL);
+		FILE *fp;
+		struct tc_device *device = NULL;
+		struct tc_class *class = NULL;
 
-		// calculate the time it took for a full loop
-		usec = usecdiff(&now, &last);
-		debug(D_TC_LOOP, "TC: Last loop took %llu usec.", usec);
+		sprintf(buffer, "./tc-all.sh %d", update_every);
+		fp = popen(buffer, "r");
 
+		while(fgets(buffer, TC_LINE_MAX, fp) != NULL) {
+			buffer[TC_LINE_MAX] = '\0';
+			char *b = buffer, *p;
+			// debug(D_TC_LOOP, "TC: read '%s'", buffer);
 
+			p = strsep(&b, " \n");
+			while (p && (*p == ' ' || *p == '\0')) p = strsep(&b, " \n");
+			if(!p) continue;
 
-		// BEGIN -- the job to be done
+			if(strcmp(p, "END") == 0) {
+				if(device) {
+					tc_device_commit(device);
+					tc_device_free(device);
+					device = NULL;
+					class = NULL;
+				}
+			}
+			else if(strcmp(p, "BEGIN") == 0) {
+				if(device) tc_device_free(device);
 
-		/* --- BEGIN OF OLD VERSION ---
-		// this works!
-		// it is simpler...
-		// but it is 2-3 times slower than the current implementation!
-		// I guess the difference is that popen first runs /bin/sh.
+				p = strsep(&b, " \n");
+				if(p && *p) device = tc_device_create(p);
+			}
+			else if(device && (strcmp(p, "class") == 0)) {
+				p = strsep(&b, " \n"); // the class: htb, fq_codel, etc
+				char *id       = strsep(&b, " \n"); // the class major:minor
+				char *parent   = strsep(&b, " \n"); // 'parent' or 'root'
+				char *parentid = strsep(&b, " \n"); // the parent's id
 
-		FILE *fp = popen("/sbin/tc -s -d qdisc show", "r");
+				if(id && *id
+					&& parent && *parent
+					&& parentid && *parentid
+					&& (
+						(strcmp(parent, "parent") == 0 && parentid && *parentid)
+						|| strcmp(parent, "root") == 0
+					)) {
+					if(strcmp(parent, "root") == 0) parentid = NULL;
 
-		char *p;
-		while((p = fgets(buffer, TC_SHOW_MAX, fp))) {
-			buffer[TC_SHOW_MAX] = '\0';
-			debug(D_TC_LOOP, "TC: read '%s'", p);
+					class = tc_class_add(device, id, parentid);
+				}
+			}
+			else if(device && class && (strcmp(p, "Sent") == 0)) {
+				p = strsep(&b, " \n");
+				if(p && *p) class->bytes = atoll(p);
+			}
+			else if(device && (strcmp(p, "SETCLASSNAME") == 0)) {
+				char *name = strsep(&b, " |\n");
+				char *id = strsep(&b, " |\n");
+				tc_device_set_class_name(device, id, name);
+			}
+			else if((strcmp(p, "MYPID") == 0)) {
+				char *id = strsep(&b, " \n");
+				tc_child_pid = atol(id);
+				debug(D_TC_LOOP, "Child PID is %d.", tc_child_pid);
+			}
 		}
 		pclose(fp);
 
-		--- END OF OLD VERSION --- */
-
-		if(pipe(pipefd) != 0) {
-			error("TC: Cannot create pipe for tc. TC will be disabled.");
-			return NULL;
-		}
-
-		pid_t pid = fork();
-		if(pid == -1) {
-			error("TC: cannot fork child. TC will be disabled.");
-			return NULL;
-		}
-		else if(pid == 0) {
-			// the child
-
-			// close the read fd of the pipe
-			close(pipefd[PIPE_READ]);
-
-			// attach the pipe to stdout and stderr
-			if(dup2(pipefd[PIPE_WRITE], STDOUT_FILENO) == -1) {
-				error("TC: cannot attach pipe write to stdout.");
-				exit(1);
-			}
-			if(dup2(pipefd[PIPE_WRITE], STDERR_FILENO) == -1) {
-				error("TC: cannot attach pipe write to stderr.");
-				exit(1);
-			}
-
-			// execute tc to get the output
-			execl("/sbin/tc", "-s", "-d", "qdisc", "show", NULL);
-			exit(0);
-		}
-		// the parent
-
-		// close the write fd of the pipe
-		close(pipefd[PIPE_WRITE]);
-
-		// read data from the pipe
-		i = 1;
-		len = 0;
-		while(i > 0 && len < TC_SHOW_MAX) {
-			debug(D_TC_LOOP, "TC: Reading from pipe...");
-			i = read(pipefd[PIPE_READ], &buffer[len], TC_SHOW_MAX - len);
-			if(i > 0) len += i;
-			// debug(D_TC_LOOP, "TC READ: '%s'", buffer);
-		}
-		buffer[len] = '\0';
-		debug(D_TC_LOOP, "TC: Completed reading %d bytes.", len);
-		close(pipefd[PIPE_READ]);
-
-		// END -- the job is done
-
-
-
-		// find the time to sleep in order to wait exactly update_every seconds
-		gettimeofday(&tmp, NULL);
-		usec = usecdiff(&tmp, &now);
-		debug(D_TC_LOOP, "TC: This loop took %llu usec.", usec);
-		
-		if(usec < (update_every * 1000000)) susec = (update_every * 1000000) - usec;
-		else susec = 0;
-		
-		// make sure we will wait at least 100ms
-		if(susec < 100000) susec = 100000;
-		
-		debug(D_TC_LOOP, "TC: Sleeping for %llu usec.", susec);
-		usleep(susec);
-		
-		// copy now to last
-		last.tv_sec = now.tv_sec;
-		last.tv_usec = now.tv_usec;
+		sleep(1);
 	}
 
 	return NULL;
 }
 
+void bye(void)
+{
+	if(tc_child_pid) kill(tc_child_pid, SIGTERM);
+	tc_child_pid = 0;
+}
+
+void sig_handler(int signo)
+{
+	error("Signal %d received.", signo);
+
+	switch(signo) {
+		case SIGTERM:
+		case SIGQUIT:
+		case SIGINT:
+		case SIGHUP:
+			error("Cleanup.");
+			if(tc_child_pid) kill(tc_child_pid, SIGTERM);
+			tc_child_pid = 0;
+			exit(1);
+			break;
+	}
+}
 
 int main(int argc, char **argv)
 {
@@ -1731,6 +1857,13 @@ int main(int argc, char **argv)
 		close(2);
 		silent = 1;
 	}
+
+	// make sure we cleanup correctly
+	atexit(bye);
+	if(signal(SIGINT,  sig_handler) == SIG_ERR) error("Can't catch SIGINT.");
+	if(signal(SIGTERM, sig_handler) == SIG_ERR) error("Can't catch SIGTERM.");
+	if(signal(SIGQUIT, sig_handler) == SIG_ERR) error("Can't catch SIGQUIT.");
+	if(signal(SIGHUP,  sig_handler) == SIG_ERR) error("Can't catch SIGHUP.");
 
 	pthread_t p_proc, p_tc;
 	int r_proc, r_tc;
