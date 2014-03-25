@@ -197,7 +197,7 @@ cat >>${data}/index.html <<EOF3
 	
 	var refreshCount = 0;
 	function myChartsRefresh() {
-		refreshCount++;
+		refreshCount += $ref;
 		if(refreshCount > $NETDATA_CONFIG_RELOAD_EVERY) location.reload();
 
 		// refresh up to $ref charts per second
