@@ -181,32 +181,20 @@ EOF2
 	fi
 done
 
-ref=$[4 * NETDATA_CONFIG_UPDATE_EVERY]
-tim=$[1000 * NETDATA_CONFIG_UPDATE_EVERY]
-if [ $count -gt 4 ]
-then
-	ref=1
-	tim=$[1000 * NETDATA_CONFIG_UPDATE_EVERY / count]
-	if [ $tim -lt $[200 * NETDATA_CONFIG_UPDATE_EVERY] ]
-	then
-		tim=$[200 * NETDATA_CONFIG_UPDATE_EVERY]
-	fi
-fi
-
 cat >>${data}/index.html <<EOF3
 		refreshCharts(999999);
 	}
 	
 	var refreshCount = 0;
 	function myChartsRefresh() {
-		refreshCount += $ref;
+		refreshCount += 2;
 		if(refreshCount > $NETDATA_CONFIG_RELOAD_EVERY) location.reload();
 
-		// refresh up to $ref charts per second
-		refreshCharts($ref);
+		// refresh up to 2 charts per second
+		refreshCharts(2);
 	}
 	
-	setInterval(myChartsRefresh, $tim);
+	setInterval(myChartsRefresh, 1000);
 
 	//window.onresize = function(event) {
 	//	refreshCharts(999999);
