@@ -17,11 +17,11 @@ do
 		/sbin/tc -s class show dev $x
 		if [ -f /var/run/fireqos/ifaces/$x ]
 		then
-			name=`cat /var/run/fireqos/ifaces/$x`
+			name="`cat /var/run/fireqos/ifaces/$x`"
 			echo "SETDEVICENAME $name"
 			interface_classes=
-			source /var/run/fireqos/$name.conf
-			for x in $interface_classes
+			. /var/run/fireqos/$name.conf
+			for x in $interface_classes_monitor
 			do
 					echo "SETCLASSNAME $x"
 			done

@@ -1925,8 +1925,10 @@ void *tc_main(void *ptr)
 			}
 			else if(device && (strcmp(p, "SETCLASSNAME") == 0)) {
 				char *name = strsep(&b, " |\n");
+				char *path = strsep(&b, " |\n");
 				char *id = strsep(&b, " |\n");
-				if(id && *id && name && *name) tc_device_set_class_name(device, id, name);
+				char *qdisc = strsep(&b, " |\n");
+				if(id && *id && path && *path) tc_device_set_class_name(device, id, path);
 			}
 			else if((strcmp(p, "MYPID") == 0)) {
 				char *id = strsep(&b, " \n");
