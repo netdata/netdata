@@ -86,6 +86,8 @@ echo "Stopping a (possibly) running netdata..."
 killall netdata 2>/dev/null
 killall tc-all.sh 2>/dev/null
 
+sleep 2
+
 echo "Compiling netdata"
 # gcc -Wall -O3 -o netdata netdata.c -lpthread || exit 1
 gcc -Wall -ggdb -o netdata netdata.c -lpthread || exit 1
