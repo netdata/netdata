@@ -15,6 +15,13 @@
 	<script type="text/javascript" src="netdata.js"></script>
 	<script type="text/javascript">
 
+	<!--
+	<xsl:variable name="unique-list" select="//graph/type[not(.=following::type)]" />
+	<xsl:for-each select="$unique-list">
+	alert('<xsl:value-of select="." />');
+	</xsl:for-each>
+	-->
+	
 	// Set a callback to run when the Google Visualization API is loaded.
 	google.setOnLoadCallback(drawCharts);
 
@@ -50,6 +57,7 @@
 		</div>
 	</div>
 	</xsl:for-each>
+
 </body>
 </html>
 </xsl:template>

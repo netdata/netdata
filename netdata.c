@@ -962,7 +962,7 @@ int mysendfile(struct web_client *w, char *filename)
 
 		if(errno == EBUSY || errno == EAGAIN) {
 			error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, filename);
-			sprintf(w->response_header, "Location: %s\r\n", filename);
+			sprintf(w->response_header, "Location: " WEB_PATH_FILE "/%s\r\n", filename);
 			w->data->bytes = sprintf(w->data->buffer, "The file '%s' is currently busy. Please try again later.", filename);
 			return 307;
 		}
@@ -1246,7 +1246,11 @@ void web_client_process(struct web_client *w)
 	struct tm tm = *gmtime(&w->data->date);
 	strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S %Z", &tm);
 
-	size_t headerlen = strlen(w->response_header);
+	char custom_header[MAX_HTTP_HEADER_SIZE + 1] = "";
+	if(w->response_header[0]) 
+		strcpy(custom_header, w->response_header);
+
+	size_t headerlen = 0;
 	headerlen += sprintf(&w->response_header[headerlen],
 		"HTTP/1.1 %d %s\r\n"
 		"Connection: %s\r\n"
@@ -1259,6 +1263,9 @@ void web_client_process(struct web_client *w)
 		, content_type_string
 		, date
 		);
+
+	if(custom_header[0])
+		headerlen += sprintf(&w->response_header[headerlen], "%s", custom_header);
 
 	if(w->mode == WEB_CLIENT_MODE_NORMAL) {
 		headerlen += sprintf(&w->response_header[headerlen],
