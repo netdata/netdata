@@ -38,7 +38,7 @@ NETDATA_CONFIG_PORT=19999
 # get user configuration
 if [ -f netdata.conf ]
 then
-	source netdata.conf
+	. netdata.conf
 fi
 
 # how many history lines to keep in netdata
@@ -68,7 +68,7 @@ then
 else
 	echo >&2 "WARNING: NOT RUNNING AS ROOT - CANNOT SWITCH TO USER $NETDATA_CONFIG_USER"
 	echo >&2 "WARNING: MAKE SURE FILES IN web/ ARE OWNED BY $USER - or it will not work"
-	./netdata -d -t $NETDATA_CONFIG_INTERNAL_UPDATE_EVERY -l $NETDATA_HISTORY_LINES -p $NETDATA_CONFIG_PORT || exit 1
+	`pwd`/netdata -d -t $NETDATA_CONFIG_INTERNAL_UPDATE_EVERY -l $NETDATA_HISTORY_LINES -p $NETDATA_CONFIG_PORT || exit 1
 fi
 sleep 2
 
@@ -147,7 +147,7 @@ do
 	if [ ! "$p" = "IGNORE" ]
 	then
 		cat >>web/index.html <<EOF2
-		addChart('${x}', '${y}_div', 0, 0, "data/${x}/${NETDATA_CONFIG_HISTORY_POINTS}/${NETDATA_CONFIG_UPDATE_EVERY}/average/", "${title}${t} (${x})", "${vtitle}");
+		addChart('${x}', '${y}_div', 0, 0, "/data/${x}/${NETDATA_CONFIG_HISTORY_POINTS}/${NETDATA_CONFIG_UPDATE_EVERY}/average/", "${title}${t} (${x})", "${vtitle}");
 EOF2
 	fi
 done

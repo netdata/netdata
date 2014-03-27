@@ -72,6 +72,12 @@
 #define CT_TEXT_XML						6
 #define CT_APPLICATION_XML				7
 #define CT_TEXT_XSL						8
+#define CT_APPLICATION_OCTET_STREAM		9
+#define CT_APPLICATION_X_FONT_TRUETYPE	10
+#define CT_APPLICATION_X_FONT_OPENTYPE	11
+#define CT_APPLICATION_FONT_WOFF		12
+#define CT_APPLICATION_VND_MS_FONTOBJ	13
+#define CT_IMAGE_SVG_XML				14
 
 // configuration
 #define DEBUG (D_WEB_CLIENT_ACCESS|D_LISTENER|D_RRD_STATS)
@@ -962,7 +968,7 @@ int mysendfile(struct web_client *w, char *filename)
 
 		if(errno == EBUSY || errno == EAGAIN) {
 			error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, filename);
-			sprintf(w->response_header, "Location: " WEB_PATH_FILE "/%s\r\n", filename);
+			sprintf(w->response_header, "Location: /" WEB_PATH_FILE "/%s\r\n", filename);
 			w->data->bytes = sprintf(w->data->buffer, "The file '%s' is currently busy. Please try again later.", filename);
 			return 307;
 		}
@@ -979,6 +985,13 @@ int mysendfile(struct web_client *w, char *filename)
 	else if(strstr(filename, ".css")  != NULL)	w->data->contenttype = CT_TEXT_CSS;
 	else if(strstr(filename, ".xml")  != NULL)	w->data->contenttype = CT_TEXT_XML;
 	else if(strstr(filename, ".xsl")  != NULL)	w->data->contenttype = CT_TEXT_XSL;
+	else if(strstr(filename, ".txt")  != NULL)  w->data->contenttype = CT_TEXT_PLAIN;
+	else if(strstr(filename, ".svg")  != NULL)  w->data->contenttype = CT_IMAGE_SVG_XML;
+	else if(strstr(filename, ".ttf")  != NULL)  w->data->contenttype = CT_APPLICATION_X_FONT_TRUETYPE;
+	else if(strstr(filename, ".otf")  != NULL)  w->data->contenttype = CT_APPLICATION_X_FONT_OPENTYPE;
+	else if(strstr(filename, ".woff") != NULL)  w->data->contenttype = CT_APPLICATION_FONT_WOFF;
+	else if(strstr(filename, ".eot")  != NULL)  w->data->contenttype = CT_APPLICATION_VND_MS_FONTOBJ;
+	else w->data->contenttype = CT_APPLICATION_OCTET_STREAM;
 
 	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%ld bytes, ifd %d, ofd %d).", w->id, filename, stat.st_size, w->ifd, w->ofd);
 
@@ -1159,7 +1172,13 @@ void web_client_process(struct web_client *w)
 			w->data->bytes = rrd_stats_all_xml(w->data->buffer, w->data->size);
 		}
 		else if(strcmp(tok, WEB_PATH_FILE) == 0) { // "file"
-			code = mysendfile(w, url);
+			tok = mystrsep(&url, "/?&");
+			if(tok && *tok) code = mysendfile(w, tok);
+			else {
+				code = 400;
+				strcpy(w->data->buffer, "You have to give a filename to get.\r\n");
+				w->data->bytes = strlen(w->data->buffer);
+			}
 		}
 		else if(!tok[0]) {
 			code = mysendfile(w, "index.html");
@@ -1207,6 +1226,30 @@ void web_client_process(struct web_client *w)
 
 		case CT_TEXT_XSL:
 			content_type_string = "text/xsl";
+			break;
+
+		case CT_APPLICATION_OCTET_STREAM:
+			content_type_string = "application/octet-stream";
+			break;
+
+		case CT_IMAGE_SVG_XML:
+			content_type_string = "image/svg+xml";
+			break;
+
+		case CT_APPLICATION_X_FONT_TRUETYPE:
+			content_type_string = "application/x-font-truetype";
+			break;
+
+		case CT_APPLICATION_X_FONT_OPENTYPE:
+			content_type_string = "application/x-font-opentype";
+			break;
+
+		case CT_APPLICATION_FONT_WOFF:
+			content_type_string = "application/font-woff";
+			break;
+
+		case CT_APPLICATION_VND_MS_FONTOBJ:
+			content_type_string = "application/vnd.ms-fontobject";
 			break;
 
 		default:
