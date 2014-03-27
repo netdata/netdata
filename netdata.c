@@ -6,6 +6,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <pwd.h>
 #include <sys/types.h>
 #include <sys/time.h>
 
@@ -933,9 +934,15 @@ int mysendfile(struct web_client *w, char *filename)
 		return 400;
 	}
 
+	// access the file in web/*
+	char webfilename[FILENAME_MAX + 1];
+	strcpy(webfilename, "web/");
+	strncpy(&webfilename[4], filename, FILENAME_MAX - 4);
+	webfilename[FILENAME_MAX] = '\0';
+
 	// check if the file exists
 	struct stat stat;
-	if(lstat(filename, &stat) != 0) {
+	if(lstat(webfilename, &stat) != 0) {
 		debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not found.", w->id, filename);
 		w->data->bytes = sprintf(w->data->buffer, "File '%s' does not exist, or is not accessible.", filename);
 		return 404;
@@ -949,7 +956,7 @@ int mysendfile(struct web_client *w, char *filename)
 	}
 
 	// open the file
-	w->ifd = open(filename, O_NONBLOCK, O_RDONLY);
+	w->ifd = open(webfilename, O_NONBLOCK, O_RDONLY);
 	if(w->ifd == -1) {
 		w->ifd = w->ofd;
 
@@ -2023,6 +2030,33 @@ void sig_handler(int signo)
 	}
 }
 
+int become_user(const char *username)
+{
+	struct passwd *pw = getpwnam(username);
+	if(!pw) {
+		fprintf(stderr, "User %s is not present. Error: %s\n", username, strerror(errno));
+		return -1;
+	}
+	if(setgid(pw->pw_gid) != 0) {
+		fprintf(stderr, "Cannot switch to user's %s group (gid: %d). Error: %s\n", username, pw->pw_gid, strerror(errno));
+		return -1;
+	}
+	if(setegid(pw->pw_gid) != 0) {
+		fprintf(stderr, "Cannot effectively switch to user's %s group (gid: %d). Error: %s\n", username, pw->pw_gid, strerror(errno));
+		return -1;
+	}
+	if(setuid(pw->pw_uid) != 0) {
+		fprintf(stderr, "Cannot switch to user %s (uid: %d). Error: %s\n", username, pw->pw_uid, strerror(errno));
+		return -1;
+	}
+	if(seteuid(pw->pw_uid) != 0) {
+		fprintf(stderr, "Cannot effectively switch to user %s (uid: %d). Error: %s\n", username, pw->pw_uid, strerror(errno));
+		return -1;
+	}
+
+	return(0);
+}
+
 int main(int argc, char **argv)
 {
 	int i, daemon = 0;
@@ -2032,7 +2066,7 @@ int main(int argc, char **argv)
 		if(strcmp(argv[i], "-l") == 0 && (i+1) < argc) {
 			save_history = atoi(argv[i+1]);
 			if(save_history < 5 || save_history > HISTORY_MAX) {
-				error("Invalid save lines %d given. Defaulting to %d.", save_history, HISTORY);
+				fprintf(stderr, "Invalid save lines %d given. Defaulting to %d.\n", save_history, HISTORY);
 				save_history = HISTORY;
 			}
 			else {
@@ -2041,9 +2075,19 @@ int main(int argc, char **argv)
 			i++;
 		}
 		else if(strcmp(argv[i], "-u") == 0 && (i+1) < argc) {
+			if(become_user(argv[i+1]) != 0) {
+				fprintf(stderr, "Cannot become user %s.\n", argv[i+1]);
+				exit(1);
+			}
+			else {
+				debug(D_OPTIONS, "Successfully became user %s.", argv[i+1]);
+			}
+			i++;
+		}
+		else if(strcmp(argv[i], "-t") == 0 && (i+1) < argc) {
 			update_every = atoi(argv[i+1]);
 			if(update_every < 1 || update_every > 600) {
-				error("Invalid update timer %d given. Defaulting to %d.", update_every, UPDATE_EVERY_MAX);
+				fprintf(stderr, "Invalid update timer %d given. Defaulting to %d.\n", update_every, UPDATE_EVERY_MAX);
 				update_every = UPDATE_EVERY;
 			}
 			else {
@@ -2054,7 +2098,7 @@ int main(int argc, char **argv)
 		else if(strcmp(argv[i], "-p") == 0 && (i+1) < argc) {
 			listen_port = atoi(argv[i+1]);
 			if(listen_port < 1 || listen_port > 65535) {
-				error("Invalid listen port %d given. Defaulting to %d.", listen_port, LISTEN_PORT);
+				fprintf(stderr, "Invalid listen port %d given. Defaulting to %d.\n", listen_port, LISTEN_PORT);
 				listen_port = LISTEN_PORT;
 			}
 			else {
@@ -2071,10 +2115,16 @@ int main(int argc, char **argv)
 			fprintf(stderr, "\nUSAGE: %s [-d] [-l LINES_TO_SAVE] [-u UPDATE_TIMER] [-p LISTEN_PORT].\n\n", argv[0]);
 			fprintf(stderr, "  -d enable daemon mode (run in background).\n");
 			fprintf(stderr, "  -l LINES_TO_SAVE can be from 5 to %d lines in JSON data. Default: %d.\n", HISTORY_MAX, HISTORY);
-			fprintf(stderr, "  -u UPDATE_TIMER can be from 1 to %d seconds. Default: %d.\n", UPDATE_EVERY_MAX, UPDATE_EVERY);
+			fprintf(stderr, "  -t UPDATE_TIMER can be from 1 to %d seconds. Default: %d.\n", UPDATE_EVERY_MAX, UPDATE_EVERY);
 			fprintf(stderr, "  -p LISTEN_PORT can be from 1 to %d. Default: %d.\n", 65535, LISTEN_PORT);
+			fprintf(stderr, "  -u USERNAME can be any system username to run as. Default: none.\n");
 			exit(1);
 		}
+	}
+
+	// never become a problem
+	if(nice(20) == -1) {
+		fprintf(stderr, "Cannot lower my CPU priority. Error %s.\n", strerror(errno));
 	}
 
 	if(daemon) {
@@ -2083,7 +2133,10 @@ int main(int argc, char **argv)
 			perror("cannot fork");
 			exit(1);
 		}
-		if(i != 0) exit(0); // the parent
+		if(i != 0) {
+			fprintf(stderr, "Running in the background...\n");
+			exit(0); // the parent
+		}
 		close(0);
 		close(1);
 		close(2);

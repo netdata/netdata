@@ -2,7 +2,7 @@
 
 base="`dirname "$0"`"
 
-if [ ! -d "$base" -o ! -f "$base/netdata.c" ]
+if [ ! -d "$base" -o ! -f "$base/netdata.c" -o ! -d "$base/web" ]
 then
 	echo >&2 "Cannot find my home directory '${base}'."
 	exit 1
@@ -26,6 +26,16 @@ NETDATA_CONFIG_HISTORY_DATA=3600
 # when refreshes graphs
 NETDATA_CONFIG_RELOAD_EVERY=500
 
+# the user to run netdata under
+NETDATA_CONFIG_USER=nobody
+
+# set to 1, to enable debugging
+NETDATA_CONFIG_DEBUG=0
+
+# our port
+NETDATA_CONFIG_PORT=19999
+
+# get user configuration
 if [ -f netdata.conf ]
 then
 	source netdata.conf
@@ -34,75 +44,36 @@ fi
 # how many history lines to keep in netdata
 NETDATA_HISTORY_LINES=$[NETDATA_CONFIG_UPDATE_EVERY * NETDATA_CONFIG_HISTORY_POINTS / NETDATA_CONFIG_INTERNAL_UPDATE_EVERY]
 
-echo "Creating a directory for netdata..."
-data=
-for x in /run/netdata /var/run/netdata /tmp/netdata
-do
-	echo "	Trying '${x}'..."
-	if [ ! -d "${x}" ]
-	then
-		mkdir "${x}" 2>/dev/null
-		if [ $? -eq 0 ]
-		then
-			echo "	OK. '${x}' works."
-			data="${x}"
-			break
-		fi
-	else
-		echo "	OK. '${x}' works."
-		data="${x}"
-		break
-	fi
-done
-
-if [ -z "${data}" ]
-then
-	echo >&2 "Cannot find where to put netdata files."
-	exit 1
-fi
-
-if [ -h data ]
-then
-	echo "Removing existing $base/data link"
-	rm data || exit 1
-fi
-
-if [ ! -d data ]
-then
-	echo "Linking '${data}' to $base/data"
-	ln -s "${data}" data || exit 1
-else
-	echo >&2 "Directory $base/data already exists. Not touching it, however it should be a link '${data}'."
-fi
-
-cp "${base}/all.xsl" "${data}/"
-cp "${base}/netdata.js" "${data}/"
-cp "${base}/tc-all.sh" "${data}/"
-chmod 700 "${data}/tc-all.sh"
-
-echo "Finding proper parameters for dashboard..."
-
 echo "Stopping a (possibly) running netdata..."
 killall netdata 2>/dev/null
 killall tc-all.sh 2>/dev/null
-
 sleep 2
 
 echo "Compiling netdata"
-# gcc -Wall -O3 -o netdata netdata.c -lpthread || exit 1
-gcc -Wall -ggdb -o netdata netdata.c -lpthread || exit 1
+if [ $NETDATA_CONFIG_DEBUG -eq 1 ]
+then
+	ulimit -c unlimited
+	gcc -Wall -ggdb -o netdata netdata.c -lpthread || exit 1
+else
+	gcc -Wall -O3 -o netdata netdata.c -lpthread || exit 1
+fi
 
 echo "Starting netdata"
-p=`pwd`
-cd data
-ulimit -c unlimited
-$p/netdata -d -u $NETDATA_CONFIG_INTERNAL_UPDATE_EVERY -l $NETDATA_HISTORY_LINES || exit 1
-cd "$p"
-
+if [ "$USER" = "root" ]
+then
+	chown -R "$NETDATA_CONFIG_USER" web || exit 1
+	chmod    0775 web   || exit 1
+	chmod -R 0664 web/* || exit 1
+	./netdata -d -u $NETDATA_CONFIG_USER -t $NETDATA_CONFIG_INTERNAL_UPDATE_EVERY -l $NETDATA_HISTORY_LINES -p $NETDATA_CONFIG_PORT || exit 1
+else
+	echo >&2 "WARNING: NOT RUNNING AS ROOT - CANNOT SWITCH TO USER $NETDATA_CONFIG_USER"
+	echo >&2 "WARNING: MAKE SURE FILES IN web/ ARE OWNED BY $USER - or it will not work"
+	./netdata -d -t $NETDATA_CONFIG_INTERNAL_UPDATE_EVERY -l $NETDATA_HISTORY_LINES -p $NETDATA_CONFIG_PORT || exit 1
+fi
 sleep 2
 
 # count all graphs
-all=`wget http://127.0.0.1:19999/list -O - 2>/dev/null`
+all=`wget http://127.0.0.1:$NETDATA_CONFIG_PORT/list -O - 2>/dev/null`
 count=0
 for x in $all
 do
@@ -116,9 +87,9 @@ done
 
 echo "We have $count graphs..."
 
-echo "Generating ${data}/index.html"
+echo "Generating web/index.html"
 host="`hostname`"
-cat >${data}/index.html <<EOF
+cat >web/index.html <<EOF
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <style>
@@ -175,13 +146,13 @@ do
 	eval "p=\${NETDATA_PRIORITY_${y}}"
 	if [ ! "$p" = "IGNORE" ]
 	then
-		cat >>${data}/index.html <<EOF2
+		cat >>web/index.html <<EOF2
 		addChart('${x}', '${y}_div', 0, 0, "data/${x}/${NETDATA_CONFIG_HISTORY_POINTS}/${NETDATA_CONFIG_UPDATE_EVERY}/average/", "${title}${t} (${x})", "${vtitle}");
 EOF2
 	fi
 done
 
-cat >>${data}/index.html <<EOF3
+cat >>web/index.html <<EOF3
 		refreshCharts(999999);
 	}
 	
@@ -225,25 +196,29 @@ done >"${tmp}"
 for x in `cat "${tmp}" | sort`
 do
 	n="`echo "$x" | cut -d '|' -f 2-`"
-	cat >>${data}/index.html <<EOF4
+	cat >>web/index.html <<EOF4
 	<div id="${n}_div"></div>
 EOF4
 done
 rm -f "${tmp}"
 
-cat >>${data}/index.html <<EOF5
+cat >>web/index.html <<EOF5
  </body>
 </html>
 EOF5
 
-set|grep ^NETDATA_ >netdata.conf
-
-if [ ! -h "${data}/data" ]
+if [ "$USER" = "root" ]
 then
-	cd "${data}"
-	ln -s . data
+	chown -R "$NETDATA_CONFIG_USER" web || exit 1
+	chmod    0775 web   || exit 1
+	chmod -R 0664 web/* || exit 1
 fi
 
-echo "All Done."
-echo "Just hit http://127.0.0.1:19999/ from your browser."
+# save config back
+set|grep ^NETDATA_ >netdata.conf
 
+echo "All Done."
+echo "Just hit http://127.0.0.1:$NETDATA_CONFIG_PORT/ from your browser."
+echo
+echo "You can edit config options in file netdata.conf"
+echo
