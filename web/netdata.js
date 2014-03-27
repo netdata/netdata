@@ -9,6 +9,20 @@
 	function refreshChart(index) {
 		if(index >= charts.length) return;
 		
+		charts[index].refreshCount++;
+		
+		if(charts[index].chart != null) {
+			if(charts[index].chart.getSelection()[0]) return;
+			
+			if(charts[index].refreshCount >= 1) {
+				charts[index].jsondata = null;
+				charts[index].datatable = null;
+				charts[index].chart.clearChart();
+				charts[index].chart = null;
+				charts[index].refreshCount = 1;
+			}
+		}
+		
 		charts[index].jsondata = $.ajax({
 			url: charts[index].url,
 			dataType:"json",
@@ -50,6 +64,9 @@
 			isStacked: isStacked,
 			hAxis: {title: hAxisTitle},
 			vAxis: {title: vAxisTitle, minValue: 10},
+			focusTarget: 'category',
+			lineWidth: (isStacked)?1:2,
+			areaOpacity: (isStacked)?1.0:0.3,
 			// animation: {duration: 1000, easing: 'inAndOut'},
 		};
 
@@ -72,6 +89,7 @@
 		charts[i].vtitle = vtitle;
 		charts[i].width = width;
 		charts[i].height = height;
+		charts[i].refreshCount = 0;
 	}
 	
 	var charts_last_drawn = 999999999;
