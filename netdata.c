@@ -581,7 +581,7 @@ size_t rrd_stats_one_xml(RRD_STATS *st, char *buffer, size_t len)
 	return(i);
 }
 
-#define RRD_GRAPH_XML_HEADER "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<?xml-stylesheet type=\"text/xsl\" href=\"all.xsl\"?>\n\n<catalog>\n"
+#define RRD_GRAPH_XML_HEADER "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<?xml-stylesheet type=\"text/xsl\" href=\"/all.xsl\"?>\n\n<catalog>\n"
 #define RRD_GRAPH_XML_FOOTER "</catalog>\n"
 
 size_t rrd_stats_graph_xml(RRD_STATS *st, char *buffer, size_t len)
