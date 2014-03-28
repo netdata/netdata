@@ -14,7 +14,7 @@
 		if(charts[index].chart != null) {
 			if(charts[index].chart.getSelection()[0]) return;
 			
-			if(charts[index].refreshCount >= 1) {
+			if(charts[index].refreshCount >= 9999999) {
 				charts[index].jsondata = null;
 				charts[index].datatable = null;
 				charts[index].chart.clearChart();
@@ -46,8 +46,8 @@
 
 		var hAxisTitle = null;
 		var vAxisTitle = null;
-		if(height >= 200) hAxisTitle = "Time of Day";
-		if(width >= 400) vAxisTitle = charts[index].vtitle;
+		if(height >= 250) hAxisTitle = "Time of Day";
+		if(width >= 450) vAxisTitle = charts[index].vtitle;
 		
 		var title = charts[index].title;
 
