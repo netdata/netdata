@@ -563,7 +563,7 @@ void rrd_stats_dimension_set(RRD_STATS *st, const char *id, void *data)
 #define GROUP_AVERAGE	0
 #define GROUP_MAX 		1
 
-size_t rrd_stats_one_xml(RRD_STATS *st, char *buffer, size_t len)
+size_t rrd_stats_one_xml(RRD_STATS *st, char *options, char *buffer, size_t len)
 {
 	size_t i = 0;
 	if(i + 200 > len) return(0);
@@ -574,7 +574,7 @@ size_t rrd_stats_one_xml(RRD_STATS *st, char *buffer, size_t len)
 	i += sprintf(&buffer[i], "\t\t<type>%s</type>\n", st->type);
 	i += sprintf(&buffer[i], "\t\t<title>%s%s</title>\n", st->title, st->name);
 	i += sprintf(&buffer[i], "\t\t<vtitle>%s</vtitle>\n", st->vtitle);
-	i += sprintf(&buffer[i], "\t\t<dataurl>/data/%s</dataurl>\n", st->name);
+	i += sprintf(&buffer[i], "\t\t<dataurl>/data/%s/%s</dataurl>\n", st->name, options?options:"");
 	i += sprintf(&buffer[i], "\t\t<entries>%ld</entries>\n", st->entries);
 	i += sprintf(&buffer[i], "\t</graph>\n");
 
@@ -584,11 +584,11 @@ size_t rrd_stats_one_xml(RRD_STATS *st, char *buffer, size_t len)
 #define RRD_GRAPH_XML_HEADER "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<?xml-stylesheet type=\"text/xsl\" href=\"/all.xsl\"?>\n\n<catalog>\n"
 #define RRD_GRAPH_XML_FOOTER "</catalog>\n"
 
-size_t rrd_stats_graph_xml(RRD_STATS *st, char *buffer, size_t len)
+size_t rrd_stats_graph_xml(RRD_STATS *st, char * options, char *buffer, size_t len)
 {
 	size_t i = 0;
 	i += sprintf(&buffer[i], RRD_GRAPH_XML_HEADER);
-	i += rrd_stats_one_xml(st, &buffer[i], len - i);
+	i += rrd_stats_one_xml(st, options, &buffer[i], len - i);
 	i += sprintf(&buffer[i], RRD_GRAPH_XML_FOOTER);
 	return(i);
 }
@@ -601,7 +601,7 @@ size_t rrd_stats_all_xml(char *buffer, size_t len)
 	i += sprintf(&buffer[i], RRD_GRAPH_XML_HEADER);
 
 	for(st = root; st ; st = st->next)
-		i += rrd_stats_one_xml(st, &buffer[i], len - i);
+		i += rrd_stats_one_xml(st, NULL, &buffer[i], len - i);
 	
 	i += sprintf(&buffer[i], RRD_GRAPH_XML_FOOTER);
 	return(i);
@@ -1143,7 +1143,7 @@ void web_client_process(struct web_client *w)
 				code = 200;
 				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending %s.xml of RRD_STATS...", w->id, st->name);
 				w->data->contenttype = CT_TEXT_XML;
-				w->data->bytes = rrd_stats_graph_xml(st, w->data->buffer, w->data->size);
+				w->data->bytes = rrd_stats_graph_xml(st, url, w->data->buffer, w->data->size);
 			}
 		}
 		else if(strcmp(tok, "mirror") == 0) {

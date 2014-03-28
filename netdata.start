@@ -18,9 +18,6 @@ NETDATA_CONFIG_INTERNAL_UPDATE_EVERY=1
 # how many points should the graphs have
 NETDATA_CONFIG_HISTORY_POINTS=120
 
-# how many points should be kept in memory
-NETDATA_CONFIG_HISTORY_DATA=3600
-
 # every how many graph refreshes, the page should be reloaded
 # this fixes a bug in the google graphs API which leaks memory
 # when refreshes graphs
