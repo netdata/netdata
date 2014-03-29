@@ -368,6 +368,7 @@ pthread_mutex_t root_mutex = PTHREAD_MUTEX_INITIALIZER;
 RRD_STATS *rrd_stats_create(const char *id, const char *name, unsigned long entries, const char *title, const char *vtitle, const char *type)
 {
 	RRD_STATS *st = NULL;
+	char *p;
 
 	debug(D_RRD_STATS, "Creating RRD_STATS for '%s'.", name);
 
@@ -386,6 +387,9 @@ RRD_STATS *rrd_stats_create(const char *id, const char *name, unsigned long entr
 
 	strncpy(st->name, name, RRD_STATS_NAME_MAX);
 	st->name[RRD_STATS_NAME_MAX] = '\0';
+	while((p = strchr(st->name, '/'))) *p = '_';
+	while((p = strchr(st->name, '?'))) *p = '_';
+	while((p = strchr(st->name, '&'))) *p = '_';
 
 	strncpy(st->title, title, RRD_STATS_NAME_MAX);
 	st->title[RRD_STATS_NAME_MAX] = '\0';
@@ -397,7 +401,6 @@ RRD_STATS *rrd_stats_create(const char *id, const char *name, unsigned long entr
 	st->type[RRD_STATS_NAME_MAX] = '\0';
 
 	// check if there is a name for it in the environment
-	char *p;
 	sprintf(st->envtitle, "NETDATA_TITLE_%s", st->id);
 	while((p = strchr(st->envtitle, '.'))) *p = '_';
 	while((p = strchr(st->envtitle, '-'))) *p = '_';
