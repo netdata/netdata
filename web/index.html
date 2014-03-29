@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="costa@tsaousis.gr">
+ 
+ 	<title>NetData</title>
+
+	<!-- Google AJAX API -->
+	<script type="text/javascript" src="https://www.google.com/jsapi"></script>
+	<script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+
+	<!-- Bootstrap -->
+	<link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+	<link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap-theme.min.css">
+	<script src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
+	<link href="/file/theme.css" rel="stylesheet">
+
+	<!-- NetData -->
+	<script type="text/javascript" src="/file/netdata.js"></script>
+	<script type="text/javascript">
+	
+	// Set a callback to run when the Google Visualization API is loaded.
+	google.setOnLoadCallback(drawCharts);
+	
+	var mycharts = new Array();
+	var mainchart;
+
+	function mainChart(c) {
+		if(mainchart && mainchart.chart) mainchart.chart.clearChart();
+
+		mainchart = $.extend(true, {}, c);
+
+		mainchart.chart = null;
+		mainchart.width = Math.round(((window.innerWidth * 0.95) - 50) / 1);
+		mainchart.height = window.innerHeight - 200;
+		mainchart.thumbnail = false;
+		mainchart.group = 5;
+		mainchart.group_method = "max";
+		mainchart.div = 'maingraph';
+		mainchart.last_updated = 0;
+		mainchart.explorer = false;
+
+		if(mainchart.type == "tc") {
+			mainchart.group = 15;
+			mainchart.group_method = "average";
+		}
+
+		// calculate the time to refresh each chart
+		mainchart.chart_update_every = mainchart.group * 1000; // milliseconds
+
+		// calculate how many point to show for each chart
+		mainchart.points_to_show = Math.round(mainchart.entries / mainchart.group) - 1;
+
+		// show max 10 mins of data
+		if(mainchart.points_to_show * mainchart.group > 1200) mainchart.points_to_show = 1200 / mainchart.group;
+
+		refreshChart(mainchart);
+		showMainGraph();
+	}
+
+	function setMainChart(i) {
+		mainChart(mycharts[i]);
+	}
+
+	function thumbWidth() {
+		var items = Math.round(((window.innerWidth * 0.95) - 50) / 400);
+		if(items < 1) items = 1;
+
+		var width = Math.round(((window.innerWidth * 0.95) - 50) / items) - 1;
+		console.log("window = " + ((window.innerWidth * 0.95) - 50) + ", items = " + items + ", width = " + width);
+
+		return width;
+	}
+
+	function resizeCharts() {
+		if(mainchart) {
+			mainchart.width = Math.round(((window.innerWidth * 0.95) - 50) / 1);
+			mainchart.height = window.innerHeight - 200;
+		}
+
+		var width = thumbWidth();
+		$.each(mycharts, function(i, c) {
+			if(c.enabled) {
+				c.width = width;
+				c.needs_refresh = true;
+			}
+		});
+	}
+
+	var go_thumbs = 0;
+	function drawCharts() {
+		var now = new Date().getTime();
+
+		go_thumbs = 0;
+		$.each(mycharts, function(i, c) {
+			if(c.enabled && c.needs_refresh) {
+				refreshChart(c);
+				c.needs_refresh = false;
+				c.last_updated = now;
+			}
+		});
+
+		if(mainchart) refreshChart(mainchart);
+		go_thumbs = 1;
+	};
+
+	function initCharts() {
+		var width = thumbWidth();
+		var height = 200;
+
+		mycharts = loadCharts();
+		if(mycharts == null || mycharts.length == 0) {
+			alert("Cannot load data from server.");
+			return;
+		}
+
+		var scroll = document.getElementById("graphs");
+		if(!scroll) {
+			alert("Cannot find the scroller");
+			return;
+		}
+
+		function chartssort(a, b) {
+			if(a.userpriority < b.userpriority) return -1;
+			return 1;
+		}
+		mycharts.sort(chartssort);
+
+		// create an array for grouping all same-type graphs together
+		var html = new Array();
+		$.each(mycharts, function(i, c) {
+			c.thumbnail = false;
+			c.last_updated = 0;
+			c.width = width;
+			c.height = height;
+			c.enabled = true;
+			c.needs_refresh = true;
+
+			if(c.userpriority == "IGNORE") c.enabled = false;
+			if(c.usertitle) c.title = c.usertitle;
+
+			if(c.type == "tc") {
+				c.category = "Quality of Service"
+				c.group = 30;
+				c.group_method = "average";
+			}
+			else if(c.type == "net") {
+				c.category = "Network Traffic"
+				c.group = 10;
+				c.group_method = "max";
+
+				if((c.id.substring(c.id.length - 4, c.id.length) == "-ifb") ||
+					c.id == "net.lo")
+					c.enabled = false;
+			}
+			else if(c.type == "disk") {
+				c.category = "Disk I/O"
+				c.group = 20;
+				c.group_method = "max";
+			}
+			else {
+				c.category = "Unknown"
+				c.group = 60;
+				c.group_method = "max";
+			}
+
+			// calculate the time to refresh each chart
+			c.chart_update_every = c.group * 1000; // milliseconds
+
+			// calculate how many point to show for each chart
+			c.points_to_show = Math.round(c.entries / c.group) - 1;
+
+			// show max 10 mins of data
+			if(c.points_to_show * c.group > 600) c.points_to_show = 600 / c.group;
+
+			if(c.enabled) {
+				var j;
+				var h = "<div class=\"thumbgraph\"><table><tr><td><div class=\"thumbgraph\" id=\"" + c.div + "\">" + c.name + "</div></td></tr><tr><td align=\"center\"><div class=\"btn-group-xs\"><button type=\"button\" class=\"btn btn-default\" onclick=\"setMainChart(" + i +");\">&nbsp;&nbsp;select " + c.name + " for zoom&nbsp;&nbsp;</button></div></td></tr></table></div>";
+
+				// find the html object for this type
+				for(j = 0; j < html.length ;j++) {
+					if(html[j].name == c.type) {
+						html[j].html += h;
+						html[j].count++;
+						break;
+					}
+				}
+
+				if(j == html.length) {
+					var t = "(as " + c.group_method + " every " + (c.group*c.update_every) + " seconds)";
+					html.push({name: c.type, title: c.category, description: t, priority: 0, count: 1, html: h});
+				}
+			}
+		});
+
+		$.each(html, function(i, a) {
+			     if(a.name == "net") a.priority = 1;
+			else if(a.name == "tc") a.priority = 2;
+			else if(a.name == "disk") a.priority = 3;
+			else a.priority = 4;
+
+			a.html = "<tr><td><ol class=\"breadcrumb\"><li class=\"active\"><a id=\"" + a.type + "\" href=\"#" + a.type + "\"><b>" + a.title + "</b> " + a.description + " </a></li></ol></td></tr><tr><td><div class=\"thumbgraphs\">" + a.html + "</td></tr>";
+		});
+
+		function htmlsort(a, b) {
+			if(a.priority < b.priority) return -1;
+			return 1;
+		}
+		html.sort(htmlsort);
+
+		// combine all the htmls into one
+		var allhtml = "<table width=\"100%\">";
+		$.each(html, function(i, a) {
+			allhtml += a.html;
+		});
+		allhtml += "</table>";
+
+		scroll.innerHTML = allhtml;
+		showThumbGraphs();
+	};
+
+	var last_mini = 0;
+	function myChartsRefresh() {
+		var now = new Date().getTime();
+
+		if(mainchart && (now - mainchart.last_updated) >= mainchart.chart_update_every) {
+			refreshChart(mainchart);
+			mainchart.last_updated = now;
+		}
+
+		if(mycharts.length == 0 || !go_thumbs) return;
+
+		// refresh the mini charts
+		var wanted = 1;
+		var did    = 0;
+		var count  = mycharts.length - 1;
+		while(did < wanted && count >= 0) {
+			count--;
+			last_mini++;
+			if(last_mini >= mycharts.length) last_mini = 0;
+
+			if(!mycharts[last_mini].enabled) continue;
+			if(!mycharts[last_mini].needs_refresh && now - mycharts[last_mini].last_updated < mycharts[last_mini].chart_update_every) continue;
+
+			if(mycharts[last_mini].chart != null)
+				if(mycharts[last_mini].chart.getSelection()[0]) continue;
+
+			refreshChart(mycharts[last_mini]);
+			mycharts[last_mini].last_updated = now;
+
+			did++;
+			mycharts[last_mini].needs_refresh = false;
+		}
+	}
+
+	setInterval(myChartsRefresh, 500);
+
+	window.onresize = function(event) {
+		go_thumbs = 0;
+		resizeCharts();
+		drawCharts();
+		go_thumbs = 1;
+	};
+
+	function showMainGraph() {
+		if(!mainchart) return;
+
+		go_thumbs = 0;
+		document.getElementById('maingraph_container').style.display = 'block';
+		document.getElementById('thumbgraphs_container').style.display = 'none';
+	}
+
+	function showThumbGraphs() {
+		document.getElementById('maingraph_container').style.display = 'none';
+		document.getElementById('thumbgraphs_container').style.display = 'block';
+
+		if(mainchart) {
+			if(mainchart.chart) mainchart.chart.clearChart();
+			mainchart = null;
+		}
+		go_thumbs = 1;
+	}
+
+	</script>
+</head>
+
+<body role="document">
+    <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="#">NetData</a>
+        </div>
+        <div class="collapse navbar-collapse">
+          <ul class="nav navbar-nav">
+            <li class="active"><a href="#">Home</a></li>
+            <li><a href="#net">net</a></li>
+            <li><a href="#tc">tc</a></li>
+            <li><a href="#disk">disk</a></li>
+          </ul>
+        </div><!--/.nav-collapse -->
+      </div>
+    </div>
+
+    <div class="container graphs" id="maingraph_container"">
+		<table>
+			<tr><td><ol class="breadcrumb"><li class="active"><a id="maingraph_title" href="#maingraph"><b> Maingraph </b></a></li></ol></td></tr>
+			<tr><td>
+		    	<div class="maingraph">
+					<table>
+						<tr><td><div class="maingraph" id="maingraph"></div></td></tr>
+						<tr><td align="center"><div class="btn-group"><button type="button" onclick="showThumbGraphs();" class="btn btn-default"> close main graph </button></div></td></tr>
+					</table>
+		 	   </div><!-- /.maingraph -->
+			</td></tr>
+		</table>
+	</div>
+
+    <div class="container graphs" id="thumbgraphs_container">
+    	<div class="allgraphs" id="graphs">
+    	</div>
+	</div>
+
+	<script type="text/javascript">initCharts();</script>
+</html>
