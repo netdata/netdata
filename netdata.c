@@ -340,6 +340,12 @@ struct rrd_stats {
 	char title[RRD_STATS_NAME_MAX + 1];
 	char vtitle[RRD_STATS_NAME_MAX + 1];
 
+	char usertitle[RRD_STATS_NAME_MAX + 1];
+	char userpriority[RRD_STATS_NAME_MAX + 1];
+
+	char envtitle[RRD_STATS_NAME_MAX + 1];
+	char envpriority[RRD_STATS_NAME_MAX + 1];
+
 	char type[RRD_STATS_NAME_MAX + 1];
 
 	size_t entries;
@@ -387,6 +393,26 @@ RRD_STATS *rrd_stats_create(const char *id, const char *name, unsigned long entr
 
 	strncpy(st->type, type, RRD_STATS_NAME_MAX);
 	st->type[RRD_STATS_NAME_MAX] = '\0';
+
+	// check if there is a name for it in the environment
+	char *p;
+	sprintf(st->envtitle, "NETDATA_TITLE_%s", st->id);
+	while((p = strchr(st->envtitle, '.'))) *p = '_';
+	while((p = strchr(st->envtitle, '-'))) *p = '_';
+	p = getenv(st->envtitle);
+
+	if(p) strncpy(st->usertitle, p, RRD_STATS_NAME_MAX);
+	else strncpy(st->usertitle, st->name, RRD_STATS_NAME_MAX);
+	st->usertitle[RRD_STATS_NAME_MAX] = '\0';
+
+	sprintf(st->envpriority, "NETDATA_PRIORITY_%s", st->id);
+	while((p = strchr(st->envpriority, '.'))) *p = '_';
+	while((p = strchr(st->envpriority, '-'))) *p = '_';
+	p = getenv(st->envpriority);
+
+	if(p) strncpy(st->userpriority, p, RRD_STATS_NAME_MAX);
+	else strncpy(st->userpriority, st->name, RRD_STATS_NAME_MAX);
+	st->userpriority[RRD_STATS_NAME_MAX] = '\0';
 
 	st->entries = entries;
 	st->current_entry = 0;
@@ -584,10 +610,15 @@ size_t rrd_stats_one_json(RRD_STATS *st, char *options, char *buffer, size_t len
 	i += sprintf(&buffer[i], "\t\t\t\"name\" : \"%s\",\n", st->name);
 	i += sprintf(&buffer[i], "\t\t\t\"type\" : \"%s\",\n", st->type);
 	i += sprintf(&buffer[i], "\t\t\t\"title\" : \"%s %s\",\n", st->title, st->name);
+	i += sprintf(&buffer[i], "\t\t\t\"usertitle\" : \"%s %s (%s)\",\n", st->title, st->usertitle, st->name);
+	i += sprintf(&buffer[i], "\t\t\t\"userpriority\" : \"%s\",\n", st->userpriority);
+	i += sprintf(&buffer[i], "\t\t\t\"envtitle\" : \"%s\",\n", st->envtitle);
+	i += sprintf(&buffer[i], "\t\t\t\"envpriority\" : \"%s\",\n", st->envpriority);
 	i += sprintf(&buffer[i], "\t\t\t\"vtitle\" : \"%s\",\n", st->vtitle);
 	i += sprintf(&buffer[i], "\t\t\t\"url\" : \"/data/%s/%s\",\n", st->name, options?options:"");
 	i += sprintf(&buffer[i], "\t\t\t\"entries\" : %ld,\n", st->entries);
 	i += sprintf(&buffer[i], "\t\t\t\"current\" : %ld,\n", st->current_entry);
+	i += sprintf(&buffer[i], "\t\t\t\"update_every\" : %d,\n", update_every);
 	i += sprintf(&buffer[i], "\t\t\t\"last_updated\" : %lu,\n", st->last_updated);
 	i += sprintf(&buffer[i], "\t\t\t\"last_updated_secs_ago\" : %lu\n", time(NULL) - st->last_updated);
 	i += sprintf(&buffer[i], "\t\t}");
@@ -747,7 +778,8 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 
 			switch(rd->type) {
 				case RRD_DIMENSION_INCREMENTAL:
-					value -= oldvalue;
+					if(oldvalue > value) value = 0;	// detect overflows and resets
+					else value -= oldvalue;
 					value = value * 1000000L / usec;
 					break;
 
@@ -1187,6 +1219,19 @@ void web_client_process(struct web_client *w)
 
 			for ( ; st ; st = st->next )
 				w->data->bytes += sprintf(&w->data->buffer[w->data->bytes], "%s\n", st->name);
+		}
+		else if(strcmp(tok, "envlist") == 0) {
+			code = 200;
+
+			debug(D_WEB_CLIENT_ACCESS, "%llu: Sending envlist of RRD_STATS...", w->id);
+
+			w->data->bytes = 0;
+			RRD_STATS *st = root;
+
+			for ( ; st ; st = st->next ) {
+				w->data->bytes += sprintf(&w->data->buffer[w->data->bytes], "%s=%s\n", st->envtitle, st->usertitle);
+				w->data->bytes += sprintf(&w->data->buffer[w->data->bytes], "%s=%s\n", st->envpriority, st->userpriority);
+			}
 		}
 		else if(strcmp(tok, "all.json") == 0) {
 			code = 200;
