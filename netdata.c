@@ -348,6 +348,8 @@ struct rrd_stats {
 
 	char type[RRD_STATS_NAME_MAX + 1];
 
+	char hostname[RRD_STATS_NAME_MAX + 1];
+
 	size_t entries;
 	size_t current_entry;
 	// size_t last_entry;
@@ -413,6 +415,9 @@ RRD_STATS *rrd_stats_create(const char *id, const char *name, unsigned long entr
 	if(p) strncpy(st->userpriority, p, RRD_STATS_NAME_MAX);
 	else strncpy(st->userpriority, st->name, RRD_STATS_NAME_MAX);
 	st->userpriority[RRD_STATS_NAME_MAX] = '\0';
+
+	if(gethostname(st->hostname, RRD_STATS_NAME_MAX) == -1)
+		error("Cannot get hostname.");
 
 	st->entries = entries;
 	st->current_entry = 0;
@@ -614,6 +619,7 @@ size_t rrd_stats_one_json(RRD_STATS *st, char *options, char *buffer, size_t len
 	i += sprintf(&buffer[i], "\t\t\t\"userpriority\" : \"%s\",\n", st->userpriority);
 	i += sprintf(&buffer[i], "\t\t\t\"envtitle\" : \"%s\",\n", st->envtitle);
 	i += sprintf(&buffer[i], "\t\t\t\"envpriority\" : \"%s\",\n", st->envpriority);
+	i += sprintf(&buffer[i], "\t\t\t\"hostname\" : \"%s\",\n", st->hostname);
 	i += sprintf(&buffer[i], "\t\t\t\"vtitle\" : \"%s\",\n", st->vtitle);
 	i += sprintf(&buffer[i], "\t\t\t\"url\" : \"/data/%s/%s\",\n", st->name, options?options:"");
 	i += sprintf(&buffer[i], "\t\t\t\"entries\" : %ld,\n", st->entries);

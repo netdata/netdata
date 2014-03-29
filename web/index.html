@@ -59,6 +59,8 @@
 		// show max 10 mins of data
 		if(mainchart.points_to_show * mainchart.group > 1200) mainchart.points_to_show = 1200 / mainchart.group;
 
+		document.getElementById('maingraph_title').innerHTML = " <b> " + mainchart.title + " </b> (as " + mainchart.group_method + " of every " + (mainchart.group * mainchart.update_every) + " seconds)";
+
 		refreshChart(mainchart);
 		showMainGraph();
 	}
@@ -93,22 +95,15 @@
 	}
 
 	var go_thumbs = 0;
+	var go_main = 0;
 	function drawCharts() {
 		var now = new Date().getTime();
 
-		go_thumbs = 0;
-		$.each(mycharts, function(i, c) {
-			if(c.enabled && c.needs_refresh) {
-				refreshChart(c);
-				c.needs_refresh = false;
-				c.last_updated = now;
-			}
-		});
-
-		if(mainchart) refreshChart(mainchart);
-		go_thumbs = 1;
+		myChartsRefreshInternal(mycharts.length);
 	};
 
+	// load the charts from the server
+	// generate html for the thumbgraphs to support them
 	function initCharts() {
 		var width = thumbWidth();
 		var height = 200;
@@ -131,8 +126,11 @@
 		}
 		mycharts.sort(chartssort);
 
+		document.getElementById('hostname_id').innerHTML = mycharts[0].hostname;
+		document.title = mycharts[0].hostname;
+
 		// create an array for grouping all same-type graphs together
-		var html = new Array();
+		var categories = new Array();
 		$.each(mycharts, function(i, c) {
 			c.thumbnail = false;
 			c.last_updated = 0;
@@ -182,61 +180,70 @@
 				var j;
 				var h = "<div class=\"thumbgraph\"><table><tr><td><div class=\"thumbgraph\" id=\"" + c.div + "\">" + c.name + "</div></td></tr><tr><td align=\"center\"><div class=\"btn-group-xs\"><button type=\"button\" class=\"btn btn-default\" onclick=\"setMainChart(" + i +");\">&nbsp;&nbsp;select " + c.name + " for zoom&nbsp;&nbsp;</button></div></td></tr></table></div>";
 
-				// find the html object for this type
-				for(j = 0; j < html.length ;j++) {
-					if(html[j].name == c.type) {
-						html[j].html += h;
-						html[j].count++;
+				// find the categories object for this type
+				for(j = 0; j < categories.length ;j++) {
+					if(categories[j].name == c.type) {
+						categories[j].html += h;
+						categories[j].count++;
 						break;
 					}
 				}
 
-				if(j == html.length) {
+				if(j == categories.length) {
 					var t = "(as " + c.group_method + " every " + (c.group*c.update_every) + " seconds)";
-					html.push({name: c.type, title: c.category, description: t, priority: 0, count: 1, html: h});
+					categories.push({name: c.type, title: c.category, description: t, priority: 0, count: 1, html: h});
 				}
 			}
 		});
 
-		$.each(html, function(i, a) {
+		$.each(categories, function(i, a) {
 			     if(a.name == "net") a.priority = 1;
 			else if(a.name == "tc") a.priority = 2;
 			else if(a.name == "disk") a.priority = 3;
 			else a.priority = 4;
 
-			a.html = "<tr><td><ol class=\"breadcrumb\"><li class=\"active\"><a id=\"" + a.type + "\" href=\"#" + a.type + "\"><b>" + a.title + "</b> " + a.description + " </a></li></ol></td></tr><tr><td><div class=\"thumbgraphs\">" + a.html + "</td></tr>";
+			a.html = "<tr><td><ol class=\"breadcrumb graphs\"><li class=\"active\"><a id=\"" + a.type + "\" href=\"#" + a.type + "\"><b>" + a.title + "</b> " + a.description + " </a></li></ol></td></tr><tr><td><div class=\"thumbgraphs\">" + a.html + "</td></tr>";
 		});
 
-		function htmlsort(a, b) {
+		function categoriessort(a, b) {
 			if(a.priority < b.priority) return -1;
 			return 1;
 		}
-		html.sort(htmlsort);
+		categories.sort(categoriessort);
 
 		// combine all the htmls into one
-		var allhtml = "<table width=\"100%\">";
-		$.each(html, function(i, a) {
-			allhtml += a.html;
+		var allcategories = "<table width=\"100%\">";
+		$.each(categories, function(i, a) {
+			allcategories += a.html;
 		});
-		allhtml += "</table>";
+		allcategories += "</table>";
 
-		scroll.innerHTML = allhtml;
+		scroll.innerHTML = allcategories;
 		showThumbGraphs();
 	};
 
 	var last_mini = 0;
-	function myChartsRefresh() {
+	function myChartsRefreshInternal(howmany) {
+		var ot = go_thumbs;
+		var om = go_main;
+
+		go_thumbs = 0;
+		go_main = 0;
+
 		var now = new Date().getTime();
 
-		if(mainchart && (now - mainchart.last_updated) >= mainchart.chart_update_every) {
+		// refresh the main chart
+		if(om && mainchart && (now - mainchart.last_updated) >= mainchart.chart_update_every) {
 			refreshChart(mainchart);
 			mainchart.last_updated = now;
 		}
+		go_main = om;
 
-		if(mycharts.length == 0 || !go_thumbs) return;
+		// refresh a few of the thumbcharts
+		if(mycharts.length == 0 || !ot) return;
 
 		// refresh the mini charts
-		var wanted = 1;
+		var wanted = howmany;
 		var did    = 0;
 		var count  = mycharts.length - 1;
 		while(did < wanted && count >= 0) {
@@ -256,23 +263,38 @@
 			did++;
 			mycharts[last_mini].needs_refresh = false;
 		}
+
+		go_thumbs = ot;
+	}
+
+	function myChartsRefresh() {
+		myChartsRefreshInternal(1);
 	}
 
 	setInterval(myChartsRefresh, 500);
 
 	window.onresize = function(event) {
+		var ot = go_thumbs;
+		var om = go_main;
+
 		go_thumbs = 0;
+		go_main = 0;
+
 		resizeCharts();
 		drawCharts();
-		go_thumbs = 1;
+
+		go_thumbs = ot;
+		go_main = om;
 	};
 
 	function showMainGraph() {
 		if(!mainchart) return;
 
-		go_thumbs = 0;
 		document.getElementById('maingraph_container').style.display = 'block';
 		document.getElementById('thumbgraphs_container').style.display = 'none';
+
+		go_thumbs = 0;
+		go_main = 1;
 	}
 
 	function showThumbGraphs() {
@@ -283,7 +305,9 @@
 			if(mainchart.chart) mainchart.chart.clearChart();
 			mainchart = null;
 		}
+
 		go_thumbs = 1;
+		go_main = 0;
 	}
 
 	</script>
@@ -299,7 +323,7 @@
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
           </button>
-          <a class="navbar-brand" href="#">NetData</a>
+          <a class="navbar-brand" href="#" id="hostname_id">NetData</a>
         </div>
         <div class="collapse navbar-collapse">
           <ul class="nav navbar-nav">
@@ -314,7 +338,7 @@
 
     <div class="container graphs" id="maingraph_container"">
 		<table>
-			<tr><td><ol class="breadcrumb"><li class="active"><a id="maingraph_title" href="#maingraph"><b> Maingraph </b></a></li></ol></td></tr>
+			<tr><td><ol class="breadcrumb graphs"><li class="active"><a id="maingraph_title" href="#maingraph"><b> Maingraph </b></a></li></ol></td></tr>
 			<tr><td>
 		    	<div class="maingraph">
 					<table>

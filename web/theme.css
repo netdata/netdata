@@ -34,3 +34,8 @@ body {
 .container.graphs {
 	width: 95%;
 }
+
+.breadcrumb.graphs {
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
