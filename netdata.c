@@ -27,6 +27,7 @@
 #include <ctype.h>
 #include <time.h>
 #include <fcntl.h>
+#include <syslog.h>
 
 #include <pthread.h>
 
@@ -171,6 +172,10 @@ void error_int( const char *file, const char *function, const unsigned long line
             errno = 0;
     }
     else fprintf(stderr, "\n");
+
+    va_start( args, fmt );
+	vsyslog(LOG_ERR,  fmt, args );
+    va_end( args );
 }
 
 #define fatal(args...)  fatal_int(__FILE__, __FUNCTION__, __LINE__, ##args)
@@ -190,6 +195,10 @@ void fatal_int( const char *file, const char *function, const unsigned long line
 
 	perror(" # ");
 	fprintf(stderr, "\n");
+
+    va_start( args, fmt );
+	vsyslog(LOG_CRIT,  fmt, args );
+    va_end( args );
 
 	exit(EXIT_FAILURE);
 }
@@ -492,6 +501,8 @@ void rrd_stats_next(RRD_STATS *st)
 	now = &st->times[st->current_entry];
 	gettimeofday(now, NULL);
 
+	st->last_updated = now->tv_sec;
+
 	// leave mutex locked
 }
 
@@ -563,47 +574,52 @@ void rrd_stats_dimension_set(RRD_STATS *st, const char *id, void *data)
 #define GROUP_AVERAGE	0
 #define GROUP_MAX 		1
 
-size_t rrd_stats_one_xml(RRD_STATS *st, char *options, char *buffer, size_t len)
+size_t rrd_stats_one_json(RRD_STATS *st, char *options, char *buffer, size_t len)
 {
 	size_t i = 0;
 	if(i + 200 > len) return(0);
 
-	i += sprintf(&buffer[i], "\t<graph>\n");
-	i += sprintf(&buffer[i], "\t\t<id>%s</id>\n", st->id);
-	i += sprintf(&buffer[i], "\t\t<name>%s</name>\n", st->name);
-	i += sprintf(&buffer[i], "\t\t<type>%s</type>\n", st->type);
-	i += sprintf(&buffer[i], "\t\t<title>%s%s</title>\n", st->title, st->name);
-	i += sprintf(&buffer[i], "\t\t<vtitle>%s</vtitle>\n", st->vtitle);
-	i += sprintf(&buffer[i], "\t\t<dataurl>/data/%s/%s</dataurl>\n", st->name, options?options:"");
-	i += sprintf(&buffer[i], "\t\t<entries>%ld</entries>\n", st->entries);
-	i += sprintf(&buffer[i], "\t</graph>\n");
+	i += sprintf(&buffer[i], "\t\t{\n");
+	i += sprintf(&buffer[i], "\t\t\t\"id\" : \"%s\",\n", st->id);
+	i += sprintf(&buffer[i], "\t\t\t\"name\" : \"%s\",\n", st->name);
+	i += sprintf(&buffer[i], "\t\t\t\"type\" : \"%s\",\n", st->type);
+	i += sprintf(&buffer[i], "\t\t\t\"title\" : \"%s %s\",\n", st->title, st->name);
+	i += sprintf(&buffer[i], "\t\t\t\"vtitle\" : \"%s\",\n", st->vtitle);
+	i += sprintf(&buffer[i], "\t\t\t\"url\" : \"/data/%s/%s\",\n", st->name, options?options:"");
+	i += sprintf(&buffer[i], "\t\t\t\"entries\" : %ld,\n", st->entries);
+	i += sprintf(&buffer[i], "\t\t\t\"current\" : %ld,\n", st->current_entry);
+	i += sprintf(&buffer[i], "\t\t\t\"last_updated\" : %lu,\n", st->last_updated);
+	i += sprintf(&buffer[i], "\t\t\t\"last_updated_secs_ago\" : %lu\n", time(NULL) - st->last_updated);
+	i += sprintf(&buffer[i], "\t\t}");
 
 	return(i);
 }
 
-#define RRD_GRAPH_XML_HEADER "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<?xml-stylesheet type=\"text/xsl\" href=\"/all.xsl\"?>\n\n<catalog>\n"
-#define RRD_GRAPH_XML_FOOTER "</catalog>\n"
+#define RRD_GRAPH_JSON_HEADER "{\n\t\"charts\": [\n"
+#define RRD_GRAPH_JSON_FOOTER "\n\t]\n}\n"
 
-size_t rrd_stats_graph_xml(RRD_STATS *st, char * options, char *buffer, size_t len)
+size_t rrd_stats_graph_json(RRD_STATS *st, char * options, char *buffer, size_t len)
 {
 	size_t i = 0;
-	i += sprintf(&buffer[i], RRD_GRAPH_XML_HEADER);
-	i += rrd_stats_one_xml(st, options, &buffer[i], len - i);
-	i += sprintf(&buffer[i], RRD_GRAPH_XML_FOOTER);
+	i += sprintf(&buffer[i], RRD_GRAPH_JSON_HEADER);
+	i += rrd_stats_one_json(st, options, &buffer[i], len - i);
+	i += sprintf(&buffer[i], RRD_GRAPH_JSON_FOOTER);
 	return(i);
 }
 
-size_t rrd_stats_all_xml(char *buffer, size_t len)
+size_t rrd_stats_all_json(char *buffer, size_t len)
 {
-	size_t i = 0;
+	size_t i = 0, c;
 	RRD_STATS *st;
 
-	i += sprintf(&buffer[i], RRD_GRAPH_XML_HEADER);
+	i += sprintf(&buffer[i], RRD_GRAPH_JSON_HEADER);
 
-	for(st = root; st ; st = st->next)
-		i += rrd_stats_one_xml(st, NULL, &buffer[i], len - i);
+	for(st = root, c = 0; st ; st = st->next, c++) {
+		if(c) i += sprintf(&buffer[i], "%s", ",\n");
+		i += rrd_stats_one_json(st, NULL, &buffer[i], len - i);
+	}
 	
-	i += sprintf(&buffer[i], RRD_GRAPH_XML_FOOTER);
+	i += sprintf(&buffer[i], RRD_GRAPH_JSON_FOOTER);
 	return(i);
 }
 
@@ -831,6 +847,7 @@ void web_buffer_increase(struct web_buffer *b, size_t free_size_required)
 
 struct web_client {
 	unsigned long long id;
+	char client_ip[101];
 
 	int mode;
 	int keepalive;
@@ -879,7 +896,11 @@ struct web_client *web_client_create(int listener)
 	}
 	w->ofd = w->ifd;
 
-	debug(D_WEB_CLIENT_ACCESS, "%llu: New web client from %s on socket %d.", w->id, inet_ntoa(w->clientaddr.sin_addr), w->ifd);
+	strncpy(w->client_ip, inet_ntoa(w->clientaddr.sin_addr), 100);
+	w->client_ip[100] = '\0';
+
+	syslog(LOG_NOTICE, "%llu: New client from %s.", w->id, w->client_ip);
+	debug(D_WEB_CLIENT_ACCESS, "%llu: New web client from %s on socket %d.", w->id, w->client_ip, w->ifd);
 
 	{
 		int flag = 1; 
@@ -979,6 +1000,8 @@ int mysendfile(struct web_client *w, char *filename)
 		}
 	}
 	
+	syslog(LOG_NOTICE, "%llu: Sending file '%s' to client %s.", w->id, filename, w->client_ip);
+
 	// pick a Content-Type for the file
 	     if(strstr(filename, ".html") != NULL)	w->data->contenttype = CT_TEXT_HTML;
 	else if(strstr(filename, ".js")   != NULL)	w->data->contenttype = CT_APPLICATION_X_JAVASCRIPT;
@@ -1141,9 +1164,9 @@ void web_client_process(struct web_client *w)
 			}
 			else {
 				code = 200;
-				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending %s.xml of RRD_STATS...", w->id, st->name);
-				w->data->contenttype = CT_TEXT_XML;
-				w->data->bytes = rrd_stats_graph_xml(st, url, w->data->buffer, w->data->size);
+				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending %s.json of RRD_STATS...", w->id, st->name);
+				w->data->contenttype = CT_APPLICATION_JSON;
+				w->data->bytes = rrd_stats_graph_json(st, url, w->data->buffer, w->data->size);
 			}
 		}
 		else if(strcmp(tok, "mirror") == 0) {
@@ -1165,11 +1188,11 @@ void web_client_process(struct web_client *w)
 			for ( ; st ; st = st->next )
 				w->data->bytes += sprintf(&w->data->buffer[w->data->bytes], "%s\n", st->name);
 		}
-		else if(strcmp(tok, "all.xml") == 0) {
+		else if(strcmp(tok, "all.json") == 0) {
 			code = 200;
-			debug(D_WEB_CLIENT_ACCESS, "%llu: Sending all.xml of RRD_STATS...", w->id);
-			w->data->contenttype = CT_TEXT_XML;
-			w->data->bytes = rrd_stats_all_xml(w->data->buffer, w->data->size);
+			debug(D_WEB_CLIENT_ACCESS, "%llu: Sending all.json of RRD_STATS...", w->id);
+			w->data->contenttype = CT_APPLICATION_JSON;
+			w->data->bytes = rrd_stats_all_json(w->data->buffer, w->data->size);
 		}
 		else if(strcmp(tok, WEB_PATH_FILE) == 0) { // "file"
 			tok = mystrsep(&url, "/?&");
@@ -1507,7 +1530,7 @@ void *new_client(void *ptr)
 		retval = select(fdmax+1, &ifds, &ofds, &efds, &tv);
 
 		if(retval == -1)
-			fatal("LISTENER: select() failed.");
+			fatal("%llu: LISTENER: select() failed.", w->id);
 		else if(!retval) {
 			// timeout
 			w->obsolete = 1;
@@ -1519,6 +1542,7 @@ void *new_client(void *ptr)
 			w->obsolete = 1;
 			return NULL;
 		}
+
 		if(FD_ISSET(w->ofd, &efds)) {
 			debug(D_WEB_CLIENT_ACCESS, "%llu: Received error on output socket (%s).", w->id, strerror(errno));
 			w->obsolete = 1;
@@ -1545,6 +1569,7 @@ void *new_client(void *ptr)
 			if(w->mode == WEB_CLIENT_MODE_NORMAL) web_client_process(w);
 		}
 	}
+	debug(D_WEB_CLIENT, "%llu: done...", w->id);
 
 	return NULL;
 }
@@ -1590,10 +1615,15 @@ void *socket_listen_main(void *ptr)
 			if(FD_ISSET(listener, &ifds)) {
 				w = web_client_create(listener);	
 
-				w->thread = pthread_create(&w->thread, NULL, new_client, w);
+				if(pthread_create(&w->thread, NULL, new_client, w) != 0)
+					error("%llu: failed to create new thread.");
+
+				if(pthread_detach(w->thread) != 0)
+					error("%llu: Cannot request detach of newly created thread.", w->id);
 			}
+			else debug(D_WEB_CLIENT, "LISTENER: select() didn't do anything.");
 		}
-		// else timeout
+		else debug(D_WEB_CLIENT, "LISTENER: select() timeout.");
 
 		// cleanup unused clients
 		for(w = web_clients; w ; w = w?w->next:NULL) {
@@ -1603,6 +1633,8 @@ void *socket_listen_main(void *ptr)
 			}
 		}
 	}
+
+	error("LISTENER: exit!");
 
 	close(listener);
 	exit(2);
@@ -1794,7 +1826,7 @@ void *proc_main(void *ptr)
 		
 		// calculate the time it took for a full loop
 		usec = usecdiff(&now, &last);
-		debug(D_PROCNETDEV_LOOP, "PROCNETDEV: Last loop took %llu usec.", usec);
+		debug(D_PROCNETDEV_LOOP, "PROCNETDEV: Last full loop took %llu usec.", usec);
 		
 		// BEGIN -- the job to be done
 		do_proc_net_dev(usec);
@@ -1804,7 +1836,7 @@ void *proc_main(void *ptr)
 		// find the time to sleep in order to wait exactly update_every seconds
 		gettimeofday(&tmp, NULL);
 		usec = usecdiff(&tmp, &now);
-		debug(D_PROCNETDEV_LOOP, "PROCNETDEV: This loop took %llu usec.", usec);
+		debug(D_PROCNETDEV_LOOP, "PROCNETDEV: This loop's work took %llu usec.", usec);
 		
 		if(usec < (update_every * 1000000)) susec = (update_every * 1000000) - usec;
 		else susec = 0;
@@ -2059,23 +2091,26 @@ void *tc_main(void *ptr)
 
 void bye(void)
 {
+	error("bye...");
 	if(tc_child_pid) kill(tc_child_pid, SIGTERM);
 	tc_child_pid = 0;
 }
 
 void sig_handler(int signo)
 {
-	error("Signal %d received.", signo);
-
 	switch(signo) {
 		case SIGTERM:
 		case SIGQUIT:
 		case SIGINT:
 		case SIGHUP:
-			error("Cleanup.");
+			error("Signaled cleanup (signal %d).", signo);
 			if(tc_child_pid) kill(tc_child_pid, SIGTERM);
 			tc_child_pid = 0;
 			exit(1);
+			break;
+
+		default:
+			error("Signal %d received. Ignoring it.", signo);
 			break;
 	}
 }
@@ -2105,6 +2140,44 @@ int become_user(const char *username)
 	}
 
 	return(0);
+}
+
+void become_daemon()
+{
+	int i = fork();
+	if(i == -1) {
+		perror("cannot fork");
+		exit(1);
+	}
+	if(i != 0) {
+		exit(0); // the parent
+	}
+
+	// become session leader
+	if (setsid() < 0)
+		exit(2);
+
+	signal(SIGCHLD, SIG_IGN);
+	signal(SIGHUP, SIG_IGN);
+
+	// fork() again
+	i = fork();
+	if(i == -1) {
+		perror("cannot fork");
+		exit(1);
+	}
+	if(i != 0) {
+		exit(0); // the parent
+	}
+
+	// Set new file permissions
+	umask(0);
+
+    // close all files
+ 	for(i = sysconf(_SC_OPEN_MAX); i > 0; i--)
+ 		close(i);
+
+	silent = 1;
 }
 
 int main(int argc, char **argv)
@@ -2177,28 +2250,18 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Cannot lower my CPU priority. Error %s.\n", strerror(errno));
 	}
 
-	if(daemon) {
-		i = fork();
-		if(i == -1) {
-			perror("cannot fork");
-			exit(1);
-		}
-		if(i != 0) {
-			fprintf(stderr, "Running in the background...\n");
-			exit(0); // the parent
-		}
-		close(0);
-		close(1);
-		close(2);
-		silent = 1;
-	}
+	if(daemon) become_daemon();
+
+	// open syslog
+	openlog("netdata", LOG_PID, LOG_DAEMON);
+	syslog(LOG_NOTICE, "netdata started.");
 
 	// make sure we cleanup correctly
 	atexit(bye);
-	if(signal(SIGINT,  sig_handler) == SIG_ERR) error("Can't catch SIGINT.");
-	if(signal(SIGTERM, sig_handler) == SIG_ERR) error("Can't catch SIGTERM.");
-	if(signal(SIGQUIT, sig_handler) == SIG_ERR) error("Can't catch SIGQUIT.");
-	if(signal(SIGHUP,  sig_handler) == SIG_ERR) error("Can't catch SIGHUP.");
+
+	// catch all signals
+	for (i = 1 ; i < 65 ;i++) signal(i,  sig_handler);
+	
 
 	pthread_t p_proc, p_tc;
 	int r_proc, r_tc;
