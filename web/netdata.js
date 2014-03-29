@@ -9,18 +9,16 @@ function refreshChart(chart) {
 	
 	if(chart.chart != null) {
 		if(chart.chart.getSelection()[0]) return;
-		
-		if(chart.refreshCount >= 9999999) {
-			chart.jsondata = null;
-			chart.datatable = null;
-			chart.chart.clearChart();
-			chart.chart = null;
-			chart.refreshCount = 1;
-		}
 	}
 	
+	var url = chart.url;
+	url += chart.points_to_show?chart.points_to_show.toString():"all";
+	url += "/";
+	url += chart.group?chart.group.toString():"1";
+	url += "/";
+	url += chart.group_method?chart.group_method:"average";
 	chart.jsondata = $.ajax({
-		url: chart.url,
+		url: url,
 		dataType:"json",
 		async: false,
 		cache: false
@@ -30,12 +28,6 @@ function refreshChart(chart) {
 	
 	// Create our data table out of JSON data loaded from server.
 	chart.datatable = new google.visualization.DataTable(chart.jsondata);
-	
-	// Instantiate and draw our chart, passing in some options.
-	if(!chart.chart) {
-		console.log('Creating new chart for ' + chart.url);
-		chart.chart = new google.visualization.AreaChart(document.getElementById(chart.div));
-	}
 	
 	var width = chart.width;
 	var height = chart.height;
@@ -63,57 +55,67 @@ function refreshChart(chart) {
 		focusTarget: 'category',
 		lineWidth: (isStacked)?1:2,
 		areaOpacity: (isStacked)?1.0:0.3,
+		explorer: (chart.explorer)?true:false,
 		// animation: {duration: 1000, easing: 'inAndOut'},
 	};
 
+	var thumb_options = {
+		// legend: { position: 'none' },
+		// tooltip: { trigger: 'none' },
+		enableInteractivity: false,
+		//chartArea: {left: 0, top: 0, width: chart.width, height: chart.height},
+	};
+	if(chart.thumbnail) $.extend(options, thumb_options);
+
+	// cleanup once every 100 updates
+	if(chart.chart && chart.refreshCount > 100) {
+		chart.chart.clearChart();
+		chart.chart = null;
+	}
+
+	// Instantiate and draw our chart, passing in some options.
+	if(!chart.chart) {
+		console.log('Creating new chart for ' + chart.url);
+		chart.chart = new google.visualization.AreaChart(document.getElementById(chart.div));
+	}
+	
 	if(chart.chart) chart.chart.draw(chart.datatable, options);
 	else console.log('Cannot create chart for ' + chart.url);
 }
 
-function cloneJSON(obj) {
-    // basic type deep copy
-    if (obj === null || obj === undefined || typeof obj !== 'object')  {
-        return obj
-    }
-    // array deep copy
-    if (obj instanceof Array) {
-        var cloneA = [];
-        for (var i = 0; i < obj.length; ++i) {
-            cloneA[i] = cloneJSON(obj[i]);
-        }              
-        return cloneA;
-    }                  
-    // object deep copy
-    var cloneO = {};   
-    for (var i in obj) {
-        cloneO[i] = cloneJSON(obj[i]);
-    }                  
-    return cloneO;
-}
+// loadCharts()
+// fetches all the charts from the server
+// returns an array of objects, containing all the server metadata
+// (not the values of the graphs - just the info about the graphs)
 
 function loadCharts() {
 	var mycharts = new Array();
 
-	$.getJSON('/all.json', function(json) {
-		$.each(json.charts, function(i, value) {
-			mycharts[i] = $.extend(true, {}, value);
-
-			mycharts[i].div = mycharts[i].name.replace(/\./g,"_");
-			mycharts[i].div = mycharts[i].div.replace(/\-/g,"_");
-			mycharts[i].div = mycharts[i].div + "_div";
-
-			mycharts[i].width = 0;
-			mycharts[i].height = 0;
-			mycharts[i].refreshCount = 0;
-
-			mycharts[i].chart = null;
-			mycharts[i].jsondata = null;
-			mycharts[i].datatable = null;
-		});
+	$.ajax({
+		url: '/all.json',
+		async: false,
+		dataType: 'json',
+		success: function (json) { mycharts = json.charts; }
 	});
 
-	console.log("all: " + mycharts.length)
-	console.log(mycharts);
+	$.each(mycharts, function(i, value) {
+		mycharts[i].div = mycharts[i].name.replace(/\./g,"_");
+		mycharts[i].div = mycharts[i].div.replace(/\-/g,"_");
+		mycharts[i].div = mycharts[i].div + "_div";
+
+		mycharts[i].width = 0;
+		mycharts[i].height = 0;
+		mycharts[i].thumbnail = false;
+		mycharts[i].refreshCount = 0;
+		mycharts[i].group = 1;
+		mycharts[i].points_to_show = 0;	// all
+		mycharts[i].group_method = "average";
+
+		mycharts[i].chart = null;
+		mycharts[i].jsondata = null;
+		mycharts[i].datatable = null;
+	});
+
 	return mycharts;
 };
 
@@ -123,17 +125,22 @@ function addChart(name, div, width, height, jsonurl, title, vtitle) {
 	
 	console.log('Creating new objects for chart ' + name);
 	charts[i] = [];
-	charts[i].chart = null;
-	charts[i].jsondata = null;
-	charts[i].datatable = null;
+
 	charts[i].name = name;
-	charts[i].div = div;
-	charts[i].url = jsonurl;
 	charts[i].title = title;
 	charts[i].vtitle = vtitle;
+	charts[i].url = jsonurl;
+
+	charts[i].div = div;
+
 	charts[i].width = width;
 	charts[i].height = height;
 	charts[i].refreshCount = 0;
+	charts[i].thumbnail = false;
+
+	charts[i].chart = null;
+	charts[i].jsondata = null;
+	charts[i].datatable = null;
 }
 
 var charts_last_drawn = 999999999;
