@@ -34,8 +34,8 @@ function refreshChart(chart) {
 
 	var hAxisTitle = null;
 	var vAxisTitle = null;
-	if(height >= 250) hAxisTitle = "Time of Day";
-	if(width >= 450) vAxisTitle = chart.vtitle;
+	if(height >= 200) hAxisTitle = "Time of Day";
+	if(width >= 350) vAxisTitle = chart.vtitle;
 	
 	var title = chart.title;
 
