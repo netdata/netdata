@@ -758,7 +758,7 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
  		}
 
 		for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
-			long long oldvalue, value;			// temp variable for storing data values
+			long long oldvalue = 0, value = 0;			// temp variable for storing data values
 
 			if(rd->bytes == sizeof(long long)) {
 				long long *dimension = rd->values;
@@ -1015,7 +1015,7 @@ int mysendfile(struct web_client *w, char *filename)
 
 	// check if the file is owned by us
 	if(stat.st_uid != getuid() && stat.st_uid != geteuid()) {
-		debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not mine.", w->id, filename);
+		error("%llu: File '%s' is owned by user %d (I run as user %d). Access Denied.", w->id, filename, stat.st_uid, getuid());
 		w->data->bytes = sprintf(w->data->buffer, "Access to file '%s' is not permitted.", filename);
 		return 403;
 	}
