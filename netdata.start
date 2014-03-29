@@ -9,19 +9,11 @@ then
 fi
 cd "$base" || exit 1
 
-# every how many seconds to show the graphs
-NETDATA_CONFIG_UPDATE_EVERY=2
-
 # the detail of the data that will be kept in netdata
 NETDATA_CONFIG_INTERNAL_UPDATE_EVERY=1
 
-# how many points should the graphs have
-NETDATA_CONFIG_HISTORY_POINTS=120
-
-# every how many graph refreshes, the page should be reloaded
-# this fixes a bug in the google graphs API which leaks memory
-# when refreshes graphs
-NETDATA_CONFIG_RELOAD_EVERY=500
+# how many entries to keep in memory
+NETDATA_CONFIG_INTERNAL_HISTORY_LINES=2400
 
 # the user to run netdata under
 NETDATA_CONFIG_USER=nobody
@@ -38,9 +30,6 @@ then
 	. netdata.conf
 fi
 
-# how many history lines to keep in netdata
-NETDATA_HISTORY_LINES=$[NETDATA_CONFIG_UPDATE_EVERY * NETDATA_CONFIG_HISTORY_POINTS / NETDATA_CONFIG_INTERNAL_UPDATE_EVERY]
-
 echo "Stopping a (possibly) running netdata..."
 killall netdata 2>/dev/null
 killall tc-all.sh 2>/dev/null
@@ -55,154 +44,23 @@ else
 	gcc -Wall -O3 -o netdata netdata.c -lpthread || exit 1
 fi
 
+# exporting NETDATA variables to netdata
+export `set | grep ^NETDATA_TITLE_ ` 2>/dev/null
+export `set | grep ^NETDATA_PRIORITY_ ` 2>/dev/null
+
 echo "Starting netdata"
 if [ "$USER" = "root" ]
 then
 	chown -R "$NETDATA_CONFIG_USER" web || exit 1
 	chmod    0775 web   || exit 1
 	chmod -R 0664 web/* || exit 1
-	`pwd`/netdata -d -u $NETDATA_CONFIG_USER -t $NETDATA_CONFIG_INTERNAL_UPDATE_EVERY -l $NETDATA_HISTORY_LINES -p $NETDATA_CONFIG_PORT || exit 1
+	`pwd`/netdata -d -u $NETDATA_CONFIG_USER -t $NETDATA_CONFIG_INTERNAL_UPDATE_EVERY -l $NETDATA_CONFIG_INTERNAL_HISTORY_LINES -p $NETDATA_CONFIG_PORT || exit 1
 else
 	echo >&2 "WARNING: NOT RUNNING AS ROOT - CANNOT SWITCH TO USER $NETDATA_CONFIG_USER"
 	echo >&2 "WARNING: MAKE SURE FILES IN web/ ARE OWNED BY $USER - or it will not work"
-	`pwd`/netdata -d -t $NETDATA_CONFIG_INTERNAL_UPDATE_EVERY -l $NETDATA_HISTORY_LINES -p $NETDATA_CONFIG_PORT || exit 1
+	`pwd`/netdata -d -t $NETDATA_CONFIG_INTERNAL_UPDATE_EVERY -l $NETDATA_CONFIG_INTERNAL_HISTORY_LINES -p $NETDATA_CONFIG_PORT || exit 1
 fi
 sleep 2
-
-# count all graphs
-all=`wget http://127.0.0.1:$NETDATA_CONFIG_PORT/list -O - 2>/dev/null`
-count=0
-for x in $all
-do
-	y=`echo "$x" | tr ".-" "__"`
-	eval "t=\${NETDATA_PRIORITY_${y}}"
-	if [ ! "$t" = "IGNORE" ]
-	then
-		count=$[count + 1]
-	fi
-done
-
-echo "We have $count graphs..."
-
-echo "Generating web/index.html"
-host="`hostname`"
-cat >web/index.html <<EOF
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
-<style>
-        * {font-family:Arial}
-        div {float: left; margin: 0 0 0 0; }
-</style>
-<title>${host} netdata</title>
-<head>
-	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
-
-	<!--Load the AJAX API-->
-	<script type="text/javascript" src="https://www.google.com/jsapi"></script>
-	<script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
-	<script type="text/javascript" src="/file/netdata.js"></script>
-	<script type="text/javascript">
-	
-	// Set a callback to run when the Google Visualization API is loaded.
-	google.setOnLoadCallback(drawCharts);
-	
-	function drawCharts() {
-		// EDIT: add one line per interface you have
-		// EDIT: 
-		// EDIT:   name    div id                    json data           graph 					vertical axis title
-		// EDIT: --------------------------------------------------------------------------------------------------
-EOF
-
-for x in $all
-do
-	y=`echo "$x" | tr ".-" "__"`
-
-	title=
-	vtitle=
-	case "$x" in
-		net.*)
-			title="Network Usage for "
-			vtitle="bandwidth in kilobits/s"
-			;;
-
-		disk.*)
-			title="Disk I/O for "
-			vtitle="I/O in kilobytes/s"
-			;;
-
-		tc.*)
-			title="Class utilization for "
-			vtitle="bandwidth in kilobits/s"
-			;;
-
-	esac
-
-	eval "NETDATA_TITLE_${y}=\${NETDATA_TITLE_${y}:-${x}}"
-	eval "t=\${NETDATA_TITLE_${y}}"
-	
-	eval "p=\${NETDATA_PRIORITY_${y}}"
-	if [ ! "$p" = "IGNORE" ]
-	then
-		cat >>web/index.html <<EOF2
-		addChart('${x}', '${y}_div', 0, 0, "/data/${x}/${NETDATA_CONFIG_HISTORY_POINTS}/${NETDATA_CONFIG_UPDATE_EVERY}/average/", "${title}${t} (${x})", "${vtitle}");
-EOF2
-	fi
-done
-
-cat >>web/index.html <<EOF3
-		refreshCharts(999999);
-	}
-	
-	var refreshCount = 0;
-	function myChartsRefresh() {
-		refreshCount += 2;
-		if(refreshCount > $NETDATA_CONFIG_RELOAD_EVERY) location.reload();
-
-		// refresh up to 2 charts per second
-		refreshCharts(2);
-	}
-	
-	setInterval(myChartsRefresh, 1000);
-
-	//window.onresize = function(event) {
-	//	refreshCharts(999999);
-	//};
-	</script>
-
-	</head>
-
-<body>
- 	<!--
-		EDIT: add one div per interface you have
-		EDIT: use the same id above and bellow!
-	-->
-EOF3
-
-tmp="/tmp/$RANDOM.netdata.$$.$RANDOM"
-for x in $all
-do
-	y=`echo "$x" | tr ".-" "__"`
-	eval "NETDATA_PRIORITY_${y}=\${NETDATA_PRIORITY_${y}:-${x}}"
-	eval "t=\${NETDATA_PRIORITY_${y}}"
-	if [ ! "$t" = "IGNORE" ]
-	then
-		echo "${t}|${y}"
-	fi
-done >"${tmp}"
-
-for x in `cat "${tmp}" | sort`
-do
-	n="`echo "$x" | cut -d '|' -f 2-`"
-	cat >>web/index.html <<EOF4
-	<div id="${n}_div"></div>
-EOF4
-done
-rm -f "${tmp}"
-
-cat >>web/index.html <<EOF5
- </body>
-</html>
-EOF5
 
 if [ "$USER" = "root" ]
 then
@@ -211,8 +69,13 @@ then
 	chmod -R 0664 web/* || exit 1
 fi
 
+# merge the server variables into the config
+eval "`wget -O -  http://localhost:$NETDATA_CONFIG_PORT/envlist 2>/dev/null`"
+
 # save config back
-set|grep ^NETDATA_ >netdata.conf
+set|grep ^NETDATA_CONFIG_	>netdata.conf
+set|grep ^NETDATA_PRIORITY_	>>netdata.conf
+set|grep ^NETDATA_TITLE_	>>netdata.conf
 
 echo "All Done."
 echo "Just hit http://127.0.0.1:$NETDATA_CONFIG_PORT/ from your browser."
