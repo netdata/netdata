@@ -402,6 +402,7 @@ RRD_STATS *rrd_stats_create(const char *id, const char *name, unsigned long entr
 
 	// check if there is a name for it in the environment
 	sprintf(st->envtitle, "NETDATA_TITLE_%s", st->id);
+	while((p = strchr(st->envtitle, '/'))) *p = '_';
 	while((p = strchr(st->envtitle, '.'))) *p = '_';
 	while((p = strchr(st->envtitle, '-'))) *p = '_';
 	p = getenv(st->envtitle);
@@ -411,6 +412,7 @@ RRD_STATS *rrd_stats_create(const char *id, const char *name, unsigned long entr
 	st->usertitle[RRD_STATS_NAME_MAX] = '\0';
 
 	sprintf(st->envpriority, "NETDATA_PRIORITY_%s", st->id);
+	while((p = strchr(st->envpriority, '/'))) *p = '_';
 	while((p = strchr(st->envpriority, '.'))) *p = '_';
 	while((p = strchr(st->envpriority, '-'))) *p = '_';
 	p = getenv(st->envpriority);
