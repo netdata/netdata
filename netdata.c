@@ -1791,21 +1791,94 @@ int do_proc_diskstats() {
 		if(r != 14) error("Cannot read /proc/diskstats line. Expected 14 params, read %d.", r);
 		else {
 			switch(major) {
-				case 1: // ram drives
-					continue;
+				case 3: // ide
+				case 13: // 8bit ide
+				case 22: // ide
+				case 33: // ide
+				case 34: // ide
+				case 56: // ide
+				case 57: // ide
+				case 88: // ide
+				case 89: // ide
+				case 90: // ide
+				case 91: // ide
+					if(minor % 64) continue; // partitions
+					break;
 
-				case 7: // loops
-					continue;
-
-				case 8: // disks
+				case 8: // scsi disks
+				case 65: // scsi disks
+				case 66: // scsi disks
+				case 67: // scsi disks
+				case 68: // scsi disks
+				case 69: // scsi disks
+				case 70: // scsi disks
+				case 71: // scsi disks
+				case 72: // scsi disks
+				case 73: // scsi disks
+				case 74: // scsi disks
+				case 75: // scsi disks
+				case 76: // scsi disks
+				case 77: // scsi disks
+				case 78: // scsi disks
+				case 79: // scsi disks
+				case 80: // i2o
+				case 81: // i2o
+				case 82: // i2o
+				case 83: // i2o
+				case 84: // i2o
+				case 85: // i2o
+				case 86: // i2o
+				case 87: // i2o
+				case 101: // hyperdisk
+				case 102: // compressed
+				case 104: // scsi
+				case 105: // scsi
+				case 106: // scsi
+				case 107: // scsi
+				case 108: // scsi
+				case 109: // scsi
+				case 110: // scsi
+				case 111: // scsi
+				case 114: // bios raid
+				case 116: // ram board
+				case 128: // scsi
+				case 129: // scsi
+				case 130: // scsi
+				case 131: // scsi
+				case 132: // scsi
+				case 133: // scsi
+				case 134: // scsi
+				case 135: // scsi
+				case 153: // raid
 					if(minor % 16) continue; // partitions
 					break;
 
 				case 9: // MDs
+				case 43: // network block
+				case 144: // nfs
+				case 145: // nfs
+				case 146: // nfs
 					break;
 
-				case 11: // CDs
-					continue;
+				case 48: // RAID
+				case 49: // RAID
+				case 50: // RAID
+				case 51: // RAID
+				case 52: // RAID
+				case 53: // RAID
+				case 54: // RAID
+				case 55: // RAID
+				case 112: // RAID
+				case 136: // RAID
+				case 137: // RAID
+				case 138: // RAID
+				case 139: // RAID
+				case 140: // RAID
+				case 141: // RAID
+				case 142: // RAID
+				case 143: // RAID
+					if(minor % 8) continue; // partitions
+					break;
 
 				default:
 					continue;
