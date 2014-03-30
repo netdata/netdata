@@ -566,7 +566,7 @@ void rrd_stats_done(RRD_STATS *st)
 
 	// find if there are any obsolete dimensions (not updated recently)
 	for( rd = st->dimensions, last = NULL ; rd ; ) {
-		if(rd->last_updated < st->last_updated) {
+		if((rd->last_updated + (10 * update_every)) < st->last_updated) { // remove it only it is not updated in 10 seconds
 			debug(D_RRD_STATS, "Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
 
 			if(!last) {
@@ -592,12 +592,12 @@ void rrd_stats_done(RRD_STATS *st)
 	pthread_mutex_unlock(&st->mutex);
 }
 
-void rrd_stats_dimension_set(RRD_STATS *st, const char *id, void *data)
+int rrd_stats_dimension_set(RRD_STATS *st, const char *id, void *data)
 {
 	RRD_DIMENSION *rd = rrd_stats_dimension_find(st, id);
 	if(!rd) {
 		error("Cannot find dimension with id '%s' on stats '%s' (%s).", id, st->name, st->id);
-		return;
+		return 1;
 	}
 
 	rd->last_updated = st->last_updated;
@@ -623,6 +623,8 @@ void rrd_stats_dimension_set(RRD_STATS *st, const char *id, void *data)
 		dimension[st->current_entry] = (*value);
 	}
 	else fatal("I don't know how to handle data of length %d bytes.", rd->bytes);
+
+	return 0;
 }
 
 #define GROUP_AVERAGE	0
@@ -2532,7 +2534,19 @@ void tc_device_commit(struct tc_device *d)
 
 	for ( c = d->classes ; c ; c = c->next) {
 		if(c->isleaf && c->hasparent)
-			rrd_stats_dimension_set(st, c->id, &c->bytes);
+			if(rrd_stats_dimension_set(st, c->id, &c->bytes) != 0) {
+				
+				// new class, we have to add it
+				if(!rrd_stats_dimension_add(st, c->id, c->name, sizeof(unsigned long long), 8, 1024, RRD_DIMENSION_INCREMENTAL))
+					error("Cannot add RRD_STATS dimension %s.", c->name);
+				else rrd_stats_dimension_set(st, c->id, &c->bytes);
+			}
+
+			// check if the class changed name
+			RRD_DIMENSION *rd;
+			for(rd = st->dimensions ; rd ; rd = rd->next) {
+				if(strcmp(rd->id, c->id) == 0) { strcpy(rd->name, c->name); break; }
+			}
 	}
 	rrd_stats_done(st);
 }
