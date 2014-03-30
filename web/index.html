@@ -103,8 +103,6 @@
 	var go_thumbs = 0;
 	var go_main = 0;
 	function drawCharts() {
-		var now = new Date().getTime();
-
 		myChartsRefreshInternal(mycharts.length);
 	};
 
@@ -150,11 +148,13 @@
 
 			if(c.type == "tc") {
 				c.category = "Quality of Service"
+				c.glyphicon = "glyphicon-transfer";
 				c.group = 30;
 				c.group_method = "average";
 			}
 			else if(c.type == "net") {
 				c.category = "Network Traffic"
+				c.glyphicon = "glyphicon-cloud";
 				c.group = 10;
 				c.group_method = "max";
 
@@ -164,26 +164,31 @@
 			}
 			else if(c.type == "ipv4") {
 				c.category = "IPv4 connections"
+				c.glyphicon = "glyphicon-resize-full";
 				c.group = 30;
 				c.group_method = "max";
 			}
 			else if(c.type == "conntrack") {
 				c.category = "Netfilter Connections Tracked"
+				c.glyphicon = "glyphicon-eye-open";
 				c.group = 30;
 				c.group_method = "max";
 			}
 			else if(c.type == "ipvs") {
 				c.category = "IPVS"
+				c.glyphicon = "glyphicon-sort";
 				c.group = 30;
 				c.group_method = "max";
 			}
 			else if(c.type == "disk") {
 				c.category = "Disk I/O"
+				c.glyphicon = "glyphicon-floppy-disk";
 				c.group = 20;
 				c.group_method = "max";
 			}
 			else {
 				c.category = "Unknown"
+				c.glyphicon = "glyphicon-search";
 				c.group = 60;
 				c.group_method = "max";
 			}
@@ -199,7 +204,7 @@
 
 			if(c.enabled) {
 				var j;
-				var h = "<div class=\"thumbgraph\"><table><tr><td><div class=\"thumbgraph\" id=\"" + c.div + "\">" + c.name + "</div></td></tr><tr><td align=\"center\"><div class=\"btn-group-xs\"><button type=\"button\" class=\"btn btn-default\" onclick=\"setMainChart(" + i +");\">&nbsp;&nbsp;select " + c.name + " for zoom&nbsp;&nbsp;</button></div></td></tr></table></div>";
+				var h = "<div class=\"thumbgraph\"><table><tr><td><div class=\"thumbgraph\" id=\"" + c.div + "\"><table><tr><td align=\"center\" width=\"" + c.width + "\" height=\"" + c.height + "\"><h4><span class=\"glyphicon glyphicon-refresh\"></span><br/><br/>loading chart<br/><br/><span class=\"label label-default\">Please wait...</span></h4></td></tr></table></div></td></tr><tr><td align=\"center\"><div class=\"btn-group-xs\"><button type=\"button\" class=\"btn btn-default\" onclick=\"setMainChart(" + i +");\">&nbsp;&nbsp;select " + c.name + " for zoom&nbsp;&nbsp;</button></div></td></tr></table></div>";
 
 				// find the categories object for this type
 				for(j = 0; j < categories.length ;j++) {
@@ -212,7 +217,7 @@
 
 				if(j == categories.length) {
 					var t = "(as " + c.group_method + " every " + (c.group*c.update_every) + " seconds)";
-					categories.push({name: c.type, title: c.category, description: t, priority: 0, count: 1, html: h});
+					categories.push({name: c.type, title: c.category, description: t, priority: 0, count: 1, glyphicon: c.glyphicon, html: h});
 				}
 			}
 		});
@@ -226,7 +231,7 @@
 			else if(a.name == "disk") a.priority = 6;
 			else a.priority = 4;
 
-			a.html = "<tr><td><ol class=\"breadcrumb graphs\"><li class=\"active\"><a id=\"" + a.name + "\" href=\"#" + a.name + "\"><b>" + a.title + "</b> " + a.description + " </a></li></ol></td></tr><tr><td><div class=\"thumbgraphs\">" + a.html + "</td></tr>";
+			a.html = "<tr><td><ol class=\"breadcrumb graphs\"><li class=\"active\"><span class=\"glyphicon " + a.glyphicon + "\"></span> &nbsp; <a id=\"" + a.name + "\" href=\"#" + a.name + "\"><b>" + a.title + "</b> " + a.description + " </a></li></ol></td></tr><tr><td><div class=\"thumbgraphs\">" + a.html + "</td></tr>";
 		});
 
 		function categoriessort(a, b) {
@@ -298,17 +303,8 @@
 	setInterval(myChartsRefresh, 500);
 
 	window.onresize = function(event) {
-		var ot = go_thumbs;
-		var om = go_main;
-
-		go_thumbs = 0;
-		go_main = 0;
-
 		resizeCharts();
 		drawCharts();
-
-		go_thumbs = ot;
-		go_main = om;
 	};
 
 	function showMainGraph() {
@@ -352,9 +348,12 @@
         <div class="collapse navbar-collapse">
           <ul class="nav navbar-nav">
             <li class="active"><a href="#">Home</a></li>
-            <li><a href="#net">net</a></li>
-            <li><a href="#tc">tc</a></li>
-            <li><a href="#disk">disk</a></li>
+            <li><a href="#net">Network</a></li>
+            <li><a href="#tc">QoS</a></li>
+            <li><a href="#conntrack">Netfilter</a></li>
+            <li><a href="#ipv4">IPv4</a></li>
+            <li><a href="#ipvs">IPVS</a></li>
+            <li><a href="#disk">Disk</a></li>
           </ul>
         </div><!--/.nav-collapse -->
       </div>
