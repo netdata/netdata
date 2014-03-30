@@ -29,45 +29,42 @@ function refreshChart(chart) {
 	// Create our data table out of JSON data loaded from server.
 	chart.datatable = new google.visualization.DataTable(chart.jsondata);
 	
-	var width = chart.width;
-	var height = chart.height;
-
-	var hAxisTitle = null;
-	var vAxisTitle = null;
-	if(height >= 200) hAxisTitle = "Time of Day";
-	if(width >= 350) vAxisTitle = chart.vtitle;
-	
-	var title = chart.title;
-
-	var isStacked = false;
-	if(chart.name.substring(0, 3) == "tc.") {
-		isStacked = true;
-		title += " [stacked]";
-	}
-
+	// setup the default options
 	var options = {
-		width: width,
-		height: height,
-		title: title,
-		isStacked: isStacked,
-		hAxis: {title: hAxisTitle},
-		vAxis: {title: vAxisTitle, minValue: 10},
+		width: chart.width,
+		height: chart.height,
+		title: chart.title,
+		hAxis: {title: "Time of Day"},
+		vAxis: {title: chart.vtitle, minValue: 10},
 		focusTarget: 'category',
-		lineWidth: (isStacked)?1:2,
-		areaOpacity: (isStacked)?1.0:0.3,
 		explorer: (chart.explorer)?true:false,
 		// animation: {duration: 1000, easing: 'inAndOut'},
 	};
 
-	var thumb_options = {
-		// legend: { position: 'none' },
-		// tooltip: { trigger: 'none' },
-		enableInteractivity: false,
-		//chartArea: {left: 0, top: 0, width: chart.width, height: chart.height},
-	};
-	if(chart.thumbnail) $.extend(options, thumb_options);
+	// disable interactivity on thumbnails
+	if(chart.thumbnail) options.enableInteractivity = false;
+
+	// hide axis titles if too small
+	if(chart.height < 200) options.vAxis.title = null;
+	if(chart.width < 350) options.hAxis.title = null;
+
+	if(chart.name.substring(0, 5) == "ipv4.") {
+		options.lineWidth = 3;
+		options.curveType = 'function';
+	}
+	else if(chart.name.substring(0, 3) == "tc.") {
+		options.isStacked = true;
+		options.title += " [stacked]";
+		options.areaOpacity = 1.0;
+		options.lineWidth = 1;
+	}
+	else {
+		options.areaOpacity = 0.3;
+		options.lineWidth = 2;
+	}
 
 	// cleanup once every 100 updates
+	// we don't cleanup on every single, to avoid firefox flashing effect
 	if(chart.chart && chart.refreshCount > 100) {
 		chart.chart.clearChart();
 		chart.chart = null;
@@ -76,7 +73,10 @@ function refreshChart(chart) {
 	// Instantiate and draw our chart, passing in some options.
 	if(!chart.chart) {
 		console.log('Creating new chart for ' + chart.url);
-		chart.chart = new google.visualization.AreaChart(document.getElementById(chart.div));
+		if(chart.name.substring(0, 5) == "ipv4.")
+			chart.chart = new google.visualization.LineChart(document.getElementById(chart.div));
+		else
+			chart.chart = new google.visualization.AreaChart(document.getElementById(chart.div));
 	}
 	
 	if(chart.chart) chart.chart.draw(chart.datatable, options);

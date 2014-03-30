@@ -34,18 +34,21 @@
 #define RRD_DIMENSION_ABSOLUTE		0
 #define RRD_DIMENSION_INCREMENTAL	1
 
-#define RRD_TYPE_NET		"net"
-#define RRD_TYPE_NET_LEN	strlen(RRD_TYPE_NET)
+#define RRD_TYPE_NET			"net"
+#define RRD_TYPE_NET_LEN		strlen(RRD_TYPE_NET)
 
-#define RRD_TYPE_TC			"tc"
-#define RRD_TYPE_TC_LEN		strlen(RRD_TYPE_TC)
+#define RRD_TYPE_TC				"tc"
+#define RRD_TYPE_TC_LEN			strlen(RRD_TYPE_TC)
 
-#define RRD_TYPE_DISK		"disk"
-#define RRD_TYPE_DISK_LEN	strlen(RRD_TYPE_DISK)
+#define RRD_TYPE_DISK			"disk"
+#define RRD_TYPE_DISK_LEN		strlen(RRD_TYPE_DISK)
 
-#define WEB_PATH_FILE		"file"
-#define WEB_PATH_DATA		"data"
-#define WEB_PATH_GRAPH		"graph"
+#define RRD_TYPE_NET_SNMP		"ipv4"
+#define RRD_TYPE_NET_SNMP_LEN	strlen(RRD_TYPE_NET_SNMP)
+
+#define WEB_PATH_FILE			"file"
+#define WEB_PATH_DATA			"data"
+#define WEB_PATH_GRAPH			"graph"
 
 // internal defaults
 #define UPDATE_EVERY 1
@@ -101,6 +104,9 @@
 
 #define MAX_PROC_DISKSTATS_LINE 4096
 #define MAX_PROC_DISKSTATS_DISK_NAME 1024
+
+#define MAX_PROC_NET_SNMP_LINE 4096
+#define MAX_PROC_NET_SNMP_NAME 1024
 
 
 int silent = 0;
@@ -1585,8 +1591,10 @@ void *new_client(void *ptr)
 		debug(D_WEB_CLIENT, "%llu: Waiting...", w->id);
 		retval = select(fdmax+1, &ifds, &ofds, &efds, &tv);
 
-		if(retval == -1)
-			fatal("%llu: LISTENER: select() failed.", w->id);
+		if(retval == -1) {
+			error("%llu: LISTENER: select() failed.", w->id);
+			continue;
+		}
 		else if(!retval) {
 			// timeout
 			w->obsolete = 1;
@@ -1664,8 +1672,10 @@ void *socket_listen_main(void *ptr)
 		// debug(D_WEB_CLIENT, "LISTENER: Waiting...");
 		retval = select(fdmax+1, &ifds, &ofds, &efds, &tv);
 
-		if(retval == -1)
-			fatal("LISTENER: select() failed.");
+		if(retval == -1) {
+			error("LISTENER: select() failed.");
+			continue;
+		}
 		else if(retval) {
 			// check for new incoming connections
 			if(FD_ISSET(listener, &ifds)) {
@@ -1940,6 +1950,148 @@ int do_proc_diskstats() {
 }
 
 // ----------------------------------------------------------------------------
+// /proc/net/snmp processor
+
+int do_proc_net_snmp() {
+	char buffer[MAX_PROC_NET_SNMP_LINE+1] = "";
+
+	FILE *fp = fopen("/proc/net/snmp", "r");
+	if(!fp) {
+		error("Cannot read /proc/net/snmp.");
+		return 1;
+	}
+
+	for(;1;) {
+		char *p = fgets(buffer, MAX_PROC_NET_SNMP_LINE, fp);
+		if(!p) break;
+
+		if(strncmp(p, "Ip: ", 4) == 0) {
+			// skip the header line, read the data
+			p = fgets(buffer, MAX_PROC_NET_SNMP_LINE, fp);
+			if(!p) break;
+
+			if(strncmp(p, "Ip: ", 4) != 0) {
+				error("Cannot read IP line from /proc/net/snmp.");
+				break;
+			}
+
+			// see also http://net-snmp.sourceforge.net/docs/mibs/ip.html
+			unsigned long long Forwarding, DefaultTTL, InReceives, InHdrErrors, InAddrErrors, ForwDatagrams, InUnknownProtos, InDiscards, InDelivers,
+				OutRequests, OutDiscards, OutNoRoutes, ReasmTimeout, ReasmReqds, ReasmOKs, ReasmFails, FragOKs, FragFails, FragCreates;
+
+			int r = sscanf(&buffer[4], "%llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu\n",
+				&Forwarding, &DefaultTTL, &InReceives, &InHdrErrors, &InAddrErrors, &ForwDatagrams, &InUnknownProtos, &InDiscards, &InDelivers,
+				&OutRequests, &OutDiscards, &OutNoRoutes, &ReasmTimeout, &ReasmReqds, &ReasmOKs, &ReasmFails, &FragOKs, &FragFails, &FragCreates);
+
+			if(r == EOF) break;
+			if(r != 19) error("Cannot read /proc/net/snmp IP line. Expected 19 params, read %d.", r);
+
+			RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_SNMP ".ip");
+			if(!st) {
+				st = rrd_stats_create(RRD_TYPE_NET_SNMP ".ip", RRD_TYPE_NET_SNMP ".ip", save_history, "IPv4 Packets", "Packets/s", RRD_TYPE_NET_SNMP);
+				if(!st) {
+					error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_SNMP ".ip");
+					continue;
+				}
+
+				if(!rrd_stats_dimension_add(st, "forwarded", "forwarded", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL))
+					error("Cannot add RRD_STATS dimension %s.", "forwarded");
+
+				if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), -1, 1, RRD_DIMENSION_INCREMENTAL))
+					error("Cannot add RRD_STATS dimension %s.", "sent");
+
+				if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL))
+					error("Cannot add RRD_STATS dimension %s.", "received");
+
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "sent", &OutRequests);
+			rrd_stats_dimension_set(st, "received", &InReceives);
+			rrd_stats_dimension_set(st, "forwarded", &ForwDatagrams);
+			rrd_stats_done(st);
+		}
+		else if(strncmp(p, "Tcp: ", 5) == 0) {
+			// skip the header line, read the data
+			p = fgets(buffer, MAX_PROC_NET_SNMP_LINE, fp);
+			if(!p) break;
+
+			if(strncmp(p, "Tcp: ", 5) != 0) {
+				error("Cannot read TCP line from /proc/net/snmp.");
+				break;
+			}
+
+			unsigned long long RtoAlgorithm, RtoMin, RtoMax, MaxConn, ActiveOpens, PassiveOpens, AttemptFails, EstabResets, CurrEstab, InSegs, OutSegs, RetransSegs, InErrs, OutRsts;
+
+			int r = sscanf(&buffer[5], "%llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu\n",
+				&RtoAlgorithm, &RtoMin, &RtoMax, &MaxConn, &ActiveOpens, &PassiveOpens, &AttemptFails, &EstabResets, &CurrEstab, &InSegs, &OutSegs, &RetransSegs, &InErrs, &OutRsts);
+
+			if(r == EOF) break;
+			if(r != 14) error("Cannot read /proc/net/snmp TCP line. Expected 14 params, read %d.", r);
+
+			// see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
+			RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcp");
+			if(!st) {
+				st = rrd_stats_create(RRD_TYPE_NET_SNMP ".tcp", RRD_TYPE_NET_SNMP ".tcp", save_history, "IPv4 TCP Established Sockets", "Established Sockets", RRD_TYPE_NET_SNMP);
+				if(!st) {
+					error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_SNMP ".tcp");
+					continue;
+				}
+
+				if(!rrd_stats_dimension_add(st, "established", "established", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_ABSOLUTE))
+					error("Cannot add RRD_STATS dimension %s.", "established");
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "established", &CurrEstab);
+			rrd_stats_done(st);
+		}
+		else if(strncmp(p, "Udp: ", 5) == 0) {
+			// skip the header line, read the data
+			p = fgets(buffer, MAX_PROC_NET_SNMP_LINE, fp);
+			if(!p) break;
+
+			if(strncmp(p, "Udp: ", 5) != 0) {
+				error("Cannot read UDP line from /proc/net/snmp.");
+				break;
+			}
+
+			unsigned long long InDatagrams, NoPorts, InErrors, OutDatagrams, RcvbufErrors, SndbufErrors;
+
+			int r = sscanf(&buffer[5], "%llu %llu %llu %llu %llu %llu\n",
+				&InDatagrams, &NoPorts, &InErrors, &OutDatagrams, &RcvbufErrors, &SndbufErrors);
+
+			if(r == EOF) break;
+			if(r != 6) error("Cannot read /proc/net/snmp UDP line. Expected 6 params, read %d.", r);
+
+			// see http://net-snmp.sourceforge.net/docs/mibs/udp.html
+			RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_SNMP ".udp");
+			if(!st) {
+				st = rrd_stats_create(RRD_TYPE_NET_SNMP ".udp", RRD_TYPE_NET_SNMP ".udp", save_history, "IPv4 UDP Packets", "Packets/s", RRD_TYPE_NET_SNMP);
+				if(!st) {
+					error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_SNMP ".udp");
+					continue;
+				}
+
+				if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), -1, 1, RRD_DIMENSION_INCREMENTAL))
+					error("Cannot add RRD_STATS dimension %s.", "sent");
+
+				if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL))
+					error("Cannot add RRD_STATS dimension %s.", "received");
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "received", &InDatagrams);
+			rrd_stats_dimension_set(st, "sent", &OutDatagrams);
+			rrd_stats_done(st);
+		}
+	}
+	
+	fclose(fp);
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
 // /proc processor
 
 void *proc_main(void *ptr)
@@ -1960,6 +2112,7 @@ void *proc_main(void *ptr)
 		// BEGIN -- the job to be done
 		do_proc_net_dev(usec);
 		do_proc_diskstats(usec);
+		do_proc_net_snmp(usec);
 		// END -- the job is done
 		
 		// find the time to sleep in order to wait exactly update_every seconds
@@ -2288,6 +2441,7 @@ void become_daemon()
 
 	signal(SIGCHLD, SIG_IGN);
 	signal(SIGHUP, SIG_IGN);
+	signal(SIGWINCH, SIG_IGN);
 
 	// fork() again
 	i = fork();
