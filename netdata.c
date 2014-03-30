@@ -2340,13 +2340,13 @@ int do_proc_net_ip_vs_stats() {
 
 	RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_IPVS ".sockets");
 	if(!st) {
-		st = rrd_stats_create(RRD_TYPE_NET_IPVS ".sockets", RRD_TYPE_NET_IPVS ".sockets", save_history, "IPVS Connections", "Connections", RRD_TYPE_NET_IPVS);
+		st = rrd_stats_create(RRD_TYPE_NET_IPVS ".sockets", RRD_TYPE_NET_IPVS ".sockets", save_history, "IPVS New Connections", "new connections", RRD_TYPE_NET_IPVS);
 		if(!st) {
 			error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_IPVS ".sockets");
 			return 1;
 		}
 
-		if(!rrd_stats_dimension_add(st, "connections", "connections", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_ABSOLUTE))
+		if(!rrd_stats_dimension_add(st, "connections", "connections", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL))
 			error("Cannot add RRD_STATS dimension %s.", "connections");
 	}
 	else rrd_stats_next(st);
@@ -2374,11 +2374,11 @@ int do_proc_net_ip_vs_stats() {
 	rrd_stats_dimension_set(st, "sent", &OutPackets);
 	rrd_stats_done(st);
 
-	st = rrd_stats_find(RRD_TYPE_NET_IPVS ".bytes");
+	st = rrd_stats_find(RRD_TYPE_NET ".ipvs");
 	if(!st) {
-		st = rrd_stats_create(RRD_TYPE_NET_IPVS ".bytes", RRD_TYPE_NET_IPVS ".bytes", save_history, "IPVS Bandwidth", "bandwidth in kilobits/s", RRD_TYPE_NET_IPVS);
+		st = rrd_stats_create(RRD_TYPE_NET ".ipvs", RRD_TYPE_NET ".ipvs", save_history, "IPVS Bandwidth", "bandwidth in kilobits/s", RRD_TYPE_NET);
 		if(!st) {
-			error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_IPVS ".bytes");
+			error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET ".ipvs");
 			return 1;
 		}
 
