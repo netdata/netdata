@@ -48,7 +48,7 @@ function refreshChart(chart) {
 	if(chart.height < 200) options.vAxis.title = null;
 	if(chart.width < 350) options.hAxis.title = null;
 
-	if(chart.name.substring(0, 5) == "ipv4.") {
+	if(chart.name.substring(0, 5) == "ipv4." || chart.name.substring(0, 10) == "conntrack." || chart.name.substring(0, 5) == "ipvs.") {
 		options.lineWidth = 3;
 		options.curveType = 'function';
 	}
@@ -73,7 +73,7 @@ function refreshChart(chart) {
 	// Instantiate and draw our chart, passing in some options.
 	if(!chart.chart) {
 		console.log('Creating new chart for ' + chart.url);
-		if(chart.name.substring(0, 5) == "ipv4.")
+		if(chart.name.substring(0, 5) == "ipv4." || chart.name.substring(0, 10) == "conntrack." || chart.name.substring(0, 5) == "ipvs.")
 			chart.chart = new google.visualization.LineChart(document.getElementById(chart.div));
 		else
 			chart.chart = new google.visualization.AreaChart(document.getElementById(chart.div));

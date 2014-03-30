@@ -34,17 +34,23 @@
 #define RRD_DIMENSION_ABSOLUTE		0
 #define RRD_DIMENSION_INCREMENTAL	1
 
-#define RRD_TYPE_NET			"net"
-#define RRD_TYPE_NET_LEN		strlen(RRD_TYPE_NET)
+#define RRD_TYPE_NET				"net"
+#define RRD_TYPE_NET_LEN			strlen(RRD_TYPE_NET)
 
-#define RRD_TYPE_TC				"tc"
-#define RRD_TYPE_TC_LEN			strlen(RRD_TYPE_TC)
+#define RRD_TYPE_TC					"tc"
+#define RRD_TYPE_TC_LEN				strlen(RRD_TYPE_TC)
 
-#define RRD_TYPE_DISK			"disk"
-#define RRD_TYPE_DISK_LEN		strlen(RRD_TYPE_DISK)
+#define RRD_TYPE_DISK				"disk"
+#define RRD_TYPE_DISK_LEN			strlen(RRD_TYPE_DISK)
 
-#define RRD_TYPE_NET_SNMP		"ipv4"
-#define RRD_TYPE_NET_SNMP_LEN	strlen(RRD_TYPE_NET_SNMP)
+#define RRD_TYPE_NET_SNMP			"ipv4"
+#define RRD_TYPE_NET_SNMP_LEN		strlen(RRD_TYPE_NET_SNMP)
+
+#define RRD_TYPE_NET_STAT_CONNTRACK 	"conntrack"
+#define RRD_TYPE_NET_STAT_CONNTRACK_LEN	strlen(RRD_TYPE_NET_STAT_CONNTRACK)
+
+#define RRD_TYPE_NET_IPVS 			"ipvs"
+#define RRD_TYPE_NET_IPVS_LEN		strlen(RRD_TYPE_NET_IPVS)
 
 #define WEB_PATH_FILE			"file"
 #define WEB_PATH_DATA			"data"
@@ -107,6 +113,12 @@
 
 #define MAX_PROC_NET_SNMP_LINE 4096
 #define MAX_PROC_NET_SNMP_NAME 1024
+
+#define MAX_PROC_NET_STAT_CONNTRACK_LINE 4096
+#define MAX_PROC_NET_STAT_CONNTRACK_NAME 1024
+
+#define MAX_PROC_NET_IPVS_LINE 4096
+#define MAX_PROC_NET_IPVS_NAME 1024
 
 
 int silent = 0;
@@ -2030,20 +2042,40 @@ int do_proc_net_snmp() {
 			if(r != 14) error("Cannot read /proc/net/snmp TCP line. Expected 14 params, read %d.", r);
 
 			// see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
-			RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcp");
+			RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcpsock");
 			if(!st) {
-				st = rrd_stats_create(RRD_TYPE_NET_SNMP ".tcp", RRD_TYPE_NET_SNMP ".tcp", save_history, "IPv4 TCP Established Sockets", "Established Sockets", RRD_TYPE_NET_SNMP);
+				st = rrd_stats_create(RRD_TYPE_NET_SNMP ".tcpsock", RRD_TYPE_NET_SNMP ".tcpsock", save_history, "IPv4 TCP Connections", "Connections", RRD_TYPE_NET_SNMP);
+				if(!st) {
+					error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_SNMP ".tcpsock");
+					continue;
+				}
+
+				if(!rrd_stats_dimension_add(st, "connections", "connections", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_ABSOLUTE))
+					error("Cannot add RRD_STATS dimension %s.", "connections");
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "connections", &CurrEstab);
+			rrd_stats_done(st);
+
+			st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcp");
+			if(!st) {
+				st = rrd_stats_create(RRD_TYPE_NET_SNMP ".tcp", RRD_TYPE_NET_SNMP ".tcp", save_history, "IPv4 TCP Packets", "Packets/s", RRD_TYPE_NET_SNMP);
 				if(!st) {
 					error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_SNMP ".tcp");
 					continue;
 				}
 
-				if(!rrd_stats_dimension_add(st, "established", "established", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_ABSOLUTE))
-					error("Cannot add RRD_STATS dimension %s.", "established");
+				if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), -1, 1, RRD_DIMENSION_INCREMENTAL))
+					error("Cannot add RRD_STATS dimension %s.", "sent");
+
+				if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL))
+					error("Cannot add RRD_STATS dimension %s.", "received");
 			}
 			else rrd_stats_next(st);
 
-			rrd_stats_dimension_set(st, "established", &CurrEstab);
+			rrd_stats_dimension_set(st, "received", &InSegs);
+			rrd_stats_dimension_set(st, "sent", &OutSegs);
 			rrd_stats_done(st);
 		}
 		else if(strncmp(p, "Udp: ", 5) == 0) {
@@ -2092,6 +2124,280 @@ int do_proc_net_snmp() {
 }
 
 // ----------------------------------------------------------------------------
+// /proc/net/netstat processor
+
+int do_proc_net_netstat() {
+	char buffer[MAX_PROC_NET_SNMP_LINE+1] = "";
+
+	FILE *fp = fopen("/proc/net/netstat", "r");
+	if(!fp) {
+		error("Cannot read /proc/net/netstat.");
+		return 1;
+	}
+
+	for(;1;) {
+		char *p = fgets(buffer, MAX_PROC_NET_SNMP_LINE, fp);
+		if(!p) break;
+
+		if(strncmp(p, "IpExt: ", 7) == 0) {
+			// skip the header line, read the data
+			p = fgets(buffer, MAX_PROC_NET_SNMP_LINE, fp);
+			if(!p) break;
+
+			if(strncmp(p, "IpExt: ", 7) != 0) {
+				error("Cannot read IpExt line from /proc/net/netstat.");
+				break;
+			}
+
+			unsigned long long InNoRoutes, InTruncatedPkts, InMcastPkts, OutMcastPkts, InBcastPkts, OutBcastPkts, InOctets, OutOctets, InMcastOctets, OutMcastOctets, InBcastOctets, OutBcastOctets;
+	
+			int r = sscanf(&buffer[7], "%llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu\n",
+				&InNoRoutes, &InTruncatedPkts, &InMcastPkts, &OutMcastPkts, &InBcastPkts, &OutBcastPkts, &InOctets, &OutOctets, &InMcastOctets, &OutMcastOctets, &InBcastOctets, &OutBcastOctets);
+
+			if(r == EOF) break;
+			if(r != 12) error("Cannot read /proc/net/netstat IpExt line. Expected 12 params, read %d.", r);
+
+			RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET ".ipv4");
+			if(!st) {
+				st = rrd_stats_create(RRD_TYPE_NET ".ipv4", RRD_TYPE_NET ".ipv4", save_history, "All IPv4 Bandwidth", "bandwidth in kilobits/s", RRD_TYPE_NET);
+				if(!st) {
+					error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET ".ipv4");
+					continue;
+				}
+
+				if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), -8, 1024, RRD_DIMENSION_INCREMENTAL))
+					error("Cannot add RRD_STATS dimension %s.", "sent");
+
+				if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 8, 1024, RRD_DIMENSION_INCREMENTAL))
+					error("Cannot add RRD_STATS dimension %s.", "received");
+
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "sent", &OutOctets);
+			rrd_stats_dimension_set(st, "received", &InOctets);
+			rrd_stats_done(st);
+		}
+	}
+	
+	fclose(fp);
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
+// /proc/net/stat/nf_conntrack processor
+
+int do_proc_net_stat_conntrack() {
+	char buffer[MAX_PROC_NET_STAT_CONNTRACK_LINE+1] = "";
+
+	FILE *fp = fopen("/proc/net/stat/nf_conntrack", "r");
+	if(!fp) {
+		error("Cannot read /proc/net/stat/nf_conntrack.");
+		return 1;
+	}
+
+	// read the discard the header
+	char *p = fgets(buffer, MAX_PROC_NET_STAT_CONNTRACK_LINE, fp);
+
+	unsigned long long aentries = 0, asearched = 0, afound = 0, anew = 0, ainvalid = 0, aignore = 0, adelete = 0, adelete_list = 0,
+		ainsert = 0, ainsert_failed = 0, adrop = 0, aearly_drop = 0, aicmp_error = 0, aexpect_new = 0, aexpect_create = 0, aexpect_delete = 0, asearch_restart = 0;
+
+	for(;1;) {
+		p = fgets(buffer, MAX_PROC_NET_STAT_CONNTRACK_LINE, fp);
+		if(!p) break;
+
+		unsigned long long tentries, tsearched, tfound, tnew, tinvalid, tignore, tdelete, tdelete_list, tinsert, tinsert_failed, tdrop, tearly_drop, ticmp_error, texpect_new, texpect_create, texpect_delete, tsearch_restart;
+
+		int r = sscanf(buffer, "%llx %llx %llx %llx %llx %llx %llx %llx %llx %llx %llx %llx %llx %llx %llx %llx %llx\n",
+			&tentries, &tsearched, &tfound, &tnew, &tinvalid, &tignore, &tdelete, &tdelete_list, &tinsert, &tinsert_failed, &tdrop, &tearly_drop, &ticmp_error, &texpect_new, &texpect_create, &texpect_delete, &tsearch_restart);
+
+		if(r == EOF) break;
+		if(r != 17) error("Cannot read /proc/net/stat/nf_conntrack. Expected 17 params, read %d.", r);
+
+		if(!aentries) aentries =  tentries;
+
+		// sum all the cpus together
+		asearched 			+= tsearched;
+		afound 				+= tfound;
+		anew 				+= tnew;
+		ainvalid 			+= tinvalid;
+		aignore 			+= tignore;
+		adelete 			+= tdelete;
+		adelete_list 		+= tdelete_list;
+		ainsert 			+= tinsert;
+		ainsert_failed 		+= tinsert_failed;
+		adrop 				+= tdrop;
+		aearly_drop 		+= tearly_drop;
+		aicmp_error 		+= ticmp_error;
+		aexpect_new 		+= texpect_new;
+		aexpect_create 		+= texpect_create;
+		aexpect_delete 		+= texpect_delete;
+		asearch_restart 	+= tsearch_restart;
+	}
+	fclose(fp);
+
+	RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".sockets");
+	if(!st) {
+		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK ".sockets", RRD_TYPE_NET_STAT_CONNTRACK ".sockets", save_history, "Netfilter Connections", "Connections", RRD_TYPE_NET_STAT_CONNTRACK);
+		if(!st) {
+			error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_STAT_CONNTRACK ".sockets");
+			return 1;
+		}
+
+		if(!rrd_stats_dimension_add(st, "connections", "connections", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_ABSOLUTE))
+			error("Cannot add RRD_STATS dimension %s.", "connections");
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "connections", &aentries);
+	rrd_stats_done(st);
+
+	st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".new");
+	if(!st) {
+		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK ".new", RRD_TYPE_NET_STAT_CONNTRACK ".new", save_history, "Netfilter New Connections", "Connections/s", RRD_TYPE_NET_STAT_CONNTRACK);
+		if(!st) {
+			error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_STAT_CONNTRACK ".new");
+			return 1;
+		}
+
+		if(!rrd_stats_dimension_add(st, "dropped", "dropped", sizeof(unsigned long long), -1, 1, RRD_DIMENSION_INCREMENTAL))
+			error("Cannot add RRD_STATS dimension %s.", "dropped");
+
+		if(!rrd_stats_dimension_add(st, "new", "new", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL))
+			error("Cannot add RRD_STATS dimension %s.", "new");
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "new", &anew);
+	rrd_stats_dimension_set(st, "dropped", &adrop);
+	rrd_stats_done(st);
+
+	st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".changes");
+	if(!st) {
+		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK ".changes", RRD_TYPE_NET_STAT_CONNTRACK ".changes", save_history, "Netfilter Connection Changes", "Connections/s", RRD_TYPE_NET_STAT_CONNTRACK);
+		if(!st) {
+			error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_STAT_CONNTRACK ".changes");
+			return 1;
+		}
+
+		if(!rrd_stats_dimension_add(st, "deleted", "deleted", sizeof(unsigned long long), -1, 1, RRD_DIMENSION_INCREMENTAL))
+			error("Cannot add RRD_STATS dimension %s.", "deleted");
+
+		if(!rrd_stats_dimension_add(st, "inserted", "inserted", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL))
+			error("Cannot add RRD_STATS dimension %s.", "inserted");
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "inserted", &ainsert);
+	rrd_stats_dimension_set(st, "deleted", &adelete);
+	rrd_stats_done(st);
+
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
+// /proc/net/ip_vs_stats processor
+
+int do_proc_net_ip_vs_stats() {
+	char buffer[MAX_PROC_NET_IPVS_LINE+1] = "";
+
+	FILE *fp = fopen("/proc/net/ip_vs_stats", "r");
+	if(!fp) {
+		error("Cannot read /proc/net/ip_vs_stats.");
+		return 1;
+	}
+
+	// read the discard the 2 header lines
+	char *p = fgets(buffer, MAX_PROC_NET_IPVS_LINE, fp);
+	if(!p) {
+		error("Cannot read /proc/net/ip_vs_stats.");
+		return 1;
+	}
+
+	p = fgets(buffer, MAX_PROC_NET_IPVS_LINE, fp);
+	if(!p) {
+		error("Cannot read /proc/net/ip_vs_stats.");
+		return 1;
+	}
+
+	p = fgets(buffer, MAX_PROC_NET_IPVS_LINE, fp);
+	if(!p) {
+		error("Cannot read /proc/net/ip_vs_stats.");
+		return 1;
+	}
+
+	unsigned long long entries, InPackets, OutPackets, InBytes, OutBytes;
+
+	int r = sscanf(buffer, "%llx %llx %llx %llx %llx\n", &entries, &InPackets, &OutPackets, &InBytes, &OutBytes);
+
+	if(r == EOF) {
+		error("Cannot read /proc/net/ip_vs_stats.");
+		return 1;
+	}
+	if(r != 5) error("Cannot read /proc/net/ip_vs_stats. Expected 5 params, read %d.", r);
+
+	fclose(fp);
+
+	RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_IPVS ".sockets");
+	if(!st) {
+		st = rrd_stats_create(RRD_TYPE_NET_IPVS ".sockets", RRD_TYPE_NET_IPVS ".sockets", save_history, "IPVS Connections", "Connections", RRD_TYPE_NET_IPVS);
+		if(!st) {
+			error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_IPVS ".sockets");
+			return 1;
+		}
+
+		if(!rrd_stats_dimension_add(st, "connections", "connections", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_ABSOLUTE))
+			error("Cannot add RRD_STATS dimension %s.", "connections");
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "connections", &entries);
+	rrd_stats_done(st);
+
+	st = rrd_stats_find(RRD_TYPE_NET_IPVS ".packets");
+	if(!st) {
+		st = rrd_stats_create(RRD_TYPE_NET_IPVS ".packets", RRD_TYPE_NET_IPVS ".packets", save_history, "IPVS Packets", "Packets/s", RRD_TYPE_NET_IPVS);
+		if(!st) {
+			error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_IPVS ".packets");
+			return 1;
+		}
+
+		if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), -1, 1, RRD_DIMENSION_INCREMENTAL))
+			error("Cannot add RRD_STATS dimension %s.", "sent");
+
+		if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL))
+			error("Cannot add RRD_STATS dimension %s.", "received");
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "received", &InPackets);
+	rrd_stats_dimension_set(st, "sent", &OutPackets);
+	rrd_stats_done(st);
+
+	st = rrd_stats_find(RRD_TYPE_NET_IPVS ".bytes");
+	if(!st) {
+		st = rrd_stats_create(RRD_TYPE_NET_IPVS ".bytes", RRD_TYPE_NET_IPVS ".bytes", save_history, "IPVS Bandwidth", "bandwidth in kilobits/s", RRD_TYPE_NET_IPVS);
+		if(!st) {
+			error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_IPVS ".bytes");
+			return 1;
+		}
+
+		if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), -8, 1024, RRD_DIMENSION_INCREMENTAL))
+			error("Cannot add RRD_STATS dimension %s.", "sent");
+
+		if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 8, 1024, RRD_DIMENSION_INCREMENTAL))
+			error("Cannot add RRD_STATS dimension %s.", "received");
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "received", &InBytes);
+	rrd_stats_dimension_set(st, "sent", &OutBytes);
+	rrd_stats_done(st);
+
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
 // /proc processor
 
 void *proc_main(void *ptr)
@@ -2101,6 +2407,14 @@ void *proc_main(void *ptr)
 	gettimeofday(&last, NULL);
 	last.tv_sec -= update_every;
 	
+	// when ZERO, attempt to do it
+	int	vdo_proc_net_dev = 0;
+	int vdo_proc_diskstats = 0;
+	int vdo_proc_net_snmp = 0;
+	int vdo_proc_net_netstat = 0;
+	int vdo_proc_net_stat_conntrack = 0;
+	int vdo_proc_net_ip_vs_stats = 0;
+
 	for(;1;) {
 		unsigned long long usec, susec;
 		gettimeofday(&now, NULL);
@@ -2110,9 +2424,12 @@ void *proc_main(void *ptr)
 		debug(D_PROCNETDEV_LOOP, "PROCNETDEV: Last full loop took %llu usec.", usec);
 		
 		// BEGIN -- the job to be done
-		do_proc_net_dev(usec);
-		do_proc_diskstats(usec);
-		do_proc_net_snmp(usec);
+		if(!vdo_proc_net_dev)				vdo_proc_net_dev			= do_proc_net_dev(usec);
+		if(!vdo_proc_diskstats)				vdo_proc_diskstats			= do_proc_diskstats(usec);
+		if(!vdo_proc_net_snmp)				vdo_proc_net_snmp			= do_proc_net_snmp(usec);
+		if(!vdo_proc_net_netstat)			vdo_proc_net_netstat		= do_proc_net_netstat(usec);
+		if(!vdo_proc_net_stat_conntrack)	vdo_proc_net_stat_conntrack	= do_proc_net_stat_conntrack(usec);
+		if(!vdo_proc_net_ip_vs_stats)		vdo_proc_net_ip_vs_stats	= do_proc_net_ip_vs_stats(usec);
 		// END -- the job is done
 		
 		// find the time to sleep in order to wait exactly update_every seconds
