@@ -22,23 +22,34 @@
 
 	<!-- NetData -->
 	<script type="text/javascript" src="/file/netdata.js"></script>
+	<script type="text/javascript" src="/file/jquery.visible.js"></script>
 	<script type="text/javascript">
 	
 	// Set a callback to run when the Google Visualization API is loaded.
-	google.setOnLoadCallback(drawCharts);
+	google.setOnLoadCallback(initCharts);
 	
+	var MODE_THUMBS = 1;
+	var MODE_MAIN = 2;
+	var mode; // one of the MODE_* values
+
 	var mycharts = new Array();
 	var mainchart;
 
+	function chartIsLoadingHTML(width, height) { return "<table><tr><td align=\"center\" width=\"" + width + "\" height=\"" + height + "\"><h4><span class=\"glyphicon glyphicon-refresh\"></span><br/><br/>loading chart<br/><br/><span class=\"label label-default\">Please wait...</span></h4></td></tr></table>"; }
+
+	function showChartIsLoading(id, width, height) { document.getElementById(id).innerHTML = chartIsLoadingHTML(width, height); }
+
+	// copy the chart c to mainchart
+	// switch to main graphs screen
 	function mainChart(c) {
 		if(mainchart && mainchart.chart) mainchart.chart.clearChart();
 
 		mainchart = $.extend(true, {}, c);
 
 		mainchart.chart = null;
-		mainchart.width = Math.round(((window.innerWidth * 0.95) - 50) / 1);
-		mainchart.height = window.innerHeight - 200;
-		if(mainchart.height < 300) mainchart.height = 300;
+		mainchart.chartOptions.width = Math.round((($(window).width() * 0.95) - 50) / 1);
+		mainchart.chartOptions.height = $(window).height() - 200;
+		if(mainchart.chartOptions.height < 300) mainchart.chartOptions.height = 300;
 		
 		mainchart.thumbnail = false;
 		mainchart.group = 5;
@@ -65,9 +76,11 @@
 		// show max 10 mins of data
 		if(mainchart.points_to_show * mainchart.group > 1200) mainchart.points_to_show = 1200 / mainchart.group;
 
+		// initialize the div
+		showChartIsLoading(mainchart.div, mainchart.chartOptions.width, mainchart.chartOptions.height);
+
 		document.getElementById('maingraph_title').innerHTML = " <b> " + mainchart.title + " </b> (as " + mainchart.group_method + " of every " + (mainchart.group * mainchart.update_every) + " seconds)";
 
-		refreshChart(mainchart);
 		showMainGraph();
 	}
 
@@ -75,36 +88,61 @@
 		mainChart(mycharts[i]);
 	}
 
+	// refresh the main chart
+	// make sure it gets updated frequently
+	function mainChartRefresh() {
+		if(!mainchart || mode != MODE_MAIN) {
+			if(mainchart) mainchart.clearChart();
+			showThumbGraphs();
+			return;
+		}
+
+		var now = new Date().getTime();
+
+		if((now - mainchart.last_updated) >= mainchart.chart_update_every) {
+			refreshChart(mainchart, triggerMainChartRefresh);
+			mainchart.last_updated = now;
+		}
+		else triggerMainChartRefresh();
+	}
+
+	// callback for refreshing the main chart
+	function triggerMainChartRefresh() {
+		if(mode == MODE_MAIN) setTimeout(mainChartRefresh, 500);
+	}
+
+	// calculate the proper width for the thumb charts
 	function thumbWidth() {
-		var items = Math.round(((window.innerWidth * 0.95) - 50) / 500);
+		var items = Math.round((($(window).width() * 0.95) - 50) / 500);
 		if(items < 1) items = 1;
 
-		var width = Math.round(((window.innerWidth * 0.95) - 50) / items) - 1;
-		console.log("window = " + ((window.innerWidth * 0.95) - 50) + ", items = " + items + ", width = " + width);
+		var width = Math.round((($(window).width() * 0.95) - 50) / items) - 1;
+		//console.log("window = " + (($(window).width() * 0.95) - 50) + ", items = " + items + ", width = " + width);
 
 		return width;
 	}
 
+	// resize all charts
+	// if the thumb charts need resize in their width, reset them
 	function resizeCharts() {
+		var width = Math.round((($(window).width() * 0.95) - 50) / 1);
 		if(mainchart) {
-			mainchart.width = Math.round(((window.innerWidth * 0.95) - 50) / 1);
-			mainchart.height = window.innerHeight - 200;
+			mainchart.chartOptions.width = Math.round((($(window).width() * 0.95) - 50) / 1);
+			mainchart.chartOptions.height = $(window).height() - 200;
+			mainchart.last_updated = 0;
 		}
 
-		var width = thumbWidth();
+		width = thumbWidth();
 		$.each(mycharts, function(i, c) {
-			if(c.enabled) {
-				c.width = width;
-				c.needs_refresh = true;
+			if(c.enabled && c.chartOptions.width != width) {
+				if(c.chart) c.chart.clearChart();
+				c.chart = null;
+				c.chartOptions.width = width;
+				showChartIsLoading(c.div, c.chartOptions.width, c.chartOptions.height);
+				c.last_updated = 0;
 			}
 		});
 	}
-
-	var go_thumbs = 0;
-	var go_main = 0;
-	function drawCharts() {
-		myChartsRefreshInternal(mycharts.length);
-	};
 
 	// load the charts from the server
 	// generate html for the thumbgraphs to support them
@@ -112,164 +150,144 @@
 		var width = thumbWidth();
 		var height = 200;
 
-		mycharts = loadCharts();
-		if(mycharts == null || mycharts.length == 0) {
-			alert("Cannot load data from server.");
-			return;
-		}
+		loadCharts(function(c) {
+			mycharts = c;
 
-		var scroll = document.getElementById("graphs");
-		if(!scroll) {
-			alert("Cannot find the scroller");
-			return;
-		}
-
-		function chartssort(a, b) {
-			if(a.userpriority < b.userpriority) return -1;
-			return 1;
-		}
-		mycharts.sort(chartssort);
-
-		document.getElementById('hostname_id').innerHTML = mycharts[0].hostname;
-		document.title = mycharts[0].hostname;
-
-		// create an array for grouping all same-type graphs together
-		var categories = new Array();
-		$.each(mycharts, function(i, c) {
-			c.thumbnail = false;
-			c.last_updated = 0;
-			c.width = width;
-			c.height = height;
-			c.enabled = true;
-			c.needs_refresh = true;
-
-			if(c.userpriority == "IGNORE") c.enabled = false;
-			if(c.usertitle) c.title = c.usertitle;
-
-			if(c.type == "tc") {
-				c.category = "Quality of Service"
-				c.glyphicon = "glyphicon-transfer";
-				c.group = 30;
-				c.group_method = "average";
-			}
-			else if(c.type == "net") {
-				c.category = "Network Traffic"
-				c.glyphicon = "glyphicon-cloud";
-				c.group = 10;
-				c.group_method = "max";
-
-				if((c.id.substring(c.id.length - 4, c.id.length) == "-ifb") ||
-					c.id == "net.lo")
-					c.enabled = false;
-			}
-			else if(c.type == "ipv4") {
-				c.category = "IPv4 connections"
-				c.glyphicon = "glyphicon-resize-full";
-				c.group = 30;
-				c.group_method = "max";
-			}
-			else if(c.type == "conntrack") {
-				c.category = "Netfilter Connections Tracked"
-				c.glyphicon = "glyphicon-eye-open";
-				c.group = 30;
-				c.group_method = "max";
-			}
-			else if(c.type == "ipvs") {
-				c.category = "IPVS"
-				c.glyphicon = "glyphicon-sort";
-				c.group = 30;
-				c.group_method = "max";
-			}
-			else if(c.type == "disk") {
-				c.category = "Disk I/O"
-				c.glyphicon = "glyphicon-floppy-disk";
-				c.group = 20;
-				c.group_method = "max";
-			}
-			else {
-				c.category = "Unknown"
-				c.glyphicon = "glyphicon-search";
-				c.group = 60;
-				c.group_method = "max";
+			if(mycharts == null || mycharts.length == 0) {
+				alert("Cannot load data from server.");
+				return;
 			}
 
-			// calculate the time to refresh each chart
-			c.chart_update_every = c.group * 1000; // milliseconds
+			var thumbsContainer = document.getElementById("graphs");
+			if(!thumbsContainer) {
+				alert("Cannot find the thumbsContainer");
+				return;
+			}
 
-			// calculate how many point to show for each chart
-			c.points_to_show = Math.round(c.entries / c.group) - 1;
+			function chartssort(a, b) {
+				if(a.userpriority < b.userpriority) return -1;
+				return 1;
+			}
+			mycharts.sort(chartssort);
 
-			// show max 10 mins of data
-			if(c.points_to_show * c.group > 600) c.points_to_show = 600 / c.group;
+			document.getElementById('hostname_id').innerHTML = mycharts[0].hostname;
+			document.title = mycharts[0].hostname;
 
-			if(c.enabled) {
-				var j;
-				var h = "<div class=\"thumbgraph\"><table><tr><td><div class=\"thumbgraph\" id=\"" + c.div + "\"><table><tr><td align=\"center\" width=\"" + c.width + "\" height=\"" + c.height + "\"><h4><span class=\"glyphicon glyphicon-refresh\"></span><br/><br/>loading chart<br/><br/><span class=\"label label-default\">Please wait...</span></h4></td></tr></table></div></td></tr><tr><td align=\"center\"><div class=\"btn-group-xs\"><button type=\"button\" class=\"btn btn-default\" onclick=\"setMainChart(" + i +");\">&nbsp;&nbsp;select " + c.name + " for zoom&nbsp;&nbsp;</button></div></td></tr></table></div>";
+			// create an array for grouping all same-type graphs together
+			var categories = new Array();
+			$.each(mycharts, function(i, c) {
+				c.last_updated = 0;
+				c.chartOptions.width = width;
+				c.chartOptions.height = height;
 
-				// find the categories object for this type
-				for(j = 0; j < categories.length ;j++) {
-					if(categories[j].name == c.type) {
-						categories[j].html += h;
-						categories[j].count++;
+				switch(c.type) {
+					case "tc":
+						c.glyphicon = "glyphicon-transfer";
+						c.group = 30;
+						c.group_method = "average";
 						break;
+
+					case "net":
+						c.glyphicon = "glyphicon-cloud";
+						c.group = 10;
+						c.group_method = "max";
+						break;
+
+					case "ipv4":
+						c.glyphicon = "glyphicon-resize-full";
+						c.group = 30;
+						c.group_method = "max";
+						break;
+
+					case "conntrack":
+						c.glyphicon = "glyphicon-eye-open";
+						c.group = 30;
+						c.group_method = "max";
+						break;
+
+					case "ipvs":
+						c.glyphicon = "glyphicon-sort";
+						c.group = 30;
+						c.group_method = "max";
+						break;
+
+					case "disk":
+						c.glyphicon = "glyphicon-floppy-disk";
+						c.group = 20;
+						c.group_method = "max";
+						break;
+
+					default:
+						c.glyphicon = "glyphicon-search";
+						c.group = 60;
+						c.group_method = "max";
+						break;
+				}
+
+				// calculate the time to refresh each chart
+				c.chart_update_every = c.group * 1000; // milliseconds
+
+				// calculate how many point to show for each chart
+				c.points_to_show = Math.round(c.entries / c.group) - 1;
+
+				// show max 10 mins of data
+				if(c.points_to_show * c.group > 600) c.points_to_show = 600 / c.group;
+
+				if(c.enabled) {
+					var j;
+					var h = "<div class=\"thumbgraph\"><table><tr><td><div class=\"thumbgraph\" id=\"" + c.div + "\">" + chartIsLoadingHTML(c.chartOptions.width, c.chartOptions.height) + "</div></td></tr><tr><td align=\"center\"><div class=\"btn-group-xs\"><button type=\"button\" class=\"btn btn-default\" onclick=\"setMainChart(" + i +");\">&nbsp;&nbsp;select " + c.name + " for zoom&nbsp;&nbsp;</button></div></td></tr></table></div>";
+
+					// find the categories object for this type
+					for(j = 0; j < categories.length ;j++) {
+						if(categories[j].name == c.type) {
+							categories[j].html += h;
+							categories[j].count++;
+							break;
+						}
+					}
+
+					if(j == categories.length) {
+						var t = "(as " + c.group_method + " every " + (c.group*c.update_every) + " seconds)";
+						categories.push({name: c.type, title: c.category, description: t, priority: 0, count: 1, glyphicon: c.glyphicon, html: h});
 					}
 				}
+			});
 
-				if(j == categories.length) {
-					var t = "(as " + c.group_method + " every " + (c.group*c.update_every) + " seconds)";
-					categories.push({name: c.type, title: c.category, description: t, priority: 0, count: 1, glyphicon: c.glyphicon, html: h});
-				}
+			$.each(categories, function(i, a) {
+				     if(a.name == "net") a.priority = 1;
+				else if(a.name == "tc") a.priority = 2;
+				else if(a.name == "conntrack") a.priority = 3;
+				else if(a.name == "ipvs") a.priority = 4;
+				else if(a.name == "ipv4") a.priority = 5;
+				else if(a.name == "disk") a.priority = 6;
+				else a.priority = 4;
+
+				a.html = "<tr><td><ol class=\"breadcrumb graphs\"><li class=\"active\"><span class=\"glyphicon " + a.glyphicon + "\"></span> &nbsp; <a id=\"" + a.name + "\" href=\"#" + a.name + "\"><b>" + a.title + "</b> " + a.description + " </a></li></ol></td></tr><tr><td><div class=\"thumbgraphs\">" + a.html + "</td></tr>";
+			});
+
+			function categoriessort(a, b) {
+				if(a.priority < b.priority) return -1;
+				return 1;
 			}
+			categories.sort(categoriessort);
+
+			// combine all the htmls into one
+			var allcategories = "<table width=\"100%\">";
+			$.each(categories, function(i, a) {
+				allcategories += a.html;
+			});
+			allcategories += "</table>";
+
+			thumbsContainer.innerHTML = allcategories;
+			showThumbGraphs();
 		});
-
-		$.each(categories, function(i, a) {
-			     if(a.name == "net") a.priority = 1;
-			else if(a.name == "tc") a.priority = 2;
-			else if(a.name == "conntrack") a.priority = 3;
-			else if(a.name == "ipvs") a.priority = 4;
-			else if(a.name == "ipv4") a.priority = 5;
-			else if(a.name == "disk") a.priority = 6;
-			else a.priority = 4;
-
-			a.html = "<tr><td><ol class=\"breadcrumb graphs\"><li class=\"active\"><span class=\"glyphicon " + a.glyphicon + "\"></span> &nbsp; <a id=\"" + a.name + "\" href=\"#" + a.name + "\"><b>" + a.title + "</b> " + a.description + " </a></li></ol></td></tr><tr><td><div class=\"thumbgraphs\">" + a.html + "</td></tr>";
-		});
-
-		function categoriessort(a, b) {
-			if(a.priority < b.priority) return -1;
-			return 1;
-		}
-		categories.sort(categoriessort);
-
-		// combine all the htmls into one
-		var allcategories = "<table width=\"100%\">";
-		$.each(categories, function(i, a) {
-			allcategories += a.html;
-		});
-		allcategories += "</table>";
-
-		scroll.innerHTML = allcategories;
-		showThumbGraphs();
-	};
+	}
 
 	var last_mini = 0;
-	function myChartsRefreshInternal(howmany) {
-		var ot = go_thumbs;
-		var om = go_main;
-
-		go_thumbs = 0;
-		go_main = 0;
+	function thumbChartsRefreshInternal(howmany) {
+		if(mycharts.length == 0 || mode != MODE_THUMBS) return;
 
 		var now = new Date().getTime();
-
-		// refresh the main chart
-		if(om && mainchart && (now - mainchart.last_updated) >= mainchart.chart_update_every) {
-			refreshChart(mainchart);
-			mainchart.last_updated = now;
-		}
-		go_main = om;
-
-		// refresh a few of the thumbcharts
-		if(mycharts.length == 0 || !ot) return;
 
 		// refresh the mini charts
 		var wanted = howmany;
@@ -281,43 +299,53 @@
 			if(last_mini >= mycharts.length) last_mini = 0;
 
 			if(!mycharts[last_mini].enabled) continue;
-			if(!mycharts[last_mini].needs_refresh && now - mycharts[last_mini].last_updated < mycharts[last_mini].chart_update_every) continue;
+			if((now - mycharts[last_mini].last_updated) < mycharts[last_mini].chart_update_every) continue;
 
 			if(mycharts[last_mini].chart != null)
 				if(mycharts[last_mini].chart.getSelection()[0]) continue;
 
-			refreshChart(mycharts[last_mini]);
+			if($('#' + mycharts[last_mini].div).visible(true) == false) continue;
+
+			refreshChart(mycharts[last_mini], mycharts[last_mini].last_updated?triggerThumbChartsRefresh:triggerThumbChartsRefreshFast);
 			mycharts[last_mini].last_updated = now;
 
 			did++;
-			mycharts[last_mini].needs_refresh = false;
 		}
 
-		go_thumbs = ot;
+		if(did == 0) triggerThumbChartsRefresh();
 	}
 
-	function myChartsRefresh() {
-		myChartsRefreshInternal(1);
+	function triggerThumbChartsRefresh() {
+		setTimeout(thumbChartsRefresh, 500);
 	}
 
-	setInterval(myChartsRefresh, 500);
+	function triggerThumbChartsRefreshFast() {
+		thumbChartsRefresh();
+	}
+
+	function thumbChartsRefresh() {
+		if(mode == MODE_THUMBS) thumbChartsRefreshInternal(1);
+	}
+
+	// setInterval(myChartsRefresh, 500);
 
 	window.onresize = function(event) {
 		resizeCharts();
-		drawCharts();
 	};
 
 	function showMainGraph() {
 		if(!mainchart) return;
+		mode = MODE_MAIN;
 
 		document.getElementById('maingraph_container').style.display = 'block';
 		document.getElementById('thumbgraphs_container').style.display = 'none';
 
-		go_thumbs = 0;
-		go_main = 1;
+		mainChartRefresh();
 	}
 
 	function showThumbGraphs() {
+		mode = MODE_THUMBS;
+
 		document.getElementById('maingraph_container').style.display = 'none';
 		document.getElementById('thumbgraphs_container').style.display = 'block';
 
@@ -326,8 +354,7 @@
 			mainchart = null;
 		}
 
-		go_thumbs = 1;
-		go_main = 0;
+		thumbChartsRefresh(1);
 	}
 
 	</script>
@@ -359,7 +386,7 @@
       </div>
     </div>
 
-    <div class="container graphs" id="maingraph_container"">
+    <div class="container graphs" id="maingraph_container" style="display: none">
 		<table>
 			<tr><td><ol class="breadcrumb graphs"><li class="active"><a id="maingraph_title" href="#maingraph"><b> Maingraph </b></a></li></ol></td></tr>
 			<tr><td>
@@ -375,8 +402,7 @@
 
     <div class="container graphs" id="thumbgraphs_container">
     	<div class="allgraphs" id="graphs">
+    	<table width="100%"><tr><td align="center"><p/>&nbsp;<p/>&nbsp;<p/>&nbsp;<h1><span class="glyphicon glyphicon-refresh"></span><br/><br/>loading charts<br/><br/><span class="label label-default">Please wait...</span></h1></td></tr></table>
     	</div>
 	</div>
-
-	<script type="text/javascript">initCharts();</script>
 </html>

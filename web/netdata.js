@@ -4,7 +4,7 @@ if(!window.console){ window.console = {log: function(){} }; }
 // Load the Visualization API and the piechart package.
 google.load('visualization', '1', {'packages':['corechart']});
 
-function refreshChart(chart) {
+function refreshChart(chart, doNext) {
 	chart.refreshCount++;
 	
 	if(chart.chart != null) {
@@ -17,70 +17,39 @@ function refreshChart(chart) {
 	url += chart.group?chart.group.toString():"1";
 	url += "/";
 	url += chart.group_method?chart.group_method:"average";
-	chart.jsondata = $.ajax({
+
+	$.ajax({
 		url: url,
 		dataType:"json",
-		async: false,
 		cache: false
-	}).responseText;
-	
-	if(!chart.jsondata || chart.jsondata.length == 0) return;
-	
-	// Create our data table out of JSON data loaded from server.
-	chart.datatable = new google.visualization.DataTable(chart.jsondata);
-	
-	// setup the default options
-	var options = {
-		width: chart.width,
-		height: chart.height,
-		title: chart.title,
-		hAxis: {title: "Time of Day"},
-		vAxis: {title: chart.vtitle, minValue: 10},
-		focusTarget: 'category',
-		explorer: (chart.explorer)?true:false,
-		// animation: {duration: 1000, easing: 'inAndOut'},
-	};
+	}).done(function(jsondata) {
+		if(!jsondata || jsondata.length == 0) return;
+		chart.jsondata = jsondata;
+		
+		// Create our data table out of JSON data loaded from server.
+		chart.datatable = new google.visualization.DataTable(chart.jsondata);
+		
+		// cleanup once every 50 updates
+		// we don't cleanup on every single, to avoid firefox flashing effect
+		if(chart.chart && chart.refreshCount > 50) {
+			chart.chart.clearChart();
+			chart.chart = null;
+		}
 
-	// disable interactivity on thumbnails
-	if(chart.thumbnail) options.enableInteractivity = false;
+		// Instantiate and draw our chart, passing in some options.
+		if(!chart.chart) {
+			console.log('Creating new chart for ' + chart.url);
+			if(chart.chartType == "LineChart")
+				chart.chart = new google.visualization.LineChart(document.getElementById(chart.div));
+			else
+				chart.chart = new google.visualization.AreaChart(document.getElementById(chart.div));
+		}
+		
+		if(chart.chart) chart.chart.draw(chart.datatable, chart.chartOptions);
+		else console.log('Cannot create chart for ' + chart.url);
 
-	// hide axis titles if too small
-	if(chart.height < 200) options.vAxis.title = null;
-	if(chart.width < 350) options.hAxis.title = null;
-
-	if(chart.name.substring(0, 5) == "ipv4." || chart.name.substring(0, 10) == "conntrack." || chart.name.substring(0, 5) == "ipvs.") {
-		options.lineWidth = 3;
-		options.curveType = 'function';
-	}
-	else if(chart.name.substring(0, 3) == "tc.") {
-		options.isStacked = true;
-		options.title += " [stacked]";
-		options.areaOpacity = 1.0;
-		options.lineWidth = 1;
-	}
-	else {
-		options.areaOpacity = 0.3;
-		options.lineWidth = 2;
-	}
-
-	// cleanup once every 100 updates
-	// we don't cleanup on every single, to avoid firefox flashing effect
-	if(chart.chart && chart.refreshCount > 100) {
-		chart.chart.clearChart();
-		chart.chart = null;
-	}
-
-	// Instantiate and draw our chart, passing in some options.
-	if(!chart.chart) {
-		console.log('Creating new chart for ' + chart.url);
-		if(chart.name.substring(0, 5) == "ipv4." || chart.name.substring(0, 10) == "conntrack." || chart.name.substring(0, 5) == "ipvs.")
-			chart.chart = new google.visualization.LineChart(document.getElementById(chart.div));
-		else
-			chart.chart = new google.visualization.AreaChart(document.getElementById(chart.div));
-	}
-	
-	if(chart.chart) chart.chart.draw(chart.datatable, options);
-	else console.log('Cannot create chart for ' + chart.url);
+		if(typeof doNext == "function") doNext();
+	});
 }
 
 // loadCharts()
@@ -88,35 +57,111 @@ function refreshChart(chart) {
 // returns an array of objects, containing all the server metadata
 // (not the values of the graphs - just the info about the graphs)
 
-function loadCharts() {
-	var mycharts = new Array();
-
+function loadCharts(doNext) {
 	$.ajax({
 		url: '/all.json',
-		async: false,
 		dataType: 'json',
-		success: function (json) { mycharts = json.charts; }
+		cache: false
+	}).done(function(json) {
+		$.each(json.charts, function(i, value) {
+			json.charts[i].div = json.charts[i].name.replace(/\./g,"_");
+			json.charts[i].div = json.charts[i].div.replace(/\-/g,"_");
+			json.charts[i].div = json.charts[i].div + "_div";
+
+			json.charts[i].thumbnail = false;
+			json.charts[i].refreshCount = 0;
+			json.charts[i].group = 1;
+			json.charts[i].points_to_show = 0;	// all
+			json.charts[i].group_method = "max";
+
+			json.charts[i].chart = null;
+			json.charts[i].jsondata = null;
+			json.charts[i].datatable = null;
+			
+			// if the user has given a title, use it
+			if(json.charts[i].usertitle) json.charts[i].title = json.charts[i].usertitle;
+
+			// check if the userpriority is IGNORE
+			if(json.charts[i].userpriority == "IGNORE")
+				json.charts[i].enabled = false;
+			else
+				json.charts[i].enabled = true;
+
+			// set default chart options
+			json.charts[i].chartOptions = {
+				lineWidth: 2,
+				title: json.charts[i].title,
+				hAxis: {title: "Time of Day"},
+				vAxis: {title: json.charts[i].vtitle, minValue: 10},
+				focusTarget: 'category',
+			};
+
+			// set the chart type
+			if((json.charts[i].type == "ipv4" || json.charts[i].type == "ipv6" || json.charts[i].type == "ipvs" || json.charts[i].type == "conntrack")
+				&& json.charts[i].name != "ipv4.net" && json.charts[i].name != "ipvs.net") {
+				
+				// default for all LineChart
+				json.charts[i].chartType = "LineChart";
+				json.charts[i].chartOptions.lineWidth = 3;
+				json.charts[i].chartOptions.curveType = 'function';
+			}
+			else if(json.charts[i].type == "tc") {
+
+				// default for all stacked AreaChart
+				json.charts[i].chartType = "AreaChart";
+				json.charts[i].chartOptions.isStacked = true;
+				json.charts[i].chartOptions.areaOpacity = 1.0;
+				json.charts[i].chartOptions.lineWidth = 1;
+
+				json.charts[i].group_method = "average";
+			}
+			else {
+
+				// default for all AreaChart
+				json.charts[i].chartType = "AreaChart";
+				json.charts[i].chartOptions.isStacked = false;
+				json.charts[i].chartOptions.areaOpacity = 0.3;
+			}
+
+			// the category name, and other options, per type
+			switch(json.charts[i].type) {
+				case "tc":
+					json.charts[i].category = "Quality of Service";
+					break;
+
+				case "net":
+					json.charts[i].category = "Network Interfaces";
+
+					// disable IFB and net.lo devices by default
+					if((json.charts[i].id.substring(json.charts[i].id.length - 4, json.charts[i].id.length) == "-ifb")
+						|| json.charts[i].id == "net.lo")
+						json.charts[i].enabled = false;
+					break;
+
+				case "ipv4":
+					json.charts[i].category = "IPv4";
+					break;
+
+				case "conntrack":
+					json.charts[i].category = "Netfilter";
+					break;
+
+				case "ipvs":
+					json.charts[i].category = "IPVS";
+					break;
+
+				case "disk":
+					json.charts[i].category = "Disk I/O";
+					break;
+
+				default:
+					json.charts[i].category = "Unknown";
+					break;
+			}
+		});
+
+		if(typeof doNext == "function") doNext(json.charts);
 	});
-
-	$.each(mycharts, function(i, value) {
-		mycharts[i].div = mycharts[i].name.replace(/\./g,"_");
-		mycharts[i].div = mycharts[i].div.replace(/\-/g,"_");
-		mycharts[i].div = mycharts[i].div + "_div";
-
-		mycharts[i].width = 0;
-		mycharts[i].height = 0;
-		mycharts[i].thumbnail = false;
-		mycharts[i].refreshCount = 0;
-		mycharts[i].group = 1;
-		mycharts[i].points_to_show = 0;	// all
-		mycharts[i].group_method = "average";
-
-		mycharts[i].chart = null;
-		mycharts[i].jsondata = null;
-		mycharts[i].datatable = null;
-	});
-
-	return mycharts;
 };
 
 var charts = new Array();
@@ -133,14 +178,22 @@ function addChart(name, div, width, height, jsonurl, title, vtitle) {
 
 	charts[i].div = div;
 
-	charts[i].width = width;
-	charts[i].height = height;
 	charts[i].refreshCount = 0;
 	charts[i].thumbnail = false;
 
 	charts[i].chart = null;
 	charts[i].jsondata = null;
 	charts[i].datatable = null;
+
+	charts[i].chartType = "AreaChart";
+	charts[i].chartOptions = {
+		width: width,
+		height: height,
+		title: charts[i].title,
+		hAxis: {title: "Time of Day"},
+		vAxis: {title: charts[i].vtitle, minValue: 10},
+		focusTarget: 'category',
+	};
 }
 
 var charts_last_drawn = 999999999;
@@ -188,9 +241,9 @@ function refreshCharts(howmany) {
 		charts_last_drawn++;
 		if(charts_last_drawn >= charts.length) charts_last_drawn = 0;
 		
-		if(charts[charts_last_drawn].width == 0 && charts[charts_last_drawn].height == 0) {
-			charts[charts_last_drawn].width = width;
-			charts[charts_last_drawn].height = height;
+		if(charts[charts_last_drawn].chartOptions.width == 0 && charts[charts_last_drawn].height == 0) {
+			charts[charts_last_drawn].chartOptions.width = width;
+			charts[charts_last_drawn].chartOptions.height = height;
 			zeroDimensions = 1;
 		}
 
@@ -204,8 +257,8 @@ function refreshCharts(howmany) {
 		}
 
 		if(zeroDimensions == 1) {
-			charts[charts_last_drawn].width = 0;
-			charts[charts_last_drawn].height = 0;
+			charts[charts_last_drawn].chartOptions.width = 0;
+			charts[charts_last_drawn].chartOptions.height = 0;
 		}
 	}
 	return 0;

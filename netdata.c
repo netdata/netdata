@@ -2159,11 +2159,11 @@ int do_proc_net_netstat() {
 			if(r == EOF) break;
 			if(r != 12) error("Cannot read /proc/net/netstat IpExt line. Expected 12 params, read %d.", r);
 
-			RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET ".ipv4");
+			RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_SNMP ".net");
 			if(!st) {
-				st = rrd_stats_create(RRD_TYPE_NET ".ipv4", RRD_TYPE_NET ".ipv4", save_history, "All IPv4 Bandwidth", "bandwidth in kilobits/s", RRD_TYPE_NET);
+				st = rrd_stats_create(RRD_TYPE_NET_SNMP ".net", RRD_TYPE_NET_SNMP ".net", save_history, "All IPv4 Bandwidth", "bandwidth in kilobits/s", RRD_TYPE_NET_SNMP);
 				if(!st) {
-					error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET ".ipv4");
+					error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_SNMP ".net");
 					continue;
 				}
 
@@ -2376,11 +2376,11 @@ int do_proc_net_ip_vs_stats() {
 	rrd_stats_dimension_set(st, "sent", &OutPackets);
 	rrd_stats_done(st);
 
-	st = rrd_stats_find(RRD_TYPE_NET ".ipvs");
+	st = rrd_stats_find(RRD_TYPE_NET_IPVS ".net");
 	if(!st) {
-		st = rrd_stats_create(RRD_TYPE_NET ".ipvs", RRD_TYPE_NET ".ipvs", save_history, "IPVS Bandwidth", "bandwidth in kilobits/s", RRD_TYPE_NET);
+		st = rrd_stats_create(RRD_TYPE_NET_IPVS ".net", RRD_TYPE_NET_IPVS ".net", save_history, "IPVS Bandwidth", "bandwidth in kilobits/s", RRD_TYPE_NET_IPVS);
 		if(!st) {
-			error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET ".ipvs");
+			error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_IPVS ".net");
 			return 1;
 		}
 
