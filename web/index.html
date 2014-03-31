@@ -306,7 +306,7 @@
 
 			if($('#' + mycharts[last_mini].div).visible(true) == false) continue;
 
-			refreshChart(mycharts[last_mini], mycharts[last_mini].last_updated?triggerThumbChartsRefresh:triggerThumbChartsRefreshFast);
+			refreshChart(mycharts[last_mini], triggerThumbChartsRefreshFast);
 			mycharts[last_mini].last_updated = now;
 
 			did++;
@@ -316,7 +316,7 @@
 	}
 
 	function triggerThumbChartsRefresh() {
-		setTimeout(thumbChartsRefresh, 500);
+		setTimeout(thumbChartsRefresh, 200);
 	}
 
 	function triggerThumbChartsRefreshFast() {
