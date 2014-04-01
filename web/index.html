@@ -328,8 +328,12 @@
 		resizeCharts();
 	};
 
+	var thumbsScrollPosition = null;
 	function showMainGraph() {
 		if(!mainchart) return;
+
+		thumbsScrollPosition = window.pageYOffset;
+
 		mode = MODE_MAIN;
 
 		document.getElementById('maingraph_container').style.display = 'block';
@@ -343,6 +347,8 @@
 
 		document.getElementById('maingraph_container').style.display = 'none';
 		document.getElementById('thumbgraphs_container').style.display = 'block';
+
+		if(thumbsScrollPosition) window.scrollTo(0, thumbsScrollPosition);
 
 		if(mainchart) {
 			if(mainchart.chart) mainchart.chart.clearChart();
