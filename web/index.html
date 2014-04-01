@@ -5,6 +5,8 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="description" content="">
     <meta name="author" content="costa@tsaousis.gr">
  
@@ -35,7 +37,7 @@
 	var mycharts = new Array();
 	var mainchart;
 
-	function chartIsLoadingHTML(width, height) { return "<table><tr><td align=\"center\" width=\"" + width + "\" height=\"" + height + "\"><h4><span class=\"glyphicon glyphicon-refresh\"></span><br/><br/>loading chart<br/><br/><span class=\"label label-default\">Please wait...</span></h4></td></tr></table>"; }
+	function chartIsLoadingHTML(width, height) { return "<table><tr><td align=\"center\" width=\"" + width + "\" height=\"" + height + "\" style=\"vertical-align:middle\"><h4><span class=\"glyphicon glyphicon-refresh\"></span><br/><br/>loading chart<br/><br/><span class=\"label label-default\">Please wait...</span></h4></td></tr></table>"; }
 
 	function showChartIsLoading(id, width, height) { document.getElementById(id).innerHTML = chartIsLoadingHTML(width, height); }
 
@@ -53,19 +55,11 @@
 		
 		mainchart.thumbnail = false;
 		mainchart.group = 5;
-		mainchart.group_method = "max";
 		mainchart.div = 'maingraph';
 		mainchart.last_updated = 0;
 		mainchart.explorer = false;
 
-		if(mainchart.type == "tc") {
-			mainchart.group = 15;
-			mainchart.group_method = "average";
-		}
-		else if(mainchart.type == "ipv4" || mainchart.type == "conntrack" || mainchart.type == "ipvs") {
-			mainchart.group = 15;
-			mainchart.group_method = "max";
-		}
+		if(mainchart.chartOptions.isStacked) mainchart.group = 15;
 
 		// calculate the time to refresh each chart
 		mainchart.chart_update_every = mainchart.group * 1000; // milliseconds
@@ -150,6 +144,8 @@
 		var width = thumbWidth();
 		var height = 200;
 
+		document.getElementById('splash').height = $(window).height() * 0.95;
+
 		loadCharts(function(c) {
 			mycharts = c;
 
@@ -158,7 +154,7 @@
 				return;
 			}
 
-			var thumbsContainer = document.getElementById("graphs");
+			var thumbsContainer = document.getElementById("thumbgraphs");
 			if(!thumbsContainer) {
 				alert("Cannot find the thumbsContainer");
 				return;
@@ -184,43 +180,41 @@
 					case "tc":
 						c.glyphicon = "glyphicon-transfer";
 						c.group = 30;
-						c.group_method = "average";
 						break;
 
 					case "net":
 						c.glyphicon = "glyphicon-cloud";
 						c.group = 10;
-						c.group_method = "max";
 						break;
 
 					case "ipv4":
 						c.glyphicon = "glyphicon-resize-full";
 						c.group = 30;
-						c.group_method = "max";
 						break;
 
 					case "conntrack":
 						c.glyphicon = "glyphicon-eye-open";
 						c.group = 30;
-						c.group_method = "max";
 						break;
 
 					case "ipvs":
 						c.glyphicon = "glyphicon-sort";
 						c.group = 30;
-						c.group_method = "max";
 						break;
 
 					case "disk":
 						c.glyphicon = "glyphicon-floppy-disk";
 						c.group = 20;
-						c.group_method = "max";
+						break;
+
+					case "cpu":
+						c.glyphicon = "glyphicon-search";
+						c.group = 10;
 						break;
 
 					default:
 						c.glyphicon = "glyphicon-search";
 						c.group = 60;
-						c.group_method = "max";
 						break;
 				}
 
@@ -259,8 +253,9 @@
 				else if(a.name == "conntrack") a.priority = 3;
 				else if(a.name == "ipvs") a.priority = 4;
 				else if(a.name == "ipv4") a.priority = 5;
-				else if(a.name == "disk") a.priority = 6;
-				else a.priority = 4;
+				else if(a.name == "cpu") a.priority = 6;
+				else if(a.name == "disk") a.priority = 7;
+				else a.priority = 99;
 
 				a.html = "<tr><td><ol class=\"breadcrumb graphs\"><li class=\"active\"><span class=\"glyphicon " + a.glyphicon + "\"></span> &nbsp; <a id=\"" + a.name + "\" href=\"#" + a.name + "\"><b>" + a.title + "</b> " + a.description + " </a></li></ol></td></tr><tr><td><div class=\"thumbgraphs\">" + a.html + "</td></tr>";
 			});
@@ -401,8 +396,20 @@
 	</div>
 
     <div class="container graphs" id="thumbgraphs_container">
-    	<div class="allgraphs" id="graphs">
-    	<table width="100%"><tr><td align="center"><p/>&nbsp;<p/>&nbsp;<p/>&nbsp;<h1><span class="glyphicon glyphicon-refresh"></span><br/><br/>loading charts<br/><br/><span class="label label-default">Please wait...</span></h1></td></tr></table>
+    	<div class="allgraphs" id="thumbgraphs">
+    		<table width="100%" height="95%">
+    			<tr><td id="splash" align="center" style="vertical-align:middle">
+    				<h1>
+    				Welcome to <b>NetData</b>!
+    				<br/><br/>
+    				<span class="glyphicon glyphicon-refresh"></span>
+    				<br/><br/>
+    				loading charts
+    				<br/><br/>
+    				<span class="label label-default">Please wait...</span>
+    				</h1>
+    			</td></tr>
+    		</table>
     	</div>
 	</div>
 </html>

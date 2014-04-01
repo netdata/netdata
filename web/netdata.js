@@ -8,7 +8,10 @@ function refreshChart(chart, doNext) {
 	chart.refreshCount++;
 	
 	if(chart.chart != null) {
-		if(chart.chart.getSelection()[0]) return;
+		if(chart.chart.getSelection()[0]) {
+			if(typeof doNext == "function") doNext();
+			return;
+		}
 	}
 	
 	var url = chart.url;
@@ -97,7 +100,15 @@ function loadCharts(doNext) {
 			};
 
 			// set the chart type
-			if((json.charts[i].type == "ipv4" || json.charts[i].type == "ipv6" || json.charts[i].type == "ipvs" || json.charts[i].type == "conntrack")
+			if((json.charts[i].type == "ipv4"
+				|| json.charts[i].type == "ipv6"
+				|| json.charts[i].type == "ipvs"
+				|| json.charts[i].type == "conntrack"
+				|| json.charts[i].id == "cpu.ctxt"
+				|| json.charts[i].id == "cpu.intr"
+				|| json.charts[i].id == "cpu.processes"
+				|| json.charts[i].id == "cpu.procs_running"
+				)
 				&& json.charts[i].name != "ipv4.net" && json.charts[i].name != "ipvs.net") {
 				
 				// default for all LineChart
@@ -105,7 +116,7 @@ function loadCharts(doNext) {
 				json.charts[i].chartOptions.lineWidth = 3;
 				json.charts[i].chartOptions.curveType = 'function';
 			}
-			else if(json.charts[i].type == "tc") {
+			else if(json.charts[i].type == "tc" || json.charts[i].type == "cpu") {
 
 				// default for all stacked AreaChart
 				json.charts[i].chartType = "AreaChart";
@@ -125,6 +136,10 @@ function loadCharts(doNext) {
 
 			// the category name, and other options, per type
 			switch(json.charts[i].type) {
+				case "cpu":
+					json.charts[i].category = "CPU";
+					break;
+
 				case "tc":
 					json.charts[i].category = "Quality of Service";
 					break;

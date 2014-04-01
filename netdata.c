@@ -33,6 +33,7 @@
 
 #define RRD_DIMENSION_ABSOLUTE		0
 #define RRD_DIMENSION_INCREMENTAL	1
+#define RRD_DIMENSION_PCENT_OVER_TOTAL 2
 
 #define RRD_TYPE_NET				"net"
 #define RRD_TYPE_NET_LEN			strlen(RRD_TYPE_NET)
@@ -51,6 +52,9 @@
 
 #define RRD_TYPE_NET_IPVS 			"ipvs"
 #define RRD_TYPE_NET_IPVS_LEN		strlen(RRD_TYPE_NET_IPVS)
+
+#define RRD_TYPE_STAT 				"cpu"
+#define RRD_TYPE_STAT_LEN			strlen(RRD_TYPE_STAT)
 
 #define WEB_PATH_FILE			"file"
 #define WEB_PATH_DATA			"data"
@@ -120,6 +124,9 @@
 #define MAX_PROC_NET_IPVS_LINE 4096
 #define MAX_PROC_NET_IPVS_NAME 1024
 
+#define MAX_PROC_STAT_LINE 4096
+#define MAX_PROC_STAT_NAME 1024
+
 
 int silent = 0;
 int save_history = HISTORY;
@@ -131,7 +138,7 @@ int listen_port = LISTEN_PORT;
 // helpers
 
 unsigned long long usecdiff(struct timeval *now, struct timeval *last) {
-		return ((((now->tv_sec * 1000000) + now->tv_usec) - ((last->tv_sec * 1000000) + last->tv_usec)));
+		return ((((now->tv_sec * 1000000L) + now->tv_usec) - ((last->tv_sec * 1000000L) + last->tv_usec)));
 }
 
 // ----------------------------------------------------------------------------
@@ -338,6 +345,7 @@ struct rrd_dimension {
 	size_t entries;
 
 	int type;
+	int hidden;			// if set to non zero, this dimension will not be sent to the client
 
 	long multiplier;
 	long divisor;
@@ -592,6 +600,19 @@ void rrd_stats_done(RRD_STATS *st)
 	pthread_mutex_unlock(&st->mutex);
 }
 
+int rrd_stats_dimension_hide(RRD_STATS *st, const char *id)
+{
+	RRD_DIMENSION *rd = rrd_stats_dimension_find(st, id);
+	if(!rd) {
+		error("Cannot find dimension with id '%s' on stats '%s' (%s).", id, st->name, st->id);
+		return 1;
+	}
+
+	rd->hidden = 1;
+	return 0;
+}
+
+
 int rrd_stats_dimension_set(RRD_STATS *st, const char *id, void *data)
 {
 	RRD_DIMENSION *rd = rrd_stats_dimension_find(st, id);
@@ -640,7 +661,7 @@ size_t rrd_stats_one_json(RRD_STATS *st, char *options, char *buffer, size_t len
 	i += sprintf(&buffer[i], "\t\t\t\"name\" : \"%s\",\n", st->name);
 	i += sprintf(&buffer[i], "\t\t\t\"type\" : \"%s\",\n", st->type);
 	i += sprintf(&buffer[i], "\t\t\t\"title\" : \"%s %s\",\n", st->title, st->name);
-	i += sprintf(&buffer[i], "\t\t\t\"usertitle\" : \"%s %s (%s)\",\n", st->title, st->usertitle, st->name);
+	i += sprintf(&buffer[i], "\t\t\t\"usertitle\" : \"%s %s (%s)\",\n", st->title, st->usertitle, st->id);
 	i += sprintf(&buffer[i], "\t\t\t\"userpriority\" : \"%s\",\n", st->userpriority);
 	i += sprintf(&buffer[i], "\t\t\t\"envtitle\" : \"%s\",\n", st->envtitle);
 	i += sprintf(&buffer[i], "\t\t\t\"envpriority\" : \"%s\",\n", st->envpriority);
@@ -685,6 +706,29 @@ size_t rrd_stats_all_json(char *buffer, size_t len)
 	return(i);
 }
 
+long long rrd_stats_dimension_get(RRD_DIMENSION *rd, size_t position)
+{
+		if(rd->bytes == sizeof(long long)) {
+			long long *dimension = rd->values;
+			return(dimension[position]);
+		}
+		else if(rd->bytes == sizeof(long)) {
+			long *dimension = rd->values;
+			return(dimension[position]);
+		}
+		else if(rd->bytes == sizeof(int)) {
+			int *dimension = rd->values;
+			return(dimension[position]);
+		}
+		else if(rd->bytes == sizeof(char)) {
+			char *dimension = rd->values;
+			return(dimension[position]);
+		}
+		else fatal("Cannot produce JSON for size %d bytes dimension.", rd->bytes);
+
+		return(0);
+}
+
 size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_show, size_t group_count, int group_method)
 {
 	pthread_mutex_lock(&st->mutex);
@@ -709,9 +753,13 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 	unsigned long long usec = 0;// usec between the entries
 	char dtm[201];				// temp variable for storing dates
 
+	int we_need_totals = 0;		// if set, we should calculate totals for all dimensions
+
 	// find how many dimensions we have
-	for( rd = st->dimensions ; rd ; rd = rd->next)
+	for( rd = st->dimensions ; rd ; rd = rd->next) {
 		dimensions++;
+		if(rd->type == RRD_DIMENSION_PCENT_OVER_TOTAL) we_need_totals++;
+	}
 
 	if(!dimensions) {
 		pthread_mutex_unlock(&st->mutex);
@@ -725,10 +773,11 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 		group_values[c] = group_counts[c] = 0;
 
 	i += sprintf(&b[i], "{\n	\"cols\":\n	[\n");
-	i += sprintf(&b[i], "		{\"id\":\"\",\"label\":\"time\",\"pattern\":\"\",\"type\":\"datetime\"},\n");
+	i += sprintf(&b[i], "		{\"id\":\"\",\"label\":\"time\",\"pattern\":\"\",\"type\":\"datetime\"}");
 
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
-		i += sprintf(&b[i], "		{\"id\":\"\",\"label\":\"%s\",\"pattern\":\"\",\"type\":\"number\"}%s\n", rd->name, rd->next?",":"");
+		if(!rd->hidden)
+			i += sprintf(&b[i], ",\n		{\"id\":\"\",\"label\":\"%s\",\"pattern\":\"\",\"type\":\"number\"}", rd->name);
 
 	i += sprintf(&b[i], "	],\n	\"rows\":\n	[\n");
 
@@ -777,37 +826,31 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 			sprintf(dtm, "\"Date(%d, %d, %d, %d, %d, %d, %d)\"", tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(st->times[t].tv_usec / 1000)); // datetime
 			// strftime(dtm, 200, "\"Date(%Y, %m, %d, %H, %M, %S)\"", tm); // datetime
 			// strftime(dtm, 200, "[%H, %M, %S, 0]", tm); // timeofday
- 			i += sprintf(&b[i], "%s		{\"c\":[{\"v\":%s},", printed?"]},\n":"", dtm);
+ 			i += sprintf(&b[i], "%s		{\"c\":[{\"v\":%s}", printed?"]},\n":"", dtm);
 
  			printed++;
  		}
 
-		for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
-			long long oldvalue = 0, value = 0;			// temp variable for storing data values
+ 		// if we need a PCENT_OVER_TOTAL, calculate the totals for the current and the last
+ 		long long total = 0, oldtotal = 0;
+ 		if(we_need_totals) {
+			for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
+				total    += rrd_stats_dimension_get(rd, t);
+				oldtotal += rrd_stats_dimension_get(rd, lt);
+			}
+ 		}
 
-			if(rd->bytes == sizeof(long long)) {
-				long long *dimension = rd->values;
-				value    = dimension[t];
-				oldvalue = dimension[lt];
-			}
-			else if(rd->bytes == sizeof(long)) {
-				long *dimension = rd->values;
-				value    = dimension[t];
-				oldvalue = dimension[lt];
-			}
-			else if(rd->bytes == sizeof(int)) {
-				int *dimension = rd->values;
-				value    = dimension[t];
-				oldvalue = dimension[lt];
-			}
-			else if(rd->bytes == sizeof(char)) {
-				char *dimension = rd->values;
-				value    = dimension[t];
-				oldvalue = dimension[lt];
-			}
-			else fatal("Cannot produce JSON for size %d bytes dimension.", rd->bytes);
+		for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
+			long long oldvalue, value;			// temp variable for storing data values
+
+			value    = rrd_stats_dimension_get(rd, t);
+			oldvalue = rrd_stats_dimension_get(rd, lt);
 
 			switch(rd->type) {
+ 				case RRD_DIMENSION_PCENT_OVER_TOTAL:
+					value = 100 * (value - oldvalue) / (total - oldtotal);
+					break;
+
 				case RRD_DIMENSION_INCREMENTAL:
 					if(oldvalue > value) value = 0;	// detect overflows and resets
 					else value -= oldvalue;
@@ -834,7 +877,9 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 			}
 
 			if(((count-pad) % group_count) == 0) {
-				i += sprintf(&b[i], "{\"v\":%lld}%s", group_values[c], rd->next?",":"");
+				if(!rd->hidden)
+					i += sprintf(&b[i], ",{\"v\":%lld}", group_values[c]);
+
 				group_values[c] = group_counts[c] = 0;
 			}
 		}
@@ -1169,6 +1214,7 @@ void web_client_process(struct web_client *w)
 
 			// do we have such a data set?
 			RRD_STATS *st = rrd_stats_find_byname(tok);
+			if(!st) st = rrd_stats_find(tok);
 			if(!st) {
 				// we don't have it
 				// try to send a file with that name
@@ -2000,11 +2046,11 @@ int do_proc_net_snmp() {
 			if(r == EOF) break;
 			if(r != 19) error("Cannot read /proc/net/snmp IP line. Expected 19 params, read %d.", r);
 
-			RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_SNMP ".ip");
+			RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_SNMP ".packets");
 			if(!st) {
-				st = rrd_stats_create(RRD_TYPE_NET_SNMP ".ip", RRD_TYPE_NET_SNMP ".ip", save_history, "IPv4 Packets", "Packets/s", RRD_TYPE_NET_SNMP);
+				st = rrd_stats_create(RRD_TYPE_NET_SNMP ".packets", RRD_TYPE_NET_SNMP ".packets", save_history, "IPv4 Packets", "Packets/s", RRD_TYPE_NET_SNMP);
 				if(!st) {
-					error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_SNMP ".ip");
+					error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_SNMP ".packets");
 					continue;
 				}
 
@@ -2399,6 +2445,205 @@ int do_proc_net_ip_vs_stats() {
 	return 0;
 }
 
+int do_proc_stat() {
+	char buffer[MAX_PROC_STAT_LINE+1] = "";
+
+	FILE *fp = fopen("/proc/stat", "r");
+	if(!fp) {
+		error("Cannot read /proc/stat.");
+		return 1;
+	}
+
+	for(;1;) {
+		char *p = fgets(buffer, MAX_PROC_STAT_LINE, fp);
+		if(!p) break;
+
+		if(strncmp(p, "cpu", 3) == 0) {
+			char id[MAX_PROC_STAT_NAME + 1] = RRD_TYPE_STAT ".";
+			unsigned long long user, nice, system, idle, iowait, irq, softirq, steal, guest, guest_nice;
+			char *name = &id[RRD_TYPE_STAT_LEN + 1];
+
+			int r = sscanf(buffer, "%s %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu\n",
+				name, &user, &nice, &system, &idle, &iowait, &irq, &softirq, &steal, &guest, &guest_nice);
+
+			if(r == EOF) break;
+			if(r != 11) error("Cannot read /proc/stat cpu line. Expected 11 params, read %d.", r);
+
+			RRD_STATS *st = rrd_stats_find(id);
+			if(!st) {
+				st = rrd_stats_create(id, id, save_history, "Time for ", "Percentage", RRD_TYPE_STAT);
+				if(!st) {
+					error("Cannot create RRD_STATS for %s.", id);
+					continue;
+				}
+
+				if(strcmp(id, "cpu.cpu") == 0) strcpy(st->usertitle, "all CPUs");
+				else strcpy(st->usertitle, name);
+
+				long multiplier = 1;
+				long divisor = 1; // sysconf(_SC_CLK_TCK);
+
+				if(!rrd_stats_dimension_add(st, "iowait", "iowait", sizeof(unsigned long long), multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL))
+					error("Cannot add RRD_STATS dimension %s.", "iowait");
+
+				if(!rrd_stats_dimension_add(st, "nice", "nice", sizeof(unsigned long long), multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL))
+					error("Cannot add RRD_STATS dimension %s.", "nice");
+
+				if(!rrd_stats_dimension_add(st, "system", "system", sizeof(unsigned long long), multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL))
+					error("Cannot add RRD_STATS dimension %s.", "system");
+
+				if(!rrd_stats_dimension_add(st, "user", "user", sizeof(unsigned long long), multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL))
+					error("Cannot add RRD_STATS dimension %s.", "user");
+
+				if(!rrd_stats_dimension_add(st, "idle", "idle", sizeof(unsigned long long), multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL))
+					error("Cannot add RRD_STATS dimension %s.", "idle");
+				else rrd_stats_dimension_hide(st, "idle");
+
+				if(!rrd_stats_dimension_add(st, "irq", "irq", sizeof(unsigned long long), multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL))
+					error("Cannot add RRD_STATS dimension %s.", "irq");
+
+				if(!rrd_stats_dimension_add(st, "softirq", "softirq", sizeof(unsigned long long), multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL))
+					error("Cannot add RRD_STATS dimension %s.", "softirq");
+
+				if(!rrd_stats_dimension_add(st, "steal", "steal", sizeof(unsigned long long), multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL))
+					error("Cannot add RRD_STATS dimension %s.", "steal");
+
+				if(!rrd_stats_dimension_add(st, "guest", "guest", sizeof(unsigned long long), multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL))
+					error("Cannot add RRD_STATS dimension %s.", "guest");
+
+				if(!rrd_stats_dimension_add(st, "guest_nice", "guest_nice", sizeof(unsigned long long), multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL))
+					error("Cannot add RRD_STATS dimension %s.", "guest_nice");
+
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "user", &user);
+			rrd_stats_dimension_set(st, "nice", &nice);
+			rrd_stats_dimension_set(st, "system", &system);
+			rrd_stats_dimension_set(st, "idle", &idle);
+			rrd_stats_dimension_set(st, "iowait", &iowait);
+			rrd_stats_dimension_set(st, "irq", &irq);
+			rrd_stats_dimension_set(st, "softirq", &softirq);
+			rrd_stats_dimension_set(st, "steal", &steal);
+			rrd_stats_dimension_set(st, "guest", &guest);
+			rrd_stats_dimension_set(st, "guest_nice", &guest_nice);
+			rrd_stats_done(st);
+		}
+		else if(strncmp(p, "intr ", 5) == 0) {
+			char id[MAX_PROC_STAT_NAME + 1] = RRD_TYPE_STAT ".";
+			char *name = &id[RRD_TYPE_STAT_LEN + 1];
+
+			unsigned long long value;
+
+			int r = sscanf(buffer, "%s %llu ", name, &value);
+			if(r == EOF) break;
+			if(r != 2) error("Cannot read /proc/stat intr line. Expected 2 params, read %d.", r);
+
+			RRD_STATS *st = rrd_stats_find(id);
+			if(!st) {
+				st = rrd_stats_create(id, id, save_history, "CPU Interrupts", "interrupts/s", RRD_TYPE_STAT);
+				if(!st) {
+					error("Cannot create RRD_STATS for %s.", id);
+					continue;
+				}
+
+				if(!rrd_stats_dimension_add(st, "interrupts", "interrupts", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL))
+					error("Cannot add RRD_STATS dimension %s.", "interrupts");
+
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "interrupts", &value);
+			rrd_stats_done(st);
+		}
+		else if(strncmp(p, "ctxt ", 5) == 0) {
+			char id[MAX_PROC_STAT_NAME + 1] = RRD_TYPE_STAT ".";
+			char *name = &id[RRD_TYPE_STAT_LEN + 1];
+
+			unsigned long long value;
+
+			int r = sscanf(buffer, "%s %llu ", name, &value);
+			if(r == EOF) break;
+			if(r != 2) error("Cannot read /proc/stat ctxt line. Expected 2 params, read %d.", r);
+
+			RRD_STATS *st = rrd_stats_find(id);
+			if(!st) {
+				st = rrd_stats_create(id, id, save_history, "CPU Context Switches", "context switches/s", RRD_TYPE_STAT);
+				if(!st) {
+					error("Cannot create RRD_STATS for %s.", id);
+					continue;
+				}
+
+				if(!rrd_stats_dimension_add(st, "switches", "switches", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL))
+					error("Cannot add RRD_STATS dimension %s.", "switches");
+
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "switches", &value);
+			rrd_stats_done(st);
+		}
+		else if(strncmp(p, "processes ", 10) == 0) {
+			char id[MAX_PROC_STAT_NAME + 1] = RRD_TYPE_STAT ".";
+			char *name = &id[RRD_TYPE_STAT_LEN + 1];
+
+			unsigned long long value;
+
+			int r = sscanf(buffer, "%s %llu ", name, &value);
+			if(r == EOF) break;
+			if(r != 2) error("Cannot read /proc/stat processes line. Expected 2 params, read %d.", r);
+
+			RRD_STATS *st = rrd_stats_find(id);
+			if(!st) {
+				st = rrd_stats_create(id, id, save_history, "Started Processes", "processes started", RRD_TYPE_STAT);
+				if(!st) {
+					error("Cannot create RRD_STATS for %s.", id);
+					continue;
+				}
+
+				if(!rrd_stats_dimension_add(st, "started", "started", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL))
+					error("Cannot add RRD_STATS dimension %s.", "started");
+
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "started", &value);
+			rrd_stats_done(st);
+		}
+		else if(strncmp(p, "procs_running ", 14) == 0) {
+			char id[MAX_PROC_STAT_NAME + 1] = RRD_TYPE_STAT ".";
+			char *name = &id[RRD_TYPE_STAT_LEN + 1];
+
+			unsigned long long value;
+
+			int r = sscanf(buffer, "%s %llu ", name, &value);
+			if(r == EOF) break;
+			if(r != 2) error("Cannot read /proc/stat processes line. Expected 2 params, read %d.", r);
+
+			RRD_STATS *st = rrd_stats_find(id);
+			if(!st) {
+				st = rrd_stats_create(id, id, save_history, "CPU Running Processes", "processes running", RRD_TYPE_STAT);
+				if(!st) {
+					error("Cannot create RRD_STATS for %s.", id);
+					continue;
+				}
+
+				if(!rrd_stats_dimension_add(st, "running", "running", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_ABSOLUTE))
+					error("Cannot add RRD_STATS dimension %s.", "running");
+
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "running", &value);
+			rrd_stats_done(st);
+		}
+	}
+	
+	fclose(fp);
+	return 0;
+}
+
+
 // ----------------------------------------------------------------------------
 // /proc processor
 
@@ -2416,6 +2661,7 @@ void *proc_main(void *ptr)
 	int vdo_proc_net_netstat = 0;
 	int vdo_proc_net_stat_conntrack = 0;
 	int vdo_proc_net_ip_vs_stats = 0;
+	int vdo_proc_stat = 0;
 
 	for(;1;) {
 		unsigned long long usec, susec;
@@ -2432,6 +2678,7 @@ void *proc_main(void *ptr)
 		if(!vdo_proc_net_netstat)			vdo_proc_net_netstat		= do_proc_net_netstat(usec);
 		if(!vdo_proc_net_stat_conntrack)	vdo_proc_net_stat_conntrack	= do_proc_net_stat_conntrack(usec);
 		if(!vdo_proc_net_ip_vs_stats)		vdo_proc_net_ip_vs_stats	= do_proc_net_ip_vs_stats(usec);
+		if(!vdo_proc_stat)					vdo_proc_stat 				= do_proc_stat(usec);
 		// END -- the job is done
 		
 		// find the time to sleep in order to wait exactly update_every seconds
@@ -2716,6 +2963,7 @@ void sig_handler(int signo)
 		case SIGQUIT:
 		case SIGINT:
 		case SIGHUP:
+		case SIGSEGV:
 			error("Signaled cleanup (signal %d).", signo);
 			if(tc_child_pid) kill(tc_child_pid, SIGTERM);
 			tc_child_pid = 0;
@@ -2874,7 +3122,7 @@ int main(int argc, char **argv)
 	atexit(bye);
 
 	// catch all signals
-	for (i = 1 ; i < 65 ;i++) signal(i,  sig_handler);
+	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV) signal(i,  sig_handler);
 	
 
 	pthread_t p_proc, p_tc;
