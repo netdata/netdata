@@ -4,16 +4,28 @@ if(!window.console){ window.console = {log: function(){} }; }
 // Load the Visualization API and the piechart package.
 google.load('visualization', '1', {'packages':['corechart']});
 
+function canChartBeRefreshed(chart) {
+	// is it enabled?
+	if(!chart.enabled) return false;
+
+	// is there something selected on the chart?
+	if(chart.chart && chart.chart.getSelection()[0]) return false;
+
+	// is it too soon for a refresh?
+	var now = new Date().getTime();
+	if((now - chart.last_updated) < (chart.group * chart.update_every * 1000)) return false;
+
+	// is the chart in the visible area?
+	if($('#' + chart.div).visible(true) == false) return false;
+
+	// ok, do it
+	return true;
+}
+
 function refreshChart(chart, doNext) {
-	chart.refreshCount++;
-	
-	if(chart.chart != null) {
-		if(chart.chart.getSelection()[0]) {
-			if(typeof doNext == "function") doNext();
-			return;
-		}
-	}
-	
+	if(canChartBeRefreshed(chart) == false) return false;
+
+	// build the data URL
 	var url = chart.url;
 	url += chart.points_to_show?chart.points_to_show.toString():"all";
 	url += "/";
@@ -48,11 +60,17 @@ function refreshChart(chart, doNext) {
 				chart.chart = new google.visualization.AreaChart(document.getElementById(chart.div));
 		}
 		
-		if(chart.chart) chart.chart.draw(chart.datatable, chart.chartOptions);
+		if(chart.chart) {
+			chart.chart.draw(chart.datatable, chart.chartOptions);
+			chart.refreshCount++;
+			chart.last_updated = new Date().getTime();
+		}
 		else console.log('Cannot create chart for ' + chart.url);
 
 		if(typeof doNext == "function") doNext();
 	});
+
+	return true;
 }
 
 // loadCharts()
@@ -71,6 +89,10 @@ function loadCharts(doNext) {
 			json.charts[i].div = json.charts[i].div.replace(/\-/g,"_");
 			json.charts[i].div = json.charts[i].div + "_div";
 
+			// make sure we have the proper values
+			if(!json.charts[i].update_every) chart.update_every = 1;
+
+			json.charts[i].last_updated = 0;
 			json.charts[i].thumbnail = false;
 			json.charts[i].refreshCount = 0;
 			json.charts[i].group = 1;
@@ -92,6 +114,8 @@ function loadCharts(doNext) {
 
 			// set default chart options
 			json.charts[i].chartOptions = {
+				width: 400,
+				height: 200,
 				lineWidth: 2,
 				title: json.charts[i].title,
 				hAxis: {title: "Time of Day", viewWindowMode: 'maximized', format:'HH:mm:ss'},
@@ -215,7 +239,10 @@ function addChart(name, div, width, height, jsonurl, title, vtitle) {
 	charts[i].div = div;
 
 	charts[i].refreshCount = 0;
-	charts[i].thumbnail = false;
+	charts[i].update_every = 1;
+	charts[i].last_updated = 0;
+	charts[i].enabled = true;
+	charts[i].group = 1;
 
 	charts[i].chart = null;
 	charts[i].jsondata = null;

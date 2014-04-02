@@ -65,9 +65,6 @@
 
 		if(mainchart.chartOptions.isStacked) mainchart.group = 15;
 
-		// calculate the time to refresh each chart
-		mainchart.chart_update_every = mainchart.group * 1000; // milliseconds
-
 		// calculate how many point to show for each chart
 		mainchart.points_to_show = Math.round(mainchart.entries / mainchart.group) - 1;
 
@@ -95,13 +92,7 @@
 			return;
 		}
 
-		var now = new Date().getTime();
-
-		if((now - mainchart.last_updated) >= mainchart.chart_update_every) {
-			refreshChart(mainchart, triggerRefresh);
-			mainchart.last_updated = now;
-		}
-		else triggerRefresh();
+		if(!refreshChart(mainchart, triggerRefresh)) triggerRefresh();
 	}
 
 	function screenWidth() {
@@ -174,12 +165,8 @@
 			// create an array for grouping all same-type graphs together
 			var categories = new Array();
 			$.each(mycharts, function(i, c) {
-				c.last_updated = 0;
 				c.chartOptions.width = width;
 				c.chartOptions.height = height;
-
-				// calculate the time to refresh each chart
-				c.chart_update_every = c.group * 1000; // milliseconds
 
 				// calculate how many point to show for each chart
 				c.points_to_show = Math.round(c.entries / c.group) - 1;
@@ -201,7 +188,7 @@
 					}
 
 					if(j == categories.length) {
-						var t = "(as " + c.group_method + " every " + (c.group*c.update_every) + " seconds)";
+						var t = "(as " + c.group_method + " every " + (c.group * c.update_every) + " seconds)";
 						categories.push({name: c.type, title: c.category, description: t, priority: 0, count: 1, glyphicon: c.glyphicon, html: h});
 					}
 				}
@@ -238,41 +225,25 @@
 		});
 	}
 
-	var last_mini = 0;
-	function thumbChartsRefreshInternal(howmany) {
+	var last_thumb_updated = 0;
+	function thumbChartsRefresh() {
 		if(mycharts.length == 0 || mode != MODE_THUMBS) return;
 
-		var now = new Date().getTime();
+		// find a chart to refresh
+		var orig = last_thumb_updated;
+		last_thumb_updated++;
+		if(last_thumb_updated >= mycharts.length) last_thumb_updated = 0;
 
-		// refresh the mini charts
-		var wanted = howmany;
-		var did    = 0;
-		var count  = mycharts.length - 1;
-		while(did < wanted && count >= 0) {
-			count--;
-			last_mini++;
-			if(last_mini >= mycharts.length) last_mini = 0;
+		while(last_thumb_updated != orig) {
+			if(refreshChart(mycharts[last_thumb_updated], chartsRefresh)) break;
 
-			if(!mycharts[last_mini].enabled) continue;
-			if((now - mycharts[last_mini].last_updated) < mycharts[last_mini].chart_update_every) continue;
-
-			if(mycharts[last_mini].chart != null)
-				if(mycharts[last_mini].chart.getSelection()[0]) continue;
-
-			if($('#' + mycharts[last_mini].div).visible(true) == false) continue;
-
-			refreshChart(mycharts[last_mini], chartsRefresh);
-			mycharts[last_mini].last_updated = now;
-
-			did++;
+			last_thumb_updated++;
+			if(last_thumb_updated >= mycharts.length) last_thumb_updated = 0;
 		}
 
-		if(did == 0) triggerRefresh();
-	}
-
-	// default thumbs charts refresh
-	function thumbChartsRefresh() {
-		thumbChartsRefreshInternal(1);
+		// no chart refreshed
+		if(last_thumb_updated == orig)
+			triggerRefresh();
 	}
 
 	// refresh the proper chart
