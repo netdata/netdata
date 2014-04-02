@@ -5,12 +5,7 @@ linux network traffic web monitoring
 
 This little program will allow you to create embedable live monitoring charts on any web page.
 
-Example server with 6 interfaces:
-![image](https://f.cloud.github.com/assets/2662304/664777/3dad6c32-d78d-11e2-9ecf-b921afebfb0b.png)
-
-Example server with 20 interfaces:
-![image](https://f.cloud.github.com/assets/2662304/689979/807dfb4e-dac6-11e2-8546-6d83fdb05866.png)
-
+![image](https://cloud.githubusercontent.com/assets/2662304/2593406/3c797e88-ba80-11e3-8ec7-c10174d59ad6.png)
 
 # How it works
 
