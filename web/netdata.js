@@ -16,6 +16,7 @@ function canChartBeRefreshed(chart) {
 	if((now - chart.last_updated) < (chart.group * chart.update_every * 1000)) return false;
 
 	// is the chart in the visible area?
+	//console.log(chart.div);
 	if($('#' + chart.div).visible(true) == false) return false;
 
 	// ok, do it
@@ -78,9 +79,9 @@ function refreshChart(chart, doNext) {
 // returns an array of objects, containing all the server metadata
 // (not the values of the graphs - just the info about the graphs)
 
-function loadCharts(doNext) {
+function loadCharts(base_url, doNext) {
 	$.ajax({
-		url: '/all.json',
+		url: ((base_url)?base_url:'') + '/all.json',
 		dataType: 'json',
 		cache: false
 	}).done(function(json) {
@@ -91,6 +92,7 @@ function loadCharts(doNext) {
 
 			// make sure we have the proper values
 			if(!json.charts[i].update_every) chart.update_every = 1;
+			if(base_url) json.charts[i].url = base_url + json.charts[i].url;
 
 			json.charts[i].last_updated = 0;
 			json.charts[i].thumbnail = false;
@@ -223,106 +225,3 @@ function loadCharts(doNext) {
 		if(typeof doNext == "function") doNext(json.charts);
 	});
 };
-
-var charts = new Array();
-function addChart(name, div, width, height, jsonurl, title, vtitle) {
-	var i = charts.length;
-	
-	console.log('Creating new objects for chart ' + name);
-	charts[i] = [];
-
-	charts[i].name = name;
-	charts[i].title = title;
-	charts[i].vtitle = vtitle;
-	charts[i].url = jsonurl;
-
-	charts[i].div = div;
-
-	charts[i].refreshCount = 0;
-	charts[i].update_every = 1;
-	charts[i].last_updated = 0;
-	charts[i].enabled = true;
-	charts[i].group = 1;
-
-	charts[i].chart = null;
-	charts[i].jsondata = null;
-	charts[i].datatable = null;
-
-	charts[i].chartType = "AreaChart";
-	charts[i].chartOptions = {
-		width: width,
-		height: height,
-		title: charts[i].title,
-		hAxis: {title: "Time of Day"},
-		vAxis: {title: charts[i].vtitle, minValue: 10},
-		focusTarget: 'category',
-	};
-}
-
-var charts_last_drawn = 999999999;
-function refreshCharts(howmany) {
-	
-	if(charts.length == 0) return;
-	
-	var h = howmany;
-	if(h == 0) h = charts.length;
-	if(h > charts.length) h = charts.length;
-	//console.log('Will run for ' + h + ' charts');
-	
-	var width = Math.round(Math.sqrt(charts.length));
-	var height = Math.round(Math.sqrt(charts.length));
-	while((width * height) < charts.length) {
-		if((height + 1) <= width) height++;
-		else width++;
-	}
-	// console.log('all: ' + charts.length + ', optimal: width = ' + width + ', height = ' + height);
-
-	while(width > 1 && width >= height) {
-		width--;
-		height++;
-	}
-	if(width * height < charts.length) height++;
-	// console.log('final: width = ' + width + ', height = ' + height);
-
-	ww = (window.innerWidth < document.documentElement.clientWidth)?window.innerWidth:document.documentElement.clientWidth;
-	wh = (window.innerHeight < document.documentElement.clientHeight)?window.innerHeight:document.documentElement.clientHeight;
-
-	if(width == 0) width = (ww - 40) / 2;
-	if(width <= 10) width = (ww - 40) / width;
-	if(width < 200) width = 200;
-	
-	if(height == 0) height = (wh - 20) / 2;
-	if(height <= 10) height = (wh - 20) / height;
-	if(height < 100) height = 100;
-
-	// console.log('width = ' + width + ', height = ' + height);
-
-	var i;
-	for(i = 0; i < h; i++) {
-		var zeroDimensions = 0;
-
-		charts_last_drawn++;
-		if(charts_last_drawn >= charts.length) charts_last_drawn = 0;
-		
-		if(charts[charts_last_drawn].chartOptions.width == 0 && charts[charts_last_drawn].height == 0) {
-			charts[charts_last_drawn].chartOptions.width = width;
-			charts[charts_last_drawn].chartOptions.height = height;
-			zeroDimensions = 1;
-		}
-
-		try {
-
-			console.log('Refreshing chart ' + charts[charts_last_drawn].name);
-			refreshChart(charts[charts_last_drawn]);
-		}
-		catch(err) {
-			console.log('Cannot refresh chart for ' + charts[charts_last_drawn].url);
-		}
-
-		if(zeroDimensions == 1) {
-			charts[charts_last_drawn].chartOptions.width = 0;
-			charts[charts_last_drawn].chartOptions.height = 0;
-		}
-	}
-	return 0;
-}
