@@ -30,6 +30,10 @@
 	// Set a callback to run when the Google Visualization API is loaded.
 	google.setOnLoadCallback(initCharts);
 	
+	var TARGET_THUMB_GRAPH_WIDTH = 500; // chart width will range from 0.5 to 1.5 of that
+	var MINIMUM_THUMB_GRAPH_WIDTH = 400; // chart will generally try to be wider than that
+	var TARGET_THUMB_GRAPH_HEIGHT = 220;
+
 	var MODE_THUMBS = 1;
 	var MODE_MAIN = 2;
 	var mode; // one of the MODE_* values
@@ -49,7 +53,7 @@
 		mainchart = $.extend(true, {}, c);
 
 		mainchart.chart = null;
-		mainchart.chartOptions.width = Math.round((($(window).width() * 0.95) - 50) / 1);
+		mainchart.chartOptions.width = screenWidth();
 		mainchart.chartOptions.height = $(window).height() - 200;
 		if(mainchart.chartOptions.height < 300) mainchart.chartOptions.height = 300;
 		
@@ -94,34 +98,34 @@
 		var now = new Date().getTime();
 
 		if((now - mainchart.last_updated) >= mainchart.chart_update_every) {
-			refreshChart(mainchart, triggerMainChartRefresh);
+			refreshChart(mainchart, triggerRefresh);
 			mainchart.last_updated = now;
 		}
-		else triggerMainChartRefresh();
+		else triggerRefresh();
 	}
 
-	// callback for refreshing the main chart
-	function triggerMainChartRefresh() {
-		if(mode == MODE_MAIN) setTimeout(mainChartRefresh, 500);
+	function screenWidth() {
+		return (($(window).width() * 0.95) - 40);
 	}
 
 	// calculate the proper width for the thumb charts
 	function thumbWidth() {
-		var items = Math.round((($(window).width() * 0.95) - 50) / 500);
+		var cwidth = screenWidth();
+		var items = Math.round(cwidth / TARGET_THUMB_GRAPH_WIDTH);
 		if(items < 1) items = 1;
 
-		var width = Math.round((($(window).width() * 0.95) - 50) / items) - 1;
-		//console.log("window = " + (($(window).width() * 0.95) - 50) + ", items = " + items + ", width = " + width);
+		if(items > 1 && (cwidth / items) < MINIMUM_THUMB_GRAPH_WIDTH) items--;
 
-		return width;
+		return Math.round(cwidth / items) - 1;
 	}
 
 	// resize all charts
 	// if the thumb charts need resize in their width, reset them
 	function resizeCharts() {
-		var width = Math.round((($(window).width() * 0.95) - 50) / 1);
+		var width = screenWidth();
+
 		if(mainchart) {
-			mainchart.chartOptions.width = Math.round((($(window).width() * 0.95) - 50) / 1);
+			mainchart.chartOptions.width = width;
 			mainchart.chartOptions.height = $(window).height() - 200;
 			mainchart.last_updated = 0;
 		}
@@ -142,9 +146,7 @@
 	// generate html for the thumbgraphs to support them
 	function initCharts() {
 		var width = thumbWidth();
-		var height = 200;
-
-		document.getElementById('splash').height = $(window).height() * 0.95;
+		var height = TARGET_THUMB_GRAPH_HEIGHT;
 
 		loadCharts(function(c) {
 			mycharts = c;
@@ -175,48 +177,6 @@
 				c.last_updated = 0;
 				c.chartOptions.width = width;
 				c.chartOptions.height = height;
-
-				switch(c.type) {
-					case "tc":
-						c.glyphicon = "glyphicon-transfer";
-						c.group = 30;
-						break;
-
-					case "net":
-						c.glyphicon = "glyphicon-cloud";
-						c.group = 10;
-						break;
-
-					case "ipv4":
-						c.glyphicon = "glyphicon-resize-full";
-						c.group = 30;
-						break;
-
-					case "conntrack":
-						c.glyphicon = "glyphicon-eye-open";
-						c.group = 30;
-						break;
-
-					case "ipvs":
-						c.glyphicon = "glyphicon-sort";
-						c.group = 30;
-						break;
-
-					case "disk":
-						c.glyphicon = "glyphicon-floppy-disk";
-						c.group = 20;
-						break;
-
-					case "cpu":
-						c.glyphicon = "glyphicon-search";
-						c.group = 10;
-						break;
-
-					default:
-						c.glyphicon = "glyphicon-search";
-						c.group = 60;
-						break;
-				}
 
 				// calculate the time to refresh each chart
 				c.chart_update_every = c.group * 1000; // milliseconds
@@ -301,28 +261,43 @@
 
 			if($('#' + mycharts[last_mini].div).visible(true) == false) continue;
 
-			refreshChart(mycharts[last_mini], triggerThumbChartsRefreshFast);
+			refreshChart(mycharts[last_mini], chartsRefresh);
 			mycharts[last_mini].last_updated = now;
 
 			did++;
 		}
 
-		if(did == 0) triggerThumbChartsRefresh();
+		if(did == 0) triggerRefresh();
 	}
 
-	function triggerThumbChartsRefresh() {
-		setTimeout(thumbChartsRefresh, 200);
-	}
-
-	function triggerThumbChartsRefreshFast() {
-		thumbChartsRefresh();
-	}
-
+	// default thumbs charts refresh
 	function thumbChartsRefresh() {
-		if(mode == MODE_THUMBS) thumbChartsRefreshInternal(1);
+		thumbChartsRefreshInternal(1);
 	}
 
-	// setInterval(myChartsRefresh, 500);
+	// refresh the proper chart
+	function chartsRefresh() {
+		if(mode == MODE_THUMBS)
+			thumbChartsRefresh();
+
+		else if(mode == MODE_MAIN)
+			mainChartRefresh();
+
+		else
+			setTimeout(triggerRefresh, 1000);
+	}
+
+	// callback for refreshing the charts later
+	function triggerRefresh() {
+		if(mode == MODE_THUMBS)
+			setTimeout(thumbChartsRefresh, 200);
+
+		else if(mode == MODE_MAIN)
+			setTimeout(mainChartRefresh, 500);
+
+		else
+			setTimeout(triggerRefresh, 1000);
+	}
 
 	window.onresize = function(event) {
 		resizeCharts();
@@ -339,7 +314,7 @@
 		document.getElementById('maingraph_container').style.display = 'block';
 		document.getElementById('thumbgraphs_container').style.display = 'none';
 
-		mainChartRefresh();
+		chartsRefresh();
 	}
 
 	function showThumbGraphs() {
@@ -355,7 +330,7 @@
 			mainchart = null;
 		}
 
-		thumbChartsRefresh(1);
+		chartsRefresh();
 	}
 
 	</script>
@@ -403,12 +378,12 @@
 
     <div class="container graphs" id="thumbgraphs_container">
     	<div class="allgraphs" id="thumbgraphs">
-    		<table width="100%" height="95%">
+    		<table width="100%">
     			<tr><td id="splash" align="center" style="vertical-align:middle">
     				<h1>
     				Welcome to <b>NetData</b>!
     				<br/><br/>
-    				<span class="glyphicon glyphicon-refresh"></span>
+    				<span class="glyphicon glyphicon-off"></span>
     				<br/><br/>
     				loading charts
     				<br/><br/>
@@ -418,4 +393,6 @@
     		</table>
     	</div>
 	</div>
+
+	<script type="text/javascript">document.getElementById('splash').height = $(window).height();</script>
 </html>

@@ -94,8 +94,8 @@ function loadCharts(doNext) {
 			json.charts[i].chartOptions = {
 				lineWidth: 2,
 				title: json.charts[i].title,
-				hAxis: {title: "Time of Day"},
-				vAxis: {title: json.charts[i].vtitle, minValue: 10},
+				hAxis: {title: "Time of Day", viewWindowMode: 'maximized', format:'HH:mm:ss'},
+				vAxis: {title: json.charts[i].vtitle, minValue: 0},
 				focusTarget: 'category',
 			};
 
@@ -138,14 +138,25 @@ function loadCharts(doNext) {
 			switch(json.charts[i].type) {
 				case "cpu":
 					json.charts[i].category = "CPU";
+					json.charts[i].glyphicon = "glyphicon-dashboard";
+					json.charts[i].group = 15;
+
+					if(json.charts[i].id.substring(0, 7) == "cpu.cpu") {
+						json.charts[i].chartOptions.vAxis.minValue = 0;
+						json.charts[i].chartOptions.vAxis.maxValue = 100;
+					}
 					break;
 
 				case "tc":
 					json.charts[i].category = "Quality of Service";
+					json.charts[i].glyphicon = "glyphicon-random";
+					json.charts[i].group = 30;
 					break;
 
 				case "net":
 					json.charts[i].category = "Network Interfaces";
+					json.charts[i].glyphicon = "glyphicon-transfer";
+					json.charts[i].group = 10;
 
 					// disable IFB and net.lo devices by default
 					if((json.charts[i].id.substring(json.charts[i].id.length - 4, json.charts[i].id.length) == "-ifb")
@@ -155,22 +166,32 @@ function loadCharts(doNext) {
 
 				case "ipv4":
 					json.charts[i].category = "IPv4";
+					json.charts[i].glyphicon = "glyphicon-globe";
+					json.charts[i].group = 20;
 					break;
 
 				case "conntrack":
 					json.charts[i].category = "Netfilter";
+					json.charts[i].glyphicon = "glyphicon-cloud";
+					json.charts[i].group = 20;
 					break;
 
 				case "ipvs":
 					json.charts[i].category = "IPVS";
+					json.charts[i].glyphicon = "glyphicon-sort";
+					json.charts[i].group = 15;
 					break;
 
 				case "disk":
 					json.charts[i].category = "Disk I/O";
+					json.charts[i].glyphicon = "glyphicon-hdd";
+					json.charts[i].group = 15;
 					break;
 
 				default:
 					json.charts[i].category = "Unknown";
+					json.charts[i].glyphicon = "glyphicon-search";
+					json.charts[i].group = 30;
 					break;
 			}
 		});

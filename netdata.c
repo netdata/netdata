@@ -744,7 +744,7 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 	size_t current_entry = st->current_entry;
 	size_t t, lt;				// t = the current entry, lt = the lest entry of data
 	long count = st->entries;	// count down of the entries examined so far
-	int pad = 0;				// align the entries when grouping values together
+	long pad = 0;				// align the entries when grouping values together
 
 	RRD_DIMENSION *rd;
 	size_t c = 0;				// counter for dimension loops
@@ -767,8 +767,8 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 	}
 
 	// temporary storage to keep track of group values and counts
-	long long group_values[dimensions];
-	long long group_counts[dimensions];
+	long double group_values[dimensions];
+	int group_counts[dimensions];
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
 		group_values[c] = group_counts[c] = 0;
 
@@ -832,36 +832,37 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
  		}
 
  		// if we need a PCENT_OVER_TOTAL, calculate the totals for the current and the last
- 		long long total = 0, oldtotal = 0;
+ 		long double total = 0, oldtotal = 0;
  		if(we_need_totals) {
 			for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
-				total    += rrd_stats_dimension_get(rd, t);
-				oldtotal += rrd_stats_dimension_get(rd, lt);
+				total    += (long double)rrd_stats_dimension_get(rd, t);
+				oldtotal += (long double)rrd_stats_dimension_get(rd, lt);
 			}
  		}
 
 		for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
-			long long oldvalue, value;			// temp variable for storing data values
+			//long long oldvalue, value;			// temp variable for storing data values
+			long double oldvalue, value;			// temp variable for storing data values
 
-			value    = rrd_stats_dimension_get(rd, t);
-			oldvalue = rrd_stats_dimension_get(rd, lt);
+			value    = (long double)rrd_stats_dimension_get(rd, t);
+			oldvalue = (long double)rrd_stats_dimension_get(rd, lt);
 
 			switch(rd->type) {
  				case RRD_DIMENSION_PCENT_OVER_TOTAL:
-					value = 100 * (value - oldvalue) / (total - oldtotal);
+					value = (long double)100 * (value - oldvalue) / (total - oldtotal);
 					break;
 
 				case RRD_DIMENSION_INCREMENTAL:
 					if(oldvalue > value) value = 0;	// detect overflows and resets
 					else value -= oldvalue;
-					value = value * 1000000L / usec;
+					value = value * (long double)1000000L / (long double)usec;
 					break;
 
 				default:
 					break;
 			}
 
-			value = value * rd->multiplier / rd->divisor;
+			value = value * (long double)rd->multiplier / (long double)rd->divisor;
 
 			group_counts[c]++;
 			switch(group_method) {
@@ -872,13 +873,14 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 				default:
 				case GROUP_AVERAGE:
 					group_values[c] += value;
-					if(((count-pad) % group_count) == 0) group_values[c] /= group_counts[c];
+					if(((count - pad) % group_count) == 0) group_values[c] /= (long double)group_counts[c];
 					break;
 			}
 
 			if(((count-pad) % group_count) == 0) {
 				if(!rd->hidden)
-					i += sprintf(&b[i], ",{\"v\":%lld}", group_values[c]);
+					i += sprintf(&b[i], ",{\"v\":%0.1Lf}", group_values[c]);
+					//i += sprintf(&b[i], ",{\"v\":%lld}", group_values[c]);
 
 				group_values[c] = group_counts[c] = 0;
 			}
@@ -2092,7 +2094,7 @@ int do_proc_net_snmp() {
 			// see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
 			RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcpsock");
 			if(!st) {
-				st = rrd_stats_create(RRD_TYPE_NET_SNMP ".tcpsock", RRD_TYPE_NET_SNMP ".tcpsock", save_history, "IPv4 TCP Connections", "Connections", RRD_TYPE_NET_SNMP);
+				st = rrd_stats_create(RRD_TYPE_NET_SNMP ".tcpsock", RRD_TYPE_NET_SNMP ".tcpsock", save_history, "IPv4 TCP Connections", "tcp connections", RRD_TYPE_NET_SNMP);
 				if(!st) {
 					error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_SNMP ".tcpsock");
 					continue;
@@ -2106,11 +2108,11 @@ int do_proc_net_snmp() {
 			rrd_stats_dimension_set(st, "connections", &CurrEstab);
 			rrd_stats_done(st);
 
-			st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcp");
+			st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcppackets");
 			if(!st) {
-				st = rrd_stats_create(RRD_TYPE_NET_SNMP ".tcp", RRD_TYPE_NET_SNMP ".tcp", save_history, "IPv4 TCP Packets", "Packets/s", RRD_TYPE_NET_SNMP);
+				st = rrd_stats_create(RRD_TYPE_NET_SNMP ".tcppackets", RRD_TYPE_NET_SNMP ".tcppackets", save_history, "IPv4 TCP Packets", "Packets/s", RRD_TYPE_NET_SNMP);
 				if(!st) {
-					error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_SNMP ".tcp");
+					error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_SNMP ".tcppackets");
 					continue;
 				}
 
@@ -2145,11 +2147,11 @@ int do_proc_net_snmp() {
 			if(r != 6) error("Cannot read /proc/net/snmp UDP line. Expected 6 params, read %d.", r);
 
 			// see http://net-snmp.sourceforge.net/docs/mibs/udp.html
-			RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_SNMP ".udp");
+			RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_SNMP ".udppackets");
 			if(!st) {
-				st = rrd_stats_create(RRD_TYPE_NET_SNMP ".udp", RRD_TYPE_NET_SNMP ".udp", save_history, "IPv4 UDP Packets", "Packets/s", RRD_TYPE_NET_SNMP);
+				st = rrd_stats_create(RRD_TYPE_NET_SNMP ".udppackets", RRD_TYPE_NET_SNMP ".udppackets", save_history, "IPv4 UDP Packets", "Packets/s", RRD_TYPE_NET_SNMP);
 				if(!st) {
-					error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_SNMP ".udp");
+					error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_SNMP ".udppackets");
 					continue;
 				}
 
@@ -2286,7 +2288,7 @@ int do_proc_net_stat_conntrack() {
 
 	RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".sockets");
 	if(!st) {
-		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK ".sockets", RRD_TYPE_NET_STAT_CONNTRACK ".sockets", save_history, "Netfilter Connections", "Connections", RRD_TYPE_NET_STAT_CONNTRACK);
+		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK ".sockets", RRD_TYPE_NET_STAT_CONNTRACK ".sockets", save_history, "Netfilter Connections", "netfilter connections", RRD_TYPE_NET_STAT_CONNTRACK);
 		if(!st) {
 			error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_STAT_CONNTRACK ".sockets");
 			return 1;
@@ -2302,7 +2304,7 @@ int do_proc_net_stat_conntrack() {
 
 	st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".new");
 	if(!st) {
-		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK ".new", RRD_TYPE_NET_STAT_CONNTRACK ".new", save_history, "Netfilter New Connections", "Connections/s", RRD_TYPE_NET_STAT_CONNTRACK);
+		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK ".new", RRD_TYPE_NET_STAT_CONNTRACK ".new", save_history, "Netfilter New Connections", "connections/s", RRD_TYPE_NET_STAT_CONNTRACK);
 		if(!st) {
 			error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_STAT_CONNTRACK ".new");
 			return 1;
@@ -2322,7 +2324,7 @@ int do_proc_net_stat_conntrack() {
 
 	st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".changes");
 	if(!st) {
-		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK ".changes", RRD_TYPE_NET_STAT_CONNTRACK ".changes", save_history, "Netfilter Connection Changes", "Connections/s", RRD_TYPE_NET_STAT_CONNTRACK);
+		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK ".changes", RRD_TYPE_NET_STAT_CONNTRACK ".changes", save_history, "Netfilter Connection Changes", "connections/s", RRD_TYPE_NET_STAT_CONNTRACK);
 		if(!st) {
 			error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_STAT_CONNTRACK ".changes");
 			return 1;
@@ -2388,7 +2390,7 @@ int do_proc_net_ip_vs_stats() {
 
 	RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_IPVS ".sockets");
 	if(!st) {
-		st = rrd_stats_create(RRD_TYPE_NET_IPVS ".sockets", RRD_TYPE_NET_IPVS ".sockets", save_history, "IPVS New Connections", "new connections", RRD_TYPE_NET_IPVS);
+		st = rrd_stats_create(RRD_TYPE_NET_IPVS ".sockets", RRD_TYPE_NET_IPVS ".sockets", save_history, "IPVS New Connections", "new connections/s", RRD_TYPE_NET_IPVS);
 		if(!st) {
 			error("Cannot create RRD_STATS for %s.", RRD_TYPE_NET_IPVS ".sockets");
 			return 1;
@@ -2471,7 +2473,7 @@ int do_proc_stat() {
 
 			RRD_STATS *st = rrd_stats_find(id);
 			if(!st) {
-				st = rrd_stats_create(id, id, save_history, "Time for ", "Percentage", RRD_TYPE_STAT);
+				st = rrd_stats_create(id, id, save_history, "Time for ", "percentage", RRD_TYPE_STAT);
 				if(!st) {
 					error("Cannot create RRD_STATS for %s.", id);
 					continue;
@@ -2595,7 +2597,7 @@ int do_proc_stat() {
 
 			RRD_STATS *st = rrd_stats_find(id);
 			if(!st) {
-				st = rrd_stats_create(id, id, save_history, "Started Processes", "processes started", RRD_TYPE_STAT);
+				st = rrd_stats_create(id, id, save_history, "Started Processes", "processes/s", RRD_TYPE_STAT);
 				if(!st) {
 					error("Cannot create RRD_STATS for %s.", id);
 					continue;
@@ -3109,7 +3111,11 @@ int main(int argc, char **argv)
 
 	// never become a problem
 	if(nice(20) == -1) {
-		fprintf(stderr, "Cannot lower my CPU priority. Error %s.\n", strerror(errno));
+		fprintf(stderr, "Cannot lower my CPU priority. Error: %s.\n", strerror(errno));
+	}
+
+	if(sizeof(long long) >= sizeof(long double)) {
+		fprintf(stderr, "\n\nWARNING:\nThis system does not support [long double] variables properly.\nArithmetic overflows and rounding errors may occur.\n\n");
 	}
 
 	if(daemon) become_daemon();
