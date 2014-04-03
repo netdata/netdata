@@ -70,7 +70,7 @@ then
 fi
 
 # merge the server variables into the config
-eval "`wget -O -  http://localhost:$NETDATA_CONFIG_PORT/envlist 2>/dev/null`"
+eval "`wget -O -  http://localhost:$NETDATA_CONFIG_PORT/envlist 2>/dev/null | tr " " "_" `"
 
 # save config back
 set|grep ^NETDATA_CONFIG_	>netdata.conf

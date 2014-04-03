@@ -31,9 +31,9 @@
 
 #include <pthread.h>
 
-#define RRD_DIMENSION_ABSOLUTE		0
-#define RRD_DIMENSION_INCREMENTAL	1
-#define RRD_DIMENSION_PCENT_OVER_TOTAL 2
+#define RRD_DIMENSION_ABSOLUTE			0
+#define RRD_DIMENSION_INCREMENTAL		1
+#define RRD_DIMENSION_PCENT_OVER_TOTAL 	2
 
 #define RRD_TYPE_NET				"net"
 #define RRD_TYPE_NET_LEN			strlen(RRD_TYPE_NET)
@@ -56,9 +56,9 @@
 #define RRD_TYPE_STAT 				"cpu"
 #define RRD_TYPE_STAT_LEN			strlen(RRD_TYPE_STAT)
 
-#define WEB_PATH_FILE			"file"
-#define WEB_PATH_DATA			"data"
-#define WEB_PATH_GRAPH			"graph"
+#define WEB_PATH_FILE				"file"
+#define WEB_PATH_DATA				"data"
+#define WEB_PATH_GRAPH				"graph"
 
 // internal defaults
 #define UPDATE_EVERY 1
@@ -101,13 +101,10 @@
 #define EXIT_FAILURE 1
 #define LISTEN_BACKLOG 100
 
-#define MAX_SOCKET_INPUT_DATA 65536
-#define MAX_SOCKET_OUTPUT_DATA 65536
+#define MAX_SOCKET_DATA_LENGTH (256 * 1024)
+#define SOCKET_DATA_LENGTH_INCREASE_STEP 65536
 
-#define MIN_SOCKET_INPUT_DATA 16384
-#define DEFAULT_DATA_BUFFER 65536
-
-#define MAX_HTTP_HEADER_SIZE 8192
+#define MAX_HTTP_HEADER_SIZE 16384
 
 #define MAX_PROC_NET_DEV_LINE 4096
 #define MAX_PROC_NET_DEV_IFACE_NAME 1024
@@ -1017,7 +1014,7 @@ struct web_client *web_client_create(int listener)
 		if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0) error("%llu: Cannot set SO_KEEPALIVE on socket.", w->id);
 	}
 
-	w->data = web_buffer_create(DEFAULT_DATA_BUFFER);
+	w->data = web_buffer_create(MAX_SOCKET_DATA_LENGTH);
 	if(!w->data) {
 		close(w->ifd);
 		free(w);
@@ -1567,7 +1564,7 @@ ssize_t web_client_send(struct web_client *w)
 ssize_t web_client_receive(struct web_client *w)
 {
 	// do we have any space for more data?
-	web_buffer_increase(w->data, MIN_SOCKET_INPUT_DATA);
+	web_buffer_increase(w->data, SOCKET_DATA_LENGTH_INCREASE_STEP);
 
 	ssize_t left = w->data->size - w->data->bytes;
 	ssize_t bytes;
@@ -1882,6 +1879,11 @@ int do_proc_diskstats() {
 					if(minor % 64) continue; // partitions
 					break;
 
+				case 160: // raid
+				case 161: // raid
+					if(minor % 32) continue; // partitions
+					break;
+
 				case 8: // scsi disks
 				case 65: // scsi disks
 				case 66: // scsi disks
@@ -1927,6 +1929,9 @@ int do_proc_diskstats() {
 				case 134: // scsi
 				case 135: // scsi
 				case 153: // raid
+				case 202: // xen
+				case 256: // flash
+				case 257: // flash
 					if(minor % 16) continue; // partitions
 					break;
 
@@ -1935,6 +1940,8 @@ int do_proc_diskstats() {
 				case 144: // nfs
 				case 145: // nfs
 				case 146: // nfs
+				case 199: // veritas
+				case 201: // veritas
 					break;
 
 				case 48: // RAID
@@ -1954,6 +1961,8 @@ int do_proc_diskstats() {
 				case 141: // RAID
 				case 142: // RAID
 				case 143: // RAID
+				case 179: // MMC
+				case 180: // USB
 					if(minor % 8) continue; // partitions
 					break;
 
