@@ -57,11 +57,17 @@
 		mainchart.chartOptions.height = $(window).height() - 200;
 		if(mainchart.chartOptions.height < 300) mainchart.chartOptions.height = 300;
 		
-		mainchart.thumbnail = false;
 		mainchart.group = 5;
 		mainchart.div = 'maingraph';
 		mainchart.last_updated = 0;
-		mainchart.explorer = false;
+		//mainchart.chartOptions.theme = 'maximized';
+		//mainchart.chartOptions.titlePosition = 'none';
+		//mainchart.chartOptions.axisTitlesPosition = 'in';
+		//mainchart.chartOptions.legend = {position: 'none'};
+		//mainchart.chartOptions.hAxis.title = null;
+		//mainchart.chartOptions.hAxis.viewWindowMode = 'maximized';
+		//mainchart.chartOptions.vAxis.viewWindowMode = 'maximized';
+
 
 		if(mainchart.chartOptions.isStacked) mainchart.group = 15;
 
@@ -69,7 +75,7 @@
 		mainchart.points_to_show = Math.round(mainchart.entries / mainchart.group) - 1;
 
 		// show max 10 mins of data
-		if(mainchart.points_to_show * mainchart.group > 1200) mainchart.points_to_show = 1200 / mainchart.group;
+		if(mainchart.points_to_show * mainchart.group > 600) mainchart.points_to_show = 600 / mainchart.group;
 
 		// initialize the div
 		showChartIsLoading(mainchart.div, mainchart.chartOptions.width, mainchart.chartOptions.height);
@@ -242,32 +248,27 @@
 		}
 
 		// no chart refreshed
-		if(last_thumb_updated == orig)
-			triggerRefresh();
+		if(last_thumb_updated == orig) triggerRefresh();
 	}
 
 	// refresh the proper chart
+	var timeout;
 	function chartsRefresh() {
-		if(mode == MODE_THUMBS)
-			thumbChartsRefresh();
+		if(timeout) {
+			clearTimeout(timeout);
+			timeout = null;
+		}
 
-		else if(mode == MODE_MAIN)
-			mainChartRefresh();
-
-		else
-			setTimeout(triggerRefresh, 1000);
+		     if(mode == MODE_THUMBS) thumbChartsRefresh();
+		else if(mode == MODE_MAIN)   mainChartRefresh();
+		else                         timeout = setTimeout(triggerRefresh, 1000);
 	}
 
 	// callback for refreshing the charts later
 	function triggerRefresh() {
-		if(mode == MODE_THUMBS)
-			setTimeout(thumbChartsRefresh, 200);
-
-		else if(mode == MODE_MAIN)
-			setTimeout(mainChartRefresh, 500);
-
-		else
-			setTimeout(triggerRefresh, 1000);
+		     if(mode == MODE_THUMBS) timeout = setTimeout(chartsRefresh, 200);
+		else if(mode == MODE_MAIN)   timeout = setTimeout(chartsRefresh, 500);
+		else                         timeout = setTimeout(triggerRefresh, 1000);
 	}
 
 	window.onresize = function(event) {

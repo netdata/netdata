@@ -38,7 +38,8 @@ function refreshChart(chart, doNext) {
 		url: url,
 		dataType:"json",
 		cache: false
-	}).done(function(jsondata) {
+	})
+	.done(function(jsondata) {
 		if(!jsondata || jsondata.length == 0) return;
 		chart.jsondata = jsondata;
 		
@@ -67,7 +68,8 @@ function refreshChart(chart, doNext) {
 			chart.last_updated = new Date().getTime();
 		}
 		else console.log('Cannot create chart for ' + chart.url);
-
+	})
+	.always(function() {
 		if(typeof doNext == "function") doNext();
 	});
 
@@ -84,7 +86,8 @@ function loadCharts(base_url, doNext) {
 		url: ((base_url)?base_url:'') + '/all.json',
 		dataType: 'json',
 		cache: false
-	}).done(function(json) {
+	})
+	.done(function(json) {
 		$.each(json.charts, function(i, value) {
 			json.charts[i].div = json.charts[i].name.replace(/\./g,"_");
 			json.charts[i].div = json.charts[i].div.replace(/\-/g,"_");
@@ -221,7 +224,10 @@ function loadCharts(base_url, doNext) {
 					break;
 			}
 		});
-
+		
 		if(typeof doNext == "function") doNext(json.charts);
+	})
+	.fail(function() {
+		if(typeof doNext == "function") doNext();
 	});
 };
