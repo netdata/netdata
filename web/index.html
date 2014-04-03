@@ -18,7 +18,7 @@
 
 	<!-- Bootstrap -->
 	<link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
-	<link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap-theme.min.css">
+	<!-- <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap-theme.min.css"> -->
 	<script src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
 	<link href="/file/theme.css" rel="stylesheet">
 
@@ -33,6 +33,8 @@
 	var TARGET_THUMB_GRAPH_WIDTH = 500; // chart width will range from 0.5 to 1.5 of that
 	var MINIMUM_THUMB_GRAPH_WIDTH = 400; // chart will generally try to be wider than that
 	var TARGET_THUMB_GRAPH_HEIGHT = 220;
+	var MAINCHART_MAX_TIME_TO_SHOW = 1200;
+	var THUMBS_MAX_TIME_TO_SHOW = 600;
 
 	var MODE_THUMBS = 1;
 	var MODE_MAIN = 2;
@@ -60,33 +62,63 @@
 		mainchart.group = 5;
 		mainchart.div = 'maingraph';
 		mainchart.last_updated = 0;
-		//mainchart.chartOptions.theme = 'maximized';
-		//mainchart.chartOptions.titlePosition = 'none';
-		//mainchart.chartOptions.axisTitlesPosition = 'in';
-		//mainchart.chartOptions.legend = {position: 'none'};
-		//mainchart.chartOptions.hAxis.title = null;
-		//mainchart.chartOptions.hAxis.viewWindowMode = 'maximized';
-		//mainchart.chartOptions.vAxis.viewWindowMode = 'maximized';
-
 
 		if(mainchart.chartOptions.isStacked) mainchart.group = 15;
-
-		// calculate how many point to show for each chart
-		mainchart.points_to_show = Math.round(mainchart.entries / mainchart.group) - 1;
-
-		// show max 10 mins of data
-		if(mainchart.points_to_show * mainchart.group > 600) mainchart.points_to_show = 600 / mainchart.group;
 
 		// initialize the div
 		showChartIsLoading(mainchart.div, mainchart.chartOptions.width, mainchart.chartOptions.height);
 
-		document.getElementById('maingraph_title').innerHTML = " <b> " + mainchart.title + " </b> (as " + mainchart.group_method + " of every " + (mainchart.group * mainchart.update_every) + " seconds)";
+		document.getElementById('maingraph_title').innerHTML = " " + mainchart.title + " ";
+
+		// set the radio buttons
+		if(mainchart.group_method == 'average')	$('#groupaverage').trigger('click');
+		else $('#groupmax').trigger('click');
+
+		$('#group' + mainchart.group).trigger('click');
+
+		$('#chartnormal').trigger('click');
 
 		showMainGraph();
 	}
 
 	function setMainChart(i) {
 		mainChart(mycharts[i]);
+	}
+
+	function setMainChartMax(m) {
+		if(!mainchart) return;
+
+		if(m == "maximized") {
+			mainchart.chartOptions.theme = 'maximized';
+			//mainchart.chartOptions.titlePosition = 'none';
+			//mainchart.chartOptions.axisTitlesPosition = 'in';
+			//mainchart.chartOptions.legend = {position: 'none'};
+			//mainchart.chartOptions.hAxis.title = null;
+			//mainchart.chartOptions.hAxis.viewWindowMode = 'maximized';
+			//mainchart.chartOptions.vAxis.viewWindowMode = 'maximized';
+		}
+		else {
+			mainchart.chartOptions.theme = null;
+		}
+		mainchart.last_updated = 0;
+	}
+
+	function setMainChartGroup(g) {
+		if(!mainchart) return;
+
+		mainchart.group = g;
+		mainchart.last_updated = 0;
+
+		chartsRefresh();
+	}
+
+	function setMainChartGroupMethod(g) {
+		if(!mainchart) return;
+
+		mainchart.group_method = g;
+		mainchart.last_updated = 0;
+
+		chartsRefresh();
 	}
 
 	// refresh the main chart
@@ -97,6 +129,11 @@
 			showThumbGraphs();
 			return;
 		}
+
+		mainchart.points_to_show = Math.round(mainchart.entries / mainchart.group) - 1;
+
+		if(mainchart.points_to_show * mainchart.group > MAINCHART_MAX_TIME_TO_SHOW)
+			mainchart.points_to_show = MAINCHART_MAX_TIME_TO_SHOW / mainchart.group;
 
 		if(!refreshChart(mainchart, triggerRefresh)) triggerRefresh();
 	}
@@ -178,7 +215,7 @@
 				c.points_to_show = Math.round(c.entries / c.group) - 1;
 
 				// show max 10 mins of data
-				if(c.points_to_show * c.group > 600) c.points_to_show = 600 / c.group;
+				if(c.points_to_show * c.group > THUMBS_MAX_TIME_TO_SHOW) c.points_to_show = THUMBS_MAX_TIME_TO_SHOW / c.group;
 
 				if(c.enabled) {
 					var j;
@@ -210,7 +247,7 @@
 				else if(a.name == "disk") a.priority = 7;
 				else a.priority = 99;
 
-				a.html = "<tr><td><ol class=\"breadcrumb graphs\"><li class=\"active\"><span class=\"glyphicon " + a.glyphicon + "\"></span> &nbsp; <a id=\"" + a.name + "\" href=\"#" + a.name + "\"><b>" + a.title + "</b> " + a.description + " </a></li></ol></td></tr><tr><td><div class=\"thumbgraphs\">" + a.html + "</td></tr>";
+				a.html = "<tr><td id=\"" + a.name + "\"><ol class=\"breadcrumb graphs\"><li class=\"active\"><span class=\"glyphicon " + a.glyphicon + "\"></span> &nbsp; <a id=\"" + a.name + "\" href=\"#" + a.name + "\"><b>" + a.title + "</b> " + a.description + " </a></li></ol></td></tr><tr><td><div class=\"thumbgraphs\">" + a.html + "</td></tr>";
 			});
 
 			function categoriessort(a, b) {
@@ -309,7 +346,7 @@
 </head>
 
 <body role="document">
-    <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+    <nav id="mynav" class="navbar navbar-inverse navbar-fixed-top" role="navigation">
       <div class="container">
         <div class="navbar-header">
           <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
@@ -328,20 +365,47 @@
             <li><a href="#conntrack">Netfilter</a></li>
             <li><a href="#ipv4">IPv4</a></li>
             <li><a href="#ipvs">IPVS</a></li>
+            <li><a href="#cpu">CPU</a></li>
             <li><a href="#disk">Disk</a></li>
           </ul>
         </div><!--/.nav-collapse -->
       </div>
-    </div>
+    </nav>
 
     <div class="container graphs" id="maingraph_container" style="display: none">
 		<table>
-			<tr><td><ol class="breadcrumb graphs"><li class="active"><a id="maingraph_title" href="#maingraph"><b> Maingraph </b></a></li></ol></td></tr>
+			<tr><td><ol class="breadcrumb graphs"><li class="active"><div class="btn-group btn-group-sm"><button type="button" onclick="showThumbGraphs();" class="btn btn-default" data-toggle="tooltip" title="Close this chart and return to the index page."> &larr; Back </button></div><a id="maingraph_title" href="#maingraph"><b> Maingraph </b></a></li></ol></td></tr>
 			<tr><td>
 		    	<div class="maingraph">
 					<table>
 						<tr><td><div class="maingraph" id="maingraph"></div></td></tr>
-						<tr><td align="center"><div class="btn-group"><button type="button" onclick="showThumbGraphs();" class="btn btn-default"> close main graph </button></div></td></tr>
+						<tr><td align="center">
+							<div class="btn-group">
+								<form id="mainchartform">
+									<div class="btn-group" data-toggle="buttons">
+										<button type="button" class="btn btn-default disabled"> Group </button>
+										<label class="btn btn-primary" data-toggle="tooltip" title="show the MAX point among all points grouped"><input type="radio" name="groupmethod" id="groupmax" onChange="setMainChartGroupMethod('max');"><span class="glyphicon glyphicon-signal"></span></label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="show the AVERAGE of all points grouped"><input type="radio" name="groupmethod" id="groupaverage" onChange="setMainChartGroupMethod('average');"><span class="glyphicon glyphicon-align-justify"></span></label>
+									</div>
+									<div class="btn-group" data-toggle="buttons" >
+										<label class="btn btn-primary" data-toggle="tooltip" title="do not group points, show the raw data"><input type="radio" name="group" id="group1" onChange="setMainChartGroup(1);">1</label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="group in half, show 1 every 2 points of data"><input type="radio" name="group" id="group2" onChange="setMainChartGroup(2);">2</label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="group every 5 points of data"><input type="radio" name="group" id="group5" onChange="setMainChartGroup(5);">5</label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="group every 10 points of data"><input type="radio" name="group" id="group10" onChange="setMainChartGroup(10);">10</label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="group every 15 points of data"><input type="radio" name="group" id="group15" onChange="setMainChartGroup(15);">15</label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="group every 20 points of data"><input type="radio" name="group" id="group20" onChange="setMainChartGroup(20);">20</label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="group every 30 points of data"><input type="radio" name="group" id="group30" onChange="setMainChartGroup(30);">30</label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="group every 45 points of data"><input type="radio" name="group" id="group45" onChange="setMainChartGroup(45);">45</label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="group every 60 points of data"><input type="radio" name="group" id="group60" onChange="setMainChartGroup(60);">60</label>
+									</div>
+									<div class="btn-group" data-toggle="buttons" >
+										<button type="button" class="btn btn-default disabled" > Chart </button>
+										<label class="btn btn-primary" data-toggle="tooltip" title="NORMAL chart size"><input type="radio" name="chartmax" id="chartnormal" onChange="setMainChartMax('normal');"><span class="glyphicon glyphicon-resize-small"></span></label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="MAXIMIZED chart size"><input type="radio" name="chartmax" id="chartmax" onChange="setMainChartMax('maximized');"><span class="glyphicon glyphicon-fullscreen"></span></label>
+									</div>
+								</form>
+							</div>
+							</td></tr>
 					</table>
 		 	   </div><!-- /.maingraph -->
 			</td></tr>
@@ -366,5 +430,14 @@
     	</div>
 	</div>
 
-	<script type="text/javascript">document.getElementById('splash').height = $(window).height();</script>
+	<script type='text/javascript'>
+		
+
+		$(document).ready(function(){
+			document.getElementById('splash').height = $(window).height();
+
+			$('[data-toggle="tooltip"]').tooltip({'placement': 'top', 'container': 'body'});
+		});
+
+	</script>
 </html>
