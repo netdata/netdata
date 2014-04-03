@@ -64,6 +64,7 @@
 		mainchart.last_updated = 0;
 
 		if(mainchart.chartOptions.isStacked) mainchart.group = 15;
+		//mainchart.chartOptions.titlePosition = 'none';
 
 		// initialize the div
 		showChartIsLoading(mainchart.div, mainchart.chartOptions.width, mainchart.chartOptions.height);
@@ -90,15 +91,16 @@
 
 		if(m == "maximized") {
 			mainchart.chartOptions.theme = 'maximized';
-			//mainchart.chartOptions.titlePosition = 'none';
 			//mainchart.chartOptions.axisTitlesPosition = 'in';
 			//mainchart.chartOptions.legend = {position: 'none'};
 			//mainchart.chartOptions.hAxis.title = null;
-			//mainchart.chartOptions.hAxis.viewWindowMode = 'maximized';
-			//mainchart.chartOptions.vAxis.viewWindowMode = 'maximized';
+			mainchart.chartOptions.hAxis.viewWindowMode = 'maximized';
+			mainchart.chartOptions.vAxis.viewWindowMode = 'maximized';
 		}
 		else {
 			mainchart.chartOptions.theme = null;
+			mainchart.chartOptions.hAxis.viewWindowMode = null;
+			mainchart.chartOptions.vAxis.viewWindowMode = null;
 		}
 		mainchart.last_updated = 0;
 	}
@@ -374,7 +376,7 @@
 
     <div class="container graphs" id="maingraph_container" style="display: none">
 		<table>
-			<tr><td><ol class="breadcrumb graphs"><li class="active"><div class="btn-group btn-group-sm"><button type="button" onclick="showThumbGraphs();" class="btn btn-default" data-toggle="tooltip" title="Close this chart and return to the index page."> &larr; Back </button></div><a id="maingraph_title" href="#maingraph"><b> Maingraph </b></a></li></ol></td></tr>
+			<tr><td><ol class="breadcrumb graphs"><li class="active"><div class="btn-group btn-group-sm"><button type="button" onclick="showThumbGraphs();" class="btn btn-default"> &larr; Back </button></div><a id="maingraph_title" href="#maingraph"><b> Maingraph </b></a></li></ol></td></tr>
 			<tr><td>
 		    	<div class="maingraph">
 					<table>
@@ -383,25 +385,55 @@
 							<div class="btn-group">
 								<form id="mainchartform">
 									<div class="btn-group" data-toggle="buttons">
-										<button type="button" class="btn btn-default disabled"> Group </button>
-										<label class="btn btn-primary" data-toggle="tooltip" title="show the MAX point among all points grouped"><input type="radio" name="groupmethod" id="groupmax" onChange="setMainChartGroupMethod('max');"><span class="glyphicon glyphicon-signal"></span></label>
-										<label class="btn btn-primary" data-toggle="tooltip" title="show the AVERAGE of all points grouped"><input type="radio" name="groupmethod" id="groupaverage" onChange="setMainChartGroupMethod('average');"><span class="glyphicon glyphicon-align-justify"></span></label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="show the MAX point among all points grouped">
+											<input type="radio" name="groupmethod" id="groupmax" onChange="setMainChartGroupMethod('max');">
+											<span class="glyphicon glyphicon-signal"></span>
+										</label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="show the AVERAGE of all points grouped">
+											<input type="radio" name="groupmethod" id="groupaverage" onChange="setMainChartGroupMethod('average');">
+											<span class="glyphicon glyphicon-align-justify"></span>
+										</label>
 									</div>
 									<div class="btn-group" data-toggle="buttons" >
-										<label class="btn btn-primary" data-toggle="tooltip" title="do not group points, show the raw data"><input type="radio" name="group" id="group1" onChange="setMainChartGroup(1);">1</label>
-										<label class="btn btn-primary" data-toggle="tooltip" title="group in half, show 1 every 2 points of data"><input type="radio" name="group" id="group2" onChange="setMainChartGroup(2);">2</label>
-										<label class="btn btn-primary" data-toggle="tooltip" title="group every 5 points of data"><input type="radio" name="group" id="group5" onChange="setMainChartGroup(5);">5</label>
-										<label class="btn btn-primary" data-toggle="tooltip" title="group every 10 points of data"><input type="radio" name="group" id="group10" onChange="setMainChartGroup(10);">10</label>
-										<label class="btn btn-primary" data-toggle="tooltip" title="group every 15 points of data"><input type="radio" name="group" id="group15" onChange="setMainChartGroup(15);">15</label>
-										<label class="btn btn-primary" data-toggle="tooltip" title="group every 20 points of data"><input type="radio" name="group" id="group20" onChange="setMainChartGroup(20);">20</label>
-										<label class="btn btn-primary" data-toggle="tooltip" title="group every 30 points of data"><input type="radio" name="group" id="group30" onChange="setMainChartGroup(30);">30</label>
-										<label class="btn btn-primary" data-toggle="tooltip" title="group every 45 points of data"><input type="radio" name="group" id="group45" onChange="setMainChartGroup(45);">45</label>
-										<label class="btn btn-primary" data-toggle="tooltip" title="group every 60 points of data"><input type="radio" name="group" id="group60" onChange="setMainChartGroup(60);">60</label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="do not group points, show the raw data">
+											<input type="radio" name="group" id="group1" onChange="setMainChartGroup(1);">1
+										</label>
+										
+										<label class="btn btn-primary" data-toggle="tooltip" title="group in half, show 1 every 2 points of data">
+											<input type="radio" name="group" id="group2" onChange="setMainChartGroup(2);">2
+										</label>
+
+										<label class="btn btn-primary" data-toggle="tooltip" title="group every 5 points of data">
+											<input type="radio" name="group" id="group5" onChange="setMainChartGroup(5);">5
+										</label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="group every 10 points of data">
+											<input type="radio" name="group" id="group10" onChange="setMainChartGroup(10);">10
+										</label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="group every 15 points of data">
+											<input type="radio" name="group" id="group15" onChange="setMainChartGroup(15);">15
+										</label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="group every 20 points of data">
+											<input type="radio" name="group" id="group20" onChange="setMainChartGroup(20);">20
+										</label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="group every 30 points of data">
+											<input type="radio" name="group" id="group30" onChange="setMainChartGroup(30);">30
+										</label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="group every 45 points of data">
+											<input type="radio" name="group" id="group45" onChange="setMainChartGroup(45);">45
+										</label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="group every 60 points of data">
+											<input type="radio" name="group" id="group60" onChange="setMainChartGroup(60);">60
+										</label>
 									</div>
 									<div class="btn-group" data-toggle="buttons" >
-										<button type="button" class="btn btn-default disabled" > Chart </button>
-										<label class="btn btn-primary" data-toggle="tooltip" title="NORMAL chart size"><input type="radio" name="chartmax" id="chartnormal" onChange="setMainChartMax('normal');"><span class="glyphicon glyphicon-resize-small"></span></label>
-										<label class="btn btn-primary" data-toggle="tooltip" title="MAXIMIZED chart size"><input type="radio" name="chartmax" id="chartmax" onChange="setMainChartMax('maximized');"><span class="glyphicon glyphicon-fullscreen"></span></label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="NORMAL chart size">
+											<input type="radio" name="chartmax" id="chartnormal" onChange="setMainChartMax('normal');">
+											<span class="glyphicon glyphicon-resize-small"></span>
+										</label>
+										<label class="btn btn-primary" data-toggle="tooltip" title="MAXIMIZED chart size">
+											<input type="radio" name="chartmax" id="chartmax" onChange="setMainChartMax('maximized');">
+											<span class="glyphicon glyphicon-fullscreen"></span>
+										</label>
 									</div>
 								</form>
 							</div>
