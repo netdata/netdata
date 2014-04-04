@@ -168,14 +168,19 @@
 
 		width = thumbWidth();
 		$.each(mycharts, function(i, c) {
+			var now = new Date().getTime();
+
 			if(c.enabled && c.chartOptions.width != width) {
 				if(c.chart) c.chart.clearChart();
 				c.chart = null;
+				c.last_updated = now + (c.update_every * 1000);
 				c.chartOptions.width = width;
 				showChartIsLoading(c.div, c.chartOptions.width, c.chartOptions.height);
 				c.last_updated = 0;
 			}
 		});
+
+		chartsRefresh();
 	}
 
 	// load the charts from the server

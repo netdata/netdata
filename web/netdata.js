@@ -137,6 +137,7 @@ function loadCharts(base_url, doNext) {
 				|| json.charts[i].id == "cpu.intr"
 				|| json.charts[i].id == "cpu.processes"
 				|| json.charts[i].id == "cpu.procs_running"
+				|| json.charts[i].id == "cpu.jitter"
 				)
 				&& json.charts[i].name != "ipv4.net" && json.charts[i].name != "ipvs.net") {
 				

@@ -178,22 +178,22 @@ void debug_int( const char *file, const char *function, const unsigned long line
 
 void error_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... )
 {
-	if(silent) return;
-
     va_list args;
 
-    log_date();
+	if(!silent) {
+	    log_date();
 
-    va_start( args, fmt );
-    fprintf(stderr, "ERROR (%04lu@%-15.15s): ", line, function);
-    vfprintf( stderr, fmt, args );
-    va_end( args );
+	    va_start( args, fmt );
+	    fprintf(stderr, "ERROR (%04lu@%-15.15s): ", line, function);
+	    vfprintf( stderr, fmt, args );
+	    va_end( args );
 
-    if(errno) {
-            fprintf(stderr, " (errno %d, %s)\n", errno, strerror(errno));
-            errno = 0;
-    }
-    else fprintf(stderr, "\n");
+	    if(errno) {
+	            fprintf(stderr, " (errno %d, %s)\n", errno, strerror(errno));
+	            errno = 0;
+	    }
+	    else fprintf(stderr, "\n");
+	}
 
     va_start( args, fmt );
 	vsyslog(LOG_ERR,  fmt, args );
@@ -204,19 +204,19 @@ void error_int( const char *file, const char *function, const unsigned long line
 
 void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... )
 {
-	if(silent) exit(EXIT_FAILURE);
-
 	va_list args;
 
-	log_date();
+	if(!silent) {
+		log_date();
 
-	va_start( args, fmt );
-	fprintf(stderr, "FATAL (%04lu@%-15.15s): ", line, function);
-	vfprintf( stderr, fmt, args );
-	va_end( args );
+		va_start( args, fmt );
+		fprintf(stderr, "FATAL (%04lu@%-15.15s): ", line, function);
+		vfprintf( stderr, fmt, args );
+		va_end( args );
 
-	perror(" # ");
-	fprintf(stderr, "\n");
+		perror(" # ");
+		fprintf(stderr, "\n");
+	}
 
     va_start( args, fmt );
 	vsyslog(LOG_CRIT,  fmt, args );
@@ -1157,6 +1157,7 @@ void web_client_reset(struct web_client *w)
 	w->data->bytes = 0;
 	w->data->sent = 0;
 
+	w->response_header[0] = '\0';
 	w->data->buffer[0] = '\0';
 
 	w->wait_receive = 1;
@@ -1169,175 +1170,185 @@ void web_client_process(struct web_client *w)
 	int bytes;
 
 	// check if we have an empty line (end of HTTP header)
-	if(!strstr(w->data->buffer, "\r\n\r\n")) return;
+	if(strstr(w->data->buffer, "\r\n\r\n")) {
+		debug(D_WEB_DATA, "%llu: Processing data buffer of %d bytes: '%s'.", w->id, w->data->bytes, w->data->buffer);
 
-	w->response_header[0] = '\0';
+		// check if the client requested keep-alive HTTP
+		if(strcasestr(w->data->buffer, "Connection: keep-alive") == 0) w->keepalive = 0;
+		else w->keepalive = 1;
+
+		char *buf = w->data->buffer;
+		char *tok = strsep(&buf, " \r\n");
+		char *url = NULL;
+
+		if(buf && strcmp(tok, "GET") == 0) {
+			tok = strsep(&buf, " \r\n");
+			url = url_decode(tok);
+			debug(D_WEB_CLIENT, "%llu: Processing HTTP GET on url '%s'.", w->id, url);
+		}
+		else if (buf && strcmp(tok, "POST") == 0) {
+			w->keepalive = 0;
+			tok = strsep(&buf, " \r\n");
+			url = url_decode(tok);
+
+			debug(D_WEB_CLIENT, "%llu: I don't know how to handle POST with form data. Assuming it is a GET on url '%s'.", w->id, url);
+		}
+
+		if(url) {
+			tok = mystrsep(&url, "/?&");
+
+			debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
+
+			if(strcmp(tok, WEB_PATH_DATA) == 0) { // "data"
+				// the client is requesting rrd data
+
+				// get the name of the data to show
+				tok = mystrsep(&url, "/?&");
+				debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
+
+				// do we have such a data set?
+				RRD_STATS *st = rrd_stats_find_byname(tok);
+				if(!st) st = rrd_stats_find(tok);
+				if(!st) {
+					// we don't have it
+					// try to send a file with that name
+					code = mysendfile(w, tok);
+				}
+				else {
+					// we have it
+					debug(D_WEB_CLIENT, "%llu: Found RRD data with name '%s'.", w->id, tok);
+
+					// how many entries does the client want?
+					size_t lines = save_history;
+					size_t group_count = 1;
+					int group_method = GROUP_AVERAGE;
+
+					if(url) {
+						// parse the lines required
+						tok = mystrsep(&url, "/?&");
+						if(tok) lines = atoi(tok);
+						if(lines < 5) lines = save_history;
+					}
+					if(url) {
+						// parse the group count required
+						tok = mystrsep(&url, "/?&");
+						if(tok) group_count = atoi(tok);
+						if(group_count < 1) group_count = 1;
+						if(group_count > save_history / 20) group_count = save_history / 20;
+					}
+					if(url) {
+						// parse the grouping method required
+						tok = mystrsep(&url, "/?&");
+						if(strcmp(tok, "max") == 0) group_method = GROUP_MAX;
+						else if(strcmp(tok, "average") == 0) group_method = GROUP_AVERAGE;
+						else debug(D_WEB_CLIENT, "%llu: Unknown group method '%s'", w->id, tok);
+					}
+
+					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group_count, %d group_method).", w->id, st->name, st->id, lines, group_count, group_method);
+
+					code = 200;
+					w->data->contenttype = CT_APPLICATION_JSON;
+					w->data->bytes = rrd_stats_json(st, w->data->buffer, w->data->size, lines, group_count, group_method);
+				}
+			}
+			else if(strcmp(tok, WEB_PATH_GRAPH) == 0) { // "graph"
+				// the client is requesting an rrd graph
+
+				// get the name of the data to show
+				tok = mystrsep(&url, "/?&");
+				debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
+
+				// do we have such a data set?
+				RRD_STATS *st = rrd_stats_find_byname(tok);
+				if(!st) {
+					// we don't have it
+					// try to send a file with that name
+					code = mysendfile(w, tok);
+				}
+				else {
+					code = 200;
+					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending %s.json of RRD_STATS...", w->id, st->name);
+					w->data->contenttype = CT_APPLICATION_JSON;
+					w->data->bytes = rrd_stats_graph_json(st, url, w->data->buffer, w->data->size);
+				}
+			}
+			else if(strcmp(tok, "mirror") == 0) {
+				code = 200;
+
+				debug(D_WEB_CLIENT_ACCESS, "%llu: Mirroring...", w->id);
+
+				// just leave the buffer as is
+				// it will be copied back to the client
+			}
+			else if(strcmp(tok, "list") == 0) {
+				code = 200;
+
+				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending list of RRD_STATS...", w->id);
+
+				w->data->bytes = 0;
+				RRD_STATS *st = root;
+
+				for ( ; st ; st = st->next )
+					w->data->bytes += sprintf(&w->data->buffer[w->data->bytes], "%s\n", st->name);
+			}
+			else if(strcmp(tok, "envlist") == 0) {
+				code = 200;
+
+				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending envlist of RRD_STATS...", w->id);
+
+				w->data->bytes = 0;
+				RRD_STATS *st = root;
+
+				for ( ; st ; st = st->next ) {
+					w->data->bytes += sprintf(&w->data->buffer[w->data->bytes], "%s=%s\n", st->envtitle, st->usertitle);
+					w->data->bytes += sprintf(&w->data->buffer[w->data->bytes], "%s=%s\n", st->envpriority, st->userpriority);
+				}
+			}
+			else if(strcmp(tok, "all.json") == 0) {
+				code = 200;
+				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending all.json of RRD_STATS...", w->id);
+				w->data->contenttype = CT_APPLICATION_JSON;
+				w->data->bytes = rrd_stats_all_json(w->data->buffer, w->data->size);
+			}
+			else if(strcmp(tok, WEB_PATH_FILE) == 0) { // "file"
+				tok = mystrsep(&url, "/?&");
+				if(tok && *tok) code = mysendfile(w, tok);
+				else {
+					code = 400;
+					strcpy(w->data->buffer, "You have to give a filename to get.\r\n");
+					w->data->bytes = strlen(w->data->buffer);
+				}
+			}
+			else if(!tok[0]) {
+				code = mysendfile(w, "index.html");
+			}
+			else {
+				code = mysendfile(w, tok);
+			}
+		}
+		else {
+			if(buf) debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, buf);
+
+			code = 500;
+			strcpy(w->data->buffer, "I don't understand you...\r\n");
+			w->data->bytes = strlen(w->data->buffer);
+		}
+	}
+	else if(w->data->bytes > 8192) {
+		debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big.", w->id);
+
+		code = 400;
+		strcpy(w->data->buffer, "Received request is too big.\r\n");
+		w->data->bytes = strlen(w->data->buffer);
+	}
+	else {
+		// wait for more data
+		return;
+	}
+
 	w->data->date = time(NULL);
 	w->wait_receive = 0;
 	w->data->sent = 0;
-
-	debug(D_WEB_DATA, "%llu: Processing data buffer of %d bytes: '%s'.", w->id, w->data->bytes, w->data->buffer);
-
-	// check if the client requested keep-alive HTTP
-	if(strcasestr(w->data->buffer, "Connection: keep-alive") == 0) w->keepalive = 0;
-	else w->keepalive = 1;
-
-	char *buf = w->data->buffer;
-	char *tok = strsep(&buf, " \r\n");
-	char *url = NULL;
-
-	if(buf && strcmp(tok, "GET") == 0) {
-		tok = strsep(&buf, " \r\n");
-		url = url_decode(tok);
-		debug(D_WEB_CLIENT, "%llu: Processing HTTP GET on url '%s'.", w->id, url);
-	}
-	else if (buf && strcmp(tok, "POST") == 0) {
-		w->keepalive = 0;
-		tok = strsep(&buf, " \r\n");
-		url = url_decode(tok);
-
-		debug(D_WEB_CLIENT, "%llu: I don't know how to handle POST with form data. Assuming it is a GET on url '%s'.", w->id, url);
-	}
-
-	if(url) {
-		tok = mystrsep(&url, "/?&");
-
-		debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
-
-		if(strcmp(tok, WEB_PATH_DATA) == 0) { // "data"
-			// the client is requesting rrd data
-
-			// get the name of the data to show
-			tok = mystrsep(&url, "/?&");
-			debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
-
-			// do we have such a data set?
-			RRD_STATS *st = rrd_stats_find_byname(tok);
-			if(!st) st = rrd_stats_find(tok);
-			if(!st) {
-				// we don't have it
-				// try to send a file with that name
-				code = mysendfile(w, tok);
-			}
-			else {
-				// we have it
-				debug(D_WEB_CLIENT, "%llu: Found RRD data with name '%s'.", w->id, tok);
-
-				// how many entries does the client want?
-				size_t lines = save_history;
-				size_t group_count = 1;
-				int group_method = GROUP_AVERAGE;
-
-				if(url) {
-					// parse the lines required
-					tok = mystrsep(&url, "/?&");
-					if(tok) lines = atoi(tok);
-					if(lines < 5) lines = save_history;
-				}
-				if(url) {
-					// parse the group count required
-					tok = mystrsep(&url, "/?&");
-					if(tok) group_count = atoi(tok);
-					if(group_count < 1) group_count = 1;
-					if(group_count > save_history / 20) group_count = save_history / 20;
-				}
-				if(url) {
-					// parse the grouping method required
-					tok = mystrsep(&url, "/?&");
-					if(strcmp(tok, "max") == 0) group_method = GROUP_MAX;
-					else if(strcmp(tok, "average") == 0) group_method = GROUP_AVERAGE;
-					else debug(D_WEB_CLIENT, "%llu: Unknown group method '%s'", w->id, tok);
-				}
-
-				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group_count, %d group_method).", w->id, st->name, st->id, lines, group_count, group_method);
-
-				code = 200;
-				w->data->contenttype = CT_APPLICATION_JSON;
-				w->data->bytes = rrd_stats_json(st, w->data->buffer, w->data->size, lines, group_count, group_method);
-			}
-		}
-		else if(strcmp(tok, WEB_PATH_GRAPH) == 0) { // "graph"
-			// the client is requesting an rrd graph
-
-			// get the name of the data to show
-			tok = mystrsep(&url, "/?&");
-			debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
-
-			// do we have such a data set?
-			RRD_STATS *st = rrd_stats_find_byname(tok);
-			if(!st) {
-				// we don't have it
-				// try to send a file with that name
-				code = mysendfile(w, tok);
-			}
-			else {
-				code = 200;
-				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending %s.json of RRD_STATS...", w->id, st->name);
-				w->data->contenttype = CT_APPLICATION_JSON;
-				w->data->bytes = rrd_stats_graph_json(st, url, w->data->buffer, w->data->size);
-			}
-		}
-		else if(strcmp(tok, "mirror") == 0) {
-			code = 200;
-
-			debug(D_WEB_CLIENT_ACCESS, "%llu: Mirroring...", w->id);
-
-			// just leave the buffer as is
-			// it will be copied back to the client
-		}
-		else if(strcmp(tok, "list") == 0) {
-			code = 200;
-
-			debug(D_WEB_CLIENT_ACCESS, "%llu: Sending list of RRD_STATS...", w->id);
-
-			w->data->bytes = 0;
-			RRD_STATS *st = root;
-
-			for ( ; st ; st = st->next )
-				w->data->bytes += sprintf(&w->data->buffer[w->data->bytes], "%s\n", st->name);
-		}
-		else if(strcmp(tok, "envlist") == 0) {
-			code = 200;
-
-			debug(D_WEB_CLIENT_ACCESS, "%llu: Sending envlist of RRD_STATS...", w->id);
-
-			w->data->bytes = 0;
-			RRD_STATS *st = root;
-
-			for ( ; st ; st = st->next ) {
-				w->data->bytes += sprintf(&w->data->buffer[w->data->bytes], "%s=%s\n", st->envtitle, st->usertitle);
-				w->data->bytes += sprintf(&w->data->buffer[w->data->bytes], "%s=%s\n", st->envpriority, st->userpriority);
-			}
-		}
-		else if(strcmp(tok, "all.json") == 0) {
-			code = 200;
-			debug(D_WEB_CLIENT_ACCESS, "%llu: Sending all.json of RRD_STATS...", w->id);
-			w->data->contenttype = CT_APPLICATION_JSON;
-			w->data->bytes = rrd_stats_all_json(w->data->buffer, w->data->size);
-		}
-		else if(strcmp(tok, WEB_PATH_FILE) == 0) { // "file"
-			tok = mystrsep(&url, "/?&");
-			if(tok && *tok) code = mysendfile(w, tok);
-			else {
-				code = 400;
-				strcpy(w->data->buffer, "You have to give a filename to get.\r\n");
-				w->data->bytes = strlen(w->data->buffer);
-			}
-		}
-		else if(!tok[0]) {
-			code = mysendfile(w, "index.html");
-		}
-		else {
-			code = mysendfile(w, tok);
-		}
-	}
-	else {
-		if(buf) debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, buf);
-
-		code = 500;
-		strcpy(w->data->buffer, "I don't understand you...\r\n");
-		w->data->bytes = strlen(w->data->buffer);
-	}
 
 	// prepare the HTTP response header
 	debug(D_WEB_CLIENT, "%llu: Generating HTTP header with response %d.", w->id, code);
@@ -1644,7 +1655,7 @@ void *new_client(void *ptr)
 			if(w->ofd > fdmax) fdmax = w->ofd;
 		}
 
-		tv.tv_sec = 10;
+		tv.tv_sec = 30;
 		tv.tv_usec = 0;
 
 		debug(D_WEB_CLIENT, "%llu: Waiting...", w->id);
@@ -2883,7 +2894,7 @@ void *tc_main(void *ptr)
 		struct tc_device *device = NULL;
 		struct tc_class *class = NULL;
 
-		sprintf(buffer, "./tc-all.sh %d", update_every);
+		sprintf(buffer, "exec ./tc-all.sh %d", update_every);
 		fp = popen(buffer, "r");
 
 		while(fgets(buffer, TC_LINE_MAX, fp) != NULL) {
@@ -2959,6 +2970,54 @@ void *tc_main(void *ptr)
 
 	return NULL;
 }
+
+// ----------------------------------------------------------------------------
+// cpu jitter calculation
+
+#define CPU_JITTER_SLEEP_TIME_MS 20
+
+void *cpujitter_main(void *ptr)
+{
+
+	struct timeval before, after;
+
+	while(1) {
+		unsigned long long usec, susec = 0;
+
+		while(susec < (update_every * 1000000L)) {
+
+			gettimeofday(&before, NULL);
+			usleep(CPU_JITTER_SLEEP_TIME_MS * 1000);
+			gettimeofday(&after, NULL);
+
+			// calculate the time it took for a full loop
+			usec = usecdiff(&after, &before);
+			susec += usec;
+		}
+		usec -= (CPU_JITTER_SLEEP_TIME_MS * 1000);
+
+		RRD_STATS *st = rrd_stats_find(RRD_TYPE_STAT ".jitter");
+		if(!st) {
+			st = rrd_stats_create(RRD_TYPE_STAT ".jitter", RRD_TYPE_STAT ".jitter", save_history, "CPU Jitter", "microseconds lost", RRD_TYPE_STAT);
+			if(!st) {
+				error("Cannot create RRD_STATS for interface %s.", RRD_TYPE_STAT ".jitter");
+				continue;
+			}
+
+			if(!rrd_stats_dimension_add(st, "jitter", "jitter", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_ABSOLUTE))
+				error("Cannot add RRD_STATS dimension %s.", "jitter");
+
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "jitter", &usec);
+		rrd_stats_done(st);
+	}
+
+	return NULL;
+}
+
+
 
 void bye(void)
 {
@@ -3140,12 +3199,13 @@ int main(int argc, char **argv)
 	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV) signal(i,  sig_handler);
 	
 
-	pthread_t p_proc, p_tc;
-	int r_proc, r_tc;
+	pthread_t p_proc, p_tc, p_jitter;
+	int r_proc, r_tc, r_jitter;
 
 	// spawn a child to collect data
-	r_proc  = pthread_create(&p_proc, NULL, proc_main, NULL);
-	r_tc    = pthread_create(&p_tc,   NULL, tc_main,   NULL);
+	r_proc   = pthread_create(&p_proc,   NULL, proc_main,      NULL);
+	r_tc     = pthread_create(&p_tc,     NULL, tc_main,        NULL);
+	r_jitter = pthread_create(&p_jitter, NULL, cpujitter_main, NULL);
 
 	// the main process - the web server listener
 	//sleep(1);
@@ -3157,6 +3217,7 @@ int main(int argc, char **argv)
 
 	printf("TC            thread returns: %d\n", r_tc);
 	printf("PROC NET DEV  thread returns: %d\n", r_proc);
+	printf("CPU JITTER    thread returns: %d\n", r_jitter);
 
 	exit(0);
 }
