@@ -168,19 +168,14 @@
 
 		width = thumbWidth();
 		$.each(mycharts, function(i, c) {
-			var now = new Date().getTime();
-
 			if(c.enabled && c.chartOptions.width != width) {
 				if(c.chart) c.chart.clearChart();
 				c.chart = null;
-				c.last_updated = now + (c.update_every * 1000);
 				c.chartOptions.width = width;
 				showChartIsLoading(c.div, c.chartOptions.width, c.chartOptions.height);
 				c.last_updated = 0;
 			}
 		});
-
-		chartsRefresh();
 	}
 
 	// load the charts from the server
@@ -389,7 +384,7 @@
 						<tr><td align="center">
 							<div class="btn-group">
 								<form id="mainchartform">
-									<div class="btn-group" data-toggle="buttons">
+									<div class="btn-group btn-group-xs" data-toggle="buttons">
 										<label class="btn btn-primary" data-toggle="tooltip" title="show the MAX point among all points grouped">
 											<input type="radio" name="groupmethod" id="groupmax" onChange="setMainChartGroupMethod('max');">
 											<span class="glyphicon glyphicon-signal"></span>
@@ -399,7 +394,7 @@
 											<span class="glyphicon glyphicon-align-justify"></span>
 										</label>
 									</div>
-									<div class="btn-group" data-toggle="buttons" >
+									<div class="btn-group btn-group-xs" data-toggle="buttons" >
 										<label class="btn btn-primary" data-toggle="tooltip" title="do not group points, show the raw data">
 											<input type="radio" name="group" id="group1" onChange="setMainChartGroup(1);">1
 										</label>
@@ -430,7 +425,7 @@
 											<input type="radio" name="group" id="group60" onChange="setMainChartGroup(60);">60
 										</label>
 									</div>
-									<div class="btn-group" data-toggle="buttons" >
+									<div class="btn-group btn-group-xs" data-toggle="buttons" >
 										<label class="btn btn-primary" data-toggle="tooltip" title="NORMAL chart size">
 											<input type="radio" name="chartmax" id="chartnormal" onChange="setMainChartMax('normal');">
 											<span class="glyphicon glyphicon-resize-small"></span>

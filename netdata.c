@@ -30,6 +30,7 @@
 #include <syslog.h>
 
 #include <pthread.h>
+#include <zlib.h>
 
 #define RRD_DIMENSION_ABSOLUTE			0
 #define RRD_DIMENSION_INCREMENTAL		1
@@ -77,6 +78,7 @@
 #define D_RRD_STATS 		0x00000040
 #define D_WEB_CLIENT_ACCESS	0x00000080
 #define D_TC_LOOP           0x00000100
+#define D_DEFLATE           0x00000200
 
 #define CT_APPLICATION_JSON				1
 #define CT_TEXT_PLAIN					2
@@ -103,6 +105,7 @@
 
 #define MAX_SOCKET_DATA_LENGTH (256 * 1024)
 #define SOCKET_DATA_LENGTH_INCREASE_STEP 65536
+#define ZLIB_CHUNK 	16384
 
 #define MAX_HTTP_HEADER_SIZE 16384
 
@@ -143,17 +146,17 @@ unsigned long long usecdiff(struct timeval *now, struct timeval *last) {
 
 void log_date()
 {
-        char outstr[200];
-        time_t t;
-        struct tm *tmp;
+		char outstr[200];
+		time_t t;
+		struct tm *tmp;
 
-        t = time(NULL);
-        tmp = localtime(&t);
+		t = time(NULL);
+		tmp = localtime(&t);
 
-        if (tmp == NULL) return;
-        if (strftime(outstr, sizeof(outstr), "%y-%m-%d %H:%M:%S", tmp) == 0) return;
+		if (tmp == NULL) return;
+		if (strftime(outstr, sizeof(outstr), "%y-%m-%d %H:%M:%S", tmp) == 0) return;
 
-        fprintf(stderr, "%s: ", outstr);
+		fprintf(stderr, "%s: ", outstr);
 }
 
 #define debug(args...)  debug_int(__FILE__, __FUNCTION__, __LINE__, ##args)
@@ -162,42 +165,42 @@ void debug_int( const char *file, const char *function, const unsigned long line
 {
 	if(silent) return;
 
-    va_list args;
+	va_list args;
 
-    if(DEBUG & type) {
-        log_date();
-        va_start( args, fmt );
-        fprintf(stderr, "DEBUG (%04lu@%-15.15s): ", line, function);
-        vfprintf( stderr, fmt, args );
-        va_end( args );
-        fprintf(stderr, "\n");
-    }
+	if(DEBUG & type) {
+		log_date();
+		va_start( args, fmt );
+		fprintf(stderr, "DEBUG (%04lu@%-15.15s): ", line, function);
+		vfprintf( stderr, fmt, args );
+		va_end( args );
+		fprintf(stderr, "\n");
+	}
 }
 
 #define error(args...)  error_int(__FILE__, __FUNCTION__, __LINE__, ##args)
 
 void error_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... )
 {
-    va_list args;
+	va_list args;
 
 	if(!silent) {
-	    log_date();
+		log_date();
 
-	    va_start( args, fmt );
-	    fprintf(stderr, "ERROR (%04lu@%-15.15s): ", line, function);
-	    vfprintf( stderr, fmt, args );
-	    va_end( args );
+		va_start( args, fmt );
+		fprintf(stderr, "ERROR (%04lu@%-15.15s): ", line, function);
+		vfprintf( stderr, fmt, args );
+		va_end( args );
 
-	    if(errno) {
-	            fprintf(stderr, " (errno %d, %s)\n", errno, strerror(errno));
-	            errno = 0;
-	    }
-	    else fprintf(stderr, "\n");
+		if(errno) {
+				fprintf(stderr, " (errno %d, %s)\n", errno, strerror(errno));
+				errno = 0;
+		}
+		else fprintf(stderr, "\n");
 	}
 
-    va_start( args, fmt );
+	va_start( args, fmt );
 	vsyslog(LOG_ERR,  fmt, args );
-    va_end( args );
+	va_end( args );
 }
 
 #define fatal(args...)  fatal_int(__FILE__, __FUNCTION__, __LINE__, ##args)
@@ -218,9 +221,9 @@ void fatal_int( const char *file, const char *function, const unsigned long line
 		fprintf(stderr, "\n");
 	}
 
-    va_start( args, fmt );
+	va_start( args, fmt );
 	vsyslog(LOG_CRIT,  fmt, args );
-    va_end( args );
+	va_end( args );
 
 	exit(EXIT_FAILURE);
 }
@@ -302,31 +305,31 @@ char *url_decode(char *str) {
 
 int create_listen_socket(int port)
 {
-        int sock=-1;
-        int sockopt=1;
-        struct sockaddr_in name;
+		int sock=-1;
+		int sockopt=1;
+		struct sockaddr_in name;
 
-        debug(D_LISTENER, "Creating new listening socket on port %d", port);
+		debug(D_LISTENER, "Creating new listening socket on port %d", port);
 
-        sock = socket(AF_INET, SOCK_STREAM, 0);
-        if (sock < 0)
-                fatal("socket() failed, errno=%d", errno);
+		sock = socket(AF_INET, SOCK_STREAM, 0);
+		if (sock < 0)
+				fatal("socket() failed, errno=%d", errno);
 
-        /* avoid "address already in use" */
-        setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt));
+		/* avoid "address already in use" */
+		setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt));
 
-        memset(&name, 0, sizeof(struct sockaddr_in));
-        name.sin_family = AF_INET;
-        name.sin_port = htons (port);
-        name.sin_addr.s_addr = htonl (INADDR_ANY);
-        if (bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0)
-            fatal("bind() failed, errno=%d", errno);
+		memset(&name, 0, sizeof(struct sockaddr_in));
+		name.sin_family = AF_INET;
+		name.sin_port = htons (port);
+		name.sin_addr.s_addr = htonl (INADDR_ANY);
+		if (bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0)
+			fatal("bind() failed, errno=%d", errno);
 
-        if (listen(sock, LISTEN_BACKLOG) < 0)
+		if (listen(sock, LISTEN_BACKLOG) < 0)
 			fatal("listen() failed, errno=%d", errno);
 
-        debug(D_LISTENER, "Listening Port %d created", port);
-        return sock;
+		debug(D_LISTENER, "Listening Port %d created", port);
+		return sock;
 }
 
 
@@ -823,19 +826,19 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 			sprintf(dtm, "\"Date(%d, %d, %d, %d, %d, %d, %d)\"", tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(st->times[t].tv_usec / 1000)); // datetime
 			// strftime(dtm, 200, "\"Date(%Y, %m, %d, %H, %M, %S)\"", tm); // datetime
 			// strftime(dtm, 200, "[%H, %M, %S, 0]", tm); // timeofday
- 			i += sprintf(&b[i], "%s		{\"c\":[{\"v\":%s}", printed?"]},\n":"", dtm);
+			i += sprintf(&b[i], "%s		{\"c\":[{\"v\":%s}", printed?"]},\n":"", dtm);
 
- 			printed++;
- 		}
+			printed++;
+		}
 
- 		// if we need a PCENT_OVER_TOTAL, calculate the totals for the current and the last
- 		long double total = 0, oldtotal = 0;
- 		if(we_need_totals) {
+		// if we need a PCENT_OVER_TOTAL, calculate the totals for the current and the last
+		long double total = 0, oldtotal = 0;
+		if(we_need_totals) {
 			for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 				total    += (long double)rrd_stats_dimension_get(rd, t);
 				oldtotal += (long double)rrd_stats_dimension_get(rd, lt);
 			}
- 		}
+		}
 
 		for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 			//long long oldvalue, value;			// temp variable for storing data values
@@ -845,7 +848,7 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 			oldvalue = (long double)rrd_stats_dimension_get(rd, lt);
 
 			switch(rd->type) {
- 				case RRD_DIMENSION_PCENT_OVER_TOTAL:
+				case RRD_DIMENSION_PCENT_OVER_TOTAL:
 					value = (long double)100 * (value - oldvalue) / (total - oldtotal);
 					break;
 
@@ -884,10 +887,10 @@ size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_s
 		}
 	}
 	if(printed) i += sprintf(&b[i], "]}");
- 	i += sprintf(&b[i], "\n	]\n}\n");
+	i += sprintf(&b[i], "\n	]\n}\n");
 
 	pthread_mutex_unlock(&st->mutex);
- 	return(i);
+	return(i);
 }
 
 // ----------------------------------------------------------------------------
@@ -968,6 +971,13 @@ struct web_client {
 	int ofd;
 
 	struct web_buffer *data;
+
+	int zoutput;					// if set to 1, web_client_send() will send compressed data
+	z_stream zstream;				// zlib stream for sending compressed output to client
+	Bytef zbuffer[ZLIB_CHUNK];		// temporary buffer for storing compressed output
+	size_t zsent;					// the compressed bytes we have sent to the client
+	size_t zhave;					// the compressed bytes that we have to send
+	int zinitialized;
 
 	int wait_receive;
 	int wait_send;
@@ -1057,7 +1067,7 @@ int mysendfile(struct web_client *w, char *filename)
 	while (filename[0] == '/') filename = &filename[1];
 
 	// if the filename contain known paths, skip them
-	     if(strncmp(filename, WEB_PATH_DATA "/",  strlen(WEB_PATH_DATA)  + 1) == 0) filename = &filename[strlen(WEB_PATH_DATA)  + 1];
+		 if(strncmp(filename, WEB_PATH_DATA "/",  strlen(WEB_PATH_DATA)  + 1) == 0) filename = &filename[strlen(WEB_PATH_DATA)  + 1];
 	else if(strncmp(filename, WEB_PATH_GRAPH "/", strlen(WEB_PATH_GRAPH) + 1) == 0) filename = &filename[strlen(WEB_PATH_GRAPH) + 1];
 	else if(strncmp(filename, WEB_PATH_FILE "/",  strlen(WEB_PATH_FILE)  + 1) == 0) filename = &filename[strlen(WEB_PATH_FILE)  + 1];
 
@@ -1110,7 +1120,7 @@ int mysendfile(struct web_client *w, char *filename)
 	syslog(LOG_NOTICE, "%llu: Sending file '%s' to client %s.", w->id, filename, w->client_ip);
 
 	// pick a Content-Type for the file
-	     if(strstr(filename, ".html") != NULL)	w->data->contenttype = CT_TEXT_HTML;
+		 if(strstr(filename, ".html") != NULL)	w->data->contenttype = CT_TEXT_HTML;
 	else if(strstr(filename, ".js")   != NULL)	w->data->contenttype = CT_APPLICATION_X_JAVASCRIPT;
 	else if(strstr(filename, ".css")  != NULL)	w->data->contenttype = CT_TEXT_CSS;
 	else if(strstr(filename, ".xml")  != NULL)	w->data->contenttype = CT_TEXT_XML;
@@ -1145,7 +1155,10 @@ char *mystrsep(char **ptr, char *s)
 
 void web_client_reset(struct web_client *w)
 {
+	debug(D_WEB_CLIENT, "%llu: Reseting client.", w->id);
+
 	if(w->mode == WEB_CLIENT_MODE_FILECOPY) {
+		debug(D_WEB_CLIENT, "%llu: Closing filecopy input file.", w->id);
 		close(w->ifd);
 		w->ifd = w->ofd;
 	}
@@ -1162,6 +1175,65 @@ void web_client_reset(struct web_client *w)
 
 	w->wait_receive = 1;
 	w->wait_send = 0;
+
+	// if we had enabled compression, release it
+	if(w->zinitialized) {
+		debug(D_DEFLATE, "%llu: Reseting compression.", w->id);
+		deflateEnd(&w->zstream);
+		w->zoutput = 0;
+		w->zsent = 0;
+		w->zhave = 0;
+		w->zstream.avail_in = 0;
+		w->zstream.avail_out = 0;
+		w->zstream.total_in = 0;
+		w->zstream.total_out = 0;
+		w->zinitialized = 0;
+	}
+}
+
+void web_client_enable_deflate(struct web_client *w) {
+	if(w->zinitialized == 1) {
+		error("%llu: Compression has already be initialized for this client.", w->id);
+		return;
+	}
+
+	if(w->data->sent) {
+		error("%llu: Cannot enable compression in the middle of a conversation.", w->id);
+		return;
+	}
+
+	w->zstream.zalloc = Z_NULL;
+	w->zstream.zfree = Z_NULL;
+	w->zstream.opaque = Z_NULL;
+
+	w->zstream.next_in = (Bytef *)w->data->buffer;
+	w->zstream.avail_in = 0;
+	w->zstream.total_in = 0;
+
+	w->zstream.next_out = w->zbuffer;
+	w->zstream.avail_out = 0;
+	w->zstream.total_out = 0;
+
+	w->zstream.zalloc = Z_NULL;
+	w->zstream.zfree = Z_NULL;
+	w->zstream.opaque = Z_NULL;
+
+//	if(deflateInit(&w->zstream, Z_DEFAULT_COMPRESSION) != Z_OK) {
+//		error("%llu: Failed to initialize zlib. Proceeding without compression.", w->id);
+//		return;
+//	}
+
+	// Select GZIP compression: windowbits = 15 + 16 = 31
+	if(deflateInit2(&w->zstream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 31, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
+		error("%llu: Failed to initialize zlib. Proceeding without compression.", w->id);
+		return;
+	}
+
+	w->zsent = 0;
+	w->zoutput = 1;
+	w->zinitialized = 1;
+
+	debug(D_DEFLATE, "%llu: Initialized compression.", w->id);
 }
 
 void web_client_process(struct web_client *w)
@@ -1169,13 +1241,19 @@ void web_client_process(struct web_client *w)
 	int code = 500;
 	int bytes;
 
+	w->wait_receive = 0;
+
 	// check if we have an empty line (end of HTTP header)
 	if(strstr(w->data->buffer, "\r\n\r\n")) {
 		debug(D_WEB_DATA, "%llu: Processing data buffer of %d bytes: '%s'.", w->id, w->data->bytes, w->data->buffer);
 
 		// check if the client requested keep-alive HTTP
-		if(strcasestr(w->data->buffer, "Connection: keep-alive") == 0) w->keepalive = 0;
-		else w->keepalive = 1;
+		if(strcasestr(w->data->buffer, "Connection: keep-alive")) w->keepalive = 1;
+		else w->keepalive = 0;
+
+		// check if the client accepts deflate
+		if(strstr(w->data->buffer, "gzip"))
+			web_client_enable_deflate(w);
 
 		char *buf = w->data->buffer;
 		char *tok = strsep(&buf, " \r\n");
@@ -1343,11 +1421,11 @@ void web_client_process(struct web_client *w)
 	}
 	else {
 		// wait for more data
+		w->wait_receive = 1;
 		return;
 	}
 
 	w->data->date = time(NULL);
-	w->wait_receive = 0;
 	w->data->sent = 0;
 
 	// prepare the HTTP response header
@@ -1468,18 +1546,31 @@ void web_client_process(struct web_client *w)
 	if(w->mode == WEB_CLIENT_MODE_NORMAL) {
 		headerlen += sprintf(&w->response_header[headerlen],
 			"Expires: %s\r\n"
-			"Cache-Control: private\r\n"
+			"Cache-Control: no-cache\r\n"
 			, date
+			);
+	}
+	else {
+		headerlen += sprintf(&w->response_header[headerlen],
+			"Cache-Control: public\r\n"
 			);
 	}
 
 	// if we know the content length, put it
-	if(w->data->bytes || w->data->rbytes)
+	if(!w->zoutput && (w->data->bytes || w->data->rbytes))
 		headerlen += sprintf(&w->response_header[headerlen],
 			"Content-Length: %ld\r\n"
 			, w->data->bytes?w->data->bytes:w->data->rbytes
 			);
-	else w->keepalive = 0;	// content-length is required for keep-alive
+	else if(!w->zoutput)
+		w->keepalive = 0;	// content-length is required for keep-alive
+
+	if(w->zoutput) {
+		headerlen += sprintf(&w->response_header[headerlen],
+			"Content-Encoding: gzip\r\n"
+			"Transfer-Encoding: chunked\r\n"
+			);
+	}
 
 	headerlen += sprintf(&w->response_header[headerlen], "\r\n");
 
@@ -1488,7 +1579,7 @@ void web_client_process(struct web_client *w)
 	if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0) error("%llu: failed to disable TCP_NODELAY on socket.", w->id);
 
 	// sent the HTTP header
-	debug(D_WEB_CLIENT, "%llu: Sending response HTTP header of size %d.", w->id, headerlen);
+	debug(D_WEB_CLIENT, "%llu: Sending response HTTP header of size %d: '%s'", w->id, headerlen, w->response_header);
 
 	bytes = send(w->ofd, w->response_header, headerlen, 0);
 	if(bytes != headerlen)
@@ -1511,7 +1602,9 @@ void web_client_process(struct web_client *w)
 		case WEB_CLIENT_MODE_FILECOPY:
 			if(w->data->rbytes) {
 				debug(D_WEB_CLIENT, "%llu: Done preparing the response. Will be sending data file of %d bytes to client.", w->id, w->data->rbytes);
+				w->wait_receive = 1;
 
+				/*
 				// utilize the kernel sendfile() for copying the file to the socket.
 				// this block of code can be commented, without anything missing.
 				// when it is commented, the program will copy the data using async I/O.
@@ -1520,6 +1613,7 @@ void web_client_process(struct web_client *w)
 					if(len != w->data->rbytes) error("%llu: sendfile() should copy %ld bytes, but copied %ld. Falling back to manual copy.", w->id, w->data->rbytes, len);
 					else web_client_reset(w);
 				}
+				*/
 			}
 			else
 				debug(D_WEB_CLIENT, "%llu: Done preparing the response. Will be sending an unknown amount of bytes to client.", w->id);
@@ -1531,8 +1625,144 @@ void web_client_process(struct web_client *w)
 	}
 }
 
+void web_client_send_chunk_header(struct web_client *w, int len)
+{
+	debug(D_DEFLATE, "%llu: OPEN CHUNK of %d bytes (hex: %x).", w->id, len, len);
+	char buf[1024]; 
+	sprintf(buf, "%X\r\n", len);
+	int bytes = send(w->ofd, buf, strlen(buf), MSG_DONTWAIT);
+
+	if(bytes > 0) debug(D_DEFLATE, "%llu: Sent chunk header %d bytes.", w->id, bytes);
+	else if(bytes == 0) debug(D_DEFLATE, "%llu: Did not send chunk header to the client.", w->id);
+	else debug(D_DEFLATE, "%llu: Failed to send chunk header to client.", w->id);
+}
+
+void web_client_send_chunk_close(struct web_client *w)
+{
+	debug(D_DEFLATE, "%llu: CLOSE CHUNK.", w->id);
+
+	int bytes = send(w->ofd, "\r\n", 2, MSG_DONTWAIT);
+
+	if(bytes > 0) debug(D_DEFLATE, "%llu: Sent chunk suffix %d bytes.", w->id, bytes);
+	else if(bytes == 0) debug(D_DEFLATE, "%llu: Did not send chunk suffix to the client.", w->id);
+	else debug(D_DEFLATE, "%llu: Failed to send chunk suffix to client.", w->id);
+}
+
+void web_client_send_chunk_finalize(struct web_client *w)
+{
+	debug(D_DEFLATE, "%llu: FINALIZE CHUNK.", w->id);
+
+	int bytes = send(w->ofd, "\r\n0\r\n\r\n", 7, MSG_DONTWAIT);
+
+	if(bytes > 0) debug(D_DEFLATE, "%llu: Sent chunk suffix %d bytes.", w->id, bytes);
+	else if(bytes == 0) debug(D_DEFLATE, "%llu: Did not send chunk suffix to the client.", w->id);
+	else debug(D_DEFLATE, "%llu: Failed to send chunk suffix to client.", w->id);
+}
+
+ssize_t web_client_send_deflate(struct web_client *w)
+{
+	ssize_t bytes;
+
+	// when using compression,
+	// w->data->sent is the amount of bytes passed through compression
+
+	debug(D_DEFLATE, "%llu: TEST w->data->bytes = %d, w->data->sent = %d, w->zhave = %d, w->zsent = %d, w->zstream.avail_in = %d, w->zstream.avail_out = %d, w->zstream.total_in = %d, w->zstream.total_out = %d.", w->id, w->data->bytes, w->data->sent, w->zhave, w->zsent, w->zstream.avail_in, w->zstream.avail_out, w->zstream.total_in, w->zstream.total_out);
+
+	if(w->data->bytes - w->data->sent == 0 && w->zstream.avail_in == 0 && w->zhave == w->zsent && w->zstream.avail_out != 0) {
+		// there is nothing to send
+
+		debug(D_WEB_CLIENT, "%llu: Out of output data.", w->id);
+
+		// finalize the chunk
+		if(w->data->sent != 0)
+			web_client_send_chunk_finalize(w);
+
+		// there can be two cases for this
+		// A. we have done everything
+		// B. we temporarily have nothing to send, waiting for the buffer to be filled by ifd
+
+		if(w->mode == WEB_CLIENT_MODE_FILECOPY && w->wait_receive && w->ifd != w->ofd && w->data->rbytes && w->data->rbytes > w->data->bytes) {
+			// we have to wait, more data will come
+			debug(D_WEB_CLIENT, "%llu: Waiting for more data to become available.", w->id);
+			w->wait_send = 0;
+			return(0);
+		}
+
+		if(w->keepalive == 0) {
+			debug(D_WEB_CLIENT, "%llu: Closing (keep-alive is not enabled). %ld bytes sent.", w->id, w->data->sent);
+			errno = 0;
+			return(-1);
+		}
+
+		// reset the client
+		web_client_reset(w);
+		debug(D_WEB_CLIENT, "%llu: Done sending all data on socket. Waiting for next request on the same socket.", w->id);
+		return(0);
+	}
+
+	if(w->zstream.avail_out == 0 && w->zhave == w->zsent) {
+		// compress more input data
+
+		// close the previous open chunk
+		if(w->data->sent != 0) web_client_send_chunk_close(w);
+
+		debug(D_DEFLATE, "%llu: Compressing %d bytes starting from %d.", w->id, (w->data->bytes - w->data->sent), w->data->sent);
+
+		// give the compressor all the data not passed through the compressor yet
+		if(w->data->bytes > w->data->sent) {
+			w->zstream.next_in = (Bytef *)&w->data->buffer[w->data->sent];
+			w->zstream.avail_in = (w->data->bytes - w->data->sent);
+		}
+
+		// reset the compressor output buffer
+		w->zstream.next_out = w->zbuffer;
+		w->zstream.avail_out = ZLIB_CHUNK;
+
+		// ask for FINISH if we have all the input
+		int flush = Z_SYNC_FLUSH;
+		if(w->mode == WEB_CLIENT_MODE_NORMAL
+			|| (w->mode == WEB_CLIENT_MODE_FILECOPY && w->data->bytes == w->data->rbytes)) {
+			flush = Z_FINISH;
+			debug(D_DEFLATE, "%llu: Requesting Z_FINISH.", w->id);
+		}
+		else {
+			debug(D_DEFLATE, "%llu: Requesting Z_SYNC_FLUSH.", w->id);
+		}
+
+		// compress
+		if(deflate(&w->zstream, flush) == Z_STREAM_ERROR) {
+			error("%llu: Compression failed. Closing down client.", w->id);
+			web_client_reset(w);
+			return(-1);
+		}
+
+		w->zhave = ZLIB_CHUNK - w->zstream.avail_out;
+		w->zsent = 0;
+
+		// keep track of the bytes passed through the compressor
+		w->data->sent = w->data->bytes;
+
+		debug(D_DEFLATE, "%llu: Compression produced %d bytes.", w->id, w->zhave);
+
+		// open a new chunk
+		web_client_send_chunk_header(w, w->zhave);
+	}
+
+	bytes = send(w->ofd, &w->zbuffer[w->zsent], w->zhave - w->zsent, MSG_DONTWAIT);
+	if(bytes > 0) {
+		w->zsent += bytes;
+		debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, bytes);
+	}
+	else if(bytes == 0) debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client.", w->id);
+	else debug(D_WEB_CLIENT, "%llu: Failed to send data to client.", w->id);
+
+	return(bytes);
+}
+
 ssize_t web_client_send(struct web_client *w)
 {
+	if(w->zoutput) return web_client_send_deflate(w);
+
 	ssize_t bytes;
 
 	if(w->data->bytes - w->data->sent == 0) {
@@ -1567,7 +1797,9 @@ ssize_t web_client_send(struct web_client *w)
 		w->data->sent += bytes;
 		debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, bytes);
 	}
-	else if(bytes == 0) debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, bytes);
+	else if(bytes == 0) debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client.", w->id);
+	else debug(D_WEB_CLIENT, "%llu: Failed to send data to client.", w->id);
+
 
 	return(bytes);
 }
@@ -1645,12 +1877,10 @@ void *new_client(void *ptr)
 		FD_SET(w->ifd, &efds);
 		if(w->ifd != w->ofd)	FD_SET(w->ofd, &efds);
 		if (w->wait_receive) {
-			debug(D_WEB_CLIENT, "%llu: Waiting for input (fd %d).", w->id, w->ifd);
 			FD_SET(w->ifd, &ifds);
 			if(w->ifd > fdmax) fdmax = w->ifd;
 		}
 		if (w->wait_send) {
-			debug(D_WEB_CLIENT, "%llu: Waiting for output (fd %d).", w->id, w->ofd);
 			FD_SET(w->ofd, &ofds);
 			if(w->ofd > fdmax) fdmax = w->ofd;
 		}
@@ -1658,7 +1888,7 @@ void *new_client(void *ptr)
 		tv.tv_sec = 30;
 		tv.tv_usec = 0;
 
-		debug(D_WEB_CLIENT, "%llu: Waiting...", w->id);
+		debug(D_WEB_CLIENT, "%llu: Waiting for input: %s, output: %s ...", w->id, w->wait_receive?"YES":"NO", w->wait_send?"YES":"NO");
 		retval = select(fdmax+1, &ifds, &ofds, &efds, &tv);
 
 		if(retval == -1) {
@@ -3105,9 +3335,9 @@ void become_daemon()
 	// Set new file permissions
 	umask(0);
 
-    // close all files
- 	for(i = sysconf(_SC_OPEN_MAX); i > 0; i--)
- 		close(i);
+	// close all files
+	for(i = sysconf(_SC_OPEN_MAX); i > 0; i--)
+		close(i);
 
 	silent = 1;
 }

@@ -39,9 +39,9 @@ echo "Compiling netdata"
 if [ $NETDATA_CONFIG_DEBUG -eq 1 ]
 then
 	ulimit -c unlimited
-	gcc -Wall -ggdb -o netdata netdata.c -lpthread || exit 1
+	gcc -Wall -ggdb -o netdata netdata.c -lpthread -lz || exit 1
 else
-	gcc -Wall -O3 -o netdata netdata.c -lpthread || exit 1
+	gcc -Wall -O3 -o netdata netdata.c -lpthread -lz || exit 1
 fi
 
 # exporting NETDATA variables to netdata
