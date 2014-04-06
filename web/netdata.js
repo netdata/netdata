@@ -2,7 +2,8 @@
 if(!window.console){ window.console = {log: function(){} }; }
 
 // Load the Visualization API and the piechart package.
-google.load('visualization', '1', {'packages':['corechart']});
+google.load('visualization', '1.1', {'packages':['corechart']});
+google.load('visualization', '1.1', {'packages':['controls']});
 
 function canChartBeRefreshed(chart) {
 	// is it enabled?
@@ -23,9 +24,7 @@ function canChartBeRefreshed(chart) {
 	return true;
 }
 
-function refreshChart(chart, doNext) {
-	if(canChartBeRefreshed(chart) == false) return false;
-
+function generateChartURL(chart) {
 	// build the data URL
 	var url = chart.url;
 	url += chart.points_to_show?chart.points_to_show.toString():"all";
@@ -34,8 +33,14 @@ function refreshChart(chart, doNext) {
 	url += "/";
 	url += chart.group_method?chart.group_method:"average";
 
+	return url;
+}
+
+function refreshChart(chart, doNext) {
+	if(canChartBeRefreshed(chart) == false) return false;
+
 	$.ajax({
-		url: url,
+		url: generateChartURL(chart),
 		dataType:"json",
 		cache: false
 	})
@@ -75,6 +80,105 @@ function refreshChart(chart, doNext) {
 
 	return true;
 }
+
+/*
+function showChartWithRange(chart) {
+	var oldgroup = chart.group;
+	var oldpoints = chart.points_to_show;
+	chart.group = 1;
+	chart.points_to_show = 0; // all
+
+	$.ajax({
+		url: generateChartURL(chart),
+		dataType:"json",
+		cache: false
+	})
+	.done(function(jsondata) {
+		chart.jsondata = jsondata;
+
+		chart.control_div = chart.div + "_control";
+		chart.chart_div = chart.div + "_chart";
+
+		var div = document.getElementById(chart.div);
+		div.innerHTML = "<div class=\"maingraph\" id=\"" + chart.chart_div + "\"></div><div class=\"maingraph\" id=\"" + chart.control_div + "\"></div>";
+		//div.width = chart.chartOptions.width;
+		//div.height = chart.chartOptions.height;
+
+		console.log(chart.div);
+		chart.dashboard = new google.visualization.Dashboard(div);
+		console.log('dashboard ok');
+		console.log(chart.dashboard);
+
+		chart.data = new google.visualization.DataTable(chart.jsondata);
+		var range = chart.data.getColumnRange(0);
+
+		chart.control = new google.visualization.ControlWrapper({
+			'controlType': 'ChartRangeFilter',
+			'containerId': chart.control_div,
+			'options': {
+				// Filter by the date axis.
+				'filterColumnIndex': 0,
+				'ui': {
+					'chartType': 'AreaChart',
+					'chartOptions': {
+						'height': chart.chartOptions.height * 0.15,
+						'width': chart.chartOptions.width,
+						'chartArea': {'width': "90%"},
+						'hAxis': {'baselineColor': 'none'}
+					},
+					
+					//'chartView': {
+					//	'columns': [0, 1]
+					//},
+
+					// 1 day in milliseconds = 24 * 60 * 60 * 1000 = 86,400,000
+					//'minRangeSize': 86400000
+				}
+			},
+
+			// Initial range: 2012-02-09 to 2012-03-20.
+			'state': {'range': {'start': range.min, 'end': range.max}}
+		});
+		console.log('control ok');
+		console.log(chart.control);
+
+		var columns = new Array();
+		var i;
+		for (i = 0; i < chart.data.getNumberOfColumns(); i++)
+			columns[i] = i;
+
+		columns[0] = {
+			'calc': function(dataTable, rowIndex) {
+				return dataTable.getFormattedValue(rowIndex, 0);
+			},
+			'type': 'string'
+		};
+
+		
+		chart.chartOptions.height = chart.chartOptions.height * 0.85;
+		chart.chartOptions.chartArea = {'height': "80%", 'width': "90%"};
+		chart.chartOptions.legend = 'none';
+
+		chart.chartwrap = new google.visualization.ChartWrapper({
+			'chartType': chart.chartType,
+			'containerId': chart.chart_div,
+			'options': chart.chartOptions,
+		});
+		console.log('chart ok');
+		console.log(chart.chartwrap);
+
+		chart.dashboard.bind(chart.control, chart.chartwrap);
+		console.log('bind ok');
+
+		chart.dashboard.draw(chart.data);
+		console.log('draw ok');
+
+		// restore what we changed
+		chart.group = oldgroup;
+		chart.points_to_show = oldpoints;
+	});
+}
+*/
 
 // loadCharts()
 // fetches all the charts from the server

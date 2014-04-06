@@ -65,6 +65,7 @@
 
 		if(mainchart.chartOptions.isStacked) mainchart.group = 15;
 		//mainchart.chartOptions.titlePosition = 'none';
+		mainchart.chartOptions.explorer = null;
 
 		// initialize the div
 		showChartIsLoading(mainchart.div, mainchart.chartOptions.width, mainchart.chartOptions.height);
@@ -72,11 +73,9 @@
 		document.getElementById('maingraph_title').innerHTML = " " + mainchart.title + " ";
 
 		// set the radio buttons
-		if(mainchart.group_method == 'average')	$('#groupaverage').trigger('click');
-		else $('#groupmax').trigger('click');
+		setMainChartGroupMethod(mainchart.group_method, 'no-refresh');
 
 		$('#group' + mainchart.group).trigger('click');
-
 		$('#chartnormal').trigger('click');
 
 		showMainGraph();
@@ -86,8 +85,14 @@
 		mainChart(mycharts[i]);
 	}
 
+	var last_main_chart_max='normal';
 	function setMainChartMax(m) {
 		if(!mainchart) return;
+
+		if(m == 'toggle') {
+			if(last_main_chart_max == 'maximized') m = 'normal';
+			else m = 'maximized';
+		}
 
 		if(m == "maximized") {
 			mainchart.chartOptions.theme = 'maximized';
@@ -102,6 +107,8 @@
 			mainchart.chartOptions.hAxis.viewWindowMode = null;
 			mainchart.chartOptions.vAxis.viewWindowMode = null;
 		}
+		$('.mainchart_max_button').button(m);
+		last_main_chart_max = m;
 		mainchart.last_updated = 0;
 	}
 
@@ -114,13 +121,59 @@
 		chartsRefresh();
 	}
 
-	function setMainChartGroupMethod(g) {
+	var last_main_chart_avg = null;
+	function setMainChartGroupMethod(g, norefresh) {
 		if(!mainchart) return;
 
-		mainchart.group_method = g;
-		mainchart.last_updated = 0;
+		if(g == 'toggle') {
+			if(last_main_chart_avg == 'max') g = 'average';
+			else g = 'max';
+		}
 
+		mainchart.group_method = g;
+
+		$('.mainchart_avg_button').button(g);
+
+		if(!norefresh) {
+			mainchart.last_updated = 0;
+			chartsRefresh();
+		}
+
+		last_main_chart_avg = g;
+	}
+
+	var stop_refreshing = 0;
+	function playGraphs() {
+		stop_refreshing = 0;
+		$('.mainchart_play_button').button('play');
 		chartsRefresh();
+	}
+	function pauseGraphs() {
+		stop_refreshing = 1;
+		$('.mainchart_play_button').button('pause');
+	}
+
+	function setMainChartPlay(p) {
+		if(!mainchart) return;
+
+		if(p == 'toggle') {
+			if(stop_refreshing) p = 'play';
+			else p = 'pause';
+		}
+
+		if(p == 'play') {
+			mainchart.chartOptions.explorer = null;
+			playGraphs();
+		}
+		else {
+			mainchart.chartOptions.explorer = {
+				'axis': 'horizontal',
+				'maxZoomOut': 1,
+			};
+			mainchart.last_updated = 0;
+			refreshChart(mainchart, pauseGraphs);
+		}
+		last_main_chart_play = p;
 	}
 
 	// refresh the main chart
@@ -138,6 +191,9 @@
 			mainchart.points_to_show = MAINCHART_MAX_TIME_TO_SHOW / mainchart.group;
 
 		if(!refreshChart(mainchart, triggerRefresh)) triggerRefresh();
+
+		// FIXME for controlled charts
+		// showChartWithRange(mainchart);
 	}
 
 	function screenWidth() {
@@ -176,6 +232,8 @@
 				c.last_updated = 0;
 			}
 		});
+
+		playGraphs();
 	}
 
 	// load the charts from the server
@@ -293,6 +351,8 @@
 	// refresh the proper chart
 	var timeout;
 	function chartsRefresh() {
+		if(stop_refreshing) return;
+
 		if(timeout) {
 			clearTimeout(timeout);
 			timeout = null;
@@ -325,7 +385,7 @@
 		document.getElementById('maingraph_container').style.display = 'block';
 		document.getElementById('thumbgraphs_container').style.display = 'none';
 
-		chartsRefresh();
+		playGraphs();
 	}
 
 	function showThumbGraphs() {
@@ -341,7 +401,7 @@
 			mainchart = null;
 		}
 
-		chartsRefresh();
+		playGraphs();
 	}
 
 	</script>
@@ -380,11 +440,23 @@
 			<tr><td>
 		    	<div class="maingraph">
 					<table>
-						<tr><td><div class="maingraph" id="maingraph"></div></td></tr>
+						<tr><td>
+						<div class="maingraph" id="maingraph"></div>
+						</td></tr>
 						<tr><td align="center">
 							<div class="btn-group">
 								<form id="mainchartform">
-									<div class="btn-group btn-group-xs" data-toggle="buttons">
+									<div class="btn-group btn-group-xs" data-toggle="buttons" >
+										<button type="button" class="btn btn-primary mainchart_play_button" data-toggle="tooltip" title=" click <span class='glyphicon glyphicon-play'></span> to have the graph auto-refresh, or click <span class='glyphicon glyphicon-pause'></span> to pause the graph. When paused the graph can be zoomed and panned horizontally." data-play-text="<span class='glyphicon glyphicon-pause'></span>" data-pause-text="<span class='glyphicon glyphicon-play'></span>" onClick="setMainChartPlay('toggle');">
+											<span class="glyphicon glyphicon-pause"></span>
+										</button>
+									</div>
+									<div class="btn-group btn-group-xs" data-toggle="buttons" >
+										<button type="button" class="btn btn-primary mainchart_avg_button" data-toggle="tooltip" title="use the maximum ( <span class='glyphicon glyphicon-signal'></span> ) or the average ( <span class='glyphicon glyphicon-align-justify'></span> ) value of grouped points" data-max-text="<span class='glyphicon glyphicon-signal'></span>" data-average-text="<span class='glyphicon glyphicon-align-justify'></span>" onClick="setMainChartGroupMethod('toggle');">
+											<span class="glyphicon glyphicon-signal"></span>
+										</button>
+									</div>
+<!--									<div class="btn-group btn-group-xs" data-toggle="buttons">
 										<label class="btn btn-primary" data-toggle="tooltip" title="show the MAX point among all points grouped">
 											<input type="radio" name="groupmethod" id="groupmax" onChange="setMainChartGroupMethod('max');">
 											<span class="glyphicon glyphicon-signal"></span>
@@ -394,7 +466,7 @@
 											<span class="glyphicon glyphicon-align-justify"></span>
 										</label>
 									</div>
-									<div class="btn-group btn-group-xs" data-toggle="buttons" >
+-->									<div class="btn-group btn-group-xs" data-toggle="buttons" >
 										<label class="btn btn-primary" data-toggle="tooltip" title="do not group points, show the raw data">
 											<input type="radio" name="group" id="group1" onChange="setMainChartGroup(1);">1
 										</label>
@@ -426,6 +498,11 @@
 										</label>
 									</div>
 									<div class="btn-group btn-group-xs" data-toggle="buttons" >
+										<button type="button" class="btn btn-primary mainchart_max_button" data-toggle="tooltip" title="maximized ( <span class='glyphicon glyphicon-fullscreen'></span> ) or normal ( <span class='glyphicon glyphicon-resize-small'></span> ) view of the graph" data-maximized-text="<span class='glyphicon glyphicon-resize-small'></span>" data-normal-text="<span class='glyphicon glyphicon-fullscreen'></span>" onClick="setMainChartMax('toggle');">
+											<span class="glyphicon glyphicon-fullscreen"></span>
+										</button>
+									</div>
+<!--									<div class="btn-group btn-group-xs" data-toggle="buttons" >
 										<label class="btn btn-primary" data-toggle="tooltip" title="NORMAL chart size">
 											<input type="radio" name="chartmax" id="chartnormal" onChange="setMainChartMax('normal');">
 											<span class="glyphicon glyphicon-resize-small"></span>
@@ -435,7 +512,7 @@
 											<span class="glyphicon glyphicon-fullscreen"></span>
 										</label>
 									</div>
-								</form>
+-->								</form>
 							</div>
 							</td></tr>
 					</table>
@@ -468,7 +545,7 @@
 		$(document).ready(function(){
 			document.getElementById('splash').height = $(window).height();
 
-			$('[data-toggle="tooltip"]').tooltip({'placement': 'top', 'container': 'body'});
+			$('[data-toggle="tooltip"]').tooltip({'placement': 'top', 'container': 'body', 'html': true});
 		});
 
 	</script>
