@@ -74,9 +74,9 @@
 
 		// set the radio buttons
 		setMainChartGroupMethod(mainchart.group_method, 'no-refresh');
+		setMainChartMax('normal');
 
 		$('#group' + mainchart.group).trigger('click');
-		$('#chartnormal').trigger('click');
 
 		showMainGraph();
 	}
