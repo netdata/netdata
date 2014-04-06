@@ -225,7 +225,7 @@ function loadCharts(base_url, doNext) {
 			json.charts[i].chartOptions = {
 				width: 400,
 				height: 200,
-				lineWidth: 2,
+				lineWidth: 1,
 				title: json.charts[i].title,
 				hAxis: {title: "Time of Day", viewWindowMode: 'maximized', format:'HH:mm:ss'},
 				vAxis: {title: json.charts[i].vtitle, minValue: 0},
@@ -247,7 +247,7 @@ function loadCharts(base_url, doNext) {
 				
 				// default for all LineChart
 				json.charts[i].chartType = "LineChart";
-				json.charts[i].chartOptions.lineWidth = 3;
+				json.charts[i].chartOptions.lineWidth = 2;
 				json.charts[i].chartOptions.curveType = 'function';
 			}
 			else if(json.charts[i].type == "tc" || json.charts[i].type == "cpu") {
@@ -273,7 +273,7 @@ function loadCharts(base_url, doNext) {
 				case "cpu":
 					json.charts[i].category = "CPU";
 					json.charts[i].glyphicon = "glyphicon-dashboard";
-					json.charts[i].group = 10;
+					json.charts[i].group = 5;
 
 					if(json.charts[i].id.substring(0, 7) == "cpu.cpu") {
 						json.charts[i].chartOptions.vAxis.minValue = 0;
@@ -284,7 +284,7 @@ function loadCharts(base_url, doNext) {
 				case "tc":
 					json.charts[i].category = "Quality of Service";
 					json.charts[i].glyphicon = "glyphicon-random";
-					json.charts[i].group = 30;
+					json.charts[i].group = 15;
 					break;
 
 				case "net":
@@ -301,31 +301,31 @@ function loadCharts(base_url, doNext) {
 				case "ipv4":
 					json.charts[i].category = "IPv4";
 					json.charts[i].glyphicon = "glyphicon-globe";
-					json.charts[i].group = 10;
+					json.charts[i].group = 5;
 					break;
 
 				case "conntrack":
 					json.charts[i].category = "Netfilter";
 					json.charts[i].glyphicon = "glyphicon-cloud";
-					json.charts[i].group = 10;
+					json.charts[i].group = 5;
 					break;
 
 				case "ipvs":
 					json.charts[i].category = "IPVS";
 					json.charts[i].glyphicon = "glyphicon-sort";
-					json.charts[i].group = 10;
+					json.charts[i].group = 5;
 					break;
 
 				case "disk":
 					json.charts[i].category = "Disk I/O";
 					json.charts[i].glyphicon = "glyphicon-hdd";
-					json.charts[i].group = 10;
+					json.charts[i].group = 5;
 					break;
 
 				default:
 					json.charts[i].category = "Unknown";
 					json.charts[i].glyphicon = "glyphicon-search";
-					json.charts[i].group = 15;
+					json.charts[i].group = 5;
 					break;
 			}
 		});

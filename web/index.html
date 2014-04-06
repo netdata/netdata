@@ -59,11 +59,11 @@
 		mainchart.chartOptions.height = $(window).height() - 200;
 		if(mainchart.chartOptions.height < 300) mainchart.chartOptions.height = 300;
 		
-		mainchart.group = 5;
+		mainchart.group = 2;
 		mainchart.div = 'maingraph';
 		mainchart.last_updated = 0;
 
-		if(mainchart.chartOptions.isStacked) mainchart.group = 15;
+		if(mainchart.chartOptions.isStacked) mainchart.group = 5;
 		//mainchart.chartOptions.titlePosition = 'none';
 		mainchart.chartOptions.explorer = null;
 
