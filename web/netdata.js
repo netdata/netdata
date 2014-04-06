@@ -255,7 +255,7 @@ function loadCharts(base_url, doNext) {
 				// default for all stacked AreaChart
 				json.charts[i].chartType = "AreaChart";
 				json.charts[i].chartOptions.isStacked = true;
-				json.charts[i].chartOptions.areaOpacity = 1.0;
+				json.charts[i].chartOptions.areaOpacity = 0.85;
 				json.charts[i].chartOptions.lineWidth = 1;
 
 				json.charts[i].group_method = "average";
