@@ -729,172 +729,9 @@ long long rrd_stats_dimension_get(RRD_DIMENSION *rd, size_t position)
 		return(0);
 }
 
-size_t rrd_stats_json(RRD_STATS *st, char *b, size_t length, size_t entries_to_show, size_t group_count, int group_method)
-{
-	pthread_mutex_lock(&st->mutex);
-
-	// check the options
-	if(entries_to_show <= 0) entries_to_show = 1;
-	if(group_count <= 0) group_count = 1;
-	if(group_count > st->entries / 20) group_count = st->entries / 20;
-
-	size_t i = 0;				// the bytes of JSON output we have generated so far
-	size_t printed = 0;			// the lines of JSON data we have generated so far
-
-	size_t current_entry = st->current_entry;
-	size_t t, lt;				// t = the current entry, lt = the lest entry of data
-	long count = st->entries;	// count down of the entries examined so far
-	long pad = 0;				// align the entries when grouping values together
-
-	RRD_DIMENSION *rd;
-	size_t c = 0;				// counter for dimension loops
-	size_t dimensions = 0;		// the total number of dimensions present
-
-	unsigned long long usec = 0;// usec between the entries
-	char dtm[201];				// temp variable for storing dates
-
-	int we_need_totals = 0;		// if set, we should calculate totals for all dimensions
-
-	// find how many dimensions we have
-	for( rd = st->dimensions ; rd ; rd = rd->next) {
-		dimensions++;
-		if(rd->type == RRD_DIMENSION_PCENT_OVER_TOTAL) we_need_totals++;
-	}
-
-	if(!dimensions) {
-		pthread_mutex_unlock(&st->mutex);
-		return sprintf(b, "No dimensions yet.");
-	}
-
-	// temporary storage to keep track of group values and counts
-	long double group_values[dimensions];
-	int group_counts[dimensions];
-	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
-		group_values[c] = group_counts[c] = 0;
-
-	i += sprintf(&b[i], "{\n	\"cols\":\n	[\n");
-	i += sprintf(&b[i], "		{\"id\":\"\",\"label\":\"time\",\"pattern\":\"\",\"type\":\"datetime\"}");
-
-	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
-		if(!rd->hidden)
-			i += sprintf(&b[i], ",\n		{\"id\":\"\",\"label\":\"%s\",\"pattern\":\"\",\"type\":\"number\"}", rd->name);
-
-	i += sprintf(&b[i], "	],\n	\"rows\":\n	[\n");
-
-	// to allow grouping on the same values, we need a pad
-	pad = current_entry % group_count;
-
-	// make sure current_entry is within limits
-	if(current_entry < 0 || current_entry >= st->entries) current_entry = 0;
-
-	// find the old entry of the round-robin
-	t = current_entry + 1;
-	if(t >= st->entries) t = 0;
-	lt = t;
-
-	// find the current entry
-	t++;
-	if(t >= st->entries) t = 0;
-
-	// the loop in dimension data
-	count -= 2;
-	for ( ; t != current_entry && count >= 0 ; lt = t++, count--) {
-		if(t >= st->entries) t = 0;
-
-		// if the last is empty, loop again
-		if(!st->times[lt].tv_sec) continue;
-
-		// check if we may exceed the buffer provided
-		if((length - i) < 1024) break;
-
-		// prefer the most recent last entries
-		if(((count-pad) / group_count) > entries_to_show) continue;
-
-
-		// ok. we will use this entry!
-		// find how much usec since the previous entry
-
-		usec = usecdiff(&st->times[t], &st->times[lt]);
-
-		if(((count-pad) % group_count) == 0) {
-			if(printed >= entries_to_show) break;
-
-			// generate the local date time
-			struct tm *tm = localtime(&st->times[t].tv_sec);
-			if(!tm) { error("localtime() failed."); continue; }
-
-			sprintf(dtm, "\"Date(%d, %d, %d, %d, %d, %d, %d)\"", tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(st->times[t].tv_usec / 1000)); // datetime
-			// strftime(dtm, 200, "\"Date(%Y, %m, %d, %H, %M, %S)\"", tm); // datetime
-			// strftime(dtm, 200, "[%H, %M, %S, 0]", tm); // timeofday
-			i += sprintf(&b[i], "%s		{\"c\":[{\"v\":%s}", printed?"]},\n":"", dtm);
-
-			printed++;
-		}
-
-		// if we need a PCENT_OVER_TOTAL, calculate the totals for the current and the last
-		long double total = 0, oldtotal = 0;
-		if(we_need_totals) {
-			for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
-				total    += (long double)rrd_stats_dimension_get(rd, t);
-				oldtotal += (long double)rrd_stats_dimension_get(rd, lt);
-			}
-		}
-
-		for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
-			//long long oldvalue, value;			// temp variable for storing data values
-			long double oldvalue, value;			// temp variable for storing data values
-
-			value    = (long double)rrd_stats_dimension_get(rd, t);
-			oldvalue = (long double)rrd_stats_dimension_get(rd, lt);
-
-			switch(rd->type) {
-				case RRD_DIMENSION_PCENT_OVER_TOTAL:
-					value = (long double)100 * (value - oldvalue) / (total - oldtotal);
-					break;
-
-				case RRD_DIMENSION_INCREMENTAL:
-					if(oldvalue > value) value = 0;	// detect overflows and resets
-					else value -= oldvalue;
-					value = value * (long double)1000000L / (long double)usec;
-					break;
-
-				default:
-					break;
-			}
-
-			value = value * (long double)rd->multiplier / (long double)rd->divisor;
-
-			group_counts[c]++;
-			switch(group_method) {
-				case GROUP_MAX:
-					if(abs(value) > abs(group_values[c])) group_values[c] = value;
-					break;
-
-				default:
-				case GROUP_AVERAGE:
-					group_values[c] += value;
-					if(((count - pad) % group_count) == 0) group_values[c] /= (long double)group_counts[c];
-					break;
-			}
-
-			if(((count-pad) % group_count) == 0) {
-				if(!rd->hidden)
-					i += sprintf(&b[i], ",{\"v\":%0.1Lf}", group_values[c]);
-					//i += sprintf(&b[i], ",{\"v\":%lld}", group_values[c]);
-
-				group_values[c] = group_counts[c] = 0;
-			}
-		}
-	}
-	if(printed) i += sprintf(&b[i], "]}");
-	i += sprintf(&b[i], "\n	]\n}\n");
-
-	pthread_mutex_unlock(&st->mutex);
-	return(i);
-}
 
 // ----------------------------------------------------------------------------
-// listener (web server)
+// web buffer
 
 struct web_buffer {
 	size_t size;	// allocation size of buffer
@@ -1016,7 +853,7 @@ struct web_client *web_client_create(int listener)
 	strncpy(w->client_ip, inet_ntoa(w->clientaddr.sin_addr), 100);
 	w->client_ip[100] = '\0';
 
-	syslog(LOG_NOTICE, "%llu: New client from %s.", w->id, w->client_ip);
+	// syslog(LOG_NOTICE, "%llu: New client from %s.", w->id, w->client_ip);
 	debug(D_WEB_CLIENT_ACCESS, "%llu: New web client from %s on socket %d.", w->id, w->client_ip, w->ifd);
 
 	{
@@ -1057,6 +894,172 @@ struct web_client *web_client_free(struct web_client *w)
 	free(w);
 
 	return(n);
+}
+
+size_t rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show, size_t group_count, int group_method)
+{
+	char *b = wb->buffer;
+
+	pthread_mutex_lock(&st->mutex);
+
+	// check the options
+	if(entries_to_show <= 0) entries_to_show = 1;
+	if(group_count <= 0) group_count = 1;
+	if(group_count > st->entries / 20) group_count = st->entries / 20;
+
+	size_t i = 0;				// the bytes of JSON output we have generated so far
+	size_t printed = 0;			// the lines of JSON data we have generated so far
+
+	size_t current_entry = st->current_entry;
+	size_t t, lt;				// t = the current entry, lt = the lest entry of data
+	long count = st->entries;	// count down of the entries examined so far
+	long pad = 0;				// align the entries when grouping values together
+
+	RRD_DIMENSION *rd;
+	size_t c = 0;				// counter for dimension loops
+	size_t dimensions = 0;		// the total number of dimensions present
+
+	unsigned long long usec = 0;// usec between the entries
+	char dtm[201];				// temp variable for storing dates
+
+	int we_need_totals = 0;		// if set, we should calculate totals for all dimensions
+
+	// find how many dimensions we have
+	for( rd = st->dimensions ; rd ; rd = rd->next) {
+		dimensions++;
+		if(rd->type == RRD_DIMENSION_PCENT_OVER_TOTAL) we_need_totals++;
+	}
+
+	if(!dimensions) {
+		pthread_mutex_unlock(&st->mutex);
+		return (wb->bytes = sprintf(b, "No dimensions yet."));
+	}
+
+	// temporary storage to keep track of group values and counts
+	long double group_values[dimensions];
+	int group_counts[dimensions];
+	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
+		group_values[c] = group_counts[c] = 0;
+
+	i += sprintf(&b[i], "{\n	\"cols\":\n	[\n");
+	i += sprintf(&b[i], "		{\"id\":\"\",\"label\":\"time\",\"pattern\":\"\",\"type\":\"datetime\"}");
+
+	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
+		if(!rd->hidden)
+			i += sprintf(&b[i], ",\n		{\"id\":\"\",\"label\":\"%s\",\"pattern\":\"\",\"type\":\"number\"}", rd->name);
+
+	i += sprintf(&b[i], "	],\n	\"rows\":\n	[\n");
+
+	// to allow grouping on the same values, we need a pad
+	pad = current_entry % group_count;
+
+	// make sure current_entry is within limits
+	if(current_entry < 0 || current_entry >= st->entries) current_entry = 0;
+
+	// find the old entry of the round-robin
+	t = current_entry + 1;
+	if(t >= st->entries) t = 0;
+	lt = t;
+
+	// find the current entry
+	t++;
+	if(t >= st->entries) t = 0;
+
+	// the loop in dimension data
+	count -= 2;
+	for ( ; t != current_entry && count >= 0 ; lt = t++, count--) {
+		if(t >= st->entries) t = 0;
+
+		// if the last is empty, loop again
+		if(!st->times[lt].tv_sec) continue;
+
+		// check if we may exceed the buffer provided
+		web_buffer_increase(wb, 1024);
+
+		// prefer the most recent last entries
+		if(((count-pad) / group_count) > entries_to_show) continue;
+
+
+		// ok. we will use this entry!
+		// find how much usec since the previous entry
+
+		usec = usecdiff(&st->times[t], &st->times[lt]);
+
+		if(((count-pad) % group_count) == 0) {
+			if(printed >= entries_to_show) break;
+
+			// generate the local date time
+			struct tm *tm = localtime(&st->times[t].tv_sec);
+			if(!tm) { error("localtime() failed."); continue; }
+
+			sprintf(dtm, "\"Date(%d, %d, %d, %d, %d, %d, %d)\"", tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(st->times[t].tv_usec / 1000)); // datetime
+			// strftime(dtm, 200, "\"Date(%Y, %m, %d, %H, %M, %S)\"", tm); // datetime
+			// strftime(dtm, 200, "[%H, %M, %S, 0]", tm); // timeofday
+			i += sprintf(&b[i], "%s		{\"c\":[{\"v\":%s}", printed?"]},\n":"", dtm);
+
+			printed++;
+		}
+
+		// if we need a PCENT_OVER_TOTAL, calculate the totals for the current and the last
+		long double total = 0, oldtotal = 0;
+		if(we_need_totals) {
+			for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
+				total    += (long double)rrd_stats_dimension_get(rd, t);
+				oldtotal += (long double)rrd_stats_dimension_get(rd, lt);
+			}
+		}
+
+		for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
+			//long long oldvalue, value;			// temp variable for storing data values
+			long double oldvalue, value;			// temp variable for storing data values
+
+			value    = (long double)rrd_stats_dimension_get(rd, t);
+			oldvalue = (long double)rrd_stats_dimension_get(rd, lt);
+
+			switch(rd->type) {
+				case RRD_DIMENSION_PCENT_OVER_TOTAL:
+					value = (long double)100 * (value - oldvalue) / (total - oldtotal);
+					break;
+
+				case RRD_DIMENSION_INCREMENTAL:
+					if(oldvalue > value) value = 0;	// detect overflows and resets
+					else value -= oldvalue;
+					value = value * (long double)1000000L / (long double)usec;
+					break;
+
+				default:
+					break;
+			}
+
+			value = value * (long double)rd->multiplier / (long double)rd->divisor;
+
+			group_counts[c]++;
+			switch(group_method) {
+				case GROUP_MAX:
+					if(abs(value) > abs(group_values[c])) group_values[c] = value;
+					break;
+
+				default:
+				case GROUP_AVERAGE:
+					group_values[c] += value;
+					if(((count - pad) % group_count) == 0) group_values[c] /= (long double)group_counts[c];
+					break;
+			}
+
+			if(((count-pad) % group_count) == 0) {
+				if(!rd->hidden)
+					i += sprintf(&b[i], ",{\"v\":%0.1Lf}", group_values[c]);
+					//i += sprintf(&b[i], ",{\"v\":%lld}", group_values[c]);
+
+				group_values[c] = group_counts[c] = 0;
+			}
+		}
+	}
+	if(printed) i += sprintf(&b[i], "]}");
+	i += sprintf(&b[i], "\n	]\n}\n");
+
+	pthread_mutex_unlock(&st->mutex);
+	return(wb->bytes = i);
 }
 
 int mysendfile(struct web_client *w, char *filename)
@@ -1322,11 +1325,12 @@ void web_client_process(struct web_client *w)
 						else debug(D_WEB_CLIENT, "%llu: Unknown group method '%s'", w->id, tok);
 					}
 
+					syslog(LOG_NOTICE, "%llu: Sending '%s' data to client %s.", w->id, st->name, w->client_ip);
 					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group_count, %d group_method).", w->id, st->name, st->id, lines, group_count, group_method);
 
 					code = 200;
 					w->data->contenttype = CT_APPLICATION_JSON;
-					w->data->bytes = rrd_stats_json(st, w->data->buffer, w->data->size, lines, group_count, group_method);
+					w->data->bytes = rrd_stats_json(st, w->data, lines, group_count, group_method);
 				}
 			}
 			else if(strcmp(tok, WEB_PATH_GRAPH) == 0) { // "graph"
@@ -1345,6 +1349,7 @@ void web_client_process(struct web_client *w)
 				}
 				else {
 					code = 200;
+					syslog(LOG_NOTICE, "%llu: Sending '%s' graph to client %s.", w->id, st->name, w->client_ip);
 					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending %s.json of RRD_STATS...", w->id, st->name);
 					w->data->contenttype = CT_APPLICATION_JSON;
 					w->data->bytes = rrd_stats_graph_json(st, url, w->data->buffer, w->data->size);
@@ -1354,6 +1359,7 @@ void web_client_process(struct web_client *w)
 				code = 200;
 
 				debug(D_WEB_CLIENT_ACCESS, "%llu: Mirroring...", w->id);
+				syslog(LOG_NOTICE, "%llu: mirroring client %s.", w->id, w->client_ip);
 
 				// just leave the buffer as is
 				// it will be copied back to the client
@@ -1361,6 +1367,7 @@ void web_client_process(struct web_client *w)
 			else if(strcmp(tok, "list") == 0) {
 				code = 200;
 
+				syslog(LOG_NOTICE, "%llu: Sending text list of all monitors to client %s.", w->id, w->client_ip);
 				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending list of RRD_STATS...", w->id);
 
 				w->data->bytes = 0;
@@ -1373,6 +1380,7 @@ void web_client_process(struct web_client *w)
 				code = 200;
 
 				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending envlist of RRD_STATS...", w->id);
+				syslog(LOG_NOTICE, "%llu: Sending envlist to client %s.", w->id, w->client_ip);
 
 				w->data->bytes = 0;
 				RRD_STATS *st = root;
@@ -1384,7 +1392,9 @@ void web_client_process(struct web_client *w)
 			}
 			else if(strcmp(tok, "all.json") == 0) {
 				code = 200;
-				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending all.json of RRD_STATS...", w->id);
+				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending JSON list of all monitors of RRD_STATS...", w->id);
+				syslog(LOG_NOTICE, "%llu: Sending list with all graphs in JSON to client %s.", w->id, w->client_ip);
+
 				w->data->contenttype = CT_APPLICATION_JSON;
 				w->data->bytes = rrd_stats_all_json(w->data->buffer, w->data->size);
 			}
