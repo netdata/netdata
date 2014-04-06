@@ -446,13 +446,13 @@
 						<tr><td align="center">
 							<div class="btn-group">
 								<form id="mainchartform">
-									<div class="btn-group btn-group-xs" data-toggle="buttons" >
-										<button type="button" class="btn btn-primary mainchart_play_button" data-toggle="tooltip" title=" click <span class='glyphicon glyphicon-play'></span> to have the graph auto-refresh, or click <span class='glyphicon glyphicon-pause'></span> to pause the graph. When paused the graph can be zoomed and panned horizontally." data-play-text="<span class='glyphicon glyphicon-pause'></span>" data-pause-text="<span class='glyphicon glyphicon-play'></span>" onClick="setMainChartPlay('toggle');">
+									<div class="btn-group btn-group-xs" data-toggle="tooltip" title=" click <span class='glyphicon glyphicon-play'></span> to have the graph auto-refresh, or click <span class='glyphicon glyphicon-pause'></span> to pause the graph. When paused the graph can be zoomed and panned horizontally." >
+										<button type="button" class="btn btn-primary mainchart_play_button" data-play-text="<span class='glyphicon glyphicon-pause'></span>" data-pause-text="<span class='glyphicon glyphicon-play'></span>" onClick="setMainChartPlay('toggle');">
 											<span class="glyphicon glyphicon-pause"></span>
 										</button>
 									</div>
-									<div class="btn-group btn-group-xs" data-toggle="buttons" >
-										<button type="button" class="btn btn-primary mainchart_avg_button" data-toggle="tooltip" title="use the maximum ( <span class='glyphicon glyphicon-signal'></span> ) or the average ( <span class='glyphicon glyphicon-align-justify'></span> ) value of grouped points" data-max-text="<span class='glyphicon glyphicon-signal'></span>" data-average-text="<span class='glyphicon glyphicon-align-justify'></span>" onClick="setMainChartGroupMethod('toggle');">
+									<div class="btn-group btn-group-xs" data-toggle="tooltip" title="use the maximum ( <span class='glyphicon glyphicon-signal'></span> ) or the average ( <span class='glyphicon glyphicon-align-justify'></span> ) value of grouped points" >
+										<button type="button" class="btn btn-primary mainchart_avg_button" data-max-text="<span class='glyphicon glyphicon-signal'></span>" data-average-text="<span class='glyphicon glyphicon-align-justify'></span>" onClick="setMainChartGroupMethod('toggle');">
 											<span class="glyphicon glyphicon-signal"></span>
 										</button>
 									</div>
@@ -497,8 +497,8 @@
 											<input type="radio" name="group" id="group60" onChange="setMainChartGroup(60);">60
 										</label>
 									</div>
-									<div class="btn-group btn-group-xs" data-toggle="buttons" >
-										<button type="button" class="btn btn-primary mainchart_max_button" data-toggle="tooltip" title="maximized ( <span class='glyphicon glyphicon-fullscreen'></span> ) or normal ( <span class='glyphicon glyphicon-resize-small'></span> ) view of the graph" data-maximized-text="<span class='glyphicon glyphicon-resize-small'></span>" data-normal-text="<span class='glyphicon glyphicon-fullscreen'></span>" onClick="setMainChartMax('toggle');">
+									<div class="btn-group btn-group-xs" data-toggle="tooltip" title="maximized ( <span class='glyphicon glyphicon-fullscreen'></span> ) or normal ( <span class='glyphicon glyphicon-resize-small'></span> ) view of the graph" >
+										<button type="button" class="btn btn-primary mainchart_max_button" data-maximized-text="<span class='glyphicon glyphicon-resize-small'></span>" data-normal-text="<span class='glyphicon glyphicon-fullscreen'></span>" onClick="setMainChartMax('toggle');">
 											<span class="glyphicon glyphicon-fullscreen"></span>
 										</button>
 									</div>

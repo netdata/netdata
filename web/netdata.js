@@ -273,7 +273,7 @@ function loadCharts(base_url, doNext) {
 				case "cpu":
 					json.charts[i].category = "CPU";
 					json.charts[i].glyphicon = "glyphicon-dashboard";
-					json.charts[i].group = 15;
+					json.charts[i].group = 10;
 
 					if(json.charts[i].id.substring(0, 7) == "cpu.cpu") {
 						json.charts[i].chartOptions.vAxis.minValue = 0;
@@ -290,7 +290,7 @@ function loadCharts(base_url, doNext) {
 				case "net":
 					json.charts[i].category = "Network Interfaces";
 					json.charts[i].glyphicon = "glyphicon-transfer";
-					json.charts[i].group = 10;
+					json.charts[i].group = 5;
 
 					// disable IFB and net.lo devices by default
 					if((json.charts[i].id.substring(json.charts[i].id.length - 4, json.charts[i].id.length) == "-ifb")
@@ -301,31 +301,31 @@ function loadCharts(base_url, doNext) {
 				case "ipv4":
 					json.charts[i].category = "IPv4";
 					json.charts[i].glyphicon = "glyphicon-globe";
-					json.charts[i].group = 20;
+					json.charts[i].group = 10;
 					break;
 
 				case "conntrack":
 					json.charts[i].category = "Netfilter";
 					json.charts[i].glyphicon = "glyphicon-cloud";
-					json.charts[i].group = 20;
+					json.charts[i].group = 10;
 					break;
 
 				case "ipvs":
 					json.charts[i].category = "IPVS";
 					json.charts[i].glyphicon = "glyphicon-sort";
-					json.charts[i].group = 15;
+					json.charts[i].group = 10;
 					break;
 
 				case "disk":
 					json.charts[i].category = "Disk I/O";
 					json.charts[i].glyphicon = "glyphicon-hdd";
-					json.charts[i].group = 15;
+					json.charts[i].group = 10;
 					break;
 
 				default:
 					json.charts[i].category = "Unknown";
 					json.charts[i].glyphicon = "glyphicon-search";
-					json.charts[i].group = 30;
+					json.charts[i].group = 15;
 					break;
 			}
 		});
