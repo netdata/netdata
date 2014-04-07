@@ -96,7 +96,7 @@
 #define CT_IMAGE_SVG_XML				14
 
 // configuration
-#define DEBUG (D_WEB_BUFFER|D_WEB_CLIENT|D_WEB_CLIENT_ACCESS|D_LISTENER|D_RRD_STATS)
+#define DEBUG (D_WEB_CLIENT_ACCESS|D_LISTENER|D_RRD_STATS)
 //#define DEBUG 0xffffffff
 //#define DEBUG (0)
 
