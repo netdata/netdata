@@ -648,87 +648,6 @@ int rrd_stats_dimension_set(RRD_STATS *st, const char *id, void *data)
 	return 0;
 }
 
-#define GROUP_AVERAGE	0
-#define GROUP_MAX 		1
-
-size_t rrd_stats_one_json(RRD_STATS *st, char *options, char *buffer, size_t len)
-{
-	size_t i = 0;
-	if(i + 200 > len) return(0);
-
-	i += sprintf(&buffer[i], "\t\t{\n");
-	i += sprintf(&buffer[i], "\t\t\t\"id\" : \"%s\",\n", st->id);
-	i += sprintf(&buffer[i], "\t\t\t\"name\" : \"%s\",\n", st->name);
-	i += sprintf(&buffer[i], "\t\t\t\"type\" : \"%s\",\n", st->type);
-	i += sprintf(&buffer[i], "\t\t\t\"title\" : \"%s %s\",\n", st->title, st->name);
-	i += sprintf(&buffer[i], "\t\t\t\"usertitle\" : \"%s %s (%s)\",\n", st->title, st->usertitle, st->id);
-	i += sprintf(&buffer[i], "\t\t\t\"userpriority\" : \"%s\",\n", st->userpriority);
-	i += sprintf(&buffer[i], "\t\t\t\"envtitle\" : \"%s\",\n", st->envtitle);
-	i += sprintf(&buffer[i], "\t\t\t\"envpriority\" : \"%s\",\n", st->envpriority);
-	i += sprintf(&buffer[i], "\t\t\t\"hostname\" : \"%s\",\n", st->hostname);
-	i += sprintf(&buffer[i], "\t\t\t\"vtitle\" : \"%s\",\n", st->vtitle);
-	i += sprintf(&buffer[i], "\t\t\t\"url\" : \"/data/%s/%s\",\n", st->name, options?options:"");
-	i += sprintf(&buffer[i], "\t\t\t\"entries\" : %ld,\n", st->entries);
-	i += sprintf(&buffer[i], "\t\t\t\"current\" : %ld,\n", st->current_entry);
-	i += sprintf(&buffer[i], "\t\t\t\"update_every\" : %d,\n", update_every);
-	i += sprintf(&buffer[i], "\t\t\t\"last_updated\" : %lu,\n", st->last_updated);
-	i += sprintf(&buffer[i], "\t\t\t\"last_updated_secs_ago\" : %lu\n", time(NULL) - st->last_updated);
-	i += sprintf(&buffer[i], "\t\t}");
-
-	return(i);
-}
-
-#define RRD_GRAPH_JSON_HEADER "{\n\t\"charts\": [\n"
-#define RRD_GRAPH_JSON_FOOTER "\n\t]\n}\n"
-
-size_t rrd_stats_graph_json(RRD_STATS *st, char * options, char *buffer, size_t len)
-{
-	size_t i = 0;
-	i += sprintf(&buffer[i], RRD_GRAPH_JSON_HEADER);
-	i += rrd_stats_one_json(st, options, &buffer[i], len - i);
-	i += sprintf(&buffer[i], RRD_GRAPH_JSON_FOOTER);
-	return(i);
-}
-
-size_t rrd_stats_all_json(char *buffer, size_t len)
-{
-	size_t i = 0, c;
-	RRD_STATS *st;
-
-	i += sprintf(&buffer[i], RRD_GRAPH_JSON_HEADER);
-
-	for(st = root, c = 0; st ; st = st->next, c++) {
-		if(c) i += sprintf(&buffer[i], "%s", ",\n");
-		i += rrd_stats_one_json(st, NULL, &buffer[i], len - i);
-	}
-	
-	i += sprintf(&buffer[i], RRD_GRAPH_JSON_FOOTER);
-	return(i);
-}
-
-long long rrd_stats_dimension_get(RRD_DIMENSION *rd, size_t position)
-{
-		if(rd->bytes == sizeof(long long)) {
-			long long *dimension = rd->values;
-			return(dimension[position]);
-		}
-		else if(rd->bytes == sizeof(long)) {
-			long *dimension = rd->values;
-			return(dimension[position]);
-		}
-		else if(rd->bytes == sizeof(int)) {
-			int *dimension = rd->values;
-			return(dimension[position]);
-		}
-		else if(rd->bytes == sizeof(char)) {
-			char *dimension = rd->values;
-			return(dimension[position]);
-		}
-		else fatal("Cannot produce JSON for size %d bytes dimension.", rd->bytes);
-
-		return(0);
-}
-
 
 // ----------------------------------------------------------------------------
 // web buffer
@@ -783,7 +702,7 @@ void web_buffer_increase(struct web_buffer *b, size_t free_size_required)
 
 	debug(D_WEB_BUFFER, "Increasing data buffer from size %d to %d.", b->size, b->size + increase);
 
-	b->buffer = realloc(b->buffer, b->size + free_size_required - left);
+	b->buffer = realloc(b->buffer, b->size + increase);
 	if(!b->buffer) fatal("Failed to increase data buffer from size %d to %d.", b->size, b->size + increase);
 	
 	b->size += increase;
@@ -795,6 +714,8 @@ void web_buffer_increase(struct web_buffer *b, size_t free_size_required)
 struct web_client {
 	unsigned long long id;
 	char client_ip[101];
+
+	struct timeval tv_in, tv_ready;
 
 	int mode;
 	int keepalive;
@@ -896,7 +817,86 @@ struct web_client *web_client_free(struct web_client *w)
 	return(n);
 }
 
-size_t rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show, size_t group_count, int group_method)
+#define GROUP_AVERAGE	0
+#define GROUP_MAX 		1
+
+void rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer *wb)
+{
+	web_buffer_increase(wb, 8192);
+
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t{\n");
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"id\" : \"%s\",\n", st->id);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"name\" : \"%s\",\n", st->name);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"type\" : \"%s\",\n", st->type);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"title\" : \"%s %s\",\n", st->title, st->name);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"usertitle\" : \"%s %s (%s)\",\n", st->title, st->usertitle, st->id);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"userpriority\" : \"%s\",\n", st->userpriority);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"envtitle\" : \"%s\",\n", st->envtitle);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"envpriority\" : \"%s\",\n", st->envpriority);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"hostname\" : \"%s\",\n", st->hostname);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"vtitle\" : \"%s\",\n", st->vtitle);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"url\" : \"/data/%s/%s\",\n", st->name, options?options:"");
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"entries\" : %ld,\n", st->entries);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"current\" : %ld,\n", st->current_entry);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"update_every\" : %d,\n", update_every);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_updated\" : %lu,\n", st->last_updated);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_updated_secs_ago\" : %lu\n", time(NULL) - st->last_updated);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t}");
+}
+
+#define RRD_GRAPH_JSON_HEADER "{\n\t\"charts\": [\n"
+#define RRD_GRAPH_JSON_FOOTER "\n\t]\n}\n"
+
+void rrd_stats_graph_json(RRD_STATS *st, char *options, struct web_buffer *wb)
+{
+	web_buffer_increase(wb, 4096);
+
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], RRD_GRAPH_JSON_HEADER);
+	rrd_stats_one_json(st, options, wb);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], RRD_GRAPH_JSON_FOOTER);
+}
+
+void rrd_stats_all_json(struct web_buffer *wb)
+{
+	web_buffer_increase(wb, 4096);
+
+	size_t c;
+	RRD_STATS *st;
+
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], RRD_GRAPH_JSON_HEADER);
+
+	for(st = root, c = 0; st ; st = st->next, c++) {
+		if(c) wb->bytes += sprintf(&wb->buffer[wb->bytes], "%s", ",\n");
+		rrd_stats_one_json(st, NULL, wb);
+	}
+	
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], RRD_GRAPH_JSON_FOOTER);
+}
+
+long long rrd_stats_dimension_get(RRD_DIMENSION *rd, size_t position)
+{
+		if(rd->bytes == sizeof(long long)) {
+			long long *dimension = rd->values;
+			return(dimension[position]);
+		}
+		else if(rd->bytes == sizeof(long)) {
+			long *dimension = rd->values;
+			return(dimension[position]);
+		}
+		else if(rd->bytes == sizeof(int)) {
+			int *dimension = rd->values;
+			return(dimension[position]);
+		}
+		else if(rd->bytes == sizeof(char)) {
+			char *dimension = rd->values;
+			return(dimension[position]);
+		}
+		else fatal("Cannot produce JSON for size %d bytes dimension.", rd->bytes);
+
+		return(0);
+}
+
+void rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show, size_t group_count, int group_method)
 {
 	char *b = wb->buffer;
 
@@ -907,7 +907,6 @@ size_t rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_sh
 	if(group_count <= 0) group_count = 1;
 	if(group_count > st->entries / 20) group_count = st->entries / 20;
 
-	size_t i = 0;				// the bytes of JSON output we have generated so far
 	size_t printed = 0;			// the lines of JSON data we have generated so far
 
 	size_t current_entry = st->current_entry;
@@ -932,7 +931,8 @@ size_t rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_sh
 
 	if(!dimensions) {
 		pthread_mutex_unlock(&st->mutex);
-		return (wb->bytes = sprintf(b, "No dimensions yet."));
+		wb->bytes = sprintf(b, "No dimensions yet.");
+		return;
 	}
 
 	// temporary storage to keep track of group values and counts
@@ -941,14 +941,14 @@ size_t rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_sh
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
 		group_values[c] = group_counts[c] = 0;
 
-	i += sprintf(&b[i], "{\n	\"cols\":\n	[\n");
-	i += sprintf(&b[i], "		{\"id\":\"\",\"label\":\"time\",\"pattern\":\"\",\"type\":\"datetime\"}");
+	wb->bytes += sprintf(&b[wb->bytes], "{\n	\"cols\":\n	[\n");
+	wb->bytes += sprintf(&b[wb->bytes], "		{\"id\":\"\",\"label\":\"time\",\"pattern\":\"\",\"type\":\"datetime\"}");
 
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
 		if(!rd->hidden)
-			i += sprintf(&b[i], ",\n		{\"id\":\"\",\"label\":\"%s\",\"pattern\":\"\",\"type\":\"number\"}", rd->name);
+			wb->bytes += sprintf(&b[wb->bytes], ",\n		{\"id\":\"\",\"label\":\"%s\",\"pattern\":\"\",\"type\":\"number\"}", rd->name);
 
-	i += sprintf(&b[i], "	],\n	\"rows\":\n	[\n");
+	wb->bytes += sprintf(&b[wb->bytes], "	],\n	\"rows\":\n	[\n");
 
 	// to allow grouping on the same values, we need a pad
 	pad = current_entry % group_count;
@@ -974,7 +974,7 @@ size_t rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_sh
 		if(!st->times[lt].tv_sec) continue;
 
 		// check if we may exceed the buffer provided
-		web_buffer_increase(wb, 4096);
+		web_buffer_increase(wb, 1024 + (50 * dimensions));
 
 		// prefer the most recent last entries
 		if(((count-pad) / group_count) > entries_to_show) continue;
@@ -995,7 +995,7 @@ size_t rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_sh
 			sprintf(dtm, "\"Date(%d, %d, %d, %d, %d, %d, %d)\"", tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(st->times[t].tv_usec / 1000)); // datetime
 			// strftime(dtm, 200, "\"Date(%Y, %m, %d, %H, %M, %S)\"", tm); // datetime
 			// strftime(dtm, 200, "[%H, %M, %S, 0]", tm); // timeofday
-			i += sprintf(&b[i], "%s		{\"c\":[{\"v\":%s}", printed?"]},\n":"", dtm);
+			wb->bytes += sprintf(&b[wb->bytes], "%s		{\"c\":[{\"v\":%s}", printed?"]},\n":"", dtm);
 
 			printed++;
 		}
@@ -1048,18 +1048,17 @@ size_t rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_sh
 
 			if(((count-pad) % group_count) == 0) {
 				if(!rd->hidden)
-					i += sprintf(&b[i], ",{\"v\":%0.1Lf}", group_values[c]);
-					//i += sprintf(&b[i], ",{\"v\":%lld}", group_values[c]);
+					wb->bytes += sprintf(&b[wb->bytes], ",{\"v\":%0.1Lf}", group_values[c]);
+					//wb->bytes += sprintf(&b[wb->bytes], ",{\"v\":%lld}", group_values[c]);
 
 				group_values[c] = group_counts[c] = 0;
 			}
 		}
 	}
-	if(printed) i += sprintf(&b[i], "]}");
-	i += sprintf(&b[i], "\n	]\n}\n");
+	if(printed) wb->bytes += sprintf(&b[wb->bytes], "]}");
+	wb->bytes += sprintf(&b[wb->bytes], "\n	]\n}\n");
 
 	pthread_mutex_unlock(&st->mutex);
-	return(wb->bytes = i);
 }
 
 int mysendfile(struct web_client *w, char *filename)
@@ -1248,6 +1247,7 @@ void web_client_process(struct web_client *w)
 
 	// check if we have an empty line (end of HTTP header)
 	if(strstr(w->data->buffer, "\r\n\r\n")) {
+		gettimeofday(&w->tv_in, NULL);
 		debug(D_WEB_DATA, "%llu: Processing data buffer of %d bytes: '%s'.", w->id, w->data->bytes, w->data->buffer);
 
 		// check if the client requested keep-alive HTTP
@@ -1293,6 +1293,7 @@ void web_client_process(struct web_client *w)
 				if(!st) {
 					// we don't have it
 					// try to send a file with that name
+					w->data->bytes = 0;
 					code = mysendfile(w, tok);
 				}
 				else {
@@ -1330,7 +1331,8 @@ void web_client_process(struct web_client *w)
 
 					code = 200;
 					w->data->contenttype = CT_APPLICATION_JSON;
-					w->data->bytes = rrd_stats_json(st, w->data, lines, group_count, group_method);
+					w->data->bytes = 0;
+					rrd_stats_json(st, w->data, lines, group_count, group_method);
 				}
 			}
 			else if(strcmp(tok, WEB_PATH_GRAPH) == 0) { // "graph"
@@ -1345,6 +1347,7 @@ void web_client_process(struct web_client *w)
 				if(!st) {
 					// we don't have it
 					// try to send a file with that name
+					w->data->bytes = 0;
 					code = mysendfile(w, tok);
 				}
 				else {
@@ -1352,7 +1355,8 @@ void web_client_process(struct web_client *w)
 					syslog(LOG_NOTICE, "%llu: Sending '%s' graph to client %s.", w->id, st->name, w->client_ip);
 					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending %s.json of RRD_STATS...", w->id, st->name);
 					w->data->contenttype = CT_APPLICATION_JSON;
-					w->data->bytes = rrd_stats_graph_json(st, url, w->data->buffer, w->data->size);
+					w->data->bytes = 0;
+					rrd_stats_graph_json(st, url, w->data);
 				}
 			}
 			else if(strcmp(tok, "mirror") == 0) {
@@ -1396,21 +1400,25 @@ void web_client_process(struct web_client *w)
 				syslog(LOG_NOTICE, "%llu: Sending list with all graphs in JSON to client %s.", w->id, w->client_ip);
 
 				w->data->contenttype = CT_APPLICATION_JSON;
-				w->data->bytes = rrd_stats_all_json(w->data->buffer, w->data->size);
+				w->data->bytes = 0;
+				rrd_stats_all_json(w->data);
 			}
 			else if(strcmp(tok, WEB_PATH_FILE) == 0) { // "file"
 				tok = mystrsep(&url, "/?&");
 				if(tok && *tok) code = mysendfile(w, tok);
 				else {
 					code = 400;
+					w->data->bytes = 0;
 					strcpy(w->data->buffer, "You have to give a filename to get.\r\n");
 					w->data->bytes = strlen(w->data->buffer);
 				}
 			}
 			else if(!tok[0]) {
+				w->data->bytes = 0;
 				code = mysendfile(w, "index.html");
 			}
 			else {
+				w->data->bytes = 0;
 				code = mysendfile(w, tok);
 			}
 		}
@@ -1418,6 +1426,7 @@ void web_client_process(struct web_client *w)
 			if(buf) debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, buf);
 
 			code = 500;
+			w->data->bytes = 0;
 			strcpy(w->data->buffer, "I don't understand you...\r\n");
 			w->data->bytes = strlen(w->data->buffer);
 		}
@@ -1426,6 +1435,7 @@ void web_client_process(struct web_client *w)
 		debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big.", w->id);
 
 		code = 400;
+		w->data->bytes = 0;
 		strcpy(w->data->buffer, "Received request is too big.\r\n");
 		w->data->bytes = strlen(w->data->buffer);
 	}
@@ -1435,6 +1445,11 @@ void web_client_process(struct web_client *w)
 		return;
 	}
 
+	if(w->data->bytes > w->data->size) {
+		error("%llu: memory overflow encountered (size is %ld, written %ld).", w->data->size, w->data->bytes);
+	}
+
+	gettimeofday(&w->tv_ready, NULL);
 	w->data->date = time(NULL);
 	w->data->sent = 0;
 
