@@ -974,7 +974,7 @@ size_t rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_sh
 		if(!st->times[lt].tv_sec) continue;
 
 		// check if we may exceed the buffer provided
-		web_buffer_increase(wb, 1024);
+		web_buffer_increase(wb, 4096);
 
 		// prefer the most recent last entries
 		if(((count-pad) / group_count) > entries_to_show) continue;
@@ -2516,13 +2516,13 @@ int do_proc_net_stat_conntrack() {
 		p = fgets(buffer, MAX_PROC_NET_STAT_CONNTRACK_LINE, fp);
 		if(!p) break;
 
-		unsigned long long tentries, tsearched, tfound, tnew, tinvalid, tignore, tdelete, tdelete_list, tinsert, tinsert_failed, tdrop, tearly_drop, ticmp_error, texpect_new, texpect_create, texpect_delete, tsearch_restart;
+		unsigned long long tentries = 0, tsearched = 0, tfound = 0, tnew = 0, tinvalid = 0, tignore = 0, tdelete = 0, tdelete_list = 0, tinsert = 0, tinsert_failed = 0, tdrop = 0, tearly_drop = 0, ticmp_error = 0, texpect_new = 0, texpect_create = 0, texpect_delete = 0, tsearch_restart = 0;
 
 		int r = sscanf(buffer, "%llx %llx %llx %llx %llx %llx %llx %llx %llx %llx %llx %llx %llx %llx %llx %llx %llx\n",
 			&tentries, &tsearched, &tfound, &tnew, &tinvalid, &tignore, &tdelete, &tdelete_list, &tinsert, &tinsert_failed, &tdrop, &tearly_drop, &ticmp_error, &texpect_new, &texpect_create, &texpect_delete, &tsearch_restart);
 
 		if(r == EOF) break;
-		if(r != 17) error("Cannot read /proc/net/stat/nf_conntrack. Expected 17 params, read %d.", r);
+		if(r < 16) error("Cannot read /proc/net/stat/nf_conntrack. Expected 17 params, read %d.", r);
 
 		if(!aentries) aentries =  tentries;
 
@@ -2722,14 +2722,14 @@ int do_proc_stat() {
 
 		if(strncmp(p, "cpu", 3) == 0) {
 			char id[MAX_PROC_STAT_NAME + 1] = RRD_TYPE_STAT ".";
-			unsigned long long user, nice, system, idle, iowait, irq, softirq, steal, guest, guest_nice;
+			unsigned long long user = 0, nice = 0, system = 0, idle = 0, iowait = 0, irq = 0, softirq = 0, steal = 0, guest = 0, guest_nice = 0;
 			char *name = &id[RRD_TYPE_STAT_LEN + 1];
 
 			int r = sscanf(buffer, "%s %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu\n",
 				name, &user, &nice, &system, &idle, &iowait, &irq, &softirq, &steal, &guest, &guest_nice);
 
 			if(r == EOF) break;
-			if(r != 11) error("Cannot read /proc/stat cpu line. Expected 11 params, read %d.", r);
+			if(r < 10) error("Cannot read /proc/stat cpu line. Expected 11 params, read %d.", r);
 
 			RRD_STATS *st = rrd_stats_find(id);
 			if(!st) {
