@@ -96,15 +96,15 @@
 #define CT_IMAGE_SVG_XML				14
 
 // configuration
-#define DEBUG (D_WEB_CLIENT_ACCESS|D_LISTENER|D_RRD_STATS)
+#define DEBUG (D_WEB_BUFFER|D_WEB_CLIENT|D_WEB_CLIENT_ACCESS|D_LISTENER|D_RRD_STATS)
 //#define DEBUG 0xffffffff
 //#define DEBUG (0)
 
 #define EXIT_FAILURE 1
 #define LISTEN_BACKLOG 100
 
-#define MAX_SOCKET_DATA_LENGTH (256 * 1024)
-#define SOCKET_DATA_LENGTH_INCREASE_STEP 65536
+#define INITIAL_WEB_DATA_LENGTH 65536
+#define WEB_DATA_LENGTH_INCREASE_STEP 65536
 #define ZLIB_CHUNK 	16384
 
 #define MAX_HTTP_HEADER_SIZE 16384
@@ -699,6 +699,7 @@ void web_buffer_increase(struct web_buffer *b, size_t free_size_required)
 
 	if(left >= free_size_required) return;
 	size_t increase = free_size_required - left;
+	if(increase < WEB_DATA_LENGTH_INCREASE_STEP) increase = WEB_DATA_LENGTH_INCREASE_STEP;
 
 	debug(D_WEB_BUFFER, "Increasing data buffer from size %d to %d.", b->size, b->size + increase);
 
@@ -782,7 +783,7 @@ struct web_client *web_client_create(int listener)
 		if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0) error("%llu: Cannot set SO_KEEPALIVE on socket.", w->id);
 	}
 
-	w->data = web_buffer_create(MAX_SOCKET_DATA_LENGTH);
+	w->data = web_buffer_create(INITIAL_WEB_DATA_LENGTH);
 	if(!w->data) {
 		close(w->ifd);
 		free(w);
@@ -822,7 +823,7 @@ struct web_client *web_client_free(struct web_client *w)
 
 void rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer *wb)
 {
-	web_buffer_increase(wb, 8192);
+	web_buffer_increase(wb, 16384);
 
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t{\n");
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"id\" : \"%s\",\n", st->id);
@@ -849,7 +850,7 @@ void rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer *wb)
 
 void rrd_stats_graph_json(RRD_STATS *st, char *options, struct web_buffer *wb)
 {
-	web_buffer_increase(wb, 4096);
+	web_buffer_increase(wb, 16384);
 
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], RRD_GRAPH_JSON_HEADER);
 	rrd_stats_one_json(st, options, wb);
@@ -858,7 +859,7 @@ void rrd_stats_graph_json(RRD_STATS *st, char *options, struct web_buffer *wb)
 
 void rrd_stats_all_json(struct web_buffer *wb)
 {
-	web_buffer_increase(wb, 4096);
+	web_buffer_increase(wb, 16384);
 
 	size_t c;
 	RRD_STATS *st;
@@ -898,8 +899,6 @@ long long rrd_stats_dimension_get(RRD_DIMENSION *rd, size_t position)
 
 void rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show, size_t group_count, int group_method)
 {
-	char *b = wb->buffer;
-
 	pthread_mutex_lock(&st->mutex);
 
 	// check the options
@@ -931,7 +930,7 @@ void rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show
 
 	if(!dimensions) {
 		pthread_mutex_unlock(&st->mutex);
-		wb->bytes = sprintf(b, "No dimensions yet.");
+		wb->bytes = sprintf(wb->buffer, "No dimensions yet.");
 		return;
 	}
 
@@ -941,14 +940,14 @@ void rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
 		group_values[c] = group_counts[c] = 0;
 
-	wb->bytes += sprintf(&b[wb->bytes], "{\n	\"cols\":\n	[\n");
-	wb->bytes += sprintf(&b[wb->bytes], "		{\"id\":\"\",\"label\":\"time\",\"pattern\":\"\",\"type\":\"datetime\"}");
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "{\n	\"cols\":\n	[\n");
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "		{\"id\":\"\",\"label\":\"time\",\"pattern\":\"\",\"type\":\"datetime\"}");
 
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
 		if(!rd->hidden)
-			wb->bytes += sprintf(&b[wb->bytes], ",\n		{\"id\":\"\",\"label\":\"%s\",\"pattern\":\"\",\"type\":\"number\"}", rd->name);
+			wb->bytes += sprintf(&wb->buffer[wb->bytes], ",\n		{\"id\":\"\",\"label\":\"%s\",\"pattern\":\"\",\"type\":\"number\"}", rd->name);
 
-	wb->bytes += sprintf(&b[wb->bytes], "	],\n	\"rows\":\n	[\n");
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "	],\n	\"rows\":\n	[\n");
 
 	// to allow grouping on the same values, we need a pad
 	pad = current_entry % group_count;
@@ -995,7 +994,7 @@ void rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show
 			sprintf(dtm, "\"Date(%d, %d, %d, %d, %d, %d, %d)\"", tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(st->times[t].tv_usec / 1000)); // datetime
 			// strftime(dtm, 200, "\"Date(%Y, %m, %d, %H, %M, %S)\"", tm); // datetime
 			// strftime(dtm, 200, "[%H, %M, %S, 0]", tm); // timeofday
-			wb->bytes += sprintf(&b[wb->bytes], "%s		{\"c\":[{\"v\":%s}", printed?"]},\n":"", dtm);
+			wb->bytes += sprintf(&wb->buffer[wb->bytes], "%s		{\"c\":[{\"v\":%s}", printed?"]},\n":"", dtm);
 
 			printed++;
 		}
@@ -1048,15 +1047,15 @@ void rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show
 
 			if(((count-pad) % group_count) == 0) {
 				if(!rd->hidden)
-					wb->bytes += sprintf(&b[wb->bytes], ",{\"v\":%0.1Lf}", group_values[c]);
-					//wb->bytes += sprintf(&b[wb->bytes], ",{\"v\":%lld}", group_values[c]);
+					wb->bytes += sprintf(&wb->buffer[wb->bytes], ",{\"v\":%0.1Lf}", group_values[c]);
+					//wb->bytes += sprintf(&wb->buffer[wb->bytes], ",{\"v\":%lld}", group_values[c]);
 
 				group_values[c] = group_counts[c] = 0;
 			}
 		}
 	}
-	if(printed) wb->bytes += sprintf(&b[wb->bytes], "]}");
-	wb->bytes += sprintf(&b[wb->bytes], "\n	]\n}\n");
+	if(printed) wb->bytes += sprintf(&wb->buffer[wb->bytes], "]}");
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\n	]\n}\n");
 
 	pthread_mutex_unlock(&st->mutex);
 }
@@ -1450,6 +1449,7 @@ void web_client_process(struct web_client *w)
 	}
 
 	gettimeofday(&w->tv_ready, NULL);
+	debug(D_WEB_CLIENT, "%llu: Generated response of %ld bytes in %llu microseconds.", w->id, w->data->bytes, usecdiff(&w->tv_ready, &w->tv_in));
 	w->data->date = time(NULL);
 	w->data->sent = 0;
 
@@ -1604,7 +1604,7 @@ void web_client_process(struct web_client *w)
 	if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0) error("%llu: failed to disable TCP_NODELAY on socket.", w->id);
 
 	// sent the HTTP header
-	debug(D_WEB_CLIENT, "%llu: Sending response HTTP header of size %d: '%s'", w->id, headerlen, w->response_header);
+	debug(D_WEB_DATA, "%llu: Sending response HTTP header of size %d: '%s'", w->id, headerlen, w->response_header);
 
 	bytes = send(w->ofd, w->response_header, headerlen, 0);
 	if(bytes != headerlen)
@@ -1832,7 +1832,7 @@ ssize_t web_client_send(struct web_client *w)
 ssize_t web_client_receive(struct web_client *w)
 {
 	// do we have any space for more data?
-	web_buffer_increase(w->data, SOCKET_DATA_LENGTH_INCREASE_STEP);
+	web_buffer_increase(w->data, WEB_DATA_LENGTH_INCREASE_STEP);
 
 	ssize_t left = w->data->size - w->data->bytes;
 	ssize_t bytes;
