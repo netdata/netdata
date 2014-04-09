@@ -73,9 +73,9 @@ fi
 eval "`wget -O -  http://localhost:$NETDATA_CONFIG_PORT/envlist 2>/dev/null | tr " " "_" `"
 
 # save config back
-set|grep ^NETDATA_CONFIG_	>netdata.conf
-set|grep ^NETDATA_PRIORITY_	>>netdata.conf
-set|grep ^NETDATA_TITLE_	>>netdata.conf
+set 2>/dev/null |grep ^NETDATA_CONFIG_		>netdata.conf
+set 2>/dev/null |grep ^NETDATA_PRIORITY_	>>netdata.conf
+set 2>/dev/null |grep ^NETDATA_TITLE_		>>netdata.conf
 
 echo "All Done."
 echo "Just hit http://127.0.0.1:$NETDATA_CONFIG_PORT/ from your browser."
