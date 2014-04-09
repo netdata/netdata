@@ -230,6 +230,8 @@ function loadCharts(base_url, doNext) {
 				hAxis: {title: "Time of Day", viewWindowMode: 'maximized', format:'HH:mm:ss'},
 				vAxis: {title: json.charts[i].vtitle, minValue: 0},
 				focusTarget: 'category',
+				annotation: {'1': {style: 'line'}},
+				//tooltip: {isHtml: true},
 			};
 
 			// set the chart type
