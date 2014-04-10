@@ -341,6 +341,9 @@ int create_listen_socket(int port)
 struct rrd_dimension {
 	char id[RRD_STATS_NAME_MAX + 1];
 	char name[RRD_STATS_NAME_MAX + 1];
+	
+	int issigned;
+
 	size_t bytes;
 	size_t entries;
 
@@ -399,6 +402,11 @@ RRD_STATS *rrd_stats_create(const char *id, const char *name, unsigned long entr
 	RRD_STATS *st = NULL;
 	char *p;
 
+	if(!id || !id[0]) {
+		error("Cannot create rrd stats without an id.");
+		return NULL;
+	}
+
 	debug(D_RRD_STATS, "Creating RRD_STATS for '%s'.", name);
 
 	st = calloc(1, sizeof(RRD_STATS));
@@ -414,7 +422,9 @@ RRD_STATS *rrd_stats_create(const char *id, const char *name, unsigned long entr
 	strncpy(st->id, id, RRD_STATS_NAME_MAX);
 	st->id[RRD_STATS_NAME_MAX] = '\0';
 
-	strncpy(st->name, name, RRD_STATS_NAME_MAX);
+	if(name) strncpy(st->name, name, RRD_STATS_NAME_MAX);
+	else strncpy(st->name, id, RRD_STATS_NAME_MAX);
+
 	st->name[RRD_STATS_NAME_MAX] = '\0';
 	while((p = strchr(st->name, '/'))) *p = '_';
 	while((p = strchr(st->name, '?'))) *p = '_';
@@ -472,7 +482,7 @@ RRD_STATS *rrd_stats_create(const char *id, const char *name, unsigned long entr
 	return(st);
 }
 
-RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char *name, size_t bytes, long multiplier, long divisor, int type, void *obsolete)
+RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char *name, size_t bytes, int issigned, long multiplier, long divisor, int type, void *obsolete)
 {
 	RRD_DIMENSION *rd = NULL;
 
@@ -486,6 +496,7 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 	rd->multiplier = multiplier;
 	rd->divisor = divisor;
 	rd->type = type;
+	rd->issigned = issigned;
 
 	rd->values = calloc(rd->entries, rd->bytes);
 	if(!rd->values) {
@@ -580,27 +591,52 @@ void rrd_stats_dimension_set_by_pointer(RRD_STATS *st, RRD_DIMENSION *rd, void *
 {
 	rd->last_updated = st->last_updated;
 
-	if(rd->bytes == sizeof(long long)) {
-		long long *dimension = rd->values, *value = data;
+	if(rd->issigned) {
+		if(rd->bytes == sizeof(long long)) {
+			long long *dimension = rd->values, *value = data;
 
-		dimension[st->current_entry] = (*value);
-	}
-	else if(rd->bytes == sizeof(long)) {
-		long *dimension = rd->values, *value = data;
+			dimension[st->current_entry] = (*value);
+		}
+		else if(rd->bytes == sizeof(long)) {
+			long *dimension = rd->values, *value = data;
 
-		dimension[st->current_entry] = (*value);
-	}
-	else if(rd->bytes == sizeof(int)) {
-		int *dimension = rd->values, *value = data;
+			dimension[st->current_entry] = (*value);
+		}
+		else if(rd->bytes == sizeof(short int)) {
+			short int *dimension = rd->values, *value = data;
 
-		dimension[st->current_entry] = (*value);
-	}
-	else if(rd->bytes == sizeof(char)) {
-		char *dimension = rd->values, *value = data;
+			dimension[st->current_entry] = (*value);
+		}
+		else if(rd->bytes == sizeof(char)) {
+			char *dimension = rd->values, *value = data;
 
-		dimension[st->current_entry] = (*value);
+			dimension[st->current_entry] = (*value);
+		}
+		else fatal("I don't know how to handle data of length %d (signed) bytes.", rd->bytes);
 	}
-	else fatal("I don't know how to handle data of length %d bytes.", rd->bytes);
+	else {
+		if(rd->bytes == sizeof(unsigned long long)) {
+			unsigned long long *dimension = rd->values, *value = data;
+
+			dimension[st->current_entry] = (*value);
+		}
+		else if(rd->bytes == sizeof(unsigned long)) {
+			unsigned long *dimension = rd->values, *value = data;
+
+			dimension[st->current_entry] = (*value);
+		}
+		else if(rd->bytes == sizeof(unsigned short int)) {
+			unsigned short int *dimension = rd->values, *value = data;
+
+			dimension[st->current_entry] = (*value);
+		}
+		else if(rd->bytes == sizeof(unsigned char)) {
+			unsigned char *dimension = rd->values, *value = data;
+
+			dimension[st->current_entry] = (*value);
+		}
+		else fatal("I don't know how to handle data of length %d (unsigned) bytes.", rd->bytes);
+	}
 
 	// clear any previous annotations
 /*	if(rd->annotations[st->current_entry]) {
@@ -913,8 +949,9 @@ void rrd_stats_all_json(struct web_buffer *wb)
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], RRD_GRAPH_JSON_FOOTER);
 }
 
-long long rrd_stats_dimension_get(RRD_DIMENSION *rd, size_t position)
+long double rrd_stats_dimension_get(RRD_DIMENSION *rd, size_t position)
 {
+	if(rd->issigned) {
 		if(rd->bytes == sizeof(long long)) {
 			long long *dimension = rd->values;
 			return(dimension[position]);
@@ -923,17 +960,37 @@ long long rrd_stats_dimension_get(RRD_DIMENSION *rd, size_t position)
 			long *dimension = rd->values;
 			return(dimension[position]);
 		}
-		else if(rd->bytes == sizeof(int)) {
-			int *dimension = rd->values;
+		else if(rd->bytes == sizeof(short int)) {
+			short int *dimension = rd->values;
 			return(dimension[position]);
 		}
 		else if(rd->bytes == sizeof(char)) {
 			char *dimension = rd->values;
 			return(dimension[position]);
 		}
-		else fatal("Cannot produce JSON for size %d bytes dimension.", rd->bytes);
+		else fatal("Cannot produce JSON for size %d bytes (signed) dimension.", rd->bytes);
+	}
+	else {
+		if(rd->bytes == sizeof(unsigned long long)) {
+			unsigned long long *dimension = rd->values;
+			return(dimension[position]);
+		}
+		else if(rd->bytes == sizeof(unsigned long)) {
+			unsigned long *dimension = rd->values;
+			return(dimension[position]);
+		}
+		else if(rd->bytes == sizeof(unsigned short int)) {
+			unsigned short int *dimension = rd->values;
+			return(dimension[position]);
+		}
+		else if(rd->bytes == sizeof(unsigned char)) {
+			unsigned char *dimension = rd->values;
+			return(dimension[position]);
+		}
+		else fatal("Cannot produce JSON for size %d bytes (unsigned) dimension.", rd->bytes);
+	}
 
-		return(0);
+	return(0);
 }
 
 
@@ -1102,16 +1159,16 @@ void rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show
 		long double total = 0, oldtotal = 0;
 		if(we_need_totals) {
 			for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
-				total    += (long double)rrd_stats_dimension_get(rd, t);
-				oldtotal += (long double)rrd_stats_dimension_get(rd, lt);
+				total    += rrd_stats_dimension_get(rd, t);
+				oldtotal += rrd_stats_dimension_get(rd, lt);
 			}
 		}
 
 		for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 			long double oldvalue, value;			// temp variable for storing data values
 
-			value    = (long double)rrd_stats_dimension_get(rd, t);
-			oldvalue = (long double)rrd_stats_dimension_get(rd, lt);
+			value    = rrd_stats_dimension_get(rd, t);
+			oldvalue = rrd_stats_dimension_get(rd, lt);
 			
 			switch(rd->type) {
 				case RRD_DIMENSION_PCENT_OVER_TOTAL:
@@ -2206,10 +2263,10 @@ int do_proc_net_dev() {
 					continue;
 				}
 
-				if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "sent");
 
-				if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "received");
 
 			}
@@ -2393,10 +2450,10 @@ int do_proc_diskstats() {
 					continue;
 				}
 
-				if(!rrd_stats_dimension_add(st, "writes", "writes", sizeof(unsigned long long), sector_size * -1, 1024, RRD_DIMENSION_INCREMENTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "writes", "writes", sizeof(unsigned long long), 0, sector_size * -1, 1024, RRD_DIMENSION_INCREMENTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "writes");
 
-				if(!rrd_stats_dimension_add(st, "reads", "reads", sizeof(unsigned long long), sector_size, 1024, RRD_DIMENSION_INCREMENTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "reads", "reads", sizeof(unsigned long long), 0, sector_size, 1024, RRD_DIMENSION_INCREMENTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "reads");
 
 			}
@@ -2457,13 +2514,13 @@ int do_proc_net_snmp() {
 					continue;
 				}
 
-				if(!rrd_stats_dimension_add(st, "forwarded", "forwarded", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "forwarded", "forwarded", sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "forwarded");
 
-				if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), -1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "sent");
 
-				if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "received");
 
 			}
@@ -2501,7 +2558,7 @@ int do_proc_net_snmp() {
 					continue;
 				}
 
-				if(!rrd_stats_dimension_add(st, "connections", "connections", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_ABSOLUTE, NULL))
+				if(!rrd_stats_dimension_add(st, "connections", "connections", sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "connections");
 			}
 			else rrd_stats_next(st);
@@ -2517,10 +2574,10 @@ int do_proc_net_snmp() {
 					continue;
 				}
 
-				if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), -1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "sent");
 
-				if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "received");
 			}
 			else rrd_stats_next(st);
@@ -2556,10 +2613,10 @@ int do_proc_net_snmp() {
 					continue;
 				}
 
-				if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), -1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "sent");
 
-				if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "received");
 			}
 			else rrd_stats_next(st);
@@ -2616,10 +2673,10 @@ int do_proc_net_netstat() {
 					continue;
 				}
 
-				if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "sent");
 
-				if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "received");
 
 			}
@@ -2695,7 +2752,7 @@ int do_proc_net_stat_conntrack() {
 			return 1;
 		}
 
-		if(!rrd_stats_dimension_add(st, "connections", "connections", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_ABSOLUTE, NULL))
+		if(!rrd_stats_dimension_add(st, "connections", "connections", sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL))
 			error("Cannot add RRD_STATS dimension %s.", "connections");
 	}
 	else rrd_stats_next(st);
@@ -2711,10 +2768,10 @@ int do_proc_net_stat_conntrack() {
 			return 1;
 		}
 
-		if(!rrd_stats_dimension_add(st, "dropped", "dropped", sizeof(unsigned long long), -1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
+		if(!rrd_stats_dimension_add(st, "dropped", "dropped", sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
 			error("Cannot add RRD_STATS dimension %s.", "dropped");
 
-		if(!rrd_stats_dimension_add(st, "new", "new", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
+		if(!rrd_stats_dimension_add(st, "new", "new", sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
 			error("Cannot add RRD_STATS dimension %s.", "new");
 	}
 	else rrd_stats_next(st);
@@ -2731,10 +2788,10 @@ int do_proc_net_stat_conntrack() {
 			return 1;
 		}
 
-		if(!rrd_stats_dimension_add(st, "deleted", "deleted", sizeof(unsigned long long), -1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
+		if(!rrd_stats_dimension_add(st, "deleted", "deleted", sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
 			error("Cannot add RRD_STATS dimension %s.", "deleted");
 
-		if(!rrd_stats_dimension_add(st, "inserted", "inserted", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
+		if(!rrd_stats_dimension_add(st, "inserted", "inserted", sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
 			error("Cannot add RRD_STATS dimension %s.", "inserted");
 	}
 	else rrd_stats_next(st);
@@ -2797,7 +2854,7 @@ int do_proc_net_ip_vs_stats() {
 			return 1;
 		}
 
-		if(!rrd_stats_dimension_add(st, "connections", "connections", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
+		if(!rrd_stats_dimension_add(st, "connections", "connections", sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
 			error("Cannot add RRD_STATS dimension %s.", "connections");
 	}
 	else rrd_stats_next(st);
@@ -2813,10 +2870,10 @@ int do_proc_net_ip_vs_stats() {
 			return 1;
 		}
 
-		if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), -1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
+		if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
 			error("Cannot add RRD_STATS dimension %s.", "sent");
 
-		if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
+		if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
 			error("Cannot add RRD_STATS dimension %s.", "received");
 	}
 	else rrd_stats_next(st);
@@ -2833,10 +2890,10 @@ int do_proc_net_ip_vs_stats() {
 			return 1;
 		}
 
-		if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL))
+		if(!rrd_stats_dimension_add(st, "sent", "sent", sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL))
 			error("Cannot add RRD_STATS dimension %s.", "sent");
 
-		if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL))
+		if(!rrd_stats_dimension_add(st, "received", "received", sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL))
 			error("Cannot add RRD_STATS dimension %s.", "received");
 	}
 	else rrd_stats_next(st);
@@ -2886,35 +2943,35 @@ int do_proc_stat() {
 				long multiplier = 1;
 				long divisor = 1; // sysconf(_SC_CLK_TCK);
 
-				if(!rrd_stats_dimension_add(st, "iowait", "iowait", sizeof(unsigned long long), multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "iowait", "iowait", sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "iowait");
 
-				if(!rrd_stats_dimension_add(st, "nice", "nice", sizeof(unsigned long long), multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "nice", "nice", sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "nice");
 
-				if(!rrd_stats_dimension_add(st, "system", "system", sizeof(unsigned long long), multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "system", "system", sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "system");
 
-				if(!rrd_stats_dimension_add(st, "user", "user", sizeof(unsigned long long), multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "user", "user", sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "user");
 
-				if(!rrd_stats_dimension_add(st, "idle", "idle", sizeof(unsigned long long), multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "idle", "idle", sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "idle");
 				else rrd_stats_dimension_hide(st, "idle");
 
-				if(!rrd_stats_dimension_add(st, "irq", "irq", sizeof(unsigned long long), multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "irq", "irq", sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "irq");
 
-				if(!rrd_stats_dimension_add(st, "softirq", "softirq", sizeof(unsigned long long), multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "softirq", "softirq", sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "softirq");
 
-				if(!rrd_stats_dimension_add(st, "steal", "steal", sizeof(unsigned long long), multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "steal", "steal", sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "steal");
 
-				if(!rrd_stats_dimension_add(st, "guest", "guest", sizeof(unsigned long long), multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "guest", "guest", sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "guest");
 
-				if(!rrd_stats_dimension_add(st, "guest_nice", "guest_nice", sizeof(unsigned long long), multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "guest_nice", "guest_nice", sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "guest_nice");
 
 			}
@@ -2950,7 +3007,7 @@ int do_proc_stat() {
 					continue;
 				}
 
-				if(!rrd_stats_dimension_add(st, "interrupts", "interrupts", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "interrupts", "interrupts", sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "interrupts");
 
 			}
@@ -2977,7 +3034,7 @@ int do_proc_stat() {
 					continue;
 				}
 
-				if(!rrd_stats_dimension_add(st, "switches", "switches", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "switches", "switches", sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "switches");
 
 			}
@@ -3004,7 +3061,7 @@ int do_proc_stat() {
 					continue;
 				}
 
-				if(!rrd_stats_dimension_add(st, "started", "started", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
+				if(!rrd_stats_dimension_add(st, "started", "started", sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "started");
 
 			}
@@ -3031,7 +3088,7 @@ int do_proc_stat() {
 					continue;
 				}
 
-				if(!rrd_stats_dimension_add(st, "running", "running", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_ABSOLUTE, NULL))
+				if(!rrd_stats_dimension_add(st, "running", "running", sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL))
 					error("Cannot add RRD_STATS dimension %s.", "running");
 
 			}
@@ -3175,7 +3232,7 @@ void tc_device_commit(struct tc_device *d)
 
 		for ( c = d->classes ; c ; c = c->next) {
 			if(c->isleaf && c->hasparent) {
-				if(!rrd_stats_dimension_add(st, c->id, c->name, sizeof(unsigned long long), 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL))
+				if(!rrd_stats_dimension_add(st, c->id, c->name, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", c->name);
 			}
 		}
@@ -3187,7 +3244,7 @@ void tc_device_commit(struct tc_device *d)
 			if(rrd_stats_dimension_set(st, c->id, &c->bytes, NULL) != 0) {
 				
 				// new class, we have to add it
-				if(!rrd_stats_dimension_add(st, c->id, c->name, sizeof(unsigned long long), 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL))
+				if(!rrd_stats_dimension_add(st, c->id, c->name, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL))
 					error("Cannot add RRD_STATS dimension %s.", c->name);
 				else rrd_stats_dimension_set(st, c->id, &c->bytes, NULL);
 			}
@@ -3385,7 +3442,7 @@ void *cpujitter_main(void *ptr)
 				continue;
 			}
 
-			if(!rrd_stats_dimension_add(st, "jitter", "jitter", sizeof(unsigned long long), 1, 1, RRD_DIMENSION_ABSOLUTE, NULL))
+			if(!rrd_stats_dimension_add(st, "jitter", "jitter", sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL))
 				error("Cannot add RRD_STATS dimension %s.", "jitter");
 
 		}

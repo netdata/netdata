@@ -228,7 +228,7 @@ function loadCharts(base_url, doNext) {
 				lineWidth: 1,
 				title: json.charts[i].title,
 				hAxis: {title: "Time of Day", viewWindowMode: 'maximized', format:'HH:mm:ss'},
-				vAxis: {title: json.charts[i].vtitle, minValue: 0},
+				vAxis: {title: json.charts[i].vtitle, viewWindowMode: 'pretty', minValue: 0, maxValue: 10},
 				focusTarget: 'category',
 				annotation: {'1': {style: 'line'}},
 				//tooltip: {isHtml: true},
@@ -279,7 +279,7 @@ function loadCharts(base_url, doNext) {
 
 					if(json.charts[i].id.substring(0, 7) == "cpu.cpu") {
 						json.charts[i].chartOptions.vAxis.minValue = 0;
-						json.charts[i].chartOptions.vAxis.maxValue = 100;
+						json.charts[i].chartOptions.vAxis.maxValue = 101;
 					}
 					break;
 
