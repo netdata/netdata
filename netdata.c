@@ -3175,6 +3175,7 @@ struct tc_class {
 	char id[RRD_STATS_NAME_MAX + 1];
 	char name[RRD_STATS_NAME_MAX + 1];
 
+	char leafid[RRD_STATS_NAME_MAX + 1];
 	char parentid[RRD_STATS_NAME_MAX + 1];
 
 	int hasparent;
@@ -3195,11 +3196,14 @@ void tc_device_commit(struct tc_device *d)
 {
 	// we only need to add leaf classes
 	struct tc_class *c, *x;
-	for ( c = d->classes ; c ; c = c->next) {
+
+	for ( c = d->classes ; c ; c = c->next)
 		c->isleaf = 1;
 
+	for ( c = d->classes ; c ; c = c->next) {
 		for ( x = d->classes ; x ; x = x->next) {
-			if(strcmp(c->id, x->parentid) == 0) {
+			if(x->parentid[0] && (strcmp(c->id, x->parentid) == 0 || strcmp(c->leafid, x->parentid) == 0)) {
+				// debug(D_TC_LOOP, "In device '%s', class '%s' (leafid: '%s') has leaf the class '%s' (parentid: '%s').", d->name, c->name, c->leafid, x->name, x->parentid);
 				c->isleaf = 0;
 				x->hasparent = 1;
 			}
@@ -3207,10 +3211,12 @@ void tc_device_commit(struct tc_device *d)
 	}
 	
 	// debugging:
-	// for ( c = d->classes ; c ; c = c->next) {
-	//	if(c->isleaf && c->hasparent) debug(D_TC_LOOP, "Device %s, class %s, OK", d->name, c->id);
-	//	else debug(D_TC_LOOP, "Device %s, class %s, IGNORE (isleaf: %d, hasparent: %d, parent: %s)", d->name, c->id, c->isleaf, c->hasparent, c->parentid);
-	// }
+	/*
+	for ( c = d->classes ; c ; c = c->next) {
+		if(c->isleaf && c->hasparent) debug(D_TC_LOOP, "Device %s, class %s, OK", d->name, c->id);
+		else debug(D_TC_LOOP, "Device %s, class %s, IGNORE (isleaf: %d, hasparent: %d, parent: %s)", d->name, c->id, c->isleaf, c->hasparent, c->parentid);
+	}
+	*/
 
 	for ( c = d->classes ; c ; c = c->next) {
 		if(c->isleaf && c->hasparent) break;
@@ -3264,7 +3270,7 @@ void tc_device_set_class_name(struct tc_device *d, char *id, char *name)
 	for ( c = d->classes ; c ; c = c->next) {
 		if(strcmp(c->id, id) == 0) {
 			strncpy(c->name, name, RRD_STATS_NAME_MAX);
-			c->name[RRD_STATS_NAME_MAX] = '\0';
+			// no need for null termination - it is already null
 			break;
 		}
 	}
@@ -3285,15 +3291,16 @@ struct tc_device *tc_device_create(char *name)
 	if(!d) return NULL;
 
 	strcpy(d->name, RRD_TYPE_TC ".");
-	strncpy(&d->name[RRD_TYPE_TC_LEN + 1], name, RRD_STATS_NAME_MAX - 3);
-	d->name[RRD_STATS_NAME_MAX] = '\0';
+	strncpy(&d->name[RRD_TYPE_TC_LEN + 1], name, RRD_STATS_NAME_MAX - RRD_TYPE_TC_LEN - 1);
 
 	strcpy(d->id, d->name);
+
+	// no need for null termination on the strings, because of calloc()
 
 	return(d);
 }
 
-struct tc_class *tc_class_add(struct tc_device *n, char *id, char *parentid)
+struct tc_class *tc_class_add(struct tc_device *n, char *id, char *parentid, char *leafid)
 {
 	struct tc_class *c;
 
@@ -3306,6 +3313,9 @@ struct tc_class *tc_class_add(struct tc_device *n, char *id, char *parentid)
 	strncpy(c->id, id, RRD_STATS_NAME_MAX);
 	strcpy(c->name, c->id);
 	if(parentid) strncpy(c->parentid, parentid, RRD_STATS_NAME_MAX);
+	if(leafid) strncpy(c->leafid, leafid, RRD_STATS_NAME_MAX);
+
+	// no need for null termination on the strings, because of calloc()
 
 	return(c);
 }
@@ -3363,6 +3373,8 @@ void *tc_main(void *ptr)
 				char *id       = strsep(&b, " \n"); // the class major:minor
 				char *parent   = strsep(&b, " \n"); // 'parent' or 'root'
 				char *parentid = strsep(&b, " \n"); // the parent's id
+				char *leaf     = strsep(&b, " \n"); // 'leaf'
+				char *leafid   = strsep(&b, " \n"); // leafid
 
 				if(id && *id
 					&& parent && *parent
@@ -3371,9 +3383,22 @@ void *tc_main(void *ptr)
 						(strcmp(parent, "parent") == 0 && parentid && *parentid)
 						|| strcmp(parent, "root") == 0
 					)) {
-					if(strcmp(parent, "root") == 0) parentid = NULL;
 
-					class = tc_class_add(device, id, parentid);
+					if(strcmp(parent, "root") == 0) {
+						parentid = NULL;
+						leafid = NULL;
+					}
+					else if(!leaf || strcmp(leaf, "leaf") != 0)
+						leafid = NULL;
+
+					char leafbuf[20 + 1] = "";
+					if(leafid && leafid[strlen(leafid) - 1] == ':') {
+						strncpy(leafbuf, leafid, 20 - 1);
+						strcat(leafbuf, "1");
+						leafid = leafbuf;
+					}
+
+					class = tc_class_add(device, id, parentid, leafid);
 				}
 			}
 			else if(device && class && (strcmp(p, "Sent") == 0)) {
