@@ -12,6 +12,11 @@ fi
 
 devices=
 fix_names=
+
+setclassname() {
+	echo "SETCLASSNAME $3 $2"
+}
+
 show_tc() {
 	local x="$1"
 
@@ -27,9 +32,9 @@ show_tc() {
 
 		interface_classes=
 		. /var/run/fireqos/$name.conf
-		for x in $interface_classes_monitor
+		for n in $interface_classes_monitor
 		do
-				echo "SETCLASSNAME $x"
+				setclassname `echo $n | tr '|' ' '`
 		done
 	fi
 	echo "END $x"

@@ -3246,7 +3246,7 @@ void tc_device_commit(struct tc_device *d)
 	else rrd_stats_next(st);
 
 	for ( c = d->classes ; c ; c = c->next) {
-		if(c->isleaf && c->hasparent)
+		if(c->isleaf && c->hasparent) {
 			if(rrd_stats_dimension_set(st, c->id, &c->bytes, NULL) != 0) {
 				
 				// new class, we have to add it
@@ -3255,11 +3255,16 @@ void tc_device_commit(struct tc_device *d)
 				else rrd_stats_dimension_set(st, c->id, &c->bytes, NULL);
 			}
 
-			// check if the class changed name
-			RRD_DIMENSION *rd;
-			for(rd = st->dimensions ; rd ; rd = rd->next) {
-				if(strcmp(rd->id, c->id) == 0) { strcpy(rd->name, c->name); break; }
+			// if it has a name, different to the id
+			if(strcmp(c->id, c->name) != 0) {
+
+				// update the rrd dimension with the new name
+				RRD_DIMENSION *rd;
+				for(rd = st->dimensions ; rd ; rd = rd->next) {
+					if(strcmp(rd->id, c->id) == 0) { strcpy(rd->name, c->name); break; }
+				}
 			}
+		}
 	}
 	rrd_stats_done(st);
 }
@@ -3410,15 +3415,9 @@ void *tc_main(void *ptr)
 				if(name && *name) tc_device_set_device_name(device, name);
 			}
 			else if(device && (strcmp(p, "SETCLASSNAME") == 0)) {
-				char *name  = strsep(&b, " |\n");
-				char *path  = strsep(&b, " |\n");
 				char *id    = strsep(&b, " |\n");
-				char *qdisc = strsep(&b, " |\n");
+				char *path  = strsep(&b, " |\n");
 				if(id && *id && path && *path) tc_device_set_class_name(device, id, path);
-
-				// prevent unused variables warning
-				if(qdisc) qdisc = NULL;
-				if(name) name = NULL;
 			}
 			else if((strcmp(p, "MYPID") == 0)) {
 				char *id = strsep(&b, " \n");
