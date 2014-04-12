@@ -31,6 +31,7 @@
 
 #include <pthread.h>
 #include <zlib.h>
+#include <malloc.h>
 
 #define RRD_DIMENSION_ABSOLUTE					0
 #define RRD_DIMENSION_INCREMENTAL				1
@@ -388,6 +389,9 @@ struct rrd_stats {
 
 	time_t last_updated;						// when this data set was last updated
 
+	int isdetail;								// if set, the data set should be considered as a detail of another
+												// (the master data set should be the one that has the same group and is not detail)
+
 	struct timeval *times;						// the time in microseconds each data entry was collected
 	RRD_DIMENSION *dimensions;					// the actual data for every dimension
 
@@ -533,8 +537,14 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 	if(name) strncpy(rd->name, name, RRD_STATS_NAME_MAX);
 	else strncpy(rd->name, id, RRD_STATS_NAME_MAX);
 
-	rd->next = st->dimensions;
-	st->dimensions = rd;
+	// append this dimension
+	if(!st->dimensions)
+		st->dimensions = rd;
+	else {
+		RRD_DIMENSION *td = st->dimensions;
+		for(; td->next; td = td->next) ;
+		td->next = rd;
+	}
 
 	//rd->annotator = annotator;
 
@@ -932,9 +942,14 @@ void rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer *wb)
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"id\" : \"%s\",\n", st->id);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"name\" : \"%s\",\n", st->name);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"type\" : \"%s\",\n", st->type);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"group_name\" : \"%s\",\n", st->group);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"title\" : \"%s %s\",\n", st->title, st->name);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"usertitle\" : \"%s %s (%s)\",\n", st->title, st->usertitle, st->id);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"group_tag\" : \"%s\",\n", st->group);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"title\" : \"%s\",\n", st->title);
+
+	if(strcmp(st->id, st->usertitle) == 0 || strcmp(st->name, st->usertitle) == 0)
+		wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"usertitle\" : \"%s (%s)\",\n", st->title, st->name);
+	else 
+		wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"usertitle\" : \"%s %s (%s)\",\n", st->title, st->usertitle, st->name);
+
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"userpriority\" : \"%s\",\n", st->userpriority);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"envtitle\" : \"%s\",\n", st->envtitle);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"envpriority\" : \"%s\",\n", st->envpriority);
@@ -945,7 +960,8 @@ void rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer *wb)
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"current\" : %ld,\n", st->current_entry);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"update_every\" : %d,\n", update_every);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_updated\" : %lu,\n", st->last_updated);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_updated_secs_ago\" : %lu\n", time(NULL) - st->last_updated);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_updated_secs_ago\" : %lu,\n", time(NULL) - st->last_updated);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"isdetail\" : %d\n", st->isdetail);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t}");
 }
 
@@ -1475,16 +1491,17 @@ void web_client_process(struct web_client *w)
 		char *buf = w->data->buffer;
 		char *tok = strsep(&buf, " \r\n");
 		char *url = NULL;
+		char *pointer_to_free = NULL; // keep url_decode() allocated buffer
 
 		if(buf && strcmp(tok, "GET") == 0) {
 			tok = strsep(&buf, " \r\n");
-			url = url_decode(tok);
+			pointer_to_free = url = url_decode(tok);
 			debug(D_WEB_CLIENT, "%llu: Processing HTTP GET on url '%s'.", w->id, url);
 		}
 		else if (buf && strcmp(tok, "POST") == 0) {
 			w->keepalive = 0;
 			tok = strsep(&buf, " \r\n");
-			url = url_decode(tok);
+			pointer_to_free = url = url_decode(tok);
 
 			debug(D_WEB_CLIENT, "%llu: I don't know how to handle POST with form data. Assuming it is a GET on url '%s'.", w->id, url);
 		}
@@ -1635,6 +1652,7 @@ void web_client_process(struct web_client *w)
 				w->data->bytes = 0;
 				code = mysendfile(w, tok);
 			}
+
 		}
 		else {
 			if(buf) debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, buf);
@@ -1644,6 +1662,9 @@ void web_client_process(struct web_client *w)
 			strcpy(w->data->buffer, "I don't understand you...\r\n");
 			w->data->bytes = strlen(w->data->buffer);
 		}
+		
+		// free url_decode() buffer
+		if(pointer_to_free) free(pointer_to_free);
 	}
 	else if(w->data->bytes > 8192) {
 		debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big.", w->id);
@@ -2186,6 +2207,31 @@ void *new_client(void *ptr)
 // 3. spawns a new pthread to serve the client (this is optimal for keep-alive clients)
 // 4. cleans up old web_clients that their pthreads have been exited
 
+void syslog_allocations(void)
+{
+	static int mem = 0;
+
+	struct mallinfo mi;
+
+	mi = mallinfo();
+	if(mi.uordblks > mem) {
+		syslog(LOG_NOTICE, "Allocated memory increased from %d to %d (increased by %d bytes).", mem, mi.uordblks, mi.uordblks - mem );
+		mem = mi.uordblks;
+	}
+	/*
+	syslog(LOG_NOTICE, "Total non-mmapped bytes (arena):       %d\n", mi.arena);
+	syslog(LOG_NOTICE, "# of free chunks (ordblks):            %d\n", mi.ordblks);
+	syslog(LOG_NOTICE, "# of free fastbin blocks (smblks):     %d\n", mi.smblks);
+	syslog(LOG_NOTICE, "# of mapped regions (hblks):           %d\n", mi.hblks);
+	syslog(LOG_NOTICE, "Bytes in mapped regions (hblkhd):      %d\n", mi.hblkhd);
+	syslog(LOG_NOTICE, "Max. total allocated space (usmblks):  %d\n", mi.usmblks);
+	syslog(LOG_NOTICE, "Free bytes held in fastbins (fsmblks): %d\n", mi.fsmblks);
+	syslog(LOG_NOTICE, "Total allocated space (uordblks):      %d\n", mi.uordblks);
+	syslog(LOG_NOTICE, "Total free space (fordblks):           %d\n", mi.fordblks);
+	syslog(LOG_NOTICE, "Topmost releasable block (keepcost):   %d\n", mi.keepcost);
+	*/
+}
+
 void *socket_listen_main(void *ptr)
 {
 	struct web_client *w;
@@ -2236,6 +2282,7 @@ void *socket_listen_main(void *ptr)
 			if(w->obsolete) {
 				debug(D_WEB_CLIENT, "%llu: Removing client.", w->id);
 				w = web_client_free(w);
+				syslog_allocations();
 			}
 		}
 	}
@@ -2283,27 +2330,94 @@ int do_proc_net_dev() {
 		if(c) *c = '\t';
 		
 		// if(DEBUG) printf("%s\n", buffer);
-		r = sscanf(buffer, "%s\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\n",
+		r = sscanf(buffer, "%s %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu\n",
 			iface,
 			&rbytes, &rpackets, &rerrors, &rdrops, &rfifo, &rframe, &rcompressed, &rmulticast,
 			&tbytes, &tpackets, &terrors, &tdrops, &tfifo, &tcollisions, &tcarrier, &tcompressed);
 		if(r == EOF) break;
-		if(r != 17) error("Cannot read /proc/net/dev line. Expected 17 params, read %d.", r);
-		else {
-			RRD_STATS *st = rrd_stats_find_bytype(RRD_TYPE_NET, iface);
-
-			if(!st) {
-				st = rrd_stats_create(RRD_TYPE_NET, iface, NULL, iface, "Bandwidth", "kilobits/s", save_history);
-
-				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
-				rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
-			}
-			else rrd_stats_next(st);
-
-			rrd_stats_dimension_set(st, "received", &rbytes, NULL);
-			rrd_stats_dimension_set(st, "sent", &tbytes, NULL);
-			rrd_stats_done(st);
+		if(r != 17) {
+			error("Cannot read /proc/net/dev line. Expected 17 params, read %d.", r);
+			continue;
 		}
+
+		// --------------------------------------------------------------------
+
+		RRD_STATS *st = rrd_stats_find_bytype(RRD_TYPE_NET, iface);
+		if(!st) {
+			st = rrd_stats_create(RRD_TYPE_NET, iface, NULL, iface, "Bandwidth", "kilobits/s", save_history);
+
+			rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "received", &rbytes, NULL);
+		rrd_stats_dimension_set(st, "sent", &tbytes, NULL);
+		rrd_stats_done(st);
+
+		// --------------------------------------------------------------------
+
+		st = rrd_stats_find_bytype(iface, "packets");
+		if(!st) {
+			st = rrd_stats_create(iface, "packets", NULL, iface, "Packets", "packets/s", save_history);
+			st->isdetail = 1;
+
+			rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "received", &rpackets, NULL);
+		rrd_stats_dimension_set(st, "sent", &tpackets, NULL);
+		rrd_stats_done(st);
+
+		// --------------------------------------------------------------------
+
+		st = rrd_stats_find_bytype(iface, "errors");
+		if(!st) {
+			st = rrd_stats_create(iface, "errors", NULL, iface, "Interface Errors", "errors/s", save_history);
+			st->isdetail = 1;
+
+			rrd_stats_dimension_add(st, "receive", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "transmit", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "receive", &rerrors, NULL);
+		rrd_stats_dimension_set(st, "transmit", &terrors, NULL);
+		rrd_stats_done(st);
+
+		// --------------------------------------------------------------------
+
+		st = rrd_stats_find_bytype(iface, "fifo");
+		if(!st) {
+			st = rrd_stats_create(iface, "fifo", NULL, iface, "Interface Queue", "packets", save_history);
+			st->isdetail = 1;
+
+			rrd_stats_dimension_add(st, "receive", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "transmit", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "receive", &rfifo, NULL);
+		rrd_stats_dimension_set(st, "transmit", &tfifo, NULL);
+		rrd_stats_done(st);
+
+		// --------------------------------------------------------------------
+
+		st = rrd_stats_find_bytype(iface, "compressed");
+		if(!st) {
+			st = rrd_stats_create(iface, "compressed", NULL, iface, "Compressed Packets", "packets/s", save_history);
+			st->isdetail = 1;
+
+			rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "received", &rcompressed, NULL);
+		rrd_stats_dimension_set(st, "sent", &tcompressed, NULL);
+		rrd_stats_done(st);
 	}
 	
 	fclose(fp);
@@ -2319,8 +2433,6 @@ int do_proc_net_dev() {
 int do_proc_diskstats() {
 	char buffer[MAX_PROC_DISKSTATS_LINE+1] = "";
 	char disk[MAX_PROC_DISKSTATS_DISK_NAME + 1] = "";
-	//                               1      2             3            4       5       6              7             8        9           10     11
-	unsigned long long major, minor, reads, reads_merged, readsectors, readms, writes, writes_merged, writesectors, writems, currentios, iosms, wiosms;
 	
 	int r;
 	char *p;
@@ -2332,6 +2444,11 @@ int do_proc_diskstats() {
 	}
 	
 	for(;1;) {
+		unsigned long long 	major = 0, minor = 0,
+							reads = 0,  reads_merged = 0,  readsectors = 0,  readms = 0,
+							writes = 0, writes_merged = 0, writesectors = 0, writems = 0,
+							currentios = 0, iosms = 0, wiosms = 0;
+
 		p = fgets(buffer, MAX_PROC_DISKSTATS_LINE, fp);
 		if(!p) break;
 		
@@ -2341,150 +2458,220 @@ int do_proc_diskstats() {
 			&reads, &reads_merged, &readsectors, &readms, &writes, &writes_merged, &writesectors, &writems, &currentios, &iosms, &wiosms
 		);
 		if(r == EOF) break;
-		if(r != 14) error("Cannot read /proc/diskstats line. Expected 14 params, read %d.", r);
-		else {
-			switch(major) {
-				case 9: // MDs
-				case 43: // network block
-				case 144: // nfs
-				case 145: // nfs
-				case 146: // nfs
-				case 199: // veritas
-				case 201: // veritas
-				case 251: // dm
-					break;
-
-				case 48: // RAID
-				case 49: // RAID
-				case 50: // RAID
-				case 51: // RAID
-				case 52: // RAID
-				case 53: // RAID
-				case 54: // RAID
-				case 55: // RAID
-				case 112: // RAID
-				case 136: // RAID
-				case 137: // RAID
-				case 138: // RAID
-				case 139: // RAID
-				case 140: // RAID
-				case 141: // RAID
-				case 142: // RAID
-				case 143: // RAID
-				case 179: // MMC
-				case 180: // USB
-					if(minor % 8) continue; // partitions
-					break;
-
-				case 8: // scsi disks
-				case 65: // scsi disks
-				case 66: // scsi disks
-				case 67: // scsi disks
-				case 68: // scsi disks
-				case 69: // scsi disks
-				case 70: // scsi disks
-				case 71: // scsi disks
-				case 72: // scsi disks
-				case 73: // scsi disks
-				case 74: // scsi disks
-				case 75: // scsi disks
-				case 76: // scsi disks
-				case 77: // scsi disks
-				case 78: // scsi disks
-				case 79: // scsi disks
-				case 80: // i2o
-				case 81: // i2o
-				case 82: // i2o
-				case 83: // i2o
-				case 84: // i2o
-				case 85: // i2o
-				case 86: // i2o
-				case 87: // i2o
-				case 101: // hyperdisk
-				case 102: // compressed
-				case 104: // scsi
-				case 105: // scsi
-				case 106: // scsi
-				case 107: // scsi
-				case 108: // scsi
-				case 109: // scsi
-				case 110: // scsi
-				case 111: // scsi
-				case 114: // bios raid
-				case 116: // ram board
-				case 128: // scsi
-				case 129: // scsi
-				case 130: // scsi
-				case 131: // scsi
-				case 132: // scsi
-				case 133: // scsi
-				case 134: // scsi
-				case 135: // scsi
-				case 153: // raid
-				case 202: // xen
-				case 256: // flash
-				case 257: // flash
-					if(minor % 16) continue; // partitions
-					break;
-
-				case 160: // raid
-				case 161: // raid
-					if(minor % 32) continue; // partitions
-					break;
-
-				case 3: // ide
-				case 13: // 8bit ide
-				case 22: // ide
-				case 33: // ide
-				case 34: // ide
-				case 56: // ide
-				case 57: // ide
-				case 88: // ide
-				case 89: // ide
-				case 90: // ide
-				case 91: // ide
-					if(minor % 64) continue; // partitions
-					break;
-
-				default:
-					continue;
-			}
-
-			RRD_STATS *st = rrd_stats_find_bytype(RRD_TYPE_DISK, disk);
-			if(!st) {
-				char ssfilename[FILENAME_MAX + 1];
-				int sector_size = 512;
-
-				sprintf(ssfilename, "/sys/block/%s/queue/hw_sector_size", disk);
-				FILE *fpss = fopen(ssfilename, "r");
-				if(fpss) {
-					char ssbuffer[1025];
-					char *tmp = fgets(ssbuffer, 1024, fpss);
-
-					if(tmp) {
-						sector_size = atoi(tmp);
-						if(sector_size <= 0) {
-							error("Invalid sector size %d for device %s in %s. Assuming 512.", sector_size, disk, ssfilename);
-							sector_size = 512;
-						}
-					}
-					else error("Cannot read data for sector size for device %s from %s. Assuming 512.", disk, ssfilename);
-
-					fclose(fpss);
-				}
-				else error("Cannot read sector size for device %s from %s. Assuming 512.", disk, ssfilename);
-
-				st = rrd_stats_create(RRD_TYPE_DISK, disk, NULL, disk, "Disk I/O", "kilobytes/s", save_history);
-
-				rrd_stats_dimension_add(st, "writes", NULL, sizeof(unsigned long long), 0, sector_size * -1, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
-				rrd_stats_dimension_add(st, "reads", NULL, sizeof(unsigned long long), 0, sector_size, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
-			}
-			else rrd_stats_next(st);
-
-			rrd_stats_dimension_set(st, "reads", &readsectors, NULL);
-			rrd_stats_dimension_set(st, "writes", &writesectors, NULL);
-			rrd_stats_done(st);
+		if(r != 14) {
+			error("Cannot read /proc/diskstats line. Expected 14 params, read %d.", r);
+			continue;
 		}
+
+		switch(major) {
+			case 9: // MDs
+			case 43: // network block
+			case 144: // nfs
+			case 145: // nfs
+			case 146: // nfs
+			case 199: // veritas
+			case 201: // veritas
+			case 251: // dm
+				break;
+
+			case 48: // RAID
+			case 49: // RAID
+			case 50: // RAID
+			case 51: // RAID
+			case 52: // RAID
+			case 53: // RAID
+			case 54: // RAID
+			case 55: // RAID
+			case 112: // RAID
+			case 136: // RAID
+			case 137: // RAID
+			case 138: // RAID
+			case 139: // RAID
+			case 140: // RAID
+			case 141: // RAID
+			case 142: // RAID
+			case 143: // RAID
+			case 179: // MMC
+			case 180: // USB
+				if(minor % 8) continue; // partitions
+				break;
+
+			case 8: // scsi disks
+			case 65: // scsi disks
+			case 66: // scsi disks
+			case 67: // scsi disks
+			case 68: // scsi disks
+			case 69: // scsi disks
+			case 70: // scsi disks
+			case 71: // scsi disks
+			case 72: // scsi disks
+			case 73: // scsi disks
+			case 74: // scsi disks
+			case 75: // scsi disks
+			case 76: // scsi disks
+			case 77: // scsi disks
+			case 78: // scsi disks
+			case 79: // scsi disks
+			case 80: // i2o
+			case 81: // i2o
+			case 82: // i2o
+			case 83: // i2o
+			case 84: // i2o
+			case 85: // i2o
+			case 86: // i2o
+			case 87: // i2o
+			case 101: // hyperdisk
+			case 102: // compressed
+			case 104: // scsi
+			case 105: // scsi
+			case 106: // scsi
+			case 107: // scsi
+			case 108: // scsi
+			case 109: // scsi
+			case 110: // scsi
+			case 111: // scsi
+			case 114: // bios raid
+			case 116: // ram board
+			case 128: // scsi
+			case 129: // scsi
+			case 130: // scsi
+			case 131: // scsi
+			case 132: // scsi
+			case 133: // scsi
+			case 134: // scsi
+			case 135: // scsi
+			case 153: // raid
+			case 202: // xen
+			case 256: // flash
+			case 257: // flash
+				if(minor % 16) continue; // partitions
+				break;
+
+			case 160: // raid
+			case 161: // raid
+				if(minor % 32) continue; // partitions
+				break;
+
+			case 3: // ide
+			case 13: // 8bit ide
+			case 22: // ide
+			case 33: // ide
+			case 34: // ide
+			case 56: // ide
+			case 57: // ide
+			case 88: // ide
+			case 89: // ide
+			case 90: // ide
+			case 91: // ide
+				if(minor % 64) continue; // partitions
+				break;
+
+			default:
+				continue;
+		}
+
+		// --------------------------------------------------------------------
+
+		RRD_STATS *st = rrd_stats_find_bytype(RRD_TYPE_DISK, disk);
+		if(!st) {
+			char ssfilename[FILENAME_MAX + 1];
+			int sector_size = 512;
+
+			sprintf(ssfilename, "/sys/block/%s/queue/hw_sector_size", disk);
+			FILE *fpss = fopen(ssfilename, "r");
+			if(fpss) {
+				char ssbuffer[1025];
+				char *tmp = fgets(ssbuffer, 1024, fpss);
+
+				if(tmp) {
+					sector_size = atoi(tmp);
+					if(sector_size <= 0) {
+						error("Invalid sector size %d for device %s in %s. Assuming 512.", sector_size, disk, ssfilename);
+						sector_size = 512;
+					}
+				}
+				else error("Cannot read data for sector size for device %s from %s. Assuming 512.", disk, ssfilename);
+
+				fclose(fpss);
+			}
+			else error("Cannot read sector size for device %s from %s. Assuming 512.", disk, ssfilename);
+
+			st = rrd_stats_create(RRD_TYPE_DISK, disk, NULL, disk, "Disk I/O", "kilobytes/s", save_history);
+
+			rrd_stats_dimension_add(st, "reads", NULL, sizeof(unsigned long long), 0, sector_size, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "writes", NULL, sizeof(unsigned long long), 0, sector_size * -1, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "reads", &readsectors, NULL);
+		rrd_stats_dimension_set(st, "writes", &writesectors, NULL);
+		rrd_stats_done(st);
+
+		// --------------------------------------------------------------------
+
+		st = rrd_stats_find_bytype(disk, "ops");
+		if(!st) {
+			st = rrd_stats_create(disk, "ops", NULL, disk, "Disk Operations", "operations/s", save_history);
+			st->isdetail = 1;
+
+			rrd_stats_dimension_add(st, "reads", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "writes", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "reads", &reads, NULL);
+		rrd_stats_dimension_set(st, "writes", &writes, NULL);
+		rrd_stats_done(st);
+
+		// --------------------------------------------------------------------
+
+		st = rrd_stats_find_bytype(disk, "merged_ops");
+		if(!st) {
+			st = rrd_stats_create(disk, "merged_ops", NULL, disk, "Merged Disk Operations", "operations/s", save_history);
+			st->isdetail = 1;
+
+			rrd_stats_dimension_add(st, "reads", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "writes", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "reads", &reads_merged, NULL);
+		rrd_stats_dimension_set(st, "writes", &writes_merged, NULL);
+		rrd_stats_done(st);
+
+		// --------------------------------------------------------------------
+
+		st = rrd_stats_find_bytype(disk, "iotime");
+		if(!st) {
+			st = rrd_stats_create(disk, "iotime", NULL, disk, "Disk I/O Time", "milliseconds/s", save_history);
+			st->isdetail = 1;
+
+			rrd_stats_dimension_add(st, "reads", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "writes", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "latency", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "weighted", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "reads", &readms, NULL);
+		rrd_stats_dimension_set(st, "writes", &writems, NULL);
+		rrd_stats_dimension_set(st, "latency", &iosms, NULL);
+		rrd_stats_dimension_set(st, "weighted", &wiosms, NULL);
+		rrd_stats_done(st);
+
+		// --------------------------------------------------------------------
+
+		st = rrd_stats_find_bytype(disk, "current_ops");
+		if(!st) {
+			st = rrd_stats_create(disk, "current_ops", NULL, disk, "Current Disk I/O operations", "operations", save_history);
+			st->isdetail = 1;
+
+			rrd_stats_dimension_add(st, "operations", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "operations", &currentios, NULL);
+		rrd_stats_done(st);
 	}
 	
 	fclose(fp);
@@ -2528,13 +2715,15 @@ int do_proc_net_snmp() {
 			if(r == EOF) break;
 			if(r != 19) error("Cannot read /proc/net/snmp IP line. Expected 19 params, read %d.", r);
 
+			// --------------------------------------------------------------------
+
 			RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_SNMP ".packets");
 			if(!st) {
 				st = rrd_stats_create(RRD_TYPE_NET_SNMP, "packets", NULL, RRD_TYPE_NET_SNMP, "IPv4 Packets", "packets/s", save_history);
 
-				rrd_stats_dimension_add(st, "forwarded", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 				rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "forwarded", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 			}
 			else rrd_stats_next(st);
 
@@ -2561,6 +2750,8 @@ int do_proc_net_snmp() {
 			if(r == EOF) break;
 			if(r != 14) error("Cannot read /proc/net/snmp TCP line. Expected 14 params, read %d.", r);
 
+			// --------------------------------------------------------------------
+			
 			// see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
 			RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcpsock");
 			if(!st) {
@@ -2573,12 +2764,14 @@ int do_proc_net_snmp() {
 			rrd_stats_dimension_set(st, "connections", &CurrEstab, NULL);
 			rrd_stats_done(st);
 
+			// --------------------------------------------------------------------
+			
 			st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcppackets");
 			if(!st) {
 				st = rrd_stats_create(RRD_TYPE_NET_SNMP, "tcppackets", NULL, RRD_TYPE_NET_SNMP, "IPv4 TCP Packets", "packets/s", save_history);
 
-				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 				rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 			}
 			else rrd_stats_next(st);
 
@@ -2604,13 +2797,15 @@ int do_proc_net_snmp() {
 			if(r == EOF) break;
 			if(r != 6) error("Cannot read /proc/net/snmp UDP line. Expected 6 params, read %d.", r);
 
+			// --------------------------------------------------------------------
+			
 			// see http://net-snmp.sourceforge.net/docs/mibs/udp.html
 			RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_SNMP ".udppackets");
 			if(!st) {
 				st = rrd_stats_create(RRD_TYPE_NET_SNMP, "udppackets", NULL, RRD_TYPE_NET_SNMP, "IPv4 UDP Packets", "packets/s", save_history);
 
-				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 				rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 			}
 			else rrd_stats_next(st);
 
@@ -2650,25 +2845,109 @@ int do_proc_net_netstat() {
 				break;
 			}
 
-			unsigned long long InNoRoutes, InTruncatedPkts, InMcastPkts, OutMcastPkts, InBcastPkts, OutBcastPkts, InOctets, OutOctets, InMcastOctets, OutMcastOctets, InBcastOctets, OutBcastOctets;
+			unsigned long long
+				InNoRoutes = 0, InTruncatedPkts = 0,
+				InOctets = 0,  InMcastPkts = 0,  InBcastPkts = 0,  InMcastOctets = 0,  InBcastOctets = 0,
+				OutOctets = 0, OutMcastPkts = 0, OutBcastPkts = 0, OutMcastOctets = 0, OutBcastOctets = 0;
 	
 			int r = sscanf(&buffer[7], "%llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu\n",
-				&InNoRoutes, &InTruncatedPkts, &InMcastPkts, &OutMcastPkts, &InBcastPkts, &OutBcastPkts, &InOctets, &OutOctets, &InMcastOctets, &OutMcastOctets, &InBcastOctets, &OutBcastOctets);
+				&InNoRoutes, &InTruncatedPkts, &InMcastPkts, &OutMcastPkts, &InBcastPkts, &OutBcastPkts,
+				&InOctets, &OutOctets, &InMcastOctets, &OutMcastOctets, &InBcastOctets, &OutBcastOctets);
 
 			if(r == EOF) break;
-			if(r != 12) error("Cannot read /proc/net/netstat IpExt line. Expected 12 params, read %d.", r);
+			if(r != 12) {
+				error("Cannot read /proc/net/netstat IpExt line. Expected 12 params, read %d.", r);
+				continue;
+			}
 
-			RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_SNMP ".net");
+			// --------------------------------------------------------------------
+
+			RRD_STATS *st = rrd_stats_find("system.ipv4");
 			if(!st) {
-				st = rrd_stats_create(RRD_TYPE_NET_SNMP, "net", NULL, RRD_TYPE_NET_SNMP, "All IPv4 Bandwidth", "kilobits/s", save_history);
+				st = rrd_stats_create("system", "ipv4", NULL, "system", "IPv4 Bandwidth", "kilobits/s", save_history);
 
-				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
 				rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
 			}
 			else rrd_stats_next(st);
 
 			rrd_stats_dimension_set(st, "sent", &OutOctets, NULL);
 			rrd_stats_dimension_set(st, "received", &InOctets, NULL);
+			rrd_stats_done(st);
+
+			// --------------------------------------------------------------------
+
+			st = rrd_stats_find("ipv4.inerrors");
+			if(!st) {
+				st = rrd_stats_create("ipv4", "inerrors", NULL, "ipv4", "IPv4 Input Errors", "packets/s", save_history);
+
+				rrd_stats_dimension_add(st, "noroutes", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "trunkated", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "noroutes", &InNoRoutes, NULL);
+			rrd_stats_dimension_set(st, "trunkated", &InTruncatedPkts, NULL);
+			rrd_stats_done(st);
+
+			// --------------------------------------------------------------------
+
+			st = rrd_stats_find("ipv4.mcast");
+			if(!st) {
+				st = rrd_stats_create("ipv4", "mcast", NULL, "ipv4", "IPv4 Multicast Bandwidth", "kilobits/s", save_history);
+
+				rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "sent", &OutMcastOctets, NULL);
+			rrd_stats_dimension_set(st, "received", &InMcastOctets, NULL);
+			rrd_stats_done(st);
+
+			// --------------------------------------------------------------------
+
+			st = rrd_stats_find("ipv4.bcast");
+			if(!st) {
+				st = rrd_stats_create("ipv4", "bcast", NULL, "ipv4", "IPv4 Broadcast Bandwidth", "kilobits/s", save_history);
+
+				rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "sent", &OutBcastOctets, NULL);
+			rrd_stats_dimension_set(st, "received", &InBcastOctets, NULL);
+			rrd_stats_done(st);
+
+			// --------------------------------------------------------------------
+
+			st = rrd_stats_find("ipv4.mcastpkts");
+			if(!st) {
+				st = rrd_stats_create("ipv4", "mcastpkts", NULL, "ipv4", "IPv4 Multicast Packets", "packets/s", save_history);
+
+				rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "sent", &OutMcastPkts, NULL);
+			rrd_stats_dimension_set(st, "received", &InMcastPkts, NULL);
+			rrd_stats_done(st);
+
+			// --------------------------------------------------------------------
+
+			st = rrd_stats_find("ipv4.bcastpkts");
+			if(!st) {
+				st = rrd_stats_create("ipv4", "bcastpkts", NULL, "ipv4", "IPv4 Broadcast Packets", "packets/s", save_history);
+
+				rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "sent", &OutBcastPkts, NULL);
+			rrd_stats_dimension_set(st, "received", &InBcastPkts, NULL);
 			rrd_stats_done(st);
 		}
 	}
@@ -2744,8 +3023,8 @@ int do_proc_net_stat_conntrack() {
 	if(!st) {
 		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "new", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter New Connections", "connections/s", save_history);
 
-		rrd_stats_dimension_add(st, "dropped", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 		rrd_stats_dimension_add(st, "new", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		rrd_stats_dimension_add(st, "dropped", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 	}
 	else rrd_stats_next(st);
 
@@ -2757,8 +3036,8 @@ int do_proc_net_stat_conntrack() {
 	if(!st) {
 		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "changes", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Changes", "connections/s", save_history);
 
-		rrd_stats_dimension_add(st, "deleted", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 		rrd_stats_dimension_add(st, "inserted", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		rrd_stats_dimension_add(st, "deleted", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 	}
 	else rrd_stats_next(st);
 
@@ -2827,8 +3106,8 @@ int do_proc_net_ip_vs_stats() {
 	if(!st) {
 		st = rrd_stats_create(RRD_TYPE_NET_IPVS, "packets", NULL, RRD_TYPE_NET_IPVS, "IPVS Packets", "packets/s", save_history);
 
-		rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 		rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 	}
 	else rrd_stats_next(st);
 
@@ -2840,8 +3119,8 @@ int do_proc_net_ip_vs_stats() {
 	if(!st) {
 		st = rrd_stats_create(RRD_TYPE_NET_IPVS, "net", NULL, RRD_TYPE_NET_IPVS, "IPVS Bandwidth", "kilobits/s", save_history);
 
-		rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
 		rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+		rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
 	}
 	else rrd_stats_next(st);
 
@@ -2875,28 +3154,32 @@ int do_proc_stat() {
 			if(r == EOF) break;
 			if(r < 10) error("Cannot read /proc/stat cpu line. Expected 11 params, read %d.", r);
 
-			RRD_STATS *st = rrd_stats_find_bytype(RRD_TYPE_STAT, id);
-			if(!st) {
-				char *title = "Core utilization";
-				if(strcmp(id, "cpu") == 0) title = "Total CPU utilization";
+			char *title = "Core utilization";
+			char *type = RRD_TYPE_STAT;
+			if(strcmp(id, "cpu") == 0) {
+				title = "Total CPU utilization";
+				type = "system";
+			}
 
-				st = rrd_stats_create(RRD_TYPE_STAT, id, NULL, RRD_TYPE_STAT, title, "percentage", save_history);
+			RRD_STATS *st = rrd_stats_find_bytype(type, id);
+			if(!st) {
+				st = rrd_stats_create(type, id, NULL, type, title, "percentage", save_history);
 
 				long multiplier = 1;
 				long divisor = 1; // sysconf(_SC_CLK_TCK);
 
-				rrd_stats_dimension_add(st, "iowait", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "nice", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "system", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+				rrd_stats_dimension_add(st, "guest_nice", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+				rrd_stats_dimension_add(st, "guest", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+				rrd_stats_dimension_add(st, "steal", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+				rrd_stats_dimension_add(st, "softirq", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+				rrd_stats_dimension_add(st, "irq", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
 				rrd_stats_dimension_add(st, "user", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+				rrd_stats_dimension_add(st, "system", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+				rrd_stats_dimension_add(st, "nice", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+				rrd_stats_dimension_add(st, "iowait", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+
 				rrd_stats_dimension_add(st, "idle", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
 				rrd_stats_dimension_hide(st, "idle");
-
-				rrd_stats_dimension_add(st, "irq", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "softirq", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "steal", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "guest", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "guest_nice", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
 			}
 			else rrd_stats_next(st);
 
@@ -2921,9 +3204,9 @@ int do_proc_stat() {
 			if(r == EOF) break;
 			if(r != 2) error("Cannot read /proc/stat intr line. Expected 2 params, read %d.", r);
 
-			RRD_STATS *st = rrd_stats_find_bytype(RRD_TYPE_STAT, id);
+			RRD_STATS *st = rrd_stats_find_bytype("system", id);
 			if(!st) {
-				st = rrd_stats_create(RRD_TYPE_STAT, id, NULL, RRD_TYPE_STAT, "CPU Interrupts", "interrupts/s", save_history);
+				st = rrd_stats_create("system", id, NULL, "system", "CPU Interrupts", "interrupts/s", save_history);
 
 				rrd_stats_dimension_add(st, "interrupts", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 			}
@@ -2941,9 +3224,9 @@ int do_proc_stat() {
 			if(r == EOF) break;
 			if(r != 2) error("Cannot read /proc/stat ctxt line. Expected 2 params, read %d.", r);
 
-			RRD_STATS *st = rrd_stats_find_bytype(RRD_TYPE_STAT, id);
+			RRD_STATS *st = rrd_stats_find_bytype("system", id);
 			if(!st) {
-				st = rrd_stats_create(RRD_TYPE_STAT, id, NULL, RRD_TYPE_STAT, "CPU Context Switches", "context switches/s", save_history);
+				st = rrd_stats_create("system", id, NULL, "system", "CPU Context Switches", "context switches/s", save_history);
 
 				rrd_stats_dimension_add(st, "switches", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 			}
@@ -2961,9 +3244,9 @@ int do_proc_stat() {
 			if(r == EOF) break;
 			if(r != 2) error("Cannot read /proc/stat processes line. Expected 2 params, read %d.", r);
 
-			RRD_STATS *st = rrd_stats_find_bytype(RRD_TYPE_STAT, id);
+			RRD_STATS *st = rrd_stats_find_bytype("system", id);
 			if(!st) {
-				st = rrd_stats_create(RRD_TYPE_STAT, id, NULL, RRD_TYPE_STAT, "Started Processes", "processes/s", save_history);
+				st = rrd_stats_create("system", id, NULL, "system", "New Processes", "new processes/s", save_history);
 
 				rrd_stats_dimension_add(st, "started", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 			}
@@ -2981,9 +3264,9 @@ int do_proc_stat() {
 			if(r == EOF) break;
 			if(r != 2) error("Cannot read /proc/stat processes line. Expected 2 params, read %d.", r);
 
-			RRD_STATS *st = rrd_stats_find_bytype(RRD_TYPE_STAT, id);
+			RRD_STATS *st = rrd_stats_find_bytype("system", id);
 			if(!st) {
-				st = rrd_stats_create(RRD_TYPE_STAT, id, NULL, RRD_TYPE_STAT, "CPU Running Processes", "processes running",  save_history);
+				st = rrd_stats_create("system", id, NULL, "system", "CPU Running Processes", "processes running",  save_history);
 
 				rrd_stats_dimension_add(st, "running", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
 			}
@@ -3085,14 +3368,14 @@ int do_proc_meminfo() {
 	// http://stackoverflow.com/questions/3019748/how-to-reliably-measure-available-memory-in-linux
 	MemUsed = MemTotal - MemFree - Cached - Buffers;
 
-	RRD_STATS *st = rrd_stats_find("mem.ram");
+	RRD_STATS *st = rrd_stats_find("system.ram");
 	if(!st) {
-		st = rrd_stats_create("mem", "ram", NULL, "mem", "System RAM", "percentage", save_history);
+		st = rrd_stats_create("system", "ram", NULL, "system", "System RAM", "percentage", save_history);
 
-		rrd_stats_dimension_add(st, "free",    NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL, NULL);
-		rrd_stats_dimension_add(st, "cached",  NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL, NULL);
-		rrd_stats_dimension_add(st, "used",    NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL, NULL);
 		rrd_stats_dimension_add(st, "buffers", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL, NULL);
+		rrd_stats_dimension_add(st, "used",    NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL, NULL);
+		rrd_stats_dimension_add(st, "cached",  NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL, NULL);
+		rrd_stats_dimension_add(st, "free",    NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL, NULL);
 	}
 	else rrd_stats_next(st);
 
@@ -3105,6 +3388,173 @@ int do_proc_meminfo() {
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
+// /proc/vmstat processor
+
+#define MAX_PROC_VMSTAT_LINE 4096
+#define MAX_PROC_VMSTAT_NAME 1024
+
+int do_proc_vmstat() {
+	char buffer[MAX_PROC_VMSTAT_LINE+1] = "";
+
+	FILE *fp = fopen("/proc/vmstat", "r");
+	if(!fp) {
+		error("Cannot read /proc/vmstat.");
+		return 1;
+	}
+
+	unsigned long long nr_free_pages = 0, nr_inactive_anon = 0, nr_active_anon = 0, nr_inactive_file = 0, nr_active_file = 0, nr_unevictable = 0, nr_mlock = 0,
+		nr_anon_pages = 0, nr_mapped = 0, nr_file_pages = 0, nr_dirty = 0, nr_writeback = 0, nr_slab_reclaimable = 0, nr_slab_unreclaimable = 0, nr_page_table_pages = 0,
+		nr_kernel_stack = 0, nr_unstable = 0, nr_bounce = 0, nr_vmscan_write = 0, nr_vmscan_immediate_reclaim = 0, nr_writeback_temp = 0, nr_isolated_anon = 0, nr_isolated_file = 0,
+		nr_shmem = 0, nr_dirtied = 0, nr_written = 0, nr_anon_transparent_hugepages = 0, nr_dirty_threshold = 0, nr_dirty_background_threshold = 0,
+		pgpgin = 0, pgpgout = 0, pswpin = 0, pswpout = 0, pgalloc_dma = 0, pgalloc_dma32 = 0, pgalloc_normal = 0, pgalloc_movable = 0, pgfree = 0, pgactivate = 0, pgdeactivate = 0,
+		pgfault = 0, pgmajfault = 0, pgrefill_dma = 0, pgrefill_dma32 = 0, pgrefill_normal = 0, pgrefill_movable = 0, pgsteal_kswapd_dma = 0, pgsteal_kswapd_dma32 = 0,
+		pgsteal_kswapd_normal = 0, pgsteal_kswapd_movable = 0, pgsteal_direct_dma = 0, pgsteal_direct_dma32 = 0, pgsteal_direct_normal = 0, pgsteal_direct_movable = 0, 
+		pgscan_kswapd_dma = 0, pgscan_kswapd_dma32 = 0, pgscan_kswapd_normal = 0, pgscan_kswapd_movable = 0, pgscan_direct_dma = 0, pgscan_direct_dma32 = 0, pgscan_direct_normal = 0,
+		pgscan_direct_movable = 0, pginodesteal = 0, slabs_scanned = 0, kswapd_inodesteal = 0, kswapd_low_wmark_hit_quickly = 0, kswapd_high_wmark_hit_quickly = 0,
+		kswapd_skip_congestion_wait = 0, pageoutrun = 0, allocstall = 0, pgrotated = 0, compact_blocks_moved = 0, compact_pages_moved = 0, compact_pagemigrate_failed = 0,
+		compact_stall = 0, compact_fail = 0, compact_success = 0, htlb_buddy_alloc_success = 0, htlb_buddy_alloc_fail = 0, unevictable_pgs_culled = 0, unevictable_pgs_scanned = 0,
+		unevictable_pgs_rescued = 0, unevictable_pgs_mlocked = 0, unevictable_pgs_munlocked = 0, unevictable_pgs_cleared = 0, unevictable_pgs_stranded = 0, unevictable_pgs_mlockfreed = 0,
+		thp_fault_alloc = 0, thp_fault_fallback = 0, thp_collapse_alloc = 0, thp_collapse_alloc_failed = 0, thp_split = 0;
+
+	for(;1;) {
+		char *p = fgets(buffer, MAX_PROC_VMSTAT_NAME, fp);
+		if(!p) break;
+
+		// remove ':'
+		while((p = strchr(buffer, ':'))) *p = ' ';
+
+		char name[MAX_PROC_MEMINFO_NAME + 1] = "";
+		unsigned long long value = 0;
+
+		int r = sscanf(buffer, "%s %llu\n", name, &value);
+
+		if(r == EOF) break;
+		if(r != 2) error("Cannot read /proc/meminfo line. Expected 2 params, read %d.", r);
+
+		     if(!nr_free_pages && strcmp(name, "nr_free_pages") == 0) nr_free_pages = value;
+		else if(!nr_inactive_anon && strcmp(name, "nr_inactive_anon") == 0) nr_inactive_anon = value;
+		else if(!nr_active_anon && strcmp(name, "nr_active_anon") == 0) nr_active_anon = value;
+		else if(!nr_inactive_file && strcmp(name, "nr_inactive_file") == 0) nr_inactive_file = value;
+		else if(!nr_active_file && strcmp(name, "nr_active_file") == 0) nr_active_file = value;
+		else if(!nr_unevictable && strcmp(name, "nr_unevictable") == 0) nr_unevictable = value;
+		else if(!nr_mlock && strcmp(name, "nr_mlock") == 0) nr_mlock = value;
+		else if(!nr_anon_pages && strcmp(name, "nr_anon_pages") == 0) nr_anon_pages = value;
+		else if(!nr_mapped && strcmp(name, "nr_mapped") == 0) nr_mapped = value;
+		else if(!nr_file_pages && strcmp(name, "nr_file_pages") == 0) nr_file_pages = value;
+		else if(!nr_dirty && strcmp(name, "nr_dirty") == 0) nr_dirty = value;
+		else if(!nr_writeback && strcmp(name, "nr_writeback") == 0) nr_writeback = value;
+		else if(!nr_slab_reclaimable && strcmp(name, "nr_slab_reclaimable") == 0) nr_slab_reclaimable = value;
+		else if(!nr_slab_unreclaimable && strcmp(name, "nr_slab_unreclaimable") == 0) nr_slab_unreclaimable = value;
+		else if(!nr_page_table_pages && strcmp(name, "nr_page_table_pages") == 0) nr_page_table_pages = value;
+		else if(!nr_kernel_stack && strcmp(name, "nr_kernel_stack") == 0) nr_kernel_stack = value;
+		else if(!nr_unstable && strcmp(name, "nr_unstable") == 0) nr_unstable = value;
+		else if(!nr_bounce && strcmp(name, "nr_bounce") == 0) nr_bounce = value;
+		else if(!nr_vmscan_write && strcmp(name, "nr_vmscan_write") == 0) nr_vmscan_write = value;
+		else if(!nr_vmscan_immediate_reclaim && strcmp(name, "nr_vmscan_immediate_reclaim") == 0) nr_vmscan_immediate_reclaim = value;
+		else if(!nr_writeback_temp && strcmp(name, "nr_writeback_temp") == 0) nr_writeback_temp = value;
+		else if(!nr_isolated_anon && strcmp(name, "nr_isolated_anon") == 0) nr_isolated_anon = value;
+		else if(!nr_isolated_file && strcmp(name, "nr_isolated_file") == 0) nr_isolated_file = value;
+		else if(!nr_shmem && strcmp(name, "nr_shmem") == 0) nr_shmem = value;
+		else if(!nr_dirtied && strcmp(name, "nr_dirtied") == 0) nr_dirtied = value;
+		else if(!nr_written && strcmp(name, "nr_written") == 0) nr_written = value;
+		else if(!nr_anon_transparent_hugepages && strcmp(name, "nr_anon_transparent_hugepages") == 0) nr_anon_transparent_hugepages = value;
+		else if(!nr_dirty_threshold && strcmp(name, "nr_dirty_threshold") == 0) nr_dirty_threshold = value;
+		else if(!nr_dirty_background_threshold && strcmp(name, "nr_dirty_background_threshold") == 0) nr_dirty_background_threshold = value;
+		else if(!pgpgin && strcmp(name, "pgpgin") == 0) pgpgin = value;
+		else if(!pgpgout && strcmp(name, "pgpgout") == 0) pgpgout = value;
+		else if(!pswpin && strcmp(name, "pswpin") == 0) pswpin = value;
+		else if(!pswpout && strcmp(name, "pswpout") == 0) pswpout = value;
+		else if(!pgalloc_dma && strcmp(name, "pgalloc_dma") == 0) pgalloc_dma = value;
+		else if(!pgalloc_dma32 && strcmp(name, "pgalloc_dma32") == 0) pgalloc_dma32 = value;
+		else if(!pgalloc_normal && strcmp(name, "pgalloc_normal") == 0) pgalloc_normal = value;
+		else if(!pgalloc_movable && strcmp(name, "pgalloc_movable") == 0) pgalloc_movable = value;
+		else if(!pgfree && strcmp(name, "pgfree") == 0) pgfree = value;
+		else if(!pgactivate && strcmp(name, "pgactivate") == 0) pgactivate = value;
+		else if(!pgdeactivate && strcmp(name, "pgdeactivate") == 0) pgdeactivate = value;
+		else if(!pgfault && strcmp(name, "pgfault") == 0) pgfault = value;
+		else if(!pgmajfault && strcmp(name, "pgmajfault") == 0) pgmajfault = value;
+		else if(!pgrefill_dma && strcmp(name, "pgrefill_dma") == 0) pgrefill_dma = value;
+		else if(!pgrefill_dma32 && strcmp(name, "pgrefill_dma32") == 0) pgrefill_dma32 = value;
+		else if(!pgrefill_normal && strcmp(name, "pgrefill_normal") == 0) pgrefill_normal = value;
+		else if(!pgrefill_movable && strcmp(name, "pgrefill_movable") == 0) pgrefill_movable = value;
+		else if(!pgsteal_kswapd_dma && strcmp(name, "pgsteal_kswapd_dma") == 0) pgsteal_kswapd_dma = value;
+		else if(!pgsteal_kswapd_dma32 && strcmp(name, "pgsteal_kswapd_dma32") == 0) pgsteal_kswapd_dma32 = value;
+		else if(!pgsteal_kswapd_normal && strcmp(name, "pgsteal_kswapd_normal") == 0) pgsteal_kswapd_normal = value;
+		else if(!pgsteal_kswapd_movable && strcmp(name, "pgsteal_kswapd_movable") == 0) pgsteal_kswapd_movable = value;
+		else if(!pgsteal_direct_dma && strcmp(name, "pgsteal_direct_dma") == 0) pgsteal_direct_dma = value;
+		else if(!pgsteal_direct_dma32 && strcmp(name, "pgsteal_direct_dma32") == 0) pgsteal_direct_dma32 = value;
+		else if(!pgsteal_direct_normal && strcmp(name, "pgsteal_direct_normal") == 0) pgsteal_direct_normal = value;
+		else if(!pgsteal_direct_movable && strcmp(name, "pgsteal_direct_movable") == 0) pgsteal_direct_movable = value;
+		else if(!pgscan_kswapd_dma && strcmp(name, "pgscan_kswapd_dma") == 0) pgscan_kswapd_dma = value;
+		else if(!pgscan_kswapd_dma32 && strcmp(name, "pgscan_kswapd_dma32") == 0) pgscan_kswapd_dma32 = value;
+		else if(!pgscan_kswapd_normal && strcmp(name, "pgscan_kswapd_normal") == 0) pgscan_kswapd_normal = value;
+		else if(!pgscan_kswapd_movable && strcmp(name, "pgscan_kswapd_movable") == 0) pgscan_kswapd_movable = value;
+		else if(!pgscan_direct_dma && strcmp(name, "pgscan_direct_dma") == 0) pgscan_direct_dma = value;
+		else if(!pgscan_direct_dma32 && strcmp(name, "pgscan_direct_dma32") == 0) pgscan_direct_dma32 = value;
+		else if(!pgscan_direct_normal && strcmp(name, "pgscan_direct_normal") == 0) pgscan_direct_normal = value;
+		else if(!pgscan_direct_movable && strcmp(name, "pgscan_direct_movable") == 0) pgscan_direct_movable = value;
+		else if(!pginodesteal && strcmp(name, "pginodesteal") == 0) pginodesteal = value;
+		else if(!slabs_scanned && strcmp(name, "slabs_scanned") == 0) slabs_scanned = value;
+		else if(!kswapd_inodesteal && strcmp(name, "kswapd_inodesteal") == 0) kswapd_inodesteal = value;
+		else if(!kswapd_low_wmark_hit_quickly && strcmp(name, "kswapd_low_wmark_hit_quickly") == 0) kswapd_low_wmark_hit_quickly = value;
+		else if(!kswapd_high_wmark_hit_quickly && strcmp(name, "kswapd_high_wmark_hit_quickly") == 0) kswapd_high_wmark_hit_quickly = value;
+		else if(!kswapd_skip_congestion_wait && strcmp(name, "kswapd_skip_congestion_wait") == 0) kswapd_skip_congestion_wait = value;
+		else if(!pageoutrun && strcmp(name, "pageoutrun") == 0) pageoutrun = value;
+		else if(!allocstall && strcmp(name, "allocstall") == 0) allocstall = value;
+		else if(!pgrotated && strcmp(name, "pgrotated") == 0) pgrotated = value;
+		else if(!compact_blocks_moved && strcmp(name, "compact_blocks_moved") == 0) compact_blocks_moved = value;
+		else if(!compact_pages_moved && strcmp(name, "compact_pages_moved") == 0) compact_pages_moved = value;
+		else if(!compact_pagemigrate_failed && strcmp(name, "compact_pagemigrate_failed") == 0) compact_pagemigrate_failed = value;
+		else if(!compact_stall && strcmp(name, "compact_stall") == 0) compact_stall = value;
+		else if(!compact_fail && strcmp(name, "compact_fail") == 0) compact_fail = value;
+		else if(!compact_success && strcmp(name, "compact_success") == 0) compact_success = value;
+		else if(!htlb_buddy_alloc_success && strcmp(name, "htlb_buddy_alloc_success") == 0) htlb_buddy_alloc_success = value;
+		else if(!htlb_buddy_alloc_fail && strcmp(name, "htlb_buddy_alloc_fail") == 0) htlb_buddy_alloc_fail = value;
+		else if(!unevictable_pgs_culled && strcmp(name, "unevictable_pgs_culled") == 0) unevictable_pgs_culled = value;
+		else if(!unevictable_pgs_scanned && strcmp(name, "unevictable_pgs_scanned") == 0) unevictable_pgs_scanned = value;
+		else if(!unevictable_pgs_rescued && strcmp(name, "unevictable_pgs_rescued") == 0) unevictable_pgs_rescued = value;
+		else if(!unevictable_pgs_mlocked && strcmp(name, "unevictable_pgs_mlocked") == 0) unevictable_pgs_mlocked = value;
+		else if(!unevictable_pgs_munlocked && strcmp(name, "unevictable_pgs_munlocked") == 0) unevictable_pgs_munlocked = value;
+		else if(!unevictable_pgs_cleared && strcmp(name, "unevictable_pgs_cleared") == 0) unevictable_pgs_cleared = value;
+		else if(!unevictable_pgs_stranded && strcmp(name, "unevictable_pgs_stranded") == 0) unevictable_pgs_stranded = value;
+		else if(!unevictable_pgs_mlockfreed && strcmp(name, "unevictable_pgs_mlockfreed") == 0) unevictable_pgs_mlockfreed = value;
+		else if(!thp_fault_alloc && strcmp(name, "thp_fault_alloc") == 0) thp_fault_alloc = value;
+		else if(!thp_fault_fallback && strcmp(name, "thp_fault_fallback") == 0) thp_fault_fallback = value;
+		else if(!thp_collapse_alloc && strcmp(name, "thp_collapse_alloc") == 0) thp_collapse_alloc = value;
+		else if(!thp_collapse_alloc_failed && strcmp(name, "thp_collapse_alloc_failed") == 0) thp_collapse_alloc_failed = value;
+		else if(!thp_split && strcmp(name, "thp_split") == 0) thp_split = value;
+	}
+	fclose(fp);
+
+	RRD_STATS *st = rrd_stats_find("system.swapio");
+	if(!st) {
+		st = rrd_stats_create("system", "swapio", NULL, "system", "Swap I/O", "kilobytes/s", save_history);
+
+		rrd_stats_dimension_add(st, "in",  NULL, sizeof(unsigned long long), 0, sysconf(_SC_PAGESIZE), 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+		rrd_stats_dimension_add(st, "out", NULL, sizeof(unsigned long long), 0, -sysconf(_SC_PAGESIZE), 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "in", &pswpin, NULL);
+	rrd_stats_dimension_set(st, "out", &pswpout, NULL);
+	rrd_stats_done(st);
+
+	st = rrd_stats_find("system.io");
+	if(!st) {
+		st = rrd_stats_create("system", "io", NULL, "system", "Disk I/O", "kilobytes/s", save_history);
+
+		rrd_stats_dimension_add(st, "in",  NULL, sizeof(unsigned long long), 0,  1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		rrd_stats_dimension_add(st, "out", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "in", &pgpgin, NULL);
+	rrd_stats_dimension_set(st, "out", &pgpgout, NULL);
+	rrd_stats_done(st);
+
+	return 0;
+}
 
 // ----------------------------------------------------------------------------
 // /proc processor
@@ -3125,6 +3575,7 @@ void *proc_main(void *ptr)
 	int vdo_proc_net_ip_vs_stats = 0;
 	int vdo_proc_stat = 0;
 	int vdo_proc_meminfo = 0;
+	int vdo_proc_vmstat = 0;
 
 	for(;1;) {
 		unsigned long long usec, susec;
@@ -3143,6 +3594,7 @@ void *proc_main(void *ptr)
 		if(!vdo_proc_net_ip_vs_stats)		vdo_proc_net_ip_vs_stats	= do_proc_net_ip_vs_stats(usec);
 		if(!vdo_proc_stat)					vdo_proc_stat 				= do_proc_stat(usec);
 		if(!vdo_proc_meminfo)				vdo_proc_meminfo			= do_proc_meminfo(usec);
+		if(!vdo_proc_vmstat)				vdo_proc_vmstat				= do_proc_vmstat(usec);
 		// END -- the job is done
 		
 		// find the time to sleep in order to wait exactly update_every seconds
@@ -3482,9 +3934,9 @@ void *cpuidlejitter_main(void *ptr)
 		}
 		usec -= (CPU_IDLEJITTER_SLEEP_TIME_MS * 1000);
 
-		RRD_STATS *st = rrd_stats_find(RRD_TYPE_STAT ".idlejitter");
+		RRD_STATS *st = rrd_stats_find("system.idlejitter");
 		if(!st) {
-			st = rrd_stats_create(RRD_TYPE_STAT, "idlejitter", NULL, RRD_TYPE_STAT, "CPU Idle Jitter", "microseconds lost/s", save_history);
+			st = rrd_stats_create("system", "idlejitter", NULL, "system", "CPU Idle Jitter", "microseconds lost/s", save_history);
 
 			rrd_stats_dimension_add(st, "jitter", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
 		}

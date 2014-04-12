@@ -216,7 +216,9 @@ function loadCharts(base_url, doNext) {
 			if(json.charts[i].usertitle) json.charts[i].title = json.charts[i].usertitle;
 
 			// check if the userpriority is IGNORE
-			if(json.charts[i].userpriority == "IGNORE")
+			if(json.charts[i].userpriority == "IGNORE"
+				// || json.charts[i].isdetail
+				)
 				json.charts[i].enabled = false;
 			else
 				json.charts[i].enabled = true;
@@ -231,47 +233,64 @@ function loadCharts(base_url, doNext) {
 				vAxis: {title: json.charts[i].units, viewWindowMode: 'pretty', minValue: 0, maxValue: 10},
 				focusTarget: 'category',
 				annotation: {'1': {style: 'line'}},
+				//colors: ['blue', 'red', 'green', 'lime', 'olive', 'yellow', 'navy', 'fuchsia', 'maroon', 'aqua', 'teal', 'purple', 'black', 'gray', 'silver'],
 				//tooltip: {isHtml: true},
 			};
 
 			// set the chart type
-			if((json.charts[i].type == "ipv4"
-				|| json.charts[i].type == "ipv6"
-				|| json.charts[i].type == "ipvs"
-				|| json.charts[i].type == "conntrack"
-				|| json.charts[i].id == "cpu.ctxt"
-				|| json.charts[i].id == "cpu.intr"
-				|| json.charts[i].id == "cpu.processes"
-				|| json.charts[i].id == "cpu.procs_running"
-				|| json.charts[i].id == "cpu.idlejitter"
-				)
-				&& json.charts[i].name != "ipv4.net" && json.charts[i].name != "ipvs.net") {
-				
-				// default for all LineChart
-				json.charts[i].chartType = "LineChart";
-				json.charts[i].chartOptions.lineWidth = 2;
-				json.charts[i].chartOptions.curveType = 'function';
-			}
-			else if(json.charts[i].type == "tc" || json.charts[i].type == "cpu" || json.charts[i].name == 'mem.ram') {
+			if(json.charts[i].type == "tc" || json.charts[i].id.substring(0, 7) == "cpu.cpu" || json.charts[i].name == 'system.cpu' || json.charts[i].name == 'system.ram') {
 
 				// default for all stacked AreaChart
 				json.charts[i].chartType = "AreaChart";
 				json.charts[i].chartOptions.isStacked = true;
 				json.charts[i].chartOptions.areaOpacity = 0.85;
 				json.charts[i].chartOptions.lineWidth = 1;
+				json.charts[i].chartOptions.vAxis.viewWindowMode = 'maximized';
 
 				json.charts[i].group_method = "average";
 			}
-			else {
+			else if(json.charts[i].type == "net"
+				|| json.charts[i].type == "disk"
+				|| json.charts[i].id == "system.ipv4"
+				|| json.charts[i].id == "system.io"
+				|| json.charts[i].id == "system.swapio"
+				|| json.charts[i].id == "ipv4.mcast"
+				|| json.charts[i].id == "ipv4.bcast"
+				) {
 
 				// default for all AreaChart
 				json.charts[i].chartType = "AreaChart";
 				json.charts[i].chartOptions.isStacked = false;
 				json.charts[i].chartOptions.areaOpacity = 0.3;
 			}
+			else {
+				
+				// default for all LineChart
+				json.charts[i].chartType = "LineChart";
+				json.charts[i].chartOptions.lineWidth = 2;
+				json.charts[i].chartOptions.curveType = 'function';
+
+				json.charts[i].chartOptions.vAxis.minValue = -10;
+				json.charts[i].chartOptions.vAxis.maxValue =  10;
+			}
 
 			// the category name, and other options, per type
 			switch(json.charts[i].type) {
+				case "system":
+					json.charts[i].category = "System";
+					json.charts[i].glyphicon = "glyphicon-dashboard";
+					json.charts[i].group = 5;
+
+					if(json.charts[i].id == "system.cpu" || json.charts[i].id == "system.ram") {
+						json.charts[i].chartOptions.vAxis.minValue = 0;
+						json.charts[i].chartOptions.vAxis.maxValue = 100;
+					}
+					else {
+						json.charts[i].chartOptions.vAxis.minValue = -10;
+						json.charts[i].chartOptions.vAxis.maxValue =  10;
+					}
+					break;
+
 				case "cpu":
 					json.charts[i].category = "CPU";
 					json.charts[i].glyphicon = "glyphicon-dashboard";
@@ -336,7 +355,7 @@ function loadCharts(base_url, doNext) {
 					break;
 
 				default:
-					json.charts[i].category = "Unknown";
+					json.charts[i].category = json.charts[i].type;
 					json.charts[i].glyphicon = "glyphicon-search";
 					json.charts[i].group = 5;
 					break;
