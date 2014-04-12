@@ -3437,9 +3437,9 @@ void *tc_main(void *ptr)
 // ----------------------------------------------------------------------------
 // cpu jitter calculation
 
-#define CPU_JITTER_SLEEP_TIME_MS 20
+#define CPU_IDLEJITTER_SLEEP_TIME_MS 20
 
-void *cpujitter_main(void *ptr)
+void *cpuidlejitter_main(void *ptr)
 {
 
 	struct timeval before, after;
@@ -3450,20 +3450,20 @@ void *cpujitter_main(void *ptr)
 		while(susec < (update_every * 1000000L)) {
 
 			gettimeofday(&before, NULL);
-			usleep(CPU_JITTER_SLEEP_TIME_MS * 1000);
+			usleep(CPU_IDLEJITTER_SLEEP_TIME_MS * 1000);
 			gettimeofday(&after, NULL);
 
 			// calculate the time it took for a full loop
 			usec = usecdiff(&after, &before);
 			susec += usec;
 		}
-		usec -= (CPU_JITTER_SLEEP_TIME_MS * 1000);
+		usec -= (CPU_IDLEJITTER_SLEEP_TIME_MS * 1000);
 
-		RRD_STATS *st = rrd_stats_find(RRD_TYPE_STAT ".jitter");
+		RRD_STATS *st = rrd_stats_find(RRD_TYPE_STAT ".idlejitter");
 		if(!st) {
-			st = rrd_stats_create(RRD_TYPE_STAT ".jitter", RRD_TYPE_STAT ".jitter", save_history, "CPU Jitter", "microseconds lost", RRD_TYPE_STAT);
+			st = rrd_stats_create(RRD_TYPE_STAT ".idlejitter", RRD_TYPE_STAT ".idlejitter", save_history, "CPU Idle Jitter", "microseconds lost", RRD_TYPE_STAT);
 			if(!st) {
-				error("Cannot create RRD_STATS for interface %s.", RRD_TYPE_STAT ".jitter");
+				error("Cannot create RRD_STATS for interface %s.", RRD_TYPE_STAT ".idlejitter");
 				continue;
 			}
 
@@ -3666,9 +3666,9 @@ int main(int argc, char **argv)
 	int r_proc, r_tc, r_jitter;
 
 	// spawn a child to collect data
-	r_proc   = pthread_create(&p_proc,   NULL, proc_main,      NULL);
-	r_tc     = pthread_create(&p_tc,     NULL, tc_main,        NULL);
-	r_jitter = pthread_create(&p_jitter, NULL, cpujitter_main, NULL);
+	r_proc   = pthread_create(&p_proc,   NULL, proc_main,          NULL);
+	r_tc     = pthread_create(&p_tc,     NULL, tc_main,            NULL);
+	r_jitter = pthread_create(&p_jitter, NULL, cpuidlejitter_main, NULL);
 
 	// the main process - the web server listener
 	//sleep(1);
