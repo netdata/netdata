@@ -228,7 +228,7 @@ function loadCharts(base_url, doNext) {
 				lineWidth: 1,
 				title: json.charts[i].title,
 				hAxis: {title: "Time of Day", viewWindowMode: 'maximized', format:'HH:mm:ss'},
-				vAxis: {title: json.charts[i].vtitle, viewWindowMode: 'pretty', minValue: 0, maxValue: 10},
+				vAxis: {title: json.charts[i].units, viewWindowMode: 'pretty', minValue: 0, maxValue: 10},
 				focusTarget: 'category',
 				annotation: {'1': {style: 'line'}},
 				//tooltip: {isHtml: true},

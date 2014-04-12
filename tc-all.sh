@@ -36,6 +36,8 @@ show_tc() {
 		do
 				setclassname `echo $n | tr '|' ' '`
 		done
+		
+		echo "SETDEVICEGROUP $interface_dev"
 	fi
 	echo "END $x"
 }
