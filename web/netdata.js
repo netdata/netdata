@@ -279,7 +279,7 @@ function loadCharts(base_url, doNext) {
 
 					if(json.charts[i].id.substring(0, 7) == "cpu.cpu") {
 						json.charts[i].chartOptions.vAxis.minValue = 0;
-						json.charts[i].chartOptions.vAxis.maxValue = 101;
+						json.charts[i].chartOptions.vAxis.maxValue = 100;
 					}
 					break;
 
