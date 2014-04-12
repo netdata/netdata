@@ -304,7 +304,8 @@
 				else if(a.name == "ipvs") a.priority = 4;
 				else if(a.name == "ipv4") a.priority = 5;
 				else if(a.name == "cpu") a.priority = 6;
-				else if(a.name == "disk") a.priority = 7;
+				else if(a.name == "mem") a.priority = 7;
+				else if(a.name == "disk") a.priority = 8;
 				else a.priority = 99;
 
 				a.html = "<tr><td id=\"" + a.name + "\"><ol class=\"breadcrumb graphs\"><li class=\"active\"><span class=\"glyphicon " + a.glyphicon + "\"></span> &nbsp; <a id=\"" + a.name + "\" href=\"#" + a.name + "\"><b>" + a.title + "</b> " + a.description + " </a></li></ol></td></tr><tr><td><div class=\"thumbgraphs\">" + a.html + "</td></tr>";

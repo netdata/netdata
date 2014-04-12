@@ -32,9 +32,10 @@
 #include <pthread.h>
 #include <zlib.h>
 
-#define RRD_DIMENSION_ABSOLUTE			0
-#define RRD_DIMENSION_INCREMENTAL		1
-#define RRD_DIMENSION_PCENT_OVER_TOTAL 	2
+#define RRD_DIMENSION_ABSOLUTE					0
+#define RRD_DIMENSION_INCREMENTAL				1
+#define RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL 	2
+#define RRD_DIMENSION_PCENT_OVER_ROW_TOTAL 		3
 
 #define RRD_TYPE_NET				"net"
 #define RRD_TYPE_NET_LEN			strlen(RRD_TYPE_NET)
@@ -407,7 +408,7 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 		return NULL;
 	}
 
-	debug(D_RRD_STATS, "Creating RRD_STATS for '%s'.", name);
+	debug(D_RRD_STATS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
 	st = calloc(1, sizeof(RRD_STATS));
 	if(!st) {
@@ -495,11 +496,11 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 {
 	RRD_DIMENSION *rd = NULL;
 
-	debug(D_RRD_STATS, "Adding dimension '%s' (%s) to RRD_STATS '%s' (%s).", name, id, st->name, st->id);
+	debug(D_RRD_STATS, "Adding dimension '%s/%s'.", st->id, id);
 
 	rd = calloc(1, sizeof(RRD_DIMENSION));
 	if(!rd) {
-		fatal("Cannot allocate RRD_DIMENSION %s/%s.", st->name, id);
+		fatal("Cannot allocate RRD_DIMENSION %s/%s.", st->id, id);
 		return NULL;
 	}
 
@@ -931,7 +932,7 @@ void rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer *wb)
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"id\" : \"%s\",\n", st->id);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"name\" : \"%s\",\n", st->name);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"type\" : \"%s\",\n", st->type);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"group\" : \"%s\",\n", st->group);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"group_name\" : \"%s\",\n", st->group);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"title\" : \"%s %s\",\n", st->title, st->name);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"usertitle\" : \"%s %s (%s)\",\n", st->title, st->usertitle, st->id);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"userpriority\" : \"%s\",\n", st->userpriority);
@@ -1101,7 +1102,7 @@ void rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show
 	// find how many dimensions we have
 	for( rd = st->dimensions ; rd ; rd = rd->next) {
 		dimensions++;
-		if(rd->type == RRD_DIMENSION_PCENT_OVER_TOTAL) we_need_totals++;
+		if(rd->type == RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL || rd->type == RRD_DIMENSION_PCENT_OVER_ROW_TOTAL) we_need_totals++;
 	}
 
 	if(!dimensions) {
@@ -1199,8 +1200,12 @@ void rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show
 			oldvalue = rrd_stats_dimension_get(rd, lt);
 			
 			switch(rd->type) {
-				case RRD_DIMENSION_PCENT_OVER_TOTAL:
+				case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
 					value = (long double)100 * (value - oldvalue) / (total - oldtotal);
+					break;
+
+				case RRD_DIMENSION_PCENT_OVER_ROW_TOTAL:
+					value = (long double)100 * value / total;
 					break;
 
 				case RRD_DIMENSION_INCREMENTAL:
@@ -2880,18 +2885,18 @@ int do_proc_stat() {
 				long multiplier = 1;
 				long divisor = 1; // sysconf(_SC_CLK_TCK);
 
-				rrd_stats_dimension_add(st, "iowait", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "nice", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "system", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "user", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "idle", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL);
+				rrd_stats_dimension_add(st, "iowait", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+				rrd_stats_dimension_add(st, "nice", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+				rrd_stats_dimension_add(st, "system", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+				rrd_stats_dimension_add(st, "user", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+				rrd_stats_dimension_add(st, "idle", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
 				rrd_stats_dimension_hide(st, "idle");
 
-				rrd_stats_dimension_add(st, "irq", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "softirq", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "steal", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "guest", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "guest_nice", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_TOTAL, NULL);
+				rrd_stats_dimension_add(st, "irq", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+				rrd_stats_dimension_add(st, "softirq", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+				rrd_stats_dimension_add(st, "steal", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+				rrd_stats_dimension_add(st, "guest", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+				rrd_stats_dimension_add(st, "guest_nice", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
 			}
 			else rrd_stats_next(st);
 
@@ -2993,6 +2998,113 @@ int do_proc_stat() {
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
+// /proc/meminfo processor
+
+#define MAX_PROC_MEMINFO_LINE 4096
+#define MAX_PROC_MEMINFO_NAME 1024
+
+int do_proc_meminfo() {
+	char buffer[MAX_PROC_MEMINFO_LINE+1] = "";
+
+	FILE *fp = fopen("/proc/meminfo", "r");
+	if(!fp) {
+		error("Cannot read /proc/meminfo.");
+		return 1;
+	}
+
+	unsigned long long MemTotal = 0, MemFree = 0, Buffers = 0, Cached = 0, SwapCached = 0,
+		Active = 0, Inactive = 0, ActiveAnon = 0, InactiveAnon = 0, ActiveFile = 0, InactiveFile = 0,
+		Unevictable = 0, Mlocked = 0, SwapTotal = 0, SwapFree = 0, Dirty = 0, Writeback = 0, AnonPages = 0,
+		Mapped = 0, Shmem = 0, Slab = 0, SReclaimable = 0, SUnreclaim = 0, KernelStack = 0, PageTables = 0,
+		NFS_Unstable = 0, Bounce = 0, WritebackTmp = 0, CommitLimit = 0, Committed_AS = 0,
+		VmallocTotal = 0, VmallocUsed = 0, VmallocChunk = 0,
+		AnonHugePages = 0, HugePages_Total = 0, HugePages_Free = 0, HugePages_Rsvd = 0, HugePages_Surp = 0, Hugepagesize = 0,
+		DirectMap4k = 0, DirectMap2M = 0,
+		MemUsed = 0;
+
+	for(;1;) {
+		char *p = fgets(buffer, MAX_PROC_MEMINFO_LINE, fp);
+		if(!p) break;
+
+		// remove ':'
+		while((p = strchr(buffer, ':'))) *p = ' ';
+
+		char name[MAX_PROC_MEMINFO_NAME + 1] = "";
+		unsigned long long value = 0;
+
+		int r = sscanf(buffer, "%s %llu kB\n", name, &value);
+
+		if(r == EOF) break;
+		if(r != 2) error("Cannot read /proc/meminfo line. Expected 2 params, read %d.", r);
+
+		     if(!MemTotal && strcmp(name, "MemTotal") == 0) MemTotal = value;
+		else if(!MemFree && strcmp(name, "MemFree") == 0) MemFree = value;
+		else if(!Buffers && strcmp(name, "Buffers") == 0) Buffers = value;
+		else if(!Cached && strcmp(name, "Cached") == 0) Cached = value;
+		else if(!SwapCached && strcmp(name, "SwapCached") == 0) SwapCached = value;
+		else if(!Active && strcmp(name, "Active") == 0) Active = value;
+		else if(!Inactive && strcmp(name, "Inactive") == 0) Inactive = value;
+		else if(!ActiveAnon && strcmp(name, "ActiveAnon") == 0) ActiveAnon = value;
+		else if(!InactiveAnon && strcmp(name, "InactiveAnon") == 0) InactiveAnon = value;
+		else if(!ActiveFile && strcmp(name, "ActiveFile") == 0) ActiveFile = value;
+		else if(!InactiveFile && strcmp(name, "InactiveFile") == 0) InactiveFile = value;
+		else if(!Unevictable && strcmp(name, "Unevictable") == 0) Unevictable = value;
+		else if(!Mlocked && strcmp(name, "Mlocked") == 0) Mlocked = value;
+		else if(!SwapTotal && strcmp(name, "SwapTotal") == 0) SwapTotal = value;
+		else if(!SwapFree && strcmp(name, "SwapFree") == 0) SwapFree = value;
+		else if(!Dirty && strcmp(name, "Dirty") == 0) Dirty = value;
+		else if(!Writeback && strcmp(name, "Writeback") == 0) Writeback = value;
+		else if(!AnonPages && strcmp(name, "AnonPages") == 0) AnonPages = value;
+		else if(!Mapped && strcmp(name, "Mapped") == 0) Mapped = value;
+		else if(!Shmem && strcmp(name, "Shmem") == 0) Shmem = value;
+		else if(!Slab && strcmp(name, "Slab") == 0) Slab = value;
+		else if(!SReclaimable && strcmp(name, "SReclaimable") == 0) SReclaimable = value;
+		else if(!SUnreclaim && strcmp(name, "SUnreclaim") == 0) SUnreclaim = value;
+		else if(!KernelStack && strcmp(name, "KernelStack") == 0) KernelStack = value;
+		else if(!PageTables && strcmp(name, "PageTables") == 0) PageTables = value;
+		else if(!NFS_Unstable && strcmp(name, "NFS_Unstable") == 0) NFS_Unstable = value;
+		else if(!Bounce && strcmp(name, "Bounce") == 0) Bounce = value;
+		else if(!WritebackTmp && strcmp(name, "WritebackTmp") == 0) WritebackTmp = value;
+		else if(!CommitLimit && strcmp(name, "CommitLimit") == 0) CommitLimit = value;
+		else if(!Committed_AS && strcmp(name, "Committed_AS") == 0) Committed_AS = value;
+		else if(!VmallocTotal && strcmp(name, "VmallocTotal") == 0) VmallocTotal = value;
+		else if(!VmallocUsed && strcmp(name, "VmallocUsed") == 0) VmallocUsed = value;
+		else if(!VmallocChunk && strcmp(name, "VmallocChunk") == 0) VmallocChunk = value;
+		else if(!AnonHugePages && strcmp(name, "AnonHugePages") == 0) AnonHugePages = value;
+		else if(!HugePages_Total && strcmp(name, "HugePages_Total") == 0) HugePages_Total = value;
+		else if(!HugePages_Free && strcmp(name, "HugePages_Free") == 0) HugePages_Free = value;
+		else if(!HugePages_Rsvd && strcmp(name, "HugePages_Rsvd") == 0) HugePages_Rsvd = value;
+		else if(!HugePages_Surp && strcmp(name, "HugePages_Surp") == 0) HugePages_Surp = value;
+		else if(!Hugepagesize && strcmp(name, "Hugepagesize") == 0) Hugepagesize = value;
+		else if(!DirectMap4k && strcmp(name, "DirectMap4k") == 0) DirectMap4k = value;
+		else if(!DirectMap2M && strcmp(name, "DirectMap2M") == 0) DirectMap2M = value;
+	}
+	fclose(fp);
+
+	// http://stackoverflow.com/questions/3019748/how-to-reliably-measure-available-memory-in-linux
+	MemUsed = MemTotal - MemFree - Cached - Buffers;
+
+	RRD_STATS *st = rrd_stats_find("mem.ram");
+	if(!st) {
+		st = rrd_stats_create("mem", "ram", NULL, "mem", "System RAM", "percentage", save_history);
+
+		rrd_stats_dimension_add(st, "free",    NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL, NULL);
+		rrd_stats_dimension_add(st, "cached",  NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL, NULL);
+		rrd_stats_dimension_add(st, "used",    NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL, NULL);
+		rrd_stats_dimension_add(st, "buffers", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL, NULL);
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "used", &MemUsed, NULL);
+	rrd_stats_dimension_set(st, "free", &MemFree, NULL);
+	rrd_stats_dimension_set(st, "cached", &Cached, NULL);
+	rrd_stats_dimension_set(st, "buffers", &Buffers, NULL);
+	rrd_stats_done(st);
+
+	return 0;
+}
+
 
 // ----------------------------------------------------------------------------
 // /proc processor
@@ -3012,6 +3124,7 @@ void *proc_main(void *ptr)
 	int vdo_proc_net_stat_conntrack = 0;
 	int vdo_proc_net_ip_vs_stats = 0;
 	int vdo_proc_stat = 0;
+	int vdo_proc_meminfo = 0;
 
 	for(;1;) {
 		unsigned long long usec, susec;
@@ -3029,6 +3142,7 @@ void *proc_main(void *ptr)
 		if(!vdo_proc_net_stat_conntrack)	vdo_proc_net_stat_conntrack	= do_proc_net_stat_conntrack(usec);
 		if(!vdo_proc_net_ip_vs_stats)		vdo_proc_net_ip_vs_stats	= do_proc_net_ip_vs_stats(usec);
 		if(!vdo_proc_stat)					vdo_proc_stat 				= do_proc_stat(usec);
+		if(!vdo_proc_meminfo)				vdo_proc_meminfo			= do_proc_meminfo(usec);
 		// END -- the job is done
 		
 		// find the time to sleep in order to wait exactly update_every seconds

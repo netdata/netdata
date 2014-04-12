@@ -252,7 +252,7 @@ function loadCharts(base_url, doNext) {
 				json.charts[i].chartOptions.lineWidth = 2;
 				json.charts[i].chartOptions.curveType = 'function';
 			}
-			else if(json.charts[i].type == "tc" || json.charts[i].type == "cpu") {
+			else if(json.charts[i].type == "tc" || json.charts[i].type == "cpu" || json.charts[i].name == 'mem.ram') {
 
 				// default for all stacked AreaChart
 				json.charts[i].chartType = "AreaChart";
@@ -278,6 +278,17 @@ function loadCharts(base_url, doNext) {
 					json.charts[i].group = 5;
 
 					if(json.charts[i].id.substring(0, 7) == "cpu.cpu") {
+						json.charts[i].chartOptions.vAxis.minValue = 0;
+						json.charts[i].chartOptions.vAxis.maxValue = 100;
+					}
+					break;
+
+				case "mem":
+					json.charts[i].category = "Memory";
+					json.charts[i].glyphicon = "glyphicon-dashboard";
+					json.charts[i].group = 5;
+
+					if(json.charts[i].name == "mem.ram") {
 						json.charts[i].chartOptions.vAxis.minValue = 0;
 						json.charts[i].chartOptions.vAxis.maxValue = 100;
 					}
