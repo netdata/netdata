@@ -48,12 +48,21 @@ all_devices() {
 	done
 }
 
+# update devices and class names
+# once every 2 minutes
 names_every=$((120 / sleep_time))
+
+# exit this script every hour
+# it will be restarted automatically
+exit_after=$((3600 / sleep_time))
+
 c=0
+gc=0
 while [ 1 ]
 do
 	fix_names=
 	c=$((c + 1))
+	gc=$((gc + 1))
 
 	if [ $c -le 1 -o $c -ge $names_every ]
 	then
@@ -67,5 +76,7 @@ do
 		show_tc $d
 	done
 
+	[ $gc -gt $exit_after ] && exit 0
+	
 	sleep $sleep_time
 done

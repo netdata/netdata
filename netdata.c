@@ -3368,7 +3368,11 @@ void *tc_main(void *ptr)
 				}
 			}
 			else if(strcmp(p, "BEGIN") == 0) {
-				if(device) tc_device_free(device);
+				if(device) {
+					tc_device_free(device);
+					device = NULL;
+					class = NULL;
+				}
 
 				p = strsep(&b, " \n");
 				if(p && *p) device = tc_device_create(p);
@@ -3427,7 +3431,13 @@ void *tc_main(void *ptr)
 		}
 		pclose(fp);
 
-		sleep(1);
+		if(device) {
+			tc_device_free(device);
+			device = NULL;
+			class = NULL;
+		}
+
+		sleep(update_every);
 	}
 
 	return NULL;
