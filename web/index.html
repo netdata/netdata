@@ -53,7 +53,10 @@
 
 	function chartIsLoadingHTML(width, height) { return "<table><tr><td align=\"center\" width=\"" + width + "\" height=\"" + height + "\" style=\"vertical-align:middle\"><h4><span class=\"glyphicon glyphicon-refresh\"></span><br/><br/>loading chart<br/><br/><span class=\"label label-default\">Please wait...</span></h4></td></tr></table>"; }
 
-	function showChartIsLoading(id, width, height) { document.getElementById(id).innerHTML = chartIsLoadingHTML(width, height); }
+	function showChartIsLoading(id, width, height) {
+		//mylog('adding loading chart html in div with id ' + id);
+		document.getElementById(id).innerHTML = chartIsLoadingHTML(width, height);
+	}
 
 	function thumbChartActions(i, c, nogroup) {
 		var name = c.name;
@@ -93,35 +96,8 @@
 		return html;
 	}
 
-	function disableChart(i) {
-		var chart = null;
-
-		var count = 0;
-		if(group_charts) $.each(group_charts, function(i, c) {
-			if(c.enabled) count++;
-		});
-		if(count <= 1) {
-			alert('Cannot close the last chart shown.');
-			return;
-		}
-
-		if(group_charts) 
-			chart = group_charts[i];
-		else
-			chart = mycharts[i];
-
-		if(chart) {
-			chart.enabled = false;
-			if(chart.chart) chart.chart.clearChart();
-			chart.chart = null;
-		}
-		var div = document.getElementById(chart.div);
-		if(div) div.innerHTML = "";
-
-		div = document.getElementById(chart.div + "_parent");
-		if(div) div.innerHTML = "";
-
-		resizeCharts();
+	function mylog(txt) {
+		console.log(txt);
 	}
 
 	function chartssort(a, b) {
@@ -136,10 +112,7 @@
 	// copy the chart c to mainchart
 	// switch to main graphs screen
 	function initMainChart(c) {
-		if(mainchart && mainchart.chart) {
-			mainchart.chart.clearChart();
-			mainchart.chart = null;
-		}
+		if(mainchart) cleanThisChart(mainchart);
 
 		mainchart = $.extend(true, {}, c);
 
@@ -177,7 +150,7 @@
 
 	var last_main_chart_max='normal';
 	function setMainChartMax(m) {
-		if(!mainchart || mode != MODE_MAIN) return;
+		if(!mainchart) return;
 
 		if(m == 'toggle') {
 			if(last_main_chart_max == 'maximized') m = 'normal';
@@ -203,7 +176,7 @@
 	}
 
 	function setMainChartGroup(g) {
-		if(!mainchart || mode != MODE_MAIN) return;
+		if(!mainchart) return;
 
 		mainchart.group = g;
 		mainchart.last_updated = 0;
@@ -212,7 +185,7 @@
 
 	var last_main_chart_avg = null;
 	function setMainChartGroupMethod(g, norefresh) {
-		if(!mainchart || mode != MODE_MAIN) return;
+		if(!mainchart) return;
 
 		if(g == 'toggle') {
 			if(last_main_chart_avg == 'max') g = 'average';
@@ -261,7 +234,7 @@
 	// Chart resizing
 
 	function screenWidth() {
-		return (($(window).width() * 0.95) - 40);
+		return (($(window).width() * 0.95) - 50);
 	}
 
 	// calculate the proper width for the thumb charts
@@ -277,7 +250,7 @@
 
 	function groupChartSizes() {
 		var s = { width: screenWidth() / 2, height: ($(window).height() - 130) / 3 - 10};
-		if(s.width < MINIMUM_THUMB_GRAPH_WIDTH) s.width = screenWidth();
+		if(s.width < MINIMUM_THUMB_GRAPH_WIDTH * 1.5) s.width = screenWidth();
 
 		var count = 0;
 		if(group_charts) $.each(group_charts, function(i, c) {
@@ -316,8 +289,7 @@
 		width = thumbWidth();
 		$.each(mycharts, function(i, c) {
 			if(c.enabled && c.chartOptions.width != width) {
-				if(c.chart) c.chart.clearChart();
-				c.chart = null;
+				cleanThisChart(c);
 				c.chartOptions.width = width;
 				showChartIsLoading(c.div, c.chartOptions.width, c.chartOptions.height);
 				c.last_updated = 0;
@@ -328,20 +300,18 @@
 			var sizes = groupChartSizes();
 
 			if(c.enabled && (c.chartOptions.width != sizes.width || c.chartOptions.height != sizes.height)) {
-				if(c.chart) c.chart.clearChart();
-				c.chart = null;
+				cleanThisChart(c);
 				c.chartOptions.width = sizes.width;
 				c.chartOptions.height = sizes.height;
 				showChartIsLoading(c.div, c.chartOptions.width, c.chartOptions.height);
 				c.last_updated = 0;
 			}
 		});
-
-		playGraphs();
 	}
 
+	var resize_request = false;
 	window.onresize = function(event) {
-		resizeCharts();
+		resize_request = true;
 	};
 
 
@@ -356,7 +326,7 @@
 			var now = new Date().getTime();
 			if((now - last_refresh) > 5000) {
 				// it died!
-				console.log('It seems the refresh thread died. Restarting it.');
+				//mylog('It seems the refresh thread died. Restarting it.');
 				chartsRefresh();
 			}
 			return;
@@ -378,8 +348,20 @@
 	// this is an internal function.
 	// never call it directly, or new javascript threads will be spawn
 	var timeout;
+	var refresh_count = 0;
 	function chartsRefresh() {
-		if(stop_refreshing) return;
+		refresh_count++;
+
+		if(resize_request) {
+			resizeCharts();
+			resize_request = false;
+			stop_refreshing = 0;
+		}
+
+		if(stop_refreshing) {
+			//mylog("stop refresh");
+			return;
+		}
 
 		last_refresh = new Date().getTime();
 
@@ -393,6 +375,8 @@
 	// this is an internal function.
 	// never call it directly, or new javascript threads will be spawn
 	function triggerRefresh() {
+		//mylog('triggerRefresh(' + refresh_count + ')');
+
 		// cleanup has to take place when the charts are not refreshed
 		// since the refreshing thread is in this function, it means
 		// nothing is being refreshed.
@@ -407,6 +391,8 @@
 	// refresh the main chart
 	// make sure we don't loose the refreshing thread
 	function mainChartRefresh() {
+		//mylog('mainChartRefresh()');
+
 		if(mode != MODE_MAIN || !mainchart) {
 			triggerRefresh();
 			return;
@@ -421,66 +407,55 @@
 			triggerRefresh();
 	}
 
+	function roundRobinRefresh(charts, startat) {
+		var refreshed = false;
+
+		// find a chart to refresh
+		var all = charts.length;
+		var cur = startat;
+		var count = 0;
+
+		for(count = 0; count < all ; count++, cur++) {
+			if(cur >= all) cur = 0;
+
+			if(charts[cur].enabled) {
+				//mylog('going to refresh chart ' + charts[cur].name);
+				refreshed = refreshChart(charts[cur], chartsRefresh);
+				if(refreshed) break;
+			}
+		}
+
+		if(!refreshed) triggerRefresh();
+		return cur;
+	}
+
 	// refresh the thumb charts
 	// make sure we don't loose the refreshing thread
 	var last_thumb_updated = 0;
 	function thumbChartsRefresh() {
+		//mylog('thumbChartsRefresh()');
+
 		if(mycharts.length == 0 || mode != MODE_THUMBS) {
 			triggerRefresh();
 			return;
 		}
 
-		if(last_thumb_updated >= mycharts.length) last_thumb_updated = 0;
-
-		// find a chart to refresh
-		var orig = last_thumb_updated;
-		var refreshed = false;
-
-		last_thumb_updated++;
-		if(last_thumb_updated >= mycharts.length) last_thumb_updated = 0;
-
-		while(1) {
-			refreshed = refreshChart(mycharts[last_thumb_updated], chartsRefresh);
-			if(refreshed) break;
-
-			last_thumb_updated++;
-			if(last_thumb_updated >= mycharts.length) last_thumb_updated = 0;
-			if(last_thumb_updated == orig) break;
-		}
-
-		// no chart refreshed
-		if(!refreshed) triggerRefresh();
+		last_thumb_updated = roundRobinRefresh(mycharts, last_thumb_updated);
 	}
 
 	// refresh the group charts
 	// make sure we don't loose the refreshing thread
 	var last_group_updated = 0;
 	function groupChartsRefresh() {
+		//mylog('groupChartsRefresh()');
+
 		if(!group_charts || group_charts.length == 0 || mode != MODE_GROUP_THUMBS) {
+			//mylog('cannot refresh charts');
 			triggerRefresh();
 			return;
 		}
 
-		if(last_group_updated >= group_charts.length) last_group_updated = 0;
-
-		// find a chart to refresh
-		var orig = last_group_updated;
-		var refreshed = false;
-
-		last_group_updated++;
-		if(last_group_updated >= group_charts.length) last_group_updated = 0;
-
-		while(1) {
-			refreshed = refreshChart(group_charts[last_group_updated], chartsRefresh);
-			if(refreshed) break;
-
-			last_group_updated++;
-			if(last_group_updated >= group_charts.length) last_group_updated = 0;
-			if(last_group_updated == orig) break;
-		}
-
-		// no chart refreshed
-		if(!refreshed) triggerRefresh();
+		last_group_updated = roundRobinRefresh(group_charts, last_group_updated);
 	}
 
 
@@ -488,19 +463,96 @@
 	// switch the screen between views
 	// these should be called only from initXXXX()
 
+	function disableChart(i) {
+		//mylog('disableChart(' + i + ')');
+
+		var chart = null;
+
+		var count = 0;
+		if(mode == MODE_GROUP_THUMBS && group_charts) {
+			$.each(group_charts, function(i, c) {
+				if(c.enabled) count++;
+			});
+
+			if(i < group_charts.length) chart = group_charts[i];
+		}
+		else if(mode == MODE_THUMBS) {
+			$.each(mycharts, function(i, c) {
+				if(c.enabled) count++;
+			});
+
+			if(i < mycharts.length) chart = mycharts[i];
+		}
+
+		if(!chart) return;
+
+		if(count <= 1) {
+			alert('Cannot close the last chart shown.');
+			return;
+		}
+
+		if(chart) {
+			//mylog("disabling chart " + chart.name);
+			chart.disablethisplease = true;
+		}
+	}
+
+	function cleanThisChart(chart, emptydivs) {
+		//mylog('cleanThisChart(' + chart.name + ', ' + emptydivs +')');
+
+		if(chart.chart) chart.chart.clearChart();
+		chart.chart = null;
+
+		if(emptydivs) {
+			var div = document.getElementById(chart.div);
+			if(div) {
+				div.style.display = 'none';
+				div.innerHTML = "";
+			}
+
+			div = document.getElementById(chart.div + "_parent");
+			if(div) {
+				div.style.display = 'none';
+				div.innerHTML = "";
+			}
+		}
+
+		//mylog("chart " + chart.name + " cleaned with option " + emptydivs);
+	}
+
 	// cleanup the previously shown charts
 	function cleanupCharts() {
+		//mylog('cleanupCharts()');
+
 		if(mode != MODE_MAIN && mainchart) {
-			if(mainchart.chart) {
-				mainchart.chart.clearChart();
-				mainchart.chart = null;
-			}
+			if(mainchart.chart) cleanThisChart(mainchart);
 			mainchart = null;
 		}
 
 		if(mode != MODE_GROUP_THUMBS && group_charts) {
 			clearGroupGraphs();
 		}
+
+		// cleanup the disabled charts
+		$.each(mycharts, function(i, c) {
+			if(c.disablethisplease && c.enabled) {
+				cleanThisChart(c, 'emptydivs');
+				c.disablethisplease = false;
+				c.enabled = false;
+				resize_request = true;
+				//mylog("disabled chart " + c.name + " removed");
+			}
+		});
+
+		if(group_charts) $.each(group_charts, function(i, c) {
+			if(c.disablethisplease && c.enabled) {
+				cleanThisChart(c, 'emptydivs');
+				c.disablethisplease = false;
+				c.enabled = false;
+				resize_request = true;
+				//mylog("disabled chart " + c.name + " removed");
+			}
+		});
 
 		// we never cleanup the thumb charts
 	}
@@ -515,6 +567,8 @@
 
 	var thumbsScrollPosition = null;
 	function switchToMainGraph() {
+		//mylog('switchToMainGraph()');
+
 		if(!mainchart) return;
 
 		if(!group_charts) thumbsScrollPosition = window.pageYOffset;
@@ -525,12 +579,16 @@
 
 		document.getElementById("main_menu_div").innerHTML = "<ul class=\"nav navbar-nav\"><li><a href=\"javascript:switchToThumbGraphs();\">Back to Home</a></li><li class=\"active\"><a href=\"#\">" + mainchart.title + "</a></li></ul>";
 
+		window.scrollTo(0, 0);
+
 		mode = MODE_MAIN;
 		playGraphs();
 		updateUI();
 	}
 
 	function switchToThumbGraphs() {
+		//mylog('switchToThumbGraphs()');
+
 		document.getElementById('maingraph_container').style.display = 'none';
 		document.getElementById('thumbgraphs_container').style.display = 'block';
 		document.getElementById('groupgraphs_container').style.display = 'none';
@@ -546,6 +604,8 @@
 	}
 
 	function switchToGroupGraphs() {
+		//mylog('switchToGroupGraphs()');
+
 		if(!group_charts) return;
 
 		if(!mainchart) thumbsScrollPosition = window.pageYOffset;
@@ -606,8 +666,7 @@
 	function clearGroupGraphs() {
 		if(group_charts && group_charts.length) {
 			$.each(group_charts, function(i, c) {
-				if(c.chart) c.chart.clearChart();
-				c.chart = null;
+				cleanThisChart(c, 'emptydivs');
 			});
 
 			group_charts = null;
@@ -845,6 +904,17 @@
     <div class="container graphs" id="groupgraphs_container">
     	<div class="allgraphs" id="groupgraphs">
     	</div>
+	</div>
+
+    <div class="container graphs" id="groupgraphs_container">
+   	&nbsp;<p/>
+   	<hr/>
+    <h4>NetData</h4>
+    Realtime System Information over the web for all linux systems.
+    <p/>
+    Distributed under GPL.
+    <p/>
+    (c) 2014 Costa Tsaousis <a href="mailto:costa@tsaousis.gr">costa@tsaousis.gr</a>
 	</div>
 
 	<script type='text/javascript'>
