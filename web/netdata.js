@@ -217,7 +217,7 @@ function loadCharts(base_url, doNext) {
 
 			// check if the userpriority is IGNORE
 			if(json.charts[i].userpriority == "IGNORE"
-				// || json.charts[i].isdetail
+				|| json.charts[i].isdetail
 				)
 				json.charts[i].enabled = false;
 			else
@@ -314,13 +314,13 @@ function loadCharts(base_url, doNext) {
 					break;
 
 				case "tc":
-					json.charts[i].category = "Quality of Service";
+					json.charts[i].category = "QoS";
 					json.charts[i].glyphicon = "glyphicon-random";
 					json.charts[i].group = 15;
 					break;
 
 				case "net":
-					json.charts[i].category = "Network Interfaces";
+					json.charts[i].category = "Network";
 					json.charts[i].glyphicon = "glyphicon-transfer";
 					json.charts[i].group = 5;
 
@@ -349,7 +349,7 @@ function loadCharts(base_url, doNext) {
 					break;
 
 				case "disk":
-					json.charts[i].category = "Disk I/O";
+					json.charts[i].category = "Disks";
 					json.charts[i].glyphicon = "glyphicon-hdd";
 					json.charts[i].group = 5;
 					break;

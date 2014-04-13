@@ -2864,7 +2864,7 @@ int do_proc_net_netstat() {
 
 			RRD_STATS *st = rrd_stats_find("system.ipv4");
 			if(!st) {
-				st = rrd_stats_create("system", "ipv4", NULL, "system", "IPv4 Bandwidth", "kilobits/s", save_history);
+				st = rrd_stats_create("system", "ipv4", NULL, "ipv4", "IPv4 Bandwidth", "kilobits/s", save_history);
 
 				rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
 				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
@@ -2880,6 +2880,7 @@ int do_proc_net_netstat() {
 			st = rrd_stats_find("ipv4.inerrors");
 			if(!st) {
 				st = rrd_stats_create("ipv4", "inerrors", NULL, "ipv4", "IPv4 Input Errors", "packets/s", save_history);
+				st->isdetail = 1;
 
 				rrd_stats_dimension_add(st, "noroutes", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 				rrd_stats_dimension_add(st, "trunkated", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
@@ -2895,6 +2896,7 @@ int do_proc_net_netstat() {
 			st = rrd_stats_find("ipv4.mcast");
 			if(!st) {
 				st = rrd_stats_create("ipv4", "mcast", NULL, "ipv4", "IPv4 Multicast Bandwidth", "kilobits/s", save_history);
+				st->isdetail = 1;
 
 				rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
 				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
@@ -2910,6 +2912,7 @@ int do_proc_net_netstat() {
 			st = rrd_stats_find("ipv4.bcast");
 			if(!st) {
 				st = rrd_stats_create("ipv4", "bcast", NULL, "ipv4", "IPv4 Broadcast Bandwidth", "kilobits/s", save_history);
+				st->isdetail = 1;
 
 				rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
 				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
@@ -2925,6 +2928,7 @@ int do_proc_net_netstat() {
 			st = rrd_stats_find("ipv4.mcastpkts");
 			if(!st) {
 				st = rrd_stats_create("ipv4", "mcastpkts", NULL, "ipv4", "IPv4 Multicast Packets", "packets/s", save_history);
+				st->isdetail = 1;
 
 				rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
@@ -2940,6 +2944,7 @@ int do_proc_net_netstat() {
 			st = rrd_stats_find("ipv4.bcastpkts");
 			if(!st) {
 				st = rrd_stats_create("ipv4", "bcastpkts", NULL, "ipv4", "IPv4 Broadcast Packets", "packets/s", save_history);
+				st->isdetail = 1;
 
 				rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
@@ -3008,6 +3013,8 @@ int do_proc_net_stat_conntrack() {
 	}
 	fclose(fp);
 
+	// --------------------------------------------------------------------
+	
 	RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".sockets");
 	if(!st) {
 		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "sockets", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connections", "active connections", save_history);
@@ -3018,6 +3025,8 @@ int do_proc_net_stat_conntrack() {
 
 	rrd_stats_dimension_set(st, "connections", &aentries, NULL);
 	rrd_stats_done(st);
+
+	// --------------------------------------------------------------------
 
 	st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".new");
 	if(!st) {
@@ -3032,9 +3041,12 @@ int do_proc_net_stat_conntrack() {
 	rrd_stats_dimension_set(st, "dropped", &adrop, NULL);
 	rrd_stats_done(st);
 
+	// --------------------------------------------------------------------
+
 	st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".changes");
 	if(!st) {
 		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "changes", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Changes", "connections/s", save_history);
+		st->isdetail = 1;
 
 		rrd_stats_dimension_add(st, "inserted", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 		rrd_stats_dimension_add(st, "deleted", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
@@ -3163,7 +3175,7 @@ int do_proc_stat() {
 
 			RRD_STATS *st = rrd_stats_find_bytype(type, id);
 			if(!st) {
-				st = rrd_stats_create(type, id, NULL, type, title, "percentage", save_history);
+				st = rrd_stats_create(type, id, NULL, "cpu", title, "percentage", save_history);
 
 				long multiplier = 1;
 				long divisor = 1; // sysconf(_SC_CLK_TCK);
@@ -3206,7 +3218,7 @@ int do_proc_stat() {
 
 			RRD_STATS *st = rrd_stats_find_bytype("system", id);
 			if(!st) {
-				st = rrd_stats_create("system", id, NULL, "system", "CPU Interrupts", "interrupts/s", save_history);
+				st = rrd_stats_create("system", id, NULL, "cpu", "CPU Interrupts", "interrupts/s", save_history);
 
 				rrd_stats_dimension_add(st, "interrupts", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 			}
@@ -3226,7 +3238,7 @@ int do_proc_stat() {
 
 			RRD_STATS *st = rrd_stats_find_bytype("system", id);
 			if(!st) {
-				st = rrd_stats_create("system", id, NULL, "system", "CPU Context Switches", "context switches/s", save_history);
+				st = rrd_stats_create("system", id, NULL, "cpu", "CPU Context Switches", "context switches/s", save_history);
 
 				rrd_stats_dimension_add(st, "switches", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 			}
@@ -3246,7 +3258,7 @@ int do_proc_stat() {
 
 			RRD_STATS *st = rrd_stats_find_bytype("system", id);
 			if(!st) {
-				st = rrd_stats_create("system", id, NULL, "system", "New Processes", "new processes/s", save_history);
+				st = rrd_stats_create("system", id, NULL, "cpu", "New Processes", "new processes/s", save_history);
 
 				rrd_stats_dimension_add(st, "started", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 			}
@@ -3266,7 +3278,7 @@ int do_proc_stat() {
 
 			RRD_STATS *st = rrd_stats_find_bytype("system", id);
 			if(!st) {
-				st = rrd_stats_create("system", id, NULL, "system", "CPU Running Processes", "processes running",  save_history);
+				st = rrd_stats_create("system", id, NULL, "cpu", "CPU Running Processes", "processes running",  save_history);
 
 				rrd_stats_dimension_add(st, "running", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
 			}
@@ -3370,7 +3382,7 @@ int do_proc_meminfo() {
 
 	RRD_STATS *st = rrd_stats_find("system.ram");
 	if(!st) {
-		st = rrd_stats_create("system", "ram", NULL, "system", "System RAM", "percentage", save_history);
+		st = rrd_stats_create("system", "ram", NULL, "mem", "System RAM", "percentage", save_history);
 
 		rrd_stats_dimension_add(st, "buffers", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL, NULL);
 		rrd_stats_dimension_add(st, "used",    NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL, NULL);
@@ -3529,7 +3541,7 @@ int do_proc_vmstat() {
 
 	RRD_STATS *st = rrd_stats_find("system.swapio");
 	if(!st) {
-		st = rrd_stats_create("system", "swapio", NULL, "system", "Swap I/O", "kilobytes/s", save_history);
+		st = rrd_stats_create("system", "swapio", NULL, "mem", "Swap I/O", "kilobytes/s", save_history);
 
 		rrd_stats_dimension_add(st, "in",  NULL, sizeof(unsigned long long), 0, sysconf(_SC_PAGESIZE), 1024, RRD_DIMENSION_INCREMENTAL, NULL);
 		rrd_stats_dimension_add(st, "out", NULL, sizeof(unsigned long long), 0, -sysconf(_SC_PAGESIZE), 1024, RRD_DIMENSION_INCREMENTAL, NULL);
@@ -3542,7 +3554,7 @@ int do_proc_vmstat() {
 
 	st = rrd_stats_find("system.io");
 	if(!st) {
-		st = rrd_stats_create("system", "io", NULL, "system", "Disk I/O", "kilobytes/s", save_history);
+		st = rrd_stats_create("system", "io", NULL, "disk", "Disk I/O", "kilobytes/s", save_history);
 
 		rrd_stats_dimension_add(st, "in",  NULL, sizeof(unsigned long long), 0,  1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 		rrd_stats_dimension_add(st, "out", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
@@ -3936,7 +3948,7 @@ void *cpuidlejitter_main(void *ptr)
 
 		RRD_STATS *st = rrd_stats_find("system.idlejitter");
 		if(!st) {
-			st = rrd_stats_create("system", "idlejitter", NULL, "system", "CPU Idle Jitter", "microseconds lost/s", save_history);
+			st = rrd_stats_create("system", "idlejitter", NULL, "cpu", "CPU Idle Jitter", "microseconds lost/s", save_history);
 
 			rrd_stats_dimension_add(st, "jitter", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
 		}

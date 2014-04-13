@@ -38,6 +38,7 @@
 
 	var MODE_THUMBS = 1;
 	var MODE_MAIN = 2;
+	var MODE_GROUP_THUMBS = 3;
 	var mode; // one of the MODE_* values
 
 	var mycharts = new Array();
@@ -56,7 +57,7 @@
 
 		mainchart.chart = null;
 		mainchart.chartOptions.width = screenWidth();
-		mainchart.chartOptions.height = $(window).height() - 200;
+		mainchart.chartOptions.height = $(window).height() - 150;
 		if(mainchart.chartOptions.height < 300) mainchart.chartOptions.height = 300;
 		
 		mainchart.group = 2;
@@ -70,8 +71,6 @@
 		// initialize the div
 		showChartIsLoading(mainchart.div, mainchart.chartOptions.width, mainchart.chartOptions.height);
 
-		document.getElementById('maingraph_title').innerHTML = " " + mainchart.title + " ";
-
 		// set the radio buttons
 		setMainChartGroupMethod(mainchart.group_method, 'no-refresh');
 		setMainChartMax('normal');
@@ -82,7 +81,10 @@
 	}
 
 	function setMainChart(i) {
-		mainChart(mycharts[i]);
+		if(group_charts) 
+			mainChart(group_charts[i]);
+		else
+			mainChart(mycharts[i]);
 	}
 
 	var last_main_chart_max='normal';
@@ -233,11 +235,62 @@
 			}
 		});
 
+		width = groupWidth();
+		if(group_charts) $.each(group_charts, function(i, c) {
+			if(c.enabled && c.chartOptions.width != width) {
+				if(c.chart) c.chart.clearChart();
+				c.chart = null;
+				c.chartOptions.width = width;
+				showChartIsLoading(c.div, c.chartOptions.width, c.chartOptions.height);
+				c.last_updated = 0;
+			}
+		});
+
 		playGraphs();
+	}
+
+	function disableChart(i) {
+		var chart = null;
+
+		if(group_charts) 
+			chart = group_charts[i];
+		else
+			chart = mycharts[i];
+
+		if(chart) {
+			chart.enabled = false;
+			if(chart.chart) chart.chart.clearChart();
+			chart.chart = null;
+		}
+		var div = document.getElementById(chart.div);
+		if(div) div.innerHTML = "";
+
+		div = document.getElementById(chart.div + "_parent");
+		if(div) div.innerHTML = "";
+	}
+
+	function thumbChartActions(i, c, nogroup) {
+
+		var refinfo = "the chart " + c.name + " is drawing ";
+		if(c.group == 1) refinfo += "every single point collected.";
+		else refinfo += ((c.group_method == "average")?"the average":"the max") + " value for every " + (c.group * c.update_every) + " seconds of data";
+
+		var html = "<div class=\"btn-group btn-group-xs\">"
+		+		"<button type=\"button\" class=\"btn btn-default\" data-toggle=\"tooltip\" title=\"" + refinfo + "\" onclick=\"alert('" + refinfo + "');\"><span class=\"glyphicon glyphicon-info-sign\"></span></button>";
+
+		if(!nogroup) html += "<button type=\"button\" data-toggle=\"tooltip\" title=\"Show all charts in group '" + c.group_tag + "'\" class=\"btn btn-default\" onclick=\"initGroupGraphs('" + c.group_tag +"');\"><span class=\"glyphicon glyphicon-th\"></span></button>";
+
+		html += "<button type=\"button\" data-toggle=\"tooltip\" title=\"show chart '" + c.name + "' in fullscreen\" class=\"btn btn-default\" onclick=\"setMainChart(" + i +");\"><span class=\"glyphicon glyphicon-resize-full\"></span></button>"
+		+		"<button type=\"button\" data-toggle=\"tooltip\" title=\"set options for chart '" + c.name + "'\" class=\"btn btn-default disabled\" onclick=\"alert('Not implemented yet!');\"><span class=\"glyphicon glyphicon-cog\"></span></button>"
+		+		"<button type=\"button\" data-toggle=\"tooltip\" title=\"ignore chart '" + c.name + "'\" class=\"btn btn-default\" onclick=\"disableChart(" + i + ");\"><span class=\"glyphicon glyphicon-trash\"></span></button>"
+		+	"</div>";
+
+		return html;
 	}
 
 	// load the charts from the server
 	// generate html for the thumbgraphs to support them
+	var mainmenu = "";
 	function initCharts() {
 		var width = thumbWidth();
 		var height = TARGET_THUMB_GRAPH_HEIGHT;
@@ -279,7 +332,9 @@
 
 				if(c.enabled) {
 					var j;
-					var h = "<div class=\"thumbgraph\"><table><tr><td><div class=\"thumbgraph\" id=\"" + c.div + "\">" + chartIsLoadingHTML(c.chartOptions.width, c.chartOptions.height) + "</div></td></tr><tr><td align=\"center\"><div class=\"btn-group-xs\"><button type=\"button\" class=\"btn btn-default\" onclick=\"setMainChart(" + i +");\">&nbsp;&nbsp;select " + c.name + " for zoom&nbsp;&nbsp;</button></div></td></tr></table></div>";
+					var h = "<div class=\"thumbgraph\" id=\"" + c.div + "_parent\"><table><tr><td><div class=\"thumbgraph\" id=\"" + c.div + "\">" + chartIsLoadingHTML(c.chartOptions.width, c.chartOptions.height) + "</div></td></tr><tr><td align=\"center\">"
+					+ thumbChartActions(i, c)
+					+	"</td></tr></table></div>";
 
 					// find the categories object for this type
 					for(j = 0; j < categories.length ;j++) {
@@ -291,8 +346,7 @@
 					}
 
 					if(j == categories.length) {
-						var t = "(as " + c.group_method + " every " + (c.group * c.update_every) + " seconds)";
-						categories.push({name: c.type, title: c.category, description: t, priority: 0, count: 1, glyphicon: c.glyphicon, html: h});
+						categories.push({name: c.type, title: c.category, description: '', priority: 0, count: 1, glyphicon: c.glyphicon, html: h});
 					}
 				}
 			});
@@ -317,13 +371,16 @@
 				return 1;
 			}
 			categories.sort(categoriessort);
-
+			
 			// combine all the htmls into one
 			var allcategories = "<table width=\"100%\">";
+			mainmenu = "<ul class=\"nav navbar-nav\"><li class=\"active\"><a href=\"#\">Home</a></li>";
 			$.each(categories, function(i, a) {
 				allcategories += a.html;
+				mainmenu += "<li><a href=\"#" + a.name + "\">" + a.title + "</a></li>";
 			});
 			allcategories += "</table>";
+			mainmenu += "</ul>";
 
 			thumbsContainer.innerHTML = allcategories;
 			showThumbGraphs();
@@ -332,7 +389,7 @@
 
 	var last_thumb_updated = 0;
 	function thumbChartsRefresh() {
-		if(mycharts.length == 0 || mode != MODE_THUMBS) return;
+		if(mycharts.length == 0 || mode != MODE_THUMBS) triggerRefresh();
 
 		// find a chart to refresh
 		var orig = last_thumb_updated;
@@ -350,6 +407,26 @@
 		if(last_thumb_updated == orig) triggerRefresh();
 	}
 
+	var last_group_updated = 0;
+	function groupChartsRefresh() {
+		if(!group_charts || group_charts.length == 0 || mode != MODE_GROUP_THUMBS) triggerRefresh();
+
+		// find a chart to refresh
+		var orig = last_group_updated;
+		last_group_updated++;
+		if(last_group_updated >= group_charts.length) last_group_updated = 0;
+
+		while(last_group_updated != orig) {
+			if(refreshChart(group_charts[last_group_updated], chartsRefresh)) break;
+
+			last_group_updated++;
+			if(last_group_updated >= group_charts.length) last_group_updated = 0;
+		}
+
+		// no chart refreshed
+		if(last_group_updated == orig) triggerRefresh();
+	}
+
 	// refresh the proper chart
 	var timeout;
 	function chartsRefresh() {
@@ -360,16 +437,18 @@
 			timeout = null;
 		}
 
-		     if(mode == MODE_THUMBS) thumbChartsRefresh();
-		else if(mode == MODE_MAIN)   mainChartRefresh();
-		else                         timeout = setTimeout(triggerRefresh, 1000);
+		     if(mode == MODE_THUMBS)		thumbChartsRefresh();
+		else if(mode == MODE_GROUP_THUMBS)  groupChartsRefresh();
+		else if(mode == MODE_MAIN)   		mainChartRefresh();
+		else                         		timeout = setTimeout(triggerRefresh, 1000);
 	}
 
 	// callback for refreshing the charts later
 	function triggerRefresh() {
-		     if(mode == MODE_THUMBS) timeout = setTimeout(chartsRefresh, 200);
-		else if(mode == MODE_MAIN)   timeout = setTimeout(chartsRefresh, 500);
-		else                         timeout = setTimeout(triggerRefresh, 1000);
+		     if(mode == MODE_THUMBS) 		timeout = setTimeout(chartsRefresh, 200);
+		else if(mode == MODE_GROUP_THUMBS)	timeout = setTimeout(chartsRefresh, 200);
+		else if(mode == MODE_MAIN)   		timeout = setTimeout(chartsRefresh, 500);
+		else                         		timeout = setTimeout(triggerRefresh, 1000);
 	}
 
 	window.onresize = function(event) {
@@ -380,12 +459,17 @@
 	function showMainGraph() {
 		if(!mainchart) return;
 
-		thumbsScrollPosition = window.pageYOffset;
+		if(!group_charts) thumbsScrollPosition = window.pageYOffset;
 
 		mode = MODE_MAIN;
 
 		document.getElementById('maingraph_container').style.display = 'block';
 		document.getElementById('thumbgraphs_container').style.display = 'none';
+		document.getElementById('groupgraphs_container').style.display = 'none';
+
+		document.getElementById("main_menu_div").innerHTML = "<ul class=\"nav navbar-nav\"><li><a href=\"javascript:showThumbGraphs();\">Back to Home</a></li><li class=\"active\"><a href=\"#\">" + mainchart.title + "</a></li></ul>";
+
+		if(group_charts) clearGroupGraphs();
 
 		playGraphs();
 	}
@@ -395,6 +479,9 @@
 
 		document.getElementById('maingraph_container').style.display = 'none';
 		document.getElementById('thumbgraphs_container').style.display = 'block';
+		document.getElementById('groupgraphs_container').style.display = 'none';
+
+		document.getElementById("main_menu_div").innerHTML = mainmenu;
 
 		if(thumbsScrollPosition) window.scrollTo(0, thumbsScrollPosition);
 
@@ -402,7 +489,95 @@
 			if(mainchart.chart) mainchart.chart.clearChart();
 			mainchart = null;
 		}
+		if(group_charts) clearGroupGraphs();
 
+		playGraphs();
+	}
+
+	function showGroupGraphs() {
+		if(!group_charts) return;
+
+		if(!mainchart) thumbsScrollPosition = window.pageYOffset;
+
+		mode = MODE_GROUP_THUMBS;
+
+		document.getElementById('maingraph_container').style.display = 'none';
+		document.getElementById('thumbgraphs_container').style.display = 'none';
+		document.getElementById('groupgraphs_container').style.display = 'block';
+
+		document.getElementById("main_menu_div").innerHTML = "<ul class=\"nav navbar-nav\"><li><a href=\"javascript:showThumbGraphs();\">Back to Home</a></li><li class=\"active\"><a href=\"#\">" + group_charts[0].group_tag + " charts</a></li></ul>";
+
+		window.scrollTo(0, 0);
+
+		if(mainchart) {
+			if(mainchart.chart) mainchart.chart.clearChart();
+			mainchart = null;
+		}
+
+		playGraphs();
+	}
+
+	function groupWidth() {
+		var width = screenWidth() / 2;
+		if(width < 500) width = screenWidth();
+		return width;
+	}
+
+	var group_charts = null;
+	function initGroupGraphs(group) {
+		var width = groupWidth();
+		var height = (($(window).height() - 130) / 3) - 10;
+		if(height < TARGET_THUMB_GRAPH_HEIGHT) height = TARGET_THUMB_GRAPH_HEIGHT;
+
+		var count = 0;
+		
+		if(group_charts) clearGroupGraphs();
+		group_charts = new Array();
+
+		var groupbody = "";
+		$.each(mycharts, function(i, c) {
+			if(c.group_tag == group) {
+				group_charts[count] = [];
+				group_charts[count] = $.extend(true, {}, c);
+				group_charts[count].div += "_group";
+				group_charts[count].enabled = true;
+				group_charts[count].chart = null;
+				group_charts[count].last_updated = 0;
+
+				group_charts[count].chartOptions.width = width;
+				group_charts[count].chartOptions.height = height;
+				count++;
+			}
+		});
+
+		function chartssort(a, b) {
+			if(a.userpriority < b.userpriority) return -1;
+			return 1;
+		}
+		group_charts.sort(chartssort);
+
+		var groupbody = "";
+		$.each(group_charts, function(i, c) {
+			groupbody += "<div class=\"thumbgraph\" id=\"" + c.div + "_parent\"><table><tr><td><div class=\"thumbgraph\" id=\"" + c.div + "\">" + chartIsLoadingHTML(c.chartOptions.width, c.chartOptions.height) + "</div></td></tr><tr><td align=\"center\">" + thumbChartActions(i, c, 'nogroup') + "</td></tr></table></div>";
+		});
+		groupbody += "";
+
+		document.getElementById("groupgraphs").innerHTML = groupbody;
+		showGroupGraphs();
+	}
+
+	function clearGroupGraphs() {
+		if(group_charts && group_charts.length) {
+			$.each(group_charts, function(i, c) {
+				if(c.chart) c.chart.clearChart();
+				c.chart = null;
+			});
+
+			group_charts = null;
+		}
+
+		document.getElementById("groupgroups").innerHTML = "";
+		mode = MODE_THUMBS;
 		playGraphs();
 	}
 
@@ -419,9 +594,9 @@
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
           </button>
-          <a class="navbar-brand" href="#" id="hostname_id">NetData</a>
+          <a class="navbar-brand" href="javascript:showThumbGraphs();" id="hostname_id">NetData</a>
         </div>
-        <div class="collapse navbar-collapse">
+        <div class="collapse navbar-collapse" id="main_menu_div">
           <ul class="nav navbar-nav">
             <li class="active"><a href="#">Home</a></li>
             <li><a href="#system">System</a></li>
@@ -439,7 +614,6 @@
 
     <div class="container graphs" id="maingraph_container" style="display: none">
 		<table>
-			<tr><td><ol class="breadcrumb graphs"><li class="active"><div class="btn-group btn-group-sm"><button type="button" onclick="showThumbGraphs();" class="btn btn-default"> &larr; Back </button></div><a id="maingraph_title" href="#maingraph"><b> Maingraph </b></a></li></ol></td></tr>
 			<tr><td>
 		    	<div class="maingraph">
 					<table>
@@ -542,9 +716,22 @@
     	</div>
 	</div>
 
-	<script type='text/javascript'>
-		
+    <div class="container graphs" id="groupgraphs_container">
+    	<div class="allgraphs" id="groupgraphs">
+    		<table width="100%">
+    			<tr><td id="splash" align="center" style="vertical-align:middle">
+    				<span class="glyphicon glyphicon-off"></span>
+    				<br/><br/>
+    				loading charts
+    				<br/><br/>
+    				<span class="label label-default">Please wait...</span>
+    				</h1>
+    			</td></tr>
+    		</table>
+    	</div>
+	</div>
 
+	<script type='text/javascript'>
 		$(document).ready(function(){
 			document.getElementById('splash').height = $(window).height();
 
