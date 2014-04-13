@@ -468,6 +468,14 @@
 		// we never cleanup the thumb charts
 	}
 
+	function updateUI() {
+		$('[data-toggle="tooltip"]').tooltip({'placement': 'top', 'container': 'body', 'html': true});
+
+		$('[data-spy="scroll"]').each(function () {
+			var $spy = $(this).scrollspy('refresh')
+		})
+	}
+
 	var thumbsScrollPosition = null;
 	function switchToMainGraph() {
 		if(!mainchart) return;
@@ -482,6 +490,7 @@
 
 		mode = MODE_MAIN;
 		playGraphs();
+		updateUI();
 	}
 
 	function switchToThumbGraphs() {
@@ -496,10 +505,7 @@
 		// switch mode
 		mode = MODE_THUMBS;
 		playGraphs();
-
-		$('[data-spy="scroll"]').each(function () {
-			var $spy = $(this).scrollspy('refresh')
-		})
+		updateUI();
 	}
 
 	function switchToGroupGraphs() {
@@ -517,6 +523,7 @@
 
 		mode = MODE_GROUP_THUMBS;
 		playGraphs();
+		updateUI();
 	}
 
 
@@ -669,7 +676,6 @@
 			mainmenu += "</ul>";
 
 			thumbsContainer.innerHTML = allcategories;
-			$('[data-toggle="tooltip"]').tooltip({'placement': 'top', 'container': 'body', 'html': true});
 			switchToThumbGraphs();
 		});
 	}
