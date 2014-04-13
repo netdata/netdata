@@ -96,6 +96,15 @@
 	function disableChart(i) {
 		var chart = null;
 
+		var count = 0;
+		if(group_charts) $.each(group_charts, function(i, c) {
+			if(c.enabled) count++;
+		});
+		if(count <= 1) {
+			alert('Cannot close the last chart shown.');
+			return;
+		}
+
 		if(group_charts) 
 			chart = group_charts[i];
 		else
@@ -111,6 +120,8 @@
 
 		div = document.getElementById(chart.div + "_parent");
 		if(div) div.innerHTML = "";
+
+		resizeCharts();
 	}
 
 	function chartssort(a, b) {
@@ -264,10 +275,31 @@
 		return Math.round(cwidth / items) - 1;
 	}
 
-	function groupWidth() {
-		var width = screenWidth() / 2;
-		if(width < 500) width = screenWidth();
-		return width;
+	function groupChartSizes() {
+		var s = { width: screenWidth() / 2, height: ($(window).height() - 130) / 3 - 10};
+		if(s.width < MINIMUM_THUMB_GRAPH_WIDTH) s.width = screenWidth();
+
+		var count = 0;
+		if(group_charts) $.each(group_charts, function(i, c) {
+			if(c.enabled) count++;
+		});
+
+		if(count == 0) {
+			s.width = TARGET_THUMB_GRAPH_WIDTH;
+			s.height = TARGET_THUMB_GRAPH_HEIGHT;
+		}
+		if(count < 4) {
+			s.width = screenWidth();
+			s.height = ($(window).height() - 130) / count - 10;
+		}
+		else if(count == 4) {
+			s.height = ($(window).height() - 130) / 2 - 10;
+		}
+
+		if(s.height < TARGET_THUMB_GRAPH_HEIGHT * 1.5)
+			s.height = TARGET_THUMB_GRAPH_HEIGHT * 1.5;
+
+		return s;
 	}
 
 	// resize all charts
@@ -292,12 +324,14 @@
 			}
 		});
 
-		width = groupWidth();
 		if(group_charts) $.each(group_charts, function(i, c) {
-			if(c.enabled && c.chartOptions.width != width) {
+			var sizes = groupChartSizes();
+
+			if(c.enabled && (c.chartOptions.width != sizes.width || c.chartOptions.height != sizes.height)) {
 				if(c.chart) c.chart.clearChart();
 				c.chart = null;
-				c.chartOptions.width = width;
+				c.chartOptions.width = sizes.width;
+				c.chartOptions.height = sizes.height;
 				showChartIsLoading(c.div, c.chartOptions.width, c.chartOptions.height);
 				c.last_updated = 0;
 			}
@@ -535,10 +569,6 @@
 
 	var group_charts = null;
 	function initGroupGraphs(group) {
-		var width = groupWidth();
-		var height = (($(window).height() - 130) / 3) - 10;
-		if(height < TARGET_THUMB_GRAPH_HEIGHT) height = TARGET_THUMB_GRAPH_HEIGHT;
-
 		var count = 0;
 		
 		if(group_charts) clearGroupGraphs();
@@ -553,16 +583,18 @@
 				group_charts[count].enabled = true;
 				group_charts[count].chart = null;
 				group_charts[count].last_updated = 0;
-
-				group_charts[count].chartOptions.width = width;
-				group_charts[count].chartOptions.height = height;
 				count++;
 			}
 		});
 		group_charts.sort(chartssort);
 
+		var sizes = groupChartSizes();
+
 		var groupbody = "";
 		$.each(group_charts, function(i, c) {
+			c.chartOptions.width = sizes.width;
+			c.chartOptions.height = sizes.height;
+
 			groupbody += "<div class=\"thumbgraph\" id=\"" + c.div + "_parent\"><table><tr><td><div class=\"thumbgraph\" id=\"" + c.div + "\">" + chartIsLoadingHTML(c.chartOptions.width, c.chartOptions.height) + "</div></td></tr><tr><td align=\"center\">" + thumbChartActions(i, c, 'nogroup') + "</td></tr></table></div>";
 		});
 		groupbody += "";
