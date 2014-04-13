@@ -56,6 +56,9 @@
 	function showChartIsLoading(id, width, height) { document.getElementById(id).innerHTML = chartIsLoadingHTML(width, height); }
 
 	function thumbChartActions(i, c, nogroup) {
+		var name = c.name;
+		if(!nogroup) name = c.group_tag;
+
 		var refinfo = "the chart is drawing ";
 		if(c.group == 1) refinfo += "every single point collected.";
 		else refinfo += ((c.group_method == "average")?"the average":"the max") + " value for every " + (c.group * c.update_every) + " seconds of data";
@@ -63,7 +66,7 @@
 		var html = "<div class=\"btn-group btn-group\" data-toggle=\"tooltip\" title=\"" + refinfo + "\">"
 		+		"<button type=\"button\" class=\"btn btn-default\" onclick=\"javascript: return;\"><span class=\"glyphicon glyphicon-info-sign\"></span></button>"
 		+	"</div>"
-		+	"<div class=\"btn-group btn-group\"><button type=\"button\" class=\"btn btn-default disabled\"><small>&nbsp;&nbsp; " + c.name + "</small></button>";
+		+	"<div class=\"btn-group btn-group\"><button type=\"button\" class=\"btn btn-default disabled\"><small>&nbsp;&nbsp; " + name + "</small></button>";
 
 		if(!nogroup) {
 			var ingroup = 0;

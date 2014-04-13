@@ -2731,6 +2731,68 @@ int do_proc_net_snmp() {
 			rrd_stats_dimension_set(st, "received", &InReceives, NULL);
 			rrd_stats_dimension_set(st, "forwarded", &ForwDatagrams, NULL);
 			rrd_stats_done(st);
+
+			// --------------------------------------------------------------------
+
+			st = rrd_stats_find(RRD_TYPE_NET_SNMP ".fragsout");
+			if(!st) {
+				st = rrd_stats_create(RRD_TYPE_NET_SNMP, "fragsout", NULL, RRD_TYPE_NET_SNMP, "IPv4 Fragments Sent", "packets/s", save_history);
+				st->isdetail = 1;
+
+				rrd_stats_dimension_add(st, "ok", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "failed", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "all", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "ok", &FragOKs, NULL);
+			rrd_stats_dimension_set(st, "failed", &FragFails, NULL);
+			rrd_stats_dimension_set(st, "all", &FragCreates, NULL);
+			rrd_stats_done(st);
+
+			// --------------------------------------------------------------------
+
+			st = rrd_stats_find(RRD_TYPE_NET_SNMP ".fragsin");
+			if(!st) {
+				st = rrd_stats_create(RRD_TYPE_NET_SNMP, "fragsin", NULL, RRD_TYPE_NET_SNMP, "IPv4 Fragments Reassembly", "packets/s", save_history);
+				st->isdetail = 1;
+
+				rrd_stats_dimension_add(st, "ok", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "failed", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "all", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "ok", &ReasmOKs, NULL);
+			rrd_stats_dimension_set(st, "failed", &ReasmFails, NULL);
+			rrd_stats_dimension_set(st, "all", &ReasmReqds, NULL);
+			rrd_stats_done(st);
+
+			// --------------------------------------------------------------------
+
+			st = rrd_stats_find(RRD_TYPE_NET_SNMP ".errors");
+			if(!st) {
+				st = rrd_stats_create(RRD_TYPE_NET_SNMP, "errors", NULL, RRD_TYPE_NET_SNMP, "IPv4 Errors", "packets/s", save_history);
+				st->isdetail = 1;
+
+				rrd_stats_dimension_add(st, "InDiscards", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "OutDiscards", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+
+				rrd_stats_dimension_add(st, "InHdrErrors", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "InAddrErrors", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "InUnknownProtos", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+
+				rrd_stats_dimension_add(st, "OutNoRoutes", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "InDiscards", &InDiscards, NULL);
+			rrd_stats_dimension_set(st, "OutDiscards", &OutDiscards, NULL);
+			rrd_stats_dimension_set(st, "InHdrErrors", &InHdrErrors, NULL);
+			rrd_stats_dimension_set(st, "InAddrErrors", &InAddrErrors, NULL);
+			rrd_stats_dimension_set(st, "InUnknownProtos", &InUnknownProtos, NULL);
+			rrd_stats_dimension_set(st, "OutNoRoutes", &OutNoRoutes, NULL);
+			rrd_stats_done(st);
 		}
 		else if(strncmp(p, "Tcp: ", 5) == 0) {
 			// skip the header line, read the data
@@ -2742,7 +2804,8 @@ int do_proc_net_snmp() {
 				break;
 			}
 
-			unsigned long long RtoAlgorithm, RtoMin, RtoMax, MaxConn, ActiveOpens, PassiveOpens, AttemptFails, EstabResets, CurrEstab, InSegs, OutSegs, RetransSegs, InErrs, OutRsts;
+			unsigned long long RtoAlgorithm, RtoMin, RtoMax, MaxConn, ActiveOpens, PassiveOpens, AttemptFails, EstabResets,
+				CurrEstab, InSegs, OutSegs, RetransSegs, InErrs, OutRsts;
 
 			int r = sscanf(&buffer[5], "%llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu\n",
 				&RtoAlgorithm, &RtoMin, &RtoMax, &MaxConn, &ActiveOpens, &PassiveOpens, &AttemptFails, &EstabResets, &CurrEstab, &InSegs, &OutSegs, &RetransSegs, &InErrs, &OutRsts);
@@ -2755,7 +2818,7 @@ int do_proc_net_snmp() {
 			// see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
 			RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcpsock");
 			if(!st) {
-				st = rrd_stats_create(RRD_TYPE_NET_SNMP, "tcpsock", NULL, RRD_TYPE_NET_SNMP, "IPv4 TCP Connections", "active connections", save_history);
+				st = rrd_stats_create(RRD_TYPE_NET_SNMP, "tcpsock", NULL, "tcp", "IPv4 TCP Connections", "active connections", save_history);
 
 				rrd_stats_dimension_add(st, "connections", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
 			}
@@ -2768,7 +2831,7 @@ int do_proc_net_snmp() {
 			
 			st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcppackets");
 			if(!st) {
-				st = rrd_stats_create(RRD_TYPE_NET_SNMP, "tcppackets", NULL, RRD_TYPE_NET_SNMP, "IPv4 TCP Packets", "packets/s", save_history);
+				st = rrd_stats_create(RRD_TYPE_NET_SNMP, "tcppackets", NULL, "tcp", "IPv4 TCP Packets", "packets/s", save_history);
 
 				rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
@@ -2777,6 +2840,44 @@ int do_proc_net_snmp() {
 
 			rrd_stats_dimension_set(st, "received", &InSegs, NULL);
 			rrd_stats_dimension_set(st, "sent", &OutSegs, NULL);
+			rrd_stats_done(st);
+
+			// --------------------------------------------------------------------
+			
+			st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcperrors");
+			if(!st) {
+				st = rrd_stats_create(RRD_TYPE_NET_SNMP, "tcperrors", NULL, "tcp", "IPv4 TCP Errors", "packets/s", save_history);
+				st->isdetail = 1;
+
+				rrd_stats_dimension_add(st, "InErrs", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "RetransSegs", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "InErrs", &InErrs, NULL);
+			rrd_stats_dimension_set(st, "RetransSegs", &RetransSegs, NULL);
+			rrd_stats_done(st);
+
+			// --------------------------------------------------------------------
+			
+			st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcphandshake");
+			if(!st) {
+				st = rrd_stats_create(RRD_TYPE_NET_SNMP, "tcphandshake", NULL, "tcp", "IPv4 TCP Handshake Issues", "events/s", save_history);
+				st->isdetail = 1;
+
+				rrd_stats_dimension_add(st, "EstabResets", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "OutRsts", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "ActiveOpens", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "PassiveOpens", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "AttemptFails", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "EstabResets", &EstabResets, NULL);
+			rrd_stats_dimension_set(st, "OutRsts", &OutRsts, NULL);
+			rrd_stats_dimension_set(st, "ActiveOpens", &ActiveOpens, NULL);
+			rrd_stats_dimension_set(st, "PassiveOpens", &PassiveOpens, NULL);
+			rrd_stats_dimension_set(st, "AttemptFails", &AttemptFails, NULL);
 			rrd_stats_done(st);
 		}
 		else if(strncmp(p, "Udp: ", 5) == 0) {
@@ -2802,7 +2903,7 @@ int do_proc_net_snmp() {
 			// see http://net-snmp.sourceforge.net/docs/mibs/udp.html
 			RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_SNMP ".udppackets");
 			if(!st) {
-				st = rrd_stats_create(RRD_TYPE_NET_SNMP, "udppackets", NULL, RRD_TYPE_NET_SNMP, "IPv4 UDP Packets", "packets/s", save_history);
+				st = rrd_stats_create(RRD_TYPE_NET_SNMP, "udppackets", NULL, "udp", "IPv4 UDP Packets", "packets/s", save_history);
 
 				rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
@@ -2811,6 +2912,26 @@ int do_proc_net_snmp() {
 
 			rrd_stats_dimension_set(st, "received", &InDatagrams, NULL);
 			rrd_stats_dimension_set(st, "sent", &OutDatagrams, NULL);
+			rrd_stats_done(st);
+
+			// --------------------------------------------------------------------
+			
+			st = rrd_stats_find(RRD_TYPE_NET_SNMP ".udperrors");
+			if(!st) {
+				st = rrd_stats_create(RRD_TYPE_NET_SNMP, "udperrors", NULL, "udp", "IPv4 UDP Errors", "events/s", save_history);
+				st->isdetail = 1;
+
+				rrd_stats_dimension_add(st, "RcvbufErrors", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "SndbufErrors", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "InErrors", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "NoPorts", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			}
+			else rrd_stats_next(st);
+
+			rrd_stats_dimension_set(st, "InErrors", &InErrors, NULL);
+			rrd_stats_dimension_set(st, "NoPorts", &NoPorts, NULL);
+			rrd_stats_dimension_set(st, "RcvbufErrors", &RcvbufErrors, NULL);
+			rrd_stats_dimension_set(st, "SndbufErrors", &SndbufErrors, NULL);
 			rrd_stats_done(st);
 		}
 	}
@@ -2973,7 +3094,7 @@ int do_proc_net_stat_conntrack() {
 		return 1;
 	}
 
-	// read the discard the header
+	// read and discard the header
 	char *p = fgets(buffer, MAX_PROC_NET_STAT_CONNTRACK_LINE, fp);
 
 	unsigned long long aentries = 0, asearched = 0, afound = 0, anew = 0, ainvalid = 0, aignore = 0, adelete = 0, adelete_list = 0,
@@ -2994,22 +3115,22 @@ int do_proc_net_stat_conntrack() {
 		if(!aentries) aentries =  tentries;
 
 		// sum all the cpus together
-		asearched 			+= tsearched;
-		afound 				+= tfound;
-		anew 				+= tnew;
-		ainvalid 			+= tinvalid;
-		aignore 			+= tignore;
-		adelete 			+= tdelete;
-		adelete_list 		+= tdelete_list;
-		ainsert 			+= tinsert;
-		ainsert_failed 		+= tinsert_failed;
-		adrop 				+= tdrop;
-		aearly_drop 		+= tearly_drop;
-		aicmp_error 		+= ticmp_error;
-		aexpect_new 		+= texpect_new;
-		aexpect_create 		+= texpect_create;
-		aexpect_delete 		+= texpect_delete;
-		asearch_restart 	+= tsearch_restart;
+		asearched 			+= tsearched;			// conntrack.search
+		afound 				+= tfound;				// conntrack.search
+		anew 				+= tnew;				// conntrack.new
+		ainvalid 			+= tinvalid;			// conntrack.new
+		aignore 			+= tignore;				// conntrack.new
+		adelete 			+= tdelete;				// conntrack.changes
+		adelete_list 		+= tdelete_list;		// conntrack.changes
+		ainsert 			+= tinsert;				// conntrack.changes
+		ainsert_failed 		+= tinsert_failed;		// conntrack.errors
+		adrop 				+= tdrop;				// conntrack.errors
+		aearly_drop 		+= tearly_drop;			// conntrack.errors
+		aicmp_error 		+= ticmp_error;			// conntrack.errors
+		aexpect_new 		+= texpect_new;			// conntrack.expect
+		aexpect_create 		+= texpect_create;		// conntrack.expect
+		aexpect_delete 		+= texpect_delete;		// conntrack.expect
+		asearch_restart 	+= tsearch_restart;		// conntrack.search
 	}
 	fclose(fp);
 
@@ -3033,28 +3154,88 @@ int do_proc_net_stat_conntrack() {
 		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "new", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter New Connections", "connections/s", save_history);
 
 		rrd_stats_dimension_add(st, "new", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-		rrd_stats_dimension_add(st, "dropped", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		rrd_stats_dimension_add(st, "ignore", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		rrd_stats_dimension_add(st, "invalid", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 	}
 	else rrd_stats_next(st);
 
 	rrd_stats_dimension_set(st, "new", &anew, NULL);
-	rrd_stats_dimension_set(st, "dropped", &adrop, NULL);
+	rrd_stats_dimension_set(st, "ignore", &aignore, NULL);
+	rrd_stats_dimension_set(st, "invalid", &ainvalid, NULL);
 	rrd_stats_done(st);
 
 	// --------------------------------------------------------------------
 
 	st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".changes");
 	if(!st) {
-		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "changes", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Changes", "connections/s", save_history);
+		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "changes", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Changes", "changes/s", save_history);
 		st->isdetail = 1;
 
 		rrd_stats_dimension_add(st, "inserted", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 		rrd_stats_dimension_add(st, "deleted", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		rrd_stats_dimension_add(st, "delete_list", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 	}
 	else rrd_stats_next(st);
 
 	rrd_stats_dimension_set(st, "inserted", &ainsert, NULL);
 	rrd_stats_dimension_set(st, "deleted", &adelete, NULL);
+	rrd_stats_dimension_set(st, "delete_list", &adelete_list, NULL);
+	rrd_stats_done(st);
+
+	// --------------------------------------------------------------------
+
+	st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".expect");
+	if(!st) {
+		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "expect", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Expectations", "expectations/s", save_history);
+		st->isdetail = 1;
+
+		rrd_stats_dimension_add(st, "created", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		rrd_stats_dimension_add(st, "deleted", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		rrd_stats_dimension_add(st, "new", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "created", &aexpect_create, NULL);
+	rrd_stats_dimension_set(st, "deleted", &aexpect_delete, NULL);
+	rrd_stats_dimension_set(st, "new", &aexpect_new, NULL);
+	rrd_stats_done(st);
+
+	// --------------------------------------------------------------------
+
+	st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".search");
+	if(!st) {
+		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "search", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Searches", "searches/s", save_history);
+		st->isdetail = 1;
+
+		rrd_stats_dimension_add(st, "searched", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		rrd_stats_dimension_add(st, "restarted", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		rrd_stats_dimension_add(st, "found", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "searched", &asearched, NULL);
+	rrd_stats_dimension_set(st, "restarted", &asearch_restart, NULL);
+	rrd_stats_dimension_set(st, "found", &afound, NULL);
+	rrd_stats_done(st);
+
+	// --------------------------------------------------------------------
+
+	st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".errors");
+	if(!st) {
+		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "errors", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Errors", "events/s", save_history);
+		st->isdetail = 1;
+
+		rrd_stats_dimension_add(st, "icmp_error", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		rrd_stats_dimension_add(st, "insert_failed", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		rrd_stats_dimension_add(st, "drop", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		rrd_stats_dimension_add(st, "early_drop", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "icmp_error", &aicmp_error, NULL);
+	rrd_stats_dimension_set(st, "insert_failed", &ainsert_failed, NULL);
+	rrd_stats_dimension_set(st, "drop", &adrop, NULL);
+	rrd_stats_dimension_set(st, "early_drop", &aearly_drop, NULL);
 	rrd_stats_done(st);
 
 	return 0;
@@ -3103,6 +3284,8 @@ int do_proc_net_ip_vs_stats() {
 
 	fclose(fp);
 
+	// --------------------------------------------------------------------
+
 	RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_IPVS ".sockets");
 	if(!st) {
 		st = rrd_stats_create(RRD_TYPE_NET_IPVS, "sockets", NULL, RRD_TYPE_NET_IPVS, "IPVS New Connections", "connections/s", save_history);
@@ -3114,6 +3297,8 @@ int do_proc_net_ip_vs_stats() {
 	rrd_stats_dimension_set(st, "connections", &entries, NULL);
 	rrd_stats_done(st);
 
+	// --------------------------------------------------------------------
+	
 	st = rrd_stats_find(RRD_TYPE_NET_IPVS ".packets");
 	if(!st) {
 		st = rrd_stats_create(RRD_TYPE_NET_IPVS, "packets", NULL, RRD_TYPE_NET_IPVS, "IPVS Packets", "packets/s", save_history);
@@ -3127,6 +3312,8 @@ int do_proc_net_ip_vs_stats() {
 	rrd_stats_dimension_set(st, "sent", &OutPackets, NULL);
 	rrd_stats_done(st);
 
+	// --------------------------------------------------------------------
+	
 	st = rrd_stats_find(RRD_TYPE_NET_IPVS ".net");
 	if(!st) {
 		st = rrd_stats_create(RRD_TYPE_NET_IPVS, "net", NULL, RRD_TYPE_NET_IPVS, "IPVS Bandwidth", "kilobits/s", save_history);
@@ -3151,6 +3338,8 @@ int do_proc_stat() {
 		error("Cannot read /proc/stat.");
 		return 1;
 	}
+
+	unsigned long long processes = 0, running = 0 , blocked = 0;
 
 	for(;1;) {
 		char *p = fgets(buffer, MAX_PROC_STAT_LINE, fp);
@@ -3216,6 +3405,8 @@ int do_proc_stat() {
 			if(r == EOF) break;
 			if(r != 2) error("Cannot read /proc/stat intr line. Expected 2 params, read %d.", r);
 
+			// --------------------------------------------------------------------
+	
 			RRD_STATS *st = rrd_stats_find_bytype("system", id);
 			if(!st) {
 				st = rrd_stats_create("system", id, NULL, "cpu", "CPU Interrupts", "interrupts/s", save_history);
@@ -3236,6 +3427,8 @@ int do_proc_stat() {
 			if(r == EOF) break;
 			if(r != 2) error("Cannot read /proc/stat ctxt line. Expected 2 params, read %d.", r);
 
+			// --------------------------------------------------------------------
+	
 			RRD_STATS *st = rrd_stats_find_bytype("system", id);
 			if(!st) {
 				st = rrd_stats_create("system", id, NULL, "cpu", "CPU Context Switches", "context switches/s", save_history);
@@ -3256,16 +3449,7 @@ int do_proc_stat() {
 			if(r == EOF) break;
 			if(r != 2) error("Cannot read /proc/stat processes line. Expected 2 params, read %d.", r);
 
-			RRD_STATS *st = rrd_stats_find_bytype("system", id);
-			if(!st) {
-				st = rrd_stats_create("system", id, NULL, "cpu", "New Processes", "new processes/s", save_history);
-
-				rrd_stats_dimension_add(st, "started", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-			}
-			else rrd_stats_next(st);
-
-			rrd_stats_dimension_set(st, "started", &value, NULL);
-			rrd_stats_done(st);
+			processes = value;
 		}
 		else if(strncmp(p, "procs_running ", 14) == 0) {
 			char id[MAX_PROC_STAT_NAME + 1] = "";
@@ -3274,22 +3458,51 @@ int do_proc_stat() {
 
 			int r = sscanf(buffer, "%s %llu ", id, &value);
 			if(r == EOF) break;
-			if(r != 2) error("Cannot read /proc/stat processes line. Expected 2 params, read %d.", r);
+			if(r != 2) error("Cannot read /proc/stat procs_running line. Expected 2 params, read %d.", r);
 
-			RRD_STATS *st = rrd_stats_find_bytype("system", id);
-			if(!st) {
-				st = rrd_stats_create("system", id, NULL, "cpu", "CPU Running Processes", "processes running",  save_history);
+			running = value;
+		}
+		else if(strncmp(p, "procs_blocked ", 14) == 0) {
+			char id[MAX_PROC_STAT_NAME + 1] = "procs_running";
 
-				rrd_stats_dimension_add(st, "running", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
-			}
-			else rrd_stats_next(st);
+			unsigned long long value;
 
-			rrd_stats_dimension_set(st, "running", &value, NULL);
-			rrd_stats_done(st);
+			int r = sscanf(buffer, "%s %llu ", id, &value);
+			if(r == EOF) break;
+			if(r != 2) error("Cannot read /proc/stat procs_blocked line. Expected 2 params, read %d.", r);
+
+			blocked = value;
 		}
 	}
-	
 	fclose(fp);
+
+	// --------------------------------------------------------------------
+
+	RRD_STATS *st = rrd_stats_find_bytype("system", "forks");
+	if(!st) {
+		st = rrd_stats_create("system", "forks", NULL, "cpu", "New Processes", "processes/s", save_history);
+
+		rrd_stats_dimension_add(st, "started", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "started", &processes, NULL);
+	rrd_stats_done(st);
+
+	// --------------------------------------------------------------------
+
+	st = rrd_stats_find_bytype("system", "processes");
+	if(!st) {
+		st = rrd_stats_create("system", "processes", NULL, "cpu", "Processes", "processes", save_history);
+
+		rrd_stats_dimension_add(st, "running", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
+		rrd_stats_dimension_add(st, "blocked", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "running", &running, NULL);
+	rrd_stats_dimension_set(st, "blocked", &blocked, NULL);
+	rrd_stats_done(st);
 	return 0;
 }
 
@@ -3377,6 +3590,8 @@ int do_proc_meminfo() {
 	}
 	fclose(fp);
 
+	// --------------------------------------------------------------------
+	
 	// http://stackoverflow.com/questions/3019748/how-to-reliably-measure-available-memory-in-linux
 	MemUsed = MemTotal - MemFree - Cached - Buffers;
 
@@ -3539,6 +3754,8 @@ int do_proc_vmstat() {
 	}
 	fclose(fp);
 
+	// --------------------------------------------------------------------
+	
 	RRD_STATS *st = rrd_stats_find("system.swapio");
 	if(!st) {
 		st = rrd_stats_create("system", "swapio", NULL, "mem", "Swap I/O", "kilobytes/s", save_history);
@@ -3552,6 +3769,8 @@ int do_proc_vmstat() {
 	rrd_stats_dimension_set(st, "out", &pswpout, NULL);
 	rrd_stats_done(st);
 
+	// --------------------------------------------------------------------
+	
 	st = rrd_stats_find("system.io");
 	if(!st) {
 		st = rrd_stats_create("system", "io", NULL, "disk", "Disk I/O", "kilobytes/s", save_history);
