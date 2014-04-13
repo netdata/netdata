@@ -51,7 +51,10 @@
 	// copy the chart c to mainchart
 	// switch to main graphs screen
 	function mainChart(c) {
-		if(mainchart && mainchart.chart) mainchart.chart.clearChart();
+		if(mainchart && mainchart.chart) {
+			mainchart.chart.clearChart();
+			mainchart.chart = null;
+		}
 
 		mainchart = $.extend(true, {}, c);
 
@@ -144,7 +147,7 @@
 		last_main_chart_avg = g;
 	}
 
-	var stop_refreshing = 0;
+	var stop_refreshing = 1;
 	function playGraphs() {
 		stop_refreshing = 0;
 		$('.mainchart_play_button').button('play');
@@ -182,7 +185,13 @@
 	// make sure it gets updated frequently
 	function mainChartRefresh() {
 		if(!mainchart || mode != MODE_MAIN) {
-			if(mainchart) mainchart.clearChart();
+			if(mainchart) {
+				if(mainchart.chart) {
+					mainchart.chart.clearChart();
+					mainchart.chart = null;
+				}
+				mainchart = null;
+			}
 			showThumbGraphs();
 			return;
 		}
@@ -391,16 +400,20 @@
 	function thumbChartsRefresh() {
 		if(mycharts.length == 0 || mode != MODE_THUMBS) triggerRefresh();
 
+		if(last_thumb_updated >= mycharts.length) last_thumb_updated = 0;
+
 		// find a chart to refresh
 		var orig = last_thumb_updated;
 		last_thumb_updated++;
 		if(last_thumb_updated >= mycharts.length) last_thumb_updated = 0;
 
-		while(last_thumb_updated != orig) {
+		while(1) {
 			if(refreshChart(mycharts[last_thumb_updated], chartsRefresh)) break;
 
 			last_thumb_updated++;
 			if(last_thumb_updated >= mycharts.length) last_thumb_updated = 0;
+
+			if(last_thumb_updated == orig) break;
 		}
 
 		// no chart refreshed
@@ -411,16 +424,20 @@
 	function groupChartsRefresh() {
 		if(!group_charts || group_charts.length == 0 || mode != MODE_GROUP_THUMBS) triggerRefresh();
 
+		if(last_group_updated >= group_charts.length) last_group_updated = 0;
+
 		// find a chart to refresh
 		var orig = last_group_updated;
 		last_group_updated++;
 		if(last_group_updated >= group_charts.length) last_group_updated = 0;
 
-		while(last_group_updated != orig) {
+		while(1) {
 			if(refreshChart(group_charts[last_group_updated], chartsRefresh)) break;
 
 			last_group_updated++;
 			if(last_group_updated >= group_charts.length) last_group_updated = 0;
+
+			if(last_group_updated == orig) break;
 		}
 
 		// no chart refreshed
@@ -430,12 +447,12 @@
 	// refresh the proper chart
 	var timeout;
 	function chartsRefresh() {
-		if(stop_refreshing) return;
-
 		if(timeout) {
 			clearTimeout(timeout);
 			timeout = null;
 		}
+
+		if(stop_refreshing) return;
 
 		     if(mode == MODE_THUMBS)		thumbChartsRefresh();
 		else if(mode == MODE_GROUP_THUMBS)  groupChartsRefresh();
@@ -461,8 +478,6 @@
 
 		if(!group_charts) thumbsScrollPosition = window.pageYOffset;
 
-		mode = MODE_MAIN;
-
 		document.getElementById('maingraph_container').style.display = 'block';
 		document.getElementById('thumbgraphs_container').style.display = 'none';
 		document.getElementById('groupgraphs_container').style.display = 'none';
@@ -471,12 +486,11 @@
 
 		if(group_charts) clearGroupGraphs();
 
-		playGraphs();
+		mode = MODE_MAIN;
+		if(stop_refreshing) playGraphs();
 	}
 
 	function showThumbGraphs() {
-		mode = MODE_THUMBS;
-
 		document.getElementById('maingraph_container').style.display = 'none';
 		document.getElementById('thumbgraphs_container').style.display = 'block';
 		document.getElementById('groupgraphs_container').style.display = 'none';
@@ -486,20 +500,22 @@
 		if(thumbsScrollPosition) window.scrollTo(0, thumbsScrollPosition);
 
 		if(mainchart) {
-			if(mainchart.chart) mainchart.chart.clearChart();
+			if(mainchart.chart) {
+				mainchart.chart.clearChart();
+				mainchart.chart = null;
+			}
 			mainchart = null;
 		}
 		if(group_charts) clearGroupGraphs();
 
-		playGraphs();
+		mode = MODE_THUMBS;
+		if(stop_refreshing) playGraphs();
 	}
 
 	function showGroupGraphs() {
 		if(!group_charts) return;
 
 		if(!mainchart) thumbsScrollPosition = window.pageYOffset;
-
-		mode = MODE_GROUP_THUMBS;
 
 		document.getElementById('maingraph_container').style.display = 'none';
 		document.getElementById('thumbgraphs_container').style.display = 'none';
@@ -510,11 +526,15 @@
 		window.scrollTo(0, 0);
 
 		if(mainchart) {
-			if(mainchart.chart) mainchart.chart.clearChart();
+			if(mainchart.chart) {
+				mainchart.chart.clearChart();
+				mainchart.chart = null;
+			}
 			mainchart = null;
 		}
 
-		playGraphs();
+		mode = MODE_GROUP_THUMBS;
+		if(stop_refreshing) playGraphs();
 	}
 
 	function groupWidth() {
@@ -576,9 +596,7 @@
 			group_charts = null;
 		}
 
-		document.getElementById("groupgroups").innerHTML = "";
-		mode = MODE_THUMBS;
-		playGraphs();
+		document.getElementById("groupgraphs").innerHTML = "";
 	}
 
 	</script>
