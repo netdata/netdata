@@ -61,7 +61,13 @@
 
 #define WEB_PATH_FILE				"file"
 #define WEB_PATH_DATA				"data"
+#define WEB_PATH_DATASOURCE			"datasource"
 #define WEB_PATH_GRAPH				"graph"
+
+// type of JSON generations
+#define DATASOURCE_JSON 0
+#define DATASOURCE_GOOGLE_JSON 1
+#define DATASOURCE_GOOGLE_JSONP 2
 
 // internal defaults
 #define UPDATE_EVERY 1
@@ -825,9 +831,12 @@ void web_buffer_increase(struct web_buffer *b, size_t free_size_required)
 #define WEB_CLIENT_MODE_NORMAL		0
 #define WEB_CLIENT_MODE_FILECOPY	1
 
+#define URL_MAX 8192
+
 struct web_client {
 	unsigned long long id;
 	char client_ip[101];
+	char last_url[URL_MAX+1];
 
 	struct timeval tv_in, tv_ready;
 
@@ -1090,9 +1099,25 @@ void web_line_free(struct web_line *wl)
 	free(wl);
 }
 
-void rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show, size_t group_count, int group_method)
+unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show, size_t group_count, int group_method)
 {
 	pthread_mutex_lock(&st->mutex);
+
+	unsigned long last_timestamp = 0;
+
+	char kq[2] = "\"";
+	char sq[2] = "\"";
+	switch(type) {
+		case DATASOURCE_GOOGLE_JSON:
+		case DATASOURCE_GOOGLE_JSONP:
+			kq[0] = '\0';
+			sq[0] = '\'';
+			break;
+
+		case DATASOURCE_JSON:
+		default:
+			break;
+	}
 
 	// check the options
 	if(entries_to_show <= 0) entries_to_show = 1;
@@ -1124,7 +1149,7 @@ void rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show
 	if(!dimensions) {
 		pthread_mutex_unlock(&st->mutex);
 		wb->bytes = sprintf(wb->buffer, "No dimensions yet.");
-		return;
+		return 0;
 	}
 
 	int line_size = 4096 + (dimensions * 200);
@@ -1137,16 +1162,16 @@ void rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
 		group_values[c] = group_counts[c] = 0;
 
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "{\n	\"cols\":\n	[\n");
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "		{\"id\":\"\",\"label\":\"time\",\"pattern\":\"\",\"type\":\"datetime\"},\n");
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "		{\"id\":\"\",\"label\":\"\",\"pattern\":\"\",\"type\":\"string\",\"p\":{\"role\":\"annotation\"}},\n");
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "		{\"id\":\"\",\"label\":\"\",\"pattern\":\"\",\"type\":\"string\",\"p\":{\"role\":\"annotationText\"}}");
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "{\n	%scols%s:\n	[\n", kq, kq);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "		{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotation%s}},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotationText%s}}", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
 
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
 		if(!rd->hidden)
-			wb->bytes += sprintf(&wb->buffer[wb->bytes], ",\n		{\"id\":\"\",\"label\":\"%s\",\"pattern\":\"\",\"type\":\"number\"}", rd->name);
+			wb->bytes += sprintf(&wb->buffer[wb->bytes], ",\n		{%sid%s:%s%s,%slabel%s:%s%s%s,%spattern%s:%s%s,%stype%s:%snumber%s}", kq, kq, sq, sq, kq, kq, sq, rd->name, sq, kq, kq, sq, sq, kq, kq, sq, sq);
 
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\n	],\n	\"rows\":\n	[\n");
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\n	],\n	%srows%s:\n	[\n", kq, kq);
 
 	// to allow grouping on the same values, we need a pad
 	pad = current_entry % group_count;
@@ -1193,8 +1218,10 @@ void rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show
 			struct tm *tm = localtime(&st->times[t].tv_sec);
 			if(!tm) { error("localtime() failed."); continue; }
 
-			sprintf(dtm, "\"Date(%d, %d, %d, %d, %d, %d, %d)\"", tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(st->times[t].tv_usec / 1000)); // datetime
-			wb->bytes += sprintf(&wb->buffer[wb->bytes], "%s		{\"c\":[{\"v\":%s}", printed?"]},\n":"", dtm);
+			if(st->times[t].tv_sec > last_timestamp) last_timestamp = st->times[t].tv_sec;
+
+			sprintf(dtm, "Date(%d, %d, %d, %d, %d, %d, %d)", tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(st->times[t].tv_usec / 1000)); // datetime
+			wb->bytes += sprintf(&wb->buffer[wb->bytes], "%s		{%sc%s:[{%sv%s:%s%s%s}", printed?"]},\n":"", kq, kq, kq, kq, sq, dtm, sq);
 
 			print_this = 1;
 			web_line_reset(wl);
@@ -1260,8 +1287,7 @@ void rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show
 
 			if(print_this) {
 				if(!rd->hidden)
-					web_line_printf(wl, ",{\"v\":%0.1Lf}", group_values[c]);
-					//wb->bytes += sprintf(&wb->buffer[wb->bytes], ",{\"v\":%0.1Lf}", group_values[c]);
+					web_line_printf(wl, ",{%sv%s:%0.1Lf}", kq, kq, group_values[c]);
 
 				group_values[c] = group_counts[c] = 0;
 			}
@@ -1270,11 +1296,11 @@ void rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show
 		if(print_this) {
 			if(annotate_reset) {
 				annotation_count++;
-				wb->bytes += sprintf(&wb->buffer[wb->bytes], ",{\"v\":\"RESET OR OVERFLOW\"},{\"v\":\"The counters have been wrapped.\"}");
+				wb->bytes += sprintf(&wb->buffer[wb->bytes], ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
 				annotate_reset = 0;
 			}
 			else {
-				wb->bytes += sprintf(&wb->buffer[wb->bytes], ",{\"v\":null},{\"v\":null}");
+				wb->bytes += sprintf(&wb->buffer[wb->bytes], ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
 			}
 
 			strcpy(&wb->buffer[wb->bytes], wl->buffer);
@@ -1289,6 +1315,7 @@ void rrd_stats_json(RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show
 	web_line_free(wl);
 
 	pthread_mutex_unlock(&st->mutex);
+	return last_timestamp;
 }
 
 int mysendfile(struct web_client *w, char *filename)
@@ -1299,9 +1326,10 @@ int mysendfile(struct web_client *w, char *filename)
 	while (filename[0] == '/') filename = &filename[1];
 
 	// if the filename contain known paths, skip them
-		 if(strncmp(filename, WEB_PATH_DATA "/",  strlen(WEB_PATH_DATA)  + 1) == 0) filename = &filename[strlen(WEB_PATH_DATA)  + 1];
-	else if(strncmp(filename, WEB_PATH_GRAPH "/", strlen(WEB_PATH_GRAPH) + 1) == 0) filename = &filename[strlen(WEB_PATH_GRAPH) + 1];
-	else if(strncmp(filename, WEB_PATH_FILE "/",  strlen(WEB_PATH_FILE)  + 1) == 0) filename = &filename[strlen(WEB_PATH_FILE)  + 1];
+		 if(strncmp(filename, WEB_PATH_DATA       "/", strlen(WEB_PATH_DATA)       + 1) == 0) filename = &filename[strlen(WEB_PATH_DATA)       + 1];
+	else if(strncmp(filename, WEB_PATH_DATASOURCE "/", strlen(WEB_PATH_DATASOURCE) + 1) == 0) filename = &filename[strlen(WEB_PATH_DATASOURCE) + 1];
+	else if(strncmp(filename, WEB_PATH_GRAPH      "/", strlen(WEB_PATH_GRAPH)      + 1) == 0) filename = &filename[strlen(WEB_PATH_GRAPH)      + 1];
+	else if(strncmp(filename, WEB_PATH_FILE       "/", strlen(WEB_PATH_FILE)       + 1) == 0) filename = &filename[strlen(WEB_PATH_FILE)       + 1];
 
 	// if the filename contains a / or a .., refuse to serve it
 	if(strstr(filename, "/") != 0 || strstr(filename, "..") != 0) {
@@ -1349,7 +1377,7 @@ int mysendfile(struct web_client *w, char *filename)
 		}
 	}
 	
-	syslog(LOG_NOTICE, "%llu: Sending file '%s' to client %s.", w->id, filename, w->client_ip);
+	//syslog(LOG_NOTICE, "%llu: Sending file '%s' to client %s.", w->id, filename, w->client_ip);
 
 	// pick a Content-Type for the file
 		 if(strstr(filename, ".html") != NULL)	w->data->contenttype = CT_TEXT_HTML;
@@ -1387,6 +1415,21 @@ char *mystrsep(char **ptr, char *s)
 
 void web_client_reset(struct web_client *w)
 {
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+
+	long sent = w->zoutput?w->zstream.total_out:(w->mode == WEB_CLIENT_MODE_FILECOPY)?w->data->rbytes:w->data->bytes;
+	long size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->data->rbytes:w->data->bytes;
+	syslog(LOG_NOTICE, "%llu: (sent/all = %ld/%ld bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: '%s'",
+		w->id,
+		sent, size, -((size>0)?((float)(size-sent)/(float)size * 100.0):0.0),
+		(float)usecdiff(&w->tv_ready, &w->tv_in) / 1000.0,
+		(float)usecdiff(&tv, &w->tv_ready) / 1000.0,
+		(float)usecdiff(&tv, &w->tv_in) / 1000.0,
+		(w->mode == WEB_CLIENT_MODE_FILECOPY)?"filecopy":"data",
+		w->last_url
+		);
+
 	debug(D_WEB_CLIENT, "%llu: Reseting client.", w->id);
 
 	if(w->mode == WEB_CLIENT_MODE_FILECOPY) {
@@ -1468,6 +1511,140 @@ void web_client_enable_deflate(struct web_client *w) {
 	debug(D_DEFLATE, "%llu: Initialized compression.", w->id);
 }
 
+int web_client_data_request(struct web_client *w, char *url, int datasource_type)
+{
+	char *args = strchr(url, '?');
+	if(args) {
+		*args='\0';
+		args = &args[1];
+	}
+
+	// get the name of the data to show
+	char *tok = mystrsep(&url, "/");
+	debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
+
+	// do we have such a data set?
+	RRD_STATS *st = rrd_stats_find_byname(tok);
+	if(!st) st = rrd_stats_find(tok);
+	if(!st) {
+		// we don't have it
+		// try to send a file with that name
+		w->data->bytes = 0;
+		return(mysendfile(w, tok));
+	}
+
+	// we have it
+	debug(D_WEB_CLIENT, "%llu: Found RRD data with name '%s'.", w->id, tok);
+
+	// how many entries does the client want?
+	size_t lines = save_history;
+	size_t group_count = 1;
+	int group_method = GROUP_AVERAGE;
+
+	if(url) {
+		// parse the lines required
+		tok = mystrsep(&url, "/");
+		if(tok) lines = atoi(tok);
+		if(lines < 5) lines = save_history;
+	}
+	if(url) {
+		// parse the group count required
+		tok = mystrsep(&url, "/");
+		if(tok) group_count = atoi(tok);
+		if(group_count < 1) group_count = 1;
+		if(group_count > save_history / 20) group_count = save_history / 20;
+	}
+	if(url) {
+		// parse the grouping method required
+		tok = mystrsep(&url, "/");
+		if(strcmp(tok, "max") == 0) group_method = GROUP_MAX;
+		else if(strcmp(tok, "average") == 0) group_method = GROUP_AVERAGE;
+		else debug(D_WEB_CLIENT, "%llu: Unknown group method '%s'", w->id, tok);
+	}
+
+	w->data->contenttype = CT_APPLICATION_JSON;
+	w->data->bytes = 0;
+
+	char *google_version = "0.6";
+	char *google_reqId = "0";
+	char *google_sig = "0";
+	char *google_out = "json";
+	char *google_responseHandler = "google.visualization.Query.setResponse";
+	char *google_outFileName = NULL;
+	unsigned long last_timestamp_in_data = 0;
+	if(datasource_type == DATASOURCE_GOOGLE_JSON || datasource_type == DATASOURCE_GOOGLE_JSONP) {
+
+		while(args) {
+			tok = mystrsep(&args, "&");
+			if(tok) {
+				char *name = mystrsep(&tok, "=");
+				if(name && strcmp(name, "tqx") == 0) {
+					char *key = mystrsep(&tok, ":");
+					char *value = mystrsep(&tok, ";");
+					if(key && value && *key && *value) {
+						if(strcmp(key, "version") == 0)
+							google_version = value;
+
+						else if(strcmp(key, "reqId") == 0)
+							google_reqId = value;
+
+						else if(strcmp(key, "sig") == 0)
+							google_sig = value;
+						
+						else if(strcmp(key, "out") == 0)
+							google_out = value;
+						
+						else if(strcmp(key, "responseHandler") == 0)
+							google_responseHandler = value;
+						
+						else if(strcmp(key, "outFileName") == 0)
+							google_outFileName = value;
+					}
+				}
+			}
+		}
+
+		debug(D_WEB_CLIENT_ACCESS, "%llu: GOOGLE JSONP: version = '%s', reqId = '%s', sig = '%s', out = '%s', responseHandler = '%s', outFileName = '%s'",
+			w->id, google_version, google_reqId, google_sig, google_out, google_responseHandler, google_outFileName
+			);
+
+		if(datasource_type == DATASOURCE_GOOGLE_JSONP) {
+			last_timestamp_in_data = strtoul(google_sig, NULL, 0);
+
+			// check the client wants json
+			if(strcmp(google_out, "json") != 0) {
+				w->data->bytes = snprintf(w->data->buffer, w->data->size, 
+					"%s({version:'%s',reqId:'%s',status:'error',errors:[{reason:'invalid_query',message:'output format is not supported',detailed_message:'the format %s requested is not supported by netdata.'}]});",
+					google_responseHandler, google_version, google_reqId, google_out);
+					return 200;
+			}
+		}
+	}
+
+	if(datasource_type == DATASOURCE_GOOGLE_JSONP) {
+		w->data->bytes = snprintf(w->data->buffer, w->data->size, 
+			"%s({version:'%s',reqId:'%s',status:'ok',sig:'%lu',table:",
+			google_responseHandler, google_version, google_reqId, st->last_updated);
+	}
+	
+	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group_count, %d group_method).", w->id, st->name, st->id, lines, group_count, group_method);
+	unsigned long timestamp_in_data = rrd_stats_json(datasource_type, st, w->data, lines, group_count, group_method);
+
+	if(datasource_type == DATASOURCE_GOOGLE_JSONP) {
+		if(timestamp_in_data > last_timestamp_in_data)
+			w->data->bytes += snprintf(&w->data->buffer[w->data->bytes], w->data->size - w->data->bytes, "});");
+
+		else {
+			// the client already has the latest data
+			w->data->bytes = snprintf(w->data->buffer, w->data->size, 
+				"%s({version:'%s',reqId:'%s',status:'error',errors:[{reason:'not_modified',message:'Data not modified'}]});",
+				google_responseHandler, google_version, google_reqId);
+		}
+	}
+
+	return 200;
+}
+
 void web_client_process(struct web_client *w)
 {
 	int code = 500;
@@ -1488,6 +1665,10 @@ void web_client_process(struct web_client *w)
 		if(strstr(w->data->buffer, "gzip"))
 			web_client_enable_deflate(w);
 
+		int datasource_type = DATASOURCE_GOOGLE_JSONP;
+		//if(strstr(w->data->buffer, "X-DataSource-Auth"))
+		//	datasource_type = DATASOURCE_GOOGLE_JSON;
+
 		char *buf = w->data->buffer;
 		char *tok = strsep(&buf, " \r\n");
 		char *url = NULL;
@@ -1506,65 +1687,23 @@ void web_client_process(struct web_client *w)
 			debug(D_WEB_CLIENT, "%llu: I don't know how to handle POST with form data. Assuming it is a GET on url '%s'.", w->id, url);
 		}
 
+		w->last_url[0] = '\0';
 		if(url) {
+			strncpy(w->last_url, url, URL_MAX);
+			w->last_url[URL_MAX] = '\0';
+
 			tok = mystrsep(&url, "/?&");
 
 			debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
 
 			if(strcmp(tok, WEB_PATH_DATA) == 0) { // "data"
 				// the client is requesting rrd data
-
-				// get the name of the data to show
-				tok = mystrsep(&url, "/?&");
-				debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
-
-				// do we have such a data set?
-				RRD_STATS *st = rrd_stats_find_byname(tok);
-				if(!st) st = rrd_stats_find(tok);
-				if(!st) {
-					// we don't have it
-					// try to send a file with that name
-					w->data->bytes = 0;
-					code = mysendfile(w, tok);
-				}
-				else {
-					// we have it
-					debug(D_WEB_CLIENT, "%llu: Found RRD data with name '%s'.", w->id, tok);
-
-					// how many entries does the client want?
-					size_t lines = save_history;
-					size_t group_count = 1;
-					int group_method = GROUP_AVERAGE;
-
-					if(url) {
-						// parse the lines required
-						tok = mystrsep(&url, "/?&");
-						if(tok) lines = atoi(tok);
-						if(lines < 5) lines = save_history;
-					}
-					if(url) {
-						// parse the group count required
-						tok = mystrsep(&url, "/?&");
-						if(tok) group_count = atoi(tok);
-						if(group_count < 1) group_count = 1;
-						if(group_count > save_history / 20) group_count = save_history / 20;
-					}
-					if(url) {
-						// parse the grouping method required
-						tok = mystrsep(&url, "/?&");
-						if(strcmp(tok, "max") == 0) group_method = GROUP_MAX;
-						else if(strcmp(tok, "average") == 0) group_method = GROUP_AVERAGE;
-						else debug(D_WEB_CLIENT, "%llu: Unknown group method '%s'", w->id, tok);
-					}
-
-					syslog(LOG_NOTICE, "%llu: Sending '%s' data to client %s.", w->id, st->name, w->client_ip);
-					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group_count, %d group_method).", w->id, st->name, st->id, lines, group_count, group_method);
-
-					code = 200;
-					w->data->contenttype = CT_APPLICATION_JSON;
-					w->data->bytes = 0;
-					rrd_stats_json(st, w->data, lines, group_count, group_method);
-				}
+				datasource_type = DATASOURCE_JSON;
+				code = web_client_data_request(w, url, datasource_type);
+			}
+			else if(strcmp(tok, WEB_PATH_DATASOURCE) == 0) { // "datasource"
+				// the client is requesting google datasource
+				code = web_client_data_request(w, url, datasource_type);
 			}
 			else if(strcmp(tok, WEB_PATH_GRAPH) == 0) { // "graph"
 				// the client is requesting an rrd graph
@@ -1583,7 +1722,6 @@ void web_client_process(struct web_client *w)
 				}
 				else {
 					code = 200;
-					syslog(LOG_NOTICE, "%llu: Sending '%s' graph to client %s.", w->id, st->name, w->client_ip);
 					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending %s.json of RRD_STATS...", w->id, st->name);
 					w->data->contenttype = CT_APPLICATION_JSON;
 					w->data->bytes = 0;
@@ -1594,7 +1732,6 @@ void web_client_process(struct web_client *w)
 				code = 200;
 
 				debug(D_WEB_CLIENT_ACCESS, "%llu: Mirroring...", w->id);
-				syslog(LOG_NOTICE, "%llu: mirroring client %s.", w->id, w->client_ip);
 
 				// just leave the buffer as is
 				// it will be copied back to the client
@@ -1602,7 +1739,6 @@ void web_client_process(struct web_client *w)
 			else if(strcmp(tok, "list") == 0) {
 				code = 200;
 
-				syslog(LOG_NOTICE, "%llu: Sending text list of all monitors to client %s.", w->id, w->client_ip);
 				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending list of RRD_STATS...", w->id);
 
 				w->data->bytes = 0;
@@ -1615,7 +1751,6 @@ void web_client_process(struct web_client *w)
 				code = 200;
 
 				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending envlist of RRD_STATS...", w->id);
-				syslog(LOG_NOTICE, "%llu: Sending envlist to client %s.", w->id, w->client_ip);
 
 				w->data->bytes = 0;
 				RRD_STATS *st = root;
@@ -1628,7 +1763,6 @@ void web_client_process(struct web_client *w)
 			else if(strcmp(tok, "all.json") == 0) {
 				code = 200;
 				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending JSON list of all monitors of RRD_STATS...", w->id);
-				syslog(LOG_NOTICE, "%llu: Sending list with all graphs in JSON to client %s.", w->id, w->client_ip);
 
 				w->data->contenttype = CT_APPLICATION_JSON;
 				w->data->bytes = 0;
@@ -1655,6 +1789,8 @@ void web_client_process(struct web_client *w)
 
 		}
 		else {
+			strcpy(w->last_url, "not a valid response");
+
 			if(buf) debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, buf);
 
 			code = 500;
@@ -1667,6 +1803,8 @@ void web_client_process(struct web_client *w)
 		if(pointer_to_free) free(pointer_to_free);
 	}
 	else if(w->data->bytes > 8192) {
+		strcpy(w->last_url, "too big request");
+
 		debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big.", w->id);
 
 		code = 400;
@@ -1685,7 +1823,6 @@ void web_client_process(struct web_client *w)
 	}
 
 	gettimeofday(&w->tv_ready, NULL);
-	debug(D_WEB_CLIENT, "%llu: Generated response of %ld bytes in %llu microseconds.", w->id, w->data->bytes, usecdiff(&w->tv_ready, &w->tv_in));
 	w->data->date = time(NULL);
 	w->data->sent = 0;
 
@@ -2272,6 +2409,8 @@ void *socket_listen_main(void *ptr)
 
 				if(pthread_detach(w->thread) != 0)
 					error("%llu: Cannot request detach of newly created thread.", w->id);
+				
+				syslog(LOG_NOTICE, "%llu: %s connected", w->id, w->client_ip);
 			}
 			else debug(D_WEB_CLIENT, "LISTENER: select() didn't do anything.");
 		}
@@ -2280,6 +2419,7 @@ void *socket_listen_main(void *ptr)
 		// cleanup unused clients
 		for(w = web_clients; w ; w = w?w->next:NULL) {
 			if(w->obsolete) {
+				syslog(LOG_NOTICE, "%llu: %s disconnected", w->id, w->client_ip);
 				debug(D_WEB_CLIENT, "%llu: Removing client.", w->id);
 				w = web_client_free(w);
 				syslog_allocations();
