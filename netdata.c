@@ -3550,6 +3550,7 @@ int do_proc_stat() {
 			RRD_STATS *st = rrd_stats_find_bytype("system", id);
 			if(!st) {
 				st = rrd_stats_create("system", id, NULL, "cpu", "CPU Interrupts", "interrupts/s", save_history);
+				st->isdetail = 1;
 
 				rrd_stats_dimension_add(st, "interrupts", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 			}
@@ -3621,6 +3622,7 @@ int do_proc_stat() {
 	RRD_STATS *st = rrd_stats_find_bytype("system", "forks");
 	if(!st) {
 		st = rrd_stats_create("system", "forks", NULL, "cpu", "New Processes", "processes/s", save_history);
+		st->isdetail = 1;
 
 		rrd_stats_dimension_add(st, "started", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 	}
@@ -3668,8 +3670,7 @@ int do_proc_meminfo() {
 		NFS_Unstable = 0, Bounce = 0, WritebackTmp = 0, CommitLimit = 0, Committed_AS = 0,
 		VmallocTotal = 0, VmallocUsed = 0, VmallocChunk = 0,
 		AnonHugePages = 0, HugePages_Total = 0, HugePages_Free = 0, HugePages_Rsvd = 0, HugePages_Surp = 0, Hugepagesize = 0,
-		DirectMap4k = 0, DirectMap2M = 0,
-		MemUsed = 0;
+		DirectMap4k = 0, DirectMap2M = 0, HardwareCorrupted = 0;
 
 	for(;1;) {
 		char *p = fgets(buffer, MAX_PROC_MEMINFO_LINE, fp);
@@ -3719,6 +3720,7 @@ int do_proc_meminfo() {
 		else if(!VmallocTotal && strcmp(name, "VmallocTotal") == 0) VmallocTotal = value;
 		else if(!VmallocUsed && strcmp(name, "VmallocUsed") == 0) VmallocUsed = value;
 		else if(!VmallocChunk && strcmp(name, "VmallocChunk") == 0) VmallocChunk = value;
+		else if(!HardwareCorrupted && strcmp(name, "HardwareCorrupted") == 0) HardwareCorrupted = value;
 		else if(!AnonHugePages && strcmp(name, "AnonHugePages") == 0) AnonHugePages = value;
 		else if(!HugePages_Total && strcmp(name, "HugePages_Total") == 0) HugePages_Total = value;
 		else if(!HugePages_Free && strcmp(name, "HugePages_Free") == 0) HugePages_Free = value;
@@ -3733,16 +3735,16 @@ int do_proc_meminfo() {
 	// --------------------------------------------------------------------
 	
 	// http://stackoverflow.com/questions/3019748/how-to-reliably-measure-available-memory-in-linux
-	MemUsed = MemTotal - MemFree - Cached - Buffers;
+	unsigned long long MemUsed = MemTotal - MemFree - Cached - Buffers;
 
 	RRD_STATS *st = rrd_stats_find("system.ram");
 	if(!st) {
 		st = rrd_stats_create("system", "ram", NULL, "mem", "System RAM", "percentage", save_history);
 
-		rrd_stats_dimension_add(st, "buffers", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL, NULL);
-		rrd_stats_dimension_add(st, "used",    NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL, NULL);
-		rrd_stats_dimension_add(st, "cached",  NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL, NULL);
-		rrd_stats_dimension_add(st, "free",    NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL, NULL);
+		rrd_stats_dimension_add(st, "buffers", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+		rrd_stats_dimension_add(st, "used",    NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+		rrd_stats_dimension_add(st, "cached",  NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+		rrd_stats_dimension_add(st, "free",    NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
 	}
 	else rrd_stats_next(st);
 
@@ -3750,6 +3752,110 @@ int do_proc_meminfo() {
 	rrd_stats_dimension_set(st, "free", &MemFree, NULL);
 	rrd_stats_dimension_set(st, "cached", &Cached, NULL);
 	rrd_stats_dimension_set(st, "buffers", &Buffers, NULL);
+	rrd_stats_done(st);
+
+	// --------------------------------------------------------------------
+	
+	unsigned long long SwapUsed = SwapTotal - SwapFree;
+
+	st = rrd_stats_find("system.swap");
+	if(!st) {
+		st = rrd_stats_create("system", "swap", NULL, "mem", "System Swap", "percentage", save_history);
+		st->isdetail = 1;
+
+		rrd_stats_dimension_add(st, "free",    NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+		rrd_stats_dimension_add(st, "used",    NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "used", &SwapUsed, NULL);
+	rrd_stats_dimension_set(st, "free", &SwapFree, NULL);
+	rrd_stats_done(st);
+
+	// --------------------------------------------------------------------
+	
+	st = rrd_stats_find("mem.hwcorrupt");
+	if(!st) {
+		st = rrd_stats_create("mem", "hwcorrupt", NULL, "mem", "Hardware Corrupted ECC", "MB", save_history);
+		st->isdetail = 1;
+
+		rrd_stats_dimension_add(st, "HardwareCorrupted", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "HardwareCorrupted", &HardwareCorrupted, NULL);
+	rrd_stats_done(st);
+
+	// --------------------------------------------------------------------
+	
+	st = rrd_stats_find("mem.committed");
+	if(!st) {
+		st = rrd_stats_create("mem", "committed", NULL, "mem", "Committed (Allocated) Memory", "MB", save_history);
+		st->isdetail = 1;
+
+		rrd_stats_dimension_add(st, "Committed_AS", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "Committed_AS", &Committed_AS, NULL);
+	rrd_stats_done(st);
+
+	// --------------------------------------------------------------------
+	
+	st = rrd_stats_find("mem.writeback");
+	if(!st) {
+		st = rrd_stats_create("mem", "writeback", NULL, "mem", "Writeback Memory", "MB", save_history);
+		st->isdetail = 1;
+
+		rrd_stats_dimension_add(st, "Dirty", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+		rrd_stats_dimension_add(st, "Writeback", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+		rrd_stats_dimension_add(st, "FuseWriteback", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+		rrd_stats_dimension_add(st, "NfsWriteback", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+		rrd_stats_dimension_add(st, "Bounce", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "Dirty", &Dirty, NULL);
+	rrd_stats_dimension_set(st, "Writeback", &Writeback, NULL);
+	rrd_stats_dimension_set(st, "FuseWriteback", &WritebackTmp, NULL);
+	rrd_stats_dimension_set(st, "NfsWriteback", &NFS_Unstable, NULL);
+	rrd_stats_dimension_set(st, "Bounce", &Bounce, NULL);
+	rrd_stats_done(st);
+
+	// --------------------------------------------------------------------
+	
+	st = rrd_stats_find("mem.kernel");
+	if(!st) {
+		st = rrd_stats_create("mem", "kernel", NULL, "mem", "Memory Used by Kernel", "MB", save_history);
+		st->isdetail = 1;
+
+		rrd_stats_dimension_add(st, "Slab", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+		rrd_stats_dimension_add(st, "KernelStack", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+		rrd_stats_dimension_add(st, "PageTables", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+		rrd_stats_dimension_add(st, "VmallocUsed", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "KernelStack", &KernelStack, NULL);
+	rrd_stats_dimension_set(st, "Slab", &Slab, NULL);
+	rrd_stats_dimension_set(st, "PageTables", &PageTables, NULL);
+	rrd_stats_dimension_set(st, "VmallocUsed", &VmallocUsed, NULL);
+	rrd_stats_done(st);
+
+	// --------------------------------------------------------------------
+	
+	st = rrd_stats_find("mem.slab");
+	if(!st) {
+		st = rrd_stats_create("mem", "slab", NULL, "mem", "Reclaimable Kernel Memory", "MB", save_history);
+		st->isdetail = 1;
+
+		rrd_stats_dimension_add(st, "reclaimable", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+		rrd_stats_dimension_add(st, "unreclaimable", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "reclaimable", &SReclaimable, NULL);
+	rrd_stats_dimension_set(st, "unreclaimable", &SUnreclaim, NULL);
 	rrd_stats_done(st);
 
 	return 0;
