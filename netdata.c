@@ -1104,7 +1104,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 
 	// temp for the printable values
 	long double print_values[dimensions];
-	int print_enabled[dimensions];
+	int print_hidden[dimensions];
 
 	// temporary storage to keep track of group values and counts
 	long double group_values[dimensions];
@@ -1119,9 +1119,9 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 		if(rd->hidden)
-			print_enabled[c] = 0;
+			print_hidden[c] = 1;
 		else {
-			print_enabled[c] = 1;
+			print_hidden[c] = 0;
 			wb->bytes += sprintf(&wb->buffer[wb->bytes], ",\n		{%sid%s:%s%s,%slabel%s:%s%s%s,%spattern%s:%s%s,%stype%s:%snumber%s}", kq, kq, sq, sq, kq, kq, sq, rd->name, sq, kq, kq, sq, sq, kq, kq, sq, sq);
 		}
 	}
@@ -1268,10 +1268,9 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 				wb->bytes += normal_annotation_len;
 			}
 
-			if(print_enabled[c]) {
-				for(c = 0 ; c < dimensions ; c++) {
+			for(c = 0 ; c < dimensions ; c++) {
+				if(!print_hidden[c])
 					wb->bytes += sprintf(&wb->buffer[wb->bytes], ",{%sv%s:%0.1Lf}", kq, kq, print_values[c]);
-				}
 			}
 
 			printed++;
