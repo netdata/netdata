@@ -1047,58 +1047,6 @@ long double rrd_stats_dimension_get(RRD_DIMENSION *rd, size_t position)
 	return(0);
 }
 
-
-struct web_line {
-	char *buffer;
-	int len;
-	int size;
-};
-
-struct web_line *web_line_create(size_t size)
-{
-	struct web_line *l;
-	l = calloc(1, sizeof(struct web_line));
-	if(!l) fatal("Cannot allocate %d bytes.", sizeof(struct web_line));
-
-	l->buffer = calloc(size + 1, sizeof(char));
-	if(!l->buffer) fatal("Cannot allocate %d bytes.", (size + 1) * sizeof(char));
-
-	l->len = 0;
-	l->size = size;
-
-	return (l);
-}
-
-int web_line_printf(struct web_line *wl, const char *fmt, ... )
-{
-	if(wl->len < wl->size) {
-		va_list args;
-		va_start( args, fmt );
-		wl->len += vsnprintf(&wl->buffer[wl->len], wl->size - wl->len, fmt, args);
-		va_end( args );
-		wl->buffer[wl->len] = '\0';
-	}
-
-	return (wl->len);
-}
-
-char *web_line(struct web_line *wl)
-{
-	return wl->buffer;
-}
-
-void web_line_reset(struct web_line *wl)
-{
-	wl->len = 0;
-	wl->buffer[wl->len] = 0;
-}
-
-void web_line_free(struct web_line *wl)
-{
-	free(wl->buffer);
-	free(wl);
-}
-
 unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show, size_t group_count, int group_method)
 {
 	pthread_mutex_lock(&st->mutex);
@@ -1152,9 +1100,11 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 		return 0;
 	}
 
-	int line_size = 4096 + (dimensions * 200);
-	struct web_line *wl = web_line_create(line_size);
 	int annotation_count = 0;
+
+	// temp for the printable values
+	long double print_values[dimensions];
+	int print_enabled[dimensions];
 
 	// temporary storage to keep track of group values and counts
 	long double group_values[dimensions];
@@ -1167,9 +1117,14 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotation%s}},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotationText%s}}", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
 
-	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
-		if(!rd->hidden)
+	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
+		if(rd->hidden)
+			print_enabled[c] = 0;
+		else {
+			print_enabled[c] = 1;
 			wb->bytes += sprintf(&wb->buffer[wb->bytes], ",\n		{%sid%s:%s%s,%slabel%s:%s%s%s,%spattern%s:%s%s,%stype%s:%snumber%s}", kq, kq, sq, sq, kq, kq, sq, rd->name, sq, kq, kq, sq, sq, kq, kq, sq, sq);
+		}
+	}
 
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\n	],\n	%srows%s:\n	[\n", kq, kq);
 
@@ -1187,6 +1142,17 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	// find the current entry
 	t++;
 	if(t >= st->entries) t = 0;
+
+	// the minimum line length we expect
+	int line_size = 4096 + (dimensions * 200);
+
+	char overflow_annotation[201];
+	int overflow_annotation_len = snprintf(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
+	overflow_annotation[200] = '\0';
+
+	char normal_annotation[201];
+	int normal_annotation_len = snprintf(normal_annotation, 200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
+	normal_annotation[200] = '\0';
 
 	// the loop in dimension data
 	count -= 2;
@@ -1224,7 +1190,6 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 			wb->bytes += sprintf(&wb->buffer[wb->bytes], "%s		{%sc%s:[{%sv%s:%s%s%s}", printed?"]},\n":"", kq, kq, kq, kq, sq, dtm, sq);
 
 			print_this = 1;
-			web_line_reset(wl);
 		}
 
 		// if we need a PCENT_OVER_TOTAL, calculate the totals for the current and the last
@@ -1244,22 +1209,21 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 			
 			switch(rd->type) {
 				case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
-					value = (long double)100 * (value - oldvalue) / (total - oldtotal);
+					value = 100.0 * (value - oldvalue) / (total - oldtotal);
 					break;
 
 				case RRD_DIMENSION_PCENT_OVER_ROW_TOTAL:
-					value = (long double)100 * value / total;
+					value = 100.0 * value / total;
 					break;
 
 				case RRD_DIMENSION_INCREMENTAL:
 					if(oldvalue > value) {
-						// reset
 						annotate_reset = 1;
 						value = 0;
 					}
 					else value -= oldvalue;
 
-					value = value * (long double)1000000L / (long double)usec;
+					value = value * 1000000.0 / (long double)usec;
 					break;
 
 				default:
@@ -1281,38 +1245,41 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 				default:
 				case GROUP_AVERAGE:
 					group_values[c] += value;
-					if(((count - pad) % group_count) == 0) group_values[c] /= (long double)group_counts[c];
+					if(print_this) group_values[c] /= group_counts[c];
 					break;
 			}
 
 			if(print_this) {
-				if(!rd->hidden)
-					web_line_printf(wl, ",{%sv%s:%0.1Lf}", kq, kq, group_values[c]);
-
-				group_values[c] = group_counts[c] = 0;
+				print_values[c] = group_values[c];
+				group_values[c] = 0;
+				group_counts[c] = 0;
 			}
 		}
 
 		if(print_this) {
 			if(annotate_reset) {
 				annotation_count++;
-				wb->bytes += sprintf(&wb->buffer[wb->bytes], ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
+				strcpy(&wb->buffer[wb->bytes], overflow_annotation);
+				wb->bytes += overflow_annotation_len;
 				annotate_reset = 0;
 			}
 			else {
-				wb->bytes += sprintf(&wb->buffer[wb->bytes], ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
+				strcpy(&wb->buffer[wb->bytes], normal_annotation);
+				wb->bytes += normal_annotation_len;
 			}
 
-			strcpy(&wb->buffer[wb->bytes], wl->buffer);
-			wb->bytes += wl->len;
+			if(print_enabled[c]) {
+				for(c = 0 ; c < dimensions ; c++) {
+					wb->bytes += sprintf(&wb->buffer[wb->bytes], ",{%sv%s:%0.1Lf}", kq, kq, print_values[c]);
+				}
+			}
+
 			printed++;
 		}
 	}
 
 	if(printed) wb->bytes += sprintf(&wb->buffer[wb->bytes], "]}");
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\n	]\n}\n");
-
-	web_line_free(wl);
 
 	pthread_mutex_unlock(&st->mutex);
 	return last_timestamp;
