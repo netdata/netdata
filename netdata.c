@@ -3705,7 +3705,7 @@ int do_proc_meminfo() {
 
 	RRD_STATS *st = rrd_stats_find("system.ram");
 	if(!st) {
-		st = rrd_stats_create("system", "ram", NULL, "mem", "System RAM", "percentage", save_history);
+		st = rrd_stats_create("system", "ram", NULL, "mem", "System RAM", "MB", save_history);
 
 		rrd_stats_dimension_add(st, "buffers", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
 		rrd_stats_dimension_add(st, "used",    NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
@@ -3726,7 +3726,7 @@ int do_proc_meminfo() {
 
 	st = rrd_stats_find("system.swap");
 	if(!st) {
-		st = rrd_stats_create("system", "swap", NULL, "mem", "System Swap", "percentage", save_history);
+		st = rrd_stats_create("system", "swap", NULL, "mem", "System Swap", "MB", save_history);
 		st->isdetail = 1;
 
 		rrd_stats_dimension_add(st, "free",    NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
@@ -3994,6 +3994,22 @@ int do_proc_vmstat() {
 
 	rrd_stats_dimension_set(st, "in", &pgpgin, NULL);
 	rrd_stats_dimension_set(st, "out", &pgpgout, NULL);
+	rrd_stats_done(st);
+
+	// --------------------------------------------------------------------
+	
+	st = rrd_stats_find("system.pgfaults");
+	if(!st) {
+		st = rrd_stats_create("system", "pgfaults", NULL, "mem", "Memory Page Faults", "page faults/s", save_history);
+		st->isdetail = 1;
+
+		rrd_stats_dimension_add(st, "minor",  NULL, sizeof(unsigned long long), 0,  1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		rrd_stats_dimension_add(st, "major", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+	}
+	else rrd_stats_next(st);
+
+	rrd_stats_dimension_set(st, "minor", &pgfault, NULL);
+	rrd_stats_dimension_set(st, "major", &pgmajfault, NULL);
 	rrd_stats_done(st);
 
 	return 0;
