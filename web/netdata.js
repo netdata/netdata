@@ -3,7 +3,7 @@ if(!window.console){ window.console = {log: function(){} }; }
 
 // Load the Visualization API and the piechart package.
 google.load('visualization', '1.1', {'packages':['corechart']});
-google.load('visualization', '1.1', {'packages':['controls']});
+//google.load('visualization', '1.1', {'packages':['controls']});
 
 function canChartBeRefreshed(chart) {
 	// is it enabled?

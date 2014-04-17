@@ -45,8 +45,8 @@ else
 fi
 
 # exporting NETDATA variables to netdata
-export `set | grep ^NETDATA_TITLE_ ` 2>/dev/null
-export `set | grep ^NETDATA_PRIORITY_ ` 2>/dev/null
+export `set 2>&1 | grep ^NETDATA_TITLE_ `
+export `set 2>&1 | grep ^NETDATA_PRIORITY_ `
 
 echo "Starting netdata"
 if [ "$USER" = "root" ]

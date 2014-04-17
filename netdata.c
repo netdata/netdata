@@ -2465,9 +2465,9 @@ int do_proc_net_dev() {
 
 		// --------------------------------------------------------------------
 
-		st = rrd_stats_find_bytype(iface, "packets");
+		st = rrd_stats_find_bytype("net_packets", iface);
 		if(!st) {
-			st = rrd_stats_create(iface, "packets", NULL, iface, "Packets", "packets/s", save_history);
+			st = rrd_stats_create("net_packets", iface, NULL, iface, "Packets", "packets/s", save_history);
 			st->isdetail = 1;
 
 			rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
@@ -2481,9 +2481,9 @@ int do_proc_net_dev() {
 
 		// --------------------------------------------------------------------
 
-		st = rrd_stats_find_bytype(iface, "errors");
+		st = rrd_stats_find_bytype("net_errors", iface);
 		if(!st) {
-			st = rrd_stats_create(iface, "errors", NULL, iface, "Interface Errors", "errors/s", save_history);
+			st = rrd_stats_create("net_errors", iface, NULL, iface, "Interface Errors", "errors/s", save_history);
 			st->isdetail = 1;
 
 			rrd_stats_dimension_add(st, "receive", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
@@ -2497,9 +2497,9 @@ int do_proc_net_dev() {
 
 		// --------------------------------------------------------------------
 
-		st = rrd_stats_find_bytype(iface, "fifo");
+		st = rrd_stats_find_bytype("net_fifo", iface);
 		if(!st) {
-			st = rrd_stats_create(iface, "fifo", NULL, iface, "Interface Queue", "packets", save_history);
+			st = rrd_stats_create("net_fifo", iface, NULL, iface, "Interface Queue", "packets", save_history);
 			st->isdetail = 1;
 
 			rrd_stats_dimension_add(st, "receive", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
@@ -2513,9 +2513,9 @@ int do_proc_net_dev() {
 
 		// --------------------------------------------------------------------
 
-		st = rrd_stats_find_bytype(iface, "compressed");
+		st = rrd_stats_find_bytype("net_compressed", iface);
 		if(!st) {
-			st = rrd_stats_create(iface, "compressed", NULL, iface, "Compressed Packets", "packets/s", save_history);
+			st = rrd_stats_create("net_compressed", iface, NULL, iface, "Compressed Packets", "packets/s", save_history);
 			st->isdetail = 1;
 
 			rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
@@ -2717,9 +2717,9 @@ int do_proc_diskstats() {
 
 		// --------------------------------------------------------------------
 
-		st = rrd_stats_find_bytype(disk, "ops");
+		st = rrd_stats_find_bytype("disk_ops", disk);
 		if(!st) {
-			st = rrd_stats_create(disk, "ops", NULL, disk, "Disk Operations", "operations/s", save_history);
+			st = rrd_stats_create("disk_ops", disk, NULL, disk, "Disk Operations", "operations/s", save_history);
 			st->isdetail = 1;
 
 			rrd_stats_dimension_add(st, "reads", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
@@ -2733,9 +2733,9 @@ int do_proc_diskstats() {
 
 		// --------------------------------------------------------------------
 
-		st = rrd_stats_find_bytype(disk, "merged_ops");
+		st = rrd_stats_find_bytype("disk_merged_ops", disk);
 		if(!st) {
-			st = rrd_stats_create(disk, "merged_ops", NULL, disk, "Merged Disk Operations", "operations/s", save_history);
+			st = rrd_stats_create("disk_merged_ops", disk, NULL, disk, "Merged Disk Operations", "operations/s", save_history);
 			st->isdetail = 1;
 
 			rrd_stats_dimension_add(st, "reads", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
@@ -2749,9 +2749,9 @@ int do_proc_diskstats() {
 
 		// --------------------------------------------------------------------
 
-		st = rrd_stats_find_bytype(disk, "iotime");
+		st = rrd_stats_find_bytype("disk_iotime", disk);
 		if(!st) {
-			st = rrd_stats_create(disk, "iotime", NULL, disk, "Disk I/O Time", "milliseconds/s", save_history);
+			st = rrd_stats_create("disk_iotime", disk, NULL, disk, "Disk I/O Time", "milliseconds/s", save_history);
 			st->isdetail = 1;
 
 			rrd_stats_dimension_add(st, "reads", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
@@ -2769,9 +2769,9 @@ int do_proc_diskstats() {
 
 		// --------------------------------------------------------------------
 
-		st = rrd_stats_find_bytype(disk, "current_ops");
+		st = rrd_stats_find_bytype("disk_cur_ops", disk);
 		if(!st) {
-			st = rrd_stats_create(disk, "current_ops", NULL, disk, "Current Disk I/O operations", "operations", save_history);
+			st = rrd_stats_create("disk_cur_ops", disk, NULL, disk, "Current Disk I/O operations", "operations", save_history);
 			st->isdetail = 1;
 
 			rrd_stats_dimension_add(st, "operations", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
@@ -4431,10 +4431,13 @@ void sig_handler(int signo)
 		case SIGINT:
 		case SIGHUP:
 		case SIGSEGV:
-			error("Signaled cleanup (signal %d).", signo);
+			error("Signaled exit (signal %d).", signo);
 			if(tc_child_pid) kill(tc_child_pid, SIGTERM);
 			tc_child_pid = 0;
 			exit(1);
+			break;
+
+		case SIGCHLD:
 			break;
 
 		default:
