@@ -1540,6 +1540,8 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	unsigned long last_timestamp_in_data = 0;
 	if(datasource_type == DATASOURCE_GOOGLE_JSON || datasource_type == DATASOURCE_GOOGLE_JSONP) {
 
+		w->data->contenttype = CT_APPLICATION_X_JAVASCRIPT;
+
 		while(args) {
 			tok = mystrsep(&args, "&");
 			if(tok) {
@@ -3629,6 +3631,8 @@ int do_proc_meminfo() {
 		return 1;
 	}
 
+	int hwcorrupted = 0;
+
 	unsigned long long MemTotal = 0, MemFree = 0, Buffers = 0, Cached = 0, SwapCached = 0,
 		Active = 0, Inactive = 0, ActiveAnon = 0, InactiveAnon = 0, ActiveFile = 0, InactiveFile = 0,
 		Unevictable = 0, Mlocked = 0, SwapTotal = 0, SwapFree = 0, Dirty = 0, Writeback = 0, AnonPages = 0,
@@ -3686,7 +3690,7 @@ int do_proc_meminfo() {
 		else if(!VmallocTotal && strcmp(name, "VmallocTotal") == 0) VmallocTotal = value;
 		else if(!VmallocUsed && strcmp(name, "VmallocUsed") == 0) VmallocUsed = value;
 		else if(!VmallocChunk && strcmp(name, "VmallocChunk") == 0) VmallocChunk = value;
-		else if(!HardwareCorrupted && strcmp(name, "HardwareCorrupted") == 0) HardwareCorrupted = value;
+		else if(!HardwareCorrupted && strcmp(name, "HardwareCorrupted") == 0) { HardwareCorrupted = value; hwcorrupted = 1; }
 		else if(!AnonHugePages && strcmp(name, "AnonHugePages") == 0) AnonHugePages = value;
 		else if(!HugePages_Total && strcmp(name, "HugePages_Total") == 0) HugePages_Total = value;
 		else if(!HugePages_Free && strcmp(name, "HugePages_Free") == 0) HugePages_Free = value;
@@ -3740,17 +3744,19 @@ int do_proc_meminfo() {
 
 	// --------------------------------------------------------------------
 	
-	st = rrd_stats_find("mem.hwcorrupt");
-	if(!st) {
-		st = rrd_stats_create("mem", "hwcorrupt", NULL, "mem", "Hardware Corrupted ECC", "MB", save_history);
-		st->isdetail = 1;
+	if(hwcorrupted) {
+		st = rrd_stats_find("mem.hwcorrupt");
+		if(!st) {
+			st = rrd_stats_create("mem", "hwcorrupt", NULL, "mem", "Hardware Corrupted ECC", "MB", save_history);
+			st->isdetail = 1;
 
-		rrd_stats_dimension_add(st, "HardwareCorrupted", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "HardwareCorrupted", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "HardwareCorrupted", &HardwareCorrupted, NULL);
+		rrd_stats_done(st);
 	}
-	else rrd_stats_next(st);
-
-	rrd_stats_dimension_set(st, "HardwareCorrupted", &HardwareCorrupted, NULL);
-	rrd_stats_done(st);
 
 	// --------------------------------------------------------------------
 	
