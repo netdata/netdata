@@ -1,9 +1,21 @@
 netdata
 =======
 
-linux network traffic web monitoring
+linux real time system monitoring
 
-This little program will allow you to create embedable live monitoring charts on any web page.
+This program is a daemon that collects system information from /proc and other sources.
+It is heavily optimized and lightweight.
+
+It updates everything every second!
+But tt only needs a few microseconds (just a fraction of a millisecond) of one of your cores and a few megabytes of memory.
+
+If listens on port 19999 and it will give you a full featured web interface using google charts.
+
+Check it live at:
+
+http://www.tsaousis.gr:19999/
+
+Here is a screenshot:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/2593406/3c797e88-ba80-11e3-8ec7-c10174d59ad6.png)
 
@@ -14,8 +26,9 @@ This little program will allow you to create embedable live monitoring charts on
  
  netdata:
 
-  - reads /proc/net/dev and for every interface present there it keeps in its memory a short history of its received and sent bytes.
-  - generates JSON HTTP responses containing all the data needed for the web graphs.
+  - reads several /proc files
+  - keeps track of the values in memroy (a short history)
+  - generates JSON and JSONP HTTP responses containing all the data needed for the web graphs
   - is a web server. You can access JSON data by using:
  
  ```
@@ -47,7 +60,7 @@ This little program will allow you to create embedable live monitoring charts on
 
 ## Automatic installation
 
-1. Download everything in a directory inside your web server.
+1. Download the git.
 2. cd to that directory
 3. run:
 
@@ -55,14 +68,10 @@ This little program will allow you to create embedable live monitoring charts on
 ./netdata.start
 ```
 
-For this to work, you need to have persmission to create a directory in /run or /var/run or /tmp.
-If you run into problems, try to become root to verify it works. Please, do not run netdata are root permanently.
-Since netdata is a web server, the right thing to do, is to have a special user for it.
-
 Once you run it, the file netdata.conf will be created. You can edit this file to set options for each graph.
 To apply the changes you made, you have to run netdata.start again.
 
-To access the panel for all graphs, go to:
+To access the web site for all graphs, go to:
 
  ```
  http://127.0.0.1:19999/
@@ -78,29 +87,24 @@ To access the panel for all graphs, go to:
 step into the directory you downloaded everything and compile netdata
 
 ```sh
-gcc -Wall -O3 -o netdata netdata.c -lpthread
+gcc -Wall -O3 -o netdata netdata.c -lpthread -lz
 ```
 
 ### run netdata
 Run netdata:
 
 ```sh
-./netdata -d -l 60 -u 1 -p 19999
+./netdata -u nobody -d -l 1200 -u 1 -p 19999
 ```
  - -d says to go daemon mode
- - -l 60 says to keep 60 history entries
- - -u 1 says to add a new history entry every second
+ - -l 1200 says to keep 1200 history entries (20 minutes)
+ - -t 1 says to add a new history entry every second
  - -p 19999 is the port to listen for web clients
-
-### edit index.html
-Set in index.html the interfaces you would like to monitor on the web page.
-
-** REMEMBER: there are 2 sections in index.html to edit. A javascript section and an HTML section. **
+ - -u nobody to run as nobody
 
 ### open a web browser
 
  ```
  http://127.0.0.1:19999/
  ```
-
 
