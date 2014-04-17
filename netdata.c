@@ -2263,18 +2263,21 @@ void *new_client(void *ptr)
 		}
 		else if(!retval) {
 			// timeout
+			web_client_reset(w);
 			w->obsolete = 1;
 			return NULL;
 		}
 
 		if(FD_ISSET(w->ifd, &efds)) {
 			debug(D_WEB_CLIENT_ACCESS, "%llu: Received error on input socket (%s).", w->id, strerror(errno));
+			web_client_reset(w);
 			w->obsolete = 1;
 			return NULL;
 		}
 
 		if(FD_ISSET(w->ofd, &efds)) {
 			debug(D_WEB_CLIENT_ACCESS, "%llu: Received error on output socket (%s).", w->id, strerror(errno));
+			web_client_reset(w);
 			w->obsolete = 1;
 			return NULL;
 		}
@@ -2282,8 +2285,9 @@ void *new_client(void *ptr)
 		if(w->wait_send && FD_ISSET(w->ofd, &ofds)) {
 			if(web_client_send(w) < 0) {
 				debug(D_WEB_CLIENT, "%llu: Closing client (input: %s).", w->id, strerror(errno));
-				errno = 0;
+				web_client_reset(w);
 				w->obsolete = 1;
+				errno = 0;
 				return NULL;
 			}
 		}
@@ -2291,8 +2295,9 @@ void *new_client(void *ptr)
 		if(w->wait_receive && FD_ISSET(w->ifd, &ifds)) {
 			if(web_client_receive(w) < 0) {
 				debug(D_WEB_CLIENT, "%llu: Closing client (output: %s).", w->id, strerror(errno));
-				errno = 0;
+				web_client_reset(w);
 				w->obsolete = 1;
+				errno = 0;
 				return NULL;
 			}
 
@@ -2320,7 +2325,11 @@ void syslog_allocations(void)
 
 	mi = mallinfo();
 	if(mi.uordblks > mem) {
-		syslog(LOG_NOTICE, "Allocated memory increased from %d to %d (increased by %d bytes).", mem, mi.uordblks, mi.uordblks - mem );
+		int clients = 0;
+		struct web_client *w;
+		for(w = web_clients; w ; w = w->next) clients++;
+
+		syslog(LOG_NOTICE, "Allocated memory increased from %d to %d (increased by %d bytes). There are %d web clients connected.", mem, mi.uordblks, mi.uordblks - mem, clients);
 		mem = mi.uordblks;
 	}
 	/*
@@ -2354,8 +2363,8 @@ void *socket_listen_main(void *ptr)
 	FD_ZERO (&efds);
 
 	for(;;) {
-		tv.tv_sec = 1;
-		tv.tv_usec = 0;
+		tv.tv_sec = 0;
+		tv.tv_usec = 200000;
 
 		FD_SET(listener, &ifds);
 		FD_SET(listener, &efds);
@@ -2370,7 +2379,7 @@ void *socket_listen_main(void *ptr)
 		else if(retval) {
 			// check for new incoming connections
 			if(FD_ISSET(listener, &ifds)) {
-				w = web_client_create(listener);	
+				w = web_client_create(listener);
 
 				if(pthread_create(&w->thread, NULL, new_client, w) != 0)
 					error("%llu: failed to create new thread.");
@@ -2381,14 +2390,16 @@ void *socket_listen_main(void *ptr)
 				syslog(LOG_NOTICE, "%llu: %s connected", w->id, w->client_ip);
 			}
 			else debug(D_WEB_CLIENT, "LISTENER: select() didn't do anything.");
+
 		}
-		else debug(D_WEB_CLIENT, "LISTENER: select() timeout.");
+		//else debug(D_WEB_CLIENT, "LISTENER: select() timeout.");
 
 		// cleanup unused clients
 		for(w = web_clients; w ; w = w?w->next:NULL) {
 			if(w->obsolete) {
 				syslog(LOG_NOTICE, "%llu: %s disconnected", w->id, w->client_ip);
 				debug(D_WEB_CLIENT, "%llu: Removing client.", w->id);
+				pthread_join(w->thread,  NULL);
 				w = web_client_free(w);
 				syslog_allocations();
 			}
