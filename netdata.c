@@ -1386,7 +1386,8 @@ void web_client_reset(struct web_client *w)
 
 	long sent = w->zoutput?w->zstream.total_out:(w->mode == WEB_CLIENT_MODE_FILECOPY)?w->data->rbytes:w->data->bytes;
 	long size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->data->rbytes:w->data->bytes;
-	syslog(LOG_NOTICE, "%llu: (sent/all = %ld/%ld bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: '%s'",
+	
+	if(w->last_url[0]) syslog(LOG_NOTICE, "%llu: (sent/all = %ld/%ld bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: '%s'",
 		w->id,
 		sent, size, -((size>0)?((float)(size-sent)/(float)size * 100.0):0.0),
 		(float)usecdiff(&w->tv_ready, &w->tv_in) / 1000.0,
@@ -1403,6 +1404,8 @@ void web_client_reset(struct web_client *w)
 		close(w->ifd);
 		w->ifd = w->ofd;
 	}
+
+	w->last_url[0] = '\0';
 
 	w->data->contenttype = CT_TEXT_PLAIN;
 	w->mode = WEB_CLIENT_MODE_NORMAL;
