@@ -2399,7 +2399,7 @@ void *socket_listen_main(void *ptr)
 			if(w->obsolete) {
 				syslog(LOG_NOTICE, "%llu: %s disconnected", w->id, w->client_ip);
 				debug(D_WEB_CLIENT, "%llu: Removing client.", w->id);
-				pthread_join(w->thread,  NULL);
+				// pthread_join(w->thread,  NULL);
 				w = web_client_free(w);
 				syslog_allocations();
 			}
