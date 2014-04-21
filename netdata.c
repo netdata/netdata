@@ -943,9 +943,28 @@ struct web_client *web_client_free(struct web_client *w)
 #define GROUP_AVERAGE	0
 #define GROUP_MAX 		1
 
+// find the oldest entry in the data, skipping all empty slots
+size_t rrd_stats_first_entry(RRD_STATS *st)
+{
+	size_t first_entry = st->current_entry + 1;
+	if(first_entry >= st->entries) first_entry = 0;
+
+	while(st->times[first_entry].tv_sec == 0 && first_entry != st->current_entry) {
+		first_entry++;
+		if(first_entry >= st->entries) first_entry = 0;
+	}
+
+	return first_entry;
+}
+
 void rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer *wb)
 {
 	web_buffer_increase(wb, 16384);
+
+	pthread_mutex_lock(&st->mutex);
+
+	size_t first_entry = rrd_stats_first_entry(st);
+	time_t first_entry_t = st->times[first_entry].tv_sec;
 
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t{\n");
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"id\" : \"%s\",\n", st->id);
@@ -966,12 +985,16 @@ void rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer *wb)
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"units\" : \"%s\",\n", st->units);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"url\" : \"/data/%s/%s\",\n", st->name, options?options:"");
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"entries\" : %ld,\n", st->entries);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"current\" : %ld,\n", st->current_entry);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"first_entry\" : %ld,\n", first_entry);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"first_entry_t\" : %ld,\n", first_entry_t);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_entry\" : %ld,\n", st->current_entry);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_entry_t\" : %lu,\n", st->last_updated);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_entry_secs_ago\" : %lu,\n", time(NULL) - st->last_updated);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"update_every\" : %d,\n", update_every);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_updated\" : %lu,\n", st->last_updated);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_updated_secs_ago\" : %lu,\n", time(NULL) - st->last_updated);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"isdetail\" : %d\n", st->isdetail);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t}");
+
+	pthread_mutex_unlock(&st->mutex);
 }
 
 #define RRD_GRAPH_JSON_HEADER "{\n\t\"charts\": [\n"
@@ -1047,7 +1070,7 @@ long double rrd_stats_dimension_get(RRD_DIMENSION *rd, size_t position)
 	return(0);
 }
 
-unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show, size_t group_count, int group_method)
+unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show, size_t group_count, int group_method, time_t after, time_t before)
 {
 	pthread_mutex_lock(&st->mutex);
 
@@ -1070,14 +1093,12 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	// check the options
 	if(entries_to_show <= 0) entries_to_show = 1;
 	if(group_count <= 0) group_count = 1;
-	if(group_count > st->entries / 20) group_count = st->entries / 20;
+	// if(group_count > st->entries / 20) group_count = st->entries / 20;
 
 	size_t printed = 0;			// the lines of JSON data we have generated so far
 
 	size_t current_entry = st->current_entry;
 	size_t t, lt;				// t = the current entry, lt = the lest entry of data
-	long count = st->entries;	// count down of the entries examined so far
-	long pad = 0;				// align the entries when grouping values together
 
 	RRD_DIMENSION *rd;
 	size_t c = 0;				// counter for dimension loops
@@ -1128,20 +1149,19 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\n	],\n	%srows%s:\n	[\n", kq, kq);
 
-	// to allow grouping on the same values, we need a pad
-	pad = current_entry % group_count;
-
 	// make sure current_entry is within limits
 	if(current_entry < 0 || current_entry >= st->entries) current_entry = 0;
+	if(before == 0) before = st->times[current_entry].tv_sec;
 
-	// find the old entry of the round-robin
-	t = current_entry + 1;
-	if(t >= st->entries) t = 0;
+	// find the oldest entry of the round-robin
+	t = rrd_stats_first_entry(st);
 	lt = t;
+	size_t stop_entry = t;
 
-	// find the current entry
+	// skip the oldest, to have incremental data
 	t++;
 	if(t >= st->entries) t = 0;
+	if(after == 0) after = st->times[t].tv_sec;
 
 	// the minimum line length we expect
 	int line_size = 4096 + (dimensions * 200);
@@ -1154,23 +1174,30 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	int normal_annotation_len = snprintf(normal_annotation, 200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
 	normal_annotation[200] = '\0';
 
+	// count down of the entries examined so far
+	long count = ((before - after) / update_every) + 1;
+
+	// to allow grouping on the same values, we need a pad
+	long pad = before % group_count;
+
+	// debug(D_RRD_STATS, "after = %lu, before = %lu, diff = %lu, pad = %ld, count = %ld, entries_to_show = %lu, group_count = %lu, current_entry = %lu, t = %lu", after, before, before - after, pad, count, entries_to_show, group_count, current_entry, t);
+
 	// the loop in dimension data
-	count -= 2;
 	int annotate_reset = 0;
-	for ( ; t != current_entry && count >= 0 ; lt = t++, count--) {
+	for ( ; t != stop_entry && count >= 0 ; lt = t++) {
 		int print_this = 0;
 
 		if(t >= st->entries) t = 0;
 
-		// if the last is empty, loop again
-		if(!st->times[lt].tv_sec) continue;
+		// make sure we return data in the proper time range
+		if(st->times[t].tv_sec < after || st->times[t].tv_sec > before) continue;
+		count--;
 
 		// check if we may exceed the buffer provided
 		web_buffer_increase(wb, line_size);
 
 		// prefer the most recent last entries
-		if(((count-pad) / group_count) > entries_to_show) continue;
-
+		if(((count-pad) / group_count) >= entries_to_show) continue;
 
 		// ok. we will use this entry!
 		// find how much usec since the previous entry
@@ -1178,7 +1205,10 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 		usec = usecdiff(&st->times[t], &st->times[lt]);
 
 		if(((count-pad) % group_count) == 0) {
-			if(printed >= entries_to_show) break;
+			if(printed >= entries_to_show) {
+				// debug(D_RRD_STATS, "Already printed all rows. Stopping.");
+				break;
+			}
 
 			// generate the local date time
 			struct tm *tm = localtime(&st->times[t].tv_sec);
@@ -1279,6 +1309,8 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 
 	if(printed) wb->bytes += sprintf(&wb->buffer[wb->bytes], "]}");
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\n	]\n}\n");
+
+	// debug(D_RRD_STATS, "last_timestamp = %lu", last_timestamp);
 
 	pthread_mutex_unlock(&st->mutex);
 	return last_timestamp;
@@ -1508,6 +1540,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	// how many entries does the client want?
 	size_t lines = save_history;
 	size_t group_count = 1;
+	time_t after = 0, before = 0;
 	int group_method = GROUP_AVERAGE;
 
 	if(url) {
@@ -1529,6 +1562,18 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 		if(strcmp(tok, "max") == 0) group_method = GROUP_MAX;
 		else if(strcmp(tok, "average") == 0) group_method = GROUP_AVERAGE;
 		else debug(D_WEB_CLIENT, "%llu: Unknown group method '%s'", w->id, tok);
+	}
+	if(url) {
+		// parse after time
+		tok = mystrsep(&url, "/");
+		if(tok) after = strtoul(tok, NULL, 10);
+		if(after < 0) after = 0;
+	}
+	if(url) {
+		// parse before time
+		tok = mystrsep(&url, "/");
+		if(tok) before = strtoul(tok, NULL, 10);
+		if(before < 0) before = 0;
 	}
 
 	w->data->contenttype = CT_APPLICATION_JSON;
@@ -1599,7 +1644,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	}
 	
 	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group_count, %d group_method).", w->id, st->name, st->id, lines, group_count, group_method);
-	unsigned long timestamp_in_data = rrd_stats_json(datasource_type, st, w->data, lines, group_count, group_method);
+	unsigned long timestamp_in_data = rrd_stats_json(datasource_type, st, w->data, lines, group_count, group_method, after, before);
 
 	if(datasource_type == DATASOURCE_GOOGLE_JSONP) {
 		if(timestamp_in_data > last_timestamp_in_data)
