@@ -44,6 +44,9 @@ else
 	gcc -Wall -O3 -o netdata netdata.c -lpthread -lz || exit 1
 fi
 
+NETDATA_TITLE_DEFAULT=
+NETDATA_PRIORITY_DEFAULT=
+
 # exporting NETDATA variables to netdata
 export `set 2>&1 | grep ^NETDATA_TITLE_ `
 export `set 2>&1 | grep ^NETDATA_PRIORITY_ `

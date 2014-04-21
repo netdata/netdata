@@ -32,6 +32,11 @@ function generateChartURL(chart) {
 	url += chart.group?chart.group.toString():"1";
 	url += "/";
 	url += chart.group_method?chart.group_method:"average";
+	url += "/";
+	url += chart.after?chart.after.toString():"0";
+	url += "/";
+	url += chart.before?chart.before.toString():"0";
+	url += "/";
 
 	return url;
 }
@@ -211,7 +216,9 @@ function loadCharts(base_url, doNext) {
 			json.charts[i].chart = null;
 			json.charts[i].jsondata = null;
 			json.charts[i].datatable = null;
-			
+			json.charts[i].before = 0;
+			json.charts[i].after = 0;
+
 			// if the user has given a title, use it
 			if(json.charts[i].usertitle) json.charts[i].title = json.charts[i].usertitle;
 

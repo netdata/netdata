@@ -33,8 +33,10 @@
 	var TARGET_THUMB_GRAPH_WIDTH = 500; // chart width will range from 0.5 to 1.5 of that
 	var MINIMUM_THUMB_GRAPH_WIDTH = 400; // chart will generally try to be wider than that
 	var TARGET_THUMB_GRAPH_HEIGHT = 220;
-	var MAINCHART_MAX_TIME_TO_SHOW = 1200;
+	var MAINCHART_MAX_TIME_TO_SHOW = 600;
 	var THUMBS_MAX_TIME_TO_SHOW = 600;
+	var MAINCHART_CONTROL_HEIGHT = 100;
+	var MAINCHART_CONTROL_DIVISOR = 3;
 
 	var MODE_THUMBS = 1;
 	var MODE_MAIN = 2;
@@ -115,15 +117,20 @@
 		if(mainchart) cleanThisChart(mainchart);
 
 		mainchart = $.extend(true, {}, c);
+		var tempchart = $.extend(true, {}, mainchart);
 
 		mainchart.chart = null;
 		mainchart.chartOptions.width = screenWidth();
-		mainchart.chartOptions.height = $(window).height() - 150;
+		mainchart.chartOptions.height = $(window).height() - 150 - MAINCHART_CONTROL_HEIGHT;
 		if(mainchart.chartOptions.height < 300) mainchart.chartOptions.height = 300;
 		
 		mainchart.group = 2;
 		mainchart.div = 'maingraph';
 		mainchart.last_updated = 0;
+
+		mainchart.points_to_show = Math.round(mainchart.entries / mainchart.group) - 1;
+		if(mainchart.points_to_show * mainchart.group > MAINCHART_MAX_TIME_TO_SHOW)
+			mainchart.points_to_show = MAINCHART_MAX_TIME_TO_SHOW / mainchart.group;
 
 		if(mainchart.chartOptions.isStacked) mainchart.group = 5;
 		//mainchart.chartOptions.titlePosition = 'none';
@@ -138,12 +145,86 @@
 
 		$('#group' + mainchart.group).trigger('click');
 
-		switchToMainGraph();
+		mainchart.dashboard = new google.visualization.Dashboard(document.getElementById('maingraph_dashboard'));
+		mainchart.control = new google.visualization.ControlWrapper({
+			controlType: 'ChartRangeFilter',
+			containerId: 'maingraph_control',
+			options: {
+				filterColumnIndex: 0,
+				ui: {
+					chartType: mainchart.chartType,
+					chartOptions: {
+						isStacked: mainchart.chartOptions.isStacked,
+						width: mainchart.chartOptions.width,
+						height: MAINCHART_CONTROL_HEIGHT,
+						chartArea: {'width': '90%'},
+						hAxis: {'baselineColor': 'none'}
+					},
+					minRangeSize: MAINCHART_MAX_TIME_TO_SHOW / mainchart.update_every * 1000,
+				}
+			},
+		});
+		mainchart.hiddenchart = new google.visualization.ChartWrapper({
+			chartType: mainchart.chartType,
+			containerId: 'maingraph_hidden',
+			options: {
+				isStacked: mainchart.chartOptions.isStacked,
+				width: mainchart.chartOptions.width,
+				height: mainchart.chartOptions.height,
+				//chartArea: {'height': '80%', 'width': '100%'},
+				//hAxis: {'slantedText': false},
+				//legend: {'position': 'none'}
+			},
+		});
+
+		// load the data for the control and the hidden chart
+		tempchart.points_to_show = Math.round(mainchart.chartOptions.width / MAINCHART_CONTROL_DIVISOR);
+		tempchart.after = tempchart.first_entry_t;
+		tempchart.before = Math.round(new Date().getTime() / 1000);
+		if(tempchart.entries * tempchart.update_every > tempchart.before - tempchart.after)
+			tempchart.after = tempchart.before - tempchart.entries * tempchart.update_every;
+		tempchart.group = Math.round((tempchart.before - tempchart.after) / tempchart.points_to_show);
+
+		$.ajax({
+			url: generateChartURL(tempchart),
+			dataType:"json",
+			cache: false
+		})
+		.done(function(jsondata) {
+			if(!jsondata || jsondata.length == 0) return;
+
+			mainchart.control_data = new google.visualization.DataTable(jsondata);
+
+			google.visualization.events.addListener(mainchart.control, 'ready', mainchartControlReadyEvent);
+			mainchart.dashboard.bind(mainchart.control, mainchart.hiddenchart);
+			mainchart.dashboard.draw(mainchart.control_data);
+
+			switchToMainGraph();
+		});
+	}
+
+	function mainchartControlReadyEvent() {
+		google.visualization.events.addListener(mainchart.control, 'statechange', mainchartControlStateHandler);
+	}
+
+	function mainchartControlStateHandler() {
+		// setMainChartPlay('pause');
+
+		var state = mainchart.control.getState();
+		mainchart.after = Math.round(state.range.start.getTime() / 1000);
+		mainchart.before = Math.round(state.range.end.getTime() / 1000);
+
+		mainchart.points_to_show = mainchart.chartOptions.width / 2;
+		mainchart.group = Math.round((mainchart.before - mainchart.after) / mainchart.points_to_show);
+		console.log('group = ' + mainchart.group + ', points_to_show = ' + mainchart.position);
+
+		mainchart.last_updated = 0;
 	}
 
 	function initMainChartIndex(i) {
 		if(mode == MODE_GROUP_THUMBS) 
 			initMainChart(group_charts[i]);
+
 		else if(mode == MODE_THUMBS)
 			initMainChart(mycharts[i]);
 	}
@@ -213,20 +294,21 @@
 		}
 
 		if(p == 'play') {
-			mainchart.chartOptions.explorer = null;
+			//mainchart.chartOptions.explorer = null;
+			mainchart.after = 0;
+			mainchart.before = 0;
 			playGraphs();
 		}
 		else {
-			mainchart.chartOptions.explorer = {
-				'axis': 'horizontal',
-				'maxZoomOut': 1,
-			};
-			mainchart.last_updated = 0;
+			//mainchart.chartOptions.explorer = {
+			//	'axis': 'horizontal',
+			//	'maxZoomOut': 1,
+			//};
+			//mainchart.last_updated = 0;
 			
-			if(!refreshChart(mainchart, pauseGraphs))
-				pauseGraphs();
+			//if(!refreshChart(mainchart, pauseGraphs))
+			pauseGraphs();
 		}
-		last_main_chart_play = p;
 	}
 
 
@@ -397,11 +479,6 @@
 			triggerRefresh();
 			return;
 		}
-
-		mainchart.points_to_show = Math.round(mainchart.entries / mainchart.group) - 1;
-
-		if(mainchart.points_to_show * mainchart.group > MAINCHART_MAX_TIME_TO_SHOW)
-			mainchart.points_to_show = MAINCHART_MAX_TIME_TO_SHOW / mainchart.group;
 
 		if(!refreshChart(mainchart, triggerRefresh))
 			triggerRefresh();
@@ -804,6 +881,10 @@
 					<table>
 						<tr><td>
 						<div class="maingraph" id="maingraph"></div>
+						<div id="maingraph_dashboard">
+							<div class="maingraph" id="maingraph_hidden" style="display: none"></div>
+							<div class="maingraph" id="maingraph_control"></div>
+						</div>
 						</td></tr>
 						<tr><td align="center">
 							<div class="btn-group">
@@ -918,6 +999,8 @@
 	</div>
 
 	<script type='text/javascript'>
+		google.load('visualization', '1.1', {packages: ['controls']});
+
 		$(document).ready(function(){
 			document.getElementById('splash').height = $(window).height();
 
