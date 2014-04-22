@@ -36,7 +36,8 @@
 	var MAINCHART_MAX_TIME_TO_SHOW = 600;
 	var THUMBS_MAX_TIME_TO_SHOW = 600;
 	var MAINCHART_CONTROL_HEIGHT = 100;
-	var MAINCHART_CONTROL_DIVISOR = 3;
+	var MAINCHART_CONTROL_DIVISOR = 1;
+	var MAINCHART_POINTS_DIVISOR = 5;
 
 	var MODE_THUMBS = 1;
 	var MODE_MAIN = 2;
@@ -111,6 +112,50 @@
 	// ------------------------------------------------------------------------
 	// MAINGRAPH = fullscreen view of 1 graph
 
+	function calculateChartGroup(c, divisor, maxtime, group) {
+		var before = c.before?c.before:new Date().getTime() / 1000;
+		var after = c.after?c.after:c.first_entry_t;
+
+		var dt = before - after;
+		if(dt > c.entries * c.update_every) dt = c.entries * c.update_every;
+
+		if(maxtime && dt > maxtime) dt = maxtime;
+
+		var data_points = dt / c.update_every;
+		var screen_points = Math.round(c.chartOptions.width / divisor);
+
+		if(!group) {
+			if(screen_points > data_points) {
+				c.group = 1;
+				c.points_to_show = data_points;
+			}
+			else {
+				c.group = Math.round(data_points / screen_points);
+
+				     if(c.group > 60) c.group = 60;
+				else if(c.group > 45) c.group = 45;
+				else if(c.group > 30) c.group = 30;
+				else if(c.group > 20) c.group = 20;
+				else if(c.group > 15) c.group = 15;
+				else if(c.group > 10) c.group = 10;
+				else if(c.group > 5) c.group = 5;
+				else if(c.group > 2) c.group = 2;
+				else c.group = 1;
+
+				c.points_to_show = Math.round(data_points / c.group);
+			}
+		}
+		else {
+			c.group = group;
+			c.points_to_show = Math.round(data_points / group);
+		}
+
+		if(mainchart.chartType == 'LineChart') {
+			if(mainchart.group <= 2) mainchart.chartOptions.lineWidth = 1;
+			else mainchart.chartOptions.lineWidth = 2;
+		}
+	}
+
 	// copy the chart c to mainchart
 	// switch to main graphs screen
 	function initMainChart(c) {
@@ -123,17 +168,11 @@
 		mainchart.chartOptions.width = screenWidth();
 		mainchart.chartOptions.height = $(window).height() - 150 - MAINCHART_CONTROL_HEIGHT;
 		if(mainchart.chartOptions.height < 300) mainchart.chartOptions.height = 300;
-		
-		mainchart.group = 2;
+
 		mainchart.div = 'maingraph';
 		mainchart.last_updated = 0;
 
-		mainchart.points_to_show = Math.round(mainchart.entries / mainchart.group) - 1;
-		if(mainchart.points_to_show * mainchart.group > MAINCHART_MAX_TIME_TO_SHOW)
-			mainchart.points_to_show = MAINCHART_MAX_TIME_TO_SHOW / mainchart.group;
-
-		if(mainchart.chartOptions.isStacked) mainchart.group = 5;
-		//mainchart.chartOptions.titlePosition = 'none';
+		calculateChartGroup(mainchart, MAINCHART_POINTS_DIVISOR, MAINCHART_MAX_TIME_TO_SHOW, 0);
 		mainchart.chartOptions.explorer = null;
 
 		// initialize the div
@@ -144,6 +183,15 @@
 		setMainChartMax('normal');
 
 		$('#group' + mainchart.group).trigger('click');
+		setMainChartGroup(mainchart.group, 'no-refresh');
+
+		var controlopts = $.extend(true, {}, mainchart.chartOptions, {
+			lineWidth: 1,
+			height: MAINCHART_CONTROL_HEIGHT,
+			chartArea: {'width': '90%'},
+			hAxis: {'baselineColor': 'none'},
+			vAxis: {'title': null},
+		});
 
 		mainchart.dashboard = new google.visualization.Dashboard(document.getElementById('maingraph_dashboard'));
 		mainchart.control = new google.visualization.ControlWrapper({
@@ -153,14 +201,8 @@
 				filterColumnIndex: 0,
 				ui: {
 					chartType: mainchart.chartType,
-					chartOptions: {
-						isStacked: mainchart.chartOptions.isStacked,
-						width: mainchart.chartOptions.width,
-						height: MAINCHART_CONTROL_HEIGHT,
-						chartArea: {'width': '90%'},
-						hAxis: {'baselineColor': 'none'}
-					},
-					minRangeSize: MAINCHART_MAX_TIME_TO_SHOW / mainchart.update_every * 1000,
+					chartOptions: controlopts,
+					minRangeSize: MAINCHART_MAX_TIME_TO_SHOW * mainchart.update_every / MAINCHART_POINTS_DIVISOR * 1000,
 				}
 			},
 		});
@@ -178,12 +220,10 @@
 		});
 
 		// load the data for the control and the hidden chart
-		tempchart.points_to_show = Math.round(mainchart.chartOptions.width / MAINCHART_CONTROL_DIVISOR);
-		tempchart.after = tempchart.first_entry_t;
-		tempchart.before = Math.round(new Date().getTime() / 1000);
-		if(tempchart.entries * tempchart.update_every > tempchart.before - tempchart.after)
-			tempchart.after = tempchart.before - tempchart.entries * tempchart.update_every;
-		tempchart.group = Math.round((tempchart.before - tempchart.after) / tempchart.points_to_show);
+		calculateChartGroup(tempchart, MAINCHART_CONTROL_DIVISOR, 0, 0);
+		// alert("diff = " + (tempchart.before - tempchart.after) + ", group = " + tempchart.group);
+
+		switchToMainGraph();
 
 		$.ajax({
 			url: generateChartURL(tempchart),
@@ -198,8 +238,6 @@
 			google.visualization.events.addListener(mainchart.control, 'ready', mainchartControlReadyEvent);
 			mainchart.dashboard.bind(mainchart.control, mainchart.hiddenchart);
 			mainchart.dashboard.draw(mainchart.control_data);
-
-			switchToMainGraph();
 		});
 	}
 
@@ -214,11 +252,13 @@
 		mainchart.after = Math.round(state.range.start.getTime() / 1000);
 		mainchart.before = Math.round(state.range.end.getTime() / 1000);
 
-		mainchart.points_to_show = mainchart.chartOptions.width / 2;
-		mainchart.group = Math.round((mainchart.before - mainchart.after) / mainchart.points_to_show);
-		console.log('group = ' + mainchart.group + ', points_to_show = ' + mainchart.position);
+		calculateChartGroup(mainchart, MAINCHART_POINTS_DIVISOR, 0, 0);
+		console.log('group = ' + mainchart.group + ', points_to_show = ' + mainchart.points_to_show + ', dt = ' + (mainchart.before - mainchart.after));
 
+		$('#group' + mainchart.group).trigger('click');
 		mainchart.last_updated = 0;
+
+		if(refresh_mode != REFRESH_ZOOMED) zoomGraphs();
 	}
 
 	function initMainChartIndex(i) {
@@ -256,12 +296,20 @@
 		mainchart.last_updated = 0;
 	}
 
-	function setMainChartGroup(g) {
+	function setMainChartGroup(g, norefresh) {
 		if(!mainchart) return;
 
 		mainchart.group = g;
-		mainchart.last_updated = 0;
-		playGraphs();
+
+		if(!mainchart.before && !mainchart.after)
+			calculateChartGroup(mainchart, MAINCHART_POINTS_DIVISOR, MAINCHART_MAX_TIME_TO_SHOW, mainchart.group);
+		else
+			calculateChartGroup(mainchart, MAINCHART_POINTS_DIVISOR, 0, mainchart.group);
+
+		if(!norefresh) {
+			mainchart.last_updated = 0;
+			if(refresh_mode == REFRESH_PAUSED) playGraphs();
+		}
 	}
 
 	var last_main_chart_avg = null;
@@ -279,7 +327,7 @@
 
 		if(!norefresh) {
 			mainchart.last_updated = 0;
-			playGraphs();
+			if(refresh_mode == REFRESH_PAUSED) playGraphs();
 		}
 
 		last_main_chart_avg = g;
@@ -289,7 +337,7 @@
 		if(!mainchart) return;
 
 		if(p == 'toggle') {
-			if(stop_refreshing) p = 'play';
+			if(refresh_mode != REFRESH_ALWAYS) p = 'play';
 			else p = 'pause';
 		}
 
@@ -297,6 +345,9 @@
 			//mainchart.chartOptions.explorer = null;
 			mainchart.after = 0;
 			mainchart.before = 0;
+			calculateChartGroup(mainchart, MAINCHART_POINTS_DIVISOR, MAINCHART_MAX_TIME_TO_SHOW, 0);
+			$('#group' + mainchart.group).trigger('click');
+			mainchart.last_updated = 0;
 			playGraphs();
 		}
 		else {
@@ -400,10 +451,14 @@
 	// ------------------------------------------------------------------------
 	// Core of the thread refreshing the charts
 
-	var stop_refreshing = 1;
+	var REFRESH_PAUSED = 0;
+	var REFRESH_ALWAYS = 1;
+	var REFRESH_ZOOMED = 2;
+
+	var refresh_mode = REFRESH_PAUSED;
 	var last_refresh = 0;
 	function playGraphs() {
-		if(!stop_refreshing) {
+		if(refresh_mode != REFRESH_PAUSED) {
 			// check if the thread died due to a javascript error
 			var now = new Date().getTime();
 			if((now - last_refresh) > 5000) {
@@ -414,15 +469,22 @@
 			return;
 		}
 
-		stop_refreshing = 0;
+		refresh_mode = REFRESH_ALWAYS;
 		$('.mainchart_play_button').button('play');
 		chartsRefresh();
 	}
 
 	function pauseGraphs() {
-		if(stop_refreshing) return;
+		if(refresh_mode == REFRESH_PAUSED) return;
 
-		stop_refreshing = 1;
+		refresh_mode = REFRESH_PAUSED;
+		$('.mainchart_play_button').button('pause');
+	}
+
+	function zoomGraphs() {
+		if(refresh_mode == REFRESH_ZOOMED) return;
+
+		refresh_mode = REFRESH_ZOOMED;
 		$('.mainchart_play_button').button('pause');
 	}
 
@@ -437,10 +499,10 @@
 		if(resize_request) {
 			resizeCharts();
 			resize_request = false;
-			stop_refreshing = 0;
+			refresh_mode = REFRESH_ALWAYS;
 		}
 
-		if(stop_refreshing) {
+		if(refresh_mode == REFRESH_PAUSED) {
 			//mylog("stop refresh");
 			return;
 		}

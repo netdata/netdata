@@ -61,6 +61,7 @@ function refreshChart(chart, doNext) {
 		if(chart.chart && chart.refreshCount > 50) {
 			chart.chart.clearChart();
 			chart.chart = null;
+			chart.refreshCount = 0;
 		}
 
 		// Instantiate and draw our chart, passing in some options.
