@@ -1103,14 +1103,12 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	if(group_count < 1) group_count = 1;
 	// if(group_count > st->entries / 20) group_count = st->entries / 20;
 
-	size_t printed = 0;			// the lines of JSON data we have generated so far
+	long printed = 0;			// the lines of JSON data we have generated so far
 
-	size_t current_entry = st->current_entry;
-	size_t t, lt;				// t = the current entry, lt = the lest entry of data
+	long stop_entry, current_entry = st->current_entry;
 
-	RRD_DIMENSION *rd;
-	size_t c = 0;				// counter for dimension loops
-	size_t dimensions = 0;		// the total number of dimensions present
+	int c = 0;					// counter for dimension loops
+	int dimensions = 0;			// the total number of dimensions present
 
 	unsigned long long usec = 0;// usec between the entries
 	char dtm[201];				// temp variable for storing dates
@@ -1118,6 +1116,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	int we_need_totals = 0;		// if set, we should calculate totals for all dimensions
 
 	// find how many dimensions we have
+	RRD_DIMENSION *rd;
 	for( rd = st->dimensions ; rd ; rd = rd->next) {
 		dimensions++;
 		if(rd->type == RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL || rd->type == RRD_DIMENSION_PCENT_OVER_ROW_TOTAL) we_need_totals++;
@@ -1141,11 +1140,14 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
 		group_values[c] = group_counts[c] = 0;
 
+	// print the labels
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "{\n	%scols%s:\n	[\n", kq, kq);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "		{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotation%s}},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotationText%s}}", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
 
+	// print the header for each dimension
+	// and update the print_hidden array for the dimensions that should be hidden
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 		if(rd->hidden)
 			print_hidden[c] = 1;
@@ -1155,6 +1157,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 		}
 	}
 
+	// print the begin of row data
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\n	],\n	%srows%s:\n	[\n", kq, kq);
 
 	// make sure current_entry is within limits
@@ -1162,14 +1165,10 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	if(before == 0) before = st->times[current_entry].tv_sec;
 
 	// find the oldest entry of the round-robin
-	t = rrd_stats_first_entry(st);
-	lt = t;
-	size_t stop_entry = t;
+	stop_entry = rrd_stats_first_entry(st);
 
 	// skip the oldest, to have incremental data
-	t++;
-	if(t >= st->entries) t = 0;
-	if(after == 0) after = st->times[t].tv_sec;
+	if(after == 0) after = st->times[stop_entry].tv_sec;
 
 	// the minimum line length we expect
 	int line_size = 4096 + (dimensions * 200);
@@ -1182,43 +1181,31 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	int normal_annotation_len = snprintf(normal_annotation, 200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
 	normal_annotation[200] = '\0';
 
-	// count down of the entries examined so far
-	long count = ((before - after) / update_every) + 1;
-
 	// to allow grouping on the same values, we need a pad
 	long pad = before % group_count;
 
 	// checks for debuging
 	if(before < after)
-		error("WARNING: The newest value in the database (%lu) is earlier than the oldest (%lu)", before, after);
+		debug(D_RRD_STATS, "WARNING: %s The newest value in the database (%lu) is earlier than the oldest (%lu)", st->name, before, after);
 
 	if((before - after) > st->entries * update_every)
-		error("WARNING: The time difference between the oldest and the newest entries (%lu) is higher than the capacity of the database (%lu)", before - after, st->entries * update_every);
+		debug(D_RRD_STATS, "WARNING: %s The time difference between the oldest and the newest entries (%lu) is higher than the capacity of the database (%lu)", st->name, before - after, st->entries * update_every);
 
-	// we need these at the end for debugging
-	long count_start = count;
-	size_t t_start = t;
-
-	// the loop in dimension data
+	// loop in dimension data
 	int annotate_reset = 0;
-	for ( ; t != stop_entry && count >= 0 ; lt = t++) {
+	long t = current_entry, lt = current_entry - 1, count; // t = the current entry, lt = the last entry of data
+	if(lt < 0) lt = st->entries - 1;
+	for (count = printed = 0; t != stop_entry ; t = lt--) {
 		int print_this = 0;
 
-		if(t >= st->entries) t = 0;
+		if(lt < 0) lt = st->entries - 1;
 
 		// make sure we return data in the proper time range
 		if(st->times[t].tv_sec < after || st->times[t].tv_sec > before) continue;
-		count--;
-
-		// check if we may exceed the buffer provided
-		web_buffer_increase(wb, line_size);
-
-		// prefer the most recent last entries
-		if(((count - pad) / group_count) >= entries_to_show) continue;
+		count++;
 
 		// ok. we will use this entry!
 		// find how much usec since the previous entry
-
 		usec = usecdiff(&st->times[t], &st->times[lt]);
 
 		if(((count - pad) % group_count) == 0) {
@@ -1226,6 +1213,9 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 				// debug(D_RRD_STATS, "Already printed all rows. Stopping.");
 				break;
 			}
+
+			// check if we may exceed the buffer provided
+			web_buffer_increase(wb, line_size);
 
 			// generate the local date time
 			struct tm *tm = localtime(&st->times[t].tv_sec);
@@ -1327,8 +1317,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	if(printed) wb->bytes += sprintf(&wb->buffer[wb->bytes], "]}");
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\n	]\n}\n");
 
-	if(!printed)
-		error("WARNING: NOTHING PRINTED: %s, after = %lu, before = %lu, diff = %lu, pad = %ld, count = %ld, entries_to_show = %lu, group_count = %lu, current_entry = %lu, t = %lu", st->name, after, before, before - after, pad, count_start, entries_to_show, group_count, current_entry, t_start);
+	debug(D_RRD_STATS, "RRD_STATS_JSON: %s Generated %ld rows, total %ld bytes", st->name, printed, wb->bytes);
 
 	pthread_mutex_unlock(&st->mutex);
 	return last_timestamp;
