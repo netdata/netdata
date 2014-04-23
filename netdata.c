@@ -103,10 +103,14 @@
 #define CT_APPLICATION_VND_MS_FONTOBJ	13
 #define CT_IMAGE_SVG_XML				14
 
-// configuration
+
 #define DEBUG (D_WEB_CLIENT_ACCESS|D_LISTENER|D_RRD_STATS)
 //#define DEBUG 0xffffffff
 //#define DEBUG (0)
+
+unsigned long long debug_flags = DEBUG;
+char *debug_log = NULL;
+int debug_fd = -1;
 
 #define EXIT_FAILURE 1
 #define LISTEN_BACKLOG 100
@@ -169,7 +173,7 @@ void debug_int( const char *file, const char *function, const unsigned long line
 
 	va_list args;
 
-	if(DEBUG & type) {
+	if(debug_flags & type) {
 		log_date();
 		va_start( args, fmt );
 		fprintf(stderr, "DEBUG (%04lu@%-15.15s): ", line, function);
@@ -706,11 +710,13 @@ int rrd_stats_dimension_set(RRD_STATS *st, char *id, void *data, void *obsolete)
 	return 0;
 }
 
-void rrd_stats_next(RRD_STATS *st)
+unsigned long long rrd_stats_next(RRD_STATS *st)
 {
-	struct timeval *now;
+	struct timeval *now, *old;
 
 	pthread_mutex_lock(&st->mutex);
+
+	old = &st->times[st->current_entry];
 
 	// st->current_entry should never be outside the array
 	// or, the parallel threads may end up crashing
@@ -723,6 +729,8 @@ void rrd_stats_next(RRD_STATS *st)
 	st->last_updated = now->tv_sec;
 
 	// leave mutex locked
+
+	return usecdiff(now, old);
 }
 
 void rrd_stats_done(RRD_STATS *st)
@@ -943,9 +951,28 @@ struct web_client *web_client_free(struct web_client *w)
 #define GROUP_AVERAGE	0
 #define GROUP_MAX 		1
 
+// find the oldest entry in the data, skipping all empty slots
+size_t rrd_stats_first_entry(RRD_STATS *st)
+{
+	size_t first_entry = st->current_entry + 1;
+	if(first_entry >= st->entries) first_entry = 0;
+
+	while(st->times[first_entry].tv_sec == 0 && first_entry != st->current_entry) {
+		first_entry++;
+		if(first_entry >= st->entries) first_entry = 0;
+	}
+
+	return first_entry;
+}
+
 void rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer *wb)
 {
 	web_buffer_increase(wb, 16384);
+
+	pthread_mutex_lock(&st->mutex);
+
+	size_t first_entry = rrd_stats_first_entry(st);
+	time_t first_entry_t = st->times[first_entry].tv_sec;
 
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t{\n");
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"id\" : \"%s\",\n", st->id);
@@ -966,12 +993,16 @@ void rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer *wb)
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"units\" : \"%s\",\n", st->units);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"url\" : \"/data/%s/%s\",\n", st->name, options?options:"");
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"entries\" : %ld,\n", st->entries);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"current\" : %ld,\n", st->current_entry);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"first_entry\" : %ld,\n", first_entry);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"first_entry_t\" : %ld,\n", first_entry_t);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_entry\" : %ld,\n", st->current_entry);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_entry_t\" : %lu,\n", st->last_updated);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_entry_secs_ago\" : %lu,\n", time(NULL) - st->last_updated);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"update_every\" : %d,\n", update_every);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_updated\" : %lu,\n", st->last_updated);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_updated_secs_ago\" : %lu,\n", time(NULL) - st->last_updated);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"isdetail\" : %d\n", st->isdetail);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t}");
+
+	pthread_mutex_unlock(&st->mutex);
 }
 
 #define RRD_GRAPH_JSON_HEADER "{\n\t\"charts\": [\n"
@@ -1047,7 +1078,7 @@ long double rrd_stats_dimension_get(RRD_DIMENSION *rd, size_t position)
 	return(0);
 }
 
-unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show, size_t group_count, int group_method)
+unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show, size_t group_count, int group_method, time_t after, time_t before)
 {
 	pthread_mutex_lock(&st->mutex);
 
@@ -1068,20 +1099,16 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	}
 
 	// check the options
-	if(entries_to_show <= 0) entries_to_show = 1;
-	if(group_count <= 0) group_count = 1;
-	if(group_count > st->entries / 20) group_count = st->entries / 20;
+	if(entries_to_show < 1) entries_to_show = 1;
+	if(group_count < 1) group_count = 1;
+	// if(group_count > st->entries / 20) group_count = st->entries / 20;
 
-	size_t printed = 0;			// the lines of JSON data we have generated so far
+	long printed = 0;			// the lines of JSON data we have generated so far
 
-	size_t current_entry = st->current_entry;
-	size_t t, lt;				// t = the current entry, lt = the lest entry of data
-	long count = st->entries;	// count down of the entries examined so far
-	long pad = 0;				// align the entries when grouping values together
+	long stop_entry, current_entry = st->current_entry;
 
-	RRD_DIMENSION *rd;
-	size_t c = 0;				// counter for dimension loops
-	size_t dimensions = 0;		// the total number of dimensions present
+	int c = 0;					// counter for dimension loops
+	int dimensions = 0;			// the total number of dimensions present
 
 	unsigned long long usec = 0;// usec between the entries
 	char dtm[201];				// temp variable for storing dates
@@ -1089,6 +1116,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	int we_need_totals = 0;		// if set, we should calculate totals for all dimensions
 
 	// find how many dimensions we have
+	RRD_DIMENSION *rd;
 	for( rd = st->dimensions ; rd ; rd = rd->next) {
 		dimensions++;
 		if(rd->type == RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL || rd->type == RRD_DIMENSION_PCENT_OVER_ROW_TOTAL) we_need_totals++;
@@ -1112,11 +1140,14 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
 		group_values[c] = group_counts[c] = 0;
 
+	// print the labels
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "{\n	%scols%s:\n	[\n", kq, kq);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "		{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotation%s}},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotationText%s}}", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
 
+	// print the header for each dimension
+	// and update the print_hidden array for the dimensions that should be hidden
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 		if(rd->hidden)
 			print_hidden[c] = 1;
@@ -1126,22 +1157,18 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 		}
 	}
 
+	// print the begin of row data
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\n	],\n	%srows%s:\n	[\n", kq, kq);
-
-	// to allow grouping on the same values, we need a pad
-	pad = current_entry % group_count;
 
 	// make sure current_entry is within limits
 	if(current_entry < 0 || current_entry >= st->entries) current_entry = 0;
+	if(before == 0) before = st->times[current_entry].tv_sec;
 
-	// find the old entry of the round-robin
-	t = current_entry + 1;
-	if(t >= st->entries) t = 0;
-	lt = t;
+	// find the oldest entry of the round-robin
+	stop_entry = rrd_stats_first_entry(st);
 
-	// find the current entry
-	t++;
-	if(t >= st->entries) t = 0;
+	// skip the oldest, to have incremental data
+	if(after == 0) after = st->times[stop_entry].tv_sec;
 
 	// the minimum line length we expect
 	int line_size = 4096 + (dimensions * 200);
@@ -1154,31 +1181,41 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	int normal_annotation_len = snprintf(normal_annotation, 200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
 	normal_annotation[200] = '\0';
 
-	// the loop in dimension data
-	count -= 2;
+	// to allow grouping on the same values, we need a pad
+	long pad = before % group_count;
+
+	// checks for debuging
+	if(before < after)
+		debug(D_RRD_STATS, "WARNING: %s The newest value in the database (%lu) is earlier than the oldest (%lu)", st->name, before, after);
+
+	if((before - after) > st->entries * update_every)
+		debug(D_RRD_STATS, "WARNING: %s The time difference between the oldest and the newest entries (%lu) is higher than the capacity of the database (%lu)", st->name, before - after, st->entries * update_every);
+
+	// loop in dimension data
 	int annotate_reset = 0;
-	for ( ; t != current_entry && count >= 0 ; lt = t++, count--) {
+	long t = current_entry, lt = current_entry - 1, count; // t = the current entry, lt = the last entry of data
+	if(lt < 0) lt = st->entries - 1;
+	for (count = printed = 0; t != stop_entry ; t = lt--) {
 		int print_this = 0;
 
-		if(t >= st->entries) t = 0;
+		if(lt < 0) lt = st->entries - 1;
 
-		// if the last is empty, loop again
-		if(!st->times[lt].tv_sec) continue;
-
-		// check if we may exceed the buffer provided
-		web_buffer_increase(wb, line_size);
-
-		// prefer the most recent last entries
-		if(((count-pad) / group_count) > entries_to_show) continue;
-
+		// make sure we return data in the proper time range
+		if(st->times[t].tv_sec < after || st->times[t].tv_sec > before) continue;
+		count++;
 
 		// ok. we will use this entry!
 		// find how much usec since the previous entry
-
 		usec = usecdiff(&st->times[t], &st->times[lt]);
 
-		if(((count-pad) % group_count) == 0) {
-			if(printed >= entries_to_show) break;
+		if(((count - pad) % group_count) == 0) {
+			if(printed >= entries_to_show) {
+				// debug(D_RRD_STATS, "Already printed all rows. Stopping.");
+				break;
+			}
+
+			// check if we may exceed the buffer provided
+			web_buffer_increase(wb, line_size);
 
 			// generate the local date time
 			struct tm *tm = localtime(&st->times[t].tv_sec);
@@ -1279,6 +1316,8 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 
 	if(printed) wb->bytes += sprintf(&wb->buffer[wb->bytes], "]}");
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\n	]\n}\n");
+
+	debug(D_RRD_STATS, "RRD_STATS_JSON: %s Generated %ld rows, total %ld bytes", st->name, printed, wb->bytes);
 
 	pthread_mutex_unlock(&st->mutex);
 	return last_timestamp;
@@ -1508,20 +1547,21 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	// how many entries does the client want?
 	size_t lines = save_history;
 	size_t group_count = 1;
+	time_t after = 0, before = 0;
 	int group_method = GROUP_AVERAGE;
 
 	if(url) {
 		// parse the lines required
 		tok = mystrsep(&url, "/");
 		if(tok) lines = atoi(tok);
-		if(lines < 5) lines = save_history;
+		if(lines < 1) lines = 1;
 	}
 	if(url) {
 		// parse the group count required
 		tok = mystrsep(&url, "/");
 		if(tok) group_count = atoi(tok);
 		if(group_count < 1) group_count = 1;
-		if(group_count > save_history / 20) group_count = save_history / 20;
+		//if(group_count > save_history / 20) group_count = save_history / 20;
 	}
 	if(url) {
 		// parse the grouping method required
@@ -1529,6 +1569,18 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 		if(strcmp(tok, "max") == 0) group_method = GROUP_MAX;
 		else if(strcmp(tok, "average") == 0) group_method = GROUP_AVERAGE;
 		else debug(D_WEB_CLIENT, "%llu: Unknown group method '%s'", w->id, tok);
+	}
+	if(url) {
+		// parse after time
+		tok = mystrsep(&url, "/");
+		if(tok) after = strtoul(tok, NULL, 10);
+		if(after < 0) after = 0;
+	}
+	if(url) {
+		// parse before time
+		tok = mystrsep(&url, "/");
+		if(tok) before = strtoul(tok, NULL, 10);
+		if(before < 0) before = 0;
 	}
 
 	w->data->contenttype = CT_APPLICATION_JSON;
@@ -1598,8 +1650,8 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 			google_responseHandler, google_version, google_reqId, st->last_updated);
 	}
 	
-	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group_count, %d group_method).", w->id, st->name, st->id, lines, group_count, group_method);
-	unsigned long timestamp_in_data = rrd_stats_json(datasource_type, st, w->data, lines, group_count, group_method);
+	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group, %d group_method, %lu after, %lu before).", w->id, st->name, st->id, lines, group_count, group_method, after, before);
+	unsigned long timestamp_in_data = rrd_stats_json(datasource_type, st, w->data, lines, group_count, group_method, after, before);
 
 	if(datasource_type == DATASOURCE_GOOGLE_JSONP) {
 		if(timestamp_in_data > last_timestamp_in_data)
@@ -2003,29 +2055,29 @@ void web_client_send_chunk_header(struct web_client *w, int len)
 
 	if(bytes > 0) debug(D_DEFLATE, "%llu: Sent chunk header %d bytes.", w->id, bytes);
 	else if(bytes == 0) debug(D_DEFLATE, "%llu: Did not send chunk header to the client.", w->id);
-	else debug(D_DEFLATE, "%llu: Failed to send chunk header to client.", w->id);
+	else debug(D_DEFLATE, "%llu: Failed to send chunk header to client. Reason: %s", w->id, strerror(errno));
 }
 
 void web_client_send_chunk_close(struct web_client *w)
 {
-	debug(D_DEFLATE, "%llu: CLOSE CHUNK.", w->id);
+	//debug(D_DEFLATE, "%llu: CLOSE CHUNK.", w->id);
 
 	int bytes = send(w->ofd, "\r\n", 2, MSG_DONTWAIT);
 
 	if(bytes > 0) debug(D_DEFLATE, "%llu: Sent chunk suffix %d bytes.", w->id, bytes);
 	else if(bytes == 0) debug(D_DEFLATE, "%llu: Did not send chunk suffix to the client.", w->id);
-	else debug(D_DEFLATE, "%llu: Failed to send chunk suffix to client.", w->id);
+	else debug(D_DEFLATE, "%llu: Failed to send chunk suffix to client. Reason: %s", w->id, strerror(errno));
 }
 
 void web_client_send_chunk_finalize(struct web_client *w)
 {
-	debug(D_DEFLATE, "%llu: FINALIZE CHUNK.", w->id);
+	//debug(D_DEFLATE, "%llu: FINALIZE CHUNK.", w->id);
 
 	int bytes = send(w->ofd, "\r\n0\r\n\r\n", 7, MSG_DONTWAIT);
 
 	if(bytes > 0) debug(D_DEFLATE, "%llu: Sent chunk suffix %d bytes.", w->id, bytes);
 	else if(bytes == 0) debug(D_DEFLATE, "%llu: Did not send chunk suffix to the client.", w->id);
-	else debug(D_DEFLATE, "%llu: Failed to send chunk suffix to client.", w->id);
+	else debug(D_DEFLATE, "%llu: Failed to send chunk suffix to client. Reason: %s", w->id, strerror(errno));
 }
 
 ssize_t web_client_send_deflate(struct web_client *w)
@@ -2035,7 +2087,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
 	// when using compression,
 	// w->data->sent is the amount of bytes passed through compression
 
-	debug(D_DEFLATE, "%llu: TEST w->data->bytes = %d, w->data->sent = %d, w->zhave = %d, w->zsent = %d, w->zstream.avail_in = %d, w->zstream.avail_out = %d, w->zstream.total_in = %d, w->zstream.total_out = %d.", w->id, w->data->bytes, w->data->sent, w->zhave, w->zsent, w->zstream.avail_in, w->zstream.avail_out, w->zstream.total_in, w->zstream.total_out);
+	// debug(D_DEFLATE, "%llu: TEST w->data->bytes = %d, w->data->sent = %d, w->zhave = %d, w->zsent = %d, w->zstream.avail_in = %d, w->zstream.avail_out = %d, w->zstream.total_in = %d, w->zstream.total_out = %d.", w->id, w->data->bytes, w->data->sent, w->zhave, w->zsent, w->zstream.avail_in, w->zstream.avail_out, w->zstream.total_in, w->zstream.total_out);
 
 	if(w->data->bytes - w->data->sent == 0 && w->zstream.avail_in == 0 && w->zhave == w->zsent && w->zstream.avail_out != 0) {
 		// there is nothing to send
@@ -2123,7 +2175,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
 		debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, bytes);
 	}
 	else if(bytes == 0) debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client.", w->id);
-	else debug(D_WEB_CLIENT, "%llu: Failed to send data to client.", w->id);
+	else debug(D_WEB_CLIENT, "%llu: Failed to send data to client. Reason: %s", w->id, strerror(errno));
 
 	return(bytes);
 }
@@ -2167,7 +2219,7 @@ ssize_t web_client_send(struct web_client *w)
 		debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, bytes);
 	}
 	else if(bytes == 0) debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client.", w->id);
-	else debug(D_WEB_CLIENT, "%llu: Failed to send data to client.", w->id);
+	else debug(D_WEB_CLIENT, "%llu: Failed to send data to client. Reason: %s", w->id, strerror(errno));
 
 
 	return(bytes);
@@ -2257,7 +2309,7 @@ void *new_client(void *ptr)
 		tv.tv_sec = 30;
 		tv.tv_usec = 0;
 
-		debug(D_WEB_CLIENT, "%llu: Waiting for input: %s, output: %s ...", w->id, w->wait_receive?"YES":"NO", w->wait_send?"YES":"NO");
+		debug(D_WEB_CLIENT, "%llu: Waiting socket async I/O for %s %s", w->id, w->wait_receive?"INPUT":"", w->wait_send?"OUTPUT":"");
 		retval = select(fdmax+1, &ifds, &ofds, &efds, &tv);
 
 		if(retval == -1) {
@@ -2451,7 +2503,6 @@ int do_proc_net_dev() {
 		c = strchr(buffer, ':');
 		if(c) *c = '\t';
 		
-		// if(DEBUG) printf("%s\n", buffer);
 		r = sscanf(buffer, "%s %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu\n",
 			iface,
 			&rbytes, &rpackets, &rerrors, &rdrops, &rfifo, &rframe, &rcompressed, &rmulticast,
@@ -2574,7 +2625,6 @@ int do_proc_diskstats() {
 		p = fgets(buffer, MAX_PROC_DISKSTATS_LINE, fp);
 		if(!p) break;
 		
-		// if(DEBUG) printf("%s\n", buffer);
 		r = sscanf(buffer, "%llu %llu %s %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu\n",
 			&major, &minor, disk,
 			&reads, &reads_merged, &readsectors, &readms, &writes, &writes_merged, &writesectors, &writems, &currentios, &iosms, &wiosms
@@ -4040,7 +4090,7 @@ int do_proc_vmstat() {
 
 void *proc_main(void *ptr)
 {
-	struct timeval last, now, tmp;
+	struct timeval last, now;
 
 	gettimeofday(&last, NULL);
 	last.tv_sec -= update_every;
@@ -4056,13 +4106,9 @@ void *proc_main(void *ptr)
 	int vdo_proc_meminfo = 0;
 	int vdo_proc_vmstat = 0;
 
+	gettimeofday(&last, NULL);
+	unsigned long long usec = 0, susec = 0;
 	for(;1;) {
-		unsigned long long usec, susec;
-		gettimeofday(&now, NULL);
-		
-		// calculate the time it took for a full loop
-		usec = usecdiff(&now, &last);
-		debug(D_PROCNETDEV_LOOP, "PROCNETDEV: Last full loop took %llu usec.", usec);
 		
 		// BEGIN -- the job to be done
 		if(!vdo_proc_net_dev)				vdo_proc_net_dev			= do_proc_net_dev(usec);
@@ -4077,9 +4123,9 @@ void *proc_main(void *ptr)
 		// END -- the job is done
 		
 		// find the time to sleep in order to wait exactly update_every seconds
-		gettimeofday(&tmp, NULL);
-		usec = usecdiff(&tmp, &now);
-		debug(D_PROCNETDEV_LOOP, "PROCNETDEV: This loop's work took %llu usec.", usec);
+		gettimeofday(&now, NULL);
+		usec = usecdiff(&now, &last) - susec;
+		debug(D_PROCNETDEV_LOOP, "PROCNETDEV: last loop took %llu usec (worked for %llu, sleeped for %llu).", usec + susec, usec, susec);
 		
 		if(usec < (update_every * 1000000)) susec = (update_every * 1000000) - usec;
 		else susec = 0;
@@ -4087,7 +4133,6 @@ void *proc_main(void *ptr)
 		// make sure we will wait at least 100ms
 		if(susec < 100000) susec = 100000;
 		
-		debug(D_PROCNETDEV_LOOP, "PROCNETDEV: Sleeping for %llu usec.", susec);
 		usleep(susec);
 		
 		// copy now to last
@@ -4139,7 +4184,7 @@ void tc_device_commit(struct tc_device *d)
 	for ( c = d->classes ; c ; c = c->next) {
 		for ( x = d->classes ; x ; x = x->next) {
 			if(x->parentid[0] && (strcmp(c->id, x->parentid) == 0 || strcmp(c->leafid, x->parentid) == 0)) {
-				// debug(D_TC_LOOP, "In device '%s', class '%s' (leafid: '%s') has leaf the class '%s' (parentid: '%s').", d->name, c->name, c->leafid, x->name, x->parentid);
+				// debug(D_TC_LOOP, "TC: In device '%s', class '%s' (leafid: '%s') has leaf the class '%s' (parentid: '%s').", d->name, c->name, c->leafid, x->name, x->parentid);
 				c->isleaf = 0;
 				x->hasparent = 1;
 			}
@@ -4149,8 +4194,8 @@ void tc_device_commit(struct tc_device *d)
 	// debugging:
 	/*
 	for ( c = d->classes ; c ; c = c->next) {
-		if(c->isleaf && c->hasparent) debug(D_TC_LOOP, "Device %s, class %s, OK", d->name, c->id);
-		else debug(D_TC_LOOP, "Device %s, class %s, IGNORE (isleaf: %d, hasparent: %d, parent: %s)", d->name, c->id, c->isleaf, c->hasparent, c->parentid);
+		if(c->isleaf && c->hasparent) debug(D_TC_LOOP, "TC: Device %s, class %s, OK", d->name, c->id);
+		else debug(D_TC_LOOP, "TC: Device %s, class %s, IGNORE (isleaf: %d, hasparent: %d, parent: %s)", d->name, c->id, c->isleaf, c->hasparent, c->parentid);
 	}
 	*/
 
@@ -4158,14 +4203,14 @@ void tc_device_commit(struct tc_device *d)
 		if(c->isleaf && c->hasparent) break;
 	}
 	if(!c) {
-		debug(D_TC_LOOP, "Ignoring TC device '%s'. No leaf classes.", d->name);
+		debug(D_TC_LOOP, "TC: Ignoring TC device '%s'. No leaf classes.", d->name);
 		return;
 	}
 
-	debug(D_TC_LOOP, "Committing TC device '%s'", d->name);
-
 	RRD_STATS *st = rrd_stats_find_bytype(RRD_TYPE_TC, d->id);
 	if(!st) {
+		debug(D_TC_LOOP, "TC: Committing new TC device '%s'", d->name);
+
 		st = rrd_stats_create(RRD_TYPE_TC, d->id, d->name, d->group, "Class usage for ", "kilobits/s", save_history);
 
 		for ( c = d->classes ; c ; c = c->next) {
@@ -4173,7 +4218,10 @@ void tc_device_commit(struct tc_device *d)
 				rrd_stats_dimension_add(st, c->id, c->name, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
 		}
 	}
-	else rrd_stats_next(st);
+	else {
+		unsigned long long usec = rrd_stats_next(st);
+		debug(D_TC_LOOP, "TC: Committing TC device '%s' after %llu usec", d->name, usec);
+	}
 
 	for ( c = d->classes ; c ; c = c->next) {
 		if(c->isleaf && c->hasparent) {
@@ -4371,7 +4419,7 @@ void *tc_main(void *ptr)
 			else if((strcmp(p, "MYPID") == 0)) {
 				char *id = strsep(&b, " \n");
 				tc_child_pid = atol(id);
-				debug(D_TC_LOOP, "Child PID is %d.", tc_child_pid);
+				debug(D_TC_LOOP, "TC: Child PID is %d.", tc_child_pid);
 			}
 		}
 		pclose(fp);
@@ -4521,9 +4569,18 @@ void become_daemon()
 
 	// close all files
 	for(i = sysconf(_SC_OPEN_MAX); i > 0; i--)
-		close(i);
+		if(i != debug_fd) close(i);
 
-	silent = 1;
+	if(debug_fd >= 0) {
+		silent = 0;
+
+		if(dup2(debug_fd, STDOUT_FILENO) < 0)
+			silent = 1;
+
+		if(dup2(debug_fd, STDERR_FILENO) < 0)
+			silent = 1;
+	}
+	else silent = 1;
 }
 
 int main(int argc, char **argv)
@@ -4551,6 +4608,21 @@ int main(int argc, char **argv)
 			else {
 				debug(D_OPTIONS, "Successfully became user %s.", argv[i+1]);
 			}
+			i++;
+		}
+		else if(strcmp(argv[i], "-dl") == 0 && (i+1) < argc) {
+			debug_log = argv[i+1];
+			debug_fd = open(debug_log, O_WRONLY | O_APPEND | O_CREAT, 0666);
+			if(debug_fd < 0) {
+				fprintf(stderr, "Cannot open file '%s'. Reason: %s\n", debug_log, strerror(errno));
+				exit(1);
+			}
+			debug(D_OPTIONS, "Debug LOG set to '%s'.", debug_log);
+			i++;
+		}
+		else if(strcmp(argv[i], "-df") == 0 && (i+1) < argc) {
+			debug_flags = strtoull(argv[i+1], NULL, 0);
+			debug(D_OPTIONS, "Debug flags set to '0x%8llx'.", debug_flags);
 			i++;
 		}
 		else if(strcmp(argv[i], "-t") == 0 && (i+1) < argc) {
@@ -4581,12 +4653,14 @@ int main(int argc, char **argv)
 		}
 		else {
 			fprintf(stderr, "Cannot understand option '%s'.\n", argv[i]);
-			fprintf(stderr, "\nUSAGE: %s [-d] [-l LINES_TO_SAVE] [-u UPDATE_TIMER] [-p LISTEN_PORT].\n\n", argv[0]);
+			fprintf(stderr, "\nUSAGE: %s [-d] [-l LINES_TO_SAVE] [-u UPDATE_TIMER] [-p LISTEN_PORT] [-dl debug log file] [-df debug flags].\n\n", argv[0]);
 			fprintf(stderr, "  -d enable daemon mode (run in background).\n");
 			fprintf(stderr, "  -l LINES_TO_SAVE can be from 5 to %d lines in JSON data. Default: %d.\n", HISTORY_MAX, HISTORY);
 			fprintf(stderr, "  -t UPDATE_TIMER can be from 1 to %d seconds. Default: %d.\n", UPDATE_EVERY_MAX, UPDATE_EVERY);
 			fprintf(stderr, "  -p LISTEN_PORT can be from 1 to %d. Default: %d.\n", 65535, LISTEN_PORT);
 			fprintf(stderr, "  -u USERNAME can be any system username to run as. Default: none.\n");
+			fprintf(stderr, "  -dl FILENAME write debug log to FILENAME. Default: none.\n");
+			fprintf(stderr, "  -df FLAGS debug options. Default: 0x%8llx.\n", debug_flags);
 			exit(1);
 		}
 	}
