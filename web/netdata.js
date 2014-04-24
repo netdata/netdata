@@ -151,6 +151,7 @@ function calculateChartPointsToShow(c, divisor, maxtime, group) {
 	}
 	mylog('group = ' + c.group + ', points = ' + c.points_to_show);
 
+	// make sure the line width is not congesting the chart
 	if(c.chartType == 'LineChart') {
 		if(c.points_to_show > c.chartOptions.width / 2) {
 			c.chartOptions.lineWidth = 1;
@@ -166,6 +167,13 @@ function calculateChartPointsToShow(c, divisor, maxtime, group) {
 			c.chartOptions.lineWidth = 2;
 			c.chartOptions.curveType = 'function';
 		}
+	}
+	else if(c.chartType == 'AreaChart') {
+		if(c.points_to_show > c.chartOptions.width / 2)
+			c.chartOptions.lineWidth = 0;
+
+		else
+			c.chartOptions.lineWidth = 1;
 	}
 }
 
