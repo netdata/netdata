@@ -401,6 +401,7 @@
 			calculateChartGroup(mainchart, MAINCHART_POINTS_DIVISOR, MAINCHART_MAX_TIME_TO_SHOW, 0);
 			$('#group' + mainchart.group).trigger('click');
 			mainchart.last_updated = 0;
+			mainchart.hiddenchart.last_updated = 0;
 			playGraphs();
 		}
 		else {
