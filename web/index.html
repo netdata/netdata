@@ -222,6 +222,7 @@
 			mainchart.dashboard = null;
 			mainchart.control_wrapper = null;
 			mainchart.hidden_wrapper = null;
+			mainchart.hiddenchart.last_updated = 0;
 		}
 
 		if(!mainchart.dashboard) {
@@ -556,7 +557,7 @@
 			if(mode == MODE_MAIN && mainchart.last_updated == 0)
 				mainChartRefresh();
 			else
-				timeout = setTimeout(chartsRefresh, 500);
+				timeout = setTimeout(chartsRefresh, 100);
 
 			return;
 		}
@@ -564,7 +565,7 @@
 		     if(mode == MODE_THUMBS)		thumbChartsRefresh();
 		else if(mode == MODE_GROUP_THUMBS)  groupChartsRefresh();
 		else if(mode == MODE_MAIN)   		mainChartRefresh();
-		else                         		timeout = setTimeout(triggerRefresh, 500);
+		else                         		timeout = setTimeout(triggerRefresh, 100);
 	}
 
 	// callback for refreshing the charts later
@@ -581,7 +582,7 @@
 		     if(mode == MODE_THUMBS) 		timeout = setTimeout(chartsRefresh, 200);
 		else if(mode == MODE_GROUP_THUMBS)	timeout = setTimeout(chartsRefresh, 200);
 		else if(mode == MODE_MAIN)   		timeout = setTimeout(chartsRefresh, 200);
-		else                         		timeout = setTimeout(triggerRefresh, 500);
+		else                         		timeout = setTimeout(triggerRefresh, 100);
 	}
 
 	// refresh the main chart
