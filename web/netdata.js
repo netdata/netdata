@@ -87,104 +87,88 @@ function refreshChart(chart, doNext) {
 	return true;
 }
 
-/*
-function showChartWithRange(chart) {
-	var oldgroup = chart.group;
-	var oldpoints = chart.points_to_show;
-	chart.group = 1;
-	chart.points_to_show = 0; // all
 
-	$.ajax({
-		url: generateChartURL(chart),
-		dataType:"json",
-		cache: false
-	})
-	.done(function(jsondata) {
-		chart.jsondata = jsondata;
+// calculateChartPointsToShow
+// calculate the chart group and point to show properties.
+// This uses the chartOptions.width and the supplied divisor
+// to calculate the propers values so that the chart will
+// be visually correct (not too much or too less points shown).
+//
+// c = the chart
+// divisor = when calculating screen points, divide width with this
+//           if all screen points are used the chart will be overcrowded
+//           the default is 2
+// maxtime = the maxtime to show
+//           the default is to render all the server data
+// group   = the required grouping on points
+//           if undefined or negative, any calculated value will be used
+//           if zero, one of 1,2,5,10,15,20,30,45,60 will be used
 
-		chart.control_div = chart.div + "_control";
-		chart.chart_div = chart.div + "_chart";
+function calculateChartPointsToShow(c, divisor, maxtime, group) {
+	if(!divisor) divisor = 2;
 
-		var div = document.getElementById(chart.div);
-		div.innerHTML = "<div class=\"maingraph\" id=\"" + chart.chart_div + "\"></div><div class=\"maingraph\" id=\"" + chart.control_div + "\"></div>";
-		//div.width = chart.chartOptions.width;
-		//div.height = chart.chartOptions.height;
+	var before = c.before?c.before:new Date().getTime() / 1000;
+	var after = c.after?c.after:c.first_entry_t;
 
-		console.log(chart.div);
-		chart.dashboard = new google.visualization.Dashboard(div);
-		console.log('dashboard ok');
-		console.log(chart.dashboard);
+	var dt = before - after;
+	if(dt > c.entries * c.update_every) dt = c.entries * c.update_every;
 
-		chart.data = new google.visualization.DataTable(chart.jsondata);
-		var range = chart.data.getColumnRange(0);
+	if(maxtime) dt = maxtime;
 
-		chart.control = new google.visualization.ControlWrapper({
-			'controlType': 'ChartRangeFilter',
-			'containerId': chart.control_div,
-			'options': {
-				// Filter by the date axis.
-				'filterColumnIndex': 0,
-				'ui': {
-					'chartType': 'AreaChart',
-					'chartOptions': {
-						'height': chart.chartOptions.height * 0.15,
-						'width': chart.chartOptions.width,
-						'chartArea': {'width': "90%"},
-						'hAxis': {'baselineColor': 'none'}
-					},
-					
-					//'chartView': {
-					//	'columns': [0, 1]
-					//},
+	var data_points = Math.round(dt / c.update_every);
+	var screen_points = Math.round(c.chartOptions.width / divisor);
+	mylog('screen = ' + screen_points + ', data = ' + data_points + ', divisor = ' + divisor);
 
-					// 1 day in milliseconds = 24 * 60 * 60 * 1000 = 86,400,000
-					//'minRangeSize': 86400000
-				}
-			},
+	if(group == undefined || group <= 0) {
+		if(screen_points > data_points) {
+			c.group = 1;
+			c.points_to_show = data_points;
+			//mylog("rendering at full detail");
+		}
+		else {
+			c.group = Math.round(data_points / screen_points);
 
-			// Initial range: 2012-02-09 to 2012-03-20.
-			'state': {'range': {'start': range.min, 'end': range.max}}
-		});
-		console.log('control ok');
-		console.log(chart.control);
+			if(group != undefined && group >= 0) {
+				     if(c.group > 60) c.group = 60;
+				else if(c.group > 45) c.group = 45;
+				else if(c.group > 30) c.group = 30;
+				else if(c.group > 20) c.group = 20;
+				else if(c.group > 15) c.group = 15;
+				else if(c.group > 10) c.group = 10;
+				else if(c.group > 5) c.group = 5;
+				else if(c.group > 2) c.group = 2;
+				else c.group = 1;
+			}
 
-		var columns = new Array();
-		var i;
-		for (i = 0; i < chart.data.getNumberOfColumns(); i++)
-			columns[i] = i;
+			c.points_to_show = Math.round(data_points / c.group);
+			//mylog("rendering adaptive");
+		}
+	}
+	else {
+		c.group = group;
+		c.points_to_show = Math.round(data_points / group);
+		//mylog("rendering with given group");
+	}
+	mylog('group = ' + c.group + ', points = ' + c.points_to_show);
 
-		columns[0] = {
-			'calc': function(dataTable, rowIndex) {
-				return dataTable.getFormattedValue(rowIndex, 0);
-			},
-			'type': 'string'
-		};
+	if(c.chartType == 'LineChart') {
+		if(c.points_to_show > c.chartOptions.width / 2) {
+			c.chartOptions.lineWidth = 1;
+			c.chartOptions.curveType = 'line';
+		}
 
-		
-		chart.chartOptions.height = chart.chartOptions.height * 0.85;
-		chart.chartOptions.chartArea = {'height': "80%", 'width': "90%"};
-		chart.chartOptions.legend = 'none';
+		else if(c.points_to_show > c.chartOptions.width / 3) {
+			c.chartOptions.lineWidth = 1;
+			c.chartOptions.curveType = 'function';
+		}
 
-		chart.chartwrap = new google.visualization.ChartWrapper({
-			'chartType': chart.chartType,
-			'containerId': chart.chart_div,
-			'options': chart.chartOptions,
-		});
-		console.log('chart ok');
-		console.log(chart.chartwrap);
-
-		chart.dashboard.bind(chart.control, chart.chartwrap);
-		console.log('bind ok');
-
-		chart.dashboard.draw(chart.data);
-		console.log('draw ok');
-
-		// restore what we changed
-		chart.group = oldgroup;
-		chart.points_to_show = oldpoints;
-	});
+		else {
+			c.chartOptions.lineWidth = 2;
+			c.chartOptions.curveType = 'function';
+		}
+	}
 }
-*/
+
 
 // loadCharts()
 // fetches all the charts from the server
@@ -379,3 +363,31 @@ function loadCharts(base_url, doNext) {
 		if(typeof doNext == "function") doNext();
 	});
 };
+
+// jquery visible plugin
+(function($){
+
+	/**
+	 * Copyright 2012, Digital Fusion
+	 * Licensed under the MIT license.
+	 * http://teamdf.com/jquery-plugins/license/
+	 *
+	 * @author Sam Sehnert
+	 * @desc A small plugin that checks whether elements are within
+	 *		 the user visible viewport of a web browser.
+	 *		 only accounts for vertical position, not horizontal.
+	 */
+	$.fn.visible = function(partial){
+		
+	    var $t				= $(this),
+	    	$w				= $(window),
+	    	viewTop			= $w.scrollTop(),
+	    	viewBottom		= viewTop + $w.height(),
+	    	_top			= $t.offset().top,
+	    	_bottom			= _top + $t.height(),
+	    	compareTop		= partial === true ? _bottom : _top,
+	    	compareBottom	= partial === true ? _top : _bottom;
+		
+		return ((compareBottom <= viewBottom) && (compareTop >= viewTop));
+    };
+})(jQuery);
