@@ -108,6 +108,9 @@
 //#define DEBUG 0xffffffff
 //#define DEBUG (0)
 
+#define HOSTNAME_MAX 1024
+char hostname[HOSTNAME_MAX + 1];
+
 unsigned long long debug_flags = DEBUG;
 char *debug_log = NULL;
 int debug_fd = -1;
@@ -390,8 +393,6 @@ struct rrd_stats {
 	char envtitle[RRD_STATS_NAME_MAX + 1];		// the variable name for taking the title
 	char envpriority[RRD_STATS_NAME_MAX + 1];	// the variable name for taking the priority
 
-	char hostname[RRD_STATS_NAME_MAX + 1];		// the host this data set belongs to
-
 	size_t entries;								// total number of entries in the data set
 	size_t current_entry;						// the entry that is currently being updated
 												// it goes around in a round-robin fashion
@@ -483,9 +484,6 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 
 	if(p) strncpy(st->userpriority, p, RRD_STATS_NAME_MAX);
 	else strncpy(st->userpriority, st->name, RRD_STATS_NAME_MAX);
-
-	if(gethostname(st->hostname, RRD_STATS_NAME_MAX) == -1)
-		error("Cannot get hostname.");
 
 	st->entries = entries;
 	st->current_entry = 0;
@@ -965,7 +963,7 @@ size_t rrd_stats_first_entry(RRD_STATS *st)
 	return first_entry;
 }
 
-void rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer *wb)
+unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer *wb)
 {
 	web_buffer_increase(wb, 16384);
 
@@ -987,22 +985,70 @@ void rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer *wb)
 		wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"usertitle\" : \"%s %s (%s)\",\n", st->title, st->usertitle, st->name);
 
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"userpriority\" : \"%s\",\n", st->userpriority);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"envtitle\" : \"%s\",\n", st->envtitle);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"envpriority\" : \"%s\",\n", st->envpriority);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"hostname\" : \"%s\",\n", st->hostname);
+	//wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"envtitle\" : \"%s\",\n", st->envtitle);
+	//wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"envpriority\" : \"%s\",\n", st->envpriority);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"units\" : \"%s\",\n", st->units);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"url\" : \"/data/%s/%s\",\n", st->name, options?options:"");
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"entries\" : %ld,\n", st->entries);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"first_entry\" : %ld,\n", first_entry);
+	//wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"first_entry\" : %ld,\n", first_entry);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"first_entry_t\" : %ld,\n", first_entry_t);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_entry\" : %ld,\n", st->current_entry);
+	//wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_entry\" : %ld,\n", st->current_entry);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_entry_t\" : %lu,\n", st->last_updated);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_entry_secs_ago\" : %lu,\n", time(NULL) - st->last_updated);
+	//wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_entry_secs_ago\" : %lu,\n", time(NULL) - st->last_updated);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"update_every\" : %d,\n", update_every);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"isdetail\" : %d\n", st->isdetail);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"isdetail\" : %d,\n", st->isdetail);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"dimensions\" : [\n");
+
+	unsigned long memory = sizeof(RRD_STATS) + (sizeof(struct timeval) * st->entries);
+
+	RRD_DIMENSION *rd;
+	for(rd = st->dimensions; rd ; rd = rd->next) {
+		unsigned long rdmem = sizeof(RRD_DIMENSION) + (rd->bytes * rd->entries);
+		memory += rdmem;
+
+		wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t{\n");
+		wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"id\" : \"%s\",\n", rd->id);
+		wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"name\" : \"%s\",\n", rd->name);
+		//wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"bytes\" : %ld,\n", rd->bytes);
+		//wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"entries\" : %ld,\n", rd->entries);
+		wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"isSigned\" : %d,\n", rd->issigned);
+		wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"isHidden\" : %d,\n", rd->hidden);
+
+		switch(rd->type) {
+			case RRD_DIMENSION_INCREMENTAL:
+				wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"type\" : \"%s\",\n", "incremental");
+				break;
+
+			case RRD_DIMENSION_ABSOLUTE:
+				wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"type\" : \"%s\",\n", "absolute");
+				break;
+
+			case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
+				wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"type\" : \"%s\",\n", "percent on incremental total");
+				break;
+
+			case RRD_DIMENSION_PCENT_OVER_ROW_TOTAL:
+				wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"type\" : \"%s\",\n", "percent on absolute total");
+				break;
+
+			default:
+				wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"type\" : %d,\n", rd->type);
+				break;
+		}
+
+		//wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"multiplier\" : %ld,\n", rd->multiplier);
+		//wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"divisor\" : %ld,\n", rd->divisor);
+		//wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"last_entry_t\" : %lu,\n", rd->last_updated);
+		wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"memory\" : %lu\n", rdmem);
+		wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t}%s\n", rd->next?",":"");
+	}
+
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t],\n");
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"memory\" : %lu\n", memory);
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t}");
 
 	pthread_mutex_unlock(&st->mutex);
+	return memory;
 }
 
 #define RRD_GRAPH_JSON_HEADER "{\n\t\"charts\": [\n"
@@ -1019,8 +1065,9 @@ void rrd_stats_graph_json(RRD_STATS *st, char *options, struct web_buffer *wb)
 
 void rrd_stats_all_json(struct web_buffer *wb)
 {
-	web_buffer_increase(wb, 16384);
+	web_buffer_increase(wb, 150000);
 
+	unsigned long memory = 0;
 	size_t c;
 	RRD_STATS *st;
 
@@ -1028,10 +1075,15 @@ void rrd_stats_all_json(struct web_buffer *wb)
 
 	for(st = root, c = 0; st ; st = st->next, c++) {
 		if(c) wb->bytes += sprintf(&wb->buffer[wb->bytes], "%s", ",\n");
-		rrd_stats_one_json(st, NULL, wb);
+		memory += rrd_stats_one_json(st, NULL, wb);
 	}
 	
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], RRD_GRAPH_JSON_FOOTER);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\n\t],\n");
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\"hostname\": \"%s\",\n", hostname);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\"update_every\": %d,\n", update_every);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\"history\": %d,\n", save_history);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\"memory\": %lu\n", memory);
+	wb->bytes += sprintf(&wb->buffer[wb->bytes], "}\n");
 }
 
 long double rrd_stats_dimension_get(RRD_DIMENSION *rd, size_t position)
@@ -4074,7 +4126,7 @@ int do_proc_vmstat() {
 		st->isdetail = 1;
 
 		rrd_stats_dimension_add(st, "minor",  NULL, sizeof(unsigned long long), 0,  1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-		rrd_stats_dimension_add(st, "major", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		rrd_stats_dimension_add(st, "major", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
 	}
 	else rrd_stats_next(st);
 
@@ -4090,6 +4142,7 @@ int do_proc_vmstat() {
 
 void *proc_main(void *ptr)
 {
+	struct rusage me, me_last;
 	struct timeval last, now;
 
 	gettimeofday(&last, NULL);
@@ -4106,7 +4159,11 @@ void *proc_main(void *ptr)
 	int vdo_proc_meminfo = 0;
 	int vdo_proc_vmstat = 0;
 
+	RRD_STATS *stcpu = NULL;
+
 	gettimeofday(&last, NULL);
+	getrusage(RUSAGE_SELF, &me_last);
+
 	unsigned long long usec = 0, susec = 0;
 	for(;1;) {
 		
@@ -4122,6 +4179,8 @@ void *proc_main(void *ptr)
 		if(!vdo_proc_vmstat)				vdo_proc_vmstat				= do_proc_vmstat(usec);
 		// END -- the job is done
 		
+		getrusage(RUSAGE_SELF, &me);
+
 		// find the time to sleep in order to wait exactly update_every seconds
 		gettimeofday(&now, NULL);
 		usec = usecdiff(&now, &last) - susec;
@@ -4133,11 +4192,29 @@ void *proc_main(void *ptr)
 		// make sure we will wait at least 100ms
 		if(susec < 100000) susec = 100000;
 		
+		// --------------------------------------------------------------------
+
+		unsigned long long cpuuser = usecdiff(&me.ru_utime, &me_last.ru_utime) * (usec + susec) / (update_every * 1000000);
+		unsigned long long cpusyst = usecdiff(&me.ru_stime, &me_last.ru_stime) * (usec + susec) / (update_every * 1000000);
+
+		if(!stcpu) stcpu = rrd_stats_find("cpu.netdata");
+		if(!stcpu) {
+			stcpu = rrd_stats_create("cpu", "netdata", NULL, "cpu", "NetData CPU usage", "milliseconds/s", save_history);
+
+			rrd_stats_dimension_add(stcpu, "user",  NULL, sizeof(unsigned long long), 0,  1, 1000, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(stcpu, "system", NULL, sizeof(unsigned long long), 0, 1, 1000, RRD_DIMENSION_ABSOLUTE, NULL);
+		}
+		else rrd_stats_next(stcpu);
+
+		rrd_stats_dimension_set(stcpu, "user", &cpuuser, NULL);
+		rrd_stats_dimension_set(stcpu, "system", &cpusyst, NULL);
+		rrd_stats_done(stcpu);
+
 		usleep(susec);
 		
-		// copy now to last
-		last.tv_sec = now.tv_sec;
-		last.tv_usec = now.tv_usec;
+		// copy current to last
+		bcopy(&me, &me_last, sizeof(struct rusage));
+		bcopy(&now, &last, sizeof(struct timeval));
 	}
 
 	return NULL;
@@ -4664,6 +4741,9 @@ int main(int argc, char **argv)
 			exit(1);
 		}
 	}
+
+	if(gethostname(hostname, HOSTNAME_MAX) == -1)
+		error("WARNING: Cannot get machine hostname.");
 
 	// never become a problem
 	if(nice(20) == -1) {

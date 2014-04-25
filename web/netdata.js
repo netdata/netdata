@@ -80,6 +80,14 @@ function refreshChart(chart, doNext) {
 		}
 		else console.log('Cannot create chart for ' + chart.url);
 	})
+	.fail(function() {
+		// to avoid an infinite loop, let's assume it was refreshed
+		if(chart.chart) chart.chart.clearChart();
+		chart.chart = null;
+		chart.refreshCount = 0;
+		showChartIsLoading(chart.div, chart.name, chart.chartOptions.width, chart.chartOptions.height, "failed to refresh");
+		chart.last_updated = new Date().getTime();
+	})
 	.always(function() {
 		if(typeof doNext == "function") doNext();
 	});
@@ -87,6 +95,14 @@ function refreshChart(chart, doNext) {
 	return true;
 }
 
+function chartIsLoadingHTML(name, width, height, message)
+{
+	return "<table><tr><td align=\"center\" width=\"" + width + "\" height=\"" + height + "\" style=\"vertical-align:middle\"><h4><span class=\"glyphicon glyphicon-refresh\"></span><br/><br/>loading " + name + "<br/><br/><span class=\"label label-default\">" + (message?message:"Please wait...") + "</span></h4></td></tr></table>";
+}
+
+function showChartIsLoading(id, name, width, height, message) {
+	document.getElementById(id).innerHTML = chartIsLoadingHTML(name, width, height, message);
+}
 
 // calculateChartPointsToShow
 // calculate the chart group and point to show properties.
@@ -245,6 +261,7 @@ function loadCharts(base_url, doNext) {
 				|| json.charts[i].name == 'system.swap'
 				|| json.charts[i].name == 'mem.slab'
 				|| json.charts[i].name == 'mem.kernel'
+				|| json.charts[i].name == 'cpu.netdata'
 				) {
 
 				// default for all stacked AreaChart
@@ -252,7 +269,7 @@ function loadCharts(base_url, doNext) {
 				json.charts[i].chartOptions.isStacked = true;
 				json.charts[i].chartOptions.areaOpacity = 0.85;
 				json.charts[i].chartOptions.lineWidth = 1;
-				json.charts[i].chartOptions.vAxis.viewWindowMode = 'maximized';
+				//json.charts[i].chartOptions.vAxis.viewWindowMode = 'maximized';
 
 				json.charts[i].group_method = "average";
 			}
@@ -278,8 +295,8 @@ function loadCharts(base_url, doNext) {
 				json.charts[i].chartOptions.lineWidth = 2;
 				json.charts[i].chartOptions.curveType = 'function';
 
-				json.charts[i].chartOptions.vAxis.minValue = -10;
-				json.charts[i].chartOptions.vAxis.maxValue =  10;
+				json.charts[i].chartOptions.vAxis.minValue = -0.1;
+				json.charts[i].chartOptions.vAxis.maxValue =  0.1;
 			}
 
 			// the category name, and other options, per type
@@ -294,8 +311,8 @@ function loadCharts(base_url, doNext) {
 						json.charts[i].chartOptions.vAxis.maxValue = 100;
 					}
 					else {
-						json.charts[i].chartOptions.vAxis.minValue = -10;
-						json.charts[i].chartOptions.vAxis.maxValue =  10;
+						json.charts[i].chartOptions.vAxis.minValue = -0.1;
+						json.charts[i].chartOptions.vAxis.maxValue =  0.1;
 					}
 					break;
 
@@ -365,7 +382,7 @@ function loadCharts(base_url, doNext) {
 			}
 		});
 		
-		if(typeof doNext == "function") doNext(json.charts);
+		if(typeof doNext == "function") doNext(json);
 	})
 	.fail(function() {
 		if(typeof doNext == "function") doNext();

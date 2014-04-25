@@ -32,13 +32,6 @@ var mainmenu = "";
 // ------------------------------------------------------------------------
 // common HTML generation
 
-function chartIsLoadingHTML(name, width, height) { return "<table><tr><td align=\"center\" width=\"" + width + "\" height=\"" + height + "\" style=\"vertical-align:middle\"><h4><span class=\"glyphicon glyphicon-refresh\"></span><br/><br/>loading " + name + "<br/><br/><span class=\"label label-default\">Please wait...</span></h4></td></tr></table>"; }
-
-function showChartIsLoading(id, name, width, height) {
-	//mylog('adding loading chart html in div with id ' + id);
-	document.getElementById(id).innerHTML = chartIsLoadingHTML(name, width, height);
-}
-
 function thumbChartActions(i, c, nogroup) {
 	var name = c.name;
 	if(!nogroup) name = c.group_tag;
@@ -841,8 +834,8 @@ function initCharts() {
 	var width = thumbWidth();
 	var height = TARGET_THUMB_GRAPH_HEIGHT;
 
-	loadCharts(null, function(c) {
-		mycharts = c;
+	loadCharts(null, function(all) {
+		mycharts = all.charts;
 
 		if(mycharts == null || mycharts.length == 0) {
 			alert("Cannot load data from server.");
@@ -857,12 +850,14 @@ function initCharts() {
 
 		mycharts.sort(chartssort);
 
-		document.getElementById('hostname_id').innerHTML = mycharts[0].hostname;
-		document.title = mycharts[0].hostname;
+		document.getElementById('hostname_id').innerHTML = all.hostname;
+		document.title = all.hostname;
 
 		// create an array for grouping all same-type graphs together
+		var dimensions = 0;
 		var categories = new Array();
 		$.each(mycharts, function(i, c) {
+			dimensions += c.dimensions.length;
 			c.chartOptions.width = width;
 			c.chartOptions.height = height;
 
@@ -892,6 +887,8 @@ function initCharts() {
 				}
 			}
 		});
+
+		document.getElementById('server_summary_id').innerHTML = "<small>NetData server at <b>" + all.hostname + "</b> is maintaining <b>" + mycharts.length + "</b> charts, having <b>" + dimensions + "</b> dimensions of <b>" + all.history + "</b> entries each, which are updated every <b>" + all.update_every + "s</b>, using a total of <b>" + (Math.round(all.memory * 10 / 1024 / 1024) / 10) + " MB</b> for the round robbin database.</small>";
 
 		$.each(categories, function(i, a) {
 			     if(a.name == "system") a.priority = 1;
