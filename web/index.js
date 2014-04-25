@@ -44,7 +44,7 @@ function thumbChartActions(i, c, nogroup) {
 	if(!nogroup) name = c.group_tag;
 
 	var refinfo = "the chart is drawing ";
-	if(c.group == 1) refinfo += "every single point collected.";
+	if(c.group == 1) refinfo += "every single point collected (" + c.update_every + "s each).";
 	else refinfo += ((c.group_method == "average")?"the average":"the max") + " value for every " + (c.group * c.update_every) + " seconds of data";
 
 	var html = "<div class=\"btn-group btn-group\" data-toggle=\"tooltip\" title=\"" + refinfo + "\">"
