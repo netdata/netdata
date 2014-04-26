@@ -1,6 +1,6 @@
 var TARGET_THUMB_GRAPH_WIDTH = 500;		// thumb charts width will range from 0.5 to 1.5 of that
 var MINIMUM_THUMB_GRAPH_WIDTH = 400;	// thumb chart will generally try to be wider than that
-var TARGET_THUMB_GRAPH_HEIGHT = 220;	// the height of the thumb charts
+var TARGET_THUMB_GRAPH_HEIGHT = 180;	// the height of the thumb charts
 
 var THUMBS_MAX_TIME_TO_SHOW = 600;		// how much time the thumb charts will present?
 var THUMBS_POINTS_DIVISOR = 4;
@@ -97,7 +97,6 @@ function initMainChart(c) {
 	mainchart.chartOptions.width = screenWidth();
 	mainchart.chartOptions.height = $(window).height() - 150 - MAINCHART_CONTROL_HEIGHT;
 	if(mainchart.chartOptions.height < 300) mainchart.chartOptions.height = 300;
-	//mainchart.chartOptions.chartArea = {'width': '80%'};
 
 	mainchart.div = 'maingraph';
 	calculateChartPointsToShow(mainchart, mainchart.chartOptions.isStacked?MAINCHART_STACKED_POINTS_DIVISOR:MAINCHART_POINTS_DIVISOR, MAINCHART_MAX_TIME_TO_SHOW, 0);
@@ -109,6 +108,8 @@ function initMainChart(c) {
 
 	// initialize the div
 	showChartIsLoading(mainchart.div, mainchart.name, mainchart.chartOptions.width, mainchart.chartOptions.height);
+	document.getElementById(mainchart.hiddenchart.div).innerHTML = "<table><tr><td align=\"center\" width=\"" + mainchart.hiddenchart.chartOptions.width + "\" height=\"" + mainchart.hiddenchart.chartOptions.height + "\" style=\"vertical-align:middle\"><h4><span class=\"label label-default\">Please wait...</span></h4></td></tr></table>";
+	//showChartIsLoading(mainchart.hiddenchart.div, mainchart.hiddenchart.name, mainchart.hiddenchart.chartOptions.width, mainchart.hiddenchart.chartOptions.height);
 
 	// set the radio buttons
 	setMainChartGroupMethod(mainchart.group_method, 'no-refresh');
@@ -257,14 +258,17 @@ function setMainChartMax(m) {
 		mainchart.chartOptions.theme = 'maximized';
 		//mainchart.chartOptions.axisTitlesPosition = 'in';
 		//mainchart.chartOptions.legend = {position: 'none'};
-		//mainchart.chartOptions.hAxis.title = null;
+		mainchart.chartOptions.hAxis.title = null;
 		mainchart.chartOptions.hAxis.viewWindowMode = 'maximized';
 		mainchart.chartOptions.vAxis.viewWindowMode = 'maximized';
+		mainchart.chartOptions.chartArea = {'width': '98%', 'height': '100%'};
 	}
 	else {
+		mainchart.chartOptions.hAxis.title = null;
 		mainchart.chartOptions.theme = null;
 		mainchart.chartOptions.hAxis.viewWindowMode = null;
 		mainchart.chartOptions.vAxis.viewWindowMode = null;
+		mainchart.chartOptions.chartArea = {'width': '80%', 'height': '90%'};
 	}
 	$('.mainchart_max_button').button(m);
 	last_main_chart_max = m;
@@ -803,7 +807,7 @@ function initGroupGraphs(group) {
 
 		calculateChartPointsToShow(c, c.chartOptions.isStacked?GROUPS_STACKED_POINTS_DIVISOR:GROUPS_POINTS_DIVISOR, GROUPS_MAX_TIME_TO_SHOW, -1);
 
-		groupbody += "<div class=\"thumbgraph\" id=\"" + c.div + "_parent\"><table><tr><td><div class=\"thumbgraph\" id=\"" + c.div + "\">" + chartIsLoadingHTML(c.name, c.chartOptions.width, c.chartOptions.height) + "</div></td></tr><tr><td align=\"center\">" + thumbChartActions(i, c, 'nogroup') + "</td></tr></table></div>";
+		groupbody += "<div class=\"thumbgraph\" id=\"" + c.div + "_parent\"><table><tr><td><div class=\"thumbgraph\" id=\"" + c.div + "\">" + chartIsLoadingHTML(c.name, c.chartOptions.width, c.chartOptions.height) + "</div></td></tr><tr><td align=\"center\">" + thumbChartActions(i, c, 'nogroup') + "</td></tr><tr><td height='15'></td></tr></table></div>";
 	});
 	groupbody += "";
 
@@ -871,7 +875,7 @@ function initCharts() {
 				var j;
 				var h = "<div class=\"thumbgraph\" id=\"" + c.div + "_parent\"><table><tr><td><div class=\"thumbgraph\" id=\"" + c.div + "\">" + chartIsLoadingHTML(c.name, c.chartOptions.width, c.chartOptions.height) + "</div></td></tr><tr><td align=\"center\">"
 				+ thumbChartActions(i, c)
-				+	"</td></tr></table></div>";
+				+	"</td></tr><tr><td height='15'></td></tr></table></div>";
 
 				// find the categories object for this type
 				for(j = 0; j < categories.length ;j++) {
