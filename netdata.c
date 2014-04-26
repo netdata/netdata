@@ -799,12 +799,13 @@ struct web_buffer *web_buffer_create(size_t size)
 		return NULL;
 	}
 
-	b->buffer = calloc(1, size);
+	b->buffer = malloc(size);
 	if(!b->buffer) {
 		error("Cannot allocate a buffer of size %u.", size);
 		free(b);
 		return NULL;
 	}
+	b->buffer[0] = '\0';
 	b->size = size;
 	b->contenttype = CT_TEXT_PLAIN;
 	return(b);
