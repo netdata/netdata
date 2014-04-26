@@ -4179,8 +4179,6 @@ void *proc_main(void *ptr)
 		if(!vdo_proc_vmstat)				vdo_proc_vmstat				= do_proc_vmstat(usec);
 		// END -- the job is done
 		
-		getrusage(RUSAGE_SELF, &me);
-
 		// find the time to sleep in order to wait exactly update_every seconds
 		gettimeofday(&now, NULL);
 		usec = usecdiff(&now, &last) - susec;
@@ -4194,21 +4192,24 @@ void *proc_main(void *ptr)
 		
 		// --------------------------------------------------------------------
 
-		unsigned long long cpuuser = usecdiff(&me.ru_utime, &me_last.ru_utime) * (usec + susec) / (update_every * 1000000);
-		unsigned long long cpusyst = usecdiff(&me.ru_stime, &me_last.ru_stime) * (usec + susec) / (update_every * 1000000);
+		if(getrusage(RUSAGE_SELF, &me) == 0) {
+		
+			unsigned long long cpuuser = me.ru_utime.tv_sec * 1000000L + me.ru_utime.tv_usec;
+			unsigned long long cpusyst = me.ru_stime.tv_sec * 1000000L + me.ru_stime.tv_usec;
 
-		if(!stcpu) stcpu = rrd_stats_find("cpu.netdata");
-		if(!stcpu) {
-			stcpu = rrd_stats_create("cpu", "netdata", NULL, "cpu", "NetData CPU usage", "milliseconds/s", save_history);
+			if(!stcpu) stcpu = rrd_stats_find("cpu.netdata");
+			if(!stcpu) {
+				stcpu = rrd_stats_create("cpu", "netdata", NULL, "cpu", "NetData CPU usage", "milliseconds/s", save_history);
 
-			rrd_stats_dimension_add(stcpu, "user",  NULL, sizeof(unsigned long long), 0,  1, 1000, RRD_DIMENSION_ABSOLUTE, NULL);
-			rrd_stats_dimension_add(stcpu, "system", NULL, sizeof(unsigned long long), 0, 1, 1000, RRD_DIMENSION_ABSOLUTE, NULL);
+				rrd_stats_dimension_add(stcpu, "user",  NULL, sizeof(unsigned long long), 0,  1, 1000, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(stcpu, "system", NULL, sizeof(unsigned long long), 0, 1, 1000, RRD_DIMENSION_INCREMENTAL, NULL);
+			}
+			else rrd_stats_next(stcpu);
+
+			rrd_stats_dimension_set(stcpu, "user", &cpuuser, NULL);
+			rrd_stats_dimension_set(stcpu, "system", &cpusyst, NULL);
+			rrd_stats_done(stcpu);
 		}
-		else rrd_stats_next(stcpu);
-
-		rrd_stats_dimension_set(stcpu, "user", &cpuuser, NULL);
-		rrd_stats_dimension_set(stcpu, "system", &cpusyst, NULL);
-		rrd_stats_done(stcpu);
 
 		usleep(susec);
 		
