@@ -1130,7 +1130,7 @@ long double rrd_stats_dimension_get(RRD_DIMENSION *rd, size_t position)
 	return(0);
 }
 
-unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show, size_t group_count, int group_method, time_t after, time_t before)
+unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show, size_t group, int group_method, time_t after, time_t before)
 {
 	pthread_mutex_lock(&st->mutex);
 
@@ -1152,8 +1152,8 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 
 	// check the options
 	if(entries_to_show < 1) entries_to_show = 1;
-	if(group_count < 1) group_count = 1;
-	// if(group_count > st->entries / 20) group_count = st->entries / 20;
+	if(group < 1) group = 1;
+	// if(group > st->entries / 20) group = st->entries / 20;
 
 	long printed = 0;			// the lines of JSON data we have generated so far
 
@@ -1188,9 +1188,9 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 
 	// temporary storage to keep track of group values and counts
 	long double group_values[dimensions];
-	int group_counts[dimensions];
+	int group_count = 0;
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
-		group_values[c] = group_counts[c] = 0;
+		group_values[c] = 0;
 
 	// print the labels
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "{\n	%scols%s:\n	[\n", kq, kq);
@@ -1234,7 +1234,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	normal_annotation[200] = '\0';
 
 	// to allow grouping on the same values, we need a pad
-	long pad = before % group_count;
+	long pad = before % group;
 
 	// checks for debuging
 	if(before < after)
@@ -1260,10 +1260,19 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 		// find how much usec since the previous entry
 		usec = usecdiff(&st->times[t], &st->times[lt]);
 
-		if(((count - pad) % group_count) == 0) {
+		if(((count - pad) % group) == 0) {
 			if(printed >= entries_to_show) {
 				// debug(D_RRD_STATS, "Already printed all rows. Stopping.");
 				break;
+			}
+			
+			if(group_count != (group - 1)) {
+				// this is an incomplete group, skip it.
+				for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
+					group_values[c] = 0;
+					
+				group_count = 0;
+				continue;
 			}
 
 			// check if we may exceed the buffer provided
@@ -1290,6 +1299,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 			}
 		}
 
+		group_count++;
 		for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 			long double oldvalue, value;			// temp variable for storing data values
 
@@ -1325,7 +1335,6 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 //				annotation_add(my_annotations, rd->name, "%s = %0.1lf", value);
 //			}
 
-			group_counts[c]++;
 			switch(group_method) {
 				case GROUP_MAX:
 					if(abs(value) > abs(group_values[c])) group_values[c] = value;
@@ -1334,18 +1343,19 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 				default:
 				case GROUP_AVERAGE:
 					group_values[c] += value;
-					if(print_this) group_values[c] /= group_counts[c];
+					if(print_this) group_values[c] /= group_count;
 					break;
 			}
 
 			if(print_this) {
 				print_values[c] = group_values[c];
 				group_values[c] = 0;
-				group_counts[c] = 0;
 			}
 		}
 
 		if(print_this) {
+			group_count = 0;
+			
 			if(annotate_reset) {
 				annotation_count++;
 				strcpy(&wb->buffer[wb->bytes], overflow_annotation);
