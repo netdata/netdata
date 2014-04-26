@@ -228,16 +228,8 @@ function loadCharts(base_url, doNext) {
 			json.charts[i].before = 0;
 			json.charts[i].after = 0;
 
-			// if the user has given a title, use it
-			if(json.charts[i].usertitle) json.charts[i].title = json.charts[i].usertitle;
-
-			// check if the userpriority is IGNORE
-			if(json.charts[i].userpriority == "IGNORE"
-				|| json.charts[i].isdetail
-				)
-				json.charts[i].enabled = false;
-			else
-				json.charts[i].enabled = true;
+			// if it is detail, disable it by default
+			if(json.charts[i].isdetail) json.charts[i].enabled = false;
 
 			// set default chart options
 			json.charts[i].chartOptions = {

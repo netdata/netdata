@@ -75,7 +75,11 @@ function mylog(txt) {
 }
 
 function chartssort(a, b) {
-	if(a.userpriority < b.userpriority) return -1;
+	if(a.priority == b.priority) {
+		if(a.name < b.name) return -1;
+	}
+	else if(a.priority < b.priority) return -1;
+	
 	return 1;
 }
 
@@ -529,6 +533,11 @@ function mainChartRefresh() {
 
 	if(mode != MODE_MAIN || !mainchart) {
 		triggerRefresh();
+		return;
+	}
+
+	if(refresh_mode == REFRESH_PAUSED && mainchart.last_updated != 0) {
+		hiddenChartRefresh();
 		return;
 	}
 
