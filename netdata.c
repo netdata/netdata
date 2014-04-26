@@ -1255,6 +1255,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 		// make sure we return data in the proper time range
 		if(st->times[t].tv_sec < after || st->times[t].tv_sec > before) continue;
 		count++;
+		group_count++;
 
 		// ok. we will use this entry!
 		// find how much usec since the previous entry
@@ -1266,7 +1267,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 				break;
 			}
 			
-			if(group_count != (group - 1)) {
+			if(group_count != group) {
 				// this is an incomplete group, skip it.
 				for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
 					group_values[c] = 0;
@@ -1299,7 +1300,6 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 			}
 		}
 
-		group_count++;
 		for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 			long double oldvalue, value;			// temp variable for storing data values
 
