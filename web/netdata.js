@@ -228,16 +228,8 @@ function loadCharts(base_url, doNext) {
 			json.charts[i].before = 0;
 			json.charts[i].after = 0;
 
-			// if the user has given a title, use it
-			if(json.charts[i].usertitle) json.charts[i].title = json.charts[i].usertitle;
-
-			// check if the userpriority is IGNORE
-			if(json.charts[i].userpriority == "IGNORE"
-				|| json.charts[i].isdetail
-				)
-				json.charts[i].enabled = false;
-			else
-				json.charts[i].enabled = true;
+			// if it is detail, disable it by default
+			if(json.charts[i].isdetail) json.charts[i].enabled = false;
 
 			// set default chart options
 			json.charts[i].chartOptions = {
@@ -248,7 +240,7 @@ function loadCharts(base_url, doNext) {
 				// hAxis: {title: "Time of Day", viewWindowMode: 'maximized', format:'HH:mm:ss'},
 				hAxis: {viewWindowMode: 'maximized', format:'HH:mm:ss'},
 				vAxis: {title: json.charts[i].units, viewWindowMode: 'pretty', minValue: 0, maxValue: 10},
-				chartArea : {width: '70%', height: '80%'},
+				chartArea : {width: '65%', height: '80%'},
 				focusTarget: 'category',
 				annotation: {'1': {style: 'line'}},
 				//colors: ['blue', 'red', 'green', 'lime', 'olive', 'yellow', 'navy', 'fuchsia', 'maroon', 'aqua', 'teal', 'purple', 'black', 'gray', 'silver'],
@@ -271,7 +263,9 @@ function loadCharts(base_url, doNext) {
 				json.charts[i].chartOptions.isStacked = true;
 				json.charts[i].chartOptions.areaOpacity = 0.85;
 				json.charts[i].chartOptions.lineWidth = 1;
-				//json.charts[i].chartOptions.vAxis.viewWindowMode = 'maximized';
+
+				if(json.charts[i].name == 'system.swap')
+					json.charts[i].chartOptions.vAxis.viewWindowMode = 'maximized';
 
 				json.charts[i].group_method = "average";
 			}

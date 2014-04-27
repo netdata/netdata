@@ -75,7 +75,11 @@ function mylog(txt) {
 }
 
 function chartssort(a, b) {
-	if(a.userpriority < b.userpriority) return -1;
+	if(a.priority == b.priority) {
+		if(a.name < b.name) return -1;
+	}
+	else if(a.priority < b.priority) return -1;
+	
 	return 1;
 }
 
@@ -532,6 +536,11 @@ function mainChartRefresh() {
 		return;
 	}
 
+	if(refresh_mode == REFRESH_PAUSED && mainchart.last_updated != 0) {
+		hiddenChartRefresh();
+		return;
+	}
+
 	if(!refreshChart(mainchart, hiddenChartRefresh))
 		hiddenChartRefresh();
 }
@@ -892,7 +901,7 @@ function initCharts() {
 			}
 		});
 
-		document.getElementById('server_summary_id').innerHTML = "<small>NetData server at <b>" + all.hostname + "</b> is maintaining <b>" + mycharts.length + "</b> charts, having <b>" + dimensions + "</b> dimensions of <b>" + all.history + "</b> entries each, which are updated every <b>" + all.update_every + "s</b>, using a total of <b>" + (Math.round(all.memory * 10 / 1024 / 1024) / 10) + " MB</b> for the round robin database.</small>";
+		document.getElementById('server_summary_id').innerHTML = "<small>NetData server at <b>" + all.hostname + "</b> is maintaining <b>" + mycharts.length + "</b> charts, having <b>" + dimensions + "</b> dimensions (by default with <b>" + all.history + "</b> entries each), which are updated every <b>" + all.update_every + "s</b>, using a total of <b>" + (Math.round(all.memory * 10 / 1024 / 1024) / 10) + " MB</b> for the round robin database.</small>";
 
 		$.each(categories, function(i, a) {
 			     if(a.name == "system") a.priority = 1;
