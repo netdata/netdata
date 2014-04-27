@@ -36,10 +36,19 @@ then
 
 		mv netdata.conf netdata.conf.old
 		echo "You are having an old config. Moved to netdata.conf.old"
+	else
+		# find if debug is enabled in the config
+		df=`grep -C 3 "\[debug\]" netdata.conf | grep "flags" | tail -n 1 | cut -d '=' -f 2 | sed s"/ //g"`
+		if [ -z "$df" -o "$df" = "0x00000000" ]
+		then
+			NETDATA_CONFIG_DEBUG=0
+		else
+			NETDATA_CONFIG_DEBUG=1
+		fi
 	fi
 fi
 
-echo "Compiling netdata"
+echo "Compiling netdata (debug=$NETDATA_CONFIG_DEBUG)"
 if [ $NETDATA_CONFIG_DEBUG -eq 1 ]
 then
 	ulimit -c unlimited
@@ -47,7 +56,7 @@ then
 	debug_opts="-df 0xfffffadf -dl netdata.log"
 else
 	gcc -Wall -O3 -o netdata netdata.c -lpthread -lz || exit 1
-	debug_opts=
+	debug_opts="-df 0x00000000"
 fi
 
 echo "Stopping a (possibly) running netdata..."
