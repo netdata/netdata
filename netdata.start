@@ -13,7 +13,7 @@ cd "$base" || exit 1
 NETDATA_CONFIG_INTERNAL_UPDATE_EVERY=1
 
 # how many entries to keep in memory
-NETDATA_CONFIG_INTERNAL_HISTORY_LINES=2400
+NETDATA_CONFIG_INTERNAL_HISTORY_LINES=3600
 
 # the user to run netdata under
 NETDATA_CONFIG_USER=nobody
