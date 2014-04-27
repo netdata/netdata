@@ -1700,19 +1700,43 @@ void generate_config(struct web_buffer *wb)
 	struct config_value *cv;
 
 	for(i = 0; i < 3 ;i++) {
+		web_buffer_increase(wb, 500);
+		switch(i) {
+			case 0:
+				web_buffer_printf(wb, "\n\n# global netdata configuration\n");
+				break;
+
+			case 1:
+				web_buffer_printf(wb, "\n\n# per plugin configuration\n");
+				break;
+
+			case 2:
+				web_buffer_printf(wb, "\n\n# per chart configuration\n");
+				break;
+		}
+
 		for(co = config_root; co ; co = co->next) {
 			if(strcmp(co->name, "global") == 0 || strcmp(co->name, "debug") == 0 || strcmp(co->name, "plugins") == 0) pri = 0;
 			else if(strncmp(co->name, "plugin:", 7) == 0) pri = 1;
 			else pri = 2;
 
 			if(i == pri) {
+				int used = 0;
+				for(cv = co->values; cv ; cv = cv->next)
+					used += cv->used;
+
+				if(!used) {
+					web_buffer_increase(wb, 500);
+					web_buffer_printf(wb, "\n# node '%s' is not used.", co->name);
+				}
+
 				web_buffer_increase(wb, CONFIG_MAX_NAME + 4);
 				web_buffer_printf(wb, "\n[%s]\n", co->name);
 
 				for(cv = co->values; cv ; cv = cv->next) {
-					if(!cv->used) {
+					if(used && !cv->used) {
 						web_buffer_increase(wb, CONFIG_MAX_NAME + 200);
-						web_buffer_printf(wb, "\t# the option '%s' is not used, you can remove it\n", cv->name);
+						web_buffer_printf(wb, "\n\t# option '%s' is not used.\n", cv->name);
 					}
 					web_buffer_increase(wb, CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 5);
 					web_buffer_printf(wb, "\t%s = %s\n", cv->name, cv->value);
