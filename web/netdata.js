@@ -240,7 +240,7 @@ function loadCharts(base_url, doNext) {
 				// hAxis: {title: "Time of Day", viewWindowMode: 'maximized', format:'HH:mm:ss'},
 				hAxis: {viewWindowMode: 'maximized', format:'HH:mm:ss'},
 				vAxis: {title: json.charts[i].units, viewWindowMode: 'pretty', minValue: 0, maxValue: 10},
-				chartArea : {width: '65%', height: '80%'},
+				chartArea : {width: '65%', height: '75%'},
 				focusTarget: 'category',
 				annotation: {'1': {style: 'line'}},
 				//colors: ['blue', 'red', 'green', 'lime', 'olive', 'yellow', 'navy', 'fuchsia', 'maroon', 'aqua', 'teal', 'purple', 'black', 'gray', 'silver'],
