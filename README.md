@@ -8,38 +8,46 @@ This presentation is full of charts that precisely render all system values, in 
 
 # Features
 
-- highly optimized C code
+- **highly optimized C code**
+
   it only needs a few milliseconds per second to collect all the data.
  
-- extremely lightweight
+- **extremely lightweight**
+
   it only needs a few megabytes of memory to store all its round robin database.
 
-- per second data collection
+- **per second data collection**
+
   every chart, every value, is updated every second.
 
-- visualizes QoS classes automatically
+- **visualizes QoS classes automatically**
+
   if you also use fireqos for QoS, it even collects class names automatically.
 
-- the generated web site uses bootstrap and google charts for a very appealing result
+- **appealing web site**
+
+  the generated web site uses bootstrap and google charts for a very appealing result.
   it works even on mobile devices, adapts to screen size changes and rotation.
 
-- web charts do respect your browser resources
+- **web charts do respect your browser resources**
+
   the charts adapt to show only as many points are required to have a clear view.
 
-- highly configurable
+- **highly configurable**
+
   all charts and all features can be enabled or disabled.
 
 - it reads and renders charts for all these:
- - /proc/net/dev (all netwrok interfaces for all their values)
- - /proc/diskstats (all disks for all their values)
- - /proc/net/snmp (total IPv4, TCP and UDP usage)
- - /proc/net/netstat (more IPv4 usage)
- - /proc/net/stat/nf_conntrack (connection tracking performance)
- - /proc/net/ip_vs/stats (IPVS connection statistics)
- - /proc/stat (CPU utilization)
- - /proc/meminfo (memory information)
- - /proc/vmstat (system performance)
- - tc classes (QoS classes)
+ - `/proc/net/dev` (all netwrok interfaces for all their values)
+ - `/proc/diskstats` (all disks for all their values)
+ - `/proc/net/snmp` (total IPv4, TCP and UDP usage)
+ - `/proc/net/netstat` (more IPv4 usage)
+ - `/proc/net/stat/nf_conntrack` (connection tracking performance)
+ - `/proc/net/ip_vs/stats` (IPVS connection statistics)
+ - `/proc/stat` (CPU utilization)
+ - `/proc/meminfo` (memory information)
+ - `/proc/vmstat` (system performance)
+ - `tc` classes (QoS classes)
 
 
 Check it live at:
