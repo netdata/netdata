@@ -1695,20 +1695,29 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 
 void generate_config(struct web_buffer *wb)
 {
+	int i, pri;
 	struct config *co;
 	struct config_value *cv;
 
-	for(co = config_root; co ; co = co->next) {
-		web_buffer_increase(wb, CONFIG_MAX_NAME + 4);
-		web_buffer_printf(wb, "\n[%s]\n", co->name);
+	for(i = 0; i < 3 ;i++) {
+		for(co = config_root; co ; co = co->next) {
+			if(strcmp(co->name, "global") == 0 || strcmp(co->name, "debug") == 0 || strcmp(co->name, "plugins") == 0) pri = 0;
+			else if(strncmp(co->name, "plugin:", 7) == 0) pri = 1;
+			else pri = 2;
 
-		for(cv = co->values; cv ; cv = cv->next) {
-			if(!cv->used) {
-				web_buffer_increase(wb, CONFIG_MAX_NAME + 200);
-				web_buffer_printf(wb, "\t# the option '%s' is not used, you can remove it\n", cv->name);
+			if(i == pri) {
+				web_buffer_increase(wb, CONFIG_MAX_NAME + 4);
+				web_buffer_printf(wb, "\n[%s]\n", co->name);
+
+				for(cv = co->values; cv ; cv = cv->next) {
+					if(!cv->used) {
+						web_buffer_increase(wb, CONFIG_MAX_NAME + 200);
+						web_buffer_printf(wb, "\t# the option '%s' is not used, you can remove it\n", cv->name);
+					}
+					web_buffer_increase(wb, CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 5);
+					web_buffer_printf(wb, "\t%s = %s\n", cv->name, cv->value);
+				}
 			}
-			web_buffer_increase(wb, CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 5);
-			web_buffer_printf(wb, "\t%s = %s\n", cv->name, cv->value);
 		}
 	}
 }
