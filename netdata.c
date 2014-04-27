@@ -3765,6 +3765,16 @@ int do_proc_net_netstat() {
 // /proc/net/stat/nf_conntrack processor
 
 int do_proc_net_stat_conntrack() {
+	static int do_sockets = -1, do_new = -1, do_changes = -1, do_expect = -1, do_search = -1, do_errors = -1;
+
+	if(do_sockets == -1)	do_sockets = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter connections", 1);
+	if(do_new == -1)		do_new = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter new connections", 1);
+	if(do_changes == -1)	do_changes = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter connection changes", 1);
+	if(do_expect == -1)		do_expect = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter connection expectations", 1);
+	if(do_search == -1)		do_search = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter connection searches", 1);
+	if(do_errors == -1)		do_errors = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter errors", 1);
+
+
 	char buffer[MAX_PROC_NET_STAT_CONNTRACK_LINE+1] = "";
 
 	FILE *fp = fopen("/proc/net/stat/nf_conntrack", "r");
@@ -3813,109 +3823,123 @@ int do_proc_net_stat_conntrack() {
 	}
 	fclose(fp);
 
+	RRD_STATS *st;
+
 	// --------------------------------------------------------------------
 	
-	RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".sockets");
-	if(!st) {
-		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "sockets", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connections", "active connections", 1000);
+	if(do_sockets) {
+		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".sockets");
+		if(!st) {
+			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "sockets", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connections", "active connections", 1000);
 
-		rrd_stats_dimension_add(st, "connections", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "connections", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "connections", &aentries, NULL);
+		rrd_stats_done(st);
 	}
-	else rrd_stats_next(st);
-
-	rrd_stats_dimension_set(st, "connections", &aentries, NULL);
-	rrd_stats_done(st);
 
 	// --------------------------------------------------------------------
 
-	st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".new");
-	if(!st) {
-		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "new", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter New Connections", "connections/s", 1001);
+	if(do_new) {
+		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".new");
+		if(!st) {
+			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "new", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter New Connections", "connections/s", 1001);
 
-		rrd_stats_dimension_add(st, "new", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-		rrd_stats_dimension_add(st, "ignore", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-		rrd_stats_dimension_add(st, "invalid", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "new", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "ignore", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "invalid", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "new", &anew, NULL);
+		rrd_stats_dimension_set(st, "ignore", &aignore, NULL);
+		rrd_stats_dimension_set(st, "invalid", &ainvalid, NULL);
+		rrd_stats_done(st);
 	}
-	else rrd_stats_next(st);
-
-	rrd_stats_dimension_set(st, "new", &anew, NULL);
-	rrd_stats_dimension_set(st, "ignore", &aignore, NULL);
-	rrd_stats_dimension_set(st, "invalid", &ainvalid, NULL);
-	rrd_stats_done(st);
 
 	// --------------------------------------------------------------------
 
-	st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".changes");
-	if(!st) {
-		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "changes", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Changes", "changes/s", 1002);
-		st->isdetail = 1;
+	if(do_changes) {
+		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".changes");
+		if(!st) {
+			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "changes", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Changes", "changes/s", 1002);
+			st->isdetail = 1;
 
-		rrd_stats_dimension_add(st, "inserted", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-		rrd_stats_dimension_add(st, "deleted", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-		rrd_stats_dimension_add(st, "delete_list", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "inserted", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "deleted", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "delete_list", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "inserted", &ainsert, NULL);
+		rrd_stats_dimension_set(st, "deleted", &adelete, NULL);
+		rrd_stats_dimension_set(st, "delete_list", &adelete_list, NULL);
+		rrd_stats_done(st);
 	}
-	else rrd_stats_next(st);
-
-	rrd_stats_dimension_set(st, "inserted", &ainsert, NULL);
-	rrd_stats_dimension_set(st, "deleted", &adelete, NULL);
-	rrd_stats_dimension_set(st, "delete_list", &adelete_list, NULL);
-	rrd_stats_done(st);
 
 	// --------------------------------------------------------------------
 
-	st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".expect");
-	if(!st) {
-		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "expect", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Expectations", "expectations/s", 1003);
-		st->isdetail = 1;
+	if(do_expect) {
+		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".expect");
+		if(!st) {
+			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "expect", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Expectations", "expectations/s", 1003);
+			st->isdetail = 1;
 
-		rrd_stats_dimension_add(st, "created", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-		rrd_stats_dimension_add(st, "deleted", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-		rrd_stats_dimension_add(st, "new", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "created", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "deleted", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "new", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "created", &aexpect_create, NULL);
+		rrd_stats_dimension_set(st, "deleted", &aexpect_delete, NULL);
+		rrd_stats_dimension_set(st, "new", &aexpect_new, NULL);
+		rrd_stats_done(st);
 	}
-	else rrd_stats_next(st);
-
-	rrd_stats_dimension_set(st, "created", &aexpect_create, NULL);
-	rrd_stats_dimension_set(st, "deleted", &aexpect_delete, NULL);
-	rrd_stats_dimension_set(st, "new", &aexpect_new, NULL);
-	rrd_stats_done(st);
 
 	// --------------------------------------------------------------------
 
-	st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".search");
-	if(!st) {
-		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "search", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Searches", "searches/s", 1010);
-		st->isdetail = 1;
+	if(do_search) {
+		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".search");
+		if(!st) {
+			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "search", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Searches", "searches/s", 1010);
+			st->isdetail = 1;
 
-		rrd_stats_dimension_add(st, "searched", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-		rrd_stats_dimension_add(st, "restarted", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-		rrd_stats_dimension_add(st, "found", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "searched", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "restarted", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "found", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "searched", &asearched, NULL);
+		rrd_stats_dimension_set(st, "restarted", &asearch_restart, NULL);
+		rrd_stats_dimension_set(st, "found", &afound, NULL);
+		rrd_stats_done(st);
 	}
-	else rrd_stats_next(st);
-
-	rrd_stats_dimension_set(st, "searched", &asearched, NULL);
-	rrd_stats_dimension_set(st, "restarted", &asearch_restart, NULL);
-	rrd_stats_dimension_set(st, "found", &afound, NULL);
-	rrd_stats_done(st);
 
 	// --------------------------------------------------------------------
 
-	st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".errors");
-	if(!st) {
-		st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "errors", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Errors", "events/s", 1005);
-		st->isdetail = 1;
+	if(do_errors) {
+		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".errors");
+		if(!st) {
+			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "errors", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Errors", "events/s", 1005);
+			st->isdetail = 1;
 
-		rrd_stats_dimension_add(st, "icmp_error", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-		rrd_stats_dimension_add(st, "insert_failed", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-		rrd_stats_dimension_add(st, "drop", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-		rrd_stats_dimension_add(st, "early_drop", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "icmp_error", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "insert_failed", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "drop", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "early_drop", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "icmp_error", &aicmp_error, NULL);
+		rrd_stats_dimension_set(st, "insert_failed", &ainsert_failed, NULL);
+		rrd_stats_dimension_set(st, "drop", &adrop, NULL);
+		rrd_stats_dimension_set(st, "early_drop", &aearly_drop, NULL);
+		rrd_stats_done(st);
 	}
-	else rrd_stats_next(st);
-
-	rrd_stats_dimension_set(st, "icmp_error", &aicmp_error, NULL);
-	rrd_stats_dimension_set(st, "insert_failed", &ainsert_failed, NULL);
-	rrd_stats_dimension_set(st, "drop", &adrop, NULL);
-	rrd_stats_dimension_set(st, "early_drop", &aearly_drop, NULL);
-	rrd_stats_done(st);
 
 	return 0;
 }
@@ -3924,6 +3948,12 @@ int do_proc_net_stat_conntrack() {
 // /proc/net/ip_vs_stats processor
 
 int do_proc_net_ip_vs_stats() {
+	static int do_bandwidth = -1, do_sockets = -1, do_packets = -1;
+
+	if(do_bandwidth == -1)	do_bandwidth = config_get_boolean("plugin:proc:/proc/net/ip_vs_stats", "IPVS bandwidth", 1);
+	if(do_sockets == -1)	do_sockets = config_get_boolean("plugin:proc:/proc/net/ip_vs_stats", "IPVS connections", 1);
+	if(do_packets == -1)	do_packets = config_get_boolean("plugin:proc:/proc/net/ip_vs_stats", "IPVS packets", 1);
+
 	char buffer[MAX_PROC_NET_IPVS_LINE+1] = "";
 
 	FILE *fp = fopen("/proc/net/ip_vs_stats", "r");
@@ -3963,53 +3993,70 @@ int do_proc_net_ip_vs_stats() {
 
 	fclose(fp);
 
-	// --------------------------------------------------------------------
-
-	RRD_STATS *st = rrd_stats_find(RRD_TYPE_NET_IPVS ".sockets");
-	if(!st) {
-		st = rrd_stats_create(RRD_TYPE_NET_IPVS, "sockets", NULL, RRD_TYPE_NET_IPVS, "IPVS New Connections", "connections/s", 1001);
-
-		rrd_stats_dimension_add(st, "connections", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-	}
-	else rrd_stats_next(st);
-
-	rrd_stats_dimension_set(st, "connections", &entries, NULL);
-	rrd_stats_done(st);
+	RRD_STATS *st;
 
 	// --------------------------------------------------------------------
-	
-	st = rrd_stats_find(RRD_TYPE_NET_IPVS ".packets");
-	if(!st) {
-		st = rrd_stats_create(RRD_TYPE_NET_IPVS, "packets", NULL, RRD_TYPE_NET_IPVS, "IPVS Packets", "packets/s", 1002);
 
-		rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-		rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+	if(do_sockets) {
+		st = rrd_stats_find(RRD_TYPE_NET_IPVS ".sockets");
+		if(!st) {
+			st = rrd_stats_create(RRD_TYPE_NET_IPVS, "sockets", NULL, RRD_TYPE_NET_IPVS, "IPVS New Connections", "connections/s", 1001);
+
+			rrd_stats_dimension_add(st, "connections", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "connections", &entries, NULL);
+		rrd_stats_done(st);
 	}
-	else rrd_stats_next(st);
-
-	rrd_stats_dimension_set(st, "received", &InPackets, NULL);
-	rrd_stats_dimension_set(st, "sent", &OutPackets, NULL);
-	rrd_stats_done(st);
 
 	// --------------------------------------------------------------------
 	
-	st = rrd_stats_find(RRD_TYPE_NET_IPVS ".net");
-	if(!st) {
-		st = rrd_stats_create(RRD_TYPE_NET_IPVS, "net", NULL, RRD_TYPE_NET_IPVS, "IPVS Bandwidth", "kilobits/s", 1000);
+	if(do_packets) {
+		st = rrd_stats_find(RRD_TYPE_NET_IPVS ".packets");
+		if(!st) {
+			st = rrd_stats_create(RRD_TYPE_NET_IPVS, "packets", NULL, RRD_TYPE_NET_IPVS, "IPVS Packets", "packets/s", 1002);
 
-		rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
-		rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "received", &InPackets, NULL);
+		rrd_stats_dimension_set(st, "sent", &OutPackets, NULL);
+		rrd_stats_done(st);
 	}
-	else rrd_stats_next(st);
 
-	rrd_stats_dimension_set(st, "received", &InBytes, NULL);
-	rrd_stats_dimension_set(st, "sent", &OutBytes, NULL);
-	rrd_stats_done(st);
+	// --------------------------------------------------------------------
+	
+	if(do_bandwidth) {
+		st = rrd_stats_find(RRD_TYPE_NET_IPVS ".net");
+		if(!st) {
+			st = rrd_stats_create(RRD_TYPE_NET_IPVS, "net", NULL, RRD_TYPE_NET_IPVS, "IPVS Bandwidth", "kilobits/s", 1000);
+
+			rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "received", &InBytes, NULL);
+		rrd_stats_dimension_set(st, "sent", &OutBytes, NULL);
+		rrd_stats_done(st);
+	}
 
 	return 0;
 }
 
 int do_proc_stat() {
+	static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1;
+
+	if(do_cpu == -1)		do_cpu = config_get_boolean("plugin:proc:/proc/stat", "cpu utilization", 1);
+	if(do_cpu_cores == -1)	do_cpu_cores = config_get_boolean("plugin:proc:/proc/stat", "per cpu core utilization", 1);
+	if(do_interrupts == -1)	do_interrupts = config_get_boolean("plugin:proc:/proc/stat", "cpu interrupts", 1);
+	if(do_context == -1)	do_context = config_get_boolean("plugin:proc:/proc/stat", "context switches", 1);
+	if(do_forks == -1)		do_forks = config_get_boolean("plugin:proc:/proc/stat", "processes started", 1);
+	if(do_processes == -1)	do_processes = config_get_boolean("plugin:proc:/proc/stat", "processes running", 1);
+
 	char buffer[MAX_PROC_STAT_LINE+1] = "";
 
 	FILE *fp = fopen("/proc/stat", "r");
@@ -4019,6 +4066,7 @@ int do_proc_stat() {
 	}
 
 	unsigned long long processes = 0, running = 0 , blocked = 0;
+	RRD_STATS *st;
 
 	for(;1;) {
 		char *p = fgets(buffer, MAX_PROC_STAT_LINE, fp);
@@ -4037,45 +4085,49 @@ int do_proc_stat() {
 			char *title = "Core utilization";
 			char *type = RRD_TYPE_STAT;
 			long priority = 1000;
+			int isthistotal = 0;
 			if(strcmp(id, "cpu") == 0) {
+				isthistotal = 1;
 				title = "Total CPU utilization";
 				type = "system";
 				priority = 100;
 			}
 
-			RRD_STATS *st = rrd_stats_find_bytype(type, id);
-			if(!st) {
-				st = rrd_stats_create(type, id, NULL, "cpu", title, "percentage", priority);
+			if((isthistotal && do_cpu) || (!isthistotal && do_cpu_cores)) {
+				st = rrd_stats_find_bytype(type, id);
+				if(!st) {
+					st = rrd_stats_create(type, id, NULL, "cpu", title, "percentage", priority);
 
-				long multiplier = 1;
-				long divisor = 1; // sysconf(_SC_CLK_TCK);
+					long multiplier = 1;
+					long divisor = 1; // sysconf(_SC_CLK_TCK);
 
-				rrd_stats_dimension_add(st, "guest_nice", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "guest", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "steal", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "softirq", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "irq", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "user", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "system", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "nice", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-				rrd_stats_dimension_add(st, "iowait", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+					rrd_stats_dimension_add(st, "guest_nice", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+					rrd_stats_dimension_add(st, "guest", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+					rrd_stats_dimension_add(st, "steal", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+					rrd_stats_dimension_add(st, "softirq", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+					rrd_stats_dimension_add(st, "irq", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+					rrd_stats_dimension_add(st, "user", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+					rrd_stats_dimension_add(st, "system", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+					rrd_stats_dimension_add(st, "nice", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+					rrd_stats_dimension_add(st, "iowait", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
 
-				rrd_stats_dimension_add(st, "idle", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-				rrd_stats_dimension_hide(st, "idle");
+					rrd_stats_dimension_add(st, "idle", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+					rrd_stats_dimension_hide(st, "idle");
+				}
+				else rrd_stats_next(st);
+
+				rrd_stats_dimension_set(st, "user", &user, NULL);
+				rrd_stats_dimension_set(st, "nice", &nice, NULL);
+				rrd_stats_dimension_set(st, "system", &system, NULL);
+				rrd_stats_dimension_set(st, "idle", &idle, NULL);
+				rrd_stats_dimension_set(st, "iowait", &iowait, NULL);
+				rrd_stats_dimension_set(st, "irq", &irq, NULL);
+				rrd_stats_dimension_set(st, "softirq", &softirq, NULL);
+				rrd_stats_dimension_set(st, "steal", &steal, NULL);
+				rrd_stats_dimension_set(st, "guest", &guest, NULL);
+				rrd_stats_dimension_set(st, "guest_nice", &guest_nice, NULL);
+				rrd_stats_done(st);
 			}
-			else rrd_stats_next(st);
-
-			rrd_stats_dimension_set(st, "user", &user, NULL);
-			rrd_stats_dimension_set(st, "nice", &nice, NULL);
-			rrd_stats_dimension_set(st, "system", &system, NULL);
-			rrd_stats_dimension_set(st, "idle", &idle, NULL);
-			rrd_stats_dimension_set(st, "iowait", &iowait, NULL);
-			rrd_stats_dimension_set(st, "irq", &irq, NULL);
-			rrd_stats_dimension_set(st, "softirq", &softirq, NULL);
-			rrd_stats_dimension_set(st, "steal", &steal, NULL);
-			rrd_stats_dimension_set(st, "guest", &guest, NULL);
-			rrd_stats_dimension_set(st, "guest_nice", &guest_nice, NULL);
-			rrd_stats_done(st);
 		}
 		else if(strncmp(p, "intr ", 5) == 0) {
 			char id[MAX_PROC_STAT_NAME + 1];
@@ -4088,17 +4140,19 @@ int do_proc_stat() {
 
 			// --------------------------------------------------------------------
 	
-			RRD_STATS *st = rrd_stats_find_bytype("system", id);
-			if(!st) {
-				st = rrd_stats_create("system", id, NULL, "cpu", "CPU Interrupts", "interrupts/s", 900);
-				st->isdetail = 1;
+			if(do_interrupts) {
+				st = rrd_stats_find_bytype("system", id);
+				if(!st) {
+					st = rrd_stats_create("system", id, NULL, "cpu", "CPU Interrupts", "interrupts/s", 900);
+					st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "interrupts", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "interrupts", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				}
+				else rrd_stats_next(st);
+
+				rrd_stats_dimension_set(st, "interrupts", &value, NULL);
+				rrd_stats_done(st);
 			}
-			else rrd_stats_next(st);
-
-			rrd_stats_dimension_set(st, "interrupts", &value, NULL);
-			rrd_stats_done(st);
 		}
 		else if(strncmp(p, "ctxt ", 5) == 0) {
 			char id[MAX_PROC_STAT_NAME + 1] = "";
@@ -4111,16 +4165,18 @@ int do_proc_stat() {
 
 			// --------------------------------------------------------------------
 	
-			RRD_STATS *st = rrd_stats_find_bytype("system", id);
-			if(!st) {
-				st = rrd_stats_create("system", id, NULL, "cpu", "CPU Context Switches", "context switches/s", 800);
+			if(do_context) {
+				st = rrd_stats_find_bytype("system", id);
+				if(!st) {
+					st = rrd_stats_create("system", id, NULL, "cpu", "CPU Context Switches", "context switches/s", 800);
 
-				rrd_stats_dimension_add(st, "switches", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "switches", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				}
+				else rrd_stats_next(st);
+
+				rrd_stats_dimension_set(st, "switches", &value, NULL);
+				rrd_stats_done(st);
 			}
-			else rrd_stats_next(st);
-
-			rrd_stats_dimension_set(st, "switches", &value, NULL);
-			rrd_stats_done(st);
 		}
 		else if(strncmp(p, "processes ", 10) == 0) {
 			char id[MAX_PROC_STAT_NAME + 1] = "";
@@ -4160,32 +4216,37 @@ int do_proc_stat() {
 
 	// --------------------------------------------------------------------
 
-	RRD_STATS *st = rrd_stats_find_bytype("system", "forks");
-	if(!st) {
-		st = rrd_stats_create("system", "forks", NULL, "cpu", "New Processes", "processes/s", 700);
-		st->isdetail = 1;
+	if(do_forks) {
+		st = rrd_stats_find_bytype("system", "forks");
+		if(!st) {
+			st = rrd_stats_create("system", "forks", NULL, "cpu", "New Processes", "processes/s", 700);
+			st->isdetail = 1;
 
-		rrd_stats_dimension_add(st, "started", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "started", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "started", &processes, NULL);
+		rrd_stats_done(st);
 	}
-	else rrd_stats_next(st);
-
-	rrd_stats_dimension_set(st, "started", &processes, NULL);
-	rrd_stats_done(st);
 
 	// --------------------------------------------------------------------
 
-	st = rrd_stats_find_bytype("system", "processes");
-	if(!st) {
-		st = rrd_stats_create("system", "processes", NULL, "cpu", "Processes", "processes", 600);
+	if(do_processes) {
+		st = rrd_stats_find_bytype("system", "processes");
+		if(!st) {
+			st = rrd_stats_create("system", "processes", NULL, "cpu", "Processes", "processes", 600);
 
-		rrd_stats_dimension_add(st, "running", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
-		rrd_stats_dimension_add(st, "blocked", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "running", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "blocked", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "running", &running, NULL);
+		rrd_stats_dimension_set(st, "blocked", &blocked, NULL);
+		rrd_stats_done(st);
 	}
-	else rrd_stats_next(st);
 
-	rrd_stats_dimension_set(st, "running", &running, NULL);
-	rrd_stats_dimension_set(st, "blocked", &blocked, NULL);
-	rrd_stats_done(st);
 	return 0;
 }
 
@@ -4196,6 +4257,16 @@ int do_proc_stat() {
 #define MAX_PROC_MEMINFO_NAME 1024
 
 int do_proc_meminfo() {
+	static int do_ram = -1, do_swap = -1, do_hwcorrupt = -1, do_committed = -1, do_writeback = -1, do_kernel = -1, do_slab = -1;
+
+	if(do_ram == -1)		do_ram = config_get_boolean("plugin:proc:/proc/meminfo", "system ram", 1);
+	if(do_swap == -1)		do_swap = config_get_boolean("plugin:proc:/proc/meminfo", "system swap", 1);
+	if(do_hwcorrupt == -1)	do_hwcorrupt = config_get_boolean("plugin:proc:/proc/meminfo", "hardware corrupted ECC", 1);
+	if(do_committed == -1)	do_committed = config_get_boolean("plugin:proc:/proc/meminfo", "committed memory", 1);
+	if(do_writeback == -1)	do_writeback = config_get_boolean("plugin:proc:/proc/meminfo", "writeback memory", 1);
+	if(do_kernel == -1)		do_kernel = config_get_boolean("plugin:proc:/proc/meminfo", "kernel memory", 1);
+	if(do_slab == -1)		do_slab = config_get_boolean("plugin:proc:/proc/meminfo", "slab memory", 1);
+
 	char buffer[MAX_PROC_MEMINFO_LINE+1] = "";
 
 	FILE *fp = fopen("/proc/meminfo", "r");
@@ -4275,49 +4346,55 @@ int do_proc_meminfo() {
 	}
 	fclose(fp);
 
+	RRD_STATS *st;
+
 	// --------------------------------------------------------------------
 	
 	// http://stackoverflow.com/questions/3019748/how-to-reliably-measure-available-memory-in-linux
 	unsigned long long MemUsed = MemTotal - MemFree - Cached - Buffers;
 
-	RRD_STATS *st = rrd_stats_find("system.ram");
-	if(!st) {
-		st = rrd_stats_create("system", "ram", NULL, "mem", "System RAM", "MB", 200);
+	if(do_ram) {
+		st = rrd_stats_find("system.ram");
+		if(!st) {
+			st = rrd_stats_create("system", "ram", NULL, "mem", "System RAM", "MB", 200);
 
-		rrd_stats_dimension_add(st, "buffers", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-		rrd_stats_dimension_add(st, "used",    NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-		rrd_stats_dimension_add(st, "cached",  NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-		rrd_stats_dimension_add(st, "free",    NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "buffers", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "used",    NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "cached",  NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "free",    NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "used", &MemUsed, NULL);
+		rrd_stats_dimension_set(st, "free", &MemFree, NULL);
+		rrd_stats_dimension_set(st, "cached", &Cached, NULL);
+		rrd_stats_dimension_set(st, "buffers", &Buffers, NULL);
+		rrd_stats_done(st);
 	}
-	else rrd_stats_next(st);
-
-	rrd_stats_dimension_set(st, "used", &MemUsed, NULL);
-	rrd_stats_dimension_set(st, "free", &MemFree, NULL);
-	rrd_stats_dimension_set(st, "cached", &Cached, NULL);
-	rrd_stats_dimension_set(st, "buffers", &Buffers, NULL);
-	rrd_stats_done(st);
 
 	// --------------------------------------------------------------------
 	
 	unsigned long long SwapUsed = SwapTotal - SwapFree;
 
-	st = rrd_stats_find("system.swap");
-	if(!st) {
-		st = rrd_stats_create("system", "swap", NULL, "mem", "System Swap", "MB", 201);
-		st->isdetail = 1;
+	if(do_swap) {
+		st = rrd_stats_find("system.swap");
+		if(!st) {
+			st = rrd_stats_create("system", "swap", NULL, "mem", "System Swap", "MB", 201);
+			st->isdetail = 1;
 
-		rrd_stats_dimension_add(st, "free",    NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-		rrd_stats_dimension_add(st, "used",    NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "free",    NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "used",    NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "used", &SwapUsed, NULL);
+		rrd_stats_dimension_set(st, "free", &SwapFree, NULL);
+		rrd_stats_done(st);
 	}
-	else rrd_stats_next(st);
-
-	rrd_stats_dimension_set(st, "used", &SwapUsed, NULL);
-	rrd_stats_dimension_set(st, "free", &SwapFree, NULL);
-	rrd_stats_done(st);
 
 	// --------------------------------------------------------------------
 	
-	if(hwcorrupted) {
+	if(hwcorrupted && do_hwcorrupt) {
 		st = rrd_stats_find("mem.hwcorrupt");
 		if(!st) {
 			st = rrd_stats_create("mem", "hwcorrupt", NULL, "mem", "Hardware Corrupted ECC", "MB", 9000);
@@ -4333,75 +4410,83 @@ int do_proc_meminfo() {
 
 	// --------------------------------------------------------------------
 	
-	st = rrd_stats_find("mem.committed");
-	if(!st) {
-		st = rrd_stats_create("mem", "committed", NULL, "mem", "Committed (Allocated) Memory", "MB", 5000);
-		st->isdetail = 1;
+	if(do_committed) {
+		st = rrd_stats_find("mem.committed");
+		if(!st) {
+			st = rrd_stats_create("mem", "committed", NULL, "mem", "Committed (Allocated) Memory", "MB", 5000);
+			st->isdetail = 1;
 
-		rrd_stats_dimension_add(st, "Committed_AS", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "Committed_AS", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "Committed_AS", &Committed_AS, NULL);
+		rrd_stats_done(st);
 	}
-	else rrd_stats_next(st);
-
-	rrd_stats_dimension_set(st, "Committed_AS", &Committed_AS, NULL);
-	rrd_stats_done(st);
 
 	// --------------------------------------------------------------------
 	
-	st = rrd_stats_find("mem.writeback");
-	if(!st) {
-		st = rrd_stats_create("mem", "writeback", NULL, "mem", "Writeback Memory", "MB", 4000);
-		st->isdetail = 1;
+	if(do_writeback) {
+		st = rrd_stats_find("mem.writeback");
+		if(!st) {
+			st = rrd_stats_create("mem", "writeback", NULL, "mem", "Writeback Memory", "MB", 4000);
+			st->isdetail = 1;
 
-		rrd_stats_dimension_add(st, "Dirty", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-		rrd_stats_dimension_add(st, "Writeback", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-		rrd_stats_dimension_add(st, "FuseWriteback", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-		rrd_stats_dimension_add(st, "NfsWriteback", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-		rrd_stats_dimension_add(st, "Bounce", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "Dirty", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "Writeback", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "FuseWriteback", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "NfsWriteback", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "Bounce", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "Dirty", &Dirty, NULL);
+		rrd_stats_dimension_set(st, "Writeback", &Writeback, NULL);
+		rrd_stats_dimension_set(st, "FuseWriteback", &WritebackTmp, NULL);
+		rrd_stats_dimension_set(st, "NfsWriteback", &NFS_Unstable, NULL);
+		rrd_stats_dimension_set(st, "Bounce", &Bounce, NULL);
+		rrd_stats_done(st);
 	}
-	else rrd_stats_next(st);
-
-	rrd_stats_dimension_set(st, "Dirty", &Dirty, NULL);
-	rrd_stats_dimension_set(st, "Writeback", &Writeback, NULL);
-	rrd_stats_dimension_set(st, "FuseWriteback", &WritebackTmp, NULL);
-	rrd_stats_dimension_set(st, "NfsWriteback", &NFS_Unstable, NULL);
-	rrd_stats_dimension_set(st, "Bounce", &Bounce, NULL);
-	rrd_stats_done(st);
 
 	// --------------------------------------------------------------------
 	
-	st = rrd_stats_find("mem.kernel");
-	if(!st) {
-		st = rrd_stats_create("mem", "kernel", NULL, "mem", "Memory Used by Kernel", "MB", 6000);
-		st->isdetail = 1;
+	if(do_kernel) {
+		st = rrd_stats_find("mem.kernel");
+		if(!st) {
+			st = rrd_stats_create("mem", "kernel", NULL, "mem", "Memory Used by Kernel", "MB", 6000);
+			st->isdetail = 1;
 
-		rrd_stats_dimension_add(st, "Slab", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-		rrd_stats_dimension_add(st, "KernelStack", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-		rrd_stats_dimension_add(st, "PageTables", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-		rrd_stats_dimension_add(st, "VmallocUsed", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "Slab", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "KernelStack", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "PageTables", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "VmallocUsed", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "KernelStack", &KernelStack, NULL);
+		rrd_stats_dimension_set(st, "Slab", &Slab, NULL);
+		rrd_stats_dimension_set(st, "PageTables", &PageTables, NULL);
+		rrd_stats_dimension_set(st, "VmallocUsed", &VmallocUsed, NULL);
+		rrd_stats_done(st);
 	}
-	else rrd_stats_next(st);
-
-	rrd_stats_dimension_set(st, "KernelStack", &KernelStack, NULL);
-	rrd_stats_dimension_set(st, "Slab", &Slab, NULL);
-	rrd_stats_dimension_set(st, "PageTables", &PageTables, NULL);
-	rrd_stats_dimension_set(st, "VmallocUsed", &VmallocUsed, NULL);
-	rrd_stats_done(st);
 
 	// --------------------------------------------------------------------
 	
-	st = rrd_stats_find("mem.slab");
-	if(!st) {
-		st = rrd_stats_create("mem", "slab", NULL, "mem", "Reclaimable Kernel Memory", "MB", 6500);
-		st->isdetail = 1;
+	if(do_slab) {
+		st = rrd_stats_find("mem.slab");
+		if(!st) {
+			st = rrd_stats_create("mem", "slab", NULL, "mem", "Reclaimable Kernel Memory", "MB", 6500);
+			st->isdetail = 1;
 
-		rrd_stats_dimension_add(st, "reclaimable", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-		rrd_stats_dimension_add(st, "unreclaimable", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "reclaimable", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "unreclaimable", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "reclaimable", &SReclaimable, NULL);
+		rrd_stats_dimension_set(st, "unreclaimable", &SUnreclaim, NULL);
+		rrd_stats_done(st);
 	}
-	else rrd_stats_next(st);
-
-	rrd_stats_dimension_set(st, "reclaimable", &SReclaimable, NULL);
-	rrd_stats_dimension_set(st, "unreclaimable", &SUnreclaim, NULL);
-	rrd_stats_done(st);
 
 	return 0;
 }
@@ -4413,6 +4498,12 @@ int do_proc_meminfo() {
 #define MAX_PROC_VMSTAT_NAME 1024
 
 int do_proc_vmstat() {
+	static int do_swapio = -1, do_io = -1, do_pgfaults = -1;
+
+	if(do_swapio == -1)		do_swapio = config_get_boolean("plugin:proc:/proc/vmstat", "swap i/o", 1);
+	if(do_io == -1)			do_io = config_get_boolean("plugin:proc:/proc/vmstat", "disk i/o", 1);
+	if(do_pgfaults == -1)	do_pgfaults = config_get_boolean("plugin:proc:/proc/vmstat", "memory page faults", 1);
+
 	char buffer[MAX_PROC_VMSTAT_LINE+1] = "";
 
 	FILE *fp = fopen("/proc/vmstat", "r");
@@ -4545,51 +4636,59 @@ int do_proc_vmstat() {
 	}
 	fclose(fp);
 
-	// --------------------------------------------------------------------
-	
-	RRD_STATS *st = rrd_stats_find("system.swapio");
-	if(!st) {
-		st = rrd_stats_create("system", "swapio", NULL, "mem", "Swap I/O", "kilobytes/s", 250);
-
-		rrd_stats_dimension_add(st, "in",  NULL, sizeof(unsigned long long), 0, sysconf(_SC_PAGESIZE), 1024, RRD_DIMENSION_INCREMENTAL, NULL);
-		rrd_stats_dimension_add(st, "out", NULL, sizeof(unsigned long long), 0, -sysconf(_SC_PAGESIZE), 1024, RRD_DIMENSION_INCREMENTAL, NULL);
-	}
-	else rrd_stats_next(st);
-
-	rrd_stats_dimension_set(st, "in", &pswpin, NULL);
-	rrd_stats_dimension_set(st, "out", &pswpout, NULL);
-	rrd_stats_done(st);
+	RRD_STATS *st;
 
 	// --------------------------------------------------------------------
 	
-	st = rrd_stats_find("system.io");
-	if(!st) {
-		st = rrd_stats_create("system", "io", NULL, "disk", "Disk I/O", "kilobytes/s", 150);
+	if(do_swapio) {
+		st = rrd_stats_find("system.swapio");
+		if(!st) {
+			st = rrd_stats_create("system", "swapio", NULL, "mem", "Swap I/O", "kilobytes/s", 250);
 
-		rrd_stats_dimension_add(st, "in",  NULL, sizeof(unsigned long long), 0,  1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-		rrd_stats_dimension_add(st, "out", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "in",  NULL, sizeof(unsigned long long), 0, sysconf(_SC_PAGESIZE), 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "out", NULL, sizeof(unsigned long long), 0, -sysconf(_SC_PAGESIZE), 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "in", &pswpin, NULL);
+		rrd_stats_dimension_set(st, "out", &pswpout, NULL);
+		rrd_stats_done(st);
 	}
-	else rrd_stats_next(st);
-
-	rrd_stats_dimension_set(st, "in", &pgpgin, NULL);
-	rrd_stats_dimension_set(st, "out", &pgpgout, NULL);
-	rrd_stats_done(st);
 
 	// --------------------------------------------------------------------
 	
-	st = rrd_stats_find("system.pgfaults");
-	if(!st) {
-		st = rrd_stats_create("system", "pgfaults", NULL, "mem", "Memory Page Faults", "page faults/s", 500);
-		st->isdetail = 1;
+	if(do_io) {
+		st = rrd_stats_find("system.io");
+		if(!st) {
+			st = rrd_stats_create("system", "io", NULL, "disk", "Disk I/O", "kilobytes/s", 150);
 
-		rrd_stats_dimension_add(st, "minor",  NULL, sizeof(unsigned long long), 0,  1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-		rrd_stats_dimension_add(st, "major", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "in",  NULL, sizeof(unsigned long long), 0,  1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "out", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "in", &pgpgin, NULL);
+		rrd_stats_dimension_set(st, "out", &pgpgout, NULL);
+		rrd_stats_done(st);
 	}
-	else rrd_stats_next(st);
 
-	rrd_stats_dimension_set(st, "minor", &pgfault, NULL);
-	rrd_stats_dimension_set(st, "major", &pgmajfault, NULL);
-	rrd_stats_done(st);
+	// --------------------------------------------------------------------
+	
+	if(do_pgfaults) {
+		st = rrd_stats_find("system.pgfaults");
+		if(!st) {
+			st = rrd_stats_create("system", "pgfaults", NULL, "mem", "Memory Page Faults", "page faults/s", 500);
+			st->isdetail = 1;
+
+			rrd_stats_dimension_add(st, "minor",  NULL, sizeof(unsigned long long), 0,  1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "major", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "minor", &pgfault, NULL);
+		rrd_stats_dimension_set(st, "major", &pgmajfault, NULL);
+		rrd_stats_done(st);
+	}
 
 	return 0;
 }
