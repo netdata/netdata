@@ -557,6 +557,24 @@ long long config_get_number(char *section, char *name, long long value)
 	return strtoll(s, NULL, 0);
 }
 
+int config_get_boolean(char *section, char *name, int value)
+{
+	char *s;
+	if(value) s = "yes";
+	else s = "no";
+
+	s = config_get(section, name, s);
+
+	if(strcmp(s, "yes") == 0 || strcmp(s, "true") == 0 || strcmp(s, "1") == 0) {
+		strcpy(s, "yes");
+		return 1;
+	}
+	else {
+		strcpy(s, "no");
+		return 0;
+	}
+}
+
 void config_set(char *section, char *name, char *value)
 {
 	struct config_value *cv;
@@ -584,6 +602,15 @@ void config_set_number(char *section, char *name, long long value)
 	sprintf(buffer, "%lld", value);
 
 	config_set(section, name, buffer);
+}
+
+void config_set_boolean(char *section, char *name, int value)
+{
+	char *s;
+	if(value) s = "yes";
+	else s = "no";
+
+	config_set(section, name, s);
 }
 
 
@@ -715,7 +742,7 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 	if(st->entries > HISTORY_MAX) st->entries = HISTORY_MAX;
 
 	st->userpriority = config_get_number(st->id, "priority", priority);
-	st->enabled = config_get_number(st->id, "enabled", 1);
+	st->enabled = config_get_boolean(st->id, "enabled", 1);
 	if(!st->enabled) st->entries = 5;
 
 	st->times = calloc(st->entries, sizeof(struct timeval));
@@ -1307,9 +1334,12 @@ void rrd_stats_all_json(struct web_buffer *wb)
 
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], RRD_GRAPH_JSON_HEADER);
 
-	for(st = root, c = 0; st ; st = st->next, c++) {
-		if(c) wb->bytes += sprintf(&wb->buffer[wb->bytes], "%s", ",\n");
-		memory += rrd_stats_one_json(st, NULL, wb);
+	for(st = root, c = 0; st ; st = st->next) {
+		if(st->enabled) {
+			if(c) wb->bytes += sprintf(&wb->buffer[wb->bytes], "%s", ",\n");
+			memory += rrd_stats_one_json(st, NULL, wb);
+			c++;
+		}
 	}
 	
 	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\n\t],\n");
@@ -4410,15 +4440,16 @@ void *proc_main(void *ptr)
 	last.tv_sec -= update_every;
 	
 	// when ZERO, attempt to do it
-	int	vdo_proc_net_dev = 0;
-	int vdo_proc_diskstats = 0;
-	int vdo_proc_net_snmp = 0;
-	int vdo_proc_net_netstat = 0;
-	int vdo_proc_net_stat_conntrack = 0;
-	int vdo_proc_net_ip_vs_stats = 0;
-	int vdo_proc_stat = 0;
-	int vdo_proc_meminfo = 0;
-	int vdo_proc_vmstat = 0;
+	int	vdo_proc_net_dev = !config_get_boolean("plugin:proc", "/proc/net/dev", 1);
+	int vdo_proc_diskstats = !config_get_boolean("plugin:proc", "/proc/diskstats", 1);
+	int vdo_proc_net_snmp = !config_get_boolean("plugin:proc", "/proc/net/snmp", 1);
+	int vdo_proc_net_netstat = !config_get_boolean("plugin:proc", "/proc/net/netstat", 1);
+	int vdo_proc_net_stat_conntrack = !config_get_boolean("plugin:proc", "/proc/net/stat/conntrack", 1);
+	int vdo_proc_net_ip_vs_stats = !config_get_boolean("plugin:proc", "/proc/net/ip_vs/stats", 1);
+	int vdo_proc_stat = !config_get_boolean("plugin:proc", "/proc/stat", 1);
+	int vdo_proc_meminfo = !config_get_boolean("plugin:proc", "/proc/meminfo", 1);
+	int vdo_proc_vmstat = !config_get_boolean("plugin:proc", "/proc/vmstat", 1);
+	int vdo_cpu_netdata = !config_get_boolean("plugin:proc", "netdata cpu", 1);
 
 	RRD_STATS *stcpu = NULL;
 
@@ -4453,7 +4484,7 @@ void *proc_main(void *ptr)
 		
 		// --------------------------------------------------------------------
 
-		if(getrusage(RUSAGE_SELF, &me) == 0) {
+		if(!vdo_cpu_netdata && getrusage(RUSAGE_SELF, &me) == 0) {
 		
 			unsigned long long cpuuser = me.ru_utime.tv_sec * 1000000L + me.ru_utime.tv_usec;
 			unsigned long long cpusyst = me.ru_stime.tv_sec * 1000000L + me.ru_stime.tv_usec;
@@ -4470,12 +4501,13 @@ void *proc_main(void *ptr)
 			rrd_stats_dimension_set(stcpu, "user", &cpuuser, NULL);
 			rrd_stats_dimension_set(stcpu, "system", &cpusyst, NULL);
 			rrd_stats_done(stcpu);
+			
+			bcopy(&me, &me_last, sizeof(struct rusage));
 		}
 
 		usleep(susec);
 		
 		// copy current to last
-		bcopy(&me, &me_last, sizeof(struct rusage));
 		bcopy(&now, &last, sizeof(struct timeval));
 	}
 
@@ -4672,7 +4704,7 @@ void *tc_main(void *ptr)
 		struct tc_device *device = NULL;
 		struct tc_class *class = NULL;
 
-		sprintf(buffer, "exec ./tc-all.sh %d", update_every);
+		sprintf(buffer, "exec %s %d", config_get("plugin:tc", "script", "./tc-all.sh"), update_every);
 		fp = popen(buffer, "r");
 
 		while(fgets(buffer, TC_LINE_MAX, fp) != NULL) {
@@ -4782,6 +4814,11 @@ void *tc_main(void *ptr)
 
 void *cpuidlejitter_main(void *ptr)
 {
+	int sleep_ms = config_get_number("plugin:idlejitter", "loop time in ms", CPU_IDLEJITTER_SLEEP_TIME_MS);
+	if(sleep_ms <= 0) {
+		config_set_number("plugin:idlejitter", "loop time in ms", CPU_IDLEJITTER_SLEEP_TIME_MS);
+		sleep_ms = CPU_IDLEJITTER_SLEEP_TIME_MS;
+	}
 
 	struct timeval before, after;
 
@@ -4791,14 +4828,14 @@ void *cpuidlejitter_main(void *ptr)
 		while(susec < (update_every * 1000000L)) {
 
 			gettimeofday(&before, NULL);
-			usleep(CPU_IDLEJITTER_SLEEP_TIME_MS * 1000);
+			usleep(sleep_ms * 1000);
 			gettimeofday(&after, NULL);
 
 			// calculate the time it took for a full loop
 			usec = usecdiff(&after, &before);
 			susec += usec;
 		}
-		usec -= (CPU_IDLEJITTER_SLEEP_TIME_MS * 1000);
+		usec -= (sleep_ms * 1000);
 
 		RRD_STATS *st = rrd_stats_find("system.idlejitter");
 		if(!st) {
@@ -5035,7 +5072,7 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		daemon = config_get_number("global", "daemon", 0);
+		daemon = config_get_boolean("global", "daemon", 0);
 	}
 
 	// never become a problem
@@ -5061,24 +5098,15 @@ int main(int argc, char **argv)
 	
 
 	pthread_t p_proc, p_tc, p_jitter;
-	int r_proc, r_tc, r_jitter;
 
 	// spawn a child to collect data
-	r_proc   = pthread_create(&p_proc,   NULL, proc_main,          NULL);
-	r_tc     = pthread_create(&p_tc,     NULL, tc_main,            NULL);
-	r_jitter = pthread_create(&p_jitter, NULL, cpuidlejitter_main, NULL);
+	if(config_get_boolean("plugins", "tc",         1)) pthread_create(&p_tc,     NULL, tc_main,            NULL);
+	if(config_get_boolean("plugins", "idlejitter", 1)) pthread_create(&p_jitter, NULL, cpuidlejitter_main, NULL);
+	if(config_get_boolean("plugins", "proc",       1)) pthread_create(&p_proc,   NULL, proc_main,          NULL);
 
 	// the main process - the web server listener
-	//sleep(1);
+	// this never ends
 	socket_listen_main(NULL);
-
-	// wait for the childs to finish
-	pthread_join(p_tc,  NULL);
-	pthread_join(p_proc,  NULL);
-
-	printf("TC            thread returns: %d\n", r_tc);
-	printf("PROC NET DEV  thread returns: %d\n", r_proc);
-	printf("CPU JITTER    thread returns: %d\n", r_jitter);
 
 	exit(0);
 }
