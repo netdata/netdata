@@ -39,7 +39,7 @@ then
 	else
 		# find if debug is enabled in the config
 		df=`grep -C 3 "\[debug\]" netdata.conf | grep "flags" | tail -n 1 | cut -d '=' -f 2 | sed s"/ //g"`
-		if [ -z "$df" -o "$df" = "0x00000000" ]
+		if [ -z "$df" -o "$df" = "0x00000000" -o $((df + 1 - 1)) -eq 0 ]
 		then
 			NETDATA_CONFIG_DEBUG=0
 		else
