@@ -179,22 +179,20 @@ void log_date()
 		fprintf(stderr, "%s: ", outstr);
 }
 
-#define debug(args...)  debug_int(__FILE__, __FUNCTION__, __LINE__, ##args)
+int debug_variable;
+//#define debug(args...) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args)
+#define debug(type, args...) do { if(!silent && debug_flags & type) debug_int(__FILE__, __FUNCTION__, __LINE__, type, ##args); } while(0)
 
 void debug_int( const char *file, const char *function, const unsigned long line, unsigned long type, const char *fmt, ... )
 {
-	if(silent) return;
-
 	va_list args;
 
-	if(debug_flags & type) {
-		log_date();
-		va_start( args, fmt );
-		fprintf(stderr, "DEBUG (%04lu@%-15.15s): ", line, function);
-		vfprintf( stderr, fmt, args );
-		va_end( args );
-		fprintf(stderr, "\n");
-	}
+	log_date();
+	va_start( args, fmt );
+	fprintf(stderr, "DEBUG (%04lu@%-15.15s): ", line, function);
+	vfprintf( stderr, fmt, args );
+	va_end( args );
+	fprintf(stderr, "\n");
 }
 
 #define error(args...)  error_int(__FILE__, __FUNCTION__, __LINE__, ##args)
@@ -1097,6 +1095,8 @@ struct web_buffer {
 	time_t date;	// the date this content has been generated
 };
 
+#define web_buffer_printf(wb, args...) wb->bytes += snprintf(&wb->buffer[wb->bytes], (wb->size - wb->bytes), ##args)
+
 struct web_buffer *web_buffer_create(size_t size)
 {
 	struct web_buffer *b;
@@ -1283,26 +1283,26 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 	size_t first_entry = rrd_stats_first_entry(st);
 	time_t first_entry_t = st->times[first_entry].tv_sec;
 
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t{\n");
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"id\" : \"%s\",\n", st->id);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"name\" : \"%s\",\n", st->name);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"type\" : \"%s\",\n", st->type);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"group_tag\" : \"%s\",\n", st->group);
-	//wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"title\" : \"%s\",\n", st->title);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"title\" : \"%s\",\n", st->usertitle);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"priority\" : %ld,\n", st->userpriority);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"enabled\" : %d,\n", st->enabled);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"units\" : \"%s\",\n", st->units);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"url\" : \"/data/%s/%s\",\n", st->name, options?options:"");
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"entries\" : %ld,\n", st->entries);
-	//wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"first_entry\" : %ld,\n", first_entry);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"first_entry_t\" : %ld,\n", first_entry_t);
-	//wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_entry\" : %ld,\n", st->current_entry);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_entry_t\" : %lu,\n", st->last_updated);
-	//wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"last_entry_secs_ago\" : %lu,\n", time(NULL) - st->last_updated);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"update_every\" : %d,\n", update_every);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"isdetail\" : %d,\n", st->isdetail);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"dimensions\" : [\n");
+	web_buffer_printf(wb, "\t\t{\n");
+	web_buffer_printf(wb, "\t\t\t\"id\" : \"%s\",\n", st->id);
+	web_buffer_printf(wb, "\t\t\t\"name\" : \"%s\",\n", st->name);
+	web_buffer_printf(wb, "\t\t\t\"type\" : \"%s\",\n", st->type);
+	web_buffer_printf(wb, "\t\t\t\"group_tag\" : \"%s\",\n", st->group);
+	//web_buffer_printf(wb, "\t\t\t\"title\" : \"%s\",\n", st->title);
+	web_buffer_printf(wb, "\t\t\t\"title\" : \"%s\",\n", st->usertitle);
+	web_buffer_printf(wb, "\t\t\t\"priority\" : %ld,\n", st->userpriority);
+	web_buffer_printf(wb, "\t\t\t\"enabled\" : %d,\n", st->enabled);
+	web_buffer_printf(wb, "\t\t\t\"units\" : \"%s\",\n", st->units);
+	web_buffer_printf(wb, "\t\t\t\"url\" : \"/data/%s/%s\",\n", st->name, options?options:"");
+	web_buffer_printf(wb, "\t\t\t\"entries\" : %ld,\n", st->entries);
+	//web_buffer_printf(wb, "\t\t\t\"first_entry\" : %ld,\n", first_entry);
+	web_buffer_printf(wb, "\t\t\t\"first_entry_t\" : %ld,\n", first_entry_t);
+	//web_buffer_printf(wb, "\t\t\t\"last_entry\" : %ld,\n", st->current_entry);
+	web_buffer_printf(wb, "\t\t\t\"last_entry_t\" : %lu,\n", st->last_updated);
+	//web_buffer_printf(wb, "\t\t\t\"last_entry_secs_ago\" : %lu,\n", time(NULL) - st->last_updated);
+	web_buffer_printf(wb, "\t\t\t\"update_every\" : %d,\n", update_every);
+	web_buffer_printf(wb, "\t\t\t\"isdetail\" : %d,\n", st->isdetail);
+	web_buffer_printf(wb, "\t\t\t\"dimensions\" : [\n");
 
 	unsigned long memory = sizeof(RRD_STATS) + (sizeof(struct timeval) * st->entries);
 
@@ -1311,46 +1311,46 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 		unsigned long rdmem = sizeof(RRD_DIMENSION) + (rd->bytes * rd->entries);
 		memory += rdmem;
 
-		wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t{\n");
-		wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"id\" : \"%s\",\n", rd->id);
-		wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"name\" : \"%s\",\n", rd->name);
-		//wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"bytes\" : %ld,\n", rd->bytes);
-		//wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"entries\" : %ld,\n", rd->entries);
-		wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"isSigned\" : %d,\n", rd->issigned);
-		wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"isHidden\" : %d,\n", rd->hidden);
+		web_buffer_printf(wb, "\t\t\t\t{\n");
+		web_buffer_printf(wb, "\t\t\t\t\t\"id\" : \"%s\",\n", rd->id);
+		web_buffer_printf(wb, "\t\t\t\t\t\"name\" : \"%s\",\n", rd->name);
+		//web_buffer_printf(wb, "\t\t\t\t\t\"bytes\" : %ld,\n", rd->bytes);
+		//web_buffer_printf(wb, "\t\t\t\t\t\"entries\" : %ld,\n", rd->entries);
+		web_buffer_printf(wb, "\t\t\t\t\t\"isSigned\" : %d,\n", rd->issigned);
+		web_buffer_printf(wb, "\t\t\t\t\t\"isHidden\" : %d,\n", rd->hidden);
 
 		switch(rd->type) {
 			case RRD_DIMENSION_INCREMENTAL:
-				wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"type\" : \"%s\",\n", "incremental");
+				web_buffer_printf(wb, "\t\t\t\t\t\"type\" : \"%s\",\n", "incremental");
 				break;
 
 			case RRD_DIMENSION_ABSOLUTE:
-				wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"type\" : \"%s\",\n", "absolute");
+				web_buffer_printf(wb, "\t\t\t\t\t\"type\" : \"%s\",\n", "absolute");
 				break;
 
 			case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
-				wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"type\" : \"%s\",\n", "percent on incremental total");
+				web_buffer_printf(wb, "\t\t\t\t\t\"type\" : \"%s\",\n", "percent on incremental total");
 				break;
 
 			case RRD_DIMENSION_PCENT_OVER_ROW_TOTAL:
-				wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"type\" : \"%s\",\n", "percent on absolute total");
+				web_buffer_printf(wb, "\t\t\t\t\t\"type\" : \"%s\",\n", "percent on absolute total");
 				break;
 
 			default:
-				wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"type\" : %d,\n", rd->type);
+				web_buffer_printf(wb, "\t\t\t\t\t\"type\" : %d,\n", rd->type);
 				break;
 		}
 
-		//wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"multiplier\" : %ld,\n", rd->multiplier);
-		//wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"divisor\" : %ld,\n", rd->divisor);
-		//wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"last_entry_t\" : %lu,\n", rd->last_updated);
-		wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t\t\"memory\" : %lu\n", rdmem);
-		wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\t}%s\n", rd->next?",":"");
+		//web_buffer_printf(wb, "\t\t\t\t\t\"multiplier\" : %ld,\n", rd->multiplier);
+		//web_buffer_printf(wb, "\t\t\t\t\t\"divisor\" : %ld,\n", rd->divisor);
+		//web_buffer_printf(wb, "\t\t\t\t\t\"last_entry_t\" : %lu,\n", rd->last_updated);
+		web_buffer_printf(wb, "\t\t\t\t\t\"memory\" : %lu\n", rdmem);
+		web_buffer_printf(wb, "\t\t\t\t}%s\n", rd->next?",":"");
 	}
 
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t],\n");
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t\t\"memory\" : %lu\n", memory);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\t}");
+	web_buffer_printf(wb, "\t\t\t],\n");
+	web_buffer_printf(wb, "\t\t\t\"memory\" : %lu\n", memory);
+	web_buffer_printf(wb, "\t\t}");
 
 	pthread_mutex_unlock(&st->mutex);
 	return memory;
@@ -1363,35 +1363,35 @@ void rrd_stats_graph_json(RRD_STATS *st, char *options, struct web_buffer *wb)
 {
 	web_buffer_increase(wb, 16384);
 
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], RRD_GRAPH_JSON_HEADER);
+	web_buffer_printf(wb, RRD_GRAPH_JSON_HEADER);
 	rrd_stats_one_json(st, options, wb);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], RRD_GRAPH_JSON_FOOTER);
+	web_buffer_printf(wb, RRD_GRAPH_JSON_FOOTER);
 }
 
 void rrd_stats_all_json(struct web_buffer *wb)
 {
-	web_buffer_increase(wb, 150000);
+	web_buffer_increase(wb, 1024);
 
 	unsigned long memory = 0;
 	size_t c;
 	RRD_STATS *st;
 
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], RRD_GRAPH_JSON_HEADER);
+	web_buffer_printf(wb, RRD_GRAPH_JSON_HEADER);
 
 	for(st = root, c = 0; st ; st = st->next) {
 		if(st->enabled) {
-			if(c) wb->bytes += sprintf(&wb->buffer[wb->bytes], "%s", ",\n");
+			if(c) web_buffer_printf(wb, "%s", ",\n");
 			memory += rrd_stats_one_json(st, NULL, wb);
 			c++;
 		}
 	}
 	
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\n\t],\n");
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\"hostname\": \"%s\",\n", hostname);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\"update_every\": %d,\n", update_every);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\"history\": %d,\n", save_history);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t\"memory\": %lu\n", memory);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "}\n");
+	web_buffer_printf(wb, "\n\t],\n");
+	web_buffer_printf(wb, "\t\"hostname\": \"%s\",\n", hostname);
+	web_buffer_printf(wb, "\t\"update_every\": %d,\n", update_every);
+	web_buffer_printf(wb, "\t\"history\": %d,\n", save_history);
+	web_buffer_printf(wb, "\t\"memory\": %lu\n", memory);
+	web_buffer_printf(wb, "}\n");
 }
 
 long double rrd_stats_dimension_get(RRD_DIMENSION *rd, size_t position)
@@ -1484,7 +1484,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 
 	if(!dimensions) {
 		pthread_mutex_unlock(&st->mutex);
-		wb->bytes = sprintf(wb->buffer, "No dimensions yet.");
+		web_buffer_printf(wb, "No dimensions yet.");
 		return 0;
 	}
 
@@ -1501,10 +1501,10 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 		group_values[c] = 0;
 
 	// print the labels
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "{\n	%scols%s:\n	[\n", kq, kq);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "		{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotation%s}},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotationText%s}}", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
+	web_buffer_printf(wb, "{\n	%scols%s:\n	[\n", kq, kq);
+	web_buffer_printf(wb, "		{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
+	web_buffer_printf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotation%s}},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
+	web_buffer_printf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotationText%s}}", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
 
 	// print the header for each dimension
 	// and update the print_hidden array for the dimensions that should be hidden
@@ -1513,12 +1513,12 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 			print_hidden[c] = 1;
 		else {
 			print_hidden[c] = 0;
-			wb->bytes += sprintf(&wb->buffer[wb->bytes], ",\n		{%sid%s:%s%s,%slabel%s:%s%s%s,%spattern%s:%s%s,%stype%s:%snumber%s}", kq, kq, sq, sq, kq, kq, sq, rd->name, sq, kq, kq, sq, sq, kq, kq, sq, sq);
+			web_buffer_printf(wb, ",\n		{%sid%s:%s%s,%slabel%s:%s%s%s,%spattern%s:%s%s,%stype%s:%snumber%s}", kq, kq, sq, sq, kq, kq, sq, rd->name, sq, kq, kq, sq, sq, kq, kq, sq, sq);
 		}
 	}
 
 	// print the begin of row data
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\n	],\n	%srows%s:\n	[\n", kq, kq);
+	web_buffer_printf(wb, "\n	],\n	%srows%s:\n	[\n", kq, kq);
 
 	// make sure current_entry is within limits
 	if(current_entry < 0 || current_entry >= st->entries) current_entry = 0;
@@ -1594,7 +1594,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 			if(st->times[t].tv_sec > last_timestamp) last_timestamp = st->times[t].tv_sec;
 
 			sprintf(dtm, "Date(%d, %d, %d, %d, %d, %d, %d)", tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(st->times[t].tv_usec / 1000)); // datetime
-			wb->bytes += sprintf(&wb->buffer[wb->bytes], "%s		{%sc%s:[{%sv%s:%s%s%s}", printed?"]},\n":"", kq, kq, kq, kq, sq, dtm, sq);
+			web_buffer_printf(wb, "%s		{%sc%s:[{%sv%s:%s%s%s}", printed?"]},\n":"", kq, kq, kq, kq, sq, dtm, sq);
 
 			print_this = 1;
 		}
@@ -1677,15 +1677,15 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 
 			for(c = 0 ; c < dimensions ; c++) {
 				if(!print_hidden[c])
-					wb->bytes += sprintf(&wb->buffer[wb->bytes], ",{%sv%s:%0.1Lf}", kq, kq, print_values[c]);
+					web_buffer_printf(wb, ",{%sv%s:%0.1Lf}", kq, kq, print_values[c]);
 			}
 
 			printed++;
 		}
 	}
 
-	if(printed) wb->bytes += sprintf(&wb->buffer[wb->bytes], "]}");
-	wb->bytes += sprintf(&wb->buffer[wb->bytes], "\n	]\n}\n");
+	if(printed) web_buffer_printf(wb, "]}");
+	web_buffer_printf(wb, "\n	]\n}\n");
 
 	debug(D_RRD_STATS, "RRD_STATS_JSON: %s Generated %ld rows, total %ld bytes", st->name, printed, wb->bytes);
 
@@ -1700,15 +1700,15 @@ void generate_config(struct web_buffer *wb)
 
 	for(co = config_root; co ; co = co->next) {
 		web_buffer_increase(wb, CONFIG_MAX_NAME + 4);
-		wb->bytes += sprintf(&wb->buffer[wb->bytes], "\n[%s]\n", co->name);
+		web_buffer_printf(wb, "\n[%s]\n", co->name);
 
 		for(cv = co->values; cv ; cv = cv->next) {
 			if(!cv->used) {
 				web_buffer_increase(wb, CONFIG_MAX_NAME + 200);
-				wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t# the option '%s' is not used, you can remove it\n", cv->name);
+				web_buffer_printf(wb, "\t# the option '%s' is not used, you can remove it\n", cv->name);
 			}
 			web_buffer_increase(wb, CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 5);
-			wb->bytes += sprintf(&wb->buffer[wb->bytes], "\t%s = %s\n", cv->name, cv->value);
+			web_buffer_printf(wb, "\t%s = %s\n", cv->name, cv->value);
 		}
 	}
 }
@@ -1729,7 +1729,7 @@ int mysendfile(struct web_client *w, char *filename)
 	// if the filename contains a / or a .., refuse to serve it
 	if(strstr(filename, "/") != 0 || strstr(filename, "..") != 0) {
 		debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not acceptable.", w->id, filename);
-		w->data->bytes = sprintf(w->data->buffer, "File '%s' cannot be served. Filenames cannot contain / or ..", filename);
+		web_buffer_printf(w->data, "File '%s' cannot be served. Filenames cannot contain / or ..", filename);
 		return 400;
 	}
 
@@ -1743,14 +1743,14 @@ int mysendfile(struct web_client *w, char *filename)
 	struct stat stat;
 	if(lstat(webfilename, &stat) != 0) {
 		debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not found.", w->id, filename);
-		w->data->bytes = sprintf(w->data->buffer, "File '%s' does not exist, or is not accessible.", filename);
+		web_buffer_printf(w->data, "File '%s' does not exist, or is not accessible.", filename);
 		return 404;
 	}
 
 	// check if the file is owned by us
 	if(stat.st_uid != getuid() && stat.st_uid != geteuid()) {
 		error("%llu: File '%s' is owned by user %d (I run as user %d). Access Denied.", w->id, filename, stat.st_uid, getuid());
-		w->data->bytes = sprintf(w->data->buffer, "Access to file '%s' is not permitted.", filename);
+		web_buffer_printf(w->data, "Access to file '%s' is not permitted.", filename);
 		return 403;
 	}
 
@@ -1761,13 +1761,13 @@ int mysendfile(struct web_client *w, char *filename)
 
 		if(errno == EBUSY || errno == EAGAIN) {
 			error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, filename);
-			sprintf(w->response_header, "Location: /" WEB_PATH_FILE "/%s\r\n", filename);
-			w->data->bytes = sprintf(w->data->buffer, "The file '%s' is currently busy. Please try again later.", filename);
+			snprintf(w->response_header, MAX_HTTP_HEADER_SIZE, "Location: /" WEB_PATH_FILE "/%s\r\n", filename);
+			web_buffer_printf(w->data, "The file '%s' is currently busy. Please try again later.", filename);
 			return 307;
 		}
 		else {
 			error("%llu: Cannot open file '%s'.", w->id, filename);
-			w->data->bytes = sprintf(w->data->buffer, "Cannot open file '%s'.", filename);
+			web_buffer_printf(w->data, "Cannot open file '%s'.", filename);
 			return 404;
 		}
 	}
@@ -2158,7 +2158,7 @@ void web_client_process(struct web_client *w)
 				RRD_STATS *st = root;
 
 				for ( ; st ; st = st->next )
-					w->data->bytes += sprintf(&w->data->buffer[w->data->bytes], "%s\n", st->name);
+					web_buffer_printf(w->data, "%s\n", st->name);
 			}
 			else if(strcmp(tok, "all.json") == 0) {
 				code = 200;
@@ -2333,10 +2333,10 @@ void web_client_process(struct web_client *w)
 		strcpy(custom_header, w->response_header);
 
 	size_t headerlen = 0;
-	headerlen += sprintf(&w->response_header[headerlen],
+	headerlen += snprintf(&w->response_header[headerlen], MAX_HTTP_HEADER_SIZE - headerlen,
 		"HTTP/1.1 %d %s\r\n"
 		"Connection: %s\r\n"
-		"Server: Data Collector HTTP Server\r\n"
+		"Server: NetData Embedded HTTP Server\r\n"
 		"Content-Type: %s\r\n"
 		"Access-Control-Allow-Origin: *\r\n"
 		"Date: %s\r\n"
@@ -2347,24 +2347,24 @@ void web_client_process(struct web_client *w)
 		);
 
 	if(custom_header[0])
-		headerlen += sprintf(&w->response_header[headerlen], "%s", custom_header);
+		headerlen += snprintf(&w->response_header[headerlen], MAX_HTTP_HEADER_SIZE - headerlen, "%s", custom_header);
 
 	if(w->mode == WEB_CLIENT_MODE_NORMAL) {
-		headerlen += sprintf(&w->response_header[headerlen],
+		headerlen += snprintf(&w->response_header[headerlen], MAX_HTTP_HEADER_SIZE - headerlen,
 			"Expires: %s\r\n"
 			"Cache-Control: no-cache\r\n"
 			, date
 			);
 	}
 	else {
-		headerlen += sprintf(&w->response_header[headerlen],
+		headerlen += snprintf(&w->response_header[headerlen], MAX_HTTP_HEADER_SIZE - headerlen,
 			"Cache-Control: public\r\n"
 			);
 	}
 
 	// if we know the content length, put it
 	if(!w->zoutput && (w->data->bytes || w->data->rbytes))
-		headerlen += sprintf(&w->response_header[headerlen],
+		headerlen += snprintf(&w->response_header[headerlen], MAX_HTTP_HEADER_SIZE - headerlen,
 			"Content-Length: %ld\r\n"
 			, w->data->bytes?w->data->bytes:w->data->rbytes
 			);
@@ -2372,13 +2372,13 @@ void web_client_process(struct web_client *w)
 		w->keepalive = 0;	// content-length is required for keep-alive
 
 	if(w->zoutput) {
-		headerlen += sprintf(&w->response_header[headerlen],
+		headerlen += snprintf(&w->response_header[headerlen], MAX_HTTP_HEADER_SIZE - headerlen,
 			"Content-Encoding: gzip\r\n"
 			"Transfer-Encoding: chunked\r\n"
 			);
 	}
 
-	headerlen += sprintf(&w->response_header[headerlen], "\r\n");
+	headerlen += snprintf(&w->response_header[headerlen], MAX_HTTP_HEADER_SIZE - headerlen, "\r\n");
 
 	// disable TCP_NODELAY, to buffer the header
 	int flag = 0;
@@ -3187,7 +3187,7 @@ int do_proc_diskstats() {
 				char ssfilename[FILENAME_MAX + 1];
 				int sector_size = 512;
 
-				sprintf(ssfilename, "/sys/block/%s/queue/hw_sector_size", disk);
+				snprintf(ssfilename, FILENAME_MAX, "/sys/block/%s/queue/hw_sector_size", disk);
 				FILE *fpss = fopen(ssfilename, "r");
 				if(fpss) {
 					char ssbuffer[1025];
@@ -4969,7 +4969,7 @@ void *tc_main(void *ptr)
 		struct tc_device *device = NULL;
 		struct tc_class *class = NULL;
 
-		sprintf(buffer, "exec %s %d", config_get("plugin:tc", "script", "./tc-all.sh"), update_every);
+		snprintf(buffer, TC_LINE_MAX, "exec %s %d", config_get("plugin:tc", "script", "./tc-all.sh"), update_every);
 		fp = popen(buffer, "r");
 
 		while(fgets(buffer, TC_LINE_MAX, fp) != NULL) {
