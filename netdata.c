@@ -4843,42 +4843,46 @@ void tc_device_commit(struct tc_device *d)
 		return;
 	}
 
-	RRD_STATS *st = rrd_stats_find_bytype(RRD_TYPE_TC, d->id);
-	if(!st) {
-		debug(D_TC_LOOP, "TC: Committing new TC device '%s'", d->name);
+	char var_name[4096 + 1];
+	snprintf(var_name, 4096, "qos for %s", d->id);
+	if(config_get_boolean("plugin:tc", var_name, 1)) {
+		RRD_STATS *st = rrd_stats_find_bytype(RRD_TYPE_TC, d->id);
+		if(!st) {
+			debug(D_TC_LOOP, "TC: Committing new TC device '%s'", d->name);
 
-		st = rrd_stats_create(RRD_TYPE_TC, d->id, d->name, d->group, "Class Usage", "kilobits/s", 1000);
+			st = rrd_stats_create(RRD_TYPE_TC, d->id, d->name, d->group, "Class Usage", "kilobits/s", 1000);
+
+			for ( c = d->classes ; c ; c = c->next) {
+				if(c->isleaf && c->hasparent)
+					rrd_stats_dimension_add(st, c->id, c->name, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+			}
+		}
+		else {
+			unsigned long long usec = rrd_stats_next(st);
+			debug(D_TC_LOOP, "TC: Committing TC device '%s' after %llu usec", d->name, usec);
+		}
 
 		for ( c = d->classes ; c ; c = c->next) {
-			if(c->isleaf && c->hasparent)
-				rrd_stats_dimension_add(st, c->id, c->name, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
-		}
-	}
-	else {
-		unsigned long long usec = rrd_stats_next(st);
-		debug(D_TC_LOOP, "TC: Committing TC device '%s' after %llu usec", d->name, usec);
-	}
+			if(c->isleaf && c->hasparent) {
+				if(rrd_stats_dimension_set(st, c->id, &c->bytes, NULL) != 0) {
+					
+					// new class, we have to add it
+					rrd_stats_dimension_add(st, c->id, c->name, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_set(st, c->id, &c->bytes, NULL);
+				}
 
-	for ( c = d->classes ; c ; c = c->next) {
-		if(c->isleaf && c->hasparent) {
-			if(rrd_stats_dimension_set(st, c->id, &c->bytes, NULL) != 0) {
-				
-				// new class, we have to add it
-				rrd_stats_dimension_add(st, c->id, c->name, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
-				rrd_stats_dimension_set(st, c->id, &c->bytes, NULL);
-			}
-
-			// if it has a name, different to the id
-			if(strcmp(c->id, c->name) != 0) {
-				// update the rrd dimension with the new name
-				RRD_DIMENSION *rd;
-				for(rd = st->dimensions ; rd ; rd = rd->next) {
-					if(strcmp(rd->id, c->id) == 0) { strcpy(rd->name, c->name); break; }
+				// if it has a name, different to the id
+				if(strcmp(c->id, c->name) != 0) {
+					// update the rrd dimension with the new name
+					RRD_DIMENSION *rd;
+					for(rd = st->dimensions ; rd ; rd = rd->next) {
+						if(strcmp(rd->id, c->id) == 0) { strcpy(rd->name, c->name); break; }
+					}
 				}
 			}
 		}
+		rrd_stats_done(st);
 	}
-	rrd_stats_done(st);
 }
 
 void tc_device_set_class_name(struct tc_device *d, char *id, char *name)
