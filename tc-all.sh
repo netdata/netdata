@@ -1,5 +1,15 @@
 #!/bin/sh
 
+# default sleep function
+loopsleepms() {
+	sleep $1
+}
+# if found and included, this file overwrites loopsleepms()
+# with a high resolution timer function for precise looping.
+. "`dirname $0`/charts.d/loopsleepms.sh.inc"
+
+# let netdata know our PID
+# this is required to kill us when it exits
 echo "MYPID $$"
 
 # check if we have a valid number for interval
@@ -80,5 +90,5 @@ do
 
 	[ $gc -gt $exit_after ] && exit 0
 	
-	sleep $sleep_time
+	loopsleepms $sleep_time
 done
