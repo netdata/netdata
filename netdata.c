@@ -1286,26 +1286,44 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 	size_t first_entry = rrd_stats_first_entry(st);
 	time_t first_entry_t = st->times[first_entry].tv_sec;
 
-	web_buffer_printf(wb, "\t\t{\n");
-	web_buffer_printf(wb, "\t\t\t\"id\" : \"%s\",\n", st->id);
-	web_buffer_printf(wb, "\t\t\t\"name\" : \"%s\",\n", st->name);
-	web_buffer_printf(wb, "\t\t\t\"type\" : \"%s\",\n", st->type);
-	web_buffer_printf(wb, "\t\t\t\"group_tag\" : \"%s\",\n", st->group);
-	//web_buffer_printf(wb, "\t\t\t\"title\" : \"%s\",\n", st->title);
-	web_buffer_printf(wb, "\t\t\t\"title\" : \"%s\",\n", st->usertitle);
-	web_buffer_printf(wb, "\t\t\t\"priority\" : %ld,\n", st->userpriority);
-	web_buffer_printf(wb, "\t\t\t\"enabled\" : %d,\n", st->enabled);
-	web_buffer_printf(wb, "\t\t\t\"units\" : \"%s\",\n", st->units);
-	web_buffer_printf(wb, "\t\t\t\"url\" : \"/data/%s/%s\",\n", st->name, options?options:"");
-	web_buffer_printf(wb, "\t\t\t\"entries\" : %ld,\n", st->entries);
-	//web_buffer_printf(wb, "\t\t\t\"first_entry\" : %ld,\n", first_entry);
-	web_buffer_printf(wb, "\t\t\t\"first_entry_t\" : %ld,\n", first_entry_t);
-	//web_buffer_printf(wb, "\t\t\t\"last_entry\" : %ld,\n", st->current_entry);
-	web_buffer_printf(wb, "\t\t\t\"last_entry_t\" : %lu,\n", st->last_updated);
-	//web_buffer_printf(wb, "\t\t\t\"last_entry_secs_ago\" : %lu,\n", time(NULL) - st->last_updated);
-	web_buffer_printf(wb, "\t\t\t\"update_every\" : %d,\n", st->update_every);
-	web_buffer_printf(wb, "\t\t\t\"isdetail\" : %d,\n", st->isdetail);
-	web_buffer_printf(wb, "\t\t\t\"dimensions\" : [\n");
+	web_buffer_printf(wb,
+		"\t\t{\n"
+		"\t\t\t\"id\": \"%s\",\n"
+		"\t\t\t\"name\": \"%s\",\n"
+		"\t\t\t\"type\": \"%s\",\n"
+		"\t\t\t\"group_tag\": \"%s\",\n"
+		"\t\t\t\"title\": \"%s\",\n"
+		"\t\t\t\"priority\": %ld,\n"
+		"\t\t\t\"enabled\": %d,\n"
+		"\t\t\t\"units\": \"%s\",\n"
+		"\t\t\t\"url\": \"/data/%s/%s\",\n"
+		"\t\t\t\"entries\": %ld,\n"
+		"\t\t\t\"first_entry\": %ld,\n"
+		"\t\t\t\"first_entry_t\": %ld,\n"
+		"\t\t\t\"last_entry\": %ld,\n"
+		"\t\t\t\"last_entry_t\": %lu,\n"
+		"\t\t\t\"last_entry_secs_ago\": %lu,\n"
+		"\t\t\t\"update_every\": %d,\n"
+		"\t\t\t\"isdetail\": %d,\n"
+		"\t\t\t\"dimensions\": [\n"
+		, st->id
+		, st->name
+		, st->type
+		, st->group
+		, st->usertitle
+		, st->userpriority
+		, st->enabled
+		, st->units
+		, st->name, options?options:""
+		, st->entries
+		, first_entry
+		, first_entry_t
+		, st->current_entry
+		, st->last_updated
+		, time(NULL) - st->last_updated
+		, st->update_every
+		, st->isdetail
+		);
 
 	unsigned long memory = sizeof(RRD_STATS) + (sizeof(struct timeval) * st->entries);
 
@@ -1314,46 +1332,64 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 		unsigned long rdmem = sizeof(RRD_DIMENSION) + (rd->bytes * rd->entries);
 		memory += rdmem;
 
-		web_buffer_printf(wb, "\t\t\t\t{\n");
-		web_buffer_printf(wb, "\t\t\t\t\t\"id\" : \"%s\",\n", rd->id);
-		web_buffer_printf(wb, "\t\t\t\t\t\"name\" : \"%s\",\n", rd->name);
-		//web_buffer_printf(wb, "\t\t\t\t\t\"bytes\" : %ld,\n", rd->bytes);
-		//web_buffer_printf(wb, "\t\t\t\t\t\"entries\" : %ld,\n", rd->entries);
-		web_buffer_printf(wb, "\t\t\t\t\t\"isSigned\" : %d,\n", rd->issigned);
-		web_buffer_printf(wb, "\t\t\t\t\t\"isHidden\" : %d,\n", rd->hidden);
-
+		char *algorithm = "";
 		switch(rd->type) {
 			case RRD_DIMENSION_INCREMENTAL:
-				web_buffer_printf(wb, "\t\t\t\t\t\"type\" : \"%s\",\n", "incremental");
+				algorithm = "incremental";
 				break;
 
 			case RRD_DIMENSION_ABSOLUTE:
-				web_buffer_printf(wb, "\t\t\t\t\t\"type\" : \"%s\",\n", "absolute");
+				algorithm = "absolute";
 				break;
 
 			case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
-				web_buffer_printf(wb, "\t\t\t\t\t\"type\" : \"%s\",\n", "percent on incremental total");
+				algorithm = "percent on incremental total";
 				break;
 
 			case RRD_DIMENSION_PCENT_OVER_ROW_TOTAL:
-				web_buffer_printf(wb, "\t\t\t\t\t\"type\" : \"%s\",\n", "percent on absolute total");
+				algorithm = "percent on absolute total";
 				break;
 
 			default:
-				web_buffer_printf(wb, "\t\t\t\t\t\"type\" : %d,\n", rd->type);
+				algorithm = "other";
 				break;
 		}
 
-		//web_buffer_printf(wb, "\t\t\t\t\t\"multiplier\" : %ld,\n", rd->multiplier);
-		//web_buffer_printf(wb, "\t\t\t\t\t\"divisor\" : %ld,\n", rd->divisor);
-		//web_buffer_printf(wb, "\t\t\t\t\t\"last_entry_t\" : %lu,\n", rd->last_updated);
-		web_buffer_printf(wb, "\t\t\t\t\t\"memory\" : %lu\n", rdmem);
-		web_buffer_printf(wb, "\t\t\t\t}%s\n", rd->next?",":"");
+		web_buffer_printf(wb,
+			"\t\t\t\t{\n"
+			"\t\t\t\t\t\"id\" : \"%s\",\n"
+			"\t\t\t\t\t\"name\" : \"%s\",\n"
+			"\t\t\t\t\t\"bytes\" : %ld,\n"
+			"\t\t\t\t\t\"entries\" : %ld,\n"
+			"\t\t\t\t\t\"isSigned\" : %d,\n"
+			"\t\t\t\t\t\"isHidden\" : %d,\n"
+			"\t\t\t\t\t\"algorithm\" : \"%s\",\n"
+			"\t\t\t\t\t\"multiplier\" : %ld,\n"
+			"\t\t\t\t\t\"divisor\" : %ld,\n"
+			"\t\t\t\t\t\"last_entry_t\" : %lu,\n"
+			"\t\t\t\t\t\"memory\" : %lu\n"
+			"\t\t\t\t}%s\n"
+			, rd->id
+			, rd->name
+			, rd->bytes
+			, rd->entries
+			, rd->issigned
+			, rd->hidden
+			, algorithm
+			, rd->multiplier
+			, rd->divisor
+			, rd->last_updated
+			, rdmem
+			, rd->next?",":""
+			);
 	}
 
-	web_buffer_printf(wb, "\t\t\t],\n");
-	web_buffer_printf(wb, "\t\t\t\"memory\" : %lu\n", memory);
-	web_buffer_printf(wb, "\t\t}");
+	web_buffer_printf(wb,
+		"\t\t\t],\n"
+		"\t\t\t\"memory\" : %lu\n"
+		"\t\t}"
+		, memory
+		);
 
 	pthread_mutex_unlock(&st->mutex);
 	return memory;
