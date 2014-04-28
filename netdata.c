@@ -703,6 +703,8 @@ struct rrd_stats {
 												// it goes around in a round-robin fashion
 	// size_t last_entry;
 
+	int update_every;							// every how many seconds is this updated?
+
 	time_t last_updated;						// when this data set was last updated
 
 	int isdetail;								// if set, the data set should be considered as a detail of another
@@ -791,6 +793,7 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 	// st->last_entry = 0;
 	st->dimensions = NULL;
 	st->last_updated = time(NULL);
+	st->update_every = update_every;
 
 	pthread_mutex_init(&st->mutex, NULL);
 	pthread_mutex_lock(&st->mutex);
@@ -1045,7 +1048,7 @@ void rrd_stats_done(RRD_STATS *st)
 
 	// find if there are any obsolete dimensions (not updated recently)
 	for( rd = st->dimensions, last = NULL ; rd ; ) {
-		if((rd->last_updated + (10 * update_every)) < st->last_updated) { // remove it only it is not updated in 10 seconds
+		if((rd->last_updated + (10 * st->update_every)) < st->last_updated) { // remove it only it is not updated in 10 seconds
 			debug(D_RRD_STATS, "Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
 
 			if(!last) {
@@ -1063,7 +1066,7 @@ void rrd_stats_done(RRD_STATS *st)
 				continue;
 			}
 		}
-		else if((rd->last_updated + update_every) < st->last_updated) {
+		else if((rd->last_updated + st->update_every) < st->last_updated) {
 			debug(D_RRD_STATS, "Clearing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
 
 			unsigned char zero[rd->bytes];
@@ -1300,7 +1303,7 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 	//web_buffer_printf(wb, "\t\t\t\"last_entry\" : %ld,\n", st->current_entry);
 	web_buffer_printf(wb, "\t\t\t\"last_entry_t\" : %lu,\n", st->last_updated);
 	//web_buffer_printf(wb, "\t\t\t\"last_entry_secs_ago\" : %lu,\n", time(NULL) - st->last_updated);
-	web_buffer_printf(wb, "\t\t\t\"update_every\" : %d,\n", update_every);
+	web_buffer_printf(wb, "\t\t\t\"update_every\" : %d,\n", st->update_every);
 	web_buffer_printf(wb, "\t\t\t\"isdetail\" : %d,\n", st->isdetail);
 	web_buffer_printf(wb, "\t\t\t\"dimensions\" : [\n");
 
@@ -1548,8 +1551,8 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	if(before < after)
 		debug(D_RRD_STATS, "WARNING: %s The newest value in the database (%lu) is earlier than the oldest (%lu)", st->name, before, after);
 
-	if((before - after) > st->entries * update_every)
-		debug(D_RRD_STATS, "WARNING: %s The time difference between the oldest and the newest entries (%lu) is higher than the capacity of the database (%lu)", st->name, before - after, st->entries * update_every);
+	if((before - after) > st->entries * st->update_every)
+		debug(D_RRD_STATS, "WARNING: %s The time difference between the oldest and the newest entries (%lu) is higher than the capacity of the database (%lu)", st->name, before - after, st->entries * st->update_every);
 
 	// loop in dimension data
 	int annotate_reset = 0;
@@ -2178,6 +2181,11 @@ void web_client_process(struct web_client *w)
 				code = 200;
 
 				debug(D_WEB_CLIENT_ACCESS, "%llu: Mirroring...", w->id);
+
+				// replace the zero bytes with spaces
+				int i;
+				for(i = 0; i < w->data->size; i++)
+					if(w->data->buffer[i] == '\0') w->data->buffer[i] = ' ';
 
 				// just leave the buffer as is
 				// it will be copied back to the client
@@ -2894,13 +2902,16 @@ void *socket_listen_main(void *ptr)
 #define MAX_PROC_NET_DEV_IFACE_NAME 1024
 
 int do_proc_net_dev() {
+	static int enable_new_interfaces = -1;
 	static int do_bandwidth = -1, do_packets = -1, do_errors = -1, do_fifo = -1, do_compressed = -1;
 
-	if(do_bandwidth == -1)	do_bandwidth = config_get_boolean("plugin:proc:/proc/net/dev", "bandwidth", 1);
-	if(do_packets == -1)	do_packets = config_get_boolean("plugin:proc:/proc/net/dev", "packets", 1);
-	if(do_errors == -1)		do_errors = config_get_boolean("plugin:proc:/proc/net/dev", "errors", 1);
-	if(do_fifo == -1) 		do_fifo = config_get_boolean("plugin:proc:/proc/net/dev", "fifo", 1);
-	if(do_compressed == -1)	do_compressed = config_get_boolean("plugin:proc:/proc/net/dev", "compressed", 1);
+	if(enable_new_interfaces == -1)	enable_new_interfaces = config_get_boolean("plugin:proc:/proc/net/dev", "enable new interfaces detected at runtime", 1);
+
+	if(do_bandwidth == -1)	do_bandwidth = config_get_boolean("plugin:proc:/proc/net/dev", "bandwidth for all interfaces", 1);
+	if(do_packets == -1)	do_packets = config_get_boolean("plugin:proc:/proc/net/dev", "packets for all interfaces", 1);
+	if(do_errors == -1)		do_errors = config_get_boolean("plugin:proc:/proc/net/dev", "errors for all interfaces", 1);
+	if(do_fifo == -1) 		do_fifo = config_get_boolean("plugin:proc:/proc/net/dev", "fifo for all interfaces", 1);
+	if(do_compressed == -1)	do_compressed = config_get_boolean("plugin:proc:/proc/net/dev", "compressed packets for all interfaces", 1);
 
 	char buffer[MAX_PROC_NET_DEV_LINE+1] = "";
 	char iface[MAX_PROC_NET_DEV_IFACE_NAME + 1] = "";
@@ -2943,7 +2954,7 @@ int do_proc_net_dev() {
 		{
 			char var_name[4096 + 1];
 			snprintf(var_name, 4096, "interface %s", iface);
-			if(!config_get_boolean("plugin:proc:/proc/net/dev", var_name, 1)) continue;
+			if(!config_get_boolean("plugin:proc:/proc/net/dev", var_name, enable_new_interfaces)) continue;
 		}
 
 		RRD_STATS *st;
@@ -3049,13 +3060,16 @@ int do_proc_net_dev() {
 #define MAX_PROC_DISKSTATS_DISK_NAME 1024
 
 int do_proc_diskstats() {
+	static int enable_new_disks = -1;
 	static int do_io = -1, do_ops = -1, do_merged_ops = -1, do_iotime = -1, do_cur_ops = -1;
 
-	if(do_io == -1)			do_io = config_get_boolean("plugin:proc:/proc/diskstats", "bandwidth", 1);
-	if(do_ops == -1)		do_ops = config_get_boolean("plugin:proc:/proc/diskstats", "operations", 1);
-	if(do_merged_ops == -1)	do_merged_ops = config_get_boolean("plugin:proc:/proc/diskstats", "merged operations", 1);
-	if(do_iotime == -1)		do_iotime = config_get_boolean("plugin:proc:/proc/diskstats", "i/o time", 1);
-	if(do_cur_ops == -1)	do_cur_ops = config_get_boolean("plugin:proc:/proc/diskstats", "current operations", 1);
+	if(enable_new_disks == -1)	enable_new_disks = config_get_boolean("plugin:proc:/proc/diskstats", "enable new disks detected at runtime", 1);
+
+	if(do_io == -1)			do_io = config_get_boolean("plugin:proc:/proc/diskstats", "bandwidth for all disks", 1);
+	if(do_ops == -1)		do_ops = config_get_boolean("plugin:proc:/proc/diskstats", "operations for all disks", 1);
+	if(do_merged_ops == -1)	do_merged_ops = config_get_boolean("plugin:proc:/proc/diskstats", "merged operations for all disks", 1);
+	if(do_iotime == -1)		do_iotime = config_get_boolean("plugin:proc:/proc/diskstats", "i/o time for all disks", 1);
+	if(do_cur_ops == -1)	do_cur_ops = config_get_boolean("plugin:proc:/proc/diskstats", "current operations for all disks", 1);
 
 	char buffer[MAX_PROC_DISKSTATS_LINE+1] = "";
 	char disk[MAX_PROC_DISKSTATS_DISK_NAME + 1] = "";
@@ -3099,7 +3113,7 @@ int do_proc_diskstats() {
 			case 199: // veritas
 			case 201: // veritas
 			case 251: // dm
-				def_enabled = 1;
+				def_enabled = enable_new_disks;
 				break;
 
 			case 48: // RAID
@@ -3122,7 +3136,7 @@ int do_proc_diskstats() {
 			case 179: // MMC
 			case 180: // USB
 				if(minor % 8) def_enabled = 0; // partitions
-				else def_enabled = 1;
+				else def_enabled = enable_new_disks;
 				break;
 
 			case 8: // scsi disks
@@ -3174,13 +3188,13 @@ int do_proc_diskstats() {
 			case 256: // flash
 			case 257: // flash
 				if(minor % 16) def_enabled = 0; // partitions
-				else def_enabled = 1;
+				else def_enabled = enable_new_disks;
 				break;
 
 			case 160: // raid
 			case 161: // raid
 				if(minor % 32) def_enabled = 0; // partitions
-				else def_enabled = 1;
+				else def_enabled = enable_new_disks;
 				break;
 
 			case 3: // ide
@@ -3195,7 +3209,7 @@ int do_proc_diskstats() {
 			case 90: // ide
 			case 91: // ide
 				if(minor % 64) def_enabled = 0; // partitions
-				else def_enabled = 1;
+				else def_enabled = enable_new_disks;
 				break;
 
 			default:
@@ -4737,6 +4751,10 @@ void *proc_main(void *ptr)
 	gettimeofday(&last, NULL);
 	last.tv_sec -= update_every;
 	
+	// disable (by default) various interface that are not needed
+	config_get_boolean("plugin:proc:/proc/net/dev", "interface lo", 0);
+	config_get_boolean("plugin:proc:/proc/net/dev", "interface fireqos_monitor", 0);
+
 	// when ZERO, attempt to do it
 	int	vdo_proc_net_dev = !config_get_boolean("plugin:proc", "/proc/net/dev", 1);
 	int vdo_proc_diskstats = !config_get_boolean("plugin:proc", "/proc/diskstats", 1);
@@ -4844,6 +4862,10 @@ struct tc_device {
 
 void tc_device_commit(struct tc_device *d)
 {
+	static int enable_new_interfaces = -1;
+
+	if(enable_new_interfaces == -1)	enable_new_interfaces = config_get_boolean("plugin:tc", "enable new interfaces detected at runtime", 1);
+	
 	// we only need to add leaf classes
 	struct tc_class *c, *x;
 
@@ -4878,7 +4900,7 @@ void tc_device_commit(struct tc_device *d)
 
 	char var_name[4096 + 1];
 	snprintf(var_name, 4096, "qos for %s", d->id);
-	if(config_get_boolean("plugin:tc", var_name, 1)) {
+	if(config_get_boolean("plugin:tc", var_name, enable_new_interfaces)) {
 		RRD_STATS *st = rrd_stats_find_bytype(RRD_TYPE_TC, d->id);
 		if(!st) {
 			debug(D_TC_LOOP, "TC: Committing new TC device '%s'", d->name);
@@ -5006,7 +5028,7 @@ void *tc_main(void *ptr)
 		struct tc_device *device = NULL;
 		struct tc_class *class = NULL;
 
-		snprintf(buffer, TC_LINE_MAX, "exec %s %d", config_get("plugin:tc", "script", "./tc-all.sh"), update_every);
+		snprintf(buffer, TC_LINE_MAX, "exec %s %d", config_get("plugin:tc", "script to run to get tc values", "./tc-all.sh"), update_every);
 		fp = popen(buffer, "r");
 
 		while(fgets(buffer, TC_LINE_MAX, fp) != NULL) {
