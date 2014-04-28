@@ -1277,6 +1277,50 @@ size_t rrd_stats_first_entry(RRD_STATS *st)
 	return first_entry;
 }
 
+long double rrd_stats_dimension_get(RRD_DIMENSION *rd, size_t position)
+{
+	if(rd->issigned) {
+		if(rd->bytes == sizeof(long long)) {
+			long long *dimension = rd->values;
+			return(dimension[position]);
+		}
+		else if(rd->bytes == sizeof(long)) {
+			long *dimension = rd->values;
+			return(dimension[position]);
+		}
+		else if(rd->bytes == sizeof(short int)) {
+			short int *dimension = rd->values;
+			return(dimension[position]);
+		}
+		else if(rd->bytes == sizeof(char)) {
+			char *dimension = rd->values;
+			return(dimension[position]);
+		}
+		else fatal("Cannot produce JSON for size %d bytes (signed) dimension.", rd->bytes);
+	}
+	else {
+		if(rd->bytes == sizeof(unsigned long long)) {
+			unsigned long long *dimension = rd->values;
+			return(dimension[position]);
+		}
+		else if(rd->bytes == sizeof(unsigned long)) {
+			unsigned long *dimension = rd->values;
+			return(dimension[position]);
+		}
+		else if(rd->bytes == sizeof(unsigned short int)) {
+			unsigned short int *dimension = rd->values;
+			return(dimension[position]);
+		}
+		else if(rd->bytes == sizeof(unsigned char)) {
+			unsigned char *dimension = rd->values;
+			return(dimension[position]);
+		}
+		else fatal("Cannot produce JSON for size %d bytes (unsigned) dimension.", rd->bytes);
+	}
+
+	return(0);
+}
+
 unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer *wb)
 {
 	web_buffer_increase(wb, 16384);
@@ -1357,17 +1401,18 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 
 		web_buffer_printf(wb,
 			"\t\t\t\t{\n"
-			"\t\t\t\t\t\"id\" : \"%s\",\n"
-			"\t\t\t\t\t\"name\" : \"%s\",\n"
-			"\t\t\t\t\t\"bytes\" : %ld,\n"
-			"\t\t\t\t\t\"entries\" : %ld,\n"
-			"\t\t\t\t\t\"isSigned\" : %d,\n"
-			"\t\t\t\t\t\"isHidden\" : %d,\n"
-			"\t\t\t\t\t\"algorithm\" : \"%s\",\n"
-			"\t\t\t\t\t\"multiplier\" : %ld,\n"
-			"\t\t\t\t\t\"divisor\" : %ld,\n"
-			"\t\t\t\t\t\"last_entry_t\" : %lu,\n"
-			"\t\t\t\t\t\"memory\" : %lu\n"
+			"\t\t\t\t\t\"id\": \"%s\",\n"
+			"\t\t\t\t\t\"name\": \"%s\",\n"
+			"\t\t\t\t\t\"bytes\": %ld,\n"
+			"\t\t\t\t\t\"entries\": %ld,\n"
+			"\t\t\t\t\t\"isSigned\": %d,\n"
+			"\t\t\t\t\t\"isHidden\": %d,\n"
+			"\t\t\t\t\t\"algorithm\": \"%s\",\n"
+			"\t\t\t\t\t\"multiplier\": %ld,\n"
+			"\t\t\t\t\t\"divisor\": %ld,\n"
+			"\t\t\t\t\t\"last_entry_t\": %lu,\n"
+			"\t\t\t\t\t\"memory\": %lu,\n"
+			"\t\t\t\t\t\"last_collected_value\": %0.1Lf\n"
 			"\t\t\t\t}%s\n"
 			, rd->id
 			, rd->name
@@ -1380,6 +1425,7 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 			, rd->divisor
 			, rd->last_updated
 			, rdmem
+			, rrd_stats_dimension_get(rd, st->current_entry)
 			, rd->next?",":""
 			);
 	}
@@ -1425,56 +1471,17 @@ void rrd_stats_all_json(struct web_buffer *wb)
 		}
 	}
 	
-	web_buffer_printf(wb, "\n\t],\n");
-	web_buffer_printf(wb, "\t\"hostname\": \"%s\",\n", hostname);
-	web_buffer_printf(wb, "\t\"update_every\": %d,\n", update_every);
-	web_buffer_printf(wb, "\t\"history\": %d,\n", save_history);
-	web_buffer_printf(wb, "\t\"memory\": %lu\n", memory);
-	web_buffer_printf(wb, "}\n");
-}
-
-long double rrd_stats_dimension_get(RRD_DIMENSION *rd, size_t position)
-{
-	if(rd->issigned) {
-		if(rd->bytes == sizeof(long long)) {
-			long long *dimension = rd->values;
-			return(dimension[position]);
-		}
-		else if(rd->bytes == sizeof(long)) {
-			long *dimension = rd->values;
-			return(dimension[position]);
-		}
-		else if(rd->bytes == sizeof(short int)) {
-			short int *dimension = rd->values;
-			return(dimension[position]);
-		}
-		else if(rd->bytes == sizeof(char)) {
-			char *dimension = rd->values;
-			return(dimension[position]);
-		}
-		else fatal("Cannot produce JSON for size %d bytes (signed) dimension.", rd->bytes);
-	}
-	else {
-		if(rd->bytes == sizeof(unsigned long long)) {
-			unsigned long long *dimension = rd->values;
-			return(dimension[position]);
-		}
-		else if(rd->bytes == sizeof(unsigned long)) {
-			unsigned long *dimension = rd->values;
-			return(dimension[position]);
-		}
-		else if(rd->bytes == sizeof(unsigned short int)) {
-			unsigned short int *dimension = rd->values;
-			return(dimension[position]);
-		}
-		else if(rd->bytes == sizeof(unsigned char)) {
-			unsigned char *dimension = rd->values;
-			return(dimension[position]);
-		}
-		else fatal("Cannot produce JSON for size %d bytes (unsigned) dimension.", rd->bytes);
-	}
-
-	return(0);
+	web_buffer_printf(wb, "\n\t],\n"
+		"\t\"hostname\": \"%s\",\n"
+		"\t\"update_every\": %d,\n"
+		"\t\"history\": %d,\n"
+		"\t\"memory\": %lu\n"
+		"}\n"
+		, hostname
+		, update_every
+		, save_history
+		, memory
+		);
 }
 
 unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show, size_t group, int group_method, time_t after, time_t before)
