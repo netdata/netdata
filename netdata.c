@@ -1044,10 +1044,10 @@ void rrd_stats_done(RRD_STATS *st)
 					break;
 			}
 
-			rd->calculated_value = rd->calculated_value * rd->multiplier / rd->divisor;
+			rd->calculated_value = rd->calculated_value * 10 * rd->multiplier / rd->divisor;
 
 			// store the calculated value
-			rd->values[st->current_entry] = rd->calculated_value * 10;
+			rd->values[st->current_entry] = rd->calculated_value;
 		}
 
 		// store the time difference to the last entry

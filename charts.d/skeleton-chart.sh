@@ -19,8 +19,8 @@ echo "MYPID $$"
 
 # -----------------------------------------------------------------------------
 # create a new chart
-# > CHART type.chartname family[=chartname] homegroup[=type] charttype priority[=1000]
-# charttype = line or area or stacked
+# > CHART type.chartname family[=chartname] homegroup[=type] charttype[=line] priority[=1000] update_every[=user default]
+# charttype = line, area or stacked
 # homegroup = any name or the word 'none' which hides the chart from the home web page
 # 
 # set the chart title
@@ -29,11 +29,8 @@ echo "MYPID $$"
 # set the units of measurement
 # > UNITS my wonderfull unit
 #
-# you can overwrite the update frequency as you need
-# > UPDATE EVERY $update_every
-#
 # create all the dimensions you need
-# > DIMENSION CREATE dimensionname1 algorithm signed|unsigned byte|char|int|long|long long multiplier divisor [hidden]"
+# > DIMENSION CREATE dimensionname algorithm multiplier divisor [hidden]"
 #
 # algorithms:
 #   absolute
@@ -50,17 +47,38 @@ echo "MYPID $$"
 #     the % is drawn of this value compared to the differential total of
 #     each dimension
 #
-# number sizes:
-#   unsigned byte      = 1 byte  = 0 ...                        255
-#   unsigned int       = 2 bytes = 0 ...                     65.535
-#   unsigned long      = 4 bytes = 0 ...              4.294.967.295
-#   unsigned long long = 8 bytes = 0 ... 18.446.744.073.709.551.615
-#   
-#   signed values are from - to + the half of the above
+# A NOTE ABOUT VALUES
+# NetData will collect any signed value in the 64bit range:
+#
+#    -9.223.372.036.854.775.807   to   +9.223.372.036.854.775.807
+#
+# However, to lower its memory requirements, it stores all values in the
+# signed 32bit range, divided by 10, that is:
+#
+#                  -214.748.364   to    214.748.364
+#
+# This division by 10, is used to give you a decimal point in the charts.
+# In memory, every number is 4 bytes (32bits).
+#
+# To work with this without loosing detail, you should set the proper
+# algorithm of calculation, together with a multiplier and a divider.
+#
+# The algorithm is applied in the wider 64bit numbers. Once the calculation
+# is complete the value is multiplied by the multiplier, by 10, and then
+# divided by the divider (all of these at the 64bit level).
+# The 64bit result is then stored in a 32 bit signed int.
+#
+# So, at the chart level:
+#
+#  - the finest number is 0.1
+#  - the smallest -214.748.364,7
+#  - the highest   214.748.364,7
+#
+# You should choose a multiplier and divider to stay within these limits.
 #
 
 cat <<EOF
-CHART example.random ExampleGroup ExampleCategory stacked 1
+CHART example.random ExampleGroup ExampleCategory stacked 1 1
 TITLE Random Numbers Example Chart
 UNITS random numbers
 UPDATE EVERY $update_every
