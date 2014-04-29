@@ -34,7 +34,7 @@ var mainmenu = "";
 
 function thumbChartActions(i, c, nogroup) {
 	var name = c.name;
-	if(!nogroup) name = c.group_tag;
+	if(!nogroup) name = c.family;
 
 	var refinfo = "the chart is drawing ";
 	if(c.group == 1) refinfo += "every single point collected (" + c.update_every + "s each).";
@@ -50,7 +50,7 @@ function thumbChartActions(i, c, nogroup) {
 		var ingroup_detail = 0;
 
 		$.each(mycharts, function(i, d) {
-			if(d.group_tag == c.group_tag) {
+			if(d.family == c.family) {
 				ingroup++;
 				if(d.isdetail) ingroup_detail++;
 			}
@@ -59,7 +59,7 @@ function thumbChartActions(i, c, nogroup) {
 		var hidden = "";
 		if(ingroup_detail) hidden = ", including " + ingroup_detail + " charts not shown now";
 
-		html += "<button type=\"button\" data-toggle=\"tooltip\" title=\"Show all " + ingroup + " charts in group '" + c.group_tag + "'" + hidden + "\" class=\"btn btn-default\" onclick=\"initGroupGraphs('" + c.group_tag +"');\"><span class=\"glyphicon glyphicon-th-large\"></span></button>";
+		html += "<button type=\"button\" data-toggle=\"tooltip\" title=\"Show all " + ingroup + " charts in group '" + c.family + "'" + hidden + "\" class=\"btn btn-default\" onclick=\"initGroupGraphs('" + c.family +"');\"><span class=\"glyphicon glyphicon-th-large\"></span></button>";
 	}
 
 	html += "<button type=\"button\" data-toggle=\"tooltip\" title=\"show chart '" + c.name + "' in fullscreen\" class=\"btn btn-default\" onclick=\"initMainChartIndex(" + i +");\"><span class=\"glyphicon glyphicon-resize-full\"></span></button>"
@@ -773,7 +773,7 @@ function switchToGroupGraphs() {
 	document.getElementById('thumbgraphs_container').style.display = 'none';
 	document.getElementById('groupgraphs_container').style.display = 'block';
 
-	document.getElementById("main_menu_div").innerHTML = "<ul class=\"nav navbar-nav\"><li><a href=\"javascript:switchToThumbGraphs();\">Back to Home</a></li><li class=\"active\"><a href=\"#\">" + group_charts[0].group_tag + " charts</a></li></ul>";
+	document.getElementById("main_menu_div").innerHTML = "<ul class=\"nav navbar-nav\"><li><a href=\"javascript:switchToThumbGraphs();\">Back to Home</a></li><li class=\"active\"><a href=\"#\">" + group_charts[0].family + " charts</a></li></ul>";
 
 	window.scrollTo(0, 0);
 
@@ -795,7 +795,7 @@ function initGroupGraphs(group) {
 
 	var groupbody = "";
 	$.each(mycharts, function(i, c) {
-		if(c.group_tag == group) {
+		if(c.family == group) {
 			group_charts[count] = [];
 			group_charts[count] = $.extend(true, {}, c);
 			group_charts[count].div += "_group";

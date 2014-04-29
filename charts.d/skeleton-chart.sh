@@ -19,7 +19,7 @@ echo "MYPID $$"
 
 # -----------------------------------------------------------------------------
 # create a new chart
-# > CHART family.chartname group[=type] homegroup[=family] charttype priority[=1000]
+# > CHART type.chartname family[=chartname] homegroup[=type] charttype priority[=1000]
 # charttype = line or area or stacked
 # homegroup = any name or the word 'none' which hides the chart from the home web page
 # 
@@ -33,7 +33,7 @@ echo "MYPID $$"
 # > UPDATE EVERY $update_every
 #
 # create all the dimensions you need
-# > DIMENSION CREATE dimensionname1 algorithm signed|unsigned byte|char|int|long|long long multiplier divisor"
+# > DIMENSION CREATE dimensionname1 algorithm signed|unsigned byte|char|int|long|long long multiplier divisor [hidden]"
 #
 # algorithms:
 #   absolute
