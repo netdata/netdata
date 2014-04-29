@@ -33,7 +33,7 @@ echo "MYPID $$"
 # > UPDATE EVERY $update_every
 #
 # create all the dimensions you need
-# > DIMENSION CREATE dimensionname1 algorithm signed|unsigned byte|char|int|long|long long"
+# > DIMENSION CREATE dimensionname1 algorithm signed|unsigned byte|char|int|long|long long multiplier divisor"
 #
 # algorithms:
 #   absolute
@@ -64,9 +64,9 @@ CHART example.random ExampleGroup ExampleCategory stacked 1
 TITLE Random Numbers Example Chart
 UNITS random numbers
 UPDATE EVERY $update_every
-DIMENSION number1 absolute unsigned int
-DIMENSION number2 absolute unsigned int
-DIMENSION number3 absolute unsigned int
+DIMENSION number1 absolute unsigned int 1 1
+DIMENSION number2 absolute unsigned int 1 1
+DIMENSION number3 absolute unsigned int 1 1
 EOF
 
 # You can create more charts if you like.
