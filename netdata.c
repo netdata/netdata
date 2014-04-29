@@ -1517,7 +1517,6 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	int dimensions = 0;			// the total number of dimensions present
 
 	unsigned long long usec = 0;// usec between the entries
-	char dtm[201];				// temp variable for storing dates
 
 	int we_need_totals = 0;		// if set, we should calculate totals for all dimensions
 
@@ -1636,11 +1635,12 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 			// generate the local date time
 			struct tm *tm = localtime(&st->times[t].tv_sec);
 			if(!tm) { error("localtime() failed."); continue; }
-
 			if(st->times[t].tv_sec > last_timestamp) last_timestamp = st->times[t].tv_sec;
 
-			sprintf(dtm, "Date(%d, %d, %d, %d, %d, %d, %d)", tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(st->times[t].tv_usec / 1000)); // datetime
-			web_buffer_printf(wb, "%s		{%sc%s:[{%sv%s:%s%s%s}", printed?"]},\n":"", kq, kq, kq, kq, sq, dtm, sq);
+			web_buffer_printf(wb, "%s		{%sc%s:[{%sv%s:%sDate(%d, %d, %d, %d, %d, %d, %d)%s}", printed?"]},\n":"",
+				kq, kq, kq, kq, sq,
+				tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(st->times[t].tv_usec / 1000),
+				sq);
 
 			print_this = 1;
 		}
