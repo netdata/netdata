@@ -1794,10 +1794,13 @@ void generate_config(struct web_buffer *wb)
 
 int mysendfile(struct web_client *w, char *filename)
 {
+	static char *web_dir = NULL;
+	if(!web_dir) web_dir = config_get("global", "web files directory", "web");
+
 	debug(D_WEB_CLIENT, "%llu: Looking for file '%s'...", w->id, filename);
 
 	// skip leading slashes
-	while (filename[0] == '/') filename = &filename[1];
+	while (*filename == '/') filename++;
 
 	// if the filename contain known paths, skip them
 		 if(strncmp(filename, WEB_PATH_DATA       "/", strlen(WEB_PATH_DATA)       + 1) == 0) filename = &filename[strlen(WEB_PATH_DATA)       + 1];
@@ -1806,17 +1809,15 @@ int mysendfile(struct web_client *w, char *filename)
 	else if(strncmp(filename, WEB_PATH_FILE       "/", strlen(WEB_PATH_FILE)       + 1) == 0) filename = &filename[strlen(WEB_PATH_FILE)       + 1];
 
 	// if the filename contains a / or a .., refuse to serve it
-	if(strstr(filename, "/") != 0 || strstr(filename, "..") != 0) {
+	if(strchr(filename, '/') != 0 || strstr(filename, "..") != 0) {
 		debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not acceptable.", w->id, filename);
 		web_buffer_printf(w->data, "File '%s' cannot be served. Filenames cannot contain / or ..", filename);
 		return 400;
 	}
 
-	// access the file in web/*
+	// access the file
 	char webfilename[FILENAME_MAX + 1];
-	strcpy(webfilename, "web/");
-	strncpy(&webfilename[4], filename, FILENAME_MAX - 4);
-	webfilename[FILENAME_MAX] = '\0';
+	snprintf(webfilename, FILENAME_MAX, "%s/%s", web_dir, filename);
 
 	// check if the file exists
 	struct stat stat;
