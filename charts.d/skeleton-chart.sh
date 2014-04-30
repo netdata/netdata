@@ -18,17 +18,19 @@ test $update_every -eq 0 && update_every=1 # if it is zero, make it 1
 echo "MYPID $$"
 
 # -----------------------------------------------------------------------------
-# create a new chart
-# > CHART type.chartname family[=chartname] homegroup[=type] charttype[=line] priority[=1000] update_every[=user default]
-# charttype = line, area or stacked
-# homegroup = any name or the word 'none' which hides the chart from the home web page
+# DOCUMENTATION
+#
+# This is a long doc, to describe a simple procedure.
+# If you don't want to read it, just skip at the end to see the action...
+#
+# CREATE NEW CHART:
+# > CHART type.chartname title units family[=chartname] category[=type] charttype[=line] priority[=1000] update_every[=user default]
+#
+# where
+# - charttype = line, area or stacked
+# - family is used to group charts together (for example all eth0 charts should say: eth0)
+# - category = is the home page section: any name or the word 'none' which hides the chart from the home web page
 # 
-# set the chart title
-# > TITLE My Super Title
-#
-# set the units of measurement
-# > UNITS my wonderfull unit
-#
 # create all the dimensions you need
 # > DIMENSION CREATE dimensionname algorithm multiplier divisor [hidden]"
 #
@@ -71,20 +73,27 @@ echo "MYPID $$"
 # So, at the chart level:
 #
 #  - the finest number is 0.1
-#  - the smallest -214.748.364,7
+#  - the smallest -214.748.364,8
 #  - the highest   214.748.364,7
 #
 # You should choose a multiplier and divider to stay within these limits.
 #
+# Example:
+# eth0 bytes-in is a 64bit number that is incremented every time.
+# let say it is 1.000.000.000.000.000.000 and one second later it is 1.000.000.000.999.000.000
+# the dimension is 'incremental' with multiplier 8 (bytes to bits) and divider 1024 (bits to kilobits).
+# netdata will store this value:
+#
+# value = (1.000.000.000.000.000.000 - 1.000.000.000.999.000.000) * 10 * 8 / 1024 = 78.046.875
+# or 7.804.687,5 kilobits/second (a little less than 8 gigabits/second)
+# 
+
 
 cat <<EOF
-CHART example.random ExampleGroup ExampleCategory stacked 1 1
-TITLE Random Numbers Example Chart
-UNITS random numbers
-UPDATE EVERY $update_every
-DIMENSION number1 absolute unsigned int 1 1
-DIMENSION number2 absolute unsigned int 1 1
-DIMENSION number3 absolute unsigned int 1 1
+CHART example.random "Random Numbers Example Chart" "random numbers" ExampleFamily ExampleCategory stacked 500 $update_every
+DIMENSION number1 absolute 1 1
+DIMENSION number2 absolute 1 1
+DIMENSION number3 absolute 1 1 hidden
 EOF
 
 # You can create more charts if you like.

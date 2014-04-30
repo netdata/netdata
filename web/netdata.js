@@ -248,51 +248,33 @@ function loadCharts(base_url, doNext) {
 			};
 
 			// set the chart type
-			if(json.charts[i].type == "tc"
-				|| json.charts[i].id.substring(0, 7) == "cpu.cpu"
-				|| json.charts[i].name == 'system.cpu'
-				|| json.charts[i].name == 'system.ram'
-				|| json.charts[i].name == 'system.swap'
-				|| json.charts[i].name == 'mem.slab'
-				|| json.charts[i].name == 'mem.kernel'
-				|| json.charts[i].name == 'cpu.netdata'
-				) {
+			switch(json.charts[i].chart_type) {
+				case "area":
+					json.charts[i].chartType = "AreaChart";
+					json.charts[i].chartOptions.isStacked = false;
+					json.charts[i].chartOptions.areaOpacity = 0.3;
+					break;
 
-				// default for all stacked AreaChart
-				json.charts[i].chartType = "AreaChart";
-				json.charts[i].chartOptions.isStacked = true;
-				json.charts[i].chartOptions.areaOpacity = 0.85;
-				json.charts[i].chartOptions.lineWidth = 1;
+				case "stacked":
+					json.charts[i].chartType = "AreaChart";
+					json.charts[i].chartOptions.isStacked = true;
+					json.charts[i].chartOptions.areaOpacity = 0.85;
+					json.charts[i].chartOptions.lineWidth = 1;
+					json.charts[i].group_method = "average";
 
-				if(json.charts[i].name == 'system.swap')
-					json.charts[i].chartOptions.vAxis.viewWindowMode = 'maximized';
+					if(json.charts[i].name == 'system.swap')
+						json.charts[i].chartOptions.vAxis.viewWindowMode = 'maximized';
+					break;
 
-				json.charts[i].group_method = "average";
-			}
-			else if(json.charts[i].type == "net"
-				|| json.charts[i].type == "disk"
-				|| json.charts[i].id == "system.ipv4"
-				|| json.charts[i].id == "system.io"
-				|| json.charts[i].id == "system.swapio"
-				|| json.charts[i].id == "ipv4.mcast"
-				|| json.charts[i].id == "ipv4.bcast"
-				|| json.charts[i].id == "mem.committed"
-				) {
+				default:
+				case "line":
+					json.charts[i].chartType = "LineChart";
+					json.charts[i].chartOptions.lineWidth = 2;
+					json.charts[i].chartOptions.curveType = 'function';
 
-				// default for all AreaChart
-				json.charts[i].chartType = "AreaChart";
-				json.charts[i].chartOptions.isStacked = false;
-				json.charts[i].chartOptions.areaOpacity = 0.3;
-			}
-			else {
-				
-				// default for all LineChart
-				json.charts[i].chartType = "LineChart";
-				json.charts[i].chartOptions.lineWidth = 2;
-				json.charts[i].chartOptions.curveType = 'function';
-
-				json.charts[i].chartOptions.vAxis.minValue = -0.1;
-				json.charts[i].chartOptions.vAxis.maxValue =  0.1;
+					json.charts[i].chartOptions.vAxis.minValue = -0.1;
+					json.charts[i].chartOptions.vAxis.maxValue =  0.1;
+					break;
 			}
 
 			// the category name, and other options, per type
