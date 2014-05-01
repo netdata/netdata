@@ -2055,7 +2055,7 @@ int mysendfile(struct web_client *w, char *filename)
 	// check if the file exists
 	struct stat stat;
 	if(lstat(webfilename, &stat) != 0) {
-		debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not found.", w->id, filename);
+		error("%llu: File '%s' is not found.", w->id, filename);
 		web_buffer_printf(w->data, "File '%s' does not exist, or is not accessible.", filename);
 		return 404;
 	}
