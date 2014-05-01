@@ -1995,7 +1995,7 @@ void generate_config(struct web_buffer *wb, int only_changed)
 						web_buffer_printf(wb, "\n\t# option '%s' is not used.\n", cv->name);
 					}
 					web_buffer_increase(wb, CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 5);
-					web_buffer_printf(wb, "\t%s%s = %s\n", (!cv->changed)?"# ":"", cv->name, cv->value);
+					web_buffer_printf(wb, "\t%s%s = %s\n", (!cv->changed && cv->used)?"# ":"", cv->name, cv->value);
 				}
 			}
 		}
