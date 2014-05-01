@@ -680,14 +680,45 @@ const char *chart_type_name(int chart_type)
 
 
 // ----------------------------------------------------------------------------
+// FAST NUMBER TO STRING
+
+static void strreverse(char* begin, char* end)
+{
+    char aux;
+    while (end > begin)
+        aux = *end, *end-- = *begin, *begin++ = aux;
+}
+
+// fast number to string
+// returns length of string
+int itoa(int32_t value, char *str)
+{
+	char *wstr = str;
+
+	// Take care of sign
+	unsigned int uvalue = (value < 0) ? -value : value;
+
+	// Conversion. Number is reversed.
+	do *wstr++ = (char)(48 + (uvalue % 10)); while(uvalue /= 10);
+	if (value < 0) *wstr++ = '-';
+	*wstr='\0';
+
+	// Reverse string
+	strreverse(str,wstr-1);
+
+	return(wstr - str);
+}
+
+
+// ----------------------------------------------------------------------------
 // RRD STATS
 
 #define RRD_STATS_NAME_MAX 1024
 
-//typedef long double calculated_number;
-//#define CALCULATED_NUMBER_FORMAT "%0.1Lf"
-typedef long long calculated_number;
-#define CALCULATED_NUMBER_FORMAT "%lld"
+typedef long double calculated_number;
+#define CALCULATED_NUMBER_FORMAT "%0.1Lf"
+//typedef long long calculated_number;
+//#define CALCULATED_NUMBER_FORMAT "%lld"
 
 typedef long long collected_number;
 #define COLLECTED_NUMBER_FORMAT "%lld"
@@ -696,6 +727,7 @@ typedef long long total_number;
 #define TOTAL_NUMBER_FORMAT "%lld"
 
 typedef int32_t storage_number;
+typedef uint32_t ustorage_number;
 #define STORAGE_NUMBER_FORMAT "%d"
 
 
@@ -1243,6 +1275,105 @@ struct web_buffer {
 
 #define web_buffer_printf(wb, args...) wb->bytes += snprintf(&wb->buffer[wb->bytes], (wb->size - wb->bytes), ##args)
 
+void web_buffer_strcpy(struct web_buffer *wb, const char *txt)
+{
+	char *buffer = wb->buffer;
+	size_t bytes = wb->bytes, size = wb->size, i = 0;
+
+	while(txt[i] && bytes < size)
+		buffer[bytes++] = txt[i++];
+
+	wb->bytes = bytes;
+}
+
+void web_buffer_rrd_value(struct web_buffer *wb, storage_number value)
+{
+	if(wb->size - wb->bytes < 11) return;
+
+	char *str = &wb->buffer[wb->bytes];
+	char *wstr = str;
+
+	// make sure it is unsigned
+	ustorage_number uvalue = (value < 0) ? -value : value;
+
+	// print each digit
+	do *wstr++ = (char)(48 + (uvalue % 10)); while(uvalue /= 10);
+
+	// if it is just one byte, add a zero
+	if((wstr - str) == 1) *wstr++ = '0';
+
+	// put the sign back
+	if (value < 0) *wstr++ = '-';
+
+	// reverse it
+	strreverse(str, wstr-1);
+
+	// move the last digit
+	wstr--;
+	wstr[1] = wstr[0];
+
+	// put the dot
+	wstr[0] = '.';
+
+	// terminate it
+	wstr += 2;
+	*wstr='\0';
+
+	// update the buffer length
+	wb->bytes += (wstr - str);
+}
+
+// generate a javascript date, the fastest possible way...
+void web_buffer_jsdate(struct web_buffer *wb, int year, int month, int day, int hours, int minutes, int seconds, int milliseconds)
+{
+	//         10        20        30      = 35
+	// 01234567890123456789012345678901234
+	// Date(2014, 04, 01, 03, 28, 20, 065)
+
+	if(wb->size - wb->bytes < 36) return;
+
+	char *b = &wb->buffer[wb->bytes];
+
+	b[0]='D';
+	b[1]='a';
+	b[2]='t';
+	b[3]='e';
+	b[4]='(';
+	b[5]= 48 + year / 1000; year -= (year / 1000) * 1000;
+	b[6]= 48 + year / 100; year -= (year / 100) * 100;
+	b[7]= 48 + year / 10;
+	b[8]= 48 + year % 10;
+	b[9]=',';
+	b[10]=' ';
+	b[11]= 48 + month / 10;
+	b[12]= 48 + month % 10;
+	b[13]=',';
+	b[14]=' ';
+	b[15]= 48 + day / 10;
+	b[16]= 48 + day % 10;
+	b[17]=',';
+	b[18]=' ';
+	b[19]= 48 + hours / 10;
+	b[20]= 48 + hours % 10;
+	b[21]=',';
+	b[22]=' ';
+	b[23]= 48 + minutes / 10;
+	b[24]= 48 + minutes % 10;
+	b[25]=',';
+	b[26]=' ';
+	b[27]= 48 + seconds / 10;
+	b[28]= 48 + seconds % 10;
+	b[29]=',';
+	b[30]=' ';
+	b[31]= 48 + milliseconds / 100; milliseconds -= (milliseconds / 100) * 100;
+	b[32]= 48 + milliseconds / 10;
+	b[33]= 48 + milliseconds % 10;
+	b[34]=')';
+	b[35]='\0';
+
+	wb->bytes += 35;
+}
+
 struct web_buffer *web_buffer_create(size_t size)
 {
 	struct web_buffer *b;
@@ -1672,13 +1803,12 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	// the minimum line length we expect
 	int line_size = 4096 + (dimensions * 200);
 
-	char overflow_annotation[201];
-	int overflow_annotation_len = snprintf(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
-	overflow_annotation[200] = '\0';
-
-	char normal_annotation[201];
-	int normal_annotation_len = snprintf(normal_annotation, 200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
-	normal_annotation[200] = '\0';
+	char overflow_annotation[201]; snprintf(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
+	char normal_annotation[201]; snprintf(normal_annotation, 200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
+	char pre_date[51]; snprintf(pre_date, 50, "		{%sc%s:[{%sv%s:%s", kq, kq, kq, kq, sq);
+	char post_date[21]; snprintf(post_date, 20, "%s}", sq);
+	char pre_value[21]; snprintf(pre_value, 20, ",{%sv%s:", kq, kq);
+	char post_value[21]; snprintf(post_value, 20, "}");
 
 	// to allow grouping on the same values, we need a pad
 	long pad = before % group;
@@ -1734,10 +1864,11 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 			if(!tm) { error("localtime() failed."); continue; }
 			if(now.tv_sec > last_timestamp) last_timestamp = now.tv_sec;
 
-			web_buffer_printf(wb, "%s		{%sc%s:[{%sv%s:%sDate(%d, %d, %d, %d, %d, %d, %d)%s}", printed?"]},\n":"",
-				kq, kq, kq, kq, sq,
-				tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(now.tv_usec / 1000),
-				sq);
+			if(printed) web_buffer_strcpy(wb, "]},\n");
+			web_buffer_strcpy(wb, pre_date);
+			web_buffer_jsdate(wb, tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(now.tv_usec / 1000));
+			// web_buffer_printf(wb, "%d, %d, %d, %d, %d, %d, %d", tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(now.tv_usec / 1000));
+			web_buffer_strcpy(wb, post_date);
 
 			print_this = 1;
 		}
@@ -1768,19 +1899,19 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 			
 			if(annotate_reset) {
 				annotation_count++;
-				strcpy(&wb->buffer[wb->bytes], overflow_annotation);
-				wb->bytes += overflow_annotation_len;
+				web_buffer_strcpy(wb, overflow_annotation);
 				annotate_reset = 0;
 			}
-			else {
-				strcpy(&wb->buffer[wb->bytes], normal_annotation);
-				wb->bytes += normal_annotation_len;
-			}
+			else
+				web_buffer_strcpy(wb, normal_annotation);
 
 			for(c = 0 ; c < dimensions ; c++) {
 				if(!print_hidden[c]) {
-					long double x = (long double)print_values[c] / 10.0;
-					web_buffer_printf(wb, ",{%sv%s:%0.1Lf}", kq, kq, x);
+					web_buffer_strcpy(wb, pre_value);
+					web_buffer_rrd_value(wb, print_values[c]);
+					// long double x = (long double)print_values[c] / 10.0;
+					// web_buffer_printf(wb, "%0.1Lf", x);
+					web_buffer_strcpy(wb, post_value);
 				}
 			}
 
