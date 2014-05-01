@@ -1730,10 +1730,13 @@ void rrd_stats_all_json(struct web_buffer *wb)
 
 unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show, size_t group, int group_method, time_t after, time_t before)
 {
+	int c;
 	pthread_mutex_lock(&st->mutex);
 
-	unsigned long last_timestamp = 0;
 
+	// -------------------------------------------------------------------------
+	// switch from JSON to google JSON
+	
 	char kq[2] = "\"";
 	char sq[2] = "\"";
 	switch(type) {
@@ -1748,41 +1751,42 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 			break;
 	}
 
-	// check the options
+
+	// -------------------------------------------------------------------------
+	// validate the parameters
+	
 	if(entries_to_show < 1) entries_to_show = 1;
 	if(group < 1) group = 1;
-	// if(group > st->entries / 20) group = st->entries / 20;
+	
+	// make sure current_entry is within limits
+	long current_entry = st->current_entry;
+	if(current_entry < 0) current_entry = 0;
+	else if(current_entry >= st->entries) current_entry = st->entries;
+	
+	// find the oldest entry of the round-robin
+	long stop_entry = current_entry + 1;
+	if(stop_entry >= st->entries) stop_entry = 0;
+	
+	if(before == 0) before = st->last_updated.tv_sec;
+	if(after  == 0) after = rrd_stats_first_entry_t(st);
 
-	long printed = 0;			// the lines of JSON data we have generated so far
 
-	long stop_entry, current_entry = st->current_entry;
-
-	int c = 0;					// counter for dimension loops
-	int dimensions = 0;			// the total number of dimensions present
-
+	// -------------------------------------------------------------------------
 	// find how many dimensions we have
+	
+	int dimensions = 0;
 	RRD_DIMENSION *rd;
 	for( rd = st->dimensions ; rd ; rd = rd->next) dimensions++;
-
 	if(!dimensions) {
 		pthread_mutex_unlock(&st->mutex);
 		web_buffer_printf(wb, "No dimensions yet.");
 		return 0;
 	}
 
-	int annotation_count = 0;
-
-	// temp for the printable values
-	long long print_values[dimensions];
-	int print_hidden[dimensions];
-
-	// temporary storage to keep track of group values and counts
-	long long group_values[dimensions];
-	int group_count = 0;
-	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
-		group_values[c] = 0;
-
-	// print the labels
+	
+	// -------------------------------------------------------------------------
+	// print the JSON header
+	
 	web_buffer_printf(wb, "{\n	%scols%s:\n	[\n", kq, kq);
 	web_buffer_printf(wb, "		{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
 	web_buffer_printf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotation%s}},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
@@ -1791,44 +1795,29 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	// print the header for each dimension
 	// and update the print_hidden array for the dimensions that should be hidden
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
-		if(rd->hidden)
-			print_hidden[c] = 1;
-		else {
-			print_hidden[c] = 0;
-			web_buffer_printf(wb, ",\n		{%sid%s:%s%s,%slabel%s:%s%s%s,%spattern%s:%s%s,%stype%s:%snumber%s}", kq, kq, sq, sq, kq, kq, sq, rd->name, sq, kq, kq, sq, sq, kq, kq, sq, sq);
-		}
+		if(!rd->hidden) web_buffer_printf(wb, ",\n		{%sid%s:%s%s,%slabel%s:%s%s%s,%spattern%s:%s%s,%stype%s:%snumber%s}", kq, kq, sq, sq, kq, kq, sq, rd->name, sq, kq, kq, sq, sq, kq, kq, sq, sq);
 	}
 
 	// print the begin of row data
 	web_buffer_printf(wb, "\n	],\n	%srows%s:\n	[\n", kq, kq);
 
-	// make sure current_entry is within limits
-	if(current_entry < 0 || current_entry >= st->entries) current_entry = 0;
-	if(before == 0) before = st->last_updated.tv_sec;
 
-	// find the oldest entry of the round-robin
-	stop_entry = st->current_entry + 1;
-	if(stop_entry >= st->entries) stop_entry = st->entries - 1;
-
-	// skip the oldest, to have incremental data
-	if(after == 0) after = rrd_stats_first_entry_t(st);
-
-	// the minimum line length we expect
-	int line_size = 4096 + (dimensions * 200);
-
+	// -------------------------------------------------------------------------
+	// prepare various strings, to speed up the loop
+	
 	char overflow_annotation[201]; snprintf(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
-	char normal_annotation[201]; snprintf(normal_annotation, 200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
-	char pre_date[51]; snprintf(pre_date, 50, "		{%sc%s:[{%sv%s:%s", kq, kq, kq, kq, sq);
-	char post_date[21]; snprintf(post_date, 20, "%s}", sq);
-	char pre_value[21]; snprintf(pre_value, 20, ",{%sv%s:", kq, kq);
-	char post_value[21]; snprintf(post_value, 20, "}");
+	char normal_annotation[201];   snprintf(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
+	char pre_date[51];             snprintf(pre_date,             50, "		{%sc%s:[{%sv%s:%s", kq, kq, kq, kq, sq);
+	char post_date[21];            snprintf(post_date,            20, "%s}", sq);
+	char pre_value[21];            snprintf(pre_value,            20, ",{%sv%s:", kq, kq);
+	char post_value[21];           snprintf(post_value,           20, "}");
 
-	// to allow grouping on the same values, we need a pad
-	long pad = before % group;
 
+	// -------------------------------------------------------------------------
 	// checks for debuging
+	
 	if(st->debug) {
-		debug(D_RRD_STATS, "%s first_entry_t = %lu, last_entry_t = %lu, duration = %lu, after = %lu, before = %lu, duration = %lu, entries_to_show = %lu, group = %lu"
+		debug(D_RRD_STATS, "%s first_entry_t = %lu, last_entry_t = %lu, duration = %lu, after = %lu, before = %lu, duration = %lu, entries_to_show = %lu, group = %lu, stop_entry = %ld"
 			, st->id
 			, rrd_stats_first_entry_t(st)
 			, st->last_updated.tv_sec
@@ -1838,6 +1827,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 			, before - after
 			, entries_to_show
 			, group
+			, stop_entry
 			);
 
 		if(before < after)
@@ -1847,11 +1837,40 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 			debug(D_RRD_STATS, "WARNING: %s The time difference between the oldest and the newest entries (%lu) is higher than the capacity of the database (%lu)", st->name, before - after, st->entries * st->update_every);
 	}
 
-	// loop in dimension data
+
+	// -------------------------------------------------------------------------
+	// temp arrays for keeping values per dimension
+	
+	calculated_number group_values[dimensions]; // keep sums when grouping
+	storage_number    print_values[dimensions]; // keep the final value to be printed
+	int               print_hidden[dimensions]; // keep hidden flags
+
+	// initialize them
+	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
+		group_values[c] = print_values[c] = 0;
+		print_hidden[c] = rd->hidden;
+	}
+
+	// -------------------------------------------------------------------------
+	// the main loop
+
+	// our return value (the last timestamp printed)
+	// this is required to detect re-transmit in google JSONP
+	time_t last_timestamp = 0;
+	
 	int annotate_reset = 0;
+	int annotation_count = 0;
+	
+	// to allow grouping on the same values, we need a pad
+	long pad = before % group;
+
+	// the minimum line length we expect
+	int line_size = 4096 + (dimensions * 200);
+
 	unsigned long long time_usec = st->last_updated.tv_sec * 1000000ULL + st->last_updated.tv_usec;
-	long t, count;
-	for (count = printed = 0, t = current_entry; t != stop_entry && st->timediff[t] ; time_usec -= st->timediff[t], t--) {
+	long t, count, printed, group_count;
+	
+	for (count = printed = group_count = 0, t = current_entry; t != stop_entry && st->timediff[t] ; time_usec -= st->timediff[t], t--) {
 		if(t < 0) t = st->entries - 1;
 
 		int print_this = 0;
@@ -1943,8 +1962,6 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 				if(!print_hidden[c]) {
 					web_buffer_strcpy(wb, pre_value);
 					web_buffer_rrd_value(wb, print_values[c]);
-					// long double x = (long double)print_values[c] / 10.0;
-					// web_buffer_printf(wb, "%0.1Lf", x);
 					web_buffer_strcpy(wb, post_value);
 				}
 			}

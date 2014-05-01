@@ -240,8 +240,8 @@ function loadCharts(base_url, doNext) {
 				lineWidth: 1,
 				title: json.charts[i].title,
 				// hAxis: {title: "Time of Day", viewWindowMode: 'maximized', format:'HH:mm:ss'},
-				hAxis: {viewWindowMode: 'maximized', format:'HH:mm:ss'},
-				vAxis: {title: json.charts[i].units, viewWindowMode: 'pretty', minValue: 0, maxValue: 10},
+				hAxis: {viewWindowMode: 'maximized', slantedText: false, format:'HH:mm:ss'},
+				vAxis: {title: json.charts[i].units, viewWindowMode: 'pretty', minValue: -0.1, maxValue: 0.1},
 				chartArea : {width: '65%', height: '75%'},
 				focusTarget: 'category',
 				annotation: {'1': {style: 'line'}},
@@ -255,6 +255,10 @@ function loadCharts(base_url, doNext) {
 					json.charts[i].chartType = "AreaChart";
 					json.charts[i].chartOptions.isStacked = false;
 					json.charts[i].chartOptions.areaOpacity = 0.3;
+					
+					json.charts[i].chartOptions.vAxis.viewWindowMode = 'maximized';
+					json.charts[i].chartOptions.vAxis.minValue = null;
+					json.charts[i].chartOptions.vAxis.maxValue = null;
 					break;
 
 				case "stacked":
@@ -264,8 +268,9 @@ function loadCharts(base_url, doNext) {
 					json.charts[i].chartOptions.lineWidth = 1;
 					json.charts[i].group_method = "average";
 
-					if(json.charts[i].name == 'system.swap')
-						json.charts[i].chartOptions.vAxis.viewWindowMode = 'maximized';
+					json.charts[i].chartOptions.vAxis.viewWindowMode = 'maximized';
+					json.charts[i].chartOptions.vAxis.minValue = null;
+					json.charts[i].chartOptions.vAxis.maxValue = null;
 					break;
 
 				default:
@@ -273,9 +278,6 @@ function loadCharts(base_url, doNext) {
 					json.charts[i].chartType = "LineChart";
 					json.charts[i].chartOptions.lineWidth = 2;
 					json.charts[i].chartOptions.curveType = 'function';
-
-					json.charts[i].chartOptions.vAxis.minValue = -0.1;
-					json.charts[i].chartOptions.vAxis.maxValue =  0.1;
 					break;
 			}
 

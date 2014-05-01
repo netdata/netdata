@@ -154,7 +154,7 @@ function refreshHiddenChart(doNext) {
 			lineWidth: 1,
 			height: mainchart.hiddenchart.chartOptions.height,
 			chartArea: {'width': '98%'},
-			hAxis: {'baselineColor': 'none'},
+			hAxis: {'baselineColor': 'none', viewWindowMode: 'maximized'},
 			vAxis: {'title': null},
 		});
 
