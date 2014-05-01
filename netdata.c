@@ -567,7 +567,7 @@ char *config_get(const char *section, const char *name, const char *default_valu
 	if(!cv) cv = config_value_create(co, name, default_value);
 	cv->used = 1;
 
-	if(cv->loaded) {
+	if(cv->loaded || cv->changed) {
 		// this is a loaded value from the config file
 		// if it is different that the default, mark it
 		if(strcmp(cv->value, default_value) != 0) cv->changed = 1;
