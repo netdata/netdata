@@ -5575,7 +5575,7 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		char *user = config_get("global", "user", "");
+		char *user = config_get("global", "run as user", "");
 		if(*user) {
 			if(become_user(user) != 0) {
 				fprintf(stderr, "Cannot become user %s.\n", user);
