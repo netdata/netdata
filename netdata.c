@@ -35,11 +35,6 @@
 #include <inttypes.h>
 
 
-#define RRD_DIMENSION_ABSOLUTE					0
-#define RRD_DIMENSION_INCREMENTAL				1
-#define RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL 	2
-#define RRD_DIMENSION_PCENT_OVER_ROW_TOTAL 		3
-
 #define RRD_TYPE_NET				"net"
 #define RRD_TYPE_NET_LEN			strlen(RRD_TYPE_NET)
 
@@ -680,6 +675,47 @@ const char *chart_type_name(int chart_type)
 
 
 // ----------------------------------------------------------------------------
+// algorithms types
+
+#define RRD_DIMENSION_ABSOLUTE					0
+#define RRD_DIMENSION_INCREMENTAL				1
+#define RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL 	2
+#define RRD_DIMENSION_PCENT_OVER_ROW_TOTAL 		3
+
+int algorithm_id(const char *name)
+{
+	if(strcmp(name, "absolute") == 0) return RRD_DIMENSION_ABSOLUTE;
+	if(strcmp(name, "incremental") == 0) return RRD_DIMENSION_INCREMENTAL;
+	if(strcmp(name, "percentage-of-absolute-row") == 0) return RRD_DIMENSION_PCENT_OVER_ROW_TOTAL;
+	if(strcmp(name, "percentage-of-incremental-row") == 0) return RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL;
+	return RRD_DIMENSION_ABSOLUTE;
+}
+
+const char *algorithm_name(int chart_type)
+{
+	static char *absolute = "absolute";
+	static char *incremental = "incremental";
+	static char *percentage_of_absolute_row = "percentage-of-absolute-row";
+	static char *percentage_of_incremental_row = "percentage-of-incremental-row";
+
+	switch(chart_type) {
+		case RRD_DIMENSION_ABSOLUTE:
+			return absolute;
+
+		case RRD_DIMENSION_INCREMENTAL:
+			return incremental;
+
+		case RRD_DIMENSION_PCENT_OVER_ROW_TOTAL:
+			return percentage_of_absolute_row;
+
+		case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
+			return percentage_of_incremental_row;
+	}
+	return absolute;
+}
+
+
+// ----------------------------------------------------------------------------
 // FAST NUMBER TO STRING
 
 static void strreverse(char* begin, char* end)
@@ -886,6 +922,20 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 		fatal("Cannot allocate RRD_DIMENSION %s/%s.", st->id, id);
 		return NULL;
 	}
+
+	char varname[RRD_STATS_NAME_MAX + 1];
+
+	snprintf(varname, RRD_STATS_NAME_MAX, "dim %s name", id);
+	name = config_get(st->id, varname, name?name:id);
+
+	snprintf(varname, RRD_STATS_NAME_MAX, "dim %s algorithm", id);
+	algorithm = algorithm_id(config_get(st->id, varname, algorithm_name(algorithm)));
+
+	snprintf(varname, RRD_STATS_NAME_MAX, "dim %s multiplier", id);
+	multiplier = config_get_number(st->id, varname, multiplier);
+
+	snprintf(varname, RRD_STATS_NAME_MAX, "dim %s divisor", id);
+	divisor = config_get_number(st->id, varname, divisor);
 
 	rd->entries = st->entries;
 	rd->multiplier = multiplier;
@@ -1585,29 +1635,6 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 		unsigned long rdmem = sizeof(RRD_DIMENSION) + (sizeof(storage_number) * rd->entries);
 		memory += rdmem;
 
-		char *algorithm = "";
-		switch(rd->algorithm) {
-			case RRD_DIMENSION_INCREMENTAL:
-				algorithm = "incremental";
-				break;
-
-			case RRD_DIMENSION_ABSOLUTE:
-				algorithm = "absolute";
-				break;
-
-			case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
-				algorithm = "percent on incremental total";
-				break;
-
-			case RRD_DIMENSION_PCENT_OVER_ROW_TOTAL:
-				algorithm = "percent on absolute total";
-				break;
-
-			default:
-				algorithm = "other";
-				break;
-		}
-
 		web_buffer_printf(wb,
 			"\t\t\t\t{\n"
 			"\t\t\t\t\t\"id\": \"%s\",\n"
@@ -1628,7 +1655,7 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 			, rd->name
 			, rd->entries
 			, rd->hidden
-			, algorithm
+			, algorithm_name(rd->algorithm)
 			, rd->multiplier
 			, rd->divisor
 			, rd->last_updated.tv_sec
