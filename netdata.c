@@ -365,8 +365,9 @@ struct config_value {
 	unsigned long hash;		// a simple hash to speed up searching
 							// we first compare hashes, and only if the hashes are equal we do string comparisons
 
-	int used;
-	int changed;
+	int loaded;				// loaded from the user config
+	int used;				// has been accessed from the program
+	int changed;			// changed from the internal default
 
 	struct config_value *next;
 };
@@ -537,6 +538,7 @@ int load_config(char *filename, int overwrite_used)
 			else
 				debug(D_CONFIG, "Ignoring line %d, '%s/%s' is already present and used.", line, co->name, cv->name);
 		}
+		cv->loaded = 1;
 	}
 
 	fclose(fp);
@@ -565,7 +567,16 @@ char *config_get(const char *section, const char *name, const char *default_valu
 	if(!cv) cv = config_value_create(co, name, default_value);
 	cv->used = 1;
 
-	if(strcmp(cv->value, default_value) != 0) cv->changed = 1;
+	if(cv->loaded) {
+		// this is a loaded value from the config file
+		// if it is different that the default, mark it
+		if(strcmp(cv->value, default_value) != 0) cv->changed = 1;
+	}
+	else {
+		// this is not loaded from the config
+		// copy the default value to it
+		strncpy(cv->value, default_value, CONFIG_MAX_VALUE);
+	}
 
 	pthread_mutex_unlock(&config_mutex);
 	return(cv->value);
@@ -598,7 +609,7 @@ int config_get_boolean(const char *section, const char *name, int value)
 	}
 }
 
-void config_set(const char *section, const char *name, char *value)
+const char *config_set(const char *section, const char *name, const char *value)
 {
 	struct config_value *cv;
 
@@ -617,29 +628,36 @@ void config_set(const char *section, const char *name, char *value)
 
 	if(!cv) cv = config_value_create(co, name, value);
 	cv->used = 1;
-	cv->changed = 1;
+
+	if(strcmp(cv->value, value) != 0) cv->changed = 1;
 
 	strncpy(cv->value, value, CONFIG_MAX_VALUE);
 	// termination is already there
 
 	pthread_mutex_unlock(&config_mutex);
+
+	return value;
 }
 
-void config_set_number(const char *section, const char *name, long long value)
+long long config_set_number(const char *section, const char *name, long long value)
 {
 	char buffer[100];
 	sprintf(buffer, "%lld", value);
 
 	config_set(section, name, buffer);
+
+	return value;
 }
 
-void config_set_boolean(const char *section, const char *name, int value)
+int config_set_boolean(const char *section, const char *name, int value)
 {
 	char *s;
 	if(value) s = "yes";
 	else s = "no";
 
 	config_set(section, name, s);
+
+	return value;
 }
 
 
@@ -753,7 +771,7 @@ typedef uint32_t ustorage_number;
 
 struct rrd_dimension {
 	char id[RRD_STATS_NAME_MAX + 1];			// the id of this dimension (for internal identification)
-	char name[RRD_STATS_NAME_MAX + 1];			// the name of this dimension (as presented to user)
+	char *name;									// the name of this dimension (as presented to user)
 	
 	unsigned long hash;							// a simple hash on the id, to speed up searching
 												// we first compare hashes, and only if the hashes are equal we do string comparisons
@@ -787,19 +805,17 @@ struct rrd_stats {
 	unsigned long counter;						// the number of times we added values to this rrd
 
 	char id[RRD_STATS_NAME_MAX + 1];			// id of the data set
-	char name[RRD_STATS_NAME_MAX + 1];			// name of the data set
+	char *name;									// name of the data set
 
 	unsigned long hash;							// a simple hash on the id, to speed up searching
 												// we first compare hashes, and only if the hashes are equal we do string comparisons
 
-	char type[RRD_STATS_NAME_MAX + 1];			// the type of graph RRD_TYPE_* (a category, for determining graphing options)
-	char family[RRD_STATS_NAME_MAX + 1];		// the family of this data set (for grouping them together)
+	char *type;									// the type of graph RRD_TYPE_* (a category, for determining graphing options)
+	char *family;								// the family of this data set (for grouping them together)
+	char *title;								// title shown to user
+	char *units;								// units of measurement
 
-	char title[RRD_STATS_NAME_MAX + 1];			// title shown to user
-	char units[RRD_STATS_NAME_MAX + 1];			// units of measurement
-
-	char usertitle[RRD_STATS_NAME_MAX + 1];
-	long userpriority;
+	long priority;
 
 	long entries;								// total number of entries in the data set
 	long current_entry;							// the entry that is currently being updated
@@ -832,7 +848,6 @@ pthread_mutex_t root_mutex = PTHREAD_MUTEX_INITIALIZER;
 RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, const char *family, const char *title, const char *units, long priority, int update_every, int chart_type)
 {
 	RRD_STATS *st = NULL;
-	char *p;
 
 	if(!id || !id[0]) {
 		fatal("Cannot create rrd stats without an id.");
@@ -849,49 +864,34 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 
 	// no need to terminate the strings after strncpy(), because of calloc()
 
-	strncpy(st->id, type, RRD_STATS_NAME_MAX-1);
-	strcat(st->id, ".");
-	int len = strlen(st->id);
-	strncpy(&st->id[len], id, RRD_STATS_NAME_MAX - len);
+	snprintf(st->id, RRD_STATS_NAME_MAX, "%s.%s", type, id);
 	st->hash = simple_hash(st->id);
 
 	if(name) {
-		strncpy(st->name, type, RRD_STATS_NAME_MAX - 1);
-		strcat(st->name, ".");
-		len = strlen(st->name);
-		strncpy(&st->name[len], name, RRD_STATS_NAME_MAX - len);
+		char varvalue[CONFIG_MAX_VALUE + 1];
+		snprintf(varvalue, CONFIG_MAX_VALUE, "%s.%s", type?type:"", name);
+		st->name = config_get(st->id, "name", varvalue);
 	}
-	else strcpy(st->name, st->id);
+	else st->name = config_get(st->id, "name", st->id);
 
-	// replace illegal characters in name
-	while((p = strchr(st->name, ' '))) *p = '_';
-	while((p = strchr(st->name, '/'))) *p = '_';
-	while((p = strchr(st->name, '?'))) *p = '_';
-	while((p = strchr(st->name, '&'))) *p = '_';
+	{
+		char varvalue[CONFIG_MAX_VALUE + 1];
+		snprintf(varvalue, CONFIG_MAX_VALUE, "%s (%s)", title?title:"", st->name);
+		st->title  = config_get(st->id, "title", varvalue);
+	}
 
-	if(family) strncpy(st->family, family, RRD_STATS_NAME_MAX);
-	else strcpy(st->family, st->id);
-
-	strncpy(st->title, title, RRD_STATS_NAME_MAX);
-	strncpy(st->units, units, RRD_STATS_NAME_MAX);
-	strncpy(st->type, type, RRD_STATS_NAME_MAX);
-
-	snprintf(st->usertitle, RRD_STATS_NAME_MAX, "%s (%s)", st->title, st->name);
-	strncpy(st->usertitle, config_get(st->id, "title", st->usertitle), RRD_STATS_NAME_MAX);
-
+	st->family     = config_get(st->id, "family", family?family:st->id);
+	st->units      = config_get(st->id, "units", units?units:"");
+	st->type       = config_get(st->id, "type", type?type:"");
 	st->chart_type = chart_type_id(config_get(st->id, "chart type", chart_type_name(chart_type)));
 
-	p = config_get(st->id, "history", "default");
-	st->entries = strtoul(p, NULL, 0);
-	if(strcmp(p, "default") == 0) st->entries = save_history;
-	if(st->entries < 5) st->entries = 5;
-	if(st->entries > HISTORY_MAX) st->entries = HISTORY_MAX;
+	st->entries = config_get_number(st->id, "history", save_history);
+	if(st->entries < 5) st->entries = config_set_number(st->id, "history", 5);
+	if(st->entries > HISTORY_MAX) st->entries = config_set_number(st->id, "history", HISTORY_MAX);
 
-	st->userpriority = config_get_number(st->id, "priority", priority);
+	st->priority = config_get_number(st->id, "priority", priority);
 	st->enabled = config_get_boolean(st->id, "enabled", 1);
 	if(!st->enabled) st->entries = 5;
-
-	st->debug = config_get_boolean(st->id, "debug", 0);
 
 	st->timediff = calloc(st->entries, sizeof(uint32_t));
 	if(!st->timediff) {
@@ -915,8 +915,15 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 	return(st);
 }
 
+void rrd_stats_set_name(RRD_STATS *st, const char *name)
+{
+	config_get(st->id, "name", name);
+}
+
+
 RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char *name, long multiplier, long divisor, int algorithm)
 {
+	char varname[CONFIG_MAX_NAME + 1];
 	RRD_DIMENSION *rd = NULL;
 
 	debug(D_RRD_STATS, "Adding dimension '%s/%s'.", st->id, id);
@@ -927,39 +934,29 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 		return NULL;
 	}
 
-	char varname[RRD_STATS_NAME_MAX + 1];
+	strncpy(rd->id, id, RRD_STATS_NAME_MAX);
+	rd->hash = simple_hash(rd->id);
 
-	snprintf(varname, RRD_STATS_NAME_MAX, "dim %s name", id);
-	name = config_get(st->id, varname, name?name:id);
+	snprintf(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
+	rd->name = config_get(st->id, varname, name?name:rd->id);
 
-	snprintf(varname, RRD_STATS_NAME_MAX, "dim %s algorithm", id);
-	algorithm = algorithm_id(config_get(st->id, varname, algorithm_name(algorithm)));
+	snprintf(varname, CONFIG_MAX_NAME, "dim %s algorithm", rd->id);
+	rd->algorithm = algorithm_id(config_get(st->id, varname, algorithm_name(algorithm)));
 
-	snprintf(varname, RRD_STATS_NAME_MAX, "dim %s multiplier", id);
-	multiplier = config_get_number(st->id, varname, multiplier);
+	snprintf(varname, CONFIG_MAX_NAME, "dim %s multiplier", rd->id);
+	rd->multiplier = config_get_number(st->id, varname, multiplier);
 
-	snprintf(varname, RRD_STATS_NAME_MAX, "dim %s divisor", id);
-	divisor = config_get_number(st->id, varname, divisor);
+	snprintf(varname, CONFIG_MAX_NAME, "dim %s divisor", rd->id);
+	rd->divisor = config_get_number(st->id, varname, divisor);
 
 	rd->entries = st->entries;
-	rd->multiplier = multiplier;
-	rd->divisor = divisor;
-	rd->algorithm = algorithm;
-
+	
 	rd->values = calloc(rd->entries, sizeof(storage_number));
 	if(!rd->values) {
 		free(rd);
 		fatal("Cannot allocate %lu entries for RRD_DIMENSION values.", rd->entries);
 		return NULL;
 	}
-
-	// no need to terminate the strings after strncpy(), because of calloc()
-
-	strncpy(rd->id, id, RRD_STATS_NAME_MAX);
-	rd->hash = simple_hash(rd->id);
-
-	if(name) strncpy(rd->name, name, RRD_STATS_NAME_MAX);
-	else strncpy(rd->name, id, RRD_STATS_NAME_MAX);
 
 	// append this dimension
 	if(!st->dimensions)
@@ -970,9 +967,14 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 		td->next = rd;
 	}
 
-	//rd->annotator = annotator;
-
 	return(rd);
+}
+
+void rrd_stats_dimension_set_name(RRD_STATS *st, RRD_DIMENSION *rd, const char *name)
+{
+	char varname[CONFIG_MAX_NAME + 1];
+	snprintf(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
+	config_get(st->id, varname, name);
 }
 
 void rrd_stats_dimension_free(RRD_DIMENSION *rd)
@@ -1613,8 +1615,8 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 		, st->name
 		, st->type
 		, st->family
-		, st->usertitle
-		, st->userpriority
+		, st->title
+		, st->priority
 		, st->enabled
 		, st->units
 		, st->name, options?options:""
@@ -1825,29 +1827,51 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	long pad = before % group;
 
 	// checks for debuging
-	if(before < after)
-		debug(D_RRD_STATS, "WARNING: %s The newest value in the database (%lu) is earlier than the oldest (%lu)", st->name, before, after);
+	if(st->debug) {
+		debug(D_RRD_STATS, "%s first_entry_t = %lu, last_entry_t = %lu, duration = %lu, after = %lu, before = %lu, duration = %lu, entries_to_show = %lu, group = %lu"
+			, st->id
+			, rrd_stats_first_entry_t(st)
+			, st->last_updated.tv_sec
+			, st->last_updated.tv_sec - rrd_stats_first_entry_t(st)
+			, after
+			, before
+			, before - after
+			, entries_to_show
+			, group
+			);
 
-	if((before - after) > st->entries * st->update_every)
-		debug(D_RRD_STATS, "WARNING: %s The time difference between the oldest and the newest entries (%lu) is higher than the capacity of the database (%lu)", st->name, before - after, st->entries * st->update_every);
+		if(before < after)
+			debug(D_RRD_STATS, "WARNING: %s The newest value in the database (%lu) is earlier than the oldest (%lu)", st->name, before, after);
+
+		if((before - after) > st->entries * st->update_every)
+			debug(D_RRD_STATS, "WARNING: %s The time difference between the oldest and the newest entries (%lu) is higher than the capacity of the database (%lu)", st->name, before - after, st->entries * st->update_every);
+	}
 
 	// loop in dimension data
 	int annotate_reset = 0;
-	struct timeval now;
-	now.tv_sec = st->last_updated.tv_sec;
-	now.tv_usec = st->last_updated.tv_usec;
-	unsigned long long time_usec = now.tv_sec * 1000000ULL + now.tv_usec;
+	unsigned long long time_usec = st->last_updated.tv_sec * 1000000ULL + st->last_updated.tv_usec;
 	long t, count;
 	for (count = printed = 0, t = current_entry; t != stop_entry && st->timediff[t] ; time_usec -= st->timediff[t], t--) {
-		int print_this = 0;
-
 		if(t < 0) t = st->entries - 1;
 
-		now.tv_sec = time_usec / 1000000;
-		now.tv_usec = time_usec % 1000000;
+		int print_this = 0;
+		time_t now = time_usec / 1000000ULL;
+
+		if(st->debug) {
+			debug(D_RRD_STATS, "%s t = %ld, count = %ld, group_count = %ld, printed = %ld, now = %lu, %s %s"
+				, st->id
+				, t
+				, count + 1
+				, group_count + 1
+				, printed
+				, now
+				, (((count + 1 - pad) % group) == 0)?"PRINT":"  -  "
+				, (now >= after && now <= before)?"RANGE":"  -  "
+				);
+		}
 
 		// make sure we return data in the proper time range
-		if(now.tv_sec < after || now.tv_sec > before) continue;
+		if(now < after || now > before) continue;
 
 		count++;
 		group_count++;
@@ -1871,14 +1895,13 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 			web_buffer_increase(wb, line_size);
 
 			// generate the local date time
-			struct tm *tm = localtime(&now.tv_sec);
+			struct tm *tm = localtime(&now);
 			if(!tm) { error("localtime() failed."); continue; }
-			if(now.tv_sec > last_timestamp) last_timestamp = now.tv_sec;
+			if(now > last_timestamp) last_timestamp = now;
 
 			if(printed) web_buffer_strcpy(wb, "]},\n");
 			web_buffer_strcpy(wb, pre_date);
-			web_buffer_jsdate(wb, tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(now.tv_usec / 1000));
-			// web_buffer_printf(wb, "%d, %d, %d, %d, %d, %d, %d", tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(now.tv_usec / 1000));
+			web_buffer_jsdate(wb, tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)((time_usec % 1000000ULL) / 1000));
 			web_buffer_strcpy(wb, post_date);
 
 			print_this = 1;
@@ -2429,6 +2452,28 @@ void web_client_process(struct web_client *w)
 					w->data->contenttype = CT_APPLICATION_JSON;
 					w->data->bytes = 0;
 					rrd_stats_graph_json(st, url, w->data);
+				}
+			}
+			else if(strcmp(tok, "debug") == 0) {
+				w->data->bytes = 0;
+
+				// get the name of the data to show
+				tok = mystrsep(&url, "/?&");
+				debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
+
+				// do we have such a data set?
+				RRD_STATS *st = rrd_stats_find_byname(tok);
+				if(!st) {
+					code = 404;
+					web_buffer_printf(w->data, "Chart %s is not found.\r\n", tok);
+					debug(D_WEB_CLIENT_ACCESS, "%llu: %s is not found.", w->id, tok);
+				}
+				else {
+					code = 200;
+					debug_flags |= D_RRD_STATS;
+					st->debug = st->debug?0:1;
+					web_buffer_printf(w->data, "Chart %s has now debug %s.\r\n", tok, st->debug?"enabled":"disabled");
+					debug(D_WEB_CLIENT_ACCESS, "%llu: debug for %s is %s.", w->id, tok, st->debug?"enabled":"disabled");
 				}
 			}
 			else if(strcmp(tok, "mirror") == 0) {
@@ -5169,6 +5214,11 @@ void tc_device_commit(struct tc_device *d)
 		else {
 			unsigned long long usec = rrd_stats_next(st);
 			debug(D_TC_LOOP, "TC: Committing TC device '%s' after %llu usec", d->name, usec);
+
+			if(strcmp(d->id, d->name) != 0) {
+				// update the device name with the new one
+				rrd_stats_set_name(st, d->name);
+			}
 		}
 
 		for ( c = d->classes ; c ; c = c->next) {
@@ -5185,7 +5235,7 @@ void tc_device_commit(struct tc_device *d)
 					// update the rrd dimension with the new name
 					RRD_DIMENSION *rd;
 					for(rd = st->dimensions ; rd ; rd = rd->next) {
-						if(strcmp(rd->id, c->id) == 0) { strcpy(rd->name, c->name); break; }
+						if(strcmp(rd->id, c->id) == 0) { rrd_stats_dimension_set_name(st, rd, c->name); break; }
 					}
 				}
 			}

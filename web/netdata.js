@@ -129,17 +129,19 @@ function calculateChartPointsToShow(c, divisor, maxtime, group) {
 	var dt = before - after;
 	if(dt > c.entries * c.update_every) dt = c.entries * c.update_every;
 
+	console.log('chart ' + c.id + ' internal duration is ' + dt + ' secs, requested maxtime is ' + maxtime + ' secs');
+
 	if(maxtime) dt = maxtime;
 
 	var data_points = Math.round(dt / c.update_every);
 	var screen_points = Math.round(c.chartOptions.width / divisor);
-	mylog('screen = ' + screen_points + ', data = ' + data_points + ', divisor = ' + divisor);
+	console.log('screen = ' + screen_points + ', data = ' + data_points + ', divisor = ' + divisor);
 
 	if(group == undefined || group <= 0) {
 		if(screen_points > data_points) {
 			c.group = 1;
 			c.points_to_show = data_points;
-			//mylog("rendering at full detail");
+			//console.log("rendering at full detail");
 		}
 		else {
 			c.group = Math.round(data_points / screen_points);
@@ -157,15 +159,15 @@ function calculateChartPointsToShow(c, divisor, maxtime, group) {
 			}
 
 			c.points_to_show = Math.round(data_points / c.group);
-			//mylog("rendering adaptive");
+			//console.log("rendering adaptive");
 		}
 	}
 	else {
 		c.group = group;
 		c.points_to_show = Math.round(data_points / group);
-		//mylog("rendering with given group");
+		//console.log("rendering with given group");
 	}
-	mylog('group = ' + c.group + ', points = ' + c.points_to_show);
+	console.log('group = ' + c.group + ', points = ' + c.points_to_show);
 
 	// make sure the line width is not congesting the chart
 	if(c.chartType == 'LineChart') {

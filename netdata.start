@@ -24,6 +24,9 @@ NETDATA_CONFIG_DEBUG=0
 # our port
 NETDATA_CONFIG_PORT=19999
 
+# our web files
+NETDATA_CONFIG_WEB_DIR=web
+
 if [ -f netdata.conf ]
 then
 	x="`grep "\[global\]" netdata.conf`"
@@ -48,6 +51,7 @@ then
 
 		# find the user to run as
 		NETDATA_CONFIG_USER="`grep 'run as user = ' netdata.conf | head -n 1 | cut -d '=' -f 2 | sed s"/ //g"`"
+		NETDATA_CONFIG_WEB_DIR="`grep 'web files directory = ' netdata.conf | head -n 1 | cut -d '=' -f 2 | sed -e s"/^ \+//g" -e s"/ \+$//g"`"
 	fi
 fi
 
@@ -67,11 +71,18 @@ killall netdata 2>/dev/null
 killall tc-all.sh 2>/dev/null
 sleep 2
 
-if [ "$USER" = "root" -a ! -z "$NETDATA_CONFIG_USER" ]
+if [ "$USER" = "root" -a ! -z "$NETDATA_CONFIG_USER" -a -d "$NETDATA_CONFIG_WEB_DIR" ]
 then
-	chown -R "$NETDATA_CONFIG_USER" web || exit 1
-	chmod    0775 web   || exit 1
-	chmod -R 0664 web/* || exit 1
+	echo "Chaning ownership of web files in $NETDATA_CONFIG_WEB_DIR to $NETDATA_CONFIG_USER"
+	chown -R "$NETDATA_CONFIG_USER" "$NETDATA_CONFIG_WEB_DIR" || exit 1
+	chmod    0775 "$NETDATA_CONFIG_WEB_DIR" || exit 1
+	chmod -R 0664 "$NETDATA_CONFIG_WEB_DIR" || exit 1
+fi
+
+if [ ! "$USER" = "root" ]
+then
+	echo >&2 "WARNING: NOT RUNNING AS ROOT - CANNOT SWITCH TO USER $NETDATA_CONFIG_USER"
+	echo >&2 "WARNING: MAKE SURE FILES IN web/ ARE OWNED BY $USER - or it will not work"
 fi
 
 echo "Starting netdata..."
@@ -85,8 +96,6 @@ else
 	then
 		`pwd`/netdata $debug_opts -d -u $NETDATA_CONFIG_USER -t $NETDATA_CONFIG_INTERNAL_UPDATE_EVERY -l $NETDATA_CONFIG_INTERNAL_HISTORY_LINES -p $NETDATA_CONFIG_PORT || exit 1
 	else
-		echo >&2 "WARNING: NOT RUNNING AS ROOT - CANNOT SWITCH TO USER $NETDATA_CONFIG_USER"
-		echo >&2 "WARNING: MAKE SURE FILES IN web/ ARE OWNED BY $USER - or it will not work"
 		`pwd`/netdata $debug_opts -d -t $NETDATA_CONFIG_INTERNAL_UPDATE_EVERY -l $NETDATA_CONFIG_INTERNAL_HISTORY_LINES -p $NETDATA_CONFIG_PORT || exit 1
 	fi
 
