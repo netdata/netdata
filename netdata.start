@@ -76,7 +76,6 @@ then
 	echo "Chaning ownership of web files in $NETDATA_CONFIG_WEB_DIR to $NETDATA_CONFIG_USER"
 	chown -R "$NETDATA_CONFIG_USER" "$NETDATA_CONFIG_WEB_DIR" || exit 1
 	chmod    0775 "$NETDATA_CONFIG_WEB_DIR" || exit 1
-	chmod -R 0664 "$NETDATA_CONFIG_WEB_DIR" || exit 1
 fi
 
 if [ ! "$USER" = "root" ]
