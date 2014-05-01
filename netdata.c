@@ -2055,14 +2055,14 @@ int mysendfile(struct web_client *w, char *filename)
 	// check if the file exists
 	struct stat stat;
 	if(lstat(webfilename, &stat) != 0) {
-		error("%llu: File '%s' is not found.", w->id, filename);
+		error("%llu: File '%s' is not found.", w->id, webfilename);
 		web_buffer_printf(w->data, "File '%s' does not exist, or is not accessible.", filename);
 		return 404;
 	}
 
 	// check if the file is owned by us
 	if(stat.st_uid != getuid() && stat.st_uid != geteuid()) {
-		error("%llu: File '%s' is owned by user %d (I run as user %d). Access Denied.", w->id, filename, stat.st_uid, getuid());
+		error("%llu: File '%s' is owned by user %d (I run as user %d). Access Denied.", w->id, webfilename, stat.st_uid, getuid());
 		web_buffer_printf(w->data, "Access to file '%s' is not permitted.", filename);
 		return 403;
 	}
@@ -2073,13 +2073,13 @@ int mysendfile(struct web_client *w, char *filename)
 		w->ifd = w->ofd;
 
 		if(errno == EBUSY || errno == EAGAIN) {
-			error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, filename);
+			error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, webfilename);
 			snprintf(w->response_header, MAX_HTTP_HEADER_SIZE, "Location: /" WEB_PATH_FILE "/%s\r\n", filename);
 			web_buffer_printf(w->data, "The file '%s' is currently busy. Please try again later.", filename);
 			return 307;
 		}
 		else {
-			error("%llu: Cannot open file '%s'.", w->id, filename);
+			error("%llu: Cannot open file '%s'.", w->id, webfilename);
 			web_buffer_printf(w->data, "Cannot open file '%s'.", filename);
 			return 404;
 		}
@@ -2101,7 +2101,7 @@ int mysendfile(struct web_client *w, char *filename)
 	else if(strstr(filename, ".eot")  != NULL)  w->data->contenttype = CT_APPLICATION_VND_MS_FONTOBJ;
 	else w->data->contenttype = CT_APPLICATION_OCTET_STREAM;
 
-	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%ld bytes, ifd %d, ofd %d).", w->id, filename, stat.st_size, w->ifd, w->ofd);
+	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%ld bytes, ifd %d, ofd %d).", w->id, webfilename, stat.st_size, w->ifd, w->ofd);
 
 	w->mode = WEB_CLIENT_MODE_FILECOPY;
 	w->wait_receive = 1;
