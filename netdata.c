@@ -32,6 +32,8 @@
 #include <pthread.h>
 #include <zlib.h>
 #include <malloc.h>
+#include <inttypes.h>
+
 
 #define RRD_DIMENSION_ABSOLUTE					0
 #define RRD_DIMENSION_INCREMENTAL				1
@@ -148,7 +150,7 @@ int listen_port = LISTEN_PORT;
 // helpers
 
 unsigned long long usecdiff(struct timeval *now, struct timeval *last) {
-		return ((((now->tv_sec * 1000000L) + now->tv_usec) - ((last->tv_sec * 1000000L) + last->tv_usec)));
+		return ((((now->tv_sec * 1000000ULL) + now->tv_usec) - ((last->tv_sec * 1000000ULL) + last->tv_usec)));
 }
 
 unsigned long simple_hash(const char *name)
@@ -384,7 +386,7 @@ struct config {
 	struct config *next;
 } *config_root = NULL;
 
-struct config_value *config_value_create(struct config *co, char *name, char *value)
+struct config_value *config_value_create(struct config *co, const char *name, const char *value)
 {
 	debug(D_CONFIG, "Creating config entry for name '%s', value '%s', in section '%s'.", name, value, co->name);
 
@@ -407,7 +409,7 @@ struct config_value *config_value_create(struct config *co, char *name, char *va
 	return cv;
 }
 
-struct config *config_create(char *section)
+struct config *config_create(const char *section)
 {
 	debug(D_CONFIG, "Creating section '%s'.", section);
 
@@ -429,7 +431,7 @@ struct config *config_create(char *section)
 	return co;
 }
 
-struct config *config_find_section(char *section)
+struct config *config_find_section(const char *section)
 {
 	struct config *co;
 	unsigned long hash = simple_hash(section);
@@ -547,7 +549,7 @@ int load_config(char *filename, int overwrite_used)
 	return 1;
 }
 
-char *config_get(char *section, char *name, char *default_value)
+char *config_get(const char *section, const char *name, const char *default_value)
 {
 	struct config_value *cv;
 
@@ -571,7 +573,7 @@ char *config_get(char *section, char *name, char *default_value)
 	return(cv->value);
 }
 
-long long config_get_number(char *section, char *name, long long value)
+long long config_get_number(const char *section, const char *name, long long value)
 {
 	char buffer[100], *s;
 	sprintf(buffer, "%lld", value);
@@ -580,7 +582,7 @@ long long config_get_number(char *section, char *name, long long value)
 	return strtoll(s, NULL, 0);
 }
 
-int config_get_boolean(char *section, char *name, int value)
+int config_get_boolean(const char *section, const char *name, int value)
 {
 	char *s;
 	if(value) s = "yes";
@@ -598,7 +600,7 @@ int config_get_boolean(char *section, char *name, int value)
 	}
 }
 
-void config_set(char *section, char *name, char *value)
+void config_set(const char *section, const char *name, char *value)
 {
 	struct config_value *cv;
 
@@ -624,7 +626,7 @@ void config_set(char *section, char *name, char *value)
 	pthread_mutex_unlock(&config_mutex);
 }
 
-void config_set_number(char *section, char *name, long long value)
+void config_set_number(const char *section, const char *name, long long value)
 {
 	char buffer[100];
 	sprintf(buffer, "%lld", value);
@@ -632,7 +634,7 @@ void config_set_number(char *section, char *name, long long value)
 	config_set(section, name, buffer);
 }
 
-void config_set_boolean(char *section, char *name, int value)
+void config_set_boolean(const char *section, const char *name, int value)
 {
 	char *s;
 	if(value) s = "yes";
@@ -642,12 +644,92 @@ void config_set_boolean(char *section, char *name, int value)
 }
 
 
+// ----------------------------------------------------------------------------
+// chart types
+
+#define CHART_TYPE_LINE	0
+#define CHART_TYPE_AREA 1
+#define CHART_TYPE_STACKED 2
+
+int chart_type_id(const char *name)
+{
+	if(strcmp(name, "area") == 0) return CHART_TYPE_AREA;
+	if(strcmp(name, "stacked") == 0) return CHART_TYPE_STACKED;
+	if(strcmp(name, "line") == 0) return CHART_TYPE_LINE;
+	return CHART_TYPE_LINE;
+}
+
+const char *chart_type_name(int chart_type)
+{
+	static char *line = "line";
+	static char *area = "area";
+	static char *stacked = "stacked";
+
+	switch(chart_type) {
+		case CHART_TYPE_LINE:
+			return line;
+
+		case CHART_TYPE_AREA:
+			return area;
+
+		case CHART_TYPE_STACKED:
+			return stacked;
+	}
+	return line;
+}
+
+
+// ----------------------------------------------------------------------------
+// FAST NUMBER TO STRING
+
+static void strreverse(char* begin, char* end)
+{
+    char aux;
+    while (end > begin)
+        aux = *end, *end-- = *begin, *begin++ = aux;
+}
+
+// fast number to string
+// returns length of string
+int itoa(int32_t value, char *str)
+{
+	char *wstr = str;
+
+	// Take care of sign
+	unsigned int uvalue = (value < 0) ? -value : value;
+
+	// Conversion. Number is reversed.
+	do *wstr++ = (char)(48 + (uvalue % 10)); while(uvalue /= 10);
+	if (value < 0) *wstr++ = '-';
+	*wstr='\0';
+
+	// Reverse string
+	strreverse(str,wstr-1);
+
+	return(wstr - str);
+}
 
 
 // ----------------------------------------------------------------------------
 // RRD STATS
 
 #define RRD_STATS_NAME_MAX 1024
+
+typedef long double calculated_number;
+#define CALCULATED_NUMBER_FORMAT "%0.1Lf"
+//typedef long long calculated_number;
+//#define CALCULATED_NUMBER_FORMAT "%lld"
+
+typedef long long collected_number;
+#define COLLECTED_NUMBER_FORMAT "%lld"
+
+typedef long long total_number;
+#define TOTAL_NUMBER_FORMAT "%lld"
+
+typedef int32_t storage_number;
+typedef uint32_t ustorage_number;
+#define STORAGE_NUMBER_FORMAT "%d"
+
 
 struct rrd_dimension {
 	char id[RRD_STATS_NAME_MAX + 1];			// the id of this dimension (for internal identification)
@@ -656,25 +738,24 @@ struct rrd_dimension {
 	unsigned long hash;							// a simple hash on the id, to speed up searching
 												// we first compare hashes, and only if the hashes are equal we do string comparisons
 
-	int issigned;								// if true, the values are signed
-
-	size_t bytes;								// how many bytes each value has, e.g. sizeof(long)
-	size_t entries;								// how many entries this dimension has
+	long entries;								// how many entries this dimension has
 												// this should be the same to the entries of the data set
 
 	int hidden;									// if set to non zero, this dimension will not be sent to the client
 
-												// before presenting the value to the user:
-	int type;									//  - first calculate a long double value based on this type of calculation
-	long multiplier;							//  - then, multiple by this
-	long divisor;								//  - then, divide by this
+	int algorithm;
+	long multiplier;
+	long divisor;
 
-	void *values;								// the array of values, each value is 'bytes' in length
+	storage_number *values;						// the array of values
 
-//	char **annotations;	
-//	char *(*annotator)(long double previous, long double current);
+	struct timeval last_updated;				// when was this dimension last updated
 
-	time_t last_updated;						// when was this dimension last updated
+	calculated_number calculated_value;
+	calculated_number last_calculated_value;
+
+	collected_number collected_value;
+	collected_number last_collected_value;
 
 	struct rrd_dimension *next;					// linking of dimensions within the same data set
 };
@@ -683,6 +764,8 @@ typedef struct rrd_dimension RRD_DIMENSION;
 struct rrd_stats {
 	pthread_mutex_t mutex;
 
+	unsigned long counter;						// the number of times we added values to this rrd
+
 	char id[RRD_STATS_NAME_MAX + 1];			// id of the data set
 	char name[RRD_STATS_NAME_MAX + 1];			// name of the data set
 
@@ -690,7 +773,7 @@ struct rrd_stats {
 												// we first compare hashes, and only if the hashes are equal we do string comparisons
 
 	char type[RRD_STATS_NAME_MAX + 1];			// the type of graph RRD_TYPE_* (a category, for determining graphing options)
-	char group[RRD_STATS_NAME_MAX + 1];			// the group of this data set (for grouping them together)
+	char family[RRD_STATS_NAME_MAX + 1];		// the family of this data set (for grouping them together)
 
 	char title[RRD_STATS_NAME_MAX + 1];			// title shown to user
 	char units[RRD_STATS_NAME_MAX + 1];			// units of measurement
@@ -698,21 +781,25 @@ struct rrd_stats {
 	char usertitle[RRD_STATS_NAME_MAX + 1];
 	long userpriority;
 
-	size_t entries;								// total number of entries in the data set
-	size_t current_entry;						// the entry that is currently being updated
+	long entries;								// total number of entries in the data set
+	long current_entry;							// the entry that is currently being updated
 												// it goes around in a round-robin fashion
-	// size_t last_entry;
 
 	int update_every;							// every how many seconds is this updated?
+	unsigned long long first_entry_t;			// the timestamp (in microseconds) of the oldest entry in the db
+	struct timeval last_updated;				// when this data set was last updated
+	unsigned long long usec_since_last_update;
 
-	time_t last_updated;						// when this data set was last updated
+	total_number absolute_total;
+	total_number last_absolute_total;
 
-	int isdetail;								// if set, the data set should be considered as a detail of another
-												// (the master data set should be the one that has the same group and is not detail)
-
+	int chart_type;
+	int debug;
 	int enabled;
+	int isdetail;								// if set, the data set should be considered as a detail of another
+												// (the master data set should be the one that has the same family and is not detail)
 
-	struct timeval *times;						// the time in microseconds each data entry was collected
+	uint32_t *timediff;							// the time in microseconds between each data entry
 	RRD_DIMENSION *dimensions;					// the actual data for every dimension
 
 	struct rrd_stats *next;						// linking of rrd stats
@@ -722,7 +809,7 @@ typedef struct rrd_stats RRD_STATS;
 RRD_STATS *root = NULL;
 pthread_mutex_t root_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, const char *group, const char *title, const char *units, long priority)
+RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, const char *family, const char *title, const char *units, long priority, int update_every, int chart_type)
 {
 	RRD_STATS *st = NULL;
 	char *p;
@@ -762,8 +849,8 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 	while((p = strchr(st->name, '?'))) *p = '_';
 	while((p = strchr(st->name, '&'))) *p = '_';
 
-	if(group) strncpy(st->group, group, RRD_STATS_NAME_MAX);
-	else strcpy(st->group, st->id);
+	if(family) strncpy(st->family, family, RRD_STATS_NAME_MAX);
+	else strcpy(st->family, st->id);
 
 	strncpy(st->title, title, RRD_STATS_NAME_MAX);
 	strncpy(st->units, units, RRD_STATS_NAME_MAX);
@@ -771,6 +858,8 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 
 	snprintf(st->usertitle, RRD_STATS_NAME_MAX, "%s (%s)", st->title, st->name);
 	strncpy(st->usertitle, config_get(st->id, "title", st->usertitle), RRD_STATS_NAME_MAX);
+
+	st->chart_type = chart_type_id(config_get(st->id, "chart type", chart_type_name(chart_type)));
 
 	p = config_get(st->id, "history", "default");
 	st->entries = strtoul(p, NULL, 0);
@@ -782,17 +871,15 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 	st->enabled = config_get_boolean(st->id, "enabled", 1);
 	if(!st->enabled) st->entries = 5;
 
-	st->times = calloc(st->entries, sizeof(struct timeval));
-	if(!st->times) {
+	st->debug = config_get_boolean(st->id, "debug", 0);
+
+	st->timediff = calloc(st->entries, sizeof(uint32_t));
+	if(!st->timediff) {
 		free(st);
 		fatal("Cannot allocate %lu entries of %lu bytes each for RRD_STATS.", st->entries, sizeof(struct timeval));
 		return NULL;
 	}
 	
-	st->current_entry = 0;
-	// st->last_entry = 0;
-	st->dimensions = NULL;
-	st->last_updated = time(NULL);
 	st->update_every = update_every;
 
 	pthread_mutex_init(&st->mutex, NULL);
@@ -808,7 +895,7 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 	return(st);
 }
 
-RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char *name, size_t bytes, int issigned, long multiplier, long divisor, int type, void *obsolete)
+RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char *name, long multiplier, long divisor, int algorithm)
 {
 	RRD_DIMENSION *rd = NULL;
 
@@ -820,28 +907,18 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 		return NULL;
 	}
 
-	rd->bytes = bytes;
 	rd->entries = st->entries;
 	rd->multiplier = multiplier;
 	rd->divisor = divisor;
-	rd->type = type;
-	rd->issigned = issigned;
+	rd->algorithm = algorithm;
 
-	rd->values = calloc(rd->entries, rd->bytes);
+	rd->values = calloc(rd->entries, sizeof(storage_number));
 	if(!rd->values) {
 		free(rd);
-		fatal("Cannot allocate %lu entries of %lu bytes each for RRD_DIMENSION values.", rd->entries, rd->bytes);
+		fatal("Cannot allocate %lu entries for RRD_DIMENSION values.", rd->entries);
 		return NULL;
 	}
 
-/*	rd->annotations = calloc(rd->entries, sizeof(char *));
-	if(!rd->annotations) {
-		free(rd->values);
-		free(rd);
-		fatal("Cannot allocate %lu entries of %lu bytes each for RRD_DIMENSION annotations.", rd->entries, sizeof(char *));
-		return NULL;
-	}
-*/
 	// no need to terminate the strings after strncpy(), because of calloc()
 
 	strncpy(rd->id, id, RRD_STATS_NAME_MAX);
@@ -944,70 +1021,15 @@ int rrd_stats_dimension_hide(RRD_STATS *st, const char *id)
 	return 0;
 }
 
-void rrd_stats_dimension_set_by_pointer(RRD_STATS *st, RRD_DIMENSION *rd, void *data, void *obsolete)
+void rrd_stats_dimension_set_by_pointer(RRD_STATS *st, RRD_DIMENSION *rd, collected_number value)
 {
-	rd->last_updated = st->last_updated;
+	rd->last_updated.tv_sec = st->last_updated.tv_sec;
+	rd->last_updated.tv_usec = st->last_updated.tv_usec;
 
-	if(rd->issigned) {
-		if(rd->bytes == sizeof(long long)) {
-			long long *dimension = rd->values, *value = data;
-
-			dimension[st->current_entry] = (*value);
-		}
-		else if(rd->bytes == sizeof(long)) {
-			long *dimension = rd->values, *value = data;
-
-			dimension[st->current_entry] = (*value);
-		}
-		else if(rd->bytes == sizeof(short int)) {
-			short int *dimension = rd->values, *value = data;
-
-			dimension[st->current_entry] = (*value);
-		}
-		else if(rd->bytes == sizeof(char)) {
-			char *dimension = rd->values, *value = data;
-
-			dimension[st->current_entry] = (*value);
-		}
-		else fatal("I don't know how to handle data of length %d (signed) bytes.", rd->bytes);
-	}
-	else {
-		if(rd->bytes == sizeof(unsigned long long)) {
-			unsigned long long *dimension = rd->values, *value = data;
-
-			dimension[st->current_entry] = (*value);
-		}
-		else if(rd->bytes == sizeof(unsigned long)) {
-			unsigned long *dimension = rd->values, *value = data;
-
-			dimension[st->current_entry] = (*value);
-		}
-		else if(rd->bytes == sizeof(unsigned short int)) {
-			unsigned short int *dimension = rd->values, *value = data;
-
-			dimension[st->current_entry] = (*value);
-		}
-		else if(rd->bytes == sizeof(unsigned char)) {
-			unsigned char *dimension = rd->values, *value = data;
-
-			dimension[st->current_entry] = (*value);
-		}
-		else fatal("I don't know how to handle data of length %d (unsigned) bytes.", rd->bytes);
-	}
-
-	// clear any previous annotations
-/*	if(rd->annotations[st->current_entry]) {
-		free(rd->annotations[st->current_entry]);
-		rd->annotations[st->current_entry] = NULL;
-	}
-
-	// set the new annotation
-	if(annotation)
-		rd->annotations[st->current_entry] = strdup(annotation);
-*/
+	rd->collected_value = value;
 }
 
-int rrd_stats_dimension_set(RRD_STATS *st, char *id, void *data, void *obsolete)
+int rrd_stats_dimension_set(RRD_STATS *st, char *id, collected_number value)
 {
 	RRD_DIMENSION *rd = rrd_stats_dimension_find(st, id);
 	if(!rd) {
@@ -1015,31 +1037,31 @@ int rrd_stats_dimension_set(RRD_STATS *st, char *id, void *data, void *obsolete)
 		return 1;
 	}
 
-	rrd_stats_dimension_set_by_pointer(st, rd, data, obsolete);
+	rrd_stats_dimension_set_by_pointer(st, rd, value);
 	return 0;
 }
 
 unsigned long long rrd_stats_next(RRD_STATS *st)
 {
-	struct timeval *now, *old;
-
 	pthread_mutex_lock(&st->mutex);
 
-	old = &st->times[st->current_entry];
+	RRD_DIMENSION *rd;
+	for( rd = st->dimensions; rd ; rd = rd->next ) {
+		rd->last_calculated_value   = rd->calculated_value;
+		rd->last_collected_value    = rd->collected_value;
 
-	// st->current_entry should never be outside the array
-	// or, the parallel threads may end up crashing
-	// st->last_entry = st->current_entry;
-	st->current_entry = ((st->current_entry + 1) >= st->entries) ? 0 : st->current_entry + 1;
+		rd->calculated_value = 0;
+		rd->collected_value = 0;
+	}
 
-	now = &st->times[st->current_entry];
-	gettimeofday(now, NULL);
-
-	st->last_updated = now->tv_sec;
+	st->last_absolute_total  = st->absolute_total;
+	st->absolute_total       = 0;
+	st->current_entry        = ((st->current_entry + 1) >= st->entries) ? 0 : st->current_entry + 1;
+	st->counter++;
 
 	// leave mutex locked
 
-	return usecdiff(now, old);
+	return st->usec_since_last_update;
 }
 
 void rrd_stats_done(RRD_STATS *st)
@@ -1048,7 +1070,7 @@ void rrd_stats_done(RRD_STATS *st)
 
 	// find if there are any obsolete dimensions (not updated recently)
 	for( rd = st->dimensions, last = NULL ; rd ; ) {
-		if((rd->last_updated + (10 * st->update_every)) < st->last_updated) { // remove it only it is not updated in 10 seconds
+		if((rd->last_updated.tv_sec + (10 * st->update_every)) < st->last_updated.tv_sec) { // remove it only it is not updated in 10 seconds
 			debug(D_RRD_STATS, "Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
 
 			if(!last) {
@@ -1066,19 +1088,172 @@ void rrd_stats_done(RRD_STATS *st)
 				continue;
 			}
 		}
-		else if((rd->last_updated + st->update_every) < st->last_updated) {
-			debug(D_RRD_STATS, "Clearing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
-
-			unsigned char zero[rd->bytes];
-			int i;
-			for(i = 0; i < rd->bytes ; i++) zero[i] = 0;
-
-			rrd_stats_dimension_set_by_pointer(st, rd, &zero, NULL);
-		}
 
 		last = rd;
 		rd = rd->next;
 	}
+
+	if(!st->dimensions) {
+		st->enabled = 0;
+		// rrd_stats_free(st);
+		return;
+	}
+
+	// calculate totals and count the dimensions
+	st->absolute_total = 0;
+	int dimensions;
+	for( rd = st->dimensions, dimensions = 0 ; rd ; rd = rd->next, dimensions++ )
+		st->absolute_total += rd->collected_value;
+
+	struct timeval now;
+	gettimeofday(&now, NULL);
+
+	// if this is the second+ value we collect
+	if(st->counter) {
+		
+		st->usec_since_last_update = usecdiff(&now, &st->last_updated);
+		if(st->debug) debug(D_RRD_STATS, "microseconds since last update: %llu", st->usec_since_last_update);
+
+		// x 10
+		// in all calculations we multiply with 10 to allow
+		// for all 1 decimal point at the chart
+
+		// process all dimensions to calculate its values
+		for( rd = st->dimensions ; rd ; rd = rd->next ) {
+			switch(rd->algorithm) {
+				case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
+					// the percentage of the current increment
+					// over the increment of all dimensions together
+					rd->calculated_value =
+						  (calculated_number)10
+						* (calculated_number)100
+						* (calculated_number)(rd->collected_value - rd->last_collected_value)
+						/ (calculated_number)(st->absolute_total  - st->last_absolute_total);
+
+					if(st->debug)
+						debug(D_RRD_STATS, "%s/%s: CALC "
+							CALCULATED_NUMBER_FORMAT " = 10 * 100"
+							" * (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
+							" / (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
+							, st->id, rd->name
+							, rd->calculated_value
+							, rd->collected_value, rd->last_collected_value
+							, st->absolute_total, st->last_absolute_total
+							);
+					break;
+
+				case RRD_DIMENSION_PCENT_OVER_ROW_TOTAL:
+					// the percentage of the current value
+					// over the total of all dimensions
+					rd->calculated_value =
+						  (calculated_number)10
+						* (calculated_number)100
+						* (calculated_number)rd->collected_value
+						/ (calculated_number)st->absolute_total;
+
+					if(st->debug)
+						debug(D_RRD_STATS, "%s/%s: CALC "
+							CALCULATED_NUMBER_FORMAT " = 10 * 100"
+							" * " COLLECTED_NUMBER_FORMAT
+							" / " COLLECTED_NUMBER_FORMAT
+							, st->id, rd->name
+							, rd->calculated_value
+							, rd->collected_value
+							, st->absolute_total
+							);
+					break;
+
+				case RRD_DIMENSION_INCREMENTAL:
+					// we need the incremental calculation to produce per second results
+					// so, we multiply with 1.000.000 and divide by the microseconds passed since
+					// the last entry
+					if(rd->last_collected_value > rd->collected_value) rd->calculated_value = 0;
+					else rd->calculated_value =
+						  (calculated_number)10
+						* (calculated_number)1000000
+						* (calculated_number)(rd->collected_value - rd->last_collected_value)
+						/ (calculated_number)st->usec_since_last_update;
+
+					if(st->debug)
+						debug(D_RRD_STATS, "%s/%s: CALC "
+							CALCULATED_NUMBER_FORMAT " = 10 * 1000000"
+							" * (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
+							" / %llu"
+							, st->id, rd->name
+							, rd->calculated_value
+							, rd->collected_value, rd->last_collected_value
+							, st->usec_since_last_update
+							);
+					break;
+
+				case RRD_DIMENSION_ABSOLUTE:
+					rd->calculated_value =
+						  (calculated_number)10
+						* (calculated_number)rd->collected_value;
+
+					if(st->debug)
+						debug(D_RRD_STATS, "%s/%s: CALC "
+							CALCULATED_NUMBER_FORMAT " = 10"
+							" * " COLLECTED_NUMBER_FORMAT
+							, st->id, rd->name
+							, rd->calculated_value
+							, rd->collected_value
+							);
+					break;
+
+				default:
+					// make the default zero, to make sure
+					// it gets noticed when we add new types
+					rd->calculated_value = 0;
+
+					if(st->debug)
+						debug(D_RRD_STATS, "%s/%s: CALC "
+							CALCULATED_NUMBER_FORMAT " = 0"
+							, st->id, rd->name
+							, rd->calculated_value
+							);
+					break;
+			}
+
+			// store the calculated value
+			rd->values[st->current_entry] = (storage_number)
+				(	  rd->calculated_value
+					* (calculated_number)rd->multiplier
+					/ (calculated_number)rd->divisor
+				);
+			
+			if(st->debug)
+				debug(D_RRD_STATS, "%s/%s STORE "
+					STORAGE_NUMBER_FORMAT " = "
+					CALCULATED_NUMBER_FORMAT
+					" * %ld"
+					" / %ld"
+					, st->id, rd->name
+					, rd->values[st->current_entry]
+					, rd->calculated_value
+					, rd->multiplier
+					, rd->divisor
+					);
+		}
+
+		if(!st->first_entry_t) {
+			// this is the first entry in the database
+			st->first_entry_t = now.tv_sec * 1000000ULL + now.tv_usec;
+		}
+		else {
+			if(st->counter > st->entries) {
+				// the db is overwriting values
+				// add the value we will overwrite
+				st->first_entry_t += st->timediff[st->current_entry];
+			}
+
+			// store the time difference to the last entry
+			st->timediff[st->current_entry] = st->usec_since_last_update;
+		}
+	}
+
+	st->last_updated.tv_sec  = now.tv_sec;
+	st->last_updated.tv_usec = now.tv_usec;
 
 	pthread_mutex_unlock(&st->mutex);
 }
@@ -1099,6 +1274,105 @@ struct web_buffer {
 };
 
 #define web_buffer_printf(wb, args...) wb->bytes += snprintf(&wb->buffer[wb->bytes], (wb->size - wb->bytes), ##args)
+
+void web_buffer_strcpy(struct web_buffer *wb, const char *txt)
+{
+	char *buffer = wb->buffer;
+	size_t bytes = wb->bytes, size = wb->size, i = 0;
+
+	while(txt[i] && bytes < size)
+		buffer[bytes++] = txt[i++];
+
+	wb->bytes = bytes;
+}
+
+void web_buffer_rrd_value(struct web_buffer *wb, storage_number value)
+{
+	if(wb->size - wb->bytes < 11) return;
+
+	char *str = &wb->buffer[wb->bytes];
+	char *wstr = str;
+
+	// make sure it is unsigned
+	ustorage_number uvalue = (value < 0) ? -value : value;
+
+	// print each digit
+	do *wstr++ = (char)(48 + (uvalue % 10)); while(uvalue /= 10);
+
+	// if it is just one byte, add a zero
+	if((wstr - str) == 1) *wstr++ = '0';
+
+	// put the sign back
+	if (value < 0) *wstr++ = '-';
+
+	// reverse it
+	strreverse(str, wstr-1);
+
+	// move the last digit
+	wstr--;
+	wstr[1] = wstr[0];
+
+	// put the dot
+	wstr[0] = '.';
+
+	// terminate it
+	wstr += 2;
+	*wstr='\0';
+
+	// update the buffer length
+	wb->bytes += (wstr - str);
+}
+
+// generate a javascript date, the fastest possible way...
+void web_buffer_jsdate(struct web_buffer *wb, int year, int month, int day, int hours, int minutes, int seconds, int milliseconds)
+{
+	//         10        20        30      = 35
+	// 01234567890123456789012345678901234
+	// Date(2014, 04, 01, 03, 28, 20, 065)
+
+	if(wb->size - wb->bytes < 36) return;
+
+	char *b = &wb->buffer[wb->bytes];
+
+	b[0]='D';
+	b[1]='a';
+	b[2]='t';
+	b[3]='e';
+	b[4]='(';
+	b[5]= 48 + year / 1000; year -= (year / 1000) * 1000;
+	b[6]= 48 + year / 100; year -= (year / 100) * 100;
+	b[7]= 48 + year / 10;
+	b[8]= 48 + year % 10;
+	b[9]=',';
+	b[10]=' ';
+	b[11]= 48 + month / 10;
+	b[12]= 48 + month % 10;
+	b[13]=',';
+	b[14]=' ';
+	b[15]= 48 + day / 10;
+	b[16]= 48 + day % 10;
+	b[17]=',';
+	b[18]=' ';
+	b[19]= 48 + hours / 10;
+	b[20]= 48 + hours % 10;
+	b[21]=',';
+	b[22]=' ';
+	b[23]= 48 + minutes / 10;
+	b[24]= 48 + minutes % 10;
+	b[25]=',';
+	b[26]=' ';
+	b[27]= 48 + seconds / 10;
+	b[28]= 48 + seconds % 10;
+	b[29]=',';
+	b[30]=' ';
+	b[31]= 48 + milliseconds / 100; milliseconds -= (milliseconds / 100) * 100;
+	b[32]= 48 + milliseconds / 10;
+	b[33]= 48 + milliseconds % 10;
+	b[34]=')';
+	b[35]='\0';
+
+	wb->bytes += 35;
+}
 
 struct web_buffer *web_buffer_create(size_t size)
 {
@@ -1264,61 +1538,11 @@ struct web_client *web_client_free(struct web_client *w)
 #define GROUP_MAX 		1
 
 // find the oldest entry in the data, skipping all empty slots
-size_t rrd_stats_first_entry(RRD_STATS *st)
+time_t rrd_stats_first_entry_t(RRD_STATS *st)
 {
-	size_t first_entry = st->current_entry + 1;
-	if(first_entry >= st->entries) first_entry = 0;
-
-	while(st->times[first_entry].tv_sec == 0 && first_entry != st->current_entry) {
-		first_entry++;
-		if(first_entry >= st->entries) first_entry = 0;
-	}
-
-	return first_entry;
-}
-
-long double rrd_stats_dimension_get(RRD_DIMENSION *rd, size_t position)
-{
-	if(rd->issigned) {
-		if(rd->bytes == sizeof(long long)) {
-			long long *dimension = rd->values;
-			return(dimension[position]);
-		}
-		else if(rd->bytes == sizeof(long)) {
-			long *dimension = rd->values;
-			return(dimension[position]);
-		}
-		else if(rd->bytes == sizeof(short int)) {
-			short int *dimension = rd->values;
-			return(dimension[position]);
-		}
-		else if(rd->bytes == sizeof(char)) {
-			char *dimension = rd->values;
-			return(dimension[position]);
-		}
-		else fatal("Cannot produce JSON for size %d bytes (signed) dimension.", rd->bytes);
-	}
-	else {
-		if(rd->bytes == sizeof(unsigned long long)) {
-			unsigned long long *dimension = rd->values;
-			return(dimension[position]);
-		}
-		else if(rd->bytes == sizeof(unsigned long)) {
-			unsigned long *dimension = rd->values;
-			return(dimension[position]);
-		}
-		else if(rd->bytes == sizeof(unsigned short int)) {
-			unsigned short int *dimension = rd->values;
-			return(dimension[position]);
-		}
-		else if(rd->bytes == sizeof(unsigned char)) {
-			unsigned char *dimension = rd->values;
-			return(dimension[position]);
-		}
-		else fatal("Cannot produce JSON for size %d bytes (unsigned) dimension.", rd->bytes);
-	}
-
-	return(0);
+	if(!st->first_entry_t) return st->last_updated.tv_sec;
+	
+	return st->first_entry_t / 1000000;
 }
 
 unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer *wb)
@@ -1327,57 +1551,62 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 
 	pthread_mutex_lock(&st->mutex);
 
-	size_t first_entry = rrd_stats_first_entry(st);
-	time_t first_entry_t = st->times[first_entry].tv_sec;
-
 	web_buffer_printf(wb,
 		"\t\t{\n"
 		"\t\t\t\"id\": \"%s\",\n"
 		"\t\t\t\"name\": \"%s\",\n"
 		"\t\t\t\"type\": \"%s\",\n"
-		"\t\t\t\"group_tag\": \"%s\",\n"
+		"\t\t\t\"family\": \"%s\",\n"
 		"\t\t\t\"title\": \"%s\",\n"
 		"\t\t\t\"priority\": %ld,\n"
 		"\t\t\t\"enabled\": %d,\n"
 		"\t\t\t\"units\": \"%s\",\n"
 		"\t\t\t\"url\": \"/data/%s/%s\",\n"
+		"\t\t\t\"chart_type\": \"%s\",\n"
+		"\t\t\t\"counter\": %ld,\n"
 		"\t\t\t\"entries\": %ld,\n"
-		"\t\t\t\"first_entry\": %ld,\n"
-		"\t\t\t\"first_entry_t\": %ld,\n"
+		"\t\t\t\"first_entry_t\": %lu,\n"
 		"\t\t\t\"last_entry\": %ld,\n"
 		"\t\t\t\"last_entry_t\": %lu,\n"
 		"\t\t\t\"last_entry_secs_ago\": %lu,\n"
 		"\t\t\t\"update_every\": %d,\n"
 		"\t\t\t\"isdetail\": %d,\n"
+		"\t\t\t\"usec_since_last_update\": %llu,\n"
+		"\t\t\t\"absolute_total\": " TOTAL_NUMBER_FORMAT ",\n"
+		"\t\t\t\"last_absolute_total\": " TOTAL_NUMBER_FORMAT ",\n"
 		"\t\t\t\"dimensions\": [\n"
 		, st->id
 		, st->name
 		, st->type
-		, st->group
+		, st->family
 		, st->usertitle
 		, st->userpriority
 		, st->enabled
 		, st->units
 		, st->name, options?options:""
+		, chart_type_name(st->chart_type)
+		, st->counter
 		, st->entries
-		, first_entry
-		, first_entry_t
+		, rrd_stats_first_entry_t(st)
 		, st->current_entry
-		, st->last_updated
-		, time(NULL) - st->last_updated
+		, st->last_updated.tv_sec
+		, time(NULL) - st->last_updated.tv_sec
 		, st->update_every
 		, st->isdetail
+		, st->usec_since_last_update
+		, st->absolute_total
+		, st->last_absolute_total
 		);
 
-	unsigned long memory = sizeof(RRD_STATS) + (sizeof(struct timeval) * st->entries);
+	unsigned long memory = sizeof(RRD_STATS) + (sizeof(uint32_t) * st->entries);
 
 	RRD_DIMENSION *rd;
 	for(rd = st->dimensions; rd ; rd = rd->next) {
-		unsigned long rdmem = sizeof(RRD_DIMENSION) + (rd->bytes * rd->entries);
+		unsigned long rdmem = sizeof(RRD_DIMENSION) + (sizeof(storage_number) * rd->entries);
 		memory += rdmem;
 
 		char *algorithm = "";
-		switch(rd->type) {
+		switch(rd->algorithm) {
 			case RRD_DIMENSION_INCREMENTAL:
 				algorithm = "incremental";
 				break;
@@ -1403,29 +1632,31 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 			"\t\t\t\t{\n"
 			"\t\t\t\t\t\"id\": \"%s\",\n"
 			"\t\t\t\t\t\"name\": \"%s\",\n"
-			"\t\t\t\t\t\"bytes\": %ld,\n"
 			"\t\t\t\t\t\"entries\": %ld,\n"
-			"\t\t\t\t\t\"isSigned\": %d,\n"
 			"\t\t\t\t\t\"isHidden\": %d,\n"
 			"\t\t\t\t\t\"algorithm\": \"%s\",\n"
 			"\t\t\t\t\t\"multiplier\": %ld,\n"
 			"\t\t\t\t\t\"divisor\": %ld,\n"
 			"\t\t\t\t\t\"last_entry_t\": %lu,\n"
-			"\t\t\t\t\t\"memory\": %lu,\n"
-			"\t\t\t\t\t\"last_collected_value\": %0.1Lf\n"
+			"\t\t\t\t\t\"collected_value\": " COLLECTED_NUMBER_FORMAT ",\n"
+			"\t\t\t\t\t\"calculated_value\": " CALCULATED_NUMBER_FORMAT ",\n"
+			"\t\t\t\t\t\"last_collected_value\": " COLLECTED_NUMBER_FORMAT ",\n"
+			"\t\t\t\t\t\"last_calculated_value\": " CALCULATED_NUMBER_FORMAT ",\n"
+			"\t\t\t\t\t\"memory\": %lu\n"
 			"\t\t\t\t}%s\n"
 			, rd->id
 			, rd->name
-			, rd->bytes
 			, rd->entries
-			, rd->issigned
 			, rd->hidden
 			, algorithm
 			, rd->multiplier
 			, rd->divisor
-			, rd->last_updated
+			, rd->last_updated.tv_sec
+			, rd->collected_value
+			, rd->calculated_value
+			, rd->last_collected_value
+			, rd->last_calculated_value
 			, rdmem
-			, rrd_stats_dimension_get(rd, st->current_entry)
 			, rd->next?",":""
 			);
 	}
@@ -1516,16 +1747,9 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	int c = 0;					// counter for dimension loops
 	int dimensions = 0;			// the total number of dimensions present
 
-	unsigned long long usec = 0;// usec between the entries
-
-	int we_need_totals = 0;		// if set, we should calculate totals for all dimensions
-
 	// find how many dimensions we have
 	RRD_DIMENSION *rd;
-	for( rd = st->dimensions ; rd ; rd = rd->next) {
-		dimensions++;
-		if(rd->type == RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL || rd->type == RRD_DIMENSION_PCENT_OVER_ROW_TOTAL) we_need_totals++;
-	}
+	for( rd = st->dimensions ; rd ; rd = rd->next) dimensions++;
 
 	if(!dimensions) {
 		pthread_mutex_unlock(&st->mutex);
@@ -1536,11 +1760,11 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	int annotation_count = 0;
 
 	// temp for the printable values
-	long double print_values[dimensions];
+	long long print_values[dimensions];
 	int print_hidden[dimensions];
 
 	// temporary storage to keep track of group values and counts
-	long double group_values[dimensions];
+	long long group_values[dimensions];
 	int group_count = 0;
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
 		group_values[c] = 0;
@@ -1567,24 +1791,24 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 
 	// make sure current_entry is within limits
 	if(current_entry < 0 || current_entry >= st->entries) current_entry = 0;
-	if(before == 0) before = st->times[current_entry].tv_sec;
+	if(before == 0) before = st->last_updated.tv_sec;
 
 	// find the oldest entry of the round-robin
-	stop_entry = rrd_stats_first_entry(st);
+	stop_entry = st->current_entry + 1;
+	if(stop_entry >= st->entries) stop_entry = st->entries - 1;
 
 	// skip the oldest, to have incremental data
-	if(after == 0) after = st->times[stop_entry].tv_sec;
+	if(after == 0) after = rrd_stats_first_entry_t(st);
 
 	// the minimum line length we expect
 	int line_size = 4096 + (dimensions * 200);
 
-	char overflow_annotation[201];
-	int overflow_annotation_len = snprintf(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
-	overflow_annotation[200] = '\0';
-
-	char normal_annotation[201];
-	int normal_annotation_len = snprintf(normal_annotation, 200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
-	normal_annotation[200] = '\0';
+	char overflow_annotation[201]; snprintf(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
+	char normal_annotation[201]; snprintf(normal_annotation, 200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
+	char pre_date[51]; snprintf(pre_date, 50, "		{%sc%s:[{%sv%s:%s", kq, kq, kq, kq, sq);
+	char post_date[21]; snprintf(post_date, 20, "%s}", sq);
+	char pre_value[21]; snprintf(pre_value, 20, ",{%sv%s:", kq, kq);
+	char post_value[21]; snprintf(post_value, 20, "}");
 
 	// to allow grouping on the same values, we need a pad
 	long pad = before % group;
@@ -1598,21 +1822,24 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 
 	// loop in dimension data
 	int annotate_reset = 0;
-	long t = current_entry, lt = current_entry - 1, count; // t = the current entry, lt = the last entry of data
-	if(lt < 0) lt = st->entries - 1;
-	for (count = printed = 0; t != stop_entry ; t = lt--) {
+	struct timeval now;
+	now.tv_sec = st->last_updated.tv_sec;
+	now.tv_usec = st->last_updated.tv_usec;
+	unsigned long long time_usec = now.tv_sec * 1000000ULL + now.tv_usec;
+	long t, count;
+	for (count = printed = 0, t = current_entry; t != stop_entry && st->timediff[t] ; time_usec -= st->timediff[t], t--) {
 		int print_this = 0;
 
-		if(lt < 0) lt = st->entries - 1;
+		if(t < 0) t = st->entries - 1;
+
+		now.tv_sec = time_usec / 1000000;
+		now.tv_usec = time_usec % 1000000;
 
 		// make sure we return data in the proper time range
-		if(st->times[t].tv_sec < after || st->times[t].tv_sec > before) continue;
+		if(now.tv_sec < after || now.tv_sec > before) continue;
+
 		count++;
 		group_count++;
-
-		// ok. we will use this entry!
-		// find how much usec since the previous entry
-		usec = usecdiff(&st->times[t], &st->times[lt]);
 
 		if(((count - pad) % group) == 0) {
 			if(printed >= entries_to_show) {
@@ -1633,62 +1860,22 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 			web_buffer_increase(wb, line_size);
 
 			// generate the local date time
-			struct tm *tm = localtime(&st->times[t].tv_sec);
+			struct tm *tm = localtime(&now.tv_sec);
 			if(!tm) { error("localtime() failed."); continue; }
-			if(st->times[t].tv_sec > last_timestamp) last_timestamp = st->times[t].tv_sec;
+			if(now.tv_sec > last_timestamp) last_timestamp = now.tv_sec;
 
-			web_buffer_printf(wb, "%s		{%sc%s:[{%sv%s:%sDate(%d, %d, %d, %d, %d, %d, %d)%s}", printed?"]},\n":"",
-				kq, kq, kq, kq, sq,
-				tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(st->times[t].tv_usec / 1000),
-				sq);
+			if(printed) web_buffer_strcpy(wb, "]},\n");
+			web_buffer_strcpy(wb, pre_date);
+			web_buffer_jsdate(wb, tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(now.tv_usec / 1000));
+			// web_buffer_printf(wb, "%d, %d, %d, %d, %d, %d, %d", tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(now.tv_usec / 1000));
+			web_buffer_strcpy(wb, post_date);
 
 			print_this = 1;
 		}
 
-		// if we need a PCENT_OVER_TOTAL, calculate the totals for the current and the last
-		long double total = 0, oldtotal = 0;
-		if(we_need_totals) {
-			for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
-				total    += rrd_stats_dimension_get(rd, t);
-				oldtotal += rrd_stats_dimension_get(rd, lt);
-			}
-		}
-
 		for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
-			long double oldvalue, value;			// temp variable for storing data values
-
-			value    = rrd_stats_dimension_get(rd, t);
-			oldvalue = rrd_stats_dimension_get(rd, lt);
+			long value = rd->values[t];
 			
-			switch(rd->type) {
-				case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
-					value = 100.0 * (value - oldvalue) / (total - oldtotal);
-					break;
-
-				case RRD_DIMENSION_PCENT_OVER_ROW_TOTAL:
-					value = 100.0 * value / total;
-					break;
-
-				case RRD_DIMENSION_INCREMENTAL:
-					if(oldvalue > value) {
-						annotate_reset = 1;
-						value = 0;
-					}
-					else value -= oldvalue;
-
-					value = value * 1000000.0 / (long double)usec;
-					break;
-
-				default:
-					break;
-			}
-
-			value = value * (long double)rd->multiplier / (long double)rd->divisor;
-
-//			if(rd->options & RRD_OPTION_ANNOTATE_NOT_ZERO) {
-//				annotation_add(my_annotations, rd->name, "%s = %0.1lf", value);
-//			}
-
 			switch(group_method) {
 				case GROUP_MAX:
 					if(abs(value) > abs(group_values[c])) group_values[c] = value;
@@ -1712,18 +1899,20 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 			
 			if(annotate_reset) {
 				annotation_count++;
-				strcpy(&wb->buffer[wb->bytes], overflow_annotation);
-				wb->bytes += overflow_annotation_len;
+				web_buffer_strcpy(wb, overflow_annotation);
 				annotate_reset = 0;
 			}
-			else {
-				strcpy(&wb->buffer[wb->bytes], normal_annotation);
-				wb->bytes += normal_annotation_len;
-			}
+			else
+				web_buffer_strcpy(wb, normal_annotation);
 
 			for(c = 0 ; c < dimensions ; c++) {
-				if(!print_hidden[c])
-					web_buffer_printf(wb, ",{%sv%s:%0.1Lf}", kq, kq, print_values[c]);
+				if(!print_hidden[c]) {
+					web_buffer_strcpy(wb, pre_value);
+					web_buffer_rrd_value(wb, print_values[c]);
+					// long double x = (long double)print_values[c] / 10.0;
+					// web_buffer_printf(wb, "%0.1Lf", x);
+					web_buffer_strcpy(wb, post_value);
+				}
 			}
 
 			printed++;
@@ -2117,7 +2306,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	if(datasource_type == DATASOURCE_GOOGLE_JSONP) {
 		w->data->bytes = snprintf(w->data->buffer, w->data->size, 
 			"%s({version:'%s',reqId:'%s',status:'ok',sig:'%lu',table:",
-			google_responseHandler, google_version, google_reqId, st->last_updated);
+			google_responseHandler, google_version, google_reqId, st->last_updated.tv_sec);
 	}
 	
 	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group, %d group_method, %lu after, %lu before).", w->id, st->name, st->id, lines, group_count, group_method, after, before);
@@ -3008,15 +3197,15 @@ int do_proc_net_dev() {
 		if(do_bandwidth) {
 			st = rrd_stats_find_bytype(RRD_TYPE_NET, iface);
 			if(!st) {
-				st = rrd_stats_create(RRD_TYPE_NET, iface, NULL, iface, "Bandwidth", "kilobits/s", 1000);
+				st = rrd_stats_create(RRD_TYPE_NET, iface, NULL, iface, "Bandwidth", "kilobits/s", 1000, update_every, CHART_TYPE_AREA);
 
-				rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
-				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "received", NULL, 8, 1024, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "sent", NULL, -8, 1024, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(st);
 
-			rrd_stats_dimension_set(st, "received", &rbytes, NULL);
-			rrd_stats_dimension_set(st, "sent", &tbytes, NULL);
+			rrd_stats_dimension_set(st, "received", rbytes);
+			rrd_stats_dimension_set(st, "sent", tbytes);
 			rrd_stats_done(st);
 		}
 
@@ -3025,16 +3214,16 @@ int do_proc_net_dev() {
 		if(do_packets) {
 			st = rrd_stats_find_bytype("net_packets", iface);
 			if(!st) {
-				st = rrd_stats_create("net_packets", iface, NULL, iface, "Packets", "packets/s", 1001);
+				st = rrd_stats_create("net_packets", iface, NULL, iface, "Packets", "packets/s", 1001, update_every, CHART_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "received", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "sent", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(st);
 
-			rrd_stats_dimension_set(st, "received", &rpackets, NULL);
-			rrd_stats_dimension_set(st, "sent", &tpackets, NULL);
+			rrd_stats_dimension_set(st, "received", rpackets);
+			rrd_stats_dimension_set(st, "sent", tpackets);
 			rrd_stats_done(st);
 		}
 
@@ -3043,16 +3232,16 @@ int do_proc_net_dev() {
 		if(do_errors) {
 			st = rrd_stats_find_bytype("net_errors", iface);
 			if(!st) {
-				st = rrd_stats_create("net_errors", iface, NULL, iface, "Interface Errors", "errors/s", 1002);
+				st = rrd_stats_create("net_errors", iface, NULL, iface, "Interface Errors", "errors/s", 1002, update_every, CHART_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "receive", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-				rrd_stats_dimension_add(st, "transmit", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "receive", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "transmit", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(st);
 
-			rrd_stats_dimension_set(st, "receive", &rerrors, NULL);
-			rrd_stats_dimension_set(st, "transmit", &terrors, NULL);
+			rrd_stats_dimension_set(st, "receive", rerrors);
+			rrd_stats_dimension_set(st, "transmit", terrors);
 			rrd_stats_done(st);
 		}
 
@@ -3061,16 +3250,16 @@ int do_proc_net_dev() {
 		if(do_fifo) {
 			st = rrd_stats_find_bytype("net_fifo", iface);
 			if(!st) {
-				st = rrd_stats_create("net_fifo", iface, NULL, iface, "Interface Queue", "packets", 1100);
+				st = rrd_stats_create("net_fifo", iface, NULL, iface, "Interface Queue", "packets", 1100, update_every, CHART_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "receive", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
-				rrd_stats_dimension_add(st, "transmit", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
+				rrd_stats_dimension_add(st, "receive", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
+				rrd_stats_dimension_add(st, "transmit", NULL, -1, 1, RRD_DIMENSION_ABSOLUTE);
 			}
 			else rrd_stats_next(st);
 
-			rrd_stats_dimension_set(st, "receive", &rfifo, NULL);
-			rrd_stats_dimension_set(st, "transmit", &tfifo, NULL);
+			rrd_stats_dimension_set(st, "receive", rfifo);
+			rrd_stats_dimension_set(st, "transmit", tfifo);
 			rrd_stats_done(st);
 		}
 
@@ -3079,16 +3268,16 @@ int do_proc_net_dev() {
 		if(do_compressed) {
 			st = rrd_stats_find_bytype("net_compressed", iface);
 			if(!st) {
-				st = rrd_stats_create("net_compressed", iface, NULL, iface, "Compressed Packets", "packets/s", 1200);
+				st = rrd_stats_create("net_compressed", iface, NULL, iface, "Compressed Packets", "packets/s", 1200, update_every, CHART_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-				rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "received", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "sent", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(st);
 
-			rrd_stats_dimension_set(st, "received", &rcompressed, NULL);
-			rrd_stats_dimension_set(st, "sent", &tcompressed, NULL);
+			rrd_stats_dimension_set(st, "received", rcompressed);
+			rrd_stats_dimension_set(st, "sent", tcompressed);
 			rrd_stats_done(st);
 		}
 	}
@@ -3297,15 +3486,15 @@ int do_proc_diskstats() {
 				}
 				else error("Cannot read sector size for device %s from %s. Assuming 512.", disk, ssfilename);
 
-				st = rrd_stats_create(RRD_TYPE_DISK, disk, NULL, disk, "Disk I/O", "kilobytes/s", 2000);
+				st = rrd_stats_create(RRD_TYPE_DISK, disk, NULL, disk, "Disk I/O", "kilobytes/s", 2000, update_every, CHART_TYPE_AREA);
 
-				rrd_stats_dimension_add(st, "reads", NULL, sizeof(unsigned long long), 0, sector_size, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
-				rrd_stats_dimension_add(st, "writes", NULL, sizeof(unsigned long long), 0, sector_size * -1, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "reads", NULL, sector_size, 1024, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "writes", NULL, sector_size * -1, 1024, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(st);
 
-			rrd_stats_dimension_set(st, "reads", &readsectors, NULL);
-			rrd_stats_dimension_set(st, "writes", &writesectors, NULL);
+			rrd_stats_dimension_set(st, "reads", readsectors);
+			rrd_stats_dimension_set(st, "writes", writesectors);
 			rrd_stats_done(st);
 		}
 
@@ -3314,16 +3503,16 @@ int do_proc_diskstats() {
 		if(do_ops) {
 			st = rrd_stats_find_bytype("disk_ops", disk);
 			if(!st) {
-				st = rrd_stats_create("disk_ops", disk, NULL, disk, "Disk Operations", "operations/s", 2001);
+				st = rrd_stats_create("disk_ops", disk, NULL, disk, "Disk Operations", "operations/s", 2001, update_every, CHART_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "reads", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-				rrd_stats_dimension_add(st, "writes", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "reads", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "writes", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(st);
 
-			rrd_stats_dimension_set(st, "reads", &reads, NULL);
-			rrd_stats_dimension_set(st, "writes", &writes, NULL);
+			rrd_stats_dimension_set(st, "reads", reads);
+			rrd_stats_dimension_set(st, "writes", writes);
 			rrd_stats_done(st);
 		}
 		
@@ -3332,16 +3521,16 @@ int do_proc_diskstats() {
 		if(do_merged_ops) {
 			st = rrd_stats_find_bytype("disk_merged_ops", disk);
 			if(!st) {
-				st = rrd_stats_create("disk_merged_ops", disk, NULL, disk, "Merged Disk Operations", "operations/s", 2010);
+				st = rrd_stats_create("disk_merged_ops", disk, NULL, disk, "Merged Disk Operations", "operations/s", 2010, update_every, CHART_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "reads", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-				rrd_stats_dimension_add(st, "writes", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "reads", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "writes", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(st);
 
-			rrd_stats_dimension_set(st, "reads", &reads_merged, NULL);
-			rrd_stats_dimension_set(st, "writes", &writes_merged, NULL);
+			rrd_stats_dimension_set(st, "reads", reads_merged);
+			rrd_stats_dimension_set(st, "writes", writes_merged);
 			rrd_stats_done(st);
 		}
 
@@ -3350,20 +3539,20 @@ int do_proc_diskstats() {
 		if(do_iotime) {
 			st = rrd_stats_find_bytype("disk_iotime", disk);
 			if(!st) {
-				st = rrd_stats_create("disk_iotime", disk, NULL, disk, "Disk I/O Time", "milliseconds/s", 2005);
+				st = rrd_stats_create("disk_iotime", disk, NULL, disk, "Disk I/O Time", "milliseconds/s", 2005, update_every, CHART_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "reads", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-				rrd_stats_dimension_add(st, "writes", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-				rrd_stats_dimension_add(st, "latency", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-				rrd_stats_dimension_add(st, "weighted", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(st, "reads", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "writes", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "latency", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "weighted", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(st);
 
-			rrd_stats_dimension_set(st, "reads", &readms, NULL);
-			rrd_stats_dimension_set(st, "writes", &writems, NULL);
-			rrd_stats_dimension_set(st, "latency", &iosms, NULL);
-			rrd_stats_dimension_set(st, "weighted", &wiosms, NULL);
+			rrd_stats_dimension_set(st, "reads", readms);
+			rrd_stats_dimension_set(st, "writes", writems);
+			rrd_stats_dimension_set(st, "latency", iosms);
+			rrd_stats_dimension_set(st, "weighted", wiosms);
 			rrd_stats_done(st);
 		}
 
@@ -3372,14 +3561,14 @@ int do_proc_diskstats() {
 		if(do_cur_ops) {
 			st = rrd_stats_find_bytype("disk_cur_ops", disk);
 			if(!st) {
-				st = rrd_stats_create("disk_cur_ops", disk, NULL, disk, "Current Disk I/O operations", "operations", 2004);
+				st = rrd_stats_create("disk_cur_ops", disk, NULL, disk, "Current Disk I/O operations", "operations", 2004, update_every, CHART_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "operations", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
+				rrd_stats_dimension_add(st, "operations", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
 			}
 			else rrd_stats_next(st);
 
-			rrd_stats_dimension_set(st, "operations", &currentios, NULL);
+			rrd_stats_dimension_set(st, "operations", currentios);
 			rrd_stats_done(st);
 		}
 	}
@@ -3447,17 +3636,17 @@ int do_proc_net_snmp() {
 			if(do_ip_packets) {
 				st = rrd_stats_find(RRD_TYPE_NET_SNMP ".packets");
 				if(!st) {
-					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "packets", NULL, RRD_TYPE_NET_SNMP, "IPv4 Packets", "packets/s", 3000);
+					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "packets", NULL, RRD_TYPE_NET_SNMP, "IPv4 Packets", "packets/s", 3000, update_every, CHART_TYPE_LINE);
 
-					rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "forwarded", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "received", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "sent", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "forwarded", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
-				rrd_stats_dimension_set(st, "sent", &OutRequests, NULL);
-				rrd_stats_dimension_set(st, "received", &InReceives, NULL);
-				rrd_stats_dimension_set(st, "forwarded", &ForwDatagrams, NULL);
+				rrd_stats_dimension_set(st, "sent", OutRequests);
+				rrd_stats_dimension_set(st, "received", InReceives);
+				rrd_stats_dimension_set(st, "forwarded", ForwDatagrams);
 				rrd_stats_done(st);
 			}
 
@@ -3466,18 +3655,18 @@ int do_proc_net_snmp() {
 			if(do_ip_fragsout) {
 				st = rrd_stats_find(RRD_TYPE_NET_SNMP ".fragsout");
 				if(!st) {
-					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "fragsout", NULL, RRD_TYPE_NET_SNMP, "IPv4 Fragments Sent", "packets/s", 3010);
+					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "fragsout", NULL, RRD_TYPE_NET_SNMP, "IPv4 Fragments Sent", "packets/s", 3010, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "ok", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "failed", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "all", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "ok", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "failed", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "all", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
-				rrd_stats_dimension_set(st, "ok", &FragOKs, NULL);
-				rrd_stats_dimension_set(st, "failed", &FragFails, NULL);
-				rrd_stats_dimension_set(st, "all", &FragCreates, NULL);
+				rrd_stats_dimension_set(st, "ok", FragOKs);
+				rrd_stats_dimension_set(st, "failed", FragFails);
+				rrd_stats_dimension_set(st, "all", FragCreates);
 				rrd_stats_done(st);
 			}
 
@@ -3486,18 +3675,18 @@ int do_proc_net_snmp() {
 			if(do_ip_fragsin) {
 				st = rrd_stats_find(RRD_TYPE_NET_SNMP ".fragsin");
 				if(!st) {
-					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "fragsin", NULL, RRD_TYPE_NET_SNMP, "IPv4 Fragments Reassembly", "packets/s", 3011);
+					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "fragsin", NULL, RRD_TYPE_NET_SNMP, "IPv4 Fragments Reassembly", "packets/s", 3011, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "ok", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "failed", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "all", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "ok", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "failed", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "all", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
-				rrd_stats_dimension_set(st, "ok", &ReasmOKs, NULL);
-				rrd_stats_dimension_set(st, "failed", &ReasmFails, NULL);
-				rrd_stats_dimension_set(st, "all", &ReasmReqds, NULL);
+				rrd_stats_dimension_set(st, "ok", ReasmOKs);
+				rrd_stats_dimension_set(st, "failed", ReasmFails);
+				rrd_stats_dimension_set(st, "all", ReasmReqds);
 				rrd_stats_done(st);
 			}
 
@@ -3506,26 +3695,26 @@ int do_proc_net_snmp() {
 			if(do_ip_errors) {
 				st = rrd_stats_find(RRD_TYPE_NET_SNMP ".errors");
 				if(!st) {
-					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "errors", NULL, RRD_TYPE_NET_SNMP, "IPv4 Errors", "packets/s", 3002);
+					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "errors", NULL, RRD_TYPE_NET_SNMP, "IPv4 Errors", "packets/s", 3002, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "InDiscards", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "OutDiscards", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "InDiscards", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "OutDiscards", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 
-					rrd_stats_dimension_add(st, "InHdrErrors", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "InAddrErrors", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "InUnknownProtos", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "InHdrErrors", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "InAddrErrors", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "InUnknownProtos", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
 
-					rrd_stats_dimension_add(st, "OutNoRoutes", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "OutNoRoutes", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
-				rrd_stats_dimension_set(st, "InDiscards", &InDiscards, NULL);
-				rrd_stats_dimension_set(st, "OutDiscards", &OutDiscards, NULL);
-				rrd_stats_dimension_set(st, "InHdrErrors", &InHdrErrors, NULL);
-				rrd_stats_dimension_set(st, "InAddrErrors", &InAddrErrors, NULL);
-				rrd_stats_dimension_set(st, "InUnknownProtos", &InUnknownProtos, NULL);
-				rrd_stats_dimension_set(st, "OutNoRoutes", &OutNoRoutes, NULL);
+				rrd_stats_dimension_set(st, "InDiscards", InDiscards);
+				rrd_stats_dimension_set(st, "OutDiscards", OutDiscards);
+				rrd_stats_dimension_set(st, "InHdrErrors", InHdrErrors);
+				rrd_stats_dimension_set(st, "InAddrErrors", InAddrErrors);
+				rrd_stats_dimension_set(st, "InUnknownProtos", InUnknownProtos);
+				rrd_stats_dimension_set(st, "OutNoRoutes", OutNoRoutes);
 				rrd_stats_done(st);
 			}
 		}
@@ -3554,13 +3743,13 @@ int do_proc_net_snmp() {
 			if(do_tcp_sockets) {
 				st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcpsock");
 				if(!st) {
-					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "tcpsock", NULL, "tcp", "IPv4 TCP Connections", "active connections", 2500);
+					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "tcpsock", NULL, "tcp", "IPv4 TCP Connections", "active connections", 2500, update_every, CHART_TYPE_LINE);
 
-					rrd_stats_dimension_add(st, "connections", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
+					rrd_stats_dimension_add(st, "connections", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
 				}
 				else rrd_stats_next(st);
 
-				rrd_stats_dimension_set(st, "connections", &CurrEstab, NULL);
+				rrd_stats_dimension_set(st, "connections", CurrEstab);
 				rrd_stats_done(st);
 			}
 
@@ -3569,15 +3758,15 @@ int do_proc_net_snmp() {
 			if(do_tcp_packets) {
 				st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcppackets");
 				if(!st) {
-					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "tcppackets", NULL, "tcp", "IPv4 TCP Packets", "packets/s", 2600);
+					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "tcppackets", NULL, "tcp", "IPv4 TCP Packets", "packets/s", 2600, update_every, CHART_TYPE_LINE);
 
-					rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "received", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "sent", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
-				rrd_stats_dimension_set(st, "received", &InSegs, NULL);
-				rrd_stats_dimension_set(st, "sent", &OutSegs, NULL);
+				rrd_stats_dimension_set(st, "received", InSegs);
+				rrd_stats_dimension_set(st, "sent", OutSegs);
 				rrd_stats_done(st);
 			}
 
@@ -3586,16 +3775,16 @@ int do_proc_net_snmp() {
 			if(do_tcp_errors) {
 				st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcperrors");
 				if(!st) {
-					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "tcperrors", NULL, "tcp", "IPv4 TCP Errors", "packets/s", 2700);
+					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "tcperrors", NULL, "tcp", "IPv4 TCP Errors", "packets/s", 2700, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "InErrs", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "RetransSegs", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "InErrs", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "RetransSegs", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
-				rrd_stats_dimension_set(st, "InErrs", &InErrs, NULL);
-				rrd_stats_dimension_set(st, "RetransSegs", &RetransSegs, NULL);
+				rrd_stats_dimension_set(st, "InErrs", InErrs);
+				rrd_stats_dimension_set(st, "RetransSegs", RetransSegs);
 				rrd_stats_done(st);
 			}
 
@@ -3604,22 +3793,22 @@ int do_proc_net_snmp() {
 			if(do_tcp_handshake) {
 				st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcphandshake");
 				if(!st) {
-					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "tcphandshake", NULL, "tcp", "IPv4 TCP Handshake Issues", "events/s", 2900);
+					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "tcphandshake", NULL, "tcp", "IPv4 TCP Handshake Issues", "events/s", 2900, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "EstabResets", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "OutRsts", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "ActiveOpens", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "PassiveOpens", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "AttemptFails", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "EstabResets", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "OutRsts", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "ActiveOpens", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "PassiveOpens", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "AttemptFails", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
-				rrd_stats_dimension_set(st, "EstabResets", &EstabResets, NULL);
-				rrd_stats_dimension_set(st, "OutRsts", &OutRsts, NULL);
-				rrd_stats_dimension_set(st, "ActiveOpens", &ActiveOpens, NULL);
-				rrd_stats_dimension_set(st, "PassiveOpens", &PassiveOpens, NULL);
-				rrd_stats_dimension_set(st, "AttemptFails", &AttemptFails, NULL);
+				rrd_stats_dimension_set(st, "EstabResets", EstabResets);
+				rrd_stats_dimension_set(st, "OutRsts", OutRsts);
+				rrd_stats_dimension_set(st, "ActiveOpens", ActiveOpens);
+				rrd_stats_dimension_set(st, "PassiveOpens", PassiveOpens);
+				rrd_stats_dimension_set(st, "AttemptFails", AttemptFails);
 				rrd_stats_done(st);
 			}
 		}
@@ -3647,15 +3836,15 @@ int do_proc_net_snmp() {
 			if(do_udp_packets) {
 				st = rrd_stats_find(RRD_TYPE_NET_SNMP ".udppackets");
 				if(!st) {
-					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "udppackets", NULL, "udp", "IPv4 UDP Packets", "packets/s", 2601);
+					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "udppackets", NULL, "udp", "IPv4 UDP Packets", "packets/s", 2601, update_every, CHART_TYPE_LINE);
 
-					rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "received", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "sent", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
-				rrd_stats_dimension_set(st, "received", &InDatagrams, NULL);
-				rrd_stats_dimension_set(st, "sent", &OutDatagrams, NULL);
+				rrd_stats_dimension_set(st, "received", InDatagrams);
+				rrd_stats_dimension_set(st, "sent", OutDatagrams);
 				rrd_stats_done(st);
 			}
 
@@ -3664,20 +3853,20 @@ int do_proc_net_snmp() {
 			if(do_udp_errors) {
 				st = rrd_stats_find(RRD_TYPE_NET_SNMP ".udperrors");
 				if(!st) {
-					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "udperrors", NULL, "udp", "IPv4 UDP Errors", "events/s", 2701);
+					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "udperrors", NULL, "udp", "IPv4 UDP Errors", "events/s", 2701, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "RcvbufErrors", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "SndbufErrors", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "InErrors", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "NoPorts", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "RcvbufErrors", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "SndbufErrors", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "InErrors", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "NoPorts", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
-				rrd_stats_dimension_set(st, "InErrors", &InErrors, NULL);
-				rrd_stats_dimension_set(st, "NoPorts", &NoPorts, NULL);
-				rrd_stats_dimension_set(st, "RcvbufErrors", &RcvbufErrors, NULL);
-				rrd_stats_dimension_set(st, "SndbufErrors", &SndbufErrors, NULL);
+				rrd_stats_dimension_set(st, "InErrors", InErrors);
+				rrd_stats_dimension_set(st, "NoPorts", NoPorts);
+				rrd_stats_dimension_set(st, "RcvbufErrors", RcvbufErrors);
+				rrd_stats_dimension_set(st, "SndbufErrors", SndbufErrors);
 				rrd_stats_done(st);
 			}
 		}
@@ -3744,15 +3933,15 @@ int do_proc_net_netstat() {
 			if(do_bandwidth) {
 				st = rrd_stats_find("system.ipv4");
 				if(!st) {
-					st = rrd_stats_create("system", "ipv4", NULL, "ipv4", "IPv4 Bandwidth", "kilobits/s", 2000);
+					st = rrd_stats_create("system", "ipv4", NULL, "ipv4", "IPv4 Bandwidth", "kilobits/s", 2000, update_every, CHART_TYPE_AREA);
 
-					rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "received", NULL, 8, 1024, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "sent", NULL, -8, 1024, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
-				rrd_stats_dimension_set(st, "sent", &OutOctets, NULL);
-				rrd_stats_dimension_set(st, "received", &InOctets, NULL);
+				rrd_stats_dimension_set(st, "sent", OutOctets);
+				rrd_stats_dimension_set(st, "received", InOctets);
 				rrd_stats_done(st);
 			}
 
@@ -3761,16 +3950,16 @@ int do_proc_net_netstat() {
 			if(do_inerrors) {
 				st = rrd_stats_find("ipv4.inerrors");
 				if(!st) {
-					st = rrd_stats_create("ipv4", "inerrors", NULL, "ipv4", "IPv4 Input Errors", "packets/s", 4000);
+					st = rrd_stats_create("ipv4", "inerrors", NULL, "ipv4", "IPv4 Input Errors", "packets/s", 4000, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "noroutes", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "trunkated", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "noroutes", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "trunkated", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
-				rrd_stats_dimension_set(st, "noroutes", &InNoRoutes, NULL);
-				rrd_stats_dimension_set(st, "trunkated", &InTruncatedPkts, NULL);
+				rrd_stats_dimension_set(st, "noroutes", InNoRoutes);
+				rrd_stats_dimension_set(st, "trunkated", InTruncatedPkts);
 				rrd_stats_done(st);
 			}
 
@@ -3779,16 +3968,16 @@ int do_proc_net_netstat() {
 			if(do_mcast) {
 				st = rrd_stats_find("ipv4.mcast");
 				if(!st) {
-					st = rrd_stats_create("ipv4", "mcast", NULL, "ipv4", "IPv4 Multicast Bandwidth", "kilobits/s", 9000);
+					st = rrd_stats_create("ipv4", "mcast", NULL, "ipv4", "IPv4 Multicast Bandwidth", "kilobits/s", 9000, update_every, CHART_TYPE_AREA);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "received", NULL, 8, 1024, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "sent", NULL, -8, 1024, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
-				rrd_stats_dimension_set(st, "sent", &OutMcastOctets, NULL);
-				rrd_stats_dimension_set(st, "received", &InMcastOctets, NULL);
+				rrd_stats_dimension_set(st, "sent", OutMcastOctets);
+				rrd_stats_dimension_set(st, "received", InMcastOctets);
 				rrd_stats_done(st);
 			}
 
@@ -3797,16 +3986,16 @@ int do_proc_net_netstat() {
 			if(do_bcast) {
 				st = rrd_stats_find("ipv4.bcast");
 				if(!st) {
-					st = rrd_stats_create("ipv4", "bcast", NULL, "ipv4", "IPv4 Broadcast Bandwidth", "kilobits/s", 8000);
+					st = rrd_stats_create("ipv4", "bcast", NULL, "ipv4", "IPv4 Broadcast Bandwidth", "kilobits/s", 8000, update_every, CHART_TYPE_AREA);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "received", NULL, 8, 1024, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "sent", NULL, -8, 1024, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
-				rrd_stats_dimension_set(st, "sent", &OutBcastOctets, NULL);
-				rrd_stats_dimension_set(st, "received", &InBcastOctets, NULL);
+				rrd_stats_dimension_set(st, "sent", OutBcastOctets);
+				rrd_stats_dimension_set(st, "received", InBcastOctets);
 				rrd_stats_done(st);
 			}
 
@@ -3815,16 +4004,16 @@ int do_proc_net_netstat() {
 			if(do_mcast_p) {
 				st = rrd_stats_find("ipv4.mcastpkts");
 				if(!st) {
-					st = rrd_stats_create("ipv4", "mcastpkts", NULL, "ipv4", "IPv4 Multicast Packets", "packets/s", 9500);
+					st = rrd_stats_create("ipv4", "mcastpkts", NULL, "ipv4", "IPv4 Multicast Packets", "packets/s", 9500, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "received", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "sent", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
-				rrd_stats_dimension_set(st, "sent", &OutMcastPkts, NULL);
-				rrd_stats_dimension_set(st, "received", &InMcastPkts, NULL);
+				rrd_stats_dimension_set(st, "sent", OutMcastPkts);
+				rrd_stats_dimension_set(st, "received", InMcastPkts);
 				rrd_stats_done(st);
 			}
 
@@ -3833,16 +4022,16 @@ int do_proc_net_netstat() {
 			if(do_bcast_p) {
 				st = rrd_stats_find("ipv4.bcastpkts");
 				if(!st) {
-					st = rrd_stats_create("ipv4", "bcastpkts", NULL, "ipv4", "IPv4 Broadcast Packets", "packets/s", 8500);
+					st = rrd_stats_create("ipv4", "bcastpkts", NULL, "ipv4", "IPv4 Broadcast Packets", "packets/s", 8500, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "received", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "sent", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
-				rrd_stats_dimension_set(st, "sent", &OutBcastPkts, NULL);
-				rrd_stats_dimension_set(st, "received", &InBcastPkts, NULL);
+				rrd_stats_dimension_set(st, "sent", OutBcastPkts);
+				rrd_stats_dimension_set(st, "received", InBcastPkts);
 				rrd_stats_done(st);
 			}
 		}
@@ -3921,13 +4110,13 @@ int do_proc_net_stat_conntrack() {
 	if(do_sockets) {
 		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".sockets");
 		if(!st) {
-			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "sockets", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connections", "active connections", 1000);
+			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "sockets", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connections", "active connections", 1000, update_every, CHART_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "connections", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "connections", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "connections", &aentries, NULL);
+		rrd_stats_dimension_set(st, "connections", aentries);
 		rrd_stats_done(st);
 	}
 
@@ -3936,17 +4125,17 @@ int do_proc_net_stat_conntrack() {
 	if(do_new) {
 		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".new");
 		if(!st) {
-			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "new", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter New Connections", "connections/s", 1001);
+			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "new", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter New Connections", "connections/s", 1001, update_every, CHART_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "new", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-			rrd_stats_dimension_add(st, "ignore", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-			rrd_stats_dimension_add(st, "invalid", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "new", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "ignore", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "invalid", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "new", &anew, NULL);
-		rrd_stats_dimension_set(st, "ignore", &aignore, NULL);
-		rrd_stats_dimension_set(st, "invalid", &ainvalid, NULL);
+		rrd_stats_dimension_set(st, "new", anew);
+		rrd_stats_dimension_set(st, "ignore", aignore);
+		rrd_stats_dimension_set(st, "invalid", ainvalid);
 		rrd_stats_done(st);
 	}
 
@@ -3955,18 +4144,18 @@ int do_proc_net_stat_conntrack() {
 	if(do_changes) {
 		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".changes");
 		if(!st) {
-			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "changes", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Changes", "changes/s", 1002);
+			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "changes", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Changes", "changes/s", 1002, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "inserted", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-			rrd_stats_dimension_add(st, "deleted", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-			rrd_stats_dimension_add(st, "delete_list", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "inserted", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "deleted", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "delete_list", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "inserted", &ainsert, NULL);
-		rrd_stats_dimension_set(st, "deleted", &adelete, NULL);
-		rrd_stats_dimension_set(st, "delete_list", &adelete_list, NULL);
+		rrd_stats_dimension_set(st, "inserted", ainsert);
+		rrd_stats_dimension_set(st, "deleted", adelete);
+		rrd_stats_dimension_set(st, "delete_list", adelete_list);
 		rrd_stats_done(st);
 	}
 
@@ -3975,18 +4164,18 @@ int do_proc_net_stat_conntrack() {
 	if(do_expect) {
 		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".expect");
 		if(!st) {
-			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "expect", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Expectations", "expectations/s", 1003);
+			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "expect", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Expectations", "expectations/s", 1003, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "created", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-			rrd_stats_dimension_add(st, "deleted", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-			rrd_stats_dimension_add(st, "new", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "created", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "deleted", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "new", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "created", &aexpect_create, NULL);
-		rrd_stats_dimension_set(st, "deleted", &aexpect_delete, NULL);
-		rrd_stats_dimension_set(st, "new", &aexpect_new, NULL);
+		rrd_stats_dimension_set(st, "created", aexpect_create);
+		rrd_stats_dimension_set(st, "deleted", aexpect_delete);
+		rrd_stats_dimension_set(st, "new", aexpect_new);
 		rrd_stats_done(st);
 	}
 
@@ -3995,18 +4184,18 @@ int do_proc_net_stat_conntrack() {
 	if(do_search) {
 		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".search");
 		if(!st) {
-			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "search", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Searches", "searches/s", 1010);
+			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "search", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Searches", "searches/s", 1010, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "searched", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-			rrd_stats_dimension_add(st, "restarted", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-			rrd_stats_dimension_add(st, "found", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "searched", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "restarted", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "found", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "searched", &asearched, NULL);
-		rrd_stats_dimension_set(st, "restarted", &asearch_restart, NULL);
-		rrd_stats_dimension_set(st, "found", &afound, NULL);
+		rrd_stats_dimension_set(st, "searched", asearched);
+		rrd_stats_dimension_set(st, "restarted", asearch_restart);
+		rrd_stats_dimension_set(st, "found", afound);
 		rrd_stats_done(st);
 	}
 
@@ -4015,20 +4204,20 @@ int do_proc_net_stat_conntrack() {
 	if(do_errors) {
 		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".errors");
 		if(!st) {
-			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "errors", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Errors", "events/s", 1005);
+			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "errors", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Errors", "events/s", 1005, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "icmp_error", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-			rrd_stats_dimension_add(st, "insert_failed", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-			rrd_stats_dimension_add(st, "drop", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-			rrd_stats_dimension_add(st, "early_drop", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "icmp_error", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "insert_failed", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "drop", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "early_drop", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "icmp_error", &aicmp_error, NULL);
-		rrd_stats_dimension_set(st, "insert_failed", &ainsert_failed, NULL);
-		rrd_stats_dimension_set(st, "drop", &adrop, NULL);
-		rrd_stats_dimension_set(st, "early_drop", &aearly_drop, NULL);
+		rrd_stats_dimension_set(st, "icmp_error", aicmp_error);
+		rrd_stats_dimension_set(st, "insert_failed", ainsert_failed);
+		rrd_stats_dimension_set(st, "drop", adrop);
+		rrd_stats_dimension_set(st, "early_drop", aearly_drop);
 		rrd_stats_done(st);
 	}
 
@@ -4091,13 +4280,13 @@ int do_proc_net_ip_vs_stats() {
 	if(do_sockets) {
 		st = rrd_stats_find(RRD_TYPE_NET_IPVS ".sockets");
 		if(!st) {
-			st = rrd_stats_create(RRD_TYPE_NET_IPVS, "sockets", NULL, RRD_TYPE_NET_IPVS, "IPVS New Connections", "connections/s", 1001);
+			st = rrd_stats_create(RRD_TYPE_NET_IPVS, "sockets", NULL, RRD_TYPE_NET_IPVS, "IPVS New Connections", "connections/s", 1001, update_every, CHART_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "connections", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "connections", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "connections", &entries, NULL);
+		rrd_stats_dimension_set(st, "connections", entries);
 		rrd_stats_done(st);
 	}
 
@@ -4106,15 +4295,15 @@ int do_proc_net_ip_vs_stats() {
 	if(do_packets) {
 		st = rrd_stats_find(RRD_TYPE_NET_IPVS ".packets");
 		if(!st) {
-			st = rrd_stats_create(RRD_TYPE_NET_IPVS, "packets", NULL, RRD_TYPE_NET_IPVS, "IPVS Packets", "packets/s", 1002);
+			st = rrd_stats_create(RRD_TYPE_NET_IPVS, "packets", NULL, RRD_TYPE_NET_IPVS, "IPVS Packets", "packets/s", 1002, update_every, CHART_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-			rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "received", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "sent", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "received", &InPackets, NULL);
-		rrd_stats_dimension_set(st, "sent", &OutPackets, NULL);
+		rrd_stats_dimension_set(st, "received", InPackets);
+		rrd_stats_dimension_set(st, "sent", OutPackets);
 		rrd_stats_done(st);
 	}
 
@@ -4123,15 +4312,15 @@ int do_proc_net_ip_vs_stats() {
 	if(do_bandwidth) {
 		st = rrd_stats_find(RRD_TYPE_NET_IPVS ".net");
 		if(!st) {
-			st = rrd_stats_create(RRD_TYPE_NET_IPVS, "net", NULL, RRD_TYPE_NET_IPVS, "IPVS Bandwidth", "kilobits/s", 1000);
+			st = rrd_stats_create(RRD_TYPE_NET_IPVS, "net", NULL, RRD_TYPE_NET_IPVS, "IPVS Bandwidth", "kilobits/s", 1000, update_every, CHART_TYPE_AREA);
 
-			rrd_stats_dimension_add(st, "received", NULL, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
-			rrd_stats_dimension_add(st, "sent", NULL, sizeof(unsigned long long), 0, -8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "received", NULL, 8, 1024, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "sent", NULL, -8, 1024, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "received", &InBytes, NULL);
-		rrd_stats_dimension_set(st, "sent", &OutBytes, NULL);
+		rrd_stats_dimension_set(st, "received", InBytes);
+		rrd_stats_dimension_set(st, "sent", OutBytes);
 		rrd_stats_done(st);
 	}
 
@@ -4187,36 +4376,36 @@ int do_proc_stat() {
 			if((isthistotal && do_cpu) || (!isthistotal && do_cpu_cores)) {
 				st = rrd_stats_find_bytype(type, id);
 				if(!st) {
-					st = rrd_stats_create(type, id, NULL, "cpu", title, "percentage", priority);
+					st = rrd_stats_create(type, id, NULL, "cpu", title, "percentage", priority, update_every, CHART_TYPE_STACKED);
 
 					long multiplier = 1;
 					long divisor = 1; // sysconf(_SC_CLK_TCK);
 
-					rrd_stats_dimension_add(st, "guest_nice", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-					rrd_stats_dimension_add(st, "guest", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-					rrd_stats_dimension_add(st, "steal", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-					rrd_stats_dimension_add(st, "softirq", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-					rrd_stats_dimension_add(st, "irq", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-					rrd_stats_dimension_add(st, "user", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-					rrd_stats_dimension_add(st, "system", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-					rrd_stats_dimension_add(st, "nice", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
-					rrd_stats_dimension_add(st, "iowait", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+					rrd_stats_dimension_add(st, "guest_nice", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+					rrd_stats_dimension_add(st, "guest", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+					rrd_stats_dimension_add(st, "steal", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+					rrd_stats_dimension_add(st, "softirq", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+					rrd_stats_dimension_add(st, "irq", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+					rrd_stats_dimension_add(st, "user", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+					rrd_stats_dimension_add(st, "system", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+					rrd_stats_dimension_add(st, "nice", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+					rrd_stats_dimension_add(st, "iowait", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
 
-					rrd_stats_dimension_add(st, "idle", NULL, sizeof(unsigned long long), 0, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL, NULL);
+					rrd_stats_dimension_add(st, "idle", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
 					rrd_stats_dimension_hide(st, "idle");
 				}
 				else rrd_stats_next(st);
 
-				rrd_stats_dimension_set(st, "user", &user, NULL);
-				rrd_stats_dimension_set(st, "nice", &nice, NULL);
-				rrd_stats_dimension_set(st, "system", &system, NULL);
-				rrd_stats_dimension_set(st, "idle", &idle, NULL);
-				rrd_stats_dimension_set(st, "iowait", &iowait, NULL);
-				rrd_stats_dimension_set(st, "irq", &irq, NULL);
-				rrd_stats_dimension_set(st, "softirq", &softirq, NULL);
-				rrd_stats_dimension_set(st, "steal", &steal, NULL);
-				rrd_stats_dimension_set(st, "guest", &guest, NULL);
-				rrd_stats_dimension_set(st, "guest_nice", &guest_nice, NULL);
+				rrd_stats_dimension_set(st, "user", user);
+				rrd_stats_dimension_set(st, "nice", nice);
+				rrd_stats_dimension_set(st, "system", system);
+				rrd_stats_dimension_set(st, "idle", idle);
+				rrd_stats_dimension_set(st, "iowait", iowait);
+				rrd_stats_dimension_set(st, "irq", irq);
+				rrd_stats_dimension_set(st, "softirq", softirq);
+				rrd_stats_dimension_set(st, "steal", steal);
+				rrd_stats_dimension_set(st, "guest", guest);
+				rrd_stats_dimension_set(st, "guest_nice", guest_nice);
 				rrd_stats_done(st);
 			}
 		}
@@ -4234,14 +4423,14 @@ int do_proc_stat() {
 			if(do_interrupts) {
 				st = rrd_stats_find_bytype("system", id);
 				if(!st) {
-					st = rrd_stats_create("system", id, NULL, "cpu", "CPU Interrupts", "interrupts/s", 900);
+					st = rrd_stats_create("system", id, NULL, "cpu", "CPU Interrupts", "interrupts/s", 900, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "interrupts", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "interrupts", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
-				rrd_stats_dimension_set(st, "interrupts", &value, NULL);
+				rrd_stats_dimension_set(st, "interrupts", value);
 				rrd_stats_done(st);
 			}
 		}
@@ -4259,13 +4448,13 @@ int do_proc_stat() {
 			if(do_context) {
 				st = rrd_stats_find_bytype("system", id);
 				if(!st) {
-					st = rrd_stats_create("system", id, NULL, "cpu", "CPU Context Switches", "context switches/s", 800);
+					st = rrd_stats_create("system", id, NULL, "cpu", "CPU Context Switches", "context switches/s", 800, update_every, CHART_TYPE_LINE);
 
-					rrd_stats_dimension_add(st, "switches", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, "switches", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
-				rrd_stats_dimension_set(st, "switches", &value, NULL);
+				rrd_stats_dimension_set(st, "switches", value);
 				rrd_stats_done(st);
 			}
 		}
@@ -4310,14 +4499,14 @@ int do_proc_stat() {
 	if(do_forks) {
 		st = rrd_stats_find_bytype("system", "forks");
 		if(!st) {
-			st = rrd_stats_create("system", "forks", NULL, "cpu", "New Processes", "processes/s", 700);
+			st = rrd_stats_create("system", "forks", NULL, "cpu", "New Processes", "processes/s", 700, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "started", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "started", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "started", &processes, NULL);
+		rrd_stats_dimension_set(st, "started", processes);
 		rrd_stats_done(st);
 	}
 
@@ -4326,15 +4515,15 @@ int do_proc_stat() {
 	if(do_processes) {
 		st = rrd_stats_find_bytype("system", "processes");
 		if(!st) {
-			st = rrd_stats_create("system", "processes", NULL, "cpu", "Processes", "processes", 600);
+			st = rrd_stats_create("system", "processes", NULL, "cpu", "Processes", "processes", 600, update_every, CHART_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "running", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
-			rrd_stats_dimension_add(st, "blocked", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "running", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
+			rrd_stats_dimension_add(st, "blocked", NULL, -1, 1, RRD_DIMENSION_ABSOLUTE);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "running", &running, NULL);
-		rrd_stats_dimension_set(st, "blocked", &blocked, NULL);
+		rrd_stats_dimension_set(st, "running", running);
+		rrd_stats_dimension_set(st, "blocked", blocked);
 		rrd_stats_done(st);
 	}
 
@@ -4447,19 +4636,19 @@ int do_proc_meminfo() {
 	if(do_ram) {
 		st = rrd_stats_find("system.ram");
 		if(!st) {
-			st = rrd_stats_create("system", "ram", NULL, "mem", "System RAM", "MB", 200);
+			st = rrd_stats_create("system", "ram", NULL, "mem", "System RAM", "MB", 200, update_every, CHART_TYPE_STACKED);
 
-			rrd_stats_dimension_add(st, "buffers", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-			rrd_stats_dimension_add(st, "used",    NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-			rrd_stats_dimension_add(st, "cached",  NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-			rrd_stats_dimension_add(st, "free",    NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "buffers", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
+			rrd_stats_dimension_add(st, "used",    NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
+			rrd_stats_dimension_add(st, "cached",  NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
+			rrd_stats_dimension_add(st, "free",    NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "used", &MemUsed, NULL);
-		rrd_stats_dimension_set(st, "free", &MemFree, NULL);
-		rrd_stats_dimension_set(st, "cached", &Cached, NULL);
-		rrd_stats_dimension_set(st, "buffers", &Buffers, NULL);
+		rrd_stats_dimension_set(st, "used", MemUsed);
+		rrd_stats_dimension_set(st, "free", MemFree);
+		rrd_stats_dimension_set(st, "cached", Cached);
+		rrd_stats_dimension_set(st, "buffers", Buffers);
 		rrd_stats_done(st);
 	}
 
@@ -4470,16 +4659,16 @@ int do_proc_meminfo() {
 	if(do_swap) {
 		st = rrd_stats_find("system.swap");
 		if(!st) {
-			st = rrd_stats_create("system", "swap", NULL, "mem", "System Swap", "MB", 201);
+			st = rrd_stats_create("system", "swap", NULL, "mem", "System Swap", "MB", 201, update_every, CHART_TYPE_STACKED);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "free",    NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-			rrd_stats_dimension_add(st, "used",    NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "free",    NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
+			rrd_stats_dimension_add(st, "used",    NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "used", &SwapUsed, NULL);
-		rrd_stats_dimension_set(st, "free", &SwapFree, NULL);
+		rrd_stats_dimension_set(st, "used", SwapUsed);
+		rrd_stats_dimension_set(st, "free", SwapFree);
 		rrd_stats_done(st);
 	}
 
@@ -4488,14 +4677,14 @@ int do_proc_meminfo() {
 	if(hwcorrupted && do_hwcorrupt) {
 		st = rrd_stats_find("mem.hwcorrupt");
 		if(!st) {
-			st = rrd_stats_create("mem", "hwcorrupt", NULL, "mem", "Hardware Corrupted ECC", "MB", 9000);
+			st = rrd_stats_create("mem", "hwcorrupt", NULL, "mem", "Hardware Corrupted ECC", "MB", 9000, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "HardwareCorrupted", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "HardwareCorrupted", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "HardwareCorrupted", &HardwareCorrupted, NULL);
+		rrd_stats_dimension_set(st, "HardwareCorrupted", HardwareCorrupted);
 		rrd_stats_done(st);
 	}
 
@@ -4504,14 +4693,14 @@ int do_proc_meminfo() {
 	if(do_committed) {
 		st = rrd_stats_find("mem.committed");
 		if(!st) {
-			st = rrd_stats_create("mem", "committed", NULL, "mem", "Committed (Allocated) Memory", "MB", 5000);
+			st = rrd_stats_create("mem", "committed", NULL, "mem", "Committed (Allocated) Memory", "MB", 5000, update_every, CHART_TYPE_AREA);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "Committed_AS", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "Committed_AS", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "Committed_AS", &Committed_AS, NULL);
+		rrd_stats_dimension_set(st, "Committed_AS", Committed_AS);
 		rrd_stats_done(st);
 	}
 
@@ -4520,22 +4709,22 @@ int do_proc_meminfo() {
 	if(do_writeback) {
 		st = rrd_stats_find("mem.writeback");
 		if(!st) {
-			st = rrd_stats_create("mem", "writeback", NULL, "mem", "Writeback Memory", "MB", 4000);
+			st = rrd_stats_create("mem", "writeback", NULL, "mem", "Writeback Memory", "MB", 4000, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "Dirty", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-			rrd_stats_dimension_add(st, "Writeback", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-			rrd_stats_dimension_add(st, "FuseWriteback", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-			rrd_stats_dimension_add(st, "NfsWriteback", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-			rrd_stats_dimension_add(st, "Bounce", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "Dirty", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
+			rrd_stats_dimension_add(st, "Writeback", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
+			rrd_stats_dimension_add(st, "FuseWriteback", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
+			rrd_stats_dimension_add(st, "NfsWriteback", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
+			rrd_stats_dimension_add(st, "Bounce", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "Dirty", &Dirty, NULL);
-		rrd_stats_dimension_set(st, "Writeback", &Writeback, NULL);
-		rrd_stats_dimension_set(st, "FuseWriteback", &WritebackTmp, NULL);
-		rrd_stats_dimension_set(st, "NfsWriteback", &NFS_Unstable, NULL);
-		rrd_stats_dimension_set(st, "Bounce", &Bounce, NULL);
+		rrd_stats_dimension_set(st, "Dirty", Dirty);
+		rrd_stats_dimension_set(st, "Writeback", Writeback);
+		rrd_stats_dimension_set(st, "FuseWriteback", WritebackTmp);
+		rrd_stats_dimension_set(st, "NfsWriteback", NFS_Unstable);
+		rrd_stats_dimension_set(st, "Bounce", Bounce);
 		rrd_stats_done(st);
 	}
 
@@ -4544,20 +4733,20 @@ int do_proc_meminfo() {
 	if(do_kernel) {
 		st = rrd_stats_find("mem.kernel");
 		if(!st) {
-			st = rrd_stats_create("mem", "kernel", NULL, "mem", "Memory Used by Kernel", "MB", 6000);
+			st = rrd_stats_create("mem", "kernel", NULL, "mem", "Memory Used by Kernel", "MB", 6000, update_every, CHART_TYPE_STACKED);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "Slab", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-			rrd_stats_dimension_add(st, "KernelStack", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-			rrd_stats_dimension_add(st, "PageTables", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-			rrd_stats_dimension_add(st, "VmallocUsed", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "Slab", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
+			rrd_stats_dimension_add(st, "KernelStack", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
+			rrd_stats_dimension_add(st, "PageTables", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
+			rrd_stats_dimension_add(st, "VmallocUsed", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "KernelStack", &KernelStack, NULL);
-		rrd_stats_dimension_set(st, "Slab", &Slab, NULL);
-		rrd_stats_dimension_set(st, "PageTables", &PageTables, NULL);
-		rrd_stats_dimension_set(st, "VmallocUsed", &VmallocUsed, NULL);
+		rrd_stats_dimension_set(st, "KernelStack", KernelStack);
+		rrd_stats_dimension_set(st, "Slab", Slab);
+		rrd_stats_dimension_set(st, "PageTables", PageTables);
+		rrd_stats_dimension_set(st, "VmallocUsed", VmallocUsed);
 		rrd_stats_done(st);
 	}
 
@@ -4566,16 +4755,16 @@ int do_proc_meminfo() {
 	if(do_slab) {
 		st = rrd_stats_find("mem.slab");
 		if(!st) {
-			st = rrd_stats_create("mem", "slab", NULL, "mem", "Reclaimable Kernel Memory", "MB", 6500);
+			st = rrd_stats_create("mem", "slab", NULL, "mem", "Reclaimable Kernel Memory", "MB", 6500, update_every, CHART_TYPE_STACKED);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "reclaimable", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
-			rrd_stats_dimension_add(st, "unreclaimable", NULL, sizeof(unsigned long long), 0, 1, 1024, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "reclaimable", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
+			rrd_stats_dimension_add(st, "unreclaimable", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "reclaimable", &SReclaimable, NULL);
-		rrd_stats_dimension_set(st, "unreclaimable", &SUnreclaim, NULL);
+		rrd_stats_dimension_set(st, "reclaimable", SReclaimable);
+		rrd_stats_dimension_set(st, "unreclaimable", SUnreclaim);
 		rrd_stats_done(st);
 	}
 
@@ -4734,15 +4923,15 @@ int do_proc_vmstat() {
 	if(do_swapio) {
 		st = rrd_stats_find("system.swapio");
 		if(!st) {
-			st = rrd_stats_create("system", "swapio", NULL, "mem", "Swap I/O", "kilobytes/s", 250);
+			st = rrd_stats_create("system", "swapio", NULL, "mem", "Swap I/O", "kilobytes/s", 250, update_every, CHART_TYPE_AREA);
 
-			rrd_stats_dimension_add(st, "in",  NULL, sizeof(unsigned long long), 0, sysconf(_SC_PAGESIZE), 1024, RRD_DIMENSION_INCREMENTAL, NULL);
-			rrd_stats_dimension_add(st, "out", NULL, sizeof(unsigned long long), 0, -sysconf(_SC_PAGESIZE), 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "in",  NULL, sysconf(_SC_PAGESIZE), 1024, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "out", NULL, -sysconf(_SC_PAGESIZE), 1024, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "in", &pswpin, NULL);
-		rrd_stats_dimension_set(st, "out", &pswpout, NULL);
+		rrd_stats_dimension_set(st, "in", pswpin);
+		rrd_stats_dimension_set(st, "out", pswpout);
 		rrd_stats_done(st);
 	}
 
@@ -4751,15 +4940,15 @@ int do_proc_vmstat() {
 	if(do_io) {
 		st = rrd_stats_find("system.io");
 		if(!st) {
-			st = rrd_stats_create("system", "io", NULL, "disk", "Disk I/O", "kilobytes/s", 150);
+			st = rrd_stats_create("system", "io", NULL, "disk", "Disk I/O", "kilobytes/s", 150, update_every, CHART_TYPE_AREA);
 
-			rrd_stats_dimension_add(st, "in",  NULL, sizeof(unsigned long long), 0,  1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-			rrd_stats_dimension_add(st, "out", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "in",  NULL,  1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "out", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "in", &pgpgin, NULL);
-		rrd_stats_dimension_set(st, "out", &pgpgout, NULL);
+		rrd_stats_dimension_set(st, "in", pgpgin);
+		rrd_stats_dimension_set(st, "out", pgpgout);
 		rrd_stats_done(st);
 	}
 
@@ -4768,16 +4957,16 @@ int do_proc_vmstat() {
 	if(do_pgfaults) {
 		st = rrd_stats_find("system.pgfaults");
 		if(!st) {
-			st = rrd_stats_create("system", "pgfaults", NULL, "mem", "Memory Page Faults", "page faults/s", 500);
+			st = rrd_stats_create("system", "pgfaults", NULL, "mem", "Memory Page Faults", "page faults/s", 500, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "minor",  NULL, sizeof(unsigned long long), 0,  1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
-			rrd_stats_dimension_add(st, "major", NULL, sizeof(unsigned long long), 0, -1, 1, RRD_DIMENSION_INCREMENTAL, NULL);
+			rrd_stats_dimension_add(st, "minor",  NULL,  1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "major", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "minor", &pgfault, NULL);
-		rrd_stats_dimension_set(st, "major", &pgmajfault, NULL);
+		rrd_stats_dimension_set(st, "minor", pgfault);
+		rrd_stats_dimension_set(st, "major", pgmajfault);
 		rrd_stats_done(st);
 	}
 
@@ -4836,7 +5025,7 @@ void *proc_main(void *ptr)
 		usec = usecdiff(&now, &last) - susec;
 		debug(D_PROCNETDEV_LOOP, "PROCNETDEV: last loop took %llu usec (worked for %llu, sleeped for %llu).", usec + susec, usec, susec);
 		
-		if(usec < (update_every * 1000000)) susec = (update_every * 1000000) - usec;
+		if(usec < (update_every * 1000000ULL)) susec = (update_every * 1000000ULL) - usec;
 		else susec = 0;
 		
 		// make sure we will wait at least 100ms
@@ -4846,20 +5035,20 @@ void *proc_main(void *ptr)
 
 		if(!vdo_cpu_netdata && getrusage(RUSAGE_SELF, &me) == 0) {
 		
-			unsigned long long cpuuser = me.ru_utime.tv_sec * 1000000L + me.ru_utime.tv_usec;
-			unsigned long long cpusyst = me.ru_stime.tv_sec * 1000000L + me.ru_stime.tv_usec;
+			unsigned long long cpuuser = me.ru_utime.tv_sec * 1000000ULL + me.ru_utime.tv_usec;
+			unsigned long long cpusyst = me.ru_stime.tv_sec * 1000000ULL + me.ru_stime.tv_usec;
 
 			if(!stcpu) stcpu = rrd_stats_find("cpu.netdata");
 			if(!stcpu) {
-				stcpu = rrd_stats_create("cpu", "netdata", NULL, "cpu", "NetData CPU usage", "milliseconds/s", 9999);
+				stcpu = rrd_stats_create("cpu", "netdata", NULL, "cpu", "NetData CPU usage", "milliseconds/s", 9999, update_every, CHART_TYPE_STACKED);
 
-				rrd_stats_dimension_add(stcpu, "user",  NULL, sizeof(unsigned long long), 0,  1, 1000, RRD_DIMENSION_INCREMENTAL, NULL);
-				rrd_stats_dimension_add(stcpu, "system", NULL, sizeof(unsigned long long), 0, 1, 1000, RRD_DIMENSION_INCREMENTAL, NULL);
+				rrd_stats_dimension_add(stcpu, "user",  NULL,  1, 1000, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(stcpu, "system", NULL, 1, 1000, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(stcpu);
 
-			rrd_stats_dimension_set(stcpu, "user", &cpuuser, NULL);
-			rrd_stats_dimension_set(stcpu, "system", &cpusyst, NULL);
+			rrd_stats_dimension_set(stcpu, "user", cpuuser);
+			rrd_stats_dimension_set(stcpu, "system", cpusyst);
 			rrd_stats_done(stcpu);
 			
 			bcopy(&me, &me_last, sizeof(struct rusage));
@@ -4899,7 +5088,7 @@ struct tc_class {
 struct tc_device {
 	char id[RRD_STATS_NAME_MAX + 1];
 	char name[RRD_STATS_NAME_MAX + 1];
-	char group[RRD_STATS_NAME_MAX + 1];
+	char family[RRD_STATS_NAME_MAX + 1];
 
 	struct tc_class *classes;
 };
@@ -4949,11 +5138,11 @@ void tc_device_commit(struct tc_device *d)
 		if(!st) {
 			debug(D_TC_LOOP, "TC: Committing new TC device '%s'", d->name);
 
-			st = rrd_stats_create(RRD_TYPE_TC, d->id, d->name, d->group, "Class Usage", "kilobits/s", 1000);
+			st = rrd_stats_create(RRD_TYPE_TC, d->id, d->name, d->family, "Class Usage", "kilobits/s", 1000, update_every, CHART_TYPE_STACKED);
 
 			for ( c = d->classes ; c ; c = c->next) {
 				if(c->isleaf && c->hasparent)
-					rrd_stats_dimension_add(st, c->id, c->name, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
+					rrd_stats_dimension_add(st, c->id, c->name, 8, 1024, RRD_DIMENSION_INCREMENTAL);
 			}
 		}
 		else {
@@ -4963,11 +5152,11 @@ void tc_device_commit(struct tc_device *d)
 
 		for ( c = d->classes ; c ; c = c->next) {
 			if(c->isleaf && c->hasparent) {
-				if(rrd_stats_dimension_set(st, c->id, &c->bytes, NULL) != 0) {
+				if(rrd_stats_dimension_set(st, c->id, c->bytes) != 0) {
 					
 					// new class, we have to add it
-					rrd_stats_dimension_add(st, c->id, c->name, sizeof(unsigned long long), 0, 8, 1024, RRD_DIMENSION_INCREMENTAL, NULL);
-					rrd_stats_dimension_set(st, c->id, &c->bytes, NULL);
+					rrd_stats_dimension_add(st, c->id, c->name, 8, 1024, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_set(st, c->id, c->bytes);
 				}
 
 				// if it has a name, different to the id
@@ -5002,9 +5191,9 @@ void tc_device_set_device_name(struct tc_device *d, char *name)
 	// no need for null termination - it is already null
 }
 
-void tc_device_set_device_group(struct tc_device *d, char *name)
+void tc_device_set_device_family(struct tc_device *d, char *name)
 {
-	strncpy(d->group, name, RRD_STATS_NAME_MAX);
+	strncpy(d->family, name, RRD_STATS_NAME_MAX);
 	// no need for null termination - it is already null
 }
 
@@ -5020,7 +5209,7 @@ struct tc_device *tc_device_create(char *name)
 
 	strncpy(d->id, name, RRD_STATS_NAME_MAX);
 	strcpy(d->name, d->id);
-	strcpy(d->group, d->id);
+	strcpy(d->family, d->id);
 
 	// no need for null termination on the strings, because of calloc()
 
@@ -5148,7 +5337,7 @@ void *tc_main(void *ptr)
 			}
 			else if(device && (strcmp(p, "SETDEVICEGROUP") == 0)) {
 				char *name = strsep(&b, " \n");
-				if(name && *name) tc_device_set_device_group(device, name);
+				if(name && *name) tc_device_set_device_family(device, name);
 			}
 			else if(device && (strcmp(p, "SETCLASSNAME") == 0)) {
 				char *id    = strsep(&b, " \n");
@@ -5191,9 +5380,9 @@ void *cpuidlejitter_main(void *ptr)
 	struct timeval before, after;
 
 	while(1) {
-		unsigned long long usec, susec = 0;
+		unsigned long long usec = 0, susec = 0;
 
-		while(susec < (update_every * 1000000L)) {
+		while(susec < (update_every * 1000000ULL)) {
 
 			gettimeofday(&before, NULL);
 			usleep(sleep_ms * 1000);
@@ -5207,13 +5396,13 @@ void *cpuidlejitter_main(void *ptr)
 
 		RRD_STATS *st = rrd_stats_find("system.idlejitter");
 		if(!st) {
-			st = rrd_stats_create("system", "idlejitter", NULL, "cpu", "CPU Idle Jitter", "microseconds lost/s", 9999);
+			st = rrd_stats_create("system", "idlejitter", NULL, "cpu", "CPU Idle Jitter", "microseconds lost/s", 9999, update_every, CHART_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "jitter", NULL, sizeof(unsigned long long), 0, 1, 1, RRD_DIMENSION_ABSOLUTE, NULL);
+			rrd_stats_dimension_add(st, "jitter", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
 		}
 		else rrd_stats_next(st);
 
-		rrd_stats_dimension_set(st, "jitter", &usec, NULL);
+		rrd_stats_dimension_set(st, "jitter", usec);
 		rrd_stats_done(st);
 	}
 
@@ -5336,8 +5525,8 @@ int main(int argc, char **argv)
 	// parse  the arguments
 	for(i = 1; i < argc ; i++) {
 		if(strcmp(argv[i], "-c") == 0 && (i+1) < argc) {
-			if(load_config(argv[i+1], 1) != 0) {
-				fprintf(stderr, "Cannot load configuration file %s.\n", argv[i+1]);
+			if(load_config(argv[i+1], 1) != 1) {
+				fprintf(stderr, "Cannot load configuration file %s. Reason: %s\n", argv[i+1], strerror(errno));
 				exit(1);
 			}
 			else {
