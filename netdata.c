@@ -366,6 +366,7 @@ struct config_value {
 							// we first compare hashes, and only if the hashes are equal we do string comparisons
 
 	int used;
+	int changed;
 
 	struct config_value *next;
 };
@@ -564,6 +565,8 @@ char *config_get(const char *section, const char *name, const char *default_valu
 	if(!cv) cv = config_value_create(co, name, default_value);
 	cv->used = 1;
 
+	if(strcmp(cv->value, default_value) != 0) cv->changed = 1;
+
 	pthread_mutex_unlock(&config_mutex);
 	return(cv->value);
 }
@@ -614,6 +617,7 @@ void config_set(const char *section, const char *name, char *value)
 
 	if(!cv) cv = config_value_create(co, name, value);
 	cv->used = 1;
+	cv->changed = 1;
 
 	strncpy(cv->value, value, CONFIG_MAX_VALUE);
 	// termination is already there
@@ -1935,7 +1939,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	return last_timestamp;
 }
 
-void generate_config(struct web_buffer *wb)
+void generate_config(struct web_buffer *wb, int only_changed)
 {
 	int i, pri;
 	struct config *co;
@@ -1945,7 +1949,11 @@ void generate_config(struct web_buffer *wb)
 		web_buffer_increase(wb, 500);
 		switch(i) {
 			case 0:
-				web_buffer_printf(wb, "\n\n# global netdata configuration\n");
+				web_buffer_printf(wb, 
+					"# NetData Configuration\n"
+					"# You can uncomment and change any of the options bellow.\n"
+					"# The value shown in the commented settings, is the default value.\n"
+					"\n# global netdata configuration\n");
 				break;
 
 			case 1:
@@ -1964,8 +1972,13 @@ void generate_config(struct web_buffer *wb)
 
 			if(i == pri) {
 				int used = 0;
-				for(cv = co->values; cv ; cv = cv->next)
+				int changed = 0;
+				for(cv = co->values; cv ; cv = cv->next) {
 					used += cv->used;
+					changed += cv->changed;
+				}
+
+				if(only_changed && !changed) continue;
 
 				if(!used) {
 					web_buffer_increase(wb, 500);
@@ -1976,12 +1989,13 @@ void generate_config(struct web_buffer *wb)
 				web_buffer_printf(wb, "\n[%s]\n", co->name);
 
 				for(cv = co->values; cv ; cv = cv->next) {
+
 					if(used && !cv->used) {
 						web_buffer_increase(wb, CONFIG_MAX_NAME + 200);
 						web_buffer_printf(wb, "\n\t# option '%s' is not used.\n", cv->name);
 					}
 					web_buffer_increase(wb, CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 5);
-					web_buffer_printf(wb, "\t%s = %s\n", cv->name, cv->value);
+					web_buffer_printf(wb, "\t%s%s = %s\n", (!cv->changed)?"# ":"", cv->name, cv->value);
 				}
 			}
 		}
@@ -2455,7 +2469,7 @@ void web_client_process(struct web_client *w)
 
 				w->data->contenttype = CT_TEXT_PLAIN;
 				w->data->bytes = 0;
-				generate_config(w->data);
+				generate_config(w->data, 0);
 			}
 			else if(strcmp(tok, WEB_PATH_FILE) == 0) { // "file"
 				tok = mystrsep(&url, "/?&");
@@ -5549,7 +5563,7 @@ int main(int argc, char **argv)
 		else if(strcmp(argv[i], "-p")  == 0 && (i+1) < argc) { config_set("global", "port",         argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-u")  == 0 && (i+1) < argc) { config_set("global", "run as user",  argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-l")  == 0 && (i+1) < argc) { config_set("global", "history",      argv[i+1]); i++; }
-		else if(strcmp(argv[i], "-t")  == 0 && (i+1) < argc) { config_set("global", "update_every", argv[i+1]); i++; }
+		else if(strcmp(argv[i], "-t")  == 0 && (i+1) < argc) { config_set("global", "update every", argv[i+1]); i++; }
 		else {
 			fprintf(stderr, "Cannot understand option '%s'.\n", argv[i]);
 			fprintf(stderr, "\nUSAGE: %s [-d] [-l LINES_TO_SAVE] [-u UPDATE_TIMER] [-p LISTEN_PORT] [-dl debug log file] [-df debug flags].\n\n", argv[0]);
@@ -5620,7 +5634,7 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		update_every = config_get_number("global", "update_every", UPDATE_EVERY);
+		update_every = config_get_number("global", "update every", UPDATE_EVERY);
 		if(update_every < 1 || update_every > 600) {
 			fprintf(stderr, "Invalid update timer %d given. Defaulting to %d.\n", update_every, UPDATE_EVERY_MAX);
 			update_every = UPDATE_EVERY;
