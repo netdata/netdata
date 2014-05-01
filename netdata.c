@@ -689,36 +689,16 @@ static void strreverse(char* begin, char* end)
         aux = *end, *end-- = *begin, *begin++ = aux;
 }
 
-// fast number to string
-// returns length of string
-int itoa(int32_t value, char *str)
-{
-	char *wstr = str;
-
-	// Take care of sign
-	unsigned int uvalue = (value < 0) ? -value : value;
-
-	// Conversion. Number is reversed.
-	do *wstr++ = (char)(48 + (uvalue % 10)); while(uvalue /= 10);
-	if (value < 0) *wstr++ = '-';
-	*wstr='\0';
-
-	// Reverse string
-	strreverse(str,wstr-1);
-
-	return(wstr - str);
-}
-
 
 // ----------------------------------------------------------------------------
 // RRD STATS
 
 #define RRD_STATS_NAME_MAX 1024
 
-typedef long double calculated_number;
-#define CALCULATED_NUMBER_FORMAT "%0.1Lf"
-//typedef long long calculated_number;
-//#define CALCULATED_NUMBER_FORMAT "%lld"
+//typedef long double calculated_number;
+//#define CALCULATED_NUMBER_FORMAT "%0.1Lf"
+typedef long long calculated_number;
+#define CALCULATED_NUMBER_FORMAT "%lld"
 
 typedef long long collected_number;
 #define COLLECTED_NUMBER_FORMAT "%lld"
@@ -5538,15 +5518,17 @@ int main(int argc, char **argv)
 		else if(strcmp(argv[i], "-dl") == 0 && (i+1) < argc) { config_set("debug",  "log",          argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-df") == 0 && (i+1) < argc) { config_set("debug",  "flags",   	    argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-d") == 0)                  { config_set_number("global", "daemon", 1); }
+		else if(strcmp(argv[i], "-nd") == 0)                 { config_set_number("global", "daemon", 0); }
 		else if(strcmp(argv[i], "-p")  == 0 && (i+1) < argc) { config_set("global", "port",         argv[i+1]); i++; }
-		else if(strcmp(argv[i], "-u")  == 0 && (i+1) < argc) { config_set("global", "user",         argv[i+1]); i++; }
+		else if(strcmp(argv[i], "-u")  == 0 && (i+1) < argc) { config_set("global", "run as user",  argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-l")  == 0 && (i+1) < argc) { config_set("global", "history",      argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-t")  == 0 && (i+1) < argc) { config_set("global", "update_every", argv[i+1]); i++; }
 		else {
 			fprintf(stderr, "Cannot understand option '%s'.\n", argv[i]);
 			fprintf(stderr, "\nUSAGE: %s [-d] [-l LINES_TO_SAVE] [-u UPDATE_TIMER] [-p LISTEN_PORT] [-dl debug log file] [-df debug flags].\n\n", argv[0]);
 			fprintf(stderr, "  -c CONFIG FILE the configuration file to load. Default: %s.\n", CONFIG_FILENAME);
-			fprintf(stderr, "  -d enable daemon mode (run in background).\n");
+			fprintf(stderr, "  -d enable daemon mode (run in the background).\n");
+			fprintf(stderr, "  -nd disable daemon mode (do not run in the background).\n");
 			fprintf(stderr, "  -l LINES_TO_SAVE can be from 5 to %d lines in JSON data. Default: %d.\n", HISTORY_MAX, HISTORY);
 			fprintf(stderr, "  -t UPDATE_TIMER can be from 1 to %d seconds. Default: %d.\n", UPDATE_EVERY_MAX, UPDATE_EVERY);
 			fprintf(stderr, "  -p LISTEN_PORT can be from 1 to %d. Default: %d.\n", 65535, LISTEN_PORT);
