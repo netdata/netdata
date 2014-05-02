@@ -5848,10 +5848,23 @@ void *chartsd_main(void *ptr)
 // ----------------------------------------------------------------------------
 // main and related functions
 
+void kill_childs()
+{
+	if(tc_child_pid) kill(tc_child_pid, SIGTERM);
+	tc_child_pid = 0;
+
+	struct chartd *cd;
+	for(cd = chartsd_root ; cd ; cd = cd->next)
+		if(cd->pid && !cd->obsolete) {
+			kill(cd->pid, SIGTERM);
+			cd->pid = 0;
+		}
+}
+
 void bye(void)
 {
 	error("bye...");
-	if(tc_child_pid) kill(tc_child_pid, SIGTERM);
+	kill_childs();
 	tc_child_pid = 0;
 }
 
@@ -5864,13 +5877,7 @@ void sig_handler(int signo)
 		case SIGHUP:
 		case SIGSEGV:
 			error("Signaled exit (signal %d).", signo);
-			if(tc_child_pid) kill(tc_child_pid, SIGTERM);
-			tc_child_pid = 0;
-
-			struct chartd *cd;
-			for(cd = chartsd_root ; cd ; cd = cd->next)
-				if(cd->pid) kill(cd->pid, SIGTERM);
-
+			kill_childs();
 			exit(1);
 			break;
 
