@@ -5239,7 +5239,9 @@ void tc_device_commit(struct tc_device *d)
 
 			if(strcmp(d->id, d->name) != 0) {
 				// update the device name with the new one
-				rrd_stats_set_name(st, d->name);
+				char buf[RRD_STATS_NAME_MAX + 1];
+				snprintf(buf, RRD_STATS_NAME_MAX, "%s.%s", st->type, d->name);
+				rrd_stats_set_name(st, buf);
 			}
 		}
 
@@ -5520,6 +5522,8 @@ struct chartd {
 	char fullfilename[FILENAME_MAX+1];	// with path
 	char cmd[CHARTSD_CMD_MAX+1];		// the command that is executes
 
+	char config_name[CONFIG_MAX_NAME + 1];
+
 	pid_t pid;
 	pthread_t thread;
 
@@ -5586,7 +5590,9 @@ void *chartsd_worker_thread(void *arg)
 
 		unsigned long long count = 0;
 		while(fgets(line, CHARTSD_LINE_MAX, fp) != NULL) {
-			char *p = line;
+			char *p = trim(line);
+			debug(D_CHARTSD, "CHARTSD: %s: %s", cd->filename, line);
+
 			char *s = qstrsep(&p);
 
 			if(!s || !*s) continue;
@@ -5740,12 +5746,24 @@ void *chartsd_worker_thread(void *arg)
 				cd->pid = atol(pid);
 				debug(D_CHARTSD, "CHARTSD: %s is on pid %d", cd->id, cd->pid);
 			}
+			else if(!strcmp(s, "DISABLE")) {
+				error("CHARTSD: script '%s' called DISABLE. Disabling it.", cd->fullfilename);
+				config_set_boolean("plugin:charts.d", cd->config_name, 0);
+				break;
+			}
 			else error("CHARTSD: script %s is sending command '%s' which is not known by netdata", cd->fullfilename, s);
 		}
-		if(!count) error("Script '%s' does not generate usefull output.", cd->fullfilename);
+
+		// fgets() failed or loop broke
 		pclose(fp);
 
-		sleep(cd->update_every);
+		if(!count) {
+			error("CHARTSD: script '%s' does not generate usefull output. Disabling it.", cd->fullfilename);
+			config_set_boolean("plugin:charts.d", cd->config_name, 0);
+		}
+
+		if(config_get_boolean("plugin:charts.d", cd->config_name, 1)) sleep(cd->update_every);
+		else break;
 	}
 
 	cd->obsolete = 1;
@@ -5778,9 +5796,9 @@ void *chartsd_main(void *ptr)
 				continue;
 			}
 
-			char buf[CONFIG_MAX_NAME + 1];
-			snprintf(buf, CONFIG_MAX_NAME, "plugin %.*s", (int)(len - CHARTS_D_FILE_SUFFIX_LEN), file->d_name);
-			if(!config_get_boolean("plugin:charts.d", buf, 1)) continue;
+			char varname[CONFIG_MAX_NAME + 1];
+			snprintf(varname, CONFIG_MAX_NAME, "plugin %.*s", (int)(len - CHARTS_D_FILE_SUFFIX_LEN), file->d_name);
+			if(!config_get_boolean("plugin:charts.d", varname, 1)) continue;
 
 			// check if it runs already
 			for(cd = chartsd_root ; cd ; cd = cd->next) {
@@ -5800,6 +5818,9 @@ void *chartsd_main(void *ptr)
 				// link it
 				if(chartsd_root) cd->next = chartsd_root;
 				chartsd_root = cd;
+
+				// copy its config name
+				strncpy(cd->config_name, varname, CONFIG_MAX_NAME);
 			}
 
 			strncpy(cd->filename, file->d_name, FILENAME_MAX);
