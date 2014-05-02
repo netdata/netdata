@@ -5510,7 +5510,7 @@ void *cpuidlejitter_main(void *ptr)
 // charts.d
 
 #define CHARTS_D_FILE_SUFFIX "-chart.sh"
-#define CHARTS_D_FILE_SUFFIX_LEN strlen(CHARTS_D_FILE_SUFFIX)
+#define CHARTS_D_FILE_SUFFIX_LEN sizeof(CHARTS_D_FILE_SUFFIX)
 #define CHARTSD_CMD_MAX (FILENAME_MAX*2)
 #define CHARTSD_LINE_MAX 1024
 
@@ -5760,7 +5760,7 @@ void *chartsd_main(void *ptr)
 
 			if(strcmp(file->d_name, ".") == 0 || strcmp(file->d_name, "..") == 0) continue;
 
-			long len = strlen(file->d_name);
+			int len = strlen(file->d_name);
 			if(len <= CHARTS_D_FILE_SUFFIX_LEN) continue;
 			if(strcmp(CHARTS_D_FILE_SUFFIX, &file->d_name[len - CHARTS_D_FILE_SUFFIX_LEN]) != 0) {
 				debug(D_CHARTSD, "CHARTSD: File '%s' does not end in '%s'.", file->d_name, CHARTS_D_FILE_SUFFIX);
