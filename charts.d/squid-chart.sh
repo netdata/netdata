@@ -1,6 +1,6 @@
 #!/bin/sh
 
-url="http://127.0.0.1:3128/squid-internal-mgr/counters"
+url="http://127.0.0.1:8080/squid-internal-mgr/counters"
 
 # report our PID back to netdata
 # this is required for netdata to kill this process when it exits
@@ -19,25 +19,11 @@ update_every=$1
 update_every=$(( update_every + 1 - 1))	# makes sure it is a number
 test $update_every -eq 0 && update_every=1 # if it is zero, make it 1
 
-# internal default values
-min=1
-enabled="no"
-
-# check if there is a config for us - if there is, bring it in
-if [ -f "$0.conf" ]
+# we accept a url as the second argument
+if [ ! -z "$2" ]
 then
-	. "$0.conf"
+	url="$2"
 fi
-
-# check if it is enabled
-if [ ! "$enabled" = "yes" ]
-then
-	echo "DISABLE"
-	exit 1
-fi
-
-# make sure we respect the $min update frequency
-test $update_every -lt $min && update_every=$min
 
 # check once if the url works
 wget 2>/dev/null -O /dev/null "$url"

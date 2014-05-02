@@ -9,6 +9,7 @@
 #include <pwd.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <sys/wait.h>
 
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -111,10 +112,6 @@
 #define HOSTNAME_MAX 1024
 char *hostname;
 
-unsigned long long debug_flags = DEBUG;
-char *debug_log = NULL;
-int debug_fd = -1;
-
 #define EXIT_FAILURE 1
 #define LISTEN_BACKLOG 100
 
@@ -160,10 +157,68 @@ unsigned long simple_hash(const char *name)
 	return hash;
 }
 
+#define PIPE_READ 0
+#define PIPE_WRITE 1
+
+FILE *mypopen(const char *command, pid_t *pidptr)
+{
+	int pipefd[2];
+
+	if(pipe(pipefd) == -1) return NULL;
+
+	int pid = fork();
+	if(pid == -1) {
+		close(pipefd[PIPE_READ]);
+		close(pipefd[PIPE_WRITE]);
+		return NULL;
+	}
+	if(pid != 0) {
+		// the parent
+		*pidptr = pid;
+		close(pipefd[PIPE_WRITE]);
+		FILE *fp = fdopen(pipefd[PIPE_READ], "r");
+		return(fp);
+	}
+	// the child
+
+	// close all files
+	int i;
+	for(i = sysconf(_SC_OPEN_MAX); i > 0; i--)
+		if(i != STDIN_FILENO && i != STDERR_FILENO && i != pipefd[PIPE_WRITE]) close(i);
+
+	// move the pipe to stdout
+	if(pipefd[PIPE_WRITE] != STDOUT_FILENO) {
+		dup2(pipefd[PIPE_WRITE], STDOUT_FILENO);
+		close(pipefd[PIPE_WRITE]);
+	}
+
+	fprintf(stderr, "Running command: '%s'\n", command);
+ 	execl("/bin/sh", "sh", "-c", command, NULL);
+	exit(1);
+}
+
+void mypclose(FILE *fp)
+{
+	fclose(fp);
+}
+
+
 // ----------------------------------------------------------------------------
 // LOG
 
-void log_date()
+unsigned long long debug_flags = DEBUG;
+
+char *debug_log = NULL;
+int debug_fd = -1;
+
+char *access_log = NULL;
+int access_fd = -1;
+FILE *stdaccess = NULL;
+
+int log_syslog = 1;
+
+
+void log_date(FILE *out)
 {
 		char outstr[200];
 		time_t t;
@@ -175,18 +230,19 @@ void log_date()
 		if (tmp == NULL) return;
 		if (strftime(outstr, sizeof(outstr), "%y-%m-%d %H:%M:%S", tmp) == 0) return;
 
-		fprintf(stderr, "%s: ", outstr);
+		fprintf(out, "%s: ", outstr);
 }
 
 int debug_variable;
 //#define debug(args...) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args)
-#define debug(type, args...) do { if(!silent && debug_flags & type) debug_int(__FILE__, __FUNCTION__, __LINE__, type, ##args); } while(0)
+#define debug(type, args...) do { if(!silent && debug_flags & type) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 
-void debug_int( const char *file, const char *function, const unsigned long line, unsigned long type, const char *fmt, ... )
+void debug_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... )
 {
+	if(file) { ; }
 	va_list args;
 
-	log_date();
+	log_date(stderr);
 	va_start( args, fmt );
 	fprintf(stderr, "DEBUG (%04lu@%-15.15s): ", line, function);
 	vfprintf( stderr, fmt, args );
@@ -198,10 +254,11 @@ void debug_int( const char *file, const char *function, const unsigned long line
 
 void error_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... )
 {
+	if(file) { ; }
 	va_list args;
 
 	if(!silent) {
-		log_date();
+		log_date(stderr);
 
 		va_start( args, fmt );
 		fprintf(stderr, "ERROR (%04lu@%-15.15s): ", line, function);
@@ -215,19 +272,22 @@ void error_int( const char *file, const char *function, const unsigned long line
 		else fprintf(stderr, "\n");
 	}
 
-	va_start( args, fmt );
-	vsyslog(LOG_ERR,  fmt, args );
-	va_end( args );
+	if(log_syslog) {
+		va_start( args, fmt );
+		vsyslog(LOG_ERR,  fmt, args );
+		va_end( args );
+	}
 }
 
 #define fatal(args...)  fatal_int(__FILE__, __FUNCTION__, __LINE__, ##args)
 
 void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... )
 {
+	if(file) { ; }
 	va_list args;
 
 	if(!silent) {
-		log_date();
+		log_date(stderr);
 
 		va_start( args, fmt );
 		fprintf(stderr, "FATAL (%04lu@%-15.15s): ", line, function);
@@ -238,11 +298,34 @@ void fatal_int( const char *file, const char *function, const unsigned long line
 		fprintf(stderr, "\n");
 	}
 
-	va_start( args, fmt );
-	vsyslog(LOG_CRIT,  fmt, args );
-	va_end( args );
+	if(log_syslog) {
+		va_start( args, fmt );
+		vsyslog(LOG_CRIT,  fmt, args );
+		va_end( args );
+	}
 
 	exit(EXIT_FAILURE);
+}
+
+void log_access( const char *fmt, ... )
+{
+	va_list args;
+
+	if(stdaccess) {
+		log_date(stdaccess);
+
+		va_start( args, fmt );
+		vfprintf( stdaccess, fmt, args );
+		va_end( args );
+		fprintf( stdaccess, "\n");
+		fflush( stdaccess );
+	}
+
+	if(log_syslog) {
+		va_start( args, fmt );
+		vsyslog(LOG_INFO,  fmt, args );
+		va_end( args );
+	}
 }
 
 
@@ -319,6 +402,8 @@ char *url_decode(char *str) {
 
 // ----------------------------------------------------------------------------
 // socket
+
+int listen_fd = -1;
 
 int create_listen_socket(int port)
 {
@@ -1277,7 +1362,7 @@ void rrd_stats_done(RRD_STATS *st)
 			st->first_entry_t = now.tv_sec * 1000000ULL + now.tv_usec;
 		}
 		else {
-			if(st->counter > st->entries) {
+			if(st->counter > (unsigned long long)st->entries) {
 				// the db is overwriting values
 				// add the value we will overwrite
 				st->first_entry_t += st->timediff[st->current_entry];
@@ -1300,12 +1385,12 @@ void rrd_stats_done(RRD_STATS *st)
 // web buffer
 
 struct web_buffer {
-	size_t size;	// allocation size of buffer
-	size_t bytes;	// current data length in buffer
-	size_t sent;	// current data length sent to output
+	long size;	// allocation size of buffer
+	long bytes;	// current data length in buffer
+	long sent;	// current data length sent to output
 	char *buffer;	// the buffer
 	int contenttype;
-	size_t rbytes; 	// if non-zero, the excepted size of ifd
+	long rbytes; 	// if non-zero, the excepted size of ifd
 	time_t date;	// the date this content has been generated
 };
 
@@ -1314,7 +1399,7 @@ struct web_buffer {
 void web_buffer_strcpy(struct web_buffer *wb, const char *txt)
 {
 	char *buffer = wb->buffer;
-	size_t bytes = wb->bytes, size = wb->size, i = 0;
+	long bytes = wb->bytes, size = wb->size, i = 0;
 
 	while(txt[i] && bytes < size)
 		buffer[bytes++] = txt[i++];
@@ -1410,7 +1495,7 @@ void web_buffer_jsdate(struct web_buffer *wb, int year, int month, int day, int 
 	wb->bytes += 35;
 }
 
-struct web_buffer *web_buffer_create(size_t size)
+struct web_buffer *web_buffer_create(long size)
 {
 	struct web_buffer *b;
 
@@ -1442,12 +1527,12 @@ void web_buffer_free(struct web_buffer *b)
 	free(b);
 }
 
-void web_buffer_increase(struct web_buffer *b, size_t free_size_required)
+void web_buffer_increase(struct web_buffer *b, long free_size_required)
 {
-	size_t left = b->size - b->bytes;
+	long left = b->size - b->bytes;
 
 	if(left >= free_size_required) return;
-	size_t increase = free_size_required - left;
+	long increase = free_size_required - left;
 	if(increase < WEB_DATA_LENGTH_INCREASE_STEP) increase = WEB_DATA_LENGTH_INCREASE_STEP;
 
 	debug(D_WEB_BUFFER, "Increasing data buffer from size %d to %d.", b->size, b->size + increase);
@@ -1486,8 +1571,8 @@ struct web_client {
 	int zoutput;					// if set to 1, web_client_send() will send compressed data
 	z_stream zstream;				// zlib stream for sending compressed output to client
 	Bytef zbuffer[ZLIB_CHUNK];		// temporary buffer for storing compressed output
-	size_t zsent;					// the compressed bytes we have sent to the client
-	size_t zhave;					// the compressed bytes that we have to send
+	long zsent;					// the compressed bytes we have sent to the client
+	long zhave;					// the compressed bytes that we have to send
 	int zinitialized;
 
 	int wait_receive;
@@ -1527,7 +1612,6 @@ struct web_client *web_client_create(int listener)
 	strncpy(w->client_ip, inet_ntoa(w->clientaddr.sin_addr), 100);
 	w->client_ip[100] = '\0';
 
-	// syslog(LOG_NOTICE, "%llu: New client from %s.", w->id, w->client_ip);
 	debug(D_WEB_CLIENT_ACCESS, "%llu: New web client from %s on socket %d.", w->id, w->client_ip, w->ifd);
 
 	{
@@ -1702,7 +1786,7 @@ void rrd_stats_all_json(struct web_buffer *wb)
 	web_buffer_increase(wb, 1024);
 
 	unsigned long memory = 0;
-	size_t c;
+	long c;
 	RRD_STATS *st;
 
 	web_buffer_printf(wb, RRD_GRAPH_JSON_HEADER);
@@ -1728,7 +1812,7 @@ void rrd_stats_all_json(struct web_buffer *wb)
 		);
 }
 
-unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, size_t entries_to_show, size_t group, int group_method, time_t after, time_t before)
+unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int entries_to_show, int group, int group_method, time_t after, time_t before)
 {
 	int c;
 	pthread_mutex_lock(&st->mutex);
@@ -1764,7 +1848,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	else if(current_entry >= st->entries) current_entry = st->entries - 1;
 	
 	// find the oldest entry of the round-robin
-	long max_entries = (st->counter <= st->entries) ? st->counter - 1 : st->entries;
+	long max_entries = (st->counter <= (unsigned long)st->entries) ? st->counter - 1 : (unsigned long)st->entries;
 	
 	if(before == 0) before = st->last_updated.tv_sec;
 	if(after  == 0) after = rrd_stats_first_entry_t(st);
@@ -2104,8 +2188,6 @@ int mysendfile(struct web_client *w, char *filename)
 		}
 	}
 	
-	//syslog(LOG_NOTICE, "%llu: Sending file '%s' to client %s.", w->id, filename, w->client_ip);
-
 	// pick a Content-Type for the file
 		 if(strstr(filename, ".html") != NULL)	w->data->contenttype = CT_TEXT_HTML;
 	else if(strstr(filename, ".js")   != NULL)	w->data->contenttype = CT_APPLICATION_X_JAVASCRIPT;
@@ -2145,10 +2227,10 @@ void web_client_reset(struct web_client *w)
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 
-	long sent = w->zoutput?w->zstream.total_out:(w->mode == WEB_CLIENT_MODE_FILECOPY)?w->data->rbytes:w->data->bytes;
+	long sent = w->zoutput?(long)w->zstream.total_out:((w->mode == WEB_CLIENT_MODE_FILECOPY)?w->data->rbytes:w->data->bytes);
 	long size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->data->rbytes:w->data->bytes;
 	
-	if(w->last_url[0]) syslog(LOG_NOTICE, "%llu: (sent/all = %ld/%ld bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: '%s'",
+	if(w->last_url[0]) log_access("%llu: (sent/all = %ld/%ld bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: '%s'",
 		w->id,
 		sent, size, -((size>0)?((float)(size-sent)/(float)size * 100.0):0.0),
 		(float)usecdiff(&w->tv_ready, &w->tv_in) / 1000.0,
@@ -2267,8 +2349,8 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	debug(D_WEB_CLIENT, "%llu: Found RRD data with name '%s'.", w->id, tok);
 
 	// how many entries does the client want?
-	size_t lines = save_history;
-	size_t group_count = 1;
+	long lines = save_history;
+	long group_count = 1;
 	time_t after = 0, before = 0;
 	int group_method = GROUP_AVERAGE;
 
@@ -2691,7 +2773,7 @@ void web_client_process(struct web_client *w)
 	if(w->response_header[0]) 
 		strcpy(custom_header, w->response_header);
 
-	size_t headerlen = 0;
+	int headerlen = 0;
 	headerlen += snprintf(&w->response_header[headerlen], MAX_HTTP_HEADER_SIZE - headerlen,
 		"HTTP/1.1 %d %s\r\n"
 		"Connection: %s\r\n"
@@ -2774,7 +2856,7 @@ void web_client_process(struct web_client *w)
 				// this block of code can be commented, without anything missing.
 				// when it is commented, the program will copy the data using async I/O.
 				{
-					ssize_t len = sendfile(w->ofd, w->ifd, NULL, w->data->rbytes);
+					long len = sendfile(w->ofd, w->ifd, NULL, w->data->rbytes);
 					if(len != w->data->rbytes) error("%llu: sendfile() should copy %ld bytes, but copied %ld. Falling back to manual copy.", w->id, w->data->rbytes, len);
 					else web_client_reset(w);
 				}
@@ -2824,9 +2906,9 @@ void web_client_send_chunk_finalize(struct web_client *w)
 	else debug(D_DEFLATE, "%llu: Failed to send chunk suffix to client. Reason: %s", w->id, strerror(errno));
 }
 
-ssize_t web_client_send_deflate(struct web_client *w)
+long web_client_send_deflate(struct web_client *w)
 {
-	ssize_t bytes;
+	long bytes;
 
 	// when using compression,
 	// w->data->sent is the amount of bytes passed through compression
@@ -2924,11 +3006,11 @@ ssize_t web_client_send_deflate(struct web_client *w)
 	return(bytes);
 }
 
-ssize_t web_client_send(struct web_client *w)
+long web_client_send(struct web_client *w)
 {
 	if(w->zoutput) return web_client_send_deflate(w);
 
-	ssize_t bytes;
+	long bytes;
 
 	if(w->data->bytes - w->data->sent == 0) {
 		// there is nothing to send
@@ -2969,13 +3051,13 @@ ssize_t web_client_send(struct web_client *w)
 	return(bytes);
 }
 
-ssize_t web_client_receive(struct web_client *w)
+long web_client_receive(struct web_client *w)
 {
 	// do we have any space for more data?
 	web_buffer_increase(w->data, WEB_DATA_LENGTH_INCREASE_STEP);
 
-	ssize_t left = w->data->size - w->data->bytes;
-	ssize_t bytes;
+	long left = w->data->size - w->data->bytes;
+	long bytes;
 
 	if(w->mode == WEB_CLIENT_MODE_FILECOPY)
 		bytes = read(w->ifd, &w->data->buffer[w->data->bytes], (left-1));
@@ -3128,30 +3210,20 @@ void syslog_allocations(void)
 		struct web_client *w;
 		for(w = web_clients; w ; w = w->next) clients++;
 
-		syslog(LOG_NOTICE, "Allocated memory increased from %d to %d (increased by %d bytes). There are %d web clients connected.", mem, mi.uordblks, mi.uordblks - mem, clients);
+		error("Allocated memory increased from %d to %d (increased by %d bytes). There are %d web clients connected.", mem, mi.uordblks, mi.uordblks - mem, clients);
 		mem = mi.uordblks;
 	}
-	/*
-	syslog(LOG_NOTICE, "Total non-mmapped bytes (arena):       %d\n", mi.arena);
-	syslog(LOG_NOTICE, "# of free chunks (ordblks):            %d\n", mi.ordblks);
-	syslog(LOG_NOTICE, "# of free fastbin blocks (smblks):     %d\n", mi.smblks);
-	syslog(LOG_NOTICE, "# of mapped regions (hblks):           %d\n", mi.hblks);
-	syslog(LOG_NOTICE, "Bytes in mapped regions (hblkhd):      %d\n", mi.hblkhd);
-	syslog(LOG_NOTICE, "Max. total allocated space (usmblks):  %d\n", mi.usmblks);
-	syslog(LOG_NOTICE, "Free bytes held in fastbins (fsmblks): %d\n", mi.fsmblks);
-	syslog(LOG_NOTICE, "Total allocated space (uordblks):      %d\n", mi.uordblks);
-	syslog(LOG_NOTICE, "Total free space (fordblks):           %d\n", mi.fordblks);
-	syslog(LOG_NOTICE, "Topmost releasable block (keepcost):   %d\n", mi.keepcost);
-	*/
 }
 
 void *socket_listen_main(void *ptr)
 {
+	if(ptr) { ; }
 	struct web_client *w;
 	struct timeval tv;
 	int retval;
 
-	int listener = create_listen_socket(listen_port);
+	// int listener = create_listen_socket(listen_port);
+	int listener = listen_fd;
 	if(listener == -1) fatal("LISTENER: Cannot create listening socket on port 19999.");
 
 	fd_set ifds, ofds, efds;
@@ -3189,7 +3261,7 @@ void *socket_listen_main(void *ptr)
 					w->obsolete = 1;
 				}
 				
-				syslog(LOG_NOTICE, "%llu: %s connected", w->id, w->client_ip);
+				log_access("%llu: %s connected", w->id, w->client_ip);
 			}
 			else debug(D_WEB_CLIENT, "LISTENER: select() didn't do anything.");
 
@@ -3199,7 +3271,7 @@ void *socket_listen_main(void *ptr)
 		// cleanup unused clients
 		for(w = web_clients; w ; w = w?w->next:NULL) {
 			if(w->obsolete) {
-				syslog(LOG_NOTICE, "%llu: %s disconnected", w->id, w->client_ip);
+				log_access("%llu: %s disconnected", w->id, w->client_ip);
 				debug(D_WEB_CLIENT, "%llu: Removing client.", w->id);
 				// pthread_join(w->thread,  NULL);
 				w = web_client_free(w);
@@ -5066,6 +5138,7 @@ int do_proc_vmstat() {
 
 void *proc_main(void *ptr)
 {
+	if(ptr) { ; }
 	struct rusage me, me_last;
 	struct timeval last, now;
 
@@ -5155,8 +5228,6 @@ void *proc_main(void *ptr)
 // /sbin/tc processor
 // this requires the script charts.d/tc-qos-collector.sh
 
-#define PIPE_READ 0
-#define PIPE_WRITE 1
 #define TC_LINE_MAX 1024
 
 struct tc_class {
@@ -5349,6 +5420,7 @@ void tc_device_free(struct tc_device *n)
 pid_t tc_child_pid = 0;
 void *tc_main(void *ptr)
 {
+	if(ptr) { ; }
 	char buffer[TC_LINE_MAX+1] = "";
 
 	for(;1;) {
@@ -5357,9 +5429,11 @@ void *tc_main(void *ptr)
 		struct tc_class *class = NULL;
 
 		snprintf(buffer, TC_LINE_MAX, "exec %s %d", config_get("plugin:tc", "script to run to get tc values", "charts.d/tc-qos-collector.sh"), update_every);
-		fp = popen(buffer, "r");
+		debug(D_TC_LOOP, "executing '%s'", buffer);
+		// fp = popen(buffer, "r");
+		fp = mypopen(buffer, &tc_child_pid);
 		if(!fp) {
-			error("Cannot popen(\"%s\", \"r\").", buffer);
+			error("TC: Cannot popen(\"%s\", \"r\").", buffer);
 			return NULL;
 		}
 
@@ -5449,7 +5523,7 @@ void *tc_main(void *ptr)
 				debug(D_TC_LOOP, "TC: Child PID is %d.", tc_child_pid);
 			}
 		}
-		pclose(fp);
+		mypclose(fp);
 
 		if(device) {
 			tc_device_free(device);
@@ -5470,6 +5544,7 @@ void *tc_main(void *ptr)
 
 void *cpuidlejitter_main(void *ptr)
 {
+	if(ptr) { ; }
 	int sleep_ms = config_get_number("plugin:idlejitter", "loop time in ms", CPU_IDLEJITTER_SLEEP_TIME_MS);
 	if(sleep_ms <= 0) {
 		config_set_number("plugin:idlejitter", "loop time in ms", CPU_IDLEJITTER_SLEEP_TIME_MS);
@@ -5517,18 +5592,18 @@ void *cpuidlejitter_main(void *ptr)
 #define CHARTSD_LINE_MAX 1024
 
 struct chartd {
-	char id[RRD_STATS_NAME_MAX+1];		// id
+	char id[CONFIG_MAX_NAME+1];			// config node id
+
 	char filename[FILENAME_MAX+1];		// just the filename
 	char fullfilename[FILENAME_MAX+1];	// with path
 	char cmd[CHARTSD_CMD_MAX+1];		// the command that is executes
-
-	char config_name[CONFIG_MAX_NAME + 1];
 
 	pid_t pid;
 	pthread_t thread;
 
 	int update_every;
 	int obsolete;
+	int enabled;
 
 	struct chartd *next;
 } *chartsd_root = NULL;
@@ -5576,11 +5651,9 @@ void *chartsd_worker_thread(void *arg)
 	struct chartd *cd = (struct chartd *)arg;
 	char line[CHARTSD_LINE_MAX + 1];
 
-	cd->update_every = config_get_number(cd->id, "update every", update_every);
-	snprintf(cd->cmd, CHARTSD_CMD_MAX, "exec %s %d", cd->fullfilename, cd->update_every);
-
 	while(1) {
-		FILE *fp = popen(cd->cmd, "r");
+		// FILE *fp = popen(cd->cmd, "r");
+		FILE *fp = mypopen(cd->cmd, &cd->pid);
 		if(!fp) {
 			error("Cannot popen(\"%s\", \"r\").", cd->cmd);
 			break;
@@ -5748,21 +5821,21 @@ void *chartsd_worker_thread(void *arg)
 			}
 			else if(!strcmp(s, "DISABLE")) {
 				error("CHARTSD: script '%s' called DISABLE. Disabling it.", cd->fullfilename);
-				config_set_boolean("plugin:charts.d", cd->config_name, 0);
+				cd->enabled = 0;
 				break;
 			}
 			else error("CHARTSD: script %s is sending command '%s' which is not known by netdata", cd->fullfilename, s);
 		}
 
 		// fgets() failed or loop broke
-		pclose(fp);
+		mypclose(fp);
 
-		if(!count) {
+		if(!count && cd->enabled) {
 			error("CHARTSD: script '%s' does not generate usefull output. Disabling it.", cd->fullfilename);
-			config_set_boolean("plugin:charts.d", cd->config_name, 0);
+			cd->enabled = 0;
 		}
 
-		if(config_get_boolean("plugin:charts.d", cd->config_name, 1)) sleep(cd->update_every);
+		if(cd->enabled) sleep(cd->update_every);
 		else break;
 	}
 
@@ -5772,7 +5845,9 @@ void *chartsd_worker_thread(void *arg)
 
 void *chartsd_main(void *ptr)
 {
+	if(ptr) { ; }
 	char *dir_name = config_get("plugin:charts.d", "charts.d directory", "charts.d");
+	int automatic_run = config_get_boolean("plugin:charts.d", "enable runnig new scripts", 0);
 	DIR *dir = NULL;
 	struct dirent *file = NULL;
 	struct chartd *cd;
@@ -5790,15 +5865,11 @@ void *chartsd_main(void *ptr)
 			if(strcmp(file->d_name, ".") == 0 || strcmp(file->d_name, "..") == 0) continue;
 
 			int len = strlen(file->d_name);
-			if(len <= CHARTS_D_FILE_SUFFIX_LEN) continue;
+			if(len <= (int)CHARTS_D_FILE_SUFFIX_LEN) continue;
 			if(strcmp(CHARTS_D_FILE_SUFFIX, &file->d_name[len - CHARTS_D_FILE_SUFFIX_LEN]) != 0) {
 				debug(D_CHARTSD, "CHARTSD: File '%s' does not end in '%s'.", file->d_name, CHARTS_D_FILE_SUFFIX);
 				continue;
 			}
-
-			char varname[CONFIG_MAX_NAME + 1];
-			snprintf(varname, CONFIG_MAX_NAME, "plugin %.*s", (int)(len - CHARTS_D_FILE_SUFFIX_LEN), file->d_name);
-			if(!config_get_boolean("plugin:charts.d", varname, 1)) continue;
 
 			// check if it runs already
 			for(cd = chartsd_root ; cd ; cd = cd->next) {
@@ -5815,18 +5886,22 @@ void *chartsd_main(void *ptr)
 				cd = calloc(sizeof(struct chartd), 1);
 				if(!cd) fatal("Cannot allocate memory for chart.d");
 
+				snprintf(cd->id, CONFIG_MAX_NAME, "plugin:charts.d:%.*s", (int)(len - CHARTS_D_FILE_SUFFIX_LEN), file->d_name);
+				
+				strncpy(cd->filename, file->d_name, FILENAME_MAX);
+				snprintf(cd->fullfilename, FILENAME_MAX, "%s/%s", dir_name, cd->filename);
+
+				cd->enabled = config_get_boolean(cd->id, "enable", automatic_run);
+				cd->update_every = config_get_number(cd->id, "update every", update_every);
+				snprintf(cd->cmd, CHARTSD_CMD_MAX, "exec %s %d %s", cd->fullfilename, cd->update_every, config_get(cd->id, "more command options", ""));
+
 				// link it
 				if(chartsd_root) cd->next = chartsd_root;
 				chartsd_root = cd;
-
-				// copy its config name
-				strncpy(cd->config_name, varname, CONFIG_MAX_NAME);
 			}
-
-			strncpy(cd->filename, file->d_name, FILENAME_MAX);
-			snprintf(cd->id, RRD_STATS_NAME_MAX, "plugin:charts.d:%.*s", (int)(len - CHARTS_D_FILE_SUFFIX_LEN), file->d_name);
-			snprintf(cd->fullfilename, FILENAME_MAX, "%s/%s", dir_name, cd->filename);
 			cd->obsolete = 0;
+
+			if(!cd->enabled) continue;
 
 			// spawn a new thread for it
 			if(pthread_create(&cd->thread, NULL, chartsd_worker_thread, cd) != 0) {
@@ -5863,7 +5938,7 @@ void kill_childs()
 
 void bye(void)
 {
-	error("bye...");
+	error("exiting. bye...");
 	kill_childs();
 	tc_child_pid = 0;
 }
@@ -5882,6 +5957,40 @@ void sig_handler(int signo)
 			break;
 
 		case SIGCHLD:
+			error("Received SIGCHLD (signal %d).", signo);
+			siginfo_t info;
+			while(waitid(P_ALL, 0, &info, WEXITED|WNOHANG) == 0) {
+				if(!info.si_pid) break;
+				switch(info.si_code) {
+					case CLD_EXITED:
+						error("pid %d exited with code %d.", info.si_pid, info.si_status);
+						break;
+
+					case CLD_KILLED:
+						error("pid %d killed by signal %d.", info.si_pid, info.si_status);
+						break;
+
+					case CLD_DUMPED: 
+						error("pid %d core dumped by signal %d.", info.si_pid, info.si_status);
+						break;
+
+					case CLD_STOPPED:
+						error("pid %d stopped by signal %d.", info.si_pid, info.si_status);
+						break;
+
+					case CLD_TRAPPED:
+						error("pid %d trapped by signal %d.", info.si_pid, info.si_status);
+						break;
+
+					case CLD_CONTINUED:
+						error("pid %d continued by signal %d.", info.si_pid, info.si_status);
+						break;
+
+					default:
+						error("pid %d gave us a SIGCHLD with code %d and status %d.", info.si_pid, info.si_code, info.si_status);
+						break;
+				}
+			}
 			break;
 
 		default:
@@ -5917,8 +6026,15 @@ int become_user(const char *username)
 	return(0);
 }
 
+int fd_is_valid(int fd)
+{
+    return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
+}
+
 void become_daemon()
 {
+	fflush(NULL);
+
 	int i = fork();
 	if(i == -1) {
 		perror("cannot fork");
@@ -5951,10 +6067,17 @@ void become_daemon()
 
 	// close all files
 	for(i = sysconf(_SC_OPEN_MAX); i > 0; i--)
-		if(i != debug_fd) close(i);
+		if(i != debug_fd && i != access_fd && i != listen_fd && fd_is_valid(i)) close(i);
 
-	if(debug_fd >= 0) {
-		silent = 0;
+	silent = 0;
+	if(debug_fd == -1) {
+		silent = 1;
+		debug_fd = open("/dev/null", O_RDWR | O_APPEND | O_CREAT, 0666);
+	}
+
+	if(debug_fd != -1) {
+		if(dup2(debug_fd, STDIN_FILENO) < 0)
+			silent = 1;
 
 		if(dup2(debug_fd, STDOUT_FILENO) < 0)
 			silent = 1;
@@ -6015,9 +6138,61 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
+		sprintf(buffer, "0x%08llx", debug_flags);
+		char *flags = config_get("debug", "flags", buffer);
+		debug_flags = strtoull(flags, NULL, 0);
+		debug(D_OPTIONS, "Debug flags set to '0x%8llx'.", debug_flags);
+
+		// --------------------------------------------------------------------
+
+		debug_log = config_get("debug", "log", "");
+		if(*debug_log) {
+			debug_fd = open(debug_log, O_RDWR | O_APPEND | O_CREAT, 0666);
+			if(debug_fd < 0) {
+				fprintf(stderr, "Cannot open file '%s'. Reason: %s\n", debug_log, strerror(errno));
+				exit(1);
+			}
+			debug(D_OPTIONS, "Debug LOG set to '%s'.",  debug_log);
+		}
+
+		// --------------------------------------------------------------------
+
+		access_log = config_get("global", "access log", "syslog");
+		if(strcmp(access_log, "syslog") == 0) {
+			log_syslog = 1;
+			access_fd = -1;
+			stdaccess = NULL;
+
+			debug(D_OPTIONS, "access log on syslog.");
+		}
+		else if(strcmp(access_log, "none") == 0) {
+			log_syslog = 0;
+			access_fd = -1;
+			stdaccess = NULL;
+			debug(D_OPTIONS, "access log disabled.");
+		}
+		else {
+			access_fd = open(access_log, O_WRONLY | O_APPEND | O_CREAT, 0666);
+			if(access_fd < 0) {
+				fprintf(stderr, "Cannot open file '%s'. Reason: %s\n", access_log, strerror(errno));
+				exit(1);
+			}
+
+			stdaccess = fdopen(access_fd, "w");
+			if(!stdaccess) {
+				fprintf(stderr, "Cannot migrate file's '%s' fd %d. Reason: %s\n", access_log, access_fd, strerror(errno));
+				exit(1);
+			}
+
+			debug(D_OPTIONS, "access log to file '%s'.",  access_log);
+		}
+
+		// --------------------------------------------------------------------
+
 		if(gethostname(buffer, HOSTNAME_MAX) == -1)
 			error("WARNING: Cannot get machine hostname.");
 		hostname = config_get("global", "hostname", buffer);
+		debug(D_OPTIONS, "hostname set to '%s'", hostname);
 
 		// --------------------------------------------------------------------
 
@@ -6032,18 +6207,6 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		debug_log = config_get("debug", "log", "");
-		if(*debug_log) {
-			debug_fd = open(debug_log, O_WRONLY | O_APPEND | O_CREAT, 0666);
-			if(debug_fd < 0) {
-				fprintf(stderr, "Cannot open file '%s'. Reason: %s\n", debug_log, strerror(errno));
-				exit(1);
-			}
-			debug(D_OPTIONS, "Debug LOG set to '%s'.",  debug_log);
-		}
-
-		// --------------------------------------------------------------------
-
 		char *user = config_get("global", "run as user", "");
 		if(*user) {
 			if(become_user(user) != 0) {
@@ -6052,13 +6215,6 @@ int main(int argc, char **argv)
 			}
 			else debug(D_OPTIONS, "Successfully became user %s.", user);
 		}
-
-		// --------------------------------------------------------------------
-
-		sprintf(buffer, "0x%08llx", debug_flags);
-		char *flags = config_get("debug", "flags", buffer);
-		debug_flags = strtoull(flags, NULL, 0);
-		debug(D_OPTIONS, "Debug flags set to '0x%8llx'.", debug_flags);
 
 		// --------------------------------------------------------------------
 
@@ -6078,6 +6234,8 @@ int main(int argc, char **argv)
 		}
 		else debug(D_OPTIONS, "listen port set to %d.", listen_port);
 
+		listen_fd = create_listen_socket(listen_port);
+
 		// --------------------------------------------------------------------
 
 		daemon = config_get_boolean("global", "daemon", 0);
@@ -6094,9 +6252,10 @@ int main(int argc, char **argv)
 
 	if(daemon) become_daemon();
 
-	// open syslog
-	openlog("netdata", LOG_PID, LOG_DAEMON);
-	syslog(LOG_NOTICE, "netdata started.");
+	if(log_syslog) {
+		openlog("netdata", LOG_PID, LOG_DAEMON);
+		syslog(LOG_NOTICE, "netdata started.");
+	}
 
 	// make sure we cleanup correctly
 	atexit(bye);

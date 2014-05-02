@@ -59,7 +59,7 @@ echo "Compiling netdata (debug=$NETDATA_CONFIG_DEBUG)"
 if [ $NETDATA_CONFIG_DEBUG -eq 1 ]
 then
 	ulimit -c unlimited
-	gcc -Wall -ggdb -o netdata netdata.c -lpthread -lz || exit 1
+	gcc -Wall -Wextra -ggdb -o netdata netdata.c -lpthread -lz || exit 1
 	debug_opts="-df 0xfffffadf -dl netdata.log"
 else
 	gcc -Wall -O3 -o netdata netdata.c -lpthread -lz || exit 1
