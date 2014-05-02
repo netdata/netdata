@@ -5760,7 +5760,7 @@ void *chartsd_main(void *ptr)
 
 			if(strcmp(file->d_name, ".") == 0 || strcmp(file->d_name, "..") == 0) continue;
 
-			int len = strlen(file->d_name);
+			long len = strlen(file->d_name);
 			if(len <= CHARTS_D_FILE_SUFFIX_LEN) continue;
 			if(strcmp(CHARTS_D_FILE_SUFFIX, &file->d_name[len - CHARTS_D_FILE_SUFFIX_LEN]) != 0) {
 				debug(D_CHARTSD, "CHARTSD: File '%s' does not end in '%s'.", file->d_name, CHARTS_D_FILE_SUFFIX);
