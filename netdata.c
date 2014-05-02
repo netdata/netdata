@@ -5153,7 +5153,7 @@ void *proc_main(void *ptr)
 
 // ----------------------------------------------------------------------------
 // /sbin/tc processor
-// this requires the script tc-all.sh
+// this requires the script charts.d/tc-qos-collector.sh
 
 #define PIPE_READ 0
 #define PIPE_WRITE 1
@@ -5354,7 +5354,7 @@ void *tc_main(void *ptr)
 		struct tc_device *device = NULL;
 		struct tc_class *class = NULL;
 
-		snprintf(buffer, TC_LINE_MAX, "exec %s %d", config_get("plugin:tc", "script to run to get tc values", "./tc-all.sh"), update_every);
+		snprintf(buffer, TC_LINE_MAX, "exec %s %d", config_get("plugin:tc", "script to run to get tc values", "charts.d/tc-qos-collector.sh"), update_every);
 		fp = popen(buffer, "r");
 		if(!fp) {
 			error("Cannot popen(\"%s\", \"r\").", buffer);
