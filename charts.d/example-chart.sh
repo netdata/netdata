@@ -17,6 +17,22 @@ update_every=$1
 update_every=$(( update_every + 1 - 1))	# makes sure it is a number
 test $update_every -eq 0 && update_every=1 # if it is zero, make it 1
 
+# internal default values
+enabled="no"
+
+# check if there is a config for us - if there is, bring it in
+if [ -f "$0.conf" ]
+then
+	. "$0.conf"
+fi
+
+# check if it is enabled
+if [ ! "$enabled" = "yes" ]
+then
+	echo "DISABLE"
+	exit 1
+fi
+
 # create the chart with 3 dimensions
 cat <<EOF
 CHART example.load '' "System Load Average" "load" load load line 500 $update_every

@@ -19,13 +19,21 @@ update_every=$1
 update_every=$(( update_every + 1 - 1))	# makes sure it is a number
 test $update_every -eq 0 && update_every=1 # if it is zero, make it 1
 
-# we don't allow more than 1 request every $min seconds
+# internal default values
 min=1
+enabled="no"
 
 # check if there is a config for us - if there is, bring it in
 if [ -f "$0.conf" ]
 then
 	. "$0.conf"
+fi
+
+# check if it is enabled
+if [ ! "$enabled" = "yes" ]
+then
+	echo "DISABLE"
+	exit 1
 fi
 
 # make sure we respect the $min update frequency
