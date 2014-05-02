@@ -5589,7 +5589,8 @@ void *chartsd_worker_thread(void *arg)
 			char *p = line;
 			char *s = qstrsep(&p);
 
-			if(!strcmp(s, "SET")) {
+			if(!s || !*s) continue;
+			else if(!strcmp(s, "SET")) {
 				char *dimension = qstrsep(&p);
 				char *equal = qstrsep(&p);
 				char *value = qstrsep(&p);
@@ -5670,7 +5671,7 @@ void *chartsd_worker_thread(void *arg)
 				if(!family || !*family) family = id;
 				if(!category || !*category) category = type;
 
-				st = rrd_stats_find(id);
+				st = rrd_stats_find_bytype(type, id);
 				if(!st) {
 					debug(D_CHARTSD, "CHARTSD: Creating chart type='%s', id='%s', name='%s', family='%s', category='%s', chart='%s', priority=%d, update_every=%d"
 						, type, id
@@ -5684,8 +5685,10 @@ void *chartsd_worker_thread(void *arg)
 
 					st = rrd_stats_create(type, id, name, family, title, units, priority, update_every, chart_type);
 					cd->update_every = update_every;
+
+					if(strcmp(category, "none") == 0) st->isdetail = 1;
 				}
-				else debug(D_CHARTSD, "CHARTSD: Chart '%s' already exists. Not adding it again.");
+				else debug(D_CHARTSD, "CHARTSD: Chart '%s' already exists. Not adding it again.", st->id);
 			}
 			else if(!strcmp(s, "DIMENSION")) {
 				char *id = qstrsep(&p);
@@ -5730,7 +5733,7 @@ void *chartsd_worker_thread(void *arg)
 					rd = rrd_stats_dimension_add(st, id, name, multiplier, divisor, algorithm_id(algorithm));
 					if(hidden && strcmp(hidden, "hidden") == 0) rd->hidden = 1;
 				}
-				else if(st->debug) debug(D_CHARTSD, "CHARTSD: %s/%s already exists. Not adding it again.", st->id, id);
+				else if(st->debug) debug(D_CHARTSD, "CHARTSD: dimension %s/%s already exists. Not adding it again.", st->id, id);
 			}
 			else if(!strcmp(s, "MYPID")) {
 				char *pid = qstrsep(&p);
