@@ -1289,7 +1289,6 @@ void rrd_stats_done(RRD_STATS *st)
 
 	st->last_updated.tv_sec  = now.tv_sec;
 	st->last_updated.tv_usec = now.tv_usec;
-
 	st->counter++;
 
 	pthread_mutex_unlock(&st->mutex);
@@ -1765,9 +1764,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	else if(current_entry >= st->entries) current_entry = st->entries - 1;
 	
 	// find the oldest entry of the round-robin
-	long stop_entry = current_entry + 1;
-	if(stop_entry >= st->entries) stop_entry = 0;
-	if(st->counter < st->entries) stop_entry = 0;
+	long max_entries = (st->counter <= st->entries) ? st->counter - 1 : st->entries;
 	
 	if(before == 0) before = st->last_updated.tv_sec;
 	if(after  == 0) after = rrd_stats_first_entry_t(st);
@@ -1819,7 +1816,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	// checks for debuging
 	
 	if(st->debug) {
-		debug(D_RRD_STATS, "%s first_entry_t = %lu, last_entry_t = %lu, duration = %lu, after = %lu, before = %lu, duration = %lu, entries_to_show = %lu, group = %lu, stop_entry = %ld"
+		debug(D_RRD_STATS, "%s first_entry_t = %lu, last_entry_t = %lu, duration = %lu, after = %lu, before = %lu, duration = %lu, entries_to_show = %lu, group = %lu, max_entries = %ld"
 			, st->id
 			, rrd_stats_first_entry_t(st)
 			, st->last_updated.tv_sec
@@ -1829,7 +1826,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 			, before - after
 			, entries_to_show
 			, group
-			, stop_entry
+			, max_entries
 			);
 
 		if(before < after)
@@ -1872,7 +1869,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	unsigned long long time_usec = st->last_updated.tv_sec * 1000000ULL + st->last_updated.tv_usec;
 	long t, count, printed, group_count;
 	
-	for (count = printed = group_count = 0, t = current_entry; t != stop_entry ; time_usec -= st->timediff[t], t--) {
+	for (count = printed = group_count = 0, t = current_entry; max_entries ; time_usec -= st->timediff[t], t--, max_entries--) {
 		if(t < 0) t = st->entries - 1;
 
 		if(st->debug)
