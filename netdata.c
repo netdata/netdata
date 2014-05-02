@@ -33,6 +33,7 @@
 #include <zlib.h>
 #include <malloc.h>
 #include <inttypes.h>
+#include <dirent.h>
 
 
 #define RRD_TYPE_NET				"net"
@@ -85,6 +86,7 @@
 #define D_TC_LOOP           0x00000100
 #define D_DEFLATE           0x00000200
 #define D_CONFIG            0x00000400
+#define D_CHARTSD           0x00000800
 
 #define CT_APPLICATION_JSON				1
 #define CT_TEXT_PLAIN					2
@@ -867,7 +869,7 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 	snprintf(st->id, RRD_STATS_NAME_MAX, "%s.%s", type, id);
 	st->hash = simple_hash(st->id);
 
-	if(name) {
+	if(name && *name) {
 		char varvalue[CONFIG_MAX_VALUE + 1];
 		snprintf(varvalue, CONFIG_MAX_VALUE, "%s.%s", type?type:"", name);
 		st->name = config_get(st->id, "name", varvalue);
@@ -877,12 +879,12 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 	{
 		char varvalue[CONFIG_MAX_VALUE + 1];
 		snprintf(varvalue, CONFIG_MAX_VALUE, "%s (%s)", title?title:"", st->name);
-		st->title  = config_get(st->id, "title", varvalue);
+		st->title = config_get(st->id, "title", varvalue);
 	}
 
 	st->family     = config_get(st->id, "family", family?family:st->id);
 	st->units      = config_get(st->id, "units", units?units:"");
-	st->type       = config_get(st->id, "type", type?type:"");
+	st->type       = config_get(st->id, "type", type);
 	st->chart_type = chart_type_id(config_get(st->id, "chart type", chart_type_name(chart_type)));
 
 	st->entries = config_get_number(st->id, "history", save_history);
@@ -938,7 +940,7 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 	rd->hash = simple_hash(rd->id);
 
 	snprintf(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
-	rd->name = config_get(st->id, varname, name?name:rd->id);
+	rd->name = config_get(st->id, varname, (name && *name)?name:rd->id);
 
 	snprintf(varname, CONFIG_MAX_NAME, "dim %s algorithm", rd->id);
 	rd->algorithm = algorithm_id(config_get(st->id, varname, algorithm_name(algorithm)));
@@ -1093,7 +1095,6 @@ unsigned long long rrd_stats_next(RRD_STATS *st)
 	st->last_absolute_total  = st->absolute_total;
 	st->absolute_total       = 0;
 	st->current_entry        = ((st->current_entry + 1) >= st->entries) ? 0 : st->current_entry + 1;
-	st->counter++;
 
 	// leave mutex locked
 
@@ -1291,6 +1292,8 @@ void rrd_stats_done(RRD_STATS *st)
 	st->last_updated.tv_sec  = now.tv_sec;
 	st->last_updated.tv_usec = now.tv_usec;
 
+	st->counter++;
+	
 	pthread_mutex_unlock(&st->mutex);
 }
 
@@ -2134,7 +2137,7 @@ int mysendfile(struct web_client *w, char *filename)
 char *mystrsep(char **ptr, char *s)
 {
 	char *p = "";
-	while ( !p[0] && *ptr ) p = strsep(ptr, s);
+	while ( p && !p[0] && *ptr ) p = strsep(ptr, s);
 	return(p);
 }
 
@@ -3178,11 +3181,14 @@ void *socket_listen_main(void *ptr)
 			if(FD_ISSET(listener, &ifds)) {
 				w = web_client_create(listener);
 
-				if(pthread_create(&w->thread, NULL, new_client, w) != 0)
-					error("%llu: failed to create new thread.");
-
-				if(pthread_detach(w->thread) != 0)
-					error("%llu: Cannot request detach of newly created thread.", w->id);
+				if(pthread_create(&w->thread, NULL, new_client, w) != 0) {
+					error("%llu: failed to create new thread for web client.");
+					w->obsolete = 1;
+				}
+				else if(pthread_detach(w->thread) != 0) {
+					error("%llu: Cannot request detach of newly created web client thread.", w->id);
+					w->obsolete = 1;
+				}
 				
 				syslog(LOG_NOTICE, "%llu: %s connected", w->id, w->client_ip);
 			}
@@ -5351,6 +5357,10 @@ void *tc_main(void *ptr)
 
 		snprintf(buffer, TC_LINE_MAX, "exec %s %d", config_get("plugin:tc", "script to run to get tc values", "./tc-all.sh"), update_every);
 		fp = popen(buffer, "r");
+		if(!fp) {
+			error("Cannot popen(\"%s\", \"r\").", buffer);
+			return NULL;
+		}
 
 		while(fgets(buffer, TC_LINE_MAX, fp) != NULL) {
 			buffer[TC_LINE_MAX] = '\0';
@@ -5497,7 +5507,318 @@ void *cpuidlejitter_main(void *ptr)
 	return NULL;
 }
 
+// ----------------------------------------------------------------------------
+// charts.d
 
+#define CHARTS_D_FILE_SUFFIX "-chart.sh"
+#define CHARTS_D_FILE_SUFFIX_LEN strlen(CHARTS_D_FILE_SUFFIX)
+#define CHARTSD_CMD_MAX (FILENAME_MAX*2)
+#define CHARTSD_LINE_MAX 1024
+
+struct chartd {
+	char id[RRD_STATS_NAME_MAX+1];		// id
+	char filename[FILENAME_MAX+1];		// just the filename
+	char fullfilename[FILENAME_MAX+1];	// with path
+	char cmd[CHARTSD_CMD_MAX+1];		// the command that is executes
+
+	pid_t pid;
+	pthread_t thread;
+
+	int update_every;
+	int obsolete;
+
+	struct chartd *next;
+} *chartsd_root = NULL;
+
+// like strsep() but:
+// it trims spaces before and after each value
+// it accepts quoted values in single or double quotes
+char *qstrsep(char **ptr)
+{
+	if(!*ptr || !**ptr) return NULL;
+	
+	char *s, *p = *ptr;
+
+	// skip leading spaces
+	while(isspace(*p)) p++;
+
+	// if the first char is a quote, assume quoted
+	if(*p == '"' || *p == '\'') {
+		char q = *p;
+		s = ++p;
+		while(*p && *p != q) p++;
+
+		if(*p == q) {
+			*p = '\0';
+			p++;
+		}
+
+		*ptr = p;
+		return s;
+	}
+
+	s = p;
+	while(*p && !isspace(*p)) p++;
+	if(!*p) *ptr = NULL;
+	else {
+		*p = '\0';
+		*ptr = ++p;
+	}
+
+	return s;
+}
+
+void *chartsd_worker_thread(void *arg)
+{
+	struct chartd *cd = (struct chartd *)arg;
+	char line[CHARTSD_LINE_MAX + 1];
+
+	cd->update_every = config_get_number(cd->id, "update every", update_every);
+	snprintf(cd->cmd, CHARTSD_CMD_MAX, "exec %s %d", cd->fullfilename, cd->update_every);
+
+	while(1) {
+		FILE *fp = popen(cd->cmd, "r");
+		if(!fp) {
+			error("Cannot popen(\"%s\", \"r\").", cd->cmd);
+			break;
+		}
+
+		RRD_STATS *st = NULL;
+
+		unsigned long long count = 0;
+		while(fgets(line, CHARTSD_LINE_MAX, fp) != NULL) {
+			char *p = line;
+			char *s = qstrsep(&p);
+
+			if(!strcmp(s, "SET")) {
+				char *dimension = qstrsep(&p);
+				char *equal = qstrsep(&p);
+				char *value = qstrsep(&p);
+
+				if(!dimension || !equal || *equal != '=' || !value) {
+					error("CHARTSD: script %s is requesting a SET on chart '%s', like this: 'SET %s %s %s %s'", cd->fullfilename, st->id, dimension?dimension:"", equal?equal:"", value?value:"");
+					continue;
+				}
+
+				if(!st) {
+					error("CHARTSD: script %s is requesting a SET, without a BEGIN", cd->fullfilename);
+					continue;
+				}
+
+				debug(D_CHARTSD, "CHARTSD: script %s is setting dimension %s/%s to %s", cd->fullfilename, st->id, dimension, value);
+
+				rrd_stats_dimension_set(st, dimension, atoll(value));
+			}
+			else if(!strcmp(s, "BEGIN")) {
+				char *id = qstrsep(&p);
+				if(!id) {
+					error("CHARTSD: script %s is requesting a BEGIN without a chart id", cd->fullfilename);
+					continue;
+				}
+
+				st = rrd_stats_find(id);
+				if(!st) {
+					error("CHARTSD: script %s is requesting a BEGIN on chart '%s', which does not exist", cd->fullfilename, id);
+					continue;
+				}
+				if(st->counter) rrd_stats_next(st);
+			}
+			else if(!strcmp(s, "END")) {
+				if(!st) {
+					error("CHARTSD: script %s is requesting an END, without a BEGIN", cd->fullfilename);
+					continue;
+				}
+
+				debug(D_CHARTSD, "CHARTSD: script %s is requesting a END on chart %s", cd->fullfilename, st->id);
+
+				rrd_stats_done(st);
+				st = NULL;
+			}
+			else if(!strcmp(s, "CHART")) {
+				st = NULL;
+
+				char *type = qstrsep(&p);
+				char *id = NULL;
+				if(type) {
+					id = strchr(type, '.');
+					if(id) { *id = '\0'; id++; }
+				}
+				char *name = qstrsep(&p);
+				char *title = qstrsep(&p);
+				char *units = qstrsep(&p);
+				char *family = qstrsep(&p);
+				char *category = qstrsep(&p);
+				char *chart = qstrsep(&p);
+				char *priority_s = qstrsep(&p);
+				char *update_every_s = qstrsep(&p);
+
+				if(!type || !*type || !id || !*id) {
+					error("CHARTSD: script %s is requesting a CHART, without a type.id", cd->fullfilename);
+					continue;
+				}
+
+				int priority = 1000;
+				if(priority_s) priority = atoi(priority_s);
+
+				int update_every = cd->update_every;
+				if(update_every_s) update_every = atoi(update_every_s);
+				if(!update_every) update_every = cd->update_every;
+
+				int chart_type = CHART_TYPE_LINE;
+				if(chart) chart_type = chart_type_id(chart);
+
+				if(!name || !*name) name = id;
+				if(!family || !*family) family = id;
+				if(!category || !*category) category = type;
+
+				debug(D_CHARTSD, "CHARTSD: Creating chart type='%s', id='%s', name='%s', family='%s', category='%s', chart='%s', priority=%d, update_every=%d"
+					, type, id
+					, name?name:""
+					, family?family:""
+					, category?category:""
+					, chart_type_name(chart_type)
+					, priority
+					, update_every
+					);
+
+				st = rrd_stats_create(type, id, name, family, title, units, priority, update_every, chart_type);
+				cd->update_every = update_every;
+			}
+			else if(!strcmp(s, "DIMENSION")) {
+				char *id = qstrsep(&p);
+				char *name = qstrsep(&p);
+				char *algorithm = qstrsep(&p);
+				char *multiplier_s = qstrsep(&p);
+				char *divisor_s = qstrsep(&p);
+				char *hidden = qstrsep(&p);
+
+				if(!id || !*id) {
+					error("CHARTSD: script %s is requesting a DIMENSION, without an id", cd->fullfilename);
+					continue;
+				}
+
+				if(!st) {
+					error("CHARTSD: script %s is requesting an DIMENSION, without a CHART", cd->fullfilename);
+					continue;
+				}
+
+				long multiplier = 1;
+				if(multiplier_s && *multiplier_s) multiplier = atol(multiplier_s);
+				if(!multiplier) multiplier = 1;
+
+				long divisor = 1;
+				if(divisor_s && *divisor_s) divisor = atol(divisor_s);
+				if(!divisor) divisor = 1;
+
+				if(!algorithm || !*algorithm) algorithm = "absolute";
+
+				debug(D_CHARTSD, "CHARTSD: Creating dimension in chart %s, id='%s', name='%s', algorithm='%s', multiplier=%ld, divisor=%ld, hidden='%s'"
+					, st->id
+					, id
+					, name?name:""
+					, algorithm_name(algorithm_id(algorithm))
+					, multiplier
+					, divisor
+					, hidden?hidden:""
+					);
+
+				RRD_DIMENSION *rd = rrd_stats_dimension_add(st, id, name, multiplier, divisor, algorithm_id(algorithm));
+				if(hidden && strcmp(hidden, "hidden") == 0)
+					rd->hidden = 1;
+			}
+			else if(!strcmp(s, "MYPID")) {
+				char *pid = qstrsep(&p);
+				cd->pid = atol(pid);
+				debug(D_CHARTSD, "CHARTSD: %s is on pid %d", cd->id, cd->pid);
+			}
+			else error("CHARTSD: script %s is sending command '%s' which is not known by netdata", cd->fullfilename, s);
+
+			count++;
+		}
+		if(!count) error("Script '%s' does not generate any output.", cd->fullfilename);
+		pclose(fp);
+
+		sleep(cd->update_every);
+	}
+
+	cd->obsolete = 1;
+	return NULL;
+}
+
+void *chartsd_main(void *ptr)
+{
+	char *dir_name = config_get("plugin:charts.d", "charts.d directory", "charts.d");
+	DIR *dir = NULL;
+	struct dirent *file = NULL;
+	struct chartd *cd;
+
+	while(1) {
+		dir = opendir(dir_name);
+		if(!dir) {
+			error("Cannot open directory '%s'.", dir_name);
+			return NULL;
+		}
+
+		while((file = readdir(dir))) {
+			debug(D_CHARTSD, "CHARTSD: Examining file '%s'", file->d_name);
+
+			if(strcmp(file->d_name, ".") == 0 || strcmp(file->d_name, "..") == 0) continue;
+
+			int len = strlen(file->d_name);
+			if(len <= CHARTS_D_FILE_SUFFIX_LEN) continue;
+			if(strcmp(CHARTS_D_FILE_SUFFIX, &file->d_name[len - CHARTS_D_FILE_SUFFIX_LEN]) != 0) {
+				debug(D_CHARTSD, "CHARTSD: File '%s' does not end in '%s'.", file->d_name, CHARTS_D_FILE_SUFFIX);
+				continue;
+			}
+
+			char buf[CONFIG_MAX_NAME + 1];
+			snprintf(buf, CONFIG_MAX_NAME, "plugin %.*s", (int)(len - CHARTS_D_FILE_SUFFIX_LEN), file->d_name);
+			if(!config_get_boolean("plugin:charts.d", buf, 1)) continue;
+
+			// check if it runs already
+			for(cd = chartsd_root ; cd ; cd = cd->next) {
+				if(strcmp(cd->filename, file->d_name) == 0) break;
+			}
+			if(cd && !cd->obsolete) {
+				debug(D_CHARTSD, "CHARTSD: %s is already running", cd->filename);
+				continue;
+			}
+
+			// it is not running
+			// allocate a new one, or use the obsolete one
+			if(!cd) {
+				cd = calloc(sizeof(struct chartd), 1);
+				if(!cd) fatal("Cannot allocate memory for chart.d");
+
+				// link it
+				if(chartsd_root) cd->next = chartsd_root;
+				chartsd_root = cd;
+			}
+
+			strncpy(cd->filename, file->d_name, FILENAME_MAX);
+			snprintf(cd->id, RRD_STATS_NAME_MAX, "plugin:charts.d:%.*s", (int)(len - CHARTS_D_FILE_SUFFIX_LEN), file->d_name);
+			snprintf(cd->fullfilename, FILENAME_MAX, "%s/%s", dir_name, cd->filename);
+			cd->obsolete = 0;
+
+			// spawn a new thread for it
+			if(pthread_create(&cd->thread, NULL, chartsd_worker_thread, cd) != 0) {
+				error("CHARTS.D: failed to create new thread for chart.d %s.", cd->filename);
+				cd->obsolete = 1;
+			}
+			else if(pthread_detach(cd->thread) != 0)
+				error("CHARTS.D: Cannot request detach of newly created thread for chart.d %s.", cd->filename);
+		}
+
+		closedir(dir);
+		sleep(60);
+	}
+
+	return NULL;
+}
+
+
+// ----------------------------------------------------------------------------
+// main and related functions
 
 void bye(void)
 {
@@ -5517,6 +5838,11 @@ void sig_handler(int signo)
 			error("Signaled exit (signal %d).", signo);
 			if(tc_child_pid) kill(tc_child_pid, SIGTERM);
 			tc_child_pid = 0;
+
+			struct chartd *cd;
+			for(cd = chartsd_root ; cd ; cd = cd->next)
+				if(cd->pid) kill(cd->pid, SIGTERM);
+
 			exit(1);
 			break;
 
@@ -5744,13 +6070,37 @@ int main(int argc, char **argv)
 	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV) signal(i,  sig_handler);
 	
 
-	pthread_t p_proc, p_tc, p_jitter;
+	pthread_t p_proc, p_tc, p_jitter, p_chartsd;
 
-	// spawn a child to collect data
-	if(config_get_boolean("plugins", "tc",         1)) pthread_create(&p_tc,     NULL, tc_main,            NULL);
-	if(config_get_boolean("plugins", "idlejitter", 1)) pthread_create(&p_jitter, NULL, cpuidlejitter_main, NULL);
-	if(config_get_boolean("plugins", "proc",       1)) pthread_create(&p_proc,   NULL, proc_main,          NULL);
+	// spawn childs to collect data
+	if(config_get_boolean("plugins", "tc", 1)) {
+		if(pthread_create(&p_tc, NULL, tc_main, NULL))
+			error("failed to create new thread for tc.");
+		else if(pthread_detach(p_tc))
+			error("Cannot request detach of newly created tc thread.");
+	}
 
+	if(config_get_boolean("plugins", "idlejitter", 1)) {
+		if(pthread_create(&p_jitter, NULL, cpuidlejitter_main, NULL))
+			error("failed to create new thread for idlejitter.");
+		else if(pthread_detach(p_jitter))
+			error("Cannot request detach of newly created idlejitter thread.");
+	}
+
+	if(config_get_boolean("plugins", "proc", 1)) {
+		if(pthread_create(&p_proc, NULL, proc_main, NULL))
+			error("failed to create new thread for proc.");
+		else if(pthread_detach(p_proc))
+			error("Cannot request detach of newly created proc thread.");
+	}
+
+	if(config_get_boolean("plugins", "charts.d", 1)) {
+		if(pthread_create(&p_chartsd, NULL, chartsd_main, NULL))
+			error("failed to create new thread for charts.d.");
+		else if(pthread_detach(p_chartsd))
+			error("Cannot request detach of newly created charts.d thread.");
+	}
+	
 	// the main process - the web server listener
 	// this never ends
 	socket_listen_main(NULL);

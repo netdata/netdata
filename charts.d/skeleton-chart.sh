@@ -24,7 +24,7 @@ echo "MYPID $$"
 # If you don't want to read it, just skip at the end to see the action...
 #
 # CREATE NEW CHART:
-# > CHART type.chartname title units family[=chartname] category[=type] charttype[=line] priority[=1000] update_every[=user default]
+# > CHART type.id name title units family[=id] category[=type] charttype[=line] priority[=1000] update_every[=user default]
 #
 # where
 # - charttype = line, area or stacked
@@ -32,7 +32,7 @@ echo "MYPID $$"
 # - category = is the home page section: any name or the word 'none' which hides the chart from the home web page
 # 
 # create all the dimensions you need
-# > DIMENSION CREATE dimensionname algorithm multiplier divisor [hidden]"
+# > DIMENSION id name algorithm multiplier divisor [hidden]
 #
 # algorithms:
 #   absolute
@@ -90,10 +90,10 @@ echo "MYPID $$"
 
 
 cat <<EOF
-CHART example.random "Random Numbers Example Chart" "random numbers" ExampleFamily ExampleCategory stacked 500 $update_every
-DIMENSION number1 absolute 1 1
-DIMENSION number2 absolute 1 1
-DIMENSION number3 absolute 1 1 hidden
+CHART example.random '' "Random Numbers Example Chart" "random numbers" ExampleFamily ExampleCategory stacked 500 $update_every
+DIMENSION number1 '' absolute 1 1
+DIMENSION number2 '' absolute 1 1
+DIMENSION number3 '' absolute 1 1 hidden
 EOF
 
 # You can create more charts if you like.
