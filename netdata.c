@@ -864,8 +864,6 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 		return NULL;
 	}
 
-	// no need to terminate the strings after strncpy(), because of calloc()
-
 	snprintf(st->id, RRD_STATS_NAME_MAX, "%s.%s", type, id);
 	st->hash = simple_hash(st->id);
 
@@ -905,14 +903,12 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 	st->update_every = update_every;
 
 	pthread_mutex_init(&st->mutex, NULL);
-	pthread_mutex_lock(&st->mutex);
 	pthread_mutex_lock(&root_mutex);
 
 	st->next = root;
 	root = st;
 
 	pthread_mutex_unlock(&root_mutex);
-	// leave st->mutex locked
 
 	return(st);
 }
@@ -1096,13 +1092,15 @@ unsigned long long rrd_stats_next(RRD_STATS *st)
 	st->absolute_total       = 0;
 	st->current_entry        = ((st->current_entry + 1) >= st->entries) ? 0 : st->current_entry + 1;
 
-	// leave mutex locked
+	pthread_mutex_unlock(&st->mutex);
 
 	return st->usec_since_last_update;
 }
 
 void rrd_stats_done(RRD_STATS *st)
 {
+	pthread_mutex_lock(&st->mutex);
+
 	RRD_DIMENSION *rd, *last;
 
 	// find if there are any obsolete dimensions (not updated recently)
@@ -1132,6 +1130,7 @@ void rrd_stats_done(RRD_STATS *st)
 
 	if(!st->dimensions) {
 		st->enabled = 0;
+		pthread_mutex_unlock(&st->mutex);
 		// rrd_stats_free(st);
 		return;
 	}
@@ -1283,17 +1282,16 @@ void rrd_stats_done(RRD_STATS *st)
 				// add the value we will overwrite
 				st->first_entry_t += st->timediff[st->current_entry];
 			}
-
-			// store the time difference to the last entry
-			st->timediff[st->current_entry] = st->usec_since_last_update;
 		}
+		// store the time difference to the last entry
+		st->timediff[st->current_entry] = st->usec_since_last_update;
 	}
 
 	st->last_updated.tv_sec  = now.tv_sec;
 	st->last_updated.tv_usec = now.tv_usec;
 
 	st->counter++;
-	
+
 	pthread_mutex_unlock(&st->mutex);
 }
 
@@ -1764,11 +1762,12 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	// make sure current_entry is within limits
 	long current_entry = st->current_entry;
 	if(current_entry < 0) current_entry = 0;
-	else if(current_entry >= st->entries) current_entry = st->entries;
+	else if(current_entry >= st->entries) current_entry = st->entries - 1;
 	
 	// find the oldest entry of the round-robin
 	long stop_entry = current_entry + 1;
 	if(stop_entry >= st->entries) stop_entry = 0;
+	if(st->counter < st->entries) stop_entry = 0;
 	
 	if(before == 0) before = st->last_updated.tv_sec;
 	if(after  == 0) after = rrd_stats_first_entry_t(st);
@@ -1873,8 +1872,11 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, siz
 	unsigned long long time_usec = st->last_updated.tv_sec * 1000000ULL + st->last_updated.tv_usec;
 	long t, count, printed, group_count;
 	
-	for (count = printed = group_count = 0, t = current_entry; t != stop_entry && st->timediff[t] ; time_usec -= st->timediff[t], t--) {
+	for (count = printed = group_count = 0, t = current_entry; t != stop_entry ; time_usec -= st->timediff[t], t--) {
 		if(t < 0) t = st->entries - 1;
+
+		if(st->debug)
+			if(st->timediff[t] == 0) debug(D_RRD_STATS, "WARNING: %s time diff is zero at position %ld", st->id, t);
 
 		int print_this = 0;
 		time_t now = time_usec / 1000000ULL;
@@ -5605,9 +5607,10 @@ void *chartsd_worker_thread(void *arg)
 					continue;
 				}
 
-				debug(D_CHARTSD, "CHARTSD: script %s is setting dimension %s/%s to %s", cd->fullfilename, st->id, dimension, value);
-
+				if(st->debug) debug(D_CHARTSD, "CHARTSD: script %s is setting dimension %s/%s to %s", cd->fullfilename, st->id, dimension, value);
 				rrd_stats_dimension_set(st, dimension, atoll(value));
+
+				count++;
 			}
 			else if(!strcmp(s, "BEGIN")) {
 				char *id = qstrsep(&p);
@@ -5629,8 +5632,7 @@ void *chartsd_worker_thread(void *arg)
 					continue;
 				}
 
-				debug(D_CHARTSD, "CHARTSD: script %s is requesting a END on chart %s", cd->fullfilename, st->id);
-
+				if(st->debug) debug(D_CHARTSD, "CHARTSD: script %s is requesting a END on chart %s", cd->fullfilename, st->id);
 				rrd_stats_done(st);
 				st = NULL;
 			}
@@ -5698,7 +5700,7 @@ void *chartsd_worker_thread(void *arg)
 				}
 
 				if(!st) {
-					error("CHARTSD: script %s is requesting an DIMENSION, without a CHART", cd->fullfilename);
+					error("CHARTSD: script %s is requesting a DIMENSION, without a CHART", cd->fullfilename);
 					continue;
 				}
 
@@ -5712,7 +5714,7 @@ void *chartsd_worker_thread(void *arg)
 
 				if(!algorithm || !*algorithm) algorithm = "absolute";
 
-				debug(D_CHARTSD, "CHARTSD: Creating dimension in chart %s, id='%s', name='%s', algorithm='%s', multiplier=%ld, divisor=%ld, hidden='%s'"
+				if(st->debug) debug(D_CHARTSD, "CHARTSD: Creating dimension in chart %s, id='%s', name='%s', algorithm='%s', multiplier=%ld, divisor=%ld, hidden='%s'"
 					, st->id
 					, id
 					, name?name:""
@@ -5723,8 +5725,7 @@ void *chartsd_worker_thread(void *arg)
 					);
 
 				RRD_DIMENSION *rd = rrd_stats_dimension_add(st, id, name, multiplier, divisor, algorithm_id(algorithm));
-				if(hidden && strcmp(hidden, "hidden") == 0)
-					rd->hidden = 1;
+				if(hidden && strcmp(hidden, "hidden") == 0) rd->hidden = 1;
 			}
 			else if(!strcmp(s, "MYPID")) {
 				char *pid = qstrsep(&p);
@@ -5732,10 +5733,8 @@ void *chartsd_worker_thread(void *arg)
 				debug(D_CHARTSD, "CHARTSD: %s is on pid %d", cd->id, cd->pid);
 			}
 			else error("CHARTSD: script %s is sending command '%s' which is not known by netdata", cd->fullfilename, s);
-
-			count++;
 		}
-		if(!count) error("Script '%s' does not generate any output.", cd->fullfilename);
+		if(!count) error("Script '%s' does not generate usefull output.", cd->fullfilename);
 		pclose(fp);
 
 		sleep(cd->update_every);
