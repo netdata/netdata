@@ -5510,7 +5510,7 @@ void *cpuidlejitter_main(void *ptr)
 // charts.d
 
 #define CHARTS_D_FILE_SUFFIX "-chart.sh"
-#define CHARTS_D_FILE_SUFFIX_LEN sizeof(CHARTS_D_FILE_SUFFIX)
+#define CHARTS_D_FILE_SUFFIX_LEN strlen(CHARTS_D_FILE_SUFFIX)
 #define CHARTSD_CMD_MAX (FILENAME_MAX*2)
 #define CHARTSD_LINE_MAX 1024
 
@@ -5670,18 +5670,22 @@ void *chartsd_worker_thread(void *arg)
 				if(!family || !*family) family = id;
 				if(!category || !*category) category = type;
 
-				debug(D_CHARTSD, "CHARTSD: Creating chart type='%s', id='%s', name='%s', family='%s', category='%s', chart='%s', priority=%d, update_every=%d"
-					, type, id
-					, name?name:""
-					, family?family:""
-					, category?category:""
-					, chart_type_name(chart_type)
-					, priority
-					, update_every
-					);
+				st = rrd_stats_find(id);
+				if(!st) {
+					debug(D_CHARTSD, "CHARTSD: Creating chart type='%s', id='%s', name='%s', family='%s', category='%s', chart='%s', priority=%d, update_every=%d"
+						, type, id
+						, name?name:""
+						, family?family:""
+						, category?category:""
+						, chart_type_name(chart_type)
+						, priority
+						, update_every
+						);
 
-				st = rrd_stats_create(type, id, name, family, title, units, priority, update_every, chart_type);
-				cd->update_every = update_every;
+					st = rrd_stats_create(type, id, name, family, title, units, priority, update_every, chart_type);
+					cd->update_every = update_every;
+				}
+				else debug(D_CHARTSD, "CHARTSD: Chart '%s' already exists. Not adding it again.");
 			}
 			else if(!strcmp(s, "DIMENSION")) {
 				char *id = qstrsep(&p);
@@ -5721,8 +5725,12 @@ void *chartsd_worker_thread(void *arg)
 					, hidden?hidden:""
 					);
 
-				RRD_DIMENSION *rd = rrd_stats_dimension_add(st, id, name, multiplier, divisor, algorithm_id(algorithm));
-				if(hidden && strcmp(hidden, "hidden") == 0) rd->hidden = 1;
+				RRD_DIMENSION *rd = rrd_stats_dimension_find(st, id);
+				if(!rd) {
+					rd = rrd_stats_dimension_add(st, id, name, multiplier, divisor, algorithm_id(algorithm));
+					if(hidden && strcmp(hidden, "hidden") == 0) rd->hidden = 1;
+				}
+				else if(st->debug) debug(D_CHARTSD, "CHARTSD: %s/%s already exists. Not adding it again.", st->id, id);
 			}
 			else if(!strcmp(s, "MYPID")) {
 				char *pid = qstrsep(&p);
