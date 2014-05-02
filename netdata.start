@@ -68,7 +68,6 @@ fi
 
 echo "Stopping a (possibly) running netdata..."
 killall netdata 2>/dev/null
-killall tc-all.sh 2>/dev/null
 sleep 2
 
 if [ "$USER" = "root" -a ! -z "$NETDATA_CONFIG_USER" -a -d "$NETDATA_CONFIG_WEB_DIR" ]
