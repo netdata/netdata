@@ -208,14 +208,12 @@ void mypclose(FILE *fp)
 
 unsigned long long debug_flags = DEBUG;
 
-char *debug_log = NULL;
-int debug_fd = -1;
-
-char *access_log = NULL;
 int access_fd = -1;
 FILE *stdaccess = NULL;
 
-int log_syslog = 1;
+int access_log_syslog = 1;
+int error_log_syslog = 1;
+int output_log_syslog = 1;	// debug log
 
 
 void log_date(FILE *out)
@@ -242,12 +240,18 @@ void debug_int( const char *file, const char *function, const unsigned long line
 	if(file) { ; }
 	va_list args;
 
-	log_date(stderr);
+	log_date(stdout);
 	va_start( args, fmt );
-	fprintf(stderr, "DEBUG (%04lu@%-15.15s): ", line, function);
-	vfprintf( stderr, fmt, args );
+	fprintf(stdout, "DEBUG (%04lu@%-15.15s): ", line, function);
+	vfprintf( stdout, fmt, args );
 	va_end( args );
-	fprintf(stderr, "\n");
+	fprintf(stdout, "\n");
+
+	if(output_log_syslog) {
+		va_start( args, fmt );
+		vsyslog(LOG_ERR,  fmt, args );
+		va_end( args );
+	}
 }
 
 #define error(args...)  error_int(__FILE__, __FUNCTION__, __LINE__, ##args)
@@ -257,22 +261,20 @@ void error_int( const char *file, const char *function, const unsigned long line
 	if(file) { ; }
 	va_list args;
 
-	if(!silent) {
-		log_date(stderr);
+	log_date(stderr);
 
-		va_start( args, fmt );
-		fprintf(stderr, "ERROR (%04lu@%-15.15s): ", line, function);
-		vfprintf( stderr, fmt, args );
-		va_end( args );
+	va_start( args, fmt );
+	fprintf(stderr, "ERROR (%04lu@%-15.15s): ", line, function);
+	vfprintf( stderr, fmt, args );
+	va_end( args );
 
-		if(errno) {
-				fprintf(stderr, " (errno %d, %s)\n", errno, strerror(errno));
-				errno = 0;
-		}
-		else fprintf(stderr, "\n");
+	if(errno) {
+			fprintf(stderr, " (errno %d, %s)\n", errno, strerror(errno));
+			errno = 0;
 	}
+	else fprintf(stderr, "\n");
 
-	if(log_syslog) {
+	if(error_log_syslog) {
 		va_start( args, fmt );
 		vsyslog(LOG_ERR,  fmt, args );
 		va_end( args );
@@ -286,19 +288,17 @@ void fatal_int( const char *file, const char *function, const unsigned long line
 	if(file) { ; }
 	va_list args;
 
-	if(!silent) {
-		log_date(stderr);
+	log_date(stderr);
 
-		va_start( args, fmt );
-		fprintf(stderr, "FATAL (%04lu@%-15.15s): ", line, function);
-		vfprintf( stderr, fmt, args );
-		va_end( args );
+	va_start( args, fmt );
+	fprintf(stderr, "FATAL (%04lu@%-15.15s): ", line, function);
+	vfprintf( stderr, fmt, args );
+	va_end( args );
 
-		perror(" # ");
-		fprintf(stderr, "\n");
-	}
+	perror(" # ");
+	fprintf(stderr, "\n");
 
-	if(log_syslog) {
+	if(error_log_syslog) {
 		va_start( args, fmt );
 		vsyslog(LOG_CRIT,  fmt, args );
 		va_end( args );
@@ -321,7 +321,7 @@ void log_access( const char *fmt, ... )
 		fflush( stdaccess );
 	}
 
-	if(log_syslog) {
+	if(access_log_syslog) {
 		va_start( args, fmt );
 		vsyslog(LOG_INFO,  fmt, args );
 		va_end( args );
@@ -2092,7 +2092,7 @@ void generate_config(struct web_buffer *wb, int only_changed)
 		}
 
 		for(co = config_root; co ; co = co->next) {
-			if(strcmp(co->name, "global") == 0 || strcmp(co->name, "debug") == 0 || strcmp(co->name, "plugins") == 0) pri = 0;
+			if(strcmp(co->name, "global") == 0 || strcmp(co->name, "plugins") == 0) pri = 0;
 			else if(strncmp(co->name, "plugin:", 7) == 0) pri = 1;
 			else pri = 2;
 
@@ -3198,7 +3198,7 @@ void *new_client(void *ptr)
 // 3. spawns a new pthread to serve the client (this is optimal for keep-alive clients)
 // 4. cleans up old web_clients that their pthreads have been exited
 
-void syslog_allocations(void)
+void log_allocations(void)
 {
 	static int mem = 0;
 
@@ -3275,7 +3275,7 @@ void *socket_listen_main(void *ptr)
 				debug(D_WEB_CLIENT, "%llu: Removing client.", w->id);
 				// pthread_join(w->thread,  NULL);
 				w = web_client_free(w);
-				syslog_allocations();
+				log_allocations();
 			}
 		}
 	}
@@ -6031,9 +6031,78 @@ int fd_is_valid(int fd)
     return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
 }
 
-void become_daemon()
+int become_daemon(int close_all_files, const char *input, const char *output, const char *error, const char *access, int *access_fd, FILE **access_fp)
 {
 	fflush(NULL);
+
+	// open the files before forking
+	int input_fd = -1, output_fd = -1, error_fd = -1, dev_null = -1;
+
+	if(input && *input) {
+		if((input_fd = open(input, O_RDONLY, 0666)) == -1) {
+			fprintf(stderr, "Cannot open input file '%s' (%s).", input, strerror(errno));
+			return -1;
+		}
+	}
+
+	if(output && *output) {
+		if((output_fd = open(output, O_RDWR | O_APPEND | O_CREAT, 0666)) == -1) {
+			fprintf(stderr, "Cannot open output log file '%s' (%s).", output, strerror(errno));
+			if(input_fd != -1) close(input_fd);
+			return -1;
+		}
+	}
+
+	if(error && *error) {
+		if((error_fd = open(error, O_RDWR | O_APPEND | O_CREAT, 0666)) == -1) {
+			fprintf(stderr, "Cannot open error log file '%s' (%s).", error, strerror(errno));
+			if(input_fd != -1) close(input_fd);
+			if(output_fd != -1) close(output_fd);
+			return -1;
+		}
+	}
+
+	if(access && *access && access_fd) {
+		if((*access_fd = open(access, O_RDWR | O_APPEND | O_CREAT, 0666)) == -1) {
+			fprintf(stderr, "Cannot open access log file '%s' (%s).", access, strerror(errno));
+			if(input_fd != -1) close(input_fd);
+			if(output_fd != -1) close(output_fd);
+			if(error_fd != -1) close(error_fd);
+			return -1;
+		}
+
+		if(access_fp) {
+			*access_fp = fdopen(*access_fd, "w");
+			if(!*access_fp) {
+				fprintf(stderr, "Cannot migrate file's '%s' fd %d (%s).\n", access, *access_fd, strerror(errno));
+				if(input_fd != -1) close(input_fd);
+				if(output_fd != -1) close(output_fd);
+				if(error_fd != -1) close(error_fd);
+				close(*access_fd);
+				*access_fd = -1;
+				return -1;
+			}
+		}
+	}
+	
+	if((dev_null = open("/dev/null", O_RDWR, 0666)) == -1) {
+		perror("Cannot open /dev/null");
+		if(input_fd != -1) close(input_fd);
+		if(output_fd != -1) close(output_fd);
+		if(error_fd != -1) close(error_fd);
+		if(access && access_fd && *access_fd != -1) {
+			close(*access_fd);
+			*access_fd = -1;
+			if(access_fp) {
+				fclose(*access_fp);
+				*access_fp = NULL;
+			}
+		}
+		return -1;
+	}
+
+	// all files opened
+	// lets do it
 
 	int i = fork();
 	if(i == -1) {
@@ -6066,31 +6135,62 @@ void become_daemon()
 	umask(0);
 
 	// close all files
-	for(i = sysconf(_SC_OPEN_MAX); i > 0; i--)
-		if(i != debug_fd && i != access_fd && i != listen_fd && fd_is_valid(i)) close(i);
-
-	silent = 0;
-	if(debug_fd == -1) {
-		silent = 1;
-		debug_fd = open("/dev/null", O_RDWR | O_APPEND | O_CREAT, 0666);
+	if(close_all_files) {
+		for(i = sysconf(_SC_OPEN_MAX); i > 0; i--)
+			if(   
+				((access_fd && i != *access_fd) || !access_fd)
+				&& i != dev_null
+				&& i != input_fd
+				&& i != output_fd
+				&& i != error_fd
+				&& fd_is_valid(i)
+				) close(i);
+	}
+	else {
+		close(STDIN_FILENO);
+		close(STDOUT_FILENO);
+		close(STDERR_FILENO);
 	}
 
-	if(debug_fd != -1) {
-		if(dup2(debug_fd, STDIN_FILENO) < 0)
-			silent = 1;
-
-		if(dup2(debug_fd, STDOUT_FILENO) < 0)
-			silent = 1;
-
-		if(dup2(debug_fd, STDERR_FILENO) < 0)
-			silent = 1;
+	// put the opened files
+	// to our standard file descriptors
+	if(input_fd != -1) {
+		if(input_fd != STDIN_FILENO) {
+			dup2(input_fd, STDIN_FILENO);
+			close(input_fd);
+		}
+		input_fd = -1;
 	}
-	else silent = 1;
+	else dup2(dev_null, STDIN_FILENO);
+	
+	if(output_fd != -1) {
+		if(output_fd != STDOUT_FILENO) {
+			dup2(output_fd, STDOUT_FILENO);
+			close(output_fd);
+		}
+		output_fd = -1;
+	}
+	else dup2(dev_null, STDOUT_FILENO);
+
+	if(error_fd != -1) {
+		if(error_fd != STDERR_FILENO) {
+			dup2(error_fd, STDERR_FILENO);
+			close(error_fd);
+		}
+		error_fd = -1;
+	}
+	else dup2(dev_null, STDERR_FILENO);
+
+	// close /dev/null
+	if(dev_null != STDIN_FILENO && dev_null != STDOUT_FILENO && dev_null != STDERR_FILENO)
+		close(dev_null);
+
+	return(0);
 }
 
 int main(int argc, char **argv)
 {
-	int i, daemon = 0;
+	int i;
 	int config_loaded = 0;
 
 
@@ -6107,10 +6207,7 @@ int main(int argc, char **argv)
 			}
 			i++;
 		}
-		else if(strcmp(argv[i], "-dl") == 0 && (i+1) < argc) { config_set("debug",  "log",          argv[i+1]); i++; }
-		else if(strcmp(argv[i], "-df") == 0 && (i+1) < argc) { config_set("debug",  "flags",   	    argv[i+1]); i++; }
-		else if(strcmp(argv[i], "-d") == 0)                  { config_set_number("global", "daemon", 1); }
-		else if(strcmp(argv[i], "-nd") == 0)                 { config_set_number("global", "daemon", 0); }
+		else if(strcmp(argv[i], "-df") == 0 && (i+1) < argc) { config_set("global", "debug flags",  argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-p")  == 0 && (i+1) < argc) { config_set("global", "port",         argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-u")  == 0 && (i+1) < argc) { config_set("global", "run as user",  argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-l")  == 0 && (i+1) < argc) { config_set("global", "history",      argv[i+1]); i++; }
@@ -6119,13 +6216,10 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Cannot understand option '%s'.\n", argv[i]);
 			fprintf(stderr, "\nUSAGE: %s [-d] [-l LINES_TO_SAVE] [-u UPDATE_TIMER] [-p LISTEN_PORT] [-dl debug log file] [-df debug flags].\n\n", argv[0]);
 			fprintf(stderr, "  -c CONFIG FILE the configuration file to load. Default: %s.\n", CONFIG_FILENAME);
-			fprintf(stderr, "  -d enable daemon mode (run in the background).\n");
-			fprintf(stderr, "  -nd disable daemon mode (do not run in the background).\n");
 			fprintf(stderr, "  -l LINES_TO_SAVE can be from 5 to %d lines in JSON data. Default: %d.\n", HISTORY_MAX, HISTORY);
 			fprintf(stderr, "  -t UPDATE_TIMER can be from 1 to %d seconds. Default: %d.\n", UPDATE_EVERY_MAX, UPDATE_EVERY);
 			fprintf(stderr, "  -p LISTEN_PORT can be from 1 to %d. Default: %d.\n", 65535, LISTEN_PORT);
 			fprintf(stderr, "  -u USERNAME can be any system username to run as. Default: none.\n");
-			fprintf(stderr, "  -dl FILENAME write debug log to FILENAME. Default: none.\n");
 			fprintf(stderr, "  -df FLAGS debug options. Default: 0x%8llx.\n", debug_flags);
 			exit(1);
 		}
@@ -6133,59 +6227,58 @@ int main(int argc, char **argv)
 
 	if(!config_loaded) load_config(NULL, 0);
 
+	char *input_log_file = NULL;
+	char *output_log_file = NULL;
+	char *error_log_file = NULL;
+	char *access_log_file = NULL;
 	{
 		char buffer[1024];
 
 		// --------------------------------------------------------------------
 
 		sprintf(buffer, "0x%08llx", debug_flags);
-		char *flags = config_get("debug", "flags", buffer);
+		char *flags = config_get("global", "debug flags", buffer);
 		debug_flags = strtoull(flags, NULL, 0);
 		debug(D_OPTIONS, "Debug flags set to '0x%8llx'.", debug_flags);
 
 		// --------------------------------------------------------------------
 
-		debug_log = config_get("debug", "log", "");
-		if(*debug_log) {
-			debug_fd = open(debug_log, O_RDWR | O_APPEND | O_CREAT, 0666);
-			if(debug_fd < 0) {
-				fprintf(stderr, "Cannot open file '%s'. Reason: %s\n", debug_log, strerror(errno));
-				exit(1);
-			}
-			debug(D_OPTIONS, "Debug LOG set to '%s'.",  debug_log);
+		output_log_file = config_get("global", "debug log", "none");
+		if(strcmp(output_log_file, "syslog") == 0) {
+			output_log_syslog = 1;
+			output_log_file = NULL;
 		}
+		else if(strcmp(output_log_file, "none") == 0) {
+			output_log_syslog = 0;
+			output_log_file = NULL;
+		}
+		else output_log_syslog = 0;
 
 		// --------------------------------------------------------------------
 
-		access_log = config_get("global", "access log", "syslog");
-		if(strcmp(access_log, "syslog") == 0) {
-			log_syslog = 1;
-			access_fd = -1;
-			stdaccess = NULL;
-
-			debug(D_OPTIONS, "access log on syslog.");
+		error_log_file = config_get("global", "error log", "syslog");
+		if(strcmp(error_log_file, "syslog") == 0) {
+			error_log_syslog = 1;
+			error_log_file = NULL;
 		}
-		else if(strcmp(access_log, "none") == 0) {
-			log_syslog = 0;
-			access_fd = -1;
-			stdaccess = NULL;
-			debug(D_OPTIONS, "access log disabled.");
+		else if(strcmp(error_log_file, "none") == 0) {
+			error_log_syslog = 0;
+			error_log_file = NULL;
 		}
-		else {
-			access_fd = open(access_log, O_WRONLY | O_APPEND | O_CREAT, 0666);
-			if(access_fd < 0) {
-				fprintf(stderr, "Cannot open file '%s'. Reason: %s\n", access_log, strerror(errno));
-				exit(1);
-			}
+		else error_log_syslog = 0;
 
-			stdaccess = fdopen(access_fd, "w");
-			if(!stdaccess) {
-				fprintf(stderr, "Cannot migrate file's '%s' fd %d. Reason: %s\n", access_log, access_fd, strerror(errno));
-				exit(1);
-			}
+		// --------------------------------------------------------------------
 
-			debug(D_OPTIONS, "access log to file '%s'.",  access_log);
+		access_log_file = config_get("global", "access log", "syslog");
+		if(strcmp(access_log_file, "syslog") == 0) {
+			access_log_syslog = 1;
+			access_log_file = NULL;
 		}
+		else if(strcmp(access_log_file, "none") == 0) {
+			access_log_syslog = 0;
+			access_log_file = NULL;
+		}
+		else access_log_syslog = 0;
 
 		// --------------------------------------------------------------------
 
@@ -6235,10 +6328,6 @@ int main(int argc, char **argv)
 		else debug(D_OPTIONS, "listen port set to %d.", listen_port);
 
 		listen_fd = create_listen_socket(listen_port);
-
-		// --------------------------------------------------------------------
-
-		daemon = config_get_boolean("global", "daemon", 0);
 	}
 
 	// never become a problem
@@ -6250,9 +6339,13 @@ int main(int argc, char **argv)
 		fprintf(stderr, "\n\nWARNING:\nThis system does not support [long double] variables properly.\nArithmetic overflows and rounding errors may occur.\n\n");
 	}
 
-	if(daemon) become_daemon();
+	if(become_daemon(0, input_log_file, output_log_file, error_log_file, access_log_file, &access_fd, &stdaccess) == -1) {
+		fprintf(stderr, "Cannot demonize myself (%s).", strerror(errno));
+		exit(1);
+	}
 
-	if(log_syslog) {
+
+	if(output_log_syslog || error_log_syslog || access_log_syslog) {
 		openlog("netdata", LOG_PID, LOG_DAEMON);
 		syslog(LOG_NOTICE, "netdata started.");
 	}
