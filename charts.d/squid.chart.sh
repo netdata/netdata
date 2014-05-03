@@ -1,41 +1,22 @@
 #!/bin/sh
 
-url="http://127.0.0.1:8080/squid-internal-mgr/counters"
+squid_url="http://127.0.0.1:8080/squid-internal-mgr/counters"
 
-# report our PID back to netdata
-# this is required for netdata to kill this process when it exits
-echo "MYPID $$"
+squid_check() {
+	# check once if the url works
+	wget 2>/dev/null -O /dev/null "$squid_url"
+	if [ ! $? -eq 0 ]
+	then
+		echo >&2 "squid: cannot fetch the url: $squid_url. Please set squid_url='url' in $confd/squid.conf"
+		return 1
+	fi
 
-# default sleep function
-loopsleepms() {
-	sleep $1
+	return 0
 }
-# if found and included, this file overwrites loopsleepms()
-# with a high resolution timer function for precise looping.
-. "`dirname $0`/loopsleepms.sh.inc"
 
-# netdata passes the requested update frequency as the first argument
-update_every=$1
-update_every=$(( update_every + 1 - 1))	# makes sure it is a number
-test $update_every -eq 0 && update_every=1 # if it is zero, make it 1
-
-# we accept a url as the second argument
-if [ ! -z "$2" ]
-then
-	url="$2"
-fi
-
-# check once if the url works
-wget 2>/dev/null -O /dev/null "$url"
-if [ ! $? -eq 0 ]
-then
-	# it does not work - disable the plugin
-	echo "DISABLE"
-	exit 1
-fi
-
-# create the charts
-cat <<EOF
+squid_create() {
+	# create the charts
+	cat <<EOF
 CHART squid.client_bandwidth '' "Squid Client Bandwidth" "kilobits/s" squid squid area 1 $update_every
 DIMENSION client_http_kbytes_in in incremental 8 1
 DIMENSION client_http_kbytes_out out incremental -8 1
@@ -54,18 +35,17 @@ CHART squid.server_requests '' "Squid Server Requests" "requests/s" squid squid 
 DIMENSION server_all_requests requests incremental 1 1
 DIMENSION server_all_errors errors incremental -1 1
 EOF
+	
+	return 0
+}
 
-# You can create more charts if you like.
-# Just add more chart definitions.
 
-# work forever
-while [ 1 ]
-do
+squid_update() {
 	# do all the work to collect / calculate the values
 	# for each dimension
 
 	# get the values from squid
-	eval `wget 2>/dev/null -O - "$url" | sed -e "s/\./_/g" -e "s/ = /=/g" | egrep "(^client_http_|^server_all_)"`
+	eval `wget 2>/dev/null -O - "$squid_url" | sed -e "s/\./_/g" -e "s/ = /=/g" | egrep "(^client_http_|^server_all_)"`
 
 	# write the result of the work.
 	cat <<VALUESEOF
@@ -92,6 +72,6 @@ SET server_all_errors = $server_all_errors
 END
 VALUESEOF
 
-	# wait the time you are required to
-	loopsleepms $update_every
-done
+	return 0
+}
+

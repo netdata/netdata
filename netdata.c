@@ -87,7 +87,7 @@
 #define D_TC_LOOP           0x00000100
 #define D_DEFLATE           0x00000200
 #define D_CONFIG            0x00000400
-#define D_CHARTSD           0x00000800
+#define D_PLUGINSD          0x00000800
 #define D_CHILDS            0x00001000
 
 #define CT_APPLICATION_JSON				1
@@ -319,7 +319,7 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 		close(pipefd[PIPE_WRITE]);
 	}
 
-	debug(D_CHILDS, "Running command: '%s'\n", command);
+	fprintf(stderr, "executing command: '%s'\n", command);
  	execl("/bin/sh", "sh", "-c", command, NULL);
 	exit(1);
 }
@@ -441,7 +441,7 @@ int create_listen_socket(int port)
 
 #define CONFIG_MAX_NAME 1024
 #define CONFIG_MAX_VALUE 1024
-#define CONFIG_FILENAME "netdata.conf"
+#define CONFIG_FILENAME "conf.d/netdata.conf"
 #define CONFIG_FILE_LINE_MAX 4096
 
 pthread_mutex_t config_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -2100,11 +2100,14 @@ void generate_config(struct web_buffer *wb, int only_changed)
 			if(i == pri) {
 				int used = 0;
 				int changed = 0;
+				int count = 0;
 				for(cv = co->values; cv ; cv = cv->next) {
 					used += cv->used;
 					changed += cv->changed;
+					count++;
 				}
 
+				if(!count) continue;
 				if(only_changed && !changed) continue;
 
 				if(!used) {
@@ -5227,7 +5230,7 @@ void *proc_main(void *ptr)
 
 // ----------------------------------------------------------------------------
 // /sbin/tc processor
-// this requires the script charts.d/tc-qos-collector.sh
+// this requires the script plugins.d/tc-qos-helper.sh
 
 #define TC_LINE_MAX 1024
 
@@ -5429,7 +5432,7 @@ void *tc_main(void *ptr)
 		struct tc_device *device = NULL;
 		struct tc_class *class = NULL;
 
-		snprintf(buffer, TC_LINE_MAX, "exec %s %d", config_get("plugin:tc", "script to run to get tc values", "charts.d/tc-qos-collector.sh"), update_every);
+		snprintf(buffer, TC_LINE_MAX, "exec %s %d", config_get("plugin:tc", "script to run to get tc values", "plugins.d/tc-qos-helper.sh"), update_every);
 		debug(D_TC_LOOP, "executing '%s'", buffer);
 		// fp = popen(buffer, "r");
 		fp = mypopen(buffer, &tc_child_pid);
@@ -5520,7 +5523,11 @@ void *tc_main(void *ptr)
 			}
 			else if((strcmp(p, "MYPID") == 0)) {
 				char *id = strsep(&b, " \n");
-				tc_child_pid = atol(id);
+				pid_t pid = atol(id);
+
+				if(pid != tc_child_pid)
+					error("tc-qos-helper reports wrong pid %d (expected %d).", pid, tc_child_pid);
+
 				debug(D_TC_LOOP, "TC: Child PID is %d.", tc_child_pid);
 			}
 		}
@@ -5585,19 +5592,19 @@ void *cpuidlejitter_main(void *ptr)
 }
 
 // ----------------------------------------------------------------------------
-// charts.d
+// plugins.d
 
-#define CHARTS_D_FILE_SUFFIX "-chart.sh"
-#define CHARTS_D_FILE_SUFFIX_LEN strlen(CHARTS_D_FILE_SUFFIX)
-#define CHARTSD_CMD_MAX (FILENAME_MAX*2)
-#define CHARTSD_LINE_MAX 1024
+#define PLUGINSD_FILE_SUFFIX ".plugin"
+#define PLUGINSD_FILE_SUFFIX_LEN strlen(PLUGINSD_FILE_SUFFIX)
+#define PLUGINSD_CMD_MAX (FILENAME_MAX*2)
+#define PLUGINSD_LINE_MAX 1024
 
 struct chartd {
 	char id[CONFIG_MAX_NAME+1];			// config node id
 
 	char filename[FILENAME_MAX+1];		// just the filename
 	char fullfilename[FILENAME_MAX+1];	// with path
-	char cmd[CHARTSD_CMD_MAX+1];		// the command that is executes
+	char cmd[PLUGINSD_CMD_MAX+1];		// the command that is executes
 
 	pid_t pid;
 	pthread_t thread;
@@ -5607,7 +5614,7 @@ struct chartd {
 	int enabled;
 
 	struct chartd *next;
-} *chartsd_root = NULL;
+} *pluginsd_root = NULL;
 
 // like strsep() but:
 // it trims spaces before and after each value
@@ -5647,10 +5654,10 @@ char *qstrsep(char **ptr)
 	return s;
 }
 
-void *chartsd_worker_thread(void *arg)
+void *pluginsd_worker_thread(void *arg)
 {
 	struct chartd *cd = (struct chartd *)arg;
-	char line[CHARTSD_LINE_MAX + 1];
+	char line[PLUGINSD_LINE_MAX + 1];
 
 	while(1) {
 		// FILE *fp = popen(cd->cmd, "r");
@@ -5663,9 +5670,9 @@ void *chartsd_worker_thread(void *arg)
 		RRD_STATS *st = NULL;
 
 		unsigned long long count = 0;
-		while(fgets(line, CHARTSD_LINE_MAX, fp) != NULL) {
+		while(fgets(line, PLUGINSD_LINE_MAX, fp) != NULL) {
 			char *p = trim(line);
-			debug(D_CHARTSD, "CHARTSD: %s: %s", cd->filename, line);
+			debug(D_PLUGINSD, "PLUGINSD: %s: %s", cd->filename, line);
 
 			char *s = qstrsep(&p);
 
@@ -5676,16 +5683,16 @@ void *chartsd_worker_thread(void *arg)
 				char *value = qstrsep(&p);
 
 				if(!dimension || !equal || *equal != '=' || !value) {
-					error("CHARTSD: script %s is requesting a SET on chart '%s', like this: 'SET %s %s %s %s'", cd->fullfilename, st->id, dimension?dimension:"", equal?equal:"", value?value:"");
+					error("PLUGINSD: script %s is requesting a SET on chart '%s', like this: 'SET %s %s %s %s'", cd->fullfilename, st->id, dimension?dimension:"", equal?equal:"", value?value:"");
 					continue;
 				}
 
 				if(!st) {
-					error("CHARTSD: script %s is requesting a SET, without a BEGIN", cd->fullfilename);
+					error("PLUGINSD: script %s is requesting a SET, without a BEGIN", cd->fullfilename);
 					continue;
 				}
 
-				if(st->debug) debug(D_CHARTSD, "CHARTSD: script %s is setting dimension %s/%s to %s", cd->fullfilename, st->id, dimension, value);
+				if(st->debug) debug(D_PLUGINSD, "PLUGINSD: script %s is setting dimension %s/%s to %s", cd->fullfilename, st->id, dimension, value);
 				rrd_stats_dimension_set(st, dimension, atoll(value));
 
 				count++;
@@ -5693,24 +5700,24 @@ void *chartsd_worker_thread(void *arg)
 			else if(!strcmp(s, "BEGIN")) {
 				char *id = qstrsep(&p);
 				if(!id) {
-					error("CHARTSD: script %s is requesting a BEGIN without a chart id", cd->fullfilename);
+					error("PLUGINSD: script %s is requesting a BEGIN without a chart id", cd->fullfilename);
 					continue;
 				}
 
 				st = rrd_stats_find(id);
 				if(!st) {
-					error("CHARTSD: script %s is requesting a BEGIN on chart '%s', which does not exist", cd->fullfilename, id);
+					error("PLUGINSD: script %s is requesting a BEGIN on chart '%s', which does not exist", cd->fullfilename, id);
 					continue;
 				}
 				if(st->counter) rrd_stats_next(st);
 			}
 			else if(!strcmp(s, "END")) {
 				if(!st) {
-					error("CHARTSD: script %s is requesting an END, without a BEGIN", cd->fullfilename);
+					error("PLUGINSD: script %s is requesting an END, without a BEGIN", cd->fullfilename);
 					continue;
 				}
 
-				if(st->debug) debug(D_CHARTSD, "CHARTSD: script %s is requesting a END on chart %s", cd->fullfilename, st->id);
+				if(st->debug) debug(D_PLUGINSD, "PLUGINSD: script %s is requesting a END on chart %s", cd->fullfilename, st->id);
 				rrd_stats_done(st);
 				st = NULL;
 			}
@@ -5733,7 +5740,7 @@ void *chartsd_worker_thread(void *arg)
 				char *update_every_s = qstrsep(&p);
 
 				if(!type || !*type || !id || !*id) {
-					error("CHARTSD: script %s is requesting a CHART, without a type.id", cd->fullfilename);
+					error("PLUGINSD: script %s is requesting a CHART, without a type.id", cd->fullfilename);
 					continue;
 				}
 
@@ -5753,7 +5760,7 @@ void *chartsd_worker_thread(void *arg)
 
 				st = rrd_stats_find_bytype(type, id);
 				if(!st) {
-					debug(D_CHARTSD, "CHARTSD: Creating chart type='%s', id='%s', name='%s', family='%s', category='%s', chart='%s', priority=%d, update_every=%d"
+					debug(D_PLUGINSD, "PLUGINSD: Creating chart type='%s', id='%s', name='%s', family='%s', category='%s', chart='%s', priority=%d, update_every=%d"
 						, type, id
 						, name?name:""
 						, family?family:""
@@ -5768,7 +5775,7 @@ void *chartsd_worker_thread(void *arg)
 
 					if(strcmp(category, "none") == 0) st->isdetail = 1;
 				}
-				else debug(D_CHARTSD, "CHARTSD: Chart '%s' already exists. Not adding it again.", st->id);
+				else debug(D_PLUGINSD, "PLUGINSD: Chart '%s' already exists. Not adding it again.", st->id);
 			}
 			else if(!strcmp(s, "DIMENSION")) {
 				char *id = qstrsep(&p);
@@ -5779,12 +5786,12 @@ void *chartsd_worker_thread(void *arg)
 				char *hidden = qstrsep(&p);
 
 				if(!id || !*id) {
-					error("CHARTSD: script %s is requesting a DIMENSION, without an id", cd->fullfilename);
+					error("PLUGINSD: script %s is requesting a DIMENSION, without an id", cd->fullfilename);
 					continue;
 				}
 
 				if(!st) {
-					error("CHARTSD: script %s is requesting a DIMENSION, without a CHART", cd->fullfilename);
+					error("PLUGINSD: script %s is requesting a DIMENSION, without a CHART", cd->fullfilename);
 					continue;
 				}
 
@@ -5798,7 +5805,7 @@ void *chartsd_worker_thread(void *arg)
 
 				if(!algorithm || !*algorithm) algorithm = "absolute";
 
-				if(st->debug) debug(D_CHARTSD, "CHARTSD: Creating dimension in chart %s, id='%s', name='%s', algorithm='%s', multiplier=%ld, divisor=%ld, hidden='%s'"
+				if(st->debug) debug(D_PLUGINSD, "PLUGINSD: Creating dimension in chart %s, id='%s', name='%s', algorithm='%s', multiplier=%ld, divisor=%ld, hidden='%s'"
 					, st->id
 					, id
 					, name?name:""
@@ -5813,26 +5820,30 @@ void *chartsd_worker_thread(void *arg)
 					rd = rrd_stats_dimension_add(st, id, name, multiplier, divisor, algorithm_id(algorithm));
 					if(hidden && strcmp(hidden, "hidden") == 0) rd->hidden = 1;
 				}
-				else if(st->debug) debug(D_CHARTSD, "CHARTSD: dimension %s/%s already exists. Not adding it again.", st->id, id);
+				else if(st->debug) debug(D_PLUGINSD, "PLUGINSD: dimension %s/%s already exists. Not adding it again.", st->id, id);
 			}
 			else if(!strcmp(s, "MYPID")) {
-				char *pid = qstrsep(&p);
-				cd->pid = atol(pid);
-				debug(D_CHARTSD, "CHARTSD: %s is on pid %d", cd->id, cd->pid);
+				char *pid_s = qstrsep(&p);
+				pid_t pid = atol(pid_s);
+
+				if(pid != cd->pid)
+					error("plugin %s reports wrong pid %d (expected %d).", cd->filename, pid, cd->pid);
+
+				debug(D_PLUGINSD, "PLUGINSD: %s is on pid %d", cd->id, cd->pid);
 			}
 			else if(!strcmp(s, "DISABLE")) {
-				error("CHARTSD: script '%s' called DISABLE. Disabling it.", cd->fullfilename);
+				error("PLUGINSD: script '%s' called DISABLE. Disabling it.", cd->fullfilename);
 				cd->enabled = 0;
 				break;
 			}
-			else error("CHARTSD: script %s is sending command '%s' which is not known by netdata", cd->fullfilename, s);
+			else error("PLUGINSD: script %s is sending command '%s' which is not known by netdata", cd->fullfilename, s);
 		}
 
 		// fgets() failed or loop broke
 		mypclose(fp);
 
 		if(!count && cd->enabled) {
-			error("CHARTSD: script '%s' does not generate usefull output. Disabling it.", cd->fullfilename);
+			error("PLUGINSD: script '%s' does not generate usefull output. Disabling it.", cd->fullfilename);
 			cd->enabled = 0;
 		}
 
@@ -5844,14 +5855,17 @@ void *chartsd_worker_thread(void *arg)
 	return NULL;
 }
 
-void *chartsd_main(void *ptr)
+void *pluginsd_main(void *ptr)
 {
 	if(ptr) { ; }
-	char *dir_name = config_get("plugin:charts.d", "charts.d directory", "charts.d");
-	int automatic_run = config_get_boolean("plugin:charts.d", "enable runnig new scripts", 0);
+	char *dir_name = config_get("plugins", "plugins directory", "plugins.d");
+	int automatic_run = config_get_boolean("plugins", "enable running new plugins", 0);
+	int scan_frequency = config_get_number("plugins", "check for new plugins every", 60);
 	DIR *dir = NULL;
 	struct dirent *file = NULL;
 	struct chartd *cd;
+
+	if(scan_frequency < 1) scan_frequency = 1;
 
 	while(1) {
 		dir = opendir(dir_name);
@@ -5861,23 +5875,32 @@ void *chartsd_main(void *ptr)
 		}
 
 		while((file = readdir(dir))) {
-			debug(D_CHARTSD, "CHARTSD: Examining file '%s'", file->d_name);
+			debug(D_PLUGINSD, "PLUGINSD: Examining file '%s'", file->d_name);
 
 			if(strcmp(file->d_name, ".") == 0 || strcmp(file->d_name, "..") == 0) continue;
 
 			int len = strlen(file->d_name);
-			if(len <= (int)CHARTS_D_FILE_SUFFIX_LEN) continue;
-			if(strcmp(CHARTS_D_FILE_SUFFIX, &file->d_name[len - CHARTS_D_FILE_SUFFIX_LEN]) != 0) {
-				debug(D_CHARTSD, "CHARTSD: File '%s' does not end in '%s'.", file->d_name, CHARTS_D_FILE_SUFFIX);
+			if(len <= (int)PLUGINSD_FILE_SUFFIX_LEN) continue;
+			if(strcmp(PLUGINSD_FILE_SUFFIX, &file->d_name[len - PLUGINSD_FILE_SUFFIX_LEN]) != 0) {
+				debug(D_PLUGINSD, "PLUGINSD: File '%s' does not end in '%s'.", file->d_name, PLUGINSD_FILE_SUFFIX);
+				continue;
+			}
+
+			char pluginname[CONFIG_MAX_NAME + 1];
+			snprintf(pluginname, CONFIG_MAX_NAME, "%.*s", (int)(len - PLUGINSD_FILE_SUFFIX_LEN), file->d_name);
+			int enabled = config_get_boolean("plugins", pluginname, automatic_run);
+
+			if(!enabled) {
+				debug(D_PLUGINSD, "PLUGINSD: plugin '%s' is not enabled", file->d_name);
 				continue;
 			}
 
 			// check if it runs already
-			for(cd = chartsd_root ; cd ; cd = cd->next) {
+			for(cd = pluginsd_root ; cd ; cd = cd->next) {
 				if(strcmp(cd->filename, file->d_name) == 0) break;
 			}
 			if(cd && !cd->obsolete) {
-				debug(D_CHARTSD, "CHARTSD: %s is already running", cd->filename);
+				debug(D_PLUGINSD, "PLUGINSD: plugin '%s' is already running", cd->filename);
 				continue;
 			}
 
@@ -5887,25 +5910,25 @@ void *chartsd_main(void *ptr)
 				cd = calloc(sizeof(struct chartd), 1);
 				if(!cd) fatal("Cannot allocate memory for chart.d");
 
-				snprintf(cd->id, CONFIG_MAX_NAME, "plugin:charts.d:%.*s", (int)(len - CHARTS_D_FILE_SUFFIX_LEN), file->d_name);
+				snprintf(cd->id, CONFIG_MAX_NAME, "plugin:%s", pluginname);
 				
 				strncpy(cd->filename, file->d_name, FILENAME_MAX);
 				snprintf(cd->fullfilename, FILENAME_MAX, "%s/%s", dir_name, cd->filename);
 
-				cd->enabled = config_get_boolean(cd->id, "enable", automatic_run);
+				cd->enabled = enabled;
 				cd->update_every = config_get_number(cd->id, "update every", update_every);
-				snprintf(cd->cmd, CHARTSD_CMD_MAX, "exec %s %d %s", cd->fullfilename, cd->update_every, config_get(cd->id, "more command options", ""));
+				snprintf(cd->cmd, PLUGINSD_CMD_MAX, "exec %s %d %s", cd->fullfilename, cd->update_every, config_get(cd->id, "command options", ""));
 
 				// link it
-				if(chartsd_root) cd->next = chartsd_root;
-				chartsd_root = cd;
+				if(pluginsd_root) cd->next = pluginsd_root;
+				pluginsd_root = cd;
 			}
 			cd->obsolete = 0;
 
 			if(!cd->enabled) continue;
 
 			// spawn a new thread for it
-			if(pthread_create(&cd->thread, NULL, chartsd_worker_thread, cd) != 0) {
+			if(pthread_create(&cd->thread, NULL, pluginsd_worker_thread, cd) != 0) {
 				error("CHARTS.D: failed to create new thread for chart.d %s.", cd->filename);
 				cd->obsolete = 1;
 			}
@@ -5914,7 +5937,7 @@ void *chartsd_main(void *ptr)
 		}
 
 		closedir(dir);
-		sleep(60);
+		sleep(scan_frequency);
 	}
 
 	return NULL;
@@ -5930,7 +5953,7 @@ void kill_childs()
 	tc_child_pid = 0;
 
 	struct chartd *cd;
-	for(cd = chartsd_root ; cd ; cd = cd->next)
+	for(cd = pluginsd_root ; cd ; cd = cd->next)
 		if(cd->pid && !cd->obsolete) {
 			kill(cd->pid, SIGTERM);
 			cd->pid = 0;
@@ -6237,14 +6260,14 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		sprintf(buffer, "0x%08llx", debug_flags);
+		sprintf(buffer, "0x%08llx", 0ULL);
 		char *flags = config_get("global", "debug flags", buffer);
 		debug_flags = strtoull(flags, NULL, 0);
 		debug(D_OPTIONS, "Debug flags set to '0x%8llx'.", debug_flags);
 
 		// --------------------------------------------------------------------
 
-		output_log_file = config_get("global", "debug log", "none");
+		output_log_file = config_get("global", "debug log", "log/debug.log");
 		if(strcmp(output_log_file, "syslog") == 0) {
 			output_log_syslog = 1;
 			output_log_file = NULL;
@@ -6258,7 +6281,7 @@ int main(int argc, char **argv)
 		// --------------------------------------------------------------------
 
 		silent = 0;
-		error_log_file = config_get("global", "error log", "syslog");
+		error_log_file = config_get("global", "error log", "log/error.log");
 		if(strcmp(error_log_file, "syslog") == 0) {
 			error_log_syslog = 1;
 			error_log_file = NULL;
@@ -6272,7 +6295,7 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		access_log_file = config_get("global", "access log", "syslog");
+		access_log_file = config_get("global", "access log", "log/access.log");
 		if(strcmp(access_log_file, "syslog") == 0) {
 			access_log_syslog = 1;
 			access_log_file = NULL;
@@ -6348,10 +6371,10 @@ int main(int argc, char **argv)
 	}
 
 
-	if(output_log_syslog || error_log_syslog || access_log_syslog) {
+	if(output_log_syslog || error_log_syslog || access_log_syslog)
 		openlog("netdata", LOG_PID, LOG_DAEMON);
-		syslog(LOG_NOTICE, "netdata started.");
-	}
+
+	error("NetData started on pid %d", getpid());
 
 	// make sure we cleanup correctly
 	atexit(bye);
@@ -6360,7 +6383,7 @@ int main(int argc, char **argv)
 	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV) signal(i,  sig_handler);
 	
 
-	pthread_t p_proc, p_tc, p_jitter, p_chartsd;
+	pthread_t p_proc, p_tc, p_jitter, p_pluginsd;
 
 	// spawn childs to collect data
 	if(config_get_boolean("plugins", "tc", 1)) {
@@ -6384,12 +6407,10 @@ int main(int argc, char **argv)
 			error("Cannot request detach of newly created proc thread.");
 	}
 
-	if(config_get_boolean("plugins", "charts.d", 1)) {
-		if(pthread_create(&p_chartsd, NULL, chartsd_main, NULL))
-			error("failed to create new thread for charts.d.");
-		else if(pthread_detach(p_chartsd))
-			error("Cannot request detach of newly created charts.d thread.");
-	}
+	if(pthread_create(&p_pluginsd, NULL, pluginsd_main, NULL))
+		error("failed to create new thread for plugins.d.");
+	else if(pthread_detach(p_pluginsd))
+		error("Cannot request detach of newly created plugins.d thread.");
 	
 	// the main process - the web server listener
 	// this never ends

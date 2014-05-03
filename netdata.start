@@ -27,9 +27,9 @@ NETDATA_CONFIG_PORT=19999
 # our web files
 NETDATA_CONFIG_WEB_DIR=web
 
-if [ -f netdata.conf ]
+if [ -f conf.d/netdata.conf ]
 then
-	x="`grep "\[global\]" netdata.conf`"
+	x="`grep "\[global\]" conf.d/netdata.conf`"
 	if [ -z "$x" ]
 	then
 		# import the old values
@@ -38,10 +38,10 @@ then
 		rm netdata.conf.tmp
 
 		mv netdata.conf netdata.conf.old
-		echo "You are having an old config. Moved to netdata.conf.old"
+		echo "You are having an old config. Moved to netdata.conf.old. New config is in conf.d/"
 	else
 		# find if debug is enabled in the config
-		df=`grep -C 3 "\[debug\]" netdata.conf | grep "flags" | tail -n 1 | cut -d '=' -f 2 | sed s"/ //g"`
+		df=`grep -C 3 "\[debug\]" conf.d/netdata.conf | grep "flags" | tail -n 1 | cut -d '=' -f 2 | sed s"/ //g"`
 		if [ -z "$df" -o "$df" = "0x00000000" -o $((df + 1 - 1)) -eq 0 ]
 		then
 			NETDATA_CONFIG_DEBUG=0
@@ -50,8 +50,8 @@ then
 		fi
 
 		# find the user to run as
-		NETDATA_CONFIG_USER="`grep 'run as user = ' netdata.conf | head -n 1 | cut -d '=' -f 2 | sed s"/ //g"`"
-		NETDATA_CONFIG_WEB_DIR="`grep 'web files directory = ' netdata.conf | head -n 1 | cut -d '=' -f 2 | sed -e s"/^ \+//g" -e s"/ \+$//g"`"
+		NETDATA_CONFIG_USER="`grep 'run as user = ' conf.d/netdata.conf | head -n 1 | cut -d '=' -f 2 | sed s"/ //g"`"
+		NETDATA_CONFIG_WEB_DIR="`grep 'web files directory = ' conf.d/netdata.conf | head -n 1 | cut -d '=' -f 2 | sed -e s"/^ \+//g" -e s"/ \+$//g"`"
 	fi
 fi
 
@@ -60,7 +60,7 @@ if [ $NETDATA_CONFIG_DEBUG -eq 1 ]
 then
 	ulimit -c unlimited
 	gcc -Wall -Wextra -ggdb -o netdata netdata.c -lpthread -lz || exit 1
-	debug_opts="-df 0xfffffadf -dl netdata.log"
+	debug_opts="-df 0xfffffadf"
 else
 	gcc -Wall -O3 -o netdata netdata.c -lpthread -lz || exit 1
 	debug_opts="-df 0x00000000"
@@ -84,25 +84,25 @@ then
 fi
 
 echo "Starting netdata..."
-if [ -f netdata.conf ]
+if [ -f conf.d/netdata.conf ]
 then
 	`pwd`/netdata
 else
-	touch netdata.conf
+	touch conf.d/netdata.conf
 
 	if [ "$USER" = "root" ]
 	then
-		`pwd`/netdata $debug_opts -d -u $NETDATA_CONFIG_USER -t $NETDATA_CONFIG_INTERNAL_UPDATE_EVERY -l $NETDATA_CONFIG_INTERNAL_HISTORY_LINES -p $NETDATA_CONFIG_PORT || exit 1
+		`pwd`/netdata $debug_opts -u $NETDATA_CONFIG_USER -t $NETDATA_CONFIG_INTERNAL_UPDATE_EVERY -l $NETDATA_CONFIG_INTERNAL_HISTORY_LINES -p $NETDATA_CONFIG_PORT || exit 1
 	else
-		`pwd`/netdata $debug_opts -d -t $NETDATA_CONFIG_INTERNAL_UPDATE_EVERY -l $NETDATA_CONFIG_INTERNAL_HISTORY_LINES -p $NETDATA_CONFIG_PORT || exit 1
+		`pwd`/netdata $debug_opts -t $NETDATA_CONFIG_INTERNAL_UPDATE_EVERY -l $NETDATA_CONFIG_INTERNAL_HISTORY_LINES -p $NETDATA_CONFIG_PORT || exit 1
 	fi
 
 	sleep 2
-	wget 2>/dev/null -O netdata.conf.new http://localhost:$NETDATA_CONFIG_PORT/netdata.conf
-	mv netdata.conf.new netdata.conf
+	wget 2>/dev/null -O conf.d/netdata.conf.new http://localhost:$NETDATA_CONFIG_PORT/netdata.conf
+	mv conf.d/netdata.conf.new conf.d/netdata.conf
 
 	echo "Hit http://127.0.0.1:$NETDATA_CONFIG_PORT/ from your browser."
-	echo "You can edit config options in file netdata.conf"
+	echo "You can edit config options in file conf.d/netdata.conf"
 fi
 
 echo
