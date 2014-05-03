@@ -88,6 +88,7 @@
 #define D_DEFLATE           0x00000200
 #define D_CONFIG            0x00000400
 #define D_CHARTSD           0x00000800
+#define D_CHILDS            0x00001000
 
 #define CT_APPLICATION_JSON				1
 #define CT_TEXT_PLAIN					2
@@ -138,69 +139,6 @@ int silent = 0;
 int save_history = HISTORY;
 int update_every = UPDATE_EVERY;
 int listen_port = LISTEN_PORT;
-
-
-// ----------------------------------------------------------------------------
-// helpers
-
-unsigned long long usecdiff(struct timeval *now, struct timeval *last) {
-		return ((((now->tv_sec * 1000000ULL) + now->tv_usec) - ((last->tv_sec * 1000000ULL) + last->tv_usec)));
-}
-
-unsigned long simple_hash(const char *name)
-{
-	int i, len = strlen(name);
-	unsigned long hash = 0;
-
-	for(i = 0; i < len ;i++) hash += (i * name[i]) + i + name[i];
-
-	return hash;
-}
-
-#define PIPE_READ 0
-#define PIPE_WRITE 1
-
-FILE *mypopen(const char *command, pid_t *pidptr)
-{
-	int pipefd[2];
-
-	if(pipe(pipefd) == -1) return NULL;
-
-	int pid = fork();
-	if(pid == -1) {
-		close(pipefd[PIPE_READ]);
-		close(pipefd[PIPE_WRITE]);
-		return NULL;
-	}
-	if(pid != 0) {
-		// the parent
-		*pidptr = pid;
-		close(pipefd[PIPE_WRITE]);
-		FILE *fp = fdopen(pipefd[PIPE_READ], "r");
-		return(fp);
-	}
-	// the child
-
-	// close all files
-	int i;
-	for(i = sysconf(_SC_OPEN_MAX); i > 0; i--)
-		if(i != STDIN_FILENO && i != STDERR_FILENO && i != pipefd[PIPE_WRITE]) close(i);
-
-	// move the pipe to stdout
-	if(pipefd[PIPE_WRITE] != STDOUT_FILENO) {
-		dup2(pipefd[PIPE_WRITE], STDOUT_FILENO);
-		close(pipefd[PIPE_WRITE]);
-	}
-
-	fprintf(stderr, "Running command: '%s'\n", command);
- 	execl("/bin/sh", "sh", "-c", command, NULL);
-	exit(1);
-}
-
-void mypclose(FILE *fp)
-{
-	fclose(fp);
-}
 
 
 // ----------------------------------------------------------------------------
@@ -326,6 +264,69 @@ void log_access( const char *fmt, ... )
 		vsyslog(LOG_INFO,  fmt, args );
 		va_end( args );
 	}
+}
+
+
+// ----------------------------------------------------------------------------
+// helpers
+
+unsigned long long usecdiff(struct timeval *now, struct timeval *last) {
+		return ((((now->tv_sec * 1000000ULL) + now->tv_usec) - ((last->tv_sec * 1000000ULL) + last->tv_usec)));
+}
+
+unsigned long simple_hash(const char *name)
+{
+	int i, len = strlen(name);
+	unsigned long hash = 0;
+
+	for(i = 0; i < len ;i++) hash += (i * name[i]) + i + name[i];
+
+	return hash;
+}
+
+#define PIPE_READ 0
+#define PIPE_WRITE 1
+
+FILE *mypopen(const char *command, pid_t *pidptr)
+{
+	int pipefd[2];
+
+	if(pipe(pipefd) == -1) return NULL;
+
+	int pid = fork();
+	if(pid == -1) {
+		close(pipefd[PIPE_READ]);
+		close(pipefd[PIPE_WRITE]);
+		return NULL;
+	}
+	if(pid != 0) {
+		// the parent
+		*pidptr = pid;
+		close(pipefd[PIPE_WRITE]);
+		FILE *fp = fdopen(pipefd[PIPE_READ], "r");
+		return(fp);
+	}
+	// the child
+
+	// close all files
+	int i;
+	for(i = sysconf(_SC_OPEN_MAX); i > 0; i--)
+		if(i != STDIN_FILENO && i != STDERR_FILENO && i != pipefd[PIPE_WRITE]) close(i);
+
+	// move the pipe to stdout
+	if(pipefd[PIPE_WRITE] != STDOUT_FILENO) {
+		dup2(pipefd[PIPE_WRITE], STDOUT_FILENO);
+		close(pipefd[PIPE_WRITE]);
+	}
+
+	debug(D_CHILDS, "Running command: '%s'\n", command);
+ 	execl("/bin/sh", "sh", "-c", command, NULL);
+	exit(1);
+}
+
+void mypclose(FILE *fp)
+{
+	fclose(fp);
 }
 
 
@@ -6256,6 +6257,7 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
+		silent = 0;
 		error_log_file = config_get("global", "error log", "syslog");
 		if(strcmp(error_log_file, "syslog") == 0) {
 			error_log_syslog = 1;
@@ -6264,6 +6266,7 @@ int main(int argc, char **argv)
 		else if(strcmp(error_log_file, "none") == 0) {
 			error_log_syslog = 0;
 			error_log_file = NULL;
+			silent = 1; // optimization - do not even generate debug log entries
 		}
 		else error_log_syslog = 0;
 
