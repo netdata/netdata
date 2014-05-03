@@ -27,6 +27,11 @@ NETDATA_CONFIG_PORT=19999
 # our web files
 NETDATA_CONFIG_WEB_DIR=web
 
+if [ ! -d log ]
+then
+	mkdir log || exit 1
+fi
+
 if [ -f conf.d/netdata.conf ]
 then
 	x="`grep "\[global\]" conf.d/netdata.conf`"
