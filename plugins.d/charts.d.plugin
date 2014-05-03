@@ -1,0 +1,174 @@
+#!/bin/sh
+
+check=0
+if [ "$1" = "check" ]
+then
+	check=1
+	shift
+fi
+
+# default sleep function
+loopsleepms() {
+	sleep $1
+}
+# if found and included, this file overwrites loopsleepms()
+# with a high resolution timer function for precise looping.
+. "`dirname $0`/loopsleepms.sh.inc"
+
+# netdata passes the requested update frequency as the first argument
+update_every=$1
+update_every=$(( update_every + 1 - 1))	# makes sure it is a number
+test $update_every -eq 0 && update_every=1 # if it is zero, make it 1
+
+pluginsd="plugins.d"
+confd="conf.d"
+chartsd="charts.d"
+myconfig="$confd/charts.d.conf"
+minimum_update_frequency=1
+
+# load the configuration
+if [ -f "$myconfig" ]
+	then
+	. "$myconfig"
+	if [ $? -ne 0 ]
+	then
+		echo >&2 "charts.d: cannot load $myconfig"
+		echo "DISABLE"
+		exit 1
+	fi
+fi
+
+if [ ! -d "$chartsd" ]
+	then
+	echo >&2 "charts.d: cannot find charts directory '$chartsd'"
+	echo "DISABLE"
+fi
+
+all_charts() {
+	cd "$chartsd"
+	ls *.chart.sh | sed "s/\.chart\.sh$//g"
+}
+
+all_enabled_charts() {
+	local charts=
+
+	# find all enabled charts
+
+	for x in `all_charts`
+	do
+		eval "enabled=\$$x"
+		if [ "$enabled" = "yes" ]
+		then
+			local charts="$charts $x"
+		else
+			echo >&2 "charts.d: chart '$x' is NOT enabled. Add a line with $x=yes in $myconfig to enable it."
+		fi
+	done
+
+	local charts2=
+	for x in $charts
+	do
+		# check the enabled charts
+		local check=`cat "$chartsd/$x.chart.sh" | sed "s/^ \+//g" | grep "^${x}_check()"`
+		if [ -z "$check" ]
+		then
+			echo >&2 "charts.d: chart '$x' does not seem to have a ${x}_check() function. Disabling it."
+			continue
+		fi
+
+		local create=`cat "$chartsd/$x.chart.sh" | sed "s/^ \+//g" | grep "^${x}_create()"`
+		if [ -z "$create" ]
+		then
+			echo >&2 "charts.d: chart '$x' does not seem to have a ${x}_create() function. Disabling it."
+			continue
+		fi
+
+		local update=`cat "$chartsd/$x.chart.sh" | sed "s/^ \+//g" | grep "^${x}_update()"`
+		if [ -z "$update" ]
+		then
+			echo >&2 "charts.d: chart '$x' does not seem to have a ${x}_update() function. Disabling it."
+			continue
+		fi
+
+		# check its config
+		if [ -f "$confd/$x.conf" ]
+		then
+			if [ ! -z "`cat "$confd/$x.conf" | sed "s/^ \+//g" | grep -v "^$" | grep -v "^#" | grep -v "^${x}_"`" ]
+			then
+				echo >&2 "charts.d: chart's $x config $confd/$x.conf should only have lines starting with ${x}_ . Disabling it."
+				continue
+			fi
+		fi
+
+		"$pluginsd/charts.d.dryrun-helper.sh" "$x" "$chartsd/$x.chart.sh" "$confd/$x.conf" >/dev/null
+		if [ $? -ne 0 ]
+		then
+			echo >&2 "charts.d: chart's $x did not pass the dry run check. This means it uses global variables not starting with $x. Disabling it."
+			continue
+		fi
+
+		local charts2="$charts2 $x"
+	done
+
+	echo $charts2
+}
+
+
+active_charts=
+for x in `all_enabled_charts`
+do
+	. "$chartsd/$x.chart.sh"
+
+	if [ -f "$confd/$x.conf" ]
+	then
+		. "$confd/$x.conf"
+	fi
+
+	${x}_check
+	if [ $? -eq 0 ]
+	then
+		active_charts="$active_charts $x"
+	else
+		echo >&2 "charts.d: chart '$x' check() function reports failure."
+	fi
+done
+
+if [ $check -eq 1 ]
+then
+	echo "CHECK RESULT"
+	echo "Will run the charts: $active_charts"
+	exit 0
+fi
+
+run_charts=
+for x in $active_charts
+do
+	${x}_create
+	if [ $? -eq 0 ]
+	then
+		run_charts="$run_charts $x"
+	else
+		echo >&2 "charts.d: chart '$x' create() function reports failure."
+	fi
+done
+
+# work forever
+while [ 1 ]
+do
+	now_charts=$run_charts
+	run_charts=
+
+	for x in $now_charts
+	do
+		${x}_update
+		if [ $? -eq 0 ]
+		then
+			run_charts="$run_charts $x"
+		else
+			echo >&2 "charts.d: chart '$x' update() function reports failure. Disabling it."
+		fi
+	done
+
+	# wait the time you are required to
+	loopsleepms $update_every
+done
