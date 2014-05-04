@@ -285,6 +285,7 @@ function loadCharts(base_url, doNext) {
 			switch(json.charts[i].type) {
 				case "system":
 					json.charts[i].category = "System";
+					json.charts[i].categoryPriority = 10;
 					json.charts[i].glyphicon = "glyphicon-dashboard";
 					json.charts[i].group = 5;
 
@@ -298,31 +299,9 @@ function loadCharts(base_url, doNext) {
 					}
 					break;
 
-				case "cpu":
-					json.charts[i].category = "CPU";
-					json.charts[i].glyphicon = "glyphicon-dashboard";
-					json.charts[i].group = 5;
-
-					if(json.charts[i].id.substring(0, 7) == "cpu.cpu") {
-						json.charts[i].chartOptions.vAxis.minValue = 0;
-						json.charts[i].chartOptions.vAxis.maxValue = 100;
-					}
-					break;
-
-				case "mem":
-					json.charts[i].category = "Memory";
-					json.charts[i].glyphicon = "glyphicon-dashboard";
-					json.charts[i].group = 5;
-					break;
-
-				case "tc":
-					json.charts[i].category = "QoS";
-					json.charts[i].glyphicon = "glyphicon-random";
-					json.charts[i].group = 15;
-					break;
-
 				case "net":
 					json.charts[i].category = "Network";
+					json.charts[i].categoryPriority = 20;
 					json.charts[i].glyphicon = "glyphicon-transfer";
 					json.charts[i].group = 5;
 
@@ -332,32 +311,84 @@ function loadCharts(base_url, doNext) {
 						json.charts[i].enabled = false;
 					break;
 
-				case "ipv4":
-					json.charts[i].category = "IPv4";
-					json.charts[i].glyphicon = "glyphicon-globe";
+				case "tc":
+					json.charts[i].category = "QoS";
+					json.charts[i].categoryPriority = 30;
+					json.charts[i].glyphicon = "glyphicon-random";
+					json.charts[i].group = 15;
+					break;
+
+				case "ipvs":
+					json.charts[i].category = "IPVS";
+					json.charts[i].categoryPriority = 40;
+					json.charts[i].glyphicon = "glyphicon-sort";
 					json.charts[i].group = 5;
 					break;
 
 				case "conntrack":
 					json.charts[i].category = "Netfilter";
+					json.charts[i].categoryPriority = 50;
 					json.charts[i].glyphicon = "glyphicon-cloud";
 					json.charts[i].group = 5;
 					break;
 
-				case "ipvs":
-					json.charts[i].category = "IPVS";
-					json.charts[i].glyphicon = "glyphicon-sort";
+				case "ipv4":
+					json.charts[i].category = "IPv4";
+					json.charts[i].categoryPriority = 60;
+					json.charts[i].glyphicon = "glyphicon-globe";
 					json.charts[i].group = 5;
+					break;
+
+				case "mem":
+					json.charts[i].category = "Memory";
+					json.charts[i].categoryPriority = 70;
+					json.charts[i].glyphicon = "glyphicon-dashboard";
+					json.charts[i].group = 5;
+					break;
+
+				case "cpu":
+					json.charts[i].category = "CPU";
+					json.charts[i].categoryPriority = 80;
+					json.charts[i].glyphicon = "glyphicon-dashboard";
+					json.charts[i].group = 5;
+
+					if(json.charts[i].id.substring(0, 7) == "cpu.cpu") {
+						json.charts[i].chartOptions.vAxis.minValue = 0;
+						json.charts[i].chartOptions.vAxis.maxValue = 100;
+					}
 					break;
 
 				case "disk":
 					json.charts[i].category = "Disks";
+					json.charts[i].categoryPriority = 90;
 					json.charts[i].glyphicon = "glyphicon-hdd";
+					json.charts[i].group = 5;
+					break;
+
+				case "apps":
+					json.charts[i].category = "Apps";
+					json.charts[i].categoryPriority = 4000;
+					json.charts[i].glyphicon = "glyphicon-globe";
+					json.charts[i].group = 5;
+					break;
+
+				case "squid":
+					json.charts[i].category = "Squid";
+					json.charts[i].categoryPriority = 5000;
+					json.charts[i].glyphicon = "glyphicon-globe";
+					json.charts[i].group = 5;
+					break;
+
+				case "example":
+					json.charts[i].category = "Examples";
+					json.charts[i].categoryPriority = 9000;
+					json.charts[i].glyphicon = "glyphicon-search";
 					json.charts[i].group = 5;
 					break;
 
 				default:
 					json.charts[i].category = json.charts[i].type;
+					json.charts[i].categoryPriority = 1000;
 					json.charts[i].glyphicon = "glyphicon-search";
 					json.charts[i].group = 5;
 					break;

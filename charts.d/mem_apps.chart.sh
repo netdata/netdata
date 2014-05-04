@@ -23,17 +23,13 @@ mem_apps_bc_finalze=
 
 mem_apps_create() {
 
-	cat <<EOF1
-CHART system.apps '' "Apps Memory" "MB" "mem" "mem" stacked 20000 $update_every
-EOF1
+	echo "CHART apps.mem '' 'Apps Memory' MB apps apps stacked 20000 $update_every"
 
 	local x=
 	for x in $mem_apps_apps
 	do
+		echo "DIMENSION $x $x absolute 1 1024"
 
-cat <<EOF1
-DIMENSION $x $x absolute 1 1024
-EOF1
 		# this string is needed later in the update() function
 		# to finalize the instructions for the bc command
 		mem_apps_bc_finalze="$mem_apps_bc_finalze \"SET $x = \"; $x;"
@@ -41,15 +37,14 @@ EOF1
 	return 0
 }
 
-mem_apps_egrep="(`echo "$mem_apps_apps" | sed -e "s/^ \+//g" -e "s/ \+$//g" -e "s/ /|/g"`)"
 mem_apps_update() {
 	# do all the work to collect / calculate the values
 	# for each dimension
 	# remember: KEEP IT SIMPLE AND SHORT
 
-	echo "BEGIN system.apps"
-	ps -e -o comm,rss |\
-		egrep "^$mem_apps_egrep " |\
+	echo "BEGIN apps.mem"
+	ps -o comm,rss -C "$mem_apps_apps" |\
+		grep -v "^COMMAND" |\
 		(	sed -e "s/ \+/ /g" -e "s/ /+=/g";
 			echo "$mem_apps_bc_finalze"
 		) | bc
@@ -57,4 +52,3 @@ mem_apps_update() {
 
 	return 0
 }
-

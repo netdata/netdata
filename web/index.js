@@ -896,7 +896,7 @@ function initCharts() {
 				}
 
 				if(j == categories.length) {
-					categories.push({name: c.type, title: c.category, description: '', priority: 0, count: 1, glyphicon: c.glyphicon, html: h});
+					categories.push({name: c.type, title: c.category, description: '', priority: c.categoryPriority, count: 1, glyphicon: c.glyphicon, html: h});
 				}
 			}
 		});
@@ -904,17 +904,6 @@ function initCharts() {
 		document.getElementById('server_summary_id').innerHTML = "<small>NetData server at <b>" + all.hostname + "</b> is maintaining <b>" + mycharts.length + "</b> charts, having <b>" + dimensions + "</b> dimensions (by default with <b>" + all.history + "</b> entries each), which are updated every <b>" + all.update_every + "s</b>, using a total of <b>" + (Math.round(all.memory * 10 / 1024 / 1024) / 10) + " MB</b> for the round robin database.</small>";
 
 		$.each(categories, function(i, a) {
-			     if(a.name == "system") a.priority = 1;
-			else if(a.name == "net") a.priority = 2;
-			else if(a.name == "tc") a.priority = 3;
-			else if(a.name == "conntrack") a.priority = 4;
-			else if(a.name == "ipvs") a.priority = 5;
-			else if(a.name == "ipv4") a.priority = 6;
-			else if(a.name == "cpu") a.priority = 7;
-			else if(a.name == "mem") a.priority = 8;
-			else if(a.name == "disk") a.priority = 9;
-			else a.priority = 99;
-
 			a.html = "<tr><td id=\"" + a.name + "\"><ol class=\"breadcrumb graphs\"><li class=\"active\"><span class=\"glyphicon " + a.glyphicon + "\"></span> &nbsp; <a id=\"" + a.name + "\" href=\"#" + a.name + "\"><b>" + a.title + "</b> " + a.description + " </a></li></ol></td></tr><tr><td><div class=\"thumbgraphs\">" + a.html + "</td></tr>";
 		});
 

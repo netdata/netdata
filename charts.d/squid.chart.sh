@@ -17,21 +17,21 @@ squid_check() {
 squid_create() {
 	# create the charts
 	cat <<EOF
-CHART net.squid_clients '' "Squid Client Bandwidth" "kilobits/s" squid '' area 20001 $update_every
+CHART squid.clients_net '' "Squid Client Bandwidth" "kilobits/s" squid '' area 20001 $update_every
 DIMENSION client_http_kbytes_in in incremental 8 1
 DIMENSION client_http_kbytes_out out incremental -8 1
 DIMENSION client_http_hit_kbytes_out hits incremental -8 1
 
-CHART squid.client_requests '' "Squid Client Requests" "requests/s" squid 'none' line 20003 $update_every
+CHART squid.clients_requests '' "Squid Client Requests" "requests/s" squid '' line 20003 $update_every
 DIMENSION client_http_requests requests incremental 1 1
 DIMENSION client_http_hits hits incremental 1 1
 DIMENSION client_http_errors errors incremental -1 1
 
-CHART net.squid_servers '' "Squid Server Bandwidth" "kilobits/s" squid '' area 20002 $update_every
+CHART squid.servers_net '' "Squid Server Bandwidth" "kilobits/s" squid '' area 20002 $update_every
 DIMENSION server_all_kbytes_in in incremental 8 1
 DIMENSION server_all_kbytes_out out incremental -8 1
 
-CHART squid.server_requests '' "Squid Server Requests" "requests/s" squid 'none' line 20004 $update_every
+CHART squid.servers_requests '' "Squid Server Requests" "requests/s" squid '' line 20004 $update_every
 DIMENSION server_all_requests requests incremental 1 1
 DIMENSION server_all_errors errors incremental -1 1
 EOF
@@ -49,24 +49,24 @@ squid_update() {
 
 	# write the result of the work.
 	cat <<VALUESEOF
-BEGIN net.squid_clients
+BEGIN squid.clients_net
 SET client_http_kbytes_in = $client_http_kbytes_in
 SET client_http_kbytes_out = $client_http_kbytes_out
 SET client_http_hit_kbytes_out = $client_http_hit_kbytes_out
 END
 
-BEGIN squid.client_requests
+BEGIN squid.clients_requests
 SET client_http_requests = $client_http_requests
 SET client_http_hits = $client_http_hits
 SET client_http_errors = $client_http_errors
 END
 
-BEGIN net.squid_servers
+BEGIN squid.servers_net
 SET server_all_kbytes_in = $server_all_kbytes_in
 SET server_all_kbytes_out = $server_all_kbytes_out
 END
 
-BEGIN squid.server_requests
+BEGIN squid.servers_requests
 SET server_all_requests = $server_all_requests
 SET server_all_errors = $server_all_errors
 END
