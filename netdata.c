@@ -443,7 +443,7 @@ int create_listen_socket(int port)
 // CONFIG
 
 #define CONFIG_MAX_NAME 1024
-#define CONFIG_MAX_VALUE 1024
+#define CONFIG_MAX_VALUE 4096
 #define CONFIG_FILENAME "conf.d/netdata.conf"
 #define CONFIG_FILE_LINE_MAX 4096
 
@@ -5959,7 +5959,10 @@ void *pluginsd_main(void *ptr)
 
 				cd->enabled = enabled;
 				cd->update_every = config_get_number(cd->id, "update every", update_every);
-				snprintf(cd->cmd, PLUGINSD_CMD_MAX, "exec %s %d %s", cd->fullfilename, cd->update_every, config_get(cd->id, "command options", ""));
+
+				char *def = "";
+				if(strcmp(cd->id, "plugin:apps") == 0) def = "mplayer squid 'apache apache2 as apache' mysqld asterisk dovecot 'master as postfix' 'smbd nmbd as samba' sshd 'gdm as X' named 'clamd freshclam as clam' 'cupsd as cups' 'ntpd as ntp' 'deluge deluged as deluge' netdata";
+				snprintf(cd->cmd, PLUGINSD_CMD_MAX, "exec %s %d %s", cd->fullfilename, cd->update_every, config_get(cd->id, "command options", def));
 
 				// link it
 				if(pluginsd_root) cd->next = pluginsd_root;
