@@ -52,7 +52,7 @@ loopsleepms() {
 	LOOPSLEEPMS_LASTWORK=$((now - LOOPSLEEPMS_LASTRUN - LOOPSLEEPMS_LASTSLEEP))
 	# echo "# last loop's work took $LOOPSLEEPMS_LASTWORK ms"
 
-	test $tellwork -eq 1 && echo >&2 " >>> DEBUG >>> WORK TOOK $LOOPSLEEPMS_LASTWORK ms"
+	test $tellwork -eq 1 && echo >&2 " >>> PERFORMANCE >>> WORK TOOK $LOOPSLEEPMS_LASTWORK ms ( $((LOOPSLEEPMS_LASTWORK * 100 / 1000)).$((LOOPSLEEPMS_LASTWORK % 10))% cpu )"
 
 	# calculate ms to sleep
 	local mstosleep=$((t - LOOPSLEEPMS_LASTWORK))
