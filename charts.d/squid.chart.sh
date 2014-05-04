@@ -17,21 +17,21 @@ squid_check() {
 squid_create() {
 	# create the charts
 	cat <<EOF
-CHART squid.client_bandwidth '' "Squid Client Bandwidth" "kilobits/s" squid squid area 1 $update_every
+CHART net.squid_clients '' "Squid Client Bandwidth" "kilobits/s" squid '' area 20001 $update_every
 DIMENSION client_http_kbytes_in in incremental 8 1
 DIMENSION client_http_kbytes_out out incremental -8 1
 DIMENSION client_http_hit_kbytes_out hits incremental -8 1
 
-CHART squid.client_requests '' "Squid Client Requests" "requests/s" squid squid line 3 $update_every
+CHART squid.client_requests '' "Squid Client Requests" "requests/s" squid 'none' line 20003 $update_every
 DIMENSION client_http_requests requests incremental 1 1
 DIMENSION client_http_hits hits incremental 1 1
 DIMENSION client_http_errors errors incremental -1 1
 
-CHART squid.server_bandwidth '' "Squid Server Bandwidth" "kilobits/s" squid squid area 2 $update_every
+CHART net.squid_servers '' "Squid Server Bandwidth" "kilobits/s" squid '' area 20002 $update_every
 DIMENSION server_all_kbytes_in in incremental 8 1
 DIMENSION server_all_kbytes_out out incremental -8 1
 
-CHART squid.server_requests '' "Squid Server Requests" "requests/s" squid squid line 4 $update_every
+CHART squid.server_requests '' "Squid Server Requests" "requests/s" squid 'none' line 20004 $update_every
 DIMENSION server_all_requests requests incremental 1 1
 DIMENSION server_all_errors errors incremental -1 1
 EOF
@@ -49,7 +49,7 @@ squid_update() {
 
 	# write the result of the work.
 	cat <<VALUESEOF
-BEGIN squid.client_bandwidth
+BEGIN net.squid_clients
 SET client_http_kbytes_in = $client_http_kbytes_in
 SET client_http_kbytes_out = $client_http_kbytes_out
 SET client_http_hit_kbytes_out = $client_http_hit_kbytes_out
@@ -61,7 +61,7 @@ SET client_http_hits = $client_http_hits
 SET client_http_errors = $client_http_errors
 END
 
-BEGIN squid.server_bandwidth
+BEGIN net.squid_servers
 SET server_all_kbytes_in = $server_all_kbytes_in
 SET server_all_kbytes_out = $server_all_kbytes_out
 END

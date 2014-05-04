@@ -8,7 +8,15 @@
 LOOPSLEEPMS_HIGHRES=2
 LOOPSLEEPMS_LASTRUN=0
 LOOPSLEEPMS_LASTSLEEP=0
+LOOPSLEEPMS_LASTWORK=0
 loopsleepms() {
+	tellwork=0
+	if [ "$1" = "tellwork" ]
+	then
+		local tellwork=1
+		shift
+	fi
+
 	# the time in seconds to wait, as the first argument
 	local t=$1
 
@@ -41,11 +49,13 @@ loopsleepms() {
 	test $LOOPSLEEPMS_LASTRUN -eq 0 && LOOPSLEEPMS_LASTRUN=$now
 
 	# calculate ms since last run
-	local workms=$((now - LOOPSLEEPMS_LASTRUN - LOOPSLEEPMS_LASTSLEEP))
-	# echo "# last loop's work took $workms ms"
+	LOOPSLEEPMS_LASTWORK=$((now - LOOPSLEEPMS_LASTRUN - LOOPSLEEPMS_LASTSLEEP))
+	# echo "# last loop's work took $LOOPSLEEPMS_LASTWORK ms"
+
+	test $tellwork -eq 1 && echo >&2 " >>> DEBUG >>> WORK TOOK $LOOPSLEEPMS_LASTWORK ms"
 
 	# calculate ms to sleep
-	local mstosleep=$((t - workms))
+	local mstosleep=$((t - LOOPSLEEPMS_LASTWORK))
 	# echo "# mstosleep is $mstosleep ms"
 	
 	# if we are too slow, sleep some time

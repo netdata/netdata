@@ -1,32 +1,73 @@
 #!/bin/sh
 
-check=0
-if [ "$1" = "check" ]
-then
-	check=1
-	shift
-fi
-
-# default sleep function
-loopsleepms() {
-	sleep $1
-}
-# if found and included, this file overwrites loopsleepms()
-# with a high resolution timer function for precise looping.
-. "`dirname $0`/loopsleepms.sh.inc"
-
-# netdata passes the requested update frequency as the first argument
-update_every=$1
-update_every=$(( update_every + 1 - 1))	# makes sure it is a number
-test $update_every -eq 0 && update_every=1 # if it is zero, make it 1
+# -----------------------------------------------------------------------------
+# insternal defaults
 
 pluginsd="plugins.d"
 confd="conf.d"
 chartsd="charts.d"
 myconfig="$confd/charts.d.conf"
 minimum_update_frequency=1
+update_every=1	# this is overwritten by the command line
 
-# load the configuration
+# -----------------------------------------------------------------------------
+# parse parameters
+
+debug=0
+check=0
+chart_only=
+while [ ! -z "$1" ]
+do
+	if [ "$1" = "check" ]
+	then
+		check=1
+		shift
+		continue
+	fi
+
+	if [ -f "$chartsd/$1.chart.sh" ]
+	then
+		debug=1
+		chart_only="`echo $1.chart.sh | sed "s/\.chart\.sh$//g"`"
+		shift
+		continue
+	fi
+
+	if [ -f "$chartsd/$1" ]
+	then
+		debug=1
+		chart_only="`echo $1 | sed "s/\.chart\.sh$//g"`"
+		shift
+		continue
+	fi
+
+	if [ -f "$1" ]
+	then
+		debug=1
+		chart_only="`basename "$1" | sed "s/\.chart\.sh$//g"`"
+		shift
+		continue
+	fi
+
+	# number check
+	n="$1"
+	x=$((n + 1 - 1))
+	if [ "$x" = "$n" ]
+	then
+		update_every=$x
+		shift
+		continue
+	fi
+
+	echo >&2 "Cannot understand parameter $1. Aborting."
+	echo "DISABLE"
+	exit 1
+done
+
+
+# -----------------------------------------------------------------------------
+# load my configuration
+
 if [ -f "$myconfig" ]
 	then
 	. "$myconfig"
@@ -38,11 +79,36 @@ if [ -f "$myconfig" ]
 	fi
 fi
 
+
+# -----------------------------------------------------------------------------
+# internal checks
+
+# netdata passes the requested update frequency as the first argument
+update_every=$(( update_every + 1 - 1))	# makes sure it is a number
+test $update_every -eq 0 && update_every=1 # if it is zero, make it 1
+
+# check the charts.d directory
 if [ ! -d "$chartsd" ]
 	then
 	echo >&2 "charts.d: cannot find charts directory '$chartsd'"
 	echo "DISABLE"
 fi
+
+
+# -----------------------------------------------------------------------------
+# loop control
+
+# default sleep function
+loopsleepms() {
+	sleep $1
+}
+# if found and included, this file overwrites loopsleepms()
+# with a high resolution timer function for precise looping.
+. "`dirname $0`/loopsleepms.sh.inc"
+
+
+# -----------------------------------------------------------------------------
+# charts check functions
 
 all_charts() {
 	cd "$chartsd"
@@ -114,6 +180,9 @@ all_enabled_charts() {
 }
 
 
+# -----------------------------------------------------------------------------
+# load the charts
+
 active_charts=
 for x in `all_enabled_charts`
 do
@@ -133,12 +202,38 @@ do
 	fi
 done
 
+
+# -----------------------------------------------------------------------------
+# check overwrites
+
+# if we only need a specific chart, remove all the others
+debug_time=
+if [ ! -z "$chart_only" ]
+then
+	debug_time=tellwork
+	check_charts=
+	for x in $active_charts
+	do
+		if [ "$x" = "$chart_only" ]
+		then
+			check_charts="$x"
+			break
+		fi
+	done
+	active_charts="$check_charts"
+fi
+
+# stop if we just need a pre-check
 if [ $check -eq 1 ]
 then
 	echo "CHECK RESULT"
 	echo "Will run the charts: $active_charts"
 	exit 0
 fi
+
+
+# -----------------------------------------------------------------------------
+# create charts
 
 run_charts=
 for x in $active_charts
@@ -152,7 +247,9 @@ do
 	fi
 done
 
-# work forever
+
+# -----------------------------------------------------------------------------
+# update dimensions
 while [ 1 ]
 do
 	now_charts=$run_charts
@@ -170,5 +267,5 @@ do
 	done
 
 	# wait the time you are required to
-	loopsleepms $update_every
+	loopsleepms $debug_time $update_every
 done
