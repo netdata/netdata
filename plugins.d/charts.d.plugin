@@ -25,6 +25,13 @@ do
 		continue
 	fi
 
+	if [ "$1" = "debug" -o "$1" = "all" ]
+	then
+		debug=1
+		shift
+		continue
+	fi
+
 	if [ -f "$chartsd/$1.chart.sh" ]
 	then
 		debug=1
@@ -206,11 +213,13 @@ done
 # -----------------------------------------------------------------------------
 # check overwrites
 
-# if we only need a specific chart, remove all the others
+# enable work time reporting
 debug_time=
+test $debug -eq 1 && debug_time=tellwork
+
+# if we only need a specific chart, remove all the others
 if [ ! -z "$chart_only" ]
 then
-	debug_time=tellwork
 	check_charts=
 	for x in $active_charts
 	do
