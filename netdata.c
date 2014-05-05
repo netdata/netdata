@@ -5737,7 +5737,7 @@ void *pluginsd_worker_thread(void *arg)
 				if(st->debug) debug(D_PLUGINSD, "PLUGINSD: script %s is requesting a END on chart %s", cd->fullfilename, st->id);
 
 				unsigned long long usec_since_last_update = rrd_stats_done(st);
-				if(usec_since_last_update < (cd->update_every * 1000000ULL / 2)) {
+				if(usec_since_last_update < (cd->update_every * 1000000ULL / 10)) {
 					error("PLUGINSD: script '%s' updates charts too frequently. Chart %s updated after %llu microseconds, expected %llu microseconds. Disabling it.", cd->fullfilename, st->id, usec_since_last_update, cd->update_every * 1000000ULL);
 					cd->enabled = 0;
 					kill(cd->pid, SIGTERM);
