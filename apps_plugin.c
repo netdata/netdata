@@ -47,7 +47,7 @@ struct wanted {
 	unsigned long long num_threads;
 	unsigned long long rss;
 
-	int merge_count;
+	unsigned long merge_count;	// how many processes have been merged to this
 
 	struct wanted *target;	// the one that will be reported to netdata
 	struct wanted *next;
@@ -161,7 +161,7 @@ struct pid_stat {
 	int updated;
 	int merged;
 	int new_entry;
-	int merge_count;
+	unsigned long merge_count;
 	struct wanted *target;
 	struct pid_stat *parent;
 	struct pid_stat *prev;
@@ -235,7 +235,7 @@ int update_from_proc(void)
 
 		int fd = open(filename, O_RDONLY);
 		if(fd == -1) {
-			if(errno != ENOENT) fprintf(stderr, "Cannot open file '%s' for reading (%s).\n", filename, strerror(errno));
+			if(errno != ENOENT && errno != ESRCH) fprintf(stderr, "Cannot open file '%s' for reading (%s).\n", filename, strerror(errno));
 			continue;
 		}
 
@@ -357,7 +357,7 @@ void merge_processes(void)
 		found = 0;
 		for(p = root; p ; p = p->next) {
 			if(!p->childs && !p->merged && p->parent && p->parent->childs) {
-				if(debug) fprintf(stderr, "\tMerging %d %s to %d %s (count: %d)\n", p->pid, p->comm, p->ppid, all_pids[p->ppid]->comm, p->parent->merge_count+1);
+				if(debug) fprintf(stderr, "\tMerging %d %s to %d %s (count: %lu)\n", p->pid, p->comm, p->ppid, all_pids[p->ppid]->comm, p->parent->merge_count+1);
 
 				p->parent->minflt += p->minflt;
 				p->parent->majflt += p->majflt;
@@ -375,7 +375,7 @@ void merge_processes(void)
 				p->parent->childs--;
 				p->merged = 1;
 
-				p->parent->merge_count++;
+				p->parent->merge_count += p->merge_count + 1;
 
 				// the parent inherits the child's target, if it does not have a target itself
 				if(p->target && !p->parent->target) {
@@ -428,8 +428,8 @@ void merge_processes(void)
 			p->target->num_threads += p->num_threads;
 			p->target->rss += p->rss;
 
-			p->target->merge_count++;
-			if(debug) fprintf(stderr, "\tAgregating %s pid %d on %s (count: %d)\n", p->comm, p->pid, p->target->name, p->target->merge_count);
+			p->target->merge_count += p->merge_count + 1;
+			if(debug) fprintf(stderr, "\tAgregating %s pid %d on %s (count: %lu)\n", p->comm, p->pid, p->target->name, p->target->merge_count);
 		}
 	}
 }
@@ -468,6 +468,14 @@ void show_dimensions(void)
 		if(w->target) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->num_threads);
+	}
+	fprintf(stdout, "END\n");
+
+	fprintf(stdout, "BEGIN apps.processes\n");
+	for (w = wanted_root; w ; w = w->next) {
+		if(w->target) continue;
+
+		fprintf(stdout, "SET %s = %lu\n", w->name, w->merge_count);
 	}
 	fprintf(stdout, "END\n");
 
@@ -517,6 +525,13 @@ void show_charts(void)
 	}
 
 	fprintf(stdout, "CHART apps.threads '' 'Applications Threads' 'threads' apps apps stacked 20005 %d\n", update_every);
+	for (w = wanted_root; w ; w = w->next) {
+		if(w->target) continue;
+
+		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+	}
+
+	fprintf(stdout, "CHART apps.processes '' 'Applications Processes' 'processes' apps apps stacked 20004 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target) continue;
 
