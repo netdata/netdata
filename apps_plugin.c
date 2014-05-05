@@ -22,6 +22,7 @@
 #include <arpa/inet.h>
 
 #define MAX_COMPARE_NAME 15
+#define MAX_NAME 100
 
 
 #define add_childs 1ULL
@@ -33,8 +34,8 @@ int debug = 0;
 
 struct wanted {
 	char compare[MAX_COMPARE_NAME + 3];
-	char id[FILENAME_MAX+1];
-	char name[FILENAME_MAX+1];
+	char id[MAX_NAME + 1];
+	char name[MAX_NAME + 1];
 
 	unsigned long long minflt;
 	unsigned long long cminflt;
@@ -48,10 +49,11 @@ struct wanted {
 	unsigned long long rss;
 
 	unsigned long merge_count;	// how many processes have been merged to this
+	int exposed;				// if set, we have sent this to netdata
 
 	struct wanted *target;	// the one that will be reported to netdata
 	struct wanted *next;
-} *wanted_root = NULL;
+} *wanted_root = NULL, *default_target = NULL;
 
 int update_every = 1;
 
@@ -63,8 +65,8 @@ struct wanted *add_wanted(const char *id, struct wanted *target)
 		return NULL;
 	}
 
-	strncpy(w->id, id, FILENAME_MAX);
-	strncpy(w->name, id, FILENAME_MAX);
+	strncpy(w->id, id, MAX_NAME);
+	strncpy(w->name, id, MAX_NAME);
 	snprintf(w->compare, MAX_COMPARE_NAME+1, "(%.*s)", MAX_COMPARE_NAME, id);
 	w->target = target;
 
@@ -99,7 +101,7 @@ void parse_args(int argc, char **argv)
 
 		while((t = strsep(&s, " "))) {
 			if(w && strcmp(t, "as") == 0 && s && *s) {
-				strncpy(w->name, s, FILENAME_MAX);
+				strncpy(w->name, s, MAX_NAME);
 				if(debug) fprintf(stderr, "Setting dimension name to '%s' on target '%s'\n", w->name, w->id);
 				break;
 			}
@@ -108,12 +110,15 @@ void parse_args(int argc, char **argv)
 			if(!w) w = n;
 		}
 	}
+
+	default_target = add_wanted("all_other_processes", NULL);
+	strncpy(default_target->name, "other", MAX_NAME);
 }
 
 // see: man proc
 struct pid_stat {
 	int32_t pid;
-	char comm[FILENAME_MAX+1];
+	char comm[MAX_COMPARE_NAME + 3];
 	char state;
 	int32_t ppid;
 	int32_t pgrp;
@@ -163,6 +168,7 @@ struct pid_stat {
 	int new_entry;
 	unsigned long merge_count;
 	struct wanted *target;
+	int target_inherited;
 	struct pid_stat *parent;
 	struct pid_stat *prev;
 	struct pid_stat *next;
@@ -209,6 +215,7 @@ void del_entry(pid_t pid)
 int update_from_proc(void)
 {
 	char buffer[PID_STAT_LINE_MAX + 1];
+	char name[PID_STAT_LINE_MAX + 1];
 	char filename[FILENAME_MAX+1];
 	DIR *dir = opendir("/proc");
 	if(!dir) return 0;
@@ -224,6 +231,8 @@ int update_from_proc(void)
 		p->merged = 0;
 		p->new_entry = 0;
 		p->merge_count = 0;
+
+		if(p->target_inherited) p->target = NULL;
 	}
 
 	while((file = readdir(dir))) {
@@ -269,7 +278,7 @@ int update_from_proc(void)
 			" %d %d"							// exit_signal, processor
 			" %u %u"							// rt_priority, policy
 			" %llu %lu %ld"
-			, &p->pid, p->comm, &p->state
+			, &p->pid, name, &p->state
 			, &p->ppid, &p->pgrp, &p->session, &p->tty_nr, &p->tpgid
 			, &p->flags, &p->minflt, &p->cminflt, &p->majflt, &p->cmajflt
 			, &p->utime, &p->stime, &p->cutime, &p->cstime
@@ -286,6 +295,8 @@ int update_from_proc(void)
 			, &p->rt_priority, &p->policy
 			, &p->delayacct_blkio_ticks, &p->guest_time, &p->cguest_time
 			);
+		strncpy(p->comm, name, MAX_COMPARE_NAME + 2);
+		p->comm[MAX_COMPARE_NAME + 2] = '\0';
 
 		if(parsed < 39) fprintf(stderr, "file %s gave %d results (expected 44)\n", filename, parsed);
 
@@ -335,7 +346,7 @@ void merge_processes(void)
 {
 	struct pid_stat *p = NULL;
 
-	// link all parents and update childs
+	// link all parents and update childs count
 	for(p = root; p ; p = p->next) {
 		if(p->ppid > 1 && p->ppid <= pid_max && all_pids[p->ppid]) {
 			if(debug) fprintf(stderr, "\tParent of %d %s is %d %s\n", p->pid, p->comm, p->ppid, all_pids[p->ppid]->comm);
@@ -350,13 +361,18 @@ void merge_processes(void)
 		}
 	}
 
-	// find all the procs with 0 childs and update their parents
-	// continue, until nothing more can be done.
+	// find all the procs with 0 childs and merge them to their parents
+	// repeat, until nothing more can be done.
 	int found = 1;
 	for( ; found ; ) {
 		found = 0;
 		for(p = root; p ; p = p->next) {
-			if(!p->childs && !p->merged && p->parent && p->parent->childs) {
+			// if this process does not any childs, and
+			// is not already merged, and
+			// its parents has childs waiting to be merged, and
+			// the target of this process and its parent is the same, or the parent does not have a target, or this process does not have a parent
+			// then... merge them!
+			if(!p->childs && !p->merged && p->parent && p->parent->childs && (p->target == p->parent->target || !p->parent->target || !p->target)) {
 				if(debug) fprintf(stderr, "\tMerging %d %s to %d %s (count: %lu)\n", p->pid, p->comm, p->ppid, all_pids[p->ppid]->comm, p->parent->merge_count+1);
 
 				p->parent->minflt += p->minflt;
@@ -380,7 +396,8 @@ void merge_processes(void)
 				// the parent inherits the child's target, if it does not have a target itself
 				if(p->target && !p->parent->target) {
 					p->parent->target = p->target;
-					if(debug) fprintf(stderr, "\t\ttarget %s is inherited from %d %s by its child %d %s.\n", p->target->name, p->parent->pid, p->parent->comm, p->pid, p->comm);
+					p->parent->target_inherited = 1;
+					if(debug) fprintf(stderr, "\t\ttarget %s is inherited by %d %s from its child %d %s.\n", p->target->name, p->parent->pid, p->parent->comm, p->pid, p->comm);
 				}
 
 				found++;
@@ -416,21 +433,29 @@ void merge_processes(void)
 
 	// concentrate everything on the targets
 	for(p = root; p ; p = p->next) {
-		if(!p->childs && !p->merged && !p->parent && p->target) {
-			p->target->minflt += p->minflt;
-			p->target->majflt += p->majflt;
-			p->target->utime += p->utime;
-			p->target->stime += p->stime;
-			p->target->cminflt += p->cminflt;
-			p->target->cmajflt += p->cmajflt;
-			p->target->cutime += p->cutime;
-			p->target->cstime += p->cstime;
-			p->target->num_threads += p->num_threads;
-			p->target->rss += p->rss;
+		if(p->parent && !p->merged) fprintf(stderr, "\tprocess %s pid %d has a parent, but has not been merged!\n", p->comm, p->pid);
+		if(p->childs) fprintf(stderr, "\tprocess %s pid %d has %d childs that have not been merged!\n", p->comm, p->pid, p->childs);
+		if(p->merged) continue;
 
-			p->target->merge_count += p->merge_count + 1;
-			if(debug) fprintf(stderr, "\tAgregating %s pid %d on %s (count: %lu)\n", p->comm, p->pid, p->target->name, p->target->merge_count);
+		if(!p->target) {
+			p->target = default_target;
+			p->target_inherited = 1;
+			if(debug) fprintf(stderr, "\tprocess %s pid %d is orphan\n", p->comm, p->pid);
 		}
+
+		p->target->minflt += p->minflt;
+		p->target->majflt += p->majflt;
+		p->target->utime += p->utime;
+		p->target->stime += p->stime;
+		p->target->cminflt += p->cminflt;
+		p->target->cmajflt += p->cmajflt;
+		p->target->cutime += p->cutime;
+		p->target->cstime += p->cstime;
+		p->target->num_threads += p->num_threads;
+		p->target->rss += p->rss;
+
+		p->target->merge_count += p->merge_count + 1;
+		if(debug) fprintf(stderr, "\tAgregating %s pid %d on %s (count: %lu)\n", p->comm, p->pid, p->target->name, p->target->merge_count);
 	}
 }
 
@@ -441,7 +466,7 @@ void show_dimensions(void)
 
 	fprintf(stdout, "BEGIN apps.cpu\n");
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target) continue;
+		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + w->stime + (w->cutime * add_childs) + (w->cstime * add_childs));
 	}
@@ -449,7 +474,7 @@ void show_dimensions(void)
 
 	fprintf(stdout, "BEGIN apps.cpu_user\n");
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target) continue;
+		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + (w->cutime * add_childs));
 	}
@@ -457,7 +482,7 @@ void show_dimensions(void)
 
 	fprintf(stdout, "BEGIN apps.cpu_system\n");
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target) continue;
+		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->stime + (w->cstime * add_childs));
 	}
@@ -465,7 +490,7 @@ void show_dimensions(void)
 
 	fprintf(stdout, "BEGIN apps.threads\n");
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target) continue;
+		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->num_threads);
 	}
@@ -473,7 +498,7 @@ void show_dimensions(void)
 
 	fprintf(stdout, "BEGIN apps.processes\n");
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target) continue;
+		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %lu\n", w->name, w->merge_count);
 	}
@@ -481,7 +506,7 @@ void show_dimensions(void)
 
 	fprintf(stdout, "BEGIN apps.rss\n");
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target) continue;
+		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, (unsigned long long)w->rss);
 	}
@@ -489,7 +514,7 @@ void show_dimensions(void)
 
 	fprintf(stdout, "BEGIN apps.minor_faults\n");
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target) continue;
+		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->minflt + (w->cminflt * add_childs));
 	}
@@ -497,7 +522,7 @@ void show_dimensions(void)
 
 	fprintf(stdout, "BEGIN apps.major_faults\n");
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target) continue;
+		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->majflt + (w->cmajflt * add_childs));
 	}
@@ -509,59 +534,72 @@ void show_dimensions(void)
 void show_charts(void)
 {
 	struct wanted *w;
+	int newly_added = 0;
 
+	for(w = wanted_root ; w ; w = w->next)
+		if(!w->exposed && w->merge_count) {
+			newly_added++;
+			w->exposed = 1;
+			if(debug) fprintf(stderr, "%s just added - regenerating charts.\n", w->name);
+		}
+
+	// nothing more to show
+	if(!newly_added) return;
+
+	// we have something new to show
+	// update the charts
 	fprintf(stdout, "CHART apps.cpu '' 'Applications CPU Time' 'cpu time %%' apps apps stacked 20001 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target) continue;
+		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz);
 	}
 
 	fprintf(stdout, "CHART apps.rss '' 'Applications Memory' 'MB' apps apps stacked 20002 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target) continue;
+		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, sysconf(_SC_PAGESIZE), 1024L*1024L);
 	}
 
 	fprintf(stdout, "CHART apps.threads '' 'Applications Threads' 'threads' apps apps stacked 20005 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target) continue;
+		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART apps.processes '' 'Applications Processes' 'processes' apps apps stacked 20004 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target) continue;
+		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART apps.cpu_user '' 'Applications CPU User Time' 'cpu time %%' apps none stacked 20020 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target) continue;
+		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz);
 	}
 
 	fprintf(stdout, "CHART apps.cpu_system '' 'Applications CPU System Time' 'cpu time %%' apps none stacked 20021 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target) continue;
+		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz);
 	}
 
 	fprintf(stdout, "CHART apps.major_faults '' 'Applications Major Page Faults' 'page faults/s' apps apps stacked 20010 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target) continue;
+		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART apps.minor_faults '' 'Applications Minor Page Faults' 'page faults/s' apps apps stacked 20011 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target) continue;
+		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w->name);
 	}
@@ -633,8 +671,6 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	show_charts();
-
 	unsigned long long counter = 1;
 	unsigned long long usec = 0, susec = 0;
 	struct timeval last, now;
@@ -648,6 +684,7 @@ int main(int argc, char **argv)
 		}
 
 		merge_processes();
+		show_charts();		// this is smart enough to show only newly added apps, when needed
 		show_dimensions();
 
 		if(debug) fprintf(stderr, "Done Loop No %llu\n", counter);

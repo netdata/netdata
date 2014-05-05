@@ -313,14 +313,37 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 	for(i = sysconf(_SC_OPEN_MAX); i > 0; i--)
 		if(i != STDIN_FILENO && i != STDERR_FILENO && i != pipefd[PIPE_WRITE]) close(i);
 
-	// ignore all signals
-	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV) signal(i, SIG_DFL);
-
 	// move the pipe to stdout
 	if(pipefd[PIPE_WRITE] != STDOUT_FILENO) {
 		dup2(pipefd[PIPE_WRITE], STDOUT_FILENO);
 		close(pipefd[PIPE_WRITE]);
 	}
+
+/*
+	// fork again to become session leader
+	pid = fork();
+	if(pid == -1) fprintf(stderr, "Cannot fork again on pid %d\n", getpid());
+	if(pid != 0) {
+		// the parent
+		exit(0);
+	}
+
+	// set a new process group id for just this child
+	if( setpgid(0, 0) != 0 )
+		fprintf(stderr, "Cannot set a new process group for pid %d (%s)\n", getpid(), strerror(errno));
+
+	if( getpgid(0) != getpid() )
+		fprintf(stderr, "Process group set is incorrect. Expected %d, found %d\n", getpid(), getpgid(0));
+
+	if( setsid() != 0 )
+		fprintf(stderr, "Cannot set session id for pid %d (%s)\n", getpid(), strerror(errno));
+*/
+	
+	// ignore all signals
+	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV) signal(i, SIG_DFL);
+
+	fprintf(stdout, "MYPID %d\n", getpid());
+	fflush(NULL);
 
 	fprintf(stderr, "executing command: '%s'\n", command);
  	execl("/bin/sh", "sh", "-c", command, NULL);
@@ -5533,6 +5556,8 @@ void *tc_main(void *ptr)
 				if(pid != tc_child_pid)
 					error("tc-qos-helper reports wrong pid %d (expected %d).", pid, tc_child_pid);
 
+				// tc_child_pid = pid;
+
 				debug(D_TC_LOOP, "TC: Child PID is %d.", tc_child_pid);
 			}
 		}
@@ -5663,6 +5688,9 @@ void *pluginsd_worker_thread(void *arg)
 {
 	struct plugind *cd = (struct plugind *)arg;
 	char line[PLUGINSD_LINE_MAX + 1];
+
+	unsigned long long usec = 0, susec = 0;
+	struct timeval last, now;
 
 	while(1) {
 		// FILE *fp = popen(cd->cmd, "r");
@@ -5863,6 +5891,7 @@ void *pluginsd_worker_thread(void *arg)
 					kill(cd->pid, SIGTERM);
 					break;
 				}
+				// cd->pid = pid;
 
 				debug(D_PLUGINSD, "PLUGINSD: %s is on pid %d", cd->id, cd->pid);
 			}
@@ -5870,6 +5899,28 @@ void *pluginsd_worker_thread(void *arg)
 				error("PLUGINSD: script '%s' called DISABLE. Disabling it.", cd->fullfilename);
 				cd->enabled = 0;
 				kill(cd->pid, SIGTERM);
+				break;
+			}
+			else if(!strcmp(s, "STOPPING_WAKE_ME_UP_PLEASE")) {
+				error("PLUGINSD: script '%s' (pid %d) called STOPPING_WAKE_ME_UP_PLEASE.", cd->fullfilename, cd->pid);
+
+				gettimeofday(&now, NULL);
+				if(!usec && !susec) {
+					// our first run
+					susec = cd->update_every * 1000000ULL;
+				}
+				else {
+					// second+ run
+					usec = usecdiff(&now, &last) - susec;
+					error("PLUGINSD: %s last loop took %llu usec (worked for %llu, sleeped for %llu).\n", cd->fullfilename, usec + susec, usec, susec);
+					if(usec < (update_every * 1000000ULL)) susec = (update_every * 1000000ULL) - usec;
+					else susec = 100000ULL;
+				}
+
+				error("PLUGINSD: %s sleeping for %llu. Will kill pid %d to wake it up.\n", cd->fullfilename, susec, cd->pid);
+				usleep(susec);
+				kill(cd->pid, SIGCONT);
+				bcopy(&now, &last, sizeof(struct timeval));
 				break;
 			}
 			else {
@@ -5961,7 +6012,39 @@ void *pluginsd_main(void *ptr)
 				cd->update_every = config_get_number(cd->id, "update every", update_every);
 
 				char *def = "";
-				if(strcmp(cd->id, "plugin:apps") == 0) def = "mplayer squid 'apache apache2 as apache' mysqld asterisk dovecot 'master as postfix' 'smbd nmbd as samba' sshd 'gdm as X' named 'clamd freshclam as clam' 'cupsd as cups' 'ntpd as ntp' 'deluge deluged as deluge' netdata";
+				if(strcmp(cd->id, "plugin:apps") == 0)
+					def =
+					" 'mplayer vlc xine mediatomb as media'"
+					" 'squid squid3 as squid'"
+					" 'apache apache2 as apache'"
+					" 'mysql mysqld as mysql'"
+					" asterisk"
+					" opensips"
+					" dovecot"
+					" nginx"
+					" lighttpd"
+					" 'proftpd in.tftpd as ftpd'"
+					" 'master as postfix'"
+					" 'smbd nmbd winbindd as samba'"
+					" 'rpcbind rpc.statd rpc.idmapd rpc.mountd as nfs'"
+					" 'ssh sshd as ssh'"
+					" 'gdm X lightdm xdm gnome-session gconfd-2 gnome-terminal gnome-screensaver gnome-settings-daemon pulseaudio as X'"
+					" 'named as bind'"
+					" 'clamd freshclam as clam'"
+					" 'cupsd cups-browsed as cups'"
+					" 'ntpq ntpd as ntp'"
+					" 'deluge deluged as deluge'"
+					" 'vboxwebsrv VBoxXPCOMIPCD VBoxSVC as vbox'"
+					" 'ulogd syslogd syslog-ng rsyslogd logrotate as log'"
+					" 'snmpd vnstatd smokeping zabbix_agentd monit munin-node mon as nms'"
+					" 'ppp pppd pptpd pptpctrl as ppp'"
+					" 'inetd xinetd as inetd'"
+					" openvpn"
+					" 'cron atd as cron'"
+					" 'corosync hs_logd stonithd as ha'"
+					" 'ipvs_syncmaster ipvs_syncbackup as ipvs'"
+					" netdata"
+					;
 				snprintf(cd->cmd, PLUGINSD_CMD_MAX, "exec %s %d %s", cd->fullfilename, cd->update_every, config_get(cd->id, "command options", def));
 
 				// link it
@@ -6003,13 +6086,6 @@ void kill_childs()
 			kill(cd->pid, SIGTERM);
 			cd->pid = 0;
 		}
-}
-
-void bye(void)
-{
-	error("exiting. bye...");
-	kill_childs();
-	tc_child_pid = 0;
 }
 
 void sig_handler(int signo)
@@ -6421,8 +6497,6 @@ int main(int argc, char **argv)
 
 	error("NetData started on pid %d", getpid());
 
-	// make sure we cleanup correctly
-	atexit(bye);
 
 	// catch all signals
 	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV) signal(i,  sig_handler);

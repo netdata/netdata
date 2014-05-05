@@ -3,6 +3,10 @@
 # -----------------------------------------------------------------------------
 # insternal defaults
 
+pause_method="sleep" # use either "suspend" or "sleep"
+                     # DO NOT USE SUSPEND - LINUX WILL SUSPEND NETDATA TOO
+                     # THE WHOLE PROCESS GROUP - NOT JUST THE SHELL
+
 pluginsd="plugins.d"
 confd="conf.d"
 chartsd="charts.d"
@@ -86,6 +90,12 @@ if [ -f "$myconfig" ]
 	fi
 fi
 
+if [ "$pause_method" = "suspend" ]
+then
+	# enable bash job control
+	# this is required for suspend to work
+	set -m
+fi
 
 # -----------------------------------------------------------------------------
 # internal checks
@@ -275,6 +285,12 @@ do
 		fi
 	done
 
-	# wait the time you are required to
-	loopsleepms $debug_time $update_every
+	if [ "$pause_method" = "suspend" ]
+	then
+		echo "STOPPING_WAKE_ME_UP_PLEASE"
+		suspend || ( echo >&2 "suspend returned error $?, falling back to sleep."; loopsleepms $debug_time $update_every )
+	else
+		# wait the time you are required to
+		loopsleepms $debug_time $update_every
+	fi
 done
