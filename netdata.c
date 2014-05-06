@@ -6026,7 +6026,7 @@ void *pluginsd_main(void *ptr)
 					" 'proftpd in.tftpd as ftpd'"
 					" 'master as postfix'"
 					" 'smbd nmbd winbindd as samba'"
-					" 'rpcbind rpc.statd rpc.idmapd rpc.mountd as nfs'"
+					" 'rpcbind rpc.statd rpc.idmapd rpc.mountd nfsd4 nfsd4_callbacks nfsd nfsiod as nfs'"
 					" 'ssh sshd as ssh'"
 					" 'gdm X lightdm xdm gnome-session gconfd-2 gnome-terminal gnome-screensaver gnome-settings-daemon pulseaudio as X'"
 					" 'named as bind'"
@@ -6043,6 +6043,7 @@ void *pluginsd_main(void *ptr)
 					" 'cron atd as cron'"
 					" 'corosync hs_logd stonithd as ha'"
 					" 'ipvs_syncmaster ipvs_syncbackup as ipvs'"
+					" 'kthreadd as kernel'"
 					" netdata"
 					;
 				snprintf(cd->cmd, PLUGINSD_CMD_MAX, "exec %s %d %s", cd->fullfilename, cd->update_every, config_get(cd->id, "command options", def));
