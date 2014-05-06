@@ -433,8 +433,8 @@ void merge_processes(void)
 
 	// concentrate everything on the targets
 	for(p = root; p ; p = p->next) {
-		if(p->parent && !p->merged) fprintf(stderr, "\tprocess %s pid %d has a parent, but has not been merged!\n", p->comm, p->pid);
-		if(p->childs) fprintf(stderr, "\tprocess %s pid %d has %d childs that have not been merged!\n", p->comm, p->pid, p->childs);
+		//if(p->parent && !p->merged) fprintf(stderr, "\tprocess %s pid %d has a parent, but has not been merged!\n", p->comm, p->pid);
+		//if(p->childs) fprintf(stderr, "\tprocess %s pid %d has %d childs that have not been merged!\n", p->comm, p->pid, p->childs);
 		if(p->merged) continue;
 
 		if(!p->target) {
