@@ -46,7 +46,16 @@ struct wanted {
 	unsigned long long num_threads;
 	unsigned long long rss;
 
-	unsigned long merge_count;	// how many processes have been merged to this
+	unsigned long long fix_minflt;
+	unsigned long long fix_cminflt;
+	unsigned long long fix_majflt;
+	unsigned long long fix_cmajflt;
+	unsigned long long fix_utime;
+	unsigned long long fix_stime;
+	unsigned long long fix_cutime;
+	unsigned long long fix_cstime;
+
+	unsigned long processes;	// how many processes have been merged to this
 	int exposed;				// if set, we have sent this to netdata
 
 	struct wanted *target;	// the one that will be reported to netdata
@@ -55,9 +64,13 @@ struct wanted {
 
 int update_every = 1;
 
-struct wanted *add_wanted(const char *id, struct wanted *target)
+struct wanted *get_wanted(const char *id, struct wanted *target)
 {
-	struct wanted *w = calloc(sizeof(struct wanted), 1);
+	struct wanted *w;
+	for(w = wanted_root ; w ; w = w->next)
+		if(strncmp(id, w->id, MAX_NAME) == 0) return w;
+	
+	w = calloc(sizeof(struct wanted), 1);
 	if(!w) {
 		fprintf(stderr, "Cannot allocate %ld bytes of memory\n", sizeof(struct wanted));
 		return NULL;
@@ -104,12 +117,12 @@ void parse_args(int argc, char **argv)
 				break;
 			}
 
-			struct wanted *n = add_wanted(t, w);
+			struct wanted *n = get_wanted(t, w);
 			if(!w) w = n;
 		}
 	}
 
-	default_target = add_wanted("all_other_processes", NULL);
+	default_target = get_wanted("all_other_processes", NULL);
 	strncpy(default_target->name, "other", MAX_NAME);
 }
 
@@ -160,11 +173,31 @@ struct pid_stat {
 	uint64_t guest_time;
 	int64_t cguest_time;
 
+/*	unsigned long long old_utime;
+	unsigned long long old_stime;
+	unsigned long long old_minflt;
+	unsigned long long old_majflt;
+
+	unsigned long long old_cutime;
+	unsigned long long old_cstime;
+	unsigned long long old_cminflt;
+	unsigned long long old_cmajflt;
+
+	unsigned long long fix_cutime;
+	unsigned long long fix_cstime;
+	unsigned long long fix_cminflt;
+	unsigned long long fix_cmajflt;
+
+	unsigned long long diff_cutime;
+	unsigned long long diff_cstime;
+	unsigned long long diff_cminflt;
+	unsigned long long diff_cmajflt;
+*/
+
 	int childs;	// number of processes directly referencing this
 	int updated;
 	int merged;
 	int new_entry;
-	unsigned long merge_count;
 	struct wanted *target;
 	struct pid_stat *parent;
 	struct pid_stat *prev;
@@ -229,7 +262,6 @@ int update_from_proc(void)
 		p->childs = 0;
 		p->merged = 0;
 		p->new_entry = 0;
-		p->merge_count = 0;
 	}
 
 	while((file = readdir(dir))) {
@@ -241,7 +273,7 @@ int update_from_proc(void)
 
 		int fd = open(filename, O_RDONLY);
 		if(fd == -1) {
-			if(errno != ENOENT && errno != ESRCH) fprintf(stderr, "Cannot open file '%s' for reading (%s).\n", filename, strerror(errno));
+			if(errno != ENOENT && errno != ESRCH) fprintf(stderr, "Cannot open file '%s' for reading (%d, %s).\n", filename, errno, strerror(errno));
 			continue;
 		}
 
@@ -327,46 +359,48 @@ int update_from_proc(void)
 	}
 	closedir(dir);
 
-	// cleanup all un-updated processed (exited, killed, etc)
-	int c;
-	for(p = root, c = 0; p ; c++) {
-		if(!p->updated) {
-			
-			pid_t r = p->pid;
-			p = p->next;
-			del_entry(r);
-		}
-		else p = p->next;
-	}
-
 	return 1;
 }
-
-void walk_down(pid_t pid, int level) {
+/*
+int walk_down(pid_t pid, int level) {
 	struct pid_stat *p = NULL;
 	char b[level+3];
-	int i;
+	int i, ret = 0;
 
 	for(i = 0; i < level; i++) b[i] = '\t';
 	b[level] = '|';
 	b[level+1] = '-';
 	b[level+2] = '\0';
 
-	p = all_pids[pid];
-	if(p) fprintf(stderr, "%s %s %d [%s] c=%d u=%llu, s=%llu, cu=%llu, cs=%llu, n=%llu, j=%llu, cn=%llu, cj=%llu\n", b, p->comm, p->pid, p->updated?"OK":"KILLED", p->childs, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
-
 	for(p = root; p ; p = p->next) {
 		if(p->ppid == pid) {
-			walk_down(p->pid, level+1);
+			ret += walk_down(p->pid, level+1);
 		}
 	}
-}
 
-void merge_processes(void)
+	p = all_pids[pid];
+	if(p) {
+		if(!p->updated) ret += 1;
+		if(ret) fprintf(stderr, "%s %s %d [%s, %s] c=%d u=%llu+%llu, s=%llu+%llu, cu=%llu+%llu, cs=%llu+%llu, n=%llu+%llu, j=%llu+%llu, cn=%llu+%llu, cj=%llu+%llu\n"
+			, b, p->comm, p->pid, p->updated?"OK":"KILLED", p->target->name, p->childs
+			, p->utime, p->utime - p->old_utime
+			, p->stime, p->stime - p->old_stime
+			, p->cutime, p->cutime - p->old_cutime
+			, p->cstime, p->cstime - p->old_cstime
+			, p->minflt, p->minflt - p->old_minflt
+			, p->majflt, p->majflt - p->old_majflt
+			, p->cminflt, p->cminflt - p->old_cminflt
+			, p->cmajflt, p->cmajflt - p->old_cmajflt
+			);
+	}
+
+	return ret;
+}
+*/
+
+void update_statistics(void)
 {
 	struct pid_stat *p = NULL;
-
-	if(debug) walk_down(0, 1);
 
 	// link all parents and update childs count
 	for(p = root; p ; p = p->next) {
@@ -392,30 +426,8 @@ void merge_processes(void)
 			// and its parent is not init
 			// then... merge them!
 			if(!p->childs && !p->merged && p->parent && p->parent->childs && (p->target == p->parent->target || !p->parent->target || !p->target) && p->ppid != 1) {
-
-				if(debug) fprintf(stderr, "\n\t\tPARENT BEFORE MERGE: %d %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->parent->pid, p->parent->comm, p->parent->utime, p->parent->stime, p->parent->cutime, p->parent->cstime, p->parent->minflt, p->parent->majflt, p->parent->cminflt, p->parent->cmajflt);
-
-				p->parent->minflt += p->minflt;
-				p->parent->majflt += p->majflt;
-				p->parent->utime += p->utime;
-				p->parent->stime += p->stime;
-
-				p->parent->cminflt += p->cminflt;
-				p->parent->cmajflt += p->cmajflt;
-				p->parent->cutime += p->cutime;
-				p->parent->cstime += p->cstime;
-
-				p->parent->num_threads += p->num_threads;
-				p->parent->rss += p->rss;
-
-				if(debug) fprintf(stderr, "\tMERGED %d %s to %d %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->pid, p->comm, p->ppid, all_pids[p->ppid]->comm, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
-
 				p->parent->childs--;
 				p->merged = 1;
-
-				if(debug) fprintf(stderr, "\t\tPARENT AFTER  MERGE: %d %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->parent->pid, p->parent->comm, p->parent->utime, p->parent->stime, p->parent->cutime, p->parent->cstime, p->parent->minflt, p->parent->majflt, p->parent->cminflt, p->parent->cmajflt);
-
-				p->parent->merge_count += p->merge_count + 1;
 
 				// the parent inherits the child's target, if it does not have a target itself
 				if(p->target && !p->parent->target) {
@@ -433,11 +445,18 @@ void merge_processes(void)
 	// init goes always to default target
 	if(all_pids[1]) all_pids[1]->target = default_target;
 
-	for(p = root, found = 0; p ; p = p->next) {
+	for(p = root; p ; p = p->next) {
 		// if the process is not merged itself
 		// then is is a top level process
 		if(!p->merged && !p->target) p->target = default_target;
-	}
+
+/*		// by the way, update the diffs
+		// will be used later for substracting killed process times
+		p->diff_cutime = p->utime - p->cutime;
+		p->diff_cstime = p->stime - p->cstime;
+		p->diff_cminflt = p->minflt - p->cminflt;
+		p->diff_cmajflt = p->majflt - p->cmajflt;
+*/	}
 
 	// give a target to all merged child processes
 	found = 1;
@@ -451,6 +470,59 @@ void merge_processes(void)
 		}
 	}
 
+/*	// for each killed process, remove its values from the parents
+	// sums (we had already added them in a previous loop)
+	for(p = root; p ; p = p->next) {
+		if(p->updated) continue;
+
+		fprintf(stderr, "UNMERGING %d %s\n", p->pid, p->comm);
+
+		unsigned long long diff_utime = p->utime + p->cutime + p->fix_cutime;
+		unsigned long long diff_stime = p->stime + p->cstime + p->fix_cstime;
+		unsigned long long diff_minflt = p->minflt + p->cminflt + p->fix_cminflt;
+		unsigned long long diff_majflt = p->majflt + p->cmajflt + p->fix_cmajflt;
+
+		struct pid_stat *t = p;
+		while((t = t->parent)) {
+			if(!t->updated) continue;
+
+			unsigned long long x;
+			if(diff_utime && t->diff_cutime) {
+				x = (t->diff_cutime < diff_utime)?t->diff_cutime:diff_utime;
+				diff_utime -= x;
+				t->diff_cutime -= x;
+				t->fix_cutime += x;
+				fprintf(stderr, "\t cutime %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
+			}
+			if(diff_stime && t->diff_cstime) {
+				x = (t->diff_cstime < diff_stime)?t->diff_cstime:diff_stime;
+				diff_stime -= x;
+				t->diff_cstime -= x;
+				t->fix_cstime += x;
+				fprintf(stderr, "\t cstime %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
+			}
+			if(diff_minflt && t->diff_cminflt) {
+				x = (t->diff_cminflt < diff_minflt)?t->diff_cminflt:diff_minflt;
+				diff_minflt -= x;
+				t->diff_cminflt -= x;
+				t->fix_cminflt += x;
+				fprintf(stderr, "\t cminflt %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
+			}
+			if(diff_majflt && t->diff_cmajflt) {
+				x = (t->diff_cmajflt < diff_majflt)?t->diff_cmajflt:diff_majflt;
+				diff_majflt -= x;
+				t->diff_cmajflt -= x;
+				t->fix_cmajflt += x;
+				fprintf(stderr, "\t cmajflt %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
+			}
+		}
+
+		if(diff_utime) fprintf(stderr, "\t cannot fix up utime %llu\n", diff_utime);
+		if(diff_stime) fprintf(stderr, "\t cannot fix up stime %llu\n", diff_stime);
+		if(diff_minflt) fprintf(stderr, "\t cannot fix up minflt %llu\n", diff_minflt);
+		if(diff_majflt) fprintf(stderr, "\t cannot fix up majflt %llu\n", diff_majflt);
+	}
+*/
 	// zero all the targets
 	struct wanted *w;
 	for (w = wanted_root; w ; w = w->next) {
@@ -464,35 +536,85 @@ void merge_processes(void)
 		w->cstime = 0;
 		w->num_threads = 0;
 		w->rss = 0;
-		w->merge_count = 0;
+		w->processes = 0;
 	}
 
+/*	walk_down(0, 1);
+*/
 	// concentrate everything on the targets
 	for(p = root; p ; p = p->next) {
-		//if(p->parent && !p->merged) fprintf(stderr, "\tprocess %s pid %d has a parent, but has not been merged!\n", p->comm, p->pid);
-		//if(p->childs) fprintf(stderr, "\tprocess %s pid %d has %d childs that have not been merged!\n", p->comm, p->pid, p->childs);
-
 		if(!p->target) {
 			fprintf(stderr, "WRONG! pid %d %s was left without a target!\n", p->pid, p->comm);
 			continue;
 		}
 
-		if(p->merged) continue;
+		if(p->updated) {
+			p->target->cutime += p->cutime; // - p->fix_cutime;
+			p->target->cstime += p->cstime; // - p->fix_cstime;
+			p->target->cminflt += p->cminflt; // - p->fix_cminflt;
+			p->target->cmajflt += p->cmajflt; // - p->fix_cmajflt;
 
-		p->target->minflt += p->minflt;
-		p->target->majflt += p->majflt;
-		p->target->utime += p->utime;
-		p->target->stime += p->stime;
-		p->target->cminflt += p->cminflt;
-		p->target->cmajflt += p->cmajflt;
-		p->target->cutime += p->cutime;
-		p->target->cstime += p->cstime;
-		p->target->num_threads += p->num_threads;
-		p->target->rss += p->rss;
+			p->target->utime += p->utime; //+ (p->pid != 1)?(p->cutime - p->fix_cutime):0;
+			p->target->stime += p->stime; //+ (p->pid != 1)?(p->cstime - p->fix_cstime):0;
+			p->target->minflt += p->minflt; //+ (p->pid != 1)?(p->cminflt - p->fix_cminflt):0;
+			p->target->majflt += p->majflt; //+ (p->pid != 1)?(p->cmajflt - p->fix_cmajflt):0;
 
-		p->target->merge_count += p->merge_count + 1;
+			p->target->num_threads += p->num_threads;
+			p->target->rss += p->rss;
 
-		if(debug) fprintf(stderr, "\tAgregating %s pid %d on %s (count: %lu) utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, p->target->name, p->target->merge_count, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+			p->target->processes++;
+
+			if(debug) fprintf(stderr, "\tAgregating %s pid %d on %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, p->target->name, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+
+/*			if(p->utime - p->old_utime > 100) fprintf(stderr, "BIG CHANGE: %d %s utime increased by %llu from %llu to %llu\n", p->pid, p->comm, p->utime - p->old_utime, p->old_utime, p->utime);
+			if(p->cutime - p->old_cutime > 100) fprintf(stderr, "BIG CHANGE: %d %s cutime increased by %llu from %llu to %llu\n", p->pid, p->comm, p->cutime - p->old_cutime, p->old_cutime, p->cutime);
+			if(p->stime - p->old_stime > 100) fprintf(stderr, "BIG CHANGE: %d %s stime increased by %llu from %llu to %llu\n", p->pid, p->comm, p->stime - p->old_stime, p->old_stime, p->stime);
+			if(p->cstime - p->old_cstime > 100) fprintf(stderr, "BIG CHANGE: %d %s cstime increased by %llu from %llu to %llu\n", p->pid, p->comm, p->cstime - p->old_cstime, p->old_cstime, p->cstime);
+			if(p->minflt - p->old_minflt > 5000) fprintf(stderr, "BIG CHANGE: %d %s minflt increased by %llu from %llu to %llu\n", p->pid, p->comm, p->minflt - p->old_minflt, p->old_minflt, p->minflt);
+			if(p->majflt - p->old_majflt > 5000) fprintf(stderr, "BIG CHANGE: %d %s majflt increased by %llu from %llu to %llu\n", p->pid, p->comm, p->majflt - p->old_majflt, p->old_majflt, p->majflt);
+			if(p->cminflt - p->old_cminflt > 15000) fprintf(stderr, "BIG CHANGE: %d %s cminflt increased by %llu from %llu to %llu\n", p->pid, p->comm, p->cminflt - p->old_cminflt, p->old_cminflt, p->cminflt);
+			if(p->cmajflt - p->old_cmajflt > 15000) fprintf(stderr, "BIG CHANGE: %d %s cmajflt increased by %llu from %llu to %llu\n", p->pid, p->comm, p->cmajflt - p->old_cmajflt, p->old_cmajflt, p->cmajflt);
+
+			p->old_utime = p->utime;
+			p->old_cutime = p->cutime;
+			p->old_stime = p->stime;
+			p->old_cstime = p->cstime;
+			p->old_minflt = p->minflt;
+			p->old_majflt = p->majflt;
+			p->old_cminflt = p->cminflt;
+			p->old_cmajflt = p->cmajflt;
+*/		}
+		else {
+			// since the process has exited, the user
+			// will see a drop in our charts, because the incremental
+			// values of this process will not be there
+
+			// add them to the fix_* values and they will be added to
+			// the reported values, so that the report goes steady
+			p->target->fix_minflt += p->minflt;
+			p->target->fix_majflt += p->majflt;
+			p->target->fix_utime += p->utime;
+			p->target->fix_stime += p->stime;
+			p->target->fix_cminflt += p->cminflt;
+			p->target->fix_cmajflt += p->cmajflt;
+			p->target->fix_cutime += p->cutime;
+			p->target->fix_cstime += p->cstime;
+		}
+	}
+
+/*	fprintf(stderr, "\n");
+*/
+	// cleanup all un-updated processed (exited, killed, etc)
+	int c;
+	for(p = root, c = 0; p ; c++) {
+		if(!p->updated) {
+/*			fprintf(stderr, "\tEXITED %d %s [parent %d %s, target %s] utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->pid, p->comm, p->parent->pid, p->parent->comm, p->target->name,  p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+*/			
+			pid_t r = p->pid;
+			p = p->next;
+			del_entry(r);
+		}
+		else p = p->next;
 	}
 }
 
@@ -503,31 +625,31 @@ void show_dimensions(void)
 
 	fprintf(stdout, "BEGIN apps.cpu\n");
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target || (!w->merge_count && !w->exposed)) continue;
+		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + w->stime);
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + w->stime + w->fix_utime + w->fix_stime);
 	}
 	fprintf(stdout, "END\n");
 
 	fprintf(stdout, "BEGIN apps.cpu_user\n");
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target || (!w->merge_count && !w->exposed)) continue;
+		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime);
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + w->fix_utime);
 	}
 	fprintf(stdout, "END\n");
 
 	fprintf(stdout, "BEGIN apps.cpu_system\n");
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target || (!w->merge_count && !w->exposed)) continue;
+		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->stime);
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->stime + w->fix_stime);
 	}
 	fprintf(stdout, "END\n");
 
 	fprintf(stdout, "BEGIN apps.threads\n");
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target || (!w->merge_count && !w->exposed)) continue;
+		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->num_threads);
 	}
@@ -535,15 +657,15 @@ void show_dimensions(void)
 
 	fprintf(stdout, "BEGIN apps.processes\n");
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target || (!w->merge_count && !w->exposed)) continue;
+		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %lu\n", w->name, w->merge_count);
+		fprintf(stdout, "SET %s = %lu\n", w->name, w->processes);
 	}
 	fprintf(stdout, "END\n");
 
 	fprintf(stdout, "BEGIN apps.rss\n");
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target || (!w->merge_count && !w->exposed)) continue;
+		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, (unsigned long long)w->rss);
 	}
@@ -551,17 +673,17 @@ void show_dimensions(void)
 
 	fprintf(stdout, "BEGIN apps.minor_faults\n");
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target || (!w->merge_count && !w->exposed)) continue;
+		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->minflt);
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->minflt + w->fix_minflt);
 	}
 	fprintf(stdout, "END\n");
 
 	fprintf(stdout, "BEGIN apps.major_faults\n");
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target || (!w->merge_count && !w->exposed)) continue;
+		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->majflt);
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->majflt + w->fix_majflt);
 	}
 	fprintf(stdout, "END\n");
 
@@ -574,7 +696,7 @@ void show_charts(void)
 	int newly_added = 0;
 
 	for(w = wanted_root ; w ; w = w->next)
-		if(!w->exposed && w->merge_count) {
+		if(!w->exposed && w->processes) {
 			newly_added++;
 			w->exposed = 1;
 			if(debug) fprintf(stderr, "%s just added - regenerating charts.\n", w->name);
@@ -587,56 +709,56 @@ void show_charts(void)
 	// update the charts
 	fprintf(stdout, "CHART apps.cpu '' 'Applications CPU Time' 'cpu time %%' apps apps stacked 20001 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target || (!w->merge_count && !w->exposed)) continue;
+		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz);
 	}
 
 	fprintf(stdout, "CHART apps.rss '' 'Applications Memory' 'MB' apps apps stacked 20002 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target || (!w->merge_count && !w->exposed)) continue;
+		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, sysconf(_SC_PAGESIZE), 1024L*1024L);
 	}
 
 	fprintf(stdout, "CHART apps.threads '' 'Applications Threads' 'threads' apps apps stacked 20005 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target || (!w->merge_count && !w->exposed)) continue;
+		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART apps.processes '' 'Applications Processes' 'processes' apps apps stacked 20004 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target || (!w->merge_count && !w->exposed)) continue;
+		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART apps.cpu_user '' 'Applications CPU User Time' 'cpu time %%' apps none stacked 20020 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target || (!w->merge_count && !w->exposed)) continue;
+		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz);
 	}
 
 	fprintf(stdout, "CHART apps.cpu_system '' 'Applications CPU System Time' 'cpu time %%' apps none stacked 20021 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target || (!w->merge_count && !w->exposed)) continue;
+		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz);
 	}
 
 	fprintf(stdout, "CHART apps.major_faults '' 'Applications Major Page Faults' 'page faults/s' apps apps stacked 20010 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target || (!w->merge_count && !w->exposed)) continue;
+		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART apps.minor_faults '' 'Applications Minor Page Faults' 'page faults/s' apps apps stacked 20011 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
-		if(w->target || (!w->merge_count && !w->exposed)) continue;
+		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w->name);
 	}
@@ -720,7 +842,7 @@ int main(int argc, char **argv)
 			exit(1);
 		}
 
-		merge_processes();
+		update_statistics();
 		show_charts();		// this is smart enough to show only newly added apps, when needed
 		show_dimensions();
 
