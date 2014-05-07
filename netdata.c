@@ -1315,8 +1315,12 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 					// we need the incremental calculation to produce per second results
 					// so, we multiply with 1.000.000 and divide by the microseconds passed since
 					// the last entry
-					if(rd->last_collected_value > rd->collected_value) rd->calculated_value = 0;
-					else rd->calculated_value =
+
+					// if the new is smaller than the old (an overflow, or reset), set the old equal to the new
+					// to reset the calculation (it will give zero as the calculation for this second)
+					if(rd->last_collected_value > rd->collected_value) rd->last_collected_value = rd->collected_value;
+
+					rd->calculated_value =
 						  (calculated_number)10
 						* (calculated_number)1000000
 						* (calculated_number)(rd->collected_value - rd->last_collected_value)

@@ -25,8 +25,6 @@
 #define MAX_NAME 100
 
 
-#define add_childs 1ULL
-
 unsigned long long Hertz = 1;
 
 long pid_max = 32768;
@@ -168,7 +166,6 @@ struct pid_stat {
 	int new_entry;
 	unsigned long merge_count;
 	struct wanted *target;
-	int target_inherited;
 	struct pid_stat *parent;
 	struct pid_stat *prev;
 	struct pid_stat *next;
@@ -204,6 +201,8 @@ void del_entry(pid_t pid)
 {
 	if(!all_pids[pid]) return;
 
+	if(debug) fprintf(stderr, "Process %d %s exited, deleting it.\n", pid, all_pids[pid]->comm);
+
 	if(root == all_pids[pid]) root = all_pids[pid]->next;
 	if(all_pids[pid]->next) all_pids[pid]->next->prev = all_pids[pid]->prev;
 	if(all_pids[pid]->prev) all_pids[pid]->prev->next = all_pids[pid]->next;
@@ -231,8 +230,6 @@ int update_from_proc(void)
 		p->merged = 0;
 		p->new_entry = 0;
 		p->merge_count = 0;
-
-		if(p->target_inherited) p->target = NULL;
 	}
 
 	while((file = readdir(dir))) {
@@ -257,6 +254,8 @@ int update_from_proc(void)
 
 		close(fd);
 		if(bytes < 100) continue;
+		buffer[bytes] = '\0';
+		if(debug) fprintf(stderr, "READ: %s", buffer);
 
 		p = get_entry(pid);
 		if(!p) continue;
@@ -298,6 +297,8 @@ int update_from_proc(void)
 		strncpy(p->comm, name, MAX_COMPARE_NAME + 2);
 		p->comm[MAX_COMPARE_NAME + 2] = '\0';
 
+		if(debug) fprintf(stderr, "VALUES: %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+
 		if(parsed < 39) fprintf(stderr, "file %s gave %d results (expected 44)\n", filename, parsed);
 
 		// check if it is wanted
@@ -319,17 +320,18 @@ int update_from_proc(void)
 		}
 
 		// just a few checks
-		if(p->ppid < 1 || p->ppid > pid_max) p->ppid = 1;
+		if(p->ppid < 0 || p->ppid > pid_max) p->ppid = 0;
 
 		// mark it as updated
 		p->updated = 1;
 	}
 	closedir(dir);
 
-	// cleanup all un-updated
+	// cleanup all un-updated processed (exited, killed, etc)
 	int c;
 	for(p = root, c = 0; p ; c++) {
 		if(!p->updated) {
+			
 			pid_t r = p->pid;
 			p = p->next;
 			del_entry(r);
@@ -337,43 +339,61 @@ int update_from_proc(void)
 		else p = p->next;
 	}
 
-	if(debug) fprintf(stderr, "There are %d processes active\n", c);
-
 	return 1;
+}
+
+void walk_down(pid_t pid, int level) {
+	struct pid_stat *p = NULL;
+	char b[level+3];
+	int i;
+
+	for(i = 0; i < level; i++) b[i] = '\t';
+	b[level] = '|';
+	b[level+1] = '-';
+	b[level+2] = '\0';
+
+	p = all_pids[pid];
+	if(p) fprintf(stderr, "%s %s %d [%s] c=%d u=%llu, s=%llu, cu=%llu, cs=%llu, n=%llu, j=%llu, cn=%llu, cj=%llu\n", b, p->comm, p->pid, p->updated?"OK":"KILLED", p->childs, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+
+	for(p = root; p ; p = p->next) {
+		if(p->ppid == pid) {
+			walk_down(p->pid, level+1);
+		}
+	}
 }
 
 void merge_processes(void)
 {
 	struct pid_stat *p = NULL;
 
+	if(debug) walk_down(0, 1);
+
 	// link all parents and update childs count
 	for(p = root; p ; p = p->next) {
-		if(p->ppid > 1 && p->ppid <= pid_max && all_pids[p->ppid]) {
+		if(p->ppid > 0 && p->ppid <= pid_max && all_pids[p->ppid]) {
 			if(debug) fprintf(stderr, "\tParent of %d %s is %d %s\n", p->pid, p->comm, p->ppid, all_pids[p->ppid]->comm);
 			
 			p->parent = all_pids[p->ppid];
-			if(!p->parent) {
-				if(debug) fprintf(stderr, "\t\tpid %d %s states parent %d, but the later does not exist.\n", p->pid, p->comm, p->ppid);
-				continue;
-			}
-
 			p->parent->childs++;
 		}
+		else if(p->ppid != 0) fprintf(stderr, "\t\tWRONG! pid %d %s states parent %d, but the later does not exist.\n", p->pid, p->comm, p->ppid);
 	}
 
 	// find all the procs with 0 childs and merge them to their parents
 	// repeat, until nothing more can be done.
 	int found = 1;
-	for( ; found ; ) {
+	while(found) {
 		found = 0;
 		for(p = root; p ; p = p->next) {
-			// if this process does not any childs, and
+			// if this process does not have any childs, and
 			// is not already merged, and
-			// its parents has childs waiting to be merged, and
+			// its parent has childs waiting to be merged, and
 			// the target of this process and its parent is the same, or the parent does not have a target, or this process does not have a parent
+			// and its parent is not init
 			// then... merge them!
-			if(!p->childs && !p->merged && p->parent && p->parent->childs && (p->target == p->parent->target || !p->parent->target || !p->target)) {
-				if(debug) fprintf(stderr, "\tMerging %d %s to %d %s (count: %lu)\n", p->pid, p->comm, p->ppid, all_pids[p->ppid]->comm, p->parent->merge_count+1);
+			if(!p->childs && !p->merged && p->parent && p->parent->childs && (p->target == p->parent->target || !p->parent->target || !p->target) && p->ppid != 1) {
+
+				if(debug) fprintf(stderr, "\n\t\tPARENT BEFORE MERGE: %d %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->parent->pid, p->parent->comm, p->parent->utime, p->parent->stime, p->parent->cutime, p->parent->cstime, p->parent->minflt, p->parent->majflt, p->parent->cminflt, p->parent->cmajflt);
 
 				p->parent->minflt += p->minflt;
 				p->parent->majflt += p->majflt;
@@ -388,15 +408,18 @@ void merge_processes(void)
 				p->parent->num_threads += p->num_threads;
 				p->parent->rss += p->rss;
 
+				if(debug) fprintf(stderr, "\tMERGED %d %s to %d %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->pid, p->comm, p->ppid, all_pids[p->ppid]->comm, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+
 				p->parent->childs--;
 				p->merged = 1;
+
+				if(debug) fprintf(stderr, "\t\tPARENT AFTER  MERGE: %d %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->parent->pid, p->parent->comm, p->parent->utime, p->parent->stime, p->parent->cutime, p->parent->cstime, p->parent->minflt, p->parent->majflt, p->parent->cminflt, p->parent->cmajflt);
 
 				p->parent->merge_count += p->merge_count + 1;
 
 				// the parent inherits the child's target, if it does not have a target itself
 				if(p->target && !p->parent->target) {
 					p->parent->target = p->target;
-					p->parent->target_inherited = 1;
 					if(debug) fprintf(stderr, "\t\ttarget %s is inherited by %d %s from its child %d %s.\n", p->target->name, p->parent->pid, p->parent->comm, p->pid, p->comm);
 				}
 
@@ -406,16 +429,29 @@ void merge_processes(void)
 		if(debug) fprintf(stderr, "Merged %d processes\n", found);
 	}
 
-	if(debug) {
-		fprintf(stderr, "Root level processes: \n");
-		for(p = root, found = 0; p ; p = p->next) {
-			if(!p->childs && !p->merged && !p->parent) {
-				fprintf(stderr, "\t\t%s %d on target %s\n", p->comm, p->pid, p->target?p->target->name:"-");
+	// give a default target on all top level processes
+	// init goes always to default target
+	if(all_pids[1]) all_pids[1]->target = default_target;
+
+	for(p = root, found = 0; p ; p = p->next) {
+		// if the process is not merged itself
+		// then is is a top level process
+		if(!p->merged && !p->target) p->target = default_target;
+	}
+
+	// give a target to all merged child processes
+	found = 1;
+	while(found) {
+		found = 0;
+		for(p = root; p ; p = p->next) {
+			if(!p->target && p->merged && p->parent && p->parent->target) {
+				p->target = p->parent->target;
+				found++;
 			}
 		}
 	}
 
-	// zero the targets
+	// zero all the targets
 	struct wanted *w;
 	for (w = wanted_root; w ; w = w->next) {
 		w->minflt = 0;
@@ -435,13 +471,13 @@ void merge_processes(void)
 	for(p = root; p ; p = p->next) {
 		//if(p->parent && !p->merged) fprintf(stderr, "\tprocess %s pid %d has a parent, but has not been merged!\n", p->comm, p->pid);
 		//if(p->childs) fprintf(stderr, "\tprocess %s pid %d has %d childs that have not been merged!\n", p->comm, p->pid, p->childs);
-		if(p->merged) continue;
 
 		if(!p->target) {
-			p->target = default_target;
-			p->target_inherited = 1;
-			if(debug) fprintf(stderr, "\tprocess %s pid %d is orphan\n", p->comm, p->pid);
+			fprintf(stderr, "WRONG! pid %d %s was left without a target!\n", p->pid, p->comm);
+			continue;
 		}
+
+		if(p->merged) continue;
 
 		p->target->minflt += p->minflt;
 		p->target->majflt += p->majflt;
@@ -455,7 +491,8 @@ void merge_processes(void)
 		p->target->rss += p->rss;
 
 		p->target->merge_count += p->merge_count + 1;
-		if(debug) fprintf(stderr, "\tAgregating %s pid %d on %s (count: %lu)\n", p->comm, p->pid, p->target->name, p->target->merge_count);
+
+		if(debug) fprintf(stderr, "\tAgregating %s pid %d on %s (count: %lu) utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, p->target->name, p->target->merge_count, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
 	}
 }
 
@@ -468,7 +505,7 @@ void show_dimensions(void)
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + w->stime + (w->cutime * add_childs) + (w->cstime * add_childs));
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + w->stime);
 	}
 	fprintf(stdout, "END\n");
 
@@ -476,7 +513,7 @@ void show_dimensions(void)
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + (w->cutime * add_childs));
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime);
 	}
 	fprintf(stdout, "END\n");
 
@@ -484,7 +521,7 @@ void show_dimensions(void)
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->stime + (w->cstime * add_childs));
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->stime);
 	}
 	fprintf(stdout, "END\n");
 
@@ -516,7 +553,7 @@ void show_dimensions(void)
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->minflt + (w->cminflt * add_childs));
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->minflt);
 	}
 	fprintf(stdout, "END\n");
 
@@ -524,11 +561,11 @@ void show_dimensions(void)
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->merge_count && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->majflt + (w->cmajflt * add_childs));
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->majflt);
 	}
 	fprintf(stdout, "END\n");
 
-	fflush(stdout);
+	fflush(NULL);
 }
 
 void show_charts(void)
@@ -604,7 +641,7 @@ void show_charts(void)
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w->name);
 	}
 
-	fflush(stdout);
+	fflush(NULL);
 }
 
 unsigned long long get_hertz(void)
@@ -624,7 +661,7 @@ unsigned long long get_hertz(void)
 	hz = (sizeof(long)==sizeof(int) || htons(999)==999) ? 100UL : 1024UL;
 #endif
 
-	fprintf(stderr, "Unknown HZ value. Assuming %llu", hz);
+	fprintf(stderr, "Unknown HZ value. Assuming %llu.\n", hz);
 	return hz;
 }
 
