@@ -27,6 +27,7 @@
 
 unsigned long long Hertz = 1;
 
+long processors = 1;
 long pid_max = 32768;
 int debug = 0;
 
@@ -94,15 +95,17 @@ void parse_args(int argc, char **argv)
 	int i = 1;
 
 	debug = 0;
-	if(strcmp(argv[i], "debug") == 0) {
+	if(i < argc && strcmp(argv[i], "debug") == 0) {
 		debug = 1;
 		i++;
 	}
 
-	update_every = atoi(argv[i++]);
-	if(update_every == 0) {
-		i = 1;
-		update_every = 1;
+	if(i < argc) {
+		update_every = atoi(argv[i++]);
+		if(update_every == 0) {
+			i = 1;
+			update_every = 1;
+		}
 	}
 
 	for(; i < argc ; i++) {
@@ -707,56 +710,56 @@ void show_charts(void)
 
 	// we have something new to show
 	// update the charts
-	fprintf(stdout, "CHART apps.cpu '' 'Applications CPU Time' 'cpu time %%' apps apps stacked 20001 %d\n", update_every);
+	fprintf(stdout, "CHART apps.cpu '' 'Apps CPU Time (100%% = %ld core%s)' 'cpu time %%' apps apps stacked 20001 %d\n", processors, (processors>1)?"s":"", update_every);
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz);
+		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz * processors);
 	}
 
-	fprintf(stdout, "CHART apps.rss '' 'Applications Memory' 'MB' apps apps stacked 20002 %d\n", update_every);
+	fprintf(stdout, "CHART apps.rss '' 'Apps Memory' 'MB' apps apps stacked 20002 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, sysconf(_SC_PAGESIZE), 1024L*1024L);
 	}
 
-	fprintf(stdout, "CHART apps.threads '' 'Applications Threads' 'threads' apps apps stacked 20005 %d\n", update_every);
+	fprintf(stdout, "CHART apps.threads '' 'Apps Threads' 'threads' apps apps stacked 20005 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
-	fprintf(stdout, "CHART apps.processes '' 'Applications Processes' 'processes' apps apps stacked 20004 %d\n", update_every);
+	fprintf(stdout, "CHART apps.processes '' 'Apps Processes' 'processes' apps apps stacked 20004 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
-	fprintf(stdout, "CHART apps.cpu_user '' 'Applications CPU User Time' 'cpu time %%' apps none stacked 20020 %d\n", update_every);
+	fprintf(stdout, "CHART apps.cpu_user '' 'Apps CPU User Time (100%% = %ld core%s)' 'cpu time %%' apps none stacked 20020 %d\n", processors, (processors>1)?"s":"", update_every);
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz);
+		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz * processors);
 	}
 
-	fprintf(stdout, "CHART apps.cpu_system '' 'Applications CPU System Time' 'cpu time %%' apps none stacked 20021 %d\n", update_every);
+	fprintf(stdout, "CHART apps.cpu_system '' 'Apps CPU System Time (100%% = %ld core%s)' 'cpu time %%' apps none stacked 20021 %d\n", processors, (processors>1)?"s":"", update_every);
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz);
+		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz * processors);
 	}
 
-	fprintf(stdout, "CHART apps.major_faults '' 'Applications Major Page Faults' 'page faults/s' apps apps stacked 20010 %d\n", update_every);
+	fprintf(stdout, "CHART apps.major_faults '' 'Apps Major Page Faults (swaps in)' 'page faults/s' apps apps stacked 20010 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w->name);
 	}
 
-	fprintf(stdout, "CHART apps.minor_faults '' 'Applications Minor Page Faults' 'page faults/s' apps apps stacked 20011 %d\n", update_every);
+	fprintf(stdout, "CHART apps.minor_faults '' 'Apps Minor Page Faults' 'page faults/s' apps apps stacked 20011 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
@@ -787,6 +790,22 @@ unsigned long long get_hertz(void)
 	return hz;
 }
 
+long get_processors(void)
+{
+	char buffer[1025], *s;
+	int processors = 0;
+
+	FILE *fp = fopen("/proc/stat", "r");
+	if(!fp) return 1;
+
+	while((s = fgets(buffer, 1024, fp))) {
+		if(strncmp(buffer, "cpu", 3) == 0) processors++;
+	}
+	fclose(fp);
+	processors--;
+	if(processors < 1) processors = 1;
+	return processors;
+}
 
 long get_pid_max(void)
 {
@@ -797,29 +816,11 @@ unsigned long long usecdiff(struct timeval *now, struct timeval *last) {
 		return ((((now->tv_sec * 1000000ULL) + now->tv_usec) - ((last->tv_sec * 1000000ULL) + last->tv_usec)));
 }
 
-void mysleep(unsigned long long susec)
-{
-	while(susec) {
-		struct timeval t1, t2;
-
-		gettimeofday(&t1, NULL);
-
-		if(debug) fprintf(stderr, "Sleeping for %llu microseconds\n", susec);
-		usleep(susec);
-
-		gettimeofday(&t2, NULL);
-
-		unsigned long long diff = usecdiff(&t2, &t1);
-		
-		if(diff < susec) susec -= diff;
-		else susec = 0;
-	}
-}
-
 int main(int argc, char **argv)
 {
 	Hertz = get_hertz();
 	pid_max = get_pid_max();
+	processors = get_processors();
 
 	parse_args(argc, argv);
 
@@ -857,7 +858,7 @@ int main(int argc, char **argv)
 		if(usec < (update_every * 1000000ULL)) susec = (update_every * 1000000ULL) - usec;
 		else susec = 0;
 
-		mysleep(susec);
+		usleep(susec);
 
 		bcopy(&now, &last, sizeof(struct timeval));
 	}
