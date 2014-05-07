@@ -73,7 +73,7 @@ struct wanted *get_wanted(const char *id, struct wanted *target)
 	
 	w = calloc(sizeof(struct wanted), 1);
 	if(!w) {
-		fprintf(stderr, "Cannot allocate %ld bytes of memory\n", sizeof(struct wanted));
+		fprintf(stderr, "Cannot allocate %lu bytes of memory\n", sizeof(struct wanted));
 		return NULL;
 	}
 

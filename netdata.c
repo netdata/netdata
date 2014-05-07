@@ -5694,7 +5694,7 @@ void *pluginsd_worker_thread(void *arg)
 	char line[PLUGINSD_LINE_MAX + 1];
 
 	unsigned long long usec = 0, susec = 0;
-	struct timeval last, now;
+	struct timeval last = {0, 0} , now = {0, 0};
 
 	while(1) {
 		// FILE *fp = popen(cd->cmd, "r");
@@ -6485,10 +6485,6 @@ int main(int argc, char **argv)
 	// never become a problem
 	if(nice(20) == -1) {
 		fprintf(stderr, "Cannot lower my CPU priority. Error: %s.\n", strerror(errno));
-	}
-
-	if(sizeof(long long) >= sizeof(long double)) {
-		fprintf(stderr, "\n\nWARNING:\nThis system does not support [long double] variables properly.\nArithmetic overflows and rounding errors may occur.\n\n");
 	}
 
 	if(become_daemon(0, input_log_file, output_log_file, error_log_file, access_log_file, &access_fd, &stdaccess) == -1) {
