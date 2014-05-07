@@ -32,6 +32,11 @@ then
 	mkdir log || exit 1
 fi
 
+if [ ! -d conf.d ]
+then
+	mkdir conf.d || exit 1
+fi
+
 if [ -f conf.d/netdata.conf ]
 then
 	x="`grep "\[global\]" conf.d/netdata.conf`"
