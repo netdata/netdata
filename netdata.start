@@ -83,7 +83,7 @@ sleep 2
 if [ "$USER" = "root" -a ! -z "$NETDATA_CONFIG_USER" -a -d "$NETDATA_CONFIG_WEB_DIR" ]
 then
 	echo "Chaning ownership of web files in $NETDATA_CONFIG_WEB_DIR to $NETDATA_CONFIG_USER"
-	chown -R "$NETDATA_CONFIG_USER" "$NETDATA_CONFIG_WEB_DIR" || exit 1
+	chown -R "$NETDATA_CONFIG_USER" "$NETDATA_CONFIG_WEB_DIR" conf.d log || exit 1
 	chmod    0775 "$NETDATA_CONFIG_WEB_DIR" || exit 1
 fi
 
