@@ -32,7 +32,7 @@ long pid_max = 32768;
 int debug = 0;
 
 struct wanted {
-	char compare[MAX_COMPARE_NAME + 3];
+	char compare[MAX_COMPARE_NAME + 1];
 	char id[MAX_NAME + 1];
 	char name[MAX_NAME + 1];
 
@@ -79,7 +79,7 @@ struct wanted *get_wanted(const char *id, struct wanted *target)
 
 	strncpy(w->id, id, MAX_NAME);
 	strncpy(w->name, id, MAX_NAME);
-	snprintf(w->compare, MAX_COMPARE_NAME+1, "(%.*s)", MAX_COMPARE_NAME, id);
+	strncpy(w->compare, id, MAX_COMPARE_NAME);
 	w->target = target;
 
 	w->next = wanted_root;
@@ -132,7 +132,7 @@ void parse_args(int argc, char **argv)
 // see: man proc
 struct pid_stat {
 	int32_t pid;
-	char comm[MAX_COMPARE_NAME + 3];
+	char comm[MAX_COMPARE_NAME + 1];
 	char state;
 	int32_t ppid;
 	int32_t pgrp;
@@ -296,7 +296,7 @@ int update_from_proc(void)
 		if(!p) continue;
 
 		int parsed = sscanf(buffer,
-			"%d %s %c"							// pid, comm, state
+			"%d (%[^)]) %c"						// pid, comm, state
 			" %d %d %d %d %d"					// ppid, pgrp, session, tty_nr, tpgid
 			" %lu %llu %llu %llu %llu"			// flags, minflt, cminflt, majflt, cmajflt
 			" %llu %llu %llu %llu"				// utime, stime, cutime, cstime
@@ -329,8 +329,8 @@ int update_from_proc(void)
 			, &p->rt_priority, &p->policy
 			, &p->delayacct_blkio_ticks, &p->guest_time, &p->cguest_time
 			);
-		strncpy(p->comm, name, MAX_COMPARE_NAME + 2);
-		p->comm[MAX_COMPARE_NAME + 2] = '\0';
+		strncpy(p->comm, name, MAX_COMPARE_NAME);
+		p->comm[MAX_COMPARE_NAME] = '\0';
 
 		if(debug) fprintf(stderr, "VALUES: %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
 
