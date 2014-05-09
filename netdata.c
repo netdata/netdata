@@ -5831,7 +5831,7 @@ void *pluginsd_worker_thread(void *arg)
 				int chart_type = CHART_TYPE_LINE;
 				if(chart) chart_type = chart_type_id(chart);
 
-				if(!name || !*name) name = id;
+				if(!name || !*name) name = NULL;
 				if(!family || !*family) family = id;
 				if(!category || !*category) category = type;
 
