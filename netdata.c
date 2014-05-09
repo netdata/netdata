@@ -924,6 +924,8 @@ struct rrd_stats {
 	unsigned long hash;							// a simple hash on the id, to speed up searching
 												// we first compare hashes, and only if the hashes are equal we do string comparisons
 
+	unsigned long hash_name;					// a simple hash on the name
+
 	char *type;									// the type of graph RRD_TYPE_* (a category, for determining graphing options)
 	char *family;								// the family of this data set (for grouping them together)
 	char *title;								// title shown to user
@@ -959,6 +961,28 @@ typedef struct rrd_stats RRD_STATS;
 RRD_STATS *root = NULL;
 pthread_mutex_t root_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+char *rrd_stats_strncpy_name(char *to, const char *from, int length)
+{
+	int i;
+	for(i = 0; i < length && from[i] ;i++) {
+		if(from[i] == '.' || isalpha(from[i]) || isdigit(from[i])) to[i] = from[i];
+		else to[i] = '_';
+	}
+	if(i < length) to[i] = '\0';
+	to[length - 1] = '\0';
+
+	return to;
+}
+
+void rrd_stats_set_name(RRD_STATS *st, const char *name)
+{
+	char b[CONFIG_MAX_VALUE+1];
+
+	rrd_stats_strncpy_name(b, name, CONFIG_MAX_VALUE);
+	st->name = config_get(st->id, "name", b);
+	st->hash_name = simple_hash(st->name);
+}
+
 RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, const char *family, const char *title, const char *units, long priority, int update_every, int chart_type)
 {
 	RRD_STATS *st = NULL;
@@ -979,12 +1003,8 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 	snprintf(st->id, RRD_STATS_NAME_MAX, "%s.%s", type, id);
 	st->hash = simple_hash(st->id);
 
-	if(name && *name) {
-		char varvalue[CONFIG_MAX_VALUE + 1];
-		snprintf(varvalue, CONFIG_MAX_VALUE, "%s.%s", type?type:"", name);
-		st->name = config_get(st->id, "name", varvalue);
-	}
-	else st->name = config_get(st->id, "name", st->id);
+	if(name && *name) rrd_stats_set_name(st, name);
+	else rrd_stats_set_name(st, st->id);
 
 	{
 		char varvalue[CONFIG_MAX_VALUE + 1];
@@ -1024,12 +1044,6 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 
 	return(st);
 }
-
-void rrd_stats_set_name(RRD_STATS *st, const char *name)
-{
-	config_get(st->id, "name", name);
-}
-
 
 RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char *name, long multiplier, long divisor, int algorithm)
 {
@@ -1129,12 +1143,16 @@ RRD_STATS *rrd_stats_find_bytype(const char *type, const char *id)
 
 RRD_STATS *rrd_stats_find_byname(const char *name)
 {
+	char b[CONFIG_MAX_VALUE + 1];
+
 	pthread_mutex_lock(&root_mutex);
 
-	RRD_STATS *st = root;
+	rrd_stats_strncpy_name(b, name, CONFIG_MAX_VALUE);
+	unsigned long hash = simple_hash(b);
 
+	RRD_STATS *st = root;
 	for ( ; st ; st = st->next ) {
-		if(strcmp(st->name, name) == 0) break;
+		if(hash == st->hash_name && strcmp(st->name, b) == 0) break;
 	}
 
 	pthread_mutex_unlock(&root_mutex);
@@ -5961,6 +5979,9 @@ void *pluginsd_main(void *ptr)
 	DIR *dir = NULL;
 	struct dirent *file = NULL;
 	struct plugind *cd;
+
+	// enable the apps plugin by default
+	config_get_boolean("plugins", "apps", 1);
 
 	if(scan_frequency < 1) scan_frequency = 1;
 
