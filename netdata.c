@@ -153,7 +153,7 @@ struct global_statistics {
 	unsigned long long bytes_received;
 	unsigned long long bytes_sent;
 
-} global_statistics = { 0ULL };
+} global_statistics = { 0ULL, 0ULL, 0ULL, 0ULL };
 
 pthread_mutex_t global_statistics_mutex = PTHREAD_MUTEX_INITIALIZER;
 
