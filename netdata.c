@@ -142,6 +142,31 @@ int listen_port = LISTEN_PORT;
 
 
 // ----------------------------------------------------------------------------
+// global statistics
+
+struct global_statistics {
+
+	unsigned long long connected_clients;
+
+	unsigned long long web_requests;
+
+	unsigned long long bytes_received;
+	unsigned long long bytes_sent;
+
+} global_statistics = { 0ULL };
+
+pthread_mutex_t global_statistics_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void global_statistics_lock(void)
+{
+	pthread_mutex_lock(&global_statistics_mutex);
+}
+void global_statistics_unlock(void)
+{
+	pthread_mutex_unlock(&global_statistics_mutex);
+}
+
+// ----------------------------------------------------------------------------
 // LOG
 
 unsigned long long debug_flags = DEBUG;
@@ -976,9 +1001,11 @@ char *rrd_stats_strncpy_name(char *to, const char *from, int length)
 
 void rrd_stats_set_name(RRD_STATS *st, const char *name)
 {
-	char b[CONFIG_MAX_VALUE+1];
+	char b[CONFIG_MAX_VALUE + 1];
+	char n[RRD_STATS_NAME_MAX + 1];
 
-	rrd_stats_strncpy_name(b, name, CONFIG_MAX_VALUE);
+	snprintf(n, RRD_STATS_NAME_MAX, "%s.%s", st->type, name);
+	rrd_stats_strncpy_name(b, n, CONFIG_MAX_VALUE);
 	st->name = config_get(st->id, "name", b);
 	st->hash_name = simple_hash(st->name);
 }
@@ -1003,19 +1030,19 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 	snprintf(st->id, RRD_STATS_NAME_MAX, "%s.%s", type, id);
 	st->hash = simple_hash(st->id);
 
+	st->family     = config_get(st->id, "family", family?family:st->id);
+	st->units      = config_get(st->id, "units", units?units:"");
+	st->type       = config_get(st->id, "type", type);
+	st->chart_type = chart_type_id(config_get(st->id, "chart type", chart_type_name(chart_type)));
+
 	if(name && *name) rrd_stats_set_name(st, name);
-	else rrd_stats_set_name(st, st->id);
+	else rrd_stats_set_name(st, id);
 
 	{
 		char varvalue[CONFIG_MAX_VALUE + 1];
 		snprintf(varvalue, CONFIG_MAX_VALUE, "%s (%s)", title?title:"", st->name);
 		st->title = config_get(st->id, "title", varvalue);
 	}
-
-	st->family     = config_get(st->id, "family", family?family:st->id);
-	st->units      = config_get(st->id, "units", units?units:"");
-	st->type       = config_get(st->id, "type", type);
-	st->chart_type = chart_type_id(config_get(st->id, "chart type", chart_type_name(chart_type)));
 
 	st->entries = config_get_number(st->id, "history", save_history);
 	if(st->entries < 5) st->entries = config_set_number(st->id, "history", 5);
@@ -1684,6 +1711,8 @@ struct web_client *web_client_create(int listener)
 	w->next = web_clients;
 	web_clients = w;
 
+	global_statistics.connected_clients++;
+
 	return(w);
 }
 
@@ -1702,6 +1731,8 @@ struct web_client *web_client_free(struct web_client *w)
 	close(w->ifd);
 	if(w->ofd != w->ifd) close(w->ofd);
 	free(w);
+
+	global_statistics.connected_clients--;
 
 	return(n);
 }
@@ -2536,6 +2567,10 @@ void web_client_process(struct web_client *w)
 
 	// check if we have an empty line (end of HTTP header)
 	if(strstr(w->data->buffer, "\r\n\r\n")) {
+		global_statistics_lock();
+		global_statistics.web_requests++;
+		global_statistics_unlock();
+
 		gettimeofday(&w->tv_in, NULL);
 		debug(D_WEB_DATA, "%llu: Processing data buffer of %d bytes: '%s'.", w->id, w->data->bytes, w->data->buffer);
 
@@ -2886,6 +2921,11 @@ void web_client_process(struct web_client *w)
 	bytes = send(w->ofd, w->response_header, headerlen, 0);
 	if(bytes != headerlen)
 		error("%llu: HTTP Header failed to be sent (I sent %d bytes but the system sent %d bytes).", w->id, headerlen, bytes);
+	else {
+		global_statistics_lock();
+		global_statistics.bytes_sent += bytes;
+		global_statistics_unlock();
+	}
 
 	// enable TCP_NODELAY, to send all data immediately at the next send()
 	flag = 1;
@@ -2927,7 +2967,7 @@ void web_client_process(struct web_client *w)
 	}
 }
 
-void web_client_send_chunk_header(struct web_client *w, int len)
+long web_client_send_chunk_header(struct web_client *w, int len)
 {
 	debug(D_DEFLATE, "%llu: OPEN CHUNK of %d bytes (hex: %x).", w->id, len, len);
 	char buf[1024]; 
@@ -2937,9 +2977,11 @@ void web_client_send_chunk_header(struct web_client *w, int len)
 	if(bytes > 0) debug(D_DEFLATE, "%llu: Sent chunk header %d bytes.", w->id, bytes);
 	else if(bytes == 0) debug(D_DEFLATE, "%llu: Did not send chunk header to the client.", w->id);
 	else debug(D_DEFLATE, "%llu: Failed to send chunk header to client. Reason: %s", w->id, strerror(errno));
+
+	return bytes;
 }
 
-void web_client_send_chunk_close(struct web_client *w)
+long web_client_send_chunk_close(struct web_client *w)
 {
 	//debug(D_DEFLATE, "%llu: CLOSE CHUNK.", w->id);
 
@@ -2948,9 +2990,11 @@ void web_client_send_chunk_close(struct web_client *w)
 	if(bytes > 0) debug(D_DEFLATE, "%llu: Sent chunk suffix %d bytes.", w->id, bytes);
 	else if(bytes == 0) debug(D_DEFLATE, "%llu: Did not send chunk suffix to the client.", w->id);
 	else debug(D_DEFLATE, "%llu: Failed to send chunk suffix to client. Reason: %s", w->id, strerror(errno));
+
+	return bytes;
 }
 
-void web_client_send_chunk_finalize(struct web_client *w)
+long web_client_send_chunk_finalize(struct web_client *w)
 {
 	//debug(D_DEFLATE, "%llu: FINALIZE CHUNK.", w->id);
 
@@ -2959,11 +3003,13 @@ void web_client_send_chunk_finalize(struct web_client *w)
 	if(bytes > 0) debug(D_DEFLATE, "%llu: Sent chunk suffix %d bytes.", w->id, bytes);
 	else if(bytes == 0) debug(D_DEFLATE, "%llu: Did not send chunk suffix to the client.", w->id);
 	else debug(D_DEFLATE, "%llu: Failed to send chunk suffix to client. Reason: %s", w->id, strerror(errno));
+
+	return bytes;
 }
 
 long web_client_send_deflate(struct web_client *w)
 {
-	long bytes;
+	long bytes = 0, t = 0;
 
 	// when using compression,
 	// w->data->sent is the amount of bytes passed through compression
@@ -2977,7 +3023,7 @@ long web_client_send_deflate(struct web_client *w)
 
 		// finalize the chunk
 		if(w->data->sent != 0)
-			web_client_send_chunk_finalize(w);
+			t += web_client_send_chunk_finalize(w);
 
 		// there can be two cases for this
 		// A. we have done everything
@@ -3006,7 +3052,7 @@ long web_client_send_deflate(struct web_client *w)
 		// compress more input data
 
 		// close the previous open chunk
-		if(w->data->sent != 0) web_client_send_chunk_close(w);
+		if(w->data->sent != 0) t += web_client_send_chunk_close(w);
 
 		debug(D_DEFLATE, "%llu: Compressing %d bytes starting from %d.", w->id, (w->data->bytes - w->data->sent), w->data->sent);
 
@@ -3047,12 +3093,13 @@ long web_client_send_deflate(struct web_client *w)
 		debug(D_DEFLATE, "%llu: Compression produced %d bytes.", w->id, w->zhave);
 
 		// open a new chunk
-		web_client_send_chunk_header(w, w->zhave);
+		t += web_client_send_chunk_header(w, w->zhave);
 	}
 
 	bytes = send(w->ofd, &w->zbuffer[w->zsent], w->zhave - w->zsent, MSG_DONTWAIT);
 	if(bytes > 0) {
 		w->zsent += bytes;
+		if(t > 0) bytes += t;
 		debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, bytes);
 	}
 	else if(bytes == 0) debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client.", w->id);
@@ -3219,22 +3266,36 @@ void *new_client(void *ptr)
 		}
 
 		if(w->wait_send && FD_ISSET(w->ofd, &ofds)) {
-			if(web_client_send(w) < 0) {
+			long bytes;
+			if((bytes = web_client_send(w)) < 0) {
 				debug(D_WEB_CLIENT, "%llu: Closing client (input: %s).", w->id, strerror(errno));
 				web_client_reset(w);
 				w->obsolete = 1;
 				errno = 0;
 				return NULL;
 			}
+			else {
+				global_statistics_lock();
+				global_statistics.bytes_sent += bytes;
+				global_statistics_unlock();
+			}
 		}
 
 		if(w->wait_receive && FD_ISSET(w->ifd, &ifds)) {
-			if(web_client_receive(w) < 0) {
+			long bytes;
+			if((bytes = web_client_receive(w)) < 0) {
 				debug(D_WEB_CLIENT, "%llu: Closing client (output: %s).", w->id, strerror(errno));
 				web_client_reset(w);
 				w->obsolete = 1;
 				errno = 0;
 				return NULL;
+			}
+			else {
+				if(w->mode != WEB_CLIENT_MODE_FILECOPY) {
+					global_statistics_lock();
+					global_statistics.bytes_received += bytes;
+					global_statistics_unlock();
+				}
 			}
 
 			if(w->mode == WEB_CLIENT_MODE_NORMAL) web_client_process(w);
@@ -5214,9 +5275,9 @@ void *proc_main(void *ptr)
 	int vdo_proc_stat = !config_get_boolean("plugin:proc", "/proc/stat", 1);
 	int vdo_proc_meminfo = !config_get_boolean("plugin:proc", "/proc/meminfo", 1);
 	int vdo_proc_vmstat = !config_get_boolean("plugin:proc", "/proc/vmstat", 1);
-	int vdo_cpu_netdata = !config_get_boolean("plugin:proc", "netdata cpu", 1);
+	int vdo_cpu_netdata = !config_get_boolean("plugin:proc", "netdata server resources", 1);
 
-	RRD_STATS *stcpu = NULL;
+	RRD_STATS *stcpu = NULL, *stclients = NULL, *streqs = NULL, *stbytes = NULL;
 
 	gettimeofday(&last, NULL);
 	getrusage(RUSAGE_SELF, &me_last);
@@ -5254,7 +5315,7 @@ void *proc_main(void *ptr)
 			unsigned long long cpuuser = me.ru_utime.tv_sec * 1000000ULL + me.ru_utime.tv_usec;
 			unsigned long long cpusyst = me.ru_stime.tv_sec * 1000000ULL + me.ru_stime.tv_usec;
 
-			if(!stcpu) stcpu = rrd_stats_find("cpu.netdata");
+			if(!stcpu) stcpu = rrd_stats_find("netdata.server_cpu");
 			if(!stcpu) {
 				stcpu = rrd_stats_create("netdata", "server_cpu", NULL, "netdata", "NetData CPU usage", "milliseconds/s", 9999, update_every, CHART_TYPE_STACKED);
 
@@ -5268,6 +5329,47 @@ void *proc_main(void *ptr)
 			rrd_stats_done(stcpu);
 			
 			bcopy(&me, &me_last, sizeof(struct rusage));
+
+			// ----------------------------------------------------------------
+
+			if(!stclients) stclients = rrd_stats_find("netdata.clients");
+			if(!stclients) {
+				stclients = rrd_stats_create("netdata", "clients", NULL, "netdata", "NetData Web Clients", "clients", 11000, update_every, CHART_TYPE_LINE);
+
+				rrd_stats_dimension_add(stclients, "clients",  NULL,  1, 1, RRD_DIMENSION_ABSOLUTE);
+			}
+			else rrd_stats_next(stclients);
+
+			rrd_stats_dimension_set(stclients, "clients", global_statistics.connected_clients);
+			rrd_stats_done(stclients);
+
+			// ----------------------------------------------------------------
+
+			if(!streqs) streqs = rrd_stats_find("netdata.requests");
+			if(!streqs) {
+				streqs = rrd_stats_create("netdata", "requests", NULL, "netdata", "NetData Web Requests", "requests", 12000, update_every, CHART_TYPE_LINE);
+
+				rrd_stats_dimension_add(streqs, "requests",  NULL,  1, 1, RRD_DIMENSION_INCREMENTAL);
+			}
+			else rrd_stats_next(streqs);
+
+			rrd_stats_dimension_set(streqs, "requests", global_statistics.web_requests);
+			rrd_stats_done(streqs);
+
+			// ----------------------------------------------------------------
+
+			if(!stbytes) stbytes = rrd_stats_find("netdata.net");
+			if(!stbytes) {
+				stbytes = rrd_stats_create("netdata", "net", NULL, "netdata", "NetData Network Traffic", "kilobits/s", 13000, update_every, CHART_TYPE_AREA);
+
+				rrd_stats_dimension_add(stbytes, "in",  NULL,  8, 1024, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(stbytes, "out",  NULL,  -8, 1024, RRD_DIMENSION_INCREMENTAL);
+			}
+			else rrd_stats_next(stbytes);
+
+			rrd_stats_dimension_set(stbytes, "in", global_statistics.bytes_received);
+			rrd_stats_dimension_set(stbytes, "out", global_statistics.bytes_sent);
+			rrd_stats_done(stbytes);
 		}
 
 		usleep(susec);
@@ -5362,12 +5464,7 @@ void tc_device_commit(struct tc_device *d)
 		else {
 			rrd_stats_next(st);
 
-			if(strcmp(d->id, d->name) != 0) {
-				// update the device name with the new one
-				char buf[RRD_STATS_NAME_MAX + 1];
-				snprintf(buf, RRD_STATS_NAME_MAX, "%s.%s", st->type, d->name);
-				rrd_stats_set_name(st, buf);
-			}
+			if(strcmp(d->id, d->name) != 0) rrd_stats_set_name(st, d->name);
 		}
 
 		for ( c = d->classes ; c ; c = c->next) {
