@@ -866,7 +866,7 @@ void show_dimensions(void)
 	}
 	fprintf(stdout, "END\n");
 
-	fprintf(stdout, "BEGIN apps.reads\n");
+	fprintf(stdout, "BEGIN apps.lreads\n");
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
@@ -874,11 +874,27 @@ void show_dimensions(void)
 	}
 	fprintf(stdout, "END\n");
 
-	fprintf(stdout, "BEGIN apps.writes\n");
+	fprintf(stdout, "BEGIN apps.lwrites\n");
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_logical_bytes_written);
+	}
+	fprintf(stdout, "END\n");
+
+	fprintf(stdout, "BEGIN apps.preads\n");
+	for (w = wanted_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_storage_bytes_read);
+	}
+	fprintf(stdout, "END\n");
+
+	fprintf(stdout, "BEGIN apps.pwrites\n");
+	for (w = wanted_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_storage_bytes_written);
 	}
 	fprintf(stdout, "END\n");
 }
@@ -956,14 +972,28 @@ void show_charts(void)
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w->name);
 	}
 
-	fprintf(stdout, "CHART apps.reads '' 'Apps Logical Reads' 'kilobytes/s' apps apps stacked 20002 %d\n", update_every);
+	fprintf(stdout, "CHART apps.lreads '' 'Apps Logical Reads' 'kilobytes/s' apps apps stacked 20042 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1024\n", w->name);
 	}
 
-	fprintf(stdout, "CHART apps.writes '' 'Apps Logical Writes' 'kilobytes/s' apps apps stacked 20002 %d\n", update_every);
+	fprintf(stdout, "CHART apps.lwrites '' 'Apps Logical Writes' 'kilobytes/s' apps apps stacked 20042 %d\n", update_every);
+	for (w = wanted_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "DIMENSION %s '' incremental 1 1024\n", w->name);
+	}
+
+	fprintf(stdout, "CHART apps.preads '' 'Apps Reads' 'kilobytes/s' apps apps stacked 20002 %d\n", update_every);
+	for (w = wanted_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "DIMENSION %s '' incremental 1 1024\n", w->name);
+	}
+
+	fprintf(stdout, "CHART apps.pwrites '' 'Apps Writes' 'kilobytes/s' apps apps stacked 20002 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
