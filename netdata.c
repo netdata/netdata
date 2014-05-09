@@ -5256,7 +5256,7 @@ void *proc_main(void *ptr)
 
 			if(!stcpu) stcpu = rrd_stats_find("cpu.netdata");
 			if(!stcpu) {
-				stcpu = rrd_stats_create("cpu", "netdata", NULL, "cpu", "NetData CPU usage", "milliseconds/s", 9999, update_every, CHART_TYPE_STACKED);
+				stcpu = rrd_stats_create("netdata", "server_cpu", NULL, "netdata", "NetData CPU usage", "milliseconds/s", 9999, update_every, CHART_TYPE_STACKED);
 
 				rrd_stats_dimension_add(stcpu, "user",  NULL,  1, 1000, RRD_DIMENSION_INCREMENTAL);
 				rrd_stats_dimension_add(stcpu, "system", NULL, 1, 1000, RRD_DIMENSION_INCREMENTAL);
@@ -6044,7 +6044,10 @@ void *pluginsd_main(void *ptr)
 					" 'apache apache2 as apache'"
 					" 'mysql mysqld as mysql'"
 					" asterisk"
-					" opensips"
+					" 'opensips opensips-mi-pro as opensips'"
+					" stund"
+					" 'radiusd radiusclient as radius'"
+					" 'fail2ban-server as fail2ban'"
 					" dovecot"
 					" nginx"
 					" lighttpd"
@@ -6054,19 +6057,19 @@ void *pluginsd_main(void *ptr)
 					" 'rpcbind rpc.statd rpc.idmapd rpc.mountd nfsd4 nfsd4_callbacks nfsd nfsiod as nfs'"
 					" 'ssh sshd as ssh'"
 					" 'gdm X lightdm xdm gnome-session gconfd-2 gnome-terminal gnome-screensaver gnome-settings-daemon pulseaudio as X'"
-					" 'named as bind'"
+					" named"
 					" 'clamd freshclam as clam'"
 					" 'cupsd cups-browsed as cups'"
 					" 'ntpq ntpd as ntp'"
 					" 'deluge deluged as deluge'"
 					" 'vboxwebsrv VBoxXPCOMIPCD VBoxSVC as vbox'"
 					" 'ulogd syslogd syslog-ng rsyslogd logrotate as log'"
-					" 'snmpd vnstatd smokeping zabbix_agentd monit munin-node mon as nms'"
+					" 'snmpd vnstatd smokeping zabbix_agentd monit munin-node mon openhpid as nms'"
 					" 'ppp pppd pptpd pptpctrl as ppp'"
 					" 'inetd xinetd as inetd'"
 					" openvpn"
 					" 'cron atd as cron'"
-					" 'corosync hs_logd stonithd as ha'"
+					" 'corosync hs_logd ha_logd stonithd as ha'"
 					" 'ipvs_syncmaster ipvs_syncbackup as ipvs'"
 					" 'kthreadd as kernel'"
 					" netdata"

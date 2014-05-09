@@ -365,17 +365,24 @@ function loadCharts(base_url, doNext) {
 					json.charts[i].group = 5;
 					break;
 
+				case "netdata":
+					json.charts[i].category = "NetData";
+					json.charts[i].categoryPriority = 3000;
+					json.charts[i].glyphicon = "glyphicon-thumbs-up";
+					json.charts[i].group = 5;
+					break;
+
 				case "apps":
 					json.charts[i].category = "Apps";
 					json.charts[i].categoryPriority = 4000;
-					json.charts[i].glyphicon = "glyphicon-globe";
+					json.charts[i].glyphicon = "glyphicon-tasks";
 					json.charts[i].group = 5;
 					break;
 
 				case "squid":
 					json.charts[i].category = "Squid";
 					json.charts[i].categoryPriority = 5000;
-					json.charts[i].glyphicon = "glyphicon-globe";
+					json.charts[i].glyphicon = "glyphicon-link";
 					json.charts[i].group = 5;
 					break;
 

@@ -56,6 +56,30 @@ struct wanted {
 	unsigned long long fix_cutime;
 	unsigned long long fix_cstime;
 
+	unsigned long long statm_size;
+	unsigned long long statm_resident;
+	unsigned long long statm_share;
+	unsigned long long statm_text;
+	unsigned long long statm_lib;
+	unsigned long long statm_data;
+	unsigned long long statm_dirty;
+
+	unsigned long long io_logical_bytes_read;
+	unsigned long long io_logical_bytes_written;
+	unsigned long long io_read_calls;
+	unsigned long long io_write_calls;
+	unsigned long long io_storage_bytes_read;
+	unsigned long long io_storage_bytes_written;
+	unsigned long long io_cancelled_write_bytes;
+
+	unsigned long long fix_io_logical_bytes_read;
+	unsigned long long fix_io_logical_bytes_written;
+	unsigned long long fix_io_read_calls;
+	unsigned long long fix_io_write_calls;
+	unsigned long long fix_io_storage_bytes_read;
+	unsigned long long fix_io_storage_bytes_written;
+	unsigned long long fix_io_cancelled_write_bytes;
+
 	unsigned long processes;	// how many processes have been merged to this
 	int exposed;				// if set, we have sent this to netdata
 
@@ -64,6 +88,7 @@ struct wanted {
 } *wanted_root = NULL, *default_target = NULL;
 
 int update_every = 1;
+unsigned long long file_counter = 0;
 
 struct wanted *get_wanted(const char *id, struct wanted *target)
 {
@@ -176,6 +201,22 @@ struct pid_stat {
 	uint64_t guest_time;
 	int64_t cguest_time;
 
+	unsigned long long statm_size;
+	unsigned long long statm_resident;
+	unsigned long long statm_share;
+	unsigned long long statm_text;
+	unsigned long long statm_lib;
+	unsigned long long statm_data;
+	unsigned long long statm_dirty;
+
+	unsigned long long io_logical_bytes_read;
+	unsigned long long io_logical_bytes_written;
+	unsigned long long io_read_calls;
+	unsigned long long io_write_calls;
+	unsigned long long io_storage_bytes_read;
+	unsigned long long io_storage_bytes_written;
+	unsigned long long io_cancelled_write_bytes;
+
 /*	unsigned long long old_utime;
 	unsigned long long old_stime;
 	unsigned long long old_minflt;
@@ -209,7 +250,7 @@ struct pid_stat {
 
 struct pid_stat **all_pids;
 
-#define PID_STAT_LINE_MAX 4096
+#define PROC_BUFFER 4096
 
 struct pid_stat *get_entry(pid_t pid)
 {
@@ -249,8 +290,10 @@ void del_entry(pid_t pid)
 
 int update_from_proc(void)
 {
-	char buffer[PID_STAT_LINE_MAX + 1];
-	char name[PID_STAT_LINE_MAX + 1];
+	static long count_open_errors = 0;
+
+	char buffer[PROC_BUFFER + 1];
+	char name[PROC_BUFFER + 1];
 	char filename[FILENAME_MAX+1];
 	DIR *dir = opendir("/proc");
 	if(!dir) return 0;
@@ -272,25 +315,32 @@ int update_from_proc(void)
 		pid_t pid = strtoul(file->d_name, &endptr, 10);
 		if(pid <= 0 || pid > pid_max || endptr == file->d_name || *endptr != '\0') continue;
 
-		snprintf(filename, FILENAME_MAX, "/proc/%s/stat", file->d_name);
 
+		// --------------------------------------------------------------------
+		// /proc/<pid>/stat
+
+		snprintf(filename, FILENAME_MAX, "/proc/%s/stat", file->d_name);
 		int fd = open(filename, O_RDONLY);
 		if(fd == -1) {
-			if(errno != ENOENT && errno != ESRCH) fprintf(stderr, "Cannot open file '%s' for reading (%d, %s).\n", filename, errno, strerror(errno));
+			if(errno != ENOENT && errno != ESRCH) {
+				if(!count_open_errors) fprintf(stderr, "Cannot open file '%s' for reading (%d, %s).\n", filename, errno, strerror(errno));
+				count_open_errors++;
+			}
 			continue;
 		}
+		file_counter++;
 
-		int bytes = read(fd, buffer, PID_STAT_LINE_MAX);
+		int bytes = read(fd, buffer, PROC_BUFFER);
+		close(fd);
+
 		if(bytes == -1) {
 			fprintf(stderr, "Cannot read from file '%s' (%s).\n", filename, strerror(errno));
-			close(fd);
 			continue;
 		}
 
-		close(fd);
-		if(bytes < 100) continue;
+		if(bytes < 10) continue;
 		buffer[bytes] = '\0';
-		if(debug) fprintf(stderr, "READ: %s", buffer);
+		if(debug) fprintf(stderr, "READ stat: %s", buffer);
 
 		p = get_entry(pid);
 		if(!p) continue;
@@ -357,9 +407,95 @@ int update_from_proc(void)
 		// just a few checks
 		if(p->ppid < 0 || p->ppid > pid_max) p->ppid = 0;
 
+
+		// --------------------------------------------------------------------
+		// /proc/<pid>/statm
+
+		snprintf(filename, FILENAME_MAX, "/proc/%s/statm", file->d_name);
+		fd = open(filename, O_RDONLY);
+		if(fd == -1) {
+			if(errno != ENOENT && errno != ESRCH) {
+				if(!count_open_errors) fprintf(stderr, "Cannot open file '%s' for reading (%d, %s).\n", filename, errno, strerror(errno));
+				count_open_errors++;
+			}
+		}
+		else {
+			file_counter++;
+			bytes = read(fd, buffer, PROC_BUFFER);
+			close(fd);
+
+			if(bytes == -1) {
+				fprintf(stderr, "Cannot read from file '%s' (%s).\n", filename, strerror(errno));
+			}
+			else if(bytes > 10) {
+				buffer[bytes] = '\0';
+				if(debug) fprintf(stderr, "READ statm: %s", buffer);
+
+				parsed = sscanf(buffer,
+					"%llu %llu %llu %llu %llu %llu %llu"
+					, &p->statm_size
+					, &p->statm_resident
+					, &p->statm_share
+					, &p->statm_text
+					, &p->statm_lib
+					, &p->statm_data
+					, &p->statm_dirty
+					);
+
+				if(parsed < 7) fprintf(stderr, "file %s gave %d results (expected 7)\n", filename, parsed);
+			}
+		}
+
+		// --------------------------------------------------------------------
+		// /proc/<pid>/io
+
+		snprintf(filename, FILENAME_MAX, "/proc/%s/io", file->d_name);
+		fd = open(filename, O_RDONLY);
+		if(fd == -1) {
+			if(errno != ENOENT && errno != ESRCH) {
+				if(!count_open_errors) fprintf(stderr, "Cannot open file '%s' for reading (%d, %s).\n", filename, errno, strerror(errno));
+				count_open_errors++;
+			}
+		}
+		else {
+			file_counter++;
+			bytes = read(fd, buffer, PROC_BUFFER);
+			close(fd);
+
+			if(bytes == -1) {
+				fprintf(stderr, "Cannot read from file '%s' (%s).\n", filename, strerror(errno));
+			}
+			else if(bytes > 10) {
+				buffer[bytes] = '\0';
+				if(debug) fprintf(stderr, "READ io: %s", buffer);
+
+				parsed = sscanf(buffer,
+					"rchar: %llu\nwchar: %llu\nsyscr: %llu\nsyscw: %llu\nread_bytes: %llu\nwrite_bytes: %llu\ncancelled_write_bytes: %llu"
+					, &p->io_logical_bytes_read
+					, &p->io_logical_bytes_written
+					, &p->io_read_calls
+					, &p->io_write_calls
+					, &p->io_storage_bytes_read
+					, &p->io_storage_bytes_written
+					, &p->io_cancelled_write_bytes
+					);
+
+				if(parsed < 7) fprintf(stderr, "file %s gave %d results (expected 7)\n", filename, parsed);
+			}
+		}
+
+
+		// --------------------------------------------------------------------
+		// done!
+
 		// mark it as updated
 		p->updated = 1;
 	}
+	if(count_open_errors > 1 && count_open_errors > 1000) {
+		fprintf(stderr, "file open errors repeated %ld times\n", count_open_errors - 1);
+		count_open_errors = 0;
+	}
+
 	closedir(dir);
 
 	return 1;
@@ -540,6 +676,22 @@ void update_statistics(void)
 		w->num_threads = 0;
 		w->rss = 0;
 		w->processes = 0;
+
+		w->statm_size = 0;
+		w->statm_resident = 0;
+		w->statm_share = 0;
+		w->statm_text = 0;
+		w->statm_lib = 0;
+		w->statm_data = 0;
+		w->statm_dirty = 0;
+
+		w->io_logical_bytes_read = 0;
+		w->io_logical_bytes_written = 0;
+		w->io_read_calls = 0;
+		w->io_write_calls = 0;
+		w->io_storage_bytes_read = 0;
+		w->io_storage_bytes_written = 0;
+		w->io_cancelled_write_bytes = 0;
 	}
 
 /*	walk_down(0, 1);
@@ -564,6 +716,22 @@ void update_statistics(void)
 
 			p->target->num_threads += p->num_threads;
 			p->target->rss += p->rss;
+
+			p->target->statm_size += p->statm_size;
+			p->target->statm_resident += p->statm_resident;
+			p->target->statm_share += p->statm_share;
+			p->target->statm_text += p->statm_text;
+			p->target->statm_lib += p->statm_lib;
+			p->target->statm_data += p->statm_data;
+			p->target->statm_dirty += p->statm_dirty;
+
+			p->target->io_logical_bytes_read += p->io_logical_bytes_read;
+			p->target->io_logical_bytes_written += p->io_logical_bytes_written;
+			p->target->io_read_calls += p->io_read_calls;
+			p->target->io_write_calls += p->io_write_calls;
+			p->target->io_storage_bytes_read += p->io_storage_bytes_read;
+			p->target->io_storage_bytes_written += p->io_storage_bytes_written;
+			p->target->io_cancelled_write_bytes += p->io_cancelled_write_bytes;
 
 			p->target->processes++;
 
@@ -602,6 +770,14 @@ void update_statistics(void)
 			p->target->fix_cmajflt += p->cmajflt;
 			p->target->fix_cutime += p->cutime;
 			p->target->fix_cstime += p->cstime;
+
+			p->target->fix_io_logical_bytes_read += p->io_logical_bytes_read;
+			p->target->fix_io_logical_bytes_written += p->io_logical_bytes_written;
+			p->target->fix_io_read_calls += p->io_read_calls;
+			p->target->fix_io_write_calls += p->io_write_calls;
+			p->target->fix_io_storage_bytes_read += p->io_storage_bytes_read;
+			p->target->fix_io_storage_bytes_written += p->io_storage_bytes_written;
+			p->target->fix_io_cancelled_write_bytes += p->io_cancelled_write_bytes;
 		}
 	}
 
@@ -666,11 +842,11 @@ void show_dimensions(void)
 	}
 	fprintf(stdout, "END\n");
 
-	fprintf(stdout, "BEGIN apps.rss\n");
+	fprintf(stdout, "BEGIN apps.mem\n");
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, (unsigned long long)w->rss);
+		fprintf(stdout, "SET %s = %lld\n", w->name, (long long)w->statm_resident - (long long)w->statm_share);
 	}
 	fprintf(stdout, "END\n");
 
@@ -690,7 +866,21 @@ void show_dimensions(void)
 	}
 	fprintf(stdout, "END\n");
 
-	fflush(NULL);
+	fprintf(stdout, "BEGIN apps.reads\n");
+	for (w = wanted_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_logical_bytes_read);
+	}
+	fprintf(stdout, "END\n");
+
+	fprintf(stdout, "BEGIN apps.writes\n");
+	for (w = wanted_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_logical_bytes_written);
+	}
+	fprintf(stdout, "END\n");
 }
 
 void show_charts(void)
@@ -710,14 +900,14 @@ void show_charts(void)
 
 	// we have something new to show
 	// update the charts
-	fprintf(stdout, "CHART apps.cpu '' 'Apps CPU Time (100%% = %ld core%s)' 'cpu time %%' apps apps stacked 20001 %d\n", processors, (processors>1)?"s":"", update_every);
+	fprintf(stdout, "CHART apps.cpu '' 'Apps CPU Time (%ld%% = %ld core%s)' 'cpu time %%' apps apps stacked 20001 %d\n", (processors * 100), processors, (processors>1)?"s":"", update_every);
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz * processors);
+		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz);
 	}
 
-	fprintf(stdout, "CHART apps.rss '' 'Apps Memory' 'MB' apps apps stacked 20002 %d\n", update_every);
+	fprintf(stdout, "CHART apps.mem '' 'Apps Dedicated Memory (w/o shared)' 'MB' apps apps stacked 20003 %d\n", update_every);
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
@@ -738,14 +928,14 @@ void show_charts(void)
 		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
-	fprintf(stdout, "CHART apps.cpu_user '' 'Apps CPU User Time (100%% = %ld core%s)' 'cpu time %%' apps none stacked 20020 %d\n", processors, (processors>1)?"s":"", update_every);
+	fprintf(stdout, "CHART apps.cpu_user '' 'Apps CPU User Time (%ld%% = %ld core%s)' 'cpu time %%' apps none stacked 20020 %d\n", (processors * 100), processors, (processors>1)?"s":"", update_every);
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz * processors);
 	}
 
-	fprintf(stdout, "CHART apps.cpu_system '' 'Apps CPU System Time (100%% = %ld core%s)' 'cpu time %%' apps none stacked 20021 %d\n", processors, (processors>1)?"s":"", update_every);
+	fprintf(stdout, "CHART apps.cpu_system '' 'Apps CPU System Time (%ld%% = %ld core%s)' 'cpu time %%' apps none stacked 20021 %d\n", (processors * 100), processors, (processors>1)?"s":"", update_every);
 	for (w = wanted_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
@@ -766,7 +956,19 @@ void show_charts(void)
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w->name);
 	}
 
-	fflush(NULL);
+	fprintf(stdout, "CHART apps.reads '' 'Apps Logical Reads' 'kilobytes/s' apps apps stacked 20002 %d\n", update_every);
+	for (w = wanted_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "DIMENSION %s '' incremental 1 1024\n", w->name);
+	}
+
+	fprintf(stdout, "CHART apps.writes '' 'Apps Logical Writes' 'kilobytes/s' apps apps stacked 20002 %d\n", update_every);
+	for (w = wanted_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "DIMENSION %s '' incremental 1 1024\n", w->name);
+	}
 }
 
 unsigned long long get_hertz(void)
@@ -809,7 +1011,17 @@ long get_processors(void)
 
 long get_pid_max(void)
 {
-	return 32768L;
+	char buffer[1025], *s;
+	long mpid = 32768;
+
+	FILE *fp = fopen("/proc/sys/kernel/pid_max", "r");
+	if(!fp) return 1;
+
+	s = fgets(buffer, 1024, fp);
+	if(s) mpid = atol(buffer);
+	fclose(fp);
+	if(mpid < 32768) mpid = 32768;
+	return mpid;
 }
 
 unsigned long long usecdiff(struct timeval *now, struct timeval *last) {
@@ -831,10 +1043,13 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
+	int created_usage_chart = 0;
+	struct rusage me, me_last;
 	unsigned long long counter = 1;
 	unsigned long long usec = 0, susec = 0;
 	struct timeval last, now;
 	gettimeofday(&last, NULL);
+	getrusage(RUSAGE_SELF, &me_last);
 
 	for(;1; counter++) {
 		if(!update_from_proc()) {
@@ -847,6 +1062,32 @@ int main(int argc, char **argv)
 		show_charts();		// this is smart enough to show only newly added apps, when needed
 		show_dimensions();
 
+		if(getrusage(RUSAGE_SELF, &me) == 0) {
+			unsigned long long cpuuser = me.ru_utime.tv_sec * 1000000ULL + me.ru_utime.tv_usec;
+			unsigned long long cpusyst = me.ru_stime.tv_sec * 1000000ULL + me.ru_stime.tv_usec;
+
+			if(!created_usage_chart) {
+				created_usage_chart = 1;
+				fprintf(stdout, "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' netdata netdata stacked 10000 %d\n", update_every);
+				fprintf(stdout, "DIMENSION user '' incremental 1 1000\n");
+				fprintf(stdout, "DIMENSION system '' incremental 1 1000\n");
+
+				fprintf(stdout, "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' netdata netdata line 10001 %d\n", update_every);
+				fprintf(stdout, "DIMENSION files '' incremental 1 1\n");
+			}
+
+			fprintf(stdout, "BEGIN netdata.apps_cpu\n");
+			fprintf(stdout, "SET user = %llu\n", cpuuser);
+			fprintf(stdout, "SET system = %llu\n", cpusyst);
+			fprintf(stdout, "END\n");
+
+			fprintf(stdout, "BEGIN netdata.apps_files\n");
+			fprintf(stdout, "SET files = %llu\n", file_counter);
+			fprintf(stdout, "END\n");
+
+			bcopy(&me, &me_last, sizeof(struct rusage));
+		}
+
 		if(debug) fprintf(stderr, "Done Loop No %llu\n", counter);
 		// if(counter == 1000) exit(0);
 
@@ -855,9 +1096,12 @@ int main(int argc, char **argv)
 		usec = usecdiff(&now, &last) - susec;
 		if(debug) fprintf(stderr, "last loop took %llu usec (worked for %llu, sleeped for %llu).\n", usec + susec, usec, susec);
 
-		if(usec < (update_every * 1000000ULL)) susec = (update_every * 1000000ULL) - usec;
-		else susec = 0;
+		// if the last loop took less than half the time
+		// wait the rest of the time
+		if(usec < (update_every * 1000000ULL / 2)) susec = (update_every * 1000000ULL) - usec;
+		else susec = update_every * 1000000ULL / 2;
 
+		fflush(NULL);
 		usleep(susec);
 
 		bcopy(&now, &last, sizeof(struct timeval));
