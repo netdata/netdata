@@ -39,30 +39,18 @@ fi
 
 if [ -f conf.d/netdata.conf ]
 then
-	x="`grep "\[global\]" conf.d/netdata.conf`"
-	if [ -z "$x" ]
+	# find if debug is enabled in the config
+	df=`grep "debug flags = " conf.d/netdata.conf | tail -n 1 | cut -d '=' -f 2 | sed s"/ //g"`
+	if [ -z "$df" -o "$df" = "0x00000000" -o $((df + 1 - 1)) -eq 0 ]
 	then
-		# import the old values
-		cat netdata.conf | grep ^NETDATA_CONFIG_ >netdata.conf.tmp
-		. netdata.conf.tmp
-		rm netdata.conf.tmp
-
-		mv netdata.conf netdata.conf.old
-		echo "You are having an old config. Moved to netdata.conf.old. New config is in conf.d/"
+		NETDATA_CONFIG_DEBUG=0
 	else
-		# find if debug is enabled in the config
-		df=`grep "debug flags = " conf.d/netdata.conf | tail -n 1 | cut -d '=' -f 2 | sed s"/ //g"`
-		if [ -z "$df" -o "$df" = "0x00000000" -o $((df + 1 - 1)) -eq 0 ]
-		then
-			NETDATA_CONFIG_DEBUG=0
-		else
-			NETDATA_CONFIG_DEBUG=1
-		fi
-
-		# find the user to run as
-		NETDATA_CONFIG_USER="`grep 'run as user = ' conf.d/netdata.conf | head -n 1 | cut -d '=' -f 2 | sed s"/ //g"`"
-		NETDATA_CONFIG_WEB_DIR="`grep 'web files directory = ' conf.d/netdata.conf | head -n 1 | cut -d '=' -f 2 | sed -e s"/^ \+//g" -e s"/ \+$//g"`"
+		NETDATA_CONFIG_DEBUG=1
 	fi
+
+	# find the user to run as
+	NETDATA_CONFIG_USER="`grep 'run as user = ' conf.d/netdata.conf | head -n 1 | cut -d '=' -f 2 | sed s"/ //g"`"
+	NETDATA_CONFIG_WEB_DIR="`grep 'web files directory = ' conf.d/netdata.conf | head -n 1 | cut -d '=' -f 2 | sed -e s"/^ \+//g" -e s"/ \+$//g"`"
 fi
 
 echo "Compiling netdata (debug=$NETDATA_CONFIG_DEBUG)"

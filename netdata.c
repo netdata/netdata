@@ -36,6 +36,9 @@
 #include <inttypes.h>
 #include <dirent.h>
 
+// enabling this will detach the plugins from netdata
+// each plugin will have its own process group
+// #define DETACH_PLUGINS_FROM_NETDATA
 
 #define RRD_TYPE_NET				"net"
 #define RRD_TYPE_NET_LEN			strlen(RRD_TYPE_NET)
@@ -227,7 +230,8 @@ void info_int( const char *file, const char *function, const unsigned long line,
 	log_date(stderr);
 
 	va_start( args, fmt );
-	fprintf(stderr, "INFO (%04lu@%-15.15s): ", line, function);
+	if(debug_flags) fprintf(stderr, "INFO (%04lu@%-15.15s): ", line, function);
+	else            fprintf(stderr, "INFO: ");
 	vfprintf( stderr, fmt, args );
 	va_end( args );
 
@@ -235,7 +239,7 @@ void info_int( const char *file, const char *function, const unsigned long line,
 
 	if(error_log_syslog) {
 		va_start( args, fmt );
-		vsyslog(LOG_ERR,  fmt, args );
+		vsyslog(LOG_INFO,  fmt, args );
 		va_end( args );
 	}
 }
@@ -250,7 +254,8 @@ void error_int( const char *file, const char *function, const unsigned long line
 	log_date(stderr);
 
 	va_start( args, fmt );
-	fprintf(stderr, "ERROR (%04lu@%-15.15s): ", line, function);
+	if(debug_flags) fprintf(stderr, "ERROR (%04lu@%-15.15s): ", line, function);
+	else            fprintf(stderr, "ERROR: ");
 	vfprintf( stderr, fmt, args );
 	va_end( args );
 
@@ -277,7 +282,8 @@ void fatal_int( const char *file, const char *function, const unsigned long line
 	log_date(stderr);
 
 	va_start( args, fmt );
-	fprintf(stderr, "FATAL (%04lu@%-15.15s): ", line, function);
+	if(debug_flags) fprintf(stderr, "FATAL (%04lu@%-15.15s): ", line, function);
+	else            fprintf(stderr, "FATAL: ");
 	vfprintf( stderr, fmt, args );
 	va_end( args );
 
@@ -367,7 +373,10 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 		close(pipefd[PIPE_WRITE]);
 	}
 
-/*
+#ifdef DETACH_PLUGINS_FROM_NETDATA
+	// this was an attempt to detach the child and use the suspend mode charts.d
+	// unfortunatelly it does not work as expected.
+
 	// fork again to become session leader
 	pid = fork();
 	if(pid == -1) fprintf(stderr, "Cannot fork again on pid %d\n", getpid());
@@ -385,13 +394,13 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 
 	if( setsid() != 0 )
 		fprintf(stderr, "Cannot set session id for pid %d (%s)\n", getpid(), strerror(errno));
-*/
-	
-	// ignore all signals
-	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV) signal(i, SIG_DFL);
 
 	fprintf(stdout, "MYPID %d\n", getpid());
 	fflush(NULL);
+#endif
+	
+	// ignore all signals
+	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV) signal(i, SIG_DFL);
 
 	fprintf(stderr, "executing command: '%s'\n", command);
  	execl("/bin/sh", "sh", "-c", command, NULL);
@@ -400,6 +409,10 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 
 void mypclose(FILE *fp)
 {
+	// this is a very poor implementation of pclose()
+	// the caller should catch SIGCHLD and waitpid() on the exited child
+	// otherwise the child will be a zombie forever
+
 	fclose(fp);
 }
 
@@ -515,7 +528,7 @@ int create_listen_socket(int port)
 
 #define CONFIG_MAX_NAME 1024
 #define CONFIG_MAX_VALUE 4096
-#define CONFIG_FILENAME "conf.d/netdata.conf"
+#define CONFIG_FILENAME "netdata.conf"
 #define CONFIG_FILE_LINE_MAX 4096
 
 pthread_mutex_t config_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -629,10 +642,10 @@ int load_config(char *filename, int overwrite_used)
 
 	char buffer[CONFIG_FILE_LINE_MAX + 1], *s;
 
-	if(!filename) filename = CONFIG_FILENAME;
+	if(!filename) filename = CONFIG_DIR "/" CONFIG_FILENAME;
 	FILE *fp = fopen(filename, "r");
 	if(!fp) {
-		error("Cannot open file '%s'", CONFIG_FILENAME);
+		error("Cannot open file '%s'", CONFIG_DIR "/" CONFIG_FILENAME);
 		pthread_mutex_unlock(&config_mutex);
 		return 0;
 	}
@@ -5369,7 +5382,7 @@ void *proc_main(void *ptr)
 
 			if(!stclients) stclients = rrd_stats_find("netdata.clients");
 			if(!stclients) {
-				stclients = rrd_stats_create("netdata", "clients", NULL, "netdata", "NetData Web Clients", "clients", 11000, update_every, CHART_TYPE_LINE);
+				stclients = rrd_stats_create("netdata", "clients", NULL, "netdata", "NetData Web Clients", "connected clients", 11000, update_every, CHART_TYPE_LINE);
 
 				rrd_stats_dimension_add(stclients, "clients",  NULL,  1, 1, RRD_DIMENSION_ABSOLUTE);
 			}
@@ -5382,7 +5395,7 @@ void *proc_main(void *ptr)
 
 			if(!streqs) streqs = rrd_stats_find("netdata.requests");
 			if(!streqs) {
-				streqs = rrd_stats_create("netdata", "requests", NULL, "netdata", "NetData Web Requests", "requests", 12000, update_every, CHART_TYPE_LINE);
+				streqs = rrd_stats_create("netdata", "requests", NULL, "netdata", "NetData Web Requests", "requests/s", 12000, update_every, CHART_TYPE_LINE);
 
 				rrd_stats_dimension_add(streqs, "requests",  NULL,  1, 1, RRD_DIMENSION_INCREMENTAL);
 			}
@@ -5614,7 +5627,7 @@ void *tc_main(void *ptr)
 		struct tc_device *device = NULL;
 		struct tc_class *class = NULL;
 
-		snprintf(buffer, TC_LINE_MAX, "exec %s %d", config_get("plugin:tc", "script to run to get tc values", "plugins.d/tc-qos-helper.sh"), update_every);
+		snprintf(buffer, TC_LINE_MAX, "exec %s %d", config_get("plugin:tc", "script to run to get tc values", PLUGINS_DIR "/tc-qos-helper.sh"), update_every);
 		debug(D_TC_LOOP, "executing '%s'", buffer);
 		// fp = popen(buffer, "r");
 		fp = mypopen(buffer, &tc_child_pid);
@@ -5703,17 +5716,16 @@ void *tc_main(void *ptr)
 				char *path  = strsep(&b, " \n");
 				if(id && *id && path && *path) tc_device_set_class_name(device, id, path);
 			}
+#ifdef DETACH_PLUGINS_FROM_NETDATA
 			else if((strcmp(p, "MYPID") == 0)) {
 				char *id = strsep(&b, " \n");
 				pid_t pid = atol(id);
 
-				if(pid != tc_child_pid)
-					error("tc-qos-helper reports wrong pid %d (expected %d).", pid, tc_child_pid);
-
-				// tc_child_pid = pid;
+				if(pid) tc_child_pid = pid;
 
 				debug(D_TC_LOOP, "TC: Child PID is %d.", tc_child_pid);
 			}
+#endif
 		}
 		mypclose(fp);
 
@@ -5843,8 +5855,10 @@ void *pluginsd_worker_thread(void *arg)
 	struct plugind *cd = (struct plugind *)arg;
 	char line[PLUGINSD_LINE_MAX + 1];
 
+#ifdef DETACH_PLUGINS_FROM_NETDATA
 	unsigned long long usec = 0, susec = 0;
 	struct timeval last = {0, 0} , now = {0, 0};
+#endif
 
 	while(1) {
 		// FILE *fp = popen(cd->cmd, "r");
@@ -6035,25 +6049,19 @@ void *pluginsd_worker_thread(void *arg)
 				}
 				else if(st->debug) debug(D_PLUGINSD, "PLUGINSD: dimension %s/%s already exists. Not adding it again.", st->id, id);
 			}
-			else if(!strcmp(s, "MYPID")) {
-				char *pid_s = qstrsep(&p);
-				pid_t pid = atol(pid_s);
-
-				if(pid != cd->pid) {
-					error("plugin %s reports wrong pid %d (expected %d). Disabling it.", cd->filename, pid, cd->pid);
-					cd->enabled = 0;
-					kill(cd->pid, SIGTERM);
-					break;
-				}
-				// cd->pid = pid;
-
-				debug(D_PLUGINSD, "PLUGINSD: %s is on pid %d", cd->id, cd->pid);
-			}
 			else if(!strcmp(s, "DISABLE")) {
 				error("PLUGINSD: script '%s' called DISABLE. Disabling it.", cd->fullfilename);
 				cd->enabled = 0;
 				kill(cd->pid, SIGTERM);
 				break;
+			}
+#ifdef DETACH_PLUGINS_FROM_NETDATA
+			else if(!strcmp(s, "MYPID")) {
+				char *pid_s = qstrsep(&p);
+				pid_t pid = atol(pid_s);
+
+				if(pid) cd->pid = pid;
+				debug(D_PLUGINSD, "PLUGINSD: %s is on pid %d", cd->id, cd->pid);
 			}
 			else if(!strcmp(s, "STOPPING_WAKE_ME_UP_PLEASE")) {
 				error("PLUGINSD: script '%s' (pid %d) called STOPPING_WAKE_ME_UP_PLEASE.", cd->fullfilename, cd->pid);
@@ -6071,12 +6079,13 @@ void *pluginsd_worker_thread(void *arg)
 					else susec = 100000ULL;
 				}
 
-				error("PLUGINSD: %s sleeping for %llu. Will kill pid %d to wake it up.\n", cd->fullfilename, susec, cd->pid);
+				error("PLUGINSD: %s sleeping for %llu. Will kill with SIGCONT pid %d to wake it up.\n", cd->fullfilename, susec, cd->pid);
 				usleep(susec);
 				kill(cd->pid, SIGCONT);
 				bcopy(&now, &last, sizeof(struct timeval));
 				break;
 			}
+#endif
 			else {
 				error("PLUGINSD: script %s is sending command '%s' which is not known by netdata. Disabling it.", cd->fullfilename, s);
 				cd->enabled = 0;
@@ -6105,7 +6114,7 @@ void *pluginsd_worker_thread(void *arg)
 void *pluginsd_main(void *ptr)
 {
 	if(ptr) { ; }
-	char *dir_name = config_get("plugins", "plugins directory", "plugins.d");
+	char *dir_name = config_get("plugins", "plugins directory", PLUGINS_DIR);
 	int automatic_run = config_get_boolean("plugins", "enable running new plugins", 0);
 	int scan_frequency = config_get_number("plugins", "check for new plugins every", 60);
 	DIR *dir = NULL;
@@ -6158,7 +6167,7 @@ void *pluginsd_main(void *ptr)
 			// allocate a new one, or use the obsolete one
 			if(!cd) {
 				cd = calloc(sizeof(struct plugind), 1);
-				if(!cd) fatal("Cannot allocate memory for chart.d");
+				if(!cd) fatal("Cannot allocate memory for plugin.");
 
 				snprintf(cd->id, CONFIG_MAX_NAME, "plugin:%s", pluginname);
 				
@@ -6169,43 +6178,6 @@ void *pluginsd_main(void *ptr)
 				cd->update_every = config_get_number(cd->id, "update every", update_every);
 
 				char *def = "";
-				if(strcmp(cd->id, "plugin:apps") == 0)
-					def =
-					" 'mplayer vlc xine mediatomb as media'"
-					" 'squid squid3 as squid'"
-					" 'apache apache2 as apache'"
-					" 'mysql mysqld as mysql'"
-					" asterisk"
-					" 'opensips opensips-mi-pro as opensips'"
-					" stund"
-					" 'radiusd radiusclient as radius'"
-					" 'fail2ban-server as fail2ban'"
-					" dovecot"
-					" nginx"
-					" lighttpd"
-					" 'proftpd in.tftpd as ftpd'"
-					" 'master as postfix'"
-					" 'smbd nmbd winbindd as samba'"
-					" 'rpcbind rpc.statd rpc.idmapd rpc.mountd nfsd4 nfsd4_callbacks nfsd nfsiod as nfs'"
-					" 'ssh sshd as ssh'"
-					" 'gdm X lightdm xdm gnome-session gconfd-2 gnome-terminal gnome-screensaver gnome-settings-daemon pulseaudio as X'"
-					" named"
-					" 'clamd freshclam as clam'"
-					" 'cupsd cups-browsed as cups'"
-					" 'ntpq ntpd as ntp'"
-					" 'deluge deluged as deluge'"
-					" 'vboxwebsrv VBoxXPCOMIPCD VBoxSVC as vbox'"
-					" 'ulogd syslogd syslog-ng rsyslogd logrotate as log'"
-					" 'snmpd vnstatd smokeping zabbix_agentd monit munin-node mon openhpid as nms'"
-					" 'ppp pppd pptpd pptpctrl as ppp'"
-					" 'inetd xinetd as inetd'"
-					" openvpn"
-					" 'cron atd as cron'"
-					" 'corosync hs_logd ha_logd stonithd as ha'"
-					" 'ipvs_syncmaster ipvs_syncbackup as ipvs'"
-					" 'kthreadd as kernel'"
-					" netdata"
-					;
 				snprintf(cd->cmd, PLUGINSD_CMD_MAX, "exec %s %d %s", cd->fullfilename, cd->update_every, config_get(cd->id, "command options", def));
 
 				// link it
@@ -6523,7 +6495,7 @@ int main(int argc, char **argv)
 		else {
 			fprintf(stderr, "Cannot understand option '%s'.\n", argv[i]);
 			fprintf(stderr, "\nUSAGE: %s [-d] [-l LINES_TO_SAVE] [-u UPDATE_TIMER] [-p LISTEN_PORT] [-dl debug log file] [-df debug flags].\n\n", argv[0]);
-			fprintf(stderr, "  -c CONFIG FILE the configuration file to load. Default: %s.\n", CONFIG_FILENAME);
+			fprintf(stderr, "  -c CONFIG FILE the configuration file to load. Default: %s.\n", CONFIG_DIR "/" CONFIG_FILENAME);
 			fprintf(stderr, "  -l LINES_TO_SAVE can be from 5 to %d lines in JSON data. Default: %d.\n", HISTORY_MAX, HISTORY);
 			fprintf(stderr, "  -t UPDATE_TIMER can be from 1 to %d seconds. Default: %d.\n", UPDATE_EVERY_MAX, UPDATE_EVERY);
 			fprintf(stderr, "  -p LISTEN_PORT can be from 1 to %d. Default: %d.\n", 65535, LISTEN_PORT);
@@ -6551,7 +6523,7 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		output_log_file = config_get("global", "debug log", "log/debug.log");
+		output_log_file = config_get("global", "debug log", LOG_DIR "/debug.log");
 		if(strcmp(output_log_file, "syslog") == 0) {
 			output_log_syslog = 1;
 			output_log_file = NULL;
@@ -6565,7 +6537,7 @@ int main(int argc, char **argv)
 		// --------------------------------------------------------------------
 
 		silent = 0;
-		error_log_file = config_get("global", "error log", "log/error.log");
+		error_log_file = config_get("global", "error log", LOG_DIR "/error.log");
 		if(strcmp(error_log_file, "syslog") == 0) {
 			error_log_syslog = 1;
 			error_log_file = NULL;
@@ -6579,7 +6551,7 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		access_log_file = config_get("global", "access log", "log/access.log");
+		access_log_file = config_get("global", "access log", LOG_DIR "/access.log");
 		if(strcmp(access_log_file, "syslog") == 0) {
 			access_log_syslog = 1;
 			access_log_file = NULL;
@@ -6610,7 +6582,7 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		char *user = config_get("global", "run as user", "");
+		char *user = config_get("global", "run as user", (getuid() == 0)?"nobody":"");
 		if(*user) {
 			if(become_user(user) != 0) {
 				fprintf(stderr, "Cannot become user %s.\n", user);

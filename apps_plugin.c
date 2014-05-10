@@ -24,14 +24,13 @@
 #define MAX_COMPARE_NAME 15
 #define MAX_NAME 100
 
-
 unsigned long long Hertz = 1;
 
 long processors = 1;
 long pid_max = 32768;
 int debug = 0;
 
-struct wanted {
+struct target {
 	char compare[MAX_COMPARE_NAME + 1];
 	char id[MAX_NAME + 1];
 	char name[MAX_NAME + 1];
@@ -83,22 +82,22 @@ struct wanted {
 	unsigned long processes;	// how many processes have been merged to this
 	int exposed;				// if set, we have sent this to netdata
 
-	struct wanted *target;	// the one that will be reported to netdata
-	struct wanted *next;
-} *wanted_root = NULL, *default_target = NULL;
+	struct target *target;	// the one that will be reported to netdata
+	struct target *next;
+} *target_root = NULL, *default_target = NULL;
 
 int update_every = 1;
 unsigned long long file_counter = 0;
 
-struct wanted *get_wanted(const char *id, struct wanted *target)
+struct target *get_target(const char *id, struct target *target)
 {
-	struct wanted *w;
-	for(w = wanted_root ; w ; w = w->next)
+	struct target *w;
+	for(w = target_root ; w ; w = w->next)
 		if(strncmp(id, w->id, MAX_NAME) == 0) return w;
 	
-	w = calloc(sizeof(struct wanted), 1);
+	w = calloc(sizeof(struct target), 1);
 	if(!w) {
-		fprintf(stderr, "Cannot allocate %lu bytes of memory\n", sizeof(struct wanted));
+		fprintf(stderr, "Cannot allocate %lu bytes of memory\n", sizeof(struct target));
 		return NULL;
 	}
 
@@ -107,51 +106,124 @@ struct wanted *get_wanted(const char *id, struct wanted *target)
 	strncpy(w->compare, id, MAX_COMPARE_NAME);
 	w->target = target;
 
-	w->next = wanted_root;
-	wanted_root = w;
+	w->next = target_root;
+	target_root = w;
 
 	if(debug) fprintf(stderr, "Adding hook for process '%s', compare '%s' on target '%s'\n", w->id, w->compare, w->target?w->target->id:"");
 
 	return w;
 }
 
+char *trim(char *s)
+{
+	// skip leading spaces
+	while(*s && isspace(*s)) s++;
+	if(!*s) return NULL;
+
+	// skip tailing spaces
+	int c = strlen(s) - 1;
+	while(c >= 0 && isspace(s[c])) {
+		s[c] = '\0';
+		c--;
+	}
+	if(c < 0) return NULL;
+	if(!*s) return NULL;
+	return s;
+}
+
+int read_process_groups(const char *name)
+{
+	char buffer[4096+1];
+	char filename[FILENAME_MAX + 1];
+
+	snprintf(filename, FILENAME_MAX, "%s/apps_%s.conf", CONFIG_DIR, name);
+
+	if(debug) fprintf(stderr, "Process groups file: '%s'\n", filename);
+	FILE *fp = fopen(filename, "r");
+	if(!fp) {
+		fprintf(stderr, "Cannot open file '%s' (%s)\n", filename, strerror(errno));
+		return 1;
+	}
+
+	long line = 0;
+	while(fgets(buffer, 4096, fp) != NULL) {
+		line++;
+
+		// if(debug) fprintf(stderr, "\tread %s\n", buffer);
+
+		char *s = buffer, *t, *p;
+		s = trim(s);
+		if(!s || !*s || *s == '#') continue;
+
+		if(debug) fprintf(stderr, "\tread %s\n", s);
+
+		// the target name
+		t = strsep(&s, ":");
+		if(t) t = trim(t);
+		if(!t || !*t) continue;
+
+		if(debug) fprintf(stderr, "\t\ttarget %s\n", t);
+
+		struct target *w = NULL;
+		long count = 0;
+
+		// the process names
+		while((p = strsep(&s, " "))) {
+			p = trim(p);
+			if(!p || !*p) continue;
+
+			struct target *n = get_target(p, w);
+			if(!w) w = n;
+
+			count++;
+		}
+
+		if(w) strncpy(w->name, t, MAX_NAME);
+		if(!count) fprintf(stderr, "the line %ld on file '%s', for group '%s' does not state any process names.\n", line, filename, t);
+	}
+	fclose(fp);
+
+	default_target = get_target("+p!o@w#e$i^r&7*5(-i)l-o_", NULL); // match nothing
+	strncpy(default_target->name, "other", MAX_NAME);
+
+	return 0;
+}
+
 void parse_args(int argc, char **argv)
 {
-	int i = 1;
+	int i, freq = 0;
+	char *name = NULL;
 
-	debug = 0;
-	if(i < argc && strcmp(argv[i], "debug") == 0) {
-		debug = 1;
-		i++;
-	}
-
-	if(i < argc) {
-		update_every = atoi(argv[i++]);
-		if(update_every == 0) {
-			i = 1;
-			update_every = 1;
-		}
-	}
-
-	for(; i < argc ; i++) {
-		struct wanted *w = NULL;
-		char *s = argv[i];
-		char *t;
-
-		while((t = strsep(&s, " "))) {
-			if(w && strcmp(t, "as") == 0 && s && *s) {
-				strncpy(w->name, s, MAX_NAME);
-				if(debug) fprintf(stderr, "Setting dimension name to '%s' on target '%s'\n", w->name, w->id);
-				break;
+	for(i = 1; i < argc; i++) {
+		if(!freq) {
+			int n = atoi(argv[i]);
+			if(n > 0) {
+				freq = n;
+				continue;
 			}
-
-			struct wanted *n = get_wanted(t, w);
-			if(!w) w = n;
 		}
+
+		if(strcmp("debug", argv[i]) == 0) {
+			debug = 1;
+			continue;
+		}
+
+		if(!name) {
+			name = argv[i];
+			continue;
+		}
+
+		fprintf(stderr, "Cannot understand option %s\n", argv[i]);
+		exit(1);
 	}
 
-	default_target = get_wanted("all_other_processes", NULL);
-	strncpy(default_target->name, "other", MAX_NAME);
+	if(freq > 0) update_every = freq;
+	if(!name) name = "groups";
+
+	if(read_process_groups(name)) {
+		fprintf(stderr, "Cannot read process groups %s\n", name);
+		exit(1);
+	}
 }
 
 // see: man proc
@@ -242,7 +314,7 @@ struct pid_stat {
 	int updated;
 	int merged;
 	int new_entry;
-	struct wanted *target;
+	struct target *target;
 	struct pid_stat *parent;
 	struct pid_stat *prev;
 	struct pid_stat *next;
@@ -386,13 +458,13 @@ int update_from_proc(void)
 
 		if(parsed < 39) fprintf(stderr, "file %s gave %d results (expected 44)\n", filename, parsed);
 
-		// check if it is wanted
+		// check if it is target
 		// we do this only once, the first time this pid is loaded
 		if(p->new_entry) {
 			if(debug) fprintf(stderr, "\tJust added %s\n", p->comm);
 
-			struct wanted *w;
-			for(w = wanted_root; w ; w = w->next) {
+			struct target *w;
+			for(w = target_root; w ; w = w->next) {
 				// if(debug) fprintf(stderr, "\t\tcomparing '%s' with '%s'\n", w->compare, p->comm);
 
 				if(strcmp(w->compare, p->comm) == 0) {
@@ -663,8 +735,8 @@ void update_statistics(void)
 	}
 */
 	// zero all the targets
-	struct wanted *w;
-	for (w = wanted_root; w ; w = w->next) {
+	struct target *w;
+	for (w = target_root; w ; w = w->next) {
 		w->minflt = 0;
 		w->majflt = 0;
 		w->utime = 0;
@@ -800,10 +872,10 @@ void update_statistics(void)
 
 void show_dimensions(void)
 {
-	struct wanted *w;
+	struct target *w;
 
 	fprintf(stdout, "BEGIN apps.cpu\n");
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + w->stime + w->fix_utime + w->fix_stime);
@@ -811,7 +883,7 @@ void show_dimensions(void)
 	fprintf(stdout, "END\n");
 
 	fprintf(stdout, "BEGIN apps.cpu_user\n");
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + w->fix_utime);
@@ -819,7 +891,7 @@ void show_dimensions(void)
 	fprintf(stdout, "END\n");
 
 	fprintf(stdout, "BEGIN apps.cpu_system\n");
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->stime + w->fix_stime);
@@ -827,7 +899,7 @@ void show_dimensions(void)
 	fprintf(stdout, "END\n");
 
 	fprintf(stdout, "BEGIN apps.threads\n");
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->num_threads);
@@ -835,7 +907,7 @@ void show_dimensions(void)
 	fprintf(stdout, "END\n");
 
 	fprintf(stdout, "BEGIN apps.processes\n");
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %lu\n", w->name, w->processes);
@@ -843,7 +915,7 @@ void show_dimensions(void)
 	fprintf(stdout, "END\n");
 
 	fprintf(stdout, "BEGIN apps.mem\n");
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %lld\n", w->name, (long long)w->statm_resident - (long long)w->statm_share);
@@ -851,7 +923,7 @@ void show_dimensions(void)
 	fprintf(stdout, "END\n");
 
 	fprintf(stdout, "BEGIN apps.minor_faults\n");
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->minflt + w->fix_minflt);
@@ -859,7 +931,7 @@ void show_dimensions(void)
 	fprintf(stdout, "END\n");
 
 	fprintf(stdout, "BEGIN apps.major_faults\n");
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->majflt + w->fix_majflt);
@@ -867,7 +939,7 @@ void show_dimensions(void)
 	fprintf(stdout, "END\n");
 
 	fprintf(stdout, "BEGIN apps.lreads\n");
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_logical_bytes_read);
@@ -875,7 +947,7 @@ void show_dimensions(void)
 	fprintf(stdout, "END\n");
 
 	fprintf(stdout, "BEGIN apps.lwrites\n");
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_logical_bytes_written);
@@ -883,7 +955,7 @@ void show_dimensions(void)
 	fprintf(stdout, "END\n");
 
 	fprintf(stdout, "BEGIN apps.preads\n");
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_storage_bytes_read);
@@ -891,7 +963,7 @@ void show_dimensions(void)
 	fprintf(stdout, "END\n");
 
 	fprintf(stdout, "BEGIN apps.pwrites\n");
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_storage_bytes_written);
@@ -901,10 +973,10 @@ void show_dimensions(void)
 
 void show_charts(void)
 {
-	struct wanted *w;
+	struct target *w;
 	int newly_added = 0;
 
-	for(w = wanted_root ; w ; w = w->next)
+	for(w = target_root ; w ; w = w->next)
 		if(!w->exposed && w->processes) {
 			newly_added++;
 			w->exposed = 1;
@@ -917,84 +989,84 @@ void show_charts(void)
 	// we have something new to show
 	// update the charts
 	fprintf(stdout, "CHART apps.cpu '' 'Apps CPU Time (%ld%% = %ld core%s)' 'cpu time %%' apps apps stacked 20001 %d\n", (processors * 100), processors, (processors>1)?"s":"", update_every);
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz);
 	}
 
 	fprintf(stdout, "CHART apps.mem '' 'Apps Dedicated Memory (w/o shared)' 'MB' apps apps stacked 20003 %d\n", update_every);
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, sysconf(_SC_PAGESIZE), 1024L*1024L);
 	}
 
 	fprintf(stdout, "CHART apps.threads '' 'Apps Threads' 'threads' apps apps stacked 20005 %d\n", update_every);
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART apps.processes '' 'Apps Processes' 'processes' apps apps stacked 20004 %d\n", update_every);
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART apps.cpu_user '' 'Apps CPU User Time (%ld%% = %ld core%s)' 'cpu time %%' apps none stacked 20020 %d\n", (processors * 100), processors, (processors>1)?"s":"", update_every);
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz * processors);
 	}
 
 	fprintf(stdout, "CHART apps.cpu_system '' 'Apps CPU System Time (%ld%% = %ld core%s)' 'cpu time %%' apps none stacked 20021 %d\n", (processors * 100), processors, (processors>1)?"s":"", update_every);
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz * processors);
 	}
 
 	fprintf(stdout, "CHART apps.major_faults '' 'Apps Major Page Faults (swaps in)' 'page faults/s' apps apps stacked 20010 %d\n", update_every);
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART apps.minor_faults '' 'Apps Minor Page Faults' 'page faults/s' apps apps stacked 20011 %d\n", update_every);
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART apps.lreads '' 'Apps Logical Reads' 'kilobytes/s' apps apps stacked 20042 %d\n", update_every);
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1024\n", w->name);
 	}
 
 	fprintf(stdout, "CHART apps.lwrites '' 'Apps Logical Writes' 'kilobytes/s' apps apps stacked 20042 %d\n", update_every);
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1024\n", w->name);
 	}
 
 	fprintf(stdout, "CHART apps.preads '' 'Apps Reads' 'kilobytes/s' apps apps stacked 20002 %d\n", update_every);
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1024\n", w->name);
 	}
 
 	fprintf(stdout, "CHART apps.pwrites '' 'Apps Writes' 'kilobytes/s' apps apps stacked 20002 %d\n", update_every);
-	for (w = wanted_root; w ; w = w->next) {
+	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1024\n", w->name);

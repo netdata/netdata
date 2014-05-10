@@ -1,9 +1,5 @@
 #!/bin/sh
 
-# let netdata know our PID
-# this is required to kill us when it exits
-echo "MYPID $$"
-
 # default sleep function
 loopsleepms() {
 	sleep $1
