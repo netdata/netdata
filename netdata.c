@@ -6221,6 +6221,7 @@ void sig_handler(int signo)
 		case SIGQUIT:
 		case SIGINT:
 		case SIGHUP:
+		case SIGFPE:
 		case SIGSEGV:
 			error("Signaled exit (signal %d).", signo);
 			kill_childs();
@@ -6621,7 +6622,7 @@ int main(int argc, char **argv)
 
 
 	// catch all signals
-	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV) signal(i,  sig_handler);
+	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV && i != SIGFPE) signal(i,  sig_handler);
 	
 
 	pthread_t p_proc, p_tc, p_jitter, p_pluginsd;
