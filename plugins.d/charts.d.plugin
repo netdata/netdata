@@ -14,6 +14,12 @@ myconfig="$confd/charts.d.conf"
 minimum_update_frequency=1
 update_every=1	# this is overwritten by the command line
 
+# work around for non BASH shells
+charts_create="_create"
+charts_update="_update"
+charts_check="_check"
+charts_undescore="_"
+
 # -----------------------------------------------------------------------------
 # parse parameters
 
@@ -137,60 +143,60 @@ all_enabled_charts() {
 
 	# find all enabled charts
 
-	for x in `all_charts`
+	for chart in `all_charts`
 	do
-		eval "enabled=\$$x"
+		eval "enabled=\$$chart"
 		if [ "$enabled" = "yes" ]
 		then
-			local charts="$charts $x"
+			local charts="$charts $chart"
 		else
-			echo >&2 "charts.d: chart '$x' is NOT enabled. Add a line with $x=yes in $myconfig to enable it."
+			echo >&2 "charts.d: chart '$chart' is NOT enabled. Add a line with $chart=yes in $myconfig to enable it."
 		fi
 	done
 
 	local charts2=
-	for x in $charts
+	for chart in $charts
 	do
 		# check the enabled charts
-		local check=`cat "$chartsd/$x.chart.sh" | sed "s/^ \+//g" | grep "^${x}_check()"`
+		local check=`cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_check()"`
 		if [ -z "$check" ]
 		then
-			echo >&2 "charts.d: chart '$x' does not seem to have a ${x}_check() function. Disabling it."
+			echo >&2 "charts.d: chart '$chart' does not seem to have a $chart$charts_check() function. Disabling it."
 			continue
 		fi
 
-		local create=`cat "$chartsd/$x.chart.sh" | sed "s/^ \+//g" | grep "^${x}_create()"`
+		local create=`cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_create()"`
 		if [ -z "$create" ]
 		then
-			echo >&2 "charts.d: chart '$x' does not seem to have a ${x}_create() function. Disabling it."
+			echo >&2 "charts.d: chart '$chart' does not seem to have a $chart$charts_create() function. Disabling it."
 			continue
 		fi
 
-		local update=`cat "$chartsd/$x.chart.sh" | sed "s/^ \+//g" | grep "^${x}_update()"`
+		local update=`cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_update()"`
 		if [ -z "$update" ]
 		then
-			echo >&2 "charts.d: chart '$x' does not seem to have a ${x}_update() function. Disabling it."
+			echo >&2 "charts.d: chart '$chart' does not seem to have a $chart$charts_update() function. Disabling it."
 			continue
 		fi
 
 		# check its config
-		if [ -f "$confd/$x.conf" ]
+		if [ -f "$confd/$chart.conf" ]
 		then
-			if [ ! -z "`cat "$confd/$x.conf" | sed "s/^ \+//g" | grep -v "^$" | grep -v "^#" | grep -v "^${x}_"`" ]
+			if [ ! -z "`cat "$confd/$chart.conf" | sed "s/^ \+//g" | grep -v "^$" | grep -v "^#" | grep -v "^$chart$charts_undescore"`" ]
 			then
-				echo >&2 "charts.d: chart's $x config $confd/$x.conf should only have lines starting with ${x}_ . Disabling it."
+				echo >&2 "charts.d: chart's $chart config $confd/$chart.conf should only have lines starting with $chart$charts_undescore . Disabling it."
 				continue
 			fi
 		fi
 
-		"$pluginsd/charts.d.dryrun-helper.sh" "$x" "$chartsd/$x.chart.sh" "$confd/$x.conf" >/dev/null
+		"$pluginsd/charts.d.dryrun-helper.sh" "$chart" "$chartsd/$chart.chart.sh" "$confd/$chart.conf" >/dev/null
 		if [ $? -ne 0 ]
 		then
-			echo >&2 "charts.d: chart's $x did not pass the dry run check. This means it uses global variables not starting with $x. Disabling it."
+			echo >&2 "charts.d: chart's $chart did not pass the dry run check. This means it uses global variables not starting with $chart. Disabling it."
 			continue
 		fi
 
-		local charts2="$charts2 $x"
+		local charts2="$charts2 $chart"
 	done
 
 	echo $charts2
@@ -201,21 +207,21 @@ all_enabled_charts() {
 # load the charts
 
 active_charts=
-for x in `all_enabled_charts`
+for chart in `all_enabled_charts`
 do
-	. "$chartsd/$x.chart.sh"
+	. "$chartsd/$chart.chart.sh"
 
-	if [ -f "$confd/$x.conf" ]
+	if [ -f "$confd/$chart.conf" ]
 	then
-		. "$confd/$x.conf"
+		. "$confd/$chart.conf"
 	fi
 
-	${x}_check
+	$chart$charts_check
 	if [ $? -eq 0 ]
 	then
-		active_charts="$active_charts $x"
+		active_charts="$active_charts $chart"
 	else
-		echo >&2 "charts.d: chart '$x' check() function reports failure."
+		echo >&2 "charts.d: chart '$chart' check() function reports failure."
 	fi
 done
 
@@ -231,11 +237,11 @@ test $debug -eq 1 && debug_time=tellwork
 if [ ! -z "$chart_only" ]
 then
 	check_charts=
-	for x in $active_charts
+	for chart in $active_charts
 	do
-		if [ "$x" = "$chart_only" ]
+		if [ "$chart" = "$chart_only" ]
 		then
-			check_charts="$x"
+			check_charts="$chart"
 			break
 		fi
 	done
@@ -255,14 +261,14 @@ fi
 # create charts
 
 run_charts=
-for x in $active_charts
+for chart in $active_charts
 do
-	${x}_create
+	$chart$charts_create
 	if [ $? -eq 0 ]
 	then
-		run_charts="$run_charts $x"
+		run_charts="$run_charts $chart"
 	else
-		echo >&2 "charts.d: chart '$x' create() function reports failure."
+		echo >&2 "charts.d: chart '$chart' create() function reports failure."
 	fi
 done
 
@@ -274,14 +280,14 @@ do
 	now_charts=$run_charts
 	run_charts=
 
-	for x in $now_charts
+	for chart in $now_charts
 	do
-		${x}_update
+		$chart$charts_update
 		if [ $? -eq 0 ]
 		then
-			run_charts="$run_charts $x"
+			run_charts="$run_charts $chart"
 		else
-			echo >&2 "charts.d: chart '$x' update() function reports failure. Disabling it."
+			echo >&2 "charts.d: chart '$chart' update() function reports failure. Disabling it."
 		fi
 	done
 
