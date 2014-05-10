@@ -59,7 +59,7 @@ loopsleepms() {
 	# echo "# mstosleep is $mstosleep ms"
 	
 	# if we are too slow, sleep some time
-	test $mstosleep -lt 100 && mstosleep=100
+	test $mstosleep -lt $((t / 2)) && mstosleep=$((t / 2))
 
 	local s=$((mstosleep / 1000))
 	local m=$((mstosleep - (s * 1000)))
