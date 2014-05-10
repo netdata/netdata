@@ -1122,6 +1122,7 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 
 	snprintf(varname, CONFIG_MAX_NAME, "dim %s divisor", rd->id);
 	rd->divisor = config_get_number(st->id, varname, divisor);
+	if(!rd->divisor) rd->divisor = 1;
 
 	rd->entries = st->entries;
 	
@@ -1328,6 +1329,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 	if(st->counter) {
 		
 		st->usec_since_last_update = usecdiff(&now, &st->last_updated);
+		if(!st->usec_since_last_update) st->usec_since_last_update = 1;
 		if(st->debug) debug(D_RRD_STATS, "microseconds since last update: %llu", st->usec_since_last_update);
 
 		// x 10
@@ -1340,7 +1342,8 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 				case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
 					// the percentage of the current increment
 					// over the increment of all dimensions together
-					rd->calculated_value =
+					if(st->absolute_total == st->last_absolute_total) rd->calculated_value = 0;
+					else rd->calculated_value =
 						  (calculated_number)10
 						* (calculated_number)100
 						* (calculated_number)(rd->collected_value - rd->last_collected_value)
@@ -1359,6 +1362,8 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 					break;
 
 				case RRD_DIMENSION_PCENT_OVER_ROW_TOTAL:
+					if(!st->absolute_total) rd->calculated_value = 0;
+					else
 					// the percentage of the current value
 					// over the total of all dimensions
 					rd->calculated_value =
