@@ -3768,10 +3768,17 @@ int do_proc_diskstats() {
 		if(do_io) {
 			st = rrd_stats_find_bytype(RRD_TYPE_DISK, disk);
 			if(!st) {
+				char tf[FILENAME_MAX + 1], *t;
 				char ssfilename[FILENAME_MAX + 1];
 				int sector_size = 512;
 
-				snprintf(ssfilename, FILENAME_MAX, "/sys/block/%s/queue/hw_sector_size", disk);
+				strncpy(tf, disk, FILENAME_MAX);
+				tf[FILENAME_MAX] = '\0';
+
+				// replace all / with !
+				while((t = strchr(tf, '/'))) *t = '!';
+
+				snprintf(ssfilename, FILENAME_MAX, "/sys/block/%s/queue/hw_sector_size", tf);
 				FILE *fpss = fopen(ssfilename, "r");
 				if(fpss) {
 					char ssbuffer[1025];
