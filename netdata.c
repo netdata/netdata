@@ -217,6 +217,29 @@ void debug_int( const char *file, const char *function, const unsigned long line
 	}
 }
 
+#define info(args...)  info_int(__FILE__, __FUNCTION__, __LINE__, ##args)
+
+void info_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... )
+{
+	if(file) { ; }
+	va_list args;
+
+	log_date(stderr);
+
+	va_start( args, fmt );
+	fprintf(stderr, "INFO (%04lu@%-15.15s): ", line, function);
+	vfprintf( stderr, fmt, args );
+	va_end( args );
+
+	fprintf(stderr, "\n");
+
+	if(error_log_syslog) {
+		va_start( args, fmt );
+		vsyslog(LOG_ERR,  fmt, args );
+		va_end( args );
+	}
+}
+
 #define error(args...)  error_int(__FILE__, __FUNCTION__, __LINE__, ##args)
 
 void error_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... )
@@ -3326,7 +3349,7 @@ void log_allocations(void)
 		struct web_client *w;
 		for(w = web_clients; w ; w = w->next) clients++;
 
-		error("Allocated memory increased from %d to %d (increased by %d bytes). There are %d web clients connected.", mem, mi.uordblks, mi.uordblks - mem, clients);
+		info("Allocated memory increased from %d to %d (increased by %d bytes). There are %d web clients connected.", mem, mi.uordblks, mi.uordblks - mem, clients);
 		mem = mi.uordblks;
 	}
 }
@@ -6223,7 +6246,7 @@ void sig_handler(int signo)
 		case SIGHUP:
 		case SIGFPE:
 		case SIGSEGV:
-			error("Signaled exit (signal %d).", signo);
+			error("Signaled exit (signal %d). Errno: %d (%s)", signo, errno, strerror(errno));
 			kill_childs();
 			exit(1);
 			break;
@@ -6266,7 +6289,8 @@ void sig_handler(int signo)
 			break;
 
 		default:
-			error("Signal %d received. Ignoring it.", signo);
+			error("Signal %d received. Falling back to default action for it.", signo);
+			signal(signo, SIG_DFL);
 			break;
 	}
 }
@@ -6618,7 +6642,7 @@ int main(int argc, char **argv)
 	if(output_log_syslog || error_log_syslog || access_log_syslog)
 		openlog("netdata", LOG_PID, LOG_DAEMON);
 
-	error("NetData started on pid %d", getpid());
+	info("NetData started on pid %d", getpid());
 
 
 	// catch all signals
