@@ -869,12 +869,44 @@ void update_statistics(void)
 	}
 }
 
+unsigned long long usecdiff(struct timeval *now, struct timeval *last) {
+		return ((((now->tv_sec * 1000000ULL) + now->tv_usec) - ((last->tv_sec * 1000000ULL) + last->tv_usec)));
+}
 
 void show_dimensions(void)
 {
-	struct target *w;
+	static struct timeval last = { 0, 0 };
+	static struct rusage me_last;
 
-	fprintf(stdout, "BEGIN apps.cpu\n");
+	struct target *w;
+	struct timeval now;
+	struct rusage me;
+
+	unsigned long long usec;
+	unsigned long long cpuuser;
+	unsigned long long cpusyst;
+
+	if(!last.tv_sec) {
+		gettimeofday(&last, NULL);
+		getrusage(RUSAGE_SELF, &me_last);
+
+		usec = update_every * 1000000ULL;
+		cpuuser = 0;
+		cpusyst = 0;
+	}
+	else {
+		gettimeofday(&now, NULL);
+		getrusage(RUSAGE_SELF, &me);
+
+		usec = usecdiff(&now, &last);
+		cpuuser = me.ru_utime.tv_sec * 1000000ULL + me.ru_utime.tv_usec;
+		cpusyst = me.ru_stime.tv_sec * 1000000ULL + me.ru_stime.tv_usec;
+
+		bcopy(&now, &last, sizeof(struct timeval));
+		bcopy(&me, &me_last, sizeof(struct rusage));
+	}
+
+	fprintf(stdout, "BEGIN apps.cpu %llu\n", usec);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
@@ -882,7 +914,7 @@ void show_dimensions(void)
 	}
 	fprintf(stdout, "END\n");
 
-	fprintf(stdout, "BEGIN apps.cpu_user\n");
+	fprintf(stdout, "BEGIN apps.cpu_user %llu\n", usec);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
@@ -890,7 +922,7 @@ void show_dimensions(void)
 	}
 	fprintf(stdout, "END\n");
 
-	fprintf(stdout, "BEGIN apps.cpu_system\n");
+	fprintf(stdout, "BEGIN apps.cpu_system %llu\n", usec);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
@@ -898,7 +930,7 @@ void show_dimensions(void)
 	}
 	fprintf(stdout, "END\n");
 
-	fprintf(stdout, "BEGIN apps.threads\n");
+	fprintf(stdout, "BEGIN apps.threads %llu\n", usec);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
@@ -906,7 +938,7 @@ void show_dimensions(void)
 	}
 	fprintf(stdout, "END\n");
 
-	fprintf(stdout, "BEGIN apps.processes\n");
+	fprintf(stdout, "BEGIN apps.processes %llu\n", usec);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
@@ -914,7 +946,7 @@ void show_dimensions(void)
 	}
 	fprintf(stdout, "END\n");
 
-	fprintf(stdout, "BEGIN apps.mem\n");
+	fprintf(stdout, "BEGIN apps.mem %llu\n", usec);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
@@ -922,7 +954,7 @@ void show_dimensions(void)
 	}
 	fprintf(stdout, "END\n");
 
-	fprintf(stdout, "BEGIN apps.minor_faults\n");
+	fprintf(stdout, "BEGIN apps.minor_faults %llu\n", usec);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
@@ -930,7 +962,7 @@ void show_dimensions(void)
 	}
 	fprintf(stdout, "END\n");
 
-	fprintf(stdout, "BEGIN apps.major_faults\n");
+	fprintf(stdout, "BEGIN apps.major_faults %llu\n", usec);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
@@ -938,7 +970,7 @@ void show_dimensions(void)
 	}
 	fprintf(stdout, "END\n");
 
-	fprintf(stdout, "BEGIN apps.lreads\n");
+	fprintf(stdout, "BEGIN apps.lreads %llu\n", usec);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
@@ -946,7 +978,7 @@ void show_dimensions(void)
 	}
 	fprintf(stdout, "END\n");
 
-	fprintf(stdout, "BEGIN apps.lwrites\n");
+	fprintf(stdout, "BEGIN apps.lwrites %llu\n", usec);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
@@ -954,7 +986,7 @@ void show_dimensions(void)
 	}
 	fprintf(stdout, "END\n");
 
-	fprintf(stdout, "BEGIN apps.preads\n");
+	fprintf(stdout, "BEGIN apps.preads %llu\n", usec);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
@@ -962,12 +994,20 @@ void show_dimensions(void)
 	}
 	fprintf(stdout, "END\n");
 
-	fprintf(stdout, "BEGIN apps.pwrites\n");
+	fprintf(stdout, "BEGIN apps.pwrites %llu\n", usec);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_storage_bytes_written);
 	}
+	fprintf(stdout, "END\n");
+
+	fprintf(stdout, "BEGIN netdata.apps_cpu %llu\n", usec);
+	fprintf(stdout, "SET user = %llu\n", cpuuser);
+	fprintf(stdout, "SET system = %llu\n", cpusyst);
+	fprintf(stdout, "END\n");
+	fprintf(stdout, "BEGIN netdata.apps_files %llu\n", usec);
+	fprintf(stdout, "SET files = %llu\n", file_counter);
 	fprintf(stdout, "END\n");
 
 	fflush(stdout);
@@ -1074,6 +1114,13 @@ void show_charts(void)
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1024\n", w->name);
 	}
 
+	fprintf(stdout, "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' netdata netdata stacked 10000 %d\n", update_every);
+	fprintf(stdout, "DIMENSION user '' incremental 1 1000\n");
+	fprintf(stdout, "DIMENSION system '' incremental 1 1000\n");
+
+	fprintf(stdout, "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' netdata netdata line 10001 %d\n", update_every);
+	fprintf(stdout, "DIMENSION files '' incremental 1 1\n");
+
 	fflush(stdout);
 }
 
@@ -1130,10 +1177,6 @@ long get_pid_max(void)
 	return mpid;
 }
 
-unsigned long long usecdiff(struct timeval *now, struct timeval *last) {
-		return ((((now->tv_sec * 1000000ULL) + now->tv_usec) - ((last->tv_sec * 1000000ULL) + last->tv_usec)));
-}
-
 int main(int argc, char **argv)
 {
 	Hertz = get_hertz();
@@ -1149,13 +1192,10 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	int created_usage_chart = 0;
-	struct rusage me, me_last;
 	unsigned long long counter = 1;
 	unsigned long long usec = 0, susec = 0;
 	struct timeval last, now;
 	gettimeofday(&last, NULL);
-	getrusage(RUSAGE_SELF, &me_last);
 
 	for(;1; counter++) {
 		if(!update_from_proc()) {
@@ -1168,37 +1208,10 @@ int main(int argc, char **argv)
 		show_charts();		// this is smart enough to show only newly added apps, when needed
 		show_dimensions();
 
-		if(getrusage(RUSAGE_SELF, &me) == 0) {
-			unsigned long long cpuuser = me.ru_utime.tv_sec * 1000000ULL + me.ru_utime.tv_usec;
-			unsigned long long cpusyst = me.ru_stime.tv_sec * 1000000ULL + me.ru_stime.tv_usec;
-
-			if(!created_usage_chart) {
-				created_usage_chart = 1;
-				fprintf(stdout, "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' netdata netdata stacked 10000 %d\n", update_every);
-				fprintf(stdout, "DIMENSION user '' incremental 1 1000\n");
-				fprintf(stdout, "DIMENSION system '' incremental 1 1000\n");
-
-				fprintf(stdout, "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' netdata netdata line 10001 %d\n", update_every);
-				fprintf(stdout, "DIMENSION files '' incremental 1 1\n");
-			}
-
-			fprintf(stdout, "BEGIN netdata.apps_cpu\n");
-			fprintf(stdout, "SET user = %llu\n", cpuuser);
-			fprintf(stdout, "SET system = %llu\n", cpusyst);
-			fprintf(stdout, "END\n");
-
-			fprintf(stdout, "BEGIN netdata.apps_files\n");
-			fprintf(stdout, "SET files = %llu\n", file_counter);
-			fprintf(stdout, "END\n");
-
-			bcopy(&me, &me_last, sizeof(struct rusage));
-		}
-
 		if(debug) fprintf(stderr, "Done Loop No %llu\n", counter);
 		fflush(NULL);
 
 		gettimeofday(&now, NULL);
-
 		usec = usecdiff(&now, &last) - susec;
 		if(debug) fprintf(stderr, "last loop took %llu usec (worked for %llu, sleeped for %llu).\n", usec + susec, usec, susec);
 

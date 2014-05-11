@@ -275,28 +275,44 @@ done
 
 # -----------------------------------------------------------------------------
 # update dimensions
-while [ 1 ]
-do
-	now_charts=$run_charts
-	run_charts=
-
-	for chart in $now_charts
+global_update() {
+	while [ 1 ]
 	do
-		$chart$charts_update
-		if [ $? -eq 0 ]
+		local now_charts=$run_charts
+		local run_charts=
+
+		local chart=
+		for chart in $now_charts
+		do
+			local d=`date +'%s.%N'`
+			local s=`echo $d | cut -d '.' -f 1`
+			local m=`echo $d | cut -d '.' -f 2 | cut -b 1-3`
+			local now="$s$m" # milliseconds since epoch (1-1-1970)
+
+			eval "local last=\$last_update_$chart"
+			test -z "$last" && local last=$((now - 1000))
+
+			local dt=$(( (now - last) * 1000 ))
+			eval "last_update_$chart=$now"
+
+			$chart$charts_update $dt
+			if [ $? -eq 0 ]
+			then
+				run_charts="$run_charts $chart"
+			else
+				echo >&2 "charts.d: chart '$chart' update() function reports failure. Disabling it."
+			fi
+		done
+
+		if [ "$pause_method" = "suspend" ]
 		then
-			run_charts="$run_charts $chart"
+			echo "STOPPING_WAKE_ME_UP_PLEASE"
+			suspend || ( echo >&2 "suspend returned error $?, falling back to sleep."; loopsleepms $debug_time $update_every )
 		else
-			echo >&2 "charts.d: chart '$chart' update() function reports failure. Disabling it."
+			# wait the time you are required to
+			loopsleepms $debug_time $update_every
 		fi
 	done
+}
 
-	if [ "$pause_method" = "suspend" ]
-	then
-		echo "STOPPING_WAKE_ME_UP_PLEASE"
-		suspend || ( echo >&2 "suspend returned error $?, falling back to sleep."; loopsleepms $debug_time $update_every )
-	else
-		# wait the time you are required to
-		loopsleepms $debug_time $update_every
-	fi
-done
+global_update

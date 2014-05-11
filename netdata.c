@@ -1039,6 +1039,7 @@ struct rrd_stats {
 
 	pthread_mutex_t mutex;
 	unsigned long counter;						// the number of times we added values to this rrd
+	unsigned long counter_since_reload;			// the number of times we added values to this rrd
 
 	int mapped;									// if set to 1, this is memory mapped
 	unsigned long memsize;						// how much mem we have allocated for this (without dimensions)
@@ -1056,6 +1057,7 @@ struct rrd_stats {
 	int update_every;							// every how many seconds is this updated?
 	unsigned long long first_entry_t;			// the timestamp (in microseconds) of the oldest entry in the db
 	struct timeval last_updated;				// when this data set was last updated
+	struct timeval next_update;
 	unsigned long long usec_since_last_update;
 
 	total_number absolute_total;
@@ -1225,6 +1227,12 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 
 	st->priority = config_get_number(st->id, "priority", priority);
 	st->enabled = enabled;
+
+	st->debug = 0;
+	st->counter_since_reload = 0;
+
+	// initialize the next update
+	if(!st->next_update.tv_sec) gettimeofday(&st->next_update, NULL);
 
 	pthread_mutex_init(&st->mutex, NULL);
 	pthread_mutex_lock(&root_mutex);
@@ -1477,7 +1485,7 @@ int rrd_stats_dimension_set(RRD_STATS *st, char *id, collected_number value)
 	return 0;
 }
 
-void rrd_stats_next(RRD_STATS *st)
+void rrd_stats_next_usec(RRD_STATS *st, unsigned long long microseconds)
 {
 	// lock it to work with the dimensions
 	pthread_mutex_lock(&st->mutex);
@@ -1495,16 +1503,48 @@ void rrd_stats_next(RRD_STATS *st)
 	st->absolute_total       = 0;
 	st->current_entry        = ((st->current_entry + 1) >= st->entries) ? 0 : st->current_entry + 1;
 
+	st->usec_since_last_update = microseconds;
+	if(!st->last_updated.tv_sec) gettimeofday(&st->next_update, NULL);
+	else {
+		unsigned long long usec = st->last_updated.tv_sec * 1000000ULL + st->last_updated.tv_usec;
+		usec += microseconds;
+
+		st->next_update.tv_sec     = usec / 1000000ULL;
+		st->next_update.tv_usec    = usec % 1000000ULL;
+
+	}
+
 	pthread_mutex_unlock(&st->mutex);
 
 	return;
 }
 
+void rrd_stats_next(RRD_STATS *st)
+{
+	if(st->last_updated.tv_sec) {
+		struct timeval now;
+		gettimeofday(&now, NULL);
+		unsigned long long microseconds = usecdiff(&now, &st->last_updated);
+		
+		unsigned long long min_microseconds = st->update_every * 1000000ULL / 2ULL;
+		if(microseconds < min_microseconds) {
+			debug(D_RRD_STATS, "Chart %s is being updated too early (after %llu, expected %llu microseconds). Assuming default.", st->name, microseconds, min_microseconds);
+			microseconds = st->update_every * 1000000ULL;
+		}
+		
+		rrd_stats_next_usec(st, microseconds);
+	}
+	else
+		rrd_stats_next_usec(st, st->update_every * 1000000ULL);
+}
+
+void rrd_stats_next_plugins(RRD_STATS *st)
+{
+	rrd_stats_next_usec(st, st->update_every * 1000000ULL);
+}
+
 unsigned long long rrd_stats_done(RRD_STATS *st)
 {
-	struct timeval now;
-	gettimeofday(&now, NULL);
-
 	pthread_mutex_lock(&st->mutex);
 
 	RRD_DIMENSION *rd, *last;
@@ -1549,9 +1589,6 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 
 	// if this is the second+ value we collect
 	if(st->counter) {
-		
-		st->usec_since_last_update = usecdiff(&now, &st->last_updated);
-		if(!st->usec_since_last_update) st->usec_since_last_update = 1;
 		if(st->debug) debug(D_RRD_STATS, "microseconds since last update: %llu", st->usec_since_last_update);
 
 		// x 10
@@ -1662,6 +1699,8 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 					break;
 			}
 
+			if(!st->counter_since_reload) rd->calculated_value = 0;
+
 			// store the calculated value
 			rd->values[st->current_entry] = (storage_number)
 				(	  rd->calculated_value
@@ -1685,7 +1724,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 
 		if(!st->first_entry_t) {
 			// this is the first entry in the database
-			st->first_entry_t = now.tv_sec * 1000000ULL + now.tv_usec;
+			st->first_entry_t = st->next_update.tv_sec * 1000000ULL + st->next_update.tv_usec;
 		}
 		else {
 			if(st->counter > (unsigned long long)st->entries) {
@@ -1697,11 +1736,11 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 		// store the time difference to the last entry
 		st->timediff[st->current_entry] = st->usec_since_last_update;
 	}
-	else st->usec_since_last_update = st->update_every * 1000000ULL;
 
-	st->last_updated.tv_sec  = now.tv_sec;
-	st->last_updated.tv_usec = now.tv_usec;
+	st->last_updated.tv_sec  = st->next_update.tv_sec;
+	st->last_updated.tv_usec = st->next_update.tv_usec;
 	st->counter++;
+	st->counter_since_reload++;
 
 	pthread_mutex_unlock(&st->mutex);
 
@@ -5558,11 +5597,8 @@ void *proc_main(void *ptr)
 		usec = usecdiff(&now, &last) - susec;
 		debug(D_PROCNETDEV_LOOP, "PROCNETDEV: last loop took %llu usec (worked for %llu, sleeped for %llu).", usec + susec, usec, susec);
 		
-		if(usec < (update_every * 1000000ULL)) susec = (update_every * 1000000ULL) - usec;
-		else susec = 0;
-		
-		// make sure we will wait at least 100ms
-		if(susec < 100000) susec = 100000;
+		if(usec < (update_every * 1000000ULL / 2ULL)) susec = (update_every * 1000000ULL) - usec;
+		else susec = update_every * 1000000ULL / 2ULL;
 		
 		// --------------------------------------------------------------------
 
@@ -5718,7 +5754,7 @@ void tc_device_commit(struct tc_device *d)
 			}
 		}
 		else {
-			rrd_stats_next(st);
+			rrd_stats_next_plugins(st);
 
 			if(strcmp(d->id, d->name) != 0) rrd_stats_set_name(st, d->name);
 		}
@@ -5986,7 +6022,7 @@ void *cpuidlejitter_main(void *ptr)
 
 			rrd_stats_dimension_add(st, "jitter", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
 		}
-		else rrd_stats_next(st);
+		else rrd_stats_next_usec(st, susec);
 
 		rrd_stats_dimension_set(st, "jitter", usec);
 		rrd_stats_done(st);
@@ -6115,6 +6151,8 @@ void *pluginsd_worker_thread(void *arg)
 			}
 			else if(!strcmp(s, "BEGIN")) {
 				char *id = qstrsep(&p);
+				char *microseconds_txt = qstrsep(&p);
+
 				if(!id) {
 					error("PLUGINSD: '%s' is requesting a BEGIN without a chart id. Disabling it.", cd->fullfilename);
 					cd->enabled = 0;
@@ -6129,7 +6167,13 @@ void *pluginsd_worker_thread(void *arg)
 					kill(cd->pid, SIGTERM);
 					break;
 				}
-				if(st->counter) rrd_stats_next(st);
+
+				if(st->counter) {
+					unsigned long long microseconds = 0;
+					if(microseconds_txt && *microseconds_txt) microseconds = strtoull(microseconds_txt, NULL, 10);
+					if(microseconds) rrd_stats_next_usec(st, microseconds);
+					else rrd_stats_next_plugins(st);
+				}
 			}
 			else if(!strcmp(s, "END")) {
 				if(!st) {
@@ -6141,16 +6185,7 @@ void *pluginsd_worker_thread(void *arg)
 
 				if(st->debug) debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting a END on chart %s", cd->fullfilename, st->id);
 
-				unsigned long long usec_since_last_update = rrd_stats_done(st);
-				if((time(NULL) - cd->started_t) > 10) {
-					if(usec_since_last_update < (cd->update_every * 1000000ULL / 10)) {
-						error("PLUGINSD: '%s' (up for %lu secs) updates charts too frequently. Chart %s updated after %llu microseconds, expected %llu microseconds.", cd->fullfilename, time(NULL) - cd->started_t, st->id, usec_since_last_update, cd->update_every * 1000000ULL);
-						//cd->enabled = 0;
-						//kill(cd->pid, SIGTERM);
-						//break;
-					}
-				}
-
+				rrd_stats_done(st);
 				st = NULL;
 			}
 			else if(!strcmp(s, "FLUSH")) {
@@ -6290,8 +6325,8 @@ void *pluginsd_worker_thread(void *arg)
 					// second+ run
 					usec = usecdiff(&now, &last) - susec;
 					error("PLUGINSD: %s last loop took %llu usec (worked for %llu, sleeped for %llu).\n", cd->fullfilename, usec + susec, usec, susec);
-					if(usec < (update_every * 1000000ULL)) susec = (update_every * 1000000ULL) - usec;
-					else susec = 100000ULL;
+					if(usec < (update_every * 1000000ULL / 2ULL)) susec = (update_every * 1000000ULL) - usec;
+					else susec = update_every * 1000000ULL / 2ULL;
 				}
 
 				error("PLUGINSD: %s sleeping for %llu. Will kill with SIGCONT pid %d to wake it up.\n", cd->fullfilename, susec, cd->pid);
@@ -6451,6 +6486,11 @@ void sig_handler(int signo)
 			rrd_stats_free_all();
 			exit(1);
 			break;
+
+		case SIGPIPE:
+			error("Ignoring signal %d. Errno: %d (%s)", signo, errno, strerror(errno));
+			break;
+
 
 		case SIGCHLD:
 			error("Received SIGCHLD (signal %d).", signo);

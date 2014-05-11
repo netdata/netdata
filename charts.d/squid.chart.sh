@@ -49,24 +49,24 @@ squid_update() {
 
 	# write the result of the work.
 	cat <<VALUESEOF
-BEGIN squid.clients_net
+BEGIN squid.clients_net $1
 SET client_http_kbytes_in = $client_http_kbytes_in
 SET client_http_kbytes_out = $client_http_kbytes_out
 SET client_http_hit_kbytes_out = $client_http_hit_kbytes_out
 END
 
-BEGIN squid.clients_requests
+BEGIN squid.clients_requests $1
 SET client_http_requests = $client_http_requests
 SET client_http_hits = $client_http_hits
 SET client_http_errors = $client_http_errors
 END
 
-BEGIN squid.servers_net
+BEGIN squid.servers_net $1
 SET server_all_kbytes_in = $server_all_kbytes_in
 SET server_all_kbytes_out = $server_all_kbytes_out
 END
 
-BEGIN squid.servers_requests
+BEGIN squid.servers_requests $1
 SET server_all_requests = $server_all_requests
 SET server_all_errors = $server_all_errors
 END
