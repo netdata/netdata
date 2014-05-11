@@ -1191,7 +1191,7 @@ int main(int argc, char **argv)
 		}
 
 		if(debug) fprintf(stderr, "Done Loop No %llu\n", counter);
-		// if(counter == 1000) exit(0);
+		fflush(NULL);
 
 		gettimeofday(&now, NULL);
 
@@ -1203,7 +1203,6 @@ int main(int argc, char **argv)
 		if(usec < (update_every * 1000000ULL / 2)) susec = (update_every * 1000000ULL) - usec;
 		else susec = update_every * 1000000ULL / 2;
 
-		fflush(NULL);
 		usleep(susec);
 
 		bcopy(&now, &last, sizeof(struct timeval));
