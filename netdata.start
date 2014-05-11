@@ -37,6 +37,11 @@ then
 	mkdir conf.d || exit 1
 fi
 
+if [ ! -d cache ]
+then
+	mkdir cache || exit 1
+fi
+
 if [ -f conf.d/netdata.conf ]
 then
 	# find if debug is enabled in the config

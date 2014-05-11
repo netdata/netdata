@@ -35,6 +35,7 @@
 #include <malloc.h>
 #include <inttypes.h>
 #include <dirent.h>
+#include <sys/mman.h>
 
 // enabling this will detach the plugins from netdata
 // each plugin will have its own process group
@@ -402,7 +403,7 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 	// ignore all signals
 	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV) signal(i, SIG_DFL);
 
-	fprintf(stderr, "executing command: '%s'\n", command);
+	fprintf(stderr, "executing command: '%s' on pid %d.\n", command, getpid());
  	execl("/bin/sh", "sh", "-c", command, NULL);
 	exit(1);
 }
@@ -526,8 +527,8 @@ int create_listen_socket(int port)
 // ----------------------------------------------------------------------------
 // CONFIG
 
-#define CONFIG_MAX_NAME 1024
-#define CONFIG_MAX_VALUE 4096
+#define CONFIG_MAX_NAME 100
+#define CONFIG_MAX_VALUE 1024
 #define CONFIG_FILENAME "netdata.conf"
 #define CONFIG_FILE_LINE_MAX 4096
 
@@ -924,6 +925,50 @@ static void strreverse(char* begin, char* end)
 
 
 // ----------------------------------------------------------------------------
+// mmap() wrapper
+
+void *mymmap(const char *filename, unsigned long size)
+{
+	static int enabled = -1;
+
+	if(enabled == -1) {
+		char *cache_dir = config_get("global", "cache data in directory", "cache");
+		if(strcmp(cache_dir, "none") == 0) enabled = 0;
+		else enabled = 1;
+	}
+	if(!enabled) return NULL;
+
+	int fd;
+	void *mem = NULL;
+
+	errno = 0;
+	fd = open(filename, O_RDWR|O_CREAT|O_NOATIME, 0664);
+	if(fd != -1) {
+		if(lseek(fd, size, SEEK_SET) == (long)size) {
+			if(write(fd, "", 1) == 1) {
+
+				if(ftruncate(fd, size))
+					error("Cannot truncate file '%s' to size %ld. Will use the larger file.", filename, size);
+
+				mem = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+				if(mem) {
+					if(madvise(mem, size, MADV_SEQUENTIAL|MADV_DONTFORK) != 0)
+						error("Cannot advise the kernel about the memory usage of file '%s'.", filename);
+				}
+			}
+			else error("Cannot write to file '%s' at position %ld.", filename, size);
+		}
+		else error("Cannot seek file '%s' to size %ld.", filename, size);
+
+		close(fd);
+	}
+	else error("Cannot create/open file '%s'.", filename);
+
+	return mem;
+}
+
+
+// ----------------------------------------------------------------------------
 // RRD STATS
 
 #define RRD_STATS_NAME_MAX 1024
@@ -943,8 +988,11 @@ typedef int32_t storage_number;
 typedef uint32_t ustorage_number;
 #define STORAGE_NUMBER_FORMAT "%d"
 
+#define RRD_STATS_MAGIC     "NETDATA CACHE STATS FILE V001"
+#define RRD_DIMENSION_MAGIC "NETDATA CACHE DIMENSION FILE V002"
 
 struct rrd_dimension {
+	char magic[sizeof(RRD_DIMENSION_MAGIC) + 1];// our magic
 	char id[RRD_STATS_NAME_MAX + 1];			// the id of this dimension (for internal identification)
 	char *name;									// the name of this dimension (as presented to user)
 	
@@ -953,14 +1001,15 @@ struct rrd_dimension {
 
 	long entries;								// how many entries this dimension has
 												// this should be the same to the entries of the data set
+	long current_entry;							// the entry that is currently being updated
 
 	int hidden;									// if set to non zero, this dimension will not be sent to the client
+	int mapped;									// 1 if the file is mapped
+	unsigned long memsize;						// the memory allocated for this dimension
 
 	int algorithm;
 	long multiplier;
 	long divisor;
-
-	storage_number *values;						// the array of values
 
 	struct timeval last_updated;				// when was this dimension last updated
 
@@ -971,26 +1020,32 @@ struct rrd_dimension {
 	collected_number last_collected_value;
 
 	struct rrd_dimension *next;					// linking of dimensions within the same data set
+
+	storage_number values[];					// the array of values - THIS HAS TO BE THE LAST MEMBER
 };
 typedef struct rrd_dimension RRD_DIMENSION;
 
 struct rrd_stats {
-	pthread_mutex_t mutex;
-
-	unsigned long counter;						// the number of times we added values to this rrd
+	char magic[sizeof(RRD_STATS_MAGIC) + 1];// our magic
 
 	char id[RRD_STATS_NAME_MAX + 1];			// id of the data set
 	char *name;									// name of the data set
-
-	unsigned long hash;							// a simple hash on the id, to speed up searching
-												// we first compare hashes, and only if the hashes are equal we do string comparisons
-
-	unsigned long hash_name;					// a simple hash on the name
+	char *cache_dir;							// the directory to store dimension maps
 
 	char *type;									// the type of graph RRD_TYPE_* (a category, for determining graphing options)
 	char *family;								// the family of this data set (for grouping them together)
 	char *title;								// title shown to user
 	char *units;								// units of measurement
+
+	pthread_mutex_t mutex;
+	unsigned long counter;						// the number of times we added values to this rrd
+
+	int mapped;									// if set to 1, this is memory mapped
+	unsigned long memsize;						// how much mem we have allocated for this (without dimensions)
+
+	unsigned long hash_name;					// a simple hash on the name
+	unsigned long hash;							// a simple hash on the id, to speed up searching
+												// we first compare hashes, and only if the hashes are equal we do string comparisons
 
 	long priority;
 
@@ -1012,10 +1067,11 @@ struct rrd_stats {
 	int isdetail;								// if set, the data set should be considered as a detail of another
 												// (the master data set should be the one that has the same family and is not detail)
 
-	uint32_t *timediff;							// the time in microseconds between each data entry
 	RRD_DIMENSION *dimensions;					// the actual data for every dimension
 
 	struct rrd_stats *next;						// linking of rrd stats
+
+	uint32_t timediff[];						// the time in microseconds between each data entry - HAS TO BE LAST
 };
 typedef struct rrd_stats RRD_STATS;
 
@@ -1046,25 +1102,112 @@ void rrd_stats_set_name(RRD_STATS *st, const char *name)
 	st->hash_name = simple_hash(st->name);
 }
 
+char *rrd_stats_cache_dir(const char *id)
+{
+	char *ret = NULL;
+
+	static int enabled = 1;
+	static char *cache_dir = NULL;
+	if(!cache_dir) {
+		cache_dir = config_get("global", "cache data in directory", "cache");
+		if(strcmp(cache_dir, "none") == 0) enabled = 0;
+	}
+
+	char b[FILENAME_MAX + 1];
+	char n[FILENAME_MAX + 1];
+	rrd_stats_strncpy_name(b, id, FILENAME_MAX);
+
+	snprintf(n, FILENAME_MAX, "%s/%s", cache_dir, b);
+	ret = config_get(id, "cache_dir", n);
+
+	if(enabled) {
+		int r = mkdir(ret, 0775);
+		if(r != 0 && errno != EEXIST)
+			error("Cannot create directory '%s'", ret);
+	}
+
+	return ret;
+}
+
 RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, const char *family, const char *title, const char *units, long priority, int update_every, int chart_type)
 {
-	RRD_STATS *st = NULL;
-
 	if(!id || !id[0]) {
 		fatal("Cannot create rrd stats without an id.");
 		return NULL;
 	}
 
+	char fullid[RRD_STATS_NAME_MAX + 1];
+	char fullfilename[FILENAME_MAX + 1];
+	RRD_STATS *st;
+
+	snprintf(fullid, RRD_STATS_NAME_MAX, "%s.%s", type, id);
+
+	long entries = config_get_number(fullid, "history", save_history);
+	if(entries < 5) entries = config_set_number(fullid, "history", 5);
+	if(entries > HISTORY_MAX) entries = config_set_number(fullid, "history", HISTORY_MAX);
+
+	int enabled = config_get_boolean(fullid, "enabled", 1);
+	if(!enabled) entries = 5;
+
+	unsigned long size = sizeof(RRD_STATS) + (entries * sizeof(uint32_t));
+	char *cache_dir = rrd_stats_cache_dir(fullid);
+
 	debug(D_RRD_STATS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
-	st = calloc(1, sizeof(RRD_STATS));
-	if(!st) {
-		fatal("Cannot allocate memory for RRD_STATS %s.%s", type, id);
-		return NULL;
+	snprintf(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
+	st = (RRD_STATS *)mymmap(fullfilename, size);
+	if(st) {
+		if(strcmp(st->magic, RRD_STATS_MAGIC) != 0) {
+			errno = 0;
+			error("File %s does not have our version. Clearing it.", fullfilename);
+			bzero(st, size);
+		}
+		else if(strcmp(st->id, fullid) != 0) {
+			errno = 0;
+			error("File %s does not have our id. Unmapping it.", fullfilename);
+			munmap(st, size);
+			st = NULL;
+		}
+		else if(st->memsize != size || st->entries != entries) {
+			errno = 0;
+			error("File %s does not have the desired size. Clearing it.", fullfilename);
+			bzero(st, size);
+		}
+		else if(st->update_every != update_every) {
+			errno = 0;
+			error("File %s does not have the desired update frequency. Clearing it.", fullfilename);
+			bzero(st, size);
+		}
 	}
 
-	snprintf(st->id, RRD_STATS_NAME_MAX, "%s.%s", type, id);
+	if(st) {
+		st->name = NULL;
+		st->type = NULL;
+		st->family = NULL;
+		st->title = NULL;
+		st->units = NULL;
+		st->dimensions = NULL;
+		st->next = NULL;
+		st->mapped = 1;
+	}
+	else {
+		st = calloc(1, size);
+		if(!st) {
+			fatal("Cannot allocate memory for RRD_STATS %s.%s", type, id);
+			return NULL;
+		}
+		st->mapped = 0;
+	}
+	st->memsize = size;
+	st->entries = entries;
+	st->update_every = update_every;
+
+	strcpy(st->magic, RRD_STATS_MAGIC);
+
+	strcpy(st->id, fullid);
 	st->hash = simple_hash(st->id);
+
+	st->cache_dir = cache_dir;
 
 	st->family     = config_get(st->id, "family", family?family:st->id);
 	st->units      = config_get(st->id, "units", units?units:"");
@@ -1080,22 +1223,8 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 		st->title = config_get(st->id, "title", varvalue);
 	}
 
-	st->entries = config_get_number(st->id, "history", save_history);
-	if(st->entries < 5) st->entries = config_set_number(st->id, "history", 5);
-	if(st->entries > HISTORY_MAX) st->entries = config_set_number(st->id, "history", HISTORY_MAX);
-
 	st->priority = config_get_number(st->id, "priority", priority);
-	st->enabled = config_get_boolean(st->id, "enabled", 1);
-	if(!st->enabled) st->entries = 5;
-
-	st->timediff = calloc(st->entries, sizeof(uint32_t));
-	if(!st->timediff) {
-		free(st);
-		fatal("Cannot allocate %lu entries of %lu bytes each for RRD_STATS.", st->entries, sizeof(struct timeval));
-		return NULL;
-	}
-	
-	st->update_every = update_every;
+	st->enabled = enabled;
 
 	pthread_mutex_init(&st->mutex, NULL);
 	pthread_mutex_lock(&root_mutex);
@@ -1110,17 +1239,73 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 
 RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char *name, long multiplier, long divisor, int algorithm)
 {
+	char filename[FILENAME_MAX + 1];
+	char fullfilename[FILENAME_MAX + 1];
+
 	char varname[CONFIG_MAX_NAME + 1];
-	RRD_DIMENSION *rd = NULL;
+	RRD_DIMENSION *rd;
+	unsigned long size = sizeof(RRD_DIMENSION) + (st->entries * sizeof(storage_number));
 
 	debug(D_RRD_STATS, "Adding dimension '%s/%s'.", st->id, id);
 
-	rd = calloc(1, sizeof(RRD_DIMENSION));
-	if(!rd) {
-		fatal("Cannot allocate RRD_DIMENSION %s/%s.", st->id, id);
-		return NULL;
+	rrd_stats_strncpy_name(filename, id, FILENAME_MAX);
+	snprintf(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
+	rd = (RRD_DIMENSION *)mymmap(fullfilename, size);
+	if(rd) {
+		if(strcmp(rd->magic, RRD_DIMENSION_MAGIC) != 0) {
+			errno = 0;
+			error("File %s does not have our version. Clearing it.", fullfilename);
+			bzero(rd, size);
+		}
+		else if(rd->memsize != size) {
+			errno = 0;
+			error("File %s does not have the desired size. Clearing it.", fullfilename);
+			bzero(rd, size);
+		}
+		else if(rd->multiplier != multiplier) {
+			errno = 0;
+			error("File %s does not have the same multiplier. Clearing it.", fullfilename);
+			bzero(rd, size);
+		}
+		else if(rd->divisor != divisor) {
+			errno = 0;
+			error("File %s does not have the same divisor. Clearing it.", fullfilename);
+			bzero(rd, size);
+		}
+		else if(rd->algorithm != algorithm) {
+			errno = 0;
+			error("File %s does not have the same algorithm. Clearing it.", fullfilename);
+			bzero(rd, size);
+		}
+		else if(strcmp(rd->id, id) != 0) {
+			errno = 0;
+			error("File %s does not have our dimension id. Unmapping it.", fullfilename);
+			munmap(rd, size);
+			rd = NULL;
+		}
 	}
 
+	if(rd) {
+		// we have a file mapped for rd
+		rd->mapped = 1;
+		rd->hidden = 0;
+		rd->next = NULL;
+		rd->name = NULL;
+	}
+	else {
+		// if we didn't manage to get a mmap'd dimension, just create one
+
+		rd = calloc(1, size);
+		if(!rd) {
+			fatal("Cannot allocate RRD_DIMENSION %s/%s.", st->id, id);
+			return NULL;
+		}
+
+		rd->mapped = 0;
+	}
+	rd->memsize = size;
+
+	strcpy(rd->magic, RRD_DIMENSION_MAGIC);
 	strncpy(rd->id, id, RRD_STATS_NAME_MAX);
 	rd->hash = simple_hash(rd->id);
 
@@ -1139,13 +1324,6 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 
 	rd->entries = st->entries;
 	
-	rd->values = calloc(rd->entries, sizeof(storage_number));
-	if(!rd->values) {
-		free(rd);
-		fatal("Cannot allocate %lu entries for RRD_DIMENSION values.", rd->entries);
-		return NULL;
-	}
-
 	// append this dimension
 	if(!st->dimensions)
 		st->dimensions = rd;
@@ -1168,10 +1346,40 @@ void rrd_stats_dimension_set_name(RRD_STATS *st, RRD_DIMENSION *rd, const char *
 void rrd_stats_dimension_free(RRD_DIMENSION *rd)
 {
 	if(rd->next) rrd_stats_dimension_free(rd->next);
-	debug(D_RRD_STATS, "Removing dimension '%s'.", rd->name);
 	// free(rd->annotations);
-	free(rd->values);
-	free(rd);
+	if(rd->mapped) {
+		debug(D_RRD_STATS, "Unmapping dimension '%s'.", rd->name);
+		munmap(rd, rd->memsize);
+	}
+	else {
+		debug(D_RRD_STATS, "Removing dimension '%s'.", rd->name);
+		free(rd);
+	}
+}
+
+void rrd_stats_free_all(void)
+{
+	RRD_STATS *st;
+	pthread_mutex_lock(&root_mutex);
+
+	for(st = root; st ;) {
+		RRD_STATS *next = st->next;
+
+		pthread_mutex_lock(&st->mutex);
+
+		if(st->dimensions) rrd_stats_dimension_free(st->dimensions);
+		st->dimensions = NULL;
+
+		pthread_mutex_unlock(&st->mutex);
+
+		if(st->mapped) munmap(st, st->memsize);
+		else free(st);
+
+		st = next;
+	}
+	root = NULL;
+
+	pthread_mutex_unlock(&root_mutex);
 }
 
 RRD_STATS *rrd_stats_find(const char *id)
@@ -1842,12 +2050,11 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 		, st->last_absolute_total
 		);
 
-	unsigned long memory = sizeof(RRD_STATS) + (sizeof(uint32_t) * st->entries);
+	unsigned long memory = st->memsize;
 
 	RRD_DIMENSION *rd;
 	for(rd = st->dimensions; rd ; rd = rd->next) {
-		unsigned long rdmem = sizeof(RRD_DIMENSION) + (sizeof(storage_number) * rd->entries);
-		memory += rdmem;
+		memory += rd->memsize;
 
 		web_buffer_printf(wb,
 			"\t\t\t\t{\n"
@@ -1877,7 +2084,7 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 			, rd->calculated_value
 			, rd->last_collected_value
 			, rd->last_calculated_value
-			, rdmem
+			, rd->memsize
 			, rd->next?",":""
 			);
 	}
@@ -5809,6 +6016,8 @@ struct plugind {
 	int obsolete;
 	int enabled;
 
+	time_t started_t;
+
 	struct plugind *next;
 } *pluginsd_root = NULL;
 
@@ -5933,11 +6142,13 @@ void *pluginsd_worker_thread(void *arg)
 				if(st->debug) debug(D_PLUGINSD, "PLUGINSD: script %s is requesting a END on chart %s", cd->fullfilename, st->id);
 
 				unsigned long long usec_since_last_update = rrd_stats_done(st);
-				if(usec_since_last_update < (cd->update_every * 1000000ULL / 10)) {
-					error("PLUGINSD: script '%s' updates charts too frequently. Chart %s updated after %llu microseconds, expected %llu microseconds. Disabling it.", cd->fullfilename, st->id, usec_since_last_update, cd->update_every * 1000000ULL);
-					cd->enabled = 0;
-					kill(cd->pid, SIGTERM);
-					break;
+				if((time(NULL) - cd->started_t) > 10) {
+					if(usec_since_last_update < (cd->update_every * 1000000ULL / 10)) {
+						error("PLUGINSD: script '%s' (up for %lu secs) updates charts too frequently. Chart %s updated after %llu microseconds, expected %llu microseconds.", cd->fullfilename, time(NULL) - cd->started_t, st->id, usec_since_last_update, cd->update_every * 1000000ULL);
+						//cd->enabled = 0;
+						//kill(cd->pid, SIGTERM);
+						//break;
+					}
 				}
 
 				st = NULL;
@@ -6176,6 +6387,7 @@ void *pluginsd_main(void *ptr)
 
 				cd->enabled = enabled;
 				cd->update_every = config_get_number(cd->id, "update every", update_every);
+				cd->started_t = time(NULL);
 
 				char *def = "";
 				snprintf(cd->cmd, PLUGINSD_CMD_MAX, "exec %s %d %s", cd->fullfilename, cd->update_every, config_get(cd->id, "command options", def));
@@ -6232,6 +6444,7 @@ void sig_handler(int signo)
 		case SIGSEGV:
 			error("Signaled exit (signal %d). Errno: %d (%s)", signo, errno, strerror(errno));
 			kill_childs();
+			rrd_stats_free_all();
 			exit(1);
 			break;
 
