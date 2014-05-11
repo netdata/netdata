@@ -969,6 +969,8 @@ void show_dimensions(void)
 		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_storage_bytes_written);
 	}
 	fprintf(stdout, "END\n");
+
+	fflush(stdout);
 }
 
 void show_charts(void)
@@ -1071,6 +1073,8 @@ void show_charts(void)
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1024\n", w->name);
 	}
+
+	fflush(stdout);
 }
 
 unsigned long long get_hertz(void)
@@ -1203,7 +1207,14 @@ int main(int argc, char **argv)
 		if(usec < (update_every * 1000000ULL / 2)) susec = (update_every * 1000000ULL) - usec;
 		else susec = update_every * 1000000ULL / 2;
 
+		//fprintf(stderr, "sleeping for %llu...", susec);
+		//fflush(NULL);
+		//struct timeval before, after;
+		//gettimeofday(&before, NULL);
 		usleep(susec);
+		//gettimeofday(&after, NULL);
+		//fprintf(stderr, " sleeped for %llu\n", usecdiff(&after, &before));
+		//fflush(NULL);
 
 		bcopy(&now, &last, sizeof(struct timeval));
 	}

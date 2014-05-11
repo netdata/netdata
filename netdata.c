@@ -952,7 +952,7 @@ void *mymmap(const char *filename, unsigned long size)
 
 				mem = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 				if(mem) {
-					if(madvise(mem, size, MADV_SEQUENTIAL|MADV_DONTFORK) != 0)
+					if(madvise(mem, size, MADV_SEQUENTIAL|MADV_DONTFORK|MADV_WILLNEED) != 0)
 						error("Cannot advise the kernel about the memory usage of file '%s'.", filename);
 				}
 			}
@@ -1479,6 +1479,7 @@ int rrd_stats_dimension_set(RRD_STATS *st, char *id, collected_number value)
 
 void rrd_stats_next(RRD_STATS *st)
 {
+	// lock it to work with the dimensions
 	pthread_mutex_lock(&st->mutex);
 
 	RRD_DIMENSION *rd;
@@ -1501,6 +1502,9 @@ void rrd_stats_next(RRD_STATS *st)
 
 unsigned long long rrd_stats_done(RRD_STATS *st)
 {
+	struct timeval now;
+	gettimeofday(&now, NULL);
+
 	pthread_mutex_lock(&st->mutex);
 
 	RRD_DIMENSION *rd, *last;
@@ -1534,7 +1538,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 		st->enabled = 0;
 		pthread_mutex_unlock(&st->mutex);
 		// rrd_stats_free(st);
-		return st->update_every * 1000000ULL;
+		return(st->update_every * 1000000ULL);
 	}
 
 	// calculate totals and count the dimensions
@@ -1542,9 +1546,6 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 	int dimensions;
 	for( rd = st->dimensions, dimensions = 0 ; rd ; rd = rd->next, dimensions++ )
 		st->absolute_total += rd->collected_value;
-
-	struct timeval now;
-	gettimeofday(&now, NULL);
 
 	// if this is the second+ value we collect
 	if(st->counter) {
@@ -1704,7 +1705,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 
 	pthread_mutex_unlock(&st->mutex);
 
-	return st->usec_since_last_update;
+	return(st->usec_since_last_update);
 }
 
 
@@ -6070,7 +6071,6 @@ void *pluginsd_worker_thread(void *arg)
 #endif
 
 	while(1) {
-		// FILE *fp = popen(cd->cmd, "r");
 		FILE *fp = mypopen(cd->cmd, &cd->pid);
 		if(!fp) {
 			error("Cannot popen(\"%s\", \"r\").", cd->cmd);
@@ -6095,20 +6095,20 @@ void *pluginsd_worker_thread(void *arg)
 				char *value = qstrsep(&p);
 
 				if(!dimension || !*dimension || !value) {
-					error("PLUGINSD: script %s is requesting a SET on chart '%s', like this: 'SET %s = %s'. Disabling it.", cd->fullfilename, st->id, dimension?dimension:"", value?value:"");
+					error("PLUGINSD: '%s' is requesting a SET on chart '%s', like this: 'SET %s = %s'. Disabling it.", cd->fullfilename, st->id, dimension?dimension:"", value?value:"");
 					cd->enabled = 0;
 					kill(cd->pid, SIGTERM);
 					break;
 				}
 
 				if(!st) {
-					error("PLUGINSD: script %s is requesting a SET on dimension %s with value %s, without a BEGIN. Disabling it.", cd->fullfilename, dimension, value);
+					error("PLUGINSD: '%s' is requesting a SET on dimension %s with value %s, without a BEGIN. Disabling it.", cd->fullfilename, dimension, value);
 					cd->enabled = 0;
 					kill(cd->pid, SIGTERM);
 					break;
 				}
 
-				if(st->debug) debug(D_PLUGINSD, "PLUGINSD: script %s is setting dimension %s/%s to %s", cd->fullfilename, st->id, dimension, value);
+				if(st->debug) debug(D_PLUGINSD, "PLUGINSD: '%s' is setting dimension %s/%s to %s", cd->fullfilename, st->id, dimension, value);
 				rrd_stats_dimension_set(st, dimension, atoll(value));
 
 				count++;
@@ -6116,7 +6116,7 @@ void *pluginsd_worker_thread(void *arg)
 			else if(!strcmp(s, "BEGIN")) {
 				char *id = qstrsep(&p);
 				if(!id) {
-					error("PLUGINSD: script %s is requesting a BEGIN without a chart id. Disabling it.", cd->fullfilename);
+					error("PLUGINSD: '%s' is requesting a BEGIN without a chart id. Disabling it.", cd->fullfilename);
 					cd->enabled = 0;
 					kill(cd->pid, SIGTERM);
 					break;
@@ -6124,7 +6124,7 @@ void *pluginsd_worker_thread(void *arg)
 
 				st = rrd_stats_find(id);
 				if(!st) {
-					error("PLUGINSD: script %s is requesting a BEGIN on chart '%s', which does not exist. Disabling it.", cd->fullfilename, id);
+					error("PLUGINSD: '%s' is requesting a BEGIN on chart '%s', which does not exist. Disabling it.", cd->fullfilename, id);
 					cd->enabled = 0;
 					kill(cd->pid, SIGTERM);
 					break;
@@ -6133,24 +6133,28 @@ void *pluginsd_worker_thread(void *arg)
 			}
 			else if(!strcmp(s, "END")) {
 				if(!st) {
-					error("PLUGINSD: script %s is requesting an END, without a BEGIN. Disabling it.", cd->fullfilename);
+					error("PLUGINSD: '%s' is requesting an END, without a BEGIN. Disabling it.", cd->fullfilename);
 					cd->enabled = 0;
 					kill(cd->pid, SIGTERM);
 					break;
 				}
 
-				if(st->debug) debug(D_PLUGINSD, "PLUGINSD: script %s is requesting a END on chart %s", cd->fullfilename, st->id);
+				if(st->debug) debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting a END on chart %s", cd->fullfilename, st->id);
 
 				unsigned long long usec_since_last_update = rrd_stats_done(st);
 				if((time(NULL) - cd->started_t) > 10) {
 					if(usec_since_last_update < (cd->update_every * 1000000ULL / 10)) {
-						error("PLUGINSD: script '%s' (up for %lu secs) updates charts too frequently. Chart %s updated after %llu microseconds, expected %llu microseconds.", cd->fullfilename, time(NULL) - cd->started_t, st->id, usec_since_last_update, cd->update_every * 1000000ULL);
+						error("PLUGINSD: '%s' (up for %lu secs) updates charts too frequently. Chart %s updated after %llu microseconds, expected %llu microseconds.", cd->fullfilename, time(NULL) - cd->started_t, st->id, usec_since_last_update, cd->update_every * 1000000ULL);
 						//cd->enabled = 0;
 						//kill(cd->pid, SIGTERM);
 						//break;
 					}
 				}
 
+				st = NULL;
+			}
+			else if(!strcmp(s, "FLUSH")) {
+				debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting a FLUSH", cd->fullfilename);
 				st = NULL;
 			}
 			else if(!strcmp(s, "CHART")) {
@@ -6172,7 +6176,7 @@ void *pluginsd_worker_thread(void *arg)
 				char *update_every_s = qstrsep(&p);
 
 				if(!type || !*type || !id || !*id) {
-					error("PLUGINSD: script %s is requesting a CHART, without a type.id. Disabling it.", cd->fullfilename);
+					error("PLUGINSD: '%s' is requesting a CHART, without a type.id. Disabling it.", cd->fullfilename);
 					cd->enabled = 0;
 					kill(cd->pid, SIGTERM);
 					break;
@@ -6220,14 +6224,14 @@ void *pluginsd_worker_thread(void *arg)
 				char *hidden = qstrsep(&p);
 
 				if(!id || !*id) {
-					error("PLUGINSD: script %s is requesting a DIMENSION, without an id. Disabling it.", cd->fullfilename);
+					error("PLUGINSD: '%s' is requesting a DIMENSION, without an id. Disabling it.", cd->fullfilename);
 					cd->enabled = 0;
 					kill(cd->pid, SIGTERM);
 					break;
 				}
 
 				if(!st) {
-					error("PLUGINSD: script %s is requesting a DIMENSION, without a CHART. Disabling it.", cd->fullfilename);
+					error("PLUGINSD: '%s' is requesting a DIMENSION, without a CHART. Disabling it.", cd->fullfilename);
 					cd->enabled = 0;
 					kill(cd->pid, SIGTERM);
 					break;
@@ -6261,7 +6265,7 @@ void *pluginsd_worker_thread(void *arg)
 				else if(st->debug) debug(D_PLUGINSD, "PLUGINSD: dimension %s/%s already exists. Not adding it again.", st->id, id);
 			}
 			else if(!strcmp(s, "DISABLE")) {
-				error("PLUGINSD: script '%s' called DISABLE. Disabling it.", cd->fullfilename);
+				error("PLUGINSD: '%s' called DISABLE. Disabling it.", cd->fullfilename);
 				cd->enabled = 0;
 				kill(cd->pid, SIGTERM);
 				break;
@@ -6275,7 +6279,7 @@ void *pluginsd_worker_thread(void *arg)
 				debug(D_PLUGINSD, "PLUGINSD: %s is on pid %d", cd->id, cd->pid);
 			}
 			else if(!strcmp(s, "STOPPING_WAKE_ME_UP_PLEASE")) {
-				error("PLUGINSD: script '%s' (pid %d) called STOPPING_WAKE_ME_UP_PLEASE.", cd->fullfilename, cd->pid);
+				error("PLUGINSD: '%s' (pid %d) called STOPPING_WAKE_ME_UP_PLEASE.", cd->fullfilename, cd->pid);
 
 				gettimeofday(&now, NULL);
 				if(!usec && !susec) {
@@ -6298,7 +6302,7 @@ void *pluginsd_worker_thread(void *arg)
 			}
 #endif
 			else {
-				error("PLUGINSD: script %s is sending command '%s' which is not known by netdata. Disabling it.", cd->fullfilename, s);
+				error("PLUGINSD: '%s' is sending command '%s' which is not known by netdata. Disabling it.", cd->fullfilename, s);
 				cd->enabled = 0;
 				kill(cd->pid, SIGTERM);
 				break;
@@ -6309,7 +6313,7 @@ void *pluginsd_worker_thread(void *arg)
 		mypclose(fp);
 
 		if(!count && cd->enabled) {
-			error("PLUGINSD: script '%s' does not generate usefull output. Disabling it.", cd->fullfilename);
+			error("PLUGINSD: '%s' does not generate usefull output. Disabling it.", cd->fullfilename);
 			cd->enabled = 0;
 			kill(cd->pid, SIGTERM);
 		}
