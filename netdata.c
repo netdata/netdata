@@ -532,7 +532,7 @@ int create_listen_socket(int port)
 #define CONFIG_FILENAME "netdata.conf"
 #define CONFIG_FILE_LINE_MAX 4096
 
-pthread_mutex_t config_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_rwlock_t config_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 
 struct config_value {
 	char name[CONFIG_MAX_NAME + 1];
@@ -639,7 +639,7 @@ int load_config(char *filename, int overwrite_used)
 	int line = 0;
 	struct config *co = NULL;
 
-	pthread_mutex_lock(&config_mutex);
+	pthread_rwlock_wrlock(&config_rwlock);
 
 	char buffer[CONFIG_FILE_LINE_MAX + 1], *s;
 
@@ -647,7 +647,7 @@ int load_config(char *filename, int overwrite_used)
 	FILE *fp = fopen(filename, "r");
 	if(!fp) {
 		error("Cannot open file '%s'", CONFIG_DIR "/" CONFIG_FILENAME);
-		pthread_mutex_unlock(&config_mutex);
+		pthread_rwlock_unlock(&config_rwlock);
 		return 0;
 	}
 
@@ -719,7 +719,7 @@ int load_config(char *filename, int overwrite_used)
 
 	fclose(fp);
 
-	pthread_mutex_unlock(&config_mutex);
+	pthread_rwlock_unlock(&config_rwlock);
 	return 1;
 }
 
@@ -729,7 +729,7 @@ char *config_get(const char *section, const char *name, const char *default_valu
 
 	debug(D_CONFIG, "request to get config in section '%s', name '%s', default_value '%s'", section, name, default_value);
 
-	pthread_mutex_lock(&config_mutex);
+	pthread_rwlock_rdlock(&config_rwlock);
 
 	struct config *co = config_find_section(section);
 	if(!co) co = config_create(section);
@@ -754,7 +754,7 @@ char *config_get(const char *section, const char *name, const char *default_valu
 		strncpy(cv->value, default_value, CONFIG_MAX_VALUE);
 	}
 
-	pthread_mutex_unlock(&config_mutex);
+	pthread_rwlock_unlock(&config_rwlock);
 	return(cv->value);
 }
 
@@ -791,7 +791,7 @@ const char *config_set(const char *section, const char *name, const char *value)
 
 	debug(D_CONFIG, "request to set config in section '%s', name '%s', value '%s'", section, name, value);
 
-	pthread_mutex_lock(&config_mutex);
+	pthread_rwlock_wrlock(&config_rwlock);
 
 	struct config *co = config_find_section(section);
 	if(!co) co = config_create(section);
@@ -810,7 +810,7 @@ const char *config_set(const char *section, const char *name, const char *value)
 	strncpy(cv->value, value, CONFIG_MAX_VALUE);
 	// termination is already there
 
-	pthread_mutex_unlock(&config_mutex);
+	pthread_rwlock_unlock(&config_rwlock);
 
 	return value;
 }
@@ -988,8 +988,8 @@ typedef int32_t storage_number;
 typedef uint32_t ustorage_number;
 #define STORAGE_NUMBER_FORMAT "%d"
 
-#define RRD_STATS_MAGIC     "NETDATA CACHE STATS FILE V001"
-#define RRD_DIMENSION_MAGIC "NETDATA CACHE DIMENSION FILE V002"
+#define RRD_STATS_MAGIC     "NETDATA CACHE STATS FILE V005"
+#define RRD_DIMENSION_MAGIC "NETDATA CACHE DIMENSION FILE V005"
 
 struct rrd_dimension {
 	char magic[sizeof(RRD_DIMENSION_MAGIC) + 1];// our magic
@@ -1037,7 +1037,7 @@ struct rrd_stats {
 	char *title;								// title shown to user
 	char *units;								// units of measurement
 
-	pthread_mutex_t mutex;
+	pthread_rwlock_t rwlock;
 	unsigned long counter;						// the number of times we added values to this rrd
 	unsigned long counter_since_reload;			// the number of times we added values to this rrd
 
@@ -1078,7 +1078,7 @@ struct rrd_stats {
 typedef struct rrd_stats RRD_STATS;
 
 RRD_STATS *root = NULL;
-pthread_mutex_t root_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_rwlock_t root_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 
 char *rrd_stats_strncpy_name(char *to, const char *from, int length)
 {
@@ -1234,13 +1234,13 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 	// initialize the next update
 	if(!st->next_update.tv_sec) gettimeofday(&st->next_update, NULL);
 
-	pthread_mutex_init(&st->mutex, NULL);
-	pthread_mutex_lock(&root_mutex);
+	pthread_rwlock_init(&st->rwlock, NULL);
+	pthread_rwlock_wrlock(&root_rwlock);
 
 	st->next = root;
 	root = st;
 
-	pthread_mutex_unlock(&root_mutex);
+	pthread_rwlock_unlock(&root_rwlock);
 
 	return(st);
 }
@@ -1367,18 +1367,17 @@ void rrd_stats_dimension_free(RRD_DIMENSION *rd)
 
 void rrd_stats_free_all(void)
 {
+	pthread_rwlock_wrlock(&root_rwlock);
 	RRD_STATS *st;
-	pthread_mutex_lock(&root_mutex);
-
 	for(st = root; st ;) {
 		RRD_STATS *next = st->next;
 
-		pthread_mutex_lock(&st->mutex);
+		pthread_rwlock_wrlock(&st->rwlock);
 
 		if(st->dimensions) rrd_stats_dimension_free(st->dimensions);
 		st->dimensions = NULL;
 
-		pthread_mutex_unlock(&st->mutex);
+		pthread_rwlock_unlock(&st->rwlock);
 
 		if(st->mapped) munmap(st, st->memsize);
 		else free(st);
@@ -1386,24 +1385,21 @@ void rrd_stats_free_all(void)
 		st = next;
 	}
 	root = NULL;
-
-	pthread_mutex_unlock(&root_mutex);
+	pthread_rwlock_unlock(&root_rwlock);
 }
 
 RRD_STATS *rrd_stats_find(const char *id)
 {
 	unsigned long hash = simple_hash(id);
 
-	pthread_mutex_lock(&root_mutex);
-
+	pthread_rwlock_rdlock(&root_rwlock);
 	RRD_STATS *st = root;
-
 	for ( ; st ; st = st->next )
 		if(hash == st->hash)
 			if(strcmp(st->id, id) == 0)
 				break;
+	pthread_rwlock_unlock(&root_rwlock);
 
-	pthread_mutex_unlock(&root_mutex);
 	return(st);
 }
 
@@ -1425,17 +1421,16 @@ RRD_STATS *rrd_stats_find_byname(const char *name)
 {
 	char b[CONFIG_MAX_VALUE + 1];
 
-	pthread_mutex_lock(&root_mutex);
-
 	rrd_stats_strncpy_name(b, name, CONFIG_MAX_VALUE);
 	unsigned long hash = simple_hash(b);
 
+	pthread_rwlock_rdlock(&root_rwlock);
 	RRD_STATS *st = root;
 	for ( ; st ; st = st->next ) {
 		if(hash == st->hash_name && strcmp(st->name, b) == 0) break;
 	}
+	pthread_rwlock_unlock(&root_rwlock);
 
-	pthread_mutex_unlock(&root_mutex);
 	return(st);
 }
 
@@ -1487,8 +1482,8 @@ int rrd_stats_dimension_set(RRD_STATS *st, char *id, collected_number value)
 
 void rrd_stats_next_usec(RRD_STATS *st, unsigned long long microseconds)
 {
-	// lock it to work with the dimensions
-	pthread_mutex_lock(&st->mutex);
+	// a read lock is OK here
+	pthread_rwlock_rdlock(&st->rwlock);
 
 	RRD_DIMENSION *rd;
 	for( rd = st->dimensions; rd ; rd = rd->next ) {
@@ -1514,7 +1509,7 @@ void rrd_stats_next_usec(RRD_STATS *st, unsigned long long microseconds)
 
 	}
 
-	pthread_mutex_unlock(&st->mutex);
+	pthread_rwlock_unlock(&st->rwlock);
 
 	return;
 }
@@ -1545,41 +1540,10 @@ void rrd_stats_next_plugins(RRD_STATS *st)
 
 unsigned long long rrd_stats_done(RRD_STATS *st)
 {
-	pthread_mutex_lock(&st->mutex);
-
 	RRD_DIMENSION *rd, *last;
 
-	// find if there are any obsolete dimensions (not updated recently)
-	for( rd = st->dimensions, last = NULL ; rd ; ) {
-		if((rd->last_updated.tv_sec + (10 * st->update_every)) < st->last_updated.tv_sec) { // remove it only it is not updated in 10 seconds
-			debug(D_RRD_STATS, "Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
-
-			if(!last) {
-				st->dimensions = rd->next;
-				rd->next = NULL;
-				rrd_stats_dimension_free(rd);
-				rd = st->dimensions;
-				continue;
-			}
-			else {
-				last->next = rd->next;
-				rd->next = NULL;
-				rrd_stats_dimension_free(rd);
-				rd = last->next;
-				continue;
-			}
-		}
-
-		last = rd;
-		rd = rd->next;
-	}
-
-	if(!st->dimensions) {
-		st->enabled = 0;
-		pthread_mutex_unlock(&st->mutex);
-		// rrd_stats_free(st);
-		return(st->update_every * 1000000ULL);
-	}
+	// a read lock is OK here
+	pthread_rwlock_rdlock(&st->rwlock);
 
 	// calculate totals and count the dimensions
 	st->absolute_total = 0;
@@ -1735,6 +1699,49 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 		}
 		// store the time difference to the last entry
 		st->timediff[st->current_entry] = st->usec_since_last_update;
+
+
+		// ALL DONE ABOUT THE DATA UPDATE
+		// --------------------------------------------------------------------
+
+
+		// find if there are any obsolete dimensions (not updated recently)
+		for( rd = st->dimensions; rd ; rd = rd->next )
+			if((rd->last_updated.tv_sec + (10 * st->update_every)) < st->last_updated.tv_sec)
+				break;
+
+		if(rd) {
+			// there is dimension to free
+			// upgrade our read lock to a write lock
+			pthread_rwlock_unlock(&st->rwlock);
+			pthread_rwlock_wrlock(&st->rwlock);
+
+			for( rd = st->dimensions, last = NULL ; rd ; ) {
+				if((rd->last_updated.tv_sec + (10 * st->update_every)) < st->last_updated.tv_sec) { // remove it only it is not updated in 10 seconds
+					debug(D_RRD_STATS, "Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
+
+					if(!last) {
+						st->dimensions = rd->next;
+						rd->next = NULL;
+						rrd_stats_dimension_free(rd);
+						rd = st->dimensions;
+						continue;
+					}
+					else {
+						last->next = rd->next;
+						rd->next = NULL;
+						rrd_stats_dimension_free(rd);
+						rd = last->next;
+						continue;
+					}
+				}
+
+				last = rd;
+				rd = rd->next;
+			}
+
+			if(!st->dimensions) st->enabled = 0;
+		}
 	}
 
 	st->last_updated.tv_sec  = st->next_update.tv_sec;
@@ -1742,8 +1749,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 	st->counter++;
 	st->counter_since_reload++;
 
-	pthread_mutex_unlock(&st->mutex);
-
+	pthread_rwlock_unlock(&st->rwlock);
 	return(st->usec_since_last_update);
 }
 
@@ -2041,7 +2047,7 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 {
 	web_buffer_increase(wb, 16384);
 
-	pthread_mutex_lock(&st->mutex);
+	pthread_rwlock_rdlock(&st->rwlock);
 
 	web_buffer_printf(wb,
 		"\t\t{\n"
@@ -2136,7 +2142,7 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 		, memory
 		);
 
-	pthread_mutex_unlock(&st->mutex);
+	pthread_rwlock_unlock(&st->rwlock);
 	return memory;
 }
 
@@ -2186,7 +2192,7 @@ void rrd_stats_all_json(struct web_buffer *wb)
 unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int entries_to_show, int group, int group_method, time_t after, time_t before)
 {
 	int c;
-	pthread_mutex_lock(&st->mutex);
+	pthread_rwlock_rdlock(&st->rwlock);
 
 
 	// -------------------------------------------------------------------------
@@ -2232,7 +2238,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 	RRD_DIMENSION *rd;
 	for( rd = st->dimensions ; rd ; rd = rd->next) dimensions++;
 	if(!dimensions) {
-		pthread_mutex_unlock(&st->mutex);
+		pthread_rwlock_unlock(&st->rwlock);
 		web_buffer_printf(wb, "No dimensions yet.");
 		return 0;
 	}
@@ -2432,7 +2438,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 
 	debug(D_RRD_STATS, "RRD_STATS_JSON: %s Generated %ld rows, total %ld bytes", st->name, printed, wb->bytes);
 
-	pthread_mutex_unlock(&st->mutex);
+	pthread_rwlock_unlock(&st->rwlock);
 	return last_timestamp;
 }
 
