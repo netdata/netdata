@@ -1769,6 +1769,7 @@ struct web_buffer {
 };
 
 #define web_buffer_printf(wb, args...) wb->bytes += snprintf(&wb->buffer[wb->bytes], (wb->size - wb->bytes), ##args)
+#define web_buffer_reset(wb) wb->buffer[wb->bytes = 0] = '\0'
 
 void web_buffer_strcpy(struct web_buffer *wb, const char *txt)
 {
@@ -2168,6 +2169,7 @@ void rrd_stats_all_json(struct web_buffer *wb)
 
 	web_buffer_printf(wb, RRD_GRAPH_JSON_HEADER);
 
+	pthread_rwlock_rdlock(&root_rwlock);
 	for(st = root, c = 0; st ; st = st->next) {
 		if(st->enabled) {
 			if(c) web_buffer_printf(wb, "%s", ",\n");
@@ -2175,6 +2177,7 @@ void rrd_stats_all_json(struct web_buffer *wb)
 			c++;
 		}
 	}
+	pthread_rwlock_unlock(&root_rwlock);
 	
 	web_buffer_printf(wb, "\n\t],\n"
 		"\t\"hostname\": \"%s\",\n"
@@ -2189,7 +2192,7 @@ void rrd_stats_all_json(struct web_buffer *wb)
 		);
 }
 
-unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int entries_to_show, int group, int group_method, time_t after, time_t before)
+unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int entries_to_show, int group, int group_method, time_t after, time_t before, int only_non_zero)
 {
 	int c;
 	pthread_rwlock_rdlock(&st->rwlock);
@@ -2230,6 +2233,12 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 	if(before == 0) before = st->last_updated.tv_sec;
 	if(after  == 0) after = rrd_stats_first_entry_t(st);
 
+	// ---
+
+	// our return value (the last timestamp printed)
+	// this is required to detect re-transmit in google JSONP
+	time_t last_timestamp = 0;
+		
 
 	// -------------------------------------------------------------------------
 	// find how many dimensions we have
@@ -2244,24 +2253,6 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 	}
 
 	
-	// -------------------------------------------------------------------------
-	// print the JSON header
-	
-	web_buffer_printf(wb, "{\n	%scols%s:\n	[\n", kq, kq);
-	web_buffer_printf(wb, "		{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
-	web_buffer_printf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotation%s}},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
-	web_buffer_printf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotationText%s}}", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
-
-	// print the header for each dimension
-	// and update the print_hidden array for the dimensions that should be hidden
-	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
-		if(!rd->hidden) web_buffer_printf(wb, ",\n		{%sid%s:%s%s,%slabel%s:%s%s%s,%spattern%s:%s%s,%stype%s:%snumber%s}", kq, kq, sq, sq, kq, kq, sq, rd->name, sq, kq, kq, sq, sq, kq, kq, sq, sq);
-	}
-
-	// print the begin of row data
-	web_buffer_printf(wb, "\n	],\n	%srows%s:\n	[\n", kq, kq);
-
-
 	// -------------------------------------------------------------------------
 	// prepare various strings, to speed up the loop
 	
@@ -2304,139 +2295,184 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 	calculated_number group_values[dimensions]; // keep sums when grouping
 	storage_number    print_values[dimensions]; // keep the final value to be printed
 	int               print_hidden[dimensions]; // keep hidden flags
+	int               found_non_zero[dimensions];
 
 	// initialize them
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 		group_values[c] = print_values[c] = 0;
 		print_hidden[c] = rd->hidden;
+		found_non_zero[c] = 0;
 	}
 
 	// -------------------------------------------------------------------------
-	// the main loop
+	// remove dimensions that contain only zeros
 
-	// our return value (the last timestamp printed)
-	// this is required to detect re-transmit in google JSONP
-	time_t last_timestamp = 0;
-	
-	int annotate_reset = 0;
-	int annotation_count = 0;
-	
-	// to allow grouping on the same values, we need a pad
-	long pad = before % group;
+	int max_loop = 1;
+	if(only_non_zero) max_loop = 2;
 
-	// the minimum line length we expect
-	int line_size = 4096 + (dimensions * 200);
+	for(; max_loop ; max_loop--) {
 
-	unsigned long long time_usec = st->last_updated.tv_sec * 1000000ULL + st->last_updated.tv_usec;
-	long t, count, printed, group_count;
-	
-	for (count = printed = group_count = 0, t = current_entry; max_entries ; time_usec -= st->timediff[t], t--, max_entries--) {
-		if(t < 0) t = st->entries - 1;
+		// -------------------------------------------------------------------------
+		// print the JSON header
+		
+		web_buffer_printf(wb, "{\n	%scols%s:\n	[\n", kq, kq);
+		web_buffer_printf(wb, "		{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
+		web_buffer_printf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotation%s}},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
+		web_buffer_printf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotationText%s}}", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
 
-		if(st->debug)
-			if(st->timediff[t] == 0) debug(D_RRD_STATS, "WARNING: %s time diff is zero at position %ld", st->id, t);
-
-		int print_this = 0;
-		time_t now = time_usec / 1000000ULL;
-
-		if(st->debug) {
-			debug(D_RRD_STATS, "%s t = %ld, count = %ld, group_count = %ld, printed = %ld, now = %lu, %s %s"
-				, st->id
-				, t
-				, count + 1
-				, group_count + 1
-				, printed
-				, now
-				, (((count + 1 - pad) % group) == 0)?"PRINT":"  -  "
-				, (now >= after && now <= before)?"RANGE":"  -  "
-				);
-		}
-
-		// make sure we return data in the proper time range
-		if(now < after || now > before) continue;
-
-		count++;
-		group_count++;
-
-		if(((count - pad) % group) == 0) {
-			if(printed >= entries_to_show) {
-				// debug(D_RRD_STATS, "Already printed all rows. Stopping.");
-				break;
-			}
-			
-			if(group_count != group) {
-				// this is an incomplete group, skip it.
-				for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
-					group_values[c] = 0;
-					
-				group_count = 0;
-				continue;
-			}
-
-			// check if we may exceed the buffer provided
-			web_buffer_increase(wb, line_size);
-
-			// generate the local date time
-			struct tm *tm = localtime(&now);
-			if(!tm) { error("localtime() failed."); continue; }
-			if(now > last_timestamp) last_timestamp = now;
-
-			if(printed) web_buffer_strcpy(wb, "]},\n");
-			web_buffer_strcpy(wb, pre_date);
-			web_buffer_jsdate(wb, tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)((time_usec % 1000000ULL) / 1000));
-			web_buffer_strcpy(wb, post_date);
-
-			print_this = 1;
-		}
-
+		// print the header for each dimension
+		// and update the print_hidden array for the dimensions that should be hidden
 		for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
-			long value = rd->values[t];
-			
-			switch(group_method) {
-				case GROUP_MAX:
-					if(abs(value) > abs(group_values[c])) group_values[c] = value;
-					break;
-
-				default:
-				case GROUP_AVERAGE:
-					group_values[c] += value;
-					if(print_this) group_values[c] /= group_count;
-					break;
-			}
-
-			if(print_this) {
-				print_values[c] = group_values[c];
-				group_values[c] = 0;
-			}
+			if(!print_hidden[c])
+				web_buffer_printf(wb, ",\n		{%sid%s:%s%s,%slabel%s:%s%s%s,%spattern%s:%s%s,%stype%s:%snumber%s}", kq, kq, sq, sq, kq, kq, sq, rd->name, sq, kq, kq, sq, sq, kq, kq, sq, sq);
 		}
 
-		if(print_this) {
-			group_count = 0;
-			
-			if(annotate_reset) {
-				annotation_count++;
-				web_buffer_strcpy(wb, overflow_annotation);
-				annotate_reset = 0;
-			}
-			else
-				web_buffer_strcpy(wb, normal_annotation);
+		// print the begin of row data
+		web_buffer_printf(wb, "\n	],\n	%srows%s:\n	[\n", kq, kq);
 
-			for(c = 0 ; c < dimensions ; c++) {
-				if(!print_hidden[c]) {
-					web_buffer_strcpy(wb, pre_value);
-					web_buffer_rrd_value(wb, print_values[c]);
-					web_buffer_strcpy(wb, post_value);
+
+		// -------------------------------------------------------------------------
+		// the main loop
+
+		int annotate_reset = 0;
+		int annotation_count = 0;
+		
+		// to allow grouping on the same values, we need a pad
+		long pad = before % group;
+
+		// the minimum line length we expect
+		int line_size = 4096 + (dimensions * 200);
+
+		unsigned long long time_usec = st->last_updated.tv_sec * 1000000ULL + st->last_updated.tv_usec;
+		long t;
+
+		long count = 0, printed = 0, group_count = 0;
+		last_timestamp = 0;
+		for(t = current_entry; max_entries ; time_usec -= st->timediff[t], t--, max_entries--) {
+			if(t < 0) t = st->entries - 1;
+
+			if(st->debug)
+				if(st->timediff[t] == 0) debug(D_RRD_STATS, "WARNING: %s time diff is zero at position %ld", st->id, t);
+
+			int print_this = 0;
+			time_t now = time_usec / 1000000ULL;
+
+			if(st->debug) {
+				debug(D_RRD_STATS, "%s t = %ld, count = %ld, group_count = %ld, printed = %ld, now = %lu, %s %s"
+					, st->id
+					, t
+					, count + 1
+					, group_count + 1
+					, printed
+					, now
+					, (((count + 1 - pad) % group) == 0)?"PRINT":"  -  "
+					, (now >= after && now <= before)?"RANGE":"  -  "
+					);
+			}
+
+			// make sure we return data in the proper time range
+			if(now < after || now > before) continue;
+
+			count++;
+			group_count++;
+
+			if(((count - pad) % group) == 0) {
+				if(printed >= entries_to_show) {
+					// debug(D_RRD_STATS, "Already printed all rows. Stopping.");
+					break;
+				}
+				
+				if(group_count != group) {
+					// this is an incomplete group, skip it.
+					for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
+						group_values[c] = 0;
+						
+					group_count = 0;
+					continue;
+				}
+
+				// check if we may exceed the buffer provided
+				web_buffer_increase(wb, line_size);
+
+				// generate the local date time
+				struct tm *tm = localtime(&now);
+				if(!tm) { error("localtime() failed."); continue; }
+				if(now > last_timestamp) last_timestamp = now;
+
+				if(printed) web_buffer_strcpy(wb, "]},\n");
+				web_buffer_strcpy(wb, pre_date);
+				web_buffer_jsdate(wb, tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)((time_usec % 1000000ULL) / 1000));
+				web_buffer_strcpy(wb, post_date);
+
+				print_this = 1;
+			}
+
+			for(rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
+				long value = rd->values[t];
+				
+				switch(group_method) {
+					case GROUP_MAX:
+						if(abs(value) > abs(group_values[c])) group_values[c] = value;
+						break;
+
+					default:
+					case GROUP_AVERAGE:
+						group_values[c] += value;
+						if(print_this) group_values[c] /= group_count;
+						break;
+				}
+
+				if(print_this) {
+					print_values[c] = group_values[c];
+					group_values[c] = 0;
 				}
 			}
 
-			printed++;
+			if(print_this) {
+				group_count = 0;
+				
+				if(annotate_reset) {
+					annotation_count++;
+					web_buffer_strcpy(wb, overflow_annotation);
+					annotate_reset = 0;
+				}
+				else
+					web_buffer_strcpy(wb, normal_annotation);
+
+				for(c = 0 ; c < dimensions ; c++) {
+					if(!print_hidden[c]) {
+						web_buffer_strcpy(wb, pre_value);
+						web_buffer_rrd_value(wb, print_values[c]);
+						web_buffer_strcpy(wb, post_value);
+
+						if(print_values[c]) found_non_zero[c]++;
+					}
+				}
+
+				printed++;
+			}
 		}
-	}
 
-	if(printed) web_buffer_printf(wb, "]}");
-	web_buffer_printf(wb, "\n	]\n}\n");
+		if(printed) web_buffer_printf(wb, "]}");
+		web_buffer_printf(wb, "\n	]\n}\n");
 
-	debug(D_RRD_STATS, "RRD_STATS_JSON: %s Generated %ld rows, total %ld bytes", st->name, printed, wb->bytes);
+		if(only_non_zero && max_loop > 1) {
+			int changed = 0;
+			for(rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
+				if(!print_hidden[c] && !found_non_zero[c]) {
+					changed = 1;
+					print_hidden[c] = 1;
+				}
+			}
+
+			if(changed) web_buffer_reset(wb);
+			else break;
+		}
+		else break;
+		
+	} // max_loop
+
+	debug(D_RRD_STATS, "RRD_STATS_JSON: %s total %ld bytes", st->name, wb->bytes);
 
 	pthread_rwlock_unlock(&st->rwlock);
 	return last_timestamp;
@@ -2733,6 +2769,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	long group_count = 1;
 	time_t after = 0, before = 0;
 	int group_method = GROUP_AVERAGE;
+	int nonzero = 0;
 
 	if(url) {
 		// parse the lines required
@@ -2765,6 +2802,11 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 		tok = mystrsep(&url, "/");
 		if(tok) before = strtoul(tok, NULL, 10);
 		if(before < 0) before = 0;
+	}
+	if(url) {
+		// parse nonzero
+		tok = mystrsep(&url, "/");
+		if(tok && strcmp(tok, "nonzero") == 0) nonzero = 1;
 	}
 
 	w->data->contenttype = CT_APPLICATION_JSON;
@@ -2835,7 +2877,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	}
 	
 	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group, %d group_method, %lu after, %lu before).", w->id, st->name, st->id, lines, group_count, group_method, after, before);
-	unsigned long timestamp_in_data = rrd_stats_json(datasource_type, st, w->data, lines, group_count, group_method, after, before);
+	unsigned long timestamp_in_data = rrd_stats_json(datasource_type, st, w->data, lines, group_count, group_method, after, before, nonzero);
 
 	if(datasource_type == DATASOURCE_GOOGLE_JSONP) {
 		if(timestamp_in_data > last_timestamp_in_data)
