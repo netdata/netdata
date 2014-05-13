@@ -37,6 +37,8 @@ function generateChartURL(chart) {
 	url += "/";
 	url += chart.before?chart.before.toString():"0";
 	url += "/";
+	url += chart.non_zero?"nonzero":"all";
+	url += "/";
 
 	return url;
 }
@@ -259,6 +261,7 @@ function loadCharts(base_url, doNext) {
 					json.charts[i].chartOptions.vAxis.viewWindowMode = 'maximized';
 					json.charts[i].chartOptions.vAxis.minValue = null;
 					json.charts[i].chartOptions.vAxis.maxValue = null;
+					json.charts[i].non_zero = 0;
 					break;
 
 				case "stacked":
@@ -267,6 +270,7 @@ function loadCharts(base_url, doNext) {
 					json.charts[i].chartOptions.areaOpacity = 0.85;
 					json.charts[i].chartOptions.lineWidth = 1;
 					json.charts[i].group_method = "average";
+					json.charts[i].non_zero = 1;
 
 					json.charts[i].chartOptions.vAxis.viewWindowMode = 'maximized';
 					json.charts[i].chartOptions.vAxis.minValue = null;
@@ -278,6 +282,7 @@ function loadCharts(base_url, doNext) {
 					json.charts[i].chartType = "LineChart";
 					json.charts[i].chartOptions.lineWidth = 2;
 					json.charts[i].chartOptions.curveType = 'function';
+					json.charts[i].non_zero = 0;
 					break;
 			}
 

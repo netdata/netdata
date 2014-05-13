@@ -2228,17 +2228,19 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 	else if(current_entry >= st->entries) current_entry = st->entries - 1;
 	
 	// find the oldest entry of the round-robin
-	long max_entries = (st->counter <= (unsigned long)st->entries) ? st->counter - 1 : (unsigned long)st->entries;
+	long max_entries_init = (st->counter <= (unsigned long)st->entries) ? st->counter - 1 : (unsigned long)st->entries;
 	
 	if(before == 0) before = st->last_updated.tv_sec;
 	if(after  == 0) after = rrd_stats_first_entry_t(st);
+
+	unsigned long long time_usec_init = st->last_updated.tv_sec * 1000000ULL + st->last_updated.tv_usec;
 
 	// ---
 
 	// our return value (the last timestamp printed)
 	// this is required to detect re-transmit in google JSONP
-	time_t last_timestamp = 0;
-		
+	time_t last_timestamp = 0;			
+
 
 	// -------------------------------------------------------------------------
 	// find how many dimensions we have
@@ -2278,7 +2280,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 			, before - after
 			, entries_to_show
 			, group
-			, max_entries
+			, max_entries_init
 			);
 
 		if(before < after)
@@ -2343,7 +2345,9 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 		// the minimum line length we expect
 		int line_size = 4096 + (dimensions * 200);
 
-		unsigned long long time_usec = st->last_updated.tv_sec * 1000000ULL + st->last_updated.tv_usec;
+		unsigned long long time_usec = time_usec_init;
+		long max_entries = max_entries_init;
+
 		long t;
 
 		long count = 0, printed = 0, group_count = 0;

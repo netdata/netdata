@@ -109,6 +109,7 @@ function initMainChart(c) {
 	mainchart.hiddenchart = $.extend(true, {}, mainchart);
 	mainchart.hiddenchart.chartOptions.height = MAINCHART_CONTROL_HEIGHT;
 	mainchart.hiddenchart.div = 'maingraph_control';
+	mainchart.hiddenchart.non_zero = 0;
 
 	// initialize the div
 	showChartIsLoading(mainchart.div, mainchart.name, mainchart.chartOptions.width, mainchart.chartOptions.height);
