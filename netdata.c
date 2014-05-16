@@ -973,10 +973,10 @@ void *mymmap(const char *filename, unsigned long size)
 
 #define RRD_STATS_NAME_MAX 1024
 
-//typedef long double calculated_number;
-//#define CALCULATED_NUMBER_FORMAT "%0.1Lf"
-typedef long long calculated_number;
-#define CALCULATED_NUMBER_FORMAT "%lld"
+typedef long double calculated_number;
+#define CALCULATED_NUMBER_FORMAT "%0.3Lf"
+//typedef long long calculated_number;
+//#define CALCULATED_NUMBER_FORMAT "%lld"
 
 typedef long long collected_number;
 #define COLLECTED_NUMBER_FORMAT "%lld"
@@ -988,7 +988,7 @@ typedef int32_t storage_number;
 typedef uint32_t ustorage_number;
 #define STORAGE_NUMBER_FORMAT "%d"
 
-#define RRD_STATS_MAGIC     "NETDATA CACHE STATS FILE V005"
+#define RRD_STATS_MAGIC     "NETDATA CACHE STATS FILE V006"
 #define RRD_DIMENSION_MAGIC "NETDATA CACHE DIMENSION FILE V005"
 
 struct rrd_dimension {
@@ -1011,7 +1011,7 @@ struct rrd_dimension {
 	long multiplier;
 	long divisor;
 
-	struct timeval last_updated;				// when was this dimension last updated
+	struct timeval last_collected;				// when was this dimension last updated
 
 	calculated_number calculated_value;
 	calculated_number last_calculated_value;
@@ -1039,7 +1039,7 @@ struct rrd_stats {
 
 	pthread_rwlock_t rwlock;
 	unsigned long counter;						// the number of times we added values to this rrd
-	unsigned long counter_since_reload;			// the number of times we added values to this rrd
+	unsigned long counter_done;					// the number of times we added values to this rrd
 
 	int mapped;									// if set to 1, this is memory mapped
 	unsigned long memsize;						// how much mem we have allocated for this (without dimensions)
@@ -1057,7 +1057,7 @@ struct rrd_stats {
 	int update_every;							// every how many seconds is this updated?
 	unsigned long long first_entry_t;			// the timestamp (in microseconds) of the oldest entry in the db
 	struct timeval last_updated;				// when this data set was last updated
-	struct timeval next_update;
+	struct timeval last_collected;
 	unsigned long long usec_since_last_update;
 
 	total_number absolute_total;
@@ -1072,8 +1072,6 @@ struct rrd_stats {
 	RRD_DIMENSION *dimensions;					// the actual data for every dimension
 
 	struct rrd_stats *next;						// linking of rrd stats
-
-	uint32_t timediff[];						// the time in microseconds between each data entry - HAS TO BE LAST
 };
 typedef struct rrd_stats RRD_STATS;
 
@@ -1151,7 +1149,7 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 	int enabled = config_get_boolean(fullid, "enabled", 1);
 	if(!enabled) entries = 5;
 
-	unsigned long size = sizeof(RRD_STATS) + (entries * sizeof(uint32_t));
+	unsigned long size = sizeof(RRD_STATS);
 	char *cache_dir = rrd_stats_cache_dir(fullid);
 
 	debug(D_RRD_STATS, "Creating RRD_STATS for '%s.%s'.", type, id);
@@ -1229,10 +1227,9 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 	st->enabled = enabled;
 
 	st->debug = 0;
-	st->counter_since_reload = 0;
 
-	// initialize the next update
-	if(!st->next_update.tv_sec) gettimeofday(&st->next_update, NULL);
+	st->last_collected.tv_sec = 0;
+	st->last_collected.tv_usec = 0;
 
 	pthread_rwlock_init(&st->rwlock, NULL);
 	pthread_rwlock_wrlock(&root_rwlock);
@@ -1462,8 +1459,10 @@ int rrd_stats_dimension_hide(RRD_STATS *st, const char *id)
 
 void rrd_stats_dimension_set_by_pointer(RRD_STATS *st, RRD_DIMENSION *rd, collected_number value)
 {
-	rd->last_updated.tv_sec = st->last_updated.tv_sec;
-	rd->last_updated.tv_usec = st->last_updated.tv_usec;
+	if(!st->last_collected.tv_sec) gettimeofday(&st->last_collected, NULL);
+
+	rd->last_collected.tv_sec = st->last_collected.tv_sec;
+	rd->last_collected.tv_usec = st->last_collected.tv_usec;
 
 	rd->collected_value = value;
 }
@@ -1480,54 +1479,61 @@ int rrd_stats_dimension_set(RRD_STATS *st, char *id, collected_number value)
 	return 0;
 }
 
-void rrd_stats_next_usec(RRD_STATS *st, unsigned long long microseconds)
+void rrd_stats_next_internal(RRD_STATS *st)
 {
 	// a read lock is OK here
 	pthread_rwlock_rdlock(&st->rwlock);
 
 	RRD_DIMENSION *rd;
 	for( rd = st->dimensions; rd ; rd = rd->next ) {
-		rd->last_calculated_value   = rd->calculated_value;
-		rd->last_collected_value    = rd->collected_value;
-
-		rd->calculated_value = 0;
+		rd->last_collected_value = rd->collected_value;
 		rd->collected_value = 0;
 	}
 
-	st->last_absolute_total  = st->absolute_total;
-	st->absolute_total       = 0;
-	st->current_entry        = ((st->current_entry + 1) >= st->entries) ? 0 : st->current_entry + 1;
+	pthread_rwlock_unlock(&st->rwlock);
+}
 
-	st->usec_since_last_update = microseconds;
-	if(!st->last_updated.tv_sec) gettimeofday(&st->next_update, NULL);
-	else {
-		unsigned long long usec = st->last_updated.tv_sec * 1000000ULL + st->last_updated.tv_usec;
-		usec += microseconds;
-
-		st->next_update.tv_sec     = usec / 1000000ULL;
-		st->next_update.tv_usec    = usec % 1000000ULL;
-
+void rrd_stats_next_timeval(RRD_STATS *st, struct timeval *now)
+{
+	if(!st->last_collected.tv_sec) {
+		gettimeofday(&st->last_collected, NULL);
+		unsigned long long ut = st->last_collected.tv_sec * 1000000ULL + st->last_collected.tv_usec - st->update_every * 1000000ULL;
+		st->last_collected.tv_sec = ut / 1000000ULL;
+		st->last_collected.tv_usec = ut % 1000000ULL;
 	}
 
-	pthread_rwlock_unlock(&st->rwlock);
+	st->usec_since_last_update = usecdiff(now, &st->last_collected);
+	st->last_collected.tv_sec = now->tv_sec;
+	st->last_collected.tv_usec = now->tv_usec;
 
-	return;
+	rrd_stats_next_internal(st);
+}
+
+void rrd_stats_next_usec(RRD_STATS *st, unsigned long long microseconds)
+{
+	if(!st->last_collected.tv_sec) {
+		gettimeofday(&st->last_collected, NULL);
+		unsigned long long ut = st->last_collected.tv_sec * 1000000ULL + st->last_collected.tv_usec;
+		st->last_collected.tv_sec = ut / 1000000ULL;
+		st->last_collected.tv_usec = ut % 1000000ULL;
+	}
+	else {
+		unsigned long long ut = st->last_collected.tv_sec * 1000000ULL + st->last_collected.tv_usec + microseconds;
+		st->last_collected.tv_sec = ut / 1000000ULL;
+		st->last_collected.tv_usec = ut % 1000000ULL;
+	}
+	st->usec_since_last_update = microseconds;
+
+	rrd_stats_next_internal(st);
 }
 
 void rrd_stats_next(RRD_STATS *st)
 {
-	if(st->last_updated.tv_sec) {
+	if(st->last_collected.tv_sec) {
 		struct timeval now;
 		gettimeofday(&now, NULL);
-		unsigned long long microseconds = usecdiff(&now, &st->last_updated);
-		
-		unsigned long long min_microseconds = st->update_every * 1000000ULL / 2ULL;
-		if(microseconds < min_microseconds) {
-			debug(D_RRD_STATS, "Chart %s is being updated too early (after %llu, expected %llu microseconds). Assuming default.", st->name, microseconds, min_microseconds);
-			microseconds = st->update_every * 1000000ULL;
-		}
-		
-		rrd_stats_next_usec(st, microseconds);
+
+		rrd_stats_next_timeval(st, &now);
 	}
 	else
 		rrd_stats_next_usec(st, st->update_every * 1000000ULL);
@@ -1545,209 +1551,230 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 	// a read lock is OK here
 	pthread_rwlock_rdlock(&st->rwlock);
 
+	if(!st->last_updated.tv_sec) {
+		unsigned long long ut = st->last_collected.tv_sec * 1000000ULL + st->last_collected.tv_usec - st->usec_since_last_update;
+		st->last_updated.tv_sec = ut / 1000000ULL;
+		st->last_updated.tv_usec = ut % 1000000ULL;
+	}
+
+	unsigned long long last_ut = st->last_updated.tv_sec * 1000000ULL + st->last_updated.tv_usec;
+	unsigned long long now_ut = st->last_collected.tv_sec * 1000000ULL + st->last_collected.tv_usec + st->usec_since_last_update;
+	unsigned long long next_ut = (st->last_updated.tv_sec + st->update_every) * 1000000ULL;
+
+	st->counter_done++;
+	if(st->counter_done == 1 || now_ut < next_ut) {
+		if(st->debug) debug(D_RRD_STATS, "%s: Skipping collected values (usec since last update = %llu, counter_done = %lu)", st->name, st->usec_since_last_update, st->counter_done);
+		// we don't have any usable data yet
+		pthread_rwlock_unlock(&st->rwlock);
+		return(st->usec_since_last_update);
+	}
+
+	if(st->debug) debug(D_RRD_STATS, "microseconds since last update: %llu", st->usec_since_last_update);
+
 	// calculate totals and count the dimensions
-	st->absolute_total = 0;
 	int dimensions;
+	st->last_absolute_total  = st->absolute_total;
+	st->absolute_total = 0;
 	for( rd = st->dimensions, dimensions = 0 ; rd ; rd = rd->next, dimensions++ )
 		st->absolute_total += rd->collected_value;
 
-	// if this is the second+ value we collect
-	if(st->counter) {
-		if(st->debug) debug(D_RRD_STATS, "microseconds since last update: %llu", st->usec_since_last_update);
+	// process all dimensions to calculate its values
+	for( rd = st->dimensions ; rd ; rd = rd->next ) {
+		switch(rd->algorithm) {
+			case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
+				// the percentage of the current increment
+				// over the increment of all dimensions together
+				if(st->absolute_total == st->last_absolute_total) rd->calculated_value = 0;
+				else rd->calculated_value =
+					  (calculated_number)100
+					* (calculated_number)(rd->collected_value - rd->last_collected_value)
+					/ (calculated_number)(st->absolute_total  - st->last_absolute_total);
 
-		// x 10
-		// in all calculations we multiply with 10 to allow
-		// for all 1 decimal point at the chart
-
-		// process all dimensions to calculate its values
-		for( rd = st->dimensions ; rd ; rd = rd->next ) {
-			switch(rd->algorithm) {
-				case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
-					// the percentage of the current increment
-					// over the increment of all dimensions together
-					if(st->absolute_total == st->last_absolute_total) rd->calculated_value = 0;
-					else rd->calculated_value =
-						  (calculated_number)10
-						* (calculated_number)100
-						* (calculated_number)(rd->collected_value - rd->last_collected_value)
-						/ (calculated_number)(st->absolute_total  - st->last_absolute_total);
-
-					if(st->debug)
-						debug(D_RRD_STATS, "%s/%s: CALC "
-							CALCULATED_NUMBER_FORMAT " = 10 * 100"
-							" * (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
-							" / (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
-							, st->id, rd->name
-							, rd->calculated_value
-							, rd->collected_value, rd->last_collected_value
-							, st->absolute_total, st->last_absolute_total
-							);
-					break;
-
-				case RRD_DIMENSION_PCENT_OVER_ROW_TOTAL:
-					if(!st->absolute_total) rd->calculated_value = 0;
-					else
-					// the percentage of the current value
-					// over the total of all dimensions
-					rd->calculated_value =
-						  (calculated_number)10
-						* (calculated_number)100
-						* (calculated_number)rd->collected_value
-						/ (calculated_number)st->absolute_total;
-
-					if(st->debug)
-						debug(D_RRD_STATS, "%s/%s: CALC "
-							CALCULATED_NUMBER_FORMAT " = 10 * 100"
-							" * " COLLECTED_NUMBER_FORMAT
-							" / " COLLECTED_NUMBER_FORMAT
-							, st->id, rd->name
-							, rd->calculated_value
-							, rd->collected_value
-							, st->absolute_total
-							);
-					break;
-
-				case RRD_DIMENSION_INCREMENTAL:
-					// we need the incremental calculation to produce per second results
-					// so, we multiply with 1.000.000 and divide by the microseconds passed since
-					// the last entry
-
-					// if the new is smaller than the old (an overflow, or reset), set the old equal to the new
-					// to reset the calculation (it will give zero as the calculation for this second)
-					if(rd->last_collected_value > rd->collected_value) rd->last_collected_value = rd->collected_value;
-
-					rd->calculated_value =
-						  (calculated_number)10
-						* (calculated_number)1000000
-						* (calculated_number)(rd->collected_value - rd->last_collected_value)
-						/ (calculated_number)st->usec_since_last_update;
-
-					if(st->debug)
-						debug(D_RRD_STATS, "%s/%s: CALC "
-							CALCULATED_NUMBER_FORMAT " = 10 * 1000000"
-							" * (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
-							" / %llu"
-							, st->id, rd->name
-							, rd->calculated_value
-							, rd->collected_value, rd->last_collected_value
-							, st->usec_since_last_update
-							);
-					break;
-
-				case RRD_DIMENSION_ABSOLUTE:
-					rd->calculated_value =
-						  (calculated_number)10
-						* (calculated_number)rd->collected_value;
-
-					if(st->debug)
-						debug(D_RRD_STATS, "%s/%s: CALC "
-							CALCULATED_NUMBER_FORMAT " = 10"
-							" * " COLLECTED_NUMBER_FORMAT
-							, st->id, rd->name
-							, rd->calculated_value
-							, rd->collected_value
-							);
-					break;
-
-				default:
-					// make the default zero, to make sure
-					// it gets noticed when we add new types
-					rd->calculated_value = 0;
-
-					if(st->debug)
-						debug(D_RRD_STATS, "%s/%s: CALC "
-							CALCULATED_NUMBER_FORMAT " = 0"
-							, st->id, rd->name
-							, rd->calculated_value
-							);
-					break;
-			}
-
-			if(!st->counter_since_reload) rd->calculated_value = 0;
-
-			// store the calculated value
-			rd->values[st->current_entry] = (storage_number)
-				(	  rd->calculated_value
-					* (calculated_number)rd->multiplier
-					/ (calculated_number)rd->divisor
-				);
-			
-			if(st->debug)
-				debug(D_RRD_STATS, "%s/%s STORE "
-					STORAGE_NUMBER_FORMAT " = "
-					CALCULATED_NUMBER_FORMAT
-					" * %ld"
-					" / %ld"
-					, st->id, rd->name
-					, rd->values[st->current_entry]
-					, rd->calculated_value
-					, rd->multiplier
-					, rd->divisor
-					);
-		}
-
-		if(!st->first_entry_t) {
-			// this is the first entry in the database
-			st->first_entry_t = st->next_update.tv_sec * 1000000ULL + st->next_update.tv_usec;
-		}
-		else {
-			if(st->counter > (unsigned long long)st->entries) {
-				// the db is overwriting values
-				// add the value we will overwrite
-				st->first_entry_t += st->timediff[st->current_entry];
-			}
-		}
-		// store the time difference to the last entry
-		st->timediff[st->current_entry] = st->usec_since_last_update;
-
-
-		// ALL DONE ABOUT THE DATA UPDATE
-		// --------------------------------------------------------------------
-
-
-		// find if there are any obsolete dimensions (not updated recently)
-		for( rd = st->dimensions; rd ; rd = rd->next )
-			if((rd->last_updated.tv_sec + (10 * st->update_every)) < st->last_updated.tv_sec)
+				if(st->debug)
+					debug(D_RRD_STATS, "%s/%s: CALC "
+						CALCULATED_NUMBER_FORMAT " = 100"
+						" * (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
+						" / (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
+						, st->id, rd->name
+						, rd->calculated_value
+						, rd->collected_value, rd->last_collected_value
+						, st->absolute_total, st->last_absolute_total
+						);
 				break;
 
-		if(rd) {
-			// there is dimension to free
-			// upgrade our read lock to a write lock
-			pthread_rwlock_unlock(&st->rwlock);
-			pthread_rwlock_wrlock(&st->rwlock);
+			case RRD_DIMENSION_PCENT_OVER_ROW_TOTAL:
+				if(!st->absolute_total) rd->calculated_value = 0;
+				else
+				// the percentage of the current value
+				// over the total of all dimensions
+				rd->calculated_value =
+					  (calculated_number)100
+					* (calculated_number)rd->collected_value
+					/ (calculated_number)st->absolute_total;
 
-			for( rd = st->dimensions, last = NULL ; rd ; ) {
-				if((rd->last_updated.tv_sec + (10 * st->update_every)) < st->last_updated.tv_sec) { // remove it only it is not updated in 10 seconds
-					debug(D_RRD_STATS, "Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
+				if(st->debug)
+					debug(D_RRD_STATS, "%s/%s: CALC "
+						CALCULATED_NUMBER_FORMAT " = 100"
+						" * " COLLECTED_NUMBER_FORMAT
+						" / " COLLECTED_NUMBER_FORMAT
+						, st->id, rd->name
+						, rd->calculated_value
+						, rd->collected_value
+						, st->absolute_total
+						);
+				break;
 
-					if(!last) {
-						st->dimensions = rd->next;
-						rd->next = NULL;
-						rrd_stats_dimension_free(rd);
-						rd = st->dimensions;
-						continue;
-					}
-					else {
-						last->next = rd->next;
-						rd->next = NULL;
-						rrd_stats_dimension_free(rd);
-						rd = last->next;
-						continue;
-					}
-				}
+			case RRD_DIMENSION_INCREMENTAL:
+				// we need the incremental calculation to produce per second results
+				// so, we multiply with 1.000.000 and divide by the microseconds passed since
+				// the last entry
 
-				last = rd;
-				rd = rd->next;
-			}
+				// if the new is smaller than the old (an overflow, or reset), set the old equal to the new
+				// to reset the calculation (it will give zero as the calculation for this second)
+				if(rd->last_collected_value > rd->collected_value) rd->last_collected_value = rd->collected_value;
 
-			if(!st->dimensions) st->enabled = 0;
+				rd->calculated_value =
+					  (calculated_number)1000000
+					* (calculated_number)(rd->collected_value - rd->last_collected_value)
+					/ (calculated_number)st->usec_since_last_update;
+
+				if(st->debug)
+					debug(D_RRD_STATS, "%s/%s: CALC "
+						CALCULATED_NUMBER_FORMAT " = 1000000"
+						" * (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
+						" / %llu"
+						, st->id, rd->name
+						, rd->calculated_value
+						, rd->collected_value, rd->last_collected_value
+						, st->usec_since_last_update
+						);
+				break;
+
+			case RRD_DIMENSION_ABSOLUTE:
+				rd->calculated_value = (calculated_number)rd->collected_value;
+
+				if(st->debug)
+					debug(D_RRD_STATS, "%s/%s: CALC "
+						CALCULATED_NUMBER_FORMAT " = "
+						COLLECTED_NUMBER_FORMAT
+						, st->id, rd->name
+						, rd->calculated_value
+						, rd->collected_value
+						);
+				break;
+
+			default:
+				// make the default zero, to make sure
+				// it gets noticed when we add new types
+				rd->calculated_value = 0;
+
+				if(st->debug)
+					debug(D_RRD_STATS, "%s/%s: CALC "
+						CALCULATED_NUMBER_FORMAT " = 0"
+						, st->id, rd->name
+						, rd->calculated_value
+						);
+				break;
 		}
 	}
 
-	st->last_updated.tv_sec  = st->next_update.tv_sec;
-	st->last_updated.tv_usec = st->next_update.tv_usec;
-	st->counter++;
-	st->counter_since_reload++;
+	for( ; next_ut < now_ut ; next_ut += st->update_every * 1000000ULL ) {
+		unsigned long long np = next_ut - last_ut;
+
+		st->last_updated.tv_sec = next_ut / 1000000ULL;
+		st->last_updated.tv_usec = 0;
+
+		for( rd = st->dimensions ; rd ; rd = rd->next ) {
+			rd->calculated_value = (calculated_number)
+				(	(	  (rd->calculated_value - rd->last_calculated_value)
+						* (calculated_number)np
+						/ (calculated_number)(now_ut - last_ut)
+					)
+					+  rd->last_calculated_value
+				);
+
+			rd->values[st->current_entry] = (storage_number)
+				(	  rd->calculated_value
+					* (calculated_number)10
+					* (calculated_number)rd->multiplier
+					/ (calculated_number)rd->divisor
+				);
+
+			if(st->debug)
+				debug(D_RRD_STATS, "%s/%s: STORE[%ld] "
+					STORAGE_NUMBER_FORMAT " = ((("
+					"(" CALCULATED_NUMBER_FORMAT " - " CALCULATED_NUMBER_FORMAT ")"
+					" * %llu"
+					" / %llu) + " CALCULATED_NUMBER_FORMAT
+					" * 10 "
+					" * %ld"
+					" / %ld"
+					, st->id, rd->name
+					, st->current_entry
+					, rd->values[st->current_entry]
+					, rd->calculated_value, rd->last_calculated_value
+					, np
+					, (now_ut - last_ut), rd->last_calculated_value
+					, rd->multiplier
+					, rd->divisor
+					);
+
+			rd->last_calculated_value = rd->calculated_value;
+		}
+
+		if(st->first_entry_t && st->counter >= (unsigned long long)st->entries) {
+			// the db is overwriting values
+			// add the value we will overwrite
+			st->first_entry_t += st->update_every * 1000000ULL;
+		}
+		
+		st->counter++;
+		st->current_entry = ((st->current_entry + 1) >= st->entries) ? 0 : st->current_entry + 1;
+		if(!st->first_entry_t) st->first_entry_t = next_ut;
+		last_ut = next_ut;
+	}
+
+	// ALL DONE ABOUT THE DATA UPDATE
+	// --------------------------------------------------------------------
+
+
+	// find if there are any obsolete dimensions (not updated recently)
+	for( rd = st->dimensions; rd ; rd = rd->next )
+		if((rd->last_collected.tv_sec + (10 * st->update_every)) < st->last_collected.tv_sec)
+			break;
+
+	if(rd) {
+		// there is dimension to free
+		// upgrade our read lock to a write lock
+		pthread_rwlock_unlock(&st->rwlock);
+		pthread_rwlock_wrlock(&st->rwlock);
+
+		for( rd = st->dimensions, last = NULL ; rd ; ) {
+			if((rd->last_collected.tv_sec + (10 * st->update_every)) < st->last_collected.tv_sec) { // remove it only it is not updated in 10 seconds
+				debug(D_RRD_STATS, "Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
+
+				if(!last) {
+					st->dimensions = rd->next;
+					rd->next = NULL;
+					rrd_stats_dimension_free(rd);
+					rd = st->dimensions;
+					continue;
+				}
+				else {
+					last->next = rd->next;
+					rd->next = NULL;
+					rrd_stats_dimension_free(rd);
+					rd = last->next;
+					continue;
+				}
+			}
+
+			last = rd;
+			rd = rd->next;
+		}
+
+		if(!st->dimensions) st->enabled = 0;
+	}
 
 	pthread_rwlock_unlock(&st->rwlock);
 	return(st->usec_since_last_update);
@@ -1820,7 +1847,7 @@ void web_buffer_rrd_value(struct web_buffer *wb, storage_number value)
 }
 
 // generate a javascript date, the fastest possible way...
-void web_buffer_jsdate(struct web_buffer *wb, int year, int month, int day, int hours, int minutes, int seconds, int milliseconds)
+void web_buffer_jsdate(struct web_buffer *wb, int year, int month, int day, int hours, int minutes, int seconds)
 {
 	//         10        20        30      = 35
 	// 01234567890123456789012345678901234
@@ -1859,15 +1886,10 @@ void web_buffer_jsdate(struct web_buffer *wb, int year, int month, int day, int 
 	b[26]=' ';
 	b[27]= 48 + seconds / 10;
 	b[28]= 48 + seconds % 10;
-	b[29]=',';
-	b[30]=' ';
-	b[31]= 48 + milliseconds / 100; milliseconds -= (milliseconds / 100) * 100;
-	b[32]= 48 + milliseconds / 10;
-	b[33]= 48 + milliseconds % 10;
-	b[34]=')';
-	b[35]='\0';
+	b[29]=')';
+	b[30]='\0';
 
-	wb->bytes += 35;
+	wb->bytes += 30;
 }
 
 struct web_buffer *web_buffer_create(long size)
@@ -2126,7 +2148,7 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 			, algorithm_name(rd->algorithm)
 			, rd->multiplier
 			, rd->divisor
-			, rd->last_updated.tv_sec
+			, rd->last_collected.tv_sec
 			, rd->collected_value
 			, rd->calculated_value
 			, rd->last_collected_value
@@ -2223,17 +2245,17 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 	if(group < 1) group = 1;
 	
 	// make sure current_entry is within limits
-	long current_entry = st->current_entry;
+	long current_entry = (long)st->current_entry - (long)1;
 	if(current_entry < 0) current_entry = 0;
 	else if(current_entry >= st->entries) current_entry = st->entries - 1;
 	
 	// find the oldest entry of the round-robin
-	long max_entries_init = (st->counter <= (unsigned long)st->entries) ? st->counter - 1 : (unsigned long)st->entries;
+	long max_entries_init = (st->counter < (unsigned long)st->entries) ? st->counter : (unsigned long)st->entries;
 	
 	if(before == 0) before = st->last_updated.tv_sec;
 	if(after  == 0) after = rrd_stats_first_entry_t(st);
 
-	unsigned long long time_usec_init = st->last_updated.tv_sec * 1000000ULL + st->last_updated.tv_usec;
+	time_t time_init = st->last_updated.tv_sec;
 
 	// ---
 
@@ -2345,21 +2367,17 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 		// the minimum line length we expect
 		int line_size = 4096 + (dimensions * 200);
 
-		unsigned long long time_usec = time_usec_init;
+		time_t now = time_init;
 		long max_entries = max_entries_init;
 
 		long t;
 
 		long count = 0, printed = 0, group_count = 0;
 		last_timestamp = 0;
-		for(t = current_entry; max_entries ; time_usec -= st->timediff[t], t--, max_entries--) {
+		for(t = current_entry; max_entries ; now--, t--, max_entries--) {
 			if(t < 0) t = st->entries - 1;
 
-			if(st->debug)
-				if(st->timediff[t] == 0) debug(D_RRD_STATS, "WARNING: %s time diff is zero at position %ld", st->id, t);
-
 			int print_this = 0;
-			time_t now = time_usec / 1000000ULL;
 
 			if(st->debug) {
 				debug(D_RRD_STATS, "%s t = %ld, count = %ld, group_count = %ld, printed = %ld, now = %lu, %s %s"
@@ -2405,7 +2423,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 
 				if(printed) web_buffer_strcpy(wb, "]},\n");
 				web_buffer_strcpy(wb, pre_date);
-				web_buffer_jsdate(wb, tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (int)((time_usec % 1000000ULL) / 1000));
+				web_buffer_jsdate(wb, tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
 				web_buffer_strcpy(wb, post_date);
 
 				print_this = 1;
@@ -2463,6 +2481,8 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 		if(only_non_zero && max_loop > 1) {
 			int changed = 0;
 			for(rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
+				group_values[c] = 0;
+
 				if(!print_hidden[c] && !found_non_zero[c]) {
 					changed = 1;
 					print_hidden[c] = 1;
@@ -6084,6 +6104,81 @@ void *cpuidlejitter_main(void *ptr)
 }
 
 // ----------------------------------------------------------------------------
+// netdata checks
+
+void *checks_main(void *ptr)
+{
+	if(ptr) { ; }
+	unsigned long long usec = 0, susec = update_every * 1000000ULL, loop_usec = 0, total_susec = 0;
+	struct timeval now, last, loop;
+
+	RRD_STATS *check1, *check2, *check3, *apps_cpu = NULL;
+
+	check1 = rrd_stats_create("netdata", "check1", NULL, "netdata", "Caller gives microseconds", "a million !", 99999, update_every, CHART_TYPE_LINE);
+	rrd_stats_dimension_add(check1, "absolute", NULL, -1, 1, RRD_DIMENSION_ABSOLUTE);
+	rrd_stats_dimension_add(check1, "incremental", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+
+	check2 = rrd_stats_create("netdata", "check2", NULL, "netdata", "Netdata calcs microseconds", "a million !", 99999, update_every, CHART_TYPE_LINE);
+	rrd_stats_dimension_add(check2, "absolute", NULL, -1, 1, RRD_DIMENSION_ABSOLUTE);
+	rrd_stats_dimension_add(check2, "incremental", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+
+	check3 = rrd_stats_create("netdata", "checkdt", NULL, "netdata", "Clock difference", "microseconds diff", 99999, update_every, CHART_TYPE_LINE);
+	rrd_stats_dimension_add(check3, "caller", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
+	rrd_stats_dimension_add(check3, "netdata", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
+	rrd_stats_dimension_add(check3, "apps.plugin", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
+
+	gettimeofday(&last, NULL);
+	while(1) {
+		usleep(susec);
+
+		// find the time to sleep in order to wait exactly update_every seconds
+		gettimeofday(&now, NULL);
+		loop_usec = usecdiff(&now, &last);
+		usec = loop_usec - susec;
+		debug(D_PROCNETDEV_LOOP, "CHECK: last loop took %llu usec (worked for %llu, sleeped for %llu).", loop_usec, usec, susec);
+		
+		if(usec < (update_every * 1000000ULL / 2ULL)) susec = (update_every * 1000000ULL) - usec;
+		else susec = update_every * 1000000ULL / 2ULL;
+
+		// --------------------------------------------------------------------
+		// Calculate loop time
+
+		last.tv_sec = now.tv_sec;
+		last.tv_usec = now.tv_usec;
+		total_susec += loop_usec;
+
+		// --------------------------------------------------------------------
+		// check chart 1
+
+		if(check1->counter_done) rrd_stats_next_usec(check1, loop_usec);
+		rrd_stats_dimension_set(check1, "absolute", 1000000);
+		rrd_stats_dimension_set(check1, "incremental", total_susec);
+		rrd_stats_done(check1);
+
+		// --------------------------------------------------------------------
+		// check chart 2
+
+		if(check2->counter_done) rrd_stats_next(check2);
+		rrd_stats_dimension_set(check2, "absolute", 1000000);
+		rrd_stats_dimension_set(check2, "incremental", total_susec);
+		rrd_stats_done(check2);
+
+		// --------------------------------------------------------------------
+		// check chart 3
+
+		if(!apps_cpu) apps_cpu = rrd_stats_find("apps.cpu");
+		if(check3->counter_done) rrd_stats_next_usec(check3, loop_usec);
+		gettimeofday(&loop, NULL);
+		rrd_stats_dimension_set(check3, "caller", (long long)usecdiff(&loop, &check1->last_collected));
+		rrd_stats_dimension_set(check3, "netdata", (long long)usecdiff(&loop, &check2->last_collected));
+		if(apps_cpu) rrd_stats_dimension_set(check3, "apps.plugin", (long long)usecdiff(&loop, &apps_cpu->last_collected));
+		rrd_stats_done(check3);
+	}
+
+	return NULL;
+}
+
+// ----------------------------------------------------------------------------
 // plugins.d
 
 #define PLUGINSD_FILE_SUFFIX ".plugin"
@@ -6220,7 +6315,7 @@ void *pluginsd_worker_thread(void *arg)
 					break;
 				}
 
-				if(st->counter) {
+				if(st->counter_done) {
 					unsigned long long microseconds = 0;
 					if(microseconds_txt && *microseconds_txt) microseconds = strtoull(microseconds_txt, NULL, 10);
 					if(microseconds) rrd_stats_next_usec(st, microseconds);
@@ -6942,7 +7037,7 @@ int main(int argc, char **argv)
 	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV && i != SIGFPE) signal(i,  sig_handler);
 	
 
-	pthread_t p_proc, p_tc, p_jitter, p_pluginsd;
+	pthread_t p_proc, p_tc, p_jitter, p_pluginsd, p_checks;
 
 	// spawn childs to collect data
 	if(config_get_boolean("plugins", "tc", 1)) {
@@ -6971,6 +7066,13 @@ int main(int argc, char **argv)
 	else if(pthread_detach(p_pluginsd))
 		error("Cannot request detach of newly created plugins.d thread.");
 	
+	if(config_get_boolean("plugins", "checks", 1)) {
+		if(pthread_create(&p_checks, NULL, checks_main, NULL))
+			error("failed to create new thread for checks.");
+		else if(pthread_detach(p_checks))
+			error("Cannot request detach of newly created checks thread.");
+	}
+
 	// the main process - the web server listener
 	// this never ends
 	socket_listen_main(NULL);
