@@ -6071,28 +6071,7 @@ void *cpuidlejitter_main(void *ptr)
 		sleep_ms = CPU_IDLEJITTER_SLEEP_TIME_MS;
 	}
 
-	unsigned long long total_susec = 0, loop_usec = 0;
 	struct timeval before, after;
-	struct timeval loop1, loop2;
-
-	gettimeofday(&loop1, NULL);
-
-	RRD_STATS *jitter, *check1, *check2, *check3;
-
-	jitter = rrd_stats_create("system", "idlejitter", NULL, "cpu", "CPU Idle Jitter", "microseconds lost/s", 9999, update_every, CHART_TYPE_LINE);
-	rrd_stats_dimension_add(jitter, "jitter", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
-
-	check1 = rrd_stats_create("netdata", "check1", NULL, "netdata", "Caller gives microseconds", "a million !", 99999, update_every, CHART_TYPE_LINE);
-	rrd_stats_dimension_add(check1, "absolute", NULL, -1, 1, RRD_DIMENSION_ABSOLUTE);
-	rrd_stats_dimension_add(check1, "incremental", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-
-	check2 = rrd_stats_create("netdata", "check2", NULL, "netdata", "Netdata calcs microseconds", "a million !", 99999, update_every, CHART_TYPE_LINE);
-	rrd_stats_dimension_add(check2, "absolute", NULL, -1, 1, RRD_DIMENSION_ABSOLUTE);
-	rrd_stats_dimension_add(check2, "incremental", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-
-	check3 = rrd_stats_create("netdata", "checkdt", NULL, "netdata", "Clock difference", "microseconds diff", 99999, update_every, CHART_TYPE_LINE);
-	rrd_stats_dimension_add(check3, "caller", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
-	rrd_stats_dimension_add(check3, "netdata", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
 
 	while(1) {
 		unsigned long long usec = 0, susec = 0;
@@ -6109,21 +6088,64 @@ void *cpuidlejitter_main(void *ptr)
 		}
 		usec -= (sleep_ms * 1000);
 
+		RRD_STATS *st = rrd_stats_find("system.idlejitter");
+		if(!st) {
+			st = rrd_stats_create("system", "idlejitter", NULL, "cpu", "CPU Idle Jitter", "microseconds lost/s", 9999, update_every, CHART_TYPE_LINE);
+
+			rrd_stats_dimension_add(st, "jitter", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
+		}
+		else rrd_stats_next_usec(st, susec);
+
+		rrd_stats_dimension_set(st, "jitter", usec);
+		rrd_stats_done(st);
+	}
+
+	return NULL;
+}
+
+// ----------------------------------------------------------------------------
+// netdata checks
+
+void *checks_main(void *ptr)
+{
+	if(ptr) { ; }
+	unsigned long long usec = 0, susec = update_every * 1000000ULL, loop_usec = 0, total_susec = 0;
+	struct timeval now, last, loop;
+
+	RRD_STATS *check1, *check2, *check3, *apps_cpu = NULL;
+
+	check1 = rrd_stats_create("netdata", "check1", NULL, "netdata", "Caller gives microseconds", "a million !", 99999, update_every, CHART_TYPE_LINE);
+	rrd_stats_dimension_add(check1, "absolute", NULL, -1, 1, RRD_DIMENSION_ABSOLUTE);
+	rrd_stats_dimension_add(check1, "incremental", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+
+	check2 = rrd_stats_create("netdata", "check2", NULL, "netdata", "Netdata calcs microseconds", "a million !", 99999, update_every, CHART_TYPE_LINE);
+	rrd_stats_dimension_add(check2, "absolute", NULL, -1, 1, RRD_DIMENSION_ABSOLUTE);
+	rrd_stats_dimension_add(check2, "incremental", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+
+	check3 = rrd_stats_create("netdata", "checkdt", NULL, "netdata", "Clock difference", "microseconds diff", 99999, update_every, CHART_TYPE_LINE);
+	rrd_stats_dimension_add(check3, "caller", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
+	rrd_stats_dimension_add(check3, "netdata", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
+	rrd_stats_dimension_add(check3, "apps.plugin", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
+
+	gettimeofday(&last, NULL);
+	while(1) {
+		usleep(susec);
+
+		// find the time to sleep in order to wait exactly update_every seconds
+		gettimeofday(&now, NULL);
+		loop_usec = usecdiff(&now, &last);
+		usec = loop_usec - susec;
+		debug(D_PROCNETDEV_LOOP, "CHECK: last loop took %llu usec (worked for %llu, sleeped for %llu).", loop_usec, usec, susec);
+		
+		if(usec < (update_every * 1000000ULL / 2ULL)) susec = (update_every * 1000000ULL) - usec;
+		else susec = update_every * 1000000ULL / 2ULL;
+
 		// --------------------------------------------------------------------
 		// Calculate loop time
 
-		gettimeofday(&loop2, NULL);
-		loop_usec = usecdiff(&loop2, &loop1);
-		loop1.tv_sec = loop2.tv_sec;
-		loop1.tv_usec = loop2.tv_usec;
+		last.tv_sec = now.tv_sec;
+		last.tv_usec = now.tv_usec;
 		total_susec += loop_usec;
-
-		// --------------------------------------------------------------------
-		// idle jitter
-
-		if(jitter->counter_done) rrd_stats_next_usec(jitter, susec);
-		rrd_stats_dimension_set(jitter, "jitter", loop_usec);
-		rrd_stats_done(jitter);
 
 		// --------------------------------------------------------------------
 		// check chart 1
@@ -6144,10 +6166,12 @@ void *cpuidlejitter_main(void *ptr)
 		// --------------------------------------------------------------------
 		// check chart 3
 
-		if(check3->counter_done) rrd_stats_next_usec(check3, susec);
-		gettimeofday(&loop2, NULL);
-		rrd_stats_dimension_set(check3, "caller", (long long)usecdiff(&loop2, &check1->last_collected));
-		rrd_stats_dimension_set(check3, "netdata", (long long)usecdiff(&loop2, &check2->last_collected));
+		if(!apps_cpu) apps_cpu = rrd_stats_find("apps.cpu");
+		if(check3->counter_done) rrd_stats_next_usec(check3, loop_usec);
+		gettimeofday(&loop, NULL);
+		rrd_stats_dimension_set(check3, "caller", (long long)usecdiff(&loop, &check1->last_collected));
+		rrd_stats_dimension_set(check3, "netdata", (long long)usecdiff(&loop, &check2->last_collected));
+		if(apps_cpu) rrd_stats_dimension_set(check3, "apps.plugin", (long long)usecdiff(&loop, &apps_cpu->last_collected));
 		rrd_stats_done(check3);
 	}
 
@@ -7013,7 +7037,7 @@ int main(int argc, char **argv)
 	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV && i != SIGFPE) signal(i,  sig_handler);
 	
 
-	pthread_t p_proc, p_tc, p_jitter, p_pluginsd;
+	pthread_t p_proc, p_tc, p_jitter, p_pluginsd, p_checks;
 
 	// spawn childs to collect data
 	if(config_get_boolean("plugins", "tc", 1)) {
@@ -7042,6 +7066,13 @@ int main(int argc, char **argv)
 	else if(pthread_detach(p_pluginsd))
 		error("Cannot request detach of newly created plugins.d thread.");
 	
+	if(config_get_boolean("plugins", "checks", 1)) {
+		if(pthread_create(&p_checks, NULL, checks_main, NULL))
+			error("failed to create new thread for checks.");
+		else if(pthread_detach(p_checks))
+			error("Cannot request detach of newly created checks thread.");
+	}
+
 	// the main process - the web server listener
 	// this never ends
 	socket_listen_main(NULL);
