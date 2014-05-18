@@ -1060,7 +1060,7 @@ typedef int32_t storage_number;
 typedef uint32_t ustorage_number;
 #define STORAGE_NUMBER_FORMAT "%d"
 
-#define RRD_STATS_MAGIC     "NETDATA CACHE STATS FILE V006"
+#define RRD_STATS_MAGIC     "NETDATA CACHE STATS FILE V007"
 #define RRD_DIMENSION_MAGIC "NETDATA CACHE DIMENSION FILE V005"
 
 struct rrd_dimension {

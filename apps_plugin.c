@@ -1086,28 +1086,28 @@ void show_charts(void)
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w->name);
 	}
 
-	fprintf(stdout, "CHART apps.lreads '' 'Apps Logical Reads' 'kilobytes/s' apps apps stacked 20042 %d\n", update_every);
+	fprintf(stdout, "CHART apps.lreads '' 'Apps Disk Logical Reads' 'kilobytes/s' apps apps stacked 20042 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1024\n", w->name);
 	}
 
-	fprintf(stdout, "CHART apps.lwrites '' 'Apps Logical Writes' 'kilobytes/s' apps apps stacked 20042 %d\n", update_every);
+	fprintf(stdout, "CHART apps.lwrites '' 'Apps I/O Logical Writes' 'kilobytes/s' apps apps stacked 20042 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1024\n", w->name);
 	}
 
-	fprintf(stdout, "CHART apps.preads '' 'Apps Reads' 'kilobytes/s' apps apps stacked 20002 %d\n", update_every);
+	fprintf(stdout, "CHART apps.preads '' 'Apps Disk Reads' 'kilobytes/s' apps apps stacked 20002 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1024\n", w->name);
 	}
 
-	fprintf(stdout, "CHART apps.pwrites '' 'Apps Writes' 'kilobytes/s' apps apps stacked 20002 %d\n", update_every);
+	fprintf(stdout, "CHART apps.pwrites '' 'Apps Disk Writes' 'kilobytes/s' apps apps stacked 20002 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
@@ -1207,6 +1207,7 @@ int main(int argc, char **argv)
 		update_statistics();
 		show_charts();		// this is smart enough to show only newly added apps, when needed
 		show_dimensions();
+		// printf("FLUSH xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n");
 
 		if(debug) fprintf(stderr, "Done Loop No %llu\n", counter);
 		fflush(NULL);
