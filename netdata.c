@@ -927,19 +927,62 @@ static void strreverse(char* begin, char* end)
 // ----------------------------------------------------------------------------
 // mmap() wrapper
 
+#define NETDATA_MEMORY_MODE_RAM_NAME "ram"
+#define NETDATA_MEMORY_MODE_MAP_NAME "map"
+#define NETDATA_MEMORY_MODE_SAVE_NAME "save"
+
+#define NETDATA_MEMORY_MODE_RAM 0
+#define NETDATA_MEMORY_MODE_MAP 1
+#define NETDATA_MEMORY_MODE_SAVE 2
+
+int memory_mode = NETDATA_MEMORY_MODE_SAVE;
+
+const char *memory_mode_name(int id)
+{
+	static const char *ram = NETDATA_MEMORY_MODE_RAM_NAME;
+	static const char *map = NETDATA_MEMORY_MODE_MAP_NAME;
+	static const char *save = NETDATA_MEMORY_MODE_SAVE_NAME;
+	const char *s = save;
+
+	switch(id) {
+		case NETDATA_MEMORY_MODE_RAM:
+			s = ram;
+			;;
+
+		case NETDATA_MEMORY_MODE_MAP:
+			s = map;
+			;;
+
+		case NETDATA_MEMORY_MODE_SAVE:
+		default:
+			s = save;
+			;;
+	}
+
+	return(s);
+}
+
+int memory_mode_id(const char *name)
+{
+	if(!strcmp(name, NETDATA_MEMORY_MODE_RAM_NAME))
+		return NETDATA_MEMORY_MODE_RAM;
+	else if(!strcmp(name, NETDATA_MEMORY_MODE_MAP_NAME))
+		return NETDATA_MEMORY_MODE_MAP;
+
+	return NETDATA_MEMORY_MODE_SAVE;
+}
+
 void *mymmap(const char *filename, unsigned long size)
 {
-	static int enabled = -1;
+	if(memory_mode == NETDATA_MEMORY_MODE_RAM) return NULL;
 
-	if(enabled == -1) {
-		char *cache_dir = config_get("global", "cache data in directory", "cache");
-		if(strcmp(cache_dir, "none") == 0) enabled = 0;
-		else enabled = 1;
-	}
-	if(!enabled) return NULL;
-
-	int fd;
+	int fd, flags;
 	void *mem = NULL;
+
+	if(memory_mode == NETDATA_MEMORY_MODE_MAP)
+		flags = MAP_SHARED;
+	else
+		flags = MAP_PRIVATE;
 
 	errno = 0;
 	fd = open(filename, O_RDWR|O_CREAT|O_NOATIME, 0664);
@@ -950,7 +993,7 @@ void *mymmap(const char *filename, unsigned long size)
 				if(ftruncate(fd, size))
 					error("Cannot truncate file '%s' to size %ld. Will use the larger file.", filename, size);
 
-				mem = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+				mem = mmap(NULL, size, PROT_READ|PROT_WRITE, flags, fd, 0);
 				if(mem) {
 					if(madvise(mem, size, MADV_SEQUENTIAL|MADV_DONTFORK|MADV_WILLNEED) != 0)
 						error("Cannot advise the kernel about the memory usage of file '%s'.", filename);
@@ -965,6 +1008,35 @@ void *mymmap(const char *filename, unsigned long size)
 	else error("Cannot create/open file '%s'.", filename);
 
 	return mem;
+}
+
+int savememory(const char *filename, void *mem, unsigned long size)
+{
+	char tmpfilename[FILENAME_MAX + 1];
+
+	snprintf(tmpfilename, FILENAME_MAX, "%s.%ld.tmp", filename, (long)getpid());
+
+	int fd = open(tmpfilename, O_RDWR|O_CREAT|O_NOATIME, 0664);
+	if(fd < 0) {
+		error("Cannot create/open file '%s'.", filename);
+		return -1;
+	}
+
+	if(write(fd, mem, size) != (long)size) {
+		error("Cannot write to file '%s' %ld bytes.", filename, (long)size);
+		close(fd);
+		return -1;
+	}
+
+	close(fd);
+
+	int ret = 0;
+	if(rename(tmpfilename, filename)) {
+		error("Cannot rename '%s' to '%s'", tmpfilename, filename);
+		ret = -1;
+	}
+
+	return ret;
 }
 
 
@@ -995,6 +1067,7 @@ struct rrd_dimension {
 	char magic[sizeof(RRD_DIMENSION_MAGIC) + 1];// our magic
 	char id[RRD_STATS_NAME_MAX + 1];			// the id of this dimension (for internal identification)
 	char *name;									// the name of this dimension (as presented to user)
+	char cache_file[FILENAME_MAX+1];
 	
 	unsigned long hash;							// a simple hash on the id, to speed up searching
 												// we first compare hashes, and only if the hashes are equal we do string comparisons
@@ -1031,6 +1104,7 @@ struct rrd_stats {
 	char id[RRD_STATS_NAME_MAX + 1];			// id of the data set
 	char *name;									// name of the data set
 	char *cache_dir;							// the directory to store dimension maps
+	char cache_file[FILENAME_MAX+1];
 
 	char *type;									// the type of graph RRD_TYPE_* (a category, for determining graphing options)
 	char *family;								// the family of this data set (for grouping them together)
@@ -1106,21 +1180,17 @@ char *rrd_stats_cache_dir(const char *id)
 {
 	char *ret = NULL;
 
-	static int enabled = 1;
 	static char *cache_dir = NULL;
-	if(!cache_dir) {
-		cache_dir = config_get("global", "cache data in directory", "cache");
-		if(strcmp(cache_dir, "none") == 0) enabled = 0;
-	}
+	if(!cache_dir) cache_dir = config_get("global", "database directory", "cache");
 
 	char b[FILENAME_MAX + 1];
 	char n[FILENAME_MAX + 1];
 	rrd_stats_strncpy_name(b, id, FILENAME_MAX);
 
 	snprintf(n, FILENAME_MAX, "%s/%s", cache_dir, b);
-	ret = config_get(id, "cache_dir", n);
+	ret = config_get(id, "database directory", n);
 
-	if(enabled) {
+	if(memory_mode == NETDATA_MEMORY_MODE_MAP || memory_mode == NETDATA_MEMORY_MODE_SAVE) {
 		int r = mkdir(ret, 0775);
 		if(r != 0 && errno != EEXIST)
 			error("Cannot create directory '%s'", ret);
@@ -1188,7 +1258,7 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 		st->units = NULL;
 		st->dimensions = NULL;
 		st->next = NULL;
-		st->mapped = 1;
+		st->mapped = memory_mode;
 	}
 	else {
 		st = calloc(1, size);
@@ -1196,12 +1266,13 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 			fatal("Cannot allocate memory for RRD_STATS %s.%s", type, id);
 			return NULL;
 		}
-		st->mapped = 0;
+		st->mapped = NETDATA_MEMORY_MODE_RAM;
 	}
 	st->memsize = size;
 	st->entries = entries;
 	st->update_every = update_every;
 
+	strcpy(st->cache_file, fullfilename);
 	strcpy(st->magic, RRD_STATS_MAGIC);
 
 	strcpy(st->id, fullid);
@@ -1292,7 +1363,7 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 
 	if(rd) {
 		// we have a file mapped for rd
-		rd->mapped = 1;
+		rd->mapped = memory_mode;
 		rd->hidden = 0;
 		rd->next = NULL;
 		rd->name = NULL;
@@ -1306,11 +1377,12 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 			return NULL;
 		}
 
-		rd->mapped = 0;
+		rd->mapped = NETDATA_MEMORY_MODE_RAM;
 	}
 	rd->memsize = size;
 
 	strcpy(rd->magic, RRD_DIMENSION_MAGIC);
+	strcpy(rd->cache_file, fullfilename);
 	strncpy(rd->id, id, RRD_STATS_NAME_MAX);
 	rd->hash = simple_hash(rd->id);
 
@@ -1352,7 +1424,14 @@ void rrd_stats_dimension_free(RRD_DIMENSION *rd)
 {
 	if(rd->next) rrd_stats_dimension_free(rd->next);
 	// free(rd->annotations);
-	if(rd->mapped) {
+	if(rd->mapped == NETDATA_MEMORY_MODE_SAVE) {
+		debug(D_RRD_STATS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_file);
+		savememory(rd->cache_file, rd, rd->memsize);
+
+		debug(D_RRD_STATS, "Unmapping dimension '%s'.", rd->name);
+		munmap(rd, rd->memsize);
+	}
+	else if(rd->mapped == NETDATA_MEMORY_MODE_MAP) {
 		debug(D_RRD_STATS, "Unmapping dimension '%s'.", rd->name);
 		munmap(rd, rd->memsize);
 	}
@@ -1374,10 +1453,22 @@ void rrd_stats_free_all(void)
 		if(st->dimensions) rrd_stats_dimension_free(st->dimensions);
 		st->dimensions = NULL;
 
-		pthread_rwlock_unlock(&st->rwlock);
+		// we leave it locked, or other threads may crash...
+		// pthread_rwlock_unlock(&st->rwlock);
 
-		if(st->mapped) munmap(st, st->memsize);
-		else free(st);
+		if(st->mapped == NETDATA_MEMORY_MODE_SAVE) {
+			debug(D_RRD_STATS, "Saving stats '%s' to '%s'.", st->name, st->cache_file);
+			savememory(st->cache_file, st, st->memsize);
+
+			debug(D_RRD_STATS, "Unmapping stats '%s'.", st->name);
+			munmap(st, st->memsize);
+		}
+		else if(st->mapped == NETDATA_MEMORY_MODE_MAP) {
+			debug(D_RRD_STATS, "Unmapping stats '%s'.", st->name);
+			munmap(st, st->memsize);
+		}
+		else
+			free(st);
 
 		st = next;
 	}
@@ -6965,6 +7056,10 @@ int main(int argc, char **argv)
 			access_log_file = NULL;
 		}
 		else access_log_syslog = 0;
+
+		// --------------------------------------------------------------------
+
+		memory_mode = memory_mode_id(config_get("global", "memory mode", memory_mode_name(memory_mode)));
 
 		// --------------------------------------------------------------------
 
