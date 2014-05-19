@@ -875,15 +875,19 @@ const char *chart_type_name(int chart_type)
 // ----------------------------------------------------------------------------
 // algorithms types
 
-#define RRD_DIMENSION_ABSOLUTE					0
-#define RRD_DIMENSION_INCREMENTAL				1
-#define RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL 	2
-#define RRD_DIMENSION_PCENT_OVER_ROW_TOTAL 		3
+#define RRD_DIMENSION_ABSOLUTE						0
+#define RRD_DIMENSION_INCREMENTAL					1
+#define RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL 		2
+#define RRD_DIMENSION_PCENT_OVER_ROW_TOTAL 			3
+#define RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION	4
+#define RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION		5
 
 int algorithm_id(const char *name)
 {
 	if(strcmp(name, "absolute") == 0) return RRD_DIMENSION_ABSOLUTE;
+	if(strcmp(name, "absolute-last-value") == 0) return RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION;
 	if(strcmp(name, "incremental") == 0) return RRD_DIMENSION_INCREMENTAL;
+	if(strcmp(name, "incremental-last-value") == 0) return RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION;
 	if(strcmp(name, "percentage-of-absolute-row") == 0) return RRD_DIMENSION_PCENT_OVER_ROW_TOTAL;
 	if(strcmp(name, "percentage-of-incremental-row") == 0) return RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL;
 	return RRD_DIMENSION_ABSOLUTE;
@@ -895,13 +899,21 @@ const char *algorithm_name(int chart_type)
 	static char *incremental = "incremental";
 	static char *percentage_of_absolute_row = "percentage-of-absolute-row";
 	static char *percentage_of_incremental_row = "percentage-of-incremental-row";
+	static char *incremental_last_value = "incremental-last-value";
+	static char *absolute_last_value = "absolute-last-value";
 
 	switch(chart_type) {
 		case RRD_DIMENSION_ABSOLUTE:
 			return absolute;
 
+		case RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION:
+			return absolute_last_value;
+
 		case RRD_DIMENSION_INCREMENTAL:
 			return incremental;
+
+		case RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION:
+			return incremental_last_value;
 
 		case RRD_DIMENSION_PCENT_OVER_ROW_TOTAL:
 			return percentage_of_absolute_row;
@@ -1741,7 +1753,29 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 						);
 				break;
 
+			case RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION:
+				// we need the incremental calculation to produce per second results
+				// so, we multiply with 1.000.000 and divide by the microseconds passed since
+				// the last entry
+
+				// if the new is smaller than the old (an overflow, or reset), set the old equal to the new
+				// to reset the calculation (it will give zero as the calculation for this second)
+				if(rd->last_collected_value > rd->collected_value) rd->last_collected_value = rd->collected_value;
+
+				rd->calculated_value = (calculated_number)(rd->collected_value - rd->last_collected_value);
+
+				if(st->debug)
+					debug(D_RRD_STATS, "%s/%s: CALC "
+						CALCULATED_NUMBER_FORMAT " = "
+						COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT
+						, st->id, rd->name
+						, rd->calculated_value
+						, rd->collected_value, rd->last_collected_value
+						);
+				break;
+
 			case RRD_DIMENSION_ABSOLUTE:
+			case RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION:
 				rd->calculated_value = (calculated_number)rd->collected_value;
 
 				if(st->debug)
@@ -1776,13 +1810,44 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 		st->last_updated.tv_usec = 0;
 
 		for( rd = st->dimensions ; rd ; rd = rd->next ) {
-			rd->calculated_value = (calculated_number)
-				(	(	  (rd->calculated_value - rd->last_calculated_value)
-						* (calculated_number)np
-						/ (calculated_number)(now_ut - last_ut)
-					)
-					+  rd->last_calculated_value
-				);
+			calculated_number old_calculated_value = rd->calculated_value;
+
+			switch(rd->algorithm) {
+				case RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION:
+				case RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION:
+					rd->calculated_value = rd->last_calculated_value;
+					if(st->debug)
+						debug(D_RRD_STATS, "%s/%s: CALC2 "
+							CALCULATED_NUMBER_FORMAT " = " CALCULATED_NUMBER_FORMAT
+							, st->id, rd->name
+							, rd->calculated_value
+							, rd->last_calculated_value
+							);
+					;;
+
+				default:
+					rd->calculated_value = (calculated_number)
+						(	(	  (rd->calculated_value - rd->last_calculated_value)
+								* (calculated_number)np
+								/ (calculated_number)(now_ut - last_ut)
+							)
+							+  rd->last_calculated_value
+						);
+
+					if(st->debug)
+						debug(D_RRD_STATS, "%s/%s: CALC2 "
+							CALCULATED_NUMBER_FORMAT " = ((("
+							"(" CALCULATED_NUMBER_FORMAT " - " CALCULATED_NUMBER_FORMAT ")"
+							" * %llu"
+							" / %llu) + " CALCULATED_NUMBER_FORMAT
+							, st->id, rd->name
+							, rd->calculated_value
+							, old_calculated_value, rd->last_calculated_value
+							, np
+							, (now_ut - last_ut), rd->last_calculated_value
+							);
+					;;
+			}
 
 			rd->values[st->current_entry] = (storage_number)
 				(	  rd->calculated_value
@@ -1793,24 +1858,26 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 
 			if(st->debug)
 				debug(D_RRD_STATS, "%s/%s: STORE[%ld] "
-					STORAGE_NUMBER_FORMAT " = ((("
-					"(" CALCULATED_NUMBER_FORMAT " - " CALCULATED_NUMBER_FORMAT ")"
-					" * %llu"
-					" / %llu) + " CALCULATED_NUMBER_FORMAT
+					STORAGE_NUMBER_FORMAT " = " CALCULATED_NUMBER_FORMAT
 					" * 10 "
 					" * %ld"
 					" / %ld"
 					, st->id, rd->name
 					, st->current_entry
 					, rd->values[st->current_entry]
-					, rd->calculated_value, rd->last_calculated_value
-					, np
-					, (now_ut - last_ut), rd->last_calculated_value
+					, rd->last_calculated_value
 					, rd->multiplier
 					, rd->divisor
 					);
 
 			rd->last_calculated_value = rd->calculated_value;
+
+			if(rd->algorithm == RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION || rd->algorithm == RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION) {
+				if(next_ut + st->update_every * 1000000ULL >= now_ut) {
+					//FIXME
+					;
+				}
+			}
 		}
 
 		if(st->first_entry_t && st->counter >= (unsigned long long)st->entries) {
@@ -4846,7 +4913,7 @@ int do_proc_net_stat_conntrack() {
 		if(!st) {
 			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "sockets", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connections", "active connections", 1000, update_every, CHART_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "connections", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
+			rrd_stats_dimension_add(st, "connections", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION);
 		}
 		else rrd_stats_next(st);
 
@@ -4861,9 +4928,9 @@ int do_proc_net_stat_conntrack() {
 		if(!st) {
 			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "new", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter New Connections", "connections/s", 1001, update_every, CHART_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "new", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "ignore", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "invalid", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "new", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "ignore", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "invalid", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
 		}
 		else rrd_stats_next(st);
 
@@ -4881,9 +4948,9 @@ int do_proc_net_stat_conntrack() {
 			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "changes", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Changes", "changes/s", 1002, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "inserted", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "deleted", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "delete_list", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "inserted", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "deleted", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "delete_list", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
 		}
 		else rrd_stats_next(st);
 
@@ -4901,9 +4968,9 @@ int do_proc_net_stat_conntrack() {
 			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "expect", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Expectations", "expectations/s", 1003, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "created", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "deleted", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "new", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "created", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "deleted", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "new", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
 		}
 		else rrd_stats_next(st);
 
@@ -4921,9 +4988,9 @@ int do_proc_net_stat_conntrack() {
 			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "search", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Searches", "searches/s", 1010, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "searched", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "restarted", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "found", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "searched", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "restarted", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "found", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
 		}
 		else rrd_stats_next(st);
 
@@ -4941,10 +5008,10 @@ int do_proc_net_stat_conntrack() {
 			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "errors", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Errors", "events/s", 1005, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "icmp_error", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "insert_failed", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "drop", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "early_drop", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "icmp_error", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "insert_failed", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "drop", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "early_drop", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
 		}
 		else rrd_stats_next(st);
 
@@ -5016,7 +5083,7 @@ int do_proc_net_ip_vs_stats() {
 		if(!st) {
 			st = rrd_stats_create(RRD_TYPE_NET_IPVS, "sockets", NULL, RRD_TYPE_NET_IPVS, "IPVS New Connections", "connections/s", 1001, update_every, CHART_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "connections", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "connections", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
 		}
 		else rrd_stats_next(st);
 
@@ -5031,8 +5098,8 @@ int do_proc_net_ip_vs_stats() {
 		if(!st) {
 			st = rrd_stats_create(RRD_TYPE_NET_IPVS, "packets", NULL, RRD_TYPE_NET_IPVS, "IPVS Packets", "packets/s", 1002, update_every, CHART_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "received", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "sent", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "received", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "sent", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
 		}
 		else rrd_stats_next(st);
 
@@ -5160,7 +5227,7 @@ int do_proc_stat() {
 					st = rrd_stats_create("system", id, NULL, "cpu", "CPU Interrupts", "interrupts/s", 900, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "interrupts", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "interrupts", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
 				}
 				else rrd_stats_next(st);
 
@@ -5184,7 +5251,7 @@ int do_proc_stat() {
 				if(!st) {
 					st = rrd_stats_create("system", id, NULL, "cpu", "CPU Context Switches", "context switches/s", 800, update_every, CHART_TYPE_LINE);
 
-					rrd_stats_dimension_add(st, "switches", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "switches", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
 				}
 				else rrd_stats_next(st);
 
@@ -5236,7 +5303,7 @@ int do_proc_stat() {
 			st = rrd_stats_create("system", "forks", NULL, "cpu", "New Processes", "processes/s", 700, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "started", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "started", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
 		}
 		else rrd_stats_next(st);
 
@@ -5251,8 +5318,8 @@ int do_proc_stat() {
 		if(!st) {
 			st = rrd_stats_create("system", "processes", NULL, "cpu", "Processes", "processes", 600, update_every, CHART_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "running", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "blocked", NULL, -1, 1, RRD_DIMENSION_ABSOLUTE);
+			rrd_stats_dimension_add(st, "running", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "blocked", NULL, -1, 1, RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION);
 		}
 		else rrd_stats_next(st);
 
@@ -5791,7 +5858,7 @@ void *proc_main(void *ptr)
 			if(!stclients) {
 				stclients = rrd_stats_create("netdata", "clients", NULL, "netdata", "NetData Web Clients", "connected clients", 11000, update_every, CHART_TYPE_LINE);
 
-				rrd_stats_dimension_add(stclients, "clients",  NULL,  1, 1, RRD_DIMENSION_ABSOLUTE);
+				rrd_stats_dimension_add(stclients, "clients",  NULL,  1, 1, RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION);
 			}
 			else rrd_stats_next(stclients);
 
@@ -5804,7 +5871,7 @@ void *proc_main(void *ptr)
 			if(!streqs) {
 				streqs = rrd_stats_create("netdata", "requests", NULL, "netdata", "NetData Web Requests", "requests/s", 12000, update_every, CHART_TYPE_LINE);
 
-				rrd_stats_dimension_add(streqs, "requests",  NULL,  1, 1, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(streqs, "requests",  NULL,  1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
 			}
 			else rrd_stats_next(streqs);
 

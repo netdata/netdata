@@ -1048,14 +1048,14 @@ void show_charts(void)
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' absolute-last-value 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART apps.processes '' 'Apps Processes' 'processes' apps apps stacked 20004 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' absolute-last-value 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART apps.cpu_user '' 'Apps CPU User Time (%ld%% = %ld core%s)' 'cpu time %%' apps none stacked 20020 %d\n", (processors * 100), processors, (processors>1)?"s":"", update_every);
@@ -1119,7 +1119,7 @@ void show_charts(void)
 	fprintf(stdout, "DIMENSION system '' incremental 1 1000\n");
 
 	fprintf(stdout, "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' netdata netdata line 10001 %d\n", update_every);
-	fprintf(stdout, "DIMENSION files '' incremental 1 1\n");
+	fprintf(stdout, "DIMENSION files '' incremental-last-value 1 1\n");
 
 	fflush(stdout);
 }
