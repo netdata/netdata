@@ -99,7 +99,7 @@ function refreshChart(chart, doNext) {
 
 function chartIsLoadingHTML(name, width, height, message)
 {
-	return "<table><tr><td align=\"center\" width=\"" + width + "\" height=\"" + height + "\" style=\"vertical-align:middle\"><h4><span class=\"glyphicon glyphicon-refresh\"></span><br/><br/>loading " + name + "<br/><br/><span class=\"label label-default\">" + (message?message:"Please wait...") + "</span></h4></td></tr></table>";
+	return "<table><tr><td align=\"center\" width=\"" + width + "\" height=\"" + height + "\" style=\"vertical-align:middle\"><h4><span class=\"glyphicon glyphicon-refresh\"></span><br/><br/>" + name + "<br/><br/><span class=\"label label-default\">" + (message?message:"loading chart...") + "</span></h4></td></tr></table>";
 }
 
 function showChartIsLoading(id, name, width, height, message) {
@@ -175,17 +175,17 @@ function calculateChartPointsToShow(c, divisor, maxtime, group) {
 	if(c.chartType == 'LineChart') {
 		if(c.points_to_show > c.chartOptions.width / 2) {
 			c.chartOptions.lineWidth = 1;
-			c.chartOptions.curveType = 'line';
+			c.chartOptions.curveType = 'none';
 		}
 
 		else if(c.points_to_show > c.chartOptions.width / 3) {
 			c.chartOptions.lineWidth = 1;
-			c.chartOptions.curveType = 'function';
+			c.chartOptions.curveType = c.default_curveType;
 		}
 
 		else {
 			c.chartOptions.lineWidth = 2;
-			c.chartOptions.curveType = 'function';
+			c.chartOptions.curveType = c.default_curveType;
 		}
 	}
 	else if(c.chartType == 'AreaChart') {
@@ -259,8 +259,6 @@ function loadCharts(base_url, doNext) {
 					json.charts[i].chartOptions.areaOpacity = 0.3;
 					
 					json.charts[i].chartOptions.vAxis.viewWindowMode = 'maximized';
-					json.charts[i].chartOptions.vAxis.minValue = null;
-					json.charts[i].chartOptions.vAxis.maxValue = null;
 					json.charts[i].non_zero = 0;
 					break;
 
@@ -281,8 +279,14 @@ function loadCharts(base_url, doNext) {
 				case "line":
 					json.charts[i].chartType = "LineChart";
 					json.charts[i].chartOptions.lineWidth = 2;
-					json.charts[i].chartOptions.curveType = 'function';
 					json.charts[i].non_zero = 0;
+
+					json.charts[i].default_curveType = 'function';
+					$.each(json.charts[i].dimensions, function(d, dim) {
+						if(dim.algorithm == 'incremental-no-interpolation' || dim.algorithm == 'absolute-no-interpolation') {
+							json.charts[i].default_curveType = 'none';
+						}
+					});
 					break;
 			}
 
