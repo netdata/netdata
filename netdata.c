@@ -1686,6 +1686,10 @@ void rrd_stats_next_plugins(RRD_STATS *st)
 unsigned long long rrd_stats_done(RRD_STATS *st)
 {
 	RRD_DIMENSION *rd, *last;
+	int oldstate;
+
+	if(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate) != 0)
+		error("Cannot set pthread cancel state to DISABLE.");
 
 	// a read lock is OK here
 	pthread_rwlock_rdlock(&st->rwlock);
@@ -1705,6 +1709,10 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 		if(st->debug) debug(D_RRD_STATS, "%s: Skipping collected values (usec since last update = %llu, counter_done = %lu)", st->name, st->usec_since_last_update, st->counter_done);
 		// we don't have any usable data yet
 		pthread_rwlock_unlock(&st->rwlock);
+
+		if(pthread_setcancelstate(oldstate, NULL) != 0)
+			error("Cannot set pthread cancel state to RESTORE (%d).", oldstate);
+
 		return(st->usec_since_last_update);
 	}
 
@@ -1973,6 +1981,10 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 	}
 
 	pthread_rwlock_unlock(&st->rwlock);
+
+	if(pthread_setcancelstate(oldstate, NULL) != 0)
+		error("Cannot set pthread cancel state to RESTORE (%d).", oldstate);
+
 	return(st->usec_since_last_update);
 }
 
@@ -3785,6 +3797,12 @@ long web_client_receive(struct web_client *w)
 
 void *new_client(void *ptr)
 {
+	if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
+		error("Cannot set pthread cancel type to DEFERRED.");
+
+	if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
+		error("Cannot set pthread cancel state to ENABLE.");
+
 	struct timeval tv;
 	struct web_client *w = ptr;
 	int retval;
@@ -5835,6 +5853,13 @@ int do_proc_vmstat() {
 void *proc_main(void *ptr)
 {
 	if(ptr) { ; }
+
+	if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
+		error("Cannot set pthread cancel type to DEFERRED.");
+
+	if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
+		error("Cannot set pthread cancel state to ENABLE.");
+
 	struct rusage me, me_last;
 	struct timeval last, now;
 
@@ -6149,6 +6174,13 @@ pid_t tc_child_pid = 0;
 void *tc_main(void *ptr)
 {
 	if(ptr) { ; }
+
+	if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
+		error("Cannot set pthread cancel type to DEFERRED.");
+
+	if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
+		error("Cannot set pthread cancel state to ENABLE.");
+
 	char buffer[TC_LINE_MAX+1] = "";
 
 	for(;1;) {
@@ -6176,10 +6208,16 @@ void *tc_main(void *ptr)
 
 			if(strcmp(p, "END") == 0) {
 				if(device) {
+					if(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL) != 0)
+						error("Cannot set pthread cancel state to DISABLE.");
+
 					tc_device_commit(device);
 					tc_device_free(device);
 					device = NULL;
 					class = NULL;
+
+					if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
+						error("Cannot set pthread cancel state to ENABLE.");
 				}
 			}
 			else if(strcmp(p, "BEGIN") == 0) {
@@ -6278,15 +6316,28 @@ void *tc_main(void *ptr)
 void *cpuidlejitter_main(void *ptr)
 {
 	if(ptr) { ; }
+
+	if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
+		error("Cannot set pthread cancel type to DEFERRED.");
+
+	if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
+		error("Cannot set pthread cancel state to ENABLE.");
+
 	int sleep_ms = config_get_number("plugin:idlejitter", "loop time in ms", CPU_IDLEJITTER_SLEEP_TIME_MS);
 	if(sleep_ms <= 0) {
 		config_set_number("plugin:idlejitter", "loop time in ms", CPU_IDLEJITTER_SLEEP_TIME_MS);
 		sleep_ms = CPU_IDLEJITTER_SLEEP_TIME_MS;
 	}
 
-	struct timeval before, after;
+	RRD_STATS *st = rrd_stats_find("system.idlejitter");
+	if(!st) {
+		st = rrd_stats_create("system", "idlejitter", NULL, "cpu", "CPU Idle Jitter", "microseconds lost/s", 9999, update_every, CHART_TYPE_LINE);
+		rrd_stats_dimension_add(st, "jitter", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
+	}
 
-	while(1) {
+	struct timeval before, after;
+	unsigned long long counter;
+	for(counter = 0; 1 ;counter++) {
 		unsigned long long usec = 0, susec = 0;
 
 		while(susec < (update_every * 1000000ULL)) {
@@ -6301,14 +6352,7 @@ void *cpuidlejitter_main(void *ptr)
 		}
 		usec -= (sleep_ms * 1000);
 
-		RRD_STATS *st = rrd_stats_find("system.idlejitter");
-		if(!st) {
-			st = rrd_stats_create("system", "idlejitter", NULL, "cpu", "CPU Idle Jitter", "microseconds lost/s", 9999, update_every, CHART_TYPE_LINE);
-
-			rrd_stats_dimension_add(st, "jitter", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
-		}
-		else rrd_stats_next_usec(st, susec);
-
+		if(counter) rrd_stats_next_usec(st, susec);
 		rrd_stats_dimension_set(st, "jitter", usec);
 		rrd_stats_done(st);
 	}
@@ -6322,6 +6366,13 @@ void *cpuidlejitter_main(void *ptr)
 void *checks_main(void *ptr)
 {
 	if(ptr) { ; }
+
+	if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
+		error("Cannot set pthread cancel type to DEFERRED.");
+
+	if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
+		error("Cannot set pthread cancel state to ENABLE.");
+
 	unsigned long long usec = 0, susec = update_every * 1000000ULL, loop_usec = 0, total_susec = 0;
 	struct timeval now, last, loop;
 
@@ -6724,6 +6775,13 @@ void *pluginsd_worker_thread(void *arg)
 void *pluginsd_main(void *ptr)
 {
 	if(ptr) { ; }
+
+	if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
+		error("Cannot set pthread cancel type to DEFERRED.");
+
+	if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
+		error("Cannot set pthread cancel state to ENABLE.");
+
 	char *dir_name = config_get("plugins", "plugins directory", PLUGINS_DIR);
 	int automatic_run = config_get_boolean("plugins", "enable running new plugins", 0);
 	int scan_frequency = config_get_number("plugins", "check for new plugins every", 60);
@@ -6819,17 +6877,59 @@ void *pluginsd_main(void *ptr)
 // ----------------------------------------------------------------------------
 // main and related functions
 
+pthread_t *p_proc = NULL, *p_tc = NULL, *p_jitter = NULL, *p_pluginsd = NULL, *p_checks = NULL;
+
 void kill_childs()
 {
+	if(p_proc)	{
+		pthread_cancel(*p_proc);
+		pthread_join(*p_proc, NULL);
+		p_proc = NULL;
+	}
+
+	if(p_jitter) {
+		pthread_cancel(*p_jitter);
+		pthread_join(*p_jitter, NULL);
+		p_jitter = NULL;
+	}
+
+	if(p_checks) {
+		pthread_cancel(*p_checks);
+		pthread_join(*p_checks, NULL);
+		p_checks = NULL;
+	}
+
 	if(tc_child_pid) kill(tc_child_pid, SIGTERM);
 	tc_child_pid = 0;
 
+	if(p_tc) {
+		pthread_cancel(*p_tc);
+		pthread_join(*p_tc, NULL);
+		p_tc = NULL;
+	}
+
+	if(p_pluginsd) {
+		pthread_cancel(*p_pluginsd);
+		pthread_join(*p_pluginsd, NULL);
+		p_pluginsd = NULL;
+	}
+
 	struct plugind *cd;
-	for(cd = pluginsd_root ; cd ; cd = cd->next)
+	for(cd = pluginsd_root ; cd ; cd = cd->next) {
 		if(cd->pid && !cd->obsolete) {
 			kill(cd->pid, SIGTERM);
 			cd->pid = 0;
 		}
+
+		pthread_cancel(cd->thread);
+		pthread_join(cd->thread, NULL);
+	}
+
+	struct web_client *w;
+	for(w = web_clients; w ; w = w->next) {
+		pthread_cancel(w->thread);
+		pthread_join(w->thread, NULL);
+	}
 }
 
 void sig_handler(int signo)
@@ -6842,8 +6942,9 @@ void sig_handler(int signo)
 		case SIGFPE:
 		case SIGSEGV:
 			error("Signaled exit (signal %d). Errno: %d (%s)", signo, errno, strerror(errno));
+			signal(signo, SIG_IGN);
 			kill_childs();
-			rrd_stats_save_all();
+			rrd_stats_free_all();
 			exit(1);
 			break;
 
@@ -7253,40 +7354,42 @@ int main(int argc, char **argv)
 	// catch all signals
 	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV && i != SIGFPE) signal(i,  sig_handler);
 	
-
-	pthread_t p_proc, p_tc, p_jitter, p_pluginsd, p_checks;
-
 	// spawn childs to collect data
 	if(config_get_boolean("plugins", "tc", 1)) {
-		if(pthread_create(&p_tc, NULL, tc_main, NULL))
+		p_tc = malloc(sizeof(pthread_t));
+		if(pthread_create(p_tc, NULL, tc_main, NULL))
 			error("failed to create new thread for tc.");
-		else if(pthread_detach(p_tc))
+		else if(pthread_detach(*p_tc))
 			error("Cannot request detach of newly created tc thread.");
 	}
 
 	if(config_get_boolean("plugins", "idlejitter", 1)) {
-		if(pthread_create(&p_jitter, NULL, cpuidlejitter_main, NULL))
+		p_jitter = malloc(sizeof(pthread_t));
+		if(pthread_create(p_jitter, NULL, cpuidlejitter_main, NULL))
 			error("failed to create new thread for idlejitter.");
-		else if(pthread_detach(p_jitter))
+		else if(pthread_detach(*p_jitter))
 			error("Cannot request detach of newly created idlejitter thread.");
 	}
 
 	if(config_get_boolean("plugins", "proc", 1)) {
-		if(pthread_create(&p_proc, NULL, proc_main, NULL))
+		p_proc = malloc(sizeof(pthread_t));
+		if(pthread_create(p_proc, NULL, proc_main, NULL))
 			error("failed to create new thread for proc.");
-		else if(pthread_detach(p_proc))
+		else if(pthread_detach(*p_proc))
 			error("Cannot request detach of newly created proc thread.");
 	}
 
-	if(pthread_create(&p_pluginsd, NULL, pluginsd_main, NULL))
+	p_pluginsd = malloc(sizeof(pthread_t));
+	if(pthread_create(p_pluginsd, NULL, pluginsd_main, NULL))
 		error("failed to create new thread for plugins.d.");
-	else if(pthread_detach(p_pluginsd))
+	else if(pthread_detach(*p_pluginsd))
 		error("Cannot request detach of newly created plugins.d thread.");
 	
 	if(config_get_boolean("plugins", "checks", 1)) {
-		if(pthread_create(&p_checks, NULL, checks_main, NULL))
+		p_checks = malloc(sizeof(pthread_t));
+		if(pthread_create(p_checks, NULL, checks_main, NULL))
 			error("failed to create new thread for checks.");
-		else if(pthread_detach(p_checks))
+		else if(pthread_detach(*p_checks))
 			error("Cannot request detach of newly created checks thread.");
 	}
 
