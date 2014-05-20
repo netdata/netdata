@@ -10,8 +10,8 @@ conf="$3"
 
 can_diff=1
 
-tmp1=`mktemp`
-tmp2=`mktemp`
+tmp1="`mktemp`"
+tmp2="`mktemp`"
 
 myset() {
 	set | grep -v "^_="	| grep -v "^PIPESTATUS=" | grep -v "^BASH_LINENO="

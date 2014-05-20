@@ -36,9 +36,9 @@ loopsleepms() {
 	fi
 
 	# get the current time
-	local d=`date +'%s.%N'`
-	local s=`echo $d | cut -d '.' -f 1`
-	local m=`echo $d | cut -d '.' -f 2 | cut -b 1-3`
+	local d="`date +'%s.%N'`"
+	local s="`echo $d | cut -d '.' -f 1`"
+	local m="`echo $d | cut -d '.' -f 2 | cut -b 1-3`"
 	local now="$s$m" # milliseconds since epoch (1-1-1970)
 
 	# calculate required sleep in ms
