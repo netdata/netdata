@@ -70,8 +70,20 @@ else
 fi
 
 echo "Stopping a (possibly) running netdata..."
-killall netdata 2>/dev/null
-sleep 2
+ret=0
+count=0
+while [ $ret -eq 0 ]
+do
+	if [ $count -gt 10 ]
+	then
+		echo >&2 "Cannot stop the running netdata."
+		exit 1
+	fi
+	count=$((count + 1))
+	killall netdata 2>/dev/null
+	ret=$?
+	test $ret -eq 0 && sleep 1
+done
 
 if [ "$USER" = "root" -a ! -z "$NETDATA_CONFIG_USER" -a -d "$NETDATA_CONFIG_WEB_DIR" ]
 then

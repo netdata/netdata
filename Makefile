@@ -11,28 +11,32 @@ else
 CFLAGS = $(COMMON_FLAGS) -Wall -Wextra -O3
 endif
 
-all: setuid
+all: netdata plugins
+	@echo
+	@echo "Compilation Done!"
+	@echo "You can 'make getconf' to get the config file conf.d/netdata.conf from the netdata server."
+	@echo
 
-bin: netdata plugins
+plugins: plugins.d/apps.plugin
 
-setuid: bin
+netdata: netdata.c
+	@echo
+	@echo "Compiling netdata server..."
+	$(CC) $(CFLAGS) -o netdata netdata.c -lpthread -lz
+
+plugins.d/apps.plugin: apps_plugin.c
+	@echo
+	@echo "Compiling apps.plugin..."
+	$(CC) $(CFLAGS) -o plugins.d/apps.plugin apps_plugin.c
 	@echo
 	@echo " >>> apps.plugin requires root access to access files in /proc"
 	@echo " >>> Please authorize it!"
 	@echo
-	sudo chown root plugins.d/apps.plugin
-	sudo chmod 4775 plugins.d/apps.plugin
-
-netdata: netdata.c
-	$(CC) $(CFLAGS) -o netdata netdata.c -lpthread -lz
-
-plugins: plugins.d/apps.plugin
-
-plugins.d/apps.plugin: apps_plugin.c
-	$(CC) $(CFLAGS) -o plugins.d/apps.plugin apps_plugin.c
+	-sudo chown root plugins.d/apps.plugin
+	-sudo chmod 4775 plugins.d/apps.plugin
 
 clean:
-	rm -f *.o netdata plugins.d/apps.plugin core
+	-rm -f *.o netdata plugins.d/apps.plugin core
 
 getconf:
 	wget -O conf.d/netdata.conf.new "http://localhost:19999/netdata.conf"

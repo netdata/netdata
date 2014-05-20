@@ -93,6 +93,7 @@
 #define D_CONFIG            0x00000400
 #define D_PLUGINSD          0x00000800
 #define D_CHILDS            0x00001000
+#define D_EXIT              0x00002000
 
 #define CT_APPLICATION_JSON				1
 #define CT_TEXT_PLAIN					2
@@ -1464,18 +1465,14 @@ void rrd_stats_dimension_free(RRD_DIMENSION *rd)
 
 void rrd_stats_free_all(void)
 {
-	pthread_rwlock_wrlock(&root_rwlock);
+	info("Freeing all memory...");
+
 	RRD_STATS *st;
 	for(st = root; st ;) {
 		RRD_STATS *next = st->next;
 
-		pthread_rwlock_wrlock(&st->rwlock);
-
 		if(st->dimensions) rrd_stats_dimension_free(st->dimensions);
 		st->dimensions = NULL;
-
-		// we leave it locked, or other threads may crash...
-		// pthread_rwlock_unlock(&st->rwlock);
 
 		if(st->mapped == NETDATA_MEMORY_MODE_SAVE) {
 			debug(D_RRD_STATS, "Saving stats '%s' to '%s'.", st->name, st->cache_file);
@@ -1494,7 +1491,8 @@ void rrd_stats_free_all(void)
 		st = next;
 	}
 	root = NULL;
-	pthread_rwlock_unlock(&root_rwlock);
+
+	info("Memory cleanup completed...");
 }
 
 void rrd_stats_save_all(void)
@@ -6881,59 +6879,77 @@ pthread_t *p_proc = NULL, *p_tc = NULL, *p_jitter = NULL, *p_pluginsd = NULL, *p
 
 void kill_childs()
 {
+	siginfo_t info;
+
+	struct web_client *w;
+	for(w = web_clients; w ; w = w->next) {
+		debug(D_EXIT, "Stopping web client %s", w->client_ip);
+		pthread_cancel(w->thread);
+		pthread_join(w->thread, NULL);
+	}
+	
 	if(p_proc)	{
+		debug(D_EXIT, "Stopping proc thread");
 		pthread_cancel(*p_proc);
 		pthread_join(*p_proc, NULL);
 		p_proc = NULL;
 	}
 
 	if(p_jitter) {
+		debug(D_EXIT, "Stopping idlejitter thread");
 		pthread_cancel(*p_jitter);
 		pthread_join(*p_jitter, NULL);
 		p_jitter = NULL;
 	}
 
 	if(p_checks) {
+		debug(D_EXIT, "Stopping self-checks thread");
 		pthread_cancel(*p_checks);
 		pthread_join(*p_checks, NULL);
 		p_checks = NULL;
 	}
 
-	if(tc_child_pid) kill(tc_child_pid, SIGTERM);
-	tc_child_pid = 0;
-
 	if(p_tc) {
+		if(tc_child_pid) {
+			debug(D_EXIT, "Killing tc-qos-helper procees");
+			kill(tc_child_pid, SIGTERM);
+			waitid(tc_child_pid, 0, &info, WEXITED);
+		}
+		tc_child_pid = 0;
+
+		debug(D_EXIT, "Stopping tc plugin thread");
 		pthread_cancel(*p_tc);
 		pthread_join(*p_tc, NULL);
 		p_tc = NULL;
 	}
 
 	if(p_pluginsd) {
+		struct plugind *cd;
+		for(cd = pluginsd_root ; cd ; cd = cd->next) {
+			debug(D_EXIT, "Stopping %s plugin thread", cd->id);
+			pthread_cancel(cd->thread);
+			pthread_join(cd->thread, NULL);
+
+			if(cd->pid && !cd->obsolete) {
+				debug(D_EXIT, "killing %s plugin process", cd->id);
+				kill(cd->pid, SIGTERM);
+				waitid(cd->pid, 0, &info, WEXITED);
+			}
+		}
+
+		debug(D_EXIT, "Stopping plugin manager thread");
 		pthread_cancel(*p_pluginsd);
 		pthread_join(*p_pluginsd, NULL);
 		p_pluginsd = NULL;
 	}
 
-	struct plugind *cd;
-	for(cd = pluginsd_root ; cd ; cd = cd->next) {
-		if(cd->pid && !cd->obsolete) {
-			kill(cd->pid, SIGTERM);
-			cd->pid = 0;
-		}
-
-		pthread_cancel(cd->thread);
-		pthread_join(cd->thread, NULL);
-	}
-
-	struct web_client *w;
-	for(w = web_clients; w ; w = w->next) {
-		pthread_cancel(w->thread);
-		pthread_join(w->thread, NULL);
-	}
+	debug(D_EXIT, "All threads/childs stopped.");
 }
 
 void sig_handler(int signo)
 {
+	siginfo_t info;
+
 	switch(signo) {
 		case SIGTERM:
 		case SIGQUIT:
@@ -6941,21 +6957,29 @@ void sig_handler(int signo)
 		case SIGHUP:
 		case SIGFPE:
 		case SIGSEGV:
-			error("Signaled exit (signal %d). Errno: %d (%s)", signo, errno, strerror(errno));
-			signal(signo, SIG_IGN);
+			debug(D_EXIT, "Signaled exit (signal %d). Errno: %d (%s)", signo, errno, strerror(errno));
+			signal(SIGCHLD, SIG_IGN);
+			signal(SIGPIPE, SIG_IGN);
+			signal(SIGTERM, SIG_IGN);
+			signal(SIGQUIT, SIG_IGN);
+			signal(SIGHUP,  SIG_IGN);
+			signal(SIGINT,  SIG_IGN);
 			kill_childs();
 			rrd_stats_free_all();
+			debug(D_EXIT, "Waiting for any child exits...");
+			while(waitid(P_ALL, 0, &info, WEXITED|WNOHANG) == 0) if(!info.si_pid) break;
+			//unlink("/var/run/netdata.pid");
+			info("NetData exiting. Bye bye...");
 			exit(1);
 			break;
 
 		case SIGPIPE:
-			error("Ignoring signal %d. Errno: %d (%s)", signo, errno, strerror(errno));
+			info("Ignoring signal %d. Errno: %d (%s)", signo, errno, strerror(errno));
 			break;
 
 
 		case SIGCHLD:
-			error("Received SIGCHLD (signal %d).", signo);
-			siginfo_t info;
+			info("Received SIGCHLD (signal %d).", signo);
 			while(waitid(P_ALL, 0, &info, WEXITED|WNOHANG) == 0) {
 				if(!info.si_pid) break;
 				switch(info.si_code) {
@@ -6991,7 +7015,7 @@ void sig_handler(int signo)
 			break;
 
 		default:
-			error("Signal %d received. Falling back to default action for it.", signo);
+			info("Signal %d received. Falling back to default action for it.", signo);
 			signal(signo, SIG_DFL);
 			break;
 	}
@@ -7183,6 +7207,18 @@ int become_daemon(int close_all_files, const char *input, const char *output, co
 	if(dev_null != STDIN_FILENO && dev_null != STDOUT_FILENO && dev_null != STDERR_FILENO)
 		close(dev_null);
 
+/*	// generate our pid file
+	{
+		unlink("/var/run/netdata.pid");
+		int fd = open("/var/run/netdata.pid", O_RDWR | O_CREAT, 0666);
+		if(fd >= 0) {
+			char b[100];
+			sprintf(b, "%d\n", getpid());
+			write(fd, b, strlen(b));
+			close(fd);
+		}
+	}
+*/
 	return(0);
 }
 
