@@ -27,7 +27,7 @@ postfix_check() {
 
 	if [ -z "$postfix_postqueue" -o ! -x  "$postfix_postqueue" ]
 	then
-		echo >&2 "Cannot find postqueue. Please set 'postfix_postqueue=/path/to/postqueue' in $confd/postfix.conf"
+		echo >&2 "postfix: cannot find postqueue. Please set 'postfix_postqueue=/path/to/postqueue' in $confd/postfix.conf"
 		return 1
 	fi
 
@@ -46,13 +46,27 @@ EOF
 }
 
 postfix_update() {
+	# the first argument to this function is the microseconds since last update
+	# pass this parameter to the BEGIN statement (see bellow).
+
 	# do all the work to collect / calculate the values
 	# for each dimension
 	# remember: KEEP IT SIMPLE AND SHORT
 
-	eval `$postfix_postqueue -p | grep "^--" | sed -e "s/-- \([0-9]\+\) Kbytes in \([0-9]\+\) Requests.$/local postfix_q_size=\1\nlocal postfix_q_emails=\2/g" | grep "^local postfix_q_"`
-	test -z "$postfix_q_emails" && local postfix_q_emails=0
-	test -z "$postfix_q_size" && local postfix_q_size=0
+	# 1. execute postqueue -p
+	# 2. get the line that begins with --
+	# 3. match the 2 numbers on the line and output 2 lines like these:
+	#    local postfix_q_size=NUMBER
+	#    local postfix_q_emails=NUMBER
+	# 4. then execute this a script with the eval
+	#
+	# be very carefull with eval:
+	# prepare the script and always egrep at the end the lines that are usefull, so that
+	# even if something goes wrong, no other code can be executed
+	eval "`$postfix_postqueue -p |\
+		grep "^--" |\
+		sed -e "s/-- \([0-9]\+\) Kbytes in \([0-9]\+\) Requests.$/local postfix_q_size=\1\nlocal postfix_q_emails=\2/g" |\
+		egrep "^local postfix_q_(emails|size)=[0-9]+$"`"
 
 	# write the result of the work.
 	cat <<VALUESEOF

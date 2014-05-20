@@ -7,7 +7,7 @@ squid_check() {
 	wget 2>/dev/null -O /dev/null "$squid_url"
 	if [ ! $? -eq 0 ]
 	then
-		echo >&2 "squid: cannot fetch the url: $squid_url. Please set squid_url='url' in $confd/squid.conf"
+		echo >&2 "squid: cannot fetch the counters url: $squid_url. Please set squid_url='url' in $confd/squid.conf"
 		return 1
 	fi
 
@@ -41,34 +41,50 @@ EOF
 
 
 squid_update() {
+	# the first argument to this function is the microseconds since last update
+	# pass this parameter to the BEGIN statement (see bellow).
+
 	# do all the work to collect / calculate the values
 	# for each dimension
+	# remember: KEEP IT SIMPLE AND SHORT
 
-	# get the values from squid
-	eval `wget 2>/dev/null -O - "$squid_url" | sed -e "s/\./_/g" -e "s/ = /=/g" | egrep "(^client_http_|^server_all_)"`
+	# 1. wget the counters page from squid
+	# 2. sed to remove spaces; replace . with _; remove spaces around =; prepend each line with: local squid_
+	# 3. egrep lines starting with:
+	#    local squid_client_http_ then one or more of these a-z 0-9 _ then = and one of more of 0-9
+	#    local squid_server_all_ then one or more of these a-z 0-9 _ then = and one of more of 0-9
+	# 4. then execute this as a script with the eval
+	#
+	# be very carefull with eval:
+	# prepare the script and always grep at the end the lines that are usefull, so that
+	# even if something goes wrong, no other code can be executed
+
+	eval "`wget 2>/dev/null -O - "$squid_url" |\
+		sed -e "s/ \+/ /g" -e "s/\./_/g" -e "s/ = /=/g" -e "s/^/local squid_/g" |\
+		egrep "^local squid_(client_http|server_all)_[a-z0-9_]+=[0-9]+$"`"
 
 	# write the result of the work.
 	cat <<VALUESEOF
 BEGIN squid.clients_net $1
-SET client_http_kbytes_in = $client_http_kbytes_in
-SET client_http_kbytes_out = $client_http_kbytes_out
-SET client_http_hit_kbytes_out = $client_http_hit_kbytes_out
+SET client_http_kbytes_in = $squid_client_http_kbytes_in
+SET client_http_kbytes_out = $squid_client_http_kbytes_out
+SET client_http_hit_kbytes_out = $squid_client_http_hit_kbytes_out
 END
 
 BEGIN squid.clients_requests $1
-SET client_http_requests = $client_http_requests
-SET client_http_hits = $client_http_hits
-SET client_http_errors = $client_http_errors
+SET client_http_requests = $squid_client_http_requests
+SET client_http_hits = $squid_client_http_hits
+SET client_http_errors = $squid_client_http_errors
 END
 
 BEGIN squid.servers_net $1
-SET server_all_kbytes_in = $server_all_kbytes_in
-SET server_all_kbytes_out = $server_all_kbytes_out
+SET server_all_kbytes_in = $squid_server_all_kbytes_in
+SET server_all_kbytes_out = $squid_server_all_kbytes_out
 END
 
 BEGIN squid.servers_requests $1
-SET server_all_requests = $server_all_requests
-SET server_all_errors = $server_all_errors
+SET server_all_requests = $squid_server_all_requests
+SET server_all_errors = $squid_server_all_errors
 END
 VALUESEOF
 
