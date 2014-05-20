@@ -28,12 +28,19 @@ plugins.d/apps.plugin: apps_plugin.c
 	@echo
 	@echo "Compiling apps.plugin..."
 	$(CC) $(CFLAGS) -o plugins.d/apps.plugin apps_plugin.c
-	@echo
-	@echo " >>> apps.plugin requires root access to access files in /proc"
-	@echo " >>> Please authorize it!"
-	@echo
-	-sudo chown root plugins.d/apps.plugin
-	-sudo chmod 4775 plugins.d/apps.plugin
+	@-if [ ! "$$USER" = "root" ]; \
+	then \
+		echo; \
+		echo " >>> apps.plugin requires root access to access files in /proc"; \
+		echo " >>> Please authorize it!"; \
+		echo; \
+		sudo chown root plugins.d/apps.plugin; \
+		sudo chmod 4775 plugins.d/apps.plugin; \
+	else \
+		chown root plugins.d/apps.plugin; \
+		chmod 4775 plugins.d/apps.plugin; \
+	fi
+
 
 clean:
 	-rm -f *.o netdata plugins.d/apps.plugin core

@@ -84,7 +84,7 @@ if [ "$USER" = "root" -a ! -z "$NETDATA_CONFIG_USER" ]
 then
 	for x in "$NETDATA_CONFIG_WEB_DIR" "$NETDATA_CONFIG_CONF_DIR" "$NETDATA_CONFIG_CACHE_DIR" "$NETDATA_CONFIG_LOG_DIR"
 	do
-		echo "Chaning ownership of web files in $x to $NETDATA_CONFIG_USER"
+		echo "Changing ownership of web files in $x to $NETDATA_CONFIG_USER"
 		chown -R "$NETDATA_CONFIG_USER" "$x" || exit 1
 		chmod 0775 "$x" $NETDATA_CONFIG_CONF_DIR log cache || exit 1
 	done
