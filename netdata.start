@@ -41,8 +41,11 @@ then
 	fi
 
 	# find the user to run as
-	NETDATA_CONFIG_USER="`grep 'run as user = ' $NETDATA_CONFIG_CONF_DIR/netdata.conf | head -n 1 | cut -d '=' -f 2 | sed s"/ //g"`"
-	NETDATA_CONFIG_WEB_DIR="`grep 'web files directory = ' $NETDATA_CONFIG_CONF_DIR/netdata.conf | head -n 1 | cut -d '=' -f 2 | sed -e s"/^ \+//g" -e s"/ \+$//g"`"
+	x="`grep 'run as user = ' $NETDATA_CONFIG_CONF_DIR/netdata.conf | head -n 1 | cut -d '=' -f 2 | sed s"/ //g"`"
+	test ! -z "$x" && NETDATA_CONFIG_USER="$x"
+	
+	x="`grep 'web files directory = ' $NETDATA_CONFIG_CONF_DIR/netdata.conf | head -n 1 | cut -d '=' -f 2 | sed -e s"/^ \+//g" -e s"/ \+$//g"`"
+	test ! -z "$x" && NETDATA_CONFIG_WEB_DIR="$x"	
 fi
 
 for x in "$NETDATA_CONFIG_WEB_DIR" "$NETDATA_CONFIG_CONF_DIR" "$NETDATA_CONFIG_CACHE_DIR" "$NETDATA_CONFIG_LOG_DIR"
