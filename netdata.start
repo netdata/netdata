@@ -24,28 +24,15 @@ NETDATA_CONFIG_DEBUG=0
 # our port
 NETDATA_CONFIG_PORT=19999
 
-# our web files
-NETDATA_CONFIG_WEB_DIR=web
+NETDATA_CONFIG_CONF_DIR="conf.d"
+NETDATA_CONFIG_WEB_DIR="web"
+NETDATA_CONFIG_CACHE_DIR="cache"
+NETDATA_CONFIG_LOG_DIR="log"
 
-if [ ! -d log ]
-then
-	mkdir log || exit 1
-fi
-
-if [ ! -d conf.d ]
-then
-	mkdir conf.d || exit 1
-fi
-
-if [ ! -d cache ]
-then
-	mkdir cache || exit 1
-fi
-
-if [ -f conf.d/netdata.conf ]
+if [ -f $NETDATA_CONFIG_CONF_DIR/netdata.conf ]
 then
 	# find if debug is enabled in the config
-	df=`grep "debug flags = " conf.d/netdata.conf | tail -n 1 | cut -d '=' -f 2 | sed s"/ //g"`
+	df=`grep "debug flags = " $NETDATA_CONFIG_CONF_DIR/netdata.conf | tail -n 1 | cut -d '=' -f 2 | sed s"/ //g"`
 	if [ -z "$df" -o "$df" = "0x00000000" -o $((df + 1 - 1)) -eq 0 ]
 	then
 		NETDATA_CONFIG_DEBUG=0
@@ -54,9 +41,17 @@ then
 	fi
 
 	# find the user to run as
-	NETDATA_CONFIG_USER="`grep 'run as user = ' conf.d/netdata.conf | head -n 1 | cut -d '=' -f 2 | sed s"/ //g"`"
-	NETDATA_CONFIG_WEB_DIR="`grep 'web files directory = ' conf.d/netdata.conf | head -n 1 | cut -d '=' -f 2 | sed -e s"/^ \+//g" -e s"/ \+$//g"`"
+	NETDATA_CONFIG_USER="`grep 'run as user = ' $NETDATA_CONFIG_CONF_DIR/netdata.conf | head -n 1 | cut -d '=' -f 2 | sed s"/ //g"`"
+	NETDATA_CONFIG_WEB_DIR="`grep 'web files directory = ' $NETDATA_CONFIG_CONF_DIR/netdata.conf | head -n 1 | cut -d '=' -f 2 | sed -e s"/^ \+//g" -e s"/ \+$//g"`"
 fi
+
+for x in "$NETDATA_CONFIG_WEB_DIR" "$NETDATA_CONFIG_CONF_DIR" "$NETDATA_CONFIG_CACHE_DIR" "$NETDATA_CONFIG_LOG_DIR"
+do
+	if [ ! -d $x ]
+	then
+		mkdir $x || exit 1
+	fi
+done
 
 echo "Compiling netdata (debug=$NETDATA_CONFIG_DEBUG)"
 if [ $NETDATA_CONFIG_DEBUG -eq 1 ]
@@ -85,11 +80,14 @@ do
 	test $ret -eq 0 && sleep 1
 done
 
-if [ "$USER" = "root" -a ! -z "$NETDATA_CONFIG_USER" -a -d "$NETDATA_CONFIG_WEB_DIR" ]
+if [ "$USER" = "root" -a ! -z "$NETDATA_CONFIG_USER" ]
 then
-	echo "Chaning ownership of web files in $NETDATA_CONFIG_WEB_DIR to $NETDATA_CONFIG_USER"
-	chown -R "$NETDATA_CONFIG_USER" "$NETDATA_CONFIG_WEB_DIR" conf.d log cache || exit 1
-	chmod    0775 "$NETDATA_CONFIG_WEB_DIR" conf.d log cache || exit 1
+	for x in "$NETDATA_CONFIG_WEB_DIR" "$NETDATA_CONFIG_CONF_DIR" "$NETDATA_CONFIG_CACHE_DIR" "$NETDATA_CONFIG_LOG_DIR"
+	do
+		echo "Chaning ownership of web files in $x to $NETDATA_CONFIG_USER"
+		chown -R "$NETDATA_CONFIG_USER" "$x" || exit 1
+		chmod 0775 "$x" $NETDATA_CONFIG_CONF_DIR log cache || exit 1
+	done
 fi
 
 if [ ! "$USER" = "root" ]
@@ -99,11 +97,11 @@ then
 fi
 
 echo "Starting netdata..."
-if [ -f conf.d/netdata.conf ]
+if [ -f $NETDATA_CONFIG_CONF_DIR/netdata.conf ]
 then
 	`pwd`/netdata
 else
-	touch conf.d/netdata.conf
+	touch $NETDATA_CONFIG_CONF_DIR/netdata.conf
 
 	if [ "$USER" = "root" ]
 	then
@@ -113,11 +111,11 @@ else
 	fi
 
 	sleep 2
-	wget 2>/dev/null -O conf.d/netdata.conf.new http://localhost:$NETDATA_CONFIG_PORT/netdata.conf
-	mv conf.d/netdata.conf.new conf.d/netdata.conf
+	wget 2>/dev/null -O $NETDATA_CONFIG_CONF_DIR/netdata.conf.new http://localhost:$NETDATA_CONFIG_PORT/netdata.conf
+	mv $NETDATA_CONFIG_CONF_DIR/netdata.conf.new $NETDATA_CONFIG_CONF_DIR/netdata.conf
 
 	echo "Hit http://127.0.0.1:$NETDATA_CONFIG_PORT/ from your browser."
-	echo "You can edit config options in file conf.d/netdata.conf"
+	echo "You can edit config options in file $NETDATA_CONFIG_CONF_DIR/netdata.conf"
 fi
 
 echo
