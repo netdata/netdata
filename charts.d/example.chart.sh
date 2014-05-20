@@ -21,6 +21,9 @@ EOF
 }
 
 example_update() {
+	# the first argument to this function is the microseconds since last update
+	# pass this parameter to the BEGIN statement (see bellow).
+
 	# do all the work to collect / calculate the values
 	# for each dimension
 	# remember: KEEP IT SIMPLE AND SHORT
@@ -31,7 +34,7 @@ example_update() {
 
 	# write the result of the work.
 	cat <<VALUESEOF
-BEGIN example.random
+BEGIN example.random $1
 SET random1 = $value1
 SET random2 = $value2
 SET random3 = $value3
