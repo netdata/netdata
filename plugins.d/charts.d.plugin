@@ -158,21 +158,21 @@ all_enabled_charts() {
 	for chart in $charts
 	do
 		# check the enabled charts
-		local check=`cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_check()"`
+		local check="`cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_check()"`"
 		if [ -z "$check" ]
 		then
 			echo >&2 "charts.d: chart '$chart' does not seem to have a $chart$charts_check() function. Disabling it."
 			continue
 		fi
 
-		local create=`cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_create()"`
+		local create="`cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_create()"`"
 		if [ -z "$create" ]
 		then
 			echo >&2 "charts.d: chart '$chart' does not seem to have a $chart$charts_create() function. Disabling it."
 			continue
 		fi
 
-		local update=`cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_update()"`
+		local update="`cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_update()"`"
 		if [ -z "$update" ]
 		then
 			echo >&2 "charts.d: chart '$chart' does not seem to have a $chart$charts_update() function. Disabling it."
