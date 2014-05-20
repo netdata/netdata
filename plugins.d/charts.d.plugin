@@ -278,7 +278,7 @@ done
 global_update() {
 	while [ 1 ]
 	do
-		local now_charts=$run_charts
+		local now_charts="$run_charts"
 		local run_charts=
 
 		local chart=
