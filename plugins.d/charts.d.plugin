@@ -276,8 +276,12 @@ done
 # -----------------------------------------------------------------------------
 # update dimensions
 global_update() {
+	local exit_after=$((3600 / update_every))
+
+	local c=0
 	while [ 1 ]
 	do
+		local c=$((c + 1))
 		local now_charts="$run_charts"
 		local run_charts=
 
@@ -294,6 +298,10 @@ global_update() {
 
 			local dt=$(( (now - last) * 1000 ))
 			eval "last_update_$chart=$now"
+
+			# the first call should not give a duration
+			# so that netdata calibrates to current time
+			test $c -eq 1 && local dt=
 
 			$chart$charts_update $dt
 			if [ $? -eq 0 ]
@@ -312,6 +320,8 @@ global_update() {
 			# wait the time you are required to
 			loopsleepms $debug_time $update_every
 		fi
+
+		test $c -gt $exit_after && exit 0
 	done
 }
 

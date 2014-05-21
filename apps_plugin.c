@@ -890,7 +890,10 @@ void show_dimensions(void)
 		gettimeofday(&last, NULL);
 		getrusage(RUSAGE_SELF, &me_last);
 
-		usec = update_every * 1000000ULL;
+		// the first time, give a zero to allow
+		// netdata calibrate to the current time
+		// usec = update_every * 1000000ULL;
+		usec = 0ULL;
 		cpuuser = 0;
 		cpusyst = 0;
 	}

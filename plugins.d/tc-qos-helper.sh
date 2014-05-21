@@ -84,7 +84,7 @@ do
 		show_tc $d
 	done
 
-	[ $gc -gt $exit_after ] && exit 0
-	
 	loopsleepms $sleep_time
+
+	test $gc -gt $exit_after && exit 0
 done
