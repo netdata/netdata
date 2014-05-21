@@ -94,6 +94,7 @@
 #define D_PLUGINSD          0x00000800
 #define D_CHILDS            0x00001000
 #define D_EXIT              0x00002000
+#define D_CHECKS            0x00004000
 
 #define CT_APPLICATION_JSON				1
 #define CT_TEXT_PLAIN					2
@@ -7421,7 +7422,7 @@ int main(int argc, char **argv)
 	else if(pthread_detach(*p_pluginsd))
 		error("Cannot request detach of newly created plugins.d thread.");
 	
-	if(config_get_boolean("plugins", "checks", 1)) {
+	if(config_get_boolean("plugins", "checks", (debug_flags & D_CHECKS)?1:0)) {
 		p_checks = malloc(sizeof(pthread_t));
 		if(pthread_create(p_checks, NULL, checks_main, NULL))
 			error("failed to create new thread for checks.");

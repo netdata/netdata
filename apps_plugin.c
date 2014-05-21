@@ -81,6 +81,8 @@ struct target {
 
 	unsigned long processes;	// how many processes have been merged to this
 	int exposed;				// if set, we have sent this to netdata
+	int hidden;					// if set, we set the hidden flag on the dimension
+	int debug;
 
 	struct target *target;	// the one that will be reported to netdata
 	struct target *next;
@@ -91,9 +93,12 @@ unsigned long long file_counter = 0;
 
 struct target *get_target(const char *id, struct target *target)
 {
+	const char *nid = id;
+	if(nid[0] == '-') nid++;
+
 	struct target *w;
 	for(w = target_root ; w ; w = w->next)
-		if(strncmp(id, w->id, MAX_NAME) == 0) return w;
+		if(strncmp(nid, w->id, MAX_NAME) == 0) return w;
 	
 	w = calloc(sizeof(struct target), 1);
 	if(!w) {
@@ -101,9 +106,11 @@ struct target *get_target(const char *id, struct target *target)
 		return NULL;
 	}
 
-	strncpy(w->id, id, MAX_NAME);
-	strncpy(w->name, id, MAX_NAME);
-	strncpy(w->compare, id, MAX_COMPARE_NAME);
+	strncpy(w->id, nid, MAX_NAME);
+	strncpy(w->name, nid, MAX_NAME);
+	strncpy(w->compare, nid, MAX_COMPARE_NAME);
+	if(id[0] == '-') w->hidden = 1;
+
 	w->target = target;
 
 	w->next = target_root;
@@ -147,6 +154,7 @@ int read_process_groups(const char *name)
 
 	long line = 0;
 	while(fgets(buffer, 4096, fp) != NULL) {
+		int whidden = 0, wdebug = 0;
 		line++;
 
 		// if(debug) fprintf(stderr, "\tread %s\n", buffer);
@@ -162,6 +170,26 @@ int read_process_groups(const char *name)
 		if(t) t = trim(t);
 		if(!t || !*t) continue;
 
+		while(t[0]) {
+			int stop = 1;
+
+			switch(t[0]) {
+				case '-':
+					stop = 0;
+					whidden = 1;
+					t++;
+					break;
+
+				case '+':
+					stop = 0;
+					wdebug = 1;
+					t++;
+					break;
+			}
+
+			if(stop) break;
+		}
+
 		if(debug) fprintf(stderr, "\t\ttarget %s\n", t);
 
 		struct target *w = NULL;
@@ -173,6 +201,8 @@ int read_process_groups(const char *name)
 			if(!p || !*p) continue;
 
 			struct target *n = get_target(p, w);
+			n->hidden = whidden;
+			n->debug = wdebug;
 			if(!w) w = n;
 
 			count++;
@@ -454,7 +484,7 @@ int update_from_proc(void)
 		strncpy(p->comm, name, MAX_COMPARE_NAME);
 		p->comm[MAX_COMPARE_NAME] = '\0';
 
-		if(debug) fprintf(stderr, "VALUES: %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+		if(debug || (p->target && p->target->debug)) fprintf(stderr, "VALUES: %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
 
 		if(parsed < 39) fprintf(stderr, "file %s gave %d results (expected 44)\n", filename, parsed);
 
@@ -465,13 +495,13 @@ int update_from_proc(void)
 
 			struct target *w;
 			for(w = target_root; w ; w = w->next) {
-				// if(debug) fprintf(stderr, "\t\tcomparing '%s' with '%s'\n", w->compare, p->comm);
+				// if(debug || (p->target && p->target->debug)) fprintf(stderr, "\t\tcomparing '%s' with '%s'\n", w->compare, p->comm);
 
 				if(strcmp(w->compare, p->comm) == 0) {
 					if(w->target) p->target = w->target;
 					else p->target = w;
 
-					if(debug) fprintf(stderr, "\t\t%s linked to target %s\n", p->comm, p->target->name);
+					if(debug || (p->target && p->target->debug)) fprintf(stderr, "\t\t%s linked to target %s\n", p->comm, p->target->name);
 				}
 			}
 		}
@@ -501,7 +531,7 @@ int update_from_proc(void)
 			}
 			else if(bytes > 10) {
 				buffer[bytes] = '\0';
-				if(debug) fprintf(stderr, "READ statm: %s", buffer);
+				if(debug || (p->target && p->target->debug)) fprintf(stderr, "READ statm: %s", buffer);
 
 				parsed = sscanf(buffer,
 					"%llu %llu %llu %llu %llu %llu %llu"
@@ -539,7 +569,7 @@ int update_from_proc(void)
 			}
 			else if(bytes > 10) {
 				buffer[bytes] = '\0';
-				if(debug) fprintf(stderr, "READ io: %s", buffer);
+				if(debug || (p->target && p->target->debug)) fprintf(stderr, "READ io: %s", buffer);
 
 				parsed = sscanf(buffer,
 					"rchar: %llu\nwchar: %llu\nsyscr: %llu\nsyscw: %llu\nread_bytes: %llu\nwrite_bytes: %llu\ncancelled_write_bytes: %llu"
@@ -616,7 +646,7 @@ void update_statistics(void)
 	// link all parents and update childs count
 	for(p = root; p ; p = p->next) {
 		if(p->ppid > 0 && p->ppid <= pid_max && all_pids[p->ppid]) {
-			if(debug) fprintf(stderr, "\tParent of %d %s is %d %s\n", p->pid, p->comm, p->ppid, all_pids[p->ppid]->comm);
+			if(debug || (p->target && p->target->debug)) fprintf(stderr, "\tParent of %d %s is %d %s\n", p->pid, p->comm, p->ppid, all_pids[p->ppid]->comm);
 			
 			p->parent = all_pids[p->ppid];
 			p->parent->childs++;
@@ -643,7 +673,7 @@ void update_statistics(void)
 				// the parent inherits the child's target, if it does not have a target itself
 				if(p->target && !p->parent->target) {
 					p->parent->target = p->target;
-					if(debug) fprintf(stderr, "\t\ttarget %s is inherited by %d %s from its child %d %s.\n", p->target->name, p->parent->pid, p->parent->comm, p->pid, p->comm);
+					if(debug || (p->target && p->target->debug)) fprintf(stderr, "\t\ttarget %s is inherited by %d %s from its child %d %s.\n", p->target->name, p->parent->pid, p->parent->comm, p->pid, p->comm);
 				}
 
 				found++;
@@ -807,7 +837,7 @@ void update_statistics(void)
 
 			p->target->processes++;
 
-			if(debug) fprintf(stderr, "\tAgregating %s pid %d on %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, p->target->name, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+			if(debug || p->target->debug) fprintf(stderr, "\tAgregating %s pid %d on %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, p->target->name, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
 
 /*			if(p->utime - p->old_utime > 100) fprintf(stderr, "BIG CHANGE: %d %s utime increased by %llu from %llu to %llu\n", p->pid, p->comm, p->utime - p->old_utime, p->old_utime, p->utime);
 			if(p->cutime - p->old_cutime > 100) fprintf(stderr, "BIG CHANGE: %d %s cutime increased by %llu from %llu to %llu\n", p->pid, p->comm, p->cutime - p->old_cutime, p->old_cutime, p->cutime);
@@ -1025,7 +1055,7 @@ void show_charts(void)
 		if(!w->exposed && w->processes) {
 			newly_added++;
 			w->exposed = 1;
-			if(debug) fprintf(stderr, "%s just added - regenerating charts.\n", w->name);
+			if(debug || w->debug) fprintf(stderr, "%s just added - regenerating charts.\n", w->name);
 		}
 
 	// nothing more to show
@@ -1037,7 +1067,7 @@ void show_charts(void)
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz);
+		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu %s\n", w->name, Hertz, w->hidden?"hidden":"");
 	}
 
 	fprintf(stdout, "CHART apps.mem '' 'Apps Dedicated Memory (w/o shared)' 'MB' apps apps stacked 20003 %d\n", update_every);
@@ -1082,21 +1112,21 @@ void show_charts(void)
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w->name);
 	}
 
-	fprintf(stdout, "CHART apps.minor_faults '' 'Apps Minor Page Faults' 'page faults/s' apps apps stacked 20011 %d\n", update_every);
+	fprintf(stdout, "CHART apps.minor_faults '' 'Apps Minor Page Faults' 'page faults/s' apps none stacked 20011 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w->name);
 	}
 
-	fprintf(stdout, "CHART apps.lreads '' 'Apps Disk Logical Reads' 'kilobytes/s' apps apps stacked 20042 %d\n", update_every);
+	fprintf(stdout, "CHART apps.lreads '' 'Apps Disk Logical Reads' 'kilobytes/s' apps none stacked 20042 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1024\n", w->name);
 	}
 
-	fprintf(stdout, "CHART apps.lwrites '' 'Apps I/O Logical Writes' 'kilobytes/s' apps apps stacked 20042 %d\n", update_every);
+	fprintf(stdout, "CHART apps.lwrites '' 'Apps I/O Logical Writes' 'kilobytes/s' apps none stacked 20042 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
@@ -1121,7 +1151,7 @@ void show_charts(void)
 	fprintf(stdout, "DIMENSION user '' incremental 1 1000\n");
 	fprintf(stdout, "DIMENSION system '' incremental 1 1000\n");
 
-	fprintf(stdout, "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' netdata netdata line 10001 %d\n", update_every);
+	fprintf(stdout, "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' netdata none line 10001 %d\n", update_every);
 	fprintf(stdout, "DIMENSION files '' incremental-no-interpolation 1 1\n");
 
 	fflush(stdout);
