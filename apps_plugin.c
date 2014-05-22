@@ -79,6 +79,17 @@ struct target {
 	unsigned long long fix_io_storage_bytes_written;
 	unsigned long long fix_io_cancelled_write_bytes;
 
+	unsigned long long openfiles;
+	unsigned long long openpipes;
+	unsigned long long opensockets;
+	unsigned long long openinotifies;
+	unsigned long long openeventfds;
+	unsigned long long opentimerfds;
+	unsigned long long opensignalfds;
+	unsigned long long openeventpolls;
+	unsigned long long openanoninodes;
+	unsigned long long openother;
+
 	unsigned long processes;	// how many processes have been merged to this
 	int exposed;				// if set, we have sent this to netdata
 	int hidden;					// if set, we set the hidden flag on the dimension
@@ -340,6 +351,17 @@ struct pid_stat {
 	unsigned long long diff_cmajflt;
 */
 
+	unsigned long long openfiles;
+	unsigned long long openpipes;
+	unsigned long long opensockets;
+	unsigned long long openinotifies;
+	unsigned long long openeventfds;
+	unsigned long long opentimerfds;
+	unsigned long long opensignalfds;
+	unsigned long long openeventpolls;
+	unsigned long long openanoninodes;
+	unsigned long long openother;
+
 	int childs;	// number of processes directly referencing this
 	int updated;
 	int merged;
@@ -410,6 +432,17 @@ int update_from_proc(void)
 		p->childs = 0;
 		p->merged = 0;
 		p->new_entry = 0;
+
+		p->openfiles = 0;
+		p->openpipes = 0;
+		p->opensockets = 0;
+		p->openinotifies = 0;
+		p->openeventfds = 0;
+		p->openeventpolls = 0;
+		p->opentimerfds = 0;
+		p->opensignalfds = 0;
+		p->openanoninodes = 0;
+		p->openother = 0;
 	}
 
 	while((file = readdir(dir))) {
@@ -586,6 +619,45 @@ int update_from_proc(void)
 			}
 		}
 
+		// --------------------------------------------------------------------
+		// /proc/<pid>/fd
+
+		snprintf(filename, FILENAME_MAX, "/proc/%s/fd", file->d_name);
+		DIR *fds = opendir(filename);
+		if(fds) {
+			struct dirent *de;
+			char fdname[FILENAME_MAX + 1];
+			char linkname[FILENAME_MAX + 1];
+
+			while((de = readdir(fds))) {
+				if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) continue;
+
+				sprintf(fdname, "/proc/%s/fd/%s", file->d_name, de->d_name);
+				int l = readlink(fdname, linkname, FILENAME_MAX);
+				if(l == -1) {
+					fprintf(stderr, "Cannot read link %s\n", fdname);
+					continue;
+				}
+				file_counter++;
+
+				linkname[l] = '\0';
+
+				if(linkname[0] == '/') p->openfiles++;
+				else if(strncmp(linkname, "pipe:", 5) == 0) p->openpipes++;
+				else if(strncmp(linkname, "socket:", 7) == 0) p->opensockets++;
+				else if(strcmp(linkname, "anon_inode:inotify") == 0) p->openinotifies++;
+				else if(strcmp(linkname, "anon_inode:[eventfd]") == 0) p->openeventfds++;
+				else if(strcmp(linkname, "anon_inode:[eventpoll]") == 0) p->openeventpolls++;
+				else if(strcmp(linkname, "anon_inode:[timerfd]") == 0) p->opentimerfds++;
+				else if(strcmp(linkname, "anon_inode:[signalfd]") == 0) p->opensignalfds++;
+				else if(strncmp(linkname, "anon_inode:", 11) == 0) {
+					fprintf(stderr, "anonymous inode: %s\n", linkname);
+					p->openanoninodes++;
+				}
+				else p->openother++;
+			}
+			closedir(fds);
+		}
 
 		// --------------------------------------------------------------------
 		// done!
@@ -794,6 +866,17 @@ void update_statistics(void)
 		w->io_storage_bytes_read = 0;
 		w->io_storage_bytes_written = 0;
 		w->io_cancelled_write_bytes = 0;
+
+		w->openfiles = 0;
+		w->openpipes = 0;
+		w->opensockets = 0;
+		w->openinotifies = 0;
+		w->openeventfds = 0;
+		w->opentimerfds = 0;
+		w->opensignalfds = 0;
+		w->openeventpolls = 0;
+		w->openanoninodes = 0;
+		w->openother = 0;
 	}
 
 /*	walk_down(0, 1);
@@ -834,6 +917,17 @@ void update_statistics(void)
 			p->target->io_storage_bytes_read += p->io_storage_bytes_read;
 			p->target->io_storage_bytes_written += p->io_storage_bytes_written;
 			p->target->io_cancelled_write_bytes += p->io_cancelled_write_bytes;
+
+			p->target->openfiles += p->openfiles;
+			p->target->openpipes += p->openpipes;
+			p->target->opensockets += p->opensockets;
+			p->target->openinotifies += p->openinotifies;
+			p->target->openeventfds += p->openeventfds;
+			p->target->opentimerfds += p->opentimerfds;
+			p->target->opensignalfds += p->opensignalfds;
+			p->target->openeventpolls += p->openeventpolls;
+			p->target->openanoninodes += p->openanoninodes;
+			p->target->openother += p->openother;
 
 			p->target->processes++;
 
@@ -1035,6 +1129,62 @@ void show_dimensions(void)
 	}
 	fprintf(stdout, "END\n");
 
+	fprintf(stdout, "BEGIN apps.files %llu\n", usec);
+	for (w = target_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->openfiles);
+	}
+	fprintf(stdout, "END\n");
+
+	fprintf(stdout, "BEGIN apps.sockets %llu\n", usec);
+	for (w = target_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->opensockets);
+	}
+	fprintf(stdout, "END\n");
+
+	fprintf(stdout, "BEGIN apps.pipes %llu\n", usec);
+	for (w = target_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->openpipes);
+	}
+	fprintf(stdout, "END\n");
+
+	fprintf(stdout, "BEGIN apps.inotify %llu\n", usec);
+	for (w = target_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->openinotifies);
+	}
+	fprintf(stdout, "END\n");
+
+	fprintf(stdout, "BEGIN apps.eventfd %llu\n", usec);
+	for (w = target_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->openeventfds + w->openeventpolls);
+	}
+	fprintf(stdout, "END\n");
+
+	fprintf(stdout, "BEGIN apps.timerfd %llu\n", usec);
+	for (w = target_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->opentimerfds);
+	}
+	fprintf(stdout, "END\n");
+
+	fprintf(stdout, "BEGIN apps.signalfd %llu\n", usec);
+	for (w = target_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->opensignalfds);
+	}
+	fprintf(stdout, "END\n");
+
 	fprintf(stdout, "BEGIN netdata.apps_cpu %llu\n", usec);
 	fprintf(stdout, "SET user = %llu\n", cpuuser);
 	fprintf(stdout, "SET system = %llu\n", cpusyst);
@@ -1145,6 +1295,55 @@ void show_charts(void)
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1024\n", w->name);
+	}
+
+	fprintf(stdout, "CHART apps.files '' 'Apps Open Files' 'open files' apps apps stacked 20050 %d\n", update_every);
+	for (w = target_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "DIMENSION %s '' absolute-no-interpolation 1 1\n", w->name);
+	}
+
+	fprintf(stdout, "CHART apps.sockets '' 'Apps Open Sockets' 'open sockets' apps apps stacked 20051 %d\n", update_every);
+	for (w = target_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "DIMENSION %s '' absolute-no-interpolation 1 1\n", w->name);
+	}
+
+	fprintf(stdout, "CHART apps.pipes '' 'Apps Pipes' 'open pipes' apps none stacked 20053 %d\n", update_every);
+	for (w = target_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "DIMENSION %s '' absolute-no-interpolation 1 1\n", w->name);
+	}
+
+	fprintf(stdout, "CHART apps.inotify '' 'Apps inotifies' 'open inotifies' apps none stacked 20054 %d\n", update_every);
+	for (w = target_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "DIMENSION %s '' absolute-no-interpolation 1 1\n", w->name);
+	}
+
+	fprintf(stdout, "CHART apps.eventfd '' 'Apps Event File Descriptors' 'open event fds' apps none stacked 20055 %d\n", update_every);
+	for (w = target_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "DIMENSION %s '' absolute-no-interpolation 1 1\n", w->name);
+	}
+
+	fprintf(stdout, "CHART apps.timerfd '' 'Apps Timer File Descriptors' 'open timer fds' apps none stacked 20057 %d\n", update_every);
+	for (w = target_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "DIMENSION %s '' absolute-no-interpolation 1 1\n", w->name);
+	}
+
+	fprintf(stdout, "CHART apps.signalfd '' 'Apps Timer File Descriptors' 'open timer fds' apps none stacked 20058 %d\n", update_every);
+	for (w = target_root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
+
+		fprintf(stdout, "DIMENSION %s '' absolute-no-interpolation 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' netdata netdata stacked 10000 %d\n", update_every);
