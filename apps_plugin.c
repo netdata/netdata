@@ -113,7 +113,7 @@ struct target *get_target(const char *id, struct target *target)
 	
 	w = calloc(sizeof(struct target), 1);
 	if(!w) {
-		fprintf(stderr, "Cannot allocate %lu bytes of memory\n", sizeof(struct target));
+		fprintf(stderr, "apps.plugin: cannot allocate %lu bytes of memory\n", sizeof(struct target));
 		return NULL;
 	}
 
@@ -127,7 +127,7 @@ struct target *get_target(const char *id, struct target *target)
 	w->next = target_root;
 	target_root = w;
 
-	if(debug) fprintf(stderr, "Adding hook for process '%s', compare '%s' on target '%s'\n", w->id, w->compare, w->target?w->target->id:"");
+	if(debug) fprintf(stderr, "apps.plugin: adding hook for process '%s', compare '%s' on target '%s'\n", w->id, w->compare, w->target?w->target->id:"");
 
 	return w;
 }
@@ -156,10 +156,10 @@ int read_process_groups(const char *name)
 
 	snprintf(filename, FILENAME_MAX, "%s/apps_%s.conf", CONFIG_DIR, name);
 
-	if(debug) fprintf(stderr, "Process groups file: '%s'\n", filename);
+	if(debug) fprintf(stderr, "apps.plugin: process groups file: '%s'\n", filename);
 	FILE *fp = fopen(filename, "r");
 	if(!fp) {
-		fprintf(stderr, "Cannot open file '%s' (%s)\n", filename, strerror(errno));
+		fprintf(stderr, "apps.plugin: ERROR: cannot open file '%s' (%s)\n", filename, strerror(errno));
 		return 1;
 	}
 
@@ -168,13 +168,13 @@ int read_process_groups(const char *name)
 		int whidden = 0, wdebug = 0;
 		line++;
 
-		// if(debug) fprintf(stderr, "\tread %s\n", buffer);
+		// if(debug) fprintf(stderr, "apps.plugin: \tread %s\n", buffer);
 
 		char *s = buffer, *t, *p;
 		s = trim(s);
 		if(!s || !*s || *s == '#') continue;
 
-		if(debug) fprintf(stderr, "\tread %s\n", s);
+		if(debug) fprintf(stderr, "apps.plugin: \tread %s\n", s);
 
 		// the target name
 		t = strsep(&s, ":");
@@ -201,7 +201,7 @@ int read_process_groups(const char *name)
 			if(stop) break;
 		}
 
-		if(debug) fprintf(stderr, "\t\ttarget %s\n", t);
+		if(debug) fprintf(stderr, "apps.plugin: \t\ttarget %s\n", t);
 
 		struct target *w = NULL;
 		long count = 0;
@@ -220,7 +220,7 @@ int read_process_groups(const char *name)
 		}
 
 		if(w) strncpy(w->name, t, MAX_NAME);
-		if(!count) fprintf(stderr, "the line %ld on file '%s', for group '%s' does not state any process names.\n", line, filename, t);
+		if(!count) fprintf(stderr, "apps.plugin: ERROR: the line %ld on file '%s', for group '%s' does not state any process names.\n", line, filename, t);
 	}
 	fclose(fp);
 
@@ -254,7 +254,7 @@ void parse_args(int argc, char **argv)
 			continue;
 		}
 
-		fprintf(stderr, "Cannot understand option %s\n", argv[i]);
+		fprintf(stderr, "apps.plugin: ERROR: cannot understand option %s\n", argv[i]);
 		exit(1);
 	}
 
@@ -262,7 +262,7 @@ void parse_args(int argc, char **argv)
 	if(!name) name = "groups";
 
 	if(read_process_groups(name)) {
-		fprintf(stderr, "Cannot read process groups %s\n", name);
+		fprintf(stderr, "apps.plugin: ERROR: cannot read process groups %s\n", name);
 		exit(1);
 	}
 }
@@ -385,7 +385,7 @@ struct pid_stat *get_entry(pid_t pid)
 
 	all_pids[pid] = calloc(sizeof(struct pid_stat), 1);
 	if(!all_pids[pid]) {
-		fprintf(stderr, "Cannot allocate %lu bytes of memory", sizeof(struct pid_stat));
+		fprintf(stderr, "apps.plugin: ERROR: Cannot allocate %lu bytes of memory", sizeof(struct pid_stat));
 		return NULL;
 	}
 
@@ -402,7 +402,7 @@ void del_entry(pid_t pid)
 {
 	if(!all_pids[pid]) return;
 
-	if(debug) fprintf(stderr, "Process %d %s exited, deleting it.\n", pid, all_pids[pid]->comm);
+	if(debug) fprintf(stderr, "apps.plugin: process %d %s exited, deleting it.\n", pid, all_pids[pid]->comm);
 
 	if(root == all_pids[pid]) root = all_pids[pid]->next;
 	if(all_pids[pid]->next) all_pids[pid]->next->prev = all_pids[pid]->prev;
@@ -414,7 +414,7 @@ void del_entry(pid_t pid)
 
 int update_from_proc(void)
 {
-	static long count_open_errors = 0;
+	static long count_errors = 0;
 
 	char buffer[PROC_BUFFER + 1];
 	char name[PROC_BUFFER + 1];
@@ -458,8 +458,8 @@ int update_from_proc(void)
 		int fd = open(filename, O_RDONLY);
 		if(fd == -1) {
 			if(errno != ENOENT && errno != ESRCH) {
-				if(!count_open_errors) fprintf(stderr, "Cannot open file '%s' for reading (%d, %s).\n", filename, errno, strerror(errno));
-				count_open_errors++;
+				if(!count_errors++ || debug)
+					fprintf(stderr, "apps.plugin: ERROR: cannot open file '%s' for reading (%d, %s).\n", filename, errno, strerror(errno));
 			}
 			continue;
 		}
@@ -469,13 +469,15 @@ int update_from_proc(void)
 		close(fd);
 
 		if(bytes == -1) {
-			fprintf(stderr, "Cannot read from file '%s' (%s).\n", filename, strerror(errno));
+			if(!count_errors++ || debug)
+				fprintf(stderr, "apps.plugin: ERROR: cannot read from file '%s' (%s).\n", filename, strerror(errno));
+
 			continue;
 		}
 
 		if(bytes < 10) continue;
 		buffer[bytes] = '\0';
-		if(debug) fprintf(stderr, "READ stat: %s", buffer);
+		if(debug) fprintf(stderr, "apps.plugin: READ stat: %s", buffer);
 
 		p = get_entry(pid);
 		if(!p) continue;
@@ -517,24 +519,27 @@ int update_from_proc(void)
 		strncpy(p->comm, name, MAX_COMPARE_NAME);
 		p->comm[MAX_COMPARE_NAME] = '\0';
 
-		if(debug || (p->target && p->target->debug)) fprintf(stderr, "VALUES: %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+		if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: VALUES: %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
 
-		if(parsed < 39) fprintf(stderr, "file %s gave %d results (expected 44)\n", filename, parsed);
+		if(parsed < 39) {
+			if(!count_errors++ || debug || (p->target && p->target->debug))
+				fprintf(stderr, "apps.plugin: ERROR: file %s gave %d results (expected 44)\n", filename, parsed);
+		}
 
 		// check if it is target
 		// we do this only once, the first time this pid is loaded
 		if(p->new_entry) {
-			if(debug) fprintf(stderr, "\tJust added %s\n", p->comm);
+			if(debug) fprintf(stderr, "apps.plugin: \tJust added %s\n", p->comm);
 
 			struct target *w;
 			for(w = target_root; w ; w = w->next) {
-				// if(debug || (p->target && p->target->debug)) fprintf(stderr, "\t\tcomparing '%s' with '%s'\n", w->compare, p->comm);
+				// if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: \t\tcomparing '%s' with '%s'\n", w->compare, p->comm);
 
 				if(strcmp(w->compare, p->comm) == 0) {
 					if(w->target) p->target = w->target;
 					else p->target = w;
 
-					if(debug || (p->target && p->target->debug)) fprintf(stderr, "\t\t%s linked to target %s\n", p->comm, p->target->name);
+					if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: \t\t%s linked to target %s\n", p->comm, p->target->name);
 				}
 			}
 		}
@@ -550,8 +555,8 @@ int update_from_proc(void)
 		fd = open(filename, O_RDONLY);
 		if(fd == -1) {
 			if(errno != ENOENT && errno != ESRCH) {
-				if(!count_open_errors) fprintf(stderr, "Cannot open file '%s' for reading (%d, %s).\n", filename, errno, strerror(errno));
-				count_open_errors++;
+				if(!count_errors++ || debug || (p->target && p->target->debug))
+					fprintf(stderr, "apps.plugin: ERROR: cannot open file '%s' for reading (%d, %s).\n", filename, errno, strerror(errno));
 			}
 		}
 		else {
@@ -560,11 +565,13 @@ int update_from_proc(void)
 			close(fd);
 
 			if(bytes == -1) {
-				fprintf(stderr, "Cannot read from file '%s' (%s).\n", filename, strerror(errno));
+				if(!count_errors++ || debug || (p->target && p->target->debug))
+					fprintf(stderr, "apps.plugin: ERROR: cannot read from file '%s' (%s).\n", filename, strerror(errno));
 			}
 			else if(bytes > 10) {
 				buffer[bytes] = '\0';
-				if(debug || (p->target && p->target->debug)) fprintf(stderr, "READ statm: %s", buffer);
+				if(debug || (p->target && p->target->debug))
+					fprintf(stderr, "apps.plugin: READ statm: %s", buffer);
 
 				parsed = sscanf(buffer,
 					"%llu %llu %llu %llu %llu %llu %llu"
@@ -577,7 +584,10 @@ int update_from_proc(void)
 					, &p->statm_dirty
 					);
 
-				if(parsed < 7) fprintf(stderr, "file %s gave %d results (expected 7)\n", filename, parsed);
+				if(parsed < 7) {
+					if(!count_errors++ || debug || (p->target && p->target->debug))
+						fprintf(stderr, "apps.plugin: ERROR: file %s gave %d results (expected 7)\n", filename, parsed);
+				}
 			}
 		}
 
@@ -588,8 +598,8 @@ int update_from_proc(void)
 		fd = open(filename, O_RDONLY);
 		if(fd == -1) {
 			if(errno != ENOENT && errno != ESRCH) {
-				if(!count_open_errors) fprintf(stderr, "Cannot open file '%s' for reading (%d, %s).\n", filename, errno, strerror(errno));
-				count_open_errors++;
+				if(!count_errors++ || debug || (p->target && p->target->debug))
+					fprintf(stderr, "apps.plugin: ERROR: cannot open file '%s' for reading (%d, %s).\n", filename, errno, strerror(errno));
 			}
 		}
 		else {
@@ -598,11 +608,12 @@ int update_from_proc(void)
 			close(fd);
 
 			if(bytes == -1) {
-				fprintf(stderr, "Cannot read from file '%s' (%s).\n", filename, strerror(errno));
+				if(!count_errors++ || debug || (p->target && p->target->debug))
+					fprintf(stderr, "apps.plugin: ERROR: cannot read from file '%s' (%s).\n", filename, strerror(errno));
 			}
 			else if(bytes > 10) {
 				buffer[bytes] = '\0';
-				if(debug || (p->target && p->target->debug)) fprintf(stderr, "READ io: %s", buffer);
+				if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: READ io: %s", buffer);
 
 				parsed = sscanf(buffer,
 					"rchar: %llu\nwchar: %llu\nsyscr: %llu\nsyscw: %llu\nread_bytes: %llu\nwrite_bytes: %llu\ncancelled_write_bytes: %llu"
@@ -615,7 +626,10 @@ int update_from_proc(void)
 					, &p->io_cancelled_write_bytes
 					);
 
-				if(parsed < 7) fprintf(stderr, "file %s gave %d results (expected 7)\n", filename, parsed);
+				if(parsed < 7) {
+					if(!count_errors++ || debug || (p->target && p->target->debug))
+						fprintf(stderr, "apps.plugin: ERROR: file %s gave %d results (expected 7)\n", filename, parsed);
+				}
 			}
 		}
 
@@ -635,7 +649,10 @@ int update_from_proc(void)
 				sprintf(fdname, "/proc/%s/fd/%s", file->d_name, de->d_name);
 				int l = readlink(fdname, linkname, FILENAME_MAX);
 				if(l == -1) {
-					fprintf(stderr, "Cannot read link %s\n", fdname);
+					if(debug || (p->target && p->target->debug)) {
+						if(!count_errors++ || debug || (p->target && p->target->debug))
+							fprintf(stderr, "apps.plugin: ERROR: cannot read link %s\n", fdname);
+					}
 					continue;
 				}
 				file_counter++;
@@ -651,10 +668,13 @@ int update_from_proc(void)
 				else if(strcmp(linkname, "anon_inode:[timerfd]") == 0) p->opentimerfds++;
 				else if(strcmp(linkname, "anon_inode:[signalfd]") == 0) p->opensignalfds++;
 				else if(strncmp(linkname, "anon_inode:", 11) == 0) {
-					fprintf(stderr, "anonymous inode: %s\n", linkname);
+					if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: FIXME: unknown anonymous inode: %s\n", linkname);
 					p->openanoninodes++;
 				}
-				else p->openother++;
+				else {
+					if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: FIXME: cannot understand linkname: %s\n", linkname);
+					p->openother++;
+				}
 			}
 			closedir(fds);
 		}
@@ -665,9 +685,9 @@ int update_from_proc(void)
 		// mark it as updated
 		p->updated = 1;
 	}
-	if(count_open_errors > 1 && count_open_errors > 1000) {
-		fprintf(stderr, "file open errors repeated %ld times\n", count_open_errors - 1);
-		count_open_errors = 0;
+	if(count_errors > 1000) {
+		fprintf(stderr, "apps.plugin: ERROR: %ld more errors encountered\n", count_errors - 1);
+		count_errors = 0;
 	}
 
 	closedir(dir);
@@ -718,12 +738,12 @@ void update_statistics(void)
 	// link all parents and update childs count
 	for(p = root; p ; p = p->next) {
 		if(p->ppid > 0 && p->ppid <= pid_max && all_pids[p->ppid]) {
-			if(debug || (p->target && p->target->debug)) fprintf(stderr, "\tParent of %d %s is %d %s\n", p->pid, p->comm, p->ppid, all_pids[p->ppid]->comm);
+			if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: \tparent of %d %s is %d %s\n", p->pid, p->comm, p->ppid, all_pids[p->ppid]->comm);
 			
 			p->parent = all_pids[p->ppid];
 			p->parent->childs++;
 		}
-		else if(p->ppid != 0) fprintf(stderr, "\t\tWRONG! pid %d %s states parent %d, but the later does not exist.\n", p->pid, p->comm, p->ppid);
+		else if(p->ppid != 0) fprintf(stderr, "apps.plugin: \t\tWRONG! pid %d %s states parent %d, but the later does not exist.\n", p->pid, p->comm, p->ppid);
 	}
 
 	// find all the procs with 0 childs and merge them to their parents
@@ -745,13 +765,13 @@ void update_statistics(void)
 				// the parent inherits the child's target, if it does not have a target itself
 				if(p->target && !p->parent->target) {
 					p->parent->target = p->target;
-					if(debug || (p->target && p->target->debug)) fprintf(stderr, "\t\ttarget %s is inherited by %d %s from its child %d %s.\n", p->target->name, p->parent->pid, p->parent->comm, p->pid, p->comm);
+					if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: \t\ttarget %s is inherited by %d %s from its child %d %s.\n", p->target->name, p->parent->pid, p->parent->comm, p->pid, p->comm);
 				}
 
 				found++;
 			}
 		}
-		if(debug) fprintf(stderr, "Merged %d processes\n", found);
+		if(debug) fprintf(stderr, "apps.plugin: merged %d processes\n", found);
 	}
 
 	// give a default target on all top level processes
@@ -788,7 +808,7 @@ void update_statistics(void)
 	for(p = root; p ; p = p->next) {
 		if(p->updated) continue;
 
-		fprintf(stderr, "UNMERGING %d %s\n", p->pid, p->comm);
+		fprintf(stderr, "apps.plugin: UNMERGING %d %s\n", p->pid, p->comm);
 
 		unsigned long long diff_utime = p->utime + p->cutime + p->fix_cutime;
 		unsigned long long diff_stime = p->stime + p->cstime + p->fix_cstime;
@@ -805,35 +825,35 @@ void update_statistics(void)
 				diff_utime -= x;
 				t->diff_cutime -= x;
 				t->fix_cutime += x;
-				fprintf(stderr, "\t cutime %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
+				fprintf(stderr, "apps.plugin: \t cutime %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
 			}
 			if(diff_stime && t->diff_cstime) {
 				x = (t->diff_cstime < diff_stime)?t->diff_cstime:diff_stime;
 				diff_stime -= x;
 				t->diff_cstime -= x;
 				t->fix_cstime += x;
-				fprintf(stderr, "\t cstime %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
+				fprintf(stderr, "apps.plugin: \t cstime %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
 			}
 			if(diff_minflt && t->diff_cminflt) {
 				x = (t->diff_cminflt < diff_minflt)?t->diff_cminflt:diff_minflt;
 				diff_minflt -= x;
 				t->diff_cminflt -= x;
 				t->fix_cminflt += x;
-				fprintf(stderr, "\t cminflt %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
+				fprintf(stderr, "apps.plugin: \t cminflt %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
 			}
 			if(diff_majflt && t->diff_cmajflt) {
 				x = (t->diff_cmajflt < diff_majflt)?t->diff_cmajflt:diff_majflt;
 				diff_majflt -= x;
 				t->diff_cmajflt -= x;
 				t->fix_cmajflt += x;
-				fprintf(stderr, "\t cmajflt %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
+				fprintf(stderr, "apps.plugin: \t cmajflt %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
 			}
 		}
 
-		if(diff_utime) fprintf(stderr, "\t cannot fix up utime %llu\n", diff_utime);
-		if(diff_stime) fprintf(stderr, "\t cannot fix up stime %llu\n", diff_stime);
-		if(diff_minflt) fprintf(stderr, "\t cannot fix up minflt %llu\n", diff_minflt);
-		if(diff_majflt) fprintf(stderr, "\t cannot fix up majflt %llu\n", diff_majflt);
+		if(diff_utime) fprintf(stderr, "apps.plugin: \t cannot fix up utime %llu\n", diff_utime);
+		if(diff_stime) fprintf(stderr, "apps.plugin: \t cannot fix up stime %llu\n", diff_stime);
+		if(diff_minflt) fprintf(stderr, "apps.plugin: \t cannot fix up minflt %llu\n", diff_minflt);
+		if(diff_majflt) fprintf(stderr, "apps.plugin: \t cannot fix up majflt %llu\n", diff_majflt);
 	}
 */
 	// zero all the targets
@@ -884,7 +904,7 @@ void update_statistics(void)
 	// concentrate everything on the targets
 	for(p = root; p ; p = p->next) {
 		if(!p->target) {
-			fprintf(stderr, "WRONG! pid %d %s was left without a target!\n", p->pid, p->comm);
+			fprintf(stderr, "apps.plugin: ERROR: pid %d %s was left without a target!\n", p->pid, p->comm);
 			continue;
 		}
 
@@ -931,7 +951,7 @@ void update_statistics(void)
 
 			p->target->processes++;
 
-			if(debug || p->target->debug) fprintf(stderr, "\tAgregating %s pid %d on %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, p->target->name, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+			if(debug || p->target->debug) fprintf(stderr, "apps.plugin: \tAgregating %s pid %d on %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, p->target->name, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
 
 /*			if(p->utime - p->old_utime > 100) fprintf(stderr, "BIG CHANGE: %d %s utime increased by %llu from %llu to %llu\n", p->pid, p->comm, p->utime - p->old_utime, p->old_utime, p->utime);
 			if(p->cutime - p->old_cutime > 100) fprintf(stderr, "BIG CHANGE: %d %s cutime increased by %llu from %llu to %llu\n", p->pid, p->comm, p->cutime - p->old_cutime, p->old_cutime, p->cutime);
@@ -1205,7 +1225,7 @@ void show_charts(void)
 		if(!w->exposed && w->processes) {
 			newly_added++;
 			w->exposed = 1;
-			if(debug || w->debug) fprintf(stderr, "%s just added - regenerating charts.\n", w->name);
+			if(debug || w->debug) fprintf(stderr, "apps.plugin: %s just added - regenerating charts.\n", w->name);
 		}
 
 	// nothing more to show
@@ -1373,7 +1393,7 @@ unsigned long long get_hertz(void)
 	hz = (sizeof(long)==sizeof(int) || htons(999)==999) ? 100UL : 1024UL;
 #endif
 
-	fprintf(stderr, "Unknown HZ value. Assuming %llu.\n", hz);
+	fprintf(stderr, "apps.plugin: ERROR: unknown HZ value. Assuming %llu.\n", hz);
 	return hz;
 }
 
@@ -1419,7 +1439,7 @@ int main(int argc, char **argv)
 
 	all_pids = calloc(sizeof(struct pid_stat *), pid_max);
 	if(!all_pids) {
-		fprintf(stderr, "Cannot allocate %lu bytes of memory.\n", sizeof(struct pid_stat *) * pid_max);
+		fprintf(stderr, "apps.plugin: ERROR: cannot allocate %lu bytes of memory.\n", sizeof(struct pid_stat *) * pid_max);
 		printf("DISABLE\n");
 		exit(1);
 	}
@@ -1431,7 +1451,7 @@ int main(int argc, char **argv)
 
 	for(;1; counter++) {
 		if(!update_from_proc()) {
-			fprintf(stderr, "Cannot allocate %lu bytes of memory.\n", sizeof(struct pid_stat *) * pid_max);
+			fprintf(stderr, "apps.plugin: ERROR: cannot allocate %lu bytes of memory.\n", sizeof(struct pid_stat *) * pid_max);
 			printf("DISABLE\n");
 			exit(1);
 		}
@@ -1441,25 +1461,25 @@ int main(int argc, char **argv)
 		show_dimensions();
 		// printf("FLUSH xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n");
 
-		if(debug) fprintf(stderr, "Done Loop No %llu\n", counter);
+		if(debug) fprintf(stderr, "apps.plugin: done Loop No %llu\n", counter);
 		fflush(NULL);
 
 		gettimeofday(&now, NULL);
 		usec = usecdiff(&now, &last) - susec;
-		if(debug) fprintf(stderr, "last loop took %llu usec (worked for %llu, sleeped for %llu).\n", usec + susec, usec, susec);
+		if(debug) fprintf(stderr, "apps.plugin: last loop took %llu usec (worked for %llu, sleeped for %llu).\n", usec + susec, usec, susec);
 
 		// if the last loop took less than half the time
 		// wait the rest of the time
 		if(usec < (update_every * 1000000ULL / 2)) susec = (update_every * 1000000ULL) - usec;
 		else susec = update_every * 1000000ULL / 2;
 
-		//fprintf(stderr, "sleeping for %llu...", susec);
+		//fprintf(stderr, "apps.plugin: sleeping for %llu...", susec);
 		//fflush(NULL);
 		//struct timeval before, after;
 		//gettimeofday(&before, NULL);
 		usleep(susec);
 		//gettimeofday(&after, NULL);
-		//fprintf(stderr, " sleeped for %llu\n", usecdiff(&after, &before));
+		//fprintf(stderr, "apps.plugin:  sleeped for %llu\n", usecdiff(&after, &before));
 		//fflush(NULL);
 
 		bcopy(&now, &last, sizeof(struct timeval));
