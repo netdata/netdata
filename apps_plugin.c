@@ -79,6 +79,7 @@ struct target {
 	unsigned long long fix_io_storage_bytes_written;
 	unsigned long long fix_io_cancelled_write_bytes;
 
+	int *fds;
 	unsigned long long openfiles;
 	unsigned long long openpipes;
 	unsigned long long opensockets;
@@ -87,7 +88,6 @@ struct target {
 	unsigned long long opentimerfds;
 	unsigned long long opensignalfds;
 	unsigned long long openeventpolls;
-	unsigned long long openanoninodes;
 	unsigned long long openother;
 
 	unsigned long processes;	// how many processes have been merged to this
@@ -351,16 +351,8 @@ struct pid_stat {
 	unsigned long long diff_cmajflt;
 */
 
-	unsigned long long openfiles;
-	unsigned long long openpipes;
-	unsigned long long opensockets;
-	unsigned long long openinotifies;
-	unsigned long long openeventfds;
-	unsigned long long opentimerfds;
-	unsigned long long opensignalfds;
-	unsigned long long openeventpolls;
-	unsigned long long openanoninodes;
-	unsigned long long openother;
+	int *fds;
+	int fds_size;
 
 	int childs;	// number of processes directly referencing this
 	int updated;
@@ -389,6 +381,11 @@ struct pid_stat *get_entry(pid_t pid)
 		return NULL;
 	}
 
+	all_pids[pid]->fds = calloc(sizeof(int), 100);
+	if(!all_pids[pid]->fds)
+		fprintf(stderr, "apps.plugin: ERROR: Cannot allocate %ld bytes of memory\n", sizeof(int) * 100);
+	else all_pids[pid]->fds_size = 100;
+
 	if(root) root->prev = all_pids[pid];
 	all_pids[pid]->next = root;
 	root = all_pids[pid];
@@ -408,8 +405,127 @@ void del_entry(pid_t pid)
 	if(all_pids[pid]->next) all_pids[pid]->next->prev = all_pids[pid]->prev;
 	if(all_pids[pid]->prev) all_pids[pid]->prev->next = all_pids[pid]->next;
 
+	if(all_pids[pid]->fds) free(all_pids[pid]->fds);
 	free(all_pids[pid]);
 	all_pids[pid] = NULL;
+}
+
+
+unsigned long simple_hash(const char *name)
+{
+	int i, len = strlen(name);
+	unsigned long hash = 0;
+
+	for(i = 0; i < len ;i++) hash += (i * name[i]) + i + name[i];
+
+	return hash;
+}
+
+struct file_descriptor {
+	unsigned long hash;
+	char *name;
+	int type;
+	long count;
+} *all_files = NULL;
+
+int all_files_len = 0;
+int all_files_size = 0;
+
+#define FILETYPE_OTHER 0
+#define FILETYPE_FILE 1
+#define FILETYPE_PIPE 2
+#define FILETYPE_SOCKET 3
+#define FILETYPE_INOTIFY 4
+#define FILETYPE_EVENTFD 5
+#define FILETYPE_EVENTPOLL 6
+#define FILETYPE_TIMERFD 7
+#define FILETYPE_SIGNALFD 8
+
+void file_descriptor_not_used(int id)
+{
+	if(id > 0 && id < all_files_len) {
+		if(all_files[id].count > 0)
+			all_files[id].count--;
+		else
+			fprintf(stderr, "apps.plugin: ERROR: request to decrease counter of fd %d (%s), while the use counter is 0\n", id, all_files[id].name);
+	}
+	else	fprintf(stderr, "apps.plugin: ERROR: request to decrease counter of fd %d, which is outside the array size (1 to %d)\n", id, all_files_len);
+}
+
+unsigned long file_descriptor_find_or_add(const char *name)
+{
+	int type = FILETYPE_OTHER;
+
+	if(name[0] == '/') type = FILETYPE_FILE;
+	else if(strncmp(name, "pipe:", 5) == 0) type = FILETYPE_PIPE;
+	else if(strncmp(name, "socket:", 7) == 0) type = FILETYPE_SOCKET;
+	else if(strcmp(name, "anon_inode:inotify") == 0 || strcmp(name, "inotify") == 0) type = FILETYPE_INOTIFY;
+	else if(strcmp(name, "anon_inode:[eventfd]") == 0) type = FILETYPE_EVENTFD;
+	else if(strcmp(name, "anon_inode:[eventpoll]") == 0) type = FILETYPE_EVENTPOLL;
+	else if(strcmp(name, "anon_inode:[timerfd]") == 0) type = FILETYPE_TIMERFD;
+	else if(strcmp(name, "anon_inode:[signalfd]") == 0) type = FILETYPE_SIGNALFD;
+	else if(strncmp(name, "anon_inode:", 11) == 0) {
+		if(debug) fprintf(stderr, "apps.plugin: FIXME: unknown anonymous inode: %s\n", name);
+		type = FILETYPE_OTHER;
+	}
+	else {
+		if(debug) fprintf(stderr, "apps.plugin: FIXME: cannot understand linkname: %s\n", name);
+		type = FILETYPE_OTHER;
+	}
+
+	// init
+	if(!all_files) {
+		all_files = malloc(1024 * sizeof(struct file_descriptor));
+		if(!all_files) return 0;
+
+		all_files_size = 1024;
+		all_files_len = 1; // start from 1, skip 0
+		if(debug) fprintf(stderr, "apps.plugin: initialized fd array to %d entries\n", all_files_size);
+	}
+
+	// try to find it
+	unsigned long hash = simple_hash(name);
+	int c;
+	for( c = 0 ; c < all_files_len ; c++) {
+		if(all_files[c].hash == hash && strcmp(all_files[c].name, name) == 0) break;
+	}
+
+	// found it
+	if(c < all_files_len) {
+		all_files[c].count++;
+		return c;
+	}
+
+	// not found, search for an empty slot
+	for(c = 0 ; c < all_files_len ; c++) {
+		if(!all_files[c].count) {
+			if(debug) fprintf(stderr, "apps.plugin: re-using fd position %d (last name: %s)\n", c, all_files[c].name);
+			if(all_files[c].name) free(all_files[c].name);
+			break;
+		}
+	}
+
+	if(c == all_files_len) {
+		// not found any emtpty slot
+		all_files_len++;
+
+		if(c >= all_files_size) {
+			// not enough memory - extend it
+			if(debug) fprintf(stderr, "apps.plugin: extending fd array to %d entries\n", all_files_size + 1024);
+			all_files = realloc(all_files, (all_files_size + 1024) * sizeof(struct file_descriptor));
+			all_files_size += 1024;
+		}
+	}
+	// else we have the slot in 'c'
+
+	all_files[c].name = strdup(name);
+	all_files[c].hash = hash;
+	all_files[c].type = type;
+	all_files[c].count++;
+
+	if(debug) fprintf(stderr, "apps.plugin: using fd position %d (name: %s)\n", c, all_files[c].name);
+
+	return c;
 }
 
 int update_from_proc(void)
@@ -432,17 +548,6 @@ int update_from_proc(void)
 		p->childs = 0;
 		p->merged = 0;
 		p->new_entry = 0;
-
-		p->openfiles = 0;
-		p->openpipes = 0;
-		p->opensockets = 0;
-		p->openinotifies = 0;
-		p->openeventfds = 0;
-		p->openeventpolls = 0;
-		p->opentimerfds = 0;
-		p->opensignalfds = 0;
-		p->openanoninodes = 0;
-		p->openother = 0;
 	}
 
 	while((file = readdir(dir))) {
@@ -639,44 +744,65 @@ int update_from_proc(void)
 		snprintf(filename, FILENAME_MAX, "/proc/%s/fd", file->d_name);
 		DIR *fds = opendir(filename);
 		if(fds) {
+			int c;
 			struct dirent *de;
 			char fdname[FILENAME_MAX + 1];
 			char linkname[FILENAME_MAX + 1];
 
+			// make the array negative
+			for(c = 0 ; c < p->fds_size ; c++) p->fds[c] = -p->fds[c];
+
 			while((de = readdir(fds))) {
 				if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) continue;
 
-				sprintf(fdname, "/proc/%s/fd/%s", file->d_name, de->d_name);
-				int l = readlink(fdname, linkname, FILENAME_MAX);
-				if(l == -1) {
-					if(debug || (p->target && p->target->debug)) {
-						if(!count_errors++ || debug || (p->target && p->target->debug))
-							fprintf(stderr, "apps.plugin: ERROR: cannot read link %s\n", fdname);
+				// check if the fds array is small
+				int fdid = atol(de->d_name);
+				if(fdid < 0) continue;
+				if(fdid >= p->fds_size) {
+					// it is small, extend it
+					p->fds = realloc(p->fds, (fdid + 100) * sizeof(int));
+					if(!p->fds) {
+						fprintf(stderr, "apps.plugin: ERROR: cannot re-allocate fds for %s\n", p->comm);
+						break;
 					}
-					continue;
-				}
-				file_counter++;
 
-				linkname[l] = '\0';
+					// and initialize it
+					for(c = p->fds_size ; c <= (fdid + 100) ; c++) p->fds[c] = 0;
+					p->fds_size = fdid + 100;
+				}
 
-				if(linkname[0] == '/') p->openfiles++;
-				else if(strncmp(linkname, "pipe:", 5) == 0) p->openpipes++;
-				else if(strncmp(linkname, "socket:", 7) == 0) p->opensockets++;
-				else if(strcmp(linkname, "anon_inode:inotify") == 0 || strcmp(linkname, "inotify") == 0) p->openinotifies++;
-				else if(strcmp(linkname, "anon_inode:[eventfd]") == 0) p->openeventfds++;
-				else if(strcmp(linkname, "anon_inode:[eventpoll]") == 0) p->openeventpolls++;
-				else if(strcmp(linkname, "anon_inode:[timerfd]") == 0) p->opentimerfds++;
-				else if(strcmp(linkname, "anon_inode:[signalfd]") == 0) p->opensignalfds++;
-				else if(strncmp(linkname, "anon_inode:", 11) == 0) {
-					if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: FIXME: unknown anonymous inode: %s\n", linkname);
-					p->openanoninodes++;
+				if(p->fds[fdid] == 0) {
+					// we don't know this fd, get it
+
+					sprintf(fdname, "/proc/%s/fd/%s", file->d_name, de->d_name);
+					int l = readlink(fdname, linkname, FILENAME_MAX);
+					if(l == -1) {
+						if(debug || (p->target && p->target->debug)) {
+							if(!count_errors++ || debug || (p->target && p->target->debug))
+								fprintf(stderr, "apps.plugin: ERROR: cannot read link %s\n", fdname);
+						}
+						continue;
+					}
+					linkname[l] = '\0';
+					file_counter++;
+
+					// if another process already has this, we will get
+					// the same id
+					p->fds[fdid] = file_descriptor_find_or_add(linkname);
 				}
-				else {
-					if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: FIXME: cannot understand linkname: %s\n", linkname);
-					p->openother++;
-				}
+
+				// else make it positive again, we need it
+				// of course, the actual file may have changed, but we don't care so much
+				// FIXME: we could compare the inode as returned by readdir direct structure
+				else p->fds[fdid] = -p->fds[fdid];
 			}
 			closedir(fds);
+
+			// remove all the negative file descriptors
+			for(c = 0 ; c < p->fds_size ; c++) if(p->fds[c] < 0) {
+				file_descriptor_not_used(-p->fds[c]);
+				p->fds[c] = 0;
+			}
 		}
 
 		// --------------------------------------------------------------------
@@ -733,6 +859,7 @@ int walk_down(pid_t pid, int level) {
 
 void update_statistics(void)
 {
+	int c;
 	struct pid_stat *p = NULL;
 
 	// link all parents and update childs count
@@ -859,6 +986,10 @@ void update_statistics(void)
 	// zero all the targets
 	struct target *w;
 	for (w = target_root; w ; w = w->next) {
+		w->fds = calloc(sizeof(int), all_files_len);
+		if(!w->fds)
+			fprintf(stderr, "apps.plugin: ERROR: cannot allocate memory for fds in %s\n", w->name);
+	
 		w->minflt = 0;
 		w->majflt = 0;
 		w->utime = 0;
@@ -886,17 +1017,6 @@ void update_statistics(void)
 		w->io_storage_bytes_read = 0;
 		w->io_storage_bytes_written = 0;
 		w->io_cancelled_write_bytes = 0;
-
-		w->openfiles = 0;
-		w->openpipes = 0;
-		w->opensockets = 0;
-		w->openinotifies = 0;
-		w->openeventfds = 0;
-		w->opentimerfds = 0;
-		w->opensignalfds = 0;
-		w->openeventpolls = 0;
-		w->openanoninodes = 0;
-		w->openother = 0;
 	}
 
 /*	walk_down(0, 1);
@@ -938,18 +1058,16 @@ void update_statistics(void)
 			p->target->io_storage_bytes_written += p->io_storage_bytes_written;
 			p->target->io_cancelled_write_bytes += p->io_cancelled_write_bytes;
 
-			p->target->openfiles += p->openfiles;
-			p->target->openpipes += p->openpipes;
-			p->target->opensockets += p->opensockets;
-			p->target->openinotifies += p->openinotifies;
-			p->target->openeventfds += p->openeventfds;
-			p->target->opentimerfds += p->opentimerfds;
-			p->target->opensignalfds += p->opensignalfds;
-			p->target->openeventpolls += p->openeventpolls;
-			p->target->openanoninodes += p->openanoninodes;
-			p->target->openother += p->openother;
-
 			p->target->processes++;
+
+			for(c = 0; c < p->fds_size ;c++) {
+				if(p->fds[c] == 0) continue;
+				if(p->fds[c] > 0 && p->fds[c] < all_files_len) {
+					if(p->target->fds) p->target->fds[p->fds[c]]++;
+				}
+				else
+					fprintf(stderr, "apps.plugin: ERROR: invalid fd number %d\n", p->fds[c]);
+			}
 
 			if(debug || p->target->debug) fprintf(stderr, "apps.plugin: \tAgregating %s pid %d on %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, p->target->name, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
 
@@ -1000,7 +1118,6 @@ void update_statistics(void)
 /*	fprintf(stderr, "\n");
 */
 	// cleanup all un-updated processed (exited, killed, etc)
-	int c;
 	for(p = root, c = 0; p ; c++) {
 		if(!p->updated) {
 /*			fprintf(stderr, "\tEXITED %d %s [parent %d %s, target %s] utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->pid, p->comm, p->parent->pid, p->parent->comm, p->target->name,  p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
@@ -1010,6 +1127,60 @@ void update_statistics(void)
 			del_entry(r);
 		}
 		else p = p->next;
+	}
+
+	for (w = target_root; w ; w = w->next) {
+		w->openfiles = 0;
+		w->openpipes = 0;
+		w->opensockets = 0;
+		w->openinotifies = 0;
+		w->openeventfds = 0;
+		w->opentimerfds = 0;
+		w->opensignalfds = 0;
+		w->openeventpolls = 0;
+		w->openother = 0;
+
+		for(c = 1; c < all_files_len ;c++) {
+			if(w->fds && w->fds[c] > 0) switch(all_files[c].type) {
+				case FILETYPE_FILE:
+					w->openfiles++;
+					break;
+
+				case FILETYPE_PIPE:
+					w->openpipes++;
+					break;
+
+				case FILETYPE_SOCKET:
+					w->opensockets++;
+					break;
+
+				case FILETYPE_INOTIFY:
+					w->openinotifies++;
+					break;
+
+				case FILETYPE_EVENTFD:
+					w->openeventfds++;
+					break;
+
+				case FILETYPE_TIMERFD:
+					w->opentimerfds++;
+					break;
+
+				case FILETYPE_SIGNALFD:
+					w->opensignalfds++;
+					break;
+
+				case FILETYPE_EVENTPOLL:
+					w->openeventpolls++;
+					break;
+
+				default:
+					w->openother++;
+			}
+		}
+
+		free(w->fds);
+		w->fds = NULL;
 	}
 }
 
