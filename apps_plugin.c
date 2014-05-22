@@ -662,7 +662,7 @@ int update_from_proc(void)
 				if(linkname[0] == '/') p->openfiles++;
 				else if(strncmp(linkname, "pipe:", 5) == 0) p->openpipes++;
 				else if(strncmp(linkname, "socket:", 7) == 0) p->opensockets++;
-				else if(strcmp(linkname, "anon_inode:inotify") == 0) p->openinotifies++;
+				else if(strcmp(linkname, "anon_inode:inotify") == 0 || strcmp(linkname, "inotify") == 0) p->openinotifies++;
 				else if(strcmp(linkname, "anon_inode:[eventfd]") == 0) p->openeventfds++;
 				else if(strcmp(linkname, "anon_inode:[eventpoll]") == 0) p->openeventpolls++;
 				else if(strcmp(linkname, "anon_inode:[timerfd]") == 0) p->opentimerfds++;
