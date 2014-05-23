@@ -768,7 +768,7 @@ int update_from_proc(void)
 					}
 
 					// and initialize it
-					for(c = p->fds_size ; c <= (fdid + 100) ; c++) p->fds[c] = 0;
+					for(c = p->fds_size ; c < (fdid + 100) ; c++) p->fds[c] = 0;
 					p->fds_size = fdid + 100;
 				}
 
