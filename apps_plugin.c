@@ -760,6 +760,7 @@ int update_from_proc(void)
 				if(fdid < 0) continue;
 				if(fdid >= p->fds_size) {
 					// it is small, extend it
+					if(debug) fprintf(stderr, "apps.plugin: extending fd memory slots for %s from %d to %d\n", p->comm, p->fds_size, fdid + 100);
 					p->fds = realloc(p->fds, (fdid + 100) * sizeof(int));
 					if(!p->fds) {
 						fprintf(stderr, "apps.plugin: ERROR: cannot re-allocate fds for %s\n", p->comm);
