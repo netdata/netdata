@@ -1321,11 +1321,13 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 
 	st->priority = config_get_number(st->id, "priority", priority);
 	st->enabled = enabled;
-
+	
+	st->isdetail = 0;
 	st->debug = 0;
 
 	st->last_collected_time.tv_sec = 0;
 	st->last_collected_time.tv_usec = 0;
+	st->counter_done = 0;
 
 	pthread_rwlock_init(&st->rwlock, NULL);
 	pthread_rwlock_wrlock(&root_rwlock);
