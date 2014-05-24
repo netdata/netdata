@@ -197,6 +197,8 @@ struct target {
 	struct target *next;
 } *target_root = NULL, *default_target = NULL;
 
+long targets = 0;
+
 // find or create a target
 // there are targets that are just agregated to other target (the second argument)
 struct target *get_target(const char *id, struct target *target)
@@ -412,6 +414,8 @@ struct pid_stat {
 	struct pid_stat *prev;
 	struct pid_stat *next;
 } *root = NULL, **all_pids;
+
+long pids = 0;
 
 struct pid_stat *get_entry(pid_t pid)
 {
@@ -640,7 +644,9 @@ int update_from_proc(void)
 	struct pid_stat *p = NULL;
 
 	// mark them all as un-updated
+	pids = 0;
 	for(p = root; p ; p = p->next) {
+		pids++;
 		p->parent = NULL;
 		p->updated = 0;
 		p->childs = 0;
@@ -1066,8 +1072,11 @@ void update_statistics(void)
 #endif
 
 	// zero all the targets
+	targets = 0;
 	struct target *w;
 	for (w = target_root; w ; w = w->next) {
+		targets++;
+
 		w->fds = calloc(sizeof(int), all_files_len);
 		if(!w->fds)
 			fprintf(stderr, "apps.plugin: ERROR: cannot allocate memory for fds in %s\n", w->name);
@@ -1104,7 +1113,7 @@ void update_statistics(void)
 #ifdef INCLUDE_CHILDS
 	if(debug) walk_down(0, 1);
 #endif
-	
+
 	// concentrate everything on the targets
 	for(p = root; p ; p = p->next) {
 		if(!p->target) {
@@ -1203,10 +1212,15 @@ void update_statistics(void)
 
 //	fprintf(stderr, "\n");
 	// cleanup all un-updated processed (exited, killed, etc)
-	for(p = root, c = 0; p ; c++) {
+	for(p = root; p ;) {
 		if(!p->updated) {
 //			fprintf(stderr, "\tEXITED %d %s [parent %d %s, target %s] utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->pid, p->comm, p->parent->pid, p->parent->comm, p->target->name,  p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
 			
+			for(c = 0 ; c < p->fds_size ; c++) if(p->fds[c] > 0) {
+				file_descriptor_not_used(p->fds[c]);
+				p->fds[c] = 0;
+			}
+
 			pid_t r = p->pid;
 			p = p->next;
 			del_entry(r);
@@ -1435,6 +1449,9 @@ void show_dimensions(void)
 
 	fprintf(stdout, "BEGIN netdata.apps_files %llu\n", usec);
 	fprintf(stdout, "SET files = %llu\n", file_counter);
+	fprintf(stdout, "SET pids = %ld\n", pids);
+	fprintf(stdout, "SET fds = %d\n", all_files_len);
+	fprintf(stdout, "SET targets = %ld\n", targets);
 	fprintf(stdout, "END\n");
 
 	fflush(stdout);
@@ -1570,8 +1587,11 @@ void show_charts(void)
 	fprintf(stdout, "DIMENSION user '' incremental 1 1000\n");
 	fprintf(stdout, "DIMENSION system '' incremental 1 1000\n");
 
-	fprintf(stdout, "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' netdata none line 10001 %d\n", update_every);
+	fprintf(stdout, "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' netdata netdata line 10001 %d\n", update_every);
 	fprintf(stdout, "DIMENSION files '' incremental-no-interpolation 1 1\n");
+	fprintf(stdout, "DIMENSION pids '' absolute-no-interpolation 1 1\n");
+	fprintf(stdout, "DIMENSION fds '' absolute-no-interpolation 1 1\n");
+	fprintf(stdout, "DIMENSION targets '' absolute-no-interpolation 1 1\n");
 
 	fflush(stdout);
 }
