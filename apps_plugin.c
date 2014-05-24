@@ -30,6 +30,104 @@ long processors = 1;
 long pid_max = 32768;
 int debug = 0;
 
+int update_every = 1;
+unsigned long long file_counter = 0;
+
+#define PROC_BUFFER 4096
+
+
+// ----------------------------------------------------------------------------
+// helper functions
+
+unsigned long long usecdiff(struct timeval *now, struct timeval *last) {
+		return ((((now->tv_sec * 1000000ULL) + now->tv_usec) - ((last->tv_sec * 1000000ULL) + last->tv_usec)));
+}
+
+char *trim(char *s)
+{
+	// skip leading spaces
+	while(*s && isspace(*s)) s++;
+	if(!*s) return NULL;
+
+	// skip tailing spaces
+	int c = strlen(s) - 1;
+	while(c >= 0 && isspace(s[c])) {
+		s[c] = '\0';
+		c--;
+	}
+	if(c < 0) return NULL;
+	if(!*s) return NULL;
+	return s;
+}
+
+unsigned long simple_hash(const char *name)
+{
+	int i, len = strlen(name);
+	unsigned long hash = 0;
+
+	for(i = 0; i < len ;i++) hash += (i * name[i]) + i + name[i];
+
+	return hash;
+}
+
+long get_processors(void)
+{
+	char buffer[1025], *s;
+	int processors = 0;
+
+	FILE *fp = fopen("/proc/stat", "r");
+	if(!fp) return 1;
+
+	while((s = fgets(buffer, 1024, fp))) {
+		if(strncmp(buffer, "cpu", 3) == 0) processors++;
+	}
+	fclose(fp);
+	processors--;
+	if(processors < 1) processors = 1;
+	return processors;
+}
+
+long get_pid_max(void)
+{
+	char buffer[1025], *s;
+	long mpid = 32768;
+
+	FILE *fp = fopen("/proc/sys/kernel/pid_max", "r");
+	if(!fp) return 1;
+
+	s = fgets(buffer, 1024, fp);
+	if(s) mpid = atol(buffer);
+	fclose(fp);
+	if(mpid < 32768) mpid = 32768;
+	return mpid;
+}
+
+unsigned long long get_hertz(void)
+{
+	unsigned long long hz = 1;
+
+#ifdef _SC_CLK_TCK
+	if((hz = sysconf(_SC_CLK_TCK)) > 0) {
+		return hz;
+	}
+#endif
+
+#ifdef HZ
+	hz = (unsigned long long)HZ;    /* <asm/param.h> */
+#else
+	/* If 32-bit or big-endian (not Alpha or ia64), assume HZ is 100. */
+	hz = (sizeof(long)==sizeof(int) || htons(999)==999) ? 100UL : 1024UL;
+#endif
+
+	fprintf(stderr, "apps.plugin: ERROR: unknown HZ value. Assuming %llu.\n", hz);
+	return hz;
+}
+
+
+// ----------------------------------------------------------------------------
+// target
+// target is the point to aggregate a process tree values
+
 struct target {
 	char compare[MAX_COMPARE_NAME + 1];
 	char id[MAX_NAME + 1];
@@ -99,9 +197,8 @@ struct target {
 	struct target *next;
 } *target_root = NULL, *default_target = NULL;
 
-int update_every = 1;
-unsigned long long file_counter = 0;
-
+// find or create a target
+// there are targets that are just agregated to other target (the second argument)
 struct target *get_target(const char *id, struct target *target)
 {
 	const char *nid = id;
@@ -132,23 +229,7 @@ struct target *get_target(const char *id, struct target *target)
 	return w;
 }
 
-char *trim(char *s)
-{
-	// skip leading spaces
-	while(*s && isspace(*s)) s++;
-	if(!*s) return NULL;
-
-	// skip tailing spaces
-	int c = strlen(s) - 1;
-	while(c >= 0 && isspace(s[c])) {
-		s[c] = '\0';
-		c--;
-	}
-	if(c < 0) return NULL;
-	if(!*s) return NULL;
-	return s;
-}
-
+// read the process groups file
 int read_process_groups(const char *name)
 {
 	char buffer[4096+1];
@@ -230,44 +311,11 @@ int read_process_groups(const char *name)
 	return 0;
 }
 
-void parse_args(int argc, char **argv)
-{
-	int i, freq = 0;
-	char *name = NULL;
 
-	for(i = 1; i < argc; i++) {
-		if(!freq) {
-			int n = atoi(argv[i]);
-			if(n > 0) {
-				freq = n;
-				continue;
-			}
-		}
-
-		if(strcmp("debug", argv[i]) == 0) {
-			debug = 1;
-			continue;
-		}
-
-		if(!name) {
-			name = argv[i];
-			continue;
-		}
-
-		fprintf(stderr, "apps.plugin: ERROR: cannot understand option %s\n", argv[i]);
-		exit(1);
-	}
-
-	if(freq > 0) update_every = freq;
-	if(!name) name = "groups";
-
-	if(read_process_groups(name)) {
-		fprintf(stderr, "apps.plugin: ERROR: cannot read process groups %s\n", name);
-		exit(1);
-	}
-}
-
+// ----------------------------------------------------------------------------
+// data to store for each pid
 // see: man proc
+
 struct pid_stat {
 	int32_t pid;
 	char comm[MAX_COMPARE_NAME + 1];
@@ -330,7 +378,8 @@ struct pid_stat {
 	unsigned long long io_storage_bytes_written;
 	unsigned long long io_cancelled_write_bytes;
 
-/*	unsigned long long old_utime;
+#ifdef INCLUDE_CHILDS
+	unsigned long long old_utime;
 	unsigned long long old_stime;
 	unsigned long long old_minflt;
 	unsigned long long old_majflt;
@@ -349,24 +398,20 @@ struct pid_stat {
 	unsigned long long diff_cstime;
 	unsigned long long diff_cminflt;
 	unsigned long long diff_cmajflt;
-*/
+#endif
 
-	int *fds;
-	int fds_size;
+	int *fds;					// array of fds it uses
+	int fds_size;				// the size of the fds array
 
-	int childs;	// number of processes directly referencing this
-	int updated;
-	int merged;
+	int childs;					// number of processes directly referencing this
+	int updated;				// 1 when update
+	int merged;					// 1 when it has been merged to its parent
 	int new_entry;
 	struct target *target;
 	struct pid_stat *parent;
 	struct pid_stat *prev;
 	struct pid_stat *next;
-} *root = NULL;
-
-struct pid_stat **all_pids;
-
-#define PROC_BUFFER 4096
+} *root = NULL, **all_pids;
 
 struct pid_stat *get_entry(pid_t pid)
 {
@@ -410,16 +455,49 @@ void del_entry(pid_t pid)
 	all_pids[pid] = NULL;
 }
 
+#ifdef INCLUDE_CHILDS
+// print a tree view of all processes
+int walk_down(pid_t pid, int level) {
+	struct pid_stat *p = NULL;
+	char b[level+3];
+	int i, ret = 0;
 
-unsigned long simple_hash(const char *name)
-{
-	int i, len = strlen(name);
-	unsigned long hash = 0;
+	for(i = 0; i < level; i++) b[i] = '\t';
+	b[level] = '|';
+	b[level+1] = '-';
+	b[level+2] = '\0';
 
-	for(i = 0; i < len ;i++) hash += (i * name[i]) + i + name[i];
+	for(p = root; p ; p = p->next) {
+		if(p->ppid == pid) {
+			ret += walk_down(p->pid, level+1);
+		}
+	}
 
-	return hash;
+	p = all_pids[pid];
+	if(p) {
+		if(!p->updated) ret += 1;
+		if(ret) fprintf(stderr, "%s %s %d [%s, %s] c=%d u=%llu+%llu, s=%llu+%llu, cu=%llu+%llu, cs=%llu+%llu, n=%llu+%llu, j=%llu+%llu, cn=%llu+%llu, cj=%llu+%llu\n"
+			, b, p->comm, p->pid, p->updated?"OK":"KILLED", p->target->name, p->childs
+			, p->utime, p->utime - p->old_utime
+			, p->stime, p->stime - p->old_stime
+			, p->cutime, p->cutime - p->old_cutime
+			, p->cstime, p->cstime - p->old_cstime
+			, p->minflt, p->minflt - p->old_minflt
+			, p->majflt, p->majflt - p->old_majflt
+			, p->cminflt, p->cminflt - p->old_cminflt
+			, p->cmajflt, p->cmajflt - p->old_cmajflt
+			);
+	}
+
+	return ret;
 }
+#endif
+
+
+// ----------------------------------------------------------------------------
+// file descriptor
+// this is used to keep a global list of all open files of the system
+// it is needed in order to figure out the unique files a process tree has open
 
 struct file_descriptor {
 	unsigned long hash;
@@ -528,6 +606,26 @@ unsigned long file_descriptor_find_or_add(const char *name)
 	return c;
 }
 
+
+// ----------------------------------------------------------------------------
+// update pids from proc
+
+// 1. read all files in /proc
+// 2. for each numeric directory:
+//    i.   read /proc/pid/stat
+//    ii.  read /proc/pid/statm
+//    iii. read /proc/pid/io (requires root access)
+//    iii. read the entries in directory /proc/pid/fd (requires root access)
+//         for each entry:
+//         a. find or create a struct file_descriptor
+//         b. cleanup any old/unused file_descriptors
+
+// after all these, some pids may be linked to targets, while others may not
+
+// in case of errors, only 1 every 1000 errors is printed
+// to avoid filling up all disk space
+// if debug is enabled, all errors are printed
+
 int update_from_proc(void)
 {
 	static long count_errors = 0;
@@ -576,7 +674,6 @@ int update_from_proc(void)
 		if(bytes == -1) {
 			if(!count_errors++ || debug)
 				fprintf(stderr, "apps.plugin: ERROR: cannot read from file '%s' (%s).\n", filename, strerror(errno));
-
 			continue;
 		}
 
@@ -821,42 +918,22 @@ int update_from_proc(void)
 
 	return 1;
 }
-/*
-int walk_down(pid_t pid, int level) {
-	struct pid_stat *p = NULL;
-	char b[level+3];
-	int i, ret = 0;
 
-	for(i = 0; i < level; i++) b[i] = '\t';
-	b[level] = '|';
-	b[level+1] = '-';
-	b[level+2] = '\0';
 
-	for(p = root; p ; p = p->next) {
-		if(p->ppid == pid) {
-			ret += walk_down(p->pid, level+1);
-		}
-	}
+// ----------------------------------------------------------------------------
+// update statistics on the targets
 
-	p = all_pids[pid];
-	if(p) {
-		if(!p->updated) ret += 1;
-		if(ret) fprintf(stderr, "%s %s %d [%s, %s] c=%d u=%llu+%llu, s=%llu+%llu, cu=%llu+%llu, cs=%llu+%llu, n=%llu+%llu, j=%llu+%llu, cn=%llu+%llu, cj=%llu+%llu\n"
-			, b, p->comm, p->pid, p->updated?"OK":"KILLED", p->target->name, p->childs
-			, p->utime, p->utime - p->old_utime
-			, p->stime, p->stime - p->old_stime
-			, p->cutime, p->cutime - p->old_cutime
-			, p->cstime, p->cstime - p->old_cstime
-			, p->minflt, p->minflt - p->old_minflt
-			, p->majflt, p->majflt - p->old_majflt
-			, p->cminflt, p->cminflt - p->old_cminflt
-			, p->cmajflt, p->cmajflt - p->old_cmajflt
-			);
-	}
-
-	return ret;
-}
-*/
+// 1. link all childs to their parents
+// 2. go from bottom to top, marking as merged all childs to their parents
+//    this step links all parents without a target to the child target, if any
+// 3. link all top level processes (the ones not merged) to the default target
+// 4. go from top to bottom, linking all childs without a target, to their parent target
+//    after this step, all processes have a target
+// [5. for each killed pid (updated = 0), remove its usage from its target]
+// 6. zero all targets
+// 7. concentrate all values on the targets
+// 8. remove all killed processes
+// 9. find the unique file count for each target
 
 void update_statistics(void)
 {
@@ -911,13 +988,15 @@ void update_statistics(void)
 		// then is is a top level process
 		if(!p->merged && !p->target) p->target = default_target;
 
-/*		// by the way, update the diffs
+#ifdef INCLUDE_CHILDS
+		// by the way, update the diffs
 		// will be used later for substracting killed process times
 		p->diff_cutime = p->utime - p->cutime;
 		p->diff_cstime = p->stime - p->cstime;
 		p->diff_cminflt = p->minflt - p->cminflt;
 		p->diff_cmajflt = p->majflt - p->cmajflt;
-*/	}
+#endif
+	}
 
 	// give a target to all merged child processes
 	found = 1;
@@ -931,7 +1010,8 @@ void update_statistics(void)
 		}
 	}
 
-/*	// for each killed process, remove its values from the parents
+#ifdef INCLUDE_CHILDS
+	// for each killed process, remove its values from the parents
 	// sums (we had already added them in a previous loop)
 	for(p = root; p ; p = p->next) {
 		if(p->updated) continue;
@@ -983,7 +1063,8 @@ void update_statistics(void)
 		if(diff_minflt) fprintf(stderr, "apps.plugin: \t cannot fix up minflt %llu\n", diff_minflt);
 		if(diff_majflt) fprintf(stderr, "apps.plugin: \t cannot fix up majflt %llu\n", diff_majflt);
 	}
-*/
+#endif
+
 	// zero all the targets
 	struct target *w;
 	for (w = target_root; w ; w = w->next) {
@@ -1020,8 +1101,10 @@ void update_statistics(void)
 		w->io_cancelled_write_bytes = 0;
 	}
 
-/*	walk_down(0, 1);
-*/
+#ifdef INCLUDE_CHILDS
+	if(debug) walk_down(0, 1);
+#endif
+	
 	// concentrate everything on the targets
 	for(p = root; p ; p = p->next) {
 		if(!p->target) {
@@ -1080,7 +1163,8 @@ void update_statistics(void)
 			if(p->majflt - p->old_majflt > 5000) fprintf(stderr, "BIG CHANGE: %d %s majflt increased by %llu from %llu to %llu\n", p->pid, p->comm, p->majflt - p->old_majflt, p->old_majflt, p->majflt);
 			if(p->cminflt - p->old_cminflt > 15000) fprintf(stderr, "BIG CHANGE: %d %s cminflt increased by %llu from %llu to %llu\n", p->pid, p->comm, p->cminflt - p->old_cminflt, p->old_cminflt, p->cminflt);
 			if(p->cmajflt - p->old_cmajflt > 15000) fprintf(stderr, "BIG CHANGE: %d %s cmajflt increased by %llu from %llu to %llu\n", p->pid, p->comm, p->cmajflt - p->old_cmajflt, p->old_cmajflt, p->cmajflt);
-
+*/
+#ifdef INCLUDE_CHILDS
 			p->old_utime = p->utime;
 			p->old_cutime = p->cutime;
 			p->old_stime = p->stime;
@@ -1089,7 +1173,8 @@ void update_statistics(void)
 			p->old_majflt = p->majflt;
 			p->old_cminflt = p->cminflt;
 			p->old_cmajflt = p->cmajflt;
-*/		}
+#endif
+		}
 		else {
 			// since the process has exited, the user
 			// will see a drop in our charts, because the incremental
@@ -1116,13 +1201,12 @@ void update_statistics(void)
 		}
 	}
 
-/*	fprintf(stderr, "\n");
-*/
+//	fprintf(stderr, "\n");
 	// cleanup all un-updated processed (exited, killed, etc)
 	for(p = root, c = 0; p ; c++) {
 		if(!p->updated) {
-/*			fprintf(stderr, "\tEXITED %d %s [parent %d %s, target %s] utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->pid, p->comm, p->parent->pid, p->parent->comm, p->target->name,  p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
-*/			
+//			fprintf(stderr, "\tEXITED %d %s [parent %d %s, target %s] utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->pid, p->comm, p->parent->pid, p->parent->comm, p->target->name,  p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+			
 			pid_t r = p->pid;
 			p = p->next;
 			del_entry(r);
@@ -1185,9 +1269,8 @@ void update_statistics(void)
 	}
 }
 
-unsigned long long usecdiff(struct timeval *now, struct timeval *last) {
-		return ((((now->tv_sec * 1000000ULL) + now->tv_usec) - ((last->tv_sec * 1000000ULL) + last->tv_usec)));
-}
+// ----------------------------------------------------------------------------
+// update chart dimensions
 
 void show_dimensions(void)
 {
@@ -1345,48 +1428,21 @@ void show_dimensions(void)
 	}
 	fprintf(stdout, "END\n");
 
-	fprintf(stdout, "BEGIN apps.inotify %llu\n", usec);
-	for (w = target_root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->openinotifies);
-	}
-	fprintf(stdout, "END\n");
-
-	fprintf(stdout, "BEGIN apps.eventfd %llu\n", usec);
-	for (w = target_root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->openeventfds + w->openeventpolls);
-	}
-	fprintf(stdout, "END\n");
-
-	fprintf(stdout, "BEGIN apps.timerfd %llu\n", usec);
-	for (w = target_root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->opentimerfds);
-	}
-	fprintf(stdout, "END\n");
-
-	fprintf(stdout, "BEGIN apps.signalfd %llu\n", usec);
-	for (w = target_root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->opensignalfds);
-	}
-	fprintf(stdout, "END\n");
-
 	fprintf(stdout, "BEGIN netdata.apps_cpu %llu\n", usec);
 	fprintf(stdout, "SET user = %llu\n", cpuuser);
 	fprintf(stdout, "SET system = %llu\n", cpusyst);
 	fprintf(stdout, "END\n");
+
 	fprintf(stdout, "BEGIN netdata.apps_files %llu\n", usec);
 	fprintf(stdout, "SET files = %llu\n", file_counter);
 	fprintf(stdout, "END\n");
 
 	fflush(stdout);
 }
+
+
+// ----------------------------------------------------------------------------
+// generate the charts
 
 void show_charts(void)
 {
@@ -1510,34 +1566,6 @@ void show_charts(void)
 		fprintf(stdout, "DIMENSION %s '' absolute-no-interpolation 1 1\n", w->name);
 	}
 
-	fprintf(stdout, "CHART apps.inotify '' 'Apps inotifies' 'open inotifies' apps none stacked 20054 %d\n", update_every);
-	for (w = target_root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "DIMENSION %s '' absolute-no-interpolation 1 1\n", w->name);
-	}
-
-	fprintf(stdout, "CHART apps.eventfd '' 'Apps Event File Descriptors' 'open event fds' apps none stacked 20055 %d\n", update_every);
-	for (w = target_root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "DIMENSION %s '' absolute-no-interpolation 1 1\n", w->name);
-	}
-
-	fprintf(stdout, "CHART apps.timerfd '' 'Apps Timer File Descriptors' 'open timer fds' apps none stacked 20057 %d\n", update_every);
-	for (w = target_root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "DIMENSION %s '' absolute-no-interpolation 1 1\n", w->name);
-	}
-
-	fprintf(stdout, "CHART apps.signalfd '' 'Apps Timer File Descriptors' 'open timer fds' apps none stacked 20058 %d\n", update_every);
-	for (w = target_root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "DIMENSION %s '' absolute-no-interpolation 1 1\n", w->name);
-	}
-
 	fprintf(stdout, "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' netdata netdata stacked 10000 %d\n", update_every);
 	fprintf(stdout, "DIMENSION user '' incremental 1 1000\n");
 	fprintf(stdout, "DIMENSION system '' incremental 1 1000\n");
@@ -1548,57 +1576,45 @@ void show_charts(void)
 	fflush(stdout);
 }
 
-unsigned long long get_hertz(void)
-{
-	unsigned long long hz = 1;
 
-#ifdef _SC_CLK_TCK
-	if((hz = sysconf(_SC_CLK_TCK)) > 0) {
-		return hz;
+// ----------------------------------------------------------------------------
+// parse command line arguments
+
+void parse_args(int argc, char **argv)
+{
+	int i, freq = 0;
+	char *name = NULL;
+
+	for(i = 1; i < argc; i++) {
+		if(!freq) {
+			int n = atoi(argv[i]);
+			if(n > 0) {
+				freq = n;
+				continue;
+			}
+		}
+
+		if(strcmp("debug", argv[i]) == 0) {
+			debug = 1;
+			continue;
+		}
+
+		if(!name) {
+			name = argv[i];
+			continue;
+		}
+
+		fprintf(stderr, "apps.plugin: ERROR: cannot understand option %s\n", argv[i]);
+		exit(1);
 	}
-#endif
 
-#ifdef HZ
-	hz = (unsigned long long)HZ;    /* <asm/param.h> */
-#else
-	/* If 32-bit or big-endian (not Alpha or ia64), assume HZ is 100. */
-	hz = (sizeof(long)==sizeof(int) || htons(999)==999) ? 100UL : 1024UL;
-#endif
+	if(freq > 0) update_every = freq;
+	if(!name) name = "groups";
 
-	fprintf(stderr, "apps.plugin: ERROR: unknown HZ value. Assuming %llu.\n", hz);
-	return hz;
-}
-
-long get_processors(void)
-{
-	char buffer[1025], *s;
-	int processors = 0;
-
-	FILE *fp = fopen("/proc/stat", "r");
-	if(!fp) return 1;
-
-	while((s = fgets(buffer, 1024, fp))) {
-		if(strncmp(buffer, "cpu", 3) == 0) processors++;
+	if(read_process_groups(name)) {
+		fprintf(stderr, "apps.plugin: ERROR: cannot read process groups %s\n", name);
+		exit(1);
 	}
-	fclose(fp);
-	processors--;
-	if(processors < 1) processors = 1;
-	return processors;
-}
-
-long get_pid_max(void)
-{
-	char buffer[1025], *s;
-	long mpid = 32768;
-
-	FILE *fp = fopen("/proc/sys/kernel/pid_max", "r");
-	if(!fp) return 1;
-
-	s = fgets(buffer, 1024, fp);
-	if(s) mpid = atol(buffer);
-	fclose(fp);
-	if(mpid < 32768) mpid = 32768;
-	return mpid;
 }
 
 int main(int argc, char **argv)
@@ -1631,7 +1647,6 @@ int main(int argc, char **argv)
 		update_statistics();
 		show_charts();		// this is smart enough to show only newly added apps, when needed
 		show_dimensions();
-		// printf("FLUSH xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n");
 
 		if(debug) fprintf(stderr, "apps.plugin: done Loop No %llu\n", counter);
 		fflush(NULL);
@@ -1645,15 +1660,7 @@ int main(int argc, char **argv)
 		if(usec < (update_every * 1000000ULL / 2)) susec = (update_every * 1000000ULL) - usec;
 		else susec = update_every * 1000000ULL / 2;
 
-		//fprintf(stderr, "apps.plugin: sleeping for %llu...", susec);
-		//fflush(NULL);
-		//struct timeval before, after;
-		//gettimeofday(&before, NULL);
 		usleep(susec);
-		//gettimeofday(&after, NULL);
-		//fprintf(stderr, "apps.plugin:  sleeped for %llu\n", usecdiff(&after, &before));
-		//fflush(NULL);
-
 		bcopy(&now, &last, sizeof(struct timeval));
 	}
 }
