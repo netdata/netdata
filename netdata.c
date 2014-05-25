@@ -1159,8 +1159,8 @@ struct rrd_stats {
 	struct timeval last_collected_time;			// 
 	unsigned long long usec_since_last_update;
 
-	total_number absolute_total;
-	total_number last_absolute_total;
+	total_number collected_total;
+	total_number last_collected_total;
 
 	int chart_type;
 	int debug;
@@ -1675,24 +1675,35 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 
 	// calculate totals and count the dimensions
 	int dimensions;
-	st->last_absolute_total  = st->absolute_total;
-	st->absolute_total = 0;
+	st->collected_total = 0;
 	for( rd = st->dimensions, dimensions = 0 ; rd ; rd = rd->next, dimensions++ )
-		st->absolute_total += rd->collected_value;
+		st->collected_total += rd->collected_value;
 
 	// process all dimensions to calculate their values
 	// based on the collected figures only
 	// at this stage we do not interpolate anything
 	for( rd = st->dimensions ; rd ; rd = rd->next ) {
+		if(st->debug) debug(D_RRD_STATS, "%s/%s: "
+			" last_collected_value = " COLLECTED_NUMBER_FORMAT
+			" collected_value = " COLLECTED_NUMBER_FORMAT
+			" last_calculated_value = " CALCULATED_NUMBER_FORMAT
+			" calculated_value = " CALCULATED_NUMBER_FORMAT
+			, st->id, rd->name
+			, rd->last_collected_value
+			, rd->collected_value
+			, rd->last_calculated_value
+			, rd->calculated_value
+			);
+
 		switch(rd->algorithm) {
 			case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
 				// the percentage of the current increment
 				// over the increment of all dimensions together
-				if(st->absolute_total == st->last_absolute_total) rd->calculated_value = 0;
+				if(st->collected_total == st->last_collected_total) rd->calculated_value = 0;
 				else rd->calculated_value =
 					  (calculated_number)100
 					* (calculated_number)(rd->collected_value - rd->last_collected_value)
-					/ (calculated_number)(st->absolute_total  - st->last_absolute_total);
+					/ (calculated_number)(st->collected_total  - st->last_collected_total);
 
 				if(st->debug)
 					debug(D_RRD_STATS, "%s/%s: CALC PCENT-DIFF "
@@ -1702,19 +1713,19 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 						, st->id, rd->name
 						, rd->calculated_value
 						, rd->collected_value, rd->last_collected_value
-						, st->absolute_total, st->last_absolute_total
+						, st->collected_total, st->last_collected_total
 						);
 				break;
 
 			case RRD_DIMENSION_PCENT_OVER_ROW_TOTAL:
-				if(!st->absolute_total) rd->calculated_value = 0;
+				if(!st->collected_total) rd->calculated_value = 0;
 				else
 				// the percentage of the current value
 				// over the total of all dimensions
 				rd->calculated_value =
 					  (calculated_number)100
 					* (calculated_number)rd->collected_value
-					/ (calculated_number)st->absolute_total;
+					/ (calculated_number)st->collected_total;
 
 				if(st->debug)
 					debug(D_RRD_STATS, "%s/%s: CALC PCENT-ROW "
@@ -1724,77 +1735,42 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 						, st->id, rd->name
 						, rd->calculated_value
 						, rd->collected_value
-						, st->absolute_total
+						, st->collected_total
 						);
 				break;
 
 			case RRD_DIMENSION_INCREMENTAL:
-				// we need the incremental calculation to produce per second results
-				// so, we multiply with 1.000.000 and divide by the microseconds passed since
-				// the last entry
-
 				// if the new is smaller than the old (an overflow, or reset), set the old equal to the new
 				// to reset the calculation (it will give zero as the calculation for this second)
 				if(rd->last_collected_value > rd->collected_value) rd->last_collected_value = rd->collected_value;
 
-				if(!st->usec_since_last_update) {
-					rd->calculated_value = 0;
-					if(st->debug)
-						debug(D_RRD_STATS, "%s/%s: CALC INC-ZERO "
-							CALCULATED_NUMBER_FORMAT " = 0"
-							, st->id, rd->name
-							, rd->calculated_value
-							);
-				}
-				else {
-					rd->calculated_value =
-						  (calculated_number)1000000
-						* (calculated_number)(rd->collected_value - rd->last_collected_value)
-						/ (calculated_number)st->usec_since_last_update;
+				rd->calculated_value += (calculated_number)(rd->collected_value - rd->last_collected_value);
 
-					if(st->debug)
-						debug(D_RRD_STATS, "%s/%s: CALC INC "
-							CALCULATED_NUMBER_FORMAT " = 1000000"
-							" * (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
-							" / %llu"
-							, st->id, rd->name
-							, rd->calculated_value
-							, rd->collected_value, rd->last_collected_value
-							, st->usec_since_last_update
-							);
-				}
+				if(st->debug)
+					debug(D_RRD_STATS, "%s/%s: CALC INC "
+						CALCULATED_NUMBER_FORMAT " += "
+						COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT
+						, st->id, rd->name
+						, rd->calculated_value
+						, rd->collected_value, rd->last_collected_value
+						);
 				break;
 
 			case RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION:
-				// we need the incremental calculation to produce per second results
-				// so, we multiply with 1.000.000 and divide by the microseconds passed since
-				// the last entry
-
 				// if the new is smaller than the old (an overflow, or reset), set the old equal to the new
 				// to reset the calculation (it will give zero as the calculation for this second)
 				if(rd->last_collected_value > rd->collected_value) rd->last_collected_value = rd->collected_value;
 
-				if(!st->usec_since_last_update) {
-					rd->calculated_value = 0;
-					if(st->debug)
-						debug(D_RRD_STATS, "%s/%s: CALC INC-NO-IN-ZERO "
-							CALCULATED_NUMBER_FORMAT " = 0"
-							, st->id, rd->name
-							, rd->calculated_value
-							);
-				}
-				else {
-					rd->calculated_value = (calculated_number)(rd->collected_value - rd->last_collected_value);
+				rd->calculated_value = (calculated_number)(rd->collected_value - rd->last_collected_value);
 
-					if(st->debug)
-						debug(D_RRD_STATS, "%s/%s: CALC INC-NO-IN "
-							CALCULATED_NUMBER_FORMAT " = "
-							COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT
-							, st->id, rd->name
-							, rd->calculated_value
-							, rd->collected_value, rd->last_collected_value
-							);
-				}
+				if(st->debug)
+					debug(D_RRD_STATS, "%s/%s: CALC INC-NO-IN "
+						CALCULATED_NUMBER_FORMAT " = "
+						COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT
+						, st->id, rd->name
+						, rd->calculated_value
+						, rd->collected_value, rd->last_collected_value
+						);
 				break;
 
 			case RRD_DIMENSION_ABSOLUTE:
@@ -1827,15 +1803,26 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 	}
 	// at this point we have all the calculated values ready
 
-	if(st->counter_done == 1 || now_ut < next_ut) {
+	if(st->counter_done == 1 || next_ut > now_ut) {
 		// we don't have any usable data yet
 		if(st->debug) debug(D_RRD_STATS, "%s: Skipping collected values (usec since last update = %llu, counter_done = %lu)", st->name, st->usec_since_last_update, st->counter_done);
 
 		for( rd = st->dimensions; rd ; rd = rd->next ) {
-			rd->last_collected_value = rd->collected_value;
 			rd->last_calculated_value = rd->calculated_value;
+			rd->last_collected_value = rd->collected_value;
+
+			switch(rd->algorithm) {
+				case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
+				case RRD_DIMENSION_INCREMENTAL:
+					if(!st->usec_since_last_update) rd->calculated_value = 0;
+					// keep the previous values
+					// the next time, a new incremental total will be calculated
+					break;
+			}
+
 			rd->collected_value = 0;
 		}
+		st->last_collected_total  = st->collected_total;
 
 		pthread_rwlock_unlock(&st->rwlock);
 		if(pthread_setcancelstate(oldstate, NULL) != 0)
@@ -1846,7 +1833,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 
 	// it is now time to interpolate values on a second boundary
 	unsigned long long first_ut = last_ut;
-	for( ; next_ut < now_ut ; next_ut += st->update_every * 1000000ULL ) {
+	for( ; next_ut <= now_ut ; next_ut += st->update_every * 1000000ULL ) {
 		if(st->debug) debug(D_RRD_STATS, "%s: last ut = %0.3Lf (last updated time)", st->name, (long double)last_ut/1000000.0);
 		if(st->debug) debug(D_RRD_STATS, "%s: next ut = %0.3Lf (next interpolation point)", st->name, (long double)next_ut/1000000.0);
 
@@ -1858,29 +1845,49 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 
 			switch(rd->algorithm) {
 				case RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION:
-				case RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION:
 					if(next_ut + st->update_every * 1000000ULL < now_ut)
 						new_value = rd->last_calculated_value;
 					else
 						new_value = rd->calculated_value;
 
 					if(st->debug)
-						debug(D_RRD_STATS, "%s/%s: CALC2 NO-IN "
+						debug(D_RRD_STATS, "%s/%s: CALC2 ABS-NO-IN "
 							CALCULATED_NUMBER_FORMAT
 							, st->id, rd->name
 							, new_value
 							);
+
+					if(next_ut + st->update_every * 1000000ULL > now_ut) rd->calculated_value = new_value;
+					break;
+
+				case RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION:
+					new_value = rd->calculated_value
+						* (calculated_number)(st->update_every * 1000000)
+						/ (calculated_number)st->usec_since_last_update;
+
+					if(st->debug)
+						debug(D_RRD_STATS, "%s/%s: CALC2 INC-NO-IN "
+							CALCULATED_NUMBER_FORMAT " = "
+							CALCULATED_NUMBER_FORMAT " * "
+							"%llu / %llu"
+							, st->id, rd->name
+							, new_value
+							, rd->calculated_value
+							, (unsigned long long)(st->update_every * 1000000)
+							, (unsigned long long)st->usec_since_last_update
+							);
+
 					break;
 
 				case RRD_DIMENSION_INCREMENTAL:
 					new_value = (calculated_number)
 						(	   rd->calculated_value
 							* (calculated_number)(next_ut - last_ut)
-							/ (calculated_number)(st->update_every * 1000000)
+							/ (calculated_number)(now_ut - last_ut)
 						);
 
 					if(st->debug)
-						debug(D_RRD_STATS, "%s/%s: CALC2 DEF "
+						debug(D_RRD_STATS, "%s/%s: CALC2 INC "
 							CALCULATED_NUMBER_FORMAT " = "
 							CALCULATED_NUMBER_FORMAT
 							" * %llu"
@@ -1888,12 +1895,16 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 							, st->id, rd->name
 							, new_value
 							, rd->calculated_value
-							, (next_ut - last_ut)
-							, (st->update_every * 1000000)
+							, (unsigned long long)(next_ut - last_ut)
+							, (unsigned long long)(now_ut - last_ut)
 							);
+
+					rd->calculated_value -= new_value;
 					break;
 
 				case RRD_DIMENSION_ABSOLUTE:
+				case RRD_DIMENSION_PCENT_OVER_ROW_TOTAL:
+				case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
 				default:
 					new_value = (calculated_number)
 						(	(	  (rd->calculated_value - rd->last_calculated_value)
@@ -1915,6 +1926,8 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 							, (next_ut - first_ut)
 							, (now_ut - first_ut), rd->last_calculated_value
 							);
+
+					if(next_ut + st->update_every * 1000000ULL > now_ut) rd->calculated_value = new_value;
 					break;
 
 			}
@@ -1938,14 +1951,6 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 					, rd->multiplier
 					, rd->divisor
 					);
-
-			if(next_ut + st->update_every * 1000000ULL < now_ut) {
-				// there is another iteration
-				// do not change the anything
-				;
-			}
-			else
-				rd->calculated_value = new_value;
 		}
 
 		if(st->first_entry_t && st->counter >= (unsigned long long)st->entries) {
@@ -1965,6 +1970,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 		rd->last_calculated_value = rd->calculated_value;
 		rd->collected_value = 0;
 	}
+	st->last_collected_total  = st->collected_total;
 
 	// ALL DONE ABOUT THE DATA UPDATE
 	// --------------------------------------------------------------------
@@ -2333,8 +2339,8 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 		"\t\t\t\"update_every\": %d,\n"
 		"\t\t\t\"isdetail\": %d,\n"
 		"\t\t\t\"usec_since_last_update\": %llu,\n"
-		"\t\t\t\"absolute_total\": " TOTAL_NUMBER_FORMAT ",\n"
-		"\t\t\t\"last_absolute_total\": " TOTAL_NUMBER_FORMAT ",\n"
+		"\t\t\t\"collected_total\": " TOTAL_NUMBER_FORMAT ",\n"
+		"\t\t\t\"last_collected_total\": " TOTAL_NUMBER_FORMAT ",\n"
 		"\t\t\t\"dimensions\": [\n"
 		, st->id
 		, st->name
@@ -2355,8 +2361,8 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 		, st->update_every
 		, st->isdetail
 		, st->usec_since_last_update
-		, st->absolute_total
-		, st->last_absolute_total
+		, st->collected_total
+		, st->last_collected_total
 		);
 
 	unsigned long memory = st->memsize;
@@ -7252,114 +7258,113 @@ int become_daemon(int close_all_files, const char *input, const char *output, co
 	return(0);
 }
 
-void unit_test(void)
+int unit_test(long delay, long shift)
 {
+	static int repeat = 0;
+	repeat++;
+
+	char name[101];
+	snprintf(name, 100, "unittest-%d-%ld-%ld", repeat, delay, shift);
+
 	debug_flags = 0xffffffff;
+	memory_mode = NETDATA_MEMORY_MODE_RAM;
 
 	int do_abs = 1;
 	int do_inc = 1;
 	int do_abs2 = 1;
 	int do_inc2 = 1;
+	int do_abst = 1;
+	int do_absi = 1;
 
-	RRD_STATS *st = rrd_stats_find_bytype("netdata", "unittest");
-	if(!st) st = rrd_stats_create("netdata", "unittest", "unittest", "netdata", "Unit Testing", "a value", 1, 1, CHART_TYPE_LINE);
+	RRD_STATS *st = rrd_stats_create("netdata", name, name, "netdata", "Unit Testing", "a value", 1, 1, CHART_TYPE_LINE);
 	st->debug = 1;
 
 	RRD_DIMENSION *rdabs = NULL;
 	RRD_DIMENSION *rdinc = NULL;
 	RRD_DIMENSION *rdabs2 = NULL;
 	RRD_DIMENSION *rdinc2 = NULL;
+	RRD_DIMENSION *rdabst = NULL;
+	RRD_DIMENSION *rdabsi = NULL;
 
 	if(do_abs) rdabs = rrd_stats_dimension_add(st, "absolute", "absolute", 1, 1, RRD_DIMENSION_ABSOLUTE);
 	if(do_inc) rdinc = rrd_stats_dimension_add(st, "incremental", "incremental", 1, 1, RRD_DIMENSION_INCREMENTAL);
 	if(do_abs2) rdabs2 = rrd_stats_dimension_add(st, "absolute-no-interpolation", "absolute-no-interpolation", 1, 1, RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION);
 	if(do_inc2) rdinc2 = rrd_stats_dimension_add(st, "incremental-no-interpolation", "incremental-no-interpolation", 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+	if(do_abst) rdabst = rrd_stats_dimension_add(st, "percentage-of-absolute-row", "percentage-of-absolute-row", 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL);
+	if(do_absi) rdabsi = rrd_stats_dimension_add(st, "percentage-of-incremental-row", "percentage-of-incremental-row", 1, 1, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
 
-	long delay = 2000000;
-	collected_number i = 1000;
+	long increment = 1000;
+	collected_number i = 0;
 
-	fprintf(stderr, "\n\nINIT, VALUE = " COLLECTED_NUMBER_FORMAT "\n", i);
-	if(do_abs) rrd_stats_dimension_set(st, "absolute", i);
-	if(do_inc) rrd_stats_dimension_set(st, "incremental", i);
-	if(do_abs2) rrd_stats_dimension_set(st, "absolute-no-interpolation", i);
-	if(do_inc2) rrd_stats_dimension_set(st, "incremental-no-interpolation", i);
+	unsigned long c, dimensions = 0;
+	RRD_DIMENSION *rd;
+	for(rd = st->dimensions ; rd ; rd = rd->next) dimensions++;
 
-	gettimeofday(&st->last_collected_time, NULL);
-	st->last_collected_time.tv_usec = 500000;
-	rrd_stats_done(st);
-	//usleep(delay);
-	i += 1000;
-	fprintf(stderr, "\n\nDELAY = %ld, VALUE = " COLLECTED_NUMBER_FORMAT "\n", delay, i);
-	rrd_stats_next_usec(st, delay);
+	for(c = 0; c < 20 ;c++) {
+		i += increment;
 
-	if(do_abs) rrd_stats_dimension_set(st, "absolute", i);
-	if(do_inc) rrd_stats_dimension_set(st, "incremental", i);
-	if(do_abs2) rrd_stats_dimension_set(st, "absolute-no-interpolation", i);
-	if(do_inc2) rrd_stats_dimension_set(st, "incremental-no-interpolation", i);
+		fprintf(stderr, "\n\nLOOP = %lu, DELAY = %ld, VALUE = " COLLECTED_NUMBER_FORMAT "\n", c, delay, i);
+		if(c) {
+			rrd_stats_next_usec(st, delay);
+		}
+		if(do_abs) rrd_stats_dimension_set(st, "absolute", i);
+		if(do_inc) rrd_stats_dimension_set(st, "incremental", i);
+		if(do_abs2) rrd_stats_dimension_set(st, "absolute-no-interpolation", i);
+		if(do_inc2) rrd_stats_dimension_set(st, "incremental-no-interpolation", i);
+		if(do_abst) rrd_stats_dimension_set(st, "percentage-of-absolute-row", i);
+		if(do_absi) rrd_stats_dimension_set(st, "percentage-of-incremental-row", i);
 
-	rrd_stats_done(st);
-	//usleep(delay);
-	i += 1000;
-	fprintf(stderr, "\n\nDELAY = %ld, VALUE = " COLLECTED_NUMBER_FORMAT "\n", delay, i);
-	rrd_stats_next_usec(st, delay);
+		if(!c) {
+			gettimeofday(&st->last_collected_time, NULL);
+			st->last_collected_time.tv_usec = shift;
+		}
 
-	if(do_abs) rrd_stats_dimension_set(st, "absolute", i);
-	if(do_inc) rrd_stats_dimension_set(st, "incremental", i);
-	if(do_abs2) rrd_stats_dimension_set(st, "absolute-no-interpolation", i);
-	if(do_inc2) rrd_stats_dimension_set(st, "incremental-no-interpolation", i);
+		// prevent it from deleting the dimensions
+		for(rd = st->dimensions ; rd ; rd = rd->next) rd->last_collected_time.tv_sec = st->last_collected_time.tv_sec;
 
-	rrd_stats_done(st);
-	//usleep(delay);
-	i += 1000;
-	fprintf(stderr, "\n\nDELAY = %ld, VALUE = " COLLECTED_NUMBER_FORMAT "\n", delay, i);
-	rrd_stats_next_usec(st, delay);
+		rrd_stats_done(st);
+	}
 
-	if(do_abs) rrd_stats_dimension_set(st, "absolute", i);
-	if(do_inc) rrd_stats_dimension_set(st, "incremental", i);
-	if(do_abs2) rrd_stats_dimension_set(st, "absolute-no-interpolation", i);
-	if(do_inc2) rrd_stats_dimension_set(st, "incremental-no-interpolation", i);
-
-	rrd_stats_done(st);
-	//usleep(delay);
-	i += 1000;
-	fprintf(stderr, "\n\nDELAY = %ld, VALUE = " COLLECTED_NUMBER_FORMAT "\n", delay, i);
-	rrd_stats_next_usec(st, delay);
-
-	if(do_abs) rrd_stats_dimension_set(st, "absolute", i);
-	if(do_inc) rrd_stats_dimension_set(st, "incremental", i);
-	if(do_abs2) rrd_stats_dimension_set(st, "absolute-no-interpolation", i);
-	if(do_inc2) rrd_stats_dimension_set(st, "incremental-no-interpolation", i);
-
-	rrd_stats_done(st);
-
-	fprintf(stderr, "\n\nDONE\n");
+	unsigned long oincrement = increment;
+	increment = increment * st->update_every * 1000000 / delay;
+	fprintf(stderr, "\n\nORIGINAL INCREMENT: %lu, INCREMENT %lu, DELAY %lu, SHIFT %lu\n", oincrement * 10, increment * 10, delay, shift);
 
 	int ret = 0;
-	unsigned long c;
 	storage_number v;
 	for(c = 0 ; c < st->counter ; c++) {
-		fprintf(stderr, "\nPOSITION: %lu\n", c);
+		fprintf(stderr, "\nPOSITION: c = %lu, VALUE %lu\n", c, (oincrement + c * increment + increment * (1000000 - shift) / 1000000 )* 10);
 
-		RRD_DIMENSION *rd;
 		for(rd = st->dimensions ; rd ; rd = rd->next) {
-			fprintf(stderr, "\t %s " STORAGE_NUMBER_FORMAT " ==> ", rd->id, rd->values[c]);
+			fprintf(stderr, "\t %s " STORAGE_NUMBER_FORMAT "   ->   ", rd->id, rd->values[c]);
 
-			if(rd == rdabs) {
-				v = 12500 + c * 5000;
-			}
-			else if(rd == rdinc) {
-				if(c == 0) v = 2500;
-				else v = 5000;
-			}
-			else if(rd == rdinc2) v = c?10000:0;
-			else if(rd == rdabs2) v = 10000 + (c + 1) / 2 * 10000;
+			if(rd == rdabs) v = 
+				(	  oincrement 
+					+ (increment * (1000000 - shift) / 1000000)
+					+ c * increment
+				) * 10;
 
-			if(v == rd->values[c]) fprintf(stderr, "PASSED!\n");
-			else { fprintf(stderr, "ERROR! (expected " STORAGE_NUMBER_FORMAT ")\n", v); ret = 1; }
+			else if(rd == rdinc) v = (c?(increment):(increment * (1000000 - shift) / 1000000)) * 10;
+			else if(rd == rdabs2) v = (((oincrement + c * increment + increment * (1000000 - shift) / 1000000 ) + oincrement - 1) / oincrement) * oincrement * 10;
+			else if(rd == rdinc2) v = increment * 10;
+			else if(rd == rdabst) v = oincrement / dimensions;
+			else if(rd == rdabsi) v = oincrement / dimensions;
+			else v = 0;
+
+			if(v == rd->values[c]) fprintf(stderr, "passed.\n");
+			else {
+				if(rd == rdabs2) fprintf(stderr, "IGNORED (expected " STORAGE_NUMBER_FORMAT ")\n", v);
+				else {
+					fprintf(stderr, "ERROR! (expected " STORAGE_NUMBER_FORMAT ")\n", v);
+					ret = 1;
+				}
+			}
 		}
 	}
 
-	exit(ret);
+	if(ret)
+		fprintf(stderr, "\n\nUNIT TEST(%ld, %ld) FAILED\n\n", delay, shift);
+
+	return ret;
 }
 
 int main(int argc, char **argv)
@@ -7385,7 +7390,23 @@ int main(int argc, char **argv)
 		else if(strcmp(argv[i], "-u")  == 0 && (i+1) < argc) { config_set("global", "run as user",  argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-l")  == 0 && (i+1) < argc) { config_set("global", "history",      argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-t")  == 0 && (i+1) < argc) { config_set("global", "update every", argv[i+1]); i++; }
-		else if(strcmp(argv[i], "--unittest")  == 0) { unit_test(); }
+		else if(strcmp(argv[i], "--unittest")  == 0) {
+			update_every = 1;
+			if(unit_test(1000000, 0)) exit(1);
+			if(unit_test(1000000, 500000)) exit(1);
+			if(unit_test(1000000, 100000)) exit(1);
+			if(unit_test(1000000, 900000)) exit(1);
+			if(unit_test(2000000, 0)) exit(1);
+			if(unit_test(2000000, 500000)) exit(1);
+			if(unit_test(2000000, 100000)) exit(1);
+			if(unit_test(2000000, 900000)) exit(1);
+			if(unit_test(500000, 500000)) exit(1);
+			//if(unit_test(500000, 100000)) exit(1);
+			//if(unit_test(500000, 900000)) exit(1);
+			if(unit_test(500000, 0)) exit(1);
+			fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
+			exit(0);
+		}
 		else {
 			fprintf(stderr, "Cannot understand option '%s'.\n", argv[i]);
 			fprintf(stderr, "\nUSAGE: %s [-d] [-l LINES_TO_SAVE] [-u UPDATE_TIMER] [-p LISTEN_PORT] [-dl debug log file] [-df debug flags].\n\n", argv[0]);
