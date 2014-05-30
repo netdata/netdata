@@ -168,7 +168,7 @@ function refreshHiddenChart(doNext) {
 				ui: {
 					chartType: mainchart.chartType,
 					chartOptions: controlopts,
-					minRangeSize: (MAINCHART_MAX_TIME_TO_SHOW * 1000 * mainchart.update_every) / MAINCHART_POINTS_DIVISOR,
+					minRangeSize: (MAINCHART_MAX_TIME_TO_SHOW * 1000) / MAINCHART_POINTS_DIVISOR,
 				}
 			},
 		});
