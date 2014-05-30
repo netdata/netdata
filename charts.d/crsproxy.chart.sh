@@ -2,6 +2,7 @@
 
 crsproxy_url="http://127.0.0.1:7999/counters?"
 crsproxy_cmds=""
+crsproxy_update_every=60
 
 crsproxy_check() {
 	# check once if the url works
@@ -28,36 +29,36 @@ crsproxy_check() {
 crsproxy_create() {
 	# create the charts
 	cat <<EOF
-CHART crsproxy.connected '' "CRS Proxy Connected Clients" "clients" crsproxy '' line 20000 $update_every
-DIMENSION web '' absolute-no-interpolation 1 1
-DIMENSION native '' absolute-no-interpolation 1 1
-DIMENSION virtual '' absolute-no-interpolation 1 1
-CHART crsproxy.requests '' "CRS Proxy Requests Rate" "requests/s" crsproxy '' area 20001 $update_every
-DIMENSION web '' incremental-no-interpolation 1 1
-DIMENSION native '' incremental-no-interpolation -1 1
-CHART crsproxy.clients '' "CRS Proxy Clients Rate" "clients/s" crsproxy '' area 20010 $update_every
-DIMENSION web '' incremental-no-interpolation 1 1
-DIMENSION native '' incremental-no-interpolation -1 1
-DIMENSION virtual '' incremental-no-interpolation 1 1
-CHART crsproxy.replies '' "CRS Replies Rate" "replies/s" crsproxy '' area 20020 $update_every
-DIMENSION ok '' incremental-no-interpolation 1 1
-DIMENSION failed '' incremental-no-interpolation -1 1
-CHART crsproxy.bconnections '' "Back-End Connections Rate" "connections/s" crsproxy '' area 20030 $update_every
-DIMENSION ok '' incremental-no-interpolation 1 1
-DIMENSION failed '' incremental-no-interpolation -1 1
+CHART crsproxy.connected '' "CRS Proxy Connected Clients" "clients" crsproxy '' line 20000 $crsproxy_update_every
+DIMENSION web '' absolute 1 1
+DIMENSION native '' absolute 1 1
+DIMENSION virtual '' absolute 1 1
+CHART crsproxy.requests '' "CRS Proxy Requests Rate" "requests / $crsproxy_update_every sec" crsproxy '' area 20001 $crsproxy_update_every
+DIMENSION web '' incremental 1 1
+DIMENSION native '' incremental -1 1
+CHART crsproxy.clients '' "CRS Proxy Clients Rate" "clients / $crsproxy_update_every sec" crsproxy '' area 20010 $crsproxy_update_every
+DIMENSION web '' incremental 1 1
+DIMENSION native '' incremental -1 1
+DIMENSION virtual '' incremental 1 1
+CHART crsproxy.replies '' "CRS Replies Rate" "replies / $crsproxy_update_every sec" crsproxy '' area 20020 $crsproxy_update_every
+DIMENSION ok '' incremental 1 1
+DIMENSION failed '' incremental -1 1
+CHART crsproxy.bconnections '' "Back-End Connections Rate" "connections / $crsproxy_update_every sec" crsproxy '' area 20030 $crsproxy_update_every
+DIMENSION ok '' incremental 1 1
+DIMENSION failed '' incremental -1 1
 EOF
 
 	local x=
-	echo "CHART crsproxy.commands '' 'CRS Commands Requests' 'requests/s' crsproxy '' stacked 20100 $update_every"
+	echo "CHART crsproxy.commands '' 'CRS Commands Requests' 'requests / $crsproxy_update_every sec' crsproxy '' stacked 20100 $crsproxy_update_every"
 	for x in $crsproxy_cmds
 	do
-		echo "DIMENSION $x '' incremental-no-interpolation 1 1"
+		echo "DIMENSION $x '' incremental 1 1"
 	done
 
-	echo "CHART crsproxy.commands_failed '' 'CRS Failed Commands' 'replies/s' crsproxy '' stacked 20110 $update_every"
+	echo "CHART crsproxy.commands_failed '' 'CRS Failed Commands' 'replies / $crsproxy_update_every sec' crsproxy '' stacked 20110 $crsproxy_update_every"
 	for x in $crsproxy_cmds
 	do
-		echo "DIMENSION $x '' incremental-no-interpolation 1 1"
+		echo "DIMENSION $x '' incremental 1 1"
 	done
 
 	return 0

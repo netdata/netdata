@@ -1,6 +1,7 @@
 #!/bin/sh
 
 postfix_postqueue=
+postfix_update_every=60
 
 postfix_check() {
 	# this should return:
@@ -36,9 +37,9 @@ postfix_check() {
 
 postfix_create() {
 cat <<EOF
-CHART postfix.qemails '' "Postfix Queue Emails" "emails" postfix postfix line 5000 $update_every
-DIMENSION emails '' absolute-no-interpolation 1 1
-CHART postfix.qsize '' "Postfix Queue Emails Size" "emails size in KB" postfix postfix area 5001 $update_every
+CHART postfix.qemails '' "Postfix Queue Emails" "emails" postfix postfix line 5000 $postfix_update_every
+DIMENSION emails '' absolute 1 1
+CHART postfix.qsize '' "Postfix Queue Emails Size" "emails size in KB" postfix postfix area 5001 $postfix_update_every
 DIMENSION size '' absolute 1 1
 EOF
 

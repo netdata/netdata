@@ -6,6 +6,8 @@ cpu_apps_apps="netdata asterisk squid apache2 mysqld dovecot cupsd sshd named cl
 #cpu_apps_pagesize="`getconf PAGESIZE`"
 cpu_apps_clockticks="`getconf CLK_TCK`"
 
+cpu_apps_update_every=60
+
 cpu_apps_check() {
 	# this should return:
 	#  - 0 to enable the chart
@@ -23,7 +25,7 @@ cpu_apps_bc_finalze=
 
 cpu_apps_create() {
 
-	echo "CHART apps.cpu '' 'Apps CPU' 'milliseconds/s' apps apps stacked 20001 $update_every"
+	echo "CHART apps.cpu '' 'Apps CPU' 'milliseconds / $cpu_apps_update_every sec' apps apps stacked 20001 $cpu_apps_update_every"
 
 	local x=
 	for x in $cpu_apps_apps

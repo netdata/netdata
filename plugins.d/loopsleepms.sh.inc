@@ -9,6 +9,31 @@ LOOPSLEEPMS_HIGHRES=2
 LOOPSLEEPMS_LASTRUN=0
 LOOPSLEEPMS_LASTSLEEP=0
 LOOPSLEEPMS_LASTWORK=0
+
+check_high_res() {
+	LOOPSLEEPMS_HIGHRES=1
+	test `date +%N` = "%N" && LOOPSLEEPMS_HIGHRES=0
+}
+
+now_ms=
+current_time_ms() {
+	# check if high resolution timer is supported
+	test $LOOPSLEEPMS_HIGHRES -eq 2 && check_high_res
+
+	# if high resolution is not supported
+	# just sleep the time requested, in seconds
+	if [ $LOOPSLEEPMS_HIGHRES -eq 0 ]
+	then
+		local s="`date +'%s'`"
+		local m="000"
+	else
+		local d="`date +'%s.%N'`"
+		local s="`echo $d | cut -d '.' -f 1`"
+		local m="`echo $d | cut -d '.' -f 2 | cut -b 1-3`"
+	fi
+	now_ms="$s$m"
+}
+
 loopsleepms() {
 	tellwork=0
 	if [ "$1" = "tellwork" ]
@@ -21,11 +46,7 @@ loopsleepms() {
 	local t=$1
 
 	# check if high resolution timer is supported
-	if [ $LOOPSLEEPMS_HIGHRES -eq 2 ]
-	then
-		LOOPSLEEPMS_HIGHRES=1
-		test `date +%N` = "%N" && LOOPSLEEPMS_HIGHRES=0
-	fi
+	test $LOOPSLEEPMS_HIGHRES -eq 2 && check_high_res
 
 	# if high resolution is not supported
 	# just sleep the time requested, in seconds

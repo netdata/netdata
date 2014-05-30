@@ -1,5 +1,7 @@
 #!/bin/sh
 
+example_update_every=
+
 example_check() {
 	# this should return:
 	#  - 0 to enable the chart
@@ -11,7 +13,7 @@ example_check() {
 example_create() {
 # create the chart with 3 dimensions
 cat <<EOF
-CHART example.random '' "Random Numbers Stacked Chart" "% of random numbers" random random stacked 5000 $update_every
+CHART example.random '' "Random Numbers Stacked Chart" "% of random numbers" random random stacked 5000 $example_update_every
 DIMENSION random1 '' percentage-of-absolute-row 1 1
 DIMENSION random2 '' percentage-of-absolute-row 1 1
 DIMENSION random3 '' percentage-of-absolute-row 1 1

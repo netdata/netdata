@@ -6,6 +6,8 @@ mem_apps_apps="netdata asterisk squid apache2 mysqld dovecot cupsd sshd named cl
 #mem_apps_pagesize="`getconf PAGESIZE`"
 #mem_apps_clockticks="`getconf CLK_TCK`"
 
+mem_apps_update_every=
+
 mem_apps_check() {
 	# this should return:
 	#  - 0 to enable the chart
@@ -23,7 +25,7 @@ mem_apps_bc_finalze=
 
 mem_apps_create() {
 
-	echo "CHART apps.mem '' 'Apps Memory' MB apps apps stacked 20000 $update_every"
+	echo "CHART apps.mem '' 'Apps Memory' MB apps apps stacked 20000 $mem_apps_update_every"
 
 	local x=
 	for x in $mem_apps_apps

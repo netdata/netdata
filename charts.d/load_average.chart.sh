@@ -1,5 +1,7 @@
 #!/bin/sh
 
+load_average_update_every=
+
 load_average_check() {
 	# this should return:
 	#  - 0 to enable the chart
@@ -11,7 +13,7 @@ load_average_check() {
 load_average_create() {
 	# create a chart with 3 dimensions
 cat <<EOF
-CHART example.load '' "System Load Average" "load" load load line 500 $update_every
+CHART example.load '' "System Load Average" "load" load load line 500 $load_average_update_every
 DIMENSION load1 '1 min' absolute 1 100
 DIMENSION load5 '5 mins' absolute 1 100
 DIMENSION load15 '15 mins' absolute 1 100

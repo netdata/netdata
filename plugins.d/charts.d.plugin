@@ -206,6 +206,7 @@ all_enabled_charts() {
 # -----------------------------------------------------------------------------
 # load the charts
 
+suffix_update_every="_update_every"
 active_charts=
 for chart in `all_enabled_charts`
 do
@@ -214,6 +215,13 @@ do
 	if [ -f "$confd/$chart.conf" ]
 	then
 		. "$confd/$chart.conf"
+	fi
+
+	eval "dt=\$$chart$suffix_update_every"
+	dt=$(( dt + 1 - 1 )) # make sure it is a number
+	if [ $dt -lt $update_every ]
+	then
+		eval "$chart$suffix_update_every=$update_every"
 	fi
 
 	$chart$charts_check
@@ -275,9 +283,20 @@ done
 
 # -----------------------------------------------------------------------------
 # update dimensions
+
 global_update() {
 	local exit_after=$((3600 / update_every))
 
+	# return the current time in ms in $now_ms
+	current_time_ms
+
+	local chart=
+	for chart in $now_charts
+	do
+		eval "local last_update_$chart=\$((now_ms - ($chart$suffix_update_every * 1000) ))"
+	done
+
+	# the main loop
 	local c=0
 	while [ 1 ]
 	do
@@ -288,27 +307,34 @@ global_update() {
 		local chart=
 		for chart in $now_charts
 		do
-			local d="`date +'%s.%N'`"
-			local s="`echo $d | cut -d '.' -f 1`"
-			local m="`echo $d | cut -d '.' -f 2 | cut -b 1-3`"
-			local now="$s$m" # milliseconds since epoch (1-1-1970)
+			# return the current time in ms in $now_ms
+			current_time_ms
+
+			eval "local chart_min_dt=\$$chart$suffix_update_every"
+			test -z "$chart_min_dt" && local chart_min_dt=$update_every
+			local chart_min_dt=$((chart_min_dt * 1000000))
 
 			eval "local last=\$last_update_$chart"
-			test -z "$last" && local last=$((now - 1000))
+			test -z "$last" && local last=$((now_ms - (chart_min_dt / 1000) ))
 
-			local dt=$(( (now - last) * 1000 ))
-			eval "last_update_$chart=$now"
-
-			# the first call should not give a duration
-			# so that netdata calibrates to current time
-			test $c -eq 1 && local dt=
-
-			$chart$charts_update $dt
-			if [ $? -eq 0 ]
+			local dt=$(( (now_ms - last) * 1000 ))
+			if [ $dt -ge $chart_min_dt ]
 			then
-				run_charts="$run_charts $chart"
+				eval "last_update_$chart=$now_ms"
+
+				# the first call should not give a duration
+				# so that netdata calibrates to current time
+				test $c -eq 1 && local dt=
+
+				$chart$charts_update $dt
+				if [ $? -eq 0 ]
+				then
+					run_charts="$run_charts $chart"
+				else
+					echo >&2 "charts.d: chart '$chart' update() function reports failure. Disabling it."
+				fi
 			else
-				echo >&2 "charts.d: chart '$chart' update() function reports failure. Disabling it."
+				run_charts="$run_charts $chart"
 			fi
 		done
 

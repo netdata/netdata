@@ -1,6 +1,7 @@
 #!/bin/sh
 
 squid_url="http://127.0.0.1:8080/squid-internal-mgr/counters"
+squid_update_every=5
 
 squid_check() {
 	# check once if the url works
@@ -17,23 +18,23 @@ squid_check() {
 squid_create() {
 	# create the charts
 	cat <<EOF
-CHART squid.clients_net '' "Squid Client Bandwidth" "kilobits/s" squid '' area 20001 $update_every
+CHART squid.clients_net '' "Squid Client Bandwidth" "kilobits / $squid_update_every sec" squid '' area 20001 $squid_update_every
 DIMENSION client_http_kbytes_in in incremental 8 1
 DIMENSION client_http_kbytes_out out incremental -8 1
 DIMENSION client_http_hit_kbytes_out hits incremental -8 1
 
-CHART squid.clients_requests '' "Squid Client Requests" "requests/s" squid '' line 20003 $update_every
-DIMENSION client_http_requests requests incremental-no-interpolation 1 1
-DIMENSION client_http_hits hits incremental-no-interpolation 1 1
-DIMENSION client_http_errors errors incremental-no-interpolation -1 1
+CHART squid.clients_requests '' "Squid Client Requests" "requests / $squid_update_every sec" squid '' line 20003 $squid_update_every
+DIMENSION client_http_requests requests incremental 1 1
+DIMENSION client_http_hits hits incremental 1 1
+DIMENSION client_http_errors errors incremental -1 1
 
-CHART squid.servers_net '' "Squid Server Bandwidth" "kilobits/s" squid '' area 20002 $update_every
+CHART squid.servers_net '' "Squid Server Bandwidth" "kilobits / $squid_update_every sec" squid '' area 20002 $squid_update_every
 DIMENSION server_all_kbytes_in in incremental 8 1
 DIMENSION server_all_kbytes_out out incremental -8 1
 
-CHART squid.servers_requests '' "Squid Server Requests" "requests/s" squid '' line 20004 $update_every
-DIMENSION server_all_requests requests incremental-no-interpolation 1 1
-DIMENSION server_all_errors errors incremental-no-interpolation -1 1
+CHART squid.servers_requests '' "Squid Server Requests" "requests / $squid_update_every sec" squid '' line 20004 $squid_update_every
+DIMENSION server_all_requests requests incremental 1 1
+DIMENSION server_all_errors errors incremental -1 1
 EOF
 	
 	return 0
