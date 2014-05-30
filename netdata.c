@@ -2626,7 +2626,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 
 		long count = 0, printed = 0, group_count = 0;
 		last_timestamp = 0;
-		for(t = current_entry; max_entries ; now--, t--, max_entries--) {
+		for(t = current_entry; max_entries ; now -= st->update_every, t--, max_entries--) {
 			if(t < 0) t = st->entries - 1;
 
 			int print_this = 0;
@@ -7352,7 +7352,10 @@ int unit_test(long delay, long shift)
 
 			if(v == rd->values[c]) fprintf(stderr, "passed.\n");
 			else {
-				if(rd == rdabs2) fprintf(stderr, "IGNORED (expected " STORAGE_NUMBER_FORMAT ")\n", v);
+				if(rd == rdabs2) {
+					// FIXME: the expected numbers are wrong
+					fprintf(stderr, "IGNORED (expected " STORAGE_NUMBER_FORMAT ")\n", v);
+				}
 				else {
 					fprintf(stderr, "ERROR! (expected " STORAGE_NUMBER_FORMAT ")\n", v);
 					ret = 1;
@@ -7401,8 +7404,8 @@ int main(int argc, char **argv)
 			if(unit_test(2000000, 100000)) exit(1);
 			if(unit_test(2000000, 900000)) exit(1);
 			if(unit_test(500000, 500000)) exit(1);
-			//if(unit_test(500000, 100000)) exit(1);
-			//if(unit_test(500000, 900000)) exit(1);
+			//if(unit_test(500000, 100000)) exit(1); // FIXME: the expected numbers are wrong
+			//if(unit_test(500000, 900000)) exit(1); // FIXME: the expected numbers are wrong
 			if(unit_test(500000, 0)) exit(1);
 			fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
 			exit(0);
