@@ -1,7 +1,7 @@
 #!/bin/sh
 
 postfix_postqueue=
-postfix_update_every=60
+postfix_update_every=15
 
 postfix_check() {
 	# this should return:

@@ -2,7 +2,7 @@
 
 crsproxy_url="http://127.0.0.1:7999/counters?"
 crsproxy_cmds=""
-crsproxy_update_every=60
+crsproxy_update_every=15
 
 crsproxy_check() {
 	# check once if the url works

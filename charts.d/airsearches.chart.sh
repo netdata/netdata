@@ -1,8 +1,8 @@
 #!/bin/sh
 
-airsearches_url="https://services.viva.gr/vivatravelwcf_v2/airsabre/webtesting/searchcounters.ashx"
-airsearches_cmds=""
-airsearches_update_every=60
+airsearches_url=
+airsearches_cmds=
+airsearches_update_every=15
 
 airsearches_get() {
 	wget 2>/dev/null -O - "$airsearches_url" |\
