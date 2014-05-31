@@ -327,6 +327,8 @@ void log_access( const char *fmt, ... )
 // ----------------------------------------------------------------------------
 // helpers
 
+#define abs(x) ((x < 0)? -x : x)
+
 unsigned long long usecdiff(struct timeval *now, struct timeval *last) {
 		return ((((now->tv_sec * 1000000ULL) + now->tv_usec) - ((last->tv_sec * 1000000ULL) + last->tv_usec)));
 }
@@ -886,23 +888,16 @@ const char *chart_type_name(int chart_type)
 #define RRD_DIMENSION_INCREMENTAL_NAME 					"incremental"
 #define RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL_NAME		"percentage-of-incremental-row"
 #define RRD_DIMENSION_PCENT_OVER_ROW_TOTAL_NAME			"percentage-of-absolute-row"
-#define RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION_NAME	"incremental-no-interpolation"
-#define RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION_NAME	"absolute-no-interpolation"
-
 
 #define RRD_DIMENSION_ABSOLUTE						0
 #define RRD_DIMENSION_INCREMENTAL					1
 #define RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL 		2
 #define RRD_DIMENSION_PCENT_OVER_ROW_TOTAL 			3
-#define RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION	4
-#define RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION		5
 
 int algorithm_id(const char *name)
 {
 	if(strcmp(name, RRD_DIMENSION_ABSOLUTE_NAME) == 0) 						return RRD_DIMENSION_ABSOLUTE;
-	if(strcmp(name, RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION_NAME) == 0) 	return RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION;
 	if(strcmp(name, RRD_DIMENSION_INCREMENTAL_NAME) == 0) 					return RRD_DIMENSION_INCREMENTAL;
-	if(strcmp(name, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION_NAME) == 0) 	return RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION;
 	if(strcmp(name, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL_NAME) == 0) 			return RRD_DIMENSION_PCENT_OVER_ROW_TOTAL;
 	if(strcmp(name, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL_NAME) == 0) 		return RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL;
 	return RRD_DIMENSION_ABSOLUTE;
@@ -914,21 +909,13 @@ const char *algorithm_name(int chart_type)
 	static char incremental[] = RRD_DIMENSION_INCREMENTAL_NAME;
 	static char percentage_of_absolute_row[] = RRD_DIMENSION_PCENT_OVER_ROW_TOTAL_NAME;
 	static char percentage_of_incremental_row[] = RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL_NAME;
-	static char incremental_last_value[] = RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION_NAME;
-	static char absolute_last_value[] = RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION_NAME;
 
 	switch(chart_type) {
 		case RRD_DIMENSION_ABSOLUTE:
 			return absolute;
 
-		case RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION:
-			return absolute_last_value;
-
 		case RRD_DIMENSION_INCREMENTAL:
 			return incremental;
-
-		case RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION:
-			return incremental_last_value;
 
 		case RRD_DIMENSION_PCENT_OVER_ROW_TOTAL:
 			return percentage_of_absolute_row;
@@ -1069,7 +1056,7 @@ int savememory(const char *filename, void *mem, unsigned long size)
 #define RRD_STATS_NAME_MAX 1024
 
 typedef long double calculated_number;
-#define CALCULATED_NUMBER_FORMAT "%0.3Lf"
+#define CALCULATED_NUMBER_FORMAT "%0.7Lf"
 //typedef long long calculated_number;
 //#define CALCULATED_NUMBER_FORMAT "%lld"
 
@@ -1083,8 +1070,91 @@ typedef int32_t storage_number;
 typedef uint32_t ustorage_number;
 #define STORAGE_NUMBER_FORMAT "%d"
 
-#define RRD_STATS_MAGIC     "NETDATA CACHE STATS FILE V007"
-#define RRD_DIMENSION_MAGIC "NETDATA CACHE DIMENSION FILE V005"
+storage_number pack_storage_number(calculated_number value)
+{
+	storage_number r = 0;
+	if(!value) return r;
+
+	// bit 32 = sign
+	// bit 31 = 0:divide, 1:multiply
+	// bit 30, 29, 28 = (multiplier or divider) 0-7
+	// bit 27 to 25 = reserved for flags
+	// bit 24 to bit 1 = the value
+
+	storage_number sign = 0, exp = 0, mul;
+	int m = 0;
+	calculated_number n = value;
+
+	if(n < 0) {
+		sign = 1;
+		n = -n;
+	}
+
+	while(m < 7 && n > (calculated_number)0x00ffffff) {
+		n /= 10;
+		m++;
+	}
+	while(m > -7 && n < (calculated_number)0x00199999) {
+		n *= 10;
+		m--;
+	}
+
+	if(m <= 0) {
+		exp = 0;
+		m = -m;
+	}
+	else exp = 1;
+
+	if(n > (calculated_number)0x00ffffff) {
+		error("Number " CALCULATED_NUMBER_FORMAT " is too big.", value);
+		n = (calculated_number)0x00ffffff;
+	}
+
+	mul = m;
+
+	r = (sign << 31) + (exp << 30) + (mul << 27) + n;
+	// fprintf(stderr, "PACK: %08X, sign = %d, exp = %d, mul = %d, n = " CALCULATED_NUMBER_FORMAT "\n", r, sign, exp, mul, n);
+
+	return r;
+}
+
+calculated_number unpack_storage_number(storage_number value)
+{
+	if(!value) return 0;
+
+	int sign = 0;
+	int exp = 0;
+
+	if(value & (1 << 31)) {
+		sign = 1;
+		value ^= 1 << 31;
+	}
+
+	if(value & (1 << 30)) {
+		exp = 1;
+		value ^= 1 << 30;
+	}
+
+	int mul = value >> 27;
+	value ^= mul << 27;
+
+	calculated_number n = value;
+
+	// fprintf(stderr, "UNPACK: %08X, sign = %d, exp = %d, mul = %d, n = " CALCULATED_NUMBER_FORMAT "\n", value, sign, exp, mul, n);
+
+	while(mul > 0) {
+		if(exp) n *= 10;
+		else n /= 10;
+		mul--;
+	}
+
+	if(sign) n = -n;
+	return n;
+}
+
+
+#define RRD_STATS_MAGIC     "NETDATA CACHE STATS FILE V008"
+#define RRD_DIMENSION_MAGIC "NETDATA CACHE DIMENSION FILE V008"
 
 struct rrd_dimension {
 	char magic[sizeof(RRD_DIMENSION_MAGIC) + 1];// our magic
@@ -1756,25 +1826,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 						);
 				break;
 
-			case RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION:
-				// if the new is smaller than the old (an overflow, or reset), set the old equal to the new
-				// to reset the calculation (it will give zero as the calculation for this second)
-				if(rd->last_collected_value > rd->collected_value) rd->last_collected_value = rd->collected_value;
-
-				rd->calculated_value = (calculated_number)(rd->collected_value - rd->last_collected_value);
-
-				if(st->debug)
-					debug(D_RRD_STATS, "%s/%s: CALC INC-NO-IN "
-						CALCULATED_NUMBER_FORMAT " = "
-						COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT
-						, st->id, rd->name
-						, rd->calculated_value
-						, rd->collected_value, rd->last_collected_value
-						);
-				break;
-
 			case RRD_DIMENSION_ABSOLUTE:
-			case RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION:
 				rd->calculated_value = (calculated_number)rd->collected_value;
 
 				if(st->debug)
@@ -1844,41 +1896,6 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 			calculated_number new_value;
 
 			switch(rd->algorithm) {
-				case RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION:
-					if(next_ut + st->update_every * 1000000ULL < now_ut)
-						new_value = rd->last_calculated_value;
-					else
-						new_value = rd->calculated_value;
-
-					if(st->debug)
-						debug(D_RRD_STATS, "%s/%s: CALC2 ABS-NO-IN "
-							CALCULATED_NUMBER_FORMAT
-							, st->id, rd->name
-							, new_value
-							);
-
-					if(next_ut + st->update_every * 1000000ULL > now_ut) rd->calculated_value = new_value;
-					break;
-
-				case RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION:
-					new_value = rd->calculated_value
-						* (calculated_number)(st->update_every * 1000000)
-						/ (calculated_number)st->usec_since_last_update;
-
-					if(st->debug)
-						debug(D_RRD_STATS, "%s/%s: CALC2 INC-NO-IN "
-							CALCULATED_NUMBER_FORMAT " = "
-							CALCULATED_NUMBER_FORMAT " * "
-							"%llu / %llu"
-							, st->id, rd->name
-							, new_value
-							, rd->calculated_value
-							, (unsigned long long)(st->update_every * 1000000)
-							, (unsigned long long)st->usec_since_last_update
-							);
-
-					break;
-
 				case RRD_DIMENSION_INCREMENTAL:
 					new_value = (calculated_number)
 						(	   rd->calculated_value
@@ -1932,22 +1949,21 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 
 			}
 
-			rd->values[st->current_entry] = (storage_number)
-				(	  new_value
-					* (calculated_number)10
+
+			rd->values[st->current_entry] = pack_storage_number(
+					  new_value
 					* (calculated_number)rd->multiplier
 					/ (calculated_number)rd->divisor
 				);
 
 			if(st->debug)
 				debug(D_RRD_STATS, "%s/%s: STORE[%ld] "
-					STORAGE_NUMBER_FORMAT " = " CALCULATED_NUMBER_FORMAT
-					" * 10 "
+					CALCULATED_NUMBER_FORMAT " = " CALCULATED_NUMBER_FORMAT
 					" * %ld"
 					" / %ld"
 					, st->id, rd->name
 					, st->current_entry
-					, rd->values[st->current_entry], new_value
+					, unpack_storage_number(rd->values[st->current_entry]), new_value
 					, rd->multiplier
 					, rd->divisor
 					);
@@ -2051,21 +2067,18 @@ void web_buffer_strcpy(struct web_buffer *wb, const char *txt)
 	wb->bytes = bytes;
 }
 
-void web_buffer_rrd_value(struct web_buffer *wb, storage_number value)
+int print_calculated_number(char *str, calculated_number value)
 {
-	if(wb->size - wb->bytes < 11) return;
-
-	char *str = &wb->buffer[wb->bytes];
 	char *wstr = str;
 
 	// make sure it is unsigned
-	ustorage_number uvalue = (value < 0) ? -value : value;
+	unsigned long long uvalue = (unsigned long long)(((value < 0) ? -value : value) * (calculated_number)10000);
 
 	// print each digit
 	do *wstr++ = (char)(48 + (uvalue % 10)); while(uvalue /= 10);
 
-	// if it is just one byte, add a zero
-	if((wstr - str) == 1) *wstr++ = '0';
+	// make sure we have 8 bytes at least
+	while((wstr - str) < 5) *wstr++ = '0';
 
 	// put the sign back
 	if (value < 0) *wstr++ = '-';
@@ -2074,20 +2087,25 @@ void web_buffer_rrd_value(struct web_buffer *wb, storage_number value)
 	wstr--;
 	strreverse(str, wstr);
 
-	if(*wstr != '0') {
-		// move the last digit one byte to the right
+	// terminate it, one position to the right
+	// to let space for a dot
+	wstr[2] = '\0';
+
+	int i;
+	for(i = 0; i < 4 ;i++) {
 		wstr[1] = wstr[0];
-
-		// put the dot in the hole
-		wstr[0] = '.';
-
-		// terminate it
-		wstr += 2;
+		wstr--;
 	}
-	*wstr='\0';
+	wstr[1] = '.';
 
-	// update the buffer length
-	wb->bytes += (wstr - str);
+	// return the buffer length
+	return ( (wstr - str) + 6 );
+}
+
+void web_buffer_rrd_value(struct web_buffer *wb, calculated_number value)
+{
+	if(wb->size - wb->bytes < 50) return;
+	wb->bytes += print_calculated_number(&wb->buffer[wb->bytes], value);
 }
 
 // generate a javascript date, the fastest possible way...
@@ -2302,6 +2320,7 @@ struct web_client *web_client_free(struct web_client *w)
 
 #define GROUP_AVERAGE	0
 #define GROUP_MAX 		1
+#define GROUP_SUM		2
 
 // find the oldest entry in the data, skipping all empty slots
 time_t rrd_stats_first_entry_t(RRD_STATS *st)
@@ -2563,7 +2582,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 	// temp arrays for keeping values per dimension
 	
 	calculated_number group_values[dimensions]; // keep sums when grouping
-	storage_number    print_values[dimensions]; // keep the final value to be printed
+	calculated_number print_values[dimensions]; // keep the final value to be printed
 	int               print_hidden[dimensions]; // keep hidden flags
 	int               found_non_zero[dimensions];
 
@@ -2682,11 +2701,15 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 			}
 
 			for(rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
-				long value = rd->values[t];
+				calculated_number value = unpack_storage_number(rd->values[t]);
 				
 				switch(group_method) {
 					case GROUP_MAX:
 						if(abs(value) > abs(group_values[c])) group_values[c] = value;
+						break;
+
+					case GROUP_SUM:
+						group_values[c] += value;
 						break;
 
 					default:
@@ -2726,7 +2749,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 				}
 				if(!pc) {
 					web_buffer_strcpy(wb, pre_value);
-					web_buffer_rrd_value(wb, (storage_number)0);
+					web_buffer_rrd_value(wb, (calculated_number)0);
 					web_buffer_strcpy(wb, post_value);
 				}
 
@@ -3072,6 +3095,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 		tok = mystrsep(&url, "/");
 		if(strcmp(tok, "max") == 0) group_method = GROUP_MAX;
 		else if(strcmp(tok, "average") == 0) group_method = GROUP_AVERAGE;
+		else if(strcmp(tok, "sum") == 0) group_method = GROUP_SUM;
 		else debug(D_WEB_CLIENT, "%llu: Unknown group method '%s'", w->id, tok);
 	}
 	if(url) {
@@ -5020,7 +5044,7 @@ int do_proc_net_stat_conntrack() {
 		if(!st) {
 			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "sockets", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connections", "active connections", 1000, update_every, CHART_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "connections", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "connections", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
 		}
 		else rrd_stats_next(st);
 
@@ -5035,9 +5059,9 @@ int do_proc_net_stat_conntrack() {
 		if(!st) {
 			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "new", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter New Connections", "connections/s", 1001, update_every, CHART_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "new", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
-			rrd_stats_dimension_add(st, "ignore", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
-			rrd_stats_dimension_add(st, "invalid", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "new", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "ignore", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "invalid", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
@@ -5055,9 +5079,9 @@ int do_proc_net_stat_conntrack() {
 			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "changes", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Changes", "changes/s", 1002, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "inserted", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
-			rrd_stats_dimension_add(st, "deleted", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
-			rrd_stats_dimension_add(st, "delete_list", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "inserted", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "deleted", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "delete_list", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
@@ -5075,9 +5099,9 @@ int do_proc_net_stat_conntrack() {
 			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "expect", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Expectations", "expectations/s", 1003, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "created", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
-			rrd_stats_dimension_add(st, "deleted", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
-			rrd_stats_dimension_add(st, "new", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "created", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "deleted", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "new", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
@@ -5095,9 +5119,9 @@ int do_proc_net_stat_conntrack() {
 			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "search", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Searches", "searches/s", 1010, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "searched", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
-			rrd_stats_dimension_add(st, "restarted", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
-			rrd_stats_dimension_add(st, "found", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "searched", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "restarted", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "found", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
@@ -5115,10 +5139,10 @@ int do_proc_net_stat_conntrack() {
 			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "errors", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Errors", "events/s", 1005, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "icmp_error", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
-			rrd_stats_dimension_add(st, "insert_failed", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
-			rrd_stats_dimension_add(st, "drop", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
-			rrd_stats_dimension_add(st, "early_drop", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "icmp_error", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "insert_failed", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "drop", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "early_drop", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
@@ -5190,7 +5214,7 @@ int do_proc_net_ip_vs_stats() {
 		if(!st) {
 			st = rrd_stats_create(RRD_TYPE_NET_IPVS, "sockets", NULL, RRD_TYPE_NET_IPVS, "IPVS New Connections", "connections/s", 1001, update_every, CHART_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "connections", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "connections", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
@@ -5205,8 +5229,8 @@ int do_proc_net_ip_vs_stats() {
 		if(!st) {
 			st = rrd_stats_create(RRD_TYPE_NET_IPVS, "packets", NULL, RRD_TYPE_NET_IPVS, "IPVS Packets", "packets/s", 1002, update_every, CHART_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "received", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
-			rrd_stats_dimension_add(st, "sent", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "received", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "sent", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
@@ -5334,7 +5358,7 @@ int do_proc_stat() {
 					st = rrd_stats_create("system", id, NULL, "cpu", "CPU Interrupts", "interrupts/s", 900, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "interrupts", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+					rrd_stats_dimension_add(st, "interrupts", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
@@ -5358,7 +5382,7 @@ int do_proc_stat() {
 				if(!st) {
 					st = rrd_stats_create("system", id, NULL, "cpu", "CPU Context Switches", "context switches/s", 800, update_every, CHART_TYPE_LINE);
 
-					rrd_stats_dimension_add(st, "switches", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+					rrd_stats_dimension_add(st, "switches", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
@@ -5410,7 +5434,7 @@ int do_proc_stat() {
 			st = rrd_stats_create("system", "forks", NULL, "cpu", "New Processes", "processes/s", 700, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "started", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "started", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
@@ -5425,8 +5449,8 @@ int do_proc_stat() {
 		if(!st) {
 			st = rrd_stats_create("system", "processes", NULL, "cpu", "Processes", "processes", 600, update_every, CHART_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "running", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION);
-			rrd_stats_dimension_add(st, "blocked", NULL, -1, 1, RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION);
+			rrd_stats_dimension_add(st, "running", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
+			rrd_stats_dimension_add(st, "blocked", NULL, -1, 1, RRD_DIMENSION_ABSOLUTE);
 		}
 		else rrd_stats_next(st);
 
@@ -5972,7 +5996,7 @@ void *proc_main(void *ptr)
 			if(!stclients) {
 				stclients = rrd_stats_create("netdata", "clients", NULL, "netdata", "NetData Web Clients", "connected clients", 11000, update_every, CHART_TYPE_LINE);
 
-				rrd_stats_dimension_add(stclients, "clients",  NULL,  1, 1, RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION);
+				rrd_stats_dimension_add(stclients, "clients",  NULL,  1, 1, RRD_DIMENSION_ABSOLUTE);
 			}
 			else rrd_stats_next(stclients);
 
@@ -5985,7 +6009,7 @@ void *proc_main(void *ptr)
 			if(!streqs) {
 				streqs = rrd_stats_create("netdata", "requests", NULL, "netdata", "NetData Web Requests", "requests/s", 12000, update_every, CHART_TYPE_LINE);
 
-				rrd_stats_dimension_add(streqs, "requests",  NULL,  1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
+				rrd_stats_dimension_add(streqs, "requests",  NULL,  1, 1, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(streqs);
 
@@ -7258,6 +7282,43 @@ int become_daemon(int close_all_files, const char *input, const char *output, co
 	return(0);
 }
 
+int unit_test_storage()
+{
+	char buffer[100];
+	storage_number s;
+	calculated_number c, a = 0, d, f;
+	int i, j, g, r = 0, l;
+
+	for(g = -1; g <= 1 ; g++) {
+		a = 0;
+
+		if(!g) continue;
+
+		for(j = 0; j < 9 ;j++) {
+			a += 0.0000001;
+			c = a * g;
+			for(i = 0; i < 21 ;i++, c *= 10) {
+				s = pack_storage_number(c);
+				d = unpack_storage_number(s);
+
+				f = d / c;
+
+				l = print_calculated_number(buffer, d);
+
+				if(f < 0.99999 || f > 1.00001) {
+					fprintf(stderr, "\nERROR\n" CALCULATED_NUMBER_FORMAT " original\n" CALCULATED_NUMBER_FORMAT " unpacked, (stored as 0x%08X)\n%s printed as %d bytes\n", c, d, s, buffer, l);
+					r++;
+				}
+				else {
+					fprintf(stderr, "\nOK\n" CALCULATED_NUMBER_FORMAT " original\n" CALCULATED_NUMBER_FORMAT " unpacked, (stored as 0x%08X)\n%s printed as %d bytes\n", c, d, s, buffer, l);
+				}
+			}
+		}
+	}
+
+	return r;
+}
+
 int unit_test(long delay, long shift)
 {
 	static int repeat = 0;
@@ -7271,8 +7332,6 @@ int unit_test(long delay, long shift)
 
 	int do_abs = 1;
 	int do_inc = 1;
-	int do_abs2 = 1;
-	int do_inc2 = 1;
 	int do_abst = 1;
 	int do_absi = 1;
 
@@ -7281,15 +7340,11 @@ int unit_test(long delay, long shift)
 
 	RRD_DIMENSION *rdabs = NULL;
 	RRD_DIMENSION *rdinc = NULL;
-	RRD_DIMENSION *rdabs2 = NULL;
-	RRD_DIMENSION *rdinc2 = NULL;
 	RRD_DIMENSION *rdabst = NULL;
 	RRD_DIMENSION *rdabsi = NULL;
 
 	if(do_abs) rdabs = rrd_stats_dimension_add(st, "absolute", "absolute", 1, 1, RRD_DIMENSION_ABSOLUTE);
 	if(do_inc) rdinc = rrd_stats_dimension_add(st, "incremental", "incremental", 1, 1, RRD_DIMENSION_INCREMENTAL);
-	if(do_abs2) rdabs2 = rrd_stats_dimension_add(st, "absolute-no-interpolation", "absolute-no-interpolation", 1, 1, RRD_DIMENSION_ABSOLUTE_NO_INTERPOLATION);
-	if(do_inc2) rdinc2 = rrd_stats_dimension_add(st, "incremental-no-interpolation", "incremental-no-interpolation", 1, 1, RRD_DIMENSION_INCREMENTAL_NO_INTERPOLATION);
 	if(do_abst) rdabst = rrd_stats_dimension_add(st, "percentage-of-absolute-row", "percentage-of-absolute-row", 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL);
 	if(do_absi) rdabsi = rrd_stats_dimension_add(st, "percentage-of-incremental-row", "percentage-of-incremental-row", 1, 1, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
 
@@ -7309,8 +7364,6 @@ int unit_test(long delay, long shift)
 		}
 		if(do_abs) rrd_stats_dimension_set(st, "absolute", i);
 		if(do_inc) rrd_stats_dimension_set(st, "incremental", i);
-		if(do_abs2) rrd_stats_dimension_set(st, "absolute-no-interpolation", i);
-		if(do_inc2) rrd_stats_dimension_set(st, "incremental-no-interpolation", i);
 		if(do_abst) rrd_stats_dimension_set(st, "percentage-of-absolute-row", i);
 		if(do_absi) rrd_stats_dimension_set(st, "percentage-of-incremental-row", i);
 
@@ -7344,22 +7397,14 @@ int unit_test(long delay, long shift)
 				) * 10;
 
 			else if(rd == rdinc) v = (c?(increment):(increment * (1000000 - shift) / 1000000)) * 10;
-			else if(rd == rdabs2) v = (((oincrement + c * increment + increment * (1000000 - shift) / 1000000 ) + oincrement - 1) / oincrement) * oincrement * 10;
-			else if(rd == rdinc2) v = increment * 10;
 			else if(rd == rdabst) v = oincrement / dimensions;
 			else if(rd == rdabsi) v = oincrement / dimensions;
 			else v = 0;
 
 			if(v == rd->values[c]) fprintf(stderr, "passed.\n");
 			else {
-				if(rd == rdabs2) {
-					// FIXME: the expected numbers are wrong
-					fprintf(stderr, "IGNORED (expected " STORAGE_NUMBER_FORMAT ")\n", v);
-				}
-				else {
-					fprintf(stderr, "ERROR! (expected " STORAGE_NUMBER_FORMAT ")\n", v);
-					ret = 1;
-				}
+				fprintf(stderr, "ERROR! (expected " STORAGE_NUMBER_FORMAT ")\n", v);
+				ret = 1;
 			}
 		}
 	}
@@ -7394,6 +7439,8 @@ int main(int argc, char **argv)
 		else if(strcmp(argv[i], "-l")  == 0 && (i+1) < argc) { config_set("global", "history",      argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-t")  == 0 && (i+1) < argc) { config_set("global", "update every", argv[i+1]); i++; }
 		else if(strcmp(argv[i], "--unittest")  == 0) {
+			if(unit_test_storage()) exit(1);
+			exit(0);
 			update_every = 1;
 			if(unit_test(1000000, 0)) exit(1);
 			if(unit_test(1000000, 500000)) exit(1);

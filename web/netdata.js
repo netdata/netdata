@@ -57,7 +57,8 @@ function refreshChart(chart, doNext) {
 		
 		// Create our data table out of JSON data loaded from server.
 		chart.datatable = new google.visualization.DataTable(chart.jsondata);
-		
+		//console.log(chart.datatable);
+
 		// cleanup once every 50 updates
 		// we don't cleanup on every single, to avoid firefox flashing effect
 		if(chart.chart && chart.refreshCount > 50) {
@@ -282,11 +283,6 @@ function loadCharts(base_url, doNext) {
 					json.charts[i].non_zero = 0;
 
 					json.charts[i].default_curveType = 'function';
-					$.each(json.charts[i].dimensions, function(d, dim) {
-						if(dim.algorithm == 'incremental-no-interpolation' || dim.algorithm == 'absolute-no-interpolation') {
-							json.charts[i].default_curveType = 'none';
-						}
-					});
 					break;
 			}
 

@@ -1496,14 +1496,14 @@ void show_charts(void)
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' absolute-no-interpolation 1 1\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART apps.processes '' 'Apps Processes' 'processes' apps apps stacked 20004 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' absolute-no-interpolation 1 1\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART apps.cpu_user '' 'Apps CPU User Time (%ld%% = %ld core%s)' 'cpu time %%' apps none stacked 20020 %d\n", (processors * 100), processors, (processors>1)?"s":"", update_every);
@@ -1566,21 +1566,21 @@ void show_charts(void)
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' absolute-no-interpolation 1 1\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART apps.sockets '' 'Apps Open Sockets' 'open sockets' apps apps stacked 20051 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' absolute-no-interpolation 1 1\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART apps.pipes '' 'Apps Pipes' 'open pipes' apps none stacked 20053 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' absolute-no-interpolation 1 1\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' netdata netdata stacked 10000 %d\n", update_every);
@@ -1588,10 +1588,10 @@ void show_charts(void)
 	fprintf(stdout, "DIMENSION system '' incremental 1 1000\n");
 
 	fprintf(stdout, "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' netdata netdata line 10001 %d\n", update_every);
-	fprintf(stdout, "DIMENSION files '' incremental-no-interpolation 1 1\n");
-	fprintf(stdout, "DIMENSION pids '' absolute-no-interpolation 1 1\n");
-	fprintf(stdout, "DIMENSION fds '' absolute-no-interpolation 1 1\n");
-	fprintf(stdout, "DIMENSION targets '' absolute-no-interpolation 1 1\n");
+	fprintf(stdout, "DIMENSION files '' incremental 1 1\n");
+	fprintf(stdout, "DIMENSION pids '' absolute 1 1\n");
+	fprintf(stdout, "DIMENSION fds '' absolute 1 1\n");
+	fprintf(stdout, "DIMENSION targets '' absolute 1 1\n");
 
 	fflush(stdout);
 }
