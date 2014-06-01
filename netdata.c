@@ -4124,8 +4124,8 @@ int do_proc_net_dev() {
 			if(!st) {
 				st = rrd_stats_create(RRD_TYPE_NET, iface, NULL, iface, "Bandwidth", "kilobits/s", 1000, update_every, CHART_TYPE_AREA);
 
-				rrd_stats_dimension_add(st, "received", NULL, 8, 1024, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "sent", NULL, -8, 1024, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "received", NULL, 8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "sent", NULL, -8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(st);
 
@@ -4142,8 +4142,8 @@ int do_proc_net_dev() {
 				st = rrd_stats_create("net_packets", iface, NULL, iface, "Packets", "packets/s", 1001, update_every, CHART_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "received", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "sent", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "received", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "sent", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(st);
 
@@ -4160,8 +4160,8 @@ int do_proc_net_dev() {
 				st = rrd_stats_create("net_errors", iface, NULL, iface, "Interface Errors", "errors/s", 1002, update_every, CHART_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "receive", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "transmit", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "receive", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "transmit", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(st);
 
@@ -4196,8 +4196,8 @@ int do_proc_net_dev() {
 				st = rrd_stats_create("net_compressed", iface, NULL, iface, "Compressed Packets", "packets/s", 1200, update_every, CHART_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "received", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "sent", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "received", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "sent", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(st);
 
@@ -4420,8 +4420,8 @@ int do_proc_diskstats() {
 
 				st = rrd_stats_create(RRD_TYPE_DISK, disk, NULL, disk, "Disk I/O", "kilobytes/s", 2000, update_every, CHART_TYPE_AREA);
 
-				rrd_stats_dimension_add(st, "reads", NULL, sector_size, 1024, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "writes", NULL, sector_size * -1, 1024, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "reads", NULL, sector_size, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "writes", NULL, sector_size * -1, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(st);
 
@@ -4438,8 +4438,8 @@ int do_proc_diskstats() {
 				st = rrd_stats_create("disk_ops", disk, NULL, disk, "Disk Operations", "operations/s", 2001, update_every, CHART_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "reads", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "writes", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "reads", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "writes", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(st);
 
@@ -4456,8 +4456,8 @@ int do_proc_diskstats() {
 				st = rrd_stats_create("disk_merged_ops", disk, NULL, disk, "Merged Disk Operations", "operations/s", 2010, update_every, CHART_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "reads", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "writes", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "reads", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "writes", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(st);
 
@@ -4474,10 +4474,10 @@ int do_proc_diskstats() {
 				st = rrd_stats_create("disk_iotime", disk, NULL, disk, "Disk I/O Time", "milliseconds/s", 2005, update_every, CHART_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "reads", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "writes", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "latency", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "weighted", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "reads", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "writes", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "latency", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(st, "weighted", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(st);
 
@@ -4570,9 +4570,9 @@ int do_proc_net_snmp() {
 				if(!st) {
 					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "packets", NULL, RRD_TYPE_NET_SNMP, "IPv4 Packets", "packets/s", 3000, update_every, CHART_TYPE_LINE);
 
-					rrd_stats_dimension_add(st, "received", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "sent", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "forwarded", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "received", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "sent", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "forwarded", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
@@ -4590,9 +4590,9 @@ int do_proc_net_snmp() {
 					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "fragsout", NULL, RRD_TYPE_NET_SNMP, "IPv4 Fragments Sent", "packets/s", 3010, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "ok", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "failed", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "all", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "ok", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "failed", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "all", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
@@ -4610,9 +4610,9 @@ int do_proc_net_snmp() {
 					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "fragsin", NULL, RRD_TYPE_NET_SNMP, "IPv4 Fragments Reassembly", "packets/s", 3011, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "ok", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "failed", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "all", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "ok", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "failed", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "all", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
@@ -4630,14 +4630,14 @@ int do_proc_net_snmp() {
 					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "errors", NULL, RRD_TYPE_NET_SNMP, "IPv4 Errors", "packets/s", 3002, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "InDiscards", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "OutDiscards", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "InDiscards", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "OutDiscards", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 
-					rrd_stats_dimension_add(st, "InHdrErrors", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "InAddrErrors", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "InUnknownProtos", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "InHdrErrors", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "InAddrErrors", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "InUnknownProtos", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 
-					rrd_stats_dimension_add(st, "OutNoRoutes", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "OutNoRoutes", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
@@ -4692,8 +4692,8 @@ int do_proc_net_snmp() {
 				if(!st) {
 					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "tcppackets", NULL, "tcp", "IPv4 TCP Packets", "packets/s", 2600, update_every, CHART_TYPE_LINE);
 
-					rrd_stats_dimension_add(st, "received", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "sent", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "received", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "sent", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
@@ -4710,8 +4710,8 @@ int do_proc_net_snmp() {
 					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "tcperrors", NULL, "tcp", "IPv4 TCP Errors", "packets/s", 2700, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "InErrs", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "RetransSegs", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "InErrs", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "RetransSegs", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
@@ -4728,11 +4728,11 @@ int do_proc_net_snmp() {
 					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "tcphandshake", NULL, "tcp", "IPv4 TCP Handshake Issues", "events/s", 2900, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "EstabResets", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "OutRsts", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "ActiveOpens", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "PassiveOpens", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "AttemptFails", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "EstabResets", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "OutRsts", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "ActiveOpens", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "PassiveOpens", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "AttemptFails", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
@@ -4770,8 +4770,8 @@ int do_proc_net_snmp() {
 				if(!st) {
 					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "udppackets", NULL, "udp", "IPv4 UDP Packets", "packets/s", 2601, update_every, CHART_TYPE_LINE);
 
-					rrd_stats_dimension_add(st, "received", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "sent", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "received", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "sent", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
@@ -4788,10 +4788,10 @@ int do_proc_net_snmp() {
 					st = rrd_stats_create(RRD_TYPE_NET_SNMP, "udperrors", NULL, "udp", "IPv4 UDP Errors", "events/s", 2701, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "RcvbufErrors", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "SndbufErrors", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "InErrors", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "NoPorts", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "RcvbufErrors", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "SndbufErrors", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "InErrors", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "NoPorts", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
@@ -4867,8 +4867,8 @@ int do_proc_net_netstat() {
 				if(!st) {
 					st = rrd_stats_create("system", "ipv4", NULL, "ipv4", "IPv4 Bandwidth", "kilobits/s", 2000, update_every, CHART_TYPE_AREA);
 
-					rrd_stats_dimension_add(st, "received", NULL, 8, 1024, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "sent", NULL, -8, 1024, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "received", NULL, 8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "sent", NULL, -8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
@@ -4885,8 +4885,8 @@ int do_proc_net_netstat() {
 					st = rrd_stats_create("ipv4", "inerrors", NULL, "ipv4", "IPv4 Input Errors", "packets/s", 4000, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "noroutes", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "trunkated", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "noroutes", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "trunkated", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
@@ -4903,8 +4903,8 @@ int do_proc_net_netstat() {
 					st = rrd_stats_create("ipv4", "mcast", NULL, "ipv4", "IPv4 Multicast Bandwidth", "kilobits/s", 9000, update_every, CHART_TYPE_AREA);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "received", NULL, 8, 1024, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "sent", NULL, -8, 1024, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "received", NULL, 8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "sent", NULL, -8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
@@ -4921,8 +4921,8 @@ int do_proc_net_netstat() {
 					st = rrd_stats_create("ipv4", "bcast", NULL, "ipv4", "IPv4 Broadcast Bandwidth", "kilobits/s", 8000, update_every, CHART_TYPE_AREA);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "received", NULL, 8, 1024, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "sent", NULL, -8, 1024, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "received", NULL, 8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "sent", NULL, -8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
@@ -4939,8 +4939,8 @@ int do_proc_net_netstat() {
 					st = rrd_stats_create("ipv4", "mcastpkts", NULL, "ipv4", "IPv4 Multicast Packets", "packets/s", 9500, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "received", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "sent", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "received", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "sent", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
@@ -4957,8 +4957,8 @@ int do_proc_net_netstat() {
 					st = rrd_stats_create("ipv4", "bcastpkts", NULL, "ipv4", "IPv4 Broadcast Packets", "packets/s", 8500, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "received", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "sent", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "received", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "sent", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
@@ -5059,9 +5059,9 @@ int do_proc_net_stat_conntrack() {
 		if(!st) {
 			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "new", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter New Connections", "connections/s", 1001, update_every, CHART_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "new", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "ignore", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "invalid", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "new", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "ignore", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "invalid", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
@@ -5079,9 +5079,9 @@ int do_proc_net_stat_conntrack() {
 			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "changes", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Changes", "changes/s", 1002, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "inserted", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "deleted", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "delete_list", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "inserted", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "deleted", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "delete_list", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
@@ -5099,9 +5099,9 @@ int do_proc_net_stat_conntrack() {
 			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "expect", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Expectations", "expectations/s", 1003, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "created", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "deleted", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "new", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "created", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "deleted", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "new", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
@@ -5119,9 +5119,9 @@ int do_proc_net_stat_conntrack() {
 			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "search", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Searches", "searches/s", 1010, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "searched", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "restarted", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "found", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "searched", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "restarted", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "found", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
@@ -5139,10 +5139,10 @@ int do_proc_net_stat_conntrack() {
 			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "errors", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Errors", "events/s", 1005, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "icmp_error", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "insert_failed", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "drop", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "early_drop", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "icmp_error", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "insert_failed", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "drop", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "early_drop", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
@@ -5214,7 +5214,7 @@ int do_proc_net_ip_vs_stats() {
 		if(!st) {
 			st = rrd_stats_create(RRD_TYPE_NET_IPVS, "sockets", NULL, RRD_TYPE_NET_IPVS, "IPVS New Connections", "connections/s", 1001, update_every, CHART_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "connections", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "connections", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
@@ -5229,8 +5229,8 @@ int do_proc_net_ip_vs_stats() {
 		if(!st) {
 			st = rrd_stats_create(RRD_TYPE_NET_IPVS, "packets", NULL, RRD_TYPE_NET_IPVS, "IPVS Packets", "packets/s", 1002, update_every, CHART_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "received", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "sent", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "received", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "sent", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
@@ -5246,8 +5246,8 @@ int do_proc_net_ip_vs_stats() {
 		if(!st) {
 			st = rrd_stats_create(RRD_TYPE_NET_IPVS, "net", NULL, RRD_TYPE_NET_IPVS, "IPVS Bandwidth", "kilobits/s", 1000, update_every, CHART_TYPE_AREA);
 
-			rrd_stats_dimension_add(st, "received", NULL, 8, 1024, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "sent", NULL, -8, 1024, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "received", NULL, 8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "sent", NULL, -8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
@@ -5311,7 +5311,7 @@ int do_proc_stat() {
 					st = rrd_stats_create(type, id, NULL, "cpu", title, "percentage", priority, update_every, CHART_TYPE_STACKED);
 
 					long multiplier = 1;
-					long divisor = 1; // sysconf(_SC_CLK_TCK);
+					long divisor = 1 * update_every; // sysconf(_SC_CLK_TCK);
 
 					rrd_stats_dimension_add(st, "guest_nice", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
 					rrd_stats_dimension_add(st, "guest", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
@@ -5358,7 +5358,7 @@ int do_proc_stat() {
 					st = rrd_stats_create("system", id, NULL, "cpu", "CPU Interrupts", "interrupts/s", 900, update_every, CHART_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "interrupts", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "interrupts", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
@@ -5382,7 +5382,7 @@ int do_proc_stat() {
 				if(!st) {
 					st = rrd_stats_create("system", id, NULL, "cpu", "CPU Context Switches", "context switches/s", 800, update_every, CHART_TYPE_LINE);
 
-					rrd_stats_dimension_add(st, "switches", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, "switches", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 				}
 				else rrd_stats_next(st);
 
@@ -5434,7 +5434,7 @@ int do_proc_stat() {
 			st = rrd_stats_create("system", "forks", NULL, "cpu", "New Processes", "processes/s", 700, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "started", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "started", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
@@ -5857,8 +5857,8 @@ int do_proc_vmstat() {
 		if(!st) {
 			st = rrd_stats_create("system", "swapio", NULL, "mem", "Swap I/O", "kilobytes/s", 250, update_every, CHART_TYPE_AREA);
 
-			rrd_stats_dimension_add(st, "in",  NULL, sysconf(_SC_PAGESIZE), 1024, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "out", NULL, -sysconf(_SC_PAGESIZE), 1024, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "in",  NULL, sysconf(_SC_PAGESIZE), 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "out", NULL, -sysconf(_SC_PAGESIZE), 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
@@ -5874,8 +5874,8 @@ int do_proc_vmstat() {
 		if(!st) {
 			st = rrd_stats_create("system", "io", NULL, "disk", "Disk I/O", "kilobytes/s", 150, update_every, CHART_TYPE_AREA);
 
-			rrd_stats_dimension_add(st, "in",  NULL,  1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "out", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "in",  NULL,  1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "out", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
@@ -5892,8 +5892,8 @@ int do_proc_vmstat() {
 			st = rrd_stats_create("system", "pgfaults", NULL, "mem", "Memory Page Faults", "page faults/s", 500, update_every, CHART_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "minor",  NULL,  1, 1, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "major", NULL, -1, 1, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "minor",  NULL,  1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "major", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 		}
 		else rrd_stats_next(st);
 
@@ -5979,8 +5979,8 @@ void *proc_main(void *ptr)
 			if(!stcpu) {
 				stcpu = rrd_stats_create("netdata", "server_cpu", NULL, "netdata", "NetData CPU usage", "milliseconds/s", 9999, update_every, CHART_TYPE_STACKED);
 
-				rrd_stats_dimension_add(stcpu, "user",  NULL,  1, 1000, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(stcpu, "system", NULL, 1, 1000, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(stcpu, "user",  NULL,  1, 1000 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(stcpu, "system", NULL, 1, 1000 * update_every, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(stcpu);
 
@@ -6009,7 +6009,7 @@ void *proc_main(void *ptr)
 			if(!streqs) {
 				streqs = rrd_stats_create("netdata", "requests", NULL, "netdata", "NetData Web Requests", "requests/s", 12000, update_every, CHART_TYPE_LINE);
 
-				rrd_stats_dimension_add(streqs, "requests",  NULL,  1, 1, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(streqs, "requests",  NULL,  1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(streqs);
 
@@ -6022,8 +6022,8 @@ void *proc_main(void *ptr)
 			if(!stbytes) {
 				stbytes = rrd_stats_create("netdata", "net", NULL, "netdata", "NetData Network Traffic", "kilobits/s", 13000, update_every, CHART_TYPE_AREA);
 
-				rrd_stats_dimension_add(stbytes, "in",  NULL,  8, 1024, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(stbytes, "out",  NULL,  -8, 1024, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(stbytes, "in",  NULL,  8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrd_stats_dimension_add(stbytes, "out",  NULL,  -8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
 			}
 			else rrd_stats_next(stbytes);
 
@@ -6118,7 +6118,7 @@ void tc_device_commit(struct tc_device *d)
 
 			for ( c = d->classes ; c ; c = c->next) {
 				if(c->isleaf && c->hasparent)
-					rrd_stats_dimension_add(st, c->id, c->name, 8, 1024, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, c->id, c->name, 8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
 			}
 		}
 		else {
@@ -6132,7 +6132,7 @@ void tc_device_commit(struct tc_device *d)
 				if(rrd_stats_dimension_set(st, c->id, c->bytes) != 0) {
 					
 					// new class, we have to add it
-					rrd_stats_dimension_add(st, c->id, c->name, 8, 1024, RRD_DIMENSION_INCREMENTAL);
+					rrd_stats_dimension_add(st, c->id, c->name, 8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
 					rrd_stats_dimension_set(st, c->id, c->bytes);
 				}
 
@@ -6438,11 +6438,11 @@ void *checks_main(void *ptr)
 
 	check1 = rrd_stats_create("netdata", "check1", NULL, "netdata", "Caller gives microseconds", "a million !", 99999, update_every, CHART_TYPE_LINE);
 	rrd_stats_dimension_add(check1, "absolute", NULL, -1, 1, RRD_DIMENSION_ABSOLUTE);
-	rrd_stats_dimension_add(check1, "incremental", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+	rrd_stats_dimension_add(check1, "incremental", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 
 	check2 = rrd_stats_create("netdata", "check2", NULL, "netdata", "Netdata calcs microseconds", "a million !", 99999, update_every, CHART_TYPE_LINE);
 	rrd_stats_dimension_add(check2, "absolute", NULL, -1, 1, RRD_DIMENSION_ABSOLUTE);
-	rrd_stats_dimension_add(check2, "incremental", NULL, 1, 1, RRD_DIMENSION_INCREMENTAL);
+	rrd_stats_dimension_add(check2, "incremental", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 
 	check3 = rrd_stats_create("netdata", "checkdt", NULL, "netdata", "Clock difference", "microseconds diff", 99999, update_every, CHART_TYPE_LINE);
 	rrd_stats_dimension_add(check3, "caller", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
@@ -7329,6 +7329,7 @@ int unit_test(long delay, long shift)
 
 	debug_flags = 0xffffffff;
 	memory_mode = NETDATA_MEMORY_MODE_RAM;
+	update_every = 1;
 
 	int do_abs = 1;
 	int do_inc = 1;
@@ -7344,9 +7345,9 @@ int unit_test(long delay, long shift)
 	RRD_DIMENSION *rdabsi = NULL;
 
 	if(do_abs) rdabs = rrd_stats_dimension_add(st, "absolute", "absolute", 1, 1, RRD_DIMENSION_ABSOLUTE);
-	if(do_inc) rdinc = rrd_stats_dimension_add(st, "incremental", "incremental", 1, 1, RRD_DIMENSION_INCREMENTAL);
+	if(do_inc) rdinc = rrd_stats_dimension_add(st, "incremental", "incremental", 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 	if(do_abst) rdabst = rrd_stats_dimension_add(st, "percentage-of-absolute-row", "percentage-of-absolute-row", 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL);
-	if(do_absi) rdabsi = rrd_stats_dimension_add(st, "percentage-of-incremental-row", "percentage-of-incremental-row", 1, 1, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+	if(do_absi) rdabsi = rrd_stats_dimension_add(st, "percentage-of-incremental-row", "percentage-of-incremental-row", 1, 1 * update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
 
 	long increment = 1000;
 	collected_number i = 0;

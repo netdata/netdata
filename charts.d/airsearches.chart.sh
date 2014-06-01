@@ -40,7 +40,7 @@ airsearches_create() {
 	echo "CHART airsearches.affiliates '' 'Air Searches per affiliate' 'requests / $airsearches_update_every secs' airsearches '' stacked 20000 $airsearches_update_every"
 	for x in $airsearches_cmds
 	do
-		echo "DIMENSION $x '' incremental 1 1"
+		echo "DIMENSION $x '' incremental 1 $((1 * airsearches_update_every))"
 	done
 
 	return 0

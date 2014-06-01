@@ -34,31 +34,31 @@ DIMENSION web '' absolute 1 1
 DIMENSION native '' absolute 1 1
 DIMENSION virtual '' absolute 1 1
 CHART crsproxy.requests '' "CRS Proxy Requests Rate" "requests / $crsproxy_update_every sec" crsproxy '' area 20001 $crsproxy_update_every
-DIMENSION web '' incremental 1 1
-DIMENSION native '' incremental -1 1
+DIMENSION web '' incremental 1 $((1 * crsproxy_update_every))
+DIMENSION native '' incremental -1 $((1 * crsproxy_update_every))
 CHART crsproxy.clients '' "CRS Proxy Clients Rate" "clients / $crsproxy_update_every sec" crsproxy '' area 20010 $crsproxy_update_every
-DIMENSION web '' incremental 1 1
-DIMENSION native '' incremental -1 1
-DIMENSION virtual '' incremental 1 1
+DIMENSION web '' incremental 1 $((1 * crsproxy_update_every))
+DIMENSION native '' incremental -1 $((1 * crsproxy_update_every))
+DIMENSION virtual '' incremental 1 $((1 * crsproxy_update_every))
 CHART crsproxy.replies '' "CRS Replies Rate" "replies / $crsproxy_update_every sec" crsproxy '' area 20020 $crsproxy_update_every
-DIMENSION ok '' incremental 1 1
-DIMENSION failed '' incremental -1 1
+DIMENSION ok '' incremental 1 $((1 * crsproxy_update_every))
+DIMENSION failed '' incremental -1 $((1 * crsproxy_update_every))
 CHART crsproxy.bconnections '' "Back-End Connections Rate" "connections / $crsproxy_update_every sec" crsproxy '' area 20030 $crsproxy_update_every
-DIMENSION ok '' incremental 1 1
-DIMENSION failed '' incremental -1 1
+DIMENSION ok '' incremental 1 $((1 * crsproxy_update_every))
+DIMENSION failed '' incremental -1 $((1 * crsproxy_update_every))
 EOF
 
 	local x=
 	echo "CHART crsproxy.commands '' 'CRS Commands Requests' 'requests / $crsproxy_update_every sec' crsproxy '' stacked 20100 $crsproxy_update_every"
 	for x in $crsproxy_cmds
 	do
-		echo "DIMENSION $x '' incremental 1 1"
+		echo "DIMENSION $x '' incremental 1 $((1 * crsproxy_update_every))"
 	done
 
 	echo "CHART crsproxy.commands_failed '' 'CRS Failed Commands' 'replies / $crsproxy_update_every sec' crsproxy '' stacked 20110 $crsproxy_update_every"
 	for x in $crsproxy_cmds
 	do
-		echo "DIMENSION $x '' incremental 1 1"
+		echo "DIMENSION $x '' incremental 1 $((1 * crsproxy_update_every))"
 	done
 
 	return 0

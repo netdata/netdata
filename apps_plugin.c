@@ -1482,7 +1482,7 @@ void show_charts(void)
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu %s\n", w->name, Hertz, w->hidden?"hidden":"");
+		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu %s\n", w->name, (unsigned long long)(Hertz * update_every), w->hidden?"hidden":"");
 	}
 
 	fprintf(stdout, "CHART apps.mem '' 'Apps Dedicated Memory (w/o shared)' 'MB' apps apps stacked 20003 %d\n", update_every);
@@ -1510,56 +1510,56 @@ void show_charts(void)
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz * processors);
+		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz * processors * update_every);
 	}
 
 	fprintf(stdout, "CHART apps.cpu_system '' 'Apps CPU System Time (%ld%% = %ld core%s)' 'cpu time %%' apps none stacked 20021 %d\n", (processors * 100), processors, (processors>1)?"s":"", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz * processors);
+		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu\n", w->name, Hertz * processors * update_every);
 	}
 
 	fprintf(stdout, "CHART apps.major_faults '' 'Apps Major Page Faults (swaps in)' 'page faults/s' apps apps stacked 20010 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' incremental 1 %d\n", w->name, update_every);
 	}
 
 	fprintf(stdout, "CHART apps.minor_faults '' 'Apps Minor Page Faults' 'page faults/s' apps none stacked 20011 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' incremental 1 %d\n", w->name, update_every);
 	}
 
 	fprintf(stdout, "CHART apps.lreads '' 'Apps Disk Logical Reads' 'kilobytes/s' apps none stacked 20042 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 1 1024\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' incremental 1 %d\n", w->name, 1024 * update_every);
 	}
 
 	fprintf(stdout, "CHART apps.lwrites '' 'Apps I/O Logical Writes' 'kilobytes/s' apps none stacked 20042 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 1 1024\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' incremental 1 %d\n", w->name, 1024 * update_every);
 	}
 
 	fprintf(stdout, "CHART apps.preads '' 'Apps Disk Reads' 'kilobytes/s' apps apps stacked 20002 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 1 1024\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' incremental 1 %d\n", w->name, 1024 * update_every);
 	}
 
 	fprintf(stdout, "CHART apps.pwrites '' 'Apps Disk Writes' 'kilobytes/s' apps apps stacked 20002 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 1 1024\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' incremental 1 %d\n", w->name, 1024 * update_every);
 	}
 
 	fprintf(stdout, "CHART apps.files '' 'Apps Open Files' 'open files' apps apps stacked 20050 %d\n", update_every);
@@ -1584,11 +1584,11 @@ void show_charts(void)
 	}
 
 	fprintf(stdout, "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' netdata netdata stacked 10000 %d\n", update_every);
-	fprintf(stdout, "DIMENSION user '' incremental 1 1000\n");
-	fprintf(stdout, "DIMENSION system '' incremental 1 1000\n");
+	fprintf(stdout, "DIMENSION user '' incremental 1 %d\n", 1000 * update_every);
+	fprintf(stdout, "DIMENSION system '' incremental 1 %d\n", 1000 * update_every);
 
 	fprintf(stdout, "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' netdata netdata line 10001 %d\n", update_every);
-	fprintf(stdout, "DIMENSION files '' incremental 1 1\n");
+	fprintf(stdout, "DIMENSION files '' incremental 1 %d\n", update_every);
 	fprintf(stdout, "DIMENSION pids '' absolute 1 1\n");
 	fprintf(stdout, "DIMENSION fds '' absolute 1 1\n");
 	fprintf(stdout, "DIMENSION targets '' absolute 1 1\n");

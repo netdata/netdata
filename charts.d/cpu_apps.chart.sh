@@ -30,7 +30,7 @@ cpu_apps_create() {
 	local x=
 	for x in $cpu_apps_apps
 	do
-		echo "DIMENSION $x $x incremental 1000 $cpu_apps_clockticks"
+		echo "DIMENSION $x $x incremental 1000 $((cpu_apps_clockticks * cpu_apps_update_every))"
 
 		# this string is needed later in the update() function
 		# to finalize the instructions for the bc command
