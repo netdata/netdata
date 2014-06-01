@@ -1642,6 +1642,7 @@ void parse_args(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
+	unsigned long started_t = time(NULL), current_t;
 	Hertz = get_hertz();
 	pid_max = get_pid_max();
 	processors = get_processors();
@@ -1685,5 +1686,8 @@ int main(int argc, char **argv)
 
 		usleep(susec);
 		bcopy(&now, &last, sizeof(struct timeval));
+		
+		current_t = time(NULL);
+		if(current_t - started_t > 3600) exit(0);
 	}
 }
