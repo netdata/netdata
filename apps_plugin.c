@@ -1,3 +1,6 @@
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -212,7 +215,7 @@ struct target *get_target(const char *id, struct target *target)
 	
 	w = calloc(sizeof(struct target), 1);
 	if(!w) {
-		fprintf(stderr, "apps.plugin: cannot allocate %lu bytes of memory\n", sizeof(struct target));
+		fprintf(stderr, "apps.plugin: cannot allocate %lu bytes of memory\n", (unsigned long)sizeof(struct target));
 		return NULL;
 	}
 
@@ -426,13 +429,13 @@ struct pid_stat *get_entry(pid_t pid)
 
 	all_pids[pid] = calloc(sizeof(struct pid_stat), 1);
 	if(!all_pids[pid]) {
-		fprintf(stderr, "apps.plugin: ERROR: Cannot allocate %lu bytes of memory", sizeof(struct pid_stat));
+		fprintf(stderr, "apps.plugin: ERROR: Cannot allocate %lu bytes of memory", (unsigned long)sizeof(struct pid_stat));
 		return NULL;
 	}
 
 	all_pids[pid]->fds = calloc(sizeof(int), 100);
 	if(!all_pids[pid]->fds)
-		fprintf(stderr, "apps.plugin: ERROR: Cannot allocate %ld bytes of memory\n", sizeof(int) * 100);
+		fprintf(stderr, "apps.plugin: ERROR: Cannot allocate %ld bytes of memory\n", (unsigned long)(sizeof(int) * 100));
 	else all_pids[pid]->fds_size = 100;
 
 	if(root) root->prev = all_pids[pid];
@@ -693,20 +696,20 @@ int update_from_proc(void)
 		int parsed = sscanf(buffer,
 			"%d (%[^)]) %c"						// pid, comm, state
 			" %d %d %d %d %d"					// ppid, pgrp, session, tty_nr, tpgid
-			" %lu %llu %llu %llu %llu"			// flags, minflt, cminflt, majflt, cmajflt
+			" %" PRIu64 " %llu %llu %llu %llu"	// flags, minflt, cminflt, majflt, cmajflt
 			" %llu %llu %llu %llu"				// utime, stime, cutime, cstime
-			" %ld %ld"							// priority, nice
+			" %" PRId64 " %" PRId64				// priority, nice
 			" %d"								// num_threads
-			" %ld"								// itrealvalue
+			" %" PRId64							// itrealvalue
 			" %llu"								// starttime
 			" %llu"								// vsize
 			" %llu"								// rss
 			" %llu %llu %llu %llu %llu %llu"	// rsslim, starcode, endcode, startstack, kstkesp, kstkeip
-			" %lu %lu %lu %lu"					// signal, blocked, sigignore, sigcatch
-			" %lu %lu %lu"						// wchan, nswap, cnswap
+			" %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 // signal, blocked, sigignore, sigcatch
+			" %" PRIu64 " %" PRIu64 " %" PRIu64	// wchan, nswap, cnswap
 			" %d %d"							// exit_signal, processor
 			" %u %u"							// rt_priority, policy
-			" %llu %lu %ld"
+			" %llu %" PRIu64 " %" PRId64		// delayacct_blkio_ticks, guest_time, cguest_time
 			, &p->pid, name, &p->state
 			, &p->ppid, &p->pgrp, &p->session, &p->tty_nr, &p->tpgid
 			, &p->flags, &p->minflt, &p->cminflt, &p->majflt, &p->cmajflt
