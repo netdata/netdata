@@ -37,7 +37,7 @@ airsearches_check() {
 airsearches_create() {
 	# create the charts
 	local x=
-	echo "CHART airsearches.affiliates '' 'Air Searches per affiliate' 'requests / $airsearches_update_every secs' airsearches '' stacked 20000 $airsearches_update_every"
+	echo "CHART airsearches.affiliates '' 'Air Searches per affiliate' 'requests/s' airsearches '' stacked 20000 $airsearches_update_every"
 	for x in $airsearches_cmds
 	do
 		echo "DIMENSION $x '' incremental 1 $((1 * airsearches_update_every))"
