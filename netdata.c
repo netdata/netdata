@@ -1698,7 +1698,7 @@ void rrd_stats_next_usec(RRD_STATS *st, unsigned long long microseconds)
 void rrd_stats_next(RRD_STATS *st)
 {
 	unsigned long long microseconds = 0;
-	
+
 	if(st->last_collected_time.tv_sec) {
 		struct timeval now;
 		gettimeofday(&now, NULL);
@@ -5319,7 +5319,7 @@ int do_proc_stat() {
 					st = rrd_stats_create(type, id, NULL, "cpu", title, "percentage", priority, update_every, CHART_TYPE_STACKED);
 
 					long multiplier = 1;
-					long divisor = 1 * update_every; // sysconf(_SC_CLK_TCK);
+					long divisor = 1; // sysconf(_SC_CLK_TCK);
 
 					rrd_stats_dimension_add(st, "guest_nice", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
 					rrd_stats_dimension_add(st, "guest", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
@@ -7355,7 +7355,7 @@ int unit_test(long delay, long shift)
 	if(do_abs) rdabs = rrd_stats_dimension_add(st, "absolute", "absolute", 1, 1, RRD_DIMENSION_ABSOLUTE);
 	if(do_inc) rdinc = rrd_stats_dimension_add(st, "incremental", "incremental", 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
 	if(do_abst) rdabst = rrd_stats_dimension_add(st, "percentage-of-absolute-row", "percentage-of-absolute-row", 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL);
-	if(do_absi) rdabsi = rrd_stats_dimension_add(st, "percentage-of-incremental-row", "percentage-of-incremental-row", 1, 1 * update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+	if(do_absi) rdabsi = rrd_stats_dimension_add(st, "percentage-of-incremental-row", "percentage-of-incremental-row", 1, 1, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
 
 	long increment = 1000;
 	collected_number i = 0;
