@@ -1697,12 +1697,20 @@ void rrd_stats_next_usec(RRD_STATS *st, unsigned long long microseconds)
 
 void rrd_stats_next(RRD_STATS *st)
 {
-	rrd_stats_next_usec(st, st->update_every * 1000000ULL);
+	unsigned long long microseconds = 0;
+	
+	if(st->last_collected_time.tv_sec) {
+		struct timeval now;
+		gettimeofday(&now, NULL);
+		microseconds = usecdiff(&now, &st->last_collected_time);
+	}
+
+	rrd_stats_next_usec(st, microseconds);
 }
 
 void rrd_stats_next_plugins(RRD_STATS *st)
 {
-	rrd_stats_next_usec(st, st->update_every * 1000000ULL);
+	rrd_stats_next(st);
 }
 
 unsigned long long rrd_stats_done(RRD_STATS *st)
