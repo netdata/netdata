@@ -748,7 +748,7 @@ function switchToMainGraph() {
 	document.getElementById('thumbgraphs_container').style.display = 'none';
 	document.getElementById('groupgraphs_container').style.display = 'none';
 
-	document.getElementById("main_menu_div").innerHTML = "<ul class=\"nav navbar-nav\"><li><a href=\"javascript:switchToThumbGraphs();\"><span class=\"glyphicon glyphicon-circle-arrow-left\"></span> Back to Home</a></li><li class=\"active\"><a href=\"#\">" + mainchart.name + "</a></li>" + familiesmainmenu + chartsmainmenu + "</ul>";
+	document.getElementById("main_menu_div").innerHTML = "<ul class=\"nav navbar-nav\"><li><a href=\"javascript:switchToThumbGraphs();\"><span class=\"glyphicon glyphicon-circle-arrow-left\"></span> Back to Dashboard</a></li><li class=\"active\"><a href=\"#\">" + mainchart.name + "</a></li>" + familiesmainmenu + chartsmainmenu + "</ul>";
 
 	window.scrollTo(0, 0);
 
@@ -785,7 +785,7 @@ function switchToGroupGraphs() {
 	document.getElementById('thumbgraphs_container').style.display = 'none';
 	document.getElementById('groupgraphs_container').style.display = 'block';
 
-	document.getElementById("main_menu_div").innerHTML = "<ul class=\"nav navbar-nav\"><li><a href=\"javascript:switchToThumbGraphs();\">Back to Home</a></li><li class=\"active\"><a href=\"#\">" + group_charts[0].family + "</a></li>" + familiesmainmenu + chartsmainmenu + "</ul>";
+	document.getElementById("main_menu_div").innerHTML = "<ul class=\"nav navbar-nav\"><li><a href=\"javascript:switchToThumbGraphs();\"><span class=\"glyphicon glyphicon-circle-arrow-left\"></span> Back to Dashboard</a></li><li class=\"active\"><a href=\"#\">" + group_charts[0].family + "</a></li>" + familiesmainmenu + chartsmainmenu + "</ul>";
 
 	window.scrollTo(0, 0);
 
@@ -956,7 +956,7 @@ function initCharts() {
 		var allcategories = "<table width=\"100%\">";
 		mainmenu = '<ul class="nav navbar-nav">';
 
-		categoriesmainmenu = '<li class="dropdown"><a href="#" class="dropdown-toggle" data-toggle="dropdown"><span class=\"glyphicon glyphicon-fire\"></span> Chart Sections <b class="caret"></b></a><ul class="dropdown-menu">';
+		categoriesmainmenu = '<li class="dropdown"><a href="#" class="dropdown-toggle" data-toggle="dropdown"><span class=\"glyphicon glyphicon-fire\"></span> Dashboard Sections <b class="caret"></b></a><ul class="dropdown-menu">';
 		$.each(categories, function(i, a) {
 			allcategories += a.html;
 			categoriesmainmenu += "<li><a href=\"#" + a.name + "\">" + a.title + "</a></li>";
