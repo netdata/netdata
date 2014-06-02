@@ -27,6 +27,9 @@ var mainchart;
 
 // html for the main menu
 var mainmenu = "";
+var categoriesmainmenu = "";
+var familiesmainmenu = "";
+var chartsmainmenu = "";
 
 
 // ------------------------------------------------------------------------
@@ -93,6 +96,7 @@ function initMainChart(c) {
 	if(mainchart) cleanThisChart(mainchart);
 
 	mainchart = $.extend(true, {}, c);
+	mainchart.enabled = true;
 	mainchart.refreshCount = 0;
 	mainchart.last_updated = 0;
 	mainchart.chartOptions.explorer = null;
@@ -248,6 +252,13 @@ function initMainChartIndex(i) {
 
 	else if(mode == MODE_THUMBS)
 		initMainChart(mycharts[i]);
+
+	else
+		initMainChart(mycharts[i]);
+}
+
+function initMainChartIndexOfMyCharts(i) {
+	initMainChart(mycharts[i]);
 }
 
 var last_main_chart_max='normal';
@@ -737,7 +748,7 @@ function switchToMainGraph() {
 	document.getElementById('thumbgraphs_container').style.display = 'none';
 	document.getElementById('groupgraphs_container').style.display = 'none';
 
-	document.getElementById("main_menu_div").innerHTML = "<ul class=\"nav navbar-nav\"><li><a href=\"javascript:switchToThumbGraphs();\">Back to Home</a></li><li class=\"active\"><a href=\"#\">" + mainchart.title + "</a></li></ul>";
+	document.getElementById("main_menu_div").innerHTML = "<ul class=\"nav navbar-nav\"><li><a href=\"javascript:switchToThumbGraphs();\"><span class=\"glyphicon glyphicon-circle-arrow-left\"></span> Back to Home</a></li><li class=\"active\"><a href=\"#\">" + mainchart.name + "</a></li>" + familiesmainmenu + chartsmainmenu + "</ul>";
 
 	window.scrollTo(0, 0);
 
@@ -774,7 +785,7 @@ function switchToGroupGraphs() {
 	document.getElementById('thumbgraphs_container').style.display = 'none';
 	document.getElementById('groupgraphs_container').style.display = 'block';
 
-	document.getElementById("main_menu_div").innerHTML = "<ul class=\"nav navbar-nav\"><li><a href=\"javascript:switchToThumbGraphs();\">Back to Home</a></li><li class=\"active\"><a href=\"#\">" + group_charts[0].family + " charts</a></li></ul>";
+	document.getElementById("main_menu_div").innerHTML = "<ul class=\"nav navbar-nav\"><li><a href=\"javascript:switchToThumbGraphs();\">Back to Home</a></li><li class=\"active\"><a href=\"#\">" + group_charts[0].family + "</a></li>" + familiesmainmenu + chartsmainmenu + "</ul>";
 
 	window.scrollTo(0, 0);
 
@@ -870,7 +881,13 @@ function initCharts() {
 		// create an array for grouping all same-type graphs together
 		var dimensions = 0;
 		var categories = new Array();
+		var families = new Array();
+		var chartslist = new Array();
 		$.each(mycharts, function(i, c) {
+			var j;
+
+			chartslist.push({name: c.name, type: c.type, id: i});
+
 			dimensions += c.dimensions.length;
 			c.chartOptions.width = width;
 			c.chartOptions.height = height;
@@ -882,7 +899,6 @@ function initCharts() {
 			calculateChartPointsToShow(c, c.chartOptions.isStacked?THUMBS_STACKED_POINTS_DIVISOR:THUMBS_POINTS_DIVISOR, THUMBS_MAX_TIME_TO_SHOW, -1);
 
 			if(c.enabled) {
-				var j;
 				var h = "<div class=\"thumbgraph\" id=\"" + c.div + "_parent\"><table><tr><td><div class=\"thumbgraph\" id=\"" + c.div + "\">" + chartIsLoadingHTML(c.name, c.chartOptions.width, c.chartOptions.height) + "</div></td></tr><tr><td align=\"center\">"
 				+ thumbChartActions(i, c)
 				+	"</td></tr><tr><td height='15'></td></tr></table></div>";
@@ -896,10 +912,20 @@ function initCharts() {
 					}
 				}
 
-				if(j == categories.length) {
+				if(j == categories.length)
 					categories.push({name: c.type, title: c.category, description: '', priority: c.categoryPriority, count: 1, glyphicon: c.glyphicon, html: h});
+			}
+
+			// find the families object for this type
+			for(j = 0; j < families.length ;j++) {
+				if(families[j].name == c.family) {
+					families[j].count++;
+					break;
 				}
 			}
+
+			if(j == families.length)
+				families.push({name: c.family, count: 1});
 		});
 
 		document.getElementById('server_summary_id').innerHTML = "<small>NetData server at <b>" + all.hostname + "</b> is maintaining <b>" + mycharts.length + "</b> charts, having <b>" + dimensions + "</b> dimensions (by default with <b>" + all.history + "</b> entries each), which are updated every <b>" + all.update_every + "s</b>, using a total of <b>" + (Math.round(all.memory * 10 / 1024 / 1024) / 10) + " MB</b> for the round robin database.</small>";
@@ -914,14 +940,45 @@ function initCharts() {
 		}
 		categories.sort(categoriessort);
 		
+		function familiessort(a, b) {
+			if(a.name < b.name) return -1;
+			return 1;
+		}
+		families.sort(familiessort);
+
+		function chartslistsort(a, b) {
+			if(a.name < b.name) return -1;
+			return 1;
+		}
+		chartslist.sort(chartslistsort);
+
 		// combine all the htmls into one
 		var allcategories = "<table width=\"100%\">";
-		mainmenu = "<ul class=\"nav navbar-nav\"><li><a href=\"#\">Home</a></li>";
+		mainmenu = '<ul class="nav navbar-nav">';
+
+		categoriesmainmenu = '<li class="dropdown"><a href="#" class="dropdown-toggle" data-toggle="dropdown"><span class=\"glyphicon glyphicon-fire\"></span> Chart Sections <b class="caret"></b></a><ul class="dropdown-menu">';
 		$.each(categories, function(i, a) {
 			allcategories += a.html;
-			mainmenu += "<li><a href=\"#" + a.name + "\">" + a.title + "</a></li>";
+			categoriesmainmenu += "<li><a href=\"#" + a.name + "\">" + a.title + "</a></li>";
 		});
+		categoriesmainmenu += "</ul></li>";
 		allcategories += "</table>";
+
+		familiesmainmenu = '<li class="dropdown"><a href="#" class="dropdown-toggle" data-toggle="dropdown"><span class=\"glyphicon glyphicon-th-large\"></span> Chart Families <b class="caret"></b></a><ul class="dropdown-menu">';
+		$.each(families, function(i, a) {
+			familiesmainmenu += "<li><a href=\"javascript:initGroupGraphs('" + a.name + "');\">" + a.name + " <span class=\"badge pull-right\">" + a.count + "</span></a></li>";
+		});
+		familiesmainmenu += "</ul></li>";
+
+		chartsmainmenu = '<li class="dropdown"><a href="#" class="dropdown-toggle" data-toggle="dropdown"><span class=\"glyphicon glyphicon-resize-full\"></span> All Charts <b class="caret"></b></a><ul class="dropdown-menu">';
+		$.each(chartslist, function(i, a) {
+			chartsmainmenu += "<li><a href=\"javascript:initMainChartIndexOfMyCharts('" + a.id + "');\">" + a.name + "</a></li>";
+		});
+		chartsmainmenu += "</ul></li>";
+
+		mainmenu += categoriesmainmenu;
+		mainmenu += familiesmainmenu;
+		mainmenu += chartsmainmenu;
 		mainmenu += "</ul>";
 
 		thumbsContainer.innerHTML = allcategories;

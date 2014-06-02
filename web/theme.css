@@ -48,3 +48,10 @@ body {
     margin-top: 10px;
     margin-bottom: 10px;
 }
+
+.dropdown-menu {
+    max-height: 500px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
