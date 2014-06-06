@@ -2525,10 +2525,11 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 	// find the oldest entry of the round-robin
 	long max_entries_init = (st->counter < (unsigned long)st->entries) ? st->counter : (unsigned long)st->entries;
 	
-	if(before == 0) before = st->last_updated.tv_sec;
+	time_t time_init = st->last_updated.tv_sec;
+	
+	if(before == 0 || before > time_init) before = time_init;
 	if(after  == 0) after = rrd_stats_first_entry_t(st);
 
-	time_t time_init = st->last_updated.tv_sec;
 
 	// ---
 
