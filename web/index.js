@@ -16,6 +16,7 @@ var MAINCHART_STACKED_POINTS_DIVISOR = 20;		// how much detailed will the main c
 
 var MAINCHART_CONTROL_HEIGHT = 75;		// how tall the control chart will be
 var MAINCHART_CONTROL_DIVISOR = 2;		// how much detailed will the control chart be? 1 = finest, higher is faster
+var MAINCHART_INITIAL_SELECTOR=10;		// 1/10 of the width
 
 var MODE_THUMBS = 1;
 var MODE_MAIN = 2;
@@ -210,11 +211,15 @@ function refreshHiddenChart(doNext) {
 			google.visualization.events.addListener(mainchart.control_wrapper, 'ready', mainchartControlReadyEvent);
 			mainchart.dashboard.bind(mainchart.control_wrapper, mainchart.hidden_wrapper);
 		}
-		if(refresh_mode != REFRESH_PAUSED)
+		if(refresh_mode != REFRESH_PAUSED) {
+			var duration = (mainchart.hiddenchart.last_entry_t - mainchart.hiddenchart.first_entry_t) / MAINCHART_INITIAL_SELECTOR;
+			if(duration <= 0) duration = MAINCHART_INITIAL_SELECTOR;
+
 			mainchart.control_wrapper.setState({range: {
-				start: new Date((Math.round(new Date().getTime() / 1000) - MAINCHART_MAX_TIME_TO_SHOW) * 1000),
+				start: new Date((Math.round(new Date().getTime() / 1000) - duration) * 1000),
 				end: new Date()
 			}});
+		}
 
 		mainchart.dashboard.draw(mainchart.control_data);
 		mainchart.hiddenchart.last_updated = new Date().getTime();
