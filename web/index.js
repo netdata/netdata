@@ -16,7 +16,7 @@ var MAINCHART_STACKED_POINTS_DIVISOR = 20;		// how much detailed will the main c
 
 var MAINCHART_CONTROL_HEIGHT = 75;		// how tall the control chart will be
 var MAINCHART_CONTROL_DIVISOR = 2;		// how much detailed will the control chart be? 1 = finest, higher is faster
-var MAINCHART_INITIAL_SELECTOR= 20;		// 1/20th of the width, this overrides MAINCHART_MAX_TIME_TO_SHOW
+var MAINCHART_INITIAL_SELECTOR= 40;		// 1/20th of the width, this overrides MAINCHART_MAX_TIME_TO_SHOW
 
 var MODE_THUMBS = 1;
 var MODE_MAIN = 2;
