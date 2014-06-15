@@ -108,7 +108,7 @@ function initMainChart(c) {
 	if(mainchart.chartOptions.height < 300) mainchart.chartOptions.height = 300;
 
 	mainchart.div = 'maingraph';
-	mainchart.time_to_show = (mainchart.hiddenchart.last_entry_t - mainchart.hiddenchart.first_entry_t) / MAINCHART_INITIAL_SELECTOR;
+	mainchart.time_to_show = (mainchart.last_entry_t - mainchart.first_entry_t) / MAINCHART_INITIAL_SELECTOR;
 	if(mainchart.time_to_show < MAINCHART_INITIAL_SELECTOR) mainchart.time_to_show = MAINCHART_INITIAL_SELECTOR;
 	calculateChartPointsToShow(mainchart, mainchart.chartOptions.isStacked?MAINCHART_STACKED_POINTS_DIVISOR:MAINCHART_POINTS_DIVISOR, mainchart.time_to_show, 0);
 
