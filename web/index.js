@@ -1,3 +1,5 @@
+var page_is_visible = 1;
+
 var TARGET_THUMB_GRAPH_WIDTH = 500;		// thumb charts width will range from 0.5 to 1.5 of that
 var MINIMUM_THUMB_GRAPH_WIDTH = 400;	// thumb chart will generally try to be wider than that
 var TARGET_THUMB_GRAPH_HEIGHT = 180;	// the height of the thumb charts
@@ -504,13 +506,18 @@ function checkRefreshThread() {
 // never call it directly, or new javascript threads will be spawn
 var timeout = null;
 function chartsRefresh() {
+	last_refresh = new Date().getTime();
+	
+	if(!page_is_visible) {
+		timeout = setTimeout(triggerRefresh, 500);
+		return;
+	}
+
 	if(resize_request) {
 		resizeCharts();
 		resize_request = false;
 		// refresh_mode = REFRESH_ALWAYS;
 	}
-
-	last_refresh = new Date().getTime();
 
 	if(refresh_mode == REFRESH_PAUSED) {
 		if(mode == MODE_MAIN && mainchart.last_updated == 0) {
@@ -991,6 +998,15 @@ function initCharts() {
 	});
 }
 
+$(window).blur(function() {
+	page_is_visible = 0;
+	mylog('blur');
+});
+
+$(window).focus(function() {
+	page_is_visible = 1;
+	mylog('focus');
+});
+
 // Set a callback to run when the Google Visualization API is loaded.
 google.setOnLoadCallback(initCharts);
-
