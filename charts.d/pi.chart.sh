@@ -11,15 +11,9 @@ pi_create() {
 	cat <<EOF
 CHART pi.cpu_temp '' "Pi CPU Temperature" "Celcius degrees" pi '' line 30001 $pi_update_every
 DIMENSION cpu_temp cpu absolute 1 1000
-
-CHART pi.gpu_temp '' "Pi GPU Temperature" "Celcius degrees" pi '' line 30001 $pi_update_every
-DIMENSION gpu_temp gpu absolute 1 1000
-
 CHART pi.clock '' "Pi CPU Clock" "MHz" pi '' line 30003 $pi_update_every
 DIMENSION cpu_clock clock absolute 1 1000
-
 EOF
-	
 	return 0
 }
 
@@ -44,12 +38,6 @@ pi_update() {
 	# even if something goes wrong, no other code can be executed
 
 	local cpuTemp=$(cat /sys/class/thermal/thermal_zone0/temp)
-
-	local gpuTemp=$(/opt/vc/bin/vcgencmd measure_temp)
-	local gpuTemp=${gpuTemp//\'C/0}
-	local gpuTemp=${gpuTemp//temp=/}
-	local gpuTemp=${gpuTemp//\./0}
-
 	local cpuSpeed=$(cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq)
 
 	# write the result of the work.
@@ -57,11 +45,6 @@ pi_update() {
 BEGIN pi.cpu_temp $1
 SET cpu_temp = $cpuTemp
 END
-
-BEGIN pi.gpu_temp $1
-SET gpu_temp = $gpuTemp
-END
-
 BEGIN pi.clock $1
 SET cpu_clock = $cpuSpeed
 END
@@ -70,4 +53,3 @@ VALUESEOF
 
 	return 0
 }
-
