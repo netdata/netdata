@@ -7090,6 +7090,22 @@ void sig_handler(int signo)
 	}
 }
 
+char rundir[FILENAME_MAX + 1] = "/run/netdata";
+char pidfile[FILENAME_MAX + 1] = "";
+void prepare_rundir() {
+	if(getuid() != 0) {
+		mkdir("/run/user", 0775);
+		snprintf(rundir, FILENAME_MAX, "/run/user/%d", getpid());
+		mkdir(rundir, 0775);
+		snprintf(rundir, FILENAME_MAX, "/run/user/%d/netdata", getpid());
+	}
+	
+	snprintf(pidfile, FILENAME_MAX, "%s/netdata.pid", rundir);
+
+	if(mkdir(rundir, 0775) != 0)
+		fprintf(stderr, "Cannot create directory '%s' (%s).", rundir, strerror(errno));
+}
+
 int become_user(const char *username)
 {
 	struct passwd *pw = getpwnam(username);
@@ -7097,6 +7113,12 @@ int become_user(const char *username)
 		fprintf(stderr, "User %s is not present. Error: %s\n", username, strerror(errno));
 		return -1;
 	}
+
+	if(chown(rundir, pw->pw_uid, pw->pw_gid) != 0) {
+		fprintf(stderr, "Cannot chown directory '%s' to user %s. Error: %s\n", rundir, username, strerror(errno));
+		return -1;
+	}
+
 	if(setgid(pw->pw_gid) != 0) {
 		fprintf(stderr, "Cannot switch to user's %s group (gid: %d). Error: %s\n", username, pw->pw_gid, strerror(errno));
 		return -1;
@@ -7276,10 +7298,10 @@ int become_daemon(int close_all_files, const char *input, const char *output, co
 	if(dev_null != STDIN_FILENO && dev_null != STDOUT_FILENO && dev_null != STDERR_FILENO)
 		close(dev_null);
 
-/*	// generate our pid file
+	// generate our pid file
 	{
-		unlink("/var/run/netdata.pid");
-		int fd = open("/var/run/netdata.pid", O_RDWR | O_CREAT, 0666);
+		unlink(pidfile);
+		int fd = open(pidfile, O_RDWR | O_CREAT, 0666);
 		if(fd >= 0) {
 			char b[100];
 			sprintf(b, "%d\n", getpid());
@@ -7287,7 +7309,7 @@ int become_daemon(int close_all_files, const char *input, const char *output, co
 			close(fd);
 		}
 	}
-*/
+
 	return(0);
 }
 
@@ -7561,6 +7583,7 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
+		prepare_rundir();
 		char *user = config_get("global", "run as user", (getuid() == 0)?"nobody":"");
 		if(*user) {
 			if(become_user(user) != 0) {
