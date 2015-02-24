@@ -1,14 +1,13 @@
 #!/bin/sh
 
 squid_host="127.0.0.1"
-squid_port="3128"
-squid_path="squid-internal-mgr/counters"
-squid_path2="counters"
+squid_port="3127"
+squid_url="cache_object://$squid_host:$squid_port/counters"
 squid_update_every=5
 
 squid_get_stats() {
 nc $squid_host $squid_port <<EOF
-GET cache_object://$squid_host:$squid_port/$squid_path HTTP/1.0
+GET $squid_url HTTP/1.0
 
 EOF
 }
@@ -18,13 +17,8 @@ squid_check() {
 	local x=`squid_get_stats | grep client_http.requests`
 	if [ ! $? -eq 0 -o -z "$x" ]
 	then
-		squid_path="$squid_path2"
-		x=`squid_get_stats | grep client_http.requests`
-		if [ ! $? -eq 0 -o -z "$x" ]
-		then
-			echo >&2 "squid: cannot fetch the counters from $squid_host:$squid_port. Please set squid_host='host' and squid_port='port' in $confd/squid.conf"
-			return 1
-		fi
+		echo >&2 "squid: cannot fetch URL '$squid_url' by connecting to $squid_host:$squid_port. Please set squid_url='url' and squid_host='host' and squid_port='port' in $confd/squid.conf"
+		return 1
 	fi
 
 	return 0
