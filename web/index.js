@@ -20,6 +20,9 @@ var MAINCHART_CONTROL_HEIGHT = 75;		// how tall the control chart will be
 var MAINCHART_CONTROL_DIVISOR = 2;		// how much detailed will the control chart be? 1 = finest, higher is faster
 var MAINCHART_INITIAL_SELECTOR= 40;		// 1/20th of the width, this overrides MAINCHART_MAX_TIME_TO_SHOW
 
+var CHARTS_REFRESH_IDLE = 100;
+var CHARTS_CHECK_NO_FOCUS = 500;
+
 var MODE_THUMBS = 1;
 var MODE_MAIN = 2;
 var MODE_GROUP_THUMBS = 3;
@@ -509,7 +512,7 @@ function chartsRefresh() {
 	last_refresh = new Date().getTime();
 	
 	if(!page_is_visible) {
-		timeout = setTimeout(triggerRefresh, 500);
+		timeout = setTimeout(triggerRefresh, CHARTS_CHECK_NO_FOCUS);
 		return;
 	}
 
@@ -529,7 +532,7 @@ function chartsRefresh() {
 	     if(mode == MODE_THUMBS)		thumbChartsRefresh();
 	else if(mode == MODE_GROUP_THUMBS)  groupChartsRefresh();
 	else if(mode == MODE_MAIN)   		mainChartRefresh();
-	else                         		timeout = setTimeout(triggerRefresh, 100);
+	else                         		timeout = setTimeout(triggerRefresh, CHARTS_REFRESH_IDLE);
 }
 
 // callback for refreshing the charts later
@@ -543,10 +546,10 @@ function triggerRefresh() {
 	// nothing is being refreshed.
 	cleanupCharts();
 
-	     if(mode == MODE_THUMBS) 		timeout = setTimeout(chartsRefresh, 200);
-	else if(mode == MODE_GROUP_THUMBS)	timeout = setTimeout(chartsRefresh, 200);
-	else if(mode == MODE_MAIN)   		timeout = setTimeout(chartsRefresh, 200);
-	else                         		timeout = setTimeout(triggerRefresh, 100);
+	     if(mode == MODE_THUMBS) 		timeout = setTimeout(chartsRefresh, CHARTS_REFRESH_IDLE);
+	else if(mode == MODE_GROUP_THUMBS)	timeout = setTimeout(chartsRefresh, CHARTS_REFRESH_IDLE);
+	else if(mode == MODE_MAIN)   		timeout = setTimeout(chartsRefresh, CHARTS_REFRESH_IDLE);
+	else                         		timeout = setTimeout(triggerRefresh, CHARTS_REFRESH_IDLE);
 }
 
 // refresh the main chart
