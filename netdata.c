@@ -37,6 +37,8 @@
 #include <dirent.h>
 #include <sys/mman.h>
 
+void process_childs(int wait);
+
 // enabling this will detach the plugins from netdata
 // each plugin will have its own process group
 // #define DETACH_PLUGINS_FROM_NETDATA
@@ -884,22 +886,22 @@ const char *chart_type_name(int chart_type)
 // ----------------------------------------------------------------------------
 // algorithms types
 
-#define RRD_DIMENSION_ABSOLUTE_NAME 					"absolute"
-#define RRD_DIMENSION_INCREMENTAL_NAME 					"incremental"
-#define RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL_NAME		"percentage-of-incremental-row"
-#define RRD_DIMENSION_PCENT_OVER_ROW_TOTAL_NAME			"percentage-of-absolute-row"
+#define RRD_DIMENSION_ABSOLUTE_NAME 			"absolute"
+#define RRD_DIMENSION_INCREMENTAL_NAME 			"incremental"
+#define RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL_NAME	"percentage-of-incremental-row"
+#define RRD_DIMENSION_PCENT_OVER_ROW_TOTAL_NAME		"percentage-of-absolute-row"
 
-#define RRD_DIMENSION_ABSOLUTE						0
-#define RRD_DIMENSION_INCREMENTAL					1
+#define RRD_DIMENSION_ABSOLUTE				0
+#define RRD_DIMENSION_INCREMENTAL			1
 #define RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL 		2
-#define RRD_DIMENSION_PCENT_OVER_ROW_TOTAL 			3
+#define RRD_DIMENSION_PCENT_OVER_ROW_TOTAL 		3
 
 int algorithm_id(const char *name)
 {
-	if(strcmp(name, RRD_DIMENSION_ABSOLUTE_NAME) == 0) 						return RRD_DIMENSION_ABSOLUTE;
-	if(strcmp(name, RRD_DIMENSION_INCREMENTAL_NAME) == 0) 					return RRD_DIMENSION_INCREMENTAL;
-	if(strcmp(name, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL_NAME) == 0) 			return RRD_DIMENSION_PCENT_OVER_ROW_TOTAL;
-	if(strcmp(name, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL_NAME) == 0) 		return RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL;
+	if(strcmp(name, RRD_DIMENSION_ABSOLUTE_NAME) == 0) 			return RRD_DIMENSION_ABSOLUTE;
+	if(strcmp(name, RRD_DIMENSION_INCREMENTAL_NAME) == 0) 			return RRD_DIMENSION_INCREMENTAL;
+	if(strcmp(name, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL_NAME) == 0) 		return RRD_DIMENSION_PCENT_OVER_ROW_TOTAL;
+	if(strcmp(name, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL_NAME) == 0) 	return RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL;
 	return RRD_DIMENSION_ABSOLUTE;
 }
 
@@ -1153,80 +1155,82 @@ calculated_number unpack_storage_number(storage_number value)
 }
 
 
-#define RRD_STATS_MAGIC     "NETDATA CACHE STATS FILE V008"
-#define RRD_DIMENSION_MAGIC "NETDATA CACHE DIMENSION FILE V008"
+#define RRD_STATS_MAGIC     "NETDATA CACHE STATS FILE V009"
+#define RRD_DIMENSION_MAGIC "NETDATA CACHE DIMENSION FILE V009"
 
 struct rrd_dimension {
-	char magic[sizeof(RRD_DIMENSION_MAGIC) + 1];// our magic
-	char id[RRD_STATS_NAME_MAX + 1];			// the id of this dimension (for internal identification)
-	char *name;									// the name of this dimension (as presented to user)
+	char magic[sizeof(RRD_DIMENSION_MAGIC) + 1];	// our magic
+	char id[RRD_STATS_NAME_MAX + 1];		// the id of this dimension (for internal identification)
+	char *name;					// the name of this dimension (as presented to user)
 	char cache_file[FILENAME_MAX+1];
 	
-	unsigned long hash;							// a simple hash on the id, to speed up searching
-												// we first compare hashes, and only if the hashes are equal we do string comparisons
+	unsigned long hash;				// a simple hash on the id, to speed up searching
+							// we first compare hashes, and only if the hashes are equal we do string comparisons
 
-	long entries;								// how many entries this dimension has
-												// this should be the same to the entries of the data set
-	long current_entry;							// the entry that is currently being updated
+	long entries;					// how many entries this dimension has
+							// this should be the same to the entries of the data set
 
-	int hidden;									// if set to non zero, this dimension will not be sent to the client
-	int mapped;									// 1 if the file is mapped
-	unsigned long memsize;						// the memory allocated for this dimension
+	long current_entry;				// the entry that is currently being updated
+	int update_every;				// every how many seconds is this updated?
+
+	int hidden;					// if set to non zero, this dimension will not be sent to the client
+	int mapped;					// 1 if the file is mapped
+	unsigned long memsize;				// the memory allocated for this dimension
 
 	int algorithm;
 	long multiplier;
 	long divisor;
 
-	struct timeval last_collected_time;			// when was this dimension last updated
-												// this is only used to detect un-updated dimensions
-												// which are removed after some time
+	struct timeval last_collected_time;		// when was this dimension last updated
+							// this is only used to detect un-updated dimensions
+							// which are removed after some time
 
 	calculated_number calculated_value;
 	calculated_number last_calculated_value;
 
-	collected_number collected_value;			// the value collected at this round
+	collected_number collected_value;		// the value collected at this round
 	collected_number last_collected_value;		// the value that was collected at the last round
 
-	struct rrd_dimension *next;					// linking of dimensions within the same data set
+	struct rrd_dimension *next;			// linking of dimensions within the same data set
 
-	storage_number values[];					// the array of values - THIS HAS TO BE THE LAST MEMBER
+	storage_number values[];			// the array of values - THIS HAS TO BE THE LAST MEMBER
 };
 typedef struct rrd_dimension RRD_DIMENSION;
 
 struct rrd_stats {
-	char magic[sizeof(RRD_STATS_MAGIC) + 1];// our magic
+	char magic[sizeof(RRD_STATS_MAGIC) + 1];	// our magic
 
-	char id[RRD_STATS_NAME_MAX + 1];			// id of the data set
-	char *name;									// name of the data set
-	char *cache_dir;							// the directory to store dimension maps
+	char id[RRD_STATS_NAME_MAX + 1];		// id of the data set
+	char *name;					// name of the data set
+	char *cache_dir;				// the directory to store dimension maps
 	char cache_file[FILENAME_MAX+1];
 
-	char *type;									// the type of graph RRD_TYPE_* (a category, for determining graphing options)
-	char *family;								// the family of this data set (for grouping them together)
-	char *title;								// title shown to user
-	char *units;								// units of measurement
+	char *type;					// the type of graph RRD_TYPE_* (a category, for determining graphing options)
+	char *family;					// the family of this data set (for grouping them together)
+	char *title;					// title shown to user
+	char *units;					// units of measurement
 
 	pthread_rwlock_t rwlock;
-	unsigned long counter;						// the number of times we added values to this rrd
-	unsigned long counter_done;					// the number of times we added values to this rrd
+	unsigned long counter;				// the number of times we added values to this rrd
+	unsigned long counter_done;			// the number of times we added values to this rrd
 
-	int mapped;									// if set to 1, this is memory mapped
-	unsigned long memsize;						// how much mem we have allocated for this (without dimensions)
+	int mapped;					// if set to 1, this is memory mapped
+	unsigned long memsize;				// how much mem we have allocated for this (without dimensions)
 
-	unsigned long hash_name;					// a simple hash on the name
-	unsigned long hash;							// a simple hash on the id, to speed up searching
-												// we first compare hashes, and only if the hashes are equal we do string comparisons
+	unsigned long hash_name;			// a simple hash on the name
+	unsigned long hash;				// a simple hash on the id, to speed up searching
+							// we first compare hashes, and only if the hashes are equal we do string comparisons
 
 	long priority;
 
-	long entries;								// total number of entries in the data set
-	long current_entry;							// the entry that is currently being updated
-												// it goes around in a round-robin fashion
+	long entries;					// total number of entries in the data set
+	long current_entry;				// the entry that is currently being updated
+							// it goes around in a round-robin fashion
 
-	int update_every;							// every how many seconds is this updated?
-	unsigned long long first_entry_t;			// the timestamp (in microseconds) of the oldest entry in the db
-	struct timeval last_updated;				// when this data set was last updated (updated every time the rrd_stats_done() function)
-	struct timeval last_collected_time;			// 
+	int update_every;				// every how many seconds is this updated?
+	unsigned long long first_entry_t;		// the timestamp (in microseconds) of the oldest entry in the db
+	struct timeval last_updated;			// when this data set was last updated (updated every time the rrd_stats_done() function)
+	struct timeval last_collected_time;		// 
 	unsigned long long usec_since_last_update;
 
 	total_number collected_total;
@@ -1235,12 +1239,12 @@ struct rrd_stats {
 	int chart_type;
 	int debug;
 	int enabled;
-	int isdetail;								// if set, the data set should be considered as a detail of another
-												// (the master data set should be the one that has the same family and is not detail)
+	int isdetail;					// if set, the data set should be considered as a detail of another
+							// (the master data set should be the one that has the same family and is not detail)
 
-	RRD_DIMENSION *dimensions;					// the actual data for every dimension
+	RRD_DIMENSION *dimensions;			// the actual data for every dimension
 
-	struct rrd_stats *next;						// linking of rrd stats
+	struct rrd_stats *next;				// linking of rrd stats
 };
 typedef struct rrd_stats RRD_STATS;
 
@@ -1292,6 +1296,21 @@ char *rrd_stats_cache_dir(const char *id)
 	}
 
 	return ret;
+}
+
+void rrd_stats_reset(RRD_STATS *st)
+{
+	st->last_collected_time.tv_sec = 0;
+	st->last_collected_time.tv_usec = 0;
+	st->current_entry = 0;
+	st->counter_done = 0;
+
+	RRD_DIMENSION *rd;
+	for(rd = st->dimensions; rd ; rd = rd->next) {
+		rd->last_collected_time.tv_sec = 0;
+		rd->last_collected_time.tv_usec = 0;
+		rd->current_entry = 0;
+	}
 }
 
 RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, const char *family, const char *title, const char *units, long priority, int update_every, int chart_type)
@@ -1425,6 +1444,9 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 	snprintf(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
 	rd = (RRD_DIMENSION *)mymmap(fullfilename, size);
 	if(rd) {
+		struct timeval now;
+		gettimeofday(&now, NULL);
+
 		if(strcmp(rd->magic, RRD_DIMENSION_MAGIC) != 0) {
 			errno = 0;
 			error("File %s does not have our version. Clearing it.", fullfilename);
@@ -1448,6 +1470,16 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 		else if(rd->algorithm != algorithm) {
 			errno = 0;
 			error("File %s does not have the same algorithm. Clearing it.", fullfilename);
+			bzero(rd, size);
+		}
+		else if(rd->update_every != st->update_every) {
+			errno = 0;
+			error("File %s does not have the same refresh frequency. Clearing it.", fullfilename);
+			bzero(rd, size);
+		}
+		else if(usecdiff(&now, &rd->last_collected_time) > (rd->entries * rd->update_every * 1000000ULL)) {
+			errno = 0;
+			error("File %s is too old. Clearing it.", fullfilename);
 			bzero(rd, size);
 		}
 		else if(strcmp(rd->id, id) != 0) {
@@ -1497,6 +1529,7 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 	if(!rd->divisor) rd->divisor = 1;
 
 	rd->entries = st->entries;
+	rd->update_every = st->update_every;
 	
 	// append this dimension
 	if(!st->dimensions)
@@ -3996,6 +4029,14 @@ void *socket_listen_main(void *ptr)
 	struct timeval tv;
 	int retval;
 
+	if(ptr) { ; }
+
+	if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
+		error("Cannot set pthread cancel type to DEFERRED.");
+
+	if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
+		error("Cannot set pthread cancel state to ENABLE.");
+
 	// int listener = create_listen_socket(listen_port);
 	int listener = listen_fd;
 	if(listener == -1) fatal("LISTENER: Cannot create listening socket on port 19999.");
@@ -4040,7 +4081,9 @@ void *socket_listen_main(void *ptr)
 			else debug(D_WEB_CLIENT, "LISTENER: select() didn't do anything.");
 
 		}
-		//else debug(D_WEB_CLIENT, "LISTENER: select() timeout.");
+		//else {
+		//	debug(D_WEB_CLIENT, "LISTENER: select() timeout.");
+		//}
 
 		// cleanup unused clients
 		for(w = web_clients; w ; w = w?w->next:NULL) {
@@ -4071,13 +4114,14 @@ void *socket_listen_main(void *ptr)
 int do_proc_net_dev() {
 	static int enable_new_interfaces = -1;
 	static int do_bandwidth = -1, do_packets = -1, do_errors = -1, do_fifo = -1, do_compressed = -1;
+	static FILE *fp = NULL;
 
 	if(enable_new_interfaces == -1)	enable_new_interfaces = config_get_boolean("plugin:proc:/proc/net/dev", "enable new interfaces detected at runtime", 1);
 
 	if(do_bandwidth == -1)	do_bandwidth = config_get_boolean("plugin:proc:/proc/net/dev", "bandwidth for all interfaces", 1);
 	if(do_packets == -1)	do_packets = config_get_boolean("plugin:proc:/proc/net/dev", "packets for all interfaces", 1);
-	if(do_errors == -1)		do_errors = config_get_boolean("plugin:proc:/proc/net/dev", "errors for all interfaces", 1);
-	if(do_fifo == -1) 		do_fifo = config_get_boolean("plugin:proc:/proc/net/dev", "fifo for all interfaces", 1);
+	if(do_errors == -1)	do_errors = config_get_boolean("plugin:proc:/proc/net/dev", "errors for all interfaces", 1);
+	if(do_fifo == -1) 	do_fifo = config_get_boolean("plugin:proc:/proc/net/dev", "fifo for all interfaces", 1);
 	if(do_compressed == -1)	do_compressed = config_get_boolean("plugin:proc:/proc/net/dev", "compressed packets for all interfaces", 1);
 
 	char buffer[MAX_PROC_NET_DEV_LINE+1] = "";
@@ -4088,10 +4132,20 @@ int do_proc_net_dev() {
 	int r;
 	char *p;
 	
-	FILE *fp = fopen("/proc/net/dev", "r");
+	if(fp) {
+		if(fseek(fp, 0, SEEK_SET) == -1) {
+			error("Re-opening file /proc/net/dev.");
+			fclose(fp);
+			fp = NULL;
+		}
+	}
+
 	if(!fp) {
-		error("Cannot read /proc/net/dev.");
-		return 1;
+		fp = fopen("/proc/net/dev", "r");
+		if(!fp) {
+			error("Cannot read /proc/net/dev.");
+			return 1;
+		}
 	}
 	
 	// skip the first two lines
@@ -4216,7 +4270,6 @@ int do_proc_net_dev() {
 		}
 	}
 	
-	fclose(fp);
 	return 0;
 }
 
@@ -4229,6 +4282,7 @@ int do_proc_net_dev() {
 int do_proc_diskstats() {
 	static int enable_new_disks = -1;
 	static int do_io = -1, do_ops = -1, do_merged_ops = -1, do_iotime = -1, do_cur_ops = -1;
+	static FILE *fp = NULL;
 
 	if(enable_new_disks == -1)	enable_new_disks = config_get_boolean("plugin:proc:/proc/diskstats", "enable new disks detected at runtime", 1);
 
@@ -4244,10 +4298,20 @@ int do_proc_diskstats() {
 	int r;
 	char *p;
 	
-	FILE *fp = fopen("/proc/diskstats", "r");
+	if(fp) {
+		if(fseek(fp, 0, SEEK_SET) == -1) {
+			error("Re-opening file /proc/diskstats.");
+			fclose(fp);
+			fp = NULL;
+		}
+	}
+
 	if(!fp) {
-		error("Cannot read /proc/diskstats.");
-		return 1;
+		fp = fopen("/proc/diskstats", "r");
+		if(!fp) {
+			error("Cannot read /proc/diskstats.");
+			return 1;
+		}
 	}
 	
 	for(;1;) {
@@ -4514,7 +4578,6 @@ int do_proc_diskstats() {
 		}
 	}
 	
-	fclose(fp);
 	return 0;
 }
 
@@ -4525,6 +4588,7 @@ int do_proc_net_snmp() {
 	static int do_ip_packets = -1, do_ip_fragsout = -1, do_ip_fragsin = -1, do_ip_errors = -1,
 		do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1, 
 		do_udp_packets = -1, do_udp_errors = -1;
+	static FILE *fp = NULL;
 
 	if(do_ip_packets == -1)		do_ip_packets = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 packets", 1);
 	if(do_ip_fragsout == -1)	do_ip_fragsout = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 fragrments sent", 1);
@@ -4539,10 +4603,20 @@ int do_proc_net_snmp() {
 
 	char buffer[MAX_PROC_NET_SNMP_LINE+1] = "";
 
-	FILE *fp = fopen("/proc/net/snmp", "r");
+	if(fp) {
+		if(fseek(fp, 0, SEEK_SET) == -1) {
+			error("Re-opening file /proc/net/snmp.");
+			fclose(fp);
+			fp = NULL;
+		}
+	}
+
 	if(!fp) {
-		error("Cannot read /proc/net/snmp.");
-		return 1;
+		fp = fopen("/proc/net/snmp", "r");
+		if(!fp) {
+			error("Cannot read /proc/net/snmp.");
+			return 1;
+		}
 	}
 
 	RRD_STATS *st;
@@ -4813,7 +4887,6 @@ int do_proc_net_snmp() {
 		}
 	}
 	
-	fclose(fp);
 	return 0;
 }
 
@@ -4822,6 +4895,7 @@ int do_proc_net_snmp() {
 
 int do_proc_net_netstat() {
 	static int do_bandwidth = -1, do_inerrors = -1, do_mcast = -1, do_bcast = -1, do_mcast_p = -1, do_bcast_p = -1;
+	static FILE *fp = NULL;
 
 	if(do_bandwidth == -1)	do_bandwidth = config_get_boolean("plugin:proc:/proc/net/netstat", "bandwidth", 1);
 	if(do_inerrors == -1)	do_inerrors = config_get_boolean("plugin:proc:/proc/net/netstat", "input errors", 1);
@@ -4832,10 +4906,20 @@ int do_proc_net_netstat() {
 
 	char buffer[MAX_PROC_NET_SNMP_LINE+1] = "";
 
-	FILE *fp = fopen("/proc/net/netstat", "r");
+	if(fp) {
+		if(fseek(fp, 0, SEEK_SET) == -1) {
+			error("Re-opening file /proc/net/netstat.");
+			fclose(fp);
+			fp = NULL;
+		}
+	}
+
 	if(!fp) {
-		error("Cannot read /proc/net/netstat.");
-		return 1;
+		fp = fopen("/proc/net/netstat", "r");
+		if(!fp) {
+			error("Cannot read /proc/net/netstat.");
+			return 1;
+		}
 	}
 
 	for(;1;) {
@@ -4978,7 +5062,6 @@ int do_proc_net_netstat() {
 		}
 	}
 	
-	fclose(fp);
 	return 0;
 }
 
@@ -4987,6 +5070,7 @@ int do_proc_net_netstat() {
 
 int do_proc_net_stat_conntrack() {
 	static int do_sockets = -1, do_new = -1, do_changes = -1, do_expect = -1, do_search = -1, do_errors = -1;
+	static FILE *fp = NULL;
 
 	if(do_sockets == -1)	do_sockets = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter connections", 1);
 	if(do_new == -1)		do_new = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter new connections", 1);
@@ -4998,10 +5082,20 @@ int do_proc_net_stat_conntrack() {
 
 	char buffer[MAX_PROC_NET_STAT_CONNTRACK_LINE+1] = "";
 
-	FILE *fp = fopen("/proc/net/stat/nf_conntrack", "r");
+	if(fp) {
+		if(fseek(fp, 0, SEEK_SET) == -1) {
+			error("Re-opening file /proc/net/stat/nf_conntrack.");
+			fclose(fp);
+			fp = NULL;
+		}
+	}
+
 	if(!fp) {
-		error("Cannot read /proc/net/stat/nf_conntrack.");
-		return 1;
+		fp = fopen("/proc/net/stat/nf_conntrack", "r");
+		if(!fp) {
+			error("Cannot read /proc/net/stat/nf_conntrack.");
+			return 1;
+		}
 	}
 
 	// read and discard the header
@@ -5025,24 +5119,23 @@ int do_proc_net_stat_conntrack() {
 		if(!aentries) aentries =  tentries;
 
 		// sum all the cpus together
-		asearched 			+= tsearched;			// conntrack.search
-		afound 				+= tfound;				// conntrack.search
-		anew 				+= tnew;				// conntrack.new
-		ainvalid 			+= tinvalid;			// conntrack.new
-		aignore 			+= tignore;				// conntrack.new
-		adelete 			+= tdelete;				// conntrack.changes
-		adelete_list 		+= tdelete_list;		// conntrack.changes
-		ainsert 			+= tinsert;				// conntrack.changes
-		ainsert_failed 		+= tinsert_failed;		// conntrack.errors
-		adrop 				+= tdrop;				// conntrack.errors
-		aearly_drop 		+= tearly_drop;			// conntrack.errors
-		aicmp_error 		+= ticmp_error;			// conntrack.errors
-		aexpect_new 		+= texpect_new;			// conntrack.expect
-		aexpect_create 		+= texpect_create;		// conntrack.expect
-		aexpect_delete 		+= texpect_delete;		// conntrack.expect
-		asearch_restart 	+= tsearch_restart;		// conntrack.search
+		asearched 		+= tsearched;		// conntrack.search
+		afound 			+= tfound;		// conntrack.search
+		anew 			+= tnew;		// conntrack.new
+		ainvalid 		+= tinvalid;		// conntrack.new
+		aignore 		+= tignore;		// conntrack.new
+		adelete 		+= tdelete;		// conntrack.changes
+		adelete_list 		+= tdelete_list;	// conntrack.changes
+		ainsert 		+= tinsert;		// conntrack.changes
+		ainsert_failed 		+= tinsert_failed;	// conntrack.errors
+		adrop 			+= tdrop;		// conntrack.errors
+		aearly_drop 		+= tearly_drop;		// conntrack.errors
+		aicmp_error 		+= ticmp_error;		// conntrack.errors
+		aexpect_new 		+= texpect_new;		// conntrack.expect
+		aexpect_create 		+= texpect_create;	// conntrack.expect
+		aexpect_delete 		+= texpect_delete;	// conntrack.expect
+		asearch_restart 	+= tsearch_restart;	// conntrack.search
 	}
-	fclose(fp);
 
 	RRD_STATS *st;
 
@@ -5170,6 +5263,7 @@ int do_proc_net_stat_conntrack() {
 
 int do_proc_net_ip_vs_stats() {
 	static int do_bandwidth = -1, do_sockets = -1, do_packets = -1;
+	static FILE *fp = NULL;
 
 	if(do_bandwidth == -1)	do_bandwidth = config_get_boolean("plugin:proc:/proc/net/ip_vs_stats", "IPVS bandwidth", 1);
 	if(do_sockets == -1)	do_sockets = config_get_boolean("plugin:proc:/proc/net/ip_vs_stats", "IPVS connections", 1);
@@ -5177,10 +5271,20 @@ int do_proc_net_ip_vs_stats() {
 
 	char buffer[MAX_PROC_NET_IPVS_LINE+1] = "";
 
-	FILE *fp = fopen("/proc/net/ip_vs_stats", "r");
+	if(fp) {
+		if(fseek(fp, 0, SEEK_SET) == -1) {
+			error("Re-opening file /proc/net/ip_vs_stats.");
+			fclose(fp);
+			fp = NULL;
+		}
+	}
+
 	if(!fp) {
-		error("Cannot read /proc/net/ip_vs_stats.");
-		return 1;
+		fp = fopen("/proc/net/ip_vs_stats", "r");
+		if(!fp) {
+			error("Cannot read /proc/net/ip_vs_stats.");
+			return 1;
+		}
 	}
 
 	// read the discard the 2 header lines
@@ -5211,8 +5315,6 @@ int do_proc_net_ip_vs_stats() {
 		return 1;
 	}
 	if(r != 5) error("Cannot read /proc/net/ip_vs_stats. Expected 5 params, read %d.", r);
-
-	fclose(fp);
 
 	RRD_STATS *st;
 
@@ -5270,20 +5372,31 @@ int do_proc_net_ip_vs_stats() {
 
 int do_proc_stat() {
 	static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1;
+	static FILE *fp = NULL;
 
-	if(do_cpu == -1)		do_cpu = config_get_boolean("plugin:proc:/proc/stat", "cpu utilization", 1);
+	if(do_cpu == -1)	do_cpu = config_get_boolean("plugin:proc:/proc/stat", "cpu utilization", 1);
 	if(do_cpu_cores == -1)	do_cpu_cores = config_get_boolean("plugin:proc:/proc/stat", "per cpu core utilization", 1);
 	if(do_interrupts == -1)	do_interrupts = config_get_boolean("plugin:proc:/proc/stat", "cpu interrupts", 1);
 	if(do_context == -1)	do_context = config_get_boolean("plugin:proc:/proc/stat", "context switches", 1);
-	if(do_forks == -1)		do_forks = config_get_boolean("plugin:proc:/proc/stat", "processes started", 1);
+	if(do_forks == -1)	do_forks = config_get_boolean("plugin:proc:/proc/stat", "processes started", 1);
 	if(do_processes == -1)	do_processes = config_get_boolean("plugin:proc:/proc/stat", "processes running", 1);
 
 	char buffer[MAX_PROC_STAT_LINE+1] = "";
 
-	FILE *fp = fopen("/proc/stat", "r");
+	if(fp) {
+		if(fseek(fp, 0, SEEK_SET) == -1) {
+			error("Re-opening file /proc/stat.");
+			fclose(fp);
+			fp = NULL;
+		}
+	}
+
 	if(!fp) {
-		error("Cannot read /proc/stat.");
-		return 1;
+		fp = fopen("/proc/stat", "r");
+		if(!fp) {
+			error("Cannot read /proc/stat.");
+			return 1;
+		}
 	}
 
 	unsigned long long processes = 0, running = 0 , blocked = 0;
@@ -5433,7 +5546,6 @@ int do_proc_stat() {
 			blocked = value;
 		}
 	}
-	fclose(fp);
 
 	// --------------------------------------------------------------------
 
@@ -5479,6 +5591,7 @@ int do_proc_stat() {
 
 int do_proc_meminfo() {
 	static int do_ram = -1, do_swap = -1, do_hwcorrupt = -1, do_committed = -1, do_writeback = -1, do_kernel = -1, do_slab = -1;
+	static FILE *fp = NULL;
 
 	if(do_ram == -1)		do_ram = config_get_boolean("plugin:proc:/proc/meminfo", "system ram", 1);
 	if(do_swap == -1)		do_swap = config_get_boolean("plugin:proc:/proc/meminfo", "system swap", 1);
@@ -5490,10 +5603,20 @@ int do_proc_meminfo() {
 
 	char buffer[MAX_PROC_MEMINFO_LINE+1] = "";
 
-	FILE *fp = fopen("/proc/meminfo", "r");
+	if(fp) {
+		if(fseek(fp, 0, SEEK_SET) == -1) {
+			error("Re-opening file /proc/meminfo.");
+			fclose(fp);
+			fp = NULL;
+		}
+	}
+
 	if(!fp) {
-		error("Cannot read /proc/meminfo.");
-		return 1;
+		fp = fopen("/proc/meminfo", "r");
+		if(!fp) {
+			error("Cannot read /proc/meminfo.");
+			return 1;
+		}
 	}
 
 	int hwcorrupted = 0;
@@ -5565,7 +5688,6 @@ int do_proc_meminfo() {
 		else if(!DirectMap4k && strcmp(name, "DirectMap4k") == 0) DirectMap4k = value;
 		else if(!DirectMap2M && strcmp(name, "DirectMap2M") == 0) DirectMap2M = value;
 	}
-	fclose(fp);
 
 	RRD_STATS *st;
 
@@ -5720,17 +5842,28 @@ int do_proc_meminfo() {
 
 int do_proc_vmstat() {
 	static int do_swapio = -1, do_io = -1, do_pgfaults = -1;
+	static FILE *fp = NULL;
 
-	if(do_swapio == -1)		do_swapio = config_get_boolean("plugin:proc:/proc/vmstat", "swap i/o", 1);
-	if(do_io == -1)			do_io = config_get_boolean("plugin:proc:/proc/vmstat", "disk i/o", 1);
+	if(do_swapio == -1)	do_swapio = config_get_boolean("plugin:proc:/proc/vmstat", "swap i/o", 1);
+	if(do_io == -1)		do_io = config_get_boolean("plugin:proc:/proc/vmstat", "disk i/o", 1);
 	if(do_pgfaults == -1)	do_pgfaults = config_get_boolean("plugin:proc:/proc/vmstat", "memory page faults", 1);
 
 	char buffer[MAX_PROC_VMSTAT_LINE+1] = "";
 
-	FILE *fp = fopen("/proc/vmstat", "r");
+	if(fp) {
+		if(fseek(fp, 0, SEEK_SET) == -1) {
+			error("Re-opening file /proc/vmstat.");
+			fclose(fp);
+			fp = NULL;
+		}
+	}
+
 	if(!fp) {
-		error("Cannot read /proc/vmstat.");
-		return 1;
+		fp = fopen("/proc/vmstat", "r");
+		if(!fp) {
+			error("Cannot read /proc/vmstat.");
+			return 1;
+		}
 	}
 
 	unsigned long long nr_free_pages = 0, nr_inactive_anon = 0, nr_active_anon = 0, nr_inactive_file = 0, nr_active_file = 0, nr_unevictable = 0, nr_mlock = 0,
@@ -5855,7 +5988,6 @@ int do_proc_vmstat() {
 		else if(!thp_collapse_alloc_failed && strcmp(name, "thp_collapse_alloc_failed") == 0) thp_collapse_alloc_failed = value;
 		else if(!thp_split && strcmp(name, "thp_split") == 0) thp_split = value;
 	}
-	fclose(fp);
 
 	RRD_STATS *st;
 
@@ -5938,7 +6070,7 @@ void *proc_main(void *ptr)
 	config_get_boolean("plugin:proc:/proc/net/dev", "interface fireqos_monitor", 0);
 
 	// when ZERO, attempt to do it
-	int	vdo_proc_net_dev = !config_get_boolean("plugin:proc", "/proc/net/dev", 1);
+	int vdo_proc_net_dev = !config_get_boolean("plugin:proc", "/proc/net/dev", 1);
 	int vdo_proc_diskstats = !config_get_boolean("plugin:proc", "/proc/diskstats", 1);
 	int vdo_proc_net_snmp = !config_get_boolean("plugin:proc", "/proc/net/snmp", 1);
 	int vdo_proc_net_netstat = !config_get_boolean("plugin:proc", "/proc/net/netstat", 1);
@@ -5958,15 +6090,15 @@ void *proc_main(void *ptr)
 	for(;1;) {
 		
 		// BEGIN -- the job to be done
-		if(!vdo_proc_net_dev)				vdo_proc_net_dev			= do_proc_net_dev(usec);
-		if(!vdo_proc_diskstats)				vdo_proc_diskstats			= do_proc_diskstats(usec);
-		if(!vdo_proc_net_snmp)				vdo_proc_net_snmp			= do_proc_net_snmp(usec);
-		if(!vdo_proc_net_netstat)			vdo_proc_net_netstat		= do_proc_net_netstat(usec);
+		if(!vdo_proc_net_dev)			vdo_proc_net_dev		= do_proc_net_dev(usec);
+		if(!vdo_proc_diskstats)			vdo_proc_diskstats		= do_proc_diskstats(usec);
+		if(!vdo_proc_net_snmp)			vdo_proc_net_snmp		= do_proc_net_snmp(usec);
+		if(!vdo_proc_net_netstat)		vdo_proc_net_netstat		= do_proc_net_netstat(usec);
 		if(!vdo_proc_net_stat_conntrack)	vdo_proc_net_stat_conntrack	= do_proc_net_stat_conntrack(usec);
 		if(!vdo_proc_net_ip_vs_stats)		vdo_proc_net_ip_vs_stats	= do_proc_net_ip_vs_stats(usec);
-		if(!vdo_proc_stat)					vdo_proc_stat 				= do_proc_stat(usec);
-		if(!vdo_proc_meminfo)				vdo_proc_meminfo			= do_proc_meminfo(usec);
-		if(!vdo_proc_vmstat)				vdo_proc_vmstat				= do_proc_vmstat(usec);
+		if(!vdo_proc_stat)			vdo_proc_stat 			= do_proc_stat(usec);
+		if(!vdo_proc_meminfo)			vdo_proc_meminfo		= do_proc_meminfo(usec);
+		if(!vdo_proc_vmstat)			vdo_proc_vmstat			= do_proc_vmstat(usec);
 		// END -- the job is done
 		
 		// find the time to sleep in order to wait exactly update_every seconds
@@ -6944,7 +7076,25 @@ void *pluginsd_main(void *ptr)
 // ----------------------------------------------------------------------------
 // main and related functions
 
-pthread_t *p_proc = NULL, *p_tc = NULL, *p_jitter = NULL, *p_pluginsd = NULL, *p_checks = NULL;
+struct netdata_static_thread {
+	char *name;
+
+	char *config_section;
+	char *config_name;
+
+	pthread_t *thread;
+	void *(*start_routine) (void *);
+};
+
+struct netdata_static_thread static_threads[] = {
+	{"tc",		"plugins",	"tc",		NULL, tc_main},
+	{"idlejitter",	"plugins",	"idlejitter",	NULL, cpuidlejitter_main},
+	{"proc",	"plugins",	"proc",		NULL, proc_main},
+	{"plugins.d",	NULL,		NULL,		NULL, pluginsd_main},
+	{"check",	"plugins",	"checks",	NULL, checks_main},
+	{"web",		NULL,		NULL,		NULL, socket_listen_main},
+	{NULL,		NULL,		NULL,		NULL, NULL}
+};
 
 void kill_childs()
 {
@@ -6956,69 +7106,86 @@ void kill_childs()
 		pthread_cancel(w->thread);
 		pthread_join(w->thread, NULL);
 	}
-	
-	if(p_proc)	{
-		debug(D_EXIT, "Stopping proc thread");
-		pthread_cancel(*p_proc);
-		pthread_join(*p_proc, NULL);
-		p_proc = NULL;
-	}
 
-	if(p_jitter) {
-		debug(D_EXIT, "Stopping idlejitter thread");
-		pthread_cancel(*p_jitter);
-		pthread_join(*p_jitter, NULL);
-		p_jitter = NULL;
-	}
-
-	if(p_checks) {
-		debug(D_EXIT, "Stopping self-checks thread");
-		pthread_cancel(*p_checks);
-		pthread_join(*p_checks, NULL);
-		p_checks = NULL;
-	}
-
-	if(p_tc) {
-		if(tc_child_pid) {
-			debug(D_EXIT, "Killing tc-qos-helper procees");
-			kill(tc_child_pid, SIGTERM);
-			waitid(tc_child_pid, 0, &info, WEXITED);
+	int i;	
+	for (i = 0; static_threads[i].name != NULL ; i++) {
+		if(static_threads[i].thread) {
+			debug(D_EXIT, "Stopping %s thread", static_threads[i].name);
+			pthread_cancel(*static_threads[i].thread);
+			pthread_join(*static_threads[i].thread, NULL);
+			static_threads[i].thread = NULL;
 		}
-		tc_child_pid = 0;
-
-		debug(D_EXIT, "Stopping tc plugin thread");
-		pthread_cancel(*p_tc);
-		pthread_join(*p_tc, NULL);
-		p_tc = NULL;
 	}
 
-	if(p_pluginsd) {
-		struct plugind *cd;
-		for(cd = pluginsd_root ; cd ; cd = cd->next) {
-			debug(D_EXIT, "Stopping %s plugin thread", cd->id);
-			pthread_cancel(cd->thread);
-			pthread_join(cd->thread, NULL);
+	if(tc_child_pid) {
+		debug(D_EXIT, "Killing tc-qos-helper procees");
+		kill(tc_child_pid, SIGTERM);
+		waitid(tc_child_pid, 0, &info, WEXITED);
+	}
+	tc_child_pid = 0;
 
-			if(cd->pid && !cd->obsolete) {
-				debug(D_EXIT, "killing %s plugin process", cd->id);
-				kill(cd->pid, SIGTERM);
-				waitid(cd->pid, 0, &info, WEXITED);
-			}
+	struct plugind *cd;
+	for(cd = pluginsd_root ; cd ; cd = cd->next) {
+		debug(D_EXIT, "Stopping %s plugin thread", cd->id);
+		pthread_cancel(cd->thread);
+		pthread_join(cd->thread, NULL);
+
+		if(cd->pid && !cd->obsolete) {
+			debug(D_EXIT, "killing %s plugin process", cd->id);
+			kill(cd->pid, SIGTERM);
+			waitid(cd->pid, 0, &info, WEXITED);
 		}
-
-		debug(D_EXIT, "Stopping plugin manager thread");
-		pthread_cancel(*p_pluginsd);
-		pthread_join(*p_pluginsd, NULL);
-		p_pluginsd = NULL;
 	}
 
 	debug(D_EXIT, "All threads/childs stopped.");
 }
 
-void sig_handler(int signo)
+void process_childs(int wait)
 {
 	siginfo_t info;
+	int options = WEXITED;
+	if(!wait) options |= WNOHANG;
 
+	info.si_pid = 0;
+	while(waitid(P_ALL, 0, &info, options) == 0) {
+		if(!info.si_pid) break;
+		switch(info.si_code) {
+			case CLD_EXITED:
+				error("pid %d exited with code %d.", info.si_pid, info.si_status);
+				break;
+
+			case CLD_KILLED:
+				error("pid %d killed by signal %d.", info.si_pid, info.si_status);
+				break;
+
+			case CLD_DUMPED: 
+				error("pid %d core dumped by signal %d.", info.si_pid, info.si_status);
+				break;
+
+			case CLD_STOPPED:
+				error("pid %d stopped by signal %d.", info.si_pid, info.si_status);
+				break;
+
+			case CLD_TRAPPED:
+				error("pid %d trapped by signal %d.", info.si_pid, info.si_status);
+				break;
+
+			case CLD_CONTINUED:
+				error("pid %d continued by signal %d.", info.si_pid, info.si_status);
+				break;
+
+			default:
+				error("pid %d gave us a SIGCHLD with code %d and status %d.", info.si_pid, info.si_code, info.si_status);
+				break;
+		}
+
+		// prevent an infinite loop
+		info.si_pid = 0;
+	}
+}
+
+void sig_handler(int signo)
+{
 	switch(signo) {
 		case SIGTERM:
 		case SIGQUIT:
@@ -7034,9 +7201,8 @@ void sig_handler(int signo)
 			signal(SIGHUP,  SIG_IGN);
 			signal(SIGINT,  SIG_IGN);
 			kill_childs();
+			process_childs(0);
 			rrd_stats_free_all();
-			debug(D_EXIT, "Waiting for any child exits...");
-			while(waitid(P_ALL, 0, &info, WEXITED|WNOHANG) == 0) if(!info.si_pid) break;
 			//unlink("/var/run/netdata.pid");
 			info("NetData exiting. Bye bye...");
 			exit(1);
@@ -7049,38 +7215,7 @@ void sig_handler(int signo)
 
 		case SIGCHLD:
 			info("Received SIGCHLD (signal %d).", signo);
-			while(waitid(P_ALL, 0, &info, WEXITED|WNOHANG) == 0) {
-				if(!info.si_pid) break;
-				switch(info.si_code) {
-					case CLD_EXITED:
-						error("pid %d exited with code %d.", info.si_pid, info.si_status);
-						break;
-
-					case CLD_KILLED:
-						error("pid %d killed by signal %d.", info.si_pid, info.si_status);
-						break;
-
-					case CLD_DUMPED: 
-						error("pid %d core dumped by signal %d.", info.si_pid, info.si_status);
-						break;
-
-					case CLD_STOPPED:
-						error("pid %d stopped by signal %d.", info.si_pid, info.si_status);
-						break;
-
-					case CLD_TRAPPED:
-						error("pid %d trapped by signal %d.", info.si_pid, info.si_status);
-						break;
-
-					case CLD_CONTINUED:
-						error("pid %d continued by signal %d.", info.si_pid, info.si_status);
-						break;
-
-					default:
-						error("pid %d gave us a SIGCHLD with code %d and status %d.", info.si_pid, info.si_code, info.si_status);
-						break;
-				}
-			}
+			process_childs(0);
 			break;
 
 		default:
@@ -7305,7 +7440,7 @@ int become_daemon(int close_all_files, const char *input, const char *output, co
 		if(fd >= 0) {
 			char b[100];
 			sprintf(b, "%d\n", getpid());
-			write(fd, b, strlen(b));
+			i = write(fd, b, strlen(b));
 			close(fd);
 		}
 	}
@@ -7634,48 +7769,27 @@ int main(int argc, char **argv)
 	// catch all signals
 	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV && i != SIGFPE) signal(i,  sig_handler);
 	
-	// spawn childs to collect data
-	if(config_get_boolean("plugins", "tc", 1)) {
-		p_tc = malloc(sizeof(pthread_t));
-		if(pthread_create(p_tc, NULL, tc_main, NULL))
-			error("failed to create new thread for tc.");
-		else if(pthread_detach(*p_tc))
-			error("Cannot request detach of newly created tc thread.");
-	}
+	for (i = 0; static_threads[i].name != NULL ; i++) {
+		struct netdata_static_thread *st = &static_threads[i];
+		int doit = 1;
 
-	if(config_get_boolean("plugins", "idlejitter", 1)) {
-		p_jitter = malloc(sizeof(pthread_t));
-		if(pthread_create(p_jitter, NULL, cpuidlejitter_main, NULL))
-			error("failed to create new thread for idlejitter.");
-		else if(pthread_detach(*p_jitter))
-			error("Cannot request detach of newly created idlejitter thread.");
-	}
+		if(st->config_name) doit = config_get_boolean(st->config_section, st->config_name, doit);
 
-	if(config_get_boolean("plugins", "proc", 1)) {
-		p_proc = malloc(sizeof(pthread_t));
-		if(pthread_create(p_proc, NULL, proc_main, NULL))
-			error("failed to create new thread for proc.");
-		else if(pthread_detach(*p_proc))
-			error("Cannot request detach of newly created proc thread.");
-	}
+		if(doit) {
+			st->thread = malloc(sizeof(pthread_t));
 
-	p_pluginsd = malloc(sizeof(pthread_t));
-	if(pthread_create(p_pluginsd, NULL, pluginsd_main, NULL))
-		error("failed to create new thread for plugins.d.");
-	else if(pthread_detach(*p_pluginsd))
-		error("Cannot request detach of newly created plugins.d thread.");
-	
-	if(config_get_boolean("plugins", "checks", (debug_flags & D_CHECKS)?1:0)) {
-		p_checks = malloc(sizeof(pthread_t));
-		if(pthread_create(p_checks, NULL, checks_main, NULL))
-			error("failed to create new thread for checks.");
-		else if(pthread_detach(*p_checks))
-			error("Cannot request detach of newly created checks thread.");
+			if(pthread_create(st->thread, NULL, st->start_routine, NULL))
+				error("failed to create new thread for %s.", st->name);
+
+			else if(pthread_detach(*st->thread))
+				error("Cannot request detach of newly created %s thread.", st->name);
+		}
 	}
 
 	// the main process - the web server listener
 	// this never ends
-	socket_listen_main(NULL);
+	// socket_listen_main(NULL);
+	while(1) process_childs(1);
 
 	exit(0);
 }
