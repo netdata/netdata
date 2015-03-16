@@ -1,5 +1,3 @@
-#define _GNU_SOURCE
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -270,7 +268,7 @@ procfile *procfile_readall(procfile *ff) {
 procfile *procfile_open(const char *filename, const char *separators) {
 	if(pfdebug) fprintf(stderr, PF_PREFIX ": Opening file '%s'\n", filename);
 
-	int fd = open(filename, O_RDONLY|O_NOATIME, 0666);
+	int fd = open(filename, O_RDONLY, 0666);
 	if(fd == -1) {
 		fprintf(stderr, PF_PREFIX ": Cannot open file '%s'. Reason: %s\n", filename, strerror(errno));
 		return NULL;
