@@ -33,3 +33,11 @@ clean:
 install:
 	$(MAKE) -C src $(COMMON_FLAGS) install
 
+.PHONY: getconf
+getconf:
+	@wget -O conf.d/netdata.conf.new "http://localhost:19999/netdata.conf"; \
+	if [ $$? -eq 0 -a -s conf.d/netdata.conf.new ]; \
+	then \
+		mv conf.d/netdata.conf conf.d/netdata.conf.old; \
+		mv conf.d/netdata.conf.new conf.d/netdata.conf; \
+	fi
