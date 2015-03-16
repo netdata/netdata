@@ -7007,7 +7007,7 @@ void *pluginsd_main(void *ptr)
 
 			int len = strlen(file->d_name);
 			if(len <= (int)PLUGINSD_FILE_SUFFIX_LEN) continue;
-			if(strcmp(PLUGINSD_FILE_SUFFIX, &file->d_name[len - PLUGINSD_FILE_SUFFIX_LEN]) != 0) {
+			if(strcmp(PLUGINSD_FILE_SUFFIX, &file->d_name[len - (int)PLUGINSD_FILE_SUFFIX_LEN]) != 0) {
 				debug(D_PLUGINSD, "PLUGINSD: File '%s' does not end in '%s'.", file->d_name, PLUGINSD_FILE_SUFFIX);
 				continue;
 			}
