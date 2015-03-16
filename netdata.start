@@ -2,7 +2,7 @@
 
 base="`dirname "$0"`"
 
-if [ ! -d "$base" -o ! -f "$base/netdata.c" -o ! -d "$base/web" ]
+if [ ! -d "$base" -o ! -d "$base/web" ]
 then
 	echo >&2 "Cannot find my home directory '${base}'."
 	exit 1
