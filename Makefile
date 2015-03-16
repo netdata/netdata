@@ -27,6 +27,7 @@ all:
 .PHONY: clean
 clean:
 	$(MAKE) -C src clean
+	-rm -f netdata netdata.old plugins.d/apps.plugin plugins.d/apps.plugin.old
 
 .PHONY: install
 install:
