@@ -16,13 +16,16 @@
 #include "common.h"
 #include "web_client.h"
 
-// TODO: this can be optimized to avoid strlen()
+// http://stackoverflow.com/questions/7666509/hash-function-for-string
 unsigned long simple_hash(const char *name)
 {
-	int i, len = strlen(name);
-	unsigned long hash = 0;
+	const char *s = name;
+	unsigned long hash = 5381;
+	int i;
 
-	for(i = 0; i < len ;i++) hash += (i * name[i]) + i + name[i];
+	while((i = *s++)) hash = ((hash << 5) + hash) + i;
+
+	// fprintf(stderr, "HASH: %lu %s\n", hash, name);
 
 	return hash;
 }
