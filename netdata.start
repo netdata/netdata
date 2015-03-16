@@ -19,7 +19,7 @@ NETDATA_CONFIG_INTERNAL_HISTORY_LINES=3600
 NETDATA_CONFIG_USER=nobody
 
 # set to 1, to enable debugging
-NETDATA_CONFIG_DEBUG=1
+NETDATA_CONFIG_DEBUG=0
 
 # our port
 NETDATA_CONFIG_PORT=19999
@@ -60,21 +60,12 @@ echo "Compiling netdata (debug=$NETDATA_CONFIG_DEBUG)"
 if [ $NETDATA_CONFIG_DEBUG -eq 1 ]
 then
 	ulimit -c unlimited
-	cd src || exit 1
-	make || exit 1
-	cd plugins.d || exit 1
-	make || exit 1
+	make install debug=1 # this installs in the current directory
 	debug_opts="-df 0xfffffadf"
 else
-	cd src || exit 1
-	make final=1 || exit 1
-	cd plugins.d || exit 1
-	make final=1 || exit 1
+	make install # this installs in the current directory
 	debug_opts="-df 0x00000000"
 fi
-cd ../../ || exit 1
-mv src/netdata ./ || exit 1
-mv src/plugins.d/apps.plugin plugins.d/ || exit 1
 
 echo "Stopping a (possibly) running netdata..."
 ret=0
