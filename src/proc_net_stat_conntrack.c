@@ -40,7 +40,7 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
 	for(l = 1; l < lines ;l++) {
 		words = procfile_linewords(ff, l);
 		if(words < 17) {
-			error("Cannot read /proc/net/stat/nf_conntrack line. Expected 17 params, read %d.", words);
+			if(words) error("Cannot read /proc/net/stat/nf_conntrack line. Expected 17 params, read %d.", words);
 			continue;
 		}
 
