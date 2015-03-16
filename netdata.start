@@ -19,7 +19,7 @@ NETDATA_CONFIG_INTERNAL_HISTORY_LINES=3600
 NETDATA_CONFIG_USER=nobody
 
 # set to 1, to enable debugging
-NETDATA_CONFIG_DEBUG=0
+NETDATA_CONFIG_DEBUG=1
 
 # our port
 NETDATA_CONFIG_PORT=19999
@@ -43,9 +43,9 @@ then
 	# find the user to run as
 	x="`grep 'run as user = ' $NETDATA_CONFIG_CONF_DIR/netdata.conf | head -n 1 | cut -d '=' -f 2 | sed s"/ //g"`"
 	test ! -z "$x" && NETDATA_CONFIG_USER="$x"
-	
+
 	x="`grep 'web files directory = ' $NETDATA_CONFIG_CONF_DIR/netdata.conf | head -n 1 | cut -d '=' -f 2 | sed -e s"/^ \+//g" -e s"/ \+$//g"`"
-	test ! -z "$x" && NETDATA_CONFIG_WEB_DIR="$x"	
+	test ! -z "$x" && NETDATA_CONFIG_WEB_DIR="$x"
 fi
 
 for x in "$NETDATA_CONFIG_WEB_DIR" "$NETDATA_CONFIG_CONF_DIR" "$NETDATA_CONFIG_CACHE_DIR" "$NETDATA_CONFIG_LOG_DIR"
@@ -60,12 +60,21 @@ echo "Compiling netdata (debug=$NETDATA_CONFIG_DEBUG)"
 if [ $NETDATA_CONFIG_DEBUG -eq 1 ]
 then
 	ulimit -c unlimited
-	make debug=1 || exit 1
+	cd src || exit 1
+	make || exit 1
+	cd plugins.d || exit 1
+	make || exit 1
 	debug_opts="-df 0xfffffadf"
 else
-	make || exit 1
+	cd src || exit 1
+	make final=1 || exit 1
+	cd plugins.d || exit 1
+	make final=1 || exit 1
 	debug_opts="-df 0x00000000"
 fi
+cd ../../ || exit 1
+mv src/netdata ./ || exit 1
+mv src/plugins.d/apps.plugin plugins.d/ || exit 1
 
 echo "Stopping a (possibly) running netdata..."
 ret=0
