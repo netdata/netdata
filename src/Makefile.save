@@ -1,0 +1,25 @@
+# COMMON_FLAGS =
+
+ifdef final
+CFLAGS = -Wall -Wextra -I $(INCDIR) -O3 $(COMMON_FLAGS)
+else
+CFLAGS = -Wall -Wextra -ggdb -I $(INCDIR) $(COMMON_FLAGS)
+endif
+
+CC = gcc $(CFLAGS)
+
+sources = *.c
+headers = *.h
+objects = $(patsubst %.o,%.c,$(sources))
+
+all: netdata
+
+netdata: $(objects) $(headers) $(sources)
+	echo "${sources}
+	$(CC) -o netdata $(objects) -pthread -lzlib
+
+$(objects): %.c $(headers)
+	$(CC) -c $< -o $@
+
+clean:
+	rm -rfv *.o netdata core

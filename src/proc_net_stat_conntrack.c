@@ -1,0 +1,207 @@
+#include <inttypes.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "log.h"
+#include "config.h"
+#include "procfile.h"
+#include "rrd.h"
+#include "plugin_proc.h"
+
+#define RRD_TYPE_NET_STAT_CONNTRACK 	"conntrack"
+#define RRD_TYPE_NET_STAT_CONNTRACK_LEN	strlen(RRD_TYPE_NET_STAT_CONNTRACK)
+
+int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
+	static procfile *ff = NULL;
+	static int do_sockets = -1, do_new = -1, do_changes = -1, do_expect = -1, do_search = -1, do_errors = -1;
+
+	if(do_sockets == -1)	do_sockets = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter connections", 1);
+	if(do_new == -1)		do_new = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter new connections", 1);
+	if(do_changes == -1)	do_changes = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter connection changes", 1);
+	if(do_expect == -1)		do_expect = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter connection expectations", 1);
+	if(do_search == -1)		do_search = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter connection searches", 1);
+	if(do_errors == -1)		do_errors = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter errors", 1);
+
+	if(dt) {};
+
+	if(!ff) ff = procfile_open("/proc/net/stat/nf_conntrack", " \t:");
+	if(!ff) return 1;
+
+	ff = procfile_readall(ff);
+	if(!ff) return 0; // we return 0, so that we will retry to open it next time
+
+	uint32_t lines = procfile_lines(ff), l;
+	uint32_t words;
+
+	unsigned long long aentries = 0, asearched = 0, afound = 0, anew = 0, ainvalid = 0, aignore = 0, adelete = 0, adelete_list = 0,
+		ainsert = 0, ainsert_failed = 0, adrop = 0, aearly_drop = 0, aicmp_error = 0, aexpect_new = 0, aexpect_create = 0, aexpect_delete = 0, asearch_restart = 0;
+
+	for(l = 1; l < lines ;l++) {
+		words = procfile_linewords(ff, l);
+		if(words < 17) {
+			error("Cannot read /proc/net/stat/nf_conntrack line. Expected 17 params, read %d.", words);
+			continue;
+		}
+
+		unsigned long long tentries = 0, tsearched = 0, tfound = 0, tnew = 0, tinvalid = 0, tignore = 0, tdelete = 0, tdelete_list = 0, tinsert = 0, tinsert_failed = 0, tdrop = 0, tearly_drop = 0, ticmp_error = 0, texpect_new = 0, texpect_create = 0, texpect_delete = 0, tsearch_restart = 0;
+
+		tentries		= strtoull(procfile_lineword(ff, l, 0), NULL, 16);
+		tsearched		= strtoull(procfile_lineword(ff, l, 1), NULL, 16);
+		tfound			= strtoull(procfile_lineword(ff, l, 2), NULL, 16);
+		tnew			= strtoull(procfile_lineword(ff, l, 3), NULL, 16);
+		tinvalid		= strtoull(procfile_lineword(ff, l, 4), NULL, 16);
+		tignore			= strtoull(procfile_lineword(ff, l, 5), NULL, 16);
+		tdelete			= strtoull(procfile_lineword(ff, l, 6), NULL, 16);
+		tdelete_list	= strtoull(procfile_lineword(ff, l, 7), NULL, 16);
+		tinsert			= strtoull(procfile_lineword(ff, l, 8), NULL, 16);
+		tinsert_failed	= strtoull(procfile_lineword(ff, l, 9), NULL, 16);
+		tdrop			= strtoull(procfile_lineword(ff, l, 10), NULL, 16);
+		tearly_drop		= strtoull(procfile_lineword(ff, l, 11), NULL, 16);
+		ticmp_error		= strtoull(procfile_lineword(ff, l, 12), NULL, 16);
+		texpect_new		= strtoull(procfile_lineword(ff, l, 13), NULL, 16);
+		texpect_create	= strtoull(procfile_lineword(ff, l, 14), NULL, 16);
+		texpect_delete	= strtoull(procfile_lineword(ff, l, 15), NULL, 16);
+		tsearch_restart	= strtoull(procfile_lineword(ff, l, 16), NULL, 16);
+
+		if(!aentries) aentries =  tentries;
+
+		// sum all the cpus together
+		asearched 		+= tsearched;		// conntrack.search
+		afound 			+= tfound;		// conntrack.search
+		anew 			+= tnew;		// conntrack.new
+		ainvalid 		+= tinvalid;		// conntrack.new
+		aignore 		+= tignore;		// conntrack.new
+		adelete 		+= tdelete;		// conntrack.changes
+		adelete_list 		+= tdelete_list;	// conntrack.changes
+		ainsert 		+= tinsert;		// conntrack.changes
+		ainsert_failed 		+= tinsert_failed;	// conntrack.errors
+		adrop 			+= tdrop;		// conntrack.errors
+		aearly_drop 		+= tearly_drop;		// conntrack.errors
+		aicmp_error 		+= ticmp_error;		// conntrack.errors
+		aexpect_new 		+= texpect_new;		// conntrack.expect
+		aexpect_create 		+= texpect_create;	// conntrack.expect
+		aexpect_delete 		+= texpect_delete;	// conntrack.expect
+		asearch_restart 	+= tsearch_restart;	// conntrack.search
+	}
+
+	RRD_STATS *st;
+
+	// --------------------------------------------------------------------
+	
+	if(do_sockets) {
+		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".sockets");
+		if(!st) {
+			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "sockets", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connections", "active connections", 1000, update_every, CHART_TYPE_LINE);
+
+			rrd_stats_dimension_add(st, "connections", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "connections", aentries);
+		rrd_stats_done(st);
+	}
+
+	// --------------------------------------------------------------------
+
+	if(do_new) {
+		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".new");
+		if(!st) {
+			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "new", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter New Connections", "connections/s", 1001, update_every, CHART_TYPE_LINE);
+
+			rrd_stats_dimension_add(st, "new", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "ignore", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "invalid", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "new", anew);
+		rrd_stats_dimension_set(st, "ignore", aignore);
+		rrd_stats_dimension_set(st, "invalid", ainvalid);
+		rrd_stats_done(st);
+	}
+
+	// --------------------------------------------------------------------
+
+	if(do_changes) {
+		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".changes");
+		if(!st) {
+			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "changes", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Changes", "changes/s", 1002, update_every, CHART_TYPE_LINE);
+			st->isdetail = 1;
+
+			rrd_stats_dimension_add(st, "inserted", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "deleted", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "delete_list", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "inserted", ainsert);
+		rrd_stats_dimension_set(st, "deleted", adelete);
+		rrd_stats_dimension_set(st, "delete_list", adelete_list);
+		rrd_stats_done(st);
+	}
+
+	// --------------------------------------------------------------------
+
+	if(do_expect) {
+		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".expect");
+		if(!st) {
+			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "expect", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Expectations", "expectations/s", 1003, update_every, CHART_TYPE_LINE);
+			st->isdetail = 1;
+
+			rrd_stats_dimension_add(st, "created", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "deleted", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "new", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "created", aexpect_create);
+		rrd_stats_dimension_set(st, "deleted", aexpect_delete);
+		rrd_stats_dimension_set(st, "new", aexpect_new);
+		rrd_stats_done(st);
+	}
+
+	// --------------------------------------------------------------------
+
+	if(do_search) {
+		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".search");
+		if(!st) {
+			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "search", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Searches", "searches/s", 1010, update_every, CHART_TYPE_LINE);
+			st->isdetail = 1;
+
+			rrd_stats_dimension_add(st, "searched", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "restarted", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "found", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "searched", asearched);
+		rrd_stats_dimension_set(st, "restarted", asearch_restart);
+		rrd_stats_dimension_set(st, "found", afound);
+		rrd_stats_done(st);
+	}
+
+	// --------------------------------------------------------------------
+
+	if(do_errors) {
+		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".errors");
+		if(!st) {
+			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "errors", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Errors", "events/s", 1005, update_every, CHART_TYPE_LINE);
+			st->isdetail = 1;
+
+			rrd_stats_dimension_add(st, "icmp_error", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "insert_failed", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "drop", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "early_drop", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+		}
+		else rrd_stats_next(st);
+
+		rrd_stats_dimension_set(st, "icmp_error", aicmp_error);
+		rrd_stats_dimension_set(st, "insert_failed", ainsert_failed);
+		rrd_stats_dimension_set(st, "drop", adrop);
+		rrd_stats_dimension_set(st, "early_drop", aearly_drop);
+		rrd_stats_done(st);
+	}
+
+	return 0;
+}

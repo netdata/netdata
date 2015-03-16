@@ -1,0 +1,101 @@
+/*
+ * procfile is a library for reading kernel files from /proc
+ * 
+ * The idea is this:
+ *
+ *  - every file is opened once with procfile_open().
+ *
+ *  - to read updated contents, we rewind it (lseek() to 0) and read again
+ *    with procfile_readall().
+ *
+ *  - for every file, we use a buffer that is adjusted to fit its entire
+ *    contents in memory, allowing us to read it with a single read() call.
+ *    (this provides atomicity / consistency on the data read from the kernel)
+ *
+ *  - once the data are read, we update two arrays of pointers:
+ *     - a words array, pointing to each word in the data read
+ *     - a lines array, pointing to the first word for each line
+ *
+ *    This is highly optimized. Both arrays are automatically adjusted to
+ *    fit all contents and are updated in a single pass on the data:
+ *     - a raspberry Pi can process 5.000+ files / sec.
+ *     - a J1900 celeron processor can process 23.000+ files / sec.
+*/
+
+
+#ifndef NETDATA_PROCFILE_H
+#define NETDATA_PROCFILE_H 1
+
+// if enabled, procfile will output a lot of debug info
+extern int pfdebug;
+
+// ----------------------------------------------------------------------------
+// An array of words
+
+typedef struct {
+	uint32_t len;	// used entries
+	uint32_t size;	// capacity
+	char *words[];	// array of pointers
+} pfwords;
+
+
+// ----------------------------------------------------------------------------
+// An array of lines
+
+typedef struct {
+	uint32_t words;		// how many words this line has
+	uint32_t first;		// the id of the first word of this line
+				// in the words array
+} ffline;
+
+typedef struct {
+	uint32_t len;		// used entries
+	uint32_t size;		// capacity
+	ffline lines[];		// array of lines
+} pflines;
+
+
+// ----------------------------------------------------------------------------
+// The procfile
+
+typedef struct {
+	char filename[FILENAME_MAX + 1];
+	int fd;			// the file desriptor
+	ssize_t len;		// the bytes we have placed into data
+	ssize_t size;		// the bytes we have allocated for data
+	pflines *lines;
+	pfwords *words;
+	char separators[256];
+	char data[];		// allocated buffer to keep file contents
+} procfile;
+
+// close the proc file and free all related memory
+extern void procfile_close(procfile *ff);
+
+// (re)read and parse the proc file
+extern procfile *procfile_readall(procfile *ff);
+
+// open a /proc or /sys file
+extern procfile *procfile_open(const char *filename, const char *separators);
+
+// example walk-through a procfile parsed file
+extern void procfile_print(procfile *ff);
+
+// ----------------------------------------------------------------------------
+
+// return the number of lines present
+#define procfile_lines(ff) (ff->lines->len)
+
+// return the number of words of the Nth line
+#define procfile_linewords(ff, line) (((line) < procfile_lines(ff)) ? (ff)->lines->lines[(line)].words : 0)
+
+// return the Nth word of the file, or empty string
+#define procfile_word(ff, word) (((word) < (ff)->words->len) ? (ff)->words->words[(word)] : "")
+
+// return the first word of the Nth line, or empty string
+#define procfile_line(ff, line) (((line) < procfile_lines(ff)) ? procfile_word((ff), (ff)->lines->lines[(line)].first) : "")
+
+// return the Nth word of the current line
+#define procfile_lineword(ff, line, word) (((line) < procfile_lines(ff) && (word) < procfile_linewords(ff, (line))) ? procfile_word((ff), (ff)->lines->lines[(line)].first + word) : "")
+
+#endif /* NETDATA_PROCFILE_H */
