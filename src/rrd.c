@@ -682,7 +682,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 			case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
 				// the percentage of the current increment
 				// over the increment of all dimensions together
-				if(st->collected_total == st->last_collected_total) rd->calculated_value = 0;
+				if(st->collected_total == st->last_collected_total) rd->calculated_value = rd->last_calculated_value;
 				else rd->calculated_value =
 					  (calculated_number)100
 					* (calculated_number)(rd->collected_value - rd->last_collected_value)

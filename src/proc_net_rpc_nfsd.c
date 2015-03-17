@@ -516,19 +516,19 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 	if(do_ra == 2) {
 		st = rrd_stats_find_bytype("nfsd", "readahead");
 		if(!st) {
-			st = rrd_stats_create("nfsd", "readahead", NULL, "nfsd", "Read Ahead Depth", "reads/s", 5005, update_every, CHART_TYPE_STACKED);
+			st = rrd_stats_create("nfsd", "readahead", NULL, "nfsd", "Read Ahead Depth", "percentage", 5005, update_every, CHART_TYPE_STACKED);
 
-			rrd_stats_dimension_add(st, "10%", NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "20%", NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "30%", NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "40%", NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "50%", NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "60%", NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "70%", NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "80%", NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "90%", NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "100%", NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "misses", NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
+			rrd_stats_dimension_add(st, "10%", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+			rrd_stats_dimension_add(st, "20%", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+			rrd_stats_dimension_add(st, "30%", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+			rrd_stats_dimension_add(st, "40%", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+			rrd_stats_dimension_add(st, "50%", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+			rrd_stats_dimension_add(st, "60%", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+			rrd_stats_dimension_add(st, "70%", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+			rrd_stats_dimension_add(st, "80%", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+			rrd_stats_dimension_add(st, "90%", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+			rrd_stats_dimension_add(st, "100%", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+			rrd_stats_dimension_add(st, "misses", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
 		}
 		else rrd_stats_next(st);
 
