@@ -41,6 +41,7 @@ void *proc_main(void *ptr)
 	int vdo_proc_stat 				= !config_get_boolean("plugin:proc", "/proc/stat", 1);
 	int vdo_proc_meminfo 			= !config_get_boolean("plugin:proc", "/proc/meminfo", 1);
 	int vdo_proc_vmstat 			= !config_get_boolean("plugin:proc", "/proc/vmstat", 1);
+	int vdo_proc_net_rpc_nfsd		= !config_get_boolean("plugin:proc", "/proc/net/rpc/nfsd", 1);
 	int vdo_cpu_netdata 			= !config_get_boolean("plugin:proc", "netdata server resources", 1);
 
 	RRD_STATS *stcpu = NULL, *stclients = NULL, *streqs = NULL, *stbytes = NULL;
@@ -61,6 +62,7 @@ void *proc_main(void *ptr)
 		if(!vdo_proc_stat)					vdo_proc_stat 				= do_proc_stat(update_every, usec+susec);
 		if(!vdo_proc_meminfo)				vdo_proc_meminfo			= do_proc_meminfo(update_every, usec+susec);
 		if(!vdo_proc_vmstat)				vdo_proc_vmstat				= do_proc_vmstat(update_every, usec+susec);
+		if(!vdo_proc_net_rpc_nfsd)			vdo_proc_net_rpc_nfsd		= do_proc_net_rpc_nfsd(update_every, usec+susec);
 		// END -- the job is done
 		
 		// find the time to sleep in order to wait exactly update_every seconds

@@ -12,5 +12,6 @@ extern int do_proc_net_ip_vs_stats(int update_every, unsigned long long dt);
 extern int do_proc_stat(int update_every, unsigned long long dt);
 extern int do_proc_meminfo(int update_every, unsigned long long dt);
 extern int do_proc_vmstat(int update_every, unsigned long long dt);
+extern int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt);
 
 #endif /* NETDATA_PLUGIN_PROC_H */
