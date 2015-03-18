@@ -34,18 +34,20 @@ struct netdata_static_thread {
 	char *config_section;
 	char *config_name;
 
+	int enabled;
+
 	pthread_t *thread;
 	void *(*start_routine) (void *);
 };
 
 struct netdata_static_thread static_threads[] = {
-	{"tc",			"plugins",	"tc",			NULL, tc_main},
-	{"idlejitter",	"plugins",	"idlejitter",	NULL, cpuidlejitter_main},
-	{"proc",		"plugins",	"proc",			NULL, proc_main},
-	{"plugins.d",	NULL,		NULL,			NULL, pluginsd_main},
-	{"check",		"plugins",	"checks",		NULL, checks_main},
-	{"web",			NULL,		NULL,			NULL, socket_listen_main},
-	{NULL,			NULL,		NULL,			NULL, NULL}
+	{"tc",			"plugins",	"tc",			1, NULL, tc_main},
+	{"idlejitter",	"plugins",	"idlejitter",	1, NULL, cpuidlejitter_main},
+	{"proc",		"plugins",	"proc",			1, NULL, proc_main},
+	{"plugins.d",	NULL,		NULL,			1, NULL, pluginsd_main},
+	{"check",		"plugins",	"checks",		0, NULL, checks_main},
+	{"web",			NULL,		NULL,			1, NULL, socket_listen_main},
+	{NULL,			NULL,		NULL,			0, NULL, NULL}
 };
 
 void kill_childs()
@@ -282,11 +284,10 @@ int main(int argc, char **argv)
 	
 	for (i = 0; static_threads[i].name != NULL ; i++) {
 		struct netdata_static_thread *st = &static_threads[i];
-		int doit = 1;
 
-		if(st->config_name) doit = config_get_boolean(st->config_section, st->config_name, doit);
+		if(st->config_name) st->enabled = config_get_boolean(st->config_section, st->config_name, st->enabled);
 
-		if(doit) {
+		if(st->enabled) {
 			st->thread = malloc(sizeof(pthread_t));
 
 			if(pthread_create(st->thread, NULL, st->start_routine, NULL))
