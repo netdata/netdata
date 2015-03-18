@@ -9,7 +9,7 @@
 #include "rrd.h"
 #include "plugin_proc.h"
 
-#define RRD_TYPE_NET_STAT_CONNTRACK 	"conntrack"
+#define RRD_TYPE_NET_STAT_CONNTRACK 	"netfilter"
 #define RRD_TYPE_NET_STAT_CONNTRACK_LEN	strlen(RRD_TYPE_NET_STAT_CONNTRACK)
 
 int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
@@ -67,16 +67,16 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
 		if(!aentries) aentries =  tentries;
 
 		// sum all the cpus together
-		asearched 		+= tsearched;		// conntrack.search
-		afound 			+= tfound;		// conntrack.search
-		anew 			+= tnew;		// conntrack.new
-		ainvalid 		+= tinvalid;		// conntrack.new
-		aignore 		+= tignore;		// conntrack.new
-		adelete 		+= tdelete;		// conntrack.changes
+		asearched 			+= tsearched;		// conntrack.search
+		afound 				+= tfound;			// conntrack.search
+		anew 				+= tnew;			// conntrack.new
+		ainvalid 			+= tinvalid;		// conntrack.new
+		aignore 			+= tignore;			// conntrack.new
+		adelete 			+= tdelete;			// conntrack.changes
 		adelete_list 		+= tdelete_list;	// conntrack.changes
-		ainsert 		+= tinsert;		// conntrack.changes
+		ainsert 			+= tinsert;			// conntrack.changes
 		ainsert_failed 		+= tinsert_failed;	// conntrack.errors
-		adrop 			+= tdrop;		// conntrack.errors
+		adrop 				+= tdrop;			// conntrack.errors
 		aearly_drop 		+= tearly_drop;		// conntrack.errors
 		aicmp_error 		+= ticmp_error;		// conntrack.errors
 		aexpect_new 		+= texpect_new;		// conntrack.expect

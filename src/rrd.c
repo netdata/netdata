@@ -582,7 +582,7 @@ void rrd_stats_dimension_set_by_pointer(RRD_STATS *st, RRD_DIMENSION *rd, collec
 	rd->collected_value = value;
 }
 
-int rrd_stats_dimension_set(RRD_STATS *st, char *id, collected_number value)
+int rrd_stats_dimension_set(RRD_STATS *st, const char *id, collected_number value)
 {
 	RRD_DIMENSION *rd = rrd_stats_dimension_find(st, id);
 	if(!rd) {

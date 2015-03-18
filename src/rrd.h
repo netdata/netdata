@@ -74,77 +74,77 @@ extern const char *algorithm_name(int chart_type);
 
 struct rrd_dimension {
 	char magic[sizeof(RRD_DIMENSION_MAGIC) + 1];	// our magic
-	char id[RRD_STATS_NAME_MAX + 1];		// the id of this dimension (for internal identification)
-	char *name;					// the name of this dimension (as presented to user)
+	char id[RRD_STATS_NAME_MAX + 1];				// the id of this dimension (for internal identification)
+	char *name;										// the name of this dimension (as presented to user)
 	char cache_file[FILENAME_MAX+1];
 	
-	unsigned long hash;				// a simple hash on the id, to speed up searching
-							// we first compare hashes, and only if the hashes are equal we do string comparisons
+	unsigned long hash;								// a simple hash on the id, to speed up searching
+													// we first compare hashes, and only if the hashes are equal we do string comparisons
 
-	long entries;					// how many entries this dimension has
-							// this should be the same to the entries of the data set
+	long entries;									// how many entries this dimension has
+													// this should be the same to the entries of the data set
 
-	long current_entry;				// the entry that is currently being updated
-	int update_every;				// every how many seconds is this updated?
+	long current_entry;								// the entry that is currently being updated
+	int update_every;								// every how many seconds is this updated?
 
-	int hidden;					// if set to non zero, this dimension will not be sent to the client
-	int mapped;					// 1 if the file is mapped
-	unsigned long memsize;				// the memory allocated for this dimension
+	int hidden;										// if set to non zero, this dimension will not be sent to the client
+	int mapped;										// 1 if the file is mapped
+	unsigned long memsize;							// the memory allocated for this dimension
 
 	int algorithm;
 	long multiplier;
 	long divisor;
 
-	struct timeval last_collected_time;		// when was this dimension last updated
-							// this is only used to detect un-updated dimensions
-							// which are removed after some time
+	struct timeval last_collected_time;				// when was this dimension last updated
+													// this is only used to detect un-updated dimensions
+													// which are removed after some time
 
 	calculated_number calculated_value;
 	calculated_number last_calculated_value;
 
-	collected_number collected_value;		// the value collected at this round
-	collected_number last_collected_value;		// the value that was collected at the last round
+	collected_number collected_value;				// the value collected at this round
+	collected_number last_collected_value;			// the value that was collected at the last round
 
-	struct rrd_dimension *next;			// linking of dimensions within the same data set
+	struct rrd_dimension *next;						// linking of dimensions within the same data set
 
-	storage_number values[];			// the array of values - THIS HAS TO BE THE LAST MEMBER
+	storage_number values[];						// the array of values - THIS HAS TO BE THE LAST MEMBER
 };
 typedef struct rrd_dimension RRD_DIMENSION;
 
 struct rrd_stats {
-	char magic[sizeof(RRD_STATS_MAGIC) + 1];	// our magic
+	char magic[sizeof(RRD_STATS_MAGIC) + 1];		// our magic
 
-	char id[RRD_STATS_NAME_MAX + 1];		// id of the data set
-	char *name;					// name of the data set
-	char *cache_dir;				// the directory to store dimension maps
+	char id[RRD_STATS_NAME_MAX + 1];				// id of the data set
+	char *name;										// name of the data set
+	char *cache_dir;								// the directory to store dimension maps
 	char cache_file[FILENAME_MAX+1];
 
-	char *type;					// the type of graph RRD_TYPE_* (a category, for determining graphing options)
-	char *family;					// the family of this data set (for grouping them together)
-	char *title;					// title shown to user
-	char *units;					// units of measurement
+	char *type;										// the type of graph RRD_TYPE_* (a category, for determining graphing options)
+	char *family;									// the family of this data set (for grouping them together)
+	char *title;									// title shown to user
+	char *units;									// units of measurement
 
 	pthread_rwlock_t rwlock;
-	unsigned long counter;				// the number of times we added values to this rrd
-	unsigned long counter_done;			// the number of times we added values to this rrd
+	unsigned long counter;							// the number of times we added values to this rrd
+	unsigned long counter_done;						// the number of times we added values to this rrd
 
-	int mapped;					// if set to 1, this is memory mapped
-	unsigned long memsize;				// how much mem we have allocated for this (without dimensions)
+	int mapped;										// if set to 1, this is memory mapped
+	unsigned long memsize;							// how much mem we have allocated for this (without dimensions)
 
-	unsigned long hash_name;			// a simple hash on the name
-	unsigned long hash;				// a simple hash on the id, to speed up searching
-							// we first compare hashes, and only if the hashes are equal we do string comparisons
+	unsigned long hash_name;						// a simple hash on the name
+	unsigned long hash;								// a simple hash on the id, to speed up searching
+													// we first compare hashes, and only if the hashes are equal we do string comparisons
 
 	long priority;
 
-	long entries;					// total number of entries in the data set
-	long current_entry;				// the entry that is currently being updated
-							// it goes around in a round-robin fashion
+	long entries;									// total number of entries in the data set
+	long current_entry;								// the entry that is currently being updated
+													// it goes around in a round-robin fashion
 
-	int update_every;				// every how many seconds is this updated?
-	unsigned long long first_entry_t;		// the timestamp (in microseconds) of the oldest entry in the db
-	struct timeval last_updated;			// when this data set was last updated (updated every time the rrd_stats_done() function)
-	struct timeval last_collected_time;		// 
+	int update_every;								// every how many seconds is this updated?
+	unsigned long long first_entry_t;				// the timestamp (in microseconds) of the oldest entry in the db
+	struct timeval last_updated;					// when this data set was last updated (updated every time the rrd_stats_done() function)
+	struct timeval last_collected_time;				// 
 	unsigned long long usec_since_last_update;
 
 	total_number collected_total;
@@ -153,12 +153,12 @@ struct rrd_stats {
 	int chart_type;
 	int debug;
 	int enabled;
-	int isdetail;					// if set, the data set should be considered as a detail of another
-							// (the master data set should be the one that has the same family and is not detail)
+	int isdetail;									// if set, the data set should be considered as a detail of another
+													// (the master data set should be the one that has the same family and is not detail)
 
-	RRD_DIMENSION *dimensions;			// the actual data for every dimension
+	RRD_DIMENSION *dimensions;						// the actual data for every dimension
 
-	struct rrd_stats *next;				// linking of rrd stats
+	struct rrd_stats *next;							// linking of rrd stats
 };
 typedef struct rrd_stats RRD_STATS;
 
@@ -191,7 +191,7 @@ extern RRD_DIMENSION *rrd_stats_dimension_find(RRD_STATS *st, const char *id);
 extern int rrd_stats_dimension_hide(RRD_STATS *st, const char *id);
 
 extern void rrd_stats_dimension_set_by_pointer(RRD_STATS *st, RRD_DIMENSION *rd, collected_number value);
-extern int rrd_stats_dimension_set(RRD_STATS *st, char *id, collected_number value);
+extern int rrd_stats_dimension_set(RRD_STATS *st, const char *id, collected_number value);
 
 extern void rrd_stats_next_usec(RRD_STATS *st, unsigned long long microseconds);
 extern void rrd_stats_next(RRD_STATS *st);

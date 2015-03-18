@@ -317,20 +317,20 @@ function loadCharts(base_url, doNext) {
 					break;
 
 				case "tc":
-					json.charts[i].category = "QoS";
+					json.charts[i].category = "Quality of Service";
 					json.charts[i].categoryPriority = 30;
 					json.charts[i].glyphicon = "glyphicon-random";
 					json.charts[i].group = 15;
 					break;
 
 				case "ipvs":
-					json.charts[i].category = "IPVS";
+					json.charts[i].category = "IP Virtual Server";
 					json.charts[i].categoryPriority = 40;
 					json.charts[i].glyphicon = "glyphicon-sort";
 					json.charts[i].group = 5;
 					break;
 
-				case "conntrack":
+				case "netfilter":
 					json.charts[i].category = "Netfilter";
 					json.charts[i].categoryPriority = 50;
 					json.charts[i].glyphicon = "glyphicon-cloud";
@@ -367,6 +367,20 @@ function loadCharts(base_url, doNext) {
 					json.charts[i].category = "Disks";
 					json.charts[i].categoryPriority = 90;
 					json.charts[i].glyphicon = "glyphicon-hdd";
+					json.charts[i].group = 5;
+					break;
+
+				case "nfsd":
+					json.charts[i].category = "NFS Server";
+					json.charts[i].categoryPriority = 100;
+					json.charts[i].glyphicon = "glyphicon-hdd";
+					json.charts[i].group = 5;
+					break;
+
+				case "nut":
+					json.charts[i].category = "UPS";
+					json.charts[i].categoryPriority = 110;
+					json.charts[i].glyphicon = "glyphicon-dashboard";
 					json.charts[i].group = 5;
 					break;
 

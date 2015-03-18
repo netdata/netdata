@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "storage_number.h"
 #include "rrd.h"
@@ -7,9 +8,9 @@
 
 int unit_test_storage()
 {
-	char buffer[100];
+	char buffer[100], *msg;
 	storage_number s;
-	calculated_number c, a = 0, d, f;
+	calculated_number c, a = 0, d, ddiff, dcdiff, f, p, pdiff, pcdiff, maxddiff = 0, maxpdiff = 0;
 	int i, j, g, r = 0, l;
 
 	for(g = -1; g <= 1 ; g++) {
@@ -21,23 +22,49 @@ int unit_test_storage()
 			a += 0.0000001;
 			c = a * g;
 			for(i = 0; i < 21 ;i++, c *= 10) {
+				if(c > 0 && c < 0.00001) continue;
+				if(c < 0 && c > -0.00001) continue;
+
 				s = pack_storage_number(c);
 				d = unpack_storage_number(s);
+
+				ddiff = d - c;
+				dcdiff = ddiff * 100.0 / c;
+				if(dcdiff < 0) dcdiff = -dcdiff;
+				if(dcdiff > maxddiff) maxddiff = dcdiff;
 
 				f = d / c;
 
 				l = print_calculated_number(buffer, d);
+				p = strtold(buffer, NULL);
+				pdiff = c - p;
+				pcdiff = pdiff * 100.0 / c;
+				if(pcdiff < 0) pcdiff = -pcdiff;
+				if(pcdiff > maxpdiff) maxpdiff = pcdiff;
 
 				if(f < 0.99999 || f > 1.00001) {
-					fprintf(stderr, "\nERROR\n" CALCULATED_NUMBER_FORMAT " original\n" CALCULATED_NUMBER_FORMAT " unpacked, (stored as 0x%08X)\n%s printed as %d bytes\n", c, d, s, buffer, l);
+					msg = "ERROR";
 					r++;
 				}
-				else {
-					fprintf(stderr, "\nOK\n" CALCULATED_NUMBER_FORMAT " original\n" CALCULATED_NUMBER_FORMAT " unpacked, (stored as 0x%08X)\n%s printed as %d bytes\n", c, d, s, buffer, l);
-				}
+				else msg = "OK";
+
+				fprintf(stderr, "%s\n"
+					CALCULATED_NUMBER_FORMAT " original\n"
+					CALCULATED_NUMBER_FORMAT " unpacked, (stored as 0x%08X, diff " CALCULATED_NUMBER_FORMAT ", " CALCULATED_NUMBER_FORMAT "%%)\n"
+					"%s printed (%d bytes)\n"
+					CALCULATED_NUMBER_FORMAT " re-parsed with diff " CALCULATED_NUMBER_FORMAT ", " CALCULATED_NUMBER_FORMAT "%%\n\n",
+					msg,
+					c,
+					d, s, ddiff, dcdiff,
+					buffer,
+					l, p, pdiff, pcdiff
+				);
 			}
 		}
 	}
+
+	fprintf(stderr, "Worst accuracy loss on unpacked numbers: " CALCULATED_NUMBER_FORMAT "%%\n", maxddiff);
+	fprintf(stderr, "Worst accuracy loss on printed numbers: " CALCULATED_NUMBER_FORMAT "%%\n", maxpdiff);
 
 	return r;
 }

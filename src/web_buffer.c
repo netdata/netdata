@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <math.h>
 
 #include "web_buffer.h"
 
@@ -20,35 +21,50 @@ int print_calculated_number(char *str, calculated_number value)
 {
 	char *wstr = str;
 
-	// make sure it is unsigned
-	unsigned long long uvalue = (unsigned long long)(((value < 0) ? -value : value) * (calculated_number)10000);
+	int sign = (value < 0) ? 1 : 0;
+	if(sign) value = -value;
+
+	// without llrint() there are rounding problems
+	// for example 0.9 becomes 0.89
+	unsigned long long uvalue = llrint(value * (calculated_number)100000);
 
 	// print each digit
 	do *wstr++ = (char)(48 + (uvalue % 10)); while(uvalue /= 10);
 
-	// make sure we have 8 bytes at least
-	while((wstr - str) < 5) *wstr++ = '0';
+	// make sure we have 6 bytes at least
+	while((wstr - str) < 6) *wstr++ = '0';
 
 	// put the sign back
-	if (value < 0) *wstr++ = '-';
+	if(sign) *wstr++ = '-';
 
 	// reverse it
 	wstr--;
 	strreverse(str, wstr);
 
+	// remove trailing zeros
+	int decimal = 5;
+	while(decimal > 0 && *wstr == '0') {
+		*wstr-- = '\0';
+		decimal--;
+	}
+
 	// terminate it, one position to the right
 	// to let space for a dot
 	wstr[2] = '\0';
 
+	// make space for the dot
 	int i;
-	for(i = 0; i < 4 ;i++) {
+	for(i = 0; i < decimal ;i++) {
 		wstr[1] = wstr[0];
 		wstr--;
 	}
-	wstr[1] = '.';
+
+	// put the dot
+	if(wstr[2] == '\0') { wstr[1] = '\0'; decimal--; }
+	else wstr[1] = '.';
 
 	// return the buffer length
-	return ( (wstr - str) + 6 );
+	return ( (wstr - str) + 2 + decimal );
 }
 
 void web_buffer_rrd_value(struct web_buffer *wb, calculated_number value)

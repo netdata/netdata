@@ -25,6 +25,7 @@
 #include "plugin_tc.h"
 #include "plugin_checks.h"
 #include "plugin_proc.h"
+#include "plugin_nfacct.h"
 
 #include "main.h"
 
@@ -37,17 +38,26 @@ struct netdata_static_thread {
 	int enabled;
 
 	pthread_t *thread;
+
+	void (*init_routine) (void);
 	void *(*start_routine) (void *);
 };
 
 struct netdata_static_thread static_threads[] = {
-	{"tc",			"plugins",	"tc",			1, NULL, tc_main},
-	{"idlejitter",	"plugins",	"idlejitter",	1, NULL, cpuidlejitter_main},
-	{"proc",		"plugins",	"proc",			1, NULL, proc_main},
-	{"plugins.d",	NULL,		NULL,			1, NULL, pluginsd_main},
-	{"check",		"plugins",	"checks",		0, NULL, checks_main},
-	{"web",			NULL,		NULL,			1, NULL, socket_listen_main},
-	{NULL,			NULL,		NULL,			0, NULL, NULL}
+	{"tc",			"plugins",	"tc",			1, NULL, NULL,	tc_main},
+	{"idlejitter",	"plugins",	"idlejitter",	1, NULL, NULL,	cpuidlejitter_main},
+	{"proc",		"plugins",	"proc",			1, NULL, NULL,	proc_main},
+
+#ifdef INTERNAL_PLUGIN_NFACCT
+	// nfacct requires root access
+	// so, we build it as an external plugin with setuid to root
+	{"nfacct",		"plugins",	"nfacct",		1, NULL, NULL, 	nfacct_main},
+#endif
+
+	{"plugins.d",	NULL,		NULL,			1, NULL, NULL,	pluginsd_main},
+	{"check",		"plugins",	"checks",		0, NULL, NULL,	checks_main},
+	{"web",			NULL,		NULL,			1, NULL, NULL,	socket_listen_main},
+	{NULL,			NULL,		NULL,			0, NULL, NULL,	NULL}
 };
 
 void kill_childs()
@@ -231,6 +241,24 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
+		update_every = config_get_number("global", "update every", UPDATE_EVERY);
+		if(update_every < 1 || update_every > 600) {
+			fprintf(stderr, "Invalid update timer %d given. Defaulting to %d.\n", update_every, UPDATE_EVERY_MAX);
+			update_every = UPDATE_EVERY;
+		}
+		else debug(D_OPTIONS, "update timer set to %d.", update_every);
+
+		// --------------------------------------------------------------------
+		
+		for (i = 0; static_threads[i].name != NULL ; i++) {
+			struct netdata_static_thread *st = &static_threads[i];
+
+			if(st->config_name) st->enabled = config_get_boolean(st->config_section, st->config_name, st->enabled);
+			if(st->enabled && st->init_routine) st->init_routine();
+		}
+
+		// --------------------------------------------------------------------
+
 		prepare_rundir();
 		char *user = config_get("global", "run as user", (getuid() == 0)?"nobody":"");
 		if(*user) {
@@ -240,15 +268,6 @@ int main(int argc, char **argv)
 			}
 			else debug(D_OPTIONS, "Successfully became user %s.", user);
 		}
-
-		// --------------------------------------------------------------------
-
-		update_every = config_get_number("global", "update every", UPDATE_EVERY);
-		if(update_every < 1 || update_every > 600) {
-			fprintf(stderr, "Invalid update timer %d given. Defaulting to %d.\n", update_every, UPDATE_EVERY_MAX);
-			update_every = UPDATE_EVERY;
-		}
-		else debug(D_OPTIONS, "update timer set to %d.", update_every);
 
 		// --------------------------------------------------------------------
 
@@ -284,8 +303,6 @@ int main(int argc, char **argv)
 	
 	for (i = 0; static_threads[i].name != NULL ; i++) {
 		struct netdata_static_thread *st = &static_threads[i];
-
-		if(st->config_name) st->enabled = config_get_boolean(st->config_section, st->config_name, st->enabled);
 
 		if(st->enabled) {
 			st->thread = malloc(sizeof(pthread_t));
