@@ -262,6 +262,7 @@ procfile *procfile_readall(procfile *ff) {
 
 	ff = procfile_parser(ff);
 
+	debug(D_PROCFILE, "File '%s' updated.", ff->filename);
 	return ff;
 }
 
@@ -308,6 +309,7 @@ procfile *procfile_open(const char *filename, const char *separators) {
 	const char *s = separators;
 	while(*s) ff->separators[(int)*s++] = PF_CHAR_IS_SEPARATOR;
 
+	debug(D_PROCFILE, "File '%s' opened.", ff->filename);
 	return ff;
 }
 
