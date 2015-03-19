@@ -1,4 +1,6 @@
+#ifdef STORAGE_WITH_MATH
 #include <math.h>
+#endif
 
 #include "log.h"
 #include "storage_number.h"
@@ -45,9 +47,11 @@ storage_number pack_storage_number(calculated_number value)
 
 	mul = m;
 
+#ifdef STORAGE_WITH_MATH
 	// without this there are rounding problems
 	// example: 0.9 becomes 0.89
 	n = lrint(n);
+#endif
 
 	r = (sign << 31) + (exp << 30) + (mul << 27) + n;
 	// fprintf(stderr, "PACK: %08X, sign = %d, exp = %d, mul = %d, n = " CALCULATED_NUMBER_FORMAT "\n", r, sign, exp, mul, n);

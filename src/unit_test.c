@@ -8,7 +8,7 @@
 #include "log.h"
 #include "web_buffer.h"
 
-#define ACCURACY_LOSS 0.0000001
+#define ACCURACY_LOSS 100.0000001
 
 int check_storage_number(calculated_number n, int debug) {
 	char buffer[100];

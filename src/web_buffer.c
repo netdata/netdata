@@ -1,5 +1,8 @@
 #include <stdlib.h>
+
+#ifdef STORAGE_WITH_MATH
 #include <math.h>
+#endif
 
 #include "web_buffer.h"
 
@@ -24,9 +27,13 @@ int print_calculated_number(char *str, calculated_number value)
 	int sign = (value < 0) ? 1 : 0;
 	if(sign) value = -value;
 
+#ifdef STORAGE_WITH_MATH
 	// without llrint() there are rounding problems
 	// for example 0.9 becomes 0.89
 	unsigned long long uvalue = llrint(value * (calculated_number)100000);
+#else
+	unsigned long long uvalue = value * (calculated_number)100000;
+#endif
 
 	// print each digit
 	do *wstr++ = (char)(48 + (uvalue % 10)); while(uvalue /= 10);
