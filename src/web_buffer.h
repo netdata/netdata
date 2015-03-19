@@ -37,7 +37,6 @@ struct web_buffer {
 #define web_buffer_reset(wb) wb->buffer[wb->bytes = 0] = '\0'
 
 void web_buffer_strcpy(struct web_buffer *wb, const char *txt);
-int print_calculated_number(char *str, calculated_number value);
 void web_buffer_rrd_value(struct web_buffer *wb, calculated_number value);
 
 void web_buffer_jsdate(struct web_buffer *wb, int year, int month, int day, int hours, int minutes, int seconds);
