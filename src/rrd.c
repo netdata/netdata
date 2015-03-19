@@ -612,7 +612,7 @@ void rrd_stats_next_usec(RRD_STATS *st, unsigned long long microseconds)
 	if(microseconds > st->entries * st->update_every * 1000000ULL) {
 		info("History of chart %s too old. Reseting chart.", st->name);
 		rrd_stats_reset(st);
-		microseconds = 0;
+		microseconds = st->update_every * 1000000ULL;
 	}
 	st->usec_since_last_update = microseconds;
 }
