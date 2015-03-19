@@ -210,7 +210,7 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 	unsigned long size = sizeof(RRD_STATS);
 	char *cache_dir = rrd_stats_cache_dir(fullid);
 
-	debug(D_RRD_STATS, "Creating RRD_STATS for '%s.%s'.", type, id);
+	debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
 	snprintf(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
 	if(memory_mode != NETDATA_MEMORY_MODE_RAM) st = (RRD_STATS *)mymmap(fullfilename, size, ((memory_mode == NETDATA_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE));
@@ -234,6 +234,11 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 		else if(st->update_every != update_every) {
 			errno = 0;
 			error("File %s does not have the desired update frequency. Clearing it.", fullfilename);
+			bzero(st, size);
+		}
+		else if((time(NULL) - st->last_updated.tv_sec) > update_every * entries) {
+			errno = 0;
+			error("File %s is too old. Clearing it.", fullfilename);
 			bzero(st, size);
 		}
 	}
@@ -312,7 +317,7 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 	RRD_DIMENSION *rd = NULL;
 	unsigned long size = sizeof(RRD_DIMENSION) + (st->entries * sizeof(storage_number));
 
-	debug(D_RRD_STATS, "Adding dimension '%s/%s'.", st->id, id);
+	debug(D_RRD_CALLS, "Adding dimension '%s/%s'.", st->id, id);
 
 	rrd_stats_strncpy_name(filename, id, FILENAME_MAX);
 	snprintf(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
@@ -429,18 +434,18 @@ void rrd_stats_dimension_free(RRD_DIMENSION *rd)
 	if(rd->next) rrd_stats_dimension_free(rd->next);
 	// free(rd->annotations);
 	if(rd->mapped == NETDATA_MEMORY_MODE_SAVE) {
-		debug(D_RRD_STATS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_file);
+		debug(D_RRD_CALLS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_file);
 		savememory(rd->cache_file, rd, rd->memsize);
 
-		debug(D_RRD_STATS, "Unmapping dimension '%s'.", rd->name);
+		debug(D_RRD_CALLS, "Unmapping dimension '%s'.", rd->name);
 		munmap(rd, rd->memsize);
 	}
 	else if(rd->mapped == NETDATA_MEMORY_MODE_MAP) {
-		debug(D_RRD_STATS, "Unmapping dimension '%s'.", rd->name);
+		debug(D_RRD_CALLS, "Unmapping dimension '%s'.", rd->name);
 		munmap(rd, rd->memsize);
 	}
 	else {
-		debug(D_RRD_STATS, "Removing dimension '%s'.", rd->name);
+		debug(D_RRD_CALLS, "Removing dimension '%s'.", rd->name);
 		free(rd);
 	}
 }
@@ -457,14 +462,14 @@ void rrd_stats_free_all(void)
 		st->dimensions = NULL;
 
 		if(st->mapped == NETDATA_MEMORY_MODE_SAVE) {
-			debug(D_RRD_STATS, "Saving stats '%s' to '%s'.", st->name, st->cache_file);
+			debug(D_RRD_CALLS, "Saving stats '%s' to '%s'.", st->name, st->cache_file);
 			savememory(st->cache_file, st, st->memsize);
 
-			debug(D_RRD_STATS, "Unmapping stats '%s'.", st->name);
+			debug(D_RRD_CALLS, "Unmapping stats '%s'.", st->name);
 			munmap(st, st->memsize);
 		}
 		else if(st->mapped == NETDATA_MEMORY_MODE_MAP) {
-			debug(D_RRD_STATS, "Unmapping stats '%s'.", st->name);
+			debug(D_RRD_CALLS, "Unmapping stats '%s'.", st->name);
 			munmap(st, st->memsize);
 		}
 		else
@@ -487,13 +492,13 @@ void rrd_stats_save_all(void)
 		pthread_rwlock_wrlock(&st->rwlock);
 
 		if(st->mapped == NETDATA_MEMORY_MODE_SAVE) {
-			debug(D_RRD_STATS, "Saving stats '%s' to '%s'.", st->name, st->cache_file);
+			debug(D_RRD_CALLS, "Saving stats '%s' to '%s'.", st->name, st->cache_file);
 			savememory(st->cache_file, st, st->memsize);
 		}
 
 		for(rd = st->dimensions; rd ; rd = rd->next) {
 			if(rd->mapped == NETDATA_MEMORY_MODE_SAVE) {
-				debug(D_RRD_STATS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_file);
+				debug(D_RRD_CALLS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_file);
 				savememory(rd->cache_file, rd, rd->memsize);
 			}
 		}
@@ -506,7 +511,7 @@ void rrd_stats_save_all(void)
 
 RRD_STATS *rrd_stats_find(const char *id)
 {
-	debug(D_RRD_STATS, "rrd_stats_find() for chart %s", id);
+	debug(D_RRD_CALLS, "rrd_stats_find() for chart %s", id);
 
 	unsigned long hash = simple_hash(id);
 
@@ -523,7 +528,7 @@ RRD_STATS *rrd_stats_find(const char *id)
 
 RRD_STATS *rrd_stats_find_bytype(const char *type, const char *id)
 {
-	debug(D_RRD_STATS, "rrd_stats_find_bytype() for chart %s.%s", type, id);
+	debug(D_RRD_CALLS, "rrd_stats_find_bytype() for chart %s.%s", type, id);
 
 	char buf[RRD_STATS_NAME_MAX + 1];
 
@@ -539,7 +544,7 @@ RRD_STATS *rrd_stats_find_bytype(const char *type, const char *id)
 
 RRD_STATS *rrd_stats_find_byname(const char *name)
 {
-	debug(D_RRD_STATS, "rrd_stats_find_byname() for chart %s", name);
+	debug(D_RRD_CALLS, "rrd_stats_find_byname() for chart %s", name);
 
 	char b[CONFIG_MAX_VALUE + 1];
 
@@ -558,7 +563,7 @@ RRD_STATS *rrd_stats_find_byname(const char *name)
 
 RRD_DIMENSION *rrd_stats_dimension_find(RRD_STATS *st, const char *id)
 {
-	debug(D_RRD_STATS, "rrd_stats_dimension_find() for chart %s, dimension %s", st->name, id);
+	debug(D_RRD_CALLS, "rrd_stats_dimension_find() for chart %s, dimension %s", st->name, id);
 
 	unsigned long hash = simple_hash(id);
 
@@ -574,7 +579,7 @@ RRD_DIMENSION *rrd_stats_dimension_find(RRD_STATS *st, const char *id)
 
 int rrd_stats_dimension_hide(RRD_STATS *st, const char *id)
 {
-	debug(D_RRD_STATS, "rrd_stats_dimension_hide() for chart %s, dimension %s", st->name, id);
+	debug(D_RRD_CALLS, "rrd_stats_dimension_hide() for chart %s, dimension %s", st->name, id);
 
 	RRD_DIMENSION *rd = rrd_stats_dimension_find(st, id);
 	if(!rd) {
@@ -588,7 +593,7 @@ int rrd_stats_dimension_hide(RRD_STATS *st, const char *id)
 
 void rrd_stats_dimension_set_by_pointer(RRD_STATS *st, RRD_DIMENSION *rd, collected_number value)
 {
-	debug(D_RRD_STATS, "rrd_stats_dimension_set() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, st->name, rd->name, value);
+	debug(D_RRD_CALLS, "rrd_stats_dimension_set() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, st->name, rd->name, value);
 	
 	gettimeofday(&rd->last_collected_time, NULL);
 	rd->collected_value = value;
@@ -608,7 +613,7 @@ int rrd_stats_dimension_set(RRD_STATS *st, const char *id, collected_number valu
 
 void rrd_stats_next_usec(RRD_STATS *st, unsigned long long microseconds)
 {
-	debug(D_RRD_STATS, "rrd_stats_next() for chart %s with microseconds %llu", st->name, microseconds);
+	debug(D_RRD_CALLS, "rrd_stats_next() for chart %s with microseconds %llu", st->name, microseconds);
 
 	if(st->debug) debug(D_RRD_STATS, "%s: NEXT: %llu microseconds", st->name, microseconds);
 	st->usec_since_last_update = microseconds;
@@ -634,7 +639,7 @@ void rrd_stats_next_plugins(RRD_STATS *st)
 
 unsigned long long rrd_stats_done(RRD_STATS *st)
 {
-	debug(D_RRD_STATS, "rrd_stats_done() for chart %s", st->name);
+	debug(D_RRD_CALLS, "rrd_stats_done() for chart %s", st->name);
 
 	RRD_DIMENSION *rd, *last;
 	int oldstate;
@@ -645,8 +650,8 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 	// a read lock is OK here
 	pthread_rwlock_rdlock(&st->rwlock);
 
-	if(st->usec_since_last_update > st->entries * st->update_every * 1000000ULL || usecdiff(&st->last_collected_time, &st->last_updated) > st->entries * st->update_every * 1000000ULL) {
-		info("History of chart %s too old. Reseting chart.", st->name);
+	if(st->usec_since_last_update > st->entries * st->update_every * 1000000ULL) {
+		info("Chart chart %s took too long to be updated (%0.3Lf secs). Reseting chart history.", st->name, (long double)(st->usec_since_last_update / 1000000.0));
 		rrd_stats_reset(st);
 		st->usec_since_last_update = st->update_every * 1000000ULL;
 	}
@@ -666,6 +671,13 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 		st->last_updated.tv_usec = ut % 1000000ULL;
 
 		if(st->debug) debug(D_RRD_STATS, "%s: initializing last_updated to now - %llu microseconds (%0.3Lf)", st->name, st->usec_since_last_update, (long double)ut/1000000.0);
+	}
+
+	if(usecdiff(&st->last_collected_time, &st->last_updated) > st->entries * st->update_every * 1000000ULL) {
+		info("History of chart %s too old (last updated at %u, last collected at %u). Reseting chart.", st->name, st->last_updated.tv_sec, st->last_collected_time.tv_sec);
+		rrd_stats_reset(st);
+		st->usec_since_last_update = st->update_every * 1000000ULL;
+		return(st->usec_since_last_update);
 	}
 
 	unsigned long long last_ut = st->last_updated.tv_sec * 1000000ULL + st->last_updated.tv_usec;
