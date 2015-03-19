@@ -645,7 +645,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 	// a read lock is OK here
 	pthread_rwlock_rdlock(&st->rwlock);
 
-	if(st->usec_since_last_update > st->entries * st->update_every * 1000000ULL) {
+	if(st->usec_since_last_update > st->entries * st->update_every * 1000000ULL || usecdiff(&st->last_collected_time, &st->last_updated) > st->entries * st->update_every * 1000000ULL) {
 		info("History of chart %s too old. Reseting chart.", st->name);
 		rrd_stats_reset(st);
 		st->usec_since_last_update = st->update_every * 1000000ULL;
