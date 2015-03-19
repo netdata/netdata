@@ -38,8 +38,10 @@ int print_calculated_number(char *str, calculated_number value)
 	if(sign) *wstr++ = '-';
 
 	// reverse it
-	wstr--;
-	strreverse(str, wstr);
+    char *begin = str, *end = --wstr, aux;
+    while (end > begin) aux = *end, *end-- = *begin, *begin++ = aux;
+	// wstr--;
+	// strreverse(str, wstr);
 
 	// remove trailing zeros
 	int decimal = 5;

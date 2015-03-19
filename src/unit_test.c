@@ -1,17 +1,186 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/resource.h>
 
 #include "storage_number.h"
 #include "rrd.h"
 #include "log.h"
 #include "web_buffer.h"
 
+#define ACCURACY_LOSS 0.0000001
+
+int check_storage_number(calculated_number n, int debug) {
+	char buffer[100];
+
+	storage_number s = pack_storage_number(n);
+	calculated_number d = unpack_storage_number(s);
+
+	calculated_number ddiff = d - n;
+	calculated_number dcdiff = ddiff * 100.0 / n;
+
+	if(dcdiff < 0) dcdiff = -dcdiff;
+
+	size_t len = print_calculated_number(buffer, d);
+	calculated_number p = strtold(buffer, NULL);
+	calculated_number pdiff = n - p;
+	calculated_number pcdiff = pdiff * 100.0 / n;
+	if(pcdiff < 0) pcdiff = -pcdiff;
+
+	if(debug) {
+		fprintf(stderr,
+			CALCULATED_NUMBER_FORMAT " original\n"
+			CALCULATED_NUMBER_FORMAT " packed and unpacked, (stored as 0x%08X, diff " CALCULATED_NUMBER_FORMAT ", " CALCULATED_NUMBER_FORMAT "%%)\n"
+			"%s printed after unpacked (%lu bytes)\n"
+			CALCULATED_NUMBER_FORMAT " re-parsed from printed (diff " CALCULATED_NUMBER_FORMAT ", " CALCULATED_NUMBER_FORMAT "%%)\n\n",
+			n,
+			d, s, ddiff, dcdiff,
+			buffer,
+			len, p, pdiff, pcdiff
+		);
+		if(len != strlen(buffer)) fprintf(stderr, "ERROR: printed number %s is reported to have length %lu but it has %lu\n", buffer, len, strlen(buffer));
+		if(dcdiff > ACCURACY_LOSS) fprintf(stderr, "WARNING: packing number " CALCULATED_NUMBER_FORMAT " has accuracy loss %0.7Lf %%\n", n, dcdiff);
+		if(pcdiff > ACCURACY_LOSS) fprintf(stderr, "WARNING: re-parsing the packed, unpacked and printed number " CALCULATED_NUMBER_FORMAT " has accuracy loss %0.7Lf %%\n", n, pcdiff);
+	}
+
+	if(len != strlen(buffer)) return 1;
+	if(dcdiff > ACCURACY_LOSS) return 3;
+	if(pcdiff > ACCURACY_LOSS) return 4;
+	return 0;
+}
+
+void benchmark_storage_number(int loop, int multiplier) {
+	int i, j;
+	calculated_number n, d;
+	storage_number s;
+	unsigned long long user, system, total, mine, their;
+
+	char buffer[100];
+
+	struct rusage now, last;
+
+	fprintf(stderr, "\n\nBenchmarking %d numbers, please wait...\n\n", loop);
+
+	// ------------------------------------------------------------------------
+
+	fprintf(stderr, "SYSTEM  LONG DOUBLE    SIZE: %lu bytes\n", sizeof(calculated_number));
+	fprintf(stderr, "NETDATA FLOATING POINT SIZE: %lu bytes\n", sizeof(storage_number));
+
+	mine = (calculated_number)sizeof(storage_number) * (calculated_number)loop;
+	their = (calculated_number)sizeof(calculated_number) * (calculated_number)loop;
+	
+	if(mine > their) {
+		fprintf(stderr, "\nNETDATA NEEDS %0.2Lf TIMES MORE MEMORY. Sorry!\n", (long double)(mine / their));
+	}
+	else {
+		fprintf(stderr, "\nNETDATA INTERNAL FLOATING POINT ARITHMETICS NEEDS %0.2Lf TIMES LESS MEMORY.\n", (long double)(their / mine));
+	}
+
+	fprintf(stderr, "\nNETDATA FLOATING POINT\n");
+	fprintf(stderr, "MIN POSITIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", (calculated_number)STORAGE_NUMBER_POSITIVE_MIN);
+	fprintf(stderr, "MAX POSITIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", (calculated_number)STORAGE_NUMBER_POSITIVE_MAX);
+	fprintf(stderr, "MIN NEGATIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", (calculated_number)STORAGE_NUMBER_NEGATIVE_MIN);
+	fprintf(stderr, "MAX NEGATIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", (calculated_number)STORAGE_NUMBER_NEGATIVE_MAX);
+	fprintf(stderr, "Maximum accuracy loss: " CALCULATED_NUMBER_FORMAT "%%\n\n\n", (calculated_number)ACCURACY_LOSS);
+
+	// ------------------------------------------------------------------------
+
+	fprintf(stderr, "INTERNAL LONG DOUBLE PRINTING: ");
+	getrusage(RUSAGE_SELF, &last);
+
+	// do the job
+	for(j = 1; j < 11 ;j++) {
+		n = STORAGE_NUMBER_POSITIVE_MIN * j;
+
+		for(i = 0; i < loop ;i++) {
+			n *= multiplier;
+			if(n > STORAGE_NUMBER_POSITIVE_MAX) n = STORAGE_NUMBER_POSITIVE_MIN;
+
+			print_calculated_number(buffer, n);
+		}
+	}
+
+	getrusage(RUSAGE_SELF, &now);
+	user   = now.ru_utime.tv_sec * 1000000ULL + now.ru_utime.tv_usec - last.ru_utime.tv_sec * 1000000ULL + last.ru_utime.tv_usec;
+	system = now.ru_stime.tv_sec * 1000000ULL + now.ru_stime.tv_usec - last.ru_stime.tv_sec * 1000000ULL + last.ru_stime.tv_usec;
+	total  = user + system;
+	mine = total;
+
+	fprintf(stderr, "user %0.5Lf, system %0.5Lf, total %0.5Lf\n", (long double)(user / 1000000.0), (long double)(system / 1000000.0), (long double)(total / 1000000.0));
+	
+	// ------------------------------------------------------------------------
+
+	fprintf(stderr, "SYSTEM   LONG DOUBLE PRINTING: ");
+	getrusage(RUSAGE_SELF, &last);
+
+	// do the job
+	for(j = 1; j < 11 ;j++) {
+		n = STORAGE_NUMBER_POSITIVE_MIN * j;
+
+		for(i = 0; i < loop ;i++) {
+			n *= multiplier;
+			if(n > STORAGE_NUMBER_POSITIVE_MAX) n = STORAGE_NUMBER_POSITIVE_MIN;
+			snprintf(buffer, 100, CALCULATED_NUMBER_FORMAT, n);
+		}
+	}
+
+	getrusage(RUSAGE_SELF, &now);
+	user   = now.ru_utime.tv_sec * 1000000ULL + now.ru_utime.tv_usec - last.ru_utime.tv_sec * 1000000ULL + last.ru_utime.tv_usec;
+	system = now.ru_stime.tv_sec * 1000000ULL + now.ru_stime.tv_usec - last.ru_stime.tv_sec * 1000000ULL + last.ru_stime.tv_usec;
+	total  = user + system;
+	their = total;
+
+	fprintf(stderr, "user %0.5Lf, system %0.5Lf, total %0.5Lf\n", (long double)(user / 1000000.0), (long double)(system / 1000000.0), (long double)(total / 1000000.0));
+
+	if(mine > total) {
+		fprintf(stderr, "NETDATA CODE IS SLOWER %0.2Lf TIMES\n", (long double)(mine / their));
+	}
+	else {
+		fprintf(stderr, "NETDATA CODE IS  F A S T E R  %0.2Lf TIMES\n", (long double)(their / mine));
+	}
+
+	// ------------------------------------------------------------------------
+
+	fprintf(stderr, "\nINTERNAL LONG DOUBLE PRINTING WITH PACK / UNPACK: ");
+	getrusage(RUSAGE_SELF, &last);
+
+	// do the job
+	for(j = 1; j < 11 ;j++) {
+		n = STORAGE_NUMBER_POSITIVE_MIN * j;
+
+		for(i = 0; i < loop ;i++) {
+			n *= multiplier;
+			if(n > STORAGE_NUMBER_POSITIVE_MAX) n = STORAGE_NUMBER_POSITIVE_MIN;
+
+			s = pack_storage_number(n);
+			d = unpack_storage_number(s);
+			print_calculated_number(buffer, d);
+		}
+	}
+
+	getrusage(RUSAGE_SELF, &now);
+	user   = now.ru_utime.tv_sec * 1000000ULL + now.ru_utime.tv_usec - last.ru_utime.tv_sec * 1000000ULL + last.ru_utime.tv_usec;
+	system = now.ru_stime.tv_sec * 1000000ULL + now.ru_stime.tv_usec - last.ru_stime.tv_sec * 1000000ULL + last.ru_stime.tv_usec;
+	total  = user + system;
+	mine = total;
+
+	fprintf(stderr, "user %0.5Lf, system %0.5Lf, total %0.5Lf\n", (long double)(user / 1000000.0), (long double)(system / 1000000.0), (long double)(total / 1000000.0));
+
+	if(mine > their) {
+		fprintf(stderr, "WITH PACKING UNPACKING NETDATA CODE IS SLOWER %0.2Lf TIMES\n", (long double)(mine / their));
+	}
+	else {
+		fprintf(stderr, "EVEN WITH PACKING AND UNPACKING, NETDATA CODE IS  F A S T E R  %0.2Lf TIMES\n", (long double)(their / mine));
+	}
+
+	// ------------------------------------------------------------------------
+
+}
+
 int unit_test_storage()
 {
-	char buffer[100], *msg;
-	storage_number s;
-	calculated_number c, a = 0, d, ddiff, dcdiff, f, p, pdiff, pcdiff, maxddiff = 0, maxpdiff = 0;
-	int i, j, g, r = 0, l;
+	calculated_number c, a = 0;
+	int i, j, g, r = 0;
 
 	for(g = -1; g <= 1 ; g++) {
 		a = 0;
@@ -22,50 +191,15 @@ int unit_test_storage()
 			a += 0.0000001;
 			c = a * g;
 			for(i = 0; i < 21 ;i++, c *= 10) {
-				if(c > 0 && c < 0.00001) continue;
-				if(c < 0 && c > -0.00001) continue;
+				if(c > 0 && c < STORAGE_NUMBER_POSITIVE_MIN) continue;
+				if(c < 0 && c > STORAGE_NUMBER_NEGATIVE_MAX) continue;
 
-				s = pack_storage_number(c);
-				d = unpack_storage_number(s);
-
-				ddiff = d - c;
-				dcdiff = ddiff * 100.0 / c;
-				if(dcdiff < 0) dcdiff = -dcdiff;
-				if(dcdiff > maxddiff) maxddiff = dcdiff;
-
-				f = d / c;
-
-				l = print_calculated_number(buffer, d);
-				p = strtold(buffer, NULL);
-				pdiff = c - p;
-				pcdiff = pdiff * 100.0 / c;
-				if(pcdiff < 0) pcdiff = -pcdiff;
-				if(pcdiff > maxpdiff) maxpdiff = pcdiff;
-
-				if(f < 0.99999 || f > 1.00001) {
-					msg = "ERROR";
-					r++;
-				}
-				else msg = "OK";
-
-				fprintf(stderr, "%s\n"
-					CALCULATED_NUMBER_FORMAT " original\n"
-					CALCULATED_NUMBER_FORMAT " unpacked, (stored as 0x%08X, diff " CALCULATED_NUMBER_FORMAT ", " CALCULATED_NUMBER_FORMAT "%%)\n"
-					"%s printed (%d bytes)\n"
-					CALCULATED_NUMBER_FORMAT " re-parsed with diff " CALCULATED_NUMBER_FORMAT ", " CALCULATED_NUMBER_FORMAT "%%\n\n",
-					msg,
-					c,
-					d, s, ddiff, dcdiff,
-					buffer,
-					l, p, pdiff, pcdiff
-				);
+				if(check_storage_number(c, 1)) return 1;
 			}
 		}
 	}
 
-	fprintf(stderr, "Worst accuracy loss on unpacked numbers: " CALCULATED_NUMBER_FORMAT "%%\n", maxddiff);
-	fprintf(stderr, "Worst accuracy loss on printed numbers: " CALCULATED_NUMBER_FORMAT "%%\n", maxpdiff);
-
+	benchmark_storage_number(1000000, 2);
 	return r;
 }
 
