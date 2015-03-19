@@ -26,14 +26,14 @@
 #define PFWORDS_INCREASE_STEP 200
 
 pfwords *pfwords_add(pfwords *fw, char *str) {
-	debug(D_PROCFILE, PF_PREFIX ":	adding word No %d: '%s'\n", fw->len, str);
+	debug(D_PROCFILE, PF_PREFIX ":	adding word No %d: '%s'", fw->len, str);
 
 	if(fw->len == fw->size) {
-		debug(D_PROCFILE, PF_PREFIX ":	expanding words\n");
+		debug(D_PROCFILE, PF_PREFIX ":	expanding words");
 
 		pfwords *new = realloc(fw, sizeof(pfwords) + (fw->size + PFWORDS_INCREASE_STEP) * sizeof(char *));
 		if(!new) {
-			error(PF_PREFIX ":	failed to expand words\n");
+			error(PF_PREFIX ":	failed to expand words");
 			free(fw);
 			return NULL;
 		}
@@ -47,7 +47,7 @@ pfwords *pfwords_add(pfwords *fw, char *str) {
 }
 
 pfwords *pfwords_new(void) {
-	debug(D_PROCFILE, PF_PREFIX ":	initializing words\n");
+	debug(D_PROCFILE, PF_PREFIX ":	initializing words");
 
 	pfwords *new = malloc(sizeof(pfwords) + PFWORDS_INCREASE_STEP * sizeof(char *));
 	if(!new) return NULL;
@@ -58,12 +58,12 @@ pfwords *pfwords_new(void) {
 }
 
 void pfwords_reset(pfwords *fw) {
-	debug(D_PROCFILE, PF_PREFIX ":	reseting words\n");
+	debug(D_PROCFILE, PF_PREFIX ":	reseting words");
 	fw->len = 0;
 }
 
 void pfwords_free(pfwords *fw) {
-	debug(D_PROCFILE, PF_PREFIX ":	freeing words\n");
+	debug(D_PROCFILE, PF_PREFIX ":	freeing words");
 
 	free(fw);
 }
@@ -75,14 +75,14 @@ void pfwords_free(pfwords *fw) {
 #define PFLINES_INCREASE_STEP 10
 
 pflines *pflines_add(pflines *fl, uint32_t first_word) {
-	debug(D_PROCFILE, PF_PREFIX ":	adding line %d at word %d\n", fl->len, first_word);
+	debug(D_PROCFILE, PF_PREFIX ":	adding line %d at word %d", fl->len, first_word);
 
 	if(fl->len == fl->size) {
-		debug(D_PROCFILE, PF_PREFIX ":	expanding lines\n");
+		debug(D_PROCFILE, PF_PREFIX ":	expanding lines");
 
 		pflines *new = realloc(fl, sizeof(pflines) + (fl->size + PFLINES_INCREASE_STEP) * sizeof(ffline));
 		if(!new) {
-			error(PF_PREFIX ":	failed to expand lines\n");
+			error(PF_PREFIX ":	failed to expand lines");
 			free(fl);
 			return NULL;
 		}
@@ -97,7 +97,7 @@ pflines *pflines_add(pflines *fl, uint32_t first_word) {
 }
 
 pflines *pflines_new(void) {
-	debug(D_PROCFILE, PF_PREFIX ":	initializing lines\n");
+	debug(D_PROCFILE, PF_PREFIX ":	initializing lines");
 
 	pflines *new = malloc(sizeof(pflines) + PFLINES_INCREASE_STEP * sizeof(ffline));
 	if(!new) return NULL;
@@ -108,13 +108,13 @@ pflines *pflines_new(void) {
 }
 
 void pflines_reset(pflines *fl) {
-	debug(D_PROCFILE, PF_PREFIX ":	reseting lines\n");
+	debug(D_PROCFILE, PF_PREFIX ":	reseting lines");
 
 	fl->len = 0;
 }
 
 void pflines_free(pflines *fl) {
-	debug(D_PROCFILE, PF_PREFIX ":	freeing lines\n");
+	debug(D_PROCFILE, PF_PREFIX ":	freeing lines");
 
 	free(fl);
 }
@@ -131,7 +131,7 @@ void pflines_free(pflines *fl) {
 #define PF_CHAR_IS_WORD		2
 
 void procfile_close(procfile *ff) {
-	debug(D_PROCFILE, PF_PREFIX ": Closing file '%s'. Reason: %s\n", ff->filename, strerror(errno));
+	debug(D_PROCFILE, PF_PREFIX ": Closing file '%s'. Reason: %s", ff->filename, strerror(errno));
 
 	if(ff->lines) pflines_free(ff->lines);
 	if(ff->words) pfwords_free(ff->words);
@@ -141,7 +141,7 @@ void procfile_close(procfile *ff) {
 }
 
 procfile *procfile_parser(procfile *ff) {
-	debug(D_PROCFILE, PF_PREFIX ": Parsing file '%s'\n", ff->filename);
+	debug(D_PROCFILE, PF_PREFIX ": Parsing file '%s'", ff->filename);
 
 	char *s = ff->data, *e = ff->data, *t = ff->data;
 	uint32_t l = 0, w = 0;
@@ -181,7 +181,7 @@ procfile *procfile_parser(procfile *ff) {
 				ff->lines->lines[l].words++;
 				w++;
 
-				debug(D_PROCFILE, PF_PREFIX ":	ended line %d with %d words\n", l, ff->lines->lines[l].words);
+				debug(D_PROCFILE, PF_PREFIX ":	ended line %d with %d words", l, ff->lines->lines[l].words);
 
 				ff->lines = pflines_add(ff->lines, w);
 				if(!ff->lines) goto cleanup;
@@ -214,24 +214,24 @@ procfile *procfile_parser(procfile *ff) {
 	return ff;
 
 cleanup:
-	error(PF_PREFIX ": Failed to parse file '%s'. Reason: %s\n", ff->filename, strerror(errno));
+	error(PF_PREFIX ": Failed to parse file '%s'. Reason: %s", ff->filename, strerror(errno));
 	procfile_close(ff);
 	return NULL;
 }
 
 procfile *procfile_readall(procfile *ff) {
-	debug(D_PROCFILE, PF_PREFIX ": Reading file '%s'.\n", ff->filename);
+	debug(D_PROCFILE, PF_PREFIX ": Reading file '%s'.", ff->filename);
 
 	ssize_t s = 0, r = ff->size, x = ff->size;
 	ff->len = 0;
 
 	while(r == x) {
 		if(s) {
-			debug(D_PROCFILE, PF_PREFIX ": Expanding data buffer for file '%s'.\n", ff->filename);
+			debug(D_PROCFILE, PF_PREFIX ": Expanding data buffer for file '%s'.", ff->filename);
 
 			procfile *new = realloc(ff, sizeof(procfile) + ff->size + PROCFILE_INCREMENT_BUFFER);
 			if(!new) {
-				error(PF_PREFIX ": Cannot allocate memory for file '%s'. Reason: %s\n", ff->filename, strerror(errno));
+				error(PF_PREFIX ": Cannot allocate memory for file '%s'. Reason: %s", ff->filename, strerror(errno));
 				procfile_close(ff);
 				return NULL;
 			}
@@ -243,7 +243,7 @@ procfile *procfile_readall(procfile *ff) {
 		debug(D_PROCFILE, "Reading file '%s', from position %ld with length %ld", ff->filename, s, ff->size - s);
 		r = read(ff->fd, &ff->data[s], ff->size - s);
 		if(r == -1) {
-			error(PF_PREFIX ": Cannot read from file '%s'. Reason: %s\n", ff->filename, strerror(errno));
+			error(PF_PREFIX ": Cannot read from file '%s'. Reason: %s", ff->filename, strerror(errno));
 			procfile_close(ff);
 			return NULL;
 		}
@@ -254,7 +254,7 @@ procfile *procfile_readall(procfile *ff) {
 
 	debug(D_PROCFILE, "Rewinding file '%s'", ff->filename);
 	if(lseek(ff->fd, 0, SEEK_SET) == -1) {
-		error(PF_PREFIX ": Cannot rewind on file '%s'.\n", ff->filename);
+		error(PF_PREFIX ": Cannot rewind on file '%s'.", ff->filename);
 		procfile_close(ff);
 		return NULL;
 	}
@@ -269,17 +269,17 @@ procfile *procfile_readall(procfile *ff) {
 }
 
 procfile *procfile_open(const char *filename, const char *separators) {
-	debug(D_PROCFILE, PF_PREFIX ": Opening file '%s'\n", filename);
+	debug(D_PROCFILE, PF_PREFIX ": Opening file '%s'", filename);
 
 	int fd = open(filename, O_RDONLY, 0666);
 	if(fd == -1) {
-		error(PF_PREFIX ": Cannot open file '%s'. Reason: %s\n", filename, strerror(errno));
+		error(PF_PREFIX ": Cannot open file '%s'. Reason: %s", filename, strerror(errno));
 		return NULL;
 	}
 
 	procfile *ff = malloc(sizeof(procfile) + PROCFILE_INITIAL_BUFFER);
 	if(!ff) {
-		error(PF_PREFIX ": Cannot allocate memory for file '%s'. Reason: %s\n", ff->filename, strerror(errno));
+		error(PF_PREFIX ": Cannot allocate memory for file '%s'. Reason: %s", ff->filename, strerror(errno));
 		close(fd);
 		return NULL;
 	}
@@ -295,7 +295,7 @@ procfile *procfile_open(const char *filename, const char *separators) {
 	ff->words = pfwords_new();
 
 	if(!ff->lines || !ff->words) {
-		error(PF_PREFIX ": Cannot initialize parser for file '%s'. Reason: %s\n", ff->filename, strerror(errno));
+		error(PF_PREFIX ": Cannot initialize parser for file '%s'. Reason: %s", ff->filename, strerror(errno));
 		procfile_close(ff);
 		return NULL;
 	}
@@ -324,16 +324,16 @@ void procfile_print(procfile *ff) {
 	uint32_t words, w;
 	char *s;
 
-	debug(D_PROCFILE, "File '%s' with %d lines and %d words\n", ff->filename, ff->lines->len, ff->words->len);
+	debug(D_PROCFILE, "File '%s' with %d lines and %d words", ff->filename, ff->lines->len, ff->words->len);
 
 	for(l = 0; l < lines ;l++) {
 		words = procfile_linewords(ff, l);
 
-		debug(D_PROCFILE, "	line %d starts at word %d and has %d words\n", l, ff->lines->lines[l].first, ff->lines->lines[l].words);
+		debug(D_PROCFILE, "	line %d starts at word %d and has %d words", l, ff->lines->lines[l].first, ff->lines->lines[l].words);
 
 		for(w = 0; w < words ;w++) {
 			s = procfile_lineword(ff, l, w);
-			debug(D_PROCFILE, "		[%d.%d] '%s'\n", l, w, s);
+			debug(D_PROCFILE, "		[%d.%d] '%s'", l, w, s);
 		}
 	}
 }

@@ -504,6 +504,8 @@ void rrd_stats_save_all(void)
 
 RRD_STATS *rrd_stats_find(const char *id)
 {
+	debug(D_RRD_STATS, "rrd_stats_find() for chart %s", id);
+
 	unsigned long hash = simple_hash(id);
 
 	pthread_rwlock_rdlock(&root_rwlock);
@@ -519,6 +521,8 @@ RRD_STATS *rrd_stats_find(const char *id)
 
 RRD_STATS *rrd_stats_find_bytype(const char *type, const char *id)
 {
+	debug(D_RRD_STATS, "rrd_stats_find_bytype() for chart %s.%s", type, id);
+
 	char buf[RRD_STATS_NAME_MAX + 1];
 
 	strncpy(buf, type, RRD_STATS_NAME_MAX - 1);
@@ -533,6 +537,8 @@ RRD_STATS *rrd_stats_find_bytype(const char *type, const char *id)
 
 RRD_STATS *rrd_stats_find_byname(const char *name)
 {
+	debug(D_RRD_STATS, "rrd_stats_find_byname() for chart %s", name);
+
 	char b[CONFIG_MAX_VALUE + 1];
 
 	rrd_stats_strncpy_name(b, name, CONFIG_MAX_VALUE);
@@ -550,6 +556,8 @@ RRD_STATS *rrd_stats_find_byname(const char *name)
 
 RRD_DIMENSION *rrd_stats_dimension_find(RRD_STATS *st, const char *id)
 {
+	debug(D_RRD_STATS, "rrd_stats_dimension_find() for chart %s, dimension %s", st->name, id);
+
 	unsigned long hash = simple_hash(id);
 
 	RRD_DIMENSION *rd = st->dimensions;
@@ -564,6 +572,8 @@ RRD_DIMENSION *rrd_stats_dimension_find(RRD_STATS *st, const char *id)
 
 int rrd_stats_dimension_hide(RRD_STATS *st, const char *id)
 {
+	debug(D_RRD_STATS, "rrd_stats_dimension_hide() for chart %s, dimension %s", st->name, id);
+
 	RRD_DIMENSION *rd = rrd_stats_dimension_find(st, id);
 	if(!rd) {
 		error("Cannot find dimension with id '%s' on stats '%s' (%s).", id, st->name, st->id);
@@ -576,7 +586,7 @@ int rrd_stats_dimension_hide(RRD_STATS *st, const char *id)
 
 void rrd_stats_dimension_set_by_pointer(RRD_STATS *st, RRD_DIMENSION *rd, collected_number value)
 {
-	if(st) {;}
+	debug(D_RRD_STATS, "rrd_stats_dimension_set() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, st->name, rd->name, value);
 	
 	gettimeofday(&rd->last_collected_time, NULL);
 	rd->collected_value = value;
@@ -596,6 +606,8 @@ int rrd_stats_dimension_set(RRD_STATS *st, const char *id, collected_number valu
 
 void rrd_stats_next_usec(RRD_STATS *st, unsigned long long microseconds)
 {
+	debug(D_RRD_STATS, "rrd_stats_next() for chart %s with microseconds %llu", st->name, microseconds);
+
 	if(st->debug) debug(D_RRD_STATS, "%s: NEXT: %llu microseconds", st->name, microseconds);
 	if(microseconds > st->entries * st->update_every * 1000000ULL) {
 		info("History of chart %s too old. Reseting chart.", st->name);
@@ -625,6 +637,8 @@ void rrd_stats_next_plugins(RRD_STATS *st)
 
 unsigned long long rrd_stats_done(RRD_STATS *st)
 {
+	debug(D_RRD_STATS, "rrd_stats_done() for chart %s", st->name);
+
 	RRD_DIMENSION *rd, *last;
 	int oldstate;
 
