@@ -240,6 +240,7 @@ procfile *procfile_readall(procfile *ff) {
 			x = PROCFILE_INCREMENT_BUFFER;
 		}
 
+		debug(D_PROCFILE, "Reading file '%s', from position %ld with length %ld", ff->filename, s, ff->size - s);
 		r = read(ff->fd, &ff->data[s], ff->size - s);
 		if(r == -1) {
 			error(PF_PREFIX ": Cannot read from file '%s'. Reason: %s\n", ff->filename, strerror(errno));
@@ -251,6 +252,7 @@ procfile *procfile_readall(procfile *ff) {
 		s = ff->len;
 	}
 
+	debug(D_PROCFILE, "Rewinding file '%s'", ff->filename);
 	if(lseek(ff->fd, 0, SEEK_SET) == -1) {
 		error(PF_PREFIX ": Cannot rewind on file '%s'.\n", ff->filename);
 		procfile_close(ff);
