@@ -8,7 +8,7 @@
 #include "log.h"
 #include "web_buffer.h"
 
-#define ACCURACY_LOSS 100.0000001
+#define ACCURACY_LOSS 0.0000001
 
 int check_storage_number(calculated_number n, int debug) {
 	char buffer[100];
@@ -31,14 +31,14 @@ int check_storage_number(calculated_number n, int debug) {
 		fprintf(stderr,
 			CALCULATED_NUMBER_FORMAT " original\n"
 			CALCULATED_NUMBER_FORMAT " packed and unpacked, (stored as 0x%08X, diff " CALCULATED_NUMBER_FORMAT ", " CALCULATED_NUMBER_FORMAT "%%)\n"
-			"%s printed after unpacked (%lu bytes)\n"
+			"%s printed after unpacked (%zu bytes)\n"
 			CALCULATED_NUMBER_FORMAT " re-parsed from printed (diff " CALCULATED_NUMBER_FORMAT ", " CALCULATED_NUMBER_FORMAT "%%)\n\n",
 			n,
 			d, s, ddiff, dcdiff,
 			buffer,
 			len, p, pdiff, pcdiff
 		);
-		if(len != strlen(buffer)) fprintf(stderr, "ERROR: printed number %s is reported to have length %lu but it has %lu\n", buffer, len, strlen(buffer));
+		if(len != strlen(buffer)) fprintf(stderr, "ERROR: printed number %s is reported to have length %zu but it has %zu\n", buffer, len, strlen(buffer));
 		if(dcdiff > ACCURACY_LOSS) fprintf(stderr, "WARNING: packing number " CALCULATED_NUMBER_FORMAT " has accuracy loss %0.7Lf %%\n", n, dcdiff);
 		if(pcdiff > ACCURACY_LOSS) fprintf(stderr, "WARNING: re-parsing the packed, unpacked and printed number " CALCULATED_NUMBER_FORMAT " has accuracy loss %0.7Lf %%\n", n, pcdiff);
 	}
@@ -63,8 +63,8 @@ void benchmark_storage_number(int loop, int multiplier) {
 
 	// ------------------------------------------------------------------------
 
-	fprintf(stderr, "SYSTEM  LONG DOUBLE    SIZE: %lu bytes\n", sizeof(calculated_number));
-	fprintf(stderr, "NETDATA FLOATING POINT SIZE: %lu bytes\n", sizeof(storage_number));
+	fprintf(stderr, "SYSTEM  LONG DOUBLE    SIZE: %zu bytes\n", sizeof(calculated_number));
+	fprintf(stderr, "NETDATA FLOATING POINT SIZE: %zu bytes\n", sizeof(storage_number));
 
 	mine = (calculated_number)sizeof(storage_number) * (calculated_number)loop;
 	their = (calculated_number)sizeof(calculated_number) * (calculated_number)loop;

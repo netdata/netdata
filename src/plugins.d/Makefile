@@ -25,14 +25,11 @@ else
 CFLAGS = -Wall -Wextra -O3 -DBIN_DIR='$(BIN_DIR)' -DCONFIG_DIR='$(CONFIG_DIR)' -DLOG_DIR='$(LOG_DIR)' -DPLUGINS_DIR='$(PLUGINS_DIR)'
 endif
 
-.PHONY: options
+all: options plugins
+
 options:
 	@echo "    COMPILING WITH OPTIONS: $(CFLAGS)"
 
-.PHONY: all
-all: options plugins
-
-.PHONY: plugins
 plugins: apps.plugin
 
 apps.plugin: apps_plugin.c
@@ -64,3 +61,4 @@ install: all
 	fi; \
 	echo;
 
+.PHONY: options all plugins clean install

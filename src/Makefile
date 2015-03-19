@@ -14,6 +14,10 @@ ifndef PLUGINS_DIR
 PLUGINS_DIR = "plugins.d"
 endif
 
+ifndef nomath
+STORAGE_WITH_MATH = 1
+endif
+
 COMMON_FLAGS = BIN_DIR='$(BIN_DIR)' CONFIG_DIR='$(CONFIG_DIR)' LOG_DIR='$(LOG_DIR)' PLUGINS_DIR='$(PLUGINS_DIR)'
 
 ifdef debug
@@ -30,6 +34,7 @@ sources = procfile.c common.c log.c popen.c url.c config.c web_buffer.c storage_
 libs    = -pthread -lz
 
 ifdef STORAGE_WITH_MATH
+CFLAGS += -DSTORAGE_WITH_MATH=1
 libs += -lm
 endif
 
@@ -43,25 +48,22 @@ endif
 headers = $(patsubst %.c,%.h,$(sources))
 objects = $(patsubst %.c,%.o,$(sources) $(proc_sources))
 
-.PHONY: options
-options:
-	@echo "    COMPILING WITH OPTIONS: $(CFLAGS)"
-
-all: options netdata plugins
-
-netdata: $(objects)
-	@echo "    $(CC) netdata"
-	@$(CC) -o netdata $(objects) $(libs)
-
-.PHONY: plugins
-plugins:
-	$(MAKE) -C plugins.d $(COMMON_FLAGS) all
+all: show_options netdata plugins
 
 %.o: %.c ${headers}
 	@echo "    $(CC) $<"
 	@$(CC) $(CFLAGS) -c $< -o $@
 
-.PHONY: clean
+netdata: $(objects)
+	@echo "    $(CC) netdata"
+	@$(CC) -o netdata $(objects) $(libs)
+
+show_options:
+	@echo "    COMPILING WITH OPTIONS: $(CFLAGS)"
+
+plugins:
+	$(MAKE) -C plugins.d $(COMMON_FLAGS) all
+
 clean:
 	$(MAKE) -C plugins.d clean
 	rm -f *.o netdata core
@@ -76,3 +78,5 @@ install: all
 	fi; \
 	cp -f netdata $(BIN_DIR)/; \
 	echo
+
+.PHONY: all show_options plugins clean install
