@@ -174,6 +174,8 @@ void rrd_stats_reset(RRD_STATS *st)
 {
 	st->last_collected_time.tv_sec = 0;
 	st->last_collected_time.tv_usec = 0;
+	st->last_updated.tv_sec = 0;
+	st->last_updated.tv_usec = 0;
 	st->current_entry = 0;
 	st->counter_done = 0;
 
@@ -609,11 +611,6 @@ void rrd_stats_next_usec(RRD_STATS *st, unsigned long long microseconds)
 	debug(D_RRD_STATS, "rrd_stats_next() for chart %s with microseconds %llu", st->name, microseconds);
 
 	if(st->debug) debug(D_RRD_STATS, "%s: NEXT: %llu microseconds", st->name, microseconds);
-	if(microseconds > st->entries * st->update_every * 1000000ULL) {
-		info("History of chart %s too old. Reseting chart.", st->name);
-		rrd_stats_reset(st);
-		microseconds = st->update_every * 1000000ULL;
-	}
 	st->usec_since_last_update = microseconds;
 }
 
@@ -647,6 +644,12 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 
 	// a read lock is OK here
 	pthread_rwlock_rdlock(&st->rwlock);
+
+	if(st->usec_since_last_update > st->entries * st->update_every * 1000000ULL) {
+		info("History of chart %s too old. Reseting chart.", st->name);
+		rrd_stats_reset(st);
+		st->usec_since_last_update = st->update_every * 1000000ULL;
+	}
 
 	if(st->debug) debug(D_RRD_STATS, "%s: microseconds since last update: %llu", st->name, st->usec_since_last_update);
 
