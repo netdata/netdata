@@ -677,6 +677,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 		info("History of chart %s too old (last updated at %u, last collected at %u). Reseting chart.", st->name, st->last_updated.tv_sec, st->last_collected_time.tv_sec);
 		rrd_stats_reset(st);
 		st->usec_since_last_update = st->update_every * 1000000ULL;
+		pthread_rwlock_unlock(&st->rwlock);
 		return(st->usec_since_last_update);
 	}
 
