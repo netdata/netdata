@@ -133,10 +133,10 @@ void benchmark_storage_number(int loop, int multiplier) {
 	fprintf(stderr, "user %0.5Lf, system %0.5Lf, total %0.5Lf\n", (long double)(user / 1000000.0), (long double)(system / 1000000.0), (long double)(total / 1000000.0));
 
 	if(mine > total) {
-		fprintf(stderr, "NETDATA CODE IS SLOWER %0.2Lf TIMES\n", (long double)(mine / their));
+		fprintf(stderr, "NETDATA CODE IS SLOWER %0.2Lf %%\n", (long double)(mine * 100.0 / their - 100.0));
 	}
 	else {
-		fprintf(stderr, "NETDATA CODE IS  F A S T E R  %0.2Lf TIMES\n", (long double)(their / mine));
+		fprintf(stderr, "NETDATA CODE IS  F A S T E R  %0.2Lf %%\n", (long double)(their * 100.0 / mine - 100.0));
 	}
 
 	// ------------------------------------------------------------------------
@@ -167,10 +167,10 @@ void benchmark_storage_number(int loop, int multiplier) {
 	fprintf(stderr, "user %0.5Lf, system %0.5Lf, total %0.5Lf\n", (long double)(user / 1000000.0), (long double)(system / 1000000.0), (long double)(total / 1000000.0));
 
 	if(mine > their) {
-		fprintf(stderr, "WITH PACKING UNPACKING NETDATA CODE IS SLOWER %0.2Lf TIMES\n", (long double)(mine / their));
+		fprintf(stderr, "WITH PACKING UNPACKING NETDATA CODE IS SLOWER %0.2Lf %%\n", (long double)(mine * 100.0 / their - 100.0));
 	}
 	else {
-		fprintf(stderr, "EVEN WITH PACKING AND UNPACKING, NETDATA CODE IS  F A S T E R  %0.2Lf TIMES\n", (long double)(their / mine));
+		fprintf(stderr, "EVEN WITH PACKING AND UNPACKING, NETDATA CODE IS  F A S T E R  %0.2Lf %%\n", (long double)(their * 100.0 / mine - 100.0));
 	}
 
 	// ------------------------------------------------------------------------
