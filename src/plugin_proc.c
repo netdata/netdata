@@ -53,16 +53,55 @@ void *proc_main(void *ptr)
 	for(;1;) {
 		
 		// BEGIN -- the job to be done
-		if(!vdo_proc_net_dev)				vdo_proc_net_dev			= do_proc_net_dev(update_every, usec+susec);
-		if(!vdo_proc_diskstats)				vdo_proc_diskstats			= do_proc_diskstats(update_every, usec+susec);
-		if(!vdo_proc_net_snmp)				vdo_proc_net_snmp			= do_proc_net_snmp(update_every, usec+susec);
-		if(!vdo_proc_net_netstat)			vdo_proc_net_netstat		= do_proc_net_netstat(update_every, usec+susec);
-		if(!vdo_proc_net_stat_conntrack)	vdo_proc_net_stat_conntrack	= do_proc_net_stat_conntrack(update_every, usec+susec);
-		if(!vdo_proc_net_ip_vs_stats)		vdo_proc_net_ip_vs_stats	= do_proc_net_ip_vs_stats(update_every, usec+susec);
-		if(!vdo_proc_stat)					vdo_proc_stat 				= do_proc_stat(update_every, usec+susec);
-		if(!vdo_proc_meminfo)				vdo_proc_meminfo			= do_proc_meminfo(update_every, usec+susec);
-		if(!vdo_proc_vmstat)				vdo_proc_vmstat				= do_proc_vmstat(update_every, usec+susec);
-		if(!vdo_proc_net_rpc_nfsd)			vdo_proc_net_rpc_nfsd		= do_proc_net_rpc_nfsd(update_every, usec+susec);
+		
+		if(!vdo_proc_net_dev) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_dev().");
+			vdo_proc_net_dev = do_proc_net_dev(update_every, usec+susec);
+		}
+		if(!vdo_proc_diskstats) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_diskstats().");
+			vdo_proc_diskstats = do_proc_diskstats(update_every, usec+susec);
+		}
+		if(!vdo_proc_net_snmp) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_snmp().");
+			vdo_proc_net_snmp = do_proc_net_snmp(update_every, usec+susec);
+		}
+
+		if(!vdo_proc_net_netstat) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_netstat().");
+			vdo_proc_net_netstat = do_proc_net_netstat(update_every, usec+susec);
+		}
+
+		if(!vdo_proc_net_stat_conntrack) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_stat_conntrack().");
+			vdo_proc_net_stat_conntrack	= do_proc_net_stat_conntrack(update_every, usec+susec);
+		}
+
+		if(!vdo_proc_net_ip_vs_stats) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling vdo_proc_net_ip_vs_stats().");
+			vdo_proc_net_ip_vs_stats = do_proc_net_ip_vs_stats(update_every, usec+susec);
+		}
+
+		if(!vdo_proc_stat) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_stat().");
+			vdo_proc_stat = do_proc_stat(update_every, usec+susec);
+		}
+
+		if(!vdo_proc_meminfo) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling vdo_proc_meminfo().");
+			vdo_proc_meminfo = do_proc_meminfo(update_every, usec+susec);
+		}
+
+		if(!vdo_proc_vmstat) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling vdo_proc_vmstat().");
+			vdo_proc_vmstat = do_proc_vmstat(update_every, usec+susec);
+		}
+
+		if(!vdo_proc_net_rpc_nfsd) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_rpc_nfsd().");
+			vdo_proc_net_rpc_nfsd = do_proc_net_rpc_nfsd(update_every, usec+susec);
+		}
+
 		// END -- the job is done
 		
 		// find the time to sleep in order to wait exactly update_every seconds

@@ -307,12 +307,15 @@ int main(int argc, char **argv)
 		if(st->enabled) {
 			st->thread = malloc(sizeof(pthread_t));
 
+			info("Starting thread %s.", st->name);
+
 			if(pthread_create(st->thread, NULL, st->start_routine, NULL))
 				error("failed to create new thread for %s.", st->name);
 
 			else if(pthread_detach(*st->thread))
 				error("Cannot request detach of newly created %s thread.", st->name);
 		}
+		else info("Not starting thread %s.", st->name);
 	}
 
 	// the main process - the web server listener
