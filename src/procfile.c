@@ -15,10 +15,10 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 
+#include "log.h"
 #include "procfile.h"
 
 #define PF_PREFIX "PROCFILE"
-int pfdebug = 0;
 
 // ----------------------------------------------------------------------------
 // An array of words
@@ -26,14 +26,14 @@ int pfdebug = 0;
 #define PFWORDS_INCREASE_STEP 200
 
 pfwords *pfwords_add(pfwords *fw, char *str) {
-	if(pfdebug) fprintf(stderr, PF_PREFIX ":	adding word No %d: '%s'\n", fw->len, str);
+	debug(D_PROCFILE, PF_PREFIX ":	adding word No %d: '%s'\n", fw->len, str);
 
 	if(fw->len == fw->size) {
-		if(pfdebug) fprintf(stderr, PF_PREFIX ":	expanding words\n");
+		debug(D_PROCFILE, PF_PREFIX ":	expanding words\n");
 
 		pfwords *new = realloc(fw, sizeof(pfwords) + (fw->size + PFWORDS_INCREASE_STEP) * sizeof(char *));
 		if(!new) {
-			fprintf(stderr, PF_PREFIX ":	failed to expand words\n");
+			error(PF_PREFIX ":	failed to expand words\n");
 			free(fw);
 			return NULL;
 		}
@@ -47,7 +47,7 @@ pfwords *pfwords_add(pfwords *fw, char *str) {
 }
 
 pfwords *pfwords_new(void) {
-	if(pfdebug) fprintf(stderr, PF_PREFIX ":	initializing words\n");
+	debug(D_PROCFILE, PF_PREFIX ":	initializing words\n");
 
 	pfwords *new = malloc(sizeof(pfwords) + PFWORDS_INCREASE_STEP * sizeof(char *));
 	if(!new) return NULL;
@@ -58,12 +58,12 @@ pfwords *pfwords_new(void) {
 }
 
 void pfwords_reset(pfwords *fw) {
-	if(pfdebug) fprintf(stderr, PF_PREFIX ":	reseting words\n");
+	debug(D_PROCFILE, PF_PREFIX ":	reseting words\n");
 	fw->len = 0;
 }
 
 void pfwords_free(pfwords *fw) {
-	if(pfdebug) fprintf(stderr, PF_PREFIX ":	freeing words\n");
+	debug(D_PROCFILE, PF_PREFIX ":	freeing words\n");
 
 	free(fw);
 }
@@ -75,14 +75,14 @@ void pfwords_free(pfwords *fw) {
 #define PFLINES_INCREASE_STEP 10
 
 pflines *pflines_add(pflines *fl, uint32_t first_word) {
-	if(pfdebug) fprintf(stderr, PF_PREFIX ":	adding line %d at word %d\n", fl->len, first_word);
+	debug(D_PROCFILE, PF_PREFIX ":	adding line %d at word %d\n", fl->len, first_word);
 
 	if(fl->len == fl->size) {
-		if(pfdebug) fprintf(stderr, PF_PREFIX ":	expanding lines\n");
+		debug(D_PROCFILE, PF_PREFIX ":	expanding lines\n");
 
 		pflines *new = realloc(fl, sizeof(pflines) + (fl->size + PFLINES_INCREASE_STEP) * sizeof(ffline));
 		if(!new) {
-			fprintf(stderr, PF_PREFIX ":	failed to expand lines\n");
+			error(PF_PREFIX ":	failed to expand lines\n");
 			free(fl);
 			return NULL;
 		}
@@ -97,7 +97,7 @@ pflines *pflines_add(pflines *fl, uint32_t first_word) {
 }
 
 pflines *pflines_new(void) {
-	if(pfdebug) fprintf(stderr, PF_PREFIX ":	initializing lines\n");
+	debug(D_PROCFILE, PF_PREFIX ":	initializing lines\n");
 
 	pflines *new = malloc(sizeof(pflines) + PFLINES_INCREASE_STEP * sizeof(ffline));
 	if(!new) return NULL;
@@ -108,13 +108,13 @@ pflines *pflines_new(void) {
 }
 
 void pflines_reset(pflines *fl) {
-	if(pfdebug) fprintf(stderr, PF_PREFIX ":	reseting lines\n");
+	debug(D_PROCFILE, PF_PREFIX ":	reseting lines\n");
 
 	fl->len = 0;
 }
 
 void pflines_free(pflines *fl) {
-	if(pfdebug) fprintf(stderr, PF_PREFIX ":	freeing lines\n");
+	debug(D_PROCFILE, PF_PREFIX ":	freeing lines\n");
 
 	free(fl);
 }
@@ -131,7 +131,7 @@ void pflines_free(pflines *fl) {
 #define PF_CHAR_IS_WORD		2
 
 void procfile_close(procfile *ff) {
-	if(pfdebug) fprintf(stderr, PF_PREFIX ": Closing file '%s'. Reason: %s\n", ff->filename, strerror(errno));
+	debug(D_PROCFILE, PF_PREFIX ": Closing file '%s'. Reason: %s\n", ff->filename, strerror(errno));
 
 	if(ff->lines) pflines_free(ff->lines);
 	if(ff->words) pfwords_free(ff->words);
@@ -141,7 +141,7 @@ void procfile_close(procfile *ff) {
 }
 
 procfile *procfile_parser(procfile *ff) {
-	if(pfdebug) fprintf(stderr, PF_PREFIX ": Parsing file '%s'\n", ff->filename);
+	debug(D_PROCFILE, PF_PREFIX ": Parsing file '%s'\n", ff->filename);
 
 	char *s = ff->data, *e = ff->data, *t = ff->data;
 	uint32_t l = 0, w = 0;
@@ -181,7 +181,7 @@ procfile *procfile_parser(procfile *ff) {
 				ff->lines->lines[l].words++;
 				w++;
 
-				if(pfdebug) fprintf(stderr, PF_PREFIX ":	ended line %d with %d words\n", l, ff->lines->lines[l].words);
+				debug(D_PROCFILE, PF_PREFIX ":	ended line %d with %d words\n", l, ff->lines->lines[l].words);
 
 				ff->lines = pflines_add(ff->lines, w);
 				if(!ff->lines) goto cleanup;
@@ -214,24 +214,24 @@ procfile *procfile_parser(procfile *ff) {
 	return ff;
 
 cleanup:
-	fprintf(stderr, PF_PREFIX ": Failed to parse file '%s'. Reason: %s\n", ff->filename, strerror(errno));
+	error(PF_PREFIX ": Failed to parse file '%s'. Reason: %s\n", ff->filename, strerror(errno));
 	procfile_close(ff);
 	return NULL;
 }
 
 procfile *procfile_readall(procfile *ff) {
-	if(pfdebug) fprintf(stderr, PF_PREFIX ": Reading file '%s'.\n", ff->filename);
+	debug(D_PROCFILE, PF_PREFIX ": Reading file '%s'.\n", ff->filename);
 
 	ssize_t s = 0, r = ff->size, x = ff->size;
 	ff->len = 0;
 
 	while(r == x) {
 		if(s) {
-			if(pfdebug) fprintf(stderr, PF_PREFIX ": Expanding data buffer for file '%s'.\n", ff->filename);
+			debug(D_PROCFILE, PF_PREFIX ": Expanding data buffer for file '%s'.\n", ff->filename);
 
 			procfile *new = realloc(ff, sizeof(procfile) + ff->size + PROCFILE_INCREMENT_BUFFER);
 			if(!new) {
-				fprintf(stderr, PF_PREFIX ": Cannot allocate memory for file '%s'. Reason: %s\n", ff->filename, strerror(errno));
+				error(PF_PREFIX ": Cannot allocate memory for file '%s'. Reason: %s\n", ff->filename, strerror(errno));
 				procfile_close(ff);
 				return NULL;
 			}
@@ -242,7 +242,7 @@ procfile *procfile_readall(procfile *ff) {
 
 		r = read(ff->fd, &ff->data[s], ff->size - s);
 		if(r == -1) {
-			fprintf(stderr, PF_PREFIX ": Cannot read from file '%s'. Reason: %s\n", ff->filename, strerror(errno));
+			error(PF_PREFIX ": Cannot read from file '%s'. Reason: %s\n", ff->filename, strerror(errno));
 			procfile_close(ff);
 			return NULL;
 		}
@@ -252,7 +252,7 @@ procfile *procfile_readall(procfile *ff) {
 	}
 
 	if(lseek(ff->fd, 0, SEEK_SET) == -1) {
-		fprintf(stderr, PF_PREFIX ": Cannot rewind on file '%s'.\n", ff->filename);
+		error(PF_PREFIX ": Cannot rewind on file '%s'.\n", ff->filename);
 		procfile_close(ff);
 		return NULL;
 	}
@@ -266,17 +266,17 @@ procfile *procfile_readall(procfile *ff) {
 }
 
 procfile *procfile_open(const char *filename, const char *separators) {
-	if(pfdebug) fprintf(stderr, PF_PREFIX ": Opening file '%s'\n", filename);
+	debug(D_PROCFILE, PF_PREFIX ": Opening file '%s'\n", filename);
 
 	int fd = open(filename, O_RDONLY, 0666);
 	if(fd == -1) {
-		fprintf(stderr, PF_PREFIX ": Cannot open file '%s'. Reason: %s\n", filename, strerror(errno));
+		error(PF_PREFIX ": Cannot open file '%s'. Reason: %s\n", filename, strerror(errno));
 		return NULL;
 	}
 
 	procfile *ff = malloc(sizeof(procfile) + PROCFILE_INITIAL_BUFFER);
 	if(!ff) {
-		fprintf(stderr, PF_PREFIX ": Cannot allocate memory for file '%s'. Reason: %s\n", ff->filename, strerror(errno));
+		error(PF_PREFIX ": Cannot allocate memory for file '%s'. Reason: %s\n", ff->filename, strerror(errno));
 		close(fd);
 		return NULL;
 	}
@@ -292,7 +292,7 @@ procfile *procfile_open(const char *filename, const char *separators) {
 	ff->words = pfwords_new();
 
 	if(!ff->lines || !ff->words) {
-		fprintf(stderr, PF_PREFIX ": Cannot initialize parser for file '%s'. Reason: %s\n", ff->filename, strerror(errno));
+		error(PF_PREFIX ": Cannot initialize parser for file '%s'. Reason: %s\n", ff->filename, strerror(errno));
 		procfile_close(ff);
 		return NULL;
 	}
@@ -320,16 +320,16 @@ void procfile_print(procfile *ff) {
 	uint32_t words, w;
 	char *s;
 
-	fprintf(stderr, "File '%s' with %d lines and %d words\n", ff->filename, ff->lines->len, ff->words->len);
+	debug(D_PROCFILE, "File '%s' with %d lines and %d words\n", ff->filename, ff->lines->len, ff->words->len);
 
 	for(l = 0; l < lines ;l++) {
 		words = procfile_linewords(ff, l);
 
-		fprintf(stderr, "	line %d starts at word %d and has %d words\n", l, ff->lines->lines[l].first, ff->lines->lines[l].words);
+		debug(D_PROCFILE, "	line %d starts at word %d and has %d words\n", l, ff->lines->lines[l].first, ff->lines->lines[l].words);
 
 		for(w = 0; w < words ;w++) {
 			s = procfile_lineword(ff, l, w);
-			fprintf(stderr, "		[%d.%d] '%s'\n", l, w, s);
+			debug(D_PROCFILE, "		[%d.%d] '%s'\n", l, w, s);
 		}
 	}
 }

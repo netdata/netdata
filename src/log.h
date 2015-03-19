@@ -20,6 +20,7 @@
 #define D_EXIT              0x00002000
 #define D_CHECKS            0x00004000
 #define D_NFACCT_LOOP		0x00008000
+#define D_PROCFILE			0x00010000
 
 #define DEBUG (D_WEB_CLIENT_ACCESS|D_LISTENER|D_RRD_STATS)
 //#define DEBUG 0xffffffff
