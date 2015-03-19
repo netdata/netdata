@@ -1,0 +1,206 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <time.h>
+#include <errno.h>
+
+#include <libmnl/libmnl.h>
+#include <libnetfilter_acct/libnetfilter_acct.h>
+
+#include "global_statistics.h"
+#include "common.h"
+#include "config.h"
+#include "log.h"
+#include "rrd.h"
+#include "plugin_proc.h"
+
+struct mynfacct {
+	const char *name;
+	uint64_t pkts;
+	uint64_t bytes;
+	struct nfacct *nfacct;
+};
+
+struct nfacct_list {
+	int size;
+	int len;
+	struct mynfacct data[];
+} *nfacct_list = NULL;
+
+static int nfacct_callback(const struct nlmsghdr *nlh, void *data) {
+	if(data) {};
+
+	if(!nfacct_list || nfacct_list->len == nfacct_list->size) {
+		int size = (nfacct_list) ? nfacct_list->size : 0;
+		int len = (nfacct_list) ? nfacct_list->len : 0;
+		size++;
+
+		info("nfacct.plugin: increasing nfacct_list to size %d", size);
+
+		nfacct_list = realloc(nfacct_list, sizeof(struct nfacct_list) + (sizeof(struct mynfacct) * size));
+		if(!nfacct_list) {
+			error("nfacct.plugin: cannot allocate nfacct_list.");
+			return MNL_CB_OK;
+		}
+
+		nfacct_list->data[len].nfacct = nfacct_alloc();
+		if(!nfacct_list->data[size - 1].nfacct) {
+			error("nfacct.plugin: nfacct_alloc() failed.");
+			free(nfacct_list);
+			nfacct_list = NULL;
+			return MNL_CB_OK;
+		}
+
+		nfacct_list->size = size;
+		nfacct_list->len = len;
+	}
+
+	if(nfacct_nlmsg_parse_payload(nlh, nfacct_list->data[nfacct_list->len].nfacct) < 0) {
+		error("nfacct.plugin: nfacct_nlmsg_parse_payload() failed.");
+		return MNL_CB_OK;
+	}
+
+	nfacct_list->data[nfacct_list->len].name  = nfacct_attr_get_str(nfacct_list->data[nfacct_list->len].nfacct, NFACCT_ATTR_NAME);
+	nfacct_list->data[nfacct_list->len].pkts  = nfacct_attr_get_u64(nfacct_list->data[nfacct_list->len].nfacct, NFACCT_ATTR_PKTS);
+	nfacct_list->data[nfacct_list->len].bytes = nfacct_attr_get_u64(nfacct_list->data[nfacct_list->len].nfacct, NFACCT_ATTR_BYTES);
+
+	nfacct_list->len++;
+	return MNL_CB_OK;
+}
+
+void *nfacct_main(void *ptr) {
+	if(ptr) { ; }
+
+	if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
+		error("nfacct.plugin: Cannot set pthread cancel type to DEFERRED.");
+
+	if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
+		error("nfacct.plugin: Cannot set pthread cancel state to ENABLE.");
+
+	char buf[MNL_SOCKET_BUFFER_SIZE];
+	struct mnl_socket *nl = NULL;
+	struct nlmsghdr *nlh = NULL;
+	unsigned int seq = 0, portid = 0;
+
+	seq = time(NULL) - 1;
+
+	nl  = mnl_socket_open(NETLINK_NETFILTER);
+	if(!nl) {
+		error("nfacct.plugin: mnl_socket_open() failed");
+		return NULL;
+	}
+
+	if(mnl_socket_bind(nl, 0, MNL_SOCKET_AUTOPID) < 0) {
+		mnl_socket_close(nl);
+		error("nfacct.plugin: mnl_socket_bind() failed");
+		return NULL;
+	}
+	portid = mnl_socket_get_portid(nl);
+
+	// ------------------------------------------------------------------------
+
+	struct timeval last, now;
+	unsigned long long usec = 0, susec = 0;
+	RRD_STATS *st = NULL;
+
+	gettimeofday(&last, NULL);
+
+	// ------------------------------------------------------------------------
+
+	while(1) {
+		seq++;
+
+		nlh = nfacct_nlmsg_build_hdr(buf, NFNL_MSG_ACCT_GET, NLM_F_DUMP, seq);
+		if(!nlh) {
+			mnl_socket_close(nl);
+			error("nfacct.plugin: nfacct_nlmsg_build_hdr() failed");
+			return NULL;
+		}
+
+		if(mnl_socket_sendto(nl, nlh, nlh->nlmsg_len) < 0) {
+			error("nfacct.plugin: mnl_socket_send");
+			return NULL;
+		}
+
+		if(nfacct_list) nfacct_list->len = 0;
+
+		int ret;
+		while((ret = mnl_socket_recvfrom(nl, buf, sizeof(buf))) > 0) {
+			if((ret = mnl_cb_run(buf, ret, seq, portid, nfacct_callback, NULL)) <= 0) break;
+		}
+
+		if (ret == -1) {
+			error("nfacct.plugin: error communicating with kernel.");
+			return NULL;
+		}
+
+		// --------------------------------------------------------------------
+
+		gettimeofday(&now, NULL);
+		usec = usecdiff(&now, &last) - susec;
+		debug(D_NFACCT_LOOP, "nfacct.plugin: last loop took %llu usec (worked for %llu, sleeped for %llu).", usec + susec, usec, susec);
+		
+		if(usec < (update_every * 1000000ULL / 2ULL)) susec = (update_every * 1000000ULL) - usec;
+		else susec = update_every * 1000000ULL / 2ULL;
+
+
+		// --------------------------------------------------------------------
+
+		if(nfacct_list && nfacct_list->len) {
+			int i;
+
+			st = rrd_stats_find_bytype("nfacct", "packets");
+			if(!st) {
+				st = rrd_stats_create("nfacct", "packets", NULL, "netfilter", "Netfilter Accounting Packets", "packets/s", 1006, update_every, CHART_TYPE_STACKED);
+
+				for(i = 0; i < nfacct_list->len ; i++)
+					rrd_stats_dimension_add(st, nfacct_list->data[i].name, NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
+			}
+			else rrd_stats_next(st);
+
+			for(i = 0; i < nfacct_list->len ; i++) {
+				RRD_DIMENSION *rd = rrd_stats_dimension_find(st, nfacct_list->data[i].name);
+
+				if(!rd) rd = rrd_stats_dimension_add(st, nfacct_list->data[i].name, NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
+				if(rd) rrd_stats_dimension_set_by_pointer(st, rd, nfacct_list->data[i].pkts);
+			}
+			
+			rrd_stats_done(st);
+
+			// ----------------------------------------------------------------
+
+			st = rrd_stats_find_bytype("nfacct", "bytes");
+			if(!st) {
+				st = rrd_stats_create("nfacct", "bytes", NULL, "netfilter", "Netfilter Accounting Bandwidth", "kilobytes/s", 1007, update_every, CHART_TYPE_STACKED);
+
+				for(i = 0; i < nfacct_list->len ; i++)
+					rrd_stats_dimension_add(st, nfacct_list->data[i].name, NULL, 1, 1000 * update_every, RRD_DIMENSION_INCREMENTAL);
+			}
+			else rrd_stats_next(st);
+
+			for(i = 0; i < nfacct_list->len ; i++) {
+				RRD_DIMENSION *rd = rrd_stats_dimension_find(st, nfacct_list->data[i].name);
+
+				if(!rd) rd = rrd_stats_dimension_add(st, nfacct_list->data[i].name, NULL, 1, 1000 * update_every, RRD_DIMENSION_INCREMENTAL);
+				if(rd) rrd_stats_dimension_set_by_pointer(st, rd, nfacct_list->data[i].bytes);
+			}
+			
+			rrd_stats_done(st);
+		}
+
+		// --------------------------------------------------------------------
+
+		usleep(susec);
+		
+		// copy current to last
+		bcopy(&now, &last, sizeof(struct timeval));
+	}
+
+	mnl_socket_close(nl);
+	return NULL;
+}
