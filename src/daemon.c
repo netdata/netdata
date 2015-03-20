@@ -62,7 +62,7 @@ void sig_handler(int signo)
 	}
 }
 
-char rundir[FILENAME_MAX + 1] = "/run/netdata";
+char rundir[FILENAME_MAX + 1] = "/var/run/netdata";
 char pidfile[FILENAME_MAX + 1] = "";
 void prepare_rundir() {
 	if(getuid() != 0) {
