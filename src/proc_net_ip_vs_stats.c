@@ -34,11 +34,11 @@ int do_proc_net_ip_vs_stats(int update_every, unsigned long long dt) {
 
 	unsigned long long entries, InPackets, OutPackets, InBytes, OutBytes;
 
-	entries 	= strtoull(procfile_lineword(ff, 2, 0), NULL, 10);
-	InPackets 	= strtoull(procfile_lineword(ff, 2, 1), NULL, 10);
-	OutPackets 	= strtoull(procfile_lineword(ff, 2, 2), NULL, 10);
-	InBytes 	= strtoull(procfile_lineword(ff, 2, 3), NULL, 10);
-	OutBytes 	= strtoull(procfile_lineword(ff, 2, 4), NULL, 10);
+	entries 	= strtoull(procfile_lineword(ff, 2, 0), NULL, 16);
+	InPackets 	= strtoull(procfile_lineword(ff, 2, 1), NULL, 16);
+	OutPackets 	= strtoull(procfile_lineword(ff, 2, 2), NULL, 16);
+	InBytes 	= strtoull(procfile_lineword(ff, 2, 3), NULL, 16);
+	OutBytes 	= strtoull(procfile_lineword(ff, 2, 4), NULL, 16);
 
 	RRD_STATS *st;
 
