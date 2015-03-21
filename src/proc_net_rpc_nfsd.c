@@ -196,7 +196,10 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 			rc_hits = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
 			rc_misses = strtoull(procfile_lineword(ff, l, 2), NULL, 10);
 			rc_nocache = strtoull(procfile_lineword(ff, l, 3), NULL, 10);
-			do_rc = 2;
+
+			unsigned long long sum = rc_hits + rc_misses + rc_nocache;
+			if(sum == 0ULL) do_rc = -1;
+			else do_rc = 2;
 		}
 		else if(do_fh == 1 && strcmp(type, "fh") == 0) {
 			if(words < 6) {
@@ -210,7 +213,9 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 			fh_dir_not_in_dcache = strtoull(procfile_lineword(ff, l, 4), NULL, 10);
 			fh_non_dir_not_in_dcache = strtoull(procfile_lineword(ff, l, 5), NULL, 10);
 
-			do_fh = 2;
+			unsigned long long sum = fh_stale + fh_total_lookups + fh_anonymous_lookups + fh_dir_not_in_dcache + fh_non_dir_not_in_dcache;
+			if(sum == 0ULL) do_fh = -1;
+			else do_fh = 2;
 		}
 		else if(do_io == 1 && strcmp(type, "io") == 0) {
 			if(words < 3) {
@@ -221,7 +226,9 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 			io_read = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
 			io_write = strtoull(procfile_lineword(ff, l, 2), NULL, 10);
 
-			do_io = 2;
+			unsigned long long sum = io_read + io_write;
+			if(sum == 0ULL) do_io = -1;
+			else do_io = 2;
 		}
 		else if(do_th == 1 && strcmp(type, "th") == 0) {
 			if(words < 13) {
@@ -294,7 +301,9 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 			net_tcp_count = strtoull(procfile_lineword(ff, l, 3), NULL, 10);
 			net_tcp_connections = strtoull(procfile_lineword(ff, l, 4), NULL, 10);
 
-			do_net = 2;
+			unsigned long long sum = net_count + net_udp_count + net_tcp_count + net_tcp_connections;
+			if(sum == 0ULL) do_net = -1;
+			else do_net = 2;
 		}
 		else if(do_rpc == 1 && strcmp(type, "rpc") == 0) {
 			if(words < 6) {
@@ -307,7 +316,9 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 			rpc_bad_auth = strtoull(procfile_lineword(ff, l, 3), NULL, 10);
 			rpc_bad_client = strtoull(procfile_lineword(ff, l, 4), NULL, 10);
 
-			do_rpc = 2;
+			unsigned long long sum = rpc_count + rpc_bad_format + rpc_bad_auth + rpc_bad_client;
+			if(sum == 0ULL) do_rpc = -1;
+			else do_rpc = 2;
 		}
 		else if(do_proc2 == 1 && strcmp(type, "proc2") == 0) {
 			// the first number is the count of numbers present
