@@ -14,14 +14,16 @@ extern int update_every;
 #define HISTORY_MAX (86400*10)
 extern int save_history;
 
+#define DEFAULT_GAP_INTERPOLATIONS 10
+
 typedef long long total_number;
 
 #define TOTAL_NUMBER_FORMAT "%lld"
 
 #define RRD_STATS_NAME_MAX 1024
 
-#define RRD_STATS_MAGIC     "NETDATA CACHE STATS FILE V009"
-#define RRD_DIMENSION_MAGIC "NETDATA CACHE DIMENSION FILE V009"
+#define RRD_STATS_MAGIC     "NETDATA CACHE STATS FILE V010"
+#define RRD_DIMENSION_MAGIC "NETDATA CACHE DIMENSION FILE V010"
 
 
 // ----------------------------------------------------------------------------
@@ -59,8 +61,8 @@ extern int memory_mode_id(const char *name);
 // ----------------------------------------------------------------------------
 // algorithms types
 
-#define RRD_DIMENSION_ABSOLUTE_NAME 			"absolute"
-#define RRD_DIMENSION_INCREMENTAL_NAME 			"incremental"
+#define RRD_DIMENSION_ABSOLUTE_NAME 				"absolute"
+#define RRD_DIMENSION_INCREMENTAL_NAME 				"incremental"
 #define RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL_NAME	"percentage-of-incremental-row"
 #define RRD_DIMENSION_PCENT_OVER_ROW_TOTAL_NAME		"percentage-of-absolute-row"
 
@@ -84,8 +86,8 @@ struct rrd_dimension {
 	long entries;									// how many entries this dimension has
 													// this should be the same to the entries of the data set
 
-	long current_entry;								// the entry that is currently being updated
 	int update_every;								// every how many seconds is this updated?
+	int updated;									// set to 0 after each calculation, to 1 after each collected value
 
 	int hidden;										// if set to non zero, this dimension will not be sent to the client
 	int mapped;										// 1 if the file is mapped
@@ -96,14 +98,17 @@ struct rrd_dimension {
 	long divisor;
 
 	struct timeval last_collected_time;				// when was this dimension last updated
-													// this is only used to detect un-updated dimensions
-													// which are removed after some time
+													// this is actual date time we updated the last_collected_value
+													// THIS IS DIFFERENT FROM THE SAME MEMBER OF RRD_STATS
 
 	calculated_number calculated_value;
 	calculated_number last_calculated_value;
 
 	collected_number collected_value;				// the value collected at this round
 	collected_number last_collected_value;			// the value that was collected at the last round
+
+	calculated_number collected_volume;
+	calculated_number stored_volume;
 
 	struct rrd_dimension *next;						// linking of dimensions within the same data set
 
@@ -134,6 +139,9 @@ struct rrd_stats {
 	unsigned long hash_name;						// a simple hash on the name
 	unsigned long hash;								// a simple hash on the id, to speed up searching
 													// we first compare hashes, and only if the hashes are equal we do string comparisons
+
+	int gap_when_lost_iterations;					// after how many lost iterations a gap should be stored
+													// netdata will interpolate values for gaps lower than this
 
 	long priority;
 

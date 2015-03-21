@@ -8,13 +8,17 @@
 #include "log.h"
 #include "web_buffer.h"
 
-#define ACCURACY_LOSS 0.0000001
-
 int check_storage_number(calculated_number n, int debug) {
 	char buffer[100];
+	uint32_t flags = SN_EXISTS;
 
-	storage_number s = pack_storage_number(n);
+	storage_number s = pack_storage_number(n, flags);
 	calculated_number d = unpack_storage_number(s);
+
+	if(!does_storage_number_exist(s)) {
+		fprintf(stderr, "Exists flags missing for number " CALCULATED_NUMBER_FORMAT "!\n", n);
+		return 5;
+	}
 
 	calculated_number ddiff = d - n;
 	calculated_number dcdiff = ddiff * 100.0 / n;
@@ -152,7 +156,7 @@ void benchmark_storage_number(int loop, int multiplier) {
 			n *= multiplier;
 			if(n > STORAGE_NUMBER_POSITIVE_MAX) n = STORAGE_NUMBER_POSITIVE_MIN;
 
-			s = pack_storage_number(n);
+			s = pack_storage_number(n, 1);
 			d = unpack_storage_number(s);
 			print_calculated_number(buffer, d);
 		}
@@ -177,8 +181,38 @@ void benchmark_storage_number(int loop, int multiplier) {
 
 }
 
+static int check_storage_number_exists() {
+	uint32_t flags = SN_EXISTS;
+
+
+	for(flags = 0; flags < 7 ; flags++) {
+		if(get_storage_number_flags(flags << 24) != flags << 24) {
+			fprintf(stderr, "Flag 0x%08x is not checked correctly. It became 0x%08x\n", flags << 24, get_storage_number_flags(flags << 24));
+			return 1;
+		}
+	}
+
+	flags = SN_EXISTS;
+	calculated_number n = 0.0;
+
+	storage_number s = pack_storage_number(n, flags);
+	calculated_number d = unpack_storage_number(s);
+	if(get_storage_number_flags(s) != flags) {
+		fprintf(stderr, "Wrong flags. Given %08x, Got %08x!\n", flags, get_storage_number_flags(s));
+		return 1;
+	}
+	if(n != d) {
+		fprintf(stderr, "Wrong number returned. Expected " CALCULATED_NUMBER_FORMAT ", returned " CALCULATED_NUMBER_FORMAT "!\n", n, d);
+		return 1;
+	}
+
+	return 0;
+}
+
 int unit_test_storage()
 {
+	if(check_storage_number_exists()) return 0;
+
 	calculated_number c, a = 0;
 	int i, j, g, r = 0;
 

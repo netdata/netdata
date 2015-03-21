@@ -177,13 +177,14 @@ void rrd_stats_reset(RRD_STATS *st)
 	st->last_updated.tv_sec = 0;
 	st->last_updated.tv_usec = 0;
 	st->current_entry = 0;
+	st->counter = 0;
 	st->counter_done = 0;
 
 	RRD_DIMENSION *rd;
 	for(rd = st->dimensions; rd ; rd = rd->next) {
 		rd->last_collected_time.tv_sec = 0;
 		rd->last_collected_time.tv_usec = 0;
-		rd->current_entry = 0;
+		bzero(rd->values, rd->entries * sizeof(storage_number));
 	}
 }
 
@@ -217,14 +218,15 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 	if(st) {
 		if(strcmp(st->magic, RRD_STATS_MAGIC) != 0) {
 			errno = 0;
-			error("File %s does not have our version. Clearing it.", fullfilename);
+			info("Initializing file %s.", fullfilename);
 			bzero(st, size);
 		}
 		else if(strcmp(st->id, fullid) != 0) {
 			errno = 0;
-			error("File %s does not have our id. Unmapping it.", fullfilename);
-			munmap(st, size);
-			st = NULL;
+			error("File %s contents are not for chart %s. Clearing it.", fullfilename, fullid);
+			// munmap(st, size);
+			// st = NULL;
+			bzero(st, size);
 		}
 		else if(st->memsize != size || st->entries != entries) {
 			errno = 0;
@@ -297,6 +299,8 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 	st->last_collected_time.tv_usec = 0;
 	st->counter_done = 0;
 
+	st->gap_when_lost_iterations = config_get_number(st->id, "gap when lost iterations above", DEFAULT_GAP_INTERPOLATIONS);
+
 	pthread_rwlock_init(&st->rwlock, NULL);
 	pthread_rwlock_wrlock(&root_rwlock);
 
@@ -328,7 +332,7 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 
 		if(strcmp(rd->magic, RRD_DIMENSION_MAGIC) != 0) {
 			errno = 0;
-			error("File %s does not have our version. Clearing it.", fullfilename);
+			info("Initializing file %s.", fullfilename);
 			bzero(rd, size);
 		}
 		else if(rd->memsize != size) {
@@ -363,9 +367,10 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 		}
 		else if(strcmp(rd->id, id) != 0) {
 			errno = 0;
-			error("File %s does not have our dimension id. Unmapping it.", fullfilename);
-			munmap(rd, size);
-			rd = NULL;
+			error("File %s contents are not for dimension %s. Clearing it.", fullfilename, id);
+			// munmap(rd, size);
+			// rd = NULL;
+			bzero(rd, size);
 		}
 	}
 
@@ -597,6 +602,7 @@ void rrd_stats_dimension_set_by_pointer(RRD_STATS *st, RRD_DIMENSION *rd, collec
 	
 	gettimeofday(&rd->last_collected_time, NULL);
 	rd->collected_value = value;
+	rd->updated = 1;
 }
 
 int rrd_stats_dimension_set(RRD_STATS *st, const char *id, collected_number value)
@@ -642,7 +648,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 	debug(D_RRD_CALLS, "rrd_stats_done() for chart %s", st->name);
 
 	RRD_DIMENSION *rd, *last;
-	int oldstate;
+	int oldstate, store_this_entry = 1;
 
 	if(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate) != 0)
 		error("Cannot set pthread cancel state to DISABLE.");
@@ -650,45 +656,81 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 	// a read lock is OK here
 	pthread_rwlock_rdlock(&st->rwlock);
 
+	// check if the chart has a long time to be refreshed
 	if(st->usec_since_last_update > st->entries * st->update_every * 1000000ULL) {
-		info("Chart chart %s took too long to be updated (%0.3Lf secs). Reseting chart history.", st->name, (long double)(st->usec_since_last_update / 1000000.0));
+		info("%s: took too long to be updated (%0.3Lf secs). Reseting it.", st->name, (long double)(st->usec_since_last_update / 1000000.0));
 		rrd_stats_reset(st);
 		st->usec_since_last_update = st->update_every * 1000000ULL;
 	}
-
 	if(st->debug) debug(D_RRD_STATS, "%s: microseconds since last update: %llu", st->name, st->usec_since_last_update);
 
-	if(!st->last_collected_time.tv_sec) gettimeofday(&st->last_collected_time, NULL);
+	// set last_collected_time
+	if(!st->last_collected_time.tv_sec) {
+		// it is the first entry
+		// set the last_collected_time to now
+		gettimeofday(&st->last_collected_time, NULL);
+
+		// the first entry should not be stored
+		store_this_entry = 0;
+
+		if(st->debug) debug(D_RRD_STATS, "%s: initializing last_collected to now. Will not store the next entry.", st->name);
+	}
 	else {
+		// it is not the first entry
+		// calculate the proper last_collected_time, using usec_since_last_update
 		unsigned long long ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec + st->usec_since_last_update;
 		st->last_collected_time.tv_sec = ut / 1000000ULL;
 		st->last_collected_time.tv_usec = ut % 1000000ULL;
 	}
 
+	// if this set has not been updated in the past
+	// we fake the last_update time to be = now - usec_since_last_update
 	if(!st->last_updated.tv_sec) {
+		// it has never been updated before
+		// set a fake last_updated, in the past using usec_since_last_update
 		unsigned long long ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec - st->usec_since_last_update;
 		st->last_updated.tv_sec = ut / 1000000ULL;
 		st->last_updated.tv_usec = ut % 1000000ULL;
 
-		if(st->debug) debug(D_RRD_STATS, "%s: initializing last_updated to now - %llu microseconds (%0.3Lf)", st->name, st->usec_since_last_update, (long double)ut/1000000.0);
+		// the first entry should not be stored
+		store_this_entry = 0;
+
+		if(st->debug) debug(D_RRD_STATS, "%s: initializing last_updated to now - %llu microseconds (%0.3Lf). Will not store the next entry.", st->name, st->usec_since_last_update, (long double)ut/1000000.0);
 	}
 
-	if(usecdiff(&st->last_collected_time, &st->last_updated) > st->entries * st->update_every * 1000000ULL) {
-		info("History of chart %s too old (last updated at %u, last collected at %u). Reseting chart.", st->name, st->last_updated.tv_sec, st->last_collected_time.tv_sec);
+	// check if we will re-write the entire data set
+	if(usecdiff(&st->last_collected_time, &st->last_updated) > st->update_every * st->entries * 1000000ULL) {
+		info("%s: too old data (last updated at %u.%u, last collected at %u.%u). Reseting it. Will not store the next entry.", st->name, st->last_updated.tv_sec, st->last_updated.tv_usec, st->last_collected_time.tv_sec, st->last_collected_time.tv_usec);
 		rrd_stats_reset(st);
+
 		st->usec_since_last_update = st->update_every * 1000000ULL;
-		pthread_rwlock_unlock(&st->rwlock);
-		return(st->usec_since_last_update);
+
+		gettimeofday(&st->last_collected_time, NULL);
+
+		unsigned long long ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec - st->usec_since_last_update;
+		st->last_updated.tv_sec = ut / 1000000ULL;
+		st->last_updated.tv_usec = ut % 1000000ULL;
+
+		// the first entry should not be stored
+		store_this_entry = 0;
 	}
 
+	// these are the 3 variables that will help us in interpolation
+	// last_ut = the last time we added a value to the storage
+	//  now_ut = the time the current value is taken at
+	// next_ut = the time of the next interpolation point
 	unsigned long long last_ut = st->last_updated.tv_sec * 1000000ULL + st->last_updated.tv_usec;
-	unsigned long long now_ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec;
+	unsigned long long now_ut  = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec;
 	unsigned long long next_ut = (st->last_updated.tv_sec + st->update_every) * 1000000ULL;
 
 	if(st->debug) debug(D_RRD_STATS, "%s: last ut = %0.3Lf (last updated time)", st->name, (long double)last_ut/1000000.0);
 	if(st->debug) debug(D_RRD_STATS, "%s: now  ut = %0.3Lf (current update time)", st->name, (long double)now_ut/1000000.0);
 	if(st->debug) debug(D_RRD_STATS, "%s: next ut = %0.3Lf (next interpolation point)", st->name, (long double)next_ut/1000000.0);
 
+	if(!st->counter_done) {
+		store_this_entry = 0;
+		if(st->debug) debug(D_RRD_STATS, "%s: Will not store the next entry.", st->name);
+	}
 	st->counter_done++;
 
 	// calculate totals and count the dimensions
@@ -697,10 +739,13 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 	for( rd = st->dimensions, dimensions = 0 ; rd ; rd = rd->next, dimensions++ )
 		st->collected_total += rd->collected_value;
 
+	uint32_t storage_flags = SN_EXISTS;
+
 	// process all dimensions to calculate their values
 	// based on the collected figures only
 	// at this stage we do not interpolate anything
 	for( rd = st->dimensions ; rd ; rd = rd->next ) {
+
 		if(st->debug) debug(D_RRD_STATS, "%s/%s: "
 			" last_collected_value = " COLLECTED_NUMBER_FORMAT
 			" collected_value = " COLLECTED_NUMBER_FORMAT
@@ -760,7 +805,10 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 			case RRD_DIMENSION_INCREMENTAL:
 				// if the new is smaller than the old (an overflow, or reset), set the old equal to the new
 				// to reset the calculation (it will give zero as the calculation for this second)
-				if(rd->last_collected_value > rd->collected_value) rd->last_collected_value = rd->collected_value;
+				if(rd->last_collected_value > rd->collected_value) {
+					storage_flags = SN_EXISTS_RESET;
+					rd->last_collected_value = rd->collected_value;
+				}
 
 				rd->calculated_value += (calculated_number)(rd->collected_value - rd->last_collected_value);
 
@@ -801,39 +849,16 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 				break;
 		}
 	}
+
 	// at this point we have all the calculated values ready
-
-	if(st->counter_done == 1 || next_ut > now_ut) {
-		// we don't have any usable data yet
-		if(st->debug) debug(D_RRD_STATS, "%s: Skipping collected values (usec since last update = %llu, counter_done = %lu)", st->name, st->usec_since_last_update, st->counter_done);
-
-		for( rd = st->dimensions; rd ; rd = rd->next ) {
-			rd->last_calculated_value = rd->calculated_value;
-			rd->last_collected_value = rd->collected_value;
-
-			switch(rd->algorithm) {
-				case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
-				case RRD_DIMENSION_INCREMENTAL:
-					if(!st->usec_since_last_update) rd->calculated_value = 0;
-					// keep the previous values
-					// the next time, a new incremental total will be calculated
-					break;
-			}
-
-			rd->collected_value = 0;
-		}
-		st->last_collected_total  = st->collected_total;
-
-		pthread_rwlock_unlock(&st->rwlock);
-		if(pthread_setcancelstate(oldstate, NULL) != 0)
-			error("Cannot set pthread cancel state to RESTORE (%d).", oldstate);
-
-		return(st->usec_since_last_update);
-	}
-
 	// it is now time to interpolate values on a second boundary
+
 	unsigned long long first_ut = last_ut;
-	for( ; next_ut <= now_ut ; next_ut += st->update_every * 1000000ULL ) {
+	int iterations = (now_ut - last_ut) / (st->update_every * 1000000ULL);
+
+	for( ; next_ut <= now_ut ; next_ut += st->update_every * 1000000ULL, iterations-- ) {
+		if(iterations < 0) error("iterations calculation wrapped!");
+
 		if(st->debug) debug(D_RRD_STATS, "%s: last ut = %0.3Lf (last updated time)", st->name, (long double)last_ut/1000000.0);
 		if(st->debug) debug(D_RRD_STATS, "%s: next ut = %0.3Lf (next interpolation point)", st->name, (long double)next_ut/1000000.0);
 
@@ -894,28 +919,70 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 
 					if(next_ut + st->update_every * 1000000ULL > now_ut) rd->calculated_value = new_value;
 					break;
-
 			}
 
+			if(!store_this_entry) {
+				store_this_entry = 1;
+				continue;
+			}
 
-			rd->values[st->current_entry] = pack_storage_number(
-					  new_value
-					* (calculated_number)rd->multiplier
-					/ (calculated_number)rd->divisor
-				);
+			if(rd->updated && iterations < st->gap_when_lost_iterations) {
+				rd->values[st->current_entry] = pack_storage_number(
+						  new_value
+						* (calculated_number)rd->multiplier
+						/ (calculated_number)rd->divisor
+					, storage_flags );
 
-			if(st->debug)
-				debug(D_RRD_STATS, "%s/%s: STORE[%ld] "
-					CALCULATED_NUMBER_FORMAT " = " CALCULATED_NUMBER_FORMAT
-					" * %ld"
-					" / %ld"
-					, st->id, rd->name
-					, st->current_entry
-					, unpack_storage_number(rd->values[st->current_entry]), new_value
-					, rd->multiplier
-					, rd->divisor
-					);
+				if(st->debug)
+					debug(D_RRD_STATS, "%s/%s: STORE[%ld] "
+						CALCULATED_NUMBER_FORMAT " = " CALCULATED_NUMBER_FORMAT
+						" * %ld"
+						" / %ld"
+						, st->id, rd->name
+						, st->current_entry
+						, unpack_storage_number(rd->values[st->current_entry]), new_value
+						, rd->multiplier
+						, rd->divisor
+						);
+			}
+			else {
+				if(st->debug) debug(D_RRD_STATS, "%s/%s: STORE[%ld] = NON EXISTING "
+						, st->id, rd->name
+						, st->current_entry
+						);
+				rd->values[st->current_entry] = pack_storage_number(0, SN_NOT_EXISTS);
+			}
+
+			if(st->debug) {
+				calculated_number t1 = new_value * (calculated_number)rd->multiplier / (calculated_number)rd->divisor;
+				calculated_number t2 = unpack_storage_number(rd->values[st->current_entry]);
+				calculated_number accuracy = accuracy_loss(t1, t2);
+				debug(D_RRD_STATS, "%s/%s: UNPACK[%ld] = " CALCULATED_NUMBER_FORMAT " FLAGS=0x%08x (original = " CALCULATED_NUMBER_FORMAT ", accuracy loss = " CALCULATED_NUMBER_FORMAT "%%%s)"
+						, st->id, rd->name
+						, st->current_entry
+						, t2
+						, get_storage_number_flags(rd->values[st->current_entry])
+						, t1
+						, accuracy
+						, (accuracy > ACCURACY_LOSS) ? " **TOO BIG** " : ""
+						);
+
+				rd->collected_volume += t1;
+				rd->stored_volume += t2;
+				accuracy = accuracy_loss(rd->collected_volume, rd->stored_volume);
+				debug(D_RRD_STATS, "%s/%s: VOLUME[%ld] = " CALCULATED_NUMBER_FORMAT ", calculated  = " CALCULATED_NUMBER_FORMAT ", accuracy loss = " CALCULATED_NUMBER_FORMAT "%%%s"
+						, st->id, rd->name
+						, st->current_entry
+						, rd->stored_volume
+						, rd->collected_volume
+						, accuracy
+						, (accuracy > ACCURACY_LOSS) ? " **TOO BIG** " : ""
+						);
+
+			}
 		}
+		// reset the storage flags for the next point, if any;
+		storage_flags = SN_EXISTS;
 
 		if(st->first_entry_t && st->counter >= (unsigned long long)st->entries) {
 			// the db is overwriting values
@@ -930,15 +997,27 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 	}
 
 	for( rd = st->dimensions; rd ; rd = rd->next ) {
+		if(!rd->updated) continue;
 		rd->last_collected_value = rd->collected_value;
 		rd->last_calculated_value = rd->calculated_value;
 		rd->collected_value = 0;
+		rd->updated = 0;
+
+		// if this is the first entry of incremental dimensions
+		// we have to set the first calculated_value to zero
+		// to eliminate the first spike
+		if(st->counter_done == 1) switch(rd->algorithm) {
+			case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
+			case RRD_DIMENSION_INCREMENTAL:
+				rd->calculated_value = 0;
+				// the next time, a new incremental total will be calculated
+				break;
+		}
 	}
 	st->last_collected_total  = st->collected_total;
 
 	// ALL DONE ABOUT THE DATA UPDATE
 	// --------------------------------------------------------------------
-
 
 	// find if there are any obsolete dimensions (not updated recently)
 	for( rd = st->dimensions; rd ; rd = rd->next )

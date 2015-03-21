@@ -264,12 +264,14 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 	calculated_number print_values[dimensions]; // keep the final value to be printed
 	int               print_hidden[dimensions]; // keep hidden flags
 	int               found_non_zero[dimensions];
+	int               found_non_existing[dimensions];
 
 	// initialize them
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 		group_values[c] = print_values[c] = 0;
 		print_hidden[c] = rd->hidden;
 		found_non_zero[c] = 0;
+		found_non_existing[c] = 0;
 	}
 
 	// -------------------------------------------------------------------------
@@ -348,6 +350,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 			count++;
 			group_count++;
 
+			// check if we have to print this now
 			if(((count - pad) % group) == 0) {
 				if(printed >= entries_to_show) {
 					// debug(D_RRD_STATS, "Already printed all rows. Stopping.");
@@ -356,8 +359,10 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 				
 				if(group_count != group) {
 					// this is an incomplete group, skip it.
-					for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
+					for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 						group_values[c] = 0;
+						found_non_existing[c] = 0;
+					}
 						
 					group_count = 0;
 					continue;
@@ -379,9 +384,17 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 				print_this = 1;
 			}
 
+			// do the calculations
 			for(rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
-				calculated_number value = unpack_storage_number(rd->values[t]);
+				storage_number n = rd->values[t];
+				calculated_number value = unpack_storage_number(n);
 				
+				if(!does_storage_number_exist(n)) {
+					value = 0.0;
+					found_non_existing[c]++;
+				}
+				if(did_storage_number_reset(n)) annotate_reset = 1;
+
 				switch(group_method) {
 					case GROUP_MAX:
 						if(abs(value) > abs(group_values[c])) group_values[c] = value;
@@ -394,19 +407,12 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 					default:
 					case GROUP_AVERAGE:
 						group_values[c] += value;
-						if(print_this) group_values[c] /= group_count;
+						if(print_this) group_values[c] /= ( group_count - found_non_existing[c] );
 						break;
-				}
-
-				if(print_this) {
-					print_values[c] = group_values[c];
-					group_values[c] = 0;
 				}
 			}
 
 			if(print_this) {
-				group_count = 0;
-				
 				if(annotate_reset) {
 					annotation_count++;
 					web_buffer_strcpy(wb, overflow_annotation);
@@ -417,22 +423,36 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 
 				pc = 0;
 				for(c = 0 ; c < dimensions ; c++) {
-					if(!print_hidden[c]) {
+					if(found_non_existing[c] == group_count) {
+						// all entries are non-existing
 						pc++;
 						web_buffer_strcpy(wb, pre_value);
-						web_buffer_rrd_value(wb, print_values[c]);
+						web_buffer_strcpy(wb, "null");
+						web_buffer_strcpy(wb, post_value);
+					}
+					else if(!print_hidden[c]) {
+						pc++;
+						web_buffer_strcpy(wb, pre_value);
+						web_buffer_rrd_value(wb, group_values[c]);
 						web_buffer_strcpy(wb, post_value);
 
-						if(print_values[c]) found_non_zero[c]++;
+						if(group_values[c]) found_non_zero[c]++;
 					}
+
+					// reset them for the next loop
+					group_values[c] = 0;
+					found_non_existing[c] = 0;
 				}
+
+				// if all dimensions are hidden, print a null
 				if(!pc) {
 					web_buffer_strcpy(wb, pre_value);
-					web_buffer_rrd_value(wb, (calculated_number)0);
+					web_buffer_strcpy(wb, "null");
 					web_buffer_strcpy(wb, post_value);
 				}
 
 				printed++;
+				group_count = 0;
 			}
 		}
 
@@ -443,6 +463,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 			int changed = 0;
 			for(rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 				group_values[c] = 0;
+				found_non_existing[c] = 0;
 
 				if(!print_hidden[c] && !found_non_zero[c]) {
 					changed = 1;

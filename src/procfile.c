@@ -279,7 +279,7 @@ procfile *procfile_open(const char *filename, const char *separators) {
 
 	procfile *ff = malloc(sizeof(procfile) + PROCFILE_INITIAL_BUFFER);
 	if(!ff) {
-		error(PF_PREFIX ": Cannot allocate memory for file '%s'. Reason: %s", ff->filename, strerror(errno));
+		error(PF_PREFIX ": Cannot allocate memory for file '%s'. Reason: %s", filename, strerror(errno));
 		close(fd);
 		return NULL;
 	}
@@ -295,7 +295,7 @@ procfile *procfile_open(const char *filename, const char *separators) {
 	ff->words = pfwords_new();
 
 	if(!ff->lines || !ff->words) {
-		error(PF_PREFIX ": Cannot initialize parser for file '%s'. Reason: %s", ff->filename, strerror(errno));
+		error(PF_PREFIX ": Cannot initialize parser for file '%s'. Reason: %s", filename, strerror(errno));
 		procfile_close(ff);
 		return NULL;
 	}
@@ -311,7 +311,7 @@ procfile *procfile_open(const char *filename, const char *separators) {
 	const char *s = separators;
 	while(*s) ff->separators[(int)*s++] = PF_CHAR_IS_SEPARATOR;
 
-	debug(D_PROCFILE, "File '%s' opened.", ff->filename);
+	debug(D_PROCFILE, "File '%s' opened.", filename);
 	return ff;
 }
 
