@@ -18,6 +18,10 @@ ifndef nomath
 STORAGE_WITH_MATH = 1
 endif
 
+ifdef nofork
+NETDATA_NO_DAEMON = 1
+endif
+
 COMMON_FLAGS = BIN_DIR='$(BIN_DIR)' CONFIG_DIR='$(CONFIG_DIR)' LOG_DIR='$(LOG_DIR)' PLUGINS_DIR='$(PLUGINS_DIR)'
 
 proc_sources = proc_net_dev.c proc_net_ip_vs_stats.c proc_diskstats.c proc_meminfo.c proc_net_netstat.c proc_net_snmp.c proc_net_stat_conntrack.c proc_stat.c proc_vmstat.c proc_net_rpc_nfsd.c
@@ -38,6 +42,10 @@ CC = gcc
 ifdef STORAGE_WITH_MATH
 CFLAGS += -DSTORAGE_WITH_MATH=1
 libs += -lm
+endif
+
+ifdef NETDATA_NO_DAEMON
+CFLAGS += -DNETDATA_NO_DAEMON=1
 endif
 
 # nfacct requires root access, so we prefer it as a plugin.d external plugin

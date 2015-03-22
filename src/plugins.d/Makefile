@@ -22,7 +22,7 @@ libs :=
 ifdef debug
 COMMON_FLAGS += debug=1
 # CFLAGS = -Wall -Wextra -ggdb -DBIN_DIR='$(BIN_DIR)' -DCONFIG_DIR='$(CONFIG_DIR)' -DLOG_DIR='$(LOG_DIR)' -DPLUGINS_DIR='$(PLUGINS_DIR)' -fsanitize=address -fno-omit-frame-pointer
-CFLAGS := -Wall -Wextra -O -g -DBIN_DIR='$(BIN_DIR)' -DCONFIG_DIR='$(CONFIG_DIR)' -DLOG_DIR='$(LOG_DIR)' -DPLUGINS_DIR='$(PLUGINS_DIR)' -fsanitize=address -fno-omit-frame-pointer
+CFLAGS := -Wall -Wextra -O3 -ggdb -DBIN_DIR='$(BIN_DIR)' -DCONFIG_DIR='$(CONFIG_DIR)' -DLOG_DIR='$(LOG_DIR)' -DPLUGINS_DIR='$(PLUGINS_DIR)' -fsanitize=address -fno-omit-frame-pointer
 #libs += -ltsan -lpie
 else
 CFLAGS := -Wall -Wextra -O3 -DBIN_DIR='$(BIN_DIR)' -DCONFIG_DIR='$(CONFIG_DIR)' -DLOG_DIR='$(LOG_DIR)' -DPLUGINS_DIR='$(PLUGINS_DIR)' -fomit-frame-pointer

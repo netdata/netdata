@@ -557,10 +557,13 @@ void file_descriptor_not_used(int id)
 			return;
 		}
 
+		if(debug) fprintf(stderr, "apps.plugin: decreasing slot %d (count = %ld).\n", id, all_files[id].count);
+
 		if(all_files[id].count > 0) {
 			all_files[id].count--;
 
 			if(!all_files[id].count) {
+				if(debug) fprintf(stderr, "apps.plugin:   >> slot %d is empty.\n", id);
 				file_descriptor_remove(&all_files[id]);
 				all_files[id].magic = 0x00000000;
 				all_files_len--;
@@ -582,6 +585,7 @@ unsigned long file_descriptor_find_or_add(const char *name)
 	struct file_descriptor *fd = file_descriptor_find(name, hash);
 	if(fd) {
 		// found
+		if(debug) fprintf(stderr, "apps.plugin:   >> found on slot %ld\n", fd->pos);
 		fd->count++;
 		return fd->pos;
 	}
@@ -598,18 +602,27 @@ unsigned long file_descriptor_find_or_add(const char *name)
 		// if the address changed, we have to rebuild the index
 		// since all pointers are now invalid
 		if(old && old != (void *)all_files) {
-			if(debug) fprintf(stderr, "apps.plugin: re-indexing.\n");
+			if(debug) fprintf(stderr, "apps.plugin:   >> re-indexing.\n");
 			all_files_index.root = NULL;
 			int i;
 			for(i = 0; i < all_files_size; i++) {
 				if(!all_files[i].count) continue;
 				file_descriptor_add(&all_files[i]);
 			}
+			for(i = all_files_size; i < (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP); i++) {
+				all_files[i].count = 0;
+				all_files[i].name = NULL;
+				all_files[i].magic = 0x00000000;
+				all_files[i].pos = i;
+			}
+			if(debug) fprintf(stderr, "apps.plugin:   >> re-indexing done.\n");
 		}
 
 		if(!all_files_size) all_files_len = 1;
 		all_files_size += FILE_DESCRIPTORS_INCREASE_STEP;
 	}
+
+	if(debug) fprintf(stderr, "apps.plugin:   >> searching for empty slot.\n");
 
 	// search for an empty slot
 	int i, c;
@@ -618,10 +631,12 @@ unsigned long file_descriptor_find_or_add(const char *name)
 		if(c == 0) continue;
 
 		if(!all_files[c].count) {
+			if(debug) fprintf(stderr, "apps.plugin:   >> eximining slot %d.\n", c);
+
 			if(all_files[c].magic == 0x0BADCAFE && all_files[c].name && file_descriptor_find(all_files[c].name, all_files[c].hash))
 				error("apps.plugin: fd on position %d is not cleared properly. It still has %s in it.\n", c, all_files[c].name);
 
-			if(debug) fprintf(stderr, "apps.plugin: re-using fd position %d for %s (last name: %s)\n", c, name, all_files[c].name);
+			if(debug) fprintf(stderr, "apps.plugin:   >> %s fd position %d for %s (last name: %s)\n", all_files[c].name?"re-using":"using", c, name, all_files[c].name);
 			if(all_files[c].name) free((void *)all_files[c].name);
 			all_files[c].name = NULL;
 			break;
@@ -631,6 +646,8 @@ unsigned long file_descriptor_find_or_add(const char *name)
 		error("We should find an empty slot, but there isn't any");
 		return 0;
 	}
+	if(debug) fprintf(stderr, "apps.plugin:   >> updating slot %d.\n", c);
+
 	all_files_len++;
 
 	// else we have an empty slot in 'c'

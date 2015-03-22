@@ -21,7 +21,7 @@ pthread_rwlock_t config_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 #define CONFIG_VALUE_CHECKED 0x08 // has been checked if the value is different from the default
 
 struct config_value {
-	avl avl;
+	avl avl;				// the index - this has to be first!
 
 	unsigned long hash;		// a simple hash to speed up searching
 							// we first compare hashes, and only if the hashes are equal we do string comparisons

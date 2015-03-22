@@ -275,8 +275,8 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
 
 	// do we have such a data set?
-	RRDSET *st = rrdset_find_byname(tok);
-	if(!st) st = rrdset_find(tok);
+	RRDSET *st = rrdset_find(tok);
+	if(!st) st = rrdset_find_byname(tok);
 	if(!st) {
 		// we don't have it
 		// try to send a file with that name
@@ -490,7 +490,8 @@ void web_client_process(struct web_client *w)
 				debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
 
 				// do we have such a data set?
-				RRDSET *st = rrdset_find_byname(tok);
+				RRDSET *st = rrdset_find(tok);
+				if(!st) st = rrdset_find_byname(tok);
 				if(!st) {
 					// we don't have it
 					// try to send a file with that name
@@ -513,7 +514,8 @@ void web_client_process(struct web_client *w)
 				debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
 
 				// do we have such a data set?
-				RRDSET *st = rrdset_find_byname(tok);
+				RRDSET *st = rrdset_find(tok);
+				if(!st) st = rrdset_find_byname(tok);
 				if(!st) {
 					code = 404;
 					web_buffer_printf(w->data, "Chart %s is not found.\r\n", tok);

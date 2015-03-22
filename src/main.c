@@ -286,11 +286,12 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Cannot lower my CPU priority. Error: %s.\n", strerror(errno));
 	}
 
+#ifndef NETDATA_NO_DAEMON
 	if(become_daemon(0, input_log_file, output_log_file, error_log_file, access_log_file, &access_fd, &stdaccess) == -1) {
 		fprintf(stderr, "Cannot demonize myself (%s).", strerror(errno));
 		exit(1);
 	}
-
+#endif
 
 	if(output_log_syslog || error_log_syslog || access_log_syslog)
 		openlog("netdata", LOG_PID, LOG_DAEMON);

@@ -78,10 +78,10 @@ extern const char *rrddim_algorithm_name(int chart_type);
 // RRD DIMENSION
 
 struct rrddim {
-	avl avl;
+	avl avl;										// the index - this has to be first!
 
 	char magic[sizeof(RRDDIMENSION_MAGIC) + 1];		// our magic
-	char id[RRD_ID_LENGTH_MAX + 1];						// the id of this dimension (for internal identification)
+	char id[RRD_ID_LENGTH_MAX + 1];					// the id of this dimension (for internal identification)
 	const char *name;								// the name of this dimension (as presented to user)
 	char cache_filename[FILENAME_MAX+1];
 	
@@ -115,7 +115,7 @@ struct rrddim {
 	calculated_number collected_volume;
 	calculated_number stored_volume;
 
-	struct rrddim *next;						// linking of dimensions within the same data set
+	struct rrddim *next;							// linking of dimensions within the same data set
 
 	storage_number values[];						// the array of values - THIS HAS TO BE THE LAST MEMBER
 };
@@ -126,11 +126,12 @@ typedef struct rrddim RRDDIM;
 // RRDSET
 
 struct rrdset {
-	avl avl;
+	avl avl;										// the index, with key the id - this has to be first!
+	avl avlname;									// the index, with key the name
 
 	char magic[sizeof(RRDSET_MAGIC) + 1];			// our magic
 
-	char id[RRD_ID_LENGTH_MAX + 1];						// id of the data set
+	char id[RRD_ID_LENGTH_MAX + 1];					// id of the data set
 	const char *name;								// name of the data set
 	char *cache_dir;								// the directory to store dimension maps
 	char cache_filename[FILENAME_MAX+1];
@@ -176,8 +177,7 @@ struct rrdset {
 													// (the master data set should be the one that has the same family and is not detail)
 
 	RRDDIM *dimensions;								// the actual data for every dimension
-
-	avl_tree dimensions_index;
+	avl_tree dimensions_index;						// the root of the dimensions index
 
 	struct rrdset *next;							// linking of rrdsets
 };

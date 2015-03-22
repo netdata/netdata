@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
@@ -56,6 +57,57 @@ static RRDSET *rrdset_index_find(const char *id, unsigned long hash) {
 	avl_search(&(rrdset_root_index), (avl *)&tmp, rrdset_iterator, (avl **)&result);
 	return result;
 }
+
+// ----------------------------------------------------------------------------
+// RRDSET name index
+
+#define rrdset_from_avlname(avlname_ptr) ((RRDSET *)((avlname_ptr) - offsetof(RRDSET, avlname)))
+
+static int rrdset_iterator_name(avl *a) { if(a) {}; return 0; }
+
+static int rrdset_compare_name(void* a, void* b) {
+	RRDSET *A = rrdset_from_avlname(a);
+	RRDSET *B = rrdset_from_avlname(b);
+
+	// fprintf(stderr, "COMPARING: %s with %s\n", A->name, B->name);
+
+	if(A->hash_name < B->hash_name) return -1;
+	else if(A->hash_name > B->hash_name) return 1;
+	else return strcmp(A->name, B->name);
+}
+
+avl_tree rrdset_root_index_name = {
+		NULL,
+		rrdset_compare_name
+};
+
+int rrdset_index_add_name(RRDSET *st) {
+	// fprintf(stderr, "ADDING: %s (name: %s)\n", st->id, st->name);
+	return avl_insert(&rrdset_root_index_name, (avl *)(&st->avlname));
+}
+
+#define rrdset_index_del_name(st) avl_remove(&rrdset_root_index_name, (avl *)(&st->avlname))
+
+static RRDSET *rrdset_index_find_name(const char *name, unsigned long hash) {
+	void *result = NULL;
+	RRDSET tmp;
+	tmp.name = name;
+	tmp.hash_name = (hash)?hash:simple_hash(tmp.name);
+
+	// fprintf(stderr, "SEARCHING: %s\n", name);
+	avl_search(&(rrdset_root_index_name), (avl *)(&(tmp.avlname)), rrdset_iterator_name, (avl **)&result);
+	if(result) {
+		RRDSET *st = rrdset_from_avlname(result);
+		if(strcmp(st->magic, RRDSET_MAGIC))
+			error("Search for RRDSET %s returned an invalid RRDSET %s (name %s)", name, st->id, st->name);
+
+		// fprintf(stderr, "FOUND: %s\n", name);
+		return rrdset_from_avlname(result);
+	}
+	// fprintf(stderr, "NOT FOUND: %s\n", name);
+	return NULL;
+}
+
 
 // ----------------------------------------------------------------------------
 // RRDDIM index
@@ -199,6 +251,10 @@ char *rrdset_strncpy_name(char *to, const char *from, int length)
 
 void rrdset_set_name(RRDSET *st, const char *name)
 {
+	debug(D_RRD_CALLS, "rrdset_set_name() old: %s, new: %s", st->name, name);
+
+	if(st->name) rrdset_index_del_name(st);
+
 	char b[CONFIG_MAX_VALUE + 1];
 	char n[RRD_ID_LENGTH_MAX + 1];
 
@@ -206,6 +262,8 @@ void rrdset_set_name(RRDSET *st, const char *name)
 	rrdset_strncpy_name(b, n, CONFIG_MAX_VALUE);
 	st->name = config_get(st->id, "name", b);
 	st->hash_name = simple_hash(st->name);
+
+	rrdset_index_add_name(st);
 }
 
 // ----------------------------------------------------------------------------
@@ -239,6 +297,8 @@ char *rrdset_cache_dir(const char *id)
 
 void rrdset_reset(RRDSET *st)
 {
+	debug(D_RRD_CALLS, "rrdset_reset() %s", st->name);
+
 	st->last_collected_time.tv_sec = 0;
 	st->last_collected_time.tv_usec = 0;
 	st->last_updated.tv_sec = 0;
@@ -347,15 +407,6 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 	st->type       = config_get(st->id, "type", type);
 	st->chart_type = rrdset_type_id(config_get(st->id, "chart type", rrdset_type_name(chart_type)));
 
-	if(name && *name) rrdset_set_name(st, name);
-	else rrdset_set_name(st, id);
-
-	{
-		char varvalue[CONFIG_MAX_VALUE + 1];
-		snprintf(varvalue, CONFIG_MAX_VALUE, "%s (%s)", title?title:"", st->name);
-		st->title = config_get(st->id, "title", varvalue);
-	}
-
 	st->priority = config_get_number(st->id, "priority", priority);
 	st->enabled = enabled;
 	
@@ -373,6 +424,15 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 
 	pthread_rwlock_init(&st->rwlock, NULL);
 	pthread_rwlock_wrlock(&rrdset_root_rwlock);
+
+	if(name && *name) rrdset_set_name(st, name);
+	else rrdset_set_name(st, id);
+
+	{
+		char varvalue[CONFIG_MAX_VALUE + 1];
+		snprintf(varvalue, CONFIG_MAX_VALUE, "%s (%s)", title?title:"", st->name);
+		st->title = config_get(st->id, "title", varvalue);
+	}
 
 	st->next = rrdset_root;
 	rrdset_root = st;
@@ -503,6 +563,8 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 
 void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name)
 {
+	debug(D_RRD_CALLS, "rrddim_set_name() %s.%s", st->name, rd->name);
+
 	char varname[CONFIG_MAX_NAME + 1];
 	snprintf(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
 	config_get(st->id, varname, name);
@@ -510,6 +572,8 @@ void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name)
 
 void rrddim_free(RRDSET *st, RRDDIM *rd)
 {
+	debug(D_RRD_CALLS, "rrddim_free() %s.%s", st->name, rd->name);
+
 	RRDDIM *i = st->dimensions, *last = NULL;
 	for(i = st->dimensions; i && i != rd ; i = i->next) last = i;
 
@@ -577,6 +641,8 @@ void rrdset_free_all(void)
 
 void rrdset_save_all(void)
 {
+	debug(D_RRD_CALLS, "rrdset_save_all()");
+
 	RRDSET *st;
 	RRDDIM *rd;
 
@@ -604,7 +670,7 @@ void rrdset_save_all(void)
 
 RRDSET *rrdset_find(const char *id)
 {
-	debug(D_RRD_CALLS, "rrd_stats_find() for chart %s", id);
+	debug(D_RRD_CALLS, "rrdset_find() for chart %s", id);
 
 	pthread_rwlock_rdlock(&rrdset_root_rwlock);
 	RRDSET *st = rrdset_index_find(id, 0);
@@ -615,7 +681,7 @@ RRDSET *rrdset_find(const char *id)
 
 RRDSET *rrdset_find_bytype(const char *type, const char *id)
 {
-	debug(D_RRD_CALLS, "rrd_stats_find_bytype() for chart %s.%s", type, id);
+	debug(D_RRD_CALLS, "rrdset_find_bytype() for chart %s.%s", type, id);
 
 	char buf[RRD_ID_LENGTH_MAX + 1];
 
@@ -631,18 +697,10 @@ RRDSET *rrdset_find_bytype(const char *type, const char *id)
 
 RRDSET *rrdset_find_byname(const char *name)
 {
-	debug(D_RRD_CALLS, "rrd_stats_find_byname() for chart %s", name);
-
-	char b[CONFIG_MAX_VALUE + 1];
-
-	rrdset_strncpy_name(b, name, CONFIG_MAX_VALUE);
-	unsigned long hash = simple_hash(b);
+	debug(D_RRD_CALLS, "rrdset_find_byname() for chart %s", name);
 
 	pthread_rwlock_rdlock(&rrdset_root_rwlock);
-	RRDSET *st = rrdset_root;
-	for ( ; st ; st = st->next ) {
-		if(hash == st->hash_name && strcmp(st->name, b) == 0) break;
-	}
+	RRDSET *st = rrdset_index_find_name(name, 0);
 	pthread_rwlock_unlock(&rrdset_root_rwlock);
 
 	return(st);
@@ -650,14 +708,14 @@ RRDSET *rrdset_find_byname(const char *name)
 
 RRDDIM *rrddim_find(RRDSET *st, const char *id)
 {
-	debug(D_RRD_CALLS, "rrd_stats_dimension_find() for chart %s, dimension %s", st->name, id);
+	debug(D_RRD_CALLS, "rrddim_find() for chart %s, dimension %s", st->name, id);
 
 	return rrddim_index_find(st, id, 0);
 }
 
 int rrddim_hide(RRDSET *st, const char *id)
 {
-	debug(D_RRD_CALLS, "rrd_stats_dimension_hide() for chart %s, dimension %s", st->name, id);
+	debug(D_RRD_CALLS, "rrddim_hide() for chart %s, dimension %s", st->name, id);
 
 	RRDDIM *rd = rrddim_find(st, id);
 	if(!rd) {
@@ -671,7 +729,7 @@ int rrddim_hide(RRDSET *st, const char *id)
 
 void rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value)
 {
-	debug(D_RRD_CALLS, "rrd_stats_dimension_set() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, st->name, rd->name, value);
+	debug(D_RRD_CALLS, "rrddim_set_by_pointer() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, st->name, rd->name, value);
 	
 	gettimeofday(&rd->last_collected_time, NULL);
 	rd->collected_value = value;
@@ -692,7 +750,7 @@ int rrddim_set(RRDSET *st, const char *id, collected_number value)
 
 void rrdset_next_usec(RRDSET *st, unsigned long long microseconds)
 {
-	debug(D_RRD_CALLS, "rrd_stats_next() for chart %s with microseconds %llu", st->name, microseconds);
+	debug(D_RRD_CALLS, "rrdset_next_usec() for chart %s with microseconds %llu", st->name, microseconds);
 
 	if(st->debug) debug(D_RRD_STATS, "%s: NEXT: %llu microseconds", st->name, microseconds);
 	st->usec_since_last_update = microseconds;
@@ -718,7 +776,7 @@ void rrdset_next_plugins(RRDSET *st)
 
 unsigned long long rrdset_done(RRDSET *st)
 {
-	debug(D_RRD_CALLS, "rrd_stats_done() for chart %s", st->name);
+	debug(D_RRD_CALLS, "rrdset_done() for chart %s", st->name);
 
 	RRDDIM *rd, *last;
 	int oldstate, store_this_entry = 1;

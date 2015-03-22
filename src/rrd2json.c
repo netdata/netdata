@@ -47,7 +47,7 @@ unsigned long rrd_stats_one_json(RRDSET *st, char *options, struct web_buffer *w
 		, st->priority
 		, st->enabled
 		, st->units
-		, st->name, options?options:""
+		, st->id, options?options:""
 		, rrdset_type_name(st->chart_type)
 		, st->counter
 		, st->entries
