@@ -29,10 +29,10 @@ void *cpuidlejitter_main(void *ptr)
 		sleep_ms = CPU_IDLEJITTER_SLEEP_TIME_MS;
 	}
 
-	RRD_STATS *st = rrd_stats_find("system.idlejitter");
+	RRDSET *st = rrdset_find("system.idlejitter");
 	if(!st) {
-		st = rrd_stats_create("system", "idlejitter", NULL, "cpu", "CPU Idle Jitter", "microseconds lost/s", 9999, update_every, CHART_TYPE_LINE);
-		rrd_stats_dimension_add(st, "jitter", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
+		st = rrdset_create("system", "idlejitter", NULL, "cpu", "CPU Idle Jitter", "microseconds lost/s", 9999, rrd_update_every, RRDSET_TYPE_LINE);
+		rrddim_add(st, "jitter", NULL, 1, 1, RRDDIM_ABSOLUTE);
 	}
 
 	struct timeval before, after;
@@ -40,7 +40,7 @@ void *cpuidlejitter_main(void *ptr)
 	for(counter = 0; 1 ;counter++) {
 		unsigned long long usec = 0, susec = 0;
 
-		while(susec < (update_every * 1000000ULL)) {
+		while(susec < (rrd_update_every * 1000000ULL)) {
 
 			gettimeofday(&before, NULL);
 			usleep(sleep_ms * 1000);
@@ -52,9 +52,9 @@ void *cpuidlejitter_main(void *ptr)
 		}
 		usec -= (sleep_ms * 1000);
 
-		if(counter) rrd_stats_next_usec(st, susec);
-		rrd_stats_dimension_set(st, "jitter", usec);
-		rrd_stats_done(st);
+		if(counter) rrdset_next_usec(st, susec);
+		rrddim_set(st, "jitter", usec);
+		rrdset_done(st);
 	}
 
 	return NULL;

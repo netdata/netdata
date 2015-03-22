@@ -186,12 +186,12 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 			if(!config_get_boolean("plugin:proc:/proc/diskstats", var_name, def_enabled)) continue;
 		}
 
-		RRD_STATS *st;
+		RRDSET *st;
 
 		// --------------------------------------------------------------------
 
 		if(do_io) {
-			st = rrd_stats_find_bytype(RRD_TYPE_DISK, disk);
+			st = rrdset_find_bytype(RRD_TYPE_DISK, disk);
 			if(!st) {
 				char tf[FILENAME_MAX + 1], *t;
 				char ssfilename[FILENAME_MAX + 1];
@@ -222,90 +222,90 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 				}
 				else error("Cannot read sector size for device %s from %s. Assuming 512.", disk, ssfilename);
 
-				st = rrd_stats_create(RRD_TYPE_DISK, disk, NULL, disk, "Disk I/O", "kilobytes/s", 2000, update_every, CHART_TYPE_AREA);
+				st = rrdset_create(RRD_TYPE_DISK, disk, NULL, disk, "Disk I/O", "kilobytes/s", 2000, update_every, RRDSET_TYPE_AREA);
 
-				rrd_stats_dimension_add(st, "reads", NULL, sector_size, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "writes", NULL, sector_size * -1, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrddim_add(st, "reads", NULL, sector_size, 1024 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "writes", NULL, sector_size * -1, 1024 * update_every, RRDDIM_INCREMENTAL);
 			}
-			else rrd_stats_next(st);
+			else rrdset_next(st);
 
-			rrd_stats_dimension_set(st, "reads", readsectors);
-			rrd_stats_dimension_set(st, "writes", writesectors);
-			rrd_stats_done(st);
+			rrddim_set(st, "reads", readsectors);
+			rrddim_set(st, "writes", writesectors);
+			rrdset_done(st);
 		}
 
 		// --------------------------------------------------------------------
 
 		if(do_ops) {
-			st = rrd_stats_find_bytype("disk_ops", disk);
+			st = rrdset_find_bytype("disk_ops", disk);
 			if(!st) {
-				st = rrd_stats_create("disk_ops", disk, NULL, disk, "Disk Operations", "operations/s", 2001, update_every, CHART_TYPE_LINE);
+				st = rrdset_create("disk_ops", disk, NULL, disk, "Disk Operations", "operations/s", 2001, update_every, RRDSET_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "reads", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "writes", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrddim_add(st, "reads", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "writes", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
 			}
-			else rrd_stats_next(st);
+			else rrdset_next(st);
 
-			rrd_stats_dimension_set(st, "reads", reads);
-			rrd_stats_dimension_set(st, "writes", writes);
-			rrd_stats_done(st);
+			rrddim_set(st, "reads", reads);
+			rrddim_set(st, "writes", writes);
+			rrdset_done(st);
 		}
 		
 		// --------------------------------------------------------------------
 
 		if(do_merged_ops) {
-			st = rrd_stats_find_bytype("disk_merged_ops", disk);
+			st = rrdset_find_bytype("disk_merged_ops", disk);
 			if(!st) {
-				st = rrd_stats_create("disk_merged_ops", disk, NULL, disk, "Merged Disk Operations", "operations/s", 2010, update_every, CHART_TYPE_LINE);
+				st = rrdset_create("disk_merged_ops", disk, NULL, disk, "Merged Disk Operations", "operations/s", 2010, update_every, RRDSET_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "reads", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "writes", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrddim_add(st, "reads", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "writes", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
 			}
-			else rrd_stats_next(st);
+			else rrdset_next(st);
 
-			rrd_stats_dimension_set(st, "reads", reads_merged);
-			rrd_stats_dimension_set(st, "writes", writes_merged);
-			rrd_stats_done(st);
+			rrddim_set(st, "reads", reads_merged);
+			rrddim_set(st, "writes", writes_merged);
+			rrdset_done(st);
 		}
 
 		// --------------------------------------------------------------------
 
 		if(do_iotime) {
-			st = rrd_stats_find_bytype("disk_iotime", disk);
+			st = rrdset_find_bytype("disk_iotime", disk);
 			if(!st) {
-				st = rrd_stats_create("disk_iotime", disk, NULL, disk, "Disk I/O Time", "milliseconds/s", 2005, update_every, CHART_TYPE_LINE);
+				st = rrdset_create("disk_iotime", disk, NULL, disk, "Disk I/O Time", "milliseconds/s", 2005, update_every, RRDSET_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "reads", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "writes", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "latency", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "weighted", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrddim_add(st, "reads", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "writes", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "latency", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "weighted", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
 			}
-			else rrd_stats_next(st);
+			else rrdset_next(st);
 
-			rrd_stats_dimension_set(st, "reads", readms);
-			rrd_stats_dimension_set(st, "writes", writems);
-			rrd_stats_dimension_set(st, "latency", iosms);
-			rrd_stats_dimension_set(st, "weighted", wiosms);
-			rrd_stats_done(st);
+			rrddim_set(st, "reads", readms);
+			rrddim_set(st, "writes", writems);
+			rrddim_set(st, "latency", iosms);
+			rrddim_set(st, "weighted", wiosms);
+			rrdset_done(st);
 		}
 
 		// --------------------------------------------------------------------
 
 		if(do_cur_ops) {
-			st = rrd_stats_find_bytype("disk_cur_ops", disk);
+			st = rrdset_find_bytype("disk_cur_ops", disk);
 			if(!st) {
-				st = rrd_stats_create("disk_cur_ops", disk, NULL, disk, "Current Disk I/O operations", "operations", 2004, update_every, CHART_TYPE_LINE);
+				st = rrdset_create("disk_cur_ops", disk, NULL, disk, "Current Disk I/O operations", "operations", 2004, update_every, RRDSET_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "operations", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
+				rrddim_add(st, "operations", NULL, 1, 1, RRDDIM_ABSOLUTE);
 			}
-			else rrd_stats_next(st);
+			else rrdset_next(st);
 
-			rrd_stats_dimension_set(st, "operations", currentios);
-			rrd_stats_done(st);
+			rrddim_set(st, "operations", currentios);
+			rrdset_done(st);
 		}
 	}
 	

@@ -67,135 +67,135 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 			if(!config_get_boolean("plugin:proc:/proc/net/dev", var_name, enable_new_interfaces)) continue;
 		}
 
-		RRD_STATS *st;
+		RRDSET *st;
 
 		// --------------------------------------------------------------------
 
 		if(do_bandwidth) {
-			st = rrd_stats_find_bytype("net", iface);
+			st = rrdset_find_bytype("net", iface);
 			if(!st) {
-				st = rrd_stats_create("net", iface, NULL, iface, "Bandwidth", "kilobits/s", 1000, update_every, CHART_TYPE_AREA);
+				st = rrdset_create("net", iface, NULL, iface, "Bandwidth", "kilobits/s", 1000, update_every, RRDSET_TYPE_AREA);
 
-				rrd_stats_dimension_add(st, "received", NULL, 8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "sent", NULL, -8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrddim_add(st, "received", NULL, 8, 1024 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "sent", NULL, -8, 1024 * update_every, RRDDIM_INCREMENTAL);
 			}
-			else rrd_stats_next(st);
+			else rrdset_next(st);
 
-			rrd_stats_dimension_set(st, "received", rbytes);
-			rrd_stats_dimension_set(st, "sent", tbytes);
-			rrd_stats_done(st);
+			rrddim_set(st, "received", rbytes);
+			rrddim_set(st, "sent", tbytes);
+			rrdset_done(st);
 		}
 
 		// --------------------------------------------------------------------
 
 		if(do_packets) {
-			st = rrd_stats_find_bytype("net_packets", iface);
+			st = rrdset_find_bytype("net_packets", iface);
 			if(!st) {
-				st = rrd_stats_create("net_packets", iface, NULL, iface, "Packets", "packets/s", 1001, update_every, CHART_TYPE_LINE);
+				st = rrdset_create("net_packets", iface, NULL, iface, "Packets", "packets/s", 1001, update_every, RRDSET_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "received", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "sent", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "multicast", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrddim_add(st, "received", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "sent", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "multicast", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
 			}
-			else rrd_stats_next(st);
+			else rrdset_next(st);
 
-			rrd_stats_dimension_set(st, "received", rpackets);
-			rrd_stats_dimension_set(st, "sent", tpackets);
-			rrd_stats_dimension_set(st, "multicast", rmulticast);
-			rrd_stats_done(st);
+			rrddim_set(st, "received", rpackets);
+			rrddim_set(st, "sent", tpackets);
+			rrddim_set(st, "multicast", rmulticast);
+			rrdset_done(st);
 		}
 
 		// --------------------------------------------------------------------
 
 		if(do_errors) {
-			st = rrd_stats_find_bytype("net_errors", iface);
+			st = rrdset_find_bytype("net_errors", iface);
 			if(!st) {
-				st = rrd_stats_create("net_errors", iface, NULL, iface, "Interface Errors", "errors/s", 1002, update_every, CHART_TYPE_LINE);
+				st = rrdset_create("net_errors", iface, NULL, iface, "Interface Errors", "errors/s", 1002, update_every, RRDSET_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "inbound", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "outbound", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrddim_add(st, "inbound", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "outbound", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
 			}
-			else rrd_stats_next(st);
+			else rrdset_next(st);
 
-			rrd_stats_dimension_set(st, "inbound", rerrors);
-			rrd_stats_dimension_set(st, "outbound", terrors);
-			rrd_stats_done(st);
+			rrddim_set(st, "inbound", rerrors);
+			rrddim_set(st, "outbound", terrors);
+			rrdset_done(st);
 		}
 
 		// --------------------------------------------------------------------
 
 		if(do_drops) {
-			st = rrd_stats_find_bytype("net_drops", iface);
+			st = rrdset_find_bytype("net_drops", iface);
 			if(!st) {
-				st = rrd_stats_create("net_drops", iface, NULL, iface, "Interface Drops", "drops/s", 1003, update_every, CHART_TYPE_LINE);
+				st = rrdset_create("net_drops", iface, NULL, iface, "Interface Drops", "drops/s", 1003, update_every, RRDSET_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "inbound", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "outbound", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrddim_add(st, "inbound", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "outbound", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
 			}
-			else rrd_stats_next(st);
+			else rrdset_next(st);
 
-			rrd_stats_dimension_set(st, "inbound", rdrops);
-			rrd_stats_dimension_set(st, "outbound", tdrops);
-			rrd_stats_done(st);
+			rrddim_set(st, "inbound", rdrops);
+			rrddim_set(st, "outbound", tdrops);
+			rrdset_done(st);
 		}
 
 		// --------------------------------------------------------------------
 
 		if(do_fifo) {
-			st = rrd_stats_find_bytype("net_fifo", iface);
+			st = rrdset_find_bytype("net_fifo", iface);
 			if(!st) {
-				st = rrd_stats_create("net_fifo", iface, NULL, iface, "Interface Queue", "packets", 1100, update_every, CHART_TYPE_LINE);
+				st = rrdset_create("net_fifo", iface, NULL, iface, "Interface Queue", "packets", 1100, update_every, RRDSET_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "receive", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
-				rrd_stats_dimension_add(st, "transmit", NULL, -1, 1, RRD_DIMENSION_ABSOLUTE);
+				rrddim_add(st, "receive", NULL, 1, 1, RRDDIM_ABSOLUTE);
+				rrddim_add(st, "transmit", NULL, -1, 1, RRDDIM_ABSOLUTE);
 			}
-			else rrd_stats_next(st);
+			else rrdset_next(st);
 
-			rrd_stats_dimension_set(st, "receive", rfifo);
-			rrd_stats_dimension_set(st, "transmit", tfifo);
-			rrd_stats_done(st);
+			rrddim_set(st, "receive", rfifo);
+			rrddim_set(st, "transmit", tfifo);
+			rrdset_done(st);
 		}
 
 		// --------------------------------------------------------------------
 
 		if(do_compressed) {
-			st = rrd_stats_find_bytype("net_compressed", iface);
+			st = rrdset_find_bytype("net_compressed", iface);
 			if(!st) {
-				st = rrd_stats_create("net_compressed", iface, NULL, iface, "Compressed Packets", "packets/s", 1200, update_every, CHART_TYPE_LINE);
+				st = rrdset_create("net_compressed", iface, NULL, iface, "Compressed Packets", "packets/s", 1200, update_every, RRDSET_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "received", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "sent", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrddim_add(st, "received", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "sent", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
 			}
-			else rrd_stats_next(st);
+			else rrdset_next(st);
 
-			rrd_stats_dimension_set(st, "received", rcompressed);
-			rrd_stats_dimension_set(st, "sent", tcompressed);
-			rrd_stats_done(st);
+			rrddim_set(st, "received", rcompressed);
+			rrddim_set(st, "sent", tcompressed);
+			rrdset_done(st);
 		}
 
 		// --------------------------------------------------------------------
 
 		if(do_events) {
-			st = rrd_stats_find_bytype("net_events", iface);
+			st = rrdset_find_bytype("net_events", iface);
 			if(!st) {
-				st = rrd_stats_create("net_events", iface, NULL, iface, "Network Interface Events", "events/s", 1200, update_every, CHART_TYPE_LINE);
+				st = rrdset_create("net_events", iface, NULL, iface, "Network Interface Events", "events/s", 1200, update_every, RRDSET_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrd_stats_dimension_add(st, "frames", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "collisions", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-				rrd_stats_dimension_add(st, "carrier", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+				rrddim_add(st, "frames", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "collisions", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "carrier", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
 			}
-			else rrd_stats_next(st);
+			else rrdset_next(st);
 
-			rrd_stats_dimension_set(st, "frames", rframe);
-			rrd_stats_dimension_set(st, "collisions", tcollisions);
-			rrd_stats_dimension_set(st, "carrier", tcarrier);
-			rrd_stats_done(st);
+			rrddim_set(st, "frames", rframe);
+			rrddim_set(st, "collisions", tcollisions);
+			rrddim_set(st, "carrier", tcarrier);
+			rrdset_done(st);
 		}
 	}
 

@@ -19,11 +19,11 @@
 #define TC_LINE_MAX 1024
 
 struct tc_class {
-	char id[RRD_STATS_NAME_MAX + 1];
-	char name[RRD_STATS_NAME_MAX + 1];
+	char id[RRD_ID_LENGTH_MAX + 1];
+	char name[RRD_ID_LENGTH_MAX + 1];
 
-	char leafid[RRD_STATS_NAME_MAX + 1];
-	char parentid[RRD_STATS_NAME_MAX + 1];
+	char leafid[RRD_ID_LENGTH_MAX + 1];
+	char parentid[RRD_ID_LENGTH_MAX + 1];
 
 	int hasparent;
 	int isleaf;
@@ -33,9 +33,9 @@ struct tc_class {
 };
 
 struct tc_device {
-	char id[RRD_STATS_NAME_MAX + 1];
-	char name[RRD_STATS_NAME_MAX + 1];
-	char family[RRD_STATS_NAME_MAX + 1];
+	char id[RRD_ID_LENGTH_MAX + 1];
+	char name[RRD_ID_LENGTH_MAX + 1];
+	char family[RRD_ID_LENGTH_MAX + 1];
 
 	struct tc_class *classes;
 };
@@ -81,43 +81,43 @@ void tc_device_commit(struct tc_device *d)
 	char var_name[4096 + 1];
 	snprintf(var_name, 4096, "qos for %s", d->id);
 	if(config_get_boolean("plugin:tc", var_name, enable_new_interfaces)) {
-		RRD_STATS *st = rrd_stats_find_bytype(RRD_TYPE_TC, d->id);
+		RRDSET *st = rrdset_find_bytype(RRD_TYPE_TC, d->id);
 		if(!st) {
 			debug(D_TC_LOOP, "TC: Committing new TC device '%s'", d->name);
 
-			st = rrd_stats_create(RRD_TYPE_TC, d->id, d->name, d->family, "Class Usage", "kilobits/s", 1000, update_every, CHART_TYPE_STACKED);
+			st = rrdset_create(RRD_TYPE_TC, d->id, d->name, d->family, "Class Usage", "kilobits/s", 1000, rrd_update_every, RRDSET_TYPE_STACKED);
 
 			for ( c = d->classes ; c ; c = c->next) {
 				if(c->isleaf && c->hasparent)
-					rrd_stats_dimension_add(st, c->id, c->name, 8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrddim_add(st, c->id, c->name, 8, 1024 * rrd_update_every, RRDDIM_INCREMENTAL);
 			}
 		}
 		else {
-			rrd_stats_next_plugins(st);
+			rrdset_next_plugins(st);
 
-			if(strcmp(d->id, d->name) != 0) rrd_stats_set_name(st, d->name);
+			if(strcmp(d->id, d->name) != 0) rrdset_set_name(st, d->name);
 		}
 
 		for ( c = d->classes ; c ; c = c->next) {
 			if(c->isleaf && c->hasparent) {
-				if(rrd_stats_dimension_set(st, c->id, c->bytes) != 0) {
+				if(rrddim_set(st, c->id, c->bytes) != 0) {
 					
 					// new class, we have to add it
-					rrd_stats_dimension_add(st, c->id, c->name, 8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_set(st, c->id, c->bytes);
+					rrddim_add(st, c->id, c->name, 8, 1024 * rrd_update_every, RRDDIM_INCREMENTAL);
+					rrddim_set(st, c->id, c->bytes);
 				}
 
 				// if it has a name, different to the id
 				if(strcmp(c->id, c->name) != 0) {
 					// update the rrd dimension with the new name
-					RRD_DIMENSION *rd;
+					RRDDIM *rd;
 					for(rd = st->dimensions ; rd ; rd = rd->next) {
-						if(strcmp(rd->id, c->id) == 0) { rrd_stats_dimension_set_name(st, rd, c->name); break; }
+						if(strcmp(rd->id, c->id) == 0) { rrddim_set_name(st, rd, c->name); break; }
 					}
 				}
 			}
 		}
-		rrd_stats_done(st);
+		rrdset_done(st);
 	}
 }
 
@@ -126,7 +126,7 @@ void tc_device_set_class_name(struct tc_device *d, char *id, char *name)
 	struct tc_class *c;
 	for ( c = d->classes ; c ; c = c->next) {
 		if(strcmp(c->id, id) == 0) {
-			strncpy(c->name, name, RRD_STATS_NAME_MAX);
+			strncpy(c->name, name, RRD_ID_LENGTH_MAX);
 			// no need for null termination - it is already null
 			break;
 		}
@@ -135,13 +135,13 @@ void tc_device_set_class_name(struct tc_device *d, char *id, char *name)
 
 void tc_device_set_device_name(struct tc_device *d, char *name)
 {
-	strncpy(d->name, name, RRD_STATS_NAME_MAX);
+	strncpy(d->name, name, RRD_ID_LENGTH_MAX);
 	// no need for null termination - it is already null
 }
 
 void tc_device_set_device_family(struct tc_device *d, char *name)
 {
-	strncpy(d->family, name, RRD_STATS_NAME_MAX);
+	strncpy(d->family, name, RRD_ID_LENGTH_MAX);
 	// no need for null termination - it is already null
 }
 
@@ -155,7 +155,7 @@ struct tc_device *tc_device_create(char *name)
 		return NULL;
 	}
 
-	strncpy(d->id, name, RRD_STATS_NAME_MAX);
+	strncpy(d->id, name, RRD_ID_LENGTH_MAX);
 	strcpy(d->name, d->id);
 	strcpy(d->family, d->id);
 
@@ -177,10 +177,10 @@ struct tc_class *tc_class_add(struct tc_device *n, char *id, char *parentid, cha
 	c->next = n->classes;
 	n->classes = c;
 
-	strncpy(c->id, id, RRD_STATS_NAME_MAX);
+	strncpy(c->id, id, RRD_ID_LENGTH_MAX);
 	strcpy(c->name, c->id);
-	if(parentid) strncpy(c->parentid, parentid, RRD_STATS_NAME_MAX);
-	if(leafid) strncpy(c->leafid, leafid, RRD_STATS_NAME_MAX);
+	if(parentid) strncpy(c->parentid, parentid, RRD_ID_LENGTH_MAX);
+	if(leafid) strncpy(c->leafid, leafid, RRD_ID_LENGTH_MAX);
 
 	// no need for null termination on the strings, because of calloc()
 
@@ -217,7 +217,7 @@ void *tc_main(void *ptr)
 		struct tc_device *device = NULL;
 		struct tc_class *class = NULL;
 
-		snprintf(buffer, TC_LINE_MAX, "exec %s %d", config_get("plugin:tc", "script to run to get tc values", PLUGINS_DIR "/tc-qos-helper.sh"), update_every);
+		snprintf(buffer, TC_LINE_MAX, "exec %s %d", config_get("plugin:tc", "script to run to get tc values", PLUGINS_DIR "/tc-qos-helper.sh"), rrd_update_every);
 		debug(D_TC_LOOP, "executing '%s'", buffer);
 		// fp = popen(buffer, "r");
 		fp = mypopen(buffer, &tc_child_pid);
@@ -331,7 +331,7 @@ void *tc_main(void *ptr)
 			class = NULL;
 		}
 
-		sleep(update_every);
+		sleep(rrd_update_every);
 	}
 
 	return NULL;

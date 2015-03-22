@@ -26,9 +26,6 @@
 #ifndef NETDATA_PROCFILE_H
 #define NETDATA_PROCFILE_H 1
 
-// if enabled, procfile will output a lot of debug info
-extern int pfdebug;
-
 // ----------------------------------------------------------------------------
 // An array of words
 

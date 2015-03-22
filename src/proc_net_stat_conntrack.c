@@ -85,122 +85,122 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
 		asearch_restart 	+= tsearch_restart;	// conntrack.search
 	}
 
-	RRD_STATS *st;
+	RRDSET *st;
 
 	// --------------------------------------------------------------------
 	
 	if(do_sockets) {
-		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".sockets");
+		st = rrdset_find(RRD_TYPE_NET_STAT_CONNTRACK ".sockets");
 		if(!st) {
-			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "sockets", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connections", "active connections", 1000, update_every, CHART_TYPE_LINE);
+			st = rrdset_create(RRD_TYPE_NET_STAT_CONNTRACK, "sockets", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connections", "active connections", 1000, update_every, RRDSET_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "connections", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
+			rrddim_add(st, "connections", NULL, 1, 1, RRDDIM_ABSOLUTE);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "connections", aentries);
-		rrd_stats_done(st);
+		rrddim_set(st, "connections", aentries);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 
 	if(do_new) {
-		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".new");
+		st = rrdset_find(RRD_TYPE_NET_STAT_CONNTRACK ".new");
 		if(!st) {
-			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "new", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter New Connections", "connections/s", 1001, update_every, CHART_TYPE_LINE);
+			st = rrdset_create(RRD_TYPE_NET_STAT_CONNTRACK, "new", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter New Connections", "connections/s", 1001, update_every, RRDSET_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "new", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "ignore", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "invalid", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrddim_add(st, "new", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "ignore", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "invalid", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "new", anew);
-		rrd_stats_dimension_set(st, "ignore", aignore);
-		rrd_stats_dimension_set(st, "invalid", ainvalid);
-		rrd_stats_done(st);
+		rrddim_set(st, "new", anew);
+		rrddim_set(st, "ignore", aignore);
+		rrddim_set(st, "invalid", ainvalid);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 
 	if(do_changes) {
-		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".changes");
+		st = rrdset_find(RRD_TYPE_NET_STAT_CONNTRACK ".changes");
 		if(!st) {
-			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "changes", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Changes", "changes/s", 1002, update_every, CHART_TYPE_LINE);
+			st = rrdset_create(RRD_TYPE_NET_STAT_CONNTRACK, "changes", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Changes", "changes/s", 1002, update_every, RRDSET_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "inserted", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "deleted", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "delete_list", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrddim_add(st, "inserted", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "deleted", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "delete_list", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "inserted", ainsert);
-		rrd_stats_dimension_set(st, "deleted", adelete);
-		rrd_stats_dimension_set(st, "delete_list", adelete_list);
-		rrd_stats_done(st);
+		rrddim_set(st, "inserted", ainsert);
+		rrddim_set(st, "deleted", adelete);
+		rrddim_set(st, "delete_list", adelete_list);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 
 	if(do_expect) {
-		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".expect");
+		st = rrdset_find(RRD_TYPE_NET_STAT_CONNTRACK ".expect");
 		if(!st) {
-			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "expect", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Expectations", "expectations/s", 1003, update_every, CHART_TYPE_LINE);
+			st = rrdset_create(RRD_TYPE_NET_STAT_CONNTRACK, "expect", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Expectations", "expectations/s", 1003, update_every, RRDSET_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "created", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "deleted", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "new", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrddim_add(st, "created", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "deleted", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "new", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "created", aexpect_create);
-		rrd_stats_dimension_set(st, "deleted", aexpect_delete);
-		rrd_stats_dimension_set(st, "new", aexpect_new);
-		rrd_stats_done(st);
+		rrddim_set(st, "created", aexpect_create);
+		rrddim_set(st, "deleted", aexpect_delete);
+		rrddim_set(st, "new", aexpect_new);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 
 	if(do_search) {
-		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".search");
+		st = rrdset_find(RRD_TYPE_NET_STAT_CONNTRACK ".search");
 		if(!st) {
-			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "search", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Searches", "searches/s", 1010, update_every, CHART_TYPE_LINE);
+			st = rrdset_create(RRD_TYPE_NET_STAT_CONNTRACK, "search", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Searches", "searches/s", 1010, update_every, RRDSET_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "searched", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "restarted", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "found", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrddim_add(st, "searched", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "restarted", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "found", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "searched", asearched);
-		rrd_stats_dimension_set(st, "restarted", asearch_restart);
-		rrd_stats_dimension_set(st, "found", afound);
-		rrd_stats_done(st);
+		rrddim_set(st, "searched", asearched);
+		rrddim_set(st, "restarted", asearch_restart);
+		rrddim_set(st, "found", afound);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 
 	if(do_errors) {
-		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".errors");
+		st = rrdset_find(RRD_TYPE_NET_STAT_CONNTRACK ".errors");
 		if(!st) {
-			st = rrd_stats_create(RRD_TYPE_NET_STAT_CONNTRACK, "errors", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Errors", "events/s", 1005, update_every, CHART_TYPE_LINE);
+			st = rrdset_create(RRD_TYPE_NET_STAT_CONNTRACK, "errors", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Errors", "events/s", 1005, update_every, RRDSET_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "icmp_error", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "insert_failed", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "drop", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "early_drop", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrddim_add(st, "icmp_error", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "insert_failed", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "drop", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "early_drop", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "icmp_error", aicmp_error);
-		rrd_stats_dimension_set(st, "insert_failed", ainsert_failed);
-		rrd_stats_dimension_set(st, "drop", adrop);
-		rrd_stats_dimension_set(st, "early_drop", aearly_drop);
-		rrd_stats_done(st);
+		rrddim_set(st, "icmp_error", aicmp_error);
+		rrddim_set(st, "insert_failed", ainsert_failed);
+		rrddim_set(st, "drop", adrop);
+		rrddim_set(st, "early_drop", aearly_drop);
+		rrdset_done(st);
 	}
 
 	return 0;

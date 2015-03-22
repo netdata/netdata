@@ -13,8 +13,6 @@ extern char *trim(char *s);
 extern void *mymmap(const char *filename, unsigned long size, int flags);
 extern int savememory(const char *filename, void *mem, unsigned long size);
 
-extern void log_allocations(void);
-
 extern int fd_is_valid(int fd);
 
 #endif /* NETDATA_COMMON_H */

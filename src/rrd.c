@@ -16,58 +16,119 @@
 
 #include "rrd.h"
 
-int update_every = UPDATE_EVERY;
-int save_history = HISTORY;
+// ----------------------------------------------------------------------------
+// globals
+
+int rrd_update_every = UPDATE_EVERY;
+int rrd_default_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
+
+RRDSET *rrdset_root = NULL;
+pthread_rwlock_t rrdset_root_rwlock = PTHREAD_RWLOCK_INITIALIZER;
+
+int rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
+
+
+// ----------------------------------------------------------------------------
+// RRDSET index
+
+static int rrdset_iterator(avl *a) { if(a) {}; return 0; }
+
+static int rrdset_compare(void* a, void* b) {
+	if(((RRDSET *)a)->hash < ((RRDSET *)b)->hash) return -1;
+	else if(((RRDSET *)a)->hash > ((RRDSET *)b)->hash) return 1;
+	else return strcmp(((RRDSET *)a)->id, ((RRDSET *)b)->id);
+}
+
+avl_tree rrdset_root_index = {
+		NULL,
+		rrdset_compare
+};
+
+#define rrdset_index_add(st) avl_insert(&rrdset_root_index, (avl *)(st))
+#define rrdset_index_del(st) avl_remove(&rrdset_root_index, (avl *)(st))
+
+static RRDSET *rrdset_index_find(const char *id, unsigned long hash) {
+	RRDSET *result = NULL, tmp;
+	strncpy(tmp.id, id, RRD_ID_LENGTH_MAX);
+	tmp.id[RRD_ID_LENGTH_MAX] = '\0';
+	tmp.hash = (hash)?hash:simple_hash(tmp.id);
+
+	avl_search(&(rrdset_root_index), (avl *)&tmp, rrdset_iterator, (avl **)&result);
+	return result;
+}
+
+// ----------------------------------------------------------------------------
+// RRDDIM index
+
+static int rrddim_iterator(avl *a) { if(a) {}; return 0; }
+
+static int rrddim_compare(void* a, void* b) {
+	if(((RRDDIM *)a)->hash < ((RRDDIM *)b)->hash) return -1;
+	else if(((RRDDIM *)a)->hash > ((RRDDIM *)b)->hash) return 1;
+	else return strcmp(((RRDDIM *)a)->id, ((RRDDIM *)b)->id);
+}
+
+#define rrddim_index_add(st, rd) avl_insert(&((st)->dimensions_index), (avl *)(rd))
+#define rrddim_index_del(st,rd ) avl_remove(&((st)->dimensions_index), (avl *)(rd))
+
+static RRDDIM *rrddim_index_find(RRDSET *st, const char *id, unsigned long hash) {
+	RRDDIM *result = NULL, tmp;
+	tmp.hash = (hash)?hash:simple_hash(id);
+	strncpy(tmp.id, id, RRD_ID_LENGTH_MAX);
+	tmp.id[RRD_ID_LENGTH_MAX] = '\0';
+	tmp.hash = (hash)?hash:simple_hash(tmp.id);
+
+	avl_search(&(st->dimensions_index), (avl *)&tmp, rrddim_iterator, (avl **)&result);
+	return result;
+}
 
 // ----------------------------------------------------------------------------
 // chart types
 
-int chart_type_id(const char *name)
+int rrdset_type_id(const char *name)
 {
-	if(strcmp(name, CHART_TYPE_AREA_NAME) == 0) return CHART_TYPE_AREA;
-	if(strcmp(name, CHART_TYPE_STACKED_NAME) == 0) return CHART_TYPE_STACKED;
-	if(strcmp(name, CHART_TYPE_LINE_NAME) == 0) return CHART_TYPE_LINE;
-	return CHART_TYPE_LINE;
+	if(strcmp(name, RRDSET_TYPE_AREA_NAME) == 0) return RRDSET_TYPE_AREA;
+	if(strcmp(name, RRDSET_TYPE_STACKED_NAME) == 0) return RRDSET_TYPE_STACKED;
+	if(strcmp(name, RRDSET_TYPE_LINE_NAME) == 0) return RRDSET_TYPE_LINE;
+	return RRDSET_TYPE_LINE;
 }
 
-const char *chart_type_name(int chart_type)
+const char *rrdset_type_name(int chart_type)
 {
-	static char line[] = CHART_TYPE_LINE_NAME;
-	static char area[] = CHART_TYPE_AREA_NAME;
-	static char stacked[] = CHART_TYPE_STACKED_NAME;
+	static char line[] = RRDSET_TYPE_LINE_NAME;
+	static char area[] = RRDSET_TYPE_AREA_NAME;
+	static char stacked[] = RRDSET_TYPE_STACKED_NAME;
 
 	switch(chart_type) {
-		case CHART_TYPE_LINE:
+		case RRDSET_TYPE_LINE:
 			return line;
 
-		case CHART_TYPE_AREA:
+		case RRDSET_TYPE_AREA:
 			return area;
 
-		case CHART_TYPE_STACKED:
+		case RRDSET_TYPE_STACKED:
 			return stacked;
 	}
 	return line;
 }
 
 // ----------------------------------------------------------------------------
-// mmap() wrapper
+// load / save
 
-int memory_mode = NETDATA_MEMORY_MODE_SAVE;
-
-const char *memory_mode_name(int id)
+const char *rrd_memory_mode_name(int id)
 {
-	static const char ram[] = NETDATA_MEMORY_MODE_RAM_NAME;
-	static const char map[] = NETDATA_MEMORY_MODE_MAP_NAME;
-	static const char save[] = NETDATA_MEMORY_MODE_SAVE_NAME;
+	static const char ram[] = RRD_MEMORY_MODE_RAM_NAME;
+	static const char map[] = RRD_MEMORY_MODE_MAP_NAME;
+	static const char save[] = RRD_MEMORY_MODE_SAVE_NAME;
 
 	switch(id) {
-		case NETDATA_MEMORY_MODE_RAM:
+		case RRD_MEMORY_MODE_RAM:
 			return ram;
 
-		case NETDATA_MEMORY_MODE_MAP:
+		case RRD_MEMORY_MODE_MAP:
 			return map;
 
-		case NETDATA_MEMORY_MODE_SAVE:
+		case RRD_MEMORY_MODE_SAVE:
 		default:
 			return save;
 	}
@@ -75,55 +136,55 @@ const char *memory_mode_name(int id)
 	return save;
 }
 
-int memory_mode_id(const char *name)
+int rrd_memory_mode_id(const char *name)
 {
-	if(!strcmp(name, NETDATA_MEMORY_MODE_RAM_NAME))
-		return NETDATA_MEMORY_MODE_RAM;
-	else if(!strcmp(name, NETDATA_MEMORY_MODE_MAP_NAME))
-		return NETDATA_MEMORY_MODE_MAP;
+	if(!strcmp(name, RRD_MEMORY_MODE_RAM_NAME))
+		return RRD_MEMORY_MODE_RAM;
+	else if(!strcmp(name, RRD_MEMORY_MODE_MAP_NAME))
+		return RRD_MEMORY_MODE_MAP;
 
-	return NETDATA_MEMORY_MODE_SAVE;
+	return RRD_MEMORY_MODE_SAVE;
 }
 
 // ----------------------------------------------------------------------------
 // algorithms types
 
-int algorithm_id(const char *name)
+int rrddim_algorithm_id(const char *name)
 {
-	if(strcmp(name, RRD_DIMENSION_ABSOLUTE_NAME) == 0) 			return RRD_DIMENSION_ABSOLUTE;
-	if(strcmp(name, RRD_DIMENSION_INCREMENTAL_NAME) == 0) 			return RRD_DIMENSION_INCREMENTAL;
-	if(strcmp(name, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL_NAME) == 0) 		return RRD_DIMENSION_PCENT_OVER_ROW_TOTAL;
-	if(strcmp(name, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL_NAME) == 0) 	return RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL;
-	return RRD_DIMENSION_ABSOLUTE;
+	if(strcmp(name, RRDDIM_ABSOLUTE_NAME) == 0) 			return RRDDIM_ABSOLUTE;
+	if(strcmp(name, RRDDIM_INCREMENTAL_NAME) == 0) 			return RRDDIM_INCREMENTAL;
+	if(strcmp(name, RRDDIM_PCENT_OVER_ROW_TOTAL_NAME) == 0) 		return RRDDIM_PCENT_OVER_ROW_TOTAL;
+	if(strcmp(name, RRDDIM_PCENT_OVER_DIFF_TOTAL_NAME) == 0) 	return RRDDIM_PCENT_OVER_DIFF_TOTAL;
+	return RRDDIM_ABSOLUTE;
 }
 
-const char *algorithm_name(int chart_type)
+const char *rrddim_algorithm_name(int chart_type)
 {
-	static char absolute[] = RRD_DIMENSION_ABSOLUTE_NAME;
-	static char incremental[] = RRD_DIMENSION_INCREMENTAL_NAME;
-	static char percentage_of_absolute_row[] = RRD_DIMENSION_PCENT_OVER_ROW_TOTAL_NAME;
-	static char percentage_of_incremental_row[] = RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL_NAME;
+	static char absolute[] = RRDDIM_ABSOLUTE_NAME;
+	static char incremental[] = RRDDIM_INCREMENTAL_NAME;
+	static char percentage_of_absolute_row[] = RRDDIM_PCENT_OVER_ROW_TOTAL_NAME;
+	static char percentage_of_incremental_row[] = RRDDIM_PCENT_OVER_DIFF_TOTAL_NAME;
 
 	switch(chart_type) {
-		case RRD_DIMENSION_ABSOLUTE:
+		case RRDDIM_ABSOLUTE:
 			return absolute;
 
-		case RRD_DIMENSION_INCREMENTAL:
+		case RRDDIM_INCREMENTAL:
 			return incremental;
 
-		case RRD_DIMENSION_PCENT_OVER_ROW_TOTAL:
+		case RRDDIM_PCENT_OVER_ROW_TOTAL:
 			return percentage_of_absolute_row;
 
-		case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
+		case RRDDIM_PCENT_OVER_DIFF_TOTAL:
 			return percentage_of_incremental_row;
 	}
 	return absolute;
 }
 
-RRD_STATS *root = NULL;
-pthread_rwlock_t root_rwlock = PTHREAD_RWLOCK_INITIALIZER;
+// ----------------------------------------------------------------------------
+// chart names
 
-char *rrd_stats_strncpy_name(char *to, const char *from, int length)
+char *rrdset_strncpy_name(char *to, const char *from, int length)
 {
 	int i;
 	for(i = 0; i < length && from[i] ;i++) {
@@ -136,18 +197,21 @@ char *rrd_stats_strncpy_name(char *to, const char *from, int length)
 	return to;
 }
 
-void rrd_stats_set_name(RRD_STATS *st, const char *name)
+void rrdset_set_name(RRDSET *st, const char *name)
 {
 	char b[CONFIG_MAX_VALUE + 1];
-	char n[RRD_STATS_NAME_MAX + 1];
+	char n[RRD_ID_LENGTH_MAX + 1];
 
-	snprintf(n, RRD_STATS_NAME_MAX, "%s.%s", st->type, name);
-	rrd_stats_strncpy_name(b, n, CONFIG_MAX_VALUE);
+	snprintf(n, RRD_ID_LENGTH_MAX, "%s.%s", st->type, name);
+	rrdset_strncpy_name(b, n, CONFIG_MAX_VALUE);
 	st->name = config_get(st->id, "name", b);
 	st->hash_name = simple_hash(st->name);
 }
 
-char *rrd_stats_cache_dir(const char *id)
+// ----------------------------------------------------------------------------
+// cache directory
+
+char *rrdset_cache_dir(const char *id)
 {
 	char *ret = NULL;
 
@@ -156,12 +220,12 @@ char *rrd_stats_cache_dir(const char *id)
 
 	char b[FILENAME_MAX + 1];
 	char n[FILENAME_MAX + 1];
-	rrd_stats_strncpy_name(b, id, FILENAME_MAX);
+	rrdset_strncpy_name(b, id, FILENAME_MAX);
 
 	snprintf(n, FILENAME_MAX, "%s/%s", cache_dir, b);
 	ret = config_get(id, "database directory", n);
 
-	if(memory_mode == NETDATA_MEMORY_MODE_MAP || memory_mode == NETDATA_MEMORY_MODE_SAVE) {
+	if(rrd_memory_mode == RRD_MEMORY_MODE_MAP || rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
 		int r = mkdir(ret, 0775);
 		if(r != 0 && errno != EEXIST)
 			error("Cannot create directory '%s'", ret);
@@ -170,7 +234,10 @@ char *rrd_stats_cache_dir(const char *id)
 	return ret;
 }
 
-void rrd_stats_reset(RRD_STATS *st)
+// ----------------------------------------------------------------------------
+// core functions
+
+void rrdset_reset(RRDSET *st)
 {
 	st->last_collected_time.tv_sec = 0;
 	st->last_collected_time.tv_usec = 0;
@@ -180,7 +247,7 @@ void rrd_stats_reset(RRD_STATS *st)
 	st->counter = 0;
 	st->counter_done = 0;
 
-	RRD_DIMENSION *rd;
+	RRDDIM *rd;
 	for(rd = st->dimensions; rd ; rd = rd->next) {
 		rd->last_collected_time.tv_sec = 0;
 		rd->last_collected_time.tv_usec = 0;
@@ -188,35 +255,35 @@ void rrd_stats_reset(RRD_STATS *st)
 	}
 }
 
-RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, const char *family, const char *title, const char *units, long priority, int update_every, int chart_type)
+RRDSET *rrdset_create(const char *type, const char *id, const char *name, const char *family, const char *title, const char *units, long priority, int update_every, int chart_type)
 {
 	if(!id || !id[0]) {
 		fatal("Cannot create rrd stats without an id.");
 		return NULL;
 	}
 
-	char fullid[RRD_STATS_NAME_MAX + 1];
+	char fullid[RRD_ID_LENGTH_MAX + 1];
 	char fullfilename[FILENAME_MAX + 1];
-	RRD_STATS *st = NULL;
+	RRDSET *st = NULL;
 
-	snprintf(fullid, RRD_STATS_NAME_MAX, "%s.%s", type, id);
+	snprintf(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
 
-	long entries = config_get_number(fullid, "history", save_history);
+	long entries = config_get_number(fullid, "history", rrd_default_history_entries);
 	if(entries < 5) entries = config_set_number(fullid, "history", 5);
-	if(entries > HISTORY_MAX) entries = config_set_number(fullid, "history", HISTORY_MAX);
+	if(entries > RRD_HISTORY_ENTRIES_MAX) entries = config_set_number(fullid, "history", RRD_HISTORY_ENTRIES_MAX);
 
 	int enabled = config_get_boolean(fullid, "enabled", 1);
 	if(!enabled) entries = 5;
 
-	unsigned long size = sizeof(RRD_STATS);
-	char *cache_dir = rrd_stats_cache_dir(fullid);
+	unsigned long size = sizeof(RRDSET);
+	char *cache_dir = rrdset_cache_dir(fullid);
 
 	debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
 	snprintf(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
-	if(memory_mode != NETDATA_MEMORY_MODE_RAM) st = (RRD_STATS *)mymmap(fullfilename, size, ((memory_mode == NETDATA_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE));
+	if(rrd_memory_mode != RRD_MEMORY_MODE_RAM) st = (RRDSET *)mymmap(fullfilename, size, ((rrd_memory_mode == RRD_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE));
 	if(st) {
-		if(strcmp(st->magic, RRD_STATS_MAGIC) != 0) {
+		if(strcmp(st->magic, RRDSET_MAGIC) != 0) {
 			errno = 0;
 			info("Initializing file %s.", fullfilename);
 			bzero(st, size);
@@ -253,7 +320,7 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 		st->units = NULL;
 		st->dimensions = NULL;
 		st->next = NULL;
-		st->mapped = memory_mode;
+		st->mapped = rrd_memory_mode;
 	}
 	else {
 		st = calloc(1, size);
@@ -261,14 +328,14 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 			fatal("Cannot allocate memory for RRD_STATS %s.%s", type, id);
 			return NULL;
 		}
-		st->mapped = NETDATA_MEMORY_MODE_RAM;
+		st->mapped = RRD_MEMORY_MODE_RAM;
 	}
 	st->memsize = size;
 	st->entries = entries;
 	st->update_every = update_every;
 
-	strcpy(st->cache_file, fullfilename);
-	strcpy(st->magic, RRD_STATS_MAGIC);
+	strcpy(st->cache_filename, fullfilename);
+	strcpy(st->magic, RRDSET_MAGIC);
 
 	strcpy(st->id, fullid);
 	st->hash = simple_hash(st->id);
@@ -278,10 +345,10 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 	st->family     = config_get(st->id, "family", family?family:st->id);
 	st->units      = config_get(st->id, "units", units?units:"");
 	st->type       = config_get(st->id, "type", type);
-	st->chart_type = chart_type_id(config_get(st->id, "chart type", chart_type_name(chart_type)));
+	st->chart_type = rrdset_type_id(config_get(st->id, "chart type", rrdset_type_name(chart_type)));
 
-	if(name && *name) rrd_stats_set_name(st, name);
-	else rrd_stats_set_name(st, id);
+	if(name && *name) rrdset_set_name(st, name);
+	else rrdset_set_name(st, id);
 
 	{
 		char varvalue[CONFIG_MAX_VALUE + 1];
@@ -299,38 +366,43 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 	st->last_collected_time.tv_usec = 0;
 	st->counter_done = 0;
 
-	st->gap_when_lost_iterations = config_get_number(st->id, "gap when lost iterations above", DEFAULT_GAP_INTERPOLATIONS);
+	st->gap_when_lost_iterations_above = config_get_number(st->id, "gap when lost iterations above", RRD_DEFAULT_GAP_INTERPOLATIONS);
+
+	st->dimensions_index.root = NULL;
+	st->dimensions_index.compar = rrddim_compare;
 
 	pthread_rwlock_init(&st->rwlock, NULL);
-	pthread_rwlock_wrlock(&root_rwlock);
+	pthread_rwlock_wrlock(&rrdset_root_rwlock);
 
-	st->next = root;
-	root = st;
+	st->next = rrdset_root;
+	rrdset_root = st;
 
-	pthread_rwlock_unlock(&root_rwlock);
+	rrdset_index_add(st);
+
+	pthread_rwlock_unlock(&rrdset_root_rwlock);
 
 	return(st);
 }
 
-RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char *name, long multiplier, long divisor, int algorithm)
+RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier, long divisor, int algorithm)
 {
 	char filename[FILENAME_MAX + 1];
 	char fullfilename[FILENAME_MAX + 1];
 
 	char varname[CONFIG_MAX_NAME + 1];
-	RRD_DIMENSION *rd = NULL;
-	unsigned long size = sizeof(RRD_DIMENSION) + (st->entries * sizeof(storage_number));
+	RRDDIM *rd = NULL;
+	unsigned long size = sizeof(RRDDIM) + (st->entries * sizeof(storage_number));
 
 	debug(D_RRD_CALLS, "Adding dimension '%s/%s'.", st->id, id);
 
-	rrd_stats_strncpy_name(filename, id, FILENAME_MAX);
+	rrdset_strncpy_name(filename, id, FILENAME_MAX);
 	snprintf(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
-	if(memory_mode != NETDATA_MEMORY_MODE_RAM) rd = (RRD_DIMENSION *)mymmap(fullfilename, size, ((memory_mode == NETDATA_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE));
+	if(rrd_memory_mode != RRD_MEMORY_MODE_RAM) rd = (RRDDIM *)mymmap(fullfilename, size, ((rrd_memory_mode == RRD_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE));
 	if(rd) {
 		struct timeval now;
 		gettimeofday(&now, NULL);
 
-		if(strcmp(rd->magic, RRD_DIMENSION_MAGIC) != 0) {
+		if(strcmp(rd->magic, RRDDIMENSION_MAGIC) != 0) {
 			errno = 0;
 			info("Initializing file %s.", fullfilename);
 			bzero(rd, size);
@@ -376,7 +448,7 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 
 	if(rd) {
 		// we have a file mapped for rd
-		rd->mapped = memory_mode;
+		rd->mapped = rrd_memory_mode;
 		rd->hidden = 0;
 		rd->next = NULL;
 		rd->name = NULL;
@@ -390,20 +462,20 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 			return NULL;
 		}
 
-		rd->mapped = NETDATA_MEMORY_MODE_RAM;
+		rd->mapped = RRD_MEMORY_MODE_RAM;
 	}
 	rd->memsize = size;
 
-	strcpy(rd->magic, RRD_DIMENSION_MAGIC);
-	strcpy(rd->cache_file, fullfilename);
-	strncpy(rd->id, id, RRD_STATS_NAME_MAX);
+	strcpy(rd->magic, RRDDIMENSION_MAGIC);
+	strcpy(rd->cache_filename, fullfilename);
+	strncpy(rd->id, id, RRD_ID_LENGTH_MAX);
 	rd->hash = simple_hash(rd->id);
 
 	snprintf(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
 	rd->name = config_get(st->id, varname, (name && *name)?name:rd->id);
 
 	snprintf(varname, CONFIG_MAX_NAME, "dim %s algorithm", rd->id);
-	rd->algorithm = algorithm_id(config_get(st->id, varname, algorithm_name(algorithm)));
+	rd->algorithm = rrddim_algorithm_id(config_get(st->id, varname, rrddim_algorithm_name(algorithm)));
 
 	snprintf(varname, CONFIG_MAX_NAME, "dim %s multiplier", rd->id);
 	rd->multiplier = config_get_number(st->id, varname, multiplier);
@@ -419,33 +491,47 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 	if(!st->dimensions)
 		st->dimensions = rd;
 	else {
-		RRD_DIMENSION *td = st->dimensions;
+		RRDDIM *td = st->dimensions;
 		for(; td->next; td = td->next) ;
 		td->next = rd;
 	}
 
+	rrddim_index_add(st, rd);
+
 	return(rd);
 }
 
-void rrd_stats_dimension_set_name(RRD_STATS *st, RRD_DIMENSION *rd, const char *name)
+void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name)
 {
 	char varname[CONFIG_MAX_NAME + 1];
 	snprintf(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
 	config_get(st->id, varname, name);
 }
 
-void rrd_stats_dimension_free(RRD_DIMENSION *rd)
+void rrddim_free(RRDSET *st, RRDDIM *rd)
 {
-	if(rd->next) rrd_stats_dimension_free(rd->next);
+	RRDDIM *i = st->dimensions, *last = NULL;
+	for(i = st->dimensions; i && i != rd ; i = i->next) last = i;
+
+	if(!i) {
+		error("Request to free dimension %s.%s but it is not linked.", st->id, rd->name);
+		return;
+	}
+
+	if(last) last = i->next;
+	else st->dimensions = i->next;
+
+	rrddim_index_del(st, rd);
+
 	// free(rd->annotations);
-	if(rd->mapped == NETDATA_MEMORY_MODE_SAVE) {
-		debug(D_RRD_CALLS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_file);
-		savememory(rd->cache_file, rd, rd->memsize);
+	if(rd->mapped == RRD_MEMORY_MODE_SAVE) {
+		debug(D_RRD_CALLS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_filename);
+		savememory(rd->cache_filename, rd, rd->memsize);
 
 		debug(D_RRD_CALLS, "Unmapping dimension '%s'.", rd->name);
 		munmap(rd, rd->memsize);
 	}
-	else if(rd->mapped == NETDATA_MEMORY_MODE_MAP) {
+	else if(rd->mapped == RRD_MEMORY_MODE_MAP) {
 		debug(D_RRD_CALLS, "Unmapping dimension '%s'.", rd->name);
 		munmap(rd, rd->memsize);
 	}
@@ -455,25 +541,27 @@ void rrd_stats_dimension_free(RRD_DIMENSION *rd)
 	}
 }
 
-void rrd_stats_free_all(void)
+void rrdset_free_all(void)
 {
 	info("Freeing all memory...");
 
-	RRD_STATS *st;
-	for(st = root; st ;) {
-		RRD_STATS *next = st->next;
+	RRDSET *st;
+	for(st = rrdset_root; st ;) {
+		RRDSET *next = st->next;
 
-		if(st->dimensions) rrd_stats_dimension_free(st->dimensions);
-		st->dimensions = NULL;
+		while(st->dimensions)
+			rrddim_free(st, st->dimensions);
 
-		if(st->mapped == NETDATA_MEMORY_MODE_SAVE) {
-			debug(D_RRD_CALLS, "Saving stats '%s' to '%s'.", st->name, st->cache_file);
-			savememory(st->cache_file, st, st->memsize);
+		rrdset_index_del(st);
+
+		if(st->mapped == RRD_MEMORY_MODE_SAVE) {
+			debug(D_RRD_CALLS, "Saving stats '%s' to '%s'.", st->name, st->cache_filename);
+			savememory(st->cache_filename, st, st->memsize);
 
 			debug(D_RRD_CALLS, "Unmapping stats '%s'.", st->name);
 			munmap(st, st->memsize);
 		}
-		else if(st->mapped == NETDATA_MEMORY_MODE_MAP) {
+		else if(st->mapped == RRD_MEMORY_MODE_MAP) {
 			debug(D_RRD_CALLS, "Unmapping stats '%s'.", st->name);
 			munmap(st, st->memsize);
 		}
@@ -482,111 +570,96 @@ void rrd_stats_free_all(void)
 
 		st = next;
 	}
-	root = NULL;
+	rrdset_root = NULL;
 
 	info("Memory cleanup completed...");
 }
 
-void rrd_stats_save_all(void)
+void rrdset_save_all(void)
 {
-	RRD_STATS *st;
-	RRD_DIMENSION *rd;
+	RRDSET *st;
+	RRDDIM *rd;
 
-	pthread_rwlock_wrlock(&root_rwlock);
-	for(st = root; st ; st = st->next) {
+	pthread_rwlock_wrlock(&rrdset_root_rwlock);
+	for(st = rrdset_root; st ; st = st->next) {
 		pthread_rwlock_wrlock(&st->rwlock);
 
-		if(st->mapped == NETDATA_MEMORY_MODE_SAVE) {
-			debug(D_RRD_CALLS, "Saving stats '%s' to '%s'.", st->name, st->cache_file);
-			savememory(st->cache_file, st, st->memsize);
+		if(st->mapped == RRD_MEMORY_MODE_SAVE) {
+			debug(D_RRD_CALLS, "Saving stats '%s' to '%s'.", st->name, st->cache_filename);
+			savememory(st->cache_filename, st, st->memsize);
 		}
 
 		for(rd = st->dimensions; rd ; rd = rd->next) {
-			if(rd->mapped == NETDATA_MEMORY_MODE_SAVE) {
-				debug(D_RRD_CALLS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_file);
-				savememory(rd->cache_file, rd, rd->memsize);
+			if(rd->mapped == RRD_MEMORY_MODE_SAVE) {
+				debug(D_RRD_CALLS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_filename);
+				savememory(rd->cache_filename, rd, rd->memsize);
 			}
 		}
 
 		pthread_rwlock_unlock(&st->rwlock);
 	}
-	pthread_rwlock_unlock(&root_rwlock);
+	pthread_rwlock_unlock(&rrdset_root_rwlock);
 }
 
 
-RRD_STATS *rrd_stats_find(const char *id)
+RRDSET *rrdset_find(const char *id)
 {
 	debug(D_RRD_CALLS, "rrd_stats_find() for chart %s", id);
 
-	unsigned long hash = simple_hash(id);
-
-	pthread_rwlock_rdlock(&root_rwlock);
-	RRD_STATS *st = root;
-	for ( ; st ; st = st->next )
-		if(hash == st->hash)
-			if(strcmp(st->id, id) == 0)
-				break;
-	pthread_rwlock_unlock(&root_rwlock);
+	pthread_rwlock_rdlock(&rrdset_root_rwlock);
+	RRDSET *st = rrdset_index_find(id, 0);
+	pthread_rwlock_unlock(&rrdset_root_rwlock);
 
 	return(st);
 }
 
-RRD_STATS *rrd_stats_find_bytype(const char *type, const char *id)
+RRDSET *rrdset_find_bytype(const char *type, const char *id)
 {
 	debug(D_RRD_CALLS, "rrd_stats_find_bytype() for chart %s.%s", type, id);
 
-	char buf[RRD_STATS_NAME_MAX + 1];
+	char buf[RRD_ID_LENGTH_MAX + 1];
 
-	strncpy(buf, type, RRD_STATS_NAME_MAX - 1);
-	buf[RRD_STATS_NAME_MAX - 1] = '\0';
+	strncpy(buf, type, RRD_ID_LENGTH_MAX - 1);
+	buf[RRD_ID_LENGTH_MAX - 1] = '\0';
 	strcat(buf, ".");
 	int len = strlen(buf);
-	strncpy(&buf[len], id, RRD_STATS_NAME_MAX - len);
-	buf[RRD_STATS_NAME_MAX] = '\0';
+	strncpy(&buf[len], id, RRD_ID_LENGTH_MAX - len);
+	buf[RRD_ID_LENGTH_MAX] = '\0';
 
-	return(rrd_stats_find(buf));
+	return(rrdset_find(buf));
 }
 
-RRD_STATS *rrd_stats_find_byname(const char *name)
+RRDSET *rrdset_find_byname(const char *name)
 {
 	debug(D_RRD_CALLS, "rrd_stats_find_byname() for chart %s", name);
 
 	char b[CONFIG_MAX_VALUE + 1];
 
-	rrd_stats_strncpy_name(b, name, CONFIG_MAX_VALUE);
+	rrdset_strncpy_name(b, name, CONFIG_MAX_VALUE);
 	unsigned long hash = simple_hash(b);
 
-	pthread_rwlock_rdlock(&root_rwlock);
-	RRD_STATS *st = root;
+	pthread_rwlock_rdlock(&rrdset_root_rwlock);
+	RRDSET *st = rrdset_root;
 	for ( ; st ; st = st->next ) {
 		if(hash == st->hash_name && strcmp(st->name, b) == 0) break;
 	}
-	pthread_rwlock_unlock(&root_rwlock);
+	pthread_rwlock_unlock(&rrdset_root_rwlock);
 
 	return(st);
 }
 
-RRD_DIMENSION *rrd_stats_dimension_find(RRD_STATS *st, const char *id)
+RRDDIM *rrddim_find(RRDSET *st, const char *id)
 {
 	debug(D_RRD_CALLS, "rrd_stats_dimension_find() for chart %s, dimension %s", st->name, id);
 
-	unsigned long hash = simple_hash(id);
-
-	RRD_DIMENSION *rd = st->dimensions;
-
-	for ( ; rd ; rd = rd->next )
-		if(hash == rd->hash)
-			if(strcmp(rd->id, id) == 0)
-				break;
-
-	return(rd);
+	return rrddim_index_find(st, id, 0);
 }
 
-int rrd_stats_dimension_hide(RRD_STATS *st, const char *id)
+int rrddim_hide(RRDSET *st, const char *id)
 {
 	debug(D_RRD_CALLS, "rrd_stats_dimension_hide() for chart %s, dimension %s", st->name, id);
 
-	RRD_DIMENSION *rd = rrd_stats_dimension_find(st, id);
+	RRDDIM *rd = rrddim_find(st, id);
 	if(!rd) {
 		error("Cannot find dimension with id '%s' on stats '%s' (%s).", id, st->name, st->id);
 		return 1;
@@ -596,7 +669,7 @@ int rrd_stats_dimension_hide(RRD_STATS *st, const char *id)
 	return 0;
 }
 
-void rrd_stats_dimension_set_by_pointer(RRD_STATS *st, RRD_DIMENSION *rd, collected_number value)
+void rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value)
 {
 	debug(D_RRD_CALLS, "rrd_stats_dimension_set() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, st->name, rd->name, value);
 	
@@ -605,19 +678,19 @@ void rrd_stats_dimension_set_by_pointer(RRD_STATS *st, RRD_DIMENSION *rd, collec
 	rd->updated = 1;
 }
 
-int rrd_stats_dimension_set(RRD_STATS *st, const char *id, collected_number value)
+int rrddim_set(RRDSET *st, const char *id, collected_number value)
 {
-	RRD_DIMENSION *rd = rrd_stats_dimension_find(st, id);
+	RRDDIM *rd = rrddim_find(st, id);
 	if(!rd) {
 		error("Cannot find dimension with id '%s' on stats '%s' (%s).", id, st->name, st->id);
 		return 1;
 	}
 
-	rrd_stats_dimension_set_by_pointer(st, rd, value);
+	rrddim_set_by_pointer(st, rd, value);
 	return 0;
 }
 
-void rrd_stats_next_usec(RRD_STATS *st, unsigned long long microseconds)
+void rrdset_next_usec(RRDSET *st, unsigned long long microseconds)
 {
 	debug(D_RRD_CALLS, "rrd_stats_next() for chart %s with microseconds %llu", st->name, microseconds);
 
@@ -625,7 +698,7 @@ void rrd_stats_next_usec(RRD_STATS *st, unsigned long long microseconds)
 	st->usec_since_last_update = microseconds;
 }
 
-void rrd_stats_next(RRD_STATS *st)
+void rrdset_next(RRDSET *st)
 {
 	unsigned long long microseconds = 0;
 
@@ -635,19 +708,19 @@ void rrd_stats_next(RRD_STATS *st)
 		microseconds = usecdiff(&now, &st->last_collected_time);
 	}
 
-	rrd_stats_next_usec(st, microseconds);
+	rrdset_next_usec(st, microseconds);
 }
 
-void rrd_stats_next_plugins(RRD_STATS *st)
+void rrdset_next_plugins(RRDSET *st)
 {
-	rrd_stats_next(st);
+	rrdset_next(st);
 }
 
-unsigned long long rrd_stats_done(RRD_STATS *st)
+unsigned long long rrdset_done(RRDSET *st)
 {
 	debug(D_RRD_CALLS, "rrd_stats_done() for chart %s", st->name);
 
-	RRD_DIMENSION *rd, *last;
+	RRDDIM *rd, *last;
 	int oldstate, store_this_entry = 1;
 
 	if(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate) != 0)
@@ -659,7 +732,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 	// check if the chart has a long time to be refreshed
 	if(st->usec_since_last_update > st->entries * st->update_every * 1000000ULL) {
 		info("%s: took too long to be updated (%0.3Lf secs). Reseting it.", st->name, (long double)(st->usec_since_last_update / 1000000.0));
-		rrd_stats_reset(st);
+		rrdset_reset(st);
 		st->usec_since_last_update = st->update_every * 1000000ULL;
 	}
 	if(st->debug) debug(D_RRD_STATS, "%s: microseconds since last update: %llu", st->name, st->usec_since_last_update);
@@ -701,7 +774,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 	// check if we will re-write the entire data set
 	if(usecdiff(&st->last_collected_time, &st->last_updated) > st->update_every * st->entries * 1000000ULL) {
 		info("%s: too old data (last updated at %u.%u, last collected at %u.%u). Reseting it. Will not store the next entry.", st->name, st->last_updated.tv_sec, st->last_updated.tv_usec, st->last_collected_time.tv_sec, st->last_collected_time.tv_usec);
-		rrd_stats_reset(st);
+		rrdset_reset(st);
 
 		st->usec_since_last_update = st->update_every * 1000000ULL;
 
@@ -759,7 +832,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 			);
 
 		switch(rd->algorithm) {
-			case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
+			case RRDDIM_PCENT_OVER_DIFF_TOTAL:
 				// the percentage of the current increment
 				// over the increment of all dimensions together
 				if(st->collected_total == st->last_collected_total) rd->calculated_value = rd->last_calculated_value;
@@ -780,7 +853,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 						);
 				break;
 
-			case RRD_DIMENSION_PCENT_OVER_ROW_TOTAL:
+			case RRDDIM_PCENT_OVER_ROW_TOTAL:
 				if(!st->collected_total) rd->calculated_value = 0;
 				else
 				// the percentage of the current value
@@ -802,10 +875,14 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 						);
 				break;
 
-			case RRD_DIMENSION_INCREMENTAL:
+			case RRDDIM_INCREMENTAL:
 				// if the new is smaller than the old (an overflow, or reset), set the old equal to the new
 				// to reset the calculation (it will give zero as the calculation for this second)
 				if(rd->last_collected_value > rd->collected_value) {
+					info("%s.%s: Detect RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
+							, st->name, rd->name
+							, rd->last_collected_value
+							, rd->collected_value);
 					storage_flags = SN_EXISTS_RESET;
 					rd->last_collected_value = rd->collected_value;
 				}
@@ -822,7 +899,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 						);
 				break;
 
-			case RRD_DIMENSION_ABSOLUTE:
+			case RRDDIM_ABSOLUTE:
 				rd->calculated_value = (calculated_number)rd->collected_value;
 
 				if(st->debug)
@@ -869,7 +946,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 			calculated_number new_value;
 
 			switch(rd->algorithm) {
-				case RRD_DIMENSION_INCREMENTAL:
+				case RRDDIM_INCREMENTAL:
 					new_value = (calculated_number)
 						(	   rd->calculated_value
 							* (calculated_number)(next_ut - last_ut)
@@ -892,9 +969,9 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 					rd->calculated_value -= new_value;
 					break;
 
-				case RRD_DIMENSION_ABSOLUTE:
-				case RRD_DIMENSION_PCENT_OVER_ROW_TOTAL:
-				case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
+				case RRDDIM_ABSOLUTE:
+				case RRDDIM_PCENT_OVER_ROW_TOTAL:
+				case RRDDIM_PCENT_OVER_DIFF_TOTAL:
 				default:
 					new_value = (calculated_number)
 						(	(	  (rd->calculated_value - rd->last_calculated_value)
@@ -926,7 +1003,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 				continue;
 			}
 
-			if(rd->updated && iterations < st->gap_when_lost_iterations) {
+			if(rd->updated && iterations < st->gap_when_lost_iterations_above) {
 				rd->values[st->current_entry] = pack_storage_number(
 						  new_value
 						* (calculated_number)rd->multiplier
@@ -1007,8 +1084,8 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 		// we have to set the first calculated_value to zero
 		// to eliminate the first spike
 		if(st->counter_done == 1) switch(rd->algorithm) {
-			case RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL:
-			case RRD_DIMENSION_INCREMENTAL:
+			case RRDDIM_PCENT_OVER_DIFF_TOTAL:
+			case RRDDIM_INCREMENTAL:
 				rd->calculated_value = 0;
 				// the next time, a new incremental total will be calculated
 				break;
@@ -1037,14 +1114,14 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 				if(!last) {
 					st->dimensions = rd->next;
 					rd->next = NULL;
-					rrd_stats_dimension_free(rd);
+					rrddim_free(st, rd);
 					rd = st->dimensions;
 					continue;
 				}
 				else {
 					last->next = rd->next;
 					rd->next = NULL;
-					rrd_stats_dimension_free(rd);
+					rrddim_free(st, rd);
 					rd = last->next;
 					continue;
 				}
@@ -1067,7 +1144,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 
 
 // find the oldest entry in the data, skipping all empty slots
-time_t rrd_stats_first_entry_t(RRD_STATS *st)
+time_t rrdset_first_entry_t(RRDSET *st)
 {
 	if(!st->first_entry_t) return st->last_updated.tv_sec;
 	

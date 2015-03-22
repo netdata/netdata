@@ -39,7 +39,7 @@ void sig_handler(int signo)
 			signal(SIGINT,  SIG_IGN);
 			kill_childs();
 			process_childs(0);
-			rrd_stats_free_all();
+			rrdset_free_all();
 			//unlink("/var/run/netdata.pid");
 			info("NetData exiting. Bye bye...");
 			exit(1);

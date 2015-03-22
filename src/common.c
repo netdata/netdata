@@ -9,12 +9,10 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/mman.h>
-#include <malloc.h>
 
 
 #include "log.h"
 #include "common.h"
-#include "web_client.h"
 
 // http://stackoverflow.com/questions/7666509/hash-function-for-string
 unsigned long simple_hash(const char *name)
@@ -157,23 +155,6 @@ int savememory(const char *filename, void *mem, unsigned long size)
 	}
 
 	return ret;
-}
-
-void log_allocations(void)
-{
-	static int mem = 0;
-
-	struct mallinfo mi;
-
-	mi = mallinfo();
-	if(mi.uordblks > mem) {
-		int clients = 0;
-		struct web_client *w;
-		for(w = web_clients; w ; w = w->next) clients++;
-
-		info("Allocated memory increased from %d to %d (increased by %d bytes). There are %d web clients connected.", mem, mi.uordblks, mi.uordblks - mem, clients);
-		mem = mi.uordblks;
-	}
 }
 
 int fd_is_valid(int fd) {

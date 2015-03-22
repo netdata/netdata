@@ -406,280 +406,280 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 		}
 	}
 
-	RRD_STATS *st;
+	RRDSET *st;
 
 	// --------------------------------------------------------------------
 
 	if(do_rc == 2) {
-		st = rrd_stats_find_bytype("nfsd", "readcache");
+		st = rrdset_find_bytype("nfsd", "readcache");
 		if(!st) {
-			st = rrd_stats_create("nfsd", "readcache", NULL, "nfsd", "Read Cache", "reads/s", 5000, update_every, CHART_TYPE_STACKED);
+			st = rrdset_create("nfsd", "readcache", NULL, "nfsd", "Read Cache", "reads/s", 5000, update_every, RRDSET_TYPE_STACKED);
 
-			rrd_stats_dimension_add(st, "hits", NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "misses", NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "nocache", NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
+			rrddim_add(st, "hits", NULL, 1, update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "misses", NULL, 1, update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "nocache", NULL, 1, update_every, RRDDIM_INCREMENTAL);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "hits", rc_hits);
-		rrd_stats_dimension_set(st, "misses", rc_misses);
-		rrd_stats_dimension_set(st, "nocache", rc_nocache);
-		rrd_stats_done(st);
+		rrddim_set(st, "hits", rc_hits);
+		rrddim_set(st, "misses", rc_misses);
+		rrddim_set(st, "nocache", rc_nocache);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 
 	if(do_fh == 2) {
-		st = rrd_stats_find_bytype("nfsd", "filehandles");
+		st = rrdset_find_bytype("nfsd", "filehandles");
 		if(!st) {
-			st = rrd_stats_create("nfsd", "filehandles", NULL, "nfsd", "File Handles", "handles/s", 5001, update_every, CHART_TYPE_LINE);
+			st = rrdset_create("nfsd", "filehandles", NULL, "nfsd", "File Handles", "handles/s", 5001, update_every, RRDSET_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "stale", NULL, 1, update_every, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "total_lookups", NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "anonymous_lookups", NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "dir_not_in_dcache", NULL, -1, update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "non_dir_not_in_dcache", NULL, -1, update_every, RRD_DIMENSION_INCREMENTAL);
+			rrddim_add(st, "stale", NULL, 1, update_every, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "total_lookups", NULL, 1, update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "anonymous_lookups", NULL, 1, update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "dir_not_in_dcache", NULL, -1, update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "non_dir_not_in_dcache", NULL, -1, update_every, RRDDIM_INCREMENTAL);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "stale", fh_stale);
-		rrd_stats_dimension_set(st, "total_lookups", fh_total_lookups);
-		rrd_stats_dimension_set(st, "anonymous_lookups", fh_anonymous_lookups);
-		rrd_stats_dimension_set(st, "dir_not_in_dcache", fh_dir_not_in_dcache);
-		rrd_stats_dimension_set(st, "non_dir_not_in_dcache", fh_non_dir_not_in_dcache);
-		rrd_stats_done(st);
+		rrddim_set(st, "stale", fh_stale);
+		rrddim_set(st, "total_lookups", fh_total_lookups);
+		rrddim_set(st, "anonymous_lookups", fh_anonymous_lookups);
+		rrddim_set(st, "dir_not_in_dcache", fh_dir_not_in_dcache);
+		rrddim_set(st, "non_dir_not_in_dcache", fh_non_dir_not_in_dcache);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 
 	if(do_io == 2) {
-		st = rrd_stats_find_bytype("nfsd", "io");
+		st = rrdset_find_bytype("nfsd", "io");
 		if(!st) {
-			st = rrd_stats_create("nfsd", "io", NULL, "nfsd", "I/O", "kilobytes/s", 5002, update_every, CHART_TYPE_AREA);
+			st = rrdset_create("nfsd", "io", NULL, "nfsd", "I/O", "kilobytes/s", 5002, update_every, RRDSET_TYPE_AREA);
 
-			rrd_stats_dimension_add(st, "read", NULL, 1, 1000 * update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "write", NULL, -1, 1000 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrddim_add(st, "read", NULL, 1, 1000 * update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "write", NULL, -1, 1000 * update_every, RRDDIM_INCREMENTAL);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "read", io_read);
-		rrd_stats_dimension_set(st, "write", io_write);
-		rrd_stats_done(st);
+		rrddim_set(st, "read", io_read);
+		rrddim_set(st, "write", io_write);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 
 	if(do_th == 2) {
-		st = rrd_stats_find_bytype("nfsd", "threads");
+		st = rrdset_find_bytype("nfsd", "threads");
 		if(!st) {
-			st = rrd_stats_create("nfsd", "threads", NULL, "nfsd", "Threads", "threads", 5003, update_every, CHART_TYPE_LINE);
+			st = rrdset_create("nfsd", "threads", NULL, "nfsd", "Threads", "threads", 5003, update_every, RRDSET_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "threads", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
+			rrddim_add(st, "threads", NULL, 1, 1, RRDDIM_ABSOLUTE);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "threads", th_threads);
-		rrd_stats_done(st);
+		rrddim_set(st, "threads", th_threads);
+		rrdset_done(st);
 
-		st = rrd_stats_find_bytype("nfsd", "threads_fullcnt");
+		st = rrdset_find_bytype("nfsd", "threads_fullcnt");
 		if(!st) {
-			st = rrd_stats_create("nfsd", "threads_fullcnt", NULL, "nfsd", "Threads Full Count", "ops/s", 5004, update_every, CHART_TYPE_LINE);
+			st = rrdset_create("nfsd", "threads_fullcnt", NULL, "nfsd", "Threads Full Count", "ops/s", 5004, update_every, RRDSET_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "full_count", NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
+			rrddim_add(st, "full_count", NULL, 1, update_every, RRDDIM_INCREMENTAL);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "full_count", th_fullcnt);
-		rrd_stats_done(st);
+		rrddim_set(st, "full_count", th_fullcnt);
+		rrdset_done(st);
 
-		st = rrd_stats_find_bytype("nfsd", "threads_histogram");
+		st = rrdset_find_bytype("nfsd", "threads_histogram");
 		if(!st) {
-			st = rrd_stats_create("nfsd", "threads_histogram", NULL, "nfsd", "Threads Usage Histogram", "percentage", 5005, update_every, CHART_TYPE_LINE);
+			st = rrdset_create("nfsd", "threads_histogram", NULL, "nfsd", "Threads Usage Histogram", "percentage", 5005, update_every, RRDSET_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "0%-10%", NULL, 1, 1000, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "10%-20%", NULL, 1, 1000, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "20%-30%", NULL, 1, 1000, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "30%-40%", NULL, 1, 1000, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "40%-50%", NULL, 1, 1000, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "50%-60%", NULL, 1, 1000, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "60%-70%", NULL, 1, 1000, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "70%-80%", NULL, 1, 1000, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "80%-90%", NULL, 1, 1000, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "90%-100%", NULL, 1, 1000, RRD_DIMENSION_ABSOLUTE);
+			rrddim_add(st, "0%-10%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "10%-20%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "20%-30%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "30%-40%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "40%-50%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "50%-60%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "60%-70%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "70%-80%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "80%-90%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "90%-100%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "0%-10%", th_hist10);
-		rrd_stats_dimension_set(st, "10%-20%", th_hist20);
-		rrd_stats_dimension_set(st, "20%-30%", th_hist30);
-		rrd_stats_dimension_set(st, "30%-40%", th_hist40);
-		rrd_stats_dimension_set(st, "40%-50%", th_hist50);
-		rrd_stats_dimension_set(st, "50%-60%", th_hist60);
-		rrd_stats_dimension_set(st, "60%-70%", th_hist70);
-		rrd_stats_dimension_set(st, "70%-80%", th_hist80);
-		rrd_stats_dimension_set(st, "80%-90%", th_hist90);
-		rrd_stats_dimension_set(st, "90%-100%", th_hist100);
-		rrd_stats_done(st);
+		rrddim_set(st, "0%-10%", th_hist10);
+		rrddim_set(st, "10%-20%", th_hist20);
+		rrddim_set(st, "20%-30%", th_hist30);
+		rrddim_set(st, "30%-40%", th_hist40);
+		rrddim_set(st, "40%-50%", th_hist50);
+		rrddim_set(st, "50%-60%", th_hist60);
+		rrddim_set(st, "60%-70%", th_hist70);
+		rrddim_set(st, "70%-80%", th_hist80);
+		rrddim_set(st, "80%-90%", th_hist90);
+		rrddim_set(st, "90%-100%", th_hist100);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 
 	if(do_ra == 2) {
-		st = rrd_stats_find_bytype("nfsd", "readahead");
+		st = rrdset_find_bytype("nfsd", "readahead");
 		if(!st) {
-			st = rrd_stats_create("nfsd", "readahead", NULL, "nfsd", "Read Ahead Depth", "percentage", 5005, update_every, CHART_TYPE_STACKED);
+			st = rrdset_create("nfsd", "readahead", NULL, "nfsd", "Read Ahead Depth", "percentage", 5005, update_every, RRDSET_TYPE_STACKED);
 
-			rrd_stats_dimension_add(st, "10%", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
-			rrd_stats_dimension_add(st, "20%", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
-			rrd_stats_dimension_add(st, "30%", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
-			rrd_stats_dimension_add(st, "40%", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
-			rrd_stats_dimension_add(st, "50%", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
-			rrd_stats_dimension_add(st, "60%", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
-			rrd_stats_dimension_add(st, "70%", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
-			rrd_stats_dimension_add(st, "80%", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
-			rrd_stats_dimension_add(st, "90%", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
-			rrd_stats_dimension_add(st, "100%", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
-			rrd_stats_dimension_add(st, "misses", NULL, 1, update_every, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "10%", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "20%", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "30%", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "40%", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "50%", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "60%", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "70%", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "80%", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "90%", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "100%", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "misses", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
 		// ignore ra_size
 		if(ra_size) {};
 
-		rrd_stats_dimension_set(st, "10%", ra_hist10);
-		rrd_stats_dimension_set(st, "20%", ra_hist20);
-		rrd_stats_dimension_set(st, "30%", ra_hist30);
-		rrd_stats_dimension_set(st, "40%", ra_hist40);
-		rrd_stats_dimension_set(st, "50%", ra_hist50);
-		rrd_stats_dimension_set(st, "60%", ra_hist60);
-		rrd_stats_dimension_set(st, "70%", ra_hist70);
-		rrd_stats_dimension_set(st, "80%", ra_hist80);
-		rrd_stats_dimension_set(st, "90%", ra_hist90);
-		rrd_stats_dimension_set(st, "100%", ra_hist100);
-		rrd_stats_dimension_set(st, "misses", ra_none);
-		rrd_stats_done(st);
+		rrddim_set(st, "10%", ra_hist10);
+		rrddim_set(st, "20%", ra_hist20);
+		rrddim_set(st, "30%", ra_hist30);
+		rrddim_set(st, "40%", ra_hist40);
+		rrddim_set(st, "50%", ra_hist50);
+		rrddim_set(st, "60%", ra_hist60);
+		rrddim_set(st, "70%", ra_hist70);
+		rrddim_set(st, "80%", ra_hist80);
+		rrddim_set(st, "90%", ra_hist90);
+		rrddim_set(st, "100%", ra_hist100);
+		rrddim_set(st, "misses", ra_none);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 
 	if(do_net == 2) {
-		st = rrd_stats_find_bytype("nfsd", "net");
+		st = rrdset_find_bytype("nfsd", "net");
 		if(!st) {
-			st = rrd_stats_create("nfsd", "net", NULL, "nfsd", "Network Reads", "reads/s", 5007, update_every, CHART_TYPE_STACKED);
+			st = rrdset_create("nfsd", "net", NULL, "nfsd", "Network Reads", "reads/s", 5007, update_every, RRDSET_TYPE_STACKED);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "udp", NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "tcp", NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
+			rrddim_add(st, "udp", NULL, 1, update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "tcp", NULL, 1, update_every, RRDDIM_INCREMENTAL);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
 		// ignore net_count, net_tcp_connections
 		if(net_count) {};
 		if(net_tcp_connections) {};
 
-		rrd_stats_dimension_set(st, "udp", net_udp_count);
-		rrd_stats_dimension_set(st, "tcp", net_tcp_count);
-		rrd_stats_done(st);
+		rrddim_set(st, "udp", net_udp_count);
+		rrddim_set(st, "tcp", net_tcp_count);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 
 	if(do_rpc == 2) {
-		st = rrd_stats_find_bytype("nfsd", "rpc");
+		st = rrdset_find_bytype("nfsd", "rpc");
 		if(!st) {
-			st = rrd_stats_create("nfsd", "rpc", NULL, "nfsd", "Remote Procedure Calls", "calls/s", 5008, update_every, CHART_TYPE_LINE);
+			st = rrdset_create("nfsd", "rpc", NULL, "nfsd", "Remote Procedure Calls", "calls/s", 5008, update_every, RRDSET_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "all", NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "bad_format", NULL, -1, update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "bad_auth", NULL, -1, update_every, RRD_DIMENSION_INCREMENTAL);
+			rrddim_add(st, "all", NULL, 1, update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "bad_format", NULL, -1, update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "bad_auth", NULL, -1, update_every, RRDDIM_INCREMENTAL);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
 		// ignore rpc_bad_client
 		if(rpc_bad_client) {};
 
-		rrd_stats_dimension_set(st, "all", rpc_count);
-		rrd_stats_dimension_set(st, "bad_format", rpc_bad_format);
-		rrd_stats_dimension_set(st, "bad_auth", rpc_bad_auth);
-		rrd_stats_done(st);
+		rrddim_set(st, "all", rpc_count);
+		rrddim_set(st, "bad_format", rpc_bad_format);
+		rrddim_set(st, "bad_auth", rpc_bad_auth);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 
 	if(do_proc2 == 2) {
 		unsigned int i;
-		st = rrd_stats_find_bytype("nfsd", "proc2");
+		st = rrdset_find_bytype("nfsd", "proc2");
 		if(!st) {
-			st = rrd_stats_create("nfsd", "proc2", NULL, "nfsd", "NFS v2 Calls", "calls/s", 5009, update_every, CHART_TYPE_STACKED);
+			st = rrdset_create("nfsd", "proc2", NULL, "nfsd", "NFS v2 Calls", "calls/s", 5009, update_every, RRDSET_TYPE_STACKED);
 
 			for(i = 0; nfsd_proc_values[i].present2 ; i++)
-				rrd_stats_dimension_add(st, nfsd_proc_values[i].name, NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
+				rrddim_add(st, nfsd_proc_values[i].name, NULL, 1, update_every, RRDDIM_INCREMENTAL);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
 		for(i = 0; nfsd_proc_values[i].present2 ; i++)
-			rrd_stats_dimension_set(st, nfsd_proc_values[i].name, nfsd_proc_values[i].proc2);
+			rrddim_set(st, nfsd_proc_values[i].name, nfsd_proc_values[i].proc2);
 		
-		rrd_stats_done(st);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 
 	if(do_proc3 == 2) {
 		unsigned int i;
-		st = rrd_stats_find_bytype("nfsd", "proc3");
+		st = rrdset_find_bytype("nfsd", "proc3");
 		if(!st) {
-			st = rrd_stats_create("nfsd", "proc3", NULL, "nfsd", "NFS v3 Calls", "calls/s", 5010, update_every, CHART_TYPE_STACKED);
+			st = rrdset_create("nfsd", "proc3", NULL, "nfsd", "NFS v3 Calls", "calls/s", 5010, update_every, RRDSET_TYPE_STACKED);
 
 			for(i = 0; nfsd_proc_values[i].present3 ; i++)
-				rrd_stats_dimension_add(st, nfsd_proc_values[i].name, NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
+				rrddim_add(st, nfsd_proc_values[i].name, NULL, 1, update_every, RRDDIM_INCREMENTAL);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
 		for(i = 0; nfsd_proc_values[i].present3 ; i++)
-			rrd_stats_dimension_set(st, nfsd_proc_values[i].name, nfsd_proc_values[i].proc3);
+			rrddim_set(st, nfsd_proc_values[i].name, nfsd_proc_values[i].proc3);
 		
-		rrd_stats_done(st);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 
 	if(do_proc4 == 2) {
 		unsigned int i;
-		st = rrd_stats_find_bytype("nfsd", "proc4");
+		st = rrdset_find_bytype("nfsd", "proc4");
 		if(!st) {
-			st = rrd_stats_create("nfsd", "proc4", NULL, "nfsd", "NFS v4 Calls", "calls/s", 5011, update_every, CHART_TYPE_STACKED);
+			st = rrdset_create("nfsd", "proc4", NULL, "nfsd", "NFS v4 Calls", "calls/s", 5011, update_every, RRDSET_TYPE_STACKED);
 
 			for(i = 0; nfsd_proc_values[i].present4 ; i++)
-				rrd_stats_dimension_add(st, nfsd_proc_values[i].name, NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
+				rrddim_add(st, nfsd_proc_values[i].name, NULL, 1, update_every, RRDDIM_INCREMENTAL);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
 		for(i = 0; nfsd_proc_values[i].present4 ; i++)
-			rrd_stats_dimension_set(st, nfsd_proc_values[i].name, nfsd_proc_values[i].proc4);
+			rrddim_set(st, nfsd_proc_values[i].name, nfsd_proc_values[i].proc4);
 		
-		rrd_stats_done(st);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 
 	if(do_proc4ops == 2) {
 		unsigned int i;
-		st = rrd_stats_find_bytype("nfsd", "proc4ops");
+		st = rrdset_find_bytype("nfsd", "proc4ops");
 		if(!st) {
-			st = rrd_stats_create("nfsd", "proc4ops", NULL, "nfsd", "NFS v4 Operations", "operations/s", 5012, update_every, CHART_TYPE_STACKED);
+			st = rrdset_create("nfsd", "proc4ops", NULL, "nfsd", "NFS v4 Operations", "operations/s", 5012, update_every, RRDSET_TYPE_STACKED);
 
 			for(i = 0; nfsd4_ops_values[i].present ; i++)
-				rrd_stats_dimension_add(st, nfsd4_ops_values[i].name, NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
+				rrddim_add(st, nfsd4_ops_values[i].name, NULL, 1, update_every, RRDDIM_INCREMENTAL);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
 		for(i = 0; nfsd4_ops_values[i].present ; i++)
-			rrd_stats_dimension_set(st, nfsd4_ops_values[i].name, nfsd4_ops_values[i].value);
+			rrddim_set(st, nfsd4_ops_values[i].name, nfsd4_ops_values[i].value);
 		
-		rrd_stats_done(st);
+		rrdset_done(st);
 	}
 
 	return 0;

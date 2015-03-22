@@ -1,7 +1,9 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 
+#include "avl.h"
 #include "common.h"
 #include "config.h"
 #include "log.h"
@@ -10,30 +12,95 @@
 
 pthread_rwlock_t config_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 
+// ----------------------------------------------------------------------------
+// definitions
+
+#define CONFIG_VALUE_LOADED  0x01 // has been loaded from the config
+#define CONFIG_VALUE_USED    0x02 // has been accessed from the program
+#define CONFIG_VALUE_CHANGED 0x04 // has been changed from the loaded value
+#define CONFIG_VALUE_CHECKED 0x08 // has been checked if the value is different from the default
+
 struct config_value {
-	char name[CONFIG_MAX_NAME + 1];
-	char value[CONFIG_MAX_VALUE + 1];
+	avl avl;
 
 	unsigned long hash;		// a simple hash to speed up searching
 							// we first compare hashes, and only if the hashes are equal we do string comparisons
 
-	int loaded;				// loaded from the user config
-	int used;				// has been accessed from the program
-	int changed;			// changed from the internal default
+	char name[CONFIG_MAX_NAME + 1];
+	char value[CONFIG_MAX_VALUE + 1];
+
+	uint8_t	flags;
 
 	struct config_value *next;
 };
 
 struct config {
-	char name[CONFIG_MAX_NAME + 1];
+	avl avl;
 
 	unsigned long hash;		// a simple hash to speed up searching
 							// we first compare hashes, and only if the hashes are equal we do string comparisons
 
+	char name[CONFIG_MAX_NAME + 1];
+
 	struct config_value *values;
+	avl_tree values_index;
 
 	struct config *next;
 } *config_root = NULL;
+
+
+// ----------------------------------------------------------------------------
+// config value
+
+static int config_value_iterator(avl *a) { if(a) {}; return 0; }
+
+static int config_value_compare(void* a, void* b) {
+	if(((struct config_value *)a)->hash < ((struct config_value *)b)->hash) return -1;
+	else if(((struct config_value *)a)->hash > ((struct config_value *)b)->hash) return 1;
+	else return strcmp(((struct config_value *)a)->name, ((struct config_value *)b)->name);
+}
+
+#define config_value_index_add(co, cv) avl_insert(&((co)->values_index), (avl *)(cv))
+#define config_value_index_del(co, cv) avl_remove(&((co)->values_index), (avl *)(cv))
+
+static struct config_value *config_value_index_find(struct config *co, const char *name, unsigned long hash) {
+	struct config_value *result = NULL, tmp;
+	tmp.hash = (hash)?hash:simple_hash(name);
+	strncpy(tmp.name, name, CONFIG_MAX_NAME);
+	tmp.name[CONFIG_MAX_NAME] = '\0';
+
+	avl_search(&(co->values_index), (avl *)&tmp, config_value_iterator, (avl **)&result);
+	return result;
+}
+
+// ----------------------------------------------------------------------------
+// config
+
+static int config_iterator(avl *a) { if(a) {}; return 0; }
+
+static int config_compare(void* a, void* b) {
+	if(((struct config *)a)->hash < ((struct config *)b)->hash) return -1;
+	else if(((struct config *)a)->hash > ((struct config *)b)->hash) return 1;
+	else return strcmp(((struct config *)a)->name, ((struct config *)b)->name);
+}
+
+avl_tree config_root_index = {
+		NULL,
+		config_compare
+};
+
+#define config_index_add(cfg) avl_insert(&config_root_index, (avl *)(cfg))
+#define config_index_del(cfg) avl_remove(&config_root_index, (avl *)(cfg))
+
+static struct config *config_index_find(const char *name, unsigned long hash) {
+	struct config *result = NULL, tmp;
+	tmp.hash = (hash)?hash:simple_hash(name);
+	strncpy(tmp.name, name, CONFIG_MAX_NAME);
+	tmp.name[CONFIG_MAX_NAME] = '\0';
+
+	avl_search(&config_root_index, (avl *)&tmp, config_iterator, (avl **)&result);
+	return result;
+}
 
 struct config_value *config_value_create(struct config *co, const char *name, const char *value)
 {
@@ -45,6 +112,8 @@ struct config_value *config_value_create(struct config *co, const char *name, co
 	strncpy(cv->name,  name,  CONFIG_MAX_NAME);
 	strncpy(cv->value, value, CONFIG_MAX_VALUE);
 	cv->hash = simple_hash(cv->name);
+
+	config_value_index_add(co, cv);
 
 	// no need for string termination, due to calloc()
 
@@ -67,6 +136,9 @@ struct config *config_create(const char *section)
 
 	strncpy(co->name, section, CONFIG_MAX_NAME);
 	co->hash = simple_hash(co->name);
+	co->values_index.compar = config_value_compare;
+
+	config_index_add(co);
 
 	// no need for string termination, due to calloc()
 
@@ -82,15 +154,7 @@ struct config *config_create(const char *section)
 
 struct config *config_find_section(const char *section)
 {
-	struct config *co;
-	unsigned long hash = simple_hash(section);
-
-	for(co = config_root; co ; co = co->next)
-		if(hash == co->hash)
-			if(strcmp(co->name, section) == 0)
-				break;
-
-	return co;
+	return config_index_find(section, 0);
 }
 
 int load_config(char *filename, int overwrite_used)
@@ -159,13 +223,11 @@ int load_config(char *filename, int overwrite_used)
 			continue;
 		}
 
-		struct config_value *cv;
-		for(cv = co->values; cv ; cv = cv->next)
-			if(strcmp(cv->name, name) == 0) break;
+		struct config_value *cv = config_value_index_find(co, name, 0);
 
 		if(!cv) cv = config_value_create(co, name, value);
 		else {
-			if((cv->used && overwrite_used) || !cv->used) {
+			if((cv->flags & CONFIG_VALUE_USED && overwrite_used) || !(cv->flags & CONFIG_VALUE_USED)) {
 				debug(D_CONFIG, "Overwriting '%s/%s'.", line, co->name, cv->name);
 				strncpy(cv->value, value, CONFIG_MAX_VALUE);
 				// termination is already there
@@ -173,7 +235,7 @@ int load_config(char *filename, int overwrite_used)
 			else
 				debug(D_CONFIG, "Ignoring line %d, '%s/%s' is already present and used.", line, co->name, cv->name);
 		}
-		cv->loaded = 1;
+		cv->flags |= CONFIG_VALUE_LOADED;
 	}
 
 	fclose(fp);
@@ -193,19 +255,17 @@ char *config_get(const char *section, const char *name, const char *default_valu
 	struct config *co = config_find_section(section);
 	if(!co) co = config_create(section);
 
-	unsigned long hash = simple_hash(name);
-	for(cv = co->values; cv ; cv = cv->next)
-		if(hash == cv->hash)
-			if(strcmp(cv->name, name) == 0)
-				break;
-
+	cv = config_value_index_find(co, name, 0);
 	if(!cv) cv = config_value_create(co, name, default_value);
-	cv->used = 1;
+	cv->flags |= CONFIG_VALUE_USED;
 
-	if(cv->loaded || cv->changed) {
+	if(cv->flags & CONFIG_VALUE_LOADED || cv->flags & CONFIG_VALUE_CHANGED) {
 		// this is a loaded value from the config file
 		// if it is different that the default, mark it
-		if(strcmp(cv->value, default_value) != 0) cv->changed = 1;
+		if(!(cv->flags & CONFIG_VALUE_CHECKED)) {
+			if(strcmp(cv->value, default_value) != 0) cv->flags |= CONFIG_VALUE_CHANGED;
+			cv->flags |= CONFIG_VALUE_CHECKED;
+		}
 	}
 	else {
 		// this is not loaded from the config
@@ -255,16 +315,11 @@ const char *config_set(const char *section, const char *name, const char *value)
 	struct config *co = config_find_section(section);
 	if(!co) co = config_create(section);
 
-	unsigned long hash = simple_hash(name);
-	for(cv = co->values; cv ; cv = cv->next)
-		if(hash == cv->hash)
-			if(strcmp(cv->name, name) == 0)
-				break;
-
+	cv = config_value_index_find(co, name, 0);
 	if(!cv) cv = config_value_create(co, name, value);
-	cv->used = 1;
+	cv->flags |= CONFIG_VALUE_USED;
 
-	if(strcmp(cv->value, value) != 0) cv->changed = 1;
+	if(strcmp(cv->value, value) != 0) cv->flags |= CONFIG_VALUE_CHANGED;
 
 	strncpy(cv->value, value, CONFIG_MAX_VALUE);
 	// termination is already there
@@ -331,8 +386,8 @@ void generate_config(struct web_buffer *wb, int only_changed)
 				int changed = 0;
 				int count = 0;
 				for(cv = co->values; cv ; cv = cv->next) {
-					used += cv->used;
-					changed += cv->changed;
+					used += (cv->flags && CONFIG_VALUE_USED)?1:0;
+					changed += (cv->flags & CONFIG_VALUE_CHANGED)?1:0;
 					count++;
 				}
 
@@ -349,12 +404,12 @@ void generate_config(struct web_buffer *wb, int only_changed)
 
 				for(cv = co->values; cv ; cv = cv->next) {
 
-					if(used && !cv->used) {
+					if(used && !(cv->flags & CONFIG_VALUE_USED)) {
 						web_buffer_increase(wb, CONFIG_MAX_NAME + 200);
 						web_buffer_printf(wb, "\n\t# option '%s' is not used.\n", cv->name);
 					}
 					web_buffer_increase(wb, CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 5);
-					web_buffer_printf(wb, "\t%s%s = %s\n", (!cv->changed && cv->used)?"# ":"", cv->name, cv->value);
+					web_buffer_printf(wb, "\t%s%s = %s\n", ((!(cv->flags & CONFIG_VALUE_CHANGED)) && (cv->flags & CONFIG_VALUE_USED))?"# ":"", cv->name, cv->value);
 				}
 			}
 		}

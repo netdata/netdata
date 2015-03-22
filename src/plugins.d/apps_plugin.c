@@ -24,6 +24,11 @@
 #include <dirent.h>
 #include <arpa/inet.h>
 
+#include "../common.h"
+#include "../log.h"
+#include "../avl.h"
+#include "../procfile.h"
+
 #define MAX_COMPARE_NAME 15
 #define MAX_NAME 100
 
@@ -42,66 +47,47 @@ unsigned long long file_counter = 0;
 // ----------------------------------------------------------------------------
 // helper functions
 
-unsigned long long usecdiff(struct timeval *now, struct timeval *last) {
-		return ((((now->tv_sec * 1000000ULL) + now->tv_usec) - ((last->tv_sec * 1000000ULL) + last->tv_usec)));
-}
-
-char *trim(char *s)
-{
-	// skip leading spaces
-	while(*s && isspace(*s)) s++;
-	if(!*s) return NULL;
-
-	// skip tailing spaces
-	int c = strlen(s) - 1;
-	while(c >= 0 && isspace(s[c])) {
-		s[c] = '\0';
-		c--;
-	}
-	if(c < 0) return NULL;
-	if(!*s) return NULL;
-	return s;
-}
-
-unsigned long simple_hash(const char *name)
-{
-	int i, len = strlen(name);
-	unsigned long hash = 0;
-
-	for(i = 0; i < len ;i++) hash += (i * name[i]) + i + name[i];
-
-	return hash;
-}
-
-long get_processors(void)
-{
-	char buffer[1025], *s;
+long get_processors(void) {
 	int processors = 0;
 
-	FILE *fp = fopen("/proc/stat", "r");
-	if(!fp) return 1;
+	procfile *ff = procfile_open("/proc/stat", O_RDONLY);
+	if(!ff) return 1;
 
-	while((s = fgets(buffer, 1024, fp))) {
-		if(strncmp(buffer, "cpu", 3) == 0) processors++;
+	ff = procfile_readall(ff);
+	if(!ff) {
+		procfile_close(ff);
+		return 1;
 	}
-	fclose(fp);
+
+	unsigned int i;
+	for(i = 0; i < procfile_lines(ff); i++) {
+		if(!procfile_linewords(ff, i)) continue;
+
+		if(strncmp(procfile_lineword(ff, i, 0), "cpu", 3) == 0) processors++;
+	}
 	processors--;
 	if(processors < 1) processors = 1;
+
+	procfile_close(ff);
 	return processors;
 }
 
-long get_pid_max(void)
-{
-	char buffer[1025], *s;
+long get_pid_max(void) {
 	long mpid = 32768;
 
-	FILE *fp = fopen("/proc/sys/kernel/pid_max", "r");
-	if(!fp) return 1;
+	procfile *ff = procfile_open("/proc/sys/kernel/pid_max", O_RDONLY);
+	if(!ff) return mpid;
 
-	s = fgets(buffer, 1024, fp);
-	if(s) mpid = atol(buffer);
-	fclose(fp);
-	if(mpid < 32768) mpid = 32768;
+	ff = procfile_readall(ff);
+	if(!ff) {
+		procfile_close(ff);
+		return mpid;
+	}
+
+	mpid = atol(procfile_lineword(ff, 0, 0));
+	if(mpid) mpid = 32768;
+
+	procfile_close(ff);
 	return mpid;
 }
 
@@ -122,7 +108,7 @@ unsigned long long get_hertz(void)
 	hz = (sizeof(long)==sizeof(int) || htons(999)==999) ? 100UL : 1024UL;
 #endif
 
-	fprintf(stderr, "apps.plugin: ERROR: unknown HZ value. Assuming %llu.\n", hz);
+	error("apps.plugin: ERROR: unknown HZ value. Assuming %llu.", hz);
 	return hz;
 }
 
@@ -215,7 +201,7 @@ struct target *get_target(const char *id, struct target *target)
 	
 	w = calloc(sizeof(struct target), 1);
 	if(!w) {
-		fprintf(stderr, "apps.plugin: cannot allocate %lu bytes of memory\n", (unsigned long)sizeof(struct target));
+		error("apps.plugin: cannot allocate %lu bytes of memory", (unsigned long)sizeof(struct target));
 		return NULL;
 	}
 
@@ -245,7 +231,7 @@ int read_process_groups(const char *name)
 	if(debug) fprintf(stderr, "apps.plugin: process groups file: '%s'\n", filename);
 	FILE *fp = fopen(filename, "r");
 	if(!fp) {
-		fprintf(stderr, "apps.plugin: ERROR: cannot open file '%s' (%s)\n", filename, strerror(errno));
+		error("apps.plugin: ERROR: cannot open file '%s' (%s)", filename, strerror(errno));
 		return 1;
 	}
 
@@ -306,7 +292,7 @@ int read_process_groups(const char *name)
 		}
 
 		if(w) strncpy(w->name, t, MAX_NAME);
-		if(!count) fprintf(stderr, "apps.plugin: ERROR: the line %ld on file '%s', for group '%s' does not state any process names.\n", line, filename, t);
+		if(!count) error("apps.plugin: ERROR: the line %ld on file '%s', for group '%s' does not state any process names.", line, filename, t);
 	}
 	fclose(fp);
 
@@ -429,13 +415,13 @@ struct pid_stat *get_entry(pid_t pid)
 
 	all_pids[pid] = calloc(sizeof(struct pid_stat), 1);
 	if(!all_pids[pid]) {
-		fprintf(stderr, "apps.plugin: ERROR: Cannot allocate %lu bytes of memory", (unsigned long)sizeof(struct pid_stat));
+		error("apps.plugin: ERROR: Cannot allocate %lu bytes of memory", (unsigned long)sizeof(struct pid_stat));
 		return NULL;
 	}
 
 	all_pids[pid]->fds = calloc(sizeof(int), 100);
 	if(!all_pids[pid]->fds)
-		fprintf(stderr, "apps.plugin: ERROR: Cannot allocate %ld bytes of memory\n", (unsigned long)(sizeof(int) * 100));
+		error("apps.plugin: ERROR: Cannot allocate %ld bytes of memory", (unsigned long)(sizeof(int) * 100));
 	else all_pids[pid]->fds_size = 100;
 
 	if(root) root->prev = all_pids[pid];
@@ -506,15 +492,52 @@ int walk_down(pid_t pid, int level) {
 // this is used to keep a global list of all open files of the system
 // it is needed in order to figure out the unique files a process tree has open
 
+#define FILE_DESCRIPTORS_INCREASE_STEP 100
+
 struct file_descriptor {
+	avl avl;
+	unsigned long magic;
 	unsigned long hash;
-	char *name;
+	const char *name;
 	int type;
 	long count;
+	long pos;
 } *all_files = NULL;
 
 int all_files_len = 0;
 int all_files_size = 0;
+
+int file_descriptor_compare(void* a, void* b) {
+	if(((struct file_descriptor *)a)->magic != 0x0BADCAFE || ((struct file_descriptor *)b)->magic != 0x0BADCAFE)
+		error("Corrupted index data detected. Please report this.");
+
+	if(((struct file_descriptor *)a)->hash < ((struct file_descriptor *)b)->hash)
+		return -1;
+	else if(((struct file_descriptor *)a)->hash > ((struct file_descriptor *)b)->hash)
+		return 1;
+	else return strcmp(((struct file_descriptor *)a)->name, ((struct file_descriptor *)b)->name);
+}
+int file_descriptor_iterator(avl *a) { if(a) {}; return 0; }
+
+avl_tree all_files_index = {
+		NULL,
+		file_descriptor_compare
+};
+
+static struct file_descriptor *file_descriptor_find(const char *name, unsigned long hash) {
+	struct file_descriptor *result = NULL, tmp;
+	tmp.hash = (hash)?hash:simple_hash(name);
+	tmp.name = name;
+	tmp.count = 0;
+	tmp.pos = 0;
+	tmp.magic = 0x0BADCAFE;
+
+	avl_search(&all_files_index, (avl *)&tmp, file_descriptor_iterator, (avl **)&result);
+	return result;
+}
+
+#define file_descriptor_add(fd) avl_insert(&all_files_index, (avl *)(fd))
+#define file_descriptor_remove(fd) avl_remove(&all_files_index, (avl *)(fd))
 
 #define FILETYPE_OTHER 0
 #define FILETYPE_FILE 1
@@ -528,19 +551,91 @@ int all_files_size = 0;
 
 void file_descriptor_not_used(int id)
 {
-	if(id > 0 && id < all_files_len) {
-		if(all_files[id].count > 0)
+	if(id > 0 && id < all_files_size) {
+		if(all_files[id].magic != 0x0BADCAFE) {
+			error("Ignoring request to remove empty file id %d.", id);
+			return;
+		}
+
+		if(all_files[id].count > 0) {
 			all_files[id].count--;
+
+			if(!all_files[id].count) {
+				file_descriptor_remove(&all_files[id]);
+				all_files[id].magic = 0x00000000;
+				all_files_len--;
+			}
+		}
 		else
-			fprintf(stderr, "apps.plugin: ERROR: request to decrease counter of fd %d (%s), while the use counter is 0\n", id, all_files[id].name);
+			error("apps.plugin: ERROR: request to decrease counter of fd %d (%s), while the use counter is 0", id, all_files[id].name);
 	}
-	else	fprintf(stderr, "apps.plugin: ERROR: request to decrease counter of fd %d, which is outside the array size (1 to %d)\n", id, all_files_len);
+	else	error("apps.plugin: ERROR: request to decrease counter of fd %d, which is outside the array size (1 to %d)", id, all_files_size);
 }
 
 unsigned long file_descriptor_find_or_add(const char *name)
 {
-	int type = FILETYPE_OTHER;
+	static int last_pos = 0;
+	unsigned long hash = simple_hash(name);
 
+	if(debug) fprintf(stderr, "apps.plugin: adding or finding name '%s' with hash %lu\n", name, hash);
+
+	struct file_descriptor *fd = file_descriptor_find(name, hash);
+	if(fd) {
+		// found
+		fd->count++;
+		return fd->pos;
+	}
+	// not found
+
+	// check we have enough memory to add it
+	if(!all_files || all_files_len == all_files_size) {
+		void *old = all_files;
+
+		// there is no empty slot
+		if(debug) fprintf(stderr, "apps.plugin: extending fd array to %d entries\n", all_files_size + FILE_DESCRIPTORS_INCREASE_STEP);
+		all_files = realloc(all_files, (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP) * sizeof(struct file_descriptor));
+
+		// if the address changed, we have to rebuild the index
+		// since all pointers are now invalid
+		if(old && old != (void *)all_files) {
+			if(debug) fprintf(stderr, "apps.plugin: re-indexing.\n");
+			all_files_index.root = NULL;
+			int i;
+			for(i = 0; i < all_files_size; i++) {
+				if(!all_files[i].count) continue;
+				file_descriptor_add(&all_files[i]);
+			}
+		}
+
+		if(!all_files_size) all_files_len = 1;
+		all_files_size += FILE_DESCRIPTORS_INCREASE_STEP;
+	}
+
+	// search for an empty slot
+	int i, c;
+	for(i = 0, c = last_pos ; i < all_files_size ; i++, c++) {
+		if(c >= all_files_size) c = 0;
+		if(c == 0) continue;
+
+		if(!all_files[c].count) {
+			if(all_files[c].magic == 0x0BADCAFE && all_files[c].name && file_descriptor_find(all_files[c].name, all_files[c].hash))
+				error("apps.plugin: fd on position %d is not cleared properly. It still has %s in it.\n", c, all_files[c].name);
+
+			if(debug) fprintf(stderr, "apps.plugin: re-using fd position %d for %s (last name: %s)\n", c, name, all_files[c].name);
+			if(all_files[c].name) free((void *)all_files[c].name);
+			all_files[c].name = NULL;
+			break;
+		}
+	}
+	if(i == all_files_size) {
+		error("We should find an empty slot, but there isn't any");
+		return 0;
+	}
+	all_files_len++;
+
+	// else we have an empty slot in 'c'
+
+	int type = FILETYPE_OTHER;
 	if(name[0] == '/') type = FILETYPE_FILE;
 	else if(strncmp(name, "pipe:", 5) == 0) type = FILETYPE_PIPE;
 	else if(strncmp(name, "socket:", 7) == 0) type = FILETYPE_SOCKET;
@@ -558,55 +653,14 @@ unsigned long file_descriptor_find_or_add(const char *name)
 		type = FILETYPE_OTHER;
 	}
 
-	// init
-	if(!all_files) {
-		all_files = malloc(1024 * sizeof(struct file_descriptor));
-		if(!all_files) return 0;
-
-		all_files_size = 1024;
-		all_files_len = 1; // start from 1, skip 0
-		if(debug) fprintf(stderr, "apps.plugin: initialized fd array to %d entries\n", all_files_size);
-	}
-
-	// try to find it
-	unsigned long hash = simple_hash(name);
-	int c;
-	for( c = 0 ; c < all_files_len ; c++) {
-		if(all_files[c].hash == hash && strcmp(all_files[c].name, name) == 0) break;
-	}
-
-	// found it
-	if(c < all_files_len) {
-		all_files[c].count++;
-		return c;
-	}
-
-	// not found, search for an empty slot
-	for(c = 0 ; c < all_files_len ; c++) {
-		if(!all_files[c].count) {
-			if(debug) fprintf(stderr, "apps.plugin: re-using fd position %d (last name: %s)\n", c, all_files[c].name);
-			if(all_files[c].name) free(all_files[c].name);
-			break;
-		}
-	}
-
-	if(c == all_files_len) {
-		// not found any emtpty slot
-		all_files_len++;
-
-		if(c >= all_files_size) {
-			// not enough memory - extend it
-			if(debug) fprintf(stderr, "apps.plugin: extending fd array to %d entries\n", all_files_size + 1024);
-			all_files = realloc(all_files, (all_files_size + 1024) * sizeof(struct file_descriptor));
-			all_files_size += 1024;
-		}
-	}
-	// else we have the slot in 'c'
-
 	all_files[c].name = strdup(name);
 	all_files[c].hash = hash;
 	all_files[c].type = type;
-	all_files[c].count++;
+	all_files[c].pos  = c;
+	all_files[c].count = 1;
+	all_files[c].magic = 0x0BADCAFE;
+
+	file_descriptor_add(&all_files[c]);
 
 	if(debug) fprintf(stderr, "apps.plugin: using fd position %d (name: %s)\n", c, all_files[c].name);
 
@@ -671,7 +725,7 @@ int update_from_proc(void)
 		if(fd == -1) {
 			if(errno != ENOENT && errno != ESRCH) {
 				if(!count_errors++ || debug)
-					fprintf(stderr, "apps.plugin: ERROR: cannot open file '%s' for reading (%d, %s).\n", filename, errno, strerror(errno));
+					error("apps.plugin: ERROR: cannot open file '%s' for reading (%d, %s).", filename, errno, strerror(errno));
 			}
 			continue;
 		}
@@ -682,7 +736,7 @@ int update_from_proc(void)
 
 		if(bytes == -1) {
 			if(!count_errors++ || debug)
-				fprintf(stderr, "apps.plugin: ERROR: cannot read from file '%s' (%s).\n", filename, strerror(errno));
+				error("apps.plugin: ERROR: cannot read from file '%s' (%s).", filename, strerror(errno));
 			continue;
 		}
 
@@ -734,7 +788,7 @@ int update_from_proc(void)
 
 		if(parsed < 39) {
 			if(!count_errors++ || debug || (p->target && p->target->debug))
-				fprintf(stderr, "apps.plugin: ERROR: file %s gave %d results (expected 44)\n", filename, parsed);
+				error("apps.plugin: ERROR: file %s gave %d results (expected 44)\n", filename, parsed);
 		}
 
 		// check if it is target
@@ -767,7 +821,7 @@ int update_from_proc(void)
 		if(fd == -1) {
 			if(errno != ENOENT && errno != ESRCH) {
 				if(!count_errors++ || debug || (p->target && p->target->debug))
-					fprintf(stderr, "apps.plugin: ERROR: cannot open file '%s' for reading (%d, %s).\n", filename, errno, strerror(errno));
+					error("apps.plugin: ERROR: cannot open file '%s' for reading (%d, %s).", filename, errno, strerror(errno));
 			}
 		}
 		else {
@@ -777,7 +831,7 @@ int update_from_proc(void)
 
 			if(bytes == -1) {
 				if(!count_errors++ || debug || (p->target && p->target->debug))
-					fprintf(stderr, "apps.plugin: ERROR: cannot read from file '%s' (%s).\n", filename, strerror(errno));
+					error("apps.plugin: ERROR: cannot read from file '%s' (%s).", filename, strerror(errno));
 			}
 			else if(bytes > 10) {
 				buffer[bytes] = '\0';
@@ -797,7 +851,7 @@ int update_from_proc(void)
 
 				if(parsed < 7) {
 					if(!count_errors++ || debug || (p->target && p->target->debug))
-						fprintf(stderr, "apps.plugin: ERROR: file %s gave %d results (expected 7)\n", filename, parsed);
+						error("apps.plugin: ERROR: file %s gave %d results (expected 7)", filename, parsed);
 				}
 			}
 		}
@@ -810,7 +864,7 @@ int update_from_proc(void)
 		if(fd == -1) {
 			if(errno != ENOENT && errno != ESRCH) {
 				if(!count_errors++ || debug || (p->target && p->target->debug))
-					fprintf(stderr, "apps.plugin: ERROR: cannot open file '%s' for reading (%d, %s).\n", filename, errno, strerror(errno));
+					error("apps.plugin: ERROR: cannot open file '%s' for reading (%d, %s).", filename, errno, strerror(errno));
 			}
 		}
 		else {
@@ -820,7 +874,7 @@ int update_from_proc(void)
 
 			if(bytes == -1) {
 				if(!count_errors++ || debug || (p->target && p->target->debug))
-					fprintf(stderr, "apps.plugin: ERROR: cannot read from file '%s' (%s).\n", filename, strerror(errno));
+					error("apps.plugin: ERROR: cannot read from file '%s' (%s).", filename, strerror(errno));
 			}
 			else if(bytes > 10) {
 				buffer[bytes] = '\0';
@@ -839,7 +893,7 @@ int update_from_proc(void)
 
 				if(parsed < 7) {
 					if(!count_errors++ || debug || (p->target && p->target->debug))
-						fprintf(stderr, "apps.plugin: ERROR: file %s gave %d results (expected 7)\n", filename, parsed);
+						error("apps.plugin: ERROR: file %s gave %d results (expected 7)", filename, parsed);
 				}
 			}
 		}
@@ -869,7 +923,7 @@ int update_from_proc(void)
 					if(debug) fprintf(stderr, "apps.plugin: extending fd memory slots for %s from %d to %d\n", p->comm, p->fds_size, fdid + 100);
 					p->fds = realloc(p->fds, (fdid + 100) * sizeof(int));
 					if(!p->fds) {
-						fprintf(stderr, "apps.plugin: ERROR: cannot re-allocate fds for %s\n", p->comm);
+						error("apps.plugin: ERROR: cannot re-allocate fds for %s", p->comm);
 						break;
 					}
 
@@ -886,7 +940,7 @@ int update_from_proc(void)
 					if(l == -1) {
 						if(debug || (p->target && p->target->debug)) {
 							if(!count_errors++ || debug || (p->target && p->target->debug))
-								fprintf(stderr, "apps.plugin: ERROR: cannot read link %s\n", fdname);
+								error("apps.plugin: ERROR: cannot read link %s", fdname);
 						}
 						continue;
 					}
@@ -919,7 +973,7 @@ int update_from_proc(void)
 		p->updated = 1;
 	}
 	if(count_errors > 1000) {
-		fprintf(stderr, "apps.plugin: ERROR: %ld more errors encountered\n", count_errors - 1);
+		error("apps.plugin: ERROR: %ld more errors encountered\n", count_errors - 1);
 		count_errors = 0;
 	}
 
@@ -957,7 +1011,7 @@ void update_statistics(void)
 			p->parent = all_pids[p->ppid];
 			p->parent->childs++;
 		}
-		else if(p->ppid != 0) fprintf(stderr, "apps.plugin: \t\tWRONG! pid %d %s states parent %d, but the later does not exist.\n", p->pid, p->comm, p->ppid);
+		else if(p->ppid != 0) error("apps.plugin: \t\tWRONG! pid %d %s states parent %d, but the later does not exist.", p->pid, p->comm, p->ppid);
 	}
 
 	// find all the procs with 0 childs and merge them to their parents
@@ -1025,7 +1079,7 @@ void update_statistics(void)
 	for(p = root; p ; p = p->next) {
 		if(p->updated) continue;
 
-		fprintf(stderr, "apps.plugin: UNMERGING %d %s\n", p->pid, p->comm);
+		if(debug) fprintf(stderr, "apps.plugin: UNMERGING %d %s\n", p->pid, p->comm);
 
 		unsigned long long diff_utime = p->utime + p->cutime + p->fix_cutime;
 		unsigned long long diff_stime = p->stime + p->cstime + p->fix_cstime;
@@ -1042,35 +1096,35 @@ void update_statistics(void)
 				diff_utime -= x;
 				t->diff_cutime -= x;
 				t->fix_cutime += x;
-				fprintf(stderr, "apps.plugin: \t cutime %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
+				if(debug) fprintf(stderr, "apps.plugin: \t cutime %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
 			}
 			if(diff_stime && t->diff_cstime) {
 				x = (t->diff_cstime < diff_stime)?t->diff_cstime:diff_stime;
 				diff_stime -= x;
 				t->diff_cstime -= x;
 				t->fix_cstime += x;
-				fprintf(stderr, "apps.plugin: \t cstime %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
+				if(debug) fprintf(stderr, "apps.plugin: \t cstime %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
 			}
 			if(diff_minflt && t->diff_cminflt) {
 				x = (t->diff_cminflt < diff_minflt)?t->diff_cminflt:diff_minflt;
 				diff_minflt -= x;
 				t->diff_cminflt -= x;
 				t->fix_cminflt += x;
-				fprintf(stderr, "apps.plugin: \t cminflt %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
+				if(debug) fprintf(stderr, "apps.plugin: \t cminflt %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
 			}
 			if(diff_majflt && t->diff_cmajflt) {
 				x = (t->diff_cmajflt < diff_majflt)?t->diff_cmajflt:diff_majflt;
 				diff_majflt -= x;
 				t->diff_cmajflt -= x;
 				t->fix_cmajflt += x;
-				fprintf(stderr, "apps.plugin: \t cmajflt %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
+				if(debug) fprintf(stderr, "apps.plugin: \t cmajflt %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
 			}
 		}
 
-		if(diff_utime) fprintf(stderr, "apps.plugin: \t cannot fix up utime %llu\n", diff_utime);
-		if(diff_stime) fprintf(stderr, "apps.plugin: \t cannot fix up stime %llu\n", diff_stime);
-		if(diff_minflt) fprintf(stderr, "apps.plugin: \t cannot fix up minflt %llu\n", diff_minflt);
-		if(diff_majflt) fprintf(stderr, "apps.plugin: \t cannot fix up majflt %llu\n", diff_majflt);
+		if(diff_utime) error("apps.plugin: \t cannot fix up utime %llu", diff_utime);
+		if(diff_stime) error("apps.plugin: \t cannot fix up stime %llu", diff_stime);
+		if(diff_minflt) error("apps.plugin: \t cannot fix up minflt %llu", diff_minflt);
+		if(diff_majflt) error("apps.plugin: \t cannot fix up majflt %llu", diff_majflt);
 	}
 #endif
 
@@ -1080,9 +1134,9 @@ void update_statistics(void)
 	for (w = target_root; w ; w = w->next) {
 		targets++;
 
-		w->fds = calloc(sizeof(int), all_files_len);
+		w->fds = calloc(sizeof(int), all_files_size);
 		if(!w->fds)
-			fprintf(stderr, "apps.plugin: ERROR: cannot allocate memory for fds in %s\n", w->name);
+			error("apps.plugin: ERROR: cannot allocate memory for fds in %s", w->name);
 	
 		w->minflt = 0;
 		w->majflt = 0;
@@ -1120,7 +1174,7 @@ void update_statistics(void)
 	// concentrate everything on the targets
 	for(p = root; p ; p = p->next) {
 		if(!p->target) {
-			fprintf(stderr, "apps.plugin: ERROR: pid %d %s was left without a target!\n", p->pid, p->comm);
+			error("apps.plugin: ERROR: pid %d %s was left without a target!", p->pid, p->comm);
 			continue;
 		}
 
@@ -1158,11 +1212,11 @@ void update_statistics(void)
 
 			for(c = 0; c < p->fds_size ;c++) {
 				if(p->fds[c] == 0) continue;
-				if(p->fds[c] > 0 && p->fds[c] < all_files_len) {
+				if(p->fds[c] < all_files_size) {
 					if(p->target->fds) p->target->fds[p->fds[c]]++;
 				}
 				else
-					fprintf(stderr, "apps.plugin: ERROR: invalid fd number %d\n", p->fds[c]);
+					error("apps.plugin: ERROR: invalid fd number %d", p->fds[c]);
 			}
 
 			if(debug || p->target->debug) fprintf(stderr, "apps.plugin: \tAgregating %s pid %d on %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, p->target->name, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
@@ -1242,7 +1296,7 @@ void update_statistics(void)
 		w->openeventpolls = 0;
 		w->openother = 0;
 
-		for(c = 1; c < all_files_len ;c++) {
+		for(c = 1; c < all_files_size ;c++) {
 			if(w->fds && w->fds[c] > 0) switch(all_files[c].type) {
 				case FILETYPE_FILE:
 					w->openfiles++;
@@ -1627,7 +1681,7 @@ void parse_args(int argc, char **argv)
 			continue;
 		}
 
-		fprintf(stderr, "apps.plugin: ERROR: cannot understand option %s\n", argv[i]);
+		error("apps.plugin: ERROR: cannot understand option %s", argv[i]);
 		exit(1);
 	}
 
@@ -1635,13 +1689,15 @@ void parse_args(int argc, char **argv)
 	if(!name) name = "groups";
 
 	if(read_process_groups(name)) {
-		fprintf(stderr, "apps.plugin: ERROR: cannot read process groups %s\n", name);
+		error("apps.plugin: ERROR: cannot read process groups %s", name);
 		exit(1);
 	}
 }
 
 int main(int argc, char **argv)
 {
+	// debug_flags = D_PROCFILE;
+
 	unsigned long started_t = time(NULL), current_t;
 	Hertz = get_hertz();
 	pid_max = get_pid_max();
@@ -1651,7 +1707,7 @@ int main(int argc, char **argv)
 
 	all_pids = calloc(sizeof(struct pid_stat *), pid_max);
 	if(!all_pids) {
-		fprintf(stderr, "apps.plugin: ERROR: cannot allocate %lu bytes of memory.\n", sizeof(struct pid_stat *) * pid_max);
+		error("apps.plugin: ERROR: cannot allocate %lu bytes of memory.", sizeof(struct pid_stat *) * pid_max);
 		printf("DISABLE\n");
 		exit(1);
 	}
@@ -1663,7 +1719,7 @@ int main(int argc, char **argv)
 
 	for(;1; counter++) {
 		if(!update_from_proc()) {
-			fprintf(stderr, "apps.plugin: ERROR: cannot allocate %lu bytes of memory.\n", sizeof(struct pid_stat *) * pid_max);
+			error("apps.plugin: ERROR: cannot allocate %lu bytes of memory.", sizeof(struct pid_stat *) * pid_max);
 			printf("DISABLE\n");
 			exit(1);
 		}

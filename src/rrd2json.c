@@ -8,7 +8,7 @@
 #define HOSTNAME_MAX 1024
 char *hostname = "unknown";
 
-unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer *wb)
+unsigned long rrd_stats_one_json(RRDSET *st, char *options, struct web_buffer *wb)
 {
 	time_t now = time(NULL);
 	web_buffer_increase(wb, 16384);
@@ -48,10 +48,10 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 		, st->enabled
 		, st->units
 		, st->name, options?options:""
-		, chart_type_name(st->chart_type)
+		, rrdset_type_name(st->chart_type)
 		, st->counter
 		, st->entries
-		, rrd_stats_first_entry_t(st)
+		, rrdset_first_entry_t(st)
 		, st->current_entry
 		, st->last_updated.tv_sec
 		, now - (st->last_updated.tv_sec > now) ? now : st->last_updated.tv_sec
@@ -64,7 +64,7 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 
 	unsigned long memory = st->memsize;
 
-	RRD_DIMENSION *rd;
+	RRDDIM *rd;
 	for(rd = st->dimensions; rd ; rd = rd->next) {
 		memory += rd->memsize;
 
@@ -88,7 +88,7 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 			, rd->name
 			, rd->entries
 			, rd->hidden
-			, algorithm_name(rd->algorithm)
+			, rrddim_algorithm_name(rd->algorithm)
 			, rd->multiplier
 			, rd->divisor
 			, rd->last_collected_time.tv_sec
@@ -115,7 +115,7 @@ unsigned long rrd_stats_one_json(RRD_STATS *st, char *options, struct web_buffer
 #define RRD_GRAPH_JSON_HEADER "{\n\t\"charts\": [\n"
 #define RRD_GRAPH_JSON_FOOTER "\n\t]\n}\n"
 
-void rrd_stats_graph_json(RRD_STATS *st, char *options, struct web_buffer *wb)
+void rrd_stats_graph_json(RRDSET *st, char *options, struct web_buffer *wb)
 {
 	web_buffer_increase(wb, 16384);
 
@@ -130,19 +130,19 @@ void rrd_stats_all_json(struct web_buffer *wb)
 
 	unsigned long memory = 0;
 	long c;
-	RRD_STATS *st;
+	RRDSET *st;
 
 	web_buffer_printf(wb, RRD_GRAPH_JSON_HEADER);
 
-	pthread_rwlock_rdlock(&root_rwlock);
-	for(st = root, c = 0; st ; st = st->next) {
+	pthread_rwlock_rdlock(&rrdset_root_rwlock);
+	for(st = rrdset_root, c = 0; st ; st = st->next) {
 		if(st->enabled) {
 			if(c) web_buffer_printf(wb, "%s", ",\n");
 			memory += rrd_stats_one_json(st, NULL, wb);
 			c++;
 		}
 	}
-	pthread_rwlock_unlock(&root_rwlock);
+	pthread_rwlock_unlock(&rrdset_root_rwlock);
 	
 	web_buffer_printf(wb, "\n\t],\n"
 		"\t\"hostname\": \"%s\",\n"
@@ -151,13 +151,13 @@ void rrd_stats_all_json(struct web_buffer *wb)
 		"\t\"memory\": %lu\n"
 		"}\n"
 		, hostname
-		, update_every
-		, save_history
+		, rrd_update_every
+		, rrd_default_history_entries
 		, memory
 		);
 }
 
-unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int entries_to_show, int group, int group_method, time_t after, time_t before, int only_non_zero)
+unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int entries_to_show, int group, int group_method, time_t after, time_t before, int only_non_zero)
 {
 	int c;
 	pthread_rwlock_rdlock(&st->rwlock);
@@ -198,7 +198,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 	time_t time_init = st->last_updated.tv_sec;
 	
 	if(before == 0 || before > time_init) before = time_init;
-	if(after  == 0) after = rrd_stats_first_entry_t(st);
+	if(after  == 0) after = rrdset_first_entry_t(st);
 
 
 	// ---
@@ -212,7 +212,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 	// find how many dimensions we have
 	
 	int dimensions = 0;
-	RRD_DIMENSION *rd;
+	RRDDIM *rd;
 	for( rd = st->dimensions ; rd ; rd = rd->next) dimensions++;
 	if(!dimensions) {
 		pthread_rwlock_unlock(&st->rwlock);
@@ -238,9 +238,9 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 	if(st->debug) {
 		debug(D_RRD_STATS, "%s first_entry_t = %lu, last_entry_t = %lu, duration = %lu, after = %lu, before = %lu, duration = %lu, entries_to_show = %lu, group = %lu, max_entries = %ld"
 			, st->id
-			, rrd_stats_first_entry_t(st)
+			, rrdset_first_entry_t(st)
 			, st->last_updated.tv_sec
-			, st->last_updated.tv_sec - rrd_stats_first_entry_t(st)
+			, st->last_updated.tv_sec - rrdset_first_entry_t(st)
 			, after
 			, before
 			, before - after

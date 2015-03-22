@@ -63,113 +63,113 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
 			InBcastOctets 		= strtoull(procfile_lineword(ff, l, 11), NULL, 10);
 			OutBcastOctets 		= strtoull(procfile_lineword(ff, l, 12), NULL, 10);
 
-			RRD_STATS *st;
+			RRDSET *st;
 
 			// --------------------------------------------------------------------
 
 			if(do_bandwidth) {
-				st = rrd_stats_find("system.ipv4");
+				st = rrdset_find("system.ipv4");
 				if(!st) {
-					st = rrd_stats_create("system", "ipv4", NULL, "ipv4", "IPv4 Bandwidth", "kilobits/s", 2000, update_every, CHART_TYPE_AREA);
+					st = rrdset_create("system", "ipv4", NULL, "ipv4", "IPv4 Bandwidth", "kilobits/s", 2000, update_every, RRDSET_TYPE_AREA);
 
-					rrd_stats_dimension_add(st, "received", NULL, 8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "sent", NULL, -8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrddim_add(st, "received", NULL, 8, 1024 * update_every, RRDDIM_INCREMENTAL);
+					rrddim_add(st, "sent", NULL, -8, 1024 * update_every, RRDDIM_INCREMENTAL);
 				}
-				else rrd_stats_next(st);
+				else rrdset_next(st);
 
-				rrd_stats_dimension_set(st, "sent", OutOctets);
-				rrd_stats_dimension_set(st, "received", InOctets);
-				rrd_stats_done(st);
+				rrddim_set(st, "sent", OutOctets);
+				rrddim_set(st, "received", InOctets);
+				rrdset_done(st);
 			}
 
 			// --------------------------------------------------------------------
 
 			if(do_inerrors) {
-				st = rrd_stats_find("ipv4.inerrors");
+				st = rrdset_find("ipv4.inerrors");
 				if(!st) {
-					st = rrd_stats_create("ipv4", "inerrors", NULL, "ipv4", "IPv4 Input Errors", "packets/s", 4000, update_every, CHART_TYPE_LINE);
+					st = rrdset_create("ipv4", "inerrors", NULL, "ipv4", "IPv4 Input Errors", "packets/s", 4000, update_every, RRDSET_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "noroutes", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "trunkated", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrddim_add(st, "noroutes", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+					rrddim_add(st, "trunkated", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
 				}
-				else rrd_stats_next(st);
+				else rrdset_next(st);
 
-				rrd_stats_dimension_set(st, "noroutes", InNoRoutes);
-				rrd_stats_dimension_set(st, "trunkated", InTruncatedPkts);
-				rrd_stats_done(st);
+				rrddim_set(st, "noroutes", InNoRoutes);
+				rrddim_set(st, "trunkated", InTruncatedPkts);
+				rrdset_done(st);
 			}
 
 			// --------------------------------------------------------------------
 
 			if(do_mcast) {
-				st = rrd_stats_find("ipv4.mcast");
+				st = rrdset_find("ipv4.mcast");
 				if(!st) {
-					st = rrd_stats_create("ipv4", "mcast", NULL, "ipv4", "IPv4 Multicast Bandwidth", "kilobits/s", 9000, update_every, CHART_TYPE_AREA);
+					st = rrdset_create("ipv4", "mcast", NULL, "ipv4", "IPv4 Multicast Bandwidth", "kilobits/s", 9000, update_every, RRDSET_TYPE_AREA);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "received", NULL, 8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "sent", NULL, -8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrddim_add(st, "received", NULL, 8, 1024 * update_every, RRDDIM_INCREMENTAL);
+					rrddim_add(st, "sent", NULL, -8, 1024 * update_every, RRDDIM_INCREMENTAL);
 				}
-				else rrd_stats_next(st);
+				else rrdset_next(st);
 
-				rrd_stats_dimension_set(st, "sent", OutMcastOctets);
-				rrd_stats_dimension_set(st, "received", InMcastOctets);
-				rrd_stats_done(st);
+				rrddim_set(st, "sent", OutMcastOctets);
+				rrddim_set(st, "received", InMcastOctets);
+				rrdset_done(st);
 			}
 
 			// --------------------------------------------------------------------
 
 			if(do_bcast) {
-				st = rrd_stats_find("ipv4.bcast");
+				st = rrdset_find("ipv4.bcast");
 				if(!st) {
-					st = rrd_stats_create("ipv4", "bcast", NULL, "ipv4", "IPv4 Broadcast Bandwidth", "kilobits/s", 8000, update_every, CHART_TYPE_AREA);
+					st = rrdset_create("ipv4", "bcast", NULL, "ipv4", "IPv4 Broadcast Bandwidth", "kilobits/s", 8000, update_every, RRDSET_TYPE_AREA);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "received", NULL, 8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "sent", NULL, -8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrddim_add(st, "received", NULL, 8, 1024 * update_every, RRDDIM_INCREMENTAL);
+					rrddim_add(st, "sent", NULL, -8, 1024 * update_every, RRDDIM_INCREMENTAL);
 				}
-				else rrd_stats_next(st);
+				else rrdset_next(st);
 
-				rrd_stats_dimension_set(st, "sent", OutBcastOctets);
-				rrd_stats_dimension_set(st, "received", InBcastOctets);
-				rrd_stats_done(st);
+				rrddim_set(st, "sent", OutBcastOctets);
+				rrddim_set(st, "received", InBcastOctets);
+				rrdset_done(st);
 			}
 
 			// --------------------------------------------------------------------
 
 			if(do_mcast_p) {
-				st = rrd_stats_find("ipv4.mcastpkts");
+				st = rrdset_find("ipv4.mcastpkts");
 				if(!st) {
-					st = rrd_stats_create("ipv4", "mcastpkts", NULL, "ipv4", "IPv4 Multicast Packets", "packets/s", 9500, update_every, CHART_TYPE_LINE);
+					st = rrdset_create("ipv4", "mcastpkts", NULL, "ipv4", "IPv4 Multicast Packets", "packets/s", 9500, update_every, RRDSET_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "received", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "sent", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrddim_add(st, "received", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+					rrddim_add(st, "sent", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
 				}
-				else rrd_stats_next(st);
+				else rrdset_next(st);
 
-				rrd_stats_dimension_set(st, "sent", OutMcastPkts);
-				rrd_stats_dimension_set(st, "received", InMcastPkts);
-				rrd_stats_done(st);
+				rrddim_set(st, "sent", OutMcastPkts);
+				rrddim_set(st, "received", InMcastPkts);
+				rrdset_done(st);
 			}
 
 			// --------------------------------------------------------------------
 
 			if(do_bcast_p) {
-				st = rrd_stats_find("ipv4.bcastpkts");
+				st = rrdset_find("ipv4.bcastpkts");
 				if(!st) {
-					st = rrd_stats_create("ipv4", "bcastpkts", NULL, "ipv4", "IPv4 Broadcast Packets", "packets/s", 8500, update_every, CHART_TYPE_LINE);
+					st = rrdset_create("ipv4", "bcastpkts", NULL, "ipv4", "IPv4 Broadcast Packets", "packets/s", 8500, update_every, RRDSET_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "received", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-					rrd_stats_dimension_add(st, "sent", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrddim_add(st, "received", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+					rrddim_add(st, "sent", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
 				}
-				else rrd_stats_next(st);
+				else rrdset_next(st);
 
-				rrd_stats_dimension_set(st, "sent", OutBcastPkts);
-				rrd_stats_dimension_set(st, "received", InBcastPkts);
-				rrd_stats_done(st);
+				rrddim_set(st, "sent", OutBcastPkts);
+				rrddim_set(st, "received", InBcastPkts);
+				rrdset_done(st);
 			}
 		}
 	}

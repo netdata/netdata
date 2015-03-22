@@ -106,7 +106,7 @@ void *nfacct_main(void *ptr) {
 
 	struct timeval last, now;
 	unsigned long long usec = 0, susec = 0;
-	RRD_STATS *st = NULL;
+	RRDSET *st = NULL;
 
 	gettimeofday(&last, NULL);
 
@@ -145,8 +145,8 @@ void *nfacct_main(void *ptr) {
 		usec = usecdiff(&now, &last) - susec;
 		debug(D_NFACCT_LOOP, "nfacct.plugin: last loop took %llu usec (worked for %llu, sleeped for %llu).", usec + susec, usec, susec);
 		
-		if(usec < (update_every * 1000000ULL / 2ULL)) susec = (update_every * 1000000ULL) - usec;
-		else susec = update_every * 1000000ULL / 2ULL;
+		if(usec < (rrd_update_every * 1000000ULL / 2ULL)) susec = (rrd_update_every * 1000000ULL) - usec;
+		else susec = rrd_update_every * 1000000ULL / 2ULL;
 
 
 		// --------------------------------------------------------------------
@@ -154,43 +154,43 @@ void *nfacct_main(void *ptr) {
 		if(nfacct_list && nfacct_list->len) {
 			int i;
 
-			st = rrd_stats_find_bytype("nfacct", "packets");
+			st = rrdset_find_bytype("nfacct", "packets");
 			if(!st) {
-				st = rrd_stats_create("nfacct", "packets", NULL, "netfilter", "Netfilter Accounting Packets", "packets/s", 1006, update_every, CHART_TYPE_STACKED);
+				st = rrdset_create("nfacct", "packets", NULL, "netfilter", "Netfilter Accounting Packets", "packets/s", 1006, rrd_update_every, RRDSET_TYPE_STACKED);
 
 				for(i = 0; i < nfacct_list->len ; i++)
-					rrd_stats_dimension_add(st, nfacct_list->data[i].name, NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
+					rrddim_add(st, nfacct_list->data[i].name, NULL, 1, rrd_update_every, RRDDIM_INCREMENTAL);
 			}
-			else rrd_stats_next(st);
+			else rrdset_next(st);
 
 			for(i = 0; i < nfacct_list->len ; i++) {
-				RRD_DIMENSION *rd = rrd_stats_dimension_find(st, nfacct_list->data[i].name);
+				RRDDIM *rd = rrddim_find(st, nfacct_list->data[i].name);
 
-				if(!rd) rd = rrd_stats_dimension_add(st, nfacct_list->data[i].name, NULL, 1, update_every, RRD_DIMENSION_INCREMENTAL);
-				if(rd) rrd_stats_dimension_set_by_pointer(st, rd, nfacct_list->data[i].pkts);
+				if(!rd) rd = rrddim_add(st, nfacct_list->data[i].name, NULL, 1, rrd_update_every, RRDDIM_INCREMENTAL);
+				if(rd) rrddim_set_by_pointer(st, rd, nfacct_list->data[i].pkts);
 			}
 			
-			rrd_stats_done(st);
+			rrdset_done(st);
 
 			// ----------------------------------------------------------------
 
-			st = rrd_stats_find_bytype("nfacct", "bytes");
+			st = rrdset_find_bytype("nfacct", "bytes");
 			if(!st) {
-				st = rrd_stats_create("nfacct", "bytes", NULL, "netfilter", "Netfilter Accounting Bandwidth", "kilobytes/s", 1007, update_every, CHART_TYPE_STACKED);
+				st = rrdset_create("nfacct", "bytes", NULL, "netfilter", "Netfilter Accounting Bandwidth", "kilobytes/s", 1007, rrd_update_every, RRDSET_TYPE_STACKED);
 
 				for(i = 0; i < nfacct_list->len ; i++)
-					rrd_stats_dimension_add(st, nfacct_list->data[i].name, NULL, 1, 1000 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrddim_add(st, nfacct_list->data[i].name, NULL, 1, 1000 * rrd_update_every, RRDDIM_INCREMENTAL);
 			}
-			else rrd_stats_next(st);
+			else rrdset_next(st);
 
 			for(i = 0; i < nfacct_list->len ; i++) {
-				RRD_DIMENSION *rd = rrd_stats_dimension_find(st, nfacct_list->data[i].name);
+				RRDDIM *rd = rrddim_find(st, nfacct_list->data[i].name);
 
-				if(!rd) rd = rrd_stats_dimension_add(st, nfacct_list->data[i].name, NULL, 1, 1000 * update_every, RRD_DIMENSION_INCREMENTAL);
-				if(rd) rrd_stats_dimension_set_by_pointer(st, rd, nfacct_list->data[i].bytes);
+				if(!rd) rd = rrddim_add(st, nfacct_list->data[i].name, NULL, 1, 1000 * rrd_update_every, RRDDIM_INCREMENTAL);
+				if(rd) rrddim_set_by_pointer(st, rd, nfacct_list->data[i].bytes);
 			}
 			
-			rrd_stats_done(st);
+			rrdset_done(st);
 		}
 
 		// --------------------------------------------------------------------

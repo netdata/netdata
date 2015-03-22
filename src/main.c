@@ -131,7 +131,7 @@ int main(int argc, char **argv)
 		else if(strcmp(argv[i], "--unittest")  == 0) {
 			if(unit_test_storage()) exit(1);
 			exit(0);
-			update_every = 1;
+			rrd_update_every = 1;
 			if(unit_test(1000000, 0)) exit(1);
 			if(unit_test(1000000, 500000)) exit(1);
 			if(unit_test(1000000, 100000)) exit(1);
@@ -151,7 +151,7 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Cannot understand option '%s'.\n", argv[i]);
 			fprintf(stderr, "\nUSAGE: %s [-d] [-l LINES_TO_SAVE] [-u UPDATE_TIMER] [-p LISTEN_PORT] [-dl debug log file] [-df debug flags].\n\n", argv[0]);
 			fprintf(stderr, "  -c CONFIG FILE the configuration file to load. Default: %s.\n", CONFIG_DIR "/" CONFIG_FILENAME);
-			fprintf(stderr, "  -l LINES_TO_SAVE can be from 5 to %d lines in JSON data. Default: %d.\n", HISTORY_MAX, HISTORY);
+			fprintf(stderr, "  -l LINES_TO_SAVE can be from 5 to %d lines in JSON data. Default: %d.\n", RRD_HISTORY_ENTRIES_MAX, RRD_DEFAULT_HISTORY_ENTRIES);
 			fprintf(stderr, "  -t UPDATE_TIMER can be from 1 to %d seconds. Default: %d.\n", UPDATE_EVERY_MAX, UPDATE_EVERY);
 			fprintf(stderr, "  -p LISTEN_PORT can be from 1 to %d. Default: %d.\n", 65535, LISTEN_PORT);
 			fprintf(stderr, "  -u USERNAME can be any system username to run as. Default: none.\n");
@@ -219,7 +219,7 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		memory_mode = memory_mode_id(config_get("global", "memory mode", memory_mode_name(memory_mode)));
+		rrd_memory_mode = rrd_memory_mode_id(config_get("global", "memory mode", rrd_memory_mode_name(rrd_memory_mode)));
 
 		// --------------------------------------------------------------------
 
@@ -230,23 +230,23 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		save_history = config_get_number("global", "history", HISTORY);
-		if(save_history < 5 || save_history > HISTORY_MAX) {
-			fprintf(stderr, "Invalid save lines %d given. Defaulting to %d.\n", save_history, HISTORY);
-			save_history = HISTORY;
+		rrd_default_history_entries = config_get_number("global", "history", RRD_DEFAULT_HISTORY_ENTRIES);
+		if(rrd_default_history_entries < 5 || rrd_default_history_entries > RRD_HISTORY_ENTRIES_MAX) {
+			fprintf(stderr, "Invalid save lines %d given. Defaulting to %d.\n", rrd_default_history_entries, RRD_DEFAULT_HISTORY_ENTRIES);
+			rrd_default_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
 		}
 		else {
-			debug(D_OPTIONS, "save lines set to %d.", save_history);
+			debug(D_OPTIONS, "save lines set to %d.", rrd_default_history_entries);
 		}
 
 		// --------------------------------------------------------------------
 
-		update_every = config_get_number("global", "update every", UPDATE_EVERY);
-		if(update_every < 1 || update_every > 600) {
-			fprintf(stderr, "Invalid update timer %d given. Defaulting to %d.\n", update_every, UPDATE_EVERY_MAX);
-			update_every = UPDATE_EVERY;
+		rrd_update_every = config_get_number("global", "update every", UPDATE_EVERY);
+		if(rrd_update_every < 1 || rrd_update_every > 600) {
+			fprintf(stderr, "Invalid update timer %d given. Defaulting to %d.\n", rrd_update_every, UPDATE_EVERY_MAX);
+			rrd_update_every = UPDATE_EVERY;
 		}
-		else debug(D_OPTIONS, "update timer set to %d.", update_every);
+		else debug(D_OPTIONS, "update timer set to %d.", rrd_update_every);
 
 		// --------------------------------------------------------------------
 		

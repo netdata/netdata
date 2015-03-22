@@ -150,58 +150,58 @@ int do_proc_vmstat(int update_every, unsigned long long dt) {
 		else if(!thp_split && strcmp(name, "thp_split") == 0) thp_split = value;
 	}
 
-	RRD_STATS *st;
+	RRDSET *st;
 
 	// --------------------------------------------------------------------
 	
 	if(do_swapio) {
-		st = rrd_stats_find("system.swapio");
+		st = rrdset_find("system.swapio");
 		if(!st) {
-			st = rrd_stats_create("system", "swapio", NULL, "mem", "Swap I/O", "kilobytes/s", 250, update_every, CHART_TYPE_AREA);
+			st = rrdset_create("system", "swapio", NULL, "mem", "Swap I/O", "kilobytes/s", 250, update_every, RRDSET_TYPE_AREA);
 
-			rrd_stats_dimension_add(st, "in",  NULL, sysconf(_SC_PAGESIZE), 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "out", NULL, -sysconf(_SC_PAGESIZE), 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrddim_add(st, "in",  NULL, sysconf(_SC_PAGESIZE), 1024 * update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "out", NULL, -sysconf(_SC_PAGESIZE), 1024 * update_every, RRDDIM_INCREMENTAL);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "in", pswpin);
-		rrd_stats_dimension_set(st, "out", pswpout);
-		rrd_stats_done(st);
+		rrddim_set(st, "in", pswpin);
+		rrddim_set(st, "out", pswpout);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 	
 	if(do_io) {
-		st = rrd_stats_find("system.io");
+		st = rrdset_find("system.io");
 		if(!st) {
-			st = rrd_stats_create("system", "io", NULL, "disk", "Disk I/O", "kilobytes/s", 150, update_every, CHART_TYPE_AREA);
+			st = rrdset_create("system", "io", NULL, "disk", "Disk I/O", "kilobytes/s", 150, update_every, RRDSET_TYPE_AREA);
 
-			rrd_stats_dimension_add(st, "in",  NULL,  1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "out", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrddim_add(st, "in",  NULL,  1, 1 * update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "out", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "in", pgpgin);
-		rrd_stats_dimension_set(st, "out", pgpgout);
-		rrd_stats_done(st);
+		rrddim_set(st, "in", pgpgin);
+		rrddim_set(st, "out", pgpgout);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 	
 	if(do_pgfaults) {
-		st = rrd_stats_find("system.pgfaults");
+		st = rrdset_find("system.pgfaults");
 		if(!st) {
-			st = rrd_stats_create("system", "pgfaults", NULL, "mem", "Memory Page Faults", "page faults/s", 500, update_every, CHART_TYPE_LINE);
+			st = rrdset_create("system", "pgfaults", NULL, "mem", "Memory Page Faults", "page faults/s", 500, update_every, RRDSET_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "minor",  NULL,  1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-			rrd_stats_dimension_add(st, "major", NULL, -1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrddim_add(st, "minor",  NULL,  1, 1 * update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "major", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "minor", pgfault);
-		rrd_stats_dimension_set(st, "major", pgmajfault);
-		rrd_stats_done(st);
+		rrddim_set(st, "minor", pgfault);
+		rrddim_set(st, "major", pgmajfault);
+		rrdset_done(st);
 	}
 
 	return 0;

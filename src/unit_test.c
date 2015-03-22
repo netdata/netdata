@@ -246,32 +246,32 @@ int unit_test(long delay, long shift)
 	snprintf(name, 100, "unittest-%d-%ld-%ld", repeat, delay, shift);
 
 	debug_flags = 0xffffffff;
-	memory_mode = NETDATA_MEMORY_MODE_RAM;
-	update_every = 1;
+	rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+	rrd_update_every = 1;
 
 	int do_abs = 1;
 	int do_inc = 1;
 	int do_abst = 1;
 	int do_absi = 1;
 
-	RRD_STATS *st = rrd_stats_create("netdata", name, name, "netdata", "Unit Testing", "a value", 1, 1, CHART_TYPE_LINE);
+	RRDSET *st = rrdset_create("netdata", name, name, "netdata", "Unit Testing", "a value", 1, 1, RRDSET_TYPE_LINE);
 	st->debug = 1;
 
-	RRD_DIMENSION *rdabs = NULL;
-	RRD_DIMENSION *rdinc = NULL;
-	RRD_DIMENSION *rdabst = NULL;
-	RRD_DIMENSION *rdabsi = NULL;
+	RRDDIM *rdabs = NULL;
+	RRDDIM *rdinc = NULL;
+	RRDDIM *rdabst = NULL;
+	RRDDIM *rdabsi = NULL;
 
-	if(do_abs) rdabs = rrd_stats_dimension_add(st, "absolute", "absolute", 1, 1, RRD_DIMENSION_ABSOLUTE);
-	if(do_inc) rdinc = rrd_stats_dimension_add(st, "incremental", "incremental", 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
-	if(do_abst) rdabst = rrd_stats_dimension_add(st, "percentage-of-absolute-row", "percentage-of-absolute-row", 1, 1, RRD_DIMENSION_PCENT_OVER_ROW_TOTAL);
-	if(do_absi) rdabsi = rrd_stats_dimension_add(st, "percentage-of-incremental-row", "percentage-of-incremental-row", 1, 1, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+	if(do_abs) rdabs = rrddim_add(st, "absolute", "absolute", 1, 1, RRDDIM_ABSOLUTE);
+	if(do_inc) rdinc = rrddim_add(st, "incremental", "incremental", 1, 1 * rrd_update_every, RRDDIM_INCREMENTAL);
+	if(do_abst) rdabst = rrddim_add(st, "percentage-of-absolute-row", "percentage-of-absolute-row", 1, 1, RRDDIM_PCENT_OVER_ROW_TOTAL);
+	if(do_absi) rdabsi = rrddim_add(st, "percentage-of-incremental-row", "percentage-of-incremental-row", 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
 
 	long increment = 1000;
 	collected_number i = 0;
 
 	unsigned long c, dimensions = 0;
-	RRD_DIMENSION *rd;
+	RRDDIM *rd;
 	for(rd = st->dimensions ; rd ; rd = rd->next) dimensions++;
 
 	for(c = 0; c < 20 ;c++) {
@@ -279,12 +279,12 @@ int unit_test(long delay, long shift)
 
 		fprintf(stderr, "\n\nLOOP = %lu, DELAY = %ld, VALUE = " COLLECTED_NUMBER_FORMAT "\n", c, delay, i);
 		if(c) {
-			rrd_stats_next_usec(st, delay);
+			rrdset_next_usec(st, delay);
 		}
-		if(do_abs) rrd_stats_dimension_set(st, "absolute", i);
-		if(do_inc) rrd_stats_dimension_set(st, "incremental", i);
-		if(do_abst) rrd_stats_dimension_set(st, "percentage-of-absolute-row", i);
-		if(do_absi) rrd_stats_dimension_set(st, "percentage-of-incremental-row", i);
+		if(do_abs) rrddim_set(st, "absolute", i);
+		if(do_inc) rrddim_set(st, "incremental", i);
+		if(do_abst) rrddim_set(st, "percentage-of-absolute-row", i);
+		if(do_absi) rrddim_set(st, "percentage-of-incremental-row", i);
 
 		if(!c) {
 			gettimeofday(&st->last_collected_time, NULL);
@@ -294,7 +294,7 @@ int unit_test(long delay, long shift)
 		// prevent it from deleting the dimensions
 		for(rd = st->dimensions ; rd ; rd = rd->next) rd->last_collected_time.tv_sec = st->last_collected_time.tv_sec;
 
-		rrd_stats_done(st);
+		rrdset_done(st);
 	}
 
 	unsigned long oincrement = increment;

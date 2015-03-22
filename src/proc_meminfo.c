@@ -98,7 +98,7 @@ int do_proc_meminfo(int update_every, unsigned long long dt) {
 		else if(!DirectMap2M && strcmp(name, "DirectMap2M") == 0) DirectMap2M = value;
 	}
 
-	RRD_STATS *st;
+	RRDSET *st;
 
 	// --------------------------------------------------------------------
 	
@@ -106,22 +106,22 @@ int do_proc_meminfo(int update_every, unsigned long long dt) {
 	unsigned long long MemUsed = MemTotal - MemFree - Cached - Buffers;
 
 	if(do_ram) {
-		st = rrd_stats_find("system.ram");
+		st = rrdset_find("system.ram");
 		if(!st) {
-			st = rrd_stats_create("system", "ram", NULL, "mem", "System RAM", "MB", 200, update_every, CHART_TYPE_STACKED);
+			st = rrdset_create("system", "ram", NULL, "mem", "System RAM", "MB", 200, update_every, RRDSET_TYPE_STACKED);
 
-			rrd_stats_dimension_add(st, "buffers", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "used",    NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "cached",  NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "free",    NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
+			rrddim_add(st, "buffers", NULL, 1, 1024, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "used",    NULL, 1, 1024, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "cached",  NULL, 1, 1024, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "free",    NULL, 1, 1024, RRDDIM_ABSOLUTE);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "used", MemUsed);
-		rrd_stats_dimension_set(st, "free", MemFree);
-		rrd_stats_dimension_set(st, "cached", Cached);
-		rrd_stats_dimension_set(st, "buffers", Buffers);
-		rrd_stats_done(st);
+		rrddim_set(st, "used", MemUsed);
+		rrddim_set(st, "free", MemFree);
+		rrddim_set(st, "cached", Cached);
+		rrddim_set(st, "buffers", Buffers);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
@@ -129,115 +129,115 @@ int do_proc_meminfo(int update_every, unsigned long long dt) {
 	unsigned long long SwapUsed = SwapTotal - SwapFree;
 
 	if(do_swap) {
-		st = rrd_stats_find("system.swap");
+		st = rrdset_find("system.swap");
 		if(!st) {
-			st = rrd_stats_create("system", "swap", NULL, "mem", "System Swap", "MB", 201, update_every, CHART_TYPE_STACKED);
+			st = rrdset_create("system", "swap", NULL, "mem", "System Swap", "MB", 201, update_every, RRDSET_TYPE_STACKED);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "free",    NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "used",    NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
+			rrddim_add(st, "free",    NULL, 1, 1024, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "used",    NULL, 1, 1024, RRDDIM_ABSOLUTE);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "used", SwapUsed);
-		rrd_stats_dimension_set(st, "free", SwapFree);
-		rrd_stats_done(st);
+		rrddim_set(st, "used", SwapUsed);
+		rrddim_set(st, "free", SwapFree);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 	
 	if(hwcorrupted && do_hwcorrupt) {
-		st = rrd_stats_find("mem.hwcorrupt");
+		st = rrdset_find("mem.hwcorrupt");
 		if(!st) {
-			st = rrd_stats_create("mem", "hwcorrupt", NULL, "mem", "Hardware Corrupted ECC", "MB", 9000, update_every, CHART_TYPE_LINE);
+			st = rrdset_create("mem", "hwcorrupt", NULL, "mem", "Hardware Corrupted ECC", "MB", 9000, update_every, RRDSET_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "HardwareCorrupted", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
+			rrddim_add(st, "HardwareCorrupted", NULL, 1, 1024, RRDDIM_ABSOLUTE);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "HardwareCorrupted", HardwareCorrupted);
-		rrd_stats_done(st);
+		rrddim_set(st, "HardwareCorrupted", HardwareCorrupted);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 	
 	if(do_committed) {
-		st = rrd_stats_find("mem.committed");
+		st = rrdset_find("mem.committed");
 		if(!st) {
-			st = rrd_stats_create("mem", "committed", NULL, "mem", "Committed (Allocated) Memory", "MB", 5000, update_every, CHART_TYPE_AREA);
+			st = rrdset_create("mem", "committed", NULL, "mem", "Committed (Allocated) Memory", "MB", 5000, update_every, RRDSET_TYPE_AREA);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "Committed_AS", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
+			rrddim_add(st, "Committed_AS", NULL, 1, 1024, RRDDIM_ABSOLUTE);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "Committed_AS", Committed_AS);
-		rrd_stats_done(st);
+		rrddim_set(st, "Committed_AS", Committed_AS);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 	
 	if(do_writeback) {
-		st = rrd_stats_find("mem.writeback");
+		st = rrdset_find("mem.writeback");
 		if(!st) {
-			st = rrd_stats_create("mem", "writeback", NULL, "mem", "Writeback Memory", "MB", 4000, update_every, CHART_TYPE_LINE);
+			st = rrdset_create("mem", "writeback", NULL, "mem", "Writeback Memory", "MB", 4000, update_every, RRDSET_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "Dirty", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "Writeback", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "FuseWriteback", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "NfsWriteback", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "Bounce", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
+			rrddim_add(st, "Dirty", NULL, 1, 1024, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "Writeback", NULL, 1, 1024, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "FuseWriteback", NULL, 1, 1024, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "NfsWriteback", NULL, 1, 1024, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "Bounce", NULL, 1, 1024, RRDDIM_ABSOLUTE);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "Dirty", Dirty);
-		rrd_stats_dimension_set(st, "Writeback", Writeback);
-		rrd_stats_dimension_set(st, "FuseWriteback", WritebackTmp);
-		rrd_stats_dimension_set(st, "NfsWriteback", NFS_Unstable);
-		rrd_stats_dimension_set(st, "Bounce", Bounce);
-		rrd_stats_done(st);
+		rrddim_set(st, "Dirty", Dirty);
+		rrddim_set(st, "Writeback", Writeback);
+		rrddim_set(st, "FuseWriteback", WritebackTmp);
+		rrddim_set(st, "NfsWriteback", NFS_Unstable);
+		rrddim_set(st, "Bounce", Bounce);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 	
 	if(do_kernel) {
-		st = rrd_stats_find("mem.kernel");
+		st = rrdset_find("mem.kernel");
 		if(!st) {
-			st = rrd_stats_create("mem", "kernel", NULL, "mem", "Memory Used by Kernel", "MB", 6000, update_every, CHART_TYPE_STACKED);
+			st = rrdset_create("mem", "kernel", NULL, "mem", "Memory Used by Kernel", "MB", 6000, update_every, RRDSET_TYPE_STACKED);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "Slab", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "KernelStack", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "PageTables", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "VmallocUsed", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
+			rrddim_add(st, "Slab", NULL, 1, 1024, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "KernelStack", NULL, 1, 1024, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "PageTables", NULL, 1, 1024, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "VmallocUsed", NULL, 1, 1024, RRDDIM_ABSOLUTE);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "KernelStack", KernelStack);
-		rrd_stats_dimension_set(st, "Slab", Slab);
-		rrd_stats_dimension_set(st, "PageTables", PageTables);
-		rrd_stats_dimension_set(st, "VmallocUsed", VmallocUsed);
-		rrd_stats_done(st);
+		rrddim_set(st, "KernelStack", KernelStack);
+		rrddim_set(st, "Slab", Slab);
+		rrddim_set(st, "PageTables", PageTables);
+		rrddim_set(st, "VmallocUsed", VmallocUsed);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 	
 	if(do_slab) {
-		st = rrd_stats_find("mem.slab");
+		st = rrdset_find("mem.slab");
 		if(!st) {
-			st = rrd_stats_create("mem", "slab", NULL, "mem", "Reclaimable Kernel Memory", "MB", 6500, update_every, CHART_TYPE_STACKED);
+			st = rrdset_create("mem", "slab", NULL, "mem", "Reclaimable Kernel Memory", "MB", 6500, update_every, RRDSET_TYPE_STACKED);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "reclaimable", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "unreclaimable", NULL, 1, 1024, RRD_DIMENSION_ABSOLUTE);
+			rrddim_add(st, "reclaimable", NULL, 1, 1024, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "unreclaimable", NULL, 1, 1024, RRDDIM_ABSOLUTE);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "reclaimable", SReclaimable);
-		rrd_stats_dimension_set(st, "unreclaimable", SUnreclaim);
-		rrd_stats_done(st);
+		rrddim_set(st, "reclaimable", SReclaimable);
+		rrddim_set(st, "unreclaimable", SUnreclaim);
+		rrdset_done(st);
 	}
 
 	return 0;

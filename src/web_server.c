@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <netinet/tcp.h>
+#include <malloc.h>
 
 #include "common.h"
 #include "log.h"
@@ -25,6 +26,23 @@
 
 int listen_fd = -1;
 int listen_port = LISTEN_PORT;
+
+static void log_allocations(void)
+{
+	static int mem = 0;
+
+	struct mallinfo mi;
+
+	mi = mallinfo();
+	if(mi.uordblks > mem) {
+		int clients = 0;
+		struct web_client *w;
+		for(w = web_clients; w ; w = w->next) clients++;
+
+		info("Allocated memory increased from %d to %d (increased by %d bytes). There are %d web clients connected.", mem, mi.uordblks, mi.uordblks - mem, clients);
+		mem = mi.uordblks;
+	}
+}
 
 int create_listen_socket(int port)
 {
@@ -257,8 +275,8 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
 
 	// do we have such a data set?
-	RRD_STATS *st = rrd_stats_find_byname(tok);
-	if(!st) st = rrd_stats_find(tok);
+	RRDSET *st = rrdset_find_byname(tok);
+	if(!st) st = rrdset_find(tok);
 	if(!st) {
 		// we don't have it
 		// try to send a file with that name
@@ -270,7 +288,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	debug(D_WEB_CLIENT, "%llu: Found RRD data with name '%s'.", w->id, tok);
 
 	// how many entries does the client want?
-	long lines = save_history;
+	long lines = rrd_default_history_entries;
 	long group_count = 1;
 	time_t after = 0, before = 0;
 	int group_method = GROUP_AVERAGE;
@@ -472,7 +490,7 @@ void web_client_process(struct web_client *w)
 				debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
 
 				// do we have such a data set?
-				RRD_STATS *st = rrd_stats_find_byname(tok);
+				RRDSET *st = rrdset_find_byname(tok);
 				if(!st) {
 					// we don't have it
 					// try to send a file with that name
@@ -495,7 +513,7 @@ void web_client_process(struct web_client *w)
 				debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
 
 				// do we have such a data set?
-				RRD_STATS *st = rrd_stats_find_byname(tok);
+				RRDSET *st = rrdset_find_byname(tok);
 				if(!st) {
 					code = 404;
 					web_buffer_printf(w->data, "Chart %s is not found.\r\n", tok);
@@ -528,7 +546,7 @@ void web_client_process(struct web_client *w)
 				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending list of RRD_STATS...", w->id);
 
 				w->data->bytes = 0;
-				RRD_STATS *st = root;
+				RRDSET *st = rrdset_root;
 
 				for ( ; st ; st = st->next )
 					web_buffer_printf(w->data, "%s\n", st->name);

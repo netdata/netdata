@@ -35,7 +35,7 @@ int do_proc_stat(int update_every, unsigned long long dt) {
 	uint32_t words;
 
 	unsigned long long processes = 0, running = 0 , blocked = 0;
-	RRD_STATS *st;
+	RRDSET *st;
 
 	for(l = 0; l < lines ;l++) {
 		if(strncmp(procfile_lineword(ff, l, 0), "cpu", 3) == 0) {
@@ -72,39 +72,39 @@ int do_proc_stat(int update_every, unsigned long long dt) {
 			}
 
 			if((isthistotal && do_cpu) || (!isthistotal && do_cpu_cores)) {
-				st = rrd_stats_find_bytype(type, id);
+				st = rrdset_find_bytype(type, id);
 				if(!st) {
-					st = rrd_stats_create(type, id, NULL, "cpu", title, "percentage", priority, update_every, CHART_TYPE_STACKED);
+					st = rrdset_create(type, id, NULL, "cpu", title, "percentage", priority, update_every, RRDSET_TYPE_STACKED);
 
 					long multiplier = 1;
 					long divisor = 1; // sysconf(_SC_CLK_TCK);
 
-					rrd_stats_dimension_add(st, "guest_nice", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
-					rrd_stats_dimension_add(st, "guest", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
-					rrd_stats_dimension_add(st, "steal", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
-					rrd_stats_dimension_add(st, "softirq", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
-					rrd_stats_dimension_add(st, "irq", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
-					rrd_stats_dimension_add(st, "user", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
-					rrd_stats_dimension_add(st, "system", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
-					rrd_stats_dimension_add(st, "nice", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
-					rrd_stats_dimension_add(st, "iowait", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
+					rrddim_add(st, "guest_nice", NULL, multiplier, divisor, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+					rrddim_add(st, "guest", NULL, multiplier, divisor, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+					rrddim_add(st, "steal", NULL, multiplier, divisor, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+					rrddim_add(st, "softirq", NULL, multiplier, divisor, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+					rrddim_add(st, "irq", NULL, multiplier, divisor, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+					rrddim_add(st, "user", NULL, multiplier, divisor, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+					rrddim_add(st, "system", NULL, multiplier, divisor, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+					rrddim_add(st, "nice", NULL, multiplier, divisor, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+					rrddim_add(st, "iowait", NULL, multiplier, divisor, RRDDIM_PCENT_OVER_DIFF_TOTAL);
 
-					rrd_stats_dimension_add(st, "idle", NULL, multiplier, divisor, RRD_DIMENSION_PCENT_OVER_DIFF_TOTAL);
-					rrd_stats_dimension_hide(st, "idle");
+					rrddim_add(st, "idle", NULL, multiplier, divisor, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+					rrddim_hide(st, "idle");
 				}
-				else rrd_stats_next(st);
+				else rrdset_next(st);
 
-				rrd_stats_dimension_set(st, "user", user);
-				rrd_stats_dimension_set(st, "nice", nice);
-				rrd_stats_dimension_set(st, "system", system);
-				rrd_stats_dimension_set(st, "idle", idle);
-				rrd_stats_dimension_set(st, "iowait", iowait);
-				rrd_stats_dimension_set(st, "irq", irq);
-				rrd_stats_dimension_set(st, "softirq", softirq);
-				rrd_stats_dimension_set(st, "steal", steal);
-				rrd_stats_dimension_set(st, "guest", guest);
-				rrd_stats_dimension_set(st, "guest_nice", guest_nice);
-				rrd_stats_done(st);
+				rrddim_set(st, "user", user);
+				rrddim_set(st, "nice", nice);
+				rrddim_set(st, "system", system);
+				rrddim_set(st, "idle", idle);
+				rrddim_set(st, "iowait", iowait);
+				rrddim_set(st, "irq", irq);
+				rrddim_set(st, "softirq", softirq);
+				rrddim_set(st, "steal", steal);
+				rrddim_set(st, "guest", guest);
+				rrddim_set(st, "guest_nice", guest_nice);
+				rrdset_done(st);
 			}
 		}
 		else if(strcmp(procfile_lineword(ff, l, 0), "intr") == 0) {
@@ -113,17 +113,17 @@ int do_proc_stat(int update_every, unsigned long long dt) {
 			// --------------------------------------------------------------------
 	
 			if(do_interrupts) {
-				st = rrd_stats_find_bytype("system", "intr");
+				st = rrdset_find_bytype("system", "intr");
 				if(!st) {
-					st = rrd_stats_create("system", "intr", NULL, "cpu", "CPU Interrupts", "interrupts/s", 900, update_every, CHART_TYPE_LINE);
+					st = rrdset_create("system", "intr", NULL, "cpu", "CPU Interrupts", "interrupts/s", 900, update_every, RRDSET_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrd_stats_dimension_add(st, "interrupts", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrddim_add(st, "interrupts", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
 				}
-				else rrd_stats_next(st);
+				else rrdset_next(st);
 
-				rrd_stats_dimension_set(st, "interrupts", value);
-				rrd_stats_done(st);
+				rrddim_set(st, "interrupts", value);
+				rrdset_done(st);
 			}
 		}
 		else if(strcmp(procfile_lineword(ff, l, 0), "ctxt") == 0) {
@@ -132,16 +132,16 @@ int do_proc_stat(int update_every, unsigned long long dt) {
 			// --------------------------------------------------------------------
 	
 			if(do_context) {
-				st = rrd_stats_find_bytype("system", "ctxt");
+				st = rrdset_find_bytype("system", "ctxt");
 				if(!st) {
-					st = rrd_stats_create("system", "ctxt", NULL, "cpu", "CPU Context Switches", "context switches/s", 800, update_every, CHART_TYPE_LINE);
+					st = rrdset_create("system", "ctxt", NULL, "cpu", "CPU Context Switches", "context switches/s", 800, update_every, RRDSET_TYPE_LINE);
 
-					rrd_stats_dimension_add(st, "switches", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+					rrddim_add(st, "switches", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
 				}
-				else rrd_stats_next(st);
+				else rrdset_next(st);
 
-				rrd_stats_dimension_set(st, "switches", value);
-				rrd_stats_done(st);
+				rrddim_set(st, "switches", value);
+				rrdset_done(st);
 			}
 		}
 		else if(!processes && strcmp(procfile_lineword(ff, l, 0), "processes") == 0) {
@@ -158,34 +158,34 @@ int do_proc_stat(int update_every, unsigned long long dt) {
 	// --------------------------------------------------------------------
 
 	if(do_forks) {
-		st = rrd_stats_find_bytype("system", "forks");
+		st = rrdset_find_bytype("system", "forks");
 		if(!st) {
-			st = rrd_stats_create("system", "forks", NULL, "cpu", "New Processes", "processes/s", 700, update_every, CHART_TYPE_LINE);
+			st = rrdset_create("system", "forks", NULL, "cpu", "New Processes", "processes/s", 700, update_every, RRDSET_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrd_stats_dimension_add(st, "started", NULL, 1, 1 * update_every, RRD_DIMENSION_INCREMENTAL);
+			rrddim_add(st, "started", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "started", processes);
-		rrd_stats_done(st);
+		rrddim_set(st, "started", processes);
+		rrdset_done(st);
 	}
 
 	// --------------------------------------------------------------------
 
 	if(do_processes) {
-		st = rrd_stats_find_bytype("system", "processes");
+		st = rrdset_find_bytype("system", "processes");
 		if(!st) {
-			st = rrd_stats_create("system", "processes", NULL, "cpu", "Processes", "processes", 600, update_every, CHART_TYPE_LINE);
+			st = rrdset_create("system", "processes", NULL, "cpu", "Processes", "processes", 600, update_every, RRDSET_TYPE_LINE);
 
-			rrd_stats_dimension_add(st, "running", NULL, 1, 1, RRD_DIMENSION_ABSOLUTE);
-			rrd_stats_dimension_add(st, "blocked", NULL, -1, 1, RRD_DIMENSION_ABSOLUTE);
+			rrddim_add(st, "running", NULL, 1, 1, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "blocked", NULL, -1, 1, RRDDIM_ABSOLUTE);
 		}
-		else rrd_stats_next(st);
+		else rrdset_next(st);
 
-		rrd_stats_dimension_set(st, "running", running);
-		rrd_stats_dimension_set(st, "blocked", blocked);
-		rrd_stats_done(st);
+		rrddim_set(st, "running", running);
+		rrddim_set(st, "blocked", blocked);
+		rrdset_done(st);
 	}
 
 	return 0;

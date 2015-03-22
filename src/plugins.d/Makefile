@@ -1,5 +1,5 @@
 ifndef BIN_DIR
-BIN_DIR = "$(PWD)"
+BIN_DIR = "."
 endif
 
 ifndef CONFIG_DIR
@@ -16,13 +16,16 @@ endif
 
 COMMON_FLAGS = BIN_DIR='$(BIN_DIR)' CONFIG_DIR='$(CONFIG_DIR)' LOG_DIR='$(LOG_DIR)' PLUGINS_DIR='$(PLUGINS_DIR)'
 
-CC = gcc
+CC := gcc
+libs :=
 
 ifdef debug
 COMMON_FLAGS += debug=1
-CFLAGS = -Wall -Wextra -ggdb -DBIN_DIR='$(BIN_DIR)' -DCONFIG_DIR='$(CONFIG_DIR)' -DLOG_DIR='$(LOG_DIR)' -DPLUGINS_DIR='$(PLUGINS_DIR)'
+# CFLAGS = -Wall -Wextra -ggdb -DBIN_DIR='$(BIN_DIR)' -DCONFIG_DIR='$(CONFIG_DIR)' -DLOG_DIR='$(LOG_DIR)' -DPLUGINS_DIR='$(PLUGINS_DIR)' -fsanitize=address -fno-omit-frame-pointer
+CFLAGS := -Wall -Wextra -O -g -DBIN_DIR='$(BIN_DIR)' -DCONFIG_DIR='$(CONFIG_DIR)' -DLOG_DIR='$(LOG_DIR)' -DPLUGINS_DIR='$(PLUGINS_DIR)' -fsanitize=address -fno-omit-frame-pointer
+#libs += -ltsan -lpie
 else
-CFLAGS = -Wall -Wextra -O3 -DBIN_DIR='$(BIN_DIR)' -DCONFIG_DIR='$(CONFIG_DIR)' -DLOG_DIR='$(LOG_DIR)' -DPLUGINS_DIR='$(PLUGINS_DIR)'
+CFLAGS := -Wall -Wextra -O3 -DBIN_DIR='$(BIN_DIR)' -DCONFIG_DIR='$(CONFIG_DIR)' -DLOG_DIR='$(LOG_DIR)' -DPLUGINS_DIR='$(PLUGINS_DIR)' -fomit-frame-pointer
 endif
 
 all: options plugins
@@ -33,8 +36,7 @@ options:
 plugins: apps.plugin
 
 apps.plugin: apps_plugin.c
-	@echo "    $(CC) $@"
-	@$(CC) $(CFLAGS) -o $@ apps_plugin.c
+	$(CC) $(CFLAGS) -o $@ apps_plugin.c ../avl.o ../common.o ../log.o ../procfile.o $(libs)
 
 clean:
 	-rm -f *.o apps.plugin core

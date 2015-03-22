@@ -32,7 +32,7 @@ void *pluginsd_worker_thread(void *arg)
 			break;
 		}
 
-		RRD_STATS *st = NULL;
+		RRDSET *st = NULL;
 
 		unsigned long long count = 0;
 		while(fgets(line, PLUGINSD_LINE_MAX, fp) != NULL) {
@@ -64,7 +64,7 @@ void *pluginsd_worker_thread(void *arg)
 				}
 
 				if(st->debug) debug(D_PLUGINSD, "PLUGINSD: '%s' is setting dimension %s/%s to %s", cd->fullfilename, st->id, dimension, value);
-				rrd_stats_dimension_set(st, dimension, atoll(value));
+				rrddim_set(st, dimension, atoll(value));
 
 				count++;
 			}
@@ -79,7 +79,7 @@ void *pluginsd_worker_thread(void *arg)
 					break;
 				}
 
-				st = rrd_stats_find(id);
+				st = rrdset_find(id);
 				if(!st) {
 					error("PLUGINSD: '%s' is requesting a BEGIN on chart '%s', which does not exist. Disabling it.", cd->fullfilename, id);
 					cd->enabled = 0;
@@ -90,8 +90,8 @@ void *pluginsd_worker_thread(void *arg)
 				if(st->counter_done) {
 					unsigned long long microseconds = 0;
 					if(microseconds_txt && *microseconds_txt) microseconds = strtoull(microseconds_txt, NULL, 10);
-					if(microseconds) rrd_stats_next_usec(st, microseconds);
-					else rrd_stats_next_plugins(st);
+					if(microseconds) rrdset_next_usec(st, microseconds);
+					else rrdset_next_plugins(st);
 				}
 			}
 			else if(!strcmp(s, "END")) {
@@ -104,7 +104,7 @@ void *pluginsd_worker_thread(void *arg)
 
 				if(st->debug) debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting a END on chart %s", cd->fullfilename, st->id);
 
-				rrd_stats_done(st);
+				rrdset_done(st);
 				st = NULL;
 			}
 			else if(!strcmp(s, "FLUSH")) {
@@ -143,26 +143,26 @@ void *pluginsd_worker_thread(void *arg)
 				if(update_every_s) update_every = atoi(update_every_s);
 				if(!update_every) update_every = cd->update_every;
 
-				int chart_type = CHART_TYPE_LINE;
-				if(chart) chart_type = chart_type_id(chart);
+				int chart_type = RRDSET_TYPE_LINE;
+				if(chart) chart_type = rrdset_type_id(chart);
 
 				if(!name || !*name) name = NULL;
 				if(!family || !*family) family = id;
 				if(!category || !*category) category = type;
 
-				st = rrd_stats_find_bytype(type, id);
+				st = rrdset_find_bytype(type, id);
 				if(!st) {
 					debug(D_PLUGINSD, "PLUGINSD: Creating chart type='%s', id='%s', name='%s', family='%s', category='%s', chart='%s', priority=%d, update_every=%d"
 						, type, id
 						, name?name:""
 						, family?family:""
 						, category?category:""
-						, chart_type_name(chart_type)
+						, rrdset_type_name(chart_type)
 						, priority
 						, update_every
 						);
 
-					st = rrd_stats_create(type, id, name, family, title, units, priority, update_every, chart_type);
+					st = rrdset_create(type, id, name, family, title, units, priority, update_every, chart_type);
 					cd->update_every = update_every;
 
 					if(strcmp(category, "none") == 0) st->isdetail = 1;
@@ -205,15 +205,15 @@ void *pluginsd_worker_thread(void *arg)
 					, st->id
 					, id
 					, name?name:""
-					, algorithm_name(algorithm_id(algorithm))
+					, rrddim_algorithm_name(rrddim_algorithm_id(algorithm))
 					, multiplier
 					, divisor
 					, hidden?hidden:""
 					);
 
-				RRD_DIMENSION *rd = rrd_stats_dimension_find(st, id);
+				RRDDIM *rd = rrddim_find(st, id);
 				if(!rd) {
-					rd = rrd_stats_dimension_add(st, id, name, multiplier, divisor, algorithm_id(algorithm));
+					rd = rrddim_add(st, id, name, multiplier, divisor, rrddim_algorithm_id(algorithm));
 					if(hidden && strcmp(hidden, "hidden") == 0) rd->hidden = 1;
 				}
 				else if(st->debug) debug(D_PLUGINSD, "PLUGINSD: dimension %s/%s already exists. Not adding it again.", st->id, id);
@@ -238,14 +238,14 @@ void *pluginsd_worker_thread(void *arg)
 				gettimeofday(&now, NULL);
 				if(!usec && !susec) {
 					// our first run
-					susec = cd->update_every * 1000000ULL;
+					susec = cd->rrd_update_every * 1000000ULL;
 				}
 				else {
 					// second+ run
 					usec = usecdiff(&now, &last) - susec;
 					error("PLUGINSD: %s last loop took %llu usec (worked for %llu, sleeped for %llu).\n", cd->fullfilename, usec + susec, usec, susec);
-					if(usec < (update_every * 1000000ULL / 2ULL)) susec = (update_every * 1000000ULL) - usec;
-					else susec = update_every * 1000000ULL / 2ULL;
+					if(usec < (rrd_update_every * 1000000ULL / 2ULL)) susec = (rrd_update_every * 1000000ULL) - usec;
+					else susec = rrd_update_every * 1000000ULL / 2ULL;
 				}
 
 				error("PLUGINSD: %s sleeping for %llu. Will kill with SIGCONT pid %d to wake it up.\n", cd->fullfilename, susec, cd->pid);
@@ -351,7 +351,7 @@ void *pluginsd_main(void *ptr)
 				snprintf(cd->fullfilename, FILENAME_MAX, "%s/%s", dir_name, cd->filename);
 
 				cd->enabled = enabled;
-				cd->update_every = config_get_number(cd->id, "update every", update_every);
+				cd->update_every = config_get_number(cd->id, "update every", rrd_update_every);
 				cd->started_t = time(NULL);
 
 				char *def = "";
