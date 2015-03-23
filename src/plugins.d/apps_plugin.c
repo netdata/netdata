@@ -631,7 +631,7 @@ unsigned long file_descriptor_find_or_add(const char *name)
 		if(c == 0) continue;
 
 		if(!all_files[c].count) {
-			if(debug) fprintf(stderr, "apps.plugin:   >> eximining slot %d.\n", c);
+			if(debug) fprintf(stderr, "apps.plugin:   >> Examining slot %d.\n", c);
 
 			if(all_files[c].magic == 0x0BADCAFE && all_files[c].name && file_descriptor_find(all_files[c].name, all_files[c].hash))
 				error("apps.plugin: fd on position %d is not cleared properly. It still has %s in it.\n", c, all_files[c].name);
@@ -1714,6 +1714,8 @@ void parse_args(int argc, char **argv)
 int main(int argc, char **argv)
 {
 	// debug_flags = D_PROCFILE;
+
+	info("apps.plugin: starting...");
 
 	unsigned long started_t = time(NULL), current_t;
 	Hertz = get_hertz();

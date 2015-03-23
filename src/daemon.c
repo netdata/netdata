@@ -74,8 +74,9 @@ void prepare_rundir() {
 	
 	snprintf(pidfile, FILENAME_MAX, "%s/netdata.pid", rundir);
 
-	if(mkdir(rundir, 0775) != 0)
-		fprintf(stderr, "Cannot create directory '%s' (%s).", rundir, strerror(errno));
+	if(mkdir(rundir, 0775) != 0) {
+		if(errno != EEXIST) fprintf(stderr, "Cannot create directory '%s' (%s).", rundir, strerror(errno));
+	}
 }
 
 int become_user(const char *username)

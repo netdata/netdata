@@ -60,10 +60,10 @@ echo "Compiling netdata (debug=$NETDATA_CONFIG_DEBUG)"
 if [ $NETDATA_CONFIG_DEBUG -eq 1 ]
 then
 	ulimit -c unlimited
-	make install debug=1 # this installs in the current directory
+	make install debug=1 || exit 1 # this installs in the current directory
 	debug_opts="-df 0xfffffadf"
 else
-	make install # this installs in the current directory
+	make install || exit 1 # this installs in the current directory
 	debug_opts="-df 0x00000000"
 fi
 
