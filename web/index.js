@@ -13,12 +13,12 @@ var GROUPS_POINTS_DIVISOR = 4;
 var GROUPS_STACKED_POINTS_DIVISOR = 10;
 
 var MAINCHART_MAX_TIME_TO_SHOW = 600;	// how much time the main chart will present by default?
-var MAINCHART_POINTS_DIVISOR = 10;		// how much detailed will the main chart be by default? 1 = finest, higher is faster
-var MAINCHART_STACKED_POINTS_DIVISOR = 20;		// how much detailed will the main chart be by default? 1 = finest, higher is faster
+var MAINCHART_POINTS_DIVISOR = 5;		// how much detailed will the main chart be by default? 1 = finest, higher is faster
+var MAINCHART_STACKED_POINTS_DIVISOR = 10;		// how much detailed will the main chart be by default? 1 = finest, higher is faster
 
 var MAINCHART_CONTROL_HEIGHT = 75;		// how tall the control chart will be
 var MAINCHART_CONTROL_DIVISOR = 2;		// how much detailed will the control chart be? 1 = finest, higher is faster
-var MAINCHART_INITIAL_SELECTOR= 40;		// 1/20th of the width, this overrides MAINCHART_MAX_TIME_TO_SHOW
+var MAINCHART_INITIAL_SELECTOR= 20;		// 1/20th of the width, this overrides MAINCHART_MAX_TIME_TO_SHOW
 
 var CHARTS_REFRESH_IDLE = 100;
 var CHARTS_CHECK_NO_FOCUS = 500;

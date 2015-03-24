@@ -9,10 +9,12 @@
 #define LISTEN_PORT 19999
 #define LISTEN_BACKLOG 100
 
+extern int listen_backlog;
 extern int listen_fd;
 extern int listen_port;
 
-extern int create_listen_socket(int port);
+extern int create_listen_socket4(int port, int listen_backlog);
+extern int create_listen_socket6(int port, int listen_backlog);
 extern void *socket_listen_main(void *ptr);
 
 #endif /* NETDATA_WEB_SERVER_H */

@@ -261,6 +261,8 @@ function loadCharts(base_url, doNext) {
 					
 					json.charts[i].chartOptions.vAxis.viewWindowMode = 'maximized';
 					json.charts[i].non_zero = 0;
+					
+					json.charts[i].group = 3;
 					break;
 
 				case "stacked":
@@ -274,6 +276,8 @@ function loadCharts(base_url, doNext) {
 					json.charts[i].chartOptions.vAxis.viewWindowMode = 'maximized';
 					json.charts[i].chartOptions.vAxis.minValue = null;
 					json.charts[i].chartOptions.vAxis.maxValue = null;
+
+					json.charts[i].group = 10;
 					break;
 
 				default:
@@ -283,6 +287,8 @@ function loadCharts(base_url, doNext) {
 					json.charts[i].non_zero = 0;
 
 					json.charts[i].default_curveType = 'function';
+					
+					json.charts[i].group = 3;
 					break;
 			}
 
@@ -292,7 +298,6 @@ function loadCharts(base_url, doNext) {
 					json.charts[i].category = "System";
 					json.charts[i].categoryPriority = 10;
 					json.charts[i].glyphicon = "glyphicon-dashboard";
-					json.charts[i].group = 5;
 
 					if(json.charts[i].id == "system.cpu" || json.charts[i].id == "system.ram") {
 						json.charts[i].chartOptions.vAxis.minValue = 0;
@@ -308,7 +313,6 @@ function loadCharts(base_url, doNext) {
 					json.charts[i].category = "Network";
 					json.charts[i].categoryPriority = 20;
 					json.charts[i].glyphicon = "glyphicon-transfer";
-					json.charts[i].group = 5;
 
 					// disable IFB and net.lo devices by default
 					if((json.charts[i].id.substring(json.charts[i].id.length - 4, json.charts[i].id.length) == "-ifb")
@@ -320,42 +324,36 @@ function loadCharts(base_url, doNext) {
 					json.charts[i].category = "Quality of Service";
 					json.charts[i].categoryPriority = 30;
 					json.charts[i].glyphicon = "glyphicon-random";
-					json.charts[i].group = 15;
 					break;
 
 				case "ipvs":
 					json.charts[i].category = "IP Virtual Server";
 					json.charts[i].categoryPriority = 40;
 					json.charts[i].glyphicon = "glyphicon-sort";
-					json.charts[i].group = 5;
 					break;
 
 				case "netfilter":
 					json.charts[i].category = "Netfilter";
 					json.charts[i].categoryPriority = 50;
 					json.charts[i].glyphicon = "glyphicon-cloud";
-					json.charts[i].group = 5;
 					break;
 
 				case "ipv4":
 					json.charts[i].category = "IPv4";
 					json.charts[i].categoryPriority = 60;
 					json.charts[i].glyphicon = "glyphicon-globe";
-					json.charts[i].group = 5;
 					break;
 
 				case "mem":
 					json.charts[i].category = "Memory";
 					json.charts[i].categoryPriority = 70;
 					json.charts[i].glyphicon = "glyphicon-dashboard";
-					json.charts[i].group = 5;
 					break;
 
 				case "cpu":
 					json.charts[i].category = "CPU";
 					json.charts[i].categoryPriority = 80;
 					json.charts[i].glyphicon = "glyphicon-dashboard";
-					json.charts[i].group = 5;
 
 					if(json.charts[i].id.substring(0, 7) == "cpu.cpu") {
 						json.charts[i].chartOptions.vAxis.minValue = 0;
@@ -367,56 +365,48 @@ function loadCharts(base_url, doNext) {
 					json.charts[i].category = "Disks";
 					json.charts[i].categoryPriority = 90;
 					json.charts[i].glyphicon = "glyphicon-hdd";
-					json.charts[i].group = 5;
 					break;
 
 				case "nfsd":
 					json.charts[i].category = "NFS Server";
 					json.charts[i].categoryPriority = 100;
 					json.charts[i].glyphicon = "glyphicon-hdd";
-					json.charts[i].group = 5;
 					break;
 
 				case "nut":
 					json.charts[i].category = "UPS";
 					json.charts[i].categoryPriority = 110;
 					json.charts[i].glyphicon = "glyphicon-dashboard";
-					json.charts[i].group = 5;
 					break;
 
 				case "netdata":
 					json.charts[i].category = "NetData";
 					json.charts[i].categoryPriority = 3000;
 					json.charts[i].glyphicon = "glyphicon-thumbs-up";
-					json.charts[i].group = 5;
 					break;
 
 				case "apps":
 					json.charts[i].category = "Apps";
 					json.charts[i].categoryPriority = 4000;
 					json.charts[i].glyphicon = "glyphicon-tasks";
-					json.charts[i].group = 5;
 					break;
 
 				case "squid":
 					json.charts[i].category = "Squid";
 					json.charts[i].categoryPriority = 5000;
 					json.charts[i].glyphicon = "glyphicon-link";
-					json.charts[i].group = 5;
 					break;
 
 				case "example":
 					json.charts[i].category = "Examples";
 					json.charts[i].categoryPriority = 9000;
 					json.charts[i].glyphicon = "glyphicon-search";
-					json.charts[i].group = 5;
 					break;
 
 				default:
 					json.charts[i].category = json.charts[i].type;
 					json.charts[i].categoryPriority = 1000;
 					json.charts[i].glyphicon = "glyphicon-search";
-					json.charts[i].group = 5;
 					break;
 			}
 		});

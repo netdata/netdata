@@ -362,7 +362,7 @@ void generate_config(struct web_buffer *wb, int only_changed)
 			case 0:
 				web_buffer_printf(wb, 
 					"# NetData Configuration\n"
-					"# You can uncomment and change any of the options bellow.\n"
+					"# You can uncomment and change any of the options below.\n"
 					"# The value shown in the commented settings, is the default value.\n"
 					"\n# global netdata configuration\n");
 				break;

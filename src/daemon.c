@@ -46,7 +46,9 @@ void sig_handler(int signo)
 			break;
 
 		case SIGPIPE:
-			info("Ignoring signal %d. Errno: %d (%s)", signo, errno, strerror(errno));
+			// this is received when web clients send a reset
+			// no need to log it.
+			// info("Ignoring signal %d. Errno: %d (%s)", signo, errno, strerror(errno));
 			break;
 
 

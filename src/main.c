@@ -271,20 +271,33 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
+		listen_backlog = config_get_number("global", "http port listen backlog", LISTEN_BACKLOG);
+
 		listen_port = config_get_number("global", "port", LISTEN_PORT);
 		if(listen_port < 1 || listen_port > 65535) {
 			fprintf(stderr, "Invalid listen port %d given. Defaulting to %d.\n", listen_port, LISTEN_PORT);
 			listen_port = LISTEN_PORT;
 		}
-		else debug(D_OPTIONS, "listen port set to %d.", listen_port);
+		else debug(D_OPTIONS, "Listen port set to %d.", listen_port);
 
-		listen_fd = create_listen_socket(listen_port);
+		int ip = 0;
+		char *ipv = config_get("global", "ip version", "any");
+		if(!strcmp(ipv, "any") || !strcmp(ipv, "both") || !strcmp(ipv, "all")) ip = 0;
+		else if(!strcmp(ipv, "ipv4") || !strcmp(ipv, "IPV4") || !strcmp(ipv, "IPv4") || !strcmp(ipv, "4")) ip = 4;
+		else if(!strcmp(ipv, "ipv6") || !strcmp(ipv, "IPV6") || !strcmp(ipv, "IPv6") || !strcmp(ipv, "6")) ip = 6;
+		else fprintf(stderr, "Cannot understand ip version '%s'. Assumming 'any'.", ipv);
+
+		if(ip == 0 || ip == 6) listen_fd = create_listen_socket6(listen_port, listen_backlog);
+		if(listen_fd < 0) {
+			listen_fd = create_listen_socket4(listen_port, listen_backlog);
+			if(listen_fd >= 0 && ip != 4) fprintf(stderr, "Managed to open an IPv4 socket on port %d.", listen_port);
+		}
+
+		if(listen_fd < 0) fatal("Cannot listen socket.");
 	}
 
 	// never become a problem
-	if(nice(20) == -1) {
-		fprintf(stderr, "Cannot lower my CPU priority. Error: %s.\n", strerror(errno));
-	}
+	if(nice(20) == -1) fprintf(stderr, "Cannot lower my CPU priority. Error: %s.\n", strerror(errno));
 
 #ifndef NETDATA_NO_DAEMON
 	if(become_daemon(0, input_log_file, output_log_file, error_log_file, access_log_file, &access_fd, &stdaccess) == -1) {

@@ -24,8 +24,14 @@
 #include "rrd.h"
 #include "rrd2json.h"
 
+int listen_backlog = LISTEN_BACKLOG;
+
 int listen_fd = -1;
 int listen_port = LISTEN_PORT;
+
+#define DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS 60
+
+int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
 
 static void log_allocations(void)
 {
@@ -44,17 +50,19 @@ static void log_allocations(void)
 	}
 }
 
-int create_listen_socket(int port)
+int create_listen_socket4(int port, int listen_backlog)
 {
-		int sock=-1;
-		int sockopt=1;
+		int sock = -1;
+		int sockopt = 1;
 		struct sockaddr_in name;
 
-		debug(D_LISTENER, "Creating new listening socket on port %d", port);
+		debug(D_LISTENER, "IPv4 creating new listening socket on port %d", port);
 
 		sock = socket(AF_INET, SOCK_STREAM, 0);
-		if (sock < 0)
-				fatal("socket() failed, errno=%d", errno);
+		if(sock < 0) {
+			error("IPv4 socket() failed.");
+			return -1;
+		}
 
 		/* avoid "address already in use" */
 		setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt));
@@ -63,13 +71,59 @@ int create_listen_socket(int port)
 		name.sin_family = AF_INET;
 		name.sin_port = htons (port);
 		name.sin_addr.s_addr = htonl (INADDR_ANY);
-		if (bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0)
-			fatal("bind() failed, errno=%d", errno);
 
-		if (listen(sock, LISTEN_BACKLOG) < 0)
-			fatal("listen() failed, errno=%d", errno);
+		if(bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
+			close(sock);
+			error("IPv4 bind() failed.");
+			return -1;
+		}
 
-		debug(D_LISTENER, "Listening Port %d created", port);
+		if(listen(sock, listen_backlog) < 0) {
+			close(sock);
+			fatal("IPv4 listen() failed.");
+			return -1;
+		}
+
+		debug(D_LISTENER, "IPv4 listening port %d created", port);
+		return sock;
+}
+
+int create_listen_socket6(int port, int listen_backlog)
+{
+		int sock = -1;
+		int sockopt = 1;
+		struct sockaddr_in6 name;
+
+		debug(D_LISTENER, "IPv6 creating new listening socket on port %d", port);
+
+		sock = socket(AF_INET6, SOCK_STREAM, 0);
+		if (sock < 0) {
+			error("IPv6 socket() failed.");
+			return -1;
+		}
+
+		/* avoid "address already in use" */
+		setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt));
+
+		memset(&name, 0, sizeof(struct sockaddr_in6));
+		name.sin6_family = AF_INET6;
+		name.sin6_port = htons (port);
+		name.sin6_addr = in6addr_any;
+		name.sin6_scope_id = 0;
+
+		if (bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
+			close(sock);
+			error("IPv6 bind() failed.");
+			return -1;
+		}
+
+		if (listen(sock, listen_backlog) < 0) {
+			close(sock);
+			fatal("IPv6 listen() failed.");
+			return -1;
+		}
+
+		debug(D_LISTENER, "IPv6 listening port %d created", port);
 		return sock;
 }
 
@@ -275,8 +329,8 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
 
 	// do we have such a data set?
-	RRDSET *st = rrdset_find(tok);
-	if(!st) st = rrdset_find_byname(tok);
+	RRDSET *st = rrdset_find_byname(tok);
+	if(!st) st = rrdset_find(tok);
 	if(!st) {
 		// we don't have it
 		// try to send a file with that name
@@ -490,8 +544,8 @@ void web_client_process(struct web_client *w)
 				debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
 
 				// do we have such a data set?
-				RRDSET *st = rrdset_find(tok);
-				if(!st) st = rrdset_find_byname(tok);
+				RRDSET *st = rrdset_find_byname(tok);
+				if(!st) st = rrdset_find(tok);
 				if(!st) {
 					// we don't have it
 					// try to send a file with that name
@@ -514,8 +568,8 @@ void web_client_process(struct web_client *w)
 				debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
 
 				// do we have such a data set?
-				RRDSET *st = rrdset_find(tok);
-				if(!st) st = rrdset_find_byname(tok);
+				RRDSET *st = rrdset_find_byname(tok);
+				if(!st) st = rrdset_find(tok);
 				if(!st) {
 					code = 404;
 					web_buffer_printf(w->data, "Chart %s is not found.\r\n", tok);
@@ -1092,24 +1146,28 @@ void *new_client(void *ptr)
 		FD_ZERO (&efds);
 
 		FD_SET(w->ifd, &efds);
-		if(w->ifd != w->ofd)	FD_SET(w->ofd, &efds);
+
+		if(w->ifd != w->ofd)
+			FD_SET(w->ofd, &efds);
+
 		if (w->wait_receive) {
 			FD_SET(w->ifd, &ifds);
 			if(w->ifd > fdmax) fdmax = w->ifd;
 		}
+
 		if (w->wait_send) {
 			FD_SET(w->ofd, &ofds);
 			if(w->ofd > fdmax) fdmax = w->ofd;
 		}
 
-		tv.tv_sec = 30;
+		tv.tv_sec = web_client_timeout;
 		tv.tv_usec = 0;
 
 		debug(D_WEB_CLIENT, "%llu: Waiting socket async I/O for %s %s", w->id, w->wait_receive?"INPUT":"", w->wait_send?"OUTPUT":"");
 		retval = select(fdmax+1, &ifds, &ofds, &efds, &tv);
 
 		if(retval == -1) {
-			error("%llu: LISTENER: select() failed.", w->id);
+			debug(D_WEB_CLIENT_ACCESS, "%llu: LISTENER: select() failed.", w->id);
 			continue;
 		}
 		else if(!retval) {
@@ -1197,12 +1255,12 @@ void *socket_listen_main(void *ptr)
 	if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
 		error("Cannot set pthread cancel state to ENABLE.");
 
-	// int listener = create_listen_socket(listen_port);
-	int listener = listen_fd;
-	if(listener == -1) fatal("LISTENER: Cannot create listening socket on port 19999.");
+	web_client_timeout = config_get_number("global", "disconnect idle web clients after seconds", DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS);
+
+	if(listen_fd < 0) fatal("LISTENER: Listen socket is not ready.");
 
 	fd_set ifds, ofds, efds;
-	int fdmax = listener;
+	int fdmax = listen_fd;
 
 	FD_ZERO (&ifds);
 	FD_ZERO (&ofds);
@@ -1212,8 +1270,10 @@ void *socket_listen_main(void *ptr)
 		tv.tv_sec = 0;
 		tv.tv_usec = 200000;
 
-		FD_SET(listener, &ifds);
-		FD_SET(listener, &efds);
+		if(listen_fd >= 0) {
+			FD_SET(listen_fd, &ifds);
+			FD_SET(listen_fd, &efds);
+		}
 
 		// debug(D_WEB_CLIENT, "LISTENER: Waiting...");
 		retval = select(fdmax+1, &ifds, &ofds, &efds, &tv);
@@ -1224,8 +1284,8 @@ void *socket_listen_main(void *ptr)
 		}
 		else if(retval) {
 			// check for new incoming connections
-			if(FD_ISSET(listener, &ifds)) {
-				w = web_client_create(listener);
+			if(FD_ISSET(listen_fd, &ifds)) {
+				w = web_client_create(listen_fd);
 
 				if(pthread_create(&w->thread, NULL, new_client, w) != 0) {
 					error("%llu: failed to create new thread for web client.");
@@ -1235,7 +1295,7 @@ void *socket_listen_main(void *ptr)
 					error("%llu: Cannot request detach of newly created web client thread.", w->id);
 					w->obsolete = 1;
 				}
-				
+
 				log_access("%llu: %s connected", w->id, w->client_ip);
 			}
 			else debug(D_WEB_CLIENT, "LISTENER: select() didn't do anything.");
@@ -1259,7 +1319,7 @@ void *socket_listen_main(void *ptr)
 
 	error("LISTENER: exit!");
 
-	close(listener);
+	if(listen_fd >= 0) close(listen_fd);
 	exit(2);
 
 	return NULL;

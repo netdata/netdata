@@ -17,6 +17,8 @@
 
 #include "rrd.h"
 
+#define RRD_DEFAULT_GAP_INTERPOLATIONS 10
+
 // ----------------------------------------------------------------------------
 // globals
 
