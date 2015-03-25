@@ -66,6 +66,10 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 
 		int def_enabled = 0;
 
+		// remove slashes from disk names
+		char *s;
+		for(s = disk; *s ;s++) if(*s == '/') *s = '_';
+
 		switch(major) {
 			case 9: // MDs
 			case 43: // network block
