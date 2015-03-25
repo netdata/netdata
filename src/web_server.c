@@ -1296,7 +1296,7 @@ void *socket_listen_main(void *ptr)
 					w->obsolete = 1;
 				}
 
-				log_access("%llu: %s connected", w->id, w->client_ip);
+				log_access("%llu: %s port %s connected", w->id, w->client_ip, w->client_port);
 			}
 			else debug(D_WEB_CLIENT, "LISTENER: select() didn't do anything.");
 
@@ -1308,7 +1308,7 @@ void *socket_listen_main(void *ptr)
 		// cleanup unused clients
 		for(w = web_clients; w ; w = w?w->next:NULL) {
 			if(w->obsolete) {
-				log_access("%llu: %s disconnected", w->id, w->client_ip);
+				log_access("%llu: %s port %s disconnected", w->id, w->client_ip, w->client_port);
 				debug(D_WEB_CLIENT, "%llu: Removing client.", w->id);
 				// pthread_join(w->thread,  NULL);
 				w = web_client_free(w);

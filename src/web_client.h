@@ -4,6 +4,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 
 #include "web_buffer.h"
 
@@ -19,7 +20,10 @@
 
 struct web_client {
 	unsigned long long id;
-	char client_ip[101];
+
+	char client_ip[NI_MAXHOST+1];
+	char client_port[NI_MAXSERV+1];
+
 	char last_url[URL_MAX+1];
 
 	struct timeval tv_in, tv_ready;
@@ -27,7 +31,7 @@ struct web_client {
 	int mode;
 	int keepalive;
 
-	struct sockaddr_in clientaddr;
+	struct sockaddr_storage clientaddr;
 
 	pthread_t thread;				// the thread servicing this client
 	int obsolete;					// if set to 1, the listener will remove this client
