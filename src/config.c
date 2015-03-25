@@ -256,7 +256,10 @@ char *config_get(const char *section, const char *name, const char *default_valu
 	if(!co) co = config_create(section);
 
 	cv = config_value_index_find(co, name, 0);
-	if(!cv) cv = config_value_create(co, name, default_value);
+	if(!cv) {
+		cv = config_value_create(co, name, default_value);
+		if(!cv) return NULL;
+	}
 	cv->flags |= CONFIG_VALUE_USED;
 
 	if(cv->flags & CONFIG_VALUE_LOADED || cv->flags & CONFIG_VALUE_CHANGED) {
@@ -266,11 +269,6 @@ char *config_get(const char *section, const char *name, const char *default_valu
 			if(strcmp(cv->value, default_value) != 0) cv->flags |= CONFIG_VALUE_CHANGED;
 			cv->flags |= CONFIG_VALUE_CHECKED;
 		}
-	}
-	else {
-		// this is not loaded from the config
-		// copy the default value to it
-		strncpy(cv->value, default_value, CONFIG_MAX_VALUE);
 	}
 
 	pthread_rwlock_unlock(&config_rwlock);
@@ -283,6 +281,8 @@ long long config_get_number(const char *section, const char *name, long long val
 	sprintf(buffer, "%lld", value);
 
 	s = config_get(section, name, buffer);
+	if(!s) return 0;
+
 	return strtoll(s, NULL, 0);
 }
 
@@ -293,6 +293,7 @@ int config_get_boolean(const char *section, const char *name, int value)
 	else s = "no";
 
 	s = config_get(section, name, s);
+	if(!s) return 0;
 
 	if(strcmp(s, "yes") == 0 || strcmp(s, "true") == 0 || strcmp(s, "1") == 0) {
 		strcpy(s, "yes");
