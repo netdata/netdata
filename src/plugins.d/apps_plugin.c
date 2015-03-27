@@ -643,8 +643,8 @@ unsigned long file_descriptor_find_or_add(const char *name)
 		}
 	}
 	if(i == all_files_size) {
-		error("We should find an empty slot, but there isn't any");
-		return 0;
+		fatal("We should find an empty slot, but there isn't any");
+		exit(1);
 	}
 	if(debug) fprintf(stderr, "apps.plugin:   >> updating slot %d.\n", c);
 
