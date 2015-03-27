@@ -639,6 +639,7 @@ unsigned long file_descriptor_find_or_add(const char *name)
 			if(debug) fprintf(stderr, "apps.plugin:   >> %s fd position %d for %s (last name: %s)\n", all_files[c].name?"re-using":"using", c, name, all_files[c].name);
 			if(all_files[c].name) free((void *)all_files[c].name);
 			all_files[c].name = NULL;
+			last_pos = c;
 			break;
 		}
 	}
