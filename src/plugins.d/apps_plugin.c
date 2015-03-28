@@ -50,7 +50,7 @@ unsigned long long file_counter = 0;
 long get_processors(void) {
 	int processors = 0;
 
-	procfile *ff = procfile_open("/proc/stat", O_RDONLY);
+	procfile *ff = procfile_open("/proc/stat", "");
 	if(!ff) return 1;
 
 	ff = procfile_readall(ff);
@@ -75,7 +75,7 @@ long get_processors(void) {
 long get_pid_max(void) {
 	long mpid = 32768;
 
-	procfile *ff = procfile_open("/proc/sys/kernel/pid_max", O_RDONLY);
+	procfile *ff = procfile_open("/proc/sys/kernel/pid_max", "");
 	if(!ff) return mpid;
 
 	ff = procfile_readall(ff);

@@ -3,9 +3,12 @@
 #ifndef NETDATA_CONFIG_H
 #define NETDATA_CONFIG_H 1
 
-#define CONFIG_MAX_NAME 100
-#define CONFIG_MAX_VALUE 1024
 #define CONFIG_FILENAME "netdata.conf"
+
+// these are used to limit the configuration names and values lengths
+// they are not enforced by config.c functions (they will strdup() all strings, no matter of their length)
+#define CONFIG_MAX_NAME 1024
+#define CONFIG_MAX_VALUE 2048
 
 extern int load_config(char *filename, int overwrite_used);
 

@@ -8,7 +8,7 @@
 #include "config.h"
 #include "log.h"
 
-#define CONFIG_FILE_LINE_MAX 4096
+#define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 
 pthread_rwlock_t config_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 
@@ -26,8 +26,8 @@ struct config_value {
 	unsigned long hash;		// a simple hash to speed up searching
 							// we first compare hashes, and only if the hashes are equal we do string comparisons
 
-	char name[CONFIG_MAX_NAME + 1];
-	char value[CONFIG_MAX_VALUE + 1];
+	char *name;
+	char *value;
 
 	uint8_t	flags;
 
@@ -40,7 +40,7 @@ struct config {
 	unsigned long hash;		// a simple hash to speed up searching
 							// we first compare hashes, and only if the hashes are equal we do string comparisons
 
-	char name[CONFIG_MAX_NAME + 1];
+	char *name;
 
 	struct config_value *values;
 	avl_tree values_index;
@@ -66,8 +66,7 @@ static int config_value_compare(void* a, void* b) {
 static struct config_value *config_value_index_find(struct config *co, const char *name, unsigned long hash) {
 	struct config_value *result = NULL, tmp;
 	tmp.hash = (hash)?hash:simple_hash(name);
-	strncpy(tmp.name, name, CONFIG_MAX_NAME);
-	tmp.name[CONFIG_MAX_NAME] = '\0';
+	tmp.name = (char *)name;
 
 	avl_search(&(co->values_index), (avl *)&tmp, config_value_iterator, (avl **)&result);
 	return result;
@@ -95,8 +94,7 @@ avl_tree config_root_index = {
 static struct config *config_index_find(const char *name, unsigned long hash) {
 	struct config *result = NULL, tmp;
 	tmp.hash = (hash)?hash:simple_hash(name);
-	strncpy(tmp.name, name, CONFIG_MAX_NAME);
-	tmp.name[CONFIG_MAX_NAME] = '\0';
+	tmp.name = (char *)name;
 
 	avl_search(&config_root_index, (avl *)&tmp, config_iterator, (avl **)&result);
 	return result;
@@ -109,9 +107,12 @@ struct config_value *config_value_create(struct config *co, const char *name, co
 	struct config_value *cv = calloc(1, sizeof(struct config_value));
 	if(!cv) fatal("Cannot allocate config_value");
 
-	strncpy(cv->name,  name,  CONFIG_MAX_NAME);
-	strncpy(cv->value, value, CONFIG_MAX_VALUE);
+	cv->name = strdup(name);
+	if(!cv->name) fatal("Cannot allocate config.name");
 	cv->hash = simple_hash(cv->name);
+
+	cv->value = strdup(value);
+	if(!cv->value) fatal("Cannot allocate config.value");
 
 	config_value_index_add(co, cv);
 
@@ -134,8 +135,10 @@ struct config *config_create(const char *section)
 	struct config *co = calloc(1, sizeof(struct config));
 	if(!co) fatal("Cannot allocate config");
 
-	strncpy(co->name, section, CONFIG_MAX_NAME);
+	co->name = strdup(section);
+	if(!co->name) fatal("Cannot allocate config.name");
 	co->hash = simple_hash(co->name);
+
 	co->values_index.compar = config_value_compare;
 
 	config_index_add(co);
@@ -229,8 +232,9 @@ int load_config(char *filename, int overwrite_used)
 		else {
 			if((cv->flags & CONFIG_VALUE_USED && overwrite_used) || !(cv->flags & CONFIG_VALUE_USED)) {
 				debug(D_CONFIG, "Overwriting '%s/%s'.", line, co->name, cv->name);
-				strncpy(cv->value, value, CONFIG_MAX_VALUE);
-				// termination is already there
+				free(cv->value);
+				cv->value = strdup(value);
+				if(!cv->value) fatal("Cannot allocate config.value");
 			}
 			else
 				debug(D_CONFIG, "Ignoring line %d, '%s/%s' is already present and used.", line, co->name, cv->name);
@@ -295,14 +299,8 @@ int config_get_boolean(const char *section, const char *name, int value)
 	s = config_get(section, name, s);
 	if(!s) return 0;
 
-	if(strcmp(s, "yes") == 0 || strcmp(s, "true") == 0 || strcmp(s, "1") == 0) {
-		strcpy(s, "yes");
-		return 1;
-	}
-	else {
-		strcpy(s, "no");
-		return 0;
-	}
+	if(!strcmp(s, "yes")) return 1;
+	else return 0;
 }
 
 const char *config_set(const char *section, const char *name, const char *value)
@@ -322,8 +320,9 @@ const char *config_set(const char *section, const char *name, const char *value)
 
 	if(strcmp(cv->value, value) != 0) cv->flags |= CONFIG_VALUE_CHANGED;
 
-	strncpy(cv->value, value, CONFIG_MAX_VALUE);
-	// termination is already there
+	free(cv->value);
+	cv->value = strdup(value);
+	if(!cv->value) fatal("Cannot allocate config.value");
 
 	pthread_rwlock_unlock(&config_rwlock);
 
@@ -400,16 +399,16 @@ void generate_config(struct web_buffer *wb, int only_changed)
 					web_buffer_printf(wb, "\n# node '%s' is not used.", co->name);
 				}
 
-				web_buffer_increase(wb, CONFIG_MAX_NAME + 4);
+				web_buffer_increase(wb, CONFIG_FILE_LINE_MAX+1);
 				web_buffer_printf(wb, "\n[%s]\n", co->name);
 
 				for(cv = co->values; cv ; cv = cv->next) {
 
 					if(used && !(cv->flags & CONFIG_VALUE_USED)) {
-						web_buffer_increase(wb, CONFIG_MAX_NAME + 200);
+						web_buffer_increase(wb, CONFIG_FILE_LINE_MAX + 1);
 						web_buffer_printf(wb, "\n\t# option '%s' is not used.\n", cv->name);
 					}
-					web_buffer_increase(wb, CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 5);
+					web_buffer_increase(wb, CONFIG_FILE_LINE_MAX + 1);
 					web_buffer_printf(wb, "\t%s%s = %s\n", ((!(cv->flags & CONFIG_VALUE_CHANGED)) && (cv->flags & CONFIG_VALUE_USED))?"# ":"", cv->name, cv->value);
 				}
 			}

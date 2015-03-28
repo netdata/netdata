@@ -39,12 +39,11 @@ void log_date(FILE *out)
 
 void debug_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... )
 {
-	if(file) { ; }
 	va_list args;
 
 	log_date(stdout);
 	va_start( args, fmt );
-	fprintf(stdout, "DEBUG (%04lu@%-15.15s): ", line, function);
+	fprintf(stdout, "DEBUG (%04lu@%-10.10s:%-15.15s): ", line, file, function);
 	vfprintf( stdout, fmt, args );
 	va_end( args );
 	fprintf(stdout, "\n");
@@ -58,13 +57,12 @@ void debug_int( const char *file, const char *function, const unsigned long line
 
 void info_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... )
 {
-	if(file) { ; }
 	va_list args;
 
 	log_date(stderr);
 
 	va_start( args, fmt );
-	if(debug_flags) fprintf(stderr, "INFO (%04lu@%-15.15s): ", line, function);
+	if(debug_flags) fprintf(stderr, "INFO (%04lu@%-10.10s:%-15.15s): ", line, file, function);
 	else            fprintf(stderr, "INFO: ");
 	vfprintf( stderr, fmt, args );
 	va_end( args );
@@ -80,13 +78,12 @@ void info_int( const char *file, const char *function, const unsigned long line,
 
 void error_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... )
 {
-	if(file) { ; }
 	va_list args;
 
 	log_date(stderr);
 
 	va_start( args, fmt );
-	if(debug_flags) fprintf(stderr, "ERROR (%04lu@%-15.15s): ", line, function);
+	if(debug_flags) fprintf(stderr, "ERROR (%04lu@%-10.10s:%-15.15s): ", line, file, function);
 	else            fprintf(stderr, "ERROR: ");
 	vfprintf( stderr, fmt, args );
 	va_end( args );
@@ -106,13 +103,12 @@ void error_int( const char *file, const char *function, const unsigned long line
 
 void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... )
 {
-	if(file) { ; }
 	va_list args;
 
 	log_date(stderr);
 
 	va_start( args, fmt );
-	if(debug_flags) fprintf(stderr, "FATAL (%04lu@%-15.15s): ", line, function);
+	if(debug_flags) fprintf(stderr, "FATAL (%04lu@%-10.10s:%-15.15s): ", line, file, function);
 	else            fprintf(stderr, "FATAL: ");
 	vfprintf( stderr, fmt, args );
 	va_end( args );

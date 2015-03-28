@@ -112,7 +112,7 @@ struct rrddim {
 
 	struct timeval last_collected_time;				// when was this dimension last updated
 													// this is actual date time we updated the last_collected_value
-													// THIS IS DIFFERENT FROM THE SAME MEMBER OF RRD_STATS
+													// THIS IS DIFFERENT FROM THE SAME MEMBER OF RRDSET
 
 	calculated_number calculated_value;				// the current calculated value, after applying the algorithm
 	calculated_number last_calculated_value;		// the last calculated value
