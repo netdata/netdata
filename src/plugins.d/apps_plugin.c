@@ -594,6 +594,7 @@ unsigned long file_descriptor_find_or_add(const char *name)
 	// check we have enough memory to add it
 	if(!all_files || all_files_len == all_files_size) {
 		void *old = all_files;
+		int i;
 
 		// there is no empty slot
 		if(debug) fprintf(stderr, "apps.plugin: extending fd array to %d entries\n", all_files_size + FILE_DESCRIPTORS_INCREASE_STEP);
@@ -604,18 +605,18 @@ unsigned long file_descriptor_find_or_add(const char *name)
 		if(old && old != (void *)all_files) {
 			if(debug) fprintf(stderr, "apps.plugin:   >> re-indexing.\n");
 			all_files_index.root = NULL;
-			int i;
 			for(i = 0; i < all_files_size; i++) {
 				if(!all_files[i].count) continue;
 				file_descriptor_add(&all_files[i]);
 			}
-			for(i = all_files_size; i < (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP); i++) {
-				all_files[i].count = 0;
-				all_files[i].name = NULL;
-				all_files[i].magic = 0x00000000;
-				all_files[i].pos = i;
-			}
 			if(debug) fprintf(stderr, "apps.plugin:   >> re-indexing done.\n");
+		}
+
+		for(i = all_files_size; i < (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP); i++) {
+			all_files[i].count = 0;
+			all_files[i].name = NULL;
+			all_files[i].magic = 0x00000000;
+			all_files[i].pos = i;
 		}
 
 		if(!all_files_size) all_files_len = 1;
