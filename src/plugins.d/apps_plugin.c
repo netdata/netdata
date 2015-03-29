@@ -1375,6 +1375,9 @@ void update_statistics(void)
 			p->target->minflt += p->minflt; //+ (p->pid != 1)?(p->cminflt - p->fix_cminflt):0;
 			p->target->majflt += p->majflt; //+ (p->pid != 1)?(p->cmajflt - p->fix_cmajflt):0;
 
+			if(p->num_threads < 0)
+				error("Negative threads number for pid '%s': %d", p->comm, p->num_threads);
+
 			p->target->num_threads += p->num_threads;
 			p->target->rss += p->rss;
 
