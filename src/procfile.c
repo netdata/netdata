@@ -131,7 +131,7 @@ void pflines_free(pflines *fl) {
 #define PF_CHAR_IS_WORD		2
 
 void procfile_close(procfile *ff) {
-	debug(D_PROCFILE, PF_PREFIX ": Closing file '%s'. Reason: %s", ff->filename, strerror(errno));
+	debug(D_PROCFILE, PF_PREFIX ": Closing file '%s'", ff->filename);
 
 	if(ff->lines) pflines_free(ff->lines);
 	if(ff->words) pfwords_free(ff->words);
@@ -181,7 +181,7 @@ procfile *procfile_parser(procfile *ff) {
 				ff->lines->lines[l].words++;
 				w++;
 
-				debug(D_PROCFILE, PF_PREFIX ":	ended line %d with %d words", l, ff->lines->lines[l].words);
+				// debug(D_PROCFILE, PF_PREFIX ":	ended line %d with %d words", l, ff->lines->lines[l].words);
 
 				ff->lines = pflines_add(ff->lines, w);
 				if(!ff->lines) goto cleanup;
