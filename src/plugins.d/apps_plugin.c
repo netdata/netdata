@@ -43,6 +43,156 @@ unsigned long long file_counter = 0;
 
 #define PROC_BUFFER 4096
 
+// ----------------------------------------------------------------------------
+// memory debugger
+
+struct allocations {
+	size_t allocations;
+	size_t allocated;
+	size_t allocated_max;
+} allocations = { 0, 0, 0 };
+
+#define MALLOC_MARK (size_t)(0x0BADCAFE)
+#define MALLOC_PREFIX (sizeof(size_t) * 2)
+#define MALLOC_SUFFIX (sizeof(size_t))
+#define MALLOC_OVERHEAD (MALLOC_PREFIX + MALLOC_SUFFIX)
+
+void *mark_allocation(void *allocated_ptr, size_t size_without_overheads) {
+	size_t *real_ptr = (size_t *)allocated_ptr;
+	real_ptr[0] = MALLOC_MARK;
+	real_ptr[1] = size_without_overheads;
+
+	size_t *end_ptr = (size_t *)(allocated_ptr + MALLOC_PREFIX + size_without_overheads);
+	end_ptr[0] = MALLOC_MARK;
+
+	// fprintf(stderr, "MEMORY_POINTER: Allocated at %p, returning %p.\n", allocated_ptr, (void *)(allocated_ptr + MALLOC_PREFIX));
+
+	return (void *)(allocated_ptr + MALLOC_PREFIX);
+}
+
+void *check_allocation(const char *file, int line, const char *function, void *marked_ptr, size_t *size_without_overheads_ptr) {
+	size_t *real_ptr = (size_t *)(marked_ptr - MALLOC_PREFIX);
+
+	// fprintf(stderr, "MEMORY_POINTER: Checking pointer at %p, real %p for %s/%u@%s.\n", marked_ptr, (void *)(marked_ptr - MALLOC_PREFIX), function, line, file);
+
+	if(real_ptr[0] != MALLOC_MARK) fatal("MEMORY: prefix MARK is not valid for %s/%u@%s.", function, line, file);
+
+	size_t size = real_ptr[1];
+
+	size_t *end_ptr = (size_t *)(marked_ptr + size);
+	if(end_ptr[0] != MALLOC_MARK) fatal("MEMORY: suffix MARK of allocation with size %zu is not valid for %s/%u@%s.", size, function, line, file);
+
+	if(size_without_overheads_ptr) *size_without_overheads_ptr = size;
+
+	return real_ptr;
+}
+
+void *malloc_debug(const char *file, int line, const char *function, size_t size) {
+	void *ptr = malloc(size + MALLOC_OVERHEAD);
+	if(!ptr) fatal("MEMORY: Cannot allocate %zu bytes for %s/%u@%s.", size, function, line, file);
+
+	allocations.allocated += size;
+	allocations.allocations++;
+
+	debug(D_MEMORY, "MEMORY: Allocated %zu bytes for %s/%u@%s."
+		" Status: allocated %zu in %zu allocs."
+		, size
+		, function, line, file
+		, allocations.allocated
+		, allocations.allocations
+	);
+
+	if(allocations.allocated > allocations.allocated_max) {
+		debug(D_MEMORY, "MEMORY: total allocation peak increased from %zu to %zu", allocations.allocated_max, allocations.allocated);
+		allocations.allocated_max = allocations.allocated;
+	}
+
+	size_t csize;
+	check_allocation(file, line, function, mark_allocation(ptr, size), &csize);
+	if(size != csize) {
+		fatal("Invalid size.");
+	}
+
+	return mark_allocation(ptr, size);
+}
+
+void *calloc_debug(const char *file, int line, const char *function, size_t nmemb, size_t size) {
+	void *ptr = malloc_debug(file, line, function, (nmemb * size));
+	bzero(ptr, nmemb * size);
+	return ptr;
+}
+
+void free_debug(const char *file, int line, const char *function, void *ptr) {
+	size_t size;
+	void *real_ptr = check_allocation(file, line, function, ptr, &size);
+
+	bzero(real_ptr, size + MALLOC_OVERHEAD);
+
+	free(real_ptr);
+	allocations.allocated -= size;
+	allocations.allocations--;
+
+	debug(D_MEMORY, "MEMORY: freed %zu bytes for %s/%u@%s."
+		" Status: allocated %zu in %zu allocs."
+		, size
+		, function, line, file
+		, allocations.allocated
+		, allocations.allocations
+	);
+}
+
+void *realloc_debug(const char *file, int line, const char *function, void *ptr, size_t size) {
+	if(!ptr) return malloc_debug(file, line, function, size);
+	if(!size) { free_debug(file, line, function, ptr); return NULL; }
+
+	size_t old_size;
+	void *real_ptr = check_allocation(file, line, function, ptr, &old_size);
+
+	void *new_ptr = realloc(real_ptr, size + MALLOC_OVERHEAD);
+	if(!new_ptr) fatal("MEMORY: Cannot allocate %zu bytes for %s/%u@%s.", size, function, line, file);
+
+	allocations.allocated += size;
+	allocations.allocated -= old_size;
+
+	debug(D_MEMORY, "MEMORY: Re-allocated from %zu to %zu bytes for %s/%u@%s."
+		" Status: allocated %z in %zu allocs."
+		, old_size, size
+		, function, line, file
+		, allocations.allocated
+		, allocations.allocations
+	);
+
+	if(allocations.allocated > allocations.allocated_max) {
+		debug(D_MEMORY, "MEMORY: total allocation peak increased from %zu to %zu", allocations.allocated_max, allocations.allocated);
+		allocations.allocated_max = allocations.allocated;
+	}
+
+	return mark_allocation(new_ptr, size);
+}
+
+char *strdup_debug(const char *file, int line, const char *function, const char *ptr) {
+	size_t size = 0;
+	const char *s = ptr;
+
+	while(*s++) size++;
+	size++;
+
+	char *p = malloc_debug(file, line, function, size);
+	if(!p) fatal("Cannot allocate %zu bytes.", size);
+
+	memcpy(p, ptr, size);
+	return p;
+}
+
+#define malloc(size) malloc_debug(__FILE__, __LINE__, __FUNCTION__, (size))
+#define calloc(nmemb, size) calloc_debug(__FILE__, __LINE__, __FUNCTION__, (nmemb), (size))
+#define realloc(ptr, size) realloc_debug(__FILE__, __LINE__, __FUNCTION__, (ptr), (size))
+#define free(ptr) free_debug(__FILE__, __LINE__, __FUNCTION__, (ptr))
+
+#ifdef strdup
+#undef strdup
+#endif
+#define strdup(ptr) strdup_debug(__FILE__, __LINE__, __FUNCTION__, (ptr))
 
 // ----------------------------------------------------------------------------
 // helper functions
@@ -1692,6 +1842,7 @@ void parse_args(int argc, char **argv)
 
 		if(strcmp("debug", argv[i]) == 0) {
 			debug = 1;
+			debug_flags = 0xffffffff;
 			continue;
 		}
 
