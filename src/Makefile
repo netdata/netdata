@@ -25,7 +25,7 @@ endif
 COMMON_FLAGS = BIN_DIR='$(BIN_DIR)' CONFIG_DIR='$(CONFIG_DIR)' LOG_DIR='$(LOG_DIR)' PLUGINS_DIR='$(PLUGINS_DIR)'
 
 proc_sources = proc_net_dev.c proc_net_ip_vs_stats.c proc_diskstats.c proc_meminfo.c proc_net_netstat.c proc_net_snmp.c proc_net_stat_conntrack.c proc_stat.c proc_vmstat.c proc_net_rpc_nfsd.c
-sources = avl.c procfile.c common.c log.c popen.c url.c config.c web_buffer.c storage_number.c web_client.c global_statistics.c rrd.c rrd2json.c web_server.c plugins_d.c daemon.c plugin_tc.c plugin_checks.c plugin_idlejitter.c plugin_proc.c unit_test.c main.c
+sources = avl.c dictionary.c procfile.c common.c log.c popen.c url.c config.c web_buffer.c storage_number.c web_client.c global_statistics.c rrd.c rrd2json.c web_server.c plugins_d.c daemon.c plugin_tc.c plugin_checks.c plugin_idlejitter.c plugin_proc.c unit_test.c main.c
 libs    = -pthread -lz
 
 ifdef debug

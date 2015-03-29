@@ -1,5 +1,6 @@
 #include <pthread.h>
 #include <sys/time.h>
+#include <stdlib.h>
 
 #include "log.h"
 #include "common.h"
@@ -483,3 +484,97 @@ unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int en
 	pthread_rwlock_unlock(&st->rwlock);
 	return last_timestamp;
 }
+
+
+/*
+unsigned long rrdset2json(int type, RRDSET *st, struct web_buffer *wb, int entries_to_show, int group, int group_method, time_t after, time_t before, int only_non_zero) {
+
+	if(!st->dimensions) {
+		web_buffer_printf(wb, "No dimensions yet.");
+		return 0;
+	}
+
+	int c;
+	pthread_rwlock_rdlock(&st->rwlock);
+
+	// -------------------------------------------------------------------------
+	// validate the parameters
+
+	if(entries_to_show < 1) entries_to_show = 1;
+	if(group < 1) group = 1;
+
+	// make sure current_entry is within limits
+	long current_entry = (long)st->current_entry - (long)1;
+	if(current_entry < 0) current_entry = 0;
+	else if(current_entry >= st->entries) current_entry = st->entries - 1;
+
+	// find the oldest entry of the round-robin
+	long max_entries = (st->counter < (unsigned long)st->entries) ? st->counter : (unsigned long)st->entries;
+	if(entries_to_show > max_entries) entries_to_show = max_entries;
+
+	if(before == 0 || before > st->last_updated.tv_sec) before = st->last_updated.tv_sec;
+	if(after  == 0 || after  < rrdset_first_entry_t(st)) after = rrdset_first_entry_t(st);
+
+	if(entries_to_show > (before - after) / st->update_every / group) entries_to_show = (before - after) / st->update_every / group;
+
+	// -------------------------------------------------------------------------
+	// checks for debuging
+
+	if(st->debug) {
+		debug(D_RRD_STATS, "%s first_entry_t = %lu, last_entry_t = %lu, duration = %lu, after = %lu, before = %lu, duration = %lu, entries_to_show = %lu, group = %lu, max_entries = %ld"
+			, st->id
+			, rrdset_first_entry_t(st)
+			, st->last_updated.tv_sec
+			, st->last_updated.tv_sec - rrdset_first_entry_t(st)
+			, after
+			, before
+			, before - after
+			, entries_to_show
+			, group
+			, max_entries
+			);
+
+		if(before < after)
+			debug(D_RRD_STATS, "WARNING: %s The newest value in the database (%lu) is earlier than the oldest (%lu)", st->name, before, after);
+
+		if((before - after) > st->entries * st->update_every)
+			debug(D_RRD_STATS, "WARNING: %s The time difference between the oldest and the newest entries (%lu) is higher than the capacity of the database (%lu)", st->name, before - after, st->entries * st->update_every);
+	}
+
+	// -------------------------------------------------------------------------
+
+	int dimensions = 0, i, j;
+	RRDDIM *rd;
+	for( rd = st->dimensions ; rd ; rd = rd->next) dimensions++;
+
+	uint32_t *annotations[dimensions];
+	calculated_number *values[dimensions];
+	int enabled[dimensions];
+
+	for( rd = st->dimensions, i = 0 ; rd && i < dimensions ; rd = rd->next, i++) {
+		annotations[i] = malloc(sizeof(uint32_t) * entries_to_show);
+		if(!annotations[i]) fatal("Cannot allocate %z bytes of memory.", sizeof(uint32_t) * entries_to_show);
+
+		values[i] = malloc(sizeof(calculated_number) * entries_to_show);
+		if(!values[i]) fatal("Cannot allocate %z bytes of memory.", sizeof(calculated_number) * entries_to_show);
+
+		calculated_number sum = rrddim2values(st, rd, values, annotations, entries_to_show, group, group_method, after, before);
+		if(only_non_zero && sum == 0) enabled[i] = 0;
+		else enabled[i] = 1;
+	}
+
+	switch(type) {
+		case DATASOURCE_GOOGLE_JSON:
+		case DATASOURCE_GOOGLE_JSONP:
+			//rrdvalues2googlejson(st, rd, values, annotations, enabled, entries_to_show, );
+			break;
+
+		case DATASOURCE_JSON:
+		default:
+			//rrdvalues2json();
+			break;
+	}
+
+	//return ???;
+}
+*/

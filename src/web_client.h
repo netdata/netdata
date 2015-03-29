@@ -8,6 +8,9 @@
 
 #include "web_buffer.h"
 
+#define DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS 60
+extern int web_client_timeout;
+
 #ifndef NETDATA_WEB_CLIENT_H
 #define NETDATA_WEB_CLIENT_H 1
 
@@ -18,6 +21,26 @@
 #define ZLIB_CHUNK 	16384
 #define MAX_HTTP_HEADER_SIZE 16384
 
+/*
+struct name_value {
+	char *name;
+	char *value;
+	unsigned long hash;
+	struct name_value *next;
+};
+
+struct web_request {
+	char *protocol;
+	char *hostname;
+	char *path;
+	char *query_string;
+
+	struct name_value *headers;
+	struct name_value *query_parameters;
+	struct name_value *post_parameters;
+};
+*/
+
 struct web_client {
 	unsigned long long id;
 
@@ -25,6 +48,8 @@ struct web_client {
 	char client_port[NI_MAXSERV+1];
 
 	char last_url[URL_MAX+1];
+
+	struct web_request *request;
 
 	struct timeval tv_in, tv_ready;
 
@@ -61,5 +86,7 @@ extern struct web_client *web_clients;
 
 extern struct web_client *web_client_create(int listener);
 extern struct web_client *web_client_free(struct web_client *w);
+
+extern void *web_client_main(void *ptr);
 
 #endif
