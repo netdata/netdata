@@ -1376,7 +1376,10 @@ void update_statistics(void)
 			p->target->majflt += p->majflt; //+ (p->pid != 1)?(p->cmajflt - p->fix_cmajflt):0;
 
 			if(p->num_threads < 0)
-				error("Negative threads number for pid '%s': %d", p->comm, p->num_threads);
+				error("Negative threads number for pid '%s' (%d): %d", p->comm, p->pid, p->num_threads);
+
+			if(p->num_threads > 1000)
+				error("Excessive threads number for pid '%s' (%d): %d", p->comm, p->pid, p->num_threads);
 
 			p->target->num_threads += p->num_threads;
 			p->target->rss += p->rss;
