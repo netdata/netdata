@@ -675,7 +675,7 @@ int read_proc_pid_stat(struct pid_stat *p) {
 	// p->guest_time	= strtoull(procfile_lineword(ff, 0, 42), NULL, 10);
 	// p->cguest_time	= strtoull(procfile_lineword(ff, 0, 43), NULL, 10);
 
-	if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: VALUES: %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+	if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: VALUES: %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu, threads=%d\n", p->comm, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
 
 	procfile_close(ff);
 	return 0;

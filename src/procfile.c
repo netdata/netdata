@@ -26,10 +26,10 @@
 #define PFWORDS_INCREASE_STEP 200
 
 pfwords *pfwords_add(pfwords *fw, char *str) {
-	debug(D_PROCFILE, PF_PREFIX ":	adding word No %d: '%s'", fw->len, str);
+	// debug(D_PROCFILE, PF_PREFIX ":	adding word No %d: '%s'", fw->len, str);
 
 	if(fw->len == fw->size) {
-		debug(D_PROCFILE, PF_PREFIX ":	expanding words");
+		// debug(D_PROCFILE, PF_PREFIX ":	expanding words");
 
 		pfwords *new = realloc(fw, sizeof(pfwords) + (fw->size + PFWORDS_INCREASE_STEP) * sizeof(char *));
 		if(!new) {
@@ -47,7 +47,7 @@ pfwords *pfwords_add(pfwords *fw, char *str) {
 }
 
 pfwords *pfwords_new(void) {
-	debug(D_PROCFILE, PF_PREFIX ":	initializing words");
+	// debug(D_PROCFILE, PF_PREFIX ":	initializing words");
 
 	pfwords *new = malloc(sizeof(pfwords) + PFWORDS_INCREASE_STEP * sizeof(char *));
 	if(!new) return NULL;
@@ -58,12 +58,12 @@ pfwords *pfwords_new(void) {
 }
 
 void pfwords_reset(pfwords *fw) {
-	debug(D_PROCFILE, PF_PREFIX ":	reseting words");
+	// debug(D_PROCFILE, PF_PREFIX ":	reseting words");
 	fw->len = 0;
 }
 
 void pfwords_free(pfwords *fw) {
-	debug(D_PROCFILE, PF_PREFIX ":	freeing words");
+	// debug(D_PROCFILE, PF_PREFIX ":	freeing words");
 
 	free(fw);
 }
@@ -75,10 +75,10 @@ void pfwords_free(pfwords *fw) {
 #define PFLINES_INCREASE_STEP 10
 
 pflines *pflines_add(pflines *fl, uint32_t first_word) {
-	debug(D_PROCFILE, PF_PREFIX ":	adding line %d at word %d", fl->len, first_word);
+	// debug(D_PROCFILE, PF_PREFIX ":	adding line %d at word %d", fl->len, first_word);
 
 	if(fl->len == fl->size) {
-		debug(D_PROCFILE, PF_PREFIX ":	expanding lines");
+		// debug(D_PROCFILE, PF_PREFIX ":	expanding lines");
 
 		pflines *new = realloc(fl, sizeof(pflines) + (fl->size + PFLINES_INCREASE_STEP) * sizeof(ffline));
 		if(!new) {
@@ -97,7 +97,7 @@ pflines *pflines_add(pflines *fl, uint32_t first_word) {
 }
 
 pflines *pflines_new(void) {
-	debug(D_PROCFILE, PF_PREFIX ":	initializing lines");
+	// debug(D_PROCFILE, PF_PREFIX ":	initializing lines");
 
 	pflines *new = malloc(sizeof(pflines) + PFLINES_INCREASE_STEP * sizeof(ffline));
 	if(!new) return NULL;
@@ -108,13 +108,13 @@ pflines *pflines_new(void) {
 }
 
 void pflines_reset(pflines *fl) {
-	debug(D_PROCFILE, PF_PREFIX ":	reseting lines");
+	// debug(D_PROCFILE, PF_PREFIX ":	reseting lines");
 
 	fl->len = 0;
 }
 
 void pflines_free(pflines *fl) {
-	debug(D_PROCFILE, PF_PREFIX ":	freeing lines");
+	// debug(D_PROCFILE, PF_PREFIX ":	freeing lines");
 
 	free(fl);
 }
