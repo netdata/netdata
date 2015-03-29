@@ -52,17 +52,17 @@ struct allocations {
 	size_t allocated_max;
 } allocations = { 0, 0, 0 };
 
-#define MALLOC_MARK (size_t)(0x0BADCAFE)
-#define MALLOC_PREFIX (sizeof(size_t) * 2)
-#define MALLOC_SUFFIX (sizeof(size_t))
+#define MALLOC_MARK (uint32_t)(0x0BADCAFE)
+#define MALLOC_PREFIX (sizeof(uint32_t) * 2)
+#define MALLOC_SUFFIX (sizeof(uint32_t))
 #define MALLOC_OVERHEAD (MALLOC_PREFIX + MALLOC_SUFFIX)
 
 void *mark_allocation(void *allocated_ptr, size_t size_without_overheads) {
-	size_t *real_ptr = (size_t *)allocated_ptr;
+	uint32_t *real_ptr = (uint32_t *)allocated_ptr;
 	real_ptr[0] = MALLOC_MARK;
 	real_ptr[1] = size_without_overheads;
 
-	size_t *end_ptr = (size_t *)(allocated_ptr + MALLOC_PREFIX + size_without_overheads);
+	uint32_t *end_ptr = (uint32_t *)(allocated_ptr + MALLOC_PREFIX + size_without_overheads);
 	end_ptr[0] = MALLOC_MARK;
 
 	// fprintf(stderr, "MEMORY_POINTER: Allocated at %p, returning %p.\n", allocated_ptr, (void *)(allocated_ptr + MALLOC_PREFIX));
@@ -71,7 +71,7 @@ void *mark_allocation(void *allocated_ptr, size_t size_without_overheads) {
 }
 
 void *check_allocation(const char *file, int line, const char *function, void *marked_ptr, size_t *size_without_overheads_ptr) {
-	size_t *real_ptr = (size_t *)(marked_ptr - MALLOC_PREFIX);
+	uint32_t *real_ptr = (uint32_t *)(marked_ptr - MALLOC_PREFIX);
 
 	// fprintf(stderr, "MEMORY_POINTER: Checking pointer at %p, real %p for %s/%u@%s.\n", marked_ptr, (void *)(marked_ptr - MALLOC_PREFIX), function, line, file);
 
@@ -79,7 +79,7 @@ void *check_allocation(const char *file, int line, const char *function, void *m
 
 	size_t size = real_ptr[1];
 
-	size_t *end_ptr = (size_t *)(marked_ptr + size);
+	uint32_t *end_ptr = (uint32_t *)(marked_ptr + size);
 	if(end_ptr[0] != MALLOC_MARK) fatal("MEMORY: suffix MARK of allocation with size %zu is not valid for %s/%u@%s.", size, function, line, file);
 
 	if(size_without_overheads_ptr) *size_without_overheads_ptr = size;
@@ -552,11 +552,11 @@ struct pid_stat {
 	struct pid_stat *parent;
 	struct pid_stat *prev;
 	struct pid_stat *next;
-} *root = NULL, **all_pids;
+} *root_of_pids = NULL, **all_pids;
 
-long pids = 0;
+long all_pids_count = 0;
 
-struct pid_stat *get_entry(pid_t pid)
+struct pid_stat *get_pid_entry(pid_t pid)
 {
 	if(all_pids[pid]) {
 		all_pids[pid]->new_entry = 0;
@@ -574,22 +574,22 @@ struct pid_stat *get_entry(pid_t pid)
 		error("apps.plugin: ERROR: Cannot allocate %ld bytes of memory", (unsigned long)(sizeof(int) * 100));
 	else all_pids[pid]->fds_size = 100;
 
-	if(root) root->prev = all_pids[pid];
-	all_pids[pid]->next = root;
-	root = all_pids[pid];
+	if(root_of_pids) root_of_pids->prev = all_pids[pid];
+	all_pids[pid]->next = root_of_pids;
+	root_of_pids = all_pids[pid];
 
 	all_pids[pid]->new_entry = 1;
 
 	return all_pids[pid];
 }
 
-void del_entry(pid_t pid)
+void del_pid_entry(pid_t pid)
 {
 	if(!all_pids[pid]) return;
 
 	if(debug) fprintf(stderr, "apps.plugin: process %d %s exited, deleting it.\n", pid, all_pids[pid]->comm);
 
-	if(root == all_pids[pid]) root = all_pids[pid]->next;
+	if(root_of_pids == all_pids[pid]) root_of_pids = all_pids[pid]->next;
 	if(all_pids[pid]->next) all_pids[pid]->next->prev = all_pids[pid]->prev;
 	if(all_pids[pid]->prev) all_pids[pid]->prev->next = all_pids[pid]->next;
 
@@ -597,6 +597,8 @@ void del_entry(pid_t pid)
 	free(all_pids[pid]);
 	all_pids[pid] = NULL;
 }
+
+// ----------------------------------------------------------------------------
 
 #ifdef INCLUDE_CHILDS
 // print a tree view of all processes
@@ -610,7 +612,7 @@ int walk_down(pid_t pid, int level) {
 	b[level+1] = '-';
 	b[level+2] = '\0';
 
-	for(p = root; p ; p = p->next) {
+	for(p = root_of_pids; p ; p = p->next) {
 		if(p->ppid == pid) {
 			ret += walk_down(p->pid, level+1);
 		}
@@ -870,9 +872,9 @@ int update_from_proc(void)
 	struct pid_stat *p = NULL;
 
 	// mark them all as un-updated
-	pids = 0;
-	for(p = root; p ; p = p->next) {
-		pids++;
+	all_pids_count = 0;
+	for(p = root_of_pids; p ; p = p->next) {
+		all_pids_count++;
 		p->parent = NULL;
 		p->updated = 0;
 		p->childs = 0;
@@ -913,7 +915,7 @@ int update_from_proc(void)
 		buffer[bytes] = '\0';
 		if(debug) fprintf(stderr, "apps.plugin: READ stat: %s", buffer);
 
-		p = get_entry(pid);
+		p = get_pid_entry(pid);
 		if(!p) continue;
 
 		int parsed = sscanf(buffer,
@@ -1173,7 +1175,7 @@ void update_statistics(void)
 	struct pid_stat *p = NULL;
 
 	// link all parents and update childs count
-	for(p = root; p ; p = p->next) {
+	for(p = root_of_pids; p ; p = p->next) {
 		if(p->ppid > 0 && p->ppid <= pid_max && all_pids[p->ppid]) {
 			if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: \tparent of %d %s is %d %s\n", p->pid, p->comm, p->ppid, all_pids[p->ppid]->comm);
 			
@@ -1188,7 +1190,7 @@ void update_statistics(void)
 	int found = 1;
 	while(found) {
 		found = 0;
-		for(p = root; p ; p = p->next) {
+		for(p = root_of_pids; p ; p = p->next) {
 			// if this process does not have any childs, and
 			// is not already merged, and
 			// its parent has childs waiting to be merged, and
@@ -1215,7 +1217,7 @@ void update_statistics(void)
 	// init goes always to default target
 	if(all_pids[1]) all_pids[1]->target = default_target;
 
-	for(p = root; p ; p = p->next) {
+	for(p = root_of_pids; p ; p = p->next) {
 		// if the process is not merged itself
 		// then is is a top level process
 		if(!p->merged && !p->target) p->target = default_target;
@@ -1234,7 +1236,7 @@ void update_statistics(void)
 	found = 1;
 	while(found) {
 		found = 0;
-		for(p = root; p ; p = p->next) {
+		for(p = root_of_pids; p ; p = p->next) {
 			if(!p->target && p->merged && p->parent && p->parent->target) {
 				p->target = p->parent->target;
 				found++;
@@ -1245,7 +1247,7 @@ void update_statistics(void)
 #ifdef INCLUDE_CHILDS
 	// for each killed process, remove its values from the parents
 	// sums (we had already added them in a previous loop)
-	for(p = root; p ; p = p->next) {
+	for(p = root_of_pids; p ; p = p->next) {
 		if(p->updated) continue;
 
 		if(debug) fprintf(stderr, "apps.plugin: UNMERGING %d %s\n", p->pid, p->comm);
@@ -1341,7 +1343,7 @@ void update_statistics(void)
 #endif
 
 	// concentrate everything on the targets
-	for(p = root; p ; p = p->next) {
+	for(p = root_of_pids; p ; p = p->next) {
 		if(!p->target) {
 			error("apps.plugin: ERROR: pid %d %s was left without a target!", p->pid, p->comm);
 			continue;
@@ -1438,7 +1440,7 @@ void update_statistics(void)
 
 //	fprintf(stderr, "\n");
 	// cleanup all un-updated processed (exited, killed, etc)
-	for(p = root; p ;) {
+	for(p = root_of_pids; p ;) {
 		if(!p->updated) {
 //			fprintf(stderr, "\tEXITED %d %s [parent %d %s, target %s] utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->pid, p->comm, p->parent->pid, p->parent->comm, p->target->name,  p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
 			
@@ -1449,7 +1451,7 @@ void update_statistics(void)
 
 			pid_t r = p->pid;
 			p = p->next;
-			del_entry(r);
+			del_pid_entry(r);
 		}
 		else p = p->next;
 	}
@@ -1675,7 +1677,7 @@ void show_dimensions(void)
 
 	fprintf(stdout, "BEGIN netdata.apps_files %llu\n", usec);
 	fprintf(stdout, "SET files = %llu\n", file_counter);
-	fprintf(stdout, "SET pids = %ld\n", pids);
+	fprintf(stdout, "SET pids = %ld\n", all_pids_count);
 	fprintf(stdout, "SET fds = %d\n", all_files_len);
 	fprintf(stdout, "SET targets = %ld\n", targets);
 	fprintf(stdout, "END\n");
