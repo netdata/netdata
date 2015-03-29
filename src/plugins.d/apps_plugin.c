@@ -460,13 +460,13 @@ int read_process_groups(const char *name)
 struct pid_stat {
 	int32_t pid;
 	char comm[MAX_COMPARE_NAME + 1];
-	char state;
+	// char state;
 	int32_t ppid;
-	int32_t pgrp;
-	int32_t session;
-	int32_t tty_nr;
-	int32_t tpgid;
-	uint64_t flags;
+	// int32_t pgrp;
+	// int32_t session;
+	// int32_t tty_nr;
+	// int32_t tpgid;
+	// uint64_t flags;
 	unsigned long long minflt;
 	unsigned long long cminflt;
 	unsigned long long majflt;
@@ -475,33 +475,33 @@ struct pid_stat {
 	unsigned long long stime;
 	unsigned long long cutime;
 	unsigned long long cstime;
-	int64_t priority;
-	int64_t nice;
+	// int64_t priority;
+	// int64_t nice;
 	int32_t num_threads;
-	int64_t itrealvalue;
-	unsigned long long starttime;
-	unsigned long long vsize;
+	// int64_t itrealvalue;
+	// unsigned long long starttime;
+	// unsigned long long vsize;
 	unsigned long long rss;
-	unsigned long long rsslim;
-	unsigned long long starcode;
-	unsigned long long endcode;
-	unsigned long long startstack;
-	unsigned long long kstkesp;
-	unsigned long long kstkeip;
-	uint64_t signal;
-	uint64_t blocked;
-	uint64_t sigignore;
-	uint64_t sigcatch;
-	uint64_t wchan;
-	uint64_t nswap;
-	uint64_t cnswap;
-	int32_t exit_signal;
-	int32_t processor;
-	uint32_t rt_priority;
-	uint32_t policy;
-	unsigned long long delayacct_blkio_ticks;
-	uint64_t guest_time;
-	int64_t cguest_time;
+	// unsigned long long rsslim;
+	// unsigned long long starcode;
+	// unsigned long long endcode;
+	// unsigned long long startstack;
+	// unsigned long long kstkesp;
+	// unsigned long long kstkeip;
+	// uint64_t signal;
+	// uint64_t blocked;
+	// uint64_t sigignore;
+	// uint64_t sigcatch;
+	// uint64_t wchan;
+	// uint64_t nswap;
+	// uint64_t cnswap;
+	// int32_t exit_signal;
+	// int32_t processor;
+	// uint32_t rt_priority;
+	// uint32_t policy;
+	// unsigned long long delayacct_blkio_ticks;
+	// uint64_t guest_time;
+	// int64_t cguest_time;
 
 	unsigned long long statm_size;
 	unsigned long long statm_resident;
@@ -578,6 +578,7 @@ struct pid_stat *get_pid_entry(pid_t pid)
 	all_pids[pid]->next = root_of_pids;
 	root_of_pids = all_pids[pid];
 
+	all_pids[pid]->pid = pid;
 	all_pids[pid]->new_entry = 1;
 
 	return all_pids[pid];
@@ -597,6 +598,145 @@ void del_pid_entry(pid_t pid)
 	free(all_pids[pid]);
 	all_pids[pid] = NULL;
 }
+
+
+// ----------------------------------------------------------------------------
+// update pids from proc
+
+int read_proc_pid_stat(struct pid_stat *p) {
+	char filename[FILENAME_MAX + 1];
+
+	snprintf(filename, FILENAME_MAX, "/proc/%d/stat", p->pid);
+
+	procfile *ff = procfile_open(filename, "");
+	if(!ff) return 1;
+
+	ff = procfile_readall(ff);
+	if(!ff) {
+		procfile_close(ff);
+		return 1;
+	}
+
+	file_counter++;
+
+	int len = strlen(procfile_lineword(ff, 0, 1));
+	if(len < 2) {
+		error("apps.plugin: File %s states too small command name '%s'. Ignoring file.", filename, procfile_lineword(ff, 0, 1));
+		procfile_close(ff);
+		return 1;
+	}
+
+	len -= 2; // remove ()
+	if(len > MAX_COMPARE_NAME) len = MAX_COMPARE_NAME;
+	strncpy(p->comm, &(procfile_lineword(ff, 0, 1))[1], len);
+
+	// p->pid			= atol(procfile_lineword(ff, 0, 0));
+	// comm is at 1
+	// p->state			= *(procfile_lineword(ff, 0, 2));
+	p->ppid				= atol(procfile_lineword(ff, 0, 3));
+	// p->pgrp			= atol(procfile_lineword(ff, 0, 4));
+	// p->session		= atol(procfile_lineword(ff, 0, 5));
+	// p->tty_nr		= atol(procfile_lineword(ff, 0, 6));
+	// p->tpgid			= atol(procfile_lineword(ff, 0, 7));
+	// p->flags			= strtoull(procfile_lineword(ff, 0, 8), NULL, 10);
+	p->minflt			= strtoull(procfile_lineword(ff, 0, 9), NULL, 10);
+	p->cminflt			= strtoull(procfile_lineword(ff, 0, 10), NULL, 10);
+	p->majflt			= strtoull(procfile_lineword(ff, 0, 11), NULL, 10);
+	p->cmajflt			= strtoull(procfile_lineword(ff, 0, 12), NULL, 10);
+	p->utime			= strtoull(procfile_lineword(ff, 0, 13), NULL, 10);
+	p->stime			= strtoull(procfile_lineword(ff, 0, 14), NULL, 10);
+	p->cutime			= strtoull(procfile_lineword(ff, 0, 15), NULL, 10);
+	p->cstime			= strtoull(procfile_lineword(ff, 0, 16), NULL, 10);
+	// p->priority		= strtoull(procfile_lineword(ff, 0, 17), NULL, 10);
+	// p->nice			= strtoull(procfile_lineword(ff, 0, 18), NULL, 10);
+	p->num_threads		= atol(procfile_lineword(ff, 0, 19));
+	// p->itrealvalue	= strtoull(procfile_lineword(ff, 0, 20), NULL, 10);
+	// p->starttime		= strtoull(procfile_lineword(ff, 0, 21), NULL, 10);
+	// p->vsize			= strtoull(procfile_lineword(ff, 0, 22), NULL, 10);
+	p->rss				= strtoull(procfile_lineword(ff, 0, 23), NULL, 10);
+	// p->rsslim		= strtoull(procfile_lineword(ff, 0, 24), NULL, 10);
+	// p->starcode		= strtoull(procfile_lineword(ff, 0, 25), NULL, 10);
+	// p->endcode		= strtoull(procfile_lineword(ff, 0, 26), NULL, 10);
+	// p->startstack	= strtoull(procfile_lineword(ff, 0, 27), NULL, 10);
+	// p->kstkesp		= strtoull(procfile_lineword(ff, 0, 28), NULL, 10);
+	// p->kstkeip		= strtoull(procfile_lineword(ff, 0, 29), NULL, 10);
+	// p->signal		= strtoull(procfile_lineword(ff, 0, 30), NULL, 10);
+	// p->blocked		= strtoull(procfile_lineword(ff, 0, 31), NULL, 10);
+	// p->sigignore		= strtoull(procfile_lineword(ff, 0, 32), NULL, 10);
+	// p->sigcatch		= strtoull(procfile_lineword(ff, 0, 33), NULL, 10);
+	// p->wchan			= strtoull(procfile_lineword(ff, 0, 34), NULL, 10);
+	// p->nswap			= strtoull(procfile_lineword(ff, 0, 35), NULL, 10);
+	// p->cnswap		= strtoull(procfile_lineword(ff, 0, 36), NULL, 10);
+	// p->exit_signal	= atol(procfile_lineword(ff, 0, 37));
+	// p->processor		= atol(procfile_lineword(ff, 0, 38));
+	// p->rt_priority	= strtoul(procfile_lineword(ff, 0, 39), NULL, 10);
+	// p->policy		= strtoul(procfile_lineword(ff, 0, 40), NULL, 10);
+	// p->delayacct_blkio_ticks		= strtoull(procfile_lineword(ff, 0, 41), NULL, 10);
+	// p->guest_time	= strtoull(procfile_lineword(ff, 0, 42), NULL, 10);
+	// p->cguest_time	= strtoull(procfile_lineword(ff, 0, 43), NULL, 10);
+
+	if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: VALUES: %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+
+	procfile_close(ff);
+	return 0;
+}
+
+int read_proc_pid_statm(struct pid_stat *p) {
+	char filename[FILENAME_MAX + 1];
+
+	snprintf(filename, FILENAME_MAX, "/proc/%d/statm", p->pid);
+
+	procfile *ff = procfile_open(filename, "");
+	if(!ff) return 1;
+
+	ff = procfile_readall(ff);
+	if(!ff) {
+		procfile_close(ff);
+		return 1;
+	}
+
+	file_counter++;
+
+	p->statm_size			= strtoull(procfile_lineword(ff, 0, 0), NULL, 10);
+	p->statm_resident		= strtoull(procfile_lineword(ff, 0, 1), NULL, 10);
+	p->statm_share			= strtoull(procfile_lineword(ff, 0, 2), NULL, 10);
+	p->statm_text			= strtoull(procfile_lineword(ff, 0, 3), NULL, 10);
+	p->statm_lib			= strtoull(procfile_lineword(ff, 0, 4), NULL, 10);
+	p->statm_data			= strtoull(procfile_lineword(ff, 0, 5), NULL, 10);
+	p->statm_dirty			= strtoull(procfile_lineword(ff, 0, 6), NULL, 10);
+
+	procfile_close(ff);
+	return 0;
+}
+
+int read_proc_pid_io(struct pid_stat *p) {
+	char filename[FILENAME_MAX + 1];
+
+	snprintf(filename, FILENAME_MAX, "/proc/%d/io", p->pid);
+
+	procfile *ff = procfile_open(filename, ":");
+	if(!ff) return 1;
+
+	ff = procfile_readall(ff);
+	if(!ff) {
+		procfile_close(ff);
+		return 1;
+	}
+
+	file_counter++;
+
+	p->io_logical_bytes_read 		= strtoull(procfile_lineword(ff, 0, 1), NULL, 10);
+	p->io_logical_bytes_written 	= strtoull(procfile_lineword(ff, 1, 1), NULL, 10);
+	p->io_read_calls 				= strtoull(procfile_lineword(ff, 2, 1), NULL, 10);
+	p->io_write_calls 				= strtoull(procfile_lineword(ff, 3, 1), NULL, 10);
+	p->io_storage_bytes_read 		= strtoull(procfile_lineword(ff, 4, 1), NULL, 10);
+	p->io_storage_bytes_written 	= strtoull(procfile_lineword(ff, 5, 1), NULL, 10);
+	p->io_cancelled_write_bytes		= strtoull(procfile_lineword(ff, 6, 1), NULL, 10);
+
+	procfile_close(ff);
+	return 0;
+}
+
 
 // ----------------------------------------------------------------------------
 
@@ -839,9 +979,6 @@ unsigned long file_descriptor_find_or_add(const char *name)
 }
 
 
-// ----------------------------------------------------------------------------
-// update pids from proc
-
 // 1. read all files in /proc
 // 2. for each numeric directory:
 //    i.   read /proc/pid/stat
@@ -862,8 +999,6 @@ int update_from_proc(void)
 {
 	static long count_errors = 0;
 
-	char buffer[PROC_BUFFER + 1];
-	char name[PROC_BUFFER + 1];
 	char filename[FILENAME_MAX+1];
 	DIR *dir = opendir("/proc");
 	if(!dir) return 0;
@@ -887,80 +1022,38 @@ int update_from_proc(void)
 		pid_t pid = strtoul(file->d_name, &endptr, 10);
 		if(pid <= 0 || pid > pid_max || endptr == file->d_name || *endptr != '\0') continue;
 
+		p = get_pid_entry(pid);
+		if(!p) continue;
 
 		// --------------------------------------------------------------------
 		// /proc/<pid>/stat
 
-		snprintf(filename, FILENAME_MAX, "/proc/%s/stat", file->d_name);
-		int fd = open(filename, O_RDONLY);
-		if(fd == -1) {
-			if(errno != ENOENT && errno != ESRCH) {
-				if(!count_errors++ || debug)
-					error("apps.plugin: ERROR: cannot open file '%s' for reading (%d, %s).", filename, errno, strerror(errno));
-			}
+		if(read_proc_pid_stat(p)) {
+			error("Cannot process /proc/%d/stat", pid);
 			continue;
 		}
-		file_counter++;
+		if(p->ppid < 0 || p->ppid > pid_max) p->ppid = 0;
 
-		int bytes = read(fd, buffer, PROC_BUFFER);
-		close(fd);
 
-		if(bytes == -1) {
-			if(!count_errors++ || debug)
-				error("apps.plugin: ERROR: cannot read from file '%s' (%s).", filename, strerror(errno));
+		// --------------------------------------------------------------------
+		// /proc/<pid>/statm
+
+		if(read_proc_pid_statm(p)) {
+			error("Cannot process /proc/%d/statm", pid);
 			continue;
 		}
 
-		if(bytes < 10) continue;
-		buffer[bytes] = '\0';
-		if(debug) fprintf(stderr, "apps.plugin: READ stat: %s", buffer);
 
-		p = get_pid_entry(pid);
-		if(!p) continue;
+		// --------------------------------------------------------------------
+		// /proc/<pid>/io
 
-		int parsed = sscanf(buffer,
-			"%d (%[^)]) %c"						// pid, comm, state
-			" %d %d %d %d %d"					// ppid, pgrp, session, tty_nr, tpgid
-			" %" PRIu64 " %llu %llu %llu %llu"	// flags, minflt, cminflt, majflt, cmajflt
-			" %llu %llu %llu %llu"				// utime, stime, cutime, cstime
-			" %" PRId64 " %" PRId64				// priority, nice
-			" %d"								// num_threads
-			" %" PRId64							// itrealvalue
-			" %llu"								// starttime
-			" %llu"								// vsize
-			" %llu"								// rss
-			" %llu %llu %llu %llu %llu %llu"	// rsslim, starcode, endcode, startstack, kstkesp, kstkeip
-			" %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 // signal, blocked, sigignore, sigcatch
-			" %" PRIu64 " %" PRIu64 " %" PRIu64	// wchan, nswap, cnswap
-			" %d %d"							// exit_signal, processor
-			" %u %u"							// rt_priority, policy
-			" %llu %" PRIu64 " %" PRId64		// delayacct_blkio_ticks, guest_time, cguest_time
-			, &p->pid, name, &p->state
-			, &p->ppid, &p->pgrp, &p->session, &p->tty_nr, &p->tpgid
-			, &p->flags, &p->minflt, &p->cminflt, &p->majflt, &p->cmajflt
-			, &p->utime, &p->stime, &p->cutime, &p->cstime
-			, &p->priority, &p->nice
-			, &p->num_threads
-			, &p->itrealvalue
-			, &p->starttime
-			, &p->vsize
-			, &p->rss
-			, &p->rsslim, &p->starcode, &p->endcode, &p->startstack, &p->kstkesp, &p->kstkeip
-			, &p->signal, &p->blocked, &p->sigignore, &p->sigcatch
-			, &p->wchan, &p->nswap, &p->cnswap
-			, &p->exit_signal, &p->processor
-			, &p->rt_priority, &p->policy
-			, &p->delayacct_blkio_ticks, &p->guest_time, &p->cguest_time
-			);
-		strncpy(p->comm, name, MAX_COMPARE_NAME);
-		p->comm[MAX_COMPARE_NAME] = '\0';
-
-		if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: VALUES: %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
-
-		if(parsed < 39) {
-			if(!count_errors++ || debug || (p->target && p->target->debug))
-				error("apps.plugin: ERROR: file %s gave %d results (expected 44)\n", filename, parsed);
+		if(read_proc_pid_io(p)) {
+			error("Cannot process /proc/%d/io", pid);
+			continue;
 		}
+
+		// --------------------------------------------------------------------
+		// link it
 
 		// check if it is target
 		// we do this only once, the first time this pid is loaded
@@ -976,95 +1069,6 @@ int update_from_proc(void)
 					else p->target = w;
 
 					if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: \t\t%s linked to target %s\n", p->comm, p->target->name);
-				}
-			}
-		}
-
-		// just a few checks
-		if(p->ppid < 0 || p->ppid > pid_max) p->ppid = 0;
-
-
-		// --------------------------------------------------------------------
-		// /proc/<pid>/statm
-
-		snprintf(filename, FILENAME_MAX, "/proc/%s/statm", file->d_name);
-		fd = open(filename, O_RDONLY);
-		if(fd == -1) {
-			if(errno != ENOENT && errno != ESRCH) {
-				if(!count_errors++ || debug || (p->target && p->target->debug))
-					error("apps.plugin: ERROR: cannot open file '%s' for reading (%d, %s).", filename, errno, strerror(errno));
-			}
-		}
-		else {
-			file_counter++;
-			bytes = read(fd, buffer, PROC_BUFFER);
-			close(fd);
-
-			if(bytes == -1) {
-				if(!count_errors++ || debug || (p->target && p->target->debug))
-					error("apps.plugin: ERROR: cannot read from file '%s' (%s).", filename, strerror(errno));
-			}
-			else if(bytes > 10) {
-				buffer[bytes] = '\0';
-				if(debug || (p->target && p->target->debug))
-					fprintf(stderr, "apps.plugin: READ statm: %s", buffer);
-
-				parsed = sscanf(buffer,
-					"%llu %llu %llu %llu %llu %llu %llu"
-					, &p->statm_size
-					, &p->statm_resident
-					, &p->statm_share
-					, &p->statm_text
-					, &p->statm_lib
-					, &p->statm_data
-					, &p->statm_dirty
-					);
-
-				if(parsed < 7) {
-					if(!count_errors++ || debug || (p->target && p->target->debug))
-						error("apps.plugin: ERROR: file %s gave %d results (expected 7)", filename, parsed);
-				}
-			}
-		}
-
-		// --------------------------------------------------------------------
-		// /proc/<pid>/io
-
-		snprintf(filename, FILENAME_MAX, "/proc/%s/io", file->d_name);
-		fd = open(filename, O_RDONLY);
-		if(fd == -1) {
-			if(errno != ENOENT && errno != ESRCH) {
-				if(!count_errors++ || debug || (p->target && p->target->debug))
-					error("apps.plugin: ERROR: cannot open file '%s' for reading (%d, %s).", filename, errno, strerror(errno));
-			}
-		}
-		else {
-			file_counter++;
-			bytes = read(fd, buffer, PROC_BUFFER);
-			close(fd);
-
-			if(bytes == -1) {
-				if(!count_errors++ || debug || (p->target && p->target->debug))
-					error("apps.plugin: ERROR: cannot read from file '%s' (%s).", filename, strerror(errno));
-			}
-			else if(bytes > 10) {
-				buffer[bytes] = '\0';
-				if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: READ io: %s", buffer);
-
-				parsed = sscanf(buffer,
-					"rchar: %llu\nwchar: %llu\nsyscr: %llu\nsyscw: %llu\nread_bytes: %llu\nwrite_bytes: %llu\ncancelled_write_bytes: %llu"
-					, &p->io_logical_bytes_read
-					, &p->io_logical_bytes_written
-					, &p->io_read_calls
-					, &p->io_write_calls
-					, &p->io_storage_bytes_read
-					, &p->io_storage_bytes_written
-					, &p->io_cancelled_write_bytes
-					);
-
-				if(parsed < 7) {
-					if(!count_errors++ || debug || (p->target && p->target->debug))
-						error("apps.plugin: ERROR: file %s gave %d results (expected 7)", filename, parsed);
 				}
 			}
 		}
