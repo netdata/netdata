@@ -197,15 +197,17 @@ char *strdup_debug(const char *file, int line, const char *function, const char 
 // ----------------------------------------------------------------------------
 // helper functions
 
+procfile *ff = NULL;
+
 long get_processors(void) {
 	int processors = 0;
 
-	procfile *ff = procfile_open("/proc/stat", "");
+	ff = procfile_reopen(ff, "/proc/stat", "");
 	if(!ff) return 1;
 
 	ff = procfile_readall(ff);
 	if(!ff) {
-		procfile_close(ff);
+		// procfile_close(ff);
 		return 1;
 	}
 
@@ -218,26 +220,26 @@ long get_processors(void) {
 	processors--;
 	if(processors < 1) processors = 1;
 
-	procfile_close(ff);
+	// procfile_close(ff);
 	return processors;
 }
 
 long get_pid_max(void) {
 	long mpid = 32768;
 
-	procfile *ff = procfile_open("/proc/sys/kernel/pid_max", "");
+	ff = procfile_reopen(ff, "/proc/sys/kernel/pid_max", "");
 	if(!ff) return mpid;
 
 	ff = procfile_readall(ff);
 	if(!ff) {
-		procfile_close(ff);
+		// procfile_close(ff);
 		return mpid;
 	}
 
 	mpid = atol(procfile_lineword(ff, 0, 0));
 	if(mpid) mpid = 32768;
 
-	procfile_close(ff);
+	// procfile_close(ff);
 	return mpid;
 }
 
@@ -608,12 +610,12 @@ int read_proc_pid_stat(struct pid_stat *p) {
 
 	snprintf(filename, FILENAME_MAX, "/proc/%d/stat", p->pid);
 
-	procfile *ff = procfile_open(filename, "");
+	ff = procfile_reopen(ff, filename, "");
 	if(!ff) return 1;
 
 	ff = procfile_readall(ff);
 	if(!ff) {
-		procfile_close(ff);
+		// procfile_close(ff);
 		return 1;
 	}
 
@@ -688,7 +690,7 @@ int read_proc_pid_stat(struct pid_stat *p) {
 
 	if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: VALUES: %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu, threads=%d\n", p->comm, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
 
-	procfile_close(ff);
+	// procfile_close(ff);
 	return 0;
 }
 
@@ -697,12 +699,12 @@ int read_proc_pid_statm(struct pid_stat *p) {
 
 	snprintf(filename, FILENAME_MAX, "/proc/%d/statm", p->pid);
 
-	procfile *ff = procfile_open(filename, "");
+	ff = procfile_reopen(ff, filename, "");
 	if(!ff) return 1;
 
 	ff = procfile_readall(ff);
 	if(!ff) {
-		procfile_close(ff);
+		// procfile_close(ff);
 		return 1;
 	}
 
@@ -716,7 +718,7 @@ int read_proc_pid_statm(struct pid_stat *p) {
 	p->statm_data			= strtoull(procfile_lineword(ff, 0, 5), NULL, 10);
 	p->statm_dirty			= strtoull(procfile_lineword(ff, 0, 6), NULL, 10);
 
-	procfile_close(ff);
+	// procfile_close(ff);
 	return 0;
 }
 
@@ -725,12 +727,12 @@ int read_proc_pid_io(struct pid_stat *p) {
 
 	snprintf(filename, FILENAME_MAX, "/proc/%d/io", p->pid);
 
-	procfile *ff = procfile_open(filename, ":");
+	ff = procfile_reopen(ff, filename, ":");
 	if(!ff) return 1;
 
 	ff = procfile_readall(ff);
 	if(!ff) {
-		procfile_close(ff);
+		// procfile_close(ff);
 		return 1;
 	}
 
@@ -744,7 +746,7 @@ int read_proc_pid_io(struct pid_stat *p) {
 	p->io_storage_bytes_written 	= strtoull(procfile_lineword(ff, 5, 1), NULL, 10);
 	p->io_cancelled_write_bytes		= strtoull(procfile_lineword(ff, 6, 1), NULL, 10);
 
-	procfile_close(ff);
+	// procfile_close(ff);
 	return 0;
 }
 
@@ -1892,6 +1894,8 @@ int main(int argc, char **argv)
 	// debug_flags = D_PROCFILE;
 
 	info("apps.plugin: starting...");
+
+	procfile_adaptive_initial_allocation = 1;
 
 	unsigned long started_t = time(NULL), current_t;
 	Hertz = get_hertz();

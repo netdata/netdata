@@ -20,10 +20,21 @@
 
 #define PF_PREFIX "PROCFILE"
 
+#define PFWORDS_INCREASE_STEP 200
+#define PFLINES_INCREASE_STEP 10
+#define PROCFILE_INCREMENT_BUFFER 512
+
+int procfile_adaptive_initial_allocation = 0;
+
+// if adaptive allocation is set, these store the
+// max values we have seen so far
+uint32_t procfile_max_lines = PFLINES_INCREASE_STEP;
+uint32_t procfile_max_words = PFWORDS_INCREASE_STEP;
+size_t procfile_max_allocation = PROCFILE_INCREMENT_BUFFER;
+
 // ----------------------------------------------------------------------------
 // An array of words
 
-#define PFWORDS_INCREASE_STEP 200
 
 pfwords *pfwords_add(pfwords *fw, char *str) {
 	// debug(D_PROCFILE, PF_PREFIX ":	adding word No %d: '%s'", fw->len, str);
@@ -49,11 +60,13 @@ pfwords *pfwords_add(pfwords *fw, char *str) {
 pfwords *pfwords_new(void) {
 	// debug(D_PROCFILE, PF_PREFIX ":	initializing words");
 
-	pfwords *new = malloc(sizeof(pfwords) + PFWORDS_INCREASE_STEP * sizeof(char *));
+	uint32_t size = (procfile_adaptive_initial_allocation) ? procfile_max_words : PFWORDS_INCREASE_STEP;
+
+	pfwords *new = malloc(sizeof(pfwords) + size * sizeof(char *));
 	if(!new) return NULL;
 
 	new->len = 0;
-	new->size = PFWORDS_INCREASE_STEP;
+	new->size = size;
 	return new;
 }
 
@@ -71,8 +84,6 @@ void pfwords_free(pfwords *fw) {
 
 // ----------------------------------------------------------------------------
 // An array of lines
-
-#define PFLINES_INCREASE_STEP 10
 
 pflines *pflines_add(pflines *fl, uint32_t first_word) {
 	// debug(D_PROCFILE, PF_PREFIX ":	adding line %d at word %d", fl->len, first_word);
@@ -99,11 +110,13 @@ pflines *pflines_add(pflines *fl, uint32_t first_word) {
 pflines *pflines_new(void) {
 	// debug(D_PROCFILE, PF_PREFIX ":	initializing lines");
 
-	pflines *new = malloc(sizeof(pflines) + PFLINES_INCREASE_STEP * sizeof(ffline));
+	uint32_t size = (procfile_adaptive_initial_allocation) ? procfile_max_words : PFLINES_INCREASE_STEP;
+
+	pflines *new = malloc(sizeof(pflines) + size * sizeof(ffline));
 	if(!new) return NULL;
 
 	new->len = 0;
-	new->size = PFLINES_INCREASE_STEP;
+	new->size = size;
 	return new;
 }
 
@@ -122,9 +135,6 @@ void pflines_free(pflines *fl) {
 
 // ----------------------------------------------------------------------------
 // The procfile
-
-#define PROCFILE_INITIAL_BUFFER 256
-#define PROCFILE_INCREMENT_BUFFER 512
 
 #define PF_CHAR_IS_SEPARATOR	0
 #define PF_CHAR_IS_NEWLINE	1
@@ -264,6 +274,12 @@ procfile *procfile_readall(procfile *ff) {
 
 	ff = procfile_parser(ff);
 
+	if(procfile_adaptive_initial_allocation) {
+		if(ff->len > procfile_max_allocation) procfile_max_allocation = ff->len;
+		if(ff->lines->len > procfile_max_lines) procfile_max_lines = ff->lines->len;
+		if(ff->words->len > procfile_max_words) procfile_max_words = ff->words->len;
+	}
+
 	debug(D_PROCFILE, "File '%s' updated.", ff->filename);
 	return ff;
 }
@@ -277,7 +293,8 @@ procfile *procfile_open(const char *filename, const char *separators) {
 		return NULL;
 	}
 
-	procfile *ff = malloc(sizeof(procfile) + PROCFILE_INITIAL_BUFFER);
+	size_t size = (procfile_adaptive_initial_allocation) ? procfile_max_allocation : PROCFILE_INCREMENT_BUFFER;
+	procfile *ff = malloc(sizeof(procfile) + size);
 	if(!ff) {
 		error(PF_PREFIX ": Cannot allocate memory for file '%s'. Reason: %s", filename, strerror(errno));
 		close(fd);
@@ -288,7 +305,7 @@ procfile *procfile_open(const char *filename, const char *separators) {
 	ff->filename[FILENAME_MAX] = '\0';
 
 	ff->fd = fd;
-	ff->size = PROCFILE_INITIAL_BUFFER;
+	ff->size = size;
 	ff->len = 0;
 
 	ff->lines = pflines_new();
@@ -315,6 +332,22 @@ procfile *procfile_open(const char *filename, const char *separators) {
 	return ff;
 }
 
+procfile *procfile_reopen(procfile *ff, const char *filename, const char *separators) {
+	if(!ff) return procfile_open(filename, separators);
+
+	if(ff->fd != -1) close(ff->fd);
+
+	ff->fd = open(filename, O_RDONLY, 0666);
+	if(ff->fd == -1) {
+		procfile_close(ff);
+		return NULL;
+	}
+
+	strncpy(ff->filename, filename, FILENAME_MAX);
+	ff->filename[FILENAME_MAX] = '\0';
+
+	return ff;
+}
 
 // ----------------------------------------------------------------------------
 // example parsing of procfile data

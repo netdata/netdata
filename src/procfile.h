@@ -58,8 +58,8 @@ typedef struct {
 typedef struct {
 	char filename[FILENAME_MAX + 1];
 	int fd;			// the file desriptor
-	ssize_t len;		// the bytes we have placed into data
-	ssize_t size;		// the bytes we have allocated for data
+	size_t len;		// the bytes we have placed into data
+	size_t size;		// the bytes we have allocated for data
 	pflines *lines;
 	pfwords *words;
 	char separators[256];
@@ -75,10 +75,17 @@ extern procfile *procfile_readall(procfile *ff);
 // open a /proc or /sys file
 extern procfile *procfile_open(const char *filename, const char *separators);
 
+// re-open a file
+// the separators argument is only used if ff == NULL
+extern procfile *procfile_reopen(procfile *ff, const char *filename, const char *separators);
+
 // example walk-through a procfile parsed file
 extern void procfile_print(procfile *ff);
 
 // ----------------------------------------------------------------------------
+
+// set this to 1, to have procfile adapt its initial buffer allocation to the max allocation used so far
+extern int procfile_adaptive_initial_allocation;
 
 // return the number of lines present
 #define procfile_lines(ff) (ff->lines->len)
