@@ -6,7 +6,7 @@
 typedef struct name_value {
 	avl avl;				// the index - this has to be first!
 
-	unsigned long hash;		// a simple hash to speed up searching
+	uint32_t hash;			// a simple hash to speed up searching
 							// we first compare hashes, and only if the hashes are equal we do string comparisons
 
 	char *name;

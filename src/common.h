@@ -1,10 +1,12 @@
+#include <inttypes.h>
+
 #ifndef NETDATA_COMMON_H
 #define NETDATA_COMMON_H 1
 
 #define abs(x) ((x < 0)? -x : x)
 #define usecdiff(now, last) (((((now)->tv_sec * 1000000ULL) + (now)->tv_usec) - (((last)->tv_sec * 1000000ULL) + (last)->tv_usec)))
 
-extern unsigned long simple_hash(const char *name);
+extern uint32_t simple_hash(const char *name);
 extern void strreverse(char* begin, char* end);
 extern char *mystrsep(char **ptr, char *s);
 extern char *qstrsep(char **ptr);

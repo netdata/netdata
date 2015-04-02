@@ -101,7 +101,7 @@ struct rrddim {
 	// ------------------------------------------------------------------------
 	// members for temporary data we need for calculations
 
-	unsigned long hash;								// a simple hash of the id, to speed up searching / indexing
+	uint32_t hash;									// a simple hash of the id, to speed up searching / indexing
 													// instead of strcmp() every item in the binary index
 													// we first compare the hashes
 
@@ -209,10 +209,10 @@ struct rrdset {
 
 	unsigned long long first_entry_t;				// the timestamp (in microseconds) of the oldest entry in the db
 
-	unsigned long hash;								// a simple hash on the id, to speed up searching
+	uint32_t hash;									// a simple hash on the id, to speed up searching
 													// we first compare hashes, and only if the hashes are equal we do string comparisons
 
-	unsigned long hash_name;						// a simple hash on the name
+	uint32_t hash_name;								// a simple hash on the name
 
 	unsigned long long usec_since_last_update;		// the time in microseconds since the last collection of data
 

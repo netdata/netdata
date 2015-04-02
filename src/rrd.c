@@ -50,7 +50,7 @@ avl_tree rrdset_root_index = {
 #define rrdset_index_add(st) avl_insert(&rrdset_root_index, (avl *)(st))
 #define rrdset_index_del(st) avl_remove(&rrdset_root_index, (avl *)(st))
 
-static RRDSET *rrdset_index_find(const char *id, unsigned long hash) {
+static RRDSET *rrdset_index_find(const char *id, uint32_t hash) {
 	RRDSET *result = NULL, tmp;
 	strncpy(tmp.id, id, RRD_ID_LENGTH_MAX);
 	tmp.id[RRD_ID_LENGTH_MAX] = '\0';
@@ -90,7 +90,7 @@ int rrdset_index_add_name(RRDSET *st) {
 
 #define rrdset_index_del_name(st) avl_remove(&rrdset_root_index_name, (avl *)(&st->avlname))
 
-static RRDSET *rrdset_index_find_name(const char *name, unsigned long hash) {
+static RRDSET *rrdset_index_find_name(const char *name, uint32_t hash) {
 	void *result = NULL;
 	RRDSET tmp;
 	tmp.name = name;
@@ -125,7 +125,7 @@ static int rrddim_compare(void* a, void* b) {
 #define rrddim_index_add(st, rd) avl_insert(&((st)->dimensions_index), (avl *)(rd))
 #define rrddim_index_del(st,rd ) avl_remove(&((st)->dimensions_index), (avl *)(rd))
 
-static RRDDIM *rrddim_index_find(RRDSET *st, const char *id, unsigned long hash) {
+static RRDDIM *rrddim_index_find(RRDSET *st, const char *id, uint32_t hash) {
 	RRDDIM *result = NULL, tmp;
 	tmp.hash = (hash)?hash:simple_hash(id);
 	strncpy(tmp.id, id, RRD_ID_LENGTH_MAX);

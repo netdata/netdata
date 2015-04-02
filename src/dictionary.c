@@ -23,7 +23,7 @@ static int name_value_compare(void* a, void* b) {
 #define name_value_index_add(dict, cv) avl_insert(&((dict)->values_index), (avl *)(cv))
 #define name_value_index_del(dict, cv) avl_remove(&((dict)->values_index), (avl *)(cv))
 
-static NAME_VALUE *dictionary_name_value_index_find(DICTIONARY *dict, const char *name, unsigned long hash) {
+static NAME_VALUE *dictionary_name_value_index_find(DICTIONARY *dict, const char *name, uint32_t hash) {
 	NAME_VALUE *result = NULL, tmp;
 	tmp.hash = (hash)?hash:simple_hash(name);
 	tmp.name = (char *)name;

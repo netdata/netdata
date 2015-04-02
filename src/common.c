@@ -14,11 +14,12 @@
 #include "log.h"
 #include "common.h"
 
+/*
 // http://stackoverflow.com/questions/7666509/hash-function-for-string
-unsigned long simple_hash(const char *name)
+uint32_t simple_hash(const char *name)
 {
 	const char *s = name;
-	unsigned long hash = 5381;
+	uint32_t hash = 5381;
 	int i;
 
 	while((i = *s++)) hash = ((hash << 5) + hash) + i;
@@ -27,6 +28,27 @@ unsigned long simple_hash(const char *name)
 
 	return hash;
 }
+*/
+
+// http://isthe.com/chongo/tech/comp/fnv/#FNV-1a
+uint32_t simple_hash(const char *name) {
+	unsigned char *s = (unsigned char *)name;
+	uint32_t hval = 0x811c9dc5;
+
+	// FNV-1a algorithm
+	while (*s) {
+		// multiply by the 32 bit FNV magic prime mod 2^32
+		// gcc optimized
+		hval += (hval<<1) + (hval<<4) + (hval<<7) + (hval<<8) + (hval<<24);
+
+		// xor the bottom with the current octet
+		hval ^= (uint32_t)*s++;
+	}
+
+	// fprintf(stderr, "HASH: %u = %s\n", hval, name);
+	return hval;
+}
+
 
 void strreverse(char* begin, char* end)
 {

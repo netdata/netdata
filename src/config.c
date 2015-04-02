@@ -23,7 +23,7 @@ pthread_rwlock_t config_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 struct config_value {
 	avl avl;				// the index - this has to be first!
 
-	unsigned long hash;		// a simple hash to speed up searching
+	uint32_t hash;			// a simple hash to speed up searching
 							// we first compare hashes, and only if the hashes are equal we do string comparisons
 
 	char *name;
@@ -37,7 +37,7 @@ struct config_value {
 struct config {
 	avl avl;
 
-	unsigned long hash;		// a simple hash to speed up searching
+	uint32_t hash;			// a simple hash to speed up searching
 							// we first compare hashes, and only if the hashes are equal we do string comparisons
 
 	char *name;
@@ -63,7 +63,7 @@ static int config_value_compare(void* a, void* b) {
 #define config_value_index_add(co, cv) avl_insert(&((co)->values_index), (avl *)(cv))
 #define config_value_index_del(co, cv) avl_remove(&((co)->values_index), (avl *)(cv))
 
-static struct config_value *config_value_index_find(struct config *co, const char *name, unsigned long hash) {
+static struct config_value *config_value_index_find(struct config *co, const char *name, uint32_t hash) {
 	struct config_value *result = NULL, tmp;
 	tmp.hash = (hash)?hash:simple_hash(name);
 	tmp.name = (char *)name;
@@ -91,7 +91,7 @@ avl_tree config_root_index = {
 #define config_index_add(cfg) avl_insert(&config_root_index, (avl *)(cfg))
 #define config_index_del(cfg) avl_remove(&config_root_index, (avl *)(cfg))
 
-static struct config *config_index_find(const char *name, unsigned long hash) {
+static struct config *config_index_find(const char *name, uint32_t hash) {
 	struct config *result = NULL, tmp;
 	tmp.hash = (hash)?hash:simple_hash(name);
 	tmp.name = (char *)name;

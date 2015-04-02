@@ -727,7 +727,7 @@ int read_proc_pid_io(struct pid_stat *p) {
 
 	snprintf(filename, FILENAME_MAX, "/proc/%d/io", p->pid);
 
-	ff = procfile_reopen(ff, filename, ":");
+	ff = procfile_reopen(ff, filename, "");
 	if(!ff) return 1;
 
 	ff = procfile_readall(ff);
@@ -801,8 +801,8 @@ int walk_down(pid_t pid, int level) {
 
 struct file_descriptor {
 	avl avl;
-	unsigned long magic;
-	unsigned long hash;
+	uint32_t magic;
+	uint32_t hash;
 	const char *name;
 	int type;
 	long count;
@@ -829,7 +829,7 @@ avl_tree all_files_index = {
 		file_descriptor_compare
 };
 
-static struct file_descriptor *file_descriptor_find(const char *name, unsigned long hash) {
+static struct file_descriptor *file_descriptor_find(const char *name, uint32_t hash) {
 	struct file_descriptor *result = NULL, tmp;
 	tmp.hash = (hash)?hash:simple_hash(name);
 	tmp.name = name;
@@ -883,9 +883,9 @@ void file_descriptor_not_used(int id)
 unsigned long file_descriptor_find_or_add(const char *name)
 {
 	static int last_pos = 0;
-	unsigned long hash = simple_hash(name);
+	uint32_t hash = simple_hash(name);
 
-	if(debug) fprintf(stderr, "apps.plugin: adding or finding name '%s' with hash %lu\n", name, hash);
+	if(debug) fprintf(stderr, "apps.plugin: adding or finding name '%s' with hash %u\n", name, hash);
 
 	struct file_descriptor *fd = file_descriptor_find(name, hash);
 	if(fd) {
