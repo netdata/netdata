@@ -127,7 +127,6 @@ static int rrddim_compare(void* a, void* b) {
 
 static RRDDIM *rrddim_index_find(RRDSET *st, const char *id, uint32_t hash) {
 	RRDDIM *result = NULL, tmp;
-	tmp.hash = (hash)?hash:simple_hash(id);
 	strncpy(tmp.id, id, RRD_ID_LENGTH_MAX);
 	tmp.id[RRD_ID_LENGTH_MAX] = '\0';
 	tmp.hash = (hash)?hash:simple_hash(tmp.id);

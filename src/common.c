@@ -30,6 +30,7 @@ uint32_t simple_hash(const char *name)
 }
 */
 
+/*
 // http://isthe.com/chongo/tech/comp/fnv/#FNV-1a
 uint32_t simple_hash(const char *name) {
 	unsigned char *s = (unsigned char *)name;
@@ -48,7 +49,28 @@ uint32_t simple_hash(const char *name) {
 	// fprintf(stderr, "HASH: %u = %s\n", hval, name);
 	return hval;
 }
+*/
 
+// http://eternallyconfuzzled.com/tuts/algorithms/jsw_tut_hashing.aspx
+// one at a time hash
+uint32_t simple_hash(const char *name) {
+	unsigned char *s = (unsigned char *)name;
+	uint32_t h = 0;
+
+	while(*s) {
+		h += *s++;
+		h += (h << 10);
+		h ^= (h >> 6);
+	}
+
+	h += (h << 3);
+	h ^= (h >> 11);
+	h += (h << 15);
+
+	// fprintf(stderr, "HASH: %u = %s\n", h, name);
+
+	return h;
+}
 
 void strreverse(char* begin, char* end)
 {
