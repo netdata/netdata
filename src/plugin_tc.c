@@ -38,9 +38,11 @@ struct tc_class {
 	char isleaf;
 	unsigned long long bytes;
 
-	char updated;
+	char updated;	// updated bytes
+	char seen;		// seen in the tc list (even without bytes)
 
 	struct tc_class *next;
+	struct tc_class *prev;
 };
 
 struct tc_device {
@@ -112,6 +114,48 @@ static struct tc_class *tc_class_index_find(struct tc_device *st, const char *id
 
 // ----------------------------------------------------------------------------
 
+static void tc_class_free(struct tc_device *n, struct tc_class *c) {
+	debug(D_TC_LOOP, "Removing from device '%s' class '%s', parentid '%s', leafid '%s', seen=%d", n->id, c->id, c->parentid?c->parentid:"", c->leafid?c->leafid:"", c->seen);
+
+	if(c->next) c->next->prev = c->prev;
+	if(c->prev) c->prev->next = c->next;
+	if(n->classes == c) n->classes = c->next;
+
+	tc_class_index_del(n, c);
+
+	if(c->id) free(c->id);
+	if(c->name) free(c->name);
+	if(c->leafid) free(c->leafid);
+	if(c->parentid) free(c->parentid);
+
+	free(c);
+}
+
+static void tc_device_classes_cleanup(struct tc_device *d) {
+	static int cleanup_every = 999;
+
+	if(cleanup_every > 0) {
+		cleanup_every = -config_get_number("plugin:tc", "cleanup unused classes every", 60);
+		if(cleanup_every > 0) cleanup_every = -cleanup_every;
+		if(cleanup_every == 0) cleanup_every = -1;
+	}
+
+	struct tc_class *c = d->classes;
+	while(c) {
+		if(c->seen < cleanup_every) {
+			struct tc_class *nc = c->next;
+			tc_class_free(d, c);
+			c = nc;
+		}
+		else c = c->next;
+
+		if(c) {
+			c->updated = 0;
+			c->seen--;
+		}
+	}
+}
+
 static void tc_device_commit(struct tc_device *d)
 {
 	static int enable_new_interfaces = -1;
@@ -121,7 +165,7 @@ static void tc_device_commit(struct tc_device *d)
 	// we only need to add leaf classes
 	struct tc_class *c, *x;
 
-	// set them all as leafs without parent
+	// set all classes
 	for(c = d->classes ; c ; c = c->next) {
 		c->isleaf = 1;
 		c->hasparent = 0;
@@ -134,10 +178,12 @@ static void tc_device_commit(struct tc_device *d)
 		for(x = d->classes ; x ; x = x->next) {
 			if(!x->updated) continue;
 
+			if(c == x) continue;
+
 			if(x->parentid && (
 				(               c->hash      == x->parent_hash && strcmp(c->id,     x->parentid) == 0) ||
 				(c->leafid   && c->leaf_hash == x->parent_hash && strcmp(c->leafid, x->parentid) == 0))) {
-				// debug(D_TC_LOOP, "TC: In device '%s', class '%s' (leafid: '%s') has leaf the class '%s' (parentid: '%s').", d->name, c->name, c->leafid, x->name, x->parentid);
+				// debug(D_TC_LOOP, "TC: In device '%s', class '%s' (leafid: '%s') has as leaf class '%s' (parentid: '%s').", d->name?d->name:d->id, c->name?c->name:c->id, c->leafid?c->leafid:c->id, x->name?x->name:x->id, x->parentid?x->parentid:x->id);
 				c->isleaf = 0;
 				x->hasparent = 1;
 			}
@@ -152,13 +198,15 @@ static void tc_device_commit(struct tc_device *d)
 	}
 	*/
 
-	// we need a device
+	// we need at least a class
 	for(c = d->classes ; c ; c = c->next) {
+		// debug(D_TC_LOOP, "TC: Device '%s', class '%s', isLeaf=%d, HasParent=%d, Seen=%d", d->name?d->name:d->id, c->name?c->name:c->id, c->isleaf, c->hasparent, c->seen);
 		if(!c->updated) continue;
 		if(c->isleaf && c->hasparent) break;
 	}
 	if(!c) {
 		debug(D_TC_LOOP, "TC: Ignoring TC device '%s'. No leaf classes.", d->name?d->name:d->id);
+		tc_device_classes_cleanup(d);
 		return;
 	}
 
@@ -167,7 +215,7 @@ static void tc_device_commit(struct tc_device *d)
 	if(config_get_boolean("plugin:tc", var_name, enable_new_interfaces)) {
 		RRDSET *st = rrdset_find_bytype(RRD_TYPE_TC, d->id);
 		if(!st) {
-			debug(D_TC_LOOP, "TC: Committing new TC device '%s'", d->name?d->name:d->id);
+			debug(D_TC_LOOP, "TC: Creating new chart for device '%s'", d->name?d->name:d->id);
 
 			st = rrdset_create(RRD_TYPE_TC, d->id, d->name?d->name:d->id, d->family?d->family:d->id, "Class Usage", "kilobits/s", 1000, rrd_update_every, RRDSET_TYPE_STACKED);
 
@@ -179,6 +227,7 @@ static void tc_device_commit(struct tc_device *d)
 			}
 		}
 		else {
+			debug(D_TC_LOOP, "TC: Updating chart for device '%s'", d->name?d->name:d->id);
 			rrdset_next_plugins(st);
 
 			if(d->name && strcmp(d->id, d->name) != 0) rrdset_set_name(st, d->name);
@@ -189,27 +238,32 @@ static void tc_device_commit(struct tc_device *d)
 
 			if(c->isleaf && c->hasparent) {
 				if(rrddim_set(st, c->id, c->bytes) != 0) {
+					debug(D_TC_LOOP, "TC: Adding to chart '%s', dimension '%s'", st->id, c->id, c->name);
 					
 					// new class, we have to add it
 					rrddim_add(st, c->id, c->name?c->name:c->id, 8, 1024 * rrd_update_every, RRDDIM_INCREMENTAL);
 					rrddim_set(st, c->id, c->bytes);
 				}
+				else debug(D_TC_LOOP, "TC: Updating chart '%s', dimension '%s'", st->id, c->id);
 
 				// if it has a name, different to the id
 				if(c->name) {
 					// update the rrd dimension with the new name
 					RRDDIM *rd = rrddim_find(st, c->id);
-					if(rd) rrddim_set_name(st, rd, c->name);
+					if(rd) {
+						debug(D_TC_LOOP, "TC: Setting chart '%s', dimension '%s' name to '%s'", st->id, rd->id, c->name);
+						rrddim_set_name(st, rd, c->name);
+					}
 
 					free(c->name);
 					c->name = NULL;
 				}
 			}
-
-			c->updated = 0;
 		}
 		rrdset_done(st);
 	}
+
+	tc_device_classes_cleanup(d);
 }
 
 static void tc_device_set_class_name(struct tc_device *d, char *id, char *name)
@@ -219,7 +273,10 @@ static void tc_device_set_class_name(struct tc_device *d, char *id, char *name)
 		if(c->name) free(c->name);
 		c->name = NULL;
 
-		if(name && *name && strcmp(c->id, name) != 0) c->name = strdup(name);
+		if(name && *name && strcmp(c->id, name) != 0) {
+			debug(D_TC_LOOP, "TC: Setting device '%s', class '%s' name to '%s'", d->id, id, name);
+			c->name = strdup(name);
+		}
 	}
 }
 
@@ -227,14 +284,20 @@ static void tc_device_set_device_name(struct tc_device *d, char *name) {
 	if(d->name) free(d->name);
 	d->name = NULL;
 
-	if(name && *name && strcmp(d->id, name) != 0) d->name = strdup(name);
+	if(name && *name && strcmp(d->id, name) != 0) {
+		debug(D_TC_LOOP, "TC: Setting device '%s' name to '%s'", d->id, name);
+		d->name = strdup(name);
+	}
 }
 
 static void tc_device_set_device_family(struct tc_device *d, char *family) {
 	if(d->family) free(d->family);
 	d->family = NULL;
 
-	if(family && *family && strcmp(d->id, family) != 0) d->family = strdup(family);
+	if(family && *family && strcmp(d->id, family) != 0) {
+		debug(D_TC_LOOP, "TC: Setting device '%s' family to '%s'", d->id, family);
+		d->family = strdup(family);
+	}
 	// no need for null termination - it is already null
 }
 
@@ -243,6 +306,7 @@ static struct tc_device *tc_device_create(char *id)
 	struct tc_device *d = tc_device_index_find(id, 0);
 
 	if(!d) {
+		debug(D_TC_LOOP, "TC: Creating device '%s'", id);
 
 		d = calloc(1, sizeof(struct tc_device));
 		if(!d) {
@@ -264,16 +328,18 @@ static struct tc_device *tc_device_create(char *id)
 
 static struct tc_class *tc_class_add(struct tc_device *n, char *id, char *parentid, char *leafid)
 {
-	// fprintf(stderr, "Adding class id '%s', parentid '%s', leafid '%s'\n", id, parentid, leafid);
-
 	struct tc_class *c = tc_class_index_find(n, id, 0);
+
 	if(!c) {
+		debug(D_TC_LOOP, "TC: Creating in device '%s', class id '%s', parentid '%s', leafid '%s'", n->id, id, parentid?parentid:"", leafid?leafid:"");
+
 		c = calloc(1, sizeof(struct tc_class));
 		if(!c) {
 			fatal("Cannot allocate memory for tc class");
 			return NULL;
 		}
 
+		if(n->classes) n->classes->prev = c;
 		c->next = n->classes;
 		n->classes = c;
 
@@ -297,26 +363,16 @@ static struct tc_class *tc_class_add(struct tc_device *n, char *id, char *parent
 		tc_class_index_add(n, c);
 	}
 
+	c->seen = 1;
+
 	return(c);
 }
 /*
-static void tc_class_free_all(struct tc_device *n, struct tc_class *c)
-{
-	if(c->next) tc_class_free_all(n, c->next);
-	tc_class_index_del(n, c);
-
-	if(c->id) free(c->id);
-	if(c->name) free(c->name);
-	if(c->leafid) free(c->leafid);
-	if(c->parentid) free(c->parentid);
-
-	free(c);
-}
-
 static void tc_device_free(struct tc_device *n)
 {
 	tc_device_index_del(n);
-	if(n->classes) tc_class_free_all(n, n->classes);
+
+	while(n->classes) tc_class_free(n, n->classes);
 
 	if(n->id) free(n->id);
 	if(n->name) free(n->name);

@@ -69,9 +69,9 @@ char pidfile[FILENAME_MAX + 1] = "";
 void prepare_rundir() {
 	if(getuid() != 0) {
 		mkdir("/run/user", 0775);
-		snprintf(rundir, FILENAME_MAX, "/run/user/%d", getpid());
+		snprintf(rundir, FILENAME_MAX, "/run/user/%d", getuid());
 		mkdir(rundir, 0775);
-		snprintf(rundir, FILENAME_MAX, "/run/user/%d/netdata", getpid());
+		snprintf(rundir, FILENAME_MAX, "/run/user/%d/netdata", getuid());
 	}
 	
 	snprintf(pidfile, FILENAME_MAX, "%s/netdata.pid", rundir);
