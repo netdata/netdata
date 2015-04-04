@@ -136,9 +136,9 @@ void pflines_free(pflines *fl) {
 // ----------------------------------------------------------------------------
 // The procfile
 
-#define PF_CHAR_IS_SEPARATOR	0
-#define PF_CHAR_IS_NEWLINE	1
-#define PF_CHAR_IS_WORD		2
+#define PF_CHAR_IS_SEPARATOR	' '
+#define PF_CHAR_IS_NEWLINE		'N'
+#define PF_CHAR_IS_WORD			'W'
 
 void procfile_close(procfile *ff) {
 	debug(D_PROCFILE, PF_PREFIX ": Closing file '%s'", ff->filename);
@@ -224,7 +224,7 @@ procfile *procfile_parser(procfile *ff) {
 	return ff;
 
 cleanup:
-	error(PF_PREFIX ": Failed to parse file '%s'. Reason: %s", ff->filename, strerror(errno));
+	error(PF_PREFIX ": Failed to parse file '%s'", ff->filename);
 	procfile_close(ff);
 	return NULL;
 }
@@ -241,7 +241,7 @@ procfile *procfile_readall(procfile *ff) {
 
 			procfile *new = realloc(ff, sizeof(procfile) + ff->size + PROCFILE_INCREMENT_BUFFER);
 			if(!new) {
-				error(PF_PREFIX ": Cannot allocate memory for file '%s'. Reason: %s", ff->filename, strerror(errno));
+				error(PF_PREFIX ": Cannot allocate memory for file '%s'", ff->filename);
 				procfile_close(ff);
 				return NULL;
 			}
@@ -253,7 +253,7 @@ procfile *procfile_readall(procfile *ff) {
 		debug(D_PROCFILE, "Reading file '%s', from position %ld with length %ld", ff->filename, s, ff->size - s);
 		r = read(ff->fd, &ff->data[s], ff->size - s);
 		if(r == -1) {
-			error(PF_PREFIX ": Cannot read from file '%s'. Reason: %s", ff->filename, strerror(errno));
+			if(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO)) error(PF_PREFIX ": Cannot read from file '%s'", ff->filename);
 			procfile_close(ff);
 			return NULL;
 		}
@@ -264,7 +264,7 @@ procfile *procfile_readall(procfile *ff) {
 
 	debug(D_PROCFILE, "Rewinding file '%s'", ff->filename);
 	if(lseek(ff->fd, 0, SEEK_SET) == -1) {
-		error(PF_PREFIX ": Cannot rewind on file '%s'.", ff->filename);
+		if(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO)) error(PF_PREFIX ": Cannot rewind on file '%s'.", ff->filename);
 		procfile_close(ff);
 		return NULL;
 	}
@@ -284,19 +284,46 @@ procfile *procfile_readall(procfile *ff) {
 	return ff;
 }
 
-procfile *procfile_open(const char *filename, const char *separators) {
+static void procfile_set_separators(procfile *ff, const char *separators) {
+	static char def[256] = { [0 ... 255] = 0 };
+	int i;
+
+	if(!def[255]) {
+		// this is thread safe
+		// we check that the last byte is non-zero
+		// if it is zero, multiple threads may be executing this at the same time
+		// setting in def[] the exact same values
+		for(i = 0; i < 256 ;i++) {
+			if(i == '\n' || i == '\r') def[i] = PF_CHAR_IS_NEWLINE;
+			else if(isspace(i) || !isprint(i)) def[i] = PF_CHAR_IS_SEPARATOR;
+			else def[i] = PF_CHAR_IS_WORD;
+		}
+	}
+
+	// copy the default
+	char *ffs = ff->separators, *ffd = def, *ffe = &def[256];
+	while(ffd != ffe) *ffs++ = *ffd++;
+
+	// set the separators
+	if(!separators) separators = " \t=|";
+	ffs = ff->separators;
+	const char *s = separators;
+	while(*s) ffs[(int)*s++] = PF_CHAR_IS_SEPARATOR;
+}
+
+procfile *procfile_open(const char *filename, const char *separators, uint32_t flags) {
 	debug(D_PROCFILE, PF_PREFIX ": Opening file '%s'", filename);
 
 	int fd = open(filename, O_RDONLY, 0666);
 	if(fd == -1) {
-		error(PF_PREFIX ": Cannot open file '%s'. Reason: %s", filename, strerror(errno));
+		if(!(flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO)) error(PF_PREFIX ": Cannot open file '%s'", filename);
 		return NULL;
 	}
 
 	size_t size = (procfile_adaptive_initial_allocation) ? procfile_max_allocation : PROCFILE_INCREMENT_BUFFER;
 	procfile *ff = malloc(sizeof(procfile) + size);
 	if(!ff) {
-		error(PF_PREFIX ": Cannot allocate memory for file '%s'. Reason: %s", filename, strerror(errno));
+		error(PF_PREFIX ": Cannot allocate memory for file '%s'", filename);
 		close(fd);
 		return NULL;
 	}
@@ -307,33 +334,25 @@ procfile *procfile_open(const char *filename, const char *separators) {
 	ff->fd = fd;
 	ff->size = size;
 	ff->len = 0;
+	ff->flags = flags;
 
 	ff->lines = pflines_new();
 	ff->words = pfwords_new();
 
 	if(!ff->lines || !ff->words) {
-		error(PF_PREFIX ": Cannot initialize parser for file '%s'. Reason: %s", filename, strerror(errno));
+		error(PF_PREFIX ": Cannot initialize parser for file '%s'", filename);
 		procfile_close(ff);
 		return NULL;
 	}
 
-	int i;
-	for(i = 0; i < 256 ;i++) {
-		if(i == '\n' || i == '\r') ff->separators[i] = PF_CHAR_IS_NEWLINE;
-		else if(isspace(i) || !isprint(i)) ff->separators[i] = PF_CHAR_IS_SEPARATOR;
-		else ff->separators[i] = PF_CHAR_IS_WORD;
-	}
-
-	if(!separators) separators = " \t=|";
-	const char *s = separators;
-	while(*s) ff->separators[(int)*s++] = PF_CHAR_IS_SEPARATOR;
+	procfile_set_separators(ff, separators);
 
 	debug(D_PROCFILE, "File '%s' opened.", filename);
 	return ff;
 }
 
-procfile *procfile_reopen(procfile *ff, const char *filename, const char *separators) {
-	if(!ff) return procfile_open(filename, separators);
+procfile *procfile_reopen(procfile *ff, const char *filename, const char *separators, uint32_t flags) {
+	if(!ff) return procfile_open(filename, separators, flags);
 
 	if(ff->fd != -1) close(ff->fd);
 
@@ -345,6 +364,11 @@ procfile *procfile_reopen(procfile *ff, const char *filename, const char *separa
 
 	strncpy(ff->filename, filename, FILENAME_MAX);
 	ff->filename[FILENAME_MAX] = '\0';
+
+	ff->flags = flags;
+
+	// do not do the separators again if NULL is given
+	if(separators) procfile_set_separators(ff, separators);
 
 	return ff;
 }

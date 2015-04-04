@@ -137,7 +137,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 
 	if(dt) {};
 
-	if(!ff) ff = procfile_open("/proc/net/rpc/nfsd", " \t");
+	if(!ff) ff = procfile_open("/proc/net/rpc/nfsd", " \t", PROCFILE_FLAG_DEFAULT);
 	if(!ff) return 1;
 
 	ff = procfile_readall(ff);

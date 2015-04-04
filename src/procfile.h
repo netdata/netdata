@@ -55,8 +55,12 @@ typedef struct {
 // ----------------------------------------------------------------------------
 // The procfile
 
+#define PROCFILE_FLAG_DEFAULT             0x00000000
+#define PROCFILE_FLAG_NO_ERROR_ON_FILE_IO 0x00000001
+
 typedef struct {
 	char filename[FILENAME_MAX + 1];
+	uint32_t flags;
 	int fd;			// the file desriptor
 	size_t len;		// the bytes we have placed into data
 	size_t size;		// the bytes we have allocated for data
@@ -73,11 +77,11 @@ extern void procfile_close(procfile *ff);
 extern procfile *procfile_readall(procfile *ff);
 
 // open a /proc or /sys file
-extern procfile *procfile_open(const char *filename, const char *separators);
+extern procfile *procfile_open(const char *filename, const char *separators, uint32_t flags);
 
 // re-open a file
-// the separators argument is only used if ff == NULL
-extern procfile *procfile_reopen(procfile *ff, const char *filename, const char *separators);
+// if separators == NULL, the last separators are used
+extern procfile *procfile_reopen(procfile *ff, const char *filename, const char *separators, uint32_t flags);
 
 // example walk-through a procfile parsed file
 extern void procfile_print(procfile *ff);

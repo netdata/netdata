@@ -14,7 +14,7 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 
 	if(dt) {};
 
-	if(!ff) ff = procfile_open("/proc/net/dev", " \t,:|");
+	if(!ff) ff = procfile_open("/proc/net/dev", " \t,:|", PROCFILE_FLAG_DEFAULT);
 	if(!ff) return 1;
 
 	ff = procfile_readall(ff);

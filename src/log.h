@@ -31,6 +31,8 @@
 
 extern unsigned long long debug_flags;
 
+extern const char *program_name;
+
 extern int silent;
 
 extern int access_fd;

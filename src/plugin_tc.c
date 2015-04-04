@@ -3,7 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "avl.h"
 #include "log.h"
+#include "common.h"
 #include "config.h"
 #include "rrd.h"
 #include "popen.h"
@@ -19,28 +21,98 @@
 #define TC_LINE_MAX 1024
 
 struct tc_class {
-	char id[RRD_ID_LENGTH_MAX + 1];
-	char name[RRD_ID_LENGTH_MAX + 1];
+	avl avl;
 
-	char leafid[RRD_ID_LENGTH_MAX + 1];
-	char parentid[RRD_ID_LENGTH_MAX + 1];
+	char *id;
+	uint32_t hash;
 
-	int hasparent;
-	int isleaf;
+	char *name;
+
+	char *leafid;
+	uint32_t leaf_hash;
+
+	char *parentid;
+	uint32_t parent_hash;
+
+	char hasparent;
+	char isleaf;
 	unsigned long long bytes;
+
+	char updated;
 
 	struct tc_class *next;
 };
 
 struct tc_device {
-	char id[RRD_ID_LENGTH_MAX + 1];
-	char name[RRD_ID_LENGTH_MAX + 1];
-	char family[RRD_ID_LENGTH_MAX + 1];
+	avl avl;
+
+	char *id;
+	uint32_t hash;
+
+	char *name;
+	char *family;
+
+	avl_tree classes_index;
 
 	struct tc_class *classes;
 };
 
-void tc_device_commit(struct tc_device *d)
+
+// ----------------------------------------------------------------------------
+// tc_device index
+
+static int tc_device_iterator(avl *a) { if(a) {}; return 0; }
+
+static int tc_device_compare(void* a, void* b) {
+	if(((struct tc_device *)a)->hash < ((struct tc_device *)b)->hash) return -1;
+	else if(((struct tc_device *)a)->hash > ((struct tc_device *)b)->hash) return 1;
+	else return strcmp(((struct tc_device *)a)->id, ((struct tc_device *)b)->id);
+}
+
+avl_tree tc_device_root_index = {
+		NULL,
+		tc_device_compare
+};
+
+#define tc_device_index_add(st) avl_insert(&tc_device_root_index, (avl *)(st))
+#define tc_device_index_del(st) avl_remove(&tc_device_root_index, (avl *)(st))
+
+static struct tc_device *tc_device_index_find(const char *id, uint32_t hash) {
+	struct tc_device *result = NULL, tmp;
+	tmp.id = (char *)id;
+	tmp.hash = (hash)?hash:simple_hash(tmp.id);
+
+	avl_search(&(tc_device_root_index), (avl *)&tmp, tc_device_iterator, (avl **)&result);
+	return result;
+}
+
+
+// ----------------------------------------------------------------------------
+// tc_class index
+
+static int tc_class_iterator(avl *a) { if(a) {}; return 0; }
+
+static int tc_class_compare(void* a, void* b) {
+	if(((struct tc_class *)a)->hash < ((struct tc_class *)b)->hash) return -1;
+	else if(((struct tc_class *)a)->hash > ((struct tc_class *)b)->hash) return 1;
+	else return strcmp(((struct tc_class *)a)->id, ((struct tc_class *)b)->id);
+}
+
+#define tc_class_index_add(st, rd) avl_insert(&((st)->classes_index), (avl *)(rd))
+#define tc_class_index_del(st, rd) avl_remove(&((st)->classes_index), (avl *)(rd))
+
+static struct tc_class *tc_class_index_find(struct tc_device *st, const char *id, uint32_t hash) {
+	struct tc_class *result = NULL, tmp;
+	tmp.id = (char *)id;
+	tmp.hash = (hash)?hash:simple_hash(tmp.id);
+
+	avl_search(&(st->classes_index), (avl *)&tmp, tc_class_iterator, (avl **)&result);
+	return result;
+}
+
+// ----------------------------------------------------------------------------
+
+static void tc_device_commit(struct tc_device *d)
 {
 	static int enable_new_interfaces = -1;
 
@@ -49,12 +121,22 @@ void tc_device_commit(struct tc_device *d)
 	// we only need to add leaf classes
 	struct tc_class *c, *x;
 
-	for ( c = d->classes ; c ; c = c->next)
+	// set them all as leafs without parent
+	for(c = d->classes ; c ; c = c->next) {
 		c->isleaf = 1;
+		c->hasparent = 0;
+	}
 
-	for ( c = d->classes ; c ; c = c->next) {
-		for ( x = d->classes ; x ; x = x->next) {
-			if(x->parentid[0] && (strcmp(c->id, x->parentid) == 0 || strcmp(c->leafid, x->parentid) == 0)) {
+	// mark the classes as leafs and parents
+	for(c = d->classes ; c ; c = c->next) {
+		if(!c->updated) continue;
+
+		for(x = d->classes ; x ; x = x->next) {
+			if(!x->updated) continue;
+
+			if(x->parentid && (
+				(               c->hash      == x->parent_hash && strcmp(c->id,     x->parentid) == 0) ||
+				(c->leafid   && c->leaf_hash == x->parent_hash && strcmp(c->leafid, x->parentid) == 0))) {
 				// debug(D_TC_LOOP, "TC: In device '%s', class '%s' (leafid: '%s') has leaf the class '%s' (parentid: '%s').", d->name, c->name, c->leafid, x->name, x->parentid);
 				c->isleaf = 0;
 				x->hasparent = 1;
@@ -70,133 +152,228 @@ void tc_device_commit(struct tc_device *d)
 	}
 	*/
 
-	for ( c = d->classes ; c ; c = c->next) {
+	// we need a device
+	for(c = d->classes ; c ; c = c->next) {
+		if(!c->updated) continue;
 		if(c->isleaf && c->hasparent) break;
 	}
 	if(!c) {
-		debug(D_TC_LOOP, "TC: Ignoring TC device '%s'. No leaf classes.", d->name);
+		debug(D_TC_LOOP, "TC: Ignoring TC device '%s'. No leaf classes.", d->name?d->name:d->id);
 		return;
 	}
 
-	char var_name[4096 + 1];
-	snprintf(var_name, 4096, "qos for %s", d->id);
+	char var_name[CONFIG_MAX_NAME + 1];
+	snprintf(var_name, CONFIG_MAX_NAME, "qos for %s", d->id);
 	if(config_get_boolean("plugin:tc", var_name, enable_new_interfaces)) {
 		RRDSET *st = rrdset_find_bytype(RRD_TYPE_TC, d->id);
 		if(!st) {
-			debug(D_TC_LOOP, "TC: Committing new TC device '%s'", d->name);
+			debug(D_TC_LOOP, "TC: Committing new TC device '%s'", d->name?d->name:d->id);
 
-			st = rrdset_create(RRD_TYPE_TC, d->id, d->name, d->family, "Class Usage", "kilobits/s", 1000, rrd_update_every, RRDSET_TYPE_STACKED);
+			st = rrdset_create(RRD_TYPE_TC, d->id, d->name?d->name:d->id, d->family?d->family:d->id, "Class Usage", "kilobits/s", 1000, rrd_update_every, RRDSET_TYPE_STACKED);
 
-			for ( c = d->classes ; c ; c = c->next) {
+			for(c = d->classes ; c ; c = c->next) {
+				if(!c->updated) continue;
+
 				if(c->isleaf && c->hasparent)
-					rrddim_add(st, c->id, c->name, 8, 1024 * rrd_update_every, RRDDIM_INCREMENTAL);
+					rrddim_add(st, c->id, c->name?c->name:c->id, 8, 1024 * rrd_update_every, RRDDIM_INCREMENTAL);
 			}
 		}
 		else {
 			rrdset_next_plugins(st);
 
-			if(strcmp(d->id, d->name) != 0) rrdset_set_name(st, d->name);
+			if(d->name && strcmp(d->id, d->name) != 0) rrdset_set_name(st, d->name);
 		}
 
-		for ( c = d->classes ; c ; c = c->next) {
+		for(c = d->classes ; c ; c = c->next) {
+			if(!c->updated) continue;
+
 			if(c->isleaf && c->hasparent) {
 				if(rrddim_set(st, c->id, c->bytes) != 0) {
 					
 					// new class, we have to add it
-					rrddim_add(st, c->id, c->name, 8, 1024 * rrd_update_every, RRDDIM_INCREMENTAL);
+					rrddim_add(st, c->id, c->name?c->name:c->id, 8, 1024 * rrd_update_every, RRDDIM_INCREMENTAL);
 					rrddim_set(st, c->id, c->bytes);
 				}
 
 				// if it has a name, different to the id
-				if(strcmp(c->id, c->name) != 0) {
+				if(c->name) {
 					// update the rrd dimension with the new name
-					RRDDIM *rd;
-					for(rd = st->dimensions ; rd ; rd = rd->next) {
-						if(strcmp(rd->id, c->id) == 0) { rrddim_set_name(st, rd, c->name); break; }
-					}
+					RRDDIM *rd = rrddim_find(st, c->id);
+					if(rd) rrddim_set_name(st, rd, c->name);
+
+					free(c->name);
+					c->name = NULL;
 				}
 			}
+
+			c->updated = 0;
 		}
 		rrdset_done(st);
 	}
 }
 
-void tc_device_set_class_name(struct tc_device *d, char *id, char *name)
+static void tc_device_set_class_name(struct tc_device *d, char *id, char *name)
 {
-	struct tc_class *c;
-	for ( c = d->classes ; c ; c = c->next) {
-		if(strcmp(c->id, id) == 0) {
-			strncpy(c->name, name, RRD_ID_LENGTH_MAX);
-			// no need for null termination - it is already null
-			break;
-		}
+	struct tc_class *c = tc_class_index_find(d, id, 0);
+	if(c) {
+		if(c->name) free(c->name);
+		c->name = NULL;
+
+		if(name && *name && strcmp(c->id, name) != 0) c->name = strdup(name);
 	}
 }
 
-void tc_device_set_device_name(struct tc_device *d, char *name)
-{
-	strncpy(d->name, name, RRD_ID_LENGTH_MAX);
+static void tc_device_set_device_name(struct tc_device *d, char *name) {
+	if(d->name) free(d->name);
+	d->name = NULL;
+
+	if(name && *name && strcmp(d->id, name) != 0) d->name = strdup(name);
+}
+
+static void tc_device_set_device_family(struct tc_device *d, char *family) {
+	if(d->family) free(d->family);
+	d->family = NULL;
+
+	if(family && *family && strcmp(d->id, family) != 0) d->family = strdup(family);
 	// no need for null termination - it is already null
 }
 
-void tc_device_set_device_family(struct tc_device *d, char *name)
+static struct tc_device *tc_device_create(char *id)
 {
-	strncpy(d->family, name, RRD_ID_LENGTH_MAX);
-	// no need for null termination - it is already null
-}
+	struct tc_device *d = tc_device_index_find(id, 0);
 
-struct tc_device *tc_device_create(char *name)
-{
-	struct tc_device *d;
-
-	d = calloc(1, sizeof(struct tc_device));
 	if(!d) {
-		fatal("Cannot allocate memory for tc_device %s", name);
-		return NULL;
+
+		d = calloc(1, sizeof(struct tc_device));
+		if(!d) {
+			fatal("Cannot allocate memory for tc_device %s", id);
+			return NULL;
+		}
+
+		d->id = strdup(id);
+		d->hash = simple_hash(d->id);
+
+		d->classes_index.root = NULL;
+		d->classes_index.compar = tc_class_compare;
+
+		tc_device_index_add(d);
 	}
-
-	strncpy(d->id, name, RRD_ID_LENGTH_MAX);
-	strcpy(d->name, d->id);
-	strcpy(d->family, d->id);
-
-	// no need for null termination on the strings, because of calloc()
 
 	return(d);
 }
 
-struct tc_class *tc_class_add(struct tc_device *n, char *id, char *parentid, char *leafid)
+static struct tc_class *tc_class_add(struct tc_device *n, char *id, char *parentid, char *leafid)
 {
-	struct tc_class *c;
+	// fprintf(stderr, "Adding class id '%s', parentid '%s', leafid '%s'\n", id, parentid, leafid);
 
-	c = calloc(1, sizeof(struct tc_class));
+	struct tc_class *c = tc_class_index_find(n, id, 0);
 	if(!c) {
-		fatal("Cannot allocate memory for tc class");
-		return NULL;
+		c = calloc(1, sizeof(struct tc_class));
+		if(!c) {
+			fatal("Cannot allocate memory for tc class");
+			return NULL;
+		}
+
+		c->next = n->classes;
+		n->classes = c;
+
+		c->id = strdup(id);
+		if(!c->id) {
+			free(c);
+			return NULL;
+		}
+		c->hash = simple_hash(c->id);
+
+		if(parentid && *parentid) {
+			c->parentid = strdup(parentid);
+			c->parent_hash = simple_hash(c->parentid);
+		}
+
+		if(leafid && *leafid) {
+			c->leafid = strdup(leafid);
+			c->leaf_hash = simple_hash(c->leafid);
+		}
+
+		tc_class_index_add(n, c);
 	}
-
-	c->next = n->classes;
-	n->classes = c;
-
-	strncpy(c->id, id, RRD_ID_LENGTH_MAX);
-	strcpy(c->name, c->id);
-	if(parentid) strncpy(c->parentid, parentid, RRD_ID_LENGTH_MAX);
-	if(leafid) strncpy(c->leafid, leafid, RRD_ID_LENGTH_MAX);
-
-	// no need for null termination on the strings, because of calloc()
 
 	return(c);
 }
-
-void tc_class_free(struct tc_class *c)
+/*
+static void tc_class_free_all(struct tc_device *n, struct tc_class *c)
 {
-	if(c->next) tc_class_free(c->next);
+	if(c->next) tc_class_free_all(n, c->next);
+	tc_class_index_del(n, c);
+
+	if(c->id) free(c->id);
+	if(c->name) free(c->name);
+	if(c->leafid) free(c->leafid);
+	if(c->parentid) free(c->parentid);
+
 	free(c);
 }
 
-void tc_device_free(struct tc_device *n)
+static void tc_device_free(struct tc_device *n)
 {
-	if(n->classes) tc_class_free(n->classes);
+	tc_device_index_del(n);
+	if(n->classes) tc_class_free_all(n, n->classes);
+
+	if(n->id) free(n->id);
+	if(n->name) free(n->name);
+	if(n->family) free(n->family);
+
 	free(n);
+}
+*/
+
+#define MAX_WORDS 20
+
+int tc_space(char c) {
+	switch(c) {
+	case ' ':
+	case '\t':
+	case '\r':
+	case '\n':
+		return 1;
+
+	default:
+		return 0;
+	}
+}
+
+void tc_split_words(char *str, char **words, int max_words) {
+	char *s = str;
+	int i = 0;
+
+	// skip all white space
+	while(tc_space(*s)) s++;
+
+	// store the first word
+	words[i++] = s;
+
+	// while we have something
+	while(*s) {
+		// if it is a space
+		if(tc_space(*s)) {
+
+			// terminate the word
+			*s++ = '\0';
+
+			// skip all white space
+			while(tc_space(*s)) s++;
+
+			// if we reached the end, stop
+			if(!*s) break;
+
+			// store the next word
+			if(i < max_words) words[i++] = s;
+			else break;
+		}
+		else s++;
+	}
+
+	// terminate the words
+	while(i < max_words) words[i++] = NULL;
 }
 
 pid_t tc_child_pid = 0;
@@ -211,6 +388,19 @@ void *tc_main(void *ptr)
 		error("Cannot set pthread cancel state to ENABLE.");
 
 	char buffer[TC_LINE_MAX+1] = "";
+	char *words[MAX_WORDS] = { NULL };
+
+	uint32_t BEGIN_HASH = simple_hash("BEGIN");
+	uint32_t END_HASH = simple_hash("END");
+	uint32_t CLASS_HASH = simple_hash("class");
+	uint32_t SENT_HASH = simple_hash("Sent");
+	uint32_t SETDEVICENAME_HASH = simple_hash("SETDEVICENAME");
+	uint32_t SETDEVICEGROUP_HASH = simple_hash("SETDEVICEGROUP");
+	uint32_t SETCLASSNAME_HASH = simple_hash("SETCLASSNAME");
+#ifdef DETACH_PLUGINS_FROM_NETDATA
+	uint32_t MYPID_HASH = simple_hash("MYPID");
+#endif
+	uint32_t first_hash;
 
 	for(;1;) {
 		FILE *fp;
@@ -228,55 +418,27 @@ void *tc_main(void *ptr)
 
 		while(fgets(buffer, TC_LINE_MAX, fp) != NULL) {
 			buffer[TC_LINE_MAX] = '\0';
-			char *b = buffer, *p;
 			// debug(D_TC_LOOP, "TC: read '%s'", buffer);
 
-			p = strsep(&b, " \n");
-			while (p && (*p == ' ' || *p == '\0')) p = strsep(&b, " \n");
-			if(!p) continue;
-
-			if(strcmp(p, "END") == 0) {
-				if(device) {
-					if(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL) != 0)
-						error("Cannot set pthread cancel state to DISABLE.");
-
-					tc_device_commit(device);
-					tc_device_free(device);
-					device = NULL;
-					class = NULL;
-
-					if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-						error("Cannot set pthread cancel state to ENABLE.");
-				}
+			tc_split_words(buffer, words, MAX_WORDS);
+			if(!words[0] || !*words[0]) {
+				// debug(D_TC_LOOP, "empty line");
+				continue;
 			}
-			else if(strcmp(p, "BEGIN") == 0) {
-				if(device) {
-					tc_device_free(device);
-					device = NULL;
-					class = NULL;
-				}
+			// else debug(D_TC_LOOP, "First word is '%s'", words[0]);
 
-				p = strsep(&b, " \n");
-				if(p && *p) {
-					device = tc_device_create(p);
-					class = NULL;
-				}
-			}
-			else if(device && (strcmp(p, "class") == 0)) {
-				p = strsep(&b, " \n"); // the class: htb, fq_codel, etc
-				char *id       = strsep(&b, " \n"); // the class major:minor
-				char *parent   = strsep(&b, " \n"); // 'parent' or 'root'
-				char *parentid = strsep(&b, " \n"); // the parent's id
-				char *leaf     = strsep(&b, " \n"); // 'leaf'
-				char *leafid   = strsep(&b, " \n"); // leafid
+			first_hash = simple_hash(words[0]);
 
-				if(id && *id
-					&& parent && *parent
-					&& parentid && *parentid
-					&& (
-						(strcmp(parent, "parent") == 0 && parentid && *parentid)
-						|| strcmp(parent, "root") == 0
-					)) {
+			if(first_hash == CLASS_HASH && strcmp(words[0], "class") == 0 && device) {
+				// debug(D_TC_LOOP, "CLASS line on class id='%s', parent='%s', parentid='%s', leaf='%s', leafid='%s'", words[2], words[3], words[4], words[5], words[6]);
+
+				if(words[1] && words[2] && words[3] && words[4] && (strcmp(words[3], "parent") == 0 || strcmp(words[3], "root") == 0)) {
+					// char *type     = words[1];  // the class: htb, fq_codel, etc
+					char *id       = words[2];	// the class major:minor
+					char *parent   = words[3];	// 'parent' or 'root'
+					char *parentid = words[4];	// the parent's id
+					char *leaf     = words[5];	// 'leaf'
+					char *leafid   = words[6];	// leafid
 
 					if(strcmp(parent, "root") == 0) {
 						parentid = NULL;
@@ -295,26 +457,62 @@ void *tc_main(void *ptr)
 					class = tc_class_add(device, id, parentid, leafid);
 				}
 			}
-			else if(device && class && (strcmp(p, "Sent") == 0)) {
-				p = strsep(&b, " \n");
-				if(p && *p) class->bytes = atoll(p);
+			else if(first_hash == END_HASH && strcmp(words[0], "END") == 0) {
+				// debug(D_TC_LOOP, "END line");
+
+				if(device) {
+					if(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL) != 0)
+						error("Cannot set pthread cancel state to DISABLE.");
+
+					tc_device_commit(device);
+					// tc_device_free(device);
+					device = NULL;
+					class = NULL;
+
+					if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
+						error("Cannot set pthread cancel state to ENABLE.");
+				}
 			}
-			else if(device && (strcmp(p, "SETDEVICENAME") == 0)) {
-				char *name = strsep(&b, " \n");
-				if(name && *name) tc_device_set_device_name(device, name);
+			else if(first_hash == BEGIN_HASH && strcmp(words[0], "BEGIN") == 0) {
+				// debug(D_TC_LOOP, "BEGIN line on device '%s'", words[1]);
+
+				if(device) {
+					// tc_device_free(device);
+					device = NULL;
+					class = NULL;
+				}
+
+				if(words[1] && *words[1]) {
+					device = tc_device_create(words[1]);
+					class = NULL;
+				}
 			}
-			else if(device && (strcmp(p, "SETDEVICEGROUP") == 0)) {
-				char *name = strsep(&b, " \n");
-				if(name && *name) tc_device_set_device_family(device, name);
+			else if(first_hash == SENT_HASH && strcmp(words[0], "Sent") == 0 && device && class) {
+				// debug(D_TC_LOOP, "SENT line '%s'", words[1]);
+				if(words[1] && *words[1]) {
+					class->bytes = atoll(words[1]);
+					class->updated = 1;
+				}
+				else class->bytes = 0;
 			}
-			else if(device && (strcmp(p, "SETCLASSNAME") == 0)) {
-				char *id    = strsep(&b, " \n");
-				char *path  = strsep(&b, " \n");
+			else if(first_hash == SETDEVICENAME_HASH && strcmp(words[0], "SETDEVICENAME") == 0 && device) {
+				// debug(D_TC_LOOP, "SETDEVICENAME line '%s'", words[1]);
+				if(words[1] && *words[1]) tc_device_set_device_name(device, words[1]);
+			}
+			else if(first_hash == SETDEVICEGROUP_HASH && strcmp(words[0], "SETDEVICEGROUP") == 0 && device) {
+				// debug(D_TC_LOOP, "SETDEVICEGROUP line '%s'", words[1]);
+				if(words[1] && *words[1]) tc_device_set_device_family(device, words[1]);
+			}
+			else if(first_hash == SETCLASSNAME_HASH && strcmp(words[0], "SETCLASSNAME") == 0 && device) {
+				// debug(D_TC_LOOP, "SETCLASSNAME line '%s' '%s'", words[1], words[2]);
+				char *id    = words[1];
+				char *path  = words[2];
 				if(id && *id && path && *path) tc_device_set_class_name(device, id, path);
 			}
 #ifdef DETACH_PLUGINS_FROM_NETDATA
-			else if((strcmp(p, "MYPID") == 0)) {
-				char *id = strsep(&b, " \n");
+			else if(first_hash == MYPID_HASH && (strcmp(words[0], "MYPID") == 0)) {
+				// debug(D_TC_LOOP, "MYPID line '%s'", words[1]);
+				char *id = words[1];
 				pid_t pid = atol(id);
 
 				if(pid) tc_child_pid = pid;
@@ -322,11 +520,14 @@ void *tc_main(void *ptr)
 				debug(D_TC_LOOP, "TC: Child PID is %d.", tc_child_pid);
 			}
 #endif
+			//else {
+			//	debug(D_TC_LOOP, "IGNORED line");
+			//}
 		}
 		mypclose(fp);
 
 		if(device) {
-			tc_device_free(device);
+			// tc_device_free(device);
 			device = NULL;
 			class = NULL;
 		}

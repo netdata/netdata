@@ -202,7 +202,7 @@ procfile *ff = NULL;
 long get_processors(void) {
 	int processors = 0;
 
-	ff = procfile_reopen(ff, "/proc/stat", "");
+	ff = procfile_reopen(ff, "/proc/stat", "", PROCFILE_FLAG_DEFAULT);
 	if(!ff) return 1;
 
 	ff = procfile_readall(ff);
@@ -227,7 +227,7 @@ long get_processors(void) {
 long get_pid_max(void) {
 	long mpid = 32768;
 
-	ff = procfile_reopen(ff, "/proc/sys/kernel/pid_max", "");
+	ff = procfile_reopen(ff, "/proc/sys/kernel/pid_max", "", PROCFILE_FLAG_DEFAULT);
 	if(!ff) return mpid;
 
 	ff = procfile_readall(ff);
@@ -260,7 +260,7 @@ unsigned long long get_hertz(void)
 	hz = (sizeof(long)==sizeof(int) || htons(999)==999) ? 100UL : 1024UL;
 #endif
 
-	error("apps.plugin: ERROR: unknown HZ value. Assuming %llu.", hz);
+	error("Unknown HZ value. Assuming %llu.", hz);
 	return hz;
 }
 
@@ -353,7 +353,7 @@ struct target *get_target(const char *id, struct target *target)
 	
 	w = calloc(sizeof(struct target), 1);
 	if(!w) {
-		error("apps.plugin: cannot allocate %lu bytes of memory", (unsigned long)sizeof(struct target));
+		error("Cannot allocate %lu bytes of memory", (unsigned long)sizeof(struct target));
 		return NULL;
 	}
 
@@ -383,7 +383,7 @@ int read_process_groups(const char *name)
 	if(debug) fprintf(stderr, "apps.plugin: process groups file: '%s'\n", filename);
 	FILE *fp = fopen(filename, "r");
 	if(!fp) {
-		error("apps.plugin: ERROR: cannot open file '%s' (%s)", filename, strerror(errno));
+		error("Cannot open file '%s' (%s)", filename, strerror(errno));
 		return 1;
 	}
 
@@ -444,7 +444,7 @@ int read_process_groups(const char *name)
 		}
 
 		if(w) strncpy(w->name, t, MAX_NAME);
-		if(!count) error("apps.plugin: ERROR: the line %ld on file '%s', for group '%s' does not state any process names.", line, filename, t);
+		if(!count) error("The line %ld on file '%s', for group '%s' does not state any process names.", line, filename, t);
 	}
 	fclose(fp);
 
@@ -567,13 +567,13 @@ struct pid_stat *get_pid_entry(pid_t pid)
 
 	all_pids[pid] = calloc(sizeof(struct pid_stat), 1);
 	if(!all_pids[pid]) {
-		error("apps.plugin: ERROR: Cannot allocate %lu bytes of memory", (unsigned long)sizeof(struct pid_stat));
+		error("Cannot allocate %lu bytes of memory", (unsigned long)sizeof(struct pid_stat));
 		return NULL;
 	}
 
 	all_pids[pid]->fds = calloc(sizeof(int), 100);
 	if(!all_pids[pid]->fds)
-		error("apps.plugin: ERROR: Cannot allocate %ld bytes of memory", (unsigned long)(sizeof(int) * 100));
+		error("Cannot allocate %ld bytes of memory", (unsigned long)(sizeof(int) * 100));
 	else all_pids[pid]->fds_size = 100;
 
 	if(root_of_pids) root_of_pids->prev = all_pids[pid];
@@ -610,7 +610,7 @@ int read_proc_pid_stat(struct pid_stat *p) {
 
 	snprintf(filename, FILENAME_MAX, "/proc/%d/stat", p->pid);
 
-	ff = procfile_reopen(ff, filename, "");
+	ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
 	if(!ff) return 1;
 
 	ff = procfile_readall(ff);
@@ -699,7 +699,7 @@ int read_proc_pid_statm(struct pid_stat *p) {
 
 	snprintf(filename, FILENAME_MAX, "/proc/%d/statm", p->pid);
 
-	ff = procfile_reopen(ff, filename, "");
+	ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
 	if(!ff) return 1;
 
 	ff = procfile_readall(ff);
@@ -727,7 +727,7 @@ int read_proc_pid_io(struct pid_stat *p) {
 
 	snprintf(filename, FILENAME_MAX, "/proc/%d/io", p->pid);
 
-	ff = procfile_reopen(ff, filename, "");
+	ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
 	if(!ff) return 1;
 
 	ff = procfile_readall(ff);
@@ -875,9 +875,9 @@ void file_descriptor_not_used(int id)
 			}
 		}
 		else
-			error("apps.plugin: ERROR: request to decrease counter of fd %d (%s), while the use counter is 0", id, all_files[id].name);
+			error("Request to decrease counter of fd %d (%s), while the use counter is 0", id, all_files[id].name);
 	}
-	else	error("apps.plugin: ERROR: request to decrease counter of fd %d, which is outside the array size (1 to %d)", id, all_files_size);
+	else	error("Request to decrease counter of fd %d, which is outside the array size (1 to %d)", id, all_files_size);
 }
 
 unsigned long file_descriptor_find_or_add(const char *name)
@@ -940,7 +940,7 @@ unsigned long file_descriptor_find_or_add(const char *name)
 			if(debug) fprintf(stderr, "apps.plugin:   >> Examining slot %d.\n", c);
 
 			if(all_files[c].magic == 0x0BADCAFE && all_files[c].name && file_descriptor_find(all_files[c].name, all_files[c].hash))
-				error("apps.plugin: fd on position %d is not cleared properly. It still has %s in it.\n", c, all_files[c].name);
+				error("fd on position %d is not cleared properly. It still has %s in it.\n", c, all_files[c].name);
 
 			if(debug) fprintf(stderr, "apps.plugin:   >> %s fd position %d for %s (last name: %s)\n", all_files[c].name?"re-using":"using", c, name, all_files[c].name);
 			if(all_files[c].name) free((void *)all_files[c].name);
@@ -1042,7 +1042,9 @@ int update_from_proc(void)
 		// /proc/<pid>/stat
 
 		if(read_proc_pid_stat(p)) {
-			error("Cannot process /proc/%d/stat", pid);
+			if(!count_errors++ || debug || (p->target && p->target->debug))
+				error("Cannot process /proc/%d/stat", pid);
+
 			continue;
 		}
 		if(p->ppid < 0 || p->ppid > pid_max) p->ppid = 0;
@@ -1052,7 +1054,9 @@ int update_from_proc(void)
 		// /proc/<pid>/statm
 
 		if(read_proc_pid_statm(p)) {
-			error("Cannot process /proc/%d/statm", pid);
+			if(!count_errors++ || debug || (p->target && p->target->debug))
+				error("Cannot process /proc/%d/statm", pid);
+
 			continue;
 		}
 
@@ -1061,7 +1065,9 @@ int update_from_proc(void)
 		// /proc/<pid>/io
 
 		if(read_proc_pid_io(p)) {
-			error("Cannot process /proc/%d/io", pid);
+			if(!count_errors++ || debug || (p->target && p->target->debug))
+				error("Cannot process /proc/%d/io", pid);
+
 			continue;
 		}
 
@@ -1111,7 +1117,7 @@ int update_from_proc(void)
 					if(debug) fprintf(stderr, "apps.plugin: extending fd memory slots for %s from %d to %d\n", p->comm, p->fds_size, fdid + 100);
 					p->fds = realloc(p->fds, (fdid + 100) * sizeof(int));
 					if(!p->fds) {
-						error("apps.plugin: ERROR: cannot re-allocate fds for %s", p->comm);
+						error("Cannot re-allocate fds for %s", p->comm);
 						break;
 					}
 
@@ -1128,7 +1134,7 @@ int update_from_proc(void)
 					if(l == -1) {
 						if(debug || (p->target && p->target->debug)) {
 							if(!count_errors++ || debug || (p->target && p->target->debug))
-								error("apps.plugin: ERROR: cannot read link %s", fdname);
+								error("Cannot read link %s", fdname);
 						}
 						continue;
 					}
@@ -1161,7 +1167,7 @@ int update_from_proc(void)
 		p->updated = 1;
 	}
 	if(count_errors > 1000) {
-		error("apps.plugin: ERROR: %ld more errors encountered\n", count_errors - 1);
+		error("%ld more errors encountered\n", count_errors - 1);
 		count_errors = 0;
 	}
 
@@ -1199,7 +1205,7 @@ void update_statistics(void)
 			p->parent = all_pids[p->ppid];
 			p->parent->childs++;
 		}
-		else if(p->ppid != 0) error("apps.plugin: \t\tWRONG! pid %d %s states parent %d, but the later does not exist.", p->pid, p->comm, p->ppid);
+		else if(p->ppid != 0) error("pid %d %s states parent %d, but the later does not exist.", p->pid, p->comm, p->ppid);
 	}
 
 	// find all the procs with 0 childs and merge them to their parents
@@ -1309,10 +1315,10 @@ void update_statistics(void)
 			}
 		}
 
-		if(diff_utime) error("apps.plugin: \t cannot fix up utime %llu", diff_utime);
-		if(diff_stime) error("apps.plugin: \t cannot fix up stime %llu", diff_stime);
-		if(diff_minflt) error("apps.plugin: \t cannot fix up minflt %llu", diff_minflt);
-		if(diff_majflt) error("apps.plugin: \t cannot fix up majflt %llu", diff_majflt);
+		if(diff_utime) error("Cannot fix up utime %llu", diff_utime);
+		if(diff_stime) error("Cannot fix up stime %llu", diff_stime);
+		if(diff_minflt) error("Cannot fix up minflt %llu", diff_minflt);
+		if(diff_majflt) error("Cannot fix up majflt %llu", diff_majflt);
 	}
 #endif
 
@@ -1324,7 +1330,7 @@ void update_statistics(void)
 
 		w->fds = calloc(sizeof(int), all_files_size);
 		if(!w->fds)
-			error("apps.plugin: ERROR: cannot allocate memory for fds in %s", w->name);
+			error("Cannot allocate memory for fds in %s", w->name);
 	
 		w->minflt = 0;
 		w->majflt = 0;
@@ -1362,7 +1368,7 @@ void update_statistics(void)
 	// concentrate everything on the targets
 	for(p = root_of_pids; p ; p = p->next) {
 		if(!p->target) {
-			error("apps.plugin: ERROR: pid %d %s was left without a target!", p->pid, p->comm);
+			error("pid %d %s was left without a target!", p->pid, p->comm);
 			continue;
 		}
 
@@ -1410,7 +1416,7 @@ void update_statistics(void)
 					if(p->target->fds) p->target->fds[p->fds[c]]++;
 				}
 				else
-					error("apps.plugin: ERROR: invalid fd number %d", p->fds[c]);
+					error("Invalid fd number %d", p->fds[c]);
 			}
 
 			if(debug || p->target->debug) fprintf(stderr, "apps.plugin: \tAgregating %s pid %d on %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, p->target->name, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
@@ -1876,7 +1882,7 @@ void parse_args(int argc, char **argv)
 			continue;
 		}
 
-		error("apps.plugin: ERROR: cannot understand option %s", argv[i]);
+		error("Cannot understand option %s", argv[i]);
 		exit(1);
 	}
 
@@ -1884,7 +1890,7 @@ void parse_args(int argc, char **argv)
 	if(!name) name = "groups";
 
 	if(read_process_groups(name)) {
-		error("apps.plugin: ERROR: cannot read process groups %s", name);
+		error("Cannot read process groups %s", name);
 		exit(1);
 	}
 }
@@ -1893,7 +1899,10 @@ int main(int argc, char **argv)
 {
 	// debug_flags = D_PROCFILE;
 
-	info("apps.plugin: starting...");
+	// set the name for logging
+	program_name = "apps.plugin";
+
+	info("starting...");
 
 	procfile_adaptive_initial_allocation = 1;
 
@@ -1906,7 +1915,7 @@ int main(int argc, char **argv)
 
 	all_pids = calloc(sizeof(struct pid_stat *), pid_max);
 	if(!all_pids) {
-		error("apps.plugin: ERROR: cannot allocate %lu bytes of memory.", sizeof(struct pid_stat *) * pid_max);
+		error("Cannot allocate %lu bytes of memory.", sizeof(struct pid_stat *) * pid_max);
 		printf("DISABLE\n");
 		exit(1);
 	}
@@ -1918,7 +1927,7 @@ int main(int argc, char **argv)
 
 	for(;1; counter++) {
 		if(!update_from_proc()) {
-			error("apps.plugin: ERROR: cannot allocate %lu bytes of memory.", sizeof(struct pid_stat *) * pid_max);
+			error("Cannot allocate %lu bytes of memory.", sizeof(struct pid_stat *) * pid_max);
 			printf("DISABLE\n");
 			exit(1);
 		}

@@ -110,6 +110,9 @@ int main(int argc, char **argv)
 	int i;
 	int config_loaded = 0;
 
+	// set the name for logging
+	program_name = "netdata";
+
 	// parse  the arguments
 	for(i = 1; i < argc ; i++) {
 		if(strcmp(argv[i], "-c") == 0 && (i+1) < argc) {
