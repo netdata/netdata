@@ -42,6 +42,7 @@ void *proc_main(void *ptr)
 	int vdo_proc_meminfo 			= !config_get_boolean("plugin:proc", "/proc/meminfo", 1);
 	int vdo_proc_vmstat 			= !config_get_boolean("plugin:proc", "/proc/vmstat", 1);
 	int vdo_proc_net_rpc_nfsd		= !config_get_boolean("plugin:proc", "/proc/net/rpc/nfsd", 1);
+	int vdo_proc_sys_kernel_random_entropy_avail	= !config_get_boolean("plugin:proc", "/proc/sys/kernel/random/entropy_avail", 1);
 	int vdo_cpu_netdata 			= !config_get_boolean("plugin:proc", "netdata server resources", 1);
 
 	RRDSET *stcpu = NULL, *stclients = NULL, *streqs = NULL, *stbytes = NULL;
@@ -54,6 +55,10 @@ void *proc_main(void *ptr)
 		
 		// BEGIN -- the job to be done
 		
+		if(!vdo_proc_sys_kernel_random_entropy_avail) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_sys_kernel_random_entropy_avail().");
+			vdo_proc_sys_kernel_random_entropy_avail = do_proc_sys_kernel_random_entropy_avail(rrd_update_every, usec+susec);
+		}
 		if(!vdo_proc_net_dev) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_dev().");
 			vdo_proc_net_dev = do_proc_net_dev(rrd_update_every, usec+susec);
