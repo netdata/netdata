@@ -384,7 +384,7 @@ static void tc_device_free(struct tc_device *n)
 
 #define MAX_WORDS 20
 
-int tc_space(char c) {
+static inline int tc_space(char c) {
 	switch(c) {
 	case ' ':
 	case '\t':
@@ -397,7 +397,7 @@ int tc_space(char c) {
 	}
 }
 
-void tc_split_words(char *str, char **words, int max_words) {
+static void tc_split_words(char *str, char **words, int max_words) {
 	char *s = str;
 	int i = 0;
 

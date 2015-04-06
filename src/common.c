@@ -87,44 +87,6 @@ char *mystrsep(char **ptr, char *s)
 	return(p);
 }
 
-// like strsep() but:
-// it trims spaces before and after each value
-// it accepts quoted values in single or double quotes
-char *qstrsep(char **ptr)
-{
-	if(!*ptr || !**ptr) return NULL;
-	
-	char *s, *p = *ptr;
-
-	// skip leading spaces
-	while(isspace(*p)) p++;
-
-	// if the first char is a quote, assume quoted
-	if(*p == '"' || *p == '\'') {
-		char q = *p;
-		s = ++p;
-		while(*p && *p != q) p++;
-
-		if(*p == q) {
-			*p = '\0';
-			p++;
-		}
-
-		*ptr = p;
-		return s;
-	}
-
-	s = p;
-	while(*p && !isspace(*p)) p++;
-	if(!*p) *ptr = NULL;
-	else {
-		*p = '\0';
-		*ptr = ++p;
-	}
-
-	return s;
-}
-
 char *trim(char *s)
 {
 	// skip leading spaces

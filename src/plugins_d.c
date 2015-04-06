@@ -15,6 +15,85 @@
 
 struct plugind *pluginsd_root = NULL;
 
+#define MAX_WORDS 20
+
+static inline int pluginsd_space(char c) {
+	switch(c) {
+	case ' ':
+	case '\t':
+	case '\r':
+	case '\n':
+	case '=':
+		return 1;
+
+	default:
+		return 0;
+	}
+}
+
+static void pluginsd_split_words(char *str, char **words, int max_words) {
+	char *s = str, quote = 0;
+	int i = 0;
+
+	// skip all white space
+	while(pluginsd_space(*s)) s++;
+
+	// check for quote
+	if(*s == '\'' || *s == '"') {
+		quote = *s;	// remember the quote
+		s++;		// skip the quote
+	}
+
+	// store the first word
+	words[i++] = s;
+
+	// while we have something
+	while(*s) {
+		// if it is escape
+		if(*s == '\\' && s[1]) {
+			s += 2;
+			continue;
+		}
+
+		// if it is quote
+		else if(*s == quote) {
+			quote = 0;
+			*s = ' ';
+			continue;
+		}
+
+		// if it is a space
+		else if(quote == 0 && pluginsd_space(*s)) {
+
+			// terminate the word
+			*s++ = '\0';
+
+			// skip all white space
+			while(pluginsd_space(*s)) s++;
+
+			// check for quote
+			if(*s == '\'' || *s == '"') {
+				quote = *s;	// remember the quote
+				s++;		// skip the quote
+			}
+
+			// if we reached the end, stop
+			if(!*s) break;
+
+			// store the next word
+			if(i < max_words) words[i++] = s;
+			else break;
+		}
+
+		// anything else
+		else s++;
+	}
+
+	// terminate the words
+	while(i < max_words) words[i++] = NULL;
+}
+
+
 void *pluginsd_worker_thread(void *arg)
 {
 	struct plugind *cd = (struct plugind *)arg;
@@ -25,6 +104,19 @@ void *pluginsd_worker_thread(void *arg)
 	struct timeval last = {0, 0} , now = {0, 0};
 #endif
 
+	char *words[MAX_WORDS] = { NULL };
+	uint32_t SET_HASH = simple_hash("SET");
+	uint32_t BEGIN_HASH = simple_hash("BEGIN");
+	uint32_t END_HASH = simple_hash("END");
+	uint32_t FLUSH_HASH = simple_hash("FLUSH");
+	uint32_t CHART_HASH = simple_hash("CHART");
+	uint32_t DIMENSION_HASH = simple_hash("DIMENSION");
+	uint32_t DISABLE_HASH = simple_hash("DISABLE");
+#ifdef DETACH_PLUGINS_FROM_NETDATA
+	uint32_t MYPID_HASH = simple_hash("MYPID");
+	uint32_t STOPPING_WAKE_ME_UP_PLEASE_HASH = simple_hash("STOPPING_WAKE_ME_UP_PLEASE");
+#endif
+
 	while(1) {
 		FILE *fp = mypopen(cd->cmd, &cd->pid);
 		if(!fp) {
@@ -33,28 +125,38 @@ void *pluginsd_worker_thread(void *arg)
 		}
 
 		RRDSET *st = NULL;
-
 		unsigned long long count = 0;
+		char *s;
+		uint32_t hash;
+
 		while(fgets(line, PLUGINSD_LINE_MAX, fp) != NULL) {
-			char *p = trim(line);
-			debug(D_PLUGINSD, "PLUGINSD: %s: %s", cd->filename, line);
+			line[PLUGINSD_LINE_MAX] = '\0';
 
-			char *s = qstrsep(&p);
+			// debug(D_PLUGINSD, "PLUGINSD: %s: %s", cd->filename, line);
 
-			if(!s || !*s) continue;
-			else if(!strcmp(s, "SET")) {
-				char *t;
-				while((t = strchr(p, '='))) *t = ' ';
-				
-				char *dimension = qstrsep(&p);
-				char *value = qstrsep(&p);
+			pluginsd_split_words(line, words, MAX_WORDS);
+			s = words[0];
+			if(!s || !*s) {
+				// debug(D_PLUGINSD, "PLUGINSD: empty line");
+				continue;
+			}
 
-				if(!dimension || !*dimension || !value) {
-					error("PLUGINSD: '%s' is requesting a SET on chart '%s', like this: 'SET %s = %s'. Disabling it.", cd->fullfilename, st->id, dimension?dimension:"", value?value:"");
+			// debug(D_PLUGINSD, "PLUGINSD: words 0='%s' 1='%s' 2='%s' 3='%s' 4='%s' 5='%s' 6='%s' 7='%s' 8='%s' 9='%s'", words[0], words[1], words[2], words[3], words[4], words[5], words[6], words[7], words[8], words[9]);
+
+			hash = simple_hash(s);
+
+			if(hash == SET_HASH && !strcmp(s, "SET")) {
+				char *dimension = words[1];
+				char *value = words[2];
+
+				if(!dimension || !*dimension) {
+					error("PLUGINSD: '%s' is requesting a SET on chart '%s', like this: 'SET %s = %s'. Disabling it.", cd->fullfilename, st->id, dimension?dimension:"<nothing>", value?value:"<nothing>");
 					cd->enabled = 0;
 					kill(cd->pid, SIGTERM);
 					break;
 				}
+
+				if(!value || !*value) value = "0";
 
 				if(!st) {
 					error("PLUGINSD: '%s' is requesting a SET on dimension %s with value %s, without a BEGIN. Disabling it.", cd->fullfilename, dimension, value);
@@ -68,9 +170,9 @@ void *pluginsd_worker_thread(void *arg)
 
 				count++;
 			}
-			else if(!strcmp(s, "BEGIN")) {
-				char *id = qstrsep(&p);
-				char *microseconds_txt = qstrsep(&p);
+			else if(hash == BEGIN_HASH && !strcmp(s, "BEGIN")) {
+				char *id = words[1];
+				char *microseconds_txt = words[2];
 
 				if(!id) {
 					error("PLUGINSD: '%s' is requesting a BEGIN without a chart id. Disabling it.", cd->fullfilename);
@@ -94,7 +196,7 @@ void *pluginsd_worker_thread(void *arg)
 					else rrdset_next_plugins(st);
 				}
 			}
-			else if(!strcmp(s, "END")) {
+			else if(hash == END_HASH && !strcmp(s, "END")) {
 				if(!st) {
 					error("PLUGINSD: '%s' is requesting an END, without a BEGIN. Disabling it.", cd->fullfilename);
 					cd->enabled = 0;
@@ -107,27 +209,27 @@ void *pluginsd_worker_thread(void *arg)
 				rrdset_done(st);
 				st = NULL;
 			}
-			else if(!strcmp(s, "FLUSH")) {
+			else if(hash == FLUSH_HASH && !strcmp(s, "FLUSH")) {
 				debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting a FLUSH", cd->fullfilename);
 				st = NULL;
 			}
-			else if(!strcmp(s, "CHART")) {
+			else if(hash == CHART_HASH && !strcmp(s, "CHART")) {
 				st = NULL;
 
-				char *type = qstrsep(&p);
+				char *type = words[1];
 				char *id = NULL;
 				if(type) {
 					id = strchr(type, '.');
 					if(id) { *id = '\0'; id++; }
 				}
-				char *name = qstrsep(&p);
-				char *title = qstrsep(&p);
-				char *units = qstrsep(&p);
-				char *family = qstrsep(&p);
-				char *category = qstrsep(&p);
-				char *chart = qstrsep(&p);
-				char *priority_s = qstrsep(&p);
-				char *update_every_s = qstrsep(&p);
+				char *name = words[2];
+				char *title = words[3];
+				char *units = words[4];
+				char *family = words[5];
+				char *category = words[6];
+				char *chart = words[7];
+				char *priority_s = words[8];
+				char *update_every_s = words[9];
 
 				if(!type || !*type || !id || !*id) {
 					error("PLUGINSD: '%s' is requesting a CHART, without a type.id. Disabling it.", cd->fullfilename);
@@ -169,13 +271,13 @@ void *pluginsd_worker_thread(void *arg)
 				}
 				else debug(D_PLUGINSD, "PLUGINSD: Chart '%s' already exists. Not adding it again.", st->id);
 			}
-			else if(!strcmp(s, "DIMENSION")) {
-				char *id = qstrsep(&p);
-				char *name = qstrsep(&p);
-				char *algorithm = qstrsep(&p);
-				char *multiplier_s = qstrsep(&p);
-				char *divisor_s = qstrsep(&p);
-				char *hidden = qstrsep(&p);
+			else if(hash == DIMENSION_HASH && !strcmp(s, "DIMENSION")) {
+				char *id = words[1];
+				char *name = words[2];
+				char *algorithm = words[3];
+				char *multiplier_s = words[4];
+				char *divisor_s = words[5];
+				char *hidden = words[6];
 
 				if(!id || !*id) {
 					error("PLUGINSD: '%s' is requesting a DIMENSION, without an id. Disabling it.", cd->fullfilename);
@@ -218,21 +320,21 @@ void *pluginsd_worker_thread(void *arg)
 				}
 				else if(st->debug) debug(D_PLUGINSD, "PLUGINSD: dimension %s/%s already exists. Not adding it again.", st->id, id);
 			}
-			else if(!strcmp(s, "DISABLE")) {
+			else if(hash == DISABLE_HASH && !strcmp(s, "DISABLE")) {
 				error("PLUGINSD: '%s' called DISABLE. Disabling it.", cd->fullfilename);
 				cd->enabled = 0;
 				kill(cd->pid, SIGTERM);
 				break;
 			}
 #ifdef DETACH_PLUGINS_FROM_NETDATA
-			else if(!strcmp(s, "MYPID")) {
-				char *pid_s = qstrsep(&p);
+			else if(hash == MYPID_HASH && !strcmp(s, "MYPID")) {
+				char *pid_s = words[1];
 				pid_t pid = atol(pid_s);
 
 				if(pid) cd->pid = pid;
 				debug(D_PLUGINSD, "PLUGINSD: %s is on pid %d", cd->id, cd->pid);
 			}
-			else if(!strcmp(s, "STOPPING_WAKE_ME_UP_PLEASE")) {
+			else if(hash == STOPPING_WAKE_ME_UP_PLEASE_HASH && !strcmp(s, "STOPPING_WAKE_ME_UP_PLEASE")) {
 				error("PLUGINSD: '%s' (pid %d) called STOPPING_WAKE_ME_UP_PLEASE.", cd->fullfilename, cd->pid);
 
 				gettimeofday(&now, NULL);

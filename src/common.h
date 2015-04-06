@@ -9,7 +9,6 @@
 extern uint32_t simple_hash(const char *name);
 extern void strreverse(char* begin, char* end);
 extern char *mystrsep(char **ptr, char *s);
-extern char *qstrsep(char **ptr);
 extern char *trim(char *s);
 
 extern void *mymmap(const char *filename, unsigned long size, int flags);
