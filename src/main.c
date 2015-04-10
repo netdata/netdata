@@ -338,7 +338,10 @@ int main(int argc, char **argv)
 	// the main process - the web server listener
 	// this never ends
 	// socket_listen_main(NULL);
-	while(1) process_childs(1);
+	while(1) {
+		process_childs(1);
+		sleep(1);
+	}
 
 	exit(0);
 }
