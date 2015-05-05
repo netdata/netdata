@@ -366,7 +366,8 @@ void *pluginsd_worker_thread(void *arg)
 		}
 
 		// fgets() failed or loop broke
-		mypclose(fp);
+		mypclose(fp, cd->pid);
+		cd->pid = 0;
 
 		if(!count && cd->enabled) {
 			error("PLUGINSD: '%s' does not generate usefull output. Disabling it.", cd->fullfilename);

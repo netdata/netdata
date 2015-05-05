@@ -6,7 +6,46 @@
 
 #include "log.h"
 #include "popen.h"
+/*
+struct mypopen {
+	pid_t pid;
+	FILE *fp;
+	struct mypopen *next;
+	struct mypopen *prev;
+};
 
+static struct mypopen *mypopen_root = NULL;
+
+static void mypopen_add(FILE *fp, pid_t *pid) {
+	struct mypopen *mp = malloc(sizeof(struct mypopen));
+	if(!mp) {
+		fatal("Cannot allocate %zu bytes", sizeof(struct mypopen))
+		return;
+	}
+
+	mp->fp = fp;
+	mp->pid = pid;
+	mp->next = popen_root;
+	mp->prev = NULL;
+	if(mypopen_root) mypopen_root->prev = mp;
+	mypopen_root = mp;
+}
+
+static void mypopen_del(FILE *fp) {
+	struct mypopen *mp;
+
+	for(mp = mypopen_root; mp; mp = mp->next)
+		if(mp->fd == fp) break;
+
+	if(!mp) error("Cannot find mypopen() file pointer in open childs.");
+	else {
+		if(mp->next) mp->next->prev = mp->prev;
+		if(mp->prev) mp->prev->next = mp->next;
+		if(mypopen_root == mp) mypopen_root = mp->next;
+		free(mp);
+	}
+}
+*/
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 
@@ -27,6 +66,7 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 		*pidptr = pid;
 		close(pipefd[PIPE_WRITE]);
 		FILE *fp = fdopen(pipefd[PIPE_READ], "r");
+		/*mypopen_add(fp, pid);*/
 		return(fp);
 	}
 	// the child
@@ -68,7 +108,7 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 	fflush(NULL);
 #endif
 	
-	// ignore all signals
+	// reset all signals
 	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV) signal(i, SIG_DFL);
 
 	fprintf(stderr, "executing command: '%s' on pid %d.\n", command, getpid());
@@ -76,24 +116,12 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 	exit(1);
 }
 
-void mypclose(FILE *fp)
-{
-	// this is a very poor implementation of pclose()
-	// the caller should catch SIGCHLD and waitpid() on the exited child
-	// otherwise the child will be a zombie forever
-
+void mypclose(FILE *fp, pid_t pid) {
+	/*mypopen_del(fp);*/
 	fclose(fp);
-}
 
-void process_childs(int wait)
-{
 	siginfo_t info;
-	int options = WEXITED;
-	if(!wait) options |= WNOHANG;
-
-	info.si_pid = 0;
-	while(waitid(P_ALL, 0, &info, options) == 0) {
-		if(!info.si_pid) break;
+	if(waitid(P_PID, pid, &info, WEXITED) != -1) {
 		switch(info.si_code) {
 			case CLD_EXITED:
 				error("pid %d exited with code %d.", info.si_pid, info.si_status);
@@ -123,8 +151,6 @@ void process_childs(int wait)
 				error("pid %d gave us a SIGCHLD with code %d and status %d.", info.si_pid, info.si_code, info.si_status);
 				break;
 		}
-
-		// prevent an infinite loop
-		info.si_pid = 0;
 	}
+	else error("Cannot waitid() for pid %d", pid);
 }

@@ -316,8 +316,20 @@ int main(int argc, char **argv)
 
 
 	// catch all signals
-	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV && i != SIGFPE) signal(i,  sig_handler);
-	
+	for (i = 1 ; i < 65 ;i++) {
+		switch(i) {
+			case SIGSEGV:
+			case SIGFPE:
+			case SIGCHLD:
+				signal(i, SIG_DFL);
+				break;
+
+			default:
+				signal(i,  sig_handler);
+				break;
+		}
+	}
+
 	for (i = 0; static_threads[i].name != NULL ; i++) {
 		struct netdata_static_thread *st = &static_threads[i];
 
@@ -335,13 +347,8 @@ int main(int argc, char **argv)
 		else info("Not starting thread %s.", st->name);
 	}
 
-	// the main process - the web server listener
-	// this never ends
-	// socket_listen_main(NULL);
-	while(1) {
-		process_childs(1);
-		sleep(1);
-	}
+	// for future use - the main thread
+	while(1) sleep(60);
 
 	exit(0);
 }

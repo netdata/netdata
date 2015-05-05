@@ -37,8 +37,8 @@ void sig_handler(int signo)
 			signal(SIGQUIT, SIG_IGN);
 			signal(SIGHUP,  SIG_IGN);
 			signal(SIGINT,  SIG_IGN);
+			signal(SIGCHLD, SIG_IGN);
 			kill_childs();
-			process_childs(0);
 			rrdset_free_all();
 			//unlink("/var/run/netdata.pid");
 			info("NetData exiting. Bye bye...");
@@ -49,12 +49,6 @@ void sig_handler(int signo)
 			// this is received when web clients send a reset
 			// no need to log it.
 			// info("Ignoring signal %d. Errno: %d (%s)", signo, errno, strerror(errno));
-			break;
-
-
-		case SIGCHLD:
-			info("Received SIGCHLD (signal %d).", signo);
-			process_childs(0);
 			break;
 
 		default:
@@ -200,8 +194,8 @@ int become_daemon(int close_all_files, const char *input, const char *output, co
 	if (setsid() < 0)
 		exit(2);
 
-	signal(SIGCHLD, SIG_IGN);
-	signal(SIGHUP, SIG_IGN);
+	signal(SIGCHLD,  SIG_IGN);
+	signal(SIGHUP,   SIG_IGN);
 	signal(SIGWINCH, SIG_IGN);
 
 	// fork() again

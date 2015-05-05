@@ -9,7 +9,6 @@
 #define PIPE_WRITE 1
 
 extern FILE *mypopen(const char *command, pid_t *pidptr);
-extern void mypclose(FILE *fp);
-extern void process_childs(int wait);
+extern void mypclose(FILE *fp, pid_t pid);
 
 #endif /* NETDATA_POPEN_H */

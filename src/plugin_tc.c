@@ -580,7 +580,8 @@ void *tc_main(void *ptr)
 			//	debug(D_TC_LOOP, "IGNORED line");
 			//}
 		}
-		mypclose(fp);
+		mypclose(fp, tc_child_pid);
+		tc_child_pid = 0;
 
 		if(device) {
 			// tc_device_free(device);
