@@ -1150,7 +1150,7 @@ long web_client_receive(struct web_client *w)
 		// in this case, the error should be generated when the file has been sent to the client.
 
 		if(w->mode == WEB_CLIENT_MODE_FILECOPY) {
-			// we are copying data fron ifd to ofd
+			// we are copying data from ifd to ofd
 			// let it finish copying...
 			w->wait_receive = 0;
 			debug(D_WEB_CLIENT, "%llu: Disabling input.", w->id);
@@ -1219,62 +1219,56 @@ void *web_client_main(void *ptr)
 		}
 		else if(!retval) {
 			// timeout
-			web_client_reset(w);
-			w->obsolete = 1;
-			return NULL;
+			debug(D_WEB_CLIENT_ACCESS, "%llu: LISTENER: timeout.", w->id);
+			break;
 		}
 
 		if(FD_ISSET(w->ifd, &efds)) {
 			debug(D_WEB_CLIENT_ACCESS, "%llu: Received error on input socket (%s).", w->id, strerror(errno));
-			web_client_reset(w);
-			w->obsolete = 1;
-			return NULL;
+			break;
 		}
 
 		if(FD_ISSET(w->ofd, &efds)) {
 			debug(D_WEB_CLIENT_ACCESS, "%llu: Received error on output socket (%s).", w->id, strerror(errno));
-			web_client_reset(w);
-			w->obsolete = 1;
-			return NULL;
+			break;
 		}
 
 		if(w->wait_send && FD_ISSET(w->ofd, &ofds)) {
 			long bytes;
 			if((bytes = web_client_send(w)) < 0) {
-				debug(D_WEB_CLIENT, "%llu: Closing client (input: %s).", w->id, strerror(errno));
-				web_client_reset(w);
-				w->obsolete = 1;
+				debug(D_WEB_CLIENT, "%llu: Cannot send data to client. Closing client (ouput: %s).", w->id, strerror(errno));
 				errno = 0;
-				return NULL;
+				break;
 			}
-			else {
-				global_statistics_lock();
-				global_statistics.bytes_sent += bytes;
-				global_statistics_unlock();
-			}
+
+			global_statistics_lock();
+			global_statistics.bytes_sent += bytes;
+			global_statistics_unlock();
 		}
 
 		if(w->wait_receive && FD_ISSET(w->ifd, &ifds)) {
 			long bytes;
 			if((bytes = web_client_receive(w)) < 0) {
-				debug(D_WEB_CLIENT, "%llu: Closing client (output: %s).", w->id, strerror(errno));
-				web_client_reset(w);
-				w->obsolete = 1;
+				debug(D_WEB_CLIENT, "%llu: Cannot receive data from client. Closing client (input: %s).", w->id, strerror(errno));
 				errno = 0;
-				return NULL;
-			}
-			else {
-				if(w->mode != WEB_CLIENT_MODE_FILECOPY) {
-					global_statistics_lock();
-					global_statistics.bytes_received += bytes;
-					global_statistics_unlock();
-				}
+				break;
 			}
 
-			if(w->mode == WEB_CLIENT_MODE_NORMAL) web_client_process(w);
+			global_statistics_lock();
+			global_statistics.bytes_received += bytes;
+			global_statistics_unlock();
+
+			if(w->mode == WEB_CLIENT_MODE_NORMAL) {
+				debug(D_WEB_CLIENT, "%llu: Attempting to process received data.", w->id);
+				web_client_process(w);
+			}
 		}
 	}
+
 	debug(D_WEB_CLIENT, "%llu: done...", w->id);
+
+	web_client_reset(w);
+	w->obsolete = 1;
 
 	return NULL;
 }
