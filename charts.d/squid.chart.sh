@@ -1,7 +1,7 @@
 #!/bin/sh
 
 squid_host="127.0.0.1"
-squid_port="3127"
+squid_port="3128"
 squid_url="cache_object://$squid_host:$squid_port/counters"
 squid_update_every=5
 
@@ -16,6 +16,8 @@ EOF
 }
 
 squid_check() {
+	squid_url="cache_object://$squid_host:$squid_port/counters"
+
 	# check once if the url works
 	local x="$(squid_get_stats | grep client_http.requests)"
 	if [ ! $? -eq 0 -o -z "$x" ]
