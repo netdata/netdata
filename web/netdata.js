@@ -43,7 +43,7 @@ function generateChartURL(chart) {
 	return url;
 }
 
-function refreshChart(chart, doNext) {
+function renderChart(chart, doNext) {
 	if(canChartBeRefreshed(chart) == false) return false;
 
 	$.ajax({
@@ -69,7 +69,7 @@ function refreshChart(chart, doNext) {
 
 		// Instantiate and draw our chart, passing in some options.
 		if(!chart.chart) {
-			console.log('Creating new chart for ' + chart.url);
+			// console.log('Creating new chart for ' + chart.url);
 			if(chart.chartType == "LineChart")
 				chart.chart = new google.visualization.LineChart(document.getElementById(chart.div));
 			else
@@ -132,13 +132,13 @@ function calculateChartPointsToShow(c, divisor, maxtime, group) {
 	var dt = before - after;
 	if(dt > c.entries * c.update_every) dt = c.entries * c.update_every;
 
-	console.log('chart ' + c.id + ' internal duration is ' + dt + ' secs, requested maxtime is ' + maxtime + ' secs');
+	// console.log('chart ' + c.id + ' internal duration is ' + dt + ' secs, requested maxtime is ' + maxtime + ' secs');
 
 	if(maxtime) dt = maxtime;
 
 	var data_points = Math.round(dt / c.update_every);
 	var screen_points = Math.round(c.chartOptions.width / divisor);
-	console.log('screen = ' + screen_points + ', data = ' + data_points + ', divisor = ' + divisor);
+	// console.log('screen = ' + screen_points + ', data = ' + data_points + ', divisor = ' + divisor);
 
 	if(group == undefined || group <= 0) {
 		if(screen_points > data_points) {
@@ -170,7 +170,7 @@ function calculateChartPointsToShow(c, divisor, maxtime, group) {
 		c.points_to_show = Math.round(data_points / group);
 		//console.log("rendering with given group");
 	}
-	console.log('group = ' + c.group + ', points = ' + c.points_to_show);
+	// console.log('group = ' + c.group + ', points = ' + c.points_to_show);
 
 	// make sure the line width is not congesting the chart
 	if(c.chartType == 'LineChart') {

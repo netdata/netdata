@@ -20,8 +20,10 @@ var MAINCHART_CONTROL_HEIGHT = 75;		// how tall the control chart will be
 var MAINCHART_CONTROL_DIVISOR = 2;		// how much detailed will the control chart be? 1 = finest, higher is faster
 var MAINCHART_INITIAL_SELECTOR= 20;		// 1/20th of the width, this overrides MAINCHART_MAX_TIME_TO_SHOW
 
-var CHARTS_REFRESH_IDLE = 100;
+var CHARTS_REFRESH_LOOP = 100;
+var CHARTS_REFRESH_IDLE = 500;
 var CHARTS_CHECK_NO_FOCUS = 500;
+var CHARTS_SCROLL_IDLE = 300;
 
 var MODE_THUMBS = 1;
 var MODE_MAIN = 2;
@@ -81,6 +83,7 @@ function thumbChartActions(i, c, nogroup) {
 
 function mylog(txt) {
 	console.log(txt);
+	$('#logline').html(txt);
 }
 
 function chartssort(a, b) {
@@ -360,7 +363,7 @@ function setMainChartPlay(p) {
 		//};
 		//mainchart.last_updated = 0;
 		
-		//if(!refreshChart(mainchart, pauseGraphs))
+		//if(!renderChart(mainchart, pauseGraphs))
 		pauseGraphs();
 	}
 }
@@ -522,6 +525,19 @@ function chartsRefresh() {
 		// refresh_mode = REFRESH_ALWAYS;
 	}
 
+	if(last_user_scroll) {
+		var now = new Date().getTime();
+		if((now - last_user_scroll) >= CHARTS_SCROLL_IDLE) {
+			last_user_scroll = 0;
+			mylog('Scrolling: resuming refresh...');
+		}
+		else {
+			mylog('Scrolling: pausing refresh for ' + (CHARTS_SCROLL_IDLE - (now - last_user_scroll)) + ' ms...');
+			timeout = setTimeout(triggerRefresh, CHARTS_SCROLL_IDLE - (now - last_user_scroll));
+			return;
+		}
+	}
+
 	if(refresh_mode == REFRESH_PAUSED) {
 		if(mode == MODE_MAIN && mainchart.last_updated == 0) {
 			mainChartRefresh();
@@ -529,9 +545,9 @@ function chartsRefresh() {
 		}
 	}
 
-	     if(mode == MODE_THUMBS)		thumbChartsRefresh();
-	else if(mode == MODE_GROUP_THUMBS)  groupChartsRefresh();
-	else if(mode == MODE_MAIN)   		mainChartRefresh();
+	     if(mode == MODE_THUMBS)		timeout = setTimeout(thumbChartsRefresh, CHARTS_REFRESH_LOOP);
+	else if(mode == MODE_GROUP_THUMBS)  timeout = setTimeout(groupChartsRefresh, CHARTS_REFRESH_LOOP);
+	else if(mode == MODE_MAIN)   		timeout = setTimeout(mainChartRefresh, CHARTS_REFRESH_LOOP);
 	else                         		timeout = setTimeout(triggerRefresh, CHARTS_REFRESH_IDLE);
 }
 
@@ -567,7 +583,7 @@ function mainChartRefresh() {
 		return;
 	}
 
-	if(!refreshChart(mainchart, hiddenChartRefresh))
+	if(!renderChart(mainchart, hiddenChartRefresh))
 		hiddenChartRefresh();
 }
 
@@ -580,15 +596,15 @@ function roundRobinRefresh(charts, startat) {
 
 	// find a chart to refresh
 	var all = charts.length;
-	var cur = startat;
+	var cur = startat + 1;
 	var count = 0;
 
 	for(count = 0; count < all ; count++, cur++) {
 		if(cur >= all) cur = 0;
 
 		if(charts[cur].enabled) {
-			//mylog('going to refresh chart ' + charts[cur].name);
-			refreshed = refreshChart(charts[cur], chartsRefresh);
+			mylog('Rendering: ' + charts[cur].name);
+			refreshed = renderChart(charts[cur], chartsRefresh);
 			if(refreshed) break;
 		}
 	}
@@ -867,11 +883,18 @@ function clearGroupGraphs() {
 // Global entry point
 // initialize the thumb charts
 
+var last_user_scroll = 0;
+
 // load the charts from the server
 // generate html for the thumbgraphs to support them
 function initCharts() {
 	var width = thumbWidth();
 	var height = TARGET_THUMB_GRAPH_HEIGHT;
+
+	window.onscroll = function (e) {
+		last_user_scroll = new Date().getTime();
+		mylog('Scrolling: detected');
+	}
 
 	loadCharts(null, function(all) {
 		mycharts = all.charts;
@@ -993,7 +1016,7 @@ function initCharts() {
 		mainmenu += categoriesmainmenu;
 		mainmenu += familiesmainmenu;
 		mainmenu += chartsmainmenu;
-		mainmenu += "</ul>";
+		mainmenu += '<li role="presentation" class="disabled" style="display: none;"><a href="#" id="logline"></a></li></ul>';
 
 		thumbsContainer.innerHTML = allcategories;
 		switchToThumbGraphs();
@@ -1003,12 +1026,12 @@ function initCharts() {
 
 $(window).blur(function() {
 	page_is_visible = 0;
-	mylog('blur');
+	mylog('Lost Focus!');
 });
 
 $(window).focus(function() {
 	page_is_visible = 1;
-	mylog('focus');
+	mylog('Focus restored!');
 });
 
 // Set a callback to run when the Google Visualization API is loaded.

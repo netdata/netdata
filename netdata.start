@@ -83,7 +83,7 @@ do
 	test $ret -eq 0 && sleep 1
 done
 
-if [ "$USER" = "root" -a ! -z "$NETDATA_CONFIG_USER" ]
+if [ "$UID" = "0" -a ! -z "$NETDATA_CONFIG_USER" ]
 then
 	for x in "$NETDATA_CONFIG_WEB_DIR" "$NETDATA_CONFIG_CONF_DIR" "$NETDATA_CONFIG_CACHE_DIR" "$NETDATA_CONFIG_LOG_DIR"
 	do
@@ -93,7 +93,7 @@ then
 	done
 fi
 
-if [ ! "$USER" = "root" ]
+if [ ! "$UID" = "0" ]
 then
 	echo >&2 "WARNING: NOT RUNNING AS ROOT - CANNOT SWITCH TO USER $NETDATA_CONFIG_USER"
 	echo >&2 "WARNING: MAKE SURE FILES IN web/ ARE OWNED BY $USER - or it will not work"
