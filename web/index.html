@@ -37,7 +37,7 @@
       </div>
     </nav>
 
-    <div class="container graphs" id="maingraph_container" style="display: none">
+    <div class="container graphs" id="maingraph_container" style="display: none;">
 		<table>
 			<tr><td>
 		    	<div class="maingraph">
@@ -107,40 +107,43 @@
 		</table>
 	</div>
 
-    <div class="container graphs" id="thumbgraphs_container">
-    	<div class="allgraphs" id="thumbgraphs">
-    		<table width="100%">
-    			<tr><td id="splash" align="center" style="vertical-align:middle">
-    				<h1>
-    				Welcome to <b>NetData</b>!
-    				<br/><br/>
-    				<span class="glyphicon glyphicon-off"></span>
-    				<br/><br/>
-    				loading cosmos
-    				<br/><br/>
-    				<span class="label label-default">Please wait...</span>
-    				</h1>
-    			</td></tr>
-    		</table>
+    <div class="container graphs" id="thumbgraphs_container" style="display: none;">
+    	<div id="thumbgraphs">
     	</div>
 	</div>
 
-    <div class="container graphs" id="groupgraphs_container">
+    <div class="container graphs" id="groupgraphs_container" style="display: none;">
     	<div class="allgraphs" id="groupgraphs">
     	</div>
 	</div>
 
-    <div class="container graphs" id="groupgraphs_container">
-   	&nbsp;<p/>
-   	<hr/>
-    <h4>NetData</h4>
-    Realtime System Information over the web for all linux systems.
-    <p/>
-    Distributed under GPL.
-    <p/>
-    (c) 2015 Costa Tsaousis <a href="mailto:costa@tsaousis.gr">costa@tsaousis.gr</a>
-    <p/>
-    <div id="server_summary_id"></div>
+    <div class="container" id="splash_container">
+		<table width="100%">
+			<tr><td id="splash" align="center" style="vertical-align: middle; height: calc(100% / 2); overflow: auto;">
+				<h2>
+				Welcome to <b>NetData</b>!
+				<br/><br/>
+				<span class="glyphicon glyphicon-off"></span>
+				<br/><br/>
+				loading cosmos
+				<br/><br/>
+				<span class="label label-default">Please wait...</span>
+				</h2>
+			</td></tr>
+		</table>
+	</div>
+
+    <div class="container graphs" id="footer_container">
+   		&nbsp;<p/>
+   		<hr/>
+    	<h4>NetData</h4>
+    	Realtime System Information over the web for all linux systems.
+    	<p/>
+    	Distributed under GPL v2.
+    	<p/>
+    	(c) 2015 Costa Tsaousis <a href="mailto:costa@tsaousis.gr">costa@tsaousis.gr</a>
+    	<p/>
+    	<div id="server_summary_id"></div>
     </div>
 
 	<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>

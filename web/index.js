@@ -8,7 +8,7 @@ var THUMBS_MAX_TIME_TO_SHOW = 240;		// how much time the thumb charts will prese
 var THUMBS_POINTS_DIVISOR = 3;
 var THUMBS_STACKED_POINTS_DIVISOR = 3;
 
-var GROUPS_MAX_TIME_TO_SHOW = 120;		// how much time the thumb charts will present?
+var GROUPS_MAX_TIME_TO_SHOW = 120;		// how much time the group charts will present?
 var GROUPS_POINTS_DIVISOR = 2;
 var GROUPS_STACKED_POINTS_DIVISOR = 2;
 
@@ -20,10 +20,10 @@ var MAINCHART_CONTROL_HEIGHT = 75;		// how tall the control chart will be
 var MAINCHART_CONTROL_DIVISOR = 2;		// how much detailed will the control chart be? 1 = finest, higher is faster
 var MAINCHART_INITIAL_SELECTOR= 20;		// 1/20th of the width, this overrides MAINCHART_MAX_TIME_TO_SHOW
 
-var CHARTS_REFRESH_LOOP = 100;
-var CHARTS_REFRESH_IDLE = 500;
-var CHARTS_CHECK_NO_FOCUS = 500;
-var CHARTS_SCROLL_IDLE = 300;
+var CHARTS_REFRESH_LOOP = 100;			// delay between chart refreshes
+var CHARTS_REFRESH_IDLE = 500;			// delay between chart refreshes when no chart was ready for refresh the last time
+var CHARTS_CHECK_NO_FOCUS = 500;		// delay to check for visibility when the page has no focus
+var CHARTS_SCROLL_IDLE = 300;			// delay to wait after a page scroll
 
 var MODE_THUMBS = 1;
 var MODE_MAIN = 2;
@@ -603,9 +603,11 @@ function roundRobinRefresh(charts, startat) {
 		if(cur >= all) cur = 0;
 
 		if(charts[cur].enabled) {
-			mylog('Rendering: ' + charts[cur].name);
 			refreshed = renderChart(charts[cur], chartsRefresh);
-			if(refreshed) break;
+			if(refreshed) {
+				mylog('Refreshed: ' + charts[cur].name);
+				break;
+			}
 		}
 	}
 
@@ -777,6 +779,7 @@ function switchToMainGraph() {
 	document.getElementById('maingraph_container').style.display = 'block';
 	document.getElementById('thumbgraphs_container').style.display = 'none';
 	document.getElementById('groupgraphs_container').style.display = 'none';
+	document.getElementById('splash_container').style.display = 'none';
 
 	document.getElementById("main_menu_div").innerHTML = "<ul class=\"nav navbar-nav\"><li><a href=\"javascript:switchToThumbGraphs();\"><span class=\"glyphicon glyphicon-circle-arrow-left\"></span> Back to Dashboard</a></li><li class=\"active\"><a href=\"#\">" + mainchart.name + "</a></li>" + familiesmainmenu + chartsmainmenu + "</ul>";
 
@@ -793,6 +796,7 @@ function switchToThumbGraphs() {
 	document.getElementById('maingraph_container').style.display = 'none';
 	document.getElementById('thumbgraphs_container').style.display = 'block';
 	document.getElementById('groupgraphs_container').style.display = 'none';
+	document.getElementById('splash_container').style.display = 'none';
 
 	document.getElementById("main_menu_div").innerHTML = mainmenu;
 
@@ -814,6 +818,7 @@ function switchToGroupGraphs() {
 	document.getElementById('maingraph_container').style.display = 'none';
 	document.getElementById('thumbgraphs_container').style.display = 'none';
 	document.getElementById('groupgraphs_container').style.display = 'block';
+	document.getElementById('splash_container').style.display = 'none';
 
 	document.getElementById("main_menu_div").innerHTML = "<ul class=\"nav navbar-nav\"><li><a href=\"javascript:switchToThumbGraphs();\"><span class=\"glyphicon glyphicon-circle-arrow-left\"></span> Back to Dashboard</a></li><li class=\"active\"><a href=\"#\">" + group_charts[0].family + "</a></li>" + familiesmainmenu + chartsmainmenu + "</ul>";
 
