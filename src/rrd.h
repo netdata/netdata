@@ -15,6 +15,10 @@ extern int rrd_update_every;
 #define RRD_HISTORY_ENTRIES_MAX (86400*10)
 extern int rrd_default_history_entries;
 
+// time in seconds to delete unupdated dimensions
+// set to zero to disable this feature
+extern int rrd_delete_unupdated_dimensions;
+
 #define RRD_ID_LENGTH_MAX 1024
 
 #define RRDSET_MAGIC		"NETDATA RRD SET FILE V012"
@@ -281,6 +285,7 @@ extern void rrddim_free(RRDSET *st, RRDDIM *rd);
 extern RRDDIM *rrddim_find(RRDSET *st, const char *id);
 
 extern int rrddim_hide(RRDSET *st, const char *id);
+extern int rrddim_unhide(RRDSET *st, const char *id);
 
 extern void rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
 extern int rrddim_set(RRDSET *st, const char *id, collected_number value);

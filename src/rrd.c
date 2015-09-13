@@ -22,6 +22,8 @@
 // ----------------------------------------------------------------------------
 // globals
 
+int rrd_delete_unupdated_dimensions = (86400 * 7);
+
 int rrd_update_every = UPDATE_EVERY;
 int rrd_default_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
 
@@ -728,6 +730,20 @@ int rrddim_hide(RRDSET *st, const char *id)
 	return 0;
 }
 
+int rrddim_unhide(RRDSET *st, const char *id)
+{
+	debug(D_RRD_CALLS, "rrddim_unhide() for chart %s, dimension %s", st->name, id);
+
+	RRDDIM *rd = rrddim_find(st, id);
+	if(!rd) {
+		error("Cannot find dimension with id '%s' on stats '%s' (%s).", id, st->name, st->id);
+		return 1;
+	}
+
+	rd->hidden = 0;
+	return 0;
+}
+
 void rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value)
 {
 	debug(D_RRD_CALLS, "rrddim_set_by_pointer() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, st->name, rd->name, value);
@@ -1156,41 +1172,46 @@ unsigned long long rrdset_done(RRDSET *st)
 	// --------------------------------------------------------------------
 
 	// find if there are any obsolete dimensions (not updated recently)
-	for( rd = st->dimensions; rd ; rd = rd->next )
-		if((rd->last_collected_time.tv_sec + (10 * st->update_every)) < st->last_collected_time.tv_sec)
-			break;
+	if(rrd_delete_unupdated_dimensions) {
 
-	if(rd) {
-		// there is dimension to free
-		// upgrade our read lock to a write lock
-		pthread_rwlock_unlock(&st->rwlock);
-		pthread_rwlock_wrlock(&st->rwlock);
+		for( rd = st->dimensions; rd ; rd = rd->next )
+			if((rd->last_collected_time.tv_sec + (rrd_delete_unupdated_dimensions * st->update_every)) < st->last_collected_time.tv_sec)
+				break;
 
-		for( rd = st->dimensions, last = NULL ; rd ; ) {
-			if((rd->last_collected_time.tv_sec + (10 * st->update_every)) < st->last_collected_time.tv_sec) { // remove it only it is not updated in 10 seconds
-				debug(D_RRD_STATS, "Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
+		if(rd) {
+			// there is dimension to free
+			// upgrade our read lock to a write lock
+			pthread_rwlock_unlock(&st->rwlock);
+			pthread_rwlock_wrlock(&st->rwlock);
 
-				if(!last) {
-					st->dimensions = rd->next;
-					rd->next = NULL;
-					rrddim_free(st, rd);
-					rd = st->dimensions;
-					continue;
+			for( rd = st->dimensions, last = NULL ; rd ; ) {
+				// remove it only it is not updated in rrd_delete_unupdated_dimensions seconds
+
+				if((rd->last_collected_time.tv_sec + (rrd_delete_unupdated_dimensions * st->update_every)) < st->last_collected_time.tv_sec) {
+					debug(D_RRD_STATS, "Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
+
+					if(!last) {
+						st->dimensions = rd->next;
+						rd->next = NULL;
+						rrddim_free(st, rd);
+						rd = st->dimensions;
+						continue;
+					}
+					else {
+						last->next = rd->next;
+						rd->next = NULL;
+						rrddim_free(st, rd);
+						rd = last->next;
+						continue;
+					}
 				}
-				else {
-					last->next = rd->next;
-					rd->next = NULL;
-					rrddim_free(st, rd);
-					rd = last->next;
-					continue;
-				}
+
+				last = rd;
+				rd = rd->next;
 			}
 
-			last = rd;
-			rd = rd->next;
+			if(!st->dimensions) st->enabled = 0;
 		}
-
-		if(!st->dimensions) st->enabled = 0;
 	}
 
 	pthread_rwlock_unlock(&st->rwlock);
