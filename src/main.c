@@ -60,6 +60,62 @@ struct netdata_static_thread static_threads[] = {
 	{NULL,			NULL,		NULL,			0, NULL, NULL,	NULL}
 };
 
+int killpid(pid_t pid, int sig)
+{
+	int ret = -1;
+	debug(D_EXIT, "Request to kill pid %d", pid);
+
+	errno = 0;
+	if(kill(pid, 0) == -1) {
+		switch(errno) {
+			case ESRCH: 
+				error("Request to kill pid %d, but it is not running.", pid);
+				break;
+
+			case EPERM:
+				error("Request to kill pid %d, but I do not have enough permissions.", pid);
+				break;
+
+			default:
+				error("Request to kill pid %d, but I received an error.", pid);
+				break;
+		}
+	}
+	else {
+		errno = 0;
+		
+		void (*old)(int);		
+		old = signal(sig, SIG_IGN);
+		if(old == SIG_ERR) {
+			error("Cannot overwrite signal handler for signal %d", sig);
+			old = sig_handler;
+		}
+
+		ret = kill(pid, sig);
+
+		if(signal(sig, old) == SIG_ERR)
+			error("Cannot restore signal handler for signal %d", sig);
+
+		if(ret == -1) {
+			switch(errno) {
+				case ESRCH: 
+					error("Cannot kill pid %d, but it is not running.", pid);
+					break;
+
+				case EPERM:
+					error("Cannot kill pid %d, but I do not have enough permissions.", pid);
+					break;
+
+				default:
+					error("Cannot kill pid %d, but I received an error.", pid);
+					break;
+			}
+		}
+	}
+
+	return ret;
+}
+
 void kill_childs()
 {
 	siginfo_t info;
@@ -82,11 +138,9 @@ void kill_childs()
 	}
 
 	if(tc_child_pid) {
-		if(kill(tc_child_pid, 0) != -1) {
-			info("Killing tc-qos-helper procees");
-			kill(tc_child_pid, SIGTERM);
+		info("Killing tc-qos-helper procees");
+		if(killpid(tc_child_pid, SIGTERM) != -1)
 			waitid(tc_child_pid, 0, &info, WEXITED);
-		}
 	}
 	tc_child_pid = 0;
 
@@ -97,11 +151,9 @@ void kill_childs()
 		pthread_join(cd->thread, NULL);
 
 		if(cd->pid && !cd->obsolete) {
-			if(kill(cd->pid, 0) != -1) {
-				debug(D_EXIT, "killing %s plugin process", cd->id);
-				kill(cd->pid, SIGTERM);
+			debug(D_EXIT, "killing %s plugin process", cd->id);
+			if(killpid(cd->pid, SIGTERM) != -1)
 				waitid(cd->pid, 0, &info, WEXITED);
-			}
 		}
 	}
 

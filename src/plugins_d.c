@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <signal.h>
 
+#include "main.h"
 #include "common.h"
 #include "config.h"
 #include "log.h"
@@ -124,6 +125,8 @@ void *pluginsd_worker_thread(void *arg)
 			break;
 		}
 
+		info("PLUGINSD: '%s' running on pid %d", cd->fullfilename, cd->pid);
+
 		RRDSET *st = NULL;
 		unsigned long long count = 0;
 		char *s;
@@ -152,8 +155,7 @@ void *pluginsd_worker_thread(void *arg)
 				if(!dimension || !*dimension) {
 					error("PLUGINSD: '%s' is requesting a SET on chart '%s', like this: 'SET %s = %s'. Disabling it.", cd->fullfilename, st->id, dimension?dimension:"<nothing>", value?value:"<nothing>");
 					cd->enabled = 0;
-					// test: killing an exited child kills us - lets check it exists before killing it
-					if(kill(cd->pid, 0) != -1) kill(cd->pid, SIGTERM);
+					killpid(cd->pid, SIGTERM);
 					break;
 				}
 
@@ -162,8 +164,7 @@ void *pluginsd_worker_thread(void *arg)
 				if(!st) {
 					error("PLUGINSD: '%s' is requesting a SET on dimension %s with value %s, without a BEGIN. Disabling it.", cd->fullfilename, dimension, value);
 					cd->enabled = 0;
-					// test: killing an exited child kills us - lets check it exists before killing it
-					if(kill(cd->pid, 0) != -1) kill(cd->pid, SIGTERM);
+					killpid(cd->pid, SIGTERM);
 					break;
 				}
 
@@ -179,8 +180,7 @@ void *pluginsd_worker_thread(void *arg)
 				if(!id) {
 					error("PLUGINSD: '%s' is requesting a BEGIN without a chart id. Disabling it.", cd->fullfilename);
 					cd->enabled = 0;
-					// test: killing an exited child kills us - lets check it exists before killing it
-					if(kill(cd->pid, 0) != -1) kill(cd->pid, SIGTERM);
+					killpid(cd->pid, SIGTERM);
 					break;
 				}
 
@@ -188,8 +188,7 @@ void *pluginsd_worker_thread(void *arg)
 				if(!st) {
 					error("PLUGINSD: '%s' is requesting a BEGIN on chart '%s', which does not exist. Disabling it.", cd->fullfilename, id);
 					cd->enabled = 0;
-					// test: killing an exited child kills us - lets check it exists before killing it
-					if(kill(cd->pid, 0) != -1) kill(cd->pid, SIGTERM);
+					killpid(cd->pid, SIGTERM);
 					break;
 				}
 
@@ -204,8 +203,7 @@ void *pluginsd_worker_thread(void *arg)
 				if(!st) {
 					error("PLUGINSD: '%s' is requesting an END, without a BEGIN. Disabling it.", cd->fullfilename);
 					cd->enabled = 0;
-					// test: killing an exited child kills us - lets check it exists before killing it
-					if(kill(cd->pid, 0) != -1) kill(cd->pid, SIGTERM);
+					killpid(cd->pid, SIGTERM);
 					break;
 				}
 
@@ -239,8 +237,7 @@ void *pluginsd_worker_thread(void *arg)
 				if(!type || !*type || !id || !*id) {
 					error("PLUGINSD: '%s' is requesting a CHART, without a type.id. Disabling it.", cd->fullfilename);
 					cd->enabled = 0;
-					// test: killing an exited child kills us - lets check it exists before killing it
-					if(kill(cd->pid, 0) != -1) kill(cd->pid, SIGTERM);
+					killpid(cd->pid, SIGTERM);
 					break;
 				}
 
@@ -288,16 +285,14 @@ void *pluginsd_worker_thread(void *arg)
 				if(!id || !*id) {
 					error("PLUGINSD: '%s' is requesting a DIMENSION, without an id. Disabling it.", cd->fullfilename);
 					cd->enabled = 0;
-					// test: killing an exited child kills us - lets check it exists before killing it
-					if(kill(cd->pid, 0) != -1) kill(cd->pid, SIGTERM);
+					killpid(cd->pid, SIGTERM);
 					break;
 				}
 
 				if(!st) {
 					error("PLUGINSD: '%s' is requesting a DIMENSION, without a CHART. Disabling it.", cd->fullfilename);
 					cd->enabled = 0;
-					// test: killing an exited child kills us - lets check it exists before killing it
-					if(kill(cd->pid, 0) != -1) kill(cd->pid, SIGTERM);
+					killpid(cd->pid, SIGTERM);
 					break;
 				}
 
@@ -331,8 +326,7 @@ void *pluginsd_worker_thread(void *arg)
 			else if(hash == DISABLE_HASH && !strcmp(s, "DISABLE")) {
 				error("PLUGINSD: '%s' called DISABLE. Disabling it.", cd->fullfilename);
 				cd->enabled = 0;
-				// test: killing an exited child kills us - lets check it exists before killing it
-				if(kill(cd->pid, 0) != -1) kill(cd->pid, SIGTERM);
+				killpid(cd->pid, SIGTERM);
 				break;
 			}
 #ifdef DETACH_PLUGINS_FROM_NETDATA
@@ -361,8 +355,7 @@ void *pluginsd_worker_thread(void *arg)
 
 				error("PLUGINSD: %s sleeping for %llu. Will kill with SIGCONT pid %d to wake it up.\n", cd->fullfilename, susec, cd->pid);
 				usleep(susec);
-				// test: killing an exited child kills us - lets check it exists before killing it
-				if(kill(cd->pid, 0) != -1) kill(cd->pid, SIGCONT);
+				killpid(cd->pid, SIGCONT);
 				bcopy(&now, &last, sizeof(struct timeval));
 				break;
 			}
@@ -370,22 +363,22 @@ void *pluginsd_worker_thread(void *arg)
 			else {
 				error("PLUGINSD: '%s' is sending command '%s' which is not known by netdata. Disabling it.", cd->fullfilename, s);
 				cd->enabled = 0;
-				// test: killing an exited child kills us - lets check it exists before killing it
-				if(kill(cd->pid, 0) != -1) kill(cd->pid, SIGTERM);
+				killpid(cd->pid, SIGTERM);
 				break;
 			}
 		}
 
+		info("PLUGINSD: '%s' on pid %d stopped.", cd->fullfilename, cd->pid);
+
 		// fgets() failed or loop broke
 		mypclose(fp, cd->pid);
-		cd->pid = 0;
 
 		if(!count && cd->enabled) {
-			error("PLUGINSD: '%s' does not generate usefull output. Disabling it.", cd->fullfilename);
-			cd->enabled = 0;
-			// test: killing an exited child kills us - lets check it exists before killing it
-			if(kill(cd->pid, 0) != -1) kill(cd->pid, SIGTERM);
+			error("PLUGINSD: '%s' (pid %d) does not generate usefull output. Waiting a bit before starting it again.", cd->fullfilename, cd->pid);
+			sleep(cd->update_every * 10);
 		}
+
+		cd->pid = 0;
 
 		if(cd->enabled) sleep(cd->update_every);
 		else break;

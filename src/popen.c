@@ -117,6 +117,8 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 }
 
 void mypclose(FILE *fp, pid_t pid) {
+	debug(D_EXIT, "Request to mypclose() on pid %d", pid);
+	
 	/*mypopen_del(fp);*/
 	fclose(fp);
 
