@@ -30,7 +30,7 @@ void sig_handler(int signo)
 		case SIGHUP:
 		case SIGFPE:
 		case SIGSEGV:
-			debug(D_EXIT, "Signaled exit (signal %d). Errno: %d (%s)", signo, errno, strerror(errno));
+			info("Signaled exit (signal %d). Errno: %d (%s)", signo, errno, strerror(errno));
 			signal(SIGCHLD, SIG_IGN);
 			signal(SIGPIPE, SIG_IGN);
 			signal(SIGTERM, SIG_IGN);
@@ -46,6 +46,7 @@ void sig_handler(int signo)
 			break;
 
 		case SIGPIPE:
+			info("Signaled PIPE (signal %d). Errno: %d (%s)", signo, errno, strerror(errno));
 			// this is received when web clients send a reset
 			// no need to log it.
 			// info("Ignoring signal %d. Errno: %d (%s)", signo, errno, strerror(errno));
