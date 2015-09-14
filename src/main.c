@@ -82,9 +82,11 @@ void kill_childs()
 	}
 
 	if(tc_child_pid) {
-		debug(D_EXIT, "Killing tc-qos-helper procees");
-		kill(tc_child_pid, SIGTERM);
-		waitid(tc_child_pid, 0, &info, WEXITED);
+		if(kill(tc_child_pid, 0) != -1) {
+			info("Killing tc-qos-helper procees");
+			kill(tc_child_pid, SIGTERM);
+			waitid(tc_child_pid, 0, &info, WEXITED);
+		}
 	}
 	tc_child_pid = 0;
 
@@ -95,9 +97,11 @@ void kill_childs()
 		pthread_join(cd->thread, NULL);
 
 		if(cd->pid && !cd->obsolete) {
-			debug(D_EXIT, "killing %s plugin process", cd->id);
-			kill(cd->pid, SIGTERM);
-			waitid(cd->pid, 0, &info, WEXITED);
+			if(kill(cd->pid, 0) != -1) {
+				debug(D_EXIT, "killing %s plugin process", cd->id);
+				kill(cd->pid, SIGTERM);
+				waitid(cd->pid, 0, &info, WEXITED);
+			}
 		}
 	}
 
