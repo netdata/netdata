@@ -22,7 +22,8 @@
 // ----------------------------------------------------------------------------
 // globals
 
-int rrd_delete_unupdated_dimensions = (86400 * 7);
+// if not zero it gives the time (in seconds) to remove un-updated dimensions
+int rrd_delete_unupdated_dimensions = 0;
 
 int rrd_update_every = UPDATE_EVERY;
 int rrd_default_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
