@@ -12,8 +12,8 @@ Also, you can view a short history of all collected values.
 Check it live at:
 
  - [My Home Gentoo Box](http://195.97.5.206:19999/)
- - [My Home Raspberry Pi B+](http://195.97.5.202:19999/) with data collection every 5s (raspbian playing movies 24x7)
- - [My Home Raspberry Pi 2](http://195.97.5.203:19999/) (osmc as an access point)
+ - [My Home Raspberry Pi B+](http://195.97.5.204:19999/) with data collection every 5s (raspbian playing movies 24x7)
+ - [My Home Raspberry Pi 2](http://195.97.5.205:19999/) (osmc as an access point)
 
 Here is a screenshot:
 
