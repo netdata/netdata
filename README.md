@@ -90,8 +90,11 @@ Here is a screenshot:
  - `charts.d.plugin` provides a simple way to script data collection in BASH. It includes example plugins that collect values from:
 
    - `nut` (UPS load, frequency, voltage, etc)
+   
    - `pi` (raspberry pi CPU clock and temperature)
+   
    - `postfix` (e-mail queue size)
+   
    - `squid` (web proxy statistics)
 
 - netdata is a web server, supporting gzip compression
