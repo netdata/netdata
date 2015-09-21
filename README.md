@@ -31,7 +31,7 @@ Here is a screenshot:
 
   It only needs a few megabytes of memory to store all its round robin database.
   
-  Internally, it uses a **custom-made 32-bit number** to store all the values, along with a limited number of metadata for each collected value. This customer-made number can store in 29 bits values from -167772150000000.0 to  167772150000000.0 with a precision of 0.00001 (yes, it is a floating point number, meaning that higher integer values have less decimal precision) and 3 bits for flags (2 are currently used and 1 is reserved for future use). This provides an extremely optimized memory footprint.
+  Internally, it uses a **custom-made 32-bit number** to store all the values, along with a limited number of metadata for each collected value. This custom-made number can store in 29 bits values from -167772150000000.0 to  167772150000000.0 with a precision of 0.00001 (yes, it is a floating point number, meaning that higher integer values have less decimal precision) and 3 bits for flags (2 are currently used and 1 is reserved for future use). This provides an extremely optimized memory footprint.
 
 - **per second data collection**
 
