@@ -37,12 +37,15 @@ Here is a screenshot:
 
   Every chart, every value, is updated every second. Of course, you can control collection period per module.
 
-  **netdata** can perform several calculations on each value collected:
+  **netdata** can perform several calculations on each value (dimension) collected:
 
-  - **absolute**, the collected value should be stored as collected
-  - **incremental**, the difference of the collected value to the last collected value should be stored (this is used for counters that always get incremented - netdata automatically interpolates these values so that small delays at the data collection layer will not affect the quality of the result - also, **netdata** detects arithmetic overflows and presents them properly at the charts)
-  - **percentage of absolute row**, stores the percentage of the collected value, in the sum of all collected values of the chart
-  - **percentage of incremental row**, stores the percentage of this value, in the sum of the the **incremental** differences of the chart
+  - **absolute**, stores the collected value, as collected (this is used, for example for the number of processes running, the number of connections open, the amount of RAM used, etc)
+
+  - **incremental**, stores the difference of the collected value to the last collected value (this is used, for example, for the bandwidth of interfaces, disk I/O, i.e. for counters that always get incremented) - **netdata** automatically interpolates these values so that small delays at the data collection layer will not affect the quality of the result - also, **netdata** detects arithmetic overflows and presents them properly at the charts.
+
+  - **percentage of absolute row**, stores the percentage of the collected value, over the sum of all dimensions of the chart.
+
+  - **percentage of incremental row**, stores the percentage of this collected value, over the sum of the the **incremental** differences of all dimensions of the chart (this is used, for example, for system CPU utilization).
 
 - **visualizes QoS classes automatically**
 
