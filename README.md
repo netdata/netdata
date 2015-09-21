@@ -97,7 +97,8 @@ Here is a screenshot:
 - netdata is a web server, supporting gzip compression
 
   It serves its own static files and dynamic files for rendering the site.
-  (it does not support authentication or SSL - limit its access using your firewall)
+  It does not support authentication or SSL - limit its access using your firewall.
+  It does not allow ` .. ` or ` / ` in the files requested (so it can only serve files stored in the `web/` directory).
 
 
 # How it works
@@ -107,10 +108,12 @@ Here is a screenshot:
  
  netdata:
 
-  - reads several /proc files
-  - keeps track of the values in memroy (a short history)
-  - generates JSON and JSONP HTTP responses containing all the data needed for the web graphs
-  - is a web server. You can access JSON data by using:
+  - Spawns threads to collect all the data for all sources
+  - Keeps track of the collected values in memory (no disk I/O at all)
+  - Generates JSON and JSONP HTTP responses containing all the data needed for the web graphs
+  - Is a standalone web server.
+
+ For example, you can access JSON data by using:
  
  ```
  http://127.0.0.1:19999/data/net.eth0
@@ -131,8 +134,7 @@ Here is a screenshot:
   - 0/0 they are `before` and `after` timestamps, allowing panning on the data
 
 
-2. On your web page, you add a few javascript lines and a DIV for every graph you need.
- Your browser will hit the web server to fetch the JSON data and refresh the graphs.
+2. If you need to embed a **netdata** chart on your web page, you can add a few javascript lines and a `div` for every graph you need. Check [this example](http://195.97.5.206:19999/datasource.html) (open it in a new tab and view its source to get the idea).
 
 3. Graphs are generated using Google Charts API (so, your client needs to have internet access).
 
