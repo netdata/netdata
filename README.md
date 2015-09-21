@@ -31,11 +31,18 @@ Here is a screenshot:
 
   It only needs a few megabytes of memory to store all its round robin database.
   
-  Internally, it uses a **custom-made 32-bit number** to store all the values, along with a limited number of metadata for each collected value. This floating point number can store in 32 bits values from -167772150000000.0 to  167772150000000.0 with a precision of 0.00001 (yes, it is a floating point number, meaning that higher integer values have less decimal precision). Of course, this provides an extremely optimized memory footprint. 
+  Internally, it uses a **custom-made 32-bit number** to store all the values, along with a limited number of metadata for each collected value. This floating point number can store in 29 bits values from -167772150000000.0 to  167772150000000.0 with a precision of 0.00001 (yes, it is a floating point number, meaning that higher integer values have less decimal precision) and 3 bits for flags (2 are currently used and 1 is reserved for future use). This provides an extremely optimized memory footprint.
 
 - **per second data collection**
 
   Every chart, every value, is updated every second. Of course, you can control collection period per module.
+
+  **netdata** can perform several calculations on each value collected:
+
+  - **absolute**, the collected value should be stored as collected
+  - **incremental**, the difference of the collected value to the last collected value should be stored (this is used for counters that always get incremented - netdata automatically interpolates these values so that small delays at the data collection layer will not affect the quality of the result - also, **netdata** detects arithmetic overflows and presents them properly at the charts)
+  - **percentage of absolute row**, stores the percentage of the collected value, in the sum of all collected values of the chart
+  - **percentage of incremental row**, stores the percentage of this value, in the sum of the the **incremental** differences of the chart
 
 - **visualizes QoS classes automatically**
 
