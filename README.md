@@ -6,6 +6,20 @@ linux real time system monitoring over the web
 Netdata is a daemon that collects system information from a linux system and presents a web site to view the data.
 The presentation is full of charts that precisely render all system values, in realtime, for a short time (1 hour by default).
 
+You can use it to monitor all your servers, linux PCs or linux embedded devices, without the need to ssh to them.
+Also, you can view a short history of all collected values.
+
+Check it live at:
+
+ - [My Home Gentoo Box](http://195.97.5.206:19999/)
+ - [My Home Raspberry Pi B+](http://195.97.5.202:19999/) with data collection every 5s (raspbian playing movies 24x7)
+ - [My Home Raspberry Pi 2](http://195.97.5.203:19999/) (osmc as an access point)
+
+Here is a screenshot:
+
+![image](https://cloud.githubusercontent.com/assets/2662304/2593406/3c797e88-ba80-11e3-8ec7-c10174d59ad6.png)
+
+
 # Features
 
 - **highly optimized C code**
@@ -74,17 +88,6 @@ The presentation is full of charts that precisely render all system values, in r
 
   It serves its own static files and dynamic files for rendering the site.
   (it does not support authentication or SSL - limit its access using your firewall)
-
-
-Check it live at:
-
- - [My Home Gentoo Box](http://195.97.5.206:19999/)
- - [My Home Raspberry Pi B+](http://195.97.5.202:19999/) with data collection every 5s (raspbian playing movies 24x7)
- - [My Home Raspberry Pi 2](http://195.97.5.203:19999/) (osmc as an access point)
-
-Here is a screenshot:
-
-![image](https://cloud.githubusercontent.com/assets/2662304/2593406/3c797e88-ba80-11e3-8ec7-c10174d59ad6.png)
 
 
 # How it works
