@@ -1,13 +1,13 @@
 netdata
 =======
 
-linux real time system monitoring over the web
+### Linux real time system monitoring, over the web!
 
-Netdata is a daemon that collects system information from a linux system and presents a web site to view the data.
+**Netdata** is a daemon that collects system information from a linux system and presents a web site to view the data.
 The presentation is full of charts that precisely render all system values, in realtime, for a short time (1 hour by default).
 
 You can use it to monitor all your servers, linux PCs or linux embedded devices, without the need to ssh to them.
-Also, you can view a short history of all collected values.
+Also, you can view a short history of all collected values, so if something happens you can use **netdata** to find out what and when.
 
 Check it live at:
 
@@ -149,9 +149,12 @@ cd netdata.git
 Once you run it, the file conf.d/netdata.conf will be created. You can edit this file to set options for each graph.
 To apply the changes you made, you have to run netdata.start again.
 
+If you run `netdata.start` as `root`, netdata will start by default as `nobody`. Otherwise it will run as the user that started it. If you run it as `root`, you can set the user you want it to run in the config file `conf.d/netdata.conf`.
+
 To access the web site for all graphs, go to:
 
  ```
  http://127.0.0.1:19999/
  ```
 
+You can get the running config file at any time, by accessing `http://127.0.0.1:19999/netdata.conf`.
