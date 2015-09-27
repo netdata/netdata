@@ -31,7 +31,7 @@ Here is a screenshot:
 
   It only needs a few megabytes of memory to store all its round robin database.
   
-  Internally, it uses a **custom-made 32-bit number** to store all the values, along with a limited number of metadata for each collected value. This custom-made number can store in 29 bits values from -167772150000000.0 to  167772150000000.0 with a precision of 0.00001 (yes, it is a floating point number, meaning that higher integer values have less decimal precision) and 3 bits for flags (2 are currently used and 1 is reserved for future use). This provides an extremely optimized memory footprint with just 0.0001% max accuracy loss (run: `./netdata --unittest` to see it in action).
+  Although `netdata` does all its calculation using `long double` (128 bit) arithmetics, it stores all values using a **custom-made 32-bit number**. This custom-made number can store in 29 bits values from -167772150000000.0 to  167772150000000.0 with a precision of 0.00001 (yes, it is a floating point number, meaning that higher integer values have less decimal precision) and 3 bits for flags (2 are currently used and 1 is reserved for future use). This provides an extremely optimized memory footprint with just 0.0001% max accuracy loss (run: `./netdata --unittest` to see it in action).
 
 - **per second data collection**
 
@@ -41,7 +41,7 @@ Here is a screenshot:
 
   - **absolute**, stores the collected value, as collected (this is used, for example for the number of processes running, the number of connections open, the amount of RAM used, etc)
 
-  - **incremental**, stores the difference of the collected value to the last collected value (this is used, for example, for the bandwidth of interfaces, disk I/O, i.e. for counters that always get incremented) - **netdata** automatically interpolates these values so that small delays at the data collection layer will not affect the quality of the result - also, **netdata** detects arithmetic overflows and presents them properly at the charts.
+  - **incremental**, stores the difference of the collected value to the last collected value (this is used, for example, for the bandwidth of interfaces, disk I/O, i.e. for counters that always get incremented) - **netdata** automatically interpolates these values to second boundary, using nanosecond calculations so that small delays at the data collection layer will not affect the quality of the result - also, **netdata** detects arithmetic overflows and presents them properly at the charts.
 
   - **percentage of absolute row**, stores the percentage of the collected value, over the sum of all dimensions of the chart.
 
@@ -54,7 +54,7 @@ Here is a screenshot:
 - **appealing web site**
 
   The web site uses bootstrap and google charts for a very appealing result.
-  It works even on mobile devices and adapts to screen size changes and rotation.
+  It works even on mobile devices and adapts to screen size changes and rotation (responsive design).
 
 - **web charts do respect your browser resources**
 
@@ -85,7 +85,7 @@ Here is a screenshot:
 
   It ships with 2 plugins: `apps.plugin` and `charts.d.plugin`:
 
- - `apps.plugin` is a plugin that attempts to collect statistics per process.
+ - `apps.plugin` is a plugin that attempts to collect statistics per process. It groups the entire process tree based on your settings (for example, mplayer, kodi, vlc are all considered `media`) and for each group it attempts to find CPU usage, memory usages, physical and logical disk read and writes, number of processes, number of threads, number of open files, number of open sockets, number of open pipes, minor and major page faults (major = swapping), etc. 15 stackable (per group) charts in total.
 
  - `charts.d.plugin` provides a simple way to script data collection in BASH. It includes example plugins that collect values from:
 
@@ -170,3 +170,7 @@ To access the web site for all graphs, go to:
  ```
 
 You can get the running config file at any time, by accessing `http://127.0.0.1:19999/netdata.conf`.
+
+To start it at boot, just run `/path/to/netdata.git/netdata.start` from your `/etc/rc.local` or equivalent.
+
+You can stop and start netdata at any point. Netdata saves on exit its round robbin database to `cache/` so that it will continue from where it stopped the last time. 
