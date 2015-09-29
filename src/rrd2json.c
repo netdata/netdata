@@ -12,7 +12,7 @@ char *hostname = "unknown";
 unsigned long rrd_stats_one_json(RRDSET *st, char *options, struct web_buffer *wb)
 {
 	time_t now = time(NULL);
-	web_buffer_increase(wb, 16384);
+	web_buffer_increase(wb, 65536);
 
 	pthread_rwlock_rdlock(&st->rwlock);
 
@@ -67,6 +67,8 @@ unsigned long rrd_stats_one_json(RRDSET *st, char *options, struct web_buffer *w
 
 	RRDDIM *rd;
 	for(rd = st->dimensions; rd ; rd = rd->next) {
+		web_buffer_increase(wb, 4096);
+
 		memory += rd->memsize;
 
 		web_buffer_printf(wb,
@@ -118,7 +120,7 @@ unsigned long rrd_stats_one_json(RRDSET *st, char *options, struct web_buffer *w
 
 void rrd_stats_graph_json(RRDSET *st, char *options, struct web_buffer *wb)
 {
-	web_buffer_increase(wb, 16384);
+	web_buffer_increase(wb, 2048);
 
 	web_buffer_printf(wb, RRD_GRAPH_JSON_HEADER);
 	rrd_stats_one_json(st, options, wb);
@@ -127,7 +129,7 @@ void rrd_stats_graph_json(RRDSET *st, char *options, struct web_buffer *wb)
 
 void rrd_stats_all_json(struct web_buffer *wb)
 {
-	web_buffer_increase(wb, 1024);
+	web_buffer_increase(wb, 2048);
 
 	unsigned long memory = 0;
 	long c;
