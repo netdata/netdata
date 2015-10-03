@@ -12,13 +12,13 @@ var GROUPS_MAX_TIME_TO_SHOW = 120;		// how much time the group charts will prese
 var GROUPS_POINTS_DIVISOR = 2;
 var GROUPS_STACKED_POINTS_DIVISOR = 2;
 
-var MAINCHART_MAX_TIME_TO_SHOW = 600;	// how much time the main chart will present by default?
+var MAINCHART_MIN_TIME_TO_SHOW = 600;	// how much time the main chart will present by default?
 var MAINCHART_POINTS_DIVISOR = 5;		// how much detailed will the main chart be by default? 1 = finest, higher is faster
 var MAINCHART_STACKED_POINTS_DIVISOR = 10;		// how much detailed will the main chart be by default? 1 = finest, higher is faster
 
 var MAINCHART_CONTROL_HEIGHT = 75;		// how tall the control chart will be
 var MAINCHART_CONTROL_DIVISOR = 2;		// how much detailed will the control chart be? 1 = finest, higher is faster
-var MAINCHART_INITIAL_SELECTOR= 20;		// 1/20th of the width, this overrides MAINCHART_MAX_TIME_TO_SHOW
+var MAINCHART_INITIAL_SELECTOR= 20;		// 1/20th of the width, this overrides MAINCHART_MIN_TIME_TO_SHOW
 
 var CHARTS_REFRESH_LOOP = 100;			// delay between chart refreshes
 var CHARTS_REFRESH_IDLE = 500;			// delay between chart refreshes when no chart was ready for refresh the last time
@@ -120,7 +120,7 @@ function initMainChart(c) {
 
 	mainchart.div = 'maingraph';
 	mainchart.max_time_to_show = (mainchart.last_entry_t - mainchart.first_entry_t) / MAINCHART_INITIAL_SELECTOR;
-	if(mainchart.max_time_to_show < mainchart.update_every * MAINCHART_INITIAL_SELECTOR) mainchart.max_time_to_show = mainchart.update_every * MAINCHART_INITIAL_SELECTOR;
+	if(mainchart.max_time_to_show < MAINCHART_MIN_TIME_TO_SHOW) mainchart.max_time_to_show = MAINCHART_MIN_TIME_TO_SHOW;
 	calculateChartPointsToShow(mainchart, mainchart.chartOptions.isStacked?MAINCHART_STACKED_POINTS_DIVISOR:MAINCHART_POINTS_DIVISOR, mainchart.max_time_to_show, 0);
 
 	// copy it to the hidden chart
@@ -186,7 +186,7 @@ function refreshHiddenChart(doNext) {
 				ui: {
 					chartType: mainchart.chartType,
 					chartOptions: controlopts,
-					minRangeSize: (MAINCHART_MAX_TIME_TO_SHOW * 1000) / MAINCHART_POINTS_DIVISOR,
+					minRangeSize: (mainchart.max_time_to_show * 1000) / MAINCHART_POINTS_DIVISOR,
 				}
 			},
 		});
@@ -225,8 +225,10 @@ function refreshHiddenChart(doNext) {
 			mainchart.dashboard.bind(mainchart.control_wrapper, mainchart.hidden_wrapper);
 		}
 		if(refresh_mode != REFRESH_PAUSED) {
+			// console.log('mainchart.points_to_show: ' + mainchart.points_to_show + ', mainchart.group: ' + mainchart.group + ', mainchart.update_every: ' + mainchart.update_every);
+
 			mainchart.control_wrapper.setState({range: {
-				start: new Date(now - (mainchart.max_time_to_show * 1000)),
+				start: new Date(new Date().getTime() - (mainchart.points_to_show * mainchart.group * mainchart.update_every * 1000)),
 				end: new Date()
 			}});
 		}
@@ -481,7 +483,7 @@ function playGraphs() {
 
 	// check if the thread died due to a javascript error
 	var now = new Date().getTime();
-	if((now - last_refresh) > 5000) {
+	if((now - last_refresh) > 60000) {
 		// it died or never started
 		//mylog('It seems the refresh thread died. Restarting it.');
 		chartsRefresh();
@@ -504,7 +506,7 @@ function checkRefreshThread() {
 	}
 
 	var now = new Date().getTime();
-	if(now - last_refresh > 10000) {
+	if(now - last_refresh > 60000) {
 		mylog('Refresh thread died. Restarting it.');
 		chartsRefresh();
 	}
