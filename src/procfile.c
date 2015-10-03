@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 
+#include "common.h"
 #include "log.h"
 #include "procfile.h"
 
@@ -39,11 +40,11 @@ size_t procfile_max_allocation = PROCFILE_INCREMENT_BUFFER;
 pfwords *pfwords_add(pfwords *fw, char *str) {
 	// debug(D_PROCFILE, PF_PREFIX ":	adding word No %d: '%s'", fw->len, str);
 
-	if(fw->len == fw->size) {
+	if(unlikely(fw->len == fw->size)) {
 		// debug(D_PROCFILE, PF_PREFIX ":	expanding words");
 
 		pfwords *new = realloc(fw, sizeof(pfwords) + (fw->size + PFWORDS_INCREASE_STEP) * sizeof(char *));
-		if(!new) {
+		if(unlikely(!new)) {
 			error(PF_PREFIX ":	failed to expand words");
 			free(fw);
 			return NULL;
@@ -63,7 +64,7 @@ pfwords *pfwords_new(void) {
 	uint32_t size = (procfile_adaptive_initial_allocation) ? procfile_max_words : PFWORDS_INCREASE_STEP;
 
 	pfwords *new = malloc(sizeof(pfwords) + size * sizeof(char *));
-	if(!new) return NULL;
+	if(unlikely(!new)) return NULL;
 
 	new->len = 0;
 	new->size = size;
@@ -88,11 +89,11 @@ void pfwords_free(pfwords *fw) {
 pflines *pflines_add(pflines *fl, uint32_t first_word) {
 	// debug(D_PROCFILE, PF_PREFIX ":	adding line %d at word %d", fl->len, first_word);
 
-	if(fl->len == fl->size) {
+	if(unlikely(fl->len == fl->size)) {
 		// debug(D_PROCFILE, PF_PREFIX ":	expanding lines");
 
 		pflines *new = realloc(fl, sizeof(pflines) + (fl->size + PFLINES_INCREASE_STEP) * sizeof(ffline));
-		if(!new) {
+		if(unlikely(!new)) {
 			error(PF_PREFIX ":	failed to expand lines");
 			free(fl);
 			return NULL;
@@ -110,10 +111,10 @@ pflines *pflines_add(pflines *fl, uint32_t first_word) {
 pflines *pflines_new(void) {
 	// debug(D_PROCFILE, PF_PREFIX ":	initializing lines");
 
-	uint32_t size = (procfile_adaptive_initial_allocation) ? procfile_max_words : PFLINES_INCREASE_STEP;
+	uint32_t size = (unlikely(procfile_adaptive_initial_allocation)) ? procfile_max_words : PFLINES_INCREASE_STEP;
 
 	pflines *new = malloc(sizeof(pflines) + size * sizeof(ffline));
-	if(!new) return NULL;
+	if(unlikely(!new)) return NULL;
 
 	new->len = 0;
 	new->size = size;
@@ -143,10 +144,10 @@ void pflines_free(pflines *fl) {
 void procfile_close(procfile *ff) {
 	debug(D_PROCFILE, PF_PREFIX ": Closing file '%s'", ff->filename);
 
-	if(ff->lines) pflines_free(ff->lines);
-	if(ff->words) pfwords_free(ff->words);
+	if(likely(ff->lines)) pflines_free(ff->lines);
+	if(likely(ff->words)) pfwords_free(ff->words);
 
-	if(ff->fd != -1) close(ff->fd);
+	if(likely(ff->fd != -1)) close(ff->fd);
 	free(ff);
 }
 
@@ -158,12 +159,12 @@ procfile *procfile_parser(procfile *ff) {
 	e += ff->len;
 	
 	ff->lines = pflines_add(ff->lines, w);
-	if(!ff->lines) goto cleanup;
+	if(unlikely(!ff->lines)) goto cleanup;
 
-	while(s < e) {
+	while(likely(s < e)) {
 		switch(ff->separators[(int)(*s)]) {
 			case PF_CHAR_IS_SEPARATOR:
-				if(s == t) {
+				if(likely(s == t)) {
 					// skip all leading white spaces
 					t = ++s;
 					continue;
@@ -173,7 +174,7 @@ procfile *procfile_parser(procfile *ff) {
 				*s = '\0';
 
 				ff->words = pfwords_add(ff->words, t);
-				if(!ff->words) goto cleanup;
+				if(unlikely(!ff->words)) goto cleanup;
 
 				ff->lines->lines[l].words++;
 				w++;
@@ -186,7 +187,7 @@ procfile *procfile_parser(procfile *ff) {
 				*s = '\0';
 
 				ff->words = pfwords_add(ff->words, t);
-				if(!ff->words) goto cleanup;
+				if(unlikely(!ff->words)) goto cleanup;
 
 				ff->lines->lines[l].words++;
 				w++;
@@ -194,7 +195,7 @@ procfile *procfile_parser(procfile *ff) {
 				// debug(D_PROCFILE, PF_PREFIX ":	ended line %d with %d words", l, ff->lines->lines[l].words);
 
 				ff->lines = pflines_add(ff->lines, w);
-				if(!ff->lines) goto cleanup;
+				if(unlikely(!ff->lines)) goto cleanup;
 				l++;
 
 				t = ++s;
@@ -206,16 +207,16 @@ procfile *procfile_parser(procfile *ff) {
 		}
 	}
 
-	if(s != t) {
+	if(likely(s != t)) {
 		// the last word
-		if(ff->len < ff->size) *s = '\0';
+		if(likely(ff->len < ff->size)) *s = '\0';
 		else {
 			// we are going to loose the last byte
 			ff->data[ff->size - 1] = '\0';
 		}
 
 		ff->words = pfwords_add(ff->words, t);
-		if(!ff->words) goto cleanup;
+		if(unlikely(!ff->words)) goto cleanup;
 
 		ff->lines->lines[l].words++;
 		w++;
@@ -235,12 +236,12 @@ procfile *procfile_readall(procfile *ff) {
 	ssize_t s = 0, r = ff->size, x = ff->size;
 	ff->len = 0;
 
-	while(r == x) {
+	while(likely(r == x)) {
 		if(s) {
 			debug(D_PROCFILE, PF_PREFIX ": Expanding data buffer for file '%s'.", ff->filename);
 
 			procfile *new = realloc(ff, sizeof(procfile) + ff->size + PROCFILE_INCREMENT_BUFFER);
-			if(!new) {
+			if(unlikely(!new)) {
 				error(PF_PREFIX ": Cannot allocate memory for file '%s'", ff->filename);
 				procfile_close(ff);
 				return NULL;
@@ -252,8 +253,8 @@ procfile *procfile_readall(procfile *ff) {
 
 		debug(D_PROCFILE, "Reading file '%s', from position %ld with length %ld", ff->filename, s, ff->size - s);
 		r = read(ff->fd, &ff->data[s], ff->size - s);
-		if(r == -1) {
-			if(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO)) error(PF_PREFIX ": Cannot read from file '%s'", ff->filename);
+		if(unlikely(r == -1)) {
+			if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) error(PF_PREFIX ": Cannot read from file '%s'", ff->filename);
 			procfile_close(ff);
 			return NULL;
 		}
@@ -263,8 +264,8 @@ procfile *procfile_readall(procfile *ff) {
 	}
 
 	debug(D_PROCFILE, "Rewinding file '%s'", ff->filename);
-	if(lseek(ff->fd, 0, SEEK_SET) == -1) {
-		if(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO)) error(PF_PREFIX ": Cannot rewind on file '%s'.", ff->filename);
+	if(unlikely(lseek(ff->fd, 0, SEEK_SET) == -1)) {
+		if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) error(PF_PREFIX ": Cannot rewind on file '%s'.", ff->filename);
 		procfile_close(ff);
 		return NULL;
 	}
@@ -274,10 +275,10 @@ procfile *procfile_readall(procfile *ff) {
 
 	ff = procfile_parser(ff);
 
-	if(procfile_adaptive_initial_allocation) {
-		if(ff->len > procfile_max_allocation) procfile_max_allocation = ff->len;
-		if(ff->lines->len > procfile_max_lines) procfile_max_lines = ff->lines->len;
-		if(ff->words->len > procfile_max_words) procfile_max_words = ff->words->len;
+	if(unlikely(procfile_adaptive_initial_allocation)) {
+		if(unlikely(ff->len > procfile_max_allocation)) procfile_max_allocation = ff->len;
+		if(unlikely(ff->lines->len > procfile_max_lines)) procfile_max_lines = ff->lines->len;
+		if(unlikely(ff->words->len > procfile_max_words)) procfile_max_words = ff->words->len;
 	}
 
 	debug(D_PROCFILE, "File '%s' updated.", ff->filename);
@@ -288,41 +289,41 @@ static void procfile_set_separators(procfile *ff, const char *separators) {
 	static char def[256] = { [0 ... 255] = 0 };
 	int i;
 
-	if(!def[255]) {
+	if(unlikely(!def[255])) {
 		// this is thread safe
 		// we check that the last byte is non-zero
 		// if it is zero, multiple threads may be executing this at the same time
 		// setting in def[] the exact same values
-		for(i = 0; i < 256 ;i++) {
-			if(i == '\n' || i == '\r') def[i] = PF_CHAR_IS_NEWLINE;
-			else if(isspace(i) || !isprint(i)) def[i] = PF_CHAR_IS_SEPARATOR;
+		for(i = 0; likely(i < 256) ;i++) {
+			if(unlikely(i == '\n' || i == '\r')) def[i] = PF_CHAR_IS_NEWLINE;
+			else if(unlikely(isspace(i) || !isprint(i))) def[i] = PF_CHAR_IS_SEPARATOR;
 			else def[i] = PF_CHAR_IS_WORD;
 		}
 	}
 
 	// copy the default
 	char *ffs = ff->separators, *ffd = def, *ffe = &def[256];
-	while(ffd != ffe) *ffs++ = *ffd++;
+	while(likely(ffd != ffe)) *ffs++ = *ffd++;
 
 	// set the separators
-	if(!separators) separators = " \t=|";
+	if(unlikely(!separators)) separators = " \t=|";
 	ffs = ff->separators;
 	const char *s = separators;
-	while(*s) ffs[(int)*s++] = PF_CHAR_IS_SEPARATOR;
+	while(likely(*s)) ffs[(int)*s++] = PF_CHAR_IS_SEPARATOR;
 }
 
 procfile *procfile_open(const char *filename, const char *separators, uint32_t flags) {
 	debug(D_PROCFILE, PF_PREFIX ": Opening file '%s'", filename);
 
 	int fd = open(filename, O_RDONLY, 0666);
-	if(fd == -1) {
-		if(!(flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO)) error(PF_PREFIX ": Cannot open file '%s'", filename);
+	if(unlikely(fd == -1)) {
+		if(unlikely(!(flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) error(PF_PREFIX ": Cannot open file '%s'", filename);
 		return NULL;
 	}
 
-	size_t size = (procfile_adaptive_initial_allocation) ? procfile_max_allocation : PROCFILE_INCREMENT_BUFFER;
+	size_t size = (unlikely(procfile_adaptive_initial_allocation)) ? procfile_max_allocation : PROCFILE_INCREMENT_BUFFER;
 	procfile *ff = malloc(sizeof(procfile) + size);
-	if(!ff) {
+	if(unlikely(!ff)) {
 		error(PF_PREFIX ": Cannot allocate memory for file '%s'", filename);
 		close(fd);
 		return NULL;
@@ -339,7 +340,7 @@ procfile *procfile_open(const char *filename, const char *separators, uint32_t f
 	ff->lines = pflines_new();
 	ff->words = pfwords_new();
 
-	if(!ff->lines || !ff->words) {
+	if(unlikely(!ff->lines || !ff->words)) {
 		error(PF_PREFIX ": Cannot initialize parser for file '%s'", filename);
 		procfile_close(ff);
 		return NULL;
@@ -352,12 +353,12 @@ procfile *procfile_open(const char *filename, const char *separators, uint32_t f
 }
 
 procfile *procfile_reopen(procfile *ff, const char *filename, const char *separators, uint32_t flags) {
-	if(!ff) return procfile_open(filename, separators, flags);
+	if(unlikely(!ff)) return procfile_open(filename, separators, flags);
 
-	if(ff->fd != -1) close(ff->fd);
+	if(likely(ff->fd != -1)) close(ff->fd);
 
 	ff->fd = open(filename, O_RDONLY, 0666);
-	if(ff->fd == -1) {
+	if(unlikely(ff->fd == -1)) {
 		procfile_close(ff);
 		return NULL;
 	}
@@ -368,7 +369,7 @@ procfile *procfile_reopen(procfile *ff, const char *filename, const char *separa
 	ff->flags = flags;
 
 	// do not do the separators again if NULL is given
-	if(separators) procfile_set_separators(ff, separators);
+	if(likely(separators)) procfile_set_separators(ff, separators);
 
 	return ff;
 }
@@ -383,12 +384,12 @@ void procfile_print(procfile *ff) {
 
 	debug(D_PROCFILE, "File '%s' with %d lines and %d words", ff->filename, ff->lines->len, ff->words->len);
 
-	for(l = 0; l < lines ;l++) {
+	for(l = 0; likely(l < lines) ;l++) {
 		words = procfile_linewords(ff, l);
 
 		debug(D_PROCFILE, "	line %d starts at word %d and has %d words", l, ff->lines->lines[l].first, ff->lines->lines[l].words);
 
-		for(w = 0; w < words ;w++) {
+		for(w = 0; likely(w < words) ;w++) {
 			s = procfile_lineword(ff, l, w);
 			debug(D_PROCFILE, "		[%d.%d] '%s'", l, w, s);
 		}

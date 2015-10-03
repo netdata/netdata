@@ -2,6 +2,7 @@
 #include <string.h>
 #include <ctype.h>
 
+#include "common.h"
 #include "log.h"
 #include "url.h"
 

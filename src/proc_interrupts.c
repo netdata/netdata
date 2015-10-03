@@ -4,6 +4,7 @@
 #include <string.h>
 #include <ctype.h>
 
+#include "common.h"
 #include "config.h"
 #include "procfile.h"
 #include "rrd.h"

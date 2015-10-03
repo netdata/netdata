@@ -6,7 +6,7 @@ squid_url="cache_object://$squid_host:$squid_port/counters"
 squid_update_every=5
 
 squid_get_stats() {
-nc $squid_host $squid_port <<EOF
+	nc $squid_host $squid_port <<EOF
 GET $squid_url HTTP/1.0
 Host: $squid_host:$squid_port
 Accept: */*
@@ -63,7 +63,7 @@ squid_update() {
 	# for each dimension
 	# remember: KEEP IT SIMPLE AND SHORT
 
-	# 1. wget the counters page from squid
+	# 1. get the counters page from squid
 	# 2. sed to remove spaces; replace . with _; remove spaces around =; prepend each line with: local squid_
 	# 3. egrep lines starting with:
 	#    local squid_client_http_ then one or more of these a-z 0-9 _ then = and one of more of 0-9

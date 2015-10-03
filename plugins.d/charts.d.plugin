@@ -45,7 +45,7 @@ do
 	if [ -f "$chartsd/$1.chart.sh" ]
 	then
 		debug=1
-		chart_only="`echo $1.chart.sh | sed "s/\.chart\.sh$//g"`"
+		chart_only="$( echo $1.chart.sh | sed "s/\.chart\.sh$//g" )"
 		shift
 		continue
 	fi
@@ -53,7 +53,7 @@ do
 	if [ -f "$chartsd/$1" ]
 	then
 		debug=1
-		chart_only="`echo $1 | sed "s/\.chart\.sh$//g"`"
+		chart_only="$( echo $1 | sed "s/\.chart\.sh$//g" )"
 		shift
 		continue
 	fi
@@ -61,7 +61,7 @@ do
 	if [ -f "$1" ]
 	then
 		debug=1
-		chart_only="`basename "$1" | sed "s/\.chart\.sh$//g"`"
+		chart_only="$( basename "$1" | sed "s/\.chart\.sh$//g" )"
 		shift
 		continue
 	fi
@@ -127,7 +127,7 @@ loopsleepms() {
 }
 # if found and included, this file overwrites loopsleepms()
 # with a high resolution timer function for precise looping.
-. "`dirname $0`/loopsleepms.sh.inc"
+. "$( dirname $0 )/loopsleepms.sh.inc"
 
 
 # -----------------------------------------------------------------------------
@@ -143,7 +143,7 @@ all_enabled_charts() {
 
 	# find all enabled charts
 
-	for chart in `all_charts`
+	for chart in $( all_charts )
 	do
 		eval "enabled=\$$chart"
 		if [ "$enabled" = "yes" ]
@@ -158,21 +158,21 @@ all_enabled_charts() {
 	for chart in $charts
 	do
 		# check the enabled charts
-		local check="`cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_check()"`"
+		local check="$( cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_check()" )"
 		if [ -z "$check" ]
 		then
 			echo >&2 "charts.d: chart '$chart' does not seem to have a $chart$charts_check() function. Disabling it."
 			continue
 		fi
 
-		local create="`cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_create()"`"
+		local create="$( cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_create()" )"
 		if [ -z "$create" ]
 		then
 			echo >&2 "charts.d: chart '$chart' does not seem to have a $chart$charts_create() function. Disabling it."
 			continue
 		fi
 
-		local update="`cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_update()"`"
+		local update="$( cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_update()" )"
 		if [ -z "$update" ]
 		then
 			echo >&2 "charts.d: chart '$chart' does not seem to have a $chart$charts_update() function. Disabling it."
@@ -182,7 +182,7 @@ all_enabled_charts() {
 		# check its config
 		if [ -f "$confd/$chart.conf" ]
 		then
-			if [ ! -z "`cat "$confd/$chart.conf" | sed "s/^ \+//g" | grep -v "^$" | grep -v "^#" | grep -v "^$chart$charts_undescore"`" ]
+			if [ ! -z "$( cat "$confd/$chart.conf" | sed "s/^ \+//g" | grep -v "^$" | grep -v "^#" | grep -v "^$chart$charts_undescore" )" ]
 			then
 				echo >&2 "charts.d: chart's $chart config $confd/$chart.conf should only have lines starting with $chart$charts_undescore . Disabling it."
 				continue
@@ -208,7 +208,7 @@ all_enabled_charts() {
 
 suffix_update_every="_update_every"
 active_charts=
-for chart in `all_enabled_charts`
+for chart in $( all_enabled_charts )
 do
 	. "$chartsd/$chart.chart.sh"
 
@@ -263,6 +263,39 @@ then
 	echo "Will run the charts: $active_charts"
 	exit 0
 fi
+
+# -----------------------------------------------------------------------------
+# create temp dir
+
+TMP_DIR=
+chartsd_cleanup() {
+	if [ ! -z "$TMP_DIR" -a -d "$TMP_DIR" ]
+	then
+		echo >&2 "charts.d: cleaning up temporary directory $TMP_DIR ..."
+		rm -rf "$TMP_DIR"
+	fi
+	exit 0
+}
+trap chartsd_cleanup EXIT
+trap chartsd_cleanup SIGHUP
+trap chartsd_cleanup INT
+
+if [ $UID = "0" ]
+then
+	TMP_DIR="$( mktemp -d /var/run/netdata-charts.d-XXXXXXXXXX )"
+else
+	TMP_DIR="$( mktemp -d /tmp/.netdata-charts.d-XXXXXXXXXX )"
+fi
+
+# -----------------------------------------------------------------------------
+# library functions
+
+fixid() {
+	echo "$*" |\
+		tr -c "[A-Z][a-z][0-9]" "_" |\
+		sed -e "s|^_\+||g" -e "s|_\+$||g" -e "s|_\+|_|g" |\
+		tr "[A-Z]" "[a-z]"
+}
 
 
 # -----------------------------------------------------------------------------

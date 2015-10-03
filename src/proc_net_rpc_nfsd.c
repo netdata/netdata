@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "common.h"
 #include "log.h"
 #include "config.h"
 #include "procfile.h"

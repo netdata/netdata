@@ -2,6 +2,7 @@
 #include <math.h>
 #endif
 
+#include "common.h"
 #include "log.h"
 #include "storage_number.h"
 

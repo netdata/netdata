@@ -42,7 +42,7 @@ extern int access_log_syslog;
 extern int error_log_syslog;
 extern int output_log_syslog;
 
-#define debug(type, args...) do { if(!silent && debug_flags & type) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
+#define debug(type, args...) do { if(unlikely(!silent && (debug_flags & type))) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #define info(args...)  info_int(__FILE__, __FUNCTION__, __LINE__, ##args)
 #define error(args...)  error_int(__FILE__, __FUNCTION__, __LINE__, ##args)
 #define fatal(args...)  fatal_int(__FILE__, __FUNCTION__, __LINE__, ##args)

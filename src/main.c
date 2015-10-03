@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+#include "common.h"
 #include "log.h"
 #include "daemon.h"
 #include "web_server.h"

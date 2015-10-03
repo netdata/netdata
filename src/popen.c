@@ -6,6 +6,8 @@
 
 #include "log.h"
 #include "popen.h"
+#include "common.h"
+
 /*
 struct mypopen {
 	pid_t pid;

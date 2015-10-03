@@ -230,7 +230,7 @@ int load_config(char *filename, int overwrite_used)
 
 		if(!cv) cv = config_value_create(co, name, value);
 		else {
-			if((cv->flags & CONFIG_VALUE_USED && overwrite_used) || !(cv->flags & CONFIG_VALUE_USED)) {
+			if(((cv->flags & CONFIG_VALUE_USED) && overwrite_used) || !(cv->flags & CONFIG_VALUE_USED)) {
 				debug(D_CONFIG, "Overwriting '%s/%s'.", line, co->name, cv->name);
 				free(cv->value);
 				cv->value = strdup(value);
@@ -266,7 +266,7 @@ char *config_get(const char *section, const char *name, const char *default_valu
 	}
 	cv->flags |= CONFIG_VALUE_USED;
 
-	if(cv->flags & CONFIG_VALUE_LOADED || cv->flags & CONFIG_VALUE_CHANGED) {
+	if((cv->flags & CONFIG_VALUE_LOADED) || (cv->flags & CONFIG_VALUE_CHANGED)) {
 		// this is a loaded value from the config file
 		// if it is different that the default, mark it
 		if(!(cv->flags & CONFIG_VALUE_CHECKED)) {

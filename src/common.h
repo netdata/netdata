@@ -16,4 +16,14 @@ extern int savememory(const char *filename, void *mem, unsigned long size);
 
 extern int fd_is_valid(int fd);
 
+#ifdef __GNUC__
+// gcc branch optimization
+// #warning "Using GCC branch optimizations"
+#define likely(x)       __builtin_expect(!!(x), 1)
+#define unlikely(x)     __builtin_expect(!!(x), 0)
+#else
+#define likely(x)       (x)
+#define unlikely(x)     (x)
+#endif
+
 #endif /* NETDATA_COMMON_H */

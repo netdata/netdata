@@ -143,9 +143,9 @@ static RRDDIM *rrddim_index_find(RRDSET *st, const char *id, uint32_t hash) {
 
 int rrdset_type_id(const char *name)
 {
-	if(strcmp(name, RRDSET_TYPE_AREA_NAME) == 0) return RRDSET_TYPE_AREA;
-	if(strcmp(name, RRDSET_TYPE_STACKED_NAME) == 0) return RRDSET_TYPE_STACKED;
-	if(strcmp(name, RRDSET_TYPE_LINE_NAME) == 0) return RRDSET_TYPE_LINE;
+	if(unlikely(strcmp(name, RRDSET_TYPE_AREA_NAME) == 0)) return RRDSET_TYPE_AREA;
+	else if(unlikely(strcmp(name, RRDSET_TYPE_STACKED_NAME) == 0)) return RRDSET_TYPE_STACKED;
+	else if(unlikely(strcmp(name, RRDSET_TYPE_LINE_NAME) == 0)) return RRDSET_TYPE_LINE;
 	return RRDSET_TYPE_LINE;
 }
 
@@ -194,9 +194,9 @@ const char *rrd_memory_mode_name(int id)
 
 int rrd_memory_mode_id(const char *name)
 {
-	if(!strcmp(name, RRD_MEMORY_MODE_RAM_NAME))
+	if(unlikely(!strcmp(name, RRD_MEMORY_MODE_RAM_NAME)))
 		return RRD_MEMORY_MODE_RAM;
-	else if(!strcmp(name, RRD_MEMORY_MODE_MAP_NAME))
+	else if(unlikely(!strcmp(name, RRD_MEMORY_MODE_MAP_NAME)))
 		return RRD_MEMORY_MODE_MAP;
 
 	return RRD_MEMORY_MODE_SAVE;
@@ -660,7 +660,7 @@ void rrdset_save_all(void)
 		}
 
 		for(rd = st->dimensions; rd ; rd = rd->next) {
-			if(rd->mapped == RRD_MEMORY_MODE_SAVE) {
+			if(likely(rd->mapped == RRD_MEMORY_MODE_SAVE)) {
 				debug(D_RRD_CALLS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_filename);
 				savememory(rd->cache_filename, rd, rd->memsize);
 			}
@@ -722,7 +722,7 @@ int rrddim_hide(RRDSET *st, const char *id)
 	debug(D_RRD_CALLS, "rrddim_hide() for chart %s, dimension %s", st->name, id);
 
 	RRDDIM *rd = rrddim_find(st, id);
-	if(!rd) {
+	if(unlikely(!rd)) {
 		error("Cannot find dimension with id '%s' on stats '%s' (%s).", id, st->name, st->id);
 		return 1;
 	}
@@ -736,7 +736,7 @@ int rrddim_unhide(RRDSET *st, const char *id)
 	debug(D_RRD_CALLS, "rrddim_unhide() for chart %s, dimension %s", st->name, id);
 
 	RRDDIM *rd = rrddim_find(st, id);
-	if(!rd) {
+	if(unlikely(!rd)) {
 		error("Cannot find dimension with id '%s' on stats '%s' (%s).", id, st->name, st->id);
 		return 1;
 	}
@@ -757,7 +757,7 @@ void rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value)
 int rrddim_set(RRDSET *st, const char *id, collected_number value)
 {
 	RRDDIM *rd = rrddim_find(st, id);
-	if(!rd) {
+	if(unlikely(!rd)) {
 		error("Cannot find dimension with id '%s' on stats '%s' (%s).", id, st->name, st->id);
 		return 1;
 	}
@@ -770,7 +770,7 @@ void rrdset_next_usec(RRDSET *st, unsigned long long microseconds)
 {
 	debug(D_RRD_CALLS, "rrdset_next_usec() for chart %s with microseconds %llu", st->name, microseconds);
 
-	if(st->debug) debug(D_RRD_STATS, "%s: NEXT: %llu microseconds", st->name, microseconds);
+	if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: NEXT: %llu microseconds", st->name, microseconds);
 	st->usec_since_last_update = microseconds;
 }
 
@@ -778,7 +778,7 @@ void rrdset_next(RRDSET *st)
 {
 	unsigned long long microseconds = 0;
 
-	if(st->last_collected_time.tv_sec) {
+	if(likely(st->last_collected_time.tv_sec)) {
 		struct timeval now;
 		gettimeofday(&now, NULL);
 		microseconds = usecdiff(&now, &st->last_collected_time);
@@ -799,22 +799,22 @@ unsigned long long rrdset_done(RRDSET *st)
 	RRDDIM *rd, *last;
 	int oldstate, store_this_entry = 1;
 
-	if(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate) != 0)
+	if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate) != 0))
 		error("Cannot set pthread cancel state to DISABLE.");
 
 	// a read lock is OK here
 	pthread_rwlock_rdlock(&st->rwlock);
 
 	// check if the chart has a long time to be refreshed
-	if(st->usec_since_last_update > st->entries * st->update_every * 1000000ULL) {
+	if(unlikely(st->usec_since_last_update > st->entries * st->update_every * 1000000ULL)) {
 		info("%s: took too long to be updated (%0.3Lf secs). Reseting it.", st->name, (long double)(st->usec_since_last_update / 1000000.0));
 		rrdset_reset(st);
 		st->usec_since_last_update = st->update_every * 1000000ULL;
 	}
-	if(st->debug) debug(D_RRD_STATS, "%s: microseconds since last update: %llu", st->name, st->usec_since_last_update);
+	if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: microseconds since last update: %llu", st->name, st->usec_since_last_update);
 
 	// set last_collected_time
-	if(!st->last_collected_time.tv_sec) {
+	if(unlikely(!st->last_collected_time.tv_sec)) {
 		// it is the first entry
 		// set the last_collected_time to now
 		gettimeofday(&st->last_collected_time, NULL);
@@ -822,7 +822,7 @@ unsigned long long rrdset_done(RRDSET *st)
 		// the first entry should not be stored
 		store_this_entry = 0;
 
-		if(st->debug) debug(D_RRD_STATS, "%s: initializing last_collected to now. Will not store the next entry.", st->name);
+		if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: initializing last_collected to now. Will not store the next entry.", st->name);
 	}
 	else {
 		// it is not the first entry
@@ -834,7 +834,7 @@ unsigned long long rrdset_done(RRDSET *st)
 
 	// if this set has not been updated in the past
 	// we fake the last_update time to be = now - usec_since_last_update
-	if(!st->last_updated.tv_sec) {
+	if(unlikely(!st->last_updated.tv_sec)) {
 		// it has never been updated before
 		// set a fake last_updated, in the past using usec_since_last_update
 		unsigned long long ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec - st->usec_since_last_update;
@@ -844,11 +844,11 @@ unsigned long long rrdset_done(RRDSET *st)
 		// the first entry should not be stored
 		store_this_entry = 0;
 
-		if(st->debug) debug(D_RRD_STATS, "%s: initializing last_updated to now - %llu microseconds (%0.3Lf). Will not store the next entry.", st->name, st->usec_since_last_update, (long double)ut/1000000.0);
+		if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: initializing last_updated to now - %llu microseconds (%0.3Lf). Will not store the next entry.", st->name, st->usec_since_last_update, (long double)ut/1000000.0);
 	}
 
 	// check if we will re-write the entire data set
-	if(usecdiff(&st->last_collected_time, &st->last_updated) > st->update_every * st->entries * 1000000ULL) {
+	if(unlikely(usecdiff(&st->last_collected_time, &st->last_updated) > st->update_every * st->entries * 1000000ULL)) {
 		info("%s: too old data (last updated at %u.%u, last collected at %u.%u). Reseting it. Will not store the next entry.", st->name, st->last_updated.tv_sec, st->last_updated.tv_usec, st->last_collected_time.tv_sec, st->last_collected_time.tv_usec);
 		rrdset_reset(st);
 
@@ -872,20 +872,22 @@ unsigned long long rrdset_done(RRDSET *st)
 	unsigned long long now_ut  = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec;
 	unsigned long long next_ut = (st->last_updated.tv_sec + st->update_every) * 1000000ULL;
 
-	if(st->debug) debug(D_RRD_STATS, "%s: last ut = %0.3Lf (last updated time)", st->name, (long double)last_ut/1000000.0);
-	if(st->debug) debug(D_RRD_STATS, "%s: now  ut = %0.3Lf (current update time)", st->name, (long double)now_ut/1000000.0);
-	if(st->debug) debug(D_RRD_STATS, "%s: next ut = %0.3Lf (next interpolation point)", st->name, (long double)next_ut/1000000.0);
+	if(unlikely(st->debug)) {
+		debug(D_RRD_STATS, "%s: last ut = %0.3Lf (last updated time)", st->name, (long double)last_ut/1000000.0);
+		debug(D_RRD_STATS, "%s: now  ut = %0.3Lf (current update time)", st->name, (long double)now_ut/1000000.0);
+		debug(D_RRD_STATS, "%s: next ut = %0.3Lf (next interpolation point)", st->name, (long double)next_ut/1000000.0);
+	}
 
-	if(!st->counter_done) {
+	if(unlikely(!st->counter_done)) {
 		store_this_entry = 0;
-		if(st->debug) debug(D_RRD_STATS, "%s: Will not store the next entry.", st->name);
+		if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: Will not store the next entry.", st->name);
 	}
 	st->counter_done++;
 
 	// calculate totals and count the dimensions
 	int dimensions;
 	st->collected_total = 0;
-	for( rd = st->dimensions, dimensions = 0 ; rd ; rd = rd->next, dimensions++ )
+	for( rd = st->dimensions, dimensions = 0 ; likely(rd) ; rd = rd->next, dimensions++ )
 		st->collected_total += rd->collected_value;
 
 	uint32_t storage_flags = SN_EXISTS;
@@ -893,9 +895,9 @@ unsigned long long rrdset_done(RRDSET *st)
 	// process all dimensions to calculate their values
 	// based on the collected figures only
 	// at this stage we do not interpolate anything
-	for( rd = st->dimensions ; rd ; rd = rd->next ) {
+	for( rd = st->dimensions ; likely(rd) ; rd = rd->next ) {
 
-		if(st->debug) debug(D_RRD_STATS, "%s/%s: "
+		if(unlikely(st->debug)) debug(D_RRD_STATS, "%s/%s: "
 			" last_collected_value = " COLLECTED_NUMBER_FORMAT
 			" collected_value = " COLLECTED_NUMBER_FORMAT
 			" last_calculated_value = " CALCULATED_NUMBER_FORMAT
@@ -911,13 +913,13 @@ unsigned long long rrdset_done(RRDSET *st)
 			case RRDDIM_PCENT_OVER_DIFF_TOTAL:
 				// the percentage of the current increment
 				// over the increment of all dimensions together
-				if(st->collected_total == st->last_collected_total) rd->calculated_value = rd->last_calculated_value;
+				if(unlikely(st->collected_total == st->last_collected_total)) rd->calculated_value = rd->last_calculated_value;
 				else rd->calculated_value =
 					  (calculated_number)100
 					* (calculated_number)(rd->collected_value - rd->last_collected_value)
 					/ (calculated_number)(st->collected_total  - st->last_collected_total);
 
-				if(st->debug)
+				if(unlikely(st->debug))
 					debug(D_RRD_STATS, "%s/%s: CALC PCENT-DIFF "
 						CALCULATED_NUMBER_FORMAT " = 100"
 						" * (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
@@ -930,7 +932,7 @@ unsigned long long rrdset_done(RRDSET *st)
 				break;
 
 			case RRDDIM_PCENT_OVER_ROW_TOTAL:
-				if(!st->collected_total) rd->calculated_value = 0;
+				if(unlikely(!st->collected_total)) rd->calculated_value = 0;
 				else
 				// the percentage of the current value
 				// over the total of all dimensions
@@ -939,7 +941,7 @@ unsigned long long rrdset_done(RRDSET *st)
 					* (calculated_number)rd->collected_value
 					/ (calculated_number)st->collected_total;
 
-				if(st->debug)
+				if(unlikely(st->debug))
 					debug(D_RRD_STATS, "%s/%s: CALC PCENT-ROW "
 						CALCULATED_NUMBER_FORMAT " = 100"
 						" * " COLLECTED_NUMBER_FORMAT
@@ -954,7 +956,7 @@ unsigned long long rrdset_done(RRDSET *st)
 			case RRDDIM_INCREMENTAL:
 				// if the new is smaller than the old (an overflow, or reset), set the old equal to the new
 				// to reset the calculation (it will give zero as the calculation for this second)
-				if(rd->last_collected_value > rd->collected_value) {
+				if(unlikely(rd->last_collected_value > rd->collected_value)) {
 					info("%s.%s: Detect RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
 							, st->name, rd->name
 							, rd->last_collected_value
@@ -965,7 +967,7 @@ unsigned long long rrdset_done(RRDSET *st)
 
 				rd->calculated_value += (calculated_number)(rd->collected_value - rd->last_collected_value);
 
-				if(st->debug)
+				if(unlikely(st->debug))
 					debug(D_RRD_STATS, "%s/%s: CALC INC "
 						CALCULATED_NUMBER_FORMAT " += "
 						COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT
@@ -978,7 +980,7 @@ unsigned long long rrdset_done(RRDSET *st)
 			case RRDDIM_ABSOLUTE:
 				rd->calculated_value = (calculated_number)rd->collected_value;
 
-				if(st->debug)
+				if(unlikely(st->debug))
 					debug(D_RRD_STATS, "%s/%s: CALC ABS/ABS-NO-IN "
 						CALCULATED_NUMBER_FORMAT " = "
 						COLLECTED_NUMBER_FORMAT
@@ -993,7 +995,7 @@ unsigned long long rrdset_done(RRDSET *st)
 				// it gets noticed when we add new types
 				rd->calculated_value = 0;
 
-				if(st->debug)
+				if(unlikely(st->debug))
 					debug(D_RRD_STATS, "%s/%s: CALC "
 						CALCULATED_NUMBER_FORMAT " = 0"
 						, st->id, rd->name
@@ -1009,16 +1011,18 @@ unsigned long long rrdset_done(RRDSET *st)
 	unsigned long long first_ut = last_ut;
 	int iterations = (now_ut - last_ut) / (st->update_every * 1000000ULL);
 
-	for( ; next_ut <= now_ut ; next_ut += st->update_every * 1000000ULL, iterations-- ) {
+	for( ; likely(next_ut <= now_ut) ; next_ut += st->update_every * 1000000ULL, iterations-- ) {
 		if(iterations < 0) error("iterations calculation wrapped!");
 
-		if(st->debug) debug(D_RRD_STATS, "%s: last ut = %0.3Lf (last updated time)", st->name, (long double)last_ut/1000000.0);
-		if(st->debug) debug(D_RRD_STATS, "%s: next ut = %0.3Lf (next interpolation point)", st->name, (long double)next_ut/1000000.0);
+		if(unlikely(st->debug)) {
+			debug(D_RRD_STATS, "%s: last ut = %0.3Lf (last updated time)", st->name, (long double)last_ut/1000000.0);
+			debug(D_RRD_STATS, "%s: next ut = %0.3Lf (next interpolation point)", st->name, (long double)next_ut/1000000.0);
+		}
 
 		st->last_updated.tv_sec = next_ut / 1000000ULL;
 		st->last_updated.tv_usec = 0;
 
-		for( rd = st->dimensions ; rd ; rd = rd->next ) {
+		for( rd = st->dimensions ; likely(rd) ; rd = rd->next ) {
 			calculated_number new_value;
 
 			switch(rd->algorithm) {
@@ -1029,7 +1033,7 @@ unsigned long long rrdset_done(RRDSET *st)
 							/ (calculated_number)(now_ut - last_ut)
 						);
 
-					if(st->debug)
+					if(unlikely(st->debug))
 						debug(D_RRD_STATS, "%s/%s: CALC2 INC "
 							CALCULATED_NUMBER_FORMAT " = "
 							CALCULATED_NUMBER_FORMAT
@@ -1057,7 +1061,7 @@ unsigned long long rrdset_done(RRDSET *st)
 							+  rd->last_calculated_value
 						);
 
-					if(st->debug)
+					if(unlikely(st->debug))
 						debug(D_RRD_STATS, "%s/%s: CALC2 DEF "
 							CALCULATED_NUMBER_FORMAT " = ((("
 							"(" CALCULATED_NUMBER_FORMAT " - " CALCULATED_NUMBER_FORMAT ")"
@@ -1070,23 +1074,23 @@ unsigned long long rrdset_done(RRDSET *st)
 							, (now_ut - first_ut), rd->last_calculated_value
 							);
 
-					if(next_ut + st->update_every * 1000000ULL > now_ut) rd->calculated_value = new_value;
+					if(likely(next_ut + st->update_every * 1000000ULL > now_ut)) rd->calculated_value = new_value;
 					break;
 			}
 
-			if(!store_this_entry) {
+			if(unlikely(!store_this_entry)) {
 				store_this_entry = 1;
 				continue;
 			}
 
-			if(rd->updated && iterations < st->gap_when_lost_iterations_above) {
+			if(likely(rd->updated && iterations < st->gap_when_lost_iterations_above)) {
 				rd->values[st->current_entry] = pack_storage_number(
 						  new_value
 						* (calculated_number)rd->multiplier
 						/ (calculated_number)rd->divisor
 					, storage_flags );
 
-				if(st->debug)
+				if(unlikely(st->debug))
 					debug(D_RRD_STATS, "%s/%s: STORE[%ld] "
 						CALCULATED_NUMBER_FORMAT " = " CALCULATED_NUMBER_FORMAT
 						" * %ld"
@@ -1099,14 +1103,14 @@ unsigned long long rrdset_done(RRDSET *st)
 						);
 			}
 			else {
-				if(st->debug) debug(D_RRD_STATS, "%s/%s: STORE[%ld] = NON EXISTING "
+				if(unlikely(st->debug)) debug(D_RRD_STATS, "%s/%s: STORE[%ld] = NON EXISTING "
 						, st->id, rd->name
 						, st->current_entry
 						);
 				rd->values[st->current_entry] = pack_storage_number(0, SN_NOT_EXISTS);
 			}
 
-			if(st->debug) {
+			if(unlikely(st->debug)) {
 				calculated_number t1 = new_value * (calculated_number)rd->multiplier / (calculated_number)rd->divisor;
 				calculated_number t2 = unpack_storage_number(rd->values[st->current_entry]);
 				calculated_number accuracy = accuracy_loss(t1, t2);
@@ -1137,7 +1141,7 @@ unsigned long long rrdset_done(RRDSET *st)
 		// reset the storage flags for the next point, if any;
 		storage_flags = SN_EXISTS;
 
-		if(st->first_entry_t && st->counter >= (unsigned long long)st->entries) {
+		if(unlikely(st->first_entry_t && st->counter >= (unsigned long long)st->entries)) {
 			// the db is overwriting values
 			// add the value we will overwrite
 			st->first_entry_t += st->update_every * 1000000ULL;
@@ -1145,12 +1149,12 @@ unsigned long long rrdset_done(RRDSET *st)
 		
 		st->counter++;
 		st->current_entry = ((st->current_entry + 1) >= st->entries) ? 0 : st->current_entry + 1;
-		if(!st->first_entry_t) st->first_entry_t = next_ut;
+		if(unlikely(!st->first_entry_t)) st->first_entry_t = next_ut;
 		last_ut = next_ut;
 	}
 
-	for( rd = st->dimensions; rd ; rd = rd->next ) {
-		if(!rd->updated) continue;
+	for( rd = st->dimensions; likely(rd) ; rd = rd->next ) {
+		if(unlikely(!rd->updated)) continue;
 		rd->last_collected_value = rd->collected_value;
 		rd->last_calculated_value = rd->calculated_value;
 		rd->collected_value = 0;
@@ -1159,7 +1163,7 @@ unsigned long long rrdset_done(RRDSET *st)
 		// if this is the first entry of incremental dimensions
 		// we have to set the first calculated_value to zero
 		// to eliminate the first spike
-		if(st->counter_done == 1) switch(rd->algorithm) {
+		if(unlikely(st->counter_done == 1)) switch(rd->algorithm) {
 			case RRDDIM_PCENT_OVER_DIFF_TOTAL:
 			case RRDDIM_INCREMENTAL:
 				rd->calculated_value = 0;
@@ -1173,25 +1177,25 @@ unsigned long long rrdset_done(RRDSET *st)
 	// --------------------------------------------------------------------
 
 	// find if there are any obsolete dimensions (not updated recently)
-	if(rrd_delete_unupdated_dimensions) {
+	if(unlikely(rrd_delete_unupdated_dimensions)) {
 
-		for( rd = st->dimensions; rd ; rd = rd->next )
+		for( rd = st->dimensions; likely(rd) ; rd = rd->next )
 			if((rd->last_collected_time.tv_sec + (rrd_delete_unupdated_dimensions * st->update_every)) < st->last_collected_time.tv_sec)
 				break;
 
-		if(rd) {
+		if(unlikely(rd)) {
 			// there is dimension to free
 			// upgrade our read lock to a write lock
 			pthread_rwlock_unlock(&st->rwlock);
 			pthread_rwlock_wrlock(&st->rwlock);
 
-			for( rd = st->dimensions, last = NULL ; rd ; ) {
+			for( rd = st->dimensions, last = NULL ; likely(rd) ; ) {
 				// remove it only it is not updated in rrd_delete_unupdated_dimensions seconds
 
-				if((rd->last_collected_time.tv_sec + (rrd_delete_unupdated_dimensions * st->update_every)) < st->last_collected_time.tv_sec) {
-					debug(D_RRD_STATS, "Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
+				if(unlikely((rd->last_collected_time.tv_sec + (rrd_delete_unupdated_dimensions * st->update_every)) < st->last_collected_time.tv_sec)) {
+					info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
 
-					if(!last) {
+					if(unlikely(!last)) {
 						st->dimensions = rd->next;
 						rd->next = NULL;
 						rrddim_free(st, rd);
@@ -1211,13 +1215,16 @@ unsigned long long rrdset_done(RRDSET *st)
 				rd = rd->next;
 			}
 
-			if(!st->dimensions) st->enabled = 0;
+			if(unlikely(!st->dimensions)) {
+				info("Disabling chart %s (%s) since it does not have any dimensions", st->name, st->id);
+				st->enabled = 0;
+			}
 		}
 	}
 
 	pthread_rwlock_unlock(&st->rwlock);
 
-	if(pthread_setcancelstate(oldstate, NULL) != 0)
+	if(unlikely(pthread_setcancelstate(oldstate, NULL) != 0))
 		error("Cannot set pthread cancel state to RESTORE (%d).", oldstate);
 
 	return(st->usec_since_last_update);
@@ -1227,7 +1234,7 @@ unsigned long long rrdset_done(RRDSET *st)
 // find the oldest entry in the data, skipping all empty slots
 time_t rrdset_first_entry_t(RRDSET *st)
 {
-	if(!st->first_entry_t) return st->last_updated.tv_sec;
+	if(unlikely(!st->first_entry_t)) return st->last_updated.tv_sec;
 	
 	return st->first_entry_t / 1000000;
 }

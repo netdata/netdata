@@ -3,6 +3,7 @@
 #include <string.h>
 #include <sys/resource.h>
 
+#include "common.h"
 #include "storage_number.h"
 #include "rrd.h"
 #include "log.h"

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "common.h"
 #include "config.h"
 #include "procfile.h"
 #include "rrd.h"

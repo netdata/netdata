@@ -26,17 +26,6 @@ pi_update() {
 	# for each dimension
 	# remember: KEEP IT SIMPLE AND SHORT
 
-	# 1. wget the counters page from squid
-	# 2. sed to remove spaces; replace . with _; remove spaces around =; prepend each line with: local squid_
-	# 3. egrep lines starting with:
-	#    local squid_client_http_ then one or more of these a-z 0-9 _ then = and one of more of 0-9
-	#    local squid_server_all_ then one or more of these a-z 0-9 _ then = and one of more of 0-9
-	# 4. then execute this as a script with the eval
-	#
-	# be very carefull with eval:
-	# prepare the script and always grep at the end the lines that are usefull, so that
-	# even if something goes wrong, no other code can be executed
-
 	local cpuTemp=$(cat /sys/class/thermal/thermal_zone0/temp)
 	local cpuSpeed=$(cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq)
 
