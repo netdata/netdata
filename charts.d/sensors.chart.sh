@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# sensors docs
+# https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface
+
 # if this chart is called X.chart.sh, then all functions and global variables
 # must start with X_
 
