@@ -3,12 +3,15 @@
 # if this chart is called X.chart.sh, then all functions and global variables
 # must start with X_
 
+sensors_sys_dir="/sys/class/hwmon"
+sensors_sys_depth=3
+
 # _update_every is a special variable - it holds the number of seconds
 # between the calls of the _update() function
 sensors_update_every=
 
 sensors_find_all_files() {
-	find $1 -name temp\?_input -o -name temp -o -name in\?_input -o -name fan\?_input 2>/dev/null
+	find -L $1 -maxdepth $sensors_sys_depth -name temp\?_input -o -name temp -o -name in\?_input -o -name fan\?_input 2>/dev/null
 }
 
 sensors_find_all_dirs() {
@@ -25,7 +28,7 @@ sensors_check() {
 	#  - 0 to enable the chart
 	#  - 1 to disable the chart
 
-	[ ! -z "$( sensors_find_all_files /sys/devices/ )" ] && return 0
+	[ ! -z "$( sensors_find_all_files $sensors_sys_dir )" ] && return 0
 	return 1
 }
 
@@ -35,7 +38,7 @@ sensors_create() {
 
 	echo >$TMP_DIR/temp.sh "sensors_update() {"
 
-	for path in $( sensors_find_all_dirs /sys/devices/ | sort -u )
+	for path in $( sensors_find_all_dirs $sensors_sys_dir | sort -u )
 	do
 		dir=$( basename $path )
 		device=
@@ -60,7 +63,7 @@ sensors_create() {
 
 		id="$( fixid "$device.$subsystem.$dir" )"
 
-		echo >&2 "charts.d: temperature sensors on path='$path', dir='$dir', device='$device', subsystem='$subsystem', id='$id', name='$name'"
+		echo >&2 "charts.d: sensors on path='$path', dir='$dir', device='$device', subsystem='$subsystem', id='$id', name='$name'"
 
 		for mode in temperature voltage fans
 		do
@@ -69,7 +72,7 @@ sensors_create() {
 			divisor=1
 			case $mode in
 				temperature)
-					files="$( find $path -name temp\?_input -o -name temp | sort -u)"
+					files="$( find -H $path -name temp\?_input -o -name temp | sort -u)"
 					[ -z "$files" ] && continue
 					echo "CHART sensors.temp_${id} '' '${name} Temperature' 'Temperature' 'Celcius Degrees' '' line 6000 $sensors_update_every"
 					echo >>$TMP_DIR/temp.sh "echo \"BEGIN sensors.temp_${id} \$1\""
@@ -77,7 +80,7 @@ sensors_create() {
 					;;
 
 				voltage)
-					files="$( find $path -name in\?_input )"
+					files="$( find -H $path -name in\?_input )"
 					[ -z "$files" ] && continue
 					echo "CHART sensors.volt_${id} '' '${name} Voltage' 'Voltage' 'Volts' '' line 6001 $sensors_update_every"
 					echo >>$TMP_DIR/temp.sh "echo \"BEGIN sensors.volt_${id} \$1\""
@@ -85,7 +88,7 @@ sensors_create() {
 					;;
 
 				fans)
-					files="$( find $path -name fan\?_input )"
+					files="$( find -H $path -name fan\?_input )"
 					[ -z "$files" ] && continue
 					echo "CHART sensors.fan_${id} '' '${name} Fans Speed' 'Fans' 'Rotations Per Minute (RPM)' '' line 6002 $sensors_update_every"
 					echo >>$TMP_DIR/temp.sh "echo \"BEGIN sensors.fan_${id} \$1\""
@@ -101,7 +104,7 @@ sensors_create() {
 				file="$x"
 				fid="$( fixid "$file" )"
 				lfile="$( basename $file | sed "s|_input$|_label|g" )"
-				labelname="$( basename $file )"
+				labelname="$( basename $file | sed "s|_input$||g" )"
 
 				if [ ! "$path/$lfile" = "$file" -a -f "$path/$lfile" ]
 					then
@@ -117,6 +120,7 @@ sensors_create() {
 	done
 
 	echo >>$TMP_DIR/temp.sh "}"
+	cat >&2 $TMP_DIR/temp.sh
 	. $TMP_DIR/temp.sh
 
 	return 0
