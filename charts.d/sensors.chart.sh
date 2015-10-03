@@ -5,6 +5,7 @@
 
 sensors_sys_dir="/sys/devices"
 sensors_sys_depth=10
+sensors_source_update=1
 
 # _update_every is a special variable - it holds the number of seconds
 # between the calls of the _update() function
@@ -33,13 +34,37 @@ sensors_check() {
 }
 
 sensors_check_files() {
+	# we only need sensors that report a non-zero value
+
 	local f= v=
 	for f in $*
 	do
-		echo >&2 "checking $f"
+		[ ! -f "$f" ] && continue
+
 		v="$( cat $f )"
 		v=$(( v + 1 - 1 ))
-		[ $v -ne 0 ] && echo "$f"
+		[ $v -ne 0 ] && echo "$f" && continue
+		
+		echo >&2 "charts.d: sensors: $f gives zero values"
+	done
+}
+
+sensors_check_temp_type() {
+	# valid temp types are 1 to 6
+	# disabled sensors have the value 0
+
+	local f= t= v=
+	for f in $*
+	do
+		t=$( echo $f | sed "s|_input$|_type|g" )
+		[ "$f" = "$t" ] && echo "$f" && continue
+		[ ! -f "$t" ] && echo "$f" && continue
+
+		v="$( cat $t )"
+		v=$(( v + 1 - 1 ))
+		[ $v -ne 0 ] && echo "$f" && continue
+
+		echo >&2 "charts.d: sensors: $f is disabled"
 	done
 }
 
@@ -47,7 +72,10 @@ sensors_check_files() {
 sensors_create() {
 	local path= dir= name= x= file= lfile= labelname= labelid= device= subsystem= id= type= mode= files= multiplier= divisor=
 
-	echo >$TMP_DIR/temp.sh "sensors_update() {"
+	# we create a script with the source of the
+	# sensors_update() function
+	# - the highest speed we can achieve -
+	[ $sensors_source_update -eq 1 ] && echo >$TMP_DIR/temp.sh "sensors_update() {"
 
 	for path in $( sensors_find_all_dirs $sensors_sys_dir | sort -u )
 	do
@@ -74,7 +102,7 @@ sensors_create() {
 
 		id="$( fixid "$device.$subsystem.$dir" )"
 
-		echo >&2 "charts.d: sensors on path='$path', dir='$dir', device='$device', subsystem='$subsystem', id='$id', name='$name'"
+		echo >&2 "charts.d: sensors: on path='$path', dir='$dir', device='$device', subsystem='$subsystem', id='$id', name='$name'"
 
 		for mode in temperature voltage fans power current energy humidity
 		do
@@ -87,6 +115,7 @@ sensors_create() {
 				temperature)
 					files="$( ls $path/temp*_input 2>/dev/null; ls $path/temp 2>/dev/null )"
 					files="$( sensors_check_files $files )"
+					files="$( sensors_check_temp_type $files )"
 					[ -z "$files" ] && continue
 					echo "CHART sensors.temp_${id} '' '${name} Temperature' 'Celcius' '${device}' '' line 6000 $sensors_update_every"
 					echo >>$TMP_DIR/temp.sh "echo \"BEGIN sensors.temp_${id} \$1\""
@@ -173,8 +202,10 @@ sensors_create() {
 	done
 
 	echo >>$TMP_DIR/temp.sh "}"
-	cat >&2 $TMP_DIR/temp.sh
-	. $TMP_DIR/temp.sh
+	# cat >&2 $TMP_DIR/temp.sh
+
+	# ok, load the function sensors_update() we created
+	[ $sensors_source_update -eq 1 ] && . $TMP_DIR/temp.sh
 
 	return 0
 }
@@ -188,7 +219,7 @@ sensors_update() {
 	# for each dimension
 	# remember: KEEP IT SIMPLE AND SHORT
 
-#	. $TMP_DIR/temp.sh $1
+	[ $sensors_source_update -eq 0 ] && . $TMP_DIR/temp.sh $1
 
 	return 0
 }
