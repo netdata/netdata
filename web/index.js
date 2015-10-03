@@ -111,14 +111,17 @@ function initMainChart(c) {
 	mainchart.chartOptions.explorer = null;
 	mainchart.chart = null;
 
+	mainchart.before = 0;
+	mainchart.after = 0;
+
 	mainchart.chartOptions.width = screenWidth();
 	mainchart.chartOptions.height = $(window).height() - 150 - MAINCHART_CONTROL_HEIGHT;
 	if(mainchart.chartOptions.height < 300) mainchart.chartOptions.height = 300;
 
 	mainchart.div = 'maingraph';
-	mainchart.time_to_show = (mainchart.last_entry_t - mainchart.first_entry_t) / MAINCHART_INITIAL_SELECTOR;
-	if(mainchart.time_to_show < MAINCHART_INITIAL_SELECTOR) mainchart.time_to_show = MAINCHART_INITIAL_SELECTOR;
-	calculateChartPointsToShow(mainchart, mainchart.chartOptions.isStacked?MAINCHART_STACKED_POINTS_DIVISOR:MAINCHART_POINTS_DIVISOR, mainchart.time_to_show, 0);
+	mainchart.max_time_to_show = (mainchart.last_entry_t - mainchart.first_entry_t) / MAINCHART_INITIAL_SELECTOR;
+	if(mainchart.max_time_to_show < mainchart.update_every * MAINCHART_INITIAL_SELECTOR) mainchart.max_time_to_show = mainchart.update_every * MAINCHART_INITIAL_SELECTOR;
+	calculateChartPointsToShow(mainchart, mainchart.chartOptions.isStacked?MAINCHART_STACKED_POINTS_DIVISOR:MAINCHART_POINTS_DIVISOR, mainchart.max_time_to_show, 0);
 
 	// copy it to the hidden chart
 	mainchart.hiddenchart = $.extend(true, {}, mainchart);
@@ -149,7 +152,7 @@ function refreshHiddenChart(doNext) {
 
 	// is it too soon for a refresh?
 	var now = new Date().getTime();
-	if((now - mainchart.hiddenchart.last_updated) < (mainchart.hiddenchart.group * mainchart.hiddenchart.update_every * 1000)) {
+	if((now - mainchart.hiddenchart.last_updated) < (mainchart.update_every * 10 * 1000) || (now - mainchart.hiddenchart.last_updated) < (mainchart.hiddenchart.group * mainchart.hiddenchart.update_every * 1000)) {
 		if(typeof doNext == "function") doNext();
 		return;
 	}
@@ -223,7 +226,7 @@ function refreshHiddenChart(doNext) {
 		}
 		if(refresh_mode != REFRESH_PAUSED) {
 			mainchart.control_wrapper.setState({range: {
-				start: new Date((Math.round(new Date().getTime() / 1000) - mainchart.hiddenchart.time_to_show) * 1000),
+				start: new Date(now - (mainchart.max_time_to_show * 1000)),
 				end: new Date()
 			}});
 		}
@@ -309,7 +312,7 @@ function setMainChartGroup(g, norefresh) {
 	mainchart.group = g;
 
 	if(!mainchart.before && !mainchart.after)
-		calculateChartPointsToShow(mainchart, mainchart.chartOptions.isStacked?MAINCHART_STACKED_POINTS_DIVISOR:MAINCHART_POINTS_DIVISOR, mainchart.time_to_show, mainchart.group);
+		calculateChartPointsToShow(mainchart, mainchart.chartOptions.isStacked?MAINCHART_STACKED_POINTS_DIVISOR:MAINCHART_POINTS_DIVISOR, mainchart.max_time_to_show, mainchart.group);
 	else
 		calculateChartPointsToShow(mainchart, mainchart.chartOptions.isStacked?MAINCHART_STACKED_POINTS_DIVISOR:MAINCHART_POINTS_DIVISOR, 0, mainchart.group);
 
@@ -350,7 +353,7 @@ function setMainChartPlay(p) {
 		//mainchart.chartOptions.explorer = null;
 		mainchart.after = 0;
 		mainchart.before = 0;
-		calculateChartPointsToShow(mainchart, mainchart.chartOptions.isStacked?MAINCHART_STACKED_POINTS_DIVISOR:MAINCHART_POINTS_DIVISOR, mainchart.time_to_show, 0);
+		calculateChartPointsToShow(mainchart, mainchart.chartOptions.isStacked?MAINCHART_STACKED_POINTS_DIVISOR:MAINCHART_POINTS_DIVISOR, mainchart.max_time_to_show, 0);
 		$('#group' + mainchart.group).trigger('click');
 		mainchart.last_updated = 0;
 		mainchart.hiddenchart.last_updated = 0;
