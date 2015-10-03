@@ -227,9 +227,17 @@ function refreshHiddenChart(doNext) {
 		if(refresh_mode != REFRESH_PAUSED) {
 			// console.log('mainchart.points_to_show: ' + mainchart.points_to_show + ', mainchart.group: ' + mainchart.group + ', mainchart.update_every: ' + mainchart.update_every);
 
+			var start = now - (mainchart.points_to_show * mainchart.group * mainchart.update_every * 1000);
+			var end = now;
+			var min = MAINCHART_MIN_TIME_TO_SHOW * 1000;
+			if(end - start < min) start = end - min;
+
 			mainchart.control_wrapper.setState({range: {
-				start: new Date(new Date().getTime() - (mainchart.points_to_show * mainchart.group * mainchart.update_every * 1000)),
-				end: new Date()
+				start: new Date(start),
+				end: new Date(end)
+			},
+			ui: {
+				minRangeSize: min
 			}});
 		}
 
