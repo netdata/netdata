@@ -32,7 +32,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 
 	if(dt) {};
 
-	if(!ff) ff = procfile_open("/proc/net/snmp", " \t:", PROCFILE_FLAG_DEFAULT);
+	if(!ff) ff = procfile_open(config_get("plugin:proc:/proc/net/snmp", "filename to monitor", "/proc/net/snmp"), " \t:", PROCFILE_FLAG_DEFAULT);
 	if(!ff) return 1;
 
 	ff = procfile_readall(ff);

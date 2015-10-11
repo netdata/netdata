@@ -31,7 +31,7 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 
 	if(do_per_core == -1) do_per_core = config_get_boolean("plugin:proc:/proc/interrupts", "interrupts per core", 0);
 
-	if(!ff) ff = procfile_open("/proc/interrupts", " \t", PROCFILE_FLAG_DEFAULT);
+	if(!ff) ff = procfile_open(config_get("plugin:proc:/proc/interrupts", "filename to monitor", "/proc/interrupts"), " \t", PROCFILE_FLAG_DEFAULT);
 	if(!ff) return 1;
 
 	ff = procfile_readall(ff);

@@ -17,7 +17,7 @@
 
 int do_proc_diskstats(int update_every, unsigned long long dt) {
 	static procfile *ff = NULL;
-
+	static char *path_to_get_hw_sector_size = NULL;
 	static int enable_new_disks = -1;
 	static int do_io = -1, do_ops = -1, do_merged_ops = -1, do_iotime = -1, do_cur_ops = -1;
 
@@ -31,8 +31,10 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 
 	if(dt) {};
 
-	if(!ff) ff = procfile_open("/proc/diskstats", " \t", PROCFILE_FLAG_DEFAULT);
+	if(!ff) ff = procfile_open(config_get("plugin:proc:/proc/diskstats", "filename to monitor", "/proc/diskstats"), " \t", PROCFILE_FLAG_DEFAULT);
 	if(!ff) return 1;
+
+	if(!path_to_get_hw_sector_size) path_to_get_hw_sector_size = config_get("plugin:proc:/proc/diskstats", "path to get h/w sector size", "/sys/block/%s/queue/hw_sector_size");
 
 	ff = procfile_readall(ff);
 	if(!ff) return 0; // we return 0, so that we will retry to open it next time
@@ -208,7 +210,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 				// replace all / with !
 				while((t = strchr(tf, '/'))) *t = '!';
 
-				snprintf(ssfilename, FILENAME_MAX, "/sys/block/%s/queue/hw_sector_size", tf);
+				snprintf(ssfilename, FILENAME_MAX, path_to_get_hw_sector_size, tf);
 				FILE *fpss = fopen(ssfilename, "r");
 				if(fpss) {
 					char ssbuffer[1025];

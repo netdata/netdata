@@ -28,7 +28,7 @@ int do_proc_meminfo(int update_every, unsigned long long dt) {
 
 	if(dt) {};
 
-	if(!ff) ff = procfile_open("/proc/meminfo", " \t:", PROCFILE_FLAG_DEFAULT);
+	if(!ff) ff = procfile_open(config_get("plugin:proc:/proc/meminfo", "filename to monitor", "/proc/meminfo"), " \t:", PROCFILE_FLAG_DEFAULT);
 	if(!ff) return 1;
 
 	ff = procfile_readall(ff);
