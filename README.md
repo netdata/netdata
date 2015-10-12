@@ -17,7 +17,7 @@ Check it live at:
 
 Here is a screenshot:
 
-![image](https://cloud.githubusercontent.com/assets/2662304/2593406/3c797e88-ba80-11e3-8ec7-c10174d59ad6.png)
+![image](https://cloud.githubusercontent.com/assets/2662304/10440038/b40bcb6c-7146-11e5-93ac-db2e177e39f8.png)
 
 
 # Features

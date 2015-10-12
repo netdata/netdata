@@ -1,3 +1,9 @@
+// TODO
+//
+// 1. support -ch option to set global /proc and /sys prefix
+// 2. disable RESET_OR_OVERFLOW check in charts
+
+
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
