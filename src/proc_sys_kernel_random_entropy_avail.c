@@ -13,7 +13,11 @@ int do_proc_sys_kernel_random_entropy_avail(int update_every, unsigned long long
 
 	if(dt) {} ;
 
-	if(!ff) ff = procfile_open(config_get("plugin:proc:/proc/sys/kernel/random/entropy_avail", "filename to monitor", "/proc/sys/kernel/random/entropy_avail"), "", PROCFILE_FLAG_DEFAULT);
+	if(!ff) {
+		char filename[FILENAME_MAX + 1];
+		snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/sys/kernel/random/entropy_avail");
+		ff = procfile_open(config_get("plugin:proc:/proc/sys/kernel/random/entropy_avail", "filename to monitor", filename), "", PROCFILE_FLAG_DEFAULT);
+	}
 	if(!ff) return 1;
 
 	ff = procfile_readall(ff);

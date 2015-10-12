@@ -21,7 +21,11 @@ int do_proc_net_ip_vs_stats(int update_every, unsigned long long dt) {
 
 	if(dt) {};
 
-	if(!ff) ff = procfile_open(config_get("plugin:proc:/proc/net/ip_vs_stats", "filename to monitor", "/proc/net/ip_vs_stats"), " \t,:|", PROCFILE_FLAG_DEFAULT);
+	if(!ff) {
+		char filename[FILENAME_MAX + 1];
+		snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/net/ip_vs_stats");
+		ff = procfile_open(config_get("plugin:proc:/proc/net/ip_vs_stats", "filename to monitor", filename), " \t,:|", PROCFILE_FLAG_DEFAULT);
+	}
 	if(!ff) return 1;
 
 	ff = procfile_readall(ff);

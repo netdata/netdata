@@ -188,6 +188,7 @@ int main(int argc, char **argv)
 		else if(strcmp(argv[i], "-u")  == 0 && (i+1) < argc) { config_set("global", "run as user",  argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-l")  == 0 && (i+1) < argc) { config_set("global", "history",      argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-t")  == 0 && (i+1) < argc) { config_set("global", "update every", argv[i+1]); i++; }
+		else if(strcmp(argv[i], "-ch") == 0 && (i+1) < argc) { config_set("global", "host access prefix", argv[i+1]); i++; }
 		else if(strcmp(argv[i], "--unittest")  == 0) {
 			if(unit_test_storage()) exit(1);
 			exit(0);
@@ -215,6 +216,7 @@ int main(int argc, char **argv)
 			fprintf(stderr, "  -t UPDATE_TIMER can be from 1 to %d seconds. Default: %d.\n", UPDATE_EVERY_MAX, UPDATE_EVERY);
 			fprintf(stderr, "  -p LISTEN_PORT can be from 1 to %d. Default: %d.\n", 65535, LISTEN_PORT);
 			fprintf(stderr, "  -u USERNAME can be any system username to run as. Default: none.\n");
+			fprintf(stderr, "  -ch path to access host /proc and /sys when running in a container. Default: empty.\n");
 			fprintf(stderr, "  -df FLAGS debug options. Default: 0x%8llx.\n", debug_flags);
 			exit(1);
 		}
@@ -235,6 +237,10 @@ int main(int argc, char **argv)
 		char *flags = config_get("global", "debug flags", buffer);
 		debug_flags = strtoull(flags, NULL, 0);
 		debug(D_OPTIONS, "Debug flags set to '0x%8llx'.", debug_flags);
+
+		// --------------------------------------------------------------------
+
+		global_host_prefix = config_get("global", "host access prefix", "");
 
 		// --------------------------------------------------------------------
 

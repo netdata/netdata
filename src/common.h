@@ -16,6 +16,8 @@ extern int savememory(const char *filename, void *mem, unsigned long size);
 
 extern int fd_is_valid(int fd);
 
+extern char *global_host_prefix;
+
 #ifdef __GNUC__
 // gcc branch optimization
 // #warning "Using GCC branch optimizations"

@@ -14,6 +14,8 @@
 #include "log.h"
 #include "common.h"
 
+char *global_host_prefix = "";
+
 /*
 // http://stackoverflow.com/questions/7666509/hash-function-for-string
 uint32_t simple_hash(const char *name)
