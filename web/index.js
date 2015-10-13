@@ -20,10 +20,22 @@ var MAINCHART_CONTROL_HEIGHT = 75;		// how tall the control chart will be
 var MAINCHART_CONTROL_DIVISOR = 2;		// how much detailed will the control chart be? 1 = finest, higher is faster
 var MAINCHART_INITIAL_SELECTOR= 20;		// 1/20th of the width, this overrides MAINCHART_MIN_TIME_TO_SHOW
 
-var CHARTS_REFRESH_LOOP = 100;			// delay between chart refreshes
+var CHARTS_REFRESH_LOOP = 50;			// delay between chart refreshes
 var CHARTS_REFRESH_IDLE = 500;			// delay between chart refreshes when no chart was ready for refresh the last time
 var CHARTS_CHECK_NO_FOCUS = 500;		// delay to check for visibility when the page has no focus
-var CHARTS_SCROLL_IDLE = 300;			// delay to wait after a page scroll
+var CHARTS_SCROLL_IDLE = 100;			// delay to wait after a page scroll
+
+
+function isIE() {
+  userAgent = navigator.userAgent;
+  return userAgent.indexOf("MSIE ") > -1 || userAgent.indexOf("Trident/") > -1;
+}
+
+if(isIE()){
+	// do stuff with ie-users
+	CHARTS_REFRESH_LOOP=250;
+	CHARTS_SCROLL_IDLE=500;
+}
 
 var MODE_THUMBS = 1;
 var MODE_MAIN = 2;

@@ -166,6 +166,7 @@ int main(int argc, char **argv)
 {
 	int i;
 	int config_loaded = 0;
+	int dont_fork = 0;
 
 	// set the name for logging
 	program_name = "netdata";
@@ -189,6 +190,7 @@ int main(int argc, char **argv)
 		else if(strcmp(argv[i], "-l")  == 0 && (i+1) < argc) { config_set("global", "history",      argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-t")  == 0 && (i+1) < argc) { config_set("global", "update every", argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-ch") == 0 && (i+1) < argc) { config_set("global", "host access prefix", argv[i+1]); i++; }
+		else if(strcmp(argv[i], "-nodeamon") == 0 || strcmp(argv[i], "-nd") == 0) dont_fork = 1;
 		else if(strcmp(argv[i], "--unittest")  == 0) {
 			if(unit_test_storage()) exit(1);
 			exit(0);
@@ -217,6 +219,7 @@ int main(int argc, char **argv)
 			fprintf(stderr, "  -p LISTEN_PORT can be from 1 to %d. Default: %d.\n", 65535, LISTEN_PORT);
 			fprintf(stderr, "  -u USERNAME can be any system username to run as. Default: none.\n");
 			fprintf(stderr, "  -ch path to access host /proc and /sys when running in a container. Default: empty.\n");
+			fprintf(stderr, "  -nd or -nodeamon to disable forking in the background. Default: unset.\n");
 			fprintf(stderr, "  -df FLAGS debug options. Default: 0x%8llx.\n", debug_flags);
 			exit(1);
 		}
@@ -366,7 +369,7 @@ int main(int argc, char **argv)
 	if(nice(20) == -1) fprintf(stderr, "Cannot lower my CPU priority. Error: %s.\n", strerror(errno));
 
 #ifndef NETDATA_NO_DAEMON
-	if(become_daemon(0, input_log_file, output_log_file, error_log_file, access_log_file, &access_fd, &stdaccess) == -1) {
+	if(become_daemon(dont_fork, 0, input_log_file, output_log_file, error_log_file, access_log_file, &access_fd, &stdaccess) == -1) {
 		fprintf(stderr, "Cannot demonize myself (%s).", strerror(errno));
 		exit(1);
 	}

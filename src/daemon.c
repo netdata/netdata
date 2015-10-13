@@ -109,7 +109,7 @@ int become_user(const char *username)
 	return(0);
 }
 
-int become_daemon(int close_all_files, const char *input, const char *output, const char *error, const char *access, int *access_fd, FILE **access_fp)
+int become_daemon(int dont_fork, int close_all_files, const char *input, const char *output, const char *error, const char *access, int *access_fd, FILE **access_fp)
 {
 	fflush(NULL);
 
@@ -182,31 +182,37 @@ int become_daemon(int close_all_files, const char *input, const char *output, co
 	// all files opened
 	// lets do it
 
-	int i = fork();
-	if(i == -1) {
-		perror("cannot fork");
-		exit(1);
-	}
-	if(i != 0) {
-		exit(0); // the parent
-	}
+	if(!dont_fork) {
+		int i = fork();
+		if(i == -1) {
+			perror("cannot fork");
+			exit(1);
+		}
+		if(i != 0) {
+			exit(0); // the parent
+		}
 
-	// become session leader
-	if (setsid() < 0)
-		exit(2);
+		// become session leader
+		if (setsid() < 0) {
+			perror("Cannot become session leader.");
+			exit(2);
+		}
+	}
 
 	signal(SIGCHLD,  SIG_IGN);
 	signal(SIGHUP,   SIG_IGN);
 	signal(SIGWINCH, SIG_IGN);
 
 	// fork() again
-	i = fork();
-	if(i == -1) {
-		perror("cannot fork");
-		exit(1);
-	}
-	if(i != 0) {
-		exit(0); // the parent
+	if(!dont_fork) {
+		int i = fork();
+		if(i == -1) {
+			perror("cannot fork");
+			exit(1);
+		}
+		if(i != 0) {
+			exit(0); // the parent
+		}
 	}
 
 	// Set new file permissions
@@ -214,6 +220,7 @@ int become_daemon(int close_all_files, const char *input, const char *output, co
 
 	// close all files
 	if(close_all_files) {
+		int i;
 		for(i = sysconf(_SC_OPEN_MAX); i > 0; i--)
 			if(   
 				((access_fd && i != *access_fd) || !access_fd)
@@ -270,7 +277,8 @@ int become_daemon(int close_all_files, const char *input, const char *output, co
 		if(fd >= 0) {
 			char b[100];
 			sprintf(b, "%d\n", getpid());
-			i = write(fd, b, strlen(b));
+			int i = write(fd, b, strlen(b));
+			if(i <= 0) perror("Cannot write pid to file.");
 			close(fd);
 		}
 	}
