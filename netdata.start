@@ -2,125 +2,134 @@
 
 base="`dirname "$0"`"
 
-if [ ! -d "$base" -o ! -d "$base/web" ]
+if [ ! -d "${base}" ]
 then
 	echo >&2 "Cannot find my home directory '${base}'."
 	exit 1
 fi
-cd "$base" || exit 1
+cd "${base}" || exit 1
 
-# the detail of the data that will be kept in netdata
-NETDATA_CONFIG_INTERNAL_UPDATE_EVERY=1
 
-# how many entries to keep in memory
-NETDATA_CONFIG_INTERNAL_HISTORY_LINES=3600
+# -----------------------------------------------------------------------------
+# load options from the configuration file
 
-# the user to run netdata under
-NETDATA_CONFIG_USER=nobody
+config_option() {
+	local key="${1}" value="${2}" line=
 
-# set to 1, to enable debugging
-NETDATA_CONFIG_DEBUG=0
-
-# our port
-NETDATA_CONFIG_PORT=19999
-
-NETDATA_CONFIG_CONF_DIR="conf.d"
-NETDATA_CONFIG_WEB_DIR="web"
-NETDATA_CONFIG_CACHE_DIR="cache"
-NETDATA_CONFIG_LOG_DIR="log"
-
-if [ -f $NETDATA_CONFIG_CONF_DIR/netdata.conf ]
-then
-	# find if debug is enabled in the config
-	df=`grep "debug flags = " $NETDATA_CONFIG_CONF_DIR/netdata.conf | tail -n 1 | cut -d '=' -f 2 | sed s"/ //g"`
-	if [ -z "$df" -o "$df" = "0x00000000" -o $((df + 1 - 1)) -eq 0 ]
-	then
-		NETDATA_CONFIG_DEBUG=0
-	else
-		NETDATA_CONFIG_DEBUG=1
+	if [ -f "conf.d/netdata.conf" ]
+		then
+		line="$( grep "^[[:space:]]*${key}[[:space:]]*=[[:space:]]*" "conf.d/netdata.conf" | head -n 1 )"
+		[ ! -z "${line}" ] && value="$( echo "${line}" | cut -d '=' -f 2 | sed -e "s/^[[:space:]]\+//g" -e "s/[[:space:]]\+$//g" )"
 	fi
 
-	# find the user to run as
-	x="`grep 'run as user = ' $NETDATA_CONFIG_CONF_DIR/netdata.conf | head -n 1 | cut -d '=' -f 2 | sed s"/ //g"`"
-	test ! -z "$x" && NETDATA_CONFIG_USER="$x"
+	echo "${value}"
+}
 
-	x="`grep 'web files directory = ' $NETDATA_CONFIG_CONF_DIR/netdata.conf | head -n 1 | cut -d '=' -f 2 | sed -e s"/^ \+//g" -e s"/ \+$//g"`"
-	test ! -z "$x" && NETDATA_CONFIG_WEB_DIR="$x"
-fi
+# user
+defuser="nobody"
+[ ! "${UID}" = "0" ] && defuser="${USER}"
+NETDATA_USER="$( config_option "run as user" "${defuser}" )"
 
-for x in "$NETDATA_CONFIG_WEB_DIR" "$NETDATA_CONFIG_CONF_DIR" "$NETDATA_CONFIG_CACHE_DIR" "$NETDATA_CONFIG_LOG_DIR"
-do
-	if [ ! -d $x ]
+# debug flags
+defdebug=0
+NETDATA_DEBUG="$( config_option "debug flags" ${defdebug} )"
+
+# port
+defport=19999
+NETDATA_PORT="$( config_option "port" ${defport} )"
+
+# directories
+NETDATA_CACHE_DIR="$( config_option "database directory" "cache" )"
+NETDATA_WEB_DIR="$( config_option "web files directory" "web" )"
+NETDATA_LOG_DIR="log"
+NETDATA_CONF_DIR="conf.d"
+
+
+# -----------------------------------------------------------------------------
+# compile netdata
+
+echo >&2 "Compiling netdata (debug flags = $NETDATA_DEBUG)..."
+if [ $[ NETDATA_DEBUG ] -ne 0 ]
 	then
-		mkdir $x || exit 1
-	fi
-done
-
-echo "Compiling netdata (debug=$NETDATA_CONFIG_DEBUG)"
-if [ $NETDATA_CONFIG_DEBUG -eq 1 ]
-then
-	ulimit -c unlimited
 	make install debug=1 || exit 1 # this installs in the current directory
-	debug_opts="-df 0xfffffadf"
+
+	# let netdata core dump if it crashes
+	ulimit -c unlimited
+
 else
 	make install || exit 1 # this installs in the current directory
-	debug_opts="-df 0x00000000"
 fi
 
-echo "Stopping a (possibly) running netdata..."
+
+# -----------------------------------------------------------------------------
+# prepare the directories
+
+echo >&2 "Fixing directory permissions for user ${NETDATA_USER}..."
+for x in "${NETDATA_WEB_DIR}" "${NETDATA_CONF_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}"
+do
+	if [ ! -d "${x}" ]
+		then
+		mkdir "${x}" || exit 1
+	fi
+	chown -R "${NETDATA_USER}" "${x}" || echo >&2 "WARNING: Cannot change the ownership of the files in directory ${x} to ${NETDATA_USER}..."
+	chmod 0775 "${x}" "${x}" || echo >&2 "WARNING: Cannot change the permissions of the directory ${x} to 0755..."
+done
+
+
+# -----------------------------------------------------------------------------
+# stop a running netdata
+
+printf >&2 "Stopping a (possibly) running netdata..."
 ret=0
 count=0
 while [ $ret -eq 0 ]
 do
-	if [ $count -gt 10 ]
-	then
+	if [ $count -gt 15 ]
+		then
 		echo >&2 "Cannot stop the running netdata."
 		exit 1
 	fi
+
 	count=$((count + 1))
 	killall netdata 2>/dev/null
 	ret=$?
-	test $ret -eq 0 && sleep 1
+	test $ret -eq 0 && printf >&2 "." && sleep 2
 done
+echo >&2
 
-if [ "$UID" = "0" -a ! -z "$NETDATA_CONFIG_USER" ]
-then
-	for x in "$NETDATA_CONFIG_WEB_DIR" "$NETDATA_CONFIG_CONF_DIR" "$NETDATA_CONFIG_CACHE_DIR" "$NETDATA_CONFIG_LOG_DIR"
-	do
-		echo "Changing ownership of web files in $x to $NETDATA_CONFIG_USER"
-		chown -R "$NETDATA_CONFIG_USER" "$x" || exit 1
-		chmod 0775 "$x" $NETDATA_CONFIG_CONF_DIR log cache || exit 1
-	done
-fi
 
-if [ ! "$UID" = "0" ]
-then
-	echo >&2 "WARNING: NOT RUNNING AS ROOT - CANNOT SWITCH TO USER $NETDATA_CONFIG_USER"
-	echo >&2 "WARNING: MAKE SURE FILES IN web/ ARE OWNED BY $USER - or it will not work"
-fi
+# -----------------------------------------------------------------------------
+# run netdata
 
-echo "Starting netdata..."
-if [ -f $NETDATA_CONFIG_CONF_DIR/netdata.conf ]
-then
-	`pwd`/netdata
-else
-	touch $NETDATA_CONFIG_CONF_DIR/netdata.conf
+echo >&2 "Starting netdata..."
+`pwd`/netdata "${@}"
 
-	if [ "$USER" = "root" ]
+if [ $? -ne 0 ]
 	then
-		`pwd`/netdata $debug_opts -u $NETDATA_CONFIG_USER -t $NETDATA_CONFIG_INTERNAL_UPDATE_EVERY -l $NETDATA_CONFIG_INTERNAL_HISTORY_LINES -p $NETDATA_CONFIG_PORT || exit 1
-	else
-		`pwd`/netdata $debug_opts -t $NETDATA_CONFIG_INTERNAL_UPDATE_EVERY -l $NETDATA_CONFIG_INTERNAL_HISTORY_LINES -p $NETDATA_CONFIG_PORT || exit 1
-	fi
-
-	sleep 2
-	wget 2>/dev/null -O $NETDATA_CONFIG_CONF_DIR/netdata.conf.new http://localhost:$NETDATA_CONFIG_PORT/netdata.conf
-	mv $NETDATA_CONFIG_CONF_DIR/netdata.conf.new $NETDATA_CONFIG_CONF_DIR/netdata.conf
-
-	echo "Hit http://127.0.0.1:$NETDATA_CONFIG_PORT/ from your browser."
-	echo "You can edit config options in file $NETDATA_CONFIG_CONF_DIR/netdata.conf"
+	echo >&2
+	echo >&2 "SORRY! FAILED TO START NETDATA!"
+	exit 1
 fi
 
-echo
-echo "All Done."
-echo
+
+# -----------------------------------------------------------------------------
+# save a config file, if it is not already there
+
+if [ ! -f conf.d/netdata.conf ]
+	then
+	sleep 5
+	wget 2>/dev/null -O conf.d/netdata.conf.new "http://localhost:${NETDATA_PORT}/netdata.conf"
+	if [ $? -eq 0 -a -s conf.d/netdata.conf.new ]
+		then
+		mv conf.d/netdata.conf.new conf.d/netdata.conf
+		echo >&2 "New configuration saved for you to edit at conf.d/netdata.conf"
+	else
+		rm conf.d/netdata.conf.new
+	fi
+fi
+
+echo >&2
+echo >&2 "OK. NetData started! Hit http://localhost:${NETDATA_PORT}/ from your browser."
+echo >&2
+echo >&2 "Enjoy..."
+echo >&2
