@@ -148,6 +148,7 @@ void *socket_listen_main(void *ptr)
 		error("Cannot set pthread cancel state to ENABLE.");
 
 	web_client_timeout = config_get_number("global", "disconnect idle web clients after seconds", DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS);
+	web_enable_gzip = config_get_boolean("global", "enable web responses gzip compression", web_enable_gzip);
 
 	if(listen_fd < 0) fatal("LISTENER: Listen socket is not ready.");
 

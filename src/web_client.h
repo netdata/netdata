@@ -10,6 +10,7 @@
 
 #define DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS 60
 extern int web_client_timeout;
+extern int web_enable_gzip;
 
 #ifndef NETDATA_WEB_CLIENT_H
 #define NETDATA_WEB_CLIENT_H 1

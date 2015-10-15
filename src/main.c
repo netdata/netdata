@@ -220,7 +220,7 @@ int main(int argc, char **argv)
 			fprintf(stderr, "  -u USERNAME can be any system username to run as. Default: none.\n");
 			fprintf(stderr, "  -ch path to access host /proc and /sys when running in a container. Default: empty.\n");
 			fprintf(stderr, "  -nd or -nodeamon to disable forking in the background. Default: unset.\n");
-			fprintf(stderr, "  -df FLAGS debug options. Default: 0x%8llx.\n", debug_flags);
+			fprintf(stderr, "  -df FLAGS debug options. Default: 0x%08llx.\n", debug_flags);
 			exit(1);
 		}
 	}

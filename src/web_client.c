@@ -28,7 +28,7 @@
 #define INITIAL_WEB_DATA_LENGTH 65536
 
 int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
-
+int web_enable_gzip = 1;
 
 struct web_client *web_clients = NULL;
 unsigned long long web_clients_count = 0;
@@ -540,7 +540,7 @@ void web_client_process(struct web_client *w) {
 		else w->keepalive = 0;
 
 		// check if the client accepts deflate
-		if(strstr(w->data->buffer, "gzip"))
+		if(web_enable_gzip && strstr(w->data->buffer, "gzip"))
 			web_client_enable_deflate(w);
 
 		int datasource_type = DATASOURCE_GOOGLE_JSONP;
