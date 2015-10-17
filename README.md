@@ -90,10 +90,13 @@ Here is a screenshot:
  - `charts.d.plugin` provides a simple way to script data collection in BASH. It includes example plugins that collect values from:
 
     - `nut` (UPS load, frequency, voltage, etc)
-    - `sensors` (read temperature, voltage, current, power, humidity, fans rotation sensors)
-    - `cpufreq` (read current CPU clock frequency)
+    - `sensors` (temperature, voltage, current, power, humidity, fans rotation sensors)
+    - `cpufreq` (current CPU clock frequency)
     - `postfix` (e-mail queue size)
     - `squid` (web proxy statistics)
+    - `mysql` (mysql global statistics)
+
+    Of course, you can write your own using BASH scripting.
 
 - netdata is a web server, supporting gzip compression
 

@@ -70,9 +70,11 @@ struct web_client *web_client_create(int listener)
 		w->client_port[NI_MAXSERV] = '\0';
 
 		switch(sadr->sa_family) {
+
 		case AF_INET:
 			debug(D_WEB_CLIENT_ACCESS, "%llu: New IPv4 web client from %s port %s on socket %d.", w->id, w->client_ip, w->client_port, w->ifd);
 			break;
+
 		case AF_INET6:
 			if(strncmp(w->client_ip, "::ffff:", 7) == 0) {
 				strcpy(w->client_ip, &w->client_ip[7]);
@@ -80,6 +82,7 @@ struct web_client *web_client_create(int listener)
 			}
 			debug(D_WEB_CLIENT_ACCESS, "%llu: New IPv6 web client from %s port %s on socket %d.", w->id, w->client_ip, w->client_port, w->ifd);
 			break;
+
 		default:
 			debug(D_WEB_CLIENT_ACCESS, "%llu: New UNKNOWN web client from %s port %s on socket %d.", w->id, w->client_ip, w->client_port, w->ifd);
 			break;
@@ -90,7 +93,8 @@ struct web_client *web_client_create(int listener)
 	}
 
 	w->data = web_buffer_create(INITIAL_WEB_DATA_LENGTH);
-	if(!w->data) {
+	if(unlikely(!w->data)) {
+		// no need for error log - web_buffer_create already logged the error
 		close(w->ifd);
 		free(w);
 		return NULL;
@@ -734,31 +738,31 @@ void web_client_process(struct web_client *w) {
 	char *content_type_string = "";
 	switch(w->data->contenttype) {
 		case CT_TEXT_HTML:
-			content_type_string = "text/html";
+			content_type_string = "text/html; charset=utf-8";
 			break;
 
 		case CT_APPLICATION_XML:
-			content_type_string = "application/xml";
+			content_type_string = "application/xml; charset=utf-8";
 			break;
 
 		case CT_APPLICATION_JSON:
-			content_type_string = "application/json";
+			content_type_string = "application/json; charset=utf-8";
 			break;
 
 		case CT_APPLICATION_X_JAVASCRIPT:
-			content_type_string = "application/x-javascript";
+			content_type_string = "application/x-javascript; charset=utf-8";
 			break;
 
 		case CT_TEXT_CSS:
-			content_type_string = "text/css";
+			content_type_string = "text/css; charset=utf-8";
 			break;
 
 		case CT_TEXT_XML:
-			content_type_string = "text/xml";
+			content_type_string = "text/xml; charset=utf-8";
 			break;
 
 		case CT_TEXT_XSL:
-			content_type_string = "text/xsl";
+			content_type_string = "text/xsl; charset=utf-8";
 			break;
 
 		case CT_APPLICATION_OCTET_STREAM:
@@ -787,7 +791,7 @@ void web_client_process(struct web_client *w) {
 
 		default:
 		case CT_TEXT_PLAIN:
-			content_type_string = "text/plain";
+			content_type_string = "text/plain; charset=utf-8";
 			break;
 	}
 

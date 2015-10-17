@@ -179,6 +179,10 @@ void *socket_listen_main(void *ptr)
 			// check for new incoming connections
 			if(FD_ISSET(listen_fd, &ifds)) {
 				w = web_client_create(listen_fd);
+				if(unlikely(!w)) {
+					// no need for error log - web_client_create already logged the error
+					continue;
+				}
 
 				if(pthread_create(&w->thread, NULL, web_client_main, w) != 0) {
 					error("%llu: failed to create new thread for web client.");
