@@ -13,10 +13,14 @@ cd "${base}" || exit 1
 # -----------------------------------------------------------------------------
 # load options from the configuration file
 
+# create an empty config if it does not exist
+[ ! -f conf.d/netdata.conf ] && touch conf.d/netdata.conf
+
+# function to extract values from the config file
 config_option() {
 	local key="${1}" value="${2}" line=
 
-	if [ -f "conf.d/netdata.conf" ]
+	if [ -s "conf.d/netdata.conf" ]
 		then
 		line="$( grep "^[[:space:]]*${key}[[:space:]]*=[[:space:]]*" "conf.d/netdata.conf" | head -n 1 )"
 		[ ! -z "${line}" ] && value="$( echo "${line}" | cut -d '=' -f 2 | sed -e "s/^[[:space:]]\+//g" -e "s/[[:space:]]\+$//g" )"
@@ -109,27 +113,48 @@ if [ $? -ne 0 ]
 	echo >&2
 	echo >&2 "SORRY! FAILED TO START NETDATA!"
 	exit 1
+else
+	echo >&2 "OK. NetData Started!"
 fi
 
 
 # -----------------------------------------------------------------------------
 # save a config file, if it is not already there
 
-if [ ! -f conf.d/netdata.conf ]
+if [ ! -s conf.d/netdata.conf ]
 	then
+	echo >&2 "Downloading default configuration from netdata..."
 	sleep 5
+
+	# remove a possibly obsolete download
+	[ -f conf.d/netdata.conf.new ] && rm conf.d/netdata.conf.new
+
+	# try wget
 	wget 2>/dev/null -O conf.d/netdata.conf.new "http://localhost:${NETDATA_PORT}/netdata.conf"
-	if [ $? -eq 0 -a -s conf.d/netdata.conf.new ]
+	ret=$?
+
+	# try curl
+	if [ $ret -ne 0 -o ! -s conf.d/netdata.conf.net ]
+		then
+		curl -s -o conf.d/netdata.conf.new "http://localhost:${NETDATA_PORT}/netdata.conf"
+		ret=$?
+	fi
+
+	if [ $ret -eq 0 -a -s conf.d/netdata.conf.new ]
 		then
 		mv conf.d/netdata.conf.new conf.d/netdata.conf
 		echo >&2 "New configuration saved for you to edit at conf.d/netdata.conf"
+
+		chown -R "${NETDATA_USER}" conf.d/netdata.conf
+		chmod 0664 conf.d/netdata.conf
 	else
+		echo >&2 "Cannnot download configuration from netdata daemon!"
 		rm conf.d/netdata.conf.new
 	fi
 fi
 
 echo >&2
-echo >&2 "OK. NetData started! Hit http://localhost:${NETDATA_PORT}/ from your browser."
+echo >&2 "Hit http://localhost:${NETDATA_PORT}/ from your browser."
 echo >&2
 echo >&2 "Enjoy..."
 echo >&2
