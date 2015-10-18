@@ -148,8 +148,8 @@ if [ ! -s conf.d/netdata.conf ]
 		chown -R "${NETDATA_USER}" conf.d/netdata.conf
 		chmod 0664 conf.d/netdata.conf
 	else
-		echo >&2 "Cannnot download configuration from netdata daemon!"
-		rm conf.d/netdata.conf.new
+		echo >&2 "Cannnot download configuration from netdata daemon using url 'http://localhost:${NETDATA_PORT}/netdata.conf'"
+		[ -f conf.d/netdata.conf.new ] && rm conf.d/netdata.conf.new
 	fi
 fi
 
