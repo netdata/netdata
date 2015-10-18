@@ -1,6 +1,7 @@
 // enable strcasestr()
 #define _GNU_SOURCE
 
+#include <unistd.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -224,22 +225,28 @@ void web_client_reset(struct web_client *w)
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 
-	long sent = w->zoutput?(long)w->zstream.total_out:((w->mode == WEB_CLIENT_MODE_FILECOPY)?w->data->rbytes:w->data->bytes);
+	long sent = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->data->rbytes:w->data->bytes;
+
+#ifndef NETDATA_WITHOUT_ZLIB
+	if(likely(w->zoutput)) sent = (long)w->zstream.total_out;
+#endif
+
 	long size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->data->rbytes:w->data->bytes;
 
-	if(w->last_url[0]) log_access("%llu: (sent/all = %ld/%ld bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: '%s'",
-		w->id,
-		sent, size, -((size>0)?((float)(size-sent)/(float)size * 100.0):0.0),
-		(float)usecdiff(&w->tv_ready, &w->tv_in) / 1000.0,
-		(float)usecdiff(&tv, &w->tv_ready) / 1000.0,
-		(float)usecdiff(&tv, &w->tv_in) / 1000.0,
-		(w->mode == WEB_CLIENT_MODE_FILECOPY)?"filecopy":"data",
-		w->last_url
+	if(likely(w->last_url[0]))
+		log_access("%llu: (sent/all = %ld/%ld bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: '%s'",
+			w->id,
+			sent, size, -((size>0)?((float)(size-sent)/(float)size * 100.0):0.0),
+			(float)usecdiff(&w->tv_ready, &w->tv_in) / 1000.0,
+			(float)usecdiff(&tv, &w->tv_ready) / 1000.0,
+			(float)usecdiff(&tv, &w->tv_in) / 1000.0,
+			(w->mode == WEB_CLIENT_MODE_FILECOPY)?"filecopy":"data",
+					w->last_url
 		);
 
 	debug(D_WEB_CLIENT, "%llu: Reseting client.", w->id);
 
-	if(w->mode == WEB_CLIENT_MODE_FILECOPY) {
+	if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
 		debug(D_WEB_CLIENT, "%llu: Closing filecopy input file.", w->id);
 		close(w->ifd);
 		w->ifd = w->ofd;
@@ -260,11 +267,13 @@ void web_client_reset(struct web_client *w)
 	w->wait_receive = 1;
 	w->wait_send = 0;
 
+	w->zoutput = 0;
+
 	// if we had enabled compression, release it
+#ifndef NETDATA_WITHOUT_ZLIB
 	if(w->zinitialized) {
 		debug(D_DEFLATE, "%llu: Reseting compression.", w->id);
 		deflateEnd(&w->zstream);
-		w->zoutput = 0;
 		w->zsent = 0;
 		w->zhave = 0;
 		w->zstream.avail_in = 0;
@@ -273,8 +282,10 @@ void web_client_reset(struct web_client *w)
 		w->zstream.total_out = 0;
 		w->zinitialized = 0;
 	}
+#endif // NETDATA_WITHOUT_ZLIB
 }
 
+#ifndef NETDATA_WITHOUT_ZLIB
 void web_client_enable_deflate(struct web_client *w) {
 	if(w->zinitialized == 1) {
 		error("%llu: Compression has already be initialized for this client.", w->id);
@@ -319,6 +330,7 @@ void web_client_enable_deflate(struct web_client *w) {
 
 	debug(D_DEFLATE, "%llu: Initialized compression.", w->id);
 }
+#endif // NETDATA_WITHOUT_ZLIB
 
 int web_client_data_request(struct web_client *w, char *url, int datasource_type)
 {
@@ -543,9 +555,11 @@ void web_client_process(struct web_client *w) {
 		if(strcasestr(w->data->buffer, "Connection: keep-alive")) w->keepalive = 1;
 		else w->keepalive = 0;
 
+#ifndef NETDATA_WITHOUT_ZLIB
 		// check if the client accepts deflate
 		if(web_enable_gzip && strstr(w->data->buffer, "gzip"))
 			web_client_enable_deflate(w);
+#endif // NETDATA_WITHOUT_ZLIB
 
 		int datasource_type = DATASOURCE_GOOGLE_JSONP;
 		//if(strstr(w->data->buffer, "X-DataSource-Auth"))
@@ -974,6 +988,7 @@ long web_client_send_chunk_finalize(struct web_client *w)
 	return bytes;
 }
 
+#ifndef NETDATA_WITHOUT_ZLIB
 long web_client_send_deflate(struct web_client *w)
 {
 	long bytes = 0, t = 0;
@@ -1074,14 +1089,17 @@ long web_client_send_deflate(struct web_client *w)
 
 	return(bytes);
 }
+#endif // NETDATA_WITHOUT_ZLIB
 
 long web_client_send(struct web_client *w)
 {
-	if(w->zoutput) return web_client_send_deflate(w);
+#ifndef NETDATA_WITHOUT_ZLIB
+	if(likely(w->zoutput)) return web_client_send_deflate(w);
+#endif // NETDATA_WITHOUT_ZLIB
 
 	long bytes;
 
-	if(w->data->bytes - w->data->sent == 0) {
+	if(unlikely(w->data->bytes - w->data->sent == 0)) {
 		// there is nothing to send
 
 		debug(D_WEB_CLIENT, "%llu: Out of output data.", w->id);
@@ -1097,7 +1115,7 @@ long web_client_send(struct web_client *w)
 			return(0);
 		}
 
-		if(w->keepalive == 0) {
+		if(unlikely(w->keepalive == 0)) {
 			debug(D_WEB_CLIENT, "%llu: Closing (keep-alive is not enabled). %ld bytes sent.", w->id, w->data->sent);
 			errno = 0;
 			return(-1);
@@ -1109,13 +1127,12 @@ long web_client_send(struct web_client *w)
 	}
 
 	bytes = send(w->ofd, &w->data->buffer[w->data->sent], w->data->bytes - w->data->sent, MSG_DONTWAIT);
-	if(bytes > 0) {
+	if(likely(bytes > 0)) {
 		w->data->sent += bytes;
 		debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, bytes);
 	}
-	else if(bytes == 0) debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client.", w->id);
+	else if(likely(bytes == 0)) debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client.", w->id);
 	else debug(D_WEB_CLIENT, "%llu: Failed to send data to client. Reason: %s", w->id, strerror(errno));
-
 
 	return(bytes);
 }
@@ -1128,12 +1145,12 @@ long web_client_receive(struct web_client *w)
 	long left = w->data->size - w->data->bytes;
 	long bytes;
 
-	if(w->mode == WEB_CLIENT_MODE_FILECOPY)
+	if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY))
 		bytes = read(w->ifd, &w->data->buffer[w->data->bytes], (left-1));
 	else
 		bytes = recv(w->ifd, &w->data->buffer[w->data->bytes], left-1, MSG_DONTWAIT);
 
-	if(bytes > 0) {
+	if(likely(bytes > 0)) {
 		int old = w->data->bytes;
 		w->data->bytes += bytes;
 		w->data->buffer[w->data->bytes] = '\0';
@@ -1146,7 +1163,7 @@ long web_client_receive(struct web_client *w)
 			if(w->data->rbytes && w->data->bytes >= w->data->rbytes) w->wait_receive = 0;
 		}
 	}
-	else if(bytes == 0) {
+	else if(likely(bytes == 0)) {
 		debug(D_WEB_CLIENT, "%llu: Out of input data.", w->id);
 
 		// if we cannot read, it means we have an error on input.

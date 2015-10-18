@@ -1,4 +1,8 @@
+
+#ifndef NETDATA_WITHOUT_ZLIB
 #include <zlib.h>
+#endif
+
 #include <sys/time.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -68,11 +72,13 @@ struct web_client {
 	struct web_buffer *data;
 
 	int zoutput;					// if set to 1, web_client_send() will send compressed data
+#ifndef NETDATA_WITHOUT_ZLIB
 	z_stream zstream;				// zlib stream for sending compressed output to client
 	Bytef zbuffer[ZLIB_CHUNK];		// temporary buffer for storing compressed output
 	long zsent;					// the compressed bytes we have sent to the client
 	long zhave;					// the compressed bytes that we have to send
 	int zinitialized;
+#endif
 
 	int wait_receive;
 	int wait_send;

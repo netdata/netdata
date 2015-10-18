@@ -20,7 +20,11 @@ ifdef debug
 COMMON_FLAGS += debug=1
 endif
 
-all: 
+ifdef nozlib
+COMMON_FLAGS += nozlib=1
+endif
+
+all:
 	$(MAKE) -C src $(COMMON_FLAGS) all
 
 clean:
