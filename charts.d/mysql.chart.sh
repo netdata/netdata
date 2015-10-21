@@ -1,6 +1,11 @@
 #!/bin/sh
 
 # http://dev.mysql.com/doc/refman/5.0/en/server-status-variables.html
+#
+# https://dev.mysql.com/doc/refman/5.1/en/show-status.html
+# SHOW STATUS provides server status information (see Section 5.1.6, “Server Status Variables”).
+# This statement does not require any privilege.
+# It requires only the ability to connect to the server.
 
 mysql_cmd_opts=""
 mysql_update_every=5
@@ -67,7 +72,6 @@ DIMENSION Sort_merge_passes merge_passes incremental 1 $((1 * mysql_update_every
 DIMENSION Sort_range range incremental 1 $((1 * mysql_update_every))
 DIMENSION Sort_scan scan incremental 1 $((1 * mysql_update_every))
 EOF
-	
 	return 0
 }
 
@@ -92,7 +96,7 @@ mysql_update() {
 	# even if something goes wrong, no other code can be executed
 
 	eval "$(mysql_get_stats |\
-		 sed -e "s/[[:space:]]\+/ /g" -e "s/\./_/g" -e "s/^\([a-z0-9_]\+\)[[:space:]]\+\([0-9]\+\)$/local mysql_\1=\2/g" |\
+		 sed -e "s/[[:space:]]\+/ /g" -e "s/\./_/g" -e "s/^\([a-zA-Z0-9_]\+\)[[:space:]]\+\([0-9]\+\)$/local mysql_\1=\2/g" |\
 		 egrep "^local mysql_[a-zA-Z0-9_]+=[[:digit:]]+$")"
 
 	# write the result of the work.
