@@ -1141,15 +1141,8 @@ unsigned long long rrdset_done(RRDSET *st)
 		// reset the storage flags for the next point, if any;
 		storage_flags = SN_EXISTS;
 
-		if(unlikely(st->first_entry_t && st->counter >= (unsigned long long)st->entries)) {
-			// the db is overwriting values
-			// add the value we will overwrite
-			st->first_entry_t += st->update_every * 1000000ULL;
-		}
-		
 		st->counter++;
 		st->current_entry = ((st->current_entry + 1) >= st->entries) ? 0 : st->current_entry + 1;
-		if(unlikely(!st->first_entry_t)) st->first_entry_t = next_ut;
 		last_ut = next_ut;
 	}
 
@@ -1228,13 +1221,4 @@ unsigned long long rrdset_done(RRDSET *st)
 		error("Cannot set pthread cancel state to RESTORE (%d).", oldstate);
 
 	return(st->usec_since_last_update);
-}
-
-
-// find the oldest entry in the data, skipping all empty slots
-time_t rrdset_first_entry_t(RRDSET *st)
-{
-	if(unlikely(!st->first_entry_t)) return st->last_updated.tv_sec;
-	
-	return st->first_entry_t / 1000000;
 }

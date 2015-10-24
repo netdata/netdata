@@ -21,8 +21,8 @@ extern int rrd_delete_unupdated_dimensions;
 
 #define RRD_ID_LENGTH_MAX 1024
 
-#define RRDSET_MAGIC		"NETDATA RRD SET FILE V012"
-#define RRDDIMENSION_MAGIC	"NETDATA RRD DIMENSION FILE V012"
+#define RRDSET_MAGIC		"NETDATA RRD SET FILE V013"
+#define RRDDIMENSION_MAGIC	"NETDATA RRD DIMENSION FILE V013"
 
 typedef long long total_number;
 #define TOTAL_NUMBER_FORMAT "%lld"
@@ -211,8 +211,6 @@ struct rrdset {
 	unsigned long counter;							// the number of times we added values to this rrd
 	unsigned long counter_done;						// the number of times we added values to this rrd
 
-	unsigned long long first_entry_t;				// the timestamp (in microseconds) of the oldest entry in the db
-
 	uint32_t hash;									// a simple hash on the id, to speed up searching
 													// we first compare hashes, and only if the hashes are equal we do string comparisons
 
@@ -271,8 +269,33 @@ extern void rrdset_next_plugins(RRDSET *st);
 
 extern unsigned long long rrdset_done(RRDSET *st);
 
-extern time_t rrdset_first_entry_t(RRDSET *st);
+// get the total duration in seconds of the round robin database
+#define rrdset_duration(st) ((time_t)( (((st)->counter >= ((unsigned long)(st)->entries))?(unsigned long)(st)->entries:(st)->counter) * (st)->update_every ))
 
+// get the timestamp of the last entry in the round robin database
+#define rrdset_last_entry_t(st) ((time_t)(((st)->last_updated.tv_sec)))
+
+// get the timestamp of first entry in the round robin database
+#define rrdset_first_entry_t(st) ((time_t)(rrdset_last_entry_t(st) - rrdset_duration(st)))
+
+// get the last slot updated in the round robin database
+#define rrdset_last_slot(st) (((st)->current_entry == 0) ? (st)->entries - 1 : (st)->current_entry - 1)
+
+// get the first / oldest slot updated in the round robin database
+#define rrdset_first_slot(st) ((st)->current_entry)
+
+// get the slot of the round robin database, for the given timestamp (t)
+// it always returns a valid slot, although may not be for the time requested if the time is outside the round robin database
+#define rrdset_time2slot(st, t) ( \
+		(  (t) >= rrdset_last_entry_t(st))  ? ( rrdset_last_slot(st) ) : \
+		( ((t) <= rrdset_first_entry_t(st)) ?   rrdset_first_slot(st) : \
+		( (rrdset_last_slot(st) >= ((long)(rrdset_last_entry_t(st) - (t)) / (long)((st)->update_every)) ) ? \
+		  (rrdset_last_slot(st) -  ((long)(rrdset_last_entry_t(st) - (t)) / (long)((st)->update_every)) ) : \
+		  (rrdset_last_slot(st) -  ((long)(rrdset_last_entry_t(st) - (t)) / (long)((st)->update_every)) + (st)->entries ) \
+		)))
+
+// get the timestamp of a specific slot in the round robin database
+#define rrdset_slot2time(st, slot) ()
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION functions
@@ -289,5 +312,8 @@ extern int rrddim_unhide(RRDSET *st, const char *id);
 
 extern void rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
 extern int rrddim_set(RRDSET *st, const char *id, collected_number value);
+
+
+
 
 #endif /* NETDATA_RRD_H */
