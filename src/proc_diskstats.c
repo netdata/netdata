@@ -19,7 +19,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 	static procfile *ff = NULL;
 	static char path_to_get_hw_sector_size[FILENAME_MAX + 1] = "";
 	static int enable_new_disks = -1;
-	static int do_io = -1, do_ops = -1, do_merged_ops = -1, do_iotime = -1, do_cur_ops = -1;
+	static int do_io = -1, do_ops = -1, do_merged_ops = -1, do_iotime = -1, do_cur_ops = -1, do_util = -1, do_qsize = -1;
 
 	if(enable_new_disks == -1)	enable_new_disks = config_get_boolean("plugin:proc:/proc/diskstats", "enable new disks detected at runtime", 1);
 
@@ -28,8 +28,8 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 	if(do_merged_ops == -1)	do_merged_ops 	= config_get_boolean("plugin:proc:/proc/diskstats", "merged operations for all disks", 1);
 	if(do_iotime == -1)		do_iotime 		= config_get_boolean("plugin:proc:/proc/diskstats", "i/o time for all disks", 1);
 	if(do_cur_ops == -1)	do_cur_ops 		= config_get_boolean("plugin:proc:/proc/diskstats", "current operations for all disks", 1);
-
-	if(dt) {};
+	if(do_util == -1)		do_util 		= config_get_boolean("plugin:proc:/proc/diskstats", "utilization percentage for all disks", 1);
+	if(do_qsize == -1)		do_qsize 		= config_get_boolean("plugin:proc:/proc/diskstats", "queue size for all disks", 1);
 
 	if(!ff) {
 		char filename[FILENAME_MAX + 1];
@@ -57,23 +57,56 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 							writes = 0, writes_merged = 0, writesectors = 0, writems = 0,
 							currentios = 0, iosms = 0, wiosms = 0;
 
+		unsigned long long 	last_reads = 0,  last_readsectors = 0,  last_readms = 0,
+							last_writes = 0, last_writesectors = 0, last_writems = 0,
+							last_iosms = 0;
+
 		words = procfile_linewords(ff, l);
 		if(words < 14) continue;
 
 		major 			= strtoull(procfile_lineword(ff, l, 0), NULL, 10);
 		minor 			= strtoull(procfile_lineword(ff, l, 1), NULL, 10);
 		disk 			= procfile_lineword(ff, l, 2);
-		reads 			= strtoull(procfile_lineword(ff, l, 3), NULL, 10);
-		reads_merged 	= strtoull(procfile_lineword(ff, l, 4), NULL, 10);
-		readsectors 	= strtoull(procfile_lineword(ff, l, 5), NULL, 10);
-		readms 			= strtoull(procfile_lineword(ff, l, 6), NULL, 10);
-		writes 			= strtoull(procfile_lineword(ff, l, 7), NULL, 10);
-		writes_merged 	= strtoull(procfile_lineword(ff, l, 8), NULL, 10);
-		writesectors 	= strtoull(procfile_lineword(ff, l, 9), NULL, 10);
-		writems 		= strtoull(procfile_lineword(ff, l, 10), NULL, 10);
-		currentios 		= strtoull(procfile_lineword(ff, l, 11), NULL, 10);
-		iosms 			= strtoull(procfile_lineword(ff, l, 12), NULL, 10);
-		wiosms 			= strtoull(procfile_lineword(ff, l, 13), NULL, 10);
+
+		// # of reads completed # of writes completed
+		// This is the total number of reads or writes completed successfully.
+		reads 			= strtoull(procfile_lineword(ff, l, 3), NULL, 10); 	// rd_ios
+		writes 			= strtoull(procfile_lineword(ff, l, 7), NULL, 10); 	// wr_ios
+
+		// # of reads merged # of writes merged
+		// Reads and writes which are adjacent to each other may be merged for
+	    // efficiency.  Thus two 4K reads may become one 8K read before it is
+	    // ultimately handed to the disk, and so it will be counted (and queued)
+		reads_merged 	= strtoull(procfile_lineword(ff, l, 4), NULL, 10); 	// rd_merges_or_rd_sec
+		writes_merged 	= strtoull(procfile_lineword(ff, l, 8), NULL, 10); 	// wr_merges
+
+		// # of sectors read # of sectors written
+		// This is the total number of sectors read or written successfully.
+		readsectors 	= strtoull(procfile_lineword(ff, l, 5), NULL, 10); 	// rd_sec_or_wr_ios
+		writesectors 	= strtoull(procfile_lineword(ff, l, 9), NULL, 10); 	// wr_sec
+
+		// # of milliseconds spent reading # of milliseconds spent writing
+		// This is the total number of milliseconds spent by all reads or writes (as
+		// measured from __make_request() to end_that_request_last()).
+		readms 			= strtoull(procfile_lineword(ff, l, 6), NULL, 10); 	// rd_ticks_or_wr_sec
+		writems 		= strtoull(procfile_lineword(ff, l, 10), NULL, 10);	// wr_ticks
+
+		// # of I/Os currently in progress
+		// The only field that should go to zero. Incremented as requests are
+		// given to appropriate struct request_queue and decremented as they finish.
+		currentios 		= strtoull(procfile_lineword(ff, l, 11), NULL, 10);	// ios_pgr
+
+		// # of milliseconds spent doing I/Os
+		// This field increases so long as field currentios is nonzero.
+		iosms 			= strtoull(procfile_lineword(ff, l, 12), NULL, 10);	// tot_ticks
+
+		// weighted # of milliseconds spent doing I/Os
+		// This field is incremented at each I/O start, I/O completion, I/O
+		// merge, or read of these stats by the number of I/Os in progress
+		// (field currentios) times the number of milliseconds spent doing I/O since the
+		// last update of this field.  This can provide an easy measure of both
+		// I/O completion time and the backlog that may be accumulating.
+		wiosms 			= strtoull(procfile_lineword(ff, l, 13), NULL, 10);	// rq_ticks
 
 		int def_enabled = 0;
 
@@ -205,12 +238,12 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 
 		// --------------------------------------------------------------------
 
+		int sector_size = 512;
 		if(do_io) {
 			st = rrdset_find_bytype(RRD_TYPE_DISK, disk);
 			if(!st) {
 				char tf[FILENAME_MAX + 1], *t;
 				char ssfilename[FILENAME_MAX + 1];
-				int sector_size = 512;
 
 				strncpy(tf, disk, FILENAME_MAX);
 				tf[FILENAME_MAX] = '\0';
@@ -242,10 +275,10 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 				rrddim_add(st, "reads", NULL, sector_size, 1024 * update_every, RRDDIM_INCREMENTAL);
 				rrddim_add(st, "writes", NULL, sector_size * -1, 1024 * update_every, RRDDIM_INCREMENTAL);
 			}
-			else rrdset_next(st);
+			else rrdset_next_usec(st, dt);
 
-			rrddim_set(st, "reads", readsectors);
-			rrddim_set(st, "writes", writesectors);
+			last_readsectors  = rrddim_set(st, "reads", readsectors);
+			last_writesectors = rrddim_set(st, "writes", writesectors);
 			rrdset_done(st);
 		}
 
@@ -260,50 +293,42 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 				rrddim_add(st, "reads", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
 				rrddim_add(st, "writes", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
 			}
-			else rrdset_next(st);
+			else rrdset_next_usec(st, dt);
 
-			rrddim_set(st, "reads", reads);
-			rrddim_set(st, "writes", writes);
-			rrdset_done(st);
-		}
-		
-		// --------------------------------------------------------------------
-
-		if(do_merged_ops) {
-			st = rrdset_find_bytype("disk_merged_ops", disk);
-			if(!st) {
-				st = rrdset_create("disk_merged_ops", disk, NULL, disk, "Merged Disk Operations", "operations/s", 2010, update_every, RRDSET_TYPE_LINE);
-				st->isdetail = 1;
-
-				rrddim_add(st, "reads", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
-				rrddim_add(st, "writes", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
-			}
-			else rrdset_next(st);
-
-			rrddim_set(st, "reads", reads_merged);
-			rrddim_set(st, "writes", writes_merged);
+			last_reads  = rrddim_set(st, "reads", reads);
+			last_writes = rrddim_set(st, "writes", writes);
 			rrdset_done(st);
 		}
 
 		// --------------------------------------------------------------------
 
-		if(do_iotime) {
-			st = rrdset_find_bytype("disk_iotime", disk);
+		if(do_util) {
+			st = rrdset_find_bytype("disk_util", disk);
 			if(!st) {
-				st = rrdset_create("disk_iotime", disk, NULL, disk, "Disk I/O Time", "milliseconds/s", 2005, update_every, RRDSET_TYPE_LINE);
+				st = rrdset_create("disk_util", disk, NULL, disk, "Disk Utilization", "%", 2002, update_every, RRDSET_TYPE_AREA);
 				st->isdetail = 1;
 
-				rrddim_add(st, "reads", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
-				rrddim_add(st, "writes", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
-				rrddim_add(st, "latency", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
-				rrddim_add(st, "weighted", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "utilization", NULL, 1, 10 * update_every, RRDDIM_INCREMENTAL);
 			}
-			else rrdset_next(st);
+			else rrdset_next_usec(st, dt);
 
-			rrddim_set(st, "reads", readms);
-			rrddim_set(st, "writes", writems);
-			rrddim_set(st, "latency", iosms);
-			rrddim_set(st, "weighted", wiosms);
+			last_iosms = rrddim_set(st, "utilization", iosms);
+			rrdset_done(st);
+		}
+
+		// --------------------------------------------------------------------
+
+		if(do_qsize) {
+			st = rrdset_find_bytype("disk_qsize", disk);
+			if(!st) {
+				st = rrdset_create("disk_qsize", disk, NULL, disk, "Disk Average Queue Size", "queue size", 2003, update_every, RRDSET_TYPE_AREA);
+				st->isdetail = 1;
+
+				rrddim_add(st, "queue_size", NULL, 1, 1000 * update_every, RRDDIM_INCREMENTAL);
+			}
+			else rrdset_next_usec(st, dt);
+
+			rrddim_set(st, "queue_size", wiosms);
 			rrdset_done(st);
 		}
 
@@ -317,11 +342,108 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 
 				rrddim_add(st, "operations", NULL, 1, 1, RRDDIM_ABSOLUTE);
 			}
-			else rrdset_next(st);
+			else rrdset_next_usec(st, dt);
 
 			rrddim_set(st, "operations", currentios);
 			rrdset_done(st);
 		}
+
+		// --------------------------------------------------------------------
+
+		if(do_merged_ops) {
+			st = rrdset_find_bytype("disk_merged_ops", disk);
+			if(!st) {
+				st = rrdset_create("disk_merged_ops", disk, NULL, disk, "Disk Merged Operations", "operations/s", 2021, update_every, RRDSET_TYPE_LINE);
+				st->isdetail = 1;
+
+				rrddim_add(st, "reads", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "writes", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
+			}
+			else rrdset_next_usec(st, dt);
+
+			rrddim_set(st, "reads", reads_merged);
+			rrddim_set(st, "writes", writes_merged);
+			rrdset_done(st);
+		}
+
+		// --------------------------------------------------------------------
+
+		if(do_iotime) {
+			st = rrdset_find_bytype("disk_iotime", disk);
+			if(!st) {
+				st = rrdset_create("disk_iotime", disk, NULL, disk, "Disk I/O Time", "milliseconds/s", 2022, update_every, RRDSET_TYPE_LINE);
+				st->isdetail = 1;
+
+				rrddim_add(st, "reads", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "writes", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
+			}
+			else rrdset_next_usec(st, dt);
+
+			last_readms  = rrddim_set(st, "reads", readms);
+			last_writems = rrddim_set(st, "writes", writems);
+			rrdset_done(st);
+		}
+
+		// --------------------------------------------------------------------
+		// calculate differential charts
+		// only if this is not the first time we run
+
+		if(dt) {
+			if(do_iotime && do_ops) {
+				st = rrdset_find_bytype("disk_await", disk);
+				if(!st) {
+					st = rrdset_create("disk_await", disk, NULL, disk, "Average Wait Time", "ms per operation", 2005, update_every, RRDSET_TYPE_AREA);
+					st->isdetail = 1;
+
+					rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_ABSOLUTE);
+					rrddim_add(st, "writes", NULL, -1, 1, RRDDIM_ABSOLUTE);
+				}
+				else rrdset_next_usec(st, dt);
+
+				rrddim_set(st, "reads", (reads - last_reads) ? (readms - last_readms) / (reads - last_reads) : 0);
+				rrddim_set(st, "writes", (writes - last_writes) ? (writems - last_writems) / (writes - last_writes) : 0);
+				rrdset_done(st);
+			}
+
+			if(do_io && do_ops) {
+				st = rrdset_find_bytype("disk_avgsz", disk);
+				if(!st) {
+					st = rrdset_create("disk_avgsz", disk, NULL, disk, "Average Operation Size", "kilobytes", 2006, update_every, RRDSET_TYPE_AREA);
+					st->isdetail = 1;
+
+					rrddim_add(st, "reads", NULL, sector_size, 1024, RRDDIM_ABSOLUTE);
+					rrddim_add(st, "writes", NULL, -sector_size, 1024, RRDDIM_ABSOLUTE);
+				}
+				else rrdset_next_usec(st, dt);
+
+				rrddim_set(st, "reads", (reads - last_reads) ? (readsectors - last_readsectors) / (reads - last_reads) : 0);
+				rrddim_set(st, "writes", (writes - last_writes) ? (writesectors - last_writesectors) / (writes - last_writes) : 0);
+				rrdset_done(st);
+			}
+
+			if(do_util && do_ops) {
+				st = rrdset_find_bytype("disk_svctm", disk);
+				if(!st) {
+					st = rrdset_create("disk_svctm", disk, NULL, disk, "Average Service Time", "ms per operation", 2007, update_every, RRDSET_TYPE_AREA);
+					st->isdetail = 1;
+
+					rrddim_add(st, "svctm", NULL, -1, 1, RRDDIM_ABSOLUTE);
+				}
+				else rrdset_next_usec(st, dt);
+
+				rrddim_set(st, "svctm", ((reads - last_reads) + (writes - last_writes)) ? (iosms - last_iosms) / ((reads - last_reads) + (writes - last_writes)) : 0);
+				rrdset_done(st);
+			}
+		}
+
+		// TODO
+		// the differential (readms + writems) / (reads + writes) = average wait time
+		// the differential (readms ) / (reads ) = the average wait time for reads
+		// the differential (writems) / (writes) = the average wait time for writes
+
+		// similarly for bytes to find the average read and write size
+
+		// svctm = % of utilization per request (reads + writes)
 	}
 	
 	return 0;

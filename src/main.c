@@ -168,6 +168,9 @@ int main(int argc, char **argv)
 	int config_loaded = 0;
 	int dont_fork = 0;
 
+	// global initialization
+	get_HZ();
+
 	// set the name for logging
 	program_name = "netdata";
 

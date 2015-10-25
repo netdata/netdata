@@ -28,4 +28,10 @@ extern char *global_host_prefix;
 #define unlikely(x)     (x)
 #endif
 
+
+/* Number of ticks per second */
+#define HZ		hz
+extern unsigned int hz;
+extern void get_HZ(void);
+
 #endif /* NETDATA_COMMON_H */

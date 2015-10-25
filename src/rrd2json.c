@@ -383,11 +383,6 @@ RRDR *rrd2rrdr(RRDSET *st, long points, time_t after, time_t before, int group_m
 	if(group <= 0) group = 1;
 	if(duration / group > points) group++;
 
-	// align timestamps to group
-	before -= before % group;
-	after -= after % group;
-	duration = before - after;
-
 	// error("NEW: points=%d after=%d before=%d group=%d, duration=%d", points, after, before, group, duration);
 
 	// Now we have:
@@ -458,6 +453,9 @@ RRDR *rrd2rrdr(RRDSET *st, long points, time_t after, time_t before, int group_m
 			group_count = 0,
 			add_this = 0,
 			stop_now = 0;
+
+	// align to group for proper panning of data
+	t -= t % group;
 
 	time_t 	now = rrdset_slot2time(st, t),
 			dt = st->update_every,

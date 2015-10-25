@@ -237,23 +237,23 @@ static void tc_device_commit(struct tc_device *d)
 			if(!c->updated) continue;
 
 			if(c->isleaf && c->hasparent) {
-				if(rrddim_set(st, c->id, c->bytes) != 0) {
+				RRDDIM *rd = rrddim_find(st, c->id);
+
+				if(!rd) {
 					debug(D_TC_LOOP, "TC: Adding to chart '%s', dimension '%s'", st->id, c->id, c->name);
 					
 					// new class, we have to add it
-					rrddim_add(st, c->id, c->name?c->name:c->id, 8, 1024 * rrd_update_every, RRDDIM_INCREMENTAL);
-					rrddim_set(st, c->id, c->bytes);
+					rd = rrddim_add(st, c->id, c->name?c->name:c->id, 8, 1024 * rrd_update_every, RRDDIM_INCREMENTAL);
 				}
 				else debug(D_TC_LOOP, "TC: Updating chart '%s', dimension '%s'", st->id, c->id);
+
+				rrddim_set_by_pointer(st, rd, c->bytes);
 
 				// if it has a name, different to the id
 				if(c->name) {
 					// update the rrd dimension with the new name
-					RRDDIM *rd = rrddim_find(st, c->id);
-					if(rd) {
-						debug(D_TC_LOOP, "TC: Setting chart '%s', dimension '%s' name to '%s'", st->id, rd->id, c->name);
-						rrddim_set_name(st, rd, c->name);
-					}
+					debug(D_TC_LOOP, "TC: Setting chart '%s', dimension '%s' name to '%s'", st->id, rd->id, c->name);
+					rrddim_set_name(st, rd, c->name);
 
 					free(c->name);
 					c->name = NULL;

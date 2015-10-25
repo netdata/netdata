@@ -745,33 +745,37 @@ int rrddim_unhide(RRDSET *st, const char *id)
 	return 0;
 }
 
-void rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value)
+collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value)
 {
 	debug(D_RRD_CALLS, "rrddim_set_by_pointer() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, st->name, rd->name, value);
 	
 	gettimeofday(&rd->last_collected_time, NULL);
 	rd->collected_value = value;
 	rd->updated = 1;
+
+	return rd->last_collected_value;
 }
 
-int rrddim_set(RRDSET *st, const char *id, collected_number value)
+collected_number rrddim_set(RRDSET *st, const char *id, collected_number value)
 {
 	RRDDIM *rd = rrddim_find(st, id);
 	if(unlikely(!rd)) {
 		error("Cannot find dimension with id '%s' on stats '%s' (%s).", id, st->name, st->id);
-		return 1;
+		return 0;
 	}
 
-	rrddim_set_by_pointer(st, rd, value);
-	return 0;
+	return rrddim_set_by_pointer(st, rd, value);
 }
 
 void rrdset_next_usec(RRDSET *st, unsigned long long microseconds)
 {
-	debug(D_RRD_CALLS, "rrdset_next_usec() for chart %s with microseconds %llu", st->name, microseconds);
+	if(!microseconds) rrdset_next(st);
+	else {
+		debug(D_RRD_CALLS, "rrdset_next_usec() for chart %s with microseconds %llu", st->name, microseconds);
 
-	if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: NEXT: %llu microseconds", st->name, microseconds);
-	st->usec_since_last_update = microseconds;
+		if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: NEXT: %llu microseconds", st->name, microseconds);
+		st->usec_since_last_update = microseconds;
+	}
 }
 
 void rrdset_next(RRDSET *st)

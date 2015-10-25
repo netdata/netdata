@@ -170,3 +170,20 @@ int fd_is_valid(int fd) {
     return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
 }
 
+/*
+ ***************************************************************************
+ * Get number of clock ticks per second.
+ ***************************************************************************
+ */
+unsigned int hz;
+
+void get_HZ(void)
+{
+	long ticks;
+
+	if ((ticks = sysconf(_SC_CLK_TCK)) == -1) {
+		perror("sysconf");
+	}
+
+	hz = (unsigned int) ticks;
+}

@@ -315,10 +315,7 @@ extern RRDDIM *rrddim_find(RRDSET *st, const char *id);
 extern int rrddim_hide(RRDSET *st, const char *id);
 extern int rrddim_unhide(RRDSET *st, const char *id);
 
-extern void rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
-extern int rrddim_set(RRDSET *st, const char *id, collected_number value);
-
-
-
+extern collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
+extern collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
 
 #endif /* NETDATA_RRD_H */
