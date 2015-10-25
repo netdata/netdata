@@ -608,6 +608,8 @@ unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int en
 	if(before == 0 || before > time_init) before = time_init;
 	if(after  == 0) after = rrdset_first_entry_t(st);
 
+	before -= before % group;
+	after -= after % group;
 
 	// ---
 
@@ -724,39 +726,48 @@ unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int en
 		int annotate_reset = 0;
 		int annotation_count = 0;
 
-		// to allow grouping on the same values, we need a pad
-		long pad = before % group;
-
 		// the minimum line length we expect
 		int line_size = 4096 + (dimensions * 200);
-
-		time_t now = time_init;
 
 		long 	t = rrdset_time2slot(st, before),
 				stop_at_t = rrdset_time2slot(st, after),
 				stop_now = 0;
 
+		time_t now = rrdset_slot2time(st, t), dt = st->update_every;
+
 		long count = 0, printed = 0, group_count = 0;
 		last_timestamp = 0;
 
-		for(; !stop_now ; now -= st->update_every, t--) {
+		if(st->debug) debug(D_RRD_STATS, "%s: REQUEST after:%lu before:%lu, points:%d, group:%d, CHART cur:%ld first: %lu last:%lu, CALC start_t:%ld, stop_t:%ld"
+					, st->id
+					, after
+					, before
+					, entries_to_show
+					, group
+					, st->current_entry
+					, rrdset_first_entry_t(st)
+					, rrdset_last_entry_t(st)
+					, t
+					, stop_at_t
+					);
+
+		for(; !stop_now ; now -= dt, t--) {
 			if(t < 0) t = st->entries - 1;
 			if(t == stop_at_t) stop_now = 1;
 
 			int print_this = 0;
 
-			if(st->debug) {
-				debug(D_RRD_STATS, "%s t = %ld, count = %ld, group_count = %ld, printed = %ld, now = %lu, %s %s"
+			if(st->debug) debug(D_RRD_STATS, "%s t = %ld, count = %ld, group_count = %ld, printed = %ld, now = %lu, %s %s"
 					, st->id
 					, t
 					, count + 1
 					, group_count + 1
 					, printed
 					, now
-					, (((count + 1 - pad) % group) == 0)?"PRINT":"  -  "
+					, (group_count + 1 == group)?"PRINT":"  -  "
 					, (now >= after && now <= before)?"RANGE":"  -  "
 					);
-			}
+
 
 			// make sure we return data in the proper time range
 			if(now > before) continue;
@@ -769,21 +780,10 @@ unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int en
 			group_count++;
 
 			// check if we have to print this now
-			if(((count - pad) % group) == 0) {
+			if(group_count == group) {
 				if(printed >= entries_to_show) {
 					// debug(D_RRD_STATS, "Already printed all rows. Stopping.");
 					break;
-				}
-
-				if(group_count != group) {
-					// this is an incomplete group, skip it.
-					for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
-						group_values[c] = 0;
-						found_non_existing[c] = 0;
-					}
-
-					group_count = 0;
-					continue;
 				}
 
 				// check if we may exceed the buffer provided
