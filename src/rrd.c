@@ -17,7 +17,7 @@
 
 #include "rrd.h"
 
-#define RRD_DEFAULT_GAP_INTERPOLATIONS 10
+#define RRD_DEFAULT_GAP_INTERPOLATIONS 1
 
 // ----------------------------------------------------------------------------
 // globals
@@ -421,7 +421,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 	st->last_collected_time.tv_usec = 0;
 	st->counter_done = 0;
 
-	st->gap_when_lost_iterations_above = config_get_number(st->id, "gap when lost iterations above", RRD_DEFAULT_GAP_INTERPOLATIONS);
+	st->gap_when_lost_iterations_above = config_get_number(st->id, "gap when lost iterations above", RRD_DEFAULT_GAP_INTERPOLATIONS) + 2;
 
 	st->dimensions_index.root = NULL;
 	st->dimensions_index.compar = rrddim_compare;

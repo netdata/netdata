@@ -295,7 +295,12 @@ extern unsigned long long rrdset_done(RRDSET *st);
 		)))
 
 // get the timestamp of a specific slot in the round robin database
-#define rrdset_slot2time(st, slot) ()
+#define rrdset_slot2time(st, slot) ( rrdset_last_entry_t(st) - \
+		((st)->update_every * ( \
+				( (slot) > rrdset_last_slot(st)) ? \
+				( (rrdset_last_slot(st) - slot + (st)->entries) ) : \
+				( (rrdset_last_slot(st) - slot) )) \
+		))
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION functions
