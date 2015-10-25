@@ -573,7 +573,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, time_t after, time_t before, int group_m
 	return NULL;
 }
 
-unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int entries_to_show, int group, int group_method, time_t after, time_t before, int only_non_zero)
+unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int points, int group, int group_method, time_t after, time_t before, int only_non_zero)
 {
 	int c;
 	pthread_rwlock_rdlock(&st->rwlock);
@@ -600,16 +600,11 @@ unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int en
 	// -------------------------------------------------------------------------
 	// validate the parameters
 
-	if(entries_to_show < 1) entries_to_show = 1;
+	if(points < 1) points = 1;
 	if(group < 1) group = 1;
 
-	time_t time_init = rrdset_last_entry_t(st);
-
-	if(before == 0 || before > time_init) before = time_init;
-	if(after  == 0) after = rrdset_first_entry_t(st);
-
-	before -= before % group;
-	after -= after % group;
+	if(before == 0 || before > rrdset_last_entry_t(st)) before = rrdset_last_entry_t(st);
+	if(after  == 0 || after < rrdset_first_entry_t(st)) after = rrdset_first_entry_t(st);
 
 	// ---
 
@@ -643,7 +638,7 @@ unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int en
 
 
 	// -------------------------------------------------------------------------
-	// checks for debuging
+	// checks for debugging
 
 	if(st->debug) {
 		debug(D_RRD_STATS, "%s first_entry_t = %lu, last_entry_t = %lu, duration = %lu, after = %lu, before = %lu, duration = %lu, entries_to_show = %lu, group = %lu"
@@ -654,7 +649,7 @@ unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int en
 			, after
 			, before
 			, before - after
-			, entries_to_show
+			, points
 			, group
 			);
 
@@ -733,7 +728,10 @@ unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int en
 				stop_at_t = rrdset_time2slot(st, after),
 				stop_now = 0;
 
-		time_t now = rrdset_slot2time(st, t), dt = st->update_every;
+		t -= t % group;
+
+		time_t 	now = rrdset_slot2time(st, t),
+				dt = st->update_every;
 
 		long count = 0, printed = 0, group_count = 0;
 		last_timestamp = 0;
@@ -742,7 +740,7 @@ unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int en
 					, st->id
 					, after
 					, before
-					, entries_to_show
+					, points
 					, group
 					, st->current_entry
 					, rrdset_first_entry_t(st)
@@ -781,7 +779,7 @@ unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int en
 
 			// check if we have to print this now
 			if(group_count == group) {
-				if(printed >= entries_to_show) {
+				if(printed >= points) {
 					// debug(D_RRD_STATS, "Already printed all rows. Stopping.");
 					break;
 				}
