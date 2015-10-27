@@ -324,7 +324,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 				st = rrdset_create("disk_backlog", disk, NULL, disk, "Disk Backlog", "backlog (ms)", 2003, update_every, RRDSET_TYPE_AREA);
 				st->isdetail = 1;
 
-				rrddim_add(st, "backlog", NULL, 1, 1000 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "backlog", NULL, 1, 10 * update_every, RRDDIM_INCREMENTAL);
 			}
 			else rrdset_next_usec(st, dt);
 
@@ -392,7 +392,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 			if(do_iotime && do_ops) {
 				st = rrdset_find_bytype("disk_await", disk);
 				if(!st) {
-					st = rrdset_create("disk_await", disk, NULL, disk, "Average Completed I/O Operation Time", "ms per operation", 2005, update_every, RRDSET_TYPE_AREA);
+					st = rrdset_create("disk_await", disk, NULL, disk, "Average Completed I/O Operation Time", "ms per operation", 2005, update_every, RRDSET_TYPE_LINE);
 					st->isdetail = 1;
 
 					rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_ABSOLUTE);
@@ -424,7 +424,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 			if(do_util && do_ops) {
 				st = rrdset_find_bytype("disk_svctm", disk);
 				if(!st) {
-					st = rrdset_create("disk_svctm", disk, NULL, disk, "Average Service Time", "ms per operation", 2007, update_every, RRDSET_TYPE_AREA);
+					st = rrdset_create("disk_svctm", disk, NULL, disk, "Average Service Time", "ms per operation", 2007, update_every, RRDSET_TYPE_LINE);
 					st->isdetail = 1;
 
 					rrddim_add(st, "svctm", NULL, 1, 1, RRDDIM_ABSOLUTE);
