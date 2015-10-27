@@ -392,6 +392,8 @@ void *pluginsd_main(void *ptr)
 {
 	if(ptr) { ; }
 
+	info("PLUGINS.D thread created with task id %d", gettid());
+
 	if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
 		error("Cannot set pthread cancel type to DEFERRED.");
 

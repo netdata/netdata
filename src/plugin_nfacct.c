@@ -76,6 +76,8 @@ static int nfacct_callback(const struct nlmsghdr *nlh, void *data) {
 void *nfacct_main(void *ptr) {
 	if(ptr) { ; }
 
+	info("NFACCT thread created with task id %d", gettid());
+
 	if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
 		error("nfacct.plugin: Cannot set pthread cancel type to DEFERRED.");
 

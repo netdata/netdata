@@ -1,7 +1,7 @@
-#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
 
 #include "avl.h"
 #include "log.h"
@@ -436,6 +436,8 @@ pid_t tc_child_pid = 0;
 void *tc_main(void *ptr)
 {
 	if(ptr) { ; }
+
+	info("TC thread created with task id %d", gettid());
 
 	if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
 		error("Cannot set pthread cancel type to DEFERRED.");

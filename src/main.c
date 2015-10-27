@@ -8,6 +8,8 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 #include "common.h"
 #include "log.h"
@@ -243,6 +245,12 @@ int main(int argc, char **argv)
 		char *flags = config_get("global", "debug flags", buffer);
 		debug_flags = strtoull(flags, NULL, 0);
 		debug(D_OPTIONS, "Debug flags set to '0x%8llx'.", debug_flags);
+
+		if(debug_flags != 0) {
+			struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
+			if(setrlimit(RLIMIT_CORE, &rl) != 0)
+				info("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
+		}
 
 		// --------------------------------------------------------------------
 

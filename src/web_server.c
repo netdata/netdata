@@ -136,6 +136,9 @@ int create_listen_socket6(int port, int listen_backlog)
 void *socket_listen_main(void *ptr)
 {
 	if(ptr) { ; }
+
+	info("WEB SERVER thread created with task id %d", gettid());
+
 	struct web_client *w;
 	struct timeval tv;
 	int retval;
@@ -193,8 +196,6 @@ void *socket_listen_main(void *ptr)
 					error("%llu: Cannot request detach of newly created web client thread.", w->id);
 					w->obsolete = 1;
 				}
-
-				log_access("%llu: %s port %s connected", w->id, w->client_ip, w->client_port);
 			}
 			else debug(D_WEB_CLIENT, "LISTENER: select() didn't do anything.");
 
@@ -206,7 +207,6 @@ void *socket_listen_main(void *ptr)
 		// cleanup unused clients
 		for(w = web_clients; w ; w = w?w->next:NULL) {
 			if(w->obsolete) {
-				log_access("%llu: %s port %s disconnected", w->id, w->client_ip, w->client_port);
 				debug(D_WEB_CLIENT, "%llu: Removing client.", w->id);
 				// pthread_join(w->thread,  NULL);
 				w = web_client_free(w);

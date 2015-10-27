@@ -1,4 +1,6 @@
 #include <inttypes.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #ifndef NETDATA_COMMON_H
 #define NETDATA_COMMON_H 1
@@ -33,5 +35,7 @@ extern char *global_host_prefix;
 #define HZ		hz
 extern unsigned int hz;
 extern void get_HZ(void);
+
+extern pid_t gettid(void);
 
 #endif /* NETDATA_COMMON_H */

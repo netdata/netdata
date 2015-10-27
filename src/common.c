@@ -1,6 +1,6 @@
 // enable O_NOATIME
 #define _GNU_SOURCE
-
+#include <sys/syscall.h>
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
@@ -187,3 +187,9 @@ void get_HZ(void)
 
 	hz = (unsigned int) ticks;
 }
+
+pid_t gettid(void)
+{
+	return syscall(SYS_gettid);
+}
+

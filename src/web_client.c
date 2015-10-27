@@ -1208,6 +1208,8 @@ void *web_client_main(void *ptr)
 	fd_set ifds, ofds, efds;
 	int fdmax = 0;
 
+	log_access("%llu: %s port %s connected on thread task id %d", w->id, w->client_ip, w->client_port, gettid());
+
 	for(;;) {
 		FD_ZERO (&ifds);
 		FD_ZERO (&ofds);
@@ -1286,6 +1288,7 @@ void *web_client_main(void *ptr)
 		}
 	}
 
+	log_access("%llu: %s port %s disconnected from thread task id %d", w->id, w->client_ip, w->client_port, gettid());
 	debug(D_WEB_CLIENT, "%llu: done...", w->id);
 
 	web_client_reset(w);

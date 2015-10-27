@@ -10,6 +10,7 @@
 #include <pthread.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <execinfo.h>
 
 #include "config.h"
 #include "log.h"
@@ -21,17 +22,45 @@
 #include "main.h"
 #include "daemon.h"
 
+#define BACKTRACE_SIZE 4096
+
+void print_backtrace()
+{
+	void *buffer[BACKTRACE_SIZE];
+	int nptrs;
+
+	nptrs = backtrace(buffer, BACKTRACE_SIZE);
+	fprintf(stderr, "\n\nSTACK TRACE (%d addresses):\n\n", nptrs);
+	backtrace_symbols_fd(buffer, nptrs, STDERR_FILENO);
+	fprintf(stderr, "\n\n");
+}
+
 void sig_handler(int signo)
 {
 	switch(signo) {
+		case SIGILL:
+		case SIGABRT:
+		case SIGFPE:
+		case SIGSEGV:
+		case SIGBUS:
+		case SIGSYS:
+		case SIGTRAP:
+		case SIGXCPU:
+		case SIGXFSZ:
+			info("Death signaled exit (signal %d). Errno: %d (%s)", signo, errno, strerror(errno));
+			print_backtrace();
+			signal(signo, SIG_DFL);
+			break;
+
+		case SIGKILL:
 		case SIGTERM:
 		case SIGQUIT:
 		case SIGINT:
 		case SIGHUP:
-		case SIGFPE:
-		case SIGSEGV:
+		case SIGUSR1:
+		case SIGUSR2:
 			info("Signaled exit (signal %d). Errno: %d (%s)", signo, errno, strerror(errno));
-			signal(SIGCHLD, SIG_IGN);
+			print_backtrace();
 			signal(SIGPIPE, SIG_IGN);
 			signal(SIGTERM, SIG_IGN);
 			signal(SIGQUIT, SIG_IGN);

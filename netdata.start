@@ -105,6 +105,10 @@ echo >&2
 # -----------------------------------------------------------------------------
 # run netdata
 
+# avoid extended stat(/etc/localtime)
+# http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
+export TZ=":/etc/localtime"
+
 echo >&2 "Starting netdata..."
 `pwd`/netdata "${@}"
 

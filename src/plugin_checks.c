@@ -14,6 +14,8 @@ void *checks_main(void *ptr)
 {
 	if(ptr) { ; }
 
+	info("CHECKS thread created with task id %d", gettid());
+
 	if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
 		error("Cannot set pthread cancel type to DEFERRED.");
 

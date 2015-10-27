@@ -37,6 +37,7 @@ COMMON_FLAGS += debug=1
 CFLAGS = -Wall -Wextra -O -ggdb -DBIN_DIR='$(BIN_DIR)' -DCONFIG_DIR='$(CONFIG_DIR)' -DLOG_DIR='$(LOG_DIR)' -DPLUGINS_DIR='$(PLUGINS_DIR)' -fno-omit-frame-pointer
 # CFLAGS := -Wall -Wextra -O -g -DBIN_DIR='$(BIN_DIR)' -DCONFIG_DIR='$(CONFIG_DIR)' -DLOG_DIR='$(LOG_DIR)' -DPLUGINS_DIR='$(PLUGINS_DIR)' -fsanitize=thread -fno-omit-frame-pointer -fPIE
 # libs += -pie -ltsan
+libs += -rdynamic
 else
 CFLAGS := -Wall -Wextra -O3 -DBIN_DIR='$(BIN_DIR)' -DCONFIG_DIR='$(CONFIG_DIR)' -DLOG_DIR='$(LOG_DIR)' -DPLUGINS_DIR='$(PLUGINS_DIR)' -fomit-frame-pointer
 endif
