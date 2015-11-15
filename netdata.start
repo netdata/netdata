@@ -10,6 +10,9 @@ then
         echo >&2 "Running ./configure ..."
         ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var --with-zlib --with-math --with-user=netdata CFLAGS="-march=native -O3 -Wall -Wextra" || exit 1
 
+        echo >&2 "Cleaning a possibly old compilation ..."
+        make clean || exit 1
+
         echo >&2 "Compiling netdata ..."
         make || exit 1
 fi
