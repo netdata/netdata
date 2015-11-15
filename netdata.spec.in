@@ -32,7 +32,7 @@ getent passwd netdata > /dev/null || useradd -r -g netdata -c netdata -s /sbin/n
 %build
 %configure \
 	--docdir="%{_docdir}/%{name}-%{version}" \
-	--enable-plugin-plugin-nfacct \
+	--enable-plugin-nfacct \
 	--with-zlib \
 	--with-math \
 	--with-user=netdata \

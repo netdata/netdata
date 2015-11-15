@@ -27,10 +27,10 @@ PKG_PROG_PKG_CONFIG
 AC_USE_SYSTEM_EXTENSIONS
 
 AC_ARG_ENABLE(
-	[plugin-plugin-nfacct],
-	[AS_HELP_STRING([--enable-plugin-plugin-nfacct], [enable nfacct plugin, requires root])],
+	[plugin-nfacct],
+	[AS_HELP_STRING([--enable-nfacct], [enable nfacct plugin, requires root])],
 	,
-	[enable_plugin_plugin_nfacct="no"]
+	[enable_plugin_nfacct="no"]
 )
 AC_ARG_ENABLE(
 	[pedantic],
@@ -96,7 +96,7 @@ if test -z "${MATH_LIBS}"; then
 fi
 
 test "${enable_daemon}" = "yes" && AC_DEFINE([NETDATA_DAEMON], [1], [daemon settings])
-if test "${enable_plugin_plugin_nfacct}" = "yes"; then
+if test "${enable_plugin_nfacct}" = "yes"; then
 	test -z "${NFACCT_LIBS}" && AC_MSG_ERROR([netfilter_acct required but not found])
 	test -z "${LIBMNL_LIBS}" && AC_MSG_ERROR([libmnl required but not found])
 	AC_DEFINE([INTERNAL_PLUGIN_NFACCT], [1], [nfacct plugin settings])
