@@ -239,6 +239,7 @@ int main(int argc, char **argv)
 	char *output_log_file = NULL;
 	char *error_log_file = NULL;
 	char *access_log_file = NULL;
+	char *user = NULL;
 	{
 		char buffer[1024];
 
@@ -343,14 +344,7 @@ int main(int argc, char **argv)
 		// --------------------------------------------------------------------
 
 		prepare_rundir();
-		char *user = config_get("global", "run as user", (getuid() == 0)?NETDATA_USER:"");
-		if(*user) {
-			if(become_user(user) != 0) {
-				fprintf(stderr, "Cannot become user %s.\n", user);
-				exit(1);
-			}
-			else debug(D_OPTIONS, "Successfully became user %s.", user);
-		}
+		user = config_get("global", "run as user", (getuid() == 0)?NETDATA_USER:"");
 
 		// --------------------------------------------------------------------
 
@@ -382,12 +376,10 @@ int main(int argc, char **argv)
 	// never become a problem
 	if(nice(20) == -1) fprintf(stderr, "Cannot lower my CPU priority. Error: %s.\n", strerror(errno));
 
-#ifdef NETDATA_DAEMON
-	if(become_daemon(dont_fork, 0, input_log_file, output_log_file, error_log_file, access_log_file, &access_fd, &stdaccess) == -1) {
-		fprintf(stderr, "Cannot demonize myself (%s).", strerror(errno));
+	if(become_daemon(dont_fork, 0, user, input_log_file, output_log_file, error_log_file, access_log_file, &access_fd, &stdaccess) == -1) {
+		fatal("Cannot demonize myself (%s).", strerror(errno));
 		exit(1);
 	}
-#endif
 
 	if(output_log_syslog || error_log_syslog || access_log_syslog)
 		openlog("netdata", LOG_PID, LOG_DAEMON);

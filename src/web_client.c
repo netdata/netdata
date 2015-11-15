@@ -229,6 +229,8 @@ void web_client_reset(struct web_client *w)
 
 #ifdef NETDATA_WITH_ZLIB
 	if(likely(w->zoutput)) sent = (long)w->zstream.total_out;
+#else
+#warning "You are building without zlib. zlib allows netdata to trasnfer a lot less data with web clients. It should be enabled."
 #endif
 
 	long size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->data->rbytes:w->data->bytes;

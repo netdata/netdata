@@ -1,7 +1,6 @@
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
-#ifdef NETDATA_DAEMON
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -142,7 +141,7 @@ int become_user(const char *username)
 	return(0);
 }
 
-int become_daemon(int dont_fork, int close_all_files, const char *input, const char *output, const char *error, const char *access, int *access_fd, FILE **access_fp)
+int become_daemon(int dont_fork, int close_all_files, const char *user, const char *input, const char *output, const char *error, const char *access, int *access_fd, FILE **access_fp)
 {
 	fflush(NULL);
 
@@ -151,14 +150,14 @@ int become_daemon(int dont_fork, int close_all_files, const char *input, const c
 
 	if(input && *input) {
 		if((input_fd = open(input, O_RDONLY, 0666)) == -1) {
-			fprintf(stderr, "Cannot open input file '%s' (%s).", input, strerror(errno));
+			fprintf(stderr, "Cannot open input file '%s' (%s).\n", input, strerror(errno));
 			return -1;
 		}
 	}
 
 	if(output && *output) {
 		if((output_fd = open(output, O_RDWR | O_APPEND | O_CREAT, 0666)) == -1) {
-			fprintf(stderr, "Cannot open output log file '%s' (%s).", output, strerror(errno));
+			fprintf(stderr, "Cannot open output log file '%s' (%s).\n", output, strerror(errno));
 			if(input_fd != -1) close(input_fd);
 			return -1;
 		}
@@ -166,7 +165,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *input, const c
 
 	if(error && *error) {
 		if((error_fd = open(error, O_RDWR | O_APPEND | O_CREAT, 0666)) == -1) {
-			fprintf(stderr, "Cannot open error log file '%s' (%s).", error, strerror(errno));
+			fprintf(stderr, "Cannot open error log file '%s' (%s).\n", error, strerror(errno));
 			if(input_fd != -1) close(input_fd);
 			if(output_fd != -1) close(output_fd);
 			return -1;
@@ -175,7 +174,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *input, const c
 
 	if(access && *access && access_fd) {
 		if((*access_fd = open(access, O_RDWR | O_APPEND | O_CREAT, 0666)) == -1) {
-			fprintf(stderr, "Cannot open access log file '%s' (%s).", access, strerror(errno));
+			fprintf(stderr, "Cannot open access log file '%s' (%s).\n", access, strerror(errno));
 			if(input_fd != -1) close(input_fd);
 			if(output_fd != -1) close(output_fd);
 			if(error_fd != -1) close(error_fd);
@@ -316,6 +315,12 @@ int become_daemon(int dont_fork, int close_all_files, const char *input, const c
 		}
 	}
 
+	if(user && *user) {
+		if(become_user(user) != 0) {
+			error("Cannot become user '%s'. Continuing as we are.", user);
+		}
+		else debug(D_OPTIONS, "Successfully became user '%s'.", user);
+	}
+
 	return(0);
 }
-#endif

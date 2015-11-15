@@ -27,12 +27,6 @@ PKG_PROG_PKG_CONFIG
 AC_USE_SYSTEM_EXTENSIONS
 
 AC_ARG_ENABLE(
-	[daemon],
-	[AS_HELP_STRING([--disable-daemon], [disable daemon])],
-	,
-	[enable_daemon="yes"]
-)
-AC_ARG_ENABLE(
 	[plugin-plugin-nfacct],
 	[AS_HELP_STRING([--enable-plugin-plugin-nfacct], [enable nfacct plugin, requires root])],
 	,

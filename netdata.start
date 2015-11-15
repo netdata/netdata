@@ -1,5 +1,33 @@
 #!/bin/bash
 
+netdata=$(which netdata)
+
+if [ -z "${netdata}" -o ! -f src/netdata ]
+then
+        echo >&2 "Running ./autogen.sh ..."
+        ./autogen.sh || exit 1
+
+        echo >&2 "Running ./configure ..."
+        ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var --with-zlib --with-math --with-user=netdata CFLAGS="-march=native -O3 -Wall -Wextra" || exit 1
+
+        echo >&2 "Compiling netdata ..."
+        make || exit 1
+fi
+
+if [ -z "${netdata}" -o src/netdata -nt "${netdata}" ]
+then
+        echo >&2 "Installing netdata ..."
+        make install
+
+        echo >&2 "Adding netdata group ..."
+        getent group netdata > /dev/null || groupadd -r netdata
+
+        echo >&2 "Adding netdata user ..."
+        getent passwd netdata > /dev/null || useradd -r -g netdata -c netdata -s /sbin/nologin -d / netdata
+fi
+
+netdata=$(which netdata)
+
 base="`dirname "$0"`"
 
 if [ ! -d "${base}" ]
@@ -20,7 +48,7 @@ cd "${base}" || exit 1
 config_option() {
 	local key="${1}" value="${2}" line=
 
-	if [ -s "conf.d/netdata.conf" ]
+	if [ -s "/etc/netdata/netdata.conf" ]
 		then
 		line="$( grep "^[[:space:]]*${key}[[:space:]]*=[[:space:]]*" "conf.d/netdata.conf" | head -n 1 )"
 		[ ! -z "${line}" ] && value="$( echo "${line}" | cut -d '=' -f 2 | sed -e "s/^[[:space:]]\+//g" -e "s/[[:space:]]\+$//g" )"
@@ -30,7 +58,7 @@ config_option() {
 }
 
 # user
-defuser="nobody"
+defuser="netdata"
 [ ! "${UID}" = "0" ] && defuser="${USER}"
 NETDATA_USER="$( config_option "run as user" "${defuser}" )"
 
@@ -43,26 +71,10 @@ defport=19999
 NETDATA_PORT="$( config_option "port" ${defport} )"
 
 # directories
-NETDATA_CACHE_DIR="$( config_option "database directory" "cache" )"
-NETDATA_WEB_DIR="$( config_option "web files directory" "web" )"
+NETDATA_CACHE_DIR="$( config_option "database directory" "/var/cache/netdata" )"
+NETDATA_WEB_DIR="$( config_option "web files directory" "/usr/share/netdata/web" )"
 NETDATA_LOG_DIR="log"
 NETDATA_CONF_DIR="conf.d"
-
-
-# -----------------------------------------------------------------------------
-# compile netdata
-
-echo >&2 "Compiling netdata (debug flags = $NETDATA_DEBUG)..."
-if [ $[ NETDATA_DEBUG ] -ne 0 ]
-	then
-	make install debug=1 || exit 1 # this installs in the current directory
-
-	# let netdata core dump if it crashes
-	ulimit -c unlimited
-
-else
-	make install || exit 1 # this installs in the current directory
-fi
 
 
 # -----------------------------------------------------------------------------
@@ -110,7 +122,7 @@ echo >&2
 export TZ=":/etc/localtime"
 
 echo >&2 "Starting netdata..."
-`pwd`/netdata "${@}"
+netdata "${@}"
 
 if [ $? -ne 0 ]
 	then
@@ -125,35 +137,35 @@ fi
 # -----------------------------------------------------------------------------
 # save a config file, if it is not already there
 
-if [ ! -s conf.d/netdata.conf ]
+if [ ! -s /etc/netdata/netdata.conf ]
 	then
 	echo >&2 "Downloading default configuration from netdata..."
 	sleep 5
 
 	# remove a possibly obsolete download
-	[ -f conf.d/netdata.conf.new ] && rm conf.d/netdata.conf.new
+	[ -f /etc/netdata/netdata.conf.new ] && rm /etc/netdata/netdata.conf.new
 
 	# try wget
-	wget 2>/dev/null -O conf.d/netdata.conf.new "http://localhost:${NETDATA_PORT}/netdata.conf"
+	wget 2>/dev/null -O /etc/netdata/netdata.conf.new "http://localhost:${NETDATA_PORT}/netdata.conf"
 	ret=$?
 
 	# try curl
-	if [ $ret -ne 0 -o ! -s conf.d/netdata.conf.net ]
+	if [ $ret -ne 0 -o ! -s /etc/netdata/netdata.conf.net ]
 		then
-		curl -s -o conf.d/netdata.conf.new "http://localhost:${NETDATA_PORT}/netdata.conf"
+		curl -s -o /etc/netdata/netdata.conf.new "http://localhost:${NETDATA_PORT}/netdata.conf"
 		ret=$?
 	fi
 
-	if [ $ret -eq 0 -a -s conf.d/netdata.conf.new ]
+	if [ $ret -eq 0 -a -s /etc/netdata/netdata.conf.new ]
 		then
-		mv conf.d/netdata.conf.new conf.d/netdata.conf
-		echo >&2 "New configuration saved for you to edit at conf.d/netdata.conf"
+		mv /etc/netdata/netdata.conf.new /etc/netdata/netdata.conf
+		echo >&2 "New configuration saved for you to edit at /etc/netdata/netdata.conf"
 
-		chown -R "${NETDATA_USER}" conf.d/netdata.conf
-		chmod 0664 conf.d/netdata.conf
+		chown "${NETDATA_USER}" /etc/netdata/netdata.conf
+		chmod 0664 /etc/netdata/netdata.conf
 	else
 		echo >&2 "Cannnot download configuration from netdata daemon using url 'http://localhost:${NETDATA_PORT}/netdata.conf'"
-		[ -f conf.d/netdata.conf.new ] && rm conf.d/netdata.conf.new
+		[ -f /etc/netdata/netdata.conf.new ] && rm /etc/netdata/netdata.conf.new
 	fi
 fi
 
