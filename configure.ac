@@ -155,3 +155,6 @@ AC_CONFIG_FILES([
 	web/Makefile
 ])
 AC_OUTPUT
+
+test "${with_math}" != "yes" && AC_MSG_WARN([You are building without math. math allows accurate calculations. It should be enabled.])
+test "${with_zlib}" != "yes" && AC_MSG_WARN([You are building without zlib. zlib allows netdata to trasnfer a lot less data with web clients. It should be enabled.])
