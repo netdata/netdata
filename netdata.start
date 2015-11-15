@@ -91,6 +91,9 @@ do
 	chmod 0775 "${x}" "${x}" || echo >&2 "WARNING: Cannot change the permissions of the directory ${x} to 0755..."
 done
 
+# fix apps.plugin to be setuid to root
+chown root '/usr/libexec/netdata/plugins.d/apps.plugin' && chmod 4755 '/usr/libexec/netdata/plugins.d/apps.plugin'
+
 
 # -----------------------------------------------------------------------------
 # stop a running netdata
