@@ -1,3 +1,6 @@
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 #include <sys/types.h>
 #include <dirent.h>
 #include <pthread.h>
@@ -8,7 +11,7 @@
 
 #include "main.h"
 #include "common.h"
-#include "config.h"
+#include "appconfig.h"
 #include "log.h"
 #include "rrd.h"
 #include "popen.h"

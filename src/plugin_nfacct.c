@@ -1,3 +1,7 @@
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+#ifdef INTERNAL_PLUGIN_NFACCT
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,7 +18,7 @@
 
 #include "global_statistics.h"
 #include "common.h"
-#include "config.h"
+#include "appconfig.h"
 #include "log.h"
 #include "rrd.h"
 #include "plugin_proc.h"
@@ -206,3 +210,4 @@ void *nfacct_main(void *ptr) {
 	mnl_socket_close(nl);
 	return NULL;
 }
+#endif

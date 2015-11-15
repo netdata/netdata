@@ -1,11 +1,13 @@
-#include <inttypes.h>
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 
 #include "common.h"
-#include "config.h"
+#include "appconfig.h"
 #include "procfile.h"
 #include "rrd.h"
 #include "plugin_proc.h"

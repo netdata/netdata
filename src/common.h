@@ -1,9 +1,13 @@
-#include <inttypes.h>
-#include <sys/types.h>
-#include <unistd.h>
-
 #ifndef NETDATA_COMMON_H
 #define NETDATA_COMMON_H 1
+
+#if defined(HAVE_INTTYPES_H)
+#include <inttypes.h>
+#elif defined(HAVE_STDINT_H)
+#include <stdint.h>
+#endif
+#include <sys/types.h>
+#include <unistd.h>
 
 #define abs(x) ((x < 0)? -x : x)
 #define usecdiff(now, last) (((((now)->tv_sec * 1000000ULL) + (now)->tv_usec) - (((last)->tv_sec * 1000000ULL) + (last)->tv_usec)))
@@ -19,17 +23,6 @@ extern int savememory(const char *filename, void *mem, unsigned long size);
 extern int fd_is_valid(int fd);
 
 extern char *global_host_prefix;
-
-#ifdef __GNUC__
-// gcc branch optimization
-// #warning "Using GCC branch optimizations"
-#define likely(x)       __builtin_expect(!!(x), 1)
-#define unlikely(x)     __builtin_expect(!!(x), 0)
-#else
-#define likely(x)       (x)
-#define unlikely(x)     (x)
-#endif
-
 
 /* Number of ticks per second */
 #define HZ		hz

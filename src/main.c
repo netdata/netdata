@@ -1,3 +1,6 @@
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -16,7 +19,7 @@
 #include "daemon.h"
 #include "web_server.h"
 #include "popen.h"
-#include "config.h"
+#include "appconfig.h"
 #include "web_client.h"
 #include "rrd.h"
 #include "rrd2json.h"
@@ -340,7 +343,7 @@ int main(int argc, char **argv)
 		// --------------------------------------------------------------------
 
 		prepare_rundir();
-		char *user = config_get("global", "run as user", (getuid() == 0)?"nobody":"");
+		char *user = config_get("global", "run as user", (getuid() == 0)?NETDATA_USER:"");
 		if(*user) {
 			if(become_user(user) != 0) {
 				fprintf(stderr, "Cannot become user %s.\n", user);
@@ -379,7 +382,7 @@ int main(int argc, char **argv)
 	// never become a problem
 	if(nice(20) == -1) fprintf(stderr, "Cannot lower my CPU priority. Error: %s.\n", strerror(errno));
 
-#ifndef NETDATA_NO_DAEMON
+#ifdef NETDATA_DAEMON
 	if(become_daemon(dont_fork, 0, input_log_file, output_log_file, error_log_file, access_log_file, &access_fd, &stdaccess) == -1) {
 		fprintf(stderr, "Cannot demonize myself (%s).", strerror(errno));
 		exit(1);

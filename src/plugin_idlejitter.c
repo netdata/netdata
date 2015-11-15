@@ -1,3 +1,6 @@
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 #include <pthread.h>
 #include <sys/time.h>
 #include <sys/resource.h>
@@ -6,7 +9,7 @@
 
 #include "global_statistics.h"
 #include "common.h"
-#include "config.h"
+#include "appconfig.h"
 #include "log.h"
 #include "rrd.h"
 #include "plugin_idlejitter.h"

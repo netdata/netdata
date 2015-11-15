@@ -1,5 +1,3 @@
-#!/bin/sh
-
 # this function is used to sleep a fraction of a second
 # it calculates the difference between every time is called
 # and tries to align the sleep time to give you exactly the
