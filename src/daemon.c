@@ -1,3 +1,7 @@
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+#ifdef NETDATA_DAEMON
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -12,9 +16,9 @@
 #include <sys/stat.h>
 #include <execinfo.h>
 
-#include "config.h"
-#include "log.h"
 #include "common.h"
+#include "appconfig.h"
+#include "log.h"
 #include "web_client.h"
 #include "plugins_d.h"
 #include "rrd.h"
@@ -314,3 +318,4 @@ int become_daemon(int dont_fork, int close_all_files, const char *input, const c
 
 	return(0);
 }
+#endif

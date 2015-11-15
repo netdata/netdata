@@ -1,12 +1,14 @@
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 #include <stdlib.h>
 
 #ifdef STORAGE_WITH_MATH
 #include <math.h>
 #endif
 
-#include "web_buffer.h"
-
 #include "common.h"
+#include "web_buffer.h"
 #include "log.h"
 
 void web_buffer_strcpy(struct web_buffer *wb, const char *txt)

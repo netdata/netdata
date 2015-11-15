@@ -1,6 +1,6 @@
-// enable strcasestr()
-#define _GNU_SOURCE
-
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -16,7 +16,7 @@
 
 #include "common.h"
 #include "log.h"
-#include "config.h"
+#include "appconfig.h"
 #include "url.h"
 #include "web_buffer.h"
 #include "web_client.h"

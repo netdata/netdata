@@ -1,3 +1,6 @@
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 #include <stddef.h>
 #include <string.h>
 #include <unistd.h>
@@ -11,9 +14,9 @@
 #include <sys/types.h>
 #include <stdlib.h>
 
-#include "log.h"
-#include "config.h"
 #include "common.h"
+#include "log.h"
+#include "appconfig.h"
 
 #include "rrd.h"
 
@@ -278,7 +281,7 @@ char *rrdset_cache_dir(const char *id)
 	char *ret = NULL;
 
 	static char *cache_dir = NULL;
-	if(!cache_dir) cache_dir = config_get("global", "database directory", "cache");
+	if(!cache_dir) cache_dir = config_get("global", "database directory", CACHE_DIR);
 
 	char b[FILENAME_MAX + 1];
 	char n[FILENAME_MAX + 1];

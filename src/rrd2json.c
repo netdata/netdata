@@ -1,3 +1,6 @@
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 #include <pthread.h>
 #include <sys/time.h>
 #include <stdlib.h>

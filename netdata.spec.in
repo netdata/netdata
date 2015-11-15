@@ -1,0 +1,58 @@
+Summary:	Linux real time system monitoring, over the web
+Name:		@PACKAGE_NAME@
+Version:	@PACKAGE_RPM_VERSION@
+Release:	@PACKAGE_RPM_RELEASE@%{?release_suffix}%{?dist}
+License:	GPLv2+
+URL:		http://firehol.org
+Source:		%{name}-@PACKAGE_VERSION@.tar.bz2
+
+BuildRequires:	libmnl-devel
+BuildRequires:	libnetfilter_acct-devel
+BuildRequires:	zlib-devel
+Requires:	libmnl
+Requires:	libnetfilter_acct
+Requires:	zlib
+
+BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+
+%description
+Linux real time system monitoring, over the web!
+
+%pre
+getent group netdata > /dev/null || groupadd -r netdata
+getent passwd netdata > /dev/null || useradd -r -g netdata -c netdata -s /sbin/nologin -d / netdata
+
+%global ovirt_create_user_engine \
+%_ovirt_create_user %{engine_user} %{engine_uid} %{engine_group} %{engine_gid} "%{ovirt_user_description}" %{engine_state}
+
+
+%prep
+%setup -q -n %{name}-@PACKAGE_VERSION@
+
+%build
+%configure \
+	--docdir="%{_docdir}/%{name}-%{version}" \
+	--enable-plugin-plugin-nfacct \
+	--with-zlib \
+	--with-math \
+	--with-user=netdata \
+	%{?conf}
+make %{?_smp_mflags}
+
+%install
+rm -rf "%{buildroot}"
+make %{?_smp_mflags} install DESTDIR="%{buildroot}"
+find "%{buildroot}" -name .keep -exec rm {} \;
+
+%files
+%attr(4755, root, root) %{_libexecdir}/%{name}/plugins.d/apps.plugin
+%attr(-, netdata, netdata) %dir %{_localstatedir}/cache/%{name}/
+%attr(-, netdata, netdata) %dir %{_localstatedir}/log/%{name}/
+%{_bindir}/%{name}
+%{_datadir}/%{name}/
+%{_libexecdir}/%{name}/
+%{_sysconfdir}/%{name}/
+
+%changelog
+* Sun Nov 15 2015 Alon Bar-Lev <alonbl@redhat.com> - 1.0.0-1
+- Initial add.

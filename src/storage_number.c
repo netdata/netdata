@@ -1,3 +1,6 @@
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 #ifdef STORAGE_WITH_MATH
 #include <math.h>
 #endif

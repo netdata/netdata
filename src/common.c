@@ -1,5 +1,6 @@
-// enable O_NOATIME
-#define _GNU_SOURCE
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 #include <sys/syscall.h>
 #include <string.h>
 #include <ctype.h>

@@ -3,10 +3,9 @@
 // 1. support -ch option to set global /proc and /sys prefix
 // 2. disable RESET_OR_OVERFLOW check in charts
 
-
-#define __STDC_FORMAT_MACROS
-#include <inttypes.h>
-
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,14 +25,13 @@
 #include <fcntl.h>
 
 #include <malloc.h>
-#include <inttypes.h>
 #include <dirent.h>
 #include <arpa/inet.h>
 
-#include "../common.h"
-#include "../log.h"
-#include "../avl.h"
-#include "../procfile.h"
+#include "common.h"
+#include "log.h"
+#include "avl.h"
+#include "procfile.h"
 
 #define MAX_COMPARE_NAME 15
 #define MAX_NAME 100

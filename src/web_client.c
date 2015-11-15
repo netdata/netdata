@@ -1,6 +1,6 @@
-// enable strcasestr()
-#define _GNU_SOURCE
-
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -16,7 +16,7 @@
 
 #include "common.h"
 #include "log.h"
-#include "config.h"
+#include "appconfig.h"
 #include "url.h"
 #include "web_buffer.h"
 #include "web_server.h"
@@ -136,7 +136,7 @@ struct web_client *web_client_free(struct web_client *w)
 int mysendfile(struct web_client *w, char *filename)
 {
 	static char *web_dir = NULL;
-	if(!web_dir) web_dir = config_get("global", "web files directory", "web");
+	if(!web_dir) web_dir = config_get("global", "web files directory", WEB_DIR);
 
 	debug(D_WEB_CLIENT, "%llu: Looking for file '%s'...", w->id, filename);
 
@@ -227,7 +227,7 @@ void web_client_reset(struct web_client *w)
 
 	long sent = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->data->rbytes:w->data->bytes;
 
-#ifndef NETDATA_WITHOUT_ZLIB
+#ifdef NETDATA_WITH_ZLIB
 	if(likely(w->zoutput)) sent = (long)w->zstream.total_out;
 #endif
 
@@ -270,7 +270,7 @@ void web_client_reset(struct web_client *w)
 	w->zoutput = 0;
 
 	// if we had enabled compression, release it
-#ifndef NETDATA_WITHOUT_ZLIB
+#ifdef NETDATA_WITH_ZLIB
 	if(w->zinitialized) {
 		debug(D_DEFLATE, "%llu: Reseting compression.", w->id);
 		deflateEnd(&w->zstream);
@@ -282,10 +282,10 @@ void web_client_reset(struct web_client *w)
 		w->zstream.total_out = 0;
 		w->zinitialized = 0;
 	}
-#endif // NETDATA_WITHOUT_ZLIB
+#endif // NETDATA_WITH_ZLIB
 }
 
-#ifndef NETDATA_WITHOUT_ZLIB
+#ifdef NETDATA_WITH_ZLIB
 void web_client_enable_deflate(struct web_client *w) {
 	if(w->zinitialized == 1) {
 		error("%llu: Compression has already be initialized for this client.", w->id);
@@ -330,7 +330,7 @@ void web_client_enable_deflate(struct web_client *w) {
 
 	debug(D_DEFLATE, "%llu: Initialized compression.", w->id);
 }
-#endif // NETDATA_WITHOUT_ZLIB
+#endif // NETDATA_WITH_ZLIB
 
 int web_client_data_request(struct web_client *w, char *url, int datasource_type)
 {
@@ -555,11 +555,11 @@ void web_client_process(struct web_client *w) {
 		if(strcasestr(w->data->buffer, "Connection: keep-alive")) w->keepalive = 1;
 		else w->keepalive = 0;
 
-#ifndef NETDATA_WITHOUT_ZLIB
+#ifdef NETDATA_WITH_ZLIB
 		// check if the client accepts deflate
 		if(web_enable_gzip && strstr(w->data->buffer, "gzip"))
 			web_client_enable_deflate(w);
-#endif // NETDATA_WITHOUT_ZLIB
+#endif // NETDATA_WITH_ZLIB
 
 		int datasource_type = DATASOURCE_GOOGLE_JSONP;
 		//if(strstr(w->data->buffer, "X-DataSource-Auth"))
@@ -988,7 +988,7 @@ long web_client_send_chunk_finalize(struct web_client *w)
 	return bytes;
 }
 
-#ifndef NETDATA_WITHOUT_ZLIB
+#ifdef NETDATA_WITH_ZLIB
 long web_client_send_deflate(struct web_client *w)
 {
 	long bytes = 0, t = 0;
@@ -1089,13 +1089,13 @@ long web_client_send_deflate(struct web_client *w)
 
 	return(bytes);
 }
-#endif // NETDATA_WITHOUT_ZLIB
+#endif // NETDATA_WITH_ZLIB
 
 long web_client_send(struct web_client *w)
 {
-#ifndef NETDATA_WITHOUT_ZLIB
+#ifdef NETDATA_WITH_ZLIB
 	if(likely(w->zoutput)) return web_client_send_deflate(w);
-#endif // NETDATA_WITHOUT_ZLIB
+#endif // NETDATA_WITH_ZLIB
 
 	long bytes;
 
