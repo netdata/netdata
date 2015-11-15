@@ -45,7 +45,6 @@ make %{?_smp_mflags} install DESTDIR="%{buildroot}"
 find "%{buildroot}" -name .keep -exec rm {} \;
 
 %files
-%attr(4755, root, root) %{_libexecdir}/%{name}/plugins.d/apps.plugin
 %attr(-, netdata, netdata) %dir %{_localstatedir}/cache/%{name}/
 %attr(-, netdata, netdata) %dir %{_localstatedir}/log/%{name}/
 %{_bindir}/%{name}
