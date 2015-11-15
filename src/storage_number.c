@@ -3,8 +3,6 @@
 #endif
 #ifdef STORAGE_WITH_MATH
 #include <math.h>
-#else
-#warning "You are building without math. math allows accurate calculations. It should be enabled."
 #endif
 
 #include "common.h"
