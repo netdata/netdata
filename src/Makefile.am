@@ -73,10 +73,15 @@ apps_plugin_SOURCES = \
 	procfile.c procfile.h \
 	$(NULL)
 
-install-data-hook:
-	@echo
-	@echo "ATTENTION"
-	@echo
-	@echo "setuid bit of $(pluginsdir)/apps.plugin must be set, please execute as root:"
-	@echo "chown root '$(pluginsdir)/apps.plugin' && chmod 4755 '$(pluginsdir)/apps.plugin'"
-	@echo
+install-exec-hook:
+	if [ `id -u` == 0 ]; then \
+		chown root '$(DESTDIR)$(pluginsdir)/apps.plugin' && \
+			chmod 4755 '$(DESTDIR)$(pluginsdir)/apps.plugin'; \
+	else \
+		echo; \
+		echo "ATTENTION"; \
+		echo; \
+		echo "setuid bit of $(pluginsdir)/apps.plugin must be set, please execute as root:"; \
+		echo "chown root '$(pluginsdir)/apps.plugin' && chmod 4755 '$(pluginsdir)/apps.plugin'"; \
+		echo; \
+	fi
