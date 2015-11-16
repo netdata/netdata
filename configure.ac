@@ -83,7 +83,6 @@ if test -z "${MATH_LIBS}"; then
 	)
 fi
 
-test "${enable_daemon}" = "yes" && AC_DEFINE([NETDATA_DAEMON], [1], [daemon settings])
 if test "${enable_plugin_nfacct}" = "yes"; then
 	PKG_CHECK_MODULES(
 		[NFACCT],
