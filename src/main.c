@@ -235,6 +235,20 @@ int main(int argc, char **argv)
 
 	if(!config_loaded) load_config(NULL, 0);
 
+	// prepare configuration environment variables for the plugins
+	setenv("NETDATA_CONFIG_DIR" , config_get("global", "config directory"   , CONFIG_DIR) , 1);
+	setenv("NETDATA_PLUGINS_DIR", config_get("global", "plugins directory"  , PLUGINS_DIR), 1);
+	setenv("NETDATA_WEB_DIR"    , config_get("global", "web files directory", WEB_DIR)    , 1);
+	setenv("NETDATA_CACHE_DIR"  , config_get("global", "cache directory"    , CACHE_DIR)  , 1);
+	setenv("NETDATA_LOG_DIR"    , config_get("global", "log directory"      , LOG_DIR)    , 1);
+
+	// avoid extended to stat(/etc/localtime)
+	// http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
+	setenv("TZ", ":/etc/localtime", 0);
+
+	// cd to /tmp to avoid any plugins writing files at random places
+	if(chdir("/tmp")) fprintf(stderr, "netdata: ERROR: Cannot cd to /tmp: %s", strerror(errno));
+
 	char *input_log_file = NULL;
 	char *output_log_file = NULL;
 	char *error_log_file = NULL;
@@ -247,6 +261,8 @@ int main(int argc, char **argv)
 
 		sprintf(buffer, "0x%08llx", 0ULL);
 		char *flags = config_get("global", "debug flags", buffer);
+		setenv("NETDATA_DEBUG_FLAGS", flags, 1);
+
 		debug_flags = strtoull(flags, NULL, 0);
 		debug(D_OPTIONS, "Debug flags set to '0x%8llx'.", debug_flags);
 
@@ -259,6 +275,7 @@ int main(int argc, char **argv)
 		// --------------------------------------------------------------------
 
 		global_host_prefix = config_get("global", "host access prefix", "");
+		setenv("NETDATA_HOST_PREFIX", global_host_prefix, 1);
 
 		// --------------------------------------------------------------------
 
@@ -331,6 +348,13 @@ int main(int argc, char **argv)
 			rrd_update_every = UPDATE_EVERY;
 		}
 		else debug(D_OPTIONS, "update timer set to %d.", rrd_update_every);
+
+		// let the plugins know the min update_every
+		{
+			char buffer[50];
+			snprintf(buffer, 50, "%d", rrd_update_every);
+			setenv("NETDATA_UPDATE_EVERY", buffer, 1);
+		}
 
 		// --------------------------------------------------------------------
 		

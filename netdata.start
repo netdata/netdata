@@ -13,9 +13,10 @@ then
         echo >&2 "Cleaning a possibly old compilation ..."
         make clean || exit 1
 
-        echo >&2 "Compiling netdata ..."
-        make || exit 1
 fi
+
+echo >&2 "Compiling netdata ..."
+make || exit 1
 
 if [ -z "${netdata}" -o src/netdata -nt "${netdata}" ]
 then
@@ -31,15 +32,6 @@ fi
 
 netdata=$(which netdata)
 
-base="`dirname "$0"`"
-
-if [ ! -d "${base}" ]
-then
-	echo >&2 "Cannot find my home directory '${base}'."
-	exit 1
-fi
-cd "${base}" || exit 1
-
 
 # -----------------------------------------------------------------------------
 # load options from the configuration file
@@ -53,7 +45,7 @@ config_option() {
 
 	if [ -s "/etc/netdata/netdata.conf" ]
 		then
-		line="$( grep "^[[:space:]]*${key}[[:space:]]*=[[:space:]]*" "conf.d/netdata.conf" | head -n 1 )"
+		line="$( grep "^[[:space:]]*${key}[[:space:]]*=[[:space:]]*" "/etc/netdata/netdata.conf" | head -n 1 )"
 		[ ! -z "${line}" ] && value="$( echo "${line}" | cut -d '=' -f 2 | sed -e "s/^[[:space:]]\+//g" -e "s/[[:space:]]\+$//g" )"
 	fi
 
@@ -74,10 +66,10 @@ defport=19999
 NETDATA_PORT="$( config_option "port" ${defport} )"
 
 # directories
-NETDATA_CACHE_DIR="$( config_option "database directory" "/var/cache/netdata" )"
+NETDATA_CACHE_DIR="$( config_option "cache directory" "/var/cache/netdata" )"
 NETDATA_WEB_DIR="$( config_option "web files directory" "/usr/share/netdata/web" )"
-NETDATA_LOG_DIR="log"
-NETDATA_CONF_DIR="conf.d"
+NETDATA_LOG_DIR="$( config_option "log directory" "/var/log/netdata" )"
+NETDATA_CONF_DIR="$( config_option "config directory" "/etc/netdata" )"
 
 
 # -----------------------------------------------------------------------------
@@ -88,7 +80,8 @@ for x in "${NETDATA_WEB_DIR}" "${NETDATA_CONF_DIR}" "${NETDATA_CACHE_DIR}" "${NE
 do
 	if [ ! -d "${x}" ]
 		then
-		mkdir "${x}" || exit 1
+		echo >&2 "Creating directory '${x}'"
+		mkdir -p "${x}" || exit 1
 	fi
 	chown -R "${NETDATA_USER}" "${x}" || echo >&2 "WARNING: Cannot change the ownership of the files in directory ${x} to ${NETDATA_USER}..."
 	chmod 0775 "${x}" "${x}" || echo >&2 "WARNING: Cannot change the permissions of the directory ${x} to 0755..."
@@ -122,10 +115,6 @@ echo >&2
 
 # -----------------------------------------------------------------------------
 # run netdata
-
-# avoid extended stat(/etc/localtime)
-# http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
-export TZ=":/etc/localtime"
 
 echo >&2 "Starting netdata..."
 netdata "${@}"

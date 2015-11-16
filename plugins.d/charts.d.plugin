@@ -1,18 +1,56 @@
 #!/bin/bash
 
+PROGRAM_FILE="$0"
+PROGRAM_NAME="charts.d"
+echo >&2 "$PROGRAM_NAME: started from '$PROGRAM_FILE' with options: $*"
+
+if [ $(( ${BASH_VERSINFO[0]} )) -lt 4 ]
+then
+	echo >&2 
+	echo >&2 "$PROGRAM_NAME: ERROR"
+	echo >&2 "BASH version 4 or later is required."
+	echo >&2 "You are running version: ${BASH_VERSION}"
+	echo >&2 "Please upgrade."
+	echo >&2 
+	exit 1
+fi
+
+# check a few commands
+require_cmd() {
+	which "$1" >/dev/null
+	if [ $? -ne 0 ]
+		then
+		echo >&2 "$PROGRAM_NAME: ERROR: Command '$1' is not found in the system path."
+		return 1
+	fi
+	return 0
+}
+
+require_cmd date || exit 1
+require_cmd sed || exit 1
+require_cmd basename || exit 1
+require_cmd dirname || exit 1
+require_cmd cat || exit 1
+require_cmd grep || exit 1
+require_cmd mktemp || exit 1
+
 # -----------------------------------------------------------------------------
 # insternal defaults
+# netdata exposes a few environment variables for us
 
 pause_method="sleep" # use either "suspend" or "sleep"
                      # DO NOT USE SUSPEND - LINUX WILL SUSPEND NETDATA TOO
                      # THE WHOLE PROCESS GROUP - NOT JUST THE SHELL
 
-pluginsd="plugins.d"
-confd="conf.d"
-chartsd="charts.d"
+pluginsd="${NETDATA_PLUGINS_DIR}"
+[ -z "$pluginsd" ] && pluginsd="$( dirname $PROGRAM_FILE )"
+
+confd="${NETDATA_CONFIG_DIR-/etc/netdata}"
+chartsd="$pluginsd/../charts.d"
 myconfig="$confd/charts.d.conf"
-minimum_update_frequency=1
-update_every=1	# this is overwritten by the command line
+
+minimum_update_frequency="${NETDATA_UPDATE_EVERY-1}"
+update_every=${minimum_update_frequency}	# this will be overwritten by the command line
 
 # work around for non BASH shells
 charts_create="_create"
@@ -58,21 +96,13 @@ do
 		continue
 	fi
 
-	if [ -f "$1" ]
-	then
-		debug=1
-		chart_only="$( basename "$1" | sed "s/\.chart\.sh$//g" )"
-		shift
-		continue
-	fi
-
 	# number check
 	n="$1"
-	x=$((n + 1 - 1))
+	x=$(( n ))
 	if [ "$x" = "$n" ]
 	then
-		update_every=$x
 		shift
+		update_every=$x
 		continue
 	fi
 
@@ -90,7 +120,7 @@ if [ -f "$myconfig" ]
 	. "$myconfig"
 	if [ $? -ne 0 ]
 	then
-		echo >&2 "charts.d: cannot load $myconfig"
+		echo >&2 "$PROGRAM_NAME: cannot load $myconfig"
 		echo "DISABLE"
 		exit 1
 	fi
@@ -113,7 +143,7 @@ test $update_every -eq 0 && update_every=1 # if it is zero, make it 1
 # check the charts.d directory
 if [ ! -d "$chartsd" ]
 	then
-	echo >&2 "charts.d: cannot find charts directory '$chartsd'"
+	echo >&2 "$PROGRAM_NAME: cannot find charts directory '$chartsd'"
 	echo "DISABLE"
 fi
 
@@ -125,9 +155,16 @@ fi
 loopsleepms() {
 	sleep $1
 }
+
+now_ms=
+current_time_ms() {
+	now_ms="$(date +'%s')000"
+}
+
 # if found and included, this file overwrites loopsleepms()
-# with a high resolution timer function for precise looping.
-. "$( dirname $0 )/loopsleepms.sh.inc"
+# and current_time_ms() with a high resolution timer function
+# for precise looping.
+. "$pluginsd/loopsleepms.sh.inc"
 
 
 # -----------------------------------------------------------------------------
@@ -135,6 +172,8 @@ loopsleepms() {
 
 all_charts() {
 	cd "$chartsd"
+	[ $? -ne 0 ] && echo >&2 "$PROGRAM_NAME: Cannot cd to $chartsd" && return 1
+
 	ls *.chart.sh | sed "s/\.chart\.sh$//g"
 }
 
@@ -148,9 +187,10 @@ all_enabled_charts() {
 		eval "enabled=\$$chart"
 		if [ "$enabled" = "yes" ]
 		then
+			[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: '$chart' is enabled."
 			local charts="$charts $chart"
 		else
-			echo >&2 "charts.d: chart '$chart' is NOT enabled. Add a line with $chart=yes in $myconfig to enable it."
+			echo >&2 "$PROGRAM_NAME: '$chart' is NOT enabled. Add a line with $chart=yes in $myconfig to enable it."
 		fi
 	done
 
@@ -161,38 +201,38 @@ all_enabled_charts() {
 		local check="$( cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_check()" )"
 		if [ -z "$check" ]
 		then
-			echo >&2 "charts.d: chart '$chart' does not seem to have a $chart$charts_check() function. Disabling it."
+			echo >&2 "$PROGRAM_NAME: chart '$chart' does not seem to have a $chart$charts_check() function. Disabling it."
 			continue
 		fi
 
 		local create="$( cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_create()" )"
 		if [ -z "$create" ]
 		then
-			echo >&2 "charts.d: chart '$chart' does not seem to have a $chart$charts_create() function. Disabling it."
+			echo >&2 "$PROGRAM_NAME: chart '$chart' does not seem to have a $chart$charts_create() function. Disabling it."
 			continue
 		fi
 
 		local update="$( cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_update()" )"
 		if [ -z "$update" ]
 		then
-			echo >&2 "charts.d: chart '$chart' does not seem to have a $chart$charts_update() function. Disabling it."
+			echo >&2 "$PROGRAM_NAME: chart '$chart' does not seem to have a $chart$charts_update() function. Disabling it."
 			continue
 		fi
 
 		# check its config
-		if [ -f "$confd/$chart.conf" ]
-		then
-			if [ ! -z "$( cat "$confd/$chart.conf" | sed "s/^ \+//g" | grep -v "^$" | grep -v "^#" | grep -v "^$chart$charts_undescore" )" ]
-			then
-				echo >&2 "charts.d: chart's $chart config $confd/$chart.conf should only have lines starting with $chart$charts_undescore . Disabling it."
-				continue
-			fi
-		fi
+		#if [ -f "$confd/$chart.conf" ]
+		#then
+		#	if [ ! -z "$( cat "$confd/$chart.conf" | sed "s/^ \+//g" | grep -v "^$" | grep -v "^#" | grep -v "^$chart$charts_undescore" )" ]
+		#	then
+		#		echo >&2 "$PROGRAM_NAME: chart's $chart config $confd/$chart.conf should only have lines starting with $chart$charts_undescore . Disabling it."
+		#		continue
+		#	fi
+		#fi
 
 		"$pluginsd/charts.d.dryrun-helper.sh" "$chart" "$chartsd/$chart.chart.sh" "$confd/$chart.conf" >/dev/null
 		if [ $? -ne 0 ]
 		then
-			echo >&2 "charts.d: chart's $chart did not pass the dry run check. This means it uses global variables not starting with $chart. Disabling it."
+			echo >&2 "$PROGRAM_NAME: chart's $chart did not pass the dry run check. This means it uses global variables not starting with $chart. Disabling it."
 			continue
 		fi
 
@@ -200,6 +240,7 @@ all_enabled_charts() {
 	done
 
 	echo $charts2
+	[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: enabled charts: $charts2"
 }
 
 
@@ -210,10 +251,12 @@ suffix_update_every="_update_every"
 active_charts=
 for chart in $( all_enabled_charts )
 do
+	[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: loading chart: '$chartsd/$chart.chart.sh'"
 	. "$chartsd/$chart.chart.sh"
 
 	if [ -f "$confd/$chart.conf" ]
 	then
+		[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: loading chart options: '$confd/$chart.conf'"
 		. "$confd/$chart.conf"
 	fi
 
@@ -227,11 +270,13 @@ do
 	$chart$charts_check
 	if [ $? -eq 0 ]
 	then
+		[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: '$chart' activated"
 		active_charts="$active_charts $chart"
 	else
-		echo >&2 "charts.d: chart '$chart' check() function reports failure."
+		echo >&2 "$PROGRAM_NAME: chart '$chart' check() function reports failure."
 	fi
 done
+[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: activated charts: $active_charts"
 
 
 # -----------------------------------------------------------------------------
@@ -242,8 +287,9 @@ debug_time=
 test $debug -eq 1 && debug_time=tellwork
 
 # if we only need a specific chart, remove all the others
-if [ ! -z "$chart_only" ]
+if [ ! -z "${chart_only}" ]
 then
+	[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: requested to run only for: '${chart_only}'"
 	check_charts=
 	for chart in $active_charts
 	do
@@ -255,12 +301,13 @@ then
 	done
 	active_charts="$check_charts"
 fi
+[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: activated charts: $active_charts"
 
 # stop if we just need a pre-check
 if [ $check -eq 1 ]
 then
-	echo "CHECK RESULT"
-	echo "Will run the charts: $active_charts"
+	echo >&2 "CHECK RESULT"
+	echo >&2 "Will run the charts: $active_charts"
 	exit 0
 fi
 
@@ -269,9 +316,10 @@ fi
 
 TMP_DIR=
 chartsd_cleanup() {
+	cd /tmp
 	if [ ! -z "$TMP_DIR" -a -d "$TMP_DIR" ]
 	then
-		echo >&2 "charts.d: cleaning up temporary directory $TMP_DIR ..."
+		[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: cleaning up temporary directory $TMP_DIR ..."
 		rm -rf "$TMP_DIR"
 	fi
 	exit 0
@@ -286,6 +334,8 @@ then
 else
 	TMP_DIR="$( mktemp -d /tmp/.netdata-charts.d-XXXXXXXXXX )"
 fi
+
+cd "$TMP_DIR" || exit 1
 
 # -----------------------------------------------------------------------------
 # library functions
@@ -304,77 +354,75 @@ fixid() {
 run_charts=
 for chart in $active_charts
 do
+	[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: Calling '$chart$charts_create()'..."
 	$chart$charts_create
 	if [ $? -eq 0 ]
 	then
 		run_charts="$run_charts $chart"
+		[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: '$chart' has initialized."
 	else
-		echo >&2 "charts.d: chart '$chart' create() function reports failure."
+		echo >&2 "$PROGRAM_NAME: chart '$chart' function '$chart$charts_create()' reports failure."
 	fi
 done
+[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: run_charts='$run_charts'"
 
 
 # -----------------------------------------------------------------------------
 # update dimensions
 
+declare -A charts_last_update=() charts_min_dt=()
 global_update() {
-	local exit_after=$((3600 / update_every))
+	local exit_after=$((3600 / update_every)) \
+		c=0 dt \
+		chart now_charts=() next_charts=($run_charts)
 
 	# return the current time in ms in $now_ms
 	current_time_ms
 
-	local chart=
-	for chart in $now_charts
+	for chart in $run_charts
 	do
-		eval "local last_update_$chart=\$((now_ms - ($chart$suffix_update_every * 1000) ))"
+		eval "charts_min_dt[$chart]=\$$chart$suffix_update_every"
+		test -z "${charts_min_dt[$chart]}" && charts_min_dt[$charts]=$update_every
+		charts_last_update[$chart]=$((now_ms - (charts_min_dt[$chart] * 1000) ))
 	done
 
 	# the main loop
-	local c=0
 	while [ 1 ]
 	do
-		local c=$((c + 1))
-		local now_charts="$run_charts"
-		local run_charts=
+		c=$((c + 1))
+		now_charts=("${next_charts[@]}")
+		next_charts=()
 
-		local chart=
-		for chart in $now_charts
+		for chart in "${now_charts[@]}"
 		do
 			# return the current time in ms in $now_ms
 			current_time_ms
 
-			eval "local chart_min_dt=\$$chart$suffix_update_every"
-			test -z "$chart_min_dt" && local chart_min_dt=$update_every
-			local chart_min_dt=$((chart_min_dt * 1000000))
-
-			eval "local last=\$last_update_$chart"
-			test -z "$last" && local last=$((now_ms - (chart_min_dt / 1000) ))
-
-			local dt=$(( (now_ms - last) * 1000 ))
-			if [ $dt -ge $chart_min_dt ]
+			dt=$(( (now_ms - charts_last_update[$chart]) * 1000 ))
+			if [ $dt -ge $(( charts_min_dt[$chart] * 1000000 )) ]
 			then
-				eval "last_update_$chart=$now_ms"
+				charts_last_update[$chart]=$now_ms
 
 				# the first call should not give a duration
 				# so that netdata calibrates to current time
-				test $c -eq 1 && local dt=
+				test $c -eq 1 && dt=
 
 				$chart$charts_update $dt
 				if [ $? -eq 0 ]
 				then
-					run_charts="$run_charts $chart"
+					next_charts+=($chart)
 				else
-					echo >&2 "charts.d: chart '$chart' update() function reports failure. Disabling it."
+					echo >&2 "$PROGRAM_NAME: chart '$chart' update() function reports failure. Disabling it."
 				fi
 			else
-				run_charts="$run_charts $chart"
+				next_charts+=($chart)
 			fi
 		done
 
 		if [ "$pause_method" = "suspend" ]
 		then
 			echo "STOPPING_WAKE_ME_UP_PLEASE"
-			suspend || ( echo >&2 "suspend returned error $?, falling back to sleep."; loopsleepms $debug_time $update_every )
+			suspend || ( echo >&2 "$PROGRAM_NAME: suspend returned error $?, falling back to sleep."; loopsleepms $debug_time $update_every )
 		else
 			# wait the time you are required to
 			loopsleepms $debug_time $update_every

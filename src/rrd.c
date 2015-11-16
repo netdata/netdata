@@ -281,14 +281,14 @@ char *rrdset_cache_dir(const char *id)
 	char *ret = NULL;
 
 	static char *cache_dir = NULL;
-	if(!cache_dir) cache_dir = config_get("global", "database directory", CACHE_DIR);
+	if(!cache_dir) cache_dir = config_get("global", "cache directory", CACHE_DIR);
 
 	char b[FILENAME_MAX + 1];
 	char n[FILENAME_MAX + 1];
 	rrdset_strncpy_name(b, id, FILENAME_MAX);
 
 	snprintf(n, FILENAME_MAX, "%s/%s", cache_dir, b);
-	ret = config_get(id, "database directory", n);
+	ret = config_get(id, "cache directory", n);
 
 	if(rrd_memory_mode == RRD_MEMORY_MODE_MAP || rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
 		int r = mkdir(ret, 0775);
@@ -964,7 +964,7 @@ unsigned long long rrdset_done(RRDSET *st)
 				// if the new is smaller than the old (an overflow, or reset), set the old equal to the new
 				// to reset the calculation (it will give zero as the calculation for this second)
 				if(unlikely(rd->last_collected_value > rd->collected_value)) {
-					info("%s.%s: Detect RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
+					debug(D_RRD_STATS, "%s.%s: Detect RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
 							, st->name, rd->name
 							, rd->last_collected_value
 							, rd->collected_value);
