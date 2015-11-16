@@ -28,7 +28,7 @@ AC_USE_SYSTEM_EXTENSIONS
 
 AC_ARG_ENABLE(
 	[plugin-nfacct],
-	[AS_HELP_STRING([--enable-nfacct], [enable nfacct plugin, requires root])],
+	[AS_HELP_STRING([--enable-plugin-nfacct], [enable nfacct plugin, requires root])],
 	,
 	[enable_plugin_nfacct="no"]
 )
@@ -73,18 +73,6 @@ AC_TYPE_UINT16_T
 AC_TYPE_UINT32_T
 AC_C_INLINE
 
-PKG_CHECK_MODULES(
-	[NFACCT],
-	[libnetfilter_acct],
-)
-PKG_CHECK_MODULES(
-	[LIBMNL],
-	[libmnl],
-)
-PKG_CHECK_MODULES(
-	[ZLIB],
-	[zlib],
-)
 AC_ARG_VAR([MATH_CFLAGS], [C compiler flags for math])
 AC_ARG_VAR([MATH_LIBS], [linker flags for math])
 if test -z "${MATH_LIBS}"; then
@@ -95,8 +83,15 @@ if test -z "${MATH_LIBS}"; then
 	)
 fi
 
-test "${enable_daemon}" = "yes" && AC_DEFINE([NETDATA_DAEMON], [1], [daemon settings])
 if test "${enable_plugin_nfacct}" = "yes"; then
+	PKG_CHECK_MODULES(
+		[NFACCT],
+		[libnetfilter_acct],
+	)
+	PKG_CHECK_MODULES(
+		[LIBMNL],
+		[libmnl],
+	)
 	test -z "${NFACCT_LIBS}" && AC_MSG_ERROR([netfilter_acct required but not found])
 	test -z "${LIBMNL_LIBS}" && AC_MSG_ERROR([libmnl required but not found])
 	AC_DEFINE([INTERNAL_PLUGIN_NFACCT], [1], [nfacct plugin settings])
@@ -104,6 +99,10 @@ if test "${enable_plugin_nfacct}" = "yes"; then
 	OPTIONAL_NFACCT_LIBS="${NFACCT_LIBS} ${LIBMNL_LIBS}"
 fi
 if test "${with_zlib}" = "yes"; then
+	PKG_CHECK_MODULES(
+		[ZLIB],
+		[zlib],
+	)
 	test -z "${ZLIB_LIBS}" && AC_MSG_ERROR([zlib required but not found])
 	AC_DEFINE([NETDATA_WITH_ZLIB], [1], [zlib settings])
 	OPTIONAL_ZLIB_CLFAGS="${ZLIB_CFLAGS}"
