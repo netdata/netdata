@@ -154,18 +154,33 @@ To install it in Ubuntu, you need to run:
 apt-get install zlib1g-dev
 ```
 
+You also need to have a basic build environment in place. You will need packages like
+`pgk-config`, `autoconf`, `gcc`, etc.
+
 Then do this to install and run netdata:
 
 ```sh
+
+# download it
 git clone https://github.com/ktsaou/netdata.git netdata.git
 cd netdata.git
-./netdata.start
+
+# build it
+./netdata-installer.sh
+
 ```
 
-Once you run it, the file conf.d/netdata.conf will be created. You can edit this file to set options for each graph.
+The script `netdata-installer.sh` will build netdata and install it to your system.
+
+Once the installer completes, the file `/etc/netdata/netdata.conf` will be created.
+You can edit this file to set options.
 To apply the changes you made, you have to run netdata.start again.
 
-If you run `netdata.start` as `root`, netdata will start by default as `nobody`. Otherwise it will run as the user that started it. If you run it as `root`, you can set the user you want it to run in the config file `conf.d/netdata.conf`.
+- You can start netdata by executing it with `netdata` (the installer will also start it).
+
+- You can stop netdata by killing it with `killall netdata`.
+    You can stop and start netdata at any point. Netdata saves on exit its round robbin
+    database to `/var/cache/netdata` so that it will continue from where it stopped the last time. 
 
 To access the web site for all graphs, go to:
 
@@ -175,6 +190,4 @@ To access the web site for all graphs, go to:
 
 You can get the running config file at any time, by accessing `http://127.0.0.1:19999/netdata.conf`.
 
-To start it at boot, just run `/path/to/netdata.git/netdata.start` from your `/etc/rc.local` or equivalent.
-
-You can stop and start netdata at any point. Netdata saves on exit its round robbin database to `cache/` so that it will continue from where it stopped the last time. 
+To start it at boot, just run `netdata` from your `/etc/rc.local` or equivalent.
