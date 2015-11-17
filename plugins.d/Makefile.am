@@ -4,12 +4,12 @@
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
 dist_plugins_DATA = \
-	README \
-	loopsleepms.sh.inc \
+	README.md \
 	$(NULL)
 
 dist_plugins_SCRIPTS = \
 	charts.d.dryrun-helper.sh \
 	charts.d.plugin \
 	tc-qos-helper.sh \
+	loopsleepms.sh.inc \
 	$(NULL)

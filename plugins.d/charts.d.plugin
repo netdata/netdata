@@ -103,6 +103,7 @@ do
 	then
 		shift
 		update_every=$x
+		[ $update_every -lt $minimum_update_frequency ] && update_every=$minimum_update_frequency
 		continue
 	fi
 

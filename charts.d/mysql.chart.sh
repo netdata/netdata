@@ -7,7 +7,7 @@
 # This statement does not require any privilege.
 # It requires only the ability to connect to the server.
 
-mysql_cmd_opts=""
+mysql_cmd_opts=
 mysql_update_every=5
 
 mysql_get_stats() {
@@ -15,6 +15,10 @@ mysql_get_stats() {
 }
 
 mysql_check() {
+	require_cmd mysql || exit 1
+	require_cmd egrep || exit 1
+	require_cmd sed   || exit 1
+
 	# check once if the url works
 	local x="$(mysql_get_stats | grep "^Connections[[:space:]]")"
 	if [ ! $? -eq 0 -o -z "$x" ]

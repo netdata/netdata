@@ -77,7 +77,7 @@ Here is a screenshot:
  - `/proc/meminfo` (memory information)
  - `/proc/vmstat` (system performance)
  - `/proc/net/rpc/nfsd` (NFS server statistics for both v3 and v4 NFS)
- - `tc` classes (QoS classes)
+ - `tc` classes (QoS classes - [with FireQOS class names](http://firehol.org/tutorial/fireqos-new-user/))
 
 - It supports **plugins** for collecting information from other sources!
 
@@ -89,12 +89,13 @@ Here is a screenshot:
 
  - `charts.d.plugin` provides a simple way to script data collection in BASH. It includes example plugins that collect values from:
 
-    - `nut` (UPS load, frequency, voltage, etc)
+    - `nut` (UPS load, frequency, voltage, etc, for multiple UPSes)
     - `sensors` (temperature, voltage, current, power, humidity, fans rotation sensors)
-    - `cpufreq` (current CPU clock frequency)
+    - `cpufreq` (current CPU clock frequency, for all CPUs)
     - `postfix` (e-mail queue size)
     - `squid` (web proxy statistics)
     - `mysql` (mysql global statistics)
+    - `opensips` (opensips statistics)
 
     Of course, you can write your own using BASH scripting.
 
@@ -102,7 +103,7 @@ Here is a screenshot:
 
   It serves its own static files and dynamic files for rendering the site.
   It does not support authentication or SSL - limit its access using your firewall.
-  It does not allow ` .. ` or ` / ` in the files requested (so it can only serve files stored in the `web/` directory).
+  It does not allow ` .. ` or ` / ` in the files requested (so it can only serve files stored in the web directory `/usr/share/netdata/web`).
 
 
 # How it works

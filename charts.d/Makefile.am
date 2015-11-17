@@ -4,6 +4,7 @@
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
 dist_charts_SCRIPTS = \
+	README.md \
 	airsearches.chart.sh \
 	cpu_apps.chart.sh \
 	cpufreq.chart.sh \

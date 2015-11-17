@@ -35,9 +35,9 @@ static inline int pluginsd_space(char c) {
 	}
 }
 
-static void pluginsd_split_words(char *str, char **words, int max_words) {
+static int pluginsd_split_words(char *str, char **words, int max_words) {
 	char *s = str, quote = 0;
-	int i = 0;
+	int i = 0, j;
 
 	// skip all white space
 	while(unlikely(pluginsd_space(*s))) s++;
@@ -94,7 +94,10 @@ static void pluginsd_split_words(char *str, char **words, int max_words) {
 	}
 
 	// terminate the words
-	while(likely(i < max_words)) words[i++] = NULL;
+	j = i;
+	while(likely(j < max_words)) words[j++] = NULL;
+
+	return i;
 }
 
 
@@ -140,9 +143,9 @@ void *pluginsd_worker_thread(void *arg)
 
 			// debug(D_PLUGINSD, "PLUGINSD: %s: %s", cd->filename, line);
 
-			pluginsd_split_words(line, words, MAX_WORDS);
+			int w = pluginsd_split_words(line, words, MAX_WORDS);
 			s = words[0];
-			if(unlikely(!s || !*s)) {
+			if(unlikely(!s || !*s || !w)) {
 				// debug(D_PLUGINSD, "PLUGINSD: empty line");
 				continue;
 			}
@@ -156,23 +159,24 @@ void *pluginsd_worker_thread(void *arg)
 				char *value = words[2];
 
 				if(unlikely(!dimension || !*dimension)) {
-					error("PLUGINSD: '%s' is requesting a SET on chart '%s', like this: 'SET %s = %s'. Disabling it.", cd->fullfilename, st->id, dimension?dimension:"<nothing>", value?value:"<nothing>");
+					error("PLUGINSD: '%s' is requesting a SET on chart '%s', without a dimension. Disabling it.", cd->fullfilename, st->id);
 					cd->enabled = 0;
 					killpid(cd->pid, SIGTERM);
 					break;
 				}
 
-				if(unlikely(!value || !*value)) value = "0";
+				if(unlikely(!value || !*value)) value = NULL;
 
 				if(unlikely(!st)) {
-					error("PLUGINSD: '%s' is requesting a SET on dimension %s with value %s, without a BEGIN. Disabling it.", cd->fullfilename, dimension, value);
+					error("PLUGINSD: '%s' is requesting a SET on dimension %s with value %s, without a BEGIN. Disabling it.", cd->fullfilename, dimension, value?value:"<nothing>");
 					cd->enabled = 0;
 					killpid(cd->pid, SIGTERM);
 					break;
 				}
 
-				if(unlikely(st->debug)) debug(D_PLUGINSD, "PLUGINSD: '%s' is setting dimension %s/%s to %s", cd->fullfilename, st->id, dimension, value);
-				rrddim_set(st, dimension, atoll(value));
+				if(unlikely(st->debug)) debug(D_PLUGINSD, "PLUGINSD: '%s' is setting dimension %s/%s to %s", cd->fullfilename, st->id, dimension, value?value:"<nothing>");
+
+				if(value) rrddim_set(st, dimension, atoll(value));
 
 				count++;
 			}
@@ -404,14 +408,14 @@ void *pluginsd_main(void *ptr)
 		error("Cannot set pthread cancel state to ENABLE.");
 
 	char *dir_name = config_get("plugins", "plugins directory", PLUGINS_DIR);
-	int automatic_run = config_get_boolean("plugins", "enable running new plugins", 0);
+	int automatic_run = config_get_boolean("plugins", "enable running new plugins", 1);
 	int scan_frequency = config_get_number("plugins", "check for new plugins every", 60);
 	DIR *dir = NULL;
 	struct dirent *file = NULL;
 	struct plugind *cd;
 
 	// enable the apps plugin by default
-	config_get_boolean("plugins", "apps", 1);
+	// config_get_boolean("plugins", "apps", 1);
 
 	if(scan_frequency < 1) scan_frequency = 1;
 
@@ -480,11 +484,11 @@ void *pluginsd_main(void *ptr)
 
 			// spawn a new thread for it
 			if(unlikely(pthread_create(&cd->thread, NULL, pluginsd_worker_thread, cd) != 0)) {
-				error("CHARTS.D: failed to create new thread for chart.d %s.", cd->filename);
+				error("PLUGINSD: failed to create new thread for plugin '%s'.", cd->filename);
 				cd->obsolete = 1;
 			}
 			else if(unlikely(pthread_detach(cd->thread) != 0))
-				error("CHARTS.D: Cannot request detach of newly created thread for chart.d %s.", cd->filename);
+				error("PLUGINSD: Cannot request detach of newly created thread for plugin '%s'.", cd->filename);
 		}
 
 		closedir(dir);
