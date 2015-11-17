@@ -55,7 +55,7 @@ The plugin should output instructions for netdata to its output (`stdout`).
 
 the template is:
 
- > CHART type.id name title units [family [category [charttype [priority [update_every]]]]]
+> CHART type.id name title units [family [category [charttype [priority [update_every]]]]]
 
  where:
   - `type.id`
@@ -113,7 +113,7 @@ the template is:
 
 the template is:
 
- > DIMENSION id [name [algorithm [multiplier [divisor [hidden]]]]]
+> DIMENSION id [name [algorithm [multiplier [divisor [hidden]]]]]
 
  where:
 
@@ -171,7 +171,7 @@ the template is:
 
 data collection is defined as a series of `BEGIN` -> `SET` -> `END` lines
 
- > BEGIN type.id [microseconds]
+> BEGIN type.id [microseconds]
 
   - `type.id`
 
@@ -190,7 +190,7 @@ data collection is defined as a series of `BEGIN` -> `SET` -> `END` lines
     The first time the plugin is started, no microseconds should be given
     to netdata.
 
- > SET id = value
+> SET id = value
 
    - `id`
 
@@ -200,9 +200,9 @@ data collection is defined as a series of `BEGIN` -> `SET` -> `END` lines
 
      is the collected value
 
- > END
+> END
 
-END does not take any parameters, it commits the collected values to the chart.
+    END does not take any parameters, it commits the collected values to the chart.
 
 More `SET` lines may appear to update all the dimensions of the chart.
 All of them in one `BEGIN` -> `END` block.
@@ -221,7 +221,7 @@ If a plugin does not behave properly (outputs invalid lines, or does not
 follow these guidelines), will be disabled by netdata.
 
 
-# collected values
+### collected values
 
 netdata will collect any **signed** value in the 64bit range:
 `-9.223.372.036.854.775.808` to `+9.223.372.036.854.775.807`
