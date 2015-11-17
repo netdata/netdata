@@ -155,7 +155,7 @@ apt-get install zlib1g-dev
 ```
 
 You also need to have a basic build environment in place. You will need packages like
-`pgk-config`, `autoconf`, `gcc`, etc.
+`gcc`, `autoconf`, `autogen`, `automake`, `pgk-config`, etc.
 
 Then do this to install and run netdata:
 
