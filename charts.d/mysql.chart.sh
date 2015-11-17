@@ -15,9 +15,9 @@ mysql_get_stats() {
 }
 
 mysql_check() {
-	require_cmd mysql || exit 1
-	require_cmd egrep || exit 1
-	require_cmd sed   || exit 1
+	require_cmd mysql || return 1
+	require_cmd egrep || return 1
+	require_cmd sed   || return 1
 
 	# check once if the url works
 	local x="$(mysql_get_stats | grep "^Connections[[:space:]]")"
