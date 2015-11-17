@@ -16,7 +16,7 @@ AM_CFLAGS = \
 	$(OPTIONAL_ZLIB_CFLAGS) \
 	$(NULL)
 
-bin_PROGRAMS = netdata
+sbin_PROGRAMS = netdata
 dist_cache_DATA = .keep
 dist_log_DATA = .keep
 plugins_PROGRAMS = apps.plugin
