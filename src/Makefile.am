@@ -73,7 +73,7 @@ apps_plugin_SOURCES = \
 	procfile.c procfile.h \
 	$(NULL)
 
-install-exec-hook:
+install-data-hook:
 	if [ `id -u` == 0 ]; then \
 		chown root '$(DESTDIR)$(pluginsdir)/apps.plugin' && \
 			chmod 4755 '$(DESTDIR)$(pluginsdir)/apps.plugin'; \
