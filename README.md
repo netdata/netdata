@@ -174,7 +174,7 @@ The script `netdata-installer.sh` will build netdata and install it to your syst
 
 Once the installer completes, the file `/etc/netdata/netdata.conf` will be created.
 You can edit this file to set options.
-To apply the changes you made, you have to run netdata.start again.
+To apply the changes you made, you have to restart netdata.
 
 - You can start netdata by executing it with `netdata` (the installer will also start it).
 
