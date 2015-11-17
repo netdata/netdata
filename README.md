@@ -173,10 +173,9 @@ cd netdata.git
 The script `netdata-installer.sh` will build netdata and install it to your system.
 
 Once the installer completes, the file `/etc/netdata/netdata.conf` will be created.
-You can edit this file to set options.
-To apply the changes you made, you have to restart netdata.
+You can edit this file to set options. To apply the changes you made, you have to restart netdata.
 
-- You can start netdata by executing it with `netdata` (the installer will also start it).
+- You can start netdata by executing it with `/usr/sbin/netdata` (the installer will also start it).
 
 - You can stop netdata by killing it with `killall netdata`.
     You can stop and start netdata at any point. Netdata saves on exit its round robbin
@@ -190,4 +189,4 @@ To access the web site for all graphs, go to:
 
 You can get the running config file at any time, by accessing `http://127.0.0.1:19999/netdata.conf`.
 
-To start it at boot, just run `netdata` from your `/etc/rc.local` or equivalent.
+To start it at boot, just run `/usr/sbin/netdata` from your `/etc/rc.local` or equivalent.
