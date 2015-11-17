@@ -202,7 +202,7 @@ data collection is defined as a series of `BEGIN` -> `SET` -> `END` lines
 
 > END
 
-    END does not take any parameters, it commits the collected values to the chart.
+  END does not take any parameters, it commits the collected values to the chart.
 
 More `SET` lines may appear to update all the dimensions of the chart.
 All of them in one `BEGIN` -> `END` block.
