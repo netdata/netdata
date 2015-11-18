@@ -16,6 +16,10 @@ EOF
 }
 
 squid_check() {
+	require_cmd nc    || return 1
+	require_cmd sed   || return 1
+	require_cmd egrep || return 1
+
 	squid_url="cache_object://$squid_host:$squid_port/counters"
 
 	# check once if the url works

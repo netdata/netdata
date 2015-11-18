@@ -1,7 +1,15 @@
 #!/bin/bash
 
 PROGRAM_FILE="$0"
-PROGRAM_NAME="charts.d"
+PROGRAM_NAME="$(basename $0)"
+PROGRAM_NAME="${PROGRAM_NAME/.plugin}"
+
+# if you need to run parallel charts.d processes
+# just link this files with a different name
+# in the same directory, with a .plugin suffix
+# netdata will start multiple of them
+# each will have a different config file
+
 echo >&2 "$PROGRAM_NAME: started from '$PROGRAM_FILE' with options: $*"
 
 if [ $(( ${BASH_VERSINFO[0]} )) -lt 4 ]
@@ -47,7 +55,8 @@ pluginsd="${NETDATA_PLUGINS_DIR}"
 
 confd="${NETDATA_CONFIG_DIR-/etc/netdata}"
 chartsd="$pluginsd/../charts.d"
-myconfig="$confd/charts.d.conf"
+
+myconfig="$confd/$PROGRAM_NAME.conf"
 
 minimum_update_frequency="${NETDATA_UPDATE_EVERY-1}"
 update_every=${minimum_update_frequency}	# this will be overwritten by the command line
@@ -331,9 +340,9 @@ trap chartsd_cleanup INT
 
 if [ $UID = "0" ]
 then
-	TMP_DIR="$( mktemp -d /var/run/netdata-charts.d-XXXXXXXXXX )"
+	TMP_DIR="$( mktemp -d /var/run/netdata-${PROGRAM_NAME}-XXXXXXXXXX )"
 else
-	TMP_DIR="$( mktemp -d /tmp/.netdata-charts.d-XXXXXXXXXX )"
+	TMP_DIR="$( mktemp -d /tmp/.netdata-${PROGRAM_NAME}-XXXXXXXXXX )"
 fi
 
 cd "$TMP_DIR" || exit 1
