@@ -6,12 +6,19 @@
 # if this chart is called X.chart.sh, then all functions and global variables
 # must start with X_
 
-sensors_sys_dir="/sys/devices"
+# the directory the kernel keeps sensor data
+sensors_sys_dir="${NETDATA_HOST_PREFIX}/sys/devices"
+
+# how deep in the tree to check for sensor data
 sensors_sys_depth=10
+
+# if set to 1, the script will overwrite internal
+# script functions with code generated ones
+# leave to 1, is faster
 sensors_source_update=1
 
-# _update_every is a special variable - it holds the number of seconds
-# between the calls of the _update() function
+# how frequently to collect sensor data
+# the default is to collect it at every iteration of charts.d
 sensors_update_every=
 
 sensors_find_all_files() {
@@ -160,7 +167,7 @@ sensors_create() {
 					echo >>$TMP_DIR/sensors.sh "echo \"BEGIN sensors.fan_$id \$1\""
 					;;
 
-				emergy)
+				energy)
 					files="$( ls $path/energy*_input 2>/dev/null )"
 					files="$( sensors_check_files $files )"
 					[ -z "$files" ] && continue
@@ -204,7 +211,7 @@ sensors_create() {
 		done
 	done
 
-	[ $cpufreq_source_update -eq 1 ] && echo >>$TMP_DIR/sensors.sh "}"
+	[ $sensors_source_update -eq 1 ] && echo >>$TMP_DIR/sensors.sh "}"
 	# cat >&2 $TMP_DIR/sensors.sh
 
 	# ok, load the function sensors_update() we created

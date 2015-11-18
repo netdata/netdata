@@ -1,18 +1,48 @@
 #!/bin/sh
 
-squid_host="127.0.0.1"
-squid_port="3128"
-squid_url="cache_object://$squid_host:$squid_port/counters"
+squid_host=
+squid_port=
+squid_url=
+squid_timeout=2
 squid_update_every=5
 
-squid_get_stats() {
-	nc $squid_host $squid_port <<EOF
-GET $squid_url HTTP/1.0
-Host: $squid_host:$squid_port
+squid_get_stats_internal() {
+	local host="$1" port="$2" url="$3"
+
+	nc -w $squid_timeout $host $port <<EOF
+GET $url HTTP/1.0
+Host: $host:$port
 Accept: */*
 User-Agent: netdata (charts.d/squid.chart.sh)
 
 EOF
+}
+
+squid_get_stats() {
+	squid_get_stats_internal "$squid_host" "$squid_port" "$squid_url"
+}
+
+squid_autodetect() {
+	local host="127.0.0.1" port url x
+
+	for port in 3128 8080
+	do
+		for url in "cache_object://$host:$port/counters" "/squid-internal-mgr/counters"
+		do
+			x=$(squid_get_stats_internal "$host" "$port" "$url" | grep client_http.requests)
+			if [ ! -z "$x" ]
+				then
+				squid_host="$host"
+				squid_port="$port"
+				squid_url="$url"
+				echo >&2 "squid: found squid at '$host:$port' with url '$url'"
+				return 0
+			fi
+		done
+	done
+
+	echo >&2 "squid: cannot find squid running in localhost. Please set squid_url='url' and squid_host='IP' and squid_port='PORT' in $confd/squid.conf"
+	return 1
 }
 
 squid_check() {
@@ -20,7 +50,10 @@ squid_check() {
 	require_cmd sed   || return 1
 	require_cmd egrep || return 1
 
-	squid_url="cache_object://$squid_host:$squid_port/counters"
+	if [ -z "$squid_host" -o -z "$squid_port" -o -z "$squid_url" ]
+		then
+		squid_autodetect || return 1
+	fi
 
 	# check once if the url works
 	local x="$(squid_get_stats | grep client_http.requests)"
@@ -109,4 +142,3 @@ VALUESEOF
 
 	return 0
 }
-

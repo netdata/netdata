@@ -1,6 +1,10 @@
 #!/bin/sh
 
+# the postqueue command
+# if empty, it will use the one found in the system path
 postfix_postqueue=
+
+# how frequently to collect queue size
 postfix_update_every=15
 
 postfix_check() {

@@ -67,6 +67,18 @@ charts_update="_update"
 charts_check="_check"
 charts_undescore="_"
 
+# when making iterations, charts.d can loop more frequently
+# to prevent plugins missing iterations.
+# this is a percentage relative to update_every to align its
+# iterations.
+# The minimum is 10%, the maximum 100%.
+# So, if update_every is 1 second and time_divisor is 50,
+# charts.d will iterate every 500ms.
+# Charts will be called to collect data only if the time
+# passes since the last time the collected data is equal or
+# above their update_every.
+time_divisor=50
+
 # -----------------------------------------------------------------------------
 # parse parameters
 
@@ -134,6 +146,9 @@ if [ -f "$myconfig" ]
 		echo "DISABLE"
 		exit 1
 	fi
+	time_divisor=$((time_divisor))
+	[ $time_divisor -lt 10 ] && time_divisor=10
+	[ $time_divisor -gt 100 ] && time_divisor=100
 fi
 
 if [ "$pause_method" = "suspend" ]
@@ -163,6 +178,7 @@ fi
 
 # default sleep function
 loopsleepms() {
+	[ "$1" = "tellwork" ] && shift
 	sleep $1
 }
 
@@ -380,6 +396,13 @@ done
 # -----------------------------------------------------------------------------
 # update dimensions
 
+if [ -z "$run_charts" ]
+	then
+	echo >&2 "$PROGRAM_NAME: No charts to collect data from."
+	echo "DISABLE"
+	exit 1
+fi
+
 declare -A charts_last_update=() charts_min_dt=()
 global_update() {
 	local exit_after=$((3600 / update_every)) \
@@ -432,10 +455,10 @@ global_update() {
 		if [ "$pause_method" = "suspend" ]
 		then
 			echo "STOPPING_WAKE_ME_UP_PLEASE"
-			suspend || ( echo >&2 "$PROGRAM_NAME: suspend returned error $?, falling back to sleep."; loopsleepms $debug_time $update_every )
+			suspend || ( echo >&2 "$PROGRAM_NAME: suspend returned error $?, falling back to sleep."; loopsleepms $debug_time $update_every $time_divisor)
 		else
 			# wait the time you are required to
-			loopsleepms $debug_time $update_every
+			loopsleepms $debug_time $update_every $time_divisor
 		fi
 
 		test $c -gt $exit_after && exit 0

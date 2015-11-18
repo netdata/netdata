@@ -32,7 +32,7 @@ current_time_ms() {
 }
 
 loopsleepms() {
-	local tellwork=0 t="$1" s m now mstosleep
+	local tellwork=0 t="$1" div s m now mstosleep
 
 	if [ "$t" = "tellwork" ]
 	then
@@ -40,6 +40,7 @@ loopsleepms() {
 		shift
 		t="$1"
 	fi
+	div="$2"
 
 	# $t = the time in seconds to wait
 
@@ -56,7 +57,7 @@ loopsleepms() {
 	now="$(( $( $LOOPSLEEP_DATE +'%s * 1000 + %-N / 1000000' ) ))"
 
 	# calculate required sleep in ms
-	t=$((t * 1000))
+	t=$((t * 1000 * div / 100))
 
 	# this is our first run
 	# just wait the requested time
@@ -66,17 +67,17 @@ loopsleepms() {
 	LOOPSLEEPMS_LASTWORK=$((now - LOOPSLEEPMS_LASTRUN - LOOPSLEEPMS_LASTSLEEP))
 	# echo "# last loop's work took $LOOPSLEEPMS_LASTWORK ms"
 
-	test $tellwork -eq 1 && echo >&2 " >>> PERFORMANCE >>> WORK TOOK $LOOPSLEEPMS_LASTWORK ms ( $((LOOPSLEEPMS_LASTWORK * 100 / 1000)).$((LOOPSLEEPMS_LASTWORK % 10))% cpu )"
-
 	# calculate ms to sleep
-	mstosleep=$((t - LOOPSLEEPMS_LASTWORK))
+	mstosleep=$(( t - LOOPSLEEPMS_LASTWORK ))
 	# echo "# mstosleep is $mstosleep ms"
 	
 	# if we are too slow, sleep some time
-	test $mstosleep -lt $((t / 2)) && mstosleep=$((t / 2))
+	test $mstosleep -lt 200 && mstosleep=200
 
 	s=$((mstosleep / 1000))
 	m=$((mstosleep - (s * 1000)))
+
+	test $tellwork -eq 1 && echo >&2 " >>> PERFORMANCE >>> WORK TOOK $LOOPSLEEPMS_LASTWORK ms ( $((LOOPSLEEPMS_LASTWORK * 100 / 1000)).$((LOOPSLEEPMS_LASTWORK % 10))% cpu ) >>> SLEEPING $mstosleep ms"
 
 	# echo "# sleeping $s.$m"
 	# echo

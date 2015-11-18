@@ -1,6 +1,10 @@
 #!/bin/sh
 
+# a space separated list of UPS names
+# if empty, the list returned by 'upsc -l' will be used
 nut_ups=
+
+# how frequently to collect UPS data
 nut_update_every=2
 
 nut_check() {
