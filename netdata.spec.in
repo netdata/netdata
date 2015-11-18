@@ -47,10 +47,10 @@ find "%{buildroot}" -name .keep -exec rm {} \;
 %files
 %attr(-, netdata, netdata) %dir %{_localstatedir}/cache/%{name}/
 %attr(-, netdata, netdata) %dir %{_localstatedir}/log/%{name}/
+%config(noreplace) %{_sysconfdir}/%{name}/
 %{_bindir}/%{name}
 %{_datadir}/%{name}/
 %{_libexecdir}/%{name}/
-%{_sysconfdir}/%{name}/
 
 %changelog
 * Sun Nov 15 2015 Alon Bar-Lev <alonbl@redhat.com> - 1.0.0-1
