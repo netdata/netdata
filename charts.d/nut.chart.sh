@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # a space separated list of UPS names
 # if empty, the list returned by 'upsc -l' will be used
@@ -7,24 +7,44 @@ nut_ups=
 # how frequently to collect UPS data
 nut_update_every=2
 
-nut_check() {
-	local x all
+nut_timeout=2
 
+declare -A nut_ids=()
+
+nut_get_all() {
+	timeout $nut_timeout upsc -l
+}
+
+nut_get() {
+	timeout $nut_timeout upsc "$1"
+}
+
+nut_check() {
+
+	# this should return:
+	#  - 0 to enable the chart
+	#  - 1 to disable the chart
+
+	local x
+
+	require_cmd timeout || return 1
 	require_cmd upsc || return 1
 	require_cmd awk  || return 1
 
-	all="$nut_ups"
-	[ -z "$all" ] && all="$(upsc -l)"
+	[ -z "$nut_ups" ] && nut_ups="$( nut_get_all )"
 
-	nut_ups=
-	for x in $all
+	for x in $nut_ups
 	do
-		upsc "$x" >/dev/null
-		[ $? -eq 0 ] && nut_ups="$nut_ups $x" && continue
+		nut_get "$x" >/dev/null
+		if [ $? -eq 0 ]
+			then
+			nut_ids[$x]="$( fixid "$x" )"
+			continue
+		fi
 		echo >&2 "nut: ERROR: Cannot get information for NUT UPS '$x'."
 	done
 
-	if [ -z "$nut_ups" ]
+	if [ ${#nut_ids[@]} -eq 0 ]
 		then
 		echo >&2 "nut: Please set nut_ups='ups_name' in $confd/nut.conf"
 		return 1
@@ -37,7 +57,7 @@ nut_create() {
 	# create the charts
 	local x
 
-	for x in $nut_ups
+	for x in "${nut_ids[@]}"
 	do
 		cat <<EOF
 CHART nut_$x.charge '' "UPS Charge" "percentage" $x nut area 21001 $nut_update_every
@@ -84,11 +104,11 @@ nut_update() {
 	# for each dimension
 	# remember: KEEP IT SIMPLE AND SHORT
 
-	local x
-
-	for x in $nut_ups
+	local i x
+	for i in "${!nut_ids[@]}"
 	do
-		upsc "$x" | awk "
+		x="${nut_ids[$i]}"
+		nut_get "$i" | awk "
 BEGIN {
 	battery_charge = 0;
 	battery_voltage = 0;
@@ -157,10 +177,10 @@ END {
 	print \"BEGIN nut_$x.temp $1\";
 	print \"SET temp = \" temp;
 	print \"END\"
-}
-"
+}"
+		[ $? -ne 0 ] && unset nut_ids[$i] && echo >&2 "nut: failed to get values for '$i', disabling it."
 	done
-	
+
+	[ ${#nut_ids[@]} -eq 0 ] && echo >&2 "nut: no UPSes left active." && return 1
 	return 0
 }
-

@@ -79,6 +79,11 @@ charts_undescore="_"
 # above their update_every.
 time_divisor=50
 
+# number of seconds to run without restart
+# after this time, charts.d.plugin will exit
+# netdata will restart it
+restart_timeout=1800
+
 # -----------------------------------------------------------------------------
 # parse parameters
 
@@ -191,6 +196,17 @@ current_time_ms() {
 # and current_time_ms() with a high resolution timer function
 # for precise looping.
 . "$pluginsd/loopsleepms.sh.inc"
+
+
+# -----------------------------------------------------------------------------
+# library functions
+
+fixid() {
+	echo "$*" |\
+		tr -c "[A-Z][a-z][0-9]" "_" |\
+		sed -e "s|^_\+||g" -e "s|_\+$||g" -e "s|_\+|_|g" |\
+		tr "[A-Z]" "[a-z]"
+}
 
 
 # -----------------------------------------------------------------------------
@@ -364,17 +380,6 @@ fi
 cd "$TMP_DIR" || exit 1
 
 # -----------------------------------------------------------------------------
-# library functions
-
-fixid() {
-	echo "$*" |\
-		tr -c "[A-Z][a-z][0-9]" "_" |\
-		sed -e "s|^_\+||g" -e "s|_\+$||g" -e "s|_\+|_|g" |\
-		tr "[A-Z]" "[a-z]"
-}
-
-
-# -----------------------------------------------------------------------------
 # create charts
 
 run_charts=
@@ -405,7 +410,7 @@ fi
 
 declare -A charts_last_update=() charts_min_dt=()
 global_update() {
-	local exit_after=$((3600 / update_every)) \
+	local exit_after=$((restart_timeout / update_every)) \
 		c=0 dt \
 		chart now_charts=() next_charts=($run_charts)
 
