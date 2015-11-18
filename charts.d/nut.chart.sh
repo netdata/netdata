@@ -60,34 +60,34 @@ nut_create() {
 	for x in "${nut_ids[@]}"
 	do
 		cat <<EOF
-CHART nut_$x.charge '' "UPS Charge" "percentage" $x nut area 21001 $nut_update_every
+CHART nut_$x.charge '' "UPS Charge" "percentage" ups_$x nut area 21001 $nut_update_every
 DIMENSION battery_charge charge absolute 1 100
 
-CHART nut_$x.battery_voltage '' "UPS Battery Voltage" "Volts" $x nut line 21002 $nut_update_every
+CHART nut_$x.battery_voltage '' "UPS Battery Voltage" "Volts" ups_$x nut line 21002 $nut_update_every
 DIMENSION battery_voltage voltage absolute 1 100
 DIMENSION battery_voltage_high high absolute 1 100
 DIMENSION battery_voltage_low low absolute 1 100
 DIMENSION battery_voltage_nominal nominal absolute 1 100
 
-CHART nut_$x.input_voltage '' "UPS Input Voltage" "Volts" $x nut line 21003 $nut_update_every
+CHART nut_$x.input_voltage '' "UPS Input Voltage" "Volts" ups_$x nut line 21003 $nut_update_every
 DIMENSION input_voltage voltage absolute 1 100
 DIMENSION input_voltage_fault fault absolute 1 100
 DIMENSION input_voltage_nominal nominal absolute 1 100
 
-CHART nut_$x.input_current '' "UPS Input Current" "Ampere" $x nut line 21004 $nut_update_every
+CHART nut_$x.input_current '' "UPS Input Current" "Ampere" ups_$x nut line 21004 $nut_update_every
 DIMENSION input_current_nominal nominal absolute 1 100
 
-CHART nut_$x.input_frequency '' "UPS Input Frequency" "Hz" $x nut line 21005 $nut_update_every
+CHART nut_$x.input_frequency '' "UPS Input Frequency" "Hz" ups_$x nut line 21005 $nut_update_every
 DIMENSION input_frequency frequency absolute 1 100
 DIMENSION input_frequency_nominal nominal absolute 1 100
 
-CHART nut_$x.output_voltage '' "UPS Output Voltage" "Volts" $x nut line 21006 $nut_update_every
+CHART nut_$x.output_voltage '' "UPS Output Voltage" "Volts" ups_$x nut line 21006 $nut_update_every
 DIMENSION output_voltage voltage absolute 1 100
 
-CHART nut_$x.load '' "UPS Load" "percentage" $x nut area 21000 $nut_update_every
+CHART nut_$x.load '' "UPS Load" "percentage" ups_$x nut area 21000 $nut_update_every
 DIMENSION load load absolute 1 100
 
-CHART nut_$x.temp '' "UPS Temperature" "temperature" $x nut line 21007 $nut_update_every
+CHART nut_$x.temp '' "UPS Temperature" "temperature" ups_$x nut line 21007 $nut_update_every
 DIMENSION temp temp absolute 1 100
 EOF
 	done

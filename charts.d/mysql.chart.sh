@@ -35,8 +35,8 @@ mysql_check() {
 
 	if [ ${#mysql_opts[@]} -eq 0 ]
 		then
-		mysql_cmds[localhost]="$mysql_cmd"
-		mysql_opts[localhost]=
+		mysql_cmds[local]="$mysql_cmd"
+		mysql_opts[local]=
 	fi
 
 	# check once if the url works
@@ -76,16 +76,16 @@ mysql_create() {
 	for m in "${mysql_ids[@]}"
 	do
 		cat <<EOF
-CHART mysql_$m.bandwidth '' "mysql Bandwidth" "kilobits / sec" $m mysql area 20001 $mysql_update_every
+CHART mysql_$m.bandwidth '' "mysql Bandwidth" "kilobits / sec" mysql_$m mysql area 20001 $mysql_update_every
 DIMENSION Bytes_received in incremental 8 $((1024 * mysql_update_every))
 DIMENSION Bytes_sent out incremental -8 $((1024 * mysql_update_every))
 
-CHART mysql_$m.queries '' "mysql Queries" "queries / sec" $m mysql line 20002 $mysql_update_every
+CHART mysql_$m.queries '' "mysql Queries" "queries / sec" mysql_$m mysql line 20002 $mysql_update_every
 DIMENSION Queries queries incremental 1 $((1 * mysql_update_every))
 DIMENSION Questions questions incremental 1 $((1 * mysql_update_every))
 DIMENSION Slow_queries slow_queries incremental -1 $((1 * mysql_update_every))
 
-CHART mysql_$m.operations '' "mysql Operations" "operations / sec" $m mysql line 20003 $mysql_update_every
+CHART mysql_$m.operations '' "mysql Operations" "operations / sec" mysql_$m mysql line 20003 $mysql_update_every
 DIMENSION Opened_tables opened_tables incremental 1 $((1 * mysql_update_every))
 DIMENSION Flush_commands flush incremental 1 $((1 * mysql_update_every))
 DIMENSION Handler_commit commit incremental 1 $((1 * mysql_update_every))
@@ -103,18 +103,18 @@ DIMENSION Handler_savepoint_rollback savepoint_rollback incremental 1 $((1 * mys
 DIMENSION Handler_update update incremental 1 $((1 * mysql_update_every))
 DIMENSION Handler_write write incremental 1 $((1 * mysql_update_every))
 
-CHART mysql_$m.table_locks '' "mysql Tables Locks" "locks / sec" $m mysql line 20004 $mysql_update_every
+CHART mysql_$m.table_locks '' "mysql Tables Locks" "locks / sec" mysql_$m mysql line 20004 $mysql_update_every
 DIMENSION Table_locks_immediate immediate incremental 1 $((1 * mysql_update_every))
 DIMENSION Table_locks_waited waited incremental -1 $((1 * mysql_update_every))
 
-CHART mysql_$m.select_issues '' "mysql Select Issues" "issues / sec" $m mysql line 20005 $mysql_update_every
+CHART mysql_$m.select_issues '' "mysql Select Issues" "issues / sec" mysql_$m mysql line 20005 $mysql_update_every
 DIMENSION Select_full_join full_join incremental 1 $((1 * mysql_update_every))
 DIMENSION Select_full_range_join full_range_join incremental 1 $((1 * mysql_update_every))
 DIMENSION Select_range range incremental 1 $((1 * mysql_update_every))
 DIMENSION Select_range_check range_check incremental 1 $((1 * mysql_update_every))
 DIMENSION Select_scan scan incremental 1 $((1 * mysql_update_every))
 
-CHART mysql_$m.sort_issues '' "mysql Sort Issues" "issues / sec" $m mysql line 20006 $mysql_update_every
+CHART mysql_$m.sort_issues '' "mysql Sort Issues" "issues / sec" mysql_$m mysql line 20006 $mysql_update_every
 DIMENSION Sort_merge_passes merge_passes incremental 1 $((1 * mysql_update_every))
 DIMENSION Sort_range range incremental 1 $((1 * mysql_update_every))
 DIMENSION Sort_scan scan incremental 1 $((1 * mysql_update_every))
