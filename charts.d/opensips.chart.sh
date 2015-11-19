@@ -3,21 +3,29 @@
 opensips_opts="fifo get_statistics all"
 opensips_cmd="opensipsctl"
 opensips_update_every=5
+opensips_timeout=2
 
 opensips_get_stats() {
-	"$opensips_cmd" $opensips_opts |\
+	timeout $opensips_timeout "$opensips_cmd" $opensips_opts |\
 		grep "^\(core\|dialog\|net\|registrar\|shmem\|siptrace\|sl\|tm\|uri\|usrloc\):[a-zA-Z0-9_ -]\+[[:space:]]*=[[:space:]]*[0-9]\+[[:space:]]*$" |\
 		sed 	-e "s|-|_|g" \
 			-e "s|:|_|g" \
 			-e "s|[[:space:]]\+=[[:space:]]\+|=|g" \
 			-e "s|[[:space:]]\+$||" \
 			-e "s|^[[:space:]]\+||" \
-			-e "s|[[:space:]]\+|_|"
+			-e "s|[[:space:]]\+|_|" \
+			-e "s|^|opensips_|g"
+
+	local ret=$?
+	[ $ret -ne 0 ] && echo "opensips_command_failed=1"
+	return $ret
 }
 
 opensips_check() {
+	require_cmd timeout || return 1
+
 	# check once if the url works
-	local x="$(opensips_get_stats | grep "^core_")"
+	local x="$(opensips_get_stats | grep "^opensips_core_")"
 	if [ ! $? -eq 0 -o -z "$x" ]
 	then
 		echo >&2 "opensips: cannot get global status. Please set opensips_opts='options' whatever needed to get connected to opensips server, in $confd/opensips.conf"
@@ -146,121 +154,180 @@ opensips_update() {
 	# prepare the script and always grep at the end the lines that are usefull, so that
 	# even if something goes wrong, no other code can be executed
 
+	unset \
+		opensips_dialog_active_dialogs \
+		opensips_dialog_early_dialogs \
+		opensips_usrloc_registered_users \
+		opensips_usrloc_location_users \
+		opensips_usrloc_location_contacts \
+		opensips_usrloc_location_expires \
+		opensips_registrar_accepted_regs \
+		opensips_registrar_rejected_regs \
+		opensips_tm_UAS_transactions \
+		opensips_tm_UAC_transactions \
+		opensips_core_rcv_requests \
+		opensips_core_rcv_replies \
+		opensips_core_fwd_requests \
+		opensips_core_fwd_replies \
+		opensips_core_drop_requests \
+		opensips_core_drop_replies \
+		opensips_core_err_requests \
+		opensips_core_err_replies \
+		opensips_core_bad_URIs_rcvd \
+		opensips_core_unsupported_methods \
+		opensips_core_bad_msg_hdr \
+		opensips_tm_received_replies \
+		opensips_tm_relayed_replies \
+		opensips_tm_local_replies \
+		opensips_tm_2xx_transactions \
+		opensips_tm_3xx_transactions \
+		opensips_tm_4xx_transactions \
+		opensips_tm_5xx_transactions \
+		opensips_tm_6xx_transactions \
+		opensips_tm_inuse_transactions \
+		opensips_sl_1xx_replies \
+		opensips_sl_2xx_replies \
+		opensips_sl_3xx_replies \
+		opensips_sl_4xx_replies \
+		opensips_sl_5xx_replies \
+		opensips_sl_6xx_replies \
+		opensips_sl_sent_replies \
+		opensips_sl_sent_err_replies \
+		opensips_sl_received_ACKs \
+		opensips_dialog_processed_dialogs \
+		opensips_dialog_expired_dialogs \
+		opensips_dialog_failed_dialogs \
+		opensips_net_waiting_udp \
+		opensips_net_waiting_tcp \
+		opensips_uri_positive_checks \
+		opensips_uri_negative_checks \
+		opensips_siptrace_traced_requests \
+		opensips_siptrace_traced_replies \
+		opensips_shmem_total_size \
+		opensips_shmem_used_size \
+		opensips_shmem_real_used_size \
+		opensips_shmem_max_used_size \
+		opensips_shmem_free_size \
+		opensips_shmem_fragments
+
+	opensips_command_failed=0
 	eval "local $(opensips_get_stats)"
-	[ $? -ne 0 ] && continue
+	[ $? -ne 0 ] && return 1
+
+	[ $opensips_command_failed -eq 1 ] && echo >&2 "opensips: failed to get values, disabling." && return 1
 
 	# write the result of the work.
 	cat <<VALUESEOF
 
 BEGIN opensips.dialogs_active $1
-SET dialog_active_dialogs = $dialog_active_dialogs
-SET dialog_early_dialogs = $dialog_early_dialogs
+SET dialog_active_dialogs = $opensips_dialog_active_dialogs
+SET dialog_early_dialogs = $opensips_dialog_early_dialogs
 END
 
 BEGIN opensips.users $1
-SET usrloc_registered_users = $usrloc_registered_users
-SET usrloc_location_users = $usrloc_location_users
-SET usrloc_location_contacts = $usrloc_location_contacts
-SET usrloc_location_expires = $usrloc_location_expires
+SET usrloc_registered_users = $opensips_usrloc_registered_users
+SET usrloc_location_users = $opensips_usrloc_location_users
+SET usrloc_location_contacts = $opensips_usrloc_location_contacts
+SET usrloc_location_expires = $opensips_usrloc_location_expires
 END
 
 BEGIN opensips.registrar $1
-SET registrar_accepted_regs = $registrar_accepted_regs
-SET registrar_rejected_regs = $registrar_rejected_regs
+SET registrar_accepted_regs = $opensips_registrar_accepted_regs
+SET registrar_rejected_regs = $opensips_registrar_rejected_regs
 END
 
 BEGIN opensips.transactions $1
-SET tm_UAS_transactions = $tm_UAS_transactions
-SET tm_UAC_transactions = $tm_UAC_transactions
+SET tm_UAS_transactions = $opensips_tm_UAS_transactions
+SET tm_UAC_transactions = $opensips_tm_UAC_transactions
 END
 
 BEGIN opensips.core_rcv $1
-SET core_rcv_requests = $core_rcv_requests
-SET core_rcv_replies = $core_rcv_replies
+SET core_rcv_requests = $opensips_core_rcv_requests
+SET core_rcv_replies = $opensips_core_rcv_replies
 END
 
 BEGIN opensips.core_fwd $1
-SET core_fwd_requests = $core_fwd_requests
-SET core_fwd_replies = $core_fwd_replies
+SET core_fwd_requests = $opensips_core_fwd_requests
+SET core_fwd_replies = $opensips_core_fwd_replies
 END
 
 BEGIN opensips.core_drop $1
-SET core_drop_requests = $core_drop_requests
-SET core_drop_replies = $core_drop_replies
+SET core_drop_requests = $opensips_core_drop_requests
+SET core_drop_replies = $opensips_core_drop_replies
 END
 
 BEGIN opensips.core_err $1
-SET core_err_requests = $core_err_requests
-SET core_err_replies = $core_err_replies
+SET core_err_requests = $opensips_core_err_requests
+SET core_err_replies = $opensips_core_err_replies
 END
 
 BEGIN opensips.core_bad $1
-SET core_bad_URIs_rcvd = $core_bad_URIs_rcvd
-SET core_unsupported_methods = $core_unsupported_methods
-SET core_bad_msg_hdr = $core_bad_msg_hdr
+SET core_bad_URIs_rcvd = $opensips_core_bad_URIs_rcvd
+SET core_unsupported_methods = $opensips_core_unsupported_methods
+SET core_bad_msg_hdr = $opensips_core_bad_msg_hdr
 END
 
 BEGIN opensips.tm_replies $1
-SET tm_received_replies = $tm_received_replies
-SET tm_relayed_replies = $tm_relayed_replies
-SET tm_local_replies = $tm_local_replies
+SET tm_received_replies = $opensips_tm_received_replies
+SET tm_relayed_replies = $opensips_tm_relayed_replies
+SET tm_local_replies = $opensips_tm_local_replies
 END
 
 BEGIN opensips.transactions_status $1
-SET tm_2xx_transactions = $tm_2xx_transactions
-SET tm_3xx_transactions = $tm_3xx_transactions
-SET tm_4xx_transactions = $tm_4xx_transactions
-SET tm_5xx_transactions = $tm_5xx_transactions
-SET tm_6xx_transactions = $tm_6xx_transactions
+SET tm_2xx_transactions = $opensips_tm_2xx_transactions
+SET tm_3xx_transactions = $opensips_tm_3xx_transactions
+SET tm_4xx_transactions = $opensips_tm_4xx_transactions
+SET tm_5xx_transactions = $opensips_tm_5xx_transactions
+SET tm_6xx_transactions = $opensips_tm_6xx_transactions
 END
 
 BEGIN opensips.transactions_inuse $1
-SET tm_inuse_transactions = $tm_inuse_transactions
+SET tm_inuse_transactions = $opensips_tm_inuse_transactions
 END
 
 BEGIN opensips.sl_replies $1
-SET sl_1xx_replies = $sl_1xx_replies
-SET sl_2xx_replies = $sl_2xx_replies
-SET sl_3xx_replies = $sl_3xx_replies
-SET sl_4xx_replies = $sl_4xx_replies
-SET sl_5xx_replies = $sl_5xx_replies
-SET sl_6xx_replies = $sl_6xx_replies
-SET sl_sent_replies = $sl_sent_replies
-SET sl_sent_err_replies = $sl_sent_err_replies
-SET sl_received_ACKs = $sl_received_ACKs
+SET sl_1xx_replies = $opensips_sl_1xx_replies
+SET sl_2xx_replies = $opensips_sl_2xx_replies
+SET sl_3xx_replies = $opensips_sl_3xx_replies
+SET sl_4xx_replies = $opensips_sl_4xx_replies
+SET sl_5xx_replies = $opensips_sl_5xx_replies
+SET sl_6xx_replies = $opensips_sl_6xx_replies
+SET sl_sent_replies = $opensips_sl_sent_replies
+SET sl_sent_err_replies = $opensips_sl_sent_err_replies
+SET sl_received_ACKs = $opensips_sl_received_ACKs
 END
 
 BEGIN opensips.dialogs $1
-SET dialog_processed_dialogs = $dialog_processed_dialogs
-SET dialog_expired_dialogs = $dialog_expired_dialogs
-SET dialog_failed_dialogs = $dialog_failed_dialogs
+SET dialog_processed_dialogs = $opensips_dialog_processed_dialogs
+SET dialog_expired_dialogs = $opensips_dialog_expired_dialogs
+SET dialog_failed_dialogs = $opensips_dialog_failed_dialogs
 END
 
 BEGIN opensips.net_waiting $1
-SET net_waiting_udp = $net_waiting_udp
-SET net_waiting_tcp = $net_waiting_tcp
+SET net_waiting_udp = $opensips_net_waiting_udp
+SET net_waiting_tcp = $opensips_net_waiting_tcp
 END
 
 BEGIN opensips.uri_checks $1
-SET uri_positive_checks = $uri_positive_checks
-SET uri_negative_checks = $uri_negative_checks
+SET uri_positive_checks = $opensips_uri_positive_checks
+SET uri_negative_checks = $opensips_uri_negative_checks
 END
 
 BEGIN opensips.traces $1
-SET siptrace_traced_requests = $siptrace_traced_requests
-SET siptrace_traced_replies = $siptrace_traced_replies
+SET siptrace_traced_requests = $opensips_siptrace_traced_requests
+SET siptrace_traced_replies = $opensips_siptrace_traced_replies
 END
 
 BEGIN opensips.shmem $1
-SET shmem_total_size = $shmem_total_size
-SET shmem_used_size = $shmem_used_size
-SET shmem_real_used_size = $shmem_real_used_size
-SET shmem_max_used_size = $shmem_max_used_size
-SET shmem_free_size = $shmem_free_size
+SET shmem_total_size = $opensips_shmem_total_size
+SET shmem_used_size = $opensips_shmem_used_size
+SET shmem_real_used_size = $opensips_shmem_real_used_size
+SET shmem_max_used_size = $opensips_shmem_max_used_size
+SET shmem_free_size = $opensips_shmem_free_size
 END
 
 BEGIN opensips.shmem_fragments $1
-SET shmem_fragments = $shmem_fragments
+SET shmem_fragments = $opensips_shmem_fragments
 END
 VALUESEOF
 
