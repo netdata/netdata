@@ -978,7 +978,7 @@ unsigned long long rrdset_done(RRDSET *st)
 					rd->last_collected_value = rd->collected_value;
 				}
 
-				rd->calculated_value = (calculated_number)(rd->collected_value - rd->last_collected_value);
+				rd->calculated_value += (calculated_number)(rd->collected_value - rd->last_collected_value);
 
 				if(unlikely(st->debug))
 					debug(D_RRD_STATS, "%s/%s: CALC INC "
