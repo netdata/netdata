@@ -420,7 +420,7 @@ fi
 declare -A charts_last_update=() charts_min_dt=()
 global_update() {
 	local exit_after=$((restart_timeout / update_every)) \
-		c=0 dt \
+		c=0 dt ret exec_start_ms exec_end_ms \
 		chart now_charts=() next_charts=($run_charts)
 
 	# return the current time in ms in $now_ms
@@ -431,6 +431,9 @@ global_update() {
 		eval "charts_min_dt[$chart]=\$$chart$suffix_update_every"
 		test -z "${charts_min_dt[$chart]}" && charts_min_dt[$charts]=$update_every
 		charts_last_update[$chart]=$((now_ms - (charts_min_dt[$chart] * 1000) ))
+
+		echo "CHART netdata.plugin_$chart '' 'Execution time for $chart plugin' 'milliseconds / run' netdata netdata area 90000 ${charts_min_dt[$chart]}"
+		echo "DIMENSION run_time 'run time' absolute 1 1"
 	done
 
 	# the main loop
@@ -444,7 +447,6 @@ global_update() {
 		do
 			# return the current time in ms in $now_ms
 			current_time_ms
-
 			dt=$(( (now_ms - charts_last_update[$chart]) * 1000 ))
 			if [ $dt -ge $(( charts_min_dt[$chart] * 1000000 )) ]
 			then
@@ -454,13 +456,21 @@ global_update() {
 				# so that netdata calibrates to current time
 				test $c -eq 1 && dt=
 
+				exec_start_ms=$now_ms
 				$chart$charts_update $dt
-				if [ $? -eq 0 ]
+				ret=$?
+				current_time_ms; exec_end_ms=$now_ms
+
+				echo "BEGIN netdata.plugin_$chart $dt"
+				if [ $ret -eq 0 ]
 				then
+					echo "SET run_time = $(( exec_end_ms - exec_start_ms ))"
 					next_charts+=($chart)
 				else
+					echo "SET run_time = $(( (exec_end_ms - exec_start_ms) * -1 ))"
 					echo >&2 "$PROGRAM_NAME: chart '$chart' update() function reports failure. Disabling it."
 				fi
+				echo "END"
 			else
 				next_charts+=($chart)
 			fi
