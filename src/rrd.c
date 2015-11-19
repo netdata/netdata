@@ -516,7 +516,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 	if(rd) {
 		// we have a file mapped for rd
 		rd->mapped = rrd_memory_mode;
-		rd->hidden = 0;
+		rd->flags = 0x00000000;
 		rd->next = NULL;
 		rd->name = NULL;
 	}
@@ -730,7 +730,7 @@ int rrddim_hide(RRDSET *st, const char *id)
 		return 1;
 	}
 
-	rd->hidden = 1;
+	rd->flags |= RRDDIM_FLAG_HIDDEN;
 	return 0;
 }
 
@@ -744,7 +744,7 @@ int rrddim_unhide(RRDSET *st, const char *id)
 		return 1;
 	}
 
-	rd->hidden = 0;
+	if(rd->flags & RRDDIM_FLAG_HIDDEN) rd->flags ^= RRDDIM_FLAG_HIDDEN;
 	return 0;
 }
 
@@ -755,6 +755,7 @@ collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number 
 	gettimeofday(&rd->last_collected_time, NULL);
 	rd->collected_value = value;
 	rd->updated = 1;
+	rd->counter++;
 
 	return rd->last_collected_value;
 }
@@ -904,6 +905,11 @@ unsigned long long rrdset_done(RRDSET *st)
 	// at this stage we do not interpolate anything
 	for( rd = st->dimensions ; likely(rd) ; rd = rd->next ) {
 
+		if(unlikely(!rd->updated || rd->counter <= 1)) {
+			rd->calculated_value = 0;
+			continue;
+		}
+
 		if(unlikely(st->debug)) debug(D_RRD_STATS, "%s/%s: "
 			" last_collected_value = " COLLECTED_NUMBER_FORMAT
 			" collected_value = " COLLECTED_NUMBER_FORMAT
@@ -964,15 +970,15 @@ unsigned long long rrdset_done(RRDSET *st)
 				// if the new is smaller than the old (an overflow, or reset), set the old equal to the new
 				// to reset the calculation (it will give zero as the calculation for this second)
 				if(unlikely(rd->last_collected_value > rd->collected_value)) {
-					debug(D_RRD_STATS, "%s.%s: Detect RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
+					debug(D_RRD_STATS, "%s.%s: RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
 							, st->name, rd->name
 							, rd->last_collected_value
 							, rd->collected_value);
-					storage_flags = SN_EXISTS_RESET;
+					if(!(rd->flags & RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)) storage_flags = SN_EXISTS_RESET;
 					rd->last_collected_value = rd->collected_value;
 				}
 
-				rd->calculated_value += (calculated_number)(rd->collected_value - rd->last_collected_value);
+				rd->calculated_value = (calculated_number)(rd->collected_value - rd->last_collected_value);
 
 				if(unlikely(st->debug))
 					debug(D_RRD_STATS, "%s/%s: CALC INC "
@@ -1090,7 +1096,7 @@ unsigned long long rrdset_done(RRDSET *st)
 				continue;
 			}
 
-			if(likely(rd->updated && iterations < st->gap_when_lost_iterations_above)) {
+			if(likely(rd->updated && rd->counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
 				rd->values[st->current_entry] = pack_storage_number(
 						  new_value
 						* (calculated_number)rd->multiplier

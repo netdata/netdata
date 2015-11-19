@@ -22,7 +22,7 @@ extern int rrd_delete_unupdated_dimensions;
 #define RRD_ID_LENGTH_MAX 1024
 
 #define RRDSET_MAGIC		"NETDATA RRD SET FILE V013"
-#define RRDDIMENSION_MAGIC	"NETDATA RRD DIMENSION FILE V013"
+#define RRDDIMENSION_MAGIC	"NETDATA RRD DIMENSION FILE V015"
 
 typedef long long total_number;
 #define TOTAL_NUMBER_FORMAT "%lld"
@@ -75,6 +75,11 @@ extern int rrd_memory_mode_id(const char *name);
 extern int rrddim_algorithm_id(const char *name);
 extern const char *rrddim_algorithm_name(int chart_type);
 
+// ----------------------------------------------------------------------------
+// flags
+
+#define RRDDIM_FLAG_HIDDEN 0x00000001 // this dimension will not be offered to callers
+#define RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS 0x00000002 // do not offer RESET or OVERFLOW info to callers
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION
@@ -99,7 +104,6 @@ struct rrddim {
 	long multiplier;								// the multiplier of the collected values
 	long divisor;									// the divider of the collected values
 
-	int hidden;										// if set to non zero, this dimension will not be offered to callers
 	int mapped;										// if set to non zero, this dimension is mapped to a file
 
 	// ------------------------------------------------------------------------
@@ -109,7 +113,11 @@ struct rrddim {
 													// instead of strcmp() every item in the binary index
 													// we first compare the hashes
 
+	uint32_t flags;
+
 	char cache_filename[FILENAME_MAX+1];			// the filename we load/save from/to this set
+
+	unsigned long counter;							// the number of times we added values to this rrdim
 
 	int updated;									// set to 0 after each calculation, to 1 after each collected value
 													// we use this to detect that a dimension is not updated

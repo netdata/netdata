@@ -287,7 +287,7 @@ void *pluginsd_worker_thread(void *arg)
 				char *algorithm = words[3];
 				char *multiplier_s = words[4];
 				char *divisor_s = words[5];
-				char *hidden = words[6];
+				char *options = words[6];
 
 				if(unlikely(!id || !*id)) {
 					error("PLUGINSD: '%s' is requesting a DIMENSION, without an id. Disabling it.", cd->fullfilename);
@@ -320,13 +320,18 @@ void *pluginsd_worker_thread(void *arg)
 					, rrddim_algorithm_name(rrddim_algorithm_id(algorithm))
 					, multiplier
 					, divisor
-					, hidden?hidden:""
+					, options?options:""
 					);
 
 				RRDDIM *rd = rrddim_find(st, id);
 				if(unlikely(!rd)) {
 					rd = rrddim_add(st, id, name, multiplier, divisor, rrddim_algorithm_id(algorithm));
-					if(unlikely(hidden && strcmp(hidden, "hidden") == 0)) rd->hidden = 1;
+					rd->flags = 0x00000000;
+					if(options && *options) {
+						if(strstr(options, "hidden") != NULL) rd->flags |= RRDDIM_FLAG_HIDDEN;
+						if(strstr(options, "noreset") != NULL) rd->flags |= RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS;
+						if(strstr(options, "nooverflow") != NULL) rd->flags |= RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS;
+					}
 				}
 				else if(unlikely(st->debug)) debug(D_PLUGINSD, "PLUGINSD: dimension %s/%s already exists. Not adding it again.", st->id, id);
 			}

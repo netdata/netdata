@@ -93,7 +93,7 @@ unsigned long rrd_stats_one_json(RRDSET *st, char *options, struct web_buffer *w
 			, rd->id
 			, rd->name
 			, rd->entries
-			, rd->hidden
+			, (rd->flags & RRDDIM_FLAG_HIDDEN)?1:0
 			, rrddim_algorithm_name(rd->algorithm)
 			, rd->multiplier
 			, rd->divisor
@@ -540,7 +540,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, time_t after, time_t before, int group_m
 
 				// update the dimension options
 				if(found_non_zero[c]) r->od[c] |= RRDR_NONZERO;
-				if(rd->hidden) r->od[c] |= RRDR_HIDDEN;
+				if(rd->flags & RRDDIM_FLAG_HIDDEN) r->od[c] |= RRDR_HIDDEN;
 
 				// store the specific point options
 				co[c] = group_options[c];
@@ -673,7 +673,7 @@ unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int po
 	// initialize them
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 		group_values[c] = 0;
-		print_hidden[c] = rd->hidden;
+		print_hidden[c] = (rd->flags & RRDDIM_FLAG_HIDDEN)?1:0;
 		found_non_zero[c] = 0;
 		found_non_existing[c] = 0;
 	}
