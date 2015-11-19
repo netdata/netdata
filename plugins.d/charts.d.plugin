@@ -84,6 +84,12 @@ time_divisor=50
 # netdata will restart it
 restart_timeout=1800
 
+# check if the charts.d plugins are using global variables
+# they should not.
+# It does not currently support BASH v4 arrays, so it is
+# disabled
+dryrunner=0
+
 # -----------------------------------------------------------------------------
 # parse parameters
 
@@ -271,11 +277,14 @@ all_enabled_charts() {
 		#	fi
 		#fi
 
-		"$pluginsd/charts.d.dryrun-helper.sh" "$chart" "$chartsd/$chart.chart.sh" "$confd/$chart.conf" >/dev/null
-		if [ $? -ne 0 ]
-		then
-			echo >&2 "$PROGRAM_NAME: chart's $chart did not pass the dry run check. This means it uses global variables not starting with $chart. Disabling it."
-			continue
+		if [ $dryrunner -eq 1 ]
+			then
+			"$pluginsd/charts.d.dryrun-helper.sh" "$chart" "$chartsd/$chart.chart.sh" "$confd/$chart.conf" >/dev/null
+			if [ $? -ne 0 ]
+			then
+				echo >&2 "$PROGRAM_NAME: chart's $chart did not pass the dry run check. This means it uses global variables not starting with $chart. Disabling it."
+				continue
+			fi
 		fi
 
 		local charts2="$charts2 $chart"
