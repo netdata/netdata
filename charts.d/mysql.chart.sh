@@ -28,9 +28,6 @@ mysql_check() {
 
 	local x m mysql_cmd
 
-	require_cmd egrep || return 1
-	require_cmd sed   || return 1
-
 	[ -z "${mysql_cmd}" ] && mysql_cmd="$(which mysql)"
 
 	if [ ${#mysql_opts[@]} -eq 0 ]
@@ -45,13 +42,13 @@ mysql_check() {
 		[ -z "${mysql_cmds[$m]}" ] && mysql_cmds[$m]="$mysql_cmd"
 		if [ -z "${mysql_cmds[$m]}" ]
 			then
-			echo >&2 "mysql: cannot get mysql command for '$m'. Please set mysql_cmds[$m]='/path/to/mysql', in $confd/mysql.conf"
+			echo >&2 "$PROGRAM_NAME: mysql: cannot get mysql command for '$m'. Please set mysql_cmds[$m]='/path/to/mysql', in $confd/mysql.conf"
 		fi
 
 		x="$(mysql_get "${mysql_cmds[$m]}" ${mysql_opts[$m]} | grep "^Connections[[:space:]]")"
 		if [ ! $? -eq 0 -o -z "$x" ]
 		then
-			echo >&2 "mysql: cannot get global status for '$m'. Please set mysql_opts[$m]='options' to whatever needed to get connected to the mysql server, in $confd/mysql.conf"
+			echo >&2 "$PROGRAM_NAME: mysql: cannot get global status for '$m'. Please set mysql_opts[$m]='options' to whatever needed to get connected to the mysql server, in $confd/mysql.conf"
 			unset mysql_cmds[$m]
 			unset mysql_opts[$m]
 			unset mysql_ids[$m]
@@ -63,7 +60,8 @@ mysql_check() {
 
 	if [ ${#mysql_opts[@]} -eq 0 ]
 		then
-		echo >&2 "mysql: no mysql servers found. Please set mysql_opts[name]='options' to whatever needed to get connected to the mysql server, in $confd/mysql.conf"
+		echo >&2 "$PROGRAM_NAME: mysql: no mysql servers found. Please set mysql_opts[name]='options' to whatever needed to get connected to the mysql server, in $confd/mysql.conf"
+		return 1
 	fi
 
 	return 0
@@ -157,7 +155,7 @@ mysql_update() {
 			unset mysql_ids[$m]
 			unset mysql_opts[$m]
 			unset mysql_cmds[$m]
-			echo >&2 "mysql: failed to get values for '$m', disabling it."
+			echo >&2 "$PROGRAM_NAME: mysql: failed to get values for '$m', disabling it."
 			continue
 		fi
 
@@ -209,7 +207,7 @@ END
 VALUESEOF
 	done
 
-	[ ${#mysql_ids[@]} -eq 0 ] && echo >&2 "mysql: no mysql servers left active." && return 1
+	[ ${#mysql_ids[@]} -eq 0 ] && echo >&2 "$PROGRAM_NAME: mysql: no mysql servers left active." && return 1
 	return 0
 }
 

@@ -1,10 +1,14 @@
 #!/bin/sh
 
-cpu_apps_apps="netdata asterisk squid apache2 mysqld dovecot cupsd sshd named clamd smbd"
+# THIS PLUGIN IS OBSOLETE
+# USE apps.plugin INSTEAD
+
+# a space separated list of command to monitor
+cpu_apps_apps=
 
 # these are required for computing memory in bytes and cpu in seconds
 #cpu_apps_pagesize="`getconf PAGESIZE`"
-cpu_apps_clockticks="`getconf CLK_TCK`"
+cpu_apps_clockticks="$(getconf CLK_TCK)"
 
 cpu_apps_update_every=60
 
@@ -15,7 +19,7 @@ cpu_apps_check() {
 
 	if [ -z "$cpu_apps_apps" ]
 	then
-		echo >&2 "cpu_apps: Please set cpu_apps_apps='command1 command2 ...' in $confd/cpu_apps_apps.conf"
+		echo >&2 "$PROGRAM_NAME: cpu_apps: Please set cpu_apps_apps='command1 command2 ...' in $confd/cpu_apps_apps.conf"
 		return 1
 	fi
 	return 0

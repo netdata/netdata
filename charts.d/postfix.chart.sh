@@ -32,7 +32,7 @@ postfix_check() {
 
 	if [ -z "$postfix_postqueue" -o ! -x  "$postfix_postqueue" ]
 	then
-		echo >&2 "postfix: cannot find postqueue. Please set 'postfix_postqueue=/path/to/postqueue' in $confd/postfix.conf"
+		echo >&2 "$PROGRAM_NAME: postfix: cannot find postqueue. Please set 'postfix_postqueue=/path/to/postqueue' in $confd/postfix.conf"
 		return 1
 	fi
 

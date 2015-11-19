@@ -1,6 +1,6 @@
 #!/bin/sh
 
-mem_apps_apps="netdata asterisk squid apache2 mysqld dovecot cupsd sshd named clamd smbd"
+mem_apps_apps=
 
 # these are required for computing memory in bytes and cpu in seconds
 #mem_apps_pagesize="`getconf PAGESIZE`"
@@ -15,7 +15,7 @@ mem_apps_check() {
 
 	if [ -z "$mem_apps_apps" ]
 	then
-		echo >&2 "mem_apps: Please set mem_apps_apps='command1 command2 ...' in $confd/mem_apps_apps.conf"
+		echo >&2 "$PROGRAM_NAME: mem_apps: not configured. Please set mem_apps_apps='command1 command2 ...' in $confd/mem_apps_apps.conf"
 		return 1
 	fi
 	return 0

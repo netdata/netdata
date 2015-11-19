@@ -4,6 +4,5 @@
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
 dist_config_DATA = \
-	charts.d.conf \
 	apps_groups.conf \
 	$(NULL)

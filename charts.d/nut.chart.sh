@@ -27,9 +27,7 @@ nut_check() {
 
 	local x
 
-	require_cmd timeout || return 1
 	require_cmd upsc || return 1
-	require_cmd awk  || return 1
 
 	[ -z "$nut_ups" ] && nut_ups="$( nut_get_all )"
 

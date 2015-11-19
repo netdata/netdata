@@ -39,8 +39,8 @@ sensors_check() {
 	#  - 0 to enable the chart
 	#  - 1 to disable the chart
 
-	[ ! -z "$( sensors_find_all_files $sensors_sys_dir )" ] && return 0
-	return 1
+	[ -z "$( sensors_find_all_files $sensors_sys_dir )" ] && echo >&2 "$PROGRAM_NAME: sensors: no sensors found in '$sensors_sys_dir'." && return 1
+	return 0
 }
 
 sensors_check_files() {
@@ -55,7 +55,7 @@ sensors_check_files() {
 		v=$(( v + 1 - 1 ))
 		[ $v -ne 0 ] && echo "$f" && continue
 		
-		echo >&2 "charts.d: sensors: $f gives zero values"
+		echo >&2 "$PROGRAM_NAME: sensors: $f gives zero values"
 	done
 }
 
@@ -74,7 +74,7 @@ sensors_check_temp_type() {
 		v=$(( v + 1 - 1 ))
 		[ $v -ne 0 ] && echo "$f" && continue
 
-		echo >&2 "charts.d: sensors: $f is disabled"
+		echo >&2 "$PROGRAM_NAME: sensors: $f is disabled"
 	done
 }
 

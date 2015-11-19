@@ -1,26 +1,46 @@
 #!/bin/sh
 
-crsproxy_url="http://127.0.0.1:7999/counters?"
-crsproxy_cmds=""
+crsproxy_url=
+crsproxy_cmds=
 crsproxy_update_every=15
 
+crsproxy_get() {
+	wget 2>/dev/null -O - "$crsproxy_url" |\
+		sed \
+			-e "s/ \+/ /g" \
+			-e "s/\./_/g" \
+			-e "s/ =/=/g" \
+			-e "s/= /=/g" \
+			-e "s/^/crsproxy_/g" |\
+		egrep "^crsproxy_[a-zA-Z][a-zA-Z0-9_]*=[0-9]+$"
+}
+
 crsproxy_check() {
+	if [ -z "$crsproxy_url" ]
+		then
+		echo >&2 "$PROGRAM_NAME: crsproxy: not configured. Please set crsproxy_url='url' in $confd/crsproxy.conf"
+		return 1
+	fi
+
 	# check once if the url works
 	wget 2>/dev/null -O /dev/null "$crsproxy_url"
 	if [ ! $? -eq 0 ]
 	then
-		echo >&2 "crsproxy: cannot fetch the url: $crsproxy_url. Please set crsproxy_url='url' in $confd/crsproxy.conf"
+		echo >&2 "$PROGRAM_NAME: crsproxy: cannot fetch the url: $crsproxy_url. Please set crsproxy_url='url' in $confd/crsproxy.conf"
 		return 1
 	fi
 
+	# if the user did not request specific commands
+	# find the commands available
 	if [ -z "$crsproxy_cmds" ]
 	then
-		crsproxy_cmds="`wget 2>/dev/null -O - "$crsproxy_url" | egrep "^cmd_[a-zA-Z][a-zA-Z0-9]_[a-z_]+ *= *[0-9]+$" | cut -d '_' -f 2 | sort -u`"
-		echo
+		crsproxy_cmds="$(crsproxy_get | cut -d '=' -f 1 | sed "s/^crsproxy_cmd_//g" | sort -u)"
 	fi
+
+	# if no commands are available
 	if [ -z "$crsproxy_cmds" ]
 	then
-		echo >&2 "crsproxy: cannot find command list automatically. Please set crsproxy_cmds='...' in $confd/crsproxy.conf"
+		echo >&2 "$PROGRAM_NAME: crsproxy: cannot find command list automatically. Please set crsproxy_cmds='...' in $confd/crsproxy.conf"
 		return 1
 	fi
 	return 0
@@ -74,9 +94,7 @@ crsproxy_update() {
 	# remember: KEEP IT SIMPLE AND SHORT
 
 	# get the values from crsproxy
-	eval "`wget 2>/dev/null -O - "$crsproxy_url" |\
-		sed -e "s/ \+/ /g" -e "s/\./_/g" -e "s/ = /=/g" -e "s/^/crsproxy_/g" |\
-		egrep "^crsproxy_[a-zA-Z][a-zA-Z0-9_]*=[0-9]+$"`"
+	eval "$(crsproxy_get)"
 
 
 	# write the result of the work.

@@ -22,8 +22,8 @@ cpufreq_check() {
 	#  - 0 to enable the chart
 	#  - 1 to disable the chart
 
-	[ ! -z "$( cpufreq_find_all_files $cpufreq_sys_dir )" ] && return 0
-	return 1
+	[ -z "$( cpufreq_find_all_files $cpufreq_sys_dir )" ] && return 1
+	return 0
 }
 
 # _create is called once, to create the charts
