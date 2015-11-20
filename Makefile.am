@@ -16,7 +16,11 @@ MAINTAINERCLEANFILES= \
 	$(srcdir)/m4/ltoptions.m4 \
 	$(srcdir)/pkcs11-helper.spec $(srcdir)/config-w32-vc.h
 
-EXTRA_DIST = README.md
+EXTRA_DIST = \
+	.gitignore \
+	README.md \
+	netdata-9999.ebuild \
+	$(NULL)
 
 SUBDIRS = \
 	charts.d \
@@ -27,3 +31,7 @@ SUBDIRS = \
 	$(NULL)
 
 dist_noinst_DATA = netdata.spec
+
+# until integrated within build
+# should be proper init.d/openrc/systemd usable
+dist_noinst_SCRIPTS = netdata-installer.sh
