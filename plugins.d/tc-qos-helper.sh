@@ -1,19 +1,33 @@
-#!/bin/sh
+#!/bin/bash
+
+# default time function
+now_ms=
+current_time_ms() {
+	now_ms="$(date +'%s')000"
+}
 
 # default sleep function
+LOOPSLEEPMS_LASTWORK=0
 loopsleepms() {
+	[ "$1" = "tellwork" ] && shift
 	sleep $1
 }
+
 # if found and included, this file overwrites loopsleepms()
 # with a high resolution timer function for precise looping.
-. "`dirname $0`/loopsleepms.sh.inc"
+. "$NETDATA_PLUGINS_DIR/loopsleepms.sh.inc"
 
 # check if we have a valid number for interval
 t=$1
-sleep_time=$(( t + 1 - 1 ))
-if [ "$sleep_time" -eq 0 ]
+sleep_time=$((t))
+[ $((sleep_time)) -lt 1 ] && $NETDATA_UPDATE_EVERY
+[ $((sleep_time)) -lt 1 ] && sleep_time=1
+
+tc_cmd="$(which tc)"
+if [ -z "$tc_cmd" ]
 	then
-	sleep_time=1
+	echo >&2 "tc: Cannot find a 'tc' command in this system."
+	exit 1
 fi
 
 devices=
@@ -28,19 +42,19 @@ show_tc() {
 
 	echo "BEGIN $x"
 	
-	/sbin/tc -s class show dev $x
+	$tc_cmd -s class show dev $x
 	
 	# check FireQOS names for classes
 	if [ ! -z "$fix_names" -a -f /var/run/fireqos/ifaces/$x ]
 	then
-		name="`cat /var/run/fireqos/ifaces/$x`"
+		name="$(cat /var/run/fireqos/ifaces/$x)"
 		echo "SETDEVICENAME $name"
 
 		interface_classes=
 		. /var/run/fireqos/$name.conf
 		for n in $interface_classes_monitor
 		do
-				setclassname `echo $n | tr '|' ' '`
+				setclassname $(echo $n | tr '|' ' ')
 		done
 		
 		echo "SETDEVICEGROUP $interface_dev"
@@ -51,7 +65,7 @@ show_tc() {
 all_devices() {
 	cat /proc/net/dev | grep ":" | cut -d ':' -f 1 | while read dev
 	do
-		l=`/sbin/tc class show dev $dev | wc -l`
+		l=$($tc_cmd class show dev $dev | wc -l)
 		[ $l -ne 0 ] && echo $dev
 	done
 }
@@ -76,7 +90,7 @@ do
 	then
 		c=1
 		fix_names="YES"
-		devices="`all_devices`"
+		devices="$( all_devices )"
 	fi
 
 	for d in $devices
@@ -84,7 +98,9 @@ do
 		show_tc $d
 	done
 
-	loopsleepms $sleep_time
+	echo "WORKTIME $LOOPSLEEPMS_LASTWORK"
 
-	test $gc -gt $exit_after && exit 0
+	loopsleepms tellwork $sleep_time
+
+	[ $gc -gt $exit_after ] && exit 0
 done

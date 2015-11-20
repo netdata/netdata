@@ -140,7 +140,6 @@ EOF
 	return 0
 }
 
-
 opensips_update() {
 	# the first argument to this function is the microseconds since last update
 	# pass this parameter to the BEGIN statement (see bellow).

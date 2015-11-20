@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <sys/resource.h>
 
 #include "avl.h"
 #include "log.h"
@@ -448,6 +449,9 @@ void *tc_main(void *ptr)
 	if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
 		error("Cannot set pthread cancel state to ENABLE.");
 
+	struct rusage thread;
+	RRDSET *stcpu = NULL, *sttime = NULL;
+
 	char buffer[TC_LINE_MAX+1] = "";
 	char *words[MAX_WORDS] = { NULL };
 
@@ -458,6 +462,7 @@ void *tc_main(void *ptr)
 	uint32_t SETDEVICENAME_HASH = simple_hash("SETDEVICENAME");
 	uint32_t SETDEVICEGROUP_HASH = simple_hash("SETDEVICEGROUP");
 	uint32_t SETCLASSNAME_HASH = simple_hash("SETCLASSNAME");
+	uint32_t WORKTIME_HASH = simple_hash("WORKTIME");
 #ifdef DETACH_PLUGINS_FROM_NETDATA
 	uint32_t MYPID_HASH = simple_hash("MYPID");
 #endif
@@ -569,6 +574,33 @@ void *tc_main(void *ptr)
 				char *id    = words[1];
 				char *path  = words[2];
 				if(id && *id && path && *path) tc_device_set_class_name(device, id, path);
+			}
+			else if(first_hash == WORKTIME_HASH && strcmp(words[0], "WORKTIME") == 0) {
+				// debug(D_TC_LOOP, "WORKTIME line '%s' '%s'", words[1], words[2]);
+				getrusage(RUSAGE_THREAD, &thread);
+
+				if(!stcpu) stcpu = rrdset_find("netdata.plugin_tc_cpu");
+				if(!stcpu) {
+					stcpu = rrdset_create("netdata", "plugin_tc_cpu", NULL, "netdata", "NetData TC CPU usage", "milliseconds/s", 10000, rrd_update_every, RRDSET_TYPE_STACKED);
+					rrddim_add(stcpu, "user",  NULL,  1, 1000 * rrd_update_every, RRDDIM_INCREMENTAL);
+					rrddim_add(stcpu, "system", NULL, 1, 1000 * rrd_update_every, RRDDIM_INCREMENTAL);
+				}
+				else rrdset_next(stcpu);
+
+				rrddim_set(stcpu, "user"  , thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
+				rrddim_set(stcpu, "system", thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
+				rrdset_done(stcpu);
+
+				if(!sttime) stcpu = rrdset_find("netdata.plugin_tc_time");
+				if(!sttime) {
+					sttime = rrdset_create("netdata", "plugin_tc_time", NULL, "netdata", "NetData TC script execution", "milliseconds/run", 10001, rrd_update_every, RRDSET_TYPE_AREA);
+					rrddim_add(sttime, "run_time",  "run time",  1, 1, RRDDIM_ABSOLUTE);
+				}
+				else rrdset_next(sttime);
+
+				rrddim_set(sttime, "run_time", atoll(words[1]));
+				rrdset_done(sttime);
+
 			}
 #ifdef DETACH_PLUGINS_FROM_NETDATA
 			else if(first_hash == MYPID_HASH && (strcmp(words[0], "MYPID") == 0)) {
