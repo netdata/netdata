@@ -40,7 +40,7 @@ loopsleepms() {
 		shift
 		t="$1"
 	fi
-	div="$2"
+	div="${2-100}"
 
 	# $t = the time in seconds to wait
 
