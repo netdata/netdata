@@ -261,7 +261,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 			unsigned long long sum = th_hist10 + th_hist20 + th_hist30 + th_hist40 + th_hist50 + th_hist60 + th_hist70 + th_hist80 + th_hist90 + th_hist100;
 			if(sum == 0ULL) {
 				if(!th_warning) {
-					info("Disabling /proc/net/rpc/nfsd threads histogram. It seems useless on this machine. It will be enabled if it is found with data in it.");
+					info("Disabling /proc/net/rpc/nfsd threads histogram. It seems unused on this machine. It will be enabled automatically when found with data in it.");
 					th_warning = 1;
 				}
 				do_th = -1;
@@ -290,7 +290,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 			unsigned long long sum = ra_hist10 + ra_hist20 + ra_hist30 + ra_hist40 + ra_hist50 + ra_hist60 + ra_hist70 + ra_hist80 + ra_hist90 + ra_hist100 + ra_none;
 			if(sum == 0ULL) {
 				if(!ra_warning) {
-					info("Disabling /proc/net/rpc/nfsd read ahead histogram. It seems useless on this machine. It will be enabled if it is found with data in it.");
+					info("Disabling /proc/net/rpc/nfsd read ahead histogram. It seems unused on this machine. It will be enabled automatically when found with data in it.");
 					ra_warning = 1;
 				}
 				do_ra = -1;
@@ -341,7 +341,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 
 			if(sum == 0ULL) {
 				if(!proc2_warning) {
-					error("Disabling /proc/net/rpc/nfsd v2 procedure calls chart. It seems useless on this machine. It will be enabled if it is found with data in it.");
+					error("Disabling /proc/net/rpc/nfsd v2 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
 					proc2_warning = 1;
 				}
 				do_proc2 = 0;
@@ -362,7 +362,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 
 			if(sum == 0ULL) {
 				if(!proc3_warning) {
-					info("Disabling /proc/net/rpc/nfsd v3 procedure calls chart. It seems useless on this machine. It will be enabled if it is found with data in it.");
+					info("Disabling /proc/net/rpc/nfsd v3 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
 					proc3_warning = 1;
 				}
 				do_proc3 = 0;
@@ -383,7 +383,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 
 			if(sum == 0ULL) {
 				if(!proc4_warning) {
-					info("Disabling /proc/net/rpc/nfsd v4 procedure calls chart. It seems useless on this machine. It will be enabled if it is found with data in it.");
+					info("Disabling /proc/net/rpc/nfsd v4 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
 					proc4_warning = 1;
 				}
 				do_proc4 = 0;
@@ -404,7 +404,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 
 			if(sum == 0ULL) {
 				if(!proc4ops_warning) {
-					info("Disabling /proc/net/rpc/nfsd v4 operations chart. It seems useless on this machine. It will be enabled if it is found with data in it.");
+					info("Disabling /proc/net/rpc/nfsd v4 operations chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
 					proc4ops_warning = 1;
 				}
 				do_proc4ops = 0;
