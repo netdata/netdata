@@ -1,5 +1,7 @@
 #!/bin/bash
 
+LC_ALL=C
+
 cat <<BANNER
 
 
