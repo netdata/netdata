@@ -68,6 +68,9 @@ postfix_update() {
 	# be very carefull with eval:
 	# prepare the script and always egrep at the end the lines that are usefull, so that
 	# even if something goes wrong, no other code can be executed
+	postfix_q_emails=0
+	postfix_q_size=0
+	
 	eval "`$postfix_postqueue -p |\
 		grep "^--" |\
 		sed -e "s/-- \([0-9]\+\) Kbytes in \([0-9]\+\) Requests.$/local postfix_q_size=\1\nlocal postfix_q_emails=\2/g" |\
