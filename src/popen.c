@@ -101,13 +101,13 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 
 	// set a new process group id for just this child
 	if( setpgid(0, 0) != 0 )
-		fprintf(stderr, "Cannot set a new process group for pid %d (%s)\n", getpid(), strerror(errno));
+		error("Cannot set a new process group for pid %d (%s)", getpid(), strerror(errno));
 
 	if( getpgid(0) != getpid() )
-		fprintf(stderr, "Process group set is incorrect. Expected %d, found %d\n", getpid(), getpgid(0));
+		error("Process group set is incorrect. Expected %d, found %d", getpid(), getpgid(0));
 
 	if( setsid() != 0 )
-		fprintf(stderr, "Cannot set session id for pid %d (%s)\n", getpid(), strerror(errno));
+		error("Cannot set session id for pid %d (%s)", getpid(), strerror(errno));
 
 	fprintf(stdout, "MYPID %d\n", getpid());
 	fflush(NULL);
@@ -116,7 +116,7 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 	// reset all signals
 	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV) signal(i, SIG_DFL);
 
-	fprintf(stderr, "executing command: '%s' on pid %d.\n", command, getpid());
+	info("executing command: '%s' on pid %d.", command, getpid());
  	execl("/bin/sh", "sh", "-c", command, NULL);
 	exit(1);
 }
