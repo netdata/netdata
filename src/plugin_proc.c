@@ -26,7 +26,7 @@ void *proc_main(void *ptr)
 	if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
 		error("Cannot set pthread cancel state to ENABLE.");
 
-	struct rusage me, me_last;
+	struct rusage me, thread;
 	struct timeval last, now;
 
 	gettimeofday(&last, NULL);
@@ -51,10 +51,9 @@ void *proc_main(void *ptr)
 	int vdo_proc_interrupts			= !config_get_boolean("plugin:proc", "/proc/interrupts", 1);
 	int vdo_cpu_netdata 			= !config_get_boolean("plugin:proc", "netdata server resources", 1);
 
-	RRDSET *stcpu = NULL, *stclients = NULL, *streqs = NULL, *stbytes = NULL;
+	RRDSET *stcpu = NULL, *stcpu_thread = NULL, *stclients = NULL, *streqs = NULL, *stbytes = NULL;
 
 	gettimeofday(&last, NULL);
-	getrusage(RUSAGE_SELF, &me_last);
 
 	unsigned long long usec = 0, susec = 0;
 	for(;1;) {
@@ -129,31 +128,43 @@ void *proc_main(void *ptr)
 		
 		// --------------------------------------------------------------------
 
-		if(!vdo_cpu_netdata && getrusage(RUSAGE_SELF, &me) == 0) {
-		
-			unsigned long long cpuuser = me.ru_utime.tv_sec * 1000000ULL + me.ru_utime.tv_usec;
-			unsigned long long cpusyst = me.ru_stime.tv_sec * 1000000ULL + me.ru_stime.tv_usec;
+		if(!vdo_cpu_netdata) {
+			getrusage(RUSAGE_THREAD, &thread);
+			getrusage(RUSAGE_SELF, &me);
+
+			if(!stcpu_thread) stcpu_thread = rrdset_find("netdata.plugin_proc_cpu");
+			if(!stcpu_thread) {
+				stcpu_thread = rrdset_create("netdata", "plugin_proc_cpu", NULL, "netdata", "NetData Proc Plugin CPU usage", "milliseconds/s", 9999, rrd_update_every, RRDSET_TYPE_STACKED);
+
+				rrddim_add(stcpu_thread, "user",  NULL,  1, 1000 * rrd_update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(stcpu_thread, "system", NULL, 1, 1000 * rrd_update_every, RRDDIM_INCREMENTAL);
+			}
+			else rrdset_next(stcpu_thread);
+
+			rrddim_set(stcpu_thread, "user"  , thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
+			rrddim_set(stcpu_thread, "system", thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
+			rrdset_done(stcpu_thread);
+
+			// ----------------------------------------------------------------
 
 			if(!stcpu) stcpu = rrdset_find("netdata.server_cpu");
 			if(!stcpu) {
-				stcpu = rrdset_create("netdata", "server_cpu", NULL, "netdata", "NetData CPU usage", "milliseconds/s", 9999, rrd_update_every, RRDSET_TYPE_STACKED);
+				stcpu = rrdset_create("netdata", "server_cpu", NULL, "netdata", "NetData CPU usage", "milliseconds/s", 2000, rrd_update_every, RRDSET_TYPE_STACKED);
 
 				rrddim_add(stcpu, "user",  NULL,  1, 1000 * rrd_update_every, RRDDIM_INCREMENTAL);
 				rrddim_add(stcpu, "system", NULL, 1, 1000 * rrd_update_every, RRDDIM_INCREMENTAL);
 			}
 			else rrdset_next(stcpu);
 
-			rrddim_set(stcpu, "user", cpuuser);
-			rrddim_set(stcpu, "system", cpusyst);
+			rrddim_set(stcpu, "user"  , me.ru_utime.tv_sec * 1000000ULL + me.ru_utime.tv_usec);
+			rrddim_set(stcpu, "system", me.ru_stime.tv_sec * 1000000ULL + me.ru_stime.tv_usec);
 			rrdset_done(stcpu);
-			
-			bcopy(&me, &me_last, sizeof(struct rusage));
 
 			// ----------------------------------------------------------------
 
 			if(!stclients) stclients = rrdset_find("netdata.clients");
 			if(!stclients) {
-				stclients = rrdset_create("netdata", "clients", NULL, "netdata", "NetData Web Clients", "connected clients", 11000, rrd_update_every, RRDSET_TYPE_LINE);
+				stclients = rrdset_create("netdata", "clients", NULL, "netdata", "NetData Web Clients", "connected clients", 3000, rrd_update_every, RRDSET_TYPE_LINE);
 
 				rrddim_add(stclients, "clients",  NULL,  1, 1, RRDDIM_ABSOLUTE);
 			}
@@ -166,7 +177,7 @@ void *proc_main(void *ptr)
 
 			if(!streqs) streqs = rrdset_find("netdata.requests");
 			if(!streqs) {
-				streqs = rrdset_create("netdata", "requests", NULL, "netdata", "NetData Web Requests", "requests/s", 12000, rrd_update_every, RRDSET_TYPE_LINE);
+				streqs = rrdset_create("netdata", "requests", NULL, "netdata", "NetData Web Requests", "requests/s", 3001, rrd_update_every, RRDSET_TYPE_LINE);
 
 				rrddim_add(streqs, "requests",  NULL,  1, 1 * rrd_update_every, RRDDIM_INCREMENTAL);
 			}
@@ -179,7 +190,7 @@ void *proc_main(void *ptr)
 
 			if(!stbytes) stbytes = rrdset_find("netdata.net");
 			if(!stbytes) {
-				stbytes = rrdset_create("netdata", "net", NULL, "netdata", "NetData Network Traffic", "kilobits/s", 13000, rrd_update_every, RRDSET_TYPE_AREA);
+				stbytes = rrdset_create("netdata", "net", NULL, "netdata", "NetData Network Traffic", "kilobits/s", 3002, rrd_update_every, RRDSET_TYPE_AREA);
 
 				rrddim_add(stbytes, "in",  NULL,  8, 1024 * rrd_update_every, RRDDIM_INCREMENTAL);
 				rrddim_add(stbytes, "out",  NULL,  -8, 1024 * rrd_update_every, RRDDIM_INCREMENTAL);
