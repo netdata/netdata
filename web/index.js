@@ -3,17 +3,17 @@ var page_is_visible = 1;
 var TARGET_THUMB_GRAPH_WIDTH = 500;		// thumb charts width will range from 0.5 to 1.5 of that
 var MINIMUM_THUMB_GRAPH_WIDTH = 400;	// thumb chart will generally try to be wider than that
 var TARGET_THUMB_GRAPH_HEIGHT = 160;	// the height of the thumb charts
-var TARGET_GROUP_GRAPH_HEIGHT = 120;
+var TARGET_GROUP_GRAPH_HEIGHT = 160;
 
 var THUMBS_MAX_TIME_TO_SHOW = 240;		// how much time the thumb charts will present?
 var THUMBS_POINTS_DIVISOR = 3;
 var THUMBS_STACKED_POINTS_DIVISOR = 3;
 
-var GROUPS_MAX_TIME_TO_SHOW = 360;		// how much time the group charts will present?
+var GROUPS_MAX_TIME_TO_SHOW = 600;		// how much time the group charts will present?
 var GROUPS_POINTS_DIVISOR = 2;
 var GROUPS_STACKED_POINTS_DIVISOR = 2;
 
-var MAINCHART_MIN_TIME_TO_SHOW = 600;	// how much time the main chart will present by default?
+var MAINCHART_MIN_TIME_TO_SHOW = 1200;	// how much time the main chart will present by default?
 var MAINCHART_POINTS_DIVISOR = 5;		// how much detailed will the main chart be by default? 1 = finest, higher is faster
 var MAINCHART_STACKED_POINTS_DIVISOR = 10;		// how much detailed will the main chart be by default? 1 = finest, higher is faster
 
