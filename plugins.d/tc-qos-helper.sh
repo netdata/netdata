@@ -100,7 +100,7 @@ do
 
 	echo "WORKTIME $LOOPSLEEPMS_LASTWORK"
 
-	loopsleepms tellwork $sleep_time
+	loopsleepms $sleep_time
 
 	[ $gc -gt $exit_after ] && exit 0
 done
