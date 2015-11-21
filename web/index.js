@@ -417,7 +417,7 @@ function buttonGlobalPlayPause(p) {
 		setMainChartPlay(p);
 		return;
 	}
-	
+
 	if(p == 'toggle') {
 		if(refresh_mode != REFRESH_ALWAYS) p = 'play';
 		else p = 'pause';
@@ -941,7 +941,6 @@ function initGroupGraphs(group) {
 		c.chartOptions.titlePosition = 'in';
 		c.chartOptions.tooltip = { "textStyle": { "fontSize": 9 } };
 		c.chartOptions.legend = { "textStyle": { "fontSize": 9 } };
-		c.default_curveType = 'none';
 
 		calculateChartPointsToShow(c, c.chartOptions.isStacked?GROUPS_STACKED_POINTS_DIVISOR:GROUPS_POINTS_DIVISOR, GROUPS_MAX_TIME_TO_SHOW, -1);
 
