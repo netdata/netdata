@@ -11,7 +11,7 @@ mysql_update_every=5
 
 declare -A mysql_cmds=() mysql_opts=() mysql_ids=()
 
-mysql_get() {
+mysql_exec() {
 	local ret
 	
 	"${@}" -s -e "show global status;"
@@ -19,6 +19,91 @@ mysql_get() {
 
 	[ $ret -ne 0 ] && echo "plugin_command_failure $ret"
 	return $ret
+}
+
+mysql_get() {
+	unset \
+		mysql_Bytes_received \
+		mysql_Bytes_sent \
+		mysql_Queries \
+		mysql_Questions \
+		mysql_Slow_queries \
+		mysql_Handler_commit \
+		mysql_Handler_delete \
+		mysql_Handler_prepare \
+		mysql_Handler_read_first \
+		mysql_Handler_read_key \
+		mysql_Handler_read_next \
+		mysql_Handler_read_prev \
+		mysql_Handler_read_rnd \
+		mysql_Handler_read_rnd_next \
+		mysql_Handler_rollback \
+		mysql_Handler_savepoint \
+		mysql_Handler_savepoint_rollback \
+		mysql_Handler_update \
+		mysql_Handler_write \
+		mysql_Table_locks_immediate \
+		mysql_Table_locks_waited \
+		mysql_Select_full_join \
+		mysql_Select_full_range_join \
+		mysql_Select_range \
+		mysql_Select_range_check \
+		mysql_Select_scan \
+		mysql_Sort_merge_passes \
+		mysql_Sort_range \
+		mysql_Sort_scan \
+		mysql_Created_tmp_disk_tables \
+		mysql_Created_tmp_files \
+		mysql_Created_tmp_tables \
+		mysql_Connection_errors_accept \
+		mysql_Connection_errors_internal \
+		mysql_Connection_errors_max_connections \
+		mysql_Connection_errors_peer_addr \
+		mysql_Connection_errors_select \
+		mysql_Connection_errors_tcpwrap \
+		mysql_Connections \
+		mysql_Aborted_connects \
+		mysql_Binlog_cache_disk_use \
+		mysql_Binlog_cache_use \
+		mysql_Binlog_stmt_cache_disk_use \
+		mysql_Binlog_stmt_cache_use \
+		mysql_Threads_connected \
+		mysql_Threads_created \
+		mysql_Threads_cached \
+		mysql_Threads_running \
+		mysql_Innodb_data_read \
+		mysql_Innodb_data_written \
+		mysql_Innodb_data_reads \
+		mysql_Innodb_data_writes \
+		mysql_Innodb_log_waits \
+		mysql_Innodb_log_write_requests \
+		mysql_Innodb_log_writes \
+		mysql_Innodb_os_log_fsyncs \
+		mysql_Innodb_os_log_pending_fsyncs \
+		mysql_Innodb_os_log_pending_writes \
+		mysql_Innodb_os_log_written \
+		mysql_Innodb_row_lock_current_waits \
+		mysql_Innodb_rows_inserted \
+		mysql_Innodb_rows_read \
+		mysql_Innodb_rows_updated \
+		mysql_Innodb_rows_deleted
+
+	mysql_plugin_command_failure=0
+
+	eval "$(mysql_exec "${@}" |\
+		sed \
+			-e "s/[[:space:]]\+/ /g" \
+			-e "s/\./_/g" \
+			-e "s/^\([a-zA-Z0-9_]\+\)[[:space:]]\+\([0-9]\+\)$/mysql_\1=\2/g" |\
+		egrep "^mysql_[a-zA-Z0-9_]+=[[:digit:]]+$")"
+
+	[ $mysql_plugin_command_failure -eq 1 ] && return 1
+	[ -z "$mysql_Connections" ] && return 1
+
+	mysql_Thread_cache_misses=0
+	[ $(( mysql_Connections + 1 - 1 )) -gt 0 ] && mysql_Thread_cache_misses=$(( mysql_Threads_created * 10000 / mysql_Connections ))
+
+	return 0
 }
 
 mysql_check() {
@@ -45,8 +130,8 @@ mysql_check() {
 			echo >&2 "$PROGRAM_NAME: mysql: cannot get mysql command for '$m'. Please set mysql_cmds[$m]='/path/to/mysql', in $confd/mysql.conf"
 		fi
 
-		x="$(mysql_get "${mysql_cmds[$m]}" ${mysql_opts[$m]} | grep "^Connections[[:space:]]")"
-		if [ ! $? -eq 0 -o -z "$x" ]
+		mysql_get "${mysql_cmds[$m]}" ${mysql_opts[$m]}
+		if [ ! $? -eq 0 ]
 		then
 			echo >&2 "$PROGRAM_NAME: mysql: cannot get global status for '$m'. Please set mysql_opts[$m]='options' to whatever needed to get connected to the mysql server, in $confd/mysql.conf"
 			unset mysql_cmds[$m]
@@ -120,14 +205,6 @@ DIMENSION Created_tmp_disk_tables disk_tables incremental 1 $((1 * mysql_update_
 DIMENSION Created_tmp_files files incremental 1 $((1 * mysql_update_every))
 DIMENSION Created_tmp_tables tables incremental 1 $((1 * mysql_update_every))
 
-CHART mysql_$m.connection_errors '' "mysql Connection Errors" "connections/s" mysql_$m mysql line 20008 $mysql_update_every
-DIMENSION Connection_errors_accept accept incremental 1 $((1 * mysql_update_every))
-DIMENSION Connection_errors_internal internal incremental 1 $((1 * mysql_update_every))
-DIMENSION Connection_errors_max_connections max incremental 1 $((1 * mysql_update_every))
-DIMENSION Connection_errors_peer_addr peer_addr incremental 1 $((1 * mysql_update_every))
-DIMENSION Connection_errors_select select incremental 1 $((1 * mysql_update_every))
-DIMENSION Connection_errors_tcpwrap tcpwrap incremental 1 $((1 * mysql_update_every))
-
 CHART mysql_$m.connections '' "mysql Connections" "connections/s" mysql_$m mysql line 20009 $mysql_update_every
 DIMENSION Connections all incremental 1 $((1 * mysql_update_every))
 DIMENSION Aborted_connects aborded incremental 1 $((1 * mysql_update_every))
@@ -135,10 +212,6 @@ DIMENSION Aborted_connects aborded incremental 1 $((1 * mysql_update_every))
 CHART mysql_$m.binlog_cache '' "mysql Binlog Cache" "transactions/s" mysql_$m mysql line 20010 $mysql_update_every
 DIMENSION Binlog_cache_disk_use disk incremental 1 $((1 * mysql_update_every))
 DIMENSION Binlog_cache_use all incremental 1 $((1 * mysql_update_every))
-
-CHART mysql_$m.binlog_stmt_cache '' "mysql Binlog Statement Cache" "statements/s" mysql_$m mysql line 20011 $mysql_update_every
-DIMENSION Binlog_stmt_cache_disk_use disk incremental 1 $((1 * mysql_update_every))
-DIMENSION Binlog_stmt_cache_use all incremental 1 $((1 * mysql_update_every))
 
 CHART mysql_$m.threads '' "mysql Threads" "threads" mysql_$m mysql line 20012 $mysql_update_every
 DIMENSION Threads_connected connected absolute 1 $((1 * mysql_update_every))
@@ -180,6 +253,29 @@ DIMENSION Innodb_rows_inserted inserted incremental 1 $((1 * mysql_update_every)
 DIMENSION Innodb_rows_updated updated incremental -1 $((1 * mysql_update_every))
 
 EOF
+
+	if [ ! -z "$mysql_Binlog_stmt_cache_disk_use" ]
+		then
+		cat <<EOF
+CHART mysql_$m.binlog_stmt_cache '' "mysql Binlog Statement Cache" "statements/s" mysql_$m mysql line 20011 $mysql_update_every
+DIMENSION Binlog_stmt_cache_disk_use disk incremental 1 $((1 * mysql_update_every))
+DIMENSION Binlog_stmt_cache_use all incremental 1 $((1 * mysql_update_every))
+EOF
+	fi
+
+	if [ ! -z "$mysql_Connection_errors_accept" ]
+		then
+		cat <<EOF
+CHART mysql_$m.connection_errors '' "mysql Connection Errors" "connections/s" mysql_$m mysql line 20008 $mysql_update_every
+DIMENSION Connection_errors_accept accept incremental 1 $((1 * mysql_update_every))
+DIMENSION Connection_errors_internal internal incremental 1 $((1 * mysql_update_every))
+DIMENSION Connection_errors_max_connections max incremental 1 $((1 * mysql_update_every))
+DIMENSION Connection_errors_peer_addr peer_addr incremental 1 $((1 * mysql_update_every))
+DIMENSION Connection_errors_select select incremental 1 $((1 * mysql_update_every))
+DIMENSION Connection_errors_tcpwrap tcpwrap incremental 1 $((1 * mysql_update_every))
+EOF
+	fi
+
 	done
 	return 0
 }
@@ -209,79 +305,8 @@ mysql_update() {
 	do
 		x="${mysql_ids[$m]}"
 
-		unset \
-			mysql_Bytes_received \
-			mysql_Bytes_sent \
-			mysql_Queries \
-			mysql_Questions \
-			mysql_Slow_queries \
-			mysql_Handler_commit \
-			mysql_Handler_delete \
-			mysql_Handler_prepare \
-			mysql_Handler_read_first \
-			mysql_Handler_read_key \
-			mysql_Handler_read_next \
-			mysql_Handler_read_prev \
-			mysql_Handler_read_rnd \
-			mysql_Handler_read_rnd_next \
-			mysql_Handler_rollback \
-			mysql_Handler_savepoint \
-			mysql_Handler_savepoint_rollback \
-			mysql_Handler_update \
-			mysql_Handler_write \
-			mysql_Table_locks_immediate \
-			mysql_Table_locks_waited \
-			mysql_Select_full_join \
-			mysql_Select_full_range_join \
-			mysql_Select_range \
-			mysql_Select_range_check \
-			mysql_Select_scan \
-			mysql_Sort_merge_passes \
-			mysql_Sort_range \
-			mysql_Sort_scan \
-			mysql_Created_tmp_disk_tables \
-			mysql_Created_tmp_files \
-			mysql_Created_tmp_tables \
-			mysql_Connection_errors_accept \
-			mysql_Connection_errors_internal \
-			mysql_Connection_errors_max_connections \
-			mysql_Connection_errors_peer_addr \
-			mysql_Connection_errors_select \
-			mysql_Connection_errors_tcpwrap \
-			mysql_Connections \
-			mysql_Aborted_connects \
-			mysql_Binlog_cache_disk_use \
-			mysql_Binlog_cache_use \
-			mysql_Binlog_stmt_cache_disk_use \
-			mysql_Binlog_stmt_cache_use \
-			mysql_Threads_connected \
-			mysql_Threads_created \
-			mysql_Threads_cached \
-			mysql_Threads_running \
-			mysql_Innodb_data_read \
-			mysql_Innodb_data_written \
-			mysql_Innodb_data_reads \
-			mysql_Innodb_data_writes \
-			mysql_Innodb_log_waits \
-			mysql_Innodb_log_write_requests \
-			mysql_Innodb_log_writes \
-			mysql_Innodb_os_log_fsyncs \
-			mysql_Innodb_os_log_pending_fsyncs \
-			mysql_Innodb_os_log_pending_writes \
-			mysql_Innodb_os_log_written \
-			mysql_Innodb_row_lock_current_waits \
-			mysql_Innodb_rows_inserted \
-			mysql_Innodb_rows_read \
-			mysql_Innodb_rows_updated \
-			mysql_Innodb_rows_deleted
-
-		mysql_plugin_command_failure=0
-		
-		eval "$(mysql_get "${mysql_cmds[$m]}" ${mysql_opts[$m]} |\
-			sed -e "s/[[:space:]]\+/ /g" -e "s/\./_/g" -e "s/^\([a-zA-Z0-9_]\+\)[[:space:]]\+\([0-9]\+\)$/local mysql_\1=\2/g" |\
-			egrep "^local mysql_[a-zA-Z0-9_]+=[[:digit:]]+$")"
-
-		if [ $mysql_plugin_command_failure -ne 0 ]
+		mysql_get "${mysql_cmds[$m]}" ${mysql_opts[$m]}
+		if [ $? -ne 0 ]
 			then
 			unset mysql_ids[$m]
 			unset mysql_opts[$m]
@@ -289,10 +314,6 @@ mysql_update() {
 			echo >&2 "$PROGRAM_NAME: mysql: failed to get values for '$m', disabling it."
 			continue
 		fi
-
-		local misses=0
-		[ -z "$mysql_Connections" ] && mysql_Connections=0
-		[ $(( mysql_Connections + 1 - 1 )) -gt 0 ] && misses=$(( mysql_Threads_created * 10000 / mysql_Connections ))
 
 		# write the result of the work.
 		cat <<VALUESEOF
@@ -342,14 +363,6 @@ SET Created_tmp_disk_tables = $mysql_Created_tmp_disk_tables
 SET Created_tmp_files = $mysql_Created_tmp_files
 SET Created_tmp_tables = $mysql_Created_tmp_tables
 END
-BEGIN mysql_$m.connection_errors $1
-SET Connection_errors_accept = $mysql_Connection_errors_accept
-SET Connection_errors_internal = $mysql_Connection_errors_internal
-SET Connection_errors_max_connections = $mysql_Connection_errors_max_connections
-SET Connection_errors_peer_addr = $mysql_Connection_errors_peer_addr
-SET Connection_errors_select = $mysql_Connection_errors_select
-SET Connection_errors_tcpwrap = $mysql_Connection_errors_tcpwrap
-END
 BEGIN mysql_$m.connections $1
 SET Connections = $mysql_Connections
 SET Aborted_connects = $mysql_Aborted_connects
@@ -358,10 +371,6 @@ BEGIN mysql_$m.binlog_cache $1
 SET Binlog_cache_disk_use = $mysql_Binlog_cache_disk_use
 SET Binlog_cache_use = $mysql_Binlog_cache_use
 END
-BEGIN mysql_$m.binlog_stmt_cache $1
-SET Binlog_stmt_cache_disk_use = $mysql_Binlog_stmt_cache_disk_use
-SET Binlog_stmt_cache_use = $mysql_Binlog_stmt_cache_use
-END
 BEGIN mysql_$m.threads $1
 SET Threads_connected = $mysql_Threads_connected
 SET Threads_created = $mysql_Threads_created
@@ -369,7 +378,7 @@ SET Threads_cached = $mysql_Threads_cached
 SET Threads_running = $mysql_Threads_running
 END
 BEGIN mysql_$m.thread_cache_misses $1
-SET misses = $misses
+SET misses = $mysql_Thread_cache_misses
 END
 BEGIN mysql_$m.innodb_io $1
 SET Innodb_data_read = $mysql_Innodb_data_read
@@ -402,6 +411,30 @@ SET Innodb_rows_updated = $mysql_Innodb_rows_updated
 SET Innodb_rows_deleted = $mysql_Innodb_rows_deleted
 END
 VALUESEOF
+
+		if [ ! -z "$mysql_Binlog_stmt_cache_disk_use" ]
+			then
+			cat <<VALUESEOF
+BEGIN mysql_$m.binlog_stmt_cache $1
+SET Binlog_stmt_cache_disk_use = $mysql_Binlog_stmt_cache_disk_use
+SET Binlog_stmt_cache_use = $mysql_Binlog_stmt_cache_use
+END
+VALUESEOF
+		fi
+
+		if [ ! -z "$mysql_Connection_errors_accept" ]
+			then
+			cat <<VALUESEOF
+BEGIN mysql_$m.connection_errors $1
+SET Connection_errors_accept = $mysql_Connection_errors_accept
+SET Connection_errors_internal = $mysql_Connection_errors_internal
+SET Connection_errors_max_connections = $mysql_Connection_errors_max_connections
+SET Connection_errors_peer_addr = $mysql_Connection_errors_peer_addr
+SET Connection_errors_select = $mysql_Connection_errors_select
+SET Connection_errors_tcpwrap = $mysql_Connection_errors_tcpwrap
+END
+VALUESEOF
+		fi
 	done
 
 	[ ${#mysql_ids[@]} -eq 0 ] && echo >&2 "$PROGRAM_NAME: mysql: no mysql servers left active." && return 1
