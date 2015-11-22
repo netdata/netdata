@@ -198,11 +198,14 @@ function calculateChartPointsToShow(c, divisor, maxtime, group) {
 	else
 		c.chartOptions.curveType = c.default_curveType;
 
-	var hpoints = Math.round(maxtime / 30);
-	if(hpoints > 10) hpoints = 10;
-
-	c.chartOptions.hAxis.gridlines = { "count": hpoints, "color": '#EEE' };
+	c.chartOptions.hAxis.gridlines = { "color": '#EEE' };
 	c.chartOptions.vAxis.gridlines = { "color": '#EEE' };
+	
+	if(maxtime) {
+		var hpoints = Math.round(maxtime / 30);
+		if(hpoints > 10) hpoints = 10;
+		c.chartOptions.hAxis.gridlines.count = hpoints;
+	}
 }
 
 
