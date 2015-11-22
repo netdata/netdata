@@ -55,3 +55,33 @@ body {
     overflow-x: hidden;
 }
 
+.google-visualization-tooltip-action: hover {
+  background-color: #eeeeee;
+}
+.google-visualization-tooltip {
+  border: solid 1px #bdbdbd;
+  border-radius: 2px;
+  background-color: white;
+  box-shadow: 0px 2px 2px 0px rgba(204, 204, 204, 0.6);
+  font-size: 9px;
+  -moz-box-shadow: 0px 2px 2px 0px rgba(204, 204, 204, 0.6);
+  -webkit-box-shadow: 0px 2px 2px 0px rgba(204, 204, 204, 0.6);
+  position: absolute;
+  z-index: 1000;
+  line-height: 90% !important;
+  margin: 0 0 0 0 !important;
+  padding: 0.5em 0.1em 0.5em 0.1em !important;
+  width: 180px !important;
+}
+.google-visualization-tooltip-item-list {
+  list-style-type: none;
+  margin: 0 0 0 0 !important;
+  padding: 0 0 0 0 !important;
+}
+.google-visualization-tooltip-item {
+  margin: 0 0 0 0 !important;
+}
+.google-visualization-tooltip-item-list
+.google-visualization-tooltip-item:first-child {
+  margin: 0 0 0 0 !important;
+}

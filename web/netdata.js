@@ -123,7 +123,7 @@ function showChartIsLoading(id, name, width, height, message) {
 //           if undefined or negative, any calculated value will be used
 //           if zero, one of 1,2,5,10,15,20,30,45,60 will be used
 
-function calculateChartPointsToShow(c, divisor, maxtime, group) {
+function calculateChartPointsToShow(c, divisor, maxtime, group, enable_curve) {
 	// console.log('calculateChartPointsToShow( c = ' + c.id + ',  divisor = ' + divisor + ', maxtime = ' + maxtime + ', group = ' + group + ' )');
 
 	if(!divisor) divisor = 2;
@@ -136,43 +136,47 @@ function calculateChartPointsToShow(c, divisor, maxtime, group) {
 
 	// console.log('chart ' + c.id + ' internal duration is ' + dt + ' secs, requested maxtime is ' + maxtime + ' secs');
 
-	if(maxtime) dt = maxtime;
+	if(!maxtime) maxtime = c.entries * c.update_every;
+	dt = maxtime;
 
 	var data_points = Math.round(dt / c.update_every);
+	if(!data_points) data_points = 100;
+
 	var screen_points = Math.round(c.chartOptions.width / divisor);
-	// console.log('screen = ' + screen_points + ', data = ' + data_points + ', divisor = ' + divisor);
+	if(!screen_points) screen_points = 100;
+
+	// console.log('screen_points = ' + screen_points + ', data_points = ' + data_points + ', divisor = ' + divisor);
 
 	if(group == undefined || group <= 0) {
 		if(screen_points > data_points) {
 			c.group = 1;
 			c.points_to_show = data_points;
-			// console.log("rendering at full detail");
+			// console.log("rendering at full detail (group = " + c.group + ", points_to_show = " + c.points_to_show + ')');
 		}
 		else {
 			c.group = Math.round(data_points / screen_points);
 
-			if(group != undefined && group >= 0) {
-				     if(c.group > 60) c.group = 60;
-				else if(c.group > 45) c.group = 45;
-				else if(c.group > 30) c.group = 30;
-				else if(c.group > 20) c.group = 20;
-				else if(c.group > 15) c.group = 15;
-				else if(c.group > 10) c.group = 10;
-				else if(c.group > 5) c.group = 5;
-				else if(c.group > 2) c.group = 2;
-				else c.group = 1;
-			}
+			     if(c.group > 45) c.group = 60;
+			else if(c.group > 30) c.group = 45;
+			else if(c.group > 20) c.group = 30;
+			else if(c.group > 15) c.group = 20;
+			else if(c.group > 10) c.group = 15;
+			else if(c.group > 5) c.group = 10;
+			else if(c.group > 2) c.group = 5;
+			else if(c.group > 1) c.group = 2;
+			else c.group = 1;
 
 			c.points_to_show = Math.round(data_points / c.group);
-			//console.log("rendering adaptive");
+			// console.log("rendering adaptive (group = " + c.group + ", points_to_show = " + c.points_to_show + ')');
 		}
 	}
 	else {
 		c.group = group;
 		c.points_to_show = Math.round(data_points / group);
-		//console.log("rendering with given group");
+		// console.log("rendering with supplied group (group = " + c.group + ", points_to_show = " + c.points_to_show + ')');
 	}
-	// console.log('group = ' + c.group + ', points = ' + c.points_to_show);
+	
+	// console.log("final configuration (group = " + c.group + ", points_to_show = " + c.points_to_show + ')');
 
 	// make sure the line width is not congesting the chart
 	if(c.chartType == 'LineChart') {
@@ -193,19 +197,14 @@ function calculateChartPointsToShow(c, divisor, maxtime, group) {
 
 	// do not render curves when we don't have at
 	// least 2 twice the space per point
-	if(c.points_to_show > (c.chartOptions.width * c.chartOptions.lineWidth / 2) ) 
+	if(!enable_curve || c.points_to_show > (c.chartOptions.width * c.chartOptions.lineWidth / 2) ) 
 		c.chartOptions.curveType = 'none';
 	else
 		c.chartOptions.curveType = c.default_curveType;
 
-	c.chartOptions.hAxis.gridlines = { "color": '#EEE' };
-	c.chartOptions.vAxis.gridlines = { "color": '#EEE' };
-	
-	if(maxtime) {
-		var hpoints = Math.round(maxtime / 30);
-		if(hpoints > 10) hpoints = 10;
-		c.chartOptions.hAxis.gridlines.count = hpoints;
-	}
+	var hpoints = Math.round(maxtime / 30);
+	if(hpoints > 10) hpoints = 10;
+	c.chartOptions.hAxis.gridlines.count = hpoints;
 }
 
 
@@ -252,15 +251,55 @@ function loadCharts(base_url, doNext) {
 				height: 200,
 				lineWidth: 1,
 				title: json.charts[i].title,
-				// hAxis: {title: "Time of Day", viewWindowMode: 'maximized', format:'HH:mm:ss'},
 				fontSize: 11,
-				hAxis: {viewWindowMode: 'maximized', slantedText: false, format:'HH:mm:ss', textStyle: { fontSize: 9 } },
-				vAxis: {title: json.charts[i].units, viewWindowMode: 'pretty', minValue: -0.1, maxValue: 0.1, textStyle: { fontSize: 9 } },
-				chartArea : {width: '65%', height: '80%'},
+				hAxis: {
+				//	title: "Time of Day",
+				//	format:'HH:mm:ss',
+					viewWindowMode: 'maximized',
+					slantedText: false,
+					format:'HH:mm:ss',
+					textStyle: {
+						fontSize: 9
+					},
+					gridlines: {
+						color: '#EEE'
+					}
+				},
+				vAxis: {
+					title: json.charts[i].units,
+					viewWindowMode: 'pretty',
+					minValue: -0.1,
+					maxValue: 0.1,
+					direction: 1,
+					textStyle: {
+						fontSize: 9
+					},
+					gridlines: {
+						color: '#EEE'
+					}
+				},
+				chartArea: {
+					width: '65%',
+					height: '80%'
+				},
 				focusTarget: 'category',
-				annotation: {'1': {style: 'line'}},
-				//colors: ['blue', 'red', 'green', 'lime', 'olive', 'yellow', 'navy', 'fuchsia', 'maroon', 'aqua', 'teal', 'purple', 'black', 'gray', 'silver'],
-				//tooltip: {isHtml: true},
+				annotation: {
+					'1': {
+						style: 'line'
+					}
+				},
+				pointsVisible: 0,
+				titlePosition: 'out',
+				titleTextStyle: {
+					fontSize: 11
+				},
+				tooltip: {
+					isHtml: true,
+					ignoreBounds: true,
+					textStyle: {
+						fontSize: 9
+					}
+				}
 			};
 
 			json.charts[i].default_curveType = 'none';

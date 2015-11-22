@@ -7,18 +7,18 @@ var TARGET_GROUP_GRAPH_HEIGHT = 160;
 
 var THUMBS_MAX_TIME_TO_SHOW = 240;		// how much time the thumb charts will present?
 var THUMBS_POINTS_DIVISOR = 3;
-var THUMBS_STACKED_POINTS_DIVISOR = 3;
+var THUMBS_STACKED_POINTS_DIVISOR = 4;
 
 var GROUPS_MAX_TIME_TO_SHOW = 600;		// how much time the group charts will present?
 var GROUPS_POINTS_DIVISOR = 2;
-var GROUPS_STACKED_POINTS_DIVISOR = 2;
+var GROUPS_STACKED_POINTS_DIVISOR = 3;
 
 var MAINCHART_MIN_TIME_TO_SHOW = 1200;	// how much time the main chart will present by default?
-var MAINCHART_POINTS_DIVISOR = 5;		// how much detailed will the main chart be by default? 1 = finest, higher is faster
-var MAINCHART_STACKED_POINTS_DIVISOR = 10;		// how much detailed will the main chart be by default? 1 = finest, higher is faster
+var MAINCHART_POINTS_DIVISOR = 2;		// how much detailed will the main chart be by default? 1 = finest, higher is faster
+var MAINCHART_STACKED_POINTS_DIVISOR = 3;		// how much detailed will the main chart be by default? 1 = finest, higher is faster
 
 var MAINCHART_CONTROL_HEIGHT = 75;		// how tall the control chart will be
-var MAINCHART_CONTROL_DIVISOR = 2;		// how much detailed will the control chart be? 1 = finest, higher is faster
+var MAINCHART_CONTROL_DIVISOR = 5;		// how much detailed will the control chart be? 1 = finest, higher is faster
 var MAINCHART_INITIAL_SELECTOR= 20;		// 1/20th of the width, this overrides MAINCHART_MIN_TIME_TO_SHOW
 
 var CHARTS_REFRESH_LOOP = 50;			// delay between chart refreshes
@@ -26,6 +26,52 @@ var CHARTS_REFRESH_IDLE = 500;			// delay between chart refreshes when no chart 
 var CHARTS_CHECK_NO_FOCUS = 500;		// delay to check for visibility when the page has no focus
 var CHARTS_SCROLL_IDLE = 100;			// delay to wait after a page scroll
 
+var ENABLE_CURVE = 1;
+
+var resize_request = false;
+
+function setPresentationNormal(ui) {
+	THUMBS_POINTS_DIVISOR 				= 3;
+	THUMBS_STACKED_POINTS_DIVISOR 		= Math.round(THUMBS_POINTS_DIVISOR * 1.5);
+	GROUPS_POINTS_DIVISOR 				= 2;
+	GROUPS_STACKED_POINTS_DIVISOR 		= Math.round(GROUPS_POINTS_DIVISOR * 1.5);
+	MAINCHART_POINTS_DIVISOR 			= 2;
+	MAINCHART_STACKED_POINTS_DIVISOR 	= Math.round(MAINCHART_POINTS_DIVISOR * 1.5);
+	ENABLE_CURVE = 1;
+	CHARTS_REFRESH_LOOP = 50;
+	CHARTS_SCROLL_IDLE = 50;
+	resize_request = true;
+	if(ui) $('#presentation_normal').trigger('click');
+	playGraphs();
+}
+function setPresentationSpeedy(ui) {
+	THUMBS_POINTS_DIVISOR 				= 10;
+	THUMBS_STACKED_POINTS_DIVISOR 		= Math.round(THUMBS_POINTS_DIVISOR * 1.5);
+	GROUPS_POINTS_DIVISOR 				= 8;
+	GROUPS_STACKED_POINTS_DIVISOR 		= Math.round(GROUPS_POINTS_DIVISOR * 1.5);
+	MAINCHART_POINTS_DIVISOR 			= 5;
+	MAINCHART_STACKED_POINTS_DIVISOR 	= Math.round(MAINCHART_POINTS_DIVISOR * 1.5);
+	ENABLE_CURVE = 0;
+	CHARTS_REFRESH_LOOP = 50;
+	CHARTS_SCROLL_IDLE = 100;
+	resize_request = true;
+	if(ui) $('#presentation_speedy').trigger('click');
+	playGraphs();
+}
+function setPresentationDetailed(ui) {
+	THUMBS_POINTS_DIVISOR 				= 1;
+	THUMBS_STACKED_POINTS_DIVISOR 		= 1;
+	GROUPS_POINTS_DIVISOR 				= 1;
+	GROUPS_STACKED_POINTS_DIVISOR 		= 1;
+	MAINCHART_POINTS_DIVISOR 			= 1;
+	MAINCHART_STACKED_POINTS_DIVISOR 	= 1;
+	ENABLE_CURVE = 1;
+	CHARTS_REFRESH_LOOP = 50;
+	CHARTS_SCROLL_IDLE = 50;
+	resize_request = true;
+	if(ui) $('#presentation_detailed').trigger('click');
+	playGraphs();
+}
 
 function isIE() {
   userAgent = navigator.userAgent;
@@ -64,7 +110,7 @@ function thumbChartActions(i, c, nogroup) {
 	if(c.group == 1) refinfo += "every single point collected (" + c.update_every + "s each).";
 	else refinfo += ((c.group_method == "average")?"the average":"the max") + " value for every " + (c.group * c.update_every) + " seconds of data";
 
-	var html = "<div class=\"btn-group btn-group\" data-toggle=\"tooltip\" title=\"" + refinfo + "\">"
+	var html = "<div class=\"btn-group btn-group\" data-toggle=\"tooltip\" data-placement=\"top\" title=\"" + refinfo + "\">"
 	+		"<button type=\"button\" class=\"btn btn-default\" onclick=\"javascript: return;\"><span class=\"glyphicon glyphicon-info-sign\"></span></button>"
 	+	"</div>"
 	+	"<div class=\"btn-group btn-group\"><button type=\"button\" class=\"btn btn-default disabled\"><small>&nbsp;&nbsp; " + name + "</small></button>";
@@ -83,12 +129,12 @@ function thumbChartActions(i, c, nogroup) {
 		var hidden = "";
 		if(ingroup_detail) hidden = ", including " + ingroup_detail + " charts not shown now";
 
-		html += "<button type=\"button\" data-toggle=\"tooltip\" title=\"Show all " + ingroup + " charts in group '" + c.family + "'" + hidden + "\" class=\"btn btn-default\" onclick=\"initGroupGraphs('" + c.family +"');\"><span class=\"glyphicon glyphicon-th-large\"></span></button>";
+		html += "<button type=\"button\" data-toggle=\"tooltip\" data-placement=\"top\" title=\"Show all " + ingroup + " charts in group '" + c.family + "'" + hidden + "\" class=\"btn btn-default\" onclick=\"initGroupGraphs('" + c.family +"');\"><span class=\"glyphicon glyphicon-th-large\"></span></button>";
 	}
 
-	html += "<button type=\"button\" data-toggle=\"tooltip\" title=\"show chart '" + c.name + "' in fullscreen\" class=\"btn btn-default\" onclick=\"initMainChartIndex(" + i +");\"><span class=\"glyphicon glyphicon-resize-full\"></span></button>"
-	+		"<button type=\"button\" data-toggle=\"tooltip\" title=\"set options for chart '" + c.name + "'\" class=\"btn btn-default disabled\" onclick=\"alert('Not implemented yet!');\"><span class=\"glyphicon glyphicon-cog\"></span></button>"
-	+		"<button type=\"button\" data-toggle=\"tooltip\" title=\"ignore chart '" + c.name + "'\" class=\"btn btn-default\" onclick=\"disableChart(" + i + ");\"><span class=\"glyphicon glyphicon-trash\"></span></button>"
+	html += "<button type=\"button\" data-toggle=\"tooltip\" data-placement=\"top\" title=\"show chart '" + c.name + "' in fullscreen\" class=\"btn btn-default\" onclick=\"initMainChartIndex(" + i +");\"><span class=\"glyphicon glyphicon-resize-full\"></span></button>"
+	+		"<button type=\"button\" data-toggle=\"tooltip\" data-placement=\"top\" title=\"set options for chart '" + c.name + "'\" class=\"btn btn-default disabled\" onclick=\"alert('Not implemented yet!');\"><span class=\"glyphicon glyphicon-cog\"></span></button>"
+	+		"<button type=\"button\" data-toggle=\"tooltip\" data-placement=\"top\" title=\"ignore chart '" + c.name + "'\" class=\"btn btn-default\" onclick=\"disableChart(" + i + ");\"><span class=\"glyphicon glyphicon-trash\"></span></button>"
 	+	"</div>";
 
 	return html;
@@ -101,12 +147,12 @@ function groupChartActions(i, c) {
 	if(c.group == 1) refinfo += "every single point collected (" + c.update_every + "s each).";
 	else refinfo += ((c.group_method == "average")?"the average":"the max") + " value for every " + (c.group * c.update_every) + " seconds of data";
 
-	var html = "<div class=\"btn-group btn-group\" data-toggle=\"tooltip\" title=\"" + refinfo + "\">"
+	var html = "<div class=\"btn-group btn-group\" data-toggle=\"tooltip\" data-placement=\"left\" title=\"" + refinfo + "\">"
 	+		"<button type=\"button\" class=\"btn btn-default\" onclick=\"javascript: return;\"><span class=\"glyphicon glyphicon-info-sign\"></span></button>"
 	+	"</div>";
 
-	html += "<button type=\"button\" data-toggle=\"tooltip\" title=\"show chart '" + c.name + "' in fullscreen\" class=\"btn btn-default\" onclick=\"initMainChartIndex(" + i +");\"><span class=\"glyphicon glyphicon-resize-full\"></span></button>"
-	+		"<button type=\"button\" data-toggle=\"tooltip\" title=\"ignore chart '" + c.name + "'\" class=\"btn btn-default\" onclick=\"disableChart(" + i + ");\"><span class=\"glyphicon glyphicon-trash\"></span></button>"
+	html += "<button type=\"button\" data-toggle=\"tooltip\" data-placement=\"left\" title=\"show chart '" + c.name + "' in fullscreen\" class=\"btn btn-default\" onclick=\"initMainChartIndex(" + i +");\"><span class=\"glyphicon glyphicon-resize-full\"></span></button>"
+	+		"<button type=\"button\" data-toggle=\"tooltip\" data-placement=\"left\" title=\"ignore chart '" + c.name + "'\" class=\"btn btn-default\" onclick=\"disableChart(" + i + ");\"><span class=\"glyphicon glyphicon-trash\"></span></button>"
 	+	"</div>";
 
 	return html;
@@ -152,7 +198,7 @@ function initMainChart(c) {
 	mainchart.div = 'maingraph';
 	mainchart.max_time_to_show = (mainchart.last_entry_t - mainchart.first_entry_t) / ( MAINCHART_INITIAL_SELECTOR * mainchart.update_every );
 	if(mainchart.max_time_to_show < MAINCHART_MIN_TIME_TO_SHOW) mainchart.max_time_to_show = MAINCHART_MIN_TIME_TO_SHOW;
-	calculateChartPointsToShow(mainchart, mainchart.chartOptions.isStacked?MAINCHART_STACKED_POINTS_DIVISOR:MAINCHART_POINTS_DIVISOR, mainchart.max_time_to_show, 0);
+	calculateChartPointsToShow(mainchart, mainchart.chartOptions.isStacked?MAINCHART_STACKED_POINTS_DIVISOR:MAINCHART_POINTS_DIVISOR, mainchart.max_time_to_show, 0, ENABLE_CURVE);
 
 	// copy it to the hidden chart
 	mainchart.hiddenchart = $.extend(true, {}, mainchart);
@@ -239,7 +285,7 @@ function refreshHiddenChart(doNext) {
 
 	// load the data for the control and the hidden wrappers
 	// calculate the group and points to show for the control chart
-	calculateChartPointsToShow(mainchart.hiddenchart, MAINCHART_CONTROL_DIVISOR, 0, -1);
+	calculateChartPointsToShow(mainchart.hiddenchart, MAINCHART_CONTROL_DIVISOR, 0, -1, ENABLE_CURVE);
 
 	$.ajax({
 		url: generateChartURL(mainchart.hiddenchart),
@@ -293,7 +339,7 @@ function mainchartControlStateHandler() {
 	mainchart.after = Math.round(state.range.start.getTime() / 1000);
 	mainchart.before = Math.round(state.range.end.getTime() / 1000);
 
-	calculateChartPointsToShow(mainchart, mainchart.chartOptions.isStacked?MAINCHART_STACKED_POINTS_DIVISOR:MAINCHART_POINTS_DIVISOR, 0, 0);
+	calculateChartPointsToShow(mainchart, mainchart.chartOptions.isStacked?MAINCHART_STACKED_POINTS_DIVISOR:MAINCHART_POINTS_DIVISOR, mainchart.before - mainchart.after, 0, ENABLE_CURVE);
 	//mylog('group = ' + mainchart.group + ', points_to_show = ' + mainchart.points_to_show + ', dt = ' + (mainchart.before - mainchart.after));
 
 	$('#group' + mainchart.group).trigger('click');
@@ -353,9 +399,9 @@ function setMainChartGroup(g, norefresh) {
 	mainchart.group = g;
 
 	if(!mainchart.before && !mainchart.after)
-		calculateChartPointsToShow(mainchart, mainchart.chartOptions.isStacked?MAINCHART_STACKED_POINTS_DIVISOR:MAINCHART_POINTS_DIVISOR, mainchart.max_time_to_show, mainchart.group);
+		calculateChartPointsToShow(mainchart, mainchart.chartOptions.isStacked?MAINCHART_STACKED_POINTS_DIVISOR:MAINCHART_POINTS_DIVISOR, mainchart.max_time_to_show, mainchart.group, ENABLE_CURVE);
 	else
-		calculateChartPointsToShow(mainchart, mainchart.chartOptions.isStacked?MAINCHART_STACKED_POINTS_DIVISOR:MAINCHART_POINTS_DIVISOR, 0, mainchart.group);
+		calculateChartPointsToShow(mainchart, mainchart.chartOptions.isStacked?MAINCHART_STACKED_POINTS_DIVISOR:MAINCHART_POINTS_DIVISOR, 0, mainchart.group, ENABLE_CURVE);
 
 	if(!norefresh) {
 		mainchart.last_updated = 0;
@@ -394,7 +440,7 @@ function setMainChartPlay(p) {
 		//mainchart.chartOptions.explorer = null;
 		mainchart.after = 0;
 		mainchart.before = 0;
-		calculateChartPointsToShow(mainchart, mainchart.chartOptions.isStacked?MAINCHART_STACKED_POINTS_DIVISOR:MAINCHART_POINTS_DIVISOR, mainchart.max_time_to_show, 0);
+		calculateChartPointsToShow(mainchart, mainchart.chartOptions.isStacked?MAINCHART_STACKED_POINTS_DIVISOR:MAINCHART_POINTS_DIVISOR, mainchart.max_time_to_show, 0, ENABLE_CURVE);
 		$('#group' + mainchart.group).trigger('click');
 		mainchart.last_updated = 0;
 		mainchart.hiddenchart.last_updated = 0;
@@ -487,11 +533,12 @@ function resizeCharts() {
 
 	width = thumbWidth();
 	$.each(allCharts, function(i, c) {
-		if(c.enabled && c.chartOptions.width != width) {
+		if(c.enabled) {
 			cleanThisChart(c);
 			c.chartOptions.width = width;
-			calculateChartPointsToShow(c, c.chartOptions.isStacked?THUMBS_STACKED_POINTS_DIVISOR:THUMBS_POINTS_DIVISOR, THUMBS_MAX_TIME_TO_SHOW, -1);
+			calculateChartPointsToShow(c, c.chartOptions.isStacked?THUMBS_STACKED_POINTS_DIVISOR:THUMBS_POINTS_DIVISOR, THUMBS_MAX_TIME_TO_SHOW, -1, ENABLE_CURVE);
 			showChartIsLoading(c.div, c.name, c.chartOptions.width, c.chartOptions.height);
+			document.getElementById(c.id + '_thumb_actions_div').innerHTML = thumbChartActions(i, c);
 			c.last_updated = 0;
 		}
 	});
@@ -499,18 +546,20 @@ function resizeCharts() {
 	if(groupCharts) $.each(groupCharts, function(i, c) {
 		var sizes = groupChartSizes();
 
-		if(c.enabled && (c.chartOptions.width != sizes.width || c.chartOptions.height != sizes.height)) {
+		if(c.enabled) {
 			cleanThisChart(c);
 			c.chartOptions.width = sizes.width;
 			c.chartOptions.height = sizes.height;
-			calculateChartPointsToShow(c, c.chartOptions.isStacked?GROUPS_STACKED_POINTS_DIVISOR:GROUPS_POINTS_DIVISOR, GROUPS_MAX_TIME_TO_SHOW, -1);
+			calculateChartPointsToShow(c, c.chartOptions.isStacked?GROUPS_STACKED_POINTS_DIVISOR:GROUPS_POINTS_DIVISOR, GROUPS_MAX_TIME_TO_SHOW, -1, ENABLE_CURVE);
 			showChartIsLoading(c.div, c.name, c.chartOptions.width, c.chartOptions.height);
+			document.getElementById(c.id + '_group_actions_div').innerHTML = groupChartActions(i, c);
 			c.last_updated = 0;
 		}
 	});
+
+	updateUI();
 }
 
-var resize_request = false;
 window.onresize = function(event) {
 	resize_request = true;
 };
@@ -806,33 +855,31 @@ function cleanupCharts() {
 	}
 
 	// cleanup the disabled charts
-	if(mode == MODE_THUMBS)
-		$.each(allCharts, function(i, c) {
-			if(c.disablethisplease && c.enabled) {
-				cleanThisChart(c, 'emptydivs');
-				c.disablethisplease = false;
-				c.enabled = false;
-				resize_request = true;
-				mylog("removed thumb chart " + c.name + " removed");
-			}
-		});
+	$.each(allCharts, function(i, c) {
+		if(c.disablethisplease && c.enabled) {
+			cleanThisChart(c, 'emptydivs');
+			c.disablethisplease = false;
+			c.enabled = false;
+			resize_request = true;
+			mylog("removed thumb chart " + c.name + " removed");
+		}
+	});
 
-	if(mode == MODE_GROUP_THUMBS)
-		if(groupCharts) $.each(groupCharts, function(i, c) {
-			if(c.disablethisplease && c.enabled) {
-				cleanThisChart(c, 'emptydivs');
-				c.disablethisplease = false;
-				c.enabled = false;
-				resize_request = true;
-				mylog("removed group chart " + c.name + " removed");
-			}
-		});
+	if(groupCharts) $.each(groupCharts, function(i, c) {
+		if(c.disablethisplease && c.enabled) {
+			cleanThisChart(c, 'emptydivs');
+			c.disablethisplease = false;
+			c.enabled = false;
+			resize_request = true;
+			mylog("removed group chart " + c.name + " removed");
+		}
+	});
 
 	// we never cleanup the main chart
 }
 
 function updateUI() {
-	$('[data-toggle="tooltip"]').tooltip({'placement': 'top', 'container': 'body', 'html': true});
+	$('[data-toggle="tooltip"]').tooltip({'container': 'body', 'html': true});
 
 	$('[data-spy="scroll"]').each(function () {
 		var $spy = $(this).scrollspy('refresh')
@@ -942,9 +989,9 @@ function initGroupGraphs(group) {
 		c.chartOptions.tooltip = { "textStyle": { "fontSize": 9 } };
 		c.chartOptions.legend = { "textStyle": { "fontSize": 9 } };
 
-		calculateChartPointsToShow(c, c.chartOptions.isStacked?GROUPS_STACKED_POINTS_DIVISOR:GROUPS_POINTS_DIVISOR, GROUPS_MAX_TIME_TO_SHOW, -1);
+		calculateChartPointsToShow(c, c.chartOptions.isStacked?GROUPS_STACKED_POINTS_DIVISOR:GROUPS_POINTS_DIVISOR, GROUPS_MAX_TIME_TO_SHOW, -1, ENABLE_CURVE);
 
-		groupbody += "<div class=\"thumbgraph\" id=\"" + c.div + "_parent\"><table><tr><td width='" + sizes.width + "'><div class=\"thumbgraph\" id=\"" + c.div + "\">" + chartIsLoadingHTML(c.name, c.chartOptions.width, c.chartOptions.height) + "</div></td><td align=\"center\">" + groupChartActions(i, c) + "</td></tr><tr><td width='15'></td></tr></table></div>";
+		groupbody += "<div class=\"thumbgraph\" id=\"" + c.div + "_parent\"><table><tr><td width='" + sizes.width + "'><div class=\"thumbgraph\" id=\"" + c.div + "\">" + chartIsLoadingHTML(c.name, c.chartOptions.width, c.chartOptions.height) + "</div></td><td id=\"" + c.id + "_group_actions_div\" align=\"center\">" + groupChartActions(i, c) + "</td></tr><tr><td width='15'></td></tr></table></div>";
 		//groupbody += "<div class=\"thumbgraph\" id=\"" + c.div + "\">" + chartIsLoadingHTML(c.name, c.chartOptions.width, c.chartOptions.height) + "</div>";
 	});
 	groupbody += "";
@@ -975,6 +1022,8 @@ var last_user_scroll = 0;
 // load the charts from the server
 // generate html for the thumbgraphs to support them
 function initCharts() {
+	setPresentationNormal(1);
+
 	var width = thumbWidth();
 	var height = TARGET_THUMB_GRAPH_HEIGHT;
 
@@ -1020,10 +1069,10 @@ function initCharts() {
 			//c.points_to_show = Math.round(c.entries / c.group) - 1;
 			// show max 10 mins of data
 			//if(c.points_to_show * c.group > THUMBS_MAX_TIME_TO_SHOW) c.points_to_show = THUMBS_MAX_TIME_TO_SHOW / c.group;
-			calculateChartPointsToShow(c, c.chartOptions.isStacked?THUMBS_STACKED_POINTS_DIVISOR:THUMBS_POINTS_DIVISOR, THUMBS_MAX_TIME_TO_SHOW, -1);
+			calculateChartPointsToShow(c, c.chartOptions.isStacked?THUMBS_STACKED_POINTS_DIVISOR:THUMBS_POINTS_DIVISOR, THUMBS_MAX_TIME_TO_SHOW, -1, ENABLE_CURVE);
 
 			if(c.enabled) {
-				var h = "<div class=\"thumbgraph\" id=\"" + c.div + "_parent\"><table><tr><td><div class=\"thumbgraph\" id=\"" + c.div + "\">" + chartIsLoadingHTML(c.name, c.chartOptions.width, c.chartOptions.height) + "</div></td></tr><tr><td align=\"center\">"
+				var h = "<div class=\"thumbgraph\" id=\"" + c.div + "_parent\"><table><tr><td><div class=\"thumbgraph\" id=\"" + c.div + "\">" + chartIsLoadingHTML(c.name, c.chartOptions.width, c.chartOptions.height) + "</div></td></tr><tr><td id=\"" + c.id + "_thumb_actions_div\" align=\"center\">"
 				+ thumbChartActions(i, c)
 				+	"</td></tr><tr><td height='15'></td></tr></table></div>";
 
