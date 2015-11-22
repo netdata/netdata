@@ -359,10 +359,9 @@ void generate_config(struct web_buffer *wb, int only_changed)
 	struct config_value *cv;
 
 	for(i = 0; i < 3 ;i++) {
-		web_buffer_increase(wb, 500);
 		switch(i) {
 			case 0:
-				web_buffer_printf(wb, 
+				web_buffer_strcat(wb,
 					"# NetData Configuration\n"
 					"# You can uncomment and change any of the options below.\n"
 					"# The value shown in the commented settings, is the default value.\n"
@@ -370,11 +369,11 @@ void generate_config(struct web_buffer *wb, int only_changed)
 				break;
 
 			case 1:
-				web_buffer_printf(wb, "\n\n# per plugin configuration\n");
+				web_buffer_strcat(wb, "\n\n# per plugin configuration\n");
 				break;
 
 			case 2:
-				web_buffer_printf(wb, "\n\n# per chart configuration\n");
+				web_buffer_strcat(wb, "\n\n# per chart configuration\n");
 				break;
 		}
 
@@ -397,21 +396,17 @@ void generate_config(struct web_buffer *wb, int only_changed)
 				if(only_changed && !changed) continue;
 
 				if(!used) {
-					web_buffer_increase(wb, 500);
-					web_buffer_printf(wb, "\n# node '%s' is not used.", co->name);
+					web_buffer_snprintf(wb, CONFIG_FILE_LINE_MAX+1, "\n# node '%s' is not used.", co->name);
 				}
 
-				web_buffer_increase(wb, CONFIG_FILE_LINE_MAX+1);
-				web_buffer_printf(wb, "\n[%s]\n", co->name);
+				web_buffer_snprintf(wb, CONFIG_FILE_LINE_MAX+1, "\n[%s]\n", co->name);
 
 				for(cv = co->values; cv ; cv = cv->next) {
 
 					if(used && !(cv->flags & CONFIG_VALUE_USED)) {
-						web_buffer_increase(wb, CONFIG_FILE_LINE_MAX + 1);
-						web_buffer_printf(wb, "\n\t# option '%s' is not used.\n", cv->name);
+						web_buffer_snprintf(wb, CONFIG_FILE_LINE_MAX + 1, "\n\t# option '%s' is not used.\n", cv->name);
 					}
-					web_buffer_increase(wb, CONFIG_FILE_LINE_MAX + 1);
-					web_buffer_printf(wb, "\t%s%s = %s\n", ((!(cv->flags & CONFIG_VALUE_CHANGED)) && (cv->flags & CONFIG_VALUE_USED))?"# ":"", cv->name, cv->value);
+					web_buffer_snprintf(wb, CONFIG_FILE_LINE_MAX + 1, "\t%s%s = %s\n", ((!(cv->flags & CONFIG_VALUE_CHANGED)) && (cv->flags & CONFIG_VALUE_USED))?"# ":"", cv->name, cv->value);
 				}
 			}
 		}

@@ -9,11 +9,11 @@
 
 struct web_buffer {
 	long size;		// allocation size of buffer
-	long bytes;		// current data length in buffer
+	long len;		// current data length in buffer
 	long sent;		// current data length sent to output
 	char *buffer;	// the buffer
 	int contenttype;
-	long rbytes; 	// if non-zero, the excepted size of ifd
+	long rlen; 	// if non-zero, the excepted size of ifd
 	time_t date;	// the date this content has been generated
 };
 
@@ -33,10 +33,12 @@ struct web_buffer {
 #define CT_APPLICATION_VND_MS_FONTOBJ	13
 #define CT_IMAGE_SVG_XML				14
 
-#define web_buffer_printf(wb, args...) wb->bytes += snprintf(&wb->buffer[wb->bytes], (wb->size - wb->bytes), ##args)
-#define web_buffer_reset(wb) wb->buffer[wb->bytes = 0] = '\0'
+#define web_buffer_need_bytes(buffer, needed_free_size) do { if(unlikely((buffer)->size - (buffer)->len < (needed_free_size))) web_buffer_increase((buffer), (needed_free_size)); } while(0)
 
-void web_buffer_strcpy(struct web_buffer *wb, const char *txt);
+#define web_buffer_flush(wb) wb->buffer[wb->len = 0] = '\0'
+void web_buffer_reset(struct web_buffer *wb);
+
+void web_buffer_strcat(struct web_buffer *wb, const char *txt);
 void web_buffer_rrd_value(struct web_buffer *wb, calculated_number value);
 
 void web_buffer_jsdate(struct web_buffer *wb, int year, int month, int day, int hours, int minutes, int seconds);
@@ -44,5 +46,9 @@ void web_buffer_jsdate(struct web_buffer *wb, int year, int month, int day, int 
 struct web_buffer *web_buffer_create(long size);
 void web_buffer_free(struct web_buffer *b);
 void web_buffer_increase(struct web_buffer *b, long free_size_required);
+
+void web_buffer_snprintf(struct web_buffer *wb, size_t len, const char *fmt, ...);
+
+void web_buffer_char_replace(struct web_buffer *wb, char from, char to);
 
 #endif /* NETDATA_WEB_BUFFER_H */

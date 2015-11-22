@@ -2,6 +2,7 @@
 #include <config.h>
 #endif
 #include <stdlib.h>
+#include <string.h>
 
 #ifdef STORAGE_WITH_MATH
 #include <math.h>
@@ -11,21 +12,72 @@
 #include "web_buffer.h"
 #include "log.h"
 
-void web_buffer_strcpy(struct web_buffer *wb, const char *txt)
+void web_buffer_reset(struct web_buffer *wb)
+{
+	web_buffer_flush(wb);
+
+	wb->sent = 0;
+	wb->rlen = 0;
+	wb->contenttype = CT_TEXT_PLAIN;
+	wb->date = 0;
+}
+
+void web_buffer_char_replace(struct web_buffer *wb, char from, char to)
+{
+	char *s = wb->buffer, *end = &wb->buffer[wb->len];
+
+	while(s != end) {
+		if(*s == from) *s = to;
+		s++;
+	}
+}
+
+
+void web_buffer_strcat(struct web_buffer *wb, const char *txt)
 {
 	char *buffer = wb->buffer;
-	long bytes = wb->bytes, size = wb->size, i = 0;
+	const char *s = txt;
+	long bytes = wb->len, size = wb->size;
 
-	while(txt[i] && bytes < size)
-		buffer[bytes++] = txt[i++];
+	while(*s && bytes < size)
+		buffer[bytes++] = *s++;
 
-	wb->bytes = bytes;
+	wb->len = bytes;
+
+	if(*s) {
+		web_buffer_need_bytes(wb, strlen(s));
+		web_buffer_strcat(wb, s);
+	}
+	else {
+		// terminate the string
+		// without increasing the length
+		web_buffer_need_bytes(wb, 1);
+		wb->buffer[wb->len] = '\0';
+	}
 }
+
+
+void web_buffer_snprintf(struct web_buffer *wb, size_t len, const char *fmt, ...)
+{
+	web_buffer_need_bytes(wb, len+1);
+
+	va_list args;
+	va_start(args, fmt);
+	wb->len += vsnprintf(&wb->buffer[wb->len], len+1, fmt, args);
+	va_end(args);
+
+	// the buffer is \0 terminated by vsnprintf
+}
+
 
 void web_buffer_rrd_value(struct web_buffer *wb, calculated_number value)
 {
-	if(wb->size - wb->bytes < 50) return;
-	wb->bytes += print_calculated_number(&wb->buffer[wb->bytes], value);
+	web_buffer_need_bytes(wb, 50);
+	wb->len += print_calculated_number(&wb->buffer[wb->len], value);
+
+	// terminate it
+	web_buffer_need_bytes(wb, 1);
+	wb->buffer[wb->len] = '\0';
 }
 
 // generate a javascript date, the fastest possible way...
@@ -35,9 +87,9 @@ void web_buffer_jsdate(struct web_buffer *wb, int year, int month, int day, int 
 	// 01234567890123456789012345678901234
 	// Date(2014, 04, 01, 03, 28, 20, 065)
 
-	if(wb->size - wb->bytes < 36) return;
+	web_buffer_need_bytes(wb, 36);
 
-	char *b = &wb->buffer[wb->bytes];
+	char *b = &wb->buffer[wb->len];
 
 	int i = 0;
 	b[i++]='D';
@@ -72,7 +124,11 @@ void web_buffer_jsdate(struct web_buffer *wb, int year, int month, int day, int 
 	b[i++]=')';
 	b[i]='\0';
 
-	wb->bytes += i;
+	wb->len += i;
+
+	// terminate it
+	web_buffer_need_bytes(wb, 1);
+	wb->buffer[wb->len] = '\0';
 }
 
 struct web_buffer *web_buffer_create(long size)
@@ -109,9 +165,10 @@ void web_buffer_free(struct web_buffer *b)
 
 void web_buffer_increase(struct web_buffer *b, long free_size_required)
 {
-	long left = b->size - b->bytes;
+	long left = b->size - b->len;
 
 	if(left >= free_size_required) return;
+
 	long increase = free_size_required - left;
 	if(increase < WEB_DATA_LENGTH_INCREASE_STEP) increase = WEB_DATA_LENGTH_INCREASE_STEP;
 

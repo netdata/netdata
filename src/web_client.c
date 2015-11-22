@@ -152,7 +152,7 @@ int mysendfile(struct web_client *w, char *filename)
 	// if the filename contains a / or a .., refuse to serve it
 	if(strchr(filename, '/') != 0 || strstr(filename, "..") != 0) {
 		debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not acceptable.", w->id, filename);
-		web_buffer_printf(w->data, "File '%s' cannot be served. Filenames cannot contain / or ..", filename);
+		web_buffer_snprintf(w->data, FILENAME_MAX + 1024, "File '%s' cannot be served. Filenames cannot contain / or ..", filename);
 		return 400;
 	}
 
@@ -164,14 +164,14 @@ int mysendfile(struct web_client *w, char *filename)
 	struct stat stat;
 	if(lstat(webfilename, &stat) != 0) {
 		error("%llu: File '%s' is not found.", w->id, webfilename);
-		web_buffer_printf(w->data, "File '%s' does not exist, or is not accessible.", filename);
+		web_buffer_snprintf(w->data, FILENAME_MAX + 1024, "File '%s' does not exist, or is not accessible.", filename);
 		return 404;
 	}
 
 	// check if the file is owned by us
 	if(stat.st_uid != getuid() && stat.st_uid != geteuid()) {
 		error("%llu: File '%s' is owned by user %d (I run as user %d). Access Denied.", w->id, webfilename, stat.st_uid, getuid());
-		web_buffer_printf(w->data, "Access to file '%s' is not permitted.", filename);
+		web_buffer_snprintf(w->data, FILENAME_MAX + 1024, "Access to file '%s' is not permitted.", filename);
 		return 403;
 	}
 
@@ -183,12 +183,12 @@ int mysendfile(struct web_client *w, char *filename)
 		if(errno == EBUSY || errno == EAGAIN) {
 			error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, webfilename);
 			snprintf(w->response_header, MAX_HTTP_HEADER_SIZE, "Location: /" WEB_PATH_FILE "/%s\r\n", filename);
-			web_buffer_printf(w->data, "The file '%s' is currently busy. Please try again later.", filename);
+			web_buffer_snprintf(w->data, FILENAME_MAX + 1024, "The file '%s' is currently busy. Please try again later.", filename);
 			return 307;
 		}
 		else {
 			error("%llu: Cannot open file '%s'.", w->id, webfilename);
-			web_buffer_printf(w->data, "Cannot open file '%s'.", filename);
+			web_buffer_snprintf(w->data, FILENAME_MAX + 1024, "Cannot open file '%s'.", filename);
 			return 404;
 		}
 	}
@@ -212,9 +212,8 @@ int mysendfile(struct web_client *w, char *filename)
 	w->mode = WEB_CLIENT_MODE_FILECOPY;
 	w->wait_receive = 1;
 	w->wait_send = 0;
-	w->data->bytes = 0;
-	w->data->buffer[0] = '\0';
-	w->data->rbytes = stat.st_size;
+	web_buffer_flush(w->data);
+	w->data->rlen = stat.st_size;
 	w->data->date = stat.st_mtim.tv_sec;
 
 	return 200;
@@ -225,13 +224,13 @@ void web_client_reset(struct web_client *w)
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 
-	long sent = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->data->rbytes:w->data->bytes;
+	long sent = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->data->rlen:w->data->len;
 
 #ifdef NETDATA_WITH_ZLIB
 	if(likely(w->zoutput)) sent = (long)w->zstream.total_out;
 #endif
 
-	long size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->data->rbytes:w->data->bytes;
+	long size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->data->rlen:w->data->len;
 
 	if(likely(w->last_url[0]))
 		log_access("%llu: (sent/all = %ld/%ld bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: '%s'",
@@ -254,15 +253,11 @@ void web_client_reset(struct web_client *w)
 
 	w->last_url[0] = '\0';
 
-	w->data->contenttype = CT_TEXT_PLAIN;
 	w->mode = WEB_CLIENT_MODE_NORMAL;
 
-	w->data->rbytes = 0;
-	w->data->bytes = 0;
-	w->data->sent = 0;
-
 	w->response_header[0] = '\0';
-	w->data->buffer[0] = '\0';
+
+	web_buffer_reset(w->data);
 
 	w->wait_receive = 1;
 	w->wait_send = 0;
@@ -350,7 +345,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	if(!st) {
 		// we don't have it
 		// try to send a file with that name
-		w->data->bytes = 0;
+		web_buffer_flush(w->data);
 		return(mysendfile(w, tok));
 	}
 
@@ -404,7 +399,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	}
 
 	w->data->contenttype = CT_APPLICATION_JSON;
-	w->data->bytes = 0;
+	web_buffer_flush(w->data);
 
 	char *google_version = "0.6";
 	char *google_reqId = "0";
@@ -456,7 +451,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 
 			// check the client wants json
 			if(strcmp(google_out, "json") != 0) {
-				w->data->bytes = snprintf(w->data->buffer, w->data->size,
+				web_buffer_snprintf(w->data, 65536,
 					"%s({version:'%s',reqId:'%s',status:'error',errors:[{reason:'invalid_query',message:'output format is not supported',detailed_message:'the format %s requested is not supported by netdata.'}]});",
 					google_responseHandler, google_version, google_reqId, google_out);
 					return 200;
@@ -465,7 +460,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	}
 
 	if(datasource_type == DATASOURCE_GOOGLE_JSONP) {
-		w->data->bytes = snprintf(w->data->buffer, w->data->size,
+		web_buffer_snprintf(w->data, 65536,
 			"%s({version:'%s',reqId:'%s',status:'ok',sig:'%lu',table:",
 			google_responseHandler, google_version, google_reqId, st->last_updated.tv_sec);
 	}
@@ -475,11 +470,11 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 
 	if(datasource_type == DATASOURCE_GOOGLE_JSONP) {
 		if(timestamp_in_data > last_timestamp_in_data)
-			w->data->bytes += snprintf(&w->data->buffer[w->data->bytes], w->data->size - w->data->bytes, "});");
+			web_buffer_strcat(w->data, "});");
 
 		else {
 			// the client already has the latest data
-			w->data->bytes = snprintf(w->data->buffer, w->data->size,
+			web_buffer_snprintf(w->data, 65536,
 				"%s({version:'%s',reqId:'%s',status:'error',errors:[{reason:'not_modified',message:'Data not modified'}]});",
 				google_responseHandler, google_version, google_reqId);
 		}
@@ -549,7 +544,7 @@ void web_client_process(struct web_client *w) {
 		global_statistics_unlock();
 
 		gettimeofday(&w->tv_in, NULL);
-		debug(D_WEB_DATA, "%llu: Processing data buffer of %d bytes: '%s'.", w->id, w->data->bytes, w->data->buffer);
+		debug(D_WEB_DATA, "%llu: Processing data buffer of %d bytes: '%s'.", w->id, w->data->len, w->data->buffer);
 
 		// check if the client requested keep-alive HTTP
 		if(strcasestr(w->data->buffer, "Connection: keep-alive")) w->keepalive = 1;
@@ -614,19 +609,19 @@ void web_client_process(struct web_client *w) {
 				if(!st) {
 					// we don't have it
 					// try to send a file with that name
-					w->data->bytes = 0;
+					web_buffer_flush(w->data);
 					code = mysendfile(w, tok);
 				}
 				else {
 					code = 200;
 					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending %s.json of RRD_STATS...", w->id, st->name);
 					w->data->contenttype = CT_APPLICATION_JSON;
-					w->data->bytes = 0;
+					web_buffer_flush(w->data);
 					rrd_stats_graph_json(st, url, w->data);
 				}
 			}
 			else if(strcmp(tok, "debug") == 0) {
-				w->data->bytes = 0;
+				web_buffer_flush(w->data);
 
 				// get the name of the data to show
 				tok = mystrsep(&url, "/?&");
@@ -637,14 +632,14 @@ void web_client_process(struct web_client *w) {
 				if(!st) st = rrdset_find(tok);
 				if(!st) {
 					code = 404;
-					web_buffer_printf(w->data, "Chart %s is not found.\r\n", tok);
+					web_buffer_snprintf(w->data, 1024, "Chart %s is not found.\r\n", tok);
 					debug(D_WEB_CLIENT_ACCESS, "%llu: %s is not found.", w->id, tok);
 				}
 				else {
 					code = 200;
 					debug_flags |= D_RRD_STATS;
 					st->debug = st->debug?0:1;
-					web_buffer_printf(w->data, "Chart %s has now debug %s.\r\n", tok, st->debug?"enabled":"disabled");
+					web_buffer_snprintf(w->data, 1024, "Chart %s has now debug %s.\r\n", tok, st->debug?"enabled":"disabled");
 					debug(D_WEB_CLIENT_ACCESS, "%llu: debug for %s is %s.", w->id, tok, st->debug?"enabled":"disabled");
 				}
 			}
@@ -654,9 +649,7 @@ void web_client_process(struct web_client *w) {
 				debug(D_WEB_CLIENT_ACCESS, "%llu: Mirroring...", w->id);
 
 				// replace the zero bytes with spaces
-				int i;
-				for(i = 0; i < w->data->size; i++)
-					if(w->data->buffer[i] == '\0') w->data->buffer[i] = ' ';
+				web_buffer_char_replace(w->data, '\0', ' ');
 
 				// just leave the buffer as is
 				// it will be copied back to the client
@@ -666,18 +659,18 @@ void web_client_process(struct web_client *w) {
 
 				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending list of RRD_STATS...", w->id);
 
-				w->data->bytes = 0;
+				web_buffer_flush(w->data);
 				RRDSET *st = rrdset_root;
 
 				for ( ; st ; st = st->next )
-					web_buffer_printf(w->data, "%s\n", st->name);
+					web_buffer_snprintf(w->data, 1024, "%s\n", st->name);
 			}
 			else if(strcmp(tok, "all.json") == 0) {
 				code = 200;
 				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending JSON list of all monitors of RRD_STATS...", w->id);
 
 				w->data->contenttype = CT_APPLICATION_JSON;
-				w->data->bytes = 0;
+				web_buffer_flush(w->data);
 				rrd_stats_all_json(w->data);
 			}
 			else if(strcmp(tok, "netdata.conf") == 0) {
@@ -685,7 +678,7 @@ void web_client_process(struct web_client *w) {
 				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending netdata.conf ...", w->id);
 
 				w->data->contenttype = CT_TEXT_PLAIN;
-				w->data->bytes = 0;
+				web_buffer_flush(w->data);
 				generate_config(w->data, 0);
 			}
 			else if(strcmp(tok, WEB_PATH_FILE) == 0) { // "file"
@@ -693,17 +686,16 @@ void web_client_process(struct web_client *w) {
 				if(tok && *tok) code = mysendfile(w, tok);
 				else {
 					code = 400;
-					w->data->bytes = 0;
-					strcpy(w->data->buffer, "You have to give a filename to get.\r\n");
-					w->data->bytes = strlen(w->data->buffer);
+					web_buffer_flush(w->data);
+					web_buffer_strcat(w->data, "You have to give a filename to get.\r\n");
 				}
 			}
 			else if(!tok[0]) {
-				w->data->bytes = 0;
+				web_buffer_flush(w->data);
 				code = mysendfile(w, "index.html");
 			}
 			else {
-				w->data->bytes = 0;
+				web_buffer_flush(w->data);
 				code = mysendfile(w, tok);
 			}
 
@@ -714,23 +706,21 @@ void web_client_process(struct web_client *w) {
 			if(buf) debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, buf);
 
 			code = 500;
-			w->data->bytes = 0;
-			strcpy(w->data->buffer, "I don't understand you...\r\n");
-			w->data->bytes = strlen(w->data->buffer);
+			web_buffer_flush(w->data);
+			web_buffer_strcat(w->data, "I don't understand you...\r\n");
 		}
 
 		// free url_decode() buffer
 		if(pointer_to_free) free(pointer_to_free);
 	}
-	else if(w->data->bytes > 8192) {
+	else if(w->data->len > 8192) {
 		strcpy(w->last_url, "too big request");
 
 		debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big.", w->id);
 
 		code = 400;
-		w->data->bytes = 0;
-		strcpy(w->data->buffer, "Received request is too big.\r\n");
-		w->data->bytes = strlen(w->data->buffer);
+		web_buffer_flush(w->data);
+		web_buffer_strcat(w->data, "Received request is too big.\r\n");
 	}
 	else {
 		// wait for more data
@@ -738,8 +728,8 @@ void web_client_process(struct web_client *w) {
 		return;
 	}
 
-	if(w->data->bytes > w->data->size) {
-		error("%llu: memory overflow encountered (size is %ld, written %ld).", w->data->size, w->data->bytes);
+	if(w->data->len > w->data->size) {
+		error("%llu: memory overflow encountered (size is %ld, written %ld).", w->data->size, w->data->len);
 	}
 
 	gettimeofday(&w->tv_ready, NULL);
@@ -875,10 +865,10 @@ void web_client_process(struct web_client *w) {
 	}
 
 	// if we know the content length, put it
-	if(!w->zoutput && (w->data->bytes || w->data->rbytes))
+	if(!w->zoutput && (w->data->len || w->data->rlen))
 		headerlen += snprintf(&w->response_header[headerlen], MAX_HTTP_HEADER_SIZE - headerlen,
 			"Content-Length: %ld\r\n"
-			, w->data->bytes?w->data->bytes:w->data->rbytes
+			, w->data->len?w->data->len:w->data->rlen
 			);
 	else if(!w->zoutput)
 		w->keepalive = 0;	// content-length is required for keep-alive
@@ -913,18 +903,18 @@ void web_client_process(struct web_client *w) {
 	if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0) error("%llu: failed to enable TCP_NODELAY on socket.", w->id);
 
 	// enable sending immediately if we have data
-	if(w->data->bytes) w->wait_send = 1;
+	if(w->data->len) w->wait_send = 1;
 	else w->wait_send = 0;
 
 	// pretty logging
 	switch(w->mode) {
 		case WEB_CLIENT_MODE_NORMAL:
-			debug(D_WEB_CLIENT, "%llu: Done preparing the response. Sending data (%d bytes) to client.", w->id, w->data->bytes);
+			debug(D_WEB_CLIENT, "%llu: Done preparing the response. Sending data (%d bytes) to client.", w->id, w->data->len);
 			break;
 
 		case WEB_CLIENT_MODE_FILECOPY:
-			if(w->data->rbytes) {
-				debug(D_WEB_CLIENT, "%llu: Done preparing the response. Will be sending data file of %d bytes to client.", w->id, w->data->rbytes);
+			if(w->data->rlen) {
+				debug(D_WEB_CLIENT, "%llu: Done preparing the response. Will be sending data file of %d bytes to client.", w->id, w->data->rlen);
 				w->wait_receive = 1;
 
 				/*
@@ -991,14 +981,14 @@ long web_client_send_chunk_finalize(struct web_client *w)
 #ifdef NETDATA_WITH_ZLIB
 long web_client_send_deflate(struct web_client *w)
 {
-	long bytes = 0, t = 0;
+	long len = 0, t = 0;
 
 	// when using compression,
 	// w->data->sent is the amount of bytes passed through compression
 
 	// debug(D_DEFLATE, "%llu: TEST w->data->bytes = %d, w->data->sent = %d, w->zhave = %d, w->zsent = %d, w->zstream.avail_in = %d, w->zstream.avail_out = %d, w->zstream.total_in = %d, w->zstream.total_out = %d.", w->id, w->data->bytes, w->data->sent, w->zhave, w->zsent, w->zstream.avail_in, w->zstream.avail_out, w->zstream.total_in, w->zstream.total_out);
 
-	if(w->data->bytes - w->data->sent == 0 && w->zstream.avail_in == 0 && w->zhave == w->zsent && w->zstream.avail_out != 0) {
+	if(w->data->len - w->data->sent == 0 && w->zstream.avail_in == 0 && w->zhave == w->zsent && w->zstream.avail_out != 0) {
 		// there is nothing to send
 
 		debug(D_WEB_CLIENT, "%llu: Out of output data.", w->id);
@@ -1011,7 +1001,7 @@ long web_client_send_deflate(struct web_client *w)
 		// A. we have done everything
 		// B. we temporarily have nothing to send, waiting for the buffer to be filled by ifd
 
-		if(w->mode == WEB_CLIENT_MODE_FILECOPY && w->wait_receive && w->ifd != w->ofd && w->data->rbytes && w->data->rbytes > w->data->bytes) {
+		if(w->mode == WEB_CLIENT_MODE_FILECOPY && w->wait_receive && w->ifd != w->ofd && w->data->rlen && w->data->rlen > w->data->len) {
 			// we have to wait, more data will come
 			debug(D_WEB_CLIENT, "%llu: Waiting for more data to become available.", w->id);
 			w->wait_send = 0;
@@ -1036,12 +1026,12 @@ long web_client_send_deflate(struct web_client *w)
 		// close the previous open chunk
 		if(w->data->sent != 0) t += web_client_send_chunk_close(w);
 
-		debug(D_DEFLATE, "%llu: Compressing %d bytes starting from %d.", w->id, (w->data->bytes - w->data->sent), w->data->sent);
+		debug(D_DEFLATE, "%llu: Compressing %d bytes starting from %d.", w->id, (w->data->len - w->data->sent), w->data->sent);
 
 		// give the compressor all the data not passed through the compressor yet
-		if(w->data->bytes > w->data->sent) {
+		if(w->data->len > w->data->sent) {
 			w->zstream.next_in = (Bytef *)&w->data->buffer[w->data->sent];
-			w->zstream.avail_in = (w->data->bytes - w->data->sent);
+			w->zstream.avail_in = (w->data->len - w->data->sent);
 		}
 
 		// reset the compressor output buffer
@@ -1051,7 +1041,7 @@ long web_client_send_deflate(struct web_client *w)
 		// ask for FINISH if we have all the input
 		int flush = Z_SYNC_FLUSH;
 		if(w->mode == WEB_CLIENT_MODE_NORMAL
-			|| (w->mode == WEB_CLIENT_MODE_FILECOPY && w->data->bytes == w->data->rbytes)) {
+			|| (w->mode == WEB_CLIENT_MODE_FILECOPY && w->data->len == w->data->rlen)) {
 			flush = Z_FINISH;
 			debug(D_DEFLATE, "%llu: Requesting Z_FINISH.", w->id);
 		}
@@ -1070,7 +1060,7 @@ long web_client_send_deflate(struct web_client *w)
 		w->zsent = 0;
 
 		// keep track of the bytes passed through the compressor
-		w->data->sent = w->data->bytes;
+		w->data->sent = w->data->len;
 
 		debug(D_DEFLATE, "%llu: Compression produced %d bytes.", w->id, w->zhave);
 
@@ -1078,16 +1068,16 @@ long web_client_send_deflate(struct web_client *w)
 		t += web_client_send_chunk_header(w, w->zhave);
 	}
 
-	bytes = send(w->ofd, &w->zbuffer[w->zsent], w->zhave - w->zsent, MSG_DONTWAIT);
-	if(bytes > 0) {
-		w->zsent += bytes;
-		if(t > 0) bytes += t;
-		debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, bytes);
+	len = send(w->ofd, &w->zbuffer[w->zsent], w->zhave - w->zsent, MSG_DONTWAIT);
+	if(len > 0) {
+		w->zsent += len;
+		if(t > 0) len += t;
+		debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, len);
 	}
-	else if(bytes == 0) debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client.", w->id);
+	else if(len == 0) debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client.", w->id);
 	else debug(D_WEB_CLIENT, "%llu: Failed to send data to client. Reason: %s", w->id, strerror(errno));
 
-	return(bytes);
+	return(len);
 }
 #endif // NETDATA_WITH_ZLIB
 
@@ -1099,7 +1089,7 @@ long web_client_send(struct web_client *w)
 
 	long bytes;
 
-	if(unlikely(w->data->bytes - w->data->sent == 0)) {
+	if(unlikely(w->data->len - w->data->sent == 0)) {
 		// there is nothing to send
 
 		debug(D_WEB_CLIENT, "%llu: Out of output data.", w->id);
@@ -1108,7 +1098,7 @@ long web_client_send(struct web_client *w)
 		// A. we have done everything
 		// B. we temporarily have nothing to send, waiting for the buffer to be filled by ifd
 
-		if(w->mode == WEB_CLIENT_MODE_FILECOPY && w->wait_receive && w->ifd != w->ofd && w->data->rbytes && w->data->rbytes > w->data->bytes) {
+		if(w->mode == WEB_CLIENT_MODE_FILECOPY && w->wait_receive && w->ifd != w->ofd && w->data->rlen && w->data->rlen > w->data->len) {
 			// we have to wait, more data will come
 			debug(D_WEB_CLIENT, "%llu: Waiting for more data to become available.", w->id);
 			w->wait_send = 0;
@@ -1126,7 +1116,7 @@ long web_client_send(struct web_client *w)
 		return(0);
 	}
 
-	bytes = send(w->ofd, &w->data->buffer[w->data->sent], w->data->bytes - w->data->sent, MSG_DONTWAIT);
+	bytes = send(w->ofd, &w->data->buffer[w->data->sent], w->data->len - w->data->sent, MSG_DONTWAIT);
 	if(likely(bytes > 0)) {
 		w->data->sent += bytes;
 		debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, bytes);
@@ -1140,27 +1130,27 @@ long web_client_send(struct web_client *w)
 long web_client_receive(struct web_client *w)
 {
 	// do we have any space for more data?
-	web_buffer_increase(w->data, WEB_DATA_LENGTH_INCREASE_STEP);
+	web_buffer_need_bytes(w->data, WEB_DATA_LENGTH_INCREASE_STEP);
 
-	long left = w->data->size - w->data->bytes;
+	long left = w->data->size - w->data->len;
 	long bytes;
 
 	if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY))
-		bytes = read(w->ifd, &w->data->buffer[w->data->bytes], (left-1));
+		bytes = read(w->ifd, &w->data->buffer[w->data->len], (left-1));
 	else
-		bytes = recv(w->ifd, &w->data->buffer[w->data->bytes], left-1, MSG_DONTWAIT);
+		bytes = recv(w->ifd, &w->data->buffer[w->data->len], left-1, MSG_DONTWAIT);
 
 	if(likely(bytes > 0)) {
-		int old = w->data->bytes;
-		w->data->bytes += bytes;
-		w->data->buffer[w->data->bytes] = '\0';
+		int old = w->data->len;
+		w->data->len += bytes;
+		w->data->buffer[w->data->len] = '\0';
 
 		debug(D_WEB_CLIENT, "%llu: Received %d bytes.", w->id, bytes);
 		debug(D_WEB_DATA, "%llu: Received data: '%s'.", w->id, &w->data->buffer[old]);
 
 		if(w->mode == WEB_CLIENT_MODE_FILECOPY) {
 			w->wait_send = 1;
-			if(w->data->rbytes && w->data->bytes >= w->data->rbytes) w->wait_receive = 0;
+			if(w->data->rlen && w->data->len >= w->data->rlen) w->wait_receive = 0;
 		}
 	}
 	else if(likely(bytes == 0)) {

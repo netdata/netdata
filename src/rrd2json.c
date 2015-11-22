@@ -15,11 +15,10 @@ char *hostname = "unknown";
 unsigned long rrd_stats_one_json(RRDSET *st, char *options, struct web_buffer *wb)
 {
 	time_t now = time(NULL);
-	web_buffer_increase(wb, 65536);
 
 	pthread_rwlock_rdlock(&st->rwlock);
 
-	web_buffer_printf(wb,
+	web_buffer_snprintf(wb, 65536,
 		"\t\t{\n"
 		"\t\t\t\"id\": \"%s\",\n"
 		"\t\t\t\"name\": \"%s\",\n"
@@ -70,11 +69,10 @@ unsigned long rrd_stats_one_json(RRDSET *st, char *options, struct web_buffer *w
 
 	RRDDIM *rd;
 	for(rd = st->dimensions; rd ; rd = rd->next) {
-		web_buffer_increase(wb, 4096);
 
 		memory += rd->memsize;
 
-		web_buffer_printf(wb,
+		web_buffer_snprintf(wb, 4096,
 			"\t\t\t\t{\n"
 			"\t\t\t\t\t\"id\": \"%s\",\n"
 			"\t\t\t\t\t\"name\": \"%s\",\n"
@@ -107,7 +105,7 @@ unsigned long rrd_stats_one_json(RRDSET *st, char *options, struct web_buffer *w
 			);
 	}
 
-	web_buffer_printf(wb,
+	web_buffer_snprintf(wb, 200,
 		"\t\t\t],\n"
 		"\t\t\t\"memory\" : %lu\n"
 		"\t\t}"
@@ -123,34 +121,30 @@ unsigned long rrd_stats_one_json(RRDSET *st, char *options, struct web_buffer *w
 
 void rrd_stats_graph_json(RRDSET *st, char *options, struct web_buffer *wb)
 {
-	web_buffer_increase(wb, 2048);
-
-	web_buffer_printf(wb, RRD_GRAPH_JSON_HEADER);
+	web_buffer_snprintf(wb, sizeof(RRD_GRAPH_JSON_HEADER), RRD_GRAPH_JSON_HEADER);
 	rrd_stats_one_json(st, options, wb);
-	web_buffer_printf(wb, RRD_GRAPH_JSON_FOOTER);
+	web_buffer_snprintf(wb, sizeof(RRD_GRAPH_JSON_FOOTER), RRD_GRAPH_JSON_FOOTER);
 }
 
 void rrd_stats_all_json(struct web_buffer *wb)
 {
-	web_buffer_increase(wb, 2048);
-
 	unsigned long memory = 0;
 	long c;
 	RRDSET *st;
 
-	web_buffer_printf(wb, RRD_GRAPH_JSON_HEADER);
+	web_buffer_snprintf(wb, sizeof(RRD_GRAPH_JSON_HEADER), RRD_GRAPH_JSON_HEADER);
 
 	pthread_rwlock_rdlock(&rrdset_root_rwlock);
 	for(st = rrdset_root, c = 0; st ; st = st->next) {
 		if(st->enabled) {
-			if(c) web_buffer_printf(wb, "%s", ",\n");
+			if(c) web_buffer_strcat(wb, ",\n");
 			memory += rrd_stats_one_json(st, NULL, wb);
 			c++;
 		}
 	}
 	pthread_rwlock_unlock(&rrdset_root_rwlock);
 	
-	web_buffer_printf(wb, "\n\t],\n"
+	web_buffer_snprintf(wb, 4096, "\n\t],\n"
 		"\t\"hostname\": \"%s\",\n"
 		"\t\"update_every\": %d,\n"
 		"\t\"history\": %d,\n"
@@ -379,7 +373,8 @@ RRDR *rrd2rrdr(RRDSET *st, long points, time_t after, time_t before, int group_m
 	if(duration <= 0) return NULL;
 
 	// check the required points
-	if(points <= 0) points = duration;
+	if(points > duration / st->update_every) points = 0;
+	if(points <= 0) points = duration / st->update_every;
 
 	// calculate proper grouping of source data
 	long group = duration / points;
@@ -622,7 +617,7 @@ unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int po
 	for( rd = st->dimensions ; rd ; rd = rd->next) dimensions++;
 	if(!dimensions) {
 		pthread_rwlock_unlock(&st->rwlock);
-		web_buffer_printf(wb, "No dimensions yet.");
+		web_buffer_strcat(wb, "No dimensions yet.");
 		return 0;
 	}
 
@@ -694,10 +689,10 @@ unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int po
 		// -------------------------------------------------------------------------
 		// print the JSON header
 
-		web_buffer_printf(wb, "{\n	%scols%s:\n	[\n", kq, kq);
-		web_buffer_printf(wb, "		{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
-		web_buffer_printf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotation%s}},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
-		web_buffer_printf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotationText%s}}", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
+		web_buffer_snprintf(wb, 1024, "{\n	%scols%s:\n	[\n", kq, kq);
+		web_buffer_snprintf(wb, 1024, "		{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
+		web_buffer_snprintf(wb, 1024, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotation%s}},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
+		web_buffer_snprintf(wb, 1024, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotationText%s}}", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
 
 		// print the header for each dimension
 		// and update the print_hidden array for the dimensions that should be hidden
@@ -705,15 +700,15 @@ unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int po
 		for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 			if(!print_hidden[c]) {
 				pc++;
-				web_buffer_printf(wb, ",\n		{%sid%s:%s%s,%slabel%s:%s%s%s,%spattern%s:%s%s,%stype%s:%snumber%s}", kq, kq, sq, sq, kq, kq, sq, rd->name, sq, kq, kq, sq, sq, kq, kq, sq, sq);
+				web_buffer_snprintf(wb, 1024, ",\n		{%sid%s:%s%s,%slabel%s:%s%s%s,%spattern%s:%s%s,%stype%s:%snumber%s}", kq, kq, sq, sq, kq, kq, sq, rd->name, sq, kq, kq, sq, sq, kq, kq, sq, sq);
 			}
 		}
 		if(!pc) {
-			web_buffer_printf(wb, ",\n		{%sid%s:%s%s,%slabel%s:%s%s%s,%spattern%s:%s%s,%stype%s:%snumber%s}", kq, kq, sq, sq, kq, kq, sq, "no data", sq, kq, kq, sq, sq, kq, kq, sq, sq);
+			web_buffer_snprintf(wb, 1024, ",\n		{%sid%s:%s%s,%slabel%s:%s%s%s,%spattern%s:%s%s,%stype%s:%snumber%s}", kq, kq, sq, sq, kq, kq, sq, "no data", sq, kq, kq, sq, sq, kq, kq, sq, sq);
 		}
 
 		// print the begin of row data
-		web_buffer_printf(wb, "\n	],\n	%srows%s:\n	[\n", kq, kq);
+		web_buffer_snprintf(wb, 1024, "\n	],\n	%srows%s:\n	[\n", kq, kq);
 
 
 		// -------------------------------------------------------------------------
@@ -785,18 +780,15 @@ unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int po
 					break;
 				}
 
-				// check if we may exceed the buffer provided
-				web_buffer_increase(wb, line_size);
-
 				// generate the local date time
 				struct tm *tm = localtime(&now);
 				if(!tm) { error("localtime() failed."); continue; }
 				if(now > last_timestamp) last_timestamp = now;
 
-				if(printed) web_buffer_strcpy(wb, "]},\n");
-				web_buffer_strcpy(wb, pre_date);
+				if(printed) web_buffer_strcat(wb, "]},\n");
+				web_buffer_strcat(wb, pre_date);
 				web_buffer_jsdate(wb, tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
-				web_buffer_strcpy(wb, post_date);
+				web_buffer_strcat(wb, post_date);
 
 				print_this = 1;
 			}
@@ -832,26 +824,26 @@ unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int po
 			if(print_this) {
 				if(annotate_reset) {
 					annotation_count++;
-					web_buffer_strcpy(wb, overflow_annotation);
+					web_buffer_strcat(wb, overflow_annotation);
 					annotate_reset = 0;
 				}
 				else
-					web_buffer_strcpy(wb, normal_annotation);
+					web_buffer_strcat(wb, normal_annotation);
 
 				pc = 0;
 				for(c = 0 ; c < dimensions ; c++) {
 					if(found_non_existing[c] == group_count) {
 						// all entries are non-existing
 						pc++;
-						web_buffer_strcpy(wb, pre_value);
-						web_buffer_strcpy(wb, "null");
-						web_buffer_strcpy(wb, post_value);
+						web_buffer_strcat(wb, pre_value);
+						web_buffer_strcat(wb, "null");
+						web_buffer_strcat(wb, post_value);
 					}
 					else if(!print_hidden[c]) {
 						pc++;
-						web_buffer_strcpy(wb, pre_value);
+						web_buffer_strcat(wb, pre_value);
 						web_buffer_rrd_value(wb, group_values[c]);
-						web_buffer_strcpy(wb, post_value);
+						web_buffer_strcat(wb, post_value);
 
 						if(group_values[c]) found_non_zero[c]++;
 					}
@@ -863,9 +855,9 @@ unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int po
 
 				// if all dimensions are hidden, print a null
 				if(!pc) {
-					web_buffer_strcpy(wb, pre_value);
-					web_buffer_strcpy(wb, "null");
-					web_buffer_strcpy(wb, post_value);
+					web_buffer_strcat(wb, pre_value);
+					web_buffer_strcat(wb, "null");
+					web_buffer_strcat(wb, post_value);
 				}
 
 				printed++;
@@ -873,8 +865,8 @@ unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int po
 			}
 		}
 
-		if(printed) web_buffer_printf(wb, "]}");
-		web_buffer_printf(wb, "\n	]\n}\n");
+		if(printed) web_buffer_strcat(wb, "]}");
+		web_buffer_strcat(wb, "\n	]\n}\n");
 
 		if(only_non_zero && max_loop > 1) {
 			int changed = 0;
@@ -888,14 +880,14 @@ unsigned long rrd_stats_json(int type, RRDSET *st, struct web_buffer *wb, int po
 				}
 			}
 
-			if(changed) web_buffer_reset(wb);
+			if(changed) web_buffer_flush(wb);
 			else break;
 		}
 		else break;
 
 	} // max_loop
 
-	debug(D_RRD_STATS, "RRD_STATS_JSON: %s total %ld bytes", st->name, wb->bytes);
+	debug(D_RRD_STATS, "RRD_STATS_JSON: %s total %ld bytes", st->name, wb->len);
 
 	pthread_rwlock_unlock(&st->rwlock);
 	return last_timestamp;
