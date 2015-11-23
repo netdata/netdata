@@ -159,16 +159,16 @@ mysql_create() {
 	for m in "${mysql_ids[@]}"
 	do
 		cat <<EOF
-CHART mysql_$m.bandwidth '' "mysql Bandwidth" "kilobits / sec" mysql_$m mysql area 20001 $mysql_update_every
+CHART mysql_$m.bandwidth '' "mysql Bandwidth" "kilobits/s" mysql_$m mysql area 20001 $mysql_update_every
 DIMENSION Bytes_received in incremental 8 $((1024 * mysql_update_every))
 DIMENSION Bytes_sent out incremental -8 $((1024 * mysql_update_every))
 
-CHART mysql_$m.queries '' "mysql Queries" "queries / sec" mysql_$m mysql line 20002 $mysql_update_every
+CHART mysql_$m.queries '' "mysql Queries" "queries/s" mysql_$m mysql line 20002 $mysql_update_every
 DIMENSION Queries queries incremental 1 $((1 * mysql_update_every))
 DIMENSION Questions questions incremental 1 $((1 * mysql_update_every))
 DIMENSION Slow_queries slow_queries incremental -1 $((1 * mysql_update_every))
 
-CHART mysql_$m.handlers '' "mysql Handlers" "handlers / sec" mysql_$m mysql line 20003 $mysql_update_every
+CHART mysql_$m.handlers '' "mysql Handlers" "handlers/s" mysql_$m mysql line 20003 $mysql_update_every
 DIMENSION Handler_commit commit incremental 1 $((1 * mysql_update_every))
 DIMENSION Handler_delete delete incremental 1 $((1 * mysql_update_every))
 DIMENSION Handler_prepare prepare incremental 1 $((1 * mysql_update_every))
@@ -184,18 +184,18 @@ DIMENSION Handler_savepoint_rollback savepoint_rollback incremental 1 $((1 * mys
 DIMENSION Handler_update update incremental 1 $((1 * mysql_update_every))
 DIMENSION Handler_write write incremental 1 $((1 * mysql_update_every))
 
-CHART mysql_$m.table_locks '' "mysql Tables Locks" "locks / sec" mysql_$m mysql line 20004 $mysql_update_every
+CHART mysql_$m.table_locks '' "mysql Tables Locks" "locks/s" mysql_$m mysql line 20004 $mysql_update_every
 DIMENSION Table_locks_immediate immediate incremental 1 $((1 * mysql_update_every))
 DIMENSION Table_locks_waited waited incremental -1 $((1 * mysql_update_every))
 
-CHART mysql_$m.join_issues '' "mysql Select Join Issues" "joins / sec" mysql_$m mysql line 20005 $mysql_update_every
+CHART mysql_$m.join_issues '' "mysql Select Join Issues" "joins/s" mysql_$m mysql line 20005 $mysql_update_every
 DIMENSION Select_full_join full_join incremental 1 $((1 * mysql_update_every))
 DIMENSION Select_full_range_join full_range_join incremental 1 $((1 * mysql_update_every))
 DIMENSION Select_range range incremental 1 $((1 * mysql_update_every))
 DIMENSION Select_range_check range_check incremental 1 $((1 * mysql_update_every))
 DIMENSION Select_scan scan incremental 1 $((1 * mysql_update_every))
 
-CHART mysql_$m.sort_issues '' "mysql Sort Issues" "issues / sec" mysql_$m mysql line 20006 $mysql_update_every
+CHART mysql_$m.sort_issues '' "mysql Sort Issues" "issues/s" mysql_$m mysql line 20006 $mysql_update_every
 DIMENSION Sort_merge_passes merge_passes incremental 1 $((1 * mysql_update_every))
 DIMENSION Sort_range range incremental 1 $((1 * mysql_update_every))
 DIMENSION Sort_scan scan incremental 1 $((1 * mysql_update_every))
@@ -214,17 +214,17 @@ DIMENSION Binlog_cache_disk_use disk incremental 1 $((1 * mysql_update_every))
 DIMENSION Binlog_cache_use all incremental 1 $((1 * mysql_update_every))
 
 CHART mysql_$m.threads '' "mysql Threads" "threads" mysql_$m mysql line 20012 $mysql_update_every
-DIMENSION Threads_connected connected absolute 1 $((1 * mysql_update_every))
+DIMENSION Threads_connected connected absolute 1 1
 DIMENSION Threads_created created incremental 1 $((1 * mysql_update_every))
-DIMENSION Threads_cached cached absolute -1 $((1 * mysql_update_every))
+DIMENSION Threads_cached cached absolute -1 1
 DIMENSION Threads_running running absolute 1 $((1 * mysql_update_every))
 
 CHART mysql_$m.thread_cache_misses '' "mysql Threads Cache Misses" "misses" mysql_$m mysql area 20013 $mysql_update_every
-DIMENSION misses misses absolute 1 $((100 * mysql_update_every))
+DIMENSION misses misses absolute 1 100
 
-CHART mysql_$m.innodb_io '' "mysql InnoDB I/O Bandwidth" "kbps" mysql_$m mysql area 20014 $mysql_update_every
-DIMENSION Innodb_data_read read incremental 8 $((1000 * mysql_update_every))
-DIMENSION Innodb_data_written write incremental -8 $((1000 * mysql_update_every))
+CHART mysql_$m.innodb_io '' "mysql InnoDB I/O Bandwidth" "kilobytes/s" mysql_$m mysql area 20014 $mysql_update_every
+DIMENSION Innodb_data_read read incremental 1 $((1000 * mysql_update_every))
+DIMENSION Innodb_data_written write incremental -1 $((1000 * mysql_update_every))
 
 CHART mysql_$m.innodb_io_ops '' "mysql InnoDB I/O Operations" "operations/s" mysql_$m mysql line 20015 $mysql_update_every
 DIMENSION Innodb_data_reads reads incremental 1 $((1 * mysql_update_every))
@@ -240,11 +240,11 @@ DIMENSION Innodb_os_log_fsyncs fsyncs incremental 1 $((1 * mysql_update_every))
 DIMENSION Innodb_os_log_pending_fsyncs pending_fsyncs incremental 1 $((1 * mysql_update_every))
 DIMENSION Innodb_os_log_pending_writes pending_writes incremental -1 $((1 * mysql_update_every))
 
-CHART mysql_$m.innodb_os_log_io '' "mysql InnoDB OS Log Bandwidth" "kbps" mysql_$m mysql area 20018 $mysql_update_every
-DIMENSION Innodb_os_log_written write incremental -8 $((1000 * mysql_update_every))
+CHART mysql_$m.innodb_os_log_io '' "mysql InnoDB OS Log Bandwidth" "kilobytes/s" mysql_$m mysql area 20018 $mysql_update_every
+DIMENSION Innodb_os_log_written write incremental -1 $((1000 * mysql_update_every))
 
 CHART mysql_$m.innodb_cur_row_lock '' "mysql InnoDB Current Row Locks" "operations" mysql_$m mysql area 20019 $mysql_update_every
-DIMENSION Innodb_row_lock_current_waits current_waits absolute 1 $((1 * mysql_update_every))
+DIMENSION Innodb_row_lock_current_waits current_waits absolute 1 1
 
 CHART mysql_$m.innodb_rows '' "mysql InnoDB Row Operations" "operations/s" mysql_$m mysql area 20020 $mysql_update_every
 DIMENSION Innodb_rows_read read incremental 1 $((1 * mysql_update_every))
