@@ -156,13 +156,16 @@ function calculateChartPointsToShow(c, divisor, maxtime, group, enable_curve) {
 		else {
 			c.group = Math.round(data_points / screen_points);
 
-			     if(c.group > 45) c.group = 60;
+			     if(c.group > 60) c.group = 90;
+			else if(c.group > 45) c.group = 60;
 			else if(c.group > 30) c.group = 45;
 			else if(c.group > 20) c.group = 30;
 			else if(c.group > 15) c.group = 20;
 			else if(c.group > 10) c.group = 15;
 			else if(c.group > 5) c.group = 10;
-			else if(c.group > 2) c.group = 5;
+			else if(c.group > 4) c.group = 5;
+			else if(c.group > 3) c.group = 4;
+			else if(c.group > 2) c.group = 3;
 			else if(c.group > 1) c.group = 2;
 			else c.group = 1;
 
