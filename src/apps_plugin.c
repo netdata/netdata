@@ -241,7 +241,7 @@ long get_pid_max(void) {
 	}
 
 	mpid = atol(procfile_lineword(ff, 0, 0));
-	if(mpid) mpid = 32768;
+	if(!mpid) mpid = 32768;
 
 	// procfile_close(ff);
 	return mpid;
