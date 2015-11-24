@@ -75,6 +75,10 @@ mysql_get() {
 		mysql_Innodb_data_written \
 		mysql_Innodb_data_reads \
 		mysql_Innodb_data_writes \
+		mysql_Innodb_data_fsyncs \
+		mysql_Innodb_data_pending_reads \
+		mysql_Innodb_data_pending_writes \
+		mysql_Innodb_data_pending_fsyncs \
 		mysql_Innodb_log_waits \
 		mysql_Innodb_log_write_requests \
 		mysql_Innodb_log_writes \
@@ -229,6 +233,12 @@ DIMENSION Innodb_data_written write incremental -1 $((1000 * mysql_update_every)
 CHART mysql_$m.innodb_io_ops '' "mysql InnoDB I/O Operations" "operations/s" mysql_$m mysql line 20015 $mysql_update_every
 DIMENSION Innodb_data_reads reads incremental 1 $((1 * mysql_update_every))
 DIMENSION Innodb_data_writes writes incremental -1 $((1 * mysql_update_every))
+DIMENSION Innodb_data_fsyncs fsyncs incremental 1 $((1 * mysql_update_every))
+
+CHART mysql_$m.innodb_io_pending_ops '' "mysql InnoDB Pending I/O Operations" "operations/s" mysql_$m mysql line 20015 $mysql_update_every
+DIMENSION Innodb_data_pending_reads reads absolute 1 1
+DIMENSION Innodb_data_pending_writes writes absolute -1 1
+DIMENSION Innodb_data_pending_fsyncs fsyncs absolute 1 1
 
 CHART mysql_$m.innodb_log '' "mysql InnoDB Log Operations" "operations/s" mysql_$m mysql line 20016 $mysql_update_every
 DIMENSION Innodb_log_waits waits incremental 1 $((1 * mysql_update_every))
@@ -387,6 +397,12 @@ END
 BEGIN mysql_$m.innodb_io_ops $1
 SET Innodb_data_reads = $mysql_Innodb_data_reads
 SET Innodb_data_writes = $mysql_Innodb_data_writes
+SET Innodb_data_fsyncs = $mysql_Innodb_data_fsyncs
+END
+BEGIN mysql_$m.innodb_io_pending_ops $1
+SET Innodb_data_pending_reads = $mysql_Innodb_data_pending_reads
+SET Innodb_data_pending_writes = $mysql_Innodb_data_pending_writes
+SET Innodb_data_pending_fsyncs = $mysql_Innodb_data_pending_fsyncs
 END
 BEGIN mysql_$m.innodb_log $1
 SET Innodb_log_waits = $mysql_Innodb_log_waits
