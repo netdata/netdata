@@ -125,7 +125,7 @@ int do_proc_stat(int update_every, unsigned long long dt) {
 					st = rrdset_create("system", "intr", NULL, "cpu", "CPU Interrupts", "interrupts/s", 900, update_every, RRDSET_TYPE_LINE);
 					st->isdetail = 1;
 
-					rrddim_add(st, "interrupts", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+					rrddim_add(st, "interrupts", NULL, 1, 1, RRDDIM_INCREMENTAL);
 				}
 				else rrdset_next(st);
 
@@ -143,7 +143,7 @@ int do_proc_stat(int update_every, unsigned long long dt) {
 				if(!st) {
 					st = rrdset_create("system", "ctxt", NULL, "cpu", "CPU Context Switches", "context switches/s", 800, update_every, RRDSET_TYPE_LINE);
 
-					rrddim_add(st, "switches", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+					rrddim_add(st, "switches", NULL, 1, 1, RRDDIM_INCREMENTAL);
 				}
 				else rrdset_next(st);
 
@@ -170,7 +170,7 @@ int do_proc_stat(int update_every, unsigned long long dt) {
 			st = rrdset_create("system", "forks", NULL, "cpu", "New Processes", "processes/s", 700, update_every, RRDSET_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrddim_add(st, "started", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "started", NULL, 1, 1, RRDDIM_INCREMENTAL);
 		}
 		else rrdset_next(st);
 

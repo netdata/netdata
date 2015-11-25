@@ -274,8 +274,8 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 
 				st = rrdset_create(RRD_TYPE_DISK, disk, NULL, disk, "Disk I/O Bandwidth", "kilobytes/s", 2000, update_every, RRDSET_TYPE_AREA);
 
-				rrddim_add(st, "reads", NULL, sector_size, 1024 * update_every, RRDDIM_INCREMENTAL);
-				rrddim_add(st, "writes", NULL, sector_size * -1, 1024 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "reads", NULL, sector_size, 1024, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "writes", NULL, sector_size * -1, 1024, RRDDIM_INCREMENTAL);
 			}
 			else rrdset_next_usec(st, dt);
 
@@ -292,8 +292,8 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 				st = rrdset_create("disk_ops", disk, NULL, disk, "Disk Completed I/O Operations", "operations/s", 2001, update_every, RRDSET_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrddim_add(st, "reads", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
-				rrddim_add(st, "writes", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "writes", NULL, -1, 1, RRDDIM_INCREMENTAL);
 			}
 			else rrdset_next_usec(st, dt);
 
@@ -326,7 +326,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 				st = rrdset_create("disk_backlog", disk, NULL, disk, "Disk Backlog", "backlog (ms)", 2003, update_every, RRDSET_TYPE_AREA);
 				st->isdetail = 1;
 
-				rrddim_add(st, "backlog", NULL, 1, 10 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "backlog", NULL, 1, 10, RRDDIM_INCREMENTAL);
 			}
 			else rrdset_next_usec(st, dt);
 
@@ -342,7 +342,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 				st = rrdset_create("disk_util", disk, NULL, disk, "Disk Utilization Time", "% of time working", 2004, update_every, RRDSET_TYPE_AREA);
 				st->isdetail = 1;
 
-				rrddim_add(st, "utilization", NULL, 1, 10 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "utilization", NULL, 1, 10, RRDDIM_INCREMENTAL);
 			}
 			else rrdset_next_usec(st, dt);
 
@@ -358,8 +358,8 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 				st = rrdset_create("disk_mops", disk, NULL, disk, "Disk Merged Operations", "merged operations/s", 2021, update_every, RRDSET_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrddim_add(st, "reads", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
-				rrddim_add(st, "writes", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "writes", NULL, -1, 1, RRDDIM_INCREMENTAL);
 			}
 			else rrdset_next_usec(st, dt);
 
@@ -376,8 +376,8 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 				st = rrdset_create("disk_iotime", disk, NULL, disk, "Disk Total I/O Time", "milliseconds/s", 2022, update_every, RRDSET_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrddim_add(st, "reads", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
-				rrddim_add(st, "writes", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "writes", NULL, -1, 1, RRDDIM_INCREMENTAL);
 			}
 			else rrdset_next_usec(st, dt);
 

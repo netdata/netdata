@@ -32,11 +32,11 @@ void *checks_main(void *ptr)
 
 	check1 = rrdset_create("netdata", "check1", NULL, "netdata", "Caller gives microseconds", "a million !", 99999, rrd_update_every, RRDSET_TYPE_LINE);
 	rrddim_add(check1, "absolute", NULL, -1, 1, RRDDIM_ABSOLUTE);
-	rrddim_add(check1, "incremental", NULL, 1, 1 * rrd_update_every, RRDDIM_INCREMENTAL);
+	rrddim_add(check1, "incremental", NULL, 1, 1, RRDDIM_INCREMENTAL);
 
 	check2 = rrdset_create("netdata", "check2", NULL, "netdata", "Netdata calcs microseconds", "a million !", 99999, rrd_update_every, RRDSET_TYPE_LINE);
 	rrddim_add(check2, "absolute", NULL, -1, 1, RRDDIM_ABSOLUTE);
-	rrddim_add(check2, "incremental", NULL, 1, 1 * rrd_update_every, RRDDIM_INCREMENTAL);
+	rrddim_add(check2, "incremental", NULL, 1, 1, RRDDIM_INCREMENTAL);
 
 	check3 = rrdset_create("netdata", "checkdt", NULL, "netdata", "Clock difference", "microseconds diff", 99999, rrd_update_every, RRDSET_TYPE_LINE);
 	rrddim_add(check3, "caller", NULL, 1, 1, RRDDIM_ABSOLUTE);

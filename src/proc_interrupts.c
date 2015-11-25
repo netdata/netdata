@@ -110,7 +110,7 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 
 		for(l = 0; l < lines ;l++) {
 			if(!irrs[l].used) continue;
-			rrddim_add(st, irrs[l].id, irrs[l].name, 1, update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, irrs[l].id, irrs[l].name, 1, 1, RRDDIM_INCREMENTAL);
 		}
 	}
 	else rrdset_next(st);
@@ -137,7 +137,7 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 
 				for(l = 0; l < lines ;l++) {
 					if(!irrs[l].used) continue;
-					rrddim_add(st, irrs[l].id, irrs[l].name, 1, update_every, RRDDIM_INCREMENTAL);
+					rrddim_add(st, irrs[l].id, irrs[l].name, 1, 1, RRDDIM_INCREMENTAL);
 				}
 			}
 			else rrdset_next(st);

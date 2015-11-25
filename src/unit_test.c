@@ -267,7 +267,7 @@ int unit_test(long delay, long shift)
 	RRDDIM *rdabsi = NULL;
 
 	if(do_abs) rdabs = rrddim_add(st, "absolute", "absolute", 1, 1, RRDDIM_ABSOLUTE);
-	if(do_inc) rdinc = rrddim_add(st, "incremental", "incremental", 1, 1 * rrd_update_every, RRDDIM_INCREMENTAL);
+	if(do_inc) rdinc = rrddim_add(st, "incremental", "incremental", 1, 1, RRDDIM_INCREMENTAL);
 	if(do_abst) rdabst = rrddim_add(st, "percentage-of-absolute-row", "percentage-of-absolute-row", 1, 1, RRDDIM_PCENT_OVER_ROW_TOTAL);
 	if(do_absi) rdabsi = rrddim_add(st, "percentage-of-incremental-row", "percentage-of-incremental-row", 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
 

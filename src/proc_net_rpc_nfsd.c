@@ -422,9 +422,9 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 		if(!st) {
 			st = rrdset_create("nfsd", "readcache", NULL, "nfsd", "Read Cache", "reads/s", 5000, update_every, RRDSET_TYPE_STACKED);
 
-			rrddim_add(st, "hits", NULL, 1, update_every, RRDDIM_INCREMENTAL);
-			rrddim_add(st, "misses", NULL, 1, update_every, RRDDIM_INCREMENTAL);
-			rrddim_add(st, "nocache", NULL, 1, update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "hits", NULL, 1, 1, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "misses", NULL, 1, 1, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "nocache", NULL, 1, 1, RRDDIM_INCREMENTAL);
 		}
 		else rrdset_next(st);
 
@@ -442,11 +442,11 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 			st = rrdset_create("nfsd", "filehandles", NULL, "nfsd", "File Handles", "handles/s", 5001, update_every, RRDSET_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrddim_add(st, "stale", NULL, 1, update_every, RRDDIM_ABSOLUTE);
-			rrddim_add(st, "total_lookups", NULL, 1, update_every, RRDDIM_INCREMENTAL);
-			rrddim_add(st, "anonymous_lookups", NULL, 1, update_every, RRDDIM_INCREMENTAL);
-			rrddim_add(st, "dir_not_in_dcache", NULL, -1, update_every, RRDDIM_INCREMENTAL);
-			rrddim_add(st, "non_dir_not_in_dcache", NULL, -1, update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "stale", NULL, 1, 1, RRDDIM_ABSOLUTE);
+			rrddim_add(st, "total_lookups", NULL, 1, 1, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "anonymous_lookups", NULL, 1, 1, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "dir_not_in_dcache", NULL, -1, 1, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "non_dir_not_in_dcache", NULL, -1, 1, RRDDIM_INCREMENTAL);
 		}
 		else rrdset_next(st);
 
@@ -465,8 +465,8 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 		if(!st) {
 			st = rrdset_create("nfsd", "io", NULL, "nfsd", "I/O", "kilobytes/s", 5002, update_every, RRDSET_TYPE_AREA);
 
-			rrddim_add(st, "read", NULL, 1, 1000 * update_every, RRDDIM_INCREMENTAL);
-			rrddim_add(st, "write", NULL, -1, 1000 * update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "read", NULL, 1, 1000, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "write", NULL, -1, 1000, RRDDIM_INCREMENTAL);
 		}
 		else rrdset_next(st);
 
@@ -493,7 +493,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 		if(!st) {
 			st = rrdset_create("nfsd", "threads_fullcnt", NULL, "nfsd", "Threads Full Count", "ops/s", 5004, update_every, RRDSET_TYPE_LINE);
 
-			rrddim_add(st, "full_count", NULL, 1, update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "full_count", NULL, 1, 1, RRDDIM_INCREMENTAL);
 		}
 		else rrdset_next(st);
 
@@ -537,17 +537,17 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 		if(!st) {
 			st = rrdset_create("nfsd", "readahead", NULL, "nfsd", "Read Ahead Depth", "percentage", 5005, update_every, RRDSET_TYPE_STACKED);
 
-			rrddim_add(st, "10%", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-			rrddim_add(st, "20%", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-			rrddim_add(st, "30%", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-			rrddim_add(st, "40%", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-			rrddim_add(st, "50%", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-			rrddim_add(st, "60%", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-			rrddim_add(st, "70%", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-			rrddim_add(st, "80%", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-			rrddim_add(st, "90%", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-			rrddim_add(st, "100%", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-			rrddim_add(st, "misses", NULL, 1, update_every, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "10%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "20%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "30%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "40%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "50%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "60%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "70%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "80%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "90%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "100%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+			rrddim_add(st, "misses", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
 		}
 		else rrdset_next(st);
 
@@ -576,8 +576,8 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 			st = rrdset_create("nfsd", "net", NULL, "nfsd", "Network Reads", "reads/s", 5007, update_every, RRDSET_TYPE_STACKED);
 			st->isdetail = 1;
 
-			rrddim_add(st, "udp", NULL, 1, update_every, RRDDIM_INCREMENTAL);
-			rrddim_add(st, "tcp", NULL, 1, update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "udp", NULL, 1, 1, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "tcp", NULL, 1, 1, RRDDIM_INCREMENTAL);
 		}
 		else rrdset_next(st);
 
@@ -598,9 +598,9 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 			st = rrdset_create("nfsd", "rpc", NULL, "nfsd", "Remote Procedure Calls", "calls/s", 5008, update_every, RRDSET_TYPE_LINE);
 			st->isdetail = 1;
 
-			rrddim_add(st, "all", NULL, 1, update_every, RRDDIM_INCREMENTAL);
-			rrddim_add(st, "bad_format", NULL, -1, update_every, RRDDIM_INCREMENTAL);
-			rrddim_add(st, "bad_auth", NULL, -1, update_every, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "all", NULL, 1, 1, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "bad_format", NULL, -1, 1, RRDDIM_INCREMENTAL);
+			rrddim_add(st, "bad_auth", NULL, -1, 1, RRDDIM_INCREMENTAL);
 		}
 		else rrdset_next(st);
 
@@ -622,7 +622,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 			st = rrdset_create("nfsd", "proc2", NULL, "nfsd", "NFS v2 Calls", "calls/s", 5009, update_every, RRDSET_TYPE_STACKED);
 
 			for(i = 0; nfsd_proc_values[i].present2 ; i++)
-				rrddim_add(st, nfsd_proc_values[i].name, NULL, 1, update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, nfsd_proc_values[i].name, NULL, 1, 1, RRDDIM_INCREMENTAL);
 		}
 		else rrdset_next(st);
 
@@ -641,7 +641,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 			st = rrdset_create("nfsd", "proc3", NULL, "nfsd", "NFS v3 Calls", "calls/s", 5010, update_every, RRDSET_TYPE_STACKED);
 
 			for(i = 0; nfsd_proc_values[i].present3 ; i++)
-				rrddim_add(st, nfsd_proc_values[i].name, NULL, 1, update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, nfsd_proc_values[i].name, NULL, 1, 1, RRDDIM_INCREMENTAL);
 		}
 		else rrdset_next(st);
 
@@ -660,7 +660,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 			st = rrdset_create("nfsd", "proc4", NULL, "nfsd", "NFS v4 Calls", "calls/s", 5011, update_every, RRDSET_TYPE_STACKED);
 
 			for(i = 0; nfsd_proc_values[i].present4 ; i++)
-				rrddim_add(st, nfsd_proc_values[i].name, NULL, 1, update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, nfsd_proc_values[i].name, NULL, 1, 1, RRDDIM_INCREMENTAL);
 		}
 		else rrdset_next(st);
 
@@ -679,7 +679,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 			st = rrdset_create("nfsd", "proc4ops", NULL, "nfsd", "NFS v4 Operations", "operations/s", 5012, update_every, RRDSET_TYPE_STACKED);
 
 			for(i = 0; nfsd4_ops_values[i].present ; i++)
-				rrddim_add(st, nfsd4_ops_values[i].name, NULL, 1, update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, nfsd4_ops_values[i].name, NULL, 1, 1, RRDDIM_INCREMENTAL);
 		}
 		else rrdset_next(st);
 

@@ -83,8 +83,8 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 			if(!st) {
 				st = rrdset_create("net", iface, NULL, iface, "Bandwidth", "kilobits/s", 1000, update_every, RRDSET_TYPE_AREA);
 
-				rrddim_add(st, "received", NULL, 8, 1024 * update_every, RRDDIM_INCREMENTAL);
-				rrddim_add(st, "sent", NULL, -8, 1024 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "received", NULL, 8, 1024, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "sent", NULL, -8, 1024, RRDDIM_INCREMENTAL);
 			}
 			else rrdset_next(st);
 
@@ -101,9 +101,9 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 				st = rrdset_create("net_packets", iface, NULL, iface, "Packets", "packets/s", 1001, update_every, RRDSET_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrddim_add(st, "received", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
-				rrddim_add(st, "sent", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
-				rrddim_add(st, "multicast", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "multicast", NULL, 1, 1, RRDDIM_INCREMENTAL);
 			}
 			else rrdset_next(st);
 
@@ -121,8 +121,8 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 				st = rrdset_create("net_errors", iface, NULL, iface, "Interface Errors", "errors/s", 1002, update_every, RRDSET_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrddim_add(st, "inbound", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
-				rrddim_add(st, "outbound", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "inbound", NULL, 1, 1, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "outbound", NULL, -1, 1, RRDDIM_INCREMENTAL);
 			}
 			else rrdset_next(st);
 
@@ -139,8 +139,8 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 				st = rrdset_create("net_drops", iface, NULL, iface, "Interface Drops", "drops/s", 1003, update_every, RRDSET_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrddim_add(st, "inbound", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
-				rrddim_add(st, "outbound", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "inbound", NULL, 1, 1, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "outbound", NULL, -1, 1, RRDDIM_INCREMENTAL);
 			}
 			else rrdset_next(st);
 
@@ -175,8 +175,8 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 				st = rrdset_create("net_compressed", iface, NULL, iface, "Compressed Packets", "packets/s", 1200, update_every, RRDSET_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrddim_add(st, "received", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
-				rrddim_add(st, "sent", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
 			}
 			else rrdset_next(st);
 
@@ -193,9 +193,9 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 				st = rrdset_create("net_events", iface, NULL, iface, "Network Interface Events", "events/s", 1200, update_every, RRDSET_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrddim_add(st, "frames", NULL, 1, 1 * update_every, RRDDIM_INCREMENTAL);
-				rrddim_add(st, "collisions", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
-				rrddim_add(st, "carrier", NULL, -1, 1 * update_every, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "frames", NULL, 1, 1, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "collisions", NULL, -1, 1, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "carrier", NULL, -1, 1, RRDDIM_INCREMENTAL);
 			}
 			else rrdset_next(st);
 

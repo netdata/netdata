@@ -54,18 +54,18 @@ DIMENSION web '' absolute 1 1
 DIMENSION native '' absolute 1 1
 DIMENSION virtual '' absolute 1 1
 CHART crsproxy.requests '' "CRS Proxy Requests Rate" "requests / min" crsproxy '' area 20001 $crsproxy_update_every
-DIMENSION web '' incremental 60 $crsproxy_update_every
-DIMENSION native '' incremental -60 $crsproxy_update_every
+DIMENSION web '' incremental 60 1
+DIMENSION native '' incremental -60 1
 CHART crsproxy.clients '' "CRS Proxy Clients Rate" "clients / min" crsproxy '' area 20010 $crsproxy_update_every
-DIMENSION web '' incremental 60 $crsproxy_update_every
-DIMENSION native '' incremental -60 $crsproxy_update_every
-DIMENSION virtual '' incremental 60 $crsproxy_update_every
+DIMENSION web '' incremental 60 1
+DIMENSION native '' incremental -60 1
+DIMENSION virtual '' incremental 60 1
 CHART crsproxy.replies '' "CRS Replies Rate" "replies / min" crsproxy '' area 20020 $crsproxy_update_every
-DIMENSION ok '' incremental 60 $crsproxy_update_every
-DIMENSION failed '' incremental -60 $crsproxy_update_every
+DIMENSION ok '' incremental 60 1
+DIMENSION failed '' incremental -60 1
 CHART crsproxy.bconnections '' "Back-End Connections Rate" "connections / min" crsproxy '' area 20030 $crsproxy_update_every
-DIMENSION ok '' incremental 60 $crsproxy_update_every
-DIMENSION failed '' incremental -60 $crsproxy_update_every
+DIMENSION ok '' incremental 60 1
+DIMENSION failed '' incremental -60 1
 EOF
 
 	local x=

@@ -227,7 +227,7 @@ static void tc_device_commit(struct tc_device *d)
 				if(!c->updated) continue;
 
 				if(c->isleaf && c->hasparent)
-					rrddim_add(st, c->id, c->name?c->name:c->id, 8, 1024 * rrd_update_every, RRDDIM_INCREMENTAL);
+					rrddim_add(st, c->id, c->name?c->name:c->id, 8, 1024, RRDDIM_INCREMENTAL);
 			}
 		}
 		else {
@@ -247,7 +247,7 @@ static void tc_device_commit(struct tc_device *d)
 					debug(D_TC_LOOP, "TC: Adding to chart '%s', dimension '%s'", st->id, c->id, c->name);
 					
 					// new class, we have to add it
-					rd = rrddim_add(st, c->id, c->name?c->name:c->id, 8, 1024 * rrd_update_every, RRDDIM_INCREMENTAL);
+					rd = rrddim_add(st, c->id, c->name?c->name:c->id, 8, 1024, RRDDIM_INCREMENTAL);
 				}
 				else debug(D_TC_LOOP, "TC: Updating chart '%s', dimension '%s'", st->id, c->id);
 
@@ -582,8 +582,8 @@ void *tc_main(void *ptr)
 				if(!stcpu) stcpu = rrdset_find("netdata.plugin_tc_cpu");
 				if(!stcpu) {
 					stcpu = rrdset_create("netdata", "plugin_tc_cpu", NULL, "netdata", "NetData TC CPU usage", "milliseconds/s", 10000, rrd_update_every, RRDSET_TYPE_STACKED);
-					rrddim_add(stcpu, "user",  NULL,  1, 1000 * rrd_update_every, RRDDIM_INCREMENTAL);
-					rrddim_add(stcpu, "system", NULL, 1, 1000 * rrd_update_every, RRDDIM_INCREMENTAL);
+					rrddim_add(stcpu, "user",  NULL,  1, 1000, RRDDIM_INCREMENTAL);
+					rrddim_add(stcpu, "system", NULL, 1, 1000, RRDDIM_INCREMENTAL);
 				}
 				else rrdset_next(stcpu);
 

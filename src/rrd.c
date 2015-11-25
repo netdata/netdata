@@ -978,28 +978,46 @@ unsigned long long rrdset_done(RRDSET *st)
 					rd->last_collected_value = rd->collected_value;
 				}
 
-				rd->calculated_value += (calculated_number)(rd->collected_value - rd->last_collected_value);
+				rd->calculated_value += (calculated_number)(rd->collected_value - rd->last_collected_value)
+					* (calculated_number)rd->multiplier
+					/ (calculated_number)rd->divisor
+					* (calculated_number)1000000ULL
+					/ (calculated_number)st->usec_since_last_update;
 
 				if(unlikely(st->debug))
 					debug(D_RRD_STATS, "%s/%s: CALC INC "
-						CALCULATED_NUMBER_FORMAT " += "
+						CALCULATED_NUMBER_FORMAT " += ("
 						COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT
+						" * %ld"
+						" / %ld"
+						" * 1000000"
+						" / %llu"
+						")"
 						, st->id, rd->name
 						, rd->calculated_value
 						, rd->collected_value, rd->last_collected_value
+						, (calculated_number)rd->multiplier
+						, (calculated_number)rd->divisor
+						, st->usec_since_last_update
 						);
 				break;
 
 			case RRDDIM_ABSOLUTE:
-				rd->calculated_value = (calculated_number)rd->collected_value;
+				rd->calculated_value = (calculated_number)rd->collected_value
+					* (calculated_number)rd->multiplier
+					/ (calculated_number)rd->divisor;
 
 				if(unlikely(st->debug))
 					debug(D_RRD_STATS, "%s/%s: CALC ABS/ABS-NO-IN "
 						CALCULATED_NUMBER_FORMAT " = "
 						COLLECTED_NUMBER_FORMAT
+						" * %ld"
+						" / %ld"
 						, st->id, rd->name
 						, rd->calculated_value
 						, rd->collected_value
+						, (calculated_number)rd->multiplier
+						, (calculated_number)rd->divisor
 						);
 				break;
 
@@ -1097,22 +1115,14 @@ unsigned long long rrdset_done(RRDSET *st)
 			}
 
 			if(likely(rd->updated && rd->counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
-				rd->values[st->current_entry] = pack_storage_number(
-						  new_value
-						* (calculated_number)rd->multiplier
-						/ (calculated_number)rd->divisor
-					, storage_flags );
+				rd->values[st->current_entry] = pack_storage_number(new_value, storage_flags );
 
 				if(unlikely(st->debug))
 					debug(D_RRD_STATS, "%s/%s: STORE[%ld] "
 						CALCULATED_NUMBER_FORMAT " = " CALCULATED_NUMBER_FORMAT
-						" * %ld"
-						" / %ld"
 						, st->id, rd->name
 						, st->current_entry
 						, unpack_storage_number(rd->values[st->current_entry]), new_value
-						, rd->multiplier
-						, rd->divisor
 						);
 			}
 			else {

@@ -52,79 +52,79 @@ CHART opensips.users '' "OpenSIPS Users" "users" opensips '' line 20002 $opensip
 DIMENSION usrloc_registered_users registered absolute 1 1
 DIMENSION usrloc_location_users location absolute 1 1
 DIMENSION usrloc_location_contacts contacts absolute 1 1
-DIMENSION usrloc_location_expires expires incremental -1 $((1 * opensips_update_every))
+DIMENSION usrloc_location_expires expires incremental -1 1
 
 CHART opensips.registrar '' "OpenSIPS Registrar" "registrations/s" opensips '' line 20003 $opensips_update_every
-DIMENSION registrar_accepted_regs accepted incremental 1 $((1 * opensips_update_every))
-DIMENSION registrar_rejected_regs rejected incremental -1 $((1 * opensips_update_every))
+DIMENSION registrar_accepted_regs accepted incremental 1 1
+DIMENSION registrar_rejected_regs rejected incremental -1 1
 
 CHART opensips.transactions '' "OpenSIPS Transactions" "transactions/s" opensips '' line 20004 $opensips_update_every
-DIMENSION tm_UAS_transactions UAS incremental 1 $((1 * opensips_update_every))
-DIMENSION tm_UAC_transactions UAC incremental -1 $((1 * opensips_update_every))
+DIMENSION tm_UAS_transactions UAS incremental 1 1
+DIMENSION tm_UAC_transactions UAC incremental -1 1
 
 CHART opensips.core_rcv '' "OpenSIPS Core Receives" "queries/s" opensips '' line 20005 $opensips_update_every
-DIMENSION core_rcv_requests requests incremental 1 $((1 * opensips_update_every))
-DIMENSION core_rcv_replies replies incremental -1 $((1 * opensips_update_every))
+DIMENSION core_rcv_requests requests incremental 1 1
+DIMENSION core_rcv_replies replies incremental -1 1
 
 CHART opensips.core_fwd '' "OpenSIPS Core Forwards" "queries/s" opensips '' line 20006 $opensips_update_every
-DIMENSION core_fwd_requests requests incremental 1 $((1 * opensips_update_every))
-DIMENSION core_fwd_replies replies incremental -1 $((1 * opensips_update_every))
+DIMENSION core_fwd_requests requests incremental 1 1
+DIMENSION core_fwd_replies replies incremental -1 1
 
 CHART opensips.core_drop '' "OpenSIPS Core Drops" "queries/s" opensips '' line 20007 $opensips_update_every
-DIMENSION core_drop_requests requests incremental 1 $((1 * opensips_update_every))
-DIMENSION core_drop_replies replies incremental -1 $((1 * opensips_update_every))
+DIMENSION core_drop_requests requests incremental 1 1
+DIMENSION core_drop_replies replies incremental -1 1
 
 CHART opensips.core_err '' "OpenSIPS Core Errors" "queries/s" opensips '' line 20008 $opensips_update_every
-DIMENSION core_err_requests requests incremental 1 $((1 * opensips_update_every))
-DIMENSION core_err_replies replies incremental -1 $((1 * opensips_update_every))
+DIMENSION core_err_requests requests incremental 1 1
+DIMENSION core_err_replies replies incremental -1 1
 
 CHART opensips.core_bad '' "OpenSIPS Core Bad" "queries/s" opensips '' line 20009 $opensips_update_every
-DIMENSION core_bad_URIs_rcvd bad_URIs_rcvd incremental 1 $((1 * opensips_update_every))
-DIMENSION core_unsupported_methods unsupported_methods incremental 1 $((1 * opensips_update_every))
-DIMENSION core_bad_msg_hdr bad_msg_hdr incremental 1 $((1 * opensips_update_every))
+DIMENSION core_bad_URIs_rcvd bad_URIs_rcvd incremental 1 1
+DIMENSION core_unsupported_methods unsupported_methods incremental 1 1
+DIMENSION core_bad_msg_hdr bad_msg_hdr incremental 1 1
 
 CHART opensips.tm_replies '' "OpenSIPS TM Replies" "replies/s" opensips '' line 20010 $opensips_update_every
-DIMENSION tm_received_replies received incremental 1 $((1 * opensips_update_every))
-DIMENSION tm_relayed_replies relayed incremental 1 $((1 * opensips_update_every))
-DIMENSION tm_local_replies local incremental 1 $((1 * opensips_update_every))
+DIMENSION tm_received_replies received incremental 1 1
+DIMENSION tm_relayed_replies relayed incremental 1 1
+DIMENSION tm_local_replies local incremental 1 1
 
 CHART opensips.transactions_status '' "OpenSIPS Transactions Status" "transactions/s" opensips '' line 20011 $opensips_update_every
-DIMENSION tm_2xx_transactions 2xx incremental 1 $((1 * opensips_update_every))
-DIMENSION tm_3xx_transactions 3xx incremental 1 $((1 * opensips_update_every))
-DIMENSION tm_4xx_transactions 4xx incremental 1 $((1 * opensips_update_every))
-DIMENSION tm_5xx_transactions 5xx incremental 1 $((1 * opensips_update_every))
-DIMENSION tm_6xx_transactions 6xx incremental 1 $((1 * opensips_update_every))
+DIMENSION tm_2xx_transactions 2xx incremental 1 1
+DIMENSION tm_3xx_transactions 3xx incremental 1 1
+DIMENSION tm_4xx_transactions 4xx incremental 1 1
+DIMENSION tm_5xx_transactions 5xx incremental 1 1
+DIMENSION tm_6xx_transactions 6xx incremental 1 1
 
 CHART opensips.transactions_inuse '' "OpenSIPS InUse Transactions" "transactions" opensips '' line 20012 $opensips_update_every
 DIMENSION tm_inuse_transactions inuse absolute 1 1
 
 CHART opensips.sl_replies '' "OpenSIPS SL Replies" "replies/s" opensips '' line 20013 $opensips_update_every
-DIMENSION sl_1xx_replies 1xx incremental 1 $((1 * opensips_update_every))
-DIMENSION sl_2xx_replies 2xx incremental 1 $((1 * opensips_update_every))
-DIMENSION sl_3xx_replies 3xx incremental 1 $((1 * opensips_update_every))
-DIMENSION sl_4xx_replies 4xx incremental 1 $((1 * opensips_update_every))
-DIMENSION sl_5xx_replies 5xx incremental 1 $((1 * opensips_update_every))
-DIMENSION sl_6xx_replies 6xx incremental 1 $((1 * opensips_update_every))
-DIMENSION sl_sent_replies sent incremental 1 $((1 * opensips_update_every))
-DIMENSION sl_sent_err_replies error incremental 1 $((1 * opensips_update_every))
-DIMENSION sl_received_ACKs ACKed incremental 1 $((1 * opensips_update_every))
+DIMENSION sl_1xx_replies 1xx incremental 1 1
+DIMENSION sl_2xx_replies 2xx incremental 1 1
+DIMENSION sl_3xx_replies 3xx incremental 1 1
+DIMENSION sl_4xx_replies 4xx incremental 1 1
+DIMENSION sl_5xx_replies 5xx incremental 1 1
+DIMENSION sl_6xx_replies 6xx incremental 1 1
+DIMENSION sl_sent_replies sent incremental 1 1
+DIMENSION sl_sent_err_replies error incremental 1 1
+DIMENSION sl_received_ACKs ACKed incremental 1 1
 
 CHART opensips.dialogs '' "OpenSIPS Dialogs" "dialogs/s" opensips '' line 20014 $opensips_update_every
-DIMENSION dialog_processed_dialogs processed incremental 1 $((1 * opensips_update_every))
-DIMENSION dialog_expired_dialogs expired incremental 1 $((1 * opensips_update_every))
-DIMENSION dialog_failed_dialogs failed incremental -1 $((1 * opensips_update_every))
+DIMENSION dialog_processed_dialogs processed incremental 1 1
+DIMENSION dialog_expired_dialogs expired incremental 1 1
+DIMENSION dialog_failed_dialogs failed incremental -1 1
 
 CHART opensips.net_waiting '' "OpenSIPS Network Waiting" "kilobytes" opensips '' line 20015 $opensips_update_every
 DIMENSION net_waiting_udp UDP absolute 1 1024
 DIMENSION net_waiting_tcp TCP absolute 1 1024
 
 CHART opensips.uri_checks '' "OpenSIPS URI Checks" "checks / sec" opensips '' line 20016 $opensips_update_every
-DIMENSION uri_positive_checks positive incremental 1 $((1 * opensips_update_every))
-DIMENSION uri_negative_checks negative incremental -1 $((1 * opensips_update_every))
+DIMENSION uri_positive_checks positive incremental 1 1
+DIMENSION uri_negative_checks negative incremental -1 1
 
 CHART opensips.traces '' "OpenSIPS Traces" "traces / sec" opensips '' line 20017 $opensips_update_every
-DIMENSION siptrace_traced_requests requests incremental 1 $((1 * opensips_update_every))
-DIMENSION siptrace_traced_replies replies incremental -1 $((1 * opensips_update_every))
+DIMENSION siptrace_traced_requests requests incremental 1 1
+DIMENSION siptrace_traced_replies replies incremental -1 1
 
 CHART opensips.shmem '' "OpenSIPS Shared Memory" "kilobytes" opensips '' line 20018 $opensips_update_every
 DIMENSION shmem_total_size total absolute 1 1024
