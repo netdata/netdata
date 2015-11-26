@@ -235,7 +235,7 @@ DIMENSION Innodb_data_reads reads incremental 1 1
 DIMENSION Innodb_data_writes writes incremental -1 1
 DIMENSION Innodb_data_fsyncs fsyncs incremental 1 1
 
-CHART mysql_$m.innodb_io_pending_ops '' "mysql InnoDB Pending I/O Operations" "operations/s" mysql_$m mysql line 20015 $mysql_update_every
+CHART mysql_$m.innodb_io_pending_ops '' "mysql InnoDB Pending I/O Operations" "operations" mysql_$m mysql line 20015 $mysql_update_every
 DIMENSION Innodb_data_pending_reads reads absolute 1 1
 DIMENSION Innodb_data_pending_writes writes absolute -1 1
 DIMENSION Innodb_data_pending_fsyncs fsyncs absolute 1 1
@@ -245,10 +245,10 @@ DIMENSION Innodb_log_waits waits incremental 1 1
 DIMENSION Innodb_log_write_requests write_requests incremental -1 1
 DIMENSION Innodb_log_writes writes incremental -1 1
 
-CHART mysql_$m.innodb_os_log '' "mysql InnoDB OS Log Operations" "operations/s" mysql_$m mysql line 20017 $mysql_update_every
+CHART mysql_$m.innodb_os_log '' "mysql InnoDB OS Log Operations" "operations" mysql_$m mysql line 20017 $mysql_update_every
 DIMENSION Innodb_os_log_fsyncs fsyncs incremental 1 1
-DIMENSION Innodb_os_log_pending_fsyncs pending_fsyncs incremental 1 1
-DIMENSION Innodb_os_log_pending_writes pending_writes incremental -1 1
+DIMENSION Innodb_os_log_pending_fsyncs pending_fsyncs absolute 1 1
+DIMENSION Innodb_os_log_pending_writes pending_writes absolute -1 1
 
 CHART mysql_$m.innodb_os_log_io '' "mysql InnoDB OS Log Bandwidth" "kilobytes/s" mysql_$m mysql area 20018 $mysql_update_every
 DIMENSION Innodb_os_log_written write incremental -1 1024
