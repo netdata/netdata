@@ -980,9 +980,7 @@ unsigned long long rrdset_done(RRDSET *st)
 
 				rd->calculated_value += (calculated_number)(rd->collected_value - rd->last_collected_value)
 					* (calculated_number)rd->multiplier
-					/ (calculated_number)rd->divisor
-					* (calculated_number)1000000ULL
-					/ (calculated_number)st->usec_since_last_update;
+					/ (calculated_number)rd->divisor;
 
 				if(unlikely(st->debug))
 					debug(D_RRD_STATS, "%s/%s: CALC INC "
@@ -990,15 +988,12 @@ unsigned long long rrdset_done(RRDSET *st)
 						COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT
 						" * %ld"
 						" / %ld"
-						" * 1000000"
-						" / %llu"
 						")"
 						, st->id, rd->name
 						, rd->calculated_value
 						, rd->collected_value, rd->last_collected_value
 						, (calculated_number)rd->multiplier
 						, (calculated_number)rd->divisor
-						, st->usec_since_last_update
 						);
 				break;
 
@@ -1078,6 +1073,7 @@ unsigned long long rrdset_done(RRDSET *st)
 							);
 
 					rd->calculated_value -= new_value;
+					new_value /= (calculated_number)st->update_every;
 					break;
 
 				case RRDDIM_ABSOLUTE:
