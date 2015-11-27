@@ -67,7 +67,7 @@ void avl_nasty(avl* root) {
  * returns 1 if the depth of the tree has grown
  * Warning: do not insert elements already present
  */
-int avl_insert(avl_tree* t, avl* a) {
+int _avl_insert(avl_tree* t, avl* a) {
 	/* initialize */
 	a->left = 0;
 	a->right = 0;
@@ -84,7 +84,7 @@ int avl_insert(avl_tree* t, avl* a) {
 			avl_tree left_subtree;
 			left_subtree.root = t->root->left;
 			left_subtree.compar = t->compar;
-			if (avl_insert(&left_subtree, a)) {
+			if (_avl_insert(&left_subtree, a)) {
 				switch (t->root->balance--) {
 				case 1:
 					return 0;
@@ -115,7 +115,7 @@ int avl_insert(avl_tree* t, avl* a) {
 			avl_tree right_subtree;
 			right_subtree.root = t->root->right;
 			right_subtree.compar = t->compar;
-			if (avl_insert(&right_subtree, a)) {
+			if (_avl_insert(&right_subtree, a)) {
 				switch (t->root->balance++) {
 				case -1:
 					return 0;
@@ -142,16 +142,22 @@ int avl_insert(avl_tree* t, avl* a) {
 		}
 	}
 }
+int avl_insert(avl_tree* t, avl* a) {
+	pthread_rwlock_wrlock(&t->rwlock);
+	int ret = _avl_insert(t, a);
+	pthread_rwlock_unlock(&t->rwlock);
+	return ret;
+}
 
 /* Remove an element a from the AVL tree t
  * returns -1 if the depth of the tree has shrunk
  * Warning: if the element is not present in the tree,
  *          returns 0 as if it had been removed succesfully.
  */
-int avl_remove(avl_tree* t, avl* a) {
+int _avl_remove(avl_tree* t, avl* a) {
 	int b;
 	if (t->root == a)
-		return avl_removeroot(t);
+		return _avl_removeroot(t);
 	b = t->compar(t->root, a);
 	if (b >= 0) {
 		/* remove from the left subtree */
@@ -159,7 +165,7 @@ int avl_remove(avl_tree* t, avl* a) {
 		avl_tree left_subtree;
 		if ((left_subtree.root = t->root->left)) {
 			left_subtree.compar = t->compar;
-			ch = avl_remove(&left_subtree, a);
+			ch = _avl_remove(&left_subtree, a);
 			t->root->left = left_subtree.root;
 			if (ch) {
 				switch (t->root->balance++) {
@@ -193,7 +199,7 @@ int avl_remove(avl_tree* t, avl* a) {
 		avl_tree right_subtree;
 		if ((right_subtree.root = t->root->right)) {
 			right_subtree.compar = t->compar;
-			ch = avl_remove(&right_subtree, a);
+			ch = _avl_remove(&right_subtree, a);
 			t->root->right = right_subtree.root;
 			if (ch) {
 				switch (t->root->balance--) {
@@ -224,10 +230,17 @@ int avl_remove(avl_tree* t, avl* a) {
 	return 0;
 }
 
+int avl_remove(avl_tree* t, avl* a) {
+	pthread_rwlock_wrlock(&t->rwlock);
+	int ret = _avl_remove(t, a);
+	pthread_rwlock_unlock(&t->rwlock);
+	return ret;
+}
+
 /* Remove the root of the AVL tree t
  * Warning: dumps core if t is empty
  */
-int avl_removeroot(avl_tree* t) {
+int _avl_removeroot(avl_tree* t) {
 	int ch;
 	avl* a;
 	if (!t->root->left) {
@@ -253,7 +266,7 @@ int avl_removeroot(avl_tree* t) {
 		while (a->left)
 			a = a->left;
 	}
-	ch = avl_remove(t, a);
+	ch = _avl_remove(t, a);
 	a->left = t->root->left;
 	a->right = t->root->right;
 	a->balance = t->root->balance;
@@ -263,12 +276,19 @@ int avl_removeroot(avl_tree* t) {
 	return 0;
 }
 
+int avl_removeroot(avl_tree* t) {
+	pthread_rwlock_wrlock(&t->rwlock);
+	int ret = _avl_removeroot(t);
+	pthread_rwlock_unlock(&t->rwlock);
+	return ret;
+}
+
 /* Iterate through elements in t from a range between a and b (inclusive)
  * for each element calls iter(a) until it returns 0
  * returns the last value returned by iterator or 0 if there were no calls
  * Warning: a<=b must hold
  */
-int avl_range(avl_tree* t, avl* a, avl* b, int (*iter)(avl* a), avl** ret) {
+int _avl_range(avl_tree* t, avl* a, avl* b, int (*iter)(avl* a), avl** ret) {
 	int x, c = 0;
 	if (!t->root)
 		return 0;
@@ -285,7 +305,7 @@ int avl_range(avl_tree* t, avl* a, avl* b, int (*iter)(avl* a), avl** ret) {
 		avl_tree left_subtree;
 		if ((left_subtree.root = t->root->left)) {
 			left_subtree.compar = t->compar;
-			if (!(c = avl_range(&left_subtree, a, b, iter, ret)))
+			if (!(c = _avl_range(&left_subtree, a, b, iter, ret)))
 				if (x > 0)
 					return 0;
 		}
@@ -302,12 +322,19 @@ int avl_range(avl_tree* t, avl* a, avl* b, int (*iter)(avl* a), avl** ret) {
 		avl_tree right_subtree;
 		if ((right_subtree.root = t->root->right)) {
 			right_subtree.compar = t->compar;
-			if (!(c = avl_range(&right_subtree, a, b, iter, ret)))
+			if (!(c = _avl_range(&right_subtree, a, b, iter, ret)))
 				if (x < 0)
 					return 0;
 		}
 	}
 	return c;
+}
+
+int avl_range(avl_tree* t, avl* a, avl* b, int (*iter)(avl* a), avl** ret) {
+	pthread_rwlock_rdlock(&t->rwlock);
+	int ret2 = _avl_range(t, a, b, iter, ret);
+	pthread_rwlock_unlock(&t->rwlock);
+	return ret2;
 }
 
 /* Iterate through elements in t equal to a
@@ -316,4 +343,10 @@ int avl_range(avl_tree* t, avl* a, avl* b, int (*iter)(avl* a), avl** ret) {
  */
 int avl_search(avl_tree* t, avl* a, int (*iter)(avl* a), avl** ret) {
 	return avl_range(t, a, a, iter, ret);
+}
+
+void avl_init(avl_tree* t, int (*compar)(void* a, void* b)) {
+	t->root = NULL;
+	t->compar = compar;
+	pthread_rwlock_init(&t->rwlock, NULL);
 }

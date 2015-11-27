@@ -87,7 +87,8 @@ static int config_compare(void* a, void* b) {
 
 avl_tree config_root_index = {
 		NULL,
-		config_compare
+		config_compare,
+		PTHREAD_RWLOCK_INITIALIZER
 };
 
 #define config_index_add(cfg) avl_insert(&config_root_index, (avl *)(cfg))
@@ -141,7 +142,7 @@ struct config *config_create(const char *section)
 	if(!co->name) fatal("Cannot allocate config.name");
 	co->hash = simple_hash(co->name);
 
-	co->values_index.compar = config_value_compare;
+	avl_init(&co->values_index, config_value_compare);
 
 	config_index_add(co);
 

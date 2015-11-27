@@ -12,6 +12,105 @@
 #define HOSTNAME_MAX 1024
 char *hostname = "unknown";
 
+void rrd_stats_api_v1_chart(RRDSET *st, struct web_buffer *wb)
+{
+	time_t now = time(NULL);
+
+	pthread_rwlock_rdlock(&st->rwlock);
+
+	web_buffer_snprintf(wb, 65536,
+		"\t\t{\n"
+		"\t\t\t\"id\": \"%s\",\n"
+		"\t\t\t\"name\": \"%s\",\n"
+		"\t\t\t\"type\": \"%s\",\n"
+		"\t\t\t\"family\": \"%s\",\n"
+		"\t\t\t\"title\": \"%s\",\n"
+		"\t\t\t\"priority\": %ld,\n"
+		"\t\t\t\"enabled\": %s,\n"
+		"\t\t\t\"units\": \"%s\",\n"
+		"\t\t\t\"data_url\": \"/api/v1/data?chart=%s\",\n"
+		"\t\t\t\"chart_type\": \"%s\",\n"
+		"\t\t\t\"duration\": %ld,\n"
+		"\t\t\t\"first_entry\": %lu,\n"
+		"\t\t\t\"last_entry\": %lu,\n"
+		"\t\t\t\"update_every\": %d,\n"
+		"\t\t\t\"dimensions\": {\n"
+		, st->id
+		, st->name
+		, st->type
+		, st->family
+		, st->title
+		, st->priority
+		, st->enabled?"true":"false"
+		, st->units
+		, st->name
+		, rrdset_type_name(st->chart_type)
+		, st->entries * st->update_every
+		, rrdset_first_entry_t(st)
+		, rrdset_last_entry_t(st)
+		, st->update_every
+		);
+
+	unsigned long memory = st->memsize;
+
+	int c = 0;
+	RRDDIM *rd;
+	for(rd = st->dimensions; rd ; rd = rd->next) {
+		if(rd->flags & RRDDIM_FLAG_HIDDEN) continue;
+
+		memory += rd->memsize;
+
+		web_buffer_snprintf(wb, 4096,
+			"%s"
+			"\t\t\t\t\"%s\": { \"name\": \"%s\" }"
+			, c?",\n":""
+			, rd->id
+			, rd->name
+			);
+
+		c++;
+	}
+
+	web_buffer_snprintf(wb, 200,
+		"\n\t\t\t}\n"
+		"\t\t}"
+		);
+
+	pthread_rwlock_unlock(&st->rwlock);
+}
+
+void rrd_stats_api_v1_charts(struct web_buffer *wb)
+{
+	long c;
+	RRDSET *st;
+
+	web_buffer_snprintf(wb, 4096, "{\n"
+		   "\t\"hostname\": \"%s\""
+		",\n\t\"update_every\": %d"
+		",\n\t\"history\": %d"
+		",\n\t\"charts\": {"
+		, hostname
+		, rrd_update_every
+		, rrd_default_history_entries
+		);
+
+	pthread_rwlock_rdlock(&rrdset_root_rwlock);
+	for(st = rrdset_root, c = 0; st ; st = st->next) {
+		if(st->enabled) {
+			if(c) web_buffer_strcat(wb, ",");
+			web_buffer_strcat(wb, "\n\t\t\"");
+			web_buffer_strcat(wb, st->id);
+			web_buffer_strcat(wb, "\": ");
+			rrd_stats_api_v1_chart(st, wb);
+			c++;
+		}
+	}
+	pthread_rwlock_unlock(&rrdset_root_rwlock);
+
+	web_buffer_strcat(wb, "\n\t}\n}\n");
+}
+
+
 unsigned long rrd_stats_one_json(RRDSET *st, char *options, struct web_buffer *wb)
 {
 	time_t now = time(NULL);

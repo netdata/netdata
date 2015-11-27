@@ -10,13 +10,19 @@
 extern char *hostname;
 
 // type of JSON generations
+#define DATASOURCE_INVALID -1
 #define DATASOURCE_JSON 0
 #define DATASOURCE_GOOGLE_JSON 1
 #define DATASOURCE_GOOGLE_JSONP 2
+#define DATASOURCE_SSV 3
+#define DATASOURCE_CSV 4
 
 #define GROUP_AVERAGE	0
 #define GROUP_MAX 		1
 #define GROUP_SUM		2
+
+extern void rrd_stats_api_v1_chart(RRDSET *st, struct web_buffer *wb);
+extern void rrd_stats_api_v1_charts(struct web_buffer *wb);
 
 extern unsigned long rrd_stats_one_json(RRDSET *st, char *options, struct web_buffer *wb);
 

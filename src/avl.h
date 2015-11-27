@@ -12,6 +12,7 @@
  * Released under GNU General Public License (GPL) version 2
  *
  */
+#include <pthread.h>
 
 #ifndef _AVL_H
 #define _AVL_H 1
@@ -29,6 +30,7 @@ typedef struct avl {
 typedef struct avl_tree {
 	avl* root;
 	int (*compar)(void* a, void* b);
+	pthread_rwlock_t rwlock;
 } avl_tree;
 
 /* Public methods */
@@ -63,5 +65,9 @@ int avl_range(avl_tree* t, avl* a, avl* b, int (*iter)(avl* a), avl** ret);
  * returns the last value returned by iterator or 0 if there were no calls
  */
 int avl_search(avl_tree* t, avl* a, int (*iter)(avl* a), avl** ret);
+
+/* Initialize the avl_tree
+ */
+void avl_init(avl_tree* t, int (*compar)(void* a, void* b));
 
 #endif /* avl.h */

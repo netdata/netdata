@@ -830,7 +830,8 @@ int file_descriptor_iterator(avl *a) { if(a) {}; return 0; }
 
 avl_tree all_files_index = {
 		NULL,
-		file_descriptor_compare
+		file_descriptor_compare,
+		PTHREAD_RWLOCK_INITIALIZER
 };
 
 static struct file_descriptor *file_descriptor_find(const char *name, uint32_t hash) {

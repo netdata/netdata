@@ -327,6 +327,193 @@ void web_client_enable_deflate(struct web_client *w) {
 }
 #endif // NETDATA_WITH_ZLIB
 
+int rrdset_validate_dimensions(RRDSET *st, struct web_buffer *dimensions)
+{
+	;
+}
+
+int web_client_api_request_v1_data_format(char *name)
+{
+	if(!strcmp(name, "datatable"))
+		return DATASOURCE_GOOGLE_JSON;
+
+	else if(!strcmp(name, "datasource"))
+		return DATASOURCE_GOOGLE_JSONP;
+
+	else if(!strcmp(name, "json"))
+		return DATASOURCE_JSON;
+
+	else if(!strcmp(name, "ssv"))
+		return DATASOURCE_SSV;
+
+	else if(!strcmp(name, "csv"))
+		return DATASOURCE_CSV;
+
+	return DATASOURCE_INVALID;
+}
+
+int web_client_api_request_v1_charts(struct web_client *w, char *url)
+{
+	web_buffer_flush(w->data);
+	rrd_stats_api_v1_charts(w->data);
+	return 200;
+}
+
+int web_client_api_request_v1_chart(struct web_client *w, char *url)
+{
+	int ret = 400;
+	char *chart = NULL;
+
+	web_buffer_flush(w->data);
+
+	while(url) {
+		char *value = mystrsep(&url, "?&[]");
+		if(!value || !*value) continue;
+
+		char *name = mystrsep(&value, "=");
+		if(!name || !*name) continue;
+		if(!value || !*value) continue;
+
+		// name and value are now the parameters
+		// they are not null and not empty
+
+		if(!strcmp(name, "chart")) chart = value;
+		else {
+			web_buffer_snprintf(w->data, 1024, "Unknown parameter '%s' in request.", name);
+			goto cleanup;
+		}
+	}
+
+	if(!chart || !*chart) {
+		web_buffer_snprintf(w->data, 1024, "No chart id is given at the request.");
+		goto cleanup;
+	}
+
+	RRDSET *st = rrdset_find(chart);
+	if(!st) st = rrdset_find_byname(chart);
+	if(!st) {
+		web_buffer_snprintf(w->data, 1024, "Chart '%s' is not found.", chart);
+		ret = 404;
+		goto cleanup;
+	}
+
+	w->data->contenttype = CT_APPLICATION_JSON;
+	rrd_stats_api_v1_chart(st, w->data);
+	return 200;
+
+cleanup:
+	return ret;
+}
+
+int web_client_api_request_v1_data(struct web_client *w, char *url)
+{
+	int ret = 400;
+	struct web_buffer *dimensions = NULL;
+
+	web_buffer_flush(w->data);
+
+	char *chart = NULL
+			, *dim = NULL
+			, *before_str = NULL
+			, *after_str = NULL
+			, *points_str = NULL
+			, *group_str = NULL
+			, *options = NULL;
+
+	int format = DATASOURCE_JSON;
+
+	while(url) {
+		char *value = mystrsep(&url, "?&[]");
+		if(!value || !*value) continue;
+
+		char *name = mystrsep(&value, "=");
+		if(!name || !*name) continue;
+		if(!value || !*value) continue;
+
+		// name and value are now the parameters
+		// they are not null and not empty
+
+		if(!strcmp(name, "chart")) chart = value;
+		else if(!strcmp(name, "dimension") || !strcmp(name, "dim")) {
+			if(!dimensions) dimensions = web_buffer_create(strlen(value));
+			if(dimensions) {
+				web_buffer_strcat(dimensions, "|");
+				web_buffer_strcat(dimensions, value);
+			}
+		}
+		else if(!strcmp(name, "after")) after_str = value;
+		else if(!strcmp(name, "before")) before_str = value;
+		else if(!strcmp(name, "points")) points_str = value;
+		else if(!strcmp(name, "group")) group_str = value;
+		else if(!strcmp(name, "format")) {
+			format = web_client_api_request_v1_data_format(value);
+		}
+		else if(!strcmp(name, "options")) {
+			options = value;
+		}
+		else {
+			web_buffer_snprintf(w->data, 1024, "Unknown parameter '%s' in request.", name);
+			goto cleanup;
+		}
+	}
+
+	if(!chart || !*chart) {
+		web_buffer_snprintf(w->data, 1024, "No chart id is given at the request.");
+		goto cleanup;
+	}
+
+	RRDSET *st = rrdset_find(chart);
+	if(!st) st = rrdset_find_byname(chart);
+	if(!st) {
+		web_buffer_snprintf(w->data, 1024, "Chart '%s' is not found.", chart);
+		ret = 404;
+		goto cleanup;
+	}
+
+	uint32_t before = (before_str && *before_str)?atol(before_str):0;
+	uint32_t after  = (after_str  && *after_str) ?atol(after_str):0;
+	int      points = (points_str && *points_str)?atoi(points_str):0;
+	int      group  = (group_str  && *group_str) ?atoi(group_str):0;
+
+	web_buffer_snprintf(w->data, 1024, "API command 'data' for chart '%s', dimensions '%s', after '%s', before '%s', points '%s', group '%s', format '%s', options '%s'", chart, dim, after_str, before_str, points_str, group_str, format, options);
+
+cleanup:
+	if(dimensions) web_buffer_free(dimensions);
+	return ret;
+}
+
+int web_client_api_request_v1(struct web_client *w, char *url)
+{
+	// get the command
+	char *tok = mystrsep(&url, "/?&");
+	debug(D_WEB_CLIENT, "%llu: Searching for API v1 command '%s'.", w->id, tok);
+
+	if(strcmp(tok, "data") == 0)
+		return web_client_api_request_v1_data(w, url);
+	else if(strcmp(tok, "chart") == 0)
+		return web_client_api_request_v1_chart(w, url);
+	else if(strcmp(tok, "charts") == 0)
+		return web_client_api_request_v1_charts(w, url);
+
+	web_buffer_flush(w->data);
+	web_buffer_snprintf(w->data, 1024, "Unsupported v1 API command: %s", tok);
+	return 404;
+}
+
+int web_client_api_request(struct web_client *w, char *url)
+{
+	// get the api version
+	char *tok = mystrsep(&url, "/?&");
+	debug(D_WEB_CLIENT, "%llu: Searching for API version '%s'.", w->id, tok);
+
+	if(strcmp(tok, "v1") == 0)
+		return web_client_api_request_v1(w, url);
+
+	web_buffer_flush(w->data);
+	web_buffer_snprintf(w->data, 1024, "Unsupported API version: %s", tok);
+	return 404;
+}
+
 int web_client_data_request(struct web_client *w, char *url, int datasource_type)
 {
 	char *args = strchr(url, '?');
@@ -587,7 +774,12 @@ void web_client_process(struct web_client *w) {
 
 			debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
 
-			if(strcmp(tok, WEB_PATH_DATA) == 0) { // "data"
+			if(strcmp(tok, "api") == 0) {
+				// the client is requesting api access
+				datasource_type = DATASOURCE_JSON;
+				code = web_client_api_request(w, url);
+			}
+			else if(strcmp(tok, WEB_PATH_DATA) == 0) { // "data"
 				// the client is requesting rrd data
 				datasource_type = DATASOURCE_JSON;
 				code = web_client_data_request(w, url, datasource_type);

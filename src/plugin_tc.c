@@ -77,7 +77,8 @@ static int tc_device_compare(void* a, void* b) {
 
 avl_tree tc_device_root_index = {
 		NULL,
-		tc_device_compare
+		tc_device_compare,
+		PTHREAD_RWLOCK_INITIALIZER
 };
 
 #define tc_device_index_add(st) avl_insert(&tc_device_root_index, (avl *)(st))
@@ -323,6 +324,7 @@ static struct tc_device *tc_device_create(char *id)
 
 		d->classes_index.root = NULL;
 		d->classes_index.compar = tc_class_compare;
+		pthread_rwlock_init(&d->classes_index.rwlock, NULL);
 
 		tc_device_index_add(d);
 	}

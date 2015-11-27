@@ -26,6 +26,8 @@
 // globals
 
 // if not zero it gives the time (in seconds) to remove un-updated dimensions
+// DO NOT ENABLE
+// if dimensions are removed, the chart generation will have to run again
 int rrd_delete_unupdated_dimensions = 0;
 
 int rrd_update_every = UPDATE_EVERY;
@@ -50,7 +52,8 @@ static int rrdset_compare(void* a, void* b) {
 
 avl_tree rrdset_root_index = {
 		NULL,
-		rrdset_compare
+		rrdset_compare,
+		PTHREAD_RWLOCK_INITIALIZER
 };
 
 #define rrdset_index_add(st) avl_insert(&rrdset_root_index, (avl *)(st))
@@ -86,7 +89,8 @@ static int rrdset_compare_name(void* a, void* b) {
 
 avl_tree rrdset_root_index_name = {
 		NULL,
-		rrdset_compare_name
+		rrdset_compare_name,
+		PTHREAD_RWLOCK_INITIALIZER
 };
 
 int rrdset_index_add_name(RRDSET *st) {
@@ -318,6 +322,7 @@ void rrdset_reset(RRDSET *st)
 	for(rd = st->dimensions; rd ; rd = rd->next) {
 		rd->last_collected_time.tv_sec = 0;
 		rd->last_collected_time.tv_usec = 0;
+		rd->counter = 0;
 		bzero(rd->values, rd->entries * sizeof(storage_number));
 	}
 }
@@ -426,8 +431,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 
 	st->gap_when_lost_iterations_above = config_get_number(st->id, "gap when lost iterations above", RRD_DEFAULT_GAP_INTERPOLATIONS) + 2;
 
-	st->dimensions_index.root = NULL;
-	st->dimensions_index.compar = rrddim_compare;
+	avl_init(&st->dimensions_index, rrddim_compare);
 
 	pthread_rwlock_init(&st->rwlock, NULL);
 	pthread_rwlock_wrlock(&rrdset_root_rwlock);
@@ -554,6 +558,9 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 	rd->entries = st->entries;
 	rd->update_every = st->update_every;
 	
+	// prevent incremental calculation spikes
+	rd->counter = 0;
+
 	// append this dimension
 	if(!st->dimensions)
 		st->dimensions = rd;
@@ -812,6 +819,9 @@ unsigned long long rrdset_done(RRDSET *st)
 
 	// a read lock is OK here
 	pthread_rwlock_rdlock(&st->rwlock);
+
+	// enable the chart, if it was disabled
+	st->enabled = 1;
 
 	// check if the chart has a long time to be refreshed
 	if(unlikely(st->usec_since_last_update > st->entries * st->update_every * 1000000ULL)) {

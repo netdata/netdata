@@ -88,7 +88,7 @@ DICTIONARY *dictionary_create(void) {
 	DICTIONARY *dict = calloc(1, sizeof(DICTIONARY));
 	if(!dict) fatal("Cannot allocate DICTIONARY");
 
-	dict->values_index.compar = name_value_compare;
+	avl_init(&dict->values_index, name_value_compare);
 	pthread_rwlock_init(&dict->rwlock, NULL);
 
 	return dict;
