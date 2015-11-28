@@ -12,17 +12,51 @@
 #include "web_buffer.h"
 #include "log.h"
 
-void web_buffer_reset(struct web_buffer *wb)
-{
-	web_buffer_flush(wb);
+#define BUFFER_OVERFLOW_EOF "EOF"
 
-	wb->sent = 0;
-	wb->rlen = 0;
-	wb->contenttype = CT_TEXT_PLAIN;
-	wb->date = 0;
+static inline void buffer_overflow_init(BUFFER *b)
+{
+	b->buffer[b->size] = '\0';
+	strcpy(&b->buffer[b->size + 1], BUFFER_OVERFLOW_EOF);
 }
 
-void web_buffer_char_replace(struct web_buffer *wb, char from, char to)
+#define buffer_overflow_check(b) _buffer_overflow_check(b, __FILE__, __FUNCTION__, __LINE__)
+
+static inline void _buffer_overflow_check(BUFFER *b, const char *file, const char *function, const unsigned long line)
+{
+	if(b->len > b->size) {
+		error("BUFFER: length %ld is above size %ld, at line %lu, at function %s() of file '%s'.", b->len, b->size, line, function, file);
+		b->len = b->size;
+	}
+
+	if(b->buffer[b->size] != '\0' || strcmp(&b->buffer[b->size + 1], BUFFER_OVERFLOW_EOF)) {
+		error("BUFFER: detected overflow at line %lu, at function %s() of file '%s'.", line, function, file);
+		buffer_overflow_init(b);
+	}
+}
+
+
+void buffer_reset(BUFFER *wb)
+{
+	buffer_flush(wb);
+
+	wb->contenttype = CT_TEXT_PLAIN;
+	wb->date = 0;
+
+	buffer_overflow_check(wb);
+}
+
+const char *buffer_tostring(BUFFER *wb)
+{
+	buffer_need_bytes(wb, 1);
+	wb->buffer[wb->len] = '\0';
+
+	buffer_overflow_check(wb);
+
+	return(wb->buffer);
+}
+
+void buffer_char_replace(BUFFER *wb, char from, char to)
 {
 	char *s = wb->buffer, *end = &wb->buffer[wb->len];
 
@@ -30,64 +64,128 @@ void web_buffer_char_replace(struct web_buffer *wb, char from, char to)
 		if(*s == from) *s = to;
 		s++;
 	}
+
+	buffer_overflow_check(wb);
 }
 
 
-void web_buffer_strcat(struct web_buffer *wb, const char *txt)
+void buffer_strcat(BUFFER *wb, const char *txt)
 {
-	char *buffer = wb->buffer;
-	const char *s = txt;
-	long bytes = wb->len, size = wb->size;
+	if(wb->size - wb->len < 512)
+		buffer_need_bytes(wb, 512);
 
-	while(*s && bytes < size)
-		buffer[bytes++] = *s++;
+	char *s = &wb->buffer[wb->len], *end = &wb->buffer[wb->size];
+	long len = wb->len;
 
-	wb->len = bytes;
+	while(*txt && s != end) {
+		*s++ = *txt++;
+		len++;
+	}
 
-	if(*s) {
-		web_buffer_need_bytes(wb, strlen(s));
-		web_buffer_strcat(wb, s);
+	wb->len = len;
+	buffer_overflow_check(wb);
+
+	if(*txt) {
+		debug(D_WEB_BUFFER, "strcat(): increasing web_buffer at position %ld, size = %ld\n", wb->len, wb->size);
+		len = strlen(txt);
+		buffer_increase(wb, len);
+		buffer_strcat(wb, txt);
 	}
 	else {
 		// terminate the string
 		// without increasing the length
-		web_buffer_need_bytes(wb, 1);
+		buffer_need_bytes(wb, 1);
 		wb->buffer[wb->len] = '\0';
 	}
 }
 
 
-void web_buffer_snprintf(struct web_buffer *wb, size_t len, const char *fmt, ...)
+void buffer_snprintf(BUFFER *wb, size_t len, const char *fmt, ...)
 {
-	web_buffer_need_bytes(wb, len+1);
+	buffer_need_bytes(wb, len+1);
 
 	va_list args;
 	va_start(args, fmt);
 	wb->len += vsnprintf(&wb->buffer[wb->len], len+1, fmt, args);
 	va_end(args);
 
+	buffer_overflow_check(wb);
+
+	// the buffer is \0 terminated by vsnprintf
+}
+
+void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args)
+{
+	size_t len = wb->size - wb->len;
+	if(unlikely(!len)) return;
+
+	wb->len += vsnprintf(&wb->buffer[wb->len], len, fmt, args);
+
+	buffer_overflow_check(wb);
+
+	// the buffer is \0 terminated by vsnprintf
+}
+
+void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
+{
+	if(unlikely(wb->len > wb->size)) {
+		error("web_buffer_sprintf(): already overflown length %ld, size = %ld", wb->len, wb->size);
+	}
+
+//	if(wb->size - wb->len < 512)
+//		web_buffer_need_bytes(wb, 512);
+
+	size_t len = wb->size - wb->len, old_len = wb->len, wrote;
+
+	buffer_need_bytes(wb, len);
+
+	va_list args;
+	va_start(args, fmt);
+	wrote = vsnprintf(&wb->buffer[wb->len], len, fmt, args);
+	va_end(args);
+
+	if(unlikely(wrote >= len)) {
+		// there is bug in vsnprintf() and it returns
+		// a number higher to len, but it does not
+		// overflow the buffer.
+		// our buffer overflow detector will log it
+		// if it does.
+		buffer_overflow_check(wb);
+
+		debug(D_WEB_BUFFER, "web_buffer_sprintf(): increasing web_buffer at position %ld, size = %ld\n", wb->len, wb->size);
+		buffer_need_bytes(wb, len + WEB_DATA_LENGTH_INCREASE_STEP);
+
+		va_start(args, fmt);
+		buffer_vsprintf(wb, fmt, args);
+		va_end(args);
+	}
+	else
+		wb->len += wrote;
+
 	// the buffer is \0 terminated by vsnprintf
 }
 
 
-void web_buffer_rrd_value(struct web_buffer *wb, calculated_number value)
+void buffer_rrd_value(BUFFER *wb, calculated_number value)
 {
-	web_buffer_need_bytes(wb, 50);
+	buffer_need_bytes(wb, 50);
 	wb->len += print_calculated_number(&wb->buffer[wb->len], value);
 
 	// terminate it
-	web_buffer_need_bytes(wb, 1);
+	buffer_need_bytes(wb, 1);
 	wb->buffer[wb->len] = '\0';
+
+	buffer_overflow_check(wb);
 }
 
 // generate a javascript date, the fastest possible way...
-void web_buffer_jsdate(struct web_buffer *wb, int year, int month, int day, int hours, int minutes, int seconds)
+void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minutes, int seconds)
 {
 	//         10        20        30      = 35
 	// 01234567890123456789012345678901234
 	// Date(2014, 04, 01, 03, 28, 20, 065)
 
-	web_buffer_need_bytes(wb, 36);
+	buffer_need_bytes(wb, 36);
 
 	char *b = &wb->buffer[wb->len];
 
@@ -127,44 +225,53 @@ void web_buffer_jsdate(struct web_buffer *wb, int year, int month, int day, int 
 	wb->len += i;
 
 	// terminate it
-	web_buffer_need_bytes(wb, 1);
+	buffer_need_bytes(wb, 1);
 	wb->buffer[wb->len] = '\0';
+
+	buffer_overflow_check(wb);
 }
 
-struct web_buffer *web_buffer_create(long size)
+BUFFER *buffer_create(long size)
 {
-	struct web_buffer *b;
+	BUFFER *b;
 
 	debug(D_WEB_BUFFER, "Creating new web buffer of size %d.", size);
 
-	b = calloc(1, sizeof(struct web_buffer));
+	b = calloc(1, sizeof(BUFFER));
 	if(!b) {
 		error("Cannot allocate a web_buffer.");
 		return NULL;
 	}
 
-	b->buffer = malloc(size);
+	b->buffer = malloc(size + sizeof(BUFFER_OVERFLOW_EOF) + 2);
 	if(!b->buffer) {
-		error("Cannot allocate a buffer of size %u.", size);
+		error("Cannot allocate a buffer of size %u.", size + sizeof(BUFFER_OVERFLOW_EOF) + 2);
 		free(b);
 		return NULL;
 	}
 	b->buffer[0] = '\0';
 	b->size = size;
 	b->contenttype = CT_TEXT_PLAIN;
+	buffer_overflow_init(b);
+	buffer_overflow_check(b);
+
 	return(b);
 }
 
-void web_buffer_free(struct web_buffer *b)
+void buffer_free(BUFFER *b)
 {
+	buffer_overflow_check(b);
+
 	debug(D_WEB_BUFFER, "Freeing web buffer of size %d.", b->size);
 
 	if(b->buffer) free(b->buffer);
 	free(b);
 }
 
-void web_buffer_increase(struct web_buffer *b, long free_size_required)
+void buffer_increase(BUFFER *b, long free_size_required)
 {
+	buffer_overflow_check(b);
+
 	long left = b->size - b->len;
 
 	if(left >= free_size_required) return;
@@ -174,8 +281,11 @@ void web_buffer_increase(struct web_buffer *b, long free_size_required)
 
 	debug(D_WEB_BUFFER, "Increasing data buffer from size %d to %d.", b->size, b->size + increase);
 
-	b->buffer = realloc(b->buffer, b->size + increase);
-	if(!b->buffer) fatal("Failed to increase data buffer from size %d to %d.", b->size, b->size + increase);
+	b->buffer = realloc(b->buffer, b->size + increase + sizeof(BUFFER_OVERFLOW_EOF) + 2);
+	if(!b->buffer) fatal("Failed to increase data buffer from size %d to %d.", b->size + sizeof(BUFFER_OVERFLOW_EOF) + 2, b->size + increase + sizeof(BUFFER_OVERFLOW_EOF) + 2);
 	
 	b->size += increase;
+
+	buffer_overflow_init(b);
+	buffer_overflow_check(b);
 }

@@ -26,7 +26,8 @@
 
 #include "web_client.h"
 
-#define INITIAL_WEB_DATA_LENGTH 65536
+#define INITIAL_WEB_DATA_LENGTH 16384
+#define WEB_REQUEST_LENGTH 16384
 
 int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
 int web_enable_gzip = 1;
@@ -93,9 +94,28 @@ struct web_client *web_client_create(int listener)
 		if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0) error("%llu: Cannot set SO_KEEPALIVE on socket.", w->id);
 	}
 
-	w->data = web_buffer_create(INITIAL_WEB_DATA_LENGTH);
-	if(unlikely(!w->data)) {
+	w->response.data = buffer_create(INITIAL_WEB_DATA_LENGTH);
+	if(unlikely(!w->response.data)) {
 		// no need for error log - web_buffer_create already logged the error
+		close(w->ifd);
+		free(w);
+		return NULL;
+	}
+
+	w->response.header = buffer_create(HTTP_RESPONSE_HEADER_SIZE);
+	if(unlikely(!w->response.header)) {
+		// no need for error log - web_buffer_create already logged the error
+		buffer_free(w->response.data);
+		close(w->ifd);
+		free(w);
+		return NULL;
+	}
+
+	w->response.header_output = buffer_create(HTTP_RESPONSE_HEADER_SIZE);
+	if(unlikely(!w->response.header_output)) {
+		// no need for error log - web_buffer_create already logged the error
+		buffer_free(w->response.header);
+		buffer_free(w->response.data);
 		close(w->ifd);
 		free(w);
 		return NULL;
@@ -112,6 +132,69 @@ struct web_client *web_client_create(int listener)
 	return(w);
 }
 
+void web_client_reset(struct web_client *w)
+{
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+
+	long sent = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
+
+#ifdef NETDATA_WITH_ZLIB
+	if(likely(w->response.zoutput)) sent = (long)w->response.zstream.total_out;
+#endif
+
+	long size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
+
+	if(likely(w->last_url[0]))
+		log_access("%llu: (sent/all = %ld/%ld bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: '%s'",
+			w->id,
+			sent, size, -((size>0)?((float)(size-sent)/(float)size * 100.0):0.0),
+			(float)usecdiff(&w->tv_ready, &w->tv_in) / 1000.0,
+			(float)usecdiff(&tv, &w->tv_ready) / 1000.0,
+			(float)usecdiff(&tv, &w->tv_in) / 1000.0,
+			(w->mode == WEB_CLIENT_MODE_FILECOPY)?"filecopy":"data",
+					w->last_url
+		);
+
+	debug(D_WEB_CLIENT, "%llu: Reseting client.", w->id);
+
+	if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
+		debug(D_WEB_CLIENT, "%llu: Closing filecopy input file.", w->id);
+		close(w->ifd);
+		w->ifd = w->ofd;
+	}
+
+	w->last_url[0] = '\0';
+
+	w->mode = WEB_CLIENT_MODE_NORMAL;
+
+	buffer_reset(w->response.header_output);
+	buffer_reset(w->response.header);
+	buffer_reset(w->response.data);
+	w->response.rlen = 0;
+	w->response.sent = 0;
+
+	w->wait_receive = 1;
+	w->wait_send = 0;
+
+	w->response.zoutput = 0;
+
+	// if we had enabled compression, release it
+#ifdef NETDATA_WITH_ZLIB
+	if(w->response.zinitialized) {
+		debug(D_DEFLATE, "%llu: Reseting compression.", w->id);
+		deflateEnd(&w->response.zstream);
+		w->response.zsent = 0;
+		w->response.zhave = 0;
+		w->response.zstream.avail_in = 0;
+		w->response.zstream.avail_out = 0;
+		w->response.zstream.total_in = 0;
+		w->response.zstream.total_out = 0;
+		w->response.zinitialized = 0;
+	}
+#endif // NETDATA_WITH_ZLIB
+}
+
 struct web_client *web_client_free(struct web_client *w)
 {
 	struct web_client *n = w->next;
@@ -123,7 +206,8 @@ struct web_client *web_client_free(struct web_client *w)
 
 	if(w == web_clients) web_clients = w->next;
 
-	if(w->data) web_buffer_free(w->data);
+	if(w->response.header) buffer_free(w->response.header);
+	if(w->response.data) buffer_free(w->response.data);
 	close(w->ifd);
 	if(w->ofd != w->ifd) close(w->ofd);
 	free(w);
@@ -152,7 +236,7 @@ int mysendfile(struct web_client *w, char *filename)
 	// if the filename contains a / or a .., refuse to serve it
 	if(strchr(filename, '/') != 0 || strstr(filename, "..") != 0) {
 		debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not acceptable.", w->id, filename);
-		web_buffer_snprintf(w->data, FILENAME_MAX + 1024, "File '%s' cannot be served. Filenames cannot contain / or ..", filename);
+		buffer_sprintf(w->response.data, "File '%s' cannot be served. Filenames cannot contain / or ..", filename);
 		return 400;
 	}
 
@@ -164,14 +248,14 @@ int mysendfile(struct web_client *w, char *filename)
 	struct stat stat;
 	if(lstat(webfilename, &stat) != 0) {
 		error("%llu: File '%s' is not found.", w->id, webfilename);
-		web_buffer_snprintf(w->data, FILENAME_MAX + 1024, "File '%s' does not exist, or is not accessible.", filename);
+		buffer_sprintf(w->response.data, "File '%s' does not exist, or is not accessible.", filename);
 		return 404;
 	}
 
 	// check if the file is owned by us
 	if(stat.st_uid != getuid() && stat.st_uid != geteuid()) {
 		error("%llu: File '%s' is owned by user %d (I run as user %d). Access Denied.", w->id, webfilename, stat.st_uid, getuid());
-		web_buffer_snprintf(w->data, FILENAME_MAX + 1024, "Access to file '%s' is not permitted.", filename);
+		buffer_sprintf(w->response.data, "Access to file '%s' is not permitted.", filename);
 		return 403;
 	}
 
@@ -182,152 +266,92 @@ int mysendfile(struct web_client *w, char *filename)
 
 		if(errno == EBUSY || errno == EAGAIN) {
 			error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, webfilename);
-			snprintf(w->response_header, MAX_HTTP_HEADER_SIZE, "Location: /" WEB_PATH_FILE "/%s\r\n", filename);
-			web_buffer_snprintf(w->data, FILENAME_MAX + 1024, "The file '%s' is currently busy. Please try again later.", filename);
+			buffer_sprintf(w->response.header, "Location: /" WEB_PATH_FILE "/%s\r\n", filename);
+			buffer_sprintf(w->response.data, "The file '%s' is currently busy. Please try again later.", filename);
 			return 307;
 		}
 		else {
 			error("%llu: Cannot open file '%s'.", w->id, webfilename);
-			web_buffer_snprintf(w->data, FILENAME_MAX + 1024, "Cannot open file '%s'.", filename);
+			buffer_sprintf(w->response.data, "Cannot open file '%s'.", filename);
 			return 404;
 		}
 	}
 
 	// pick a Content-Type for the file
-		 if(strstr(filename, ".html") != NULL)	w->data->contenttype = CT_TEXT_HTML;
-	else if(strstr(filename, ".js")   != NULL)	w->data->contenttype = CT_APPLICATION_X_JAVASCRIPT;
-	else if(strstr(filename, ".css")  != NULL)	w->data->contenttype = CT_TEXT_CSS;
-	else if(strstr(filename, ".xml")  != NULL)	w->data->contenttype = CT_TEXT_XML;
-	else if(strstr(filename, ".xsl")  != NULL)	w->data->contenttype = CT_TEXT_XSL;
-	else if(strstr(filename, ".txt")  != NULL)  w->data->contenttype = CT_TEXT_PLAIN;
-	else if(strstr(filename, ".svg")  != NULL)  w->data->contenttype = CT_IMAGE_SVG_XML;
-	else if(strstr(filename, ".ttf")  != NULL)  w->data->contenttype = CT_APPLICATION_X_FONT_TRUETYPE;
-	else if(strstr(filename, ".otf")  != NULL)  w->data->contenttype = CT_APPLICATION_X_FONT_OPENTYPE;
-	else if(strstr(filename, ".woff") != NULL)  w->data->contenttype = CT_APPLICATION_FONT_WOFF;
-	else if(strstr(filename, ".eot")  != NULL)  w->data->contenttype = CT_APPLICATION_VND_MS_FONTOBJ;
-	else w->data->contenttype = CT_APPLICATION_OCTET_STREAM;
+		 if(strstr(filename, ".html") != NULL)	w->response.data->contenttype = CT_TEXT_HTML;
+	else if(strstr(filename, ".js")   != NULL)	w->response.data->contenttype = CT_APPLICATION_X_JAVASCRIPT;
+	else if(strstr(filename, ".css")  != NULL)	w->response.data->contenttype = CT_TEXT_CSS;
+	else if(strstr(filename, ".xml")  != NULL)	w->response.data->contenttype = CT_TEXT_XML;
+	else if(strstr(filename, ".xsl")  != NULL)	w->response.data->contenttype = CT_TEXT_XSL;
+	else if(strstr(filename, ".txt")  != NULL)  w->response.data->contenttype = CT_TEXT_PLAIN;
+	else if(strstr(filename, ".svg")  != NULL)  w->response.data->contenttype = CT_IMAGE_SVG_XML;
+	else if(strstr(filename, ".ttf")  != NULL)  w->response.data->contenttype = CT_APPLICATION_X_FONT_TRUETYPE;
+	else if(strstr(filename, ".otf")  != NULL)  w->response.data->contenttype = CT_APPLICATION_X_FONT_OPENTYPE;
+	else if(strstr(filename, ".woff") != NULL)  w->response.data->contenttype = CT_APPLICATION_FONT_WOFF;
+	else if(strstr(filename, ".eot")  != NULL)  w->response.data->contenttype = CT_APPLICATION_VND_MS_FONTOBJ;
+	else w->response.data->contenttype = CT_APPLICATION_OCTET_STREAM;
 
 	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%ld bytes, ifd %d, ofd %d).", w->id, webfilename, stat.st_size, w->ifd, w->ofd);
 
 	w->mode = WEB_CLIENT_MODE_FILECOPY;
 	w->wait_receive = 1;
 	w->wait_send = 0;
-	web_buffer_flush(w->data);
-	w->data->rlen = stat.st_size;
-	w->data->date = stat.st_mtim.tv_sec;
+	buffer_flush(w->response.data);
+	w->response.rlen = stat.st_size;
+	w->response.data->date = stat.st_mtim.tv_sec;
 
 	return 200;
 }
 
-void web_client_reset(struct web_client *w)
-{
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-
-	long sent = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->data->rlen:w->data->len;
-
-#ifdef NETDATA_WITH_ZLIB
-	if(likely(w->zoutput)) sent = (long)w->zstream.total_out;
-#endif
-
-	long size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->data->rlen:w->data->len;
-
-	if(likely(w->last_url[0]))
-		log_access("%llu: (sent/all = %ld/%ld bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: '%s'",
-			w->id,
-			sent, size, -((size>0)?((float)(size-sent)/(float)size * 100.0):0.0),
-			(float)usecdiff(&w->tv_ready, &w->tv_in) / 1000.0,
-			(float)usecdiff(&tv, &w->tv_ready) / 1000.0,
-			(float)usecdiff(&tv, &w->tv_in) / 1000.0,
-			(w->mode == WEB_CLIENT_MODE_FILECOPY)?"filecopy":"data",
-					w->last_url
-		);
-
-	debug(D_WEB_CLIENT, "%llu: Reseting client.", w->id);
-
-	if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
-		debug(D_WEB_CLIENT, "%llu: Closing filecopy input file.", w->id);
-		close(w->ifd);
-		w->ifd = w->ofd;
-	}
-
-	w->last_url[0] = '\0';
-
-	w->mode = WEB_CLIENT_MODE_NORMAL;
-
-	w->response_header[0] = '\0';
-
-	web_buffer_reset(w->data);
-
-	w->wait_receive = 1;
-	w->wait_send = 0;
-
-	w->zoutput = 0;
-
-	// if we had enabled compression, release it
-#ifdef NETDATA_WITH_ZLIB
-	if(w->zinitialized) {
-		debug(D_DEFLATE, "%llu: Reseting compression.", w->id);
-		deflateEnd(&w->zstream);
-		w->zsent = 0;
-		w->zhave = 0;
-		w->zstream.avail_in = 0;
-		w->zstream.avail_out = 0;
-		w->zstream.total_in = 0;
-		w->zstream.total_out = 0;
-		w->zinitialized = 0;
-	}
-#endif // NETDATA_WITH_ZLIB
-}
 
 #ifdef NETDATA_WITH_ZLIB
 void web_client_enable_deflate(struct web_client *w) {
-	if(w->zinitialized == 1) {
+	if(w->response.zinitialized == 1) {
 		error("%llu: Compression has already be initialized for this client.", w->id);
 		return;
 	}
 
-	if(w->data->sent) {
+	if(w->response.sent) {
 		error("%llu: Cannot enable compression in the middle of a conversation.", w->id);
 		return;
 	}
 
-	w->zstream.zalloc = Z_NULL;
-	w->zstream.zfree = Z_NULL;
-	w->zstream.opaque = Z_NULL;
+	w->response.zstream.zalloc = Z_NULL;
+	w->response.zstream.zfree = Z_NULL;
+	w->response.zstream.opaque = Z_NULL;
 
-	w->zstream.next_in = (Bytef *)w->data->buffer;
-	w->zstream.avail_in = 0;
-	w->zstream.total_in = 0;
+	w->response.zstream.next_in = (Bytef *)w->response.data->buffer;
+	w->response.zstream.avail_in = 0;
+	w->response.zstream.total_in = 0;
 
-	w->zstream.next_out = w->zbuffer;
-	w->zstream.avail_out = 0;
-	w->zstream.total_out = 0;
+	w->response.zstream.next_out = w->response.zbuffer;
+	w->response.zstream.avail_out = 0;
+	w->response.zstream.total_out = 0;
 
-	w->zstream.zalloc = Z_NULL;
-	w->zstream.zfree = Z_NULL;
-	w->zstream.opaque = Z_NULL;
+	w->response.zstream.zalloc = Z_NULL;
+	w->response.zstream.zfree = Z_NULL;
+	w->response.zstream.opaque = Z_NULL;
 
-//	if(deflateInit(&w->zstream, Z_DEFAULT_COMPRESSION) != Z_OK) {
+//	if(deflateInit(&w->response.zstream, Z_DEFAULT_COMPRESSION) != Z_OK) {
 //		error("%llu: Failed to initialize zlib. Proceeding without compression.", w->id);
 //		return;
 //	}
 
 	// Select GZIP compression: windowbits = 15 + 16 = 31
-	if(deflateInit2(&w->zstream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 31, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
+	if(deflateInit2(&w->response.zstream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 31, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
 		error("%llu: Failed to initialize zlib. Proceeding without compression.", w->id);
 		return;
 	}
 
-	w->zsent = 0;
-	w->zoutput = 1;
-	w->zinitialized = 1;
+	w->response.zsent = 0;
+	w->response.zoutput = 1;
+	w->response.zinitialized = 1;
 
 	debug(D_DEFLATE, "%llu: Initialized compression.", w->id);
 }
 #endif // NETDATA_WITH_ZLIB
 
-int rrdset_validate_dimensions(RRDSET *st, struct web_buffer *dimensions)
+int rrdset_validate_dimensions(RRDSET *st, BUFFER *dimensions)
 {
 	;
 }
@@ -354,8 +378,8 @@ int web_client_api_request_v1_data_format(char *name)
 
 int web_client_api_request_v1_charts(struct web_client *w, char *url)
 {
-	web_buffer_flush(w->data);
-	rrd_stats_api_v1_charts(w->data);
+	buffer_flush(w->response.data);
+	rrd_stats_api_v1_charts(w->response.data);
 	return 200;
 }
 
@@ -364,7 +388,7 @@ int web_client_api_request_v1_chart(struct web_client *w, char *url)
 	int ret = 400;
 	char *chart = NULL;
 
-	web_buffer_flush(w->data);
+	buffer_flush(w->response.data);
 
 	while(url) {
 		char *value = mystrsep(&url, "?&[]");
@@ -379,26 +403,26 @@ int web_client_api_request_v1_chart(struct web_client *w, char *url)
 
 		if(!strcmp(name, "chart")) chart = value;
 		else {
-			web_buffer_snprintf(w->data, 1024, "Unknown parameter '%s' in request.", name);
+			buffer_sprintf(w->response.data, "Unknown parameter '%s' in request.", name);
 			goto cleanup;
 		}
 	}
 
 	if(!chart || !*chart) {
-		web_buffer_snprintf(w->data, 1024, "No chart id is given at the request.");
+		buffer_sprintf(w->response.data, "No chart id is given at the request.");
 		goto cleanup;
 	}
 
 	RRDSET *st = rrdset_find(chart);
 	if(!st) st = rrdset_find_byname(chart);
 	if(!st) {
-		web_buffer_snprintf(w->data, 1024, "Chart '%s' is not found.", chart);
+		buffer_sprintf(w->response.data, "Chart '%s' is not found.", chart);
 		ret = 404;
 		goto cleanup;
 	}
 
-	w->data->contenttype = CT_APPLICATION_JSON;
-	rrd_stats_api_v1_chart(st, w->data);
+	w->response.data->contenttype = CT_APPLICATION_JSON;
+	rrd_stats_api_v1_chart(st, w->response.data);
 	return 200;
 
 cleanup:
@@ -408,9 +432,9 @@ cleanup:
 int web_client_api_request_v1_data(struct web_client *w, char *url)
 {
 	int ret = 400;
-	struct web_buffer *dimensions = NULL;
+	BUFFER *dimensions = NULL;
 
-	web_buffer_flush(w->data);
+	buffer_flush(w->response.data);
 
 	char *chart = NULL
 			, *dim = NULL
@@ -435,10 +459,10 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 
 		if(!strcmp(name, "chart")) chart = value;
 		else if(!strcmp(name, "dimension") || !strcmp(name, "dim")) {
-			if(!dimensions) dimensions = web_buffer_create(strlen(value));
+			if(!dimensions) dimensions = buffer_create(strlen(value));
 			if(dimensions) {
-				web_buffer_strcat(dimensions, "|");
-				web_buffer_strcat(dimensions, value);
+				buffer_strcat(dimensions, "|");
+				buffer_strcat(dimensions, value);
 			}
 		}
 		else if(!strcmp(name, "after")) after_str = value;
@@ -452,20 +476,20 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 			options = value;
 		}
 		else {
-			web_buffer_snprintf(w->data, 1024, "Unknown parameter '%s' in request.", name);
+			buffer_sprintf(w->response.data, "Unknown parameter '%s' in request.", name);
 			goto cleanup;
 		}
 	}
 
 	if(!chart || !*chart) {
-		web_buffer_snprintf(w->data, 1024, "No chart id is given at the request.");
+		buffer_sprintf(w->response.data, "No chart id is given at the request.");
 		goto cleanup;
 	}
 
 	RRDSET *st = rrdset_find(chart);
 	if(!st) st = rrdset_find_byname(chart);
 	if(!st) {
-		web_buffer_snprintf(w->data, 1024, "Chart '%s' is not found.", chart);
+		buffer_sprintf(w->response.data, "Chart '%s' is not found.", chart);
 		ret = 404;
 		goto cleanup;
 	}
@@ -475,10 +499,10 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 	int      points = (points_str && *points_str)?atoi(points_str):0;
 	int      group  = (group_str  && *group_str) ?atoi(group_str):0;
 
-	web_buffer_snprintf(w->data, 1024, "API command 'data' for chart '%s', dimensions '%s', after '%s', before '%s', points '%s', group '%s', format '%s', options '%s'", chart, dim, after_str, before_str, points_str, group_str, format, options);
+	buffer_sprintf(w->response.data, "API command 'data' for chart '%s', dimensions '%s', after '%s', before '%s', points '%s', group '%s', format '%s', options '%s'", chart, dim, after_str, before_str, points_str, group_str, format, options);
 
 cleanup:
-	if(dimensions) web_buffer_free(dimensions);
+	if(dimensions) buffer_free(dimensions);
 	return ret;
 }
 
@@ -495,8 +519,8 @@ int web_client_api_request_v1(struct web_client *w, char *url)
 	else if(strcmp(tok, "charts") == 0)
 		return web_client_api_request_v1_charts(w, url);
 
-	web_buffer_flush(w->data);
-	web_buffer_snprintf(w->data, 1024, "Unsupported v1 API command: %s", tok);
+	buffer_flush(w->response.data);
+	buffer_sprintf(w->response.data, "Unsupported v1 API command: %s", tok);
 	return 404;
 }
 
@@ -509,8 +533,8 @@ int web_client_api_request(struct web_client *w, char *url)
 	if(strcmp(tok, "v1") == 0)
 		return web_client_api_request_v1(w, url);
 
-	web_buffer_flush(w->data);
-	web_buffer_snprintf(w->data, 1024, "Unsupported API version: %s", tok);
+	buffer_flush(w->response.data);
+	buffer_sprintf(w->response.data, "Unsupported API version: %s", tok);
 	return 404;
 }
 
@@ -532,7 +556,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	if(!st) {
 		// we don't have it
 		// try to send a file with that name
-		web_buffer_flush(w->data);
+		buffer_flush(w->response.data);
 		return(mysendfile(w, tok));
 	}
 
@@ -585,8 +609,8 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 		if(tok && strcmp(tok, "nonzero") == 0) nonzero = 1;
 	}
 
-	w->data->contenttype = CT_APPLICATION_JSON;
-	web_buffer_flush(w->data);
+	w->response.data->contenttype = CT_APPLICATION_JSON;
+	buffer_flush(w->response.data);
 
 	char *google_version = "0.6";
 	char *google_reqId = "0";
@@ -597,7 +621,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	unsigned long last_timestamp_in_data = 0;
 	if(datasource_type == DATASOURCE_GOOGLE_JSON || datasource_type == DATASOURCE_GOOGLE_JSONP) {
 
-		w->data->contenttype = CT_APPLICATION_X_JAVASCRIPT;
+		w->response.data->contenttype = CT_APPLICATION_X_JAVASCRIPT;
 
 		while(args) {
 			tok = mystrsep(&args, "&");
@@ -638,7 +662,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 
 			// check the client wants json
 			if(strcmp(google_out, "json") != 0) {
-				web_buffer_snprintf(w->data, 65536,
+				buffer_sprintf(w->response.data,
 					"%s({version:'%s',reqId:'%s',status:'error',errors:[{reason:'invalid_query',message:'output format is not supported',detailed_message:'the format %s requested is not supported by netdata.'}]});",
 					google_responseHandler, google_version, google_reqId, google_out);
 					return 200;
@@ -647,21 +671,21 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	}
 
 	if(datasource_type == DATASOURCE_GOOGLE_JSONP) {
-		web_buffer_snprintf(w->data, 65536,
+		buffer_sprintf(w->response.data,
 			"%s({version:'%s',reqId:'%s',status:'ok',sig:'%lu',table:",
 			google_responseHandler, google_version, google_reqId, st->last_updated.tv_sec);
 	}
 
 	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group, %d group_method, %lu after, %lu before).", w->id, st->name, st->id, lines, group_count, group_method, after, before);
-	unsigned long timestamp_in_data = rrd_stats_json(datasource_type, st, w->data, lines, group_count, group_method, after, before, nonzero);
+	unsigned long timestamp_in_data = rrd_stats_json(datasource_type, st, w->response.data, lines, group_count, group_method, after, before, nonzero);
 
 	if(datasource_type == DATASOURCE_GOOGLE_JSONP) {
 		if(timestamp_in_data > last_timestamp_in_data)
-			web_buffer_strcat(w->data, "});");
+			buffer_strcat(w->response.data, "});");
 
 		else {
 			// the client already has the latest data
-			web_buffer_snprintf(w->data, 65536,
+			buffer_sprintf(w->response.data,
 				"%s({version:'%s',reqId:'%s',status:'error',errors:[{reason:'not_modified',message:'Data not modified'}]});",
 				google_responseHandler, google_version, google_reqId);
 		}
@@ -682,9 +706,9 @@ int web_client_parse_request(struct web_client *w) {
 
 	web_client_clean_request(w);
 
-	debug(D_WEB_DATA, "%llu: Processing data buffer of %d bytes: '%s'.", w->id, w->data->bytes, w->data->buffer);
+	debug(D_WEB_DATA, "%llu: Processing data buffer of %d bytes: '%s'.", w->id, w->response.data->bytes, w->response.data->buffer);
 
-	char *buf = w->data->buffer;
+	char *buf = w->response.data->buffer;
 	char *line, *tok;
 
 	// ------------------------------------------------------------------------
@@ -725,29 +749,29 @@ void web_client_process(struct web_client *w) {
 	w->wait_receive = 0;
 
 	// check if we have an empty line (end of HTTP header)
-	if(strstr(w->data->buffer, "\r\n\r\n")) {
+	if(strstr(w->response.data->buffer, "\r\n\r\n")) {
 		global_statistics_lock();
 		global_statistics.web_requests++;
 		global_statistics_unlock();
 
 		gettimeofday(&w->tv_in, NULL);
-		debug(D_WEB_DATA, "%llu: Processing data buffer of %d bytes: '%s'.", w->id, w->data->len, w->data->buffer);
+		debug(D_WEB_DATA, "%llu: Processing data buffer of %d bytes: '%s'.", w->id, w->response.data->len, w->response.data->buffer);
 
 		// check if the client requested keep-alive HTTP
-		if(strcasestr(w->data->buffer, "Connection: keep-alive")) w->keepalive = 1;
+		if(strcasestr(w->response.data->buffer, "Connection: keep-alive")) w->keepalive = 1;
 		else w->keepalive = 0;
 
 #ifdef NETDATA_WITH_ZLIB
 		// check if the client accepts deflate
-		if(web_enable_gzip && strstr(w->data->buffer, "gzip"))
+		if(web_enable_gzip && strstr(w->response.data->buffer, "gzip"))
 			web_client_enable_deflate(w);
 #endif // NETDATA_WITH_ZLIB
 
 		int datasource_type = DATASOURCE_GOOGLE_JSONP;
-		//if(strstr(w->data->buffer, "X-DataSource-Auth"))
+		//if(strstr(w->response.data->buffer, "X-DataSource-Auth"))
 		//	datasource_type = DATASOURCE_GOOGLE_JSON;
 
-		char *buf = w->data->buffer;
+		char *buf = w->response.data->buffer;
 		char *tok = strsep(&buf, " \r\n");
 		char *url = NULL;
 		char *pointer_to_free = NULL; // keep url_decode() allocated buffer
@@ -801,19 +825,19 @@ void web_client_process(struct web_client *w) {
 				if(!st) {
 					// we don't have it
 					// try to send a file with that name
-					web_buffer_flush(w->data);
+					buffer_flush(w->response.data);
 					code = mysendfile(w, tok);
 				}
 				else {
 					code = 200;
 					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending %s.json of RRD_STATS...", w->id, st->name);
-					w->data->contenttype = CT_APPLICATION_JSON;
-					web_buffer_flush(w->data);
-					rrd_stats_graph_json(st, url, w->data);
+					w->response.data->contenttype = CT_APPLICATION_JSON;
+					buffer_flush(w->response.data);
+					rrd_stats_graph_json(st, url, w->response.data);
 				}
 			}
 			else if(strcmp(tok, "debug") == 0) {
-				web_buffer_flush(w->data);
+				buffer_flush(w->response.data);
 
 				// get the name of the data to show
 				tok = mystrsep(&url, "/?&");
@@ -824,14 +848,14 @@ void web_client_process(struct web_client *w) {
 				if(!st) st = rrdset_find(tok);
 				if(!st) {
 					code = 404;
-					web_buffer_snprintf(w->data, 1024, "Chart %s is not found.\r\n", tok);
+					buffer_sprintf(w->response.data, "Chart %s is not found.\r\n", tok);
 					debug(D_WEB_CLIENT_ACCESS, "%llu: %s is not found.", w->id, tok);
 				}
 				else {
 					code = 200;
 					debug_flags |= D_RRD_STATS;
 					st->debug = st->debug?0:1;
-					web_buffer_snprintf(w->data, 1024, "Chart %s has now debug %s.\r\n", tok, st->debug?"enabled":"disabled");
+					buffer_sprintf(w->response.data, "Chart %s has now debug %s.\r\n", tok, st->debug?"enabled":"disabled");
 					debug(D_WEB_CLIENT_ACCESS, "%llu: debug for %s is %s.", w->id, tok, st->debug?"enabled":"disabled");
 				}
 			}
@@ -841,7 +865,7 @@ void web_client_process(struct web_client *w) {
 				debug(D_WEB_CLIENT_ACCESS, "%llu: Mirroring...", w->id);
 
 				// replace the zero bytes with spaces
-				web_buffer_char_replace(w->data, '\0', ' ');
+				buffer_char_replace(w->response.data, '\0', ' ');
 
 				// just leave the buffer as is
 				// it will be copied back to the client
@@ -851,43 +875,43 @@ void web_client_process(struct web_client *w) {
 
 				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending list of RRD_STATS...", w->id);
 
-				web_buffer_flush(w->data);
+				buffer_flush(w->response.data);
 				RRDSET *st = rrdset_root;
 
 				for ( ; st ; st = st->next )
-					web_buffer_snprintf(w->data, 1024, "%s\n", st->name);
+					buffer_sprintf(w->response.data, "%s\n", st->name);
 			}
 			else if(strcmp(tok, "all.json") == 0) {
 				code = 200;
 				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending JSON list of all monitors of RRD_STATS...", w->id);
 
-				w->data->contenttype = CT_APPLICATION_JSON;
-				web_buffer_flush(w->data);
-				rrd_stats_all_json(w->data);
+				w->response.data->contenttype = CT_APPLICATION_JSON;
+				buffer_flush(w->response.data);
+				rrd_stats_all_json(w->response.data);
 			}
 			else if(strcmp(tok, "netdata.conf") == 0) {
 				code = 200;
 				debug(D_WEB_CLIENT_ACCESS, "%llu: Sending netdata.conf ...", w->id);
 
-				w->data->contenttype = CT_TEXT_PLAIN;
-				web_buffer_flush(w->data);
-				generate_config(w->data, 0);
+				w->response.data->contenttype = CT_TEXT_PLAIN;
+				buffer_flush(w->response.data);
+				generate_config(w->response.data, 0);
 			}
 			else if(strcmp(tok, WEB_PATH_FILE) == 0) { // "file"
 				tok = mystrsep(&url, "/?&");
 				if(tok && *tok) code = mysendfile(w, tok);
 				else {
 					code = 400;
-					web_buffer_flush(w->data);
-					web_buffer_strcat(w->data, "You have to give a filename to get.\r\n");
+					buffer_flush(w->response.data);
+					buffer_strcat(w->response.data, "You have to give a filename to get.\r\n");
 				}
 			}
 			else if(!tok[0]) {
-				web_buffer_flush(w->data);
+				buffer_flush(w->response.data);
 				code = mysendfile(w, "index.html");
 			}
 			else {
-				web_buffer_flush(w->data);
+				buffer_flush(w->response.data);
 				code = mysendfile(w, tok);
 			}
 
@@ -898,21 +922,21 @@ void web_client_process(struct web_client *w) {
 			if(buf) debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, buf);
 
 			code = 500;
-			web_buffer_flush(w->data);
-			web_buffer_strcat(w->data, "I don't understand you...\r\n");
+			buffer_flush(w->response.data);
+			buffer_strcat(w->response.data, "I don't understand you...\r\n");
 		}
 
 		// free url_decode() buffer
 		if(pointer_to_free) free(pointer_to_free);
 	}
-	else if(w->data->len > 8192) {
+	else if(w->response.data->len > 8192) {
 		strcpy(w->last_url, "too big request");
 
 		debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big.", w->id);
 
 		code = 400;
-		web_buffer_flush(w->data);
-		web_buffer_strcat(w->data, "Received request is too big.\r\n");
+		buffer_flush(w->response.data);
+		buffer_strcat(w->response.data, "Received request is too big.\r\n");
 	}
 	else {
 		// wait for more data
@@ -920,19 +944,19 @@ void web_client_process(struct web_client *w) {
 		return;
 	}
 
-	if(w->data->len > w->data->size) {
-		error("%llu: memory overflow encountered (size is %ld, written %ld).", w->data->size, w->data->len);
+	if(w->response.data->len > w->response.data->size) {
+		error("%llu: memory overflow encountered (size is %ld, written %ld).", w->response.data->size, w->response.data->len);
 	}
 
 	gettimeofday(&w->tv_ready, NULL);
-	w->data->date = time(NULL);
-	w->data->sent = 0;
+	w->response.data->date = time(NULL);
+	w->response.sent = 0;
 
 	// prepare the HTTP response header
 	debug(D_WEB_CLIENT, "%llu: Generating HTTP header with response %d.", w->id, code);
 
 	char *content_type_string = "";
-	switch(w->data->contenttype) {
+	switch(w->response.data->contenttype) {
 		case CT_TEXT_HTML:
 			content_type_string = "text/html; charset=utf-8";
 			break;
@@ -1019,15 +1043,10 @@ void web_client_process(struct web_client *w) {
 	}
 
 	char date[100];
-	struct tm tm = *gmtime(&w->data->date);
+	struct tm tm = *gmtime(&w->response.data->date);
 	strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S %Z", &tm);
 
-	char custom_header[MAX_HTTP_HEADER_SIZE + 1] = "";
-	if(w->response_header[0])
-		strcpy(custom_header, w->response_header);
-
-	int headerlen = 0;
-	headerlen += snprintf(&w->response_header[headerlen], MAX_HTTP_HEADER_SIZE - headerlen,
+	buffer_sprintf(w->response.header_output,
 		"HTTP/1.1 %d %s\r\n"
 		"Connection: %s\r\n"
 		"Server: NetData Embedded HTTP Server\r\n"
@@ -1040,50 +1059,54 @@ void web_client_process(struct web_client *w) {
 		, date
 		);
 
-	if(custom_header[0])
-		headerlen += snprintf(&w->response_header[headerlen], MAX_HTTP_HEADER_SIZE - headerlen, "%s", custom_header);
+	if(buffer_strlen(w->response.header))
+		buffer_strcat(w->response.header_output, buffer_tostring(w->response.header));
 
 	if(w->mode == WEB_CLIENT_MODE_NORMAL) {
-		headerlen += snprintf(&w->response_header[headerlen], MAX_HTTP_HEADER_SIZE - headerlen,
+		buffer_sprintf(w->response.header_output,
 			"Expires: %s\r\n"
 			"Cache-Control: no-cache\r\n"
-			, date
-			);
+			, date);
 	}
-	else {
-		headerlen += snprintf(&w->response_header[headerlen], MAX_HTTP_HEADER_SIZE - headerlen,
-			"Cache-Control: public\r\n"
-			);
-	}
+	else
+		buffer_strcat(w->response.header_output, "Cache-Control: public\r\n");
 
 	// if we know the content length, put it
-	if(!w->zoutput && (w->data->len || w->data->rlen))
-		headerlen += snprintf(&w->response_header[headerlen], MAX_HTTP_HEADER_SIZE - headerlen,
+	if(!w->response.zoutput && (w->response.data->len || w->response.rlen))
+		buffer_sprintf(w->response.header_output,
 			"Content-Length: %ld\r\n"
-			, w->data->len?w->data->len:w->data->rlen
+			, w->response.data->len?w->response.data->len:w->response.rlen
 			);
-	else if(!w->zoutput)
+	else if(!w->response.zoutput)
 		w->keepalive = 0;	// content-length is required for keep-alive
 
-	if(w->zoutput) {
-		headerlen += snprintf(&w->response_header[headerlen], MAX_HTTP_HEADER_SIZE - headerlen,
+	if(w->response.zoutput) {
+		buffer_strcat(w->response.header_output,
 			"Content-Encoding: gzip\r\n"
 			"Transfer-Encoding: chunked\r\n"
 			);
 	}
 
-	headerlen += snprintf(&w->response_header[headerlen], MAX_HTTP_HEADER_SIZE - headerlen, "\r\n");
+	buffer_strcat(w->response.header_output, "\r\n");
 
 	// disable TCP_NODELAY, to buffer the header
 	int flag = 0;
-	if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0) error("%llu: failed to disable TCP_NODELAY on socket.", w->id);
+	if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0)
+		error("%llu: failed to disable TCP_NODELAY on socket.", w->id);
 
 	// sent the HTTP header
-	debug(D_WEB_DATA, "%llu: Sending response HTTP header of size %d: '%s'", w->id, headerlen, w->response_header);
+	debug(D_WEB_DATA, "%llu: Sending response HTTP header of size %d: '%s'"
+			, w->id
+			, buffer_strlen(w->response.header_output)
+			, buffer_tostring(w->response.header_output)
+			);
 
-	bytes = send(w->ofd, w->response_header, headerlen, 0);
-	if(bytes != headerlen)
-		error("%llu: HTTP Header failed to be sent (I sent %d bytes but the system sent %d bytes).", w->id, headerlen, bytes);
+	bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0);
+	if(bytes != buffer_strlen(w->response.header_output))
+		error("%llu: HTTP Header failed to be sent (I sent %d bytes but the system sent %d bytes)."
+				, w->id
+				, buffer_strlen(w->response.header_output)
+				, bytes);
 	else {
 		global_statistics_lock();
 		global_statistics.bytes_sent += bytes;
@@ -1095,18 +1118,18 @@ void web_client_process(struct web_client *w) {
 	if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0) error("%llu: failed to enable TCP_NODELAY on socket.", w->id);
 
 	// enable sending immediately if we have data
-	if(w->data->len) w->wait_send = 1;
+	if(w->response.data->len) w->wait_send = 1;
 	else w->wait_send = 0;
 
 	// pretty logging
 	switch(w->mode) {
 		case WEB_CLIENT_MODE_NORMAL:
-			debug(D_WEB_CLIENT, "%llu: Done preparing the response. Sending data (%d bytes) to client.", w->id, w->data->len);
+			debug(D_WEB_CLIENT, "%llu: Done preparing the response. Sending data (%d bytes) to client.", w->id, w->response.data->len);
 			break;
 
 		case WEB_CLIENT_MODE_FILECOPY:
-			if(w->data->rlen) {
-				debug(D_WEB_CLIENT, "%llu: Done preparing the response. Will be sending data file of %d bytes to client.", w->id, w->data->rlen);
+			if(w->response.rlen) {
+				debug(D_WEB_CLIENT, "%llu: Done preparing the response. Will be sending data file of %d bytes to client.", w->id, w->response.rlen);
 				w->wait_receive = 1;
 
 				/*
@@ -1114,8 +1137,8 @@ void web_client_process(struct web_client *w) {
 				// this block of code can be commented, without anything missing.
 				// when it is commented, the program will copy the data using async I/O.
 				{
-					long len = sendfile(w->ofd, w->ifd, NULL, w->data->rbytes);
-					if(len != w->data->rbytes) error("%llu: sendfile() should copy %ld bytes, but copied %ld. Falling back to manual copy.", w->id, w->data->rbytes, len);
+					long len = sendfile(w->ofd, w->ifd, NULL, w->response.data->rbytes);
+					if(len != w->response.data->rbytes) error("%llu: sendfile() should copy %ld bytes, but copied %ld. Falling back to manual copy.", w->id, w->response.data->rbytes, len);
 					else web_client_reset(w);
 				}
 				*/
@@ -1176,24 +1199,24 @@ long web_client_send_deflate(struct web_client *w)
 	long len = 0, t = 0;
 
 	// when using compression,
-	// w->data->sent is the amount of bytes passed through compression
+	// w->response.sent is the amount of bytes passed through compression
 
-	// debug(D_DEFLATE, "%llu: TEST w->data->bytes = %d, w->data->sent = %d, w->zhave = %d, w->zsent = %d, w->zstream.avail_in = %d, w->zstream.avail_out = %d, w->zstream.total_in = %d, w->zstream.total_out = %d.", w->id, w->data->bytes, w->data->sent, w->zhave, w->zsent, w->zstream.avail_in, w->zstream.avail_out, w->zstream.total_in, w->zstream.total_out);
+	debug(D_DEFLATE, "%llu: TEST w->response.data->len = %d, w->response.sent = %d, w->response.zhave = %d, w->response.zsent = %d, w->response.zstream.avail_in = %d, w->response.zstream.avail_out = %d, w->response.zstream.total_in = %d, w->response.zstream.total_out = %d.", w->id, w->response.data->len, w->response.sent, w->response.zhave, w->response.zsent, w->response.zstream.avail_in, w->response.zstream.avail_out, w->response.zstream.total_in, w->response.zstream.total_out);
 
-	if(w->data->len - w->data->sent == 0 && w->zstream.avail_in == 0 && w->zhave == w->zsent && w->zstream.avail_out != 0) {
+	if(w->response.data->len - w->response.sent == 0 && w->response.zstream.avail_in == 0 && w->response.zhave == w->response.zsent && w->response.zstream.avail_out != 0) {
 		// there is nothing to send
 
 		debug(D_WEB_CLIENT, "%llu: Out of output data.", w->id);
 
 		// finalize the chunk
-		if(w->data->sent != 0)
+		if(w->response.sent != 0)
 			t += web_client_send_chunk_finalize(w);
 
 		// there can be two cases for this
 		// A. we have done everything
 		// B. we temporarily have nothing to send, waiting for the buffer to be filled by ifd
 
-		if(w->mode == WEB_CLIENT_MODE_FILECOPY && w->wait_receive && w->ifd != w->ofd && w->data->rlen && w->data->rlen > w->data->len) {
+		if(w->mode == WEB_CLIENT_MODE_FILECOPY && w->wait_receive && w->ifd != w->ofd && w->response.rlen && w->response.rlen > w->response.data->len) {
 			// we have to wait, more data will come
 			debug(D_WEB_CLIENT, "%llu: Waiting for more data to become available.", w->id);
 			w->wait_send = 0;
@@ -1201,7 +1224,7 @@ long web_client_send_deflate(struct web_client *w)
 		}
 
 		if(w->keepalive == 0) {
-			debug(D_WEB_CLIENT, "%llu: Closing (keep-alive is not enabled). %ld bytes sent.", w->id, w->data->sent);
+			debug(D_WEB_CLIENT, "%llu: Closing (keep-alive is not enabled). %ld bytes sent.", w->id, w->response.sent);
 			errno = 0;
 			return(-1);
 		}
@@ -1212,28 +1235,28 @@ long web_client_send_deflate(struct web_client *w)
 		return(0);
 	}
 
-	if(w->zstream.avail_out == 0 && w->zhave == w->zsent) {
+	if(w->response.zhave == w->response.zsent) {
 		// compress more input data
 
 		// close the previous open chunk
-		if(w->data->sent != 0) t += web_client_send_chunk_close(w);
+		if(w->response.sent != 0) t += web_client_send_chunk_close(w);
 
-		debug(D_DEFLATE, "%llu: Compressing %d bytes starting from %d.", w->id, (w->data->len - w->data->sent), w->data->sent);
+		debug(D_DEFLATE, "%llu: Compressing %d bytes starting from %d.", w->id, (w->response.data->len - w->response.sent), w->response.sent);
 
 		// give the compressor all the data not passed through the compressor yet
-		if(w->data->len > w->data->sent) {
-			w->zstream.next_in = (Bytef *)&w->data->buffer[w->data->sent];
-			w->zstream.avail_in = (w->data->len - w->data->sent);
+		if(w->response.data->len > w->response.sent) {
+			w->response.zstream.next_in = (Bytef *)&w->response.data->buffer[w->response.sent];
+			w->response.zstream.avail_in = (w->response.data->len - w->response.sent);
 		}
 
 		// reset the compressor output buffer
-		w->zstream.next_out = w->zbuffer;
-		w->zstream.avail_out = ZLIB_CHUNK;
+		w->response.zstream.next_out = w->response.zbuffer;
+		w->response.zstream.avail_out = ZLIB_CHUNK;
 
 		// ask for FINISH if we have all the input
 		int flush = Z_SYNC_FLUSH;
 		if(w->mode == WEB_CLIENT_MODE_NORMAL
-			|| (w->mode == WEB_CLIENT_MODE_FILECOPY && w->data->len == w->data->rlen)) {
+			|| (w->mode == WEB_CLIENT_MODE_FILECOPY && w->response.data->len == w->response.rlen)) {
 			flush = Z_FINISH;
 			debug(D_DEFLATE, "%llu: Requesting Z_FINISH.", w->id);
 		}
@@ -1242,31 +1265,31 @@ long web_client_send_deflate(struct web_client *w)
 		}
 
 		// compress
-		if(deflate(&w->zstream, flush) == Z_STREAM_ERROR) {
+		if(deflate(&w->response.zstream, flush) == Z_STREAM_ERROR) {
 			error("%llu: Compression failed. Closing down client.", w->id);
 			web_client_reset(w);
 			return(-1);
 		}
 
-		w->zhave = ZLIB_CHUNK - w->zstream.avail_out;
-		w->zsent = 0;
+		w->response.zhave = ZLIB_CHUNK - w->response.zstream.avail_out;
+		w->response.zsent = 0;
 
 		// keep track of the bytes passed through the compressor
-		w->data->sent = w->data->len;
+		w->response.sent = w->response.data->len;
 
-		debug(D_DEFLATE, "%llu: Compression produced %d bytes.", w->id, w->zhave);
+		debug(D_DEFLATE, "%llu: Compression produced %d bytes.", w->id, w->response.zhave);
 
 		// open a new chunk
-		t += web_client_send_chunk_header(w, w->zhave);
+		t += web_client_send_chunk_header(w, w->response.zhave);
 	}
 
-	len = send(w->ofd, &w->zbuffer[w->zsent], w->zhave - w->zsent, MSG_DONTWAIT);
+	len = send(w->ofd, &w->response.zbuffer[w->response.zsent], w->response.zhave - w->response.zsent, MSG_DONTWAIT);
 	if(len > 0) {
-		w->zsent += len;
+		w->response.zsent += len;
 		if(t > 0) len += t;
 		debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, len);
 	}
-	else if(len == 0) debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client.", w->id);
+	else if(len == 0) debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client (zhave = %ld, zsent = %ld, need to send = %ld).", w->id, w->response.zhave, w->response.zsent, w->response.zhave - w->response.zsent);
 	else debug(D_WEB_CLIENT, "%llu: Failed to send data to client. Reason: %s", w->id, strerror(errno));
 
 	return(len);
@@ -1276,12 +1299,12 @@ long web_client_send_deflate(struct web_client *w)
 long web_client_send(struct web_client *w)
 {
 #ifdef NETDATA_WITH_ZLIB
-	if(likely(w->zoutput)) return web_client_send_deflate(w);
+	if(likely(w->response.zoutput)) return web_client_send_deflate(w);
 #endif // NETDATA_WITH_ZLIB
 
 	long bytes;
 
-	if(unlikely(w->data->len - w->data->sent == 0)) {
+	if(unlikely(w->response.data->len - w->response.sent == 0)) {
 		// there is nothing to send
 
 		debug(D_WEB_CLIENT, "%llu: Out of output data.", w->id);
@@ -1290,7 +1313,7 @@ long web_client_send(struct web_client *w)
 		// A. we have done everything
 		// B. we temporarily have nothing to send, waiting for the buffer to be filled by ifd
 
-		if(w->mode == WEB_CLIENT_MODE_FILECOPY && w->wait_receive && w->ifd != w->ofd && w->data->rlen && w->data->rlen > w->data->len) {
+		if(w->mode == WEB_CLIENT_MODE_FILECOPY && w->wait_receive && w->ifd != w->ofd && w->response.rlen && w->response.rlen > w->response.data->len) {
 			// we have to wait, more data will come
 			debug(D_WEB_CLIENT, "%llu: Waiting for more data to become available.", w->id);
 			w->wait_send = 0;
@@ -1298,7 +1321,7 @@ long web_client_send(struct web_client *w)
 		}
 
 		if(unlikely(w->keepalive == 0)) {
-			debug(D_WEB_CLIENT, "%llu: Closing (keep-alive is not enabled). %ld bytes sent.", w->id, w->data->sent);
+			debug(D_WEB_CLIENT, "%llu: Closing (keep-alive is not enabled). %ld bytes sent.", w->id, w->response.sent);
 			errno = 0;
 			return(-1);
 		}
@@ -1308,9 +1331,9 @@ long web_client_send(struct web_client *w)
 		return(0);
 	}
 
-	bytes = send(w->ofd, &w->data->buffer[w->data->sent], w->data->len - w->data->sent, MSG_DONTWAIT);
+	bytes = send(w->ofd, &w->response.data->buffer[w->response.sent], w->response.data->len - w->response.sent, MSG_DONTWAIT);
 	if(likely(bytes > 0)) {
-		w->data->sent += bytes;
+		w->response.sent += bytes;
 		debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, bytes);
 	}
 	else if(likely(bytes == 0)) debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client.", w->id);
@@ -1322,27 +1345,27 @@ long web_client_send(struct web_client *w)
 long web_client_receive(struct web_client *w)
 {
 	// do we have any space for more data?
-	web_buffer_need_bytes(w->data, WEB_DATA_LENGTH_INCREASE_STEP);
+	buffer_need_bytes(w->response.data, WEB_REQUEST_LENGTH);
 
-	long left = w->data->size - w->data->len;
+	long left = w->response.data->size - w->response.data->len;
 	long bytes;
 
 	if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY))
-		bytes = read(w->ifd, &w->data->buffer[w->data->len], (left-1));
+		bytes = read(w->ifd, &w->response.data->buffer[w->response.data->len], (left-1));
 	else
-		bytes = recv(w->ifd, &w->data->buffer[w->data->len], left-1, MSG_DONTWAIT);
+		bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], left-1, MSG_DONTWAIT);
 
 	if(likely(bytes > 0)) {
-		int old = w->data->len;
-		w->data->len += bytes;
-		w->data->buffer[w->data->len] = '\0';
+		int old = w->response.data->len;
+		w->response.data->len += bytes;
+		w->response.data->buffer[w->response.data->len] = '\0';
 
 		debug(D_WEB_CLIENT, "%llu: Received %d bytes.", w->id, bytes);
-		debug(D_WEB_DATA, "%llu: Received data: '%s'.", w->id, &w->data->buffer[old]);
+		debug(D_WEB_DATA, "%llu: Received data: '%s'.", w->id, &w->response.data->buffer[old]);
 
 		if(w->mode == WEB_CLIENT_MODE_FILECOPY) {
 			w->wait_send = 1;
-			if(w->data->rlen && w->data->len >= w->data->rlen) w->wait_receive = 0;
+			if(w->response.rlen && w->response.data->len >= w->response.rlen) w->wait_receive = 0;
 		}
 	}
 	else if(likely(bytes == 0)) {

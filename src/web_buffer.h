@@ -5,17 +5,15 @@
 #ifndef NETDATA_WEB_BUFFER_H
 #define NETDATA_WEB_BUFFER_H 1
 
-#define WEB_DATA_LENGTH_INCREASE_STEP 65536
+#define WEB_DATA_LENGTH_INCREASE_STEP 16384
 
-struct web_buffer {
+typedef struct web_buffer {
 	long size;		// allocation size of buffer
 	long len;		// current data length in buffer
-	long sent;		// current data length sent to output
 	char *buffer;	// the buffer
 	int contenttype;
-	long rlen; 	// if non-zero, the excepted size of ifd
 	time_t date;	// the date this content has been generated
-};
+} BUFFER;
 
 // content-types
 #define CT_APPLICATION_JSON				1
@@ -33,22 +31,27 @@ struct web_buffer {
 #define CT_APPLICATION_VND_MS_FONTOBJ	13
 #define CT_IMAGE_SVG_XML				14
 
-#define web_buffer_need_bytes(buffer, needed_free_size) do { if(unlikely((buffer)->size - (buffer)->len < (needed_free_size))) web_buffer_increase((buffer), (needed_free_size)); } while(0)
+#define buffer_strlen(wb) ((wb)->len)
+extern const char *buffer_tostring(BUFFER *wb);
 
-#define web_buffer_flush(wb) wb->buffer[wb->len = 0] = '\0'
-void web_buffer_reset(struct web_buffer *wb);
+#define buffer_need_bytes(buffer, needed_free_size) do { if(unlikely((buffer)->size - (buffer)->len < (needed_free_size))) buffer_increase((buffer), (needed_free_size)); } while(0)
 
-void web_buffer_strcat(struct web_buffer *wb, const char *txt);
-void web_buffer_rrd_value(struct web_buffer *wb, calculated_number value);
+#define buffer_flush(wb) wb->buffer[wb->len = 0] = '\0'
+extern void buffer_reset(BUFFER *wb);
 
-void web_buffer_jsdate(struct web_buffer *wb, int year, int month, int day, int hours, int minutes, int seconds);
+extern void buffer_strcat(BUFFER *wb, const char *txt);
+extern void buffer_rrd_value(BUFFER *wb, calculated_number value);
 
-struct web_buffer *web_buffer_create(long size);
-void web_buffer_free(struct web_buffer *b);
-void web_buffer_increase(struct web_buffer *b, long free_size_required);
+extern void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minutes, int seconds);
 
-void web_buffer_snprintf(struct web_buffer *wb, size_t len, const char *fmt, ...);
+extern BUFFER *buffer_create(long size);
+extern void buffer_free(BUFFER *b);
+extern void buffer_increase(BUFFER *b, long free_size_required);
 
-void web_buffer_char_replace(struct web_buffer *wb, char from, char to);
+extern void buffer_snprintf(BUFFER *wb, size_t len, const char *fmt, ...);
+extern void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args);
+extern void buffer_sprintf(BUFFER *wb, const char *fmt, ...);
+
+extern void buffer_char_replace(BUFFER *wb, char from, char to);
 
 #endif /* NETDATA_WEB_BUFFER_H */

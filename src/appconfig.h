@@ -20,6 +20,6 @@ extern const char *config_set(const char *section, const char *name, const char 
 extern long long config_set_number(const char *section, const char *name, long long value);
 extern int config_set_boolean(const char *section, const char *name, int value);
 
-extern void generate_config(struct web_buffer *wb, int only_changed);
+extern void generate_config(BUFFER *wb, int only_changed);
 
 #endif /* NETDATA_CONFIG_H */

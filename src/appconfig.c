@@ -353,7 +353,7 @@ int config_set_boolean(const char *section, const char *name, int value)
 	return value;
 }
 
-void generate_config(struct web_buffer *wb, int only_changed)
+void generate_config(BUFFER *wb, int only_changed)
 {
 	int i, pri;
 	struct config *co;
@@ -362,7 +362,7 @@ void generate_config(struct web_buffer *wb, int only_changed)
 	for(i = 0; i < 3 ;i++) {
 		switch(i) {
 			case 0:
-				web_buffer_strcat(wb,
+				buffer_strcat(wb,
 					"# NetData Configuration\n"
 					"# You can uncomment and change any of the options below.\n"
 					"# The value shown in the commented settings, is the default value.\n"
@@ -370,11 +370,11 @@ void generate_config(struct web_buffer *wb, int only_changed)
 				break;
 
 			case 1:
-				web_buffer_strcat(wb, "\n\n# per plugin configuration\n");
+				buffer_strcat(wb, "\n\n# per plugin configuration\n");
 				break;
 
 			case 2:
-				web_buffer_strcat(wb, "\n\n# per chart configuration\n");
+				buffer_strcat(wb, "\n\n# per chart configuration\n");
 				break;
 		}
 
@@ -397,17 +397,17 @@ void generate_config(struct web_buffer *wb, int only_changed)
 				if(only_changed && !changed) continue;
 
 				if(!used) {
-					web_buffer_snprintf(wb, CONFIG_FILE_LINE_MAX+1, "\n# node '%s' is not used.", co->name);
+					buffer_sprintf(wb, "\n# node '%s' is not used.", co->name);
 				}
 
-				web_buffer_snprintf(wb, CONFIG_FILE_LINE_MAX+1, "\n[%s]\n", co->name);
+				buffer_sprintf(wb, "\n[%s]\n", co->name);
 
 				for(cv = co->values; cv ; cv = cv->next) {
 
 					if(used && !(cv->flags & CONFIG_VALUE_USED)) {
-						web_buffer_snprintf(wb, CONFIG_FILE_LINE_MAX + 1, "\n\t# option '%s' is not used.\n", cv->name);
+						buffer_sprintf(wb, "\n\t# option '%s' is not used.\n", cv->name);
 					}
-					web_buffer_snprintf(wb, CONFIG_FILE_LINE_MAX + 1, "\t%s%s = %s\n", ((!(cv->flags & CONFIG_VALUE_CHANGED)) && (cv->flags & CONFIG_VALUE_USED))?"# ":"", cv->name, cv->value);
+					buffer_sprintf(wb, "\t%s%s = %s\n", ((!(cv->flags & CONFIG_VALUE_CHANGED)) && (cv->flags & CONFIG_VALUE_USED))?"# ":"", cv->name, cv->value);
 				}
 			}
 		}

@@ -112,29 +112,39 @@ int become_user(const char *username)
 {
 	struct passwd *pw = getpwnam(username);
 	if(!pw) {
-		fprintf(stderr, "User %s is not present. Error: %s\n", username, strerror(errno));
+		error("User %s is not present. Error: %s\n", username, strerror(errno));
 		return -1;
 	}
 
 	if(chown(rundir, pw->pw_uid, pw->pw_gid) != 0) {
-		fprintf(stderr, "Cannot chown directory '%s' to user %s. Error: %s\n", rundir, username, strerror(errno));
+		error("Cannot chown directory '%s' to user %s. Error: %s\n", rundir, username, strerror(errno));
+		return -1;
+	}
+
+	if(setresgid(pw->pw_gid, pw->pw_gid, pw->pw_gid) != 0) {
+		error("Cannot switch to user's %s group (gid: %d). Error: %s\n", username, pw->pw_gid, strerror(errno));
+		return -1;
+	}
+
+	if(setresuid(pw->pw_uid, pw->pw_uid, pw->pw_uid) != 0) {
+		error("Cannot switch to user %s (uid: %d). Error: %s\n", username, pw->pw_uid, strerror(errno));
 		return -1;
 	}
 
 	if(setgid(pw->pw_gid) != 0) {
-		fprintf(stderr, "Cannot switch to user's %s group (gid: %d). Error: %s\n", username, pw->pw_gid, strerror(errno));
+		error("Cannot switch to user's %s group (gid: %d). Error: %s\n", username, pw->pw_gid, strerror(errno));
 		return -1;
 	}
 	if(setegid(pw->pw_gid) != 0) {
-		fprintf(stderr, "Cannot effectively switch to user's %s group (gid: %d). Error: %s\n", username, pw->pw_gid, strerror(errno));
+		error("Cannot effectively switch to user's %s group (gid: %d). Error: %s\n", username, pw->pw_gid, strerror(errno));
 		return -1;
 	}
 	if(setuid(pw->pw_uid) != 0) {
-		fprintf(stderr, "Cannot switch to user %s (uid: %d). Error: %s\n", username, pw->pw_uid, strerror(errno));
+		error("Cannot switch to user %s (uid: %d). Error: %s\n", username, pw->pw_uid, strerror(errno));
 		return -1;
 	}
 	if(seteuid(pw->pw_uid) != 0) {
-		fprintf(stderr, "Cannot effectively switch to user %s (uid: %d). Error: %s\n", username, pw->pw_uid, strerror(errno));
+		error("Cannot effectively switch to user %s (uid: %d). Error: %s\n", username, pw->pw_uid, strerror(errno));
 		return -1;
 	}
 
@@ -319,7 +329,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 		if(become_user(user) != 0) {
 			error("Cannot become user '%s'. Continuing as we are.", user);
 		}
-		else debug(D_OPTIONS, "Successfully became user '%s'.", user);
+		else info("Successfully became user '%s'.", user);
 	}
 
 	return(0);
