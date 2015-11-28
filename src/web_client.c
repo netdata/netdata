@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <netinet/tcp.h>
 #include <malloc.h>
+#include <pwd.h>
 
 #include "common.h"
 #include "log.h"
@@ -146,14 +147,15 @@ void web_client_reset(struct web_client *w)
 	long size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
 
 	if(likely(w->last_url[0]))
-		log_access("%llu: (sent/all = %ld/%ld bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: '%s'",
+		log_access("%llu: (sent/all = %ld/%ld bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: %d '%s'",
 			w->id,
 			sent, size, -((size>0)?((float)(size-sent)/(float)size * 100.0):0.0),
 			(float)usecdiff(&w->tv_ready, &w->tv_in) / 1000.0,
 			(float)usecdiff(&tv, &w->tv_ready) / 1000.0,
 			(float)usecdiff(&tv, &w->tv_in) / 1000.0,
 			(w->mode == WEB_CLIENT_MODE_FILECOPY)?"filecopy":"data",
-					w->last_url
+			w->response.code,
+			w->last_url
 		);
 
 	debug(D_WEB_CLIENT, "%llu: Reseting client.", w->id);
@@ -173,6 +175,7 @@ void web_client_reset(struct web_client *w)
 	buffer_reset(w->response.data);
 	w->response.rlen = 0;
 	w->response.sent = 0;
+	w->response.code = 0;
 
 	w->wait_receive = 1;
 	w->wait_send = 0;
@@ -217,26 +220,59 @@ struct web_client *web_client_free(struct web_client *w)
 	return(n);
 }
 
+uid_t web_files_uid(void)
+{
+	static char *web_owner = NULL;
+	static uid_t owner_uid = 0;
+
+	if(unlikely(!web_owner)) {
+		web_owner = config_get("global", "web files owner", NETDATA_USER);
+		if(!web_owner || !*web_owner)
+			owner_uid = geteuid();
+		else {
+			struct passwd *pw = getpwnam(web_owner);
+			if(!pw) {
+				error("User %s is not present. Ignoring option. Error: %s\n", web_owner, strerror(errno));
+				owner_uid = geteuid();
+			}
+			else {
+				debug(D_WEB_CLIENT, "Web files owner set to %s.\n", web_owner);
+				owner_uid = pw->pw_uid;
+			}
+		}
+	}
+
+	return(owner_uid);
+}
+
 int mysendfile(struct web_client *w, char *filename)
 {
 	static char *web_dir = NULL;
-	if(!web_dir) web_dir = config_get("global", "web files directory", WEB_DIR);
 
-	debug(D_WEB_CLIENT, "%llu: Looking for file '%s'...", w->id, filename);
+	// initialize our static data
+	if(unlikely(!web_dir)) web_dir = config_get("global", "web files directory", WEB_DIR);
+
+	debug(D_WEB_CLIENT, "%llu: Looking for file '%s/%s'", w->id, web_dir, filename);
 
 	// skip leading slashes
 	while (*filename == '/') filename++;
 
 	// if the filename contain known paths, skip them
-		 if(strncmp(filename, WEB_PATH_DATA       "/", strlen(WEB_PATH_DATA)       + 1) == 0) filename = &filename[strlen(WEB_PATH_DATA)       + 1];
-	else if(strncmp(filename, WEB_PATH_DATASOURCE "/", strlen(WEB_PATH_DATASOURCE) + 1) == 0) filename = &filename[strlen(WEB_PATH_DATASOURCE) + 1];
-	else if(strncmp(filename, WEB_PATH_GRAPH      "/", strlen(WEB_PATH_GRAPH)      + 1) == 0) filename = &filename[strlen(WEB_PATH_GRAPH)      + 1];
-	else if(strncmp(filename, WEB_PATH_FILE       "/", strlen(WEB_PATH_FILE)       + 1) == 0) filename = &filename[strlen(WEB_PATH_FILE)       + 1];
+	if(strncmp(filename, WEB_PATH_FILE "/", strlen(WEB_PATH_FILE) + 1) == 0) filename = &filename[strlen(WEB_PATH_FILE) + 1];
 
-	// if the filename contains a / or a .., refuse to serve it
-	if(strchr(filename, '/') != 0 || strstr(filename, "..") != 0) {
+	char *s;
+	for(s = filename; *s ;s++) {
+		if( !isalnum(*s) && *s != '/' && *s != '.' && *s != '-' && *s != '_') {
+			debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not acceptable.", w->id, filename);
+			buffer_sprintf(w->response.data, "File '%s' cannot be served. Filename contains invalid character '%c'", *s);
+			return 400;
+		}
+	}
+
+	// if the filename contains a .. refuse to serve it
+	if(strstr(filename, "..") != 0) {
 		debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not acceptable.", w->id, filename);
-		buffer_sprintf(w->response.data, "File '%s' cannot be served. Filenames cannot contain / or ..", filename);
+		buffer_sprintf(w->response.data, "File '%s' cannot be served. Relative filenames with '..' in them are not supported.", filename);
 		return 400;
 	}
 
@@ -247,14 +283,25 @@ int mysendfile(struct web_client *w, char *filename)
 	// check if the file exists
 	struct stat stat;
 	if(lstat(webfilename, &stat) != 0) {
-		error("%llu: File '%s' is not found.", w->id, webfilename);
+		debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not found.", w->id, webfilename);
 		buffer_sprintf(w->response.data, "File '%s' does not exist, or is not accessible.", filename);
 		return 404;
 	}
 
 	// check if the file is owned by us
-	if(stat.st_uid != getuid() && stat.st_uid != geteuid()) {
-		error("%llu: File '%s' is owned by user %d (I run as user %d). Access Denied.", w->id, webfilename, stat.st_uid, getuid());
+	if(stat.st_uid != web_files_uid()) {
+		debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is owned by user %d (I run as user %d). Access Denied.", w->id, webfilename, stat.st_uid, getuid());
+		buffer_sprintf(w->response.data, "Access to file '%s' is not permitted.", filename);
+		return 403;
+	}
+
+	if((stat.st_mode & S_IFMT) == S_IFDIR) {
+		snprintf(webfilename, FILENAME_MAX+1, "%s/index.html", filename);
+		return mysendfile(w, webfilename);
+	}
+
+	if((stat.st_mode & S_IFMT) != S_IFREG) {
+		debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not a regular file. Access Denied.", w->id, webfilename);
 		buffer_sprintf(w->response.data, "Access to file '%s' is not permitted.", filename);
 		return 403;
 	}
@@ -794,7 +841,7 @@ void web_client_process(struct web_client *w) {
 			strncpy(w->last_url, url, URL_MAX);
 			w->last_url[URL_MAX] = '\0';
 
-			tok = mystrsep(&url, "/?&");
+			tok = mystrsep(&url, "/?");
 
 			debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
 
@@ -897,24 +944,15 @@ void web_client_process(struct web_client *w) {
 				buffer_flush(w->response.data);
 				generate_config(w->response.data, 0);
 			}
-			else if(strcmp(tok, WEB_PATH_FILE) == 0) { // "file"
-				tok = mystrsep(&url, "/?&");
-				if(tok && *tok) code = mysendfile(w, tok);
-				else {
-					code = 400;
-					buffer_flush(w->response.data);
-					buffer_strcat(w->response.data, "You have to give a filename to get.\r\n");
-				}
-			}
-			else if(!tok[0]) {
-				buffer_flush(w->response.data);
-				code = mysendfile(w, "index.html");
-			}
 			else {
+				char filename[FILENAME_MAX+1];
+				url = filename;
+				strncpy(filename, w->last_url, FILENAME_MAX);
+				filename[FILENAME_MAX] = '\0';
+				tok = mystrsep(&url, "?");
 				buffer_flush(w->response.data);
-				code = mysendfile(w, tok);
+				code = mysendfile(w, (tok && *tok)?tok:"/");
 			}
-
 		}
 		else {
 			strcpy(w->last_url, "not a valid response");
@@ -944,13 +982,10 @@ void web_client_process(struct web_client *w) {
 		return;
 	}
 
-	if(w->response.data->len > w->response.data->size) {
-		error("%llu: memory overflow encountered (size is %ld, written %ld).", w->response.data->size, w->response.data->len);
-	}
-
 	gettimeofday(&w->tv_ready, NULL);
 	w->response.data->date = time(NULL);
 	w->response.sent = 0;
+	w->response.code = code;
 
 	// prepare the HTTP response header
 	debug(D_WEB_CLIENT, "%llu: Generating HTTP header with response %d.", w->id, code);

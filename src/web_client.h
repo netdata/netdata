@@ -31,6 +31,8 @@ struct response {
 	BUFFER *header_output;			// internal use
 	BUFFER *data;					// our response data buffer
 
+	int code;						// the HTTP response code
+
 	long rlen;						// if non-zero, the excepted size of ifd (input)
 	long sent;						// current data length sent to output
 
@@ -76,6 +78,8 @@ struct web_client {
 };
 
 extern struct web_client *web_clients;
+
+extern uid_t web_files_uid(void);
 
 extern struct web_client *web_client_create(int listener);
 extern struct web_client *web_client_free(struct web_client *w);

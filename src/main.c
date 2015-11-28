@@ -368,7 +368,8 @@ int main(int argc, char **argv)
 		// --------------------------------------------------------------------
 
 		prepare_rundir();
-		user = config_get("global", "run as user", (getuid() == 0)?NETDATA_USER:"");
+		user = config_get("global", "run as user"    , (getuid() == 0)?NETDATA_USER:"");
+		web_files_uid();
 
 		// --------------------------------------------------------------------
 
