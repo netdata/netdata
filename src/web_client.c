@@ -14,6 +14,7 @@
 #include <netinet/tcp.h>
 #include <malloc.h>
 #include <pwd.h>
+#include <ctype.h>
 
 #include "common.h"
 #include "log.h"
@@ -398,9 +399,31 @@ void web_client_enable_deflate(struct web_client *w) {
 }
 #endif // NETDATA_WITH_ZLIB
 
-int rrdset_validate_dimensions(RRDSET *st, BUFFER *dimensions)
+uint32_t web_client_api_request_v1_data_options(char *o)
 {
-	;
+	uint32_t ret = 0x00000000;
+	char *tok;
+
+	while(o && *o && (tok = mystrsep(&o, ", |"))) {
+		if(!*tok) continue;
+
+		if(!strcmp(tok, "nonzero"))
+			ret |= RRDR_OPTION_NONZERO;
+		else if(!strcmp(tok, "flip") || !strcmp(tok, "reversed") || !strcmp(tok, "reverse"))
+			ret |= RRDR_OPTION_REVERSED;
+		else if(!strcmp(tok, "abs") || !strcmp(tok, "absolute") || !strcmp(tok, "absolute_sum") || !strcmp(tok, "absolute-sum"))
+			ret |= RRDR_OPTION_ABSOLUTE;
+		else if(!strcmp(tok, "min2max"))
+			ret |= RRDR_OPTION_MIN2MAX;
+		else if(!strcmp(tok, "seconds"))
+			ret |= RRDR_OPTION_SECONDS;
+		else if(!strcmp(tok, "ms") || !strcmp(tok, "milliseconds"))
+			ret |= RRDR_OPTION_MILLISECONDS;
+		else if(!strcmp(tok, "null2zero"))
+			ret |= RRDR_OPTION_NULL2ZERO;
+	}
+
+	return ret;
 }
 
 int web_client_api_request_v1_data_format(char *name)
@@ -414,17 +437,65 @@ int web_client_api_request_v1_data_format(char *name)
 	else if(!strcmp(name, "json"))
 		return DATASOURCE_JSON;
 
+	else if(!strcmp(name, "jsonp"))
+		return DATASOURCE_JSONP;
+
 	else if(!strcmp(name, "ssv"))
 		return DATASOURCE_SSV;
 
 	else if(!strcmp(name, "csv"))
 		return DATASOURCE_CSV;
 
-	return DATASOURCE_INVALID;
+	else if(!strcmp(name, "tsv"))
+		return DATASOURCE_TSV;
+
+	else if(!strcmp(name, "tsv-excel"))
+		return DATASOURCE_TSV;
+
+	else if(!strcmp(name, "html"))
+		return DATASOURCE_HTML;
+
+	else if(!strcmp(name, "array"))
+		return DATASOURCE_JS_ARRAY;
+
+	else if(!strcmp(name, "ssvcomma"))
+		return DATASOURCE_SSV_COMMA;
+
+	return DATASOURCE_JSON;
+}
+
+int web_client_api_request_v1_data_google_format(char *name)
+{
+	if(!strcmp(name, "json"))
+		return DATASOURCE_GOOGLE_JSONP;
+
+	else if(!strcmp(name, "html"))
+		return DATASOURCE_HTML;
+
+	else if(!strcmp(name, "csv"))
+		return DATASOURCE_CSV;
+
+	else if(!strcmp(name, "tsv-excel"))
+		return DATASOURCE_TSV;
+
+	return DATASOURCE_JSON;
+}
+
+int web_client_api_request_v1_data_group(char *name)
+{
+	if(!strcmp(name, "max"))
+		return GROUP_MAX;
+
+	else if(!strcmp(name, "average"))
+		return GROUP_AVERAGE;
+
+	return GROUP_MAX;
 }
 
 int web_client_api_request_v1_charts(struct web_client *w, char *url)
 {
+	if(url) { ; }
+
 	buffer_flush(w->response.data);
 	rrd_stats_api_v1_charts(w->response.data);
 	return 200;
@@ -476,22 +547,32 @@ cleanup:
 	return ret;
 }
 
+// returns the HTTP code
 int web_client_api_request_v1_data(struct web_client *w, char *url)
 {
+	debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
+
 	int ret = 400;
 	BUFFER *dimensions = NULL;
 
 	buffer_flush(w->response.data);
 
+	char 	*google_version = "0.6",
+			*google_reqId = "0",
+			*google_sig = "0",
+			*google_out = "json",
+			*google_responseHandler = "google.visualization.Query.setResponse",
+			*google_outFileName = NULL;
+
+	time_t last_timestamp_in_data = 0, google_timestamp = 0;
+
 	char *chart = NULL
-			, *dim = NULL
 			, *before_str = NULL
 			, *after_str = NULL
-			, *points_str = NULL
-			, *group_str = NULL
-			, *options = NULL;
+			, *points_str = NULL;
 
-	int format = DATASOURCE_JSON;
+	int format = DATASOURCE_JSON, group = GROUP_MAX;
+	uint32_t options = 0x00000000;
 
 	while(url) {
 		char *value = mystrsep(&url, "?&[]");
@@ -501,11 +582,13 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 		if(!name || !*name) continue;
 		if(!value || !*value) continue;
 
+		debug(D_WEB_CLIENT, "%llu: API v1 query param '%s' with value '%s'", w->id, name, value);
+
 		// name and value are now the parameters
 		// they are not null and not empty
 
 		if(!strcmp(name, "chart")) chart = value;
-		else if(!strcmp(name, "dimension") || !strcmp(name, "dim")) {
+		else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
 			if(!dimensions) dimensions = buffer_create(strlen(value));
 			if(dimensions) {
 				buffer_strcat(dimensions, "|");
@@ -515,16 +598,45 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 		else if(!strcmp(name, "after")) after_str = value;
 		else if(!strcmp(name, "before")) before_str = value;
 		else if(!strcmp(name, "points")) points_str = value;
-		else if(!strcmp(name, "group")) group_str = value;
+		else if(!strcmp(name, "group")) {
+			group = web_client_api_request_v1_data_group(value);
+		}
 		else if(!strcmp(name, "format")) {
 			format = web_client_api_request_v1_data_format(value);
 		}
 		else if(!strcmp(name, "options")) {
-			options = value;
+			options |= web_client_api_request_v1_data_options(value);
 		}
-		else {
-			buffer_sprintf(w->response.data, "Unknown parameter '%s' in request.", name);
-			goto cleanup;
+		else if(!strcmp(name, "tqx")) {
+			// parse Google Visualization API options
+			// https://developers.google.com/chart/interactive/docs/dev/implementing_data_source
+			char *tqx_name, *tqx_value;
+
+			while(value) {
+				tqx_value = mystrsep(&value, ";");
+				if(!tqx_value || !*tqx_value) continue;
+
+				tqx_name = mystrsep(&tqx_value, ":");
+				if(!tqx_name || !*tqx_name) continue;
+				if(!tqx_value || !*tqx_value) continue;
+
+				if(!strcmp(tqx_name, "version"))
+					google_version = tqx_value;
+				else if(!strcmp(tqx_name, "reqId"))
+					google_reqId = tqx_value;
+				else if(!strcmp(tqx_name, "sig")) {
+					google_sig = tqx_value;
+					google_timestamp = strtoul(google_sig, NULL, 0);
+				}
+				else if(!strcmp(tqx_name, "out")) {
+					google_out = tqx_value;
+					format = web_client_api_request_v1_data_google_format(google_out);
+				}
+				else if(!strcmp(tqx_name, "responseHandler"))
+					google_responseHandler = tqx_value;
+				else if(!strcmp(tqx_name, "outFileName"))
+					google_outFileName = tqx_value;
+			}
 		}
 	}
 
@@ -541,12 +653,51 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 		goto cleanup;
 	}
 
-	uint32_t before = (before_str && *before_str)?atol(before_str):0;
-	uint32_t after  = (after_str  && *after_str) ?atol(after_str):0;
-	int      points = (points_str && *points_str)?atoi(points_str):0;
-	int      group  = (group_str  && *group_str) ?atoi(group_str):0;
+	long long before = (before_str && *before_str)?atol(before_str):0;
+	long long after  = (after_str  && *after_str) ?atol(after_str):0;
+	int       points = (points_str && *points_str)?atoi(points_str):0;
 
-	buffer_sprintf(w->response.data, "API command 'data' for chart '%s', dimensions '%s', after '%s', before '%s', points '%s', group '%s', format '%s', options '%s'", chart, dim, after_str, before_str, points_str, group_str, format, options);
+	debug(D_WEB_CLIENT, "%llu: API command 'data' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%u', format '%u', options '0x%08x'"
+			, w->id
+			, chart
+			, (dimensions)?buffer_tostring(dimensions):""
+			, after
+			, before
+			, points
+			, group
+			, format
+			, options
+			);
+
+	if(google_outFileName && *google_outFileName) {
+		buffer_sprintf(w->response.header, "Content-Disposition: attachment; filename=\"%s\"\r\n", google_outFileName);
+		error("generating outfilename header: '%s'", google_outFileName);
+	}
+
+	if(format == DATASOURCE_GOOGLE_JSONP) {
+		debug(D_WEB_CLIENT_ACCESS, "%llu: GOOGLE JSON/JSONP: version = '%s', reqId = '%s', sig = '%s', out = '%s', responseHandler = '%s', outFileName = '%s'",
+				w->id, google_version, google_reqId, google_sig, google_out, google_responseHandler, google_outFileName
+			);
+
+		buffer_sprintf(w->response.data,
+			"%s({version:'%s',reqId:'%s',status:'ok',sig:'%lu',table:",
+			google_responseHandler, google_version, google_reqId, st->last_updated.tv_sec);
+	}
+
+	ret = rrd2format(st, w->response.data, dimensions, format, points, after, before, group, options, &last_timestamp_in_data);
+
+	if(format == DATASOURCE_GOOGLE_JSONP) {
+		if(google_timestamp < last_timestamp_in_data)
+			buffer_strcat(w->response.data, "});");
+
+		else {
+			// the client already has the latest data
+			buffer_flush(w->response.data);
+			buffer_sprintf(w->response.data,
+				"%s({version:'%s',reqId:'%s',status:'error',errors:[{reason:'not_modified',message:'Data not modified'}]});",
+				google_responseHandler, google_version, google_reqId);
+		}
+	}
 
 cleanup:
 	if(dimensions) buffer_free(dimensions);
@@ -732,6 +883,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 
 		else {
 			// the client already has the latest data
+			buffer_flush(w->response.data);
 			buffer_sprintf(w->response.data,
 				"%s({version:'%s',reqId:'%s',status:'error',errors:[{reason:'not_modified',message:'Data not modified'}]});",
 				google_responseHandler, google_version, google_reqId);

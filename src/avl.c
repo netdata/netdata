@@ -19,6 +19,7 @@
 #include "avl.h"
 
 /* Private methods */
+int _avl_removeroot(avl_tree* t);
 
 /* Swing to the left
  * Warning: no balance maintainance

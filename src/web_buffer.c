@@ -71,6 +71,8 @@ void buffer_char_replace(BUFFER *wb, char from, char to)
 
 void buffer_strcat(BUFFER *wb, const char *txt)
 {
+	if(unlikely(!txt || !*txt)) return;
+
 	if(wb->size - wb->len < 512)
 		buffer_need_bytes(wb, 512);
 
@@ -102,6 +104,8 @@ void buffer_strcat(BUFFER *wb, const char *txt)
 
 void buffer_snprintf(BUFFER *wb, size_t len, const char *fmt, ...)
 {
+	if(unlikely(!fmt || !*fmt)) return;
+
 	buffer_need_bytes(wb, len+1);
 
 	va_list args;
@@ -116,6 +120,8 @@ void buffer_snprintf(BUFFER *wb, size_t len, const char *fmt, ...)
 
 void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args)
 {
+	if(unlikely(!fmt || !*fmt)) return;
+
 	size_t len = wb->size - wb->len;
 	if(unlikely(!len)) return;
 
@@ -128,6 +134,8 @@ void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args)
 
 void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
 {
+	if(unlikely(!fmt || !*fmt)) return;
+
 	if(unlikely(wb->len > wb->size)) {
 		error("web_buffer_sprintf(): already overflown length %ld, size = %ld", wb->len, wb->size);
 	}
@@ -135,7 +143,7 @@ void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
 //	if(wb->size - wb->len < 512)
 //		web_buffer_need_bytes(wb, 512);
 
-	size_t len = wb->size - wb->len, old_len = wb->len, wrote;
+	size_t len = wb->size - wb->len, wrote;
 
 	buffer_need_bytes(wb, len);
 
@@ -183,9 +191,9 @@ void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minu
 {
 	//         10        20        30      = 35
 	// 01234567890123456789012345678901234
-	// Date(2014, 04, 01, 03, 28, 20, 065)
+	// Date(2014,04,01,03,28,20)
 
-	buffer_need_bytes(wb, 36);
+	buffer_need_bytes(wb, 30);
 
 	char *b = &wb->buffer[wb->len];
 
@@ -200,23 +208,18 @@ void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minu
 	b[i++]= 48 + year / 10;
 	b[i++]= 48 + year % 10;
 	b[i++]=',';
-	//b[i++]=' ';
 	b[i]= 48 + month / 10; if(b[i] != '0') i++;
 	b[i++]= 48 + month % 10;
 	b[i++]=',';
-	//b[i++]=' ';
 	b[i]= 48 + day / 10; if(b[i] != '0') i++;
 	b[i++]= 48 + day % 10;
 	b[i++]=',';
-	//b[i++]=' ';
 	b[i]= 48 + hours / 10; if(b[i] != '0') i++;
 	b[i++]= 48 + hours % 10;
 	b[i++]=',';
-	//b[i++]=' ';
 	b[i]= 48 + minutes / 10; if(b[i] != '0') i++;
 	b[i++]= 48 + minutes % 10;
 	b[i++]=',';
-	//b[i++]=' ';
 	b[i]= 48 + seconds / 10; if(b[i] != '0') i++;
 	b[i++]= 48 + seconds % 10;
 	b[i++]=')';
@@ -225,9 +228,47 @@ void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minu
 	wb->len += i;
 
 	// terminate it
-	buffer_need_bytes(wb, 1);
 	wb->buffer[wb->len] = '\0';
+	buffer_overflow_check(wb);
+}
 
+// generate a date, the fastest possible way...
+void buffer_date(BUFFER *wb, int year, int month, int day, int hours, int minutes, int seconds)
+{
+	//         10        20        30      = 35
+	// 01234567890123456789012345678901234
+	// 2014-04-01 03:28:20
+
+	buffer_need_bytes(wb, 36);
+
+	char *b = &wb->buffer[wb->len];
+
+	int i = 0;
+	b[i++]= 48 + year / 1000; year -= (year / 1000) * 1000;
+	b[i++]= 48 + year / 100; year -= (year / 100) * 100;
+	b[i++]= 48 + year / 10;
+	b[i++]= 48 + year % 10;
+	b[i++]='-';
+	b[i++]= 48 + month / 10;
+	b[i++]= 48 + month % 10;
+	b[i++]='-';
+	b[i++]= 48 + day / 10;
+	b[i++]= 48 + day % 10;
+	b[i++]=' ';
+	b[i++]= 48 + hours / 10;
+	b[i++]= 48 + hours % 10;
+	b[i++]=':';
+	b[i++]= 48 + minutes / 10;
+	b[i++]= 48 + minutes % 10;
+	b[i++]=':';
+	b[i++]= 48 + seconds / 10;
+	b[i++]= 48 + seconds % 10;
+	b[i]='\0';
+
+	wb->len += i;
+
+	// terminate it
+	wb->buffer[wb->len] = '\0';
 	buffer_overflow_check(wb);
 }
 

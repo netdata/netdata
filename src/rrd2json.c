@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <sys/time.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "log.h"
 #include "common.h"
@@ -14,8 +15,6 @@ char *hostname = "unknown";
 
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb)
 {
-	time_t now = time(NULL);
-
 	pthread_rwlock_rdlock(&st->rwlock);
 
 	buffer_sprintf(wb,
@@ -261,10 +260,10 @@ void rrd_stats_all_json(BUFFER *wb)
 // ----------------------------------------------------------------------------
 
 // RRDR options
-#define RRDR_EMPTY  	0x01
-#define RRDR_RESET  	0x02
-#define RRDR_HIDDEN 	0x04
-#define RRDR_NONZERO 	0x08
+#define RRDR_EMPTY  	0x01 // the dimension contains / the value is empty (null)
+#define RRDR_RESET  	0x02 // the dimension contains / the value is reset
+#define RRDR_HIDDEN 	0x04 // the dimension contains / the value is hidden
+#define RRDR_NONZERO 	0x08 // the dimension contains / the value is non-zero
 
 
 typedef struct rrdresult {
@@ -279,11 +278,14 @@ typedef struct rrdresult {
 	calculated_number *v;	// array n x d values
 	uint8_t *o;				// array n x d options
 
-	int c;					// current line ( 0 ~ n )
+	int c;					// current line ( -1 ~ n ), ( -1 = none, use rrdr_rows() to get number of rows )
 
 	int has_st_lock;		// if st is read locked by us
 } RRDR;
 
+#define rrdr_rows(r) ((r)->c + 1)
+
+/*
 static void rrdr_dump(RRDR *r)
 {
 	long c, i;
@@ -336,6 +338,353 @@ static void rrdr_dump(RRDR *r)
 
 		fprintf(stderr, "\n");
 	}
+}
+*/
+
+void rrdr_disable_not_selected_dimensions(RRDR *r, const char *dims)
+{
+	char b[strlen(dims) + 1];
+	char *o = b, *tok;
+	strcpy(o, dims);
+
+	long c;
+	RRDDIM *d;
+
+	// disable all of them
+	for(c = 0, d = r->st->dimensions; d ;c++, d = d->next)
+		r->od[c] |= RRDR_HIDDEN;
+
+	while(o && *o && (tok = mystrsep(&o, ", |"))) {
+		if(!*tok) continue;
+
+		// find it and enable it
+		for(c = 0, d = r->st->dimensions; d ;c++, d = d->next) {
+			if(!strcmp(d->name, tok)) {
+				r->od[c] &= ~RRDR_HIDDEN;
+			}
+		}
+	}
+}
+
+#define JSON_DATES_JS 1
+#define JSON_DATES_TIMESTAMP 2
+
+static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int google)
+{
+	int annotations = 0, dates = JSON_DATES_JS;
+	char kq[2] = "",					// key quote
+		sq[2] = "",						// string quote
+		pre_label[101] = "",			// before each label
+		post_label[101] = "",			// after each label
+		pre_date[101] = "",				// the beginning of line, to the date
+		post_date[101] = "",			// closing the date
+		pre_value[101] = "",			// before each value
+		post_value[101] = "",			// after each value
+		post_line[101] = "",			// at the end of each row
+		normal_annotation[201] = "",	// default row annotation
+		overflow_annotation[201] = "",	// overflow row annotation
+		data_begin[101] = "",			// between labels and values
+		finish[101] = "";				// at the end of everything
+
+	if(google) {
+		dates = JSON_DATES_JS;
+		kq[0] = '\0';
+		sq[0] = '\'';
+		annotations = 1;
+		snprintf(pre_date,   100, "		{%sc%s:[{%sv%s:%s", kq, kq, kq, kq, sq);
+		snprintf(post_date,  100, "%s}", sq);
+		snprintf(pre_label,  100, ",\n		{%sid%s:%s%s,%slabel%s:%s", kq, kq, sq, sq, kq, kq, sq);
+		snprintf(post_label, 100, "%s,%spattern%s:%s%s,%stype%s:%snumber%s}", sq, kq, kq, sq, sq, kq, kq, sq, sq);
+		snprintf(pre_value,  100, ",{%sv%s:", kq, kq);
+		snprintf(post_value, 100, "}");
+		snprintf(post_line,  100, "]}");
+		snprintf(data_begin, 100, "\n	],\n	%srows%s:\n	[\n", kq, kq);
+		snprintf(finish,     100, "\n	]\n}\n");
+
+		snprintf(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
+		snprintf(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
+
+		buffer_sprintf(wb, "{\n	%scols%s:\n	[\n", kq, kq);
+		buffer_sprintf(wb, "		{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
+		buffer_sprintf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotation%s}},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
+		buffer_sprintf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotationText%s}}", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
+	}
+	else {
+		if((options & RRDR_OPTION_SECONDS) || (options & RRDR_OPTION_MILLISECONDS)) {
+			dates = JSON_DATES_TIMESTAMP;
+			snprintf(pre_date,   100, "		[");
+		}
+		else {
+			dates = JSON_DATES_JS;
+			snprintf(pre_date,   100, "		[new ");
+		}
+		kq[0] = '"';
+		sq[0] = '"';
+		snprintf(pre_label,  100, ", \"");
+		snprintf(post_label, 100, "\"");
+		snprintf(pre_value,  100, ", ");
+		snprintf(post_line,  100, "]");
+		snprintf(data_begin, 100, "],\n	%sdata%s:\n	[\n", kq, kq);
+		snprintf(finish,     100, "\n	]\n}\n");
+
+		buffer_sprintf(wb, "{\n	%slabels%s: [", kq, kq);
+		buffer_sprintf(wb, "%stime%s", sq, sq);
+	}
+
+	// -------------------------------------------------------------------------
+	// print the JSON header
+
+	long c, i;
+	RRDDIM *rd;
+
+	// print the csv header
+	for(c = 0, i = 0, rd = r->st->dimensions; rd ;c++, rd = rd->next) {
+		if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
+		if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
+
+		buffer_strcat(wb, pre_label);
+		buffer_strcat(wb, rd->name);
+		buffer_strcat(wb, post_label);
+		i++;
+	}
+	if(!i) {
+		buffer_strcat(wb, pre_label);
+		buffer_strcat(wb, "no data");
+		buffer_strcat(wb, post_label);
+	}
+
+	// print the begin of row data
+	buffer_strcat(wb, data_begin);
+
+	// if all dimensions are hidden, print a null
+	if(!i) {
+		buffer_strcat(wb, pre_value);
+		if(options & RRDR_OPTION_NULL2ZERO)
+			buffer_strcat(wb, "0");
+		else
+			buffer_strcat(wb, "null");
+		buffer_strcat(wb, post_value);
+	}
+
+	long start = 0, end = rrdr_rows(r), step = 1;
+	if((options & RRDR_OPTION_REVERSED)) {
+		start = rrdr_rows(r) - 1;
+		end = -1;
+		step = -1;
+	}
+
+	// for each line in the array
+	for(i = start; i != end ;i += step) {
+		calculated_number *cn = &r->v[ i * r->d ];
+		uint8_t *co = &r->o[ i * r->d ];
+
+		time_t now = r->t[i];
+
+		if(dates == JSON_DATES_JS) {
+			// generate the local date time
+			struct tm *tm = localtime(&now);
+			if(!tm) { error("localtime() failed."); continue; }
+
+			if(likely(i != start)) buffer_strcat(wb, ",\n");
+			buffer_strcat(wb, pre_date);
+			buffer_jsdate(wb, tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
+			buffer_strcat(wb, post_date);
+
+			if(annotations) {
+				if(co[c] & RRDR_RESET)
+					buffer_strcat(wb, overflow_annotation);
+				else
+					buffer_strcat(wb, normal_annotation);
+			}
+		}
+		else {
+			// print the timestamp of the line
+			if(likely(i != start)) buffer_strcat(wb, ",\n");
+			buffer_strcat(wb, pre_date);
+			buffer_rrd_value(wb, (calculated_number)r->t[i]);
+			// in ms
+			if(options & RRDR_OPTION_MILLISECONDS) buffer_strcat(wb, "000");
+			buffer_strcat(wb, post_date);
+		}
+
+		// for each dimension
+		for(c = 0, rd = r->st->dimensions; rd ;c++, rd = rd->next) {
+			if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
+			if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
+
+			calculated_number n = cn[c];
+
+			if(co[c] & RRDR_EMPTY) {
+				buffer_strcat(wb, pre_value);
+				if(options & RRDR_OPTION_NULL2ZERO)
+					buffer_strcat(wb, "0");
+				else
+					buffer_strcat(wb, "null");
+				buffer_strcat(wb, post_value);
+			}
+			else if((options & RRDR_OPTION_ABSOLUTE)) {
+				buffer_strcat(wb, pre_value);
+				buffer_rrd_value(wb, (n<0)?-n:n);
+				buffer_strcat(wb, post_value);
+			}
+			else {
+				buffer_strcat(wb, pre_value);
+				buffer_rrd_value(wb, n);
+				buffer_strcat(wb, post_value);
+			}
+		}
+
+		buffer_strcat(wb, post_line);
+	}
+
+	buffer_strcat(wb, finish);
+}
+
+static void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startline, const char *separator, const char *endline)
+{
+	long c, i;
+	RRDDIM *d;
+
+	// print the csv header
+	for(c = 0, i = 0, d = r->st->dimensions; d ;c++, d = d->next) {
+		if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
+		if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
+
+		if(!i) {
+			buffer_strcat(wb, startline);
+			buffer_strcat(wb, "time");
+		}
+		buffer_strcat(wb, separator);
+		buffer_strcat(wb, d->name);
+		i++;
+	}
+	buffer_strcat(wb, endline);
+
+	if(!i) {
+		// no dimensions present
+		return;
+	}
+
+	long start = 0, end = rrdr_rows(r), step = 1;
+	if((options & RRDR_OPTION_REVERSED)) {
+		start = rrdr_rows(r) - 1;
+		end = -1;
+		step = -1;
+	}
+
+	// for each line in the array
+	for(i = start; i != end ;i += step) {
+		calculated_number *cn = &r->v[ i * r->d ];
+		uint8_t *co = &r->o[ i * r->d ];
+
+		buffer_strcat(wb, startline);
+
+		time_t now = r->t[i];
+
+		if((options & RRDR_OPTION_SECONDS) || (options & RRDR_OPTION_MILLISECONDS)) {
+			// print the timestamp of the line
+			buffer_rrd_value(wb, (calculated_number)now);
+			// in ms
+			if(options & RRDR_OPTION_MILLISECONDS) buffer_strcat(wb, "000");
+		}
+		else {
+			// generate the local date time
+			struct tm *tm = localtime(&now);
+			if(!tm) { error("localtime() failed."); continue; }
+			buffer_date(wb, tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
+		}
+
+		// for each dimension
+		for(c = 0, d = r->st->dimensions; d ;c++, d = d->next) {
+			if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
+			if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
+
+			buffer_strcat(wb, separator);
+
+			calculated_number n = cn[c];
+
+			if(co[c] & RRDR_EMPTY) {
+				if(options & RRDR_OPTION_NULL2ZERO)
+					buffer_strcat(wb, "0");
+				else
+					buffer_strcat(wb, "null");
+			}
+			else if((options & RRDR_OPTION_ABSOLUTE))
+				buffer_rrd_value(wb, (n<0)?-n:n);
+			else
+				buffer_rrd_value(wb, n);
+		}
+
+		buffer_strcat(wb, endline);
+	}
+}
+
+static void rrdr2ssv(RRDR *r, BUFFER *out, uint32_t options, const char *prefix, const char *separator, const char *suffix)
+{
+	long c, i;
+	RRDDIM *d;
+
+	buffer_strcat(out, prefix);
+	long start = 0, end = rrdr_rows(r), step = 1;
+	if((options & RRDR_OPTION_REVERSED)) {
+		start = rrdr_rows(r) - 1;
+		end = -1;
+		step = -1;
+	}
+
+	// for each line in the array
+	for(i = start; i != end ;i += step) {
+
+		calculated_number *cn = &r->v[ i * r->d ];
+		uint8_t *co = &r->o[ i * r->d ];
+
+		calculated_number sum = 0, min = 0, max = 0;
+		int all_null = 1, init = 1;
+
+		// for each dimension
+		for(c = 0, d = r->st->dimensions; d ;c++, d = d->next) {
+			if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
+			if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
+
+			calculated_number n = cn[c];
+
+			if(unlikely(init)) {
+				if(n > 0) {
+					min = 0;
+					max = n;
+				}
+				else {
+					min = n;
+					max = 0;
+				}
+				init = 0;
+			}
+
+			if(likely(!(co[c] & RRDR_EMPTY))) {
+				all_null = 0;
+				if((options & RRDR_OPTION_ABSOLUTE) && n < 0) n = -n;
+				sum += n;
+			}
+
+			if(n < min) min = n;
+			if(n > max) max = n;
+		}
+
+		if(likely(i != start))
+			buffer_strcat(out, separator);
+
+		if(all_null) {
+			if(options & RRDR_OPTION_NULL2ZERO)
+				buffer_strcat(out, "0");
+			else
+				buffer_strcat(out, "null");
+		}
+		else if(options & RRDR_OPTION_MIN2MAX)
+			buffer_rrd_value(out, max - min);
+		else
+			buffer_rrd_value(out, sum);
+	}
+	buffer_strcat(out, suffix);
 }
 
 inline static calculated_number *rrdr_line_values(RRDR *r)
@@ -442,12 +791,17 @@ cleanup:
 	return NULL;
 }
 
-RRDR *rrd2rrdr(RRDSET *st, long points, time_t after, time_t before, int group_method)
+RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int group_method)
 {
 	int debug = st->debug;
 
 	time_t first_entry_t = rrdset_first_entry_t(st);
 	time_t last_entry_t = rrdset_last_entry_t(st);
+
+	if(before == 0 && after == 0) {
+		before = last_entry_t;
+		after = first_entry_t;
+	}
 
 	// allow relative for before and after
 	if(before <= st->update_every * st->entries) before = last_entry_t + before;
@@ -462,9 +816,9 @@ RRDR *rrd2rrdr(RRDSET *st, long points, time_t after, time_t before, int group_m
 
 	// check if they are upside down
 	if(after > before) {
-		time_t t = before;
+		time_t tmp = before;
 		before = after;
-		after = t;
+		after = tmp;
 	}
 
 	// the duration of the chart
@@ -544,36 +898,49 @@ RRDR *rrd2rrdr(RRDSET *st, long points, time_t after, time_t before, int group_m
 	// -------------------------------------------------------------------------
 	// the main loop
 
-	long 	t = rrdset_time2slot(st, before), // rrdset_last_slot(st),
-			stop_at_t = rrdset_time2slot(st, after),
-			added = 0,
-			group_count = 0,
-			add_this = 0,
-			stop_now = 0;
+	long 	start_at_slot = rrdset_time2slot(st, before), // rrdset_last_slot(st),
+			stop_at_slot = rrdset_time2slot(st, after);
 
-	// align to group for proper panning of data
-	t -= t % group;
-
-	time_t 	now = rrdset_slot2time(st, t),
+	time_t 	now = rrdset_slot2time(st, start_at_slot),
 			dt = st->update_every,
 			group_start_t = 0;
 
-	if(debug) debug(D_RRD_STATS, "BEGIN %s after_t: %lu (stop slot %ld), before_t: %lu (start slot %ld), start_t(now): %lu"
+	if(unlikely(debug)) debug(D_RRD_STATS, "INFO  %s after_t: %lu (stop_at_t: %ld), before_t: %lu (start_at_t: %ld), start_t(now): %lu, current_entry: %ld, entries: %ld"
 			, st->id
 			, after
-			, stop_at_t
+			, stop_at_slot
 			, before
-			, t
+			, start_at_slot
 			, now
+			, st->current_entry
+			, st->entries
 			);
 
-	for( ; !stop_now ; now -= dt, t--) {
-		if(unlikely(t < 0)) c = st->entries - 1;
-		if(t == stop_at_t) stop_now = 1;
+	// align to group for proper panning of data
+	start_at_slot -= start_at_slot % group;
+	stop_at_slot -= stop_at_slot % group;
+	now = rrdset_slot2time(st, start_at_slot);
 
-		if(debug) debug(D_RRD_STATS, "ROW %s c: %ld, group_count: %ld, added: %ld, now: %lu, %s %s"
+	if(unlikely(debug)) debug(D_RRD_STATS, "BEGIN %s after_t: %lu (stop_at_t: %ld), before_t: %lu (start_at_t: %ld), start_t(now): %lu, current_entry: %ld, entries: %ld"
+			, st->id
+			, after
+			, stop_at_slot
+			, before
+			, start_at_slot
+			, now
+			, st->current_entry
+			, st->entries
+			);
+
+	long slot = start_at_slot, counter = 0, stop_now = 0, added = 0, group_count = 0, add_this = 0;
+	for(; !stop_now ; now -= dt, slot--, counter++) {
+		if(unlikely(slot < 0)) slot = st->entries - 1;
+		if(unlikely(slot == stop_at_slot)) stop_now = counter;
+
+		if(unlikely(debug)) debug(D_RRD_STATS, "ROW %s slot: %ld, entries_counter: %ld, group_count: %ld, added: %ld, now: %lu, %s %s"
 				, st->id
-				, t
+				, slot
+				, counter
 				, group_count + 1
 				, added
 				, now
@@ -585,7 +952,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, time_t after, time_t before, int group_m
 		if(unlikely(now > before)) continue;
 		if(unlikely(now < after)) break;
 
-		if(group_count == 0) group_start_t = now;
+		if(unlikely(group_count == 0)) group_start_t = now;
 		group_count++;
 
 		if(unlikely(group_count == group)) {
@@ -595,13 +962,13 @@ RRDR *rrd2rrdr(RRDSET *st, long points, time_t after, time_t before, int group_m
 
 		// do the calculations
 		for(rd = st->dimensions, c = 0 ; likely(rd && c < dimensions) ; rd = rd->next, c++) {
-			storage_number n = rd->values[t];
+			storage_number n = rd->values[slot];
 			if(unlikely(!does_storage_number_exist(n))) continue;
 
 			group_counts[c]++;
 
 			calculated_number value = unpack_storage_number(n);
-			if(value != 0.0) {
+			if(likely(value != 0.0)) {
 				group_options[c] |= RRDR_NONZERO;
 				found_non_zero[c] = 1;
 			}
@@ -625,7 +992,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, time_t after, time_t before, int group_m
 
 		// added it
 		if(unlikely(add_this)) {
-			if(!rrdr_line_init(r, group_start_t)) break;
+			if(unlikely(!rrdr_line_init(r, group_start_t))) break;
 
 			calculated_number *cn = rrdr_line_values(r);
 			uint8_t *co = rrdr_line_options(r);
@@ -633,14 +1000,14 @@ RRDR *rrd2rrdr(RRDSET *st, long points, time_t after, time_t before, int group_m
 			for(rd = st->dimensions, c = 0 ; likely(rd && c < dimensions) ; rd = rd->next, c++) {
 
 				// update the dimension options
-				if(found_non_zero[c]) r->od[c] |= RRDR_NONZERO;
-				if(rd->flags & RRDDIM_FLAG_HIDDEN) r->od[c] |= RRDR_HIDDEN;
+				if(likely(found_non_zero[c])) r->od[c] |= RRDR_NONZERO;
+				if(unlikely(rd->flags & RRDDIM_FLAG_HIDDEN)) r->od[c] |= RRDR_HIDDEN;
 
 				// store the specific point options
 				co[c] = group_options[c];
 
 				// store the value
-				if(group_counts[c] == 0) {
+				if(unlikely(group_counts[c] == 0)) {
 					cn[c] = 0.0;
 					co[c] |= RRDR_EMPTY;
 				}
@@ -663,9 +1030,80 @@ RRDR *rrd2rrdr(RRDSET *st, long points, time_t after, time_t before, int group_m
 		}
 	}
 
-	rrdr_dump(r);
-	rrdr_free(r);
-	return NULL;
+	return r;
+}
+
+int rrd2format(RRDSET *st, BUFFER *out, BUFFER *dimensions, uint32_t format, long points, long long after, long long before, int group_method, uint32_t options, time_t *latest_timestamp)
+{
+	RRDR *rrdr = rrd2rrdr(st, points, after, before, group_method);
+	if(!rrdr) {
+		buffer_strcat(out, "Cannot generate output with these parameters on this chart.");
+		return 500;
+	}
+
+	if(dimensions)
+		rrdr_disable_not_selected_dimensions(rrdr, buffer_tostring(dimensions));
+
+	if(latest_timestamp && rrdr_rows(rrdr) > 0)
+		*latest_timestamp = rrdr->t[rrdr_rows(rrdr) - 1];
+
+	switch(format) {
+	case DATASOURCE_SSV:
+		out->contenttype = CT_TEXT_PLAIN;
+		rrdr2ssv(rrdr, out, options, "", " ", "");
+		break;
+
+	case DATASOURCE_SSV_COMMA:
+		out->contenttype = CT_TEXT_PLAIN;
+		rrdr2ssv(rrdr, out, options, "", ",", "");
+		break;
+
+	case DATASOURCE_JS_ARRAY:
+		out->contenttype = CT_APPLICATION_JSON;
+		rrdr2ssv(rrdr, out, options, "[", ",", "]");
+		break;
+
+	case DATASOURCE_CSV:
+		out->contenttype = CT_TEXT_PLAIN;
+		rrdr2csv(rrdr, out, options, "", ",", "\r\n");
+		break;
+
+	case DATASOURCE_TSV:
+		out->contenttype = CT_TEXT_PLAIN;
+		rrdr2csv(rrdr, out, options, "", "\t", "\r\n");
+		break;
+
+	case DATASOURCE_HTML:
+		out->contenttype = CT_TEXT_HTML;
+		buffer_strcat(out, "<html>\n<center><table border=\"0\" cellpadding=\"5\" cellspacing=\"5\">");
+		rrdr2csv(rrdr, out, options, "<tr><td>", "</td><td>", "</td></tr>\n");
+		buffer_strcat(out, "</table>\n</center>\n</html>\n");
+		break;
+
+	case DATASOURCE_GOOGLE_JSONP:
+		out->contenttype = CT_APPLICATION_X_JAVASCRIPT;
+		rrdr2json(rrdr, out, options, 1);
+		break;
+
+	case DATASOURCE_GOOGLE_JSON:
+		out->contenttype = CT_APPLICATION_JSON;
+		rrdr2json(rrdr, out, options, 1);
+		break;
+
+	case DATASOURCE_JSONP:
+		out->contenttype = CT_APPLICATION_X_JAVASCRIPT;
+		rrdr2json(rrdr, out, options, 0);
+		break;
+
+	case DATASOURCE_JSON:
+	default:
+		out->contenttype = CT_APPLICATION_JSON;
+		rrdr2json(rrdr, out, options, 0);
+		break;
+	}
+
+	rrdr_free(rrdr);
+	return 200;
 }
 
 unsigned long rrd_stats_json(int type, RRDSET *st, BUFFER *wb, int points, int group, int group_method, time_t after, time_t before, int only_non_zero)
@@ -815,9 +1253,6 @@ unsigned long rrd_stats_json(int type, RRDSET *st, BUFFER *wb, int points, int g
 
 		int annotate_reset = 0;
 		int annotation_count = 0;
-
-		// the minimum line length we expect
-		int line_size = 4096 + (dimensions * 200);
 
 		long 	t = rrdset_time2slot(st, before),
 				stop_at_t = rrdset_time2slot(st, after),
