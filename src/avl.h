@@ -43,7 +43,7 @@ int avl_insert(avl_tree* t, avl* a);
 
 /* Remove an element a from the AVL tree t
  * returns -1 if the depth of the tree has shrunk
- * Warning: if the element is not present in the tree, 
+ * Warning: if the element is not present in the tree,
  *          returns 0 as if it had been removed succesfully.
  */
 int avl_remove(avl_tree* t, avl* a);

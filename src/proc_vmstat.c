@@ -45,7 +45,7 @@ int do_proc_vmstat(int update_every, unsigned long long dt) {
 		nr_shmem = 0, nr_dirtied = 0, nr_written = 0, nr_anon_transparent_hugepages = 0, nr_dirty_threshold = 0, nr_dirty_background_threshold = 0,
 		pgpgin = 0, pgpgout = 0, pswpin = 0, pswpout = 0, pgalloc_dma = 0, pgalloc_dma32 = 0, pgalloc_normal = 0, pgalloc_movable = 0, pgfree = 0, pgactivate = 0, pgdeactivate = 0,
 		pgfault = 0, pgmajfault = 0, pgrefill_dma = 0, pgrefill_dma32 = 0, pgrefill_normal = 0, pgrefill_movable = 0, pgsteal_kswapd_dma = 0, pgsteal_kswapd_dma32 = 0,
-		pgsteal_kswapd_normal = 0, pgsteal_kswapd_movable = 0, pgsteal_direct_dma = 0, pgsteal_direct_dma32 = 0, pgsteal_direct_normal = 0, pgsteal_direct_movable = 0, 
+		pgsteal_kswapd_normal = 0, pgsteal_kswapd_movable = 0, pgsteal_direct_dma = 0, pgsteal_direct_dma32 = 0, pgsteal_direct_normal = 0, pgsteal_direct_movable = 0,
 		pgscan_kswapd_dma = 0, pgscan_kswapd_dma32 = 0, pgscan_kswapd_normal = 0, pgscan_kswapd_movable = 0, pgscan_direct_dma = 0, pgscan_direct_dma32 = 0, pgscan_direct_normal = 0,
 		pgscan_direct_movable = 0, pginodesteal = 0, slabs_scanned = 0, kswapd_inodesteal = 0, kswapd_low_wmark_hit_quickly = 0, kswapd_high_wmark_hit_quickly = 0,
 		kswapd_skip_congestion_wait = 0, pageoutrun = 0, allocstall = 0, pgrotated = 0, compact_blocks_moved = 0, compact_pages_moved = 0, compact_pagemigrate_failed = 0,
@@ -160,7 +160,7 @@ int do_proc_vmstat(int update_every, unsigned long long dt) {
 	RRDSET *st;
 
 	// --------------------------------------------------------------------
-	
+
 	if(do_swapio) {
 		st = rrdset_find("system.swapio");
 		if(!st) {
@@ -177,7 +177,7 @@ int do_proc_vmstat(int update_every, unsigned long long dt) {
 	}
 
 	// --------------------------------------------------------------------
-	
+
 	if(do_io) {
 		st = rrdset_find("system.io");
 		if(!st) {
@@ -194,7 +194,7 @@ int do_proc_vmstat(int update_every, unsigned long long dt) {
 	}
 
 	// --------------------------------------------------------------------
-	
+
 	if(do_pgfaults) {
 		st = rrdset_find("system.pgfaults");
 		if(!st) {

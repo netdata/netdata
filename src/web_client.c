@@ -40,7 +40,7 @@ unsigned long long web_clients_count = 0;
 struct web_client *web_client_create(int listener)
 {
 	struct web_client *w;
-	
+
 	w = calloc(1, sizeof(struct web_client));
 	if(!w) {
 		error("Cannot allocate new web_client memory.");

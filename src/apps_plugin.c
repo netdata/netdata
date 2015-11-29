@@ -354,7 +354,7 @@ struct target *get_target(const char *id, struct target *target)
 	struct target *w;
 	for(w = target_root ; w ; w = w->next)
 		if(strncmp(nid, w->id, MAX_NAME) == 0) return w;
-	
+
 	w = calloc(sizeof(struct target), 1);
 	if(!w) {
 		error("Cannot allocate %lu bytes of memory", (unsigned long)sizeof(struct target));
@@ -1206,7 +1206,7 @@ void update_statistics(void)
 	for(p = root_of_pids; p ; p = p->next) {
 		if(p->ppid > 0 && p->ppid <= pid_max && all_pids[p->ppid]) {
 			if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: \tparent of %d %s is %d %s\n", p->pid, p->comm, p->ppid, all_pids[p->ppid]->comm);
-			
+
 			p->parent = all_pids[p->ppid];
 			p->parent->childs++;
 		}
@@ -1336,7 +1336,7 @@ void update_statistics(void)
 		w->fds = calloc(sizeof(int), all_files_size);
 		if(!w->fds)
 			error("Cannot allocate memory for fds in %s", w->name);
-	
+
 		w->minflt = 0;
 		w->majflt = 0;
 		w->utime = 0;
@@ -1477,7 +1477,7 @@ void update_statistics(void)
 	for(p = root_of_pids; p ;) {
 		if(!p->updated) {
 //			fprintf(stderr, "\tEXITED %d %s [parent %d %s, target %s] utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->pid, p->comm, p->parent->pid, p->parent->comm, p->target->name,  p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
-			
+
 			for(c = 0 ; c < p->fds_size ; c++) if(p->fds[c] > 0) {
 				file_descriptor_not_used(p->fds[c]);
 				p->fds[c] = 0;
@@ -1955,7 +1955,7 @@ int main(int argc, char **argv)
 
 		usleep(susec);
 		bcopy(&now, &last, sizeof(struct timeval));
-		
+
 		current_t = time(NULL);
 		if(current_t - started_t > 3600) exit(0);
 	}

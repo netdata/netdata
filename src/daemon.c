@@ -100,7 +100,7 @@ void prepare_rundir() {
 		mkdir(rundir, 0775);
 		snprintf(rundir, FILENAME_MAX, "/run/user/%d/netdata", getuid());
 	}
-	
+
 	snprintf(pidfile, FILENAME_MAX, "%s/netdata.pid", rundir);
 
 	if(mkdir(rundir, 0775) != 0) {
@@ -204,7 +204,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 			}
 		}
 	}
-	
+
 	if((dev_null = open("/dev/null", O_RDWR, 0666)) == -1) {
 		perror("Cannot open /dev/null");
 		if(input_fd != -1) close(input_fd);
@@ -264,7 +264,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 	if(close_all_files) {
 		int i;
 		for(i = sysconf(_SC_OPEN_MAX); i > 0; i--)
-			if(   
+			if(
 				((access_fd && i != *access_fd) || !access_fd)
 				&& i != dev_null
 				&& i != input_fd
@@ -289,7 +289,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 		input_fd = -1;
 	}
 	else dup2(dev_null, STDIN_FILENO);
-	
+
 	if(output_fd != -1) {
 		if(output_fd != STDOUT_FILENO) {
 			dup2(output_fd, STDOUT_FILENO);

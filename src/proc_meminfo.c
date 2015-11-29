@@ -108,7 +108,7 @@ int do_proc_meminfo(int update_every, unsigned long long dt) {
 	RRDSET *st;
 
 	// --------------------------------------------------------------------
-	
+
 	// http://stackoverflow.com/questions/3019748/how-to-reliably-measure-available-memory-in-linux
 	unsigned long long MemUsed = MemTotal - MemFree - Cached - Buffers;
 
@@ -132,7 +132,7 @@ int do_proc_meminfo(int update_every, unsigned long long dt) {
 	}
 
 	// --------------------------------------------------------------------
-	
+
 	unsigned long long SwapUsed = SwapTotal - SwapFree;
 
 	if(do_swap) {
@@ -152,7 +152,7 @@ int do_proc_meminfo(int update_every, unsigned long long dt) {
 	}
 
 	// --------------------------------------------------------------------
-	
+
 	if(hwcorrupted && do_hwcorrupt) {
 		st = rrdset_find("mem.hwcorrupt");
 		if(!st) {
@@ -168,7 +168,7 @@ int do_proc_meminfo(int update_every, unsigned long long dt) {
 	}
 
 	// --------------------------------------------------------------------
-	
+
 	if(do_committed) {
 		st = rrdset_find("mem.committed");
 		if(!st) {
@@ -184,7 +184,7 @@ int do_proc_meminfo(int update_every, unsigned long long dt) {
 	}
 
 	// --------------------------------------------------------------------
-	
+
 	if(do_writeback) {
 		st = rrdset_find("mem.writeback");
 		if(!st) {
@@ -208,7 +208,7 @@ int do_proc_meminfo(int update_every, unsigned long long dt) {
 	}
 
 	// --------------------------------------------------------------------
-	
+
 	if(do_kernel) {
 		st = rrdset_find("mem.kernel");
 		if(!st) {
@@ -230,7 +230,7 @@ int do_proc_meminfo(int update_every, unsigned long long dt) {
 	}
 
 	// --------------------------------------------------------------------
-	
+
 	if(do_slab) {
 		st = rrdset_find("mem.slab");
 		if(!st) {

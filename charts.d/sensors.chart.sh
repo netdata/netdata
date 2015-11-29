@@ -54,7 +54,7 @@ sensors_check_files() {
 		v="$( cat $f )"
 		v=$(( v + 1 - 1 ))
 		[ $v -ne 0 ] && echo "$f" && continue
-		
+
 		echo >&2 "$PROGRAM_NAME: sensors: $f gives zero values"
 	done
 }

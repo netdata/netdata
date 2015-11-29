@@ -438,6 +438,6 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 			}
 		}
 	}
-	
+
 	return 0;
 }

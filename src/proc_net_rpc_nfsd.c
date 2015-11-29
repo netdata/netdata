@@ -199,7 +199,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 				error("%s line of /proc/net/rpc/nfsd has %d words, expected %d", type, words, 4);
 				continue;
 			}
-			
+
 			rc_hits = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
 			rc_misses = strtoull(procfile_lineword(ff, l, 2), NULL, 10);
 			rc_nocache = strtoull(procfile_lineword(ff, l, 3), NULL, 10);
@@ -213,7 +213,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 				error("%s line of /proc/net/rpc/nfsd has %d words, expected %d", type, words, 6);
 				continue;
 			}
-			
+
 			fh_stale = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
 			fh_total_lookups = strtoull(procfile_lineword(ff, l, 2), NULL, 10);
 			fh_anonymous_lookups = strtoull(procfile_lineword(ff, l, 3), NULL, 10);
@@ -229,7 +229,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 				error("%s line of /proc/net/rpc/nfsd has %d words, expected %d", type, words, 3);
 				continue;
 			}
-			
+
 			io_read = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
 			io_write = strtoull(procfile_lineword(ff, l, 2), NULL, 10);
 
@@ -242,7 +242,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 				error("%s line of /proc/net/rpc/nfsd has %d words, expected %d", type, words, 13);
 				continue;
 			}
-			
+
 			th_threads = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
 			th_fullcnt = strtoull(procfile_lineword(ff, l, 2), NULL, 10);
 			th_hist10 = (unsigned long long)(atof(procfile_lineword(ff, l, 3)) * 1000.0);
@@ -273,7 +273,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 				error("%s line of /proc/net/rpc/nfsd has %d words, expected %d", type, words, 13);
 				continue;
 			}
-			
+
 			ra_size = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
 			ra_hist10 = strtoull(procfile_lineword(ff, l, 2), NULL, 10);
 			ra_hist20 = strtoull(procfile_lineword(ff, l, 3), NULL, 10);
@@ -302,7 +302,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 				error("%s line of /proc/net/rpc/nfsd has %d words, expected %d", type, words, 5);
 				continue;
 			}
-			
+
 			net_count = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
 			net_udp_count = strtoull(procfile_lineword(ff, l, 2), NULL, 10);
 			net_tcp_count = strtoull(procfile_lineword(ff, l, 3), NULL, 10);
@@ -317,7 +317,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 				error("%s line of /proc/net/rpc/nfsd has %d words, expected %d", type, words, 6);
 				continue;
 			}
-			
+
 			rpc_count = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
 			rpc_bad_format = strtoull(procfile_lineword(ff, l, 2), NULL, 10);
 			rpc_bad_auth = strtoull(procfile_lineword(ff, l, 3), NULL, 10);
@@ -628,7 +628,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 
 		for(i = 0; nfsd_proc_values[i].present2 ; i++)
 			rrddim_set(st, nfsd_proc_values[i].name, nfsd_proc_values[i].proc2);
-		
+
 		rrdset_done(st);
 	}
 
@@ -647,7 +647,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 
 		for(i = 0; nfsd_proc_values[i].present3 ; i++)
 			rrddim_set(st, nfsd_proc_values[i].name, nfsd_proc_values[i].proc3);
-		
+
 		rrdset_done(st);
 	}
 
@@ -666,7 +666,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 
 		for(i = 0; nfsd_proc_values[i].present4 ; i++)
 			rrddim_set(st, nfsd_proc_values[i].name, nfsd_proc_values[i].proc4);
-		
+
 		rrdset_done(st);
 	}
 
@@ -685,7 +685,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 
 		for(i = 0; nfsd4_ops_values[i].present ; i++)
 			rrddim_set(st, nfsd4_ops_values[i].name, nfsd4_ops_values[i].value);
-		
+
 		rrdset_done(st);
 	}
 

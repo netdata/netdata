@@ -468,7 +468,7 @@ void *pluginsd_main(void *ptr)
 				if(unlikely(!cd)) fatal("Cannot allocate memory for plugin.");
 
 				snprintf(cd->id, CONFIG_MAX_NAME, "plugin:%s", pluginname);
-				
+
 				strncpy(cd->filename, file->d_name, FILENAME_MAX);
 				snprintf(cd->fullfilename, FILENAME_MAX, "%s/%s", dir_name, cd->filename);
 

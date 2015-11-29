@@ -70,7 +70,7 @@ loopsleepms() {
 	# calculate ms to sleep
 	mstosleep=$(( t - LOOPSLEEPMS_LASTWORK ))
 	# echo "# mstosleep is $mstosleep ms"
-	
+
 	# if we are too slow, sleep some time
 	test $mstosleep -lt 200 && mstosleep=200
 

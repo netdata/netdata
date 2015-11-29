@@ -118,7 +118,7 @@ int do_proc_stat(int update_every, unsigned long long dt) {
 			unsigned long long value = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
 
 			// --------------------------------------------------------------------
-	
+
 			if(do_interrupts) {
 				st = rrdset_find_bytype("system", "intr");
 				if(!st) {
@@ -137,7 +137,7 @@ int do_proc_stat(int update_every, unsigned long long dt) {
 			unsigned long long value = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
 
 			// --------------------------------------------------------------------
-	
+
 			if(do_context) {
 				st = rrdset_find_bytype("system", "ctxt");
 				if(!st) {

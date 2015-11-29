@@ -405,7 +405,7 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 	fprintf(stdout, "MYPID %d\n", getpid());
 	fflush(NULL);
 #endif
-	
+
 	// ignore all signals
 	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV) signal(i, SIG_DFL);
 
@@ -485,12 +485,12 @@ char *url_decode(char *str) {
 
 		else
 			*pbuf++ = *pstr;
-		
+
 		pstr++;
 	}
-	
+
 	*pbuf = '\0';
-	
+
 	return buf;
 }
 
@@ -1163,7 +1163,7 @@ struct rrd_dimension {
 	char id[RRD_STATS_NAME_MAX + 1];		// the id of this dimension (for internal identification)
 	char *name;					// the name of this dimension (as presented to user)
 	char cache_file[FILENAME_MAX+1];
-	
+
 	unsigned long hash;				// a simple hash on the id, to speed up searching
 							// we first compare hashes, and only if the hashes are equal we do string comparisons
 
@@ -1230,7 +1230,7 @@ struct rrd_stats {
 	int update_every;				// every how many seconds is this updated?
 	unsigned long long first_entry_t;		// the timestamp (in microseconds) of the oldest entry in the db
 	struct timeval last_updated;			// when this data set was last updated (updated every time the rrd_stats_done() function)
-	struct timeval last_collected_time;		// 
+	struct timeval last_collected_time;		//
 	unsigned long long usec_since_last_update;
 
 	total_number collected_total;
@@ -1410,7 +1410,7 @@ RRD_STATS *rrd_stats_create(const char *type, const char *id, const char *name, 
 
 	st->priority = config_get_number(st->id, "priority", priority);
 	st->enabled = enabled;
-	
+
 	st->isdetail = 0;
 	st->debug = 0;
 
@@ -1530,7 +1530,7 @@ RRD_DIMENSION *rrd_stats_dimension_add(RRD_STATS *st, const char *id, const char
 
 	rd->entries = st->entries;
 	rd->update_every = st->update_every;
-	
+
 	// append this dimension
 	if(!st->dimensions)
 		st->dimensions = rd;
@@ -1705,7 +1705,7 @@ int rrd_stats_dimension_hide(RRD_STATS *st, const char *id)
 void rrd_stats_dimension_set_by_pointer(RRD_STATS *st, RRD_DIMENSION *rd, collected_number value)
 {
 	if(st) {;}
-	
+
 	gettimeofday(&rd->last_collected_time, NULL);
 	rd->collected_value = value;
 }
@@ -2015,7 +2015,7 @@ unsigned long long rrd_stats_done(RRD_STATS *st)
 			// add the value we will overwrite
 			st->first_entry_t += st->update_every * 1000000ULL;
 		}
-		
+
 		st->counter++;
 		st->current_entry = ((st->current_entry + 1) >= st->entries) ? 0 : st->current_entry + 1;
 		if(!st->first_entry_t) st->first_entry_t = next_ut;
@@ -2240,7 +2240,7 @@ void web_buffer_increase(struct web_buffer *b, long free_size_required)
 
 	b->buffer = realloc(b->buffer, b->size + increase);
 	if(!b->buffer) fatal("Failed to increase data buffer from size %d to %d.", b->size, b->size + increase);
-	
+
 	b->size += increase;
 }
 
@@ -2291,7 +2291,7 @@ struct web_client *web_client_create(int listener)
 {
 	struct web_client *w;
 	socklen_t addrlen;
-	
+
 	w = calloc(1, sizeof(struct web_client));
 	if(!w) {
 		error("Cannot allocate new web_client memory.");
@@ -2316,7 +2316,7 @@ struct web_client *web_client_create(int listener)
 	debug(D_WEB_CLIENT_ACCESS, "%llu: New web client from %s on socket %d.", w->id, w->client_ip, w->ifd);
 
 	{
-		int flag = 1; 
+		int flag = 1;
 		if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0) error("%llu: Cannot set SO_KEEPALIVE on socket.", w->id);
 	}
 
@@ -2367,7 +2367,7 @@ struct web_client *web_client_free(struct web_client *w)
 time_t rrd_stats_first_entry_t(RRD_STATS *st)
 {
 	if(!st->first_entry_t) return st->last_updated.tv_sec;
-	
+
 	return st->first_entry_t / 1000000;
 }
 
@@ -2506,7 +2506,7 @@ void rrd_stats_all_json(struct web_buffer *wb)
 		}
 	}
 	pthread_rwlock_unlock(&root_rwlock);
-	
+
 	web_buffer_printf(wb, "\n\t],\n"
 		"\t\"hostname\": \"%s\",\n"
 		"\t\"update_every\": %d,\n"
@@ -2528,7 +2528,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 
 	// -------------------------------------------------------------------------
 	// switch from JSON to google JSON
-	
+
 	char kq[2] = "\"";
 	char sq[2] = "\"";
 	switch(type) {
@@ -2546,20 +2546,20 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 
 	// -------------------------------------------------------------------------
 	// validate the parameters
-	
+
 	if(entries_to_show < 1) entries_to_show = 1;
 	if(group < 1) group = 1;
-	
+
 	// make sure current_entry is within limits
 	long current_entry = (long)st->current_entry - (long)1;
 	if(current_entry < 0) current_entry = 0;
 	else if(current_entry >= st->entries) current_entry = st->entries - 1;
-	
+
 	// find the oldest entry of the round-robin
 	long max_entries_init = (st->counter < (unsigned long)st->entries) ? st->counter : (unsigned long)st->entries;
-	
+
 	time_t time_init = st->last_updated.tv_sec;
-	
+
 	if(before == 0 || before > time_init) before = time_init;
 	if(after  == 0) after = rrd_stats_first_entry_t(st);
 
@@ -2568,12 +2568,12 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 
 	// our return value (the last timestamp printed)
 	// this is required to detect re-transmit in google JSONP
-	time_t last_timestamp = 0;			
+	time_t last_timestamp = 0;
 
 
 	// -------------------------------------------------------------------------
 	// find how many dimensions we have
-	
+
 	int dimensions = 0;
 	RRD_DIMENSION *rd;
 	for( rd = st->dimensions ; rd ; rd = rd->next) dimensions++;
@@ -2583,10 +2583,10 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 		return 0;
 	}
 
-	
+
 	// -------------------------------------------------------------------------
 	// prepare various strings, to speed up the loop
-	
+
 	char overflow_annotation[201]; snprintf(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
 	char normal_annotation[201];   snprintf(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
 	char pre_date[51];             snprintf(pre_date,             50, "		{%sc%s:[{%sv%s:%s", kq, kq, kq, kq, sq);
@@ -2597,7 +2597,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 
 	// -------------------------------------------------------------------------
 	// checks for debuging
-	
+
 	if(st->debug) {
 		debug(D_RRD_STATS, "%s first_entry_t = %lu, last_entry_t = %lu, duration = %lu, after = %lu, before = %lu, duration = %lu, entries_to_show = %lu, group = %lu, max_entries = %ld"
 			, st->id
@@ -2622,7 +2622,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 
 	// -------------------------------------------------------------------------
 	// temp arrays for keeping values per dimension
-	
+
 	calculated_number group_values[dimensions]; // keep sums when grouping
 	calculated_number print_values[dimensions]; // keep the final value to be printed
 	int               print_hidden[dimensions]; // keep hidden flags
@@ -2645,7 +2645,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 
 		// -------------------------------------------------------------------------
 		// print the JSON header
-		
+
 		web_buffer_printf(wb, "{\n	%scols%s:\n	[\n", kq, kq);
 		web_buffer_printf(wb, "		{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
 		web_buffer_printf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotation%s}},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
@@ -2673,7 +2673,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 
 		int annotate_reset = 0;
 		int annotation_count = 0;
-		
+
 		// to allow grouping on the same values, we need a pad
 		long pad = before % group;
 
@@ -2716,12 +2716,12 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 					// debug(D_RRD_STATS, "Already printed all rows. Stopping.");
 					break;
 				}
-				
+
 				if(group_count != group) {
 					// this is an incomplete group, skip it.
 					for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++)
 						group_values[c] = 0;
-						
+
 					group_count = 0;
 					continue;
 				}
@@ -2744,7 +2744,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 
 			for(rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 				calculated_number value = unpack_storage_number(rd->values[t]);
-				
+
 				switch(group_method) {
 					case GROUP_MAX:
 						if(abs(value) > abs(group_values[c])) group_values[c] = value;
@@ -2769,7 +2769,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 
 			if(print_this) {
 				group_count = 0;
-				
+
 				if(annotate_reset) {
 					annotation_count++;
 					web_buffer_strcpy(wb, overflow_annotation);
@@ -2817,7 +2817,7 @@ unsigned long rrd_stats_json(int type, RRD_STATS *st, struct web_buffer *wb, int
 			else break;
 		}
 		else break;
-		
+
 	} // max_loop
 
 	debug(D_RRD_STATS, "RRD_STATS_JSON: %s total %ld bytes", st->name, wb->bytes);
@@ -2836,7 +2836,7 @@ void generate_config(struct web_buffer *wb, int only_changed)
 		web_buffer_increase(wb, 500);
 		switch(i) {
 			case 0:
-				web_buffer_printf(wb, 
+				web_buffer_printf(wb,
 					"# NetData Configuration\n"
 					"# You can uncomment and change any of the options bellow.\n"
 					"# The value shown in the commented settings, is the default value.\n"
@@ -2951,7 +2951,7 @@ int mysendfile(struct web_client *w, char *filename)
 			return 404;
 		}
 	}
-	
+
 	// pick a Content-Type for the file
 		 if(strstr(filename, ".html") != NULL)	w->data->contenttype = CT_TEXT_HTML;
 	else if(strstr(filename, ".js")   != NULL)	w->data->contenttype = CT_APPLICATION_X_JAVASCRIPT;
@@ -2993,7 +2993,7 @@ void web_client_reset(struct web_client *w)
 
 	long sent = w->zoutput?(long)w->zstream.total_out:((w->mode == WEB_CLIENT_MODE_FILECOPY)?w->data->rbytes:w->data->bytes);
 	long size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->data->rbytes:w->data->bytes;
-	
+
 	if(w->last_url[0]) log_access("%llu: (sent/all = %ld/%ld bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: '%s'",
 		w->id,
 		sent, size, -((size>0)?((float)(size-sent)/(float)size * 100.0):0.0),
@@ -3188,13 +3188,13 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 
 						else if(strcmp(key, "sig") == 0)
 							google_sig = value;
-						
+
 						else if(strcmp(key, "out") == 0)
 							google_out = value;
-						
+
 						else if(strcmp(key, "responseHandler") == 0)
 							google_responseHandler = value;
-						
+
 						else if(strcmp(key, "outFileName") == 0)
 							google_outFileName = value;
 					}
@@ -3211,7 +3211,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 
 			// check the client wants json
 			if(strcmp(google_out, "json") != 0) {
-				w->data->bytes = snprintf(w->data->buffer, w->data->size, 
+				w->data->bytes = snprintf(w->data->buffer, w->data->size,
 					"%s({version:'%s',reqId:'%s',status:'error',errors:[{reason:'invalid_query',message:'output format is not supported',detailed_message:'the format %s requested is not supported by netdata.'}]});",
 					google_responseHandler, google_version, google_reqId, google_out);
 					return 200;
@@ -3220,11 +3220,11 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	}
 
 	if(datasource_type == DATASOURCE_GOOGLE_JSONP) {
-		w->data->bytes = snprintf(w->data->buffer, w->data->size, 
+		w->data->bytes = snprintf(w->data->buffer, w->data->size,
 			"%s({version:'%s',reqId:'%s',status:'ok',sig:'%lu',table:",
 			google_responseHandler, google_version, google_reqId, st->last_updated.tv_sec);
 	}
-	
+
 	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group, %d group_method, %lu after, %lu before).", w->id, st->name, st->id, lines, group_count, group_method, after, before);
 	unsigned long timestamp_in_data = rrd_stats_json(datasource_type, st, w->data, lines, group_count, group_method, after, before, nonzero);
 
@@ -3234,7 +3234,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 
 		else {
 			// the client already has the latest data
-			w->data->bytes = snprintf(w->data->buffer, w->data->size, 
+			w->data->bytes = snprintf(w->data->buffer, w->data->size,
 				"%s({version:'%s',reqId:'%s',status:'error',errors:[{reason:'not_modified',message:'Data not modified'}]});",
 				google_responseHandler, google_version, google_reqId);
 		}
@@ -3422,7 +3422,7 @@ void web_client_process(struct web_client *w)
 			strcpy(w->data->buffer, "I don't understand you...\r\n");
 			w->data->bytes = strlen(w->data->buffer);
 		}
-		
+
 		// free url_decode() buffer
 		if(pointer_to_free) free(pointer_to_free);
 	}
@@ -3545,7 +3545,7 @@ void web_client_process(struct web_client *w)
 	strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S %Z", &tm);
 
 	char custom_header[MAX_HTTP_HEADER_SIZE + 1] = "";
-	if(w->response_header[0]) 
+	if(w->response_header[0])
 		strcpy(custom_header, w->response_header);
 
 	int headerlen = 0;
@@ -3655,7 +3655,7 @@ void web_client_process(struct web_client *w)
 long web_client_send_chunk_header(struct web_client *w, int len)
 {
 	debug(D_DEFLATE, "%llu: OPEN CHUNK of %d bytes (hex: %x).", w->id, len, len);
-	char buf[1024]; 
+	char buf[1024];
 	sprintf(buf, "%X\r\n", len);
 	int bytes = send(w->ofd, buf, strlen(buf), MSG_DONTWAIT);
 
@@ -4075,7 +4075,7 @@ void *socket_listen_main(void *ptr)
 					error("%llu: Cannot request detach of newly created web client thread.", w->id);
 					w->obsolete = 1;
 				}
-				
+
 				log_access("%llu: %s connected", w->id, w->client_ip);
 			}
 			else debug(D_WEB_CLIENT, "LISTENER: select() didn't do anything.");
@@ -4128,10 +4128,10 @@ int do_proc_net_dev() {
 	char iface[MAX_PROC_NET_DEV_IFACE_NAME + 1] = "";
 	unsigned long long rbytes, rpackets, rerrors, rdrops, rfifo, rframe, rcompressed, rmulticast;
 	unsigned long long tbytes, tpackets, terrors, tdrops, tfifo, tcollisions, tcarrier, tcompressed;
-	
+
 	int r;
 	char *p;
-	
+
 	if(fp) {
 		if(fseek(fp, 0, SEEK_SET) == -1) {
 			error("Re-opening file /proc/net/dev.");
@@ -4147,20 +4147,20 @@ int do_proc_net_dev() {
 			return 1;
 		}
 	}
-	
+
 	// skip the first two lines
 	p = fgets(buffer, MAX_PROC_NET_DEV_LINE, fp);
 	p = fgets(buffer, MAX_PROC_NET_DEV_LINE, fp);
-	
+
 	// read the rest of the lines
 	for(;1;) {
 		char *c;
 		p = fgets(buffer, MAX_PROC_NET_DEV_LINE, fp);
 		if(!p) break;
-		
+
 		c = strchr(buffer, ':');
 		if(c) *c = '\t';
-		
+
 		r = sscanf(buffer, "%s %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu\n",
 			iface,
 			&rbytes, &rpackets, &rerrors, &rdrops, &rfifo, &rframe, &rcompressed, &rmulticast,
@@ -4269,7 +4269,7 @@ int do_proc_net_dev() {
 			rrd_stats_done(st);
 		}
 	}
-	
+
 	return 0;
 }
 
@@ -4294,10 +4294,10 @@ int do_proc_diskstats() {
 
 	char buffer[MAX_PROC_DISKSTATS_LINE+1] = "";
 	char disk[MAX_PROC_DISKSTATS_DISK_NAME + 1] = "";
-	
+
 	int r;
 	char *p;
-	
+
 	if(fp) {
 		if(fseek(fp, 0, SEEK_SET) == -1) {
 			error("Re-opening file /proc/diskstats.");
@@ -4313,7 +4313,7 @@ int do_proc_diskstats() {
 			return 1;
 		}
 	}
-	
+
 	for(;1;) {
 		unsigned long long 	major = 0, minor = 0,
 							reads = 0,  reads_merged = 0,  readsectors = 0,  readms = 0,
@@ -4322,7 +4322,7 @@ int do_proc_diskstats() {
 
 		p = fgets(buffer, MAX_PROC_DISKSTATS_LINE, fp);
 		if(!p) break;
-		
+
 		r = sscanf(buffer, "%llu %llu %s %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu\n",
 			&major, &minor, disk,
 			&reads, &reads_merged, &readsectors, &readms, &writes, &writes_merged, &writesectors, &writems, &currentios, &iosms, &wiosms
@@ -4520,7 +4520,7 @@ int do_proc_diskstats() {
 			rrd_stats_dimension_set(st, "writes", writes);
 			rrd_stats_done(st);
 		}
-		
+
 		// --------------------------------------------------------------------
 
 		if(do_merged_ops) {
@@ -4577,7 +4577,7 @@ int do_proc_diskstats() {
 			rrd_stats_done(st);
 		}
 	}
-	
+
 	return 0;
 }
 
@@ -4586,7 +4586,7 @@ int do_proc_diskstats() {
 
 int do_proc_net_snmp() {
 	static int do_ip_packets = -1, do_ip_fragsout = -1, do_ip_fragsin = -1, do_ip_errors = -1,
-		do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1, 
+		do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1,
 		do_udp_packets = -1, do_udp_errors = -1;
 	static FILE *fp = NULL;
 
@@ -4753,7 +4753,7 @@ int do_proc_net_snmp() {
 			if(r != 14) error("Cannot read /proc/net/snmp TCP line. Expected 14 params, read %d.", r);
 
 			// --------------------------------------------------------------------
-			
+
 			// see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
 			if(do_tcp_sockets) {
 				st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcpsock");
@@ -4769,7 +4769,7 @@ int do_proc_net_snmp() {
 			}
 
 			// --------------------------------------------------------------------
-			
+
 			if(do_tcp_packets) {
 				st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcppackets");
 				if(!st) {
@@ -4786,7 +4786,7 @@ int do_proc_net_snmp() {
 			}
 
 			// --------------------------------------------------------------------
-			
+
 			if(do_tcp_errors) {
 				st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcperrors");
 				if(!st) {
@@ -4804,7 +4804,7 @@ int do_proc_net_snmp() {
 			}
 
 			// --------------------------------------------------------------------
-			
+
 			if(do_tcp_handshake) {
 				st = rrd_stats_find(RRD_TYPE_NET_SNMP ".tcphandshake");
 				if(!st) {
@@ -4846,7 +4846,7 @@ int do_proc_net_snmp() {
 			if(r != 6) error("Cannot read /proc/net/snmp UDP line. Expected 6 params, read %d.", r);
 
 			// --------------------------------------------------------------------
-			
+
 			// see http://net-snmp.sourceforge.net/docs/mibs/udp.html
 			if(do_udp_packets) {
 				st = rrd_stats_find(RRD_TYPE_NET_SNMP ".udppackets");
@@ -4864,7 +4864,7 @@ int do_proc_net_snmp() {
 			}
 
 			// --------------------------------------------------------------------
-			
+
 			if(do_udp_errors) {
 				st = rrd_stats_find(RRD_TYPE_NET_SNMP ".udperrors");
 				if(!st) {
@@ -4886,7 +4886,7 @@ int do_proc_net_snmp() {
 			}
 		}
 	}
-	
+
 	return 0;
 }
 
@@ -4940,7 +4940,7 @@ int do_proc_net_netstat() {
 				InNoRoutes = 0, InTruncatedPkts = 0,
 				InOctets = 0,  InMcastPkts = 0,  InBcastPkts = 0,  InMcastOctets = 0,  InBcastOctets = 0,
 				OutOctets = 0, OutMcastPkts = 0, OutBcastPkts = 0, OutMcastOctets = 0, OutBcastOctets = 0;
-	
+
 			int r = sscanf(&buffer[7], "%llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu\n",
 				&InNoRoutes, &InTruncatedPkts, &InMcastPkts, &OutMcastPkts, &InBcastPkts, &OutBcastPkts,
 				&InOctets, &OutOctets, &InMcastOctets, &OutMcastOctets, &InBcastOctets, &OutBcastOctets);
@@ -5061,7 +5061,7 @@ int do_proc_net_netstat() {
 			}
 		}
 	}
-	
+
 	return 0;
 }
 
@@ -5140,7 +5140,7 @@ int do_proc_net_stat_conntrack() {
 	RRD_STATS *st;
 
 	// --------------------------------------------------------------------
-	
+
 	if(do_sockets) {
 		st = rrd_stats_find(RRD_TYPE_NET_STAT_CONNTRACK ".sockets");
 		if(!st) {
@@ -5334,7 +5334,7 @@ int do_proc_net_ip_vs_stats() {
 	}
 
 	// --------------------------------------------------------------------
-	
+
 	if(do_packets) {
 		st = rrd_stats_find(RRD_TYPE_NET_IPVS ".packets");
 		if(!st) {
@@ -5351,7 +5351,7 @@ int do_proc_net_ip_vs_stats() {
 	}
 
 	// --------------------------------------------------------------------
-	
+
 	if(do_bandwidth) {
 		st = rrd_stats_find(RRD_TYPE_NET_IPVS ".net");
 		if(!st) {
@@ -5473,7 +5473,7 @@ int do_proc_stat() {
 			if(r != 2) error("Cannot read /proc/stat intr line. Expected 2 params, read %d.", r);
 
 			// --------------------------------------------------------------------
-	
+
 			if(do_interrupts) {
 				st = rrd_stats_find_bytype("system", id);
 				if(!st) {
@@ -5498,7 +5498,7 @@ int do_proc_stat() {
 			if(r != 2) error("Cannot read /proc/stat ctxt line. Expected 2 params, read %d.", r);
 
 			// --------------------------------------------------------------------
-	
+
 			if(do_context) {
 				st = rrd_stats_find_bytype("system", id);
 				if(!st) {
@@ -5692,7 +5692,7 @@ int do_proc_meminfo() {
 	RRD_STATS *st;
 
 	// --------------------------------------------------------------------
-	
+
 	// http://stackoverflow.com/questions/3019748/how-to-reliably-measure-available-memory-in-linux
 	unsigned long long MemUsed = MemTotal - MemFree - Cached - Buffers;
 
@@ -5716,7 +5716,7 @@ int do_proc_meminfo() {
 	}
 
 	// --------------------------------------------------------------------
-	
+
 	unsigned long long SwapUsed = SwapTotal - SwapFree;
 
 	if(do_swap) {
@@ -5736,7 +5736,7 @@ int do_proc_meminfo() {
 	}
 
 	// --------------------------------------------------------------------
-	
+
 	if(hwcorrupted && do_hwcorrupt) {
 		st = rrd_stats_find("mem.hwcorrupt");
 		if(!st) {
@@ -5752,7 +5752,7 @@ int do_proc_meminfo() {
 	}
 
 	// --------------------------------------------------------------------
-	
+
 	if(do_committed) {
 		st = rrd_stats_find("mem.committed");
 		if(!st) {
@@ -5768,7 +5768,7 @@ int do_proc_meminfo() {
 	}
 
 	// --------------------------------------------------------------------
-	
+
 	if(do_writeback) {
 		st = rrd_stats_find("mem.writeback");
 		if(!st) {
@@ -5792,7 +5792,7 @@ int do_proc_meminfo() {
 	}
 
 	// --------------------------------------------------------------------
-	
+
 	if(do_kernel) {
 		st = rrd_stats_find("mem.kernel");
 		if(!st) {
@@ -5814,7 +5814,7 @@ int do_proc_meminfo() {
 	}
 
 	// --------------------------------------------------------------------
-	
+
 	if(do_slab) {
 		st = rrd_stats_find("mem.slab");
 		if(!st) {
@@ -5872,7 +5872,7 @@ int do_proc_vmstat() {
 		nr_shmem = 0, nr_dirtied = 0, nr_written = 0, nr_anon_transparent_hugepages = 0, nr_dirty_threshold = 0, nr_dirty_background_threshold = 0,
 		pgpgin = 0, pgpgout = 0, pswpin = 0, pswpout = 0, pgalloc_dma = 0, pgalloc_dma32 = 0, pgalloc_normal = 0, pgalloc_movable = 0, pgfree = 0, pgactivate = 0, pgdeactivate = 0,
 		pgfault = 0, pgmajfault = 0, pgrefill_dma = 0, pgrefill_dma32 = 0, pgrefill_normal = 0, pgrefill_movable = 0, pgsteal_kswapd_dma = 0, pgsteal_kswapd_dma32 = 0,
-		pgsteal_kswapd_normal = 0, pgsteal_kswapd_movable = 0, pgsteal_direct_dma = 0, pgsteal_direct_dma32 = 0, pgsteal_direct_normal = 0, pgsteal_direct_movable = 0, 
+		pgsteal_kswapd_normal = 0, pgsteal_kswapd_movable = 0, pgsteal_direct_dma = 0, pgsteal_direct_dma32 = 0, pgsteal_direct_normal = 0, pgsteal_direct_movable = 0,
 		pgscan_kswapd_dma = 0, pgscan_kswapd_dma32 = 0, pgscan_kswapd_normal = 0, pgscan_kswapd_movable = 0, pgscan_direct_dma = 0, pgscan_direct_dma32 = 0, pgscan_direct_normal = 0,
 		pgscan_direct_movable = 0, pginodesteal = 0, slabs_scanned = 0, kswapd_inodesteal = 0, kswapd_low_wmark_hit_quickly = 0, kswapd_high_wmark_hit_quickly = 0,
 		kswapd_skip_congestion_wait = 0, pageoutrun = 0, allocstall = 0, pgrotated = 0, compact_blocks_moved = 0, compact_pages_moved = 0, compact_pagemigrate_failed = 0,
@@ -5992,7 +5992,7 @@ int do_proc_vmstat() {
 	RRD_STATS *st;
 
 	// --------------------------------------------------------------------
-	
+
 	if(do_swapio) {
 		st = rrd_stats_find("system.swapio");
 		if(!st) {
@@ -6009,7 +6009,7 @@ int do_proc_vmstat() {
 	}
 
 	// --------------------------------------------------------------------
-	
+
 	if(do_io) {
 		st = rrd_stats_find("system.io");
 		if(!st) {
@@ -6026,7 +6026,7 @@ int do_proc_vmstat() {
 	}
 
 	// --------------------------------------------------------------------
-	
+
 	if(do_pgfaults) {
 		st = rrd_stats_find("system.pgfaults");
 		if(!st) {
@@ -6064,7 +6064,7 @@ void *proc_main(void *ptr)
 
 	gettimeofday(&last, NULL);
 	last.tv_sec -= update_every;
-	
+
 	// disable (by default) various interface that are not needed
 	config_get_boolean("plugin:proc:/proc/net/dev", "interface lo", 0);
 	config_get_boolean("plugin:proc:/proc/net/dev", "interface fireqos_monitor", 0);
@@ -6088,7 +6088,7 @@ void *proc_main(void *ptr)
 
 	unsigned long long usec = 0, susec = 0;
 	for(;1;) {
-		
+
 		// BEGIN -- the job to be done
 		if(!vdo_proc_net_dev)			vdo_proc_net_dev		= do_proc_net_dev(usec);
 		if(!vdo_proc_diskstats)			vdo_proc_diskstats		= do_proc_diskstats(usec);
@@ -6100,19 +6100,19 @@ void *proc_main(void *ptr)
 		if(!vdo_proc_meminfo)			vdo_proc_meminfo		= do_proc_meminfo(usec);
 		if(!vdo_proc_vmstat)			vdo_proc_vmstat			= do_proc_vmstat(usec);
 		// END -- the job is done
-		
+
 		// find the time to sleep in order to wait exactly update_every seconds
 		gettimeofday(&now, NULL);
 		usec = usecdiff(&now, &last) - susec;
 		debug(D_PROCNETDEV_LOOP, "PROCNETDEV: last loop took %llu usec (worked for %llu, sleeped for %llu).", usec + susec, usec, susec);
-		
+
 		if(usec < (update_every * 1000000ULL / 2ULL)) susec = (update_every * 1000000ULL) - usec;
 		else susec = update_every * 1000000ULL / 2ULL;
-		
+
 		// --------------------------------------------------------------------
 
 		if(!vdo_cpu_netdata && getrusage(RUSAGE_SELF, &me) == 0) {
-		
+
 			unsigned long long cpuuser = me.ru_utime.tv_sec * 1000000ULL + me.ru_utime.tv_usec;
 			unsigned long long cpusyst = me.ru_stime.tv_sec * 1000000ULL + me.ru_stime.tv_usec;
 
@@ -6128,7 +6128,7 @@ void *proc_main(void *ptr)
 			rrd_stats_dimension_set(stcpu, "user", cpuuser);
 			rrd_stats_dimension_set(stcpu, "system", cpusyst);
 			rrd_stats_done(stcpu);
-			
+
 			bcopy(&me, &me_last, sizeof(struct rusage));
 
 			// ----------------------------------------------------------------
@@ -6174,7 +6174,7 @@ void *proc_main(void *ptr)
 		}
 
 		usleep(susec);
-		
+
 		// copy current to last
 		bcopy(&now, &last, sizeof(struct timeval));
 	}
@@ -6215,7 +6215,7 @@ void tc_device_commit(struct tc_device *d)
 	static int enable_new_interfaces = -1;
 
 	if(enable_new_interfaces == -1)	enable_new_interfaces = config_get_boolean("plugin:tc", "enable new interfaces detected at runtime", 1);
-	
+
 	// we only need to add leaf classes
 	struct tc_class *c, *x;
 
@@ -6231,7 +6231,7 @@ void tc_device_commit(struct tc_device *d)
 			}
 		}
 	}
-	
+
 	// debugging:
 	/*
 	for ( c = d->classes ; c ; c = c->next) {
@@ -6271,7 +6271,7 @@ void tc_device_commit(struct tc_device *d)
 		for ( c = d->classes ; c ; c = c->next) {
 			if(c->isleaf && c->hasparent) {
 				if(rrd_stats_dimension_set(st, c->id, c->bytes) != 0) {
-					
+
 					// new class, we have to add it
 					rrd_stats_dimension_add(st, c->id, c->name, 8, 1024 * update_every, RRD_DIMENSION_INCREMENTAL);
 					rrd_stats_dimension_set(st, c->id, c->bytes);
@@ -6599,7 +6599,7 @@ void *checks_main(void *ptr)
 		loop_usec = usecdiff(&now, &last);
 		usec = loop_usec - susec;
 		debug(D_PROCNETDEV_LOOP, "CHECK: last loop took %llu usec (worked for %llu, sleeped for %llu).", loop_usec, usec, susec);
-		
+
 		if(usec < (update_every * 1000000ULL / 2ULL)) susec = (update_every * 1000000ULL) - usec;
 		else susec = update_every * 1000000ULL / 2ULL;
 
@@ -6674,7 +6674,7 @@ struct plugind {
 char *qstrsep(char **ptr)
 {
 	if(!*ptr || !**ptr) return NULL;
-	
+
 	char *s, *p = *ptr;
 
 	// skip leading spaces
@@ -6736,7 +6736,7 @@ void *pluginsd_worker_thread(void *arg)
 			else if(!strcmp(s, "SET")) {
 				char *t;
 				while((t = strchr(p, '='))) *t = ' ';
-				
+
 				char *dimension = qstrsep(&p);
 				char *value = qstrsep(&p);
 
@@ -7037,7 +7037,7 @@ void *pluginsd_main(void *ptr)
 				if(!cd) fatal("Cannot allocate memory for plugin.");
 
 				snprintf(cd->id, CONFIG_MAX_NAME, "plugin:%s", pluginname);
-				
+
 				strncpy(cd->filename, file->d_name, FILENAME_MAX);
 				snprintf(cd->fullfilename, FILENAME_MAX, "%s/%s", dir_name, cd->filename);
 
@@ -7107,7 +7107,7 @@ void kill_childs()
 		pthread_join(w->thread, NULL);
 	}
 
-	int i;	
+	int i;
 	for (i = 0; static_threads[i].name != NULL ; i++) {
 		if(static_threads[i].thread) {
 			debug(D_EXIT, "Stopping %s thread", static_threads[i].name);
@@ -7158,7 +7158,7 @@ void process_childs(int wait)
 				error("pid %d killed by signal %d.", info.si_pid, info.si_status);
 				break;
 
-			case CLD_DUMPED: 
+			case CLD_DUMPED:
 				error("pid %d core dumped by signal %d.", info.si_pid, info.si_status);
 				break;
 
@@ -7234,7 +7234,7 @@ void prepare_rundir() {
 		mkdir(rundir, 0775);
 		snprintf(rundir, FILENAME_MAX, "/run/user/%d/netdata", getpid());
 	}
-	
+
 	snprintf(pidfile, FILENAME_MAX, "%s/netdata.pid", rundir);
 
 	if(mkdir(rundir, 0775) != 0)
@@ -7332,7 +7332,7 @@ int become_daemon(int close_all_files, const char *input, const char *output, co
 			}
 		}
 	}
-	
+
 	if((dev_null = open("/dev/null", O_RDWR, 0666)) == -1) {
 		perror("Cannot open /dev/null");
 		if(input_fd != -1) close(input_fd);
@@ -7385,7 +7385,7 @@ int become_daemon(int close_all_files, const char *input, const char *output, co
 	// close all files
 	if(close_all_files) {
 		for(i = sysconf(_SC_OPEN_MAX); i > 0; i--)
-			if(   
+			if(
 				((access_fd && i != *access_fd) || !access_fd)
 				&& i != dev_null
 				&& i != input_fd
@@ -7410,7 +7410,7 @@ int become_daemon(int close_all_files, const char *input, const char *output, co
 		input_fd = -1;
 	}
 	else dup2(dev_null, STDIN_FILENO);
-	
+
 	if(output_fd != -1) {
 		if(output_fd != STDOUT_FILENO) {
 			dup2(output_fd, STDOUT_FILENO);
@@ -7557,8 +7557,8 @@ int unit_test(long delay, long shift)
 		for(rd = st->dimensions ; rd ; rd = rd->next) {
 			fprintf(stderr, "\t %s " STORAGE_NUMBER_FORMAT "   ->   ", rd->id, rd->values[c]);
 
-			if(rd == rdabs) v = 
-				(	  oincrement 
+			if(rd == rdabs) v =
+				(	  oincrement
 					+ (increment * (1000000 - shift) / 1000000)
 					+ c * increment
 				) * 10;
@@ -7768,7 +7768,7 @@ int main(int argc, char **argv)
 
 	// catch all signals
 	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV && i != SIGFPE) signal(i,  sig_handler);
-	
+
 	for (i = 0; static_threads[i].name != NULL ; i++) {
 		struct netdata_static_thread *st = &static_threads[i];
 		int doit = 1;

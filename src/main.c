@@ -74,7 +74,7 @@ int killpid(pid_t pid, int sig)
 	errno = 0;
 	if(kill(pid, 0) == -1) {
 		switch(errno) {
-			case ESRCH: 
+			case ESRCH:
 				error("Request to kill pid %d, but it is not running.", pid);
 				break;
 
@@ -89,8 +89,8 @@ int killpid(pid_t pid, int sig)
 	}
 	else {
 		errno = 0;
-		
-		void (*old)(int);		
+
+		void (*old)(int);
 		old = signal(sig, SIG_IGN);
 		if(old == SIG_ERR) {
 			error("Cannot overwrite signal handler for signal %d", sig);
@@ -104,7 +104,7 @@ int killpid(pid_t pid, int sig)
 
 		if(ret == -1) {
 			switch(errno) {
-				case ESRCH: 
+				case ESRCH:
 					error("Cannot kill pid %d, but it is not running.", pid);
 					break;
 
@@ -133,7 +133,7 @@ void kill_childs()
 		pthread_join(w->thread, NULL);
 	}
 
-	int i;	
+	int i;
 	for (i = 0; static_threads[i].name != NULL ; i++) {
 		if(static_threads[i].thread) {
 			debug(D_EXIT, "Stopping %s thread", static_threads[i].name);
@@ -357,7 +357,7 @@ int main(int argc, char **argv)
 		}
 
 		// --------------------------------------------------------------------
-		
+
 		for (i = 0; static_threads[i].name != NULL ; i++) {
 			struct netdata_static_thread *st = &static_threads[i];
 

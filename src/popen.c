@@ -112,7 +112,7 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 	fprintf(stdout, "MYPID %d\n", getpid());
 	fflush(NULL);
 #endif
-	
+
 	// reset all signals
 	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV) signal(i, SIG_DFL);
 
@@ -123,7 +123,7 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 
 void mypclose(FILE *fp, pid_t pid) {
 	debug(D_EXIT, "Request to mypclose() on pid %d", pid);
-	
+
 	/*mypopen_del(fp);*/
 	fclose(fp);
 
@@ -138,7 +138,7 @@ void mypclose(FILE *fp, pid_t pid) {
 				error("pid %d killed by signal %d.", info.si_pid, info.si_status);
 				break;
 
-			case CLD_DUMPED: 
+			case CLD_DUMPED:
 				error("pid %d core dumped by signal %d.", info.si_pid, info.si_status);
 				break;
 

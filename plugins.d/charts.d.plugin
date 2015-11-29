@@ -14,12 +14,12 @@ echo >&2 "$PROGRAM_NAME: started from '$PROGRAM_FILE' with options: $*"
 
 if [ $(( ${BASH_VERSINFO[0]} )) -lt 4 ]
 then
-	echo >&2 
+	echo >&2
 	echo >&2 "$PROGRAM_NAME: ERROR"
 	echo >&2 "BASH version 4 or later is required."
 	echo >&2 "You are running version: ${BASH_VERSION}"
 	echo >&2 "Please upgrade."
-	echo >&2 
+	echo >&2
 	exit 1
 fi
 
