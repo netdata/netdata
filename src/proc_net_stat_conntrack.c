@@ -95,7 +95,7 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
 	RRDSET *st;
 
 	// --------------------------------------------------------------------
-	
+
 	if(do_sockets) {
 		st = rrdset_find(RRD_TYPE_NET_STAT_CONNTRACK ".sockets");
 		if(!st) {

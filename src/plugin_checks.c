@@ -52,7 +52,7 @@ void *checks_main(void *ptr)
 		loop_usec = usecdiff(&now, &last);
 		usec = loop_usec - susec;
 		debug(D_PROCNETDEV_LOOP, "CHECK: last loop took %llu usec (worked for %llu, sleeped for %llu).", loop_usec, usec, susec);
-		
+
 		if(usec < (rrd_update_every * 1000000ULL / 2ULL)) susec = (rrd_update_every * 1000000ULL) - usec;
 		else susec = rrd_update_every * 1000000ULL / 2ULL;
 

@@ -168,7 +168,7 @@ function chartssort(a, b) {
 		if(a.name < b.name) return -1;
 	}
 	else if(a.priority < b.priority) return -1;
-	
+
 	return 1;
 }
 
@@ -349,7 +349,7 @@ function mainchartControlStateHandler() {
 }
 
 function initMainChartIndex(i) {
-	if(mode == MODE_GROUP_THUMBS) 
+	if(mode == MODE_GROUP_THUMBS)
 		initMainChart(groupCharts[i]);
 
 	else if(mode == MODE_THUMBS)
@@ -452,7 +452,7 @@ function setMainChartPlay(p) {
 		//	'maxZoomOut': 1,
 		//};
 		//mainchart.last_updated = 0;
-		
+
 		//if(!renderChart(mainchart, pauseGraphs))
 		pauseGraphs();
 	}
@@ -620,7 +620,7 @@ function checkRefreshThread() {
 var timeout = null;
 function renderChartCallback() {
 	last_refresh = new Date().getTime();
-	
+
 	if(!page_is_visible) {
 		timeout = setTimeout(triggerRefresh, CHARTS_CHECK_NO_FOCUS);
 		return;
@@ -954,7 +954,7 @@ function switchToGroupGraphs() {
 var groupCharts = null;
 function initGroupGraphs(group) {
 	var count = 0;
-	
+
 	if(groupCharts) clearGroupGraphs();
 	groupCharts = new Array();
 
@@ -1112,7 +1112,7 @@ function initCharts() {
 			return 1;
 		}
 		categories.sort(categoriessort);
-		
+
 		function familiessort(a, b) {
 			if(a.name < b.name) return -1;
 			return 1;

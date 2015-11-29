@@ -99,7 +99,7 @@ struct rrddim {
 													// this is a pointer to the config structure
 													// since the config always has a higher priority
 													// (the user overwrites the name of the charts)
-	
+
 	int algorithm;									// the algorithm that is applied to add new collected values
 	long multiplier;								// the multiplier of the collected values
 	long divisor;									// the divider of the collected values

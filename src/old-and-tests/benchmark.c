@@ -91,7 +91,7 @@ char *fastfile_getline(fastfile *ff) {
 
 	char *start = &ff->buffer[ff->cursor];
 	char *s = start;
-	
+
 	while(*s != '\n' && *s != '\0') s++;
 	*s = '\0';
 	ff->cursor += ( s - start + 1 );

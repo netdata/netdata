@@ -54,7 +54,7 @@ function renderChart(chart, doNext) {
 	.done(function(jsondata) {
 		if(!jsondata || jsondata.length == 0) return;
 		chart.jsondata = jsondata;
-		
+
 		// Create our data table out of JSON data loaded from server.
 		chart.datatable = new google.visualization.DataTable(chart.jsondata);
 		//console.log(chart.datatable);
@@ -75,7 +75,7 @@ function renderChart(chart, doNext) {
 			else
 				chart.chart = new google.visualization.AreaChart(document.getElementById(chart.div));
 		}
-		
+
 		if(chart.chart) {
 			chart.chart.draw(chart.datatable, chart.chartOptions);
 			chart.refreshCount++;
@@ -178,7 +178,7 @@ function calculateChartPointsToShow(c, divisor, maxtime, group, enable_curve) {
 		c.points_to_show = Math.round(data_points / group);
 		// console.log("rendering with supplied group (group = " + c.group + ", points_to_show = " + c.points_to_show + ')');
 	}
-	
+
 	// console.log("final configuration (group = " + c.group + ", points_to_show = " + c.points_to_show + ')');
 
 	// make sure the line width is not congesting the chart
@@ -200,7 +200,7 @@ function calculateChartPointsToShow(c, divisor, maxtime, group, enable_curve) {
 
 	// do not render curves when we don't have at
 	// least 2 twice the space per point
-	if(!enable_curve || c.points_to_show > (c.chartOptions.width * c.chartOptions.lineWidth / 2) ) 
+	if(!enable_curve || c.points_to_show > (c.chartOptions.width * c.chartOptions.lineWidth / 2) )
 		c.chartOptions.curveType = 'none';
 	else
 		c.chartOptions.curveType = c.default_curveType;
@@ -313,10 +313,10 @@ function loadCharts(base_url, doNext) {
 					json.charts[i].chartType = "AreaChart";
 					json.charts[i].chartOptions.isStacked = false;
 					json.charts[i].chartOptions.areaOpacity = 0.3;
-					
+
 					json.charts[i].chartOptions.vAxis.viewWindowMode = 'maximized';
 					json.charts[i].non_zero = 0;
-					
+
 					json.charts[i].group = 3;
 					break;
 
@@ -342,7 +342,7 @@ function loadCharts(base_url, doNext) {
 					json.charts[i].non_zero = 0;
 
 					json.charts[i].default_curveType = 'function';
-					
+
 					json.charts[i].group = 3;
 					break;
 			}
@@ -465,7 +465,7 @@ function loadCharts(base_url, doNext) {
 					break;
 			}
 		});
-		
+
 		if(typeof doNext == "function") doNext(json);
 	})
 	.fail(function() {
@@ -487,7 +487,7 @@ function loadCharts(base_url, doNext) {
 	 *		 only accounts for vertical position, not horizontal.
 	 */
 	$.fn.visible = function(partial){
-		
+
 	    var $t				= $(this),
 	    	$w				= $(window),
 	    	viewTop			= $w.scrollTop(),
@@ -496,7 +496,7 @@ function loadCharts(base_url, doNext) {
 	    	_bottom			= _top + $t.height(),
 	    	compareTop		= partial === true ? _bottom : _top,
 	    	compareBottom	= partial === true ? _top : _bottom;
-		
+
 		return ((compareBottom <= viewBottom) && (compareTop >= viewTop));
     };
 })(jQuery);

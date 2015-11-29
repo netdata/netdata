@@ -166,7 +166,7 @@ static void tc_device_commit(struct tc_device *d)
 	static int enable_new_interfaces = -1;
 
 	if(enable_new_interfaces == -1)	enable_new_interfaces = config_get_boolean("plugin:tc", "enable new interfaces detected at runtime", 1);
-	
+
 	// we only need to add leaf classes
 	struct tc_class *c, *x;
 
@@ -194,7 +194,7 @@ static void tc_device_commit(struct tc_device *d)
 			}
 		}
 	}
-	
+
 	// debugging:
 	/*
 	for ( c = d->classes ; c ; c = c->next) {
@@ -246,7 +246,7 @@ static void tc_device_commit(struct tc_device *d)
 
 				if(!rd) {
 					debug(D_TC_LOOP, "TC: Adding to chart '%s', dimension '%s'", st->id, c->id, c->name);
-					
+
 					// new class, we have to add it
 					rd = rrddim_add(st, c->id, c->name?c->name:c->id, 8, 1024, RRDDIM_INCREMENTAL);
 				}

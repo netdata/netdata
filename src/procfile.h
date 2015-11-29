@@ -1,6 +1,6 @@
 /*
  * procfile is a library for reading kernel files from /proc
- * 
+ *
  * The idea is this:
  *
  *  - every file is opened once with procfile_open().

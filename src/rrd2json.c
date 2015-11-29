@@ -241,7 +241,7 @@ void rrd_stats_all_json(BUFFER *wb)
 		}
 	}
 	pthread_rwlock_unlock(&rrdset_root_rwlock);
-	
+
 	buffer_sprintf(wb, "\n\t],\n"
 		"\t\"hostname\": \"%s\",\n"
 		"\t\"update_every\": %d,\n"

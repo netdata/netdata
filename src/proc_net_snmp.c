@@ -18,7 +18,7 @@
 int do_proc_net_snmp(int update_every, unsigned long long dt) {
 	static procfile *ff = NULL;
 	static int do_ip_packets = -1, do_ip_fragsout = -1, do_ip_fragsin = -1, do_ip_errors = -1,
-		do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1, 
+		do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1,
 		do_udp_packets = -1, do_udp_errors = -1;
 
 	if(do_ip_packets == -1)		do_ip_packets 		= config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 packets", 1);
@@ -87,7 +87,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 			FragOKs			= strtoull(procfile_lineword(ff, l, 17), NULL, 10);
 			FragFails		= strtoull(procfile_lineword(ff, l, 18), NULL, 10);
 			FragCreates		= strtoull(procfile_lineword(ff, l, 19), NULL, 10);
-			
+
 			// these are not counters
 			if(Forwarding) {};		// is forwarding enabled?
 			if(DefaultTTL) {};		// the default ttl on packets
@@ -222,7 +222,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 			if(MaxConn) {};
 
 			// --------------------------------------------------------------------
-			
+
 			// see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
 			if(do_tcp_sockets) {
 				st = rrdset_find(RRD_TYPE_NET_SNMP ".tcpsock");
@@ -238,7 +238,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 			}
 
 			// --------------------------------------------------------------------
-			
+
 			if(do_tcp_packets) {
 				st = rrdset_find(RRD_TYPE_NET_SNMP ".tcppackets");
 				if(!st) {
@@ -255,7 +255,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 			}
 
 			// --------------------------------------------------------------------
-			
+
 			if(do_tcp_errors) {
 				st = rrdset_find(RRD_TYPE_NET_SNMP ".tcperrors");
 				if(!st) {
@@ -273,7 +273,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 			}
 
 			// --------------------------------------------------------------------
-			
+
 			if(do_tcp_handshake) {
 				st = rrdset_find(RRD_TYPE_NET_SNMP ".tcphandshake");
 				if(!st) {
@@ -320,7 +320,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 			SndbufErrors	= strtoull(procfile_lineword(ff, l, 6), NULL, 10);
 
 			// --------------------------------------------------------------------
-			
+
 			// see http://net-snmp.sourceforge.net/docs/mibs/udp.html
 			if(do_udp_packets) {
 				st = rrdset_find(RRD_TYPE_NET_SNMP ".udppackets");
@@ -338,7 +338,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 			}
 
 			// --------------------------------------------------------------------
-			
+
 			if(do_udp_errors) {
 				st = rrdset_find(RRD_TYPE_NET_SNMP ".udperrors");
 				if(!st) {
@@ -360,7 +360,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 			}
 		}
 	}
-	
+
 	return 0;
 }
 

@@ -159,7 +159,7 @@ procfile *procfile_parser(procfile *ff) {
 	char *s = ff->data, *e = ff->data, *t = ff->data;
 	uint32_t l = 0, w = 0;
 	e += ff->len;
-	
+
 	ff->lines = pflines_add(ff->lines, w);
 	if(unlikely(!ff->lines)) goto cleanup;
 

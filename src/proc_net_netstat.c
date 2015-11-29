@@ -56,7 +56,7 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
 				InNoRoutes = 0, InTruncatedPkts = 0,
 				InOctets = 0,  InMcastPkts = 0,  InBcastPkts = 0,  InMcastOctets = 0,  InBcastOctets = 0,
 				OutOctets = 0, OutMcastPkts = 0, OutBcastPkts = 0, OutMcastOctets = 0, OutBcastOctets = 0;
-			
+
 			InNoRoutes 			= strtoull(procfile_lineword(ff, l, 1), NULL, 10);
 			InTruncatedPkts 	= strtoull(procfile_lineword(ff, l, 2), NULL, 10);
 			InMcastPkts 		= strtoull(procfile_lineword(ff, l, 3), NULL, 10);
@@ -180,6 +180,6 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
 			}
 		}
 	}
-	
+
 	return 0;
 }

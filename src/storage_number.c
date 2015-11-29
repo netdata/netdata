@@ -127,7 +127,7 @@ calculated_number unpack_storage_number(storage_number value)
 
 static char *print_calculated_number_lu_r(char *str, unsigned long uvalue) {
 	char *wstr = str;
-	
+
 	// print each digit
 	do *wstr++ = (char)(48 + (uvalue % 10)); while(uvalue /= 10);
 	return wstr;

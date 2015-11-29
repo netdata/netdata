@@ -76,7 +76,7 @@ void benchmark_storage_number(int loop, int multiplier) {
 
 	mine = (calculated_number)sizeof(storage_number) * (calculated_number)loop;
 	their = (calculated_number)sizeof(calculated_number) * (calculated_number)loop;
-	
+
 	if(mine > their) {
 		fprintf(stderr, "\nNETDATA NEEDS %0.2Lf TIMES MORE MEMORY. Sorry!\n", (long double)(mine / their));
 	}
@@ -115,7 +115,7 @@ void benchmark_storage_number(int loop, int multiplier) {
 	mine = total;
 
 	fprintf(stderr, "user %0.5Lf, system %0.5Lf, total %0.5Lf\n", (long double)(user / 1000000.0), (long double)(system / 1000000.0), (long double)(total / 1000000.0));
-	
+
 	// ------------------------------------------------------------------------
 
 	fprintf(stderr, "SYSTEM   LONG DOUBLE PRINTING: ");
@@ -313,8 +313,8 @@ int unit_test(long delay, long shift)
 		for(rd = st->dimensions ; rd ; rd = rd->next) {
 			fprintf(stderr, "\t %s " STORAGE_NUMBER_FORMAT "   ->   ", rd->id, rd->values[c]);
 
-			if(rd == rdabs) v = 
-				(	  oincrement 
+			if(rd == rdabs) v =
+				(	  oincrement
 					+ (increment * (1000000 - shift) / 1000000)
 					+ c * increment
 				) * 10;

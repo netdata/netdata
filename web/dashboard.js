@@ -140,14 +140,14 @@
 		if(typeof jQuery == 'undefined') {
 			var script = document.createElement('script');
 			script.type = 'text/javascript';
-			script.async = true;		
+			script.async = true;
 			script.src = NETDATA.jQuery;
-			
+
 			// script.onabort = onError;
 			script.onerror = function(err, t) { NETDATA.error(101, NETDATA.jQuery); };
 			if(typeof callback == "function")
 				script.onload = callback;
-			
+
 			var s = document.getElementsByTagName('script')[0];
 			s.parentNode.insertBefore(script, s);
 		}
@@ -209,7 +209,7 @@
 					NETDATA.loadCharts(targets, ++index, callback);
 				}
 				else {
-					var url = host + "/api/v1/chart?chart=" + id; 
+					var url = host + "/api/v1/chart?chart=" + id;
 
 					$.ajax( {
 						url:  url,
@@ -266,7 +266,7 @@
 			var self = $(this);
 			var lib = self.data('chart-library') || 'dygraph';
 			var method = lib + 'ChartCreate';
-			
+
 			console.log('Calling ' + method + '()');
 			NETDATA[method].apply(this, arguments);
 		})
@@ -274,7 +274,7 @@
 			var self = $(this);
 			var lib = self.data('chart-library') || 'dygraph';
 			var method = lib + 'ChartUpdate';
-			
+
 			console.log('Calling ' + method + '()');
 			NETDATA[method].apply(this, arguments);
 		});
@@ -342,7 +342,7 @@
 					// get from the 3rd column the 'v' member
 					//return item.c[3].v;
 				//});
-				
+
 				// since we downloaded the data
 				// update the last-updated time to prevent
 				// another download too soon
@@ -532,7 +532,7 @@
 		var numberDecimalMark = self.data('sparkline-numberDecimalMark') || undefined;
 		var numberDigitGroupCount = self.data('sparkline-numberDigitGroupCount') || undefined;
 		var animatedZooms = self.data('sparkline-animatedZooms') || false;
- 
+
 		var options = {
 			type: type,
 			lineColor: lineColor,
@@ -650,7 +650,7 @@
 		else
 			console.log('not updating dygraphs');
 	};
- 
+
 	NETDATA.dygraphChartCreate = function(event, data) {
 		var self = $(this);
 		var width = self.data('width') || NETDATA.chartDefaults.width;
@@ -701,7 +701,7 @@
 		var drawYGrid = self.data('dygraph-drawYGrid') || undefined;
 		var gridLinePattern = self.data('dygraph-gridLinePattern') || null;
 		var gridLineWidth = self.data('dygraph-gridLineWidth') || 0.3;
-  
+
 		var options = {
 			title: title,
 			titleHeight: titleHeight,
@@ -839,7 +839,7 @@
 		var width = self.data('width') || NETDATA.chartDefaults.width;
 		var height = self.data('height') || NETDATA.chartDefaults.height;
 		var chart = self.data('chart');
-		
+
 		self.html('<div id="morris-' + chart.id + '" style="width: ' + width + 'px; height: ' + height + 'px;"></div>');
 
 		// remove the 'time' element from the labels
@@ -902,7 +902,7 @@
 		var self = $(this);
 		var width = self.data('width') || NETDATA.chartDefaults.width;
 		var height = self.data('height') || NETDATA.chartDefaults.height;
-		
+
 		self.raphael(data, {
 			width: width,
 			height: height
@@ -913,7 +913,7 @@
 		var self = $(this);
 		var width = self.data('width') || NETDATA.chartDefaults.width;
 		var height = self.data('height') || NETDATA.chartDefaults.height;
-		
+
 		self.raphael(data, {
 			width: width,
 			height: height
@@ -954,7 +954,7 @@
 		var width = self.data('width') || NETDATA.chartDefaults.width;
 		var height = self.data('height') || NETDATA.chartDefaults.height;
 		var chart = self.data('chart');
-		
+
 		var datatable = new google.visualization.DataTable(data);
 		var gchart;
 
@@ -1051,7 +1051,7 @@
 
 	NETDATA.errorReset();
 
-	NETDATA._loadjQuery(function() {		
+	NETDATA._loadjQuery(function() {
 		NETDATA.raphaelInitialize(function() {
 			NETDATA.morrisInitialize(function() {
 				NETDATA.peityInitialize(function() {

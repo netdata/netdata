@@ -41,9 +41,9 @@ show_tc() {
 	local x="$1"
 
 	echo "BEGIN $x"
-	
+
 	$tc_cmd -s class show dev $x
-	
+
 	# check FireQOS names for classes
 	if [ ! -z "$fix_names" -a -f /var/run/fireqos/ifaces/$x ]
 	then
@@ -56,7 +56,7 @@ show_tc() {
 		do
 				setclassname $(echo $n | tr '|' ' ')
 		done
-		
+
 		echo "SETDEVICEGROUP $interface_dev"
 	fi
 	echo "END $x"

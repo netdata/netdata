@@ -13,7 +13,7 @@ declare -A mysql_cmds=() mysql_opts=() mysql_ids=()
 
 mysql_exec() {
 	local ret
-	
+
 	"${@}" -s -e "show global status;"
 	ret=$?
 

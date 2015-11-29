@@ -87,7 +87,7 @@ CHART squid.servers_requests '' "Squid Server Requests" "requests / sec" squid '
 DIMENSION server_all_requests requests incremental 1 1
 DIMENSION server_all_errors errors incremental -1 1
 EOF
-	
+
 	return 0
 }
 

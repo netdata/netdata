@@ -32,7 +32,7 @@ Here is a screenshot:
 - **extremely lightweight**
 
   It only needs a few megabytes of memory to store all its round robin database.
-  
+
   Although `netdata` does all its calculation using `long double` (128 bit) arithmetics, it stores all values using a **custom-made 32-bit number**. This custom-made number can store in 29 bits values from -167772150000000.0 to  167772150000000.0 with a precision of 0.00001 (yes, it is a floating point number, meaning that higher integer values have less decimal precision) and 3 bits for flags (2 are currently used and 1 is reserved for future use). This provides an extremely optimized memory footprint with just 0.0001% max accuracy loss (run: `./netdata --unittest` to see it in action).
 
 - **per second data collection**
@@ -112,7 +112,7 @@ Here is a screenshot:
 
 1. You run a daemon on your linux: netdata.
  This deamon is written in C and is extremely lightweight.
- 
+
  netdata:
 
   - Spawns threads to collect all the data for all sources
@@ -121,18 +121,18 @@ Here is a screenshot:
   - Is a standalone web server.
 
  For example, you can access JSON data by using:
- 
+
  ```
  http://127.0.0.1:19999/data/net.eth0
  ```
- 
+
  This will give you the JSON file for traffic on eth0.
  The above is equivalent to:
- 
+
  ```
  http://127.0.0.1:19999/data/net.eth0/3600/1/average/0/0
  ```
- 
+
  where:
 
   - 3600 is the number of entries to generate.
@@ -182,7 +182,7 @@ You can edit this file to set options. To apply the changes you made, you have t
 
 - You can stop netdata by killing it with `killall netdata`.
     You can stop and start netdata at any point. Netdata saves on exit its round robbin
-    database to `/var/cache/netdata` so that it will continue from where it stopped the last time. 
+    database to `/var/cache/netdata` so that it will continue from where it stopped the last time.
 
 To access the web site for all graphs, go to:
 

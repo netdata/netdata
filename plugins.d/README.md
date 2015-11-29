@@ -59,7 +59,7 @@ the template is:
 
  where:
   - `type.id`
-   
+
     uniquely identifies the chart,
     this is what will be needed to add values to the chart
 

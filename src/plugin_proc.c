@@ -31,7 +31,7 @@ void *proc_main(void *ptr)
 
 	gettimeofday(&last, NULL);
 	last.tv_sec -= rrd_update_every;
-	
+
 	// disable (by default) various interface that are not needed
 	config_get_boolean("plugin:proc:/proc/net/dev", "interface lo", 0);
 	config_get_boolean("plugin:proc:/proc/net/dev", "interface fireqos_monitor", 0);
@@ -57,9 +57,9 @@ void *proc_main(void *ptr)
 
 	unsigned long long usec = 0, susec = 0;
 	for(;1;) {
-		
+
 		// BEGIN -- the job to be done
-		
+
 		if(!vdo_proc_interrupts) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_interrupts().");
 			vdo_proc_interrupts = do_proc_interrupts(rrd_update_every, usec+susec);
@@ -117,15 +117,15 @@ void *proc_main(void *ptr)
 		}
 
 		// END -- the job is done
-		
+
 		// find the time to sleep in order to wait exactly update_every seconds
 		gettimeofday(&now, NULL);
 		usec = usecdiff(&now, &last) - susec;
 		debug(D_PROCNETDEV_LOOP, "PROCNETDEV: last loop took %llu usec (worked for %llu, sleeped for %llu).", usec + susec, usec, susec);
-		
+
 		if(usec < (rrd_update_every * 1000000ULL / 2ULL)) susec = (rrd_update_every * 1000000ULL) - usec;
 		else susec = rrd_update_every * 1000000ULL / 2ULL;
-		
+
 		// --------------------------------------------------------------------
 
 		if(!vdo_cpu_netdata) {
@@ -203,7 +203,7 @@ void *proc_main(void *ptr)
 		}
 
 		usleep(susec);
-		
+
 		// copy current to last
 		bcopy(&now, &last, sizeof(struct timeval));
 	}

@@ -324,7 +324,7 @@ void buffer_increase(BUFFER *b, long free_size_required)
 
 	b->buffer = realloc(b->buffer, b->size + increase + sizeof(BUFFER_OVERFLOW_EOF) + 2);
 	if(!b->buffer) fatal("Failed to increase data buffer from size %d to %d.", b->size + sizeof(BUFFER_OVERFLOW_EOF) + 2, b->size + increase + sizeof(BUFFER_OVERFLOW_EOF) + 2);
-	
+
 	b->size += increase;
 
 	buffer_overflow_init(b);

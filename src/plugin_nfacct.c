@@ -150,7 +150,7 @@ void *nfacct_main(void *ptr) {
 		gettimeofday(&now, NULL);
 		usec = usecdiff(&now, &last) - susec;
 		debug(D_NFACCT_LOOP, "nfacct.plugin: last loop took %llu usec (worked for %llu, sleeped for %llu).", usec + susec, usec, susec);
-		
+
 		if(usec < (rrd_update_every * 1000000ULL / 2ULL)) susec = (rrd_update_every * 1000000ULL) - usec;
 		else susec = rrd_update_every * 1000000ULL / 2ULL;
 
@@ -175,7 +175,7 @@ void *nfacct_main(void *ptr) {
 				if(!rd) rd = rrddim_add(st, nfacct_list->data[i].name, NULL, 1, rrd_update_every, RRDDIM_INCREMENTAL);
 				if(rd) rrddim_set_by_pointer(st, rd, nfacct_list->data[i].pkts);
 			}
-			
+
 			rrdset_done(st);
 
 			// ----------------------------------------------------------------
@@ -195,14 +195,14 @@ void *nfacct_main(void *ptr) {
 				if(!rd) rd = rrddim_add(st, nfacct_list->data[i].name, NULL, 1, 1000 * rrd_update_every, RRDDIM_INCREMENTAL);
 				if(rd) rrddim_set_by_pointer(st, rd, nfacct_list->data[i].bytes);
 			}
-			
+
 			rrdset_done(st);
 		}
 
 		// --------------------------------------------------------------------
 
 		usleep(susec);
-		
+
 		// copy current to last
 		bcopy(&now, &last, sizeof(struct timeval));
 	}

@@ -19,7 +19,7 @@
 
 /*
  * This is a library for reading kernel files from /proc
- * 
+ *
  * The idea is this:
  *
  *  - every file is opened once.
@@ -201,7 +201,7 @@ fastfile *fastfile_parser(fastfile *ff) {
 	char *s = ff->data, *e = ff->data, *t = ff->data;
 	uint32_t l = 0, w = 0;
 	e += ff->len;
-	
+
 	ff->lines = fflines_add(ff->lines, w);
 	if(!ff->lines) goto cleanup;
 

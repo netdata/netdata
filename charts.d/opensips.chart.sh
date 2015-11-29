@@ -136,7 +136,7 @@ DIMENSION shmem_free_size free absolute 1 1024
 CHART opensips.shmem_fragments '' "OpenSIPS Shared Memory Fragmentation" "fragments" opensips '' line 20019 $opensips_update_every
 DIMENSION shmem_fragments fragments absolute 1 1
 EOF
-	
+
 	return 0
 }
 

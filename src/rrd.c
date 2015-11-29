@@ -421,7 +421,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 
 	st->priority = config_get_number(st->id, "priority", priority);
 	st->enabled = enabled;
-	
+
 	st->isdetail = 0;
 	st->debug = 0;
 
@@ -557,7 +557,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 
 	rd->entries = st->entries;
 	rd->update_every = st->update_every;
-	
+
 	// prevent incremental calculation spikes
 	rd->counter = 0;
 
@@ -758,7 +758,7 @@ int rrddim_unhide(RRDSET *st, const char *id)
 collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value)
 {
 	debug(D_RRD_CALLS, "rrddim_set_by_pointer() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, st->name, rd->name, value);
-	
+
 	gettimeofday(&rd->last_collected_time, NULL);
 	rd->collected_value = value;
 	rd->updated = 1;

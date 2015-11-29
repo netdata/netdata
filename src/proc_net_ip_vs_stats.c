@@ -65,7 +65,7 @@ int do_proc_net_ip_vs_stats(int update_every, unsigned long long dt) {
 	}
 
 	// --------------------------------------------------------------------
-	
+
 	if(do_packets) {
 		st = rrdset_find(RRD_TYPE_NET_IPVS ".packets");
 		if(!st) {
@@ -82,7 +82,7 @@ int do_proc_net_ip_vs_stats(int update_every, unsigned long long dt) {
 	}
 
 	// --------------------------------------------------------------------
-	
+
 	if(do_bandwidth) {
 		st = rrdset_find(RRD_TYPE_NET_IPVS ".net");
 		if(!st) {
