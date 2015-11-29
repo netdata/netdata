@@ -802,9 +802,6 @@ static RRDR *rrdr_create(RRDSET *st, int n)
 	r->t = malloc(n * sizeof(time_t));
 	if(unlikely(!r->t)) goto cleanup;
 
-	r->t = malloc(n * sizeof(time_t));
-	if(unlikely(!r->t)) goto cleanup;
-
 	r->v = malloc(n * r->d * sizeof(calculated_number));
 	if(unlikely(!r->v)) goto cleanup;
 
