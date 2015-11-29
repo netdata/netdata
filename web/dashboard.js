@@ -86,7 +86,8 @@
 	}
 
 	NETDATA.all_url = 'all2.js';
-	NETDATA_idle_between_charts = 50;
+	NETDATA.idle_between_charts = 50;
+	NETDATA.idle_between_loops = 100;
 	NETDATA.debug = 1;
 
 	if(NETDATA.debug) console.log('welcome to NETDATA');
@@ -385,7 +386,7 @@
 			// finished, restart
 			setTimeout(function() {
 				netdataRefreshTargets(targets, 0);
-			}, 1000);
+			}, NETDATA.idle_between_loops);
 		}
 		else {
 			var self = $(target);
@@ -398,11 +399,20 @@
 					netdataDownloadChartData.call(target, function() {
 						netdataRefreshTargets(targets, ++index);
 					});
-				}, NETDATA_idle_between_charts);
+				}, NETDATA.idle_between_charts);
 			}
 		}
 	}
 
+	NETDATA.guid = function() {
+		function s4() {
+			return Math.floor((1 + Math.random()) * 0x10000)
+					.toString(16)
+					.substring(1);
+			}
+
+			return s4() + s4() + '-' + s4() + '-' + s4() + '-' + s4() + '-' + s4() + s4() + s4();
+	}
 
 	// ----------------------------------------------------------------------------------------------------------------
 	// piety
@@ -574,8 +584,13 @@
 			height: height
 		};
 
+		var uuid = NETDATA.guid();
+		this.innerHTML = '<div style="display: inline-block; position: relative;" id="' + uuid + '"></div>';
+		var div = document.getElementById(uuid);
+
 		self.sparkline(data, options);
 		self.data('sparkline-options', options)
+		.data('uuid', uuid)
 		.data('created', true);
 	};
 
@@ -757,13 +772,15 @@
 			}
 		};
 
-		self.html('<div id="dygraph-' + chart.id + '"></div>');
+		var uuid = NETDATA.guid();
+		self.html('<div id="' + uuid + '"></div>');
 
-		var dchart = new Dygraph(document.getElementById('dygraph-' + chart.id),
+		var dchart = new Dygraph(document.getElementById(uuid),
 			data.data, options);
 
 		self.data('dygraph-instance', dchart)
 		.data('dygraph-options', options)
+		.data('uuid', uuid)
 		.data('created', true);
 
 		//NETDATA.dygraphAllCharts.push(dchart);
