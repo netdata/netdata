@@ -210,6 +210,7 @@ struct web_client *web_client_free(struct web_client *w)
 
 	if(w == web_clients) web_clients = w->next;
 
+	if(w->response.header_output) buffer_free(w->response.header_output);
 	if(w->response.header) buffer_free(w->response.header);
 	if(w->response.data) buffer_free(w->response.data);
 	close(w->ifd);
