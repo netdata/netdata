@@ -421,6 +421,10 @@ uint32_t web_client_api_request_v1_data_options(char *o)
 			ret |= RRDR_OPTION_MILLISECONDS;
 		else if(!strcmp(tok, "null2zero"))
 			ret |= RRDR_OPTION_NULL2ZERO;
+		else if(!strcmp(tok, "objectrows"))
+			ret |= RRDR_OPTION_OBJECTSROWS;
+		else if(!strcmp(tok, "google_json"))
+			ret |= RRDR_OPTION_GOOGLE_JSON;
 	}
 
 	return ret;
@@ -429,10 +433,10 @@ uint32_t web_client_api_request_v1_data_options(char *o)
 int web_client_api_request_v1_data_format(char *name)
 {
 	if(!strcmp(name, "datatable"))
-		return DATASOURCE_GOOGLE_JSON;
+		return DATASOURCE_DATATABLE_JSON;
 
 	else if(!strcmp(name, "datasource"))
-		return DATASOURCE_GOOGLE_JSONP;
+		return DATASOURCE_DATATABLE_JSONP;
 
 	else if(!strcmp(name, "json"))
 		return DATASOURCE_JSON;
@@ -467,7 +471,7 @@ int web_client_api_request_v1_data_format(char *name)
 int web_client_api_request_v1_data_google_format(char *name)
 {
 	if(!strcmp(name, "json"))
-		return DATASOURCE_GOOGLE_JSONP;
+		return DATASOURCE_DATATABLE_JSONP;
 
 	else if(!strcmp(name, "html"))
 		return DATASOURCE_HTML;
@@ -674,7 +678,7 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 		error("generating outfilename header: '%s'", google_outFileName);
 	}
 
-	if(format == DATASOURCE_GOOGLE_JSONP) {
+	if(format == DATASOURCE_DATATABLE_JSONP) {
 		debug(D_WEB_CLIENT_ACCESS, "%llu: GOOGLE JSON/JSONP: version = '%s', reqId = '%s', sig = '%s', out = '%s', responseHandler = '%s', outFileName = '%s'",
 				w->id, google_version, google_reqId, google_sig, google_out, google_responseHandler, google_outFileName
 			);
@@ -686,7 +690,7 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 
 	ret = rrd2format(st, w->response.data, dimensions, format, points, after, before, group, options, &last_timestamp_in_data);
 
-	if(format == DATASOURCE_GOOGLE_JSONP) {
+	if(format == DATASOURCE_DATATABLE_JSONP) {
 		if(google_timestamp < last_timestamp_in_data)
 			buffer_strcat(w->response.data, "});");
 
@@ -817,7 +821,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	char *google_responseHandler = "google.visualization.Query.setResponse";
 	char *google_outFileName = NULL;
 	unsigned long last_timestamp_in_data = 0;
-	if(datasource_type == DATASOURCE_GOOGLE_JSON || datasource_type == DATASOURCE_GOOGLE_JSONP) {
+	if(datasource_type == DATASOURCE_DATATABLE_JSON || datasource_type == DATASOURCE_DATATABLE_JSONP) {
 
 		w->response.data->contenttype = CT_APPLICATION_X_JAVASCRIPT;
 
@@ -855,7 +859,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 			w->id, google_version, google_reqId, google_sig, google_out, google_responseHandler, google_outFileName
 			);
 
-		if(datasource_type == DATASOURCE_GOOGLE_JSONP) {
+		if(datasource_type == DATASOURCE_DATATABLE_JSONP) {
 			last_timestamp_in_data = strtoul(google_sig, NULL, 0);
 
 			// check the client wants json
@@ -868,7 +872,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 		}
 	}
 
-	if(datasource_type == DATASOURCE_GOOGLE_JSONP) {
+	if(datasource_type == DATASOURCE_DATATABLE_JSONP) {
 		buffer_sprintf(w->response.data,
 			"%s({version:'%s',reqId:'%s',status:'ok',sig:'%lu',table:",
 			google_responseHandler, google_version, google_reqId, st->last_updated.tv_sec);
@@ -877,7 +881,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group, %d group_method, %lu after, %lu before).", w->id, st->name, st->id, lines, group_count, group_method, after, before);
 	unsigned long timestamp_in_data = rrd_stats_json(datasource_type, st, w->response.data, lines, group_count, group_method, after, before, nonzero);
 
-	if(datasource_type == DATASOURCE_GOOGLE_JSONP) {
+	if(datasource_type == DATASOURCE_DATATABLE_JSONP) {
 		if(timestamp_in_data > last_timestamp_in_data)
 			buffer_strcat(w->response.data, "});");
 
@@ -966,7 +970,7 @@ void web_client_process(struct web_client *w) {
 			web_client_enable_deflate(w);
 #endif // NETDATA_WITH_ZLIB
 
-		int datasource_type = DATASOURCE_GOOGLE_JSONP;
+		int datasource_type = DATASOURCE_DATATABLE_JSONP;
 		//if(strstr(w->response.data->buffer, "X-DataSource-Auth"))
 		//	datasource_type = DATASOURCE_GOOGLE_JSON;
 

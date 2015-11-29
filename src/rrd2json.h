@@ -12,8 +12,8 @@ extern char *hostname;
 // type of JSON generations
 #define DATASOURCE_INVALID -1
 #define DATASOURCE_JSON 0
-#define DATASOURCE_GOOGLE_JSON 1
-#define DATASOURCE_GOOGLE_JSONP 2
+#define DATASOURCE_DATATABLE_JSON 1
+#define DATASOURCE_DATATABLE_JSONP 2
 #define DATASOURCE_SSV 3
 #define DATASOURCE_CSV 4
 #define DATASOURCE_JSONP 5
@@ -33,6 +33,8 @@ extern char *hostname;
 #define RRDR_OPTION_SECONDS			0x00000010 // output seconds, instead of dates
 #define RRDR_OPTION_MILLISECONDS	0x00000020 // output milliseconds, instead of dates
 #define RRDR_OPTION_NULL2ZERO		0x00000040 // do not show nulls, convert them to zeros
+#define RRDR_OPTION_OBJECTSROWS		0x00000080 // each row of values should be an object, not an array
+#define RRDR_OPTION_GOOGLE_JSON		0x00000100 // comply with google JSON/JSONP specs
 
 extern void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
 extern void rrd_stats_api_v1_charts(BUFFER *wb);

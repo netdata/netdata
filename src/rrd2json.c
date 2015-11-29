@@ -269,6 +269,9 @@ void rrd_stats_all_json(BUFFER *wb)
 typedef struct rrdresult {
 	RRDSET *st;			// the chart this result refers to
 
+	int group;				// how many collected values were grouped for each row
+	int update_every;		// what is the suggested update frequency in seconds
+
 	int d;					// the number of dimensions
 	int n;					// the number of values in the arrays
 
@@ -369,9 +372,9 @@ void rrdr_disable_not_selected_dimensions(RRDR *r, const char *dims)
 #define JSON_DATES_JS 1
 #define JSON_DATES_TIMESTAMP 2
 
-static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int google)
+static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 {
-	int annotations = 0, dates = JSON_DATES_JS;
+	int annotations = 0, dates = JSON_DATES_JS, dates_with_new = 0;
 	char kq[2] = "",					// key quote
 		sq[2] = "",						// string quote
 		pre_label[101] = "",			// before each label
@@ -386,10 +389,16 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int google)
 		data_begin[101] = "",			// between labels and values
 		finish[101] = "";				// at the end of everything
 
-	if(google) {
+	if(datatable) {
 		dates = JSON_DATES_JS;
-		kq[0] = '\0';
-		sq[0] = '\'';
+		if( options & RRDR_OPTION_GOOGLE_JSON ) {
+			kq[0] = '\0';
+			sq[0] = '\'';
+		}
+		else {
+			kq[0] = '"';
+			sq[0] = '"';
+		}
 		annotations = 1;
 		snprintf(pre_date,   100, "		{%sc%s:[{%sv%s:%s", kq, kq, kq, kq, sq);
 		snprintf(post_date,  100, "%s}", sq);
@@ -404,30 +413,42 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int google)
 		snprintf(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
 		snprintf(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
 
-		buffer_sprintf(wb, "{\n	%scols%s:\n	[\n", kq, kq);
+		buffer_sprintf(wb, "{\n	%supdate_every%s: %d,\n	%scols%s:\n	[\n", kq, kq, r->update_every, kq, kq, kq, kq);
 		buffer_sprintf(wb, "		{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
 		buffer_sprintf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotation%s}},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
 		buffer_sprintf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotationText%s}}", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
+
+		// remove the valueobjects flag
+		// google wants its own keys
+		if(options & RRDR_OPTION_OBJECTSROWS)
+			options &= ~RRDR_OPTION_OBJECTSROWS;
 	}
 	else {
+		kq[0] = '"';
+		sq[0] = '"';
 		if((options & RRDR_OPTION_SECONDS) || (options & RRDR_OPTION_MILLISECONDS)) {
 			dates = JSON_DATES_TIMESTAMP;
-			snprintf(pre_date,   100, "		[");
+			dates_with_new = 0;
 		}
 		else {
 			dates = JSON_DATES_JS;
-			snprintf(pre_date,   100, "		[new ");
+			dates_with_new = 1;
 		}
-		kq[0] = '"';
-		sq[0] = '"';
+		if( options & RRDR_OPTION_OBJECTSROWS )
+			snprintf(pre_date,   100, "		{ ");
+		else
+			snprintf(pre_date,   100, "		[ ");
 		snprintf(pre_label,  100, ", \"");
 		snprintf(post_label, 100, "\"");
 		snprintf(pre_value,  100, ", ");
-		snprintf(post_line,  100, "]");
+		if( options & RRDR_OPTION_OBJECTSROWS )
+			snprintf(post_line,  100, "}");
+		else
+			snprintf(post_line,  100, "]");
 		snprintf(data_begin, 100, "],\n	%sdata%s:\n	[\n", kq, kq);
 		snprintf(finish,     100, "\n	]\n}\n");
 
-		buffer_sprintf(wb, "{\n	%slabels%s: [", kq, kq);
+		buffer_sprintf(wb, "{\n	%supdate_every%s: %d,\n	%slabels%s: [", kq, kq, r->update_every, kq, kq);
 		buffer_sprintf(wb, "%stime%s", sq, sq);
 	}
 
@@ -487,7 +508,15 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int google)
 
 			if(likely(i != start)) buffer_strcat(wb, ",\n");
 			buffer_strcat(wb, pre_date);
+
+			if( options & RRDR_OPTION_OBJECTSROWS )
+				buffer_sprintf(wb, "%stime%s: ", kq, kq);
+
+			if(dates_with_new)
+				buffer_strcat(wb, "new ");
+
 			buffer_jsdate(wb, tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
+
 			buffer_strcat(wb, post_date);
 
 			if(annotations) {
@@ -501,9 +530,14 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int google)
 			// print the timestamp of the line
 			if(likely(i != start)) buffer_strcat(wb, ",\n");
 			buffer_strcat(wb, pre_date);
+
+			if( options & RRDR_OPTION_OBJECTSROWS )
+				buffer_sprintf(wb, "%stime%s: ", kq, kq);
+
 			buffer_rrd_value(wb, (calculated_number)r->t[i]);
 			// in ms
 			if(options & RRDR_OPTION_MILLISECONDS) buffer_strcat(wb, "000");
+
 			buffer_strcat(wb, post_date);
 		}
 
@@ -514,24 +548,23 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int google)
 
 			calculated_number n = cn[c];
 
+			buffer_strcat(wb, pre_value);
+
+			if( options & RRDR_OPTION_OBJECTSROWS )
+				buffer_sprintf(wb, "%s%s%s: ", kq, rd->name, kq);
+
 			if(co[c] & RRDR_EMPTY) {
-				buffer_strcat(wb, pre_value);
 				if(options & RRDR_OPTION_NULL2ZERO)
 					buffer_strcat(wb, "0");
 				else
 					buffer_strcat(wb, "null");
-				buffer_strcat(wb, post_value);
 			}
-			else if((options & RRDR_OPTION_ABSOLUTE)) {
-				buffer_strcat(wb, pre_value);
+			else if((options & RRDR_OPTION_ABSOLUTE))
 				buffer_rrd_value(wb, (n<0)?-n:n);
-				buffer_strcat(wb, post_value);
-			}
-			else {
-				buffer_strcat(wb, pre_value);
+			else
 				buffer_rrd_value(wb, n);
-				buffer_strcat(wb, post_value);
-			}
+
+			buffer_strcat(wb, post_value);
 		}
 
 		buffer_strcat(wb, post_line);
@@ -932,6 +965,9 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 			, st->entries
 			);
 
+	r->group = group;
+	r->update_every = group * st->update_every;
+
 	long slot = start_at_slot, counter = 0, stop_now = 0, added = 0, group_count = 0, add_this = 0;
 	for(; !stop_now ; now -= dt, slot--, counter++) {
 		if(unlikely(slot < 0)) slot = st->entries - 1;
@@ -1080,12 +1116,12 @@ int rrd2format(RRDSET *st, BUFFER *out, BUFFER *dimensions, uint32_t format, lon
 		buffer_strcat(out, "</table>\n</center>\n</html>\n");
 		break;
 
-	case DATASOURCE_GOOGLE_JSONP:
+	case DATASOURCE_DATATABLE_JSONP:
 		out->contenttype = CT_APPLICATION_X_JAVASCRIPT;
 		rrdr2json(rrdr, out, options, 1);
 		break;
 
-	case DATASOURCE_GOOGLE_JSON:
+	case DATASOURCE_DATATABLE_JSON:
 		out->contenttype = CT_APPLICATION_JSON;
 		rrdr2json(rrdr, out, options, 1);
 		break;
@@ -1118,8 +1154,8 @@ unsigned long rrd_stats_json(int type, RRDSET *st, BUFFER *wb, int points, int g
 	char kq[2] = "\"";
 	char sq[2] = "\"";
 	switch(type) {
-		case DATASOURCE_GOOGLE_JSON:
-		case DATASOURCE_GOOGLE_JSONP:
+		case DATASOURCE_DATATABLE_JSON:
+		case DATASOURCE_DATATABLE_JSONP:
 			kq[0] = '\0';
 			sq[0] = '\'';
 			break;
