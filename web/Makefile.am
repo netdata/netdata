@@ -25,4 +25,5 @@ dist_weblib_DATA = \
         lib/jquery.sparkline.min.js \
         lib/morris.min.js \
         lib/raphael-min.js \
+        lib/visible.js \
         $(NULL)

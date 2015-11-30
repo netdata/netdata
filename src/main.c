@@ -35,6 +35,17 @@
 
 #include "main.h"
 
+int netdata_exit = 0;
+
+void netdata_cleanup_and_exit(int ret)
+{
+	kill_childs();
+	rrdset_free_all();
+	//unlink("/var/run/netdata.pid");
+	info("NetData exiting. Bye bye...");
+	exit(ret);
+}
+
 struct netdata_static_thread {
 	char *name;
 
@@ -445,7 +456,17 @@ int main(int argc, char **argv)
 	}
 
 	// for future use - the main thread
-	while(1) sleep(60);
+	while(1) {
+		if(netdata_exit != 0) {
+			netdata_exit++;
+
+			if(netdata_exit > 5) {
+				netdata_cleanup_and_exit(0);
+				exit(0);
+			}
+		}
+		sleep(2);
+	}
 
 	exit(0);
 }

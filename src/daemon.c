@@ -25,19 +25,6 @@
 #include "main.h"
 #include "daemon.h"
 
-#define BACKTRACE_SIZE 4096
-
-void print_backtrace()
-{
-	void *buffer[BACKTRACE_SIZE];
-	int nptrs;
-
-	nptrs = backtrace(buffer, BACKTRACE_SIZE);
-	fprintf(stderr, "\n\nSTACK TRACE (%d addresses):\n\n", nptrs);
-	backtrace_symbols_fd(buffer, nptrs, STDERR_FILENO);
-	fprintf(stderr, "\n\n");
-}
-
 void sig_handler(int signo)
 {
 	switch(signo) {
@@ -51,7 +38,6 @@ void sig_handler(int signo)
 		case SIGXCPU:
 		case SIGXFSZ:
 			info("Death signaled exit (signal %d). Errno: %d (%s)", signo, errno, strerror(errno));
-			print_backtrace();
 			signal(signo, SIG_DFL);
 			break;
 
@@ -63,18 +49,13 @@ void sig_handler(int signo)
 		case SIGUSR1:
 		case SIGUSR2:
 			info("Signaled exit (signal %d). Errno: %d (%s)", signo, errno, strerror(errno));
-			print_backtrace();
 			signal(SIGPIPE, SIG_IGN);
 			signal(SIGTERM, SIG_IGN);
 			signal(SIGQUIT, SIG_IGN);
 			signal(SIGHUP,  SIG_IGN);
 			signal(SIGINT,  SIG_IGN);
 			signal(SIGCHLD, SIG_IGN);
-			kill_childs();
-			rrdset_free_all();
-			//unlink("/var/run/netdata.pid");
-			info("NetData exiting. Bye bye...");
-			exit(1);
+			netdata_cleanup_and_exit(1);
 			break;
 
 		case SIGPIPE:
@@ -263,7 +244,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 	// close all files
 	if(close_all_files) {
 		int i;
-		for(i = sysconf(_SC_OPEN_MAX); i > 0; i--)
+		for(i = sysconf(_SC_OPEN_MAX) - 1; i > 0; i--)
 			if(
 				((access_fd && i != *access_fd) || !access_fd)
 				&& i != dev_null

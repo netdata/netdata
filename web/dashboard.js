@@ -67,9 +67,9 @@
 	NETDATA.morris_js    = NETDATA.serverDefault + 'lib/morris.min.js';
 	NETDATA.morris_css   = NETDATA.serverDefault + 'css/morris.css';
 	NETDATA.google_js    = 'https://www.google.com/jsapi';
-	NETDATA.colors	= [ '#3366CC', '#DC3912', '#FF9900', '#109618', '#990099', '#3B3EAC', '#0099C6', '#DD4477',
-		'#66AA00', '#B82E2E', '#316395', '#994499', '#22AA99', '#AAAA11', '#6633CC', '#E67300', '#8B0707',
-		'#329262', '#5574A6', '#3B3EAC' ];
+	NETDATA.colors	= [ '#3366CC', '#DC3912', '#FF9900', '#109618', '#990099', '#3B3EAC', '#0099C6',
+						'#DD4477', '#66AA00', '#B82E2E', '#316395', '#994499', '#22AA99', '#AAAA11',
+						'#6633CC', '#E67300', '#8B0707', '#329262', '#5574A6', '#3B3EAC' ];
 
 	// ----------------------------------------------------------------------------------------------------------------
 	// the defaults for all charts
@@ -82,15 +82,23 @@
 		method: 'average',				// the grouping method
 		before: 0,						// panning
 		after: -600,					// panning
-		point_width: 1,					// the detail of the chart
+		pixels_per_point: 1,					// the detail of the chart
 	}
 
-	NETDATA.all_url = 'all2.js';
-	NETDATA.idle_between_charts = 50;
-	NETDATA.idle_between_loops = 100;
-	NETDATA.debug = 1;
+	NETDATA.options = {
+		targets: null,
+		updated_dom: 1,
+		debug: 1,
 
-	if(NETDATA.debug) console.log('welcome to NETDATA');
+		current: {
+			pixels_per_point: 1,
+			idle_between_charts: 50,
+			idle_between_loops: 100,
+			debug: 1
+		}
+	}
+
+	if(NETDATA.options.debug) console.log('welcome to NETDATA');
 
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -125,11 +133,19 @@
 		NETDATA.errorLast.datetime = 0;
 	}
 
-	NETDATA.messageInABox = function(div, width, height, message) {
-		div.innerHTML = '<table border="0"><tr><td width="' + width + '" height="' + height
-			+ '" valign="middle" align="center">'
+	NETDATA.chartContainer = function(element, width, height) {
+		self = $(element);
+		self.css('width', width)
+			.css('height', height)
+			.css('display', 'inline-block')
+			.css('overflow', 'hidden');
+	}
+
+	NETDATA.messageInABox = function(element, width, height, message) {
+		NETDATA.chartContainer(element, width, height);
+		element.innerHTML = '<div style="overflow: hidden; border: 0px; background-color: lightgrey; width: ' + width + '; height: ' + height + ';"><small>'
 			+ message
-			+ '</td></tr></table>';
+			+ '</small></div>';
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -155,58 +171,63 @@
 			callback();
 	}
 
-	NETDATA.generateDataURL = function(args) {
+	NETDATA.generateChartDataURL = function(options) {
 		// build the data URL
-		var url = args.host + args.url;
+		var url = options.host + options.url;
 		url += "&points=";
-		url += args.points.toString();
+		url += options.points.toString();
 		url += "&group=";
-		url += args.method;
+		url += options.method;
 		url += "&after=";
-		url += args.after || "0";
+		url += options.after || "0";
 		url += "&before=";
-		url += args.before || "0";
-		url += "&options=" + NETDATA.chartLibraries[args.library].options + '|';
-		url += (args.non_zero)?"nonzero":"";
-		url += "&format=" + NETDATA.chartLibraries[args.library].format;
+		url += options.before || "0";
+		url += "&options=" + NETDATA.chartLibraries[options.library].options + '|';
+		url += (options.non_zero)?"nonzero":"";
+		url += "&format=" + NETDATA.chartLibraries[options.library].format;
 
-		if(args.dimensions)
-			url += "&dimensions=" + args.dimensions;
+		if(options.dimensions)
+			url += "&dimensions=" + options.dimensions;
 
-		if(NETDATA.debug) console.log('generateDataURL(' + args + ') = ' + url );
+		if(NETDATA.options.debug) console.log('generateChartDataURL(' + options + ') = ' + url );
 		return url;
 	}
 
-	NETDATA.loadCharts = function(targets, index, callback) {
-		if(NETDATA.debug) console.log('loadCharts(<targets, ' + index + ')');
+	NETDATA.parseDomCharts = function(targets, index, callback) {
+		if(NETDATA.options.debug) console.log('parseDomCharts() working on ' + index);
 
 		var target = targets.get(index);
-
 		if(target == null) {
-			console.log('loaded all charts');
-			callback();
+			if(NETDATA.options.debug) console.log('parseDomCharts(): all ' + (index - 1) + ' charts parsed.');
+			if(typeof callback == 'function') callback();
 		}
 		else {
 			var self = $(target);
+			if(!self.data('prepared')) {
+				self.data('prepared', true);
 
-			if(!self.data('loaded')) {
 				var id = self.data('netdata');
-
 				var host = self.data('host') || NETDATA.chartDefaults.host;
 				var width = self.data('width') || NETDATA.chartDefaults.width;
 				var height = self.data('height') || NETDATA.chartDefaults.height;
 				var method = self.data('method') || NETDATA.chartDefaults.method;
 				var after = self.data('after') || NETDATA.chartDefaults.after;
 				var before = self.data('before') || NETDATA.chartDefaults.before;
-				var host = self.data('host') || NETDATA.chartDefaults.host;
 				var library = self.data('chart-library') || NETDATA.chartDefaults.library;
 				var dimensions = self.data('dimensions') || null;
 
+				NETDATA.chartContainer(target, width, height);
+				if(NETDATA.options.debug) console.log('parseDomCharts() parsing ' + id + ' of type ' + library);
+
 				if(typeof NETDATA.chartLibraries[library] == 'undefined') {
+					self.data('created', false)
+						.data('updated', 0)
+						.data('enabled', false);
+
 					NETDATA.error(402, library);
 					NETDATA.messageInABox(target, width, height, 'chart library "' + library + '" is not found');
-					self.data('enabled', false);
-					NETDATA.loadCharts(targets, ++index, callback);
+
+					NETDATA.parseDomCharts(targets, ++index, callback);
 				}
 				else {
 					var url = host + "/api/v1/chart?chart=" + id;
@@ -216,11 +237,10 @@
 						crossDomain: true
 					})
 					.done(function(chart) {
+						var pixels_per_point = self.data('point-width') || NETDATA.chartLibraries[library].pixels_per_point;
+						var points = self.data('points') || Math.round(width / pixels_per_point);
 
-						var point_width = self.data('point-width') || NETDATA.chartLibraries[library].pixels;
-						var points = self.data('points') || Math.round(width / point_width);
-
-						var url = NETDATA.generateDataURL({
+						var url = NETDATA.generateChartDataURL({
 							host: host,
 							url: chart.data_url,
 							dimensions: dimensions,
@@ -235,74 +255,77 @@
 						// done processing of this DIV
 						// store the processing result, in
 						// 'data' sections in the DIV
-						self
-							.data('chart', chart)
+						self.data('chart', chart)
 							.data('chart-url', url)
-							.data('last-updated', 0)
 							.data('update-every', chart.update_every * 1000)
-							.data('enabled', true);
+							.data('created', false)
+							.data('updated', 0)
+							.data('enabled', true)
+							.data('host', host)
+							.data('width', width)
+							.data('height', height)
+							.data('method', method)
+							.data('after', after)
+							.data('before', before)
+							.data('chart-library', library)
+							.data('dimensions', dimensions)
+							;
+						
+						NETDATA.messageInABox(target, width, height, 'chart "' + id + '" is loading...');
 					})
 					.fail(function() {
+						self.data('created', false)
+							.data('enabled', false);
+
 						NETDATA.error(404, url);
 						NETDATA.messageInABox(target, width, height, 'chart "' + id + '" not found on url "' + url + '"');
-						self.data('enabled', false);
 					})
 					.always(function() {
-						NETDATA.loadCharts(targets, ++index, callback);
+						self.data('updated', 0);
+						NETDATA.parseDomCharts(targets, ++index, callback);
 					});
 				}
 			}
 		}
 	}
 
-	function netdataParsePageCharts() {
-		if(NETDATA.debug) console.log('processing web page defined charts');
+	NETDATA.domUpdated = function(callback) {
+		NETDATA.options.updated_dom = 0;
 
-		// targets
-		// a list of all DIVs containing netdata charts
+		NETDATA.options.targets = $('div[data-netdata]') // .filter(':visible')
+			.bind('create', function(event, data) {
+				var self = $(this);
+				try {
+					NETDATA.chartLibraries[self.data('chart-library')].create(this, data);
+				}
+				catch(err) {
+					NETDATA.messageInABox(this, self.data('width'), self.data('height'), 'chart "' + id + '" failed to be created as ' + self.data('chart-library'));
+				}
+			})
+			.bind('update', function(event, data) {
+				var self = $(this);
+				try {
+					NETDATA.chartLibraries[self.data('chart-library')].update(this, data);
+				}
+				catch(err) {
+					NETDATA.messageInABox(this, self.data('width'), self.data('height'), 'chart "' + id + '" failed to be updated as ' + self.data('chart-library'));
+				}
+			});
 
-		var targets = $('div[data-netdata]')
-		.bind('create', function(event, data) {
-			var self = $(this);
-			var lib = self.data('chart-library') || 'dygraph';
-			var method = lib + 'ChartCreate';
+		if(NETDATA.options.debug)
+			console.log('DOM updated - there are ' + NETDATA.options.targets.length + ' charts on page.');
 
-			console.log('Calling ' + method + '()');
-			NETDATA[method].apply(this, arguments);
-		})
-		.bind('update', function() {
-			var self = $(this);
-			var lib = self.data('chart-library') || 'dygraph';
-			var method = lib + 'ChartUpdate';
-
-			console.log('Calling ' + method + '()');
-			NETDATA[method].apply(this, arguments);
-		});
-
-		NETDATA.loadCharts(targets, 0, function() {
-			// done processing all netdata DIVs in this page
-			// call the refresh handler
-			netdataRefreshTargets(targets, 0);
-		});
+		NETDATA.parseDomCharts(NETDATA.options.targets, 0, callback);
 	}
 
-	// ----------------------------------------------------------------------------------------------------------------
-	// Charts Libraries Registration
+	NETDATA.init = function() {
+		NETDATA.domUpdated(function() {
+			// done processing all netdata DIVs in this page
+			// call the refresh handler
 
-	NETDATA.chartLibraries = {};
-
-	NETDATA.registerChartLibrary = function(library, url, format, options, min_pixels_per_point) {
-		console.log("registering chart library: " + library);
-
-		NETDATA.chartLibraries[library] = {
-			initialized: new Date().getTime(),
-			url: url,
-			format: format,
-			options: options,
-			pixels: min_pixels_per_point
-		};
-
-		console.log(NETDATA.chartLibraries);
+			// FIXME
+			NETDATA.chartRefresher(0);
+		});
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -317,50 +340,48 @@
 	//var c = new chart();
 	//c.color();
 
-	function netdataDownloadChartData(callback) {
-		var self = $(this);
-		var last = self.data('last-updated') || 0;
+	NETDATA.chartValuesDownloader = function(element, callback) {
+		var self = $(element);
+		var last = self.data('updated') || 0;
 		var every = self.data('update-every') || 1;
 
 		// check if this chart has to be refreshed now
 		var now = new Date().getTime();
 		if(last + every > now) {
-			if(typeof callback == 'function')
-				callback();
+			console.log(self.data('netdata') + ' too soon - skipping.');
+			if(typeof callback == 'function') callback();
+		}
+		else if(!self.visible(true)) {
+			console.log(self.data('netdata') + ' is NOT visible.');
+			if(typeof callback == 'function') callback();
 		}
 		else {
-			var url = self.data('chart-url');
-
-			if(NETDATA.debug) console.log('netdataDownloadChartData(): downloading ' + url);
-
+			console.log(self.data('netdata') + ' is visible, downloading data...');
 			$.ajax( {
-				url: url,
+				url: self.data('chart-url'),
 				crossDomain: true
 			})
 			.then(function(data) {
-				//var result = $.map(data.rows, function(item) {
-					// get from the 3rd column the 'v' member
-					//return item.c[3].v;
-				//});
+				var started = new Date().getTime();
 
-				// since we downloaded the data
-				// update the last-updated time to prevent
-				// another download too soon
-				self.data('last-updated', new Date().getTime());
+				if(self.data('created')) {
+					console.log('updating ' + self.data('chart-library') + ' chart ' + self.data('netdata'));
+					self.trigger('update', [data]);
+					// NETDATA.chartLibraries[self.data('chart-library')].update(element, data);
+				}
+				else {
+					console.log('creating ' + self.data('chart-library') + ' chart ' + self.data('netdata'));
+					self.trigger('create', [data]);
+					//NETDATA.chartLibraries[self.data('chart-library')].create(element, data);
+					self.data('created', true);
+				}
 
-				// render it
-				var created = self.data('created');
-				self.trigger((created ? 'update' : 'create'), [data]).data('created', true)
-			})
-			.fail(function() {
-				console.log('failed to download chart data');
-			})
-			.always(function() {
-				var last = self.data('last-updated');
-				var now = new Date().getTime();
-				var dt = now - last;
+				var ended = new Date().getTime();
+				self.data('updated', ended);
+
+				var dt = ended - started;
+
 				self.data('refresh-dt', dt);
-
 				var element_name = self.data('dt-element-name') || null;
 				if(element_name) {
 					var element = document.getElementById(element_name) || null;
@@ -368,38 +389,46 @@
 						element.innerHTML = dt.toString();
 					}
 				}
-
-				if(typeof callback == 'function')
-					callback();
+			})
+			.fail(function() {
+				NETDATA.messageInABox(element, width, height, 'chart "' + id + '" not found on url "' + url + '"');
+			})
+			.always(function() {
+				if(typeof callback == 'function') callback();
 			});
 		}
 	};
 
-	function netdataRefreshTargets(targets, index) {
-		// if(NETDATA.debug) console.log('netdataRefreshTargets(<targets, ' + index + ')');
+	NETDATA.chartRefresher = function(index) {
+		// if(NETDATA.options.debug) console.log('NETDATA.chartRefresher(<targets, ' + index + ')');
 
-		var target = targets.get(index);
-
-		if(target == null) {
-			console.log('restart');
-
-			// finished, restart
-			setTimeout(function() {
-				netdataRefreshTargets(targets, 0);
-			}, NETDATA.idle_between_loops);
+		if(NETDATA.options.updated_dom) {
+			NETDATA.domUpdated(function() {
+				NETDATA.chartRefresher(0);
+			});
 		}
 		else {
-			var self = $(target);
+			var target = NETDATA.options.targets.get(index);
+			if(target == null) {
+				console.log('waiting to restart main loop...');
 
-			if(!self.data('enabled')) {
-				netdataRefreshTargets(targets, ++index);
+				// finished, restart
+				setTimeout(function() {
+					NETDATA.chartRefresher(0);
+				}, NETDATA.options.current.idle_between_loops);
 			}
 			else {
-				setTimeout(function() {
-					netdataDownloadChartData.call(target, function() {
-						netdataRefreshTargets(targets, ++index);
-					});
-				}, NETDATA.idle_between_charts);
+				var self = $(target);
+				if(!self.data('enabled')) {
+					NETDATA.chartRefresher(++index);
+				}
+				else {
+					setTimeout(function() {
+						NETDATA.chartValuesDownloader(target, function() {
+							NETDATA.chartRefresher(++index);
+						});
+					}, NETDATA.options.current.idle_between_charts);
+				}
 			}
 		}
 	}
@@ -421,7 +450,7 @@
 		if(typeof netdataStopPeity == 'undefined') {
 			$.getScript(NETDATA.peity_js)
 				.done(function() {
-					NETDATA.registerChartLibrary('peity', NETDATA.peity_js, 'ssvcomma', 'null2zero|flip|min2max', 2);
+					NETDATA.registerChartLibrary('peity', NETDATA.peity_js);
 				})
 				.fail(function() {
 					NETDATA.error(100, NETDATA.peity_js);
@@ -435,14 +464,14 @@
 			callback();
 	};
 
-	NETDATA.peityChartUpdate = function(event, data) {
-		var self = $(this);
+	NETDATA.peityChartUpdate = function(element, data) {
+		var self = $(element);
 		var instance = self.html(data).not('[data-created]');
 		instance.change();
 	}
 
-	NETDATA.peityChartCreate = function(event, data) {
-		var self = $(this);
+	NETDATA.peityChartCreate = function(element, data) {
+		var self = $(element);
 		var width = self.data('width') || NETDATA.chartDefaults.width;
 		var height = self.data('height') || NETDATA.chartDefaults.height;
 		var instance = self.html(data).not('[data-created]');
@@ -461,7 +490,7 @@
 		if(typeof netdataStopSparkline == 'undefined') {
 			$.getScript(NETDATA.sparkline_js)
 				.done(function() {
-					NETDATA.registerChartLibrary('sparkline', NETDATA.sparkline_js, 'array', 'flip|min2max', 2);
+					NETDATA.registerChartLibrary('sparkline', NETDATA.sparkline_js);
 				})
 				.fail(function() {
 					NETDATA.error(100, NETDATA.sparkline_js);
@@ -475,14 +504,14 @@
 			callback();
 	};
 
-	NETDATA.sparklineChartUpdate = function(event, data) {
-		var self = $(this);
+	NETDATA.sparklineChartUpdate = function(element, data) {
+		var self = $(element);
 		var options = self.data('sparkline-options');
 		self.sparkline(data, options);
 	}
 
-	NETDATA.sparklineChartCreate = function(event, data) {
-		var self = $(this);
+	NETDATA.sparklineChartCreate = function(element, data) {
+		var self = $(element);
 		var chart = self.data('chart');
 		var width = self.data('width') || NETDATA.chartDefaults.width;
 		var height = self.data('height') || NETDATA.chartDefaults.height;
@@ -585,7 +614,7 @@
 		};
 
 		var uuid = NETDATA.guid();
-		this.innerHTML = '<div style="display: inline-block; position: relative;" id="' + uuid + '"></div>';
+		element.innerHTML = '<div style="display: inline-block; position: relative;" id="' + uuid + '"></div>';
 		var div = document.getElementById(uuid);
 
 		self.sparkline(data, options);
@@ -623,7 +652,7 @@
 		if(typeof netdataStopDygraph == 'undefined') {
 			$.getScript(NETDATA.dygraph_js)
 				.done(function() {
-					NETDATA.registerChartLibrary('dygraph', NETDATA.dygraph_js, 'json', 'ms|flip', 2);
+					NETDATA.registerChartLibrary('dygraph', NETDATA.dygraph_js);
 				})
 				.fail(function() {
 					NETDATA.error(100, NETDATA.dygraph_js);
@@ -636,8 +665,8 @@
 			callback();
 	};
 
-	NETDATA.dygraphChartUpdate = function(event, data) {
-		var self = $(this);
+	NETDATA.dygraphChartUpdate = function(element, data) {
+		var self = $(element);
 		var dygraph = self.data('dygraph-instance');
 
 		if(typeof data.update_every != 'undefined')
@@ -651,8 +680,8 @@
 			console.log('not updating dygraphs');
 	};
 
-	NETDATA.dygraphChartCreate = function(event, data) {
-		var self = $(this);
+	NETDATA.dygraphChartCreate = function(element, data) {
+		var self = $(element);
 		var width = self.data('width') || NETDATA.chartDefaults.width;
 		var height = self.data('height') || NETDATA.chartDefaults.height;
 		var chart = self.data('chart');
@@ -803,7 +832,7 @@
 
 			$.getScript(NETDATA.morris_js)
 				.done(function() {
-					NETDATA.registerChartLibrary('morris', NETDATA.morris_js, 'json', 'objectrows|ms', 10);
+					NETDATA.registerChartLibrary('morris', NETDATA.morris_js);
 				})
 				.fail(function() {
 					NETDATA.error(100, NETDATA.morris_js);
@@ -817,8 +846,8 @@
 			callback();
 	};
 
-	NETDATA.morrisChartUpdate = function(event, data) {
-		var self = $(this);
+	NETDATA.morrisChartUpdate = function(element, data) {
+		var self = $(element);
 		var width = self.data('width') || NETDATA.chartDefaults.width;
 		var height = self.data('height') || NETDATA.chartDefaults.height;
 		var morris = self.data('morris-instance');
@@ -834,8 +863,8 @@
 			console.log('not updating morris');
 	};
 
-	NETDATA.morrisChartCreate = function(event, data) {
-		var self = $(this);
+	NETDATA.morrisChartCreate = function(element, data) {
+		var self = $(element);
 		var width = self.data('width') || NETDATA.chartDefaults.width;
 		var height = self.data('height') || NETDATA.chartDefaults.height;
 		var chart = self.data('chart');
@@ -884,7 +913,7 @@
 		if(typeof netdataStopRaphael == 'undefined') {
 			$.getScript(NETDATA.raphael_js)
 				.done(function() {
-					NETDATA.registerChartLibrary('raphael', NETDATA.raphael_js, 'json', 'flip|min2max', 1);
+					NETDATA.registerChartLibrary('raphael', NETDATA.raphael_js);
 				})
 				.fail(function() {
 					NETDATA.error(100, NETDATA.raphael_js);
@@ -898,8 +927,8 @@
 			callback();
 	};
 
-	NETDATA.raphaelChartUpdate = function(event, data) {
-		var self = $(this);
+	NETDATA.raphaelChartUpdate = function(element, data) {
+		var self = $(element);
 		var width = self.data('width') || NETDATA.chartDefaults.width;
 		var height = self.data('height') || NETDATA.chartDefaults.height;
 
@@ -909,8 +938,8 @@
 		})
 	};
 
-	NETDATA.raphaelChartCreate = function(event, data) {
-		var self = $(this);
+	NETDATA.raphaelChartCreate = function(element, data) {
+		var self = $(element);
 		var width = self.data('width') || NETDATA.chartDefaults.width;
 		var height = self.data('height') || NETDATA.chartDefaults.height;
 
@@ -926,7 +955,7 @@
 
 	NETDATA.googleInitialize = function(callback) {
 		if(typeof netdataStopGoogleCharts == 'undefined' && typeof google != 'undefined') {
-			NETDATA.registerChartLibrary('google', NETDATA.google_js, 'datatable', '', 3);
+			NETDATA.registerChartLibrary('google', NETDATA.google_js);
 			if(typeof callback == "function")
 				callback();
 		}
@@ -934,8 +963,8 @@
 			callback();
 	};
 
-	NETDATA.googleChartUpdate = function(event, data) {
-		var self = $(this);
+	NETDATA.googleChartUpdate = function(element, data) {
+		var self = $(element);
 		var width = self.data('width') || NETDATA.chartDefaults.width;
 		var height = self.data('height') || NETDATA.chartDefaults.height;
 		var gchart = self.data('google-instance');
@@ -949,8 +978,8 @@
 		gchart.draw(datatable, options);
 	};
 
-	NETDATA.googleChartCreate = function(event, data) {
-		var self = $(this);
+	NETDATA.googleChartCreate = function(element, data) {
+		var self = $(element);
 		var width = self.data('width') || NETDATA.chartDefaults.width;
 		var height = self.data('height') || NETDATA.chartDefaults.height;
 		var chart = self.data('chart');
@@ -1020,7 +1049,7 @@
 		switch(chart.chart_type) {
 			case "area":
 				options.vAxis.viewWindowMode = 'maximized';
-				gchart = new google.visualization.AreaChart(this);
+				gchart = new google.visualization.AreaChart(element);
 				break;
 
 			case "stacked":
@@ -1029,13 +1058,13 @@
 				options.vAxis.viewWindowMode = 'maximized';
 				options.vAxis.minValue = null;
 				options.vAxis.maxValue = null;
-				gchart = new google.visualization.AreaChart(this);
+				gchart = new google.visualization.AreaChart(element);
 				break;
 
 			default:
 			case "line":
 				options.lineWidth = 2;
-				gchart = new google.visualization.LineChart(this);
+				gchart = new google.visualization.LineChart(element);
 				break;
 		}
 
@@ -1047,25 +1076,108 @@
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
+	// Charts Libraries Registration
+
+	NETDATA.chartLibraries = {
+		"dygraph": {
+			initialize: NETDATA.dygraphInitialize,
+			create: NETDATA.dygraphChartCreate,
+			update: NETDATA.dygraphChartUpdate,
+			initialized: false,
+			enabled: true,
+			format: 'json',
+			options: 'ms|flip',
+			pixels_per_point: 2,
+			detects_dimensions_on_update: false
+		},
+		"sparkline": {
+			initialize: NETDATA.sparklineInitialize,
+			create: NETDATA.sparklineChartCreate,
+			update: NETDATA.sparklineChartUpdate,
+			initialized: false,
+			enabled: true,
+			format: 'array',
+			options: 'flip|min2max',
+			pixels_per_point: 2,
+			detects_dimensions_on_update: false
+		},
+		"peity": {
+			initialize: NETDATA.peityInitialize,
+			create: NETDATA.peityChartCreate,
+			update: NETDATA.peityChartUpdate,
+			initialized: false,
+			enabled: true,
+			format: 'ssvcomma',
+			options: 'null2zero|flip|min2max',
+			pixels_per_point: 2,
+			detects_dimensions_on_update: false
+		},
+		"morris": {
+			initialize: NETDATA.morrisInitialize,
+			create: NETDATA.morrisChartCreate,
+			update: NETDATA.morrisChartUpdate,
+			initialized: false,
+			enabled: true,
+			format: 'json',
+			options: 'objectrows|ms',
+			pixels_per_point: 10,
+			detects_dimensions_on_update: false
+		},
+		"google": {
+			initialize: NETDATA.googleInitialize,
+			create: NETDATA.googleChartCreate,
+			update: NETDATA.googleChartUpdate,
+			initialized: false,
+			enabled: true,
+			format: 'datatable',
+			options: '',
+			pixels_per_point: 2,
+			detects_dimensions_on_update: true
+		},
+		"raphael": {
+			initialize: NETDATA.raphaelInitialize,
+			create: NETDATA.raphaelChartCreate,
+			update: NETDATA.raphaelChartUpdate,
+			initialized: false,
+			enabled: true,
+			format: 'json',
+			options: '',
+			pixels_per_point: 1,
+			detects_dimensions_on_update: false
+		}
+	};
+
+	NETDATA.registerChartLibrary = function(library, url) {
+		console.log("registering chart library: " + library);
+
+		NETDATA.chartLibraries[library]
+			.url = url
+			.initialized = new Date().getTime();
+
+		console.log(NETDATA.chartLibraries);
+	}
+
+	// ----------------------------------------------------------------------------------------------------------------
 	// load all libraries and initialize
 
 	NETDATA.errorReset();
 
 	NETDATA._loadjQuery(function() {
-		NETDATA.raphaelInitialize(function() {
-			NETDATA.morrisInitialize(function() {
-				NETDATA.peityInitialize(function() {
-					NETDATA.sparklineInitialize(function() {
-						NETDATA.dygraphInitialize(function() {
-							NETDATA.googleInitialize(function() {
-								netdataParsePageCharts();
-							}) // google
-						}) // dygraph.js
-					}) // sparkline.js
-				}) // piety.js
-			}) // morris.js
-		}) // raphael.js
+		$.getScript(NETDATA.serverDefault + 'lib/visible.js').then(function() {
+			NETDATA.raphaelInitialize(function() {
+				NETDATA.morrisInitialize(function() {
+					NETDATA.peityInitialize(function() {
+						NETDATA.sparklineInitialize(function() {
+							NETDATA.dygraphInitialize(function() {
+								NETDATA.googleInitialize(function() {
+									NETDATA.init();
+								}) // google
+							}) // dygraph.js
+						}) // sparkline.js
+					}) // piety.js
+				}) // morris.js
+			}) // raphael.js
+		})
 	});
 
 })(window);
-

@@ -19,7 +19,7 @@ This is a template for building custom dashboards. To build a dashboard you just
 		data-width="600"
 		data-height="200"
 		data-after="-600"
-		&lt;/div>
+		>&lt;/div>
 &lt;/body>
 &lt;script type="text/javascript" src="http://netdata.server:19999/dashboard.js"></script>
 &lt;/html>
@@ -47,15 +47,15 @@ This is a template for building custom dashboards. To build a dashboard you just
 		System CPU - Stacked Area Chart
 		</th>
 	</tr>
-	<tr><td colspan="3" align="center">&nbsp;</td></tr>
-	<tr><th colspan="3" align="center"><hr>Peity Charts</th></tr>
-	<tr><td colspan="3" align="center">
+	<tr><td colspan="3">&nbsp;</td></tr>
+	<tr><th colspan="3"><hr>Peity Charts</th></tr>
+	<tr><td colspan="3">
 		Peity charts do not support 'NULL' values, so the charts cannot indicate that values are missing.
 		Peity charts cannot have multiple dimensions on the charts - so netdata will use 'min2max' to show
 		the total of all dimensions.
 		</td></tr>
 	<tr>
-		<td width="600" align="center">
+		<td width="600">
 			<div data-netdata="system.processes"
 				data-chart-library="peity"
 				data-width="600"
@@ -64,7 +64,7 @@ This is a template for building custom dashboards. To build a dashboard you just
 				data-dt-element-name="time11"
 				</div>
 		</td>
-		<td width="600" align="center">
+		<td width="600">
 			<div data-netdata="system.ipv4"
 				data-chart-library="peity"
 				data-width="600"
@@ -73,7 +73,7 @@ This is a template for building custom dashboards. To build a dashboard you just
 				data-dt-element-name="time12"
 				</div>
 		</td>
-		<td width="600" align="center">
+		<td width="600">
 			<div data-netdata="system.cpu"
 				data-chart-library="peity"
 				data-width="600"
@@ -88,67 +88,64 @@ This is a template for building custom dashboards. To build a dashboard you just
 		<td>rendered in <span id="time12">X</span> ms</td>
 		<td>rendered in <span id="time13">X</span> ms</td>
 	</tr>
-	<tr><td colspan="3" align="center">&nbsp;</td></tr>
-	<tr><th colspan="3" align="center"><hr>Sparkline Charts</th></tr>
-	<tr><td colspan="3" align="center">
+	<tr><td colspan="3">&nbsp;</td></tr>
+	<tr><th colspan="3"><hr>Sparkline Charts</th></tr>
+	<tr><td colspan="3">
 		Sparkline charts support 'NULL' values, so the charts can indicate that values are missing.
 		Sparkline charts stretch the values to show the variations between values in more detail.
 		They also have mouse-hover support.
 		<br/>
 		Sparklines are fantastic. You can inline charts in text. For example this
-			<div 	style="display: inline; position: relative;"
-					data-netdata="system.cpu"
+			<div	data-netdata="system.cpu"
 					data-chart-library="sparkline"
 					data-width="60"
-					data-height="15"
+					data-height="20"
 					data-after="-30"
-					</div> is my current cpu usage,
+					></div> is my current cpu usage,
 			<br/>
 			while this
-			<div 	style="display: inline; position: relative;"
-					data-netdata="netdata.net"
+			<div	data-netdata="netdata.net"
 					data-dimensions="out"
 					data-chart-library="sparkline"
 					data-width="60"
-					data-height="15"
+					data-height="20"
 					data-after="-30"
-					</div> is the bandwidth my netdata server is currently transmitting and this
+					></div> is the bandwidth my netdata server is currently transmitting and this
 
-			<div 	style="display: inline; position: relative;"
-					data-netdata="netdata.requests"
+			<div	data-netdata="netdata.requests"
 					data-chart-library="sparkline"
-					data-width="60"
-					data-height="15"
-					data-after="-30"
-					</div> is the requests/sec it serves.
+					data-width="360"
+					data-height="20"
+					data-after="-180"
+					></div> is the requests/sec it serves.
 		</td></tr>
 	<tr>
-		<td width="600" align="center">
+		<td width="600">
 			<div data-netdata="system.processes"
 				data-chart-library="sparkline"
 				data-width="600"
 				data-height="30"
 				data-after="-600"
 				data-dt-element-name="time21"
-				</div>
+				></div>
 		</td>
-		<td width="600" align="center">
+		<td width="600">
 			<div data-netdata="system.ipv4"
 				data-chart-library="sparkline"
 				data-width="600"
 				data-height="30"
 				data-after="-600"
 				data-dt-element-name="time22"
-				</div>
+				></div>
 		</td>
-		<td width="600" align="center">
+		<td width="600">
 			<div data-netdata="system.cpu"
 				data-chart-library="sparkline"
 				data-width="600"
 				data-height="30"
 				data-after="-600"
 				data-dt-element-name="time23"
-				</div>
+				></div>
 		</td>
 	</tr>
 	<tr>
@@ -156,40 +153,40 @@ This is a template for building custom dashboards. To build a dashboard you just
 		<td>rendered in <span id="time22">X</span> ms</td>
 		<td>rendered in <span id="time23">X</span> ms</td>
 	</tr>
-	<tr><td colspan="3" align="center">&nbsp;</td></tr>
-	<tr><th colspan="3" align="center"><hr>Dygraph Charts</th></tr>
-	<tr><td colspan="3" align="center">
+	<tr><td colspan="3">&nbsp;</td></tr>
+	<tr><th colspan="3"><hr>Dygraph Charts</th></tr>
+	<tr><td colspan="3">
 		The fastest charting engine that can chart complete charts (not just sparklines).
 		The charts are zoomable (drag their contents to zoom-in, double click to zoom-out).
 		For the moment zooming is just on the presentation layer (the data do not become more detailed when you zoom).
 		</td></tr>
 	<tr>
-		<td width="600" align="center">
+		<td width="600">
 			<div data-netdata="system.processes"
 				data-chart-library="dygraph"
 				data-width="600"
 				data-height="200"
 				data-after="-600"
 				data-dt-element-name="time31"
-				</div>
+				></div>
 		</td>
-		<td width="600" align="center">
+		<td width="600">
 			<div data-netdata="system.ipv4"
 				data-chart-library="dygraph"
 				data-width="600"
 				data-height="200"
 				data-after="-600"
 				data-dt-element-name="time32"
-				</div>
+				></div>
 		</td>
-		<td width="600" align="center">
+		<td width="600">
 			<div data-netdata="system.cpu"
 				data-chart-library="dygraph"
 				data-width="600"
 				data-height="200"
 				data-after="-600"
 				data-dt-element-name="time33"
-				</div>
+				></div>
 		</td>
 	</tr>
 	<tr>
@@ -197,39 +194,39 @@ This is a template for building custom dashboards. To build a dashboard you just
 		<td>rendered in <span id="time32">X</span> ms</td>
 		<td>rendered in <span id="time33">X</span> ms</td>
 	</tr>
-	<tr><td colspan="3" align="center">&nbsp;</td></tr>
-	<tr><th colspan="3" align="center"><hr>Google Charts</th></tr>
-	<tr><td colspan="3" align="center">
+	<tr><td colspan="3">&nbsp;</td></tr>
+	<tr><th colspan="3"><hr>Google Charts</th></tr>
+	<tr><td colspan="3">
 		NetData was originaly developed with Google Charts.
 		NetData is a complete Google Visualization API provider.
 		</td></tr>
 	<tr>
-		<td width="600" align="center">
+		<td width="600">
 			<div data-netdata="system.processes"
 				data-chart-library="google"
 				data-width="600"
 				data-height="200"
 				data-after="-600"
 				data-dt-element-name="time51"
-				</div>
+				></div>
 		</td>
-		<td width="600" align="center">
+		<td width="600">
 			<div data-netdata="system.ipv4"
 				data-chart-library="google"
 				data-width="600"
 				data-height="200"
 				data-after="-600"
 				data-dt-element-name="time52"
-				</div>
+				></div>
 		</td>
-		<td width="600" align="center">
+		<td width="600">
 			<div data-netdata="system.cpu"
 				data-chart-library="google"
 				data-width="600"
 				data-height="200"
 				data-after="-600"
 				data-dt-element-name="time53"
-				</div>
+				></div>
 		</td>
 	</tr>
 	<tr>
@@ -237,39 +234,39 @@ This is a template for building custom dashboards. To build a dashboard you just
 		<td>rendered in <span id="time52">X</span> ms</td>
 		<td>rendered in <span id="time53">X</span> ms</td>
 	</tr>
-	<tr><td colspan="3" align="center">&nbsp;</td></tr>
-	<tr><th colspan="3" align="center"><hr>Morris Charts</th></tr>
-	<tr><td colspan="3" align="center">
+	<tr><td colspan="3">&nbsp;</td></tr>
+	<tr><th colspan="3"><hr>Morris Charts</th></tr>
+	<tr><td colspan="3">
 		Unfortunatelly, Morris Charts are veeeeeeeeeeeeeeeery slow! We force them to lower their detail to get acceptable results.
 		And they have issues with negative numbers in area charts...
 		</td></tr>
 	<tr>
-		<td width="600" align="center">
+		<td width="600">
 			<div data-netdata="system.processes"
 				data-chart-library="morris"
 				data-width="600"
 				data-height="200"
 				data-after="-600"
 				data-dt-element-name="time41"
-				</div>
+				></div>
 		</td>
-		<td width="600" align="center">
+		<td width="600">
 			<div data-netdata="system.ipv4"
 				data-chart-library="morris"
 				data-width="600"
 				data-height="200"
 				data-after="-600"
 				data-dt-element-name="time42"
-				</div>
+				></div>
 		</td>
-		<td width="600" align="center">
+		<td width="600">
 			<div data-netdata="system.cpu"
 				data-chart-library="morris"
 				data-width="600"
 				data-height="200"
 				data-after="-600"
 				data-dt-element-name="time43"
-				</div>
+				></div>
 		</td>
 	</tr>
 	<tr>

@@ -34,6 +34,8 @@
 int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
 int web_enable_gzip = 1;
 
+extern int netdata_exit;
+
 struct web_client *web_clients = NULL;
 unsigned long long web_clients_count = 0;
 
@@ -975,7 +977,7 @@ void web_client_process(struct web_client *w) {
 		//if(strstr(w->response.data->buffer, "X-DataSource-Auth"))
 		//	datasource_type = DATASOURCE_GOOGLE_JSON;
 
-		char *buf = w->response.data->buffer;
+		char *buf = (char *)buffer_tostring(w->response.data);
 		char *tok = strsep(&buf, " \r\n");
 		char *url = NULL;
 		char *pointer_to_free = NULL; // keep url_decode() allocated buffer
@@ -1007,6 +1009,15 @@ void web_client_process(struct web_client *w) {
 				datasource_type = DATASOURCE_JSON;
 				code = web_client_api_request(w, url);
 			}
+#ifdef WEB_EXIT
+			else if(strcmp(tok, "exit") == 0) {
+				netdata_exit = 1;
+				code = 200;
+				w->response.data->contenttype = CT_TEXT_PLAIN;
+				buffer_flush(w->response.data);
+				buffer_strcat(w->response.data, "will do");
+			}
+#endif
 			else if(strcmp(tok, WEB_PATH_DATA) == 0) { // "data"
 				// the client is requesting rrd data
 				datasource_type = DATASOURCE_JSON;
