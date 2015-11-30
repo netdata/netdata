@@ -274,6 +274,7 @@ typedef struct rrdresult {
 
 	int d;					// the number of dimensions
 	int n;					// the number of values in the arrays
+	int rows;			// the number of rows used
 
 	uint8_t *od;			// the options for the dimensions
 
@@ -286,7 +287,7 @@ typedef struct rrdresult {
 	int has_st_lock;		// if st is read locked by us
 } RRDR;
 
-#define rrdr_rows(r) ((r)->c + 1)
+#define rrdr_rows(r) ((r)->rows)
 
 /*
 static void rrdr_dump(RRDR *r)
@@ -307,15 +308,15 @@ static void rrdr_dump(RRDR *r)
 				);
 	}
 
-	if(r->c < 0) {
+	if(r->rows <= 0) {
 		fprintf(stderr, "RRDR does not have any values in it.\n");
 		return;
 	}
 
-	fprintf(stderr, "RRDR includes %d values in it:\n", r->c + 1);
+	fprintf(stderr, "RRDR includes %d values in it:\n", r->rows);
 
 	// for each line in the array
-	for(i = 0; i <= r->c ;i++) {
+	for(i = 0; i < r->rows ;i++) {
 		calculated_number *cn = &r->v[ i * r->d ];
 		uint8_t *co = &r->o[ i * r->d ];
 
@@ -374,7 +375,7 @@ void rrdr_disable_not_selected_dimensions(RRDR *r, const char *dims)
 
 static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 {
-	int annotations = 0, dates = JSON_DATES_JS, dates_with_new = 0;
+	int row_annotations = 0, dates = JSON_DATES_JS, dates_with_new = 0;
 	char kq[2] = "",					// key quote
 		sq[2] = "",						// string quote
 		pre_label[101] = "",			// before each label
@@ -399,7 +400,7 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 			kq[0] = '"';
 			sq[0] = '"';
 		}
-		annotations = 1;
+		row_annotations = 1;
 		snprintf(pre_date,   100, "		{%sc%s:[{%sv%s:%s", kq, kq, kq, kq, sq);
 		snprintf(post_date,  100, "%s}", sq);
 		snprintf(pre_label,  100, ",\n		{%sid%s:%s%s,%slabel%s:%s", kq, kq, sq, sq, kq, kq, sq);
@@ -458,7 +459,7 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 	long c, i;
 	RRDDIM *rd;
 
-	// print the csv header
+	// print the header lines
 	for(c = 0, i = 0, rd = r->st->dimensions; rd ;c++, rd = rd->next) {
 		if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
 		if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
@@ -519,10 +520,17 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 
 			buffer_strcat(wb, post_date);
 
-			if(annotations) {
-				if(co[c] & RRDR_RESET)
-					buffer_strcat(wb, overflow_annotation);
-				else
+			if(row_annotations) {
+				// google supports one annotation per row
+				int annotation_found = 0;
+				for(c = 0, rd = r->st->dimensions; rd ;c++, rd = rd->next) {
+					if(co[c] & RRDR_RESET) {
+						buffer_strcat(wb, overflow_annotation);
+						annotation_found = 1;
+						break;
+					}
+				}
+				if(!annotation_found)
 					buffer_strcat(wb, normal_annotation);
 			}
 		}
@@ -733,9 +741,10 @@ inline static uint8_t *rrdr_line_options(RRDR *r)
 inline static int rrdr_line_init(RRDR *r, time_t t)
 {
 	r->c++;
+
 	if(unlikely(r->c >= r->n)) {
+		error("requested to step above RRDR size for chart %s", r->st->name);
 		r->c = r->n - 1;
-		return 0;
 	}
 
 	// save the time
@@ -781,6 +790,12 @@ inline static void rrdr_free(RRDR *r)
 	free(r);
 }
 
+inline void rrdr_done(RRDR *r)
+{
+	r->rows = r->c + 1;
+	r->c = 0;
+}
+
 static RRDR *rrdr_create(RRDSET *st, int n)
 {
 	if(unlikely(!st)) {
@@ -799,19 +814,21 @@ static RRDR *rrdr_create(RRDSET *st, int n)
 	for(rd = st->dimensions ; rd ; rd = rd->next) r->d++;
 
 	r->n = n;
-	r->t = malloc(n * sizeof(time_t));
+
+	r->t = calloc(n, sizeof(time_t));
 	if(unlikely(!r->t)) goto cleanup;
 
-	r->v = malloc(n * r->d * sizeof(calculated_number));
+	r->v = calloc(n * r->d, sizeof(calculated_number));
 	if(unlikely(!r->v)) goto cleanup;
 
-	r->o = malloc(n * r->d * sizeof(uint8_t));
+	r->o = calloc(n * r->d, sizeof(uint8_t));
 	if(unlikely(!r->o)) goto cleanup;
 
 	r->od = calloc(r->d, sizeof(uint8_t));
 	if(unlikely(!r->od)) goto cleanup;
 
 	r->c = -1;
+	r->rows = 0;
 
 	return r;
 
@@ -1063,6 +1080,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 		}
 	}
 
+	rrdr_done(r);
 	return r;
 }
 
