@@ -14,6 +14,7 @@
 #include "rrd.h"
 #include "popen.h"
 #include "plugin_tc.h"
+#include "main.h"
 
 #define RRD_TYPE_TC					"tc"
 #define RRD_TYPE_TC_LEN				strlen(RRD_TYPE_TC)
@@ -61,8 +62,13 @@ struct tc_device {
 	avl_tree classes_index;
 
 	struct tc_class *classes;
+
+	struct tc_device *next;
+	struct tc_device *prev;
 };
 
+
+struct tc_device *tc_device_root = NULL;
 
 // ----------------------------------------------------------------------------
 // tc_device index
@@ -124,7 +130,10 @@ static void tc_class_free(struct tc_device *n, struct tc_class *c) {
 
 	if(c->next) c->next->prev = c->prev;
 	if(c->prev) c->prev->next = c->next;
-	if(n->classes == c) n->classes = c->next;
+	if(n->classes == c) {
+		if(c->next) n->classes = c->next;
+		else n->classes = c->prev;
+	}
 
 	tc_class_index_del(n, c);
 
@@ -327,6 +336,15 @@ static struct tc_device *tc_device_create(char *id)
 		pthread_rwlock_init(&d->classes_index.rwlock, NULL);
 
 		tc_device_index_add(d);
+
+		if(!tc_device_root) {
+			tc_device_root = d;
+		}
+		else {
+			d->next = tc_device_root;
+			tc_device_root->prev = d;
+			tc_device_root = d;
+		}
 	}
 
 	return(d);
@@ -373,9 +391,16 @@ static struct tc_class *tc_class_add(struct tc_device *n, char *id, char *parent
 
 	return(c);
 }
-/*
+
 static void tc_device_free(struct tc_device *n)
 {
+	if(n->next) n->next->prev = n->prev;
+	if(n->prev) n->prev->next = n->next;
+	if(tc_device_root == n) {
+		if(n->next) tc_device_root = n->next;
+		else tc_device_root = n->prev;
+	}
+
 	tc_device_index_del(n);
 
 	while(n->classes) tc_class_free(n, n->classes);
@@ -386,7 +411,12 @@ static void tc_device_free(struct tc_device *n)
 
 	free(n);
 }
-*/
+
+static void tc_device_free_all()
+{
+	while(tc_device_root)
+		tc_device_free(tc_device_root);
+}
 
 #define MAX_WORDS 20
 
@@ -485,6 +515,8 @@ void *tc_main(void *ptr)
 		}
 
 		while(fgets(buffer, TC_LINE_MAX, fp) != NULL) {
+			if(netdata_exit) break;
+
 			buffer[TC_LINE_MAX] = '\0';
 			// debug(D_TC_LOOP, "TC: read '%s'", buffer);
 
@@ -626,6 +658,11 @@ void *tc_main(void *ptr)
 			// tc_device_free(device);
 			device = NULL;
 			class = NULL;
+		}
+
+		if(netdata_exit) {
+			tc_device_free_all();
+			return NULL;
 		}
 
 		sleep(rrd_update_every);
