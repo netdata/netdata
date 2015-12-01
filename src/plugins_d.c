@@ -139,6 +139,8 @@ void *pluginsd_worker_thread(void *arg)
 		uint32_t hash;
 
 		while(likely(fgets(line, PLUGINSD_LINE_MAX, fp) != NULL)) {
+			if(netdata_exit) break;
+
 			line[PLUGINSD_LINE_MAX] = '\0';
 
 			// debug(D_PLUGINSD, "PLUGINSD: %s: %s", cd->filename, line);
@@ -384,13 +386,18 @@ void *pluginsd_worker_thread(void *arg)
 
 		// fgets() failed or loop broke
 		mypclose(fp, cd->pid);
+		cd->pid = 0;
+
+		if(netdata_exit) {
+			cd->enabled = 0;
+			cd->obsolete = 1;
+			return NULL;
+		}
 
 		if(unlikely(!count && cd->enabled)) {
 			error("PLUGINSD: '%s' (pid %d) does not generate usefull output. Waiting a bit before starting it again.", cd->fullfilename, cd->pid);
 			sleep(cd->update_every * 10);
 		}
-
-		cd->pid = 0;
 
 		if(likely(cd->enabled)) sleep(cd->update_every);
 		else break;
@@ -425,6 +432,8 @@ void *pluginsd_main(void *ptr)
 	if(scan_frequency < 1) scan_frequency = 1;
 
 	while(likely(1)) {
+		if(netdata_exit) break;
+
 		dir = opendir(dir_name);
 		if(unlikely(!dir)) {
 			error("Cannot open directory '%s'.", dir_name);
@@ -432,6 +441,8 @@ void *pluginsd_main(void *ptr)
 		}
 
 		while(likely((file = readdir(dir)))) {
+			if(netdata_exit) break;
+
 			debug(D_PLUGINSD, "PLUGINSD: Examining file '%s'", file->d_name);
 
 			if(unlikely(strcmp(file->d_name, ".") == 0 || strcmp(file->d_name, "..") == 0)) continue;
