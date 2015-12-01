@@ -391,7 +391,7 @@
 				}
 			})
 			.fail(function() {
-				NETDATA.messageInABox(element, width, height, 'chart "' + id + '" not found on url "' + url + '"');
+				NETDATA.messageInABox(element, self.data('width'), self.data('height'), 'cannot download chart "' + self.data('netdata') + '" values from url "' + self.data('chart-url') + '"');
 			})
 			.always(function() {
 				if(typeof callback == 'function') callback();
