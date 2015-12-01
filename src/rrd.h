@@ -21,8 +21,8 @@ extern int rrd_delete_unupdated_dimensions;
 
 #define RRD_ID_LENGTH_MAX 1024
 
-#define RRDSET_MAGIC		"NETDATA RRD SET FILE V013"
-#define RRDDIMENSION_MAGIC	"NETDATA RRD DIMENSION FILE V015"
+#define RRDSET_MAGIC		"NETDATA RRD SET FILE V016"
+#define RRDDIMENSION_MAGIC	"NETDATA RRD DIMENSION FILE V016"
 
 typedef long long total_number;
 #define TOTAL_NUMBER_FORMAT "%lld"
