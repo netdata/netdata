@@ -851,8 +851,11 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	}
 
 	// allow relative for before and after
-	if(before <= st->update_every * st->entries) before = last_entry_t + before;
-	if(after <= st->update_every * st->entries) after = last_entry_t + after;
+	if(before <= st->update_every * st->entries)
+		before = last_entry_t + before;
+
+	if(after <= st->update_every * st->entries)
+		after = last_entry_t + after;
 
 	// make sure they are within our timeframe
 	if(before > last_entry_t) before = last_entry_t;
@@ -872,16 +875,39 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	time_t duration = before - after;
 	if(duration <= 0) return NULL;
 
-	// check the required points
-	if(points > duration / st->update_every) points = 0;
-	if(points <= 0) points = duration / st->update_every;
+	// how many points does the chart has?
+	long available_points = duration / st->update_every;
+
+	// check the wanted points
+	if(points < 0) points = -points;
+	if(points > available_points) points = available_points;
 
 	// calculate proper grouping of source data
-	long group = duration / points;
+	long group = available_points / points;
 	if(group <= 0) group = 1;
-	if(duration / group > points) group++;
 
-	// error("NEW: points=%d after=%d before=%d group=%d, duration=%d", points, after, before, group, duration);
+	// round group to the closest integer
+	if(available_points % points > points / 2) group++;
+
+	// find the starting and ending slots in our round robin db
+	long    start_at_slot = rrdset_time2slot(st, before),
+			stop_at_slot = rrdset_time2slot(st, after);
+
+	// align them, so that panning on the data
+	// will always produce the same results
+	start_at_slot -= start_at_slot % group;
+	stop_at_slot -= stop_at_slot % group;
+
+	time_t after_new = rrdset_slot2time(st, stop_at_slot);
+	time_t before_new = rrdset_slot2time(st, start_at_slot);
+	long points_new = (before_new - after_new) / st->update_every / group;
+
+	//error("SHIFT: %s: wanted %ld points, got %ld - group=%ld, wanted duration=%u, got %u - wanted %ld - %ld, got %ld - %ld", st->id, points, points_new, group, before - after, before_new - after_new, after, before, after_new, before_new);
+
+	after = after_new;
+	before = before_new;
+	duration = before - after;
+	points = points_new;
 
 	// Now we have:
 	// before = the end time of the calculation
@@ -945,28 +971,9 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	// -------------------------------------------------------------------------
 	// the main loop
 
-	long 	start_at_slot = rrdset_time2slot(st, before), // rrdset_last_slot(st),
-			stop_at_slot = rrdset_time2slot(st, after);
-
 	time_t 	now = rrdset_slot2time(st, start_at_slot),
 			dt = st->update_every,
 			group_start_t = 0;
-
-	if(unlikely(debug)) debug(D_RRD_STATS, "INFO  %s after_t: %lu (stop_at_t: %ld), before_t: %lu (start_at_t: %ld), start_t(now): %lu, current_entry: %ld, entries: %ld"
-			, st->id
-			, after
-			, stop_at_slot
-			, before
-			, start_at_slot
-			, now
-			, st->current_entry
-			, st->entries
-			);
-
-	// align to group for proper panning of data
-	start_at_slot -= start_at_slot % group;
-	stop_at_slot -= stop_at_slot % group;
-	now = rrdset_slot2time(st, start_at_slot);
 
 	if(unlikely(debug)) debug(D_RRD_STATS, "BEGIN %s after_t: %lu (stop_at_t: %ld), before_t: %lu (start_at_t: %ld), start_t(now): %lu, current_entry: %ld, entries: %ld"
 			, st->id
@@ -1081,6 +1088,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	}
 
 	rrdr_done(r);
+	//error("SHIFT: %s: wanted %ld points, got %ld", st->id, points, rrdr_rows(r));
 	return r;
 }
 
