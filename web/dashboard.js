@@ -112,6 +112,7 @@
 		100: { message: "Cannot load chart library", alert: true },
 		101: { message: "Cannot load jQuery", alert: true },
 		402: { message: "Chart library not found", alert: false },
+		403: { message: "Chart library not enabled/is failed", alert: false },
 		404: { message: "Chart not found", alert: false }
 	};
 	NETDATA.errorLast = {
@@ -246,6 +247,17 @@
 					NETDATA.messageInABox(target, 'chart library "' + library + '" is not found');
 					NETDATA.validateDomCharts(targets, ++index, callback);
 				}
+				else if(!NETDATA.chartLibraries[library].enabled) {
+					NETDATA.error(403, library);
+					NETDATA.messageInABox(target, 'chart library "' + library + '" is not enabled');
+					NETDATA.validateDomCharts(targets, ++index, callback);
+				}
+				else if(!NETDATA.chartLibraries[library].initialized) {
+					self.data('prepared', false);
+					NETDATA.chartLibraries[library].initialize(function() {
+						NETDATA.validateDomCharts(targets, index, callback);
+					});
+				}
 				else {
 					var url = host + "/api/v1/chart?chart=" + id;
 
@@ -268,6 +280,9 @@
 						NETDATA.validateDomCharts(targets, ++index, callback);
 					});
 				}
+			}
+			else {
+				NETDATA.validateDomCharts(targets, ++index, callback);
 			}
 		}
 	}
@@ -494,8 +509,11 @@
 						callback();
 				})
 		}
-		else if(typeof callback == "function")
-			callback();
+		else {
+			NETDATA.chartLibraries.peity.enabled = false;
+			if(typeof callback == "function")
+				callback();
+		}
 	};
 
 	NETDATA.peityChartUpdate = function(element, data) {
@@ -512,16 +530,6 @@
 
 	NETDATA.peityChartCreate = function(element, data) {
 		var self = $(element);
-
-		if(!NETDATA.chartLibraries.peity.initialized) {
-			if(!NETDATA.chartLibraries.peity.enabled) {
-				NETDATA.messageInABox(element, 'peity is disabled.');
-			}
-			else {
-				NETDATA.messageInABox(element, 'peity is initializing...');
-
-			}
-		}
 
 		var uuid = NETDATA.guid();
 		element.innerHTML = '<div id="' + uuid + '">' + data + '</div>';
@@ -552,8 +560,11 @@
 						callback();
 				})
 		}
-		else if(typeof callback == "function")
-			callback();
+		else {
+			NETDATA.chartLibraries.sparkline.enabled = false;
+			if(typeof callback == "function") 
+				callback();
+		}
 	};
 
 	NETDATA.sparklineChartUpdate = function(element, data) {
@@ -713,8 +724,11 @@
 					NETDATA.dygraphInitSync(callback);
 				})
 		}
-		else if(typeof callback == "function")
-			callback();
+		else {
+			NETDATA.chartLibraries.dygraph.enabled = false;
+			if(typeof callback == "function")
+				callback();
+		}
 	};
 
 	NETDATA.dygraphChartUpdate = function(element, data) {
@@ -875,6 +889,21 @@
 
 	NETDATA.morrisInitialize = function(callback) {
 		if(typeof netdataStopMorris == 'undefined') {
+
+			// morris requires raphael
+			if(!NETDATA.chartLibraries.raphael.initialized) {
+				if(NETDATA.chartLibraries.raphael.enabled) {
+					NETDATA.raphaelInitialize(function() {
+						NETDATA.morrisInitialize(callback);
+					});
+				}
+				else {
+					NETDATA.chartLibraries.morris.enabled = false;
+					if(typeof callback == "function")
+						callback();
+				}
+			}
+
 			var fileref = document.createElement("link");
 			fileref.setAttribute("rel", "stylesheet");
 			fileref.setAttribute("type", "text/css");
@@ -895,8 +924,11 @@
 						callback();
 				})
 		}
-		else if(typeof callback == "function")
-			callback();
+		else {
+			NETDATA.chartLibraries.morris.enabled = false;
+			if(typeof callback == "function")
+				callback();
+		}
 	};
 
 	NETDATA.morrisChartUpdate = function(element, data) {
@@ -971,8 +1003,11 @@
 						callback();
 				})
 		}
-		else if(typeof callback == "function")
-			callback();
+		else {
+			NETDATA.chartLibraries.raphael.enabled = false;
+			if(typeof callback == "function")
+				callback();
+		}
 	};
 
 	NETDATA.raphaelChartUpdate = function(element, data) {
@@ -998,13 +1033,27 @@
 	// google charts
 
 	NETDATA.googleInitialize = function(callback) {
-		if(typeof netdataStopGoogleCharts == 'undefined' && typeof google != 'undefined') {
-			NETDATA.registerChartLibrary('google', NETDATA.google_js);
+		if(typeof netdataStopGoogleCharts == 'undefined') {
+			$.getScript(NETDATA.google_js)
+				.done(function() {
+					NETDATA.registerChartLibrary('google', NETDATA.google_js);
+
+					google.load('visualization', '1.1', {
+						'packages': ['corechart', 'controls'],
+						'callback': callback
+					});
+				})
+				.fail(function() {
+					NETDATA.error(100, NETDATA.google_js);
+					if(typeof callback == "function")
+						callback();
+				})
+		}
+		else {
+			NETDATA.chartLibraries.google.enabled = false;
 			if(typeof callback == "function")
 				callback();
 		}
-		else if(typeof callback == "function")
-			callback();
 	};
 
 	NETDATA.googleChartUpdate = function(element, data) {
@@ -1195,9 +1244,9 @@
 	NETDATA.registerChartLibrary = function(library, url) {
 		console.log("registering chart library: " + library);
 
-		NETDATA.chartLibraries[library]
-			.url = url
-			.initialized = new Date().getTime();
+		NETDATA.chartLibraries[library].url = url;
+		NETDATA.chartLibraries[library].initialized = true;
+		NETDATA.chartLibraries[library].enabled = true;
 
 		console.log(NETDATA.chartLibraries);
 	}
@@ -1209,19 +1258,7 @@
 
 	NETDATA._loadjQuery(function() {
 		$.getScript(NETDATA.serverDefault + 'lib/visible.js').then(function() {
-			NETDATA.raphaelInitialize(function() {
-				NETDATA.morrisInitialize(function() {
-					NETDATA.peityInitialize(function() {
-						NETDATA.sparklineInitialize(function() {
-							NETDATA.dygraphInitialize(function() {
-								NETDATA.googleInitialize(function() {
-									NETDATA.init();
-								}) // google
-							}) // dygraph.js
-						}) // sparkline.js
-					}) // piety.js
-				}) // morris.js
-			}) // raphael.js
+			NETDATA.init();
 		})
 	});
 
