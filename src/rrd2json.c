@@ -881,6 +881,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	// check the wanted points
 	if(points < 0) points = -points;
 	if(points > available_points) points = available_points;
+	if(points == 0) points = available_points;
 
 	// calculate proper grouping of source data
 	long group = available_points / points;
@@ -901,6 +902,40 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	time_t after_new = rrdset_slot2time(st, stop_at_slot);
 	time_t before_new = rrdset_slot2time(st, start_at_slot);
 	long points_new = (before_new - after_new) / st->update_every / group;
+
+	if(after_new < first_entry_t) {
+		error("after_new %u is before min %u", after_new, first_entry_t);
+		after_new = first_entry_t;
+		points_new = (before_new - after_new) / st->update_every / group;
+	}
+	if(after_new > last_entry_t) {
+		error("after_new %u is after max %u", after_new, last_entry_t);
+		after_new = last_entry_t;
+		points_new = (before_new - after_new) / st->update_every / group;
+	}
+	if(before_new < first_entry_t) {
+		error("before_new %u is before min %u", before_new, first_entry_t);
+		before_new = first_entry_t;
+		points_new = (before_new - after_new) / st->update_every / group;
+	}
+	if(before_new > last_entry_t) {
+		error("before_new %u is after max %u", before_new, last_entry_t);
+		before_new = last_entry_t;
+		points_new = (before_new - after_new) / st->update_every / group;
+	}
+	if(start_at_slot < 0 || start_at_slot >= st->entries) {
+		error("start_at_slot is invalid %ld, expected %ld to %ld", start_at_slot, 0, st->entries - 1);
+		start_at_slot = st->current_entry;
+		points_new = (before_new - after_new) / st->update_every / group;
+	}
+	if(stop_at_slot < 0 || stop_at_slot >= st->entries) {
+		error("stop_at_slot is invalid %ld, expected %ld to %ld", stop_at_slot, 0, st->entries - 1);
+		stop_at_slot = 0;
+		points_new = (before_new - after_new) / st->update_every / group;
+	}
+	if(points_new > (before_new - after_new) / group / st->update_every + 1) {
+		error("points_new %ld is more than points %ld", points_new, (before_new - after_new) / group / st->update_every + 1);
+	}
 
 	//error("SHIFT: %s: wanted %ld points, got %ld - group=%ld, wanted duration=%u, got %u - wanted %ld - %ld, got %ld - %ld", st->id, points, points_new, group, before - after, before_new - after_new, after, before, after_new, before_new);
 
