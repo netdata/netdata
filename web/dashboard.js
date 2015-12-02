@@ -16,6 +16,9 @@
 
 (function(window)
 {
+	// fix IE bug with console
+	if(!window.console){ window.console = {log: function(){} }; }
+
 	var NETDATA = window.NETDATA || {};
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -76,25 +79,26 @@
 
 	NETDATA.chartDefaults = {
 		host: NETDATA.serverDefault,	// the server to get data from
-		width: 100,						// the chart width
-		height: 20,						// the chart height
-		library: 'peity',				// the graphing library to use
+		width: '100%',					// the chart width
+		height: '100%',					// the chart height
+		library: 'dygraph',				// the graphing library to use
 		method: 'average',				// the grouping method
 		before: 0,						// panning
 		after: -600,					// panning
-		pixels_per_point: 1,					// the detail of the chart
+		pixels_per_point: 1				// the detail of the chart
 	}
 
 	NETDATA.options = {
-		targets: null,
+		targets: null,				
 		updated_dom: 1,
 		debug: 1,
+		last_paused: 0,
 
 		current: {
 			pixels_per_point: 1,
-			idle_between_charts: 50,
-			idle_between_loops: 100,
-			debug: 1
+			idle_between_charts: 100,
+			idle_between_loops: 500,
+			fast_render_timeframe: 200 // render continously for these many ms
 		}
 	}
 
@@ -108,12 +112,12 @@
 		100: { message: "Cannot load chart library", alert: true },
 		101: { message: "Cannot load jQuery", alert: true },
 		402: { message: "Chart library not found", alert: false },
-		404: { message: "Chart not found", alert: false },
+		404: { message: "Chart not found", alert: false }
 	};
 	NETDATA.errorLast = {
 		code: 0,
 		message: "",
-		datetime: 0,
+		datetime: 0
 	};
 
 	NETDATA.error = function(code, msg) {
@@ -133,19 +137,18 @@
 		NETDATA.errorLast.datetime = 0;
 	}
 
-	NETDATA.chartContainer = function(element, width, height) {
+	NETDATA.messageInABox = function(element, message) {
 		self = $(element);
-		self.css('width', width)
-			.css('height', height)
-			.css('display', 'inline-block')
-			.css('overflow', 'hidden');
-	}
 
-	NETDATA.messageInABox = function(element, width, height, message) {
-		NETDATA.chartContainer(element, width, height);
-		element.innerHTML = '<div style="overflow: hidden; border: 0px; background-color: lightgrey; width: ' + width + '; height: ' + height + ';"><small>'
+		bgcolor = ""
+		if(NETDATA.options.debug)
+			bgcolor = " background-color: lightgrey;";
+
+		element.innerHTML = '<div style="overflow: hidden;' + bgcolor + ' width: 100%; height: 100%;"><small>'
 			+ message
 			+ '</small></div>';
+
+		self.data('created', false);
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -171,63 +174,77 @@
 			callback();
 	}
 
-	NETDATA.generateChartDataURL = function(options) {
+	NETDATA.generateChartDataURL = function() {
+		self = $(this);
+
+		var chart = self.data('chart');
+		var host = self.data('host') || NETDATA.chartDefaults.host;
+		var width = self.width();
+		var height = self.height();
+		var method = self.data('method') || NETDATA.chartDefaults.method;
+		var after = self.data('after') || NETDATA.chartDefaults.after;
+		var before = self.data('before') || NETDATA.chartDefaults.before;
+		var library = self.data('chart-library') || NETDATA.chartDefaults.library;
+		var dimensions = self.data('dimensions') || null;
+		var pixels_per_point = self.data('pixels-per-point') || NETDATA.chartLibraries[library].pixels_per_point;
+
+		// force an options provided detail
+		if(pixels_per_point < NETDATA.options.current.pixels_per_point)
+			pixels_per_point = NETDATA.options.current.pixels_per_point
+
+		var points = self.data('points') || Math.round(width / pixels_per_point);
+
 		// build the data URL
-		var url = options.host + options.url;
-		url += "&points=";
-		url += options.points.toString();
-		url += "&group=";
-		url += options.method;
-		url += "&after=";
-		url += options.after || "0";
-		url += "&before=";
-		url += options.before || "0";
-		url += "&options=" + NETDATA.chartLibraries[options.library].options + '|';
-		url += (options.non_zero)?"nonzero":"";
-		url += "&format=" + NETDATA.chartLibraries[options.library].format;
+		var url = host + chart.data_url;
+		url += "&format="  + NETDATA.chartLibraries[library].format;
+		url += "&points="  + points.toString();
+		url += "&options=" + NETDATA.chartLibraries[library].options;
+		url += "&group="   + method;
 
-		if(options.dimensions)
-			url += "&dimensions=" + options.dimensions;
+		if(after)
+			url += "&after="  + after.toString();
 
-		if(NETDATA.options.debug) console.log('generateChartDataURL(' + options + ') = ' + url );
+		if(before)
+			url += "&before=" + before.toString();
+
+		if(dimensions)
+			url += "&dimensions=" + dimensions;
+
+		self.data('calculated-width', width)
+			.data('calculated-height', height)
+			.data('calculated-points', points)
+			.data('calculated-url', url);
+
+		if(NETDATA.options.debug) console.log('generateChartDataURL(): ' + url + ' WxH:' + width + 'x' + height + ' points: ' + points + ' library: ' + library);
 		return url;
 	}
 
-	NETDATA.parseDomCharts = function(targets, index, callback) {
-		if(NETDATA.options.debug) console.log('parseDomCharts() working on ' + index);
+	NETDATA.validateDomCharts = function(targets, index, callback) {
+		if(NETDATA.options.debug) console.log('validateDomCharts() working on ' + index);
 
 		var target = targets.get(index);
 		if(target == null) {
-			if(NETDATA.options.debug) console.log('parseDomCharts(): all ' + (index - 1) + ' charts parsed.');
+			if(NETDATA.options.debug) console.log('validateDomCharts(): all ' + (index - 1) + ' charts parsed.');
 			if(typeof callback == 'function') callback();
 		}
 		else {
 			var self = $(target);
 			if(!self.data('prepared')) {
-				self.data('prepared', true);
+				self.data('prepared', true)
+					.data('updated', 0)
+					.data('created', false)
+					.data('enabled', false);
 
 				var id = self.data('netdata');
 				var host = self.data('host') || NETDATA.chartDefaults.host;
-				var width = self.data('width') || NETDATA.chartDefaults.width;
-				var height = self.data('height') || NETDATA.chartDefaults.height;
-				var method = self.data('method') || NETDATA.chartDefaults.method;
-				var after = self.data('after') || NETDATA.chartDefaults.after;
-				var before = self.data('before') || NETDATA.chartDefaults.before;
 				var library = self.data('chart-library') || NETDATA.chartDefaults.library;
-				var dimensions = self.data('dimensions') || null;
 
-				NETDATA.chartContainer(target, width, height);
-				if(NETDATA.options.debug) console.log('parseDomCharts() parsing ' + id + ' of type ' + library);
+				if(NETDATA.options.debug) console.log('validateDomCharts() parsing ' + id + ' of type ' + library);
 
 				if(typeof NETDATA.chartLibraries[library] == 'undefined') {
-					self.data('created', false)
-						.data('updated', 0)
-						.data('enabled', false);
-
 					NETDATA.error(402, library);
-					NETDATA.messageInABox(target, width, height, 'chart library "' + library + '" is not found');
-
-					NETDATA.parseDomCharts(targets, ++index, callback);
+					NETDATA.messageInABox(target, 'chart library "' + library + '" is not found');
+					NETDATA.validateDomCharts(targets, ++index, callback);
 				}
 				else {
 					var url = host + "/api/v1/chart?chart=" + id;
@@ -237,93 +254,96 @@
 						crossDomain: true
 					})
 					.done(function(chart) {
-						var pixels_per_point = self.data('point-width') || NETDATA.chartLibraries[library].pixels_per_point;
-						var points = self.data('points') || Math.round(width / pixels_per_point);
-
-						var url = NETDATA.generateChartDataURL({
-							host: host,
-							url: chart.data_url,
-							dimensions: dimensions,
-							library: library,
-							method: method,
-							before: before,
-							points: points,
-							after: after,
-							non_zero: null
-						});
-
-						// done processing of this DIV
-						// store the processing result, in
-						// 'data' sections in the DIV
 						self.data('chart', chart)
-							.data('chart-url', url)
 							.data('update-every', chart.update_every * 1000)
-							.data('created', false)
-							.data('updated', 0)
 							.data('enabled', true)
 							.data('host', host)
-							.data('width', width)
-							.data('height', height)
-							.data('method', method)
-							.data('after', after)
-							.data('before', before)
-							.data('chart-library', library)
-							.data('dimensions', dimensions)
-							;
-						
-						NETDATA.messageInABox(target, width, height, 'chart "' + id + '" is loading...');
+							.data('chart-library', library);
 					})
 					.fail(function() {
-						self.data('created', false)
-							.data('enabled', false);
-
 						NETDATA.error(404, url);
-						NETDATA.messageInABox(target, width, height, 'chart "' + id + '" not found on url "' + url + '"');
+						NETDATA.messageInABox(target, 'chart "' + id + '" not found on url "' + url + '"');
 					})
 					.always(function() {
-						self.data('updated', 0);
-						NETDATA.parseDomCharts(targets, ++index, callback);
+						NETDATA.validateDomCharts(targets, ++index, callback);
 					});
 				}
 			}
 		}
 	}
 
+	NETDATA.sizeDomCharts = function(targets, index, callback) {
+		// this is used to quickly size all charts to their size
+
+		if(NETDATA.options.debug) console.log('sizeDomCharts() working on ' + index);
+
+		var target = targets.get(index);
+		if(target == null) {
+			if(NETDATA.options.debug) console.log('sizeDomCharts(): all ' + (index - 1) + ' charts sized.');
+			if(typeof callback == 'function') callback();
+		}
+		else {
+			var self = $(target);
+
+			var id = self.data('netdata');
+			var width = self.data('width') || NETDATA.chartDefaults.width;
+			var height = self.data('height') || NETDATA.chartDefaults.height;
+
+			self.css('width', width)
+				.css('height', height)
+				.css('display', 'inline-block')
+				.css('overflow', 'hidden');
+
+			NETDATA.messageInABox(target, 'chart "' + id + '" is loading...');
+			NETDATA.sizeDomCharts(targets, ++index, callback);
+		}
+	}
+
 	NETDATA.domUpdated = function(callback) {
 		NETDATA.options.updated_dom = 0;
 
-		NETDATA.options.targets = $('div[data-netdata]') // .filter(':visible')
+		NETDATA.options.targets = $('div[data-netdata]').filter(':visible')
 			.bind('create', function(event, data) {
 				var self = $(this);
-				try {
+				
+				if(NETDATA.options.debug)
 					NETDATA.chartLibraries[self.data('chart-library')].create(this, data);
-				}
-				catch(err) {
-					NETDATA.messageInABox(this, self.data('width'), self.data('height'), 'chart "' + id + '" failed to be created as ' + self.data('chart-library'));
+				else {
+					try {
+						NETDATA.chartLibraries[self.data('chart-library')].create(this, data);
+					}
+					catch(err) {
+						NETDATA.messageInABox(this, 'chart "' + self.data('netdata') + '" failed to be created as ' + self.data('chart-library'));
+						self.data('created', false);
+					}
 				}
 			})
 			.bind('update', function(event, data) {
 				var self = $(this);
-				try {
+				if(NETDATA.options.debug)
 					NETDATA.chartLibraries[self.data('chart-library')].update(this, data);
-				}
-				catch(err) {
-					NETDATA.messageInABox(this, self.data('width'), self.data('height'), 'chart "' + id + '" failed to be updated as ' + self.data('chart-library'));
+				else {
+					try {
+						NETDATA.chartLibraries[self.data('chart-library')].update(this, data);
+					}
+					catch(err) {
+						NETDATA.messageInABox(this, 'chart "' + self.data('netdata') + '" failed to be updated as ' + self.data('chart-library'));
+						self.data('created', false);
+					}
 				}
 			});
 
 		if(NETDATA.options.debug)
 			console.log('DOM updated - there are ' + NETDATA.options.targets.length + ' charts on page.');
 
-		NETDATA.parseDomCharts(NETDATA.options.targets, 0, callback);
+		NETDATA.sizeDomCharts(NETDATA.options.targets, 0, function() {
+			NETDATA.validateDomCharts(NETDATA.options.targets, 0, callback);
+		});
 	}
 
 	NETDATA.init = function() {
+		// this should be called only once
 		NETDATA.domUpdated(function() {
-			// done processing all netdata DIVs in this page
-			// call the refresh handler
-
-			// FIXME
 			NETDATA.chartRefresher(0);
 		});
 	}
@@ -358,7 +378,7 @@
 		else {
 			console.log(self.data('netdata') + ' is visible, downloading data...');
 			$.ajax( {
-				url: self.data('chart-url'),
+				url: NETDATA.generateChartDataURL.call(element), // self.data('chart-url'),
 				crossDomain: true
 			})
 			.then(function(data) {
@@ -391,7 +411,7 @@
 				}
 			})
 			.fail(function() {
-				NETDATA.messageInABox(element, self.data('width'), self.data('height'), 'cannot download chart "' + self.data('netdata') + '" values from url "' + self.data('chart-url') + '"');
+				NETDATA.messageInABox(element, 'cannot download chart "' + self.data('netdata') + '" values from url "' + self.data('chart-url') + '"');
 			})
 			.always(function() {
 				if(typeof callback == 'function') callback();
@@ -402,6 +422,8 @@
 	NETDATA.chartRefresher = function(index) {
 		// if(NETDATA.options.debug) console.log('NETDATA.chartRefresher(<targets, ' + index + ')');
 
+		now = new Date().getTime();
+
 		if(NETDATA.options.updated_dom) {
 			NETDATA.domUpdated(function() {
 				NETDATA.chartRefresher(0);
@@ -410,9 +432,9 @@
 		else {
 			var target = NETDATA.options.targets.get(index);
 			if(target == null) {
-				console.log('waiting to restart main loop...');
+				if(NETDATA.options.debug) console.log('waiting to restart main loop...');
+				NETDATA.options.last_paused = now;
 
-				// finished, restart
 				setTimeout(function() {
 					NETDATA.chartRefresher(0);
 				}, NETDATA.options.current.idle_between_loops);
@@ -423,11 +445,23 @@
 					NETDATA.chartRefresher(++index);
 				}
 				else {
-					setTimeout(function() {
+					if(now - NETDATA.options.last_paused < NETDATA.options.current.fast_render_timeframe) {
+						if(NETDATA.options.debug) console.log('fast rendering...');
+
 						NETDATA.chartValuesDownloader(target, function() {
 							NETDATA.chartRefresher(++index);
 						});
-					}, NETDATA.options.current.idle_between_charts);
+					}
+					else {
+						if(NETDATA.options.debug) console.log('waiting for next refresh...');
+						NETDATA.options.last_paused = now;
+
+						setTimeout(function() {
+							NETDATA.chartValuesDownloader(target, function() {
+								NETDATA.chartRefresher(++index);
+							});
+						}, NETDATA.options.current.idle_between_charts);
+					}
 				}
 			}
 		}
@@ -466,21 +500,39 @@
 
 	NETDATA.peityChartUpdate = function(element, data) {
 		var self = $(element);
-		var instance = self.html(data).not('[data-created]');
-		instance.change();
+		var instance = self.data('peity-instance');
+		var ins = $(instance);
+		ins.html(data);
+
+		// peity.change() does not accept options
+		// to pass width and height
+		//ins.change();
+		ins.peity('line', { width: self.data('calculated-width'), height: self.data('calculated-height') })
 	}
 
 	NETDATA.peityChartCreate = function(element, data) {
 		var self = $(element);
-		var width = self.data('width') || NETDATA.chartDefaults.width;
-		var height = self.data('height') || NETDATA.chartDefaults.height;
-		var instance = self.html(data).not('[data-created]');
 
-		instance.peity('line', {
-			width: width,
-			height: height
-		})
-		.data('created', true);
+		if(!NETDATA.chartLibraries.peity.initialized) {
+			if(!NETDATA.chartLibraries.peity.enabled) {
+				NETDATA.messageInABox(element, 'peity is disabled.');
+			}
+			else {
+				NETDATA.messageInABox(element, 'peity is initializing...');
+
+			}
+		}
+
+		var uuid = NETDATA.guid();
+		element.innerHTML = '<div id="' + uuid + '">' + data + '</div>';
+		var instance = document.getElementById(uuid);
+		var ins = $(instance);
+
+		ins.peity('line', { width: self.data('calculated-width'), height: self.data('calculated-height') })
+
+		self.data('peity-uuid', uuid)
+			.data('peity-instance', instance)
+			.data('created', true);
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -507,14 +559,14 @@
 	NETDATA.sparklineChartUpdate = function(element, data) {
 		var self = $(element);
 		var options = self.data('sparkline-options');
+		options.width = self.data('calculated-width');
+		options.height = self.data('calculated-height');
 		self.sparkline(data, options);
 	}
 
 	NETDATA.sparklineChartCreate = function(element, data) {
 		var self = $(element);
 		var chart = self.data('chart');
-		var width = self.data('width') || NETDATA.chartDefaults.width;
-		var height = self.data('height') || NETDATA.chartDefaults.height;
 		var type = self.data('sparkline-type') || 'line';
 		var lineColor = self.data('sparkline-lineColor') || undefined;
 		var fillColor = self.data('sparkline-fillColor') || (chart.chart_type == 'line')?'#FFF':undefined;
@@ -609,8 +661,8 @@
 			numberDecimalMark: numberDecimalMark,
 			numberDigitGroupCount: numberDigitGroupCount,
 			animatedZooms: animatedZooms,
-			width: width,
-			height: height
+			width: self.data('calculated-width'),
+			height: self.data('calculated-height')
 		};
 
 		var uuid = NETDATA.guid();
@@ -674,7 +726,11 @@
 
 		if(dygraph != null) {
 			console.log('updating dygraphs');
-			dygraph.updateOptions( { 'file': data.data, 'labels': data.labels } );
+			dygraph.updateOptions({
+				file: data.data,
+				labels: data.labels,
+				labelsDivWidth: self.width() - 70
+			});
 		}
 		else
 			console.log('not updating dygraphs');
@@ -682,8 +738,6 @@
 
 	NETDATA.dygraphChartCreate = function(element, data) {
 		var self = $(element);
-		var width = self.data('width') || NETDATA.chartDefaults.width;
-		var height = self.data('height') || NETDATA.chartDefaults.height;
 		var chart = self.data('chart');
 		var title = self.data('dygraph-title') || chart.title;
 		var titleHeight = self.data('dygraph-titleHeight') || 20;
@@ -695,8 +749,9 @@
 		var hideOverlayOnMouseOut = self.data('dygraph-hideOverlayOnMouseOut') || true;
 		var fillGraph = self.data('dygraph-fillGraph') || (chart.chart_type == 'area')?true:false;
 		var drawPoints = self.data('dygraph-drawPoints') || false;
-		var labelsDivStyles = self.data('dygraph-labelsDivStyles') || { 'fontSize':'10' };
-		var labelsDivWidth = self.data('dygraph-labelsDivWidth') || 250;
+		var labelsDivStyles = self.data('dygraph-labelsDivStyles') || { 'fontSize':'10px' };
+		// var labelsDivWidth = self.data('dygraph-labelsDivWidth') || 250;
+		var labelsDivWidth = self.width() - 70;
 		var labelsSeparateLines = self.data('dygraph-labelsSeparateLines') || false;
 		var labelsShowZeroValues = self.data('dygraph-labelsShowZeroValues') || true;
 		var legend = self.data('dygraph-legend') || 'onmouseover';
@@ -780,8 +835,6 @@
 			showRoller: showRoller,
 			valueFormatter: valueFormatter,
 			rightGap: rightGap,
-			width: width,
-			height: height,
 			labels: data.labels,
 			axes: {
 				x: {
@@ -796,21 +849,21 @@
 					}
 				},
 				y: {
-					pixelsPerLabel: 15,
+					pixelsPerLabel: 15
 				}
 			}
 		};
 
 		var uuid = NETDATA.guid();
-		self.html('<div id="' + uuid + '"></div>');
+		self.html('<div id="' + uuid + '" style="width: 100%; height: 100%;"></div>');
 
 		var dchart = new Dygraph(document.getElementById(uuid),
 			data.data, options);
 
 		self.data('dygraph-instance', dchart)
-		.data('dygraph-options', options)
-		.data('uuid', uuid)
-		.data('created', true);
+			.data('dygraph-options', options)
+			.data('uuid', uuid)
+			.data('created', true);
 
 		//NETDATA.dygraphAllCharts.push(dchart);
 		//if(NETDATA.dygraphAllCharts.length > 1)
@@ -848,8 +901,6 @@
 
 	NETDATA.morrisChartUpdate = function(element, data) {
 		var self = $(element);
-		var width = self.data('width') || NETDATA.chartDefaults.width;
-		var height = self.data('height') || NETDATA.chartDefaults.height;
 		var morris = self.data('morris-instance');
 
 		if(typeof data.update_every != 'undefined')
@@ -865,17 +916,16 @@
 
 	NETDATA.morrisChartCreate = function(element, data) {
 		var self = $(element);
-		var width = self.data('width') || NETDATA.chartDefaults.width;
-		var height = self.data('height') || NETDATA.chartDefaults.height;
 		var chart = self.data('chart');
 
-		self.html('<div id="morris-' + chart.id + '" style="width: ' + width + 'px; height: ' + height + 'px;"></div>');
+		var uuid = NETDATA.guid();
+		self.html('<div id="' + uuid + '" style="width: ' + self.data('calculated-width') + 'px; height: ' + self.data('calculated-height') + 'px;"></div>');
 
 		// remove the 'time' element from the labels
 		data.labels.splice(0, 1);
 
 		var options = {
-				element: 'morris-' + chart.id,
+				element: uuid,
 				data: data.data,
 				xkey: 'time',
 				ykeys: data.labels,
@@ -886,9 +936,7 @@
 				hideHover: 'auto',
 				parseTime: true,
 				continuousLine: false,
-				behaveLikeLine: false,
-				width: width,
-				height: height
+				behaveLikeLine: false
 		};
 
 		var morris;
@@ -929,23 +977,19 @@
 
 	NETDATA.raphaelChartUpdate = function(element, data) {
 		var self = $(element);
-		var width = self.data('width') || NETDATA.chartDefaults.width;
-		var height = self.data('height') || NETDATA.chartDefaults.height;
 
 		self.raphael(data, {
-			width: width,
-			height: height
+			width: self.data('calculated-width'),
+			height: self.data('calculated-height')
 		})
 	};
 
 	NETDATA.raphaelChartCreate = function(element, data) {
 		var self = $(element);
-		var width = self.data('width') || NETDATA.chartDefaults.width;
-		var height = self.data('height') || NETDATA.chartDefaults.height;
 
 		self.raphael(data, {
-			width: width,
-			height: height
+			width: self.data('calculated-width'),
+			height: self.data('calculated-height')
 		})
 		.data('created', true);
 	};
@@ -965,8 +1009,6 @@
 
 	NETDATA.googleChartUpdate = function(element, data) {
 		var self = $(element);
-		var width = self.data('width') || NETDATA.chartDefaults.width;
-		var height = self.data('height') || NETDATA.chartDefaults.height;
 		var gchart = self.data('google-instance');
 		var options = self.data('google-options');
 
@@ -980,16 +1022,15 @@
 
 	NETDATA.googleChartCreate = function(element, data) {
 		var self = $(element);
-		var width = self.data('width') || NETDATA.chartDefaults.width;
-		var height = self.data('height') || NETDATA.chartDefaults.height;
 		var chart = self.data('chart');
 
 		var datatable = new google.visualization.DataTable(data);
 		var gchart;
 
 		var options = {
-			width: width,
-			height: height,
+			// do not set width, height - the chart resizes itself
+			//width: self.data('calculated-width'),
+			//height: self.data('calculated-height'),
 			lineWidth: 1,
 			title: chart.title,
 			fontSize: 11,
@@ -1046,10 +1087,13 @@
 			isStacked: false
 		};
 
+		var uuid = NETDATA.guid();
+		self.html('<div id="' + uuid + '" style="width: 100%; height: 100%;"></div>');
+
 		switch(chart.chart_type) {
 			case "area":
 				options.vAxis.viewWindowMode = 'maximized';
-				gchart = new google.visualization.AreaChart(element);
+				gchart = new google.visualization.AreaChart(document.getElementById(uuid));
 				break;
 
 			case "stacked":
@@ -1058,21 +1102,22 @@
 				options.vAxis.viewWindowMode = 'maximized';
 				options.vAxis.minValue = null;
 				options.vAxis.maxValue = null;
-				gchart = new google.visualization.AreaChart(element);
+				gchart = new google.visualization.AreaChart(document.getElementById(uuid));
 				break;
 
 			default:
 			case "line":
 				options.lineWidth = 2;
-				gchart = new google.visualization.LineChart(element);
+				gchart = new google.visualization.LineChart(document.getElementById(uuid));
 				break;
 		}
 
 		gchart.draw(datatable, options);
 
 		self.data('google-instance', gchart)
-		.data('google-options', options)
-		.data('created', true);
+			.data('google-options', options)
+			.data('uuid', uuid)
+			.data('created', true);
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
