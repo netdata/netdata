@@ -287,27 +287,27 @@ extern unsigned long long rrdset_done(RRDSET *st);
 #define rrdset_first_entry_t(st) ((time_t)(rrdset_last_entry_t(st) - rrdset_duration(st)))
 
 // get the last slot updated in the round robin database
-#define rrdset_last_slot(st) (((st)->current_entry == 0) ? (st)->entries - 1 : (st)->current_entry - 1)
+#define rrdset_last_slot(st) ((unsigned long)(((st)->current_entry == 0) ? (st)->entries - 1 : (st)->current_entry - 1))
 
 // get the first / oldest slot updated in the round robin database
-#define rrdset_first_slot(st) ((st)->current_entry)
+#define rrdset_first_slot(st) ((unsigned long)( (((st)->counter >= ((unsigned long)(st)->entries)) ? (unsigned long)( ((unsigned long)(st)->current_entry > 0) ? ((unsigned long)(st)->current_entry) : ((unsigned long)(st)->entries) ) - 1 : 0) ))
 
 // get the slot of the round robin database, for the given timestamp (t)
 // it always returns a valid slot, although may not be for the time requested if the time is outside the round robin database
 #define rrdset_time2slot(st, t) ( \
-		(  (t) >= rrdset_last_entry_t(st))  ? ( rrdset_last_slot(st) ) : \
-		( ((t) <= rrdset_first_entry_t(st)) ?   rrdset_first_slot(st) : \
-		( (rrdset_last_slot(st) >= ((long)(rrdset_last_entry_t(st) - (t)) / (long)((st)->update_every)) ) ? \
-		  (rrdset_last_slot(st) -  ((long)(rrdset_last_entry_t(st) - (t)) / (long)((st)->update_every)) ) : \
-		  (rrdset_last_slot(st) -  ((long)(rrdset_last_entry_t(st) - (t)) / (long)((st)->update_every)) + (st)->entries ) \
+		(  (time_t)(t) >= rrdset_last_entry_t(st))  ? ( rrdset_last_slot(st) ) : \
+		( ((time_t)(t) <= rrdset_first_entry_t(st)) ?   rrdset_first_slot(st) : \
+		( (rrdset_last_slot(st) >= (unsigned long)((rrdset_last_entry_t(st) - (time_t)(t)) / (unsigned long)((st)->update_every)) ) ? \
+		  (rrdset_last_slot(st) -  (unsigned long)((rrdset_last_entry_t(st) - (time_t)(t)) / (unsigned long)((st)->update_every)) ) : \
+		  (rrdset_last_slot(st) -  (unsigned long)((rrdset_last_entry_t(st) - (time_t)(t)) / (unsigned long)((st)->update_every)) + (unsigned long)(st)->entries ) \
 		)))
 
 // get the timestamp of a specific slot in the round robin database
 #define rrdset_slot2time(st, slot) ( rrdset_last_entry_t(st) - \
-		((st)->update_every * ( \
-				( (slot) > rrdset_last_slot(st)) ? \
-				( (rrdset_last_slot(st) - slot + (st)->entries) ) : \
-				( (rrdset_last_slot(st) - slot) )) \
+		((unsigned long)(st)->update_every * ( \
+				( (unsigned long)(slot) > rrdset_last_slot(st)) ? \
+				( (rrdset_last_slot(st) - (unsigned long)(slot) + (unsigned long)(st)->entries) ) : \
+				( (rrdset_last_slot(st) - (unsigned long)(slot)) )) \
 		))
 
 // ----------------------------------------------------------------------------
