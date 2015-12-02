@@ -414,14 +414,16 @@ uint32_t web_client_api_request_v1_data_options(char *o)
 			ret |= RRDR_OPTION_NONZERO;
 		else if(!strcmp(tok, "flip") || !strcmp(tok, "reversed") || !strcmp(tok, "reverse"))
 			ret |= RRDR_OPTION_REVERSED;
-		else if(!strcmp(tok, "abs") || !strcmp(tok, "absolute") || !strcmp(tok, "absolute_sum") || !strcmp(tok, "absolute-sum"))
-			ret |= RRDR_OPTION_ABSOLUTE;
+		else if(!strcmp(tok, "jsonwrap"))
+			ret |= RRDR_OPTION_JSON_WRAP;
 		else if(!strcmp(tok, "min2max"))
 			ret |= RRDR_OPTION_MIN2MAX;
-		else if(!strcmp(tok, "seconds"))
-			ret |= RRDR_OPTION_SECONDS;
 		else if(!strcmp(tok, "ms") || !strcmp(tok, "milliseconds"))
 			ret |= RRDR_OPTION_MILLISECONDS;
+		else if(!strcmp(tok, "abs") || !strcmp(tok, "absolute") || !strcmp(tok, "absolute_sum") || !strcmp(tok, "absolute-sum"))
+			ret |= RRDR_OPTION_ABSOLUTE;
+		else if(!strcmp(tok, "seconds"))
+			ret |= RRDR_OPTION_SECONDS;
 		else if(!strcmp(tok, "null2zero"))
 			ret |= RRDR_OPTION_NULL2ZERO;
 		else if(!strcmp(tok, "objectrows"))
@@ -435,38 +437,38 @@ uint32_t web_client_api_request_v1_data_options(char *o)
 
 int web_client_api_request_v1_data_format(char *name)
 {
-	if(!strcmp(name, "datatable"))
+	if(!strcmp(name, DATASOURCE_FORMAT_DATATABLE_JSON)) // datatable
 		return DATASOURCE_DATATABLE_JSON;
 
-	else if(!strcmp(name, "datasource"))
+	else if(!strcmp(name, DATASOURCE_FORMAT_DATATABLE_JSONP)) // datasource
 		return DATASOURCE_DATATABLE_JSONP;
 
-	else if(!strcmp(name, "json"))
+	else if(!strcmp(name, DATASOURCE_FORMAT_JSON)) // json
 		return DATASOURCE_JSON;
 
-	else if(!strcmp(name, "jsonp"))
+	else if(!strcmp(name, DATASOURCE_FORMAT_JSONP)) // jsonp
 		return DATASOURCE_JSONP;
 
-	else if(!strcmp(name, "ssv"))
+	else if(!strcmp(name, DATASOURCE_FORMAT_SSV)) // ssv
 		return DATASOURCE_SSV;
 
-	else if(!strcmp(name, "csv"))
+	else if(!strcmp(name, DATASOURCE_FORMAT_CSV)) // csv
 		return DATASOURCE_CSV;
 
-	else if(!strcmp(name, "tsv"))
+	else if(!strcmp(name, DATASOURCE_FORMAT_TSV)) // tsv
 		return DATASOURCE_TSV;
+
+	else if(!strcmp(name, DATASOURCE_FORMAT_HTML)) // html
+		return DATASOURCE_HTML;
+
+	else if(!strcmp(name, DATASOURCE_FORMAT_JS_ARRAY)) // array
+		return DATASOURCE_JS_ARRAY;
+
+	else if(!strcmp(name, DATASOURCE_FORMAT_SSV_COMMA)) // ssvcomma
+		return DATASOURCE_SSV_COMMA;
 
 	else if(!strcmp(name, "tsv-excel"))
 		return DATASOURCE_TSV;
-
-	else if(!strcmp(name, "html"))
-		return DATASOURCE_HTML;
-
-	else if(!strcmp(name, "array"))
-		return DATASOURCE_JS_ARRAY;
-
-	else if(!strcmp(name, "ssvcomma"))
-		return DATASOURCE_SSV_COMMA;
 
 	return DATASOURCE_JSON;
 }

@@ -22,6 +22,17 @@ extern char *hostname;
 #define DATASOURCE_JS_ARRAY 8
 #define DATASOURCE_SSV_COMMA 9
 
+#define DATASOURCE_FORMAT_JSON "json"
+#define DATASOURCE_FORMAT_DATATABLE_JSON "datatable"
+#define DATASOURCE_FORMAT_DATATABLE_JSONP "datasource"
+#define DATASOURCE_FORMAT_JSONP "jsonp"
+#define DATASOURCE_FORMAT_SSV "ssv"
+#define DATASOURCE_FORMAT_CSV "csv"
+#define DATASOURCE_FORMAT_TSV "tsv"
+#define DATASOURCE_FORMAT_HTML "html"
+#define DATASOURCE_FORMAT_JS_ARRAY "array"
+#define DATASOURCE_FORMAT_SSV_COMMA "ssvcomma"
+
 #define GROUP_AVERAGE	0
 #define GROUP_MAX 		1
 #define GROUP_SUM		2
@@ -35,6 +46,7 @@ extern char *hostname;
 #define RRDR_OPTION_NULL2ZERO		0x00000040 // do not show nulls, convert them to zeros
 #define RRDR_OPTION_OBJECTSROWS		0x00000080 // each row of values should be an object, not an array
 #define RRDR_OPTION_GOOGLE_JSON		0x00000100 // comply with google JSON/JSONP specs
+#define RRDR_OPTION_JSON_WRAP		0x00000200 // wrap the response in a JSON header with info about the result
 
 extern void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
 extern void rrd_stats_api_v1_charts(BUFFER *wb);

@@ -269,9 +269,6 @@ void rrd_stats_all_json(BUFFER *wb)
 typedef struct rrdresult {
 	RRDSET *st;			// the chart this result refers to
 
-	int group;				// how many collected values were grouped for each row
-	int update_every;		// what is the suggested update frequency in seconds
-
 	int d;					// the number of dimensions
 	int n;					// the number of values in the arrays
 	int rows;			// the number of rows used
@@ -283,6 +280,15 @@ typedef struct rrdresult {
 	uint8_t *o;				// array n x d options
 
 	int c;					// current line ( -1 ~ n ), ( -1 = none, use rrdr_rows() to get number of rows )
+
+	int group;				// how many collected values were grouped for each row
+	int update_every;		// what is the suggested update frequency in seconds
+
+	calculated_number min;
+	calculated_number max;
+
+	time_t before;
+	time_t after;
 
 	int has_st_lock;		// if st is read locked by us
 } RRDR;
@@ -370,6 +376,153 @@ void rrdr_disable_not_selected_dimensions(RRDR *r, const char *dims)
 	}
 }
 
+void rrdr_buffer_print_format(BUFFER *wb, uint32_t format)
+{
+	switch(format) {
+	case DATASOURCE_JSON:
+		buffer_strcat(wb, DATASOURCE_FORMAT_JSON);
+		break;
+
+	case DATASOURCE_DATATABLE_JSON:
+		buffer_strcat(wb, DATASOURCE_FORMAT_DATATABLE_JSON);
+		break;
+
+	case DATASOURCE_DATATABLE_JSONP:
+		buffer_strcat(wb, DATASOURCE_FORMAT_DATATABLE_JSONP);
+		break;
+
+	case DATASOURCE_JSONP:
+		buffer_strcat(wb, DATASOURCE_FORMAT_JSONP);
+		break;
+
+	case DATASOURCE_SSV:
+		buffer_strcat(wb, DATASOURCE_FORMAT_SSV);
+		break;
+
+	case DATASOURCE_CSV:
+		buffer_strcat(wb, DATASOURCE_FORMAT_CSV);
+		break;
+
+	case DATASOURCE_TSV:
+		buffer_strcat(wb, DATASOURCE_FORMAT_TSV);
+		break;
+
+	case DATASOURCE_HTML:
+		buffer_strcat(wb, DATASOURCE_FORMAT_HTML);
+		break;
+
+	case DATASOURCE_JS_ARRAY:
+		buffer_strcat(wb, DATASOURCE_FORMAT_JS_ARRAY);
+		break;
+
+	case DATASOURCE_SSV_COMMA:
+		buffer_strcat(wb, DATASOURCE_FORMAT_SSV_COMMA);
+		break;
+
+	default:
+		buffer_strcat(wb, "unknown");
+		break;
+	}
+}
+
+void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t options, int string_value)
+{
+	char kq[2] = "",					// key quote
+		sq[2] = "";						// string quote
+
+	if( options & RRDR_OPTION_GOOGLE_JSON ) {
+		kq[0] = '\0';
+		sq[0] = '\'';
+	}
+	else {
+		kq[0] = '"';
+		sq[0] = '"';
+	}
+
+	buffer_sprintf(wb, "{\n"
+			"	%sid%s: %s%s%s,\n"
+			"	%sname%s: %s%s%s,\n"
+			"	%supdate_every%s: %d,\n"
+			"	%smin%s: "
+			, kq, kq, sq, r->st->id, sq
+			, kq, kq, sq, r->st->name, sq
+			, kq, kq, r->update_every
+			, kq, kq);
+
+	buffer_rrd_value(wb, r->min);
+	buffer_sprintf(wb, ",\n	%smax%s: ", kq, kq);
+	buffer_rrd_value(wb, r->max);
+	buffer_sprintf(wb, ",\n"
+			"	%sbefore%s: %u,\n"
+			"	%safter%s: %u,\n"
+			"	%sdimension_names%s: ["
+			, kq, kq, r->before
+			, kq, kq, r->after
+			, kq, kq);
+
+
+	long c, i;
+	RRDDIM *rd;
+	for(c = 0, i = 0, rd = r->st->dimensions; rd ;c++, rd = rd->next) {
+		if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
+		if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
+
+		if(i) buffer_strcat(wb, ", ");
+		buffer_strcat(wb, sq);
+		buffer_strcat(wb, rd->name);
+		buffer_strcat(wb, sq);
+		i++;
+	}
+	buffer_sprintf(wb, "],\n"
+			"	%sdimension_ids%s: ["
+			, kq, kq);
+
+	for(c = 0, i = 0, rd = r->st->dimensions; rd ;c++, rd = rd->next) {
+		if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
+		if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
+
+		if(i) buffer_strcat(wb, ", ");
+		buffer_strcat(wb, sq);
+		buffer_strcat(wb, rd->id);
+		buffer_strcat(wb, sq);
+		i++;
+	}
+	buffer_sprintf(wb, "],\n"
+			"	%sdimensions%s: %d,\n"
+			"	%spoints%s: %d,\n"
+			"	%sformat%s: %s"
+			, kq, kq, i
+			, kq, kq, rrdr_rows(r)
+			, kq, kq, sq
+			);
+
+	rrdr_buffer_print_format(wb, format);
+
+	buffer_sprintf(wb, "%s,\n"
+			"	%sresult%s: "
+			, sq
+			, kq, kq
+			);
+
+	if(string_value) buffer_strcat(wb, sq);
+}
+
+void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb, uint32_t format, uint32_t options, int string_value)
+{
+	if(r) {;}
+	if(format) {;}
+
+	char sq[2] = "";						// string quote
+
+	if( options & RRDR_OPTION_GOOGLE_JSON )
+		sq[0] = '\'';
+	else
+		sq[0] = '"';
+
+	if(string_value) buffer_strcat(wb, sq);
+	buffer_strcat(wb, "\n}\n");
+}
+
 #define JSON_DATES_JS 1
 #define JSON_DATES_TIMESTAMP 2
 
@@ -414,7 +567,7 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 		snprintf(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
 		snprintf(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
 
-		buffer_sprintf(wb, "{\n	%supdate_every%s: %d,\n	%scols%s:\n	[\n", kq, kq, r->update_every, kq, kq, kq, kq);
+		buffer_sprintf(wb, "{\n	%scols%s:\n	[\n", kq, kq, kq, kq);
 		buffer_sprintf(wb, "		{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
 		buffer_sprintf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotation%s}},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
 		buffer_sprintf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotationText%s}}", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
@@ -449,7 +602,7 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 		snprintf(data_begin, 100, "],\n	%sdata%s:\n	[\n", kq, kq);
 		snprintf(finish,     100, "\n	]\n}\n");
 
-		buffer_sprintf(wb, "{\n	%supdate_every%s: %d,\n	%slabels%s: [", kq, kq, r->update_every, kq, kq);
+		buffer_sprintf(wb, "{\n	%slabels%s: [", kq, kq);
 		buffer_sprintf(wb, "%stime%s", sq, sq);
 	}
 
@@ -660,12 +813,12 @@ static void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startlin
 	}
 }
 
-static void rrdr2ssv(RRDR *r, BUFFER *out, uint32_t options, const char *prefix, const char *separator, const char *suffix)
+static void rrdr2ssv(RRDR *r, BUFFER *wb, uint32_t options, const char *prefix, const char *separator, const char *suffix)
 {
 	long c, i;
 	RRDDIM *d;
 
-	buffer_strcat(out, prefix);
+	buffer_strcat(wb, prefix);
 	long start = 0, end = rrdr_rows(r), step = 1;
 	if((options & RRDR_OPTION_REVERSED)) {
 		start = rrdr_rows(r) - 1;
@@ -712,20 +865,20 @@ static void rrdr2ssv(RRDR *r, BUFFER *out, uint32_t options, const char *prefix,
 		}
 
 		if(likely(i != start))
-			buffer_strcat(out, separator);
+			buffer_strcat(wb, separator);
 
 		if(all_null) {
 			if(options & RRDR_OPTION_NULL2ZERO)
-				buffer_strcat(out, "0");
+				buffer_strcat(wb, "0");
 			else
-				buffer_strcat(out, "null");
+				buffer_strcat(wb, "null");
 		}
 		else if(options & RRDR_OPTION_MIN2MAX)
-			buffer_rrd_value(out, max - min);
+			buffer_rrd_value(wb, max - min);
 		else
-			buffer_rrd_value(out, sum);
+			buffer_rrd_value(wb, sum);
 	}
-	buffer_strcat(out, suffix);
+	buffer_strcat(wb, suffix);
 }
 
 inline static calculated_number *rrdr_line_values(RRDR *r)
@@ -803,10 +956,11 @@ static RRDR *rrdr_create(RRDSET *st, int n)
 		return NULL;
 	}
 
-	RRDR *r = calloc(1, sizeof(RRDR));
+	RRDR *r = malloc(sizeof(RRDR));
 	if(unlikely(!r)) goto cleanup;
 
 	r->st = st;
+	r->has_st_lock = 0;
 
 	rrdr_lock_rrdset(r);
 
@@ -815,20 +969,29 @@ static RRDR *rrdr_create(RRDSET *st, int n)
 
 	r->n = n;
 
-	r->t = calloc(n, sizeof(time_t));
+	r->t = malloc(n * sizeof(time_t));
 	if(unlikely(!r->t)) goto cleanup;
 
-	r->v = calloc(n * r->d, sizeof(calculated_number));
+	r->v = malloc(n * r->d * sizeof(calculated_number));
 	if(unlikely(!r->v)) goto cleanup;
 
-	r->o = calloc(n * r->d, sizeof(uint8_t));
+	r->o = malloc(n * r->d * sizeof(uint8_t));
 	if(unlikely(!r->o)) goto cleanup;
 
-	r->od = calloc(r->d, sizeof(uint8_t));
+	r->od = malloc(r->d * sizeof(uint8_t));
 	if(unlikely(!r->od)) goto cleanup;
 
 	r->c = -1;
 	r->rows = 0;
+
+	r->group = 1;
+	r->update_every = 1;
+
+	r->min = 0.0;
+	r->max = 0.0;
+
+	r->before = 0;
+	r->after = 0;
 
 	return r;
 
@@ -1044,7 +1207,13 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 		if(unlikely(now > before)) continue;
 		if(unlikely(now < after)) break;
 
-		if(unlikely(group_count == 0)) group_start_t = now;
+		if(unlikely(group_count == 0)) {
+			group_start_t = now;
+			if(unlikely(!r->before)) {
+				r->before = group_start_t;
+				r->after = group_start_t;
+			}
+		}
 		group_count++;
 
 		if(unlikely(group_count == group)) {
@@ -1086,6 +1255,8 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 		if(unlikely(add_this)) {
 			if(unlikely(!rrdr_line_init(r, group_start_t))) break;
 
+			r->after = group_start_t;
+
 			calculated_number *cn = rrdr_line_values(r);
 			uint8_t *co = rrdr_line_options(r);
 
@@ -1110,6 +1281,9 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 					cn[c] = group_values[c];
 				}
 
+				if(cn[c] < r->min) r->min = cn[c];
+				if(cn[c] > r->max) r->max = cn[c];
+
 				// reset them for the next loop
 				group_values[c] = 0;
 				group_counts[c] = 0;
@@ -1121,82 +1295,160 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 			add_this = 0;
 		}
 	}
+	r->after += group * st->update_every;
 
 	rrdr_done(r);
 	//error("SHIFT: %s: wanted %ld points, got %ld", st->id, points, rrdr_rows(r));
 	return r;
 }
 
-int rrd2format(RRDSET *st, BUFFER *out, BUFFER *dimensions, uint32_t format, long points, long long after, long long before, int group_method, uint32_t options, time_t *latest_timestamp)
+int rrd2format(RRDSET *st, BUFFER *wb, BUFFER *dimensions, uint32_t format, long points, long long after, long long before, int group_method, uint32_t options, time_t *latest_timestamp)
 {
-	RRDR *rrdr = rrd2rrdr(st, points, after, before, group_method);
-	if(!rrdr) {
-		buffer_strcat(out, "Cannot generate output with these parameters on this chart.");
+	RRDR *r = rrd2rrdr(st, points, after, before, group_method);
+	if(!r) {
+		buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
 		return 500;
 	}
 
 	if(dimensions)
-		rrdr_disable_not_selected_dimensions(rrdr, buffer_tostring(dimensions));
+		rrdr_disable_not_selected_dimensions(r, buffer_tostring(dimensions));
 
-	if(latest_timestamp && rrdr_rows(rrdr) > 0)
-		*latest_timestamp = rrdr->t[rrdr_rows(rrdr) - 1];
+	if(latest_timestamp && rrdr_rows(r) > 0)
+		*latest_timestamp = r->before;
 
 	switch(format) {
 	case DATASOURCE_SSV:
-		out->contenttype = CT_TEXT_PLAIN;
-		rrdr2ssv(rrdr, out, options, "", " ", "");
+		if(options & RRDR_OPTION_JSON_WRAP) {
+			wb->contenttype = CT_APPLICATION_JSON;
+			rrdr_json_wrapper_begin(r, wb, format, options, 1);
+			rrdr2ssv(r, wb, options, "", " ", "");
+			rrdr_json_wrapper_end(r, wb, format, options, 1);
+		}
+		else {
+			wb->contenttype = CT_TEXT_PLAIN;
+			rrdr2ssv(r, wb, options, "", " ", "");
+		}
 		break;
 
 	case DATASOURCE_SSV_COMMA:
-		out->contenttype = CT_TEXT_PLAIN;
-		rrdr2ssv(rrdr, out, options, "", ",", "");
+		if(options & RRDR_OPTION_JSON_WRAP) {
+			wb->contenttype = CT_APPLICATION_JSON;
+			rrdr_json_wrapper_begin(r, wb, format, options, 1);
+			rrdr2ssv(r, wb, options, "", ",", "");
+			rrdr_json_wrapper_end(r, wb, format, options, 1);
+		}
+		else {
+			wb->contenttype = CT_TEXT_PLAIN;
+			rrdr2ssv(r, wb, options, "", ",", "");
+		}
 		break;
 
 	case DATASOURCE_JS_ARRAY:
-		out->contenttype = CT_APPLICATION_JSON;
-		rrdr2ssv(rrdr, out, options, "[", ",", "]");
+		if(options & RRDR_OPTION_JSON_WRAP) {
+			wb->contenttype = CT_APPLICATION_JSON;
+			rrdr_json_wrapper_begin(r, wb, format, options, 0);
+			rrdr2ssv(r, wb, options, "[", ",", "]");
+			rrdr_json_wrapper_end(r, wb, format, options, 0);
+		}
+		else {
+			wb->contenttype = CT_APPLICATION_JSON;
+			rrdr2ssv(r, wb, options, "[", ",", "]");
+		}
 		break;
 
 	case DATASOURCE_CSV:
-		out->contenttype = CT_TEXT_PLAIN;
-		rrdr2csv(rrdr, out, options, "", ",", "\r\n");
+		if(options & RRDR_OPTION_JSON_WRAP) {
+			wb->contenttype = CT_APPLICATION_JSON;
+			rrdr_json_wrapper_begin(r, wb, format, options, 1);
+			rrdr2csv(r, wb, options, "", ",", "\\n");
+			rrdr_json_wrapper_end(r, wb, format, options, 1);
+		}
+		else {
+			wb->contenttype = CT_TEXT_PLAIN;
+			rrdr2csv(r, wb, options, "", ",", "\r\n");
+		}
 		break;
 
 	case DATASOURCE_TSV:
-		out->contenttype = CT_TEXT_PLAIN;
-		rrdr2csv(rrdr, out, options, "", "\t", "\r\n");
+		if(options & RRDR_OPTION_JSON_WRAP) {
+			wb->contenttype = CT_APPLICATION_JSON;
+			rrdr_json_wrapper_begin(r, wb, format, options, 1);
+			rrdr2csv(r, wb, options, "", "\t", "\\n");
+			rrdr_json_wrapper_end(r, wb, format, options, 1);
+		}
+		else {
+			wb->contenttype = CT_TEXT_PLAIN;
+			rrdr2csv(r, wb, options, "", "\t", "\r\n");
+		}
 		break;
 
 	case DATASOURCE_HTML:
-		out->contenttype = CT_TEXT_HTML;
-		buffer_strcat(out, "<html>\n<center><table border=\"0\" cellpadding=\"5\" cellspacing=\"5\">");
-		rrdr2csv(rrdr, out, options, "<tr><td>", "</td><td>", "</td></tr>\n");
-		buffer_strcat(out, "</table>\n</center>\n</html>\n");
+		if(options & RRDR_OPTION_JSON_WRAP) {
+			wb->contenttype = CT_APPLICATION_JSON;
+			rrdr_json_wrapper_begin(r, wb, format, options, 1);
+			buffer_strcat(wb, "<html>\\n<center>\\n<table border=\\\"0\\\" cellpadding=\\\"5\\\" cellspacing=\\\"5\\\">\\n");
+			rrdr2csv(r, wb, options, "<tr><td>", "</td><td>", "</td></tr>\\n");
+			buffer_strcat(wb, "</table>\\n</center>\\n</html>\\n");
+			rrdr_json_wrapper_end(r, wb, format, options, 1);
+		}
+		else {
+			wb->contenttype = CT_TEXT_HTML;
+			buffer_strcat(wb, "<html>\n<center>\n<table border=\"0\" cellpadding=\"5\" cellspacing=\"5\">\n");
+			rrdr2csv(r, wb, options, "<tr><td>", "</td><td>", "</td></tr>\n");
+			buffer_strcat(wb, "</table>\n</center>\n</html>\n");
+		}
 		break;
 
 	case DATASOURCE_DATATABLE_JSONP:
-		out->contenttype = CT_APPLICATION_X_JAVASCRIPT;
-		rrdr2json(rrdr, out, options, 1);
+		wb->contenttype = CT_APPLICATION_X_JAVASCRIPT;
+
+		if(options & RRDR_OPTION_JSON_WRAP)
+			rrdr_json_wrapper_begin(r, wb, format, options, 0);
+
+		rrdr2json(r, wb, options, 1);
+
+		if(options & RRDR_OPTION_JSON_WRAP)
+			rrdr_json_wrapper_end(r, wb, format, options, 0);
 		break;
 
 	case DATASOURCE_DATATABLE_JSON:
-		out->contenttype = CT_APPLICATION_JSON;
-		rrdr2json(rrdr, out, options, 1);
+		wb->contenttype = CT_APPLICATION_JSON;
+
+		if(options & RRDR_OPTION_JSON_WRAP)
+			rrdr_json_wrapper_begin(r, wb, format, options, 0);
+
+		rrdr2json(r, wb, options, 1);
+
+		if(options & RRDR_OPTION_JSON_WRAP)
+			rrdr_json_wrapper_end(r, wb, format, options, 0);
 		break;
 
 	case DATASOURCE_JSONP:
-		out->contenttype = CT_APPLICATION_X_JAVASCRIPT;
-		rrdr2json(rrdr, out, options, 0);
+		wb->contenttype = CT_APPLICATION_X_JAVASCRIPT;
+		if(options & RRDR_OPTION_JSON_WRAP)
+			rrdr_json_wrapper_begin(r, wb, format, options, 0);
+
+		rrdr2json(r, wb, options, 0);
+
+		if(options & RRDR_OPTION_JSON_WRAP)
+			rrdr_json_wrapper_end(r, wb, format, options, 0);
 		break;
 
 	case DATASOURCE_JSON:
 	default:
-		out->contenttype = CT_APPLICATION_JSON;
-		rrdr2json(rrdr, out, options, 0);
+		wb->contenttype = CT_APPLICATION_JSON;
+
+		if(options & RRDR_OPTION_JSON_WRAP)
+			rrdr_json_wrapper_begin(r, wb, format, options, 0);
+
+		rrdr2json(r, wb, options, 0);
+
+		if(options & RRDR_OPTION_JSON_WRAP)
+			rrdr_json_wrapper_end(r, wb, format, options, 0);
 		break;
 	}
 
-	rrdr_free(rrdr);
+	rrdr_free(r);
 	return 200;
 }
 

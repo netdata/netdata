@@ -88,18 +88,30 @@
 	NETDATA.options = {
 		targets: null,				
 		updated_dom: 1,
-		debug: 0,
 		last_paused: 0,
+		page_is_visible: 1,
 
 		current: {
 			pixels_per_point: 1,
 			idle_between_charts: 100,
 			idle_between_loops: 500,
+			idle_lost_focus: 500,
 			fast_render_timeframe: 200 // render continously for these many ms
+		},
+
+		debug: {
+			show_boxes: 		0,
+			main_loop: 			0,
+			focus: 				1,
+			visibility: 		0,
+			chart_data_url: 	1,
+			chart_errors: 		1,
+			chart_timing: 		0,
+			chart_calls: 		0,
 		}
 	}
 
-	if(NETDATA.options.debug) console.log('welcome to NETDATA');
+	if(NETDATA.options.debug.main_loop) console.log('welcome to NETDATA');
 
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -139,10 +151,10 @@
 		self = $(element);
 
 		bgcolor = ""
-		if(NETDATA.options.debug)
+		if(NETDATA.options.debug.show_boxes)
 			bgcolor = " background-color: lightgrey;";
 
-		element.innerHTML = '<div style="overflow: hidden;' + bgcolor + ' width: 100%; height: 100%;"><small>'
+		element.innerHTML = '<div style="font-size: xx-small; overflow: hidden;' + bgcolor + ' width: 100%; height: 100%;"><small>'
 			+ message
 			+ '</small></div>';
 
@@ -150,9 +162,10 @@
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------
+	// Library functions
+
 	// Load a script without jquery
 	// This is used to load jquery - after it is loaded, we use jquery
-
 	NETDATA._loadjQuery = function(callback) {
 		if(typeof jQuery == 'undefined') {
 			var script = document.createElement('script');
@@ -171,6 +184,62 @@
 		else if(typeof callback == "function")
 			callback();
 	}
+
+	NETDATA.ColorLuminance = function(hex, lum) {
+		// validate hex string
+		hex = String(hex).replace(/[^0-9a-f]/gi, '');
+		if (hex.length < 6)
+			hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+
+		lum = lum || 0;
+
+		// convert to decimal and change luminosity
+		var rgb = "#", c, i;
+		for (i = 0; i < 3; i++) {
+			c = parseInt(hex.substr(i*2,2), 16);
+			c = Math.round(Math.min(Math.max(0, c + (c * lum)), 255)).toString(16);
+			rgb += ("00"+c).substr(c.length);
+		}
+
+		return rgb;
+	}
+
+	NETDATA.guid = function() {
+		function s4() {
+			return Math.floor((1 + Math.random()) * 0x10000)
+					.toString(16)
+					.substring(1);
+			}
+
+			return s4() + s4() + '-' + s4() + '-' + s4() + '-' + s4() + '-' + s4() + s4() + s4();
+	}
+
+	// this is the main function - where everything starts
+	NETDATA.init = function() {
+		// this should be called only once
+
+		$(window).blur(function() {
+			NETDATA.options.page_is_visible = 0;
+			if(NETDATA.options.debug.focus) console.log('Lost Focus!');
+		});
+
+		$(window).focus(function() {
+			NETDATA.options.page_is_visible = 1;
+			if(NETDATA.options.debug.focus) console.log('Focus restored!');
+		});
+
+		NETDATA.getDomCharts(function() {
+			NETDATA.chartRefresher(0);
+		});
+	}
+
+	// user function to signal us the DOM has been
+	// updated.
+	NETDATA.updatedDom = function() {
+		NETDATA.options.updated_dom = 1;
+	}
+
+	// ----------------------------------------------------------------------------------------------------------------
 
 	NETDATA.generateChartDataURL = function() {
 		self = $(this);
@@ -191,12 +260,14 @@
 			pixels_per_point = NETDATA.options.current.pixels_per_point
 
 		var points = self.data('points') || Math.round(width / pixels_per_point);
+		var format = self.data('format') || NETDATA.chartLibraries[library].format;
+		var options = self.data('options') || NETDATA.chartLibraries[library].options;
 
 		// build the data URL
 		var url = host + chart.data_url;
-		url += "&format="  + NETDATA.chartLibraries[library].format;
+		url += "&format="  + format;
 		url += "&points="  + points.toString();
-		url += "&options=" + NETDATA.chartLibraries[library].options;
+		url += "&options=" + options;
 		url += "&group="   + method;
 
 		if(after)
@@ -213,16 +284,16 @@
 			.data('calculated-points', points)
 			.data('calculated-url', url);
 
-		if(NETDATA.options.debug) console.log('generateChartDataURL(): ' + url + ' WxH:' + width + 'x' + height + ' points: ' + points + ' library: ' + library);
+		if(NETDATA.options.debug.chart_data_url) console.log('generateChartDataURL(): ' + url + ' WxH:' + width + 'x' + height + ' points: ' + points + ' library: ' + library);
 		return url;
 	}
 
 	NETDATA.validateDomCharts = function(targets, index, callback) {
-		if(NETDATA.options.debug) console.log('validateDomCharts() working on ' + index);
+		if(NETDATA.options.debug.main_loop) console.log('validateDomCharts() working on ' + index);
 
 		var target = targets.get(index);
 		if(target == null) {
-			if(NETDATA.options.debug) console.log('validateDomCharts(): all ' + (index - 1) + ' charts parsed.');
+			if(NETDATA.options.debug.main_loop) console.log('validateDomCharts(): all ' + (index - 1) + ' charts parsed.');
 			if(typeof callback == 'function') callback();
 		}
 		else {
@@ -237,7 +308,7 @@
 				var host = self.data('host') || NETDATA.chartDefaults.host;
 				var library = self.data('chart-library') || NETDATA.chartDefaults.library;
 
-				if(NETDATA.options.debug) console.log('validateDomCharts() parsing ' + id + ' of type ' + library);
+				if(NETDATA.options.debug.main_loop) console.log('validateDomCharts() parsing ' + id + ' of type ' + library);
 
 				if(typeof NETDATA.chartLibraries[library] == 'undefined') {
 					NETDATA.error(402, library);
@@ -287,11 +358,11 @@
 	NETDATA.sizeDomCharts = function(targets, index, callback) {
 		// this is used to quickly size all charts to their size
 
-		if(NETDATA.options.debug) console.log('sizeDomCharts() working on ' + index);
+		if(NETDATA.options.debug.main_loop) console.log('sizeDomCharts() working on ' + index);
 
 		var target = targets.get(index);
 		if(target == null) {
-			if(NETDATA.options.debug) console.log('sizeDomCharts(): all ' + (index - 1) + ' charts sized.');
+			if(NETDATA.options.debug.main_loop) console.log('sizeDomCharts(): all ' + (index - 1) + ' charts sized.');
 			if(typeof callback == 'function') callback();
 		}
 		else {
@@ -317,8 +388,8 @@
 		NETDATA.options.targets = $('div[data-netdata]').filter(':visible')
 			.bind('create', function(event, data) {
 				var self = $(this);
-				
-				if(NETDATA.options.debug)
+
+				if(NETDATA.options.debug.chart_errors)
 					NETDATA.chartLibraries[self.data('chart-library')].create(this, data);
 				else {
 					try {
@@ -332,7 +403,7 @@
 			})
 			.bind('update', function(event, data) {
 				var self = $(this);
-				if(NETDATA.options.debug)
+				if(NETDATA.options.debug.chart_errors)
 					NETDATA.chartLibraries[self.data('chart-library')].update(this, data);
 				else {
 					try {
@@ -345,18 +416,11 @@
 				}
 			});
 
-		if(NETDATA.options.debug)
+		if(NETDATA.options.debug.main_loop)
 			console.log('DOM updated - there are ' + NETDATA.options.targets.length + ' charts on page.');
 
 		NETDATA.sizeDomCharts(NETDATA.options.targets, 0, function() {
 			NETDATA.validateDomCharts(NETDATA.options.targets, 0, callback);
-		});
-	}
-
-	NETDATA.init = function() {
-		// this should be called only once
-		NETDATA.getDomCharts(function() {
-			NETDATA.chartRefresher(0);
 		});
 	}
 
@@ -380,15 +444,15 @@
 		// check if this chart has to be refreshed now
 		var now = new Date().getTime();
 		if(last + every > now) {
-			console.log(self.data('netdata') + ' too soon - skipping.');
+			if(NETDATA.options.debug.chart_timing) console.log(self.data('netdata') + ' too soon - skipping.');
 			if(typeof callback == 'function') callback();
 		}
 		else if(!self.visible(true)) {
-			console.log(self.data('netdata') + ' is NOT visible.');
+			if(NETDATA.options.debug.visibility) console.log(self.data('netdata') + ' is NOT visible.');
 			if(typeof callback == 'function') callback();
 		}
 		else {
-			console.log(self.data('netdata') + ' is visible, downloading data...');
+			if(NETDATA.options.debug.visibility) console.log(self.data('netdata') + ' is visible, downloading data...');
 			$.ajax( {
 				url: NETDATA.generateChartDataURL.call(element), // self.data('chart-url'),
 				crossDomain: true
@@ -396,13 +460,18 @@
 			.then(function(data) {
 				var started = new Date().getTime();
 
+				// if the result is JSON, find the latest update-every
+				if(NETDATA.chartLibraries[self.data('chart-library')].jsonWrapper &&
+					typeof data.update_every != 'undefined')
+						self.data('update-every', data.update_every * 1000);
+
 				if(self.data('created')) {
-					console.log('updating ' + self.data('chart-library') + ' chart ' + self.data('netdata'));
+					if(NETDATA.options.debug.chart_calls) console.log('updating ' + self.data('chart-library') + ' chart ' + self.data('netdata'));
 					self.trigger('update', [data]);
 					// NETDATA.chartLibraries[self.data('chart-library')].update(element, data);
 				}
 				else {
-					console.log('creating ' + self.data('chart-library') + ' chart ' + self.data('netdata'));
+					if(NETDATA.options.debug.chart_calls) console.log('creating ' + self.data('chart-library') + ' chart ' + self.data('netdata'));
 					self.trigger('create', [data]);
 					//NETDATA.chartLibraries[self.data('chart-library')].create(element, data);
 					self.data('created', true);
@@ -432,61 +501,61 @@
 	};
 
 	NETDATA.chartRefresher = function(index) {
-		// if(NETDATA.options.debug) console.log('NETDATA.chartRefresher(<targets, ' + index + ')');
+		// if(NETDATA.options.debug.mail_loop) console.log('NETDATA.chartRefresher(<targets, ' + index + ')');
 
-		now = new Date().getTime();
-
-		if(NETDATA.options.updated_dom) {
-			NETDATA.getDomCharts(function() {
-				NETDATA.chartRefresher(0);
-			});
+		if(!NETDATA.options.page_is_visible) {
+			if(NETDATA.options.debug.main_loop) console.log('waiting focus...');
+			setTimeout(function() {
+					NETDATA.chartRefresher(index);
+				}, NETDATA.options.current.idle_lost_focus);
 		}
 		else {
-			var target = NETDATA.options.targets.get(index);
-			if(target == null) {
-				if(NETDATA.options.debug) console.log('waiting to restart main loop...');
-				NETDATA.options.last_paused = now;
+			now = new Date().getTime();
 
-				setTimeout(function() {
+			if(NETDATA.options.updated_dom) {
+				// the dom has been updated
+				// get the dom parts again
+				NETDATA.getDomCharts(function() {
 					NETDATA.chartRefresher(0);
-				}, NETDATA.options.current.idle_between_loops);
+				});
 			}
 			else {
-				var self = $(target);
-				if(!self.data('enabled')) {
-					NETDATA.chartRefresher(++index);
+				var target = NETDATA.options.targets.get(index);
+				if(target == null) {
+					if(NETDATA.options.debug.main_loop) console.log('waiting to restart main loop...');
+					NETDATA.options.last_paused = now;
+
+					setTimeout(function() {
+						NETDATA.chartRefresher(0);
+					}, NETDATA.options.current.idle_between_loops);
 				}
 				else {
-					if(now - NETDATA.options.last_paused < NETDATA.options.current.fast_render_timeframe) {
-						if(NETDATA.options.debug) console.log('fast rendering...');
-
-						NETDATA.chartValuesDownloader(target, function() {
-							NETDATA.chartRefresher(++index);
-						});
+					var self = $(target);
+					if(!self.data('enabled')) {
+						NETDATA.chartRefresher(++index);
 					}
 					else {
-						if(NETDATA.options.debug) console.log('waiting for next refresh...');
-						NETDATA.options.last_paused = now;
+						if(now - NETDATA.options.last_paused < NETDATA.options.current.fast_render_timeframe) {
+							if(NETDATA.options.debug.main_loop) console.log('fast rendering...');
 
-						setTimeout(function() {
 							NETDATA.chartValuesDownloader(target, function() {
 								NETDATA.chartRefresher(++index);
 							});
-						}, NETDATA.options.current.idle_between_charts);
+						}
+						else {
+							if(NETDATA.options.debug.main_loop) console.log('waiting for next refresh...');
+							NETDATA.options.last_paused = now;
+
+							setTimeout(function() {
+								NETDATA.chartValuesDownloader(target, function() {
+									NETDATA.chartRefresher(++index);
+								});
+							}, NETDATA.options.current.idle_between_charts);
+						}
 					}
 				}
 			}
 		}
-	}
-
-	NETDATA.guid = function() {
-		function s4() {
-			return Math.floor((1 + Math.random()) * 0x10000)
-					.toString(16)
-					.substring(1);
-			}
-
-			return s4() + s4() + '-' + s4() + '-' + s4() + '-' + s4() + '-' + s4() + s4() + s4();
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -517,7 +586,7 @@
 		var self = $(element);
 		var instance = self.data('peity-instance');
 		var ins = $(instance);
-		ins.html(data);
+		ins.html(data.result);
 
 		// peity.change() does not accept options
 		// to pass width and height
@@ -529,7 +598,7 @@
 		var self = $(element);
 
 		var uuid = NETDATA.guid();
-		element.innerHTML = '<div id="' + uuid + '">' + data + '</div>';
+		element.innerHTML = '<div id="' + uuid + '">' + data.result + '</div>';
 		var instance = document.getElementById(uuid);
 		var ins = $(instance);
 
@@ -569,58 +638,58 @@
 		var options = self.data('sparkline-options');
 		options.width = self.data('calculated-width');
 		options.height = self.data('calculated-height');
-		self.sparkline(data, options);
+		self.sparkline(data.result, options);
 	}
 
 	NETDATA.sparklineChartCreate = function(element, data) {
 		var self = $(element);
 		var chart = self.data('chart');
 		var type = self.data('sparkline-type') || 'line';
-		var lineColor = self.data('sparkline-lineColor') || undefined;
-		var fillColor = self.data('sparkline-fillColor') || (chart.chart_type == 'line')?'#FFF':undefined;
-		var chartRangeMin = self.data('sparkline-chartRangeMin') || undefined;
-		var chartRangeMax = self.data('sparkline-chartRangeMax') || undefined;
+		var lineColor = self.data('sparkline-linecolor') || NETDATA.colors[0];
+		var fillColor = self.data('sparkline-fillcolor') || (chart.chart_type == 'line')?'#FFF':NETDATA.ColorLuminance(lineColor, 0.8);
+		var chartRangeMin = self.data('sparkline-chartrangemin') || undefined;
+		var chartRangeMax = self.data('sparkline-chartrangemax') || undefined;
 		var composite = self.data('sparkline-composite') || undefined;
-		var enableTagOptions = self.data('sparkline-enableTagOptions') || undefined;
-		var tagOptionPrefix = self.data('sparkline-tagOptionPrefix') || undefined;
-		var tagValuesAttribute = self.data('sparkline-tagValuesAttribute') || undefined;
-		var disableHiddenCheck = self.data('sparkline-disableHiddenCheck') || undefined;
-		var defaultPixelsPerValue = self.data('sparkline-defaultPixelsPerValue') || undefined;
-		var spotColor = self.data('sparkline-spotColor') || undefined;
-		var minSpotColor = self.data('sparkline-minSpotColor') || undefined;
-		var maxSpotColor = self.data('sparkline-maxSpotColor') || undefined;
-		var spotRadius = self.data('sparkline-spotRadius') || undefined;
-		var valueSpots = self.data('sparkline-valueSpots') || undefined;
-		var highlightSpotColor = self.data('sparkline-highlightSpotColor') || undefined;
-		var highlightLineColor = self.data('sparkline-highlightLineColor') || undefined;
-		var lineWidth = self.data('sparkline-lineWidth') || undefined;
-		var normalRangeMin = self.data('sparkline-normalRangeMin') || undefined;
-		var normalRangeMax = self.data('sparkline-normalRangeMax') || undefined;
-		var drawNormalOnTop = self.data('sparkline-drawNormalOnTop') || undefined;
+		var enableTagOptions = self.data('sparkline-enabletagoptions') || undefined;
+		var tagOptionPrefix = self.data('sparkline-tagoptionprefix') || undefined;
+		var tagValuesAttribute = self.data('sparkline-tagvaluesattribute') || undefined;
+		var disableHiddenCheck = self.data('sparkline-disablehiddencheck') || undefined;
+		var defaultPixelsPerValue = self.data('sparkline-defaultpixelspervalue') || undefined;
+		var spotColor = self.data('sparkline-spotcolor') || undefined;
+		var minSpotColor = self.data('sparkline-minspotcolor') || undefined;
+		var maxSpotColor = self.data('sparkline-maxspotcolor') || undefined;
+		var spotRadius = self.data('sparkline-spotradius') || undefined;
+		var valueSpots = self.data('sparkline-valuespots') || undefined;
+		var highlightSpotColor = self.data('sparkline-highlightspotcolor') || undefined;
+		var highlightLineColor = self.data('sparkline-highlightlinecolor') || undefined;
+		var lineWidth = self.data('sparkline-linewidth') || undefined;
+		var normalRangeMin = self.data('sparkline-normalrangemin') || undefined;
+		var normalRangeMax = self.data('sparkline-normalrangemax') || undefined;
+		var drawNormalOnTop = self.data('sparkline-drawnormalontop') || undefined;
 		var xvalues = self.data('sparkline-xvalues') || undefined;
-		var chartRangeClip = self.data('sparkline-chartRangeClip') || undefined;
+		var chartRangeClip = self.data('sparkline-chartrangeclip') || undefined;
 		var xvalues = self.data('sparkline-xvalues') || undefined;
-		var chartRangeMinX = self.data('sparkline-chartRangeMinX') || undefined;
-		var chartRangeMaxX = self.data('sparkline-chartRangeMaxX') || undefined;
-		var disableInteraction = self.data('sparkline-disableInteraction') || false;
-		var disableTooltips = self.data('sparkline-disableTooltips') || false;
-		var disableHighlight = self.data('sparkline-disableHighlight') || false;
-		var highlightLighten = self.data('sparkline-highlightLighten') || 1.4;
-		var highlightColor = self.data('sparkline-highlightColor') || undefined;
-		var tooltipContainer = self.data('sparkline-tooltipContainer') || undefined;
-		var tooltipClassname = self.data('sparkline-tooltipClassname') || undefined;
-		var tooltipFormat = self.data('sparkline-tooltipFormat') || undefined;
-		var tooltipPrefix = self.data('sparkline-tooltipPrefix') || undefined;
-		var tooltipSuffix = self.data('sparkline-tooltipSuffix') || ' ' + chart.units;
-		var tooltipSkipNull = self.data('sparkline-tooltipSkipNull') || true;
-		var tooltipValueLookups = self.data('sparkline-tooltipValueLookups') || undefined;
-		var tooltipFormatFieldlist = self.data('sparkline-tooltipFormatFieldlist') || undefined;
-		var tooltipFormatFieldlistKey = self.data('sparkline-tooltipFormatFieldlistKey') || undefined;
-		var numberFormatter = self.data('sparkline-numberFormatter') || function(n){ return n.toFixed(2); };
-		var numberDigitGroupSep = self.data('sparkline-numberDigitGroupSep') || undefined;
-		var numberDecimalMark = self.data('sparkline-numberDecimalMark') || undefined;
-		var numberDigitGroupCount = self.data('sparkline-numberDigitGroupCount') || undefined;
-		var animatedZooms = self.data('sparkline-animatedZooms') || false;
+		var chartRangeMinX = self.data('sparkline-chartrangeminx') || undefined;
+		var chartRangeMaxX = self.data('sparkline-chartrangemaxx') || undefined;
+		var disableInteraction = self.data('sparkline-disableinteraction') || false;
+		var disableTooltips = self.data('sparkline-disabletooltips') || false;
+		var disableHighlight = self.data('sparkline-disablehighlight') || false;
+		var highlightLighten = self.data('sparkline-highlightlighten') || 1.4;
+		var highlightColor = self.data('sparkline-highlightcolor') || undefined;
+		var tooltipContainer = self.data('sparkline-tooltipcontainer') || undefined;
+		var tooltipClassname = self.data('sparkline-tooltipclassname') || undefined;
+		var tooltipFormat = self.data('sparkline-tooltipformat') || undefined;
+		var tooltipPrefix = self.data('sparkline-tooltipprefix') || undefined;
+		var tooltipSuffix = self.data('sparkline-tooltipsuffix') || ' ' + chart.units;
+		var tooltipSkipNull = self.data('sparkline-tooltipskipnull') || true;
+		var tooltipValueLookups = self.data('sparkline-tooltipvaluelookups') || undefined;
+		var tooltipFormatFieldlist = self.data('sparkline-tooltipformatfieldlist') || undefined;
+		var tooltipFormatFieldlistKey = self.data('sparkline-tooltipformatfieldlistkey') || undefined;
+		var numberFormatter = self.data('sparkline-numberformatter') || function(n){ return n.toFixed(2); };
+		var numberDigitGroupSep = self.data('sparkline-numberdigitgroupsep') || undefined;
+		var numberDecimalMark = self.data('sparkline-numberdecimalmark') || undefined;
+		var numberDigitGroupCount = self.data('sparkline-numberdigitgroupcount') || undefined;
+		var animatedZooms = self.data('sparkline-animatedzooms') || false;
 
 		var options = {
 			type: type,
@@ -677,10 +746,10 @@
 		element.innerHTML = '<div style="display: inline-block; position: relative;" id="' + uuid + '"></div>';
 		var div = document.getElementById(uuid);
 
-		self.sparkline(data, options);
+		self.sparkline(data.result, options);
 		self.data('sparkline-options', options)
-		.data('uuid', uuid)
-		.data('created', true);
+			.data('uuid', uuid)
+			.data('created', true);
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -732,70 +801,61 @@
 		var self = $(element);
 		var dygraph = self.data('dygraph-instance');
 
-		if(typeof data.update_every != 'undefined')
-			self.data('update-every', data.update_every * 1000);
-
-		if(dygraph != null) {
-			console.log('updating dygraphs');
-			dygraph.updateOptions({
-				file: data.data,
-				labels: data.labels,
-				labelsDivWidth: self.width() - 70
-			});
-		}
-		else
-			console.log('not updating dygraphs');
+		dygraph.updateOptions({
+			file: data.result.data,
+			labels: data.result.labels,
+			labelsDivWidth: self.width() - 70
+		});
 	};
 
 	NETDATA.dygraphChartCreate = function(element, data) {
 		var self = $(element);
 		var chart = self.data('chart');
 		var title = self.data('dygraph-title') || chart.title;
-		var titleHeight = self.data('dygraph-titleHeight') || 20;
-		var labelsDiv = self.data('dygraph-labelsDiv') || undefined;
-		var connectSeparatedPoints = self.data('dygraph-connectSeparatedPoints') || false;
-		var yLabelWidth = self.data('dygraph-yLabelWidth') || 12;
-		var stackedGraph = self.data('dygraph-stackedGraph') || (chart.chart_type == 'stacked')?true:false;
-		var stackedGraphNaNFill = self.data('dygraph-stackedGraphNaNFill') || 'none';
-		var hideOverlayOnMouseOut = self.data('dygraph-hideOverlayOnMouseOut') || true;
-		var fillGraph = self.data('dygraph-fillGraph') || (chart.chart_type == 'area')?true:false;
-		var drawPoints = self.data('dygraph-drawPoints') || false;
-		var labelsDivStyles = self.data('dygraph-labelsDivStyles') || { 'fontSize':'10px' };
-		// var labelsDivWidth = self.data('dygraph-labelsDivWidth') || 250;
-		var labelsDivWidth = self.width() - 70;
-		var labelsSeparateLines = self.data('dygraph-labelsSeparateLines') || false;
-		var labelsShowZeroValues = self.data('dygraph-labelsShowZeroValues') || true;
+		var titleHeight = self.data('dygraph-titleheight') || 20;
+		var labelsDiv = self.data('dygraph-labelsdiv') || undefined;
+		var connectSeparatedPoints = self.data('dygraph-connectseparatedpoints') || false;
+		var yLabelWidth = self.data('dygraph-ylabelwidth') || 12;
+		var stackedGraph = self.data('dygraph-stackedgraph') || (chart.chart_type == 'stacked')?true:false;
+		var stackedGraphNaNFill = self.data('dygraph-stackedgraphnanfill') || 'none';
+		var hideOverlayOnMouseOut = self.data('dygraph-hideoverlayonmouseout') || true;
+		var fillGraph = self.data('dygraph-fillgraph') || (chart.chart_type == 'area')?true:false;
+		var drawPoints = self.data('dygraph-drawpoints') || false;
+		var labelsDivStyles = self.data('dygraph-labelsdivstyles') || { 'fontSize':'10px' };
+		var labelsDivWidth = self.data('dygraph-labelsdivwidth') || self.width() - 70;
+		var labelsSeparateLines = self.data('dygraph-labelsseparatelines') || false;
+		var labelsShowZeroValues = self.data('dygraph-labelsshowzerovalues') || true;
 		var legend = self.data('dygraph-legend') || 'onmouseover';
-		var showLabelsOnHighlight = self.data('dygraph-showLabelsOnHighlight') || true;
-		var gridLineColor = self.data('dygraph-gridLineColor') || '#EEE';
-		var axisLineColor = self.data('dygraph-axisLineColor') || '#EEE';
-		var maxNumberWidth = self.data('dygraph-maxNumberWidth') || 8;
-		var sigFigs = self.data('dygraph-sigFigs') || null;
-		var digitsAfterDecimal = self.data('dygraph-digitsAfterDecimal') || 2;
-		var axisLabelFontSize = self.data('dygraph-axisLabelFontSize') || 10;
-		var axisLineWidth = self.data('dygraph-axisLineWidth') || 0.3;
-		var drawAxis = self.data('dygraph-drawAxis') || true;
-		var strokeWidth = self.data('dygraph-strokeWidth') || 1.0;
-		var drawGapEdgePoints = self.data('dygraph-drawGapEdgePoints') || true;
+		var showLabelsOnHighlight = self.data('dygraph-showlabelsonhighlight') || true;
+		var gridLineColor = self.data('dygraph-gridlinecolor') || '#EEE';
+		var axisLineColor = self.data('dygraph-axislinecolor') || '#EEE';
+		var maxNumberWidth = self.data('dygraph-maxnumberwidth') || 8;
+		var sigFigs = self.data('dygraph-sigfigs') || null;
+		var digitsAfterDecimal = self.data('dygraph-digitsafterdecimal') || 2;
+		var axisLabelFontSize = self.data('dygraph-axislabelfontsize') || 10;
+		var axisLineWidth = self.data('dygraph-axislinewidth') || 0.3;
+		var drawAxis = self.data('dygraph-drawaxis') || true;
+		var strokeWidth = self.data('dygraph-strokewidth') || 1.0;
+		var drawGapEdgePoints = self.data('dygraph-drawgapedgepoints') || true;
 		var colors = self.data('dygraph-colors') || NETDATA.colors;
-		var pointSize = self.data('dygraph-pointSize') || 1;
-		var stepPlot = self.data('dygraph-stepPlot') || false;
-		var strokeBorderColor = self.data('dygraph-strokeBorderColor') || 'white';
-		var strokeBorderWidth = self.data('dygraph-strokeBorderWidth') || (chart.chart_type == 'stacked')?1.0:0.0;
-		var strokePattern = self.data('dygraph-strokePattern') || undefined;
-		var highlightCircleSize = self.data('dygraph-highlightCircleSize') || 3;
-		var highlightSeriesOpts = self.data('dygraph-highlightSeriesOpts') || { strokeWidth: 1.5 };
-		var highlightSeriesBackgroundAlpha = self.data('dygraph-highlightSeriesBackgroundAlpha') || (chart.chart_type == 'stacked')?0.7:0.5;
-		var pointClickCallback = self.data('dygraph-pointClickCallback') || undefined;
-		var showRangeSelector = self.data('dygraph-showRangeSelector') || false;
-		var showRoller = self.data('dygraph-showRoller') || false;
-		var valueFormatter = self.data('dygraph-valueFormatter') || undefined; //function(x){ return x.toFixed(2); };
-		var rightGap = self.data('dygraph-rightGap') || 5;
-		var drawGrid = self.data('dygraph-drawGrid') || true;
-		var drawXGrid = self.data('dygraph-drawXGrid') || undefined;
-		var drawYGrid = self.data('dygraph-drawYGrid') || undefined;
-		var gridLinePattern = self.data('dygraph-gridLinePattern') || null;
-		var gridLineWidth = self.data('dygraph-gridLineWidth') || 0.3;
+		var pointSize = self.data('dygraph-pointsize') || 1;
+		var stepPlot = self.data('dygraph-stepplot') || false;
+		var strokeBorderColor = self.data('dygraph-strokebordercolor') || 'white';
+		var strokeBorderWidth = self.data('dygraph-strokeborderwidth') || (chart.chart_type == 'stacked')?1.0:0.0;
+		var strokePattern = self.data('dygraph-strokepattern') || undefined;
+		var highlightCircleSize = self.data('dygraph-highlightcirclesize') || 3;
+		var highlightSeriesOpts = self.data('dygraph-highlightseriesopts') || { strokeWidth: 1.5 };
+		var highlightSeriesBackgroundAlpha = self.data('dygraph-highlightseriesbackgroundalpha') || (chart.chart_type == 'stacked')?0.7:0.5;
+		var pointClickCallback = self.data('dygraph-pointclickcallback') || undefined;
+		var showRangeSelector = self.data('dygraph-showrangeselector') || false;
+		var showRoller = self.data('dygraph-showroller') || false;
+		var valueFormatter = self.data('dygraph-valueformatter') || undefined; //function(x){ return x.toFixed(2); };
+		var rightGap = self.data('dygraph-rightgap') || 5;
+		var drawGrid = self.data('dygraph-drawgrid') || true;
+		var drawXGrid = self.data('dygraph-drawxgrid') || undefined;
+		var drawYGrid = self.data('dygraph-drawygrid') || undefined;
+		var gridLinePattern = self.data('dygraph-gridlinepattern') || null;
+		var gridLineWidth = self.data('dygraph-gridlinewidth') || 0.3;
 
 		var options = {
 			title: title,
@@ -846,7 +906,7 @@
 			showRoller: showRoller,
 			valueFormatter: valueFormatter,
 			rightGap: rightGap,
-			labels: data.labels,
+			labels: data.result.labels,
 			axes: {
 				x: {
 					pixelsPerLabel: 50,
@@ -869,7 +929,7 @@
 		self.html('<div id="' + uuid + '" style="width: 100%; height: 100%;"></div>');
 
 		var dchart = new Dygraph(document.getElementById(uuid),
-			data.data, options);
+			data.result.data, options);
 
 		self.data('dygraph-instance', dchart)
 			.data('dygraph-options', options)
@@ -932,12 +992,9 @@
 		var self = $(element);
 		var morris = self.data('morris-instance');
 
-		if(typeof data.update_every != 'undefined')
-			self.data('update-every', data.update_every * 1000);
-
 		if(morris != null) {
 			console.log('updating morris');
-			morris.setData(data.data);
+			morris.setData(data.result.data);
 		}
 		else
 			console.log('not updating morris');
@@ -950,15 +1007,12 @@
 		var uuid = NETDATA.guid();
 		self.html('<div id="' + uuid + '" style="width: ' + self.data('calculated-width') + 'px; height: ' + self.data('calculated-height') + 'px;"></div>');
 
-		// remove the 'time' element from the labels
-		data.labels.splice(0, 1);
-
 		var options = {
 				element: uuid,
-				data: data.data,
+				data: data.result.data,
 				xkey: 'time',
-				ykeys: data.labels,
-				labels: data.labels,
+				ykeys: data.dimension_names,
+				labels: data.dimension_names,
 				lineWidth: 2,
 				pointSize: 2,
 				smooth: true,
@@ -980,7 +1034,7 @@
 			morris = new Morris.Area(options);
 
 		self.data('morris-instance', morris)
-		.data('created', true);
+			.data('created', true);
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -1058,10 +1112,7 @@
 		var gchart = self.data('google-instance');
 		var options = self.data('google-options');
 
-		if(typeof data.update_every != 'undefined')
-			self.data('update-every', data.update_every * 1000);
-
-		var datatable = new google.visualization.DataTable(data);
+		var datatable = new google.visualization.DataTable(data.result);
 
 		gchart.draw(datatable, options);
 	};
@@ -1070,7 +1121,7 @@
 		var self = $(element);
 		var chart = self.data('chart');
 
-		var datatable = new google.visualization.DataTable(data);
+		var datatable = new google.visualization.DataTable(data.result);
 		var gchart;
 
 		var options = {
@@ -1177,7 +1228,8 @@
 			initialized: false,
 			enabled: true,
 			format: 'json',
-			options: 'ms|flip',
+			options: 'ms|flip|jsonwrap',
+			jsonWrapper: true,
 			pixels_per_point: 2,
 			detects_dimensions_on_update: false
 		},
@@ -1188,7 +1240,8 @@
 			initialized: false,
 			enabled: true,
 			format: 'array',
-			options: 'flip|min2max',
+			options: 'flip|min2max|jsonwrap',
+			jsonWrapper: true,
 			pixels_per_point: 2,
 			detects_dimensions_on_update: false
 		},
@@ -1199,7 +1252,8 @@
 			initialized: false,
 			enabled: true,
 			format: 'ssvcomma',
-			options: 'null2zero|flip|min2max',
+			options: 'null2zero|flip|min2max|jsonwrap',
+			jsonWrapper: true,
 			pixels_per_point: 2,
 			detects_dimensions_on_update: false
 		},
@@ -1210,7 +1264,8 @@
 			initialized: false,
 			enabled: true,
 			format: 'json',
-			options: 'objectrows|ms',
+			options: 'objectrows|ms|jsonwrap',
+			jsonWrapper: true,
 			pixels_per_point: 10,
 			detects_dimensions_on_update: false
 		},
@@ -1221,7 +1276,8 @@
 			initialized: false,
 			enabled: true,
 			format: 'datatable',
-			options: '',
+			options: 'jsonwrap',
+			jsonWrapper: true,
 			pixels_per_point: 2,
 			detects_dimensions_on_update: true
 		},
@@ -1233,6 +1289,7 @@
 			enabled: true,
 			format: 'json',
 			options: '',
+			jsonWrapper: false,
 			pixels_per_point: 1,
 			detects_dimensions_on_update: false
 		}
