@@ -3,16 +3,13 @@
 // var netdataStopDygraph = 1;			// do not use dygraph
 // var netdataStopSparkline = 1;		// do not use sparkline
 // var netdataStopPeity = 1;			// do not use peity
+// var netdataStopGoogleCharts = 1;		// do not use google
+// var netdataStopMorris = 1;			// do not use morris
 //
 // You can also set the default netdata server, using the following.
 // When this variable is not set, we assume the page is hosted on your
 // netdata server already.
 // var netdataServer = "http://yourhost:19999"; // set your NetData server
-
-// --------------------------------------------------------------------------------------------------------------------
-// For google charts you need this in your page:
-//	<script type="text/javascript" src="https://www.google.com/jsapi"></script>
-//	<script type='text/javascript'>google.load('visualization', '1.1', {'packages':['corechart', 'controls']});</script>
 
 (function(window)
 {
@@ -91,7 +88,7 @@
 	NETDATA.options = {
 		targets: null,				
 		updated_dom: 1,
-		debug: 1,
+		debug: 0,
 		last_paused: 0,
 
 		current: {
@@ -314,7 +311,7 @@
 		}
 	}
 
-	NETDATA.domUpdated = function(callback) {
+	NETDATA.getDomCharts = function(callback) {
 		NETDATA.options.updated_dom = 0;
 
 		NETDATA.options.targets = $('div[data-netdata]').filter(':visible')
@@ -358,7 +355,7 @@
 
 	NETDATA.init = function() {
 		// this should be called only once
-		NETDATA.domUpdated(function() {
+		NETDATA.getDomCharts(function() {
 			NETDATA.chartRefresher(0);
 		});
 	}
@@ -440,7 +437,7 @@
 		now = new Date().getTime();
 
 		if(NETDATA.options.updated_dom) {
-			NETDATA.domUpdated(function() {
+			NETDATA.getDomCharts(function() {
 				NETDATA.chartRefresher(0);
 			});
 		}
@@ -493,7 +490,7 @@
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------
-	// piety
+	// peity
 
 	NETDATA.peityInitialize = function(callback) {
 		if(typeof netdataStopPeity == 'undefined') {
