@@ -1625,9 +1625,10 @@ unsigned long rrd_stats_json(int type, RRDSET *st, BUFFER *wb, int points, int g
 					, stop_at_t
 					);
 
-		for(; !stop_now ; now -= dt, t--) {
+		long counter = 0;
+		for(; !stop_now ; now -= dt, t--, counter++) {
 			if(t < 0) t = st->entries - 1;
-			if(t == stop_at_t) stop_now = 1;
+			if(t == stop_at_t) stop_now = counter;
 
 			int print_this = 0;
 
