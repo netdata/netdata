@@ -1240,7 +1240,7 @@
 			initialized: false,
 			enabled: true,
 			format: 'array',
-			options: 'flip|min2max|jsonwrap',
+			options: 'flip|abs|jsonwrap',
 			jsonWrapper: true,
 			pixels_per_point: 2,
 			detects_dimensions_on_update: false
@@ -1252,7 +1252,7 @@
 			initialized: false,
 			enabled: true,
 			format: 'ssvcomma',
-			options: 'null2zero|flip|min2max|jsonwrap',
+			options: 'null2zero|flip|abs|jsonwrap',
 			jsonWrapper: true,
 			pixels_per_point: 2,
 			detects_dimensions_on_update: false

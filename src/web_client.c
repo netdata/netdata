@@ -455,7 +455,7 @@ int web_client_api_request_v1_data_format(char *name)
 	else if(!strcmp(name, DATASOURCE_FORMAT_CSV)) // csv
 		return DATASOURCE_CSV;
 
-	else if(!strcmp(name, DATASOURCE_FORMAT_TSV)) // tsv
+	else if(!strcmp(name, DATASOURCE_FORMAT_TSV) || !strcmp(name, "tsv-excel")) // tsv
 		return DATASOURCE_TSV;
 
 	else if(!strcmp(name, DATASOURCE_FORMAT_HTML)) // html
@@ -466,9 +466,6 @@ int web_client_api_request_v1_data_format(char *name)
 
 	else if(!strcmp(name, DATASOURCE_FORMAT_SSV_COMMA)) // ssvcomma
 		return DATASOURCE_SSV_COMMA;
-
-	else if(!strcmp(name, "tsv-excel"))
-		return DATASOURCE_TSV;
 
 	return DATASOURCE_JSON;
 }
@@ -506,6 +503,7 @@ int web_client_api_request_v1_charts(struct web_client *w, char *url)
 	if(url) { ; }
 
 	buffer_flush(w->response.data);
+	w->response.data->contenttype = CT_APPLICATION_JSON;
 	rrd_stats_api_v1_charts(w->response.data);
 	return 200;
 }
