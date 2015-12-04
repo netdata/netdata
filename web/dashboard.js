@@ -90,6 +90,8 @@
 		updated_dom: 1,
 		last_paused: 0,
 		page_is_visible: 1,
+		double_click_ms: 100,
+		refreshed_stop_until: 0,
 
 		current: {
 			pixels_per_point: 1,
@@ -102,12 +104,13 @@
 		debug: {
 			show_boxes: 		0,
 			main_loop: 			0,
-			focus: 				1,
+			focus: 				0,
 			visibility: 		0,
-			chart_data_url: 	1,
-			chart_errors: 		1,
+			chart_data_url: 	0,
+			chart_errors: 		0,
 			chart_timing: 		0,
 			chart_calls: 		0,
+			dygraph: 			0
 		}
 	}
 
@@ -158,7 +161,7 @@
 			+ message
 			+ '</small></div>';
 
-		self.data('created', false);
+		self.data('chart-created', false);
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -255,6 +258,11 @@
 		var dimensions = self.data('dimensions') || null;
 		var pixels_per_point = self.data('pixels-per-point') || NETDATA.chartLibraries[library].pixels_per_point;
 
+		if(self.data('chart-panning') || self.data('chart-zooming')) {
+			before = self.data('panning-before') || 0;
+			after = self.data('panning-after') || 0;
+		}
+
 		// force an options provided detail
 		if(pixels_per_point < NETDATA.options.current.pixels_per_point)
 			pixels_per_point = NETDATA.options.current.pixels_per_point
@@ -267,8 +275,9 @@
 		var url = host + chart.data_url;
 		url += "&format="  + format;
 		url += "&points="  + points.toString();
-		url += "&options=" + options;
 		url += "&group="   + method;
+		url += "&options=" + options;
+		if(NETDATA.chartLibraries[library].jsonWrapper) url += '|jsonwrap';
 
 		if(after)
 			url += "&after="  + after.toString();
@@ -282,6 +291,7 @@
 		self.data('calculated-width', width)
 			.data('calculated-height', height)
 			.data('calculated-points', points)
+			.data('calculated-options', options)
 			.data('calculated-url', url);
 
 		if(NETDATA.options.debug.chart_data_url) console.log('generateChartDataURL(): ' + url + ' WxH:' + width + 'x' + height + ' points: ' + points + ' library: ' + library);
@@ -301,8 +311,13 @@
 			if(!self.data('prepared')) {
 				self.data('prepared', true)
 					.data('updated', 0)
-					.data('created', false)
-					.data('enabled', false);
+					.data('chart-created', false)
+					.data('refresher-enabled', false)
+					.data('chart-panning', false)
+					.data('chart-zooming', false)
+					.data('chart-paused', false)
+					.data('panning-before', 0)
+					.data('panning-after', 0);
 
 				var id = self.data('netdata');
 				var host = self.data('host') || NETDATA.chartDefaults.host;
@@ -336,7 +351,7 @@
 					.done(function(chart) {
 						self.data('chart', chart)
 							.data('update-every', chart.update_every * 1000)
-							.data('enabled', true)
+							.data('refresher-enabled', true)
 							.data('host', host)
 							.data('chart-library', library);
 					})
@@ -389,15 +404,18 @@
 			.bind('create', function(event, data) {
 				var self = $(this);
 
-				if(NETDATA.options.debug.chart_errors)
+				if(NETDATA.options.debug.chart_errors) {
 					NETDATA.chartLibraries[self.data('chart-library')].create(this, data);
+					self.data('chart-created', true);
+				}
 				else {
 					try {
 						NETDATA.chartLibraries[self.data('chart-library')].create(this, data);
+						self.data('chart-created', true);
 					}
 					catch(err) {
 						NETDATA.messageInABox(this, 'chart "' + self.data('netdata') + '" failed to be created as ' + self.data('chart-library'));
-						self.data('created', false);
+						self.data('chart-created', false);
 					}
 				}
 			})
@@ -411,7 +429,7 @@
 					}
 					catch(err) {
 						NETDATA.messageInABox(this, 'chart "' + self.data('netdata') + '" failed to be updated as ' + self.data('chart-library'));
-						self.data('created', false);
+						self.data('chart-created', false);
 					}
 				}
 			});
@@ -436,18 +454,18 @@
 	//var c = new chart();
 	//c.color();
 
-	NETDATA.chartValuesDownloader = function(element, callback) {
+	NETDATA.chartValuesDownloader = function(element, callback, panning) {
 		var self = $(element);
 		var last = self.data('updated') || 0;
 		var every = self.data('update-every') || 1;
 
 		// check if this chart has to be refreshed now
 		var now = new Date().getTime();
-		if(last + every > now) {
+		if(!panning && last + every > now) {
 			if(NETDATA.options.debug.chart_timing) console.log(self.data('netdata') + ' too soon - skipping.');
 			if(typeof callback == 'function') callback();
 		}
-		else if(!self.visible(true)) {
+		else if(!panning && !self.visible(true)) {
 			if(NETDATA.options.debug.visibility) console.log(self.data('netdata') + ' is NOT visible.');
 			if(typeof callback == 'function') callback();
 		}
@@ -461,11 +479,18 @@
 				var started = new Date().getTime();
 
 				// if the result is JSON, find the latest update-every
-				if(NETDATA.chartLibraries[self.data('chart-library')].jsonWrapper &&
-					typeof data.update_every != 'undefined')
+				if(NETDATA.chartLibraries[self.data('chart-library')].jsonWrapper) {
+					if(!panning && typeof data.update_every != 'undefined')
 						self.data('update-every', data.update_every * 1000);
 
-				if(self.data('created')) {
+					if(typeof data.after != 'undefined')
+						self.data('panning-after', data.after);
+
+					if(typeof data.before != 'undefined')
+						self.data('panning-before', data.before);
+				}
+
+				if(self.data('chart-created')) {
 					if(NETDATA.options.debug.chart_calls) console.log('updating ' + self.data('chart-library') + ' chart ' + self.data('netdata'));
 					self.trigger('update', [data]);
 					// NETDATA.chartLibraries[self.data('chart-library')].update(element, data);
@@ -474,7 +499,6 @@
 					if(NETDATA.options.debug.chart_calls) console.log('creating ' + self.data('chart-library') + ' chart ' + self.data('netdata'));
 					self.trigger('create', [data]);
 					//NETDATA.chartLibraries[self.data('chart-library')].create(element, data);
-					self.data('created', true);
 				}
 
 				var ended = new Date().getTime();
@@ -512,7 +536,13 @@
 		else {
 			now = new Date().getTime();
 
-			if(NETDATA.options.updated_dom) {
+			if(now < NETDATA.options.refreshed_stop_until) {
+				if(NETDATA.options.debug.main_loop) console.log('refreshed stopped until...');
+				setTimeout(function() {
+						NETDATA.chartRefresher(index);
+					}, NETDATA.options.current.idle_between_loops);
+			}
+			else if(NETDATA.options.updated_dom) {
 				// the dom has been updated
 				// get the dom parts again
 				NETDATA.getDomCharts(function() {
@@ -531,7 +561,20 @@
 				}
 				else {
 					var self = $(target);
-					if(!self.data('enabled')) {
+					if(!self.data('refresher-enabled')) {
+						if(NETDATA.options.debug.main_loop) console.log('chart has refresher disabled...');
+						NETDATA.chartRefresher(++index);
+					}
+					else if(self.data('chart-panning')) {
+						if(NETDATA.options.debug.main_loop) console.log('chart is panning...');
+						NETDATA.chartRefresher(++index);
+					}
+					else if(self.data('chart-zooming')) {
+						if(NETDATA.options.debug.main_loop) console.log('chart is zooming...');
+						NETDATA.chartRefresher(++index);
+					}
+					else if(self.data('chart-paused')) {
+						if(NETDATA.options.debug.main_loop) console.log('chart is paused...');
 						NETDATA.chartRefresher(++index);
 					}
 					else {
@@ -540,7 +583,7 @@
 
 							NETDATA.chartValuesDownloader(target, function() {
 								NETDATA.chartRefresher(++index);
-							});
+							}, false);
 						}
 						else {
 							if(NETDATA.options.debug.main_loop) console.log('waiting for next refresh...');
@@ -549,7 +592,7 @@
 							setTimeout(function() {
 								NETDATA.chartValuesDownloader(target, function() {
 									NETDATA.chartRefresher(++index);
-								});
+								}, false);
 							}, NETDATA.options.current.idle_between_charts);
 						}
 					}
@@ -606,7 +649,7 @@
 
 		self.data('peity-uuid', uuid)
 			.data('peity-instance', instance)
-			.data('created', true);
+			.data('chart-created', true);
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -749,7 +792,7 @@
 		self.sparkline(data.result, options);
 		self.data('sparkline-options', options)
 			.data('uuid', uuid)
-			.data('created', true);
+			.data('chart-created', true);
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -797,18 +840,207 @@
 		}
 	};
 
+	NETDATA.dygraphClickCallback = function(element, dygraph, event, x, points) {
+		if(NETDATA.options.debug.dygraph) console.log('dygraphClickCallback()');
+		
+		// NETDATA.dygraphDoubleClickDetect(element, dygraph);
+		NETDATA.dygraphReset(element, dygraph);
+	}
+
+	NETDATA.dygraphPointClickCallback = function(element, dygraph, event, point) {
+		if(NETDATA.options.debug.dygraph) console.log('dygraphPointClickCallback()');
+
+		// NETDATA.dygraphDoubleClickDetect(element, dygraph);
+		NETDATA.dygraphReset(element, dygraph);
+	}
+
+	NETDATA.dygraphDrawCallback = function(element, dygraph, is_initial) {
+		if(NETDATA.options.debug.dygraph) console.log('dygraphDrawCallback()');
+
+		var x_range = dygraph.xAxisRange();
+		var after = Math.round(x_range[0] / 1000);
+		var before = Math.round(x_range[1] / 1000);
+
+		NETDATA.dygraphZoomOrPan(element, dygraph, after, before, false, true);
+	}
+
+	NETDATA.dygraphZoomCallback = function(element, dygraph, minDate, maxDate, yRanges) {
+		if(NETDATA.options.debug.dygraph) console.log('dygraphZoomCallback()');
+		
+		NETDATA.dygraphZoomOrPan(element, dygraph, Math.round(minDate / 1000), Math.round(maxDate / 1000), false, true);
+	}
+
+	NETDATA.dygraphHighlightCallback = function(element, dygraph, event, x, points, row, seriesName) {
+		if(NETDATA.options.debug.dygraph) console.log('dygraphHighlightCallback()');
+
+		// stop refreshing
+		self = $(element);
+		self.data('chart-paused', true);
+	}
+
+	NETDATA.dygraphUnhighlightCallback = function(element, dygraph) {
+		if(NETDATA.options.debug.dygraph) console.log('dygraphUnhighlightCallback()');
+
+		// start refreshing
+		self = $(element);
+		self.data('chart-paused', false);
+	}
+
+	NETDATA.dygraphMouseDown = function(element, dygraph, event, context) {
+		if(NETDATA.options.debug.dygraph) console.log('dygraphMouseDown()');
+
+		context.initializeMouseDown(event, dygraph, context);
+		if (event.altKey || event.shiftKey)
+			Dygraph.startZoom(event, dygraph, context);
+		else
+			Dygraph.startPan(event, dygraph, context);
+	}
+
+	NETDATA.dygraphMouseMove = function(element, dygraph, event, context) {
+		if(NETDATA.options.debug.dygraph) console.log('dygraphMouseMove()');
+
+		if (context.isPanning)
+			Dygraph.movePan(event, dygraph, context);
+		else if (context.isZooming)
+			Dygraph.moveZoom(event, dygraph, context);
+	}
+
+	NETDATA.dygraphMouseUp = function(element, dygraph, event, context) {
+		if(NETDATA.options.debug.dygraph) console.log('dygraphMouseUp()');
+
+		if (context.isPanning)
+			Dygraph.endPan(event, dygraph, context);
+		else if (context.isZooming)
+			Dygraph.endZoom(event, dygraph, context);
+	}
+
+	NETDATA.dygraphMouseClick = function(element, dygraph, event, context) {
+		if(NETDATA.options.debug.dygraph) console.log('dygraphMouseClick()');
+
+	}
+
+	NETDATA.dygraphMouseDoubleClick = function(element, dygraph, event, context) {
+		if(NETDATA.options.debug.dygraph) console.log('dygraphMouseDoubleClick()');
+		NETDATA.dygraphReset(element, dygraph);
+	}
+
+	NETDATA.dygraphMouseWheel = function(element, dygraph, event, context) {
+		if(NETDATA.options.debug.dygraph) console.log('dygraphMouseWheel()');
+
+		if(event.altKey || event.shiftKey) {
+			// http://dygraphs.com/gallery/interaction-api.js
+			var normal = (event.detail) ? event.detail * -1 : event.wheelDelta / 40;
+			var percentage = normal / 10;
+
+			self = $(element);
+			var before_old = self.data('panning-before');
+			var after_old = self.data('panning-after');
+			var range_old = before_old - after_old;
+
+			var range = range_old * ( 1 - percentage );
+			var dt = Math.round((range_old - range) / 2);
+			before = before_old - dt;
+			after  = after_old  + dt;
+
+			if(NETDATA.options.debug.dygraph) console.log('percent: ' + percentage + ' from ' + after_old + ' - ' + before_old + ' to ' + after + ' - ' + before + ', range from ' + (before_old - after_old).toString() + ' to ' + (before - after).toString());
+
+			NETDATA.dygraphZoomOrPan(element, dygraph, after, before, true);
+		}
+	}
+
+	NETDATA.dygraphReset = function(element, dygraph) {
+		if(NETDATA.options.debug.dygraph) console.log('dygraphReset()');
+
+		self = $(element);
+
+		if(self.data('chart-panning') || self.data('chart-paused')) {
+			self.data('chart-panning', false)
+				.data('chart-zooming', false)
+				.data('chart-paused', false)
+				.data('panning-before', 0)
+				.data('panning-after', 0)
+				.data('updated', 0)
+				.data('panning-before-max', 0);
+			
+			NETDATA.options.refreshed_stop_until = 0;
+			NETDATA.chartValuesDownloader(element, null, false);
+		}
+	}
+
+	NETDATA.dygraphZoomOrPan = function(element, dygraph, after, before, zoom) {
+		if(NETDATA.options.debug.dygraph) console.log('dygraphZoomOrPan()');
+
+		self = $(element);
+
+		var before_old = self.data('panning-before');
+		var after_old = self.data('panning-after');
+		var range_old = before_old - after_old;
+
+		var shift = Math.abs(before_old - before);
+
+		var range = before - after;
+
+		if((shift > range_old / 20 || zoom) && range > 10) {
+			// the user is panning
+			if(NETDATA.options.debug.dygraph) console.log('dygraphZoomOrPan() ' + after_old + ' - ' + before_old + ', NEW: ' + after + ' - ' + before + ', shift by: ' + shift + ' old range: ' + (before_old - after_old).toString() + ' new range: ' + (before - after).toString());
+			
+			if(!self.data('chart-panning') && !self.data('chart-zooming')) {
+				self.data('chart-panning', true)
+					.data('panning-before-max', before);
+			}
+
+			var before_max = self.data('panning-before-max');
+			if(zoom || before <= before_max) {
+				NETDATA.options.refreshed_stop_until = now + 2000;
+
+				console.log('dygraphZoomOrPan() rendering.......................................................................................................');
+
+				if(zoom) {
+					self.data('chart-panning', false)
+						.data('chart-zooming', true);
+				}
+				else {
+					self.data('chart-panning', true)
+						.data('chart-zooming', false);
+				}
+
+				self.data('chart-paused', true)
+					.data('panning-before', before)
+					.data('panning-after', after)
+					.data('updated', 0);
+				
+				NETDATA.chartValuesDownloader(element, null, true);
+			}
+		}
+	}
+
 	NETDATA.dygraphChartUpdate = function(element, data) {
+		if(NETDATA.options.debug.dygraph) console.log('dygraphChartUpdate()');
+
 		var self = $(element);
 		var dygraph = self.data('dygraph-instance');
 
-		dygraph.updateOptions({
-			file: data.result.data,
-			labels: data.result.labels,
-			labelsDivWidth: self.width() - 70
-		});
+		if(self.data('chart-panning')) {
+			dygraph.updateOptions({
+				file: data.result.data,
+				labels: data.result.labels,
+				labelsDivWidth: self.width() - 70
+			});
+		}
+		else {
+			dygraph.updateOptions({
+				file: data.result.data,
+				labels: data.result.labels,
+				labelsDivWidth: self.width() - 70,
+				dateWindow: null,
+    			valueRange: null
+			});
+		}
 	};
 
 	NETDATA.dygraphChartCreate = function(element, data) {
+		if(NETDATA.options.debug.dygraph) console.log('dygraphChartCreate()');
+
 		var self = $(element);
 		var chart = self.data('chart');
 		var title = self.data('dygraph-title') || chart.title;
@@ -922,7 +1154,21 @@
 				y: {
 					pixelsPerLabel: 15
 				}
-			}
+			},
+			//clickCallback: function(e, x, points) { NETDATA.dygraphClickCallback(element, this, e, x, points); },
+			//pointClickCallback: function(e, point) { NETDATA.dygraphPointClickCallback(element, this, e, point); },
+			drawCallback: function(dygraph, is_initial) { NETDATA.dygraphDrawCallback(element, dygraph, is_initial); },
+			zoomCallback: function(minDate, maxDate, yRanges) { NETDATA.dygraphZoomCallback(element, this, minDate, maxDate, yRanges); },
+			highlightCallback: function(event, x, points, row, seriesName) { NETDATA.dygraphHighlightCallback(element, this, event, x, points, row, seriesName); },
+			unhighlightCallback: function(event) { NETDATA.dygraphUnhighlightCallback(element, this, event); },
+			interactionModel : {
+				mousedown: function(event, dygraph, context) { NETDATA.dygraphMouseDown(element, dygraph, event, context); },
+				mousemove: function(event, dygraph, context) { NETDATA.dygraphMouseMove(element, dygraph, event, context); },
+				mouseup: function(event, dygraph, context) { NETDATA.dygraphMouseUp(element, dygraph, event, context); },
+				click: function(event, dygraph, context) { NETDATA.dygraphMouseClick(element, dygraph, event, context); },
+				dblclick: function(event, dygraph, context) { NETDATA.dygraphMouseDoubleClick(element, dygraph, event, context); },
+				mousewheel: function(event, dygraph, context) { NETDATA.dygraphMouseWheel(element, dygraph, event, context); }
+			}			
 		};
 
 		var uuid = NETDATA.guid();
@@ -934,7 +1180,7 @@
 		self.data('dygraph-instance', dchart)
 			.data('dygraph-options', options)
 			.data('uuid', uuid)
-			.data('created', true);
+			.data('chart-created', true);
 
 		//NETDATA.dygraphAllCharts.push(dchart);
 		//if(NETDATA.dygraphAllCharts.length > 1)
@@ -1034,7 +1280,7 @@
 			morris = new Morris.Area(options);
 
 		self.data('morris-instance', morris)
-			.data('created', true);
+			.data('chart-created', true);
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -1077,7 +1323,7 @@
 			width: self.data('calculated-width'),
 			height: self.data('calculated-height')
 		})
-		.data('created', true);
+		.data('chart-created', true);
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -1214,7 +1460,7 @@
 		self.data('google-instance', gchart)
 			.data('google-options', options)
 			.data('uuid', uuid)
-			.data('created', true);
+			.data('chart-created', true);
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -1228,7 +1474,7 @@
 			initialized: false,
 			enabled: true,
 			format: 'json',
-			options: 'ms|flip|jsonwrap',
+			options: 'ms|flip',
 			jsonWrapper: true,
 			pixels_per_point: 2,
 			detects_dimensions_on_update: false
@@ -1240,7 +1486,7 @@
 			initialized: false,
 			enabled: true,
 			format: 'array',
-			options: 'flip|abs|jsonwrap',
+			options: 'flip|abs',
 			jsonWrapper: true,
 			pixels_per_point: 2,
 			detects_dimensions_on_update: false
@@ -1252,7 +1498,7 @@
 			initialized: false,
 			enabled: true,
 			format: 'ssvcomma',
-			options: 'null2zero|flip|abs|jsonwrap',
+			options: 'null2zero|flip|abs',
 			jsonWrapper: true,
 			pixels_per_point: 2,
 			detects_dimensions_on_update: false
@@ -1264,7 +1510,7 @@
 			initialized: false,
 			enabled: true,
 			format: 'json',
-			options: 'objectrows|ms|jsonwrap',
+			options: 'objectrows|ms',
 			jsonWrapper: true,
 			pixels_per_point: 10,
 			detects_dimensions_on_update: false
@@ -1276,7 +1522,7 @@
 			initialized: false,
 			enabled: true,
 			format: 'datatable',
-			options: 'jsonwrap',
+			options: '',
 			jsonWrapper: true,
 			pixels_per_point: 2,
 			detects_dimensions_on_update: true
