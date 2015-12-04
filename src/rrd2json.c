@@ -996,7 +996,7 @@ static RRDR *rrdr_create(RRDSET *st, int n)
 	return r;
 
 cleanup:
-	error("Cannot allocate memory");
+	error("Cannot allocate RRDR memory for %d entries", n);
 	if(likely(r)) rrdr_free(r);
 	return NULL;
 }
@@ -1053,54 +1053,39 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	// round group to the closest integer
 	if(available_points % points > points / 2) group++;
 
-	// find the starting and ending slots in our round robin db
-	long    start_at_slot = rrdset_time2slot(st, before),
-			stop_at_slot = rrdset_time2slot(st, after);
-
-	// align them, so that panning on the data
-	// will always produce the same results
-	start_at_slot -= start_at_slot % group;
-	stop_at_slot -= stop_at_slot % group;
-
-	time_t after_new = rrdset_slot2time(st, stop_at_slot);
-	time_t before_new = rrdset_slot2time(st, start_at_slot);
+	time_t after_new = after - (after % (group * st->update_every));
+	time_t before_new = before - (before % (group * st->update_every));
 	long points_new = (before_new - after_new) / st->update_every / group;
 
+	// find the starting and ending slots in our round robin db
+	long    start_at_slot = rrdset_time2slot(st, before_new),
+			stop_at_slot = rrdset_time2slot(st, after_new);
+
 	if(after_new < first_entry_t) {
-		error("after_new %u is before min %u", after_new, first_entry_t);
-		after_new = first_entry_t;
-		points_new = (before_new - after_new) / st->update_every / group;
+		error("after_new %u is too small, minimum %u", after_new, first_entry_t);
 	}
 	if(after_new > last_entry_t) {
-		error("after_new %u is after max %u", after_new, last_entry_t);
-		after_new = last_entry_t;
-		points_new = (before_new - after_new) / st->update_every / group;
+		error("after_new %u is too big, maximum %u", after_new, last_entry_t);
 	}
 	if(before_new < first_entry_t) {
-		error("before_new %u is before min %u", before_new, first_entry_t);
-		before_new = first_entry_t;
-		points_new = (before_new - after_new) / st->update_every / group;
+		error("before_new %u is too small, minimum %u", before_new, first_entry_t);
 	}
 	if(before_new > last_entry_t) {
-		error("before_new %u is after max %u", before_new, last_entry_t);
-		before_new = last_entry_t;
-		points_new = (before_new - after_new) / st->update_every / group;
+		error("before_new %u is too big, maximum %u", before_new, last_entry_t);
 	}
 	if(start_at_slot < 0 || start_at_slot >= st->entries) {
 		error("start_at_slot is invalid %ld, expected %ld to %ld", start_at_slot, 0, st->entries - 1);
 		start_at_slot = st->current_entry;
-		points_new = (before_new - after_new) / st->update_every / group;
 	}
 	if(stop_at_slot < 0 || stop_at_slot >= st->entries) {
 		error("stop_at_slot is invalid %ld, expected %ld to %ld", stop_at_slot, 0, st->entries - 1);
 		stop_at_slot = 0;
-		points_new = (before_new - after_new) / st->update_every / group;
 	}
 	if(points_new > (before_new - after_new) / group / st->update_every + 1) {
 		error("points_new %ld is more than points %ld", points_new, (before_new - after_new) / group / st->update_every + 1);
 	}
 
-	//error("SHIFT: %s: wanted %ld points, got %ld - group=%ld, wanted duration=%u, got %u - wanted %ld - %ld, got %ld - %ld", st->id, points, points_new, group, before - after, before_new - after_new, after, before, after_new, before_new);
+	// error("SHIFT: %s: wanted %ld points, got %ld - group=%ld, wanted duration=%u, got %u - wanted %ld - %ld, got %ld - %ld", st->id, points, points_new, group, before - after, before_new - after_new, after, before, after_new, before_new);
 
 	after = after_new;
 	before = before_new;
