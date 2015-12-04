@@ -840,114 +840,6 @@
 		}
 	};
 
-	NETDATA.dygraphClickCallback = function(element, dygraph, event, x, points) {
-		if(NETDATA.options.debug.dygraph) console.log('dygraphClickCallback()');
-		
-		// NETDATA.dygraphDoubleClickDetect(element, dygraph);
-		NETDATA.dygraphReset(element, dygraph);
-	}
-
-	NETDATA.dygraphPointClickCallback = function(element, dygraph, event, point) {
-		if(NETDATA.options.debug.dygraph) console.log('dygraphPointClickCallback()');
-
-		// NETDATA.dygraphDoubleClickDetect(element, dygraph);
-		NETDATA.dygraphReset(element, dygraph);
-	}
-
-	NETDATA.dygraphDrawCallback = function(element, dygraph, is_initial) {
-		if(NETDATA.options.debug.dygraph) console.log('dygraphDrawCallback()');
-
-		var x_range = dygraph.xAxisRange();
-		var after = Math.round(x_range[0] / 1000);
-		var before = Math.round(x_range[1] / 1000);
-
-		NETDATA.dygraphZoomOrPan(element, dygraph, after, before, false, true);
-	}
-
-	NETDATA.dygraphZoomCallback = function(element, dygraph, minDate, maxDate, yRanges) {
-		if(NETDATA.options.debug.dygraph) console.log('dygraphZoomCallback()');
-		
-		NETDATA.dygraphZoomOrPan(element, dygraph, Math.round(minDate / 1000), Math.round(maxDate / 1000), false, true);
-	}
-
-	NETDATA.dygraphHighlightCallback = function(element, dygraph, event, x, points, row, seriesName) {
-		if(NETDATA.options.debug.dygraph) console.log('dygraphHighlightCallback()');
-
-		// stop refreshing
-		self = $(element);
-		self.data('chart-paused', true);
-	}
-
-	NETDATA.dygraphUnhighlightCallback = function(element, dygraph) {
-		if(NETDATA.options.debug.dygraph) console.log('dygraphUnhighlightCallback()');
-
-		// start refreshing
-		self = $(element);
-		self.data('chart-paused', false);
-	}
-
-	NETDATA.dygraphMouseDown = function(element, dygraph, event, context) {
-		if(NETDATA.options.debug.dygraph) console.log('dygraphMouseDown()');
-
-		context.initializeMouseDown(event, dygraph, context);
-		if (event.altKey || event.shiftKey)
-			Dygraph.startZoom(event, dygraph, context);
-		else
-			Dygraph.startPan(event, dygraph, context);
-	}
-
-	NETDATA.dygraphMouseMove = function(element, dygraph, event, context) {
-		if(NETDATA.options.debug.dygraph) console.log('dygraphMouseMove()');
-
-		if (context.isPanning)
-			Dygraph.movePan(event, dygraph, context);
-		else if (context.isZooming)
-			Dygraph.moveZoom(event, dygraph, context);
-	}
-
-	NETDATA.dygraphMouseUp = function(element, dygraph, event, context) {
-		if(NETDATA.options.debug.dygraph) console.log('dygraphMouseUp()');
-
-		if (context.isPanning)
-			Dygraph.endPan(event, dygraph, context);
-		else if (context.isZooming)
-			Dygraph.endZoom(event, dygraph, context);
-	}
-
-	NETDATA.dygraphMouseClick = function(element, dygraph, event, context) {
-		if(NETDATA.options.debug.dygraph) console.log('dygraphMouseClick()');
-
-	}
-
-	NETDATA.dygraphMouseDoubleClick = function(element, dygraph, event, context) {
-		if(NETDATA.options.debug.dygraph) console.log('dygraphMouseDoubleClick()');
-		NETDATA.dygraphReset(element, dygraph);
-	}
-
-	NETDATA.dygraphMouseWheel = function(element, dygraph, event, context) {
-		if(NETDATA.options.debug.dygraph) console.log('dygraphMouseWheel()');
-
-		if(event.altKey || event.shiftKey) {
-			// http://dygraphs.com/gallery/interaction-api.js
-			var normal = (event.detail) ? event.detail * -1 : event.wheelDelta / 40;
-			var percentage = normal / 10;
-
-			self = $(element);
-			var before_old = self.data('panning-before');
-			var after_old = self.data('panning-after');
-			var range_old = before_old - after_old;
-
-			var range = range_old * ( 1 - percentage );
-			var dt = Math.round((range_old - range) / 2);
-			before = before_old - dt;
-			after  = after_old  + dt;
-
-			if(NETDATA.options.debug.dygraph) console.log('percent: ' + percentage + ' from ' + after_old + ' - ' + before_old + ' to ' + after + ' - ' + before + ', range from ' + (before_old - after_old).toString() + ' to ' + (before - after).toString());
-
-			NETDATA.dygraphZoomOrPan(element, dygraph, after, before, true);
-		}
-	}
-
 	NETDATA.dygraphReset = function(element, dygraph) {
 		if(NETDATA.options.debug.dygraph) console.log('dygraphReset()');
 
@@ -1155,20 +1047,98 @@
 					pixelsPerLabel: 15
 				}
 			},
-			//clickCallback: function(e, x, points) { NETDATA.dygraphClickCallback(element, this, e, x, points); },
-			//pointClickCallback: function(e, point) { NETDATA.dygraphPointClickCallback(element, this, e, point); },
-			drawCallback: function(dygraph, is_initial) { NETDATA.dygraphDrawCallback(element, dygraph, is_initial); },
-			zoomCallback: function(minDate, maxDate, yRanges) { NETDATA.dygraphZoomCallback(element, this, minDate, maxDate, yRanges); },
-			highlightCallback: function(event, x, points, row, seriesName) { NETDATA.dygraphHighlightCallback(element, this, event, x, points, row, seriesName); },
-			unhighlightCallback: function(event) { NETDATA.dygraphUnhighlightCallback(element, this, event); },
+			drawCallback: function(dygraph, is_initial) {
+				if(NETDATA.options.debug.dygraph) console.log('dygraphDrawCallback()');
+
+				var x_range = dygraph.xAxisRange();
+				var after = Math.round(x_range[0] / 1000);
+				var before = Math.round(x_range[1] / 1000);
+
+				NETDATA.dygraphZoomOrPan(element, this, after, before, false, true);
+			},
+			zoomCallback: function(minDate, maxDate, yRanges) {
+				if(NETDATA.options.debug.dygraph) console.log('dygraphZoomCallback()');
+				NETDATA.dygraphZoomOrPan(element, this, Math.round(minDate / 1000), Math.round(maxDate / 1000), false, true);
+			},
+			highlightCallback: function(event, x, points, row, seriesName) {
+				if(NETDATA.options.debug.dygraph) console.log('dygraphHighlightCallback()');
+				self.data('chart-paused', true);
+			},
+			unhighlightCallback: function(event) {
+				if(NETDATA.options.debug.dygraph) console.log('dygraphUnhighlightCallback()');
+				self.data('chart-paused', false);
+			},
 			interactionModel : {
-				mousedown: function(event, dygraph, context) { NETDATA.dygraphMouseDown(element, dygraph, event, context); },
-				mousemove: function(event, dygraph, context) { NETDATA.dygraphMouseMove(element, dygraph, event, context); },
-				mouseup: function(event, dygraph, context) { NETDATA.dygraphMouseUp(element, dygraph, event, context); },
-				click: function(event, dygraph, context) { NETDATA.dygraphMouseClick(element, dygraph, event, context); },
-				dblclick: function(event, dygraph, context) { NETDATA.dygraphMouseDoubleClick(element, dygraph, event, context); },
-				mousewheel: function(event, dygraph, context) { NETDATA.dygraphMouseWheel(element, dygraph, event, context); }
-			}			
+				mousedown: function(event, dygraph, context) {
+					if(NETDATA.options.debug.dygraph) console.log('dygraphMouseDown()');
+
+						// Right-click should not initiate a zoom.
+					if (event.button && event.button == 2) return;
+
+					context.initializeMouseDown(event, dygraph, context);
+					
+					if (event.altKey || event.shiftKey)
+						Dygraph.startZoom(event, dygraph, context);
+					else
+						Dygraph.startPan(event, dygraph, context);
+				},
+				mousemove: function(event, dygraph, context) {
+					if(NETDATA.options.debug.dygraph) console.log('dygraphMouseMove()');
+
+					if (context.isPanning)
+						Dygraph.movePan(event, dygraph, context);
+					else if (context.isZooming)
+						Dygraph.moveZoom(event, dygraph, context);
+				},
+				mouseup: function(event, dygraph, context) {
+					if(NETDATA.options.debug.dygraph) console.log('dygraphMouseUp()');
+
+					if (context.isPanning)
+						Dygraph.endPan(event, dygraph, context);
+					else if (context.isZooming)
+						Dygraph.endZoom(event, dygraph, context);
+				},
+				click: function(event, dygraph, context) {
+					if(NETDATA.options.debug.dygraph) console.log('dygraphMouseClick()');
+					Dygraph.cancelEvent(event);
+				},
+				dblclick: function(event, dygraph, context) {
+					if(NETDATA.options.debug.dygraph) console.log('dygraphMouseDoubleClick()');
+					NETDATA.dygraphReset(element, dygraph);
+				},
+				mousewheel: function(event, dygraph, context) {
+					if(NETDATA.options.debug.dygraph) console.log('dygraphMouseWheel()');
+
+					if(event.altKey || event.shiftKey) {
+						// http://dygraphs.com/gallery/interaction-api.js
+						var normal = (event.detail) ? event.detail * -1 : event.wheelDelta / 40;
+						var percentage = normal / 10;
+
+						var before_old = self.data('panning-before');
+						var after_old = self.data('panning-after');
+						var range_old = before_old - after_old;
+
+						var range = range_old * ( 1 - percentage );
+						var dt = Math.round((range_old - range) / 2);
+						before = before_old - dt;
+						after  = after_old  + dt;
+
+						if(NETDATA.options.debug.dygraph) console.log('percent: ' + percentage + ' from ' + after_old + ' - ' + before_old + ' to ' + after + ' - ' + before + ', range from ' + (before_old - after_old).toString() + ' to ' + (before - after).toString());
+
+						NETDATA.dygraphZoomOrPan(element, dygraph, after, before, true);
+					}					
+				},
+				touchstart: function(event, dygraph, context) {
+					Dygraph.Interaction.startTouch(event, dygraph, context);
+					//context.touchDirections.y = 0;
+				},
+				touchmove: function(event, dygraph, context) {
+					Dygraph.Interaction.moveTouch(event, dygraph, context);
+				},
+				touchend: function(event, dygraph, context) {
+					Dygraph.Interaction.endTouch(event, dygraph, context);
+				}
+			}
 		};
 
 		var uuid = NETDATA.guid();
