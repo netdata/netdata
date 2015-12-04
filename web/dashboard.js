@@ -885,7 +885,7 @@
 			if(zoom || before <= before_max) {
 				NETDATA.options.refreshed_stop_until = now + 2000;
 
-				console.log('dygraphZoomOrPan() rendering.......................................................................................................');
+				if(NETDATA.options.debug.dygraph) console.log('dygraphZoomOrPan() rendering.');
 
 				if(zoom) {
 					self.data('chart-panning', false)
