@@ -442,11 +442,17 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t opti
 	buffer_sprintf(wb, "{\n"
 			"	%sid%s: %s%s%s,\n"
 			"	%sname%s: %s%s%s,\n"
+			"	%sview_update_every%s: %d,\n"
 			"	%supdate_every%s: %d,\n"
+			"	%sfirst_entry_t%s: %u, \n"
+			"	%slast_entry_t%s: %u, \n"
 			"	%smin%s: "
 			, kq, kq, sq, r->st->id, sq
 			, kq, kq, sq, r->st->name, sq
 			, kq, kq, r->update_every
+			, kq, kq, r->st->update_every
+			, kq, kq, rrdset_first_entry_t(r->st)
+			, kq, kq, rrdset_last_entry_t(r->st)
 			, kq, kq);
 
 	buffer_rrd_value(wb, r->min);
@@ -1171,6 +1177,8 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 
 	r->group = group;
 	r->update_every = group * st->update_every;
+	r->before = now;
+	r->after = now;
 
 	long slot = start_at_slot, counter = 0, stop_now = 0, added = 0, group_count = 0, add_this = 0;
 	for(; !stop_now ; now -= dt, slot--, counter++) {
@@ -1194,10 +1202,6 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 
 		if(unlikely(group_count == 0)) {
 			group_start_t = now;
-			if(unlikely(!r->before)) {
-				r->before = group_start_t;
-				r->after = group_start_t;
-			}
 		}
 		group_count++;
 
@@ -1240,7 +1244,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 		if(unlikely(add_this)) {
 			if(unlikely(!rrdr_line_init(r, group_start_t))) break;
 
-			r->after = group_start_t;
+			r->after = now;
 
 			calculated_number *cn = rrdr_line_values(r);
 			uint8_t *co = rrdr_line_options(r);
@@ -1280,7 +1284,6 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 			add_this = 0;
 		}
 	}
-	r->after += group * st->update_every;
 
 	rrdr_done(r);
 	//error("SHIFT: %s: wanted %ld points, got %ld", st->id, points, rrdr_rows(r));

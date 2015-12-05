@@ -79,7 +79,7 @@
 		width: '100%',					// the chart width
 		height: '100%',					// the chart height
 		library: 'dygraph',				// the graphing library to use
-		method: 'average',				// the grouping method
+		method: 'max',					// the grouping method
 		before: 0,						// panning
 		after: -600,					// panning
 		pixels_per_point: 1				// the detail of the chart
@@ -88,16 +88,17 @@
 	NETDATA.options = {
 		targets: null,				
 		updated_dom: 1,
-		last_paused: 0,
+		auto_refresher_fast_weight: 0,
 		page_is_visible: 1,
 		double_click_ms: 100,
-		refreshed_stop_until: 0,
+		auto_refresher_stop_until: 0,
 
 		current: {
 			pixels_per_point: 1,
-			idle_between_charts: 100,
-			idle_between_loops: 500,
+			idle_between_charts: 50,
+			idle_between_loops: 200,
 			idle_lost_focus: 500,
+			global_pan_sync_time: 500,
 			fast_render_timeframe: 200 // render continously for these many ms
 		},
 
@@ -148,20 +149,671 @@
 		NETDATA.errorLast.code = 0;
 		NETDATA.errorLast.message = "You are doing fine!";
 		NETDATA.errorLast.datetime = 0;
+	};
+
+	// ----------------------------------------------------------------------------------------------------------------
+
+	NETDATA.chartRegistry = {
+		charts: {},
+
+		add: function(host, id, data) {
+			host = host.replace(/:/g, "_").replace(/\//g, "_");
+			id   =   id.replace(/:/g, "_").replace(/\//g, "_");
+
+			if(typeof this.charts[host] == 'undefined')
+				this.charts[host] = {};
+
+			this.charts[host][id] = data;
+		},
+
+		get: function(host, id) {
+			host = host.replace(/:/g, "_").replace(/\//g, "_");
+			id   =   id.replace(/:/g, "_").replace(/\//g, "_");
+
+			if(typeof this.charts[host] == 'undefined')
+				return null;
+
+			if(typeof this.charts[host][id] == 'undefined')
+				return null;
+
+			return this.charts[host][id];
+		}
+	};
+
+	// ----------------------------------------------------------------------------------------------------------------
+
+	NETDATA.globalPanAndZoom = {
+		seq: 0,
+		state: null,
+		before_ms: null,
+		after_ms: null,
+		force_before_ms: null,
+		force_after_ms: null,
+
+		setMaster: function(state, after, before) {
+			if(this.state && this.state != state) this.state.resetChart();
+
+			this.state = state;
+			this.seq = new Date().getTime();
+			this.force_after_ms = after;
+			this.force_before_ms = before;
+		},
+		clearMaster: function() {
+			if(this.state) {
+				var state = this.state;
+				this.state = null; // prevent infinite recursion
+				this.seq = 0;
+				state.resetChart();
+				NETDATA.options.auto_refresher_stop_until = 0;
+			}
+			else {
+				this.state = null;
+				this.seq = 0;
+			}
+		},
+		shouldBeAutoRefreshed: function(state) {
+			if(!this.state || !this.seq)
+				return false;
+
+			if(state.follows_global == this.seq)
+				return false;
+
+			return true;
+		}
 	}
 
-	NETDATA.messageInABox = function(element, message) {
+	// ----------------------------------------------------------------------------------------------------------------
+	// Our state object, where all per-chart values are stored
+
+	NETDATA.chartInitialState = function(element) {
 		self = $(element);
 
-		bgcolor = ""
-		if(NETDATA.options.debug.show_boxes)
-			bgcolor = " background-color: lightgrey;";
+		var state = {
+			uuid: NETDATA.guid(),	// GUID - a unique identifier for the chart
+			id: self.data('netdata'),	// string - the name of chart
 
-		element.innerHTML = '<div style="font-size: xx-small; overflow: hidden;' + bgcolor + ' width: 100%; height: 100%;"><small>'
-			+ message
-			+ '</small></div>';
+			// the user given dimensions of the element
+			width: self.data('width') || NETDATA.chartDefaults.width,
+			height: self.data('height') || NETDATA.chartDefaults.height,
 
-		self.data('chart-created', false);
+			// these are calculated every time the chart is refreshed
+			calculated_width: 0,
+			calculated_height: 0,
+
+			// string - the netdata server URL, without any path
+			host: self.data('host') || NETDATA.chartDefaults.host,
+
+			// string - the grouping method requested by the user
+			method: self.data('method') || NETDATA.chartDefaults.method,
+
+			// the time-range requested by the user
+			after: self.data('after') || NETDATA.chartDefaults.after,
+			before: self.data('before') || NETDATA.chartDefaults.before,
+
+			// the pixels per point requested by the user
+			pixels_per_point: 1,
+			points: self.data('points') || null,
+
+			// the dimensions requested by the user
+			dimensions: self.data('dimensions') || null,
+
+			// the chart library requested by the user
+			library_name: self.data('chart-library') || NETDATA.chartDefaults.library,
+			library: null,			// object - the chart library used
+
+			element: element,		// the element it is linked to
+			
+			chart_url: null,		// string - the url to download chart info
+			chart: null,			// object - the chart as downloaded from the server
+
+			downloaded_ms: 0,		// milliseconds - the timestamp we downloaded the chart
+			created_ms: 0,			// boolean - the timestamp the chart was created
+			validated: false, 		// boolean - has the chart been validated?
+			enabled: true, 			// boolean - is the chart enabled for refresh?
+			paused: false,			// boolean - is the chart paused for any reason?
+			debug: false,
+			updates_counter: 0,		// numeric - the number of refreshes made so far
+
+			follows_global: 0,
+
+			mode: null, 			// auto, pan, zoom
+			auto: {
+				name: 'auto',
+				autorefresh: true,
+				url: 'invalid://',	// string - the last url used to update the chart
+				last_updated_ms: 0, // milliseconds - the timestamp of last refresh
+				view_update_every: 0, 	// milliseconds - the minimum acceptable refresh duration
+				after_ms: 0,		// milliseconds - the first timestamp of the data
+				before_ms: 0,		// milliseconds - the last timestamp of the data
+				points: 0,			// number - the number of points in the data
+				data: null,			// the last downloaded data
+				force_before_ms: null,
+				force_after_ms: null,
+				requested_before_ms: null,
+				requested_after_ms: null,
+				first_entry_ms: null,
+				last_entry_ms: null,
+			},
+			pan: {
+				name: 'pan',
+				autorefresh: false,
+				url: 'invalid://',	// string - the last url used to update the chart
+				last_updated_ms: 0, // milliseconds - the timestamp of last refresh
+				view_update_every: 0, 	// milliseconds - the minimum acceptable refresh duration
+				after_ms: 0,		// milliseconds - the first timestamp of the data
+				before_ms: 0,		// milliseconds - the last timestamp of the data
+				points: 0,			// number - the number of points in the data
+				data: null,			// the last downloaded data
+				force_before_ms: null,
+				force_after_ms: null,
+				requested_before_ms: null,
+				requested_after_ms: null,
+				first_entry_ms: null,
+				last_entry_ms: null,
+			},
+			zoom: {
+				name: 'zoom',
+				autorefresh: false,
+				url: 'invalid://',	// string - the last url used to update the chart
+				last_updated_ms: 0, // milliseconds - the timestamp of last refresh
+				view_update_every: 0, 	// milliseconds - the minimum acceptable refresh duration
+				after_ms: 0,		// milliseconds - the first timestamp of the data
+				before_ms: 0,		// milliseconds - the last timestamp of the data
+				points: 0,			// number - the number of points in the data
+				data: null,			// the last downloaded data
+				force_before_ms: null,
+				force_after_ms: null,
+				requested_before_ms: null,
+				requested_after_ms: null,
+				first_entry_ms: null,
+				last_entry_ms: null,
+			},
+			refresh_dt_ms: 0,		// milliseconds - the time the last refresh took
+			refresh_dt_element_name: self.data('dt-element-name') || null,	// string - the element to print refresh_dt_ms
+			refresh_dt_element: null,
+
+			log(msg) {
+				console.log(this.id + ' (' + this.library_name + ' ' + this.uuid + '): ' + msg);
+			},
+
+			setSelection: function(t) {
+				if(typeof this.library.setSelection == 'function')
+					return this.library.setSelection(this, t);
+				else
+					return false;
+			},
+
+			clearSelection: function() {
+				if(typeof this.library.clearSelection == 'function')
+					return this.library.clearSelection(this);
+				else
+					return false;
+			},
+
+			timeIsVisible: function(t) {
+				if(t >= this.mode.after_ms && t <= this.mode.before_ms)
+					return true;
+				return false;
+			},
+
+			calculateRowForTime: function(t) {
+				if(!this.timeIsVisible(t)) return -1;
+
+				var r = Math.floor((t - this.mode.after_ms) / this.mode.view_update_every);
+				// console.log(this.mode.data);
+
+				return r;
+			},
+
+			pauseChart: function() {
+				this.paused = true;
+			},
+
+			unpauseChart: function() {
+				this.paused = false;
+			},
+
+			resetChart: function() {
+				if(NETDATA.globalPanAndZoom.state == this)
+					NETDATA.globalPanAndZoom.clearMaster();
+
+				if(state.mode.name != 'auto')
+					this.setMode('auto');
+
+				this.mode.force_before_ms = null;
+				this.mode.force_after_ms = null;
+				this.mode.last_updated_ms = 0;
+				this.follows_global = 0;
+				this.paused = false;
+				this.enabled = true;
+				this.debug = false;
+
+				state.updateChart();
+			},
+
+			setMode: function(m) {
+				if(this.mode) {
+					if(this.mode.name == m) return;
+
+					this[m].url = this.mode.url;
+					this[m].last_updated_ms = this.mode.last_updated_ms;
+					this[m].view_update_every = this.mode.view_update_every;
+					this[m].after_ms = this.mode.after_ms;
+					this[m].before_ms = this.mode.before_ms;
+					this[m].points = this.mode.points;
+					this[m].data = this.mode.data;
+					this[m].requested_before_ms = this.mode.requested_before_ms;
+					this[m].requested_after_ms = this.mode.requested_after_ms;
+					this[m].first_entry_ms = this.mode.first_entry_ms;
+					this[m].last_entry_ms = this.mode.last_entry_ms;
+				}
+
+				if(m == 'auto')
+					this.mode = this.auto;
+				else if(m == 'pan')
+					this.mode = this.pan;
+				else if(m == 'zoom')
+					this.mode = this.zoom;
+				else
+					this.mode = this.auto;
+
+				this.mode.force_before_ms = null;
+				this.mode.force_after_ms = null;
+
+				if(this.debug) this.log('mode set to ' + this.mode.name);
+			},
+
+			_minPanOrZoomStep: function() {
+				return (((this.mode.before_ms - this.mode.after_ms) / this.mode.points) * ((this.mode.points * 5 / 100) + 1) );
+				// return this.mode.view_update_every * 10;
+			},
+
+			_shouldBeMoved: function(old_after, old_before, new_after, new_before) {
+				var dt_after = Math.abs(old_after - new_after);
+				var dt_before = Math.abs(old_before - new_before);
+				var old_range = old_before - old_after;
+
+				var new_range = new_before - new_after;
+				var dt = Math.abs(old_range - new_range);
+				var step = Math.max(dt_after, dt_before, dt);
+
+				var min_step = this._minPanOrZoomStep();
+				if(new_range < old_range && new_range / this.calculated_width < 100) {
+					if(this.debug) this.log('_shouldBeMoved(' + (new_after / 1000).toString() + ' - ' + (new_before / 1000).toString() + '): minimum point size: 0.10, wanted point size: ' + (new_range / this.calculated_width / 1000).toString() + ': TOO SMALL RANGE');
+					return false;
+				}
+
+				if(step >= min_step) {
+					if(this.debug) this.log('_shouldBeMoved(' + (new_after / 1000).toString() + ' - ' + (new_before / 1000).toString() + '): minimum step: ' + (min_step / 1000).toString() + ', this step: ' + (step / 1000).toString() + ': YES');
+					return true;
+				}
+				else {
+					if(this.debug) this.log('_shouldBeMoved(' + (new_after / 1000).toString() + ' - ' + (new_before / 1000).toString() + '): minimum step: ' + (min_step / 1000).toString() + ', this step: ' + (step / 1000).toString() + ': NO');
+					return false;
+				}
+			},
+
+			updateChartPanOrZoom: function(after, before, callback) {
+				var move = false;
+
+				if(this.mode.name == 'auto') {
+					if(this.debug) this.log('updateChartPanOrZoom(): caller did not set proper mode');
+					this.setMode('pan');
+				}
+					
+				if(!this.mode.force_after_ms || !this.mode.force_before_ms) {
+					if(this.debug) this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): INIT');
+					move = true;
+				}
+				else if(this._shouldBeMoved(this.mode.force_after_ms, this.mode.force_before_ms, after, before) && this._shouldBeMoved(this.mode.after_ms, this.mode.before_ms, after, before)) {
+					if(this.debug) this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): FORCE CHANGE from ' + (this.mode.force_after_ms / 1000).toString() + ' - ' + (this.mode.force_before_ms / 1000).toString());
+					move = true;
+				}
+				else if(this._shouldBeMoved(this.mode.requested_after_ms, this.mode.requested_before_ms, after, before) && this._shouldBeMoved(this.mode.after_ms, this.mode.before_ms, after, before)) {
+					if(this.debug) this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): REQUESTED CHANGE from ' + (this.mode.requested_after_ms / 1000).toString() + ' - ' + (this.mode.requested_before_ms / 1000).toString());
+					move = true;
+				}
+
+				if(move) {
+					var now = new Date().getTime();
+					NETDATA.options.auto_refresher_stop_until = now + NETDATA.options.current.global_pan_sync_time;
+					NETDATA.globalPanAndZoom.setMaster(this, after, before);
+
+					this.mode.force_after_ms = after;
+					this.mode.force_before_ms = before;
+					this.updateChart(callback);
+					return true;
+				}
+
+				if(this.debug) this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): IGNORE');
+				if(typeof callback != 'undefined') callback();
+				return false;
+			},
+
+			updateChart: function(callback) {
+				if(!this.library || !this.library.enabled) {
+					this.error('chart library "' + this.library_name + '" is not enabled');
+					if(typeof callback != 'undefined') callback();
+					return;
+				}
+
+				if(!this.enabled) {
+					if(this.debug) this.error('chart "' + this.id + '" is not enabled');
+					if(typeof callback != 'undefined') callback();
+					return;
+				}
+
+				if(!self.visible(true)) {
+					if(NETDATA.options.debug.visibility || this.debug) this.log('is not visible');
+					if(typeof callback != 'undefined') callback();
+					return;
+				}
+				if(!this.chart) {
+					var this_state_object = this;
+					this.getChart(function() { this_state_object.updateChart(callback); });
+					return;
+				}
+
+				if(!this.library.initialized) {
+					var this_state_object = this;
+					this.library.initialize(function() { this_state_object.updateChart(callback); });
+					return;
+				}
+				
+				this.clearSelection();
+				this.chartURL();
+				if(this.debug) this.log('updating from ' + this.mode.url);
+
+				var this_state_object = this;
+				$.ajax( {
+					url: this_state_object.mode.url,
+					crossDomain: true
+				})
+				.then(function(data) {
+					if(this_state_object.debug) this_state_object.log('got data from netdata server');
+					this_state_object.mode.data = data;
+
+					var started = new Date().getTime();
+
+					// if the result is JSON, find the latest update-every
+					if(typeof data == 'object' && this_state_object.library.jsonWrapper) {
+						if(!this_state_object.follows_global && typeof data.view_update_every != 'undefined')
+							this_state_object.mode.view_update_every = data.view_update_every * 1000;
+
+						if(typeof data.after != 'undefined')
+							this_state_object.mode.after_ms = data.after * 1000;
+
+						if(typeof data.before != 'undefined')
+							this_state_object.mode.before_ms = data.before * 1000;
+
+						if(typeof data.first_entry_t != 'undefined')
+							this_state_object.mode.first_entry_ms = data.first_entry_t * 1000;
+
+						if(typeof data.last_entry_t != 'undefined')
+							this_state_object.mode.last_entry_ms = data.last_entry_t * 1000;
+
+						if(typeof data.points != 'undefined')
+							this_state_object.mode.points = data.points;
+
+						data.state = this_state_object;
+					}
+
+					this_state_object.updates_counter++;
+
+					if(this_state_object.debug) {
+						this_state_object.log('UPDATE No ' + this_state_object.updates_counter + ' COMPLETED');
+
+						if(this_state_object.mode.force_after_ms)
+							this_state_object.log('STATUS: forced   : ' + (this_state_object.mode.force_after_ms / 1000).toString() + ' - ' + (this_state_object.mode.force_before_ms / 1000).toString());
+						else
+							this_state_object.log('STATUS: forced: unset');
+
+						this_state_object.log('STATUS: requested: ' + (this_state_object.mode.requested_after_ms / 1000).toString() + ' - ' + (this_state_object.mode.requested_before_ms / 1000).toString());
+						this_state_object.log('STATUS: rendered : ' + (this_state_object.mode.after_ms / 1000).toString() + ' - ' + (this_state_object.mode.before_ms / 1000).toString());
+						this_state_object.log('STATUS: points   : ' + (this_state_object.mode.points).toString() + ', min step: ' + (this_state_object._minPanOrZoomStep() / 1000).toString());
+					}
+
+					if(this_state_object.created_ms) {
+						if(this_state_object.debug) this_state_object.log('updating chart...');
+
+						if(NETDATA.options.debug.chart_errors) {
+							this_state_object.library.update(this_state_object.element, data);
+						}
+						else {
+							try {
+								this_state_object.library.update(this_state_object.element, data);
+							}
+							catch(err) {
+								this_state_object.error('chart "' + state.id + '" failed to be updated as ' + state.library_name);
+							}
+						}
+					}
+					else {
+						if(this_state_object.debug) this_state_object.log('creating chart...');
+
+						if(NETDATA.options.debug.chart_errors) {
+							this_state_object.library.create(this_state_object.element, data);
+							this_state_object.created_ms = new Date().getTime();
+						}
+						else {
+							try {
+								this_state_object.library.create(this_state_object.element, data);
+								this_state_object.created_ms = new Date().getTime();
+							}
+							catch(err) {
+								this_state_object.error('chart "' + state.id + '" failed to be created as ' + state.library_name);
+							}
+						}
+					}
+
+					// update the performance counters
+					this_state_object.mode.last_updated_ms = new Date().getTime();
+					this_state_object.refresh_dt_ms = this_state_object.mode.last_updated_ms - started;
+					NETDATA.options.auto_refresher_fast_weight += this_state_object.refresh_dt_ms;
+
+					if(this_state_object.refresh_dt_element)
+						this_state_object.refresh_dt_element.innerHTML = this_state_object.refresh_dt_ms.toString();
+				})
+				.fail(function() {
+					this_state_object.error('cannot download chart from ' + this_state_object.mode.url);
+				})
+				.always(function() {
+					if(typeof callback == 'function') callback();
+				});
+			},
+
+			chartURL: function() {
+				this.calculated_width = self.width();
+				this.calculated_height = self.height();
+
+				var before;
+				var after;
+				if(NETDATA.globalPanAndZoom.state) {
+					after = Math.round(NETDATA.globalPanAndZoom.force_after_ms / 1000);
+					before = Math.round(NETDATA.globalPanAndZoom.force_before_ms / 1000);
+					this.follows_global = NETDATA.globalPanAndZoom.seq;
+				}
+				else {
+					before = this.mode.force_before_ms != null ? Math.round(this.mode.force_before_ms / 1000) : this.before;
+					after  = this.mode.force_after_ms  != null ? Math.round(this.mode.force_after_ms / 1000) : this.after;
+					this.follows_global = 0;
+				}
+
+				this.mode.requested_after_ms = after * 1000;
+				this.mode.requested_before_ms = before * 1000;
+
+				// force an options provided detail
+				var pixels_per_point = this.pixels_per_point;
+				if(pixels_per_point < NETDATA.options.current.pixels_per_point)
+					pixels_per_point = NETDATA.options.current.pixels_per_point
+
+				this.mode.points = this.points || Math.round(this.calculated_width / pixels_per_point);
+
+				// build the data URL
+				this.mode.url = this.chart.data_url;
+				this.mode.url += "&format="  + this.library.format;
+				this.mode.url += "&points="  + this.mode.points.toString();
+				this.mode.url += "&group="   + this.method;
+				this.mode.url += "&options=" + this.library.options;
+				if(this.library.jsonWrapper) this.mode.url += '|jsonwrap';
+
+				if(after)
+					this.mode.url += "&after="  + after.toString();
+
+				if(before)
+					this.mode.url += "&before=" + before.toString();
+
+				if(this.dimensions)
+					this.mode.url += "&dimensions=" + this.dimensions;
+
+				if(NETDATA.options.debug.chart_data_url) this.log('chartURL(): ' + this.mode.url + ' WxH:' + this.calculated_width + 'x' + this.calculated_height + ' points: ' + this.mode.points + ' library: ' + this.library_name);
+			},
+
+			canBeAutoRefreshed: function(auto_refresher) {
+				if(this.mode.autorefresh) {
+					var now = new Date().getTime();
+
+					if(this.updates_counter && !NETDATA.options.page_is_visible) {
+						if(NETDATA.options.debug.focus || this.debug) this.log('page does not have focus');
+						return false;
+					}
+
+					if(!auto_refresher) return true;
+
+					if(!self.visible(true)) return false;
+
+					// options valid only for autoRefresh()
+					if(NETDATA.options.auto_refresher_stop_until == 0 || NETDATA.options.auto_refresher_stop_until < now) {
+						if(NETDATA.globalPanAndZoom.state) {
+							if(NETDATA.globalPanAndZoom.shouldBeAutoRefreshed(this))
+								return true;
+							else
+								return false;
+						}
+
+						if(this.paused) return false;
+
+						if(now - this.mode.last_updated_ms > this.mode.view_update_every)
+							return true;
+					}
+				}
+
+				return false;
+			},
+
+			autoRefresh: function(callback) {
+				if(this.canBeAutoRefreshed(true))
+					this.updateChart(callback);
+				else if(typeof callback != 'undefined')
+					callback();
+			},
+
+			// fetch the chart description from the netdata server
+			getChart: function(callback) {
+				this.chart = NETDATA.chartRegistry.get(this.host, this.id);
+				if(this.chart) {
+					if(typeof callback == 'function') callback();
+				}
+				else {
+					this.chart_url = this.host + "/api/v1/chart?chart=" + this.id;
+					if(this.debug) this.log('downloading ' + this.chart_url);
+					this_state_object = this;
+
+					$.ajax( {
+						url:  this.chart_url,
+						crossDomain: true
+					})
+					.done(function(chart) {
+						chart.data_url = (this_state_object.host + chart.data_url);
+						this_state_object.chart = chart;
+						this_state_object.mode.view_update_every = chart.update_every * 1000;
+						this_state_object.mode.points = Math.round(self.width() / (chart.update_every / 1000));
+
+						chart.url = this_state_object.chart_url;
+						NETDATA.chartRegistry.add(this_state_object.host, this_state_object.id, chart);
+					})
+					.fail(function() {
+						NETDATA.error(404, this_state_object.chart_url);
+						this_state_object.error('chart "' + this_state_object.id + '" not found on url "' + this_state_object.chart_url + '"');
+					})
+					.always(function() {
+						if(typeof callback == 'function') callback();
+					});
+				}
+			},
+
+			// resize the chart to its real dimensions
+			// as given by the caller
+			sizeChart: function() {
+				if(this.debug) this.log('sizing element');
+				self.css('width', this.width)
+					.css('height', this.height)
+					.css('display', 'inline-block')
+					.css('overflow', 'hidden');
+			},
+
+			// show a message in the chart
+			message: function(msg) {
+				var bgcolor = ""
+				if(NETDATA.options.debug.show_boxes)
+					bgcolor = " background-color: lightgrey;";
+
+				this.element.innerHTML = '<div style="font-size: x-small; overflow: hidden;' + bgcolor + ' width: 100%; height: 100%;"><small>'
+					+ msg
+					+ '</small></div>';
+				
+				// reset the creation datetime
+				// since we overwrote the whole element
+				this.created_ms = 0
+				if(this.debug) this.log(msg);
+			},
+
+			// show an error on the chart and stop it forever
+			error: function(msg) {
+				this.message(msg);
+				this.enabled = false;
+			},
+
+			// show a message indicating the chart is loading
+			loading: function() {
+				this.message('chart ' + this.id + ' is loading...');
+			}
+		};
+
+		if(state.debug) state.log('created');
+		state.sizeChart();
+		state.loading();
+
+		if(typeof NETDATA.chartLibraries[state.library_name] == 'undefined') {
+			NETDATA.error(402, state.library_name);
+			state.error('chart library "' + state.library_name + '" is not found');
+		}
+		else if(!NETDATA.chartLibraries[state.library_name].enabled) {
+			NETDATA.error(403, state.library_name);
+			state.error('chart library "' + state.library_name + '" is not enabled');
+		}
+		else {
+			state.library = NETDATA.chartLibraries[state.library_name];
+			state.pixels_per_point = self.data('pixels-per-point') || state.library.pixels_per_point;
+		}
+
+		if(state.refresh_dt_element_name)
+			state.refresh_dt_element = document.getElementById(state.refresh_dt_element_name) || null;
+
+		state.setMode('auto');
+
+		return state;
+	}
+
+	// get or create a chart state, given a DOM element
+	NETDATA.chartState = function(element) {
+		self = $(element);
+		var state = self.data('state') || null;
+		if(!state) {
+			state = NETDATA.chartInitialState(element);
+			self.data('state', state);
+		}
+		return state;
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -217,9 +869,83 @@
 			return s4() + s4() + '-' + s4() + '-' + s4() + '-' + s4() + '-' + s4() + s4() + s4();
 	}
 
+	// user function to signal us the DOM has been
+	// updated.
+	NETDATA.updatedDom = function() {
+		NETDATA.options.updated_dom = 1;
+	}
+
+	// ----------------------------------------------------------------------------------------------------------------
+
+	NETDATA.chartRefresher = function(index) {
+		// if(NETDATA.options.debug.mail_loop) console.log('NETDATA.chartRefresher(<targets, ' + index + ')');
+
+		if(NETDATA.options.updated_dom) {
+			// the dom has been updated
+			// get the dom parts again
+			NETDATA.getDomCharts(function() {
+				NETDATA.chartRefresher(0);
+			});
+
+			return;
+		}
+
+		var target = NETDATA.options.targets.get(index);
+		if(target == null) {
+			if(NETDATA.options.debug.main_loop) console.log('waiting to restart main loop...');
+				NETDATA.options.auto_refresher_fast_weight = 0;
+
+				setTimeout(function() {
+					NETDATA.chartRefresher(0);
+				}, NETDATA.options.current.idle_between_loops);
+			}
+		else {
+			var state = NETDATA.chartState(target);
+
+			if(NETDATA.options.auto_refresher_fast_weight < NETDATA.options.current.fast_render_timeframe) {
+				if(NETDATA.options.debug.main_loop) console.log('fast rendering...');
+
+				state.autoRefresh(function() {
+					NETDATA.chartRefresher(++index);
+				}, false);
+			}
+			else {
+				if(NETDATA.options.debug.main_loop) console.log('waiting for next refresh...');
+				NETDATA.options.auto_refresher_fast_weight = 0;
+
+				setTimeout(function() {
+					state.autoRefresh(function() {
+						NETDATA.chartRefresher(++index);
+					}, false);
+				}, NETDATA.options.current.idle_between_charts);
+			}
+		}
+	}
+
+	NETDATA.getDomCharts = function(callback) {
+		NETDATA.options.updated_dom = 0;
+
+		NETDATA.options.targets = $('div[data-netdata]').filter(':visible');
+
+		if(NETDATA.options.debug.main_loop)
+			console.log('DOM updated - there are ' + NETDATA.options.targets.length + ' charts on page.');
+
+		// we need to re-size all the charts quickly
+		// before making any external calls
+		$.each(NETDATA.options.targets, function(i, target) {
+			// the initialization will take care of sizing
+			// and the "loading..." message
+			var state = NETDATA.chartState(target);
+		});
+
+		if(typeof callback == 'function') callback();
+	}
+
 	// this is the main function - where everything starts
 	NETDATA.init = function() {
 		// this should be called only once
+
+		NETDATA.options.page_is_visible = 1;
 
 		$(window).blur(function() {
 			NETDATA.options.page_is_visible = 0;
@@ -231,214 +957,13 @@
 			if(NETDATA.options.debug.focus) console.log('Focus restored!');
 		});
 
+		if(typeof document.hasFocus == 'function' && !document.hasFocus()) {
+			NETDATA.options.page_is_visible = 0;
+			if(NETDATA.options.debug.focus) console.log('Document has no focus!');
+		}
+
 		NETDATA.getDomCharts(function() {
 			NETDATA.chartRefresher(0);
-		});
-	}
-
-	// user function to signal us the DOM has been
-	// updated.
-	NETDATA.updatedDom = function() {
-		NETDATA.options.updated_dom = 1;
-	}
-
-	// ----------------------------------------------------------------------------------------------------------------
-
-	NETDATA.generateChartDataURL = function() {
-		self = $(this);
-
-		var chart = self.data('chart');
-		var host = self.data('host') || NETDATA.chartDefaults.host;
-		var width = self.width();
-		var height = self.height();
-		var method = self.data('method') || NETDATA.chartDefaults.method;
-		var after = self.data('after') || NETDATA.chartDefaults.after;
-		var before = self.data('before') || NETDATA.chartDefaults.before;
-		var library = self.data('chart-library') || NETDATA.chartDefaults.library;
-		var dimensions = self.data('dimensions') || null;
-		var pixels_per_point = self.data('pixels-per-point') || NETDATA.chartLibraries[library].pixels_per_point;
-
-		if(self.data('chart-panning') || self.data('chart-zooming')) {
-			before = self.data('panning-before') || 0;
-			after = self.data('panning-after') || 0;
-		}
-
-		// force an options provided detail
-		if(pixels_per_point < NETDATA.options.current.pixels_per_point)
-			pixels_per_point = NETDATA.options.current.pixels_per_point
-
-		var points = self.data('points') || Math.round(width / pixels_per_point);
-		var format = self.data('format') || NETDATA.chartLibraries[library].format;
-		var options = self.data('options') || NETDATA.chartLibraries[library].options;
-
-		// build the data URL
-		var url = host + chart.data_url;
-		url += "&format="  + format;
-		url += "&points="  + points.toString();
-		url += "&group="   + method;
-		url += "&options=" + options;
-		if(NETDATA.chartLibraries[library].jsonWrapper) url += '|jsonwrap';
-
-		if(after)
-			url += "&after="  + after.toString();
-
-		if(before)
-			url += "&before=" + before.toString();
-
-		if(dimensions)
-			url += "&dimensions=" + dimensions;
-
-		self.data('calculated-width', width)
-			.data('calculated-height', height)
-			.data('calculated-points', points)
-			.data('calculated-options', options)
-			.data('calculated-url', url);
-
-		if(NETDATA.options.debug.chart_data_url) console.log('generateChartDataURL(): ' + url + ' WxH:' + width + 'x' + height + ' points: ' + points + ' library: ' + library);
-		return url;
-	}
-
-	NETDATA.validateDomCharts = function(targets, index, callback) {
-		if(NETDATA.options.debug.main_loop) console.log('validateDomCharts() working on ' + index);
-
-		var target = targets.get(index);
-		if(target == null) {
-			if(NETDATA.options.debug.main_loop) console.log('validateDomCharts(): all ' + (index - 1) + ' charts parsed.');
-			if(typeof callback == 'function') callback();
-		}
-		else {
-			var self = $(target);
-			if(!self.data('prepared')) {
-				self.data('prepared', true)
-					.data('updated', 0)
-					.data('chart-created', false)
-					.data('refresher-enabled', false)
-					.data('chart-panning', false)
-					.data('chart-zooming', false)
-					.data('chart-paused', false)
-					.data('panning-before', 0)
-					.data('panning-after', 0);
-
-				var id = self.data('netdata');
-				var host = self.data('host') || NETDATA.chartDefaults.host;
-				var library = self.data('chart-library') || NETDATA.chartDefaults.library;
-
-				if(NETDATA.options.debug.main_loop) console.log('validateDomCharts() parsing ' + id + ' of type ' + library);
-
-				if(typeof NETDATA.chartLibraries[library] == 'undefined') {
-					NETDATA.error(402, library);
-					NETDATA.messageInABox(target, 'chart library "' + library + '" is not found');
-					NETDATA.validateDomCharts(targets, ++index, callback);
-				}
-				else if(!NETDATA.chartLibraries[library].enabled) {
-					NETDATA.error(403, library);
-					NETDATA.messageInABox(target, 'chart library "' + library + '" is not enabled');
-					NETDATA.validateDomCharts(targets, ++index, callback);
-				}
-				else if(!NETDATA.chartLibraries[library].initialized) {
-					self.data('prepared', false);
-					NETDATA.chartLibraries[library].initialize(function() {
-						NETDATA.validateDomCharts(targets, index, callback);
-					});
-				}
-				else {
-					var url = host + "/api/v1/chart?chart=" + id;
-
-					$.ajax( {
-						url:  url,
-						crossDomain: true
-					})
-					.done(function(chart) {
-						self.data('chart', chart)
-							.data('update-every', chart.update_every * 1000)
-							.data('refresher-enabled', true)
-							.data('host', host)
-							.data('chart-library', library);
-					})
-					.fail(function() {
-						NETDATA.error(404, url);
-						NETDATA.messageInABox(target, 'chart "' + id + '" not found on url "' + url + '"');
-					})
-					.always(function() {
-						NETDATA.validateDomCharts(targets, ++index, callback);
-					});
-				}
-			}
-			else {
-				NETDATA.validateDomCharts(targets, ++index, callback);
-			}
-		}
-	}
-
-	NETDATA.sizeDomCharts = function(targets, index, callback) {
-		// this is used to quickly size all charts to their size
-
-		if(NETDATA.options.debug.main_loop) console.log('sizeDomCharts() working on ' + index);
-
-		var target = targets.get(index);
-		if(target == null) {
-			if(NETDATA.options.debug.main_loop) console.log('sizeDomCharts(): all ' + (index - 1) + ' charts sized.');
-			if(typeof callback == 'function') callback();
-		}
-		else {
-			var self = $(target);
-
-			var id = self.data('netdata');
-			var width = self.data('width') || NETDATA.chartDefaults.width;
-			var height = self.data('height') || NETDATA.chartDefaults.height;
-
-			self.css('width', width)
-				.css('height', height)
-				.css('display', 'inline-block')
-				.css('overflow', 'hidden');
-
-			NETDATA.messageInABox(target, 'chart "' + id + '" is loading...');
-			NETDATA.sizeDomCharts(targets, ++index, callback);
-		}
-	}
-
-	NETDATA.getDomCharts = function(callback) {
-		NETDATA.options.updated_dom = 0;
-
-		NETDATA.options.targets = $('div[data-netdata]').filter(':visible')
-			.bind('create', function(event, data) {
-				var self = $(this);
-
-				if(NETDATA.options.debug.chart_errors) {
-					NETDATA.chartLibraries[self.data('chart-library')].create(this, data);
-					self.data('chart-created', true);
-				}
-				else {
-					try {
-						NETDATA.chartLibraries[self.data('chart-library')].create(this, data);
-						self.data('chart-created', true);
-					}
-					catch(err) {
-						NETDATA.messageInABox(this, 'chart "' + self.data('netdata') + '" failed to be created as ' + self.data('chart-library'));
-						self.data('chart-created', false);
-					}
-				}
-			})
-			.bind('update', function(event, data) {
-				var self = $(this);
-				if(NETDATA.options.debug.chart_errors)
-					NETDATA.chartLibraries[self.data('chart-library')].update(this, data);
-				else {
-					try {
-						NETDATA.chartLibraries[self.data('chart-library')].update(this, data);
-					}
-					catch(err) {
-						NETDATA.messageInABox(this, 'chart "' + self.data('netdata') + '" failed to be updated as ' + self.data('chart-library'));
-						self.data('chart-created', false);
-					}
-				}
-			});
-
-		if(NETDATA.options.debug.main_loop)
-			console.log('DOM updated - there are ' + NETDATA.options.targets.length + ' charts on page.');
-
-		NETDATA.sizeDomCharts(NETDATA.options.targets, 0, function() {
-			NETDATA.validateDomCharts(NETDATA.options.targets, 0, callback);
 		});
 	}
 
@@ -453,153 +978,6 @@
 
 	//var c = new chart();
 	//c.color();
-
-	NETDATA.chartValuesDownloader = function(element, callback, panning) {
-		var self = $(element);
-		var last = self.data('updated') || 0;
-		var every = self.data('update-every') || 1;
-
-		// check if this chart has to be refreshed now
-		var now = new Date().getTime();
-		if(!panning && last + every > now) {
-			if(NETDATA.options.debug.chart_timing) console.log(self.data('netdata') + ' too soon - skipping.');
-			if(typeof callback == 'function') callback();
-		}
-		else if(!panning && !self.visible(true)) {
-			if(NETDATA.options.debug.visibility) console.log(self.data('netdata') + ' is NOT visible.');
-			if(typeof callback == 'function') callback();
-		}
-		else {
-			if(NETDATA.options.debug.visibility) console.log(self.data('netdata') + ' is visible, downloading data...');
-			$.ajax( {
-				url: NETDATA.generateChartDataURL.call(element), // self.data('chart-url'),
-				crossDomain: true
-			})
-			.then(function(data) {
-				var started = new Date().getTime();
-
-				// if the result is JSON, find the latest update-every
-				if(NETDATA.chartLibraries[self.data('chart-library')].jsonWrapper) {
-					if(!panning && typeof data.update_every != 'undefined')
-						self.data('update-every', data.update_every * 1000);
-
-					if(typeof data.after != 'undefined')
-						self.data('panning-after', data.after);
-
-					if(typeof data.before != 'undefined')
-						self.data('panning-before', data.before);
-				}
-
-				if(self.data('chart-created')) {
-					if(NETDATA.options.debug.chart_calls) console.log('updating ' + self.data('chart-library') + ' chart ' + self.data('netdata'));
-					self.trigger('update', [data]);
-					// NETDATA.chartLibraries[self.data('chart-library')].update(element, data);
-				}
-				else {
-					if(NETDATA.options.debug.chart_calls) console.log('creating ' + self.data('chart-library') + ' chart ' + self.data('netdata'));
-					self.trigger('create', [data]);
-					//NETDATA.chartLibraries[self.data('chart-library')].create(element, data);
-				}
-
-				var ended = new Date().getTime();
-				self.data('updated', ended);
-
-				var dt = ended - started;
-
-				self.data('refresh-dt', dt);
-				var element_name = self.data('dt-element-name') || null;
-				if(element_name) {
-					var element = document.getElementById(element_name) || null;
-					if(element) {
-						element.innerHTML = dt.toString();
-					}
-				}
-			})
-			.fail(function() {
-				NETDATA.messageInABox(element, 'cannot download chart "' + self.data('netdata') + '" values from url "' + self.data('chart-url') + '"');
-			})
-			.always(function() {
-				if(typeof callback == 'function') callback();
-			});
-		}
-	};
-
-	NETDATA.chartRefresher = function(index) {
-		// if(NETDATA.options.debug.mail_loop) console.log('NETDATA.chartRefresher(<targets, ' + index + ')');
-
-		if(!NETDATA.options.page_is_visible) {
-			if(NETDATA.options.debug.main_loop) console.log('waiting focus...');
-			setTimeout(function() {
-					NETDATA.chartRefresher(index);
-				}, NETDATA.options.current.idle_lost_focus);
-		}
-		else {
-			now = new Date().getTime();
-
-			if(now < NETDATA.options.refreshed_stop_until) {
-				if(NETDATA.options.debug.main_loop) console.log('refreshed stopped until...');
-				setTimeout(function() {
-						NETDATA.chartRefresher(index);
-					}, NETDATA.options.current.idle_between_loops);
-			}
-			else if(NETDATA.options.updated_dom) {
-				// the dom has been updated
-				// get the dom parts again
-				NETDATA.getDomCharts(function() {
-					NETDATA.chartRefresher(0);
-				});
-			}
-			else {
-				var target = NETDATA.options.targets.get(index);
-				if(target == null) {
-					if(NETDATA.options.debug.main_loop) console.log('waiting to restart main loop...');
-					NETDATA.options.last_paused = now;
-
-					setTimeout(function() {
-						NETDATA.chartRefresher(0);
-					}, NETDATA.options.current.idle_between_loops);
-				}
-				else {
-					var self = $(target);
-					if(!self.data('refresher-enabled')) {
-						if(NETDATA.options.debug.main_loop) console.log('chart has refresher disabled...');
-						NETDATA.chartRefresher(++index);
-					}
-					else if(self.data('chart-panning')) {
-						if(NETDATA.options.debug.main_loop) console.log('chart is panning...');
-						NETDATA.chartRefresher(++index);
-					}
-					else if(self.data('chart-zooming')) {
-						if(NETDATA.options.debug.main_loop) console.log('chart is zooming...');
-						NETDATA.chartRefresher(++index);
-					}
-					else if(self.data('chart-paused')) {
-						if(NETDATA.options.debug.main_loop) console.log('chart is paused...');
-						NETDATA.chartRefresher(++index);
-					}
-					else {
-						if(now - NETDATA.options.last_paused < NETDATA.options.current.fast_render_timeframe) {
-							if(NETDATA.options.debug.main_loop) console.log('fast rendering...');
-
-							NETDATA.chartValuesDownloader(target, function() {
-								NETDATA.chartRefresher(++index);
-							}, false);
-						}
-						else {
-							if(NETDATA.options.debug.main_loop) console.log('waiting for next refresh...');
-							NETDATA.options.last_paused = now;
-
-							setTimeout(function() {
-								NETDATA.chartValuesDownloader(target, function() {
-									NETDATA.chartRefresher(++index);
-								}, false);
-							}, NETDATA.options.current.idle_between_charts);
-						}
-					}
-				}
-			}
-		}
-	}
 
 	// ----------------------------------------------------------------------------------------------------------------
 	// peity
@@ -626,30 +1004,20 @@
 	};
 
 	NETDATA.peityChartUpdate = function(element, data) {
-		var self = $(element);
-		var instance = self.data('peity-instance');
-		var ins = $(instance);
-		ins.html(data.result);
-
+		var peity = $(data.state.peity_element);
+		peity.html(data.result);
 		// peity.change() does not accept options
 		// to pass width and height
-		//ins.change();
-		ins.peity('line', { width: self.data('calculated-width'), height: self.data('calculated-height') })
+		//peity.change();
+		peity.peity('line', { width: data.state.calculated_width, height: data.state.calculated_height });
 	}
 
 	NETDATA.peityChartCreate = function(element, data) {
-		var self = $(element);
+		element.innerHTML = '<div id="peity-' + data.state.uuid + '">' + data.result + '</div>';
+		data.state.peity_element = document.getElementById('peity-' + data.state.uuid);
+		var peity = $(data.state.peity_element);
 
-		var uuid = NETDATA.guid();
-		element.innerHTML = '<div id="' + uuid + '">' + data.result + '</div>';
-		var instance = document.getElementById(uuid);
-		var ins = $(instance);
-
-		ins.peity('line', { width: self.data('calculated-width'), height: self.data('calculated-height') })
-
-		self.data('peity-uuid', uuid)
-			.data('peity-instance', instance)
-			.data('chart-created', true);
+		peity.peity('line', { width: data.state.calculated_width, height: data.state.calculated_height });
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -677,19 +1045,18 @@
 	};
 
 	NETDATA.sparklineChartUpdate = function(element, data) {
-		var self = $(element);
-		var options = self.data('sparkline-options');
-		options.width = self.data('calculated-width');
-		options.height = self.data('calculated-height');
-		self.sparkline(data.result, options);
+		data.state.sparkline_options.width = data.state.calculated_width;
+		data.state.sparkline_options.height = data.state.calculated_height;
+
+		spark = $(data.state.sparkline_element);
+		spark.sparkline(data.result, data.state.sparkline_options);
 	}
 
 	NETDATA.sparklineChartCreate = function(element, data) {
 		var self = $(element);
-		var chart = self.data('chart');
 		var type = self.data('sparkline-type') || 'line';
 		var lineColor = self.data('sparkline-linecolor') || NETDATA.colors[0];
-		var fillColor = self.data('sparkline-fillcolor') || (chart.chart_type == 'line')?'#FFF':NETDATA.ColorLuminance(lineColor, 0.8);
+		var fillColor = self.data('sparkline-fillcolor') || (data.state.chart.chart_type == 'line')?'#FFF':NETDATA.ColorLuminance(lineColor, 0.8);
 		var chartRangeMin = self.data('sparkline-chartrangemin') || undefined;
 		var chartRangeMax = self.data('sparkline-chartrangemax') || undefined;
 		var composite = self.data('sparkline-composite') || undefined;
@@ -723,7 +1090,7 @@
 		var tooltipClassname = self.data('sparkline-tooltipclassname') || undefined;
 		var tooltipFormat = self.data('sparkline-tooltipformat') || undefined;
 		var tooltipPrefix = self.data('sparkline-tooltipprefix') || undefined;
-		var tooltipSuffix = self.data('sparkline-tooltipsuffix') || ' ' + chart.units;
+		var tooltipSuffix = self.data('sparkline-tooltipsuffix') || ' ' + data.state.chart.units;
 		var tooltipSkipNull = self.data('sparkline-tooltipskipnull') || true;
 		var tooltipValueLookups = self.data('sparkline-tooltipvaluelookups') || undefined;
 		var tooltipFormatFieldlist = self.data('sparkline-tooltipformatfieldlist') || undefined;
@@ -734,7 +1101,7 @@
 		var numberDigitGroupCount = self.data('sparkline-numberdigitgroupcount') || undefined;
 		var animatedZooms = self.data('sparkline-animatedzooms') || false;
 
-		var options = {
+		data.state.sparkline_options = {
 			type: type,
 			lineColor: lineColor,
 			fillColor: fillColor,
@@ -768,7 +1135,7 @@
 			highlightColor: highlightColor,
 			tooltipContainer: tooltipContainer,
 			tooltipClassname: tooltipClassname,
-			tooltipChartTitle: chart.title,
+			tooltipChartTitle: data.state.chart.title,
 			tooltipFormat: tooltipFormat,
 			tooltipPrefix: tooltipPrefix,
 			tooltipSuffix: tooltipSuffix,
@@ -781,43 +1148,92 @@
 			numberDecimalMark: numberDecimalMark,
 			numberDigitGroupCount: numberDigitGroupCount,
 			animatedZooms: animatedZooms,
-			width: self.data('calculated-width'),
-			height: self.data('calculated-height')
+			width: data.state.calculated_width,
+			height: data.state.calculated_height
 		};
 
-		var uuid = NETDATA.guid();
-		element.innerHTML = '<div style="display: inline-block; position: relative;" id="' + uuid + '"></div>';
-		var div = document.getElementById(uuid);
+		element.innerHTML = '<div id="sparkline-' + data.state.uuid + '" style="display: inline-block; position: relative;"></div>';
+		data.state.sparkline_element = document.getElementById('sparkline-' + data.state.uuid);
 
-		self.sparkline(data.result, options);
-		self.data('sparkline-options', options)
-			.data('uuid', uuid)
-			.data('chart-created', true);
+		spark = $(data.state.sparkline_element);
+		spark.sparkline(data.result, data.state.sparkline_options);
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
 	// dygraph
 
-	NETDATA.dygraphAllCharts = [];
-	NETDATA.dygraphInitSync = function(callback) {
-		//$.getScript(NETDATA.serverDefault + 'dygraph-synchronizer.js')
-		//	.always(function() {
-				if(typeof callback == "function")
-					callback();
-		//	})
-	}
+	NETDATA.dygraph = {
+		sync: false,
+		paused: []
+	};
 
-	NETDATA.dygraphSync = null;
-	NETDATA.dygraphSyncAll = function() {
-		if(NETDATA.dygraphSync) {
-			NETDATA.dygraphSync.detach();
-			NETDATA.dygraphSync = null;
+	NETDATA.dygraph.syncStart = function(state, event, x, points, row, seriesName) {
+		if(NETDATA.options.debug.dygraph || state.debug) console.log('dygraph.syncStart()');
+		state.pauseChart();
+
+		var dygraph = state.dygraph_instance;
+
+		if(!NETDATA.dygraph.sync) {
+			$.each(NETDATA.options.targets, function(i, target) {
+				var st = NETDATA.chartState(target);
+				if(typeof st.dygraph_instance == 'object' && st.library_name == state.library_name && st.canBeAutoRefreshed(false)) {
+					NETDATA.dygraph.paused.push(st);
+				}
+			});
 		}
 
-		NETDATA.dygraphSync = Dygraph.synchronize(NETDATA.dygraphAllCharts, {
- 			selection: true,
- 			zoom: false
- 		});
+		$.each(NETDATA.dygraph.paused, function(i, st) {
+			st.setSelection(x);
+		});
+
+	}
+
+	NETDATA.dygraph.syncStop = function(state) {
+		if(NETDATA.options.debug.dygraph || state.debug) console.log('dygraph.syncStop()');
+
+		if(!NETDATA.dygraph.sync) {
+			$.each(NETDATA.dygraph.paused, function(i, st) {
+				st.clearSelection();
+			});
+
+			NETDATA.dygraph.sync = false;
+			NETDATA.dygraph.paused = [];
+		}
+
+		state.unpauseChart();
+	}
+
+	NETDATA.dygraph.resetChart = function(element, dygraph) {
+		if(NETDATA.options.debug.dygraph) console.log('dygraph.resetChart()');
+
+		state = NETDATA.chartState(element);
+		state.resetChart();
+		if(NETDATA.globalPanAndZoom.clearMaster());
+	}
+
+	NETDATA.dygraph.zoomOrPan = function(element, dygraph, after, before) {
+		if(NETDATA.options.debug.dygraph) console.log('>>>> dygraph.zoomOrPan(element, dygraph, after:' + after + ', before: ' + before + ')');
+
+		state = NETDATA.chartState(element);
+		state.updateChartPanOrZoom(after, before);
+		return;
+	}
+
+	NETDATA.dygraphSetSelection = function(state, t) {
+		var r = state.calculateRowForTime(t);
+		if(r != -1) {
+			state.dygraph_instance.setSelection(r);
+			state.pauseChart();
+		}
+		else {
+			state.dygraph_instance.clearSelection();
+			state.unpauseChart();
+		}
+	}
+
+	NETDATA.dygraphclearSelection = function(state, t) {
+		state.dygraph_instance.clearSelection();
+		state.unpauseChart();
 	}
 
 	NETDATA.dygraphInitialize = function(callback) {
@@ -830,7 +1246,8 @@
 					NETDATA.error(100, NETDATA.dygraph_js);
 				})
 				.always(function() {
-					NETDATA.dygraphInitSync(callback);
+					if(typeof callback == "function")
+						callback();
 				})
 		}
 		else {
@@ -840,90 +1257,25 @@
 		}
 	};
 
-	NETDATA.dygraphReset = function(element, dygraph) {
-		if(NETDATA.options.debug.dygraph) console.log('dygraphReset()');
-
-		self = $(element);
-
-		if(self.data('chart-panning') || self.data('chart-paused')) {
-			self.data('chart-panning', false)
-				.data('chart-zooming', false)
-				.data('chart-paused', false)
-				.data('panning-before', 0)
-				.data('panning-after', 0)
-				.data('updated', 0)
-				.data('panning-before-max', 0);
-			
-			NETDATA.options.refreshed_stop_until = 0;
-			NETDATA.chartValuesDownloader(element, null, false);
-		}
-	}
-
-	NETDATA.dygraphZoomOrPan = function(element, dygraph, after, before, zoom) {
-		if(NETDATA.options.debug.dygraph) console.log('dygraphZoomOrPan()');
-
-		self = $(element);
-
-		var before_old = self.data('panning-before');
-		var after_old = self.data('panning-after');
-		var range_old = before_old - after_old;
-
-		var shift = Math.abs(before_old - before);
-
-		var range = before - after;
-
-		if((shift > range_old / 20 || zoom) && range > 10) {
-			// the user is panning
-			if(NETDATA.options.debug.dygraph) console.log('dygraphZoomOrPan() ' + after_old + ' - ' + before_old + ', NEW: ' + after + ' - ' + before + ', shift by: ' + shift + ' old range: ' + (before_old - after_old).toString() + ' new range: ' + (before - after).toString());
-			
-			if(!self.data('chart-panning') && !self.data('chart-zooming')) {
-				self.data('chart-panning', true)
-					.data('panning-before-max', before);
-			}
-
-			var before_max = self.data('panning-before-max');
-			if(zoom || before <= before_max) {
-				NETDATA.options.refreshed_stop_until = now + 2000;
-
-				if(NETDATA.options.debug.dygraph) console.log('dygraphZoomOrPan() rendering.');
-
-				if(zoom) {
-					self.data('chart-panning', false)
-						.data('chart-zooming', true);
-				}
-				else {
-					self.data('chart-panning', true)
-						.data('chart-zooming', false);
-				}
-
-				self.data('chart-paused', true)
-					.data('panning-before', before)
-					.data('panning-after', after)
-					.data('updated', 0);
-				
-				NETDATA.chartValuesDownloader(element, null, true);
-			}
-		}
-	}
-
 	NETDATA.dygraphChartUpdate = function(element, data) {
-		if(NETDATA.options.debug.dygraph) console.log('dygraphChartUpdate()');
+		if(NETDATA.options.debug.dygraph || data.state.debug) console.log('dygraphChartUpdate()');
 
-		var self = $(element);
-		var dygraph = self.data('dygraph-instance');
+		var dygraph = data.state.dygraph_instance;
 
-		if(self.data('chart-panning')) {
+		if(data.state.mode.name == 'pan') {
+			if(NETDATA.options.debug.dygraph || data.state.debug) console.log('dygraphChartUpdate() loose update');
 			dygraph.updateOptions({
 				file: data.result.data,
 				labels: data.result.labels,
-				labelsDivWidth: self.width() - 70
+				labelsDivWidth: data.state.calculated_width - 70
 			});
 		}
 		else {
+			if(NETDATA.options.debug.dygraph || data.state.debug) console.log('dygraphChartUpdate() strict update');
 			dygraph.updateOptions({
 				file: data.result.data,
 				labels: data.result.labels,
-				labelsDivWidth: self.width() - 70,
+				labelsDivWidth: data.state.calculated_width - 70,
 				dateWindow: null,
     			valueRange: null
 			});
@@ -931,19 +1283,18 @@
 	};
 
 	NETDATA.dygraphChartCreate = function(element, data) {
-		if(NETDATA.options.debug.dygraph) console.log('dygraphChartCreate()');
+		if(NETDATA.options.debug.dygraph || data.state.debug) console.log('dygraphChartCreate()');
 
 		var self = $(element);
-		var chart = self.data('chart');
-		var title = self.data('dygraph-title') || chart.title;
+		var title = self.data('dygraph-title') || data.state.chart.title;
 		var titleHeight = self.data('dygraph-titleheight') || 20;
 		var labelsDiv = self.data('dygraph-labelsdiv') || undefined;
 		var connectSeparatedPoints = self.data('dygraph-connectseparatedpoints') || false;
 		var yLabelWidth = self.data('dygraph-ylabelwidth') || 12;
-		var stackedGraph = self.data('dygraph-stackedgraph') || (chart.chart_type == 'stacked')?true:false;
+		var stackedGraph = self.data('dygraph-stackedgraph') || (data.state.chart.chart_type == 'stacked')?true:false;
 		var stackedGraphNaNFill = self.data('dygraph-stackedgraphnanfill') || 'none';
 		var hideOverlayOnMouseOut = self.data('dygraph-hideoverlayonmouseout') || true;
-		var fillGraph = self.data('dygraph-fillgraph') || (chart.chart_type == 'area')?true:false;
+		var fillGraph = self.data('dygraph-fillgraph') || (data.state.chart.chart_type == 'area')?true:false;
 		var drawPoints = self.data('dygraph-drawpoints') || false;
 		var labelsDivStyles = self.data('dygraph-labelsdivstyles') || { 'fontSize':'10px' };
 		var labelsDivWidth = self.data('dygraph-labelsdivwidth') || self.width() - 70;
@@ -965,11 +1316,11 @@
 		var pointSize = self.data('dygraph-pointsize') || 1;
 		var stepPlot = self.data('dygraph-stepplot') || false;
 		var strokeBorderColor = self.data('dygraph-strokebordercolor') || 'white';
-		var strokeBorderWidth = self.data('dygraph-strokeborderwidth') || (chart.chart_type == 'stacked')?1.0:0.0;
+		var strokeBorderWidth = self.data('dygraph-strokeborderwidth') || (data.state.chart.chart_type == 'stacked')?1.0:0.0;
 		var strokePattern = self.data('dygraph-strokepattern') || undefined;
 		var highlightCircleSize = self.data('dygraph-highlightcirclesize') || 3;
 		var highlightSeriesOpts = self.data('dygraph-highlightseriesopts') || { strokeWidth: 1.5 };
-		var highlightSeriesBackgroundAlpha = self.data('dygraph-highlightseriesbackgroundalpha') || (chart.chart_type == 'stacked')?0.7:0.5;
+		var highlightSeriesBackgroundAlpha = self.data('dygraph-highlightseriesbackgroundalpha') || (data.state.chart.chart_type == 'stacked')?0.7:0.5;
 		var pointClickCallback = self.data('dygraph-pointclickcallback') || undefined;
 		var showRangeSelector = self.data('dygraph-showrangeselector') || false;
 		var showRoller = self.data('dygraph-showroller') || false;
@@ -981,10 +1332,10 @@
 		var gridLinePattern = self.data('dygraph-gridlinepattern') || null;
 		var gridLineWidth = self.data('dygraph-gridlinewidth') || 0.3;
 
-		var options = {
+		data.state.dygraph_options = {
 			title: title,
 			titleHeight: titleHeight,
-			ylabel: chart.units,
+			ylabel: data.state.chart.units,
 			yLabelWidth: yLabelWidth,
 			connectSeparatedPoints: connectSeparatedPoints,
 			drawPoints: drawPoints,
@@ -1048,47 +1399,57 @@
 				}
 			},
 			drawCallback: function(dygraph, is_initial) {
-				if(NETDATA.options.debug.dygraph) console.log('dygraphDrawCallback()');
+				if(data.state.mode.name != 'auto') {
+					if(NETDATA.options.debug.dygraph) console.log('dygraphDrawCallback()');
 
-				var x_range = dygraph.xAxisRange();
-				var after = Math.round(x_range[0] / 1000);
-				var before = Math.round(x_range[1] / 1000);
+					var x_range = dygraph.xAxisRange();
+					var after = Math.round(x_range[0]);
+					var before = Math.round(x_range[1]);
 
-				NETDATA.dygraphZoomOrPan(element, this, after, before, false, true);
+					NETDATA.dygraph.zoomOrPan(element, this, after, before);
+				}
 			},
 			zoomCallback: function(minDate, maxDate, yRanges) {
 				if(NETDATA.options.debug.dygraph) console.log('dygraphZoomCallback()');
-				NETDATA.dygraphZoomOrPan(element, this, Math.round(minDate / 1000), Math.round(maxDate / 1000), false, true);
+				NETDATA.dygraph.zoomOrPan(element, this, minDate, maxDate);
 			},
 			highlightCallback: function(event, x, points, row, seriesName) {
 				if(NETDATA.options.debug.dygraph) console.log('dygraphHighlightCallback()');
-				self.data('chart-paused', true);
+				NETDATA.dygraph.syncStart(data.state, event, x, points, row, seriesName);
 			},
 			unhighlightCallback: function(event) {
 				if(NETDATA.options.debug.dygraph) console.log('dygraphUnhighlightCallback()');
-				self.data('chart-paused', false);
+				NETDATA.dygraph.syncStop(data.state);
 			},
 			interactionModel : {
 				mousedown: function(event, dygraph, context) {
 					if(NETDATA.options.debug.dygraph) console.log('dygraphMouseDown()');
 
-						// Right-click should not initiate a zoom.
+					// Right-click should not initiate a zoom.
 					if (event.button && event.button == 2) return;
 
 					context.initializeMouseDown(event, dygraph, context);
 					
-					if (event.altKey || event.shiftKey)
+					if (event.altKey || event.shiftKey) {
+						data.state.setMode('zoom');
 						Dygraph.startZoom(event, dygraph, context);
-					else
+					}
+					else {
+						data.state.setMode('pan');
 						Dygraph.startPan(event, dygraph, context);
+					}
 				},
 				mousemove: function(event, dygraph, context) {
 					if(NETDATA.options.debug.dygraph) console.log('dygraphMouseMove()');
 
-					if (context.isPanning)
+					if (context.isPanning) {
+						data.state.setMode('pan');
 						Dygraph.movePan(event, dygraph, context);
-					else if (context.isZooming)
+					}
+					else if (context.isZooming) {
+						data.state.setMode('zoom');
 						Dygraph.moveZoom(event, dygraph, context);
+					}
 				},
 				mouseup: function(event, dygraph, context) {
 					if(NETDATA.options.debug.dygraph) console.log('dygraphMouseUp()');
@@ -1104,7 +1465,7 @@
 				},
 				dblclick: function(event, dygraph, context) {
 					if(NETDATA.options.debug.dygraph) console.log('dygraphMouseDoubleClick()');
-					NETDATA.dygraphReset(element, dygraph);
+					NETDATA.dygraph.resetChart(element, dygraph);
 				},
 				mousewheel: function(event, dygraph, context) {
 					if(NETDATA.options.debug.dygraph) console.log('dygraphMouseWheel()');
@@ -1112,27 +1473,31 @@
 					if(event.altKey || event.shiftKey) {
 						// http://dygraphs.com/gallery/interaction-api.js
 						var normal = (event.detail) ? event.detail * -1 : event.wheelDelta / 40;
-						var percentage = normal / 10;
+						var percentage = normal / 25;
 
-						var before_old = self.data('panning-before');
-						var after_old = self.data('panning-after');
+						var before_old = data.state.mode.before_ms;
+						var after_old = data.state.mode.after_ms;
 						var range_old = before_old - after_old;
 
 						var range = range_old * ( 1 - percentage );
 						var dt = Math.round((range_old - range) / 2);
-						before = before_old - dt;
-						after  = after_old  + dt;
+
+						var before = before_old - dt;
+						var after  = after_old  + dt;
 
 						if(NETDATA.options.debug.dygraph) console.log('percent: ' + percentage + ' from ' + after_old + ' - ' + before_old + ' to ' + after + ' - ' + before + ', range from ' + (before_old - after_old).toString() + ' to ' + (before - after).toString());
 
-						NETDATA.dygraphZoomOrPan(element, dygraph, after, before, true);
+						data.state.setMode('zoom');
+						NETDATA.dygraph.zoomOrPan(element, dygraph, after, before);
 					}					
 				},
 				touchstart: function(event, dygraph, context) {
 					Dygraph.Interaction.startTouch(event, dygraph, context);
-					//context.touchDirections.y = 0;
+					context.touchDirections = { x: true, y: false };
+					data.state.setMode('zoom');
 				},
 				touchmove: function(event, dygraph, context) {
+					//Dygraph.cancelEvent(event);
 					Dygraph.Interaction.moveTouch(event, dygraph, context);
 				},
 				touchend: function(event, dygraph, context) {
@@ -1141,20 +1506,10 @@
 			}
 		};
 
-		var uuid = NETDATA.guid();
-		self.html('<div id="' + uuid + '" style="width: 100%; height: 100%;"></div>');
+		self.html('<div id="dygraph-' + data.state.uuid + '" style="width: 100%; height: 100%;"></div>');
 
-		var dchart = new Dygraph(document.getElementById(uuid),
-			data.result.data, options);
-
-		self.data('dygraph-instance', dchart)
-			.data('dygraph-options', options)
-			.data('uuid', uuid)
-			.data('chart-created', true);
-
-		//NETDATA.dygraphAllCharts.push(dchart);
-		//if(NETDATA.dygraphAllCharts.length > 1)
-		//	NETDATA.dygraphSyncAll();
+		data.state.dygraph_instance = new Dygraph(document.getElementById('dygraph-' + data.state.uuid),
+			data.result.data, data.state.dygraph_options);
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -1176,26 +1531,27 @@
 						callback();
 				}
 			}
+			else {
+				var fileref = document.createElement("link");
+				fileref.setAttribute("rel", "stylesheet");
+				fileref.setAttribute("type", "text/css");
+				fileref.setAttribute("href", NETDATA.morris_css);
 
-			var fileref = document.createElement("link");
-			fileref.setAttribute("rel", "stylesheet");
-			fileref.setAttribute("type", "text/css");
-			fileref.setAttribute("href", NETDATA.morris_css);
+				if (typeof fileref != "undefined")
+					document.getElementsByTagName("head")[0].appendChild(fileref);
 
-			if (typeof fileref != "undefined")
-				document.getElementsByTagName("head")[0].appendChild(fileref);
-
-			$.getScript(NETDATA.morris_js)
-				.done(function() {
-					NETDATA.registerChartLibrary('morris', NETDATA.morris_js);
-				})
-				.fail(function() {
-					NETDATA.error(100, NETDATA.morris_js);
-				})
-				.always(function() {
-					if(typeof callback == "function")
-						callback();
-				})
+				$.getScript(NETDATA.morris_js)
+					.done(function() {
+						NETDATA.registerChartLibrary('morris', NETDATA.morris_js);
+					})
+					.fail(function() {
+						NETDATA.error(100, NETDATA.morris_js);
+					})
+					.always(function() {
+						if(typeof callback == "function")
+							callback();
+					})
+			}
 		}
 		else {
 			NETDATA.chartLibraries.morris.enabled = false;
@@ -1205,26 +1561,15 @@
 	};
 
 	NETDATA.morrisChartUpdate = function(element, data) {
-		var self = $(element);
-		var morris = self.data('morris-instance');
-
-		if(morris != null) {
-			console.log('updating morris');
-			morris.setData(data.result.data);
-		}
-		else
-			console.log('not updating morris');
+		data.state.morris_instance.setData(data.result.data);
 	};
 
 	NETDATA.morrisChartCreate = function(element, data) {
-		var self = $(element);
-		var chart = self.data('chart');
 
-		var uuid = NETDATA.guid();
-		self.html('<div id="' + uuid + '" style="width: ' + self.data('calculated-width') + 'px; height: ' + self.data('calculated-height') + 'px;"></div>');
+		element.innerHTML = '<div id="morris-' + data.state.uuid + '" style="width: ' + data.state.calculated_width + 'px; height: ' + data.state.calculated_height + 'px;"></div>';
 
 		var options = {
-				element: uuid,
+				element: 'morris-' + data.state.uuid,
 				data: data.result.data,
 				xkey: 'time',
 				ykeys: data.dimension_names,
@@ -1239,18 +1584,18 @@
 		};
 
 		var morris;
-		if(chart.chart_type == 'line')
+		if(data.state.chart.chart_type == 'line')
 			morris = new Morris.Line(options);
 
-		else if(chart.chart_type == 'area') {
+		else if(data.state.chart.chart_type == 'area') {
 			options.behaveLikeLine = true;
 			morris = new Morris.Area(options);
 		}
 		else // stacked
 			morris = new Morris.Area(options);
 
-		self.data('morris-instance', morris)
-			.data('chart-created', true);
+		data.state.morris_instance = morris;
+		data.state.morris_options = options;
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -1281,8 +1626,8 @@
 		var self = $(element);
 
 		self.raphael(data, {
-			width: self.data('calculated-width'),
-			height: self.data('calculated-height')
+			width: data.state.calculated_width,
+			height: data.state.calculated_height
 		})
 	};
 
@@ -1290,10 +1635,9 @@
 		var self = $(element);
 
 		self.raphael(data, {
-			width: self.data('calculated-width'),
-			height: self.data('calculated-height')
+			width: data.state.calculated_width,
+			height: data.state.calculated_height
 		})
-		.data('chart-created', true);
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -1324,28 +1668,19 @@
 	};
 
 	NETDATA.googleChartUpdate = function(element, data) {
-		var self = $(element);
-		var gchart = self.data('google-instance');
-		var options = self.data('google-options');
-
 		var datatable = new google.visualization.DataTable(data.result);
-
-		gchart.draw(datatable, options);
+		data.state.google_instance.draw(datatable, data.state.google_options);
 	};
 
 	NETDATA.googleChartCreate = function(element, data) {
-		var self = $(element);
-		var chart = self.data('chart');
-
 		var datatable = new google.visualization.DataTable(data.result);
-		var gchart;
 
 		var options = {
 			// do not set width, height - the chart resizes itself
-			//width: self.data('calculated-width'),
-			//height: self.data('calculated-height'),
+			//width: data.state.calculated_width,
+			//height: data.state.calculated_height,
 			lineWidth: 1,
-			title: chart.title,
+			title: data.state.chart.title,
 			fontSize: 11,
 			hAxis: {
 			//	title: "Time of Day",
@@ -1361,7 +1696,7 @@
 				}
 			},
 			vAxis: {
-				title: chart.units,
+				title: data.state.chart.units,
 				viewWindowMode: 'pretty',
 				minValue: -0.1,
 				maxValue: 0.1,
@@ -1400,13 +1735,13 @@
 			isStacked: false
 		};
 
-		var uuid = NETDATA.guid();
-		self.html('<div id="' + uuid + '" style="width: 100%; height: 100%;"></div>');
+		element.innerHTML = '<div id="google-' + data.state.uuid + '" style="width: 100%; height: 100%;"></div>';
 
-		switch(chart.chart_type) {
+		var gchart;
+		switch(data.state.chart.chart_type) {
 			case "area":
 				options.vAxis.viewWindowMode = 'maximized';
-				gchart = new google.visualization.AreaChart(document.getElementById(uuid));
+				gchart = new google.visualization.AreaChart(document.getElementById('google-' + data.state.uuid));
 				break;
 
 			case "stacked":
@@ -1415,22 +1750,20 @@
 				options.vAxis.viewWindowMode = 'maximized';
 				options.vAxis.minValue = null;
 				options.vAxis.maxValue = null;
-				gchart = new google.visualization.AreaChart(document.getElementById(uuid));
+				gchart = new google.visualization.AreaChart(document.getElementById('google-' + data.state.uuid));
 				break;
 
 			default:
 			case "line":
 				options.lineWidth = 2;
-				gchart = new google.visualization.LineChart(document.getElementById(uuid));
+				gchart = new google.visualization.LineChart(document.getElementById('google-' + data.state.uuid));
 				break;
 		}
 
 		gchart.draw(datatable, options);
 
-		self.data('google-instance', gchart)
-			.data('google-options', options)
-			.data('uuid', uuid)
-			.data('chart-created', true);
+		data.state.google_instance = gchart;
+		data.state.google_options = options;
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -1441,6 +1774,8 @@
 			initialize: NETDATA.dygraphInitialize,
 			create: NETDATA.dygraphChartCreate,
 			update: NETDATA.dygraphChartUpdate,
+			setSelection: NETDATA.dygraphSetSelection,
+			clearSelection:  NETDATA.dygraphClearSelection,
 			initialized: false,
 			enabled: true,
 			format: 'json',
@@ -1453,6 +1788,8 @@
 			initialize: NETDATA.sparklineInitialize,
 			create: NETDATA.sparklineChartCreate,
 			update: NETDATA.sparklineChartUpdate,
+			setSelection: null,
+			clearSelection: null,
 			initialized: false,
 			enabled: true,
 			format: 'array',
@@ -1465,6 +1802,8 @@
 			initialize: NETDATA.peityInitialize,
 			create: NETDATA.peityChartCreate,
 			update: NETDATA.peityChartUpdate,
+			setSelection: null,
+			clearSelection: null,
 			initialized: false,
 			enabled: true,
 			format: 'ssvcomma',
@@ -1477,6 +1816,8 @@
 			initialize: NETDATA.morrisInitialize,
 			create: NETDATA.morrisChartCreate,
 			update: NETDATA.morrisChartUpdate,
+			setSelection: null,
+			clearSelection: null,
 			initialized: false,
 			enabled: true,
 			format: 'json',
@@ -1489,6 +1830,8 @@
 			initialize: NETDATA.googleInitialize,
 			create: NETDATA.googleChartCreate,
 			update: NETDATA.googleChartUpdate,
+			setSelection: null,
+			clearSelection: null,
 			initialized: false,
 			enabled: true,
 			format: 'datatable',
@@ -1501,11 +1844,13 @@
 			initialize: NETDATA.raphaelInitialize,
 			create: NETDATA.raphaelChartCreate,
 			update: NETDATA.raphaelChartUpdate,
+			setSelection: null,
+			clearSelection: null,
 			initialized: false,
 			enabled: true,
 			format: 'json',
 			options: '',
-			jsonWrapper: false,
+			jsonWrapper: true,
 			pixels_per_point: 1,
 			detects_dimensions_on_update: false
 		}
@@ -1518,7 +1863,7 @@
 		NETDATA.chartLibraries[library].initialized = true;
 		NETDATA.chartLibraries[library].enabled = true;
 
-		console.log(NETDATA.chartLibraries);
+		// console.log(NETDATA.chartLibraries);
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------
