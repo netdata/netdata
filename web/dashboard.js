@@ -99,7 +99,8 @@
 			idle_between_loops: 200,
 			idle_lost_focus: 500,
 			global_pan_sync_time: 500,
-			fast_render_timeframe: 200 // render continously for these many ms
+			fast_render_timeframe: 200, // render continously for these many ms
+			sync_delay: 1500			// how much time after an operation to setup synced selections?
 		},
 
 		debug: {
@@ -271,6 +272,7 @@
 			validated: false, 		// boolean - has the chart been validated?
 			enabled: true, 			// boolean - is the chart enabled for refresh?
 			paused: false,			// boolean - is the chart paused for any reason?
+			selected: false,		// boolean - is the chart shown a selection?
 			debug: false,
 			updates_counter: 0,		// numeric - the number of refreshes made so far
 
@@ -337,17 +339,33 @@
 			},
 
 			setSelection: function(t) {
-				if(typeof this.library.setSelection == 'function')
-					return this.library.setSelection(this, t);
-				else
-					return false;
+				if(typeof this.library.setSelection == 'function') {
+					if(this.library.setSelection(this, t))
+						this.selected = true;
+					else
+						this.selected = false;
+				}
+				else this.selected = true;
+
+				if(this.selected && this.debug) this.log('selection set to ' + t.toString());
+
+				return this.selected;
 			},
 
 			clearSelection: function() {
-				if(typeof this.library.clearSelection == 'function')
-					return this.library.clearSelection(this);
-				else
-					return false;
+				if(this.selected) {
+					if(typeof this.library.clearSelection == 'function') {
+						if(this.library.clearSelection(this))
+							this.selected = false;
+						else
+							this.selected = true;
+					}
+					else this.selected = false;
+					
+					if(!this.selected && this.debug) this.log('selection cleared');
+				}
+
+				return this.selected;
 			},
 
 			timeIsVisible: function(t) {
@@ -366,11 +384,17 @@
 			},
 
 			pauseChart: function() {
-				this.paused = true;
+				if(!this.paused) {
+					if(this.debug) this.log('paused');
+					this.paused = true;
+				}
 			},
 
 			unpauseChart: function() {
-				this.paused = false;
+				if(this.paused) {
+					if(this.debug) this.log('unpaused');
+					this.paused = false;
+				}
 			},
 
 			resetChart: function() {
@@ -385,6 +409,7 @@
 				this.mode.last_updated_ms = 0;
 				this.follows_global = 0;
 				this.paused = false;
+				this.selected = false;
 				this.enabled = true;
 				this.debug = false;
 
@@ -674,27 +699,44 @@
 					var now = new Date().getTime();
 
 					if(this.updates_counter && !NETDATA.options.page_is_visible) {
-						if(NETDATA.options.debug.focus || this.debug) this.log('page does not have focus');
+						if(NETDATA.options.debug.focus || this.debug) this.log('canBeAutoRefreshed(): page does not have focus');
 						return false;
 					}
 
 					if(!auto_refresher) return true;
 
-					if(!self.visible(true)) return false;
+					if(!self.visible(true)) {
+						if(this.debug) this.log('canBeAutoRefreshed(): I am not visible.');
+						return false;
+					}
 
 					// options valid only for autoRefresh()
 					if(NETDATA.options.auto_refresher_stop_until == 0 || NETDATA.options.auto_refresher_stop_until < now) {
 						if(NETDATA.globalPanAndZoom.state) {
-							if(NETDATA.globalPanAndZoom.shouldBeAutoRefreshed(this))
+							if(NETDATA.globalPanAndZoom.shouldBeAutoRefreshed(this)) {
+								if(this.debug) this.log('canBeAutoRefreshed(): global panning: I need an update.');
 								return true;
-							else
+							}
+							else {
+								if(this.debug) this.log('canBeAutoRefreshed(): global panning: I am already up to date.');
 								return false;
+							}
 						}
 
-						if(this.paused) return false;
+						if(this.selected) {
+							if(this.debug) this.log('canBeAutoRefreshed(): I have a selection in place.');
+							return false;
+						}
 
-						if(now - this.mode.last_updated_ms > this.mode.view_update_every)
+						if(this.paused) {
+							if(this.debug) this.log('canBeAutoRefreshed(): I am paused.');
+							return false;
+						}
+
+						if(now - this.mode.last_updated_ms > this.mode.view_update_every) {
+							if(this.debug) this.log('canBeAutoRefreshed(): It is time to update me.');
 							return true;
+						}
 					}
 				}
 
@@ -1163,50 +1205,96 @@
 	// dygraph
 
 	NETDATA.dygraph = {
+		state: null,
 		sync: false,
-		paused: []
+		dont_sync_before: 0,
+		slaves: []
 	};
 
 	NETDATA.dygraph.syncStart = function(state, event, x, points, row, seriesName) {
-		if(NETDATA.options.debug.dygraph || state.debug) console.log('dygraph.syncStart()');
-		state.pauseChart();
+		if(NETDATA.options.debug.dygraph || state.debug) state.log('dygraph.syncStart()');
+
+		//if(NETDATA.dygraph.state && NETDATA.dygraph.state != state) {
+		//	state.log('sync: I am not the sync master.');
+		//	return;
+		//}
+		// state.debug = true;
+
+		var t = state.mode.after_ms + row * state.mode.view_update_every;
+		// console.log('row = ' + row + ', x = ' + x + ', t = ' + t + ' ' + ((t == x)?'SAME':'DIFFERENT'));
+
+		now = new Date().getTime();
+		if(now < NETDATA.dygraph.dont_sync_before) {
+			if(state.debug) st.log('sync: cannot sync yet.');
+			return;
+		}
+
+		// since we are the sync master, we should not call state.setSelection()
+		// dygraphs is taking care of visualizing our selection.
+		state.selected = true;
 
 		var dygraph = state.dygraph_instance;
 
 		if(!NETDATA.dygraph.sync) {
+			if(state.debug) st.log('sync: setting up...');
 			$.each(NETDATA.options.targets, function(i, target) {
 				var st = NETDATA.chartState(target);
-				if(typeof st.dygraph_instance == 'object' && st.library_name == state.library_name && st.canBeAutoRefreshed(false)) {
-					NETDATA.dygraph.paused.push(st);
+				if(st == state) {
+					if(state.debug) st.log('sync: not adding me to sync');
+				}
+				else {
+					if(typeof st.dygraph_instance == 'object' && st.library_name == state.library_name && st.canBeAutoRefreshed(false)) {
+						NETDATA.dygraph.slaves.push(st);
+						if(state.debug) st.log('sync: added slave to sync');
+					}
 				}
 			});
+			NETDATA.dygraph.sync = true;
 		}
 
-		$.each(NETDATA.dygraph.paused, function(i, st) {
-			st.setSelection(x);
+		$.each(NETDATA.dygraph.slaves, function(i, st) {
+			if(st == state) {
+				if(state.debug) st.log('sync: ignoring me from set selection');
+			}
+			else {
+				if(state.debug) st.log('sync: showing master selection');
+				st.setSelection(t);
+			}
 		});
-
 	}
 
 	NETDATA.dygraph.syncStop = function(state) {
-		if(NETDATA.options.debug.dygraph || state.debug) console.log('dygraph.syncStop()');
+		if(NETDATA.options.debug.dygraph || state.debug) state.log('dygraph.syncStop()');
 
-		if(!NETDATA.dygraph.sync) {
-			$.each(NETDATA.dygraph.paused, function(i, st) {
-				st.clearSelection();
+		//if(NETDATA.dygraph.state && NETDATA.dygraph.state != state) {
+		//	state.log('sync: I am not the sync master.');
+		//	return;
+		//}
+
+		if(NETDATA.dygraph.sync) {
+			if(state.debug) st.log('sync: cleaning up...');
+			$.each(NETDATA.dygraph.slaves, function(i, st) {
+				if(st == state) {
+					if(state.debug) st.log('sync: not adding me to sync stop');
+				}
+				else {
+					if(state.debug) st.log('sync: removed slave from sync');
+					st.clearSelection();
+				}
 			});
 
+			NETDATA.dygraph.slaves = [];
 			NETDATA.dygraph.sync = false;
-			NETDATA.dygraph.paused = [];
 		}
 
-		state.unpauseChart();
+		// since we are the sync master, we should not call state.clearSelection()
+		// dygraphs is taking care of visualizing our selection.
+		state.selected = false;
 	}
 
-	NETDATA.dygraph.resetChart = function(element, dygraph) {
-		if(NETDATA.options.debug.dygraph) console.log('dygraph.resetChart()');
+	NETDATA.dygraph.resetChart = function(state, dygraph, context) {
+		if(NETDATA.options.debug.dygraph) state.log('dygraph.resetChart()');
 
-		state = NETDATA.chartState(element);
 		state.resetChart();
 		if(NETDATA.globalPanAndZoom.clearMaster());
 	}
@@ -1220,20 +1308,24 @@
 	}
 
 	NETDATA.dygraphSetSelection = function(state, t) {
-		var r = state.calculateRowForTime(t);
-		if(r != -1) {
-			state.dygraph_instance.setSelection(r);
-			state.pauseChart();
-		}
-		else {
-			state.dygraph_instance.clearSelection();
-			state.unpauseChart();
+		if(typeof state.dygraph_instance != 'undefined') {
+			var r = state.calculateRowForTime(t);
+			if(r != -1) {
+				state.dygraph_instance.setSelection(r);
+				return true;
+			}
+			else {
+				state.dygraph_instance.clearSelection();
+				return false;
+			}
 		}
 	}
 
-	NETDATA.dygraphclearSelection = function(state, t) {
-		state.dygraph_instance.clearSelection();
-		state.unpauseChart();
+	NETDATA.dygraphClearSelection = function(state, t) {
+		if(typeof state.dygraph_instance != 'undefined') {
+			state.dygraph_instance.clearSelection();
+		}
+		return true;
 	}
 
 	NETDATA.dygraphInitialize = function(callback) {
@@ -1400,7 +1492,7 @@
 			},
 			drawCallback: function(dygraph, is_initial) {
 				if(data.state.mode.name != 'auto') {
-					if(NETDATA.options.debug.dygraph) console.log('dygraphDrawCallback()');
+					if(NETDATA.options.debug.dygraph) data.state.log('dygraphDrawCallback()');
 
 					var x_range = dygraph.xAxisRange();
 					var after = Math.round(x_range[0]);
@@ -1410,65 +1502,100 @@
 				}
 			},
 			zoomCallback: function(minDate, maxDate, yRanges) {
-				if(NETDATA.options.debug.dygraph) console.log('dygraphZoomCallback()');
+				if(NETDATA.options.debug.dygraph) data.state.log('dygraphZoomCallback()');
+				NETDATA.dygraph.syncStop(data.state);
+				NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
 				NETDATA.dygraph.zoomOrPan(element, this, minDate, maxDate);
 			},
 			highlightCallback: function(event, x, points, row, seriesName) {
-				if(NETDATA.options.debug.dygraph) console.log('dygraphHighlightCallback()');
+				if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('dygraphHighlightCallback()');
+				data.state.pauseChart();
 				NETDATA.dygraph.syncStart(data.state, event, x, points, row, seriesName);
 			},
 			unhighlightCallback: function(event) {
-				if(NETDATA.options.debug.dygraph) console.log('dygraphUnhighlightCallback()');
+				if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('dygraphUnhighlightCallback()');
+				data.state.unpauseChart();
 				NETDATA.dygraph.syncStop(data.state);
 			},
 			interactionModel : {
 				mousedown: function(event, dygraph, context) {
-					if(NETDATA.options.debug.dygraph) console.log('dygraphMouseDown()');
+					if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('interactionModel.mousedown()');
+					NETDATA.dygraph.syncStop(data.state);
+
+					if(NETDATA.options.debug.dygraph) data.state.log('dygraphMouseDown()');
 
 					// Right-click should not initiate a zoom.
-					if (event.button && event.button == 2) return;
+					if(event.button && event.button == 2) return;
 
 					context.initializeMouseDown(event, dygraph, context);
 					
-					if (event.altKey || event.shiftKey) {
-						data.state.setMode('zoom');
-						Dygraph.startZoom(event, dygraph, context);
+					if(event.button && event.button == 1) {
+						if (event.altKey || event.shiftKey) {
+							data.state.setMode('pan');
+							NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
+							Dygraph.startPan(event, dygraph, context);
+						}
+						else {
+							data.state.setMode('zoom');
+							NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
+							Dygraph.startZoom(event, dygraph, context);
+						}
 					}
 					else {
-						data.state.setMode('pan');
-						Dygraph.startPan(event, dygraph, context);
+						if (event.altKey || event.shiftKey) {
+							data.state.setMode('zoom');
+							NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
+							Dygraph.startZoom(event, dygraph, context);
+						}
+						else {
+							data.state.setMode('pan');
+							NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
+							Dygraph.startPan(event, dygraph, context);
+						}
 					}
 				},
 				mousemove: function(event, dygraph, context) {
-					if(NETDATA.options.debug.dygraph) console.log('dygraphMouseMove()');
+					if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('interactionModel.mousemove()');
 
-					if (context.isPanning) {
+					if(context.isPanning) {
+						NETDATA.dygraph.syncStop(data.state);
+						NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
 						data.state.setMode('pan');
 						Dygraph.movePan(event, dygraph, context);
 					}
-					else if (context.isZooming) {
+					else if(context.isZooming) {
+						NETDATA.dygraph.syncStop(data.state);
+						NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
 						data.state.setMode('zoom');
 						Dygraph.moveZoom(event, dygraph, context);
 					}
 				},
 				mouseup: function(event, dygraph, context) {
-					if(NETDATA.options.debug.dygraph) console.log('dygraphMouseUp()');
+					if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('interactionModel.mouseup()');
 
-					if (context.isPanning)
+					if (context.isPanning) {
+						NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
 						Dygraph.endPan(event, dygraph, context);
-					else if (context.isZooming)
+					}
+					else if (context.isZooming) {
+						NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
 						Dygraph.endZoom(event, dygraph, context);
+					}
 				},
 				click: function(event, dygraph, context) {
-					if(NETDATA.options.debug.dygraph) console.log('dygraphMouseClick()');
+					if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('interactionModel.click()');
 					Dygraph.cancelEvent(event);
 				},
 				dblclick: function(event, dygraph, context) {
-					if(NETDATA.options.debug.dygraph) console.log('dygraphMouseDoubleClick()');
-					NETDATA.dygraph.resetChart(element, dygraph);
+					if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('interactionModel.dblclick()');
+					NETDATA.dygraph.syncStop(data.state);
+					NETDATA.dygraph.resetChart(data.state, dygraph, context);
 				},
 				mousewheel: function(event, dygraph, context) {
-					if(NETDATA.options.debug.dygraph) console.log('dygraphMouseWheel()');
+					if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('interactionModel.mousewheel()');
+
+					NETDATA.dygraph.syncStop(data.state);
+					NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
 
 					if(event.altKey || event.shiftKey) {
 						// http://dygraphs.com/gallery/interaction-api.js
@@ -1485,22 +1612,28 @@
 						var before = before_old - dt;
 						var after  = after_old  + dt;
 
-						if(NETDATA.options.debug.dygraph) console.log('percent: ' + percentage + ' from ' + after_old + ' - ' + before_old + ' to ' + after + ' - ' + before + ', range from ' + (before_old - after_old).toString() + ' to ' + (before - after).toString());
+						if(NETDATA.options.debug.dygraph) data.state.log('percent: ' + percentage + ' from ' + after_old + ' - ' + before_old + ' to ' + after + ' - ' + before + ', range from ' + (before_old - after_old).toString() + ' to ' + (before - after).toString());
 
 						data.state.setMode('zoom');
 						NETDATA.dygraph.zoomOrPan(element, dygraph, after, before);
 					}					
 				},
 				touchstart: function(event, dygraph, context) {
+					if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('interactionModel.touchstart()');
+					NETDATA.dygraph.syncStop(data.state);
+					NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
 					Dygraph.Interaction.startTouch(event, dygraph, context);
 					context.touchDirections = { x: true, y: false };
 					data.state.setMode('zoom');
 				},
 				touchmove: function(event, dygraph, context) {
+					if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('interactionModel.touchmove()');
 					//Dygraph.cancelEvent(event);
+					NETDATA.dygraph.syncStop(data.state);
 					Dygraph.Interaction.moveTouch(event, dygraph, context);
 				},
 				touchend: function(event, dygraph, context) {
+					if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('interactionModel.touchend()');
 					Dygraph.Interaction.endTouch(event, dygraph, context);
 				}
 			}
