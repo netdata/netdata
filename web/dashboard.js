@@ -1,11 +1,11 @@
 // You can set the following variables before loading this script:
 //
-// var netdataStopDygraph = 1;			// do not use dygraph
-// var netdataStopSparkline = 1;		// do not use sparkline
-// var netdataStopPeity = 1;			// do not use peity
-// var netdataStopGoogleCharts = 1;		// do not use google
-// var netdataStopMorris = 1;			// do not use morris
-// var netdataDontInit = 1;				// do not start the thread to process the charts
+// var netdataNoDygraphs = true;		// do not use dygraph
+// var netdataNoSparklines = true;		// do not use sparkline
+// var netdataNoPeitys = true;			// do not use peity
+// var netdataNoGoogleCharts = true;	// do not use google
+// var netdataNoMorris = true;			// do not use morris
+// var netdataDontStart = true;			// do not start the thread to process the charts
 //
 // You can also set the default netdata server, using the following.
 // When this variable is not set, we assume the page is hosted on your
@@ -56,10 +56,16 @@
 	};
 
 	if(typeof netdataServer != 'undefined')
-		NETDATA.serverDefault = netdataServer + "/";
+		NETDATA.serverDefault = netdataServer;
 	else
 		NETDATA.serverDefault = NETDATA._scriptSource();
 
+	if(NETDATA.serverDefault.slice(-1) != '/')
+		NETDATA.serverDefault += '/';
+
+	// default URLs for all the external files we need
+	// make them RELATIVE so that the whole thing can also be
+	// installed under a web server
 	NETDATA.jQuery       	= NETDATA.serverDefault + 'lib/jquery-1.11.3.min.js';
 	NETDATA.peity_js     	= NETDATA.serverDefault + 'lib/jquery.peity.min.js';
 	NETDATA.sparkline_js 	= NETDATA.serverDefault + 'lib/jquery.sparkline.min.js';
@@ -69,41 +75,93 @@
 	NETDATA.morris_css   	= NETDATA.serverDefault + 'css/morris.css';
 	NETDATA.dashboard_css	= NETDATA.serverDefault + 'dashboard.css';
 	NETDATA.google_js    	= 'https://www.google.com/jsapi';
+
+	// these are the colors Google Charts are using
+	// we have them here to attempt emulate their look and feel on the other chart libraries
+	// http://there4.io/2012/05/02/google-chart-color-list/
 	NETDATA.colors		= [ '#3366CC', '#DC3912', '#FF9900', '#109618', '#990099', '#3B3EAC', '#0099C6',
 							'#DD4477', '#66AA00', '#B82E2E', '#316395', '#994499', '#22AA99', '#AAAA11',
 							'#6633CC', '#E67300', '#8B0707', '#329262', '#5574A6', '#3B3EAC' ];
 
+	// an alternative set
+	// http://www.mulinblog.com/a-color-palette-optimized-for-data-visualization/
+	//                         (blue)     (red)      (orange)   (green)    (pink)     (brown)    (purple)   (yellow)   (gray)
+	//NETDATA.colors 		= [ '#5DA5DA', '#F15854', '#FAA43A', '#60BD68', '#F17CB0', '#B2912F', '#B276B2', '#DECF3F', '#4D4D4D' ];
+
 	// ----------------------------------------------------------------------------------------------------------------
 	// the defaults for all charts
 
+	// if the user does not specify any of these, the following will be used
+
 	NETDATA.chartDefaults = {
 		host: NETDATA.serverDefault,	// the server to get data from
-		width: '100%',					// the chart width
-		height: '100%',					// the chart height
-		min_width: 240,					// 
+		width: '100%',					// the chart width - can be null
+		height: '100%',					// the chart height - can be null
+		min_width: null,				// the chart minimum width - can be null
 		library: 'dygraph',				// the graphing library to use
 		method: 'average',				// the grouping method
 		before: 0,						// panning
 		after: -600,					// panning
-		pixels_per_point: 1				// the detail of the chart
+		pixels_per_point: 1,			// the detail of the chart
+		fill_luminance: 0.8				// luminance of colors in solit areas
 	}
 
-	NETDATA.options = {
-		targets: null,				
-		updated_dom: 1,
-		auto_refresher_fast_weight: 0,
-		page_is_visible: 1,
-		double_click_ms: 100,
-		auto_refresher_stop_until: 0,
+	// ----------------------------------------------------------------------------------------------------------------
+	// global options
 
+	NETDATA.options = {
+		targets: null,					// an array of all the DOM elements that are
+										// currently visible (independently of their
+										// viewport visibility)
+
+		updated_dom: true,				// when true, the DOM has been updated with
+										// new elements we have to check.
+
+		auto_refresher_fast_weight: 0,	// this is the current time in ms, spent
+										// rendering charts continiously.
+										// used with .current.fast_render_timeframe
+
+		page_is_visible: true,			// when true, this page is visible
+
+		auto_refresher_stop_until: 0,	// timestamp in ms - used internaly, to stop the
+										// auto-refresher for some time (when a chart is
+										// performing pan or zoom, we need to stop refreshing
+										// all other charts, to have the maximum speed for
+										// rendering the chart that is panned or zoomed).
+										// Used with .current.global_pan_sync_time
+
+		// the current profile
+		// we may have many...
 		current: {
-			pixels_per_point: 1,
-			idle_between_charts: 50,
-			idle_between_loops: 200,
-			idle_lost_focus: 500,
-			global_pan_sync_time: 500,
-			fast_render_timeframe: 200, // render continously for these many ms
-			sync_delay: 1500			// how much time after an operation to setup synced selections?
+			pixels_per_point: 1,		// the minimum pixels per point for all charts
+										// increase this to speed javascript up
+										// each chart library has its own limit too
+										// the max of this and the chart library is used
+										// the final is calculated every time, so a change
+										// here will have immediate effect on the next chart
+										// update
+
+			idle_between_charts: 50,	// ms - how much time to wait between chart updates
+
+			fast_render_timeframe: 200, // ms - render continously until this time of continious
+										// rendering has been reached
+										// this setting is used to make it render e.g. 10
+										// charts at once, sleep idle_between_charts time
+										// and continue for another 10 charts.
+
+			idle_between_loops: 200,	// ms - if all charts have been updated, wait this
+										// time before starting again.
+
+			idle_lost_focus: 500,		// ms - when the window does not have focus, check
+										// if focus has been regained, every this time
+
+			global_pan_sync_time: 500,	// ms - when you pan or zoon a chart, the background
+										// autorefreshing of charts is paused for this amount
+										// of time
+
+			sync_delay: 1500			// ms - when you pan or zoom a chart, wait this amount
+										// of time before setting up synchronized selections
+										// on hover.
 		},
 
 		debug: {
@@ -115,6 +173,7 @@
 			chart_errors: 		0,
 			chart_timing: 		0,
 			chart_calls: 		0,
+			libraries: 			0,
 			dygraph: 			0
 		}
 	}
@@ -156,6 +215,14 @@
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
+	// Chart Registry
+
+	// When multiple charts need the same chart, we avoid downloading it
+	// multiple times (and having it in browser memory multiple time)
+	// by using this registry.
+
+	// Every time we download a chart definition, we save it here with .add()
+	// Then we try to get it back with .get(). If that fails, we download it.
 
 	NETDATA.chartRegistry = {
 		charts: {},
@@ -185,38 +252,72 @@
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
+	// Global Pan and Zoom on charts
+
+	// Using this structure are synchronize all the charts, so that
+	// when you pan or zoom one, all others are automatically refreshed
+	// to the same timespan.
 
 	NETDATA.globalPanAndZoom = {
-		seq: 0,
-		state: null,
-		before_ms: null,
-		after_ms: null,
-		force_before_ms: null,
+		seq: 0,					// timestamp ms
+								// every time a chart is panned or zoomed
+								// we set the timestamp here
+								// then we use it as a sequence number
+								// to find if other charts are syncronized
+								// to this timerange
+
+		master: null,			// the master chart (state), to which all others
+								// are synchronized
+
+		force_before_ms: null,	// the timespan to sync all other charts 
 		force_after_ms: null,
 
+		// set a new master
 		setMaster: function(state, after, before) {
-			if(this.state && this.state != state) this.state.resetChart();
+			if(this.master && this.master != state)
+				this.master.resetChart();
 
-			this.state = state;
+			this.master = state;
 			this.seq = new Date().getTime();
 			this.force_after_ms = after;
 			this.force_before_ms = before;
 		},
+
+		// clear the master
 		clearMaster: function() {
-			if(this.state) {
-				var state = this.state;
-				this.state = null; // prevent infinite recursion
+			if(this.master) {
+				var state = this.master;
+				this.master = null; // prevent infinite recursion
 				this.seq = 0;
 				state.resetChart();
 				NETDATA.options.auto_refresher_stop_until = 0;
 			}
-			else {
-				this.state = null;
-				this.seq = 0;
-			}
+			
+			this.master = null;
+			this.seq = 0;
+			this.after_ms = 0;
+			this.before_ms = 0;
+			this.force_after_ms = 0;
+			this.force_before_ms = 0;
 		},
+
+		// is the given state the master of the global
+		// pan and zoom sync?
+		isMaster: function(state) {
+			if(this.master == state) return true;
+			return false;
+		},
+
+		// are we currently have a global pan and zoom sync?
+		isActive: function() {
+			if(this.master) return true;
+			return false;
+		},
+
+		// check if a chart, other than the master
+		// needs to be refreshed, due to the global pan and zoom
 		shouldBeAutoRefreshed: function(state) {
-			if(!this.state || !this.seq)
+			if(!this.master || !this.seq)
 				return false;
 
 			if(state.follows_global == this.seq)
@@ -265,7 +366,7 @@
 			library_name: self.data('chart-library') || NETDATA.chartDefaults.library,
 			library: null,			// object - the chart library used
 
-			element: element,		// the element it is linked to
+			element: element,		// the element this chart appears in
 			
 			chart_url: null,		// string - the url to download chart info
 			chart: null,			// object - the chart as downloaded from the server
@@ -276,12 +377,16 @@
 			enabled: true, 			// boolean - is the chart enabled for refresh?
 			paused: false,			// boolean - is the chart paused for any reason?
 			selected: false,		// boolean - is the chart shown a selection?
-			debug: false,
+			debug: false,			// boolena - console.log() debug info about this chart
 			updates_counter: 0,		// numeric - the number of refreshes made so far
 
-			follows_global: 0,
+			follows_global: 0,		// the sequence number of the global synchronization
+									// between chart.
+									// Used with NETDATA.globalPanAndZoom.seq
 
 			mode: null, 			// auto, pan, zoom
+									// this is a pointer to one of the sub-classes below
+
 			auto: {
 				name: 'auto',
 				autorefresh: true,
@@ -333,6 +438,7 @@
 				first_entry_ms: null,
 				last_entry_ms: null,
 			},
+
 			refresh_dt_ms: 0,		// milliseconds - the time the last refresh took
 			refresh_dt_element_name: self.data('dt-element-name') || null,	// string - the element to print refresh_dt_ms
 			refresh_dt_element: null,
@@ -401,7 +507,7 @@
 			},
 
 			resetChart: function() {
-				if(NETDATA.globalPanAndZoom.state == this)
+				if(NETDATA.globalPanAndZoom.isMaster(this))
 					NETDATA.globalPanAndZoom.clearMaster();
 
 				if(state.mode.name != 'auto')
@@ -416,6 +522,10 @@
 				this.enabled = true;
 				this.debug = false;
 
+				// do not update the chart here
+				// or the chart will flip-flop when it is the master
+				// of a selection sync and another chart becomes
+				// the new master
 				// state.updateChart();
 			},
 
@@ -656,7 +766,7 @@
 
 				var before;
 				var after;
-				if(NETDATA.globalPanAndZoom.state) {
+				if(NETDATA.globalPanAndZoom.isActive()) {
 					after = Math.round(NETDATA.globalPanAndZoom.force_after_ms / 1000);
 					before = Math.round(NETDATA.globalPanAndZoom.force_before_ms / 1000);
 					this.follows_global = NETDATA.globalPanAndZoom.seq;
@@ -721,7 +831,7 @@
 
 					// options valid only for autoRefresh()
 					if(NETDATA.options.auto_refresher_stop_until == 0 || NETDATA.options.auto_refresher_stop_until < now) {
-						if(NETDATA.globalPanAndZoom.state) {
+						if(NETDATA.globalPanAndZoom.isActive()) {
 							if(NETDATA.globalPanAndZoom.shouldBeAutoRefreshed(this)) {
 								if(this.debug) this.log('canBeAutoRefreshed(): global panning: I need an update.');
 								return true;
@@ -799,10 +909,16 @@
 				element.className += "netdata-container";
 
 				if(this.debug) this.log('sizing element');
-				self.css('width', this.width)
-					.css('height', this.height);
-					//.css('display', 'inline-block')
-					//.css('overflow', 'hidden');
+
+				if(this.width)
+					self.css('width', this.width);
+
+				if(this.height)
+					self.css('height', this.height);
+
+				// these should be left to css
+				//self.css('display', 'inline-block')
+				//self.css('overflow', 'hidden');
 
 				if(NETDATA.chartDefaults.min_width)
 					self.css('min-width', NETDATA.chartDefaults.min_width);
@@ -829,31 +945,45 @@
 			// show a message indicating the chart is loading
 			info: function(msg) {
 				this.message('info', this.id + ': ' + msg);
+			},
+
+			init: function() {
+				if(this.debug) this.log('created');
+				this.sizeChart();
+				this.info("loading...");
+
+				// make sure the host does not end with /
+				// all netdata API requests use absolute paths
+				while(this.host.slice(-1) == '/')
+					this.host = this.host.substring(0, this.host.length - 1);
+
+				// check the requested library is available
+				// we don't initialize it here - it will be initialized when
+				// this chart will be first used
+				if(typeof NETDATA.chartLibraries[this.library_name] == 'undefined') {
+					NETDATA.error(402, this.library_name);
+					this.error('chart library "' + this.library_name + '" is not found');
+				}
+				else if(!NETDATA.chartLibraries[this.library_name].enabled) {
+					NETDATA.error(403, this.library_name);
+					this.error('chart library "' + this.library_name + '" is not enabled');
+				}
+				else {
+					this.library = NETDATA.chartLibraries[this.library_name];
+					this.pixels_per_point = self.data('pixels-per-point') || this.library.pixels_per_point;
+				}
+
+				// if we need to report the rendering speed
+				// find the element that needs to be updated
+				if(this.refresh_dt_element_name)
+					this.refresh_dt_element = document.getElementById(this.refresh_dt_element_name) || null;
+
+				// the default mode for all charts
+				this.setMode('auto');
 			}
 		};
 
-		if(state.debug) state.log('created');
-		state.sizeChart();
-		state.info("loading...");
-
-		if(typeof NETDATA.chartLibraries[state.library_name] == 'undefined') {
-			NETDATA.error(402, state.library_name);
-			state.error('chart library "' + state.library_name + '" is not found');
-		}
-		else if(!NETDATA.chartLibraries[state.library_name].enabled) {
-			NETDATA.error(403, state.library_name);
-			state.error('chart library "' + state.library_name + '" is not enabled');
-		}
-		else {
-			state.library = NETDATA.chartLibraries[state.library_name];
-			state.pixels_per_point = self.data('pixels-per-point') || state.library.pixels_per_point;
-		}
-
-		if(state.refresh_dt_element_name)
-			state.refresh_dt_element = document.getElementById(state.refresh_dt_element_name) || null;
-
-		state.setMode('auto');
-
+		state.init();
 		return state;
 	}
 
@@ -934,7 +1064,7 @@
 	// user function to signal us the DOM has been
 	// updated.
 	NETDATA.updatedDom = function() {
-		NETDATA.options.updated_dom = 1;
+		NETDATA.options.updated_dom = true;
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -985,7 +1115,7 @@
 	}
 
 	NETDATA.getDomCharts = function(callback) {
-		NETDATA.options.updated_dom = 0;
+		NETDATA.options.updated_dom = false;
 
 		NETDATA.options.targets = $('div[data-netdata]').filter(':visible');
 
@@ -1004,23 +1134,23 @@
 	}
 
 	// this is the main function - where everything starts
-	NETDATA.init = function() {
+	NETDATA.start = function() {
 		// this should be called only once
 
-		NETDATA.options.page_is_visible = 1;
+		NETDATA.options.page_is_visible = true;
 
 		$(window).blur(function() {
-			NETDATA.options.page_is_visible = 0;
+			NETDATA.options.page_is_visible = false;
 			if(NETDATA.options.debug.focus) console.log('Lost Focus!');
 		});
 
 		$(window).focus(function() {
-			NETDATA.options.page_is_visible = 1;
+			NETDATA.options.page_is_visible = true;
 			if(NETDATA.options.debug.focus) console.log('Focus restored!');
 		});
 
 		if(typeof document.hasFocus == 'function' && !document.hasFocus()) {
-			NETDATA.options.page_is_visible = 0;
+			NETDATA.options.page_is_visible = false;
 			if(NETDATA.options.debug.focus) console.log('Document has no focus!');
 		}
 
@@ -1030,22 +1160,10 @@
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------
-
-	//var chart = function() {
-	//}
-
-	//chart.prototype.color = function() {
-	//	return 'red';
-	//}
-
-	//var c = new chart();
-	//c.color();
-
-	// ----------------------------------------------------------------------------------------------------------------
 	// peity
 
 	NETDATA.peityInitialize = function(callback) {
-		if(typeof netdataStopPeity == 'undefined') {
+		if(typeof netdataNoPeitys == 'undefined' || !netdataNoPeitys) {
 			$.getScript(NETDATA.peity_js)
 				.done(function() {
 					NETDATA.registerChartLibrary('peity', NETDATA.peity_js);
@@ -1086,7 +1204,7 @@
 	// sparkline
 
 	NETDATA.sparklineInitialize = function(callback) {
-		if(typeof netdataStopSparkline == 'undefined') {
+		if(typeof netdataNoSparklines == 'undefined' || !netdataNoSparklines) {
 			$.getScript(NETDATA.sparkline_js)
 				.done(function() {
 					NETDATA.registerChartLibrary('sparkline', NETDATA.sparkline_js);
@@ -1118,7 +1236,7 @@
 		var self = $(element);
 		var type = self.data('sparkline-type') || 'line';
 		var lineColor = self.data('sparkline-linecolor') || NETDATA.colors[0];
-		var fillColor = self.data('sparkline-fillcolor') || (data.state.chart.chart_type == 'line')?'#FFF':NETDATA.ColorLuminance(lineColor, 0.8);
+		var fillColor = self.data('sparkline-fillcolor') || (data.state.chart.chart_type == 'line')?'#FFF':NETDATA.ColorLuminance(lineColor, NETDATA.chartDefaults.fill_luminance);
 		var chartRangeMin = self.data('sparkline-chartrangemin') || undefined;
 		var chartRangeMax = self.data('sparkline-chartrangemax') || undefined;
 		var composite = self.data('sparkline-composite') || undefined;
@@ -1349,7 +1467,7 @@
 	}
 
 	NETDATA.dygraphInitialize = function(callback) {
-		if(typeof netdataStopDygraph == 'undefined') {
+		if(typeof netdataNoDygraphs == 'undefined' || !netdataNoDygraphs) {
 			$.getScript(NETDATA.dygraph_js)
 				.done(function() {
 					NETDATA.registerChartLibrary('dygraph', NETDATA.dygraph_js);
@@ -1413,7 +1531,7 @@
 		var labelsSeparateLines = self.data('dygraph-labelsseparatelines') || false;
 		var labelsShowZeroValues = self.data('dygraph-labelsshowzerovalues') || true;
 		var legend = self.data('dygraph-legend') || 'onmouseover';
-		var showLabelsOnHighlight = self.data('dygraph-showlabelsonhighlight') || true; // true FIXME
+		var showLabelsOnHighlight = self.data('dygraph-showlabelsonhighlight') || true;
 		var gridLineColor = self.data('dygraph-gridlinecolor') || '#EEE';
 		var axisLineColor = self.data('dygraph-axislinecolor') || '#EEE';
 		var maxNumberWidth = self.data('dygraph-maxnumberwidth') || 8;
@@ -1428,11 +1546,11 @@
 		var pointSize = self.data('dygraph-pointsize') || 1;
 		var stepPlot = self.data('dygraph-stepplot') || false;
 		var strokeBorderColor = self.data('dygraph-strokebordercolor') || 'white';
-		var strokeBorderWidth = self.data('dygraph-strokeborderwidth') || (data.state.chart.chart_type == 'stacked')?1.0:0.0;
+		var strokeBorderWidth = self.data('dygraph-strokeborderwidth') || (data.state.chart.chart_type == 'stacked')?0.1:0.0;
 		var strokePattern = self.data('dygraph-strokepattern') || undefined;
 		var highlightCircleSize = self.data('dygraph-highlightcirclesize') || 3;
-		var highlightSeriesOpts = self.data('dygraph-highlightseriesopts') || null; // FIXME { strokeWidth: 1.5 };
-		var highlightSeriesBackgroundAlpha = self.data('dygraph-highlightseriesbackgroundalpha') || null; // FIXME (data.state.chart.chart_type == 'stacked')?0.7:0.5;
+		var highlightSeriesOpts = self.data('dygraph-highlightseriesopts') || null; // TOO SLOW: { strokeWidth: 1.5 };
+		var highlightSeriesBackgroundAlpha = self.data('dygraph-highlightseriesbackgroundalpha') || null; // TOO SLOW: (data.state.chart.chart_type == 'stacked')?0.7:0.5;
 		var pointClickCallback = self.data('dygraph-pointclickcallback') || undefined;
 		var showRangeSelector = self.data('dygraph-showrangeselector') || false;
 		var showRoller = self.data('dygraph-showroller') || false;
@@ -1669,7 +1787,7 @@
 	// morris
 
 	NETDATA.morrisInitialize = function(callback) {
-		if(typeof netdataStopMorris == 'undefined') {
+		if(typeof netdataNoMorris == 'undefined' || !netdataNoMorris) {
 
 			// morris requires raphael
 			if(!NETDATA.chartLibraries.raphael.initialized) {
@@ -1722,7 +1840,7 @@
 				ykeys: data.dimension_names,
 				labels: data.dimension_names,
 				lineWidth: 2,
-				pointSize: 2,
+				pointSize: 3,
 				smooth: true,
 				hideHover: 'auto',
 				parseTime: true,
@@ -1791,7 +1909,7 @@
 	// google charts
 
 	NETDATA.googleInitialize = function(callback) {
-		if(typeof netdataStopGoogleCharts == 'undefined') {
+		if(typeof netdataNoGoogleCharts == 'undefined' || !netdataNoGoogleCharts) {
 			$.getScript(NETDATA.google_js)
 				.done(function() {
 					NETDATA.registerChartLibrary('google', NETDATA.google_js);
@@ -1970,7 +2088,7 @@
 			format: 'json',
 			options: 'objectrows|ms',
 			jsonWrapper: true,
-			pixels_per_point: 10,
+			pixels_per_point: 15,
 			detects_dimensions_on_update: false
 		},
 		"google": {
@@ -1984,7 +2102,7 @@
 			format: 'datatable',
 			options: '',
 			jsonWrapper: true,
-			pixels_per_point: 2,
+			pixels_per_point: 4,
 			detects_dimensions_on_update: true
 		},
 		"raphael": {
@@ -2004,26 +2122,24 @@
 	};
 
 	NETDATA.registerChartLibrary = function(library, url) {
-		console.log("registering chart library: " + library);
+		if(NETDATA.options.debug.libraries)
+			console.log("registering chart library: " + library);
 
 		NETDATA.chartLibraries[library].url = url;
 		NETDATA.chartLibraries[library].initialized = true;
 		NETDATA.chartLibraries[library].enabled = true;
-
-		// console.log(NETDATA.chartLibraries);
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------
-	// load all libraries and initialize
+	// Start up
 
 	NETDATA.errorReset();
-
 	NETDATA._loadjQuery(function() {
 		$.getScript(NETDATA.serverDefault + 'lib/visible.js').then(function() {
 			NETDATA._loadCSS(NETDATA.dashboard_css);
 
-			if(typeof netdataDontInit == 'undefined')
-				NETDATA.init();
+			if(typeof netdataDontStart == 'undefined' || !netdataDontStart)
+				NETDATA.start();
 		})
 	});
 
