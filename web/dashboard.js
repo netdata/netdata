@@ -82,7 +82,7 @@
 		height: '100%',					// the chart height
 		min_width: 240,					// 
 		library: 'dygraph',				// the graphing library to use
-		method: 'max',					// the grouping method
+		method: 'average',				// the grouping method
 		before: 0,						// panning
 		after: -600,					// panning
 		pixels_per_point: 1				// the detail of the chart
@@ -416,7 +416,7 @@
 				this.enabled = true;
 				this.debug = false;
 
-				state.updateChart();
+				// state.updateChart();
 			},
 
 			setMode: function(m) {
@@ -697,8 +697,16 @@
 				if(NETDATA.options.debug.chart_data_url) this.log('chartURL(): ' + this.mode.url + ' WxH:' + this.calculated_width + 'x' + this.calculated_height + ' points: ' + this.mode.points + ' library: ' + this.library_name);
 			},
 
-			canBeAutoRefreshed: function(auto_refresher) {
-				if(this.mode.autorefresh) {
+			isVisible: function() {
+				return self.visible(true);
+			},
+
+			isAutoRefreshed: function() {
+				return this.mode.autorefresh;
+			},
+
+			canBeAutoRefreshed: function() {
+				if(this.isAutoRefreshed()) {
 					var now = new Date().getTime();
 
 					if(this.updates_counter && !NETDATA.options.page_is_visible) {
@@ -706,9 +714,7 @@
 						return false;
 					}
 
-					if(!auto_refresher) return true;
-
-					if(!self.visible(true)) {
+					if(!this.isVisible()) {
 						if(this.debug) this.log('canBeAutoRefreshed(): I am not visible.');
 						return false;
 					}
@@ -747,7 +753,7 @@
 			},
 
 			autoRefresh: function(callback) {
-				if(this.canBeAutoRefreshed(true))
+				if(this.canBeAutoRefreshed())
 					this.updateChart(callback);
 				else if(typeof callback != 'undefined')
 					callback();
@@ -1257,7 +1263,7 @@
 					if(state.debug) st.log('sync: not adding me to sync');
 				}
 				else {
-					if(typeof st.dygraph_instance == 'object' && st.library_name == state.library_name && st.canBeAutoRefreshed(false)) {
+					if(typeof st.dygraph_instance == 'object' && st.library_name == state.library_name && st.isVisible()) {
 						NETDATA.dygraph.slaves.push(st);
 						if(state.debug) st.log('sync: added slave to sync');
 					}
