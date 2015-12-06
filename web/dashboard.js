@@ -5,6 +5,7 @@
 // var netdataStopPeity = 1;			// do not use peity
 // var netdataStopGoogleCharts = 1;		// do not use google
 // var netdataStopMorris = 1;			// do not use morris
+// var netdataDontInit = 1;				// do not start the thread to process the charts
 //
 // You can also set the default netdata server, using the following.
 // When this variable is not set, we assume the page is hosted on your
@@ -59,17 +60,18 @@
 	else
 		NETDATA.serverDefault = NETDATA._scriptSource();
 
-	NETDATA.jQuery       = NETDATA.serverDefault + 'lib/jquery-1.11.3.min.js';
-	NETDATA.peity_js     = NETDATA.serverDefault + 'lib/jquery.peity.min.js';
-	NETDATA.sparkline_js = NETDATA.serverDefault + 'lib/jquery.sparkline.min.js';
-	NETDATA.dygraph_js   = NETDATA.serverDefault + 'lib/dygraph-combined.js';
-	NETDATA.raphael_js   = NETDATA.serverDefault + 'lib/raphael-min.js';
-	NETDATA.morris_js    = NETDATA.serverDefault + 'lib/morris.min.js';
-	NETDATA.morris_css   = NETDATA.serverDefault + 'css/morris.css';
-	NETDATA.google_js    = 'https://www.google.com/jsapi';
-	NETDATA.colors	= [ '#3366CC', '#DC3912', '#FF9900', '#109618', '#990099', '#3B3EAC', '#0099C6',
-						'#DD4477', '#66AA00', '#B82E2E', '#316395', '#994499', '#22AA99', '#AAAA11',
-						'#6633CC', '#E67300', '#8B0707', '#329262', '#5574A6', '#3B3EAC' ];
+	NETDATA.jQuery       	= NETDATA.serverDefault + 'lib/jquery-1.11.3.min.js';
+	NETDATA.peity_js     	= NETDATA.serverDefault + 'lib/jquery.peity.min.js';
+	NETDATA.sparkline_js 	= NETDATA.serverDefault + 'lib/jquery.sparkline.min.js';
+	NETDATA.dygraph_js   	= NETDATA.serverDefault + 'lib/dygraph-combined.js';
+	NETDATA.raphael_js   	= NETDATA.serverDefault + 'lib/raphael-min.js';
+	NETDATA.morris_js    	= NETDATA.serverDefault + 'lib/morris.min.js';
+	NETDATA.morris_css   	= NETDATA.serverDefault + 'css/morris.css';
+	NETDATA.dashboard_css	= NETDATA.serverDefault + 'dashboard.css';
+	NETDATA.google_js    	= 'https://www.google.com/jsapi';
+	NETDATA.colors		= [ '#3366CC', '#DC3912', '#FF9900', '#109618', '#990099', '#3B3EAC', '#0099C6',
+							'#DD4477', '#66AA00', '#B82E2E', '#316395', '#994499', '#22AA99', '#AAAA11',
+							'#6633CC', '#E67300', '#8B0707', '#329262', '#5574A6', '#3B3EAC' ];
 
 	// ----------------------------------------------------------------------------------------------------------------
 	// the defaults for all charts
@@ -78,6 +80,7 @@
 		host: NETDATA.serverDefault,	// the server to get data from
 		width: '100%',					// the chart width
 		height: '100%',					// the chart height
+		min_width: 240,					// 
 		library: 'dygraph',				// the graphing library to use
 		method: 'max',					// the grouping method
 		before: 0,						// panning
@@ -334,7 +337,7 @@
 			refresh_dt_element_name: self.data('dt-element-name') || null,	// string - the element to print refresh_dt_ms
 			refresh_dt_element: null,
 
-			log(msg) {
+			log: function(msg) {
 				console.log(this.id + ' (' + this.library_name + ' ' + this.uuid + '): ' + msg);
 			},
 
@@ -517,7 +520,7 @@
 
 			updateChart: function(callback) {
 				if(!this.library || !this.library.enabled) {
-					this.error('chart library "' + this.library_name + '" is not enabled');
+					this.error('charting library "' + this.library_name + '" is not available');
 					if(typeof callback != 'undefined') callback();
 					return;
 				}
@@ -787,20 +790,21 @@
 			// resize the chart to its real dimensions
 			// as given by the caller
 			sizeChart: function() {
+				element.className += "netdata-container";
+
 				if(this.debug) this.log('sizing element');
 				self.css('width', this.width)
-					.css('height', this.height)
-					.css('display', 'inline-block')
-					.css('overflow', 'hidden');
+					.css('height', this.height);
+					//.css('display', 'inline-block')
+					//.css('overflow', 'hidden');
+
+				if(NETDATA.chartDefaults.min_width)
+					self.css('min-width', NETDATA.chartDefaults.min_width);
 			},
 
 			// show a message in the chart
-			message: function(msg) {
-				var bgcolor = ""
-				if(NETDATA.options.debug.show_boxes)
-					bgcolor = " background-color: lightgrey;";
-
-				this.element.innerHTML = '<div style="font-size: x-small; overflow: hidden;' + bgcolor + ' width: 100%; height: 100%;"><small>'
+			message: function(type, msg) {
+				this.element.innerHTML = '<div class="netdata-message netdata-' + type + '-message" style="font-size: x-small; overflow: hidden; width: 100%; height: 100%;"><small>'
 					+ msg
 					+ '</small></div>';
 				
@@ -812,19 +816,19 @@
 
 			// show an error on the chart and stop it forever
 			error: function(msg) {
-				this.message(msg);
+				this.message('error', this.id + ': ' + msg);
 				this.enabled = false;
 			},
 
 			// show a message indicating the chart is loading
-			loading: function() {
-				this.message('chart ' + this.id + ' is loading...');
+			info: function(msg) {
+				this.message('info', this.id + ': ' + msg);
 			}
 		};
 
 		if(state.debug) state.log('created');
 		state.sizeChart();
-		state.loading();
+		state.info("loading...");
 
 		if(typeof NETDATA.chartLibraries[state.library_name] == 'undefined') {
 			NETDATA.error(402, state.library_name);
@@ -880,6 +884,16 @@
 		}
 		else if(typeof callback == "function")
 			callback();
+	}
+
+	NETDATA._loadCSS = function(filename) {
+		var fileref = document.createElement("link");
+		fileref.setAttribute("rel", "stylesheet");
+		fileref.setAttribute("type", "text/css");
+		fileref.setAttribute("href", filename);
+
+		if (typeof fileref != "undefined")
+			document.getElementsByTagName("head")[0].appendChild(fileref);
 	}
 
 	NETDATA.ColorLuminance = function(hex, lum) {
@@ -1055,7 +1069,7 @@
 	}
 
 	NETDATA.peityChartCreate = function(element, data) {
-		element.innerHTML = '<div id="peity-' + data.state.uuid + '">' + data.result + '</div>';
+		element.innerHTML = '<div class="netdata-chart-container netdata-peity-container" id="peity-' + data.state.uuid + '">' + data.result + '</div>';
 		data.state.peity_element = document.getElementById('peity-' + data.state.uuid);
 		var peity = $(data.state.peity_element);
 
@@ -1194,7 +1208,7 @@
 			height: data.state.calculated_height
 		};
 
-		element.innerHTML = '<div id="sparkline-' + data.state.uuid + '" style="display: inline-block; position: relative;"></div>';
+		element.innerHTML = '<div class="netdata-chart-container netdata-sparkline-container" id="sparkline-' + data.state.uuid + '" style="display: inline-block; position: relative;"></div>';
 		data.state.sparkline_element = document.getElementById('sparkline-' + data.state.uuid);
 
 		spark = $(data.state.sparkline_element);
@@ -1379,7 +1393,7 @@
 
 		var self = $(element);
 		var title = self.data('dygraph-title') || data.state.chart.title;
-		var titleHeight = self.data('dygraph-titleheight') || 20;
+		var titleHeight = self.data('dygraph-titleheight') || 19;
 		var labelsDiv = self.data('dygraph-labelsdiv') || undefined;
 		var connectSeparatedPoints = self.data('dygraph-connectseparatedpoints') || false;
 		var yLabelWidth = self.data('dygraph-ylabelwidth') || 12;
@@ -1393,7 +1407,7 @@
 		var labelsSeparateLines = self.data('dygraph-labelsseparatelines') || false;
 		var labelsShowZeroValues = self.data('dygraph-labelsshowzerovalues') || true;
 		var legend = self.data('dygraph-legend') || 'onmouseover';
-		var showLabelsOnHighlight = self.data('dygraph-showlabelsonhighlight') || true;
+		var showLabelsOnHighlight = self.data('dygraph-showlabelsonhighlight') || true; // true FIXME
 		var gridLineColor = self.data('dygraph-gridlinecolor') || '#EEE';
 		var axisLineColor = self.data('dygraph-axislinecolor') || '#EEE';
 		var maxNumberWidth = self.data('dygraph-maxnumberwidth') || 8;
@@ -1411,8 +1425,8 @@
 		var strokeBorderWidth = self.data('dygraph-strokeborderwidth') || (data.state.chart.chart_type == 'stacked')?1.0:0.0;
 		var strokePattern = self.data('dygraph-strokepattern') || undefined;
 		var highlightCircleSize = self.data('dygraph-highlightcirclesize') || 3;
-		var highlightSeriesOpts = self.data('dygraph-highlightseriesopts') || { strokeWidth: 1.5 };
-		var highlightSeriesBackgroundAlpha = self.data('dygraph-highlightseriesbackgroundalpha') || (data.state.chart.chart_type == 'stacked')?0.7:0.5;
+		var highlightSeriesOpts = self.data('dygraph-highlightseriesopts') || null; // FIXME { strokeWidth: 1.5 };
+		var highlightSeriesBackgroundAlpha = self.data('dygraph-highlightseriesbackgroundalpha') || null; // FIXME (data.state.chart.chart_type == 'stacked')?0.7:0.5;
 		var pointClickCallback = self.data('dygraph-pointclickcallback') || undefined;
 		var showRangeSelector = self.data('dygraph-showrangeselector') || false;
 		var showRoller = self.data('dygraph-showroller') || false;
@@ -1639,7 +1653,7 @@
 			}
 		};
 
-		self.html('<div id="dygraph-' + data.state.uuid + '" style="width: 100%; height: 100%;"></div>');
+		self.html('<div class="netdata-chart-container netdata-dygraph-container" id="dygraph-' + data.state.uuid + '" style="width: 100%; height: 100%;"></div>');
 
 		data.state.dygraph_instance = new Dygraph(document.getElementById('dygraph-' + data.state.uuid),
 			data.result.data, data.state.dygraph_options);
@@ -1665,13 +1679,7 @@
 				}
 			}
 			else {
-				var fileref = document.createElement("link");
-				fileref.setAttribute("rel", "stylesheet");
-				fileref.setAttribute("type", "text/css");
-				fileref.setAttribute("href", NETDATA.morris_css);
-
-				if (typeof fileref != "undefined")
-					document.getElementsByTagName("head")[0].appendChild(fileref);
+				NETDATA._loadCSS(NETDATA.morris_css);
 
 				$.getScript(NETDATA.morris_js)
 					.done(function() {
@@ -1699,7 +1707,7 @@
 
 	NETDATA.morrisChartCreate = function(element, data) {
 
-		element.innerHTML = '<div id="morris-' + data.state.uuid + '" style="width: ' + data.state.calculated_width + 'px; height: ' + data.state.calculated_height + 'px;"></div>';
+		element.innerHTML = '<div class="netdata-chart-container netdata-morris-container" id="morris-' + data.state.uuid + '" style="width: ' + data.state.calculated_width + 'px; height: ' + data.state.calculated_height + 'px;"></div>';
 
 		var options = {
 				element: 'morris-' + data.state.uuid,
@@ -1868,7 +1876,7 @@
 			isStacked: false
 		};
 
-		element.innerHTML = '<div id="google-' + data.state.uuid + '" style="width: 100%; height: 100%;"></div>';
+		element.innerHTML = '<div class="netdata-chart-container netdata-google-container" id="google-' + data.state.uuid + '" style="width: 100%; height: 100%;"></div>';
 
 		var gchart;
 		switch(data.state.chart.chart_type) {
@@ -2006,7 +2014,10 @@
 
 	NETDATA._loadjQuery(function() {
 		$.getScript(NETDATA.serverDefault + 'lib/visible.js').then(function() {
-			NETDATA.init();
+			NETDATA._loadCSS(NETDATA.dashboard_css);
+
+			if(typeof netdataDontInit == 'undefined')
+				NETDATA.init();
 		})
 	});
 

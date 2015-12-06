@@ -1,0 +1,84 @@
+html {
+    font-family: sans-serif;
+}
+
+.netdata-container {
+	display: -webkit-flex; /* Safari */
+	-webkit-flex-wrap: wrap; /* Safari 6.1+ */
+	display: inline-block;
+	flex-wrap: wrap;
+	overflow: hidden;
+}
+
+.netdata-message {
+	font-size: x-small;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+}
+
+.netdata-error-message {
+	background: #EEEEEE;
+}
+
+.netdata-info-message {
+
+}
+
+/*
+.netdata-legend {
+	width: 50px;
+	height: 100%;
+	background-color:Gray;
+	overflow: auto;
+	overflow-y: scroll;
+}
+*/
+
+.netdata-chart-container {
+
+}
+
+.netdata-peity-container {
+
+}
+
+.netdata-sparkline-container {
+
+}
+
+.netdata-dygraph-container {
+
+}
+
+.netdata-morris-container {
+
+}
+
+.netdata-google-container {
+
+}
+
+/* make dygraph legend disappear on hover */
+.dygraph-legend {
+	opacity: 0.9;
+	-webkit-transition:opacity 0.2s ease;
+	-moz-transition:opacity 0.2s ease;
+	-o-transition:opacity 0.2s ease;
+}
+
+.dygraph-legend:hover {
+	/* Red(0-255), Blue(0-255), Green(0-255), Alpha (0-1) */
+	background-color:rgba(100,100,100,0); 
+	opacity:0;
+}
+
+.dygraph-title {
+	text-indent: 56px;
+	text-align: left;
+	position: absolute;
+	left: 0px;
+	top: 4px;
+	font-size: 11px;
+	font-weight: bold;
+}

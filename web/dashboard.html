@@ -10,10 +10,6 @@
 	<meta name="apple-mobile-web-app-capable" content="yes">
 	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 	<meta name="author" content="costa@tsaousis.gr">
-
-	<style type="text/css">
-		html{font-family:sans-serif;}
-	</style>
 </head>
 <body>
 
@@ -170,7 +166,7 @@ The fastest charting engine that can chart complete charts (not just sparklines)
 The charts are zoomable (drag their contents to pan, shift with mouse wheel to zoom-in or zoom-out, double click to reset it).
 <b>Netdata magic!</b> Realtime charts on your web page!
 <br/>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 24%; display: inline-block;">
 	<div data-netdata="system.processes"
 		data-chart-library="dygraph"
 		data-width="100%"
@@ -181,7 +177,7 @@ The charts are zoomable (drag their contents to pan, shift with mouse wheel to z
 	<br/>
 	<small>rendered in <span id="time201">X</span> ms</small>
 </div>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 24%; display: inline-block;">
 	<div data-netdata="system.ipv4"
 		data-chart-library="dygraph"
 		data-width="100%"
@@ -192,7 +188,7 @@ The charts are zoomable (drag their contents to pan, shift with mouse wheel to z
 	<br/>
 	<small>rendered in <span id="time202">X</span> ms</small>
 </div>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 24%; display: inline-block;">
 	<div data-netdata="system.cpu"
 		data-chart-library="dygraph"
 		data-width="100%"
@@ -202,6 +198,61 @@ The charts are zoomable (drag their contents to pan, shift with mouse wheel to z
 		></div>
 	<br/>
 	<small>rendered in <span id="time203">X</span> ms</small>
+</div>
+<div style="width: 24%; display: inline-block;">
+	<div data-netdata="system.io"
+		data-chart-library="dygraph"
+		data-width="100%"
+		data-height="200"
+		data-after="-300"
+		data-dt-element-name="time204"
+		></div>
+	<br/>
+	<small>rendered in <span id="time204">X</span> ms</small>
+</div>
+<div style="width: 24%; display: inline-block;">
+	<div data-netdata="system.interrupts"
+		data-chart-library="dygraph"
+		data-width="100%"
+		data-height="200"
+		data-after="-300"
+		data-dt-element-name="time205"
+		></div>
+	<br/>
+	<small>rendered in <span id="time205">X</span> ms</small>
+</div>
+<div style="width: 24%; display: inline-block;">
+	<div data-netdata="apps.mem"
+		data-chart-library="dygraph"
+		data-width="100%"
+		data-height="200"
+		data-after="-300"
+		data-dt-element-name="time206"
+		></div>
+	<br/>
+	<small>rendered in <span id="time206">X</span> ms</small>
+</div>
+<div style="width: 24%; display: inline-block;">
+	<div data-netdata="tc.world_in"
+		data-chart-library="dygraph"
+		data-width="100%"
+		data-height="200"
+		data-after="-300"
+		data-dt-element-name="time207"
+		></div>
+	<br/>
+	<small>rendered in <span id="time207">X</span> ms</small>
+</div>
+<div style="width: 24%; display: inline-block;">
+	<div data-netdata="tc.world_out"
+		data-chart-library="dygraph"
+		data-width="100%"
+		data-height="200"
+		data-after="-300"
+		data-dt-element-name="time208"
+		></div>
+	<br/>
+	<small>rendered in <span id="time208">X</span> ms</small>
 </div>
 
 

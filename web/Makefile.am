@@ -10,9 +10,9 @@ dist_web_DATA = \
         netdata.js \
         robots.txt \
         theme.css \
-        css/morris.css \
         dashboard.html \
         dashboard.js \
+        dashboard.css \
         $(NULL)
 
 
@@ -24,6 +24,7 @@ dist_weblib_DATA = \
         lib/jquery.peity.min.js \
         lib/jquery.sparkline.min.js \
         lib/morris.min.js \
+        css/morris.css \
         lib/raphael-min.js \
         lib/visible.js \
         $(NULL)
