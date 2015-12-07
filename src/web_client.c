@@ -236,7 +236,7 @@ uid_t web_files_uid(void)
 		else {
 			struct passwd *pw = getpwnam(web_owner);
 			if(!pw) {
-				error("User %s is not present. Ignoring option. Error: %s\n", web_owner, strerror(errno));
+				error("User %s is not present. Ignoring option.", web_owner);
 				owner_uid = geteuid();
 			}
 			else {
@@ -1246,8 +1246,8 @@ void web_client_process(struct web_client *w) {
 	}
 
 	char date[100];
-	struct tm tm = *gmtime(&w->response.data->date);
-	strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S %Z", &tm);
+	struct tm tmbuf, *tm = gmtime_r(&w->response.data->date, &tmbuf);
+	strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S %Z", tm);
 
 	buffer_sprintf(w->response.header_output,
 		"HTTP/1.1 %d %s\r\n"
@@ -1365,7 +1365,7 @@ long web_client_send_chunk_header(struct web_client *w, int len)
 
 	if(bytes > 0) debug(D_DEFLATE, "%llu: Sent chunk header %d bytes.", w->id, bytes);
 	else if(bytes == 0) debug(D_DEFLATE, "%llu: Did not send chunk header to the client.", w->id);
-	else debug(D_DEFLATE, "%llu: Failed to send chunk header to client. Reason: %s", w->id, strerror(errno));
+	else debug(D_DEFLATE, "%llu: Failed to send chunk header to client.", w->id);
 
 	return bytes;
 }
@@ -1378,7 +1378,7 @@ long web_client_send_chunk_close(struct web_client *w)
 
 	if(bytes > 0) debug(D_DEFLATE, "%llu: Sent chunk suffix %d bytes.", w->id, bytes);
 	else if(bytes == 0) debug(D_DEFLATE, "%llu: Did not send chunk suffix to the client.", w->id);
-	else debug(D_DEFLATE, "%llu: Failed to send chunk suffix to client. Reason: %s", w->id, strerror(errno));
+	else debug(D_DEFLATE, "%llu: Failed to send chunk suffix to client.", w->id);
 
 	return bytes;
 }
@@ -1391,7 +1391,7 @@ long web_client_send_chunk_finalize(struct web_client *w)
 
 	if(bytes > 0) debug(D_DEFLATE, "%llu: Sent chunk suffix %d bytes.", w->id, bytes);
 	else if(bytes == 0) debug(D_DEFLATE, "%llu: Did not send chunk suffix to the client.", w->id);
-	else debug(D_DEFLATE, "%llu: Failed to send chunk suffix to client. Reason: %s", w->id, strerror(errno));
+	else debug(D_DEFLATE, "%llu: Failed to send chunk suffix to client.", w->id);
 
 	return bytes;
 }
@@ -1540,7 +1540,7 @@ long web_client_send(struct web_client *w)
 		debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, bytes);
 	}
 	else if(likely(bytes == 0)) debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client.", w->id);
-	else debug(D_WEB_CLIENT, "%llu: Failed to send data to client. Reason: %s", w->id, strerror(errno));
+	else debug(D_WEB_CLIENT, "%llu: Failed to send data to client.", w->id);
 
 	return(bytes);
 }
@@ -1655,19 +1655,19 @@ void *web_client_main(void *ptr)
 		}
 
 		if(FD_ISSET(w->ifd, &efds)) {
-			debug(D_WEB_CLIENT_ACCESS, "%llu: Received error on input socket (%s).", w->id, strerror(errno));
+			debug(D_WEB_CLIENT_ACCESS, "%llu: Received error on input socket.", w->id);
 			break;
 		}
 
 		if(FD_ISSET(w->ofd, &efds)) {
-			debug(D_WEB_CLIENT_ACCESS, "%llu: Received error on output socket (%s).", w->id, strerror(errno));
+			debug(D_WEB_CLIENT_ACCESS, "%llu: Received error on output socket.", w->id);
 			break;
 		}
 
 		if(w->wait_send && FD_ISSET(w->ofd, &ofds)) {
 			long bytes;
 			if((bytes = web_client_send(w)) < 0) {
-				debug(D_WEB_CLIENT, "%llu: Cannot send data to client. Closing client (ouput: %s).", w->id, strerror(errno));
+				debug(D_WEB_CLIENT, "%llu: Cannot send data to client. Closing client.", w->id);
 				errno = 0;
 				break;
 			}
@@ -1680,7 +1680,7 @@ void *web_client_main(void *ptr)
 		if(w->wait_receive && FD_ISSET(w->ifd, &ifds)) {
 			long bytes;
 			if((bytes = web_client_receive(w)) < 0) {
-				debug(D_WEB_CLIENT, "%llu: Cannot receive data from client. Closing client (input: %s).", w->id, strerror(errno));
+				debug(D_WEB_CLIENT, "%llu: Cannot receive data from client. Closing client.", w->id);
 				errno = 0;
 				break;
 			}

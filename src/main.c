@@ -198,7 +198,7 @@ int main(int argc, char **argv)
 	for(i = 1; i < argc ; i++) {
 		if(strcmp(argv[i], "-c") == 0 && (i+1) < argc) {
 			if(load_config(argv[i+1], 1) != 1) {
-				fprintf(stderr, "Cannot load configuration file %s. Reason: %s\n", argv[i+1], strerror(errno));
+				error("Cannot load configuration file %s.", argv[i+1]);
 				exit(1);
 			}
 			else {
@@ -262,7 +262,7 @@ int main(int argc, char **argv)
 	setenv("TZ", ":/etc/localtime", 0);
 
 	// cd to /tmp to avoid any plugins writing files at random places
-	if(chdir("/tmp")) fprintf(stderr, "netdata: ERROR: Cannot cd to /tmp: %s", strerror(errno));
+	if(chdir("/tmp")) error("netdata: ERROR: Cannot cd to /tmp");
 
 	char *input_log_file = NULL;
 	char *output_log_file = NULL;
@@ -414,10 +414,10 @@ int main(int argc, char **argv)
 	}
 
 	// never become a problem
-	if(nice(20) == -1) fprintf(stderr, "Cannot lower my CPU priority. Error: %s.\n", strerror(errno));
+	if(nice(20) == -1) error("Cannot lower my CPU priority.");
 
 	if(become_daemon(dont_fork, 0, user, input_log_file, output_log_file, error_log_file, access_log_file, &access_fd, &stdaccess) == -1) {
-		fatal("Cannot demonize myself (%s).", strerror(errno));
+		fatal("Cannot demonize myself.");
 		exit(1);
 	}
 

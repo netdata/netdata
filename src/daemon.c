@@ -37,7 +37,7 @@ void sig_handler(int signo)
 		case SIGTRAP:
 		case SIGXCPU:
 		case SIGXFSZ:
-			info("Death signaled exit (signal %d). Errno: %d (%s)", signo, errno, strerror(errno));
+			infoerr("Death signaled exit (signal %d).", signo);
 			signal(signo, SIG_DFL);
 			break;
 
@@ -48,7 +48,7 @@ void sig_handler(int signo)
 		case SIGHUP:
 		case SIGUSR1:
 		case SIGUSR2:
-			info("Signaled exit (signal %d). Errno: %d (%s)", signo, errno, strerror(errno));
+			infoerr("Signaled exit (signal %d).", signo);
 			signal(SIGPIPE, SIG_IGN);
 			signal(SIGTERM, SIG_IGN);
 			signal(SIGQUIT, SIG_IGN);
@@ -59,10 +59,10 @@ void sig_handler(int signo)
 			break;
 
 		case SIGPIPE:
-			info("Signaled PIPE (signal %d). Errno: %d (%s)", signo, errno, strerror(errno));
+			infoerr("Signaled PIPE (signal %d).", signo);
 			// this is received when web clients send a reset
 			// no need to log it.
-			// info("Ignoring signal %d. Errno: %d (%s)", signo, errno, strerror(errno));
+			// infoerr("Ignoring signal %d.", signo);
 			break;
 
 		default:
@@ -85,7 +85,7 @@ void prepare_rundir() {
 	snprintf(pidfile, FILENAME_MAX, "%s/netdata.pid", rundir);
 
 	if(mkdir(rundir, 0775) != 0) {
-		if(errno != EEXIST) fprintf(stderr, "Cannot create directory '%s' (%s).", rundir, strerror(errno));
+		if(errno != EEXIST) error("Cannot create directory '%s'.", rundir);
 	}
 }
 
@@ -93,39 +93,39 @@ int become_user(const char *username)
 {
 	struct passwd *pw = getpwnam(username);
 	if(!pw) {
-		error("User %s is not present. Error: %s\n", username, strerror(errno));
+		error("User %s is not present.", username);
 		return -1;
 	}
 
 	if(chown(rundir, pw->pw_uid, pw->pw_gid) != 0) {
-		error("Cannot chown directory '%s' to user %s. Error: %s\n", rundir, username, strerror(errno));
+		error("Cannot chown directory '%s' to user %s.", rundir, username);
 		return -1;
 	}
 
 	if(setresgid(pw->pw_gid, pw->pw_gid, pw->pw_gid) != 0) {
-		error("Cannot switch to user's %s group (gid: %d). Error: %s\n", username, pw->pw_gid, strerror(errno));
+		error("Cannot switch to user's %s group (gid: %d).", username, pw->pw_gid);
 		return -1;
 	}
 
 	if(setresuid(pw->pw_uid, pw->pw_uid, pw->pw_uid) != 0) {
-		error("Cannot switch to user %s (uid: %d). Error: %s\n", username, pw->pw_uid, strerror(errno));
+		error("Cannot switch to user %s (uid: %d).", username, pw->pw_uid);
 		return -1;
 	}
 
 	if(setgid(pw->pw_gid) != 0) {
-		error("Cannot switch to user's %s group (gid: %d). Error: %s\n", username, pw->pw_gid, strerror(errno));
+		error("Cannot switch to user's %s group (gid: %d).", username, pw->pw_gid);
 		return -1;
 	}
 	if(setegid(pw->pw_gid) != 0) {
-		error("Cannot effectively switch to user's %s group (gid: %d). Error: %s\n", username, pw->pw_gid, strerror(errno));
+		error("Cannot effectively switch to user's %s group (gid: %d).", username, pw->pw_gid);
 		return -1;
 	}
 	if(setuid(pw->pw_uid) != 0) {
-		error("Cannot switch to user %s (uid: %d). Error: %s\n", username, pw->pw_uid, strerror(errno));
+		error("Cannot switch to user %s (uid: %d).", username, pw->pw_uid);
 		return -1;
 	}
 	if(seteuid(pw->pw_uid) != 0) {
-		error("Cannot effectively switch to user %s (uid: %d). Error: %s\n", username, pw->pw_uid, strerror(errno));
+		error("Cannot effectively switch to user %s (uid: %d).", username, pw->pw_uid);
 		return -1;
 	}
 
@@ -141,14 +141,14 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 
 	if(input && *input) {
 		if((input_fd = open(input, O_RDONLY, 0666)) == -1) {
-			fprintf(stderr, "Cannot open input file '%s' (%s).\n", input, strerror(errno));
+			error("Cannot open input file '%s'.", input);
 			return -1;
 		}
 	}
 
 	if(output && *output) {
 		if((output_fd = open(output, O_RDWR | O_APPEND | O_CREAT, 0666)) == -1) {
-			fprintf(stderr, "Cannot open output log file '%s' (%s).\n", output, strerror(errno));
+			error("Cannot open output log file '%s'", output);
 			if(input_fd != -1) close(input_fd);
 			return -1;
 		}
@@ -156,7 +156,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 
 	if(error && *error) {
 		if((error_fd = open(error, O_RDWR | O_APPEND | O_CREAT, 0666)) == -1) {
-			fprintf(stderr, "Cannot open error log file '%s' (%s).\n", error, strerror(errno));
+			error("Cannot open error log file '%s'.", error);
 			if(input_fd != -1) close(input_fd);
 			if(output_fd != -1) close(output_fd);
 			return -1;
@@ -165,7 +165,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 
 	if(access && *access && access_fd) {
 		if((*access_fd = open(access, O_RDWR | O_APPEND | O_CREAT, 0666)) == -1) {
-			fprintf(stderr, "Cannot open access log file '%s' (%s).\n", access, strerror(errno));
+			error("Cannot open access log file '%s'", access);
 			if(input_fd != -1) close(input_fd);
 			if(output_fd != -1) close(output_fd);
 			if(error_fd != -1) close(error_fd);
@@ -175,7 +175,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 		if(access_fp) {
 			*access_fp = fdopen(*access_fd, "w");
 			if(!*access_fp) {
-				fprintf(stderr, "Cannot migrate file's '%s' fd %d (%s).\n", access, *access_fd, strerror(errno));
+				error("Cannot migrate file's '%s' fd %d.", access, *access_fd);
 				if(input_fd != -1) close(input_fd);
 				if(output_fd != -1) close(output_fd);
 				if(error_fd != -1) close(error_fd);

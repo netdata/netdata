@@ -82,21 +82,23 @@ void info_int( const char *file, const char *function, const unsigned long line,
 	}
 }
 
-void error_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... )
+void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... )
 {
 	va_list args;
 
 	log_date(stderr);
 
 	va_start( args, fmt );
-	if(debug_flags) fprintf(stderr, "ERROR (%04lu@%-10.10s:%-15.15s): %s: ", line, file, function, program_name);
-	else            fprintf(stderr, "ERROR: %s: ", program_name);
+	if(debug_flags) fprintf(stderr, "%s (%04lu@%-10.10s:%-15.15s): %s: ", prefix, line, file, function, program_name);
+	else            fprintf(stderr, "%s: %s: ", prefix, program_name);
 	vfprintf( stderr, fmt, args );
 	va_end( args );
 
 	if(errno) {
-			fprintf(stderr, " (errno %d, %s)\n", errno, strerror(errno));
-			errno = 0;
+		char buf[200];
+		char *s = strerror_r(errno, buf, 200);
+		fprintf(stderr, " (errno %d, %s)\n", errno, s);
+		errno = 0;
 	}
 	else fprintf(stderr, "\n");
 

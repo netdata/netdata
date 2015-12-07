@@ -387,7 +387,7 @@ int read_process_groups(const char *name)
 	if(debug) fprintf(stderr, "apps.plugin: process groups file: '%s'\n", filename);
 	FILE *fp = fopen(filename, "r");
 	if(!fp) {
-		error("Cannot open file '%s' (%s)", filename, strerror(errno));
+		error("Cannot open file '%s'", filename);
 		return 1;
 	}
 
