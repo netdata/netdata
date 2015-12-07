@@ -32,10 +32,10 @@ void log_date(FILE *out)
 {
 		char outstr[200];
 		time_t t;
-		struct tm *tmp;
+		struct tm *tmp, tmbuf;
 
 		t = time(NULL);
-		tmp = localtime(&t);
+		tmp = localtime_r(&t, &tmbuf);
 
 		if (tmp == NULL) return;
 		if (strftime(outstr, sizeof(outstr), "%y-%m-%d %H:%M:%S", tmp) == 0) return;
@@ -142,7 +142,9 @@ void log_access( const char *fmt, ... )
 		vfprintf( stdaccess, fmt, args );
 		va_end( args );
 		fprintf( stdaccess, "\n");
+#ifdef NETDATA_INTERNAL_CHECKS
 		fflush( stdaccess );
+#endif
 	}
 
 	if(access_log_syslog) {

@@ -157,7 +157,7 @@ void kill_childs()
 	if(tc_child_pid) {
 		info("Killing tc-qos-helper procees");
 		if(killpid(tc_child_pid, SIGTERM) != -1)
-			waitid(tc_child_pid, 0, &info, WEXITED);
+			waitid(P_PID, tc_child_pid, &info, WEXITED);
 	}
 	tc_child_pid = 0;
 
@@ -170,9 +170,13 @@ void kill_childs()
 		if(cd->pid && !cd->obsolete) {
 			debug(D_EXIT, "killing %s plugin process", cd->id);
 			if(killpid(cd->pid, SIGTERM) != -1)
-				waitid(cd->pid, 0, &info, WEXITED);
+				waitid(P_PID, cd->pid, &info, WEXITED);
 		}
 	}
+
+	// if, for any reason there is any child exited
+	// catch it here
+	waitid(P_PID, 0, &info, WEXITED|WNOHANG);
 
 	debug(D_EXIT, "All threads/childs stopped.");
 }

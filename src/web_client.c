@@ -527,10 +527,10 @@ int web_client_api_request_v1_chart(struct web_client *w, char *url)
 		// they are not null and not empty
 
 		if(!strcmp(name, "chart")) chart = value;
-		else {
-			buffer_sprintf(w->response.data, "Unknown parameter '%s' in request.", name);
-			goto cleanup;
-		}
+		//else {
+		///	buffer_sprintf(w->response.data, "Unknown parameter '%s' in request.", name);
+		//	goto cleanup;
+		//}
 	}
 
 	if(!chart || !*chart) {
@@ -1009,7 +1009,7 @@ void web_client_process(struct web_client *w) {
 				datasource_type = DATASOURCE_JSON;
 				code = web_client_api_request(w, url);
 			}
-#ifdef WEB_EXIT
+#ifdef NETDATA_INTERNAL_CHECKS
 			else if(strcmp(tok, "exit") == 0) {
 				netdata_exit = 1;
 				code = 200;

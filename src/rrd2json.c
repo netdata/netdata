@@ -427,6 +427,7 @@ void rrdr_buffer_print_format(BUFFER *wb, uint32_t format)
 
 void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t options, int string_value)
 {
+	//info("JSONWRAPPER(): %s: BEGIN", r->st->id);
 	char kq[2] = "",					// key quote
 		sq[2] = "";						// string quote
 
@@ -511,6 +512,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t opti
 			);
 
 	if(string_value) buffer_strcat(wb, sq);
+	//info("JSONWRAPPER(): %s: END", r->st->id);
 }
 
 void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb, uint32_t format, uint32_t options, int string_value)
@@ -534,6 +536,7 @@ void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb, uint32_t format, uint32_t option
 
 static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 {
+	//info("RRD2JSON(): %s: BEGIN", r->st->id);
 	int row_annotations = 0, dates = JSON_DATES_JS, dates_with_new = 0;
 	char kq[2] = "",					// key quote
 		sq[2] = "",						// string quote
@@ -639,12 +642,8 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 
 	// if all dimensions are hidden, print a null
 	if(!i) {
-		buffer_strcat(wb, pre_value);
-		if(options & RRDR_OPTION_NULL2ZERO)
-			buffer_strcat(wb, "0");
-		else
-			buffer_strcat(wb, "null");
-		buffer_strcat(wb, post_value);
+		buffer_strcat(wb, finish);
+		return;
 	}
 
 	long start = 0, end = rrdr_rows(r), step = 1;
@@ -663,8 +662,8 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 
 		if(dates == JSON_DATES_JS) {
 			// generate the local date time
-			struct tm *tm = localtime(&now);
-			if(!tm) { error("localtime() failed."); continue; }
+			struct tm tmbuf, *tm = localtime_r(&now, &tmbuf);
+			if(!tm) { error("localtime_r() failed."); continue; }
 
 			if(likely(i != start)) buffer_strcat(wb, ",\n");
 			buffer_strcat(wb, pre_date);
@@ -738,10 +737,12 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 	}
 
 	buffer_strcat(wb, finish);
+	//info("RRD2JSON(): %s: END", r->st->id);
 }
 
 static void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startline, const char *separator, const char *endline)
 {
+	//info("RRD2CSV(): %s: BEGIN", r->st->id);
 	long c, i;
 	RRDDIM *d;
 
@@ -789,7 +790,7 @@ static void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startlin
 		}
 		else {
 			// generate the local date time
-			struct tm *tm = localtime(&now);
+			struct tm tmbuf, *tm = localtime_r(&now, &tmbuf);
 			if(!tm) { error("localtime() failed."); continue; }
 			buffer_date(wb, tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
 		}
@@ -817,10 +818,12 @@ static void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startlin
 
 		buffer_strcat(wb, endline);
 	}
+	//info("RRD2CSV(): %s: END", r->st->id);
 }
 
 static void rrdr2ssv(RRDR *r, BUFFER *wb, uint32_t options, const char *prefix, const char *separator, const char *suffix)
 {
+	//info("RRD2SSV(): %s: BEGIN", r->st->id);
 	long c, i;
 	RRDDIM *d;
 
@@ -885,6 +888,7 @@ static void rrdr2ssv(RRDR *r, BUFFER *wb, uint32_t options, const char *prefix, 
 			buffer_rrd_value(wb, sum);
 	}
 	buffer_strcat(wb, suffix);
+	//info("RRD2SSV(): %s: END", r->st->id);
 }
 
 inline static calculated_number *rrdr_line_values(RRDR *r)
@@ -962,11 +966,10 @@ static RRDR *rrdr_create(RRDSET *st, int n)
 		return NULL;
 	}
 
-	RRDR *r = malloc(sizeof(RRDR));
+	RRDR *r = calloc(1, sizeof(RRDR));
 	if(unlikely(!r)) goto cleanup;
 
 	r->st = st;
-	r->has_st_lock = 0;
 
 	rrdr_lock_rrdset(r);
 
@@ -988,16 +991,9 @@ static RRDR *rrdr_create(RRDSET *st, int n)
 	if(unlikely(!r->od)) goto cleanup;
 
 	r->c = -1;
-	r->rows = 0;
 
 	r->group = 1;
 	r->update_every = 1;
-
-	r->min = 0.0;
-	r->max = 0.0;
-
-	r->before = 0;
-	r->after = 0;
 
 	return r;
 
@@ -1042,10 +1038,10 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 
 	// the duration of the chart
 	time_t duration = before - after;
-	if(duration <= 0) return NULL;
-
-	// how many points does the chart has?
 	long available_points = duration / st->update_every;
+
+	if(duration <= 0 || available_points <= 0)
+		return rrdr_create(st, 1);
 
 	// check the wanted points
 	if(points < 0) points = -points;
@@ -1067,6 +1063,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	long    start_at_slot = rrdset_time2slot(st, before_new),
 			stop_at_slot = rrdset_time2slot(st, after_new);
 
+#ifdef NETDATA_INTERNAL_CHECKS
 	if(after_new < first_entry_t) {
 		error("after_new %u is too small, minimum %u", after_new, first_entry_t);
 	}
@@ -1081,17 +1078,16 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	}
 	if(start_at_slot < 0 || start_at_slot >= st->entries) {
 		error("start_at_slot is invalid %ld, expected %ld to %ld", start_at_slot, 0, st->entries - 1);
-		start_at_slot = st->current_entry;
 	}
 	if(stop_at_slot < 0 || stop_at_slot >= st->entries) {
 		error("stop_at_slot is invalid %ld, expected %ld to %ld", stop_at_slot, 0, st->entries - 1);
-		stop_at_slot = 0;
 	}
 	if(points_new > (before_new - after_new) / group / st->update_every + 1) {
 		error("points_new %ld is more than points %ld", points_new, (before_new - after_new) / group / st->update_every + 1);
 	}
+#endif
 
-	// error("SHIFT: %s: wanted %ld points, got %ld - group=%ld, wanted duration=%u, got %u - wanted %ld - %ld, got %ld - %ld", st->id, points, points_new, group, before - after, before_new - after_new, after, before, after_new, before_new);
+	//info("RRD2RRDR(): %s: wanted %ld points, got %ld - group=%ld, wanted duration=%u, got %u - wanted %ld - %ld, got %ld - %ld", st->id, points, points_new, group, before - after, before_new - after_new, after, before, after_new, before_new);
 
 	after = after_new;
 	before = before_new;
@@ -1112,10 +1108,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 
 	RRDR *r = rrdr_create(st, points);
 	if(!r) return NULL;
-	if(!r->d) {
-		rrdr_free(r);
-		return NULL;
-	}
+	if(!r->d) return r;
 
 	// find how many dimensions we have
 	long dimensions = r->d;
@@ -1180,6 +1173,8 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	r->before = now;
 	r->after = now;
 
+	//info("RRD2RRDR(): %s: STARTING", st->id);
+
 	long slot = start_at_slot, counter = 0, stop_now = 0, added = 0, group_count = 0, add_this = 0;
 	for(; !stop_now ; now -= dt, slot--, counter++) {
 		if(unlikely(slot < 0)) slot = st->entries - 1;
@@ -1211,7 +1206,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 		}
 
 		// do the calculations
-		for(rd = st->dimensions, c = 0 ; likely(rd && c < dimensions) ; rd = rd->next, c++) {
+		for(rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 			storage_number n = rd->values[slot];
 			if(unlikely(!does_storage_number_exist(n))) continue;
 
@@ -1286,6 +1281,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	}
 
 	rrdr_done(r);
+	//info("RRD2RRDR(): %s: END %ld loops made, %ld points generated", st->id, counter, rrdr_rows(r));
 	//error("SHIFT: %s: wanted %ld points, got %ld", st->id, points, rrdr_rows(r));
 	return r;
 }
@@ -1650,7 +1646,7 @@ unsigned long rrd_stats_json(int type, RRDSET *st, BUFFER *wb, int points, int g
 				}
 
 				// generate the local date time
-				struct tm *tm = localtime(&now);
+				struct tm tmbuf, *tm = localtime_r(&now, &tmbuf);
 				if(!tm) { error("localtime() failed."); continue; }
 				if(now > last_timestamp) last_timestamp = now;
 

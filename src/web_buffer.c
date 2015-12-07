@@ -20,7 +20,11 @@ static inline void buffer_overflow_init(BUFFER *b)
 	strcpy(&b->buffer[b->size + 1], BUFFER_OVERFLOW_EOF);
 }
 
+#ifdef NETDATA_INTERNAL_CHECKS
 #define buffer_overflow_check(b) _buffer_overflow_check(b, __FILE__, __FUNCTION__, __LINE__)
+#else
+#define buffer_overflow_check(b)
+#endif
 
 static inline void _buffer_overflow_check(BUFFER *b, const char *file, const char *function, const unsigned long line)
 {

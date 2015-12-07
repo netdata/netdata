@@ -383,7 +383,7 @@
 			element_chart_id: null,
 			element_legend: null, 	// the element with the legend of the chart (if created by us)
 			element_legend_id: null,
-			
+
 			chart_url: null,		// string - the url to download chart info
 			chart: null,			// object - the chart as downloaded from the server
 
@@ -885,7 +885,7 @@
 					this.library.initialize(function() { this_state_object.updateChart(callback); });
 					return;
 				}
-				
+
 				this.clearSelection();
 				this.chartURL();
 				if(this.debug) this.log('updating from ' + this.current.url);
@@ -893,7 +893,8 @@
 				var this_state_object = this;
 				$.ajax( {
 					url: this.current.url,
-					crossDomain: true
+					crossDomain: true,
+					cache: false
 				})
 				.then(function(data) {
 					this_state_object.updateChartWithData(data);
@@ -995,7 +996,8 @@
 
 					$.ajax( {
 						url:  this.chart_url,
-						crossDomain: true
+						crossDomain: true,
+						cache: false
 					})
 					.done(function(chart) {
 						chart.url = this_state_object.chart_url;
@@ -1039,7 +1041,7 @@
 				this.element.innerHTML = '<div class="netdata-message netdata-' + type + '-message" style="font-size: x-small; overflow: hidden; width: 100%; height: 100%;"><small>'
 					+ msg
 					+ '</small></div>';
-				
+
 				// reset the creation datetime
 				// since we overwrote the whole element
 				this.created_ms = 0
@@ -1270,7 +1272,11 @@
 
 	NETDATA.peityInitialize = function(callback) {
 		if(typeof netdataNoPeitys == 'undefined' || !netdataNoPeitys) {
-			$.getScript(NETDATA.peity_js)
+			$.ajax({
+				url: NETDATA.peity_js,
+				cache: true,
+				dataType: "script"
+			})
 				.done(function() {
 					NETDATA.registerChartLibrary('peity', NETDATA.peity_js);
 				})
@@ -1307,7 +1313,11 @@
 
 	NETDATA.sparklineInitialize = function(callback) {
 		if(typeof netdataNoSparklines == 'undefined' || !netdataNoSparklines) {
-			$.getScript(NETDATA.sparkline_js)
+			$.ajax({
+				url: NETDATA.sparkline_js,
+				cache: true,
+				dataType: "script"
+			})
 				.done(function() {
 					NETDATA.registerChartLibrary('sparkline', NETDATA.sparkline_js);
 				})
@@ -1568,7 +1578,11 @@
 
 	NETDATA.dygraphInitialize = function(callback) {
 		if(typeof netdataNoDygraphs == 'undefined' || !netdataNoDygraphs) {
-			$.getScript(NETDATA.dygraph_js)
+			$.ajax({
+				url: NETDATA.dygraph_js,
+				cache: true,
+				dataType: "script"
+			})
 				.done(function() {
 					NETDATA.registerChartLibrary('dygraph', NETDATA.dygraph_js);
 				})
@@ -1924,7 +1938,11 @@
 			else {
 				NETDATA._loadCSS(NETDATA.morris_css);
 
-				$.getScript(NETDATA.morris_js)
+				$.ajax({
+					url: NETDATA.morris_js,
+					cache: true,
+					dataType: "script"
+				})
 					.done(function() {
 						NETDATA.registerChartLibrary('morris', NETDATA.morris_js);
 					})
@@ -1981,7 +1999,11 @@
 
 	NETDATA.raphaelInitialize = function(callback) {
 		if(typeof netdataStopRaphael == 'undefined') {
-			$.getScript(NETDATA.raphael_js)
+			$.ajax({
+				url: NETDATA.raphael_js,
+				cache: true,
+				dataType: "script"
+			})
 				.done(function() {
 					NETDATA.registerChartLibrary('raphael', NETDATA.raphael_js);
 				})
@@ -2019,7 +2041,11 @@
 
 	NETDATA.googleInitialize = function(callback) {
 		if(typeof netdataNoGoogleCharts == 'undefined' || !netdataNoGoogleCharts) {
-			$.getScript(NETDATA.google_js)
+			$.ajax({
+				url: NETDATA.google_js,
+				cache: true,
+				dataType: "script"
+			})
 				.done(function() {
 					NETDATA.registerChartLibrary('google', NETDATA.google_js);
 
@@ -2256,7 +2282,12 @@
 
 	NETDATA.errorReset();
 	NETDATA._loadjQuery(function() {
-		$.getScript(NETDATA.serverDefault + 'lib/visible.js').then(function() {
+		$.ajax({
+			url: NETDATA.serverDefault + 'lib/visible.js',
+			cache: true,
+			dataType: "script"
+		})
+		.then(function() {
 			NETDATA._loadCSS(NETDATA.dashboard_css);
 
 			if(typeof netdataDontStart == 'undefined' || !netdataDontStart)
