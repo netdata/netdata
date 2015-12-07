@@ -506,11 +506,7 @@
 
 			calculateRowForTime: function(t) {
 				if(!this.timeIsVisible(t)) return -1;
-
-				var r = Math.floor((t - this.current.after_ms) / this.current.view_update_every);
-				// console.log(this.current.data);
-
-				return r;
+				return Math.floor((t - this.current.after_ms) / this.current.view_update_every);
 			},
 
 			pauseChart: function() {
@@ -771,7 +767,7 @@
 
 				// if the result is JSON, find the latest update-every
 				if(typeof data == 'object' && this.library.jsonWrapper) {
-					if(!this.follows_global && typeof data.view_update_every != 'undefined')
+					if(typeof data.view_update_every != 'undefined')
 						this.current.view_update_every = data.view_update_every * 1000;
 
 					if(typeof data.after != 'undefined')
@@ -1461,7 +1457,7 @@
 		// state.debug = true;
 
 		var t = state.current.after_ms + row * state.current.view_update_every;
-		// console.log('row = ' + row + ', x = ' + x + ', t = ' + t + ' ' + ((t == x)?'SAME':'DIFFERENT'));
+		// console.log('row = ' + row + ', x = ' + x + ', t = ' + t + ' ' + ((t == x)?'SAME':'DIFFERENT') + ', rows in db: ' + state.current.data.points + ' visible(x) = ' + state.timeIsVisible(x) + ' visible(t) = ' + state.timeIsVisible(t) + ' r(x) = ' + state.calculateRowForTime(x) + ' r(t) = ' + state.calculateRowForTime(t) + ' range: ' + state.current.after_ms + ' - ' + state.current.before_ms + ' real: ' + state.current.data.after + ' - ' + state.current.data.before + ' every: ' + state.current.view_update_every);
 
 		now = new Date().getTime();
 		if(now < NETDATA.dygraph.dont_sync_before) {
@@ -1544,6 +1540,7 @@
 	NETDATA.dygraph.chartPanOrZoom = function(state, dygraph, after, before) {
 		if(NETDATA.options.debug.dygraph) console.log('>>>> dygraph.zoomOrPan(state, dygraph, after:' + after + ', before: ' + before + ')');
 
+		//console.log(state.dygraph_instance);
 		state.updateChartPanOrZoom(after, before);
 		return;
 	}
@@ -1619,49 +1616,71 @@
 		var self = $(state.element);
 		var title = self.data('dygraph-title') || state.chart.title;
 		var titleHeight = self.data('dygraph-titleheight') || 19;
-		var labelsDiv = self.data('dygraph-labelsdiv') || undefined;
-		var connectSeparatedPoints = self.data('dygraph-connectseparatedpoints') || false;
-		var yLabelWidth = self.data('dygraph-ylabelwidth') || 12;
-		var stackedGraph = self.data('dygraph-stackedgraph') || (state.chart.chart_type == 'stacked')?true:false;
-		var stackedGraphNaNFill = self.data('dygraph-stackedgraphnanfill') || 'none';
 		var hideOverlayOnMouseOut = self.data('dygraph-hideoverlayonmouseout') || true;
-		var fillGraph = self.data('dygraph-fillgraph') || (state.chart.chart_type == 'area')?true:false;
-		var drawPoints = self.data('dygraph-drawpoints') || false;
+		var colors = self.data('dygraph-colors') || NETDATA.colors;
+
+		// legend
+		var legend = self.data('dygraph-legend') || 'onmouseover';
+		var labelsDiv = self.data('dygraph-labelsdiv') || undefined;
 		var labelsDivStyles = self.data('dygraph-labelsdivstyles') || { 'fontSize':'10px' };
 		var labelsDivWidth = self.data('dygraph-labelsdivwidth') || state.chartWidth() - 70;
 		var labelsSeparateLines = self.data('dygraph-labelsseparatelines') || false;
 		var labelsShowZeroValues = self.data('dygraph-labelsshowzerovalues') || true;
-		var legend = self.data('dygraph-legend') || 'onmouseover';
 		var showLabelsOnHighlight = self.data('dygraph-showlabelsonhighlight') || true;
-		var gridLineColor = self.data('dygraph-gridlinecolor') || '#EEE';
-		var axisLineColor = self.data('dygraph-axislinecolor') || '#EEE';
-		var maxNumberWidth = self.data('dygraph-maxnumberwidth') || 8;
+		var yLabelWidth = self.data('dygraph-ylabelwidth') || 12;
+
+		// Value Formatting
 		var sigFigs = self.data('dygraph-sigfigs') || null;
+		var maxNumberWidth = self.data('dygraph-maxnumberwidth') || 8;
 		var digitsAfterDecimal = self.data('dygraph-digitsafterdecimal') || 2;
+		var valueFormatter = self.data('dygraph-valueformatter') || undefined; //function(x){ return x.toFixed(2); };
+
+		// Axis and Grid
+		var drawAxis = self.data('dygraph-drawaxis') || true;
 		var axisLabelFontSize = self.data('dygraph-axislabelfontsize') || 10;
 		var axisLineWidth = self.data('dygraph-axislinewidth') || 0.3;
-		var drawAxis = self.data('dygraph-drawaxis') || true;
-		var strokeWidth = self.data('dygraph-strokewidth') || 1.0;
-		var drawGapEdgePoints = self.data('dygraph-drawgapedgepoints') || true;
-		var colors = self.data('dygraph-colors') || NETDATA.colors;
-		var pointSize = self.data('dygraph-pointsize') || 1;
+		var gridLineColor = self.data('dygraph-gridlinecolor') || '#EEE';
+		var axisLineColor = self.data('dygraph-axislinecolor') || '#DDD';
+		var drawGrid = self.data('dygraph-drawgrid') || true;
+		var drawXGrid = self.data('dygraph-drawxgrid') || undefined;
+		var drawYGrid = self.data('dygraph-drawygrid') || undefined;
+		var gridLinePattern = self.data('dygraph-gridlinepattern') || null;
+		var gridLineWidth = self.data('dygraph-gridlinewidth') || 0.3;
+
+		// enabling this makes the chart with little square lines
 		var stepPlot = self.data('dygraph-stepplot') || false;
-		var strokeBorderColor = self.data('dygraph-strokebordercolor') || 'white';
-		var strokeBorderWidth = self.data('dygraph-strokeborderwidth') || (state.chart.chart_type == 'stacked')?0.1:0.0;
+		var connectSeparatedPoints = self.data('dygraph-connectseparatedpoints') || false;
+
+		// Draw points at the edges of gaps in the data. This improves visibility of small data segments or other data irregularities.
+		var drawGapEdgePoints = self.data('dygraph-drawgapedgepoints') || true;
+
+		// The size of the dot to draw on each point in pixels (see drawPoints). A dot is always drawn when a point is "isolated",
+		// i.e. there is a missing point on either side of it. This also controls the size of those dots.
+		var drawPoints = self.data('dygraph-drawpoints') || false;
+		var pointSize = self.data('dygraph-pointsize') || 1;
+
+		// The width of the lines connecting data points. This can be used to increase the contrast or some graphs.
+		var strokeWidth = self.data('dygraph-strokewidth') || (state.chart.chart_type == 'stacked')?0.0:1.0;
 		var strokePattern = self.data('dygraph-strokepattern') || undefined;
+
+		// Draw a border around graph lines to make crossing lines more easily distinguishable. Useful for graphs with many lines.
+		var strokeBorderColor = self.data('dygraph-strokebordercolor') || 'white';
+		var strokeBorderWidth = self.data('dygraph-strokeborderwidth') || (state.chart.chart_type == 'stacked')?0.0:0.0;
+
 		var highlightCircleSize = self.data('dygraph-highlightcirclesize') || 3;
 		var highlightSeriesOpts = self.data('dygraph-highlightseriesopts') || null; // TOO SLOW: { strokeWidth: 1.5 };
 		var highlightSeriesBackgroundAlpha = self.data('dygraph-highlightseriesbackgroundalpha') || null; // TOO SLOW: (state.chart.chart_type == 'stacked')?0.7:0.5;
 		var pointClickCallback = self.data('dygraph-pointclickcallback') || undefined;
 		var showRangeSelector = self.data('dygraph-showrangeselector') || false;
 		var showRoller = self.data('dygraph-showroller') || false;
-		var valueFormatter = self.data('dygraph-valueformatter') || undefined; //function(x){ return x.toFixed(2); };
+
+		// leave a few pixels empty on the right of the chart
 		var rightGap = self.data('dygraph-rightgap') || 5;
-		var drawGrid = self.data('dygraph-drawgrid') || true;
-		var drawXGrid = self.data('dygraph-drawxgrid') || undefined;
-		var drawYGrid = self.data('dygraph-drawygrid') || undefined;
-		var gridLinePattern = self.data('dygraph-gridlinepattern') || null;
-		var gridLineWidth = self.data('dygraph-gridlinewidth') || 0.3;
+
+		var fillGraph = self.data('dygraph-fillgraph') || (state.chart.chart_type == 'area')?true:false;
+		var fillAlpha = self.data('dygraph-fillalpha') || (state.chart.chart_type == 'stacked')?0.8:0.2;
+		var stackedGraph = self.data('dygraph-stackedgraph') || (state.chart.chart_type == 'stacked')?true:false;
+		var stackedGraphNaNFill = self.data('dygraph-stackedgraphnanfill') || 'none';
 
 		state.dygraph_options = {
 			title: title,
@@ -1697,6 +1716,7 @@
 			digitsAfterDecimal: digitsAfterDecimal,
 			axisLabelFontSize: axisLabelFontSize,
 			colors: colors,
+			fillAlpha: fillAlpha,
 			strokeWidth: strokeWidth,
 			drawGapEdgePoints: drawGapEdgePoints,
 			pointSize: pointSize,
@@ -2132,7 +2152,7 @@
 			legend: 'right-side',
 			autoresize: true,
 			max_updates_to_recreate: 5000,
-			pixels_per_point: 2,
+			pixels_per_point: 3,
 			detects_dimensions_on_update: false
 		},
 		"sparkline": {
@@ -2149,7 +2169,7 @@
 			legend: 'sparkline',
 			autoresize: false,
 			max_updates_to_recreate: 5000,
-			pixels_per_point: 2,
+			pixels_per_point: 3,
 			detects_dimensions_on_update: false
 		},
 		"peity": {
@@ -2166,7 +2186,7 @@
 			legend: 'sparkline',
 			autoresize: false,
 			max_updates_to_recreate: 5000,
-			pixels_per_point: 2,
+			pixels_per_point: 3,
 			detects_dimensions_on_update: false
 		},
 		"morris": {
