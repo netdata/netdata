@@ -130,6 +130,8 @@
 										// rendering the chart that is panned or zoomed).
 										// Used with .current.global_pan_sync_time
 
+		last_resized: 0,				// the timestamp of the last resize request
+
 		// the current profile
 		// we may have many...
 		current: {
@@ -159,9 +161,15 @@
 										// autorefreshing of charts is paused for this amount
 										// of time
 
-			sync_delay: 1500			// ms - when you pan or zoom a chart, wait this amount
+			sync_selection_delay: 1500,	// ms - when you pan or zoom a chart, wait this amount
 										// of time before setting up synchronized selections
 										// on hover.
+
+			sync_selection: true,		// enable or disable selection sync
+
+			sync_pan_and_zoom: true,	// enable or disable pan and zoom sync
+
+			update_only_visible: true	// enable or disable visibility management
 		},
 
 		debug: {
@@ -170,7 +178,7 @@
 			focus: 				0,
 			visibility: 		0,
 			chart_data_url: 	0,
-			chart_errors: 		0,
+			chart_errors: 		1,
 			chart_timing: 		0,
 			chart_calls: 		0,
 			libraries: 			0,
@@ -180,6 +188,9 @@
 
 	if(NETDATA.options.debug.main_loop) console.log('welcome to NETDATA');
 
+	window.onresize = function(event) {
+		NETDATA.options.last_resized = new Date().getTime();
+	};
 
 	// ----------------------------------------------------------------------------------------------------------------
 	// Error Handling
@@ -274,6 +285,8 @@
 
 		// set a new master
 		setMaster: function(state, after, before) {
+			if(!NETDATA.options.current.sync_pan_and_zoom) return;
+
 			if(this.master && this.master != state)
 				this.master.resetChart();
 
@@ -320,6 +333,9 @@
 			if(!this.master || !this.seq)
 				return false;
 
+			if(state.needsResize())
+				return true;
+
 			if(state.follows_global == this.seq)
 				return false;
 
@@ -341,10 +357,6 @@
 			width: self.data('width') || NETDATA.chartDefaults.width,
 			height: self.data('height') || NETDATA.chartDefaults.height,
 
-			// these are calculated every time the chart is refreshed
-			calculated_width: 0,
-			calculated_height: 0,
-
 			// string - the netdata server URL, without any path
 			host: self.data('host') || NETDATA.chartDefaults.host,
 
@@ -356,7 +368,7 @@
 			before: self.data('before') || NETDATA.chartDefaults.before,
 
 			// the pixels per point requested by the user
-			pixels_per_point: 1,
+			pixels_per_point: self.data('pixels-per-point') || 1,
 			points: self.data('points') || null,
 
 			// the dimensions requested by the user
@@ -366,7 +378,11 @@
 			library_name: self.data('chart-library') || NETDATA.chartDefaults.library,
 			library: null,			// object - the chart library used
 
-			element: element,		// the element this chart appears in
+			element: element,		// the element already created by the user
+			element_chart: null,	// the element with the chart
+			element_chart_id: null,
+			element_legend: null, 	// the element with the legend of the chart (if created by us)
+			element_legend_id: null,
 			
 			chart_url: null,		// string - the url to download chart info
 			chart: null,			// object - the chart as downloaded from the server
@@ -378,11 +394,15 @@
 			paused: false,			// boolean - is the chart paused for any reason?
 			selected: false,		// boolean - is the chart shown a selection?
 			debug: false,			// boolena - console.log() debug info about this chart
+
 			updates_counter: 0,		// numeric - the number of refreshes made so far
+			updates_since_last_creation: 0,
 
 			follows_global: 0,		// the sequence number of the global synchronization
 									// between chart.
 									// Used with NETDATA.globalPanAndZoom.seq
+
+			last_resized: 0,		// the last time the chart was resized
 
 			mode: null, 			// auto, pan, zoom
 									// this is a pointer to one of the sub-classes below
@@ -477,8 +497,9 @@
 				return this.selected;
 			},
 
+			// find if a timestamp (ms) is shown in the current chart
 			timeIsVisible: function(t) {
-				if(t >= this.mode.after_ms && t <= this.mode.before_ms)
+				if(t >= this.current.after_ms && t <= this.current.before_ms)
 					return true;
 				return false;
 			},
@@ -486,8 +507,8 @@
 			calculateRowForTime: function(t) {
 				if(!this.timeIsVisible(t)) return -1;
 
-				var r = Math.floor((t - this.mode.after_ms) / this.mode.view_update_every);
-				// console.log(this.mode.data);
+				var r = Math.floor((t - this.current.after_ms) / this.current.view_update_every);
+				// console.log(this.current.data);
 
 				return r;
 			},
@@ -510,12 +531,12 @@
 				if(NETDATA.globalPanAndZoom.isMaster(this))
 					NETDATA.globalPanAndZoom.clearMaster();
 
-				if(state.mode.name != 'auto')
+				if(state.current.name != 'auto')
 					this.setMode('auto');
 
-				this.mode.force_before_ms = null;
-				this.mode.force_after_ms = null;
-				this.mode.last_updated_ms = 0;
+				this.current.force_before_ms = null;
+				this.current.force_after_ms = null;
+				this.current.last_updated_ms = 0;
 				this.follows_global = 0;
 				this.paused = false;
 				this.selected = false;
@@ -526,44 +547,45 @@
 				// or the chart will flip-flop when it is the master
 				// of a selection sync and another chart becomes
 				// the new master
-				// state.updateChart();
+				if(!NETDATA.options.current.sync_pan_and_zoom)
+					state.updateChart();
 			},
 
 			setMode: function(m) {
-				if(this.mode) {
-					if(this.mode.name == m) return;
+				if(this.current) {
+					if(this.current.name == m) return;
 
-					this[m].url = this.mode.url;
-					this[m].last_updated_ms = this.mode.last_updated_ms;
-					this[m].view_update_every = this.mode.view_update_every;
-					this[m].after_ms = this.mode.after_ms;
-					this[m].before_ms = this.mode.before_ms;
-					this[m].points = this.mode.points;
-					this[m].data = this.mode.data;
-					this[m].requested_before_ms = this.mode.requested_before_ms;
-					this[m].requested_after_ms = this.mode.requested_after_ms;
-					this[m].first_entry_ms = this.mode.first_entry_ms;
-					this[m].last_entry_ms = this.mode.last_entry_ms;
+					this[m].url = this.current.url;
+					this[m].last_updated_ms = this.current.last_updated_ms;
+					this[m].view_update_every = this.current.view_update_every;
+					this[m].after_ms = this.current.after_ms;
+					this[m].before_ms = this.current.before_ms;
+					this[m].points = this.current.points;
+					this[m].data = this.current.data;
+					this[m].requested_before_ms = this.current.requested_before_ms;
+					this[m].requested_after_ms = this.current.requested_after_ms;
+					this[m].first_entry_ms = this.current.first_entry_ms;
+					this[m].last_entry_ms = this.current.last_entry_ms;
 				}
 
 				if(m == 'auto')
-					this.mode = this.auto;
+					this.current = this.auto;
 				else if(m == 'pan')
-					this.mode = this.pan;
+					this.current = this.pan;
 				else if(m == 'zoom')
-					this.mode = this.zoom;
+					this.current = this.zoom;
 				else
-					this.mode = this.auto;
+					this.current = this.auto;
 
-				this.mode.force_before_ms = null;
-				this.mode.force_after_ms = null;
+				this.current.force_before_ms = null;
+				this.current.force_after_ms = null;
 
-				if(this.debug) this.log('mode set to ' + this.mode.name);
+				if(this.debug) this.log('mode set to ' + this.current.name);
 			},
 
 			_minPanOrZoomStep: function() {
-				return (((this.mode.before_ms - this.mode.after_ms) / this.mode.points) * ((this.mode.points * 5 / 100) + 1) );
-				// return this.mode.view_update_every * 10;
+				return (((this.current.before_ms - this.current.after_ms) / this.current.points) * ((this.current.points * 5 / 100) + 1) );
+				// return this.current.view_update_every * 10;
 			},
 
 			_shouldBeMoved: function(old_after, old_before, new_after, new_before) {
@@ -576,8 +598,8 @@
 				var step = Math.max(dt_after, dt_before, dt);
 
 				var min_step = this._minPanOrZoomStep();
-				if(new_range < old_range && new_range / this.calculated_width < 100) {
-					if(this.debug) this.log('_shouldBeMoved(' + (new_after / 1000).toString() + ' - ' + (new_before / 1000).toString() + '): minimum point size: 0.10, wanted point size: ' + (new_range / this.calculated_width / 1000).toString() + ': TOO SMALL RANGE');
+				if(new_range < old_range && new_range / this.chartWidth() < 100) {
+					if(this.debug) this.log('_shouldBeMoved(' + (new_after / 1000).toString() + ' - ' + (new_before / 1000).toString() + '): minimum point size: 0.10, wanted point size: ' + (new_range / this.chartWidth() / 1000).toString() + ': TOO SMALL RANGE');
 					return false;
 				}
 
@@ -594,21 +616,21 @@
 			updateChartPanOrZoom: function(after, before, callback) {
 				var move = false;
 
-				if(this.mode.name == 'auto') {
+				if(this.current.name == 'auto') {
 					if(this.debug) this.log('updateChartPanOrZoom(): caller did not set proper mode');
 					this.setMode('pan');
 				}
 					
-				if(!this.mode.force_after_ms || !this.mode.force_before_ms) {
+				if(!this.current.force_after_ms || !this.current.force_before_ms) {
 					if(this.debug) this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): INIT');
 					move = true;
 				}
-				else if(this._shouldBeMoved(this.mode.force_after_ms, this.mode.force_before_ms, after, before) && this._shouldBeMoved(this.mode.after_ms, this.mode.before_ms, after, before)) {
-					if(this.debug) this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): FORCE CHANGE from ' + (this.mode.force_after_ms / 1000).toString() + ' - ' + (this.mode.force_before_ms / 1000).toString());
+				else if(this._shouldBeMoved(this.current.force_after_ms, this.current.force_before_ms, after, before) && this._shouldBeMoved(this.current.after_ms, this.current.before_ms, after, before)) {
+					if(this.debug) this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): FORCE CHANGE from ' + (this.current.force_after_ms / 1000).toString() + ' - ' + (this.current.force_before_ms / 1000).toString());
 					move = true;
 				}
-				else if(this._shouldBeMoved(this.mode.requested_after_ms, this.mode.requested_before_ms, after, before) && this._shouldBeMoved(this.mode.after_ms, this.mode.before_ms, after, before)) {
-					if(this.debug) this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): REQUESTED CHANGE from ' + (this.mode.requested_after_ms / 1000).toString() + ' - ' + (this.mode.requested_before_ms / 1000).toString());
+				else if(this._shouldBeMoved(this.current.requested_after_ms, this.current.requested_before_ms, after, before) && this._shouldBeMoved(this.current.after_ms, this.current.before_ms, after, before)) {
+					if(this.debug) this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): REQUESTED CHANGE from ' + (this.current.requested_after_ms / 1000).toString() + ' - ' + (this.current.requested_before_ms / 1000).toString());
 					move = true;
 				}
 
@@ -617,8 +639,8 @@
 					NETDATA.options.auto_refresher_stop_until = now + NETDATA.options.current.global_pan_sync_time;
 					NETDATA.globalPanAndZoom.setMaster(this, after, before);
 
-					this.mode.force_after_ms = after;
-					this.mode.force_before_ms = before;
+					this.current.force_after_ms = after;
+					this.current.force_before_ms = before;
 					this.updateChart(callback);
 					return true;
 				}
@@ -626,6 +648,216 @@
 				if(this.debug) this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): IGNORE');
 				if(typeof callback != 'undefined') callback();
 				return false;
+			},
+
+			createChartDOM: function() {
+				this.element_chart_id = this.library_name + '-' + this.uuid + '-chart';
+				var html = '<div class="netdata-chart netdata-'
+					+ this.library_name + '-chart" id="'
+					+ this.element_chart_id
+					+ '"style="width: 100%; height: 100%;"></div>';
+//					+ '"style="width: ' + this.chartWidth().toString() + 'px; height: ' + this.chartHeight().toString() + 'px;"></div>';
+
+				if(this.hasLegend()) {
+					this.element_legend_id = this.library_name + '-' + this.uuid + '-legend';
+					html += '<div class="netdata-chart-legend netdata-'
+						+ this.library_name + '-legend" id="'
+						+ this.element_legend_id
+						+ '" style="width: ' + this.legendWidth().toString() + 'px; height: ' + this.legendHeight() + 'px;"></div>';
+				}
+
+				element.innerHTML = html;
+				this.element_chart = document.getElementById(this.element_chart_id);
+				$(this.element_chart).data('netdata-state-object', this);
+
+				if(this.hasLegend()) {
+					this.element_legend = document.getElementById(this.element_legend_id);
+					$(this.element_legend).data('netdata-state-object', this);
+				}
+			},
+
+			hasLegend: function() {
+				// return (this.library && this.library.legend == 'right-side');
+				return false;
+			},
+
+			legendWidth: function() {
+				return (this.hasLegend())?55:0;
+			},
+
+			legendHeight: function() {
+				return $(this.element).height();
+			},
+
+			chartWidth: function() {
+				return $(this.element).width() - this.legendWidth();
+			},
+
+			chartHeight: function() {
+				return $(this.element).height();
+			},
+
+			chartPixelsPerPoint: function() {
+				// force an options provided detail
+				var px = this.pixels_per_point;
+
+				if(this.library && px < this.library.pixels_per_point)
+					px = this.library.pixels_per_point;
+
+				if(px < NETDATA.options.current.pixels_per_point)
+					px = NETDATA.options.current.pixels_per_point;
+
+				return px;
+			},
+
+			needsResize: function() {
+				return (this.last_resized < NETDATA.options.last_resized);
+			},
+
+			resizeChart: function() {
+				if(this.needsResize()) {
+					if(this.library && !this.library.autoresize) {
+						if(this.debug) this.log('forcing re-generation due to window resize.');
+						this.created_ms = 0;
+						this.last_resized = new Date().getTime();
+					}
+				}
+			},
+
+			chartURL: function() {
+				var before;
+				var after;
+				if(NETDATA.globalPanAndZoom.isActive()) {
+					after = Math.round(NETDATA.globalPanAndZoom.force_after_ms / 1000);
+					before = Math.round(NETDATA.globalPanAndZoom.force_before_ms / 1000);
+					this.follows_global = NETDATA.globalPanAndZoom.seq;
+				}
+				else {
+					before = this.current.force_before_ms != null ? Math.round(this.current.force_before_ms / 1000) : this.before;
+					after  = this.current.force_after_ms  != null ? Math.round(this.current.force_after_ms / 1000) : this.after;
+					this.follows_global = 0;
+				}
+
+				this.current.requested_after_ms = after * 1000;
+				this.current.requested_before_ms = before * 1000;
+
+				this.current.points = this.points || Math.round(this.chartWidth() / this.chartPixelsPerPoint());
+
+				// build the data URL
+				this.current.url = this.chart.data_url;
+				this.current.url += "&format="  + this.library.format;
+				this.current.url += "&points="  + this.current.points.toString();
+				this.current.url += "&group="   + this.method;
+				this.current.url += "&options=" + this.library.options;
+				if(this.library.jsonWrapper) this.current.url += '|jsonwrap';
+
+				if(after)
+					this.current.url += "&after="  + after.toString();
+
+				if(before)
+					this.current.url += "&before=" + before.toString();
+
+				if(this.dimensions)
+					this.current.url += "&dimensions=" + this.dimensions;
+
+				if(NETDATA.options.debug.chart_data_url || this.debug) this.log('chartURL(): ' + this.current.url + ' WxH:' + this.chartWidth() + 'x' + this.chartHeight() + ' points: ' + this.current.points + ' library: ' + this.library_name);
+			},
+
+			updateChartWithData: function(data) {
+				if(this.debug) this.log('got data from netdata server');
+				this.current.data = data;
+
+				var started = new Date().getTime();
+
+				// if the result is JSON, find the latest update-every
+				if(typeof data == 'object' && this.library.jsonWrapper) {
+					if(!this.follows_global && typeof data.view_update_every != 'undefined')
+						this.current.view_update_every = data.view_update_every * 1000;
+
+					if(typeof data.after != 'undefined')
+						this.current.after_ms = data.after * 1000;
+
+					if(typeof data.before != 'undefined')
+						this.current.before_ms = data.before * 1000;
+
+					if(typeof data.first_entry_t != 'undefined')
+						this.current.first_entry_ms = data.first_entry_t * 1000;
+
+					if(typeof data.last_entry_t != 'undefined')
+						this.current.last_entry_ms = data.last_entry_t * 1000;
+
+					if(typeof data.points != 'undefined')
+						this.current.points = data.points;
+
+					data.state = this;
+				}
+
+				this.updates_counter++;
+
+				if(this.debug) {
+					this.log('UPDATE No ' + this.updates_counter + ' COMPLETED');
+
+					if(this.current.force_after_ms)
+						this.log('STATUS: forced   : ' + (this.current.force_after_ms / 1000).toString() + ' - ' + (this.current.force_before_ms / 1000).toString());
+					else
+						this.log('STATUS: forced: unset');
+
+					this.log('STATUS: requested: ' + (this.current.requested_after_ms / 1000).toString() + ' - ' + (this.current.requested_before_ms / 1000).toString());
+					this.log('STATUS: rendered : ' + (this.current.after_ms / 1000).toString() + ' - ' + (this.current.before_ms / 1000).toString());
+					this.log('STATUS: points   : ' + (this.current.points).toString() + ', min step: ' + (this._minPanOrZoomStep() / 1000).toString());
+				}
+
+				// this may force the chart to be re-created
+				this.resizeChart();
+				if(this.updates_since_last_creation >= this.library.max_updates_to_recreate) {
+					if(this.debug) this.log('max updates of ' + this.updates_since_last_creation.toString() + ' reached. Forcing re-generation.');
+					this.created_ms = 0;
+				}
+
+				if(this.created_ms && typeof this.library.update == 'function') {
+					if(this.debug) this.log('updating chart...');
+
+					this.updates_since_last_creation++;
+					if(NETDATA.options.debug.chart_errors) {
+						this.library.update(this, data);
+					}
+					else {
+						try {
+							this.library.update(this, data);
+						}
+						catch(err) {
+							this.error('chart "' + this.id + '" failed to be updated as ' + this.library_name);
+						}
+					}
+				}
+				else {
+					if(this.debug) this.log('creating chart...');
+
+					this.createChartDOM();
+					this.updates_since_last_creation = 0;
+
+					if(NETDATA.options.debug.chart_errors) {
+						this.library.create(this, data);
+						this.created_ms = new Date().getTime();
+					}
+					else {
+						try {
+							this.library.create(this, data);
+							this.created_ms = new Date().getTime();
+						}
+						catch(err) {
+							this.error('chart "' + this.id + '" failed to be created as ' + this.library_name);
+						}
+					}
+				}
+
+				// update the performance counters
+				this.current.last_updated_ms = new Date().getTime();
+				this.refresh_dt_ms = this.current.last_updated_ms - started;
+				NETDATA.options.auto_refresher_fast_weight += this.refresh_dt_ms;
+
+				if(this.refresh_dt_element)
+					this.refresh_dt_element.innerHTML = this.refresh_dt_ms.toString();
 			},
 
 			updateChart: function(callback) {
@@ -641,7 +873,7 @@
 					return;
 				}
 
-				if(!self.visible(true)) {
+				if(!this.isVisible()) {
 					if(NETDATA.options.debug.visibility || this.debug) this.log('is not visible');
 					if(typeof callback != 'undefined') callback();
 					return;
@@ -660,159 +892,33 @@
 				
 				this.clearSelection();
 				this.chartURL();
-				if(this.debug) this.log('updating from ' + this.mode.url);
+				if(this.debug) this.log('updating from ' + this.current.url);
 
 				var this_state_object = this;
 				$.ajax( {
-					url: this_state_object.mode.url,
+					url: this.current.url,
 					crossDomain: true
 				})
 				.then(function(data) {
-					if(this_state_object.debug) this_state_object.log('got data from netdata server');
-					this_state_object.mode.data = data;
-
-					var started = new Date().getTime();
-
-					// if the result is JSON, find the latest update-every
-					if(typeof data == 'object' && this_state_object.library.jsonWrapper) {
-						if(!this_state_object.follows_global && typeof data.view_update_every != 'undefined')
-							this_state_object.mode.view_update_every = data.view_update_every * 1000;
-
-						if(typeof data.after != 'undefined')
-							this_state_object.mode.after_ms = data.after * 1000;
-
-						if(typeof data.before != 'undefined')
-							this_state_object.mode.before_ms = data.before * 1000;
-
-						if(typeof data.first_entry_t != 'undefined')
-							this_state_object.mode.first_entry_ms = data.first_entry_t * 1000;
-
-						if(typeof data.last_entry_t != 'undefined')
-							this_state_object.mode.last_entry_ms = data.last_entry_t * 1000;
-
-						if(typeof data.points != 'undefined')
-							this_state_object.mode.points = data.points;
-
-						data.state = this_state_object;
-					}
-
-					this_state_object.updates_counter++;
-
-					if(this_state_object.debug) {
-						this_state_object.log('UPDATE No ' + this_state_object.updates_counter + ' COMPLETED');
-
-						if(this_state_object.mode.force_after_ms)
-							this_state_object.log('STATUS: forced   : ' + (this_state_object.mode.force_after_ms / 1000).toString() + ' - ' + (this_state_object.mode.force_before_ms / 1000).toString());
-						else
-							this_state_object.log('STATUS: forced: unset');
-
-						this_state_object.log('STATUS: requested: ' + (this_state_object.mode.requested_after_ms / 1000).toString() + ' - ' + (this_state_object.mode.requested_before_ms / 1000).toString());
-						this_state_object.log('STATUS: rendered : ' + (this_state_object.mode.after_ms / 1000).toString() + ' - ' + (this_state_object.mode.before_ms / 1000).toString());
-						this_state_object.log('STATUS: points   : ' + (this_state_object.mode.points).toString() + ', min step: ' + (this_state_object._minPanOrZoomStep() / 1000).toString());
-					}
-
-					if(this_state_object.created_ms) {
-						if(this_state_object.debug) this_state_object.log('updating chart...');
-
-						if(NETDATA.options.debug.chart_errors) {
-							this_state_object.library.update(this_state_object.element, data);
-						}
-						else {
-							try {
-								this_state_object.library.update(this_state_object.element, data);
-							}
-							catch(err) {
-								this_state_object.error('chart "' + state.id + '" failed to be updated as ' + state.library_name);
-							}
-						}
-					}
-					else {
-						if(this_state_object.debug) this_state_object.log('creating chart...');
-
-						if(NETDATA.options.debug.chart_errors) {
-							this_state_object.library.create(this_state_object.element, data);
-							this_state_object.created_ms = new Date().getTime();
-						}
-						else {
-							try {
-								this_state_object.library.create(this_state_object.element, data);
-								this_state_object.created_ms = new Date().getTime();
-							}
-							catch(err) {
-								this_state_object.error('chart "' + state.id + '" failed to be created as ' + state.library_name);
-							}
-						}
-					}
-
-					// update the performance counters
-					this_state_object.mode.last_updated_ms = new Date().getTime();
-					this_state_object.refresh_dt_ms = this_state_object.mode.last_updated_ms - started;
-					NETDATA.options.auto_refresher_fast_weight += this_state_object.refresh_dt_ms;
-
-					if(this_state_object.refresh_dt_element)
-						this_state_object.refresh_dt_element.innerHTML = this_state_object.refresh_dt_ms.toString();
+					this_state_object.updateChartWithData(data);
 				})
 				.fail(function() {
-					this_state_object.error('cannot download chart from ' + this_state_object.mode.url);
+					this_state_object.error('cannot download chart from ' + this_state_object.current.url);
 				})
 				.always(function() {
 					if(typeof callback == 'function') callback();
 				});
 			},
 
-			chartURL: function() {
-				this.calculated_width = self.width();
-				this.calculated_height = self.height();
-
-				var before;
-				var after;
-				if(NETDATA.globalPanAndZoom.isActive()) {
-					after = Math.round(NETDATA.globalPanAndZoom.force_after_ms / 1000);
-					before = Math.round(NETDATA.globalPanAndZoom.force_before_ms / 1000);
-					this.follows_global = NETDATA.globalPanAndZoom.seq;
-				}
-				else {
-					before = this.mode.force_before_ms != null ? Math.round(this.mode.force_before_ms / 1000) : this.before;
-					after  = this.mode.force_after_ms  != null ? Math.round(this.mode.force_after_ms / 1000) : this.after;
-					this.follows_global = 0;
-				}
-
-				this.mode.requested_after_ms = after * 1000;
-				this.mode.requested_before_ms = before * 1000;
-
-				// force an options provided detail
-				var pixels_per_point = this.pixels_per_point;
-				if(pixels_per_point < NETDATA.options.current.pixels_per_point)
-					pixels_per_point = NETDATA.options.current.pixels_per_point
-
-				this.mode.points = this.points || Math.round(this.calculated_width / pixels_per_point);
-
-				// build the data URL
-				this.mode.url = this.chart.data_url;
-				this.mode.url += "&format="  + this.library.format;
-				this.mode.url += "&points="  + this.mode.points.toString();
-				this.mode.url += "&group="   + this.method;
-				this.mode.url += "&options=" + this.library.options;
-				if(this.library.jsonWrapper) this.mode.url += '|jsonwrap';
-
-				if(after)
-					this.mode.url += "&after="  + after.toString();
-
-				if(before)
-					this.mode.url += "&before=" + before.toString();
-
-				if(this.dimensions)
-					this.mode.url += "&dimensions=" + this.dimensions;
-
-				if(NETDATA.options.debug.chart_data_url) this.log('chartURL(): ' + this.mode.url + ' WxH:' + this.calculated_width + 'x' + this.calculated_height + ' points: ' + this.mode.points + ' library: ' + this.library_name);
-			},
-
 			isVisible: function() {
-				return self.visible(true);
+				if(NETDATA.options.current.update_only_visible)
+					return $(this.element).visible(true);
+				else
+					return true;
 			},
 
 			isAutoRefreshed: function() {
-				return this.mode.autorefresh;
+				return this.current.autorefresh;
 			},
 
 			canBeAutoRefreshed: function() {
@@ -852,7 +958,7 @@
 							return false;
 						}
 
-						if(now - this.mode.last_updated_ms > this.mode.view_update_every) {
+						if(now - this.current.last_updated_ms > this.current.view_update_every) {
 							if(this.debug) this.log('canBeAutoRefreshed(): It is time to update me.');
 							return true;
 						}
@@ -863,34 +969,42 @@
 			},
 
 			autoRefresh: function(callback) {
-				if(this.canBeAutoRefreshed())
+				if(this.canBeAutoRefreshed()) {
 					this.updateChart(callback);
-				else if(typeof callback != 'undefined')
-					callback();
+				}
+				else {
+					if(typeof callback != 'undefined')
+						callback();
+				}
+			},
+
+			_defaultsFromDownloadedChart: function(chart) {
+				this.chart = chart;
+				this.chart_url = chart.url;
+				this.current.view_update_every = chart.update_every * 1000;
+				this.current.points = Math.round(this.chartWidth() / this.chartPixelsPerPoint());
 			},
 
 			// fetch the chart description from the netdata server
 			getChart: function(callback) {
 				this.chart = NETDATA.chartRegistry.get(this.host, this.id);
 				if(this.chart) {
+					this._defaultsFromDownloadedChart(this.chart);
 					if(typeof callback == 'function') callback();
 				}
 				else {
 					this.chart_url = this.host + "/api/v1/chart?chart=" + this.id;
 					if(this.debug) this.log('downloading ' + this.chart_url);
-					this_state_object = this;
+					var this_state_object = this;
 
 					$.ajax( {
 						url:  this.chart_url,
 						crossDomain: true
 					})
 					.done(function(chart) {
-						chart.data_url = (this_state_object.host + chart.data_url);
-						this_state_object.chart = chart;
-						this_state_object.mode.view_update_every = chart.update_every * 1000;
-						this_state_object.mode.points = Math.round(self.width() / (chart.update_every / 1000));
-
 						chart.url = this_state_object.chart_url;
+						chart.data_url = (this_state_object.host + chart.data_url);
+						this_state_object._defaultsFromDownloadedChart(chart);
 						NETDATA.chartRegistry.add(this_state_object.host, this_state_object.id, chart);
 					})
 					.fail(function() {
@@ -911,17 +1025,17 @@
 				if(this.debug) this.log('sizing element');
 
 				if(this.width)
-					self.css('width', this.width);
+					$(this.element).css('width', this.width);
 
 				if(this.height)
-					self.css('height', this.height);
+					$(this.element).css('height', this.height);
 
 				// these should be left to css
-				//self.css('display', 'inline-block')
-				//self.css('overflow', 'hidden');
+				//$(this.element).css('display', 'inline-block')
+				//$(this.element).css('overflow', 'hidden');
 
 				if(NETDATA.chartDefaults.min_width)
-					self.css('min-width', NETDATA.chartDefaults.min_width);
+					$(this.element).css('min-width', NETDATA.chartDefaults.min_width);
 			},
 
 			// show a message in the chart
@@ -968,10 +1082,8 @@
 					NETDATA.error(403, this.library_name);
 					this.error('chart library "' + this.library_name + '" is not enabled');
 				}
-				else {
+				else
 					this.library = NETDATA.chartLibraries[this.library_name];
-					this.pixels_per_point = self.data('pixels-per-point') || this.library.pixels_per_point;
-				}
 
 				// if we need to report the rendering speed
 				// find the element that needs to be updated
@@ -989,11 +1101,10 @@
 
 	// get or create a chart state, given a DOM element
 	NETDATA.chartState = function(element) {
-		self = $(element);
-		var state = self.data('state') || null;
+		var state = $(element).data('netdata-state-object') || null;
 		if(!state) {
 			state = NETDATA.chartInitialState(element);
-			self.data('state', state);
+			$(element).data('netdata-state-object', state);
 		}
 		return state;
 	}
@@ -1081,7 +1192,6 @@
 
 			return;
 		}
-
 		var target = NETDATA.options.targets.get(index);
 		if(target == null) {
 			if(NETDATA.options.debug.main_loop) console.log('waiting to restart main loop...');
@@ -1183,21 +1293,17 @@
 		}
 	};
 
-	NETDATA.peityChartUpdate = function(element, data) {
-		var peity = $(data.state.peity_element);
-		peity.html(data.result);
-		// peity.change() does not accept options
+	NETDATA.peityChartUpdate = function(state, data) {
+		$(state.element_chart).html(data.result);
+		// $(state.element_chart).change() does not accept options
 		// to pass width and height
-		//peity.change();
-		peity.peity('line', { width: data.state.calculated_width, height: data.state.calculated_height });
+		//$(state.element_chart).change();
+		$(state.element_chart).peity('line', { width: state.chartWidth(), height: state.chartHeight() });
 	}
 
-	NETDATA.peityChartCreate = function(element, data) {
-		element.innerHTML = '<div class="netdata-chart-container netdata-peity-container" id="peity-' + data.state.uuid + '">' + data.result + '</div>';
-		data.state.peity_element = document.getElementById('peity-' + data.state.uuid);
-		var peity = $(data.state.peity_element);
-
-		peity.peity('line', { width: data.state.calculated_width, height: data.state.calculated_height });
+	NETDATA.peityChartCreate = function(state, data) {
+		$(state.element_chart).html(data.result);
+		$(state.element_chart).peity('line', { width: state.chartWidth(), height: state.chartHeight() });
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -1224,19 +1330,18 @@
 		}
 	};
 
-	NETDATA.sparklineChartUpdate = function(element, data) {
-		data.state.sparkline_options.width = data.state.calculated_width;
-		data.state.sparkline_options.height = data.state.calculated_height;
+	NETDATA.sparklineChartUpdate = function(state, data) {
+		state.sparkline_options.width = state.chartWidth();
+		state.sparkline_options.height = state.chartHeight();
 
-		spark = $(data.state.sparkline_element);
-		spark.sparkline(data.result, data.state.sparkline_options);
+		$(state.element_chart).sparkline(data.result, state.sparkline_options);
 	}
 
-	NETDATA.sparklineChartCreate = function(element, data) {
-		var self = $(element);
+	NETDATA.sparklineChartCreate = function(state, data) {
+		var self = $(state.element);
 		var type = self.data('sparkline-type') || 'line';
 		var lineColor = self.data('sparkline-linecolor') || NETDATA.colors[0];
-		var fillColor = self.data('sparkline-fillcolor') || (data.state.chart.chart_type == 'line')?'#FFF':NETDATA.ColorLuminance(lineColor, NETDATA.chartDefaults.fill_luminance);
+		var fillColor = self.data('sparkline-fillcolor') || (state.chart.chart_type == 'line')?'#FFF':NETDATA.ColorLuminance(lineColor, NETDATA.chartDefaults.fill_luminance);
 		var chartRangeMin = self.data('sparkline-chartrangemin') || undefined;
 		var chartRangeMax = self.data('sparkline-chartrangemax') || undefined;
 		var composite = self.data('sparkline-composite') || undefined;
@@ -1270,7 +1375,7 @@
 		var tooltipClassname = self.data('sparkline-tooltipclassname') || undefined;
 		var tooltipFormat = self.data('sparkline-tooltipformat') || undefined;
 		var tooltipPrefix = self.data('sparkline-tooltipprefix') || undefined;
-		var tooltipSuffix = self.data('sparkline-tooltipsuffix') || ' ' + data.state.chart.units;
+		var tooltipSuffix = self.data('sparkline-tooltipsuffix') || ' ' + state.chart.units;
 		var tooltipSkipNull = self.data('sparkline-tooltipskipnull') || true;
 		var tooltipValueLookups = self.data('sparkline-tooltipvaluelookups') || undefined;
 		var tooltipFormatFieldlist = self.data('sparkline-tooltipformatfieldlist') || undefined;
@@ -1281,7 +1386,7 @@
 		var numberDigitGroupCount = self.data('sparkline-numberdigitgroupcount') || undefined;
 		var animatedZooms = self.data('sparkline-animatedzooms') || false;
 
-		data.state.sparkline_options = {
+		state.sparkline_options = {
 			type: type,
 			lineColor: lineColor,
 			fillColor: fillColor,
@@ -1315,7 +1420,7 @@
 			highlightColor: highlightColor,
 			tooltipContainer: tooltipContainer,
 			tooltipClassname: tooltipClassname,
-			tooltipChartTitle: data.state.chart.title,
+			tooltipChartTitle: state.chart.title,
 			tooltipFormat: tooltipFormat,
 			tooltipPrefix: tooltipPrefix,
 			tooltipSuffix: tooltipSuffix,
@@ -1328,15 +1433,11 @@
 			numberDecimalMark: numberDecimalMark,
 			numberDigitGroupCount: numberDigitGroupCount,
 			animatedZooms: animatedZooms,
-			width: data.state.calculated_width,
-			height: data.state.calculated_height
+			width: state.chartWidth(),
+			height: state.chartHeight()
 		};
 
-		element.innerHTML = '<div class="netdata-chart-container netdata-sparkline-container" id="sparkline-' + data.state.uuid + '" style="display: inline-block; position: relative;"></div>';
-		data.state.sparkline_element = document.getElementById('sparkline-' + data.state.uuid);
-
-		spark = $(data.state.sparkline_element);
-		spark.sparkline(data.result, data.state.sparkline_options);
+		$(state.element_chart).sparkline(data.result, state.sparkline_options);
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -1350,6 +1451,7 @@
 	};
 
 	NETDATA.dygraph.syncStart = function(state, event, x, points, row, seriesName) {
+		if(!NETDATA.options.current.sync_selection) return;
 		if(NETDATA.options.debug.dygraph || state.debug) state.log('dygraph.syncStart()');
 
 		//if(NETDATA.dygraph.state && NETDATA.dygraph.state != state) {
@@ -1358,12 +1460,12 @@
 		//}
 		// state.debug = true;
 
-		var t = state.mode.after_ms + row * state.mode.view_update_every;
+		var t = state.current.after_ms + row * state.current.view_update_every;
 		// console.log('row = ' + row + ', x = ' + x + ', t = ' + t + ' ' + ((t == x)?'SAME':'DIFFERENT'));
 
 		now = new Date().getTime();
 		if(now < NETDATA.dygraph.dont_sync_before) {
-			if(state.debug) st.log('sync: cannot sync yet.');
+			if(state.debug) state.log('sync: cannot sync yet.');
 			return;
 		}
 
@@ -1374,7 +1476,7 @@
 		var dygraph = state.dygraph_instance;
 
 		if(!NETDATA.dygraph.sync) {
-			if(state.debug) st.log('sync: setting up...');
+			if(state.debug) state.log('sync: setting up...');
 			$.each(NETDATA.options.targets, function(i, target) {
 				var st = NETDATA.chartState(target);
 				if(st == state) {
@@ -1402,6 +1504,8 @@
 	}
 
 	NETDATA.dygraph.syncStop = function(state) {
+		if(!NETDATA.options.current.sync_selection) return;
+
 		if(NETDATA.options.debug.dygraph || state.debug) state.log('dygraph.syncStop()');
 
 		//if(NETDATA.dygraph.state && NETDATA.dygraph.state != state) {
@@ -1437,10 +1541,9 @@
 		if(NETDATA.globalPanAndZoom.clearMaster());
 	}
 
-	NETDATA.dygraph.zoomOrPan = function(element, dygraph, after, before) {
-		if(NETDATA.options.debug.dygraph) console.log('>>>> dygraph.zoomOrPan(element, dygraph, after:' + after + ', before: ' + before + ')');
+	NETDATA.dygraph.chartPanOrZoom = function(state, dygraph, after, before) {
+		if(NETDATA.options.debug.dygraph) console.log('>>>> dygraph.zoomOrPan(state, dygraph, after:' + after + ', before: ' + before + ')');
 
-		state = NETDATA.chartState(element);
 		state.updateChartPanOrZoom(after, before);
 		return;
 	}
@@ -1487,47 +1590,45 @@
 		}
 	};
 
-	NETDATA.dygraphChartUpdate = function(element, data) {
-		if(NETDATA.options.debug.dygraph || data.state.debug) console.log('dygraphChartUpdate()');
+	NETDATA.dygraphChartUpdate = function(state, data) {
+		var dygraph = state.dygraph_instance;
 
-		var dygraph = data.state.dygraph_instance;
-
-		if(data.state.mode.name == 'pan') {
-			if(NETDATA.options.debug.dygraph || data.state.debug) console.log('dygraphChartUpdate() loose update');
+		if(state.current.name == 'pan') {
+			if(NETDATA.options.debug.dygraph || state.debug) state.log('dygraphChartUpdate() loose update');
 			dygraph.updateOptions({
 				file: data.result.data,
 				labels: data.result.labels,
-				labelsDivWidth: data.state.calculated_width - 70
+				labelsDivWidth: state.chartWidth() - 70
 			});
 		}
 		else {
-			if(NETDATA.options.debug.dygraph || data.state.debug) console.log('dygraphChartUpdate() strict update');
+			if(NETDATA.options.debug.dygraph || state.debug) state.log('dygraphChartUpdate() strict update');
 			dygraph.updateOptions({
 				file: data.result.data,
 				labels: data.result.labels,
-				labelsDivWidth: data.state.calculated_width - 70,
+				labelsDivWidth: state.chartWidth() - 70,
 				dateWindow: null,
     			valueRange: null
 			});
 		}
 	};
 
-	NETDATA.dygraphChartCreate = function(element, data) {
-		if(NETDATA.options.debug.dygraph || data.state.debug) console.log('dygraphChartCreate()');
+	NETDATA.dygraphChartCreate = function(state, data) {
+		if(NETDATA.options.debug.dygraph || state.debug) state.log('dygraphChartCreate()');
 
-		var self = $(element);
-		var title = self.data('dygraph-title') || data.state.chart.title;
+		var self = $(state.element);
+		var title = self.data('dygraph-title') || state.chart.title;
 		var titleHeight = self.data('dygraph-titleheight') || 19;
 		var labelsDiv = self.data('dygraph-labelsdiv') || undefined;
 		var connectSeparatedPoints = self.data('dygraph-connectseparatedpoints') || false;
 		var yLabelWidth = self.data('dygraph-ylabelwidth') || 12;
-		var stackedGraph = self.data('dygraph-stackedgraph') || (data.state.chart.chart_type == 'stacked')?true:false;
+		var stackedGraph = self.data('dygraph-stackedgraph') || (state.chart.chart_type == 'stacked')?true:false;
 		var stackedGraphNaNFill = self.data('dygraph-stackedgraphnanfill') || 'none';
 		var hideOverlayOnMouseOut = self.data('dygraph-hideoverlayonmouseout') || true;
-		var fillGraph = self.data('dygraph-fillgraph') || (data.state.chart.chart_type == 'area')?true:false;
+		var fillGraph = self.data('dygraph-fillgraph') || (state.chart.chart_type == 'area')?true:false;
 		var drawPoints = self.data('dygraph-drawpoints') || false;
 		var labelsDivStyles = self.data('dygraph-labelsdivstyles') || { 'fontSize':'10px' };
-		var labelsDivWidth = self.data('dygraph-labelsdivwidth') || self.width() - 70;
+		var labelsDivWidth = self.data('dygraph-labelsdivwidth') || state.chartWidth() - 70;
 		var labelsSeparateLines = self.data('dygraph-labelsseparatelines') || false;
 		var labelsShowZeroValues = self.data('dygraph-labelsshowzerovalues') || true;
 		var legend = self.data('dygraph-legend') || 'onmouseover';
@@ -1546,11 +1647,11 @@
 		var pointSize = self.data('dygraph-pointsize') || 1;
 		var stepPlot = self.data('dygraph-stepplot') || false;
 		var strokeBorderColor = self.data('dygraph-strokebordercolor') || 'white';
-		var strokeBorderWidth = self.data('dygraph-strokeborderwidth') || (data.state.chart.chart_type == 'stacked')?0.1:0.0;
+		var strokeBorderWidth = self.data('dygraph-strokeborderwidth') || (state.chart.chart_type == 'stacked')?0.1:0.0;
 		var strokePattern = self.data('dygraph-strokepattern') || undefined;
 		var highlightCircleSize = self.data('dygraph-highlightcirclesize') || 3;
 		var highlightSeriesOpts = self.data('dygraph-highlightseriesopts') || null; // TOO SLOW: { strokeWidth: 1.5 };
-		var highlightSeriesBackgroundAlpha = self.data('dygraph-highlightseriesbackgroundalpha') || null; // TOO SLOW: (data.state.chart.chart_type == 'stacked')?0.7:0.5;
+		var highlightSeriesBackgroundAlpha = self.data('dygraph-highlightseriesbackgroundalpha') || null; // TOO SLOW: (state.chart.chart_type == 'stacked')?0.7:0.5;
 		var pointClickCallback = self.data('dygraph-pointclickcallback') || undefined;
 		var showRangeSelector = self.data('dygraph-showrangeselector') || false;
 		var showRoller = self.data('dygraph-showroller') || false;
@@ -1562,10 +1663,10 @@
 		var gridLinePattern = self.data('dygraph-gridlinepattern') || null;
 		var gridLineWidth = self.data('dygraph-gridlinewidth') || 0.3;
 
-		data.state.dygraph_options = {
+		state.dygraph_options = {
 			title: title,
 			titleHeight: titleHeight,
-			ylabel: data.state.chart.units,
+			ylabel: state.chart.units,
 			yLabelWidth: yLabelWidth,
 			connectSeparatedPoints: connectSeparatedPoints,
 			drawPoints: drawPoints,
@@ -1629,38 +1730,38 @@
 				}
 			},
 			drawCallback: function(dygraph, is_initial) {
-				if(data.state.mode.name != 'auto') {
-					if(NETDATA.options.debug.dygraph) data.state.log('dygraphDrawCallback()');
+				if(state.current.name != 'auto') {
+					if(NETDATA.options.debug.dygraph) state.log('dygraphDrawCallback()');
 
 					var x_range = dygraph.xAxisRange();
 					var after = Math.round(x_range[0]);
 					var before = Math.round(x_range[1]);
 
-					NETDATA.dygraph.zoomOrPan(element, this, after, before);
+					NETDATA.dygraph.chartPanOrZoom(state, this, after, before);
 				}
 			},
 			zoomCallback: function(minDate, maxDate, yRanges) {
-				if(NETDATA.options.debug.dygraph) data.state.log('dygraphZoomCallback()');
-				NETDATA.dygraph.syncStop(data.state);
-				NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
-				NETDATA.dygraph.zoomOrPan(element, this, minDate, maxDate);
+				if(NETDATA.options.debug.dygraph) state.log('dygraphZoomCallback()');
+				NETDATA.dygraph.syncStop(state);
+				NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
+				NETDATA.dygraph.chartPanOrZoom(state, this, minDate, maxDate);
 			},
 			highlightCallback: function(event, x, points, row, seriesName) {
-				if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('dygraphHighlightCallback()');
-				data.state.pauseChart();
-				NETDATA.dygraph.syncStart(data.state, event, x, points, row, seriesName);
+				if(NETDATA.options.debug.dygraph || state.debug) state.log('dygraphHighlightCallback()');
+				state.pauseChart();
+				NETDATA.dygraph.syncStart(state, event, x, points, row, seriesName);
 			},
 			unhighlightCallback: function(event) {
-				if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('dygraphUnhighlightCallback()');
-				data.state.unpauseChart();
-				NETDATA.dygraph.syncStop(data.state);
+				if(NETDATA.options.debug.dygraph || state.debug) state.log('dygraphUnhighlightCallback()');
+				state.unpauseChart();
+				NETDATA.dygraph.syncStop(state);
 			},
 			interactionModel : {
 				mousedown: function(event, dygraph, context) {
-					if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('interactionModel.mousedown()');
-					NETDATA.dygraph.syncStop(data.state);
+					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.mousedown()');
+					NETDATA.dygraph.syncStop(state);
 
-					if(NETDATA.options.debug.dygraph) data.state.log('dygraphMouseDown()');
+					if(NETDATA.options.debug.dygraph) state.log('dygraphMouseDown()');
 
 					// Right-click should not initiate a zoom.
 					if(event.button && event.button == 2) return;
@@ -1669,79 +1770,79 @@
 					
 					if(event.button && event.button == 1) {
 						if (event.altKey || event.shiftKey) {
-							data.state.setMode('pan');
-							NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
+							state.setMode('pan');
+							NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
 							Dygraph.startPan(event, dygraph, context);
 						}
 						else {
-							data.state.setMode('zoom');
-							NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
+							state.setMode('zoom');
+							NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
 							Dygraph.startZoom(event, dygraph, context);
 						}
 					}
 					else {
 						if (event.altKey || event.shiftKey) {
-							data.state.setMode('zoom');
-							NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
+							state.setMode('zoom');
+							NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
 							Dygraph.startZoom(event, dygraph, context);
 						}
 						else {
-							data.state.setMode('pan');
-							NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
+							state.setMode('pan');
+							NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
 							Dygraph.startPan(event, dygraph, context);
 						}
 					}
 				},
 				mousemove: function(event, dygraph, context) {
-					if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('interactionModel.mousemove()');
+					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.mousemove()');
 
 					if(context.isPanning) {
-						NETDATA.dygraph.syncStop(data.state);
-						NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
-						data.state.setMode('pan');
+						NETDATA.dygraph.syncStop(state);
+						NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
+						state.setMode('pan');
 						Dygraph.movePan(event, dygraph, context);
 					}
 					else if(context.isZooming) {
-						NETDATA.dygraph.syncStop(data.state);
-						NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
-						data.state.setMode('zoom');
+						NETDATA.dygraph.syncStop(state);
+						NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
+						state.setMode('zoom');
 						Dygraph.moveZoom(event, dygraph, context);
 					}
 				},
 				mouseup: function(event, dygraph, context) {
-					if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('interactionModel.mouseup()');
+					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.mouseup()');
 
 					if (context.isPanning) {
-						NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
+						NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
 						Dygraph.endPan(event, dygraph, context);
 					}
 					else if (context.isZooming) {
-						NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
+						NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
 						Dygraph.endZoom(event, dygraph, context);
 					}
 				},
 				click: function(event, dygraph, context) {
-					if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('interactionModel.click()');
+					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.click()');
 					Dygraph.cancelEvent(event);
 				},
 				dblclick: function(event, dygraph, context) {
-					if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('interactionModel.dblclick()');
-					NETDATA.dygraph.syncStop(data.state);
-					NETDATA.dygraph.resetChart(data.state, dygraph, context);
+					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.dblclick()');
+					NETDATA.dygraph.syncStop(state);
+					NETDATA.dygraph.resetChart(state, dygraph, context);
 				},
 				mousewheel: function(event, dygraph, context) {
-					if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('interactionModel.mousewheel()');
+					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.mousewheel()');
 
-					NETDATA.dygraph.syncStop(data.state);
-					NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
+					NETDATA.dygraph.syncStop(state);
+					NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
 
 					if(event.altKey || event.shiftKey) {
 						// http://dygraphs.com/gallery/interaction-api.js
 						var normal = (event.detail) ? event.detail * -1 : event.wheelDelta / 40;
 						var percentage = normal / 25;
 
-						var before_old = data.state.mode.before_ms;
-						var after_old = data.state.mode.after_ms;
+						var before_old = state.current.before_ms;
+						var after_old = state.current.after_ms;
 						var range_old = before_old - after_old;
 
 						var range = range_old * ( 1 - percentage );
@@ -1750,37 +1851,35 @@
 						var before = before_old - dt;
 						var after  = after_old  + dt;
 
-						if(NETDATA.options.debug.dygraph) data.state.log('percent: ' + percentage + ' from ' + after_old + ' - ' + before_old + ' to ' + after + ' - ' + before + ', range from ' + (before_old - after_old).toString() + ' to ' + (before - after).toString());
+						if(NETDATA.options.debug.dygraph) state.log('percent: ' + percentage + ' from ' + after_old + ' - ' + before_old + ' to ' + after + ' - ' + before + ', range from ' + (before_old - after_old).toString() + ' to ' + (before - after).toString());
 
-						data.state.setMode('zoom');
-						NETDATA.dygraph.zoomOrPan(element, dygraph, after, before);
+						state.setMode('zoom');
+						NETDATA.dygraph.chartPanOrZoom(state, dygraph, after, before);
 					}					
 				},
 				touchstart: function(event, dygraph, context) {
-					if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('interactionModel.touchstart()');
-					NETDATA.dygraph.syncStop(data.state);
-					NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_delay;
+					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.touchstart()');
+					NETDATA.dygraph.syncStop(state);
+					NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
 					Dygraph.Interaction.startTouch(event, dygraph, context);
 					context.touchDirections = { x: true, y: false };
-					data.state.setMode('zoom');
+					state.setMode('zoom');
 				},
 				touchmove: function(event, dygraph, context) {
-					if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('interactionModel.touchmove()');
+					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.touchmove()');
 					//Dygraph.cancelEvent(event);
-					NETDATA.dygraph.syncStop(data.state);
+					NETDATA.dygraph.syncStop(state);
 					Dygraph.Interaction.moveTouch(event, dygraph, context);
 				},
 				touchend: function(event, dygraph, context) {
-					if(NETDATA.options.debug.dygraph || data.state.debug) data.state.log('interactionModel.touchend()');
+					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.touchend()');
 					Dygraph.Interaction.endTouch(event, dygraph, context);
 				}
 			}
 		};
 
-		self.html('<div class="netdata-chart-container netdata-dygraph-container" id="dygraph-' + data.state.uuid + '" style="width: 100%; height: 100%;"></div>');
-
-		data.state.dygraph_instance = new Dygraph(document.getElementById('dygraph-' + data.state.uuid),
-			data.result.data, data.state.dygraph_options);
+		state.dygraph_instance = new Dygraph(state.element_chart,
+			data.result.data, state.dygraph_options);
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -1825,16 +1924,14 @@
 		}
 	};
 
-	NETDATA.morrisChartUpdate = function(element, data) {
-		data.state.morris_instance.setData(data.result.data);
+	NETDATA.morrisChartUpdate = function(state, data) {
+		state.morris_instance.setData(data.result.data);
 	};
 
-	NETDATA.morrisChartCreate = function(element, data) {
+	NETDATA.morrisChartCreate = function(state, data) {
 
-		element.innerHTML = '<div class="netdata-chart-container netdata-morris-container" id="morris-' + data.state.uuid + '" style="width: ' + data.state.calculated_width + 'px; height: ' + data.state.calculated_height + 'px;"></div>';
-
-		var options = {
-				element: 'morris-' + data.state.uuid,
+		state.morris_options = {
+				element: state.element_chart_id,
 				data: data.result.data,
 				xkey: 'time',
 				ykeys: data.dimension_names,
@@ -1848,19 +1945,15 @@
 				behaveLikeLine: false
 		};
 
-		var morris;
-		if(data.state.chart.chart_type == 'line')
-			morris = new Morris.Line(options);
+		if(state.chart.chart_type == 'line')
+			state.morris_instance = new Morris.Line(state.morris_options);
 
-		else if(data.state.chart.chart_type == 'area') {
-			options.behaveLikeLine = true;
-			morris = new Morris.Area(options);
+		else if(state.chart.chart_type == 'area') {
+			state.morris_options.behaveLikeLine = true;
+			state.morris_instance = new Morris.Area(state.morris_options);
 		}
 		else // stacked
-			morris = new Morris.Area(options);
-
-		data.state.morris_instance = morris;
-		data.state.morris_options = options;
+			state.morris_instance = new Morris.Area(state.morris_options);
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -1887,21 +1980,17 @@
 		}
 	};
 
-	NETDATA.raphaelChartUpdate = function(element, data) {
-		var self = $(element);
-
-		self.raphael(data, {
-			width: data.state.calculated_width,
-			height: data.state.calculated_height
+	NETDATA.raphaelChartUpdate = function(state, data) {
+		$(state.element_chart).raphael(data.result, {
+			width: state.chartWidth(),
+			height: state.chartHeight()
 		})
 	};
 
-	NETDATA.raphaelChartCreate = function(element, data) {
-		var self = $(element);
-
-		self.raphael(data, {
-			width: data.state.calculated_width,
-			height: data.state.calculated_height
+	NETDATA.raphaelChartCreate = function(state, data) {
+		$(state.element_chart).raphael(data.result, {
+			width: state.chartWidth(),
+			height: state.chartHeight()
 		})
 	};
 
@@ -1932,20 +2021,20 @@
 		}
 	};
 
-	NETDATA.googleChartUpdate = function(element, data) {
+	NETDATA.googleChartUpdate = function(state, data) {
 		var datatable = new google.visualization.DataTable(data.result);
-		data.state.google_instance.draw(datatable, data.state.google_options);
+		state.google_instance.draw(datatable, state.google_options);
 	};
 
-	NETDATA.googleChartCreate = function(element, data) {
+	NETDATA.googleChartCreate = function(state, data) {
 		var datatable = new google.visualization.DataTable(data.result);
 
-		var options = {
+		state.google_options = {
 			// do not set width, height - the chart resizes itself
-			//width: data.state.calculated_width,
-			//height: data.state.calculated_height,
+			//width: state.chartWidth(),
+			//height: state.chartHeight(),
 			lineWidth: 1,
-			title: data.state.chart.title,
+			title: state.chart.title,
 			fontSize: 11,
 			hAxis: {
 			//	title: "Time of Day",
@@ -1961,7 +2050,7 @@
 				}
 			},
 			vAxis: {
-				title: data.state.chart.units,
+				title: state.chart.units,
 				viewWindowMode: 'pretty',
 				minValue: -0.1,
 				maxValue: 0.1,
@@ -2000,35 +2089,29 @@
 			isStacked: false
 		};
 
-		element.innerHTML = '<div class="netdata-chart-container netdata-google-container" id="google-' + data.state.uuid + '" style="width: 100%; height: 100%;"></div>';
-
-		var gchart;
-		switch(data.state.chart.chart_type) {
+		switch(state.chart.chart_type) {
 			case "area":
-				options.vAxis.viewWindowMode = 'maximized';
-				gchart = new google.visualization.AreaChart(document.getElementById('google-' + data.state.uuid));
+				state.google_options.vAxis.viewWindowMode = 'maximized';
+				state.google_instance = new google.visualization.AreaChart(state.element_chart);
 				break;
 
 			case "stacked":
-				options.isStacked = true;
-				options.areaOpacity = 0.85;
-				options.vAxis.viewWindowMode = 'maximized';
-				options.vAxis.minValue = null;
-				options.vAxis.maxValue = null;
-				gchart = new google.visualization.AreaChart(document.getElementById('google-' + data.state.uuid));
+				state.google_options.isStacked = true;
+				state.google_options.areaOpacity = 0.85;
+				state.google_options.vAxis.viewWindowMode = 'maximized';
+				state.google_options.vAxis.minValue = null;
+				state.google_options.vAxis.maxValue = null;
+				state.google_instance = new google.visualization.AreaChart(state.element_chart);
 				break;
 
 			default:
 			case "line":
-				options.lineWidth = 2;
-				gchart = new google.visualization.LineChart(document.getElementById('google-' + data.state.uuid));
+				state.google_options.lineWidth = 2;
+				state.google_instance = new google.visualization.LineChart(state.element_chart);
 				break;
 		}
 
-		gchart.draw(datatable, options);
-
-		data.state.google_instance = gchart;
-		data.state.google_options = options;
+		state.google_instance.draw(datatable, state.google_options);
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -2046,6 +2129,9 @@
 			format: 'json',
 			options: 'ms|flip',
 			jsonWrapper: true,
+			legend: 'right-side',
+			autoresize: true,
+			max_updates_to_recreate: 5000,
 			pixels_per_point: 2,
 			detects_dimensions_on_update: false
 		},
@@ -2060,6 +2146,9 @@
 			format: 'array',
 			options: 'flip|abs',
 			jsonWrapper: true,
+			legend: 'sparkline',
+			autoresize: false,
+			max_updates_to_recreate: 5000,
 			pixels_per_point: 2,
 			detects_dimensions_on_update: false
 		},
@@ -2074,6 +2163,9 @@
 			format: 'ssvcomma',
 			options: 'null2zero|flip|abs',
 			jsonWrapper: true,
+			legend: 'sparkline',
+			autoresize: false,
+			max_updates_to_recreate: 5000,
 			pixels_per_point: 2,
 			detects_dimensions_on_update: false
 		},
@@ -2088,6 +2180,9 @@
 			format: 'json',
 			options: 'objectrows|ms',
 			jsonWrapper: true,
+			legend: 'none',
+			autoresize: false,
+			max_updates_to_recreate: 50,
 			pixels_per_point: 15,
 			detects_dimensions_on_update: false
 		},
@@ -2102,6 +2197,9 @@
 			format: 'datatable',
 			options: '',
 			jsonWrapper: true,
+			legend: 'none',
+			autoresize: false,
+			max_updates_to_recreate: 300,
 			pixels_per_point: 4,
 			detects_dimensions_on_update: true
 		},
@@ -2116,6 +2214,9 @@
 			format: 'json',
 			options: '',
 			jsonWrapper: true,
+			legend: 'none',
+			autoresize: false,
+			max_updates_to_recreate: 1000,
 			pixels_per_point: 1,
 			detects_dimensions_on_update: false
 		}

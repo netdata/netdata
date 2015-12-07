@@ -25,37 +25,35 @@ html {
 
 }
 
-/*
-.netdata-legend {
-	width: 50px;
-	height: 100%;
+.netdata-chart-legend {
 	background-color:Gray;
 	overflow: auto;
 	overflow-y: scroll;
-}
-*/
-
-.netdata-chart-container {
-
+	display: inline-block;
 }
 
-.netdata-peity-container {
-
+.netdata-chart {
+	display: inline-block;
+	overflow: hidden;
 }
 
-.netdata-sparkline-container {
+.netdata-peity-chart {
 
 }
 
-.netdata-dygraph-container {
+.netdata-sparkline-chart {
 
 }
 
-.netdata-morris-container {
+.netdata-dygraph-chart {
 
 }
 
-.netdata-google-container {
+.netdata-morris-chart {
+
+}
+
+.netdata-google-chart {
 
 }
 
