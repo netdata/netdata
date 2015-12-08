@@ -298,6 +298,8 @@
 
 		// clear the master
 		clearMaster: function() {
+			if(!NETDATA.options.current.sync_pan_and_zoom) return;
+
 			if(this.master) {
 				var state = this.master;
 				this.master = null; // prevent infinite recursion
@@ -411,7 +413,7 @@
 				name: 'auto',
 				autorefresh: true,
 				url: 'invalid://',	// string - the last url used to update the chart
-				last_updated_ms: 0, // milliseconds - the timestamp of last refresh
+				last_autorefreshed: 0, // milliseconds - the timestamp of last automatic refresh
 				view_update_every: 0, 	// milliseconds - the minimum acceptable refresh duration
 				after_ms: 0,		// milliseconds - the first timestamp of the data
 				before_ms: 0,		// milliseconds - the last timestamp of the data
@@ -428,7 +430,7 @@
 				name: 'pan',
 				autorefresh: false,
 				url: 'invalid://',	// string - the last url used to update the chart
-				last_updated_ms: 0, // milliseconds - the timestamp of last refresh
+				last_autorefreshed: 0, // milliseconds - the timestamp of last refresh
 				view_update_every: 0, 	// milliseconds - the minimum acceptable refresh duration
 				after_ms: 0,		// milliseconds - the first timestamp of the data
 				before_ms: 0,		// milliseconds - the last timestamp of the data
@@ -445,7 +447,7 @@
 				name: 'zoom',
 				autorefresh: false,
 				url: 'invalid://',	// string - the last url used to update the chart
-				last_updated_ms: 0, // milliseconds - the timestamp of last refresh
+				last_autorefreshed: 0, // milliseconds - the timestamp of last refresh
 				view_update_every: 0, 	// milliseconds - the minimum acceptable refresh duration
 				after_ms: 0,		// milliseconds - the first timestamp of the data
 				before_ms: 0,		// milliseconds - the last timestamp of the data
@@ -465,6 +467,10 @@
 
 			log: function(msg) {
 				console.log(this.id + ' (' + this.library_name + ' ' + this.uuid + '): ' + msg);
+			},
+
+			delaySelectionSync: function() {
+				NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
 			},
 
 			setSelection: function(t) {
@@ -524,15 +530,19 @@
 			},
 
 			resetChart: function() {
-				if(NETDATA.globalPanAndZoom.isMaster(this))
+				if(NETDATA.globalPanAndZoom.isMaster(this)) {
 					NETDATA.globalPanAndZoom.clearMaster();
+					// it will call us back - no need to do
+					// anything more.
+					return;
+				}
 
-				if(state.current.name != 'auto')
+				//if(state.current.name != 'auto')
 					this.setMode('auto');
 
 				this.current.force_before_ms = null;
 				this.current.force_after_ms = null;
-				this.current.last_updated_ms = 0;
+				this.current.last_autorefreshed = 0;
 				this.follows_global = 0;
 				this.paused = false;
 				this.selected = false;
@@ -552,7 +562,7 @@
 					if(this.current.name == m) return;
 
 					this[m].url = this.current.url;
-					this[m].last_updated_ms = this.current.last_updated_ms;
+					this[m].last_autorefreshed = this.current.last_autorefreshed;
 					this[m].view_update_every = this.current.view_update_every;
 					this[m].after_ms = this.current.after_ms;
 					this[m].before_ms = this.current.before_ms;
@@ -805,6 +815,7 @@
 
 				// this may force the chart to be re-created
 				this.resizeChart();
+
 				if(this.updates_since_last_creation >= this.library.max_updates_to_recreate) {
 					if(this.debug) this.log('max updates of ' + this.updates_since_last_creation.toString() + ' reached. Forcing re-generation.');
 					this.created_ms = 0;
@@ -848,8 +859,16 @@
 				}
 
 				// update the performance counters
-				this.current.last_updated_ms = new Date().getTime();
-				this.refresh_dt_ms = this.current.last_updated_ms - started;
+				var now = new Date().getTime();
+				
+				// don't update last_update_ms if this chart is
+				// forced to be updated with global PanAndZoom
+				if(NETDATA.globalPanAndZoom.isActive())
+					this.current.last_autorefreshed = 0;
+				else
+					this.current.last_autorefreshed = now;
+
+				this.refresh_dt_ms = now - started;
 				NETDATA.options.auto_refresher_fast_weight += this.refresh_dt_ms;
 
 				if(this.refresh_dt_element)
@@ -955,7 +974,7 @@
 							return false;
 						}
 
-						if(now - this.current.last_updated_ms > this.current.view_update_every) {
+						if(now - this.current.last_autorefreshed > this.current.view_update_every) {
 							if(this.debug) this.log('canBeAutoRefreshed(): It is time to update me.');
 							return true;
 						}
@@ -1777,7 +1796,7 @@
 			zoomCallback: function(minDate, maxDate, yRanges) {
 				if(NETDATA.options.debug.dygraph) state.log('dygraphZoomCallback()');
 				NETDATA.dygraph.syncStop(state);
-				NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
+				state.delaySelectionSync();
 				NETDATA.dygraph.chartPanOrZoom(state, this, minDate, maxDate);
 			},
 			highlightCallback: function(event, x, points, row, seriesName) {
@@ -1805,24 +1824,24 @@
 					if(event.button && event.button == 1) {
 						if (event.altKey || event.shiftKey) {
 							state.setMode('pan');
-							NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
+							state.delaySelectionSync();
 							Dygraph.startPan(event, dygraph, context);
 						}
 						else {
 							state.setMode('zoom');
-							NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
+							state.delaySelectionSync();
 							Dygraph.startZoom(event, dygraph, context);
 						}
 					}
 					else {
 						if (event.altKey || event.shiftKey) {
 							state.setMode('zoom');
-							NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
+							state.delaySelectionSync();
 							Dygraph.startZoom(event, dygraph, context);
 						}
 						else {
 							state.setMode('pan');
-							NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
+							state.delaySelectionSync();
 							Dygraph.startPan(event, dygraph, context);
 						}
 					}
@@ -1832,13 +1851,13 @@
 
 					if(context.isPanning) {
 						NETDATA.dygraph.syncStop(state);
-						NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
+						state.delaySelectionSync();
 						state.setMode('pan');
 						Dygraph.movePan(event, dygraph, context);
 					}
 					else if(context.isZooming) {
 						NETDATA.dygraph.syncStop(state);
-						NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
+						state.delaySelectionSync();
 						state.setMode('zoom');
 						Dygraph.moveZoom(event, dygraph, context);
 					}
@@ -1847,11 +1866,11 @@
 					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.mouseup()');
 
 					if (context.isPanning) {
-						NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
+						state.delaySelectionSync();
 						Dygraph.endPan(event, dygraph, context);
 					}
 					else if (context.isZooming) {
-						NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
+						state.delaySelectionSync();
 						Dygraph.endZoom(event, dygraph, context);
 					}
 				},
@@ -1868,7 +1887,7 @@
 					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.mousewheel()');
 
 					NETDATA.dygraph.syncStop(state);
-					NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
+					state.delaySelectionSync();
 
 					if(event.altKey || event.shiftKey) {
 						// http://dygraphs.com/gallery/interaction-api.js
@@ -1894,7 +1913,7 @@
 				touchstart: function(event, dygraph, context) {
 					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.touchstart()');
 					NETDATA.dygraph.syncStop(state);
-					NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
+					state.delaySelectionSync();
 					Dygraph.Interaction.startTouch(event, dygraph, context);
 					context.touchDirections = { x: true, y: false };
 					state.setMode('zoom');
