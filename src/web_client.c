@@ -1051,6 +1051,7 @@ void web_client_process(struct web_client *w) {
 					rrd_stats_graph_json(st, url, w->response.data);
 				}
 			}
+#ifdef NETDATA_INTERNAL_CHECKS
 			else if(strcmp(tok, "debug") == 0) {
 				buffer_flush(w->response.data);
 
@@ -1085,6 +1086,7 @@ void web_client_process(struct web_client *w) {
 				// just leave the buffer as is
 				// it will be copied back to the client
 			}
+#endif
 			else if(strcmp(tok, "list") == 0) {
 				code = 200;
 
