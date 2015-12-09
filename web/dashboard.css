@@ -63,6 +63,7 @@ html {
 	-webkit-transition:opacity 0.2s ease;
 	-moz-transition:opacity 0.2s ease;
 	-o-transition:opacity 0.2s ease;
+	padding: 4px;
 }
 
 .dygraph-legend:hover {
@@ -70,6 +71,24 @@ html {
 	background-color:rgba(100,100,100,0); 
 	opacity:0;
 }
+
+/* TEST
+.dygraph-legend {
+	position: absolute;
+	background: rgb(0, 0, 0) transparent !important;
+	background-color: rgba(0,0,0,0.6) !important;
+	filter:progid:DXImageTransform.Microsoft.gradient(startColorstr=#99000000, endColorstr=#99000000) !important;
+	-ms-filter: "progid:DXImageTransform.Microsoft.gradient(startColorstr=#99000000, endColorstr=#99000000)" !important;
+	color: white !important;
+	font: 10px arial, san serif !important;
+	text-align: left !important;
+	white-space: nowrap !important;
+	padding: 5px !important;
+	border: 1px solid white !important;
+	box-sizing: content-box !important;
+	z-index: 10000 !important;
+}
+*/
 
 .dygraph-title {
 	text-indent: 56px;

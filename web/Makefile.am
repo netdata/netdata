@@ -19,7 +19,7 @@ dist_web_DATA = \
 weblibdir=$(webdir)/lib
 dist_weblib_DATA = \
         lib/dygraph-combined.js \
-        lib/dygraph-synchronizer.js \
+        lib/dygraph-smooth-plotter.js \
         lib/jquery-1.11.3.min.js \
         lib/jquery.peity.min.js \
         lib/jquery.sparkline.min.js \

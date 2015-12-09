@@ -166,6 +166,31 @@ The fastest charting engine that can chart complete charts (not just sparklines)
 The charts are zoomable (drag their contents to pan, shift with mouse wheel to zoom-in or zoom-out, double click to reset it).
 <b>Netdata magic!</b> Realtime charts on your web page!
 <br/>
+Sparklines using dygraphs
+	<div data-netdata="system.processes"
+		data-chart-library="dygraph"
+		data-dygraph-theme="sparkline"
+		data-width="15%"
+		data-height="30"
+		data-after="-300"
+		></div>
+	are also possible! This 
+	<div data-netdata="system.ipv4"
+		data-chart-library="dygraph"
+		data-dygraph-theme="sparkline"
+		data-width="15%"
+		data-height="30"
+		data-after="-300"
+		></div>
+	is an area chart, while this
+	<div data-netdata="system.cpu"
+		data-chart-library="dygraph"
+		data-dygraph-theme="sparkline"
+		data-width="15%"
+		data-height="30"
+		data-after="-300"
+		></div> is a stacked area chart!
+<br/>
 <div style="width: 24%; display: inline-block;">
 	<div data-netdata="system.processes"
 		data-chart-library="dygraph"
