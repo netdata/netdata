@@ -623,7 +623,7 @@
 					if(this.debug) this.log('updateChartPanOrZoom(): caller did not set proper mode');
 					this.setMode('pan');
 				}
-					
+
 				if(!this.current.force_after_ms || !this.current.force_before_ms) {
 					if(this.debug) this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): INIT');
 					move = true;
@@ -669,6 +669,10 @@
 							needed = true;
 							break;
 						}
+						else if(!this.follows_global) {
+							// FIXME update to latest value
+							;
+						}
 					}
 				}
 
@@ -685,7 +689,7 @@
 
 				this.element_legend_childs.title_date.className += "netdata-legend-title-date";
 				this.element_legend.appendChild(this.element_legend_childs.title_date);
-				
+
 				this.element_legend.appendChild(document.createElement('br'));
 
 				this.element_legend_childs.title_time.className += "netdata-legend-title-time";
@@ -711,6 +715,7 @@
 						};
 						me.element_legend_childs.series[d].name.className += 'netdata-legend-name';
 						me.element_legend_childs.series[d].value.className += 'netdata-legend-value';
+						me.element_legend_childs.series[d].value.title = d;
 
 						var c = i % NETDATA.colors.length;
 						me.element_legend_childs.series[d].name.style.color = NETDATA.colors[c];
@@ -732,6 +737,7 @@
 						};
 						me.element_legend_childs.series[d.name].name.className += 'netdata-legend-name';
 						me.element_legend_childs.series[d.name].value.className += 'netdata-legend-value';
+						me.element_legend_childs.series[d.name].value.title = d;
 
 						var c = i;
 						while(c >= NETDATA.colors.length) c -= NETDATA.colors.length;
@@ -745,7 +751,7 @@
 						el.appendChild(me.element_legend_childs.series[d.name].value);
 					});
 				}
-				
+
 				// create a hidden div to be used for hidding
 				// the original legend of the chart library
 				el = document.createElement('div');
@@ -794,7 +800,7 @@
 
 			hasLegend: function() {
 				if(this.element_legend) return true;
-				
+
 				if(this.library && this.library.legend == 'right-side') {
 					var legend = $(this.element).data('legend') || 'yes';
 					if(legend == 'no') return false;
@@ -834,16 +840,14 @@
 			},
 
 			needsResize: function() {
-				return (this.last_resized < NETDATA.options.last_resized);
+				return (this.library && !this.library.autoresize && this.last_resized < NETDATA.options.last_resized);
 			},
 
 			resizeChart: function() {
 				if(this.needsResize()) {
-					if(this.library && !this.library.autoresize) {
-						if(this.debug) this.log('forcing re-generation due to window resize.');
-						this.created_ms = 0;
-						this.last_resized = new Date().getTime();
-					}
+					if(this.debug) this.log('forcing re-generation due to window resize.');
+					this.created_ms = 0;
+					this.last_resized = new Date().getTime();
 				}
 			},
 
