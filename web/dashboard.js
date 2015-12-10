@@ -356,10 +356,10 @@
 	// ----------------------------------------------------------------------------------------------------------------
 	// Our state object, where all per-chart values are stored
 
-	NETDATA.chartInitialState = function(element) {
+	chartState = function(element) {
 		self = $(element);
 
-		var state = {
+		Object.assign(this, {
 			uuid: NETDATA.guid(),	// GUID - a unique identifier for the chart
 			id: self.data('netdata'),	// string - the name of chart
 
@@ -472,789 +472,898 @@
 
 			refresh_dt_ms: 0,		// milliseconds - the time the last refresh took
 			refresh_dt_element_name: self.data('dt-element-name') || null,	// string - the element to print refresh_dt_ms
-			refresh_dt_element: null,
-
-			log: function(msg) {
-				console.log(this.id + ' (' + this.library_name + ' ' + this.uuid + '): ' + msg);
-			},
-
-			delaySelectionSync: function() {
-				NETDATA.dygraph.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
-			},
-
-			setSelection: function(t) {
-				if(typeof this.library.setSelection == 'function') {
-					if(this.library.setSelection(this, t))
-						this.selected = true;
-					else
-						this.selected = false;
-				}
-				else this.selected = true;
-
-				if(this.selected && this.debug) this.log('selection set to ' + t.toString());
-
-				return this.selected;
-			},
-
-			clearSelection: function() {
-				if(this.selected) {
-					if(typeof this.library.clearSelection == 'function') {
-						if(this.library.clearSelection(this))
-							this.selected = false;
-						else
-							this.selected = true;
-					}
-					else this.selected = false;
-					
-					if(!this.selected && this.debug) this.log('selection cleared');
-				}
-
-				return this.selected;
-			},
-
-			// find if a timestamp (ms) is shown in the current chart
-			timeIsVisible: function(t) {
-				if(t >= this.current.after_ms && t <= this.current.before_ms)
-					return true;
-				return false;
-			},
-
-			calculateRowForTime: function(t) {
-				if(!this.timeIsVisible(t)) return -1;
-				return Math.floor((t - this.current.after_ms) / this.current.view_update_every);
-			},
-
-			pauseChart: function() {
-				if(!this.paused) {
-					if(this.debug) this.log('paused');
-					this.paused = true;
-				}
-			},
-
-			unpauseChart: function() {
-				if(this.paused) {
-					if(this.debug) this.log('unpaused');
-					this.paused = false;
-				}
-			},
-
-			resetChart: function() {
-				NETDATA.globalPanAndZoom.clearMaster();
-				this.follows_global = 0;
-
-				this.clearSelection();
-
-				this.setMode('auto');
-				this.current.force_before_ms = null;
-				this.current.force_after_ms = null;
-				this.current.last_autorefreshed = 0;
-				this.paused = false;
-				this.selected = false;
-				this.enabled = true;
-				this.debug = false;
-
-				// do not update the chart here
-				// or the chart will flip-flop when it is the master
-				// of a selection sync and another chart becomes
-				// the new master
-				if(!NETDATA.options.current.sync_pan_and_zoom)
-					state.updateChart();
-			},
-
-			setMode: function(m) {
-				if(this.current) {
-					if(this.current.name == m) return;
-
-					this[m].url = this.current.url;
-					this[m].last_autorefreshed = this.current.last_autorefreshed;
-					this[m].view_update_every = this.current.view_update_every;
-					this[m].after_ms = this.current.after_ms;
-					this[m].before_ms = this.current.before_ms;
-					this[m].points = this.current.points;
-					this[m].data = this.current.data;
-					this[m].requested_before_ms = this.current.requested_before_ms;
-					this[m].requested_after_ms = this.current.requested_after_ms;
-					this[m].first_entry_ms = this.current.first_entry_ms;
-					this[m].last_entry_ms = this.current.last_entry_ms;
-				}
-
-				if(m == 'auto')
-					this.current = this.auto;
-				else if(m == 'pan')
-					this.current = this.pan;
-				else if(m == 'zoom')
-					this.current = this.zoom;
-				else
-					this.current = this.auto;
-
-				this.current.force_before_ms = null;
-				this.current.force_after_ms = null;
-
-				if(this.debug) this.log('mode set to ' + this.current.name);
-			},
-
-			_minPanOrZoomStep: function() {
-				return (((this.current.before_ms - this.current.after_ms) / this.current.points) * ((this.current.points * 5 / 100) + 1) );
-				// return this.current.view_update_every * 10;
-			},
-
-			_shouldBeMoved: function(old_after, old_before, new_after, new_before) {
-				var dt_after = Math.abs(old_after - new_after);
-				var dt_before = Math.abs(old_before - new_before);
-				var old_range = old_before - old_after;
-
-				var new_range = new_before - new_after;
-				var dt = Math.abs(old_range - new_range);
-				var step = Math.max(dt_after, dt_before, dt);
-
-				var min_step = this._minPanOrZoomStep();
-				if(new_range < old_range && new_range / this.chartWidth() < 100) {
-					if(this.debug) this.log('_shouldBeMoved(' + (new_after / 1000).toString() + ' - ' + (new_before / 1000).toString() + '): minimum point size: 0.10, wanted point size: ' + (new_range / this.chartWidth() / 1000).toString() + ': TOO SMALL RANGE');
-					return false;
-				}
-
-				if(step >= min_step) {
-					if(this.debug) this.log('_shouldBeMoved(' + (new_after / 1000).toString() + ' - ' + (new_before / 1000).toString() + '): minimum step: ' + (min_step / 1000).toString() + ', this step: ' + (step / 1000).toString() + ': YES');
-					return true;
-				}
-				else {
-					if(this.debug) this.log('_shouldBeMoved(' + (new_after / 1000).toString() + ' - ' + (new_before / 1000).toString() + '): minimum step: ' + (min_step / 1000).toString() + ', this step: ' + (step / 1000).toString() + ': NO');
-					return false;
-				}
-			},
-
-			updateChartPanOrZoom: function(after, before, callback) {
-				var move = false;
-
-				if(this.current.name == 'auto') {
-					if(this.debug) this.log('updateChartPanOrZoom(): caller did not set proper mode');
-					this.setMode('pan');
-				}
-
-				if(!this.current.force_after_ms || !this.current.force_before_ms) {
-					if(this.debug) this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): INIT');
-					move = true;
-				}
-				else if(this._shouldBeMoved(this.current.force_after_ms, this.current.force_before_ms, after, before) && this._shouldBeMoved(this.current.after_ms, this.current.before_ms, after, before)) {
-					if(this.debug) this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): FORCE CHANGE from ' + (this.current.force_after_ms / 1000).toString() + ' - ' + (this.current.force_before_ms / 1000).toString());
-					move = true;
-				}
-				else if(this._shouldBeMoved(this.current.requested_after_ms, this.current.requested_before_ms, after, before) && this._shouldBeMoved(this.current.after_ms, this.current.before_ms, after, before)) {
-					if(this.debug) this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): REQUESTED CHANGE from ' + (this.current.requested_after_ms / 1000).toString() + ' - ' + (this.current.requested_before_ms / 1000).toString());
-					move = true;
-				}
-
-				if(move) {
-					var now = new Date().getTime();
-					NETDATA.options.auto_refresher_stop_until = now + NETDATA.options.current.global_pan_sync_time;
-					NETDATA.globalPanAndZoom.setMaster(this, after, before);
-
-					this.current.force_after_ms = after;
-					this.current.force_before_ms = before;
-					this.updateChart(callback);
-					return true;
-				}
-
-				if(this.debug) this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): IGNORE');
-				if(typeof callback != 'undefined') callback();
-				return false;
-			},
-
-			updateLegendDOM: function() {
-				if(!this.hasLegend()) return;
-
-				var needed = false;
-
-				// check that the legend DOM is up to date for the downloaded dimensions
-				if(typeof this.element_legend_childs.series != 'object')
-					needed = true;
-				else if(!this.current.data)
-					needed = true;
-				else {
-					for(var i = 0; i < this.current.data.dimension_names.length; i++) {
-						if(typeof this.element_legend_childs.series[this.current.data.dimension_names[i]] == 'undefined') {
-							needed = true;
-							break;
-						}
-						else if(!this.follows_global) {
-							// FIXME update to latest value
-							;
-						}
-					}
-				}
-
-				if(!needed) return;
-
-				if(this.debug) this.log('updating Legend DOM');
-
-				this.element_legend_childs = {
-					title_date: document.createElement('span'),
-					title_time: document.createElement('span'),
-					title_units: document.createElement('span'),
-					series: {}
-				};
-
-				this.element_legend_childs.title_date.className += "netdata-legend-title-date";
-				this.element_legend.appendChild(this.element_legend_childs.title_date);
-
-				this.element_legend.appendChild(document.createElement('br'));
-
-				this.element_legend_childs.title_time.className += "netdata-legend-title-time";
-				this.element_legend.appendChild(this.element_legend_childs.title_time);
-
-				this.element_legend.appendChild(document.createElement('br'));
-
-				this.element_legend_childs.title_units.className += "netdata-legend-title-units";
-				this.element_legend.appendChild(this.element_legend_childs.title_units);
-
-				this.element_legend.appendChild(document.createElement('br'));
-
-				var el = document.createElement('div');
-				el.className += "netdata-legend-series";
-				this.element_legend.appendChild(el);
-
-				var genLabel = function(state, parent, name, count) {
-					var c = count % NETDATA.colors.length;
-
-					state.element_legend_childs.series[name] = {
-						name: document.createElement('span'),
-						value: document.createElement('span')
-					};
-
-					var label = state.element_legend_childs.series[name];
-
-					label.name.className += 'netdata-legend-name';
-					label.value.className += 'netdata-legend-value';
-					label.value.title = name;
-
-					var table = document.createElement('table');
-					table.innerHTML = '<tr class="netdata-legend-name-tr"><td class="netdata-legend-name-td"></td></tr>';
-					table.className += 'netdata-legend-name-table-' + state.chart.chart_type;
-
-					var rgb = NETDATA.colorHex2Rgb(NETDATA.colors[c]);
-					table.style.backgroundColor = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + NETDATA.options.current.color_fill_opacity[state.chart.chart_type] + ')';
-
-					var text = document.createTextNode(' ' + name);
-
-					label.name.appendChild(table);
-					label.name.appendChild(text);
-
-					label.name.style.color = NETDATA.colors[c];
-					label.value.style.color = NETDATA.colors[c];
-
-					if(count > 0)
-						parent.appendChild(document.createElement('br'));
-
-					parent.appendChild(label.name);
-					parent.appendChild(label.value);
-				};
-
-				if(this.current.data) {
-					var me = this;
-					$.each(me.current.data.dimension_names, function(i, d) {
-						genLabel(me, el, d, i);
-					});
-				}
-				else {
-					var me = this;
-					$.each(me.chart.dimensions, function(i, d) {
-						genLabel(me, el, d.name, i);
-					});
-				}
-
-				// create a hidden div to be used for hidding
-				// the original legend of the chart library
-				el = document.createElement('div');
-				this.element_legend.appendChild(el);
-				el.style.display = 'none';
-
-				this.element_legend_childs.hidden = document.createElement('div');
-				el.appendChild(this.element_legend_childs.hidden);
-			},
-
-			createChartDOM: function() {
-				var html = "";
-
-				if(this.hasLegend()) {
-					this.element_chart_id = this.library_name + '-' + this.uuid + '-chart';
-					this.element_legend_id = this.library_name + '-' + this.uuid + '-legend';
-
-					html += '<div class="netdata-chart-with-legend-right netdata-'
-						+ this.library_name + '-chart-with-legend-right" id="'
-						+ this.element_chart_id
-						+ '"></div>';
-
-					html += '<div class="netdata-chart-legend netdata-'
-						+ this.library_name + '-legend" id="'
-						+ this.element_legend_id
-						+ '"></div>';
-				}
-				else {
-					this.element_chart_id = this.library_name + '-' + this.uuid + '-chart';
-					html += '<div class="netdata-chart netdata-'
-						+ this.library_name + '-chart" id="'
-						+ this.element_chart_id
-						+ '"></div>';
-				}
-
-				element.innerHTML = html;
-				this.element_chart = document.getElementById(this.element_chart_id);
-				$(this.element_chart).data('netdata-state-object', this);
-
-				if(this.hasLegend()) {
-					this.element_legend = document.getElementById(this.element_legend_id);
-					$(this.element_legend).data('netdata-state-object', this);
-					this.updateLegendDOM();
-				}
-			},
-
-			hasLegend: function() {
-				if(this.element_legend) return true;
-
-				if(this.library && this.library.legend(this) == 'right-side') {
-					var legend = $(this.element).data('legend') || 'yes';
-					if(legend == 'no') return false;
-					return true;
-				}
-
-				return false;
-			},
-
-			legendWidth: function() {
-				return (this.hasLegend())?110:0;
-			},
-
-			legendHeight: function() {
-				return $(this.element).height();
-			},
-
-			chartWidth: function() {
-				return $(this.element).width() - this.legendWidth();
-			},
-
-			chartHeight: function() {
-				return $(this.element).height();
-			},
-
-			chartPixelsPerPoint: function() {
-				// force an options provided detail
-				var px = this.pixels_per_point;
-
-				if(this.library && px < this.library.pixels_per_point(this))
-					px = this.library.pixels_per_point(this);
-
-				if(px < NETDATA.options.current.pixels_per_point)
-					px = NETDATA.options.current.pixels_per_point;
-
-				return px;
-			},
-
-			needsResize: function() {
-				return (this.library && !this.library.autoresize() && this.last_resized < NETDATA.options.last_resized);
-			},
-
-			resizeChart: function() {
-				if(this.needsResize()) {
-					if(this.debug) this.log('forcing re-generation due to window resize.');
-					this.created_ms = 0;
-					this.last_resized = new Date().getTime();
-				}
-			},
-
-			chartURL: function() {
-				var before;
-				var after;
-				if(NETDATA.globalPanAndZoom.isActive()) {
-					after = Math.round(NETDATA.globalPanAndZoom.force_after_ms / 1000);
-					before = Math.round(NETDATA.globalPanAndZoom.force_before_ms / 1000);
-					this.follows_global = NETDATA.globalPanAndZoom.seq;
-				}
-				else {
-					before = this.current.force_before_ms != null ? Math.round(this.current.force_before_ms / 1000) : this.before;
-					after  = this.current.force_after_ms  != null ? Math.round(this.current.force_after_ms / 1000) : this.after;
-					this.follows_global = 0;
-				}
-
-				this.current.requested_after_ms = after * 1000;
-				this.current.requested_before_ms = before * 1000;
-
-				this.current.points = this.points || Math.round(this.chartWidth() / this.chartPixelsPerPoint());
-
-				// build the data URL
-				this.current.url = this.chart.data_url;
-				this.current.url += "&format="  + this.library.format();
-				this.current.url += "&points="  + this.current.points.toString();
-				this.current.url += "&group="   + this.method;
-				this.current.url += "&options=" + this.library.options();
-				this.current.url += '|jsonwrap';
-
-				if(after)
-					this.current.url += "&after="  + after.toString();
-
-				if(before)
-					this.current.url += "&before=" + before.toString();
-
-				if(this.dimensions)
-					this.current.url += "&dimensions=" + this.dimensions;
-
-				if(NETDATA.options.debug.chart_data_url || this.debug) this.log('chartURL(): ' + this.current.url + ' WxH:' + this.chartWidth() + 'x' + this.chartHeight() + ' points: ' + this.current.points + ' library: ' + this.library_name);
-			},
-
-			updateChartWithData: function(data) {
-				if(this.debug) this.log('got data from netdata server');
-				this.current.data = data;
-
-				var started = new Date().getTime();
-
-				// if the result is JSON, find the latest update-every
-				if(typeof data == 'object') {
-					if(typeof data.view_update_every != 'undefined')
-						this.current.view_update_every = data.view_update_every * 1000;
-
-					if(typeof data.after != 'undefined')
-						this.current.after_ms = data.after * 1000;
-
-					if(typeof data.before != 'undefined')
-						this.current.before_ms = data.before * 1000;
-
-					if(typeof data.first_entry_t != 'undefined')
-						this.current.first_entry_ms = data.first_entry_t * 1000;
-
-					if(typeof data.last_entry_t != 'undefined')
-						this.current.last_entry_ms = data.last_entry_t * 1000;
-
-					if(typeof data.points != 'undefined')
-						this.current.points = data.points;
-
-					data.state = this;
-				}
-
-				this.updates_counter++;
-
-				if(this.debug) {
-					this.log('UPDATE No ' + this.updates_counter + ' COMPLETED');
-
-					if(this.current.force_after_ms)
-						this.log('STATUS: forced   : ' + (this.current.force_after_ms / 1000).toString() + ' - ' + (this.current.force_before_ms / 1000).toString());
-					else
-						this.log('STATUS: forced: unset');
-
-					this.log('STATUS: requested: ' + (this.current.requested_after_ms / 1000).toString() + ' - ' + (this.current.requested_before_ms / 1000).toString());
-					this.log('STATUS: rendered : ' + (this.current.after_ms / 1000).toString() + ' - ' + (this.current.before_ms / 1000).toString());
-					this.log('STATUS: points   : ' + (this.current.points).toString() + ', min step: ' + (this._minPanOrZoomStep() / 1000).toString());
-				}
-
-				// this may force the chart to be re-created
-				this.resizeChart();
-
-				if(this.updates_since_last_creation >= this.library.max_updates_to_recreate()) {
-					if(this.debug) this.log('max updates of ' + this.updates_since_last_creation.toString() + ' reached. Forcing re-generation.');
-					this.created_ms = 0;
-				}
-
-				if(this.created_ms && typeof this.library.update == 'function') {
-					if(this.debug) this.log('updating chart...');
-
-					// check and update the legend
-					this.updateLegendDOM();
-
-					this.updates_since_last_creation++;
-					if(NETDATA.options.debug.chart_errors) {
-						this.library.update(this, data);
-					}
-					else {
-						try {
-							this.library.update(this, data);
-						}
-						catch(err) {
-							this.error('chart "' + this.id + '" failed to be updated as ' + this.library_name);
-						}
-					}
-				}
-				else {
-					if(this.debug) this.log('creating chart...');
-
-					this.createChartDOM();
-					this.updates_since_last_creation = 0;
-
-					if(NETDATA.options.debug.chart_errors) {
-						this.library.create(this, data);
-						this.created_ms = new Date().getTime();
-					}
-					else {
-						try {
-							this.library.create(this, data);
-							this.created_ms = new Date().getTime();
-						}
-						catch(err) {
-							this.error('chart "' + this.id + '" failed to be created as ' + this.library_name);
-						}
-					}
-				}
-
-				// update the performance counters
-				var now = new Date().getTime();
-				
-				// don't update last_autorefreshed if this chart is
-				// forced to be updated with global PanAndZoom
-				if(NETDATA.globalPanAndZoom.isActive())
-					this.current.last_autorefreshed = 0;
-				else
-					this.current.last_autorefreshed = now;
-
-				this.refresh_dt_ms = now - started;
-				NETDATA.options.auto_refresher_fast_weight += this.refresh_dt_ms;
-
-				if(this.refresh_dt_element)
-					this.refresh_dt_element.innerHTML = this.refresh_dt_ms.toString();
-			},
-
-			updateChart: function(callback) {
-				if(!this.library || !this.library.enabled) {
-					this.error('charting library "' + this.library_name + '" is not available');
-					if(typeof callback != 'undefined') callback();
-					return;
-				}
-
-				if(!this.enabled) {
-					if(this.debug) this.error('chart "' + this.id + '" is not enabled');
-					if(typeof callback != 'undefined') callback();
-					return;
-				}
-
-				if(!this.isVisible()) {
-					if(NETDATA.options.debug.visibility || this.debug) this.log('is not visible');
-					if(typeof callback != 'undefined') callback();
-					return;
-				}
-				if(!this.chart) {
-					var this_state_object = this;
-					this.getChart(function() { this_state_object.updateChart(callback); });
-					return;
-				}
-
-				if(!this.library.initialized) {
-					var this_state_object = this;
-					this.library.initialize(function() { this_state_object.updateChart(callback); });
-					return;
-				}
-
-				this.clearSelection();
-				this.chartURL();
-				if(this.debug) this.log('updating from ' + this.current.url);
-
-				var this_state_object = this;
-				$.ajax( {
-					url: this.current.url,
-					crossDomain: true,
-					cache: false
-				})
-				.then(function(data) {
-					this_state_object.updateChartWithData(data);
-				})
-				.fail(function() {
-					this_state_object.error('cannot download chart from ' + this_state_object.current.url);
-				})
-				.always(function() {
-					if(typeof callback == 'function') callback();
-				});
-			},
-
-			isVisible: function() {
-				if(NETDATA.options.current.update_only_visible)
-					return $(this.element).visible(true);
-				else
-					return true;
-			},
-
-			isAutoRefreshed: function() {
-				return this.current.autorefresh;
-			},
-
-			canBeAutoRefreshed: function() {
-				if(this.isAutoRefreshed()) {
-					var now = new Date().getTime();
-
-					if(this.updates_counter && !NETDATA.options.page_is_visible) {
-						if(NETDATA.options.debug.focus || this.debug) this.log('canBeAutoRefreshed(): page does not have focus');
-						return false;
-					}
-
-					if(!this.isVisible()) {
-						if(this.debug) this.log('canBeAutoRefreshed(): I am not visible.');
-						return false;
-					}
-
-					// options valid only for autoRefresh()
-					if(NETDATA.options.auto_refresher_stop_until == 0 || NETDATA.options.auto_refresher_stop_until < now) {
-						if(NETDATA.globalPanAndZoom.isActive()) {
-							if(NETDATA.globalPanAndZoom.shouldBeAutoRefreshed(this)) {
-								if(this.debug) this.log('canBeAutoRefreshed(): global panning: I need an update.');
-								return true;
-							}
-							else {
-								if(this.debug) this.log('canBeAutoRefreshed(): global panning: I am already up to date.');
-								return false;
-							}
-						}
-
-						if(this.selected) {
-							if(this.debug) this.log('canBeAutoRefreshed(): I have a selection in place.');
-							return false;
-						}
-
-						if(this.paused) {
-							if(this.debug) this.log('canBeAutoRefreshed(): I am paused.');
-							return false;
-						}
-
-						if(now - this.current.last_autorefreshed > this.current.view_update_every) {
-							if(this.debug) this.log('canBeAutoRefreshed(): It is time to update me.');
-							return true;
-						}
-					}
-				}
-
-				return false;
-			},
-
-			autoRefresh: function(callback) {
-				if(this.canBeAutoRefreshed()) {
-					this.updateChart(callback);
-				}
-				else {
-					if(typeof callback != 'undefined')
-						callback();
-				}
-			},
-
-			_defaultsFromDownloadedChart: function(chart) {
-				this.chart = chart;
-				this.chart_url = chart.url;
-				this.current.view_update_every = chart.update_every * 1000;
-				this.current.points = Math.round(this.chartWidth() / this.chartPixelsPerPoint());
-			},
-
-			// fetch the chart description from the netdata server
-			getChart: function(callback) {
-				this.chart = NETDATA.chartRegistry.get(this.host, this.id);
-				if(this.chart) {
-					this._defaultsFromDownloadedChart(this.chart);
-					if(typeof callback == 'function') callback();
-				}
-				else {
-					this.chart_url = this.host + "/api/v1/chart?chart=" + this.id;
-					if(this.debug) this.log('downloading ' + this.chart_url);
-					var this_state_object = this;
-
-					$.ajax( {
-						url:  this.chart_url,
-						crossDomain: true,
-						cache: false
-					})
-					.done(function(chart) {
-						chart.url = this_state_object.chart_url;
-						chart.data_url = (this_state_object.host + chart.data_url);
-						this_state_object._defaultsFromDownloadedChart(chart);
-						NETDATA.chartRegistry.add(this_state_object.host, this_state_object.id, chart);
-					})
-					.fail(function() {
-						NETDATA.error(404, this_state_object.chart_url);
-						this_state_object.error('chart "' + this_state_object.id + '" not found on url "' + this_state_object.chart_url + '"');
-					})
-					.always(function() {
-						if(typeof callback == 'function') callback();
-					});
-				}
-			},
-
-			// resize the chart to its real dimensions
-			// as given by the caller
-			sizeChart: function() {
-				element.className += "netdata-container";
-
-				if(this.debug) this.log('sizing element');
-
-				if(this.width)
-					$(this.element).css('width', this.width);
-
-				if(this.height)
-					$(this.element).css('height', this.height);
-
-				// these should be left to css
-				//$(this.element).css('display', 'inline-block')
-				//$(this.element).css('overflow', 'hidden');
-
-				if(NETDATA.chartDefaults.min_width)
-					$(this.element).css('min-width', NETDATA.chartDefaults.min_width);
-			},
-
-			// show a message in the chart
-			message: function(type, msg) {
-				this.element.innerHTML = '<div class="netdata-message netdata-' + type + '-message" style="font-size: x-small; overflow: hidden; width: 100%; height: 100%;"><small>'
-					+ msg
-					+ '</small></div>';
-
-				// reset the creation datetime
-				// since we overwrote the whole element
-				this.created_ms = 0
-				if(this.debug) this.log(msg);
-			},
-
-			// show an error on the chart and stop it forever
-			error: function(msg) {
-				this.message('error', this.id + ': ' + msg);
-				this.enabled = false;
-			},
-
-			// show a message indicating the chart is loading
-			info: function(msg) {
-				this.message('info', this.id + ': ' + msg);
-			},
-
-			init: function() {
-				if(this.debug) this.log('created');
-				this.sizeChart();
-				this.info("loading...");
-
-				// make sure the host does not end with /
-				// all netdata API requests use absolute paths
-				while(this.host.slice(-1) == '/')
-					this.host = this.host.substring(0, this.host.length - 1);
-
-				// check the requested library is available
-				// we don't initialize it here - it will be initialized when
-				// this chart will be first used
-				if(typeof NETDATA.chartLibraries[this.library_name] == 'undefined') {
-					NETDATA.error(402, this.library_name);
-					this.error('chart library "' + this.library_name + '" is not found');
-				}
-				else if(!NETDATA.chartLibraries[this.library_name].enabled) {
-					NETDATA.error(403, this.library_name);
-					this.error('chart library "' + this.library_name + '" is not enabled');
-				}
-				else
-					this.library = NETDATA.chartLibraries[this.library_name];
-
-				// if we need to report the rendering speed
-				// find the element that needs to be updated
-				if(this.refresh_dt_element_name)
-					this.refresh_dt_element = document.getElementById(this.refresh_dt_element_name) || null;
-
-				// the default mode for all charts
-				this.setMode('auto');
+			refresh_dt_element: null
+		});
+	}
+
+	// ----------------------------------------------------------------------------------------------------------------
+	// global selection sync
+
+	NETDATA.globalSelectionSync = {
+		state: null,
+		dont_sync_before: 0,
+		slaves: []
+	};
+
+	// prevent to global selection sync for some time
+	chartState.prototype.globalSelectionSyncDelay = function() {
+		if(!NETDATA.options.current.sync_selection) return;
+		NETDATA.globalSelectionSync.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
+	}
+
+	// can we globally apply selection sync?
+	chartState.prototype.globalSelectionSyncAbility = function() {
+		if(!NETDATA.options.current.sync_selection) return false;
+		if(NETDATA.globalSelectionSync.dont_sync_before > new Date().getTime()) return false;
+		return true;
+	}
+
+	// this chart is the master of the global selection sync
+	chartState.prototype.globalSelectionSyncBeMaster = function() {
+		// am I the master?
+		if(NETDATA.globalSelectionSync.state == this) {
+			if(this.debug) this.log('sync: I am the master already.');
+			return;
+		}
+
+		if(NETDATA.globalSelectionSync.state) {
+			if(this.debug) this.log('sync: I am not the sync master. Resetting global sync.');
+			this.globalSelectionSyncStop();
+		}
+
+		// become the master
+		if(this.debug) this.log('sync: becoming sync master.');
+		this.selected = true;
+		NETDATA.globalSelectionSync.state = this;
+
+		// find the all slaves
+		var self = this;
+		$.each(NETDATA.options.targets, function(i, target) {
+			var st = NETDATA.chartState(target);
+			if(st == self) {
+				if(self.debug) st.log('sync: not adding me to sync');
 			}
+			else if(st.globalSelectionSyncIsEligible()) {
+				if(self.debug) st.log('sync: adding to sync as slave');
+				st.globalSelectionSyncBeSlave();
+			}
+		});
+	}
+
+	// can the chart participate to the global selection sync as a slave?
+	chartState.prototype.globalSelectionSyncIsEligible = function() {
+		if(this.library != null && typeof this.library.setSelection == 'function' && this.isVisible())
+			return true;
+		return false;
+	}
+
+	// this chart is a slave of the global selection sync
+	chartState.prototype.globalSelectionSyncBeSlave = function() {
+		if(NETDATA.globalSelectionSync.state != this)
+			NETDATA.globalSelectionSync.slaves.push(this);
+	}
+
+	// sync all the visible charts to the given time
+	// this is to be called from the chart libraries
+	chartState.prototype.globalSelectionSync = function(t) {
+		if(!this.globalSelectionSyncAbility()) {
+			if(this.debug) this.log('sync: cannot sync (yet?).');
+			return;
+		}
+
+		if(this.debug) this.log('sync: trying to be sync master.');
+		this.globalSelectionSyncBeMaster();
+
+		var self = this;
+		$.each(NETDATA.globalSelectionSync.slaves, function(i, st) {
+			if(st == self) {
+				// since we are the sync master, we should not call state.setSelection()
+				// the chart library is taking care of visualizing our selection.
+				if(self.debug) st.log('sync: ignoring me from set selection');
+			}
+			else {
+				if(self.debug) st.log('sync: showing master selection');
+				st.setSelection(t);
+			}
+		});
+	}
+
+	// stop syncing all charts to the given time
+	chartState.prototype.globalSelectionSyncStop = function() {
+		if(NETDATA.globalSelectionSync.slaves.length) {
+			if(this.debug) this.log('sync: cleaning up...');
+			var self = this;
+			$.each(NETDATA.globalSelectionSync.slaves, function(i, st) {
+				if(st == self) {
+					if(self.debug) st.log('sync: not adding me to sync stop');
+				}
+				else {
+					if(self.debug) st.log('sync: removed slave from sync');
+					st.clearSelection();
+				}
+			});
+
+			NETDATA.globalSelectionSync.slaves = [];
+			NETDATA.globalSelectionSync.state = null;
+		}
+
+		// since we are the sync master, we should not call this.clearSelection()
+		// dygraphs is taking care of visualizing our selection.
+		this.selected = false;
+	}
+
+	chartState.prototype.setSelection = function(t) {
+		if(typeof this.library.setSelection == 'function') {
+			if(this.library.setSelection(this, t))
+				this.selected = true;
+			else
+				this.selected = false;
+		}
+		else this.selected = true;
+
+		if(this.selected && this.debug) this.log('selection set to ' + t.toString());
+
+		return this.selected;
+	}
+
+	chartState.prototype.clearSelection = function() {
+		if(this.selected) {
+			if(typeof this.library.clearSelection == 'function') {
+				if(this.library.clearSelection(this))
+					this.selected = false;
+				else
+					this.selected = true;
+			}
+			else this.selected = false;
+			
+			if(!this.selected && this.debug) this.log('selection cleared');
+		}
+
+		return this.selected;
+	}
+
+	// find if a timestamp (ms) is shown in the current chart
+	chartState.prototype.timeIsVisible = function(t) {
+		if(t >= this.current.after_ms && t <= this.current.before_ms)
+			return true;
+		return false;
+	},
+
+	chartState.prototype.calculateRowForTime = function(t) {
+		if(!this.timeIsVisible(t)) return -1;
+		return Math.floor((t - this.current.after_ms) / this.current.view_update_every);
+	}
+
+	// ----------------------------------------------------------------------------------------------------------------
+
+	// console logging
+	chartState.prototype.log = function(msg) {
+		console.log(this.id + ' (' + this.library_name + ' ' + this.uuid + '): ' + msg);
+	}
+
+	chartState.prototype.pauseChart = function() {
+		if(!this.paused) {
+			if(this.debug) this.log('paused');
+			this.paused = true;
+		}
+	}
+
+	chartState.prototype.unpauseChart = function() {
+		if(this.paused) {
+			if(this.debug) this.log('unpaused');
+			this.paused = false;
+		}
+	}
+
+	chartState.prototype.resetChart = function() {
+		NETDATA.globalPanAndZoom.clearMaster();
+		this.follows_global = 0;
+
+		this.clearSelection();
+
+		this.setMode('auto');
+		this.current.force_before_ms = null;
+		this.current.force_after_ms = null;
+		this.current.last_autorefreshed = 0;
+		this.paused = false;
+		this.selected = false;
+		this.enabled = true;
+		this.debug = false;
+
+		// do not update the chart here
+		// or the chart will flip-flop when it is the master
+		// of a selection sync and another chart becomes
+		// the new master
+		if(!NETDATA.options.current.sync_pan_and_zoom)
+			state.updateChart();
+	}
+
+	chartState.prototype.setMode = function(m) {
+		if(this.current) {
+			if(this.current.name == m) return;
+
+			this[m].url = this.current.url;
+			this[m].last_autorefreshed = this.current.last_autorefreshed;
+			this[m].view_update_every = this.current.view_update_every;
+			this[m].after_ms = this.current.after_ms;
+			this[m].before_ms = this.current.before_ms;
+			this[m].points = this.current.points;
+			this[m].data = this.current.data;
+			this[m].requested_before_ms = this.current.requested_before_ms;
+			this[m].requested_after_ms = this.current.requested_after_ms;
+			this[m].first_entry_ms = this.current.first_entry_ms;
+			this[m].last_entry_ms = this.current.last_entry_ms;
+		}
+
+		if(m == 'auto')
+			this.current = this.auto;
+		else if(m == 'pan')
+			this.current = this.pan;
+		else if(m == 'zoom')
+			this.current = this.zoom;
+		else
+			this.current = this.auto;
+
+		this.current.force_before_ms = null;
+		this.current.force_after_ms = null;
+
+		if(this.debug) this.log('mode set to ' + this.current.name);
+	}
+
+	chartState.prototype._minPanOrZoomStep = function() {
+		return (((this.current.before_ms - this.current.after_ms) / this.current.points) * ((this.current.points * 5 / 100) + 1) );
+		// return this.current.view_update_every * 10;
+	}
+
+	chartState.prototype._shouldBeMoved = function(old_after, old_before, new_after, new_before) {
+		var dt_after = Math.abs(old_after - new_after);
+		var dt_before = Math.abs(old_before - new_before);
+		var old_range = old_before - old_after;
+
+		var new_range = new_before - new_after;
+		var dt = Math.abs(old_range - new_range);
+		var step = Math.max(dt_after, dt_before, dt);
+
+		var min_step = this._minPanOrZoomStep();
+		if(new_range < old_range && new_range / this.chartWidth() < 100) {
+			if(this.debug) this.log('_shouldBeMoved(' + (new_after / 1000).toString() + ' - ' + (new_before / 1000).toString() + '): minimum point size: 0.10, wanted point size: ' + (new_range / this.chartWidth() / 1000).toString() + ': TOO SMALL RANGE');
+			return false;
+		}
+
+		if(step >= min_step) {
+			if(this.debug) this.log('_shouldBeMoved(' + (new_after / 1000).toString() + ' - ' + (new_before / 1000).toString() + '): minimum step: ' + (min_step / 1000).toString() + ', this step: ' + (step / 1000).toString() + ': YES');
+			return true;
+		}
+		else {
+			if(this.debug) this.log('_shouldBeMoved(' + (new_after / 1000).toString() + ' - ' + (new_before / 1000).toString() + '): minimum step: ' + (min_step / 1000).toString() + ', this step: ' + (step / 1000).toString() + ': NO');
+			return false;
+		}
+	}
+
+	chartState.prototype.updateChartPanOrZoom = function(after, before, callback) {
+		var move = false;
+
+		if(this.current.name == 'auto') {
+			if(this.debug) this.log('updateChartPanOrZoom(): caller did not set proper mode');
+			this.setMode('pan');
+		}
+
+		if(!this.current.force_after_ms || !this.current.force_before_ms) {
+			if(this.debug) this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): INIT');
+			move = true;
+		}
+		else if(this._shouldBeMoved(this.current.force_after_ms, this.current.force_before_ms, after, before) && this._shouldBeMoved(this.current.after_ms, this.current.before_ms, after, before)) {
+			if(this.debug) this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): FORCE CHANGE from ' + (this.current.force_after_ms / 1000).toString() + ' - ' + (this.current.force_before_ms / 1000).toString());
+			move = true;
+		}
+		else if(this._shouldBeMoved(this.current.requested_after_ms, this.current.requested_before_ms, after, before) && this._shouldBeMoved(this.current.after_ms, this.current.before_ms, after, before)) {
+			if(this.debug) this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): REQUESTED CHANGE from ' + (this.current.requested_after_ms / 1000).toString() + ' - ' + (this.current.requested_before_ms / 1000).toString());
+			move = true;
+		}
+
+		if(move) {
+			var now = new Date().getTime();
+			NETDATA.options.auto_refresher_stop_until = now + NETDATA.options.current.global_pan_sync_time;
+			NETDATA.globalPanAndZoom.setMaster(this, after, before);
+
+			this.current.force_after_ms = after;
+			this.current.force_before_ms = before;
+			this.updateChart(callback);
+			return true;
+		}
+
+		if(this.debug) this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): IGNORE');
+		if(typeof callback != 'undefined') callback();
+		return false;
+	}
+
+	chartState.prototype.updateLegendDOM = function() {
+		if(!this.hasLegend()) return;
+
+		var needed = false;
+
+		// check that the legend DOM is up to date for the downloaded dimensions
+		if(typeof this.element_legend_childs.series != 'object')
+			needed = true;
+		else if(!this.current.data)
+			needed = true;
+		else {
+			for(var i = 0; i < this.current.data.dimension_names.length; i++) {
+				if(typeof this.element_legend_childs.series[this.current.data.dimension_names[i]] == 'undefined') {
+					needed = true;
+					break;
+				}
+				else if(!this.follows_global) {
+					// FIXME update to latest value
+					;
+				}
+			}
+		}
+
+		if(!needed) return;
+
+		if(this.debug) this.log('updating Legend DOM');
+
+		this.element_legend_childs = {
+			title_date: document.createElement('span'),
+			title_time: document.createElement('span'),
+			title_units: document.createElement('span'),
+			series: {}
 		};
 
-		state.init();
-		return state;
+		this.element_legend_childs.title_date.className += "netdata-legend-title-date";
+		this.element_legend.appendChild(this.element_legend_childs.title_date);
+
+		this.element_legend.appendChild(document.createElement('br'));
+
+		this.element_legend_childs.title_time.className += "netdata-legend-title-time";
+		this.element_legend.appendChild(this.element_legend_childs.title_time);
+
+		this.element_legend.appendChild(document.createElement('br'));
+
+		this.element_legend_childs.title_units.className += "netdata-legend-title-units";
+		this.element_legend.appendChild(this.element_legend_childs.title_units);
+
+		this.element_legend.appendChild(document.createElement('br'));
+
+		var el = document.createElement('div');
+		el.className += "netdata-legend-series";
+		this.element_legend.appendChild(el);
+
+		var genLabel = function(state, parent, name, count) {
+			var c = count % NETDATA.colors.length;
+
+			state.element_legend_childs.series[name] = {
+				name: document.createElement('span'),
+				value: document.createElement('span')
+			};
+
+			var label = state.element_legend_childs.series[name];
+
+			label.name.className += 'netdata-legend-name';
+			label.value.className += 'netdata-legend-value';
+			label.value.title = name;
+
+			var table = document.createElement('table');
+			table.innerHTML = '<tr class="netdata-legend-name-tr"><td class="netdata-legend-name-td"></td></tr>';
+			table.className += 'netdata-legend-name-table-' + state.chart.chart_type;
+
+			var rgb = NETDATA.colorHex2Rgb(NETDATA.colors[c]);
+			table.style.backgroundColor = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + NETDATA.options.current.color_fill_opacity[state.chart.chart_type] + ')';
+
+			var text = document.createTextNode(' ' + name);
+
+			label.name.appendChild(table);
+			label.name.appendChild(text);
+
+			label.name.style.color = NETDATA.colors[c];
+			label.value.style.color = NETDATA.colors[c];
+
+			if(count > 0)
+				parent.appendChild(document.createElement('br'));
+
+			parent.appendChild(label.name);
+			parent.appendChild(label.value);
+		};
+
+		if(this.current.data) {
+			var me = this;
+			$.each(me.current.data.dimension_names, function(i, d) {
+				genLabel(me, el, d, i);
+			});
+		}
+		else {
+			var me = this;
+			$.each(me.chart.dimensions, function(i, d) {
+				genLabel(me, el, d.name, i);
+			});
+		}
+
+		// create a hidden div to be used for hidding
+		// the original legend of the chart library
+		el = document.createElement('div');
+		this.element_legend.appendChild(el);
+		el.style.display = 'none';
+
+		this.element_legend_childs.hidden = document.createElement('div');
+		el.appendChild(this.element_legend_childs.hidden);
+	}
+
+	chartState.prototype.createChartDOM = function() {
+		var html = "";
+
+		if(this.hasLegend()) {
+			this.element_chart_id = this.library_name + '-' + this.uuid + '-chart';
+			this.element_legend_id = this.library_name + '-' + this.uuid + '-legend';
+
+			html += '<div class="netdata-chart-with-legend-right netdata-'
+				+ this.library_name + '-chart-with-legend-right" id="'
+				+ this.element_chart_id
+				+ '"></div>';
+
+			html += '<div class="netdata-chart-legend netdata-'
+				+ this.library_name + '-legend" id="'
+				+ this.element_legend_id
+				+ '"></div>';
+		}
+		else {
+			this.element_chart_id = this.library_name + '-' + this.uuid + '-chart';
+			html += '<div class="netdata-chart netdata-'
+				+ this.library_name + '-chart" id="'
+				+ this.element_chart_id
+				+ '"></div>';
+		}
+
+		this.element.innerHTML = html;
+		this.element_chart = document.getElementById(this.element_chart_id);
+		$(this.element_chart).data('netdata-state-object', this);
+
+		if(this.hasLegend()) {
+			this.element_legend = document.getElementById(this.element_legend_id);
+			$(this.element_legend).data('netdata-state-object', this);
+			this.updateLegendDOM();
+		}
+	}
+
+	chartState.prototype.hasLegend = function() {
+		if(this.element_legend) return true;
+
+		if(this.library && this.library.legend(this) == 'right-side') {
+			var legend = $(this.element).data('legend') || 'yes';
+			if(legend == 'no') return false;
+			return true;
+		}
+
+		return false;
+	}
+
+	chartState.prototype.legendWidth = function() {
+		return (this.hasLegend())?110:0;
+	}
+
+	chartState.prototype.legendHeight = function() {
+		return $(this.element).height();
+	}
+
+	chartState.prototype.chartWidth = function() {
+		return $(this.element).width() - this.legendWidth();
+	}
+
+	chartState.prototype.chartHeight = function() {
+		return $(this.element).height();
+	}
+
+	chartState.prototype.chartPixelsPerPoint = function() {
+		// force an options provided detail
+		var px = this.pixels_per_point;
+
+		if(this.library && px < this.library.pixels_per_point(this))
+			px = this.library.pixels_per_point(this);
+
+		if(px < NETDATA.options.current.pixels_per_point)
+			px = NETDATA.options.current.pixels_per_point;
+
+		return px;
+	}
+
+	chartState.prototype.needsResize = function() {
+		return (this.library && !this.library.autoresize() && this.last_resized < NETDATA.options.last_resized);
+	}
+
+	chartState.prototype.resizeChart = function() {
+		if(this.needsResize()) {
+			if(this.debug) this.log('forcing re-generation due to window resize.');
+			this.created_ms = 0;
+			this.last_resized = new Date().getTime();
+		}
+	}
+
+	chartState.prototype.chartURL = function() {
+		var before;
+		var after;
+		if(NETDATA.globalPanAndZoom.isActive()) {
+			after = Math.round(NETDATA.globalPanAndZoom.force_after_ms / 1000);
+			before = Math.round(NETDATA.globalPanAndZoom.force_before_ms / 1000);
+			this.follows_global = NETDATA.globalPanAndZoom.seq;
+		}
+		else {
+			before = this.current.force_before_ms != null ? Math.round(this.current.force_before_ms / 1000) : this.before;
+			after  = this.current.force_after_ms  != null ? Math.round(this.current.force_after_ms / 1000) : this.after;
+			this.follows_global = 0;
+		}
+
+		this.current.requested_after_ms = after * 1000;
+		this.current.requested_before_ms = before * 1000;
+
+		this.current.points = this.points || Math.round(this.chartWidth() / this.chartPixelsPerPoint());
+
+		// build the data URL
+		this.current.url = this.chart.data_url;
+		this.current.url += "&format="  + this.library.format();
+		this.current.url += "&points="  + this.current.points.toString();
+		this.current.url += "&group="   + this.method;
+		this.current.url += "&options=" + this.library.options();
+		this.current.url += '|jsonwrap';
+
+		if(after)
+			this.current.url += "&after="  + after.toString();
+
+		if(before)
+			this.current.url += "&before=" + before.toString();
+
+		if(this.dimensions)
+			this.current.url += "&dimensions=" + this.dimensions;
+
+		if(NETDATA.options.debug.chart_data_url || this.debug) this.log('chartURL(): ' + this.current.url + ' WxH:' + this.chartWidth() + 'x' + this.chartHeight() + ' points: ' + this.current.points + ' library: ' + this.library_name);
+	}
+
+	chartState.prototype.updateChartWithData = function(data) {
+		if(this.debug) this.log('got data from netdata server');
+		this.current.data = data;
+
+		var started = new Date().getTime();
+
+		// if the result is JSON, find the latest update-every
+		if(typeof data == 'object') {
+			if(typeof data.view_update_every != 'undefined')
+				this.current.view_update_every = data.view_update_every * 1000;
+
+			if(typeof data.after != 'undefined')
+				this.current.after_ms = data.after * 1000;
+
+			if(typeof data.before != 'undefined')
+				this.current.before_ms = data.before * 1000;
+
+			if(typeof data.first_entry_t != 'undefined')
+				this.current.first_entry_ms = data.first_entry_t * 1000;
+
+			if(typeof data.last_entry_t != 'undefined')
+				this.current.last_entry_ms = data.last_entry_t * 1000;
+
+			if(typeof data.points != 'undefined')
+				this.current.points = data.points;
+
+			data.state = this;
+		}
+
+		this.updates_counter++;
+
+		if(this.debug) {
+			this.log('UPDATE No ' + this.updates_counter + ' COMPLETED');
+
+			if(this.current.force_after_ms)
+				this.log('STATUS: forced   : ' + (this.current.force_after_ms / 1000).toString() + ' - ' + (this.current.force_before_ms / 1000).toString());
+			else
+				this.log('STATUS: forced: unset');
+
+			this.log('STATUS: requested: ' + (this.current.requested_after_ms / 1000).toString() + ' - ' + (this.current.requested_before_ms / 1000).toString());
+			this.log('STATUS: rendered : ' + (this.current.after_ms / 1000).toString() + ' - ' + (this.current.before_ms / 1000).toString());
+			this.log('STATUS: points   : ' + (this.current.points).toString() + ', min step: ' + (this._minPanOrZoomStep() / 1000).toString());
+		}
+
+		// this may force the chart to be re-created
+		this.resizeChart();
+
+		if(this.updates_since_last_creation >= this.library.max_updates_to_recreate()) {
+			if(this.debug) this.log('max updates of ' + this.updates_since_last_creation.toString() + ' reached. Forcing re-generation.');
+			this.created_ms = 0;
+		}
+
+		if(this.created_ms && typeof this.library.update == 'function') {
+			if(this.debug) this.log('updating chart...');
+
+			// check and update the legend
+			this.updateLegendDOM();
+
+			this.updates_since_last_creation++;
+			if(NETDATA.options.debug.chart_errors) {
+				this.library.update(this, data);
+			}
+			else {
+				try {
+					this.library.update(this, data);
+				}
+				catch(err) {
+					this.error('chart "' + this.id + '" failed to be updated as ' + this.library_name);
+				}
+			}
+		}
+		else {
+			if(this.debug) this.log('creating chart...');
+
+			this.createChartDOM();
+			this.updates_since_last_creation = 0;
+
+			if(NETDATA.options.debug.chart_errors) {
+				this.library.create(this, data);
+				this.created_ms = new Date().getTime();
+			}
+			else {
+				try {
+					this.library.create(this, data);
+					this.created_ms = new Date().getTime();
+				}
+				catch(err) {
+					this.error('chart "' + this.id + '" failed to be created as ' + this.library_name);
+				}
+			}
+		}
+
+		// update the performance counters
+		var now = new Date().getTime();
+		
+		// don't update last_autorefreshed if this chart is
+		// forced to be updated with global PanAndZoom
+		if(NETDATA.globalPanAndZoom.isActive())
+			this.current.last_autorefreshed = 0;
+		else
+			this.current.last_autorefreshed = now;
+
+		this.refresh_dt_ms = now - started;
+		NETDATA.options.auto_refresher_fast_weight += this.refresh_dt_ms;
+
+		if(this.refresh_dt_element)
+			this.refresh_dt_element.innerHTML = this.refresh_dt_ms.toString();
+	}
+
+	chartState.prototype.updateChart = function(callback) {
+		if(!this.library || !this.library.enabled) {
+			this.error('charting library "' + this.library_name + '" is not available');
+			if(typeof callback != 'undefined') callback();
+			return;
+		}
+
+		if(!this.enabled) {
+			if(this.debug) this.error('chart "' + this.id + '" is not enabled');
+			if(typeof callback != 'undefined') callback();
+			return;
+		}
+
+		if(!this.isVisible()) {
+			if(NETDATA.options.debug.visibility || this.debug) this.log('is not visible');
+			if(typeof callback != 'undefined') callback();
+			return;
+		}
+		if(!this.chart) {
+			var this_state_object = this;
+			this.getChart(function() { this_state_object.updateChart(callback); });
+			return;
+		}
+
+		if(!this.library.initialized) {
+			var this_state_object = this;
+			this.library.initialize(function() { this_state_object.updateChart(callback); });
+			return;
+		}
+
+		this.clearSelection();
+		this.chartURL();
+		if(this.debug) this.log('updating from ' + this.current.url);
+
+		var this_state_object = this;
+		$.ajax( {
+			url: this.current.url,
+			crossDomain: true,
+			cache: false
+		})
+		.then(function(data) {
+			this_state_object.updateChartWithData(data);
+		})
+		.fail(function() {
+			this_state_object.error('cannot download chart from ' + this_state_object.current.url);
+		})
+		.always(function() {
+			if(typeof callback == 'function') callback();
+		});
+	}
+
+	chartState.prototype.isVisible = function() {
+		if(NETDATA.options.current.update_only_visible)
+			return $(this.element).visible(true);
+		else
+			return true;
+	}
+
+	chartState.prototype.isAutoRefreshed = function() {
+		return this.current.autorefresh;
+	}
+
+	chartState.prototype.canBeAutoRefreshed = function() {
+		if(this.isAutoRefreshed()) {
+			var now = new Date().getTime();
+
+			if(this.updates_counter && !NETDATA.options.page_is_visible) {
+				if(NETDATA.options.debug.focus || this.debug) this.log('canBeAutoRefreshed(): page does not have focus');
+				return false;
+			}
+
+			if(!this.isVisible()) {
+				if(this.debug) this.log('canBeAutoRefreshed(): I am not visible.');
+				return false;
+			}
+
+			// options valid only for autoRefresh()
+			if(NETDATA.options.auto_refresher_stop_until == 0 || NETDATA.options.auto_refresher_stop_until < now) {
+				if(NETDATA.globalPanAndZoom.isActive()) {
+					if(NETDATA.globalPanAndZoom.shouldBeAutoRefreshed(this)) {
+						if(this.debug) this.log('canBeAutoRefreshed(): global panning: I need an update.');
+						return true;
+					}
+					else {
+						if(this.debug) this.log('canBeAutoRefreshed(): global panning: I am already up to date.');
+						return false;
+					}
+				}
+
+				if(this.selected) {
+					if(this.debug) this.log('canBeAutoRefreshed(): I have a selection in place.');
+					return false;
+				}
+
+				if(this.paused) {
+					if(this.debug) this.log('canBeAutoRefreshed(): I am paused.');
+					return false;
+				}
+
+				if(now - this.current.last_autorefreshed > this.current.view_update_every) {
+					if(this.debug) this.log('canBeAutoRefreshed(): It is time to update me.');
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	chartState.prototype.autoRefresh = function(callback) {
+		if(this.canBeAutoRefreshed()) {
+			this.updateChart(callback);
+		}
+		else {
+			if(typeof callback != 'undefined')
+				callback();
+		}
+	}
+
+	chartState.prototype._defaultsFromDownloadedChart = function(chart) {
+		this.chart = chart;
+		this.chart_url = chart.url;
+		this.current.view_update_every = chart.update_every * 1000;
+		this.current.points = Math.round(this.chartWidth() / this.chartPixelsPerPoint());
+	}
+
+	// fetch the chart description from the netdata server
+	chartState.prototype.getChart = function(callback) {
+		this.chart = NETDATA.chartRegistry.get(this.host, this.id);
+		if(this.chart) {
+			this._defaultsFromDownloadedChart(this.chart);
+			if(typeof callback == 'function') callback();
+		}
+		else {
+			this.chart_url = this.host + "/api/v1/chart?chart=" + this.id;
+			if(this.debug) this.log('downloading ' + this.chart_url);
+			var this_state_object = this;
+
+			$.ajax( {
+				url:  this.chart_url,
+				crossDomain: true,
+				cache: false
+			})
+			.done(function(chart) {
+				chart.url = this_state_object.chart_url;
+				chart.data_url = (this_state_object.host + chart.data_url);
+				this_state_object._defaultsFromDownloadedChart(chart);
+				NETDATA.chartRegistry.add(this_state_object.host, this_state_object.id, chart);
+			})
+			.fail(function() {
+				NETDATA.error(404, this_state_object.chart_url);
+				this_state_object.error('chart "' + this_state_object.id + '" not found on url "' + this_state_object.chart_url + '"');
+			})
+			.always(function() {
+				if(typeof callback == 'function') callback();
+			});
+		}
+	}
+
+	// resize the chart to its real dimensions
+	// as given by the caller
+	chartState.prototype.sizeChart = function() {
+		this.element.className += "netdata-container";
+
+		if(this.debug) this.log('sizing element');
+
+		if(this.width)
+			$(this.element).css('width', this.width);
+
+		if(this.height)
+			$(this.element).css('height', this.height);
+
+		if(NETDATA.chartDefaults.min_width)
+			$(this.element).css('min-width', NETDATA.chartDefaults.min_width);
+	}
+
+	// show a message in the chart
+	chartState.prototype.message = function(type, msg) {
+		this.element.innerHTML = '<div class="netdata-message netdata-' + type + '-message" style="font-size: x-small; overflow: hidden; width: 100%; height: 100%;"><small>'
+			+ msg
+			+ '</small></div>';
+
+		// reset the creation datetime
+		// since we overwrote the whole element
+		this.created_ms = 0
+		if(this.debug) this.log(msg);
+	}
+
+	// show an error on the chart and stop it forever
+	chartState.prototype.error = function(msg) {
+		this.message('error', this.id + ': ' + msg);
+		this.enabled = false;
+	}
+
+	// show a message indicating the chart is loading
+	chartState.prototype.info = function(msg) {
+		this.message('info', this.id + ': ' + msg);
+	}
+
+	chartState.prototype.init = function() {
+		if(this.debug) this.log('created');
+		this.sizeChart();
+		this.info("loading...");
+
+		// make sure the host does not end with /
+		// all netdata API requests use absolute paths
+		while(this.host.slice(-1) == '/')
+			this.host = this.host.substring(0, this.host.length - 1);
+
+		// check the requested library is available
+		// we don't initialize it here - it will be initialized when
+		// this chart will be first used
+		if(typeof NETDATA.chartLibraries[this.library_name] == 'undefined') {
+			NETDATA.error(402, this.library_name);
+			this.error('chart library "' + this.library_name + '" is not found');
+		}
+		else if(!NETDATA.chartLibraries[this.library_name].enabled) {
+			NETDATA.error(403, this.library_name);
+			this.error('chart library "' + this.library_name + '" is not enabled');
+		}
+		else
+			this.library = NETDATA.chartLibraries[this.library_name];
+
+		// if we need to report the rendering speed
+		// find the element that needs to be updated
+		if(this.refresh_dt_element_name)
+			this.refresh_dt_element = document.getElementById(this.refresh_dt_element_name) || null;
+
+		// the default mode for all charts
+		this.setMode('auto');
 	}
 
 	// get or create a chart state, given a DOM element
 	NETDATA.chartState = function(element) {
 		var state = $(element).data('netdata-state-object') || null;
 		if(!state) {
-			state = NETDATA.chartInitialState(element);
+			state = new chartState(element);
+			state.init();
 			$(element).data('netdata-state-object', state);
 		}
 		return state;
@@ -1624,109 +1733,7 @@
 
 	NETDATA.dygraph = {
 		smooth: false,
-		state: null,
-		sync: false,
-		dont_sync_before: 0,
-		slaves: []
 	};
-
-	NETDATA.dygraph.syncStart = function(state, event, x, points, row, seriesName) {
-		if(!NETDATA.options.current.sync_selection) return;
-		if(NETDATA.options.debug.dygraph || state.debug) state.log('dygraph.syncStart()');
-
-		//if(NETDATA.dygraph.state && NETDATA.dygraph.state != state) {
-		//	state.log('sync: I am not the sync master.');
-		//	return;
-		//}
-		// state.debug = true;
-
-		var t = state.current.after_ms + row * state.current.view_update_every;
-		// console.log('row = ' + row + ', x = ' + x + ', t = ' + t + ' ' + ((t == x)?'SAME':'DIFFERENT') + ', rows in db: ' + state.current.data.points + ' visible(x) = ' + state.timeIsVisible(x) + ' visible(t) = ' + state.timeIsVisible(t) + ' r(x) = ' + state.calculateRowForTime(x) + ' r(t) = ' + state.calculateRowForTime(t) + ' range: ' + state.current.after_ms + ' - ' + state.current.before_ms + ' real: ' + state.current.data.after + ' - ' + state.current.data.before + ' every: ' + state.current.view_update_every);
-
-		now = new Date().getTime();
-		if(now < NETDATA.dygraph.dont_sync_before) {
-			if(state.debug) state.log('sync: cannot sync yet.');
-			return;
-		}
-
-		// since we are the sync master, we should not call state.setSelection()
-		// dygraphs is taking care of visualizing our selection.
-		state.selected = true;
-
-		var dygraph = state.dygraph_instance;
-
-		if(!NETDATA.dygraph.sync) {
-			if(state.debug) state.log('sync: setting up...');
-			$.each(NETDATA.options.targets, function(i, target) {
-				var st = NETDATA.chartState(target);
-				if(st == state) {
-					if(state.debug) st.log('sync: not adding me to sync');
-				}
-				else {
-					if(typeof st.dygraph_instance == 'object' && st.library_name == state.library_name && st.isVisible()) {
-						NETDATA.dygraph.slaves.push(st);
-						if(state.debug) st.log('sync: added slave to sync');
-					}
-				}
-			});
-			NETDATA.dygraph.sync = true;
-		}
-
-		$.each(NETDATA.dygraph.slaves, function(i, st) {
-			if(st == state) {
-				if(state.debug) st.log('sync: ignoring me from set selection');
-			}
-			else {
-				if(state.debug) st.log('sync: showing master selection');
-				st.setSelection(t);
-			}
-		});
-	}
-
-	NETDATA.dygraph.syncStop = function(state) {
-		if(!NETDATA.options.current.sync_selection) return;
-
-		if(NETDATA.options.debug.dygraph || state.debug) state.log('dygraph.syncStop()');
-
-		//if(NETDATA.dygraph.state && NETDATA.dygraph.state != state) {
-		//	state.log('sync: I am not the sync master.');
-		//	return;
-		//}
-
-		if(NETDATA.dygraph.sync) {
-			if(state.debug) st.log('sync: cleaning up...');
-			$.each(NETDATA.dygraph.slaves, function(i, st) {
-				if(st == state) {
-					if(state.debug) st.log('sync: not adding me to sync stop');
-				}
-				else {
-					if(state.debug) st.log('sync: removed slave from sync');
-					st.clearSelection();
-				}
-			});
-
-			NETDATA.dygraph.slaves = [];
-			NETDATA.dygraph.sync = false;
-		}
-
-		// since we are the sync master, we should not call state.clearSelection()
-		// dygraphs is taking care of visualizing our selection.
-		state.selected = false;
-	}
-
-	NETDATA.dygraph.resetChart = function(state, dygraph, context) {
-		if(NETDATA.options.debug.dygraph) state.log('dygraph.resetChart()');
-
-		state.resetChart();
-	}
-
-	NETDATA.dygraph.chartPanOrZoom = function(state, dygraph, after, before) {
-		if(NETDATA.options.debug.dygraph) console.log('>>>> dygraph.zoomOrPan(state, dygraph, after:' + after + ', before: ' + before + ')');
-
-		//console.log(state.dygraph_instance);
-		state.updateChartPanOrZoom(after, before);
-		return;
-	}
 
 	NETDATA.dygraphSetSelection = function(state, t) {
 		if(typeof state.dygraph_instance != 'undefined') {
@@ -1957,19 +1964,28 @@
 					var after = Math.round(x_range[0]);
 					var before = Math.round(x_range[1]);
 
-					NETDATA.dygraph.chartPanOrZoom(state, this, after, before);
+					state.updateChartPanOrZoom(after, before);
 				}
 			},
 			zoomCallback: function(minDate, maxDate, yRanges) {
 				if(NETDATA.options.debug.dygraph) state.log('dygraphZoomCallback()');
-				NETDATA.dygraph.syncStop(state);
-				state.delaySelectionSync();
-				NETDATA.dygraph.chartPanOrZoom(state, this, minDate, maxDate);
+				state.globalSelectionSyncStop();
+				state.globalSelectionSyncDelay();
+				state.updateChartPanOrZoom(minDate, maxDate);
 			},
 			highlightCallback: function(event, x, points, row, seriesName) {
 				if(NETDATA.options.debug.dygraph || state.debug) state.log('dygraphHighlightCallback()');
 				state.pauseChart();
-				NETDATA.dygraph.syncStart(state, event, x, points, row, seriesName);
+
+				// there is a bug in dygraph when the chart is zoomed enough
+				// the time it thinks is selected is wrong
+				// here we calculate the time t based on the row number selected
+				// which is ok
+				var t = state.current.after_ms + row * state.current.view_update_every;
+				// console.log('row = ' + row + ', x = ' + x + ', t = ' + t + ' ' + ((t == x)?'SAME':'DIFFERENT') + ', rows in db: ' + state.current.data.points + ' visible(x) = ' + state.timeIsVisible(x) + ' visible(t) = ' + state.timeIsVisible(t) + ' r(x) = ' + state.calculateRowForTime(x) + ' r(t) = ' + state.calculateRowForTime(t) + ' range: ' + state.current.after_ms + ' - ' + state.current.before_ms + ' real: ' + state.current.data.after + ' - ' + state.current.data.before + ' every: ' + state.current.view_update_every);
+
+				state.globalSelectionSync(t);
+
 				// fix legend zIndex using the internal structures of dygraph legend module
 				// this works, but it is a hack!
 				// state.dygraph_instance.plugins_[0].plugin.legend_div_.style.zIndex = 10000;
@@ -1977,12 +1993,12 @@
 			unhighlightCallback: function(event) {
 				if(NETDATA.options.debug.dygraph || state.debug) state.log('dygraphUnhighlightCallback()');
 				state.unpauseChart();
-				NETDATA.dygraph.syncStop(state);
+				state.globalSelectionSyncStop();
 			},
 			interactionModel : {
 				mousedown: function(event, dygraph, context) {
 					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.mousedown()');
-					NETDATA.dygraph.syncStop(state);
+					state.globalSelectionSyncStop();
 
 					if(NETDATA.options.debug.dygraph) state.log('dygraphMouseDown()');
 
@@ -1994,24 +2010,24 @@
 					if(event.button && event.button == 1) {
 						if (event.altKey || event.shiftKey) {
 							state.setMode('pan');
-							state.delaySelectionSync();
+							state.globalSelectionSyncDelay();
 							Dygraph.startPan(event, dygraph, context);
 						}
 						else {
 							state.setMode('zoom');
-							state.delaySelectionSync();
+							state.globalSelectionSyncDelay();
 							Dygraph.startZoom(event, dygraph, context);
 						}
 					}
 					else {
 						if (event.altKey || event.shiftKey) {
 							state.setMode('zoom');
-							state.delaySelectionSync();
+							state.globalSelectionSyncDelay();
 							Dygraph.startZoom(event, dygraph, context);
 						}
 						else {
 							state.setMode('pan');
-							state.delaySelectionSync();
+							state.globalSelectionSyncDelay();
 							Dygraph.startPan(event, dygraph, context);
 						}
 					}
@@ -2020,14 +2036,14 @@
 					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.mousemove()');
 
 					if(context.isPanning) {
-						NETDATA.dygraph.syncStop(state);
-						state.delaySelectionSync();
+						state.globalSelectionSyncStop();
+						state.globalSelectionSyncDelay();
 						state.setMode('pan');
 						Dygraph.movePan(event, dygraph, context);
 					}
 					else if(context.isZooming) {
-						NETDATA.dygraph.syncStop(state);
-						state.delaySelectionSync();
+						state.globalSelectionSyncStop();
+						state.globalSelectionSyncDelay();
 						state.setMode('zoom');
 						Dygraph.moveZoom(event, dygraph, context);
 					}
@@ -2036,11 +2052,11 @@
 					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.mouseup()');
 
 					if (context.isPanning) {
-						state.delaySelectionSync();
+						state.globalSelectionSyncDelay();
 						Dygraph.endPan(event, dygraph, context);
 					}
 					else if (context.isZooming) {
-						state.delaySelectionSync();
+						state.globalSelectionSyncDelay();
 						Dygraph.endZoom(event, dygraph, context);
 					}
 				},
@@ -2050,14 +2066,14 @@
 				},
 				dblclick: function(event, dygraph, context) {
 					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.dblclick()');
-					NETDATA.dygraph.syncStop(state);
-					NETDATA.dygraph.resetChart(state, dygraph, context);
+					state.globalSelectionSyncStop();
+					state.resetChart();
 				},
 				mousewheel: function(event, dygraph, context) {
 					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.mousewheel()');
 
-					NETDATA.dygraph.syncStop(state);
-					state.delaySelectionSync();
+					state.globalSelectionSyncStop();
+					state.globalSelectionSyncDelay();
 
 					if(event.altKey || event.shiftKey) {
 						// http://dygraphs.com/gallery/interaction-api.js
@@ -2077,13 +2093,13 @@
 						if(NETDATA.options.debug.dygraph) state.log('percent: ' + percentage + ' from ' + after_old + ' - ' + before_old + ' to ' + after + ' - ' + before + ', range from ' + (before_old - after_old).toString() + ' to ' + (before - after).toString());
 
 						state.setMode('zoom');
-						NETDATA.dygraph.chartPanOrZoom(state, dygraph, after, before);
+						state.updateChartPanOrZoom(after, before);
 					}					
 				},
 				touchstart: function(event, dygraph, context) {
 					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.touchstart()');
-					NETDATA.dygraph.syncStop(state);
-					state.delaySelectionSync();
+					state.globalSelectionSyncStop();
+					state.globalSelectionSyncDelay();
 					Dygraph.Interaction.startTouch(event, dygraph, context);
 					context.touchDirections = { x: true, y: false };
 					state.setMode('zoom');
@@ -2091,7 +2107,7 @@
 				touchmove: function(event, dygraph, context) {
 					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.touchmove()');
 					//Dygraph.cancelEvent(event);
-					NETDATA.dygraph.syncStop(state);
+					state.globalSelectionSyncStop();
 					Dygraph.Interaction.moveTouch(event, dygraph, context);
 				},
 				touchend: function(event, dygraph, context) {
