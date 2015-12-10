@@ -17,6 +17,7 @@
 	// fix IE bug with console
 	if(!window.console){ window.console = {log: function(){} }; }
 
+	// global namespace
 	var NETDATA = window.NETDATA || {};
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -170,7 +171,13 @@
 
 			sync_pan_and_zoom: true,	// enable or disable pan and zoom sync
 
-			update_only_visible: true	// enable or disable visibility management
+			update_only_visible: true,	// enable or disable visibility management
+
+			color_fill_opacity: {
+				line: 1.0,
+				area: 0.2,
+				stacked: 0.8
+			}
 		},
 
 		debug: {
@@ -706,49 +713,52 @@
 				el.className += "netdata-legend-series";
 				this.element_legend.appendChild(el);
 
+				var genLabel = function(state, parent, name, count) {
+					var c = count % NETDATA.colors.length;
+
+					state.element_legend_childs.series[name] = {
+						name: document.createElement('span'),
+						value: document.createElement('span')
+					};
+
+					var label = state.element_legend_childs.series[name];
+
+					label.name.className += 'netdata-legend-name';
+					label.value.className += 'netdata-legend-value';
+					label.value.title = name;
+
+					var table = document.createElement('table');
+					table.innerHTML = '<tr class="netdata-legend-name-tr"><td class="netdata-legend-name-td"></td></tr>';
+					table.className += 'netdata-legend-name-table-' + state.chart.chart_type;
+
+					var rgb = NETDATA.colorHex2Rgb(NETDATA.colors[c]);
+					table.style.backgroundColor = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + NETDATA.options.current.color_fill_opacity[state.chart.chart_type] + ')';
+
+					var text = document.createTextNode(' ' + name);
+
+					label.name.appendChild(table);
+					label.name.appendChild(text);
+
+					label.name.style.color = NETDATA.colors[c];
+					label.value.style.color = NETDATA.colors[c];
+
+					if(count > 0)
+						parent.appendChild(document.createElement('br'));
+
+					parent.appendChild(label.name);
+					parent.appendChild(label.value);
+				};
+
 				if(this.current.data) {
 					var me = this;
 					$.each(me.current.data.dimension_names, function(i, d) {
-						me.element_legend_childs.series[d] = {
-							name: document.createElement('span'),
-							value: document.createElement('span')
-						};
-						me.element_legend_childs.series[d].name.className += 'netdata-legend-name';
-						me.element_legend_childs.series[d].value.className += 'netdata-legend-value';
-						me.element_legend_childs.series[d].value.title = d;
-
-						var c = i % NETDATA.colors.length;
-						me.element_legend_childs.series[d].name.style.color = NETDATA.colors[c];
-						me.element_legend_childs.series[d].value.style.color = NETDATA.colors[c];
-
-						if(i > 0)
-							el.appendChild(document.createElement('br'));
-
-						el.appendChild(me.element_legend_childs.series[d].name);
-						el.appendChild(me.element_legend_childs.series[d].value);
+						genLabel(me, el, d, i);
 					});
 				}
 				else {
 					var me = this;
 					$.each(me.chart.dimensions, function(i, d) {
-						me.element_legend_childs.series[d.name] = {
-							name: document.createElement('span'),
-							value: document.createElement('span')
-						};
-						me.element_legend_childs.series[d.name].name.className += 'netdata-legend-name';
-						me.element_legend_childs.series[d.name].value.className += 'netdata-legend-value';
-						me.element_legend_childs.series[d.name].value.title = d;
-
-						var c = i;
-						while(c >= NETDATA.colors.length) c -= NETDATA.colors.length;
-						me.element_legend_childs.series[d.name].name.style.color = NETDATA.colors[c];
-						me.element_legend_childs.series[d.name].value.style.color = NETDATA.colors[c];
-
-						if(i > 0)
-							el.appendChild(document.createElement('br'));
-
-						el.appendChild(me.element_legend_childs.series[d.name].name);
-						el.appendChild(me.element_legend_childs.series[d.name].value);
+						genLabel(me, el, d.name, i);
 					});
 				}
 
@@ -801,7 +811,7 @@
 			hasLegend: function() {
 				if(this.element_legend) return true;
 
-				if(this.library && this.library.legend == 'right-side') {
+				if(this.library && this.library.legend(this) == 'right-side') {
 					var legend = $(this.element).data('legend') || 'yes';
 					if(legend == 'no') return false;
 					return true;
@@ -830,8 +840,8 @@
 				// force an options provided detail
 				var px = this.pixels_per_point;
 
-				if(this.library && px < this.library.pixels_per_point)
-					px = this.library.pixels_per_point;
+				if(this.library && px < this.library.pixels_per_point(this))
+					px = this.library.pixels_per_point(this);
 
 				if(px < NETDATA.options.current.pixels_per_point)
 					px = NETDATA.options.current.pixels_per_point;
@@ -840,7 +850,7 @@
 			},
 
 			needsResize: function() {
-				return (this.library && !this.library.autoresize && this.last_resized < NETDATA.options.last_resized);
+				return (this.library && !this.library.autoresize() && this.last_resized < NETDATA.options.last_resized);
 			},
 
 			resizeChart: function() {
@@ -872,11 +882,11 @@
 
 				// build the data URL
 				this.current.url = this.chart.data_url;
-				this.current.url += "&format="  + this.library.format;
+				this.current.url += "&format="  + this.library.format();
 				this.current.url += "&points="  + this.current.points.toString();
 				this.current.url += "&group="   + this.method;
-				this.current.url += "&options=" + this.library.options;
-				if(this.library.jsonWrapper) this.current.url += '|jsonwrap';
+				this.current.url += "&options=" + this.library.options();
+				this.current.url += '|jsonwrap';
 
 				if(after)
 					this.current.url += "&after="  + after.toString();
@@ -897,7 +907,7 @@
 				var started = new Date().getTime();
 
 				// if the result is JSON, find the latest update-every
-				if(typeof data == 'object' && this.library.jsonWrapper) {
+				if(typeof data == 'object') {
 					if(typeof data.view_update_every != 'undefined')
 						this.current.view_update_every = data.view_update_every * 1000;
 
@@ -937,7 +947,7 @@
 				// this may force the chart to be re-created
 				this.resizeChart();
 
-				if(this.updates_since_last_creation >= this.library.max_updates_to_recreate) {
+				if(this.updates_since_last_creation >= this.library.max_updates_to_recreate()) {
 					if(this.debug) this.log('max updates of ' + this.updates_since_last_creation.toString() + ' reached. Forcing re-generation.');
 					this.created_ms = 0;
 				}
@@ -1284,7 +1294,22 @@
 			document.getElementsByTagName("head")[0].appendChild(fileref);
 	}
 
-	NETDATA.ColorLuminance = function(hex, lum) {
+	NETDATA.colorHex2Rgb = function(hex) {
+		// Expand shorthand form (e.g. "03F") to full form (e.g. "0033FF")
+		var shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+			hex = hex.replace(shorthandRegex, function(m, r, g, b) {
+			return r + r + g + g + b + b;
+		});
+
+		var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+		return result ? {
+			r: parseInt(result[1], 16),
+			g: parseInt(result[2], 16),
+			b: parseInt(result[3], 16)
+		} : null;
+	}
+
+	NETDATA.colorLuminance = function(hex, lum) {
 		// validate hex string
 		hex = String(hex).replace(/[^0-9a-f]/gi, '');
 		if (hex.length < 6)
@@ -1495,7 +1520,7 @@
 		var self = $(state.element);
 		var type = self.data('sparkline-type') || 'line';
 		var lineColor = self.data('sparkline-linecolor') || NETDATA.colors[0];
-		var fillColor = self.data('sparkline-fillcolor') || (state.chart.chart_type == 'line')?'#FFF':NETDATA.ColorLuminance(lineColor, NETDATA.chartDefaults.fill_luminance);
+		var fillColor = self.data('sparkline-fillcolor') || (state.chart.chart_type == 'line')?'#FFF':NETDATA.colorLuminance(lineColor, NETDATA.chartDefaults.fill_luminance);
 		var chartRangeMin = self.data('sparkline-chartrangemin') || undefined;
 		var chartRangeMax = self.data('sparkline-chartrangemax') || undefined;
 		var composite = self.data('sparkline-composite') || undefined;
@@ -1905,7 +1930,7 @@
 
 					for (var i = 0; i < data.series.length; i++) {
 						var series = data.series[i];
-						elements.series[series.label].name.innerHTML = series.dashHTML + ' ' + series.labelHTML;
+						//elements.series[series.label].name.innerHTML = series.dashHTML + ' ' + series.labelHTML;
 						elements.series[series.label].value.innerHTML = '';
 					}
 				}
@@ -1922,31 +1947,7 @@
 					}
 				}
 
-				return 'nothing interesting here';
-/*
-				if (typeof(data.x) === 'undefined') {
-					html = '<span class="netdata-legend-title-date">&nbsp;</span><br/><span class="netdata-legend-title-time">' + state.chart.name + '</span><br/><span class="netdata-legend-title-units">&nbsp;</span>';
-					for (var i = 0; i < data.series.length; i++) {
-						var series = data.series[i];
-						if (!series.isVisible) continue;
-
-						html += '<br/>';
-						html += "<span class='netdata-legend-series' style='color: " + series.color + ";'>" + series.dashHTML + " " + series.labelHTML + "</span>"
-						html += "<span class='netdata-legend-value'>&nbsp;</span>";
-					}
-					return html;
-				}
-
-				html = data.xHTML + '<br/><span class="netdata-legend-title-units">' + state.chart.units + '</span>';
-				for (var i = 0; i < data.series.length; i++) {
-					var series = data.series[i];
-					if (!series.isVisible) continue;
-					html += '<br/>';
-					html += "<span class='netdata-legend-series' style='color: " + series.color + ";'>" + series.dashHTML + " " + series.labelHTML + "</span>"
-					html += "<span class='netdata-legend-value' style='color: " + series.color + ";'>" + series.yHTML + "</span>";
-				}
-				return html;
-*/
+				return 'hidden original dygraph legend';
 			},
 			drawCallback: function(dygraph, is_initial) {
 				if(state.current.name != 'auto') {
@@ -2100,14 +2101,7 @@
 			}
 		};
 
-		// smooth lines patch
-		if(NETDATA.dygraph.smooth && state.chart.chart_type == 'line') {
-			state.dygraph_options.plotter = smoothPlotter;
-			state.dygraph_options.strokeWidth = 1.5;
-		}
-
-		var theme = self.data('dygraph-theme') || null;
-		if(theme == 'sparkline') {
+		if(NETDATA.chartLibraries.dygraph.isSparkline(state)) {
 			state.dygraph_options.drawGrid = false;
 			state.dygraph_options.drawAxis = false;
 			state.dygraph_options.title = undefined;
@@ -2120,7 +2114,14 @@
 			state.dygraph_options.labelsSeparateLines = true;
 			state.dygraph_options.highlightCircleSize = 3;
 			state.dygraph_options.rightGap = 0;
+			state.dygraph_options.strokeWidth = 1.0;
 		}
+		else if(NETDATA.dygraph.smooth && state.chart.chart_type == 'line') {
+		// smooth lines patch
+			state.dygraph_options.plotter = smoothPlotter;
+			state.dygraph_options.strokeWidth = 1.5;
+		}
+
 
 
 		state.dygraph_instance = new Dygraph(state.element_chart,
@@ -2383,14 +2384,33 @@
 			clearSelection:  NETDATA.dygraphClearSelection,
 			initialized: false,
 			enabled: true,
-			format: 'json',
-			options: 'ms|flip',
-			jsonWrapper: true,
-			legend: 'right-side',
-			autoresize: true,
-			max_updates_to_recreate: 5000,
-			pixels_per_point: 3,
-			detects_dimensions_on_update: false
+			format: function(state) { return 'json'; },
+			options: function(state) { return 'ms|flip'; },
+			legend: function(state) {
+				if(!this.isSparkline(state))
+					return 'right-side';
+				else
+					return null;
+			},
+			autoresize: function(state) { return true; },
+			max_updates_to_recreate: function(state) { return 5000; },
+			pixels_per_point: function(state) {
+				if(!this.isSparkline(state))
+					return 3;
+				else
+					return 2;
+			},
+
+			isSparkline: function(state) {
+				if(typeof state.dygraph_sparkline == 'undefined') {
+					var t = $(state.element).data('dygraph-theme');
+					if(t == 'sparkline')
+						state.dygraph_sparkline = true;
+					else
+						state.dygraph_sparkline = false;
+				}
+				return state.dygraph_sparkline;
+			}
 		},
 		"sparkline": {
 			initialize: NETDATA.sparklineInitialize,
@@ -2400,14 +2420,12 @@
 			clearSelection: null,
 			initialized: false,
 			enabled: true,
-			format: 'array',
-			options: 'flip|abs',
-			jsonWrapper: true,
-			legend: 'none',
-			autoresize: false,
-			max_updates_to_recreate: 5000,
-			pixels_per_point: 3,
-			detects_dimensions_on_update: false
+			format: function(state) { return 'array'; },
+			options: function(state) { return 'flip|abs'; },
+			legend: function(state) { return null; },
+			autoresize: function(state) { return false; },
+			max_updates_to_recreate: function(state) { return 5000; },
+			pixels_per_point: function(state) { return 3; }
 		},
 		"peity": {
 			initialize: NETDATA.peityInitialize,
@@ -2417,14 +2435,12 @@
 			clearSelection: null,
 			initialized: false,
 			enabled: true,
-			format: 'ssvcomma',
-			options: 'null2zero|flip|abs',
-			jsonWrapper: true,
-			legend: 'none',
-			autoresize: false,
-			max_updates_to_recreate: 5000,
-			pixels_per_point: 3,
-			detects_dimensions_on_update: false
+			format: function(state) { return 'ssvcomma'; },
+			options: function(state) { return 'null2zero|flip|abs'; },
+			legend: function(state) { return null; },
+			autoresize: function(state) { return false; },
+			max_updates_to_recreate: function(state) { return 5000; },
+			pixels_per_point: function(state) { return 3; }
 		},
 		"morris": {
 			initialize: NETDATA.morrisInitialize,
@@ -2434,14 +2450,12 @@
 			clearSelection: null,
 			initialized: false,
 			enabled: true,
-			format: 'json',
-			options: 'objectrows|ms',
-			jsonWrapper: true,
-			legend: 'none',
-			autoresize: false,
-			max_updates_to_recreate: 50,
-			pixels_per_point: 15,
-			detects_dimensions_on_update: false
+			format: function(state) { return 'json'; },
+			options: function(state) { return 'objectrows|ms'; },
+			legend: function(state) { return null; },
+			autoresize: function(state) { return false; },
+			max_updates_to_recreate: function(state) { return 50; },
+			pixels_per_point: function(state) { return 15; }
 		},
 		"google": {
 			initialize: NETDATA.googleInitialize,
@@ -2451,14 +2465,12 @@
 			clearSelection: null,
 			initialized: false,
 			enabled: true,
-			format: 'datatable',
-			options: '',
-			jsonWrapper: true,
-			legend: 'none',
-			autoresize: false,
-			max_updates_to_recreate: 300,
-			pixels_per_point: 4,
-			detects_dimensions_on_update: true
+			format: function(state) { return 'datatable'; },
+			options: function(state) { return ''; },
+			legend: function(state) { return null; },
+			autoresize: function(state) { return false; },
+			max_updates_to_recreate: function(state) { return 300; },
+			pixels_per_point: function(state) { return 4; }
 		},
 		"raphael": {
 			initialize: NETDATA.raphaelInitialize,
@@ -2468,14 +2480,12 @@
 			clearSelection: null,
 			initialized: false,
 			enabled: true,
-			format: 'json',
-			options: '',
-			jsonWrapper: true,
-			legend: 'none',
-			autoresize: false,
-			max_updates_to_recreate: 1000,
-			pixels_per_point: 1,
-			detects_dimensions_on_update: false
+			format: function(state) { return 'json'; },
+			options: function(state) { return ''; },
+			legend: function(state) { return null; },
+			autoresize: function(state) { return false; },
+			max_updates_to_recreate: function(state) { return 5000; },
+			pixels_per_point: function(state) { return 3; }
 		}
 	};
 

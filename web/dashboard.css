@@ -67,7 +67,6 @@ html {
 }
 .netdata-legend-series {
 	position: absolute;
-	display: block;
 	width: 100%;
 	height: calc(100% - 50px);
 	/*background-color: Gray;*/
@@ -80,15 +79,42 @@ html {
 	font-size: 10px;
 	margin-top: 0px;
 }
+.netdata-legend-name-table-line {
+	display: inline-block;
+	width: 13px;
+	height: 3px;
+	border-width: 0px;
+	border-bottom-width: 2px;
+	border-bottom-style: solid;
+	border-bottom-color: white;
+}
+.netdata-legend-name-table-area {
+	display: inline-block;
+	width: 13px;
+	height: 5px;
+	border-width: 1px;
+	border-top-width: 1px;
+	border-top-style: solid;
+	border-top-color: inherit;
+}
+.netdata-legend-name-table-stacked {
+	display: inline-block;
+	width: 13px;
+	height: 5px;
+	border-width: 1px;
+	border-top-width: 1px;
+	border-top-style: solid;
+	border-top-color: inherit;
+}
+.netdata-legend-name-tr {
+}
+.netdata-legend-name-td {
+}
 .netdata-legend-name {
-	position: absolute;
-	left: 0px;
-	float: left;
 	text-align: left;
 	font-size: 10px;
 	font-weight: bold;
 	vertical-align: bottom;
-	background-color: White;
 	margin-top: 0px;
 	z-index: 9;
 	padding: 0px;
