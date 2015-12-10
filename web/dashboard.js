@@ -386,6 +386,7 @@
 			element_chart_id: null,
 			element_legend: null, 	// the element with the legend of the chart (if created by us)
 			element_legend_id: null,
+			element_legend_childs: { hidden: null },
 
 			chart_url: null,		// string - the url to download chart info
 			chart: null,			// object - the chart as downloaded from the server
@@ -652,20 +653,132 @@
 				return false;
 			},
 
+			updateLegendDOM: function() {
+				if(!this.hasLegend()) return;
+
+				var needed = false;
+
+				// check that the legend DOM is up to date for the downloaded dimensions
+				if(typeof this.element_legend_childs.series != 'object')
+					needed = true;
+				else if(!this.current.data)
+					needed = true;
+				else {
+					for(var i = 0; i < this.current.data.dimension_names.length; i++) {
+						if(typeof this.element_legend_childs.series[this.current.data.dimension_names[i]] == 'undefined') {
+							needed = true;
+							break;
+						}
+					}
+				}
+
+				if(!needed) return;
+
+				if(this.debug) this.log('updating Legend DOM');
+
+				this.element_legend_childs = {
+					title_date: document.createElement('span'),
+					title_time: document.createElement('span'),
+					title_units: document.createElement('span'),
+					series: {}
+				};
+
+				this.element_legend_childs.title_date.className += "netdata-legend-title-date";
+				this.element_legend.appendChild(this.element_legend_childs.title_date);
+				
+				this.element_legend.appendChild(document.createElement('br'));
+
+				this.element_legend_childs.title_time.className += "netdata-legend-title-time";
+				this.element_legend.appendChild(this.element_legend_childs.title_time);
+
+				this.element_legend.appendChild(document.createElement('br'));
+
+				this.element_legend_childs.title_units.className += "netdata-legend-title-units";
+				this.element_legend.appendChild(this.element_legend_childs.title_units);
+
+				this.element_legend.appendChild(document.createElement('br'));
+
+				var el = document.createElement('div');
+				el.className += "netdata-legend-series";
+				this.element_legend.appendChild(el);
+
+				if(this.current.data) {
+					var me = this;
+					$.each(me.current.data.dimension_names, function(i, d) {
+						me.element_legend_childs.series[d] = {
+							name: document.createElement('span'),
+							value: document.createElement('span')
+						};
+						me.element_legend_childs.series[d].name.className += 'netdata-legend-name';
+						me.element_legend_childs.series[d].value.className += 'netdata-legend-value';
+
+						var c = i % NETDATA.colors.length;
+						me.element_legend_childs.series[d].name.style.color = NETDATA.colors[c];
+						me.element_legend_childs.series[d].value.style.color = NETDATA.colors[c];
+
+						if(i > 0)
+							el.appendChild(document.createElement('br'));
+
+						el.appendChild(me.element_legend_childs.series[d].name);
+						el.appendChild(me.element_legend_childs.series[d].value);
+					});
+				}
+				else {
+					var me = this;
+					$.each(me.chart.dimensions, function(i, d) {
+						me.element_legend_childs.series[d.name] = {
+							name: document.createElement('span'),
+							value: document.createElement('span')
+						};
+						me.element_legend_childs.series[d.name].name.className += 'netdata-legend-name';
+						me.element_legend_childs.series[d.name].value.className += 'netdata-legend-value';
+
+						var c = i;
+						while(c >= NETDATA.colors.length) c -= NETDATA.colors.length;
+						me.element_legend_childs.series[d.name].name.style.color = NETDATA.colors[c];
+						me.element_legend_childs.series[d.name].value.style.color = NETDATA.colors[c];
+
+						if(i > 0)
+							el.appendChild(document.createElement('br'));
+
+						el.appendChild(me.element_legend_childs.series[d.name].name);
+						el.appendChild(me.element_legend_childs.series[d.name].value);
+					});
+				}
+				
+				// create a hidden div to be used for hidding
+				// the original legend of the chart library
+				el = document.createElement('div');
+				this.element_legend.appendChild(el);
+				el.style.display = 'none';
+
+				this.element_legend_childs.hidden = document.createElement('div');
+				el.appendChild(this.element_legend_childs.hidden);
+			},
+
 			createChartDOM: function() {
-				this.element_chart_id = this.library_name + '-' + this.uuid + '-chart';
-				var html = '<div class="netdata-chart netdata-'
-					+ this.library_name + '-chart" id="'
-					+ this.element_chart_id
-					+ '"style="width: 100%; height: 100%;"></div>';
-//					+ '"style="width: ' + this.chartWidth().toString() + 'px; height: ' + this.chartHeight().toString() + 'px;"></div>';
+				var html = "";
 
 				if(this.hasLegend()) {
+					this.element_chart_id = this.library_name + '-' + this.uuid + '-chart';
 					this.element_legend_id = this.library_name + '-' + this.uuid + '-legend';
+
+					html += '<div class="netdata-chart-with-legend-right netdata-'
+						+ this.library_name + '-chart-with-legend-right" id="'
+						+ this.element_chart_id
+						+ '"></div>';
+
 					html += '<div class="netdata-chart-legend netdata-'
 						+ this.library_name + '-legend" id="'
 						+ this.element_legend_id
-						+ '" style="width: ' + this.legendWidth().toString() + 'px; height: ' + this.legendHeight() + 'px;"></div>';
+						+ '"></div>';
+				}
+				else {
+					this.element_chart_id = this.library_name + '-' + this.uuid + '-chart';
+					html += '<div class="netdata-chart netdata-'
+						+ this.library_name + '-chart" id="'
+						+ this.element_chart_id
+						+ '"></div>';
 				}
 
 				element.innerHTML = html;
@@ -675,16 +788,24 @@
 				if(this.hasLegend()) {
 					this.element_legend = document.getElementById(this.element_legend_id);
 					$(this.element_legend).data('netdata-state-object', this);
+					this.updateLegendDOM();
 				}
 			},
 
 			hasLegend: function() {
-				// return (this.library && this.library.legend == 'right-side');
+				if(this.element_legend) return true;
+				
+				if(this.library && this.library.legend == 'right-side') {
+					var legend = $(this.element).data('legend') || 'yes';
+					if(legend == 'no') return false;
+					return true;
+				}
+
 				return false;
 			},
 
 			legendWidth: function() {
-				return (this.hasLegend())?55:0;
+				return (this.hasLegend())?110:0;
 			},
 
 			legendHeight: function() {
@@ -819,6 +940,9 @@
 
 				if(this.created_ms && typeof this.library.update == 'function') {
 					if(this.debug) this.log('updating chart...');
+
+					// check and update the legend
+					this.updateLegendDOM();
 
 					this.updates_since_last_creation++;
 					if(NETDATA.options.debug.chart_errors) {
@@ -1183,6 +1307,11 @@
 			}
 
 			return s4() + s4() + '-' + s4() + '-' + s4() + '-' + s4() + '-' + s4() + s4() + s4();
+	}
+
+	NETDATA.zeropad = function(x) {
+		if(x > -10 && x < 10) return '0' + x.toString();
+		else return x.toString();
 	}
 
 	// user function to signal us the DOM has been
@@ -1670,12 +1799,12 @@
 			title: self.data('dygraph-title') || state.chart.title,
 			titleHeight: self.data('dygraph-titleheight') || 19,
 
-			legend: self.data('dygraph-legend') || 'onmouseover',
+			legend: self.data('dygraph-legend') || 'always', // 'onmouseover',
 			labels: data.result.labels,
-			labelsDiv: self.data('dygraph-labelsdiv') || undefined,
-			labelsDivStyles: self.data('dygraph-labelsdivstyles') || { 'fontSize':'10px' },
+			labelsDiv: self.data('dygraph-labelsdiv') || state.element_legend_childs.hidden,
+			labelsDivStyles: self.data('dygraph-labelsdivstyles') || { 'fontSize':'10px', 'zIndex': 10000 },
 			labelsDivWidth: self.data('dygraph-labelsdivwidth') || state.chartWidth() - 70,
-			labelsSeparateLines: self.data('dygraph-labelsseparatelines') || false,
+			labelsSeparateLines: self.data('dygraph-labelsseparatelines') || true,
 			labelsShowZeroValues: self.data('dygraph-labelsshowzerovalues') || true,
 			labelsKMB: false,
 			labelsKMG2: false,
@@ -1729,7 +1858,7 @@
 			maxNumberWidth: self.data('dygraph-maxnumberwidth') || 8,
 			sigFigs: self.data('dygraph-sigfigs') || null,
 			digitsAfterDecimal: self.data('dygraph-digitsafterdecimal') || 2,
-			valueFormatter: self.data('dygraph-valueformatter') || undefined, //function(x){ return x.toFixed(2); };,
+			valueFormatter: self.data('dygraph-valueformatter') || function(x){ return x.toFixed(2); },
 
 			highlightCircleSize: self.data('dygraph-highlightcirclesize') || 4,
 			highlightSeriesOpts: self.data('dygraph-highlightseriesopts') || null, // TOO SLOW: { strokeWidth: 1.5 },
@@ -1741,16 +1870,79 @@
 					pixelsPerLabel: 50,
 					ticker: Dygraph.dateTicker,
 					axisLabelFormatter: function (d, gran) {
-						return Dygraph.zeropad(d.getHours()) + ":" + Dygraph.zeropad(d.getMinutes()) + ":" + Dygraph.zeropad(d.getSeconds());
+						return NETDATA.zeropad(d.getHours()) + ":" + NETDATA.zeropad(d.getMinutes()) + ":" + NETDATA.zeropad(d.getSeconds());
 					},
-					valueFormatter :function (ms) {
+					valueFormatter: function (ms) {
 						var d = new Date(ms);
-						return Dygraph.zeropad(d.getHours()) + ":" + Dygraph.zeropad(d.getMinutes()) + ":" + Dygraph.zeropad(d.getSeconds());
+						return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+						// return NETDATA.zeropad(d.getHours()) + ":" + NETDATA.zeropad(d.getMinutes()) + ":" + NETDATA.zeropad(d.getSeconds());
 					}
 				},
 				y: {
-					pixelsPerLabel: 15
+					pixelsPerLabel: 15,
+					valueFormatter: function (x) {
+						return (Math.round(x*100) / 100).toLocaleString();
+					}
 				}
+			},
+			legendFormatter: function(data) {
+				var g = data.dygraph;
+				var html;
+				var elements = state.element_legend_childs;
+
+				// if the hidden div is not there
+				// state is not managing the legend
+				if(elements.hidden == null) return;
+
+				if (typeof(data.x) === 'undefined') {
+					elements.title_date.innerHTML = '&nbsp;';
+					elements.title_time.innerHTML = state.chart.name;
+					elements.title_units.innerHTML = '&nbsp;';
+
+					for (var i = 0; i < data.series.length; i++) {
+						var series = data.series[i];
+						elements.series[series.label].name.innerHTML = series.dashHTML + ' ' + series.labelHTML;
+						elements.series[series.label].value.innerHTML = '';
+					}
+				}
+				else {
+					var d = new Date(data.x);
+					elements.title_date.innerHTML = d.toLocaleDateString();
+					elements.title_time.innerHTML = d.toLocaleTimeString();
+					elements.title_units.innerHTML = state.chart.units;
+
+					for (var i = 0; i < data.series.length; i++) {
+						var series = data.series[i];
+						if(!series.isVisible) continue;
+						elements.series[series.label].value.innerHTML = series.yHTML;
+					}
+				}
+
+				return 'nothing interesting here';
+/*
+				if (typeof(data.x) === 'undefined') {
+					html = '<span class="netdata-legend-title-date">&nbsp;</span><br/><span class="netdata-legend-title-time">' + state.chart.name + '</span><br/><span class="netdata-legend-title-units">&nbsp;</span>';
+					for (var i = 0; i < data.series.length; i++) {
+						var series = data.series[i];
+						if (!series.isVisible) continue;
+
+						html += '<br/>';
+						html += "<span class='netdata-legend-series' style='color: " + series.color + ";'>" + series.dashHTML + " " + series.labelHTML + "</span>"
+						html += "<span class='netdata-legend-value'>&nbsp;</span>";
+					}
+					return html;
+				}
+
+				html = data.xHTML + '<br/><span class="netdata-legend-title-units">' + state.chart.units + '</span>';
+				for (var i = 0; i < data.series.length; i++) {
+					var series = data.series[i];
+					if (!series.isVisible) continue;
+					html += '<br/>';
+					html += "<span class='netdata-legend-series' style='color: " + series.color + ";'>" + series.dashHTML + " " + series.labelHTML + "</span>"
+					html += "<span class='netdata-legend-value' style='color: " + series.color + ";'>" + series.yHTML + "</span>";
+				}
+				return html;
+*/
 			},
 			drawCallback: function(dygraph, is_initial) {
 				if(state.current.name != 'auto') {
@@ -1773,7 +1965,6 @@
 				if(NETDATA.options.debug.dygraph || state.debug) state.log('dygraphHighlightCallback()');
 				state.pauseChart();
 				NETDATA.dygraph.syncStart(state, event, x, points, row, seriesName);
-				console.log(state.dygraph_instance);
 				// fix legend zIndex using the internal structures of dygraph legend module
 				// this works, but it is a hack!
 				// state.dygraph_instance.plugins_[0].plugin.legend_div_.style.zIndex = 10000;
@@ -1850,7 +2041,7 @@
 				},
 				click: function(event, dygraph, context) {
 					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.click()');
-					Dygraph.cancelEvent(event);
+					/*Dygraph.cancelEvent(event);*/
 				},
 				dblclick: function(event, dygraph, context) {
 					if(NETDATA.options.debug.dygraph || state.debug) state.log('interactionModel.dblclick()');
@@ -1920,11 +2111,13 @@
 			state.dygraph_options.legend = 'never'; // 'follow'
 			state.dygraph_options.ylabel = undefined;
 			state.dygraph_options.yLabelWidth = 0;
-			// state.dygraph_options.labelsDivWidth = 120;
+			state.dygraph_options.labelsDivWidth = 120;
+			state.dygraph_options.labelsDivStyles.width = '120px';
 			state.dygraph_options.labelsSeparateLines = true;
 			state.dygraph_options.highlightCircleSize = 3;
 			state.dygraph_options.rightGap = 0;
 		}
+
 
 		state.dygraph_instance = new Dygraph(state.element_chart,
 			data.result.data, state.dygraph_options);
@@ -2206,7 +2399,7 @@
 			format: 'array',
 			options: 'flip|abs',
 			jsonWrapper: true,
-			legend: 'sparkline',
+			legend: 'none',
 			autoresize: false,
 			max_updates_to_recreate: 5000,
 			pixels_per_point: 3,
@@ -2223,7 +2416,7 @@
 			format: 'ssvcomma',
 			options: 'null2zero|flip|abs',
 			jsonWrapper: true,
-			legend: 'sparkline',
+			legend: 'none',
 			autoresize: false,
 			max_updates_to_recreate: 5000,
 			pixels_per_point: 3,

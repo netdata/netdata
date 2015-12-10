@@ -8,6 +8,11 @@ html {
 	display: inline-block;
 	flex-wrap: wrap;
 	overflow: hidden;
+
+	/* required for child elements to have absolute position */
+	position: relative;
+	
+	/* width and height is given per chart with data-width and data-height */
 }
 
 .netdata-message {
@@ -26,15 +31,108 @@ html {
 }
 
 .netdata-chart-legend {
-	background-color:Gray;
+	position: absolute;			/* within .netdata-container */
+	top: 0;
+	right: 0;
+	/*background-color: Gray;*/
+	overflow: hidden;
+	text-overflow: ellipsis;
+	line-height: 14px;
+	display: block;
+	width: 110px;
+	height: 100%;
+	font-size: 10px;
+	margin-top: 5px;
+	/* width and height is calculated (depends on the appearance of the legend) */
+}
+
+.netdata-legend-title-date {
+	font-size: 10px;
+	font-weight: normal;
+	margin-top: 0px;
+}
+.netdata-legend-title-time {
+	font-size: 11px;
+	font-weight: bold;
+	margin-top: 0px;
+}
+.netdata-legend-title-units {
+	position: absolute;
+	right: 5px;
+	float: right;
+	font-size: 10px;
+	vertical-align: top;
+	font-weight: normal;
+	margin-top: 0px;
+}
+.netdata-legend-series {
+	position: absolute;
+	display: block;
+	width: 100%;
+	height: calc(100% - 50px);
+	/*background-color: Gray;*/
 	overflow: auto;
-	overflow-y: scroll;
-	display: inline-block;
+	/*overflow-y: scroll;*/
+	overflow-x: hidden;
+	text-overflow: ellipsis;
+	line-height: 14px;
+	display: block;
+	font-size: 10px;
+	margin-top: 0px;
+}
+.netdata-legend-name {
+	position: absolute;
+	left: 0px;
+	float: left;
+	text-align: left;
+	font-size: 10px;
+	font-weight: bold;
+	vertical-align: bottom;
+	background-color: White;
+	margin-top: 0px;
+	z-index: 9;
+	padding: 0px;
+}
+.netdata-legend-value {
+	/*margin-left: 14px;*/
+	position: absolute;
+	right: 5px;
+	float: right;
+	text-align: right;
+	font-size: 10px;
+	font-weight: bold;
+	vertical-align: bottom;
+	background-color: White;
+	margin-top: 0px;
+	z-index: 10;
+	padding: 0px;
+	padding-left: 15px;
 }
 
 .netdata-chart {
+	position: absolute;		/* within .netdata-container */
+	top: 0;					/* within .netdata-container */
+	left: 0;				/* within .netdata-container */
 	display: inline-block;
 	overflow: hidden;
+	width: 100%;
+	height: 100%;
+
+	/* width and height is calculated (depends on the appearance of the legend) */
+}
+
+.netdata-chart-with-legend-right {
+	position: absolute;		/* within .netdata-container */
+	top: 0;					/* within .netdata-container */
+	left: 0;				/* within .netdata-container */
+	display: block;
+	overflow: hidden;
+	margin-right: 110px;
+	width: calc(100% - 110px);
+	height: 100%;
+	flex-grow: 1;
+
+	/* width and height is calculated (depends on the appearance of the legend) */
 }
 
 .netdata-peity-chart {

@@ -1,5 +1,12 @@
-var smoothPlotter = (function() {
+(function() {
 "use strict";
+
+var Dygraph;
+if (window.Dygraph) {
+  Dygraph = window.Dygraph;
+} else if (typeof(module) !== 'undefined') {
+  Dygraph = require('../dygraph');
+}
 
 /**
  * Given three sequential points, p0, p1 and p2, find the left and right
@@ -68,6 +75,10 @@ function getControlPoints(p0, p1, p2, opt_alpha, opt_allowFalseExtrema) {
   return [l1x, l1y, r1x, r1y];
 }
 
+// i.e. is none of (null, undefined, NaN)
+function isOK(x) {
+  return !!x && !isNaN(x);
+};
 
 // A plotter which uses splines to create a smooth curve.
 // See tests/plotters.html for a demo.
@@ -81,7 +92,6 @@ function smoothPlotter(e) {
 
   // right control point for previous point
   var lastRightX = points[0].canvasx, lastRightY = points[0].canvasy;
-  var isOK = Dygraph.isOK;  // i.e. is none of (null, undefined, NaN)
 
   for (var i = 1; i < points.length; i++) {
     var p0 = points[i - 1],
@@ -121,6 +131,10 @@ function smoothPlotter(e) {
 smoothPlotter.smoothing = 1/3;
 smoothPlotter._getControlPoints = getControlPoints;  // for testing
 
-return smoothPlotter;
+// older versions exported a global.
+// This will be removed in the future.
+// The preferred way to access smoothPlotter is via Dygraph.smoothPlotter.
+window.smoothPlotter = smoothPlotter;
+Dygraph.smoothPlotter = smoothPlotter;
 
 })();
