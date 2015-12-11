@@ -159,7 +159,7 @@
 			idle_lost_focus: 500,		// ms - when the window does not have focus, check
 										// if focus has been regained, every this time
 
-			global_pan_sync_time: 500,	// ms - when you pan or zoon a chart, the background
+			global_pan_sync_time: 1000,	// ms - when you pan or zoon a chart, the background
 										// autorefreshing of charts is paused for this amount
 										// of time
 
@@ -172,6 +172,8 @@
 			sync_pan_and_zoom: true,	// enable or disable pan and zoom sync
 
 			update_only_visible: true,	// enable or disable visibility management
+
+			parallel_refresher: true,	// enable parallel refresh of charts
 
 			color_fill_opacity: {
 				line: 1.0,
@@ -359,7 +361,7 @@
 	chartState = function(element) {
 		self = $(element);
 
-		Object.assign(this, {
+		$.extend(this, {
 			uuid: NETDATA.guid(),	// GUID - a unique identifier for the chart
 			id: self.data('netdata'),	// string - the name of chart
 
@@ -1460,14 +1462,14 @@
 
 	// ----------------------------------------------------------------------------------------------------------------
 
-	NETDATA.chartRefresher = function(index) {
+	NETDATA.chartRefresher1 = function(index) {
 		// if(NETDATA.options.debug.mail_loop) console.log('NETDATA.chartRefresher(<targets, ' + index + ')');
 
 		if(NETDATA.options.updated_dom) {
 			// the dom has been updated
 			// get the dom parts again
 			NETDATA.getDomCharts(function() {
-				NETDATA.chartRefresher(0);
+				NETDATA.chartRefresher1(0);
 			});
 
 			return;
@@ -1478,7 +1480,7 @@
 				NETDATA.options.auto_refresher_fast_weight = 0;
 
 				setTimeout(function() {
-					NETDATA.chartRefresher(0);
+					NETDATA.chartRefresher1(0);
 				}, NETDATA.options.current.idle_between_loops);
 			}
 		else {
@@ -1488,8 +1490,8 @@
 				if(NETDATA.options.debug.main_loop) console.log('fast rendering...');
 
 				state.autoRefresh(function() {
-					NETDATA.chartRefresher(++index);
-				}, false);
+					NETDATA.chartRefresher1(++index);
+				});
 			}
 			else {
 				if(NETDATA.options.debug.main_loop) console.log('waiting for next refresh...');
@@ -1497,10 +1499,78 @@
 
 				setTimeout(function() {
 					state.autoRefresh(function() {
-						NETDATA.chartRefresher(++index);
-					}, false);
+						NETDATA.chartRefresher1(++index);
+					});
 				}, NETDATA.options.current.idle_between_charts);
 			}
+		}
+	}
+
+	NETDATA.chartRefresher_sequencial = function() {
+		if(NETDATA.options.updated_dom) {
+			// the dom has been updated
+			// get the dom parts again
+			NETDATA.getDomCharts(NETDATA.chartRefresher);
+			return;
+		}
+		
+		if(NETDATA.options.sequencial.length == 0)
+			NETDATA.chartRefresher();
+		else {
+			var state = NETDATA.options.sequencial.pop();
+			if(state.library.initialized)
+				NETDATA.chartRefresher();
+			else
+				state.autoRefresh(NETDATA.chartRefresher_sequencial);
+		}
+	}
+
+	NETDATA.chartRefresher = function() {
+		if(!NETDATA.options.current.parallel_refresher) {
+			NETDATA.chartRefresher1(0);
+			return;
+		}
+
+		if(NETDATA.options.updated_dom) {
+			// the dom has been updated
+			// get the dom parts again
+			NETDATA.getDomCharts(function() {
+				NETDATA.chartRefresher();
+			});
+
+			return;
+		}
+
+		NETDATA.options.parallel = new Array();
+		NETDATA.options.sequencial = new Array();
+
+		for(var i = 0; i < NETDATA.options.targets.length ; i++) {
+			var target = NETDATA.options.targets.get(i);
+			var state = NETDATA.chartState(target);
+
+			if(!state.library.initialized)
+				NETDATA.options.sequencial.push(state);
+			else
+				NETDATA.options.parallel.push(state);
+		}
+
+		if(NETDATA.options.parallel.length > 0) {
+			NETDATA.options.parallel_jobs = NETDATA.options.parallel.length;
+			console.log('PARALLEL: ' + NETDATA.options.parallel.length);
+
+			$(NETDATA.options.parallel).each(function() {
+				this.autoRefresh(function() {
+					NETDATA.options.parallel_jobs--;
+					if(NETDATA.options.parallel_jobs == 0) {
+						setTimeout(NETDATA.chartRefresher_sequencial,
+							NETDATA.options.current.idle_between_charts);
+					}
+				});
+			})
+		}
+		else {
+			setTimeout(NETDATA.chartRefresher_sequencial,
+				NETDATA.options.current.idle_between_charts);
 		}
 	}
 
