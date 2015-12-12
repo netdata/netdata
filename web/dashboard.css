@@ -79,6 +79,11 @@ html {
 	font-size: 10px;
 	margin-top: 0px;
 }
+/*
+.netdata-legend-series > .netdata-legend-series-content { padding: 10px; }
+.netdata-legend-series > .netdata-legend-series-pane   { background: #888; }
+.netdata-legend-series > .netdata-legend-series-pane > .netdata-legend-series-slider { background: #111; }
+*/
 .netdata-legend-name-table-line {
 	display: inline-block;
 	width: 13px;

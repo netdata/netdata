@@ -27,4 +27,6 @@ dist_weblib_DATA = \
         css/morris.css \
         lib/raphael-min.js \
         lib/visible.js \
+	lib/jquery.easypiechart.min.js \
+	lib/jquery.nanoscroller.min.js \
         $(NULL)

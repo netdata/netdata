@@ -495,6 +495,45 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t opti
 		i++;
 	}
 	buffer_sprintf(wb, "],\n"
+			"	%slatest_values%s: ["
+			, kq, kq);
+
+	for(c = 0, i = 0, rd = r->st->dimensions; rd ;c++, rd = rd->next) {
+		if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
+		if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
+
+		if(i) buffer_strcat(wb, ", ");
+		i++;
+
+		storage_number n = rd->values[rrdset_last_slot(r->st)];
+
+		if(!does_storage_number_exist(n))
+			buffer_strcat(wb, "null");
+		else
+			buffer_rrd_value(wb, unpack_storage_number(n));
+	}
+	buffer_sprintf(wb, "],\n"
+			"	%sresult_latest_values%s: ["
+			, kq, kq);
+
+	if(rrdr_rows(r)) {
+		for(c = 0, i = 0, rd = r->st->dimensions; rd ;c++, rd = rd->next) {
+			if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
+			if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
+
+			if(i) buffer_strcat(wb, ", ");
+			i++;
+
+			calculated_number *cn = &r->v[ (0) * r->d ];
+			uint8_t *co = &r->o[ (0) * r->d ];
+
+			if(co[c] & RRDR_EMPTY)
+				buffer_strcat(wb, "null");
+			else
+				buffer_rrd_value(wb, cn[c]);
+		}
+	}
+	buffer_sprintf(wb, "],\n"
 			"	%sdimensions%s: %d,\n"
 			"	%spoints%s: %d,\n"
 			"	%sformat%s: %s"
