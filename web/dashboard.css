@@ -66,24 +66,67 @@ html {
 	margin-top: 0px;
 }
 .netdata-legend-series {
-	position: absolute;
-	width: 100%;
+	position: relative;
+	width: 110px;
 	height: calc(100% - 50px);
-	/*background-color: Gray;*/
-	overflow: auto;
-	/*overflow-y: scroll;*/
-	overflow-x: hidden;
+	overflow: hidden;
 	text-overflow: ellipsis;
 	line-height: 14px;
 	display: block;
 	font-size: 10px;
 	margin-top: 0px;
 }
-/*
-.netdata-legend-series > .netdata-legend-series-content { padding: 10px; }
-.netdata-legend-series > .netdata-legend-series-pane   { background: #888; }
-.netdata-legend-series > .netdata-legend-series-pane > .netdata-legend-series-slider { background: #111; }
-*/
+
+.netdata-legend-series > .netdata-legend-series-content {
+	position      : absolute;
+	overflow      : scroll;
+	overflow-x    : hidden;
+	top           : 0;
+	right         : 0;
+	bottom        : 0;
+	left          : 0;
+	text-overflow: ellipsis;
+}
+.netdata-legend-series > .netdata-legend-series-content:focus {
+	outline: thin dotted;
+}
+.netdata-legend-series > .netdata-legend-series-content::-webkit-scrollbar {
+	display: block; /* was 'none', but chrome was hidding content with it */
+}
+.has-scrollbar > .netdata-legend-series-content::-webkit-scrollbar {
+	display: block;
+}
+.netdata-legend-series > .netdata-legend-series-pane {
+	background : rgba(0,0,0,.25);
+	position   : absolute;
+	width      : 4px;
+	right      : 0;
+	top        : 0;
+	bottom     : 0;
+	visibility : hidden\9; /* Target only IE7 and IE8 with this hack */
+	opacity    : .01;
+	-webkit-transition    : .2s;
+	-moz-transition       : .2s;
+	-o-transition         : .2s;
+	transition            : .2s;
+	-moz-border-radius    : 4px;
+	-webkit-border-radius : 4px;
+	border-radius         : 4px;
+}
+.netdata-legend-series > .netdata-legend-series-pane > .netdata-legend-series-slider {
+	background            : #444;
+	background            : rgba(0,0,0,.5);
+	position              : relative;
+	margin                : 0 1px;
+	-moz-border-radius    : 2px;
+	-webkit-border-radius : 2px;
+	border-radius         : 2px;
+}
+.netdata-legend-series:hover > .netdata-legend-series-pane, .netdata-legend-series-pane.active, .netdata-legend-series-pane.flashed {
+  visibility : visible\9; /* Target only IE7 and IE8 with this hack */
+  opacity    : 0.99;
+}
+
 .netdata-legend-name-table-line {
 	display: inline-block;
 	width: 13px;

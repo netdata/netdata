@@ -61,7 +61,9 @@
 	else
 		NETDATA.serverDefault = NETDATA._scriptSource();
 
-	if(NETDATA.serverDefault.slice(-1) !== '/')
+	if(NETDATA.serverDefault === null)
+		NETDATA.serverDefault = '';
+	else if(NETDATA.serverDefault.slice(-1) !== '/')
 		NETDATA.serverDefault += '/';
 
 	// default URLs for all the external files we need
@@ -135,6 +137,8 @@
 
 		last_resized: 0,				// the timestamp of the last resize request
 
+		crossDomainAjax: false,			// enable this to request crossDomain AJAX
+
 		// the current profile
 		// we may have many...
 		current: {
@@ -187,7 +191,7 @@
 
 		debug: {
 			show_boxes: 		0,
-			main_loop: 			0,
+			main_loop: 			1,
 			focus: 				0,
 			visibility: 		0,
 			chart_data_url: 	0,
@@ -445,7 +449,7 @@
 				requested_before_ms: null,
 				requested_after_ms: null,
 				first_entry_ms: null,
-				last_entry_ms: null,
+				last_entry_ms: null
 			},
 			pan: {
 				name: 'pan',
@@ -463,7 +467,7 @@
 				requested_before_ms: null,
 				requested_after_ms: null,
 				first_entry_ms: null,
-				last_entry_ms: null,
+				last_entry_ms: null
 			},
 			zoom: {
 				name: 'zoom',
@@ -481,7 +485,7 @@
 				requested_before_ms: null,
 				requested_after_ms: null,
 				first_entry_ms: null,
-				last_entry_ms: null,
+				last_entry_ms: null
 			},
 
 			refresh_dt_ms: 0,		// milliseconds - the time the last refresh took
@@ -783,11 +787,6 @@
 			this.current.force_after_ms = after;
 			this.current.force_before_ms = before;
 			NETDATA.globalPanAndZoom.setMaster(this, after, before);
-			//this.updateChart(function() {
-			//	NETDATA.globalPanAndZoom.setMaster(this, after, before);
-			//	if(typeof callback === 'function')
-			//		callback();
-			//});
 			return true;
 		}
 
@@ -958,16 +957,14 @@
 			label.value.className += 'netdata-legend-value';
 			label.value.title = name;
 
-			var table = document.createElement('table');
-			table.innerHTML = '<tr class="netdata-legend-name-tr"><td class="netdata-legend-name-td"></td></tr>';
-			table.className += 'netdata-legend-name-table-' + state.chart.chart_type;
-
 			var rgb = NETDATA.colorHex2Rgb(NETDATA.colors[c]);
-			table.style.backgroundColor = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + NETDATA.options.current.color_fill_opacity[state.chart.chart_type] + ')';
+			label.name.innerHTML = '<table class="netdata-legend-name-table-'
+				+ state.chart.chart_type
+				+ '" style="background-color: '
+				+ 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + NETDATA.options.current.color_fill_opacity[state.chart.chart_type] + ')'
+				+ '"><tr class="netdata-legend-name-tr"><td class="netdata-legend-name-td"></td></tr></table>'
 
 			var text = document.createTextNode(' ' + name);
-
-			label.name.appendChild(table);
 			label.name.appendChild(text);
 
 			label.name.style.color = NETDATA.colors[c];
@@ -1002,16 +999,18 @@
 		this.element_legend_childs.hidden = document.createElement('div');
 		el.appendChild(this.element_legend_childs.hidden);
 		nano.appendChild(el);
-/*
+
 		$(nano).nanoScroller({
 			paneClass: 'netdata-legend-series-pane',
 			sliderClass: 'netdata-legend-series-slider',
 			contentClass: 'netdata-legend-series-content',
 			enabledClass: '__enabled',
 			flashedClass: '__flashed',
-			activeClass: '__active'
+			activeClass: '__active',
+			tabIndex: -1,
+			alwaysVisible: true
 		});
-*/
+
 		this.legendShowLatestValues();
 	}
 
@@ -1254,13 +1253,21 @@
 	}
 
 	chartState.prototype.updateChart = function(callback) {
-		if(!this.chart) {
+		// due to late initialization of charts and libraries
+		// we need to check this too
+		if(this.enabled === false) {
+			if(this.debug) this.log('I am not enabled');
+			if(typeof callback === 'function') callback();
+			return false;
+		}
+
+		if(this.chart === null) {
 			var self = this;
 			this.getChart(function() { self.updateChart(callback); });
 			return;
 		}
 
-		if(!this.library.initialized) {
+		if(this.library.initialized === false) {
 			var self = this;
 			this.library.initialize(function() { self.updateChart(callback); });
 			return;
@@ -1273,7 +1280,7 @@
 		var self = this;
 		this.xhr = $.ajax( {
 			url: this.current.url,
-			crossDomain: true,
+			crossDomain: NETDATA.options.crossDomainAjax,
 			cache: false,
 			async: true
 		})
@@ -1303,18 +1310,18 @@
 	chartState.prototype.canBeAutoRefreshed = function() {
 		now = new Date().getTime();
 
-		if(!this.library || !this.library.enabled) {
+		if(this.enabled === false) {
+			if(this.debug) this.log('I am not enabled');
+			return false;
+		}
+
+		if(this.library === null || this.library.enabled === false) {
 			this.error('charting library "' + this.library_name + '" is not available');
 			if(this.debug) this.log('My chart library ' + this.library_name + ' is not available');
 			return false;
 		}
 
-		if(!this.enabled) {
-			if(this.debug) this.log('I am not enabled');
-			return false;
-		}
-
-		if(!this.isVisible()) {
+		if(this.isVisible() === false) {
 			if(NETDATA.options.debug.visibility || this.debug) this.log('I am not visible');
 			return;
 		}
@@ -1392,22 +1399,23 @@
 		else {
 			this.chart_url = this.host + "/api/v1/chart?chart=" + this.id;
 			if(this.debug) this.log('downloading ' + this.chart_url);
-			var this_state_object = this;
+			var self = this;
 
 			$.ajax( {
 				url:  this.chart_url,
-				crossDomain: true,
-				cache: false
+				crossDomain: NETDATA.options.crossDomainAjax,
+				cache: false,
+				async: true
 			})
 			.done(function(chart) {
-				chart.url = this_state_object.chart_url;
-				chart.data_url = (this_state_object.host + chart.data_url);
-				this_state_object._defaultsFromDownloadedChart(chart);
-				NETDATA.chartRegistry.add(this_state_object.host, this_state_object.id, chart);
+				chart.url = self.chart_url;
+				chart.data_url = (self.host + chart.data_url);
+				self._defaultsFromDownloadedChart(chart);
+				NETDATA.chartRegistry.add(self.host, self.id, chart);
 			})
 			.fail(function() {
-				NETDATA.error(404, this_state_object.chart_url);
-				this_state_object.error('chart "' + this_state_object.id + '" not found on url "' + this_state_object.chart_url + '"');
+				NETDATA.error(404, self.chart_url);
+				self.error('chart "' + self.id + '" not found on url "' + self.chart_url + '"');
 			})
 			.always(function() {
 				if(typeof callback === 'function') callback();
@@ -1506,6 +1514,8 @@
 	// This is used to load jquery - after it is loaded, we use jquery
 	NETDATA._loadjQuery = function(callback) {
 		if(typeof jQuery === 'undefined') {
+			if(NETDATA.options.debug.main_loop) console.log('loading ' + NETDATA.jQuery);
+			
 			var script = document.createElement('script');
 			script.type = 'text/javascript';
 			script.async = true;
@@ -1929,7 +1939,7 @@
 	// dygraph
 
 	NETDATA.dygraph = {
-		smooth: false,
+		smooth: false
 	};
 
 	NETDATA.dygraphSetSelection = function(state, t) {
@@ -2788,12 +2798,14 @@
 			return;
 		}
 
+		if(NETDATA.options.debug.main_loop) console.log('loading ' + NETDATA.requiredJs[index]);
 		$.ajax({
 			url: NETDATA.requiredJs[index],
 			cache: true,
 			dataType: "script"
 		})
 		.success(function() {
+			if(NETDATA.options.debug.main_loop) console.log('loaded ' + NETDATA.requiredJs[index]);
 			NETDATA.loadRequiredJs(++index, callback);
 		})
 		.fail(function() {
@@ -2805,8 +2817,10 @@
 	NETDATA._loadjQuery(function() {
 		NETDATA.loadRequiredJs(0, function() {
 			NETDATA._loadCSS(NETDATA.dashboard_css);
-			if(typeof netdataDontStart === 'undefined' || !netdataDontStart)
+			if(typeof netdataDontStart === 'undefined' || !netdataDontStart) {
+				if(NETDATA.options.debug.main_loop) console.log('starting chart refresh thread');
 				NETDATA.start();
+			}
 		});
 	});
 
