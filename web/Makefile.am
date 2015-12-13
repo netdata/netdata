@@ -26,7 +26,14 @@ dist_weblib_DATA = \
         lib/morris.min.js \
         css/morris.css \
         lib/raphael-min.js \
-        lib/visible.js \
 	lib/jquery.easypiechart.min.js \
 	lib/jquery.nanoscroller.min.js \
+        lib/bootstrap.min.js \
+        css/bootstrap.min.css \
+        css/bootstrap-theme.min.css \
+        fonts/glyphicons-halflings-regular.eot \
+        fonts/glyphicons-halflings-regular.svg \
+        fonts/glyphicons-halflings-regular.ttf \
+        fonts/glyphicons-halflings-regular.woff \
+        fonts/glyphicons-halflings-regular.woff2 \
         $(NULL)

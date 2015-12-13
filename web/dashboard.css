@@ -16,10 +16,23 @@ html {
 }
 
 .netdata-message {
+	display: none;
 	font-size: x-small;
 	width: 100%;
 	height: 100%;
 	overflow: hidden;
+	background: white;
+	z-index: 10000;
+}
+
+.netdata-chart-is-loading {
+	display: none;
+	font-size: x-small;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	background: white;
+	z-index: 10000;
 }
 
 .netdata-error-message {
@@ -97,25 +110,26 @@ html {
 	display: block;
 }
 .netdata-legend-series > .netdata-legend-series-pane {
-	background : rgba(0,0,0,.25);
+/*	background : rgba(0,0,0,.25);*/
+	background : #DDD;
 	position   : absolute;
 	width      : 4px;
 	right      : 0;
 	top        : 0;
 	bottom     : 0;
-	visibility : hidden\9; /* Target only IE7 and IE8 with this hack */
-	opacity    : .01;
-	-webkit-transition    : .2s;
-	-moz-transition       : .2s;
-	-o-transition         : .2s;
-	transition            : .2s;
+/*	visibility : hidden\9; */ /* Target only IE7 and IE8 with this hack */
+/*	opacity    : .01; */
+/*	-webkit-transition    : .2s; */
+/*	-moz-transition       : .2s; */
+/*	-o-transition         : .2s; */
+/*	transition            : .2s; */
 	-moz-border-radius    : 4px;
 	-webkit-border-radius : 4px;
 	border-radius         : 4px;
 }
 .netdata-legend-series > .netdata-legend-series-pane > .netdata-legend-series-slider {
 	background            : #444;
-	background            : rgba(0,0,0,.5);
+/*	background            : rgba(0,0,0,.5);*/
 	position              : relative;
 	margin                : 0 1px;
 	-moz-border-radius    : 2px;
@@ -123,8 +137,8 @@ html {
 	border-radius         : 2px;
 }
 .netdata-legend-series:hover > .netdata-legend-series-pane, .netdata-legend-series-pane.active, .netdata-legend-series-pane.flashed {
-  visibility : visible\9; /* Target only IE7 and IE8 with this hack */
-  opacity    : 0.99;
+/*  visibility : visible\9; */ /* Target only IE7 and IE8 with this hack */
+/*  opacity    : 0.99;*/
 }
 
 .netdata-legend-name-table-line {
@@ -166,7 +180,14 @@ html {
 	margin-top: 0px;
 	z-index: 9;
 	padding: 0px;
+	width: 80px !important;
+	max-width: 80px !important;
+	text-overflow: ellipsis;
+	overflow: hidden;
+	white-space: nowrap;
+	display: inline-block;
 }
+
 .netdata-legend-value {
 	/*margin-left: 14px;*/
 	position: absolute;
@@ -270,4 +291,13 @@ html {
 	top: 4px;
 	font-size: 11px;
 	font-weight: bold;
+	text-overflow: ellipsis;
+	overflow: hidden;
+	white-space: nowrap;
+}
+
+/* fix for sparkline tooltip under bootstrap */
+.jqstooltip {
+  width: auto !important;
+  height: auto !important;
 }

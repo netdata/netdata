@@ -13,6 +13,8 @@
 </head>
 <body>
 
+<div class="container-fluid">
+
 <h1>NetData Custom Dashboard <div data-netdata="system.cpu" data-chart-library="sparkline" data-height="30" data-after="-600" data-sparkline-linecolor="#888"></div></h1>
 
 This is a template for building custom dashboards. To build a dashboard you just do this:
@@ -81,7 +83,7 @@ They also have mouse-hover support.
 			></div> is the requests/sec it serves (last 3 minutes).
 
 <br/>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.processes"
 		data-chart-library="sparkline"
 		data-width="100%"
@@ -92,7 +94,7 @@ They also have mouse-hover support.
 	<br/>
 	<small>rendered in <span id="time101">X</span> ms</small>
 </div>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.ipv4"
 		data-chart-library="sparkline"
 		data-width="100%"
@@ -103,7 +105,7 @@ They also have mouse-hover support.
 	<br/>
 	<small>rendered in <span id="time102">X</span> ms</small>
 </div>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.cpu"
 		data-chart-library="sparkline"
 		data-width="100%"
@@ -123,7 +125,7 @@ Peity charts do not support 'NULL' values, so the charts cannot indicate that va
 Peity charts cannot have multiple dimensions on the charts - so netdata will use 'min2max' to show
 the total of all dimensions.
 <br/>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.processes"
 		data-chart-library="peity"
 		data-width="100%"
@@ -134,7 +136,7 @@ the total of all dimensions.
 	<br/>
 	<small>rendered in <span id="time001">X</span> ms</small>
 </div>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.ipv4"
 		data-chart-library="peity"
 		data-width="100%"
@@ -145,7 +147,7 @@ the total of all dimensions.
 	<br/>
 	<small>rendered in <span id="time002">X</span> ms</small>
 </div>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.cpu"
 		data-chart-library="peity"
 		data-width="100%"
@@ -196,7 +198,7 @@ Sparklines using dygraphs
 
 
 <br/>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.processes"
 		data-chart-library="dygraph"
 		data-dygraph-theme="sparkline"
@@ -208,7 +210,7 @@ Sparklines using dygraphs
 	<br/>
 	<small>rendered in <span id="time501">X</span> ms</small>
 </div>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.ipv4"
 		data-chart-library="dygraph"
 		data-dygraph-theme="sparkline"
@@ -220,7 +222,7 @@ Sparklines using dygraphs
 	<br/>
 	<small>rendered in <span id="time502">X</span> ms</small>
 </div>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.cpu"
 		data-chart-library="dygraph"
 		data-dygraph-theme="sparkline"
@@ -236,7 +238,7 @@ Sparklines using dygraphs
 
 
 <br/>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.processes"
 		data-chart-library="dygraph"
 		data-width="100%"
@@ -247,7 +249,7 @@ Sparklines using dygraphs
 	<br/>
 	<small>rendered in <span id="time201">X</span> ms</small>
 </div>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.ipv4"
 		data-chart-library="dygraph"
 		data-width="100%"
@@ -258,7 +260,7 @@ Sparklines using dygraphs
 	<br/>
 	<small>rendered in <span id="time202">X</span> ms</small>
 </div>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.cpu"
 		data-chart-library="dygraph"
 		data-width="100%"
@@ -269,7 +271,7 @@ Sparklines using dygraphs
 	<br/>
 	<small>rendered in <span id="time203">X</span> ms</small>
 </div>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.io"
 		data-chart-library="dygraph"
 		data-width="100%"
@@ -280,7 +282,7 @@ Sparklines using dygraphs
 	<br/>
 	<small>rendered in <span id="time204">X</span> ms</small>
 </div>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="apps.cpu"
 		data-chart-library="dygraph"
 		data-width="100%"
@@ -291,7 +293,7 @@ Sparklines using dygraphs
 	<br/>
 	<small>rendered in <span id="time205">X</span> ms</small>
 </div>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="netdata.net"
 		data-chart-library="dygraph"
 		data-width="100%"
@@ -302,7 +304,7 @@ Sparklines using dygraphs
 	<br/>
 	<small>rendered in <span id="time206">X</span> ms</small>
 </div>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="netdata.server_cpu"
 		data-chart-library="dygraph"
 		data-width="100%"
@@ -313,7 +315,7 @@ Sparklines using dygraphs
 	<br/>
 	<small>rendered in <span id="time207">X</span> ms</small>
 </div>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="netdata.requests"
 		data-chart-library="dygraph"
 		data-width="100%"
@@ -333,7 +335,7 @@ Sparklines using dygraphs
 NetData was originaly developed with Google Charts.
 NetData is a complete Google Visualization API provider.
 <br/>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.processes"
 		data-chart-library="google"
 		data-width="100%"
@@ -344,7 +346,7 @@ NetData is a complete Google Visualization API provider.
 	<br/>
 	<small>rendered in <span id="time301">X</span> ms</small>
 </div>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.ipv4"
 		data-chart-library="google"
 		data-width="100%"
@@ -355,7 +357,7 @@ NetData is a complete Google Visualization API provider.
 	<br/>
 	<small>rendered in <span id="time302">X</span> ms</small>
 </div>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.cpu"
 		data-chart-library="google"
 		data-width="100%"
@@ -376,7 +378,7 @@ NetData is a complete Google Visualization API provider.
 <h1>Morris Charts</h1>
 Unfortunatelly, Morris Charts are veeeeeeeeeeeeeeeery slow! We force them to lower their detail to get acceptable results.
 <br/>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.processes"
 		data-chart-library="morris"
 		data-width="100%"
@@ -387,7 +389,7 @@ Unfortunatelly, Morris Charts are veeeeeeeeeeeeeeeery slow! We force them to low
 	<br/>
 	<small>rendered in <span id="time401">X</span> ms</small>
 </div>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.ipv4"
 		data-chart-library="morris"
 		data-width="100%"
@@ -398,7 +400,7 @@ Unfortunatelly, Morris Charts are veeeeeeeeeeeeeeeery slow! We force them to low
 	<br/>
 	<small>rendered in <span id="time402">X</span> ms</small>
 </div>
-<div style="width: 32%; display: inline-block;">
+<div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.cpu"
 		data-chart-library="morris"
 		data-width="100%"
@@ -413,7 +415,7 @@ Unfortunatelly, Morris Charts are veeeeeeeeeeeeeeeery slow! We force them to low
 
 
 
-
+</div> <!-- 1st container -->
 </body>
 </html>
 	<!-- you can set your netdata server globally, by ucommenting this -->
