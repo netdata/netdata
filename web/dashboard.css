@@ -2,6 +2,10 @@ html {
     font-family: sans-serif;
 }
 
+.netdata-chart-alignment {
+	margin-left: 55px;
+}
+
 .netdata-container {
 	display: -webkit-flex; /* Safari */
 	-webkit-flex-wrap: wrap; /* Safari 6.1+ */

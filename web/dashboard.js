@@ -122,8 +122,8 @@
 
 		pause: false,					// when enabled we don't auto-refresh the charts
 
-		targets: null,					// an array of all the DOM elements that are
-										// currently visible (independently of their
+		targets: null,					// an array of all the state objects that are
+										// currently active (independently of their
 										// viewport visibility)
 
 		updated_dom: true,				// when true, the DOM has been updated with
@@ -217,11 +217,13 @@
 	};
 
 	window.onscroll = function(event) {
-		// FIXME targets should be states not DOM elements
-		for(i = 0; i < NETDATA.options.targets.length ;i++) {
-			var state = NETDATA.chartState(NETDATA.options.targets[i])
-			state.isVisible();
-		}
+		// when the user scrolls he sees that we have
+		// hidden all the not-visible charts
+		// using this little function we try to switch
+		// the charts back to visible quickly
+		var targets = NETDATA.options.targets;
+		var len = targets.length;
+		while(len--) targets[len].isVisible();
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -443,6 +445,8 @@
 			library_name: self.data('chart-library') || NETDATA.chartDefaults.library,
 			library: null,			// object - the chart library used
 
+			colors: null,
+
 			element: element,		// the element already created by the user
 			element_message: null,
 			element_loading: null,
@@ -554,9 +558,12 @@
 	};
 
 	// prevent to global selection sync for some time
-	chartState.prototype.globalSelectionSyncDelay = function() {
+	chartState.prototype.globalSelectionSyncDelay = function(ms) {
 		if(!NETDATA.options.current.sync_selection) return;
-		NETDATA.globalSelectionSync.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
+		if(typeof ms === 'number')
+			NETDATA.globalSelectionSync.dont_sync_before = new Date().getTime() + ms;
+		else
+			NETDATA.globalSelectionSync.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
 	}
 
 	// can we globally apply selection sync?
@@ -566,10 +573,17 @@
 		return true;
 	}
 
+	chartState.prototype.globalSelectionSyncIsMaster = function() {
+		if(NETDATA.globalSelectionSync.state === this)
+			return true;
+		else
+			return false;
+	}
+
 	// this chart is the master of the global selection sync
 	chartState.prototype.globalSelectionSyncBeMaster = function() {
 		// am I the master?
-		if(NETDATA.globalSelectionSync.state === this) {
+		if(this.globalSelectionSyncIsMaster()) {
 			if(this.debug) this.log('sync: I am the master already.');
 			return;
 		}
@@ -585,18 +599,21 @@
 		NETDATA.globalSelectionSync.state = this;
 
 		// find the all slaves
-		var self = this;
-		// FIXME targets should be states not DOM elements
-		$.each(NETDATA.options.targets, function(i, target) {
-			var st = NETDATA.chartState(target);
-			if(st === self) {
-				if(self.debug) st.log('sync: not adding me to sync');
+		var targets = NETDATA.options.targets;
+		var len = targets.length;
+		while(len--) {
+			st = targets[len];
+
+			if(st === this) {
+				if(this.debug) st.log('sync: not adding me to sync');
 			}
 			else if(st.globalSelectionSyncIsEligible()) {
-				if(self.debug) st.log('sync: adding to sync as slave');
+				if(this.debug) st.log('sync: adding to sync as slave');
 				st.globalSelectionSyncBeSlave();
 			}
-		});
+		}
+
+		this.globalSelectionSyncDelay(100);
 	}
 
 	// can the chart participate to the global selection sync as a slave?
@@ -620,21 +637,26 @@
 			return;
 		}
 
-		if(this.debug) this.log('sync: trying to be sync master.');
-		this.globalSelectionSyncBeMaster();
+		if(!this.globalSelectionSyncIsMaster()) {
+			if(this.debug) this.log('sync: trying to be sync master.');
+			this.globalSelectionSyncBeMaster();
 
-		var self = this;
+			if(!this.globalSelectionSyncAbility()) {
+				if(this.debug) this.log('sync: cannot sync (yet?).');
+				return;
+			}
+		}
+
+		// FIXME
+		// var start = new Date().getTime();
+
 		$.each(NETDATA.globalSelectionSync.slaves, function(i, st) {
-			if(st === self) {
-				// since we are the sync master, we should not call state.setSelection()
-				// the chart library is taking care of visualizing our selection.
-				if(self.debug) st.log('sync: ignoring me from set selection');
-			}
-			else {
-				if(self.debug) st.log('sync: showing master selection');
-				st.setSelection(t);
-			}
+			st.setSelection(t);
 		});
+
+		// FIXME
+		// var end = new Date().getTime();
+		// console.log(end - start);
 	}
 
 	// stop syncing all charts to the given time
@@ -848,7 +870,11 @@
 	}
 
 	chartState.prototype.legendFormatValue = function(value) {
-		if(typeof value !== 'number' || value === null) return '';
+		// FIXME
+		// return '';
+		// return value;
+		if(value === null) return '';
+		if(typeof value !== 'number') return value;
 
 		var abs = Math.abs(value);
 		if(abs >= 1) return (Math.round(value * 100) / 100).toLocaleString();
@@ -856,15 +882,17 @@
 		return (Math.round(value * 10000) / 10000).toLocaleString();
 	}
 
-	chartState.prototype.legendSetLabelValue = function(label, string) {
-		if(typeof this.element_legend_childs.series[label] === 'undefined')
+	chartState.prototype.legendSetLabelValue = function(label, value) {
+		var series = this.element_legend_childs.series[label];
+
+		if(typeof series === 'undefined' || series.last === value)
 			return;
 
-		if(this.element_legend_childs.series[label].value !== null)
-			this.element_legend_childs.series[label].value.innerHTML = string;
+		series.last = value;
+		value = this.legendFormatValue(value);
 
-		if(this.element_legend_childs.series[label].user !== null)
-			this.element_legend_childs.series[label].user.innerHTML = string;
+		if(series.value !== null) series.value.innerHTML = value;
+		if(series.user !== null) series.user.innerHTML = value;
 	}
 
 	chartState.prototype.legendSetDate = function(ms) {
@@ -910,22 +938,50 @@
 		else
 			this.legendUndefined();
 
-		for(var i = 0; i < this.current.data.dimension_names.length; i++) {
-			if(typeof this.current.data.dimension_names[i] === 'undefined')
-				continue;
+		var labels = this.current.data.dimension_names;
+		var i = labels.length;
+		while(i--) {
+			var label = labels[i];
 
-			if(typeof this.element_legend_childs.series[this.current.data.dimension_names[i]] === 'undefined')
-				continue;
+			if(typeof label === 'undefined') continue;
+			if(typeof this.element_legend_childs.series[label] === 'undefined') continue;
 
 			if(Math.abs(this.current.data.last_entry_t - this.current.data.before) <= this.current.data.view_update_every)
-				this.legendSetLabelValue(this.current.data.dimension_names[i], this.legendFormatValue(this.current.data.result_latest_values[i]));
+				this.legendSetLabelValue(label, this.current.data.result_latest_values[i]);
 			else
-				this.legendSetLabelValue(this.current.data.dimension_names[i], '');
+				this.legendSetLabelValue(label, null);
 		}
 	}
 
 	chartState.prototype.legendReset = function() {
 		this.legendShowLatestValues();
+	}
+
+	chartState.prototype.chartColors = function() {
+		if(this.colors !== null) return this.colors;
+
+		this.colors = $(this.element).data('colors');
+		if(typeof this.colors === 'undefined' || this.colors === null)
+			this.colors = NETDATA.colors;
+		else {
+			// console.log(this.colors);
+			var s = this.colors;
+			if(typeof s === 'string') s = s.split(' ');
+
+			this.colors = new Array();
+			var self = this;
+			$.each(s, function(i, c) {
+				self.colors.push(c);
+			});
+
+			// push the default colors too
+			var self = this;
+			$.each(NETDATA.colors, function(i, c) {
+				self.colors.push(c);
+			});
+		}
+
+		return this.colors;
 	}
 
 	chartState.prototype.legendUpdateDOM = function() {
@@ -944,15 +1000,18 @@
 		}
 		else {
 			// this.log('checking existing legend');
-			for(var i = 0; i < this.current.data.dimension_names.length; i++) {
-				if(typeof this.element_legend_childs.series[this.current.data.dimension_names[i]] === 'undefined') {
-					// this.log('legend is incosistent - missing dimension:' + this.current.data.dimension_names[i]);
+			var labels = this.current.data.dimension_names;
+			var i = labels.length;
+			while(i--) {
+				var name = labels[i];
+				if(typeof this.element_legend_childs.series[name] === 'undefined') {
+					// this.log('legend is incosistent - missing dimension:' + name);
 					needed = true;
 					break;
 				}
 				else if(Math.abs(this.current.data.last_entry_t - this.current.data.before) <= this.current.data.view_update_every) {
-					// this.log('setting legend of ' + this.current.data.dimension_names[i] + ' to ' + this.current.data.latest_values[i]);
-					this.legendSetLabelValue(this.current.data.dimension_names[i], this.legendFormatValue(this.current.data.latest_values[i]));
+					// this.log('setting legend of ' + name + ' to ' + this.current.data.latest_values[i]);
+					this.legendSetLabelValue(name, this.current.data.latest_values[i]);
 				}
 			}
 		}
@@ -995,7 +1054,7 @@
 
 		self = $(this);
 		var genLabel = function(state, parent, name, count) {
-			var c = count % NETDATA.colors.length;
+			var c = count % state.chartColors().length;
 
 			var user_element = null;
 			var user_id = self.data('show-value-of-' + name + '-at') || null;
@@ -1004,7 +1063,8 @@
 			state.element_legend_childs.series[name] = {
 				name: document.createElement('span'),
 				value: document.createElement('span'),
-				user: user_element
+				user: user_element,
+				last: null
 			};
 
 			var label = state.element_legend_childs.series[name];
@@ -1014,7 +1074,7 @@
 			label.name.title = name;
 			label.value.title = name;
 
-			var rgb = NETDATA.colorHex2Rgb(NETDATA.colors[c]);
+			var rgb = NETDATA.colorHex2Rgb(state.chartColors()[c]);
 			label.name.innerHTML = '<table class="netdata-legend-name-table-'
 				+ state.chart.chart_type
 				+ '" style="background-color: '
@@ -1024,8 +1084,8 @@
 			var text = document.createTextNode(' ' + name);
 			label.name.appendChild(text);
 
-			label.name.style.color = NETDATA.colors[c];
-			label.value.style.color = NETDATA.colors[c];
+			label.name.style.color = state.chartColors()[c];
+			label.value.style.color = state.chartColors()[c];
 
 			if(count > 0)
 				parent.appendChild(document.createElement('br'));
@@ -1753,7 +1813,7 @@
 	// ----------------------------------------------------------------------------------------------------------------
 
 	NETDATA.chartRefresherNoParallel = function(index) {
-		// if(NETDATA.options.debug.mail_loop) console.log('NETDATA.chartRefresher(<targets, ' + index + ')');
+		if(NETDATA.options.debug.mail_loop) console.log('NETDATA.chartRefresherNoParallel(' + index + ')');
 
 		if(NETDATA.options.updated_dom) {
 			// the dom has been updated
@@ -1761,9 +1821,7 @@
 			NETDATA.getDomCharts(NETDATA.chartRefresher);
 			return;
 		}
-		// FIXME targets should be states not DOM elements
-		var target = NETDATA.options.targets.get(index);
-		if(typeof target === 'undefined') {
+		if(index >= NETDATA.options.targets.length) {
 			if(NETDATA.options.debug.main_loop) console.log('waiting to restart main loop...');
 				NETDATA.options.auto_refresher_fast_weight = 0;
 
@@ -1772,7 +1830,7 @@
 				}, NETDATA.options.current.idle_between_loops);
 			}
 		else {
-			var state = NETDATA.chartState(target);
+			var state = NETDATA.options.targets[index];
 
 			if(NETDATA.options.auto_refresher_fast_weight < NETDATA.options.current.fast_render_timeframe) {
 				if(NETDATA.options.debug.main_loop) console.log('fast rendering...');
@@ -1843,10 +1901,10 @@
 		NETDATA.options.parallel = new Array();
 		NETDATA.options.sequencial = new Array();
 
-		// FIXME targets should be states not DOM elements
-		for(var i = 0; i < NETDATA.options.targets.length ; i++) {
-			var target = NETDATA.options.targets.get(i);
-			var state = NETDATA.chartState(target);
+		var targets = NETDATA.options.targets;
+		var len = targets.length;
+		while(len--) {
+			var state = targets[len];
 
 			if(!state.library.initialized)
 				NETDATA.options.sequencial.push(state);
@@ -1876,20 +1934,18 @@
 	NETDATA.getDomCharts = function(callback) {
 		NETDATA.options.updated_dom = false;
 
-		// FIXME targets should be states not DOM elements
-		NETDATA.options.targets = $('div[data-netdata]').filter(':visible');
+		var targets = $('div[data-netdata]').filter(':visible');
 
 		if(NETDATA.options.debug.main_loop)
-			console.log('DOM updated - there are ' + NETDATA.options.targets.length + ' charts on page.');
+			console.log('DOM updated - there are ' + targets.length + ' charts on page.');
 
-		// we need to re-size all the charts quickly
-		// before making any external calls
-		// FIXME targets should be states not DOM elements
-		$.each(NETDATA.options.targets, function(i, target) {
+		NETDATA.options.targets = new Array();
+		var len = targets.length;
+		while(len--) {
 			// the initialization will take care of sizing
 			// and the "loading..." message
-			var state = NETDATA.chartState(target);
-		});
+			NETDATA.options.targets.push(NETDATA.chartState(targets[len]));
+		}
 
 		if(typeof callback === 'function') callback();
 	}
@@ -2000,7 +2056,7 @@
 	NETDATA.sparklineChartCreate = function(state, data) {
 		var self = $(state.element);
 		var type = self.data('sparkline-type') || 'line';
-		var lineColor = self.data('sparkline-linecolor') || NETDATA.colors[0];
+		var lineColor = self.data('sparkline-linecolor') || state.chartColors()[0];
 		var fillColor = self.data('sparkline-fillcolor') || (state.chart.chart_type === 'line')?'#FFF':NETDATA.colorLuminance(lineColor, NETDATA.chartDefaults.fill_luminance);
 		var chartRangeMin = self.data('sparkline-chartrangemin') || undefined;
 		var chartRangeMax = self.data('sparkline-chartrangemax') || undefined;
@@ -2110,15 +2166,13 @@
 	NETDATA.dygraphSetSelection = function(state, t) {
 		if(typeof state.dygraph_instance !== 'undefined') {
 			var r = state.calculateRowForTime(t);
-			if(r !== -1) {
+			if(r !== -1)
 				state.dygraph_instance.setSelection(r);
-				return true;
-			}
-			else {
+			else
 				state.dygraph_instance.clearSelection();
-				return false;
-			}
 		}
+
+		return true;
 	}
 
 	NETDATA.dygraphClearSelection = function(state, t) {
@@ -2170,6 +2224,12 @@
 
 	NETDATA.dygraphChartUpdate = function(state, data) {
 		var dygraph = state.dygraph_instance;
+		
+		// when the chart is not visible, and hidden
+		// if there is a window resize, dygraph detects
+		// its element size as 0x0.
+		// this will make it re-appear properly
+		dygraph.resize();
 
 		if(state.current.name === 'pan') {
 			if(NETDATA.options.debug.dygraph || state.debug) state.log('dygraphChartUpdate() loose update');
@@ -2197,7 +2257,7 @@
 		var self = $(state.element);
 
 		state.dygraph_options = {
-			colors: self.data('dygraph-colors') || NETDATA.colors,
+			colors: self.data('dygraph-colors') || state.chartColors(),
 			
 			// leave a few pixels empty on the right of the chart
 			rightGap: self.data('dygraph-rightgap') || 5,
@@ -2290,7 +2350,9 @@
 					pixelsPerLabel: 15,
 					valueFormatter: function (x) {
 						// return (Math.round(x*100) / 100).toLocaleString();
-						return state.legendFormatValue(x);
+						//return state.legendFormatValue(x);
+						//FIXME
+						return x;
 					}
 				}
 			},
@@ -2300,7 +2362,7 @@
 				var elements = state.element_legend_childs;
 
 				// if the hidden div is not there
-				// state is not managing the legend
+				// we are not managing the legend
 				if(elements.hidden === null) return;
 
 				if (typeof data.x === 'undefined') {
@@ -2308,11 +2370,11 @@
 				}
 				else {
 					state.legendSetDate(data.x);
-					for (var i = 0; i < data.series.length; i++) {
+					var i = data.series.length;
+					while(i--) {
 						var series = data.series[i];
 						if(!series.isVisible) continue;
-						state.legendSetLabelValue(series.label, series.yHTML);
-						// elements.series[series.label].value.innerHTML = series.yHTML;
+						state.legendSetLabelValue(series.label, series.y);
 					}
 				}
 
@@ -2852,8 +2914,8 @@
 			initialize: NETDATA.sparklineInitialize,
 			create: NETDATA.sparklineChartCreate,
 			update: NETDATA.sparklineChartUpdate,
-			setSelection: null,
-			clearSelection: null,
+			setSelection: function(t) { return true; },
+			clearSelection: function() { return true; },
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'array'; },
@@ -2867,8 +2929,8 @@
 			initialize: NETDATA.peityInitialize,
 			create: NETDATA.peityChartCreate,
 			update: NETDATA.peityChartUpdate,
-			setSelection: null,
-			clearSelection: null,
+			setSelection: function(t) { return true; },
+			clearSelection: function() { return true; },
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'ssvcomma'; },
@@ -2882,8 +2944,8 @@
 			initialize: NETDATA.morrisInitialize,
 			create: NETDATA.morrisChartCreate,
 			update: NETDATA.morrisChartUpdate,
-			setSelection: null,
-			clearSelection: null,
+			setSelection: function(t) { return true; },
+			clearSelection: function() { return true; },
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'json'; },
@@ -2897,8 +2959,8 @@
 			initialize: NETDATA.googleInitialize,
 			create: NETDATA.googleChartCreate,
 			update: NETDATA.googleChartUpdate,
-			setSelection: null,
-			clearSelection: null,
+			setSelection: function(t) { return true; },
+			clearSelection: function() { return true; },
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'datatable'; },
@@ -2912,8 +2974,8 @@
 			initialize: NETDATA.raphaelInitialize,
 			create: NETDATA.raphaelChartCreate,
 			update: NETDATA.raphaelChartUpdate,
-			setSelection: null,
-			clearSelection: null,
+			setSelection: function(t) { return true; },
+			clearSelection: function() { return true; },
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'json'; },
@@ -2927,8 +2989,8 @@
 			initialize: NETDATA.easypiechartInitialize,
 			create: NETDATA.easypiechartChartCreate,
 			update: NETDATA.easypiechartChartUpdate,
-			setSelection: null,
-			clearSelection: null,
+			setSelection: function(t) { return true; },
+			clearSelection: function() { return true; },
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'json'; },

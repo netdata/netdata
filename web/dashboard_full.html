@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>NetData Dashboard</title>
+
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+	<meta name="author" content="costa@tsaousis.gr">
+</head>
+<body>
+
+<div class="container-fluid">
+	<div id="charts_div" class="container-fluid"></div>
+</div>
+
+</body>
+</html>
+	<!-- you can set your netdata server globally, by ucommenting this -->
+	<!-- you can also give a different server per chart, with the attribute: data-host="http://netdata.server:19999" -->
+	<!-- <script> netdataServer = "http://box:19999"; </script> -->
+
+	<!-- load the dashboard manager - it will do the rest -->
+	<script type="text/javascript" src="dashboard.js"></script>
+
+<script>
+var options = {
+	data: null,
+	hostnane: 'netdata_server',
+	categories: new Array(),
+	categories_idx: {},
+	families: new Array(),
+	families_idx: {},
+	chartsPerRow: 0,
+	chartsMinWidth: 450,
+	chartsHeight: 200,
+	sparklinesHeight: 60
+}
+
+function screenWidth() {
+	return (($(window).width() * 0.95) - 50);
+}
+
+function chartsPerRow(total) {
+	if(options.chartsPerRow === 0) {
+		width = Math.floor(total / options.chartsMinWidth);
+		if(width === 0) width = 1;
+		return width;
+	}
+	else return options.chartsPerRow;
+}
+
+function chartsPrioritySort(a, b) {
+	if(a.priority === b.priority) {
+		if(a.name < b.name) return -1;
+	}
+	else if(a.priority < b.priority) return -1;
+	return 1;
+}
+
+function uniq(array, find_key, get_result) {
+	if(typeof get_result === 'undefined' || get_result === null)
+		get_result = find_key;
+
+	var idx = {};
+	var result = new Array();
+
+	$.each(array, function(i, c) {
+		key = find_key(c);
+		if(typeof idx[key] === 'undefined') {
+			idx[key] = true;
+			result.push(get_result(c));
+		}
+	});
+	return result;
+}
+
+function uniq_with_list(array, find_key_function) {
+	var idx = {};
+	var result = new Array();
+
+	$.each(array, function(i, c) {
+		key = find_key_function(c);
+		if(typeof idx[key] === 'undefined') {
+			idx[key] = new Array();
+			result.push( { name: key, values: idx[key] } );
+		}
+		idx[key].push(c);
+	});
+	result.sort(function(a, b) {
+		if(a.name < b.name) return -1;
+		return 1;
+	});
+	return result;
+}
+
+function prepareScreen(data) {
+	console.log('NETDATA is paused - ready to prepare the screen');
+	console.log(data);
+
+	options.data = data;
+	options.hostname = data.hostname;
+	var charts = data.charts;
+
+	$.each(charts, function(i, c) {
+		if(c.enabled === true) {
+
+			//if(c.family.length > 4 && c.family.substring(c.family.length - 4, c.family.length) === '-ifb')
+			//	c.family = c.family.split('-')[0];
+
+			// find the category of the chart
+			c.category = c.type.split('.')[0];
+
+			var tmp = c.category.split('_')[0];
+			if(tmp === 'net' || tmp === 'disk')
+				c.category = tmp;
+
+			switch(c.category) {
+				case 'system':
+					c.category_priority = 10;
+					c.category_title = 'System';
+					c.glyphicon = "glyphicon-dashboard";
+					break;
+
+				case 'tc':
+					c.category_priority = 20;
+					c.category_title = 'Quality Of Service';
+					c.glyphicon = "glyphicon-random";
+					break;
+
+				case 'net':
+					c.category_priority = 30;
+					c.category_title = 'Network Interfaces';
+					c.glyphicon = "glyphicon-transfer";
+					break;
+
+				case 'apps':
+					c.category_priority = 40;
+					c.category_title = 'Applications Monitoring';
+					c.glyphicon = "glyphicon-tasks";
+					break;
+
+				case 'ipvs':
+					c.category_priority = 50;
+					c.category_title = 'IP Virtual Server';
+					c.glyphicon = "glyphicon-transfer";
+					break;
+
+				case 'netfilter':
+					c.category_priority = 60;
+					c.category_title = 'Netfilter';
+					c.glyphicon = "glyphicon-cloud";
+					break;
+
+				case 'ipv4':
+					c.category_priority = 70;
+					c.category_title = 'IPv4';
+					c.glyphicon = "glyphicon-globe";
+					break;
+
+				case 'mem':
+					c.category_priority = 80;
+					c.category_title = 'Memory';
+					c.glyphicon = "glyphicon-dashboard";
+					break;
+
+				case 'cpu':
+					c.category_priority = 90;
+					c.category_title = 'CPUs';
+					c.glyphicon = "glyphicon-dashboard";
+					break;
+
+				case 'disk':
+					c.category_priority = 100;
+					c.category_title = 'Disks';
+					c.glyphicon = "glyphicon-hdd";
+					break;
+
+				case 'nfsd':
+					c.category_priority = 110;
+					c.category_title = 'NFS Server';
+					c.glyphicon = "glyphicon-hdd";
+					break;
+
+				case 'squid':
+					c.category_priority = 140;
+					c.category_title = 'Proxy Server';
+					c.glyphicon = "glyphicon-link";
+					break;
+
+				case 'netdata':
+					c.category_priority = 150;
+					c.category_title = 'Netdata Monitoring';
+					c.glyphicon = "glyphicon-thumbs-up";
+					break;
+
+				case 'example':
+					c.category_priority = 100000;
+					c.category_title = 'Example Plugins';
+					c.glyphicon = "glyphicon-search";
+					break;
+
+				default:
+					c.category_priority = 150;
+					c.category_title = c.type;
+					c.glyphicon = "glyphicon-dashboard";
+					break;
+			}
+
+			// find the unique categories
+			if(typeof options.categories_idx[c.category] === 'undefined') {
+				options.categories_idx[c.category] = {
+					charts: new Array()
+				}
+				options.categories.push({
+					name: c.category,
+					title: c.category_title,
+					priority: c.category_priority,
+					glyphicon: c.glyphicon,
+					charts: options.categories_idx[c.category].charts
+				});
+			}
+			options.categories_idx[c.category].charts.push(c);
+
+			// find the unique families
+			if(typeof options.families_idx[c.family] === 'undefined') {
+				options.families_idx[c.family] = {
+					charts: new Array()
+				};
+				options.families.push({
+					name: c.family,
+					title: c.family,
+					priority: c.category_priority,
+					glyphicon: c.glyphicon,
+					charts: options.categories_idx[c.category].charts
+				});
+			}
+			options.families_idx[c.family].charts.push(c);
+		}
+	});
+
+	function prioritySort(a, b) {
+		if(a.priority < b.priority) return -1;
+		return 1;
+	}
+
+	// sort all of them
+	options.categories.sort(prioritySort);
+	options.families.sort(prioritySort);
+	$.each(options.families,   function(i, c) { c.charts.sort(prioritySort); });
+
+	var div = document.getElementById('charts_div');
+	var pcent_width = Math.floor(100 / chartsPerRow($(div).width()));
+
+	// find the proper duration for per-second updates
+	var duration = Math.round(($(div).width() * pcent_width / 100 * data.update_every / 3) / 60) * 60;
+	console.log(duration);
+	html = '';
+	$.each(options.categories, function(i, t) {
+		t.charts.sort(prioritySort);
+
+		html += '<div class="container-fluid row clearfix"><h2>' + t.title + '</h2>';
+
+		if(t.name === 'net') {
+			var interfaces = uniq_with_list(t.charts, function(c) { return c.family; });
+			console.log(interfaces);
+
+			$.each(interfaces, function(i, c) {
+				html += '<div class="netdata-group-container" id="interface_' + c.name + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 class="netdata-chart-alignment">' + c.name + '</h2>';
+				$.each(c.values, function(x, f) {
+					if(f.type === 'net') {
+						html += '<div data-netdata="' + f.id + '"'
+							+ ' data-width="100%"'
+							+ ' data-height="' + options.chartsHeight.toString() + 'px"'
+							+ ' data-before="0"'
+							+ ' data-after="-' + duration.toString() + '"'
+							+ '></div>';
+					}
+					else {
+						html += '<div data-netdata="' + f.id + '"'
+							+ ' data-width="100%"'
+							+ ' data-height="' + (options.chartsHeight / 2).toString() + 'px"'
+							+ ' data-before="0"'
+							+ ' data-after="-' + duration.toString() + '"'
+							+ '></div>';
+					}
+				});
+				html += '</div>';
+			});
+		}
+		else if(t.name === 'disk') {
+			var disks = uniq_with_list(t.charts, function(c) { return c.family; });
+			console.log(disks);
+
+			$.each(disks, function(i, c) {
+				html += '<div class="netdata-group-container" id="disk_' + c.name + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 class="netdata-chart-alignment">' + c.name + '</h2>';
+				$.each(c.values, function(x, f) {
+					var c = null;
+					var h = options.chartsHeight / 2;
+					switch(f.type) {
+						case 'disk'        : h = options.chartsHeight; break;
+						case 'disk_backlog': c = '#DD4477'; break;
+						case 'disk_util'   : c = '#109618'; break;
+						case 'disk_qops'   : c = '#8B0707'; break;
+					}
+
+					html += '<div data-netdata="' + f.id + '"'
+						+ ' data-width="100%"'
+						+ ' data-height="' + h.toString() + 'px"'
+						+ ' data-before="0"'
+						+ ' data-after="-' + duration.toString() + '"'
+						+ ' data-colors="' + c + '"'
+						+ '></div>';
+				});
+				html += '</div>';
+			});
+		}
+		else {
+			$.each(t.charts, function(x, c) {
+				html += '<div data-netdata="' + c.id + '"'
+					+ ' data-width="' + pcent_width.toString() + '%"'
+					+ ' data-height="' + options.chartsHeight.toString() + 'px"'
+					+ ' data-before="0"'
+					+ ' data-after="-' + duration.toString() + '"'
+					+ '></div>';
+			});
+		}
+
+		html += '</div>';
+	});
+
+	html += '<br/>'
+	$.each(NETDATA.colors, function(i, c){
+		html += '<div style="display: inline-block;"><div style="display: inline-block; width: 100px; height: 100px; background: ' + c + ';"></div><br/>' + c + '</div>';
+	});
+
+	div.innerHTML = html;
+	NETDATA.unpause();
+}
+
+NETDATA.ready(function() {
+	NETDATA.chartRegistry.downloadAll(NETDATA.serverDefault, function(data) {
+		NETDATA.pause(function () {
+			prepareScreen(data);
+		});
+	});
+});
+
+</script>

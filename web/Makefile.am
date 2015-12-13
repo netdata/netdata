@@ -10,6 +10,7 @@ dist_web_DATA = \
         netdata.js \
         robots.txt \
         theme.css \
+        dashboard_full.html \
         dashboard.html \
         dashboard.js \
         dashboard.css \
