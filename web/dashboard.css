@@ -83,7 +83,7 @@ html {
 	margin-top: 0px;
 }
 .netdata-legend-series {
-	position: relative;
+	position: absolute;
 	width: 110px;
 	height: calc(100% - 50px);
 	overflow: hidden;

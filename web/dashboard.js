@@ -870,9 +870,6 @@
 	}
 
 	chartState.prototype.legendFormatValue = function(value) {
-		// FIXME
-		// return '';
-		// return value;
 		if(value === null) return '';
 		if(typeof value !== 'number') return value;
 
@@ -885,11 +882,13 @@
 	chartState.prototype.legendSetLabelValue = function(label, value) {
 		var series = this.element_legend_childs.series[label];
 
-		if(typeof series === 'undefined' || series.last === value)
-			return;
+		if(typeof series === 'undefined') return;
 
-		series.last = value;
 		value = this.legendFormatValue(value);
+
+		// if the value has not changed, skip DOM update
+		if(series.last === value) return;
+		series.last = value;
 
 		if(series.value !== null) series.value.innerHTML = value;
 		if(series.user !== null) series.user.innerHTML = value;
@@ -3043,7 +3042,7 @@
 
 	NETDATA.requiredCSS = [
 		NETDATA.serverDefault + 'css/bootstrap.min.css',
-		NETDATA.serverDefault + 'css/bootstrap-theme.min.css',
+		//NETDATA.serverDefault + 'css/bootstrap-theme.min.css',
 		NETDATA.dashboard_css
 	];
 

@@ -10,12 +10,110 @@
 	<meta name="apple-mobile-web-app-capable" content="yes">
 	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 	<meta name="author" content="costa@tsaousis.gr">
+<style>
+body {
+ padding-top:50px;
+}
+
+#masthead h1 {
+ /*font-size: 30px;*/
+ line-height: 1;
+ padding-top:20px;
+}
+
+#masthead .well {
+ margin-top:4%;
+}
+
+#sidebar li.active {
+  border:0 #eee solid;
+  border-right-width:5px;
+}
+
+@media (min-width: 979px) {
+  #sidebar.affix-top {
+    position: static;
+  	margin-top:30px;
+  	width:228px;
+  }
+  
+  #sidebar.affix {
+    position: fixed;
+    top:70px;
+    width:228px;
+  }
+}
+</style>
 </head>
 <body>
+	<nav class="navbar navbar-default navbar-fixed-top" role="banner">
+		<div class="container">
+			<div class="navbar-header">
+				<button class="navbar-toggle" type="button" data-toggle="collapse" data-target=".navbar-collapse">
+					<span class="sr-only">Toggle navigation</span>
+					<span class="icon-bar"></span>
+					<span class="icon-bar"></span>
+					<span class="icon-bar"></span>
+				</button>
+				<a href="/" class="navbar-brand">Netdata</a>
+			</div>
+			<nav class="collapse navbar-collapse" role="navigation">
+				<ul class="nav navbar-nav">
+					<li><a href="#sec">Get Started</a></li>
+					<li><a href="#sec">Edit</a></li>
+					<li><a href="#sec">Visualize</a></li>
+					<li><a href="#sec">Prototype</a></li>
+				</ul>
+			</nav>
+		</div>
+	</nav>
 
-<div class="container-fluid">
-	<div id="charts_div" class="container-fluid"></div>
-</div>
+	<div id="masthead"> 
+		<div class="container">
+			<div class="row">
+				<div class="col-md-6">
+					<h1>Netdata Dashboard
+						<p class="lead">Real time data collection and graphs...</p>
+					</h1>
+				</div>
+				<div class="col-md-6">
+					<div class="well well-lg">
+						<div class="row">
+							<div class="col-sm-6">
+								<div data-netdata="system.cpu" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-before="0" data-after="-60" data-width="100%" data-height="60px"></div>
+							</div>
+							<div class="col-sm-6">
+								Drag charts to pan.<br/>
+								Shift + wheel on them, to zoom.</br>
+								Double-click on them, to reset.
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="container">
+		<div class="row">
+			<div class="col-md-10" role="main">
+				<div id="charts_div"></div>
+			</div>
+			<div class="col-md-2" role="complementary">
+				<div class="hidden-print hidden-xs hidden-sm affix-top">
+					<ul class="nav nav-stacked" id="sidebar">
+						<li><a href="#sec0">Section 0</a>
+							<ul class="nav">
+								<li><a href="#sec0">Section 0a</a></li>
+								<li><a href="#sec0">Section 0b</a></li>
+							</ul>
+						</li>
+						<li><a href="#sec0">Section 1</a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</div>
 
 </body>
 </html>
@@ -35,8 +133,8 @@ var options = {
 	families: new Array(),
 	families_idx: {},
 	chartsPerRow: 0,
-	chartsMinWidth: 450,
-	chartsHeight: 200,
+	chartsMinWidth: 1450,
+	chartsHeight: 150,
 	sparklinesHeight: 60
 }
 
@@ -121,7 +219,7 @@ function prepareScreen(data) {
 			switch(c.category) {
 				case 'system':
 					c.category_priority = 10;
-					c.category_title = 'System';
+					c.category_title = 'System Summary';
 					c.glyphicon = "glyphicon-dashboard";
 					break;
 
@@ -151,13 +249,13 @@ function prepareScreen(data) {
 
 				case 'netfilter':
 					c.category_priority = 60;
-					c.category_title = 'Netfilter';
+					c.category_title = 'Netfilter / IPTables';
 					c.glyphicon = "glyphicon-cloud";
 					break;
 
 				case 'ipv4':
 					c.category_priority = 70;
-					c.category_title = 'IPv4';
+					c.category_title = 'IPv4 Summary';
 					c.glyphicon = "glyphicon-globe";
 					break;
 
@@ -194,6 +292,18 @@ function prepareScreen(data) {
 				case 'netdata':
 					c.category_priority = 150;
 					c.category_title = 'Netdata Monitoring';
+					c.glyphicon = "glyphicon-thumbs-up";
+					break;
+
+				case 'sensors':
+					c.category_priority = 160;
+					c.category_title = 'Hardware Sensors';
+					c.glyphicon = "glyphicon-thumbs-up";
+					break;
+
+				case 'postfix':
+					c.category_priority = 170;
+					c.category_title = 'Mail Server';
 					c.glyphicon = "glyphicon-thumbs-up";
 					break;
 
@@ -258,11 +368,15 @@ function prepareScreen(data) {
 	// find the proper duration for per-second updates
 	var duration = Math.round(($(div).width() * pcent_width / 100 * data.update_every / 3) / 60) * 60;
 	console.log(duration);
-	html = '';
+	var html = '';
+	var sidebar = '';
+
+	// render the charts
 	$.each(options.categories, function(i, t) {
 		t.charts.sort(prioritySort);
 
-		html += '<div class="container-fluid row clearfix"><h2>' + t.title + '</h2>';
+		sidebar += '<li><a href="#section' + i + '">' + t.title + '</a></li>';
+		html += '<h2 id="section' + i + '">' + t.title + '</h2>';
 
 		if(t.name === 'net') {
 			var interfaces = uniq_with_list(t.charts, function(c) { return c.family; });
@@ -329,7 +443,7 @@ function prepareScreen(data) {
 			});
 		}
 
-		html += '</div>';
+		html += '';
 	});
 
 	html += '<br/>'
@@ -338,7 +452,33 @@ function prepareScreen(data) {
 	});
 
 	div.innerHTML = html;
+	document.getElementById('sidebar').innerHTML = sidebar;
 	NETDATA.unpause();
+
+	/* activate sidebar */
+	$('#sidebar').affix({
+		offset: {
+			top: 200
+		}
+	});
+
+	// fix for jumping to proper anchor after ajax
+	$(window).load(function(){
+		// Remove the # from the hash, as different browsers may or may not include it
+		var hash = location.hash.replace('#','');
+
+		if(hash != '') {
+			// Clear the hash in the URL
+			// location.hash = '';   // delete front "//" if you want to change the address bar
+			$('html, body').animate({ scrollTop: $(location.hash).offset().top - 55}, 0);
+		}
+	});
+
+	/* activate scrollspy menu */
+	$(document.body).scrollspy({
+		target: '#leftCol',
+		offset: -55
+	});
 }
 
 NETDATA.ready(function() {
