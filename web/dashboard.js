@@ -613,7 +613,7 @@
 			}
 		}
 
-		this.globalSelectionSyncDelay(100);
+		// this.globalSelectionSyncDelay(100);
 	}
 
 	// can the chart participate to the global selection sync as a slave?

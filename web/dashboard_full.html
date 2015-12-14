@@ -10,40 +10,47 @@
 	<meta name="apple-mobile-web-app-capable" content="yes">
 	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 	<meta name="author" content="costa@tsaousis.gr">
-<style>
-body {
- padding-top:50px;
-}
+	<style>
+	body {
+	 padding-top:50px;
+	}
 
-#masthead h1 {
- /*font-size: 30px;*/
- line-height: 1;
- padding-top:20px;
-}
+	#masthead h1 {
+	 /*font-size: 30px;*/
+	 line-height: 1;
+	 padding-top:20px;
+	}
 
-#masthead .well {
- margin-top:4%;
-}
+	#masthead .well {
+	 margin-top:4%;
+	}
 
-#sidebar li.active {
-  border:0 #eee solid;
-  border-right-width:5px;
-}
+	#sidebar li.active {
+	  border:0 #eee solid;
+	  border-right-width:5px;
+	}
 
-@media (min-width: 979px) {
-  #sidebar.affix-top {
-    position: static;
-  	margin-top:30px;
-  	width:228px;
-  }
-  
-  #sidebar.affix {
-    position: fixed;
-    top:70px;
-    width:228px;
-  }
-}
-</style>
+	@media (min-width: 979px) {
+	  #sidebar.affix-top {
+	    position: static;
+	  	margin-top:30px;
+	  	width:228px;
+	  }
+	  
+	  #sidebar.affix {
+	    position: fixed;
+	    top:70px;
+	    width:228px;
+	  }
+	}
+	</style>
+	
+	<!-- you can set your netdata server globally, by ucommenting this -->
+	<!-- you can also give a different server per chart, with the attribute: data-host="http://netdata.server:19999" -->
+	<!-- <script> netdataServer = "http://box:19999"; </script> -->
+
+	<!-- load the dashboard manager - it will do the rest -->
+	<script type="text/javascript" src="dashboard.js"></script>
 </head>
 <body>
 	<nav class="navbar navbar-default navbar-fixed-top" role="banner">
@@ -117,13 +124,6 @@ body {
 
 </body>
 </html>
-	<!-- you can set your netdata server globally, by ucommenting this -->
-	<!-- you can also give a different server per chart, with the attribute: data-host="http://netdata.server:19999" -->
-	<!-- <script> netdataServer = "http://box:19999"; </script> -->
-
-	<!-- load the dashboard manager - it will do the rest -->
-	<script type="text/javascript" src="dashboard.js"></script>
-
 <script>
 var options = {
 	data: null,
