@@ -189,6 +189,8 @@
 
 			parallel_refresher: true,	// enable parallel refresh of charts
 
+			destroy_on_hide: false,		// destroy charts when they are not visible
+
 			color_fill_opacity: {
 				line: 1.0,
 				area: 0.2,
@@ -481,8 +483,10 @@
 									// Used with NETDATA.globalPanAndZoom.seq
 
 			last_resized: 0,		// the last time the chart was resized
+			last_hidden: 0,
+			last_unhidden: 0,
 
-			mode: null, 			// auto, pan, zoom
+			current: null, 			// auto, pan, zoom
 									// this is a pointer to one of the sub-classes below
 
 			auto: {
@@ -1423,6 +1427,66 @@
 		});
 	}
 
+	chartState.prototype.destroyChart = function() {
+		this.current.last_autorefreshed = new Date().getTime();
+
+		if(this.element_message !== null) {
+			this.element_message.innerHTML = '';
+			this.element_message = null;
+		}
+
+		if(this.element_loading !== null) {
+			this.element_loading.innerHTML = '';
+			this.element_loading = null;
+		}
+
+		if(this.element_legend !== null) {
+			this.element_legend.innerHTML = '';
+			this.element_legend = null;
+		}
+
+		if(this.element_chart !== null) {
+			this.element_chart.innerHTML = '';
+			this.element_chart = null;
+		}
+
+		this.element_legend_childs = {
+			hidden: null,
+			title_date: null,
+			title_time: null,
+			title_units: null,
+			series: null
+		};
+
+		this.element.innerHTML = '';
+		this.refresh_dt_element = null;
+
+		this.created_ms = 0;
+		this.paused = false;
+		this.selected = false;
+		this.updates_counter = 0;
+		this.updates_since_last_creation = 0;
+		this.follows_global = 0;
+		this.last_resized = 0;
+
+		if(this.current !== null) {
+			this.current.last_autorefreshed = 0;
+			this.current.view_update_every = 0;
+			this.current.after_ms = 0;
+			this.current.before_ms = 0;
+			this.current.points = 0;
+			this.current.data = null;
+			this.current.force_update_at = 0;
+			this.current.force_after_ms = null;
+			this.current.force_before_ms = null;
+			this.current.requested_after_ms = null;
+			this.current.requested_before_ms = null;
+			this.current.first_entry_ms = null;
+			this.current.last_entry_ms = null;
+		}
+		this.init();
+	}
+
 	chartState.prototype.unhideChart = function() {
 		if(typeof this.___isHidden___ !== 'undefined') {
 			this.element_message.style.display = 'none';
@@ -1431,17 +1495,22 @@
 			if(this.element_loading !== null) this.element_loading.style.display = 'none';
 			this.___isHidden___ = undefined;
 			this.element_message.innerHTML = 'chart ' + this.id + ' is visible now';
+			this.last_unhidden = new Date().getTime();
 		}
 	}
 
 	chartState.prototype.hideChart = function() {
 		if(typeof this.___isHidden___ === 'undefined') {
+			if(NETDATA.options.current.destroy_on_hide === true)
+				this.destroyChart();
+
 			this.element_message.style.display = 'inline-block';
 			if(this.element_chart !== null) this.element_chart.style.display = 'none';
 			if(this.element_legend !== null) this.element_legend.style.display = 'none';
 			if(this.element_loading !== null) this.element_loading.style.display = 'none';
 			this.___isHidden___ = true;
 			this.element_message.innerHTML = 'chart ' + this.id + ' is hidden to speed up the browser';
+			this.last_hidden = new Date().getTime();
 		}
 	}
 
@@ -1453,6 +1522,7 @@
 			if(this.element_loading !== null) this.element_loading.style.display = 'none';
 			this.___showsLoading___ = undefined;
 			this.element_loading.innerHTML = 'chart ' + this.id + ' finished loading!';
+			this.last_unhidden = new Date().getTime();
 		}
 	}
 
@@ -1464,6 +1534,7 @@
 			if(this.element_loading !== null) this.element_loading.style.display = 'inline-block';
 			this.___showsLoading___ = true;
 			this.element_loading.innerHTML = 'chart ' + this.id + ' is loading...';
+			this.last_hidden = new Date().getTime();
 		}
 	}
 
@@ -2228,7 +2299,11 @@
 		// if there is a window resize, dygraph detects
 		// its element size as 0x0.
 		// this will make it re-appear properly
-		dygraph.resize();
+
+		if(state.last_unhidden > state.dygraph_last_rendered)
+			dygraph.resize();
+
+		state.dygraph_last_rendered = new Date().getTime();
 
 		if(state.current.name === 'pan') {
 			if(NETDATA.options.debug.dygraph || state.debug) state.log('dygraphChartUpdate() loose update');
@@ -2252,6 +2327,8 @@
 
 	NETDATA.dygraphChartCreate = function(state, data) {
 		if(NETDATA.options.debug.dygraph || state.debug) state.log('dygraphChartCreate()');
+
+		state.dygraph_last_rendered = new Date().getTime();
 
 		var self = $(state.element);
 
