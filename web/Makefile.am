@@ -25,13 +25,21 @@ dist_weblib_DATA = \
         lib/jquery.peity.min.js \
         lib/jquery.sparkline.min.js \
         lib/morris.min.js \
-        css/morris.css \
         lib/raphael-min.js \
 	lib/jquery.easypiechart.min.js \
 	lib/jquery.nanoscroller.min.js \
         lib/bootstrap.min.js \
+        $(NULL)
+
+webcssdir=$(webdir)/css
+dist_webcss_DATA = \
+        css/morris.css \
         css/bootstrap.min.css \
         css/bootstrap-theme.min.css \
+        $(NULL)
+
+webfontsdir=$(webdir)/fonts
+dist_webfonts_DATA = \
         fonts/glyphicons-halflings-regular.eot \
         fonts/glyphicons-halflings-regular.svg \
         fonts/glyphicons-halflings-regular.ttf \
