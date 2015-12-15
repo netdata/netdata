@@ -71,6 +71,7 @@ int do_proc_stat(int update_every, unsigned long long dt) {
 			char *type = RRD_TYPE_STAT;
 			long priority = 1000;
 			int isthistotal = 0;
+
 			if(strcmp(id, "cpu") == 0) {
 				isthistotal = 1;
 				title = "Total CPU utilization";
@@ -81,7 +82,7 @@ int do_proc_stat(int update_every, unsigned long long dt) {
 			if((isthistotal && do_cpu) || (!isthistotal && do_cpu_cores)) {
 				st = rrdset_find_bytype(type, id);
 				if(!st) {
-					st = rrdset_create(type, id, NULL, "cpu", title, "percentage", priority, update_every, RRDSET_TYPE_STACKED);
+					st = rrdset_create(type, id, NULL, id, title, "percentage", priority, update_every, RRDSET_TYPE_STACKED);
 
 					long multiplier = 1;
 					long divisor = 1; // sysconf(_SC_CLK_TCK);

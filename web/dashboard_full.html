@@ -640,7 +640,9 @@ function prepareScreen(data) {
 	if(hash != '') {
 		// Clear the hash in the URL
 		// location.hash = '';   // delete front "//" if you want to change the address bar
-		$('html, body').animate({ scrollTop: $(location.hash).offset().top}, 0);
+		var offset = $(location.hash).offset();
+		if(typeof offset !== 'undefined')
+			$('html, body').animate({ scrollTop: offset.top }, 0);
 	}
 
 	/* activate bootstrap scrollspy (needed for sidebar) */

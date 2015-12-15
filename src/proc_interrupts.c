@@ -15,12 +15,12 @@
 
 #define MAX_INTERRUPTS 256
 #define MAX_INTERRUPT_CPUS 256
-#define MAX_INTERRUPT_NAME 20
+#define MAX_INTERRUPT_NAME 50
 
 struct interrupt {
 	int used;
 	char *id;
-	char *name;
+	char name[MAX_INTERRUPT_NAME + 1];
 	unsigned long long value[MAX_INTERRUPT_CPUS];
 	unsigned long long total;
 };
@@ -31,7 +31,7 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 
 	if(dt) {};
 
-	if(do_per_core == -1) do_per_core = config_get_boolean("plugin:proc:/proc/interrupts", "interrupts per core", 0);
+	if(do_per_core == -1) do_per_core = config_get_boolean("plugin:proc:/proc/interrupts", "interrupts per core", 1);
 
 	if(!ff) {
 		char filename[FILENAME_MAX + 1];
@@ -78,8 +78,9 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 		irr->id = procfile_lineword(ff, l, 0);
 		if(!irr->id || !irr->id[0]) continue;
 
-		if(irr->id[strlen(irr->id) - 1] == ':')
-			irr->id[strlen(irr->id) - 1] = '\0';
+		int idlen = strlen(irr->id);
+		if(irr->id[idlen - 1] == ':')
+			irr->id[idlen - 1] = '\0';
 
 		int c;
 		for(c = 0; c < cpus ;c++) {
@@ -92,10 +93,19 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 		}
 
 		if(isdigit(irr->id[0]) && (uint32_t)(cpus + 2) < words) {
-			irr->name = procfile_lineword(ff, l, words - 1);
+			strncpy(irr->name, procfile_lineword(ff, l, words - 1), MAX_INTERRUPT_NAME);
+			irr->name[MAX_INTERRUPT_NAME] = '\0';
+			int nlen = strlen(irr->name);
+			if(nlen < (MAX_INTERRUPT_NAME-1)) {
+				irr->name[nlen] = '_';
+				strncpy(&irr->name[nlen + 1], irr->id, MAX_INTERRUPT_NAME - nlen);
+				irr->name[MAX_INTERRUPT_NAME] = '\0';
+			}
 		}
-		else
-			irr->name = irr->id;
+		else {
+			strncpy(irr->name, irr->id, MAX_INTERRUPT_NAME);
+			irr->name[MAX_INTERRUPT_NAME] = '\0';
+		}
 
 		irr->used = 1;
 	}
@@ -125,6 +135,9 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 		int c;
 
 		for(c = 0; c < cpus ; c++) {
+			char family[256];
+			snprintf(family, 256, "cpu%d", c);
+
 			char id[256];
 			snprintf(id, 256, "cpu%d_interrupts", c);
 
@@ -133,7 +146,7 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 				char name[256], title[256];
 				snprintf(name, 256, "cpu%d_interrupts", c);
 				snprintf(title, 256, "CPU%d Interrupts", c);
-				st = rrdset_create("cpu", id, name, "cpu", title, "interrupts/s", 2000 + c, update_every, RRDSET_TYPE_STACKED);
+				st = rrdset_create("cpu", id, name, family, title, "interrupts/s", 2000 + c, update_every, RRDSET_TYPE_STACKED);
 
 				for(l = 0; l < lines ;l++) {
 					if(!irrs[l].used) continue;
