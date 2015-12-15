@@ -50,6 +50,12 @@
 	 * sections of docs content.
 	 */
 
+	.dashboard-sidebar {
+		max-height: calc(100% - 70px) !important;
+		overflow-y: auto;
+		width: 170px !important;
+	}
+
 	/* By default it's not affixed in mobile views, so undo that */
 	.dashboard-sidebar.affix {
 		position: static;
@@ -62,7 +68,7 @@
 
 	.affix {
 		position: static;
-		top: 50px;
+		top: 70px !important;
 		width: 170px;
 	}
 	.affix-top {
@@ -644,10 +650,18 @@ function prepareScreen(data) {
 	});
 
 	/* activate bootstrap sidebar (affix) */
-	$('#sidebar_ul').affix({
+	$('#sidebar').affix({
 		offset: {
-			top: 200
+			top: 200,
+			bottom: 0
 		}
+	});
+
+	/* fix scrolling of very long affix lists
+	   http://stackoverflow.com/questions/21691585/bootstrap-3-1-0-affix-too-long
+	 */
+	$('#sidebar').on('affixed.bs.affix', function() {
+		$(this).removeAttr('style');
 	});
 }
 
