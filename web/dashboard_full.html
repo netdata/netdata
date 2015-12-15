@@ -11,8 +11,25 @@
 	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 	<meta name="author" content="costa@tsaousis.gr">
 	<style>
+
+	/* prevent body from hidding under the navbar */
 	body {
-	 padding-top:50px;
+		padding-top: 50px;
+	}
+
+	/* fix # anchors scrolling under the navbar
+	   https://github.com/twbs/bootstrap/issues/1768#issuecomment-46519033
+	 */
+	*[id]:before { 
+		display: block; 
+		content: " "; 
+		margin-top: -70px; 
+		height: 70px; 
+		visibility: hidden; 
+	}
+
+	.container {
+		width: 90% !important;
 	}
 
 	#masthead h1 {
@@ -25,23 +42,144 @@
 	 margin-top:4%;
 	}
 
-	#sidebar li.active {
-	  border:0 #eee solid;
-	  border-right-width:5px;
+
+	/*
+	 * Side navigation
+	 *
+	 * Scrollspy and affixed enhanced navigation to highlight sections and secondary
+	 * sections of docs content.
+	 */
+
+	/* By default it's not affixed in mobile views, so undo that */
+	.dashboard-sidebar.affix {
+		position: static;
+	}
+	@media (min-width: 768px) {
+		.dashboard-sidebar {
+			padding-left: 20px;
+		}
 	}
 
-	@media (min-width: 979px) {
-	  #sidebar.affix-top {
-	    position: static;
-	  	margin-top:30px;
-	  	width:228px;
-	  }
-	  
-	  #sidebar.affix {
-	    position: fixed;
-	    top:70px;
-	    width:228px;
-	  }
+	.affix {
+		position: static;
+		top: 50px;
+		width: 170px;
+	}
+	.affix-top {
+		width: 170px;
+	}
+
+	/* First level of nav */
+	.dashboard-sidenav {
+		margin-top: 20px;
+		margin-bottom: 20px;
+	}
+
+	/* All levels of nav */
+	.dashboard-sidebar .nav > li > a {
+		display: block;
+		padding: 4px 20px;
+		font-size: 13px;
+		font-weight: 500;
+		color: #767676;
+	}
+	.dashboard-sidebar .nav > li > a:hover,
+	.dashboard-sidebar .nav > li > a:focus {
+		padding-left: 19px;
+		color: #563d7c;
+		text-decoration: none;
+		background-color: transparent;
+		border-left: 1px solid #563d7c;
+	}
+	.dashboard-sidebar .nav > .active > a,
+	.dashboard-sidebar .nav > .active:hover > a,
+	.dashboard-sidebar .nav > .active:focus > a {
+		padding-left: 18px;
+		font-weight: bold;
+		color: #563d7c;
+		background-color: transparent;
+		border-left: 2px solid #563d7c;
+	}
+
+	/* Nav: second level (shown on .active) */
+	.dashboard-sidebar .nav .nav {
+		display: none; /* Hide by default, but at >768px, show it */
+		padding-bottom: 10px;
+	}
+	.dashboard-sidebar .nav .nav > li > a {
+		padding-top: 1px;
+		padding-bottom: 1px;
+		padding-left: 30px;
+		font-size: 12px;
+		font-weight: normal;
+	}
+	.dashboard-sidebar .nav .nav > li > a:hover,
+	.dashboard-sidebar .nav .nav > li > a:focus {
+		padding-left: 29px;
+	}
+	.dashboard-sidebar .nav .nav > .active > a,
+	.dashboard-sidebar .nav .nav > .active:hover > a,
+	.dashboard-sidebar .nav .nav > .active:focus > a {
+		padding-left: 28px;
+		font-weight: 500;
+	}
+
+	/* Back to top (hidden on mobile) */
+	.back-to-top,
+	.dashboard-theme-toggle {
+		display: none;
+		padding: 4px 10px;
+		margin-top: 10px;
+		margin-left: 10px;
+		font-size: 12px;
+		font-weight: 500;
+		color: #999;
+	}
+	.back-to-top:hover,
+	.dashboard-theme-toggle:hover {
+		color: #563d7c;
+		text-decoration: none;
+	}
+	.dashboard-theme-toggle {
+		margin-top: 0;
+	}
+
+	@media (min-width: 768px) {
+		.back-to-top,
+		.dashboard-theme-toggle {
+			display: block;
+		}
+	}
+
+	/* Show and affix the side nav when space allows it */
+	@media (min-width: 992px) {
+		.dashboard-sidebar .nav > .active > ul {
+			display: block;
+		}
+		/* Widen the fixed sidebar */
+		.dashboard-sidebar.affix,
+		.dashboard-sidebar.affix-bottom {
+			width: 213px;
+		}
+		.dashboard-sidebar.affix {
+			position: fixed; /* Undo the static from mobile first approach */
+			top: 20px;
+		}
+		.dashboard-sidebar.affix-bottom {
+			position: absolute; /* Undo the static from mobile first approach */
+		}
+		.dashboard-sidebar.affix-bottom .dashboard-sidenav,
+		.dashboard-sidebar.affix .dashboard-sidenav {
+			margin-top: 0;
+			margin-bottom: 0;
+		}
+	}
+	@media (min-width: 1200px) {
+		/* Widen the fixed sidebar again */
+		.dashboard-sidebar.affix-bottom,
+		.dashboard-sidebar.affix {
+			width: 263px;
+		}
 	}
 	</style>
 	
@@ -52,7 +190,7 @@
 	<!-- load the dashboard manager - it will do the rest -->
 	<script type="text/javascript" src="dashboard.js"></script>
 </head>
-<body>
+<body data-spy="scroll">
 	<nav class="navbar navbar-default navbar-fixed-top" role="banner">
 		<div class="container">
 			<div class="navbar-header">
@@ -78,21 +216,22 @@
 	<div id="masthead"> 
 		<div class="container">
 			<div class="row">
-				<div class="col-md-6">
+				<div class="col-md-7">
 					<h1>Netdata Dashboard
 						<p class="lead">Real time data collection and graphs...</p>
 					</h1>
 				</div>
-				<div class="col-md-6">
+				<div class="col-md-5">
 					<div class="well well-lg">
 						<div class="row">
-							<div class="col-sm-6">
-								<div data-netdata="system.cpu" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-before="0" data-after="-60" data-width="100%" data-height="60px"></div>
+						<div class="col-md-6">
+							<b>Drag</b> charts to pan.
+							<b>Shift + wheel</b> on them, to zoom in and out.
+							<b>Double-click</b> on them, to reset.
+							<b>Hover</b> on them too!
 							</div>
-							<div class="col-sm-6">
-								Drag charts to pan.<br/>
-								Shift + wheel on them, to zoom.</br>
-								Double-click on them, to reset.
+						<div class="col-md-6">
+							<div data-netdata="system.intr" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-dygraph-type="line" data-dygraph-strokewidth="3" data-dygraph-smooth="true" data-dygraph-highlightcirclesize="6" data-after="-40" data-height="60px" data-colors="#C66"></div>
 							</div>
 						</div>
 					</div>
@@ -106,18 +245,8 @@
 			<div class="col-md-10" role="main">
 				<div id="charts_div"></div>
 			</div>
-			<div class="col-md-2" role="complementary">
-				<div class="hidden-print hidden-xs hidden-sm affix-top">
-					<ul class="nav nav-stacked" id="sidebar">
-						<li><a href="#sec0">Section 0</a>
-							<ul class="nav">
-								<li><a href="#sec0">Section 0a</a></li>
-								<li><a href="#sec0">Section 0b</a></li>
-							</ul>
-						</li>
-						<li><a href="#sec0">Section 1</a></li>
-					</ul>
-				</div>
+			<div class="col-md-2" role="main">
+				<nav class="dashboard-sidebar hidden-print hidden-xs hidden-sm" data-spy="affix" id="sidebar"></nav>
 			</div>
 		</div>
 	</div>
@@ -134,9 +263,13 @@ var options = {
 	families_idx: {},
 	chartsPerRow: 0,
 	chartsMinWidth: 1450,
-	chartsHeight: 150,
+	chartsHeight: 180,
 	sparklinesHeight: 60
-}
+};
+
+var messages = {
+	'system.cpu': 'The current CPU utilization of the system is below.<br/>Keep an eye on iowait <div data-netdata="system.cpu" data-after="-60" data-width="15%" data-height="15px" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-dimensions="iowait" data-colors="' + NETDATA.colors[8] + '" data-show-value-of-iowait-at="system.cpu.iowait.1"></div> (<span id="system.cpu.iowait.1" style="display: inline-block; min-width: 40px; text-align: right;">X</span>%). If it is constantly high, your disks are a bottleneck and they slow your system down.'
+};
 
 function screenWidth() {
 	return (($(window).width() * 0.95) - 50);
@@ -369,59 +502,38 @@ function prepareScreen(data) {
 	var duration = Math.round(($(div).width() * pcent_width / 100 * data.update_every / 3) / 60) * 60;
 	console.log(duration);
 	var html = '';
-	var sidebar = '';
+	var sidebar = '<ul class="nav dashboard-sidenav" id="sidebar_ul">';
+
+	function getMessage(id) {
+		if(typeof messages[id] !== 'undefined')
+			return messages[id];
+		else
+			return '';
+	}
 
 	// render the charts
 	$.each(options.categories, function(i, t) {
 		t.charts.sort(prioritySort);
 
-		sidebar += '<li><a href="#section' + i + '">' + t.title + '</a></li>';
-		html += '<h2 id="section' + i + '">' + t.title + '</h2>';
+		sidebar += '<li class="' + ((i === 0)?'active':'').toString() + '"><a href="#' + t.name + '">' + t.title + '</a>';
+		html += '<h1 id="' + t.name + '">' + t.title + '</h1><div id="' + t.name + '">';
 
-		if(t.name === 'net') {
+		if(t.name === 'net' || t.name === 'tc') {
 			var interfaces = uniq_with_list(t.charts, function(c) { return c.family; });
-			console.log(interfaces);
 
-			$.each(interfaces, function(i, c) {
-				html += '<div class="netdata-group-container" id="interface_' + c.name + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 class="netdata-chart-alignment">' + c.name + '</h2>';
-				$.each(c.values, function(x, f) {
-					if(f.type === 'net') {
-						html += '<div data-netdata="' + f.id + '"'
-							+ ' data-width="100%"'
-							+ ' data-height="' + options.chartsHeight.toString() + 'px"'
-							+ ' data-before="0"'
-							+ ' data-after="-' + duration.toString() + '"'
-							+ '></div>';
-					}
-					else {
-						html += '<div data-netdata="' + f.id + '"'
-							+ ' data-width="100%"'
-							+ ' data-height="' + (options.chartsHeight / 2).toString() + 'px"'
-							+ ' data-before="0"'
-							+ ' data-after="-' + duration.toString() + '"'
-							+ '></div>';
-					}
-				});
-				html += '</div>';
-			});
-		}
-		else if(t.name === 'disk') {
-			var disks = uniq_with_list(t.charts, function(c) { return c.family; });
-			console.log(disks);
-
-			$.each(disks, function(i, c) {
-				html += '<div class="netdata-group-container" id="disk_' + c.name + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 class="netdata-chart-alignment">' + c.name + '</h2>';
+			sidebar += '<ul class="nav">';
+			$.each(interfaces, function(j, c) {
+				sidebar += '<li class><a href="#' + t.name + '_' + c.name + '">' + c.name + '</a></li>';
+				html += '<div class="netdata-group-container" id="interface_' + t.name + '_' + c.name + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + t.name + '_' + c.name + '" class="netdata-chart-alignment">' + c.name + '</h2>';
 				$.each(c.values, function(x, f) {
 					var c = null;
 					var h = options.chartsHeight / 2;
 					switch(f.type) {
-						case 'disk'        : h = options.chartsHeight; break;
-						case 'disk_backlog': c = '#DD4477'; break;
-						case 'disk_util'   : c = '#109618'; break;
-						case 'disk_qops'   : c = '#8B0707'; break;
+						case 'net'        : h = options.chartsHeight; break;
+						case 'tc'         : h = options.chartsHeight; break;
 					}
 
-					html += '<div data-netdata="' + f.id + '"'
+					html += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
 						+ ' data-width="100%"'
 						+ ' data-height="' + h.toString() + 'px"'
 						+ ' data-before="0"'
@@ -431,10 +543,61 @@ function prepareScreen(data) {
 				});
 				html += '</div>';
 			});
+			sidebar += '</ul>';
+		}
+		else if(t.name === 'disk') {
+			var disks = uniq_with_list(t.charts, function(c) { return c.family; });
+
+			sidebar += '<ul class="nav">';
+			$.each(disks, function(j, c) {
+				sidebar += '<li class><a href="#' + c.name + '">' + c.name + '</a></li>';
+				html += '<div class="netdata-group-container" id="disk_' + c.name + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + c.name + '" class="netdata-chart-alignment">' + c.name + '</h2>';
+				$.each(c.values, function(x, f) {
+					var c = null;
+					var h = options.chartsHeight / 2;
+					switch(f.type) {
+						case 'disk'        : h = options.chartsHeight; break;
+						case 'disk_backlog': c = '#DD4477'; break;
+						case 'disk_util'   : c = '#109618'; break;
+						case 'disk_qops'   : c = '#E67300'; break;
+					}
+
+					html += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
+						+ ' data-width="100%"'
+						+ ' data-height="' + h.toString() + 'px"'
+						+ ' data-before="0"'
+						+ ' data-after="-' + duration.toString() + '"'
+						+ ' data-colors="' + c + '"'
+						+ '></div>';
+				});
+				html += '</div>';
+			});
+			sidebar += '</ul>';
+		}
+		else if(t.name === 'apps') {
+			$.each(t.charts, function(x, f) {
+				var c = null;
+				var h = options.chartsHeight / 2;
+				switch(f.id) {
+					case 'apps.cpu'         : h = options.chartsHeight; break;
+					case 'apps.preads'      : h = options.chartsHeight; break;
+					case 'apps.pwrites'     : h = options.chartsHeight; break;
+					case 'apps.mem'         : h = options.chartsHeight; break;
+					case 'apps.major_faults': h = options.chartsHeight; break;
+				}
+
+				html += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
+					+ ' data-width="100%"'
+					+ ' data-height="' + h.toString() + 'px"'
+					+ ' data-before="0"'
+					+ ' data-after="-' + duration.toString() + '"'
+					+ ' data-colors="' + c + '"'
+					+ '></div>';
+			});
 		}
 		else {
 			$.each(t.charts, function(x, c) {
-				html += '<div data-netdata="' + c.id + '"'
+				html += getMessage(c.id) + '<div data-netdata="' + c.id + '"'
 					+ ' data-width="' + pcent_width.toString() + '%"'
 					+ ' data-height="' + options.chartsHeight.toString() + 'px"'
 					+ ' data-before="0"'
@@ -443,9 +606,12 @@ function prepareScreen(data) {
 			});
 		}
 
-		html += '';
+		sidebar += '</li>';
+		html += '</div><hr/>';
 	});
+	sidebar += '</ul>';
 
+	// show the colors
 	html += '<br/>'
 	$.each(NETDATA.colors, function(i, c){
 		html += '<div style="display: inline-block;"><div style="display: inline-block; width: 100px; height: 100px; background: ' + c + ';"></div><br/>' + c + '</div>';
@@ -453,40 +619,50 @@ function prepareScreen(data) {
 
 	div.innerHTML = html;
 	document.getElementById('sidebar').innerHTML = sidebar;
+
+	// resize all charts - without starting the background thread
+	// this has to be done while NETDATA is paused
+	// if we ommit this, the affix menu will be wrong, since all
+	// the Dom elements are initially zero-sized
+	NETDATA.parseDom();
+
+	// let it run (update the charts)
 	NETDATA.unpause();
 
-	/* activate sidebar */
-	$('#sidebar').affix({
+	// check if we have to jump to a specific section
+	var hash = location.hash.replace('#','');
+	if(hash != '') {
+		// Clear the hash in the URL
+		// location.hash = '';   // delete front "//" if you want to change the address bar
+		$('html, body').animate({ scrollTop: $(location.hash).offset().top}, 0);
+	}
+
+	/* activate bootstrap scrollspy (needed for sidebar) */
+	$(document.body).scrollspy({
+		target: '#sidebar',
+		offset: $(window).height() / 3 // controls the diff of the <hX> element to the top, to select it
+	});
+
+	/* activate bootstrap sidebar (affix) */
+	$('#sidebar_ul').affix({
 		offset: {
 			top: 200
 		}
 	});
-
-	// fix for jumping to proper anchor after ajax
-	$(window).load(function(){
-		// Remove the # from the hash, as different browsers may or may not include it
-		var hash = location.hash.replace('#','');
-
-		if(hash != '') {
-			// Clear the hash in the URL
-			// location.hash = '';   // delete front "//" if you want to change the address bar
-			$('html, body').animate({ scrollTop: $(location.hash).offset().top - 55}, 0);
-		}
-	});
-
-	/* activate scrollspy menu */
-	$(document.body).scrollspy({
-		target: '#leftCol',
-		offset: -55
-	});
 }
 
 NETDATA.ready(function() {
+
+	// download all the charts the server knows
 	NETDATA.chartRegistry.downloadAll(NETDATA.serverDefault, function(data) {
-		NETDATA.pause(function () {
+
+		// pause the NETDATA thread that updates the charts
+		NETDATA.pause(function() {
+
+			// prepare our DOM
+			// this will be called when NETDATA is paused
 			prepareScreen(data);
 		});
 	});
 });
-
 </script>
