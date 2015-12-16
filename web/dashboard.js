@@ -5,6 +5,8 @@
 // var netdataNoPeitys = true;			// do not use peity
 // var netdataNoGoogleCharts = true;	// do not use google
 // var netdataNoMorris = true;			// do not use morris
+// var netdataNoEasyPieChart = true;	// do not use easy pie chart
+// var netdataNoBootstrap = true;		// do not load bootstrap
 // var netdataDontStart = true;			// do not start the thread to process the charts
 //
 // You can also set the default netdata server, using the following.
@@ -13,7 +15,7 @@
 // var netdataServer = "http://yourhost:19999"; // set your NetData server
 
 //(function(window, document, undefined) {
-	// fix IE bug with console
+	// fix IE issue with console
 	if(!window.console){ window.console = {log: function(){} }; }
 
 	// global namespace
@@ -161,14 +163,16 @@
 
 			idle_between_charts: 100,	// ms - how much time to wait between chart updates
 
-			fast_render_timeframe: 100, // ms - render continously until this time of continious
+			fast_render_timeframe: 200, // ms - render continously until this time of continious
 										// rendering has been reached
 										// this setting is used to make it render e.g. 10
 										// charts at once, sleep idle_between_charts time
 										// and continue for another 10 charts.
 
-			idle_between_loops: 200,	// ms - if all charts have been updated, wait this
+			idle_between_loops: 500,	// ms - if all charts have been updated, wait this
 										// time before starting again.
+
+			idle_parallel_loops: 100,	// ms - the time between parallel refresher updates
 
 			idle_lost_focus: 500,		// ms - when the window does not have focus, check
 										// if focus has been regained, every this time
@@ -192,6 +196,8 @@
 			parallel_refresher: true,	// enable parallel refresh of charts
 
 			destroy_on_hide: false,		// destroy charts when they are not visible
+
+			eliminate_zero_dimensions: true, // do not show dimensions with just zeros
 
 			color_fill_opacity: {
 				line: 1.0,
@@ -223,6 +229,7 @@
 
 	window.onscroll = function(event) {
 		NETDATA.options.last_page_scroll = new Date().getTime();
+		if(NETDATA.options.targets === null) return;
 
 		// when the user scrolls he sees that we have
 		// hidden all the not-visible charts
@@ -453,6 +460,8 @@
 			library: null,			// object - the chart library used
 
 			colors: null,
+			colors_assigned: {},
+			colors_available: null,
 
 			element: element,		// the element already created by the user
 			element_message: null,
@@ -889,7 +898,7 @@
 	}
 
 	chartState.prototype.legendFormatValue = function(value) {
-		if(value === null) return '-';
+		if(value === null || value === 'undefined') return '-';
 		if(typeof value !== 'number') return value;
 
 		var abs = Math.abs(value);
@@ -915,7 +924,7 @@
 
 	chartState.prototype.legendSetDate = function(ms) {
 		if(typeof ms !== 'number') {
-			this.legendUndefined();
+			this.legendShowUndefined();
 			return;
 		}
 
@@ -931,7 +940,7 @@
 			this.element_legend_childs.title_units.innerHTML = this.chart.units;
 	}
 
-	chartState.prototype.legendUndefined = function() {
+	chartState.prototype.legendShowUndefined = function() {
 		if(this.element_legend_childs.title_date)
 			this.element_legend_childs.title_date.innerHTML = '&nbsp;';
 
@@ -959,7 +968,7 @@
 		if(this.selected) return;
 
 		if(this.current.data === null || this.element_legend_childs.series === null) {
-			this.legendUndefined();
+			this.legendShowUndefined();
 			return;
 		}
 
@@ -968,7 +977,7 @@
 			show_undefined = false;
 
 		if(show_undefined)
-			this.legendUndefined();
+			this.legendShowUndefined();
 		else
 			this.legendSetDate(this.current.data.before * 1000);
 
@@ -991,28 +1000,51 @@
 		this.legendShowLatestValues();
 	}
 
+	// this should be called just ONCE per dimension per chart
+	chartState.prototype._chartDimensionColor = function(label) {
+		if(this.colors === null)
+			this.chartColors();
+
+		if(typeof this.colors_assigned[label] === 'undefined') {
+			if(this.colors_available.length === 0) {
+				for(var i = 0, len = NETDATA.colors.length; i < len ; i++)
+					this.colors_available.push(NETDATA.colors[i]);
+			}
+
+			this.colors_assigned[label] = this.colors_available.shift();
+			if(this.debug) this.log('label "' + label + '" got color "' + this.colors_assigned[label]);
+		}
+		else {
+			if(this.debug) this.log('label "' + label + '" already has color "' + this.colors_assigned[label] + '"');
+		}
+
+		this.colors.push(this.colors_assigned[label]);
+		return this.colors_assigned[label];
+	}
+
 	chartState.prototype.chartColors = function() {
 		if(this.colors !== null) return this.colors;
 
-		this.colors = $(this.element).data('colors');
-		if(typeof this.colors === 'undefined' || this.colors === null)
-			this.colors = NETDATA.colors;
-		else {
-			// console.log(this.colors);
-			var s = this.colors;
-			if(typeof s === 'string') s = s.split(' ');
+		this.colors = new Array();
 
-			this.colors = new Array();
-			var self = this;
-			$.each(s, function(i, c) {
-				self.colors.push(c);
-			});
+		if(this.colors_available === null) {
+			this.colors_available = new Array();
 
-			// push the default colors too
-			var self = this;
-			$.each(NETDATA.colors, function(i, c) {
-				self.colors.push(c);
-			});
+			var c = $(this.element).data('colors');
+			if(typeof c !== 'undefined' && c !== null) {
+				if(typeof c !== 'string') {
+					this.log('invalid color given: ' + c + ' (give a space separated list of colors)');
+				}
+				else {
+					c = c.split(' ');
+					for(var i = 0, len = c.length; i < len ; i++)
+						this.colors_available.push(c[i]);
+				}
+			}
+
+			// push all the standard colors too
+			for(var i = 0, len = NETDATA.colors.length; i < len ; i++)
+				this.colors_available.push(NETDATA.colors[i]);
 		}
 
 		return this.colors;
@@ -1030,31 +1062,47 @@
 			// this.log('the chart does not have any data - requesting legend update');
 			needed = true;
 		}
+		else if(typeof this.element_legend_childs.series.labels_key === 'undefined') {
+			needed = true;
+		}
 		else {
-			// this.log('checking existing legend');
-			var labels = this.current.data.dimension_names;
-			var i = labels.length;
-			while(i--) {
-				var name = labels[i];
-				if(typeof this.element_legend_childs.series[name] === 'undefined') {
-					// this.log('legend is incosistent - missing dimension:' + name);
-					needed = true;
-					break;
-				}
-				else if(Math.abs(this.current.data.last_entry_t - this.current.data.before) <= this.current.data.view_update_every) {
-					// this.log('setting legend of ' + name + ' to ' + this.current.data.latest_values[i]);
-					this.legendSetLabelValue(name, this.current.data.latest_values[i]);
-				}
+			var labels = this.current.data.dimension_names.toString();
+			if(labels !== this.element_legend_childs.series.labels_key) {
+				needed = true;
+				if(this.debug) this.log('NEW LABELS: "' + labels + '" NOT EQUAL OLD LABELS: "' + this.element_legend_childs.series.labels_key + '"');
 			}
 		}
 
-		if(!needed) return;
+		if(!needed) {
+			// make sure there are colors available
+			if(this.colors === null) this.colors = NETDATA.colors;
+
+			// do we have to update the current values?
+			// we do this, only when the visible chart is current
+			if(Math.abs(this.current.data.last_entry_t - this.current.data.before) <= this.current.data.view_update_every) {
+				if(this.debug) this.log('chart in running... updating values on legend...');
+				var labels = this.current.data.dimension_names;
+				var i = labels.length;
+				while(i--)
+					this.legendSetLabelValue(labels[i], this.current.data.latest_values[i]);
+			}
+			return;
+		}
+		if(this.colors === null) {
+			// this is the first time we update the chart
+			// let's assign colors to all dimensions
+			if(this.library.track_colors() === true)
+				for(var dim in this.chart.dimensions)
+					this._chartDimensionColor(this.chart.dimensions[dim].name);
+		}
+		// we will re-generate the colors for the chart
+		this.colors = null;
 
 		if(this.debug) this.log('updating Legend DOM');
 
 		self = $(this.element);
 		var genLabel = function(state, parent, name, count) {
-			var c = count % state.chartColors().length;
+			var color = state._chartDimensionColor(name);
 
 			var user_element = null;
 			var user_id = self.data('show-value-of-' + name + '-at') || null;
@@ -1078,7 +1126,7 @@
 			label.name.title = name;
 			label.value.title = name;
 
-			var rgb = NETDATA.colorHex2Rgb(state.chartColors()[c]);
+			var rgb = NETDATA.colorHex2Rgb(color);
 			label.name.innerHTML = '<table class="netdata-legend-name-table-'
 				+ state.chart.chart_type
 				+ '" style="background-color: '
@@ -1088,8 +1136,8 @@
 			var text = document.createTextNode(' ' + name);
 			label.name.appendChild(text);
 
-			label.name.style.color = state.chartColors()[c];
-			label.value.style.color = state.chartColors()[c];
+			label.name.style.color = color;
+			label.value.style.color = color;
 
 			if(count > 0)
 				parent.appendChild(document.createElement('br'));
@@ -1154,16 +1202,21 @@
 		}
 
 		if(this.current.data) {
-			var me = this;
-			$.each(me.current.data.dimension_names, function(i, d) {
-				genLabel(me, content, d, i);
-			});
+			this.element_legend_childs.series.labels_key = this.current.data.dimension_names.toString();
+			if(this.debug) this.log('SET DATA LABELS: "' + this.element_legend_childs.series.labels_key + '"');
+
+			for(var i = 0, len = this.current.data.dimension_names.length; i < len ;i++) {
+				genLabel(this, content, this.current.data.dimension_names[i], i);
+			}
 		}
 		else {
-			var me = this;
-			$.each(me.chart.dimensions, function(i, d) {
-				genLabel(me, content, d.name, i);
-			});
+			var tmp = new Array();
+			for(var dim in this.chart.dimensions) {
+				tmp.push(this.chart.dimensions[dim].name);
+				genLabel(this, content, this.chart.dimensions[dim].name, i);
+			}
+			this.element_legend_childs.series.labels_key = tmp.toString();
+			if(this.debug) this.log('SET DEFAULT LABELS: "' + this.element_legend_childs.series.labels_key + '"');
 		}
 
 		// create a hidden div to be used for hidding
@@ -1291,6 +1344,9 @@
 		this.current.url += "&options=" + this.library.options();
 		this.current.url += '|jsonwrap';
 
+		if(NETDATA.options.current.eliminate_zero_dimensions === true)
+			this.current.url += '|nonzero';
+
 		if(after)
 			this.current.url += "&after="  + after.toString();
 
@@ -1306,8 +1362,10 @@
 	chartState.prototype.updateChartWithData = function(data) {
 		if(this.debug) this.log('got data from netdata server');
 		this.current.data = data;
+		this.updates_counter++;
 
-		var started = this.tm.last_updated = new Date().getTime();
+		var started = new Date().getTime();
+		this.tm.last_updated = started;
 
 		// if the result is JSON, find the latest update-every
 		if(typeof data === 'object') {
@@ -1332,8 +1390,6 @@
 			data.state = this;
 		}
 
-		this.updates_counter++;
-
 		if(this.debug) {
 			this.log('UPDATE No ' + this.updates_counter + ' COMPLETED');
 
@@ -1345,6 +1401,11 @@
 			this.log('STATUS: requested: ' + (this.current.requested_after_ms / 1000).toString() + ' - ' + (this.current.requested_before_ms / 1000).toString());
 			this.log('STATUS: rendered : ' + (this.current.after_ms / 1000).toString() + ' - ' + (this.current.before_ms / 1000).toString());
 			this.log('STATUS: points   : ' + (this.current.points).toString() + ', min step: ' + (this._minPanOrZoomStep() / 1000).toString());
+		}
+
+		if(data.points === 0) {
+			this.noData();
+			return;
 		}
 
 		// this may force the chart to be re-created
@@ -1403,8 +1464,12 @@
 		// forced to be updated with global PanAndZoom
 		if(NETDATA.globalPanAndZoom.isActive())
 			this.current.last_autorefreshed = 0;
-		else
-			this.current.last_autorefreshed = now;
+		else {
+			//if(NETDATA.options.current.parallel_refresher === true)
+			//	this.current.last_autorefreshed = Math.round(now / 1000) * 1000;
+			//else
+				this.current.last_autorefreshed = now;
+		}
 
 		this.refresh_dt_ms = now - started;
 		NETDATA.options.auto_refresher_fast_weight += this.refresh_dt_ms;
@@ -1429,9 +1494,16 @@
 		}
 
 		if(this.library.initialized === false) {
-			var self = this;
-			this.library.initialize(function() { self.updateChart(callback); });
-			return;
+			if(this.library.enabled === true) {
+				var self = this;
+				this.library.initialize(function() { self.updateChart(callback); });
+				return;
+			}
+			else {
+				this.error('chart library "' + this.library_name + '" is not available.');
+				if(typeof callback === 'function') callback();
+				return false;
+			}
 		}
 
 		this.clearSelection();
@@ -1462,6 +1534,8 @@
 	}
 
 	chartState.prototype.destroyChart = function() {
+		if(this.debug === true) this.log('destroying chart');
+
 		this.current.last_autorefreshed = new Date().getTime();
 
 		if(this.element_message !== null) {
@@ -1528,6 +1602,8 @@
 
 	chartState.prototype.unhideChart = function() {
 		if(typeof this.___isHidden___ !== 'undefined' && this.enabled === true) {
+			if(this.debug === true) this.log('unhiding chart');
+
 			this.element_message.style.display = 'none';
 			if(this.element_chart !== null) this.element_chart.style.display = 'inline-block';
 			if(this.element_legend !== null) this.element_legend.style.display = 'inline-block';
@@ -1548,6 +1624,7 @@
 			if(NETDATA.options.current.destroy_on_hide === true)
 				this.destroyChart();
 
+			if(this.debug === true) this.log('hiding chart');
 			this.element_message.style.display = 'inline-block';
 			if(this.element_chart !== null) this.element_chart.style.display = 'none';
 			if(this.element_legend !== null) this.element_legend.style.display = 'none';
@@ -1561,6 +1638,8 @@
 
 	chartState.prototype.hideLoading = function() {
 		if(typeof this.___showsLoading___ !== 'undefined' && this.enabled === true) {
+			if(this.debug === true) this.log('hide loading...');
+
 			this.element_message.style.display = 'none';
 			if(this.element_chart !== null) this.element_chart.style.display = 'inline-block';
 			if(this.element_legend !== null) this.element_legend.style.display = 'inline-block';
@@ -1573,6 +1652,8 @@
 
 	chartState.prototype.showLoading = function() {
 		if(typeof this.___showsLoading___ === 'undefined' && this.tm.last_created === 0 && this.enabled === true) {
+			if(this.debug === true) this.log('show loading...');
+
 			this.element_message.style.display = 'none';
 			if(this.element_chart !== null) this.element_chart.style.display = 'none';
 			if(this.element_legend !== null) this.element_legend.style.display = 'none';
@@ -1586,8 +1667,10 @@
 
 	chartState.prototype.isVisible = function() {
 		// this.log('last_visible_check: ' + this.tm.last_visible_check + ', last_page_scroll: ' + NETDATA.options.last_page_scroll);
-		if(this.tm.last_visible_check > NETDATA.options.last_page_scroll)
+		if(this.tm.last_visible_check > NETDATA.options.last_page_scroll) {
+			if(this.debug === true) this.log('isVisible: ' + this.___isVisible___);
 			return this.___isVisible___;
+		}
 
 		this.tm.last_visible_check = new Date().getTime();
 
@@ -1609,12 +1692,14 @@
 			// the chart is too far
 			this.___isVisible___ = false;
 			if(this.tm.last_created !== 0) this.hideChart();
+			if(this.debug === true) this.log('isVisible: ' + this.___isVisible___);
 			return this.___isVisible___;
 		}
 		else {
 			// the chart is inside or very close
 			this.___isVisible___ = true;
 			this.unhideChart();
+			if(this.debug === true) this.log('isVisible: ' + this.___isVisible___);
 			return this.___isVisible___;
 		}
 	}
@@ -1757,13 +1842,20 @@
 			$(this.element).css('min-width', NETDATA.chartDefaults.min_width);
 	}
 
+	chartState.prototype.noData = function() {
+		if(this.tm.last_created === 0) {
+			this.createChartDOM();
+			this.tm.last_created = new Date().getTime();
+		}
+
+		this.current.last_autorefreshed = new Date().getTime();
+		this.current.view_update_every = 30 * 1000;
+	}
+
 	// show a message in the chart
 	chartState.prototype.message = function(type, msg) {
 		this.hideChart();
 		this.element_message.innerHTML = msg;
-
-		// reset the creation datetime
-		// since we overwrote the whole element
 		if(this.debug) this.log(msg);
 	}
 
@@ -1941,10 +2033,12 @@
 
 	// ----------------------------------------------------------------------------------------------------------------
 
+	// this is purely sequencial charts refresher
+	// it is meant to be autonomous
 	NETDATA.chartRefresherNoParallel = function(index) {
 		if(NETDATA.options.debug.mail_loop) console.log('NETDATA.chartRefresherNoParallel(' + index + ')');
 
-		if(NETDATA.options.updated_dom) {
+		if(NETDATA.options.updated_dom === true) {
 			// the dom has been updated
 			// get the dom parts again
 			NETDATA.parseDom(NETDATA.chartRefresher);
@@ -1981,8 +2075,14 @@
 		}
 	}
 
-	NETDATA.chartRefresher_sequencial = function() {
-		if(NETDATA.options.updated_dom) {
+	// this is part of the parallel refresher
+	// its cause is to refresh sequencially all the charts
+	// that depend on chart library initialization
+	// it will call the parallel refresher back
+	// as soon as it sees a chart that its chart library
+	// is initialized
+	NETDATA.chartRefresher_unitialized = function() {
+		if(NETDATA.options.updated_dom === true) {
 			// the dom has been updated
 			// get the dom parts again
 			NETDATA.parseDom(NETDATA.chartRefresher);
@@ -1993,18 +2093,28 @@
 			NETDATA.chartRefresher();
 		else {
 			var state = NETDATA.options.sequencial.pop();
-			if(state.library.initialized)
+			if(state.library.initialized === true)
 				NETDATA.chartRefresher();
 			else
-				state.autoRefresh(NETDATA.chartRefresher_sequencial);
+				state.autoRefresh(NETDATA.chartRefresher_unitialized);
 		}
 	}
 
+	NETDATA.chartRefresherWaitTime = function() {
+		return NETDATA.options.current.idle_parallel_loops;
+	}
+
+	// the default refresher
+	// it will create 2 sets of charts:
+	// - the ones that can be refreshed in parallel
+	// - the ones that depend on something else
+	// the first set will be executed in parallel
+	// the second will be given to NETDATA.chartRefresher_unitialized()
 	NETDATA.chartRefresher = function() {
-		if(NETDATA.options.pause) {
+		if(NETDATA.options.pause === true) {
 			// console.log('auto-refresher is paused');
 			setTimeout(NETDATA.chartRefresher,
-				NETDATA.options.current.idle_between_loops);
+				NETDATA.chartRefresherWaitTime());
 			return;
 		}
 
@@ -2013,50 +2123,60 @@
 			NETDATA.options.pause = true;
 			NETDATA.options.pauseCallback();
 			NETDATA.chartRefresher();
+			return;
 		}
 
-		if(!NETDATA.options.current.parallel_refresher) {
+		if(NETDATA.options.current.parallel_refresher === false) {
 			NETDATA.chartRefresherNoParallel(0);
 			return;
 		}
 
-		if(NETDATA.options.updated_dom) {
+		if(NETDATA.options.updated_dom === true) {
 			// the dom has been updated
 			// get the dom parts again
 			NETDATA.parseDom(NETDATA.chartRefresher);
 			return;
 		}
 
-		NETDATA.options.parallel = new Array();
-		NETDATA.options.sequencial = new Array();
-
+		var parallel = new Array();
 		var targets = NETDATA.options.targets;
 		var len = targets.length;
 		while(len--) {
-			var state = targets[len];
+			if(!targets[len].isVisible()) continue;
 
-			if(!state.library.initialized)
-				NETDATA.options.sequencial.push(state);
-			else
-				NETDATA.options.parallel.push(state);
+			var state = targets[len];
+			if(state.library.initialized === false) {
+				if(state.library.enabled === true) {
+					state.library.initialize(NETDATA.chartRefresher);
+					return;
+				}
+				else {
+					state.error('chart library "' + state.library_name + '" is not enabled.');
+					state.enabled = false;
+				}
+			}
+
+			parallel.unshift(state);
 		}
 
-		if(NETDATA.options.parallel.length > 0) {
-			NETDATA.options.parallel_jobs = NETDATA.options.parallel.length;
+		if(parallel.length > 0) {
+			var parallel_jobs = parallel.length;
 
-			$(NETDATA.options.parallel).each(function() {
+			// this will execute the jobs in parallel
+			$(parallel).each(function() {
 				this.autoRefresh(function() {
-					NETDATA.options.parallel_jobs--;
-					if(NETDATA.options.parallel_jobs === 0) {
-						setTimeout(NETDATA.chartRefresher_sequencial,
-							NETDATA.options.current.idle_between_charts);
+					parallel_jobs--;
+					
+					if(parallel_jobs === 0) {
+						setTimeout(NETDATA.chartRefresher,
+							NETDATA.chartRefresherWaitTime());
 					}
 				});
 			})
 		}
 		else {
-			setTimeout(NETDATA.chartRefresher_sequencial,
-				NETDATA.options.current.idle_between_charts);
+			setTimeout(NETDATA.chartRefresher,
+				NETDATA.chartRefresherWaitTime());
 		}
 	}
 
@@ -2114,16 +2234,17 @@
 				cache: true,
 				dataType: "script"
 			})
-				.done(function() {
-					NETDATA.registerChartLibrary('peity', NETDATA.peity_js);
-				})
-				.fail(function() {
-					NETDATA.error(100, NETDATA.peity_js);
-				})
-				.always(function() {
-					if(typeof callback === "function")
-						callback();
-				})
+			.done(function() {
+				NETDATA.registerChartLibrary('peity', NETDATA.peity_js);
+			})
+			.fail(function() {
+				NETDATA.chartLibraries.peity.enabled = false;
+				NETDATA.error(100, NETDATA.peity_js);
+			})
+			.always(function() {
+				if(typeof callback === "function")
+					callback();
+			});
 		}
 		else {
 			NETDATA.chartLibraries.peity.enabled = false;
@@ -2133,19 +2254,33 @@
 	};
 
 	NETDATA.peityChartUpdate = function(state, data) {
-		$(state.peity_instance).html(data.result);
-		// $(state.element_chart).change() does not accept options
-		// to pass width and height
-		//$(state.peity_instance).change();
-		$(state.peity_instance).peity('line', { width: state.chartWidth(), height: state.chartHeight() });
+		state.peity_instance.innerHTML = data.result;
+
+		if(state.peity_options.stroke !== state.chartColors()[0]) {
+			state.peity_options.stroke = state.chartColors()[0];
+			if(state.chart.chart_type === 'line')
+				state.peity_options.fill = '#FFF';
+			else
+				state.peity_options.fill = NETDATA.colorLuminance(state.chartColors()[0], NETDATA.chartDefaults.fill_luminance);
+		}
+
+		$(state.peity_instance).peity('line', state.peity_options);
 	}
 
 	NETDATA.peityChartCreate = function(state, data) {
 		state.peity_instance = document.createElement('div');
 		state.element_chart.appendChild(state.peity_instance);
 
-		$(state.peity_instance).html(data.result);
-		$(state.peity_instance).peity('line', { width: state.chartWidth(), height: state.chartHeight() });
+		var self = $(state.element);
+		state.peity_options = {
+			stroke: '#000',
+			strokeWidth: self.data('peity-strokewidth') || 1,
+			width: state.chartWidth(),
+			height: state.chartHeight(),
+			fill: '#000'
+		};
+
+		NETDATA.peityChartUpdate(state, data);
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -2158,16 +2293,17 @@
 				cache: true,
 				dataType: "script"
 			})
-				.done(function() {
-					NETDATA.registerChartLibrary('sparkline', NETDATA.sparkline_js);
-				})
-				.fail(function() {
-					NETDATA.error(100, NETDATA.sparkline_js);
-				})
-				.always(function() {
-					if(typeof callback === "function")
-						callback();
-				})
+			.done(function() {
+				NETDATA.registerChartLibrary('sparkline', NETDATA.sparkline_js);
+			})
+			.fail(function() {
+				NETDATA.chartLibraries.sparkline.enabled = false;
+				NETDATA.error(100, NETDATA.sparkline_js);
+			})
+			.always(function() {
+				if(typeof callback === "function")
+					callback();
+			});
 		}
 		else {
 			NETDATA.chartLibraries.sparkline.enabled = false;
@@ -2300,7 +2436,7 @@
 				state.dygraph_instance.setSelection(r);
 			else {
 				state.dygraph_instance.clearSelection();
-				state.legendUndefined();
+				state.legendShowUndefined();
 			}
 		}
 
@@ -2320,15 +2456,18 @@
 			cache: true,
 			dataType: "script"
 		})
-			.done(function() {
-				NETDATA.dygraph.smooth = true;
-				smoothPlotter.smoothing = 0.3;
-			})
-			.always(function() {
-				if(typeof callback === "function")
-					callback();
-			})
-	};
+		.done(function() {
+			NETDATA.dygraph.smooth = true;
+			smoothPlotter.smoothing = 0.3;
+		})
+		.fail(function() {
+			NETDATA.dygraph.smooth = false;
+		})
+		.always(function() {
+			if(typeof callback === "function")
+				callback();
+		});
+	}
 
 	NETDATA.dygraphInitialize = function(callback) {
 		if(typeof netdataNoDygraphs === 'undefined' || !netdataNoDygraphs) {
@@ -2337,15 +2476,19 @@
 				cache: true,
 				dataType: "script"
 			})
-				.done(function() {
-					NETDATA.registerChartLibrary('dygraph', NETDATA.dygraph_js);
+			.done(function() {
+				NETDATA.registerChartLibrary('dygraph', NETDATA.dygraph_js);
+			})
+			.fail(function() {
+				NETDATA.chartLibraries.dygraph.enabled = false;
+				NETDATA.error(100, NETDATA.dygraph_js);
+			})
+			.always(function() {
+				if(NETDATA.chartLibraries.dygraph.enabled === true)
 					NETDATA.dygraphSmoothInitialize(callback);
-				})
-				.fail(function() {
-					NETDATA.error(100, NETDATA.dygraph_js);
-					if(typeof callback === "function")
-						callback();
-				})
+				else if(typeof callback === "function")
+					callback();
+			});
 		}
 		else {
 			NETDATA.chartLibraries.dygraph.enabled = false;
@@ -2369,6 +2512,7 @@
 			if(NETDATA.options.debug.dygraph || state.debug) state.log('dygraphChartUpdate() loose update');
 			dygraph.updateOptions({
 				file: data.result.data,
+				colors: state.chartColors(),
 				labels: data.result.labels,
 				labelsDivWidth: state.chartWidth() - 70
 			});
@@ -2377,6 +2521,7 @@
 			if(NETDATA.options.debug.dygraph || state.debug) state.log('dygraphChartUpdate() strict update');
 			dygraph.updateOptions({
 				file: data.result.data,
+				colors: state.chartColors(),
 				labels: data.result.labels,
 				labelsDivWidth: state.chartWidth() - 70,
 				dateWindow: null,
@@ -2406,9 +2551,6 @@
 		var highlightCircleSize = (NETDATA.chartLibraries.dygraph.isSparkline(state))?3:4;
 
 
-		//if(state.id == 'system.cpu')
-		//	console.log(data);
-
 		state.dygraph_options = {
 			colors: self.data('dygraph-colors') || state.chartColors(),
 			
@@ -2420,7 +2562,6 @@
 			title: self.data('dygraph-title') || state.chart.title,
 			titleHeight: self.data('dygraph-titleheight') || 19,
 
-//			legend: self.data('dygraph-legend') || NETDATA.chartLibraries.dygraph.legend(state)?'always':'never', // 'onmouseover',
 			legend: self.data('dygraph-legend') || 'always', // 'onmouseover',
 			labels: data.result.labels,
 			labelsDiv: self.data('dygraph-labelsdiv') || state.element_legend_childs.hidden,
@@ -2657,7 +2798,7 @@
 
 						// http://dygraphs.com/gallery/interaction-api.js
 						var normal = (event.detail) ? event.detail * -1 : event.wheelDelta / 40;
-						var percentage = normal / 25;
+						var percentage = normal / 10;
 
 						var before_old = state.current.before_ms;
 						var after_old = state.current.after_ms;
@@ -2709,8 +2850,7 @@
 			state.dygraph_options.rightGap = 0;
 		}
 		
-		if(smooth === true && typeof smoothPlotter === 'function')
-			state.dygraph_options.plotter = smoothPlotter;
+		if(smooth === true) state.dygraph_options.plotter = smoothPlotter;
 
 		state.dygraph_instance = new Dygraph(state.element_chart,
 			data.result.data, state.dygraph_options);
@@ -2745,16 +2885,17 @@
 					cache: true,
 					dataType: "script"
 				})
-					.done(function() {
-						NETDATA.registerChartLibrary('morris', NETDATA.morris_js);
-					})
-					.fail(function() {
-						NETDATA.error(100, NETDATA.morris_js);
-					})
-					.always(function() {
-						if(typeof callback === "function")
-							callback();
-					})
+				.done(function() {
+					NETDATA.registerChartLibrary('morris', NETDATA.morris_js);
+				})
+				.fail(function() {
+					NETDATA.chartLibraries.morris.enabled = false;
+					NETDATA.error(100, NETDATA.morris_js);
+				})
+				.always(function() {
+					if(typeof callback === "function")
+						callback();
+				});
 			}
 		}
 		else {
@@ -2800,22 +2941,23 @@
 	// raphael
 
 	NETDATA.raphaelInitialize = function(callback) {
-		if(typeof netdataStopRaphael === 'undefined') {
+		if(typeof netdataStopRaphael === 'undefined' || !netdataStopRaphael) {
 			$.ajax({
 				url: NETDATA.raphael_js,
 				cache: true,
 				dataType: "script"
 			})
-				.done(function() {
-					NETDATA.registerChartLibrary('raphael', NETDATA.raphael_js);
-				})
-				.fail(function() {
-					NETDATA.error(100, NETDATA.raphael_js);
-				})
-				.always(function() {
-					if(typeof callback === "function")
-						callback();
-				})
+			.done(function() {
+				NETDATA.registerChartLibrary('raphael', NETDATA.raphael_js);
+			})
+			.fail(function() {
+				NETDATA.chartLibraries.raphael.enabled = false;
+				NETDATA.error(100, NETDATA.raphael_js);
+			})
+			.always(function() {
+				if(typeof callback === "function")
+					callback();
+			});
 		}
 		else {
 			NETDATA.chartLibraries.raphael.enabled = false;
@@ -2848,19 +2990,19 @@
 				cache: true,
 				dataType: "script"
 			})
-				.done(function() {
-					NETDATA.registerChartLibrary('google', NETDATA.google_js);
-
-					google.load('visualization', '1.1', {
-						'packages': ['corechart', 'controls'],
-						'callback': callback
-					});
-				})
-				.fail(function() {
-					NETDATA.error(100, NETDATA.google_js);
-					if(typeof callback === "function")
-						callback();
-				})
+			.done(function() {
+				NETDATA.registerChartLibrary('google', NETDATA.google_js);
+				google.load('visualization', '1.1', {
+					'packages': ['corechart', 'controls'],
+					'callback': callback
+				});
+			})
+			.fail(function() {
+				NETDATA.chartLibraries.google.enabled = false;
+				NETDATA.error(100, NETDATA.google_js);
+				if(typeof callback === "function")
+					callback();
+			});
 		}
 		else {
 			NETDATA.chartLibraries.google.enabled = false;
@@ -2966,7 +3108,7 @@
 	// easy-pie-chart
 
 	NETDATA.easypiechartInitialize = function(callback) {
-		if(typeof netdataStopEasypiechart === 'undefined') {
+		if(typeof netdataNoEasyPieChart === 'undefined' || !netdataNoEasyPieChart) {
 			$.ajax({
 				url: NETDATA.easypiechart_js,
 				cache: true,
@@ -3041,6 +3183,7 @@
 			},
 			autoresize: function(state) { return true; },
 			max_updates_to_recreate: function(state) { return 5000; },
+			track_colors: function(state) { return true; },
 			pixels_per_point: function(state) {
 				if(!this.isSparkline(state))
 					return 3;
@@ -3072,6 +3215,7 @@
 			legend: function(state) { return null; },
 			autoresize: function(state) { return false; },
 			max_updates_to_recreate: function(state) { return 5000; },
+			track_colors: function(state) { return false; },
 			pixels_per_point: function(state) { return 3; }
 		},
 		"peity": {
@@ -3087,6 +3231,7 @@
 			legend: function(state) { return null; },
 			autoresize: function(state) { return false; },
 			max_updates_to_recreate: function(state) { return 5000; },
+			track_colors: function(state) { return false; },
 			pixels_per_point: function(state) { return 3; }
 		},
 		"morris": {
@@ -3102,6 +3247,7 @@
 			legend: function(state) { return null; },
 			autoresize: function(state) { return false; },
 			max_updates_to_recreate: function(state) { return 50; },
+			track_colors: function(state) { return false; },
 			pixels_per_point: function(state) { return 15; }
 		},
 		"google": {
@@ -3117,6 +3263,7 @@
 			legend: function(state) { return null; },
 			autoresize: function(state) { return false; },
 			max_updates_to_recreate: function(state) { return 300; },
+			track_colors: function(state) { return false; },
 			pixels_per_point: function(state) { return 4; }
 		},
 		"raphael": {
@@ -3132,6 +3279,7 @@
 			legend: function(state) { return null; },
 			autoresize: function(state) { return false; },
 			max_updates_to_recreate: function(state) { return 5000; },
+			track_colors: function(state) { return false; },
 			pixels_per_point: function(state) { return 3; }
 		},
 		"easypiechart": {
@@ -3147,6 +3295,7 @@
 			legend: function(state) { return null; },
 			autoresize: function(state) { return false; },
 			max_updates_to_recreate: function(state) { return 5000; },
+			track_colors: function(state) { return false; },
 			pixels_per_point: function(state) { return 3; }
 		}
 	};
@@ -3169,8 +3318,12 @@
 			isAlreadyLoaded: function() {
 				if(typeof $().emulateTransitionEnd == 'function')
 					return true;
-				else
-					return false;
+				else {
+					if(typeof netdataNoBootstrap !== 'undefined' && netdataNoBootstrap)
+						return true;
+					else
+						return false;
+				}
 			}
 		},
 		{
@@ -3180,9 +3333,19 @@
 	];
 
 	NETDATA.requiredCSS = [
-		NETDATA.serverDefault + 'css/bootstrap.min.css',
-		//NETDATA.serverDefault + 'css/bootstrap-theme.min.css',
-		NETDATA.dashboard_css
+		{
+			url: NETDATA.serverDefault + 'css/bootstrap.min.css',
+			isAlreadyLoaded: function() {
+				if(typeof netdataNoBootstrap !== 'undefined' && netdataNoBootstrap)
+					return true;
+				else
+					return false;
+			}
+		},
+		{
+			url: NETDATA.dashboard_css,
+			isAlreadyLoaded: function() { return false; }
+		}
 	];
 
 	NETDATA.loadRequiredJs = function(index, callback) {
@@ -3216,25 +3379,28 @@
 		if(index >= NETDATA.requiredCSS.length)
 			return;
 
-		if(NETDATA.options.debug.main_loop) console.log('loading ' + NETDATA.requiredCSS[index]);
-		NETDATA._loadCSS(NETDATA.requiredCSS[index]);
+		if(NETDATA.requiredCSS[index].isAlreadyLoaded()) {
+			NETDATA.loadRequiredCSS(++index);
+			return;
+		}
+
+		if(NETDATA.options.debug.main_loop) console.log('loading ' + NETDATA.requiredCSS[index].url);
+		NETDATA._loadCSS(NETDATA.requiredCSS[index].url);
 		NETDATA.loadRequiredCSS(++index);
 	}
 
 	NETDATA.errorReset();
 	NETDATA.loadRequiredCSS(0);
+
 	NETDATA._loadjQuery(function() {
 		NETDATA.loadRequiredJs(0, function() {
-			//NETDATA.chartRegistry.downloadAll(NETDATA.serverDefault, function() {
-				// NETDATA._loadCSS(NETDATA.dashboard_css);
-				if(typeof netdataDontStart === 'undefined' || !netdataDontStart) {
-					if(NETDATA.options.debug.main_loop) console.log('starting chart refresh thread');
-					NETDATA.start();
-				}
+			if(typeof netdataDontStart === 'undefined' || !netdataDontStart) {
+				if(NETDATA.options.debug.main_loop) console.log('starting chart refresh thread');
+				NETDATA.start();
+			}
 
-				if(typeof NETDATA.options.readyCallback === 'function')
-					NETDATA.options.readyCallback();
-			//});
+			if(typeof NETDATA.options.readyCallback === 'function')
+				NETDATA.options.readyCallback();
 		});
 	});
 
