@@ -493,6 +493,8 @@ function prepareScreen(data) {
 
 	function prioritySort(a, b) {
 		if(a.priority < b.priority) return -1;
+		if(a.priority > b.priority) return 1;
+		if(a.name < b.name) return -1;
 		return 1;
 	}
 
