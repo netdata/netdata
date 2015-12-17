@@ -602,7 +602,7 @@
 	chartState.prototype.globalSelectionSyncAbility = function() {
 		if(NETDATA.options.current.sync_selection === false)
 			return false;
-		
+
 		if(NETDATA.globalSelectionSync.dont_sync_before > new Date().getTime()) return false;
 		return true;
 	}
@@ -866,83 +866,43 @@
 			this.log('mode set to ' + this.current.name);
 	}
 
-	chartState.prototype._minPanOrZoomStep = function() {
-		return (((this.current.before_ms - this.current.after_ms) / this.current.points) * ((this.current.points * 5 / 100) + 1) );
-		// return this.current.view_update_every * 10;
-	}
-
-	chartState.prototype._shouldBeMoved = function(old_after, old_before, new_after, new_before) {
-		var dt_after = Math.abs(old_after - new_after);
-		var dt_before = Math.abs(old_before - new_before);
-		var old_range = old_before - old_after;
-
-		var new_range = new_before - new_after;
-		var dt = Math.abs(old_range - new_range);
-		var step = Math.max(dt_after, dt_before, dt);
-
-		var min_step = this._minPanOrZoomStep();
-		if(new_range < old_range && new_range / this.chartWidth() < 100) {
-			if(this.debug === true)
-				this.log('_shouldBeMoved(' + (new_after / 1000).toString() + ' - ' + (new_before / 1000).toString() + '): minimum point size: 0.10, wanted point size: ' + (new_range / this.chartWidth() / 1000).toString() + ': TOO SMALL RANGE');
-
-			return false;
-		}
-
-		if(step >= min_step) {
-			if(this.debug === true)
-				this.log('_shouldBeMoved(' + (new_after / 1000).toString() + ' - ' + (new_before / 1000).toString() + '): minimum step: ' + (min_step / 1000).toString() + ', this step: ' + (step / 1000).toString() + ': YES');
-
-			return true;
-		}
-		else {
-			if(this.debug === true)
-				this.log('_shouldBeMoved(' + (new_after / 1000).toString() + ' - ' + (new_before / 1000).toString() + '): minimum step: ' + (min_step / 1000).toString() + ', this step: ' + (step / 1000).toString() + ': NO');
-
-			return false;
-		}
-	}
-
 	chartState.prototype.updateChartPanOrZoom = function(after, before) {
-		var move = false;
+		if(before < after) return false;
 
-		if(this.current.name === 'auto') {
-			if(this.debug === true)
-				this.log('updateChartPanOrZoom(): caller did not set proper mode');
-
-			this.setMode('pan');
-		}
-
-		if(this.current.force_after_ms === null || this.current.force_before_ms === null) {
-			if(this.debug === true)
-				this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): INIT');
-
-			move = true;
-		}
-		else if(this._shouldBeMoved(this.current.force_after_ms, this.current.force_before_ms, after, before) && this._shouldBeMoved(this.current.after_ms, this.current.before_ms, after, before)) {
-			if(this.debug === true)
-				this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): FORCE CHANGE from ' + (this.current.force_after_ms / 1000).toString() + ' - ' + (this.current.force_before_ms / 1000).toString());
-
-			move = true;
-		}
-		else if(this._shouldBeMoved(this.current.requested_after_ms, this.current.requested_before_ms, after, before) && this._shouldBeMoved(this.current.after_ms, this.current.before_ms, after, before)) {
-			if(this.debug === true)
-				this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): REQUESTED CHANGE from ' + (this.current.requested_after_ms / 1000).toString() + ' - ' + (this.current.requested_before_ms / 1000).toString());
-
-			move = true;
-		}
-
-		if(move) {
-			this.current.force_update_at = new Date().getTime() + NETDATA.options.current.pan_and_zoom_delay;
-			this.current.force_after_ms = after;
-			this.current.force_before_ms = before;
-			NETDATA.globalPanAndZoom.setMaster(this, after, before);
-			return true;
-		}
+		var min_duration = Math.round((this.chartWidth() / 30 * this.chart.update_every * 1000));
 
 		if(this.debug === true)
-			this.log('updateChartPanOrZoom(' + (after / 1000).toString() + ' - ' + (before / 1000).toString() + '): IGNORE');
+			this.log('requested duration of ' + ((before - after) / 1000).toString() + ' (' + after + ' - ' + before + '), minimum ' + min_duration / 1000);
 
-		return false;
+		if((before - after) < min_duration) return false;
+
+		var current_duration = this.current.before_ms - this.current.after_ms;
+		var wanted_duration = before - after;
+		var tolerance = this.current.view_update_every * 2;
+		var movement = Math.abs(before - this.current.before_ms);
+
+		if(this.debug === true)
+			this.log('current duration: ' + current_duration / 1000 + ', wanted duration: ' + wanted_duration / 1000 + ', movement: ' + movement / 1000 + ', tolerance: ' + tolerance / 1000);
+
+		if(Math.abs(current_duration - wanted_duration) <= tolerance && movement <= tolerance) {
+			if(this.debug === true)
+				this.log('IGNORED');
+
+			return false;
+		}
+
+		if(this.current.name === 'auto') {
+			this.setMode('pan');
+
+			if(this.debug === true)
+				this.log('updateChartPanOrZoom(): caller did not set proper mode');
+		}
+
+		this.current.force_update_at = new Date().getTime() + NETDATA.options.current.pan_and_zoom_delay;
+		this.current.force_after_ms = after;
+		this.current.force_before_ms = before;
+		NETDATA.globalPanAndZoom.setMaster(this, after, before);
+		return true;
 	}
 
 	chartState.prototype.legendFormatValue = function(value) {
@@ -1467,7 +1427,7 @@
 
 			this.log('STATUS: requested: ' + (this.current.requested_after_ms / 1000).toString() + ' - ' + (this.current.requested_before_ms / 1000).toString());
 			this.log('STATUS: rendered : ' + (this.current.after_ms / 1000).toString() + ' - ' + (this.current.before_ms / 1000).toString());
-			this.log('STATUS: points   : ' + (this.current.points).toString() + ', min step: ' + (this._minPanOrZoomStep() / 1000).toString());
+			this.log('STATUS: points   : ' + (this.current.points).toString());
 		}
 
 		if(data.points === 0) {
@@ -2814,11 +2774,15 @@
 					if(NETDATA.options.debug.dygraph === true)
 						state.log('dygraphDrawCallback()');
 
+					var first = state.current.data.first_entry_t * 1000;
+					var last = state.current.data.last_entry_t * 1000;
+
 					var x_range = dygraph.xAxisRange();
 					var after = Math.round(x_range[0]);
 					var before = Math.round(x_range[1]);
 
-					state.updateChartPanOrZoom(after, before);
+					if(before <= last && after >= first)
+						state.updateChartPanOrZoom(after, before);
 				}
 			},
 			zoomCallback: function(minDate, maxDate, yRanges) {
@@ -2827,7 +2791,14 @@
 
 				state.globalSelectionSyncStop();
 				state.globalSelectionSyncDelay();
-				state.updateChartPanOrZoom(minDate, maxDate);
+
+				if(state.updateChartPanOrZoom(minDate, maxDate) == false) {
+					// we should not zoom that much
+					state.dygraph_instance.updateOptions({
+						dateWindow: null,
+						valueRange: null
+					});
+				}
 			},
 			highlightCallback: function(event, x, points, row, seriesName) {
 				if(NETDATA.options.debug.dygraph === true || state.debug === true)
@@ -2928,7 +2899,8 @@
 				click: function(event, dygraph, context) {
 					if(NETDATA.options.debug.dygraph === true || state.debug === true)
 						state.log('interactionModel.click()');
-					/*Dygraph.cancelEvent(event);*/
+
+					event.preventDefault();
 				},
 				dblclick: function(event, dygraph, context) {
 					if(NETDATA.options.debug.dygraph === true || state.debug === true)
@@ -2942,30 +2914,104 @@
 					if(NETDATA.options.debug.dygraph === true || state.debug === true)
 						state.log('interactionModel.mousewheel()');
 
+					// Take the offset of a mouse event on the dygraph canvas and
+					// convert it to a pair of percentages from the bottom left. 
+					// (Not top left, bottom is where the lower value is.)
+					function offsetToPercentage(g, offsetX, offsetY) {
+						// This is calculating the pixel offset of the leftmost date.
+						var xOffset = g.toDomCoords(g.xAxisRange()[0], null)[0];
+						var yar0 = g.yAxisRange(0);
+
+						// This is calculating the pixel of the higest value. (Top pixel)
+						var yOffset = g.toDomCoords(null, yar0[1])[1];
+
+						// x y w and h are relative to the corner of the drawing area,
+						// so that the upper corner of the drawing area is (0, 0).
+						var x = offsetX - xOffset;
+						var y = offsetY - yOffset;
+
+						// This is computing the rightmost pixel, effectively defining the
+						// width.
+						var w = g.toDomCoords(g.xAxisRange()[1], null)[0] - xOffset;
+
+						// This is computing the lowest pixel, effectively defining the height.
+						var h = g.toDomCoords(null, yar0[0])[1] - yOffset;
+
+						// Percentage from the left.
+						var xPct = w === 0 ? 0 : (x / w);
+						// Percentage from the top.
+						var yPct = h === 0 ? 0 : (y / h);
+
+						// The (1-) part below changes it from "% distance down from the top"
+						// to "% distance up from the bottom".
+						return [xPct, (1-yPct)];
+					}
+
+					// Adjusts [x, y] toward each other by zoomInPercentage%
+					// Split it so the left/bottom axis gets xBias/yBias of that change and
+					// tight/top gets (1-xBias)/(1-yBias) of that change.
+					//
+					// If a bias is missing it splits it down the middle.
+					function zoomRange(g, zoomInPercentage, xBias, yBias) {
+						xBias = xBias || 0.5;
+						yBias = yBias || 0.5;
+
+						function adjustAxis(axis, zoomInPercentage, bias) {
+							var delta = axis[1] - axis[0];
+							var increment = delta * zoomInPercentage;
+							var foo = [increment * bias, increment * (1-bias)];
+
+							return [ axis[0] + foo[0], axis[1] - foo[1] ];
+						}
+
+						var yAxes = g.yAxisRanges();
+						var newYAxes = [];
+						for (var i = 0; i < yAxes.length; i++) {
+							newYAxes[i] = adjustAxis(yAxes[i], zoomInPercentage, yBias);
+						}
+
+						return adjustAxis(g.xAxisRange(), zoomInPercentage, xBias);
+					}
+
 					if(event.altKey || event.shiftKey) {
 						state.globalSelectionSyncStop();
 						state.globalSelectionSyncDelay();
 
 						// http://dygraphs.com/gallery/interaction-api.js
 						var normal = (event.detail) ? event.detail * -1 : event.wheelDelta / 40;
-						var percentage = normal / 10;
+						var percentage = normal / 50;
 
-						var before_old = state.current.before_ms;
-						var after_old = state.current.after_ms;
-						var range_old = before_old - after_old;
+						if (!(event.offsetX && event.offsetY)){
+							event.offsetX = event.layerX - event.target.offsetLeft;
+							event.offsetY = event.layerY - event.target.offsetTop;
+						}
 
-						var range = range_old * ( 1 - percentage );
-						var dt = Math.round((range_old - range) / 2);
+						var percentages = offsetToPercentage(dygraph, event.offsetX, event.offsetY);
+						var xPct = percentages[0];
+						var yPct = percentages[1];
 
-						var before = before_old - dt;
-						var after  = after_old  + dt;
+						var new_x_range = zoomRange(dygraph, percentage, xPct, yPct);
 
-						if(NETDATA.options.debug.dygraph === true)
-							state.log('percent: ' + percentage + ' from ' + after_old + ' - ' + before_old + ' to ' + after + ' - ' + before + ', range from ' + (before_old - after_old).toString() + ' to ' + (before - after).toString());
+						var after = new_x_range[0];
+						var before = new_x_range[1];
+
+						var first = (state.current.data.first_entry_t + state.current.data.view_update_every) * 1000;
+						var last = (state.current.data.last_entry_t + state.current.data.view_update_every) * 1000;
+
+						if(before > last) {
+							after -= (before - last);
+							before = last;
+						}
+						if(after < first) {
+							after = first;
+						}
 
 						state.setMode('zoom');
-						state.updateChartPanOrZoom(after, before);
-					}					
+						if(state.updateChartPanOrZoom(after, before) === true)
+							dygraph.updateOptions({ dateWindow: [ after, before ] });
+
+						event.preventDefault();
+					}
 				},
 				touchstart: function(event, dygraph, context) {
 					if(NETDATA.options.debug.dygraph === true || state.debug === true)
