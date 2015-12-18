@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<title>NetData Dashboard</title>
+	<title>netdata dashboard</title>
 
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 	<meta charset="utf-8">
@@ -50,6 +50,11 @@
 		margin-top: -70px;
 		height: 70px;
 		visibility: hidden; 
+	}
+
+	.p {
+		display: block;
+		margin-top: 15px;
 	}
 
 	.chart-message {
@@ -235,7 +240,7 @@
 					<span class="icon-bar"></span>
 					<span class="icon-bar"></span>
 				</button>
-				<a href="/" class="navbar-brand">Netdata</a>
+				<a href="/" class="navbar-brand" id="hostname">netdata</a>
 			</div>
 <!--			<nav class="collapse navbar-collapse" role="navigation">
 				<ul class="nav navbar-nav">
@@ -248,7 +253,7 @@
 -->		</div>
 	</nav>
 
-	<div id="masthead"> 
+	<div id="masthead" style="display: none;">
 		<div class="container">
 			<div class="row">
 				<div class="col-md-7">
@@ -266,7 +271,7 @@
 							<b>Hover</b> on them too!
 							</div>
 						<div class="col-md-6">
-							<div data-netdata="system.intr" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-dygraph-type="line" data-dygraph-strokewidth="3" data-dygraph-smooth="true" data-dygraph-highlightcirclesize="6" data-after="-40" data-height="60px" data-colors="#C66"></div>
+							<div data-netdata="system.intr" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-dygraph-type="line" data-dygraph-strokewidth="3" data-dygraph-smooth="true" data-dygraph-highlightcirclesize="6" data-after="-90" data-height="60px" data-colors="#C66"></div>
 							</div>
 						</div>
 					</div>
@@ -278,21 +283,6 @@
 	<div class="container">
 		<div class="row">
 			<div class="col-md-10" role="main">
-				<div class="alert alert-info" role="alert">
-					<p>
-					<h4><b>Welcome to netdata!</b></h4>
-					</p><p>
-					<b><a href="https://github.com/firehol/netdata/" target="_blank">Netdata</a></b> is the fastest way to visualize data. It is a resource efficient, highly optimized system for collecting and visualizing any type of timeseries data.
-					</p><p>
-					To make a chart in <b><a href="https://github.com/firehol/netdata/" target="_blank">Netdata</a></b>, you just need a <b>counter</b>. Just a number you can read again and again. Netdata will turn such a number to a real time chart. For collecting these numbers, it supports <a href="https://github.com/firehol/netdata/tree/master/plugins.d" target="_blank">external plugins</a>, even <a href="https://github.com/firehol/netdata/tree/master/charts.d" target="_blank">bash plugins</a>. Any computer program, in any language, that can print just a few lines of text on its standard output, can be a netdata collector.
-					</p><p>
-					<b><a href="https://github.com/firehol/netdata/" target="_blank">Netdata</a></b> can embed charts in any web page. You can have its charts on your site too. Just give it a <code>div</code> and a real time chart, zoomable and draggable will appear (don't be afraid of its performance - <a href="https://github.com/firehol/netdata/issues/36" target="_blank">a raspberry pi 2 can sustain 300 charts updates per second</a>!).
-					</p><p>
-					If you like this project, we need help writing documentation, coding plugins, testing new features, supporting end users...
-					<br/>
-					If you have some time to spare, we will be glad to have you on board...
-					</p>
-				</div>
 				<div id="charts_div"></div>
 			</div>
 			<div class="col-md-2" role="complementary">
@@ -301,14 +291,57 @@
 		</div>
 	</div>
 
+<div class="modal fade" id="welcomeModal" tabindex="-1" role="dialog" aria-labelledby="welcomeModalLabel">
+	<div class="modal-dialog modal-lg" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+				<h4 class="modal-title" id="welcomeModalLabel">Welcome to netdata!</h4>
+			</div>
+			<div class="modal-body">
+					<div class="p">
+					<b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b> is the fastest way to visualize data. It is a resource efficient, highly optimized system for collecting and visualizing any type of realtime timeseries data, from CPU usage, disk activity, SQL queries, to web site visitors, e-shop orders, revenue and profits.
+					</div>
+					<div class="p">
+					To make a chart in <b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b>, you just need a <b>number</b>. Just a number you can read somehow. <b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b> will turn this number to a real time web chart. For collecting these numbers, it supports <a href="https://github.com/firehol/netdata/tree/master/plugins.d" target="_blank">external plugins</a>, even <a href="https://github.com/firehol/netdata/tree/master/charts.d" target="_blank">bash shell plugins</a>. Any computer program, in any language, that can print a few lines of text on its standard output, can be a netdata data collector.
+					</div>
+					<div class="p">
+					<b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b> can embed charts everywhere, like this one <div data-netdata="system.cpu" data-dimensions="system" data-after="-120" data-width="25%" data-height="15px" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-show-value-of-system-at="system.cpu.system.modal.1"></div> (my CPU system usage which is <span id="system.cpu.system.modal.1" style="display: inline-block; width: 40px; text-align: right;"></span>%),
+					or this one <div data-netdata="ipv4.tcppackets" data-dimensions="received" data-after="-120" data-width="25%" data-height="15px" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-show-value-of-received-at="ipv4.tcppackets.received.modal.1"></div> (my IPv4 received TCP packets, which are <span id="ipv4.tcppackets.received.modal.1" style="display: inline-block; width: 60px; text-align: right;"></span>/second).
+					</div>
+					<div class="p">
+					You can have <b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b> charts on your site too. Just give it a <code>div</code> and a real time chart, zoomable and draggable will appear (try it even on these tiny ones - <b>drag</b> them to pan horizontally, <b>shift + drag</b> to zoom in, on <b>chrome shift + mouse wheel</b> to zoom in/out, <b>double click</b> on them to reset them - don't be afraid of <b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b> performance - <a href="https://github.com/firehol/netdata/issues/36" target="_blank">a raspberry pi 2 can sustain 300 charts updates per second</a>!).
+					</div>
+					<div class="p">
+					If you like this project, <b>we need help writing documentation, coding plugins, testing new features, supporting end users.</b>
+					</div>
+					<div class="p">
+					We will be glad to have you on board...
+					</div>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+			</div>
+		</div>
+	</div>
+</div>
+
 </body>
 </html>
 <script>
 
+
+var demo_hostname = 'netdata.firehol.org';
+// var demo_hostname = 'box';
+
+if(document.location.hostname === demo_hostname) {
+	document.getElementById('masthead').style.display = 'block';
+}
+
 var options = {
 	sparklines_registry: {},
 	data: null,
-	hostnane: 'netdata_server', // will be overwritten by the netdata server
+	hostname: 'netdata_server', // will be overwritten by the netdata server
 	categories: new Array(),
 	categories_idx: {},
 	families: new Array(),
@@ -432,6 +465,8 @@ function prepareScreen(data) {
 
 	options.data = data;
 	options.hostname = data.hostname;
+	document.getElementById('hostname').innerHTML = options.hostname;
+	document.title = options.hostname + ' dashboard';
 	var charts = data.charts;
 
 	$.each(charts, function(i, c) {
@@ -762,11 +797,21 @@ function prepareScreen(data) {
 
 NETDATA.ready(function() {
 
+	$('#welcomeModal').on('hidden.bs.modal', function (e) {
+		NETDATA.updatedDom();
+	});
+	$('#welcomeModal').on('shown.bs.modal', function (e) {
+		NETDATA.updatedDom();
+	});
+
 	// download all the charts the server knows
 	NETDATA.chartRegistry.downloadAll(NETDATA.serverDefault, function(data) {
 
 		// pause the NETDATA thread that updates the charts
 		NETDATA.pause(function() {
+
+			if(document.location.hostname === demo_hostname)
+				$('#welcomeModal').modal();
 
 			// prepare our DOM
 			// this will be called when NETDATA is paused
@@ -774,4 +819,5 @@ NETDATA.ready(function() {
 		});
 	});
 });
+
 </script>
