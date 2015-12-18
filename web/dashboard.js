@@ -197,7 +197,7 @@
 
 			destroy_on_hide: false,		// destroy charts when they are not visible
 
-			eliminate_zero_dimensions: true, // do not show dimensions with just zeros
+			eliminate_zero_dimensions: false, // do not show dimensions with just zeros
 
 			color_fill_opacity: {
 				line: 1.0,
