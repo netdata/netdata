@@ -1082,6 +1082,13 @@ static RRDR *rrdr_create(RRDSET *st, int n)
 	r->od = malloc(r->d * sizeof(uint8_t));
 	if(unlikely(!r->od)) goto cleanup;
 
+	// set the hidden flag on hidden dimensions
+	int c;
+	for(c = 0, rd = st->dimensions ; rd ; c++, rd = rd->next) {
+		if(unlikely(rd->flags & RRDDIM_FLAG_HIDDEN)) r->od[c] = RRDR_HIDDEN;
+		else r->od[c] = 0;
+	}
+
 	r->c = -1;
 
 	r->group = 1;
@@ -1346,11 +1353,10 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 			calculated_number *cn = rrdr_line_values(r);
 			uint8_t *co = rrdr_line_options(r);
 
-			for(rd = st->dimensions, c = 0 ; likely(rd && c < dimensions) ; rd = rd->next, c++) {
+			for(rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 
 				// update the dimension options
 				if(likely(found_non_zero[c])) r->od[c] |= RRDR_NONZERO;
-				if(unlikely(rd->flags & RRDDIM_FLAG_HIDDEN)) r->od[c] |= RRDR_HIDDEN;
 
 				// store the specific point options
 				co[c] = group_options[c];

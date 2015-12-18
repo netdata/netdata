@@ -430,6 +430,10 @@ int main(int argc, char **argv)
 	// catch all signals
 	for (i = 1 ; i < 65 ;i++) {
 		switch(i) {
+			case SIGKILL: // not catchable
+			case SIGSTOP: // not catchable
+				break;
+
 			case SIGSEGV:
 			case SIGFPE:
 			case SIGCHLD:
