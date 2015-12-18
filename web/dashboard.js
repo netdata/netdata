@@ -417,7 +417,7 @@
 			if(this.master === null || this.seq === 0)
 				return false;
 
-			if(state.needsResize())
+			if(state.needsRecreation())
 				return true;
 
 			if(state.tm.pan_and_zoom_seq === this.seq)
@@ -492,13 +492,14 @@
 			selected: false,		// boolean - is the chart shown a selection?
 			debug: false,			// boolean - console.log() debug info about this chart
 
+			dom_created: false,		// boolean - is the DOM for the chart created?
+			chart_created: false,	// boolean - is the library.create() been called?
+
 			updates_counter: 0,		// numeric - the number of refreshes made so far
 			updates_since_last_creation: 0,
 
 			tm: {
 				last_info_downloaded: 0,	// milliseconds - the timestamp we downloaded the chart
-
-				last_created: 0,			// the timestamp the chart was created
 
 				last_updated: 0,			// the timestamp the chart last updated with data
 
@@ -661,8 +662,14 @@
 
 	// can the chart participate to the global selection sync as a slave?
 	chartState.prototype.globalSelectionSyncIsEligible = function() {
-		if(this.library !== null && typeof this.library.setSelection === 'function' && this.isVisible() && this.tm.last_created !== 0)
+		if(this.enabled === true
+			&& this.library !== null
+			&& typeof this.library.setSelection === 'function'
+			&& this.isVisible()
+			&& this.dom_created === true
+			&& this.chart_created === true)
 			return true;
+
 		return false;
 	}
 
@@ -696,16 +703,9 @@
 			}
 		}
 
-		// FIXME
-		// var start = new Date().getTime();
-
 		$.each(NETDATA.globalSelectionSync.slaves, function(i, st) {
 			st.setSelection(t);
 		});
-
-		// FIXME
-		// var end = new Date().getTime();
-		// console.log(end - start);
 	}
 
 	// stop syncing all charts to the given time
@@ -1010,8 +1010,7 @@
 
 	// this should be called just ONCE per dimension per chart
 	chartState.prototype._chartDimensionColor = function(label) {
-		if(this.colors === null)
-			this.chartColors();
+		if(this.colors === null) this.chartColors();
 
 		if(typeof this.colors_assigned[label] === 'undefined') {
 			if(this.colors_available.length === 0) {
@@ -1037,26 +1036,24 @@
 		if(this.colors !== null) return this.colors;
 
 		this.colors = new Array();
+		this.colors_available = new Array();
+		// this.colors_assigned = {};
 
-		if(this.colors_available === null) {
-			this.colors_available = new Array();
-
-			var c = $(this.element).data('colors');
-			if(typeof c !== 'undefined' && c !== null) {
-				if(typeof c !== 'string') {
-					this.log('invalid color given: ' + c + ' (give a space separated list of colors)');
-				}
-				else {
-					c = c.split(' ');
-					for(var i = 0, len = c.length; i < len ; i++)
-						this.colors_available.push(c[i]);
-				}
+		var c = $(this.element).data('colors');
+		if(typeof c !== 'undefined' && c !== null) {
+			if(typeof c !== 'string') {
+				this.log('invalid color given: ' + c + ' (give a space separated list of colors)');
 			}
-
-			// push all the standard colors too
-			for(var i = 0, len = NETDATA.colors.length; i < len ; i++)
-				this.colors_available.push(NETDATA.colors[i]);
+			else {
+				c = c.split(' ');
+				for(var i = 0, len = c.length; i < len ; i++)
+					this.colors_available.push(c[i]);
+			}
 		}
+
+		// push all the standard colors too
+		for(var i = 0, len = NETDATA.colors.length; i < len ; i++)
+			this.colors_available.push(NETDATA.colors[i]);
 
 		return this.colors;
 	}
@@ -1087,8 +1084,8 @@
 		}
 
 		if(needed === false) {
-			// make sure there are colors available
-			if(this.colors === null) this.colors = NETDATA.colors;
+			// make sure colors available
+			this.chartColors();
 
 			// do we have to update the current values?
 			// we do this, only when the visible chart is current
@@ -1282,6 +1279,7 @@
 		// in case the user has an active global selection sync in place
 		// reset it
 		this.globalSelectionSyncStop();
+		this.dom_created = true;
 	}
 
 	chartState.prototype.hasLegend = function() {
@@ -1327,18 +1325,25 @@
 		return px;
 	}
 
-	chartState.prototype.needsResize = function() {
-		return (this.library && !this.library.autoresize() && this.tm.last_resized < NETDATA.options.last_resized);
+	chartState.prototype.needsRecreation = function() {
+		return (
+				this.dom_created === true
+				&& this.chart_created === true
+				&& this.library
+				&& this.library.autoresize() === false
+				&& this.tm.last_resized < NETDATA.options.last_resized
+			);
 	}
 
 	chartState.prototype.resizeChart = function() {
-		if(this.needsResize()) {
+		if(this.needsRecreation()) {
 			if(this.debug === true)
 				this.log('forcing re-generation due to window resize.');
 
-			this.tm.last_created = 0;
-			this.tm.last_resized = new Date().getTime();
+			this.destroyChart();
 		}
+
+		this.tm.last_resized = new Date().getTime();
 	}
 
 	chartState.prototype.chartURL = function() {
@@ -1442,10 +1447,13 @@
 			if(this.debug === true)
 				this.log('max updates of ' + this.updates_since_last_creation.toString() + ' reached. Forcing re-generation.');
 
-			this.tm.last_created = 0;
+			this.chart_created = false;
 		}
 
-		if(this.tm.last_created > 0 && typeof this.library.update === 'function') {
+		if(this.chart_created === true
+			&& this.dom_created === true
+			&& typeof this.library.update === 'function') {
+
 			if(this.debug === true)
 				this.log('updating chart...');
 
@@ -1474,12 +1482,12 @@
 
 			if(NETDATA.options.debug.chart_errors === true) {
 				this.library.create(this, data);
-				this.tm.last_created = new Date().getTime();
+				this.chart_created = true;
 			}
 			else {
 				try {
 					this.library.create(this, data);
-					this.tm.last_created = new Date().getTime();
+					this.chart_created = true;
 				}
 				catch(err) {
 					this.error('chart failed to be created as ' + this.library_name);
@@ -1575,8 +1583,6 @@
 		if(this.debug === true)
 			this.log('destroying chart');
 
-		this.tm.last_autorefreshed = new Date().getTime();
-
 		if(this.element_message !== null) {
 			this.element_message.innerHTML = '';
 			this.element_message = null;
@@ -1610,7 +1616,8 @@
 		this.element.innerHTML = '';
 		this.refresh_dt_element = null;
 
-		this.tm.last_created = 0;
+		this.dom_created = false;
+		this.chart_created = false;
 		this.paused = false;
 		this.selected = false;
 		this.updates_counter = 0;
@@ -1694,7 +1701,7 @@
 	}
 
 	chartState.prototype.showLoading = function() {
-		if(typeof this.___showsLoading___ === 'undefined' && this.tm.last_created === 0 && this.enabled === true) {
+		if(typeof this.___showsLoading___ === 'undefined' && this.chart_created === false && this.enabled === true) {
 			if(this.debug === true)
 				this.log('show loading...');
 
@@ -1737,7 +1744,7 @@
 		if(ret > tolerance) {
 			// the chart is too far
 			this.___isVisible___ = false;
-			if(this.tm.last_created !== 0) this.hideChart();
+			if(this.chart_created === true) this.hideChart();
 			
 			if(this.debug === true)
 				this.log('isVisible: ' + this.___isVisible___);
@@ -1795,11 +1802,18 @@
 
 		if(this.isAutoRefreshed() === true) {
 			// allow the first update, even if the page is not visible
-			if(this.updates_counter && !NETDATA.options.page_is_visible) {
+			if(this.updates_counter && NETDATA.options.page_is_visible === false) {
 				if(NETDATA.options.debug.focus === true || this.debug === true)
 					this.log('canBeAutoRefreshed(): page does not have focus');
 
 				return false;
+			}
+
+			if(this.needsRecreation() === true) {
+				if(this.debug === true)
+					this.log('canBeAutoRefreshed(): needs re-creation.');
+
+				return true;
 			}
 
 			// options valid only for autoRefresh()
@@ -1919,10 +1933,8 @@
 	}
 
 	chartState.prototype.noData = function() {
-		if(this.tm.last_created === 0) {
+		if(this.dom_created === false)
 			this.createChartDOM();
-			this.tm.last_created = new Date().getTime();
-		}
 
 		this.tm.last_autorefreshed = new Date().getTime();
 		this.current.view_update_every = 30 * 1000;
@@ -2589,6 +2601,9 @@
 	NETDATA.dygraphChartUpdate = function(state, data) {
 		var dygraph = state.dygraph_instance;
 		
+		if(typeof dygraph === 'undefined')
+			NETDATA.dygraphChartCreate(state, data);
+
 		// when the chart is not visible, and hidden
 		// if there is a window resize, dygraph detects
 		// its element size as 0x0.

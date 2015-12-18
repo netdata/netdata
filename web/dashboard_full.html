@@ -20,12 +20,25 @@
 	/* fix # anchors scrolling under the navbar
 	   https://github.com/twbs/bootstrap/issues/1768#issuecomment-46519033
 	 */
-	*[id]:before { 
+	h1 {
+		position: relative;
+		z-index: -1;
+	}
+	h2 {
+		position: relative;
+		z-index: -2;
+	}
+	h1:before, h2:before { 
 		display: block; 
 		content: " "; 
-		margin-top: -70px; 
-		height: 70px; 
+		margin-top: -70px;
+		height: 70px;
 		visibility: hidden; 
+	}
+
+	.chart-message {
+		display: block; 
+		margin-top: 10px;
 	}
 
 	.container {
@@ -33,13 +46,13 @@
 	}
 
 	#masthead h1 {
-	 /*font-size: 30px;*/
-	 line-height: 1;
-	 padding-top:20px;
+		/*font-size: 30px;*/
+		line-height: 1;
+		padding-top: 30px;
 	}
 
 	#masthead .well {
-	 margin-top:4%;
+		margin-top:4%;
 	}
 
 
@@ -208,7 +221,7 @@
 				</button>
 				<a href="/" class="navbar-brand">Netdata</a>
 			</div>
-			<nav class="collapse navbar-collapse" role="navigation">
+<!--			<nav class="collapse navbar-collapse" role="navigation">
 				<ul class="nav navbar-nav">
 					<li><a href="#sec">Get Started</a></li>
 					<li><a href="#sec">Edit</a></li>
@@ -216,7 +229,7 @@
 					<li><a href="#sec">Prototype</a></li>
 				</ul>
 			</nav>
-		</div>
+-->		</div>
 	</nav>
 
 	<div id="masthead"> 
@@ -249,10 +262,25 @@
 	<div class="container">
 		<div class="row">
 			<div class="col-md-10" role="main">
+				<div class="alert alert-info" role="alert">
+					<p>
+					<h4><b>Welcome to netdata!</b></h4>
+					</p><p>
+					<b><a href="https://github.com/firehol/netdata/" target="_blank">Netdata</a></b> is the fastest way to visualize data. It is a resource efficient, highly optimized system for collecting and visualizing any type of timeseries data.
+					</p><p>
+					To make a chart in <b><a href="https://github.com/firehol/netdata/" target="_blank">Netdata</a></b>, you just need a <b>counter</b>. Just a number you can read again and again. Netdata will turn such a number to a real time chart. For collecting these numbers, it supports <a href="https://github.com/firehol/netdata/tree/master/plugins.d" target="_blank">external plugins</a>, even <a href="https://github.com/firehol/netdata/tree/master/charts.d" target="_blank">bash plugins</a>. Any computer program, in any language, that can print just a few lines of text on its standard output, can be a netdata collector.
+					</p><p>
+					<b><a href="https://github.com/firehol/netdata/" target="_blank">Netdata</a></b> can embed charts in any web page. You can have its charts on your site too. Just give it a <code>div</code> and a real time chart, zoomable and draggable will appear (don't be afraid of its performance - a raspberry pi 2 can easily serve 500 charts updates per second!).
+					</p><p>
+					If you like this project, we need help writing documentation, coding plugins, testing new features, supporting end users...
+					<br/>
+					If you have some time to spare, we will be glad to have you on board...
+					</p>
+				</div>
 				<div id="charts_div"></div>
 			</div>
-			<div class="col-md-2" role="main">
-				<nav class="dashboard-sidebar hidden-print hidden-xs hidden-sm" data-spy="affix" id="sidebar"></nav>
+			<div class="col-md-2" role="complementary">
+				<nav class="dashboard-sidebar hidden-print hidden-xs hidden-sm" data-spy="affix" id="sidebar" role="menu"></nav>
 			</div>
 		</div>
 	</div>
@@ -260,21 +288,69 @@
 </body>
 </html>
 <script>
+
 var options = {
+	sparklines_registry: {},
 	data: null,
-	hostnane: 'netdata_server',
+	hostnane: 'netdata_server', // will be overwritten by the netdata server
 	categories: new Array(),
 	categories_idx: {},
 	families: new Array(),
 	families_idx: {},
+
 	chartsPerRow: 0,
 	chartsMinWidth: 1450,
 	chartsHeight: 180,
 	sparklinesHeight: 60
 };
 
+// generate a sparkline
+// used in the documentation
+function sparkline(chart, dimension, units) {
+	var key = chart + '.' + dimension;
+
+	if(typeof units === 'undefined')
+		units = '';
+
+	if(typeof options.sparklines_registry[key] === 'undefined')
+		options.sparklines_registry[key] = { count: 1 };
+	else
+		options.sparklines_registry[key].count++;
+
+	key = key + '.' + options.sparklines_registry[key].count;
+
+	var h = '<div data-netdata="' + chart + '" data-after="-120" data-width="25%" data-height="15px" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-dimensions="' + dimension + '" data-show-value-of-' + dimension + '-at="' + key + '"></div> (<span id="' + key + '" style="display: inline-block; min-width: 50px; text-align: right;">X</span>' + units + ')';
+
+	return h;
+}
+
+// documentation for each category and chart
 var messages = {
-	'system.cpu': 'The current CPU utilization of the system is below.<br/>Keep an eye on iowait <div data-netdata="system.cpu" data-after="-60" data-width="15%" data-height="15px" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-dimensions="iowait" data-show-value-of-iowait-at="system.cpu.iowait.1"></div> (<span id="system.cpu.iowait.1" style="display: inline-block; min-width: 40px; text-align: right;">X</span>%). If it is constantly high, your disks are a bottleneck and they slow your system down.'
+
+	// categories / sections
+	'system': 'Overview of the key system metrices.',
+	'tc': 'Netdata collects and visualizes tc class utilization using its <a href="https://github.com/firehol/netdata/blob/master/plugins.d/tc-qos-helper.sh" target="_blank">tc-helper plugin</a>. If you also use <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a> for setting up QoS, netdata automatically collects interface and class names.',
+	'net': 'Per network interface statistics collected from <code>/proc/net/dev</code>.',
+	'apps': 'Per application statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics for applications of interest, defined in <code>/etc/netdata/apps_groups.conf</code> (the default is <a href="https://github.com/firehol/netdata/blob/master/conf.d/apps_groups.conf" target="_blank">here</a>). The plugin internaly builds a process tree (much like <code>ps fax</code> does), and groups processes together (evaluating both child and parent processes) so that the result is always a chart with a predefined set of dimensions (of course, only application groups found running are reported).<br/><b>IMPORTANT</b>: The values shown here are not 100% accurate. They only include values for the processes running. If an application is spawning childs continiously, which are terminated in just a few milliseconds (like shell scripts do), the values reported will be inaccurate. Linux does report the values for the exited childs of a process. However, these values are reported to the parent process <b>only when the child exits</b>. If these values, of the exited child processes, were also aggregated in the charts below, the charts would have been full of spikes, presenting unrealisting utilization for each process group. So, we decided to ignore these values and present only the utilization of <b>the currently running processes</b>.',
+
+	// charts
+	'system.cpu': 'Total CPU utilization (all cores). 100% here means there is no CPU idle time at all. You can get per core usage at the <a href="#cpu">CPUs</a> section and per application usage at the <a href="#apps">Applications Monitoring</a> section.<br/>Keep an eye on <b>iowait</b> ' + sparkline('system.cpu', 'iowait', '%') + '. If it is constantly high, your disks are a bottleneck and they slow your system down.<br/>Another important metric worth monitoring, is <b>softirq</b> ' + sparkline('system.cpu', 'softirq', '%') + '. A constantly high percentage of softirq may indicate network drivers issues.',
+	'system.io': 'Total Disk I/O, for all disks, read from <code>/proc/vmstat</code>. You can get detailed information about each disk at the <a href="#disk">Disks</a> section and per application Disk usage at the <a href="#apps">Applications Monitoring</a> section.',
+	'system.swapio': 'Total Swap I/O, read from <code>/proc/vmstat</code>. (netdata measures both <code>in</code> and <code>out</code>. If either of them is not shown in the chart, it is because it is zero - you can change the page settings to always render all the available dimensions on all charts).',
+	'system.pgfaults': 'Total page faults, read from <code>/proc/vmstat</code>. <b>Major page faults</b> indicates that the system is using its swap. You can find which applications use the swap at the <a href="#apps">Applications Monitoring</a> section.',
+	'system.entropy': '<a href="https://en.wikipedia.org/wiki/Entropy_(computing)" target="_blank">Entropy</a>, read from <code>/proc/sys/kernel/random/entropy_avail</code>, is like a pool of random numbers that are mainly used in cryptography. It is advised that the pool remains always <a href="https://blog.cloudflare.com/ensuring-randomness-with-linuxs-random-number-generator/" target="_blank">above 200</a>. If the pool of entropy gets empty, you risk your security to be predictable and you should install a user-space random numbers generating daemon, like <a href="http://www.issihosts.com/haveged/" target="_blank">haveged</a>, to keep the pool in healthy levels.',
+	'system.forks': 'The number of new processes created per second, read from <code>/proc/stat</code>.',
+	'system.intr': 'Total number of CPU interrupts, read from <code>/proc/stat</code>. Check <code>system.interrupts</code> that gives more detail about each interrupt and also the <a href="#cpu">CPUs</a> section where interrupts are analyzed per CPU core.',
+	'system.interrupts': 'CPU interrupts in detail, read from <code>/proc/interrupts</code>. At the <a href="#cpu">CPUs</a> section, interrupts are analyzed per CPU core.',
+	'system.processes': 'System processes, read from <code>/proc/stat</code>. <b>Blocked</b> are processes that are willing to execute but they cannot, e.g. because they wait for disk activity.',
+	'system.ctxt': '<a href="https://en.wikipedia.org/wiki/Context_switch" target="_blank">Context Switches</a>, read from <code>/proc/stat</code>, is the switching of the CPU from one process, task or thread to another. If there are many processes or threads willing to execute and very few CPU cores available to handle them, the system is making more context switching to balance the CPU resources among them. The whole process is computationally intensive. The more the context switches, the slower the system gets.',
+	'system.idlejitter': 'Idle jitter is calculated by netdata. A thread is spawned that requests to sleep for a few microseconds. When the system wakes it up, it measures how many microseconds have passed. The different between the requested and the actual duration of the sleep, is the <b>idle jitter</b>. This number is useful in realtime environments, where CPU jitter can affect the quality of the service (like VoIP media gateways).',
+	'system.ipv4': 'Total IPv4 Traffic, read from <code>/proc/net/netstat</code>. This includes <code>lo</code> device traffic.',
+	'system.ram': 'System memory, read from <code>/proc/meminfo</code>.',
+	'system.swap': 'System swap memory, read from <code>/proc/meminfo</code>.',
+
+	// just a line to allow ending all entries above with comma
+	'end': 'end'
 };
 
 function screenWidth() {
@@ -335,8 +411,8 @@ function uniq_with_list(array, find_key_function) {
 }
 
 function prepareScreen(data) {
-	console.log('NETDATA is paused - ready to prepare the screen');
-	console.log(data);
+	// console.log('NETDATA is paused - ready to prepare the screen');
+	// console.log(data);
 
 	options.data = data;
 	options.hostname = data.hostname;
@@ -344,9 +420,6 @@ function prepareScreen(data) {
 
 	$.each(charts, function(i, c) {
 		if(c.enabled === true) {
-
-			//if(c.family.length > 4 && c.family.substring(c.family.length - 4, c.family.length) === '-ifb')
-			//	c.family = c.family.split('-')[0];
 
 			// find the category of the chart
 			c.category = c.type.split('.')[0];
@@ -508,13 +581,12 @@ function prepareScreen(data) {
 
 	// find the proper duration for per-second updates
 	var duration = Math.round(($(div).width() * pcent_width / 100 * data.update_every / 3) / 60) * 60;
-	console.log(duration);
 	var html = '';
 	var sidebar = '<ul class="nav dashboard-sidenav" id="sidebar_ul">';
 
 	function getMessage(id) {
 		if(typeof messages[id] !== 'undefined')
-			return messages[id];
+			return '<div class="chart-message" role="document">' + messages[id] + '</div>';
 		else
 			return '';
 	}
@@ -524,7 +596,7 @@ function prepareScreen(data) {
 		t.charts.sort(prioritySort);
 
 		sidebar += '<li class="' + ((i === 0)?'active':'').toString() + '"><a href="#' + t.name + '">' + t.title + '</a>';
-		html += '<h1 id="' + t.name + '">' + t.title + '</h1><div id="' + t.name + '">';
+		html += '<div role="section"><div role="sectionhead"><h1 id="' + t.name + '" role="heading">' + t.title + '</h1>' + getMessage(t.name) + '</div><div id="' + t.name + '" role="document">';
 
 		if(t.name === 'net' || t.name === 'tc') {
 			var interfaces = uniq_with_list(t.charts, function(c) { return c.family; });
@@ -532,7 +604,7 @@ function prepareScreen(data) {
 			sidebar += '<ul class="nav">';
 			$.each(interfaces, function(j, c) {
 				sidebar += '<li class><a href="#' + t.name + '_' + c.name + '">' + c.name + '</a></li>';
-				html += '<div class="netdata-group-container" id="interface_' + t.name + '_' + c.name + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + t.name + '_' + c.name + '" class="netdata-chart-alignment">' + c.name + '</h2>';
+				html += '<div class="netdata-group-container" id="interface_' + t.name + '_' + c.name + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + t.name + '_' + c.name + '" class="netdata-chart-alignment" role="heading">' + c.name + '</h2>';
 				$.each(c.values, function(x, f) {
 					var c = null;
 					var h = options.chartsHeight / 2;
@@ -547,9 +619,9 @@ function prepareScreen(data) {
 						+ ' data-before="0"'
 						+ ' data-after="-' + duration.toString() + '"'
 						+ ' data-colors="' + c + '"'
-						+ '></div>';
+						+ ' role="application"></div>';
 				});
-				html += '</div>';
+				html += '</div>'; // netdata-group-container
 			});
 			sidebar += '</ul>';
 		}
@@ -559,7 +631,7 @@ function prepareScreen(data) {
 			sidebar += '<ul class="nav">';
 			$.each(disks, function(j, c) {
 				sidebar += '<li class><a href="#' + c.name + '">' + c.name + '</a></li>';
-				html += '<div class="netdata-group-container" id="disk_' + c.name + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + c.name + '" class="netdata-chart-alignment">' + c.name + '</h2>';
+				html += '<div class="netdata-group-container" id="disk_' + c.name + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + c.name + '" class="netdata-chart-alignment" role="heading">' + c.name + '</h2>';
 				$.each(c.values, function(x, f) {
 					var c = null;
 					var h = options.chartsHeight / 2;
@@ -576,9 +648,9 @@ function prepareScreen(data) {
 						+ ' data-before="0"'
 						+ ' data-after="-' + duration.toString() + '"'
 						+ ' data-colors="' + c + '"'
-						+ '></div>';
+						+ ' role="application"></div>';
 				});
-				html += '</div>';
+				html += '</div>'; // netdata-group-container
 			});
 			sidebar += '</ul>';
 		}
@@ -600,7 +672,7 @@ function prepareScreen(data) {
 					+ ' data-before="0"'
 					+ ' data-after="-' + duration.toString() + '"'
 					+ ' data-colors="' + c + '"'
-					+ '></div>';
+					+ ' role="application"></div>';
 			});
 		}
 		else {
@@ -610,21 +682,24 @@ function prepareScreen(data) {
 					+ ' data-height="' + options.chartsHeight.toString() + 'px"'
 					+ ' data-before="0"'
 					+ ' data-after="-' + duration.toString() + '"'
-					+ '></div>';
+					+ ' role="application"></div>';
 			});
 		}
 
 		sidebar += '</li>';
-		html += '</div><hr/>';
+		html += '</div>'; // document
+		html += '</div>'; // section
+		html += '<hr role="separator"/>';
 	});
 	sidebar += '</ul>';
-
+/*
 	// show the colors
-	html += '<br/>'
+	html += '<br/><div class="row">'
 	$.each(NETDATA.colors, function(i, c){
 		html += '<div style="display: inline-block;"><div style="display: inline-block; width: 100px; height: 100px; background: ' + c + ';"></div><br/>' + c + '</div>';
 	});
-
+	html += '</div>'
+*/
 	div.innerHTML = html;
 	document.getElementById('sidebar').innerHTML = sidebar;
 
