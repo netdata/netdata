@@ -50,16 +50,16 @@ dist_webfonts_DATA = \
 
 webimagesdir=$(webdir)/images
 dist_webimages_DATA = \
-	images/seo-performace-16.png \
-	images/seo-performace-24.png \
-	images/seo-performace-32.png \
-	images/seo-performace-48.png \
-	images/seo-performace-64.png \
-	images/seo-performace-72.png \
-	images/seo-performace-114.png \
-	images/seo-performace-128.png \
-	images/seo-performace-256.png \
-	images/seo-performace-512.png \
-	images/seo-performace-multi-size.ico \
-	images/seo-performace-multi-size.icns \
+	images/seo-performance-16.png \
+	images/seo-performance-24.png \
+	images/seo-performance-32.png \
+	images/seo-performance-48.png \
+	images/seo-performance-64.png \
+	images/seo-performance-72.png \
+	images/seo-performance-114.png \
+	images/seo-performance-128.png \
+	images/seo-performance-256.png \
+	images/seo-performance-512.png \
+	images/seo-performance-multi-size.ico \
+	images/seo-performance-multi-size.icns \
         $(NULL)
