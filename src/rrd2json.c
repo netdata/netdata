@@ -506,6 +506,9 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t opti
 		i++;
 	}
 	if(!i) {
+#ifdef NETDATA_INTERNAL_CHECKS
+		error("RRDR is empty for %s (RRDR has %d dimensions, options is 0x%08x)", r->st->id, r->d, options);
+#endif
 		rows = 0;
 		buffer_strcat(wb, sq);
 		buffer_strcat(wb, "no data");
@@ -1196,8 +1199,18 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	// initialize our result set
 
 	RRDR *r = rrdr_create(st, points);
-	if(!r) return NULL;
-	if(!r->d) return r;
+	if(!r) {
+#ifdef NETDATA_INTERNAL_CHECKS
+		error("Cannot create RRDR for %s, after=%u, before=%u, duration=%u, points=%d", st->id, after, before, duration, points);
+#endif
+		return NULL;
+	}
+	if(!r->d) {
+#ifdef NETDATA_INTERNAL_CHECKS
+		error("Returning empty RRDR (no dimensions in RRDSET) for %s, after=%u, before=%u, duration=%u, points=%d", st->id, after, before, duration, points);
+#endif
+		return r;
+	}
 
 	// find how many dimensions we have
 	long dimensions = r->d;

@@ -105,7 +105,7 @@ run ./configure \
 	--sysconfdir="${NETDATA_PREFIX}/etc" \
 	--localstatedir="${NETDATA_PREFIX}/var" \
 	--with-zlib --with-math --with-user=netdata \
-	CFLAGS="-O3" || exit 1
+	CFLAGS="-O2" || exit 1
 
 # remove the build_error hook
 trap - EXIT
