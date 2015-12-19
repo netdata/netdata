@@ -320,7 +320,7 @@
 			while(host.slice(-1) === '/')
 				host = host.substring(0, host.length - 1);
 
-			self = this;
+			var self = this;
 
 			$.ajax({
 				url: host + '/api/v1/charts',
@@ -431,7 +431,7 @@
 	// Our state object, where all per-chart values are stored
 
 	chartState = function(element) {
-		self = $(element);
+		var self = $(element);
 
 		$.extend(this, {
 			uuid: NETDATA.guid(),	// GUID - a unique identifier for the chart
@@ -1113,7 +1113,7 @@
 		if(this.debug === true)
 			this.log('updating Legend DOM');
 
-		self = $(this.element);
+		var self = $(this.element);
 		var genLabel = function(state, parent, name, count) {
 			var color = state._chartDimensionColor(name);
 
