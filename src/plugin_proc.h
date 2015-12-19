@@ -15,5 +15,6 @@ extern int do_proc_vmstat(int update_every, unsigned long long dt);
 extern int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt);
 extern int do_proc_sys_kernel_random_entropy_avail(int update_every, unsigned long long dt);
 extern int do_proc_interrupts(int update_every, unsigned long long dt);
+extern int do_proc_softirqs(int update_every, unsigned long long dt);
 
 #endif /* NETDATA_PLUGIN_PROC_H */

@@ -49,6 +49,7 @@ void *proc_main(void *ptr)
 	int vdo_proc_net_rpc_nfsd		= !config_get_boolean("plugin:proc", "/proc/net/rpc/nfsd", 1);
 	int vdo_proc_sys_kernel_random_entropy_avail	= !config_get_boolean("plugin:proc", "/proc/sys/kernel/random/entropy_avail", 1);
 	int vdo_proc_interrupts			= !config_get_boolean("plugin:proc", "/proc/interrupts", 1);
+	int vdo_proc_softirqs			= !config_get_boolean("plugin:proc", "/proc/softirqs", 1);
 	int vdo_cpu_netdata 			= !config_get_boolean("plugin:proc", "netdata server resources", 1);
 
 	RRDSET *stcpu = NULL, *stcpu_thread = NULL, *stclients = NULL, *streqs = NULL, *stbytes = NULL;
@@ -63,6 +64,10 @@ void *proc_main(void *ptr)
 		if(!vdo_proc_interrupts) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_interrupts().");
 			vdo_proc_interrupts = do_proc_interrupts(rrd_update_every, usec+susec);
+		}
+		if(!vdo_proc_softirqs) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_softirqs().");
+			vdo_proc_softirqs = do_proc_softirqs(rrd_update_every, usec+susec);
 		}
 		if(!vdo_proc_sys_kernel_random_entropy_avail) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_sys_kernel_random_entropy_avail().");

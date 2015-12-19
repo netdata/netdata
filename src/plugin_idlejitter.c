@@ -57,7 +57,7 @@ void *cpuidlejitter_main(void *ptr)
 		}
 		usec -= (sleep_ms * 1000);
 
-		if(counter) rrdset_next_usec(st, susec);
+		if(counter) rrdset_next(st);
 		rrddim_set(st, "jitter", usec);
 		rrdset_done(st);
 	}
