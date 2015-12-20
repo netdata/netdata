@@ -1,9 +1,9 @@
 swagger: '2.0'
 info:
   title: NetData API
-  description: 'Real time monitoring for linux, over the web!'
+  description: 'Real time data collection and graphs...'
   version: 1.0.0
-host: 195.97.5.206:19999
+host: netdata.firehol.org
 schemes:
   - http
 basePath: /api/v1
