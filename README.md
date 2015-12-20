@@ -1,6 +1,9 @@
 netdata
 =======
 
+[Live Demo Site](http://netdata.firehol.org)
+
+
 ### Realtime time data collection and charts!
 
 **Netdata** is a daemon that collects data in realtime (up to per second) and presents a web site to view and analyze them.
@@ -25,8 +28,6 @@ It has been designed to be installed on every system, without desrupting its ope
 You can use it to monitor all your applications, servers, linux PCs or linux embedded devices.
 
 Out of the box, it comes with plugins for data collection about system information and popular applications.
-
-Check it live at its [Demo Site](http://netdata.firehol.org)
 
 
 # Features
