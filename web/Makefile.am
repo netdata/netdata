@@ -10,6 +10,8 @@ dist_web_DATA = \
         dashboard.js \
         dashboard.css \
 	favicon.ico \
+	netdata-swagger.yaml \
+	netdata-swagger.json \
         $(NULL)
 
 webolddir=$(webdir)/old
