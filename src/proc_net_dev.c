@@ -3,6 +3,7 @@
 #endif
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "common.h"
 #include "appconfig.h"
@@ -12,7 +13,7 @@
 
 int do_proc_net_dev(int update_every, unsigned long long dt) {
 	static procfile *ff = NULL;
-	static int enable_new_interfaces = -1;
+	static int enable_new_interfaces = -1, enable_ifb_interfaces = -1;
 	static int do_bandwidth = -1, do_packets = -1, do_errors = -1, do_drops = -1, do_fifo = -1, do_compressed = -1, do_events = -1;
 
 	if(dt) {};
@@ -28,6 +29,7 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 	if(!ff) return 0; // we return 0, so that we will retry to open it next time
 
 	if(enable_new_interfaces == -1)	enable_new_interfaces = config_get_boolean("plugin:proc:/proc/net/dev", "enable new interfaces detected at runtime", 1);
+	if(enable_ifb_interfaces == -1)	enable_ifb_interfaces = config_get_boolean("plugin:proc:/proc/net/dev", "enable ifb interfaces", 0);
 
 	if(do_bandwidth == -1)	do_bandwidth 	= config_get_boolean("plugin:proc:/proc/net/dev", "bandwidth for all interfaces", 1);
 	if(do_packets == -1)	do_packets 		= config_get_boolean("plugin:proc:/proc/net/dev", "packets for all interfaces", 1);
@@ -68,10 +70,22 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 		tcarrier	= strtoull(procfile_lineword(ff, l, 15), NULL, 10);
 		tcompressed	= strtoull(procfile_lineword(ff, l, 16), NULL, 10);
 
+		int default_enable = enable_new_interfaces;
+
+		// prevent unused interfaces from creating charts
+		if(!rbytes && !tbytes)
+			default_enable = 0;
+		else {
+			int len = strlen(iface);
+			if(len >= 4 && strcmp(&iface[len-4], "-ifb") == 0)
+				default_enable = enable_ifb_interfaces;
+		}
+
+		// check if the user wants it
 		{
-			char var_name[4096 + 1];
-			snprintf(var_name, 4096, "interface %s", iface);
-			if(!config_get_boolean("plugin:proc:/proc/net/dev", var_name, enable_new_interfaces)) continue;
+			char var_name[512 + 1];
+			snprintf(var_name, 512, "interface %s", iface);
+			if(!config_get_boolean("plugin:proc:/proc/net/dev", var_name, default_enable)) continue;
 		}
 
 		RRDSET *st;
