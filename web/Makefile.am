@@ -4,19 +4,22 @@
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
 dist_web_DATA = \
-        datasource.html \
-        index.html \
-        index.js \
-        netdata.js \
         robots.txt \
-        theme.css \
-        dashboard_full.html \
+        index.html \
         dashboard.html \
         dashboard.js \
         dashboard.css \
 	favicon.ico \
         $(NULL)
 
+webolddir=$(webdir)/old
+dist_webold_DATA = \
+        old/datasource.html \
+        old/index.html \
+        old/index.js \
+        old/netdata.js \
+        old/theme.css \
+        $(NULL)
 
 weblibdir=$(webdir)/lib
 dist_weblib_DATA = \

@@ -212,7 +212,7 @@
 			focus: 				false,
 			visibility: 		false,
 			chart_data_url: 	false,
-			chart_errors: 		true,
+			chart_errors: 		false,
 			chart_timing: 		false,
 			chart_calls: 		false,
 			libraries: 			false,
