@@ -1270,8 +1270,25 @@
 		
 		if(this.hasLegend() === false)
 			this.element_legend.style.display = 'none';
-		else
+		else {
 			this.element.appendChild(this.element_legend);
+
+			if(typeof this.___addedContainerResizable___ === 'undefined') {
+				this.element.className += " netdata-container-resizable";
+				this.___addedContainerResizable___ = true;
+
+				var state = this;
+				this.resize_sensor = ResizeSensor(this.element, function() {
+					NETDATA.options.last_updated = new Date().getTime();
+
+					if(typeof state.library.resize === 'function')
+						state.library.resize(state);
+
+					if(state.element_legend_childs.nano !== null && state.element_legend_childs.nano_options !== null)
+						$(state.element_legend_childs.nano).nanoScroller();
+				});
+			}
+		}
 
 		this.element_legend_childs.series = null;
 		this.legendUpdateDOM();
@@ -2279,6 +2296,8 @@
 	}
 
 	NETDATA.parseDom = function(callback) {
+		ElementQueries.update();
+
 		NETDATA.options.last_page_scroll = new Date().getTime();
 		NETDATA.options.updated_dom = false;
 
@@ -3387,6 +3406,10 @@
 			initialize: NETDATA.dygraphInitialize,
 			create: NETDATA.dygraphChartCreate,
 			update: NETDATA.dygraphChartUpdate,
+			resize: function(state) {
+				if(typeof state.dygraph_instance.resize === 'function')
+					state.dygraph_instance.resize();
+			},
 			setSelection: NETDATA.dygraphSetSelection,
 			clearSelection:  NETDATA.dygraphClearSelection,
 			initialized: false,
@@ -3547,6 +3570,14 @@
 		{
 			url: NETDATA.serverDefault + 'lib/jquery.nanoscroller.min.js',
 			isAlreadyLoaded: function() { return false; }
+		},
+		{
+			url: NETDATA.serverDefault + 'lib/ResizeSensor.js',
+			isAlreadyLoaded: function() { return false; }
+		},
+		{
+			url: NETDATA.serverDefault + 'lib/ElementQueries.js',
+			isAlreadyLoaded: function() { return false; }
 		}
 	];
 
@@ -3559,6 +3590,10 @@
 				else
 					return false;
 			}
+		},
+		{
+			url: NETDATA.serverDefault + 'css/font-awesome.min.css',
+			isAlreadyLoaded: function() { return false; }
 		},
 		{
 			url: NETDATA.dashboard_css,
@@ -3618,6 +3653,8 @@
 
 	NETDATA._loadjQuery(function() {
 		NETDATA.loadRequiredJs(0, function() {
+			ElementQueries.init();
+
 			if(typeof netdataDontStart === 'undefined' || !netdataDontStart) {
 				if(NETDATA.options.debug.main_loop === true)
 					console.log('starting chart refresh thread');

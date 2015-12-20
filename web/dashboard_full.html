@@ -480,6 +480,18 @@ function prepareScreen(data) {
 			if(tmp === 'net' || tmp === 'disk')
 				c.category = tmp;
 
+			if(c.category === 'cpu') {
+				if(c.id.match(/^cpu\.cpu[0-9]+$/)) {
+					c.family = 'Utilization';
+				}
+				else if(c.id.match(/^cpu\.cpu[0-9]+_interrupts$/)) {
+					c.family = 'Interrupts';
+				}
+				else if(c.id.match(/^cpu\.cpu[0-9]+_softirqs$/)) {
+					c.family = 'SoftIRQs';
+				}
+			}
+
 			switch(c.category) {
 				case 'system':
 					c.category_priority = 10;
@@ -531,7 +543,7 @@ function prepareScreen(data) {
 
 				case 'cpu':
 					c.category_priority = 90;
-					c.category_title = 'CPUs';
+					c.category_title = 'CPU Cores';
 					c.glyphicon = "glyphicon-dashboard";
 					break;
 
@@ -650,7 +662,30 @@ function prepareScreen(data) {
 		sidebar += '<li class="' + ((i === 0)?'active':'').toString() + '"><a href="#' + t.name + '">' + t.title + '</a>';
 		html += '<div role="section"><div role="sectionhead"><h1 id="' + t.name + '" role="heading">' + t.title + '</h1>' + getMessage(t.name) + '</div><div id="' + t.name + '" role="document">';
 
-		if(t.name === 'net' || t.name === 'tc') {
+		if(t.name === 'cpu') {
+			var families = uniq_with_list(t.charts, function(c) { return c.family; });
+
+			sidebar += '<ul class="nav">';
+			$.each(families, function(j, c) {
+				sidebar += '<li class><a href="#' + t.name + '_' + c.name + '">' + c.name + '</a></li>';
+				html += '<div class="netdata-group-container" id="family_' + t.name + '_' + c.name + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + t.name + '_' + c.name + '" class="netdata-chart-alignment" role="heading">' + c.name + '</h2>';
+				$.each(c.values, function(x, f) {
+					var c = null;
+					var h = options.chartsHeight;
+
+					html += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
+						+ ' data-width="100%"'
+						+ ' data-height="' + h.toString() + 'px"'
+						+ ' data-before="0"'
+						+ ' data-after="-' + duration.toString() + '"'
+						+ ' data-colors="' + c + '"'
+						+ ' role="application"></div>';
+				});
+				html += '</div>'; // netdata-group-container
+			});
+			sidebar += '</ul>';
+		}
+		else if(t.name === 'net' || t.name === 'tc') {
 			var interfaces = uniq_with_list(t.charts, function(c) { return c.family; });
 
 			sidebar += '<ul class="nav">';

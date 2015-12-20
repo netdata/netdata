@@ -19,11 +19,44 @@ html {
 	/* width and height is given per chart with data-width and data-height */
 }
 
+.netdata-container-resizable {
+	display: -webkit-flex; /* Safari */
+	-webkit-flex-wrap: wrap; /* Safari 6.1+ */
+	display: inline-block;
+	flex-wrap: wrap;
+	overflow: hidden;
+
+	/* enable CSS3 resizing */
+	resize: vertical;
+
+	/* required for child elements to have absolute position */
+	position: relative;
+	
+	/* width and height is given per chart with data-width and data-height */
+}
+
+.netdata-container-resizable::after {
+    /* pointer-events: none; */
+    font-family: FontAwesome;
+    color: #999999;
+    content: "\f078";
+    font-size: 12px;
+    position: absolute;
+    height: 15px;
+    width: 18px;
+    text-align: center;
+    bottom: 0px;
+    right: -2px;
+    z-index: 2;
+    cursor: ns-resize;
+    background-color: #ffffff;
+}
+
 .netdata-message {
 	display: none;
 	font-size: x-small;
 	width: 100%;
-	height: 100%;
+	height: calc(100% - 10px); /* for the resize handler */
 	overflow: hidden;
 	background: inherit;
 	z-index: 10000;
@@ -33,7 +66,6 @@ html {
 	display: none;
 	font-size: x-small;
 	width: 100%;
-	height: 100%;
 	overflow: hidden;
 	background: white;
 	z-index: 10000;
@@ -44,20 +76,19 @@ html {
 }
 
 .netdata-info-message {
-
 }
 
 .netdata-chart-legend {
 	position: absolute;			/* within .netdata-container */
 	top: 0;
 	right: 0;
-	/*background-color: Gray;*/
+	background-color: white;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	line-height: 14px;
 	display: block;
 	width: 110px;
-	height: 100%;
+	height: calc(100% - 15px); /* 10px for the resize handler and 5px for the top margin */
 	font-size: 10px;
 	margin-top: 5px;
 	/* width and height is calculated (depends on the appearance of the legend) */
@@ -227,7 +258,7 @@ html {
 	display: block;
 	overflow: hidden;
 	margin-right: 110px;
-	width: calc(100% - 110px);
+	width: calc(100% - 110px); /* for the legend */
 	height: 100%;
 	flex-grow: 1;
 
