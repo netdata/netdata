@@ -6,23 +6,26 @@ netdata
 
 ### Realtime time data collection and charts!
 
-**Netdata** is a daemon that collects data in realtime (up to per second) and presents a web site to view and analyze them.
+**Netdata** is a daemon that collects data in realtime (per second) and presents a web site to view and analyze them.
 The presentation is full of charts that precisely render all system values, in realtime.
 
-It has been designed to be installed on every system, without desrupting its operation:
+It has been designed to be installed **on every system**, without desrupting it:
 
 1. It will just use some spare CPU cycles.
 
-    You can even control its CPU consumption by lowering its data collection frequency.
-    It is also running with the lowest possible priority.
+    Although it is very light weight, on slow processors you can futher control its CPU consumption by lowering its data collection frequency.
+    By default it is running with the lowest possible linux priority.
 
 2. It will use the memory you want it have.
 
-    You can control the memory it will use by sizing its round robin in memory database.
+    Although we have made the most to make its memory footprint the smallest possible,
+    you can further control the memory it will use, by sizing its round robin memory database.
 
 3. It does not use disk I/O.
 
-    All its database is in memory, and it is only saved on disk and loaded back when netdata restarts. You can also disable the access log of its embedded web server.
+    All its round robin database is in memory.
+    It is only saved on disk and loaded back when netdata restarts.
+    You can also disable the access log of its embedded web server, so that netdata will not use any I/O at all while running.
 
 
 You can use it to monitor all your applications, servers, linux PCs or linux embedded devices.
@@ -39,15 +42,15 @@ Out of the box, it comes with plugins for data collection about system informati
 
 - **extremely lightweight**
 
-  It only needs a few megabytes of memory to store all its round robin database.
+  It only needs a few megabytes of memory to store its round robin database.
 
-  Although `netdata` does all its calculation using `long double` (128 bit) arithmetics, it stores all values using a **custom-made 32-bit number**. This custom-made number can store in 29 bits values from -167772150000000.0 to  167772150000000.0 with a precision of 0.00001 (yes, it is a floating point number, meaning that higher integer values have less decimal precision) and 3 bits for flags (2 are currently used and 1 is reserved for future use). This provides an extremely optimized memory footprint with just 0.0001% max accuracy loss (run: `./netdata --unittest` to see it in action).
+  Although `netdata` does all its calculation using `long double` (128 bit) arithmetics, it stores all values using a **custom-made 32-bit number**. This custom-made number can store in 29 bits values from -167772150000000.0 to  167772150000000.0 with a precision of 0.00001 (yes, it is a floating point number, meaning that higher integer values have less decimal precision) and 3 bits for flags. This provides an extremely optimized memory footprint with just 0.0001% max accuracy loss (run: `./netdata --unittest` to see it in action).
 
-  It also supports KSM memory deduplication to lower its memory requirements even further.
+  If your linux box has KSM enabled, netdata will give it all its round robbin database, to lower its memory requirements even further.
 
 - **per second data collection**
 
-  Every chart, every value, is updated every second. Of course, you can control collection period per module.
+  Every chart, every value, is updated every second. Of course, you can control collection period per plugin.
 
   **netdata** can perform several calculations on each value (dimension) collected:
 
@@ -65,13 +68,13 @@ Out of the box, it comes with plugins for data collection about system informati
 
 - **appealing web site**
 
-  The web site uses bootstrap and google charts for a very appealing result.
+  The web site uses bootstrap and the excellent [dygraphs](http://dygraphs.com), for a very appealing and responsive result.
   It works even on mobile devices and adapts to screen size changes and rotation (responsive design).
 
 - **web charts do respect your browser resources**
 
   The charts adapt to show only as many points are required to have a clear view.
-  Also, the javascript code respects your browser resources (stops refreshing when the window looses focus, when scrolling, etc).
+  Also, the javascript code respects your browser resources (stops refreshing when the window looses focus, when something is selected, when charts are not in the visible viewport, etc).
 
 - **highly configurable**
 
@@ -89,6 +92,8 @@ Out of the box, it comes with plugins for data collection about system informati
  - `/proc/meminfo` (memory information)
  - `/proc/vmstat` (system performance)
  - `/proc/net/rpc/nfsd` (NFS server statistics for both v3 and v4 NFS)
+ - `/proc/interrupts` (total and per core hardware interrupts)
+ - `/proc/softirqs` (total and per core software interrupts)
  - `tc` classes (QoS classes - [with FireQOS class names](http://firehol.org/tutorial/fireqos-new-user/))
 
 - It supports **plugins** for collecting information from other sources!
@@ -114,8 +119,8 @@ Out of the box, it comes with plugins for data collection about system informati
 - netdata is a web server, supporting gzip compression
 
   It serves its own static files and dynamic files for rendering the site.
-  It does not support authentication or SSL - limit its access using your firewall.
-  It does not allow ` .. ` or ` / ` in the files requested (so it can only serve files stored in the web directory `/usr/share/netdata/web`).
+  It does not support authentication or SSL - limit its access using your firewall, or put it behind an authentication proxy.
+  It does not allow ` .. ` in the files requested (so it can only serve files stored in the web directory `/usr/share/netdata/web`).
 
 
 # How it works
@@ -133,27 +138,16 @@ Out of the box, it comes with plugins for data collection about system informati
  For example, you can access JSON data by using:
 
  ```
- http://127.0.0.1:19999/data/net.eth0
- ```
-
- This will give you the JSON file for traffic on eth0.
- The above is equivalent to:
+ 
+ http://netdata.firehol.org/api/v1/data?chart=net.eth0&after=-300&before=0&points=120&group=average&format=json
 
  ```
- http://127.0.0.1:19999/data/net.eth0/3600/1/average/0/0
- ```
 
- where:
+ The above will give you the last 300 seconds of traffic for eth0, aggregated in 120 points, grouped as averages, in json format.
+ 
+2. If you need to embed a **netdata** chart on your web page, you can add a few javascript lines and a `div` for every graph you need. Check [this example](http://netdata.firehol.org/dashboard.html) (open it in a new tab and view its source to get the idea).
 
-  - 3600 is the number of entries to generate.
-  - 1 is grouping count, 1 = every single entry, 2 = half the entries, 3 = one every 3 entries, etc
-  - `average` is the grouping method. It can also be `max`.
-  - 0/0 they are `before` and `after` timestamps, allowing panning on the data
-
-
-2. If you need to embed a **netdata** chart on your web page, you can add a few javascript lines and a `div` for every graph you need. Check [this example](http://195.97.5.206:19999/datasource.html) (open it in a new tab and view its source to get the idea).
-
-3. Graphs are generated using Google Charts API (so, your client needs to have internet access).
+3. No internet access is required. Netdata is standalone.
 
 
 # Installation
@@ -161,21 +155,22 @@ Out of the box, it comes with plugins for data collection about system informati
 ## Automatic installation
 
 Before you start, make sure you have `zlib` development files installed.
-To install it in Ubuntu, you need to run:
-
-```sh
-apt-get install zlib1g-dev
-```
 
 You also need to have a basic build environment in place. You will need packages like
 `gcc`, `autoconf`, `autogen`, `automake`, `pgk-config`, etc.
+
+To install them in debian/ubuntu, you need to run:
+
+```sh
+apt-get install zlib1g-dev gcc autoconf autogen automake pkg-config
+```
 
 Then do this to install and run netdata:
 
 ```sh
 
 # download it
-git clone https://github.com/ktsaou/netdata.git netdata.git
+git clone https://github.com/firehol/netdata.git netdata.git
 cd netdata.git
 
 # build it
@@ -203,3 +198,4 @@ To access the web site for all graphs, go to:
 You can get the running config file at any time, by accessing `http://127.0.0.1:19999/netdata.conf`.
 
 To start it at boot, just run `/usr/sbin/netdata` from your `/etc/rc.local` or equivalent.
+
