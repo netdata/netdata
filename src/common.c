@@ -14,8 +14,10 @@
 
 #include "log.h"
 #include "common.h"
+#include "appconfig.h"
 
 char *global_host_prefix = "";
+int enable_ksm = 1;
 
 /*
 // http://stackoverflow.com/questions/7666509/hash-function-for-string
@@ -107,7 +109,7 @@ char *trim(char *s)
 	return s;
 }
 
-void *mymmap(const char *filename, unsigned long size, int flags)
+void *mymmap(const char *filename, unsigned long size, int flags, int ksm)
 {
 	int fd;
 	void *mem = NULL;
@@ -117,14 +119,35 @@ void *mymmap(const char *filename, unsigned long size, int flags)
 	if(fd != -1) {
 		if(lseek(fd, size, SEEK_SET) == (long)size) {
 			if(write(fd, "", 1) == 1) {
-
 				if(ftruncate(fd, size))
 					error("Cannot truncate file '%s' to size %ld. Will use the larger file.", filename, size);
 
-				mem = mmap(NULL, size, PROT_READ|PROT_WRITE, flags, fd, 0);
-				if(mem) {
-					if(madvise(mem, size, MADV_SEQUENTIAL|MADV_DONTFORK|MADV_WILLNEED) != 0)
-						error("Cannot advise the kernel about the memory usage of file '%s'.", filename);
+				if(flags & MAP_SHARED || !enable_ksm || !ksm) {
+					mem = mmap(NULL, size, PROT_READ|PROT_WRITE, flags, fd, 0);
+					if(mem) {
+						int advise = MADV_SEQUENTIAL|MADV_DONTFORK;
+						if(flags & MAP_SHARED) advise |= MADV_WILLNEED;
+
+						if(madvise(mem, size, advise) != 0)
+							error("Cannot advise the kernel about the memory usage of file '%s'.", filename);
+					}
+				}
+				else {
+					mem = mmap(NULL, size, PROT_READ|PROT_WRITE, flags|MAP_ANONYMOUS, -1, 0);
+					if(mem) {
+						if(lseek(fd, 0, SEEK_SET) == 0) {
+							if(read(fd, mem, size) != size)
+								error("Cannot read from file '%s'", filename);
+						}
+						else
+							error("Cannot seek to beginning of file '%s'.", filename);
+
+						// don't use MADV_SEQUENTIAL|MADV_DONTFORK, they disable MADV_MERGEABLE
+						if(madvise(mem, size, MADV_MERGEABLE) != 0)
+							error("Cannot advise the kernel about the memory usage of file '%s'.", filename);
+					}
+					else
+						error("Cannot allocate PRIVATE ANONYMOUS memory for KSM for file '%s'.", filename);
 				}
 			}
 			else error("Cannot write to file '%s' at position %ld.", filename, size);

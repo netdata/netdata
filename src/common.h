@@ -17,12 +17,13 @@ extern void strreverse(char* begin, char* end);
 extern char *mystrsep(char **ptr, char *s);
 extern char *trim(char *s);
 
-extern void *mymmap(const char *filename, unsigned long size, int flags);
+extern void *mymmap(const char *filename, unsigned long size, int flags, int ksm);
 extern int savememory(const char *filename, void *mem, unsigned long size);
 
 extern int fd_is_valid(int fd);
 
 extern char *global_host_prefix;
+extern int enable_ksm;
 
 /* Number of ticks per second */
 #define HZ		hz

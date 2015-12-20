@@ -353,7 +353,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 	debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
 	snprintf(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
-	if(rrd_memory_mode != RRD_MEMORY_MODE_RAM) st = (RRDSET *)mymmap(fullfilename, size, ((rrd_memory_mode == RRD_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE));
+	if(rrd_memory_mode != RRD_MEMORY_MODE_RAM) st = (RRDSET *)mymmap(fullfilename, size, ((rrd_memory_mode == RRD_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE), 0);
 	if(st) {
 		if(strcmp(st->magic, RRDSET_MAGIC) != 0) {
 			errno = 0;
@@ -468,7 +468,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 
 	rrdset_strncpy_name(filename, id, FILENAME_MAX);
 	snprintf(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
-	if(rrd_memory_mode != RRD_MEMORY_MODE_RAM) rd = (RRDDIM *)mymmap(fullfilename, size, ((rrd_memory_mode == RRD_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE));
+	if(rrd_memory_mode != RRD_MEMORY_MODE_RAM) rd = (RRDDIM *)mymmap(fullfilename, size, ((rrd_memory_mode == RRD_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE), 1);
 	if(rd) {
 		struct timeval now;
 		gettimeofday(&now, NULL);

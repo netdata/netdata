@@ -289,6 +289,11 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
+		enable_ksm = config_get_boolean("global", "memory deduplication (ksm)", enable_ksm);
+
+		// --------------------------------------------------------------------
+
+
 		global_host_prefix = config_get("global", "host access prefix", "");
 		setenv("NETDATA_HOST_PREFIX", global_host_prefix, 1);
 
