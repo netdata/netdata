@@ -472,8 +472,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t opti
 			"	%sname%s: %s%s%s,\n"
 			"	%sview_update_every%s: %d,\n"
 			"	%supdate_every%s: %d,\n"
-			"	%sfirst_entry_t%s: %u,\n"
-			"	%slast_entry_t%s: %u,\n"
+			"	%sfirst_entry%s: %u,\n"
+			"	%slast_entry%s: %u,\n"
 			"	%smin%s: "
 			, kq, kq
 			, kq, kq, sq, r->st->id, sq
@@ -560,7 +560,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t opti
 	}
 
 	buffer_sprintf(wb, "],\n"
-			"	%sresult_latest_values%s: ["
+			"	%sview_latest_values%s: ["
 			, kq, kq);
 
 	i = 0;

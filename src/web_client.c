@@ -568,8 +568,8 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 			*google_reqId = "0",
 			*google_sig = "0",
 			*google_out = "json",
-			*google_responseHandler = "google.visualization.Query.setResponse",
-			*google_outFileName = NULL;
+			*responseHandler = NULL,
+			*outFileName = NULL;
 
 	time_t last_timestamp_in_data = 0, google_timestamp = 0;
 
@@ -614,6 +614,12 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 		else if(!strcmp(name, "options")) {
 			options |= web_client_api_request_v1_data_options(value);
 		}
+		else if(!strcmp(name, "callback")) {
+			responseHandler = value;
+		}
+		else if(!strcmp(name, "filename")) {
+			outFileName = value;
+		}
 		else if(!strcmp(name, "tqx")) {
 			// parse Google Visualization API options
 			// https://developers.google.com/chart/interactive/docs/dev/implementing_data_source
@@ -640,9 +646,9 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 					format = web_client_api_request_v1_data_google_format(google_out);
 				}
 				else if(!strcmp(tqx_name, "responseHandler"))
-					google_responseHandler = tqx_value;
+					responseHandler = tqx_value;
 				else if(!strcmp(tqx_name, "outFileName"))
-					google_outFileName = tqx_value;
+					outFileName = tqx_value;
 			}
 		}
 	}
@@ -676,19 +682,29 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 			, options
 			);
 
-	if(google_outFileName && *google_outFileName) {
-		buffer_sprintf(w->response.header, "Content-Disposition: attachment; filename=\"%s\"\r\n", google_outFileName);
-		error("generating outfilename header: '%s'", google_outFileName);
+	if(outFileName && *outFileName) {
+		buffer_sprintf(w->response.header, "Content-Disposition: attachment; filename=\"%s\"\r\n", outFileName);
+		error("generating outfilename header: '%s'", outFileName);
 	}
 
 	if(format == DATASOURCE_DATATABLE_JSONP) {
+		if(responseHandler == NULL)
+			responseHandler = "google.visualization.Query.setResponse";
+
 		debug(D_WEB_CLIENT_ACCESS, "%llu: GOOGLE JSON/JSONP: version = '%s', reqId = '%s', sig = '%s', out = '%s', responseHandler = '%s', outFileName = '%s'",
-				w->id, google_version, google_reqId, google_sig, google_out, google_responseHandler, google_outFileName
+				w->id, google_version, google_reqId, google_sig, google_out, responseHandler, outFileName
 			);
 
 		buffer_sprintf(w->response.data,
 			"%s({version:'%s',reqId:'%s',status:'ok',sig:'%lu',table:",
-			google_responseHandler, google_version, google_reqId, st->last_updated.tv_sec);
+			responseHandler, google_version, google_reqId, st->last_updated.tv_sec);
+	}
+	else if(format == DATASOURCE_JSONP) {
+		if(responseHandler == NULL)
+			responseHandler = "callback";
+
+		buffer_strcat(w->response.data, responseHandler);
+		buffer_strcat(w->response.data, "(");
 	}
 
 	ret = rrd2format(st, w->response.data, dimensions, format, points, after, before, group, options, &last_timestamp_in_data);
@@ -702,9 +718,11 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 			buffer_flush(w->response.data);
 			buffer_sprintf(w->response.data,
 				"%s({version:'%s',reqId:'%s',status:'error',errors:[{reason:'not_modified',message:'Data not modified'}]});",
-				google_responseHandler, google_version, google_reqId);
+				responseHandler, google_version, google_reqId);
 		}
 	}
+	else if(format == DATASOURCE_JSONP)
+		buffer_strcat(w->response.data, ");");
 
 cleanup:
 	if(dimensions) buffer_free(dimensions);
@@ -1257,6 +1275,8 @@ void web_client_process(struct web_client *w) {
 		"Server: NetData Embedded HTTP Server\r\n"
 		"Content-Type: %s\r\n"
 		"Access-Control-Allow-Origin: *\r\n"
+		"Access-Control-Allow-Methods: GET\r\n"
+		"Access-Control-Allow-Headers: x-requested-with\r\n"
 		"Date: %s\r\n"
 		, code, code_msg
 		, w->keepalive?"keep-alive":"close"
@@ -1271,10 +1291,13 @@ void web_client_process(struct web_client *w) {
 		buffer_sprintf(w->response.header_output,
 			"Expires: %s\r\n"
 			"Cache-Control: no-cache\r\n"
+			"Access-Control-Max-Age: 0\r\n"
 			, date);
 	}
-	else
+	else {
 		buffer_strcat(w->response.header_output, "Cache-Control: public\r\n");
+		buffer_strcat(w->response.header_output, "Access-Control-Max-Age: 3600\r\n");
+	}
 
 	// if we know the content length, put it
 	if(!w->response.zoutput && (w->response.data->len || w->response.rlen))

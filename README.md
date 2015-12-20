@@ -144,6 +144,9 @@ Out of the box, it comes with plugins for data collection about system informati
  ```
 
  The above will give you the last 300 seconds of traffic for eth0, aggregated in 120 points, grouped as averages, in json format.
+
+ Check [Netdata Swagger UI](http://netdata.firehol.org/swagger/) for more information about the API.
+
  
 2. If you need to embed a **netdata** chart on your web page, you can add a few javascript lines and a `div` for every graph you need. Check [this example](http://netdata.firehol.org/dashboard.html) (open it in a new tab and view its source to get the idea).
 

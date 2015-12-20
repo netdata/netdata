@@ -981,7 +981,7 @@
 		}
 
 		var show_undefined = true;
-		if(Math.abs(this.current.data.last_entry_t - this.current.data.before) <= this.current.data.view_update_every)
+		if(Math.abs(this.current.data.last_entry - this.current.data.before) <= this.current.data.view_update_every)
 			show_undefined = false;
 
 		if(show_undefined)
@@ -1000,7 +1000,7 @@
 			if(show_undefined)
 				this.legendSetLabelValue(label, null);
 			else
-				this.legendSetLabelValue(label, this.current.data.result_latest_values[i]);
+				this.legendSetLabelValue(label, this.current.data.view_latest_values[i]);
 		}
 	}
 
@@ -1089,7 +1089,7 @@
 
 			// do we have to update the current values?
 			// we do this, only when the visible chart is current
-			if(Math.abs(this.current.data.last_entry_t - this.current.data.before) <= this.current.data.view_update_every) {
+			if(Math.abs(this.current.data.last_entry - this.current.data.before) <= this.current.data.view_update_every) {
 				if(this.debug === true)
 					this.log('chart in running... updating values on legend...');
 
@@ -1427,11 +1427,11 @@
 			if(typeof data.before !== 'undefined')
 				this.current.before_ms = data.before * 1000;
 
-			if(typeof data.first_entry_t !== 'undefined')
-				this.current.first_entry_ms = data.first_entry_t * 1000;
+			if(typeof data.first_entry !== 'undefined')
+				this.current.first_entry_ms = data.first_entry * 1000;
 
-			if(typeof data.last_entry_t !== 'undefined')
-				this.current.last_entry_ms = data.last_entry_t * 1000;
+			if(typeof data.last_entry !== 'undefined')
+				this.current.last_entry_ms = data.last_entry * 1000;
 
 			if(typeof data.points !== 'undefined')
 				this.current.points = data.points;
@@ -2808,8 +2808,8 @@
 					if(NETDATA.options.debug.dygraph === true)
 						state.log('dygraphDrawCallback()');
 
-					var first = state.current.data.first_entry_t * 1000;
-					var last = state.current.data.last_entry_t * 1000;
+					var first = state.current.data.first_entry * 1000;
+					var last = state.current.data.last_entry * 1000;
 
 					var x_range = dygraph.xAxisRange();
 					var after = Math.round(x_range[0]);
@@ -3029,8 +3029,8 @@
 						var after = new_x_range[0];
 						var before = new_x_range[1];
 
-						var first = (state.current.data.first_entry_t + state.current.data.view_update_every) * 1000;
-						var last = (state.current.data.last_entry_t + state.current.data.view_update_every) * 1000;
+						var first = (state.current.data.first_entry + state.current.data.view_update_every) * 1000;
+						var last = (state.current.data.last_entry + state.current.data.view_update_every) * 1000;
 
 						if(before > last) {
 							after -= (before - last);

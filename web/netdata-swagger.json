@@ -5,6 +5,7 @@
         "description": "Real time monitoring for linux, over the web!",
         "version": "1.0.0"
     },
+    "host": "195.97.5.206:19999",
     "schemes": [
         "http"
     ],
@@ -41,7 +42,8 @@
                         "description": "The id of the chart as returned by the /charts call.",
                         "required": true,
                         "type": "string",
-                        "format": "as returned by /charts"
+                        "format": "as returned by /charts",
+                        "default": "system.cpu"
                     }
                 ],
                 "responses": {
@@ -69,7 +71,8 @@
                         "required": true,
                         "type": "string",
                         "format": "as returned by /charts",
-                        "allowEmptyValue": false
+                        "allowEmptyValue": false,
+                        "default": "system.cpu"
                     },
                     {
                         "name": "dimension",
@@ -112,7 +115,7 @@
                         "type": "number",
                         "format": "integer",
                         "allowEmptyValue": false,
-                        "default": 100
+                        "default": 20
                     },
                     {
                         "name": "group",
@@ -124,7 +127,7 @@
                             "max",
                             "average"
                         ],
-                        "default": "max",
+                        "default": "average",
                         "allowEmptyValue": false
                     },
                     {
@@ -174,6 +177,23 @@
                             "collectionFormat": "pipes",
                             "format": ""
                         },
+                        "default": "seconds|jsonwrap",
+                        "allowEmptyValue": false
+                    },
+                    {
+                        "name": "callback",
+                        "in": "query",
+                        "description": "For JSONP responses, the callback function name.",
+                        "required": false,
+                        "type": "string",
+                        "allowEmptyValue": false
+                    },
+                    {
+                        "name": "filename",
+                        "in": "query",
+                        "description": "Add Content-Disposition: attachment; filename=<filename> header to the response, that will instruct the browser to save the response with the given filename.",
+                        "required": false,
+                        "type": "string",
                         "allowEmptyValue": false
                     },
                     {
@@ -181,8 +201,7 @@
                         "in": "query",
                         "description": "[Google Visualization API](https://developers.google.com/chart/interactive/docs/dev/implementing_data_source?hl=en) formatted parameter.",
                         "required": false,
-                        "type": "string",
-                        "allowEmptyValue": false
+                        "type": "string"
                     }
                 ],
                 "responses": {
@@ -309,6 +328,98 @@
                 "name": {
                     "type": "string",
                     "description": "The name of the dimension"
+                }
+            }
+        },
+        "json_wrap": {
+            "type": "object",
+            "properties": {
+                "api": {
+                    "type": "number",
+                    "description": "The API version this conforms to, currently 1"
+                },
+                "id": {
+                    "type": "string",
+                    "description": "The unique id of the chart"
+                },
+                "name": {
+                    "type": "string",
+                    "description": "The name of the chart"
+                },
+                "update_every": {
+                    "type": "number",
+                    "description": "The update frequency of this chart, in seconds. One value every this amount of time is kept in the round robin database (indepedently of the current view)."
+                },
+                "view_update_every": {
+                    "type": "number",
+                    "description": "The current view appropriate update frequency of this chart, in seconds. There is no point to request chart refreshes, using the same settings, more frequently than this."
+                },
+                "first_entry": {
+                    "type": "number",
+                    "description": "The UNIX timestamp of the first entry (the oldest) in the round robin database (indepedently of the current view)."
+                },
+                "last_entry": {
+                    "type": "number",
+                    "description": "The UNIX timestamp of the latest entry in the round robin database (indepedently of the current view)."
+                },
+                "after": {
+                    "type": "number",
+                    "description": "The UNIX timestamp of the first entry (the oldest) returned in this response."
+                },
+                "before": {
+                    "type": "number",
+                    "description": "The UNIX timestamp of the latest entry returned in this response."
+                },
+                "min": {
+                    "type": "number",
+                    "description": "The minimum value returned in the current view. This can be used to size the y-series of the chart."
+                },
+                "max": {
+                    "type": "number",
+                    "description": "The maximum value returned in the current view. This can be used to size the y-series of the chart."
+                },
+                "dimension_names": {
+                    "description": "The dimension names of the chart as returned in the current view.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "dimension_ids": {
+                    "description": "The dimension IDs of the chart as returned in the current view.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "latest_values": {
+                    "description": "The latest values collected for the chart (indepedently of the current view).",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "view_latest_values": {
+                    "description": "The latest values returned with this response.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "dimensions": {
+                    "type": "number",
+                    "description": "The number of dimensions returned."
+                },
+                "points": {
+                    "type": "number",
+                    "description": "The number of rows / points returned."
+                },
+                "format": {
+                    "type": "string",
+                    "description": "The format of the result returned."
+                },
+                "result": {
+                    "description": "The result requested, in the format requested."
                 }
             }
         }
