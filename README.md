@@ -1,25 +1,32 @@
 netdata
 =======
 
-### Linux real time system monitoring, over the web!
+### Realtime time data collection and charts!
 
-**Netdata** is a daemon that collects system information from a linux system and presents a web site to view the data.
-The presentation is full of charts that precisely render all system values, in realtime, for a short time (1 hour by default).
+**Netdata** is a daemon that collects data in realtime (up to per second) and presents a web site to view and analyze them.
+The presentation is full of charts that precisely render all system values, in realtime.
 
-You can use it to monitor all your servers, linux PCs or linux embedded devices, without the need to ssh to them.
-Also, you can view a short history of all collected values, so if something happens you can use **netdata** to find out what and when.
+It has been designed to be installed on every system, without desrupting its operation:
 
-Check it live at:
+1. It will just use some spare CPU cycles.
 
- - [My Home Gentoo Box](http://195.97.5.206:19999/)
- - [My Home Raspberry Pi B+](http://195.97.5.204:19999/) with data collection every 5s (raspbian playing movies 24x7)
- - [My Home Raspberry Pi 2](http://195.97.5.205:19999/) (osmc as an access point)
+    You can even control its CPU consumption by lowering its data collection frequency.
+    It is also running with the lowest possible priority.
 
-Here is a screenshot:
+2. It will use the memory you want it have.
 
-![image](https://cloud.githubusercontent.com/assets/2662304/11323720/0ea2a5f4-9123-11e5-9c30-d57072b8e12c.png)
+    You can control the memory it will use by sizing its round robin in memory database.
 
-![image](https://cloud.githubusercontent.com/assets/2662304/11323728/3cb6e810-9123-11e5-97b3-662fd6f35725.png)
+3. It does not use disk I/O.
+
+    All its database is in memory, and it is only saved on disk and loaded back when netdata restarts. You can also disable the access log of its embedded web server.
+
+
+You can use it to monitor all your applications, servers, linux PCs or linux embedded devices.
+
+Out of the box, it comes with plugins for data collection about system information and popular applications.
+
+Check it live at its [Demo Site](http://netdata.firehol.org)
 
 
 # Features
@@ -34,6 +41,8 @@ Here is a screenshot:
   It only needs a few megabytes of memory to store all its round robin database.
 
   Although `netdata` does all its calculation using `long double` (128 bit) arithmetics, it stores all values using a **custom-made 32-bit number**. This custom-made number can store in 29 bits values from -167772150000000.0 to  167772150000000.0 with a precision of 0.00001 (yes, it is a floating point number, meaning that higher integer values have less decimal precision) and 3 bits for flags (2 are currently used and 1 is reserved for future use). This provides an extremely optimized memory footprint with just 0.0001% max accuracy loss (run: `./netdata --unittest` to see it in action).
+
+  It also supports KSM memory deduplication to lower its memory requirements even further.
 
 - **per second data collection**
 
