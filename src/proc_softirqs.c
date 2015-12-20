@@ -131,6 +131,14 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
 
 			st = rrdset_find_bytype("cpu", id);
 			if(!st) {
+				// find if everything is zero
+				unsigned long long core_sum = 0 ;
+				for(l = 0; l < lines ;l++) {
+					if(!irrs[l].used) continue;
+					core_sum += irrs[l].value[c];
+				}
+				if(core_sum == 0) continue; // try next core
+
 				char name[256], title[256];
 				snprintf(name, 256, "cpu%d_softirqs", c);
 				snprintf(title, 256, "CPU%d softirqs", c);

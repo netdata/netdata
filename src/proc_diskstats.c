@@ -110,6 +110,10 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 		// I/O completion time and the backlog that may be accumulating.
 		backlog_ms 		= strtoull(procfile_lineword(ff, l, 13), NULL, 10);	// rq_ticks
 
+
+		// do not add a disk that is completely idle
+		if(!reads && !writes && !busy_ms) continue;
+
 		int def_enabled = 0;
 
 		// remove slashes from disk names
