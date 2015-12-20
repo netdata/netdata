@@ -57,6 +57,17 @@
 		margin-top: 15px;
 	}
 
+	.option-row,
+	.option-control {
+		vertical-align: top;
+		padding: 10px;
+		padding-top: 30px;
+	}
+
+	.option-info {
+		padding: 10px;
+	}
+
 	.chart-message {
 		display: block; 
 		margin-top: 10px;
@@ -76,6 +87,14 @@
 		margin-top:4%;
 	}
 
+	/* fix the navbar shifting when a modal is open */
+	/* https://github.com/twbs/bootstrap/issues/14040#issuecomment-159891033 */
+	body.modal-open{
+		width: 100% !important;
+		padding-right: 0 !important;
+		overflow-y: scroll !important;
+		position: fixed !important;
+	}
 
 	/*
 	 * Side navigation
@@ -222,7 +241,7 @@
 		}
 	}
 	</style>
-	
+
 	<!-- you can set your netdata server globally, by ucommenting this -->
 	<!-- you can also give a different server per chart, with the attribute: data-host="http://netdata.server:19999" -->
 	<!-- <script> netdataServer = "http://box:19999"; </script> -->
@@ -230,6 +249,7 @@
 	<!-- load the dashboard manager - it will do the rest -->
 	<script type="text/javascript" src="dashboard.js"></script>
 </head>
+
 <body data-spy="scroll">
 	<nav class="navbar navbar-default navbar-fixed-top" role="banner">
 		<div class="container">
@@ -244,9 +264,10 @@
 			</div>
 			<nav class="collapse navbar-collapse navbar-right" role="navigation">
 				<ul class="nav navbar-nav">
-					<li><a href="old/">Looking for the old Dashboard?</a></li>
-<!--					<li><a href="#sec">Edit</a></li>
-					<li><a href="#sec">Visualize</a></li>
+					<li><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal"><i class="fa fa-cog"></i> settings</a></li>
+					<li><a href="https://github.com/firehol/netdata" class="btn" target="_blank"><i class="fa fa-github"></i> community</a></li>
+					<li><a href="old/" class="btn" target="_blank"><i class="fa fa-step-backward"></i> old dashboard</a></li>
+<!--					<li><a href="#sec">Visualize</a></li>
 					<li><a href="#sec">Prototype</a></li>
 -->				</ul>
 			</nav>
@@ -291,52 +312,166 @@
 		</div>
 	</div>
 
-<div class="modal fade" id="welcomeModal" tabindex="-1" role="dialog" aria-labelledby="welcomeModalLabel">
-	<div class="modal-dialog modal-lg" role="document">
-		<div class="modal-content">
-			<div class="modal-header">
-				<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-				<h4 class="modal-title" id="welcomeModalLabel">Welcome to netdata!</h4>
-			</div>
-			<div class="modal-body">
-					<div class="p">
-					<b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b> is the fastest way to visualize data. It is a resource efficient, highly optimized system for collecting and visualizing any type of realtime timeseries data, from CPU usage, disk activity, SQL queries, to web site visitors, e-shop orders, revenue and profits.
-					</div>
-					<div class="p">
-					To make a chart in <b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b>, you just need a <b>number</b>. Just a number you can read somehow. <b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b> will turn this number to a real time web chart. For collecting these numbers, it supports <a href="https://github.com/firehol/netdata/tree/master/plugins.d" target="_blank">external plugins</a>, even <a href="https://github.com/firehol/netdata/tree/master/charts.d" target="_blank">bash shell plugins</a>. Any computer program, in any language, that can print a few lines of text on its standard output, can be a netdata data collector.
-					</div>
-					<div class="p">
-					<b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b> can embed charts everywhere, like this one <div data-netdata="system.cpu" data-dimensions="system" data-after="-120" data-width="25%" data-height="15px" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-show-value-of-system-at="system.cpu.system.modal.1"></div> (my CPU system usage which is <span id="system.cpu.system.modal.1" style="display: inline-block; width: 40px; text-align: right;"></span>%),
-					or this one <div data-netdata="ipv4.tcppackets" data-dimensions="received" data-after="-120" data-width="25%" data-height="15px" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-show-value-of-received-at="ipv4.tcppackets.received.modal.1"></div> (my IPv4 received TCP packets, which are <span id="ipv4.tcppackets.received.modal.1" style="display: inline-block; width: 60px; text-align: right;"></span>/second).
-					</div>
-					<div class="p">
-					You can have <b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b> charts on your site too. Just give it a <code>div</code> and a real time chart, zoomable and draggable will appear (try it even on these tiny ones - <b>drag</b> them to pan horizontally, <b>shift + drag</b> to zoom in, on <b>chrome shift + mouse wheel</b> to zoom in/out, <b>double click</b> on them to reset them - don't be afraid of <b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b> performance - <a href="https://github.com/firehol/netdata/issues/36" target="_blank">a raspberry pi 2 can sustain 300 charts updates per second</a>!).
-					</div>
-					<div class="p">
-					If you like this project, <b>we need help writing documentation, coding plugins, testing new features, supporting end users.</b>
-					</div>
-					<div class="p">
-					We will be glad to have you on board...
-					</div>
-			</div>
-			<div class="modal-footer">
-				<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+	<div id="footer" class="container" style="display: none;">
+		<div class="row">
+			<div class="col-md-10" role="main">
+				<div class="p">
+					<big><a href="https://github.com/firehol/netdata" target="_blank">netdata</a></big><br/>
+					<i class="fa fa-copyright"></i> Copyright 2016, Costa Tsaousis.<br/>
+					Released under <a href="http://www.gnu.org/licenses/gpl-3.0.en.html" target="_blank">GPL v3 or later</a>.<br/>
+				</div>
+				<div class="p">
+					<small>
+						<a href="https://github.com/firehol/netdata" target="_blank">netdata</a> re-distributes these software tools:
+
+						<i class="fa fa-circle"></i> The excellent <a href="http://dygraphs.com/" target="_blank">Dygraphs.com</a> web chart library,
+						<i class="fa fa-copyright"></i> Copyright 2009, Dan Vanderkam, <a href="http://dygraphs.com/legal.html" target="_blank">MIT License</a>
+
+						<i class="fa fa-circle"></i> <a href="http://omnipotent.net/jquery.sparkline/" target="_blank">jQuery Sparklines</a> web chart library,
+						<i class="fa fa-copyright"></i> Copyright 2009-2012, Splunk Inc., <a href="http://opensource.org/licenses/BSD-3-Clause" target="_blank">New BSD License</a>
+
+						<i class="fa fa-circle"></i> <a href="http://benpickles.github.io/peity/" target="_blank">Peity</a> web chart library,
+						<i class="fa fa-copyright"></i> Copyright 2009-2015, Ben Pickles, <a href="https://github.com/benpickles/peity/blob/master/MIT-LICENCE" target="_blank">MIT License</a>
+
+						<i class="fa fa-circle"></i> <a href="https://rendro.github.io/easy-pie-chart/" target="_blank">Easy Pie Chart</a> web chart library,
+						<i class="fa fa-copyright"></i> Copyright 2013, Robert Fleischmann, <a href="https://github.com/rendro/easy-pie-chart/blob/master/LICENSE" target="_blank">MIT License</a>
+
+						<i class="fa fa-circle"></i> <a href="https://jquery.org/" target="_blank">jQuery</a>,
+						<i class="fa fa-copyright"></i> Copyright 2015, jQuery Foundation, <a href="https://jquery.org/license/" target="_blank">MIT License</a>
+
+						<i class="fa fa-circle"></i> <a href="http://getbootstrap.com/getting-started/" target="_blank">Bootstrap</a>,
+						<i class="fa fa-copyright"></i> Copyright 2015, Twitter, <a href="http://getbootstrap.com/getting-started/#license-faqs" target="_blank">MIT License</a>
+
+						<i class="fa fa-circle"></i> <a href="http://www.bootstraptoggle.com/" target="_blank">Bootstrap Toggle</a>,
+						<i class="fa fa-copyright"></i> Copyright (c) 2011-2014 Min Hur, The New York Times Company, <a href="https://github.com/minhur/bootstrap-toggle/blob/master/LICENSE" target="_blank">MIT License</a>
+
+						<i class="fa fa-circle"></i> <a href="https://jamesflorentino.github.io/nanoScrollerJS/" target="_blank">NanoScroller</a>,
+						<i class="fa fa-copyright"></i> Copyright 2012, James Florentino, <a href="https://github.com/jamesflorentino/nanoScrollerJS/blob/master/LICENSE" target="_blank">MIT License</a>
+
+						<i class="fa fa-circle"></i> <a href="https://github.com/marcj/css-element-queries" target="_blank">CSS Element Queries</a>,
+						<i class="fa fa-copyright"></i> Copyright Marc J. Schmidt, <a href="https://github.com/marcj/css-element-queries/blob/master/LICENSE" target="_blank">MIT License</a>
+
+						<i class="fa fa-circle"></i> <a href="http://morrisjs.github.io/morris.js/" target="_blank">morris.js</a>,
+						<i class="fa fa-copyright"></i> Copyright 2013, Olly Smith, <a href="http://morrisjs.github.io/morris.js/" target="_blank">Simplified BSD License</a>
+
+						<i class="fa fa-circle"></i> <a href="http://raphaeljs.com/" target="_blank">Raphaël</a>,
+						<i class="fa fa-copyright"></i> Copyright 2008, Dmitry Baranovskiy, <a href="http://raphaeljs.com/license.html" target="_blank">MIT License</a>
+
+						<i class="fa fa-circle"></i> <a href="https://fortawesome.github.io/Font-Awesome/" target="_blank">FontAwesome</a>,
+						<i class="fa fa-copyright"></i> Created by Dave Gandy, Font: <a href="http://scripts.sil.org/OFL" target="_blank">SIL OFL 1.1 License</a>, CSS: <a href="http://opensource.org/licenses/mit-license.html" target="_blank">MIT License</a>
+
+						<i class="fa fa-circle"></i> <a href="http://www.iconsdb.com/soylent-red-icons/seo-performance-icon.html" target="_blank">IconsDB.com Icons</a>, Icons provided as CC0 1.0 Universal (CC0 1.0) Public Domain Dedication.
+					</small>
+				</div>
 			</div>
 		</div>
 	</div>
-</div>
+
+	<div class="modal fade" id="welcomeModal" tabindex="-1" role="dialog" aria-labelledby="welcomeModalLabel">
+		<div class="modal-dialog modal-lg" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+					<h4 class="modal-title" id="welcomeModalLabel">Welcome to netdata!</h4>
+				</div>
+				<div class="modal-body">
+						<div class="p">
+						<b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b> is the fastest way to visualize data. It is a resource efficient, highly optimized system for collecting and visualizing any type of realtime timeseries data, from CPU usage, disk activity, SQL queries, to web site visitors, e-shop orders, revenue and profits.
+						</div>
+						<div class="p">
+						To make a chart in <b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b>, you just need a <b>number</b>. Just a number you can read somehow. <b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b> will turn this number to a real time web chart. For collecting these numbers, it supports <a href="https://github.com/firehol/netdata/tree/master/plugins.d" target="_blank">external plugins</a>, even <a href="https://github.com/firehol/netdata/tree/master/charts.d" target="_blank">bash shell plugins</a>. Any computer program, in any language, that can print a few lines of text on its standard output, can be a netdata data collector.
+						</div>
+						<div class="p">
+						<b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b> can embed charts everywhere, like this one <div data-netdata="system.cpu" data-dimensions="system" data-after="-120" data-width="25%" data-height="15px" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-show-value-of-system-at="system.cpu.system.modal.1"></div> (my CPU system usage which is <span id="system.cpu.system.modal.1" style="display: inline-block; width: 40px; text-align: right;"></span>%),
+						or this one <div data-netdata="ipv4.tcppackets" data-dimensions="received" data-after="-120" data-width="25%" data-height="15px" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-show-value-of-received-at="ipv4.tcppackets.received.modal.1"></div> (my IPv4 received TCP packets, which are <span id="ipv4.tcppackets.received.modal.1" style="display: inline-block; width: 60px; text-align: right;"></span>/second).
+						</div>
+						<div class="p">
+						You can have <b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b> charts on your site too. Just give it a <code>div</code> and a real time chart, zoomable and draggable will appear (try it even on these tiny ones - <b>drag</b> them to pan horizontally, <b>shift + drag</b> to zoom in, on <b>chrome shift + mouse wheel</b> to zoom in/out, <b>double click</b> on them to reset them - don't be afraid of <b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b> performance - <a href="https://github.com/firehol/netdata/issues/36" target="_blank">a raspberry pi 2 can sustain 300 charts updates per second</a>!).
+						</div>
+						<div class="p">
+						If you like this project, <b>we need help writing documentation, coding plugins, testing new features, supporting end users.</b>
+						</div>
+						<div class="p">
+						We will be glad to have you on board...
+						</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="modal fade" id="optionsModal" tabindex="-1" role="dialog" aria-labelledby="optionsModalLabel">
+		<div class="modal-dialog modal-lg" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+					<h4 class="modal-title" id="optionsModalLabel">netdata dashboard options</h4>
+				</div>
+				<div class="modal-body">
+					<form id="optionsForm" method="get" class="form-horizontal">
+						<div class="form-group">
+							<table>
+							<tr class="option-row">
+								<td class="option-control">
+								<input id="eliminate_zero_dimensions" type="checkbox" checked data-toggle="toggle" data-width="110px">
+								</td>
+								<td class="option-info"><strong>Eliminate chart dimensions with zero values.</strong><br/>
+									<small>When enabled, dimensions that have all their values (within the current view) set to zero will not be transfered from the netdata server, except if all dimensions of the chart are zero, in which case this setting does nothing (all dimensions are transfered and shown). Enable this to lower the data transfered between the browser and netdata, lower the CPU requirements of the browser (fewer lines to draw) and increase the focus on the legend (fewer entries at the legends).</small>
+								</td>
+								</tr>
+							<tr class="option-row">
+								<td class="option-control"><input id="destroy_on_hide" type="checkbox" data-toggle="toggle" data-width="110px"></td>
+								<td class="option-info"><strong>Destroy charts when they are not visible.</strong><br/>
+									<small>When enabled, charts that are not in the current viewport of the browser (are above, or below the visible area of the page), will be destroyed and re-created if and when they become visible again. When disabled, the not-visible charts will be just hidden to simplify the DOM and speed up the browser. Enable it, to lower the memory requirements of the browser. Disable it for smoother page scrolling.</small>
+								</td>
+								</tr>
+							<tr class="option-row">
+								<td class="option-control"><input id="parallel_refresher" type="checkbox" checked data-toggle="toggle" data-on="Parallel" data-off="Sequencial" data-width="110px"></td>
+								<td class="option-info"><strong>Chart refresh policy.</strong><br/>
+									<small>When set to <b>parallel</b>, visible charts are refreshed in parallel (all queries are sent to netdata server in parallel) and are rendered asynchronously. When set to <b>sequencial</b> charts are refreshed one after another. Set it to parallel if your browser can cope with it (most modern browsers do), set it to sequencial if you work on an older/slower computer.</small>
+								</td>
+								</tr>
+							<tr class="option-row">
+								<td class="option-control"><input id="sync_selection" type="checkbox" checked data-toggle="toggle" data-width="110px"></td>
+								<td class="option-info"><strong>Sync hover selection on all charts.</strong><br/>
+									<small>When enabled, a selection on one chart will automatically select the same time on all other visible charts and the legends of all visible charts will be updated to show the selected values. When disabled, only the chart getting the user's attention will be selected. Enable it to get better insights of the data. Disable it if you are on a very slow computer that cannot actually do it.</small>
+								</td>
+								</tr>
+							<tr class="option-row">
+								<td class="option-control"><input id="sync_pan_and_zoom" type="checkbox" checked data-toggle="toggle" data-width="110px"></td>
+								<td class="option-info"><strong>Sync pan and zoom on all charts.</strong><br/>
+									<small>When enabled, pan and zoom operations on a chart will be replicated to all charts (even the ones that are not currently visible - of course only when they will become visible). When disabled, pan and zoom operations will not be propagated to other charts.</small>
+								</td>
+								</tr>
+							<tr class="option-row">
+								<td class="option-control"><input id="stop_updates_when_focus_is_lost" type="checkbox" checked data-toggle="toggle" data-width="110px"></td>
+								<td class="option-info"><strong>Stop updates when this page looses focus.</strong><br/>
+									<small>When enabled, the charts will not be updated if the page / tab does not have the focus of the user. When disabled, the charts will always be refreshed. Enable it to work on another window and have the charts autorefresh. Disable it to lower the CPU requirements of the browser (and extend the battery of laptops and tablets) when this page does not have the focus of the user.</small>
+								</td>
+								</tr>
+							</table>
+						</div>
+					</form>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+				</div>
+			</div>
+		</div>
+	</div>
 
 </body>
 </html>
 <script>
 
-
 var demo_hostname = 'netdata.firehol.org';
 // var demo_hostname = 'box';
 
-//if(document.location.hostname === demo_hostname) {
+if(document.location.hostname === demo_hostname) {
 	document.getElementById('masthead').style.display = 'block';
-//}
+}
 
 var options = {
 	sparklines_registry: {},
@@ -818,7 +953,7 @@ function prepareScreen(data) {
 	/* activate bootstrap sidebar (affix) */
 	$('#sidebar').affix({
 		offset: {
-			top: 200,
+			top: (document.location.hostname === demo_hostname)?200:0,
 			bottom: 0
 		}
 	});
@@ -829,6 +964,24 @@ function prepareScreen(data) {
 	$('#sidebar').on('affixed.bs.affix', function() {
 		$(this).removeAttr('style');
 	});
+	
+	document.getElementById('footer').style.display = 'block';
+
+	// default options
+	$('#eliminate_zero_dimensions').bootstrapToggle(NETDATA.options.current.eliminate_zero_dimensions?'on':'off');
+	$('#destroy_on_hide').bootstrapToggle(NETDATA.options.current.destroy_on_hide?'on':'off');
+	$('#parallel_refresher').bootstrapToggle(NETDATA.options.current.parallel_refresher?'on':'off');
+	$('#sync_selection').bootstrapToggle(NETDATA.options.current.sync_selection?'on':'off');
+	$('#sync_pan_and_zoom').bootstrapToggle(NETDATA.options.current.sync_pan_and_zoom?'on':'off');
+	$('#stop_updates_when_focus_is_lost').bootstrapToggle(NETDATA.options.current.stop_updates_when_focus_is_lost?'on':'off');
+
+	// handle options changes
+	$('#eliminate_zero_dimensions').change(function() { NETDATA.options.current.eliminate_zero_dimensions = $(this).prop('checked'); });
+	$('#destroy_on_hide').change(function() { NETDATA.options.current.destroy_on_hide = $(this).prop('checked'); });
+	$('#parallel_refresher').change(function() { NETDATA.options.current.parallel_refresher = $(this).prop('checked'); });
+	$('#sync_selection').change(function() { NETDATA.options.current.sync_selection = $(this).prop('checked'); });
+	$('#sync_pan_and_zoom').change(function() { NETDATA.options.current.sync_pan_and_zoom = $(this).prop('checked'); });
+	$('#stop_updates_when_focus_is_lost').change(function() { NETDATA.options.current.stop_updates_when_focus_is_lost = $(this).prop('checked'); });
 }
 
 NETDATA.ready(function() {

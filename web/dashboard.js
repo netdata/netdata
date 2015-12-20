@@ -199,6 +199,8 @@
 
 			eliminate_zero_dimensions: true, // do not show dimensions with just zeros
 
+			stop_updates_when_focus_is_lost: true,
+
 			color_fill_opacity: {
 				line: 1.0,
 				area: 0.2,
@@ -830,7 +832,7 @@
 		// of a selection sync and another chart becomes
 		// the new master
 		if(NETDATA.options.current.sync_pan_and_zoom === false && this.isVisible() === true)
-			state.updateChart();
+			this.updateChart();
 	}
 
 	chartState.prototype.setMode = function(m) {
@@ -2324,21 +2326,27 @@
 		NETDATA.options.page_is_visible = true;
 
 		$(window).blur(function() {
-			NETDATA.options.page_is_visible = false;
-			if(NETDATA.options.debug.focus === true)
-				console.log('Lost Focus!');
+			if(NETDATA.options.current.stop_updates_when_focus_is_lost === true) {
+				NETDATA.options.page_is_visible = false;
+				if(NETDATA.options.debug.focus === true)
+					console.log('Lost Focus!');
+			}
 		});
 
 		$(window).focus(function() {
-			NETDATA.options.page_is_visible = true;
-			if(NETDATA.options.debug.focus === true)
-				console.log('Focus restored!');
+			if(NETDATA.options.current.stop_updates_when_focus_is_lost === true) {
+				NETDATA.options.page_is_visible = true;
+				if(NETDATA.options.debug.focus === true)
+					console.log('Focus restored!');
+			}
 		});
 
 		if(typeof document.hasFocus === 'function' && !document.hasFocus()) {
-			NETDATA.options.page_is_visible = false;
-			if(NETDATA.options.debug.focus === true)
-				console.log('Document has no focus!');
+			if(NETDATA.options.current.stop_updates_when_focus_is_lost === true) {
+				NETDATA.options.page_is_visible = false;
+				if(NETDATA.options.debug.focus === true)
+					console.log('Document has no focus!');
+			}
 		}
 
 		NETDATA.parseDom(NETDATA.chartRefresher);
@@ -3578,6 +3586,10 @@
 		{
 			url: NETDATA.serverDefault + 'lib/ElementQueries.js',
 			isAlreadyLoaded: function() { return false; }
+		},
+		{
+			url: NETDATA.serverDefault + 'lib/bootstrap-toggle.min.js',
+			isAlreadyLoaded: function() { return false; }
 		}
 	];
 
@@ -3597,6 +3609,10 @@
 		},
 		{
 			url: NETDATA.dashboard_css,
+			isAlreadyLoaded: function() { return false; }
+		},
+		{
+			url: NETDATA.serverDefault + 'css/bootstrap-toggle.min.css',
 			isAlreadyLoaded: function() { return false; }
 		}
 	];

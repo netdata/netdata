@@ -1,7 +1,7 @@
 # Netdata
 
-Copyright 2015, Costa Tsaousis.
-Release under [GPL v3 or later](http://www.gnu.org/licenses/gpl-3.0.en.html).
+Copyright 2014-2016, Costa Tsaousis.
+Released under [GPL v3 or later](http://www.gnu.org/licenses/gpl-3.0.en.html).
 
 ---
 
@@ -53,6 +53,12 @@ connectivity is not available.
 
     Copyright 2012, James Florentino
     [MIT License](https://github.com/jamesflorentino/nanoScrollerJS/blob/master/LICENSE)
+
+
+- [Bootstrap Toggle](http://www.bootstraptoggle.com/)
+
+    Copyright (c) 2011-2014 Min Hur, The New York Times Company
+    [MIT License](https://github.com/minhur/bootstrap-toggle/blob/master/LICENSE)
 
 
 - [CSS Element Queries](https://github.com/marcj/css-element-queries)

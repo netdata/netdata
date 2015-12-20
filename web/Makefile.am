@@ -37,6 +37,7 @@ dist_weblib_DATA = \
         lib/bootstrap.min.js \
 	lib/ElementQueries.js \
 	lib/ResizeSensor.js \
+        lib/bootstrap-toggle.min.js \
         $(NULL)
 
 webcssdir=$(webdir)/css
@@ -45,6 +46,7 @@ dist_webcss_DATA = \
         css/bootstrap.min.css \
         css/bootstrap-theme.min.css \
 	css/font-awesome.min.css \
+        css/bootstrap-toggle.min.css \
         $(NULL)
 
 webfontsdir=$(webdir)/fonts
