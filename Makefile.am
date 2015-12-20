@@ -19,6 +19,7 @@ MAINTAINERCLEANFILES= \
 EXTRA_DIST = \
 	.gitignore \
 	README.md \
+	LICENSE.md \
 	netdata-9999.ebuild \
 	$(NULL)
 

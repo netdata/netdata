@@ -9,8 +9,8 @@ Release under [GPL v3 or later](http://www.gnu.org/licenses/gpl-3.0.en.html).
 
 Netdata re-distributes the following third party software.
 We decided to re-distribute all these, instead of using them
-through a CDN, to allow netdata work in case internet connectivity
-is not available.
+through a CDN, to allow netdata work in cases where internet
+connectivity is not available.
 
 
 - [Dygraphs](http://dygraphs.com/)
@@ -78,4 +78,8 @@ is not available.
     Created by Dave Gandy
     Font license: [SIL OFL 1.1](http://scripts.sil.org/OFL)
     CSS license: [MIT License](http://opensource.org/licenses/mit-license.html)
+
+- [IconsDB.com Icons](http://www.iconsdb.com/soylent-red-icons/seo-performance-icon.html)
+
+    Icons provided as CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
 

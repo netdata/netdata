@@ -30,6 +30,8 @@ dist_weblib_DATA = \
 	lib/jquery.easypiechart.min.js \
 	lib/jquery.nanoscroller.min.js \
         lib/bootstrap.min.js \
+	lib/ElementQueries.js \
+	lib/ResizeSensor.js \
         $(NULL)
 
 webcssdir=$(webdir)/css
@@ -37,6 +39,7 @@ dist_webcss_DATA = \
         css/morris.css \
         css/bootstrap.min.css \
         css/bootstrap-theme.min.css \
+	css/font-awesome.min.css \
         $(NULL)
 
 webfontsdir=$(webdir)/fonts
@@ -46,6 +49,12 @@ dist_webfonts_DATA = \
         fonts/glyphicons-halflings-regular.ttf \
         fonts/glyphicons-halflings-regular.woff \
         fonts/glyphicons-halflings-regular.woff2 \
+	fonts/FontAwesome.otf \
+	fonts/fontawesome-webfont.eot \
+	fonts/fontawesome-webfont.svg \
+	fonts/fontawesome-webfont.ttf \
+	fonts/fontawesome-webfont.woff \
+	fonts/fontawesome-webfont.woff2 \
         $(NULL)
 
 webimagesdir=$(webdir)/images
@@ -63,3 +72,5 @@ dist_webimages_DATA = \
 	images/seo-performance-multi-size.ico \
 	images/seo-performance-multi-size.icns \
         $(NULL)
+
+
