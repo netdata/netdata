@@ -3059,25 +3059,56 @@
 					if(NETDATA.options.debug.dygraph === true || state.debug === true)
 						state.log('interactionModel.touchstart()');
 
-					state.globalSelectionSyncStop();
-					state.globalSelectionSyncDelay();
-					Dygraph.Interaction.startTouch(event, dygraph, context);
-					context.touchDirections = { x: true, y: false };
 					state.setMode('zoom');
+					state.pauseChart();
+
+					Dygraph.defaultInteractionModel.touchstart(event, dygraph, context);
+
+					// we overwrite the touch directions at the end, to overwrite
+					// the internal default of dygraphs
+					context.touchDirections = { x: true, y: false };
+
+					state.dygraph_last_touch_start = new Date().getTime();
+					state.dygraph_last_touch_move = 0;
+
+					if(typeof event.touches[0].pageX === 'number')
+						state.dygraph_last_touch_page_x = event.touches[0].pageX;
+					else
+						state.dygraph_last_touch_page_x = 0;
 				},
 				touchmove: function(event, dygraph, context) {
 					if(NETDATA.options.debug.dygraph === true || state.debug === true)
 						state.log('interactionModel.touchmove()');
 
-					//Dygraph.cancelEvent(event);
-					state.globalSelectionSyncStop();
-					Dygraph.Interaction.moveTouch(event, dygraph, context);
+					Dygraph.defaultInteractionModel.touchmove(event, dygraph, context);
+
+					state.dygraph_last_touch_move = new Date().getTime();
 				},
 				touchend: function(event, dygraph, context) {
 					if(NETDATA.options.debug.dygraph === true || state.debug === true)
 						state.log('interactionModel.touchend()');
 
-					Dygraph.Interaction.endTouch(event, dygraph, context);
+					Dygraph.defaultInteractionModel.touchend(event, dygraph, context);
+
+					var now = new Date().getTime();
+					if(typeof state.dygraph_last_touch_end !== 'undefined') {
+						if(state.dygraph_last_touch_move === 0) {
+							var dt = now - state.dygraph_last_touch_end;
+							if(dt <= 250) {
+								state.globalSelectionSyncStop();
+								NETDATA.globalPanAndZoom.clearMaster();
+								state.resetChart();
+							}
+							else if(state.dygraph_last_touch_move === 0 && state.dygraph_last_touch_page_x !== 0) {
+								// internal api of dygraphs
+								var pct = (state.dygraph_last_touch_page_x - (dygraph.plotter_.area.x + state.element.getBoundingClientRect().left)) / dygraph.plotter_.area.w;
+								var t = Math.round(state.current.after_ms + (state.current.before_ms - state.current.after_ms) * pct);
+								if(NETDATA.dygraphSetSelection(state, t) === true)
+									state.globalSelectionSync(t);
+							}
+						}
+					}
+					state.dygraph_last_touch_end = now;
 				}
 			}
 		};
