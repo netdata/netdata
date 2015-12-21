@@ -92,8 +92,9 @@
 	body.modal-open{
 		width: 100% !important;
 		padding-right: 0 !important;
-		overflow-y: scroll !important;
-		position: fixed !important;
+/*		overflow-y: scroll !important; */
+/*		position: fixed !important;*/
+		overflow: visible;
 	}
 
 	/*
@@ -106,7 +107,7 @@
 	.dashboard-sidebar {
 		max-height: calc(100% - 70px) !important;
 		overflow-y: auto;
-		width: 170px !important;
+		/*width: 220px !important;*/
 	}
 
 	/* By default it's not affixed in mobile views, so undo that */
@@ -122,10 +123,10 @@
 	.affix {
 		position: static;
 		top: 70px !important;
-		width: 170px;
+		/*width: 220px;*/
 	}
 	.affix-top {
-		width: 170px;
+		/*width: 220px;*/
 	}
 
 	/* First level of nav */
@@ -250,7 +251,7 @@
 	<script type="text/javascript" src="dashboard.js?v2"></script>
 </head>
 
-<body data-spy="scroll">
+<body data-spy="scroll" data-target="#sidebar">
 	<nav class="navbar navbar-default navbar-fixed-top" role="banner">
 		<div class="container">
 			<div class="navbar-header">
@@ -307,7 +308,7 @@
 				<div id="charts_div"></div>
 			</div>
 			<div class="col-md-2" role="complementary">
-				<nav class="dashboard-sidebar hidden-print hidden-xs hidden-sm" data-spy="affix" id="sidebar" role="menu"></nav>
+				<nav class="dashboard-sidebar hidden-print hidden-xs hidden-sm" id="sidebar" role="menu"></nav>
 			</div>
 		</div>
 	</div>
@@ -781,7 +782,7 @@ function prepareScreen(data) {
 	// find the proper duration for per-second updates
 	var duration = Math.round(($(div).width() * pcent_width / 100 * data.update_every / 3) / 60) * 60;
 	var html = '';
-	var sidebar = '<ul class="nav dashboard-sidenav" id="sidebar_ul">';
+	var sidebar = '<ul class="nav dashboard-sidenav" data-spy="affix" id="sidebar_ul">';
 
 	function getMessage(id) {
 		if(typeof messages[id] !== 'undefined')
@@ -924,7 +925,7 @@ function prepareScreen(data) {
 */
 	div.innerHTML = html;
 	document.getElementById('sidebar').innerHTML = sidebar;
-
+	
 	// resize all charts - without starting the background thread
 	// this has to be done while NETDATA is paused
 	// if we ommit this, the affix menu will be wrong, since all
@@ -944,16 +945,10 @@ function prepareScreen(data) {
 			$('html, body').animate({ scrollTop: offset.top }, 0);
 	}
 
-	/* activate bootstrap scrollspy (needed for sidebar) */
-	$(document.body).scrollspy({
-		target: '#sidebar',
-		offset: $(window).height() / 3 // controls the diff of the <hX> element to the top, to select it
-	});
-
 	/* activate bootstrap sidebar (affix) */
 	$('#sidebar').affix({
 		offset: {
-			top: (document.location.hostname === demo_hostname)?200:0,
+			top: (document.location.hostname === demo_hostname)?150:0,
 			bottom: 0
 		}
 	});
@@ -965,6 +960,12 @@ function prepareScreen(data) {
 		$(this).removeAttr('style');
 	});
 	
+	/* activate bootstrap scrollspy (needed for sidebar) */
+	$(document.body).scrollspy({
+		target: '#sidebar',
+		offset: $(window).height() / 3 // controls the diff of the <hX> element to the top, to select it
+	});
+
 	document.getElementById('footer').style.display = 'block';
 
 	// default options
@@ -982,6 +983,11 @@ function prepareScreen(data) {
 	$('#sync_selection').change(function() { NETDATA.options.current.sync_selection = $(this).prop('checked'); });
 	$('#sync_pan_and_zoom').change(function() { NETDATA.options.current.sync_pan_and_zoom = $(this).prop('checked'); });
 	$('#stop_updates_when_focus_is_lost').change(function() { NETDATA.options.current.stop_updates_when_focus_is_lost = $(this).prop('checked'); });
+	
+	if(document.location.hostname === demo_hostname)
+		setTimeout(function() {
+			$('#welcomeModal').modal();
+		}, 1000);
 }
 
 NETDATA.ready(function() {
@@ -998,9 +1004,6 @@ NETDATA.ready(function() {
 
 		// pause the NETDATA thread that updates the charts
 		NETDATA.pause(function() {
-
-			if(document.location.hostname === demo_hostname)
-				$('#welcomeModal').modal();
 
 			// prepare our DOM
 			// this will be called when NETDATA is paused
