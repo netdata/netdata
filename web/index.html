@@ -33,6 +33,10 @@
 		padding-top: 50px;
 	}
 
+	.modal-wide .modal-dialog {
+		width: 80%;
+	}
+
 	/* fix # anchors scrolling under the navbar
 	   https://github.com/twbs/bootstrap/issues/1768#issuecomment-46519033
 	 */
@@ -62,6 +66,7 @@
 		vertical-align: top;
 		padding: 10px;
 		padding-top: 30px;
+		padding-left: 30px;
 	}
 
 	.option-info {
@@ -248,7 +253,7 @@
 	<!-- <script> netdataServer = "http://box:19999"; </script> -->
 
 	<!-- load the dashboard manager - it will do the rest -->
-	<script type="text/javascript" src="dashboard.js?v3"></script>
+	<script type="text/javascript" src="dashboard.js?v4"></script>
 </head>
 
 <body data-spy="scroll" data-target="#sidebar">
@@ -415,41 +420,57 @@
 						<div class="form-group">
 							<table>
 							<tr class="option-row">
-								<td class="option-control">
-								<input id="eliminate_zero_dimensions" type="checkbox" checked data-toggle="toggle" data-width="110px">
-								</td>
-								<td class="option-info"><strong>Eliminate chart dimensions with zero values.</strong><br/>
-									<small>When enabled, dimensions that have all their values (within the current view) set to zero will not be transfered from the netdata server, except if all dimensions of the chart are zero, in which case this setting does nothing (all dimensions are transfered and shown). Enable this to lower the data transfered between the browser and netdata, lower the CPU requirements of the browser (fewer lines to draw) and increase the focus on the legend (fewer entries at the legends).</small>
+								<td class="option-control"><input id="stop_updates_when_focus_is_lost" type="checkbox" checked data-toggle="toggle" data-offstyle="danger" data-onstyle="success" data-on="On Focus" data-off="Always" data-width="110px"></td>
+								<td class="option-info"><strong>When to refresh the charts?</strong><br/>
+									<small>When set to <b>On Focus</b>, the charts will stop being updated if the page / tab does not have the focus of the user. When set to <b>Always</b>, the charts will always be refreshed. Set it to <b>On Focus</b> it to lower the CPU requirements of the browser (and extend the battery of laptops and tablets) when this page does not have your focus. Set to <b>Always</b> to work on another window (i.e. change the settings of something) and have the charts auto-refresh in this window.</small>
 								</td>
 								</tr>
 							<tr class="option-row">
-								<td class="option-control"><input id="destroy_on_hide" type="checkbox" data-toggle="toggle" data-width="110px"></td>
-								<td class="option-info"><strong>Destroy charts when they are not visible.</strong><br/>
-									<small>When enabled, charts that are not in the current viewport of the browser (are above, or below the visible area of the page), will be destroyed and re-created if and when they become visible again. When disabled, the not-visible charts will be just hidden to simplify the DOM and speed up the browser. Enable it, to lower the memory requirements of the browser. Disable it for smoother page scrolling.</small>
+								<td class="option-control">
+								<input id="eliminate_zero_dimensions" type="checkbox" checked data-toggle="toggle" data-on="Non Zero" data-off="All" data-width="110px">
+								</td>
+								<td class="option-info"><strong>Which dimensions to show?</strong><br/>
+									<small>When set to <b>Non Zero</b>, dimensions that have all their values (within the current view) set to zero will not be transfered from the netdata server (except if all dimensions of the chart are zero, in which case this setting does nothing - all dimensions are transfered and shown). When set to <b>All</b>, all dimensions will always be shown. Set it to <b>Non Zero</b> to lower the data transfered between netdata and your browser, lower the CPU requirements of your browser (fewer lines to draw) and increase the focus on the legends (fewer entries at the legends).</small>
+								</td>
+								</tr>
+							<tr class="option-row">
+								<td class="option-control"><input id="destroy_on_hide" type="checkbox" data-toggle="toggle" data-on="Destroy" data-off="Hide" data-width="110px"></td>
+								<td class="option-info"><strong>How to handle hidden charts?</strong><br/>
+									<small>When set to <b>Destroy</b>, charts that are not in the current viewport of the browser (are above, or below the visible area of the page), will be destroyed and re-created if and when they become visible again. When set to <b>Hide</b>, the not-visible charts will be just hidden, to simplify the DOM and speed up your browser. Set it to <b>Destroy</b>, to lower the memory requirements of your browser. Set it to <b>Hide</b> for smoother page scrolling.</small>
 								</td>
 								</tr>
 							<tr class="option-row">
 								<td class="option-control"><input id="parallel_refresher" type="checkbox" checked data-toggle="toggle" data-on="Parallel" data-off="Sequencial" data-width="110px"></td>
-								<td class="option-info"><strong>Chart refresh policy.</strong><br/>
+								<td class="option-info"><strong>Which chart refresh policy to use?</strong><br/>
 									<small>When set to <b>parallel</b>, visible charts are refreshed in parallel (all queries are sent to netdata server in parallel) and are rendered asynchronously. When set to <b>sequencial</b> charts are refreshed one after another. Set it to parallel if your browser can cope with it (most modern browsers do), set it to sequencial if you work on an older/slower computer.</small>
 								</td>
 								</tr>
+							<tr class="option-row" id="concurrent_refreshes_row">
+								<td class="option-control"></td>
+								<td class="option-info">
+									<table>
+									<tr class="option-row">
+									<td class="option-control">
+									<input id="concurrent_refreshes" type="checkbox" checked data-toggle="toggle" data-on="Resync" data-off="Best Effort" data-width="110px">
+									</td>
+									<td class="option-info">
+									<strong>Shall we re-sync chart refreshes?</strong><br/>
+									<small>When set to <b>Resync</b>, the dashboard will attempt to re-synchronize all the charts so that they are refreshed concurrently. When set to <b>Best Effort</b>, each chart may be refreshed with a little time difference to the others. Normally, the dashboard starts refreshing them in parallel, but depending on the speed of your computer and the network latencies, charts start having a slight time difference. Setting this to <b>Resync</b> will attempt to re-synchronize the charts on every update. Setting it to <b>Best Effort</b> may lower the pressure on your browser and the network.</small>
+									</td>
+									</tr>
+									</table>
+								</td>
+								</tr>
 							<tr class="option-row">
-								<td class="option-control"><input id="sync_selection" type="checkbox" checked data-toggle="toggle" data-width="110px"></td>
-								<td class="option-info"><strong>Sync hover selection on all charts.</strong><br/>
+								<td class="option-control"><input id="sync_selection" type="checkbox" checked data-toggle="toggle" data-on="Sync" data-off="Don't Sync" data-width="110px"></td>
+								<td class="option-info"><strong>Sync hover selection on all charts?</strong><br/>
 									<small>When enabled, a selection on one chart will automatically select the same time on all other visible charts and the legends of all visible charts will be updated to show the selected values. When disabled, only the chart getting the user's attention will be selected. Enable it to get better insights of the data. Disable it if you are on a very slow computer that cannot actually do it.</small>
 								</td>
 								</tr>
 							<tr class="option-row">
-								<td class="option-control"><input id="sync_pan_and_zoom" type="checkbox" checked data-toggle="toggle" data-width="110px"></td>
-								<td class="option-info"><strong>Sync pan and zoom on all charts.</strong><br/>
+								<td class="option-control"><input id="sync_pan_and_zoom" type="checkbox" checked data-toggle="toggle"  data-on="Sync" data-off="Don't Sync" data-width="110px"></td>
+								<td class="option-info"><strong>Sync pan and zoom on all charts?</strong><br/>
 									<small>When enabled, pan and zoom operations on a chart will be replicated to all charts (even the ones that are not currently visible - of course only when they will become visible). When disabled, pan and zoom operations will not be propagated to other charts.</small>
-								</td>
-								</tr>
-							<tr class="option-row">
-								<td class="option-control"><input id="stop_updates_when_focus_is_lost" type="checkbox" checked data-toggle="toggle" data-width="110px"></td>
-								<td class="option-info"><strong>Stop updates when this page looses focus.</strong><br/>
-									<small>When enabled, the charts will not be updated if the page / tab does not have the focus of the user. When disabled, the charts will always be refreshed. Enable it to lower the CPU requirements of the browser (and extend the battery of laptops and tablets) when this page does not have the focus of the user. Disable it to work on another window (i.e. change the settings of something) and have the charts auto-refresh in another window. </small>
 								</td>
 								</tr>
 							</table>
@@ -972,17 +993,29 @@ function prepareScreen(data) {
 	$('#eliminate_zero_dimensions').bootstrapToggle(NETDATA.options.current.eliminate_zero_dimensions?'on':'off');
 	$('#destroy_on_hide').bootstrapToggle(NETDATA.options.current.destroy_on_hide?'on':'off');
 	$('#parallel_refresher').bootstrapToggle(NETDATA.options.current.parallel_refresher?'on':'off');
+	$('#concurrent_refreshes').bootstrapToggle(NETDATA.options.current.concurrent_refreshes?'on':'off');
 	$('#sync_selection').bootstrapToggle(NETDATA.options.current.sync_selection?'on':'off');
 	$('#sync_pan_and_zoom').bootstrapToggle(NETDATA.options.current.sync_pan_and_zoom?'on':'off');
 	$('#stop_updates_when_focus_is_lost').bootstrapToggle(NETDATA.options.current.stop_updates_when_focus_is_lost?'on':'off');
 
+	var update_options_visibility = function() {
+		if(NETDATA.options.current.parallel_refresher === false) {
+			$('#concurrent_refreshes_row').hide();
+		}
+		else {
+			$('#concurrent_refreshes_row').show();
+		}
+	};
+	update_options_visibility();
+
 	// handle options changes
-	$('#eliminate_zero_dimensions').change(function() { NETDATA.options.current.eliminate_zero_dimensions = $(this).prop('checked'); });
-	$('#destroy_on_hide').change(function() { NETDATA.options.current.destroy_on_hide = $(this).prop('checked'); });
-	$('#parallel_refresher').change(function() { NETDATA.options.current.parallel_refresher = $(this).prop('checked'); });
-	$('#sync_selection').change(function() { NETDATA.options.current.sync_selection = $(this).prop('checked'); });
-	$('#sync_pan_and_zoom').change(function() { NETDATA.options.current.sync_pan_and_zoom = $(this).prop('checked'); });
-	$('#stop_updates_when_focus_is_lost').change(function() { NETDATA.options.current.stop_updates_when_focus_is_lost = $(this).prop('checked'); });
+	$('#eliminate_zero_dimensions').change(function() { NETDATA.options.current.eliminate_zero_dimensions = $(this).prop('checked'); update_options_visibility(); });
+	$('#destroy_on_hide').change(function() { NETDATA.options.current.destroy_on_hide = $(this).prop('checked'); update_options_visibility(); });
+	$('#parallel_refresher').change(function() { NETDATA.options.current.parallel_refresher = $(this).prop('checked'); update_options_visibility(); });
+	$('#concurrent_refreshes').change(function() { NETDATA.options.current.concurrent_refreshes = $(this).prop('checked'); update_options_visibility(); });
+	$('#sync_selection').change(function() { NETDATA.options.current.sync_selection = $(this).prop('checked'); update_options_visibility(); });
+	$('#sync_pan_and_zoom').change(function() { NETDATA.options.current.sync_pan_and_zoom = $(this).prop('checked'); update_options_visibility(); });
+	$('#stop_updates_when_focus_is_lost').change(function() { NETDATA.options.current.stop_updates_when_focus_is_lost = $(this).prop('checked'); update_options_visibility(); });
 	
 	if(document.location.hostname === demo_hostname)
 		setTimeout(function() {

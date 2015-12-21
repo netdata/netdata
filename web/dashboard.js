@@ -195,6 +195,8 @@
 
 			parallel_refresher: true,	// enable parallel refresh of charts
 
+			concurrent_refreshes: true,	// when parallel_refresher is enabled, sync also the charts
+
 			destroy_on_hide: false,		// destroy charts when they are not visible
 
 			eliminate_zero_dimensions: true, // do not show dimensions with just zeros
@@ -1523,9 +1525,9 @@
 		if(NETDATA.globalPanAndZoom.isActive())
 			this.tm.last_autorefreshed = 0;
 		else {
-			//if(NETDATA.options.current.parallel_refresher === true)
-			//	this.tm.last_autorefreshed = Math.round(now / 1000) * 1000;
-			//else
+			if(NETDATA.options.current.parallel_refresher === true && NETDATA.options.current.concurrent_refreshes)
+				this.tm.last_autorefreshed = Math.round(now / this.current.view_update_every) * this.current.view_update_every;
+			else
 				this.tm.last_autorefreshed = now;
 		}
 
@@ -1866,7 +1868,7 @@
 					return false;
 				}
 
-				if(now - this.tm.last_autorefreshed > this.current.view_update_every) {
+				if(now - this.tm.last_autorefreshed >= this.current.view_update_every) {
 					if(this.debug === true)
 						this.log('canBeAutoRefreshed(): It is time to update me.');
 
@@ -3090,6 +3092,16 @@
 
 					Dygraph.defaultInteractionModel.touchend(event, dygraph, context);
 
+					// if it didn't move, it is a selection
+					if(state.dygraph_last_touch_move === 0 && state.dygraph_last_touch_page_x !== 0) {
+						// internal api of dygraphs
+						var pct = (state.dygraph_last_touch_page_x - (dygraph.plotter_.area.x + state.element.getBoundingClientRect().left)) / dygraph.plotter_.area.w;
+						var t = Math.round(state.current.after_ms + (state.current.before_ms - state.current.after_ms) * pct);
+						if(NETDATA.dygraphSetSelection(state, t) === true)
+							state.globalSelectionSync(t);
+					}
+
+					// if it was double tap within 250ms, reset the charts
 					var now = new Date().getTime();
 					if(typeof state.dygraph_last_touch_end !== 'undefined') {
 						if(state.dygraph_last_touch_move === 0) {
@@ -3099,15 +3111,10 @@
 								NETDATA.globalPanAndZoom.clearMaster();
 								state.resetChart();
 							}
-							else if(state.dygraph_last_touch_move === 0 && state.dygraph_last_touch_page_x !== 0) {
-								// internal api of dygraphs
-								var pct = (state.dygraph_last_touch_page_x - (dygraph.plotter_.area.x + state.element.getBoundingClientRect().left)) / dygraph.plotter_.area.w;
-								var t = Math.round(state.current.after_ms + (state.current.before_ms - state.current.after_ms) * pct);
-								if(NETDATA.dygraphSetSelection(state, t) === true)
-									state.globalSelectionSync(t);
-							}
 						}
 					}
+
+					// remember the timestamp of the last touch end
 					state.dygraph_last_touch_end = now;
 				}
 			}
