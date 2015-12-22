@@ -67,6 +67,12 @@ connectivity is not available.
     [MIT License](https://github.com/marcj/css-element-queries/blob/master/LICENSE)
 
 
+- [AVL C Library](http://freecode.com/projects/avl)
+
+    Copyright 2000, Daniel Nagy, Budapest University of Technology and Economics
+    Released under GNU General Public License (GPL) version 2
+
+
 - [morris.js](http://morrisjs.github.io/morris.js/)
 
     Copyright 2013, Olly Smith

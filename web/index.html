@@ -418,6 +418,12 @@
 				<div class="modal-body">
 					<form id="optionsForm" method="get" class="form-horizontal">
 						<div class="form-group">
+							<center>
+								<small style="color: #BBBBBB;">Settings take effect immediately and are saved permanently to browser local storage (except the refresh on focus / always option).
+								<br/>
+								To reset all options to their defaults, click <a href="#" onclick="NETDATA.resetOptions(); return false;">here</a>.</small>
+							</center>
+
 							<table>
 							<tr class="option-row">
 								<td class="option-control"><input id="stop_updates_when_focus_is_lost" type="checkbox" checked data-toggle="toggle" data-offstyle="danger" data-onstyle="success" data-on="On Focus" data-off="Always" data-width="110px"></td>
@@ -989,33 +995,44 @@ function prepareScreen(data) {
 
 	document.getElementById('footer').style.display = 'block';
 
-	// default options
-	$('#eliminate_zero_dimensions').bootstrapToggle(NETDATA.options.current.eliminate_zero_dimensions?'on':'off');
-	$('#destroy_on_hide').bootstrapToggle(NETDATA.options.current.destroy_on_hide?'on':'off');
-	$('#parallel_refresher').bootstrapToggle(NETDATA.options.current.parallel_refresher?'on':'off');
-	$('#concurrent_refreshes').bootstrapToggle(NETDATA.options.current.concurrent_refreshes?'on':'off');
-	$('#sync_selection').bootstrapToggle(NETDATA.options.current.sync_selection?'on':'off');
-	$('#sync_pan_and_zoom').bootstrapToggle(NETDATA.options.current.sync_pan_and_zoom?'on':'off');
-	$('#stop_updates_when_focus_is_lost').bootstrapToggle(NETDATA.options.current.stop_updates_when_focus_is_lost?'on':'off');
 
 	var update_options_visibility = function() {
-		if(NETDATA.options.current.parallel_refresher === false) {
+		// console.log('update_options_visibility');
+
+		var sync_option = function(option) {
+			var self = $('#' + option);
+
+			if(self.prop('checked') !== NETDATA.getOption(option)) {
+				// console.log('switching ' + option.toString());
+				self.bootstrapToggle(NETDATA.getOption(option)?'on':'off');
+			}
+		}
+
+		sync_option('eliminate_zero_dimensions');
+		sync_option('destroy_on_hide');
+		sync_option('parallel_refresher');
+		sync_option('concurrent_refreshes');
+		sync_option('sync_selection');
+		sync_option('sync_pan_and_zoom');
+		sync_option('stop_updates_when_focus_is_lost');
+
+		if(NETDATA.getOption('parallel_refresher') === false) {
 			$('#concurrent_refreshes_row').hide();
 		}
 		else {
 			$('#concurrent_refreshes_row').show();
 		}
 	};
-	update_options_visibility();
+	NETDATA.setOption('set_option_callback', update_options_visibility);
 
 	// handle options changes
-	$('#eliminate_zero_dimensions').change(function() { NETDATA.options.current.eliminate_zero_dimensions = $(this).prop('checked'); update_options_visibility(); });
-	$('#destroy_on_hide').change(function() { NETDATA.options.current.destroy_on_hide = $(this).prop('checked'); update_options_visibility(); });
-	$('#parallel_refresher').change(function() { NETDATA.options.current.parallel_refresher = $(this).prop('checked'); update_options_visibility(); });
-	$('#concurrent_refreshes').change(function() { NETDATA.options.current.concurrent_refreshes = $(this).prop('checked'); update_options_visibility(); });
-	$('#sync_selection').change(function() { NETDATA.options.current.sync_selection = $(this).prop('checked'); update_options_visibility(); });
-	$('#sync_pan_and_zoom').change(function() { NETDATA.options.current.sync_pan_and_zoom = $(this).prop('checked'); update_options_visibility(); });
-	$('#stop_updates_when_focus_is_lost').change(function() { NETDATA.options.current.stop_updates_when_focus_is_lost = $(this).prop('checked'); update_options_visibility(); });
+	$('#eliminate_zero_dimensions').change(function() { NETDATA.setOption('eliminate_zero_dimensions', $(this).prop('checked')); });
+	$('#destroy_on_hide').change(function() { NETDATA.setOption('destroy_on_hide', $(this).prop('checked')); });
+	$('#parallel_refresher').change(function() { NETDATA.setOption('parallel_refresher', $(this).prop('checked')); });
+	$('#concurrent_refreshes').change(function() { NETDATA.setOption('concurrent_refreshes', $(this).prop('checked')); });
+	$('#sync_selection').change(function() { NETDATA.setOption('sync_selection', $(this).prop('checked')); });
+	$('#sync_pan_and_zoom').change(function() { NETDATA.setOption('sync_pan_and_zoom', $(this).prop('checked')); });
+	$('#stop_updates_when_focus_is_lost').change(function() { NETDATA.setOption('stop_updates_when_focus_is_lost', $(this).prop('checked')); });
 	
 	if(document.location.hostname === demo_hostname)
 		setTimeout(function() {

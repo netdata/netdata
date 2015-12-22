@@ -207,7 +207,9 @@
 				line: 1.0,
 				area: 0.2,
 				stacked: 0.8
-			}
+			},
+
+			set_option_callback: function() { ; }
 		},
 
 		debug: {
@@ -223,6 +225,112 @@
 			dygraph: 			false
 		}
 	}
+
+
+	// ----------------------------------------------------------------------------------------------------------------
+	// local storage options
+
+	NETDATA.objectToLocalStorage = function(obj, prefix) {
+		if(typeof Storage !== "undefined" && typeof localStorage === 'object') {
+			for(var i in obj) {
+				if(typeof obj[i] === 'object') {
+					//console.log('object ' + prefix + '.' + i.toString());
+					NETDATA.objectToLocalStorage(obj[i], prefix + '.' + i.toString());
+					continue;
+				}
+
+				var value = localStorage.getItem(prefix + '.' + i.toString());
+				if(value === null) {
+					switch(typeof obj[i]) {
+						case 'boolean':
+						case 'number':
+							//console.log('write ' + prefix + '.' + i.toString() + ' = ' + obj[i].toString());
+							localStorage.setItem(prefix + '.' + i.toString(), obj[i].toString())
+							break;
+					}
+					continue;
+				}
+
+				switch(typeof obj[i]) {
+					case 'boolean':
+						if(value === 'true' || value === 'false') {
+							obj[i] = (value === 'false')?false:true;
+							//console.log('read ' + prefix + '.' + i.toString() + ' = ' + obj[i].toString());
+						}
+						//else console.log('ignoring ' + i.toString());
+						break;
+
+					case 'number':
+						var n = parseInt(value);
+						if(isNaN(n) === false) {
+							obj[i] = n;
+							// console.log('read ' + prefix + '.' + i.toString() + ' = ' + obj[i].toString());
+						}
+						// else console.log('ignoring ' + i.toString());
+						break;
+				}
+			}
+		}
+	}
+
+	NETDATA.setOption = function(key, value) {
+		var ret = false;
+
+		switch(typeof NETDATA.options.current[key]) {
+			case 'boolean':
+				if(value) NETDATA.options.current[key] = true;
+				else NETDATA.options.current[key] = false;
+				localStorage.setItem('options.' + key.toString(), NETDATA.options.current[key].toString());
+				ret = true;
+				break;
+
+			case 'number':
+				if(typeof value === 'number') {
+					NETDATA.options.current[key] = value;
+					localStorage.setItem('options.' + key.toString(), NETDATA.options.current[key].toString());
+					ret = true;
+				}
+				//else
+				//	console.log('invalid number given for option key ' + key.toString);
+				break;
+
+			case 'function':
+				if(typeof value === 'function') {
+					NETDATA.options.current[key] = value;
+					ret = true;
+				}
+				//else
+				//	console.log('invalid function given for option key ' + key.toString);
+				break;
+
+			default:
+				// console.log('cannot find option key ' + key.toString());
+				break;
+		}
+
+		if(ret === true)
+			NETDATA.options.current.set_option_callback();
+
+		return ret;
+	}
+
+	NETDATA.getOption = function(key) {
+		return NETDATA.options.current[key];
+	}
+
+	NETDATA.resetOptions = function() {
+		// console.log('will reset all');
+		for(var i in NETDATA.options.defaults) {
+			if(i.toString() === 'set_option_callback') continue;
+
+			if(NETDATA.options.current[i] !== NETDATA.options.defaults[i]) {
+				// console.log('reseting ' + i.toString() + ' to ' + NETDATA.options.defaults[i].toString());
+				NETDATA.setOption(i, NETDATA.options.defaults[i]);
+			}
+		}
+	}
+
+	// ----------------------------------------------------------------------------------------------------------------
 
 	if(NETDATA.options.debug.main_loop === true)
 		console.log('welcome to NETDATA');
@@ -3708,6 +3816,15 @@
 	NETDATA._loadjQuery(function() {
 		NETDATA.loadRequiredJs(0, function() {
 			ElementQueries.init();
+
+			// keep a copy of the default settings
+			NETDATA.options.defaults = $.extend({}, NETDATA.options.current);
+
+			// read settings from local storage
+			NETDATA.objectToLocalStorage(NETDATA.options.current, 'options');
+
+			// always start with this option enabled.
+			NETDATA.setOption('stop_updates_when_focus_is_lost', true);
 
 			if(typeof netdataDontStart === 'undefined' || !netdataDontStart) {
 				if(NETDATA.options.debug.main_loop === true)
