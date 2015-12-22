@@ -1048,7 +1048,9 @@ unsigned long long rrdset_done(RRDSET *st)
 	int iterations = (now_ut - last_ut) / (st->update_every * 1000000ULL);
 
 	for( ; likely(next_ut <= now_ut) ; next_ut += st->update_every * 1000000ULL, iterations-- ) {
+#ifdef NETDATA_INTERNAL_CHECKS
 		if(iterations <= 0) error("iterations calculation wrapped!");
+#endif
 
 		if(unlikely(st->debug)) {
 			debug(D_RRD_STATS, "%s: last ut = %0.3Lf (last updated time)", st->name, (long double)last_ut/1000000.0);
