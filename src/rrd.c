@@ -1048,7 +1048,7 @@ unsigned long long rrdset_done(RRDSET *st)
 	int iterations = (now_ut - last_ut) / (st->update_every * 1000000ULL);
 
 	for( ; likely(next_ut <= now_ut) ; next_ut += st->update_every * 1000000ULL, iterations-- ) {
-		if(iterations < 0) error("iterations calculation wrapped!");
+		if(iterations <= 0) error("iterations calculation wrapped!");
 
 		if(unlikely(st->debug)) {
 			debug(D_RRD_STATS, "%s: last ut = %0.3Lf (last updated time)", st->name, (long double)last_ut/1000000.0);
@@ -1090,28 +1090,43 @@ unsigned long long rrdset_done(RRDSET *st)
 				case RRDDIM_PCENT_OVER_ROW_TOTAL:
 				case RRDDIM_PCENT_OVER_DIFF_TOTAL:
 				default:
-					new_value = (calculated_number)
-						(	(	  (rd->calculated_value - rd->last_calculated_value)
-								* (calculated_number)(next_ut - first_ut)
-								/ (calculated_number)(now_ut - first_ut)
-							)
-							+  rd->last_calculated_value
-						);
+					if(iterations == 1) {
+						// this is the last iteration
+						// do not interpolate
+						// just show the calculated value
 
-					if(unlikely(st->debug))
-						debug(D_RRD_STATS, "%s/%s: CALC2 DEF "
-							CALCULATED_NUMBER_FORMAT " = ((("
-							"(" CALCULATED_NUMBER_FORMAT " - " CALCULATED_NUMBER_FORMAT ")"
-							" * %llu"
-							" / %llu) + " CALCULATED_NUMBER_FORMAT
-							, st->id, rd->name
-							, new_value
-							, rd->calculated_value, rd->last_calculated_value
-							, (next_ut - first_ut)
-							, (now_ut - first_ut), rd->last_calculated_value
+						new_value = rd->calculated_value;
+					}
+					else {
+						// we have missed an update
+						// interpolate in the middle values
+
+						new_value = (calculated_number)
+							(	(	  (rd->calculated_value - rd->last_calculated_value)
+									* (calculated_number)(next_ut - first_ut)
+									/ (calculated_number)(now_ut - first_ut)
+								)
+								+  rd->last_calculated_value
 							);
 
-					if(likely(next_ut + st->update_every * 1000000ULL > now_ut)) rd->calculated_value = new_value;
+						if(unlikely(st->debug))
+							debug(D_RRD_STATS, "%s/%s: CALC2 DEF "
+								CALCULATED_NUMBER_FORMAT " = ((("
+								"(" CALCULATED_NUMBER_FORMAT " - " CALCULATED_NUMBER_FORMAT ")"
+								" * %llu"
+								" / %llu) + " CALCULATED_NUMBER_FORMAT
+								, st->id, rd->name
+								, new_value
+								, rd->calculated_value, rd->last_calculated_value
+								, (next_ut - first_ut)
+								, (now_ut - first_ut), rd->last_calculated_value
+								);
+
+						// this is wrong
+						// it fades the value towards the target
+						// while we know the calculated value is different
+						// if(likely(next_ut + st->update_every * 1000000ULL > now_ut)) rd->calculated_value = new_value;
+					}
 					break;
 			}
 
