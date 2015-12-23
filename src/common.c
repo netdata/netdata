@@ -122,7 +122,9 @@ void *mymmap(const char *filename, unsigned long size, int flags, int ksm)
 				if(ftruncate(fd, size))
 					error("Cannot truncate file '%s' to size %ld. Will use the larger file.", filename, size);
 
+#ifdef MADV_MERGEABLE
 				if(flags & MAP_SHARED || !enable_ksm || !ksm) {
+#endif
 					mem = mmap(NULL, size, PROT_READ|PROT_WRITE, flags, fd, 0);
 					if(mem) {
 						int advise = MADV_SEQUENTIAL|MADV_DONTFORK;
@@ -131,6 +133,7 @@ void *mymmap(const char *filename, unsigned long size, int flags, int ksm)
 						if(madvise(mem, size, advise) != 0)
 							error("Cannot advise the kernel about the memory usage of file '%s'.", filename);
 					}
+#ifdef MADV_MERGEABLE
 				}
 				else {
 					mem = mmap(NULL, size, PROT_READ|PROT_WRITE, flags|MAP_ANONYMOUS, -1, 0);
@@ -149,6 +152,7 @@ void *mymmap(const char *filename, unsigned long size, int flags, int ksm)
 					else
 						error("Cannot allocate PRIVATE ANONYMOUS memory for KSM for file '%s'.", filename);
 				}
+#endif
 			}
 			else error("Cannot write to file '%s' at position %ld.", filename, size);
 		}

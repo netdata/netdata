@@ -13,6 +13,7 @@
 #include <sys/wait.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/mman.h>
 
 #include "common.h"
 #include "log.h"
@@ -289,7 +290,11 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
+#ifdef MADV_MERGEABLE
 		enable_ksm = config_get_boolean("global", "memory deduplication (ksm)", enable_ksm);
+#else
+#warning "Kernel memory deduplication (KSM) is not available"
+#endif
 
 		// --------------------------------------------------------------------
 
