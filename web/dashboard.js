@@ -203,7 +203,11 @@
 
 			stop_updates_when_focus_is_lost: true,
 
-			color_fill_opacity: {
+			double_click_speed: 500,
+
+ 			smooth_plot: true,			// enable smooth plot, where possible
+
+ 			color_fill_opacity: {
 				line: 1.0,
 				area: 0.2,
 				stacked: 0.8
@@ -691,6 +695,85 @@
 		this.init();
 	}
 
+	// ----------------------------------------------------------------------------------------------------------------
+	// Chart Resize
+
+	chartState.prototype.resizeHandler = function(e) {
+		e.preventDefault();
+
+		if(typeof this.event_resize === 'undefined'
+			|| this.event_resize.chart_original_w === 'undefined'
+			|| this.event_resize.chart_original_h === 'undefined')
+			this.event_resize = {
+				chart_original_w: this.element.clientWidth,
+				chart_original_h: this.element.clientHeight,
+				last: 0
+			};
+
+		this.event_resize.mouse_start_x = e.clientX;
+		this.event_resize.mouse_start_y = e.clientY;
+		this.event_resize.chart_start_w = this.element.clientWidth;
+		this.event_resize.chart_start_h = this.element.clientHeight;
+		this.event_resize.chart_last_w = this.element.clientWidth;
+		this.event_resize.chart_last_h = this.element.clientHeight;
+
+		var resize_height_and_update_chart = function(state, h) {
+			state.element.style.height = h.toString() + 'px';
+
+			NETDATA.options.last_page_scroll = new Date().getTime();
+
+			if(typeof state.library.resize === 'function')
+				state.library.resize(state);
+
+			if(state.element_legend_childs.nano !== null && state.element_legend_childs.nano_options !== null)
+				$(state.element_legend_childs.nano).nanoScroller();
+		};
+
+		var now = new Date().getTime();
+		if(now - this.event_resize.last <= NETDATA.options.current.double_click_speed) {
+			// double click event
+
+			var optimal = this.event_resize.chart_last_h
+					+ this.element_legend_childs.content.scrollHeight
+					- this.element_legend_childs.content.clientHeight;
+
+			if(this.event_resize.chart_last_h != optimal)
+				resize_height_and_update_chart(this, optimal);
+
+			else if(this.event_resize.chart_last_h != this.event_resize.chart_original_h)
+				resize_height_and_update_chart(this, this.event_resize.chart_original_h);
+		}
+		else {
+			this.event_resize.last = now;
+			
+			var self = this;
+
+			document.onmousemove =
+				this.element_legend_childs.resize_handler.onmousemove =
+				this.element_legend_childs.resize_handler.onmouseout =
+				function(e) {
+					var	newH = self.event_resize.chart_start_h + e.clientY - self.event_resize.mouse_start_y;
+
+					if(newH >= 70 && newH !== self.event_resize.chart_last_h) {
+						resize_height_and_update_chart(self, newH);
+						self.event_resize.chart_last_h = newH;
+					}
+				};
+
+			document.onmouseup = 
+				this.element_legend_childs.resize_handler.onmouseup =
+				function(e) {
+					document.onmouseup =
+						document.onmousemove =
+						self.element_legend_childs.resize_handler.onmousemove =
+						self.element_legend_childs.resize_handler.onmouseout =
+						self.element_legend_childs.resize_handler.onmouseup =
+						null;
+				};
+		}
+	}
+
+	
 	// ----------------------------------------------------------------------------------------------------------------
 	// global selection sync
 
@@ -1275,6 +1358,8 @@
 
 		if(this.hasLegend()) {
 			this.element_legend_childs = {
+				content: content,
+				resize_handler: document.createElement('div'),
 				title_date: document.createElement('span'),
 				title_time: document.createElement('span'),
 				title_units: document.createElement('span'),
@@ -1293,6 +1378,14 @@
 			};
 
 			this.element_legend.innerHTML = '';
+
+			this.element_legend_childs.resize_handler.className += " netdata-legend-resize-handler";
+			this.element_legend_childs.resize_handler.innerHTML = '<i class="fa fa-chevron-up"></i><i class="fa fa-chevron-down"></i>';
+			this.element.appendChild(this.element_legend_childs.resize_handler);
+			var self2 = this;
+			this.element_legend_childs.resize_handler.onmousedown = function(e) {
+				self2.resizeHandler(e);
+			};
 
 			this.element_legend_childs.title_date.className += " netdata-legend-title-date";
 			this.element_legend.appendChild(this.element_legend_childs.title_date);
@@ -1317,6 +1410,8 @@
 		}
 		else {
 			this.element_legend_childs = {
+				content: content,
+				resize_handler: null,
 				title_date: null,
 				title_time: null,
 				title_units: null,
@@ -1382,25 +1477,8 @@
 		
 		if(this.hasLegend() === false)
 			this.element_legend.style.display = 'none';
-		else {
+		else
 			this.element.appendChild(this.element_legend);
-
-			if(typeof this.___addedContainerResizable___ === 'undefined') {
-				this.element.className += " netdata-container-resizable";
-				this.___addedContainerResizable___ = true;
-
-				var state = this;
-				this.resize_sensor = ResizeSensor(this.element, function() {
-					NETDATA.options.last_updated = new Date().getTime();
-
-					if(typeof state.library.resize === 'function')
-						state.library.resize(state);
-
-					if(state.element_legend_childs.nano !== null && state.element_legend_childs.nano_options !== null)
-						$(state.element_legend_childs.nano).nanoScroller();
-				});
-			}
-		}
 
 		this.element_legend_childs.series = null;
 		this.legendUpdateDOM();
@@ -2408,8 +2486,6 @@
 	}
 
 	NETDATA.parseDom = function(callback) {
-		ElementQueries.update();
-
 		NETDATA.options.last_page_scroll = new Date().getTime();
 		NETDATA.options.updated_dom = false;
 
@@ -2722,7 +2798,7 @@
 				NETDATA.error(100, NETDATA.dygraph_js);
 			})
 			.always(function() {
-				if(NETDATA.chartLibraries.dygraph.enabled === true)
+				if(NETDATA.chartLibraries.dygraph.enabled === true && NETDATA.options.current.smooth_plot === true)
 					NETDATA.dygraphSmoothInitialize(callback);
 				else if(typeof callback === "function")
 					callback();
@@ -2749,31 +2825,34 @@
 		if(state.tm.last_unhidden > state.dygraph_last_rendered)
 			dygraph.resize();
 
-		if(state.current.name === 'pan') {
-			if(NETDATA.options.debug.dygraph === true || state.debug === true)
-				state.log('dygraphChartUpdate() loose update');
-
-			dygraph.updateOptions({
+		var options = {
 				file: data.result.data,
 				colors: state.chartColors(),
 				labels: data.result.labels,
 				labelsDivWidth: state.chartWidth() - 70
-			});
+		}
+
+		if(state.current.name === 'pan') {
+			if(NETDATA.options.debug.dygraph === true || state.debug === true)
+				state.log('dygraphChartUpdate() loose update');
 		}
 		else {
 			if(NETDATA.options.debug.dygraph === true || state.debug === true)
 				state.log('dygraphChartUpdate() strict update');
-
-			dygraph.updateOptions({
-				file: data.result.data,
-				colors: state.chartColors(),
-				labels: data.result.labels,
-				labelsDivWidth: state.chartWidth() - 70,
-				dateWindow: null,
-    			valueRange: null
-			});
+			
+			options.dateWindow = null;
+			options.valueRange = null;
 		}
 
+		if(state.dygraph_smooth_eligible === true) {
+			if((NETDATA.options.current.smooth_plot === true && state.dygraph_options.plotter !== smoothPlotter)
+				|| (NETDATA.options.current.smooth_plot === false && state.dygraph_options.plotter === smoothPlotter)) {
+				NETDATA.dygraphChartCreate(state, data);
+				return;
+			}
+		}
+
+		dygraph.updateOptions(options);
 		state.dygraph_last_rendered = new Date().getTime();
 	};
 
@@ -2795,7 +2874,6 @@
 
 		var strokeWidth = (chart_type === 'stacked')?0.0:((smooth)?1.5:1.0)
 		var highlightCircleSize = (NETDATA.chartLibraries.dygraph.isSparkline(state))?3:4;
-
 
 		state.dygraph_options = {
 			colors: self.data('dygraph-colors') || state.chartColors(),
@@ -3209,12 +3287,12 @@
 							state.globalSelectionSync(t);
 					}
 
-					// if it was double tap within 250ms, reset the charts
+					// if it was double tap within double click time, reset the charts
 					var now = new Date().getTime();
 					if(typeof state.dygraph_last_touch_end !== 'undefined') {
 						if(state.dygraph_last_touch_move === 0) {
 							var dt = now - state.dygraph_last_touch_end;
-							if(dt <= 250) {
+							if(dt <= NETDATA.options.current.double_click_speed) {
 								state.globalSelectionSyncStop();
 								NETDATA.globalPanAndZoom.clearMaster();
 								state.resetChart();
@@ -3241,7 +3319,13 @@
 			state.dygraph_options.rightGap = 0;
 		}
 		
-		if(smooth === true) state.dygraph_options.plotter = smoothPlotter;
+		if(smooth === true) {
+			state.dygraph_smooth_eligible = true;
+
+			if(NETDATA.options.current.smooth_plot === true)
+				state.dygraph_options.plotter = smoothPlotter;
+		}
+		else state.dygraph_smooth_eligible = false;
 
 		state.dygraph_instance = new Dygraph(state.element_chart,
 			data.result.data, state.dygraph_options);
@@ -3726,14 +3810,6 @@
 			isAlreadyLoaded: function() { return false; }
 		},
 		{
-			url: NETDATA.serverDefault + 'lib/ResizeSensor.js',
-			isAlreadyLoaded: function() { return false; }
-		},
-		{
-			url: NETDATA.serverDefault + 'lib/ElementQueries.js',
-			isAlreadyLoaded: function() { return false; }
-		},
-		{
 			url: NETDATA.serverDefault + 'lib/bootstrap-toggle.min.js',
 			isAlreadyLoaded: function() { return false; }
 		}
@@ -3815,8 +3891,6 @@
 
 	NETDATA._loadjQuery(function() {
 		NETDATA.loadRequiredJs(0, function() {
-			ElementQueries.init();
-
 			// keep a copy of the default settings
 			NETDATA.options.defaults = $.extend({}, NETDATA.options.current);
 

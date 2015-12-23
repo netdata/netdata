@@ -19,37 +19,24 @@ html {
 	/* width and height is given per chart with data-width and data-height */
 }
 
-.netdata-container-resizable {
-	display: -webkit-flex; /* Safari */
-	-webkit-flex-wrap: wrap; /* Safari 6.1+ */
-	display: inline-block;
-	flex-wrap: wrap;
+.netdata-legend-resize-handler {
+	display: block;
+	position: absolute;
+	bottom: 0px;
+	right: 0px;
+	height: 15px;
+	width: 30px;
+	background-color: White;
+	font-size: 12px;
+	vertical-align: middle;
+	line-height: 15px;
+	cursor: ns-resize;
+	color: #DDDDDD;
+	text-align: center;
 	overflow: hidden;
-
-	/* enable CSS3 resizing */
-	resize: vertical;
-
-	/* required for child elements to have absolute position */
-	position: relative;
-	
-	/* width and height is given per chart with data-width and data-height */
-}
-
-.netdata-container-resizable::after {
-    /* pointer-events: none; */
-    font-family: FontAwesome;
-    color: #999999;
-    content: "\f078";
-    font-size: 12px;
-    position: absolute;
-    height: 15px;
-    width: 18px;
-    text-align: center;
-    bottom: 0px;
-    right: -2px;
-    z-index: 2;
-    cursor: ns-resize;
-    background-color: #ffffff;
+	z-index: 11;
+	padding: 0px;
+	margin: 0px;
 }
 
 .netdata-message {

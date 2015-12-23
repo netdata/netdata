@@ -253,7 +253,7 @@
 	<!-- <script> netdataServer = "http://box:19999"; </script> -->
 
 	<!-- load the dashboard manager - it will do the rest -->
-	<script type="text/javascript" src="dashboard.js?v4"></script>
+	<script type="text/javascript" src="dashboard.js?v5"></script>
 </head>
 
 <body data-spy="scroll" data-target="#sidebar">
@@ -477,6 +477,12 @@
 								<td class="option-control"><input id="sync_pan_and_zoom" type="checkbox" checked data-toggle="toggle"  data-on="Sync" data-off="Don't Sync" data-width="110px"></td>
 								<td class="option-info"><strong>Sync pan and zoom on all charts?</strong><br/>
 									<small>When enabled, pan and zoom operations on a chart will be replicated to all charts (even the ones that are not currently visible - of course only when they will become visible). When disabled, pan and zoom operations will not be propagated to other charts.</small>
+								</td>
+								</tr>
+							<tr class="option-row">
+								<td class="option-control"><input id="smooth_plot" type="checkbox" checked data-toggle="toggle"  data-on="Smooth" data-off="Rough" data-width="110px"></td>
+								<td class="option-info"><strong>Enable Bézier lines on charts?</strong><br/>
+									<small>When set to <b>Smooth</b> the charts libraries that support it, will plot smooth curves instead of simple straight lines to connect the points.</small>
 								</td>
 								</tr>
 							</table>
@@ -1015,6 +1021,7 @@ function prepareScreen(data) {
 		sync_option('sync_selection');
 		sync_option('sync_pan_and_zoom');
 		sync_option('stop_updates_when_focus_is_lost');
+		sync_option('smooth_plot');
 
 		if(NETDATA.getOption('parallel_refresher') === false) {
 			$('#concurrent_refreshes_row').hide();
@@ -1033,6 +1040,7 @@ function prepareScreen(data) {
 	$('#sync_selection').change(function() { NETDATA.setOption('sync_selection', $(this).prop('checked')); });
 	$('#sync_pan_and_zoom').change(function() { NETDATA.setOption('sync_pan_and_zoom', $(this).prop('checked')); });
 	$('#stop_updates_when_focus_is_lost').change(function() { NETDATA.setOption('stop_updates_when_focus_is_lost', $(this).prop('checked')); });
+	$('#smooth_plot').change(function() { NETDATA.setOption('smooth_plot', $(this).prop('checked')); });
 	
 	if(document.location.hostname === demo_hostname)
 		setTimeout(function() {
