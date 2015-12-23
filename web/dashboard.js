@@ -207,11 +207,9 @@
 
  			smooth_plot: true,			// enable smooth plot, where possible
 
- 			color_fill_opacity: {
-				line: 1.0,
-				area: 0.2,
-				stacked: 0.8
-			},
+ 			color_fill_opacity_line: 1.0,
+ 			color_fill_opacity_area: 0.2,
+			color_fill_opacity_stacked: 0.8,
 
 			set_option_callback: function() { ; }
 		},
@@ -265,7 +263,7 @@
 						break;
 
 					case 'number':
-						var n = parseInt(value);
+						var n = parseFloat(value);
 						if(isNaN(n) === false) {
 							obj[i] = n;
 							// console.log('read ' + prefix + '.' + i.toString() + ' = ' + obj[i].toString());
@@ -1338,7 +1336,7 @@
 			label.name.innerHTML = '<table class="netdata-legend-name-table-'
 				+ state.chart.chart_type
 				+ '" style="background-color: '
-				+ 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + NETDATA.options.current.color_fill_opacity[state.chart.chart_type] + ')'
+				+ 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + NETDATA.options.current['color_fill_opacity_' + state.chart.chart_type] + ')'
 				+ '"><tr class="netdata-legend-name-tr"><td class="netdata-legend-name-td"></td></tr></table>'
 
 			var text = document.createTextNode(' ' + name);

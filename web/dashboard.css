@@ -74,8 +74,8 @@ html {
 	text-overflow: ellipsis;
 	line-height: 14px;
 	display: block;
-	width: 110px;
-	height: calc(100% - 15px); /* 10px for the resize handler and 5px for the top margin */
+	width: 120px;				/* --legend-width */
+	height: calc(100% - 15px);	/* 10px for the resize handler and 5px for the top margin */
 	font-size: 10px;
 	margin-top: 5px;
 	/* width and height is calculated (depends on the appearance of the legend) */
@@ -102,7 +102,7 @@ html {
 }
 .netdata-legend-series {
 	position: absolute;
-	width: 110px;
+	width: 120px;				/* --legend-width */
 	height: calc(100% - 50px);
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -166,7 +166,7 @@ html {
 .netdata-legend-name-table-line {
 	display: inline-block;
 	width: 13px;
-	height: 3px;
+	height: 4px;
 	border-width: 0px;
 	border-bottom-width: 2px;
 	border-bottom-style: solid;
@@ -244,8 +244,8 @@ html {
 	left: 0;				/* within .netdata-container */
 	display: block;
 	overflow: hidden;
-	margin-right: 110px;
-	width: calc(100% - 110px); /* for the legend */
+	margin-right: 120px;		/* --legend-width */
+	width: calc(100% - 120px);	/* --legend-width */
 	height: 100%;
 	flex-grow: 1;
 
