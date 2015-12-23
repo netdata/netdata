@@ -253,7 +253,7 @@
 	<!-- <script> netdataServer = "http://box:19999"; </script> -->
 
 	<!-- load the dashboard manager - it will do the rest -->
-	<script type="text/javascript" src="dashboard.js?v5"></script>
+	<script type="text/javascript" src="dashboard.js?v6"></script>
 </head>
 
 <body data-spy="scroll" data-target="#sidebar">
@@ -1020,8 +1020,8 @@ function prepareScreen(data) {
 	document.getElementById('footer').style.display = 'block';
 
 
-	var update_options_visibility = function() {
-		// console.log('update_options_visibility');
+	var update_options_modal = function() {
+		// console.log('update_options_modal');
 
 		var sync_option = function(option) {
 			var self = $('#' + option);
@@ -1048,17 +1048,17 @@ function prepareScreen(data) {
 			$('#concurrent_refreshes_row').show();
 		}
 	};
-	NETDATA.setOption('set_option_callback', update_options_visibility);
+	NETDATA.setOption('setOptionCallback', update_options_modal);
 
 	// handle options changes
-	$('#eliminate_zero_dimensions').change(function() { NETDATA.setOption('eliminate_zero_dimensions', $(this).prop('checked')); });
-	$('#destroy_on_hide').change(function() { NETDATA.setOption('destroy_on_hide', $(this).prop('checked')); });
-	$('#parallel_refresher').change(function() { NETDATA.setOption('parallel_refresher', $(this).prop('checked')); });
-	$('#concurrent_refreshes').change(function() { NETDATA.setOption('concurrent_refreshes', $(this).prop('checked')); });
-	$('#sync_selection').change(function() { NETDATA.setOption('sync_selection', $(this).prop('checked')); });
-	$('#sync_pan_and_zoom').change(function() { NETDATA.setOption('sync_pan_and_zoom', $(this).prop('checked')); });
+	$('#eliminate_zero_dimensions').change(function()       { NETDATA.setOption('eliminate_zero_dimensions', $(this).prop('checked')); });
+	$('#destroy_on_hide').change(function()                 { NETDATA.setOption('destroy_on_hide', $(this).prop('checked')); });
+	$('#parallel_refresher').change(function()              { NETDATA.setOption('parallel_refresher', $(this).prop('checked')); });
+	$('#concurrent_refreshes').change(function()            { NETDATA.setOption('concurrent_refreshes', $(this).prop('checked')); });
+	$('#sync_selection').change(function()                  { NETDATA.setOption('sync_selection', $(this).prop('checked')); });
+	$('#sync_pan_and_zoom').change(function()               { NETDATA.setOption('sync_pan_and_zoom', $(this).prop('checked')); });
 	$('#stop_updates_when_focus_is_lost').change(function() { NETDATA.setOption('stop_updates_when_focus_is_lost', $(this).prop('checked')); });
-	$('#smooth_plot').change(function() { NETDATA.setOption('smooth_plot', $(this).prop('checked')); });
+	$('#smooth_plot').change(function()                     { NETDATA.setOption('smooth_plot', $(this).prop('checked')); });
 	
 	if(document.location.hostname === demo_hostname)
 		setTimeout(function() {
