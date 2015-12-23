@@ -509,6 +509,7 @@ if(document.location.hostname === demo_hostname) {
 
 var options = {
 	sparklines_registry: {},
+	interfaces_registry: {},
 	data: null,
 	hostname: 'netdata_server', // will be overwritten by the netdata server
 	categories: new Array(),
@@ -639,6 +640,14 @@ function prepareScreen(data) {
 	document.title = options.hostname + ' dashboard';
 	var charts = data.charts;
 
+	function name2id(s) {
+		return s
+			.replace(' ', '_')
+			.replace('(', '_')
+			.replace(')', '_')
+			.replace('/', '_');
+	}
+
 	$.each(charts, function(i, c) {
 		if(c.enabled === true) {
 
@@ -648,18 +657,6 @@ function prepareScreen(data) {
 			var tmp = c.category.split('_')[0];
 			if(tmp === 'net' || tmp === 'disk')
 				c.category = tmp;
-
-			if(c.category === 'cpu') {
-				if(c.id.match(/^cpu\.cpu[0-9]+$/)) {
-					c.family = 'Utilization';
-				}
-				else if(c.id.match(/^cpu\.cpu[0-9]+_interrupts$/)) {
-					c.family = 'Interrupts';
-				}
-				else if(c.id.match(/^cpu\.cpu[0-9]+_softirqs$/)) {
-					c.family = 'SoftIRQs';
-				}
-			}
 
 			switch(c.category) {
 				case 'system':
@@ -672,6 +669,11 @@ function prepareScreen(data) {
 					c.category_priority = 20;
 					c.category_title = 'Quality Of Service';
 					c.glyphicon = "glyphicon-random";
+					
+					// find the name of the interface from the tc family
+					if(typeof options.interfaces_registry[c.family] === 'undefined' || options.interfaces_registry[c.family] === c.family)
+						 options.interfaces_registry[c.family] = c.name.split('.')[1].split('_')[0];
+
 					break;
 
 				case 'net':
@@ -714,6 +716,17 @@ function prepareScreen(data) {
 					c.category_priority = 90;
 					c.category_title = 'CPU Cores';
 					c.glyphicon = "glyphicon-dashboard";
+
+					if(c.id.match(/^cpu\.cpu[0-9]+$/)) {
+						c.family = 'Utilization';
+					}
+					else if(c.id.match(/^cpu\.cpu[0-9]+_interrupts$/)) {
+						c.family = 'Interrupts';
+					}
+					else if(c.id.match(/^cpu\.cpu[0-9]+_softirqs$/)) {
+						c.family = 'SoftIRQs';
+					}
+
 					break;
 
 				case 'disk':
@@ -828,16 +841,16 @@ function prepareScreen(data) {
 	$.each(options.categories, function(i, t) {
 		t.charts.sort(prioritySort);
 
-		sidebar += '<li class="' + ((i === 0)?'active':'').toString() + '"><a href="#' + t.name + '">' + t.title + '</a>';
-		html += '<div role="section"><div role="sectionhead"><h1 id="' + t.name + '" role="heading">' + t.title + '</h1>' + getMessage(t.name) + '</div><div id="' + t.name + '" role="document">';
+		sidebar += '<li class="' + ((i === 0)?'active':'').toString() + '"><a href="#' + name2id(t.name) + '">' + t.title + '</a>';
+		html += '<div role="section"><div role="sectionhead"><h1 id="' + name2id(t.name) + '" role="heading">' + t.title + '</h1>' + getMessage(t.name) + '</div><div id="' + name2id(t.name) + '" role="document">';
 
 		if(t.name === 'cpu') {
 			var families = uniq_with_list(t.charts, function(c) { return c.family; });
 
 			sidebar += '<ul class="nav">';
 			$.each(families, function(j, c) {
-				sidebar += '<li class><a href="#' + t.name + '_' + c.name + '">' + c.name + '</a></li>';
-				html += '<div class="netdata-group-container" id="family_' + t.name + '_' + c.name + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + t.name + '_' + c.name + '" class="netdata-chart-alignment" role="heading">' + c.name + '</h2>';
+				sidebar += '<li class><a href="#' + name2id(t.name) + '_' + name2id(c.name) + '">' + c.name + '</a></li>';
+				html += '<div class="netdata-group-container" id="family_' + name2id(t.name) + '_' + name2id(c.name) + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + name2id(t.name) + '_' + name2id(c.name) + '" class="netdata-chart-alignment" role="heading">' + c.name + '</h2>';
 				$.each(c.values, function(x, f) {
 					var c = null;
 					var h = options.chartsHeight;
@@ -859,8 +872,13 @@ function prepareScreen(data) {
 
 			sidebar += '<ul class="nav">';
 			$.each(interfaces, function(j, c) {
-				sidebar += '<li class><a href="#' + t.name + '_' + c.name + '">' + c.name + '</a></li>';
-				html += '<div class="netdata-group-container" id="interface_' + t.name + '_' + c.name + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + t.name + '_' + c.name + '" class="netdata-chart-alignment" role="heading">' + c.name + '</h2>';
+				var menuitem = c.name;
+				var name = options.interfaces_registry[menuitem];
+				if(typeof name !== 'undefined' && name !== menuitem)
+					menuitem = menuitem + ' (' + name + ')';
+
+				sidebar += '<li class><a href="#' + name2id(t.name) + '_' + name2id(c.name) + '">' + menuitem + '</a></li>';
+				html += '<div class="netdata-group-container" id="interface_' + name2id(t.name) + '_' + name2id(c.name) + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + name2id(t.name) + '_' + name2id(c.name) + '" class="netdata-chart-alignment" role="heading">' + menuitem + '</h2>';
 				$.each(c.values, function(x, f) {
 					var c = null;
 					var h = options.chartsHeight / 2;
@@ -886,8 +904,8 @@ function prepareScreen(data) {
 
 			sidebar += '<ul class="nav">';
 			$.each(disks, function(j, c) {
-				sidebar += '<li class><a href="#' + c.name + '">' + c.name + '</a></li>';
-				html += '<div class="netdata-group-container" id="disk_' + c.name + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + c.name + '" class="netdata-chart-alignment" role="heading">' + c.name + '</h2>';
+				sidebar += '<li class><a href="#' + name2id(c.name) + '">' + c.name + '</a></li>';
+				html += '<div class="netdata-group-container" id="disk_' + name2id(c.name) + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + name2id(c.name) + '" class="netdata-chart-alignment" role="heading">' + c.name + '</h2>';
 				$.each(c.values, function(x, f) {
 					var c = null;
 					var h = options.chartsHeight / 2;
