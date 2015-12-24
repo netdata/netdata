@@ -543,6 +543,205 @@
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------
+	// dimensions selection
+
+	// FIXME
+
+	dimensionStatus = function(parent, label, name_div, value_div, color) {
+		this.enabled = false;
+		this.parent = parent;
+		this.label = label;
+		this.name_div = null;
+		this.value_div = null;
+		this.color = '#000';
+		
+		if(parent.selected === parent.unselected)
+			this.selected = true;
+		else
+			this.selected = false;
+
+		this.setOptions(name_div, value_div, color);
+	}
+
+	dimensionStatus.prototype.invalidate = function() {
+		this.name_div = null;
+		this.value_div = null;
+		this.enabled = false;
+	}
+
+	dimensionStatus.prototype.setOptions = function(name_div, value_div, color) {
+		this.color = color;
+
+		if(this.name_div != name_div) {
+			this.name_div = name_div;
+			this.name_div.title = this.label;
+			this.name_div.style.color = this.color;
+			if(this.selected === false)
+				this.name_div.className = 'netdata-legend-name not-selected';
+			else
+				this.name_div.className = 'netdata-legend-name selected';
+		}
+
+		if(this.value_div != value_div) {
+			this.value_div = value_div;
+			this.value_div.title = this.label;
+			this.value_div.style.color = this.color;
+			if(this.selected === false)
+				this.value_div.className = 'netdata-legend-value not-selected';
+			else
+				this.value_div.className = 'netdata-legend-value selected';
+		}
+
+		this.enabled = true;
+		this.setHandler();
+	}
+
+	dimensionStatus.prototype.setHandler = function() {
+		if(this.enabled === false) return;
+
+		var ds = this;
+
+		// this.name_div.onmousedown = this.value_div.onmousedown = function(e) {
+		this.name_div.onclick = this.value_div.onclick = function(e) {
+			e.preventDefault();
+			if(ds.isSelected()) {
+				// this is selected
+				if(e.shiftKey === true || e.ctrlKey === true) {
+					// control or shift key is pressed -> unselect this (except is none will remain selected, in which case select all)
+					ds.unselect();
+
+					if(ds.parent.countSelected() === 0)
+						ds.parent.selectAll();
+				}
+				else {
+					// no key is pressed -> select only this (except if it is the only selected already, in which case select all)
+					if(ds.parent.countSelected() === 1) {
+						ds.parent.selectAll();
+					}
+					else {
+						ds.parent.selectNone();
+						ds.select();
+					}
+				}
+			}
+			else {
+				// this is not selected
+				if(e.shiftKey === true || e.ctrlKey === true) {
+					// control or shift key is pressed -> select this too
+					ds.select();
+				}
+				else {
+					// no key is pressed -> select only this
+					ds.parent.selectNone();
+					ds.select();
+				}
+			}
+
+			ds.parent.state.redrawChart();
+		}
+	}
+	
+	dimensionStatus.prototype.select = function() {
+		if(this.enabled === false) return;
+
+		this.name_div.className = 'netdata-legend-name selected';
+		this.value_div.className = 'netdata-legend-value selected';
+		this.selected = true;
+	}
+	
+	dimensionStatus.prototype.unselect = function() {
+		if(this.enabled === false) return;
+
+		this.name_div.className = 'netdata-legend-name not-selected';
+		this.value_div.className = 'netdata-legend-value hidden';
+		this.selected = false;
+	}
+	
+	dimensionStatus.prototype.isSelected = function() {
+		return(this.enabled === true && this.selected === true);
+	}
+	
+	// ----------------------------------------------------------------------------------------------------------------
+
+	dimensionsVisibility = function(state) {
+		this.state = state;
+		this.len = 0;
+		this.dimensions = {};
+		this.selected_count = 0;
+		this.unselected_count = 0;
+	}
+
+	dimensionsVisibility.prototype.dimensionAdd = function(label, name_div, value_div, color) {
+		if(typeof this.dimensions[label] === 'undefined') {
+			this.len++;
+			this.dimensions[label] = new dimensionStatus(this, label, name_div, value_div, color);
+		}
+		else
+			this.dimensions[label].setOptions(name_div, value_div, color);
+
+		return this.dimensions[label];
+	}
+
+	dimensionsVisibility.prototype.dimensionGet = function(label) {
+		return this.dimensions[label];
+	}
+
+	dimensionsVisibility.prototype.invalidateAll = function() {
+		for(var d in this.dimensions)
+			this.dimensions[d].invalidate();
+	}
+
+	dimensionsVisibility.prototype.selectAll = function() {
+		for(var d in this.dimensions)
+			this.dimensions[d].select();
+	}
+
+	dimensionsVisibility.prototype.countSelected = function() {
+		var i = 0;
+		for(var d in this.dimensions)
+			if(this.dimensions[d].isSelected()) i++;
+
+		return i;
+	}
+
+	dimensionsVisibility.prototype.selectNone = function() {
+		for(var d in this.dimensions)
+			this.dimensions[d].unselect();
+	}
+
+	dimensionsVisibility.prototype.selected2BooleanArray = function(array) {
+		var ret = new Array();
+		this.selected_count = 0;
+		this.unselected_count = 0;
+
+		for(var i = 0, len = array.length; i < len ; i++) {
+			var ds = this.dimensions[array[i]];
+			if(typeof ds === 'undefined') {
+				// console.log(array[i] + ' is not found');
+				ret.push(false);
+				continue;
+			}
+
+			if(ds.isSelected()) {
+				ret.push(true);
+				this.selected_count++;
+			}
+			else {
+				ret.push(false);
+				this.unselected_count++;
+			}
+		}
+
+		if(this.selected_count === 0 && this.unselected_count !== 0) {
+			this.selectAll();
+			return this.selected2BooleanArray(array);
+		}
+
+		return ret;
+	}
+
+
+	// ----------------------------------------------------------------------------------------------------------------
 	// Our state object, where all per-chart values are stored
 
 	chartState = function(element) {
@@ -639,6 +838,8 @@
 			data_update_every: 0,	// milliseconds - the frequency to update the data
 			netdata_first: 0,		// milliseconds - the first timestamp in netdata
 			netdata_last: 0,		// milliseconds - the last timestamp in netdata
+
+			dimensions_visibility: new dimensionsVisibility(this),
 
 			current: null, 			// auto, pan, zoom
 									// this is a pointer to one of the sub-classes below
@@ -1326,6 +1527,9 @@
 		if(this.debug === true)
 			this.log('updating Legend DOM');
 
+		// mark all dimensions as invalid
+		this.dimensions_visibility.invalidateAll();
+
 		var self = $(this.element);
 		var genLabel = function(state, parent, name, count) {
 			var color = state._chartDimensionColor(name);
@@ -1347,10 +1551,8 @@
 
 			var label = state.element_legend_childs.series[name];
 
-			label.name.className += ' netdata-legend-name';
-			label.value.className += ' netdata-legend-value';
-			label.name.title = name;
-			label.value.title = name;
+			// create the dimension visibility tracking for this label
+			var ds = state.dimensions_visibility.dimensionAdd(name, label.name, label.value, color);
 
 			var rgb = NETDATA.colorHex2Rgb(color);
 			label.name.innerHTML = '<table class="netdata-legend-name-table-'
@@ -1361,9 +1563,6 @@
 
 			var text = document.createTextNode(' ' + name);
 			label.name.appendChild(text);
-
-			label.name.style.color = color;
-			label.value.style.color = color;
 
 			if(count > 0)
 				parent.appendChild(document.createElement('br'));
@@ -1620,6 +1819,11 @@
 
 		if(NETDATA.options.debug.chart_data_url === true || this.debug === true)
 			this.log('chartURL(): ' + this.data_url + ' WxH:' + this.chartWidth() + 'x' + this.chartHeight() + ' points: ' + this.data_points + ' library: ' + this.library_name);
+	}
+
+	chartState.prototype.redrawChart = function() {
+		if(this.data !== null)
+			this.updateChartWithData(this.data);
 	}
 
 	chartState.prototype.updateChartWithData = function(data) {
@@ -2858,7 +3062,8 @@
 				file: data.result.data,
 				colors: state.chartColors(),
 				labels: data.result.labels,
-				labelsDivWidth: state.chartWidth() - 70
+				labelsDivWidth: state.chartWidth() - 70,
+				visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names)
 		}
 
 		if(state.current.name === 'pan') {
@@ -2981,6 +3186,7 @@
 			highlightSeriesBackgroundAlpha: self.data('dygraph-highlightseriesbackgroundalpha') || null, // TOO SLOW: (chart_type === 'stacked')?0.7:0.5,
 
 			pointClickCallback: self.data('dygraph-pointclickcallback') || undefined,
+			visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names),
 			axes: {
 				x: {
 					pixelsPerLabel: 50,

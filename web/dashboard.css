@@ -225,6 +225,10 @@ html {
 	padding: 0px;
 	padding-left: 15px;
 }
+.netdata-legend-name.not-selected {
+	font-weight: normal;
+	opacity: 0.3;
+}
 
 .netdata-chart {
 	position: absolute;		/* within .netdata-container */
