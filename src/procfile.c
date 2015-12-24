@@ -235,11 +235,14 @@ cleanup:
 procfile *procfile_readall(procfile *ff) {
 	debug(D_PROCFILE, PF_PREFIX ": Reading file '%s'.", ff->filename);
 
-	ssize_t s = 0, r = ff->size, x = ff->size;
+	ssize_t s, r = 1, x = ff->size;
 	ff->len = 0;
 
-	while(likely(r == x)) {
-		if(s) {
+	while(likely(r > 0)) {
+		s = ff->len;
+		x = ff->size - s;
+
+		if(!x) {
 			debug(D_PROCFILE, PF_PREFIX ": Expanding data buffer for file '%s'.", ff->filename);
 
 			procfile *new = realloc(ff, sizeof(procfile) + ff->size + PROCFILE_INCREMENT_BUFFER);
@@ -262,7 +265,6 @@ procfile *procfile_readall(procfile *ff) {
 		}
 
 		ff->len += r;
-		s = ff->len;
 	}
 
 	debug(D_PROCFILE, "Rewinding file '%s'", ff->filename);

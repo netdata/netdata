@@ -37,7 +37,7 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 	if(do_drops == -1)		do_drops 		= config_get_boolean("plugin:proc:/proc/net/dev", "drops for all interfaces", 1);
 	if(do_fifo == -1) 		do_fifo 		= config_get_boolean("plugin:proc:/proc/net/dev", "fifo for all interfaces", 1);
 	if(do_compressed == -1)	do_compressed 	= config_get_boolean("plugin:proc:/proc/net/dev", "compressed packets for all interfaces", 1);
-	if(do_events == -1)		do_events 		= config_get_boolean("plugin:proc:/proc/net/dev", "frames, collisions, carrier coutners for all interfaces", 1);
+	if(do_events == -1)		do_events 		= config_get_boolean("plugin:proc:/proc/net/dev", "frames, collisions, carrier counters for all interfaces", 1);
 
 	uint32_t lines = procfile_lines(ff), l;
 	uint32_t words;
