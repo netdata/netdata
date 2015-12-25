@@ -108,7 +108,7 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 
 			// for absolute values, we need to switch the setting to 'yes'
 			// to allow it refresh from now on
-			if(ddo_fifo == CONFIG_ONDEMAND_ONDEMAND) config_set(var_name, "fifo", "yes");
+			// if(ddo_fifo == CONFIG_ONDEMAND_ONDEMAND) config_set(var_name, "fifo", "yes");
 		}
 
 		RRDSET *st;
@@ -191,11 +191,11 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 		if(ddo_fifo) {
 			st = rrdset_find_bytype("net_fifo", iface);
 			if(!st) {
-				st = rrdset_create("net_fifo", iface, NULL, iface, "Interface Queue", "packets", 1100, update_every, RRDSET_TYPE_LINE);
+				st = rrdset_create("net_fifo", iface, NULL, iface, "Interface FIFO Buffer Errors", "errors", 1100, update_every, RRDSET_TYPE_LINE);
 				st->isdetail = 1;
 
-				rrddim_add(st, "receive", NULL, 1, 1, RRDDIM_ABSOLUTE);
-				rrddim_add(st, "transmit", NULL, -1, 1, RRDDIM_ABSOLUTE);
+				rrddim_add(st, "receive", NULL, 1, 1, RRDDIM_INCREMENTAL);
+				rrddim_add(st, "transmit", NULL, -1, 1, RRDDIM_INCREMENTAL);
 			}
 			else rrdset_next(st);
 
