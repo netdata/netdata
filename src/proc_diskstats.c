@@ -115,6 +115,13 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 		if(!reads && !writes && !busy_ms) continue;
 
 		int def_enabled = 0;
+		int ddo_io = do_io, ddo_ops = do_ops, ddo_mops = do_mops, ddo_iotime = do_iotime, ddo_qops = do_qops, ddo_util = do_util, ddo_backlog = do_backlog;
+
+		// by default, do not add charts that do not have values
+		if(mreads == 0 && mwrites == 0) ddo_mops = 0;
+		if(readms == 0 && writems == 0) ddo_iotime = 0;
+		if(busy_ms == 0) ddo_util = 0;
+		if(backlog_ms == 0) { ddo_backlog = 0; ddo_qops = 0; }
 
 		// remove slashes from disk names
 		char *s;
@@ -228,16 +235,28 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 				else def_enabled = enable_new_disks;
 				break;
 
+			case 252: // zram
+				def_enabled = 0;
+				break;
+
 			default:
 				def_enabled = 0;
 				break;
 		}
 
-		// check if it is enabled
+		// check which charts are enabled for this disk
 		{
 			char var_name[4096 + 1];
-			snprintf(var_name, 4096, "disk %s", disk);
-			if(!config_get_boolean("plugin:proc:/proc/diskstats", var_name, def_enabled)) continue;
+			snprintf(var_name, 4096, "plugin:proc:/proc/diskstats:%s", disk);
+			if(!config_get_boolean(var_name, "enabled", def_enabled)) continue;
+
+			ddo_io 		= config_get_boolean(var_name, "bandwidth", ddo_io);
+			ddo_ops 	= config_get_boolean(var_name, "operations", ddo_ops);
+			ddo_mops 	= config_get_boolean(var_name, "merged operations", ddo_mops);
+			ddo_iotime 	= config_get_boolean(var_name, "i/o time", ddo_iotime);
+			ddo_qops 	= config_get_boolean(var_name, "queued operations", ddo_qops);
+			ddo_util 	= config_get_boolean(var_name, "utilization percentage", ddo_util);
+			ddo_backlog = config_get_boolean(var_name, "backlog", ddo_backlog);
 		}
 
 		RRDSET *st;
@@ -245,7 +264,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 		// --------------------------------------------------------------------
 
 		int sector_size = 512;
-		if(do_io) {
+		if(ddo_io) {
 			st = rrdset_find_bytype(RRD_TYPE_DISK, disk);
 			if(!st) {
 				char tf[FILENAME_MAX + 1], *t;
@@ -290,7 +309,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 
 		// --------------------------------------------------------------------
 
-		if(do_ops) {
+		if(ddo_ops) {
 			st = rrdset_find_bytype("disk_ops", disk);
 			if(!st) {
 				st = rrdset_create("disk_ops", disk, NULL, disk, "Disk Completed I/O Operations", "operations/s", 2001, update_every, RRDSET_TYPE_LINE);
@@ -308,7 +327,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 
 		// --------------------------------------------------------------------
 
-		if(do_qops) {
+		if(ddo_qops) {
 			st = rrdset_find_bytype("disk_qops", disk);
 			if(!st) {
 				st = rrdset_create("disk_qops", disk, NULL, disk, "Disk Queued I/O Operations", "operations", 2002, update_every, RRDSET_TYPE_LINE);
@@ -324,7 +343,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 
 		// --------------------------------------------------------------------
 
-		if(do_backlog) {
+		if(ddo_backlog) {
 			st = rrdset_find_bytype("disk_backlog", disk);
 			if(!st) {
 				st = rrdset_create("disk_backlog", disk, NULL, disk, "Disk Backlog", "backlog (ms)", 2003, update_every, RRDSET_TYPE_AREA);
@@ -340,7 +359,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 
 		// --------------------------------------------------------------------
 
-		if(do_util) {
+		if(ddo_util) {
 			st = rrdset_find_bytype("disk_util", disk);
 			if(!st) {
 				st = rrdset_create("disk_util", disk, NULL, disk, "Disk Utilization Time", "% of time working", 2004, update_every, RRDSET_TYPE_AREA);
@@ -356,7 +375,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 
 		// --------------------------------------------------------------------
 
-		if(do_mops) {
+		if(ddo_mops) {
 			st = rrdset_find_bytype("disk_mops", disk);
 			if(!st) {
 				st = rrdset_create("disk_mops", disk, NULL, disk, "Disk Merged Operations", "merged operations/s", 2021, update_every, RRDSET_TYPE_LINE);
@@ -374,7 +393,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 
 		// --------------------------------------------------------------------
 
-		if(do_iotime) {
+		if(ddo_iotime) {
 			st = rrdset_find_bytype("disk_iotime", disk);
 			if(!st) {
 				st = rrdset_create("disk_iotime", disk, NULL, disk, "Disk Total I/O Time", "milliseconds/s", 2022, update_every, RRDSET_TYPE_LINE);
@@ -395,7 +414,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 		// only if this is not the first time we run
 
 		if(dt) {
-			if(do_iotime && do_ops) {
+			if(ddo_iotime && ddo_ops) {
 				st = rrdset_find_bytype("disk_await", disk);
 				if(!st) {
 					st = rrdset_create("disk_await", disk, NULL, disk, "Average Completed I/O Operation Time", "ms per operation", 2005, update_every, RRDSET_TYPE_LINE);
@@ -411,7 +430,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 				rrdset_done(st);
 			}
 
-			if(do_io && do_ops) {
+			if(ddo_io && ddo_ops) {
 				st = rrdset_find_bytype("disk_avgsz", disk);
 				if(!st) {
 					st = rrdset_create("disk_avgsz", disk, NULL, disk, "Average Completed I/O Operation Bandwidth", "kilobytes per operation", 2006, update_every, RRDSET_TYPE_AREA);
@@ -427,7 +446,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 				rrdset_done(st);
 			}
 
-			if(do_util && do_ops) {
+			if(ddo_util && ddo_ops) {
 				st = rrdset_find_bytype("disk_svctm", disk);
 				if(!st) {
 					st = rrdset_create("disk_svctm", disk, NULL, disk, "Average Service Time", "ms per operation", 2007, update_every, RRDSET_TYPE_LINE);
