@@ -70,10 +70,18 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 		tcarrier	= strtoull(procfile_lineword(ff, l, 15), NULL, 10);
 		tcompressed	= strtoull(procfile_lineword(ff, l, 16), NULL, 10);
 
+		int ddo_bandwidth = do_bandwidth, ddo_packets = do_packets, ddo_errors = do_errors, ddo_drops = do_drops, ddo_fifo = do_fifo, ddo_compressed = do_compressed, ddo_events = do_events;
+
+		if(rerrors == 0 && terrors == 0) ddo_errors = 0;
+		if(rdrops == 0 && tdrops == 0) ddo_drops = 0;
+		if(rfifo == 0 && tfifo == 0) ddo_fifo = 0;
+		if(rcompressed == 0 && tcompressed == 0) ddo_compressed = 0;
+		if(rframe == 0 && tcollisions == 0 && tcarrier == 0) ddo_events = 0;
+
 		int default_enable = enable_new_interfaces;
 
 		// prevent unused interfaces from creating charts
-		if(!rbytes && !tbytes)
+		if(!rbytes && !tbytes || strcmp(iface, "lo") == 0)
 			default_enable = 0;
 		else {
 			int len = strlen(iface);
@@ -84,15 +92,21 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 		// check if the user wants it
 		{
 			char var_name[512 + 1];
-			snprintf(var_name, 512, "interface %s", iface);
-			if(!config_get_boolean("plugin:proc:/proc/net/dev", var_name, default_enable)) continue;
+			snprintf(var_name, 512, "plugin:proc:/proc/net/dev:%s", iface);
+			if(!config_get_boolean(var_name, "enabled", default_enable)) continue;
+
+			ddo_errors = config_get_boolean(var_name, "errors", ddo_errors);
+			ddo_drops = config_get_boolean(var_name, "drops", ddo_drops);
+			ddo_fifo = config_get_boolean(var_name, "fifo", ddo_fifo);
+			ddo_compressed = config_get_boolean(var_name, "compressed", ddo_compressed);
+			ddo_events = config_get_boolean(var_name, "events", ddo_events);
 		}
 
 		RRDSET *st;
 
 		// --------------------------------------------------------------------
 
-		if(do_bandwidth) {
+		if(ddo_bandwidth) {
 			st = rrdset_find_bytype("net", iface);
 			if(!st) {
 				st = rrdset_create("net", iface, NULL, iface, "Bandwidth", "kilobits/s", 1000, update_every, RRDSET_TYPE_AREA);
@@ -109,7 +123,7 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 
 		// --------------------------------------------------------------------
 
-		if(do_packets) {
+		if(ddo_packets) {
 			st = rrdset_find_bytype("net_packets", iface);
 			if(!st) {
 				st = rrdset_create("net_packets", iface, NULL, iface, "Packets", "packets/s", 1001, update_every, RRDSET_TYPE_LINE);
@@ -129,7 +143,7 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 
 		// --------------------------------------------------------------------
 
-		if(do_errors) {
+		if(ddo_errors) {
 			st = rrdset_find_bytype("net_errors", iface);
 			if(!st) {
 				st = rrdset_create("net_errors", iface, NULL, iface, "Interface Errors", "errors/s", 1002, update_every, RRDSET_TYPE_LINE);
@@ -147,7 +161,7 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 
 		// --------------------------------------------------------------------
 
-		if(do_drops) {
+		if(ddo_drops) {
 			st = rrdset_find_bytype("net_drops", iface);
 			if(!st) {
 				st = rrdset_create("net_drops", iface, NULL, iface, "Interface Drops", "drops/s", 1003, update_every, RRDSET_TYPE_LINE);
@@ -165,7 +179,7 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 
 		// --------------------------------------------------------------------
 
-		if(do_fifo) {
+		if(ddo_fifo) {
 			st = rrdset_find_bytype("net_fifo", iface);
 			if(!st) {
 				st = rrdset_create("net_fifo", iface, NULL, iface, "Interface Queue", "packets", 1100, update_every, RRDSET_TYPE_LINE);
@@ -183,7 +197,7 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 
 		// --------------------------------------------------------------------
 
-		if(do_compressed) {
+		if(ddo_compressed) {
 			st = rrdset_find_bytype("net_compressed", iface);
 			if(!st) {
 				st = rrdset_create("net_compressed", iface, NULL, iface, "Compressed Packets", "packets/s", 1200, update_every, RRDSET_TYPE_LINE);
@@ -201,7 +215,7 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 
 		// --------------------------------------------------------------------
 
-		if(do_events) {
+		if(ddo_events) {
 			st = rrdset_find_bytype("net_events", iface);
 			if(!st) {
 				st = rrdset_create("net_events", iface, NULL, iface, "Network Interface Events", "events/s", 1200, update_every, RRDSET_TYPE_LINE);
