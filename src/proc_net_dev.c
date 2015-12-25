@@ -28,16 +28,16 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 	ff = procfile_readall(ff);
 	if(!ff) return 0; // we return 0, so that we will retry to open it next time
 
-	if(enable_new_interfaces == -1)	enable_new_interfaces = config_get_boolean("plugin:proc:/proc/net/dev", "enable new interfaces detected at runtime", 1);
-	if(enable_ifb_interfaces == -1)	enable_ifb_interfaces = config_get_boolean("plugin:proc:/proc/net/dev", "enable ifb interfaces", 0);
+	if(enable_new_interfaces == -1)	enable_new_interfaces = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "enable new interfaces detected at runtime", CONFIG_ONDEMAND_ONDEMAND);
+	if(enable_ifb_interfaces == -1)	enable_ifb_interfaces = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "enable ifb interfaces", CONFIG_ONDEMAND_NO);
 
-	if(do_bandwidth == -1)	do_bandwidth 	= config_get_boolean("plugin:proc:/proc/net/dev", "bandwidth for all interfaces", 1);
-	if(do_packets == -1)	do_packets 		= config_get_boolean("plugin:proc:/proc/net/dev", "packets for all interfaces", 1);
-	if(do_errors == -1)		do_errors 		= config_get_boolean("plugin:proc:/proc/net/dev", "errors for all interfaces", 1);
-	if(do_drops == -1)		do_drops 		= config_get_boolean("plugin:proc:/proc/net/dev", "drops for all interfaces", 1);
-	if(do_fifo == -1) 		do_fifo 		= config_get_boolean("plugin:proc:/proc/net/dev", "fifo for all interfaces", 1);
-	if(do_compressed == -1)	do_compressed 	= config_get_boolean("plugin:proc:/proc/net/dev", "compressed packets for all interfaces", 1);
-	if(do_events == -1)		do_events 		= config_get_boolean("plugin:proc:/proc/net/dev", "frames, collisions, carrier counters for all interfaces", 1);
+	if(do_bandwidth == -1)	do_bandwidth 	= config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "bandwidth for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
+	if(do_packets == -1)	do_packets 		= config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "packets for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
+	if(do_errors == -1)		do_errors 		= config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "errors for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
+	if(do_drops == -1)		do_drops 		= config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "drops for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
+	if(do_fifo == -1) 		do_fifo 		= config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "fifo for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
+	if(do_compressed == -1)	do_compressed 	= config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "compressed packets for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
+	if(do_events == -1)		do_events 		= config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "frames, collisions, carrier counters for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
 
 	uint32_t lines = procfile_lines(ff), l;
 	uint32_t words;
@@ -72,16 +72,10 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 
 		int ddo_bandwidth = do_bandwidth, ddo_packets = do_packets, ddo_errors = do_errors, ddo_drops = do_drops, ddo_fifo = do_fifo, ddo_compressed = do_compressed, ddo_events = do_events;
 
-		if(rerrors == 0 && terrors == 0) ddo_errors = 0;
-		if(rdrops == 0 && tdrops == 0) ddo_drops = 0;
-		if(rfifo == 0 && tfifo == 0) ddo_fifo = 0;
-		if(rcompressed == 0 && tcompressed == 0) ddo_compressed = 0;
-		if(rframe == 0 && tcollisions == 0 && tcarrier == 0) ddo_events = 0;
-
 		int default_enable = enable_new_interfaces;
 
 		// prevent unused interfaces from creating charts
-		if(!rbytes && !tbytes || strcmp(iface, "lo") == 0)
+		if(strcmp(iface, "lo") == 0)
 			default_enable = 0;
 		else {
 			int len = strlen(iface);
@@ -93,13 +87,28 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 		{
 			char var_name[512 + 1];
 			snprintf(var_name, 512, "plugin:proc:/proc/net/dev:%s", iface);
-			if(!config_get_boolean(var_name, "enabled", default_enable)) continue;
+			default_enable = config_get_boolean_ondemand(var_name, "enabled", default_enable);
+			if(default_enable == CONFIG_ONDEMAND_NO) continue;
+			if(default_enable == CONFIG_ONDEMAND_ONDEMAND && !rbytes && !tbytes) continue;
 
-			ddo_errors = config_get_boolean(var_name, "errors", ddo_errors);
-			ddo_drops = config_get_boolean(var_name, "drops", ddo_drops);
-			ddo_fifo = config_get_boolean(var_name, "fifo", ddo_fifo);
-			ddo_compressed = config_get_boolean(var_name, "compressed", ddo_compressed);
-			ddo_events = config_get_boolean(var_name, "events", ddo_events);
+			ddo_bandwidth = config_get_boolean_ondemand(var_name, "bandwidth", ddo_bandwidth);
+			ddo_packets = config_get_boolean_ondemand(var_name, "packets", ddo_packets);
+			ddo_errors = config_get_boolean_ondemand(var_name, "errors", ddo_errors);
+			ddo_drops = config_get_boolean_ondemand(var_name, "drops", ddo_drops);
+			ddo_fifo = config_get_boolean_ondemand(var_name, "fifo", ddo_fifo);
+			ddo_compressed = config_get_boolean_ondemand(var_name, "compressed", ddo_compressed);
+			ddo_events = config_get_boolean_ondemand(var_name, "events", ddo_events);
+
+			if(ddo_bandwidth == CONFIG_ONDEMAND_ONDEMAND && rbytes == 0 && tbytes == 0) ddo_bandwidth = 0;
+			if(ddo_errors == CONFIG_ONDEMAND_ONDEMAND && rerrors == 0 && terrors == 0) ddo_errors = 0;
+			if(ddo_drops == CONFIG_ONDEMAND_ONDEMAND && rdrops == 0 && tdrops == 0) ddo_drops = 0;
+			if(ddo_fifo == CONFIG_ONDEMAND_ONDEMAND && rfifo == 0 && tfifo == 0) ddo_fifo = 0;
+			if(ddo_compressed == CONFIG_ONDEMAND_ONDEMAND && rcompressed == 0 && tcompressed == 0) ddo_compressed = 0;
+			if(ddo_events == CONFIG_ONDEMAND_ONDEMAND && rframe == 0 && tcollisions == 0 && tcarrier == 0) ddo_events = 0;
+
+			// for absolute values, we need to switch the setting to 'yes'
+			// to allow it refresh from now on
+			if(ddo_fifo == CONFIG_ONDEMAND_ONDEMAND) config_set(var_name, "fifo", "yes");
 		}
 
 		RRDSET *st;

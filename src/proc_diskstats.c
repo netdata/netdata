@@ -23,15 +23,15 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 	static int enable_new_disks = -1;
 	static int do_io = -1, do_ops = -1, do_mops = -1, do_iotime = -1, do_qops = -1, do_util = -1, do_backlog = -1;
 
-	if(enable_new_disks == -1)	enable_new_disks = config_get_boolean("plugin:proc:/proc/diskstats", "enable new disks detected at runtime", 1);
+	if(enable_new_disks == -1)	enable_new_disks = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "enable new disks detected at runtime", CONFIG_ONDEMAND_ONDEMAND);
 
-	if(do_io == -1)		do_io 		= config_get_boolean("plugin:proc:/proc/diskstats", "bandwidth for all disks", 1);
-	if(do_ops == -1)	do_ops 		= config_get_boolean("plugin:proc:/proc/diskstats", "operations for all disks", 1);
-	if(do_mops == -1)	do_mops 	= config_get_boolean("plugin:proc:/proc/diskstats", "merged operations for all disks", 1);
-	if(do_iotime == -1)	do_iotime 	= config_get_boolean("plugin:proc:/proc/diskstats", "i/o time for all disks", 1);
-	if(do_qops == -1)	do_qops 	= config_get_boolean("plugin:proc:/proc/diskstats", "queued operations for all disks", 1);
-	if(do_util == -1)	do_util 	= config_get_boolean("plugin:proc:/proc/diskstats", "utilization percentage for all disks", 1);
-	if(do_backlog == -1)do_backlog 	= config_get_boolean("plugin:proc:/proc/diskstats", "backlog for all disks", 1);
+	if(do_io == -1)		do_io 		= config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "bandwidth for all disks", CONFIG_ONDEMAND_ONDEMAND);
+	if(do_ops == -1)	do_ops 		= config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "operations for all disks", CONFIG_ONDEMAND_ONDEMAND);
+	if(do_mops == -1)	do_mops 	= config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "merged operations for all disks", CONFIG_ONDEMAND_ONDEMAND);
+	if(do_iotime == -1)	do_iotime 	= config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "i/o time for all disks", CONFIG_ONDEMAND_ONDEMAND);
+	if(do_qops == -1)	do_qops 	= config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "queued operations for all disks", CONFIG_ONDEMAND_ONDEMAND);
+	if(do_util == -1)	do_util 	= config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "utilization percentage for all disks", CONFIG_ONDEMAND_ONDEMAND);
+	if(do_backlog == -1)do_backlog 	= config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "backlog for all disks", CONFIG_ONDEMAND_ONDEMAND);
 
 	if(!ff) {
 		char filename[FILENAME_MAX + 1];
@@ -111,17 +111,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 		backlog_ms 		= strtoull(procfile_lineword(ff, l, 13), NULL, 10);	// rq_ticks
 
 
-		// do not add a disk that is completely idle
-		if(!reads && !writes && !busy_ms) continue;
-
 		int def_enabled = 0;
-		int ddo_io = do_io, ddo_ops = do_ops, ddo_mops = do_mops, ddo_iotime = do_iotime, ddo_qops = do_qops, ddo_util = do_util, ddo_backlog = do_backlog;
-
-		// by default, do not add charts that do not have values
-		if(mreads == 0 && mwrites == 0) ddo_mops = 0;
-		if(readms == 0 && writems == 0) ddo_iotime = 0;
-		if(busy_ms == 0) ddo_util = 0;
-		if(backlog_ms == 0) { ddo_backlog = 0; ddo_qops = 0; }
 
 		// remove slashes from disk names
 		char *s;
@@ -244,19 +234,36 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 				break;
 		}
 
+		int ddo_io = do_io, ddo_ops = do_ops, ddo_mops = do_mops, ddo_iotime = do_iotime, ddo_qops = do_qops, ddo_util = do_util, ddo_backlog = do_backlog;
+
 		// check which charts are enabled for this disk
 		{
 			char var_name[4096 + 1];
 			snprintf(var_name, 4096, "plugin:proc:/proc/diskstats:%s", disk);
-			if(!config_get_boolean(var_name, "enabled", def_enabled)) continue;
+			def_enabled = config_get_boolean_ondemand(var_name, "enabled", def_enabled);
+			if(def_enabled == CONFIG_ONDEMAND_NO) continue;
+			if(def_enabled == CONFIG_ONDEMAND_ONDEMAND && !reads && !writes) continue;
 
-			ddo_io 		= config_get_boolean(var_name, "bandwidth", ddo_io);
-			ddo_ops 	= config_get_boolean(var_name, "operations", ddo_ops);
-			ddo_mops 	= config_get_boolean(var_name, "merged operations", ddo_mops);
-			ddo_iotime 	= config_get_boolean(var_name, "i/o time", ddo_iotime);
-			ddo_qops 	= config_get_boolean(var_name, "queued operations", ddo_qops);
-			ddo_util 	= config_get_boolean(var_name, "utilization percentage", ddo_util);
-			ddo_backlog = config_get_boolean(var_name, "backlog", ddo_backlog);
+
+			ddo_io 		= config_get_boolean_ondemand(var_name, "bandwidth", ddo_io);
+			ddo_ops 	= config_get_boolean_ondemand(var_name, "operations", ddo_ops);
+			ddo_mops 	= config_get_boolean_ondemand(var_name, "merged operations", ddo_mops);
+			ddo_iotime 	= config_get_boolean_ondemand(var_name, "i/o time", ddo_iotime);
+			ddo_qops 	= config_get_boolean_ondemand(var_name, "queued operations", ddo_qops);
+			ddo_util 	= config_get_boolean_ondemand(var_name, "utilization percentage", ddo_util);
+			ddo_backlog = config_get_boolean_ondemand(var_name, "backlog", ddo_backlog);
+
+			// by default, do not add charts that do not have values
+			if(ddo_io == CONFIG_ONDEMAND_ONDEMAND && !reads && !writes) ddo_io = 0;
+			if(ddo_mops == CONFIG_ONDEMAND_ONDEMAND && mreads == 0 && mwrites == 0) ddo_mops = 0;
+			if(ddo_iotime == CONFIG_ONDEMAND_ONDEMAND && readms == 0 && writems == 0) ddo_iotime = 0;
+			if(ddo_util == CONFIG_ONDEMAND_ONDEMAND && busy_ms == 0) ddo_util = 0;
+			if(ddo_backlog == CONFIG_ONDEMAND_ONDEMAND && backlog_ms == 0) ddo_backlog = 0;
+			if(ddo_qops == CONFIG_ONDEMAND_ONDEMAND && backlog_ms == 0) ddo_qops = 0;
+
+			// for absolute values, we need to switch the setting to 'yes'
+			// to allow it refresh from now on
+			if(ddo_qops == CONFIG_ONDEMAND_ONDEMAND) config_set(var_name, "queued operations", "yes");
 		}
 
 		RRDSET *st;

@@ -17,6 +17,8 @@
 #ifndef _AVL_H
 #define _AVL_H 1
 
+// #define AVL_LOCK_WITH_MUTEX 1
+
 /* Data structures */
 
 /* One element of the AVL tree */
@@ -30,7 +32,12 @@ typedef struct avl {
 typedef struct avl_tree {
 	avl* root;
 	int (*compar)(void* a, void* b);
+
+#ifdef AVL_LOCK_WITH_MUTEX
+	pthread_mutex_t mutex;
+#else
 	pthread_rwlock_t rwlock;
+#endif
 } avl_tree;
 
 /* Public methods */

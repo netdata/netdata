@@ -53,7 +53,11 @@ static int rrdset_compare(void* a, void* b) {
 avl_tree rrdset_root_index = {
 		NULL,
 		rrdset_compare,
+#ifdef AVL_LOCK_WITH_MUTEX
+		PTHREAD_MUTEX_INITIALIZER
+#else
 		PTHREAD_RWLOCK_INITIALIZER
+#endif
 };
 
 #define rrdset_index_add(st) avl_insert(&rrdset_root_index, (avl *)(st))
@@ -90,7 +94,11 @@ static int rrdset_compare_name(void* a, void* b) {
 avl_tree rrdset_root_index_name = {
 		NULL,
 		rrdset_compare_name,
+#ifdef AVL_LOCK_WITH_MUTEX
+		PTHREAD_MUTEX_INITIALIZER
+#else
 		PTHREAD_RWLOCK_INITIALIZER
+#endif
 };
 
 int rrdset_index_add_name(RRDSET *st) {
@@ -562,6 +570,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 	rd->counter = 0;
 
 	// append this dimension
+	pthread_rwlock_wrlock(&st->rwlock);
 	if(!st->dimensions)
 		st->dimensions = rd;
 	else {
@@ -569,6 +578,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 		for(; td->next; td = td->next) ;
 		td->next = rd;
 	}
+	pthread_rwlock_unlock(&st->rwlock);
 
 	rrddim_index_add(st, rd);
 
@@ -686,10 +696,7 @@ RRDSET *rrdset_find(const char *id)
 {
 	debug(D_RRD_CALLS, "rrdset_find() for chart %s", id);
 
-	pthread_rwlock_rdlock(&rrdset_root_rwlock);
 	RRDSET *st = rrdset_index_find(id, 0);
-	pthread_rwlock_unlock(&rrdset_root_rwlock);
-
 	return(st);
 }
 
@@ -713,10 +720,7 @@ RRDSET *rrdset_find_byname(const char *name)
 {
 	debug(D_RRD_CALLS, "rrdset_find_byname() for chart %s", name);
 
-	pthread_rwlock_rdlock(&rrdset_root_rwlock);
 	RRDSET *st = rrdset_index_find_name(name, 0);
-	pthread_rwlock_unlock(&rrdset_root_rwlock);
-
 	return(st);
 }
 

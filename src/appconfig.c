@@ -48,6 +48,8 @@ struct config {
 	avl_tree values_index;
 
 	struct config *next;
+
+	pthread_rwlock_t rwlock;
 } *config_root = NULL;
 
 
@@ -88,7 +90,11 @@ static int config_compare(void* a, void* b) {
 avl_tree config_root_index = {
 		NULL,
 		config_compare,
+#ifdef AVL_LOCK_WITH_MUTEX
+		PTHREAD_MUTEX_INITIALIZER
+#else
 		PTHREAD_RWLOCK_INITIALIZER
+#endif
 };
 
 #define config_index_add(cfg) avl_insert(&config_root_index, (avl *)(cfg))
@@ -121,12 +127,16 @@ struct config_value *config_value_create(struct config *co, const char *name, co
 
 	// no need for string termination, due to calloc()
 
+	pthread_rwlock_wrlock(&co->rwlock);
+
 	struct config_value *cv2 = co->values;
 	if(cv2) {
 		while (cv2->next) cv2 = cv2->next;
 		cv2->next = cv;
 	}
 	else co->values = cv;
+
+	pthread_rwlock_unlock(&co->rwlock);
 
 	return cv;
 }
@@ -142,11 +152,14 @@ struct config *config_create(const char *section)
 	if(!co->name) fatal("Cannot allocate config.name");
 	co->hash = simple_hash(co->name);
 
+	pthread_rwlock_init(&co->rwlock, NULL);
 	avl_init(&co->values_index, config_value_compare);
 
 	config_index_add(co);
 
 	// no need for string termination, due to calloc()
+
+	pthread_rwlock_wrlock(&config_rwlock);
 
 	struct config *co2 = config_root;
 	if(co2) {
@@ -154,6 +167,8 @@ struct config *config_create(const char *section)
 		co2->next = co;
 	}
 	else config_root = co;
+
+	pthread_rwlock_unlock(&config_rwlock);
 
 	return co;
 }
@@ -168,15 +183,12 @@ int load_config(char *filename, int overwrite_used)
 	int line = 0;
 	struct config *co = NULL;
 
-	pthread_rwlock_wrlock(&config_rwlock);
-
 	char buffer[CONFIG_FILE_LINE_MAX + 1], *s;
 
 	if(!filename) filename = CONFIG_DIR "/" CONFIG_FILENAME;
 	FILE *fp = fopen(filename, "r");
 	if(!fp) {
 		error("Cannot open file '%s'", CONFIG_DIR "/" CONFIG_FILENAME);
-		pthread_rwlock_unlock(&config_rwlock);
 		return 0;
 	}
 
@@ -247,7 +259,6 @@ int load_config(char *filename, int overwrite_used)
 
 	fclose(fp);
 
-	pthread_rwlock_unlock(&config_rwlock);
 	return 1;
 }
 
@@ -256,8 +267,6 @@ char *config_get(const char *section, const char *name, const char *default_valu
 	struct config_value *cv;
 
 	debug(D_CONFIG, "request to get config in section '%s', name '%s', default_value '%s'", section, name, default_value);
-
-	pthread_rwlock_rdlock(&config_rwlock);
 
 	struct config *co = config_find_section(section);
 	if(!co) co = config_create(section);
@@ -278,7 +287,6 @@ char *config_get(const char *section, const char *name, const char *default_valu
 		}
 	}
 
-	pthread_rwlock_unlock(&config_rwlock);
 	return(cv->value);
 }
 
@@ -288,7 +296,7 @@ long long config_get_number(const char *section, const char *name, long long val
 	sprintf(buffer, "%lld", value);
 
 	s = config_get(section, name, buffer);
-	if(!s) return 0;
+	if(!s) return value;
 
 	return strtoll(s, NULL, 0);
 }
@@ -300,10 +308,36 @@ int config_get_boolean(const char *section, const char *name, int value)
 	else s = "no";
 
 	s = config_get(section, name, s);
-	if(!s) return 0;
+	if(!s) return value;
 
 	if(!strcmp(s, "yes")) return 1;
 	else return 0;
+}
+
+int config_get_boolean_ondemand(const char *section, const char *name, int value)
+{
+	char *s;
+
+	if(value == CONFIG_ONDEMAND_ONDEMAND)
+		s = "on demand";
+
+	else if(value == CONFIG_ONDEMAND_NO)
+		s = "no";
+
+	else
+		s = "yes";
+
+	s = config_get(section, name, s);
+	if(!s) return value;
+
+	if(!strcmp(s, "yes"))
+		return CONFIG_ONDEMAND_YES;
+	else if(!strcmp(s, "no"))
+		return CONFIG_ONDEMAND_NO;
+	else if(!strcmp(s, "on demand"))
+		return CONFIG_ONDEMAND_ONDEMAND;
+
+	return value;
 }
 
 const char *config_set(const char *section, const char *name, const char *value)
@@ -311,8 +345,6 @@ const char *config_set(const char *section, const char *name, const char *value)
 	struct config_value *cv;
 
 	debug(D_CONFIG, "request to set config in section '%s', name '%s', value '%s'", section, name, value);
-
-	pthread_rwlock_wrlock(&config_rwlock);
 
 	struct config *co = config_find_section(section);
 	if(!co) co = config_create(section);
@@ -326,8 +358,6 @@ const char *config_set(const char *section, const char *name, const char *value)
 	free(cv->value);
 	cv->value = strdup(value);
 	if(!cv->value) fatal("Cannot allocate config.value");
-
-	pthread_rwlock_unlock(&config_rwlock);
 
 	return value;
 }
@@ -378,6 +408,7 @@ void generate_config(BUFFER *wb, int only_changed)
 				break;
 		}
 
+		pthread_rwlock_wrlock(&config_rwlock);
 		for(co = config_root; co ; co = co->next) {
 			if(strcmp(co->name, "global") == 0 || strcmp(co->name, "plugins") == 0) pri = 0;
 			else if(strncmp(co->name, "plugin:", 7) == 0) pri = 1;
@@ -387,11 +418,16 @@ void generate_config(BUFFER *wb, int only_changed)
 				int used = 0;
 				int changed = 0;
 				int count = 0;
+
+				pthread_rwlock_wrlock(&co->rwlock);
+
 				for(cv = co->values; cv ; cv = cv->next) {
 					used += (cv->flags && CONFIG_VALUE_USED)?1:0;
 					changed += (cv->flags & CONFIG_VALUE_CHANGED)?1:0;
 					count++;
 				}
+
+				pthread_rwlock_unlock(&co->rwlock);
 
 				if(!count) continue;
 				if(only_changed && !changed) continue;
@@ -402,6 +438,7 @@ void generate_config(BUFFER *wb, int only_changed)
 
 				buffer_sprintf(wb, "\n[%s]\n", co->name);
 
+				pthread_rwlock_wrlock(&co->rwlock);
 				for(cv = co->values; cv ; cv = cv->next) {
 
 					if(used && !(cv->flags & CONFIG_VALUE_USED)) {
@@ -409,8 +446,10 @@ void generate_config(BUFFER *wb, int only_changed)
 					}
 					buffer_sprintf(wb, "\t%s%s = %s\n", ((!(cv->flags & CONFIG_VALUE_CHANGED)) && (cv->flags & CONFIG_VALUE_USED))?"# ":"", cv->name, cv->value);
 				}
+				pthread_rwlock_unlock(&co->rwlock);
 			}
 		}
+		pthread_rwlock_unlock(&config_rwlock);
 	}
 }
 

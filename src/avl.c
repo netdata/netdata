@@ -144,9 +144,19 @@ int _avl_insert(avl_tree* t, avl* a) {
 	}
 }
 int avl_insert(avl_tree* t, avl* a) {
+#ifdef AVL_LOCK_WITH_MUTEX
+	pthread_mutex_lock(&t->mutex);
+#else
 	pthread_rwlock_wrlock(&t->rwlock);
+#endif
+
 	int ret = _avl_insert(t, a);
+
+#ifdef AVL_LOCK_WITH_MUTEX
+	pthread_mutex_unlock(&t->mutex);
+#else
 	pthread_rwlock_unlock(&t->rwlock);
+#endif
 	return ret;
 }
 
@@ -232,9 +242,19 @@ int _avl_remove(avl_tree* t, avl* a) {
 }
 
 int avl_remove(avl_tree* t, avl* a) {
+#ifdef AVL_LOCK_WITH_MUTEX
+	pthread_mutex_lock(&t->mutex);
+#else
 	pthread_rwlock_wrlock(&t->rwlock);
+#endif
+
 	int ret = _avl_remove(t, a);
+
+#ifdef AVL_LOCK_WITH_MUTEX
+	pthread_mutex_unlock(&t->mutex);
+#else
 	pthread_rwlock_unlock(&t->rwlock);
+#endif
 	return ret;
 }
 
@@ -278,9 +298,19 @@ int _avl_removeroot(avl_tree* t) {
 }
 
 int avl_removeroot(avl_tree* t) {
+#ifdef AVL_LOCK_WITH_MUTEX
+	pthread_mutex_lock(&t->mutex);
+#else
 	pthread_rwlock_wrlock(&t->rwlock);
+#endif
+
 	int ret = _avl_removeroot(t);
+
+#ifdef AVL_LOCK_WITH_MUTEX
+	pthread_mutex_unlock(&t->mutex);
+#else
 	pthread_rwlock_unlock(&t->rwlock);
+#endif
 	return ret;
 }
 
@@ -332,9 +362,20 @@ int _avl_range(avl_tree* t, avl* a, avl* b, int (*iter)(avl* a), avl** ret) {
 }
 
 int avl_range(avl_tree* t, avl* a, avl* b, int (*iter)(avl* a), avl** ret) {
-	pthread_rwlock_rdlock(&t->rwlock);
+#ifdef AVL_LOCK_WITH_MUTEX
+	pthread_mutex_lock(&t->mutex);
+#else
+	pthread_rwlock_wrlock(&t->rwlock);
+#endif
+
 	int ret2 = _avl_range(t, a, b, iter, ret);
+
+#ifdef AVL_LOCK_WITH_MUTEX
+	pthread_mutex_unlock(&t->mutex);
+#else
 	pthread_rwlock_unlock(&t->rwlock);
+#endif
+
 	return ret2;
 }
 
@@ -349,5 +390,9 @@ int avl_search(avl_tree* t, avl* a, int (*iter)(avl* a), avl** ret) {
 void avl_init(avl_tree* t, int (*compar)(void* a, void* b)) {
 	t->root = NULL;
 	t->compar = compar;
+#ifdef AVL_LOCK_WITH_MUTEX
+	pthread_mutex_init(&t->mutex, NULL);
+#else
 	pthread_rwlock_init(&t->rwlock, NULL);
+#endif
 }

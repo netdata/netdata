@@ -22,6 +22,14 @@ update_every="$(curl "$host/netdata.conf" 2>/dev/null | grep "update every = " |
 entries="$(curl "$host/netdata.conf" 2>/dev/null | grep "history = " | head -n 1 | cut -d '=' -f 2)"
 [ $[ entries + 1 - 1] -eq 0 ] && entries=3600
 
+# to compare equal things, set the entries to 3600 max
+[ $entries -gt 3600 ] && entries=3600
+
+if [ $entries -ne 3600 ]
+	then
+	echo >&2 "You are running a test for a history of $entries entries."
+fi
+
 modes=("average" "max")
 formats=("jsonp" "json" "ssv" "csv" "datatable" "datasource" "tsv" "ssvcomma" "html" "array")
 options="flip|jsonwrap"
