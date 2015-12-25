@@ -50,6 +50,7 @@ void *proc_main(void *ptr)
 	int vdo_proc_sys_kernel_random_entropy_avail	= !config_get_boolean("plugin:proc", "/proc/sys/kernel/random/entropy_avail", 1);
 	int vdo_proc_interrupts			= !config_get_boolean("plugin:proc", "/proc/interrupts", 1);
 	int vdo_proc_softirqs			= !config_get_boolean("plugin:proc", "/proc/softirqs", 1);
+	int vdo_sys_kernel_mm_ksm		= !config_get_boolean("plugin:proc", "/sys/kernel/mm/ksm", 1);
 	int vdo_cpu_netdata 			= !config_get_boolean("plugin:proc", "netdata server resources", 1);
 
 	RRDSET *stcpu = NULL, *stcpu_thread = NULL, *stclients = NULL, *streqs = NULL, *stbytes = NULL;
@@ -60,6 +61,11 @@ void *proc_main(void *ptr)
 	for(;1;) {
 
 		// BEGIN -- the job to be done
+
+		if(!vdo_sys_kernel_mm_ksm) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_sys_kernel_mm_ksm().");
+			vdo_sys_kernel_mm_ksm = do_sys_kernel_mm_ksm(rrd_update_every, usec+susec);
+		}
 
 		if(!vdo_proc_interrupts) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_interrupts().");
