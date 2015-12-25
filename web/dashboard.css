@@ -208,6 +208,7 @@ html {
 	overflow: hidden;
 	white-space: nowrap;
 	display: inline-block;
+	cursor: pointer;
 }
 
 .netdata-legend-value {
@@ -224,6 +225,7 @@ html {
 	z-index: 10;
 	padding: 0px;
 	padding-left: 15px;
+	cursor: pointer;
 }
 .netdata-legend-name.not-selected {
 	font-weight: normal;
