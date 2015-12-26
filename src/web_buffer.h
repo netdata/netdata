@@ -28,8 +28,9 @@ typedef struct web_buffer {
 #define CT_APPLICATION_X_FONT_TRUETYPE	10
 #define CT_APPLICATION_X_FONT_OPENTYPE	11
 #define CT_APPLICATION_FONT_WOFF		12
-#define CT_APPLICATION_VND_MS_FONTOBJ	13
-#define CT_IMAGE_SVG_XML				14
+#define CT_APPLICATION_FONT_WOFF2		13
+#define CT_APPLICATION_VND_MS_FONTOBJ	14
+#define CT_IMAGE_SVG_XML				15
 
 #define buffer_strlen(wb) ((wb)->len)
 extern const char *buffer_tostring(BUFFER *wb);

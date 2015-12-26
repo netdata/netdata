@@ -338,6 +338,7 @@ int mysendfile(struct web_client *w, char *filename)
 	else if(strstr(filename, ".svg")  != NULL)  w->response.data->contenttype = CT_IMAGE_SVG_XML;
 	else if(strstr(filename, ".ttf")  != NULL)  w->response.data->contenttype = CT_APPLICATION_X_FONT_TRUETYPE;
 	else if(strstr(filename, ".otf")  != NULL)  w->response.data->contenttype = CT_APPLICATION_X_FONT_OPENTYPE;
+	else if(strstr(filename, ".woff2")!= NULL)  w->response.data->contenttype = CT_APPLICATION_FONT_WOFF2;
 	else if(strstr(filename, ".woff") != NULL)  w->response.data->contenttype = CT_APPLICATION_FONT_WOFF;
 	else if(strstr(filename, ".eot")  != NULL)  w->response.data->contenttype = CT_APPLICATION_VND_MS_FONTOBJ;
 	else w->response.data->contenttype = CT_APPLICATION_OCTET_STREAM;
@@ -1226,6 +1227,10 @@ void web_client_process(struct web_client *w) {
 
 		case CT_APPLICATION_FONT_WOFF:
 			content_type_string = "application/font-woff";
+			break;
+
+		case CT_APPLICATION_FONT_WOFF2:
+			content_type_string = "application/font-woff2";
 			break;
 
 		case CT_APPLICATION_VND_MS_FONTOBJ:
