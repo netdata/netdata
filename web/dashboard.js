@@ -233,102 +233,137 @@
 	// ----------------------------------------------------------------------------------------------------------------
 	// local storage options
 
-	NETDATA.objectToLocalStorage = function(obj, prefix) {
+	NETDATA.localStorage = {
+		default: {},
+		current: {},
+		callback: {} // only used for resetting back to defaults
+	};
+
+	NETDATA.localStorageGet = function(key, def, callback) {
+		var ret = def;
+
+		if(typeof NETDATA.localStorage.default[key.toString()] === 'undefined') {
+			NETDATA.localStorage.default[key.toString()] = def;
+			NETDATA.localStorage.callback[key.toString()] = callback;
+		}
+
 		if(typeof Storage !== "undefined" && typeof localStorage === 'object') {
-			for(var i in obj) {
-				if(typeof obj[i] === 'object') {
-					//console.log('object ' + prefix + '.' + i.toString());
-					NETDATA.objectToLocalStorage(obj[i], prefix + '.' + i.toString());
-					continue;
+			try {
+				// console.log('localStorage: loading "' + key.toString() + '"');
+				ret = localStorage.getItem(key.toString());
+				if(ret === null || ret === 'undefined') {
+					// console.log('localStorage: cannot load it, saving "' + key.toString() + '" with value "' + JSON.stringify(def) + '"');
+					localStorage.setItem(key.toString(), JSON.stringify(def));
+					ret = def;
 				}
-
-				var value = localStorage.getItem(prefix + '.' + i.toString());
-				if(value === null) {
-					switch(typeof obj[i]) {
-						case 'boolean':
-						case 'number':
-							//console.log('write ' + prefix + '.' + i.toString() + ' = ' + obj[i].toString());
-							localStorage.setItem(prefix + '.' + i.toString(), obj[i].toString())
-							break;
-					}
-					continue;
-				}
-
-				switch(typeof obj[i]) {
-					case 'boolean':
-						if(value === 'true' || value === 'false') {
-							obj[i] = (value === 'false')?false:true;
-							//console.log('read ' + prefix + '.' + i.toString() + ' = ' + obj[i].toString());
-						}
-						//else console.log('ignoring ' + i.toString());
-						break;
-
-					case 'number':
-						var n = parseFloat(value);
-						if(isNaN(n) === false) {
-							obj[i] = n;
-							// console.log('read ' + prefix + '.' + i.toString() + ' = ' + obj[i].toString());
-						}
-						// else console.log('ignoring ' + i.toString());
-						break;
+				else {
+					// console.log('localStorage: got "' + key.toString() + '" with value "' + ret + '"');
+					ret = JSON.parse(ret);
+					// console.log('localStorage: loaded "' + key.toString() + '" as value ' + ret + ' of type ' + typeof(ret));
 				}
 			}
+			catch(error) {
+				console.log('localStorage: failed to read "' + key.toString() + '", using default: "' + def.toString() + '"');
+				ret = def;
+			}
+		}
+
+		if(typeof ret === 'undefined' || ret === 'undefined') {
+			console.log('localStorage: LOADED UNDEFINED "' + key.toString() + '" as value ' + ret + ' of type ' + typeof(ret));
+			ret = def;
+		}
+
+		NETDATA.localStorage.current[key.toString()] = ret;
+		return ret;
+	}
+
+	NETDATA.localStorageSet = function(key, value, callback) {
+		if(typeof value === 'undefined' || value === 'undefined') {
+			console.log('localStorage: ATTEMPT TO SET UNDEFINED "' + key.toString() + '" as value ' + value + ' of type ' + typeof(value));
+		}
+		
+		if(typeof NETDATA.localStorage.default[key.toString()] === 'undefined') {
+			NETDATA.localStorage.default[key.toString()] = value;
+			NETDATA.localStorage.current[key.toString()] = value;
+			NETDATA.localStorage.callback[key.toString()] = callback;
+		}
+
+		if(typeof Storage !== "undefined" && typeof localStorage === 'object') {
+			// console.log('localStorage: saving "' + key.toString() + '" with value "' + JSON.stringify(value) + '"');
+			try {
+				localStorage.setItem(key.toString(), JSON.stringify(value));
+			}
+			catch(e) {
+				console.log('localStorage: failed to save "' + key.toString() + '" with value: "' + value.toString() + '"');
+			}
+		}
+
+		NETDATA.localStorage.current[key.toString()] = value;
+		return value;
+	}
+
+	NETDATA.localStorageGetRecursive = function(obj, prefix, callback) {
+		for(var i in obj) {
+			if(typeof obj[i] === 'object') {
+				//console.log('object ' + prefix + '.' + i.toString());
+				NETDATA.localStorageGetRecursive(obj[i], prefix + '.' + i.toString(), callback);
+				continue;
+			}
+
+			obj[i] = NETDATA.localStorageGet(prefix + '.' + i.toString(), obj[i], callback);
 		}
 	}
 
 	NETDATA.setOption = function(key, value) {
-		var ret = false;
+		if(key.toString() === 'setOptionCallback') {
+			if(typeof NETDATA.options.current.setOptionCallback === 'function') {
+				NETDATA.options.current[key.toString()] = value;
+				NETDATA.options.current.setOptionCallback();
+			}
+		}
+		else if(NETDATA.options.current[key.toString()] !== value) {
+			var name = 'options.' + key.toString();
 
-		switch(typeof NETDATA.options.current[key]) {
-			case 'boolean':
-				if(value) NETDATA.options.current[key] = true;
-				else NETDATA.options.current[key] = false;
-				localStorage.setItem('options.' + key.toString(), NETDATA.options.current[key].toString());
-				ret = true;
-				break;
+			if(typeof NETDATA.localStorage.default[name.toString()] === 'undefined')
+				console.log('localStorage: setOption() on unsaved option: "' + name.toString() + '", value: ' + value);
 
-			case 'number':
-				if(typeof value === 'number') {
-					NETDATA.options.current[key] = value;
-					localStorage.setItem('options.' + key.toString(), NETDATA.options.current[key].toString());
-					ret = true;
-				}
-				//else
-				//	console.log('invalid number given for option key ' + key.toString);
-				break;
+			//console.log(NETDATA.localStorage);
+			//console.log('setOption: setting "' + key.toString() + '" to "' + value + '" of type ' + typeof(value) + ' original type ' + typeof(NETDATA.options.current[key.toString()]));
+			//console.log(NETDATA.options);
+			NETDATA.options.current[key.toString()] = NETDATA.localStorageSet(name.toString(), value, null);
 
-			case 'function':
-				if(typeof value === 'function') {
-					NETDATA.options.current[key] = value;
-					ret = true;
-				}
-				//else
-				//	console.log('invalid function given for option key ' + key.toString);
-				break;
-
-			default:
-				// console.log('cannot find option key ' + key.toString());
-				break;
+			if(typeof NETDATA.options.current.setOptionCallback === 'function')
+				NETDATA.options.current.setOptionCallback();
 		}
 
-		if(ret === true)
-			NETDATA.options.current.setOptionCallback();
-
-		return ret;
+		return true;
 	}
 
 	NETDATA.getOption = function(key) {
-		return NETDATA.options.current[key];
+		return NETDATA.options.current[key.toString()];
 	}
 
-	NETDATA.resetOptions = function() {
-		// console.log('will reset all');
-		for(var i in NETDATA.options.defaults) {
-			if(i.toString() === 'setOptionCallback') continue;
+	// read settings from local storage
+	NETDATA.localStorageGetRecursive(NETDATA.options.current, 'options', null);
 
-			if(NETDATA.options.current[i] !== NETDATA.options.defaults[i]) {
-				// console.log('reseting ' + i.toString() + ' to ' + NETDATA.options.defaults[i].toString());
-				NETDATA.setOption(i, NETDATA.options.defaults[i]);
+	// always start with this option enabled.
+	NETDATA.setOption('stop_updates_when_focus_is_lost', true);
+
+	NETDATA.resetOptions = function() {
+		for(var i in NETDATA.localStorage.default) {
+			var a = i.split('.');
+
+			if(a[0] === 'options') {
+				if(a[1] === 'options.setOptionCallback') continue;
+				if(typeof NETDATA.localStorage.default[i] === 'undefined') continue;
+				if(NETDATA.options.current[i] === NETDATA.localStorage.default[i]) continue;
+
+				NETDATA.setOption(a[1], NETDATA.localStorage.default[i]);
+			}
+			else if(a[0] === 'chart_heights') {
+				if(typeof NETDATA.localStorage.callback[i] === 'function' && typeof NETDATA.localStorage.default[i] !== 'undefined') {
+					NETDATA.localStorage.callback[i](NETDATA.localStorage.default[i]);
+				}
 			}
 		}
 	}
@@ -744,17 +779,37 @@
 	// ----------------------------------------------------------------------------------------------------------------
 	// Our state object, where all per-chart values are stored
 
+	resizeCallback = function(state) {
+		this.state = state;
+		this.resize = function(height) {
+			this.state
+		}
+	}
+
 	chartState = function(element) {
 		var self = $(element);
 
+		// GUID - a unique identifier for the chart
+		this.uuid = NETDATA.guid();
+
+		// string - the name of chart
+		this.id = self.data('netdata');
+
+		// string - the key for localStorage settings
+		this.settings_id = self.data('id') || null;
+
+		// the user given dimensions of the element
+		this.width = self.data('width') || NETDATA.chartDefaults.width;
+		this.height = self.data('height') || NETDATA.chartDefaults.height;
+
+		if(this.settings_id !== null) {
+			var me = this;
+			this.height = NETDATA.localStorageGet('chart_heights.' + this.settings_id, this.height, function(height) {
+				me.resizeAndRedrawChart(height);
+			});
+		}
+
 		$.extend(this, {
-			uuid: NETDATA.guid(),	// GUID - a unique identifier for the chart
-			id: self.data('netdata'),	// string - the name of chart
-
-			// the user given dimensions of the element
-			width: self.data('width') || NETDATA.chartDefaults.width,
-			height: self.data('height') || NETDATA.chartDefaults.height,
-
 			// string - the netdata server URL, without any path
 			host: self.data('host') || NETDATA.chartDefaults.host,
 
@@ -883,6 +938,30 @@
 	// ----------------------------------------------------------------------------------------------------------------
 	// Chart Resize
 
+	// this is actual chart resize algorithm
+	// it will:
+	// - resize the entire container
+	// - update the internal states
+	// - resize the chart as the div changes height
+	// - update the scrollbar of the legend
+	chartState.prototype.resizeAndRedrawChart = function(h) {
+		this.element.style.height = h;
+
+		if(this.settings_id !== null)
+			NETDATA.localStorageSet('chart_heights.' + this.settings_id, h);
+
+		var now = new Date().getTime();
+		NETDATA.options.last_page_scroll = now;
+		NETDATA.options.last_resized = now;
+		NETDATA.options.auto_refresher_stop_until = now + NETDATA.options.current.stop_updates_while_resizing;
+
+		if(typeof this.library.resize === 'function' && this.element_chart !== null)
+			this.library.resize(this);
+
+		if(this.element_legend_childs.nano !== null && this.element_legend_childs.nano_options !== null)
+			$(this.element_legend_childs.nano).nanoScroller();
+	};
+
 	chartState.prototype.resizeHandler = function(e) {
 		e.preventDefault();
 
@@ -909,27 +988,6 @@
 		this.event_resize.chart_last_w = this.element.clientWidth;
 		this.event_resize.chart_last_h = this.element.clientHeight;
 
-		// this is actual chart resize algorithm
-		// it will:
-		// - resize the entire container
-		// - update the internal states
-		// - resize the chart as the div changes height
-		// - update the scrollbar of the legend
-		var resize_height_and_update_chart = function(state, h) {
-			state.element.style.height = h.toString() + 'px';
-
-			var now = new Date().getTime();
-			NETDATA.options.last_page_scroll = now;
-			NETDATA.options.last_resized = now;
-			NETDATA.options.auto_refresher_stop_until = now + NETDATA.options.current.stop_updates_while_resizing;
-
-			if(typeof state.library.resize === 'function')
-				state.library.resize(state);
-
-			if(state.element_legend_childs.nano !== null && state.element_legend_childs.nano_options !== null)
-				$(state.element_legend_childs.nano).nanoScroller();
-		};
-
 		var now = new Date().getTime();
 		if(now - this.event_resize.last <= NETDATA.options.current.double_click_speed) {
 			// double click / double tap event
@@ -942,12 +1000,12 @@
 
 			// if we are not optimal, be optimal
 			if(this.event_resize.chart_last_h != optimal)
-				resize_height_and_update_chart(this, optimal);
+				this.resizeAndRedrawChart(optimal.toString() + 'px');
 
 			// else if we do not have the original height
 			// reset to the original height
 			else if(this.event_resize.chart_last_h != this.event_resize.chart_original_h)
-				resize_height_and_update_chart(this, this.event_resize.chart_original_h);
+				this.resizeAndRedrawChart(this.event_resize.chart_original_h.toString() + 'px');
 		}
 		else {
 			this.event_resize.last = now;
@@ -970,7 +1028,7 @@
 						var	newH = self.event_resize.chart_start_h + y - self.event_resize.mouse_start_y;
 
 						if(newH >= 70 && newH !== self.event_resize.chart_last_h) {
-							resize_height_and_update_chart(self, newH);
+							self.resizeAndRedrawChart(newH.toString() + 'px');
 							self.event_resize.chart_last_h = newH;
 						}
 					}
@@ -4126,15 +4184,6 @@
 
 	NETDATA._loadjQuery(function() {
 		NETDATA.loadRequiredJs(0, function() {
-			// keep a copy of the default settings
-			NETDATA.options.defaults = $.extend({}, NETDATA.options.current);
-
-			// read settings from local storage
-			NETDATA.objectToLocalStorage(NETDATA.options.current, 'options');
-
-			// always start with this option enabled.
-			NETDATA.setOption('stop_updates_when_focus_is_lost', true);
-
 			if(typeof netdataDontStart === 'undefined' || !netdataDontStart) {
 				if(NETDATA.options.debug.main_loop === true)
 					console.log('starting chart refresh thread');

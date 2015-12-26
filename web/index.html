@@ -421,7 +421,7 @@
 							<center>
 								<small style="color: #BBBBBB;">Settings take effect immediately and are saved permanently to browser local storage (except the refresh on focus / always option).
 								<br/>
-								To reset all options to their defaults, click <a href="#" onclick="NETDATA.resetOptions(); return false;">here</a>.</small>
+								To reset all options (including charts sizes) to their defaults, click <a href="#" onclick="NETDATA.resetOptions(); return false;">here</a>.</small>
 							</center>
 
 							<table>
@@ -861,6 +861,7 @@ function prepareScreen(data) {
 						+ ' data-before="0"'
 						+ ' data-after="-' + duration.toString() + '"'
 						+ ' data-colors="' + c + '"'
+						+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
 						+ ' role="application"></div>';
 				});
 				html += '</div>'; // netdata-group-container
@@ -893,6 +894,7 @@ function prepareScreen(data) {
 						+ ' data-before="0"'
 						+ ' data-after="-' + duration.toString() + '"'
 						+ ' data-colors="' + c + '"'
+						+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
 						+ ' role="application"></div>';
 				});
 				html += '</div>'; // netdata-group-container
@@ -922,6 +924,7 @@ function prepareScreen(data) {
 						+ ' data-before="0"'
 						+ ' data-after="-' + duration.toString() + '"'
 						+ ' data-colors="' + c + '"'
+						+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
 						+ ' role="application"></div>';
 				});
 				html += '</div>'; // netdata-group-container
@@ -946,16 +949,18 @@ function prepareScreen(data) {
 					+ ' data-before="0"'
 					+ ' data-after="-' + duration.toString() + '"'
 					+ ' data-colors="' + c + '"'
+					+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
 					+ ' role="application"></div>';
 			});
 		}
 		else {
-			$.each(t.charts, function(x, c) {
-				html += getMessage(c.id) + '<div data-netdata="' + c.id + '"'
+			$.each(t.charts, function(x, f) {
+				html += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
 					+ ' data-width="' + pcent_width.toString() + '%"'
 					+ ' data-height="' + options.chartsHeight.toString() + 'px"'
 					+ ' data-before="0"'
 					+ ' data-after="-' + duration.toString() + '"'
+					+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
 					+ ' role="application"></div>';
 			});
 		}
