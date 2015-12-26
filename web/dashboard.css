@@ -19,6 +19,22 @@ html {
 	/* width and height is given per chart with data-width and data-height */
 }
 
+.netdata-container-with-legend {
+	display: -webkit-flex; /* Safari */
+	-webkit-flex-wrap: wrap; /* Safari 6.1+ */
+	display: inline-block;
+	flex-wrap: wrap;
+	overflow: hidden;
+
+	/* fix minimum scrollbar issue in firefox */
+	min-height: 99px;
+
+	/* required for child elements to have absolute position */
+	position: relative;
+	
+	/* width and height is given per chart with data-width and data-height */
+}
+
 .netdata-legend-resize-handler {
 	display: block;
 	position: absolute;
@@ -74,7 +90,7 @@ html {
 	text-overflow: ellipsis;
 	line-height: 14px;
 	display: block;
-	width: 120px;				/* --legend-width */
+	width: 140px;				/* --legend-width */
 	height: calc(100% - 15px);	/* 10px for the resize handler and 5px for the top margin */
 	font-size: 10px;
 	margin-top: 5px;
@@ -102,7 +118,7 @@ html {
 }
 .netdata-legend-series {
 	position: absolute;
-	width: 120px;				/* --legend-width */
+	width: 140px;				/* --legend-width */
 	height: calc(100% - 50px);
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -250,8 +266,8 @@ html {
 	left: 0;				/* within .netdata-container */
 	display: block;
 	overflow: hidden;
-	margin-right: 120px;		/* --legend-width */
-	width: calc(100% - 120px);	/* --legend-width */
+	margin-right: 140px;		/* --legend-width */
+	width: calc(100% - 140px);	/* --legend-width */
 	height: 100%;
 	flex-grow: 1;
 

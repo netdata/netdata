@@ -945,6 +945,7 @@
 	// - resize the chart as the div changes height
 	// - update the scrollbar of the legend
 	chartState.prototype.resizeAndRedrawChart = function(h) {
+		// console.log(h);
 		this.element.style.height = h;
 
 		if(this.settings_id !== null)
@@ -1392,14 +1393,29 @@
 		if(typeof series === 'undefined') return;
 		if(series.value === null && series.user === null) return;
 
-		value = this.legendFormatValue(value);
-
 		// if the value has not changed, skip DOM update
-		if(series.last === value) return;
-		series.last = value;
+		//if(series.last === value) return;
 
-		if(series.value !== null) series.value.innerHTML = value;
-		if(series.user !== null) series.user.innerHTML = value;
+		var s, r;
+		if(typeof value === 'number') {
+			var v = Math.abs(value);
+			s = r = this.legendFormatValue(value);
+
+			if(typeof series.last === 'number') {
+				if(v > series.last) s += '<i class="fa fa-angle-up" style="width: 8px; text-align: center; overflow: hidden; vertical-align: middle;"></i>';
+				else if(v < series.last) s += '<i class="fa fa-angle-down" style="width: 8px; text-align: center; overflow: hidden; vertical-align: middle;"></i>';
+				else s += '<i class="fa fa-angle-left" style="width: 8px; text-align: center; overflow: hidden; vertical-align: middle;"></i>';
+			}
+			else s += '<i class="fa fa-angle-right" style="width: 8px; text-align: center; overflow: hidden; vertical-align: middle;"></i>';
+			series.last = v;
+		}
+		else {
+			s = r = value;
+			series.last = value;
+		}
+
+		if(series.value !== null) series.value.innerHTML = s;
+		if(series.user !== null) series.user.innerHTML = r;
 	}
 
 	chartState.prototype.legendSetDate = function(ms) {
@@ -1456,10 +1472,12 @@
 		if(Math.abs(this.data.last_entry - this.data.before) <= this.data.view_update_every)
 			show_undefined = false;
 
-		if(show_undefined)
+		if(show_undefined) {
 			this.legendShowUndefined();
-		else
-			this.legendSetDate(this.data.before * 1000);
+			return;
+		}
+
+		this.legendSetDate(this.data.before * 1000);
 
 		var labels = this.data.dimension_names;
 		var i = labels.length;
@@ -1565,10 +1583,10 @@
 				if(this.debug === true)
 					this.log('chart in running... updating values on legend...');
 
-				var labels = this.data.dimension_names;
-				var i = labels.length;
-				while(i--)
-					this.legendSetLabelValue(labels[i], this.data.latest_values[i]);
+				//var labels = this.data.dimension_names;
+				//var i = labels.length;
+				//while(i--)
+				//	this.legendSetLabelValue(labels[i], this.data.latest_values[i]);
 			}
 			return;
 		}
@@ -1647,7 +1665,8 @@
 					flashedClass: '__flashed',
 					activeClass: '__active',
 					tabIndex: -1,
-					alwaysVisible: true
+					alwaysVisible: true,
+					sliderMinHeight: 10
 				},
 				series: {}
 			};
@@ -1787,7 +1806,7 @@
 	}
 
 	chartState.prototype.legendWidth = function() {
-		return (this.hasLegend())?110:0;
+		return (this.hasLegend())?140:0;
 	}
 
 	chartState.prototype.legendHeight = function() {
@@ -1989,7 +2008,7 @@
 				}
 			}
 		}
-		this.legendShowLatestValues();
+		// this.legendShowLatestValues();
 
 		// update the performance counters
 		var now = new Date().getTime();
@@ -2415,7 +2434,10 @@
 	// resize the chart to its real dimensions
 	// as given by the caller
 	chartState.prototype.sizeChart = function() {
-		this.element.className += " netdata-container";
+		if(this.hasLegend() === true)
+			this.element.className += " netdata-container-with-legend";
+		else
+			this.element.className += " netdata-container";
 
 		if(this.debug === true)
 			this.log('sizing element');
@@ -2472,8 +2494,6 @@
 		if(this.debug === null)
 			this.log('created');
 
-		this.sizeChart();
-
 		// make sure the host does not end with /
 		// all netdata API requests use absolute paths
 		while(this.host.slice(-1) === '/')
@@ -2492,6 +2512,8 @@
 		}
 		else
 			this.library = NETDATA.chartLibraries[this.library_name];
+
+		this.sizeChart();
 
 		// if we need to report the rendering speed
 		// find the element that needs to be updated
@@ -3164,7 +3186,7 @@
 		if(NETDATA.dygraph.smooth === false)
 			smooth = false;
 
-		var strokeWidth = (chart_type === 'stacked')?0.0:((smooth)?1.5:1.0)
+		var strokeWidth = (chart_type === 'stacked')?0.1:((smooth)?1.5:0.7)
 		var highlightCircleSize = (NETDATA.chartLibraries.dygraph.isSparkline(state))?3:4;
 
 		state.dygraph_options = {
@@ -3181,7 +3203,7 @@
 			legend: self.data('dygraph-legend') || 'always', // 'onmouseover',
 			labels: data.result.labels,
 			labelsDiv: self.data('dygraph-labelsdiv') || state.element_legend_childs.hidden,
-			labelsDivStyles: self.data('dygraph-labelsdivstyles') || { 'fontSize':'10px', 'zIndex': 10000 },
+			labelsDivStyles: self.data('dygraph-labelsdivstyles') || { 'fontSize':'1px' },
 			labelsDivWidth: self.data('dygraph-labelsdivwidth') || state.chartWidth() - 70,
 			labelsSeparateLines: self.data('dygraph-labelsseparatelines') || true,
 			labelsShowZeroValues: self.data('dygraph-labelsshowzerovalues') || true,
@@ -3217,8 +3239,8 @@
 			strokeBorderColor: self.data('dygraph-strokebordercolor') || 'white',
 			strokeBorderWidth: self.data('dygraph-strokeborderwidth') || (chart_type === 'stacked')?0.0:0.0,
 
-			fillGraph: self.data('dygraph-fillgraph') || (chart_type === 'area')?true:false,
-			fillAlpha: self.data('dygraph-fillalpha') || (chart_type === 'stacked')?0.8:0.2,
+			fillGraph: self.data('dygraph-fillgraph') || (chart_type === 'area' || chart_type === 'stacked')?true:false,
+			fillAlpha: self.data('dygraph-fillalpha') || (chart_type === 'stacked')?NETDATA.options.current.color_fill_opacity_stacked:NETDATA.options.current.color_fill_opacity_area,
 			stackedGraph: self.data('dygraph-stackedgraph') || (chart_type === 'stacked')?true:false,
 			stackedGraphNaNFill: self.data('dygraph-stackedgraphnanfill') || 'none',
 			
@@ -3278,7 +3300,7 @@
 				if(elements.hidden === null) return;
 
 				if (typeof data.x === 'undefined') {
-					state.legendReset();
+					//state.legendReset();
 				}
 				else {
 					state.legendSetDate(data.x);
@@ -3788,6 +3810,8 @@
 		var datatable = new google.visualization.DataTable(data.result);
 
 		state.google_options = {
+			colors: state.chartColors(),
+
 			// do not set width, height - the chart resizes itself
 			//width: state.chartWidth(),
 			//height: state.chartHeight(),
@@ -3850,12 +3874,13 @@
 		switch(state.chart.chart_type) {
 			case "area":
 				state.google_options.vAxis.viewWindowMode = 'maximized';
+				state.google_options.areaOpacity = NETDATA.options.current.color_fill_opacity_area;
 				state.google_instance = new google.visualization.AreaChart(state.element_chart);
 				break;
 
 			case "stacked":
 				state.google_options.isStacked = true;
-				state.google_options.areaOpacity = 0.85;
+				state.google_options.areaOpacity = NETDATA.options.current.color_fill_opacity_stacked;
 				state.google_options.vAxis.viewWindowMode = 'maximized';
 				state.google_options.vAxis.minValue = null;
 				state.google_options.vAxis.maxValue = null;
@@ -3978,6 +4003,7 @@
 			initialize: NETDATA.sparklineInitialize,
 			create: NETDATA.sparklineChartCreate,
 			update: NETDATA.sparklineChartUpdate,
+			resize: null,
 			setSelection: function(t) { return true; },
 			clearSelection: function() { return true; },
 			initialized: false,
@@ -3994,6 +4020,7 @@
 			initialize: NETDATA.peityInitialize,
 			create: NETDATA.peityChartCreate,
 			update: NETDATA.peityChartUpdate,
+			resize: null,
 			setSelection: function(t) { return true; },
 			clearSelection: function() { return true; },
 			initialized: false,
@@ -4010,6 +4037,7 @@
 			initialize: NETDATA.morrisInitialize,
 			create: NETDATA.morrisChartCreate,
 			update: NETDATA.morrisChartUpdate,
+			resize: null,
 			setSelection: function(t) { return true; },
 			clearSelection: function() { return true; },
 			initialized: false,
@@ -4026,6 +4054,7 @@
 			initialize: NETDATA.googleInitialize,
 			create: NETDATA.googleChartCreate,
 			update: NETDATA.googleChartUpdate,
+			resize: null,
 			setSelection: function(t) { return true; },
 			clearSelection: function() { return true; },
 			initialized: false,
@@ -4042,6 +4071,7 @@
 			initialize: NETDATA.raphaelInitialize,
 			create: NETDATA.raphaelChartCreate,
 			update: NETDATA.raphaelChartUpdate,
+			resize: null,
 			setSelection: function(t) { return true; },
 			clearSelection: function() { return true; },
 			initialized: false,
@@ -4058,6 +4088,7 @@
 			initialize: NETDATA.easypiechartInitialize,
 			create: NETDATA.easypiechartChartCreate,
 			update: NETDATA.easypiechartChartUpdate,
+			resize: null,
 			setSelection: function(t) { return true; },
 			clearSelection: function() { return true; },
 			initialized: false,
