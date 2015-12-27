@@ -655,7 +655,7 @@ function prepareScreen(data) {
 			c.category = c.type.split('.')[0];
 
 			var tmp = c.category.split('_')[0];
-			if(tmp === 'net' || tmp === 'disk')
+			if(tmp === 'net' || tmp === 'disk' || tmp === 'ap')
 				c.category = tmp;
 
 			switch(c.category) {
@@ -679,6 +679,12 @@ function prepareScreen(data) {
 				case 'net':
 					c.category_priority = 30;
 					c.category_title = 'Network Interfaces';
+					c.glyphicon = "glyphicon-transfer";
+					break;
+
+				case 'ap':
+					c.category_priority = 35;
+					c.category_title = 'Access Points';
 					c.glyphicon = "glyphicon-transfer";
 					break;
 
@@ -868,7 +874,7 @@ function prepareScreen(data) {
 			});
 			sidebar += '</ul>';
 		}
-		else if(t.name === 'net' || t.name === 'tc') {
+		else if(t.name === 'net' || t.name === 'tc' || t.name === 'ap') {
 			var interfaces = uniq_with_list(t.charts, function(c) { return c.family; });
 
 			sidebar += '<ul class="nav">';
@@ -884,8 +890,10 @@ function prepareScreen(data) {
 					var c = null;
 					var h = options.chartsHeight / 2;
 					switch(f.type) {
-						case 'net'        : h = options.chartsHeight; break;
-						case 'tc'         : h = options.chartsHeight; break;
+						case 'net'         : h = options.chartsHeight; break;
+						case 'tc'          : h = options.chartsHeight; break;
+						case 'ap_bandwidth': h = options.chartsHeight; break;
+						case 'ap_bitrate'  : h = options.chartsHeight; break;
 					}
 
 					html += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
