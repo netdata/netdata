@@ -72,9 +72,9 @@ CHART ap_signal.${dev} '' "Average Signal for ${ssid} on ${dev}" "dBm" ${dev} ${
 DIMENSION signal 'average signal' absolute 1 1
 
 CHART ap_bitrate.${dev} '' "Bitrate for ${ssid} on ${dev}" "Mbps" ${dev} ${dev} line 15005 $ap_update_every
-DIMENSION receive '' absolute 1 1024
-DIMENSION transmit '' absolute -1 1024
-DIMENSION expected 'expected throughput' absolute 1 1024
+DIMENSION receive '' absolute 1 1000
+DIMENSION transmit '' absolute -1 1000
+DIMENSION expected 'expected throughput' absolute 1 1000
 EOF
 
 	done
