@@ -27,7 +27,6 @@ int access_log_syslog = 1;
 int error_log_syslog = 1;
 int output_log_syslog = 1;	// debug log
 
-
 void log_date(FILE *out)
 {
 		char outstr[200];

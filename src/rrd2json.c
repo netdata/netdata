@@ -2,9 +2,9 @@
 #include <config.h>
 #endif
 #include <pthread.h>
-#include <sys/time.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "log.h"
 #include "common.h"
@@ -270,8 +270,8 @@ typedef struct rrdresult {
 	RRDSET *st;			// the chart this result refers to
 
 	int d;					// the number of dimensions
-	int n;					// the number of values in the arrays
-	int rows;			// the number of rows used
+	long n;					// the number of values in the arrays
+	long rows;			    // the number of rows used
 
 	uint8_t *od;			// the options for the dimensions
 
@@ -279,10 +279,10 @@ typedef struct rrdresult {
 	calculated_number *v;	// array n x d values
 	uint8_t *o;				// array n x d options
 
-	int c;					// current line ( -1 ~ n ), ( -1 = none, use rrdr_rows() to get number of rows )
+	long c;					// current line ( -1 ~ n ), ( -1 = none, use rrdr_rows() to get number of rows )
 
-	int group;				// how many collected values were grouped for each row
-	int update_every;		// what is the suggested update frequency in seconds
+	long group;				// how many collected values were grouped for each row
+	long update_every;		// what is the suggested update frequency in seconds
 
 	calculated_number min;
 	calculated_number max;
@@ -449,7 +449,7 @@ uint32_t rrdr_check_options(RRDR *r, uint32_t options)
 
 void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t options, int string_value)
 {
-	int rows = rrdr_rows(r);
+	long rows = rrdr_rows(r);
 	long c, i;
 	RRDDIM *rd;
 
@@ -629,7 +629,7 @@ void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb, uint32_t format, uint32_t option
 static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 {
 	//info("RRD2JSON(): %s: BEGIN", r->st->id);
-	int row_annotations = 0, dates = JSON_DATES_JS, dates_with_new = 0;
+	int row_annotations = 0, dates, dates_with_new = 0;
 	char kq[2] = "",					// key quote
 		sq[2] = "",						// string quote
 		pre_label[101] = "",			// before each label
@@ -1051,7 +1051,7 @@ inline void rrdr_done(RRDR *r)
 	r->c = 0;
 }
 
-static RRDR *rrdr_create(RRDSET *st, int n)
+static RRDR *rrdr_create(RRDSET *st, long n)
 {
 	if(unlikely(!st)) {
 		error("NULL value given!");
@@ -1546,7 +1546,7 @@ int rrd2format(RRDSET *st, BUFFER *wb, BUFFER *dimensions, uint32_t format, long
 	return 200;
 }
 
-unsigned long rrd_stats_json(int type, RRDSET *st, BUFFER *wb, int points, int group, int group_method, time_t after, time_t before, int only_non_zero)
+time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group, int group_method, time_t after, time_t before, int only_non_zero)
 {
 	int c;
 	pthread_rwlock_rdlock(&st->rwlock);

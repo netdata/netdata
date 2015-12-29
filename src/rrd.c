@@ -437,7 +437,8 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 	st->last_collected_time.tv_usec = 0;
 	st->counter_done = 0;
 
-	st->gap_when_lost_iterations_above = config_get_number(st->id, "gap when lost iterations above", RRD_DEFAULT_GAP_INTERPOLATIONS) + 2;
+	st->gap_when_lost_iterations_above = (int) (
+			config_get_number(st->id, "gap when lost iterations above", RRD_DEFAULT_GAP_INTERPOLATIONS) + 2);
 
 	avl_init(&st->dimensions_index, rrddim_compare);
 
@@ -598,7 +599,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
 {
 	debug(D_RRD_CALLS, "rrddim_free() %s.%s", st->name, rd->name);
 
-	RRDDIM *i = st->dimensions, *last = NULL;
+	RRDDIM *i, *last = NULL;
 	for(i = st->dimensions; i && i != rd ; i = i->next) last = i;
 
 	if(!i) {
@@ -606,8 +607,9 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
 		return;
 	}
 
-	if(last) last = i->next;
-	else st->dimensions = i->next;
+	if(last) last->next = rd->next;
+	else st->dimensions = rd->next;
+	rd->next = NULL;
 
 	rrddim_index_del(st, rd);
 
@@ -709,8 +711,8 @@ RRDSET *rrdset_find_bytype(const char *type, const char *id)
 	strncpy(buf, type, RRD_ID_LENGTH_MAX - 1);
 	buf[RRD_ID_LENGTH_MAX - 1] = '\0';
 	strcat(buf, ".");
-	int len = strlen(buf);
-	strncpy(&buf[len], id, RRD_ID_LENGTH_MAX - len);
+	int len = (int) strlen(buf);
+	strncpy(&buf[len], id, (size_t) (RRD_ID_LENGTH_MAX - len));
 	buf[RRD_ID_LENGTH_MAX] = '\0';
 
 	return(rrdset_find(buf));
@@ -850,8 +852,8 @@ unsigned long long rrdset_done(RRDSET *st)
 		// it is not the first entry
 		// calculate the proper last_collected_time, using usec_since_last_update
 		unsigned long long ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec + st->usec_since_last_update;
-		st->last_collected_time.tv_sec = ut / 1000000ULL;
-		st->last_collected_time.tv_usec = ut % 1000000ULL;
+		st->last_collected_time.tv_sec = (__time_t) (ut / 1000000ULL);
+		st->last_collected_time.tv_usec = (__suseconds_t) (ut % 1000000ULL);
 	}
 
 	// if this set has not been updated in the past
@@ -860,8 +862,8 @@ unsigned long long rrdset_done(RRDSET *st)
 		// it has never been updated before
 		// set a fake last_updated, in the past using usec_since_last_update
 		unsigned long long ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec - st->usec_since_last_update;
-		st->last_updated.tv_sec = ut / 1000000ULL;
-		st->last_updated.tv_usec = ut % 1000000ULL;
+		st->last_updated.tv_sec = (__time_t) (ut / 1000000ULL);
+		st->last_updated.tv_usec = (__suseconds_t) (ut % 1000000ULL);
 
 		// the first entry should not be stored
 		store_this_entry = 0;
@@ -879,8 +881,8 @@ unsigned long long rrdset_done(RRDSET *st)
 		gettimeofday(&st->last_collected_time, NULL);
 
 		unsigned long long ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec - st->usec_since_last_update;
-		st->last_updated.tv_sec = ut / 1000000ULL;
-		st->last_updated.tv_usec = ut % 1000000ULL;
+		st->last_updated.tv_sec = (__time_t) (ut / 1000000ULL);
+		st->last_updated.tv_usec = (__suseconds_t) (ut % 1000000ULL);
 
 		// the first entry should not be stored
 		store_this_entry = 0;
@@ -1049,7 +1051,7 @@ unsigned long long rrdset_done(RRDSET *st)
 	// it is now time to interpolate values on a second boundary
 
 	unsigned long long first_ut = last_ut;
-	int iterations = (now_ut - last_ut) / (st->update_every * 1000000ULL);
+	long long iterations = (now_ut - last_ut) / (st->update_every * 1000000ULL);
 
 	for( ; likely(next_ut <= now_ut) ; next_ut += st->update_every * 1000000ULL, iterations-- ) {
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1061,7 +1063,7 @@ unsigned long long rrdset_done(RRDSET *st)
 			debug(D_RRD_STATS, "%s: next ut = %0.3Lf (next interpolation point)", st->name, (long double)next_ut/1000000.0);
 		}
 
-		st->last_updated.tv_sec = next_ut / 1000000ULL;
+		st->last_updated.tv_sec = (__time_t) (next_ut / 1000000ULL);
 		st->last_updated.tv_usec = 0;
 
 		for( rd = st->dimensions ; likely(rd) ; rd = rd->next ) {
@@ -1084,8 +1086,8 @@ unsigned long long rrdset_done(RRDSET *st)
 							, st->id, rd->name
 							, new_value
 							, rd->calculated_value
-							, (unsigned long long)(next_ut - last_ut)
-							, (unsigned long long)(now_ut - last_ut)
+							, (next_ut - last_ut)
+							, (now_ut - last_ut)
 							);
 
 					rd->calculated_value -= new_value;

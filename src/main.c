@@ -158,7 +158,7 @@ void kill_childs()
 	if(tc_child_pid) {
 		info("Killing tc-qos-helper procees");
 		if(killpid(tc_child_pid, SIGTERM) != -1)
-			waitid(P_PID, tc_child_pid, &info, WEXITED);
+			waitid(P_PID, (id_t) tc_child_pid, &info, WEXITED);
 	}
 	tc_child_pid = 0;
 
@@ -171,7 +171,7 @@ void kill_childs()
 		if(cd->pid && !cd->obsolete) {
 			debug(D_EXIT, "killing %s plugin process", cd->id);
 			if(killpid(cd->pid, SIGTERM) != -1)
-				waitid(P_PID, cd->pid, &info, WEXITED);
+				waitid(P_PID, (id_t) cd->pid, &info, WEXITED);
 		}
 	}
 
@@ -317,7 +317,6 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		silent = 0;
 		error_log_file = config_get("global", "error log", LOG_DIR "/error.log");
 		if(strcmp(error_log_file, "syslog") == 0) {
 			error_log_syslog = 1;
@@ -326,7 +325,7 @@ int main(int argc, char **argv)
 		else if(strcmp(error_log_file, "none") == 0) {
 			error_log_syslog = 0;
 			error_log_file = NULL;
-			silent = 1; // optimization - do not even generate debug log entries
+			// optimization - do not even generate debug log entries
 		}
 		else error_log_syslog = 0;
 
@@ -356,7 +355,7 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		rrd_default_history_entries = config_get_number("global", "history", RRD_DEFAULT_HISTORY_ENTRIES);
+		rrd_default_history_entries = (int) config_get_number("global", "history", RRD_DEFAULT_HISTORY_ENTRIES);
 		if(rrd_default_history_entries < 5 || rrd_default_history_entries > RRD_HISTORY_ENTRIES_MAX) {
 			fprintf(stderr, "Invalid save lines %d given. Defaulting to %d.\n", rrd_default_history_entries, RRD_DEFAULT_HISTORY_ENTRIES);
 			rrd_default_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
@@ -367,7 +366,7 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		rrd_update_every = config_get_number("global", "update every", UPDATE_EVERY);
+		rrd_update_every = (int) config_get_number("global", "update every", UPDATE_EVERY);
 		if(rrd_update_every < 1 || rrd_update_every > 600) {
 			fprintf(stderr, "Invalid update timer %d given. Defaulting to %d.\n", rrd_update_every, UPDATE_EVERY_MAX);
 			rrd_update_every = UPDATE_EVERY;
@@ -376,9 +375,9 @@ int main(int argc, char **argv)
 
 		// let the plugins know the min update_every
 		{
-			char buffer[50];
-			snprintf(buffer, 50, "%d", rrd_update_every);
-			setenv("NETDATA_UPDATE_EVERY", buffer, 1);
+			char buf[50];
+			snprintf(buf, 50, "%d", rrd_update_every);
+			setenv("NETDATA_UPDATE_EVERY", buf, 1);
 		}
 
 		// --------------------------------------------------------------------
@@ -398,9 +397,9 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		listen_backlog = config_get_number("global", "http port listen backlog", LISTEN_BACKLOG);
+		listen_backlog = (int) config_get_number("global", "http port listen backlog", LISTEN_BACKLOG);
 
-		listen_port = config_get_number("global", "port", LISTEN_PORT);
+		listen_port = (int) config_get_number("global", "port", LISTEN_PORT);
 		if(listen_port < 1 || listen_port > 65535) {
 			fprintf(stderr, "Invalid listen port %d given. Defaulting to %d.\n", listen_port, LISTEN_PORT);
 			listen_port = LISTEN_PORT;

@@ -57,7 +57,7 @@ extern void rrd_stats_graph_json(RRDSET *st, char *options, BUFFER *wb);
 
 extern void rrd_stats_all_json(BUFFER *wb);
 
-extern unsigned long rrd_stats_json(int type, RRDSET *st, BUFFER *wb, int entries_to_show, int group, int group_method, time_t after, time_t before, int only_non_zero);
+extern time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long entries_to_show, long group, int group_method, time_t after, time_t before, int only_non_zero);
 
 extern int rrd2format(RRDSET *st, BUFFER *out, BUFFER *dimensions, uint32_t format, long points, long long after, long long before, int group_method, uint32_t options, time_t *latest_timestamp);
 

@@ -40,7 +40,10 @@ static NAME_VALUE *dictionary_name_value_create(DICTIONARY *dict, const char *na
 	debug(D_DICTIONARY, "Creating name value entry for name '%s', value '%s'.", name, value);
 
 	NAME_VALUE *nv = calloc(1, sizeof(NAME_VALUE));
-	if(!nv) fatal("Cannot allocate name_value of size %z", sizeof(NAME_VALUE));
+	if(!nv) {
+		fatal("Cannot allocate name_value of size %z", sizeof(NAME_VALUE));
+		exit(1);
+	}
 
 	nv->name = strdup(name);
 	if(!nv->name) fatal("Cannot allocate name_value.name of size %z", strlen(name));
@@ -70,7 +73,10 @@ static void dictionary_name_value_destroy(DICTIONARY *dict, NAME_VALUE *nv) {
 	else {
 		NAME_VALUE *n = dict->values;
 		while(n && n->next && n->next != nv) nv = nv->next;
-		if(!n || n->next != nv) fatal("Cannot find name_value with name '%s' in dictionary.", nv->name);
+		if(!n || n->next != nv) {
+			fatal("Cannot find name_value with name '%s' in dictionary.", nv->name);
+			exit(1);
+		}
 		n->next = nv->next;
 		nv->next = NULL;
 	}
@@ -86,7 +92,10 @@ DICTIONARY *dictionary_create(void) {
 	debug(D_DICTIONARY, "Creating dictionary.");
 
 	DICTIONARY *dict = calloc(1, sizeof(DICTIONARY));
-	if(!dict) fatal("Cannot allocate DICTIONARY");
+	if(!dict) {
+		fatal("Cannot allocate DICTIONARY");
+		exit(1);
+	}
 
 	avl_init(&dict->values_index, name_value_compare);
 	pthread_rwlock_init(&dict->rwlock, NULL);
@@ -115,7 +124,10 @@ void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t val
 	if(!nv) {
 		debug(D_DICTIONARY, "Dictionary entry with name '%s' not found. Creating a new one.", name);
 		nv = dictionary_name_value_create(dict, name, value, value_len);
-		if(!nv) fatal("Cannot create name_value.");
+		if(!nv) {
+			fatal("Cannot create name_value.");
+			exit(1);
+		}
 		return nv->value;
 	}
 	else {

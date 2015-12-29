@@ -202,7 +202,7 @@ int load_config(char *filename, int overwrite_used)
 			continue;
 		}
 
-		int len = strlen(s);
+		int len = (int) strlen(s);
 		if(*s == '[' && s[len - 1] == ']') {
 			// new section
 			s[len - 1] = '\0';

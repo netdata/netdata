@@ -1,5 +1,6 @@
 #include <sys/time.h>
 #include <pthread.h>
+#include <stdint.h>
 
 #include "avl.h"
 #include "storage_number.h"

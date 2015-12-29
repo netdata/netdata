@@ -137,7 +137,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 	fflush(NULL);
 
 	// open the files before forking
-	int input_fd = -1, output_fd = -1, error_fd = -1, dev_null = -1;
+	int input_fd = -1, output_fd = -1, error_fd = -1, dev_null;
 
 	if(input && *input) {
 		if((input_fd = open(input, O_RDONLY, 0666)) == -1) {
@@ -244,7 +244,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 	// close all files
 	if(close_all_files) {
 		int i;
-		for(i = sysconf(_SC_OPEN_MAX) - 1; i > 0; i--)
+		for(i = (int) (sysconf(_SC_OPEN_MAX) - 1); i > 0; i--)
 			if(
 				((access_fd && i != *access_fd) || !access_fd)
 				&& i != dev_null
@@ -300,7 +300,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 		if(fd >= 0) {
 			char b[100];
 			sprintf(b, "%d\n", getpid());
-			int i = write(fd, b, strlen(b));
+			ssize_t i = write(fd, b, strlen(b));
 			if(i <= 0) perror("Cannot write pid to file.");
 			close(fd);
 		}

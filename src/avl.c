@@ -319,7 +319,7 @@ int avl_removeroot(avl_tree* t) {
  * returns the last value returned by iterator or 0 if there were no calls
  * Warning: a<=b must hold
  */
-int _avl_range(avl_tree* t, avl* a, avl* b, int (*iter)(avl* a), avl** ret) {
+int _avl_range(avl_tree* t, avl* a, avl* b, int (*iter)(avl*), avl** ret) {
 	int x, c = 0;
 	if (!t->root)
 		return 0;
@@ -361,7 +361,7 @@ int _avl_range(avl_tree* t, avl* a, avl* b, int (*iter)(avl* a), avl** ret) {
 	return c;
 }
 
-int avl_range(avl_tree* t, avl* a, avl* b, int (*iter)(avl* a), avl** ret) {
+int avl_range(avl_tree* t, avl* a, avl* b, int (*iter)(avl*), avl** ret) {
 #ifdef AVL_LOCK_WITH_MUTEX
 	pthread_mutex_lock(&t->mutex);
 #else

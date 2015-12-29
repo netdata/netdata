@@ -235,7 +235,7 @@ cleanup:
 procfile *procfile_readall(procfile *ff) {
 	debug(D_PROCFILE, PF_PREFIX ": Reading file '%s'.", ff->filename);
 
-	ssize_t s, r = 1, x = ff->size;
+	ssize_t s, r = 1, x;
 	ff->len = 0;
 
 	while(likely(r > 0)) {
@@ -253,7 +253,6 @@ procfile *procfile_readall(procfile *ff) {
 			}
 			ff = new;
 			ff->size += PROCFILE_INCREMENT_BUFFER;
-			x = PROCFILE_INCREMENT_BUFFER;
 		}
 
 		debug(D_PROCFILE, "Reading file '%s', from position %ld with length %ld", ff->filename, s, ff->size - s);

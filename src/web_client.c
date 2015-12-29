@@ -436,7 +436,7 @@ uint32_t web_client_api_request_v1_data_options(char *o)
 	return ret;
 }
 
-int web_client_api_request_v1_data_format(char *name)
+uint32_t web_client_api_request_v1_data_format(char *name)
 {
 	if(!strcmp(name, DATASOURCE_FORMAT_DATATABLE_JSON)) // datatable
 		return DATASOURCE_DATATABLE_JSON;
@@ -471,7 +471,7 @@ int web_client_api_request_v1_data_format(char *name)
 	return DATASOURCE_JSON;
 }
 
-int web_client_api_request_v1_data_google_format(char *name)
+uint32_t web_client_api_request_v1_data_google_format(char *name)
 {
 	if(!strcmp(name, "json"))
 		return DATASOURCE_DATATABLE_JSONP;
@@ -579,7 +579,8 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 			, *after_str = NULL
 			, *points_str = NULL;
 
-	int format = DATASOURCE_JSON, group = GROUP_MAX;
+	int group = GROUP_MAX;
+	uint32_t format = DATASOURCE_JSON;
 	uint32_t options = 0x00000000;
 
 	while(url) {
@@ -842,7 +843,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	char *google_out = "json";
 	char *google_responseHandler = "google.visualization.Query.setResponse";
 	char *google_outFileName = NULL;
-	unsigned long last_timestamp_in_data = 0;
+	time_t last_timestamp_in_data = 0;
 	if(datasource_type == DATASOURCE_DATATABLE_JSON || datasource_type == DATASOURCE_DATATABLE_JSONP) {
 
 		w->response.data->contenttype = CT_APPLICATION_X_JAVASCRIPT;
@@ -901,7 +902,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	}
 
 	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group, %d group_method, %lu after, %lu before).", w->id, st->name, st->id, lines, group_count, group_method, after, before);
-	unsigned long timestamp_in_data = rrd_stats_json(datasource_type, st, w->response.data, lines, group_count, group_method, after, before, nonzero);
+	time_t timestamp_in_data = rrd_stats_json(datasource_type, st, w->response.data, lines, group_count, group_method, after, before, nonzero);
 
 	if(datasource_type == DATASOURCE_DATATABLE_JSONP) {
 		if(timestamp_in_data > last_timestamp_in_data)
@@ -969,7 +970,7 @@ cleanup:
 
 void web_client_process(struct web_client *w) {
 	int code = 500;
-	int bytes;
+	ssize_t bytes;
 
 	w->wait_receive = 0;
 
@@ -1179,7 +1180,7 @@ void web_client_process(struct web_client *w) {
 	// prepare the HTTP response header
 	debug(D_WEB_CLIENT, "%llu: Generating HTTP header with response %d.", w->id, code);
 
-	char *content_type_string = "";
+	char *content_type_string;
 	switch(w->response.data->contenttype) {
 		case CT_TEXT_HTML:
 			content_type_string = "text/html; charset=utf-8";
@@ -1243,7 +1244,7 @@ void web_client_process(struct web_client *w) {
 			break;
 	}
 
-	char *code_msg = "";
+	char *code_msg;
 	switch(code) {
 		case 200:
 			code_msg = "OK";
@@ -1308,7 +1309,7 @@ void web_client_process(struct web_client *w) {
 	if(!w->response.zoutput && (w->response.data->len || w->response.rlen))
 		buffer_sprintf(w->response.header_output,
 			"Content-Length: %ld\r\n"
-			, w->response.data->len?w->response.data->len:w->response.rlen
+			, w->response.data->len? w->response.data->len: w->response.rlen
 			);
 	else if(!w->response.zoutput)
 		w->keepalive = 0;	// content-length is required for keep-alive
@@ -1335,7 +1336,7 @@ void web_client_process(struct web_client *w) {
 			);
 
 	bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0);
-	if(bytes != buffer_strlen(w->response.header_output))
+	if(bytes != (ssize_t) buffer_strlen(w->response.header_output))
 		error("%llu: HTTP Header failed to be sent (I sent %d bytes but the system sent %d bytes)."
 				, w->id
 				, buffer_strlen(w->response.header_output)
@@ -1386,12 +1387,12 @@ void web_client_process(struct web_client *w) {
 	}
 }
 
-long web_client_send_chunk_header(struct web_client *w, int len)
+long web_client_send_chunk_header(struct web_client *w, long len)
 {
 	debug(D_DEFLATE, "%llu: OPEN CHUNK of %d bytes (hex: %x).", w->id, len, len);
 	char buf[1024];
-	sprintf(buf, "%X\r\n", len);
-	int bytes = send(w->ofd, buf, strlen(buf), MSG_DONTWAIT);
+	sprintf(buf, "%lX\r\n", len);
+	ssize_t bytes = send(w->ofd, buf, strlen(buf), MSG_DONTWAIT);
 
 	if(bytes > 0) debug(D_DEFLATE, "%llu: Sent chunk header %d bytes.", w->id, bytes);
 	else if(bytes == 0) debug(D_DEFLATE, "%llu: Did not send chunk header to the client.", w->id);
@@ -1404,7 +1405,7 @@ long web_client_send_chunk_close(struct web_client *w)
 {
 	//debug(D_DEFLATE, "%llu: CLOSE CHUNK.", w->id);
 
-	int bytes = send(w->ofd, "\r\n", 2, MSG_DONTWAIT);
+	ssize_t bytes = send(w->ofd, "\r\n", 2, MSG_DONTWAIT);
 
 	if(bytes > 0) debug(D_DEFLATE, "%llu: Sent chunk suffix %d bytes.", w->id, bytes);
 	else if(bytes == 0) debug(D_DEFLATE, "%llu: Did not send chunk suffix to the client.", w->id);
@@ -1417,7 +1418,7 @@ long web_client_send_chunk_finalize(struct web_client *w)
 {
 	//debug(D_DEFLATE, "%llu: FINALIZE CHUNK.", w->id);
 
-	int bytes = send(w->ofd, "\r\n0\r\n\r\n", 7, MSG_DONTWAIT);
+	ssize_t bytes = send(w->ofd, "\r\n0\r\n\r\n", 7, MSG_DONTWAIT);
 
 	if(bytes > 0) debug(D_DEFLATE, "%llu: Sent chunk suffix %d bytes.", w->id, bytes);
 	else if(bytes == 0) debug(D_DEFLATE, "%llu: Did not send chunk suffix to the client.", w->id);
@@ -1479,7 +1480,7 @@ long web_client_send_deflate(struct web_client *w)
 		// give the compressor all the data not passed through the compressor yet
 		if(w->response.data->len > w->response.sent) {
 			w->response.zstream.next_in = (Bytef *)&w->response.data->buffer[w->response.sent];
-			w->response.zstream.avail_in = (w->response.data->len - w->response.sent);
+			w->response.zstream.avail_in = (uInt) (w->response.data->len - w->response.sent);
 		}
 
 		// reset the compressor output buffer
@@ -1516,7 +1517,7 @@ long web_client_send_deflate(struct web_client *w)
 		t += web_client_send_chunk_header(w, w->response.zhave);
 	}
 
-	len = send(w->ofd, &w->response.zbuffer[w->response.zsent], w->response.zhave - w->response.zsent, MSG_DONTWAIT);
+	len = send(w->ofd, &w->response.zbuffer[w->response.zsent], (size_t) (w->response.zhave - w->response.zsent), MSG_DONTWAIT);
 	if(len > 0) {
 		w->response.zsent += len;
 		if(t > 0) len += t;
@@ -1584,12 +1585,12 @@ long web_client_receive(struct web_client *w)
 	long bytes;
 
 	if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY))
-		bytes = read(w->ifd, &w->response.data->buffer[w->response.data->len], (left-1));
+		bytes = read(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
 	else
-		bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], left-1, MSG_DONTWAIT);
+		bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
 
 	if(likely(bytes > 0)) {
-		int old = w->response.data->len;
+		size_t old = w->response.data->len;
 		w->response.data->len += bytes;
 		w->response.data->buffer[w->response.data->len] = '\0';
 

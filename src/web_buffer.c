@@ -52,7 +52,7 @@ void buffer_reset(BUFFER *wb)
 
 const char *buffer_tostring(BUFFER *wb)
 {
-	buffer_need_bytes(wb, 1);
+	buffer_need_bytes(wb, (size_t)1);
 	wb->buffer[wb->len] = '\0';
 
 	buffer_overflow_check(wb);
@@ -77,8 +77,7 @@ void buffer_strcat(BUFFER *wb, const char *txt)
 {
 	if(unlikely(!txt || !*txt)) return;
 
-	if(wb->size - wb->len < 512)
-		buffer_need_bytes(wb, 512);
+	buffer_need_bytes(wb, (size_t)(1));
 
 	char *s = &wb->buffer[wb->len], *end = &wb->buffer[wb->size];
 	long len = wb->len;
@@ -100,7 +99,7 @@ void buffer_strcat(BUFFER *wb, const char *txt)
 	else {
 		// terminate the string
 		// without increasing the length
-		buffer_need_bytes(wb, 1);
+		buffer_need_bytes(wb, (size_t)1);
 		wb->buffer[wb->len] = '\0';
 	}
 }
@@ -126,8 +125,9 @@ void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args)
 {
 	if(unlikely(!fmt || !*fmt)) return;
 
+	buffer_need_bytes(wb, 1);
+
 	size_t len = wb->size - wb->len;
-	if(unlikely(!len)) return;
 
 	wb->len += vsnprintf(&wb->buffer[wb->len], len, fmt, args);
 
@@ -140,20 +140,13 @@ void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
 {
 	if(unlikely(!fmt || !*fmt)) return;
 
-	if(unlikely(wb->len > wb->size)) {
-		error("web_buffer_sprintf(): already overflown length %ld, size = %ld", wb->len, wb->size);
-	}
-
-//	if(wb->size - wb->len < 512)
-//		web_buffer_need_bytes(wb, 512);
+	buffer_need_bytes(wb, 1);
 
 	size_t len = wb->size - wb->len, wrote;
 
-	buffer_need_bytes(wb, len);
-
 	va_list args;
 	va_start(args, fmt);
-	wrote = vsnprintf(&wb->buffer[wb->len], len, fmt, args);
+	wrote = (size_t) vsnprintf(&wb->buffer[wb->len], len, fmt, args);
 	va_end(args);
 
 	if(unlikely(wrote >= len)) {
@@ -207,25 +200,25 @@ void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minu
 	b[i++]='t';
 	b[i++]='e';
 	b[i++]='(';
-	b[i++]= 48 + year / 1000; year -= (year / 1000) * 1000;
-	b[i++]= 48 + year / 100; year -= (year / 100) * 100;
-	b[i++]= 48 + year / 10;
-	b[i++]= 48 + year % 10;
+	b[i++]= (char) (48 + year / 1000); year -= (year / 1000) * 1000;
+	b[i++]= (char) (48 + year / 100); year -= (year / 100) * 100;
+	b[i++]= (char) (48 + year / 10);
+	b[i++]= (char) (48 + year % 10);
 	b[i++]=',';
-	b[i]= 48 + month / 10; if(b[i] != '0') i++;
-	b[i++]= 48 + month % 10;
+	b[i]= (char) (48 + month / 10); if(b[i] != '0') i++;
+	b[i++]= (char) (48 + month % 10);
 	b[i++]=',';
-	b[i]= 48 + day / 10; if(b[i] != '0') i++;
-	b[i++]= 48 + day % 10;
+	b[i]= (char) (48 + day / 10); if(b[i] != '0') i++;
+	b[i++]= (char) (48 + day % 10);
 	b[i++]=',';
-	b[i]= 48 + hours / 10; if(b[i] != '0') i++;
-	b[i++]= 48 + hours % 10;
+	b[i]= (char) (48 + hours / 10); if(b[i] != '0') i++;
+	b[i++]= (char) (48 + hours % 10);
 	b[i++]=',';
-	b[i]= 48 + minutes / 10; if(b[i] != '0') i++;
-	b[i++]= 48 + minutes % 10;
+	b[i]= (char) (48 + minutes / 10); if(b[i] != '0') i++;
+	b[i++]= (char) (48 + minutes % 10);
 	b[i++]=',';
-	b[i]= 48 + seconds / 10; if(b[i] != '0') i++;
-	b[i++]= 48 + seconds % 10;
+	b[i]= (char) (48 + seconds / 10); if(b[i] != '0') i++;
+	b[i++]= (char) (48 + seconds % 10);
 	b[i++]=')';
 	b[i]='\0';
 
@@ -248,25 +241,25 @@ void buffer_date(BUFFER *wb, int year, int month, int day, int hours, int minute
 	char *b = &wb->buffer[wb->len];
 
 	int i = 0;
-	b[i++]= 48 + year / 1000; year -= (year / 1000) * 1000;
-	b[i++]= 48 + year / 100; year -= (year / 100) * 100;
-	b[i++]= 48 + year / 10;
-	b[i++]= 48 + year % 10;
+	b[i++]= (char) (48 + year / 1000); year -= (year / 1000) * 1000;
+	b[i++]= (char) (48 + year / 100); year -= (year / 100) * 100;
+	b[i++]= (char) (48 + year / 10);
+	b[i++]= (char) (48 + year % 10);
 	b[i++]='-';
-	b[i++]= 48 + month / 10;
-	b[i++]= 48 + month % 10;
+	b[i++]= (char) (48 + month / 10);
+	b[i++]= (char) (48 + month % 10);
 	b[i++]='-';
-	b[i++]= 48 + day / 10;
-	b[i++]= 48 + day % 10;
+	b[i++]= (char) (48 + day / 10);
+	b[i++]= (char) (48 + day % 10);
 	b[i++]=' ';
-	b[i++]= 48 + hours / 10;
-	b[i++]= 48 + hours % 10;
+	b[i++]= (char) (48 + hours / 10);
+	b[i++]= (char) (48 + hours % 10);
 	b[i++]=':';
-	b[i++]= 48 + minutes / 10;
-	b[i++]= 48 + minutes % 10;
+	b[i++]= (char) (48 + minutes / 10);
+	b[i++]= (char) (48 + minutes % 10);
 	b[i++]=':';
-	b[i++]= 48 + seconds / 10;
-	b[i++]= 48 + seconds % 10;
+	b[i++]= (char) (48 + seconds / 10);
+	b[i++]= (char) (48 + seconds % 10);
 	b[i]='\0';
 
 	wb->len += i;
@@ -313,15 +306,15 @@ void buffer_free(BUFFER *b)
 	free(b);
 }
 
-void buffer_increase(BUFFER *b, long free_size_required)
+void buffer_increase(BUFFER *b, size_t free_size_required)
 {
 	buffer_overflow_check(b);
 
-	long left = b->size - b->len;
+	size_t left = b->size - b->len;
 
 	if(left >= free_size_required) return;
 
-	long increase = free_size_required - left;
+	size_t increase = free_size_required - left;
 	if(increase < WEB_DATA_LENGTH_INCREASE_STEP) increase = WEB_DATA_LENGTH_INCREASE_STEP;
 
 	debug(D_WEB_BUFFER, "Increasing data buffer from size %d to %d.", b->size, b->size + increase);

@@ -3,7 +3,6 @@
 #endif
 #include <pthread.h>
 
-#include "common.h"
 #include "global_statistics.h"
 
 struct global_statistics global_statistics = { 0ULL, 0ULL, 0ULL, 0ULL };

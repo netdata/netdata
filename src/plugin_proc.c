@@ -213,7 +213,7 @@ void *proc_main(void *ptr)
 			rrdset_done(stbytes);
 		}
 
-		usleep(susec);
+		usleep((useconds_t) susec);
 
 		// copy current to last
 		bcopy(&now, &last, sizeof(struct timeval));

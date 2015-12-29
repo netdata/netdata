@@ -99,7 +99,7 @@ char *trim(char *s)
 	if(!*s || *s == '#') return NULL;
 
 	// skip tailing spaces
-	int c = strlen(s) - 1;
+	long c = (long) strlen(s) - 1;
 	while(c >= 0 && isspace(s[c])) {
 		s[c] = '\0';
 		c--;
@@ -109,7 +109,7 @@ char *trim(char *s)
 	return s;
 }
 
-void *mymmap(const char *filename, unsigned long size, int flags, int ksm)
+void *mymmap(const char *filename, size_t size, int flags, int ksm)
 {
 	int fd;
 	void *mem = NULL;
@@ -139,7 +139,7 @@ void *mymmap(const char *filename, unsigned long size, int flags, int ksm)
 					mem = mmap(NULL, size, PROT_READ|PROT_WRITE, flags|MAP_ANONYMOUS, -1, 0);
 					if(mem) {
 						if(lseek(fd, 0, SEEK_SET) == 0) {
-							if(read(fd, mem, size) != size)
+							if(read(fd, mem, size) != (ssize_t)size)
 								error("Cannot read from file '%s'", filename);
 						}
 						else

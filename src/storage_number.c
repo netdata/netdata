@@ -76,7 +76,7 @@ storage_number pack_storage_number(calculated_number value, uint32_t flags)
 #ifdef STORAGE_WITH_MATH
 	// without this there are rounding problems
 	// example: 0.9 becomes 0.89
-	r += lrint(n);
+	r += lrint((double) n);
 #else
 	r += (storage_number)n;
 #endif
@@ -153,7 +153,7 @@ int print_calculated_number(char *str, calculated_number value)
 #ifdef STORAGE_WITH_MATH
 	// without llrint() there are rounding problems
 	// for example 0.9 becomes 0.89
-	unsigned long long uvalue = llrint(value * (calculated_number)100000);
+	unsigned long long uvalue = (unsigned long long int) llrint(value * (calculated_number)100000);
 #else
 	unsigned long long uvalue = value * (calculated_number)100000;
 #endif
@@ -202,5 +202,5 @@ int print_calculated_number(char *str, calculated_number value)
 	else wstr[1] = '.';
 
 	// return the buffer length
-	return ( (wstr - str) + 2 + decimal );
+	return (int) ((wstr - str) + 2 + decimal );
 }

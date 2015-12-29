@@ -50,35 +50,32 @@ html {
 	color: #DDDDDD;
 	text-align: center;
 	overflow: hidden;
-	z-index: 11;
+	z-index: 20;
 	padding: 0px;
 	margin: 0px;
 }
 
 .netdata-message {
-	display: none;
+	display: inline-block;
+	text-align: left;
+	vertical-align: top;
+	font-weight: bold;
 	font-size: x-small;
 	width: 100%;
-	height: calc(100% - 10px); /* for the resize handler */
+	height: 100%;
 	overflow: hidden;
 	background: inherit;
-	z-index: 10000;
+	z-index: 0;
 }
 
-.netdata-chart-is-loading {
+.netdata-message.hidden {
 	display: none;
-	font-size: x-small;
-	width: 100%;
-	overflow: hidden;
-	background: white;
-	z-index: 10000;
 }
 
-.netdata-error-message {
-	background: #EEEEEE;
-}
-
-.netdata-info-message {
+.netdata-message.icon {
+	color: #FAFAFA;
+	text-align: center;
+	vertical-align: middle;
 }
 
 .netdata-chart-legend {
@@ -256,6 +253,7 @@ html {
 	overflow: hidden;
 	width: 100%;
 	height: 100%;
+	z-index: 5;
 
 	/* width and height is calculated (depends on the appearance of the legend) */
 }
@@ -269,6 +267,7 @@ html {
 	margin-right: 140px;		/* --legend-width */
 	width: calc(100% - 140px);	/* --legend-width */
 	height: 100%;
+	z-index: 5;
 	flex-grow: 1;
 
 	/* width and height is calculated (depends on the appearance of the legend) */

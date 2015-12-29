@@ -45,8 +45,6 @@ int debug = 0;
 int update_every = 1;
 unsigned long long file_counter = 0;
 
-#define PROC_BUFFER 4096
-
 // ----------------------------------------------------------------------------
 // memory debugger
 
@@ -64,14 +62,14 @@ struct allocations {
 void *mark_allocation(void *allocated_ptr, size_t size_without_overheads) {
 	uint32_t *real_ptr = (uint32_t *)allocated_ptr;
 	real_ptr[0] = MALLOC_MARK;
-	real_ptr[1] = size_without_overheads;
+	real_ptr[1] = (uint32_t) size_without_overheads;
 
 	uint32_t *end_ptr = (uint32_t *)(allocated_ptr + MALLOC_PREFIX + size_without_overheads);
 	end_ptr[0] = MALLOC_MARK;
 
 	// fprintf(stderr, "MEMORY_POINTER: Allocated at %p, returning %p.\n", allocated_ptr, (void *)(allocated_ptr + MALLOC_PREFIX));
 
-	return (void *)(allocated_ptr + MALLOC_PREFIX);
+	return allocated_ptr + MALLOC_PREFIX;
 }
 
 void *check_allocation(const char *file, int line, const char *function, void *marked_ptr, size_t *size_without_overheads_ptr) {
@@ -249,23 +247,23 @@ long get_pid_max(void) {
 
 unsigned long long get_hertz(void)
 {
-	unsigned long long hz = 1;
+	unsigned long long myhz = 1;
 
 #ifdef _SC_CLK_TCK
-	if((hz = sysconf(_SC_CLK_TCK)) > 0) {
-		return hz;
+	if((myhz = (unsigned long long int) sysconf(_SC_CLK_TCK)) > 0) {
+		return myhz;
 	}
 #endif
 
 #ifdef HZ
-	hz = (unsigned long long)HZ;    /* <asm/param.h> */
+	myhz = HZ;    /* <asm/param.h> */
 #else
 	/* If 32-bit or big-endian (not Alpha or ia64), assume HZ is 100. */
 	hz = (sizeof(long)==sizeof(int) || htons(999)==999) ? 100UL : 1024UL;
 #endif
 
-	error("Unknown HZ value. Assuming %llu.", hz);
-	return hz;
+	error("Unknown HZ value. Assuming %llu.", myhz);
+	return myhz;
 }
 
 
@@ -650,7 +648,7 @@ int read_proc_pid_stat(struct pid_stat *p) {
 	// p->pid			= atol(procfile_lineword(ff, 0, 0+i));
 	// comm is at 1
 	// p->state			= *(procfile_lineword(ff, 0, 2+i));
-	p->ppid				= atol(procfile_lineword(ff, 0, 3+i));
+	p->ppid				= (int32_t) atol(procfile_lineword(ff, 0, 3 + i));
 	// p->pgrp			= atol(procfile_lineword(ff, 0, 4+i));
 	// p->session		= atol(procfile_lineword(ff, 0, 5+i));
 	// p->tty_nr		= atol(procfile_lineword(ff, 0, 6+i));
@@ -666,7 +664,7 @@ int read_proc_pid_stat(struct pid_stat *p) {
 	p->cstime			= strtoull(procfile_lineword(ff, 0, 16+i), NULL, 10);
 	// p->priority		= strtoull(procfile_lineword(ff, 0, 17+i), NULL, 10);
 	// p->nice			= strtoull(procfile_lineword(ff, 0, 18+i), NULL, 10);
-	p->num_threads		= atol(procfile_lineword(ff, 0, 19+i));
+	p->num_threads		= (int32_t) atol(procfile_lineword(ff, 0, 19 + i));
 	// p->itrealvalue	= strtoull(procfile_lineword(ff, 0, 20+i), NULL, 10);
 	// p->starttime		= strtoull(procfile_lineword(ff, 0, 21+i), NULL, 10);
 	// p->vsize			= strtoull(procfile_lineword(ff, 0, 22+i), NULL, 10);
@@ -809,8 +807,8 @@ struct file_descriptor {
 	uint32_t hash;
 	const char *name;
 	int type;
-	long count;
-	long pos;
+	int count;
+	int pos;
 } *all_files = NULL;
 
 int all_files_len = 0;
@@ -871,7 +869,7 @@ void file_descriptor_not_used(int id)
 			return;
 		}
 
-		if(debug) fprintf(stderr, "apps.plugin: decreasing slot %d (count = %ld).\n", id, all_files[id].count);
+		if(debug) fprintf(stderr, "apps.plugin: decreasing slot %d (count = %d).\n", id, all_files[id].count);
 
 		if(all_files[id].count > 0) {
 			all_files[id].count--;
@@ -889,7 +887,7 @@ void file_descriptor_not_used(int id)
 	else	error("Request to decrease counter of fd %d, which is outside the array size (1 to %d)", id, all_files_size);
 }
 
-unsigned long file_descriptor_find_or_add(const char *name)
+int file_descriptor_find_or_add(const char *name)
 {
 	static int last_pos = 0;
 	uint32_t hash = simple_hash(name);
@@ -899,7 +897,7 @@ unsigned long file_descriptor_find_or_add(const char *name)
 	struct file_descriptor *fd = file_descriptor_find(name, hash);
 	if(fd) {
 		// found
-		if(debug) fprintf(stderr, "apps.plugin:   >> found on slot %ld\n", fd->pos);
+		if(debug) fprintf(stderr, "apps.plugin:   >> found on slot %d\n", fd->pos);
 		fd->count++;
 		return fd->pos;
 	}
@@ -968,7 +966,7 @@ unsigned long file_descriptor_find_or_add(const char *name)
 
 	// else we have an empty slot in 'c'
 
-	int type = FILETYPE_OTHER;
+	int type;
 	if(name[0] == '/') type = FILETYPE_FILE;
 	else if(strncmp(name, "pipe:", 5) == 0) type = FILETYPE_PIPE;
 	else if(strncmp(name, "socket:", 7) == 0) type = FILETYPE_SOCKET;
@@ -1041,7 +1039,7 @@ int update_from_proc(void)
 
 	while((file = readdir(dir))) {
 		char *endptr = file->d_name;
-		pid_t pid = strtoul(file->d_name, &endptr, 10);
+		pid_t pid = (pid_t) strtoul(file->d_name, &endptr, 10);
 		if(pid <= 0 || pid > pid_max || endptr == file->d_name || *endptr != '\0') continue;
 
 		p = get_pid_entry(pid);
@@ -1119,7 +1117,7 @@ int update_from_proc(void)
 				if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) continue;
 
 				// check if the fds array is small
-				int fdid = atol(de->d_name);
+				int fdid = atoi(de->d_name);
 				if(fdid < 0) continue;
 				if(fdid >= p->fds_size) {
 					// it is small, extend it
@@ -1139,7 +1137,7 @@ int update_from_proc(void)
 					// we don't know this fd, get it
 
 					sprintf(fdname, "/proc/%s/fd/%s", file->d_name, de->d_name);
-					int l = readlink(fdname, linkname, FILENAME_MAX);
+					ssize_t l = readlink(fdname, linkname, FILENAME_MAX);
 					if(l == -1) {
 						if(debug || (p->target && p->target->debug)) {
 							if(!count_errors++ || debug || (p->target && p->target->debug))
@@ -1337,7 +1335,7 @@ void update_statistics(void)
 	for (w = target_root; w ; w = w->next) {
 		targets++;
 
-		w->fds = calloc(sizeof(int), all_files_size);
+		w->fds = calloc(sizeof(int), (size_t) all_files_size);
 		if(!w->fds)
 			error("Cannot allocate memory for fds in %s", w->name);
 
@@ -1748,7 +1746,7 @@ void show_charts(void)
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu %s\n", w->name, (unsigned long long)(Hertz), w->hidden?"hidden,noreset":"noreset");
+		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu %s\n", w->name, Hertz, w->hidden ? "hidden,noreset" : "noreset");
 	}
 
 	fprintf(stdout, "CHART apps.mem '' 'Apps Dedicated Memory (w/o shared)' 'MB' apps apps stacked 20003 %d\n", update_every);
@@ -1915,14 +1913,15 @@ int main(int argc, char **argv)
 
 	procfile_adaptive_initial_allocation = 1;
 
-	unsigned long started_t = time(NULL), current_t;
+	time_t started_t = time(NULL);
+	time_t current_t;
 	Hertz = get_hertz();
 	pid_max = get_pid_max();
 	processors = get_processors();
 
 	parse_args(argc, argv);
 
-	all_pids = calloc(sizeof(struct pid_stat *), pid_max);
+	all_pids = calloc(sizeof(struct pid_stat *), (size_t) pid_max);
 	if(!all_pids) {
 		error("Cannot allocate %lu bytes of memory.", sizeof(struct pid_stat *) * pid_max);
 		printf("DISABLE\n");
@@ -1957,7 +1956,7 @@ int main(int argc, char **argv)
 		if(usec < (update_every * 1000000ULL / 2)) susec = (update_every * 1000000ULL) - usec;
 		else susec = update_every * 1000000ULL / 2;
 
-		usleep(susec);
+		usleep((__useconds_t) susec);
 		bcopy(&now, &last, sizeof(struct timeval));
 
 		current_t = time(NULL);

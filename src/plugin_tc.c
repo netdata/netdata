@@ -153,7 +153,7 @@ static void tc_device_classes_cleanup(struct tc_device *d) {
 	static int cleanup_every = 999;
 
 	if(cleanup_every > 0) {
-		cleanup_every = -config_get_number("plugin:tc", "cleanup unused classes every", 60);
+		cleanup_every = (int) -config_get_number("plugin:tc", "cleanup unused classes every", 60);
 		if(cleanup_every > 0) cleanup_every = -cleanup_every;
 		if(cleanup_every == 0) cleanup_every = -1;
 	}
@@ -598,7 +598,7 @@ void *tc_main(void *ptr)
 			else if(first_hash == SENT_HASH && strcmp(words[0], "Sent") == 0 && device && class) {
 				// debug(D_TC_LOOP, "SENT line '%s'", words[1]);
 				if(words[1] && *words[1]) {
-					class->bytes = atoll(words[1]);
+					class->bytes = strtoull(words[1], NULL, 10);
 					class->updated = 1;
 				}
 				else class->bytes = 0;
@@ -673,7 +673,7 @@ void *tc_main(void *ptr)
 			return NULL;
 		}
 
-		sleep(rrd_update_every);
+		sleep((unsigned int) rrd_update_every);
 	}
 
 	return NULL;

@@ -12,10 +12,10 @@
  * Released under GNU General Public License (GPL) version 2
  *
  */
-#include <pthread.h>
-
 #ifndef _AVL_H
 #define _AVL_H 1
+
+#include <pthread.h>
 
 // #define AVL_LOCK_WITH_MUTEX 1
 
@@ -65,13 +65,13 @@ int avl_removeroot(avl_tree* t);
  * returns the last value returned by iterator or 0 if there were no calls
  * Warning: a<=b must hold
  */
-int avl_range(avl_tree* t, avl* a, avl* b, int (*iter)(avl* a), avl** ret);
+int avl_range(avl_tree* t, avl* a, avl* b, int (*iter)(avl*), avl** ret);
 
 /* Iterate through elements in t equal to a
  * for each element calls iter(a) until it returns 0
  * returns the last value returned by iterator or 0 if there were no calls
  */
-int avl_search(avl_tree* t, avl* a, int (*iter)(avl* a), avl** ret);
+int avl_search(avl_tree* t, avl* a, int (*iter)(avl*), avl** ret);
 
 /* Initialize the avl_tree
  */

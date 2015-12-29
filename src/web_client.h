@@ -33,8 +33,8 @@ struct response {
 
 	int code;						// the HTTP response code
 
-	long rlen;						// if non-zero, the excepted size of ifd (input)
-	long sent;						// current data length sent to output
+	size_t rlen;					// if non-zero, the excepted size of ifd (input)
+	size_t sent;					// current data length sent to output
 
 	int zoutput;					// if set to 1, web_client_send() will send compressed data
 #ifdef NETDATA_WITH_ZLIB

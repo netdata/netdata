@@ -78,7 +78,7 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 
 	// close all files
 	int i;
-	for(i = sysconf(_SC_OPEN_MAX) - 1; i > 0; i--)
+	for(i = (int) (sysconf(_SC_OPEN_MAX) - 1); i > 0; i--)
 		if(i != STDIN_FILENO && i != STDERR_FILENO && i != pipefd[PIPE_WRITE]) close(i);
 
 	// move the pipe to stdout
@@ -128,7 +128,7 @@ void mypclose(FILE *fp, pid_t pid) {
 	fclose(fp);
 
 	siginfo_t info;
-	if(waitid(P_PID, pid, &info, WEXITED) != -1) {
+	if(waitid(P_PID, (id_t) pid, &info, WEXITED) != -1) {
 		switch(info.si_code) {
 			case CLD_EXITED:
 				error("pid %d exited with code %d.", info.si_pid, info.si_status);

@@ -28,7 +28,7 @@ void *cpuidlejitter_main(void *ptr)
 	if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
 		error("Cannot set pthread cancel state to ENABLE.");
 
-	int sleep_ms = config_get_number("plugin:idlejitter", "loop time in ms", CPU_IDLEJITTER_SLEEP_TIME_MS);
+	int sleep_ms = (int) config_get_number("plugin:idlejitter", "loop time in ms", CPU_IDLEJITTER_SLEEP_TIME_MS);
 	if(sleep_ms <= 0) {
 		config_set_number("plugin:idlejitter", "loop time in ms", CPU_IDLEJITTER_SLEEP_TIME_MS);
 		sleep_ms = CPU_IDLEJITTER_SLEEP_TIME_MS;

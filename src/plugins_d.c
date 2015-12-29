@@ -396,10 +396,10 @@ void *pluginsd_worker_thread(void *arg)
 
 		if(unlikely(!count && cd->enabled)) {
 			error("PLUGINSD: '%s' (pid %d) does not generate usefull output. Waiting a bit before starting it again.", cd->fullfilename, cd->pid);
-			sleep(cd->update_every * 10);
+			sleep((unsigned int) (cd->update_every * 10));
 		}
 
-		if(likely(cd->enabled)) sleep(cd->update_every);
+		if(likely(cd->enabled)) sleep((unsigned int) cd->update_every);
 		else break;
 	}
 
@@ -421,7 +421,7 @@ void *pluginsd_main(void *ptr)
 
 	char *dir_name = config_get("plugins", "plugins directory", PLUGINS_DIR);
 	int automatic_run = config_get_boolean("plugins", "enable running new plugins", 1);
-	int scan_frequency = config_get_number("plugins", "check for new plugins every", 60);
+	int scan_frequency = (int) config_get_number("plugins", "check for new plugins every", 60);
 	DIR *dir = NULL;
 	struct dirent *file = NULL;
 	struct plugind *cd;
@@ -447,7 +447,7 @@ void *pluginsd_main(void *ptr)
 
 			if(unlikely(strcmp(file->d_name, ".") == 0 || strcmp(file->d_name, "..") == 0)) continue;
 
-			int len = strlen(file->d_name);
+			int len = (int) strlen(file->d_name);
 			if(unlikely(len <= (int)PLUGINSD_FILE_SUFFIX_LEN)) continue;
 			if(unlikely(strcmp(PLUGINSD_FILE_SUFFIX, &file->d_name[len - (int)PLUGINSD_FILE_SUFFIX_LEN]) != 0)) {
 				debug(D_PLUGINSD, "PLUGINSD: File '%s' does not end in '%s'.", file->d_name, PLUGINSD_FILE_SUFFIX);
@@ -484,7 +484,7 @@ void *pluginsd_main(void *ptr)
 				snprintf(cd->fullfilename, FILENAME_MAX, "%s/%s", dir_name, cd->filename);
 
 				cd->enabled = enabled;
-				cd->update_every = config_get_number(cd->id, "update every", rrd_update_every);
+				cd->update_every = (int) config_get_number(cd->id, "update every", rrd_update_every);
 				cd->started_t = time(NULL);
 
 				char *def = "";
@@ -508,7 +508,7 @@ void *pluginsd_main(void *ptr)
 		}
 
 		closedir(dir);
-		sleep(scan_frequency);
+		sleep((unsigned int) scan_frequency);
 	}
 
 	return NULL;

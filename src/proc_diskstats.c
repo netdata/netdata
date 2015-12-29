@@ -12,10 +12,7 @@
 #include "rrd.h"
 #include "plugin_proc.h"
 
-#define RRD_TYPE_DISK				"disk"
-#define RRD_TYPE_DISK_LEN			strlen(RRD_TYPE_DISK)
-
-#define MAX_PROC_DISKSTATS_LINE 4096
+#define RRD_TYPE_DISK "disk"
 
 int do_proc_diskstats(int update_every, unsigned long long dt) {
 	static procfile *ff = NULL;

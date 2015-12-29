@@ -8,8 +8,8 @@
 #define WEB_DATA_LENGTH_INCREASE_STEP 16384
 
 typedef struct web_buffer {
-	long size;		// allocation size of buffer
-	long len;		// current data length in buffer
+	size_t size;		// allocation size of buffer
+	size_t len;		// current data length in buffer
 	char *buffer;	// the buffer
 	int contenttype;
 	time_t date;	// the date this content has been generated
@@ -35,7 +35,7 @@ typedef struct web_buffer {
 #define buffer_strlen(wb) ((wb)->len)
 extern const char *buffer_tostring(BUFFER *wb);
 
-#define buffer_need_bytes(buffer, needed_free_size) do { if(unlikely((buffer)->size - (buffer)->len < (long)(needed_free_size))) buffer_increase((buffer), (long)(needed_free_size)); } while(0)
+#define buffer_need_bytes(buffer, needed_free_size) do { if(unlikely((buffer)->size - (buffer)->len < (size_t)(needed_free_size))) buffer_increase((buffer), (size_t)(needed_free_size)); } while(0)
 
 #define buffer_flush(wb) wb->buffer[wb->len = 0] = '\0'
 extern void buffer_reset(BUFFER *wb);
@@ -48,7 +48,7 @@ extern void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, i
 
 extern BUFFER *buffer_create(long size);
 extern void buffer_free(BUFFER *b);
-extern void buffer_increase(BUFFER *b, long free_size_required);
+extern void buffer_increase(BUFFER *b, size_t free_size_required);
 
 extern void buffer_snprintf(BUFFER *wb, size_t len, const char *fmt, ...);
 extern void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args);
