@@ -386,9 +386,9 @@
 		// hidden all the not-visible charts
 		// using this little function we try to switch
 		// the charts back to visible quickly
-		//var targets = NETDATA.options.targets;
-		//var len = targets.length;
-		//while(len--) targets[len].isVisible();
+		var targets = NETDATA.options.targets;
+		var len = targets.length;
+		while(len--) targets[len].isVisible();
 	}
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -1158,9 +1158,9 @@
 			if(typeof that.___chartIsHidden___ !== 'undefined') {
 				that.element_chart.style.display = 'inline-block';
 				if(that.element_legend !== null) that.element_legend.style.display = 'inline-block';
-				hideMessage();
 				that.___chartIsHidden___ = undefined;
 				resizeChart();
+				hideMessage();
 			}
 		}
 
