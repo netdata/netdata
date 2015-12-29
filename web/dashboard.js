@@ -1485,9 +1485,6 @@
 				NETDATA.globalSelectionSync.state = null;
 			}
 
-			// since we are the sync master, we should not call this.clearSelection()
-			// dygraphs is taking care of visualizing our selection.
-			this.selected = false;
 			this.clearSelection();
 		}
 
@@ -1518,9 +1515,10 @@
 				
 				if(this.selected === false && this.debug === true)
 					this.log('selection cleared');
+				
+				this.legendReset();
 			}
 
-			this.legendReset();
 			return this.selected;
 		}
 
@@ -2208,9 +2206,8 @@
 				}
 			}
 			hideMessage();
+			this.legendShowLatestValues();
 			NETDATA.globalSelectionSync.stop();
-
-			// this.legendShowLatestValues();
 
 			// update the performance counters
 			var now = new Date().getTime();
