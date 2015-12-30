@@ -60,7 +60,7 @@ You many need to check these:
 
 2. You need basic build tools installed, like:
 
-   gcc autoconf automake pkg-config
+   gcc make autoconf automake pkg-config
 
 3. If your system cannot find ZLIB, although it is installed
    run me with the option:  --zlib-is-really-here

@@ -160,12 +160,12 @@ Out of the box, it comes with plugins for data collection about system informati
 Before you start, make sure you have `zlib` development files installed.
 
 You also need to have a basic build environment in place. You will need packages like
-`gcc`, `autoconf`, `autogen`, `automake`, `pgk-config`, etc.
+`git`, `make`, `gcc`, `autoconf`, `autogen`, `automake`, `pgk-config`, etc.
 
 To install them in debian/ubuntu, you need to run:
 
 ```sh
-apt-get install zlib1g-dev gcc autoconf autogen automake pkg-config
+apt-get install zlib1g-dev gcc make git autoconf autogen automake pkg-config
 ```
 
 Then do this to install and run netdata:
