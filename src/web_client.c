@@ -1435,7 +1435,7 @@ long web_client_send_deflate(struct web_client *w)
 	// when using compression,
 	// w->response.sent is the amount of bytes passed through compression
 
-	debug(D_DEFLATE, "%llu: TEST w->response.data->len = %d, w->response.sent = %d, w->response.zhave = %d, w->response.zsent = %d, w->response.zstream.avail_in = %d, w->response.zstream.avail_out = %d, w->response.zstream.total_in = %d, w->response.zstream.total_out = %d.", w->id, w->response.data->len, w->response.sent, w->response.zhave, w->response.zsent, w->response.zstream.avail_in, w->response.zstream.avail_out, w->response.zstream.total_in, w->response.zstream.total_out);
+	debug(D_DEFLATE, "%llu: web_client_send_deflate(): w->response.data->len = %d, w->response.sent = %d, w->response.zhave = %d, w->response.zsent = %d, w->response.zstream.avail_in = %d, w->response.zstream.avail_out = %d, w->response.zstream.total_in = %d, w->response.zstream.total_out = %d.", w->id, w->response.data->len, w->response.sent, w->response.zhave, w->response.zsent, w->response.zstream.avail_in, w->response.zstream.avail_out, w->response.zstream.total_in, w->response.zstream.total_out);
 
 	if(w->response.data->len - w->response.sent == 0 && w->response.zstream.avail_in == 0 && w->response.zhave == w->response.zsent && w->response.zstream.avail_out != 0) {
 		// there is nothing to send
@@ -1475,12 +1475,16 @@ long web_client_send_deflate(struct web_client *w)
 		// close the previous open chunk
 		if(w->response.sent != 0) t += web_client_send_chunk_close(w);
 
-		debug(D_DEFLATE, "%llu: Compressing %d bytes starting from %d.", w->id, (w->response.data->len - w->response.sent), w->response.sent);
+		debug(D_DEFLATE, "%llu: Compressing %d new bytes starting from %d (and %d left behind).", w->id, (w->response.data->len - w->response.sent), w->response.sent, w->response.zstream.avail_in);
 
 		// give the compressor all the data not passed through the compressor yet
 		if(w->response.data->len > w->response.sent) {
-			w->response.zstream.next_in = (Bytef *)&w->response.data->buffer[w->response.sent];
-			w->response.zstream.avail_in = (uInt) (w->response.data->len - w->response.sent);
+#ifdef NETDATA_INTERNAL_CHECKS
+			if(w->response.sent - w->response.zstream.avail_in < 0)
+				error("internal error: avail_in is corrupted.");
+#endif
+			w->response.zstream.next_in = (Bytef *)&w->response.data->buffer[w->response.sent - w->response.zstream.avail_in];
+			w->response.zstream.avail_in += (uInt) (w->response.data->len - w->response.sent);
 		}
 
 		// reset the compressor output buffer
@@ -1490,9 +1494,9 @@ long web_client_send_deflate(struct web_client *w)
 		// ask for FINISH if we have all the input
 		int flush = Z_SYNC_FLUSH;
 		if(w->mode == WEB_CLIENT_MODE_NORMAL
-			|| (w->mode == WEB_CLIENT_MODE_FILECOPY && w->response.data->len == w->response.rlen)) {
+			|| (w->mode == WEB_CLIENT_MODE_FILECOPY && !w->wait_receive && w->response.data->len == w->response.rlen)) {
 			flush = Z_FINISH;
-			debug(D_DEFLATE, "%llu: Requesting Z_FINISH.", w->id);
+			debug(D_DEFLATE, "%llu: Requesting Z_FINISH, if possible.", w->id);
 		}
 		else {
 			debug(D_DEFLATE, "%llu: Requesting Z_SYNC_FLUSH.", w->id);
@@ -1516,6 +1520,8 @@ long web_client_send_deflate(struct web_client *w)
 		// open a new chunk
 		t += web_client_send_chunk_header(w, w->response.zhave);
 	}
+	
+	debug(D_WEB_CLIENT, "%llu: Sending %d bytes of data (+%d of chunk header).", w->id, w->response.zhave - w->response.zsent, t);
 
 	len = send(w->ofd, &w->response.zbuffer[w->response.zsent], (size_t) (w->response.zhave - w->response.zsent), MSG_DONTWAIT);
 	if(len > 0) {
