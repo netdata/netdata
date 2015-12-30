@@ -1480,7 +1480,7 @@ long web_client_send_deflate(struct web_client *w)
 		// give the compressor all the data not passed through the compressor yet
 		if(w->response.data->len > w->response.sent) {
 #ifdef NETDATA_INTERNAL_CHECKS
-			if(w->response.sent - w->response.zstream.avail_in < 0)
+			if((long)w->response.sent - (long)w->response.zstream.avail_in < 0)
 				error("internal error: avail_in is corrupted.");
 #endif
 			w->response.zstream.next_in = (Bytef *)&w->response.data->buffer[w->response.sent - w->response.zstream.avail_in];
