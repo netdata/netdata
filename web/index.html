@@ -253,7 +253,7 @@
 	<!-- <script> netdataServer = "http://box:19999"; </script> -->
 
 	<!-- load the dashboard manager - it will do the rest -->
-	<script type="text/javascript" src="dashboard.js?v12"></script>
+	<script type="text/javascript" src="dashboard.js?v14"></script>
 </head>
 
 <body data-spy="scroll" data-target="#sidebar">
@@ -1079,7 +1079,7 @@ function prepareScreen(data) {
 		}, 1000);
 }
 
-NETDATA.ready(function() {
+NETDATA.pause(function() {
 
 	$('#welcomeModal').on('hidden.bs.modal', function (e) {
 		NETDATA.updatedDom();
@@ -1091,13 +1091,12 @@ NETDATA.ready(function() {
 	// download all the charts the server knows
 	NETDATA.chartRegistry.downloadAll(NETDATA.serverDefault, function(data) {
 
-		// pause the NETDATA thread that updates the charts
-		NETDATA.pause(function() {
+		// prepare our DOM
+		// this will be called when NETDATA is paused
+		prepareScreen(data);
 
-			// prepare our DOM
-			// this will be called when NETDATA is paused
-			prepareScreen(data);
-		});
+		// due to affix issues, prepareScreen() will unpause
+		// netdata as needed
 	});
 });
 
