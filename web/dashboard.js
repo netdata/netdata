@@ -281,7 +281,7 @@
 		if(typeof value === 'undefined' || value === 'undefined') {
 			console.log('localStorage: ATTEMPT TO SET UNDEFINED "' + key.toString() + '" as value ' + value + ' of type ' + typeof(value));
 		}
-		
+
 		if(typeof NETDATA.localStorage.default[key.toString()] === 'undefined') {
 			NETDATA.localStorage.default[key.toString()] = value;
 			NETDATA.localStorage.current[key.toString()] = value;
@@ -590,7 +590,7 @@
 		this.name_div = null;
 		this.value_div = null;
 		this.color = '#000';
-		
+
 		if(parent.selected === parent.unselected)
 			this.selected = true;
 		else
@@ -676,7 +676,7 @@
 			ds.parent.state.redrawChart();
 		}
 	}
-	
+
 	dimensionStatus.prototype.select = function() {
 		if(this.enabled === false) return;
 
@@ -684,7 +684,7 @@
 		this.value_div.className = 'netdata-legend-value selected';
 		this.selected = true;
 	}
-	
+
 	dimensionStatus.prototype.unselect = function() {
 		if(this.enabled === false) return;
 
@@ -692,11 +692,11 @@
 		this.value_div.className = 'netdata-legend-value hidden';
 		this.selected = false;
 	}
-	
+
 	dimensionStatus.prototype.isSelected = function() {
 		return(this.enabled === true && this.selected === true);
 	}
-	
+
 	// ----------------------------------------------------------------------------------------------------------------
 
 	dimensionsVisibility = function(state) {
@@ -1152,7 +1152,7 @@
 				that.___chartIsHidden___ = true;
 			}
 		}
-		
+
 		// unhide the chart, when it is visible - called from isVisible()
 		var unhideChart = function() {
 			if(typeof that.___chartIsHidden___ !== 'undefined') {
@@ -1316,6 +1316,10 @@
 
 		// ============================================================================================================
 		// PUBLIC FUNCTIONS
+
+		this.error = function(msg) {
+			error(msg);
+		}
 
 		this.setMode = function(m) {
 			if(this.current !== null && this.current.name === m) return;
@@ -1512,10 +1516,10 @@
 						this.selected = true;
 				}
 				else this.selected = false;
-				
+
 				if(this.selected === false && this.debug === true)
 					this.log('selection cleared');
-				
+
 				this.legendReset();
 			}
 
@@ -2318,7 +2322,7 @@
 
 				hideChart();
 				this.___isVisible___ = false;
-				
+
 				if(this.debug === true)
 					this.log('isVisible: ' + this.___isVisible___);
 
@@ -2329,7 +2333,7 @@
 
 				unhideChart();
 				this.___isVisible___ = true;
-				
+
 				if(this.debug === true)
 					this.log('isVisible: ' + this.___isVisible___);
 
@@ -2365,7 +2369,7 @@
 
 				return false;
 			}
-			
+
 			if(this.current.force_update_at !== 0 && this.current.force_update_at < now) {
 				if(this.debug === true)
 					this.log('timed force update detected - allowing this update');
@@ -2533,7 +2537,7 @@
 		// don't use jQuery here
 		// styles are loaded before jQuery
 		// to eliminate showing an unstyled page to the user
-		
+
 		var fileref = document.createElement("link");
 		fileref.setAttribute("rel", "stylesheet");
 		fileref.setAttribute("type", "text/css");
@@ -2673,7 +2677,7 @@
 			NETDATA.parseDom(NETDATA.chartRefresher);
 			return;
 		}
-		
+
 		if(NETDATA.options.sequencial.length === 0)
 			NETDATA.chartRefresher();
 		else {
@@ -2738,7 +2742,6 @@
 				}
 				else {
 					state.error('chart library "' + state.library_name + '" is not enabled.');
-					state.enabled = false;
 				}
 			}
 
@@ -2752,7 +2755,7 @@
 			$(parallel).each(function() {
 				this.autoRefresh(function() {
 					parallel_jobs--;
-					
+
 					if(parallel_jobs === 0) {
 						setTimeout(NETDATA.chartRefresher,
 							NETDATA.chartRefresherWaitTime());
@@ -3094,7 +3097,7 @@
 
 	NETDATA.dygraphChartUpdate = function(state, data) {
 		var dygraph = state.dygraph_instance;
-		
+
 		if(typeof dygraph === 'undefined')
 			NETDATA.dygraphChartCreate(state, data);
 
@@ -3121,7 +3124,7 @@
 		else {
 			if(NETDATA.options.debug.dygraph === true || state.debug === true)
 				state.log('dygraphChartUpdate() strict update');
-			
+
 			options.dateWindow = null;
 			options.valueRange = null;
 		}
@@ -3159,7 +3162,7 @@
 
 		state.dygraph_options = {
 			colors: self.data('dygraph-colors') || state.chartColors(),
-			
+
 			// leave a few pixels empty on the right of the chart
 			rightGap: self.data('dygraph-rightgap') || 5,
 			showRangeSelector: self.data('dygraph-showrangeselector') || false,
@@ -3193,7 +3196,7 @@
 			// The size of the dot to draw on each point in pixels (see drawPoints). A dot is always drawn when a point is "isolated",
 			// i.e. there is a missing point on either side of it. This also controls the size of those dots.
 			drawPoints: self.data('dygraph-drawpoints') || false,
-			
+
 			// Draw points at the edges of gaps in the data. This improves visibility of small data segments or other data irregularities.
 			drawGapEdgePoints: self.data('dygraph-drawgapedgepoints') || true,
 
@@ -3202,7 +3205,7 @@
 
 			// enabling this makes the chart with little square lines
 			stepPlot: self.data('dygraph-stepplot') || false,
-			
+
 			// Draw a border around graph lines to make crossing lines more easily distinguishable. Useful for graphs with many lines.
 			strokeBorderColor: self.data('dygraph-strokebordercolor') || 'white',
 			strokeBorderWidth: self.data('dygraph-strokeborderwidth') || (chart_type === 'stacked')?0.0:0.0,
@@ -3211,7 +3214,7 @@
 			fillAlpha: self.data('dygraph-fillalpha') || (chart_type === 'stacked')?NETDATA.options.current.color_fill_opacity_stacked:NETDATA.options.current.color_fill_opacity_area,
 			stackedGraph: self.data('dygraph-stackedgraph') || (chart_type === 'stacked')?true:false,
 			stackedGraphNaNFill: self.data('dygraph-stackedgraphnanfill') || 'none',
-			
+
 			drawAxis: self.data('dygraph-drawaxis') || true,
 			axisLabelFontSize: self.data('dygraph-axislabelfontsize') || 10,
 			axisLineColor: self.data('dygraph-axislinecolor') || '#CCC',
@@ -3354,7 +3357,7 @@
 					if(event.button && event.button === 2) return;
 
 					context.initializeMouseDown(event, dygraph, context);
-					
+
 					if(event.button && event.button === 1) {
 						if (event.altKey || event.shiftKey) {
 							state.setMode('pan');
@@ -3602,7 +3605,7 @@
 			state.dygraph_options.labelsSeparateLines = true;
 			state.dygraph_options.rightGap = 0;
 		}
-		
+
 		if(smooth === true) {
 			state.dygraph_smooth_eligible = true;
 
