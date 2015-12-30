@@ -119,7 +119,6 @@
 	// global options
 
 	NETDATA.options = {
-		readyCallback: null,			// a callback when we load the required stuf
 		pauseCallback: null,			// a callback when we are really paused
 
 		pause: false,					// when enabled we don't auto-refresh the charts
@@ -2603,11 +2602,14 @@
 	}
 
 	NETDATA.ready = function(callback) {
-		NETDATA.options.readyCallback = callback;
+		NETDATA.options.pauseCallback = callback;
 	}
 
 	NETDATA.pause = function(callback) {
-		NETDATA.options.pauseCallback = callback;
+		if(NETDATA.options.pause === true)
+			callback();
+		else
+			NETDATA.options.pauseCallback = callback;
 	}
 
 	NETDATA.unpause = function() {
@@ -4193,9 +4195,6 @@
 
 				NETDATA.start();
 			}
-
-			if(typeof NETDATA.options.readyCallback === 'function')
-				NETDATA.options.readyCallback();
 		});
 	});
 
