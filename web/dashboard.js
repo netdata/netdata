@@ -1308,7 +1308,7 @@
 
 
 		var noDataToShow = function() {
-			this.legendUpdateDOM();
+			that.legendUpdateDOM();
 			that.tm.last_autorefreshed = new Date().getTime();
 			that.data_update_every = 30 * 1000;
 		}
