@@ -156,7 +156,7 @@ void web_client_reset(struct web_client *w)
 			(float)usecdiff(&w->tv_ready, &w->tv_in) / 1000.0,
 			(float)usecdiff(&tv, &w->tv_ready) / 1000.0,
 			(float)usecdiff(&tv, &w->tv_in) / 1000.0,
-			(w->mode == WEB_CLIENT_MODE_FILECOPY)?"filecopy":"data",
+			(w->mode == WEB_CLIENT_MODE_FILECOPY)?"filecopy":((w->mode == WEB_CLIENT_MODE_OPTIONS)?"options":"data"),
 			w->response.code,
 			w->last_url
 		);
@@ -971,6 +971,7 @@ cleanup:
 void web_client_process(struct web_client *w) {
 	int code = 500;
 	ssize_t bytes;
+	int enable_gzip = 0;
 
 	w->wait_receive = 0;
 
@@ -990,7 +991,7 @@ void web_client_process(struct web_client *w) {
 #ifdef NETDATA_WITH_ZLIB
 		// check if the client accepts deflate
 		if(web_enable_gzip && strstr(w->response.data->buffer, "gzip"))
-			web_client_enable_deflate(w);
+			enable_gzip = 1;
 #endif // NETDATA_WITH_ZLIB
 
 		int datasource_type = DATASOURCE_DATATABLE_JSONP;
@@ -1002,21 +1003,43 @@ void web_client_process(struct web_client *w) {
 		char *url = NULL;
 		char *pointer_to_free = NULL; // keep url_decode() allocated buffer
 
+		w->mode = WEB_CLIENT_MODE_NORMAL;
+
 		if(buf && strcmp(tok, "GET") == 0) {
 			tok = strsep(&buf, " \r\n");
 			pointer_to_free = url = url_decode(tok);
 			debug(D_WEB_CLIENT, "%llu: Processing HTTP GET on url '%s'.", w->id, url);
 		}
+		else if(buf && strcmp(tok, "OPTIONS") == 0) {
+			tok = strsep(&buf, " \r\n");
+			pointer_to_free = url = url_decode(tok);
+			debug(D_WEB_CLIENT, "%llu: Processing HTTP OPTIONS on url '%s'.", w->id, url);
+			w->mode = WEB_CLIENT_MODE_OPTIONS;
+		}
 		else if (buf && strcmp(tok, "POST") == 0) {
 			w->keepalive = 0;
 			tok = strsep(&buf, " \r\n");
 			pointer_to_free = url = url_decode(tok);
-
 			debug(D_WEB_CLIENT, "%llu: I don't know how to handle POST with form data. Assuming it is a GET on url '%s'.", w->id, url);
 		}
 
 		w->last_url[0] = '\0';
-		if(url) {
+
+		if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
+			strncpy(w->last_url, url, URL_MAX);
+			w->last_url[URL_MAX] = '\0';
+
+			code = 200;
+			w->response.data->contenttype = CT_TEXT_PLAIN;
+			buffer_flush(w->response.data);
+			buffer_strcat(w->response.data, "OK");
+		}
+		else if(url) {
+#ifdef NETDATA_WITH_ZLIB
+			if(enable_gzip)
+				web_client_enable_deflate(w);
+#endif
+
 			strncpy(w->last_url, url, URL_MAX);
 			w->last_url[URL_MAX] = '\0';
 
@@ -1281,8 +1304,8 @@ void web_client_process(struct web_client *w) {
 		"Server: NetData Embedded HTTP Server\r\n"
 		"Content-Type: %s\r\n"
 		"Access-Control-Allow-Origin: *\r\n"
-		"Access-Control-Allow-Methods: GET\r\n"
-		"Access-Control-Allow-Headers: x-requested-with\r\n"
+		"Access-Control-Allow-Methods: GET, OPTIONS\r\n"
+		"Access-Control-Allow-Headers: accept, x-requested-with\r\n"
 		"Date: %s\r\n"
 		, code, code_msg
 		, w->keepalive?"keep-alive":"close"
@@ -1357,6 +1380,10 @@ void web_client_process(struct web_client *w) {
 
 	// pretty logging
 	switch(w->mode) {
+		case WEB_CLIENT_MODE_OPTIONS:
+			debug(D_WEB_CLIENT, "%llu: Done preparing the OPTIONS response. Sending data (%d bytes) to client.", w->id, w->response.data->len);
+			break;
+
 		case WEB_CLIENT_MODE_NORMAL:
 			debug(D_WEB_CLIENT, "%llu: Done preparing the response. Sending data (%d bytes) to client.", w->id, w->response.data->len);
 			break;

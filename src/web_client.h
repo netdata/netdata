@@ -21,6 +21,7 @@ extern int web_enable_gzip;
 
 #define WEB_CLIENT_MODE_NORMAL		0
 #define WEB_CLIENT_MODE_FILECOPY	1
+#define WEB_CLIENT_MODE_OPTIONS		2
 
 #define URL_MAX 8192
 #define ZLIB_CHUNK 	16384
