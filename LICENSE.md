@@ -73,6 +73,18 @@ connectivity is not available.
     Released under GNU General Public License (GPL) version 2
 
 
+- [FontAwesome](https://fortawesome.github.io/Font-Awesome/)
+
+    Created by Dave Gandy
+    Font license: [SIL OFL 1.1](http://scripts.sil.org/OFL)
+    CSS license: [MIT License](http://opensource.org/licenses/mit-license.html)
+
+
+- [IconsDB.com Icons](http://www.iconsdb.com/soylent-red-icons/seo-performance-icon.html)
+
+    Icons provided as CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
+
+
 - [morris.js](http://morrisjs.github.io/morris.js/)
 
     Copyright 2013, Olly Smith
@@ -85,13 +97,15 @@ connectivity is not available.
     [MIT License](http://raphaeljs.com/license.html)
     
 
-- [FontAwesome](https://fortawesome.github.io/Font-Awesome/)
+- [C3](http://c3js.org/)
 
-    Created by Dave Gandy
-    Font license: [SIL OFL 1.1](http://scripts.sil.org/OFL)
-    CSS license: [MIT License](http://opensource.org/licenses/mit-license.html)
+    Copyright 2013, Masayuki Tanaka
+    [MIT License](https://github.com/masayuki0812/c3/blob/master/LICENSE)
+    
 
-- [IconsDB.com Icons](http://www.iconsdb.com/soylent-red-icons/seo-performance-icon.html)
+- [D3](http://d3js.org/)
 
-    Icons provided as CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
+    Copyright 2015, Mike Bostock
+    [BSD License](http://opensource.org/licenses/BSD-3-Clause)
+    
 

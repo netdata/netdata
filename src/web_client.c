@@ -468,6 +468,9 @@ uint32_t web_client_api_request_v1_data_format(char *name)
 	else if(!strcmp(name, DATASOURCE_FORMAT_SSV_COMMA)) // ssvcomma
 		return DATASOURCE_SSV_COMMA;
 
+	else if(!strcmp(name, DATASOURCE_FORMAT_CSV_JSON_ARRAY)) // csvjsonarray
+		return DATASOURCE_CSV_JSON_ARRAY;
+
 	return DATASOURCE_JSON;
 }
 

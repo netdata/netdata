@@ -357,16 +357,23 @@
 						<i class="fa fa-circle"></i> <a href="https://github.com/marcj/css-element-queries" target="_blank">CSS Element Queries</a>,
 						<i class="fa fa-copyright"></i> Copyright Marc J. Schmidt, <a href="https://github.com/marcj/css-element-queries/blob/master/LICENSE" target="_blank">MIT License</a>
 
+						<i class="fa fa-circle"></i> <a href="https://fortawesome.github.io/Font-Awesome/" target="_blank">FontAwesome</a>,
+						<i class="fa fa-copyright"></i> Created by Dave Gandy, Font: <a href="http://scripts.sil.org/OFL" target="_blank">SIL OFL 1.1 License</a>, CSS: <a href="http://opensource.org/licenses/mit-license.html" target="_blank">MIT License</a>
+
+						<i class="fa fa-circle"></i> <a href="http://www.iconsdb.com/soylent-red-icons/seo-performance-icon.html" target="_blank">IconsDB.com Icons</a>, Icons provided as CC0 1.0 Universal (CC0 1.0) Public Domain Dedication.
+
 						<i class="fa fa-circle"></i> <a href="http://morrisjs.github.io/morris.js/" target="_blank">morris.js</a>,
 						<i class="fa fa-copyright"></i> Copyright 2013, Olly Smith, <a href="http://morrisjs.github.io/morris.js/" target="_blank">Simplified BSD License</a>
 
 						<i class="fa fa-circle"></i> <a href="http://raphaeljs.com/" target="_blank">Raphaël</a>,
 						<i class="fa fa-copyright"></i> Copyright 2008, Dmitry Baranovskiy, <a href="http://raphaeljs.com/license.html" target="_blank">MIT License</a>
 
-						<i class="fa fa-circle"></i> <a href="https://fortawesome.github.io/Font-Awesome/" target="_blank">FontAwesome</a>,
-						<i class="fa fa-copyright"></i> Created by Dave Gandy, Font: <a href="http://scripts.sil.org/OFL" target="_blank">SIL OFL 1.1 License</a>, CSS: <a href="http://opensource.org/licenses/mit-license.html" target="_blank">MIT License</a>
+						<i class="fa fa-circle"></i> <a href="http://C3js.org/" target="_blank">C3</a>,
+						<i class="fa fa-copyright"></i> Copyright 2013, Masayuki Tanaka, <a href="https://github.com/masayuki0812/c3/blob/master/LICENSE" target="_blank">MIT License</a>
 
-						<i class="fa fa-circle"></i> <a href="http://www.iconsdb.com/soylent-red-icons/seo-performance-icon.html" target="_blank">IconsDB.com Icons</a>, Icons provided as CC0 1.0 Universal (CC0 1.0) Public Domain Dedication.
+						<i class="fa fa-circle"></i> <a href="http://D3js.org/" target="_blank">D3</a>,
+						<i class="fa fa-copyright"></i> Copyright 2015, Mike Bostock, <a href="http://opensource.org/licenses/BSD-3-Clause" target="_blank">BSD License</a>
+
 					</small>
 				</div>
 			</div>
@@ -916,17 +923,55 @@ function prepareScreen(data) {
 			$.each(disks, function(j, c) {
 				sidebar += '<li class><a href="#' + name2id(c.name) + '">' + c.name + '</a></li>';
 				html += '<div class="netdata-group-container" id="disk_' + name2id(c.name) + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + name2id(c.name) + '" class="netdata-chart-alignment" role="heading">' + c.name + '</h2>';
+				var head = '<div class="netdata-chart-alignment">';
+				var all = '';
 				$.each(c.values, function(x, f) {
 					var c = null;
 					var h = options.chartsHeight / 2;
 					switch(f.type) {
-						case 'disk'        : h = options.chartsHeight; break;
+						case 'disk'        : h = options.chartsHeight;
+								head += '<div style="margin-right: 10px;" data-netdata="' + f.id + '"'
+								+ ' data-dimensions="reads"'
+								+ ' data-chart-library="easypiechart"'
+								+ ' data-title="Read"'
+								+ ' data-width="120px"'
+								+ ' data-height="120px"'
+								+ ' data-before="0"'
+								+ ' data-after="-' + duration.toString() + '"'
+								+ ' data-points="' + duration.toString() + '"'
+								+ ' data-colors="' + NETDATA.colors[0] + '"'
+								+ ' role="application"></div>';
+
+								head += '<div style="margin-right: 10px;" data-netdata="' + f.id + '"'
+								+ ' data-dimensions="writes"'
+								+ ' data-chart-library="easypiechart"'
+								+ ' data-title="Write"'
+								+ ' data-width="120px"'
+								+ ' data-height="120px"'
+								+ ' data-before="0"'
+								+ ' data-after="-' + duration.toString() + '"'
+								+ ' data-points="' + duration.toString() + '"'
+								+ ' data-colors="' + NETDATA.colors[1] + '"'
+								+ ' role="application"></div>';
+								break;
 						case 'disk_backlog': c = '#DD4477'; break;
-						case 'disk_util'   : c = '#109618'; break;
+						case 'disk_util'   : c = '#109618';
+								head += '<div style="margin-right: 10px;" data-netdata="' + f.id + '"'
+								+ ' data-chart-library="easypiechart"'
+								+ ' data-title="Utilization"'
+								+ ' data-easypiechart-max-value="100"'
+								+ ' data-width="120px"'
+								+ ' data-height="120px"'
+								+ ' data-before="0"'
+								+ ' data-after="-' + duration.toString() + '"'
+								+ ' data-points="' + duration.toString() + '"'
+								+ ' data-colors="' + c + '"'
+								+ ' role="application"></div>';
+								break;
 						case 'disk_qops'   : c = '#E67300'; break;
 					}
 
-					html += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
+					all += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
 						+ ' data-width="100%"'
 						+ ' data-height="' + h.toString() + 'px"'
 						+ ' data-before="0"'
@@ -935,7 +980,8 @@ function prepareScreen(data) {
 						+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
 						+ ' role="application"></div>';
 				});
-				html += '</div>'; // netdata-group-container
+				head += '</div>';
+				html += head + all + '</div>'; // netdata-group-container
 			});
 			sidebar += '</ul>';
 		}

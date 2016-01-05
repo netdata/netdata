@@ -340,6 +340,87 @@ Sparklines using dygraphs
 
 
 
+<hr>
+<h1>EasyPieChart</h1>
+<br/>
+<div style="width: 33%; display: inline-block;">
+	<div style="display: inline-block; position: relative;">
+		<div data-netdata="system.processes"
+			data-chart-library="easypiechart"
+			data-width="200"
+			data-height="200"
+			data-after="-300"
+			data-points="300"
+			data-dt-element-name="time601"
+			></div>
+		<br/>
+		<small>rendered in <span id="time601">X</span> ms</small>
+	</div>
+	<div style="display: inline-block; position: relative;">
+		<div data-netdata="system.processes"
+			data-chart-library="easypiechart"
+			data-width="150"
+			data-height="150"
+			data-after="-300"
+			data-points="150"
+			data-dt-element-name="time601a"
+			></div>
+		<br/>
+		<small>rendered in <span id="time601a">X</span> ms</small>
+	</div>
+</div>
+<div style="width: 33%; display: inline-block;">
+	<div style="display: inline-block; position: relative;">
+		<div data-netdata="system.ipv4"
+			data-chart-library="easypiechart"
+			data-width="200"
+			data-height="200"
+			data-after="-300"
+			data-points="300"
+			data-dt-element-name="time602"
+			></div>
+		<br/>
+		<small>rendered in <span id="time602">X</span> ms</small>
+	</div>
+	<div style="display: inline-block; position: relative;">
+		<div data-netdata="system.ipv4"
+			data-chart-library="easypiechart"
+			data-width="100"
+			data-height="100"
+			data-after="-300"
+			data-points="150"
+			data-dt-element-name="time602a"
+			></div>
+		<br/>
+		<small>rendered in <span id="time602a">X</span> ms</small>
+	</div>
+</div>
+<div style="width: 33%; display: inline-block;">
+	<div style="display: inline-block; position: relative;">
+		<div data-netdata="system.cpu"
+			data-chart-library="easypiechart"
+			data-width="200"
+			data-height="200"
+			data-after="-300"
+			data-points="300"
+			data-dt-element-name="time603"
+			></div>
+		<br/>
+		<small>rendered in <span id="time603">X</span> ms</small>
+	</div>
+	<div style="display: inline-block; position: relative;">
+		<div data-netdata="system.cpu"
+			data-chart-library="easypiechart"
+			data-width="75"
+			data-height="75"
+			data-after="-300"
+			data-points="150"
+			data-dt-element-name="time603a"
+			></div>
+		<br/>
+		<small>rendered in <span id="time603a">X</span> ms</small>
+	</div>
+</div>
 
 <hr>
 <h1>Google Charts</h1>
@@ -387,7 +468,7 @@ NetData is a complete Google Visualization API provider.
 
 <hr>
 <h1>Morris Charts</h1>
-Unfortunatelly, Morris Charts are veeeeeeeeeeeeeeeery slow! We force them to lower their detail to get acceptable results.
+Unfortunatelly, Morris Charts are very slow. Here we force them to lower their detail to get acceptable results.
 <br/>
 <div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.processes"
@@ -422,6 +503,53 @@ Unfortunatelly, Morris Charts are veeeeeeeeeeeeeeeery slow! We force them to low
 	<br/>
 	<small>rendered in <span id="time403">X</span> ms</small>
 </div>
+
+
+<hr>
+<h1>C3 Charts</h1>
+C3 charts are not usable in large scale. They suffer from the following issues:
+<ul>
+ <li>extreme use of transitions (implemented with D3 instead of CSS, meaning they are javascript rendered) that cannot be disabled - even opacity is hardcoded in the javascript library</li>
+ <li>rendering is done with <code>SVG</code> instead of <code>canvas</code>, so they use DOM elements for every point, becomimg useless if more than 500 points are drawn</li>
+ <li>lack of a <code>raw</code> data format, so every time a chart is updated, data convertion in javascript is required</li>
+ <li>lack of <code>stacked</code> charts support</li>
+</ul>
+So, we avoid flashing the charts, here we destroy and re-create the charts on each update. Also, since they manipulate the data with javascript we were forced to lower the detail they render to get acceptable results.
+<br/>
+<div style="width: 33%; display: inline-block;">
+	<div data-netdata="system.processes"
+		data-chart-library="c3"
+		data-width="100%"
+		data-height="200"
+		data-after="-300"
+		data-dt-element-name="time701"
+		></div>
+	<br/>
+	<small>rendered in <span id="time701">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+	<div data-netdata="system.ipv4"
+		data-chart-library="c3"
+		data-width="100%"
+		data-height="200"
+		data-after="-300"
+		data-dt-element-name="time702"
+		></div>
+	<br/>
+	<small>rendered in <span id="time702">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+	<div data-netdata="system.cpu"
+		data-chart-library="c3"
+		data-width="100%"
+		data-height="200"
+		data-after="-300"
+		data-dt-element-name="time703"
+		></div>
+	<br/>
+	<small>rendered in <span id="time703">X</span> ms</small>
+</div>
+
 
 
 

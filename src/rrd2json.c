@@ -835,7 +835,7 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 	//info("RRD2JSON(): %s: END", r->st->id);
 }
 
-static void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startline, const char *separator, const char *endline)
+static void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startline, const char *separator, const char *endline, const char *betweenlines)
 {
 	//info("RRD2CSV(): %s: BEGIN", r->st->id);
 	long c, i;
@@ -848,10 +848,14 @@ static void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startlin
 
 		if(!i) {
 			buffer_strcat(wb, startline);
+			if(options & RRDR_OPTION_LABEL_QUOTES) buffer_strcat(wb, "\"");
 			buffer_strcat(wb, "time");
+			if(options & RRDR_OPTION_LABEL_QUOTES) buffer_strcat(wb, "\"");
 		}
 		buffer_strcat(wb, separator);
+		if(options & RRDR_OPTION_LABEL_QUOTES) buffer_strcat(wb, "\"");
 		buffer_strcat(wb, d->name);
+		if(options & RRDR_OPTION_LABEL_QUOTES) buffer_strcat(wb, "\"");
 		i++;
 	}
 	buffer_strcat(wb, endline);
@@ -873,6 +877,7 @@ static void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startlin
 		calculated_number *cn = &r->v[ i * r->d ];
 		uint8_t *co = &r->o[ i * r->d ];
 
+		buffer_strcat(wb, betweenlines);
 		buffer_strcat(wb, startline);
 
 		time_t now = r->t[i];
@@ -1470,12 +1475,29 @@ int rrd2format(RRDSET *st, BUFFER *wb, BUFFER *dimensions, uint32_t format, long
 		if(options & RRDR_OPTION_JSON_WRAP) {
 			wb->contenttype = CT_APPLICATION_JSON;
 			rrdr_json_wrapper_begin(r, wb, format, options, 1);
-			rrdr2csv(r, wb, options, "", ",", "\\n");
+			rrdr2csv(r, wb, options, "", ",", "\\n", "");
 			rrdr_json_wrapper_end(r, wb, format, options, 1);
 		}
 		else {
 			wb->contenttype = CT_TEXT_PLAIN;
-			rrdr2csv(r, wb, options, "", ",", "\r\n");
+			rrdr2csv(r, wb, options, "", ",", "\r\n", "");
+		}
+		break;
+
+	case DATASOURCE_CSV_JSON_ARRAY:
+		wb->contenttype = CT_APPLICATION_JSON;
+		if(options & RRDR_OPTION_JSON_WRAP) {
+			rrdr_json_wrapper_begin(r, wb, format, options, 0);
+			buffer_strcat(wb, "[\n");
+			rrdr2csv(r, wb, options + RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n");
+			buffer_strcat(wb, "\n]");
+			rrdr_json_wrapper_end(r, wb, format, options, 0);
+		}
+		else {
+			wb->contenttype = CT_TEXT_PLAIN;
+			buffer_strcat(wb, "[\n");
+			rrdr2csv(r, wb, options + RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n");
+			buffer_strcat(wb, "\n]");
 		}
 		break;
 
@@ -1483,12 +1505,12 @@ int rrd2format(RRDSET *st, BUFFER *wb, BUFFER *dimensions, uint32_t format, long
 		if(options & RRDR_OPTION_JSON_WRAP) {
 			wb->contenttype = CT_APPLICATION_JSON;
 			rrdr_json_wrapper_begin(r, wb, format, options, 1);
-			rrdr2csv(r, wb, options, "", "\t", "\\n");
+			rrdr2csv(r, wb, options, "", "\t", "\\n", "");
 			rrdr_json_wrapper_end(r, wb, format, options, 1);
 		}
 		else {
 			wb->contenttype = CT_TEXT_PLAIN;
-			rrdr2csv(r, wb, options, "", "\t", "\r\n");
+			rrdr2csv(r, wb, options, "", "\t", "\r\n", "");
 		}
 		break;
 
@@ -1497,14 +1519,14 @@ int rrd2format(RRDSET *st, BUFFER *wb, BUFFER *dimensions, uint32_t format, long
 			wb->contenttype = CT_APPLICATION_JSON;
 			rrdr_json_wrapper_begin(r, wb, format, options, 1);
 			buffer_strcat(wb, "<html>\\n<center>\\n<table border=\\\"0\\\" cellpadding=\\\"5\\\" cellspacing=\\\"5\\\">\\n");
-			rrdr2csv(r, wb, options, "<tr><td>", "</td><td>", "</td></tr>\\n");
+			rrdr2csv(r, wb, options, "<tr><td>", "</td><td>", "</td></tr>\\n", "");
 			buffer_strcat(wb, "</table>\\n</center>\\n</html>\\n");
 			rrdr_json_wrapper_end(r, wb, format, options, 1);
 		}
 		else {
 			wb->contenttype = CT_TEXT_HTML;
 			buffer_strcat(wb, "<html>\n<center>\n<table border=\"0\" cellpadding=\"5\" cellspacing=\"5\">\n");
-			rrdr2csv(r, wb, options, "<tr><td>", "</td><td>", "</td></tr>\n");
+			rrdr2csv(r, wb, options, "<tr><td>", "</td><td>", "</td></tr>\n", "");
 			buffer_strcat(wb, "</table>\n</center>\n</html>\n");
 		}
 		break;

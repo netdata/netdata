@@ -340,18 +340,20 @@ html {
 	display: inline-block;
 	position: absolute;
 	float: left;
-	width: 100%;
+	width: 64%;
+	margin-left: 18%;
 	text-align: center;
 	color: #999999;
-	font-weight: bold;
+	font-weight: normal;
 }
 
 .easyPieChartUnits {
 	display: inline-block;
 	position: absolute;
 	float: left;
-	width: 100%;
+	width: 60%;
+	margin-left: 20%;
 	text-align: center;
-	color: #333333;
+	color: #999999;
 	font-weight: normal;
 }
