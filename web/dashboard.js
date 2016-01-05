@@ -891,19 +891,21 @@
 			series: null
 		};
 
-		this.chart_url = null;		// string - the url to download chart info
-		this.chart = null;			// object - the chart as downloaded from the server
+		this.chart_url = null;						// string - the url to download chart info
+		this.chart = null;							// object - the chart as downloaded from the server
 
-		this.validated = false; 		// boolean - has the chart been validated?
-		this.enabled = true; 			// boolean - is the chart enabled for refresh?
-		this.paused = false;			// boolean - is the chart paused for any reason?
-		this.selected = false;		// boolean - is the chart shown a selection?
-		this.debug = false;			// boolean - console.log() debug info about this chart
+		this.title = self.data('title') || null;	// the title of the chart
 
-		this.netdata_first = 0;			// milliseconds - the first timestamp in netdata
-		this.netdata_last = 0;			// milliseconds - the last timestamp in netdata
-		this.requested_after = null;	// milliseconds - the timestamp of the request after param
-		this.requested_before = null;	// milliseconds - the timestamp of the request before param
+		this.validated = false; 					// boolean - has the chart been validated?
+		this.enabled = true; 						// boolean - is the chart enabled for refresh?
+		this.paused = false;						// boolean - is the chart paused for any reason?
+		this.selected = false;						// boolean - is the chart shown a selection?
+		this.debug = false;							// boolean - console.log() debug info about this chart
+
+		this.netdata_first = 0;						// milliseconds - the first timestamp in netdata
+		this.netdata_last = 0;						// milliseconds - the last timestamp in netdata
+		this.requested_after = null;				// milliseconds - the timestamp of the request after param
+		this.requested_before = null;				// milliseconds - the timestamp of the request before param
 
 		this.auto = {
 			name: 'auto',
@@ -2307,6 +2309,16 @@
 			var ret = 0;
 			var tolerance = 0;
 
+			if(x.width === 0 || x.height === 0 || this.element.style.display === 'none') {
+				hideChart();
+				this.___isVisible___ = false;
+
+				if(this.debug === true)
+					this.log('isVisible: ' + this.___isVisible___);
+
+				return this.___isVisible___;
+			}
+
 			if(x.top < 0 && -x.top > x.height) {
 				// the chart is entirely above
 				ret = -x.top - x.height;
@@ -2452,6 +2464,9 @@
 			this.data_update_every = chart.update_every * 1000;
 			this.data_points = Math.round(this.chartWidth() / this.chartPixelsPerPoint());
 			this.tm.last_info_downloaded = new Date().getTime();
+
+			if(this.title === null)
+				this.title = chart.title;
 		}
 
 		// fetch the chart description from the netdata server
@@ -3002,7 +3017,7 @@
 			highlightColor: highlightColor,
 			tooltipContainer: tooltipContainer,
 			tooltipClassname: tooltipClassname,
-			tooltipChartTitle: state.chart.title,
+			tooltipChartTitle: state.title,
 			tooltipFormat: tooltipFormat,
 			tooltipPrefix: tooltipPrefix,
 			tooltipSuffix: tooltipSuffix,
@@ -3170,7 +3185,7 @@
 			showRangeSelector: self.data('dygraph-showrangeselector') || false,
 			showRoller: self.data('dygraph-showroller') || false,
 
-			title: self.data('dygraph-title') || state.chart.title,
+			title: self.data('dygraph-title') || state.title,
 			titleHeight: self.data('dygraph-titleheight') || 19,
 
 			legend: self.data('dygraph-legend') || 'always', // 'onmouseover',
@@ -3790,7 +3805,7 @@
 			//width: state.chartWidth(),
 			//height: state.chartHeight(),
 			lineWidth: 1,
-			title: state.chart.title,
+			title: state.title,
 			fontSize: 11,
 			hAxis: {
 			//	title: "Time of Day",
@@ -3967,7 +3982,7 @@
 		var titletop = Math.round(valuetop - titlefontsize - (size / 20));
 		state.easyPieChartTitle = document.createElement('span');
 		state.easyPieChartTitle.className = 'easyPieChartTitle';
-		state.easyPieChartTitle.innerHTML = state.chart.name;
+		state.easyPieChartTitle.innerHTML = state.title;
 		state.easyPieChartTitle.style.fontSize = titlefontsize + 'px';
 		state.easyPieChartTitle.style.lineHeight = titlefontsize + 'px';
 		state.easyPieChartTitle.style.top = titletop.toString() + 'px';
