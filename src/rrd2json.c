@@ -474,7 +474,9 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t opti
 			"	%supdate_every%s: %d,\n"
 			"	%sfirst_entry%s: %u,\n"
 			"	%slast_entry%s: %u,\n"
-			"	%smin%s: "
+			"	%sbefore%s: %u,\n"
+			"	%safter%s: %u,\n"
+			"	%sdimension_names%s: ["
 			, kq, kq
 			, kq, kq, sq, r->st->id, sq
 			, kq, kq, sq, r->st->name, sq
@@ -482,15 +484,6 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t opti
 			, kq, kq, r->st->update_every
 			, kq, kq, rrdset_first_entry_t(r->st)
 			, kq, kq, rrdset_last_entry_t(r->st)
-			, kq, kq);
-
-	buffer_rrd_value(wb, r->min);
-	buffer_sprintf(wb, ",\n	%smax%s: ", kq, kq);
-	buffer_rrd_value(wb, r->max);
-	buffer_sprintf(wb, ",\n"
-			"	%sbefore%s: %u,\n"
-			"	%safter%s: %u,\n"
-			"	%sdimension_names%s: ["
 			, kq, kq, r->before
 			, kq, kq, r->after
 			, kq, kq);
@@ -612,14 +605,24 @@ void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb, uint32_t format, uint32_t option
 	if(r) {;}
 	if(format) {;}
 
-	char sq[2] = "";						// string quote
+	char kq[2] = "",					// key quote
+		sq[2] = "";						// string quote
 
-	if( options & RRDR_OPTION_GOOGLE_JSON )
+	if( options & RRDR_OPTION_GOOGLE_JSON ) {
+		kq[0] = '\0';
 		sq[0] = '\'';
-	else
+	}
+	else {
+		kq[0] = '"';
 		sq[0] = '"';
+	}
 
 	if(string_value) buffer_strcat(wb, sq);
+
+	buffer_sprintf(wb, ",\n	%smin%s: ", kq, kq);
+	buffer_rrd_value(wb, r->min);
+	buffer_sprintf(wb, ",\n	%smax%s: ", kq, kq);
+	buffer_rrd_value(wb, r->max);
 	buffer_strcat(wb, "\n}\n");
 }
 
@@ -663,7 +666,7 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 		snprintf(post_value, 100, "}");
 		snprintf(post_line,  100, "]}");
 		snprintf(data_begin, 100, "\n	],\n	%srows%s:\n	[\n", kq, kq);
-		snprintf(finish,     100, "\n	]\n}\n");
+		snprintf(finish,     100, "\n	]\n}");
 
 		snprintf(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
 		snprintf(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
@@ -701,7 +704,7 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 		else
 			snprintf(post_line,  100, "]");
 		snprintf(data_begin, 100, "],\n	%sdata%s:\n	[\n", kq, kq);
-		snprintf(finish,     100, "\n	]\n}\n");
+		snprintf(finish,     100, "\n	]\n}");
 
 		buffer_sprintf(wb, "{\n	%slabels%s: [", kq, kq);
 		buffer_sprintf(wb, "%stime%s", sq, sq);
@@ -933,7 +936,7 @@ static void rrdr2ssv(RRDR *r, BUFFER *wb, uint32_t options, const char *prefix, 
 		calculated_number *cn = &r->v[ i * r->d ];
 		uint8_t *co = &r->o[ i * r->d ];
 
-		calculated_number sum = 0, min = 0, max = 0;
+		calculated_number sum = 0, min = 0, max = 0, v;
 		int all_null = 1, init = 1;
 
 		// for each dimension
@@ -974,10 +977,23 @@ static void rrdr2ssv(RRDR *r, BUFFER *wb, uint32_t options, const char *prefix, 
 			else
 				buffer_strcat(wb, "null");
 		}
-		else if(options & RRDR_OPTION_MIN2MAX)
-			buffer_rrd_value(wb, max - min);
-		else
-			buffer_rrd_value(wb, sum);
+		else {
+			if(options & RRDR_OPTION_MIN2MAX)
+				v = max - min;
+			else
+				v = sum;
+
+			if(likely(i != start)) {
+				if(r->min > v) r->min = v;
+				if(r->max < v) r->max = v;
+			}
+			else {
+				r->min = v;
+				r->max = v;
+			}
+
+			buffer_rrd_value(wb, v);
+		}
 	}
 	buffer_strcat(wb, suffix);
 	//info("RRD2SSV(): %s: END", r->st->id);

@@ -220,7 +220,7 @@
 			focus: 				false,
 			visibility: 		false,
 			chart_data_url: 	false,
-			chart_errors: 		false,
+			chart_errors: 		true,
 			chart_timing: 		false,
 			chart_calls: 		false,
 			libraries: 			false,
@@ -2082,7 +2082,7 @@
 			this.data_url += "&format="  + this.library.format();
 			this.data_url += "&points="  + this.data_points.toString();
 			this.data_url += "&group="   + this.method;
-			this.data_url += "&options=" + this.library.options();
+			this.data_url += "&options=" + this.library.options(this);
 			this.data_url += '|jsonwrap';
 
 			if(NETDATA.options.current.eliminate_zero_dimensions === true)
@@ -3899,33 +3899,104 @@
 		}
 	};
 
-	NETDATA.easypiechartChartUpdate = function(state, data) {
+	NETDATA.easypiechartClearSelection = function(state) {
+		var chart = $(state.element_chart);
+		state.easyPieChartLabel.innerHTML = '';
+		chart.data('easyPieChart').update(0);
+		return true;
+	};
 
-		state.easypiechart_instance.update();
+	NETDATA.easypiechartSetSelection = function(state, t) {
+		var chart = $(state.element_chart);
+
+		if(t < state.data_after || t > state.data_before)
+			return NETDATA.easypiechartClearSelection(state);
+
+		var slot = state.data.result.length - 1 - (t - state.data_after) / state.data_update_every;
+		if(slot < 0 || slot >= state.data.result.length)
+			return NETDATA.easypiechartClearSelection(state);
+
+		var value = state.data.result[slot];
+		var max = state.data.max;
+		var pcent = Math.round(value * 100 / max);
+
+		state.easyPieChartLabel.innerHTML = state.legendFormatValue(value);
+		chart.data('easyPieChart').update(pcent);
+
+		return true;
+	};
+
+	NETDATA.easypiechartChartUpdate = function(state, data) {
+		var chart = $(state.element_chart);
+
+		var value = data.result[0];
+		var max = data.max;
+		var pcent = Math.round(value * 100 / max);
+
+		// console.log('value = ' + value + ' max = ' + max + ' pcent = ' + pcent);
+
+		state.easyPieChartLabel.innerHTML = state.legendFormatValue(value);
+		chart.data('easyPieChart').update(pcent);
 	};
 
 	NETDATA.easypiechartChartCreate = function(state, data) {
 		var self = $(state.element);
+		var chart = $(state.element_chart);
 
-		var value = 10;
-		var pcent = 10;
+		var value = data.result[0];
+		var max = data.max;
+		var pcent = Math.round(value * 100 / max);
 
-		$(state.element_chart).data('data-percent', pcent);
-		data.element_chart.innerHTML = value.toString();
+		// console.log('value = ' + value + ' max = ' + max + ' pcent = ' + pcent);
+		chart.data('data-percent', pcent);
 
-		state.easypiechart_instance = new EasyPieChart(state.element_chart, {
-			barColor: self.data('easypiechart-barcolor') || '#ef1e25',
+		var size = Math.min(state.chartWidth(), state.chartHeight());
+		var stroke = size / 15;
+		if(stroke < 3) stroke = 3;
+
+		var valuefontsize = Math.floor((size * 2 / 3) / 6);
+		var valuetop = Math.round((size - valuefontsize - 10) / 2);
+		state.easyPieChartLabel = document.createElement('span');
+		state.easyPieChartLabel.className = 'easyPieChartLabel';
+		state.easyPieChartLabel.innerHTML = state.legendFormatValue(value);
+		state.easyPieChartLabel.style.fontSize = valuefontsize + 'px';
+		state.easyPieChartLabel.style.top = valuetop.toString() + 'px';
+		state.element_chart.appendChild(state.easyPieChartLabel);
+
+		var titlefontsize = Math.floor((size * 2 / 3) / 10);
+		var titletop = Math.round(valuetop - titlefontsize - (size / 20));
+		state.easyPieChartTitle = document.createElement('span');
+		state.easyPieChartTitle.className = 'easyPieChartTitle';
+		state.easyPieChartTitle.innerHTML = state.chart.name;
+		state.easyPieChartTitle.style.fontSize = titlefontsize + 'px';
+		state.easyPieChartTitle.style.lineHeight = titlefontsize + 'px';
+		state.easyPieChartTitle.style.top = titletop.toString() + 'px';
+		state.element_chart.appendChild(state.easyPieChartTitle);
+
+		var unitfontsize = Math.floor((size * 2 / 3) / 10);
+		var unittop = Math.round(valuetop + valuefontsize + (size / 20));
+		state.easyPieChartUnits = document.createElement('span');
+		state.easyPieChartUnits.className = 'easyPieChartUnits';
+		state.easyPieChartUnits.innerHTML = state.chart.units;
+		state.easyPieChartUnits.style.fontSize = unitfontsize + 'px';
+		state.easyPieChartUnits.style.top = unittop.toString() + 'px';
+		state.element_chart.appendChild(state.easyPieChartUnits);
+
+		chart.easyPieChart({
+			barColor: self.data('easypiechart-barcolor') || state.chartColors()[0], //'#ef1e25',
 			trackColor: self.data('easypiechart-trackcolor') || '#f2f2f2',
 			scaleColor: self.data('easypiechart-scalecolor') || '#dfe0e0',
 			scaleLength: self.data('easypiechart-scalelength') || 5,
 			lineCap: self.data('easypiechart-linecap') || 'round',
-			lineWidth: self.data('easypiechart-linewidth') || 3,
+			lineWidth: self.data('easypiechart-linewidth') || stroke,
 			trackWidth: self.data('easypiechart-trackwidth') || undefined,
-			size: self.data('easypiechart-size') || Math.min(state.chartWidth(), state.chartHeight()),
+			size: self.data('easypiechart-size') || size,
 			rotate: self.data('easypiechart-rotate') || 0,
-			animate: self.data('easypiechart-rotate') || {duration: 0, enabled: false},
+			animate: self.data('easypiechart-rotate') || {duration: data.view_update_every * 1000 / 2, enabled: true},
 			easing: self.data('easypiechart-easing') || undefined
-		})
+		});
+		
+		chart.data('easyPieChart').update(pcent);
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -3978,8 +4049,8 @@
 			create: NETDATA.sparklineChartCreate,
 			update: NETDATA.sparklineChartUpdate,
 			resize: null,
-			setSelection: function(t) { return true; },
-			clearSelection: function() { return true; },
+			setSelection: undefined, // function(state, t) { return true; },
+			clearSelection: undefined, // function(state) { return true; },
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'array'; },
@@ -3995,8 +4066,8 @@
 			create: NETDATA.peityChartCreate,
 			update: NETDATA.peityChartUpdate,
 			resize: null,
-			setSelection: function(t) { return true; },
-			clearSelection: function() { return true; },
+			setSelection: undefined, // function(state, t) { return true; },
+			clearSelection: undefined, // function(state) { return true; },
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'ssvcomma'; },
@@ -4012,8 +4083,8 @@
 			create: NETDATA.morrisChartCreate,
 			update: NETDATA.morrisChartUpdate,
 			resize: null,
-			setSelection: function(t) { return true; },
-			clearSelection: function() { return true; },
+			setSelection: undefined, // function(state, t) { return true; },
+			clearSelection: undefined, // function(state) { return true; },
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'json'; },
@@ -4029,8 +4100,8 @@
 			create: NETDATA.googleChartCreate,
 			update: NETDATA.googleChartUpdate,
 			resize: null,
-			setSelection: function(t) { return true; },
-			clearSelection: function() { return true; },
+			setSelection: undefined, //function(state, t) { return true; },
+			clearSelection: undefined, //function(state) { return true; },
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'datatable'; },
@@ -4046,8 +4117,8 @@
 			create: NETDATA.raphaelChartCreate,
 			update: NETDATA.raphaelChartUpdate,
 			resize: null,
-			setSelection: function(t) { return true; },
-			clearSelection: function() { return true; },
+			setSelection: undefined, // function(state, t) { return true; },
+			clearSelection: undefined, // function(state) { return true; },
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'json'; },
@@ -4063,12 +4134,12 @@
 			create: NETDATA.easypiechartChartCreate,
 			update: NETDATA.easypiechartChartUpdate,
 			resize: null,
-			setSelection: function(t) { return true; },
-			clearSelection: function() { return true; },
+			setSelection: NETDATA.easypiechartSetSelection,
+			clearSelection: NETDATA.easypiechartClearSelection,
 			initialized: false,
 			enabled: true,
-			format: function(state) { return 'json'; },
-			options: function(state) { return ''; },
+			format: function(state) { return 'array'; },
+			options: function(state) { if(state.chart.chart_type === 'stacked') return ''; else return 'min2max'; },
 			legend: function(state) { return null; },
 			autoresize: function(state) { return false; },
 			max_updates_to_recreate: function(state) { return 5000; },

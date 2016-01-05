@@ -314,3 +314,44 @@ html {
   width: auto !important;
   height: auto !important;
 }
+
+.easyPieChart {
+	position: relative;
+	text-align: center;
+}
+
+.easyPieChart canvas {
+	position: absolute;
+	top: 0;
+	left: 0;
+}
+
+.easyPieChartLabel {
+	display: inline-block;
+	position: absolute;
+	float: left;
+	width: 100%;
+	text-align: center;
+	color: #333333;
+	font-weight: normal;
+}
+
+.easyPieChartTitle {
+	display: inline-block;
+	position: absolute;
+	float: left;
+	width: 100%;
+	text-align: center;
+	color: #999999;
+	font-weight: bold;
+}
+
+.easyPieChartUnits {
+	display: inline-block;
+	position: absolute;
+	float: left;
+	width: 100%;
+	text-align: center;
+	color: #333333;
+	font-weight: normal;
+}
