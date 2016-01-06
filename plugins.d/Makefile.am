@@ -12,4 +12,5 @@ dist_plugins_SCRIPTS = \
 	charts.d.plugin \
 	tc-qos-helper.sh \
 	loopsleepms.sh.inc \
+	sma_webbox.plugin \
 	$(NULL)
