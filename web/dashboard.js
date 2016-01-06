@@ -225,7 +225,7 @@
 			focus: 				false,
 			visibility: 		false,
 			chart_data_url: 	false,
-			chart_errors: 		true,
+			chart_errors: 		false,
 			chart_timing: 		false,
 			chart_calls: 		false,
 			libraries: 			false,
@@ -4100,15 +4100,20 @@
 	};
 
 	NETDATA.easypiechartClearSelection = function(state) {
-		var chart = $(state.element_chart);
+		if(typeof state.easyPieChartEvent !== 'undefined') {
+			if(state.easyPieChartEvent.timer !== null)
+				clearTimeout(state.easyPieChartEvent.timer);
+
+			state.easyPieChartEvent.timer = null;
+		}
+
 		state.easyPieChartLabel.innerHTML = '';
-		chart.data('easyPieChart').update(0);
+		state.easyPieChart_instance.update(0);
+		state.easyPieChart_instance.enableAnimation();
 		return true;
 	};
 
 	NETDATA.easypiechartSetSelection = function(state, t) {
-		var chart = $(state.element_chart);
-
 		if(t < state.data_after || t > state.data_before)
 			return NETDATA.easypiechartClearSelection(state);
 
@@ -4128,15 +4133,31 @@
 
 		// console.log('slot = ' + slot + ' value = ' + value + ' max = ' + max + ' pcent = ' + pcent);
 
+		if(typeof state.easyPieChartEvent === 'undefined') {
+			state.easyPieChartEvent = {
+				timer: null,
+				value: 0,
+				pcent: 0,
+			};
+		}
+
+		state.easyPieChartEvent.value = value;
+		state.easyPieChartEvent.pcent = pcent;
 		state.easyPieChartLabel.innerHTML = state.legendFormatValue(value);
-		chart.data('easyPieChart').update(pcent);
+
+		if(state.easyPieChartEvent.timer === null) {
+			state.easyPieChart_instance.disableAnimation();
+
+			state.easyPieChartEvent.timer = setTimeout(function() {
+				state.easyPieChartEvent.timer = null;
+				state.easyPieChart_instance.update(state.easyPieChartEvent.pcent);
+			}, 50);
+		}
 
 		return true;
 	};
 
 	NETDATA.easypiechartChartUpdate = function(state, data) {
-		var chart = $(state.element_chart);
-
 		var value = data.result[0];
 		if(value === null) value = 0;
 
@@ -4147,8 +4168,14 @@
 		if(max !== 0)
 			pcent = Math.round(value * 100 / max);
 
-		state.easyPieChartLabel.innerHTML = state.legendFormatValue(value);
-		chart.data('easyPieChart').update(pcent);
+		if(state.isAutoRefreshed() === true) {
+			state.easyPieChartLabel.innerHTML = state.legendFormatValue(value);
+			state.easyPieChart_instance.update(pcent);
+		}
+		else {
+			state.easyPieChartLabel.innerHTML = '';
+			state.easyPieChart_instance.update(0);
+		}
 		return true;
 	};
 
@@ -4218,11 +4245,12 @@
 			trackWidth: self.data('easypiechart-trackwidth') || undefined,
 			size: self.data('easypiechart-size') || size,
 			rotate: self.data('easypiechart-rotate') || 0,
-			animate: self.data('easypiechart-rotate') || {duration: data.view_update_every * 1000, enabled: true},
+			animate: self.data('easypiechart-rotate') || {duration: data.view_update_every * 1000 / 2, enabled: true},
 			easing: self.data('easypiechart-easing') || undefined
 		});
 		
-		chart.data('easyPieChart').update(pcent);
+		state.easyPieChart_instance = chart.data('easyPieChart');
+		state.easyPieChart_instance.update(pcent);
 		return true;
 	};
 
@@ -4395,8 +4423,8 @@
 			create: NETDATA.easypiechartChartCreate,
 			update: NETDATA.easypiechartChartUpdate,
 			resize: null,
-			setSelection: undefined, // NETDATA.easypiechartSetSelection,
-			clearSelection: undefined, // NETDATA.easypiechartClearSelection,
+			setSelection: NETDATA.easypiechartSetSelection,
+			clearSelection: NETDATA.easypiechartClearSelection,
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'array'; },
