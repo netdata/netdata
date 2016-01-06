@@ -972,7 +972,7 @@
 		// PRIVATE FUNCTIONS
 
 		var createDOM = function() {
-			if(that.enabled == false) return;
+			if(that.enabled === false) return;
 
 			if(that.element_message !== null) that.element_message.innerHTML = '';
 			if(that.element_legend !== null) that.element_legend.innerHTML = '';
@@ -1024,7 +1024,7 @@
 		 * create the basic DOM for a chart
 		 */
 		var init = function() {
-			if(that.enabled == false) return;
+			if(that.enabled === false) return;
 
 			that.paused = false;
 			that.selected = false;
@@ -1884,7 +1884,7 @@
 				var label = state.element_legend_childs.series[name];
 
 				// create the dimension visibility tracking for this label
-				var ds = state.dimensions_visibility.dimensionAdd(name, label.name, label.value, color);
+				state.dimensions_visibility.dimensionAdd(name, label.name, label.value, color);
 
 				var rgb = NETDATA.colorHex2Rgb(color);
 				label.name.innerHTML = '<table class="netdata-legend-name-table-'
@@ -3303,8 +3303,6 @@
 				}
 			},
 			legendFormatter: function(data) {
-				var g = data.dygraph;
-				var html;
 				var elements = state.element_legend_childs;
 
 				// if the hidden div is not there
@@ -3349,7 +3347,7 @@
 				state.globalSelectionSyncStop();
 				state.globalSelectionSyncDelay();
 
-				if(state.updateChartPanOrZoom(minDate, maxDate) == false) {
+				if(state.updateChartPanOrZoom(minDate, maxDate) === false) {
 					// we should not zoom that much
 					state.dygraph_instance.updateOptions({
 						dateWindow: null,
