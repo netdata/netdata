@@ -1,0 +1,350 @@
+#!/usr/bin/env node
+
+// This program will connect to one or more SMA Sunny Webboxes
+// to get the Solar Power Generated (current, today, total).
+
+// It needs a configuration file named sma_webbox.conf
+// The configuration is a JSON array, like this:
+
+/* --- BEGIN EXAMPLE CONFIGURATION ---
+
+[
+        {
+                "name": "label_of_solar_installation1",
+                "hostname": "10.11.13.2"
+        },
+        {
+                "name": "label_of_solar_installation2",
+                "hostname": "10.11.13.3"
+        }
+]
+
+   --- END EXAMPLE CONFIGURATION --- */
+
+// you can add an unlimited number of webboxes
+
+var http = require('http');
+var fs = require('fs');
+
+// --------------------------------------------------------------------------------------------------------------------
+// get NETDATA environment variables
+
+var NETDATA_PLUGINS_DIR = process.env.NETDATA_PLUGINS_DIR || __dirname;
+var NETDATA_CONFIG_DIR = process.env.NETDATA_CONFIG_DIR || '/etc/netdata';
+var NETDATA_UPDATE_EVERY = process.env.NETDATA_UPDATE_EVERY || 1;
+NETDATA_UPDATE_EVERY = NETDATA_UPDATE_EVERY * 1000;
+
+var filename = NETDATA_CONFIG_DIR + '/sma_webbox.conf';
+
+// --------------------------------------------------------------------------------------------------------------------
+// get command line arguments
+
+var DEBUG = false;
+var UPDATE_EVERY = NETDATA_UPDATE_EVERY;
+var EXIT_AFTER_MS = 3600 * 1000;
+
+function debug(msg) {
+	if(DEBUG)
+		console.error(__filename + ': DEBUG: ' + ((typeof(msg) === 'object')?JSON.stringify(msg):msg).toString());
+}
+
+function error(msg) {
+	console.error(__filename + ': ERROR: ' + ((typeof(msg) === 'object')?JSON.stringify(msg):msg).toString());
+}
+
+function netdata(msg) {
+	console.log(msg.toString());
+}
+
+var found_myself = false;
+process.argv.forEach(function (val, index, array) {
+	debug('PARAM: ' + val);
+
+	if(!found_myself) {
+		if(val === __filename)
+			found_myself = true;
+	}
+	else {
+		switch(val) {
+			case 'debug':
+				DEBUG = true;
+				debug('DEBUG enabled');
+				break;
+
+			default:
+				try {
+					var x = parseInt(val);
+					if(x > 0) {
+						UPDATE_EVERY = x * 1000;
+						if(UPDATE_EVERY < NETDATA_UPDATE_EVERY) {
+							UPDATE_EVERY = NETDATA_UPDATE_EVERY;
+							debug('Update frequency ' + x + 's is too low');
+						}
+
+						debug('Update frequency set to ' + UPDATE_EVERY + ' ms');
+					}
+					else error('Ignoring parameter: ' + val);
+				}
+				catch(e) {
+					error('Cannot get value of parameter: ' + val);
+				}
+		}
+	}
+});
+
+// there is no meaning to update the values sooner than 5 seconds
+// the SMA webbox collects data every 5 seconds
+if(UPDATE_EVERY < 5000) {
+	debug('Adjusting update frequency to 5 seconds');
+	UPDATE_EVERY = 5000;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// parse configuration
+
+var Servers = new Array();
+try {
+	Servers = JSON.parse(fs.readFileSync(filename, 'utf8'));
+}
+catch(e) {
+	error('Cannot read configuration file ' + filename + ': ' + e.message);
+	process.exit(1);
+}
+
+
+// --------------------------------------------------------------------------------------------------------------------
+// library functions
+
+// function to get data from server
+function getSMAData(server, callback) {
+	// make sure there is not a request in progress for this webbox
+	if(typeof(server.running) === 'boolean' && server.running) {
+		debug(server.name + ' is already running');
+		return false;
+	}
+	server.running = true;
+
+	var now = new Date().getTime();
+
+	// align the time to collect the values
+	if(typeof(server.next_run) === 'undefined')
+		server.next_run = now - (now % UPDATE_EVERY) + UPDATE_EVERY;
+
+	// if it is too soon, we will collect data later
+	if(now < server.next_run) {
+		debug(server.name + ' not yet');
+		server.running = false;
+		return false;
+	}
+
+	// find the next refresh for this server
+	while(server.next_run < now)
+		server.next_run += UPDATE_EVERY;
+
+	if(typeof(server.last_updated) === 'undefined')
+		server.last_updated = 0;
+
+	if(typeof(server.agent) === 'undefined') {
+		server.agent = new http.Agent({
+			keepAlive: true,
+			keepAliveMsecs: UPDATE_EVERY * 5,
+			maxSockets: 2, // it needs 2, otherwise it ignores keepAlive
+			maxFreeSockets: 1
+		});
+	}
+
+	if(typeof(server.created) === 'undefined') {
+		netdata('CHART sma_webbox_' + server.name + '.current "" "Solar Power Production of ' + server.name + '" "Watts" sma_webbox_' + server.name + ' "" area 15000 ' + Math.round(UPDATE_EVERY / 1000));
+		netdata('DIMENSION GriPwr power absolute 1 1');
+		netdata('CHART sma_webbox_' + server.name + '.today "" "Today\'s Solar Power Production of ' + server.name + '" "kWatts" sma_webbox_' + server.name + ' "" area 15001 ' + Math.round(UPDATE_EVERY / 1000));
+		netdata('DIMENSION GriEgyTdy today absolute 1 1000');
+		netdata('CHART sma_webbox_' + server.name + '.total "" "Total Solar Power Production of ' + server.name + '" "kWatts" sma_webbox_' + server.name + ' "" area 15001 ' + Math.round(UPDATE_EVERY / 1000));
+		netdata('DIMENSION GriEgyTot total absolute 1 1000');
+		server.created = true;
+	}
+
+	server.error = 500;
+	server.success = false;
+	server.data = {
+		'GriPwr': {
+			unit: null,
+			value: null
+		},
+		'GriEgyTdy': {
+			unit: null,
+			value: null
+		},
+		'GriEgyTot': {
+			unit: null,
+			value: null
+		}
+	};
+
+	var postData = 'RPC={"proc":"GetPlantOverview","format":"JSON","version":"1.0","id":"1"}'
+
+	var options = {
+		protocol: server.protocol || 'http:',
+		hostname: server.hostname,
+		path: server.path || '/rpc',
+		family: server.family || 4,
+		port: server.port || 80,
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/x-www-form-urlencoded',
+			'Connection': 'keep-alive',
+			'Content-Length': postData.length
+		},
+		agent: server.agent
+	};
+
+	server.response = '';
+	server.request = http.request(options, function(res) {
+		res.setEncoding('utf8');
+		server.error = 0;
+
+		server.response_code = res.statusCode;
+
+		// check if we got HTTP/200
+		if(server.response_code !== 200) {
+			debug('Server responded with ' + server.response_code + ', failed to get data.');
+			server.error = 503;
+			server.running = false;
+			server.success = false;
+			if(typeof(callback) === 'function')
+				callback(server);
+		}
+
+		res.on('error', function() {
+			debug('Received HTTP read error, failed to get data.');
+			server.error = 504;
+			server.success = false;
+			server.running = false;
+			if(typeof(callback) === 'function')
+				callback(server);
+		});
+
+		res.on('data', function(chunk) {
+			server.response += chunk;
+		});
+
+		res.on('end', function() {
+			if(server.error !== 0)
+				return;
+
+			var t = new Date().getTime();
+
+			server.dt = 0;
+			if(server.last_updated !== 0)
+				server.dt = t - server.last_updated;
+
+			debug('RESPONSE: ' + server.response);
+			try {
+				server.response = JSON.parse(server.response);
+
+				var len = server.response.result.overview.length;
+				while(len--) {
+					var e = server.response.result.overview[len];
+					debug(e);
+					if(typeof(server.data[e.meta]) !== 'undefined') {
+						server.data[e.meta].value = e.value;
+						server.data[e.meta].unit = e.unit;
+					}
+				}
+				server.error = 0;
+				server.last_updated = t;
+
+				if(server.data['GriPwr'].value !== null) {
+					netdata('BEGIN sma_webbox_' + server.name + '.current ' + ((server.dt)?server.dt*1000:'').toString());
+					netdata('SET GriPwr = ' + server.data['GriPwr'].value);
+					netdata('END');
+				}
+
+				if(server.data['GriEgyTdy'].value !== null) {
+					netdata('BEGIN sma_webbox_' + server.name + '.today ' + ((server.dt)?server.dt*1000:'').toString());
+					netdata('SET GriEgyTdy = ' + Math.round(server.data['GriEgyTdy'].value * 1000));
+					netdata('END');
+				}
+
+				if(server.data['GriEgyTot'].value !== null) {
+					netdata('BEGIN sma_webbox_' + server.name + '.total ' + ((server.dt)?server.dt*1000:'').toString());
+					netdata('SET GriEgyTot = ' + Math.round(server.data['GriEgyTot'].value * 1000));
+					netdata('END');
+				}
+			}
+			catch(e) {
+				server.error = 501;
+				server.failure_message = e.message;
+				error('FAILED TO PARSE DATA: ' + e.message);
+			}
+
+			server.running = false;
+			if(typeof(callback) === 'function') {
+				server.success = true;
+				callback(server);
+			}
+		});
+	});
+
+	server.request.on('error', function(e) {
+		server.running = false;
+		server.error = 502;
+		server.failure_message = e.message;
+		error('problem with request to ' + server.hostname + ': ' + e.message);
+	});
+
+	// write data to request body
+	server.request.write(postData);
+	server.request.end();
+
+	return true;
+}
+
+// get a message for the current error
+function getSMAError(server) {
+	if(server.success) return 'OK';
+	
+	if(typeof(server.error) === 'undefined')
+		return 'Not initialized';
+
+	switch(server.error) {
+		case 500: return 'Pre-fetch Error';
+		case 501: return 'Failed to parse server response';
+		case 502: return 'HTTP error while making request';
+		case 504: return 'Failed to read response data';
+		default: return 'Undefined Error';
+	}
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+// if we don't have any servers to run
+// inform netdata we don't need to run on this machine
+if(!Servers.length) {
+	error('No SMA webbox servers defined.');
+	process.exit(1);
+}
+
+var started = new Date().getTime();
+function runServers() {
+	var now = new Date().getTime();
+	if(now - started > EXIT_AFTER_MS) {
+		debug('We have to exit now. Netdata will restart us.');
+		// FIXME
+		// We should wait for any currently running requests to complete
+		process.exit(0);
+	}
+
+	var len = Servers.length;
+	while(len--) {
+		getSMAData(Servers[len], function(server) {
+			if(server.success)
+				debug(' OK ' + server.name + ' time since last run: ' + server.dt + ' ms');
+			else
+				error(getSMAError(server) + server.name);
+		});
+	}
+
+	setTimeout(runServers, 100);
+}
+
+runServers();
