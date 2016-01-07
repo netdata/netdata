@@ -144,6 +144,7 @@ function getSMAData(server, callback) {
 	if(typeof(server.last_updated) === 'undefined')
 		server.last_updated = 0;
 
+	// create an agent for keep-alive
 	if(typeof(server.agent) === 'undefined') {
 		server.agent = new http.Agent({
 			keepAlive: true,
@@ -153,18 +154,22 @@ function getSMAData(server, callback) {
 		});
 	}
 
+	// create the charts, if we haven't already
 	if(typeof(server.created) === 'undefined') {
 		netdata('CHART sma_webbox_' + server.name + '.current "" "Solar Power Production of ' + server.name + '" "Watts" sma_webbox_' + server.name + ' "" area 15000 ' + Math.round(UPDATE_EVERY / 1000));
 		netdata('DIMENSION GriPwr power absolute 1 1');
+
 		netdata('CHART sma_webbox_' + server.name + '.today "" "Today\'s Solar Power Production of ' + server.name + '" "kWatts" sma_webbox_' + server.name + ' "" area 15001 ' + Math.round(UPDATE_EVERY / 1000));
 		netdata('DIMENSION GriEgyTdy today absolute 1 1000');
+
 		netdata('CHART sma_webbox_' + server.name + '.total "" "Total Solar Power Production of ' + server.name + '" "kWatts" sma_webbox_' + server.name + ' "" area 15001 ' + Math.round(UPDATE_EVERY / 1000));
 		netdata('DIMENSION GriEgyTot total absolute 1 1000');
+
 		server.created = true;
 	}
 
-	server.error = 500;
-	server.success = false;
+	// initialize our metrics to null
+	// so that we will know if we read them or not
 	server.data = {
 		'GriPwr': {
 			unit: null,
@@ -197,24 +202,38 @@ function getSMAData(server, callback) {
 		agent: server.agent
 	};
 
+	server.error = 0;
+	server.success = false;
 	server.response = '';
 	server.request = http.request(options, function(res) {
 		res.setEncoding('utf8');
-		server.error = 0;
-
 		server.response_code = res.statusCode;
 
 		// check if we got HTTP/200
 		if(server.response_code !== 200) {
-			debug('Server responded with ' + server.response_code + ', failed to get data.');
-			server.error = 503;
-			server.running = false;
-			server.success = false;
-			if(typeof(callback) === 'function')
-				callback(server);
+			// if this request is in error and we have
+			// handled it, don't do anything more
+			if(server.error === 0) {
+				debug('Server responded with ' + server.response_code + ', failed to get data.');
+				server.error = 503;
+				server.success = false;
+				server.running = false;
+				if(typeof(callback) === 'function')
+					callback(server);
+			}
 		}
 
+		res.on('data', function(chunk) {
+			// read more data, only if there is no error
+			if(server.error === 0)
+				server.response += chunk;
+		});
+
 		res.on('error', function() {
+			// do we have already handled this error?
+			if(server.error !== 0)
+				return;
+
 			debug('Received HTTP read error, failed to get data.');
 			server.error = 504;
 			server.success = false;
@@ -223,11 +242,9 @@ function getSMAData(server, callback) {
 				callback(server);
 		});
 
-		res.on('data', function(chunk) {
-			server.response += chunk;
-		});
-
 		res.on('end', function() {
+			// if there is an error we have handled
+			// don't do anything
 			if(server.error !== 0)
 				return;
 
@@ -250,8 +267,6 @@ function getSMAData(server, callback) {
 						server.data[e.meta].unit = e.unit;
 					}
 				}
-				server.error = 0;
-				server.last_updated = t;
 
 				if(server.data['GriPwr'].value !== null) {
 					netdata('BEGIN sma_webbox_' + server.name + '.current ' + ((server.dt)?server.dt*1000:'').toString());
@@ -270,26 +285,37 @@ function getSMAData(server, callback) {
 					netdata('SET GriEgyTot = ' + Math.round(server.data['GriEgyTot'].value * 1000));
 					netdata('END');
 				}
+
+				server.error = 0;
+				server.success = true;
+				server.last_updated = t;
 			}
 			catch(e) {
 				server.error = 501;
+				server.success = false;
 				server.failure_message = e.message;
 				error('FAILED TO PARSE DATA: ' + e.message);
 			}
 
 			server.running = false;
-			if(typeof(callback) === 'function') {
-				server.success = true;
+			if(typeof(callback) === 'function')
 				callback(server);
-			}
 		});
 	});
 
 	server.request.on('error', function(e) {
-		server.running = false;
+		// do we have already handled this error?
+		if(server.error !== 0)
+			return;
+
 		server.error = 502;
+		server.success = false;
+		server.running = false;
 		server.failure_message = e.message;
 		error('problem with request to ' + server.hostname + ': ' + e.message);
+
+		if(typeof(callback) === 'function')
+			callback(server);
 	});
 
 	// write data to request body
