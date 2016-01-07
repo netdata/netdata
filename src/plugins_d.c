@@ -385,10 +385,16 @@ void *pluginsd_worker_thread(void *arg)
 		info("PLUGINSD: '%s' on pid %d stopped.", cd->fullfilename, cd->pid);
 
 		// fgets() failed or loop broke
-		mypclose(fp, cd->pid);
-		cd->pid = 0;
+		int code = mypclose(fp, cd->pid);
+		if(code == 1 || code == 127) {
+			// 1 = DISABLE
+			// 127 = cannot even run it
+			error("PLUGINSD: '%s' (pid %d) exited with code %d. Disabling it.", cd->fullfilename, cd->pid, code);
+			cd->enabled = 0;
+		}
 
 		if(netdata_exit) {
+			cd->pid = 0;
 			cd->enabled = 0;
 			cd->obsolete = 1;
 			return NULL;
@@ -399,6 +405,7 @@ void *pluginsd_worker_thread(void *arg)
 			sleep((unsigned int) (cd->update_every * 10));
 		}
 
+		cd->pid = 0;
 		if(likely(cd->enabled)) sleep((unsigned int) cd->update_every);
 		else break;
 	}
