@@ -108,6 +108,7 @@ try {
 }
 catch(e) {
 	error('Cannot read configuration file ' + filename + ': ' + e.message);
+	netdata('DISABLE');
 	process.exit(1);
 }
 
@@ -347,6 +348,7 @@ function getSMAError(server) {
 // inform netdata we don't need to run on this machine
 if(!Servers.length) {
 	error('No SMA webbox servers defined.');
+	netdata('DISABLE');
 	process.exit(1);
 }
 
