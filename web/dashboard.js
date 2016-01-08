@@ -526,7 +526,7 @@
 				return;
 
 			if(this.master !== null && this.master !== state)
-				this.master.resetChart();
+				this.master.resetChart(true, true);
 
 			var now = new Date().getTime();
 			this.master = state;
@@ -538,21 +538,17 @@
 
 		// clear the master
 		clearMaster: function() {
-			if(NETDATA.options.current.sync_pan_and_zoom === false)
-				return;
-
 			if(this.master !== null) {
-				var state = this.master;
-				this.master = null; // prevent infinite recursion
-				this.seq = 0;
-				state.resetChart();
-				NETDATA.options.auto_refresher_stop_until = 0;
+				var st = this.master;
+				this.master = null;
+				st.resetChart();
 			}
 
 			this.master = null;
 			this.seq = 0;
 			this.force_after_ms = null;
 			this.force_before_ms = null;
+			NETDATA.options.auto_refresher_stop_until = 0;
 		},
 
 		// is the given state the master of the global
@@ -1599,28 +1595,42 @@
 		this.pauseChart = function() {
 			if(this.paused === false) {
 				if(this.debug === true)
-					this.log('paused');
+					this.log('pauseChart()');
 
 				this.paused = true;
 			}
 		}
 
 		this.unpauseChart = function() {
-			if(this.paused) {
+			if(this.paused === true) {
 				if(this.debug === true)
-					this.log('unpaused');
+					this.log('unpauseChart()');
 
 				this.paused = false;
 			}
 		}
 
-		this.resetChart = function() {
-			if(NETDATA.globalPanAndZoom.isMaster(this) && this.isVisible())
-				NETDATA.globalPanAndZoom.clearMaster();
+		this.resetChart = function(dont_clear_master, dont_update) {
+			if(this.debug === true)
+				this.log('resetChart(' + dont_clear_master + ', ' + dont_update + ') called');
 
-			this.tm.pan_and_zoom_seq = 0;
+			if(typeof dont_clear_master === 'undefined')
+				dont_clear_master = false;
+
+			if(typeof dont_update === 'undefined')
+				dont_update = false;
+
+			if(dont_clear_master !== true && NETDATA.globalPanAndZoom.isMaster(this) === true) {
+				if(this.debug === true)
+					this.log('resetChart() diverting to clearMaster().');
+				// this will call us back with master === true
+				NETDATA.globalPanAndZoom.clearMaster();
+				return;
+			}
 
 			this.clearSelection();
+
+			this.tm.pan_and_zoom_seq = 0;
 
 			this.setMode('auto');
 			this.current.force_update_at = 0;
@@ -1630,17 +1640,22 @@
 			this.paused = false;
 			this.selected = false;
 			this.enabled = true;
-			this.debug = false;
+			// this.debug = false;
 
 			// do not update the chart here
 			// or the chart will flip-flop when it is the master
 			// of a selection sync and another chart becomes
 			// the new master
-			if(NETDATA.options.current.sync_pan_and_zoom === false && this.isVisible() === true)
+
+			if(dont_update !== true && this.isVisible() === true) {
 				this.updateChart();
+			}
 		}
 
 		this.updateChartPanOrZoom = function(after, before) {
+			if(this.debug === true)
+				this.log('updateChartPanOrZoom() called.');
+
 			if(before < after) return false;
 
 			var min_duration = Math.round((this.chartWidth() / 30 * this.chart.update_every * 1000));
@@ -2164,7 +2179,7 @@
 
 		this.updateChartWithData = function(data) {
 			if(this.debug === true)
-				this.log('got data from netdata server');
+				this.log('updateChartWithData() called.');
 
 			// this may force the chart to be re-created
 			resizeChart();
@@ -2291,6 +2306,9 @@
 		}
 
 		this.updateChart = function(callback) {
+			if(this.debug === true)
+				this.log('updateChart() called.');
+
 			// due to late initialization of charts and libraries
 			// we need to check this too
 			if(this.enabled === false) {
@@ -2565,6 +2583,30 @@
 		// INITIALIZATION
 
 		init();
+	}
+
+	NETDATA.resetAllCharts = function(state) {
+		// first clear the global selection sync
+		// to make sure no chart is in selected state
+		state.globalSelectionSyncStop();
+
+		// there are 2 possibilities here
+		// a. state is the global Pan and Zoom master
+		// b. state is not the global Pan and Zoom master
+		var master = true;
+		if(NETDATA.globalPanAndZoom.isMaster(state) === false)
+			master = false;
+
+		// clear the global Pan and Zoom
+		// this will also refresh the master
+		// and unblock any charts currently mirroring the master
+		NETDATA.globalPanAndZoom.clearMaster();
+
+		// if we were not the master, reset our status too
+		// this is required because most probably the mouse
+		// is over this chart, blocking it from autorefreshing
+		if(master === false && (state.paused === true || state.selected === true))
+			state.resetChart();
 	}
 
 	// get or create a chart state, given a DOM element
@@ -2894,9 +2936,7 @@
 		}
 
 		// bootstrap tab switching
-		$('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
-			NETDATA.onresize();
-		});
+		$('a[data-toggle="tab"]').on('shown.bs.tab', NETDATA.onscroll);
 		
 		NETDATA.parseDom(NETDATA.chartRefresher);
 	}
@@ -3501,10 +3541,7 @@
 				dblclick: function(event, dygraph, context) {
 					if(NETDATA.options.debug.dygraph === true || state.debug === true)
 						state.log('interactionModel.dblclick()');
-
-					state.globalSelectionSyncStop();
-					NETDATA.globalPanAndZoom.clearMaster();
-					state.resetChart();
+					NETDATA.resetAllCharts(state);
 				},
 				mousewheel: function(event, dygraph, context) {
 					if(NETDATA.options.debug.dygraph === true || state.debug === true)
@@ -3658,11 +3695,8 @@
 					if(typeof state.dygraph_last_touch_end !== 'undefined') {
 						if(state.dygraph_last_touch_move === 0) {
 							var dt = now - state.dygraph_last_touch_end;
-							if(dt <= NETDATA.options.current.double_click_speed) {
-								state.globalSelectionSyncStop();
-								NETDATA.globalPanAndZoom.clearMaster();
-								state.resetChart();
-							}
+							if(dt <= NETDATA.options.current.double_click_speed)
+								NETDATA.resetAllCharts(state);
 						}
 					}
 
@@ -4146,9 +4180,15 @@
 			state.easyPieChartEvent.timer = null;
 		}
 
-		state.easyPieChartLabel.innerHTML = state.legendFormatValue(null);
-		state.easyPieChart_instance.update(0);
+		if(state.isAutoRefreshed() === true && state.data !== null) {
+			NETDATA.easypiechartChartUpdate(state, state.data);
+		}
+		else {
+			state.easyPieChartLabel.innerHTML = state.legendFormatValue(null);
+			state.easyPieChart_instance.update(0);
+		}
 		state.easyPieChart_instance.enableAnimation();
+
 		return true;
 	};
 
@@ -4297,12 +4337,20 @@
 			trackWidth: self.data('easypiechart-trackwidth') || undefined,
 			size: self.data('easypiechart-size') || size,
 			rotate: self.data('easypiechart-rotate') || 0,
-			animate: self.data('easypiechart-rotate') || {duration: data.view_update_every * 1000 / 2, enabled: true},
+			animate: self.data('easypiechart-rotate') || {duration: 500, enabled: true},
 			easing: self.data('easypiechart-easing') || undefined
 		});
 		
+		// when we just re-create the chart
+		// do not animate the first update
+		var animate = true;
+		if(typeof state.easyPieChart_instance !== 'undefined')
+			animate = false;
+
 		state.easyPieChart_instance = chart.data('easyPieChart');
+		if(animate === false) state.easyPieChart_instance.disableAnimation();
 		state.easyPieChart_instance.update(pcent);
+		if(animate === false) state.easyPieChart_instance.enableAnimation();
 		return true;
 	};
 
