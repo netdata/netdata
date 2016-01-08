@@ -431,6 +431,8 @@ uint32_t web_client_api_request_v1_data_options(char *o)
 			ret |= RRDR_OPTION_OBJECTSROWS;
 		else if(!strcmp(tok, "google_json"))
 			ret |= RRDR_OPTION_GOOGLE_JSON;
+		else if(!strcmp(tok, "percentage"))
+			ret |= RRDR_OPTION_PERCENTAGE;
 	}
 
 	return ret;

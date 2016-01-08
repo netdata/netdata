@@ -377,12 +377,12 @@
 	if(NETDATA.options.debug.main_loop === true)
 		console.log('welcome to NETDATA');
 
-	window.onresize = function(event) {
-		NETDATA.options.last_page_scroll = new Date().getTime();
+	NETDATA.onresize = function() {
 		NETDATA.options.last_resized = new Date().getTime();
+		NETDATA.onscroll();
 	};
 
-	window.onscroll = function(event) {
+	NETDATA.onscroll = function() {
 		NETDATA.options.last_page_scroll = new Date().getTime();
 		if(NETDATA.options.targets === null) return;
 
@@ -393,7 +393,10 @@
 		var targets = NETDATA.options.targets;
 		var len = targets.length;
 		while(len--) targets[len].isVisible();
-	}
+	};
+
+	window.onresize = NETDATA.onresize;
+	window.onscroll = NETDATA.onscroll;
 
 	// ----------------------------------------------------------------------------------------------------------------
 	// Error Handling
@@ -900,6 +903,8 @@
 		this.chart = null;							// object - the chart as downloaded from the server
 
 		this.title = self.data('title') || null;	// the title of the chart
+		this.units = self.data('units') || null;	// the units of the chart dimensions
+		this.append_options = self.data('append-options') || null;	// the units of the chart dimensions
 
 		this.validated = false; 					// boolean - has the chart been validated?
 		this.enabled = true; 						// boolean - is the chart enabled for refresh?
@@ -1004,11 +1009,15 @@
 			}
 			that.element_legend_childs.series = null;
 
-			if(that.width !== 0)
+			if(typeof(that.width) === 'string')
 				$(that.element).css('width', that.width);
+			else if(typeof(that.width) === 'number')
+				$(that.element).css('width', that.width + 'px');
 
-			if(that.height !== 0)
+			if(typeof(that.height) === 'string')
 				$(that.element).css('height', that.height);
+			else if(typeof(that.height) === 'number')
+				$(that.element).css('height', that.height + 'px');
 
 			if(NETDATA.chartDefaults.min_width !== null)
 				$(that.element).css('min-width', NETDATA.chartDefaults.min_width);
@@ -1140,34 +1149,69 @@
 
 		// hide the chart, when it is not visible - called from isVisible()
 		var hideChart = function() {
-			// no chart yet
-			if(that.chart_created === false) return;
+			// hide it, if it is not already hidden
+			if(typeof that.___chartIsHidden___ !== 'undefined')
+				return;
 
 			// we should destroy it
 			if(NETDATA.options.current.destroy_on_hide === true) {
-				init();
-				that.___chartIsHidden___ = undefined;
-				return;
+				if(that.chart_created === true) init();
 			}
-
-			// just hide it, if it is not already hidden
-			if(typeof that.___chartIsHidden___ === 'undefined') {
+			else {
 				showRendering();
 				that.element_chart.style.display = 'none';
 				if(that.element_legend !== null) that.element_legend.style.display = 'none';
-				that.___chartIsHidden___ = true;
 			}
+			
+			that.___chartIsHidden___ = true;
 		}
 
 		// unhide the chart, when it is visible - called from isVisible()
 		var unhideChart = function() {
-			if(typeof that.___chartIsHidden___ !== 'undefined') {
+			if(typeof that.___chartIsHidden___ === 'undefined')
+				return;
+
+			that.___chartIsHidden___ = undefined;
+
+			if(that.chart_created === false) {
+				// we need to re-initialize it, to show our background
+				// logo in bootstrap tabs, until the chart loads
+				init();
+			}
+			else {
 				that.element_chart.style.display = 'inline-block';
 				if(that.element_legend !== null) that.element_legend.style.display = 'inline-block';
-				that.___chartIsHidden___ = undefined;
 				resizeChart();
 				hideMessage();
 			}
+		}
+
+		// https://github.com/petkaantonov/bluebird/wiki/Optimization-killers
+		var callChartLibraryUpdateSafely = function(data) {
+			var status;
+
+			try {
+				status = that.library.update(that, data);
+			}
+			catch(err) {
+				status = false;
+			}
+
+			return status;
+		}
+
+		// https://github.com/petkaantonov/bluebird/wiki/Optimization-killers
+		var callChartLibraryCreateSafely = function(data) {
+			var status;
+
+			try {
+				status = that.library.create(that, data);
+			}
+			catch(err) {
+				status = false;
+			}
+
+			return status;
 		}
 
 		// ----------------------------------------------------------------------------------------------------------------
@@ -1178,12 +1222,11 @@
 		// a properly sized dom is available
 		var resizeChart = function() {
 			if(that.isVisible() === true && that.tm.last_resized < NETDATA.options.last_resized) {
-				that.tm.last_resized = new Date().getTime();
 				if(that.chart_created === false) return;
 
-				if(that.needsRecreation())
+				if(that.needsRecreation()) {
 					init();
-
+				}
 				else if(typeof that.library.resize === 'function') {
 					that.library.resize(that);
 
@@ -1192,6 +1235,8 @@
 
 					maxMessageFontSize();
 				}
+
+				that.tm.last_resized = new Date().getTime();
 			}
 		}
 
@@ -1690,7 +1735,7 @@
 				this.element_legend_childs.title_time.innerHTML = d.toLocaleTimeString();
 
 			if(this.element_legend_childs.title_units)
-				this.element_legend_childs.title_units.innerHTML = this.chart.units;
+				this.element_legend_childs.title_units.innerHTML = this.units;
 		}
 
 		this.legendShowUndefined = function() {
@@ -2096,6 +2141,9 @@
 			if(NETDATA.options.current.eliminate_zero_dimensions === true)
 				this.data_url += '|nonzero';
 
+			if(this.append_options !== null)
+				this.data_url += '|' + this.append_options.toString();
+
 			if(after)
 				this.data_url += "&after="  + after.toString();
 
@@ -2184,22 +2232,17 @@
 				if(this.debug === true)
 					this.log('updating chart...');
 
-				this.updates_since_last_creation++;
-				if(NETDATA.options.debug.chart_errors === true) {
+				if(NETDATA.options.debug.chart_errors === true)
 					status = this.library.update(this, data);
+				else
+					status = callChartLibraryUpdateSafely(data);
+
+				if(status === false) {
+					error('chart failed to be updated as ' + this.library_name);
 				}
 				else {
-					try {
-						status = this.library.update(this, data);
-					}
-					catch(err) {
-						status = false;
-						error('chart failed to be updated as ' + this.library_name);
-					}
+					this.updates_since_last_creation++;
 				}
-
-				if(status === false)
-					error('chart failed to be created as ' + this.library_name);
 			}
 			else {
 				var status = false;
@@ -2207,25 +2250,18 @@
 				if(this.debug === true)
 					this.log('creating chart...');
 
-				if(NETDATA.options.debug.chart_errors === true) {
+				if(NETDATA.options.debug.chart_errors === true)
 					status = this.library.create(this, data);
+				else
+					status = callChartLibraryCreateSafely(data);
+
+				if(status === false) {
+					error('chart failed to be created as ' + this.library_name);
+				}
+				else {
 					this.chart_created = true;
 					this.updates_since_last_creation = 0;
 				}
-				else {
-					try {
-						status = this.library.create(this, data);
-						this.chart_created = true;
-						this.updates_since_last_creation = 0;
-					}
-					catch(err) {
-						status = false;
-						error('chart failed to be created as ' + this.library_name);
-					}
-				}
-
-				if(status === false)
-					error('chart failed to be created as ' + this.library_name);
 			}
 			hideMessage();
 			this.legendShowLatestValues();
@@ -2327,12 +2363,12 @@
 			var ret = 0;
 			var tolerance = 0;
 
-			if(x.width === 0 || x.height === 0 || this.element.style.display === 'none') {
+			if(x.width === 0 || x.height === 0) {
 				hideChart();
 				this.___isVisible___ = false;
 
 				if(this.debug === true)
-					this.log('isVisible: ' + this.___isVisible___);
+					this.log('isVisible (width:' + x.width + ', height:' + x.height + ', display:"' + this.element.style.display + '"): ' + this.___isVisible___);
 
 				return this.___isVisible___;
 			}
@@ -2485,6 +2521,9 @@
 
 			if(this.title === null)
 				this.title = chart.title;
+
+			if(this.units === null)
+				this.units = chart.units;
 		}
 
 		// fetch the chart description from the netdata server
@@ -2808,7 +2847,7 @@
 		NETDATA.options.last_page_scroll = new Date().getTime();
 		NETDATA.options.updated_dom = false;
 
-		var targets = $('div[data-netdata]').filter(':visible');
+		var targets = $('div[data-netdata]'); //.filter(':visible');
 
 		if(NETDATA.options.debug.main_loop === true)
 			console.log('DOM updated - there are ' + targets.length + ' charts on page.');
@@ -2854,6 +2893,11 @@
 			}
 		}
 
+		// bootstrap tab switching
+		$('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+			NETDATA.onresize();
+		});
+		
 		NETDATA.parseDom(NETDATA.chartRefresher);
 	}
 
@@ -2993,7 +3037,7 @@
 		var tooltipClassname = self.data('sparkline-tooltipclassname') || undefined;
 		var tooltipFormat = self.data('sparkline-tooltipformat') || undefined;
 		var tooltipPrefix = self.data('sparkline-tooltipprefix') || undefined;
-		var tooltipSuffix = self.data('sparkline-tooltipsuffix') || ' ' + state.chart.units;
+		var tooltipSuffix = self.data('sparkline-tooltipsuffix') || ' ' + state.units;
 		var tooltipSkipNull = self.data('sparkline-tooltipskipnull') || true;
 		var tooltipValueLookups = self.data('sparkline-tooltipvaluelookups') || undefined;
 		var tooltipFormatFieldlist = self.data('sparkline-tooltipformatfieldlist') || undefined;
@@ -3223,7 +3267,7 @@
 			showLabelsOnHighlight: self.data('dygraph-showlabelsonhighlight') || true,
 			hideOverlayOnMouseOut: self.data('dygraph-hideoverlayonmouseout') || true,
 
-			ylabel: state.chart.units,
+			ylabel: state.units,
 			yLabelWidth: self.data('dygraph-ylabelwidth') || 12,
 
 			// the function to plot the chart
@@ -3309,10 +3353,7 @@
 				// we are not managing the legend
 				if(elements.hidden === null) return;
 
-				if (typeof data.x === 'undefined') {
-					//state.legendReset();
-				}
-				else {
+				if (typeof data.x !== 'undefined') {
 					state.legendSetDate(data.x);
 					var i = data.series.length;
 					while(i--) {
@@ -4003,7 +4044,7 @@
 				}
 			},
 			vAxis: {
-				title: state.chart.units,
+				title: state.units,
 				viewWindowMode: 'pretty',
 				minValue: -0.1,
 				maxValue: 0.1,
@@ -4105,7 +4146,7 @@
 			state.easyPieChartEvent.timer = null;
 		}
 
-		state.easyPieChartLabel.innerHTML = '';
+		state.easyPieChartLabel.innerHTML = state.legendFormatValue(null);
 		state.easyPieChart_instance.update(0);
 		state.easyPieChart_instance.enableAnimation();
 		return true;
@@ -4126,8 +4167,10 @@
 		if(max < value) max = value;
 		
 		var pcent = 0;
-		if(max !== 0)
+		if(max !== 0) {
 			pcent = Math.round(value * 100 / max);
+			if(pcent === 0 && value > 0) pcent = 1;
+		}
 
 		// console.log('slot = ' + slot + ' value = ' + value + ' max = ' + max + ' pcent = ' + pcent);
 
@@ -4156,24 +4199,29 @@
 	};
 
 	NETDATA.easypiechartChartUpdate = function(state, data) {
-		var value = data.result[0];
-		if(value === null) value = 0;
+		var value, max, pcent;
 
-		var max = (state.easyPieChartMax === null)?data.max:state.easyPieChartMax;
-		if(max < value) max = value;
-
-		var pcent = 0;
-		if(max !== 0)
-			pcent = Math.round(value * 100 / max);
-
-		if(state.isAutoRefreshed() === true) {
-			state.easyPieChartLabel.innerHTML = state.legendFormatValue(value);
-			state.easyPieChart_instance.update(pcent);
+		if(NETDATA.globalPanAndZoom.isActive() === true || state.isAutoRefreshed() === false) {
+			value = null;
+			max = 0;
+			pcent = 0;
 		}
 		else {
-			state.easyPieChartLabel.innerHTML = '';
-			state.easyPieChart_instance.update(0);
+			value = data.result[0];
+			if(value === null) value = 0;
+
+			max = (state.easyPieChartMax === null)?data.max:state.easyPieChartMax;
+			if(max < value) max = value;
+
+			pcent = 0;
+			if(max !== 0) {
+				pcent = Math.round(value * 100 / max);
+				if(pcent === 0 && value > 0) pcent = 1;
+			}
 		}
+
+		state.easyPieChartLabel.innerHTML = state.legendFormatValue(value);
+		state.easyPieChart_instance.update(pcent);
 		return true;
 	};
 
@@ -4195,14 +4243,20 @@
 		if(max < value) max = value;
 
 		var pcent = 0;
-		if(max !== 0)
+		if(max !== 0) {
 			pcent = Math.round(value * 100 / max);
+			if(pcent === 0 && value > 0) pcent = 1;
+		}
 
 		// console.log('value = ' + value + ' max = ' + max + ' pcent = ' + pcent);
 		chart.data('data-percent', pcent);
 
 		var size = Math.min(state.chartWidth(), state.chartHeight());
-		var stroke = size / 15 - 2;
+		if(size < 50) size = state.chartWidth();
+		state.element.style.width = size + 'px';
+		state.element.style.height = size + 'px';
+
+		var stroke = Math.floor(size / 22);
 		if(stroke < 3) stroke = 2;
 
 		var valuefontsize = Math.floor((size * 2 / 3) / 5);
@@ -4228,7 +4282,7 @@
 		var unittop = Math.round(valuetop + (valuefontsize + unitfontsize) + (size / 40));
 		state.easyPieChartUnits = document.createElement('span');
 		state.easyPieChartUnits.className = 'easyPieChartUnits';
-		state.easyPieChartUnits.innerHTML = state.chart.units;
+		state.easyPieChartUnits.innerHTML = state.units;
 		state.easyPieChartUnits.style.fontSize = unitfontsize + 'px';
 		state.easyPieChartUnits.style.top = unittop.toString() + 'px';
 		state.element_chart.appendChild(state.easyPieChartUnits);
@@ -4426,7 +4480,7 @@
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'array'; },
-			options: function(state) { if(state.chart.chart_type === 'stacked') return ''; else return 'min2max'; },
+			options: function(state) { return 'absolute'; },
 			legend: function(state) { return null; },
 			autoresize: function(state) { return false; },
 			max_updates_to_recreate: function(state) { return 5000; },

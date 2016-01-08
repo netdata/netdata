@@ -371,6 +371,11 @@ void rrdr_disable_not_selected_dimensions(RRDR *r, const char *dims)
 		for(c = 0, d = r->st->dimensions; d ;c++, d = d->next) {
 			if(!strcmp(d->name, tok)) {
 				r->od[c] &= ~RRDR_HIDDEN;
+
+				// since the user needs this dimension
+				// make it appear as NONZERO, to return it
+				// even if the dimension has only zeros
+				r->od[c] |= RRDR_NONZERO;
 			}
 		}
 	}
@@ -425,22 +430,31 @@ void rrdr_buffer_print_format(BUFFER *wb, uint32_t format)
 	}
 }
 
-uint32_t rrdr_check_options(RRDR *r, uint32_t options)
+uint32_t rrdr_check_options(RRDR *r, uint32_t options, const char *dims)
 {
 	if(options & RRDR_OPTION_NONZERO) {
-		long c, i;
-		RRDDIM *rd;
+		long i;
 
-		// find how many dimensions are not zero
-		for(c = 0, i = 0, rd = r->st->dimensions; rd && c < r->d ; c++, rd = rd->next) {
-			if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
-			if(unlikely(!(r->od[c] & RRDR_NONZERO))) continue;
-			i++;
+		if(dims && *dims) {
+			// the caller wants specific dimensions
+			// disable NONZERO option
+			// to make sure we don't accidentally prevent
+			// the specific dimensions from being returned
+			i = 0;
+		}
+		else {
+			// find how many dimensions are not zero
+			long c;
+			RRDDIM *rd;
+			for(c = 0, i = 0, rd = r->st->dimensions; rd && c < r->d ; c++, rd = rd->next) {
+				if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
+				if(unlikely(!(r->od[c] & RRDR_NONZERO))) continue;
+				i++;
+			}
 		}
 
-		// if with nonzero we get i = 0
-		// but c != 0, then disable nonzero
-		// to show all dimensions
+		// if with nonzero we get i = 0 (no dimensions will be returned)
+		// disable nonzero to show all dimensions
 		if(!i) options &= ~RRDR_OPTION_NONZERO;
 	}
 
@@ -749,6 +763,7 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 	}
 
 	// for each line in the array
+	calculated_number total = 1;
 	for(i = start; i != end ;i += step) {
 		calculated_number *cn = &r->v[ i * r->d ];
 		uint8_t *co = &r->o[ i * r->d ];
@@ -802,6 +817,20 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 			buffer_strcat(wb, post_date);
 		}
 
+		if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
+			total = 0;
+			for(c = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
+				calculated_number n = cn[c];
+
+				if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
+					n = -n;
+
+				total += n;
+			}
+			// prevent a division by zero
+			if(total == 0) total = 1;
+		}
+
 		// for each dimension
 		for(c = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
 			if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
@@ -820,10 +849,15 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 				else
 					buffer_strcat(wb, "null");
 			}
-			else if((options & RRDR_OPTION_ABSOLUTE))
-				buffer_rrd_value(wb, (n<0)?-n:n);
-			else
+			else {
+				if(unlikely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
+					n = -n;
+
+				if(unlikely(options & RRDR_OPTION_PERCENTAGE))
+					n = n * 100 / total;
+
 				buffer_rrd_value(wb, n);
+			}
 
 			buffer_strcat(wb, post_value);
 		}
@@ -873,6 +907,7 @@ static void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startlin
 	}
 
 	// for each line in the array
+	calculated_number total = 1;
 	for(i = start; i != end ;i += step) {
 		calculated_number *cn = &r->v[ i * r->d ];
 		uint8_t *co = &r->o[ i * r->d ];
@@ -895,6 +930,20 @@ static void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startlin
 			buffer_date(wb, tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
 		}
 
+		if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
+			total = 0;
+			for(c = 0, d = r->st->dimensions; d && c < r->d ;c++, d = d->next) {
+				calculated_number n = cn[c];
+
+				if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
+					n = -n;
+
+				total += n;
+			}
+			// prevent a division by zero
+			if(total == 0) total = 1;
+		}
+
 		// for each dimension
 		for(c = 0, d = r->st->dimensions; d && c < r->d ;c++, d = d->next) {
 			if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
@@ -910,10 +959,15 @@ static void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startlin
 				else
 					buffer_strcat(wb, "null");
 			}
-			else if((options & RRDR_OPTION_ABSOLUTE))
-				buffer_rrd_value(wb, (n<0)?-n:n);
-			else
+			else {
+				if(unlikely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
+					n = -n;
+
+				if(unlikely(options & RRDR_OPTION_PERCENTAGE))
+					n = n * 100 / total;
+
 				buffer_rrd_value(wb, n);
+			}
 		}
 
 		buffer_strcat(wb, endline);
@@ -936,6 +990,7 @@ static void rrdr2ssv(RRDR *r, BUFFER *wb, uint32_t options, const char *prefix, 
 	}
 
 	// for each line in the array
+	calculated_number total = 1;
 	for(i = start; i != end ;i += step) {
 
 		calculated_number *cn = &r->v[ i * r->d ];
@@ -944,12 +999,32 @@ static void rrdr2ssv(RRDR *r, BUFFER *wb, uint32_t options, const char *prefix, 
 		calculated_number sum = 0, min = 0, max = 0, v;
 		int all_null = 1, init = 1;
 
+		if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
+			total = 0;
+			for(c = 0, d = r->st->dimensions; d && c < r->d ;c++, d = d->next) {
+				calculated_number n = cn[c];
+
+				if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
+					n = -n;
+
+				total += n;
+			}
+			// prevent a division by zero
+			if(total == 0) total = 1;
+		}
+
 		// for each dimension
 		for(c = 0, d = r->st->dimensions; d && c < r->d ;c++, d = d->next) {
 			if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
 			if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
 
 			calculated_number n = cn[c];
+
+			if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
+				n = -n;
+
+			if(unlikely(options & RRDR_OPTION_PERCENTAGE))
+				n = n * 100 / total;
 
 			if(unlikely(init)) {
 				if(n > 0) {
@@ -965,7 +1040,6 @@ static void rrdr2ssv(RRDR *r, BUFFER *wb, uint32_t options, const char *prefix, 
 
 			if(likely(!(co[c] & RRDR_EMPTY))) {
 				all_null = 0;
-				if((options & RRDR_OPTION_ABSOLUTE) && n < 0) n = -n;
 				sum += n;
 			}
 
@@ -1423,7 +1497,7 @@ int rrd2format(RRDSET *st, BUFFER *wb, BUFFER *dimensions, uint32_t format, long
 		return 500;
 	}
 
-	options = rrdr_check_options(r, options);
+	options = rrdr_check_options(r, options, (dimensions)?buffer_tostring(dimensions):NULL);
 
 	if(dimensions)
 		rrdr_disable_not_selected_dimensions(r, buffer_tostring(dimensions));

@@ -1007,6 +1007,177 @@ function prepareScreen(data) {
 					+ ' role="application"></div>';
 			});
 		}
+		else if(t.name === 'system') {
+			var head = '<div style="text-align: center; vertical-align: bottom; width: 100%;">';
+
+			if(typeof charts['system.swap'] !== 'undefined')
+				head += '<div style="margin-right: 10px;" data-netdata="system.swap"'
+				+ ' data-dimensions="free"'
+				+ ' data-append-options="percentage"'
+				+ ' data-chart-library="easypiechart"'
+				+ ' data-title="Free Swap"'
+				+ ' data-units="%"'
+				+ ' data-easypiechart-max-value="100"'
+				+ ' data-width="8%"'
+				+ ' data-height="49px"'
+				+ ' data-before="0"'
+				+ ' data-after="-' + duration.toString() + '"'
+				+ ' data-points="' + duration.toString() + '"'
+				+ ' data-colors="' + NETDATA.colors[1] + '"'
+				+ ' role="application"></div>';
+
+			if(typeof charts['system.io'] !== 'undefined') {
+				head += '<div style="margin-right: 10px;" data-netdata="system.io"'
+				+ ' data-dimensions="in"'
+				+ ' data-chart-library="easypiechart"'
+				+ ' data-title="Disk Read"'
+				+ ' data-units="KB / s"'
+				+ ' data-width="10%"'
+				+ ' data-height="49px"'
+				+ ' data-before="0"'
+				+ ' data-after="-' + duration.toString() + '"'
+				+ ' data-points="' + duration.toString() + '"'
+				+ ' data-colors="' + NETDATA.colors[0] + '"'
+				+ ' role="application"></div>';
+
+				head += '<div style="margin-right: 10px;" data-netdata="system.io"'
+				+ ' data-dimensions="out"'
+				+ ' data-chart-library="easypiechart"'
+				+ ' data-title="Disk Write"'
+				+ ' data-units="KB / s"'
+				+ ' data-width="10%"'
+				+ ' data-height="49px"'
+				+ ' data-before="0"'
+				+ ' data-after="-' + duration.toString() + '"'
+				+ ' data-points="' + duration.toString() + '"'
+				+ ' data-colors="' + NETDATA.colors[1] + '"'
+				+ ' role="application"></div>';
+			}
+
+			if(typeof charts['system.cpu'] !== 'undefined')
+				head += '<div style="margin-right: 10px;" data-netdata="system.cpu"'
+				+ ' data-chart-library="easypiechart"'
+				+ ' data-title="CPU"'
+				+ ' data-units="%"'
+				+ ' data-easypiechart-max-value="100"'
+				+ ' data-width="11%"'
+				+ ' data-height="49px"'
+				+ ' data-after="-' + duration.toString() + '"'
+				+ ' data-points="' + duration.toString() + '"'
+				+ ' data-colors="' + NETDATA.colors[12] + '"'
+				+ ' role="application"></div>';
+
+			if(typeof charts['system.ipv4'] !== 'undefined') {
+				head += '<div style="margin-right: 10px;" data-netdata="system.ipv4"'
+				+ ' data-dimensions="received"'
+				+ ' data-chart-library="easypiechart"'
+				+ ' data-title="IPv4 Inbound"'
+				+ ' data-units="kbps"'
+				+ ' data-width="10%"'
+				+ ' data-height="49px"'
+				+ ' data-before="0"'
+				+ ' data-after="-' + duration.toString() + '"'
+				+ ' data-points="' + duration.toString() + '"'
+				+ ' data-colors="' + NETDATA.colors[0] + '"'
+				+ ' role="application"></div>';
+
+				head += '<div style="margin-right: 10px;" data-netdata="system.ipv4"'
+				+ ' data-dimensions="sent"'
+				+ ' data-chart-library="easypiechart"'
+				+ ' data-title="IPv4 Outbound"'
+				+ ' data-units="kbps"'
+				+ ' data-width="10%"'
+				+ ' data-height="49px"'
+				+ ' data-before="0"'
+				+ ' data-after="-' + duration.toString() + '"'
+				+ ' data-points="' + duration.toString() + '"'
+				+ ' data-colors="' + NETDATA.colors[1] + '"'
+				+ ' role="application"></div>';
+			}
+
+			if(typeof charts['system.ram'] !== 'undefined')
+				head += '<div style="margin-right: 10px;" data-netdata="system.ram"'
+				+ ' data-dimensions="cached|free"'
+				+ ' data-append-options="percentage"'
+				+ ' data-chart-library="easypiechart"'
+				+ ' data-title="Available RAM"'
+				+ ' data-units="%"'
+				+ ' data-easypiechart-max-value="100"'
+				+ ' data-width="8%"'
+				+ ' data-height="1"'
+				+ ' data-before="49px"'
+				+ ' data-after="-' + duration.toString() + '"'
+				+ ' data-points="' + duration.toString() + '"'
+				+ ' data-colors="' + NETDATA.colors[7] + '"'
+				+ ' role="application"></div>';
+
+/*			if(typeof charts['system.swapio'] !== 'undefined') {
+				head += "<div style=\"display: inline-block\">";
+
+				head += '<div style="margin-right: 10px;" data-netdata="system.swapio"'
+				+ ' data-dimensions="in"'
+				+ ' data-chart-library="easypiechart"'
+				+ ' data-title="Swap Read"'
+				+ ' data-width="100px"'
+				+ ' data-height="100px"'
+				+ ' data-before="0"'
+				+ ' data-after="-' + duration.toString() + '"'
+				+ ' data-points="' + duration.toString() + '"'
+				+ ' data-colors="' + NETDATA.colors[2] + '"'
+				+ ' role="application"></div>';
+
+				head += '<div style="margin-right: 10px;" data-netdata="system.swapio"'
+				+ ' data-dimensions="out"'
+				+ ' data-chart-library="easypiechart"'
+				+ ' data-title="Swap Write"'
+				+ ' data-width="100px"'
+				+ ' data-height="100px"'
+				+ ' data-before="0"'
+				+ ' data-after="-' + duration.toString() + '"'
+				+ ' data-points="' + duration.toString() + '"'
+				+ ' data-colors="' + NETDATA.colors[1] + '"'
+				+ ' role="application"></div>';
+
+				head += "</div>";
+			}
+
+			if(typeof charts['system.ctxt'] !== 'undefined')
+				head += '<div style="margin-right: 10px;" data-netdata="system.ctxt"'
+				+ ' data-chart-library="easypiechart"'
+				+ ' data-title="Switches"'
+				+ ' data-width="100px"'
+				+ ' data-height="100px"'
+				+ ' data-before="0"'
+				+ ' data-after="-' + duration.toString() + '"'
+				+ ' data-points="' + duration.toString() + '"'
+				+ ' data-colors="' + NETDATA.colors[3] + '"'
+				+ ' role="application"></div>';
+
+			if(typeof charts['system.intr'] !== 'undefined')
+				head += '<div style="margin-right: 10px;" data-netdata="system.intr"'
+				+ ' data-chart-library="easypiechart"'
+				+ ' data-title="Interrupts"'
+				+ ' data-width="100px"'
+				+ ' data-height="100px"'
+				+ ' data-before="0"'
+				+ ' data-after="-' + duration.toString() + '"'
+				+ ' data-points="' + duration.toString() + '"'
+				+ ' data-colors="' + NETDATA.colors[7] + '"'
+				+ ' role="application"></div>';
+*/
+			head += "</div>";
+			var all = '';
+			$.each(t.charts, function(x, f) {
+				all += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
+					+ ' data-width="' + pcent_width.toString() + '%"'
+					+ ' data-height="' + options.chartsHeight.toString() + 'px"'
+					+ ' data-before="0"'
+					+ ' data-after="-' + duration.toString() + '"'
+					+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
+					+ ' role="application"></div>';
+			});
+			html += head + all;
+		}
 		else {
 			$.each(t.charts, function(x, f) {
 				html += getMessage(f.id) + '<div data-netdata="' + f.id + '"'

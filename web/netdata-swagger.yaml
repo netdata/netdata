@@ -101,7 +101,7 @@ paths:
           description: 'The format of the data to be returned.'
           required: true
           type: string
-          enum: [ 'json', 'jsonp', 'csv', 'tsv', 'tsv-excel', 'ssv', 'ssvcomma', 'datatable', 'datasource', 'html', 'array' ]
+          enum: [ 'json', 'jsonp', 'csv', 'tsv', 'tsv-excel', 'ssv', 'ssvcomma', 'datatable', 'datasource', 'html', 'array', 'csvjsonarray' ]
           default: json
           allowEmptyValue: false
         - name: options
@@ -111,7 +111,7 @@ paths:
           type: array
           items:
             type: string
-            enum: [ 'nonzero', 'flip', 'jsonwrap', 'min2max', 'seconds', 'milliseconds', 'abs', 'absolute', 'absolute-sum', 'null2zero', 'objectrows', 'google_json' ]
+            enum: [ 'nonzero', 'flip', 'jsonwrap', 'min2max', 'seconds', 'milliseconds', 'abs', 'absolute', 'absolute-sum', 'null2zero', 'objectrows', 'google_json', 'percentage' ]
             collectionFormat: pipes
             format: ''
           default: seconds|jsonwrap
