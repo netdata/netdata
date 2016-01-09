@@ -1754,14 +1754,15 @@ void *web_client_main(void *ptr)
 				break;
 			}
 
+			if(w->mode == WEB_CLIENT_MODE_NORMAL) {
+				debug(D_WEB_CLIENT, "%llu: Attempting to process received data (%ld bytes).", w->id, bytes);
+				// info("%llu: Attempting to process received data (%ld bytes).", w->id, bytes);
+				web_client_process(w);
+			}
+
 			global_statistics_lock();
 			global_statistics.bytes_received += bytes;
 			global_statistics_unlock();
-
-			if(w->mode == WEB_CLIENT_MODE_NORMAL) {
-				debug(D_WEB_CLIENT, "%llu: Attempting to process received data.", w->id);
-				web_client_process(w);
-			}
 		}
 	}
 

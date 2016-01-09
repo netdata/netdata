@@ -40,6 +40,7 @@ dist_weblib_DATA = \
         lib/bootstrap-toggle.min.js \
         lib/c3.min.js \
         lib/d3.min.js \
+        lib/gauge.min.js \
         $(NULL)
 
 webcssdir=$(webdir)/css

@@ -6,6 +6,7 @@
 // var netdataNoGoogleCharts = true;	// do not use google
 // var netdataNoMorris = true;			// do not use morris
 // var netdataNoEasyPieChart = true;	// do not use easy pie chart
+// var netdataNoGauge = true;			// do not use gauge.js
 // var netdataNoD3 = true;				// do not use D3
 // var netdataNoC3 = true;				// do not use C3
 // var netdataNoBootstrap = true;		// do not load bootstrap
@@ -76,6 +77,7 @@
 	NETDATA.peity_js     		= NETDATA.serverDefault + 'lib/jquery.peity.min.js';
 	NETDATA.sparkline_js 		= NETDATA.serverDefault + 'lib/jquery.sparkline.min.js';
 	NETDATA.easypiechart_js 	= NETDATA.serverDefault + 'lib/jquery.easypiechart.min.js';
+	NETDATA.gauge_js 			= NETDATA.serverDefault + 'lib/gauge.min.js';
 	NETDATA.dygraph_js   		= NETDATA.serverDefault + 'lib/dygraph-combined.js';
 	NETDATA.dygraph_smooth_js   = NETDATA.serverDefault + 'lib/dygraph-smooth-plotter.js';
 	NETDATA.raphael_js   		= NETDATA.serverDefault + 'lib/raphael-min.js';
@@ -1356,6 +1358,7 @@
 
 
 		var noDataToShow = function() {
+			showMessageIcon('<i class="fa fa-warning"></i> empty');
 			that.legendUpdateDOM();
 			that.tm.last_autorefreshed = new Date().getTime();
 			that.data_update_every = 30 * 1000;
@@ -4145,6 +4148,21 @@
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
+
+	NETDATA.percentFromValueMax = function(value, max) {
+		if(value === null) value = 0;
+		if(max < value) max = value;
+		
+		var pcent = 0;
+		if(max !== 0) {
+			pcent = Math.round(value * 100 / max);
+			if(pcent === 0 && value > 0) pcent = 1;
+		}
+
+		return pcent;
+	}
+
+	// ----------------------------------------------------------------------------------------------------------------
 	// easy-pie-chart
 
 	NETDATA.easypiechartInitialize = function(callback) {
@@ -4200,20 +4218,6 @@
 		if(slot < 0 || slot >= state.data.result.length)
 			return NETDATA.easypiechartClearSelection(state);
 
-		var value = state.data.result[slot];
-		if(value === null) value = 0;
-
-		var max = (state.easyPieChartMax === null)?state.data.max:state.easyPieChartMax;
-		if(max < value) max = value;
-		
-		var pcent = 0;
-		if(max !== 0) {
-			pcent = Math.round(value * 100 / max);
-			if(pcent === 0 && value > 0) pcent = 1;
-		}
-
-		// console.log('slot = ' + slot + ' value = ' + value + ' max = ' + max + ' pcent = ' + pcent);
-
 		if(typeof state.easyPieChartEvent === 'undefined') {
 			state.easyPieChartEvent = {
 				timer: null,
@@ -4221,6 +4225,10 @@
 				pcent: 0,
 			};
 		}
+
+		var value = state.data.result[slot];
+		var max = (state.easyPieChartMax === null)?state.data.max:state.easyPieChartMax;
+		var pcent = NETDATA.percentFromValueMax(value, max);
 
 		state.easyPieChartEvent.value = value;
 		state.easyPieChartEvent.pcent = pcent;
@@ -4248,16 +4256,8 @@
 		}
 		else {
 			value = data.result[0];
-			if(value === null) value = 0;
-
 			max = (state.easyPieChartMax === null)?data.max:state.easyPieChartMax;
-			if(max < value) max = value;
-
-			pcent = 0;
-			if(max !== 0) {
-				pcent = Math.round(value * 100 / max);
-				if(pcent === 0 && value > 0) pcent = 1;
-			}
+			pcent = NETDATA.percentFromValueMax(value, max);
 		}
 
 		state.easyPieChartLabel.innerHTML = state.legendFormatValue(value);
@@ -4270,29 +4270,28 @@
 		var chart = $(state.element_chart);
 
 		var value = data.result[0];
-		if(value === null) value = 0;
-
 		var max = self.data('easypiechart-max-value') || null;
+		var adjust = self.data('easypiechart-adjust') || null;
+		
 		if(max === null) {
 			max = data.max;
 			state.easyPieChartMax = null;
 		}
-		else {
+		else
 			state.easyPieChartMax = max;
-		}
-		if(max < value) max = value;
 
-		var pcent = 0;
-		if(max !== 0) {
-			pcent = Math.round(value * 100 / max);
-			if(pcent === 0 && value > 0) pcent = 1;
-		}
+		var pcent = NETDATA.percentFromValueMax(value, max);
 
-		// console.log('value = ' + value + ' max = ' + max + ' pcent = ' + pcent);
 		chart.data('data-percent', pcent);
 
-		var size = Math.min(state.chartWidth(), state.chartHeight());
-		if(size < 50) size = state.chartWidth();
+		var size;
+		switch(adjust) {
+			case 'width': size = state.chartHeight(); break;
+			case 'min': size = Math.min(state.chartWidth(), state.chartHeight()); break;
+			case 'max': size = Math.max(state.chartWidth(), state.chartHeight()); break;
+			case 'height':
+			default: size = state.chartWidth(); break;
+		}
 		state.element.style.width = size + 'px';
 		state.element.style.height = size + 'px';
 
@@ -4329,7 +4328,7 @@
 
 		chart.easyPieChart({
 			barColor: self.data('easypiechart-barcolor') || state.chartColors()[0], //'#ef1e25',
-			trackColor: self.data('easypiechart-trackcolor') || '#f2f2f2',
+			trackColor: self.data('easypiechart-trackcolor') || '#f0f0f0',
 			scaleColor: self.data('easypiechart-scalecolor') || '#dfe0e0',
 			scaleLength: self.data('easypiechart-scalelength') || 5,
 			lineCap: self.data('easypiechart-linecap') || 'round',
@@ -4351,6 +4350,237 @@
 		if(animate === false) state.easyPieChart_instance.disableAnimation();
 		state.easyPieChart_instance.update(pcent);
 		if(animate === false) state.easyPieChart_instance.enableAnimation();
+		return true;
+	};
+
+	// ----------------------------------------------------------------------------------------------------------------
+	// gauge.js
+
+	NETDATA.gaugeInitialize = function(callback) {
+		if(typeof netdataNoGauge === 'undefined' || !netdataNoGauge) {
+			$.ajax({
+				url: NETDATA.gauge_js,
+				cache: true,
+				dataType: "script"
+			})
+				.done(function() {
+					NETDATA.registerChartLibrary('gauge', NETDATA.gauge_js);
+				})
+				.fail(function() {
+					NETDATA.error(100, NETDATA.gauge_js);
+				})
+				.always(function() {
+					if(typeof callback === "function")
+						callback();
+				})
+		}
+		else {
+			NETDATA.chartLibraries.gauge.enabled = false;
+			if(typeof callback === "function")
+				callback();
+		}
+	};
+
+	NETDATA.gaugeClearSelection = function(state) {
+		if(typeof state.gaugeEvent !== 'undefined') {
+			if(state.gaugeEvent.timer !== null)
+				clearTimeout(state.gaugeEvent.timer);
+
+			state.gaugeEvent.timer = null;
+		}
+
+		if(state.isAutoRefreshed() === true && state.data !== null) {
+			NETDATA.gaugeChartUpdate(state, state.data);
+		}
+		else {
+			state.gaugeChartLabel.innerHTML = state.legendFormatValue(null);
+			state.gaugeChartMax.innerHTML = state.legendFormatValue(null);
+			state.gauge_instance.animationSpeed = 1;
+			state.gauge_instance.set(0);
+		}
+		state.gauge_instance.animationSpeed = 32;
+
+		return true;
+	};
+
+	NETDATA.gaugeSetSelection = function(state, t) {
+		if(t < state.data_after || t > state.data_before)
+			return NETDATA.gaugeClearSelection(state);
+
+		var slot = Math.floor(state.data.result.length - 1 - (t - state.data_after) / state.data_update_every);
+		if(slot < 0 || slot >= state.data.result.length)
+			return NETDATA.gaugeClearSelection(state);
+
+		if(typeof state.gaugeEvent === 'undefined') {
+			state.gaugeEvent = {
+				timer: null,
+				value: 0,
+				max: 0,
+			};
+		}
+
+		var value = state.data.result[slot];
+		var max = (state.gaugeMax === null)?state.data.max:state.gaugeMax;
+		if(value > max) max = value;
+
+		state.gaugeEvent.value = value;
+		state.gaugeEvent.max = max;
+		state.gaugeChartLabel.innerHTML = state.legendFormatValue(value);
+		state.gaugeChartMax.innerHTML = state.legendFormatValue(max);
+
+		if(state.gaugeEvent.timer === null) {
+			state.gauge_instance.animationSpeed = 1;
+
+			state.gaugeEvent.timer = setTimeout(function() {
+				state.gaugeEvent.timer = null;
+				state.gauge_instance.maxValue = state.gaugeEvent.max;
+				state.gauge_instance.set(state.gaugeEvent.value);
+			}, 50);
+		}
+
+		return true;
+	};
+
+	NETDATA.gaugeChartUpdate = function(state, data) {
+		var value, max;
+
+		if(NETDATA.globalPanAndZoom.isActive() === true || state.isAutoRefreshed() === false) {
+			value = 0;
+			state.gaugeChartLabel.innerHTML = state.legendFormatValue(null);
+			state.gaugeChartMax.innerHTML = state.legendFormatValue(null);
+			state.gauge_instance.set(value);
+		}
+		else {
+			value = data.result[0];
+			max = (state.gaugeMax === null)?data.max:state.gaugeMax;
+			if(value > max) max = value;
+			state.gaugeChartLabel.innerHTML = state.legendFormatValue(value);
+			state.gaugeChartMax.innerHTML = state.legendFormatValue(max);
+			state.gauge_instance.maxValue = max;
+			state.gauge_instance.set(value);
+		}
+
+		return true;
+	};
+
+	NETDATA.gaugeChartCreate = function(state, data) {
+		var self = $(state.element);
+		var chart = $(state.element_chart);
+
+		var value = data.result[0];
+		var max = self.data('gauge-max-value') || null;
+		var adjust = self.data('gauge-adjust') || null;
+		
+		if(max === null) {
+			max = data.max;
+			state.gaugeMax = null;
+		}
+		else
+			state.gaugeMax = max;
+
+		var width = state.chartWidth(), height = state.chartHeight(), ratio = 1.5;
+		switch(adjust) {
+			case 'width': width = height * ratio; break;
+			case 'height':
+			default: height = width / ratio; break;
+		}
+		state.element.style.width = width.toString() + 'px';
+		state.element.style.height = height.toString() + 'px';
+
+		var lum_d = 0.05;
+
+		var options = {
+			lines: 12,					// The number of lines to draw
+			angle: 0.15,				// The length of each line
+			lineWidth: 0.44,			// 0.44 The line thickness
+			pointer: {
+				length: 0.8,			// 0.9 The radius of the inner circle
+				strokeWidth: 0.035,		// The rotation offset
+				color: '#C0C0C0'		// Fill color
+			},
+			colorStart: state.chartColors()[0],	// Colors
+			colorStop: state.chartColors()[0],	// just experiment with them
+			strokeColor: '#F0F0F0',		// to see which ones work best for you
+			generateGradient: false,
+			percentColors: [
+				[0.0, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 0))],
+				[0.1, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 1))],
+				[0.2, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 2))],
+				[0.3, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 3))],
+				[0.4, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 4))],
+				[0.5, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 5))],
+				[0.6, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 6))],
+				[0.7, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 7))],
+				[0.8, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 8))],
+				[0.9, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 9))],
+				[1.0, state.chartColors()[0]]]
+		};
+
+		state.gauge_canvas = document.createElement('canvas');
+		state.gauge_canvas.id = 'gauge-' + state.uuid + '-canvas';
+		state.gauge_canvas.className = 'gaugeChart';
+		state.gauge_canvas.width  = width;
+		state.gauge_canvas.height = height;
+		state.element_chart.appendChild(state.gauge_canvas);
+
+		var valuefontsize = Math.floor(height / 6);
+		var valuetop = Math.round((height - valuefontsize - (height / 6)) / 2);
+		state.gaugeChartLabel = document.createElement('span');
+		state.gaugeChartLabel.className = 'gaugeChartLabel';
+		state.gaugeChartLabel.innerHTML = state.legendFormatValue(value);
+		state.gaugeChartLabel.style.fontSize = valuefontsize + 'px';
+		state.gaugeChartLabel.style.top = valuetop.toString() + 'px';
+		state.element_chart.appendChild(state.gaugeChartLabel);
+
+		var titlefontsize = Math.round(valuefontsize / 2);
+		var titletop = 0;
+		state.gaugeChartTitle = document.createElement('span');
+		state.gaugeChartTitle.className = 'gaugeChartTitle';
+		state.gaugeChartTitle.innerHTML = state.title;
+		state.gaugeChartTitle.style.fontSize = titlefontsize + 'px';
+		state.gaugeChartTitle.style.lineHeight = titlefontsize + 'px';
+		state.gaugeChartTitle.style.top = titletop.toString() + 'px';
+		state.element_chart.appendChild(state.gaugeChartTitle);
+
+		var unitfontsize = Math.round(titlefontsize * 0.9);
+		state.gaugeChartUnits = document.createElement('span');
+		state.gaugeChartUnits.className = 'gaugeChartUnits';
+		state.gaugeChartUnits.innerHTML = state.units;
+		state.gaugeChartUnits.style.fontSize = unitfontsize + 'px';
+		state.element_chart.appendChild(state.gaugeChartUnits);
+
+		state.gaugeChartMin = document.createElement('span');
+		state.gaugeChartMin.className = 'gaugeChartMin';
+		state.gaugeChartMin.innerHTML = 0;
+		state.gaugeChartMin.style.fontSize = Math.round(valuefontsize * 0.75).toString() + 'px';
+		state.element_chart.appendChild(state.gaugeChartMin);
+
+		state.gaugeChartMax = document.createElement('span');
+		state.gaugeChartMax.className = 'gaugeChartMax';
+		state.gaugeChartMax.innerHTML = state.legendFormatValue(max);
+		state.gaugeChartMax.style.fontSize = Math.round(valuefontsize * 0.75).toString() + 'px';
+		state.element_chart.appendChild(state.gaugeChartMax);
+
+		// when we just re-create the chart
+		// do not animate the first update
+		var animate = true;
+		if(typeof state.gauge_instance !== 'undefined')
+			animate = false;
+
+		state.gauge_instance = new Gauge(state.gauge_canvas).setOptions(options); // create sexy gauge!
+		
+		// set max gauge value
+		state.gauge_instance.maxValue = max;
+
+		// set animation speed (32 is default value)
+		if(animate === false) state.gauge_instance.animationSpeed = 32;
+		else state.gauge_instance.animationSpeed = 1;
+
+		// set actual value
+		state.gauge_instance.set(value);
+		
+		// restore animation
+		state.gauge_instance.animationSpeed = 32;
 		return true;
 	};
 
@@ -4525,6 +4755,23 @@
 			resize: null,
 			setSelection: NETDATA.easypiechartSetSelection,
 			clearSelection: NETDATA.easypiechartClearSelection,
+			initialized: false,
+			enabled: true,
+			format: function(state) { return 'array'; },
+			options: function(state) { return 'absolute'; },
+			legend: function(state) { return null; },
+			autoresize: function(state) { return false; },
+			max_updates_to_recreate: function(state) { return 5000; },
+			track_colors: function(state) { return false; },
+			pixels_per_point: function(state) { return 3; }
+		},
+		"gauge": {
+			initialize: NETDATA.gaugeInitialize,
+			create: NETDATA.gaugeChartCreate,
+			update: NETDATA.gaugeChartUpdate,
+			resize: null,
+			setSelection: NETDATA.gaugeSetSelection,
+			clearSelection: NETDATA.gaugeClearSelection,
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'array'; },

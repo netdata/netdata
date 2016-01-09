@@ -330,6 +330,7 @@ html {
 	display: inline-block;
 	position: absolute;
 	float: left;
+	left: 0;
 	width: 100%;
 	text-align: center;
 	color: #333333;
@@ -340,6 +341,7 @@ html {
 	display: inline-block;
 	position: absolute;
 	float: left;
+	left: 0;
 	width: 64%;
 	margin-left: 18%;
 	text-align: center;
@@ -351,9 +353,85 @@ html {
 	display: inline-block;
 	position: absolute;
 	float: left;
+	left: 0;
 	width: 60%;
 	margin-left: 20%;
 	text-align: center;
+	color: #999999;
+	font-weight: normal;
+}
+
+
+.gaugeChart {
+	position: relative;
+	text-align: center;
+}
+
+.gaugeChart canvas {
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: 0;
+}
+
+.gaugeChartLabel {
+	display: inline-block;
+	position: absolute;
+	float: left;
+	left: 0;
+	width: 100%;
+	text-align: center;
+	color: #FFFFFF;
+	font-weight: bold;
+	z-index: 1;
+}
+
+.gaugeChartTitle {
+	display: inline-block;
+	position: absolute;
+	float: left;
+	left: 0;
+	width: 100%;
+	text-align: center;
+	color: #999999;
+	font-weight: bold;
+}
+
+.gaugeChartUnits {
+	display: inline-block;
+	position: absolute;
+	float: left;
+	left: 0;
+	bottom: 0;
+	width: 100%;
+	text-align: left;
+	margin-left: 5%;
+	color: #999999;
+	font-weight: normal;
+}
+
+.gaugeChartMin {
+	display: inline-block;
+	position: absolute;
+	float: left;
+	left: 0;
+	bottom: 10%;
+	width: 92%;
+	margin-left: 8%;
+	text-align: left;
+	color: #999999;
+	font-weight: normal;
+}
+
+.gaugeChartMax {
+	display: inline-block;
+	position: absolute;
+	float: left;
+	left: 0;
+	bottom: 10%;
+	width: 95%;
+	margin-right: 5%;
+	text-align: right;
 	color: #999999;
 	font-weight: normal;
 }

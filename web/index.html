@@ -253,7 +253,7 @@
 	<!-- <script> netdataServer = "http://box:19999"; </script> -->
 
 	<!-- load the dashboard manager - it will do the rest -->
-	<script type="text/javascript" src="dashboard.js?v15"></script>
+	<script type="text/javascript" src="dashboard.js?v16"></script>
 </head>
 
 <body data-spy="scroll" data-target="#sidebar">
@@ -341,6 +341,9 @@
 
 						<i class="fa fa-circle"></i> <a href="https://rendro.github.io/easy-pie-chart/" target="_blank">Easy Pie Chart</a> web chart library,
 						<i class="fa fa-copyright"></i> Copyright 2013, Robert Fleischmann, <a href="https://github.com/rendro/easy-pie-chart/blob/master/LICENSE" target="_blank">MIT License</a>
+
+						<i class="fa fa-circle"></i> <a href="http://bernii.github.io/gauge.js/" target="_blank">Gauge.js</a> web chart library,
+						<i class="fa fa-copyright"></i> Copyright, Bernard Kobos, <a href="http://bernii.github.io/gauge.js/" target="_blank">MIT License</a>
 
 						<i class="fa fa-circle"></i> <a href="https://jquery.org/" target="_blank">jQuery</a>,
 						<i class="fa fa-copyright"></i> Copyright 2015, jQuery Foundation, <a href="https://jquery.org/license/" target="_blank">MIT License</a>
@@ -923,31 +926,33 @@ function prepareScreen(data) {
 			$.each(disks, function(j, c) {
 				sidebar += '<li class><a href="#' + name2id(c.name) + '">' + c.name + '</a></li>';
 				html += '<div class="netdata-group-container" id="disk_' + name2id(c.name) + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + name2id(c.name) + '" class="netdata-chart-alignment" role="heading">' + c.name + '</h2>';
-				var head = '<div class="netdata-chart-alignment">';
+				var head = '<div style="width: 100%; text-align: center;">';
 				var all = '';
 				$.each(c.values, function(x, f) {
 					var c = null;
 					var h = options.chartsHeight / 2;
 					switch(f.type) {
 						case 'disk'        : h = options.chartsHeight;
-								head += '<div style="margin-right: 10px;" data-netdata="' + f.id + '"'
+								head += '<div data-netdata="' + f.id + '"'
 								+ ' data-dimensions="reads"'
-								+ ' data-chart-library="easypiechart"'
+								+ ' data-chart-library="gauge"'
+								+ ' data-gauge-adjust="width"'
 								+ ' data-title="Read"'
-								+ ' data-width="120px"'
-								+ ' data-height="120px"'
+								+ ' data-width="100px"'
+								+ ' data-height="100px"'
 								+ ' data-before="0"'
 								+ ' data-after="-' + duration.toString() + '"'
 								+ ' data-points="' + duration.toString() + '"'
 								+ ' data-colors="' + NETDATA.colors[0] + '"'
 								+ ' role="application"></div>';
 
-								head += '<div style="margin-right: 10px;" data-netdata="' + f.id + '"'
+								head += '<div data-netdata="' + f.id + '"'
 								+ ' data-dimensions="writes"'
-								+ ' data-chart-library="easypiechart"'
+								+ ' data-chart-library="gauge"'
+								+ ' data-gauge-adjust="width"'
 								+ ' data-title="Write"'
-								+ ' data-width="120px"'
-								+ ' data-height="120px"'
+								+ ' data-width="100px"'
+								+ ' data-height="100px"'
 								+ ' data-before="0"'
 								+ ' data-after="-' + duration.toString() + '"'
 								+ ' data-points="' + duration.toString() + '"'
@@ -956,12 +961,13 @@ function prepareScreen(data) {
 								break;
 						case 'disk_backlog': c = '#DD4477'; break;
 						case 'disk_util'   : c = '#109618';
-								head += '<div style="margin-right: 10px;" data-netdata="' + f.id + '"'
-								+ ' data-chart-library="easypiechart"'
+								head += '<div data-netdata="' + f.id + '"'
+								+ ' data-chart-library="gauge"'
 								+ ' data-title="Utilization"'
-								+ ' data-easypiechart-max-value="100"'
-								+ ' data-width="120px"'
-								+ ' data-height="120px"'
+								+ ' data-gauge-max-value="100"'
+								+ ' data-gauge-adjust="width"'
+								+ ' data-width="100px"'
+								+ ' data-height="100px"'
 								+ ' data-before="0"'
 								+ ' data-after="-' + duration.toString() + '"'
 								+ ' data-points="' + duration.toString() + '"'
@@ -1055,12 +1061,12 @@ function prepareScreen(data) {
 			}
 
 			if(typeof charts['system.cpu'] !== 'undefined')
-				head += '<div style="margin-right: 10px;" data-netdata="system.cpu"'
-				+ ' data-chart-library="easypiechart"'
+				head += '<div data-netdata="system.cpu"'
+				+ ' data-chart-library="gauge"'
 				+ ' data-title="CPU"'
 				+ ' data-units="%"'
-				+ ' data-easypiechart-max-value="100"'
-				+ ' data-width="11%"'
+				+ ' data-gauge-max-value="100"'
+				+ ' data-width="18%"'
 				+ ' data-height="49px"'
 				+ ' data-after="-' + duration.toString() + '"'
 				+ ' data-points="' + duration.toString() + '"'
@@ -1176,6 +1182,78 @@ function prepareScreen(data) {
 					+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
 					+ ' role="application"></div>';
 			});
+			html += head + all;
+		}
+		else if(t.name === 'netdata') {
+			var head = '<div style="width: 100%; text-align: center;">';
+			var all = '';
+
+			$.each(t.charts, function(x, f) {
+				switch(f.id) {
+					case 'netdata.net'   :
+							head += '<div data-netdata="' + f.id + '"'
+							+ ' data-dimensions="in"'
+							+ ' data-chart-library="gauge"'
+							+ ' data-title="Bytes In"'
+							+ ' data-gauge-adjust="width"'
+							+ ' data-width="100px"'
+							+ ' data-height="100px"'
+							+ ' data-before="0"'
+							+ ' data-after="-' + duration.toString() + '"'
+							+ ' data-points="' + duration.toString() + '"'
+							+ ' role="application"></div>';
+
+							head += '<div data-netdata="' + f.id + '"'
+							+ ' data-dimensions="out"'
+							+ ' data-chart-library="gauge"'
+							+ ' data-title="Bytes Out"'
+							+ ' data-gauge-adjust="width"'
+							+ ' data-width="100px"'
+							+ ' data-height="100px"'
+							+ ' data-before="0"'
+							+ ' data-after="-' + duration.toString() + '"'
+							+ ' data-points="' + duration.toString() + '"'
+							+ ' role="application"></div>';
+							break;
+
+					case 'netdata.requests'   : c = NETDATA.colors[2];
+							head += '<div data-netdata="' + f.id + '"'
+							+ ' data-chart-library="gauge"'
+							+ ' data-title="Requests / second"'
+							+ ' data-gauge-adjust="width"'
+							+ ' data-width="100px"'
+							+ ' data-height="100px"'
+							+ ' data-before="0"'
+							+ ' data-after="-' + duration.toString() + '"'
+							+ ' data-points="' + duration.toString() + '"'
+							+ ' data-colors="' + c + '"'
+							+ ' role="application"></div>';
+							break;
+
+					case 'netdata.clients'   : c = NETDATA.colors[3];
+							head += '<div data-netdata="' + f.id + '"'
+							+ ' data-chart-library="gauge"'
+							+ ' data-title="Connections"'
+							+ ' data-gauge-adjust="width"'
+							+ ' data-width="100px"'
+							+ ' data-height="100px"'
+							+ ' data-before="0"'
+							+ ' data-after="-' + duration.toString() + '"'
+							+ ' data-points="' + duration.toString() + '"'
+							+ ' data-colors="' + c + '"'
+							+ ' role="application"></div>';
+							break;
+				}
+
+				all += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
+					+ ' data-width="' + pcent_width.toString() + '%"'
+					+ ' data-height="' + options.chartsHeight.toString() + 'px"'
+					+ ' data-before="0"'
+					+ ' data-after="-' + duration.toString() + '"'
+					+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
+					+ ' role="application"></div>';
+			});
+			head += '</div>';
 			html += head + all;
 		}
 		else {

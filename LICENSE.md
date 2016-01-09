@@ -37,6 +37,12 @@ connectivity is not available.
     [MIT License](https://github.com/rendro/easy-pie-chart/blob/master/LICENSE)
 
 
+- [Guage.js](http://bernii.github.io/gauge.js/)
+
+    Copyright, Bernard Kobos
+    [MIT License](http://bernii.github.io/gauge.js/)
+
+
 - [jQuery](https://jquery.org/)
 
     Copyright 2015, jQuery Foundation
