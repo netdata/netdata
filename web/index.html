@@ -558,7 +558,7 @@ var messages = {
 
 	// categories / sections
 	'system': 'Overview of the key system metrices.',
-	'tc': 'Netdata collects and visualizes tc class utilization using its <a href="https://github.com/firehol/netdata/blob/master/plugins.d/tc-qos-helper.sh" target="_blank">tc-helper plugin</a>. If you also use <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a> for setting up QoS, netdata automatically collects interface and class names.',
+	'tc': 'Netdata collects and visualizes tc class utilization using its <a href="https://github.com/firehol/netdata/blob/master/plugins.d/tc-qos-helper.sh" target="_blank">tc-helper plugin</a>. If you also use <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a> for setting up QoS, netdata automatically collects interface and class names. If your QoS configuration includes overheads calculation, the values shown here will include these overheads (the total bandwidth for the same interface as reported in the Network Interfaces section, will be lower than the total bandwidth reported here). Also, data collection may have a slight time difference compared to the interface (QoS data collection is implemented with a BASH script, so a shift in data collection of a few milliseconds should be justified).',
 	'net': 'Per network interface statistics collected from <code>/proc/net/dev</code>.',
 	'apps': 'Per application statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics for applications of interest, defined in <code>/etc/netdata/apps_groups.conf</code> (the default is <a href="https://github.com/firehol/netdata/blob/master/conf.d/apps_groups.conf" target="_blank">here</a>). The plugin internaly builds a process tree (much like <code>ps fax</code> does), and groups processes together (evaluating both child and parent processes) so that the result is always a chart with a predefined set of dimensions (of course, only application groups found running are reported).<br/><b>IMPORTANT</b>: The values shown here are not 100% accurate. They only include values for the processes running. If an application is spawning childs continiously, which are terminated in just a few milliseconds (like shell scripts do), the values reported will be inaccurate. Linux does report the values for the exited childs of a process. However, these values are reported to the parent process <b>only when the child exits</b>. If these values, of the exited child processes, were also aggregated in the charts below, the charts would have been full of spikes, presenting unrealisting utilization for each process group. So, we decided to ignore these values and present only the utilization of <b>the currently running processes</b>.',
 
@@ -896,17 +896,77 @@ function prepareScreen(data) {
 
 				sidebar += '<li class><a href="#' + name2id(t.name) + '_' + name2id(c.name) + '">' + menuitem + '</a></li>';
 				html += '<div class="netdata-group-container" id="interface_' + name2id(t.name) + '_' + name2id(c.name) + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + name2id(t.name) + '_' + name2id(c.name) + '" class="netdata-chart-alignment" role="heading">' + menuitem + '</h2>';
+
+				var head = '<div style="width: 100%; text-align: center;">';
+				var all = '';
+
 				$.each(c.values, function(x, f) {
 					var c = null;
 					var h = options.chartsHeight / 2;
 					switch(f.type) {
-						case 'net'         : h = options.chartsHeight; break;
-						case 'tc'          : h = options.chartsHeight; break;
+						case 'net':
+							h = options.chartsHeight;
+
+							head += '<div data-netdata="' + f.id + '"'
+							+ ' data-dimensions="received"'
+							+ ' data-chart-library="gauge"'
+							+ ' data-gauge-adjust="width"'
+							+ ' data-title="Receive"'
+							+ ' data-width="100px"'
+							+ ' data-height="100px"'
+							+ ' data-before="0"'
+							+ ' data-after="-' + duration.toString() + '"'
+							+ ' data-points="' + duration.toString() + '"'
+							+ ' data-colors="' + NETDATA.colors[0] + '"'
+							+ ' role="application"></div>';
+
+							head += '<div data-netdata="' + f.id + '"'
+							+ ' data-dimensions="sent"'
+							+ ' data-chart-library="gauge"'
+							+ ' data-gauge-adjust="width"'
+							+ ' data-title="Sent"'
+							+ ' data-width="100px"'
+							+ ' data-height="100px"'
+							+ ' data-before="0"'
+							+ ' data-after="-' + duration.toString() + '"'
+							+ ' data-points="' + duration.toString() + '"'
+							+ ' data-colors="' + NETDATA.colors[1] + '"'
+							+ ' role="application"></div>';
+							break;
+
+						case 'tc':
+							h = options.chartsHeight;
+							if(f.id.match(/.*-ifb$/) !== null)
+								head += '<div data-netdata="' + f.id + '"'
+								+ ' data-chart-library="gauge"'
+								+ ' data-gauge-adjust="width"'
+								+ ' data-title="Receive"'
+								+ ' data-width="100px"'
+								+ ' data-height="100px"'
+								+ ' data-before="0"'
+								+ ' data-after="-' + duration.toString() + '"'
+								+ ' data-points="' + duration.toString() + '"'
+								+ ' data-colors="' + NETDATA.colors[2] + '"'
+								+ ' role="application"></div>';
+
+							else
+								head += '<div data-netdata="' + f.id + '"'
+								+ ' data-chart-library="gauge"'
+								+ ' data-gauge-adjust="width"'
+								+ ' data-title="Sent"'
+								+ ' data-width="100px"'
+								+ ' data-height="100px"'
+								+ ' data-before="0"'
+								+ ' data-after="-' + duration.toString() + '"'
+								+ ' data-points="' + duration.toString() + '"'
+								+ ' data-colors="' + NETDATA.colors[3] + '"'
+								+ ' role="application"></div>';
+							break;
 						case 'ap_bandwidth': h = options.chartsHeight; break;
 						case 'ap_bitrate'  : h = options.chartsHeight; break;
 					}
 
-					html += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
+					all += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
 						+ ' data-width="100%"'
 						+ ' data-height="' + h.toString() + 'px"'
 						+ ' data-before="0"'
@@ -915,7 +975,9 @@ function prepareScreen(data) {
 						+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
 						+ ' role="application"></div>';
 				});
-				html += '</div>'; // netdata-group-container
+
+				head += '</div>';
+				html += head + all + '</div>'; // netdata-group-container
 			});
 			sidebar += '</ul>';
 		}
@@ -1194,7 +1256,7 @@ function prepareScreen(data) {
 							head += '<div data-netdata="' + f.id + '"'
 							+ ' data-dimensions="in"'
 							+ ' data-chart-library="gauge"'
-							+ ' data-title="Bytes In"'
+							+ ' data-title="Received"'
 							+ ' data-gauge-adjust="width"'
 							+ ' data-width="100px"'
 							+ ' data-height="100px"'
@@ -1206,7 +1268,7 @@ function prepareScreen(data) {
 							head += '<div data-netdata="' + f.id + '"'
 							+ ' data-dimensions="out"'
 							+ ' data-chart-library="gauge"'
-							+ ' data-title="Bytes Out"'
+							+ ' data-title="Sent"'
 							+ ' data-gauge-adjust="width"'
 							+ ' data-width="100px"'
 							+ ' data-height="100px"'

@@ -227,7 +227,7 @@
 			focus: 				false,
 			visibility: 		false,
 			chart_data_url: 	false,
-			chart_errors: 		false,
+			chart_errors: 		true, // FIXME
 			chart_timing: 		false,
 			chart_calls: 		false,
 			libraries: 			false,
@@ -4240,7 +4240,7 @@
 			state.easyPieChartEvent.timer = setTimeout(function() {
 				state.easyPieChartEvent.timer = null;
 				state.easyPieChart_instance.update(state.easyPieChartEvent.pcent);
-			}, 50);
+			}, 100);
 		}
 
 		return true;
@@ -4381,6 +4381,62 @@
 		}
 	};
 
+	NETDATA.gaugeAnimation = function(state, status) {
+		var speed = 32;
+
+		if(typeof status === 'boolean' && status === false)
+			speed = 1000000000;
+		else if(typeof status === 'number')
+			speed = status;
+		
+		state.gauge_instance.animationSpeed = speed;
+		state.___gaugeOld__.speed = speed;
+	}
+
+	NETDATA.gaugeSet = function(state, value, min, max) {
+		if(typeof value !== 'number') value = 0;
+		if(typeof min !== 'number') min = 0;
+		if(typeof max !== 'number') max = 0;
+		if(value > max) max = value;
+		if(value < min) min = value;
+
+		if(max >= state.___gaugeOld__.max && min <= state.___gaugeOld__.min) {
+			state.gauge_instance.minValue = min;
+			state.gauge_instance.maxValue = max;
+			state.gauge_instance.set(value);
+		}
+		else {
+			// we can lower the maxValue or increase the minValue
+			// of gauge.js, only if we disable animation
+			// otherwise, the gauge will go crazy
+			var old_speed = state.___gaugeOld__.speed;
+			NETDATA.gaugeAnimation(state, false);
+			state.gauge_instance.minValue = min;
+			state.gauge_instance.maxValue = max;
+			state.gauge_instance.set(value);
+			NETDATA.gaugeAnimation(state, old_speed);
+		}
+
+		state.___gaugeOld__.value = value;
+		state.___gaugeOld__.min = min;
+		state.___gaugeOld__.max = max;
+	};
+
+	NETDATA.gaugeSetLabels = function(state, value, min, max) {
+		if(state.___gaugeOld__.valueLabel !== value) {
+			state.___gaugeOld__.valueLabel = value;
+			state.gaugeChartLabel.innerHTML = state.legendFormatValue(value);
+		}
+		if(state.___gaugeOld__.minLabel !== min) {
+			state.___gaugeOld__.minLabel = min;
+			state.gaugeChartMin.innerHTML = state.legendFormatValue(min);
+		}
+		if(state.___gaugeOld__.maxLabel !== max) {
+			state.___gaugeOld__.maxLabel = max;
+			state.gaugeChartMax.innerHTML = state.legendFormatValue(max);
+		}
+	};
+
 	NETDATA.gaugeClearSelection = function(state) {
 		if(typeof state.gaugeEvent !== 'undefined') {
 			if(state.gaugeEvent.timer !== null)
@@ -4393,13 +4449,12 @@
 			NETDATA.gaugeChartUpdate(state, state.data);
 		}
 		else {
-			state.gaugeChartLabel.innerHTML = state.legendFormatValue(null);
-			state.gaugeChartMax.innerHTML = state.legendFormatValue(null);
-			state.gauge_instance.animationSpeed = 1;
-			state.gauge_instance.set(0);
+			NETDATA.gaugeAnimation(state, false);
+			NETDATA.gaugeSet(state, null, null, null);
+			NETDATA.gaugeSetLabels(state, null, null, null);
 		}
-		state.gauge_instance.animationSpeed = 32;
 
+		NETDATA.gaugeAnimation(state, true);
 		return true;
 	};
 
@@ -4415,51 +4470,50 @@
 			state.gaugeEvent = {
 				timer: null,
 				value: 0,
-				max: 0,
+				min: 0,
+				max: 0
 			};
 		}
 
 		var value = state.data.result[slot];
 		var max = (state.gaugeMax === null)?state.data.max:state.gaugeMax;
-		if(value > max) max = value;
+		var min = 0;
 
 		state.gaugeEvent.value = value;
 		state.gaugeEvent.max = max;
-		state.gaugeChartLabel.innerHTML = state.legendFormatValue(value);
-		state.gaugeChartMax.innerHTML = state.legendFormatValue(max);
+		state.gaugeEvent.min = min;
+		NETDATA.gaugeSetLabels(state, value, min, max);
 
 		if(state.gaugeEvent.timer === null) {
-			state.gauge_instance.animationSpeed = 1;
+			NETDATA.gaugeAnimation(state, false);
 
 			state.gaugeEvent.timer = setTimeout(function() {
 				state.gaugeEvent.timer = null;
-				state.gauge_instance.maxValue = state.gaugeEvent.max;
-				state.gauge_instance.set(state.gaugeEvent.value);
-			}, 50);
+				NETDATA.gaugeSet(state, state.gaugeEvent.value, state.gaugeEvent.min, state.gaugeEvent.max);
+			}, 100);
 		}
 
 		return true;
 	};
 
 	NETDATA.gaugeChartUpdate = function(state, data) {
-		var value, max;
+		var value, min, max;
 
 		if(NETDATA.globalPanAndZoom.isActive() === true || state.isAutoRefreshed() === false) {
 			value = 0;
-			state.gaugeChartLabel.innerHTML = state.legendFormatValue(null);
-			state.gaugeChartMax.innerHTML = state.legendFormatValue(null);
-			state.gauge_instance.set(value);
+			min = 0;
+			max = 1;
+			NETDATA.gaugeSetLabels(state, null, null, null);
 		}
 		else {
 			value = data.result[0];
+			min = 0;
 			max = (state.gaugeMax === null)?data.max:state.gaugeMax;
 			if(value > max) max = value;
-			state.gaugeChartLabel.innerHTML = state.legendFormatValue(value);
-			state.gaugeChartMax.innerHTML = state.legendFormatValue(max);
-			state.gauge_instance.maxValue = max;
-			state.gauge_instance.set(value);
+			NETDATA.gaugeSetLabels(state, value, min, max);
 		}
 
+		NETDATA.gaugeSet(state, value, min, max);
 		return true;
 	};
 
@@ -4499,9 +4553,11 @@
 				color: '#C0C0C0'		// Fill color
 			},
 			colorStart: state.chartColors()[0],	// Colors
-			colorStop: state.chartColors()[0],	// just experiment with them
+			colorStop: void 0,			// just experiment with them
 			strokeColor: '#F0F0F0',		// to see which ones work best for you
+			limitMax: true,
 			generateGradient: false,
+			gradientType: 0,
 			percentColors: [
 				[0.0, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 0))],
 				[0.1, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 1))],
@@ -4527,7 +4583,6 @@
 		var valuetop = Math.round((height - valuefontsize - (height / 6)) / 2);
 		state.gaugeChartLabel = document.createElement('span');
 		state.gaugeChartLabel.className = 'gaugeChartLabel';
-		state.gaugeChartLabel.innerHTML = state.legendFormatValue(value);
 		state.gaugeChartLabel.style.fontSize = valuefontsize + 'px';
 		state.gaugeChartLabel.style.top = valuetop.toString() + 'px';
 		state.element_chart.appendChild(state.gaugeChartLabel);
@@ -4551,13 +4606,11 @@
 
 		state.gaugeChartMin = document.createElement('span');
 		state.gaugeChartMin.className = 'gaugeChartMin';
-		state.gaugeChartMin.innerHTML = 0;
 		state.gaugeChartMin.style.fontSize = Math.round(valuefontsize * 0.75).toString() + 'px';
 		state.element_chart.appendChild(state.gaugeChartMin);
 
 		state.gaugeChartMax = document.createElement('span');
 		state.gaugeChartMax.className = 'gaugeChartMax';
-		state.gaugeChartMax.innerHTML = state.legendFormatValue(max);
 		state.gaugeChartMax.style.fontSize = Math.round(valuefontsize * 0.75).toString() + 'px';
 		state.element_chart.appendChild(state.gaugeChartMax);
 
@@ -4568,19 +4621,20 @@
 			animate = false;
 
 		state.gauge_instance = new Gauge(state.gauge_canvas).setOptions(options); // create sexy gauge!
-		
-		// set max gauge value
-		state.gauge_instance.maxValue = max;
 
-		// set animation speed (32 is default value)
-		if(animate === false) state.gauge_instance.animationSpeed = 32;
-		else state.gauge_instance.animationSpeed = 1;
-
-		// set actual value
-		state.gauge_instance.set(value);
+		state.___gaugeOld__ = {
+			value: value,
+			min: 0,
+			max: max,
+			valueLabel: null,
+			minLabel: null,
+			maxLabel: null
+		};
 		
-		// restore animation
-		state.gauge_instance.animationSpeed = 32;
+		NETDATA.gaugeAnimation(state, animate);
+		NETDATA.gaugeSet(state, value, 0, max);
+		NETDATA.gaugeSetLabels(state, value, 0, max);
+		NETDATA.gaugeAnimation(state, true);
 		return true;
 	};
 
