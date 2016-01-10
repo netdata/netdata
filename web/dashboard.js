@@ -227,7 +227,7 @@
 			focus: 				false,
 			visibility: 		false,
 			chart_data_url: 	false,
-			chart_errors: 		true, // FIXME
+			chart_errors: 		false, // FIXME
 			chart_timing: 		false,
 			chart_calls: 		false,
 			libraries: 			false,
@@ -1145,20 +1145,28 @@
 			return false;
 		}
 
+		var isHidden = function() {
+			if(typeof that.___chartIsHidden___ !== 'undefined')
+				return true;
+
+			return false;
+		}
+
 		// hide the chart, when it is not visible - called from isVisible()
 		var hideChart = function() {
 			// hide it, if it is not already hidden
-			if(typeof that.___chartIsHidden___ !== 'undefined')
-				return;
+			if(isHidden() === true) return;
 
-			// we should destroy it
-			if(NETDATA.options.current.destroy_on_hide === true) {
-				if(that.chart_created === true) init();
-			}
-			else {
-				showRendering();
-				that.element_chart.style.display = 'none';
-				if(that.element_legend !== null) that.element_legend.style.display = 'none';
+			if(that.chart_created === true) {
+				// we should destroy it
+				if(NETDATA.options.current.destroy_on_hide === true) {
+					init();
+				}
+				else {
+					showRendering();
+					that.element_chart.style.display = 'none';
+					if(that.element_legend !== null) that.element_legend.style.display = 'none';
+				}
 			}
 			
 			that.___chartIsHidden___ = true;
@@ -1166,8 +1174,7 @@
 
 		// unhide the chart, when it is visible - called from isVisible()
 		var unhideChart = function() {
-			if(typeof that.___chartIsHidden___ === 'undefined')
-				return;
+			if(isHidden() === false) return;
 
 			that.___chartIsHidden___ = undefined;
 
@@ -1177,39 +1184,73 @@
 				init();
 			}
 			else {
-				that.element_chart.style.display = 'inline-block';
-				if(that.element_legend !== null) that.element_legend.style.display = 'inline-block';
+				that.element_chart.style.display = '';
+				if(that.element_legend !== null) that.element_legend.style.display = '';
 				resizeChart();
 				hideMessage();
 			}
+		}
+
+		var canBeRendered = function() {
+			if(isHidden() === true || that.isVisible(true) === false)
+				return false;
+
+			return true;
 		}
 
 		// https://github.com/petkaantonov/bluebird/wiki/Optimization-killers
 		var callChartLibraryUpdateSafely = function(data) {
 			var status;
 
-			try {
+			if(canBeRendered() === false)
+				return false;
+
+			if(NETDATA.options.debug.chart_errors === true)
 				status = that.library.update(that, data);
-			}
-			catch(err) {
-				status = false;
+			else {
+				try {
+					status = that.library.update(that, data);
+				}
+				catch(err) {
+					status = false;
+				}
 			}
 
-			return status;
+			if(status === false) {
+				error('chart failed to be updated as ' + that.library_name);
+				return false;
+			}
+
+			that.updates_since_last_creation++;
+			return true;
 		}
 
 		// https://github.com/petkaantonov/bluebird/wiki/Optimization-killers
 		var callChartLibraryCreateSafely = function(data) {
 			var status;
 
-			try {
+			if(canBeRendered() === false)
+				return false;
+
+			if(NETDATA.options.debug.chart_errors === true)
 				status = that.library.create(that, data);
-			}
-			catch(err) {
-				status = false;
+			else {
+				try {
+					status = that.library.create(that, data);
+				}
+				catch(err) {
+					status = false;
+				}
 			}
 
-			return status;
+			if(status === false) {
+				error('chart failed to be created as ' + that.library_name);
+				return false;
+			}
+
+			that.chart_created = true;
+			that.updates_since_last_creation = 0;
+			return true;
 		}
 
 		// ----------------------------------------------------------------------------------------------------------------
@@ -2245,41 +2286,19 @@
 
 			if(this.chart_created === true
 				&& typeof this.library.update === 'function') {
-				var status = false;
 
 				if(this.debug === true)
 					this.log('updating chart...');
 
-				if(NETDATA.options.debug.chart_errors === true)
-					status = this.library.update(this, data);
-				else
-					status = callChartLibraryUpdateSafely(data);
-
-				if(status === false) {
-					error('chart failed to be updated as ' + this.library_name);
-				}
-				else {
-					this.updates_since_last_creation++;
-				}
+				if(callChartLibraryUpdateSafely(data) === false)
+					return;
 			}
 			else {
-				var status = false;
-
 				if(this.debug === true)
 					this.log('creating chart...');
 
-				if(NETDATA.options.debug.chart_errors === true)
-					status = this.library.create(this, data);
-				else
-					status = callChartLibraryCreateSafely(data);
-
-				if(status === false) {
-					error('chart failed to be created as ' + this.library_name);
-				}
-				else {
-					this.chart_created = true;
-					this.updates_since_last_creation = 0;
-				}
+				if(callChartLibraryCreateSafely(data) === false)
+					return;
 			}
 			hideMessage();
 			this.legendShowLatestValues();
@@ -2322,15 +2341,20 @@
 				return false;
 			}
 
+			if(canBeRendered() === false) {
+				if(typeof callback === 'function') callback();
+				return false;
+			}
+
 			if(this.chart === null) {
 				this.getChart(function() { that.updateChart(callback); });
-				return;
+				return false;
 			}
 
 			if(this.library.initialized === false) {
 				if(this.library.enabled === true) {
 					this.library.initialize(function() { that.updateChart(callback); });
-					return;
+					return false;
 				}
 				else {
 					error('chart library "' + this.library_name + '" is not available.');
@@ -2363,14 +2387,19 @@
 			.always(function() {
 				if(typeof callback === 'function') callback();
 			});
+
+			return true;
 		}
 
-		this.isVisible = function() {
+		this.isVisible = function(nocache) {
+			if(typeof nocache === 'undefined')
+				nocache = false;
+
 			// this.log('last_visible_check: ' + this.tm.last_visible_check + ', last_page_scroll: ' + NETDATA.options.last_page_scroll);
 
 			// caching - we do not evaluate the charts visibility
 			// if the page has not been scrolled since the last check
-			if(this.tm.last_visible_check > NETDATA.options.last_page_scroll) {
+			if(nocache === false && this.tm.last_visible_check > NETDATA.options.last_page_scroll) {
 				if(this.debug === true)
 					this.log('isVisible: ' + this.___isVisible___);
 
