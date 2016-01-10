@@ -19,6 +19,13 @@ html {
 	/* width and height is given per chart with data-width and data-height */
 }
 
+.netdata-aspect {
+	position: relative;
+	width: 100%;
+	padding: 0px;
+	margin: 0px;
+}
+
 .netdata-container-with-legend {
 	display: -webkit-flex; /* Safari */
 	-webkit-flex-wrap: wrap; /* Safari 6.1+ */
@@ -360,7 +367,6 @@ html {
 	color: #999999;
 	font-weight: normal;
 }
-
 
 .gaugeChart {
 	position: relative;

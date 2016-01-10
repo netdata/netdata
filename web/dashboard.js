@@ -385,6 +385,8 @@
 	};
 
 	NETDATA.onscroll = function() {
+		// console.log('onscroll');
+
 		NETDATA.options.last_page_scroll = new Date().getTime();
 		if(NETDATA.options.targets === null) return;
 
@@ -1012,10 +1014,19 @@
 			else if(typeof(that.width) === 'number')
 				$(that.element).css('width', that.width + 'px');
 
-			if(typeof(that.height) === 'string')
-				$(that.element).css('height', that.height);
-			else if(typeof(that.height) === 'number')
-				$(that.element).css('height', that.height + 'px');
+			if(typeof(that.library.aspect_ratio) === 'undefined') {
+				if(typeof(that.height) === 'string')
+					$(that.element).css('height', that.height);
+				else if(typeof(that.height) === 'number')
+					$(that.element).css('height', that.height + 'px');
+			}
+			else {
+				var w = that.element.offsetWidth;
+				if(w === null || w === 0)
+					that.tm.last_resized = 0;
+				else
+					$(that.element).css('height', (that.element.offsetWidth * that.library.aspect_ratio / 100).toString() + 'px');
+			}
 
 			if(NETDATA.chartDefaults.min_width !== null)
 				$(that.element).css('min-width', NETDATA.chartDefaults.min_width);
@@ -2969,6 +2980,10 @@
 
 		// bootstrap tab switching
 		$('a[data-toggle="tab"]').on('shown.bs.tab', NETDATA.onscroll);
+
+		// bootstrap modal switching
+		$('.modal').on('hidden.bs.modal', NETDATA.onscroll);
+		$('.modal').on('shown.bs.modal', NETDATA.onscroll);
 		
 		NETDATA.parseDom(NETDATA.chartRefresher);
 	}
@@ -4561,14 +4576,14 @@
 		else
 			state.gaugeMax = max;
 
-		var width = state.chartWidth(), height = state.chartHeight(), ratio = 1.5;
-		switch(adjust) {
-			case 'width': width = height * ratio; break;
-			case 'height':
-			default: height = width / ratio; break;
-		}
-		state.element.style.width = width.toString() + 'px';
-		state.element.style.height = height.toString() + 'px';
+		var width = state.chartWidth(), height = state.chartHeight(); //, ratio = 1.5;
+		//switch(adjust) {
+		//	case 'width': width = height * ratio; break;
+		//	case 'height':
+		//	default: height = width / ratio; break;
+		//}
+		//state.element.style.width = width.toString() + 'px';
+		//state.element.style.height = height.toString() + 'px';
 
 		var lum_d = 0.05;
 
@@ -4846,7 +4861,8 @@
 			autoresize: function(state) { return false; },
 			max_updates_to_recreate: function(state) { return 5000; },
 			track_colors: function(state) { return false; },
-			pixels_per_point: function(state) { return 3; }
+			pixels_per_point: function(state) { return 3; },
+			aspect_ratio: 100
 		},
 		"gauge": {
 			initialize: NETDATA.gaugeInitialize,
@@ -4863,7 +4879,8 @@
 			autoresize: function(state) { return false; },
 			max_updates_to_recreate: function(state) { return 5000; },
 			track_colors: function(state) { return false; },
-			pixels_per_point: function(state) { return 3; }
+			pixels_per_point: function(state) { return 3; },
+			aspect_ratio: 70
 		}
 	};
 
