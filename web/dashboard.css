@@ -246,6 +246,7 @@ html {
 	padding: 0px;
 	padding-left: 15px;
 	cursor: pointer;
+	-webkit-font-smoothing: none;
 }
 .netdata-legend-name.not-selected {
 	font-weight: normal;
@@ -340,8 +341,10 @@ html {
 	left: 0;
 	width: 100%;
 	text-align: center;
-	color: #333333;
+	color: #666;
 	font-weight: normal;
+	text-shadow: #BBB 0px 0px 1px;
+	-webkit-font-smoothing: none;
 }
 
 .easyPieChartTitle {
@@ -390,6 +393,8 @@ html {
 	color: #FFFFFF;
 	font-weight: bold;
 	z-index: 1;
+	text-shadow: #777 0px 0px 1px;
+	-webkit-font-smoothing: none;
 }
 
 .gaugeChartTitle {
