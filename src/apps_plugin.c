@@ -1919,7 +1919,11 @@ int main(int argc, char **argv)
 	program_name = "apps.plugin";
 
 	host_prefix = getenv("NETDATA_HOST_PREFIX");
-	if(host_prefix == NULL) host_prefix = "";
+	if(host_prefix == NULL) {
+		info("NETDATA_HOST_PREFIX is not passed from netdata");
+		host_prefix = "";
+	}
+	else info("Found NETDATA_HOST_PREFIX='%s'", host_prefix);
 
 	info("starting...");
 
