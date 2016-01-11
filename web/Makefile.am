@@ -27,7 +27,7 @@ weblibdir=$(webdir)/lib
 dist_weblib_DATA = \
         lib/dygraph-combined.js \
         lib/dygraph-smooth-plotter.js \
-        lib/jquery-1.11.3.min.js \
+        lib/jquery-1.12.0.min.js \
         lib/jquery.peity.min.js \
         lib/jquery.sparkline.min.js \
         lib/morris.min.js \

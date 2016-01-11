@@ -73,7 +73,7 @@
 	// default URLs for all the external files we need
 	// make them RELATIVE so that the whole thing can also be
 	// installed under a web server
-	NETDATA.jQuery       		= NETDATA.serverDefault + 'lib/jquery-1.11.3.min.js';
+	NETDATA.jQuery       		= NETDATA.serverDefault + 'lib/jquery-1.12.0.min.js';
 	NETDATA.peity_js     		= NETDATA.serverDefault + 'lib/jquery.peity.min.js';
 	NETDATA.sparkline_js 		= NETDATA.serverDefault + 'lib/jquery.sparkline.min.js';
 	NETDATA.easypiechart_js 	= NETDATA.serverDefault + 'lib/jquery.easypiechart.min.js';
