@@ -1,7 +1,6 @@
 // TODO
 //
-// 1. support -ch option to set global /proc and /sys prefix
-// 2. disable RESET_OR_OVERFLOW check in charts
+// 1. disable RESET_OR_OVERFLOW check in charts
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -44,6 +43,8 @@ int debug = 0;
 
 int update_every = 1;
 unsigned long long file_counter = 0;
+
+char *host_prefix = "";
 
 // ----------------------------------------------------------------------------
 // memory debugger
@@ -204,7 +205,10 @@ procfile *ff = NULL;
 long get_processors(void) {
 	int processors = 0;
 
-	ff = procfile_reopen(ff, "/proc/stat", "", PROCFILE_FLAG_DEFAULT);
+	char filename[FILENAME_MAX + 1];
+	snprintf(filename, FILENAME_MAX, "%s/proc/stat", host_prefix);
+
+	ff = procfile_reopen(ff, filename, "", PROCFILE_FLAG_DEFAULT);
 	if(!ff) return 1;
 
 	ff = procfile_readall(ff);
@@ -229,7 +233,9 @@ long get_processors(void) {
 long get_pid_max(void) {
 	long mpid = 32768;
 
-	ff = procfile_reopen(ff, "/proc/sys/kernel/pid_max", "", PROCFILE_FLAG_DEFAULT);
+	char filename[FILENAME_MAX + 1];
+	snprintf(filename, FILENAME_MAX, "%s/proc/sys/kernel/pid_max", host_prefix);
+	ff = procfile_reopen(ff, filename, "", PROCFILE_FLAG_DEFAULT);
 	if(!ff) return mpid;
 
 	ff = procfile_readall(ff);
@@ -610,7 +616,7 @@ void del_pid_entry(pid_t pid)
 int read_proc_pid_stat(struct pid_stat *p) {
 	char filename[FILENAME_MAX + 1];
 
-	snprintf(filename, FILENAME_MAX, "/proc/%d/stat", p->pid);
+	snprintf(filename, FILENAME_MAX, "%s/proc/%d/stat", host_prefix, p->pid);
 
 	ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
 	if(!ff) return 1;
@@ -699,7 +705,7 @@ int read_proc_pid_stat(struct pid_stat *p) {
 int read_proc_pid_statm(struct pid_stat *p) {
 	char filename[FILENAME_MAX + 1];
 
-	snprintf(filename, FILENAME_MAX, "/proc/%d/statm", p->pid);
+	snprintf(filename, FILENAME_MAX, "%s/proc/%d/statm", host_prefix, p->pid);
 
 	ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
 	if(!ff) return 1;
@@ -727,7 +733,7 @@ int read_proc_pid_statm(struct pid_stat *p) {
 int read_proc_pid_io(struct pid_stat *p) {
 	char filename[FILENAME_MAX + 1];
 
-	snprintf(filename, FILENAME_MAX, "/proc/%d/io", p->pid);
+	snprintf(filename, FILENAME_MAX, "%s/proc/%d/io", host_prefix, p->pid);
 
 	ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
 	if(!ff) return 1;
@@ -1020,7 +1026,10 @@ int update_from_proc(void)
 	static long count_errors = 0;
 
 	char filename[FILENAME_MAX+1];
-	DIR *dir = opendir("/proc");
+	char dirname[FILENAME_MAX + 1];
+
+	snprintf(dirname, FILENAME_MAX, "%s/proc", host_prefix);
+	DIR *dir = opendir(dirname);
 	if(!dir) return 0;
 
 	struct dirent *file = NULL;
@@ -1050,7 +1059,7 @@ int update_from_proc(void)
 
 		if(read_proc_pid_stat(p)) {
 			if(!count_errors++ || debug || (p->target && p->target->debug))
-				error("Cannot process /proc/%d/stat", pid);
+				error("Cannot process %s/proc/%d/stat", host_prefix, pid);
 
 			continue;
 		}
@@ -1062,7 +1071,7 @@ int update_from_proc(void)
 
 		if(read_proc_pid_statm(p)) {
 			if(!count_errors++ || debug || (p->target && p->target->debug))
-				error("Cannot process /proc/%d/statm", pid);
+				error("Cannot process %s/proc/%d/statm", host_prefix, pid);
 
 			continue;
 		}
@@ -1073,7 +1082,7 @@ int update_from_proc(void)
 
 		if(read_proc_pid_io(p)) {
 			if(!count_errors++ || debug || (p->target && p->target->debug))
-				error("Cannot process /proc/%d/io", pid);
+				error("Cannot process %s/proc/%d/io", host_prefix, pid);
 
 			continue;
 		}
@@ -1102,7 +1111,7 @@ int update_from_proc(void)
 		// --------------------------------------------------------------------
 		// /proc/<pid>/fd
 
-		snprintf(filename, FILENAME_MAX, "/proc/%s/fd", file->d_name);
+		snprintf(filename, FILENAME_MAX, "%s/proc/%s/fd", host_prefix, file->d_name);
 		DIR *fds = opendir(filename);
 		if(fds) {
 			int c;
@@ -1136,7 +1145,7 @@ int update_from_proc(void)
 				if(p->fds[fdid] == 0) {
 					// we don't know this fd, get it
 
-					sprintf(fdname, "/proc/%s/fd/%s", file->d_name, de->d_name);
+					sprintf(fdname, "%s/proc/%s/fd/%s", host_prefix, file->d_name, de->d_name);
 					ssize_t l = readlink(fdname, linkname, FILENAME_MAX);
 					if(l == -1) {
 						if(debug || (p->target && p->target->debug)) {
@@ -1908,6 +1917,9 @@ int main(int argc, char **argv)
 
 	// set the name for logging
 	program_name = "apps.plugin";
+
+	host_prefix = getenv("NETDATA_HOST_PREFIX");
+	if(host_prefix == NULL) host_prefix = "";
 
 	info("starting...");
 
