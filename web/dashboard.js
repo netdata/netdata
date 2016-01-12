@@ -4444,14 +4444,17 @@
 		if(value > max) max = value;
 		if(value < min) min = value;
 
-		if(max >= state.___gaugeOld__.max && min <= state.___gaugeOld__.min) {
+		var dvalue = state.gauge_instance.displayedValue;
+
+		if(dvalue >= min && dvalue <= max) {
 			state.gauge_instance.minValue = min;
 			state.gauge_instance.maxValue = max;
 			state.gauge_instance.set(value);
 		}
 		else {
-			// we can lower the maxValue or increase the minValue
-			// of gauge.js, only if we disable animation
+			// the current display value of the gauge
+			// is outside min-max.
+			// we have to disable animation
 			// otherwise, the gauge will go crazy
 			var old_speed = state.___gaugeOld__.speed;
 			NETDATA.gaugeAnimation(state, false);

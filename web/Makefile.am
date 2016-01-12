@@ -6,6 +6,7 @@ MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 dist_web_DATA = \
         robots.txt \
         index.html \
+	demo.html \
         dashboard.html \
         dashboard.js \
         dashboard.css \

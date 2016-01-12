@@ -1243,6 +1243,7 @@ function prepareScreen(data) {
 							+ ' data-before="0"'
 							+ ' data-after="-' + duration.toString() + '"'
 							+ ' data-points="' + duration.toString() + '"'
+							+ ' data-colors="' + NETDATA.colors[0] + '"'
 							+ ' role="application"></div>';
 
 							head += '<div data-netdata="' + f.id + '"'
@@ -1254,6 +1255,7 @@ function prepareScreen(data) {
 							+ ' data-before="0"'
 							+ ' data-after="-' + duration.toString() + '"'
 							+ ' data-points="' + duration.toString() + '"'
+							+ ' data-colors="' + NETDATA.colors[1] + '"'
 							+ ' role="application"></div>';
 							break;
 
@@ -1280,6 +1282,52 @@ function prepareScreen(data) {
 							+ ' data-after="-' + duration.toString() + '"'
 							+ ' data-points="' + duration.toString() + '"'
 							+ ' data-colors="' + c + '"'
+							+ ' role="application"></div>';
+							break;
+				}
+
+				all += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
+					+ ' data-width="' + pcent_width.toString() + '%"'
+					+ ' data-height="' + options.chartsHeight.toString() + 'px"'
+					+ ' data-before="0"'
+					+ ' data-after="-' + duration.toString() + '"'
+					+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
+					+ ' role="application"></div>';
+			});
+			head += '</div>';
+			html += head + all;
+		}
+		else if(t.name === 'netfilter') {
+			var head = '<div style="width: 100%; text-align: center;">';
+			var all = '';
+
+			$.each(t.charts, function(x, f) {
+				switch(f.id) {
+					case 'netfilter.sockets'   :
+							head += '<div data-netdata="' + f.id + '"'
+							+ ' data-chart-library="gauge"'
+							+ ' data-title="Active Connections"'
+							+ ' data-units="connections"'
+							+ ' data-gauge-adjust="width"'
+							+ ' data-width="12%"'
+							+ ' data-before="0"'
+							+ ' data-after="-' + duration.toString() + '"'
+							+ ' data-points="' + duration.toString() + '"'
+							+ ' data-colors="' + NETDATA.colors[0] + '"'
+							+ ' role="application"></div>';
+							break;
+
+					case 'netfilter.new':
+							head += '<div data-netdata="' + f.id + '"'
+							+ ' data-dimensions="new"'
+							+ ' data-chart-library="gauge"'
+							+ ' data-title="New Connections"'
+							+ ' data-gauge-adjust="width"'
+							+ ' data-width="12%"'
+							+ ' data-before="0"'
+							+ ' data-after="-' + duration.toString() + '"'
+							+ ' data-points="' + duration.toString() + '"'
+							+ ' data-colors="' + NETDATA.colors[2] + '"'
 							+ ' role="application"></div>';
 							break;
 				}
