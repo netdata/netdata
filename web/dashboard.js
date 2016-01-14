@@ -150,7 +150,7 @@
 										// rendering the chart that is panned or zoomed).
 										// Used with .current.global_pan_sync_time
 
-		last_resized: 0,				// the timestamp of the last resize request
+		last_resized: new Date().getTime(), // the timestamp of the last resize request
 
 		crossDomainAjax: false,			// enable this to request crossDomain AJAX
 
@@ -196,6 +196,8 @@
 			pan_and_zoom_delay: 50,		// when panning or zooming, how ofter to update the chart
 
 			sync_pan_and_zoom: true,	// enable or disable pan and zoom sync
+
+			pan_and_zoom_data_padding: true, // fetch more data for the master chart when panning or zooming
 
 			update_only_visible: true,	// enable or disable visibility management
 
@@ -574,8 +576,8 @@
 			if(this.master === null || this.seq === 0)
 				return false;
 
-			if(state.needsRecreation())
-				return true;
+			//if(state.needsRecreation())
+			//	return true;
 
 			if(state.tm.pan_and_zoom_seq === this.seq)
 				return false;
@@ -916,6 +918,9 @@
 		this.netdata_last = 0;						// milliseconds - the last timestamp in netdata
 		this.requested_after = null;				// milliseconds - the timestamp of the request after param
 		this.requested_before = null;				// milliseconds - the timestamp of the request before param
+		this.requested_padding = null;
+		this.view_after = 0;
+		this.view_before = 0;
 
 		this.auto = {
 			name: 'auto',
@@ -1022,8 +1027,11 @@
 			}
 			else {
 				var w = that.element.offsetWidth;
-				if(w === null || w === 0)
+				if(w === null || w === 0) {
+					// the div is hidden
+					// this is resize the chart when next viewed
 					that.tm.last_resized = 0;
+				}
 				else
 					$(that.element).css('height', (that.element.offsetWidth * that.library.aspect_ratio / 100).toString() + 'px');
 			}
@@ -1047,9 +1055,10 @@
 			that.paused = false;
 			that.selected = false;
 
-			that.chart_created = false;		// boolean - is the library.create() been called?
-			that.updates_counter = 0;		// numeric - the number of refreshes made so far
-			that.updates_since_last_creation = 0;
+			that.chart_created = false;			// boolean - is the library.create() been called?
+			that.updates_counter = 0;			// numeric - the number of refreshes made so far
+			that.updates_since_last_unhide = 0;	// numeric - the number of refreshes made since the last time the chart was unhidden
+			that.updates_since_last_creation = 0; // numeric - the number of refreshes made since the last time the chart was created
 
 			that.tm = {
 				last_initialized: 0,		// milliseconds - the timestamp it was last initialized
@@ -1177,6 +1186,7 @@
 					showRendering();
 					that.element_chart.style.display = 'none';
 					if(that.element_legend !== null) that.element_legend.style.display = 'none';
+					that.tm.last_hidden = new Date().getTime();
 				}
 			}
 			
@@ -1188,6 +1198,7 @@
 			if(isHidden() === false) return;
 
 			that.___chartIsHidden___ = undefined;
+			that.updates_since_last_unhide = 0;
 
 			if(that.chart_created === false) {
 				// we need to re-initialize it, to show our background
@@ -1195,6 +1206,7 @@
 				init();
 			}
 			else {
+				that.tm.last_unhidden = new Date().getTime();
 				that.element_chart.style.display = '';
 				if(that.element_legend !== null) that.element_legend.style.display = '';
 				resizeChart();
@@ -1232,7 +1244,6 @@
 				return false;
 			}
 
-			that.updates_since_last_creation++;
 			return true;
 		}
 
@@ -1305,7 +1316,6 @@
 
 			var now = new Date().getTime();
 			NETDATA.options.last_page_scroll = now;
-			NETDATA.options.last_resized = now;
 			NETDATA.options.auto_refresher_stop_until = now + NETDATA.options.current.stop_updates_while_resizing;
 
 			// force a resize
@@ -1413,7 +1423,10 @@
 			showMessageIcon('<i class="fa fa-warning"></i> empty');
 			that.legendUpdateDOM();
 			that.tm.last_autorefreshed = new Date().getTime();
-			that.data_update_every = 30 * 1000;
+			// that.data_update_every = 30 * 1000;
+			//that.element_chart.style.display = 'none';
+			//if(that.element_legend !== null) that.element_legend.style.display = 'none';
+			//that.___chartIsHidden___ = true;
 		}
 
 		// ============================================================================================================
@@ -1708,45 +1721,76 @@
 		}
 
 		this.updateChartPanOrZoom = function(after, before) {
-			if(this.debug === true)
-				this.log('updateChartPanOrZoom() called.');
-
-			if(before < after) return false;
-
-			var min_duration = Math.round((this.chartWidth() / 30 * this.chart.update_every * 1000));
+			var logme = 'updateChartPanOrZoom(' + after + ', ' + before + '): ';
+			var ret = true;
 
 			if(this.debug === true)
-				this.log('requested duration of ' + ((before - after) / 1000).toString() + ' (' + after + ' - ' + before + '), minimum ' + min_duration / 1000);
+				this.log(logme);
 
-			if((before - after) < min_duration) return false;
+			if(before < after) {
+				this.log(logme + 'flipped parameters, rejecting it.');
+				return false;
+			}
 
-			var current_duration = this.data_before - this.data_after;
+			if(typeof this.fixed_min_duration === 'undefined')
+				this.fixed_min_duration = Math.round((this.chartWidth() / 30) * this.chart.update_every * 1000);
+			
+			var min_duration = this.fixed_min_duration;
+			var current_duration = Math.round(this.view_before - this.view_after);
+
+			// round the numbers
+			after = Math.round(after);
+			before = Math.round(before);
+
+			// align them to update_every
+			// stretching them further away
+			after -= after % this.data_update_every;
+			before += this.data_update_every - (before % this.data_update_every);
+
+			// the final wanted duration
 			var wanted_duration = before - after;
-			var tolerance = this.data_update_every * 2;
-			var movement = Math.abs(before - this.data_before);
+			
+			// to allow panning, accept just a point below our minimum
+			if((current_duration - this.data_update_every) < min_duration)
+				min_duration = current_duration - this.data_update_every;
 
-			if(this.debug === true)
-				this.log('current duration: ' + current_duration / 1000 + ', wanted duration: ' + wanted_duration / 1000 + ', movement: ' + movement / 1000 + ', tolerance: ' + tolerance / 1000);
+			// we do it, but we adjust to minimum size and return false
+			// when the wanted size is below the current and the minimum
+			// and we zoom
+			if(this.current === this.zoom && wanted_duration < current_duration && wanted_duration < min_duration) {
+				if(this.debug === true)
+					this.log(logme + 'too small: min_duration: ' + (min_duration / 1000).toString() + ', wanted: ' + (wanted_duration / 1000).toString());
+
+				min_duration = this.fixed_min_duration;
+
+				var dt = (min_duration - wanted_duration) / 2;
+				before += dt;
+				after -= dt;
+				ret = false;
+			}
+
+			var tolerance = this.data_update_every * 2;
+			var movement = Math.abs(before - this.view_before);
 
 			if(Math.abs(current_duration - wanted_duration) <= tolerance && movement <= tolerance) {
 				if(this.debug === true)
-					this.log('IGNORED');
-
+					this.log(logme + 'REJECTING UPDATE: current duration: ' + (current_duration / 1000).toString() + ', wanted duration: ' + (wanted_duration / 1000).toString() + ', duration diff: ' + (Math.round(Math.abs(current_duration - wanted_duration) / 1000)).toString() + ', movement: ' + (movement / 1000).toString() + ', tolerance: ' + (tolerance / 1000).toString() + ', returning: ' + false);
 				return false;
 			}
 
 			if(this.current.name === 'auto') {
+				this.log(logme + 'caller called me with mode: ' + this.current.name);
 				this.setMode('pan');
-
-				if(this.debug === true)
-					this.log('updateChartPanOrZoom(): caller did not set proper mode');
 			}
+
+			if(this.debug === true)
+				this.log(logme + 'ACCEPTING UPDATE: current duration: ' + (current_duration / 1000).toString() + ', wanted duration: ' + (wanted_duration / 1000).toString() + ', duration diff: ' + (Math.round(Math.abs(current_duration - wanted_duration) / 1000)).toString() + ', movement: ' + (movement / 1000).toString() + ', tolerance: ' + (tolerance / 1000).toString() + ', returning: ' + ret);
 
 			this.current.force_update_at = new Date().getTime() + NETDATA.options.current.pan_and_zoom_delay;
 			this.current.force_after_ms = after;
 			this.current.force_before_ms = before;
 			NETDATA.globalPanAndZoom.setMaster(this, after, before);
-			return true;
+			return ret;
 		}
 
 		this.legendFormatValue = function(value) {
@@ -1754,9 +1798,10 @@
 			if(typeof value !== 'number') return value;
 
 			var abs = Math.abs(value);
-			if(abs >= 100) return Math.round(value).toLocaleString();
-			if(abs >= 1) return (Math.round(value * 100) / 100).toLocaleString();
-			if(abs >= 0.1) return (Math.round(value * 1000) / 1000).toLocaleString();
+			if(abs >= 1000) return (Math.round(value)).toLocaleString();
+			if(abs >= 100 ) return (Math.round(value * 10) / 10).toLocaleString();
+			if(abs >= 1   ) return (Math.round(value * 100) / 100).toLocaleString();
+			if(abs >= 0.1 ) return (Math.round(value * 1000) / 1000).toLocaleString();
 			return (Math.round(value * 10000) / 10000).toLocaleString();
 		}
 
@@ -2182,17 +2227,47 @@
 		}
 
 		this.chartURL = function() {
-			var before;
-			var after;
-			if(NETDATA.globalPanAndZoom.isActive()) {
+			var after, before, points_multiplier = 1;
+			if(NETDATA.globalPanAndZoom.isActive() && NETDATA.globalPanAndZoom.isMaster(this) === false) {
+				this.tm.pan_and_zoom_seq = NETDATA.globalPanAndZoom.seq;
+
 				after = Math.round(NETDATA.globalPanAndZoom.force_after_ms / 1000);
 				before = Math.round(NETDATA.globalPanAndZoom.force_before_ms / 1000);
-				this.tm.pan_and_zoom_seq = NETDATA.globalPanAndZoom.seq;
+				this.view_after = after * 1000;
+				this.view_before = before * 1000;
+
+				this.requested_padding = null;
+				points_multiplier = 1;
+			}
+			else if(this.current.force_before_ms !== null && this.current.force_after_ms !== null) {
+				this.tm.pan_and_zoom_seq = 0;
+
+				before = Math.round(this.current.force_before_ms / 1000);
+				after  = Math.round(this.current.force_after_ms / 1000);
+				this.view_after = after * 1000;
+				this.view_before = before * 1000;
+
+				if(NETDATA.options.current.pan_and_zoom_data_padding === true) {
+					this.requested_padding = Math.round((before - after) / 2);
+					after -= this.requested_padding;
+					before += this.requested_padding;
+					this.requested_padding *= 1000;
+					points_multiplier = 2;
+				}
+
+				this.current.force_before_ms = null;
+				this.current.force_after_ms = null;
 			}
 			else {
-				before = this.current.force_before_ms !== null ? Math.round(this.current.force_before_ms / 1000) : this.before;
-				after  = this.current.force_after_ms  !== null ? Math.round(this.current.force_after_ms / 1000) : this.after;
 				this.tm.pan_and_zoom_seq = 0;
+
+				before = this.before;
+				after  = this.after;
+				this.view_after = after * 1000;
+				this.view_before = before * 1000;
+
+				this.requested_padding = null;
+				points_multiplier = 1;
 			}
 
 			this.requested_after = after * 1000;
@@ -2203,7 +2278,7 @@
 			// build the data URL
 			this.data_url = this.chart.data_url;
 			this.data_url += "&format="  + this.library.format();
-			this.data_url += "&points="  + this.data_points.toString();
+			this.data_url += "&points="  + (this.data_points * points_multiplier).toString();
 			this.data_url += "&group="   + this.method;
 			this.data_url += "&options=" + this.library.options(this);
 			this.data_url += '|jsonwrap';
@@ -2241,43 +2316,48 @@
 
 			this.data = data;
 			this.updates_counter++;
+			this.updates_since_last_unhide++;
+			this.updates_since_last_creation++;
 
 			var started = new Date().getTime();
 
 			// if the result is JSON, find the latest update-every
-			if(typeof data === 'object') {
-				if(typeof data.view_update_every !== 'undefined')
-					this.data_update_every = data.view_update_every * 1000;
+			this.data_update_every = data.view_update_every * 1000;
+			this.data_after = data.after * 1000;
+			this.data_before = data.before * 1000;
+			this.netdata_first = data.first_entry * 1000;
+			this.netdata_last = data.last_entry * 1000;
+			this.data_points = data.points;
+			data.state = this;
 
-				if(typeof data.after !== 'undefined')
-					this.data_after = data.after * 1000;
-
-				if(typeof data.before !== 'undefined')
-					this.data_before = data.before * 1000;
-
-				if(typeof data.first_entry !== 'undefined')
-					this.netdata_first = data.first_entry * 1000;
-
-				if(typeof data.last_entry !== 'undefined')
-					this.netdata_last = data.last_entry * 1000;
-
-				if(typeof data.points !== 'undefined')
-					this.data_points = data.points;
-
-				data.state = this;
+			if(NETDATA.options.current.pan_and_zoom_data_padding === true && this.requested_padding !== null) {
+				if(this.view_after < this.data_after) {
+					console.log('adusting view_after from ' + this.view_after + ' to ' + this.data_after);
+					this.view_after = this.data_after;
+				}
+				
+				if(this.view_before > this.data_before) {
+					console.log('adusting view_before from ' + this.view_before + ' to ' + this.data_before);
+					this.view_before = this.data_before;
+				}
+			}
+			else {
+				this.view_after = this.data_after;
+				this.view_before = this.data_before;
 			}
 
 			if(this.debug === true) {
 				this.log('UPDATE No ' + this.updates_counter + ' COMPLETED');
 
 				if(this.current.force_after_ms)
-					this.log('STATUS: forced   : ' + (this.current.force_after_ms / 1000).toString() + ' - ' + (this.current.force_before_ms / 1000).toString());
+					this.log('STATUS: forced    : ' + (this.current.force_after_ms / 1000).toString() + ' - ' + (this.current.force_before_ms / 1000).toString());
 				else
-					this.log('STATUS: forced: unset');
+					this.log('STATUS: forced    : unset');
 
-				this.log('STATUS: requested: ' + (this.requested_after / 1000).toString() + ' - ' + (this.requested_before / 1000).toString());
-				this.log('STATUS: rendered : ' + (this.data_after / 1000).toString() + ' - ' + (this.data_before / 1000).toString());
-				this.log('STATUS: points   : ' + (this.data_points).toString());
+				this.log('STATUS: requested : ' + (this.requested_after / 1000).toString() + ' - ' + (this.requested_before / 1000).toString());
+				this.log('STATUS: downloaded: ' + (this.data_after / 1000).toString() + ' - ' + (this.data_before / 1000).toString());
+				this.log('STATUS: rendered  : ' + (this.view_after / 1000).toString() + ' - ' + (this.view_before / 1000).toString());
+				this.log('STATUS: points    : ' + (this.data_points).toString());
 			}
 
 			if(this.data_points === 0) {
@@ -2410,12 +2490,8 @@
 
 			// caching - we do not evaluate the charts visibility
 			// if the page has not been scrolled since the last check
-			if(nocache === false && this.tm.last_visible_check > NETDATA.options.last_page_scroll) {
-				if(this.debug === true)
-					this.log('isVisible: ' + this.___isVisible___);
-
+			if(nocache === false && this.tm.last_visible_check > NETDATA.options.last_page_scroll)
 				return this.___isVisible___;
-			}
 
 			this.tm.last_visible_check = new Date().getTime();
 
@@ -2427,10 +2503,6 @@
 			if(x.width === 0 || x.height === 0) {
 				hideChart();
 				this.___isVisible___ = false;
-
-				if(this.debug === true)
-					this.log('isVisible (width:' + x.width + ', height:' + x.height + ', display:"' + this.element.style.display + '"): ' + this.___isVisible___);
-
 				return this.___isVisible___;
 			}
 
@@ -2448,10 +2520,6 @@
 
 				hideChart();
 				this.___isVisible___ = false;
-
-				if(this.debug === true)
-					this.log('isVisible: ' + this.___isVisible___);
-
 				return this.___isVisible___;
 			}
 			else {
@@ -2459,10 +2527,6 @@
 
 				unhideChart();
 				this.___isVisible___ = true;
-
-				if(this.debug === true)
-					this.log('isVisible: ' + this.___isVisible___);
-
 				return this.___isVisible___;
 			}
 		}
@@ -2506,7 +2570,7 @@
 
 			if(this.isAutoRefreshed() === true) {
 				// allow the first update, even if the page is not visible
-				if(this.updates_counter && NETDATA.options.page_is_visible === false) {
+				if(this.updates_counter && this.updates_since_last_unhide && NETDATA.options.page_is_visible === false) {
 					if(NETDATA.options.debug.focus === true || this.debug === true)
 						this.log('canBeAutoRefreshed(): page does not have focus');
 
@@ -3269,7 +3333,7 @@
 		var dygraph = state.dygraph_instance;
 
 		if(typeof dygraph === 'undefined')
-			NETDATA.dygraphChartCreate(state, data);
+			return NETDATA.dygraphChartCreate(state, data);
 
 		// when the chart is not visible, and hidden
 		// if there is a window resize, dygraph detects
@@ -3287,7 +3351,7 @@
 				visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names)
 		}
 
-		if(state.current.name === 'pan') {
+		if(state.current.name !== 'auto') {
 			if(NETDATA.options.debug.dygraph === true || state.debug === true)
 				state.log('dygraphChartUpdate() loose update');
 		}
@@ -3494,9 +3558,9 @@
 				// here we calculate the time t based on the row number selected
 				// which is ok
 				var t = state.data_after + row * state.data_update_every;
-				// console.log('row = ' + row + ', x = ' + x + ', t = ' + t + ' ' + ((t === x)?'SAME':'DIFFERENT') + ', rows in db: ' + state.data_points + ' visible(x) = ' + state.timeIsVisible(x) + ' visible(t) = ' + state.timeIsVisible(t) + ' r(x) = ' + state.calculateRowForTime(x) + ' r(t) = ' + state.calculateRowForTime(t) + ' range: ' + state.data_after + ' - ' + state.data_before + ' real: ' + state.data.after + ' - ' + state.data.before + ' every: ' + state.data_update_every);
+				// console.log('row = ' + row + ', x = ' + x + ', t = ' + t + ' ' + ((t === x)?'SAME':(Math.abs(x-t)<=state.data_update_every)?'SIMILAR':'DIFFERENT') + ', rows in db: ' + state.data_points + ' visible(x) = ' + state.timeIsVisible(x) + ' visible(t) = ' + state.timeIsVisible(t) + ' r(x) = ' + state.calculateRowForTime(x) + ' r(t) = ' + state.calculateRowForTime(t) + ' range: ' + state.data_after + ' - ' + state.data_before + ' real: ' + state.data.after + ' - ' + state.data.before + ' every: ' + state.data_update_every);
 
-				state.globalSelectionSync(t);
+				state.globalSelectionSync(x);
 
 				// fix legend zIndex using the internal structures of dygraph legend module
 				// this works, but it is a hack!
