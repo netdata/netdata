@@ -205,6 +205,7 @@ fi
 # loop control
 
 # default sleep function
+LOOPSLEEPMS_HIGHRES=0
 loopsleepms() {
 	[ "$1" = "tellwork" ] && shift
 	sleep $1
@@ -436,22 +437,26 @@ if [ -z "$run_charts" ]
 	exit 1
 fi
 
-declare -A charts_last_update=() charts_min_dt=()
+declare -A charts_last_update=() charts_update_every=() charts_next_update=() chart_run_counter=()
 global_update() {
-	local exit_after=$((restart_timeout / update_every)) \
+	local exit_at \
 		c=0 dt ret exec_start_ms exec_end_ms \
 		chart now_charts=() next_charts=($run_charts)
 
 	# return the current time in ms in $now_ms
 	current_time_ms
 
+	exit_at=$(( now_ms + (restart_timeout * 1000) ))
+
 	for chart in $run_charts
 	do
-		eval "charts_min_dt[$chart]=\$$chart$suffix_update_every"
-		test -z "${charts_min_dt[$chart]}" && charts_min_dt[$charts]=$update_every
-		charts_last_update[$chart]=$((now_ms - (charts_min_dt[$chart] * 1000) ))
+		eval "charts_update_every[$chart]=\$$chart$suffix_update_every"
+		test -z "${charts_update_every[$chart]}" && charts_update_every[$charts]=$update_every
+		charts_last_update[$chart]=$((now_ms - (now_ms % (charts_update_every[$chart] * 1000) ) ))
+		charts_next_update[$chart]=$(( charts_last_update[$chart] + (charts_update_every[$chart] * 1000) ))
+		charts_run_counter[$chart]=0
 
-		echo "CHART netdata.plugin_$chart '' 'Execution time for $chart plugin' 'milliseconds / run' netdata netdata area 90000 ${charts_min_dt[$chart]}"
+		echo "CHART netdata.plugin_$chart '' 'Execution time for $chart plugin' 'milliseconds / run' netdata netdata area 90000 ${charts_update_every[$chart]}"
 		echo "DIMENSION run_time 'run time' absolute 1 1"
 	done
 
@@ -462,22 +467,35 @@ global_update() {
 		now_charts=("${next_charts[@]}")
 		next_charts=()
 
+		# return the current time in ms in $now_ms
+		current_time_ms
+
 		for chart in "${now_charts[@]}"
 		do
-			# return the current time in ms in $now_ms
-			current_time_ms
-			dt=$(( (now_ms - charts_last_update[$chart]) * 1000 ))
-			if [ $dt -ge $(( charts_min_dt[$chart] * 1000000 )) ]
+			# echo >&2 "DEBUG: chart: $chart last: ${charts_last_update[$chart]}, next: ${charts_next_update[$chart]}, now: ${now_ms}"
+			if [ ${now_ms} -ge ${charts_next_update[$chart]} ]
 			then
+				dt=$(( (now_ms - charts_last_update[$chart]) ))
+				#echo >&2 "DEBUG: chart: $chart last: ${charts_last_update[$chart]}, next: ${charts_next_update[$chart]}, now: ${now_ms}, dt: ${dt}"
+
 				charts_last_update[$chart]=$now_ms
+
+				while [ ${charts_next_update[$chart]} -lt ${now_ms} ]
+				do
+					charts_next_update[$chart]=$(( charts_next_update[$chart] + (charts_update_every[$chart] * 1000) ))
+				done
 
 				# the first call should not give a duration
 				# so that netdata calibrates to current time
-				test $c -eq 1 && dt=
+				charts_run_counter[$chart]=$(( charts_run_counter[$chart] + 1 ))
+				test ${charts_run_counter[$chart]} -eq 1 && dt=
+				dt=$(( dt * 1000 ))
 
 				exec_start_ms=$now_ms
 				$chart$charts_update $dt
 				ret=$?
+				
+				# return the current time in ms in $now_ms
 				current_time_ms; exec_end_ms=$now_ms
 
 				echo "BEGIN netdata.plugin_$chart $dt"
@@ -501,10 +519,16 @@ global_update() {
 			suspend || ( echo >&2 "$PROGRAM_NAME: suspend returned error $?, falling back to sleep."; loopsleepms $debug_time $update_every $time_divisor)
 		else
 			# wait the time you are required to
-			loopsleepms $debug_time $update_every $time_divisor
+			#loopsleepms $debug_time $update_every $time_divisor
+			if [ ${LOOPSLEEPMS_HIGHRES} -eq 1 ]
+				then
+				sleep 0.2
+			else
+				sleep 1
+			fi
 		fi
 
-		test $c -gt $exit_after && exit 0
+		test ${now_ms} -ge ${exit_at} && exit 0
 	done
 }
 
