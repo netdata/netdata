@@ -44,12 +44,15 @@ var UPDATE_EVERY = NETDATA_UPDATE_EVERY;
 var EXIT_AFTER_MS = 3600 * 1000;
 
 function debug(msg) {
-	if(DEBUG)
-		console.error(__filename + ': DEBUG: ' + ((typeof(msg) === 'object')?JSON.stringify(msg):msg).toString());
+	if(DEBUG) {
+		var now = new Date();
+		console.error(now.toString() + ': ' + __filename + ': DEBUG: ' + ((typeof(msg) === 'object')?JSON.stringify(msg):msg).toString());
+	}
 }
 
 function error(msg) {
-	console.error(__filename + ': ERROR: ' + ((typeof(msg) === 'object')?JSON.stringify(msg):msg).toString());
+	var now = new Date();
+	console.error(now.toString() + ': ' + __filename + ': ERROR: ' + ((typeof(msg) === 'object')?JSON.stringify(msg):msg).toString());
 }
 
 function netdata(msg) {
