@@ -33,8 +33,8 @@ void *proc_main(void *ptr)
 	last.tv_sec -= rrd_update_every;
 
 	// disable (by default) various interface that are not needed
-	config_get_boolean("plugin:proc:/proc/net/dev", "interface lo", 0);
-	config_get_boolean("plugin:proc:/proc/net/dev", "interface fireqos_monitor", 0);
+	config_get_boolean("plugin:proc:/proc/net/dev:lo", "enabled", 0);
+	config_get_boolean("plugin:proc:/proc/net/dev:fireqos_monitor", "enabled", 0);
 
 	// when ZERO, attempt to do it
 	int vdo_proc_net_dev 			= !config_get_boolean("plugin:proc", "/proc/net/dev", 1);
