@@ -155,4 +155,4 @@ Out of the box, it comes with plugins for data collection about system informati
 
 # Installation
 
-Check the **[[Installation]]** page.
+Check the **[Installation Wiki Page](https://github.com/firehol/netdata/wiki/Installation)**.
