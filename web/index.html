@@ -109,6 +109,16 @@
 	 * sections of docs content.
 	 */
 
+	.affix {
+		position: static;
+		top: 70px !important;
+		/*width: 220px;*/
+	}
+
+	.affix-top {
+		/*width: 220px;*/
+	}
+
 	.dashboard-sidebar {
 		max-height: calc(100% - 70px) !important;
 		overflow-y: auto;
@@ -119,19 +129,11 @@
 	.dashboard-sidebar.affix {
 		position: static;
 	}
+
 	@media (min-width: 768px) {
 		.dashboard-sidebar {
 			padding-left: 20px;
 		}
-	}
-
-	.affix {
-		position: static;
-		top: 70px !important;
-		/*width: 220px;*/
-	}
-	.affix-top {
-		/*width: 220px;*/
 	}
 
 	/* First level of nav */
@@ -214,6 +216,28 @@
 		.dashboard-theme-toggle {
 			display: block;
 		}
+
+		/* Widen the fixed sidebar */
+		.dashboard-sidebar.affix,
+		.dashboard-sidebar.affix-top,
+		.dashboard-sidebar.affix-bottom {
+			width: 200px !important;
+		}
+
+		.dashboard-sidebar.affix {
+			position: fixed; /* Undo the static from mobile first approach */
+			top: 20px;
+		}
+
+		.dashboard-sidebar.affix-bottom {
+			position: absolute; /* Undo the static from mobile first approach */
+		}
+
+		.dashboard-sidebar.affix-bottom .dashboard-sidenav,
+		.dashboard-sidebar.affix .dashboard-sidenav {
+			margin-top: 0;
+			margin-bottom: 0;
+		}
 	}
 
 	/* Show and affix the side nav when space allows it */
@@ -221,10 +245,12 @@
 		.dashboard-sidebar .nav > .active > ul {
 			display: block;
 		}
+
 		/* Widen the fixed sidebar */
 		.dashboard-sidebar.affix,
+		.dashboard-sidebar.affix-top,
 		.dashboard-sidebar.affix-bottom {
-			width: 213px;
+			width: 200px !important;
 		}
 		.dashboard-sidebar.affix {
 			position: fixed; /* Undo the static from mobile first approach */
@@ -239,9 +265,11 @@
 			margin-bottom: 0;
 		}
 	}
+
 	@media (min-width: 1200px) {
 		/* Widen the fixed sidebar again */
 		.dashboard-sidebar.affix-bottom,
+		.dashboard-sidebar.affix-top,
 		.dashboard-sidebar.affix {
 			width: 263px;
 		}
@@ -253,7 +281,7 @@
 	<!-- <script> netdataServer = "http://box:19999"; </script> -->
 
 	<!-- load the dashboard manager - it will do the rest -->
-	<script type="text/javascript" src="dashboard.js?v19"></script>
+	<script type="text/javascript" src="dashboard.js?v20"></script>
 </head>
 
 <body data-spy="scroll" data-target="#sidebar">
@@ -426,78 +454,113 @@
 					<h4 class="modal-title" id="optionsModalLabel">netdata dashboard options</h4>
 				</div>
 				<div class="modal-body">
-					<form id="optionsForm" method="get" class="form-horizontal">
-						<div class="form-group">
-							<center>
-								<small style="color: #BBBBBB;">Settings take effect immediately and are saved permanently to browser local storage (except the refresh on focus / always option).
-								<br/>
-								To reset all options (including charts sizes) to their defaults, click <a href="#" onclick="NETDATA.resetOptions(); return false;">here</a>.</small>
-							</center>
+					<center>
+						<small style="color: #BBBBBB;">Settings take effect immediately and are saved permanently to browser local storage (except the refresh on focus / always option).
+						<br/>
+						To reset all options (including charts sizes) to their defaults, click <a href="#" onclick="NETDATA.resetOptions(); return false;">here</a>.</small>
+					</center>
+					<div style="padding: 10px;"></div>
 
-							<table>
-							<tr class="option-row">
-								<td class="option-control"><input id="stop_updates_when_focus_is_lost" type="checkbox" checked data-toggle="toggle" data-offstyle="danger" data-onstyle="success" data-on="On Focus" data-off="Always" data-width="110px"></td>
-								<td class="option-info"><strong>When to refresh the charts?</strong><br/>
-									<small>When set to <b>On Focus</b>, the charts will stop being updated if the page / tab does not have the focus of the user. When set to <b>Always</b>, the charts will always be refreshed. Set it to <b>On Focus</b> it to lower the CPU requirements of the browser (and extend the battery of laptops and tablets) when this page does not have your focus. Set to <b>Always</b> to work on another window (i.e. change the settings of something) and have the charts auto-refresh in this window.</small>
-								</td>
-								</tr>
-							<tr class="option-row">
-								<td class="option-control">
-								<input id="eliminate_zero_dimensions" type="checkbox" checked data-toggle="toggle" data-on="Non Zero" data-off="All" data-width="110px">
-								</td>
-								<td class="option-info"><strong>Which dimensions to show?</strong><br/>
-									<small>When set to <b>Non Zero</b>, dimensions that have all their values (within the current view) set to zero will not be transfered from the netdata server (except if all dimensions of the chart are zero, in which case this setting does nothing - all dimensions are transfered and shown). When set to <b>All</b>, all dimensions will always be shown. Set it to <b>Non Zero</b> to lower the data transfered between netdata and your browser, lower the CPU requirements of your browser (fewer lines to draw) and increase the focus on the legends (fewer entries at the legends).</small>
-								</td>
-								</tr>
-							<tr class="option-row">
-								<td class="option-control"><input id="destroy_on_hide" type="checkbox" data-toggle="toggle" data-on="Destroy" data-off="Hide" data-width="110px"></td>
-								<td class="option-info"><strong>How to handle hidden charts?</strong><br/>
-									<small>When set to <b>Destroy</b>, charts that are not in the current viewport of the browser (are above, or below the visible area of the page), will be destroyed and re-created if and when they become visible again. When set to <b>Hide</b>, the not-visible charts will be just hidden, to simplify the DOM and speed up your browser. Set it to <b>Destroy</b>, to lower the memory requirements of your browser. Set it to <b>Hide</b> for smoother page scrolling.</small>
-								</td>
-								</tr>
-							<tr class="option-row">
-								<td class="option-control"><input id="parallel_refresher" type="checkbox" checked data-toggle="toggle" data-on="Parallel" data-off="Sequencial" data-width="110px"></td>
-								<td class="option-info"><strong>Which chart refresh policy to use?</strong><br/>
-									<small>When set to <b>parallel</b>, visible charts are refreshed in parallel (all queries are sent to netdata server in parallel) and are rendered asynchronously. When set to <b>sequencial</b> charts are refreshed one after another. Set it to parallel if your browser can cope with it (most modern browsers do), set it to sequencial if you work on an older/slower computer.</small>
-								</td>
-								</tr>
-							<tr class="option-row" id="concurrent_refreshes_row">
-								<td class="option-control"></td>
-								<td class="option-info">
+					<!-- Nav tabs -->
+					<ul class="nav nav-tabs" role="tablist">
+						<li role="presentation" class="active"><a href="#settings_performance" aria-controls="settings_performance" role="tab" data-toggle="tab">Performance</a></li>
+						<li role="presentation"><a href="#settings_sync" aria-controls="settings_sync" role="tab" data-toggle="tab">Synchronization</a></li>
+						<li role="presentation"><a href="#settings_visual" aria-controls="settings_visual" role="tab" data-toggle="tab">Visual</a></li>
+					</ul>
+
+					<!-- Tab panes -->
+					<div class="tab-content">
+						<div role="tabpanel" class="tab-pane active" id="settings_performance">
+							<form id="optionsForm" method="get" class="form-horizontal">
+								<div class="form-group">
 									<table>
 									<tr class="option-row">
-									<td class="option-control">
-									<input id="concurrent_refreshes" type="checkbox" checked data-toggle="toggle" data-on="Resync" data-off="Best Effort" data-width="110px">
-									</td>
-									<td class="option-info">
-									<strong>Shall we re-sync chart refreshes?</strong><br/>
-									<small>When set to <b>Resync</b>, the dashboard will attempt to re-synchronize all the charts so that they are refreshed concurrently. When set to <b>Best Effort</b>, each chart may be refreshed with a little time difference to the others. Normally, the dashboard starts refreshing them in parallel, but depending on the speed of your computer and the network latencies, charts start having a slight time difference. Setting this to <b>Resync</b> will attempt to re-synchronize the charts on every update. Setting it to <b>Best Effort</b> may lower the pressure on your browser and the network.</small>
-									</td>
-									</tr>
+										<td class="option-control"><input id="stop_updates_when_focus_is_lost" type="checkbox" checked data-toggle="toggle" data-offstyle="danger" data-onstyle="success" data-on="On Focus" data-off="Always" data-width="110px"></td>
+										<td class="option-info"><strong>When to refresh the charts?</strong><br/>
+											<small>When set to <b>On Focus</b>, the charts will stop being updated if the page / tab does not have the focus of the user. When set to <b>Always</b>, the charts will always be refreshed. Set it to <b>On Focus</b> it to lower the CPU requirements of the browser (and extend the battery of laptops and tablets) when this page does not have your focus. Set to <b>Always</b> to work on another window (i.e. change the settings of something) and have the charts auto-refresh in this window.</small>
+										</td>
+										</tr>
+									<tr class="option-row">
+										<td class="option-control">
+										<input id="eliminate_zero_dimensions" type="checkbox" checked data-toggle="toggle" data-on="Non Zero" data-off="All" data-width="110px">
+										</td>
+										<td class="option-info"><strong>Which dimensions to show?</strong><br/>
+											<small>When set to <b>Non Zero</b>, dimensions that have all their values (within the current view) set to zero will not be transfered from the netdata server (except if all dimensions of the chart are zero, in which case this setting does nothing - all dimensions are transfered and shown). When set to <b>All</b>, all dimensions will always be shown. Set it to <b>Non Zero</b> to lower the data transfered between netdata and your browser, lower the CPU requirements of your browser (fewer lines to draw) and increase the focus on the legends (fewer entries at the legends).</small>
+										</td>
+										</tr>
+									<tr class="option-row">
+										<td class="option-control"><input id="destroy_on_hide" type="checkbox" data-toggle="toggle" data-on="Destroy" data-off="Hide" data-width="110px"></td>
+										<td class="option-info"><strong>How to handle hidden charts?</strong><br/>
+											<small>When set to <b>Destroy</b>, charts that are not in the current viewport of the browser (are above, or below the visible area of the page), will be destroyed and re-created if and when they become visible again. When set to <b>Hide</b>, the not-visible charts will be just hidden, to simplify the DOM and speed up your browser. Set it to <b>Destroy</b>, to lower the memory requirements of your browser. Set it to <b>Hide</b> for smoother page scrolling.</small>
+										</td>
+										</tr>
 									</table>
-								</td>
-								</tr>
-							<tr class="option-row">
-								<td class="option-control"><input id="sync_selection" type="checkbox" checked data-toggle="toggle" data-on="Sync" data-off="Don't Sync" data-width="110px"></td>
-								<td class="option-info"><strong>Sync hover selection on all charts?</strong><br/>
-									<small>When enabled, a selection on one chart will automatically select the same time on all other visible charts and the legends of all visible charts will be updated to show the selected values. When disabled, only the chart getting the user's attention will be selected. Enable it to get better insights of the data. Disable it if you are on a very slow computer that cannot actually do it.</small>
-								</td>
-								</tr>
-							<tr class="option-row">
-								<td class="option-control"><input id="sync_pan_and_zoom" type="checkbox" checked data-toggle="toggle"  data-on="Sync" data-off="Don't Sync" data-width="110px"></td>
-								<td class="option-info"><strong>Sync pan and zoom on all charts?</strong><br/>
-									<small>When enabled, pan and zoom operations on a chart will be replicated to all charts (even the ones that are not currently visible - of course only when they will become visible). When disabled, pan and zoom operations will not be propagated to other charts.</small>
-								</td>
-								</tr>
-							<tr class="option-row">
-								<td class="option-control"><input id="smooth_plot" type="checkbox" checked data-toggle="toggle"  data-on="Smooth" data-off="Rough" data-width="110px"></td>
-								<td class="option-info"><strong>Enable Bézier lines on charts?</strong><br/>
-									<small>When set to <b>Smooth</b> the charts libraries that support it, will plot smooth curves instead of simple straight lines to connect the points.</small>
-								</td>
-								</tr>
-							</table>
+								</div>
+							</form>
 						</div>
-					</form>
+						<div role="tabpanel" class="tab-pane" id="settings_sync">
+							<form id="optionsForm" method="get" class="form-horizontal">
+								<div class="form-group">
+									<table>
+									<tr class="option-row">
+										<td class="option-control"><input id="parallel_refresher" type="checkbox" checked data-toggle="toggle" data-on="Parallel" data-off="Sequencial" data-width="110px"></td>
+										<td class="option-info"><strong>Which chart refresh policy to use?</strong><br/>
+											<small>When set to <b>parallel</b>, visible charts are refreshed in parallel (all queries are sent to netdata server in parallel) and are rendered asynchronously. When set to <b>sequencial</b> charts are refreshed one after another. Set it to parallel if your browser can cope with it (most modern browsers do), set it to sequencial if you work on an older/slower computer.</small>
+										</td>
+										</tr>
+									<tr class="option-row" id="concurrent_refreshes_row">
+										<td class="option-control"></td>
+										<td class="option-info">
+											<table>
+											<tr class="option-row">
+											<td class="option-control">
+											<input id="concurrent_refreshes" type="checkbox" checked data-toggle="toggle" data-on="Resync" data-off="Best Effort" data-width="110px">
+											</td>
+											<td class="option-info">
+											<strong>Shall we re-sync chart refreshes?</strong><br/>
+											<small>When set to <b>Resync</b>, the dashboard will attempt to re-synchronize all the charts so that they are refreshed concurrently. When set to <b>Best Effort</b>, each chart may be refreshed with a little time difference to the others. Normally, the dashboard starts refreshing them in parallel, but depending on the speed of your computer and the network latencies, charts start having a slight time difference. Setting this to <b>Resync</b> will attempt to re-synchronize the charts on every update. Setting it to <b>Best Effort</b> may lower the pressure on your browser and the network.</small>
+											</td>
+											</tr>
+											</table>
+										</td>
+										</tr>
+									<tr class="option-row">
+										<td class="option-control"><input id="sync_selection" type="checkbox" checked data-toggle="toggle" data-on="Sync" data-off="Don't Sync" data-onstyle="success" data-offstyle="danger" data-width="110px"></td>
+										<td class="option-info"><strong>Sync hover selection on all charts?</strong><br/>
+											<small>When enabled, a selection on one chart will automatically select the same time on all other visible charts and the legends of all visible charts will be updated to show the selected values. When disabled, only the chart getting the user's attention will be selected. Enable it to get better insights of the data. Disable it if you are on a very slow computer that cannot actually do it.</small>
+										</td>
+										</tr>
+									<tr class="option-row">
+										<td class="option-control"><input id="sync_pan_and_zoom" type="checkbox" checked data-toggle="toggle"  data-on="Sync" data-off="Don't Sync" data-onstyle="success" data-offstyle="danger" data-width="110px"></td>
+										<td class="option-info"><strong>Sync pan and zoom on all charts?</strong><br/>
+											<small>When enabled, pan and zoom operations on a chart will be replicated to all charts (even the ones that are not currently visible - of course only when they will become visible). When disabled, pan and zoom operations will not be propagated to other charts.</small>
+										</td>
+										</tr>
+									</table>
+								</div>
+							</form>
+						</div>
+						<div role="tabpanel" class="tab-pane" id="settings_visual">
+							<form id="optionsForm" method="get" class="form-horizontal">
+								<div class="form-group">
+									<table>
+									<tr class="option-row">
+										<td class="option-control"><input id="pan_and_zoom_data_padding" type="checkbox" checked data-toggle="toggle"  data-on="Pad" data-off="Don't Pad" data-width="110px"></td>
+										<td class="option-info"><strong>Enable data padding when panning and zooming?</strong><br/>
+											<small>When set to <b>Pad</b> the charts will be padded with more data, both before and after the visible area, thus giving the impression the whole database is loaded. This padding will happen only after the first pan or zoom operation on the chart (initially all charts have only the visible data). When set to <b>Don't Pad</b> only the visible data will be transfered from the netdata server, even after the first pan and zoom operation.</small>
+										</td>
+										</tr>
+									<tr class="option-row">
+										<td class="option-control"><input id="smooth_plot" type="checkbox" checked data-toggle="toggle"  data-on="Smooth" data-off="Rough" data-width="110px"></td>
+										<td class="option-info"><strong>Enable Bézier lines on charts?</strong><br/>
+											<small>When set to <b>Smooth</b> the charts libraries that support it, will plot smooth curves instead of simple straight lines to connect the points.</small>
+										</td>
+										</tr>
+									</table>
+								</div>
+							</form>
+						</div>
+					</div>
 				</div>
 				<div class="modal-footer">
 					<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
@@ -1435,6 +1498,7 @@ function prepareScreen(data) {
 		sync_option('sync_pan_and_zoom');
 		sync_option('stop_updates_when_focus_is_lost');
 		sync_option('smooth_plot');
+		sync_option('pan_and_zoom_data_padding');
 
 		if(NETDATA.getOption('parallel_refresher') === false) {
 			$('#concurrent_refreshes_row').hide();
@@ -1454,6 +1518,7 @@ function prepareScreen(data) {
 	$('#sync_pan_and_zoom').change(function()               { NETDATA.setOption('sync_pan_and_zoom', $(this).prop('checked')); });
 	$('#stop_updates_when_focus_is_lost').change(function() { NETDATA.setOption('stop_updates_when_focus_is_lost', $(this).prop('checked')); });
 	$('#smooth_plot').change(function()                     { NETDATA.setOption('smooth_plot', $(this).prop('checked')); });
+	$('#pan_and_zoom_data_padding').change(function()       { NETDATA.setOption('pan_and_zoom_data_padding', $(this).prop('checked')); });
 	
 	if(document.location.hostname === demo_hostname)
 		setTimeout(function() {
