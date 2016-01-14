@@ -104,7 +104,6 @@
                         "required": false,
                         "type": "number",
                         "format": "integer",
-                        "allowEmptyValue": false,
                         "default": 0
                     },
                     {
@@ -147,7 +146,8 @@
                             "datatable",
                             "datasource",
                             "html",
-                            "array"
+                            "array",
+                            "csvjsonarray"
                         ],
                         "default": "json",
                         "allowEmptyValue": false
@@ -172,12 +172,15 @@
                                 "absolute-sum",
                                 "null2zero",
                                 "objectrows",
-                                "google_json"
+                                "google_json",
+                                "percentage"
                             ],
-                            "collectionFormat": "pipes",
-                            "format": ""
+                            "collectionFormat": "pipes"
                         },
-                        "default": "seconds|jsonwrap",
+                        "default": [
+                            "seconds",
+                            "jsonwrap"
+                        ],
                         "allowEmptyValue": false
                     },
                     {
@@ -186,7 +189,7 @@
                         "description": "For JSONP responses, the callback function name.",
                         "required": false,
                         "type": "string",
-                        "allowEmptyValue": false
+                        "allowEmptyValue": true
                     },
                     {
                         "name": "filename",
@@ -194,14 +197,15 @@
                         "description": "Add Content-Disposition: attachment; filename=<filename> header to the response, that will instruct the browser to save the response with the given filename.",
                         "required": false,
                         "type": "string",
-                        "allowEmptyValue": false
+                        "allowEmptyValue": true
                     },
                     {
                         "name": "tqx",
                         "in": "query",
                         "description": "[Google Visualization API](https://developers.google.com/chart/interactive/docs/dev/implementing_data_source?hl=en) formatted parameter.",
                         "required": false,
-                        "type": "string"
+                        "type": "string",
+                        "allowEmptyValue": true
                     }
                 ],
                 "responses": {
