@@ -112,7 +112,7 @@ paths:
             type: string
             enum: [ 'nonzero', 'flip', 'jsonwrap', 'min2max', 'seconds', 'milliseconds', 'abs', 'absolute', 'absolute-sum', 'null2zero', 'objectrows', 'google_json', 'percentage' ]
             collectionFormat: pipes
-          default: seconds|jsonwrap
+          default: [seconds, jsonwrap]
           allowEmptyValue: false
         - name: callback
           in: query
