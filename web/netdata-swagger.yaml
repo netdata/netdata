@@ -113,7 +113,6 @@ paths:
             type: string
             enum: [ 'nonzero', 'flip', 'jsonwrap', 'min2max', 'seconds', 'milliseconds', 'abs', 'absolute', 'absolute-sum', 'null2zero', 'objectrows', 'google_json', 'percentage' ]
             collectionFormat: pipes
-            format: ''
           default: seconds|jsonwrap
           allowEmptyValue: false
         - name: callback
@@ -121,18 +120,19 @@ paths:
           description: 'For JSONP responses, the callback function name.'
           required: false
           type: string
-          allowEmptyValue: false
+          allowEmptyValue: true
         - name: filename
           in: query
           description: 'Add Content-Disposition: attachment; filename=<filename> header to the response, that will instruct the browser to save the response with the given filename.'
           required: false
           type: string
-          allowEmptyValue: false
+          allowEmptyValue: true
         - name: tqx
           in: query
           description: '[Google Visualization API](https://developers.google.com/chart/interactive/docs/dev/implementing_data_source?hl=en) formatted parameter.'
           required: false
           type: string
+          allowEmptyValue: true
       responses:
         '200':
           description: 'The call was successful. The response should include the data.'
