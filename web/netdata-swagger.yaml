@@ -78,7 +78,6 @@ paths:
           required: false
           type: number
           format: integer
-          allowEmptyValue: false
           default: 0
         - name: points
           in: query
