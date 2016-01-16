@@ -11,9 +11,14 @@ typedef struct web_buffer {
 	size_t size;		// allocation size of buffer
 	size_t len;		// current data length in buffer
 	char *buffer;	// the buffer
-	int contenttype;
+	uint8_t contenttype;
+	uint8_t options;
 	time_t date;	// the date this content has been generated
 } BUFFER;
+
+// options
+#define WB_CONTENT_CACHEABLE			1
+#define WB_CONTENT_NO_CACHEABLE			2
 
 // content-types
 #define CT_APPLICATION_JSON				1

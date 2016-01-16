@@ -1311,6 +1311,7 @@ void web_client_process(struct web_client *w) {
 		"Access-Control-Allow-Origin: *\r\n"
 		"Access-Control-Allow-Methods: GET, OPTIONS\r\n"
 		"Access-Control-Allow-Headers: accept, x-requested-with\r\n"
+		"Access-Control-Max-Age: 86400\r\n"
 		"Date: %s\r\n"
 		, code, code_msg
 		, w->keepalive?"keep-alive":"close"
@@ -1321,16 +1322,22 @@ void web_client_process(struct web_client *w) {
 	if(buffer_strlen(w->response.header))
 		buffer_strcat(w->response.header_output, buffer_tostring(w->response.header));
 
-	if(w->mode == WEB_CLIENT_MODE_NORMAL) {
+	if(w->mode == WEB_CLIENT_MODE_NORMAL && (w->response.data->options & WB_CONTENT_NO_CACHEABLE)) {
 		buffer_sprintf(w->response.header_output,
 			"Expires: %s\r\n"
 			"Cache-Control: no-cache\r\n"
-			"Access-Control-Max-Age: 0\r\n"
 			, date);
 	}
 	else {
-		buffer_strcat(w->response.header_output, "Cache-Control: public\r\n");
-		buffer_strcat(w->response.header_output, "Access-Control-Max-Age: 3600\r\n");
+		char edate[100];
+		time_t et = w->response.data->date + 86400;
+		struct tm etmbuf, *etm = gmtime_r(&et, &etmbuf);
+		strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", etm);
+
+		buffer_sprintf(w->response.header_output,
+			"Expires: %s\r\n"
+			"Cache-Control: public\r\n"
+			, edate);
 	}
 
 	// if we know the content length, put it

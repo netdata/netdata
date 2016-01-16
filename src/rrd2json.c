@@ -259,15 +259,20 @@ void rrd_stats_all_json(BUFFER *wb)
 
 // ----------------------------------------------------------------------------
 
-// RRDR options
+// RRDR dimension options
 #define RRDR_EMPTY  	0x01 // the dimension contains / the value is empty (null)
 #define RRDR_RESET  	0x02 // the dimension contains / the value is reset
 #define RRDR_HIDDEN 	0x04 // the dimension contains / the value is hidden
 #define RRDR_NONZERO 	0x08 // the dimension contains / the value is non-zero
 
+// RRDR result options
+#define RRDR_RESULT_OPTION_ABSOLUTE 0x00000001
+#define RRDR_RESULT_OPTION_RELATIVE 0x00000002
 
 typedef struct rrdresult {
 	RRDSET *st;			// the chart this result refers to
+
+	uint32_t result_options;	// RRDR_RESULT_OPTION_*
 
 	int d;					// the number of dimensions
 	long n;					// the number of values in the arrays
@@ -1200,6 +1205,7 @@ cleanup:
 RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int group_method)
 {
 	int debug = st->debug;
+	int absolute_period_requested = -1;
 
 	time_t first_entry_t = rrdset_first_entry_t(st);
 	time_t last_entry_t = rrdset_last_entry_t(st);
@@ -1207,14 +1213,22 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	if(before == 0 && after == 0) {
 		before = last_entry_t;
 		after = first_entry_t;
+		absolute_period_requested = 0;
 	}
 
 	// allow relative for before and after
-	if(before <= st->update_every * st->entries)
+	if(before <= st->update_every * st->entries) {
 		before = last_entry_t + before;
+		absolute_period_requested = 0;
+	}
 
-	if(after <= st->update_every * st->entries)
+	if(after <= st->update_every * st->entries) {
 		after = last_entry_t + after;
+		absolute_period_requested = 0;
+	}
+
+	if(absolute_period_requested == -1)
+		absolute_period_requested = 1;
 
 	// make sure they are within our timeframe
 	if(before > last_entry_t) before = last_entry_t;
@@ -1313,6 +1327,11 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 #endif
 		return r;
 	}
+
+	if(absolute_period_requested == 1)
+		r->result_options |= RRDR_RESULT_OPTION_ABSOLUTE;
+	else
+		r->result_options |= RRDR_RESULT_OPTION_RELATIVE;
 
 	// find how many dimensions we have
 	long dimensions = r->d;
@@ -1496,6 +1515,11 @@ int rrd2format(RRDSET *st, BUFFER *wb, BUFFER *dimensions, uint32_t format, long
 		buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
 		return 500;
 	}
+
+	if(r->result_options & RRDR_RESULT_OPTION_RELATIVE)
+		wb->options |= WB_CONTENT_NO_CACHEABLE;
+	else if(r->result_options & RRDR_RESULT_OPTION_ABSOLUTE)
+		wb->options |= WB_CONTENT_CACHEABLE;
 
 	options = rrdr_check_options(r, options, (dimensions)?buffer_tostring(dimensions):NULL);
 
