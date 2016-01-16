@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>NetData Dashboard</title>
+
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+	<meta name="author" content="costa@tsaousis.gr">
+
+	<style>
+	.easyPieChartLabel {
+		color: #222 !important;
+		font-weight: normal;
+		text-shadow: #333 0px 0px 1px !important;
+		-webkit-font-smoothing: none;
+	}
+	</style>
+
+	<script type="text/javascript" src="dashboard.js"></script>
+</head>
+<body style="background-color: #444;">
+
+<div style="width: 100%; padding-top: 10px; text-align: center; color: #AAA">
+	<div style="font-size: 8vw;">why netdata?</div>
+	<br/>
+	<div style="font-size: 2vw;">These charts update the same data...</div>
+	<div data-netdata="example.random"
+			data-dimensions="random1"
+			data-chart-library="easypiechart"
+			data-easypiechart-max-value="100"
+			data-width="25%"
+			data-after="-600"
+			data-points="600"
+			data-title="1/second (netdata&nbsp;default)"
+			data-units="something"
+			data-colors="#CCC"
+			data-easypiechart-trackcolor="#555"
+			data-easypiechart-scalecolor="#555"
+			></div>
+	<div data-netdata="example.random"
+			data-dimensions="random1"
+			data-chart-library="easypiechart"
+			data-easypiechart-max-value="100"
+			data-width="20%"
+			data-after="-600"
+			data-points="300"
+			data-title="Updates Every 2&nbsp;Seconds"
+			data-units="something"
+			data-colors="#AAA"
+			data-easypiechart-trackcolor="#555"
+			data-easypiechart-scalecolor="#555"
+			></div>
+	<div data-netdata="example.random"
+			data-dimensions="random1"
+			data-chart-library="easypiechart"
+			data-easypiechart-max-value="100"
+			data-width="17.5%"
+			data-after="-600"
+			data-points="120"
+			data-title="Updates Every 5&nbsp;Seconds"
+			data-units="something"
+			data-colors="#999"
+			data-easypiechart-trackcolor="#555"
+			data-easypiechart-scalecolor="#555"
+			></div>
+	<div data-netdata="example.random"
+			data-dimensions="random1"
+			data-chart-library="easypiechart"
+			data-easypiechart-max-value="100"
+			data-width="15%"
+			data-after="-600"
+			data-points="10"
+			data-title="Updates Every 1&nbsp;Minute"
+			data-units="something"
+			data-colors="#888"
+			data-easypiechart-trackcolor="#555"
+			data-easypiechart-scalecolor="#555"
+			></div>
+	<div style="font-size: 2vw;">Hover on the peaks and the lows of the chart below, to see the diff on the charts above!</div>
+	<div data-netdata="example.random"
+			data-dimensions="random1"
+			data-dygraph-theme="sparkline"
+			data-width="90%"
+			data-height="20vh"
+			data-after="-600"
+			data-points="600"
+			data-title="1/second (netdata&nbsp;default)"
+			data-units="something"
+			data-colors="#CCC"
+			></div>
+</div>
+</body>
+</html>

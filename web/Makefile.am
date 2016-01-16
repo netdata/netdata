@@ -7,6 +7,7 @@ dist_web_DATA = \
         robots.txt \
         index.html \
 	demo.html \
+	demo2.html \
         dashboard.html \
         dashboard.js \
         dashboard.css \

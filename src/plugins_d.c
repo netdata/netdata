@@ -125,6 +125,8 @@ void *pluginsd_worker_thread(void *arg)
 #endif
 
 	while(likely(1)) {
+		if(unlikely(netdata_exit)) break;
+
 		FILE *fp = mypopen(cd->cmd, &cd->pid);
 		if(unlikely(!fp)) {
 			error("Cannot popen(\"%s\", \"r\").", cd->cmd);
@@ -139,7 +141,7 @@ void *pluginsd_worker_thread(void *arg)
 		uint32_t hash;
 
 		while(likely(fgets(line, PLUGINSD_LINE_MAX, fp) != NULL)) {
-			if(netdata_exit) break;
+			if(unlikely(netdata_exit)) break;
 
 			line[PLUGINSD_LINE_MAX] = '\0';
 
@@ -439,7 +441,7 @@ void *pluginsd_main(void *ptr)
 	if(scan_frequency < 1) scan_frequency = 1;
 
 	while(likely(1)) {
-		if(netdata_exit) break;
+		if(unlikely(netdata_exit)) break;
 
 		dir = opendir(dir_name);
 		if(unlikely(!dir)) {
@@ -448,7 +450,7 @@ void *pluginsd_main(void *ptr)
 		}
 
 		while(likely((file = readdir(dir)))) {
-			if(netdata_exit) break;
+			if(unlikely(netdata_exit)) break;
 
 			debug(D_PLUGINSD, "PLUGINSD: Examining file '%s'", file->d_name);
 

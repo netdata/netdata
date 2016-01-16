@@ -13,6 +13,7 @@
 #include "log.h"
 #include "rrd.h"
 #include "plugin_proc.h"
+#include "main.h"
 
 void *proc_main(void *ptr)
 {
@@ -59,6 +60,7 @@ void *proc_main(void *ptr)
 
 	unsigned long long usec = 0, susec = 0;
 	for(;1;) {
+		if(unlikely(netdata_exit)) break;
 
 		// BEGIN -- the job to be done
 
@@ -128,6 +130,8 @@ void *proc_main(void *ptr)
 		}
 
 		// END -- the job is done
+
+		if(unlikely(netdata_exit)) break;
 
 		// find the time to sleep in order to wait exactly update_every seconds
 		gettimeofday(&now, NULL);

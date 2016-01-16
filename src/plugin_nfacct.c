@@ -119,6 +119,8 @@ void *nfacct_main(void *ptr) {
 	// ------------------------------------------------------------------------
 
 	while(1) {
+		if(unlikely(netdata_exit)) break;
+
 		seq++;
 
 		nlh = nfacct_nlmsg_build_hdr(buf, NFNL_MSG_ACCT_GET, NLM_F_DUMP, seq);

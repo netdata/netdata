@@ -216,6 +216,8 @@
 
  			smooth_plot: true,			// enable smooth plot, where possible
 
+			charts_selection_animation_delay: 50, // delay to animate charts when syncing selection
+
  			color_fill_opacity_line: 1.0,
  			color_fill_opacity_area: 0.2,
 			color_fill_opacity_stacked: 0.8,
@@ -1886,7 +1888,7 @@
 			}
 
 			var show_undefined = true;
-			if(Math.abs(this.data.last_entry - this.data.before) <= this.data.view_update_every)
+			if(Math.abs(this.netdata_last - this.view_before) <= this.data_update_every)
 				show_undefined = false;
 
 			if(show_undefined) {
@@ -1894,7 +1896,7 @@
 				return;
 			}
 
-			this.legendSetDate(this.data.before * 1000);
+			this.legendSetDate(this.view_before);
 
 			var labels = this.data.dimension_names;
 			var i = labels.length;
@@ -1944,17 +1946,24 @@
 
 			this.colors = new Array();
 			this.colors_available = new Array();
-			// this.colors_assigned = {};
 
 			var c = $(this.element).data('colors');
+			// this.log('read colors: ' + c);
 			if(typeof c !== 'undefined' && c !== null) {
 				if(typeof c !== 'string') {
 					this.log('invalid color given: ' + c + ' (give a space separated list of colors)');
 				}
 				else {
 					c = c.split(' ');
-					for(var i = 0, len = c.length; i < len ; i++)
-						this.colors_available.push(c[i]);
+					var added = 0;
+
+					while(added < 20) {
+						for(var i = 0, len = c.length; i < len ; i++) {
+							added++;
+							this.colors_available.push(c[i]);
+							// this.log('adding color: ' + c[i]);
+						}
+					}
 				}
 			}
 
@@ -1996,9 +2005,9 @@
 
 				// do we have to update the current values?
 				// we do this, only when the visible chart is current
-				if(Math.abs(this.data.last_entry - this.data.before) <= this.data.view_update_every) {
+				if(Math.abs(this.netdata_last - this.view_before) <= this.data_update_every) {
 					if(this.debug === true)
-						this.log('chart in running... updating values on legend...');
+						this.log('chart is in latest position... updating values on legend...');
 
 					//var labels = this.data.dimension_names;
 					//var i = labels.length;
@@ -2015,6 +2024,7 @@
 						this._chartDimensionColor(this.chart.dimensions[dim].name);
 			}
 			// we will re-generate the colors for the chart
+			// based on the selected dimensions
 			this.colors = null;
 
 			if(this.debug === true)
@@ -2332,12 +2342,12 @@
 
 			if(NETDATA.options.current.pan_and_zoom_data_padding === true && this.requested_padding !== null) {
 				if(this.view_after < this.data_after) {
-					console.log('adusting view_after from ' + this.view_after + ' to ' + this.data_after);
+					// console.log('adusting view_after from ' + this.view_after + ' to ' + this.data_after);
 					this.view_after = this.data_after;
 				}
 				
 				if(this.view_before > this.data_before) {
-					console.log('adusting view_before from ' + this.view_before + ' to ' + this.data_before);
+					// console.log('adusting view_before from ' + this.view_before + ' to ' + this.data_before);
 					this.view_before = this.data_before;
 				}
 			}
@@ -3273,14 +3283,14 @@
 		}
 
 		return true;
-	}
+	};
 
 	NETDATA.dygraphClearSelection = function(state, t) {
 		if(typeof state.dygraph_instance !== 'undefined') {
 			state.dygraph_instance.clearSelection();
 		}
 		return true;
-	}
+	};
 
 	NETDATA.dygraphSmoothInitialize = function(callback) {
 		$.ajax({
@@ -3521,14 +3531,11 @@
 					if(NETDATA.options.debug.dygraph === true)
 						state.log('dygraphDrawCallback()');
 
-					var first = state.data.first_entry * 1000;
-					var last = state.data.last_entry * 1000;
-
 					var x_range = dygraph.xAxisRange();
 					var after = Math.round(x_range[0]);
 					var before = Math.round(x_range[1]);
 
-					if(before <= last && after >= first)
+					if(before <= state.netdata_last && after >= state.netdata_first)
 						state.updateChartPanOrZoom(after, before);
 				}
 			},
@@ -3739,8 +3746,8 @@
 						var after = new_x_range[0];
 						var before = new_x_range[1];
 
-						var first = (state.data.first_entry + state.data.view_update_every) * 1000;
-						var last = (state.data.last_entry + state.data.view_update_every) * 1000;
+						var first = state.netdata_first + state.data_update_every;
+						var last = state.netdata_last + state.data_update_every;
 
 						if(before > last) {
 							after -= (before - last);
@@ -4319,10 +4326,10 @@
 	};
 
 	NETDATA.easypiechartSetSelection = function(state, t) {
-		if(t < state.data_after || t > state.data_before)
+		if(state.timeIsVisible(t) !== true)
 			return NETDATA.easypiechartClearSelection(state);
 
-		var slot = Math.floor(state.data.result.length - 1 - (t - state.data_after) / state.data_update_every);
+		var slot = state.calculateRowForTime(t);
 		if(slot < 0 || slot >= state.data.result.length)
 			return NETDATA.easypiechartClearSelection(state);
 
@@ -4334,7 +4341,7 @@
 			};
 		}
 
-		var value = state.data.result[slot];
+		var value = state.data.result[state.data.result.length - 1 - slot];
 		var max = (state.easyPieChartMax === null)?state.data.max:state.easyPieChartMax;
 		var pcent = NETDATA.percentFromValueMax(value, max);
 
@@ -4348,7 +4355,7 @@
 			state.easyPieChartEvent.timer = setTimeout(function() {
 				state.easyPieChartEvent.timer = null;
 				state.easyPieChart_instance.update(state.easyPieChartEvent.pcent);
-			}, 100);
+			}, NETDATA.options.current.charts_selection_animation_delay);
 		}
 
 		return true;
@@ -4507,26 +4514,25 @@
 		if(typeof max !== 'number') max = 0;
 		if(value > max) max = value;
 		if(value < min) min = value;
-
-		var dvalue = state.gauge_instance.displayedValue;
-
-		if(dvalue >= min && dvalue <= max) {
-			state.gauge_instance.minValue = min;
-			state.gauge_instance.maxValue = max;
-			state.gauge_instance.set(value);
+		if(min > max) {
+			var t = min;
+			min = max;
+			max = t;
 		}
-		else {
-			// the current display value of the gauge
-			// is outside min-max.
-			// we have to disable animation
-			// otherwise, the gauge will go crazy
-			var old_speed = state.___gaugeOld__.speed;
-			NETDATA.gaugeAnimation(state, false);
-			state.gauge_instance.minValue = min;
-			state.gauge_instance.maxValue = max;
-			state.gauge_instance.set(value);
-			NETDATA.gaugeAnimation(state, old_speed);
-		}
+		else if(min == max)
+			max = min + 1;
+
+		// gauge.js has an issue if the needle
+		// is smaller than min or larger than max
+		// when we set the new values
+		// the needle will go crazy
+
+		// to prevent it, we always feed it
+		// with a percentage, so that the needle
+		// is always between min and max
+		var pcent = (value - min) * 100 / (max - min);
+
+		state.gauge_instance.set(pcent);
 
 		state.___gaugeOld__.value = value;
 		state.___gaugeOld__.min = min;
@@ -4570,10 +4576,10 @@
 	};
 
 	NETDATA.gaugeSetSelection = function(state, t) {
-		if(t < state.data_after || t > state.data_before)
+		if(state.timeIsVisible(t) !== true)
 			return NETDATA.gaugeClearSelection(state);
 
-		var slot = Math.floor(state.data.result.length - 1 - (t - state.data_after) / state.data_update_every);
+		var slot = state.calculateRowForTime(t);
 		if(slot < 0 || slot >= state.data.result.length)
 			return NETDATA.gaugeClearSelection(state);
 
@@ -4586,7 +4592,7 @@
 			};
 		}
 
-		var value = state.data.result[slot];
+		var value = state.data.result[state.data.result.length - 1 - slot];
 		var max = (state.gaugeMax === null)?state.data.max:state.gaugeMax;
 		var min = 0;
 
@@ -4601,7 +4607,7 @@
 			state.gaugeEvent.timer = setTimeout(function() {
 				state.gaugeEvent.timer = null;
 				NETDATA.gaugeSet(state, state.gaugeEvent.value, state.gaugeEvent.min, state.gaugeEvent.max);
-			}, 100);
+			}, NETDATA.options.current.charts_selection_animation_delay);
 		}
 
 		return true;
@@ -4635,7 +4641,12 @@
 		var value = data.result[0];
 		var max = self.data('gauge-max-value') || null;
 		var adjust = self.data('gauge-adjust') || null;
-		
+		var pointerColor = self.data('gauge-pointer-color') || '#C0C0C0';
+		var strokeColor = self.data('gauge-stroke-color') || '#F0F0F0';
+		var startColor = self.data('gauge-start-color') || state.chartColors()[0];
+		var stopColor = self.data('gauge-stop-color') || void 0;
+		var generateGradient = self.data('gauge-generate-gradient') || false;
+
 		if(max === null) {
 			max = data.max;
 			state.gaugeMax = null;
@@ -4661,13 +4672,13 @@
 			pointer: {
 				length: 0.8,			// 0.9 The radius of the inner circle
 				strokeWidth: 0.035,		// The rotation offset
-				color: '#C0C0C0'		// Fill color
+				color: pointerColor		// Fill color
 			},
-			colorStart: state.chartColors()[0],	// Colors
-			colorStop: void 0,			// just experiment with them
-			strokeColor: '#F0F0F0',		// to see which ones work best for you
+			colorStart: startColor,		// Colors
+			colorStop: stopColor,		// just experiment with them
+			strokeColor: strokeColor,	// to see which ones work best for you
 			limitMax: true,
-			generateGradient: false,
+			generateGradient: generateGradient,
 			gradientType: 0,
 			percentColors: [
 				[0.0, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 0))],
@@ -4742,6 +4753,10 @@
 			maxLabel: null
 		};
 		
+		// we will always feed a percentage
+		state.gauge_instance.minValue = 0;
+		state.gauge_instance.maxValue = 100;
+
 		NETDATA.gaugeAnimation(state, animate);
 		NETDATA.gaugeSet(state, value, 0, max);
 		NETDATA.gaugeSetLabels(state, value, 0, max);
@@ -4927,7 +4942,7 @@
 			legend: function(state) { return null; },
 			autoresize: function(state) { return false; },
 			max_updates_to_recreate: function(state) { return 5000; },
-			track_colors: function(state) { return false; },
+			track_colors: function(state) { return true; },
 			pixels_per_point: function(state) { return 3; },
 			aspect_ratio: 100
 		},
@@ -4945,7 +4960,7 @@
 			legend: function(state) { return null; },
 			autoresize: function(state) { return false; },
 			max_updates_to_recreate: function(state) { return 5000; },
-			track_colors: function(state) { return false; },
+			track_colors: function(state) { return true; },
 			pixels_per_point: function(state) { return 3; },
 			aspect_ratio: 70
 		}

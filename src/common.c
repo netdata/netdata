@@ -146,8 +146,11 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm)
 							error("Cannot seek to beginning of file '%s'.", filename);
 
 						// don't use MADV_SEQUENTIAL|MADV_DONTFORK, they disable MADV_MERGEABLE
+						if(madvise(mem, size, MADV_SEQUENTIAL|MADV_DONTFORK) != 0)
+							error("Cannot advise the kernel about the memory usage (MADV_SEQUENTIAL|MADV_DONTFORK) of file '%s'.", filename);
+
 						if(madvise(mem, size, MADV_MERGEABLE) != 0)
-							error("Cannot advise the kernel about the memory usage of file '%s'.", filename);
+							error("Cannot advise the kernel about the memory usage (MADV_MERGEABLE) of file '%s'.", filename);
 					}
 					else
 						error("Cannot allocate PRIVATE ANONYMOUS memory for KSM for file '%s'.", filename);

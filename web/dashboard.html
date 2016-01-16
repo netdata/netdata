@@ -598,7 +598,7 @@ C3 charts are not usable in large scale. They suffer from the following issues:
  <li>lack of a <code>raw</code> data format, so every time a chart is updated, data convertion in javascript is required</li>
  <li>lack of <code>stacked</code> charts support</li>
 </ul>
-So, we avoid flashing the charts, here we destroy and re-create the charts on each update. Also, since they manipulate the data with javascript we were forced to lower the detail they render to get acceptable results.
+So, to avoid flashing the charts, we destroy and re-create the charts on each update. Also, since they manipulate the data with javascript we were forced to lower the detail they render to get acceptable speeds.
 <br/>
 <div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.processes"
@@ -606,10 +606,10 @@ So, we avoid flashing the charts, here we destroy and re-create the charts on ea
 		data-width="100%"
 		data-height="200"
 		data-after="-300"
-		data-dt-element-name="time701"
+		data-dt-element-name="time801"
 		></div>
 	<br/>
-	<small>rendered in <span id="time701">X</span> ms</small>
+	<small>rendered in <span id="time801">X</span> ms</small>
 </div>
 <div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.ipv4"
@@ -617,10 +617,10 @@ So, we avoid flashing the charts, here we destroy and re-create the charts on ea
 		data-width="100%"
 		data-height="200"
 		data-after="-300"
-		data-dt-element-name="time702"
+		data-dt-element-name="time802"
 		></div>
 	<br/>
-	<small>rendered in <span id="time702">X</span> ms</small>
+	<small>rendered in <span id="time802">X</span> ms</small>
 </div>
 <div style="width: 33%; display: inline-block;">
 	<div data-netdata="system.cpu"
@@ -628,10 +628,10 @@ So, we avoid flashing the charts, here we destroy and re-create the charts on ea
 		data-width="100%"
 		data-height="200"
 		data-after="-300"
-		data-dt-element-name="time703"
+		data-dt-element-name="time803"
 		></div>
 	<br/>
-	<small>rendered in <span id="time703">X</span> ms</small>
+	<small>rendered in <span id="time803">X</span> ms</small>
 </div>
 
 

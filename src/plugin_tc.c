@@ -509,6 +509,8 @@ void *tc_main(void *ptr)
 	uint32_t first_hash;
 
 	for(;1;) {
+		if(unlikely(netdata_exit)) break;
+
 		FILE *fp;
 		struct tc_device *device = NULL;
 		struct tc_class *class = NULL;
@@ -523,7 +525,7 @@ void *tc_main(void *ptr)
 		}
 
 		while(fgets(buffer, TC_LINE_MAX, fp) != NULL) {
-			if(netdata_exit) break;
+			if(unlikely(netdata_exit)) break;
 
 			buffer[TC_LINE_MAX] = '\0';
 			// debug(D_TC_LOOP, "TC: read '%s'", buffer);
