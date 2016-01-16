@@ -14,9 +14,11 @@
 	<style>
 	.easyPieChartLabel {
 		color: #222 !important;
-		font-weight: normal;
 		text-shadow: #333 0px 0px 1px !important;
-		-webkit-font-smoothing: none;
+	}
+	.gaugeChartLabel {
+		color: #222 !important;
+		text-shadow: #CCC 0px 0px 1px !important;
 	}
 	</style>
 
@@ -24,73 +26,130 @@
 </head>
 <body style="background-color: #444;">
 
-<div style="width: 100%; padding-top: 10px; text-align: center; color: #AAA">
-	<div style="font-size: 8vw;">why netdata?</div>
+<div class="container" style="width: 90%; padding-top: 10px; text-align: center; color: #AAA">
+	<div style="font-size: 7vw;">why netdata?</div>
 	<br/>
-	<div style="font-size: 2vw;">These charts update the same data...</div>
-	<div data-netdata="example.random"
-			data-dimensions="random1"
-			data-chart-library="easypiechart"
-			data-easypiechart-max-value="100"
-			data-width="25%"
-			data-after="-600"
-			data-points="600"
-			data-title="1/second (netdata&nbsp;default)"
-			data-units="something"
-			data-colors="#CCC"
-			data-easypiechart-trackcolor="#555"
-			data-easypiechart-scalecolor="#555"
-			></div>
-	<div data-netdata="example.random"
-			data-dimensions="random1"
-			data-chart-library="easypiechart"
-			data-easypiechart-max-value="100"
-			data-width="20%"
-			data-after="-600"
-			data-points="300"
-			data-title="Updates Every 2&nbsp;Seconds"
-			data-units="something"
-			data-colors="#AAA"
-			data-easypiechart-trackcolor="#555"
-			data-easypiechart-scalecolor="#555"
-			></div>
-	<div data-netdata="example.random"
-			data-dimensions="random1"
-			data-chart-library="easypiechart"
-			data-easypiechart-max-value="100"
-			data-width="17.5%"
-			data-after="-600"
-			data-points="120"
-			data-title="Updates Every 5&nbsp;Seconds"
-			data-units="something"
-			data-colors="#999"
-			data-easypiechart-trackcolor="#555"
-			data-easypiechart-scalecolor="#555"
-			></div>
-	<div data-netdata="example.random"
-			data-dimensions="random1"
-			data-chart-library="easypiechart"
-			data-easypiechart-max-value="100"
-			data-width="15%"
-			data-after="-600"
-			data-points="10"
-			data-title="Updates Every 1&nbsp;Minute"
-			data-units="something"
-			data-colors="#888"
-			data-easypiechart-trackcolor="#555"
-			data-easypiechart-scalecolor="#555"
-			></div>
-	<div style="font-size: 2vw;">Hover on the peaks and the lows of the chart below, to see the diff on the charts above!</div>
-	<div data-netdata="example.random"
-			data-dimensions="random1"
+	<div style="font-size: 2vw; color: white;">These charts visualize the same data...</div>
+
+
+	<!-- Nav tabs -->
+	<ul class="nav nav-tabs" role="tablist">
+		<li role="presentation" class="active"><a href="#gauge" aria-controls="gauge" role="tab" data-toggle="tab">Gauge.js</a></li>
+		<li role="presentation"><a href="#easypiechart" aria-controls="easypiechart" role="tab" data-toggle="tab">Easy Pie Chart</a></li>
+	</ul>
+
+	<!-- Tab panes -->
+	<div class="tab-content">
+		<div role="tabpanel" class="tab-pane active" id="gauge">
+
+			<div style="display: inline-block; width: 35.8%">
+				<div style="font-size: 1.2vw; color: #666; padding-top: 10px;"><i class="fa fa-comment"></i> I can trace an issue like this</div>
+				<br/>
+				<div data-netdata="example.random2"
+						data-dimensions="random"
+						data-chart-library="gauge"
+						data-gauge-max-value="32767"
+						data-width="100%"
+						data-after="-600"
+						data-points="600"
+						data-title="1/second (netdata&nbsp;default)"
+						data-units="important metric"
+						data-colors="#5A5"
+						data-gauge-stroke-color="#555"
+						data-gauge-pointer-color="#333"
+						></div>
+			</div>
+			<div style="display: inline-block; width: 50%">
+				<div style="font-size: 1.2vw; color: #666;"><i class="fa fa-comment"></i> Can you trace an issue like these?<br/>&nbsp;<br/></div>
+				<div data-netdata="example.random2"
+						data-dimensions="random"
+						data-chart-library="gauge"
+						data-gauge-max-value="32767"
+						data-width="45%"
+						data-after="-600"
+						data-points="40"
+						data-title="Updates Every 15&nbsp;Sec&nbsp;(<a href='https://github.com/OpenTSDB/opentsdb.net/blob/gh-pages/docs/source/user_guide/utilities/tcollector.rst#collecting-lots-of-metrics-with-tcollector' target='_blank'>OpenTSDB</a>)"
+						data-units="important metric"
+						data-colors="#C55"
+						data-gauge-stroke-color="#555"
+						data-gauge-pointer-color="#333"
+						></div>
+				<div data-netdata="example.random2"
+						data-dimensions="random"
+						data-chart-library="gauge"
+						data-gauge-max-value="32767"
+						data-width="45%"
+						data-after="-600"
+						data-points="2"
+						data-title="Updates Every 5&nbsp;Mins&nbsp;(your&nbsp;NMS)"
+						data-units="important metric"
+						data-colors="#C55"
+						data-gauge-stroke-color="#555"
+						data-gauge-pointer-color="#333"
+						></div>
+			</div>
+		</div>
+		<div role="tabpanel" class="tab-pane" id="easypiechart">
+
+			<div style="display: inline-block; width: 25%">
+				<div style="font-size: 1.2vw; color: #666; padding-top: 10px;"><i class="fa fa-comment"></i> I can trace an issue like this</div>
+				<br/>
+				<div data-netdata="example.random2"
+						data-dimensions="random"
+						data-chart-library="easypiechart"
+						data-easypiechart-max-value="32767"
+						data-width="100%"
+						data-after="-600"
+						data-points="600"
+						data-title="1/second (netdata&nbsp;default)"
+						data-units="important metric"
+						data-colors="#5A5"
+						data-easypiechart-trackcolor="#555"
+						data-easypiechart-scalecolor="#555"
+						></div>
+			</div>
+			<div style="display: inline-block; width: 40%">
+				<div style="font-size: 1.2vw; color: #666;"><i class="fa fa-comment"></i> Can you trace an issue like these?<br/>&nbsp;<br/></div>
+				<div data-netdata="example.random2"
+						data-dimensions="random"
+						data-chart-library="easypiechart"
+						data-easypiechart-max-value="32767"
+						data-width="45%"
+						data-after="-600"
+						data-points="40"
+						data-title="Updates Every 15&nbsp;Sec&nbsp;(<a href='https://github.com/OpenTSDB/opentsdb.net/blob/gh-pages/docs/source/user_guide/utilities/tcollector.rst#collecting-lots-of-metrics-with-tcollector' target='_blank'>OpenTSDB</a>)"
+						data-units="important metric"
+						data-colors="#C55"
+						data-easypiechart-trackcolor="#555"
+						data-easypiechart-scalecolor="#555"
+						></div>
+				<div data-netdata="example.random2"
+						data-dimensions="random"
+						data-chart-library="easypiechart"
+						data-easypiechart-max-value="32767"
+						data-width="45%"
+						data-after="-600"
+						data-points="2"
+						data-title="Updates Every 5&nbsp;Mins&nbsp;(your&nbsp;NMS)"
+						data-units="important metric"
+						data-colors="#C55"
+						data-easypiechart-trackcolor="#555"
+						data-easypiechart-scalecolor="#555"
+						></div>
+			</div>
+		</div>
+	</div>
+	<div style="font-size: 1.5vw;">Hover on the chart below, to see the selected value on the charts above!</div>
+	<div data-netdata="example.random2"
+			data-dimensions="random"
 			data-dygraph-theme="sparkline"
-			data-width="90%"
+			data-width="100%"
 			data-height="20vh"
 			data-after="-600"
 			data-points="600"
 			data-title="1/second (netdata&nbsp;default)"
 			data-units="something"
-			data-colors="#CCC"
+			data-colors="#888"
 			></div>
 </div>
 </body>
