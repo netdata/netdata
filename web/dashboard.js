@@ -4681,17 +4681,17 @@
 			generateGradient: generateGradient,
 			gradientType: 0,
 			percentColors: [
-				[0.0, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 0))],
-				[0.1, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 1))],
-				[0.2, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 2))],
-				[0.3, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 3))],
-				[0.4, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 4))],
-				[0.5, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 5))],
-				[0.6, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 6))],
-				[0.7, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 7))],
-				[0.8, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 8))],
-				[0.9, NETDATA.colorLuminance(state.chartColors()[0], (lum_d * 10) - (lum_d * 9))],
-				[1.0, state.chartColors()[0]]]
+				[0.0, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 0))],
+				[0.1, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 1))],
+				[0.2, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 2))],
+				[0.3, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 3))],
+				[0.4, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 4))],
+				[0.5, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 5))],
+				[0.6, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 6))],
+				[0.7, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 7))],
+				[0.8, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 8))],
+				[0.9, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 9))],
+				[1.0, NETDATA.colorLuminance(startColor, 0.0)]]
 		};
 
 		state.gauge_canvas = document.createElement('canvas');
