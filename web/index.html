@@ -299,7 +299,7 @@
 			<nav class="collapse navbar-collapse navbar-right" role="navigation">
 				<ul class="nav navbar-nav">
 					<li><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal"><i class="fa fa-cog"></i> settings</a></li>
-					<li><a href="https://github.com/firehol/netdata" class="btn" target="_blank"><i class="fa fa-github"></i> community</a></li>
+					<li><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank"><i class="fa fa-github"></i> community</a></li>
 					<li><a href="old/" class="btn" target="_blank"><i class="fa fa-step-backward"></i> old dashboard</a></li>
 <!--					<li><a href="#sec">Visualize</a></li>
 					<li><a href="#sec">Prototype</a></li>
@@ -312,8 +312,8 @@
 		<div class="container">
 			<div class="row">
 				<div class="col-md-7">
-					<h1>Netdata Dashboard
-						<p class="lead">Real time data collection and graphs...</p>
+					<h1>Netdata
+						<p class="lead">non disruptive, real-time visualization, in the greatest possible detail</p>
 					</h1>
 				</div>
 				<div class="col-md-5">
@@ -350,13 +350,13 @@
 		<div class="row">
 			<div class="col-md-10" role="main">
 				<div class="p">
-					<big><a href="https://github.com/firehol/netdata" target="_blank">netdata</a></big><br/>
+					<big><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></big><br/>
 					<i class="fa fa-copyright"></i> Copyright 2016, Costa Tsaousis.<br/>
 					Released under <a href="http://www.gnu.org/licenses/gpl-3.0.en.html" target="_blank">GPL v3 or later</a>.<br/>
 				</div>
 				<div class="p">
 					<small>
-						<a href="https://github.com/firehol/netdata" target="_blank">netdata</a> re-distributes these software tools:
+						<a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a> re-distributes these software tools:
 
 						<i class="fa fa-circle"></i> The excellent <a href="http://dygraphs.com/" target="_blank">Dygraphs.com</a> web chart library,
 						<i class="fa fa-copyright"></i> Copyright 2009, Dan Vanderkam, <a href="http://dygraphs.com/legal.html" target="_blank">MIT License</a>
@@ -416,27 +416,27 @@
 			<div class="modal-content">
 				<div class="modal-header">
 					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-					<h4 class="modal-title" id="welcomeModalLabel">Welcome to netdata!</h4>
+					<h4 class="modal-title" id="welcomeModalLabel">Welcome!</h4>
 				</div>
 				<div class="modal-body">
 						<div class="p">
-						<b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b> is the fastest way to visualize data. It is a resource efficient, highly optimized system for collecting and visualizing any type of realtime timeseries data, from CPU usage, disk activity, SQL queries, to web site visitors, e-shop orders, revenue and profits.
+						<b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> is the fastest way to visualize key metrics. It is a resource efficient, highly optimized system for collecting and visualizing any type of realtime timeseries data, from CPU usage, disk activity, SQL queries, API calls, web site visitors, etc.
 						</div>
 						<div class="p">
-						To make a chart in <b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b>, you just need a <b>number</b>. Just a number you can read somehow. <b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b> will turn this number to a real time web chart. For collecting these numbers, it supports <a href="https://github.com/firehol/netdata/tree/master/plugins.d" target="_blank">external plugins</a>, even <a href="https://github.com/firehol/netdata/tree/master/charts.d" target="_blank">bash shell plugins</a>. Any computer program, in any language, that can print a few lines of text on its standard output, can be a netdata data collector.
+						<b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> tries to visualize the truth of <b>now</b>, in its <b>greatest detail</b>, so that you can get insights of what is happening now and what just happened, on your systems and applications.
 						</div>
 						<div class="p">
-						<b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b> can embed charts everywhere, like this one <div data-netdata="system.cpu" data-dimensions="system" data-after="-120" data-width="25%" data-height="15px" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-show-value-of-system-at="system.cpu.system.modal.1"></div> (my CPU system usage which is <span id="system.cpu.system.modal.1" style="display: inline-block; width: 40px; text-align: right;"></span>%),
+						To make a chart in <b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b>, you just need a <b>number</b>. Just a number you can read somehow. <b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> will turn this number to a real time, interactive, web chart. For collecting these numbers, it supports <a href="https://github.com/firehol/netdata/tree/master/plugins.d" target="_blank">external plugins</a>, even <a href="https://github.com/firehol/netdata/tree/master/charts.d" target="_blank">bash shell plugins</a>. Any computer program, in any language, that can print a few lines of text on its standard output, can be a netdata data collector.
+						</div>
+						<div class="p">
+						<b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> can embed charts everywhere, like this one <div data-netdata="system.cpu" data-dimensions="system" data-after="-120" data-width="25%" data-height="15px" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-show-value-of-system-at="system.cpu.system.modal.1"></div> (my CPU system usage which is <span id="system.cpu.system.modal.1" style="display: inline-block; width: 40px; text-align: right;"></span>%),
 						or this one <div data-netdata="ipv4.tcppackets" data-dimensions="received" data-after="-120" data-width="25%" data-height="15px" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-show-value-of-received-at="ipv4.tcppackets.received.modal.1"></div> (my IPv4 received TCP packets, which are <span id="ipv4.tcppackets.received.modal.1" style="display: inline-block; width: 60px; text-align: right;"></span>/second).
 						</div>
 						<div class="p">
-						You can have <b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b> charts on your site too. Just give it a <code>div</code> and a real time chart, zoomable and draggable will appear (try it even on these tiny ones - <b>drag</b> them to pan horizontally, <b>shift + drag</b> to zoom in, on <b>chrome shift + mouse wheel</b> to zoom in/out, <b>double click</b> on them to reset them - don't be afraid of <b><a href="https://github.com/firehol/netdata/" target="_blank">netdata</a></b> performance - <a href="https://github.com/firehol/netdata/issues/36" target="_blank">a raspberry pi 2 can sustain 300 charts updates per second</a>!).
+						You can have <b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> charts on your site too. Just give it a <code>div</code> and a real time chart, zoomable and draggable will appear (try it even on these tiny ones - <b>drag</b> them to pan horizontally, <b>shift + drag</b> to zoom in, on <b>chrome shift + mouse wheel</b> to zoom in/out, <b>double click</b> on them to reset them - don't be afraid of <b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> performance - <a href="https://github.com/firehol/netdata/issues/36" target="_blank">a raspberry pi 2 can sustain 300 charts updates per second</a>!).
 						</div>
 						<div class="p">
-						If you like this project, <b>we need help writing documentation, coding plugins, testing new features, supporting end users.</b>
-						</div>
-						<div class="p">
-						We will be glad to have you on board...
+						For more information please refer to the <b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata wiki</a></b>.
 						</div>
 				</div>
 				<div class="modal-footer">

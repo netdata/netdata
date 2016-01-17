@@ -95,6 +95,9 @@ dryrunner=0
 # check for timeout command
 check_for_timeout=1
 
+# the default enable/disable value for all charts
+enable_all_charts="yes"
+
 # -----------------------------------------------------------------------------
 # parse parameters
 
@@ -244,14 +247,19 @@ all_charts() {
 }
 
 all_enabled_charts() {
-	local charts=
+	local charts= enabled=
 
 	# find all enabled charts
 
 	for chart in $( all_charts )
 	do
 		eval "enabled=\$$chart"
-		if [ "$enabled" = "no" ]
+		if [ -z "${enabled}" ]
+			then
+			enabled="${enable_all_charts}"
+		fi
+
+		if [ ! "${enabled}" = "yes" ]
 		then
 			echo >&2 "$PROGRAM_NAME: '$chart' is NOT enabled. Add a line with $chart=yes in $myconfig to enable it (or remove the line that disables it)."
 		else
