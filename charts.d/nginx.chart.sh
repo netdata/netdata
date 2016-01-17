@@ -91,7 +91,7 @@ DIMENSION reading '' absolute 1 1
 DIMENSION writing '' absolute 1 1
 DIMENSION waiting idle absolute 1 1
 
-CHART nginx.connect_rate '' "nginx Connections Rate" "connections" nginx nginx line 16003 $nginx_update_every
+CHART nginx.connect_rate '' "nginx Connections Rate" "connections/s" nginx nginx line 16003 $nginx_update_every
 DIMENSION accepts accepted incremental 1 1
 DIMENSION handled '' incremental 1 1
 EOF
