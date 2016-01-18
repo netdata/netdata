@@ -4532,6 +4532,10 @@
 		// is always between min and max
 		var pcent = (value - min) * 100 / (max - min);
 
+		// these should never happen
+		if(pcent < 0) pcent = 0;
+		if(pcent > 100) pcent = 100;
+
 		state.gauge_instance.set(pcent);
 
 		state.___gaugeOld__.value = value;

@@ -1,5 +1,9 @@
-html {
-    font-family: sans-serif;
+html,
+body {
+	/*font-family: Calibri,"Segoe UI","Helvetica Neue",Helvetica,Arial,sans-serif;*/
+	font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+	font-style: normal;
+	font-variant: normal;
 }
 
 .netdata-chart-alignment {
@@ -246,7 +250,7 @@ html {
 	padding: 0px;
 	padding-left: 15px;
 	cursor: pointer;
-	-webkit-font-smoothing: none;
+	/* -webkit-font-smoothing: none; */
 }
 .netdata-legend-name.not-selected {
 	font-weight: normal;
@@ -344,7 +348,7 @@ html {
 	color: #666;
 	font-weight: normal;
 	text-shadow: #BBB 0px 0px 1px;
-	-webkit-font-smoothing: none;
+	/* -webkit-font-smoothing: none; */
 }
 
 .easyPieChartTitle {
@@ -394,7 +398,9 @@ html {
 	font-weight: bold;
 	z-index: 1;
 	text-shadow: #777 0px 0px 1px;
-	-webkit-font-smoothing: none;
+	/* text-shadow: #CCC 1px 1px 0px, #CCC -1px -1px 0px, #CCC 1px -1px 0px, #CCC -1px 1px 0px; */
+	/* -webkit-text-stroke: 1px #777; */
+	/* -webkit-font-smoothing: none; */
 }
 
 .gaugeChartTitle {
