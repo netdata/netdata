@@ -241,6 +241,426 @@ int unit_test_storage()
 	return r;
 }
 
+
+// --------------------------------------------------------------------------------------------------------------------
+
+struct feed_values {
+		unsigned long long microseconds;
+		calculated_number value;
+};
+
+struct test {
+	char name[100];
+	char description[1024];
+
+	int update_every;
+	unsigned long long multiplier;
+	unsigned long long divisor;
+	int algorithm;
+
+	unsigned long feed_entries;
+	unsigned long result_entries;
+	struct feed_values *feed;
+	calculated_number *results;
+};
+
+// --------------------------------------------------------------------------------------------------------------------
+// test1
+// test absolute values stored
+
+struct feed_values test1_feed[] = {
+		{ 0, 10 },
+		{ 1000000, 20 },
+		{ 1000000, 30 },
+		{ 1000000, 40 },
+		{ 1000000, 50 },
+		{ 1000000, 60 },
+		{ 1000000, 70 },
+		{ 1000000, 80 },
+		{ 1000000, 90 },
+		{ 1000000, 100 },
+};
+
+calculated_number test1_results[] = {
+		20, 30, 40, 50, 60, 70, 80, 90, 100
+};
+
+struct test test1 = {
+		"test1",			// name
+		"test absolute values stored at exactly second boundaries",
+		1,					// update_every
+		1,					// multiplier
+		1,					// divisor
+		RRDDIM_ABSOLUTE,	// algorithm
+		10,					// feed entries
+		9,					// result entries
+		test1_feed,			// feed
+		test1_results		// results
+};
+
+// --------------------------------------------------------------------------------------------------------------------
+// test2
+// test absolute values stored in the middle of second boundaries
+
+struct feed_values test2_feed[] = {
+		{ 500000, 10 },
+		{ 1000000, 20 },
+		{ 1000000, 30 },
+		{ 1000000, 40 },
+		{ 1000000, 50 },
+		{ 1000000, 60 },
+		{ 1000000, 70 },
+		{ 1000000, 80 },
+		{ 1000000, 90 },
+		{ 1000000, 100 },
+};
+
+calculated_number test2_results[] = {
+		20, 30, 40, 50, 60, 70, 80, 90, 100
+};
+
+struct test test2 = {
+		"test2",			// name
+		"test absolute values stored in the middle of second boundaries",
+		1,					// update_every
+		1,					// multiplier
+		1,					// divisor
+		RRDDIM_ABSOLUTE,	// algorithm
+		10,					// feed entries
+		9,					// result entries
+		test2_feed,			// feed
+		test2_results		// results
+};
+
+// --------------------------------------------------------------------------------------------------------------------
+// test3
+
+struct feed_values test3_feed[] = {
+		{ 0, 10 },
+		{ 1000000, 20 },
+		{ 1000000, 30 },
+		{ 1000000, 40 },
+		{ 1000000, 50 },
+		{ 1000000, 60 },
+		{ 1000000, 70 },
+		{ 1000000, 80 },
+		{ 1000000, 90 },
+		{ 1000000, 100 },
+};
+
+calculated_number test3_results[] = {
+		10, 10, 10, 10, 10, 10, 10, 10, 10
+};
+
+struct test test3 = {
+		"test3",			// name
+		"test incremental values stored at exactly second boundaries",
+		1,					// update_every
+		1,					// multiplier
+		1,					// divisor
+		RRDDIM_INCREMENTAL,	// algorithm
+		10,					// feed entries
+		9,					// result entries
+		test3_feed,			// feed
+		test3_results		// results
+};
+
+// --------------------------------------------------------------------------------------------------------------------
+// test4
+
+struct feed_values test4_feed[] = {
+		{ 500000, 10 },
+		{ 1000000, 20 },
+		{ 1000000, 30 },
+		{ 1000000, 40 },
+		{ 1000000, 50 },
+		{ 1000000, 60 },
+		{ 1000000, 70 },
+		{ 1000000, 80 },
+		{ 1000000, 90 },
+		{ 1000000, 100 },
+};
+
+calculated_number test4_results[] = {
+		5, 10, 10, 10, 10, 10, 10, 10, 10
+};
+
+struct test test4 = {
+		"test4",			// name
+		"test incremental values stored in the middle of second boundaries",
+		1,					// update_every
+		1,					// multiplier
+		1,					// divisor
+		RRDDIM_INCREMENTAL,	// algorithm
+		10,					// feed entries
+		9,					// result entries
+		test4_feed,			// feed
+		test4_results		// results
+};
+
+// --------------------------------------------------------------------------------------------------------------------
+// test5
+
+struct feed_values test5_feed[] = {
+		{ 500000, 1000 },
+		{ 1000000, 2000 },
+		{ 1000000, 2000 },
+		{ 1000000, 2000 },
+		{ 1000000, 3000 },
+		{ 1000000, 2000 },
+		{ 1000000, 2000 },
+		{ 1000000, 2000 },
+		{ 1000000, 2000 },
+		{ 1000000, 2000 },
+};
+
+calculated_number test5_results[] = {
+		500, 500, 0, 500, 500, 0, 0, 0, 0
+};
+
+struct test test5 = {
+		"test5",			// name
+		"test incremental values ups and downs",
+		1,					// update_every
+		1,					// multiplier
+		1,					// divisor
+		RRDDIM_INCREMENTAL,	// algorithm
+		10,					// feed entries
+		9,					// result entries
+		test5_feed,			// feed
+		test5_results		// results
+};
+
+// --------------------------------------------------------------------------------------------------------------------
+// test6
+
+struct feed_values test6_feed[] = {
+		{ 250000, 1000 },
+		{ 250000, 2000 },
+		{ 250000, 3000 },
+		{ 250000, 4000 },
+		{ 250000, 5000 },
+		{ 250000, 6000 },
+		{ 250000, 7000 },
+		{ 250000, 8000 },
+		{ 250000, 9000 },
+		{ 250000, 10000 },
+		{ 250000, 11000 },
+		{ 250000, 12000 },
+		{ 250000, 13000 },
+		{ 250000, 14000 },
+		{ 250000, 15000 },
+		{ 250000, 16000 },
+};
+
+calculated_number test6_results[] = {
+		3000, 4000, 4000, 4000
+};
+
+struct test test6 = {
+		"test6",			// name
+		"test incremental values updated within the same second",
+		1,					// update_every
+		1,					// multiplier
+		1,					// divisor
+		RRDDIM_INCREMENTAL,	// algorithm
+		16,					// feed entries
+		4,					// result entries
+		test6_feed,			// feed
+		test6_results		// results
+};
+
+// --------------------------------------------------------------------------------------------------------------------
+// test7
+
+struct feed_values test7_feed[] = {
+		{ 500000, 1000 },
+		{ 2000000, 2000 },
+		{ 2000000, 3000 },
+		{ 2000000, 4000 },
+		{ 2000000, 5000 },
+		{ 2000000, 6000 },
+		{ 2000000, 7000 },
+		{ 2000000, 8000 },
+		{ 2000000, 9000 },
+		{ 2000000, 10000 },
+};
+
+calculated_number test7_results[] = {
+		250, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500
+};
+
+struct test test7 = {
+		"test7",			// name
+		"test incremental values updated in long durations",
+		1,					// update_every
+		1,					// multiplier
+		1,					// divisor
+		RRDDIM_INCREMENTAL,	// algorithm
+		10,					// feed entries
+		18,					// result entries
+		test7_feed,			// feed
+		test7_results		// results
+};
+
+// --------------------------------------------------------------------------------------------------------------------
+// test8
+
+struct feed_values test8_feed[] = {
+		{ 500000, 1000 },
+		{ 2000000, 2000 },
+		{ 2000000, 3000 },
+		{ 2000000, 4000 },
+		{ 2000000, 5000 },
+		{ 2000000, 6000 },
+};
+
+calculated_number test8_results[] = {
+		1250, 2000, 2250, 3000, 3250, 4000, 4250, 5000, 5250, 6000
+};
+
+struct test test8 = {
+		"test8",			// name
+		"test absolute values updated in long durations",
+		1,					// update_every
+		1,					// multiplier
+		1,					// divisor
+		RRDDIM_ABSOLUTE,	// algorithm
+		6,					// feed entries
+		10,					// result entries
+		test8_feed,			// feed
+		test8_results		// results
+};
+
+// --------------------------------------------------------------------------------------------------------------------
+// test9
+
+struct feed_values test9_feed[] = {
+		{ 250000, 1000 },
+		{ 250000, 2000 },
+		{ 250000, 3000 },
+		{ 250000, 4000 },
+		{ 250000, 5000 },
+		{ 250000, 6000 },
+		{ 250000, 7000 },
+		{ 250000, 8000 },
+		{ 250000, 9000 },
+		{ 250000, 10000 },
+		{ 250000, 11000 },
+		{ 250000, 12000 },
+		{ 250000, 13000 },
+		{ 250000, 14000 },
+		{ 250000, 15000 },
+		{ 250000, 16000 },
+};
+
+calculated_number test9_results[] = {
+		4000, 8000, 12000, 16000
+};
+
+struct test test9 = {
+		"test9",			// name
+		"test absolute values updated within the same second",
+		1,					// update_every
+		1,					// multiplier
+		1,					// divisor
+		RRDDIM_ABSOLUTE,	// algorithm
+		16,					// feed entries
+		4,					// result entries
+		test9_feed,			// feed
+		test9_results		// results
+};
+
+// --------------------------------------------------------------------------------------------------------------------
+
+int run_test(struct test *test)
+{
+	fprintf(stderr, "\nRunning test '%s':\n%s\n", test->name, test->description);
+
+	rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+	rrd_update_every = test->update_every;
+
+	char name[101];
+	snprintf(name, 100, "unittest-%s", test->name);
+
+	// create the chart
+	RRDSET *st = rrdset_create("netdata", name, name, "netdata", "Unit Testing", "a value", 1, 1, RRDSET_TYPE_LINE);
+	RRDDIM *rd = rrddim_add(st, "dimension", NULL, test->multiplier, test->divisor, test->algorithm);
+	st->debug = 1;
+
+	// feed it with the test data
+	unsigned long c;
+	for(c = 0; c < test->feed_entries; c++) {
+		if(debug_flags) fprintf(stderr, "\n\n");
+
+		if(c) {
+			fprintf(stderr, "    > %s: feeding position %lu, after %llu microseconds, with value " CALCULATED_NUMBER_FORMAT "\n", test->name, c+1, test->feed[c].microseconds, test->feed[c].value);
+			rrdset_next_usec(st, test->feed[c].microseconds);
+		}
+		else {
+			fprintf(stderr, "    > %s: feeding position %lu with value " CALCULATED_NUMBER_FORMAT "\n", test->name, c+1, test->feed[c].value);
+		}
+
+		rrddim_set(st, "dimension", test->feed[c].value);
+		rrdset_done(st);
+
+		// align the first entry to second boundary
+		if(!c) {
+			fprintf(stderr, "    > %s: fixing first collection time to be %llu microseconds to second boundary\n", test->name, test->feed[c].microseconds);
+			rd->last_collected_time.tv_usec = st->last_collected_time.tv_usec = st->last_updated.tv_usec = test->feed[c].microseconds;
+		}
+	}
+
+	// check the result
+	int errors = 0;
+
+	if(st->counter != test->result_entries) {
+		fprintf(stderr, "    %s stored %lu entries, but we were expecting %lu, ### E R R O R ###\n", test->name, st->counter, test->result_entries);
+		errors++;
+	}
+
+	unsigned long max = (st->counter < test->result_entries)?st->counter:test->result_entries;
+	for(c = 0 ; c < max ; c++) {
+		calculated_number v = unpack_storage_number(rd->values[c]), n = test->results[c];
+		fprintf(stderr, "    %s: checking position %lu, expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n", test->name, c+1, n, v, (v == n)?"OK":"### E R R O R ###");
+		if(v != n) errors++;
+	}
+
+	return errors;
+}
+
+int run_all_mockup_tests(void)
+{
+	if(run_test(&test1))
+		return 1;
+
+	if(run_test(&test2))
+		return 1;
+
+	if(run_test(&test3))
+		return 1;
+
+	if(run_test(&test4))
+		return 1;
+
+	if(run_test(&test5))
+		return 1;
+
+	if(run_test(&test6))
+		return 1;
+
+	if(run_test(&test7))
+		return 1;
+
+	if(run_test(&test8))
+		return 1;
+
+	if(run_test(&test9))
+		return 1;
+
+	return 0;
+}
+
 int unit_test(long delay, long shift)
 {
 	static int repeat = 0;
@@ -249,14 +669,14 @@ int unit_test(long delay, long shift)
 	char name[101];
 	snprintf(name, 100, "unittest-%d-%ld-%ld", repeat, delay, shift);
 
-	debug_flags = 0xffffffff;
+	//debug_flags = 0xffffffff;
 	rrd_memory_mode = RRD_MEMORY_MODE_RAM;
 	rrd_update_every = 1;
 
 	int do_abs = 1;
 	int do_inc = 1;
-	int do_abst = 1;
-	int do_absi = 1;
+	int do_abst = 0;
+	int do_absi = 0;
 
 	RRDSET *st = rrdset_create("netdata", name, name, "netdata", "Unit Testing", "a value", 1, 1, RRDSET_TYPE_LINE);
 	st->debug = 1;
@@ -296,7 +716,8 @@ int unit_test(long delay, long shift)
 		}
 
 		// prevent it from deleting the dimensions
-		for(rd = st->dimensions ; rd ; rd = rd->next) rd->last_collected_time.tv_sec = st->last_collected_time.tv_sec;
+		for(rd = st->dimensions ; rd ; rd = rd->next)
+			rd->last_collected_time.tv_sec = st->last_collected_time.tv_sec;
 
 		rrdset_done(st);
 	}
@@ -306,27 +727,30 @@ int unit_test(long delay, long shift)
 	fprintf(stderr, "\n\nORIGINAL INCREMENT: %lu, INCREMENT %lu, DELAY %lu, SHIFT %lu\n", oincrement * 10, increment * 10, delay, shift);
 
 	int ret = 0;
-	storage_number v;
+	storage_number sn;
+	calculated_number cn, v;
 	for(c = 0 ; c < st->counter ; c++) {
-		fprintf(stderr, "\nPOSITION: c = %lu, VALUE %lu\n", c, (oincrement + c * increment + increment * (1000000 - shift) / 1000000 )* 10);
+		fprintf(stderr, "\nPOSITION: c = %lu, EXPECTED VALUE %lu\n", c, (oincrement + c * increment + increment * (1000000 - shift) / 1000000 )* 10);
 
 		for(rd = st->dimensions ; rd ; rd = rd->next) {
-			fprintf(stderr, "\t %s " STORAGE_NUMBER_FORMAT "   ->   ", rd->id, rd->values[c]);
+			sn = rd->values[c];
+			cn = unpack_storage_number(sn);
+			fprintf(stderr, "\t %s " CALCULATED_NUMBER_FORMAT " (PACKED AS " STORAGE_NUMBER_FORMAT ")   ->   ", rd->id, cn, sn);
 
 			if(rd == rdabs) v =
 				(	  oincrement
-					+ (increment * (1000000 - shift) / 1000000)
-					+ c * increment
-				) * 10;
+					// + (increment * (1000000 - shift) / 1000000)
+					+ (c + 1) * increment
+				);
 
-			else if(rd == rdinc) v = (c?(increment):(increment * (1000000 - shift) / 1000000)) * 10;
-			else if(rd == rdabst) v = oincrement / dimensions;
-			else if(rd == rdabsi) v = oincrement / dimensions;
+			else if(rd == rdinc) v = (c?(increment):(increment * (1000000 - shift) / 1000000));
+			else if(rd == rdabst) v = oincrement / dimensions / 10;
+			else if(rd == rdabsi) v = oincrement / dimensions / 10;
 			else v = 0;
 
-			if(v == rd->values[c]) fprintf(stderr, "passed.\n");
+			if(v == cn) fprintf(stderr, "passed.\n");
 			else {
-				fprintf(stderr, "ERROR! (expected " STORAGE_NUMBER_FORMAT ")\n", v);
+				fprintf(stderr, "ERROR! (expected " CALCULATED_NUMBER_FORMAT ")\n", v);
 				ret = 1;
 			}
 		}
@@ -337,4 +761,3 @@ int unit_test(long delay, long shift)
 
 	return ret;
 }
-

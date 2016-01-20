@@ -208,7 +208,7 @@ int main(int argc, char **argv)
 			}
 			i++;
 		}
-		else if(strcmp(argv[i], "-df") == 0 && (i+1) < argc) { config_set("global", "debug flags",  argv[i+1]); i++; }
+		else if(strcmp(argv[i], "-df") == 0 && (i+1) < argc) { config_set("global", "debug flags",  argv[i+1]); debug_flags = strtoull(argv[i+1], NULL, 0); i++; }
 		else if(strcmp(argv[i], "-p")  == 0 && (i+1) < argc) { config_set("global", "port",         argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-u")  == 0 && (i+1) < argc) { config_set("global", "run as user",  argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-l")  == 0 && (i+1) < argc) { config_set("global", "history",      argv[i+1]); i++; }
@@ -216,21 +216,9 @@ int main(int argc, char **argv)
 		else if(strcmp(argv[i], "-ch") == 0 && (i+1) < argc) { config_set("global", "host access prefix", argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-nodeamon") == 0 || strcmp(argv[i], "-nd") == 0) dont_fork = 1;
 		else if(strcmp(argv[i], "--unittest")  == 0) {
-			if(unit_test_storage()) exit(1);
-			exit(0);
 			rrd_update_every = 1;
-			if(unit_test(1000000, 0)) exit(1);
-			if(unit_test(1000000, 500000)) exit(1);
-			if(unit_test(1000000, 100000)) exit(1);
-			if(unit_test(1000000, 900000)) exit(1);
-			if(unit_test(2000000, 0)) exit(1);
-			if(unit_test(2000000, 500000)) exit(1);
-			if(unit_test(2000000, 100000)) exit(1);
-			if(unit_test(2000000, 900000)) exit(1);
-			if(unit_test(500000, 500000)) exit(1);
-			//if(unit_test(500000, 100000)) exit(1); // FIXME: the expected numbers are wrong
-			//if(unit_test(500000, 900000)) exit(1); // FIXME: the expected numbers are wrong
-			if(unit_test(500000, 0)) exit(1);
+			if(run_all_mockup_tests()) exit(1);
+			if(unit_test_storage()) exit(1);
 			fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
 			exit(0);
 		}
