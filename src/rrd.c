@@ -1085,7 +1085,7 @@ unsigned long long rrdset_done(RRDSET *st)
 
 	for( ; likely(next_ut <= now_ut) ; next_ut += st->update_every * 1000000ULL, iterations-- ) {
 #ifdef NETDATA_INTERNAL_CHECKS
-		if(iterations <= 0) { error("iterations calculation wrapped! first_ut = %llu, last_ut = %llu, next_ut = %llu, now_ut = %llu", first_ut, last_ut, next_ut, now_ut); }
+		if(iterations < 0) { error("%s: iterations calculation wrapped! first_ut = %llu, last_ut = %llu, next_ut = %llu, now_ut = %llu", st->name, first_ut, last_ut, next_ut, now_ut); }
 #endif
 
 		if(unlikely(st->debug)) {

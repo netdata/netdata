@@ -445,10 +445,10 @@ if [ -z "$run_charts" ]
 	exit 1
 fi
 
-declare -A charts_last_update=() charts_update_every=() charts_next_update=() chart_run_counter=()
+declare -A charts_last_update=() charts_update_every=() charts_next_update=() charts_run_counter=()
 global_update() {
 	local exit_at \
-		c=0 dt ret exec_start_ms exec_end_ms \
+		c=0 dt ret last_ms exec_start_ms exec_end_ms \
 		chart now_charts=() next_charts=($run_charts)
 
 	# return the current time in ms in $now_ms
@@ -464,7 +464,7 @@ global_update() {
 		charts_next_update[$chart]=$(( charts_last_update[$chart] + (charts_update_every[$chart] * 1000) ))
 		charts_run_counter[$chart]=0
 
-		echo "CHART netdata.plugin_$chart '' 'Execution time for $chart plugin' 'milliseconds / run' netdata netdata area 90000 ${charts_update_every[$chart]}"
+		echo "CHART netdata.plugin_chartsd_$chart '' 'Execution time for $chart plugin' 'milliseconds / run' netdata netdata area 90000 ${charts_update_every[$chart]}"
 		echo "DIMENSION run_time 'run time' absolute 1 1"
 	done
 
@@ -483,10 +483,11 @@ global_update() {
 			# echo >&2 "DEBUG: chart: $chart last: ${charts_last_update[$chart]}, next: ${charts_next_update[$chart]}, now: ${now_ms}"
 			if [ ${now_ms} -ge ${charts_next_update[$chart]} ]
 			then
-				dt=$(( (now_ms - charts_last_update[$chart]) ))
-				#echo >&2 "DEBUG: chart: $chart last: ${charts_last_update[$chart]}, next: ${charts_next_update[$chart]}, now: ${now_ms}, dt: ${dt}"
+				last_ms=${charts_last_update[$chart]}
+				dt=$(( (now_ms - last_ms) ))
+				# echo >&2 "DEBUG: chart: $chart last: ${charts_last_update[$chart]}, next: ${charts_next_update[$chart]}, now: ${now_ms}, dt: ${dt}"
 
-				charts_last_update[$chart]=$now_ms
+				charts_last_update[$chart]=${now_ms}
 
 				while [ ${charts_next_update[$chart]} -lt ${now_ms} ]
 				do
@@ -495,9 +496,12 @@ global_update() {
 
 				# the first call should not give a duration
 				# so that netdata calibrates to current time
-				charts_run_counter[$chart]=$(( charts_run_counter[$chart] + 1 ))
 				dt=$(( dt * 1000 ))
-				test ${charts_run_counter[$chart]} -eq 1 && dt=
+				charts_run_counter[$chart]=$(( charts_run_counter[$chart] + 1 ))
+				if [ ${charts_run_counter[$chart]} -eq 1 ]
+					then
+					dt=
+				fi
 
 				exec_start_ms=$now_ms
 				$chart$charts_update $dt
@@ -506,7 +510,7 @@ global_update() {
 				# return the current time in ms in $now_ms
 				current_time_ms; exec_end_ms=$now_ms
 
-				echo "BEGIN netdata.plugin_$chart $dt"
+				echo "BEGIN netdata.plugin_chartsd_$chart $dt"
 				if [ $ret -eq 0 ]
 				then
 					echo "SET run_time = $(( exec_end_ms - exec_start_ms ))"
