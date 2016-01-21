@@ -496,8 +496,8 @@ global_update() {
 				# the first call should not give a duration
 				# so that netdata calibrates to current time
 				charts_run_counter[$chart]=$(( charts_run_counter[$chart] + 1 ))
-				test ${charts_run_counter[$chart]} -eq 1 && dt=
 				dt=$(( dt * 1000 ))
+				test ${charts_run_counter[$chart]} -eq 1 && dt=
 
 				exec_start_ms=$now_ms
 				$chart$charts_update $dt
