@@ -15,6 +15,7 @@ dist_charts_SCRIPTS = \
 	load_average.chart.sh \
 	mem_apps.chart.sh \
 	mysql.chart.sh \
+	nginx.chart.sh \
 	nut.chart.sh \
 	opensips.chart.sh \
 	postfix.chart.sh \

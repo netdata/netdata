@@ -1,0 +1,40 @@
+#!/bin/sh
+
+# When run from the top-level repository, performs a complete clean
+# and maintainer-mode rebuild of the FireHOL package.
+
+if [ ! -f .gitignore -o ! -f configure.ac -o ! -x autogen.sh ]
+then
+  echo "Run as ./packaging/git-build from an autotools git repository"
+  exit 1
+fi
+
+# If we are genuinely in a git repo, try to clean it up, otherwise
+# just make the assumption
+if [ -d .git ]
+then
+  clean=$(git status -s | grep "^?")
+
+  if [ "$clean" ]
+  then
+    if [ "$1" != "-ok" ]
+    then
+      echo "Warning: this script runs: git clean -d -f -x"
+      echo "         ensure all required ?? files are added, then re-run with '-ok'"
+      git status -s | grep '^?'
+      exit 1
+    fi
+  fi
+
+  set -e
+  git clean -d -f -x
+  set +e
+fi
+
+set -e
+./autogen.sh
+./configure --enable-maintainer-mode 
+set +e
+make dist
+status=$?
+exit $status

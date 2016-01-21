@@ -1,0 +1,316 @@
+#!/bin/bash
+
+packaging_check_init() {
+  version_check=
+}
+
+packaging_check_file() {
+  local filename="$1" status=0
+
+  case $filename in
+    configure.ac)
+      check_versions || status=1
+      version_check=Y
+    ;;
+    *.spec.in)
+      check_versions || status=1
+      version_check=Y
+    ;;
+    ChangeLog)
+      check_versions || status=1
+      version_check=Y
+      if [ $status -eq 0 ]
+      then
+        check_changelog || status=1
+      fi
+    ;;
+    *)
+      #echo "No checks found for $filename"
+      :
+    ;;
+  esac
+  return $status
+}
+
+packaging_check_fin() {
+  if [ "$version_check" ]
+  then
+    version=`get_configure_ac_version`
+    case "$(match_version $version)" in
+      prerelease|candidate|release)
+        try_build || status=1
+        if [ $status -eq 0 ]
+        then
+           cp $MYTMP/build/*.tar.* .
+           echo "Check $(cd $MYTMP/build && ls *.tar.gz) before pushing tags"
+        fi
+      ;;
+    esac
+  fi
+}
+
+get_staged_file() {
+  local optional=0
+  if [ "$1" = "-o" ]
+  then
+    optional=1
+    shift
+  fi
+
+  local dir="${1%/*}"
+  if [ "$dir" = "$1" ]; then dir="."; fi
+  mkdir -p $MYTMP/files/$dir
+
+  test -f $MYTMP/files/$1 && return 0
+
+  if [ "$from_cache" ]
+  then
+    if [ $optional -eq 1 ]
+    then
+      git show :$1 > $MYTMP/files/$1 2> /dev/null || rm -f $MYTMP/files/$1
+    else
+      git show :$1 > $MYTMP/files/$1
+    fi
+  else
+    if [ $optional -eq 0 -o -f $1 ]
+    then
+      cp $1 $MYTMP/files/$1
+    fi
+  fi
+}
+
+try_build() {
+  if [ -f $MYTMP/success ]; then return 0; fi
+  mkdir -p $MYTMP/build
+  git archive HEAD | tar -xf - -C "$MYTMP/build"
+  git diff --staged | patch -p1 -d "$MYTMP/build"
+  (cd $MYTMP/build; ./packaging/git-build || touch $MYTMP/fail)
+  if [ -f $MYTMP/fail ]; then return 1; fi
+  (cd $MYTMP/build; ./packaging/tar-compare . *.tar.gz || touch $MYTMP/fail)
+  if [ -f $MYTMP/fail ]; then return 1; fi
+  touch $MYTMP/success
+  return 0
+}
+
+get_changelog_version() {
+  get_staged_file ChangeLog
+  local v=`sed -ne '1s/.*(\(.*\)).*/\1/p' $MYTMP/files/ChangeLog`
+  if [ ! "$v" ]; then v="No version in ChangeLog!"; fi
+  echo "$v"
+}
+
+get_configure_ac_version() {
+  get_staged_file configure.ac
+  local v=`sed -n \
+         -e '/define(\[VERSION_\(MINOR\|FIX\)/s/.*\[\([^[]*\)\].*/.\1/p' \
+         -e '/define(\[VERSION_\(MAJOR\|SUFFIX\)/s/.*\[\([^[]*\)\].*/\1/p' \
+         $MYTMP/files/configure.ac | tr -d '\n'`
+  if [ ! "$v" ]; then v="No version in configure.ac!"; fi
+  echo "$v"
+}
+
+get_configure_ac_package() {
+  get_staged_file configure.ac
+  local v=`sed -n -e 's/AC_INIT(\[\([^]]*\)\].*/\1/p' configure.ac`
+  if [ ! "$v" ]; then v="noname"; fi
+  echo "$v"
+}
+
+get_configure_ac_rpmrel() {
+  get_staged_file configure.ac
+  local v=`sed -n -e 's/PACKAGE_RPM_RELEASE="\([^"]*\)".*/\1/p' configure.ac`
+  if [ ! "$v" ]; then v="norpmrel"; fi
+  echo "$v"
+}
+
+get_spec_version() {
+  get_staged_file "$1".spec.in
+  test -f $MYTMP/files/"$1".spec.in || return 0 # Spec file is optional
+  sed -n -e '1,/^%changelog/d' -e '/^*/{s/.*- \([0-9].*\)/\1/p;q}' "$1".spec.in
+}
+
+splitver() {
+	local maj min fix sfx IFS=.-_
+
+	maj=$1
+	min=$2
+	fix=$3
+	sfx=$4
+
+	set -- $5
+	eval $maj=\$1 $min=\$2 $fix=\$3 $sfx=\$4
+}
+
+match_version() {
+  case "$1" in
+     [0-9]*.[0-9]*.[0-9]*_*)
+       # x.y.z_ZZZZ = development branch (can be before or after pre/rc)
+       echo "development"
+     ;;
+     [0-9]*.[0-9]*.[0-9]-pre[0-9]*)
+       echo "prerelease"
+     ;;
+     [0-9]*.[0-9]*.[0-9]-rc.[0-9]*)
+       echo "candidate"
+     ;;
+     [0-9]*.[0-9]*.[0-9]*)
+       echo "release"
+     ;;
+     *)
+       # Unknown
+       :
+     ;;
+  esac
+}
+
+check_versions() {
+  local status=0 exact=0 prerelease=0
+
+  if [ -f $MYTMP/version-checked ]
+  then
+    read status < $MYTMP/version-checked
+    return $status
+  fi
+
+  local confver=`get_configure_ac_version`
+  case "$(match_version $confver)" in
+     development)
+       :
+     ;;
+     prerelease|candidate|release)
+       exact=1
+     ;;
+     *)
+       echo "Unrecognised version in configure.ac ($confver)"
+       status=1
+     ;;
+  esac
+
+  local clogver=`get_changelog_version`
+  case "$(match_version $clogver)" in
+     development)
+       echo "Do not include development branch version in ChangeLog ($clogver)"
+       status=1
+     ;;
+     prerelease|candidate)
+       prerelease=1
+     ;;
+     release)
+       :
+     ;;
+     *)
+       echo "Unrecognised version format in ChangeLog ($clogver)"
+       status=1
+     ;;
+  esac
+
+  local package=`get_configure_ac_package`
+  local specver=`get_spec_version $package`
+
+  local clogmaj clogmin clogfix clogsfx
+  local confmaj confmin conffix confsfx
+  local specmaj specmin specfix specsfx
+
+  splitver clogmaj clogmin clogfix clogsfx "$clogver"
+  splitver confmaj confmin conffix confsfx "$confver"
+  splitver specmaj specmin specfix specsfx "$specver"
+
+  if [ "$specver" ]
+  then
+    if [ $specmaj -ne $clogmaj \
+      -o $specmin -ne $clogmin \
+      -o $specfix -ne $clogfix ]
+    then
+      echo "Main version of $package.spec.in ($specver) differs from ChangeLog ($clogver)"
+      status=1
+    fi
+  fi
+
+  if [ $status -eq 0 -a $exact -eq 0 ]
+  then
+
+    if [ $confmaj -gt $clogmaj \
+      -o $confmin -gt $clogmin \
+      -o $conffix -gt $clogfix ]
+    then
+      :
+    elif [ $confmaj -eq $clogmaj \
+        -a $confmin -eq $clogmin \
+        -a $conffix -eq $clogfix \
+        -a $prerelease -eq 1 ]
+    then
+      :
+    else
+      echo "Version in configure.ac ($confver) lesser than ChangeLog ($clogver)"
+      status=1
+    fi
+  fi
+
+  if [ $exact -eq 1 ]
+  then
+    echo "Running additional release checks"
+
+    if [ "$confver" != "$clogver" ]
+    then
+      echo "Version in configure.ac ($confver) differs from ChangeLog ($clogver)"
+      status=1
+    elif [ "$(git tag -l v$confver)" ]
+    then
+      echo "Tag v$confver already exists"
+      status=1
+    fi
+
+    if [ "$specver" ]
+    then
+      local confrpmrel=`get_configure_ac_rpmrel`
+      if [ "$specsfx" != "$confrpmrel" ]
+      then
+        echo "%changelog suffix in $package.spec.in ($specsfx) differs from configure.ac PACKAGE_RPM_RELEASE ($confrpmrel)"
+        status=1
+      fi
+    fi
+
+    if [ "$(git config user.signingkey)" = "" ]
+    then
+      echo "You need to set up a PGP signing key e.g.:"
+      echo "   gpg --list-keys"
+      echo "and"
+      echo "   git config user.signingkey SHORTID"
+      echo "or"
+      echo "   git config --global user.signingkey SHORTID"
+      status=1
+    fi
+
+    git status -s | grep "^?" > $MYTMP/needclean
+    if [ -s $MYTMP/needclean ]
+    then
+      echo "The following files must be dealt with before commit:"
+      cat $MYTMP/needclean
+      echo "e.g. add them to .gitignore or remove with 'git clean -fdx'"
+      status=1
+    fi
+  fi
+
+  echo $status > $MYTMP/version-checked
+  return $status
+}
+
+check_changelog() {
+  local status=0
+
+  if [ -f $MYTMP/changelog-checked ]
+  then
+    read status < $MYTMP/changelog-checked
+    return $status
+  fi
+
+  local version=`sed -ne '1s/.*(\(.*\)).*/\1/p' $filename`
+  if [ "`echo $version | grep '[[:space:]]'`" != "" ]
+  then
+    echo "ChangeLog version contains whitespace! Fix it!"
+    status=1
+  fi
+
+  echo $status > $MYTMP/changelog-checked
+  return $status
+}

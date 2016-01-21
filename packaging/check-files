@@ -1,0 +1,126 @@
+#!/bin/bash
+
+#
+# check-files
+#
+scriptname=check-files
+if ! MYTMP=$(mktemp -d -t $scriptname-XXXXXX)
+then
+            echo >&2
+            echo >&2
+            echo >&2 "Cannot create temporary directory."
+            echo >&2
+            exit 1
+fi
+
+cleanup() {
+  status=$?
+  rm -rf "${MYTMP}"
+  exit $status
+}
+
+# clean up if we get stopped by Crtl-C or forced logout or normal exit
+trap cleanup INT
+trap cleanup HUP
+trap cleanup 0
+
+set -e
+if [ "$1" = "--debug" ]
+then
+  set -x
+  shift
+fi
+
+if [ $# -lt 1 ]
+then
+  echo "check-files [--debug] -|filenames"
+  echo "e.g."
+  echo "  git diff | ./packaging/check-files -"
+  echo "or in .git/hooks/pre-commit:"
+  echo "  exec git diff --cached | ./packaging/check-files -"
+  exit 1
+fi
+
+if [ ! -x packaging/check-files ]
+then
+  echo "Must be run from base directory"
+  exit 1
+fi
+
+if [ "$1" = "-" ]
+then
+  from_cache=Y
+  f=""
+else
+  from_cache=
+  for f in "$@"
+  do
+    if [ ! -f "$f" ]
+    then
+      echo "$f: no such file"
+      exit 1
+    fi
+  done
+
+  git status --porcelain "$@" | grep "^?" | cut -c4- > $MYTMP/missing.lst
+
+  while read missing
+  do
+     git update-index --add --cacheinfo \
+          100644 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 $missing
+  done < $MYTMP/missing.lst
+
+  empty_tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+  git diff $empty_tree -- "$@" > $MYTMP/diff.full
+  f=$MYTMP/diff.full
+
+  while read missing
+  do
+     git update-index --force-remove $missing
+  done < $MYTMP/missing.lst
+fi
+
+> $MYTMP/diff.lst sed -e "/^+++ b/{p;s:^+++ b/::;w $MYTMP/files.lst" -e "d;}" $f
+
+#cat $MYTMP/diff.lst
+#cat $MYTMP/files.lst
+
+dirname="${0%/*}"
+if [ "$dirname" = "$0" ]; then dirname="."; fi
+
+for i in $dirname/*.functions $dirname/*/*.functions
+do
+  if [ -f "$i" ]
+  then
+    source $i
+    echo $i | sed -e 's:.*/::' -e 's/\.functions$//' -e 's/\./_/g' >> $MYTMP/fns
+  fi
+done
+
+status=0
+while read fn
+do
+  "${fn}_check_init" $filename || status=1
+done < $MYTMP/fns
+
+while read filename
+do
+  #echo Checking $filename
+  while read fn
+  do
+    if [ $status -eq 0 ]
+    then
+      "${fn}_check_file" $filename || status=1
+    fi
+  done < $MYTMP/fns
+done < $MYTMP/files.lst
+
+if [ $status -eq 0 ]
+then
+  while read fn
+  do
+    "${fn}_check_fin" $filename || status=1
+  done < $MYTMP/fns
+fi
+
+exit $status
