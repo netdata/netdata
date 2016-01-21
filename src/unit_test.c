@@ -572,6 +572,39 @@ struct test test9 = {
 };
 
 // --------------------------------------------------------------------------------------------------------------------
+// test10
+
+struct feed_values test10_feed[] = {
+		{ 500000,  1000 },
+		{ 600000,  1000 +  600 },
+		{ 200000,  1600 +  200 },
+		{ 1000000, 1800 + 1000 },
+		{ 200000,  2800 +  200 },
+		{ 2000000, 3000 + 2000 },
+		{ 600000,  5000 +  600 },
+		{ 400000,  5600 +  400 },
+		{ 900000,  6000 +  900 },
+		{ 1000000, 6900 + 1000 },
+};
+
+calculated_number test10_results[] = {
+		500, 1000, 1000, 1000, 1000, 1000, 1000
+};
+
+struct test test10 = {
+		"test10",			// name
+		"test incremental values updated in short and long durations",
+		1,					// update_every
+		1,					// multiplier
+		1,					// divisor
+		RRDDIM_INCREMENTAL,	// algorithm
+		10,					// feed entries
+		7,					// result entries
+		test10_feed,			// feed
+		test10_results		// results
+};
+
+// --------------------------------------------------------------------------------------------------------------------
 
 int run_test(struct test *test)
 {
@@ -656,6 +689,9 @@ int run_all_mockup_tests(void)
 		return 1;
 
 	if(run_test(&test9))
+		return 1;
+
+	if(run_test(&test10))
 		return 1;
 
 	return 0;
