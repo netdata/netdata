@@ -29,8 +29,8 @@
 
 	// http://stackoverflow.com/questions/984510/what-is-my-script-src-url
 	// http://stackoverflow.com/questions/6941533/get-protocol-domain-and-port-from-url
-	NETDATA._scriptSource = function(scripts) {
-		var script = null, base = null;
+	NETDATA._scriptSource = function() {
+		var script = null;
 
 		if(typeof document.currentScript !== 'undefined') {
 			script = document.currentScript;
@@ -45,25 +45,15 @@
 		else
 			script = script.getAttribute('src', -1);
 
-		var link = document.createElement('a');
-		link.setAttribute('href', script);
-
-		if(!link.protocol || !link.hostname) return null;
-
-		base = link.protocol;
-		if(base) base += "//";
-		base += link.hostname;
-
-		if(link.port) base += ":" + link.port;
-		base += "/";
-
-		return base;
+		return script;
 	};
 
 	if(typeof netdataServer !== 'undefined')
 		NETDATA.serverDefault = netdataServer;
-	else
-		NETDATA.serverDefault = NETDATA._scriptSource();
+	else {
+		var s = NETDATA._scriptSource();
+		NETDATA.serverDefault = s.replace(/\/dashboard.js(\?.*)*$/g, "");
+	}
 
 	if(NETDATA.serverDefault === null)
 		NETDATA.serverDefault = '';
@@ -2286,7 +2276,7 @@
 			this.data_points = this.points || Math.round(this.chartWidth() / this.chartPixelsPerPoint());
 
 			// build the data URL
-			this.data_url = this.chart.data_url;
+			this.data_url = this.host + this.chart.data_url;
 			this.data_url += "&format="  + this.library.format();
 			this.data_url += "&points="  + (this.data_points * points_multiplier).toString();
 			this.data_url += "&group="   + this.method;
@@ -2669,20 +2659,19 @@
 				if(typeof callback === 'function') callback();
 			}
 			else {
-				this.chart_url = this.host + "/api/v1/chart?chart=" + this.id;
+				this.chart_url = "/api/v1/chart?chart=" + this.id;
 
 				if(this.debug === true)
 					this.log('downloading ' + this.chart_url);
 
 				$.ajax( {
-					url:  this.chart_url,
+					url:  this.host + this.chart_url,
 					crossDomain: NETDATA.options.crossDomainAjax,
 					cache: false,
 					async: true
 				})
 				.done(function(chart) {
 					chart.url = that.chart_url;
-					chart.data_url = (that.host + chart.data_url);
 					that._defaultsFromDownloadedChart(chart);
 					NETDATA.chartRegistry.add(that.host, that.id, chart);
 				})
