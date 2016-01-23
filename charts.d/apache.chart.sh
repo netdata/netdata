@@ -222,7 +222,7 @@ VALUESEOF
 		then
 	cat <<VALUESEOF2
 BEGIN apache.connections $1
-SET connections = $[apache_key_connstotal]
+SET connections = $[apache_connstotal]
 END
 BEGIN apache.conns_async $1
 SET keepalive = $[apache_connsasynckeepalive]
