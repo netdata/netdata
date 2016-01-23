@@ -44,17 +44,17 @@ apache_detect() {
 	for x in "${@}"
 	do
 		case "${x}" in
-			'Accesses:') 			apache_key_accesses=$[i + 1] ;;
-			'kBytes:') 				apache_key_kbytes=$[i + 1] ;;
-			'ReqPerSec:') 			apache_key_reqpersec=$[i + 1] ;;
-			'BytesPerSec:')			apache_key_bytespersec=$[i + 1] ;;
-			'BytesPerReq:')			apache_key_bytesperreq=$[i + 1] ;;
-			'BusyWorkers:')			apache_key_busyworkers=$[i + 1] ;;
-			'IdleWorkers:')			apache_key_idleworkers=$[i + 1] ;;
-			'ConnsTotal:')			apache_key_connstotal=$[i + 1] ;;
-			'ConnsAsyncWriting:')	apache_key_connsasyncwriting=$[i + 1] ;;
-			'ConnsAsyncKeepAlive:') apache_key_connsasynckeepalive=$[i + 1] ;;
-			'ConnsAsyncClosing:')	apache_key_connsasyncclosing=$[i + 1] ;;
+			'Total Accesses') 		apache_key_accesses=$[i + 1] ;;
+			'Total kBytes') 		apache_key_kbytes=$[i + 1] ;;
+			'ReqPerSec') 			apache_key_reqpersec=$[i + 1] ;;
+			'BytesPerSec')			apache_key_bytespersec=$[i + 1] ;;
+			'BytesPerReq')			apache_key_bytesperreq=$[i + 1] ;;
+			'BusyWorkers')			apache_key_busyworkers=$[i + 1] ;;
+			'IdleWorkers')			apache_key_idleworkers=$[i + 1] ;;
+			'ConnsTotal')			apache_key_connstotal=$[i + 1] ;;
+			'ConnsAsyncWriting')	apache_key_connsasyncwriting=$[i + 1] ;;
+			'ConnsAsyncKeepAlive')	apache_key_connsasynckeepalive=$[i + 1] ;;
+			'ConnsAsyncClosing')	apache_key_connsasyncclosing=$[i + 1] ;;
 		esac
 
 		i=$[i + 1]
@@ -88,8 +88,12 @@ apache_detect() {
 }
 
 apache_get() {
-	apache_response=($(curl -s "${apache_url}"))
-	[ $? -ne 0 -o "${#apache_response[@]}" -eq 0 ] && return 1
+	local oIFS="${IFS}" ret
+	IFS=$':\n' apache_response=($(curl -s "${apache_url}"))
+	ret=$?
+	IFS="${oIFS}"
+
+	[ $ret -ne 0 -o "${#apache_response[@]}" -eq 0 ] && return 1
 
 	if [ ${apache_keys_detected} -eq 0 ]
 		then
@@ -125,10 +129,13 @@ apache_get() {
 		return 1
 	fi
 
-	apache_connstotal="${apache_response[${apache_key_connstotal}]}"
-	apache_connsasyncwriting="${apache_response[${apache_key_connsasyncwriting}]}"
-	apache_connsasynckeepalive="${apache_response[${apache_key_connsasynckeepalive}]}"
-	apache_connsasyncclosing="${apache_response[${apache_key_connsasyncclosing}]}"
+	if [ ${apache_has_conns} -eq 1 ]
+		then
+		apache_connstotal="${apache_response[${apache_key_connstotal}]}"
+		apache_connsasyncwriting="${apache_response[${apache_key_connsasyncwriting}]}"
+		apache_connsasynckeepalive="${apache_response[${apache_key_connsasynckeepalive}]}"
+		apache_connsasyncclosing="${apache_response[${apache_key_connsasyncclosing}]}"
+	fi
 
 	return 0
 }
