@@ -241,9 +241,10 @@ fixid() {
 # so that no fork is necessary
 # the multiplier must be a power of 10
 float2int() {
-	local f="$1" m="$2" a b l
+	local f m="$2" a b l v=($1)
+	f=${v[0]}
 
-	#echo >&2 "f='${f}', m='${m}'"
+	# echo >&2 "value='${1}' f='${f}', m='${m}'"
 
 	# the length of the multiplier - 1
 	l=$[ ${#m} - 1 ]
