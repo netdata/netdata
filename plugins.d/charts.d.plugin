@@ -235,6 +235,38 @@ fixid() {
 		tr "[A-Z]" "[a-z]"
 }
 
+# convert any floating point number
+# to integer, give a multiplier
+# the result is stored in ${FLOAT2INT_RESULT}
+# so that no fork is necessary
+float2int() {
+	local f="$1" m="$2" a b l
+
+	# echo >&2 "f='${f}', m='${m}'"
+
+	# split the floating point number
+	# in integer (a) and decimal (b)
+	a=${f/.*/}
+	b=${f/*./}
+
+	# the length of the multiplier
+	l=$[ ${#m} - 1 ]
+
+	# cut the decimal part if it is
+	# longer than the multiplier
+	[ ${#b} -gt ${l} ] && b=${b:0:${l}}
+	b=$[10#$b]
+
+	# prepend a zero to the integer
+	# part, if it is missing
+	[ -z "${a}" ] && a="0"
+	a=$[10#$a]
+
+	# store the result
+	FLOAT2INT_RESULT=$[ (a * m) + b ]
+	# echo >&2 "FLOAT2INT_RESULT='${FLOAT2INT_RESULT}'"
+}
+
 
 # -----------------------------------------------------------------------------
 # charts check functions
