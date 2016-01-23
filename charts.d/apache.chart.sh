@@ -21,8 +21,13 @@ apache_bytespersec=0
 apache_bytesperreq=0
 apache_busyworkers=0
 apache_idleworkers=0
+apache_connstotal=0
+apache_connsasyncwriting=0
+apache_connsasynckeepalive=0
+apache_connsasyncclosing=0
 
 apache_keys_detected=0
+apache_has_conns=0
 apache_key_accesses=
 apache_key_kbytes=
 apache_key_reqpersec=
@@ -70,6 +75,15 @@ apache_detect() {
 		return 1
 	fi
 
+	if [ ! -z "${apache_key_connstotal}" \
+		-a ! -z "${apache_key_connsasyncwriting}" \
+		-a ! -z "${apache_key_connsasynckeepalive}" \
+		-a ! -z "${apache_key_connsasyncclosing}" \
+		]
+		then
+		apache_has_conns=1
+	fi
+
 	return 0
 }
 
@@ -111,6 +125,11 @@ apache_get() {
 		return 1
 	fi
 
+	apache_connstotal="${apache_response[${apache_key_connstotal}]}"
+	apache_connsasyncwriting="${apache_response[${apache_key_connsasyncwriting}]}"
+	apache_connsasynckeepalive="${apache_response[${apache_key_connsasynckeepalive}]}"
+	apache_connsasyncclosing="${apache_response[${apache_key_connsasyncclosing}]}"
+
 	return 0
 }
 
@@ -145,9 +164,21 @@ CHART apache.bytespersec '' "apache Lifetime Avg. Bandwidth/s" "kilobits/s" apac
 DIMENSION sent '' absolute 8 $[apache_decimal_detail * 1000]
 CHART apache.requests '' "apache Requests" "requests/s" apache apache line 16001 $apache_update_every
 DIMENSION requests '' incremental 1 1
-CHART apache.net '' "apache Bandwidth" "kilobits/s" apache apache area 16002 $apache_update_every
+CHART apache.net '' "apache Bandwidth" "kilobits/s" apache apache area 16003 $apache_update_every
 DIMENSION sent '' incremental 8 1
 EOF
+
+	if [ ${apache_has_conns} -eq 1 ]
+		then
+		cat <<EOF2
+CHART apache.connections '' "apache Connections" "connections" apache apache line 16002 $apache_update_every
+DIMENSION connections '' absolute 1 1
+CHART apache.conns_async '' "apache Async Connections" "connections" apache apache stacked 16004 $apache_update_every
+DIMENSION keepalive '' absolute 1 1
+DIMENSION closing '' absolute 1 1
+DIMENSION writing '' absolute 1 1
+EOF2
+	fi
 
 	return 0
 }
@@ -186,6 +217,20 @@ SET idle = $[apache_idleworkers]
 SET busy = $[apache_busyworkers]
 END
 VALUESEOF
+
+	if [ ${apache_has_conns} -eq 1 ]
+		then
+	cat <<VALUESEOF2
+BEGIN apache.connections $1
+SET connections = $[apache_key_connstotal]
+END
+BEGIN apache.conns_async $1
+SET keepalive = $[apache_connsasynckeepalive]
+SET closing = $[apache_connsasyncwriting]
+SET writing = $[apache_connsasyncwriting]
+END
+VALUESEOF2
+	fi
 
 	return 0
 }
