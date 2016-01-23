@@ -239,32 +239,44 @@ fixid() {
 # to integer, give a multiplier
 # the result is stored in ${FLOAT2INT_RESULT}
 # so that no fork is necessary
+# the multiplier must be a power of 10
 float2int() {
 	local f="$1" m="$2" a b l
 
-	# echo >&2 "f='${f}', m='${m}'"
+	#echo >&2 "f='${f}', m='${m}'"
+
+	# the length of the multiplier - 1
+	l=$[ ${#m} - 1 ]
 
 	# split the floating point number
 	# in integer (a) and decimal (b)
 	a=${f/.*/}
 	b=${f/*./}
 
-	# the length of the multiplier
-	l=$[ ${#m} - 1 ]
-
-	# cut the decimal part if it is
-	# longer than the multiplier
-	[ ${#b} -gt ${l} ] && b=${b:0:${l}}
-	b=$[10#$b]
-
-	# prepend a zero to the integer
-	# part, if it is missing
+	# prepend a zero to the integer part
+	# if it is missing
 	[ -z "${a}" ] && a="0"
+	# strip leading zeros - base 10 convertion
 	a=$[10#$a]
+
+	# check the length of the decimal part
+	# against the length of the multiplier
+	if [ ${#b} -gt ${l} ]
+		then
+		# too many digits - take the most significant
+		b=${b:0:${l}}
+	elif [ ${#b} -lt ${l} ]
+		then
+		# too few digits - pad with zero on the right
+		local z="00000000000000000000000" r=$[l - ${#b}]
+		b="${b}${z:0:${r}}"
+	fi
+	# strip leading zeros - base 10 convertion
+	b=$[10#$b]
 
 	# store the result
 	FLOAT2INT_RESULT=$[ (a * m) + b ]
-	# echo >&2 "FLOAT2INT_RESULT='${FLOAT2INT_RESULT}'"
+	#echo >&2 "FLOAT2INT_RESULT='${FLOAT2INT_RESULT}'"
 }
 
 
