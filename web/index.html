@@ -1401,10 +1401,26 @@ function prepareScreen(data) {
 		else if(t.name === 'apache') {
 			var head = '<div style="width: 100%; text-align: center;">';
 			var all = '';
+
 			$.each(t.charts, function(x, f) {
 				var c = 'null';
+				var h = options.chartsHeight;
 				switch(f.id) {
-					case 'apache.requests'   :
+					case 'apache.connections':
+							c = NETDATA.colors[4];
+							head += '<div data-netdata="' + f.id + '"'
+							+ ' data-chart-library="gauge"'
+							+ ' data-title="Connections"'
+							+ ' data-gauge-adjust="width"'
+							+ ' data-width="12%"'
+							+ ' data-before="0"'
+							+ ' data-after="-' + duration.toString() + '"'
+							+ ' data-points="' + duration.toString() + '"'
+							+ ' data-colors="' + c + '"'
+							+ ' role="application"></div>';
+							break;
+
+					case 'apache.requests':
 							head += '<div data-netdata="' + f.id + '"'
 							+ ' data-chart-library="gauge"'
 							+ ' data-title="Requests"'
@@ -1450,12 +1466,65 @@ function prepareScreen(data) {
 
 					case 'apache.bytesperreq':
 							c = NETDATA.colors[3];
+							h = Math.round(h / 2);
+							break;
+
+					default:
+							h = Math.round(h / 2);
 							break;
 				}
 
 				all += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
 					+ ' data-width="' + pcent_width.toString() + '%"'
-					+ ' data-height="' + options.chartsHeight.toString() + 'px"'
+					+ ' data-height="' + h.toString() + 'px"'
+					+ ' data-before="0"'
+					+ ' data-after="-' + duration.toString() + '"'
+					+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
+					+ ' data-colors="' + c + '"'
+					+ ' role="application"></div>';
+			});
+			head += '</div>';
+			html += head + all;
+		}
+		else if(t.name === 'nginx') {
+			var head = '<div style="width: 100%; text-align: center;">';
+			var all = '';
+			$.each(t.charts, function(x, f) {
+				var c = 'null';
+				var h = options.chartsHeight;
+
+				switch(f.id) {
+					case 'nginx.connections':
+							c = NETDATA.colors[4];
+							head += '<div data-netdata="' + f.id + '"'
+							+ ' data-chart-library="gauge"'
+							+ ' data-title="Connections"'
+							+ ' data-gauge-adjust="width"'
+							+ ' data-width="12%"'
+							+ ' data-before="0"'
+							+ ' data-after="-' + duration.toString() + '"'
+							+ ' data-points="' + duration.toString() + '"'
+							+ ' data-colors="' + c + '"'
+							+ ' role="application"></div>';
+							break;
+
+					case 'nginx.requests':
+							head += '<div data-netdata="' + f.id + '"'
+							+ ' data-chart-library="gauge"'
+							+ ' data-title="Requests"'
+							+ ' data-gauge-adjust="width"'
+							+ ' data-width="12%"'
+							+ ' data-before="0"'
+							+ ' data-after="-' + duration.toString() + '"'
+							+ ' data-points="' + duration.toString() + '"'
+							+ ' data-colors="' + NETDATA.colors[0] + '"'
+							+ ' role="application"></div>';
+							break;
+				}
+
+				all += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
+					+ ' data-width="' + pcent_width.toString() + '%"'
+					+ ' data-height="' + h.toString() + 'px"'
 					+ ' data-before="0"'
 					+ ' data-after="-' + duration.toString() + '"'
 					+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
