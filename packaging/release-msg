@@ -1,0 +1,59 @@
+#!/bin/bash
+
+#
+# release-msg
+#
+scriptname=release-msg
+if ! MYTMP=$(mktemp -d -t $scriptname-XXXXXX)
+then
+            echo >&2
+            echo >&2
+            echo >&2 "Cannot create temporary directory."
+            echo >&2
+            exit 1
+fi
+
+cleanup() {
+  status=$?
+  rm -rf "${MYTMP}"
+  exit $status
+}
+
+# clean up if we get stopped by Crtl-C or forced logout or normal exit
+trap cleanup INT
+trap cleanup HUP
+trap cleanup 0
+
+set -e
+if [ "$1" = "--debug" ]
+then
+  set -x
+  shift
+fi
+
+if [ $# -lt 1 ]
+then
+  echo "Use only from .git/hooks/prepare-commit-msg"
+  exit 1
+fi
+
+if [ ! -x packaging/release-msg ]
+then
+  echo "Must be run from base directory"
+  exit 1
+fi
+
+dirname="${0%/*}"
+if [ "$dirname" = "$0" ]; then dirname="."; fi
+source $dirname/packaging.functions
+
+mkdir -p $MYTMP/files
+git show :configure.ac > $MYTMP/files/configure.ac
+version=`get_configure_ac_version`
+case "$(match_version $version)" in
+  prerelease|candidate|release)
+    sed -i -e "1s/.*/Prepare release $version/" "$1"
+  ;;
+esac
+
+exit 0

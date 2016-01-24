@@ -1,7 +1,7 @@
 #
 # Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
 #
-AUTOMAKE_OPTIONS=foreign dist-bzip2 1.10
+AUTOMAKE_OPTIONS=foreign dist-bzip2 dist-xz 1.10
 ACLOCAL_AMFLAGS = -I m4
 
 MAINTAINERCLEANFILES= \
@@ -18,9 +18,12 @@ MAINTAINERCLEANFILES= \
 
 EXTRA_DIST = \
 	.gitignore \
+	autogen.sh \
 	README.md \
 	LICENSE.md \
+	autogen.sh \
 	netdata-9999.ebuild \
+	tests/stress.sh \
 	$(NULL)
 
 SUBDIRS = \

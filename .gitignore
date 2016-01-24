@@ -25,3 +25,5 @@ stamp-h1
 netdata
 apps.plugin
 netdata.spec
+
+*.tar.*

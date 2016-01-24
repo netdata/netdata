@@ -1,0 +1,62 @@
+#!/bin/sh
+
+# When provided with a git repo, which has been used to produce a
+# distribution tar.gz (with make dist) and the resultant tar-file,
+# lists files which appear in one or the other only, to help check
+# for missing EXTRA_DIST entries in Makefile.am files.
+
+scriptname=tar-compare
+if ! MYTMP=$(mktemp -d -t $scriptname-XXXXXX)
+then
+            echo >&2
+            echo >&2
+            echo >&2 "Cannot create temporary directory."
+            echo >&2
+            exit 1
+fi
+
+cleanup() {
+  status=$?
+  rm -rf "${MYTMP}"
+  exit $status
+}
+
+# clean up if we get stopped by Crtl-C or forced logout or normal exit
+trap cleanup INT
+trap cleanup HUP
+trap cleanup 0
+
+if [ $# -ne 2 ]
+then
+  echo "tar-compare git-dir tar-gz-file"
+  exit 1
+fi
+
+mkdir $MYTMP/unpack
+tar xfzC "$2" $MYTMP/unpack
+diff -r "$1" $MYTMP/unpack/* | grep "^Only" | sed \
+	-e '/: autom4te\.cache$/d' \
+	-e '/: \.deps$/d' \
+	-e '/: \.git$/d' \
+	-e '/: \.gitattributes$/d' \
+	-e '/: \.gitignore$/d' \
+	-e '/: config\.log$/d' \
+	-e '/: config\.status$/d' \
+	-e '/: config\.h.*$/d' \
+	-e '/: Makefile$/d' \
+	-e '/: hooks$/d' \
+	-e '/: packaging$/d' \
+	-e '/: stamp-h1$/d' \
+	-e '/: README\.md$/d' \
+	-e '/: tmp-anchor-links$/d' \
+	-e '/: tmp-manproc$/d' \
+	-e '/: .*\.tar\.\(gz\|bz2\|xz\)$/d' \
+	-e '/: unittest$/d' \
+	-e '/: iprange$/d' \
+	-e '/: .*\.o$/d' \
+	-e '/sbin: \(firehol\|fireqos\|link-balancer\)$/d' \
+	-e '/sbin: \(update-ipsets\|vnetbuild\|commands.sed\)$/d' > $MYTMP/out
+
+cat $MYTMP/out
+test -s $MYTMP/out && exit 1
+exit 0

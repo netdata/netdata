@@ -1,0 +1,149 @@
+#!/bin/bash
+
+#
+# update-tags
+#
+scriptname=update-tags
+if ! MYTMP=$(mktemp -d -t $scriptname-XXXXXX)
+then
+            echo >&2
+            echo >&2
+            echo >&2 "Cannot create temporary directory."
+            echo >&2
+            exit 1
+fi
+
+cleanup() {
+  status=$?
+  if [ $status -ne 0 ]
+  then
+    echo "FAILED."
+    if [ "$TAGVER" ]
+    then
+      git tag -d "$TAGVER"
+    fi
+    echo "To re-run manually:"
+    echo "  git diff HEAD^ | ./packaging/update-tags -"
+    echo "To undo commit:"
+    echo "  git reset HEAD^"
+  fi
+  rm -rf "${MYTMP}"
+  exit $status
+}
+
+# clean up if we get stopped by Crtl-C or forced logout or normal exit
+trap cleanup INT
+trap cleanup HUP
+trap cleanup 0
+
+set -e
+if [ "$1" = "--debug" ]
+then
+  set -x
+  shift
+fi
+
+if [ $# -lt 1 ]
+then
+  echo "Use only from .git/hooks/post-commit"
+  exit 1
+fi
+
+if [ ! -x packaging/update-tags ]
+then
+  echo "Must be run from base directory"
+  exit 1
+fi
+
+if [ "$1" = "-" ]
+then
+  from_cache=Y
+  f=""
+else
+  from_cache=
+  for f in "$@"
+  do
+    if [ ! -f "$f" ]
+    then
+      echo "$f: no such file"
+      exit 1
+    fi
+  done
+
+  git status --porcelain "$@" | grep "^?" | cut -c4- > $MYTMP/missing.lst
+
+  while read missing
+  do
+     git update-index --add --cacheinfo \
+          100644 e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 $missing
+  done < $MYTMP/missing.lst
+
+  empty_tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+  git diff $empty_tree -- "$@" > $MYTMP/diff.full
+  f=$MYTMP/diff.full
+
+  while read missing
+  do
+     git update-index --force-remove $missing
+  done < $MYTMP/missing.lst
+fi
+
+> $MYTMP/diff.lst sed -e "/^+++ b/{p;s:^+++ b/::;w $MYTMP/files.lst" -e "d;}" $f
+
+#cat $MYTMP/diff.lst
+#cat $MYTMP/files.lst
+
+dirname="${0%/*}"
+if [ "$dirname" = "$0" ]; then dirname="."; fi
+source $dirname/packaging.functions
+
+status=0
+while read filename
+do
+  #echo Checking $filename
+  case $filename in
+    configure.ac|ChangeLog)
+      mkdir -p $MYTMP/files
+      git show HEAD:configure.ac > $MYTMP/files/configure.ac
+      version=`get_configure_ac_version`
+      case "$(match_version $version)" in
+         prerelease|candidate|release)
+           do_release=Y
+         ;;
+      esac
+    ;;
+    *)
+      #echo "No checks found for $filename"
+      :
+    ;;
+  esac
+done < $MYTMP/files.lst
+
+if [ "$do_release" ]
+then
+  echo "Tagging new release with:"
+  echo "   git tag -s \"v$version\" -m \"Release version $version\""
+  git tag -s "v$version" -m "Release version $version"
+  TAGVER="v$version"
+
+  splitver confmaj confmin conffix confsfx "$version"
+  if [ ! "$confsfx" ]
+  then
+    echo "Incrementing version in configure.ac:"
+    conffix=`expr $conffix + 1`
+    sed -i -e "s/define(\[VERSION_FIX\], \[.*])/define([VERSION_FIX], [$conffix])/" configure.ac
+  fi
+
+  echo "Resetting suffix in configure.ac:"
+  sed -i -e 's/define(\[VERSION_SUFFIX\], \[.*])/define([VERSION_SUFFIX], [_master])/' configure.ac
+  sed -i -e 's:^PACKAGE_RPM_RELEASE=.*:PACKAGE_RPM_RELEASE="0.0.$(echo VERSION_SUFFIX | sed s/^_//)":' configure.ac
+
+  echo "Committing new configure.ac:"
+  git commit --no-verify -m "Post release $version" -- configure.ac
+  echo ""
+  echo "Verify, then:"
+  echo "  git push origin"
+  echo "  git push origin tag $TAGVER"
+fi
+
+exit $status
