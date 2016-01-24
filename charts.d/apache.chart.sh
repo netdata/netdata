@@ -35,6 +35,7 @@ apache_key_bytespersec=
 apache_key_bytesperreq=
 apache_key_busyworkers=
 apache_key_idleworkers=
+apache_key_scoreboard=
 apache_key_connstotal=
 apache_key_connsasyncwriting=
 apache_key_connsasynckeepalive=
@@ -50,11 +51,12 @@ apache_detect() {
 			'BytesPerSec')			apache_key_bytespersec=$[i + 1] ;;
 			'BytesPerReq')			apache_key_bytesperreq=$[i + 1] ;;
 			'BusyWorkers')			apache_key_busyworkers=$[i + 1] ;;
-			'IdleWorkers')			apache_key_idleworkers=$[i + 1] ;;
+			'IdleWorkers')			apache_key_idleworkers=$[i + 1];;
 			'ConnsTotal')			apache_key_connstotal=$[i + 1] ;;
 			'ConnsAsyncWriting')	apache_key_connsasyncwriting=$[i + 1] ;;
 			'ConnsAsyncKeepAlive')	apache_key_connsasynckeepalive=$[i + 1] ;;
 			'ConnsAsyncClosing')	apache_key_connsasyncclosing=$[i + 1] ;;
+			'Scoreboard')			apache_key_scoreboard=$[i] ;;
 		esac
 
 		i=$[i + 1]
@@ -69,6 +71,7 @@ apache_detect() {
 		-o -z "${apache_key_bytesperreq}" \
 		-o -z "${apache_key_busyworkers}" \
 		-o -z "${apache_key_idleworkers}" \
+		-o -z "${apache_key_scoreboard}" \
 		]
 		then
 		echo >&2 "apache: Invalid response or missing keys from apache server: ${*}"
@@ -95,7 +98,9 @@ apache_get() {
 
 	[ $ret -ne 0 -o "${#apache_response[@]}" -eq 0 ] && return 1
 
-	if [ ${apache_keys_detected} -eq 0 ]
+	# the last line on the apache output is "Scoreboard"
+	# we use this label to detect that the output has a new word count
+	if [ ${apache_keys_detected} -eq 0 -o "${apache_response[${apache_key_scoreboard}]}" != "Scoreboard" ]
 		then
 		apache_detect "${apache_response[@]}" || return 1
 		apache_keys_detected=1
