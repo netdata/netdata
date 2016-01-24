@@ -710,6 +710,7 @@ function prepareScreen(data) {
 	options.data = data;
 	options.hostname = data.hostname;
 	document.getElementById('hostname').innerHTML = options.hostname;
+	document.getElementById('hostname').href = NETDATA.serverDefault;
 	document.title = options.hostname + ' dashboard';
 	var charts = data.charts;
 
