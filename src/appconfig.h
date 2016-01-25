@@ -22,6 +22,7 @@ extern int config_get_boolean(const char *section, const char *name, int value);
 extern int config_get_boolean_ondemand(const char *section, const char *name, int value);
 
 extern const char *config_set(const char *section, const char *name, const char *value);
+extern const char *config_set_default(const char *section, const char *name, const char *value);
 extern long long config_set_number(const char *section, const char *name, long long value);
 extern int config_set_boolean(const char *section, const char *name, int value);
 

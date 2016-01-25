@@ -340,6 +340,34 @@ int config_get_boolean_ondemand(const char *section, const char *name, int value
 	return value;
 }
 
+const char *config_set_default(const char *section, const char *name, const char *value)
+{
+	struct config_value *cv;
+
+	debug(D_CONFIG, "request to set config in section '%s', name '%s', value '%s'", section, name, value);
+
+	struct config *co = config_find_section(section);
+	if(!co) return config_set(section, name, value);
+
+	cv = config_value_index_find(co, name, 0);
+	if(!cv) return config_set(section, name, value);
+
+	cv->flags |= CONFIG_VALUE_USED;
+
+	if(cv->flags & CONFIG_VALUE_LOADED)
+		return cv->value;
+
+	if(strcmp(cv->value, value) != 0) {
+		cv->flags |= CONFIG_VALUE_CHANGED;
+
+		free(cv->value);
+		cv->value = strdup(value);
+		if(!cv->value) fatal("Cannot allocate config.value");
+	}
+
+	return cv->value;
+}
+
 const char *config_set(const char *section, const char *name, const char *value)
 {
 	struct config_value *cv;
@@ -353,11 +381,13 @@ const char *config_set(const char *section, const char *name, const char *value)
 	if(!cv) cv = config_value_create(co, name, value);
 	cv->flags |= CONFIG_VALUE_USED;
 
-	if(strcmp(cv->value, value) != 0) cv->flags |= CONFIG_VALUE_CHANGED;
+	if(strcmp(cv->value, value) != 0) {
+		cv->flags |= CONFIG_VALUE_CHANGED;
 
-	free(cv->value);
-	cv->value = strdup(value);
-	if(!cv->value) fatal("Cannot allocate config.value");
+		free(cv->value);
+		cv->value = strdup(value);
+		if(!cv->value) fatal("Cannot allocate config.value");
+	}
 
 	return value;
 }

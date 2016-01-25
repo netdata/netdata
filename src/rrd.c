@@ -592,7 +592,7 @@ void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name)
 
 	char varname[CONFIG_MAX_NAME + 1];
 	snprintf(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
-	config_get(st->id, varname, name);
+	config_set_default(st->id, varname, name);
 }
 
 void rrddim_free(RRDSET *st, RRDDIM *rd)
