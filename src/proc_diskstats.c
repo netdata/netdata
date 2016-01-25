@@ -334,7 +334,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 		if(ddo_qops) {
 			st = rrdset_find_bytype("disk_qops", disk);
 			if(!st) {
-				st = rrdset_create("disk_qops", disk, NULL, disk, "Disk Queued I/O Operations", "operations", 2002, update_every, RRDSET_TYPE_LINE);
+				st = rrdset_create("disk_qops", disk, NULL, disk, "Disk Current I/O Operations", "operations", 2002, update_every, RRDSET_TYPE_LINE);
 				st->isdetail = 1;
 
 				rrddim_add(st, "operations", NULL, 1, 1, RRDDIM_ABSOLUTE);

@@ -1,7 +1,7 @@
 netdata
 =======
 
-**Non disruptive, real-time monitoring and visualization, in the greatest possible detail**!
+**Real-time performance monitoring, in the greatest possible detail**!
 
 **netdata** tries to visualize the **truth of now**, in its **greatest detail**, so that you can get insights of what is happening now and what just happened, on your systems and applications.
 

@@ -9,6 +9,11 @@ typedef long double calculated_number;
 typedef long long collected_number;
 #define COLLECTED_NUMBER_FORMAT "%lld"
 
+/*
+typedef long double collected_number;
+#define COLLECTED_NUMBER_FORMAT "%0.7Lf"
+*/
+
 typedef int32_t storage_number;
 typedef uint32_t ustorage_number;
 #define STORAGE_NUMBER_FORMAT "%d"
