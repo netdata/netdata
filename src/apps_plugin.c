@@ -1975,7 +1975,8 @@ int main(int argc, char **argv)
 		usleep((__useconds_t) susec);
 		bcopy(&now, &last, sizeof(struct timeval));
 
+		// restart once per day (14400 seconds)
 		current_t = time(NULL);
-		if(current_t - started_t > 3600) exit(0);
+		if(current_t - started_t > 14400) exit(0);
 	}
 }
