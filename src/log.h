@@ -52,7 +52,7 @@ extern void log_date(FILE *out);
 extern void debug_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... );
 extern void info_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... );
 extern void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... );
-extern void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... );
+extern void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) __attribute__ ((noreturn));
 extern void log_access( const char *fmt, ... );
 
 #endif /* NETDATA_LOG_H */
