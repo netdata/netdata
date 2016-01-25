@@ -84,7 +84,7 @@ time_divisor=50
 # number of seconds to run without restart
 # after this time, charts.d.plugin will exit
 # netdata will restart it
-restart_timeout=1800
+restart_timeout=$[3600 * 4]
 
 # check if the charts.d plugins are using global variables
 # they should not.
