@@ -970,6 +970,8 @@
 
 		this.dimensions_visibility = new dimensionsVisibility(this);
 
+		this._updating = false;
+
 		// ============================================================================================================
 		// PRIVATE FUNCTIONS
 
@@ -1749,7 +1751,7 @@
 			// we do it, but we adjust to minimum size and return false
 			// when the wanted size is below the current and the minimum
 			// and we zoom
-			if(this.current === this.zoom && wanted_duration < current_duration && wanted_duration < min_duration) {
+			if(wanted_duration < current_duration && wanted_duration < min_duration) {
 				if(this.debug === true)
 					this.log(logme + 'too small: min_duration: ' + (min_duration / 1000).toString() + ', wanted: ' + (wanted_duration / 1000).toString());
 
@@ -1758,15 +1760,16 @@
 				var dt = (min_duration - wanted_duration) / 2;
 				before += dt;
 				after -= dt;
+				wanted_duration = before - after;
 				ret = false;
 			}
 
 			var tolerance = this.data_update_every * 2;
 			var movement = Math.abs(before - this.view_before);
 
-			if(Math.abs(current_duration - wanted_duration) <= tolerance && movement <= tolerance) {
+			if(Math.abs(current_duration - wanted_duration) <= tolerance && movement <= tolerance && ret === true) {
 				if(this.debug === true)
-					this.log(logme + 'REJECTING UPDATE: current duration: ' + (current_duration / 1000).toString() + ', wanted duration: ' + (wanted_duration / 1000).toString() + ', duration diff: ' + (Math.round(Math.abs(current_duration - wanted_duration) / 1000)).toString() + ', movement: ' + (movement / 1000).toString() + ', tolerance: ' + (tolerance / 1000).toString() + ', returning: ' + false);
+					this.log(logme + 'REJECTING UPDATE: current/min duration: ' + (current_duration / 1000).toString() + '/' + (this.fixed_min_duration / 1000).toString() + ', wanted duration: ' + (wanted_duration / 1000).toString() + ', duration diff: ' + (Math.round(Math.abs(current_duration - wanted_duration) / 1000)).toString() + ', movement: ' + (movement / 1000).toString() + ', tolerance: ' + (tolerance / 1000).toString() + ', returning: ' + false);
 				return false;
 			}
 
@@ -1776,7 +1779,7 @@
 			}
 
 			if(this.debug === true)
-				this.log(logme + 'ACCEPTING UPDATE: current duration: ' + (current_duration / 1000).toString() + ', wanted duration: ' + (wanted_duration / 1000).toString() + ', duration diff: ' + (Math.round(Math.abs(current_duration - wanted_duration) / 1000)).toString() + ', movement: ' + (movement / 1000).toString() + ', tolerance: ' + (tolerance / 1000).toString() + ', returning: ' + ret);
+				this.log(logme + 'ACCEPTING UPDATE: current/min duration: ' + (current_duration / 1000).toString() + '/' + (this.fixed_min_duration / 1000).toString() + ', wanted duration: ' + (wanted_duration / 1000).toString() + ', duration diff: ' + (Math.round(Math.abs(current_duration - wanted_duration) / 1000)).toString() + ', movement: ' + (movement / 1000).toString() + ', tolerance: ' + (tolerance / 1000).toString() + ', returning: ' + ret);
 
 			this.current.force_update_at = new Date().getTime() + NETDATA.options.current.pan_and_zoom_delay;
 			this.current.force_after_ms = after;
@@ -2311,6 +2314,8 @@
 			if(this.debug === true)
 				this.log('updateChartWithData() called.');
 
+			this._updating = false;
+
 			// this may force the chart to be re-created
 			resizeChart();
 
@@ -2422,6 +2427,14 @@
 			if(this.debug === true)
 				this.log('updateChart() called.');
 
+			if(this._updating === true) {
+				if(this.debug === true)
+					this.log('I am already updating...');
+
+				if(typeof callback === 'function') callback();
+				return false;
+			}
+
 			// due to late initialization of charts and libraries
 			// we need to check this too
 			if(this.enabled === false) {
@@ -2460,6 +2473,8 @@
 			if(this.debug === true)
 				this.log('updating from ' + this.data_url);
 
+			this._updating = true;
+
 			this.xhr = $.ajax( {
 				url: this.data_url,
 				crossDomain: NETDATA.options.crossDomainAjax,
@@ -2476,6 +2491,7 @@
 				error('data download failed for url: ' + that.data_url);
 			})
 			.always(function() {
+				this._updating = false;
 				if(typeof callback === 'function') callback();
 			});
 
@@ -3348,9 +3364,18 @@
 				labels: data.result.labels,
 				labelsDivWidth: state.chartWidth() - 70,
 				visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names)
-		}
+		};
 
-		if(state.current.name !== 'auto') {
+		if(state.dygraph_force_zoom === true) {
+			if(NETDATA.options.debug.dygraph === true || state.debug === true)
+				state.log('dygraphChartUpdate() forced zoom update');
+
+			options.dateWindow = (state.requested_padding !== null)?[ state.view_after, state.view_before ]:null;
+			options.valueRange = null;
+			options.isZoomedIgnoreProgrammaticZoom = true;
+			state.dygraph_force_zoom = false;
+		}
+		else if(state.current.name !== 'auto') {
 			if(NETDATA.options.debug.dygraph === true || state.debug === true)
 				state.log('dygraphChartUpdate() loose update');
 		}
@@ -3358,8 +3383,9 @@
 			if(NETDATA.options.debug.dygraph === true || state.debug === true)
 				state.log('dygraphChartUpdate() strict update');
 
-			options.dateWindow = null;
+			options.dateWindow = (state.requested_padding !== null)?[ state.view_after, state.view_before ]:null;
 			options.valueRange = null;
+			options.isZoomedIgnoreProgrammaticZoom = true;
 		}
 
 		if(state.dygraph_smooth_eligible === true) {
@@ -3371,6 +3397,7 @@
 		}
 
 		dygraph.updateOptions(options);
+
 		state.dygraph_last_rendered = new Date().getTime();
 		return true;
 	};
@@ -3516,13 +3543,15 @@
 				return '';
 			},
 			drawCallback: function(dygraph, is_initial) {
-				if(state.current.name !== 'auto') {
-					if(NETDATA.options.debug.dygraph === true)
-						state.log('dygraphDrawCallback()');
+				if(state.current.name !== 'auto' && state.dygraph_user_action === true) {
+					state.dygraph_user_action = false;
 
 					var x_range = dygraph.xAxisRange();
 					var after = Math.round(x_range[0]);
 					var before = Math.round(x_range[1]);
+
+					if(NETDATA.options.debug.dygraph === true)
+						state.log('dygraphDrawCallback(dygraph, ' + is_initial + '): ' + (after / 1000).toString() + ' - ' + (before / 1000).toString());
 
 					if(before <= state.netdata_last && after >= state.netdata_first)
 						state.updateChartPanOrZoom(after, before);
@@ -3534,14 +3563,12 @@
 
 				state.globalSelectionSyncStop();
 				state.globalSelectionSyncDelay();
+				state.setMode('zoom');
 
-				if(state.updateChartPanOrZoom(minDate, maxDate) === false) {
-					// we should not zoom that much
-					state.dygraph_instance.updateOptions({
-						dateWindow: null,
-						valueRange: null
-					});
-				}
+				// refresh it to the greatest possible zoom level
+				state.dygraph_user_action = true;
+				state.dygraph_force_zoom = true;
+				state.updateChartPanOrZoom(minDate, maxDate);
 			},
 			highlightCallback: function(event, x, points, row, seriesName) {
 				if(NETDATA.options.debug.dygraph === true || state.debug === true)
@@ -3574,6 +3601,7 @@
 					if(NETDATA.options.debug.dygraph === true || state.debug === true)
 						state.log('interactionModel.mousedown()');
 
+					state.dygraph_user_action = true;
 					state.globalSelectionSyncStop();
 
 					if(NETDATA.options.debug.dygraph === true)
@@ -3614,12 +3642,14 @@
 						state.log('interactionModel.mousemove()');
 
 					if(context.isPanning) {
+						state.dygraph_user_action = true;
 						state.globalSelectionSyncStop();
 						state.globalSelectionSyncDelay();
 						state.setMode('pan');
 						Dygraph.movePan(event, dygraph, context);
 					}
 					else if(context.isZooming) {
+						state.dygraph_user_action = true;
 						state.globalSelectionSyncStop();
 						state.globalSelectionSyncDelay();
 						state.setMode('zoom');
@@ -3631,10 +3661,12 @@
 						state.log('interactionModel.mouseup()');
 
 					if (context.isPanning) {
+						state.dygraph_user_action = true;
 						state.globalSelectionSyncDelay();
 						Dygraph.endPan(event, dygraph, context);
 					}
 					else if (context.isZooming) {
+						state.dygraph_user_action = true;
 						state.globalSelectionSyncDelay();
 						Dygraph.endZoom(event, dygraph, context);
 					}
@@ -3714,6 +3746,8 @@
 					}
 
 					if(event.altKey || event.shiftKey) {
+						state.dygraph_user_action = true;
+
 						state.globalSelectionSyncStop();
 						state.globalSelectionSyncDelay();
 
@@ -3757,6 +3791,7 @@
 					if(NETDATA.options.debug.dygraph === true || state.debug === true)
 						state.log('interactionModel.touchstart()');
 
+					state.dygraph_user_action = true;
 					state.setMode('zoom');
 					state.pauseChart();
 
@@ -3778,6 +3813,7 @@
 					if(NETDATA.options.debug.dygraph === true || state.debug === true)
 						state.log('interactionModel.touchmove()');
 
+					state.dygraph_user_action = true;
 					Dygraph.defaultInteractionModel.touchmove(event, dygraph, context);
 
 					state.dygraph_last_touch_move = new Date().getTime();
@@ -3786,6 +3822,7 @@
 					if(NETDATA.options.debug.dygraph === true || state.debug === true)
 						state.log('interactionModel.touchend()');
 
+					state.dygraph_user_action = true;
 					Dygraph.defaultInteractionModel.touchend(event, dygraph, context);
 
 					// if it didn't move, it is a selection
@@ -3837,6 +3874,8 @@
 		state.dygraph_instance = new Dygraph(state.element_chart,
 			data.result.data, state.dygraph_options);
 
+		state.dygraph_force_zoom = false;
+		state.dygraph_user_action = false;
 		state.dygraph_last_rendered = new Date().getTime();
 		return true;
 	};

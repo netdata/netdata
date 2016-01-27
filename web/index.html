@@ -281,7 +281,7 @@
 	<!-- <script> netdataServer = "http://box:19999"; </script> -->
 
 	<!-- load the dashboard manager - it will do the rest -->
-	<script type="text/javascript" src="dashboard.js?v22"></script>
+	<script type="text/javascript" src="dashboard.js?v23"></script>
 </head>
 
 <body data-spy="scroll" data-target="#sidebar">
@@ -300,7 +300,8 @@
 				<ul class="nav navbar-nav">
 					<li><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal"><i class="fa fa-cog"></i> settings</a></li>
 					<li><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank"><i class="fa fa-github"></i> community</a></li>
-					<li><a href="old/" class="btn" target="_blank"><i class="fa fa-step-backward"></i> old dashboard</a></li>
+<!--					<li><a href="old/" class="btn" target="_blank"><i class="fa fa-step-backward"></i> old dashboard</a></li> -->
+					<li><a href="#" class="btn" data-toggle="modal" data-target="#helpModal"><i class="fa fa-question-circle"></i> help</a></li>
 <!--					<li><a href="#sec">Visualize</a></li>
 					<li><a href="#sec">Prototype</a></li>
 -->				</ul>
@@ -438,6 +439,114 @@
 						<div class="p">
 						For more information please refer to the <b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata wiki</a></b>.
 						</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="modal fade" id="helpModal" tabindex="-1" role="dialog" aria-labelledby="helpModalLabel">
+		<div class="modal-dialog modal-lg" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+					<h4 class="modal-title" id="helpModalLabel">Dashboard Help</h4>
+				</div>
+				<div class="modal-body">
+
+					<h4>Dygraphs (line, area and stacked area charts)</h4>
+
+					<!-- Nav tabs -->
+					<ul class="nav nav-tabs" role="tablist">
+						<li role="presentation" class="active"><a href="#help_mouse" aria-controls="help_mouse" role="tab" data-toggle="tab">Mouse Interface</a></li>
+						<li role="presentation"><a href="#help_touch" aria-controls="help_touch" role="tab" data-toggle="tab">Touch Interface</a></li>
+					</ul>
+
+					<!-- Tab panes -->
+					<div class="tab-content">
+						<div role="tabpanel" class="tab-pane active" id="help_mouse">
+							<div class="p">
+								<h4>Mouse Over / Hover</h4>
+								Mouse over on a chart to show, at its legend, the values for the timestamp under the mouse (the chart will also highlight the point at the chart).
+								<br/>
+								All the other visible charts will also show and highlight their values for the same timestamp.
+							</div>
+							<hr/>
+							<div class="p">
+								<h4>Trag Chart Contents</h4>
+								Trag the contents of a chart to pan it horizontally.
+								<br/>
+								All the charts will follow soon after you let the chart alone (this little delay is by design: it speeds up your browser and lets you focus on what you are exploring).
+								<br/>
+								Once a chart is panned, auto refreshing stops for all charts. To enable it again, <b>double click</b> a panned chart.
+							</div>
+							<hr/>
+							<div class="p">
+								<h4>Double Click</h4>
+								Double Click a chart to reset all the charts to their default auto-refreshing state.
+							</div>
+							<hr/>
+							<div class="p">
+								<h4>SHIFT + Trag</h4>
+								While pressing the shift key, select with the mouse and area of a chart, to zoom in. The other charts will follow too. Zooming is performed in two phases:
+								<ul>
+									<li>The already loaded chart contents are zoomed (low resolution)</li>
+									<li>New data are transfered from the netdata server, to refresh the chart with possibly more detail.</li>
+								</ul>
+								Once a chart is zoomed, auto refreshing stops for all charts. To enable it again, <b>double click</b> a zoomed chart.
+							</div>
+							<hr/>
+							<div class="p">
+								<h4>SHIFT + Mouse Wheel <small>(does not work on firefox and IE/Edge)</small></h4>
+								While pressing the shift key and the mouse pointer is over the contents of a chart, scroll the mouse wheel to zoom in or out. This kind of zooming is aligned to center below the mouse pointer. The other charts will follow too.
+								<br/>
+								Once a chart is zoomed, auto refreshing stops for all charts. To enable it again, <b>double click</b> a zoomed chart.
+							</div>
+							<hr/>
+							<div class="p">
+								<h4>Legend Operations</h4>
+								Click on the label or value of a dimension, will select / unselect this dimension.
+								<br/>
+								You can press any of the shift or control keys and the click on legend labels or values, to select / unselect multiple dimensions.
+							</div>
+						</div>
+						<div role="tabpanel" class="tab-pane" id="help_touch">
+							<div class="p">
+								<h4>Single Tap</h4>
+								Single Tap on the contents of a chart to show, at its legend, the values for the timestamp tapped (the chart will also highlight the point at the chart).
+								<br/>
+								All the other visible charts will also show and highlight their values for the same timestamp.
+							</div>
+							<hr/>
+							<div class="p">
+								<h4>Trag Chart Contents</h4>
+								Touch and Trag the contents of a chart to pan it horizontally.
+								<br/>
+								All the charts will follow soon after you let the chart alone (this little delay is by design: it speeds up your browser and lets you focus on what you are exploring).
+								<br/>
+								Once a chart is panned, auto refreshing stops for all charts. To enable it again, <b>double tap</b> a panned chart.
+							</div>
+							<hr/>
+							<div class="p">
+								<h4>Double Tap</h4>
+								Double tap a chart to reset all the charts to their default auto-refreshing state.
+							</div>
+							<hr/>
+							<div class="p">
+								<h4>Zoom <small>(does not work on firefox and IE/Edge)</small></h4>
+								With two fingers, zoom in or out.
+								<br/>
+								Once a chart is zoomed, auto refreshing stops for all charts. To enable it again, <b>double click</b> a zoomed chart.
+							</div>
+							<hr/>
+							<div class="p">
+								<h4>Legend Operations</h4>
+								Tap on the label or value of a dimension, will select / unselect this dimension.
+							</div>
+						</div>
+					</div>
 				</div>
 				<div class="modal-footer">
 					<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
