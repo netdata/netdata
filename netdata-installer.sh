@@ -23,7 +23,7 @@ BANNER
 if [ ! "${UID}" = 0 -o "$1" = "-h" -o "$1" = "--help" ]
 	then
 	echo >&2
-	echo >&2 "You have to run netdata are root."
+	echo >&2 "You have to run netdata as root."
 	echo >&2 "The netdata daemon will drop priviliges"
 	echo >&2 "but you have to start it as root."
 	echo >&2
