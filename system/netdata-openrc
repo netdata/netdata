@@ -21,6 +21,9 @@ NETDATA_WAIT_EXIT_TIMEOUT=${NETDATA_WAIT_EXIT_TIMEOUT-15}
 # to exit.
 NETDATA_FORCE_EXIT=${NETDATA_FORCE_EXIT-0}
 
+# Netdata will use these services, only if they
+# are enabled to start.
+NETDATA_START_AFTER_SERVICES="${NETDATA_START_AFTER_SERVICES-apache2 squid nginx mysql named opensips upsd hostapd postfix lm_sensors}"
 
 extra_started_commands="getconf"
 pidfile="/var/run/netdata/netdata.pid"
@@ -31,9 +34,14 @@ depend() {
 	use logger
 	need net
 
-	# FIXME
-	# We should depend on these only if they are enabled:
-	# apache, squid, nginx, mysql, named, opensips, nut, hostapd, postfix, lm-sensors
+	local x
+	for x in ${NETDATA_START_AFTER_SERVICES}
+	do
+		if [ -f /etc/runlevels/default/${x} ]
+			then
+			use ${x}
+		fi
+	done
 }
 
 start() {
