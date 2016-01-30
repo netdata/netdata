@@ -1,6 +1,6 @@
 [Unit]
 Description=netdata
-After=httpd.service squid.service nfs-server.service mysqld.service named.service postfix.service
+After=network.target httpd.service squid.service nfs-server.service mysqld.service named.service postfix.service
 
 [Service]
 Type=forking
