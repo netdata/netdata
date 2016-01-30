@@ -1,0 +1,17 @@
+[Unit]
+Description=netdata
+After=httpd.service squid.service nfs-server.service mysqld.service named.service postfix.service
+
+[Service]
+Type=forking
+Environment=NETDATA_INSTALL_PATH=
+WorkingDirectory=/tmp
+User=root
+Group=root
+PIDFile=/var/run/netdata/netdata.pid
+ExecStart=${NETDATA_INSTALL_PATH}/usr/sbin/netdata
+ExecStop=/bin/kill -SIGTERM $MAINPID
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target
