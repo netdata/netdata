@@ -77,7 +77,7 @@ charts_undescore="_"
 # So, if update_every is 1 second and time_divisor is 50,
 # charts.d will iterate every 500ms.
 # Charts will be called to collect data only if the time
-# passes since the last time the collected data is equal or
+# passed since the last time the collected data is equal or
 # above their update_every.
 time_divisor=50
 
