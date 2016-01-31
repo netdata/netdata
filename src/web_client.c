@@ -294,7 +294,7 @@ int mysendfile(struct web_client *w, char *filename)
 
 	// check if the file is owned by us
 	if(stat.st_uid != web_files_uid()) {
-		debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is owned by user %d (I run as user %d). Access Denied.", w->id, webfilename, stat.st_uid, getuid());
+		error("%llu: File '%s' is owned by user %d (I run as user %d). Access Denied.", w->id, webfilename, stat.st_uid, getuid());
 		buffer_sprintf(w->response.data, "Access to file '%s' is not permitted.", filename);
 		return 403;
 	}
@@ -305,7 +305,7 @@ int mysendfile(struct web_client *w, char *filename)
 	}
 
 	if((stat.st_mode & S_IFMT) != S_IFREG) {
-		debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not a regular file. Access Denied.", w->id, webfilename);
+		error("%llu: File '%s' is not a regular file. Access Denied.", w->id, webfilename);
 		buffer_sprintf(w->response.data, "Access to file '%s' is not permitted.", filename);
 		return 403;
 	}
