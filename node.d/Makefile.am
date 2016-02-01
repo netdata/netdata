@@ -3,6 +3,7 @@ MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 dist_node_SCRIPTS = \
 	README.md \
 	named.node.js \
+	sma_webbox.node.js \
 	$(NULL)
 
 nodemodulesdir=$(nodedir)/node_modules
