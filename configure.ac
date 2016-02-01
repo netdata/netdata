@@ -141,6 +141,7 @@ AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop priv
 
 AC_SUBST([cachedir], ["\$(localstatedir)/cache/netdata"])
 AC_SUBST([chartsdir], ["\$(libexecdir)/netdata/charts.d"])
+AC_SUBST([nodedir], ["\$(libexecdir)/netdata/node.d"])
 AC_SUBST([configdir], ["\$(sysconfdir)/netdata"])
 AC_SUBST([logdir], ["\$(localstatedir)/log/netdata"])
 AC_SUBST([pluginsdir], ["\$(libexecdir)/netdata/plugins.d"])
@@ -156,6 +157,7 @@ AC_SUBST([OPTIONAL_ZLIB_LIBS])
 AC_CONFIG_FILES([
 	Makefile
 	charts.d/Makefile
+	node.d/Makefile
 	conf.d/Makefile
 	netdata.spec
 	plugins.d/Makefile

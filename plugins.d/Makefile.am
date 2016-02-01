@@ -10,7 +10,7 @@ dist_plugins_DATA = \
 dist_plugins_SCRIPTS = \
 	charts.d.dryrun-helper.sh \
 	charts.d.plugin \
+	node.d.plugin \
 	tc-qos-helper.sh \
 	loopsleepms.sh.inc \
-	sma_webbox.plugin \
 	$(NULL)

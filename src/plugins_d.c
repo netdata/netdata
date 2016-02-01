@@ -228,7 +228,11 @@ void *pluginsd_worker_thread(void *arg)
 				st = NULL;
 			}
 			else if(likely(hash == CHART_HASH && !strcmp(s, "CHART"))) {
+				int noname = 0;
 				st = NULL;
+
+				if((words[1]) != NULL && (words[2]) != NULL && strcmp(words[1], words[2]) == 0)
+					noname = 1;
 
 				char *type = words[1];
 				char *id = NULL;
@@ -262,7 +266,7 @@ void *pluginsd_worker_thread(void *arg)
 				int chart_type = RRDSET_TYPE_LINE;
 				if(unlikely(chart)) chart_type = rrdset_type_id(chart);
 
-				if(unlikely(!name || !*name)) name = NULL;
+				if(unlikely(noname || !name || !*name || strcasecmp(name, "NULL") == 0 || strcasecmp(name, "(NULL)") == 0)) name = NULL;
 				if(unlikely(!family || !*family)) family = id;
 				if(unlikely(!category || !*category)) category = type;
 

@@ -28,6 +28,7 @@ EXTRA_DIST = \
 
 SUBDIRS = \
 	charts.d \
+	node.d \
 	conf.d \
 	plugins.d \
 	src \

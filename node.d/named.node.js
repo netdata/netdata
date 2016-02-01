@@ -1,0 +1,462 @@
+'use strict';
+
+// collect statistics from bind (named) v9.10+
+//
+// bind statistics documentation at:
+// https://ftp.isc.org/isc/bind/9.10.3/doc/arm/Bv9ARM.ch06.html#statistics
+
+// example configuration in /etc/netdata/named.conf
+// the module supports auto-detection if bind is running in localhost
+
+/*
+{
+	"enable_autodetect": true,
+	"update_every": 5,
+	"servers": [
+		{
+			"name": "bind1",
+			"url": "http://127.0.0.1:8888/json/v1",
+			"update_every": 1
+		},
+		{
+			"name": "bind2",
+			"url": "http://10.1.2.3:8888/json/v1",
+			"update_every": 2
+		}
+	]
+}
+*/
+
+// the following is the bind named.conf configuration required
+
+/*
+statistics-channels {
+        inet 127.0.0.1 port 8888 allow { 127.0.0.1; };
+};
+*/
+
+var url = require('url');
+var http = require('http');
+var netdata = require('netdata');
+
+if(netdata.options.DEBUG === true) netdata.debug('loaded ' + __filename + ' plugin');
+
+var named = {
+	name: __filename,
+	enable_autodetect: true,
+	update_every: 1000,
+
+	charts: {},
+
+	chartFromMembersCreate: function(service, obj, id, title_suffix, units, family_prefix, category_prefix, type, priority, algorithm, multiplier, divisor) {
+		var chart = {
+			id: id,											// the unique id of the chart
+			name: '',										// the unique name of the chart
+			title: service.name + ' ' + title_suffix,		// the title of the chart
+			units: units,									// the units of the chart dimensions
+			family: family_prefix + '_' + service.name,		// the family of the chart
+			category: category_prefix + '_' + service.name,	// the category of the chart
+			type: type,										// the type of the chart
+			priority: priority,								// the priority relative to others in the same family and category
+			update_every: Math.round(service.update_every / 1000), // the expected update frequency of the chart
+			dimensions: {}
+		}
+
+		var found = 0;
+		for(var x in obj) {
+			if(typeof(obj[x]) !== 'undefined' && obj[x] !== 0) {
+				found++;
+				chart.dimensions[x] = {
+					id: x,					// the unique id of the dimension
+					name: x,				// the name of the dimension
+					algorithm: algorithm,	// the id of the netdata algorithm
+					multiplier: multiplier,	// the multiplier
+					divisor: divisor,		// the divisor
+					hidden: false			// is hidden (boolean)
+				}
+			}
+		}
+
+		if(found === false)
+			return null;
+
+		chart = service.chart(id, chart);
+		this.charts[id] = chart;
+		return chart;
+	},
+
+	chartFromMembers: function(service, obj, id_suffix, title_suffix, units, family_prefix, category_prefix, type, priority, algorithm, multiplier, divisor) {
+		var id = 'named_' + service.name + '.' + id_suffix;
+		var chart = this.charts[id];
+
+		if(typeof chart === 'undefined') {
+			chart = this.chartFromMembersCreate(service, obj, id, title_suffix, units, family_prefix, category_prefix, type, priority, algorithm, multiplier, divisor);
+			if(chart === null) return false;
+		}
+		else {
+			// check if we need to re-generate the chart
+			for(var x in obj) {
+				if(typeof(chart.dimensions[x]) === 'undefined') {
+					chart = this.chartFromMembersCreate(service, obj, id, title_suffix, units, family_prefix, category_prefix, type, priority, algorithm, multiplier, divisor);
+					if(chart === null) return false;
+					break;
+				}
+			}
+		}
+
+		var found = 0;
+		service.begin(chart);
+		for(var x in obj) {
+			if(typeof(chart.dimensions[x]) !== 'undefined') {
+				found++;
+				service.set(x, obj[x]);
+			}
+		}
+		service.end();
+
+		if(found > 0) return true;
+		return false;
+	},
+
+	// an index to map values to different charts
+	lookups: {
+		nsstats: {},
+		resolver_stats: {},
+		numfetch: {}
+	},
+
+	processResponse: function(service, data) {
+		if(data !== null) {
+			var r = JSON.parse(data);
+
+			if(service.added !== true)
+				netdata.serviceAdd(service);
+
+			if(typeof r.nsstats !== 'undefined') {
+				// we split the nsstats object to several others
+				var global_requests = {}, global_requests_enable = false;
+				var global_failures = {}, global_failures_enable = false;
+				var global_failures_detail = {}, global_failures_detail_enable = false;
+				var global_updates = {}, global_updates_enable = false;
+				var protocol_queries = {}, protocol_queries_enable = false;
+				var global_queries = {}, global_queries_enable = false;
+				var global_queries_success = {}, global_queries_success_enable = false;
+				var default_enable = false;
+				var RecursClients = 0;
+
+				// RecursClients is an absolute value
+				if(typeof r.nsstats['RecursClients'] !== 'undefined') {
+					RecursClients = r.nsstats['RecursClients'];
+					delete r.nsstats['RecursClients'];
+				}
+
+				for( var x in r.nsstats ) {
+					// we maintain an index of the values found
+					// mapping them to objects splitted
+
+					var look = named.lookups.nsstats[x];
+					if(typeof look === 'undefined') {
+						// a new value, not found in the index
+						// index it:
+						if(x === 'Requestv4') {
+							named.lookups.nsstats[x] = {
+								name: 'IPv4',
+								type: 'global_requests'
+							};
+						}
+						else if(x === 'Requestv6') {
+							named.lookups.nsstats[x] = {
+								name: 'IPv6',
+								type: 'global_requests'
+							};
+						}
+						else if(x === 'QryFailure') {
+							named.lookups.nsstats[x] = {
+								name: 'failures',
+								type: 'global_failures'
+							};
+						}
+						else if(x === 'QryUDP') {
+							named.lookups.nsstats[x] = {
+								name: 'UDP',
+								type: 'protocol_queries'
+							};
+						}
+						else if(x === 'QryTCP') {
+							named.lookups.nsstats[x] = {
+								name: 'TCP',
+								type: 'protocol_queries'
+							};
+						}
+						else if(x === 'QrySuccess') {
+							named.lookups.nsstats[x] = {
+								name: 'queries',
+								type: 'global_queries_success'
+							};
+						}
+						else if(x.match(/QryRej$/) !== null) {
+							named.lookups.nsstats[x] = {
+								name: x,
+								type: 'global_failures_detail'
+							};
+						}
+						else if(x.match(/^Qry/) !== null) {
+							named.lookups.nsstats[x] = {
+								name: x,
+								type: 'global_queries'
+							};
+						}
+						else if(x.match(/^Update/) !== null) {
+							named.lookups.nsstats[x] = {
+								name: x,
+								type: 'global_updates'
+							};
+						}
+						else {
+							// values not mapped, will remain
+							// in the default map
+							named.lookups.nsstats[x] = {
+								name: x,
+								type: 'default'
+							};
+						}
+
+						look = named.lookups.nsstats[x];
+						// netdata.error('lookup nsstats value: ' + x + ' >>> ' + named.lookups.nsstats[x].type);
+					}
+
+					switch(look.type) {
+						case 'global_requests': global_requests[look.name] = r.nsstats[x]; delete r.nsstats[x]; global_requests_enable = true; break;
+						case 'global_queries': global_queries[look.name] = r.nsstats[x]; delete r.nsstats[x]; global_queries_enable = true; break;
+						case 'global_queries_success': global_queries_success[look.name] = r.nsstats[x]; delete r.nsstats[x]; global_queries_success_enable = true; break;
+						case 'global_updates': global_updates[look.name] = r.nsstats[x]; delete r.nsstats[x]; global_updates_enable = true; break;
+						case 'protocol_queries': protocol_queries[look.name] = r.nsstats[x]; delete r.nsstats[x]; protocol_queries_enable = true; break;
+						case 'global_failures': global_failures[look.name] = r.nsstats[x]; delete r.nsstats[x]; global_failures_enable = true; break;
+						case 'global_failures_detail': global_failures_detail[look.name] = r.nsstats[x]; delete r.nsstats[x]; global_failures_detail_enable = true; break;
+						default: default_enable = true; break;
+					}
+				}
+
+				if(global_requests_enable == true)
+					service.module.chartFromMembers(service, global_requests, 'received_requests', 'Bind, Global Received Requests by IP version', 'requests/s', 'named', 'named', netdata.chartTypes.stacked, 100, netdata.chartAlgorithms.incremental, 1, 1);
+
+				if(global_queries_success_enable == true)
+					service.module.chartFromMembers(service, global_queries_success, 'global_queries_success', 'Bind, Global Successful Queries', 'queries/s', 'named', 'named', netdata.chartTypes.line, 150, netdata.chartAlgorithms.incremental, 1, 1);
+
+				if(protocol_queries_enable == true)
+					service.module.chartFromMembers(service, protocol_queries, 'protocols_queries', 'Bind, Global Queries by IP Protocol', 'queries/s', 'named', 'named', netdata.chartTypes.stacked, 200, netdata.chartAlgorithms.incremental, 1, 1);
+
+				if(global_queries_enable == true)
+					service.module.chartFromMembers(service, global_queries, 'global_queries', 'Bind, Global Queries Analysis', 'queries/s', 'named', 'named', netdata.chartTypes.stacked, 300, netdata.chartAlgorithms.incremental, 1, 1);
+
+				if(global_updates_enable == true)
+					service.module.chartFromMembers(service, global_updates, 'received_updates', 'Bind, Global Received Updates', 'updates/s', 'named', 'named', netdata.chartTypes.stacked, 900, netdata.chartAlgorithms.incremental, 1, 1);
+
+				if(global_failures_enable == true)
+					service.module.chartFromMembers(service, global_failures, 'query_failures', 'Bind, Global Query Failures', 'failures/s', 'named', 'named', netdata.chartTypes.line, 950, netdata.chartAlgorithms.incremental, 1, 1);
+
+				if(global_failures_detail_enable == true)
+					service.module.chartFromMembers(service, global_failures_detail, 'query_failures_detail', 'Bind, Global Query Failures Analysis', 'failures/s', 'named', 'named', netdata.chartTypes.stacked, 960, netdata.chartAlgorithms.incremental, 1, 1);
+
+				if(default_enable === true)
+					service.module.chartFromMembers(service, r.nsstats, 'nsstats', 'Bind, Other Global Server Statistics', 'operations/s', 'named', 'named', netdata.chartTypes.line, 999, netdata.chartAlgorithms.incremental, 1, 1);
+
+				// RecursClients chart
+				{
+					var id = 'named_' + service.name + '.recursive_clients';
+					var chart = named.charts[id];
+
+					if(typeof chart === 'undefined') {
+						chart = {
+							id: id,											// the unique id of the chart
+							name: '',										// the unique name of the chart
+							title: service.name + ' Bind, Current Recursive Clients',		// the title of the chart
+							units: 'clients',								// the units of the chart dimensions
+							family: 'named',								// the family of the chart
+							category: 'named',								// the category of the chart
+							type: netdata.chartTypes.line,					// the type of the chart
+							priority: 150,									// the priority relative to others in the same family and category
+							update_every: Math.round(service.update_every / 1000), // the expected update frequency of the chart
+							dimensions: {
+								'clients': {
+									id: 'clients',								// the unique id of the dimension
+									name: '',									// the name of the dimension
+									algorithm: netdata.chartAlgorithms.absolute,// the id of the netdata algorithm
+									multiplier: 1,								// the multiplier
+									divisor: 1,									// the divisor
+									hidden: false								// is hidden (boolean)
+								}
+							}
+						};
+
+						chart = service.chart(id, chart);
+						named.charts[id] = chart;
+					}
+
+					service.begin(chart);
+					service.set('clients', RecursClients);
+					service.end();
+				}
+			}
+
+			if(typeof r.opcodes !== 'undefined')
+				service.module.chartFromMembers(service, r.opcodes, 'in_opcodes', 'Bind, Global Incoming Requests by OpCode', 'requests/s', 'named', 'named', netdata.chartTypes.stacked, 1000, netdata.chartAlgorithms.incremental, 1, 1);
+
+			if(typeof r.qtypes !== 'undefined')
+				service.module.chartFromMembers(service, r.qtypes, 'in_qtypes', 'Bind, Global Incoming Requests by Query Type', 'requests/s', 'named', 'named', netdata.chartTypes.stacked, 2000, netdata.chartAlgorithms.incremental, 1, 1);
+
+			if(typeof r.views !== 'undefined') {
+				for( var x in r.views ) {
+					var resolver = r.views[x].resolver;
+
+					if(typeof resolver !== 'undefined') {
+						if(typeof resolver.stats !== 'undefined') {
+							var NumFetch = 0;
+							var key = service.name + '.' + x;
+							var default_enable = false;
+							var rtt = {}, rtt_enable = false;
+
+							// NumFetch is an absolute value
+							if(typeof resolver.stats['NumFetch'] !== 'undefined') {
+								named.lookups.numfetch[key] = true;
+								NumFetch = resolver.stats['NumFetch'];
+								delete resolver.stats['NumFetch'];
+							}
+							if(typeof resolver.stats['BucketSize'] !== 'undefined') {
+								delete resolver.stats['BucketSize'];
+							}
+
+							// split the QryRTT* from the main chart
+							for( var y in resolver.stats ) {
+								// we maintain an index of the values found
+								// mapping them to objects splitted
+
+								var look = named.lookups.resolver_stats[y];
+								if(typeof look === 'undefined') {
+									if(y.match(/^QryRTT/) !== null) {
+										named.lookups.resolver_stats[y] = {
+											name: y,
+											type: 'rtt'
+										};
+									}
+									else {
+										named.lookups.resolver_stats[y] = {
+											name: y,
+											type: 'default'
+										};
+									}
+
+									look = named.lookups.resolver_stats[y];
+									// netdata.error('lookup resolver stats value: ' + y + ' >>> ' + look.type);
+								}
+
+								switch(look.type) {
+									case 'rtt': rtt[look.name] = resolver.stats[y]; delete resolver.stats[y]; rtt_enable = true; break;
+									default: default_enable = true; break;
+								}
+							}
+
+							if(rtt_enable)
+								service.module.chartFromMembers(service, rtt, 'view_resolver_rtt_' + x, 'Bind, ' + x + ' View, Resolver Round Trip Timings', 'queries/s', 'named', 'named', netdata.chartTypes.stacked, 5600, netdata.chartAlgorithms.incremental, 1, 1);
+
+							if(default_enable)
+								service.module.chartFromMembers(service, resolver.stats, 'view_resolver_stats_' + x, 'Bind, ' + x + ' View, Resolver Statistics', 'operations/s', 'named', 'named', netdata.chartTypes.line, 5500, netdata.chartAlgorithms.incremental, 1, 1);
+
+							// NumFetch chart
+							if(typeof named.lookups.numfetch[key] !== 'undefined') {
+								var id = 'named_' + service.name + '.view_resolver_numfetch_' + x;
+								var chart = named.charts[id];
+
+								if(typeof chart === 'undefined') {
+									chart = {
+										id: id,											// the unique id of the chart
+										name: '',										// the unique name of the chart
+										title: service.name + ' Bind, ' + x + ' View, Resolver Active Queries',		// the title of the chart
+										units: 'queries',								// the units of the chart dimensions
+										family: 'named',								// the family of the chart
+										category: 'named',								// the category of the chart
+										type: netdata.chartTypes.line,					// the type of the chart
+										priority: 5000,									// the priority relative to others in the same family and category
+										update_every: Math.round(service.update_every / 1000), // the expected update frequency of the chart
+										dimensions: {
+											'queries': {
+												id: 'queries',								// the unique id of the dimension
+												name: '',									// the name of the dimension
+												algorithm: netdata.chartAlgorithms.absolute,// the id of the netdata algorithm
+												multiplier: 1,								// the multiplier
+												divisor: 1,									// the divisor
+												hidden: false								// is hidden (boolean)
+											}
+										}
+									};
+
+									chart = service.chart(id, chart);
+									named.charts[id] = chart;
+								}
+
+								service.begin(chart);
+								service.set('queries', NumFetch);
+								service.end();
+							}
+						}
+						
+						if(typeof resolver.qtypes !== 'undefined')
+							service.module.chartFromMembers(service, resolver.qtypes, 'view_resolver_qtypes_' + x, 'Bind, ' + x + ' View, Requests by Query Type', 'requests/s', 'named', 'named', netdata.chartTypes.stacked, 6000, netdata.chartAlgorithms.incremental, 1, 1);
+					}
+				}
+			}
+		}
+	},
+
+	// module.serviceExecute()
+	// this function is called only from this module
+	// its purpose is to prepare the request and call
+	// netdata.serviceExecute()
+	serviceExecute: function(name, a_url, update_every) {
+		if(netdata.options.DEBUG === true) netdata.debug(this.name + ': ' + name + ': url: ' + a_url + ', update_every: ' + update_every);
+		netdata.serviceExecute({
+			name: name,
+			request: netdata.requestFromURL(a_url),
+			update_every: update_every,
+			added: false,
+			enabled: true,
+			module: this
+		}, this.processResponse);
+	},
+
+	configure: function(config) {
+		var added = 0;
+
+		if(this.enable_autodetect === true) {
+			this.serviceExecute('local', 'http://localhost:8888/json/v1', this.update_every);
+			added++;
+		}
+		
+		if(typeof(config.servers) !== 'undefined') {
+			var len = config.servers.length;
+			while(len--) {
+				if(typeof config.servers[len].update_every === 'undefined')
+					config.servers[len].update_every = this.update_every;
+				else
+					config.servers[len].update_every = config.servers[len].update_every * 1000;
+
+				this.serviceExecute(config.servers[len].name, config.servers[len].url, config.servers[len].update_every);
+				added++;
+			}
+		}
+
+		return added;
+	},
+
+	// module.update()
+	// this is called repeatidly to collect data, by calling
+	// netdata.serviceExecute()
+	update: function(service, callback) {
+		netdata.serviceExecute(service, function(serv, data) {
+			service.module.processResponse(serv, data);
+			callback();
+		});
+	},
+};
+
+module.exports = named;

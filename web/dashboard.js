@@ -4319,6 +4319,7 @@
 					NETDATA.registerChartLibrary('easypiechart', NETDATA.easypiechart_js);
 				})
 				.fail(function() {
+					NETDATA.chartLibraries.easypiechart.enabled = false;
 					NETDATA.error(100, NETDATA.easypiechart_js);
 				})
 				.always(function() {
@@ -4510,6 +4511,7 @@
 					NETDATA.registerChartLibrary('gauge', NETDATA.gauge_js);
 				})
 				.fail(function() {
+					NETDATA.chartLibraries.gauge.enabled = false;
 					NETDATA.error(100, NETDATA.gauge_js);
 				})
 				.always(function() {
