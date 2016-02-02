@@ -3,6 +3,7 @@
 // collect statistics from bind (named) v9.10+
 //
 // bind statistics documentation at:
+// http://jpmens.net/2013/03/18/json-in-bind-9-s-statistics-server/
 // https://ftp.isc.org/isc/bind/9.10.3/doc/arm/Bv9ARM.ch06.html#statistics
 
 // example configuration in /etc/netdata/named.conf
@@ -305,6 +306,9 @@ var named = {
 			if(typeof r.qtypes !== 'undefined')
 				service.module.chartFromMembers(service, r.qtypes, 'in_qtypes', 'Bind, Global Incoming Requests by Query Type', 'requests/s', 'named', 'named', netdata.chartTypes.stacked, 2000, netdata.chartAlgorithms.incremental, 1, 1);
 
+			if(typeof r.sockstats !== 'undefined')
+				service.module.chartFromMembers(service, r.sockstats, 'in_sockstats', 'Bind, Global Socket Statistics', 'operations/s', 'named', 'named', netdata.chartTypes.line, 2500, netdata.chartAlgorithms.incremental, 1, 1);
+
 			if(typeof r.views !== 'undefined') {
 				for( var x in r.views ) {
 					var resolver = r.views[x].resolver;
@@ -399,10 +403,71 @@ var named = {
 								service.end();
 							}
 						}
-						
-						if(typeof resolver.qtypes !== 'undefined')
-							service.module.chartFromMembers(service, resolver.qtypes, 'view_resolver_qtypes_' + x, 'Bind, ' + x + ' View, Requests by Query Type', 'requests/s', 'named', 'named', netdata.chartTypes.stacked, 6000, netdata.chartAlgorithms.incremental, 1, 1);
 					}
+
+					if(typeof resolver.qtypes !== 'undefined')
+						service.module.chartFromMembers(service, resolver.qtypes, 'view_resolver_qtypes_' + x, 'Bind, ' + x + ' View, Requests by Query Type', 'requests/s', 'named', 'named', netdata.chartTypes.stacked, 6000, netdata.chartAlgorithms.incremental, 1, 1);
+
+					//if(typeof resolver.cache !== 'undefined')
+					//	service.module.chartFromMembers(service, resolver.cache, 'view_resolver_cache_' + x, 'Bind, ' + x + ' View, Cache Entries', 'entries', 'named', 'named', netdata.chartTypes.stacked, 7000, netdata.chartAlgorithms.absolute, 1, 1);
+
+					if(typeof resolver.cachestats['CacheHits'] !== 'undefined' && resolver.cachestats['CacheHits'] > 0) {
+						var id = 'named_' + service.name + '.view_resolver_cachehits_' + x;
+						var chart = named.charts[id];
+
+						if(typeof chart === 'undefined') {
+							chart = {
+								id: id,											// the unique id of the chart
+								name: '',										// the unique name of the chart
+								title: service.name + ' Bind, ' + x + ' View, Resolver Cache Hits',		// the title of the chart
+								units: 'operations/s',								// the units of the chart dimensions
+								family: 'named',								// the family of the chart
+								category: 'named',								// the category of the chart
+								type: netdata.chartTypes.area,					// the type of the chart
+								priority: 8000,									// the priority relative to others in the same family and category
+								update_every: Math.round(service.update_every / 1000), // the expected update frequency of the chart
+								dimensions: {
+									'CacheHits': {
+										id: 'CacheHits',							// the unique id of the dimension
+										name: 'hits',								// the name of the dimension
+										algorithm: netdata.chartAlgorithms.incremental,// the id of the netdata algorithm
+										multiplier: 1,								// the multiplier
+										divisor: 1,									// the divisor
+										hidden: false								// is hidden (boolean)
+									},
+									'CacheMisses': {
+										id: 'CacheMisses',							// the unique id of the dimension
+										name: 'misses',								// the name of the dimension
+										algorithm: netdata.chartAlgorithms.incremental,// the id of the netdata algorithm
+										multiplier: -1,								// the multiplier
+										divisor: 1,									// the divisor
+										hidden: false								// is hidden (boolean)
+									}
+								}
+							};
+
+							chart = service.chart(id, chart);
+							named.charts[id] = chart;
+						}
+
+						service.begin(chart);
+						service.set('CacheHits', resolver.cachestats['CacheHits']);
+						service.set('CacheMisses', resolver.cachestats['CacheMisses']);
+						service.end();
+					}
+
+					// this is wrong, it contains many types of info:
+					// 1. CacheHits, CacheMisses - incremental (added above)
+					// 2. QueryHits, QueryMisses - incremental
+					// 3. DeleteLRU, DeleteTTL - incremental
+					// 4. CacheNodes, CacheBuckets - absolute
+					// 5. TreeMemTotal, TreeMemInUse - absolute
+					// 6. HeapMemMax, HeapMemTotal, HeapMemInUse - absolute
+					//if(typeof resolver.cachestats !== 'undefined')
+					//	service.module.chartFromMembers(service, resolver.cachestats, 'view_resolver_cachestats_' + x, 'Bind, ' + x + ' View, Cache Statistics', 'requests/s', 'named', 'named', netdata.chartTypes.line, 8000, netdata.chartAlgorithms.incremental, 1, 1);
+
+					//if(typeof resolver.adb !== 'undefined')
+					//	service.module.chartFromMembers(service, resolver.adb, 'view_resolver_adb_' + x, 'Bind, ' + x + ' View, ADB Statistics', 'entries', 'named', 'named', netdata.chartTypes.line, 8500, netdata.chartAlgorithms.absolute, 1, 1);
 				}
 			}
 		}
