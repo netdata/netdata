@@ -194,8 +194,6 @@ var webbox = {
 			name: name,
 			request: netdata.requestFromURL('http://' + hostname + '/rpc'),
 			update_every: update_every,
-			added: false,
-			enabled: true,
 			module: this
 		};
 		service.postData = 'RPC={"proc":"GetPlantOverview","format":"JSON","version":"1.0","id":"1"}';

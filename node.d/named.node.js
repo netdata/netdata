@@ -418,8 +418,6 @@ var named = {
 			name: name,
 			request: netdata.requestFromURL(a_url),
 			update_every: update_every,
-			added: false,
-			enabled: true,
 			module: this
 		}, this.processResponse);
 	},
