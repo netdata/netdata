@@ -2,21 +2,123 @@
 
 LC_ALL=C
 
+# you can set CFLAGS before running installer
+CFLAGS="${CFLAGS--O3}"
+
+ME="$0"
+DONOTSTART=0
+DONOTWAIT=0
+NETDATA_PREFIX=
+ZLIB_IS_HERE=0
+
+usage() {
+	cat <<USAGE
+
+${ME} <installer options>
+
+Valid <installer options> are:
+
+   --install /PATH/TO/INSTALL
+
+        If your give: --install /opt
+        netdata will be installed in /opt/netdata
+
+   --dont-start-it
+
+        Do not (re)start netdata.
+        Just install it.
+
+   --dont-wait
+
+        Do not wait for the user to press ENTER.
+        Start immediately building it.
+
+   --zlib-is-really-here
+
+        If you get errors about missing zlib,
+        but you know it is available,
+        you have a broken pkg-config.
+        Use this option to allow it continue
+        without checking pkg-config.
+
+Netdata will by default be compiled with gcc optimization -O3
+If you need to pass different CFLAGS, use something like this:
+
+  CFLAGS="<gcc options>" $ME <installer options>
+
+For the installer to complete successfully, you will need
+these packages installed:
+
+   gcc make autoconf automake pkg-config zlib1g-dev
+
+For the plugins, you will at least need:
+
+   curl node
+
+USAGE
+}
+
+while [ ! -z "${1}" ]
+do
+	if [ "$1" = "--install" ]
+		then
+		NETDATA_PREFIX="${2}/netdata"
+		shift 2
+	elif [ "$1" = "--zlib-is-really-here" ]
+		then
+		ZLIB_IS_HERE=1
+		shift 1
+	elif [ "$1" = "--dont-start-it" ]
+		then
+		DONOTSTART=1
+		shift 1
+	elif [ "$1" = "--dont-wait" ]
+		then
+		DONOTWAIT=1
+		shift 1
+	elif [ "$1" = "--help" -o "$1" = "-h" ]
+		then
+		usage
+		exit 1
+	else
+		echo >&2
+		echo >&2 "ERROR:"
+		echo >&2 "I cannot understand option '$1'."
+		usage
+		exit 1
+	fi
+done
+
 cat <<BANNER
 
+Welcome to netdata!
+Nice to see you are giving it a try!
 
-This script will build and install netdata to your system.
+You are about to build and install netdata to your system.
 
-By default netdata will be installed as any other package.
-If you want to install it to another directory, run me
-with the option:
+By default netdata will be installed as any other package:
 
-$0 --install /path/to/install
+  - the daemon    at /usr/sbin/netdata
+  - config files  at /etc/netdata
+  - web files     at /usr/share/web/netdata
+  - plugins       at /usr/libexec/netdata
+  - cache files   at /var/cache/netdata
+  - log files     at /var/log/netdata
+
+If you want to install it to another directory, run the
+installer like this:
+
+  $ME --install /path/to/install
 
 A new directory called netdata will be created as
 
-/path/to/install/netdata
+  /path/to/install/netdata
 
+and all of netdata will be installed into it.
+Nothing will be touched on your system.
+
+This installer accepts more options.
+Run it with --help for help.
 
 BANNER
 
@@ -30,18 +132,14 @@ if [ ! "${UID}" = 0 -o "$1" = "-h" -o "$1" = "--help" ]
 	exit 1
 fi
 
-NETDATA_PREFIX=
-if [ "$1" = "--install" ]
+if [ ${DONOTWAIT} -eq 0 ]
 	then
-	NETDATA_PREFIX="${2}/netdata"
-	shift 2
-fi
-
-if [ ! -z "${NETDATA_PREFIX}" ]
-	then
-	read -p "Press ENTER to build and install netdata to '${NETDATA_PREFIX}' > "
-else
-	read -p "Press ENTER to build and install netdata to your system > "
+	if [ ! -z "${NETDATA_PREFIX}" ]
+		then
+		read -p "Press ENTER to build and install netdata to '${NETDATA_PREFIX}' > "
+	else
+		read -p "Press ENTER to build and install netdata to your system > "
+	fi
 fi
 
 # reload the profile
@@ -52,7 +150,7 @@ build_error() {
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-We are very sorry! NetData failed to build...
+Sorry! NetData failed to build...
 
 You many need to check these:
 
@@ -86,7 +184,7 @@ run() {
 	"${@}"
 }
 
-if [ "$1" = "--zlib-is-really-here" ]
+if [ ${ZLIB_IS_HERE} -eq 1 ]
 	then
 	shift
 	echo >&2 "ok, assuming zlib is really installed."
@@ -105,7 +203,7 @@ run ./configure \
 	--sysconfdir="${NETDATA_PREFIX}/etc" \
 	--localstatedir="${NETDATA_PREFIX}/var" \
 	--with-zlib --with-math --with-user=netdata \
-	CFLAGS="-O3" || exit 1
+	CFLAGS="${CFLAGS}" || exit 1
 
 # remove the build_error hook
 trap - EXIT
@@ -188,6 +286,22 @@ done
 run chown root "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
 run chmod 4755 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
 
+
+# -----------------------------------------------------------------------------
+# check if we can re-start netdata
+
+if [ ${DONOTSTART} -eq 1 ]
+	then
+	if [ ! -s "${NETDATA_PREFIX}/etc/netdata/netdata.conf" ]
+		then
+		echo >&2 "Generating empty config file in: ${NETDATA_PREFIX}/etc/netdata/netdata.conf"
+		echo "# Get config from http://127.0.0.1:${NETDATA_PORT}/netdata.conf" >"${NETDATA_PREFIX}/etc/netdata/netdata.conf"
+		chown "${NETDATA_USER}" "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
+		chmod 0664 "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
+	fi
+	echo >&2 "OK. It is now installed and ready."
+	exit 0
+fi
 
 # -----------------------------------------------------------------------------
 # stop a running netdata
