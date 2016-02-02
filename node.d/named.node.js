@@ -16,12 +16,12 @@
 	"servers": [
 		{
 			"name": "bind1",
-			"url": "http://127.0.0.1:8888/json/v1",
+			"url": "http://127.0.0.1:8888/json/v1/server",
 			"update_every": 1
 		},
 		{
 			"name": "bind2",
-			"url": "http://10.1.2.3:8888/json/v1",
+			"url": "http://10.1.2.3:8888/json/v1/server",
 			"update_every": 2
 		}
 	]
@@ -491,7 +491,7 @@ var named = {
 		var added = 0;
 
 		if(this.enable_autodetect === true) {
-			this.serviceExecute('local', 'http://localhost:8888/json/v1', this.update_every);
+			this.serviceExecute('local', 'http://localhost:8888/json/v1/server', this.update_every);
 			added++;
 		}
 		
