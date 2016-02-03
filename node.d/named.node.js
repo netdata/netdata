@@ -21,7 +21,7 @@
 		},
 		{
 			"name": "bind2",
-			"url": "http://10.1.2.3:8888/json/v1/server",
+			"url": "http://10.0.0.1:8888/xml/v3/server",
 			"update_every": 2
 		}
 	]
@@ -38,6 +38,7 @@ statistics-channels {
 
 var url = require('url');
 var http = require('http');
+var XML = require('pixl-xml');
 var netdata = require('netdata');
 
 if(netdata.options.DEBUG === true) netdata.debug('loaded ' + __filename + ' plugin');
@@ -126,9 +127,69 @@ var named = {
 		numfetch: {}
 	},
 
+	// transform the XML response of bind
+	// to the JSON response of bind
+	xml2js: function(service, data_xml) {
+		var d = XML.parse(data_xml);
+		if(d === null) return null;
+
+		var data = {};
+		var len = d.server.counters.length;
+		while(len--) {
+			var a = d.server.counters[len];
+			if(typeof a.counter === 'undefined') continue;
+			if(a.type === 'opcode') a.type = 'opcodes';
+			else if(a.type === 'qtype') a.type = 'qtypes';
+			else if(a.type === 'nsstat') a.type = 'nsstats';
+			var aa = data[a.type] = {};
+			var alen = 0
+			var alen2 = a.counter.length;
+			while(alen < alen2) {
+				aa[a.counter[alen].name] = parseInt(a.counter[alen]._Data);
+				alen++;
+			}
+		}
+
+		data.views = {};
+		var vlen = d.views.view.length;
+		while(vlen--) {
+			var vname = d.views.view[vlen].name;
+			data.views[vname] = { resolver: {} };
+			var len = d.views.view[vlen].counters.length;
+			while(len--) {
+				var a = d.views.view[vlen].counters[len];
+				if(typeof a.counter === 'undefined') continue;
+				if(a.type === 'resstats') a.type = 'stats';
+				else if(a.type === 'resqtype') a.type = 'qtypes';
+				else if(a.type === 'adbstat') a.type = 'adb';
+				var aa = data.views[vname].resolver[a.type] = {};
+				var alen = 0;
+				var alen2 = a.counter.length;
+				while(alen < alen2) {
+					aa[a.counter[alen].name] = parseInt(a.counter[alen]._Data);
+					alen++;
+				}
+			}
+		}
+
+		return data;
+	},
+
 	processResponse: function(service, data) {
 		if(data !== null) {
-			var r = JSON.parse(data);
+			var r;
+
+			// parse XML or JSON
+			// pepending on the URL given
+			if(service.request.path.match(/^\/xml/) !== null)
+				r = named.xml2js(service, data);
+			else
+				r = JSON.parse(data);
+
+			if(typeof r === 'undefined' || r === null) {
+				netdata.serviceError(service, "Cannot parse these data: " + data);
+				return;
+			}
 
 			if(service.added !== true)
 				netdata.serviceAdd(service);
