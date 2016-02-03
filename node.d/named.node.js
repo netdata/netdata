@@ -192,7 +192,7 @@ var named = {
 			}
 
 			if(service.added !== true)
-				netdata.serviceAdd(service);
+				service.commit();
 
 			if(typeof r.nsstats !== 'undefined') {
 				// we split the nsstats object to several others
@@ -540,12 +540,14 @@ var named = {
 	// netdata.serviceExecute()
 	serviceExecute: function(name, a_url, update_every) {
 		if(netdata.options.DEBUG === true) netdata.debug(this.name + ': ' + name + ': url: ' + a_url + ', update_every: ' + update_every);
-		netdata.serviceExecute({
+		var service = netdata.service({
 			name: name,
 			request: netdata.requestFromURL(a_url),
 			update_every: update_every,
 			module: this
-		}, this.processResponse);
+		});
+
+		service.execute(this.processResponse);
 	},
 
 	configure: function(config) {
@@ -576,7 +578,7 @@ var named = {
 	// this is called repeatidly to collect data, by calling
 	// netdata.serviceExecute()
 	update: function(service, callback) {
-		netdata.serviceExecute(service, function(serv, data) {
+		service.execute(function(serv, data) {
 			service.module.processResponse(serv, data);
 			callback();
 		});

@@ -70,7 +70,7 @@ var webbox = {
 
 			// add the service
 			if(found > 0 && service.added !== true)
-				netdata.serviceAdd(service);
+				service.commit();
 
 			// Grid Current Power Chart
 			if(d['GriPwr'].value !== null) {
@@ -190,17 +190,17 @@ var webbox = {
 	serviceExecute: function(name, hostname, update_every) {
 		if(netdata.options.DEBUG === true) netdata.debug(this.name + ': ' + name + ': hostname: ' + hostname + ', update_every: ' + update_every);
 
-		var service = {
+		var service = netdata.service({
 			name: name,
 			request: netdata.requestFromURL('http://' + hostname + '/rpc'),
 			update_every: update_every,
 			module: this
-		};
+		});
 		service.postData = 'RPC={"proc":"GetPlantOverview","format":"JSON","version":"1.0","id":"1"}';
 		service.request.method = 'POST';
 		service.request.headers['Content-Length'] = service.postData.length;
 
-		netdata.serviceExecute(service, this.processResponse);
+		service.execute(this.processResponse);
 	},
 
 	configure: function(config) {
@@ -229,7 +229,7 @@ var webbox = {
 	// this is called repeatidly to collect data, by calling
 	// netdata.serviceExecute()
 	update: function(service, callback) {
-		netdata.serviceExecute(service, function(serv, data) {
+		service.execute(function(serv, data) {
 			service.module.processResponse(serv, data);
 			callback();
 		});

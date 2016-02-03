@@ -97,43 +97,63 @@ function dumpError(err) {
 
 // --------------------------------------------------------------------------------------------------------------------
 // get command line arguments
+{
+	var found_myself = false;
+	var found_number = false;
+	var found_modules = false;
+	process.argv.forEach(function (val, index, array) {
+		netdata.debug('PARAM: ' + val);
 
-var found_myself = false;
-process.argv.forEach(function (val, index, array) {
-	netdata.debug('PARAM: ' + val);
+		if(!found_myself) {
+			if(val === __filename)
+				found_myself = true;
+		}
+		else {
+			switch(val) {
+				case 'debug':
+					netdata.options.DEBUG = true;
+					netdata.debug('DEBUG enabled');
+					break;
 
-	if(!found_myself) {
-		if(val === __filename)
-			found_myself = true;
-	}
-	else {
-		switch(val) {
-			case 'debug':
-				netdata.options.DEBUG = true;
-				netdata.debug('DEBUG enabled');
-				break;
-
-			default:
-				try {
-					var x = parseInt(val);
-					if(x > 0) {
-						netdata.options.update_every = x * 1000;
-						if(netdata.options.update_every < NETDATA_UPDATE_EVERY) {
-							netdata.options.update_every = NETDATA_UPDATE_EVERY;
-							netdata.debug('Update frequency ' + x + 's is too low');
+				default:
+					if(found_number === true) {
+						if(found_modules === false) {
+							for(var i in netdata.options.modules)
+								netdata.options.modules[i].enabled = false;
 						}
 
-						netdata.debug('Update frequency set to ' + netdata.options.update_every + ' ms');
+						if(typeof netdata.options.modules[val] === 'undefined')
+							netdata.options.modules[val] = {};
+
+						netdata.options.modules[val].enabled = true;
+						netdata.options.modules_enable_all = false;
+						netdata.debug('enabled module ' + val);
 					}
-					else netdata.error('Ignoring parameter: ' + val);
-				}
-				catch(e) {
-					netdata.error('Cannot get value of parameter: ' + val);
-					dumpError(e);
-				}
+					else {
+						try {
+							var x = parseInt(val);
+							if(x > 0) {
+								netdata.options.update_every = x * 1000;
+								if(netdata.options.update_every < NETDATA_UPDATE_EVERY) {
+									netdata.options.update_every = NETDATA_UPDATE_EVERY;
+									netdata.debug('Update frequency ' + x + 's is too low');
+								}
+
+								found_number = true;
+								netdata.debug('Update frequency set to ' + netdata.options.update_every + ' ms');
+							}
+							else netdata.error('Ignoring parameter: ' + val);
+						}
+						catch(e) {
+							netdata.error('Cannot get value of parameter: ' + val);
+							dumpError(e);
+						}
+					}
+					break;
+			}
 		}
-	}
-});
+	});
+}
 
 if(netdata.options.update_every < 1000) {
 	netdata.debug('Adjusting update frequency to 1 second');
