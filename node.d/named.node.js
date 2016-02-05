@@ -46,7 +46,7 @@ if(netdata.options.DEBUG === true) netdata.debug('loaded ' + __filename + ' plug
 var named = {
 	name: __filename,
 	enable_autodetect: true,
-	update_every: 1000,
+	update_every: 1,
 
 	charts: {},
 
@@ -60,7 +60,7 @@ var named = {
 			category: category_prefix + '_' + service.name,	// the category of the chart
 			type: type,										// the type of the chart
 			priority: priority,								// the priority relative to others in the same family and category
-			update_every: Math.round(service.update_every / 1000), // the expected update frequency of the chart
+			update_every: service.update_every, 			// the expected update frequency of the chart
 			dimensions: {}
 		}
 
@@ -338,7 +338,7 @@ var named = {
 							category: 'named',								// the category of the chart
 							type: netdata.chartTypes.line,					// the type of the chart
 							priority: 150,									// the priority relative to others in the same family and category
-							update_every: Math.round(service.update_every / 1000), // the expected update frequency of the chart
+							update_every: service.update_every,				// the expected update frequency of the chart
 							dimensions: {
 								'clients': {
 									id: 'clients',								// the unique id of the dimension
@@ -442,7 +442,7 @@ var named = {
 										category: 'named',								// the category of the chart
 										type: netdata.chartTypes.line,					// the type of the chart
 										priority: 5000,									// the priority relative to others in the same family and category
-										update_every: Math.round(service.update_every / 1000), // the expected update frequency of the chart
+										update_every: service.update_every,				// the expected update frequency of the chart
 										dimensions: {
 											'queries': {
 												id: 'queries',								// the unique id of the dimension
@@ -486,7 +486,7 @@ var named = {
 								category: 'named',								// the category of the chart
 								type: netdata.chartTypes.area,					// the type of the chart
 								priority: 8000,									// the priority relative to others in the same family and category
-								update_every: Math.round(service.update_every / 1000), // the expected update frequency of the chart
+								update_every: service.update_every,				// the expected update frequency of the chart
 								dimensions: {
 									'CacheHits': {
 										id: 'CacheHits',							// the unique id of the dimension
@@ -563,8 +563,6 @@ var named = {
 			while(len--) {
 				if(typeof config.servers[len].update_every === 'undefined')
 					config.servers[len].update_every = this.update_every;
-				else
-					config.servers[len].update_every = config.servers[len].update_every * 1000;
 
 				this.serviceExecute(config.servers[len].name, config.servers[len].url, config.servers[len].update_every);
 				added++;

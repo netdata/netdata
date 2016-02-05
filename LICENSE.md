@@ -114,4 +114,27 @@ connectivity is not available.
     Copyright 2015, Mike Bostock
     [BSD License](http://opensource.org/licenses/BSD-3-Clause)
     
+    
+- [node-extend](https://github.com/justmoon/node-extend)
 
+    Copyright 2014, Stefan Thomas
+    [MIT License](https://github.com/justmoon/node-extend/blob/master/LICENSE)
+    
+
+- [node-net-snmp](https://github.com/stephenwvickers/node-net-snmp)
+
+    Copyright 2013, Stephen Vickers
+    [MIT License](https://github.com/stephenwvickers/node-net-snmp)
+    
+
+- [node-asn1](https://github.com/mcavage/node-asn1)
+
+    Copyright 2011, Mark Cavage
+    [MIT License](https://github.com/mcavage/node-asn1)
+    
+
+- [pixl-xml](https://github.com/jhuckaby/pixl-xml)
+
+    Copyright 2015, Joseph Huckaby
+    [MIT License](https://github.com/jhuckaby/pixl-xml)
+    

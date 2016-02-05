@@ -32,7 +32,7 @@ if(netdata.options.DEBUG === true) netdata.debug('loaded ' + __filename + ' plug
 var webbox = {
 	name: __filename,
 	enable_autodetect: true,
-	update_every: 1000,
+	update_every: 1,
 
 	charts: {},
 
@@ -87,7 +87,7 @@ var webbox = {
 						category: 'sma_webbox_' + service.name,			// the category of the chart
 						type: netdata.chartTypes.area,					// the type of the chart
 						priority: 1000,									// the priority relative to others in the same family and category
-						update_every: Math.round(service.update_every / 1000), // the expected update frequency of the chart
+						update_every: service.update_every,				// the expected update frequency of the chart
 						dimensions: {
 							'GriPwr': {
 								id: 'GriPwr',								// the unique id of the dimension
@@ -123,7 +123,7 @@ var webbox = {
 						category: 'sma_webbox_' + service.name,			// the category of the chart
 						type: netdata.chartTypes.area,					// the type of the chart
 						priority: 1000,									// the priority relative to others in the same family and category
-						update_every: Math.round(service.update_every / 1000), // the expected update frequency of the chart
+						update_every: service.update_every,				// the expected update frequency of the chart
 						dimensions: {
 							'GriEgyTdy': {
 								id: 'GriEgyTdy',								// the unique id of the dimension
@@ -159,7 +159,7 @@ var webbox = {
 						category: 'sma_webbox_' + service.name,			// the category of the chart
 						type: netdata.chartTypes.area,					// the type of the chart
 						priority: 1000,									// the priority relative to others in the same family and category
-						update_every: Math.round(service.update_every / 1000), // the expected update frequency of the chart
+						update_every: service.update_every,				// the expected update frequency of the chart
 						dimensions: {
 							'GriEgyTot': {
 								id: 'GriEgyTot',								// the unique id of the dimension
@@ -211,11 +211,9 @@ var webbox = {
 			while(len--) {
 				if(typeof config.servers[len].update_every === 'undefined')
 					config.servers[len].update_every = this.update_every;
-				else
-					config.servers[len].update_every = config.servers[len].update_every * 1000;
 
-				if(config.servers[len].update_every < 5000)
-					config.servers[len].update_every = 5000;
+				if(config.servers[len].update_every < 5)
+					config.servers[len].update_every = 5;
 
 				this.serviceExecute(config.servers[len].name, config.servers[len].hostname, config.servers[len].update_every);
 				added++;
