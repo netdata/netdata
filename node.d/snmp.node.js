@@ -21,13 +21,13 @@
 					"priority": 1,
 					"dimensions": {
 						"in": {
-							"oid": ".1.3.6.1.2.1.2.2.1.10.1",
+							"oid": "1.3.6.1.2.1.2.2.1.10.1",
 							"algorithm": "incremental",
 							"multiplier": 8,
 							"divisor": 1024
 						},
 						"out": {
-							"oid": ".1.3.6.1.2.1.2.2.1.16.1",
+							"oid": "1.3.6.1.2.1.2.2.1.16.1",
 							"algorithm": "incremental",
 							"multiplier": -8,
 							"divisor": 1024
@@ -41,13 +41,13 @@
 					"priority": 1,
 					"dimensions": {
 						"in": {
-							"oid": ".1.3.6.1.2.1.2.2.1.10.2",
+							"oid": "1.3.6.1.2.1.2.2.1.10.2",
 							"algorithm": "incremental",
 							"multiplier": 8,
 							"divisor": 1024
 						},
 						"out": {
-							"oid": ".1.3.6.1.2.1.2.2.1.16.2",
+							"oid": "1.3.6.1.2.1.2.2.1.16.2",
 							"algorithm": "incremental",
 							"multiplier": -8,
 							"divisor": 1024
@@ -271,7 +271,7 @@ var snmp = {
 
 			if(typeof service.request.charts[c].update_every === 'undefined')
 				service.request.charts[c].update_every = service.update_every;
-			
+
 			if(typeof service.request.charts[c].multiply_range !== 'undefined') {
 				var from = service.request.charts[c].multiply_range[0];
 				var to = service.request.charts[c].multiply_range[1];
