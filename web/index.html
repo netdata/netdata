@@ -428,14 +428,14 @@
 						<b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> tries to visualize the truth of <b>now</b>, in its <b>greatest detail</b>, so that you can get insights of what is happening now and what just happened, on your systems and applications.
 						</div>
 						<div class="p">
-						To make a chart in <b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b>, you just need a <b>number</b>. Just a number you can read somehow. <b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> will turn this number to a real time, interactive, web chart. For collecting these numbers, it supports <a href="https://github.com/firehol/netdata/tree/master/plugins.d" target="_blank">external plugins</a>, even <a href="https://github.com/firehol/netdata/tree/master/charts.d" target="_blank">bash shell plugins</a>. Any computer program, in any language, that can print a few lines of text on its standard output, can be a netdata data collector.
+						To make a chart in <b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b>, you just need a <b>number</b>. Just a number you can read somehow. <b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> will turn this number to a real time, interactive, web chart. For collecting these numbers, it supports <a href="https://github.com/firehol/netdata/wiki/External-Plugins" target="_blank">external plugins</a>, even <a href="https://github.com/firehol/netdata/wiki/General-Info---charts.d" target="_blank">shell</a> or <a href="https://github.com/firehol/netdata/wiki/General-Info---charts.d" target="_blank">node.js</a> plugins. Any computer program, in any language, that can print a few lines of text on its standard output, can be a netdata data collector.
 						</div>
 						<div class="p">
 						<b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> can embed charts everywhere, like this one <div data-netdata="system.cpu" data-dimensions="system" data-after="-120" data-width="25%" data-height="15px" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-show-value-of-system-at="system.cpu.system.modal.1"></div> (my CPU system usage which is <span id="system.cpu.system.modal.1" style="display: inline-block; width: 40px; text-align: right;"></span>%),
 						or this one <div data-netdata="ipv4.tcppackets" data-dimensions="received" data-after="-120" data-width="25%" data-height="15px" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-show-value-of-received-at="ipv4.tcppackets.received.modal.1"></div> (my IPv4 received TCP packets, which are <span id="ipv4.tcppackets.received.modal.1" style="display: inline-block; width: 60px; text-align: right;"></span>/second).
 						</div>
 						<div class="p">
-						You can have <b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> charts on your site too. Just give it a <code>div</code> and a real time chart, zoomable and draggable will appear (try it even on these tiny ones - <b>drag</b> them to pan horizontally, <b>shift + drag</b> to zoom in, on <b>chrome shift + mouse wheel</b> to zoom in/out, <b>double click</b> on them to reset them - don't be afraid of <b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> performance - <a href="https://github.com/firehol/netdata/issues/36" target="_blank">a raspberry pi 2 can sustain 300 charts updates per second</a>!).
+						You can have <b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> charts on your site too. Just give it a <code>div</code> and a real time chart, zoomable and draggable will appear (try it even on these tiny ones - <b>drag</b> them to pan horizontally, <b>shift + drag</b> to zoom in, on <b>chrome shift + mouse wheel</b> to zoom in/out, <b>double click</b> on them to reset them - don't be afraid of <b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> performance - <a href="https://github.com/firehol/netdata/wiki/Performance" target="_blank">a raspberry pi 2 can sustain 300 charts updates per second</a>!).
 						</div>
 						<div class="p">
 						For more information please refer to the <b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata wiki</a></b>.
@@ -1219,13 +1219,13 @@ function prepareScreen(data) {
 		else if(t.name === 'apps') {
 			$.each(t.charts, function(x, f) {
 				var c = null;
-				var h = options.chartsHeight / 2;
+				var h = Math.round(options.chartsHeight * 1.5);
 				switch(f.id) {
-					case 'apps.cpu'         : h = options.chartsHeight; break;
-					case 'apps.preads'      : h = options.chartsHeight; break;
-					case 'apps.pwrites'     : h = options.chartsHeight; break;
-					case 'apps.mem'         : h = options.chartsHeight; break;
-					case 'apps.major_faults': h = options.chartsHeight; break;
+					case 'apps.cpu'         : h = Math.round(options.chartsHeight * 2); break;
+					case 'apps.preads'      : h = Math.round(options.chartsHeight * 2); break;
+					case 'apps.pwrites'     : h = Math.round(options.chartsHeight * 2); break;
+					case 'apps.mem'         : h = Math.round(options.chartsHeight * 2); break;
+					case 'apps.major_faults': h = Math.round(options.chartsHeight * 2); break;
 				}
 
 				html += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
