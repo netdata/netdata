@@ -62,6 +62,7 @@ void *cpuidlejitter_main(void *ptr)
 		rrdset_done(st);
 	}
 
+	pthread_exit(NULL);
 	return NULL;
 }
 

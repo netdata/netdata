@@ -403,6 +403,7 @@ void *pluginsd_worker_thread(void *arg)
 			cd->pid = 0;
 			cd->enabled = 0;
 			cd->obsolete = 1;
+			pthread_exit(NULL);
 			return NULL;
 		}
 
@@ -417,6 +418,7 @@ void *pluginsd_worker_thread(void *arg)
 	}
 
 	cd->obsolete = 1;
+	pthread_exit(NULL);
 	return NULL;
 }
 
@@ -450,6 +452,7 @@ void *pluginsd_main(void *ptr)
 		dir = opendir(dir_name);
 		if(unlikely(!dir)) {
 			error("Cannot open directory '%s'.", dir_name);
+			pthread_exit(NULL);
 			return NULL;
 		}
 
@@ -524,6 +527,7 @@ void *pluginsd_main(void *ptr)
 		sleep((unsigned int) scan_frequency);
 	}
 
+	pthread_exit(NULL);
 	return NULL;
 }
 

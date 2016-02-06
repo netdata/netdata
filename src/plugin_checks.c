@@ -91,6 +91,7 @@ void *checks_main(void *ptr)
 		rrdset_done(check3);
 	}
 
+	pthread_exit(NULL);
 	return NULL;
 }
 

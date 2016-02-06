@@ -521,6 +521,7 @@ void *tc_main(void *ptr)
 		fp = mypopen(buffer, &tc_child_pid);
 		if(!fp) {
 			error("TC: Cannot popen(\"%s\", \"r\").", buffer);
+			pthread_exit(NULL);
 			return NULL;
 		}
 
@@ -672,12 +673,14 @@ void *tc_main(void *ptr)
 
 		if(netdata_exit) {
 			tc_device_free_all();
+			pthread_exit(NULL);
 			return NULL;
 		}
 
 		sleep((unsigned int) rrd_update_every);
 	}
 
+	pthread_exit(NULL);
 	return NULL;
 }
 

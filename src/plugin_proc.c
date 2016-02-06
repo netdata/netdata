@@ -223,5 +223,6 @@ void *proc_main(void *ptr)
 		bcopy(&now, &last, sizeof(struct timeval));
 	}
 
+	pthread_exit(NULL);
 	return NULL;
 }

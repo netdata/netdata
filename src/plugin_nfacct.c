@@ -98,12 +98,14 @@ void *nfacct_main(void *ptr) {
 	nl  = mnl_socket_open(NETLINK_NETFILTER);
 	if(!nl) {
 		error("nfacct.plugin: mnl_socket_open() failed");
+		pthread_exit(NULL);
 		return NULL;
 	}
 
 	if(mnl_socket_bind(nl, 0, MNL_SOCKET_AUTOPID) < 0) {
 		mnl_socket_close(nl);
 		error("nfacct.plugin: mnl_socket_bind() failed");
+		pthread_exit(NULL);
 		return NULL;
 	}
 	portid = mnl_socket_get_portid(nl);
@@ -127,11 +129,13 @@ void *nfacct_main(void *ptr) {
 		if(!nlh) {
 			mnl_socket_close(nl);
 			error("nfacct.plugin: nfacct_nlmsg_build_hdr() failed");
+			pthread_exit(NULL);
 			return NULL;
 		}
 
 		if(mnl_socket_sendto(nl, nlh, nlh->nlmsg_len) < 0) {
 			error("nfacct.plugin: mnl_socket_send");
+			pthread_exit(NULL);
 			return NULL;
 		}
 
@@ -144,6 +148,7 @@ void *nfacct_main(void *ptr) {
 
 		if (ret == -1) {
 			error("nfacct.plugin: error communicating with kernel.");
+			pthread_exit(NULL);
 			return NULL;
 		}
 
@@ -210,6 +215,7 @@ void *nfacct_main(void *ptr) {
 	}
 
 	mnl_socket_close(nl);
+	pthread_exit(NULL);
 	return NULL;
 }
 #endif
