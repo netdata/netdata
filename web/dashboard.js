@@ -76,8 +76,51 @@
 	NETDATA.c3_js  		  		= NETDATA.serverDefault + 'lib/c3.min.js';
 	NETDATA.c3_css   			= NETDATA.serverDefault + 'css/c3.min.css';
 	NETDATA.morris_css   		= NETDATA.serverDefault + 'css/morris.css';
-	NETDATA.dashboard_css		= NETDATA.serverDefault + 'dashboard.css';
 	NETDATA.google_js    		= 'https://www.google.com/jsapi';
+
+	NETDATA.themes = {
+		default: {
+			bootstrap_css: NETDATA.serverDefault + 'css/bootstrap.min.css',
+			dashboard_css: NETDATA.serverDefault + 'dashboard.css',
+			background: '#FFFFFF',
+			foreground: '#000000',
+			grid: '#DDDDDD',
+			axis: '#CCCCCC',
+			colors: [ 	'#3366CC', '#DC3912',   '#109618', '#FF9900',   '#990099', '#DD4477',
+						'#3B3EAC', '#66AA00',   '#0099C6', '#B82E2E',   '#AAAA11', '#5574A6',
+						'#994499', '#22AA99',   '#6633CC', '#E67300',   '#316395', '#8B0707',
+						'#329262', '#3B3EAC' ],
+			easypiechart_track: '#f0f0f0',
+			easypiechart_scale: '#dfe0e0',
+			gauge_pointer: '#C0C0C0',
+			gauge_stroke: '#F0F0F0',
+			gauge_gradient: true
+		},
+		slate: {
+			bootstrap_css: NETDATA.serverDefault + 'css/bootstrap.slate.min.css',
+			dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css',
+			background: '#272b30',
+			foreground: '#C8C8C8',
+			grid: '#373b40',
+			axis: '#373b40',
+			colors: [ 	'#66AA00', '#FE3912',   '#3366CC', '#D66300',   '#0099C6', '#DDDD00',
+						'#3B3EAC', '#EE9911',   '#BB44CC', '#C83E3E',   '#990099', '#CC7700',
+						'#22AA99', '#109618',   '#6633CC', '#DD4477',   '#316395', '#8B0707',
+						'#329262', '#3B3EFF' ],
+			easypiechart_track: '#373b40',
+			easypiechart_scale: '#373b40',
+			gauge_pointer: '#474b50',
+			gauge_stroke: '#373b40',
+			gauge_gradient: false
+		}
+	};
+
+	if(typeof netdataTheme !== 'undefined' && typeof NETDATA.themes[netdataTheme] !== 'undefined')
+		NETDATA.themes.current = NETDATA.themes[netdataTheme];
+	else
+		NETDATA.themes.current = NETDATA.themes.default;
+
+	NETDATA.colors = NETDATA.themes.current.colors;
 
 	// these are the colors Google Charts are using
 	// we have them here to attempt emulate their look and feel on the other chart libraries
@@ -86,9 +129,6 @@
 	//						'#DD4477', '#66AA00', '#B82E2E', '#316395', '#994499', '#22AA99', '#AAAA11',
 	//						'#6633CC', '#E67300', '#8B0707', '#329262', '#5574A6', '#3B3EAC' ];
 
-	NETDATA.colors		= [ '#3366CC', '#DC3912', '#109618', '#FF9900', '#990099', '#DD4477', '#3B3EAC',
-							'#66AA00', '#0099C6', '#B82E2E', '#AAAA11', '#5574A6', '#994499', '#22AA99',
-							'#6633CC', '#E67300', '#316395', '#8B0707', '#329262', '#3B3EAC' ];
 	// an alternative set
 	// http://www.mulinblog.com/a-color-palette-optimized-for-data-visualization/
 	//                         (blue)     (red)      (orange)   (green)    (pink)     (brown)    (purple)   (yellow)   (gray)
@@ -590,7 +630,7 @@
 		this.label = label;
 		this.name_div = null;
 		this.value_div = null;
-		this.color = '#000';
+		this.color = NETDATA.themes.current.foreground;
 
 		if(parent.selected === parent.unselected)
 			this.selected = true;
@@ -1916,8 +1956,8 @@
 
 			if(typeof this.colors_assigned[label] === 'undefined') {
 				if(this.colors_available.length === 0) {
-					for(var i = 0, len = NETDATA.colors.length; i < len ; i++)
-						this.colors_available.push(NETDATA.colors[i]);
+					for(var i = 0, len = NETDATA.themes.current.colors.length; i < len ; i++)
+						this.colors_available.push(NETDATA.themes.current.colors[i]);
 				}
 
 				this.colors_assigned[label] = this.colors_available.shift();
@@ -1961,8 +2001,8 @@
 			}
 
 			// push all the standard colors too
-			for(var i = 0, len = NETDATA.colors.length; i < len ; i++)
-				this.colors_available.push(NETDATA.colors[i]);
+			for(var i = 0, len = NETDATA.themes.current.colors.length; i < len ; i++)
+				this.colors_available.push(NETDATA.themes.current.colors[i]);
 
 			return this.colors;
 		}
@@ -3102,7 +3142,7 @@
 		if(state.peity_options.stroke !== state.chartColors()[0]) {
 			state.peity_options.stroke = state.chartColors()[0];
 			if(state.chart.chart_type === 'line')
-				state.peity_options.fill = '#FFF';
+				state.peity_options.fill = NETDATA.themes.current.background;
 			else
 				state.peity_options.fill = NETDATA.colorLuminance(state.chartColors()[0], NETDATA.chartDefaults.fill_luminance);
 		}
@@ -3117,11 +3157,11 @@
 
 		var self = $(state.element);
 		state.peity_options = {
-			stroke: '#000',
+			stroke: NETDATA.themes.current.foreground,
 			strokeWidth: self.data('peity-strokewidth') || 1,
 			width: state.chartWidth(),
 			height: state.chartHeight(),
-			fill: '#000'
+			fill: NETDATA.themes.current.foreground
 		};
 
 		NETDATA.peityChartUpdate(state, data);
@@ -3169,7 +3209,7 @@
 		var self = $(state.element);
 		var type = self.data('sparkline-type') || 'line';
 		var lineColor = self.data('sparkline-linecolor') || state.chartColors()[0];
-		var fillColor = self.data('sparkline-fillcolor') || (state.chart.chart_type === 'line')?'#FFF':NETDATA.colorLuminance(lineColor, NETDATA.chartDefaults.fill_luminance);
+		var fillColor = self.data('sparkline-fillcolor') || (state.chart.chart_type === 'line')?NETDATA.themes.current.background:NETDATA.colorLuminance(lineColor, NETDATA.chartDefaults.fill_luminance);
 		var chartRangeMin = self.data('sparkline-chartrangemin') || undefined;
 		var chartRangeMax = self.data('sparkline-chartrangemax') || undefined;
 		var composite = self.data('sparkline-composite') || undefined;
@@ -3468,7 +3508,7 @@
 			stepPlot: self.data('dygraph-stepplot') || false,
 
 			// Draw a border around graph lines to make crossing lines more easily distinguishable. Useful for graphs with many lines.
-			strokeBorderColor: self.data('dygraph-strokebordercolor') || 'white',
+			strokeBorderColor: self.data('dygraph-strokebordercolor') || NETDATA.themes.current.background,
 			strokeBorderWidth: self.data('dygraph-strokeborderwidth') || (chart_type === 'stacked')?0.0:0.0,
 
 			fillGraph: self.data('dygraph-fillgraph') || (chart_type === 'area' || chart_type === 'stacked')?true:false,
@@ -3478,7 +3518,7 @@
 
 			drawAxis: self.data('dygraph-drawaxis') || true,
 			axisLabelFontSize: self.data('dygraph-axislabelfontsize') || 10,
-			axisLineColor: self.data('dygraph-axislinecolor') || '#CCC',
+			axisLineColor: self.data('dygraph-axislinecolor') || NETDATA.themes.current.axis,
 			axisLineWidth: self.data('dygraph-axislinewidth') || 0.3,
 
 			drawGrid: self.data('dygraph-drawgrid') || true,
@@ -3486,7 +3526,7 @@
 			drawYGrid: self.data('dygraph-drawygrid') || undefined,
 			gridLinePattern: self.data('dygraph-gridlinepattern') || null,
 			gridLineWidth: self.data('dygraph-gridlinewidth') || 0.3,
-			gridLineColor: self.data('dygraph-gridlinecolor') || '#DDD',
+			gridLineColor: self.data('dygraph-gridlinecolor') || NETDATA.themes.current.grid,
 
 			maxNumberWidth: self.data('dygraph-maxnumberwidth') || 8,
 			sigFigs: self.data('dygraph-sigfigs') || null,
@@ -4472,8 +4512,8 @@
 
 		chart.easyPieChart({
 			barColor: self.data('easypiechart-barcolor') || state.chartColors()[0], //'#ef1e25',
-			trackColor: self.data('easypiechart-trackcolor') || '#f0f0f0',
-			scaleColor: self.data('easypiechart-scalecolor') || '#dfe0e0',
+			trackColor: self.data('easypiechart-trackcolor') || NETDATA.themes.current.easypiechart_track,
+			scaleColor: self.data('easypiechart-scalecolor') || NETDATA.themes.current.easypiechart_scale,
 			scaleLength: self.data('easypiechart-scalelength') || 5,
 			lineCap: self.data('easypiechart-linecap') || 'round',
 			lineWidth: self.data('easypiechart-linewidth') || stroke,
@@ -4675,8 +4715,8 @@
 		var value = data.result[0];
 		var max = self.data('gauge-max-value') || null;
 		var adjust = self.data('gauge-adjust') || null;
-		var pointerColor = self.data('gauge-pointer-color') || '#C0C0C0';
-		var strokeColor = self.data('gauge-stroke-color') || '#F0F0F0';
+		var pointerColor = self.data('gauge-pointer-color') || NETDATA.themes.current.gauge_pointer;
+		var strokeColor = self.data('gauge-stroke-color') || NETDATA.themes.current.gauge_stroke;
 		var startColor = self.data('gauge-start-color') || state.chartColors()[0];
 		var stopColor = self.data('gauge-stop-color') || void 0;
 		var generateGradient = self.data('gauge-generate-gradient') || false;
@@ -4713,8 +4753,11 @@
 			strokeColor: strokeColor,	// to see which ones work best for you
 			limitMax: true,
 			generateGradient: generateGradient,
-			gradientType: 0,
-			percentColors: [
+			gradientType: 0
+		};
+
+		if(generateGradient === false && NETDATA.themes.current.gauge_gradient === true) {
+			options.percentColors = [
 				[0.0, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 0))],
 				[0.1, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 1))],
 				[0.2, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 2))],
@@ -4725,8 +4768,8 @@
 				[0.7, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 7))],
 				[0.8, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 8))],
 				[0.9, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 9))],
-				[1.0, NETDATA.colorLuminance(startColor, 0.0)]]
-		};
+				[1.0, NETDATA.colorLuminance(startColor, 0.0)]];
+		}
 
 		state.gauge_canvas = document.createElement('canvas');
 		state.gauge_canvas.id = 'gauge-' + state.uuid + '-canvas';
@@ -5038,7 +5081,7 @@
 
 	NETDATA.requiredCSS = [
 		{
-			url: NETDATA.serverDefault + 'css/bootstrap.min.css',
+			url: NETDATA.themes.current.bootstrap_css,
 			isAlreadyLoaded: function() {
 				if(typeof netdataNoBootstrap !== 'undefined' && netdataNoBootstrap)
 					return true;
@@ -5051,7 +5094,7 @@
 			isAlreadyLoaded: function() { return false; }
 		},
 		{
-			url: NETDATA.dashboard_css,
+			url: NETDATA.themes.current.dashboard_css,
 			isAlreadyLoaded: function() { return false; }
 		},
 		{

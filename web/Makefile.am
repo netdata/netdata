@@ -11,6 +11,7 @@ dist_web_DATA = \
         dashboard.html \
         dashboard.js \
         dashboard.css \
+        dashboard.slate.css \
 	favicon.ico \
 	netdata-swagger.yaml \
 	netdata-swagger.json \
@@ -50,6 +51,7 @@ dist_webcss_DATA = \
         css/morris.css \
         css/bootstrap.min.css \
         css/bootstrap-theme.min.css \
+        css/bootstrap.slate.min.css \
 	css/font-awesome.min.css \
         css/bootstrap-toggle.min.css \
         css/c3.min.css \

@@ -11,20 +11,10 @@
 	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 	<meta name="author" content="costa@tsaousis.gr">
 
-	<style>
-	.easyPieChartLabel {
-		color: #222 !important;
-		text-shadow: #333 0px 0px 1px !important;
-	}
-	.gaugeChartLabel {
-		color: #222 !important;
-		text-shadow: #CCC 0px 0px 1px !important;
-	}
-	</style>
-
+	<script>var netdataTheme = 'slate';</script>
 	<script type="text/javascript" src="dashboard.js"></script>
 </head>
-<body style="background-color: #444;">
+<body>
 
 <div class="container" style="width: 90%; padding-top: 10px; text-align: center; color: #AAA">
 	<div style="font-size: 7vw;">why netdata?</div>
@@ -55,8 +45,6 @@
 						data-title="1/second (netdata&nbsp;default)"
 						data-units="important metric"
 						data-colors="#5A5"
-						data-gauge-stroke-color="#555"
-						data-gauge-pointer-color="#333"
 						></div>
 			</div>
 			<div style="display: inline-block; width: 50%">
@@ -68,11 +56,9 @@
 						data-width="45%"
 						data-after="-600"
 						data-points="40"
-						data-title="Updates Every 15&nbsp;Sec&nbsp;(<a href='https://github.com/OpenTSDB/opentsdb.net/blob/gh-pages/docs/source/user_guide/utilities/tcollector.rst#collecting-lots-of-metrics-with-tcollector' target='_blank'>OpenTSDB</a>)"
+						data-title="Updates Every 15&nbsp;Sec"
 						data-units="important metric"
 						data-colors="#C55"
-						data-gauge-stroke-color="#555"
-						data-gauge-pointer-color="#333"
 						></div>
 				<div data-netdata="example.random2"
 						data-dimensions="random"
@@ -81,11 +67,9 @@
 						data-width="45%"
 						data-after="-600"
 						data-points="2"
-						data-title="Updates Every 5&nbsp;Mins&nbsp;(your&nbsp;NMS)"
+						data-title="Updates Every 5&nbsp;Mins"
 						data-units="important metric"
 						data-colors="#C55"
-						data-gauge-stroke-color="#555"
-						data-gauge-pointer-color="#333"
 						></div>
 			</div>
 		</div>
@@ -104,8 +88,6 @@
 						data-title="1/second (netdata&nbsp;default)"
 						data-units="important metric"
 						data-colors="#5A5"
-						data-easypiechart-trackcolor="#555"
-						data-easypiechart-scalecolor="#555"
 						></div>
 			</div>
 			<div style="display: inline-block; width: 40%">
@@ -120,8 +102,6 @@
 						data-title="Updates Every 15&nbsp;Sec&nbsp;(<a href='https://github.com/OpenTSDB/opentsdb.net/blob/gh-pages/docs/source/user_guide/utilities/tcollector.rst#collecting-lots-of-metrics-with-tcollector' target='_blank'>OpenTSDB</a>)"
 						data-units="important metric"
 						data-colors="#C55"
-						data-easypiechart-trackcolor="#555"
-						data-easypiechart-scalecolor="#555"
 						></div>
 				<div data-netdata="example.random2"
 						data-dimensions="random"
@@ -133,8 +113,6 @@
 						data-title="Updates Every 5&nbsp;Mins&nbsp;(your&nbsp;NMS)"
 						data-units="important metric"
 						data-colors="#C55"
-						data-easypiechart-trackcolor="#555"
-						data-easypiechart-scalecolor="#555"
 						></div>
 			</div>
 		</div>

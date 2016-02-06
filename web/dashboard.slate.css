@@ -1,0 +1,473 @@
+html,
+body {
+	/*font-family: Calibri,"Segoe UI","Helvetica Neue",Helvetica,Arial,sans-serif;*/
+	font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+	font-style: normal;
+	font-variant: normal;
+	color: #878b90;
+}
+
+code {
+	background-color: #b9b2b4
+}
+.btn {
+    padding-top: 6px;
+}
+
+.dashboard-sidebar .nav > .active > a,
+.dashboard-sidebar .nav > .active:hover > a,
+.dashboard-sidebar .nav > .active:focus > a {
+	color: #765d9c;
+	border-left: 2px solid #765d9c;
+}
+
+.netdata-chart-alignment {
+	margin-left: 55px;
+}
+
+.netdata-container {
+	display: -webkit-flex; /* Safari */
+	-webkit-flex-wrap: wrap; /* Safari 6.1+ */
+	display: inline-block;
+	flex-wrap: wrap;
+	overflow: hidden;
+
+	/* required for child elements to have absolute position */
+	position: relative;
+	
+	/* width and height is given per chart with data-width and data-height */
+}
+
+.netdata-aspect {
+	position: relative;
+	width: 100%;
+	padding: 0px;
+	margin: 0px;
+}
+
+.netdata-container-with-legend {
+	display: -webkit-flex; /* Safari */
+	-webkit-flex-wrap: wrap; /* Safari 6.1+ */
+	display: inline-block;
+	flex-wrap: wrap;
+	overflow: hidden;
+
+	/* fix minimum scrollbar issue in firefox */
+	min-height: 99px;
+
+	/* required for child elements to have absolute position */
+	position: relative;
+	
+	/* width and height is given per chart with data-width and data-height */
+}
+
+.netdata-legend-resize-handler {
+	display: block;
+	position: absolute;
+	bottom: 0px;
+	right: 0px;
+	height: 15px;
+	width: 30px;
+	background-color: #272b30;
+	font-size: 12px;
+	vertical-align: middle;
+	line-height: 15px;
+	cursor: ns-resize;
+	color: #373b40;
+	text-align: center;
+	overflow: hidden;
+	z-index: 20;
+	padding: 0px;
+	margin: 0px;
+}
+
+.netdata-message {
+	display: inline-block;
+	text-align: left;
+	vertical-align: top;
+	font-weight: bold;
+	font-size: x-small;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	background: inherit;
+	z-index: 0;
+}
+
+.netdata-message.hidden {
+	display: none;
+}
+
+.netdata-message.icon {
+	color: #373b40;
+	text-align: center;
+	vertical-align: middle;
+}
+
+.netdata-chart-legend {
+	position: absolute;			/* within .netdata-container */
+	top: 0;
+	right: 0;
+	background-color: #272b30;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	line-height: 14px;
+	display: block;
+	width: 140px;				/* --legend-width */
+	height: calc(100% - 15px);	/* 10px for the resize handler and 5px for the top margin */
+	font-size: 10px;
+	margin-top: 5px;
+	/* width and height is calculated (depends on the appearance of the legend) */
+}
+
+.netdata-legend-title-date {
+	font-size: 10px;
+	font-weight: normal;
+	margin-top: 0px;
+}
+.netdata-legend-title-time {
+	font-size: 11px;
+	font-weight: bold;
+	margin-top: 0px;
+}
+.netdata-legend-title-units {
+	position: absolute;
+	right: 5px;
+	float: right;
+	font-size: 10px;
+	vertical-align: top;
+	font-weight: normal;
+	margin-top: 0px;
+}
+.netdata-legend-series {
+	position: absolute;
+	width: 140px;				/* --legend-width */
+	height: calc(100% - 50px);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	line-height: 14px;
+	display: block;
+	font-size: 10px;
+	margin-top: 0px;
+}
+
+.netdata-legend-series > .netdata-legend-series-content {
+	position      : absolute;
+	overflow      : scroll;
+	overflow-x    : hidden;
+	top           : 0;
+	right         : 0;
+	bottom        : 0;
+	left          : 0;
+	text-overflow: ellipsis;
+}
+.netdata-legend-series > .netdata-legend-series-content:focus {
+	outline: thin dotted;
+}
+.netdata-legend-series > .netdata-legend-series-content::-webkit-scrollbar {
+	display: block; /* was 'none', but chrome was hidding content with it */
+}
+.has-scrollbar > .netdata-legend-series-content::-webkit-scrollbar {
+	display: block;
+}
+.netdata-legend-series > .netdata-legend-series-pane {
+/*	background : rgba(0,0,0,.25);*/
+	background : #373b40;
+	position   : absolute;
+	width      : 4px;
+	right      : 0;
+	top        : 0;
+	bottom     : 0;
+/*	visibility : hidden\9; */ /* Target only IE7 and IE8 with this hack */
+/*	opacity    : .01; */
+/*	-webkit-transition    : .2s; */
+/*	-moz-transition       : .2s; */
+/*	-o-transition         : .2s; */
+/*	transition            : .2s; */
+	-moz-border-radius    : 4px;
+	-webkit-border-radius : 4px;
+	border-radius         : 4px;
+}
+.netdata-legend-series > .netdata-legend-series-pane > .netdata-legend-series-slider {
+	background            : #222; /* nano scroller handler color */
+/*	background            : rgba(0,0,0,.5);*/
+	position              : relative;
+	margin                : 0 1px;
+	-moz-border-radius    : 2px;
+	-webkit-border-radius : 2px;
+	border-radius         : 2px;
+}
+.netdata-legend-series:hover > .netdata-legend-series-pane, .netdata-legend-series-pane.active, .netdata-legend-series-pane.flashed {
+/*  visibility : visible\9; */ /* Target only IE7 and IE8 with this hack */
+/*  opacity    : 0.99;*/
+}
+
+.netdata-legend-name-table-line {
+	display: inline-block;
+	width: 13px;
+	height: 4px;
+	border-width: 0px;
+	border-bottom-width: 2px;
+	border-bottom-style: solid;
+	border-bottom-color: #272b30;
+}
+.netdata-legend-name-table-area {
+	display: inline-block;
+	width: 13px;
+	height: 5px;
+	border-width: 1px;
+	border-top-width: 1px;
+	border-top-style: solid;
+	border-top-color: inherit;
+}
+.netdata-legend-name-table-stacked {
+	display: inline-block;
+	width: 13px;
+	height: 5px;
+	border-width: 1px;
+	border-top-width: 1px;
+	border-top-style: solid;
+	border-top-color: inherit;
+}
+.netdata-legend-name-tr {
+}
+.netdata-legend-name-td {
+}
+.netdata-legend-name {
+	text-align: left;
+	font-size: 10px;
+	font-weight: bold;
+	vertical-align: bottom;
+	margin-top: 0px;
+	z-index: 9;
+	padding: 0px;
+	width: 80px !important;
+	max-width: 80px !important;
+	text-overflow: ellipsis;
+	overflow: hidden;
+	white-space: nowrap;
+	display: inline-block;
+	cursor: pointer;
+}
+
+.netdata-legend-value {
+	/*margin-left: 14px;*/
+	position: absolute;
+	right: 5px;
+	float: right;
+	text-align: right;
+	font-size: 10px;
+	font-weight: bold;
+	vertical-align: bottom;
+	background-color: #272b30;
+	margin-top: 0px;
+	z-index: 10;
+	padding: 0px;
+	padding-left: 15px;
+	cursor: pointer;
+	/* -webkit-font-smoothing: none; */
+}
+.netdata-legend-name.not-selected {
+	font-weight: normal;
+	opacity: 0.3;
+}
+
+.netdata-chart {
+	position: absolute;		/* within .netdata-container */
+	top: 0;					/* within .netdata-container */
+	left: 0;				/* within .netdata-container */
+	display: inline-block;
+	overflow: hidden;
+	width: 100%;
+	height: 100%;
+	z-index: 5;
+
+	/* width and height is calculated (depends on the appearance of the legend) */
+}
+
+.netdata-chart-with-legend-right {
+	position: absolute;		/* within .netdata-container */
+	top: 0;					/* within .netdata-container */
+	left: 0;				/* within .netdata-container */
+	display: block;
+	overflow: hidden;
+	margin-right: 140px;		/* --legend-width */
+	width: calc(100% - 140px);	/* --legend-width */
+	height: 100%;
+	z-index: 5;
+	flex-grow: 1;
+
+	/* width and height is calculated (depends on the appearance of the legend) */
+}
+
+.netdata-peity-chart {
+
+}
+
+.netdata-sparkline-chart {
+
+}
+
+.netdata-dygraph-chart {
+
+}
+
+.netdata-morris-chart {
+
+}
+
+.netdata-google-chart {
+
+}
+
+.dygraph-ylabel {
+}
+
+.dygraph-axis-label {
+	color: #676b70;
+}
+
+.dygraph-title {
+	text-indent: 56px;
+	text-align: left;
+	position: absolute;
+	left: 0px;
+	top: 4px;
+	font-size: 11px;
+	font-weight: bold;
+	text-overflow: ellipsis;
+	overflow: hidden;
+	white-space: nowrap;
+}
+
+/* fix for sparkline tooltip under bootstrap */
+.jqstooltip {
+  width: auto !important;
+  height: auto !important;
+}
+
+.easyPieChart {
+	position: relative;
+	text-align: center;
+}
+
+.easyPieChart canvas {
+	position: absolute;
+	top: 0;
+	left: 0;
+}
+
+.easyPieChartLabel {
+	display: inline-block;
+	position: absolute;
+	float: left;
+	left: 0;
+	width: 100%;
+	text-align: center;
+	color: #BBB;
+	font-weight: normal;
+	text-shadow: #272b30 0px 0px 1px;
+	/* -webkit-font-smoothing: none; */
+}
+
+.easyPieChartTitle {
+	display: inline-block;
+	position: absolute;
+	float: left;
+	left: 0;
+	width: 64%;
+	margin-left: 18%;
+	text-align: center;
+	color: #676b70;
+	font-weight: normal;
+}
+
+.easyPieChartUnits {
+	display: inline-block;
+	position: absolute;
+	float: left;
+	left: 0;
+	width: 60%;
+	margin-left: 20%;
+	text-align: center;
+	color: #676b70;
+	font-weight: normal;
+}
+
+.gaugeChart {
+	position: relative;
+	text-align: center;
+}
+
+.gaugeChart canvas {
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: 0;
+}
+
+.gaugeChartLabel {
+	display: inline-block;
+	position: absolute;
+	float: left;
+	left: 0;
+	width: 100%;
+	text-align: center;
+	color: #BBB;
+	font-weight: bold;
+	z-index: 1;
+	text-shadow: #272b30 0px 0px 1px;
+	/* text-shadow: #CCC 1px 1px 0px, #CCC -1px -1px 0px, #CCC 1px -1px 0px, #CCC -1px 1px 0px; */
+	/* -webkit-text-stroke: 1px #777; */
+	/* -webkit-font-smoothing: none; */
+}
+
+.gaugeChartTitle {
+	display: inline-block;
+	position: absolute;
+	float: left;
+	left: 0;
+	width: 100%;
+	text-align: center;
+	color: #676b70;
+	font-weight: bold;
+}
+
+.gaugeChartUnits {
+	display: inline-block;
+	position: absolute;
+	float: left;
+	left: 0;
+	bottom: 0;
+	width: 100%;
+	text-align: left;
+	margin-left: 5%;
+	color: #676b70;
+	font-weight: normal;
+}
+
+.gaugeChartMin {
+	display: inline-block;
+	position: absolute;
+	float: left;
+	left: 0;
+	bottom: 10%;
+	width: 92%;
+	margin-left: 8%;
+	text-align: left;
+	color: #676b70;
+	font-weight: normal;
+}
+
+.gaugeChartMax {
+	display: inline-block;
+	position: absolute;
+	float: left;
+	left: 0;
+	bottom: 10%;
+	width: 95%;
+	margin-right: 5%;
+	text-align: right;
+	color: #676b70;
+	font-weight: normal;
+}

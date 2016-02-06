@@ -281,6 +281,7 @@
 	<!-- <script> netdataServer = "http://box:19999"; </script> -->
 
 	<!-- load the dashboard manager - it will do the rest -->
+	<script>var netdataTheme = 'slate';</script>
 	<script type="text/javascript" src="dashboard.js?v24"></script>
 </head>
 
@@ -421,7 +422,7 @@
 				</div>
 				<div class="modal-body">
 						<div class="p">
-						<b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> is the fastest way to visualize key metrics. It is a resource efficient, highly optimized system for collecting and visualizing any type of realtime timeseries data, from CPU usage, disk activity, SQL queries, API calls, web site visitors, etc.
+						<b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> is the fastest way to visualize metrics. It is a resource efficient, highly optimized system for collecting and visualizing any type of realtime timeseries data, from CPU usage, disk activity, SQL queries, API calls, web site visitors, etc.
 						</div>
 						<div class="p">
 						<b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> tries to visualize the truth of <b>now</b>, in its <b>greatest detail</b>, so that you can get insights of what is happening now and what just happened, on your systems and applications.
@@ -1184,8 +1185,8 @@ function prepareScreen(data) {
 								+ ' data-points="' + duration.toString() + '"'
 								+ ' role="application"></div>';
 								break;
-						case 'disk_backlog': c = '#DD4477'; break;
-						case 'disk_util'   : c = '#109618';
+						case 'disk_backlog': c = '#CCCC00'; break;
+						case 'disk_util'   : c = '#FF5588';
 								head += '<div data-netdata="' + f.id + '"'
 								+ ' data-chart-library="gauge"'
 								+ ' data-title="Utilization"'
@@ -1198,7 +1199,7 @@ function prepareScreen(data) {
 								+ ' data-colors="' + c + '"'
 								+ ' role="application"></div>';
 								break;
-						case 'disk_qops'   : c = '#E67300'; break;
+						case 'disk_qops'   : c = '#5555FF'; break;
 					}
 
 					all += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
