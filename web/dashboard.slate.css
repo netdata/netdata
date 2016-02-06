@@ -7,13 +7,6 @@ body {
 	color: #878b90;
 }
 
-code {
-	background-color: #b9b2b4
-}
-.btn {
-    padding-top: 6px;
-}
-
 .dashboard-sidebar .nav > .active > a,
 .dashboard-sidebar .nav > .active:hover > a,
 .dashboard-sidebar .nav > .active:focus > a {
@@ -99,7 +92,7 @@ code {
 }
 
 .netdata-message.icon {
-	color: #373b40;
+	color: #35393e;
 	text-align: center;
 	vertical-align: middle;
 }
@@ -324,7 +317,7 @@ code {
 }
 
 .dygraph-axis-label {
-	color: #676b70;
+	color: #6c7075;
 }
 
 .dygraph-title {
