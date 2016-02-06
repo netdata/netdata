@@ -96,29 +96,17 @@ Nice to see you are giving it a try!
 
 You are about to build and install netdata to your system.
 
-By default netdata will be installed as any other package:
+It will be installed at these locations:
 
-  - the daemon    at /usr/sbin/netdata
-  - config files  at /etc/netdata
-  - web files     at /usr/share/web/netdata
-  - plugins       at /usr/libexec/netdata
-  - cache files   at /var/cache/netdata
-  - log files     at /var/log/netdata
+  - the daemon    at ${NETDATA_PREFIX}/usr/sbin/netdata
+  - config files  at ${NETDATA_PREFIX}/etc/netdata
+  - web files     at ${NETDATA_PREFIX}/usr/share/web/netdata
+  - plugins       at ${NETDATA_PREFIX}/usr/libexec/netdata
+  - cache files   at ${NETDATA_PREFIX}/var/cache/netdata
+  - log files     at ${NETDATA_PREFIX}/var/log/netdata
 
-If you want to install it to another directory, run the
-installer like this:
-
-  $ME --install /path/to/install
-
-A new directory called netdata will be created as
-
-  /path/to/install/netdata
-
-and all of netdata will be installed into it.
-Nothing will be touched on your system.
-
-This installer accepts more options.
-Run it with --help for help.
+This installer allows you to change the installation path.
+Press Control-C and run the same command with --help for help.
 
 BANNER
 
@@ -396,3 +384,46 @@ To start it, just run it:
 Enjoy!
 
 END
+
+ksm_is_available_but_disabled() {
+	cat <<KSM1
+
+INFORMATION:
+
+I see you have kernel memory de-duper (called Kernel Same-page Merging,
+or KSM) available, but it is not currently enabled.
+
+To enable it run:
+
+echo 1 >/sys/kernel/mm/ksm/run
+echo 1000 >/sys/kernel/mm/ksm/sleep_millisecs
+
+If you enable it, you will save 20-60% of netdata memory.
+
+KSM1
+}
+
+ksm_is_not_available() {
+	cat <<KSM2
+
+INFORMATION:
+
+I see you do not have kernel memory de-duper (called Kernel Same-page
+Merging, or KSM) available.
+
+To enable it, you need a kernel built with CONFIG_KSM=y
+
+If you can have it, you will save 20-60% of netdata memory.
+
+KSM2
+}
+
+if [ -f "/sys/kernel/mm/ksm/run" ]
+	then
+	if [ $(cat "/sys/kernel/mm/ksm/run") != "1" ]
+		then
+		ksm_is_available_but_disabled
+	fi
+else
+	ksm_is_not_available
+fi
