@@ -1153,6 +1153,8 @@ function enrichChartData(chart) {
 	// net_* and disk_* have special grouping
 	if(chart.type.match(/^net_/))
 		chart.menu = 'net';
+	else if(chart.type.match(/^ap_/))
+		chart.menu = 'ap';
 	else if(chart.type.match(/^disk_/))
 		chart.menu = 'disk';
 	else
