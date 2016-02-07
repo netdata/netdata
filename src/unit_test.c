@@ -617,7 +617,7 @@ int run_test(struct test *test)
 	snprintf(name, 100, "unittest-%s", test->name);
 
 	// create the chart
-	RRDSET *st = rrdset_create("netdata", name, name, "netdata", "Unit Testing", "a value", 1, 1, RRDSET_TYPE_LINE);
+	RRDSET *st = rrdset_create("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", 1, 1, RRDSET_TYPE_LINE);
 	RRDDIM *rd = rrddim_add(st, "dimension", NULL, test->multiplier, test->divisor, test->algorithm);
 	st->debug = 1;
 
@@ -714,7 +714,7 @@ int unit_test(long delay, long shift)
 	int do_abst = 0;
 	int do_absi = 0;
 
-	RRDSET *st = rrdset_create("netdata", name, name, "netdata", "Unit Testing", "a value", 1, 1, RRDSET_TYPE_LINE);
+	RRDSET *st = rrdset_create("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", 1, 1, RRDSET_TYPE_LINE);
 	st->debug = 1;
 
 	RRDDIM *rdabs = NULL;

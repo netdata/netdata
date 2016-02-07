@@ -33,7 +33,7 @@ var webbox = {
 	name: __filename,
 	enable_autodetect: true,
 	update_every: 1,
-
+	base_priority: 60000,
 	charts: {},
 
 	processResponse: function(service, data) {
@@ -83,10 +83,10 @@ var webbox = {
 						name: '',										// the unique name of the chart
 						title: service.name + ' Current Grid Power',	// the title of the chart
 						units: d['GriPwr'].unit,						// the units of the chart dimensions
-						family: 'sma_webbox_' + service.name,			// the family of the chart
-						category: 'sma_webbox_' + service.name,			// the category of the chart
+						family: 'now',									// the family of the chart
+						context: 'sma_webbox.grid.power',				// the context of the chart
 						type: netdata.chartTypes.area,					// the type of the chart
-						priority: 1000,									// the priority relative to others in the same family and category
+						priority: webbox.base_priority + 1,				// the priority relative to others in the same family
 						update_every: service.update_every,				// the expected update frequency of the chart
 						dimensions: {
 							'GriPwr': {
@@ -119,10 +119,10 @@ var webbox = {
 						name: '',										// the unique name of the chart
 						title: service.name + ' Today Grid Power',		// the title of the chart
 						units: d['GriEgyTdy'].unit,						// the units of the chart dimensions
-						family: 'sma_webbox_' + service.name,			// the family of the chart
-						category: 'sma_webbox_' + service.name,			// the category of the chart
+						family: 'today',								// the family of the chart
+						context: 'sma_webbox.grid.power.today',			// the context of the chart
 						type: netdata.chartTypes.area,					// the type of the chart
-						priority: 1000,									// the priority relative to others in the same family and category
+						priority: webbox.base_priority + 2,				// the priority relative to others in the same family
 						update_every: service.update_every,				// the expected update frequency of the chart
 						dimensions: {
 							'GriEgyTdy': {
@@ -155,10 +155,10 @@ var webbox = {
 						name: '',										// the unique name of the chart
 						title: service.name + ' Total Grid Power',		// the title of the chart
 						units: d['GriEgyTot'].unit,						// the units of the chart dimensions
-						family: 'sma_webbox_' + service.name,			// the family of the chart
-						category: 'sma_webbox_' + service.name,			// the category of the chart
+						family: 'total',								// the family of the chart
+						context: 'sma_webbox.grid.power.total',			// the context of the chart
 						type: netdata.chartTypes.area,					// the type of the chart
-						priority: 1000,									// the priority relative to others in the same family and category
+						priority: webbox.base_priority + 3,				// the priority relative to others in the same family
 						update_every: service.update_every,				// the expected update frequency of the chart
 						dimensions: {
 							'GriEgyTot': {

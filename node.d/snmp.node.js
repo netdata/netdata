@@ -185,6 +185,11 @@ netdata.processors.snmp = {
 
 			if(error) {
 				service.error('Received error = ' + netdata.stringify(error) + ' varbinds = ' + netdata.stringify(varbinds));
+
+				// make all values null
+				var len = service.snmp_oids.length;
+				while(len--)
+					service.snmp_oids_index[service.snmp_oids[len]].value = null;
 			}
 			else {
 				if(netdata.options.DEBUG === true)
@@ -221,6 +226,7 @@ var snmp = {
 	name: __filename,
 	enable_autodetect: true,
 	update_every: 1,
+	base_priority: 50000,
 
 	charts: {},
 
@@ -276,6 +282,8 @@ var snmp = {
 				var from = service.request.charts[c].multiply_range[0];
 				var to = service.request.charts[c].multiply_range[1];
 				var prio = service.request.charts[c].priority || 1;
+
+				if(prio < snmp.base_priority) prio += snmp.base_priority;
 
 				while(from <= to) {
 					var id = c + from.toString();

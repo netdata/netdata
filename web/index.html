@@ -726,40 +726,6 @@ function sparkline(chart, dimension, units) {
 	return h;
 }
 
-// documentation for each category and chart
-var messages = {
-
-	// categories / sections
-	'system': 'Overview of the key system metrics.',
-	'tc': 'Netdata collects and visualizes tc class utilization using its <a href="https://github.com/firehol/netdata/blob/master/plugins.d/tc-qos-helper.sh" target="_blank">tc-helper plugin</a>. If you also use <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a> for setting up QoS, netdata automatically collects interface and class names. If your QoS configuration includes overheads calculation, the values shown here will include these overheads (the total bandwidth for the same interface as reported in the Network Interfaces section, will be lower than the total bandwidth reported here). Also, data collection may have a slight time difference compared to the interface (QoS data collection is implemented with a BASH script, so a shift in data collection of a few milliseconds should be justified).',
-	'net': 'Per network interface statistics collected from <code>/proc/net/dev</code>.',
-	'apps': 'Per application statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics for applications of interest, defined in <code>/etc/netdata/apps_groups.conf</code> (the default is <a href="https://github.com/firehol/netdata/blob/master/conf.d/apps_groups.conf" target="_blank">here</a>). The plugin internaly builds a process tree (much like <code>ps fax</code> does), and groups processes together (evaluating both child and parent processes) so that the result is always a chart with a predefined set of dimensions (of course, only application groups found running are reported).<br/><b>IMPORTANT</b>: The values shown here are not 100% accurate. They only include values for the processes running. If an application is spawning childs continiously, which are terminated in just a few milliseconds (like shell scripts do), the values reported will be inaccurate. Linux does report the values for the exited childs of a process. However, these values are reported to the parent process <b>only when the child exits</b>. If these values, of the exited child processes, were also aggregated in the charts below, the charts would have been full of spikes, presenting unrealisting utilization for each process group. So, we decided to ignore these values and present only the utilization of <b>the currently running processes</b>.',
-
-	// charts
-	'system.cpu': 'Total CPU utilization (all cores). 100% here means there is no CPU idle time at all. You can get per core usage at the <a href="#cpu">CPUs</a> section and per application usage at the <a href="#apps">Applications Monitoring</a> section.<br/>Keep an eye on <b>iowait</b> ' + sparkline('system.cpu', 'iowait', '%') + '. If it is constantly high, your disks are a bottleneck and they slow your system down.<br/>Another important metric worth monitoring, is <b>softirq</b> ' + sparkline('system.cpu', 'softirq', '%') + '. A constantly high percentage of softirq may indicate network drivers issues.',
-	'system.io': 'Total Disk I/O, for all disks, read from <code>/proc/vmstat</code>. You can get detailed information about each disk at the <a href="#disk">Disks</a> section and per application Disk usage at the <a href="#apps">Applications Monitoring</a> section.',
-	'system.swapio': 'Total Swap I/O, read from <code>/proc/vmstat</code>. (netdata measures both <code>in</code> and <code>out</code>. If either of them is not shown in the chart, it is because it is zero - you can change the page settings to always render all the available dimensions on all charts).',
-	'system.pgfaults': 'Total page faults, read from <code>/proc/vmstat</code>. <b>Major page faults</b> indicates that the system is using its swap. You can find which applications use the swap at the <a href="#apps">Applications Monitoring</a> section.',
-	'system.entropy': '<a href="https://en.wikipedia.org/wiki/Entropy_(computing)" target="_blank">Entropy</a>, read from <code>/proc/sys/kernel/random/entropy_avail</code>, is like a pool of random numbers that are mainly used in cryptography. It is advised that the pool remains always <a href="https://blog.cloudflare.com/ensuring-randomness-with-linuxs-random-number-generator/" target="_blank">above 200</a>. If the pool of entropy gets empty, you risk your security to be predictable and you should install a user-space random numbers generating daemon, like <a href="http://www.issihosts.com/haveged/" target="_blank">haveged</a>, to keep the pool in healthy levels.',
-	'system.forks': 'The number of new processes created per second, read from <code>/proc/stat</code>.',
-	'system.intr': 'Total number of CPU interrupts, read from <code>/proc/stat</code>. Check <code>system.interrupts</code> that gives more detail about each interrupt and also the <a href="#cpu">CPUs</a> section where interrupts are analyzed per CPU core.',
-	'system.interrupts': 'CPU interrupts in detail, read from <code>/proc/interrupts</code>. At the <a href="#cpu">CPUs</a> section, interrupts are analyzed per CPU core.',
-	'system.softirqs': 'CPU softirqs in detail, read from <code>/proc/softirqs</code>. At the <a href="#cpu">CPUs</a> section, softirqs are analyzed per CPU core.',
-	'system.processes': 'System processes, read from <code>/proc/stat</code>. <b>Blocked</b> are processes that are willing to execute but they cannot, e.g. because they wait for disk activity.',
-	'system.ctxt': '<a href="https://en.wikipedia.org/wiki/Context_switch" target="_blank">Context Switches</a>, read from <code>/proc/stat</code>, is the switching of the CPU from one process, task or thread to another. If there are many processes or threads willing to execute and very few CPU cores available to handle them, the system is making more context switching to balance the CPU resources among them. The whole process is computationally intensive. The more the context switches, the slower the system gets.',
-	'system.idlejitter': 'Idle jitter is calculated by netdata. A thread is spawned that requests to sleep for a few microseconds. When the system wakes it up, it measures how many microseconds have passed. The different between the requested and the actual duration of the sleep, is the <b>idle jitter</b>. This number is useful in realtime environments, where CPU jitter can affect the quality of the service (like VoIP media gateways).',
-	'system.ipv4': 'Total IPv4 Traffic, read from <code>/proc/net/netstat</code>. This includes <code>lo</code> device traffic.',
-	'system.ram': 'System memory, read from <code>/proc/meminfo</code>.',
-	'system.swap': 'System swap memory, read from <code>/proc/meminfo</code>.',
-
-	// just a line to allow ending all entries above with comma
-	'end': 'end'
-};
-
-function screenWidth() {
-	return (($(window).width() * 0.95) - 50);
-}
-
 function chartsPerRow(total) {
 	if(options.chartsPerRow === 0) {
 		width = Math.floor(total / options.chartsMinWidth);
@@ -769,249 +735,559 @@ function chartsPerRow(total) {
 	else return options.chartsPerRow;
 }
 
-function chartsPrioritySort(a, b) {
-	if(a.priority === b.priority) {
-		if(a.name < b.name) return -1;
-	}
-	else if(a.priority < b.priority) return -1;
+function prioritySort(a, b) {
+	if(a.priority < b.priority) return -1;
+	if(a.priority > b.priority) return 1;
+	if(a.name < b.name) return -1;
 	return 1;
 }
 
-function uniq(array, find_key, get_result) {
-	if(typeof get_result === 'undefined' || get_result === null)
-		get_result = find_key;
-
+function sortObjectByPriority(object) {
 	var idx = {};
-	var result = new Array();
+	var sorted = new Array();
 
-	$.each(array, function(i, c) {
-		key = find_key(c);
-		if(typeof idx[key] === 'undefined') {
-			idx[key] = true;
-			result.push(get_result(c));
+	for(var i in object) {
+		if(typeof idx[i] === 'undefined') {
+			idx[i] = object[i];
+			sorted.push(i);
 		}
-	});
-	return result;
-}
-
-function uniq_with_list(array, find_key_function) {
-	var idx = {};
-	var result = new Array();
-
-	$.each(array, function(i, c) {
-		key = find_key_function(c);
-		if(typeof idx[key] === 'undefined') {
-			idx[key] = new Array();
-			result.push( { name: key, values: idx[key] } );
-		}
-		idx[key].push(c);
-	});
-	result.sort(function(a, b) {
-		if(a.name < b.name) return -1;
-		return 1;
-	});
-	return result;
-}
-
-function prepareScreen(data) {
-	// console.log('NETDATA is paused - ready to prepare the screen');
-	// console.log(data);
-
-	options.data = data;
-	options.hostname = data.hostname;
-	document.getElementById('hostname').innerHTML = options.hostname;
-	document.getElementById('hostname').href = NETDATA.serverDefault;
-	document.title = options.hostname + ' dashboard';
-	var charts = data.charts;
-
-	function name2id(s) {
-		return s
-			.replace(' ', '_')
-			.replace('(', '_')
-			.replace(')', '_')
-			.replace('/', '_');
 	}
 
-	$.each(charts, function(i, c) {
-		if(c.enabled === true) {
-
-			// find the category of the chart
-			c.category = c.type.split('.')[0];
-
-			var tmp = c.category.split('_')[0];
-			if(tmp === 'net' || tmp === 'disk' || tmp === 'ap')
-				c.category = tmp;
-
-			switch(c.category) {
-				case 'system':
-					c.category_priority = 10;
-					c.category_title = 'System Summary';
-					c.glyphicon = "glyphicon-dashboard";
-					break;
-
-				case 'tc':
-					c.category_priority = 20;
-					c.category_title = 'Quality Of Service';
-					c.glyphicon = "glyphicon-random";
-					
-					// find the name of the interface from the tc family
-					if(typeof options.interfaces_registry[c.family] === 'undefined' || options.interfaces_registry[c.family] === c.family)
-						 options.interfaces_registry[c.family] = c.name.split('.')[1].split('_')[0];
-
-					break;
-
-				case 'net':
-					c.category_priority = 30;
-					c.category_title = 'Network Interfaces';
-					c.glyphicon = "glyphicon-transfer";
-					break;
-
-				case 'ap':
-					c.category_priority = 35;
-					c.category_title = 'Access Points';
-					c.glyphicon = "glyphicon-transfer";
-					break;
-
-				case 'apps':
-					c.category_priority = 40;
-					c.category_title = 'Applications Monitoring';
-					c.glyphicon = "glyphicon-tasks";
-					break;
-
-				case 'ipvs':
-					c.category_priority = 50;
-					c.category_title = 'IP Virtual Server';
-					c.glyphicon = "glyphicon-transfer";
-					break;
-
-				case 'netfilter':
-					c.category_priority = 60;
-					c.category_title = 'Netfilter / IPTables';
-					c.glyphicon = "glyphicon-cloud";
-					break;
-
-				case 'ipv4':
-					c.category_priority = 70;
-					c.category_title = 'IPv4 Summary';
-					c.glyphicon = "glyphicon-globe";
-					break;
-
-				case 'mem':
-					c.category_priority = 80;
-					c.category_title = 'Memory';
-					c.glyphicon = "glyphicon-dashboard";
-					break;
-
-				case 'cpu':
-					c.category_priority = 90;
-					c.category_title = 'CPU Cores';
-					c.glyphicon = "glyphicon-dashboard";
-
-					if(c.id.match(/^cpu\.cpu[0-9]+$/)) {
-						c.family = 'Utilization';
-					}
-					else if(c.id.match(/^cpu\.cpu[0-9]+_interrupts$/)) {
-						c.family = 'Interrupts';
-					}
-					else if(c.id.match(/^cpu\.cpu[0-9]+_softirqs$/)) {
-						c.family = 'SoftIRQs';
-					}
-
-					break;
-
-				case 'disk':
-					c.category_priority = 100;
-					c.category_title = 'Disks';
-					c.glyphicon = "glyphicon-hdd";
-					break;
-
-				case 'nfsd':
-					c.category_priority = 110;
-					c.category_title = 'NFS Server';
-					c.glyphicon = "glyphicon-hdd";
-					break;
-
-				case 'squid':
-					c.category_priority = 140;
-					c.category_title = 'Proxy Server';
-					c.glyphicon = "glyphicon-link";
-					break;
-
-				case 'netdata':
-					c.category_priority = 150;
-					c.category_title = 'Netdata Monitoring';
-					c.glyphicon = "glyphicon-thumbs-up";
-					break;
-
-				case 'sensors':
-					c.category_priority = 160;
-					c.category_title = 'Hardware Sensors';
-					c.glyphicon = "glyphicon-thumbs-up";
-					break;
-
-				case 'postfix':
-					c.category_priority = 170;
-					c.category_title = 'Mail Server';
-					c.glyphicon = "glyphicon-thumbs-up";
-					break;
-
-				case 'example':
-					c.category_priority = 100000;
-					c.category_title = 'Example Plugins';
-					c.glyphicon = "glyphicon-search";
-					break;
-
-				default:
-					c.category_priority = 150;
-					c.category_title = c.type;
-					c.glyphicon = "glyphicon-dashboard";
-					break;
-			}
-
-			// find the unique categories
-			if(typeof options.categories_idx[c.category] === 'undefined') {
-				options.categories_idx[c.category] = {
-					charts: new Array()
-				}
-				options.categories.push({
-					name: c.category,
-					title: c.category_title,
-					priority: c.category_priority,
-					glyphicon: c.glyphicon,
-					charts: options.categories_idx[c.category].charts
-				});
-			}
-			options.categories_idx[c.category].charts.push(c);
-
-			// find the unique families
-			if(typeof options.families_idx[c.family] === 'undefined') {
-				options.families_idx[c.family] = {
-					charts: new Array()
-				};
-				options.families.push({
-					name: c.family,
-					title: c.family,
-					priority: c.category_priority,
-					glyphicon: c.glyphicon,
-					charts: options.categories_idx[c.category].charts
-				});
-			}
-			options.families_idx[c.family].charts.push(c);
-		}
+	sorted.sort(function(a, b) {
+		if(idx[a].priority < idx[b].priority) return -1;
+		if(idx[a].priority > idx[b].priority) return 1;
+		if(a < b) return -1;
+		return 1;
 	});
 
-	function prioritySort(a, b) {
-		if(a.priority < b.priority) return -1;
-		if(a.priority > b.priority) return 1;
-		if(a.name < b.name) return -1;
-		return 1;
+	return sorted;
+}
+
+// ----------------------------------------------------------------------------
+
+function gaugeChart(title, width, dimensions, colors) {
+	if(typeof colors === 'undefined')
+		colors = '';
+	
+	if(typeof dimensions === 'undefined')
+		dimensions = '';
+	
+	return '<div data-netdata="CHART_UNIQUE_ID"'
+							+ ' data-dimensions="' + dimensions + '"'
+							+ ' data-chart-library="gauge"'
+							+ ' data-gauge-adjust="width"'
+							+ ' data-title="' + title + '"'
+							+ ' data-width="' + width + '"'
+							+ ' data-before="0"'
+							+ ' data-after="-CHART_DURATION"'
+							+ ' data-points="CHART_DURATION"'
+							+ ' data-colors="' + colors + '"'
+							+ ' role="application"></div>';
+}
+
+// ----------------------------------------------------------------------------
+
+var menuData = {
+	'system': {
+		title: 'System Overview',
+		info: 'Overview of the key system metrics.'
+	},
+
+	'ap': {
+		title: 'Access Points',
+		info: undefined
+	},
+
+	'tc': {
+		title: 'Quality of Service',
+		info: 'Netdata collects and visualizes tc class utilization using its <a href="https://github.com/firehol/netdata/blob/master/plugins.d/tc-qos-helper.sh" target="_blank">tc-helper plugin</a>. If you also use <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a> for setting up QoS, netdata automatically collects interface and class names. If your QoS configuration includes overheads calculation, the values shown here will include these overheads (the total bandwidth for the same interface as reported in the Network Interfaces section, will be lower than the total bandwidth reported here). Also, data collection may have a slight time difference compared to the interface (QoS data collection is implemented with a BASH script, so a shift in data collection of a few milliseconds should be justified).'
+	},
+
+	'net': {
+		title: 'Network Interfaces',
+		info: 'Per network interface statistics collected from <code>/proc/net/dev</code>.'
+	},
+
+	'ipv4': {
+		title: 'IPv4 Networking',
+		info: undefined
+	},
+
+	'ipvs': {
+		title: 'IP Virtual Server',
+		info: undefined
+	},
+
+	'netfilter': {
+		title: 'Firewall (netfilter)',
+		info: undefined
+	},
+
+	'cpu': {
+		title: 'CPUs',
+		info: undefined
+	},
+
+	'mem': {
+		title: 'Memory',
+		info: undefined
+	},
+
+	'disk': {
+		title: 'Disks',
+		info: undefined
+	},
+
+	'sensors': {
+		title: 'Sensors',
+		info: undefined
+	},
+
+	'nfsd': {
+		title: 'File Server (nfsd)',
+		info: undefined
+	},
+
+	'apps': {
+		title: 'Applications',
+		info: 'Per application statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics for applications of interest, defined in <code>/etc/netdata/apps_groups.conf</code> (the default is <a href="https://github.com/firehol/netdata/blob/master/conf.d/apps_groups.conf" target="_blank">here</a>). The plugin internaly builds a process tree (much like <code>ps fax</code> does), and groups processes together (evaluating both child and parent processes) so that the result is always a chart with a predefined set of dimensions (of course, only application groups found running are reported).<br/><b>IMPORTANT</b>: The values shown here are not 100% accurate. They only include values for the processes running. If an application is spawning childs continiously, which are terminated in just a few milliseconds (like shell scripts do), the values reported will be inaccurate. Linux does report the values for the exited childs of a process. However, these values are reported to the parent process <b>only when the child exits</b>. If these values, of the exited child processes, were also aggregated in the charts below, the charts would have been full of spikes, presenting unrealisting utilization for each process group. So, we decided to ignore these values and present only the utilization of <b>the currently running processes</b>.',
+		height: 1.5
+	},
+
+	'netdata': {
+		title: 'Netdata Monitoring',
+		info: undefined
+	},
+
+	'example': {
+		title: 'Example Charts',
+		info: undefined
+	},
+};
+
+var submenuData = {
+	'mem.ksm': {
+		title: 'Memory Deduper',
+		info: 'Kernel Same-page Merging (KSM) is the kernel memory de-duper.'
+	}
+};
+
+var chartData = {
+	'system.cpu': {
+		info: 'Total CPU utilization (all cores). 100% here means there is no CPU idle time at all. You can get per core usage at the <a href="#cpu">CPUs</a> section and per application usage at the <a href="#apps">Applications Monitoring</a> section.<br/>Keep an eye on <b>iowait</b> ' + sparkline('system.cpu', 'iowait', '%') + '. If it is constantly high, your disks are a bottleneck and they slow your system down.<br/>Another important metric worth monitoring, is <b>softirq</b> ' + sparkline('system.cpu', 'softirq', '%') + '. A constantly high percentage of softirq may indicate network drivers issues.'
+	},
+
+	'system.load': {
+		info: 'Current system load read from <code>/proc/loadavg</code>.',
+		height: 0.7
+	},
+
+	'system.io': {
+		info: 'Total Disk I/O, for all disks, read from <code>/proc/vmstat</code>. You can get detailed information about each disk at the <a href="#disk">Disks</a> section and per application Disk usage at the <a href="#apps">Applications Monitoring</a> section.'
+	},
+
+	'system.swapio': {
+		info: 'Total Swap I/O, read from <code>/proc/vmstat</code>. (netdata measures both <code>in</code> and <code>out</code>. If either of them is not shown in the chart, it is because it is zero - you can change the page settings to always render all the available dimensions on all charts).'
+	},
+
+	'system.pgfaults': {
+		info: 'Total page faults, read from <code>/proc/vmstat</code>. <b>Major page faults</b> indicates that the system is using its swap. You can find which applications use the swap at the <a href="#apps">Applications Monitoring</a> section.'
+	},
+
+	'system.entropy': {
+		colors: '#CC22AA',
+		info: '<a href="https://en.wikipedia.org/wiki/Entropy_(computing)" target="_blank">Entropy</a>, read from <code>/proc/sys/kernel/random/entropy_avail</code>, is like a pool of random numbers that are mainly used in cryptography. It is advised that the pool remains always <a href="https://blog.cloudflare.com/ensuring-randomness-with-linuxs-random-number-generator/" target="_blank">above 200</a>. If the pool of entropy gets empty, you risk your security to be predictable and you should install a user-space random numbers generating daemon, like <a href="http://www.issihosts.com/haveged/" target="_blank">haveged</a>, to keep the pool in healthy levels.'
+	},
+
+	'system.forks': {
+		colors: '#5555DD',
+		info: 'The number of new processes created per second, read from <code>/proc/stat</code>.'
+	},
+
+	'system.intr': {
+		colors: '#DD5555',
+		info: 'Total number of CPU interrupts, read from <code>/proc/stat</code>. Check <code>system.interrupts</code> that gives more detail about each interrupt and also the <a href="#cpu">CPUs</a> section where interrupts are analyzed per CPU core.'
+	},
+
+	'system.interrupts': {
+		info: 'CPU interrupts in detail, read from <code>/proc/interrupts</code>. At the <a href="#cpu">CPUs</a> section, interrupts are analyzed per CPU core.'
+	},
+
+	'system.softirqs': {
+		info: 'CPU softirqs in detail, read from <code>/proc/softirqs</code>. At the <a href="#cpu">CPUs</a> section, softirqs are analyzed per CPU core.'
+	},
+
+	'system.processes': {
+		info: 'System processes, read from <code>/proc/stat</code>. <b>Blocked</b> are processes that are willing to execute but they cannot, e.g. because they wait for disk activity.'
+	},
+
+	'system.ctxt': {
+		info: '<a href="https://en.wikipedia.org/wiki/Context_switch" target="_blank">Context Switches</a>, read from <code>/proc/stat</code>, is the switching of the CPU from one process, task or thread to another. If there are many processes or threads willing to execute and very few CPU cores available to handle them, the system is making more context switching to balance the CPU resources among them. The whole process is computationally intensive. The more the context switches, the slower the system gets.'
+	},
+
+	'system.idlejitter': {
+		colors: '#5555AA',
+		info: 'Idle jitter is calculated by netdata. A thread is spawned that requests to sleep for a few microseconds. When the system wakes it up, it measures how many microseconds have passed. The different between the requested and the actual duration of the sleep, is the <b>idle jitter</b>. This number is useful in realtime environments, where CPU jitter can affect the quality of the service (like VoIP media gateways).'
+	},
+
+	'system.ipv4': {
+		info: 'Total IPv4 Traffic, read from <code>/proc/net/netstat</code>. This includes <code>lo</code> device traffic.'
+	},
+
+	'system.ram': {
+		info: 'System memory, read from <code>/proc/meminfo</code>.'
+	},
+
+	'system.swap': {
+		info: 'System swap memory, read from <code>/proc/meminfo</code>.'
+	},
+
+	'mem.committed': {
+		colors: NETDATA.colors[3]
+	},
+
+	'apps.cpu': {
+		height: 2.0
+	},
+
+	'apps.preads': {
+		height: 2.0
+	},
+
+	'apps.pwrites': {
+		height: 2.0
+	},
+
+	'tc.qos': {
+		heads: [
+			function(id) {
+				if(id.match(/.*-ifb$/))
+					return gaugeChart('Inbound', '12%', '', '#5555AA');
+				else
+					return gaugeChart('Outbound', '12%', '', '#AA9900');
+			}
+		]
+	},
+
+	'net.net': {
+		heads: [
+			gaugeChart('Received', '12%', 'received'),
+			gaugeChart('Sent', '12%', 'sent')
+		]
+	},
+
+	'disk.util': {
+		colors: '#FF5588',
+		heads: [
+			gaugeChart('Utilization', '12%', '', '#FF5588')
+		]
+	},
+
+	'disk.backlog': {
+		colors: '#CCCC00'
+	},
+
+	'disk.io': {
+		heads: [
+			gaugeChart('Read', '12%', 'reads'),
+			gaugeChart('Write', '12%', 'writes')
+		]
+	},
+
+	'netfilter.sockets': {
+		colors: '#88AA00',
+		heads: [
+			gaugeChart('Active Connections', '12%', '', '#88AA00')
+		]
+	},
+
+	'netfilter.new': {
+		heads: [
+			gaugeChart('New Connections', '12%', '', '#5555AA')
+		]
+	},
+
+	'disk.iotime': {
+		height: 0.5
+	},
+	'disk.mops': {
+		height: 0.5
+	},
+	'disk.svctm': {
+		height: 0.5
+	},
+	'disk.avgsz': {
+		height: 0.5
+	},
+	'disk.await': {
+		height: 0.5
+	},
+
+	'apache.connections': {
+		colors: NETDATA.colors[4],
+		mainheads: [
+			gaugeChart('Connections', '12%', '', NETDATA.colors[4])
+		]
+	},
+
+	'apache.requests': {
+		colors: NETDATA.colors[0],
+		mainheads: [
+			gaugeChart('Connections', '12%', '', NETDATA.colors[0])
+		]
+	},
+
+	'apache.net': {
+		colors: NETDATA.colors[3],
+		mainheads: [
+			gaugeChart('Bandwidth', '12%', '', NETDATA.colors[3])
+		]
+	},
+
+	'apache.workers': {
+		mainheads: [
+			function(id) {
+				return 	'<div data-netdata="' + id + '"'
+					+ ' data-dimensions="busy"'
+					+ ' data-append-options="percentage"'
+					+ ' data-gauge-max-value="100"'
+					+ ' data-chart-library="gauge"'
+					+ ' data-title="Workers Utilization"'
+					+ ' data-units="percentage %"'
+					+ ' data-gauge-adjust="width"'
+					+ ' data-width="12%"'
+					+ ' data-before="0"'
+					+ ' data-after="-CHART_DURATION"'
+					+ ' data-points="CHART_DURATION"'
+					+ ' role="application"></div>';
+			}
+		]
+	},
+
+	'apache.bytesperreq': {
+		colors: NETDATA.colors[3],
+		height: 0.5
+	},
+
+	'apache.reqpersec': {
+		colors: NETDATA.colors[4],
+		height: 0.5
+	},
+
+	'apache.bytespersec': {
+		colors: NETDATA.colors[6],
+		height: 0.5
+	},
+
+	'nginx.connections': {
+		colors: NETDATA.colors[4],
+		mainheads: [
+			gaugeChart('Connections', '12%', '', NETDATA.colors[4])
+		]
+	},
+
+	'nginx.requests': {
+		colors: NETDATA.colors[0],
+		mainheads: [
+			gaugeChart('Requests', '12%', '', NETDATA.colors[0])
+		]
+	}
+};
+
+function anyAttribute(obj, attr, key, def) {
+	if(typeof obj[key] !== 'undefined') {
+		if(typeof obj[key][attr] !== 'undefined')
+			return obj[key][attr];
+	}
+	return def;
+}
+
+function menuTitle(menu) {
+	return anyAttribute(menuData, 'title', menu, menu);
+}
+
+function menuInfo(menu) {
+	return anyAttribute(menuData, 'title', menu, null);
+}
+
+function menuHeight(menu, relative) {
+	return anyAttribute(menuData, 'height', menu, 1.0) * relative;
+}
+
+function submenuTitle(menu, submenu) {
+	var key = menu + '.' + submenu;
+	return anyAttribute(submenuData, 'title', key, submenu);
+}
+
+function submenuInfo(menu, submenu) {
+	var key = menu + '.' + submenu;
+	return anyAttribute(submenuData, 'info', key, null);
+}
+
+function submenuHeight(menu, submenu, relative) {
+	var key = menu + '.' + submenu;
+	return anyAttribute(submenuData, 'height', key, 1.0) * relative;
+}
+
+
+function chartInfo(id) {
+	if(typeof chartData[id] !== 'undefined' && typeof chartData[id].info !== 'undefined')
+		return '<div class="chart-message netdata-chart-alignment" role="document">' + chartData[id].info + '</div>';
+	else
+		return '';
+}
+
+function chartHeight(id, def) {
+	if(typeof chartData[id] !== 'undefined' && typeof chartData[id].height !== 'undefined')
+		return def * chartData[id].height;
+	else
+		return def;
+}
+
+
+// ----------------------------------------------------------------------------
+
+// enrich the data structure returned by netdata
+// to reflect our menu system and content
+function enrichChartData(chart) {
+	// net_* and disk_* have special grouping
+	if(chart.type.match(/^net_/))
+		chart.menu = 'net';
+	else if(chart.type.match(/^disk_/))
+		chart.menu = 'disk';
+	else
+		chart.menu = chart.type;
+
+	// increase the priority of IFB devices
+	if(chart.type === 'tc' && chart.id.match(/.*-ifb$/))
+		chart.priority--;
+
+	chart.submenu = chart.family;
+}
+
+// ----------------------------------------------------------------------------
+
+function name2id(s) {
+	return s
+		.replace(' ', '_')
+		.replace('(', '_')
+		.replace(')', '_')
+		.replace('.', '_')
+		.replace('/', '_');
+}
+
+function headMain(charts, duration) {
+	var head = '';
+
+	if(typeof charts['system.swap'] !== 'undefined')
+		head += '<div style="margin-right: 10px;" data-netdata="system.swap"'
+		+ ' data-dimensions="free"'
+		+ ' data-append-options="percentage"'
+		+ ' data-chart-library="easypiechart"'
+		+ ' data-title="Free Swap"'
+		+ ' data-units="%"'
+		+ ' data-easypiechart-max-value="100"'
+		+ ' data-width="8%"'
+		+ ' data-before="0"'
+		+ ' data-after="-' + duration.toString() + '"'
+		+ ' data-points="' + duration.toString() + '"'
+		+ ' data-colors="#DD4400"'
+		+ ' role="application"></div>';
+
+	if(typeof charts['system.io'] !== 'undefined') {
+		head += '<div style="margin-right: 10px;" data-netdata="system.io"'
+		+ ' data-dimensions="in"'
+		+ ' data-chart-library="easypiechart"'
+		+ ' data-title="Disk Read"'
+		+ ' data-units="KB / s"'
+		+ ' data-width="10%"'
+		+ ' data-before="0"'
+		+ ' data-after="-' + duration.toString() + '"'
+		+ ' data-points="' + duration.toString() + '"'
+		+ ' role="application"></div>';
+
+		head += '<div style="margin-right: 10px;" data-netdata="system.io"'
+		+ ' data-dimensions="out"'
+		+ ' data-chart-library="easypiechart"'
+		+ ' data-title="Disk Write"'
+		+ ' data-units="KB / s"'
+		+ ' data-width="10%"'
+		+ ' data-before="0"'
+		+ ' data-after="-' + duration.toString() + '"'
+		+ ' data-points="' + duration.toString() + '"'
+		+ ' role="application"></div>';
 	}
 
-	// sort all of them
-	options.categories.sort(prioritySort);
-	options.families.sort(prioritySort);
-	$.each(options.families,   function(i, c) { c.charts.sort(prioritySort); });
+	if(typeof charts['system.cpu'] !== 'undefined')
+		head += '<div data-netdata="system.cpu"'
+		+ ' data-chart-library="gauge"'
+		+ ' data-title="CPU"'
+		+ ' data-units="%"'
+		+ ' data-gauge-max-value="100"'
+		+ ' data-width="18%"'
+		+ ' data-after="-' + duration.toString() + '"'
+		+ ' data-points="' + duration.toString() + '"'
+		+ ' data-colors="' + NETDATA.colors[12] + '"'
+		+ ' role="application"></div>';
 
+	if(typeof charts['system.ipv4'] !== 'undefined') {
+		head += '<div style="margin-right: 10px;" data-netdata="system.ipv4"'
+		+ ' data-dimensions="received"'
+		+ ' data-chart-library="easypiechart"'
+		+ ' data-title="IPv4 Inbound"'
+		+ ' data-units="kbps"'
+		+ ' data-width="10%"'
+		+ ' data-before="0"'
+		+ ' data-after="-' + duration.toString() + '"'
+		+ ' data-points="' + duration.toString() + '"'
+		+ ' role="application"></div>';
+
+		head += '<div style="margin-right: 10px;" data-netdata="system.ipv4"'
+		+ ' data-dimensions="sent"'
+		+ ' data-chart-library="easypiechart"'
+		+ ' data-title="IPv4 Outbound"'
+		+ ' data-units="kbps"'
+		+ ' data-width="10%"'
+		+ ' data-before="0"'
+		+ ' data-after="-' + duration.toString() + '"'
+		+ ' data-points="' + duration.toString() + '"'
+		+ ' role="application"></div>';
+	}
+
+	if(typeof charts['system.ram'] !== 'undefined')
+		head += '<div style="margin-right: 10px;" data-netdata="system.ram"'
+		+ ' data-dimensions="cached|free"'
+		+ ' data-append-options="percentage"'
+		+ ' data-chart-library="easypiechart"'
+		+ ' data-title="Available RAM"'
+		+ ' data-units="%"'
+		+ ' data-easypiechart-max-value="100"'
+		+ ' data-width="8%"'
+		+ ' data-after="-' + duration.toString() + '"'
+		+ ' data-points="' + duration.toString() + '"'
+		+ ' data-colors="' + NETDATA.colors[7] + '"'
+		+ ' role="application"></div>';
+
+	return head;
+}
+
+function generateHeadCharts(type, chart, duration) {
+	var head = '';
+	var hcharts = anyAttribute(chartData, type, chart.context, []);
+	if(hcharts.length > 0) {
+		var hi = 0, hlen = hcharts.length;
+		while(hi < hlen) {
+			if(typeof hcharts[hi] === 'function')
+				head += hcharts[hi](chart.id).replace('CHART_DURATION', duration.toString()).replace('CHART_UNIQUE_ID', chart.id);
+			else
+				head += hcharts[hi].replace('CHART_DURATION', duration.toString()).replace('CHART_UNIQUE_ID', chart.id);
+			hi++;
+		}
+	}
+	return head;
+}
+
+function renderPage(menus, data) {
 	var div = document.getElementById('charts_div');
 	var pcent_width = Math.floor(100 / chartsPerRow($(div).width()));
 
@@ -1019,661 +1295,155 @@ function prepareScreen(data) {
 	var duration = Math.round(($(div).width() * pcent_width / 100 * data.update_every / 3) / 60) * 60;
 	var html = '';
 	var sidebar = '<ul class="nav dashboard-sidenav" data-spy="affix" id="sidebar_ul">';
+	var mainhead = headMain(data.charts, duration);
 
-	function getMessage(id) {
-		if(typeof messages[id] !== 'undefined')
-			return '<div class="chart-message" role="document">' + messages[id] + '</div>';
-		else
-			return '';
+	// sort the menus
+	var main = sortObjectByPriority(menus);
+	var i = 0, len = main.length;
+	while(i < len) {
+		var menu = main[i++];
+
+		// generate an entry at the main menu
+
+		sidebar += '<li class=""><a href="#' + menu + '">' + menus[menu].title + '</a><ul class="nav">';
+		html += '<div role="section"><div role="sectionhead"><h1 id="' + menu + '" role="heading">' + menus[menu].title + '</h1></div><div id="' + menu + '" role="document">';
+
+		if(menus[menu].info !== null)
+			html += menus[menu].info;
+
+		// console.log(' >> ' + menu + ' (' + menus[menu].priority + '): ' + menus[menu].title);
+
+		var shtml = '';
+		var mhead = '<div style="width: 100%; text-align: center;">' + mainhead;
+		mainhead = '';
+
+		// sort the submenus of this menu
+		var sub = sortObjectByPriority(menus[menu].submenus);
+		var si = 0, slen = sub.length;
+		while(si < slen) {
+			var submenu = sub[si++];
+
+			// generate an entry at the submenu
+			sidebar += '<li class><a href="#' + name2id(menu + '_' + submenu) + '">' + menus[menu].submenus[submenu].title + '</a></li>';
+			shtml += '<div class="netdata-group-container" id="submenu_' + name2id(menu + '_' + submenu) + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + name2id(menu + '_' + submenu) + '" class="netdata-chart-alignment" role="heading">' + menus[menu].submenus[submenu].title + '</h2>';
+
+			if(menus[menu].submenus[submenu].info !== null)
+				shtml += '<div class="chart-message netdata-chart-alignment" role="document">' + menus[menu].submenus[submenu].info + '</div>';
+
+			var head = '<div style="width: 100%; text-align: center;">';
+			var chtml = '';
+
+			// console.log('    \------- ' + submenu + ' (' + menus[menu].submenus[submenu].priority + '): ' + menus[menu].submenus[submenu].title);
+
+			// sort the charts in this submenu of this menu
+			menus[menu].submenus[submenu].charts.sort(prioritySort);
+			var ci = 0, clen = menus[menu].submenus[submenu].charts.length;
+			while(ci < clen) {
+				var chart = menus[menu].submenus[submenu].charts[ci++];
+
+				// generate the submenu heading charts
+				mhead += generateHeadCharts('mainheads', chart, duration);
+				head += generateHeadCharts('heads', chart, duration);
+
+				// generate the chart
+				chtml += chartInfo(chart.context) + '<div data-netdata="' + chart.id + '"'
+					+ ' data-width="' + pcent_width.toString() + '%"'
+					+ ' data-height="' + chartHeight(chart.context, options.chartsHeight).toString() + 'px"'
+					+ ' data-before="0"'
+					+ ' data-after="-' + duration.toString() + '"'
+					+ ' data-id="' + name2id(options.hostname + '/' + chart.id) + '"'
+					+ ' data-colors="' + anyAttribute(chartData, 'colors', chart.context, '') + '"'
+					+ ' role="application"></div>';
+
+				// console.log('         \------- ' + chart.id + ' (' + chart.priority + '): ' + chart.context  + ' height: ' + menus[menu].submenus[submenu].height);
+			}
+
+			head += '</div>';
+			shtml += head + chtml + '</div>';
+		}
+
+		mhead += '</div>';
+		sidebar += '</ul></li>';
+		html += mhead + shtml + '</div></div><hr role="separator"/>';
 	}
 
-	// render the charts
-	$.each(options.categories, function(i, t) {
-		t.charts.sort(prioritySort);
-
-		sidebar += '<li class="' + ((i === 0)?'active':'').toString() + '"><a href="#' + name2id(t.name) + '">' + t.title + '</a>';
-		html += '<div role="section"><div role="sectionhead"><h1 id="' + name2id(t.name) + '" role="heading">' + t.title + '</h1>' + getMessage(t.name) + '</div><div id="' + name2id(t.name) + '" role="document">';
-
-		if(t.name === 'cpu') {
-			var families = uniq_with_list(t.charts, function(c) { return c.family; });
-
-			sidebar += '<ul class="nav">';
-			$.each(families, function(j, c) {
-				sidebar += '<li class><a href="#' + name2id(t.name) + '_' + name2id(c.name) + '">' + c.name + '</a></li>';
-				html += '<div class="netdata-group-container" id="family_' + name2id(t.name) + '_' + name2id(c.name) + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + name2id(t.name) + '_' + name2id(c.name) + '" class="netdata-chart-alignment" role="heading">' + c.name + '</h2>';
-				$.each(c.values, function(x, f) {
-					var c = null;
-					var h = options.chartsHeight;
-
-					html += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
-						+ ' data-width="100%"'
-						+ ' data-height="' + h.toString() + 'px"'
-						+ ' data-before="0"'
-						+ ' data-after="-' + duration.toString() + '"'
-						+ ' data-colors="' + c + '"'
-						+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
-						+ ' role="application"></div>';
-				});
-				html += '</div>'; // netdata-group-container
-			});
-			sidebar += '</ul>';
-		}
-		else if(t.name === 'net' || t.name === 'tc' || t.name === 'ap') {
-			var interfaces = uniq_with_list(t.charts, function(c) { return c.family; });
-
-			sidebar += '<ul class="nav">';
-			$.each(interfaces, function(j, c) {
-				var menuitem = c.name;
-				var name = options.interfaces_registry[menuitem];
-				if(typeof name !== 'undefined' && name !== menuitem)
-					menuitem = menuitem + ' (' + name + ')';
-
-				sidebar += '<li class><a href="#' + name2id(t.name) + '_' + name2id(c.name) + '">' + menuitem + '</a></li>';
-				html += '<div class="netdata-group-container" id="interface_' + name2id(t.name) + '_' + name2id(c.name) + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + name2id(t.name) + '_' + name2id(c.name) + '" class="netdata-chart-alignment" role="heading">' + menuitem + '</h2>';
-
-				var head = '<div style="width: 100%; text-align: center;">';
-				var all = '';
-
-				$.each(c.values, function(x, f) {
-					var c = null;
-					var h = options.chartsHeight / 2;
-					switch(f.type) {
-						case 'net':
-							h = options.chartsHeight;
-
-							head += '<div data-netdata="' + f.id + '"'
-							+ ' data-dimensions="received"'
-							+ ' data-chart-library="gauge"'
-							+ ' data-gauge-adjust="width"'
-							+ ' data-title="Receive"'
-							+ ' data-width="12%"'
-							+ ' data-before="0"'
-							+ ' data-after="-' + duration.toString() + '"'
-							+ ' data-points="' + duration.toString() + '"'
-							+ ' role="application"></div>';
-
-							head += '<div data-netdata="' + f.id + '"'
-							+ ' data-dimensions="sent"'
-							+ ' data-chart-library="gauge"'
-							+ ' data-gauge-adjust="width"'
-							+ ' data-title="Sent"'
-							+ ' data-width="12%"'
-							+ ' data-before="0"'
-							+ ' data-after="-' + duration.toString() + '"'
-							+ ' data-points="' + duration.toString() + '"'
-							+ ' role="application"></div>';
-							break;
-
-						case 'tc':
-							h = options.chartsHeight;
-							if(f.id.match(/.*-ifb$/) !== null)
-								head += '<div data-netdata="' + f.id + '"'
-								+ ' data-chart-library="gauge"'
-								+ ' data-gauge-adjust="width"'
-								+ ' data-title="Receive"'
-								+ ' data-width="12%"'
-								+ ' data-before="0"'
-								+ ' data-after="-' + duration.toString() + '"'
-								+ ' data-points="' + duration.toString() + '"'
-								+ ' data-colors="' + NETDATA.colors[2] + '"'
-								+ ' role="application"></div>';
-
-							else
-								head += '<div data-netdata="' + f.id + '"'
-								+ ' data-chart-library="gauge"'
-								+ ' data-gauge-adjust="width"'
-								+ ' data-title="Sent"'
-								+ ' data-width="12%"'
-								+ ' data-before="0"'
-								+ ' data-after="-' + duration.toString() + '"'
-								+ ' data-points="' + duration.toString() + '"'
-								+ ' data-colors="' + NETDATA.colors[3] + '"'
-								+ ' role="application"></div>';
-							break;
-						case 'ap_bandwidth': h = options.chartsHeight; break;
-						case 'ap_bitrate'  : h = options.chartsHeight; break;
-					}
-
-					all += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
-						+ ' data-width="100%"'
-						+ ' data-height="' + h.toString() + 'px"'
-						+ ' data-before="0"'
-						+ ' data-after="-' + duration.toString() + '"'
-						+ ' data-colors="' + c + '"'
-						+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
-						+ ' role="application"></div>';
-				});
-
-				head += '</div>';
-				html += head + all + '</div>'; // netdata-group-container
-			});
-			sidebar += '</ul>';
-		}
-		else if(t.name === 'disk') {
-			var disks = uniq_with_list(t.charts, function(c) { return c.family; });
-
-			sidebar += '<ul class="nav">';
-			$.each(disks, function(j, c) {
-				sidebar += '<li class><a href="#' + name2id(c.name) + '">' + c.name + '</a></li>';
-				html += '<div class="netdata-group-container" id="disk_' + name2id(c.name) + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + name2id(c.name) + '" class="netdata-chart-alignment" role="heading">' + c.name + '</h2>';
-				var head = '<div style="width: 100%; text-align: center;">';
-				var all = '';
-				$.each(c.values, function(x, f) {
-					var c = null;
-					var h = options.chartsHeight / 2;
-					switch(f.type) {
-						case 'disk'        : h = options.chartsHeight;
-								head += '<div data-netdata="' + f.id + '"'
-								+ ' data-dimensions="reads"'
-								+ ' data-chart-library="gauge"'
-								+ ' data-gauge-adjust="width"'
-								+ ' data-title="Read"'
-								+ ' data-width="12%"'
-								+ ' data-before="0"'
-								+ ' data-after="-' + duration.toString() + '"'
-								+ ' data-points="' + duration.toString() + '"'
-								+ ' role="application"></div>';
-
-								head += '<div data-netdata="' + f.id + '"'
-								+ ' data-dimensions="writes"'
-								+ ' data-chart-library="gauge"'
-								+ ' data-gauge-adjust="width"'
-								+ ' data-title="Write"'
-								+ ' data-width="12%"'
-								+ ' data-before="0"'
-								+ ' data-after="-' + duration.toString() + '"'
-								+ ' data-points="' + duration.toString() + '"'
-								+ ' role="application"></div>';
-								break;
-						case 'disk_backlog': c = '#CCCC00'; break;
-						case 'disk_util'   : c = '#FF5588';
-								head += '<div data-netdata="' + f.id + '"'
-								+ ' data-chart-library="gauge"'
-								+ ' data-title="Utilization"'
-								+ ' data-gauge-max-value="100"'
-								+ ' data-gauge-adjust="width"'
-								+ ' data-width="12%"'
-								+ ' data-before="0"'
-								+ ' data-after="-' + duration.toString() + '"'
-								+ ' data-points="' + duration.toString() + '"'
-								+ ' data-colors="' + c + '"'
-								+ ' role="application"></div>';
-								break;
-						case 'disk_qops'   : c = '#5555FF'; break;
-					}
-
-					all += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
-						+ ' data-width="100%"'
-						+ ' data-height="' + h.toString() + 'px"'
-						+ ' data-before="0"'
-						+ ' data-after="-' + duration.toString() + '"'
-						+ ' data-colors="' + c + '"'
-						+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
-						+ ' role="application"></div>';
-				});
-				head += '</div>';
-				html += head + all + '</div>'; // netdata-group-container
-			});
-			sidebar += '</ul>';
-		}
-		else if(t.name === 'apps') {
-			$.each(t.charts, function(x, f) {
-				var c = null;
-				var h = Math.round(options.chartsHeight * 1.5);
-				switch(f.id) {
-					case 'apps.cpu'         : h = Math.round(options.chartsHeight * 2); break;
-					case 'apps.preads'      : h = Math.round(options.chartsHeight * 2); break;
-					case 'apps.pwrites'     : h = Math.round(options.chartsHeight * 2); break;
-					case 'apps.mem'         : h = Math.round(options.chartsHeight * 2); break;
-					case 'apps.major_faults': h = Math.round(options.chartsHeight * 2); break;
-				}
-
-				html += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
-					+ ' data-width="100%"'
-					+ ' data-height="' + h.toString() + 'px"'
-					+ ' data-before="0"'
-					+ ' data-after="-' + duration.toString() + '"'
-					+ ' data-colors="' + c + '"'
-					+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
-					+ ' role="application"></div>';
-			});
-		}
-		else if(t.name === 'system') {
-			var head = '<div style="text-align: center; vertical-align: bottom; width: 100%;">';
-
-			if(typeof charts['system.swap'] !== 'undefined')
-				head += '<div style="margin-right: 10px;" data-netdata="system.swap"'
-				+ ' data-dimensions="free"'
-				+ ' data-append-options="percentage"'
-				+ ' data-chart-library="easypiechart"'
-				+ ' data-title="Free Swap"'
-				+ ' data-units="%"'
-				+ ' data-easypiechart-max-value="100"'
-				+ ' data-width="8%"'
-				+ ' data-before="0"'
-				+ ' data-after="-' + duration.toString() + '"'
-				+ ' data-points="' + duration.toString() + '"'
-				+ ' data-colors="' + NETDATA.colors[1] + '"'
-				+ ' role="application"></div>';
-
-			if(typeof charts['system.io'] !== 'undefined') {
-				head += '<div style="margin-right: 10px;" data-netdata="system.io"'
-				+ ' data-dimensions="in"'
-				+ ' data-chart-library="easypiechart"'
-				+ ' data-title="Disk Read"'
-				+ ' data-units="KB / s"'
-				+ ' data-width="10%"'
-				+ ' data-before="0"'
-				+ ' data-after="-' + duration.toString() + '"'
-				+ ' data-points="' + duration.toString() + '"'
-				+ ' role="application"></div>';
-
-				head += '<div style="margin-right: 10px;" data-netdata="system.io"'
-				+ ' data-dimensions="out"'
-				+ ' data-chart-library="easypiechart"'
-				+ ' data-title="Disk Write"'
-				+ ' data-units="KB / s"'
-				+ ' data-width="10%"'
-				+ ' data-before="0"'
-				+ ' data-after="-' + duration.toString() + '"'
-				+ ' data-points="' + duration.toString() + '"'
-				+ ' role="application"></div>';
-			}
-
-			if(typeof charts['system.cpu'] !== 'undefined')
-				head += '<div data-netdata="system.cpu"'
-				+ ' data-chart-library="gauge"'
-				+ ' data-title="CPU"'
-				+ ' data-units="%"'
-				+ ' data-gauge-max-value="100"'
-				+ ' data-width="18%"'
-				+ ' data-after="-' + duration.toString() + '"'
-				+ ' data-points="' + duration.toString() + '"'
-				+ ' data-colors="' + NETDATA.colors[12] + '"'
-				+ ' role="application"></div>';
-
-			if(typeof charts['system.ipv4'] !== 'undefined') {
-				head += '<div style="margin-right: 10px;" data-netdata="system.ipv4"'
-				+ ' data-dimensions="received"'
-				+ ' data-chart-library="easypiechart"'
-				+ ' data-title="IPv4 Inbound"'
-				+ ' data-units="kbps"'
-				+ ' data-width="10%"'
-				+ ' data-before="0"'
-				+ ' data-after="-' + duration.toString() + '"'
-				+ ' data-points="' + duration.toString() + '"'
-				+ ' role="application"></div>';
-
-				head += '<div style="margin-right: 10px;" data-netdata="system.ipv4"'
-				+ ' data-dimensions="sent"'
-				+ ' data-chart-library="easypiechart"'
-				+ ' data-title="IPv4 Outbound"'
-				+ ' data-units="kbps"'
-				+ ' data-width="10%"'
-				+ ' data-before="0"'
-				+ ' data-after="-' + duration.toString() + '"'
-				+ ' data-points="' + duration.toString() + '"'
-				+ ' role="application"></div>';
-			}
-
-			if(typeof charts['system.ram'] !== 'undefined')
-				head += '<div style="margin-right: 10px;" data-netdata="system.ram"'
-				+ ' data-dimensions="cached|free"'
-				+ ' data-append-options="percentage"'
-				+ ' data-chart-library="easypiechart"'
-				+ ' data-title="Available RAM"'
-				+ ' data-units="%"'
-				+ ' data-easypiechart-max-value="100"'
-				+ ' data-width="8%"'
-				+ ' data-after="-' + duration.toString() + '"'
-				+ ' data-points="' + duration.toString() + '"'
-				+ ' data-colors="' + NETDATA.colors[7] + '"'
-				+ ' role="application"></div>';
-
-/*			if(typeof charts['system.swapio'] !== 'undefined') {
-				head += "<div style=\"display: inline-block\">";
-
-				head += '<div style="margin-right: 10px;" data-netdata="system.swapio"'
-				+ ' data-dimensions="in"'
-				+ ' data-chart-library="easypiechart"'
-				+ ' data-title="Swap Read"'
-				+ ' data-width="100px"'
-				+ ' data-before="0"'
-				+ ' data-after="-' + duration.toString() + '"'
-				+ ' data-points="' + duration.toString() + '"'
-				+ ' data-colors="' + NETDATA.colors[2] + '"'
-				+ ' role="application"></div>';
-
-				head += '<div style="margin-right: 10px;" data-netdata="system.swapio"'
-				+ ' data-dimensions="out"'
-				+ ' data-chart-library="easypiechart"'
-				+ ' data-title="Swap Write"'
-				+ ' data-width="100px"'
-				+ ' data-before="0"'
-				+ ' data-after="-' + duration.toString() + '"'
-				+ ' data-points="' + duration.toString() + '"'
-				+ ' data-colors="' + NETDATA.colors[1] + '"'
-				+ ' role="application"></div>';
-
-				head += "</div>";
-			}
-
-			if(typeof charts['system.ctxt'] !== 'undefined')
-				head += '<div style="margin-right: 10px;" data-netdata="system.ctxt"'
-				+ ' data-chart-library="easypiechart"'
-				+ ' data-title="Switches"'
-				+ ' data-width="100px"'
-				+ ' data-before="0"'
-				+ ' data-after="-' + duration.toString() + '"'
-				+ ' data-points="' + duration.toString() + '"'
-				+ ' data-colors="' + NETDATA.colors[3] + '"'
-				+ ' role="application"></div>';
-
-			if(typeof charts['system.intr'] !== 'undefined')
-				head += '<div style="margin-right: 10px;" data-netdata="system.intr"'
-				+ ' data-chart-library="easypiechart"'
-				+ ' data-title="Interrupts"'
-				+ ' data-width="100px"'
-				+ ' data-before="0"'
-				+ ' data-after="-' + duration.toString() + '"'
-				+ ' data-points="' + duration.toString() + '"'
-				+ ' data-colors="' + NETDATA.colors[7] + '"'
-				+ ' role="application"></div>';
-*/
-			head += "</div>";
-			var all = '';
-			$.each(t.charts, function(x, f) {
-				all += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
-					+ ' data-width="' + pcent_width.toString() + '%"'
-					+ ' data-height="' + options.chartsHeight.toString() + 'px"'
-					+ ' data-before="0"'
-					+ ' data-after="-' + duration.toString() + '"'
-					+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
-					+ ' role="application"></div>';
-			});
-			html += head + all;
-		}
-		else if(t.name === 'netdata') {
-			var head = '<div style="width: 100%; text-align: center;">';
-			var all = '';
-
-			$.each(t.charts, function(x, f) {
-				switch(f.id) {
-					case 'netdata.net'   :
-							head += '<div data-netdata="' + f.id + '"'
-							+ ' data-dimensions="in"'
-							+ ' data-chart-library="gauge"'
-							+ ' data-title="Received"'
-							+ ' data-gauge-adjust="width"'
-							+ ' data-width="12%"'
-							+ ' data-before="0"'
-							+ ' data-after="-' + duration.toString() + '"'
-							+ ' data-points="' + duration.toString() + '"'
-							+ ' data-colors="' + NETDATA.colors[0] + '"'
-							+ ' role="application"></div>';
-
-							head += '<div data-netdata="' + f.id + '"'
-							+ ' data-dimensions="out"'
-							+ ' data-chart-library="gauge"'
-							+ ' data-title="Sent"'
-							+ ' data-gauge-adjust="width"'
-							+ ' data-width="12%"'
-							+ ' data-before="0"'
-							+ ' data-after="-' + duration.toString() + '"'
-							+ ' data-points="' + duration.toString() + '"'
-							+ ' data-colors="' + NETDATA.colors[1] + '"'
-							+ ' role="application"></div>';
-							break;
-
-					case 'netdata.requests'   : c = NETDATA.colors[2];
-							head += '<div data-netdata="' + f.id + '"'
-							+ ' data-chart-library="gauge"'
-							+ ' data-title="Requests / second"'
-							+ ' data-gauge-adjust="width"'
-							+ ' data-width="12%"'
-							+ ' data-before="0"'
-							+ ' data-after="-' + duration.toString() + '"'
-							+ ' data-points="' + duration.toString() + '"'
-							+ ' data-colors="' + c + '"'
-							+ ' role="application"></div>';
-							break;
-
-					case 'netdata.clients'   : c = NETDATA.colors[3];
-							head += '<div data-netdata="' + f.id + '"'
-							+ ' data-chart-library="gauge"'
-							+ ' data-title="Connections"'
-							+ ' data-gauge-adjust="width"'
-							+ ' data-width="12%"'
-							+ ' data-before="0"'
-							+ ' data-after="-' + duration.toString() + '"'
-							+ ' data-points="' + duration.toString() + '"'
-							+ ' data-colors="' + c + '"'
-							+ ' role="application"></div>';
-							break;
-				}
-
-				all += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
-					+ ' data-width="' + pcent_width.toString() + '%"'
-					+ ' data-height="' + options.chartsHeight.toString() + 'px"'
-					+ ' data-before="0"'
-					+ ' data-after="-' + duration.toString() + '"'
-					+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
-					+ ' role="application"></div>';
-			});
-			head += '</div>';
-			html += head + all;
-		}
-		else if(t.name === 'netfilter') {
-			var head = '<div style="width: 100%; text-align: center;">';
-			var all = '';
-
-			$.each(t.charts, function(x, f) {
-				switch(f.id) {
-					case 'netfilter.sockets'   :
-							head += '<div data-netdata="' + f.id + '"'
-							+ ' data-chart-library="gauge"'
-							+ ' data-title="Active Connections"'
-							+ ' data-units="connections"'
-							+ ' data-gauge-adjust="width"'
-							+ ' data-width="12%"'
-							+ ' data-before="0"'
-							+ ' data-after="-' + duration.toString() + '"'
-							+ ' data-points="' + duration.toString() + '"'
-							+ ' data-colors="' + NETDATA.colors[0] + '"'
-							+ ' role="application"></div>';
-							break;
-
-					case 'netfilter.new':
-							head += '<div data-netdata="' + f.id + '"'
-							+ ' data-dimensions="new"'
-							+ ' data-chart-library="gauge"'
-							+ ' data-title="New Connections"'
-							+ ' data-gauge-adjust="width"'
-							+ ' data-width="12%"'
-							+ ' data-before="0"'
-							+ ' data-after="-' + duration.toString() + '"'
-							+ ' data-points="' + duration.toString() + '"'
-							+ ' data-colors="' + NETDATA.colors[2] + '"'
-							+ ' role="application"></div>';
-							break;
-				}
-
-				all += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
-					+ ' data-width="' + pcent_width.toString() + '%"'
-					+ ' data-height="' + options.chartsHeight.toString() + 'px"'
-					+ ' data-before="0"'
-					+ ' data-after="-' + duration.toString() + '"'
-					+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
-					+ ' role="application"></div>';
-			});
-			head += '</div>';
-			html += head + all;
-		}
-		else if(t.name === 'apache') {
-			var head = '<div style="width: 100%; text-align: center;">';
-			var all = '';
-
-			$.each(t.charts, function(x, f) {
-				var c = 'null';
-				var h = options.chartsHeight;
-				switch(f.id) {
-					case 'apache.connections':
-							c = NETDATA.colors[4];
-							head += '<div data-netdata="' + f.id + '"'
-							+ ' data-chart-library="gauge"'
-							+ ' data-title="Connections"'
-							+ ' data-gauge-adjust="width"'
-							+ ' data-width="12%"'
-							+ ' data-before="0"'
-							+ ' data-after="-' + duration.toString() + '"'
-							+ ' data-points="' + duration.toString() + '"'
-							+ ' data-colors="' + c + '"'
-							+ ' role="application"></div>';
-							break;
-
-					case 'apache.requests':
-							head += '<div data-netdata="' + f.id + '"'
-							+ ' data-chart-library="gauge"'
-							+ ' data-title="Requests"'
-							+ ' data-gauge-adjust="width"'
-							+ ' data-width="12%"'
-							+ ' data-before="0"'
-							+ ' data-after="-' + duration.toString() + '"'
-							+ ' data-points="' + duration.toString() + '"'
-							+ ' data-colors="' + NETDATA.colors[0] + '"'
-							+ ' role="application"></div>';
-							break;
-
-					case 'apache.net':
-							c = NETDATA.colors[1];
-							head += '<div data-netdata="' + f.id + '"'
-							+ ' data-chart-library="gauge"'
-							+ ' data-title="Bandwidth"'
-							+ ' data-gauge-adjust="width"'
-							+ ' data-width="12%"'
-							+ ' data-before="0"'
-							+ ' data-after="-' + duration.toString() + '"'
-							+ ' data-points="' + duration.toString() + '"'
-							+ ' data-colors="' + c + '"'
-							+ ' role="application"></div>';
-							break;
-
-					case 'apache.workers':
-							head += '<div data-netdata="' + f.id + '"'
-							+ ' data-dimensions="busy"'
-							+ ' data-append-options="percentage"'
-							+ ' data-gauge-max-value="100"'
-							+ ' data-chart-library="gauge"'
-							+ ' data-title="Workers Utilization"'
-							+ ' data-units="percentage %"'
-							+ ' data-gauge-adjust="width"'
-							+ ' data-width="12%"'
-							+ ' data-before="0"'
-							+ ' data-after="-' + duration.toString() + '"'
-							+ ' data-points="' + duration.toString() + '"'
-							+ ' data-colors="' + NETDATA.colors[2] + '"'
-							+ ' role="application"></div>';
-							break;
-
-					case 'apache.bytesperreq':
-							c = NETDATA.colors[3];
-							h = Math.round(h / 2);
-							break;
-
-					default:
-							h = Math.round(h / 2);
-							break;
-				}
-
-				all += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
-					+ ' data-width="' + pcent_width.toString() + '%"'
-					+ ' data-height="' + h.toString() + 'px"'
-					+ ' data-before="0"'
-					+ ' data-after="-' + duration.toString() + '"'
-					+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
-					+ ' data-colors="' + c + '"'
-					+ ' role="application"></div>';
-			});
-			head += '</div>';
-			html += head + all;
-		}
-		else if(t.name === 'nginx') {
-			var head = '<div style="width: 100%; text-align: center;">';
-			var all = '';
-			$.each(t.charts, function(x, f) {
-				var c = 'null';
-				var h = options.chartsHeight;
-
-				switch(f.id) {
-					case 'nginx.connections':
-							c = NETDATA.colors[4];
-							head += '<div data-netdata="' + f.id + '"'
-							+ ' data-chart-library="gauge"'
-							+ ' data-title="Connections"'
-							+ ' data-gauge-adjust="width"'
-							+ ' data-width="12%"'
-							+ ' data-before="0"'
-							+ ' data-after="-' + duration.toString() + '"'
-							+ ' data-points="' + duration.toString() + '"'
-							+ ' data-colors="' + c + '"'
-							+ ' role="application"></div>';
-							break;
-
-					case 'nginx.requests':
-							head += '<div data-netdata="' + f.id + '"'
-							+ ' data-chart-library="gauge"'
-							+ ' data-title="Requests"'
-							+ ' data-gauge-adjust="width"'
-							+ ' data-width="12%"'
-							+ ' data-before="0"'
-							+ ' data-after="-' + duration.toString() + '"'
-							+ ' data-points="' + duration.toString() + '"'
-							+ ' data-colors="' + NETDATA.colors[0] + '"'
-							+ ' role="application"></div>';
-							break;
-				}
-
-				all += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
-					+ ' data-width="' + pcent_width.toString() + '%"'
-					+ ' data-height="' + h.toString() + 'px"'
-					+ ' data-before="0"'
-					+ ' data-after="-' + duration.toString() + '"'
-					+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
-					+ ' data-colors="' + c + '"'
-					+ ' role="application"></div>';
-			});
-			head += '</div>';
-			html += head + all;
-		}
-		else {
-			$.each(t.charts, function(x, f) {
-				html += getMessage(f.id) + '<div data-netdata="' + f.id + '"'
-					+ ' data-width="' + pcent_width.toString() + '%"'
-					+ ' data-height="' + options.chartsHeight.toString() + 'px"'
-					+ ' data-before="0"'
-					+ ' data-after="-' + duration.toString() + '"'
-					+ ' data-id="' + name2id(options.hostname + '/' + f.id) + '"'
-					+ ' role="application"></div>';
-			});
-		}
-
-		sidebar += '</li>';
-		html += '</div>'; // document
-		html += '</div>'; // section
-		html += '<hr role="separator"/>';
-	});
 	sidebar += '</ul>';
-/*
-	// show the colors
-	html += '<br/><div class="row">'
-	$.each(NETDATA.colors, function(i, c){
-		html += '<div style="display: inline-block;"><div style="display: inline-block; width: 100px; height: 100px; background: ' + c + ';"></div><br/>' + c + '</div>';
-	});
-	html += '</div>'
-*/
 	div.innerHTML = html;
 	document.getElementById('sidebar').innerHTML = sidebar;
-	
+	finalizePage();
+}
+
+function renderChartsAndMenu(data) {
+	var menus = {};
+	var charts = data.charts;
+
+	for(var c in charts) {
+		enrichChartData(charts[c]);
+
+		// create the menu
+		if(typeof menus[charts[c].menu] === 'undefined') {
+			menus[charts[c].menu] = {
+				priority: charts[c].priority,
+				submenus: {},
+				title: menuTitle(charts[c].menu),
+				info: menuInfo(charts[c].menu),
+				height: menuHeight(charts[c].menu, options.chartsHeight)
+			};
+		}
+		
+		if(charts[c].priority < menus[charts[c].menu].priority)
+			menus[charts[c].menu].priority = charts[c].priority;
+
+		// create the submenu
+		if(typeof menus[charts[c].menu].submenus[charts[c].submenu] === 'undefined') {
+			menus[charts[c].menu].submenus[charts[c].submenu] = {
+				priority: charts[c].priority,
+				charts: new Array(),
+				title: submenuTitle(charts[c].menu, charts[c].submenu),
+				info: submenuInfo(charts[c].menu, charts[c].submenu),
+				height: submenuHeight(charts[c].menu, charts[c].submenu, menus[charts[c].menu].height)
+			};
+		}
+		
+		if(charts[c].priority < menus[charts[c].menu].submenus[charts[c].submenu].priority)
+			menus[charts[c].menu].submenus[charts[c].submenu].priority = charts[c].priority;
+
+		// index the chart in the menu/submenu
+		menus[charts[c].menu].submenus[charts[c].submenu].charts.push(charts[c]);
+	}
+
+	renderPage(menus, data);
+}
+
+function downloadAllCharts(netdata_url) {
+	if(typeof netdata_url === 'undefined' || netdata_url === null)
+		netdata_url = NETDATA.serverDefault;
+
+	NETDATA.pause(function() {
+
+		// download all the charts the server knows
+		NETDATA.chartRegistry.downloadAll(netdata_url, function(data) {
+
+			options.data = data;
+			options.hostname = data.hostname;
+			document.getElementById('hostname').innerHTML = options.hostname;
+			document.getElementById('hostname').href = NETDATA.serverDefault;
+			document.title = options.hostname + ' dashboard';
+			
+			renderChartsAndMenu(data);
+
+			// prepare our DOM
+//			prepareScreen(data);
+
+			// due to affix issues, prepareScreen() will unpause
+			// netdata as needed
+		});
+	});
+}
+
+// ----------------------------------------------------------------------------
+
+function finalizePage() {
 	// resize all charts - without starting the background thread
 	// this has to be done while NETDATA is paused
 	// if we ommit this, the affix menu will be wrong, since all
@@ -1765,25 +1535,6 @@ function prepareScreen(data) {
 		}, 1000);
 }
 
-NETDATA.pause(function() {
-
-//	$('#welcomeModal').on('hidden.bs.modal', function (e) {
-//		NETDATA.updatedDom();
-//	});
-//	$('#welcomeModal').on('shown.bs.modal', function (e) {
-//		NETDATA.updatedDom();
-//	});
-
-	// download all the charts the server knows
-	NETDATA.chartRegistry.downloadAll(NETDATA.serverDefault, function(data) {
-
-		// prepare our DOM
-		// this will be called when NETDATA is paused
-		prepareScreen(data);
-
-		// due to affix issues, prepareScreen() will unpause
-		// netdata as needed
-	});
-});
+downloadAllCharts();
 
 </script>

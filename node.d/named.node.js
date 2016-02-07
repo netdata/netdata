@@ -47,19 +47,19 @@ var named = {
 	name: __filename,
 	enable_autodetect: true,
 	update_every: 1,
-
+	base_priority: 60000,
 	charts: {},
 
-	chartFromMembersCreate: function(service, obj, id, title_suffix, units, family_prefix, category_prefix, type, priority, algorithm, multiplier, divisor) {
+	chartFromMembersCreate: function(service, obj, id, title_suffix, units, family, context, type, priority, algorithm, multiplier, divisor) {
 		var chart = {
 			id: id,											// the unique id of the chart
 			name: '',										// the unique name of the chart
 			title: service.name + ' ' + title_suffix,		// the title of the chart
 			units: units,									// the units of the chart dimensions
-			family: family_prefix + '_' + service.name,		// the family of the chart
-			category: category_prefix + '_' + service.name,	// the category of the chart
+			family: family,									// the family of the chart
+			context: context,								// the context of the chart
 			type: type,										// the type of the chart
-			priority: priority,								// the priority relative to others in the same family and category
+			priority: priority,								// the priority relative to others in the same family
 			update_every: service.update_every, 			// the expected update frequency of the chart
 			dimensions: {}
 		}
@@ -87,19 +87,19 @@ var named = {
 		return chart;
 	},
 
-	chartFromMembers: function(service, obj, id_suffix, title_suffix, units, family_prefix, category_prefix, type, priority, algorithm, multiplier, divisor) {
+	chartFromMembers: function(service, obj, id_suffix, title_suffix, units, family, context, type, priority, algorithm, multiplier, divisor) {
 		var id = 'named_' + service.name + '.' + id_suffix;
 		var chart = this.charts[id];
 
 		if(typeof chart === 'undefined') {
-			chart = this.chartFromMembersCreate(service, obj, id, title_suffix, units, family_prefix, category_prefix, type, priority, algorithm, multiplier, divisor);
+			chart = this.chartFromMembersCreate(service, obj, id, title_suffix, units, family, context, type, priority, algorithm, multiplier, divisor);
 			if(chart === null) return false;
 		}
 		else {
 			// check if we need to re-generate the chart
 			for(var x in obj) {
 				if(typeof(chart.dimensions[x]) === 'undefined') {
-					chart = this.chartFromMembersCreate(service, obj, id, title_suffix, units, family_prefix, category_prefix, type, priority, algorithm, multiplier, divisor);
+					chart = this.chartFromMembersCreate(service, obj, id, title_suffix, units, family, context, type, priority, algorithm, multiplier, divisor);
 					if(chart === null) return false;
 					break;
 				}
@@ -300,28 +300,28 @@ var named = {
 				}
 
 				if(global_requests_enable == true)
-					service.module.chartFromMembers(service, global_requests, 'received_requests', 'Bind, Global Received Requests by IP version', 'requests/s', 'named', 'named', netdata.chartTypes.stacked, 100, netdata.chartAlgorithms.incremental, 1, 1);
+					service.module.chartFromMembers(service, global_requests, 'received_requests', 'Bind, Global Received Requests by IP version', 'requests/s', 'requests', 'named.requests', netdata.chartTypes.stacked, named.base_priority + 1, netdata.chartAlgorithms.incremental, 1, 1);
 
 				if(global_queries_success_enable == true)
-					service.module.chartFromMembers(service, global_queries_success, 'global_queries_success', 'Bind, Global Successful Queries', 'queries/s', 'named', 'named', netdata.chartTypes.line, 150, netdata.chartAlgorithms.incremental, 1, 1);
+					service.module.chartFromMembers(service, global_queries_success, 'global_queries_success', 'Bind, Global Successful Queries', 'queries/s', 'queries', 'named.queries.succcess', netdata.chartTypes.line, named.base_priority + 2, netdata.chartAlgorithms.incremental, 1, 1);
 
 				if(protocol_queries_enable == true)
-					service.module.chartFromMembers(service, protocol_queries, 'protocols_queries', 'Bind, Global Queries by IP Protocol', 'queries/s', 'named', 'named', netdata.chartTypes.stacked, 200, netdata.chartAlgorithms.incremental, 1, 1);
+					service.module.chartFromMembers(service, protocol_queries, 'protocols_queries', 'Bind, Global Queries by IP Protocol', 'queries/s', 'queries', 'named.protocol.queries', netdata.chartTypes.stacked, named.base_priority + 3, netdata.chartAlgorithms.incremental, 1, 1);
 
 				if(global_queries_enable == true)
-					service.module.chartFromMembers(service, global_queries, 'global_queries', 'Bind, Global Queries Analysis', 'queries/s', 'named', 'named', netdata.chartTypes.stacked, 300, netdata.chartAlgorithms.incremental, 1, 1);
+					service.module.chartFromMembers(service, global_queries, 'global_queries', 'Bind, Global Queries Analysis', 'queries/s', 'queries', 'named.global.queries', netdata.chartTypes.stacked, named.base_priority + 4, netdata.chartAlgorithms.incremental, 1, 1);
 
 				if(global_updates_enable == true)
-					service.module.chartFromMembers(service, global_updates, 'received_updates', 'Bind, Global Received Updates', 'updates/s', 'named', 'named', netdata.chartTypes.stacked, 900, netdata.chartAlgorithms.incremental, 1, 1);
+					service.module.chartFromMembers(service, global_updates, 'received_updates', 'Bind, Global Received Updates', 'updates/s', 'updates', 'named.global.updates', netdata.chartTypes.stacked, named.base_priority + 5, netdata.chartAlgorithms.incremental, 1, 1);
 
 				if(global_failures_enable == true)
-					service.module.chartFromMembers(service, global_failures, 'query_failures', 'Bind, Global Query Failures', 'failures/s', 'named', 'named', netdata.chartTypes.line, 950, netdata.chartAlgorithms.incremental, 1, 1);
+					service.module.chartFromMembers(service, global_failures, 'query_failures', 'Bind, Global Query Failures', 'failures/s', 'failures', 'named.global.failures', netdata.chartTypes.line, named.base_priority + 6, netdata.chartAlgorithms.incremental, 1, 1);
 
 				if(global_failures_detail_enable == true)
-					service.module.chartFromMembers(service, global_failures_detail, 'query_failures_detail', 'Bind, Global Query Failures Analysis', 'failures/s', 'named', 'named', netdata.chartTypes.stacked, 960, netdata.chartAlgorithms.incremental, 1, 1);
+					service.module.chartFromMembers(service, global_failures_detail, 'query_failures_detail', 'Bind, Global Query Failures Analysis', 'failures/s', 'failures', 'named.global.failures.detail', netdata.chartTypes.stacked, named.base_priority + 7, netdata.chartAlgorithms.incremental, 1, 1);
 
 				if(default_enable === true)
-					service.module.chartFromMembers(service, r.nsstats, 'nsstats', 'Bind, Other Global Server Statistics', 'operations/s', 'named', 'named', netdata.chartTypes.line, 999, netdata.chartAlgorithms.incremental, 1, 1);
+					service.module.chartFromMembers(service, r.nsstats, 'nsstats', 'Bind, Other Global Server Statistics', 'operations/s', 'other', 'named.nsstats', netdata.chartTypes.line, named.base_priority + 8, netdata.chartAlgorithms.incremental, 1, 1);
 
 				// RecursClients chart
 				{
@@ -334,10 +334,10 @@ var named = {
 							name: '',										// the unique name of the chart
 							title: service.name + ' Bind, Current Recursive Clients',		// the title of the chart
 							units: 'clients',								// the units of the chart dimensions
-							family: 'named',								// the family of the chart
-							category: 'named',								// the category of the chart
+							family: 'clients',								// the family of the chart
+							context: 'named.recursive.clients',				// the context of the chart
 							type: netdata.chartTypes.line,					// the type of the chart
-							priority: 150,									// the priority relative to others in the same family and category
+							priority: named.base_priority + 1,				// the priority relative to others in the same family
 							update_every: service.update_every,				// the expected update frequency of the chart
 							dimensions: {
 								'clients': {
@@ -362,13 +362,13 @@ var named = {
 			}
 
 			if(typeof r.opcodes !== 'undefined')
-				service.module.chartFromMembers(service, r.opcodes, 'in_opcodes', 'Bind, Global Incoming Requests by OpCode', 'requests/s', 'named', 'named', netdata.chartTypes.stacked, 1000, netdata.chartAlgorithms.incremental, 1, 1);
+				service.module.chartFromMembers(service, r.opcodes, 'in_opcodes', 'Bind, Global Incoming Requests by OpCode', 'requests/s', 'requests', 'named.in.opcodes', netdata.chartTypes.stacked, named.base_priority + 9, netdata.chartAlgorithms.incremental, 1, 1);
 
 			if(typeof r.qtypes !== 'undefined')
-				service.module.chartFromMembers(service, r.qtypes, 'in_qtypes', 'Bind, Global Incoming Requests by Query Type', 'requests/s', 'named', 'named', netdata.chartTypes.stacked, 2000, netdata.chartAlgorithms.incremental, 1, 1);
+				service.module.chartFromMembers(service, r.qtypes, 'in_qtypes', 'Bind, Global Incoming Requests by Query Type', 'requests/s', 'requests', 'named.in.qtypes', netdata.chartTypes.stacked, named.base_priority + 10, netdata.chartAlgorithms.incremental, 1, 1);
 
 			if(typeof r.sockstats !== 'undefined')
-				service.module.chartFromMembers(service, r.sockstats, 'in_sockstats', 'Bind, Global Socket Statistics', 'operations/s', 'named', 'named', netdata.chartTypes.line, 2500, netdata.chartAlgorithms.incremental, 1, 1);
+				service.module.chartFromMembers(service, r.sockstats, 'in_sockstats', 'Bind, Global Socket Statistics', 'operations/s', 'sockets', 'named.in.sockstats', netdata.chartTypes.line, named.base_priority + 11, netdata.chartAlgorithms.incremental, 1, 1);
 
 			if(typeof r.views !== 'undefined') {
 				for( var x in r.views ) {
@@ -422,10 +422,10 @@ var named = {
 							}
 
 							if(rtt_enable)
-								service.module.chartFromMembers(service, rtt, 'view_resolver_rtt_' + x, 'Bind, ' + x + ' View, Resolver Round Trip Timings', 'queries/s', 'named', 'named', netdata.chartTypes.stacked, 5600, netdata.chartAlgorithms.incremental, 1, 1);
+								service.module.chartFromMembers(service, rtt, 'view_resolver_rtt_' + x, 'Bind, ' + x + ' View, Resolver Round Trip Timings', 'queries/s', 'view_' + x, 'named.resolver.rtt', netdata.chartTypes.stacked, named.base_priority + 12, netdata.chartAlgorithms.incremental, 1, 1);
 
 							if(default_enable)
-								service.module.chartFromMembers(service, resolver.stats, 'view_resolver_stats_' + x, 'Bind, ' + x + ' View, Resolver Statistics', 'operations/s', 'named', 'named', netdata.chartTypes.line, 5500, netdata.chartAlgorithms.incremental, 1, 1);
+								service.module.chartFromMembers(service, resolver.stats, 'view_resolver_stats_' + x, 'Bind, ' + x + ' View, Resolver Statistics', 'operations/s', 'view_' + x, 'named.resolver.stats', netdata.chartTypes.line, named.base_priority + 13, netdata.chartAlgorithms.incremental, 1, 1);
 
 							// NumFetch chart
 							if(typeof named.lookups.numfetch[key] !== 'undefined') {
@@ -438,10 +438,10 @@ var named = {
 										name: '',										// the unique name of the chart
 										title: service.name + ' Bind, ' + x + ' View, Resolver Active Queries',		// the title of the chart
 										units: 'queries',								// the units of the chart dimensions
-										family: 'named',								// the family of the chart
-										category: 'named',								// the category of the chart
+										family: 'view_' + x,							// the family of the chart
+										context: 'named.resolver.active.queries',		// the context of the chart
 										type: netdata.chartTypes.line,					// the type of the chart
-										priority: 5000,									// the priority relative to others in the same family and category
+										priority: named.base_priority + 1001,			// the priority relative to others in the same family
 										update_every: service.update_every,				// the expected update frequency of the chart
 										dimensions: {
 											'queries': {
@@ -467,10 +467,10 @@ var named = {
 					}
 
 					if(typeof resolver.qtypes !== 'undefined')
-						service.module.chartFromMembers(service, resolver.qtypes, 'view_resolver_qtypes_' + x, 'Bind, ' + x + ' View, Requests by Query Type', 'requests/s', 'named', 'named', netdata.chartTypes.stacked, 6000, netdata.chartAlgorithms.incremental, 1, 1);
+						service.module.chartFromMembers(service, resolver.qtypes, 'view_resolver_qtypes_' + x, 'Bind, ' + x + ' View, Requests by Query Type', 'requests/s', 'view_' + x, 'named.resolver.qtypes', netdata.chartTypes.stacked, named.base_priority + 14, netdata.chartAlgorithms.incremental, 1, 1);
 
 					//if(typeof resolver.cache !== 'undefined')
-					//	service.module.chartFromMembers(service, resolver.cache, 'view_resolver_cache_' + x, 'Bind, ' + x + ' View, Cache Entries', 'entries', 'named', 'named', netdata.chartTypes.stacked, 7000, netdata.chartAlgorithms.absolute, 1, 1);
+					//	service.module.chartFromMembers(service, resolver.cache, 'view_resolver_cache_' + x, 'Bind, ' + x + ' View, Cache Entries', 'entries', 'view_' + x, 'named.resolver.cache', netdata.chartTypes.stacked, named.base_priority + 15, netdata.chartAlgorithms.absolute, 1, 1);
 
 					if(typeof resolver.cachestats['CacheHits'] !== 'undefined' && resolver.cachestats['CacheHits'] > 0) {
 						var id = 'named_' + service.name + '.view_resolver_cachehits_' + x;
@@ -481,11 +481,11 @@ var named = {
 								id: id,											// the unique id of the chart
 								name: '',										// the unique name of the chart
 								title: service.name + ' Bind, ' + x + ' View, Resolver Cache Hits',		// the title of the chart
-								units: 'operations/s',								// the units of the chart dimensions
-								family: 'named',								// the family of the chart
-								category: 'named',								// the category of the chart
+								units: 'operations/s',							// the units of the chart dimensions
+								family: 'view_' + x,							// the family of the chart
+								context: 'named.resolver.cache.hits',			// the context of the chart
 								type: netdata.chartTypes.area,					// the type of the chart
-								priority: 8000,									// the priority relative to others in the same family and category
+								priority: named.base_priority + 1100,			// the priority relative to others in the same family
 								update_every: service.update_every,				// the expected update frequency of the chart
 								dimensions: {
 									'CacheHits': {
@@ -525,10 +525,10 @@ var named = {
 					// 5. TreeMemTotal, TreeMemInUse - absolute
 					// 6. HeapMemMax, HeapMemTotal, HeapMemInUse - absolute
 					//if(typeof resolver.cachestats !== 'undefined')
-					//	service.module.chartFromMembers(service, resolver.cachestats, 'view_resolver_cachestats_' + x, 'Bind, ' + x + ' View, Cache Statistics', 'requests/s', 'named', 'named', netdata.chartTypes.line, 8000, netdata.chartAlgorithms.incremental, 1, 1);
+					//	service.module.chartFromMembers(service, resolver.cachestats, 'view_resolver_cachestats_' + x, 'Bind, ' + x + ' View, Cache Statistics', 'requests/s', 'view_' + x, 'named.resolver.cache.stats', netdata.chartTypes.line, named.base_priority + 1001, netdata.chartAlgorithms.incremental, 1, 1);
 
 					//if(typeof resolver.adb !== 'undefined')
-					//	service.module.chartFromMembers(service, resolver.adb, 'view_resolver_adb_' + x, 'Bind, ' + x + ' View, ADB Statistics', 'entries', 'named', 'named', netdata.chartTypes.line, 8500, netdata.chartAlgorithms.absolute, 1, 1);
+					//	service.module.chartFromMembers(service, resolver.adb, 'view_resolver_adb_' + x, 'Bind, ' + x + ' View, ADB Statistics', 'entries', 'view_' + x, 'named.resolver.adb', netdata.chartTypes.line, named.base_priority + 1002, netdata.chartAlgorithms.absolute, 1, 1);
 				}
 			}
 		}

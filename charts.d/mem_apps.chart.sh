@@ -25,7 +25,7 @@ mem_apps_bc_finalze=
 
 mem_apps_create() {
 
-	echo "CHART apps.mem '' 'Apps Memory' MB apps apps stacked 20000 $mem_apps_update_every"
+	echo "CHART chartsd_apps.mem '' 'Apps Memory' MB apps apps.mem stacked 20000 $mem_apps_update_every"
 
 	local x=
 	for x in $mem_apps_apps
@@ -44,7 +44,7 @@ mem_apps_update() {
 	# for each dimension
 	# remember: KEEP IT SIMPLE AND SHORT
 
-	echo "BEGIN apps.mem"
+	echo "BEGIN chartsd_apps.mem"
 	ps -o comm,rss -C "$mem_apps_apps" |\
 		grep -v "^COMMAND" |\
 		(	sed -e "s/ \+/ /g" -e "s/ /+=/g";

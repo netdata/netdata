@@ -149,7 +149,7 @@ void *proc_main(void *ptr)
 
 			if(!stcpu_thread) stcpu_thread = rrdset_find("netdata.plugin_proc_cpu");
 			if(!stcpu_thread) {
-				stcpu_thread = rrdset_create("netdata", "plugin_proc_cpu", NULL, "netdata", "NetData Proc Plugin CPU usage", "milliseconds/s", 9999, rrd_update_every, RRDSET_TYPE_STACKED);
+				stcpu_thread = rrdset_create("netdata", "plugin_proc_cpu", NULL, "proc.internal", NULL, "NetData Proc Plugin CPU usage", "milliseconds/s", 131000, rrd_update_every, RRDSET_TYPE_STACKED);
 
 				rrddim_add(stcpu_thread, "user",  NULL,  1, 1000, RRDDIM_INCREMENTAL);
 				rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRDDIM_INCREMENTAL);
@@ -164,7 +164,7 @@ void *proc_main(void *ptr)
 
 			if(!stcpu) stcpu = rrdset_find("netdata.server_cpu");
 			if(!stcpu) {
-				stcpu = rrdset_create("netdata", "server_cpu", NULL, "netdata", "NetData CPU usage", "milliseconds/s", 2000, rrd_update_every, RRDSET_TYPE_STACKED);
+				stcpu = rrdset_create("netdata", "server_cpu", NULL, "netdata", NULL, "NetData CPU usage", "milliseconds/s", 130000, rrd_update_every, RRDSET_TYPE_STACKED);
 
 				rrddim_add(stcpu, "user",  NULL,  1, 1000, RRDDIM_INCREMENTAL);
 				rrddim_add(stcpu, "system", NULL, 1, 1000, RRDDIM_INCREMENTAL);
@@ -179,7 +179,7 @@ void *proc_main(void *ptr)
 
 			if(!stclients) stclients = rrdset_find("netdata.clients");
 			if(!stclients) {
-				stclients = rrdset_create("netdata", "clients", NULL, "netdata", "NetData Web Clients", "connected clients", 3000, rrd_update_every, RRDSET_TYPE_LINE);
+				stclients = rrdset_create("netdata", "clients", NULL, "netdata", NULL, "NetData Web Clients", "connected clients", 131000, rrd_update_every, RRDSET_TYPE_LINE);
 
 				rrddim_add(stclients, "clients",  NULL,  1, 1, RRDDIM_ABSOLUTE);
 			}
@@ -192,7 +192,7 @@ void *proc_main(void *ptr)
 
 			if(!streqs) streqs = rrdset_find("netdata.requests");
 			if(!streqs) {
-				streqs = rrdset_create("netdata", "requests", NULL, "netdata", "NetData Web Requests", "requests/s", 3001, rrd_update_every, RRDSET_TYPE_LINE);
+				streqs = rrdset_create("netdata", "requests", NULL, "netdata", NULL, "NetData Web Requests", "requests/s", 131100, rrd_update_every, RRDSET_TYPE_LINE);
 
 				rrddim_add(streqs, "requests",  NULL,  1, 1, RRDDIM_INCREMENTAL);
 			}
@@ -205,7 +205,7 @@ void *proc_main(void *ptr)
 
 			if(!stbytes) stbytes = rrdset_find("netdata.net");
 			if(!stbytes) {
-				stbytes = rrdset_create("netdata", "net", NULL, "netdata", "NetData Network Traffic", "kilobits/s", 3002, rrd_update_every, RRDSET_TYPE_AREA);
+				stbytes = rrdset_create("netdata", "net", NULL, "netdata", NULL, "NetData Network Traffic", "kilobits/s", 131200, rrd_update_every, RRDSET_TYPE_AREA);
 
 				rrddim_add(stbytes, "in",  NULL,  8, 1024, RRDDIM_INCREMENTAL);
 				rrddim_add(stbytes, "out",  NULL,  -8, 1024, RRDDIM_INCREMENTAL);

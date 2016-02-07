@@ -7,6 +7,8 @@ postfix_postqueue=
 # how frequently to collect queue size
 postfix_update_every=15
 
+postfix_priority=60000
+
 postfix_check() {
 	# this should return:
 	#  - 0 to enable the chart
@@ -41,9 +43,9 @@ postfix_check() {
 
 postfix_create() {
 cat <<EOF
-CHART postfix.qemails '' "Postfix Queue Emails" "emails" postfix postfix line 5000 $postfix_update_every
+CHART postfix.qemails '' "Postfix Queue Emails" "emails" queue postfix.queued.emails line $[postfix_priority + 1] $postfix_update_every
 DIMENSION emails '' absolute 1 1
-CHART postfix.qsize '' "Postfix Queue Emails Size" "emails size in KB" postfix postfix area 5001 $postfix_update_every
+CHART postfix.qsize '' "Postfix Queue Emails Size" "emails size in KB" queue postfix.queued.size area $[postfix_priority + 2] $postfix_update_every
 DIMENSION size '' absolute 1 1
 EOF
 

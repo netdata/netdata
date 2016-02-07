@@ -235,7 +235,7 @@ static void tc_device_commit(struct tc_device *d)
 		if(!st) {
 			debug(D_TC_LOOP, "TC: Creating new chart for device '%s'", d->name?d->name:d->id);
 
-			st = rrdset_create(RRD_TYPE_TC, d->id, d->name?d->name:d->id, d->family?d->family:d->id, "Class Usage", "kilobits/s", 1000, rrd_update_every, RRDSET_TYPE_STACKED);
+			st = rrdset_create(RRD_TYPE_TC, d->id, d->name?d->name:d->id, d->family?d->family:d->id, RRD_TYPE_TC ".qos", "Class Usage", "kilobits/s", 7000, rrd_update_every, RRDSET_TYPE_STACKED);
 
 			for(c = d->classes ; c ; c = c->next) {
 				if(!c->updated) continue;
@@ -626,7 +626,7 @@ void *tc_main(void *ptr)
 
 				if(!stcpu) stcpu = rrdset_find("netdata.plugin_tc_cpu");
 				if(!stcpu) {
-					stcpu = rrdset_create("netdata", "plugin_tc_cpu", NULL, "netdata", "NetData TC CPU usage", "milliseconds/s", 10000, rrd_update_every, RRDSET_TYPE_STACKED);
+					stcpu = rrdset_create("netdata", "plugin_tc_cpu", NULL, "tc.helper", NULL, "NetData TC CPU usage", "milliseconds/s", 135000, rrd_update_every, RRDSET_TYPE_STACKED);
 					rrddim_add(stcpu, "user",  NULL,  1, 1000, RRDDIM_INCREMENTAL);
 					rrddim_add(stcpu, "system", NULL, 1, 1000, RRDDIM_INCREMENTAL);
 				}
@@ -638,7 +638,7 @@ void *tc_main(void *ptr)
 
 				if(!sttime) stcpu = rrdset_find("netdata.plugin_tc_time");
 				if(!sttime) {
-					sttime = rrdset_create("netdata", "plugin_tc_time", NULL, "netdata", "NetData TC script execution", "milliseconds/run", 10001, rrd_update_every, RRDSET_TYPE_AREA);
+					sttime = rrdset_create("netdata", "plugin_tc_time", NULL, "tc.helper", NULL, "NetData TC script execution", "milliseconds/run", 135001, rrd_update_every, RRDSET_TYPE_AREA);
 					rrddim_add(sttime, "run_time",  "run time",  1, 1, RRDDIM_ABSOLUTE);
 				}
 				else rrdset_next(sttime);

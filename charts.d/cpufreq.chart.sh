@@ -10,6 +10,7 @@ cpufreq_source_update=1
 # _update_every is a special variable - it holds the number of seconds
 # between the calls of the _update() function
 cpufreq_update_every=
+cpufreq_priority=10000
 
 cpufreq_find_all_files() {
 	find $1 -maxdepth $cpufreq_sys_depth -name scaling_cur_freq 2>/dev/null
@@ -35,8 +36,8 @@ cpufreq_create() {
 	# - the highest speed we can achieve -
 	[ $cpufreq_source_update -eq 1 ] && echo >$TMP_DIR/cpufreq.sh "cpufreq_update() {"
 
-	echo "CHART sensors.cpufreq '' 'CPU Clock' 'MHz' 'cpufreq' '' line 7000 $cpufreq_update_every"
-	echo >>$TMP_DIR/cpufreq.sh "echo \"BEGIN sensors.cpufreq \$1\""
+	echo "CHART cpu.cpufreq '' 'CPU Clock' 'MHz' 'cpufreq' '' line $[cpufreq_priority + 1] $cpufreq_update_every"
+	echo >>$TMP_DIR/cpufreq.sh "echo \"BEGIN cpu.cpufreq \$1\""
 
 	i=0
 	for file in $( cpufreq_find_all_files $cpufreq_sys_dir | sort -u )

@@ -29,7 +29,7 @@ cpu_apps_bc_finalze=
 
 cpu_apps_create() {
 
-	echo "CHART apps.cpu '' 'Apps CPU' 'milliseconds / $cpu_apps_update_every sec' apps apps stacked 20001 $cpu_apps_update_every"
+	echo "CHART chartsd_apps.cpu '' 'Apps CPU' 'milliseconds / $cpu_apps_update_every sec' apps apps stacked 20001 $cpu_apps_update_every"
 
 	local x=
 	for x in $cpu_apps_apps
@@ -48,7 +48,7 @@ cpu_apps_update() {
 	# for each dimension
 	# remember: KEEP IT SIMPLE AND SHORT
 
-	echo "BEGIN apps.cpu"
+	echo "BEGIN chartsd_apps.cpu"
 	ps -o pid,comm -C "$cpu_apps_apps" |\
 		grep -v "COMMAND" |\
 		(

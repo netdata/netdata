@@ -7,6 +7,8 @@ apache_url="http://127.0.0.1:80/server-status?auto"
 # between the calls of the _update() function
 apache_update_every=
 
+apache_priority=60000
+
 # convert apache floating point values
 # to integer using this multiplier
 # this only affects precision - the values
@@ -165,27 +167,27 @@ apache_check() {
 # _create is called once, to create the charts
 apache_create() {
 	cat <<EOF
-CHART apache.bytesperreq '' "apache Lifetime Avg. Response Size" "bytes/request" apache apache area 16008 $apache_update_every
+CHART apache.bytesperreq '' "apache Lifetime Avg. Response Size" "bytes/request" statistics apache.bytesperreq area $[apache_priority + 8] $apache_update_every
 DIMENSION size '' absolute 1 ${apache_decimal_detail}
-CHART apache.workers '' "apache Workers" "workers" apache apache stacked 16005 $apache_update_every
+CHART apache.workers '' "apache Workers" "workers" workers apache.workers stacked $[apache_priority + 5] $apache_update_every
 DIMENSION idle '' absolute 1 1
 DIMENSION busy '' absolute 1 1
-CHART apache.reqpersec '' "apache Lifetime Avg. Requests/s" "requests/s" apache apache line 16006 $apache_update_every
+CHART apache.reqpersec '' "apache Lifetime Avg. Requests/s" "requests/s" statistics apache.reqpersec line $[apache_priority + 6] $apache_update_every
 DIMENSION requests '' absolute 1 ${apache_decimal_detail}
-CHART apache.bytespersec '' "apache Lifetime Avg. Bandwidth/s" "kilobits/s" apache apache area 16007 $apache_update_every
+CHART apache.bytespersec '' "apache Lifetime Avg. Bandwidth/s" "kilobits/s" statistics apache.bytespersec area $[apache_priority + 7] $apache_update_every
 DIMENSION sent '' absolute 8 $[apache_decimal_detail * 1000]
-CHART apache.requests '' "apache Requests" "requests/s" apache apache line 16001 $apache_update_every
+CHART apache.requests '' "apache Requests" "requests/s" requests apache.requests line $[apache_priority + 1] $apache_update_every
 DIMENSION requests '' incremental 1 1
-CHART apache.net '' "apache Bandwidth" "kilobits/s" apache apache area 16003 $apache_update_every
+CHART apache.net '' "apache Bandwidth" "kilobits/s" bandwidth apache.net area $[apache_priority + 3] $apache_update_every
 DIMENSION sent '' incremental 8 1
 EOF
 
 	if [ ${apache_has_conns} -eq 1 ]
 		then
 		cat <<EOF2
-CHART apache.connections '' "apache Connections" "connections" apache apache line 16002 $apache_update_every
+CHART apache.connections '' "apache Connections" "connections" connections apache.connections line $[apache_priority + 2] $apache_update_every
 DIMENSION connections '' absolute 1 1
-CHART apache.conns_async '' "apache Async Connections" "connections" apache apache stacked 16004 $apache_update_every
+CHART apache.conns_async '' "apache Async Connections" "connections" connections apache.conns_async stacked $[apache_priority + 4] $apache_update_every
 DIMENSION keepalive '' absolute 1 1
 DIMENSION closing '' absolute 1 1
 DIMENSION writing '' absolute 1 1

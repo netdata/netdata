@@ -244,7 +244,7 @@ void *pluginsd_worker_thread(void *arg)
 				char *title = words[3];
 				char *units = words[4];
 				char *family = words[5];
-				char *category = words[6];
+				char *context = words[6];
 				char *chart = words[7];
 				char *priority_s = words[8];
 				char *update_every_s = words[9];
@@ -267,25 +267,23 @@ void *pluginsd_worker_thread(void *arg)
 				if(unlikely(chart)) chart_type = rrdset_type_id(chart);
 
 				if(unlikely(noname || !name || !*name || strcasecmp(name, "NULL") == 0 || strcasecmp(name, "(NULL)") == 0)) name = NULL;
-				if(unlikely(!family || !*family)) family = id;
-				if(unlikely(!category || !*category)) category = type;
+				if(unlikely(!family || !*family)) family = NULL;
+				if(unlikely(!context || !*context)) context = NULL;
 
 				st = rrdset_find_bytype(type, id);
 				if(unlikely(!st)) {
-					debug(D_PLUGINSD, "PLUGINSD: Creating chart type='%s', id='%s', name='%s', family='%s', category='%s', chart='%s', priority=%d, update_every=%d"
+					debug(D_PLUGINSD, "PLUGINSD: Creating chart type='%s', id='%s', name='%s', family='%s', context='%s', chart='%s', priority=%d, update_every=%d"
 						, type, id
 						, name?name:""
 						, family?family:""
-						, category?category:""
+						, context?context:""
 						, rrdset_type_name(chart_type)
 						, priority
 						, update_every
 						);
 
-					st = rrdset_create(type, id, name, family, title, units, priority, update_every, chart_type);
+					st = rrdset_create(type, id, name, family, context, title, units, priority, update_every, chart_type);
 					cd->update_every = update_every;
-
-					if(unlikely(strcmp(category, "none") == 0)) st->isdetail = 1;
 				}
 				else debug(D_PLUGINSD, "PLUGINSD: Chart '%s' already exists. Not adding it again.", st->id);
 			}

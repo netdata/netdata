@@ -22,8 +22,8 @@ extern int rrd_delete_unupdated_dimensions;
 
 #define RRD_ID_LENGTH_MAX 1024
 
-#define RRDSET_MAGIC		"NETDATA RRD SET FILE V016"
-#define RRDDIMENSION_MAGIC	"NETDATA RRD DIMENSION FILE V016"
+#define RRDSET_MAGIC		"NETDATA RRD SET FILE V017"
+#define RRDDIMENSION_MAGIC	"NETDATA RRD DIMENSION FILE V017"
 
 typedef long long total_number;
 #define TOTAL_NUMBER_FORMAT "%lld"
@@ -182,7 +182,8 @@ struct rrdset {
 													// (the user overwrites the name of the charts)
 
 	char *type;										// the type of graph RRD_TYPE_* (a category, for determining graphing options)
-	char *family;									// the family of this data set (for grouping them together)
+	char *family;									// grouping sets under the same family
+	char *context;									// the template of this data set
 	char *title;									// title shown to user
 	char *units;									// units of measurement
 
@@ -263,7 +264,16 @@ extern char *rrdset_cache_dir(const char *id);
 
 extern void rrdset_reset(RRDSET *st);
 
-extern RRDSET *rrdset_create(const char *type, const char *id, const char *name, const char *family, const char *title, const char *units, long priority, int update_every, int chart_type);
+extern RRDSET *rrdset_create(const char *type
+		, const char *id
+		, const char *name
+		, const char *family
+		, const char *context
+		, const char *title
+		, const char *units
+		, long priority
+		, int update_every
+		, int chart_type);
 
 extern void rrdset_free_all(void);
 extern void rrdset_save_all(void);

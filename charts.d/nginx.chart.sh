@@ -8,6 +8,7 @@ nginx_url="http://127.0.0.1:80/stub_status"
 # _update_every is a special variable - it holds the number of seconds
 # between the calls of the _update() function
 nginx_update_every=
+nginx_priority=60000
 
 declare -a nginx_response=()
 nginx_active_connections=0
@@ -80,18 +81,18 @@ nginx_check() {
 # _create is called once, to create the charts
 nginx_create() {
 	cat <<EOF
-CHART nginx.connections '' "nginx Active Connections" "connections" nginx nginx line 16000 $nginx_update_every
+CHART nginx.connections '' "nginx Active Connections" "connections" nginx nginx.connections line $[nginx_priority + 1] $nginx_update_every
 DIMENSION active '' absolute 1 1
 
-CHART nginx.requests '' "nginx Requests" "requests/s" nginx nginx line 16001 $nginx_update_every
+CHART nginx.requests '' "nginx Requests" "requests/s" nginx nginx.requests line $[nginx_priority + 2] $nginx_update_every
 DIMENSION requests '' incremental 1 1
 
-CHART nginx.connections_status '' "nginx Active Connections by Status" "connections" nginx nginx line 16002 $nginx_update_every
+CHART nginx.connections_status '' "nginx Active Connections by Status" "connections" nginx nginx.connections.status line $[nginx_priority + 3] $nginx_update_every
 DIMENSION reading '' absolute 1 1
 DIMENSION writing '' absolute 1 1
 DIMENSION waiting idle absolute 1 1
 
-CHART nginx.connect_rate '' "nginx Connections Rate" "connections/s" nginx nginx line 16003 $nginx_update_every
+CHART nginx.connect_rate '' "nginx Connections Rate" "connections/s" nginx nginx.connections.rate line $[nginx_priority + 4] $nginx_update_every
 DIMENSION accepts accepted incremental 1 1
 DIMENSION handled '' incremental 1 1
 EOF

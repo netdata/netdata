@@ -1,11 +1,19 @@
 #!/bin/sh
 
-load_average_update_every=
+load_average_update_every=5
+load_priority=100
 
 load_average_check() {
 	# this should return:
 	#  - 0 to enable the chart
 	#  - 1 to disable the chart
+
+	if [ ${load_average_update_every} -lt 5 ]
+		then
+		# there is no meaning for shorter than 5 seconds
+		# the kernel changes this value every 5 seconds
+		load_average_update_every=5
+	fi
 
 	return 0
 }
@@ -13,7 +21,7 @@ load_average_check() {
 load_average_create() {
 	# create a chart with 3 dimensions
 cat <<EOF
-CHART example.load '' "System Load Average" "load" load load line 500 $load_average_update_every
+CHART system.load '' "System Load Average" "load" load system.load line $[load_priority + 1] $load_average_update_every
 DIMENSION load1 '1 min' absolute 1 100
 DIMENSION load5 '5 mins' absolute 1 100
 DIMENSION load15 '15 mins' absolute 1 100
@@ -37,7 +45,7 @@ load_average_update() {
 
 	# write the result of the work.
 	cat <<VALUESEOF
-BEGIN example.load
+BEGIN system.load
 SET load1 = $load1
 SET load5 = $load5
 SET load15 = $load15

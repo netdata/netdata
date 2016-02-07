@@ -116,7 +116,7 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 
 	st = rrdset_find_bytype("system", "interrupts");
 	if(!st) {
-		st = rrdset_create("system", "interrupts", NULL, "system", "System interrupts", "interrupts/s", 1000, update_every, RRDSET_TYPE_STACKED);
+		st = rrdset_create("system", "interrupts", NULL, "interrupts", NULL, "System interrupts", "interrupts/s", 1000, update_every, RRDSET_TYPE_STACKED);
 
 		for(l = 0; l < lines ;l++) {
 			if(!irrs[l].used) continue;
@@ -135,9 +135,6 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 		int c;
 
 		for(c = 0; c < cpus ; c++) {
-			char family[256];
-			snprintf(family, 256, "cpu%d", c);
-
 			char id[256];
 			snprintf(id, 256, "cpu%d_interrupts", c);
 
@@ -146,7 +143,7 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 				char name[256], title[256];
 				snprintf(name, 256, "cpu%d_interrupts", c);
 				snprintf(title, 256, "CPU%d Interrupts", c);
-				st = rrdset_create("cpu", id, name, family, title, "interrupts/s", 2000 + c, update_every, RRDSET_TYPE_STACKED);
+				st = rrdset_create("cpu", id, name, "interrupts", "cpu.interrupts", title, "interrupts/s", 2000 + c, update_every, RRDSET_TYPE_STACKED);
 
 				for(l = 0; l < lines ;l++) {
 					if(!irrs[l].used) continue;

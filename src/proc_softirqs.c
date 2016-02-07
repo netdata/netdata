@@ -104,7 +104,7 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
 
 	st = rrdset_find_bytype("system", "softirqs");
 	if(!st) {
-		st = rrdset_create("system", "softirqs", NULL, "system", "System softirqs", "softirqs/s", 1001, update_every, RRDSET_TYPE_STACKED);
+		st = rrdset_create("system", "softirqs", NULL, "softirqs", NULL, "System softirqs", "softirqs/s", 950, update_every, RRDSET_TYPE_STACKED);
 
 		for(l = 0; l < lines ;l++) {
 			if(!irrs[l].used) continue;
@@ -123,9 +123,6 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
 		int c;
 
 		for(c = 0; c < cpus ; c++) {
-			char family[256];
-			snprintf(family, 256, "cpu%d", c);
-
 			char id[256];
 			snprintf(id, 256, "cpu%d_softirqs", c);
 
@@ -142,7 +139,7 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
 				char name[256], title[256];
 				snprintf(name, 256, "cpu%d_softirqs", c);
 				snprintf(title, 256, "CPU%d softirqs", c);
-				st = rrdset_create("cpu", id, name, family, title, "softirqs/s", 3000 + c, update_every, RRDSET_TYPE_STACKED);
+				st = rrdset_create("cpu", id, name, "softirqs", "cpu.softirqs", title, "softirqs/s", 3000 + c, update_every, RRDSET_TYPE_STACKED);
 
 				for(l = 0; l < lines ;l++) {
 					if(!irrs[l].used) continue;

@@ -99,7 +99,7 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
 	if(do_sockets) {
 		st = rrdset_find(RRD_TYPE_NET_STAT_CONNTRACK ".sockets");
 		if(!st) {
-			st = rrdset_create(RRD_TYPE_NET_STAT_CONNTRACK, "sockets", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connections", "active connections", 1000, update_every, RRDSET_TYPE_LINE);
+			st = rrdset_create(RRD_TYPE_NET_STAT_CONNTRACK, "sockets", NULL, RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Netfilter Connections", "active connections", 1000, update_every, RRDSET_TYPE_LINE);
 
 			rrddim_add(st, "connections", NULL, 1, 1, RRDDIM_ABSOLUTE);
 		}
@@ -114,7 +114,7 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
 	if(do_new) {
 		st = rrdset_find(RRD_TYPE_NET_STAT_CONNTRACK ".new");
 		if(!st) {
-			st = rrdset_create(RRD_TYPE_NET_STAT_CONNTRACK, "new", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter New Connections", "connections/s", 1001, update_every, RRDSET_TYPE_LINE);
+			st = rrdset_create(RRD_TYPE_NET_STAT_CONNTRACK, "new", NULL, RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Netfilter New Connections", "connections/s", 1001, update_every, RRDSET_TYPE_LINE);
 
 			rrddim_add(st, "new", NULL, 1, 1, RRDDIM_INCREMENTAL);
 			rrddim_add(st, "ignore", NULL, -1, 1, RRDDIM_INCREMENTAL);
@@ -133,7 +133,7 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
 	if(do_changes) {
 		st = rrdset_find(RRD_TYPE_NET_STAT_CONNTRACK ".changes");
 		if(!st) {
-			st = rrdset_create(RRD_TYPE_NET_STAT_CONNTRACK, "changes", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Changes", "changes/s", 1002, update_every, RRDSET_TYPE_LINE);
+			st = rrdset_create(RRD_TYPE_NET_STAT_CONNTRACK, "changes", NULL, RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Netfilter Connection Changes", "changes/s", 1002, update_every, RRDSET_TYPE_LINE);
 			st->isdetail = 1;
 
 			rrddim_add(st, "inserted", NULL, 1, 1, RRDDIM_INCREMENTAL);
@@ -153,7 +153,7 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
 	if(do_expect) {
 		st = rrdset_find(RRD_TYPE_NET_STAT_CONNTRACK ".expect");
 		if(!st) {
-			st = rrdset_create(RRD_TYPE_NET_STAT_CONNTRACK, "expect", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Expectations", "expectations/s", 1003, update_every, RRDSET_TYPE_LINE);
+			st = rrdset_create(RRD_TYPE_NET_STAT_CONNTRACK, "expect", NULL, RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Netfilter Connection Expectations", "expectations/s", 1003, update_every, RRDSET_TYPE_LINE);
 			st->isdetail = 1;
 
 			rrddim_add(st, "created", NULL, 1, 1, RRDDIM_INCREMENTAL);
@@ -173,7 +173,7 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
 	if(do_search) {
 		st = rrdset_find(RRD_TYPE_NET_STAT_CONNTRACK ".search");
 		if(!st) {
-			st = rrdset_create(RRD_TYPE_NET_STAT_CONNTRACK, "search", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Connection Searches", "searches/s", 1010, update_every, RRDSET_TYPE_LINE);
+			st = rrdset_create(RRD_TYPE_NET_STAT_CONNTRACK, "search", NULL, RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Netfilter Connection Searches", "searches/s", 1010, update_every, RRDSET_TYPE_LINE);
 			st->isdetail = 1;
 
 			rrddim_add(st, "searched", NULL, 1, 1, RRDDIM_INCREMENTAL);
@@ -193,7 +193,7 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
 	if(do_errors) {
 		st = rrdset_find(RRD_TYPE_NET_STAT_CONNTRACK ".errors");
 		if(!st) {
-			st = rrdset_create(RRD_TYPE_NET_STAT_CONNTRACK, "errors", NULL, RRD_TYPE_NET_STAT_CONNTRACK, "Netfilter Errors", "events/s", 1005, update_every, RRDSET_TYPE_LINE);
+			st = rrdset_create(RRD_TYPE_NET_STAT_CONNTRACK, "errors", NULL, RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Netfilter Errors", "events/s", 1005, update_every, RRDSET_TYPE_LINE);
 			st->isdetail = 1;
 
 			rrddim_add(st, "icmp_error", NULL, 1, 1, RRDDIM_INCREMENTAL);

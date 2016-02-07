@@ -1751,116 +1751,116 @@ void show_charts(void)
 
 	// we have something new to show
 	// update the charts
-	fprintf(stdout, "CHART apps.cpu '' 'Apps CPU Time (%ld%% = %ld core%s)' 'cpu time %%' apps apps stacked 20001 %d\n", (processors * 100), processors, (processors>1)?"s":"", update_every);
+	fprintf(stdout, "CHART apps.cpu '' 'Apps CPU Time (%ld%% = %ld core%s)' 'cpu time %%' cpu apps.cpu stacked 20001 %d\n", (processors * 100), processors, (processors>1)?"s":"", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu %s\n", w->name, Hertz, w->hidden ? "hidden,noreset" : "noreset");
 	}
 
-	fprintf(stdout, "CHART apps.mem '' 'Apps Dedicated Memory (w/o shared)' 'MB' apps apps stacked 20003 %d\n", update_every);
+	fprintf(stdout, "CHART apps.mem '' 'Apps Dedicated Memory (w/o shared)' 'MB' mem apps.mem stacked 20003 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' absolute %ld %ld noreset\n", w->name, sysconf(_SC_PAGESIZE), 1024L*1024L);
 	}
 
-	fprintf(stdout, "CHART apps.threads '' 'Apps Threads' 'threads' apps apps stacked 20005 %d\n", update_every);
+	fprintf(stdout, "CHART apps.threads '' 'Apps Threads' 'threads' processes apps.threads stacked 20005 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' absolute 1 1 noreset\n", w->name);
 	}
 
-	fprintf(stdout, "CHART apps.processes '' 'Apps Processes' 'processes' apps apps stacked 20004 %d\n", update_every);
+	fprintf(stdout, "CHART apps.processes '' 'Apps Processes' 'processes' processes apps.processes stacked 20004 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' absolute 1 1 noreset\n", w->name);
 	}
 
-	fprintf(stdout, "CHART apps.cpu_user '' 'Apps CPU User Time (%ld%% = %ld core%s)' 'cpu time %%' apps none stacked 20020 %d\n", (processors * 100), processors, (processors>1)?"s":"", update_every);
+	fprintf(stdout, "CHART apps.cpu_user '' 'Apps CPU User Time (%ld%% = %ld core%s)' 'cpu time %%' cpu apps.cpu_user stacked 20020 %d\n", (processors * 100), processors, (processors>1)?"s":"", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu noreset\n", w->name, Hertz * processors);
 	}
 
-	fprintf(stdout, "CHART apps.cpu_system '' 'Apps CPU System Time (%ld%% = %ld core%s)' 'cpu time %%' apps none stacked 20021 %d\n", (processors * 100), processors, (processors>1)?"s":"", update_every);
+	fprintf(stdout, "CHART apps.cpu_system '' 'Apps CPU System Time (%ld%% = %ld core%s)' 'cpu time %%' cpu apps.cpu_system stacked 20021 %d\n", (processors * 100), processors, (processors>1)?"s":"", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu noreset\n", w->name, Hertz * processors);
 	}
 
-	fprintf(stdout, "CHART apps.major_faults '' 'Apps Major Page Faults (swaps in)' 'page faults/s' apps apps stacked 20010 %d\n", update_every);
+	fprintf(stdout, "CHART apps.major_faults '' 'Apps Major Page Faults (swap read)' 'page faults/s' swap apps.major_faults stacked 20010 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1 noreset\n", w->name);
 	}
 
-	fprintf(stdout, "CHART apps.minor_faults '' 'Apps Minor Page Faults' 'page faults/s' apps none stacked 20011 %d\n", update_every);
+	fprintf(stdout, "CHART apps.minor_faults '' 'Apps Minor Page Faults' 'page faults/s' mem apps.minor_faults stacked 20011 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 1 noreset\n", w->name);
 	}
 
-	fprintf(stdout, "CHART apps.lreads '' 'Apps Disk Logical Reads' 'kilobytes/s' apps none stacked 20042 %d\n", update_every);
+	fprintf(stdout, "CHART apps.lreads '' 'Apps Disk Logical Reads' 'kilobytes/s' disk apps.lreads stacked 20042 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 %d noreset\n", w->name, 1024);
 	}
 
-	fprintf(stdout, "CHART apps.lwrites '' 'Apps I/O Logical Writes' 'kilobytes/s' apps none stacked 20042 %d\n", update_every);
+	fprintf(stdout, "CHART apps.lwrites '' 'Apps I/O Logical Writes' 'kilobytes/s' disk apps.lwrites stacked 20042 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 %d noreset\n", w->name, 1024);
 	}
 
-	fprintf(stdout, "CHART apps.preads '' 'Apps Disk Reads' 'kilobytes/s' apps apps stacked 20002 %d\n", update_every);
+	fprintf(stdout, "CHART apps.preads '' 'Apps Disk Reads' 'kilobytes/s' disk apps.preads stacked 20002 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 %d noreset\n", w->name, 1024);
 	}
 
-	fprintf(stdout, "CHART apps.pwrites '' 'Apps Disk Writes' 'kilobytes/s' apps apps stacked 20002 %d\n", update_every);
+	fprintf(stdout, "CHART apps.pwrites '' 'Apps Disk Writes' 'kilobytes/s' disk apps.pwrites stacked 20002 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' incremental 1 %d noreset\n", w->name, 1024);
 	}
 
-	fprintf(stdout, "CHART apps.files '' 'Apps Open Files' 'open files' apps apps stacked 20050 %d\n", update_every);
+	fprintf(stdout, "CHART apps.files '' 'Apps Open Files' 'open files' disk apps.files stacked 20050 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' absolute 1 1 noreset\n", w->name);
 	}
 
-	fprintf(stdout, "CHART apps.sockets '' 'Apps Open Sockets' 'open sockets' apps apps stacked 20051 %d\n", update_every);
+	fprintf(stdout, "CHART apps.sockets '' 'Apps Open Sockets' 'open sockets' net apps.sockets stacked 20051 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' absolute 1 1 noreset\n", w->name);
 	}
 
-	fprintf(stdout, "CHART apps.pipes '' 'Apps Pipes' 'open pipes' apps none stacked 20053 %d\n", update_every);
+	fprintf(stdout, "CHART apps.pipes '' 'Apps Pipes' 'open pipes' processes apps.pipes stacked 20053 %d\n", update_every);
 	for (w = target_root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		fprintf(stdout, "DIMENSION %s '' absolute 1 1 noreset\n", w->name);
 	}
 
-	fprintf(stdout, "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' netdata netdata stacked 10000 %d\n", update_every);
+	fprintf(stdout, "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' apps.plugin netdata.apps_cpu stacked 140000 %d\n", update_every);
 	fprintf(stdout, "DIMENSION user '' incremental 1 %d\n", 1000);
 	fprintf(stdout, "DIMENSION system '' incremental 1 %d\n", 1000);
 
-	fprintf(stdout, "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' netdata netdata line 10001 %d\n", update_every);
+	fprintf(stdout, "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_files line 140001 %d\n", update_every);
 	fprintf(stdout, "DIMENSION files '' incremental 1 1\n");
 	fprintf(stdout, "DIMENSION pids '' absolute 1 1\n");
 	fprintf(stdout, "DIMENSION fds '' absolute 1 1\n");

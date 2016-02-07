@@ -335,8 +335,13 @@ void rrdset_reset(RRDSET *st)
 	}
 }
 
-RRDSET *rrdset_create(const char *type, const char *id, const char *name, const char *family, const char *title, const char *units, long priority, int update_every, int chart_type)
+RRDSET *rrdset_create(const char *type, const char *id, const char *name, const char *family, const char *context, const char *title, const char *units, long priority, int update_every, int chart_type)
 {
+	if(!type || !type[0]) {
+		fatal("Cannot create rrd stats without a type.");
+		return NULL;
+	}
+
 	if(!id || !id[0]) {
 		fatal("Cannot create rrd stats without an id.");
 		return NULL;
@@ -347,6 +352,12 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 	RRDSET *st = NULL;
 
 	snprintf(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
+
+	st = rrdset_find(fullid);
+	if(st) {
+		error("Cannot create rrd stats for '%s', it already exists.", fullid);
+		return st;
+	}
 
 	long entries = config_get_number(fullid, "history", rrd_default_history_entries);
 	if(entries < 5) entries = config_set_number(fullid, "history", 5);
@@ -396,6 +407,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 		st->name = NULL;
 		st->type = NULL;
 		st->family = NULL;
+		st->context = NULL;
 		st->title = NULL;
 		st->units = NULL;
 		st->dimensions = NULL;
@@ -422,10 +434,11 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 
 	st->cache_dir = cache_dir;
 
-	st->family     = config_get(st->id, "family", family?family:st->id);
-	st->units      = config_get(st->id, "units", units?units:"");
-	st->type       = config_get(st->id, "type", type);
 	st->chart_type = rrdset_type_id(config_get(st->id, "chart type", rrdset_type_name(chart_type)));
+	st->type       = config_get(st->id, "type", type);
+	st->family     = config_get(st->id, "family", family?family:st->type);
+	st->context    = config_get(st->id, "context", context?context:st->id);
+	st->units      = config_get(st->id, "units", units?units:"");
 
 	st->priority = config_get_number(st->id, "priority", priority);
 	st->enabled = enabled;

@@ -101,7 +101,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 			if(do_ip_packets) {
 				st = rrdset_find(RRD_TYPE_NET_SNMP ".packets");
 				if(!st) {
-					st = rrdset_create(RRD_TYPE_NET_SNMP, "packets", NULL, RRD_TYPE_NET_SNMP, "IPv4 Packets", "packets/s", 3000, update_every, RRDSET_TYPE_LINE);
+					st = rrdset_create(RRD_TYPE_NET_SNMP, "packets", NULL, "packets", NULL, "IPv4 Packets", "packets/s", 3000, update_every, RRDSET_TYPE_LINE);
 
 					rrddim_add(st, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
 					rrddim_add(st, "sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
@@ -120,7 +120,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 			if(do_ip_fragsout) {
 				st = rrdset_find(RRD_TYPE_NET_SNMP ".fragsout");
 				if(!st) {
-					st = rrdset_create(RRD_TYPE_NET_SNMP, "fragsout", NULL, RRD_TYPE_NET_SNMP, "IPv4 Fragments Sent", "packets/s", 3010, update_every, RRDSET_TYPE_LINE);
+					st = rrdset_create(RRD_TYPE_NET_SNMP, "fragsout", NULL, "fragments", NULL, "IPv4 Fragments Sent", "packets/s", 3010, update_every, RRDSET_TYPE_LINE);
 					st->isdetail = 1;
 
 					rrddim_add(st, "ok", NULL, 1, 1, RRDDIM_INCREMENTAL);
@@ -140,7 +140,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 			if(do_ip_fragsin) {
 				st = rrdset_find(RRD_TYPE_NET_SNMP ".fragsin");
 				if(!st) {
-					st = rrdset_create(RRD_TYPE_NET_SNMP, "fragsin", NULL, RRD_TYPE_NET_SNMP, "IPv4 Fragments Reassembly", "packets/s", 3011, update_every, RRDSET_TYPE_LINE);
+					st = rrdset_create(RRD_TYPE_NET_SNMP, "fragsin", NULL, "fragments", NULL, "IPv4 Fragments Reassembly", "packets/s", 3011, update_every, RRDSET_TYPE_LINE);
 					st->isdetail = 1;
 
 					rrddim_add(st, "ok", NULL, 1, 1, RRDDIM_INCREMENTAL);
@@ -160,7 +160,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 			if(do_ip_errors) {
 				st = rrdset_find(RRD_TYPE_NET_SNMP ".errors");
 				if(!st) {
-					st = rrdset_create(RRD_TYPE_NET_SNMP, "errors", NULL, RRD_TYPE_NET_SNMP, "IPv4 Errors", "packets/s", 3002, update_every, RRDSET_TYPE_LINE);
+					st = rrdset_create(RRD_TYPE_NET_SNMP, "errors", NULL, "errors", NULL, "IPv4 Errors", "packets/s", 3002, update_every, RRDSET_TYPE_LINE);
 					st->isdetail = 1;
 
 					rrddim_add(st, "InDiscards", NULL, 1, 1, RRDDIM_INCREMENTAL);
@@ -227,7 +227,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 			if(do_tcp_sockets) {
 				st = rrdset_find(RRD_TYPE_NET_SNMP ".tcpsock");
 				if(!st) {
-					st = rrdset_create(RRD_TYPE_NET_SNMP, "tcpsock", NULL, "tcp", "IPv4 TCP Connections", "active connections", 2500, update_every, RRDSET_TYPE_LINE);
+					st = rrdset_create(RRD_TYPE_NET_SNMP, "tcpsock", NULL, "tcp", NULL, "IPv4 TCP Connections", "active connections", 2500, update_every, RRDSET_TYPE_LINE);
 
 					rrddim_add(st, "connections", NULL, 1, 1, RRDDIM_ABSOLUTE);
 				}
@@ -242,7 +242,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 			if(do_tcp_packets) {
 				st = rrdset_find(RRD_TYPE_NET_SNMP ".tcppackets");
 				if(!st) {
-					st = rrdset_create(RRD_TYPE_NET_SNMP, "tcppackets", NULL, "tcp", "IPv4 TCP Packets", "packets/s", 2600, update_every, RRDSET_TYPE_LINE);
+					st = rrdset_create(RRD_TYPE_NET_SNMP, "tcppackets", NULL, "tcp", NULL, "IPv4 TCP Packets", "packets/s", 2600, update_every, RRDSET_TYPE_LINE);
 
 					rrddim_add(st, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
 					rrddim_add(st, "sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
@@ -259,7 +259,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 			if(do_tcp_errors) {
 				st = rrdset_find(RRD_TYPE_NET_SNMP ".tcperrors");
 				if(!st) {
-					st = rrdset_create(RRD_TYPE_NET_SNMP, "tcperrors", NULL, "tcp", "IPv4 TCP Errors", "packets/s", 2700, update_every, RRDSET_TYPE_LINE);
+					st = rrdset_create(RRD_TYPE_NET_SNMP, "tcperrors", NULL, "tcp", NULL, "IPv4 TCP Errors", "packets/s", 2700, update_every, RRDSET_TYPE_LINE);
 					st->isdetail = 1;
 
 					rrddim_add(st, "InErrs", NULL, 1, 1, RRDDIM_INCREMENTAL);
@@ -277,7 +277,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 			if(do_tcp_handshake) {
 				st = rrdset_find(RRD_TYPE_NET_SNMP ".tcphandshake");
 				if(!st) {
-					st = rrdset_create(RRD_TYPE_NET_SNMP, "tcphandshake", NULL, "tcp", "IPv4 TCP Handshake Issues", "events/s", 2900, update_every, RRDSET_TYPE_LINE);
+					st = rrdset_create(RRD_TYPE_NET_SNMP, "tcphandshake", NULL, "tcp", NULL, "IPv4 TCP Handshake Issues", "events/s", 2900, update_every, RRDSET_TYPE_LINE);
 					st->isdetail = 1;
 
 					rrddim_add(st, "EstabResets", NULL, 1, 1, RRDDIM_INCREMENTAL);
@@ -325,7 +325,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 			if(do_udp_packets) {
 				st = rrdset_find(RRD_TYPE_NET_SNMP ".udppackets");
 				if(!st) {
-					st = rrdset_create(RRD_TYPE_NET_SNMP, "udppackets", NULL, "udp", "IPv4 UDP Packets", "packets/s", 2601, update_every, RRDSET_TYPE_LINE);
+					st = rrdset_create(RRD_TYPE_NET_SNMP, "udppackets", NULL, "udp", NULL, "IPv4 UDP Packets", "packets/s", 2601, update_every, RRDSET_TYPE_LINE);
 
 					rrddim_add(st, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
 					rrddim_add(st, "sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
@@ -342,7 +342,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 			if(do_udp_errors) {
 				st = rrdset_find(RRD_TYPE_NET_SNMP ".udperrors");
 				if(!st) {
-					st = rrdset_create(RRD_TYPE_NET_SNMP, "udperrors", NULL, "udp", "IPv4 UDP Errors", "events/s", 2701, update_every, RRDSET_TYPE_LINE);
+					st = rrdset_create(RRD_TYPE_NET_SNMP, "udperrors", NULL, "udp", NULL, "IPv4 UDP Errors", "events/s", 2701, update_every, RRDSET_TYPE_LINE);
 					st->isdetail = 1;
 
 					rrddim_add(st, "RcvbufErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);

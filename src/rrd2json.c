@@ -23,6 +23,7 @@ void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb)
 		"\t\t\t\"name\": \"%s\",\n"
 		"\t\t\t\"type\": \"%s\",\n"
 		"\t\t\t\"family\": \"%s\",\n"
+		"\t\t\t\"context\": \"%s\",\n"
 		"\t\t\t\"title\": \"%s\",\n"
 		"\t\t\t\"priority\": %ld,\n"
 		"\t\t\t\"enabled\": %s,\n"
@@ -38,6 +39,7 @@ void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb)
 		, st->name
 		, st->type
 		, st->family
+		, st->context
 		, st->title
 		, st->priority
 		, st->enabled?"true":"false"
@@ -122,6 +124,7 @@ unsigned long rrd_stats_one_json(RRDSET *st, char *options, BUFFER *wb)
 		"\t\t\t\"name\": \"%s\",\n"
 		"\t\t\t\"type\": \"%s\",\n"
 		"\t\t\t\"family\": \"%s\",\n"
+		"\t\t\t\"context\": \"%s\",\n"
 		"\t\t\t\"title\": \"%s\",\n"
 		"\t\t\t\"priority\": %ld,\n"
 		"\t\t\t\"enabled\": %d,\n"
@@ -144,6 +147,7 @@ unsigned long rrd_stats_one_json(RRDSET *st, char *options, BUFFER *wb)
 		, st->name
 		, st->type
 		, st->family
+		, st->context
 		, st->title
 		, st->priority
 		, st->enabled

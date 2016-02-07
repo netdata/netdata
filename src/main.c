@@ -41,8 +41,8 @@ int netdata_exit = 0;
 void netdata_cleanup_and_exit(int ret)
 {
 	netdata_exit = 1;
-	rrdset_free_all();
-	kill_childs();
+	rrdset_save_all();
+	// kill_childs();
 	unlink("/var/run/netdata.pid");
 	info("NetData exiting. Bye bye...");
 	exit(ret);

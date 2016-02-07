@@ -1982,7 +1982,7 @@
 
 			var c = $(this.element).data('colors');
 			// this.log('read colors: ' + c);
-			if(typeof c !== 'undefined' && c !== null) {
+			if(typeof c !== 'undefined' && c !== null && c.length > 0) {
 				if(typeof c !== 'string') {
 					this.log('invalid color given: ' + c + ' (give a space separated list of colors)');
 				}
