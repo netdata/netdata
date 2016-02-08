@@ -692,7 +692,7 @@ if(document.location.hostname === demo_hostname) {
 
 var options = {
 	sparklines_registry: {},
-	interfaces_registry: {},
+	submenu_names: {},
 	data: null,
 	hostname: 'netdata_server', // will be overwritten by the netdata server
 	categories: new Array(),
@@ -1153,30 +1153,18 @@ function enrichChartData(chart) {
 	var tmp = chart.type.split('_')[0];
 
 	switch(tmp) {
-		case 'disk':
-			chart.menu = tmp;
-			break;
-
 		case 'ap':
 		case 'net':
+		case 'disk':
 			chart.menu = tmp;
-
-			// set the family using the name
-			if(typeof options.interfaces_registry[chart.family] !== 'undefined' && options.interfaces_registry[chart.family] !== chart.family)
-				chart.family += ' (' + options.interfaces_registry[chart.family] + ')';
-
 			break;
 
 		case 'tc':
 			chart.menu = tmp;
 
 			// find the interface name from the name
-			if(typeof options.interfaces_registry[chart.family] === 'undefined' || options.interfaces_registry[chart.family] === chart.family)
-				options.interfaces_registry[chart.family] = chart.name.split('.')[1].split('_')[0];
-
-			// set the family using the name
-			if(typeof options.interfaces_registry[chart.family] !== 'undefined' && options.interfaces_registry[chart.family] !== chart.family)
-				chart.family += ' (' + options.interfaces_registry[chart.family] + ')';
+			if(typeof options.submenu_names[chart.family] === 'undefined' || options.submenu_names[chart.family] === chart.family)
+				options.submenu_names[chart.family] = chart.name.split('.')[1].split('_')[0];
 
 			// increase the priority of IFB devices
 			if(chart.id.match(/.*-ifb$/))
@@ -1426,7 +1414,7 @@ function renderChartsAndMenu(data) {
 			menus[charts[c].menu].submenus[charts[c].submenu] = {
 				priority: charts[c].priority,
 				charts: new Array(),
-				title: submenuTitle(charts[c].menu, charts[c].submenu),
+				title: null,
 				info: submenuInfo(charts[c].menu, charts[c].submenu),
 				height: submenuHeight(charts[c].menu, charts[c].submenu, menus[charts[c].menu].height)
 			};
@@ -1437,6 +1425,18 @@ function renderChartsAndMenu(data) {
 
 		// index the chart in the menu/submenu
 		menus[charts[c].menu].submenus[charts[c].submenu].charts.push(charts[c]);
+	}
+
+	for(var m in menus) {
+		for(var s in menus[m].submenus) {
+			// set the family using a name
+			if(typeof options.submenu_names[s] !== 'undefined') {
+				menus[m].submenus[s].title = s + ' (' + options.submenu_names[s] + ')';
+			}
+			else {
+				menus[m].submenus[s].title = submenuTitle(m, s);
+			}
+		}
 	}
 
 	renderPage(menus, data);
