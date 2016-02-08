@@ -1150,19 +1150,44 @@ function chartHeight(id, def) {
 // enrich the data structure returned by netdata
 // to reflect our menu system and content
 function enrichChartData(chart) {
-	// net_* and disk_* have special grouping
-	if(chart.type.match(/^net_/))
-		chart.menu = 'net';
-	else if(chart.type.match(/^ap_/))
-		chart.menu = 'ap';
-	else if(chart.type.match(/^disk_/))
-		chart.menu = 'disk';
-	else
-		chart.menu = chart.type;
+	var tmp = chart.type.split('_')[0];
 
-	// increase the priority of IFB devices
-	if(chart.type === 'tc' && chart.id.match(/.*-ifb$/))
-		chart.priority--;
+	switch(tmp) {
+		case 'disk':
+			chart.menu = tmp;
+			break;
+
+		case 'ap':
+		case 'net':
+			chart.menu = tmp;
+
+			// set the family using the name
+			if(typeof options.interfaces_registry[chart.family] !== 'undefined' && options.interfaces_registry[chart.family] !== chart.family)
+				chart.family += ' (' + options.interfaces_registry[chart.family] + ')';
+
+			break;
+
+		case 'tc':
+			chart.menu = tmp;
+
+			// find the interface name from the name
+			if(typeof options.interfaces_registry[chart.family] === 'undefined' || options.interfaces_registry[chart.family] === chart.family)
+				options.interfaces_registry[chart.family] = chart.name.split('.')[1].split('_')[0];
+
+			// set the family using the name
+			if(typeof options.interfaces_registry[chart.family] !== 'undefined' && options.interfaces_registry[chart.family] !== chart.family)
+				chart.family += ' (' + options.interfaces_registry[chart.family] + ')';
+
+			// increase the priority of IFB devices
+			if(chart.id.match(/.*-ifb$/))
+				chart.priority--;
+
+			break;
+
+		default:
+			chart.menu = chart.type;
+			break;
+	}
 
 	chart.submenu = chart.family;
 }
