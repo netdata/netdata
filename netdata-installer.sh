@@ -294,6 +294,13 @@ fi
 # -----------------------------------------------------------------------------
 # stop a running netdata
 
+isnetdata() {
+	[ -z "$1" -o ! -f "/proc/$1/stat" ] && return 1
+	[ "$(cat "/proc/$1/stat" | cut -d '(' -f 2 | cut -d ')' -f 1)" = "netdata" ] && return 0
+	return 1
+}
+
+
 printf >&2 "Stopping a (possibly) running netdata..."
 ret=0
 count=0
@@ -306,8 +313,18 @@ do
 	fi
 
 	count=$((count + 1))
-	run killall netdata 2>/dev/null
-	ret=$?
+
+	pid=$(cat /var/run/netdata/netdata.pid 2>/dev/null)
+	isnetdata $pid || pid=
+	if [ ! -z "${pid}" ]
+		then
+		run kill $pid 2>/dev/null
+		ret=$?
+	else
+		run killall netdata 2>/dev/null
+		ret=$?
+	fi
+
 	test $ret -eq 0 && printf >&2 "." && sleep 2
 done
 echo >&2
