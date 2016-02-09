@@ -946,6 +946,30 @@ var chartData = {
 		info: 'System swap memory, read from <code>/proc/meminfo</code>.'
 	},
 
+	'mem.ksm_savings': {
+		heads: [
+			gaugeChart('Saved', '12%', 'savings', '#0099CC')
+		]
+	},
+
+	'mem.ksm_ratios': {
+		heads: [
+			function(id) {
+				return 	'<div data-netdata="' + id + '"'
+					+ ' data-gauge-max-value="100"'
+					+ ' data-chart-library="gauge"'
+					+ ' data-title="Savings"'
+					+ ' data-units="percentage %"'
+					+ ' data-gauge-adjust="width"'
+					+ ' data-width="12%"'
+					+ ' data-before="0"'
+					+ ' data-after="-CHART_DURATION"'
+					+ ' data-points="CHART_DURATION"'
+					+ ' role="application"></div>';
+			}
+		]
+	},
+
 	'mem.committed': {
 		colors: NETDATA.colors[3]
 	},
