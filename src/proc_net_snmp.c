@@ -91,10 +91,10 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 			// these are not counters
 			if(Forwarding) {};		// is forwarding enabled?
 			if(DefaultTTL) {};		// the default ttl on packets
-			if(ReasmTimeout) {};	// reassemply timeout
+			if(ReasmTimeout) {};	// Reassembly timeout
 
 			// this counter is not used
-			if(InDelivers) {};		// total number of packets delivered to IP user-protcols
+			if(InDelivers) {};		// total number of packets delivered to IP user-protocols
 
 			// --------------------------------------------------------------------
 

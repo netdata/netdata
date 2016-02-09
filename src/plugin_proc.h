@@ -17,5 +17,6 @@ extern int do_proc_sys_kernel_random_entropy_avail(int update_every, unsigned lo
 extern int do_proc_interrupts(int update_every, unsigned long long dt);
 extern int do_proc_softirqs(int update_every, unsigned long long dt);
 extern int do_sys_kernel_mm_ksm(int update_every, unsigned long long dt);
+extern int do_proc_loadavg(int update_every, unsigned long long dt);
 
 #endif /* NETDATA_PLUGIN_PROC_H */

@@ -172,7 +172,7 @@ int do_proc_stat(int update_every, unsigned long long dt) {
 	if(do_forks) {
 		st = rrdset_find_bytype("system", "forks");
 		if(!st) {
-			st = rrdset_create("system", "forks", NULL, "processes", NULL, "New Processes", "processes/s", 700, update_every, RRDSET_TYPE_LINE);
+			st = rrdset_create("system", "forks", NULL, "processes", NULL, "Started Processes", "processes/s", 700, update_every, RRDSET_TYPE_LINE);
 			st->isdetail = 1;
 
 			rrddim_add(st, "started", NULL, 1, 1, RRDDIM_INCREMENTAL);
@@ -188,7 +188,7 @@ int do_proc_stat(int update_every, unsigned long long dt) {
 	if(do_processes) {
 		st = rrdset_find_bytype("system", "processes");
 		if(!st) {
-			st = rrdset_create("system", "processes", NULL, "processes", NULL, "Processes", "processes", 600, update_every, RRDSET_TYPE_LINE);
+			st = rrdset_create("system", "processes", NULL, "processes", NULL, "System Processes", "processes", 600, update_every, RRDSET_TYPE_LINE);
 
 			rrddim_add(st, "running", NULL, 1, 1, RRDDIM_ABSOLUTE);
 			rrddim_add(st, "blocked", NULL, -1, 1, RRDDIM_ABSOLUTE);

@@ -40,6 +40,7 @@ netdata_SOURCES = \
 	proc_diskstats.c \
 	proc_interrupts.c \
 	proc_softirqs.c \
+	proc_loadavg.c \
 	proc_meminfo.c \
 	proc_net_dev.c \
 	proc_net_ip_vs_stats.c \

@@ -3,6 +3,12 @@
 load_average_update_every=5
 load_priority=100
 
+# this is an example charts.d collector
+# it is disabled by default.
+# there is no point to enable it, since netdata already
+# collects this information using its internal plugins.
+load_average_enabled=0
+
 load_average_check() {
 	# this should return:
 	#  - 0 to enable the chart
@@ -15,6 +21,7 @@ load_average_check() {
 		load_average_update_every=5
 	fi
 
+	[ ${load_average_enabled} -eq 0 ] && return 1
 	return 0
 }
 

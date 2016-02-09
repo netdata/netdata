@@ -921,6 +921,10 @@ var chartData = {
 		info: 'System processes, read from <code>/proc/stat</code>. <b>Blocked</b> are processes that are willing to execute but they cannot, e.g. because they wait for disk activity.'
 	},
 
+	'system.active_processes': {
+		info: 'All system active processes, read from <code>/proc/loadavg</code>.'
+	},
+
 	'system.ctxt': {
 		info: '<a href="https://en.wikipedia.org/wiki/Context_switch" target="_blank">Context Switches</a>, read from <code>/proc/stat</code>, is the switching of the CPU from one process, task or thread to another. If there are many processes or threads willing to execute and very few CPU cores available to handle them, the system is making more context switching to balance the CPU resources among them. The whole process is computationally intensive. The more the context switches, the slower the system gets.'
 	},
@@ -984,7 +988,7 @@ var chartData = {
 	},
 
 	'disk.backlog': {
-		colors: '#CCCC00'
+		colors: '#0099CC'
 	},
 
 	'disk.io': {

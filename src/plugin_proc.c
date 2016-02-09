@@ -51,6 +51,7 @@ void *proc_main(void *ptr)
 	int vdo_proc_sys_kernel_random_entropy_avail	= !config_get_boolean("plugin:proc", "/proc/sys/kernel/random/entropy_avail", 1);
 	int vdo_proc_interrupts			= !config_get_boolean("plugin:proc", "/proc/interrupts", 1);
 	int vdo_proc_softirqs			= !config_get_boolean("plugin:proc", "/proc/softirqs", 1);
+	int vdo_proc_loadavg			= !config_get_boolean("plugin:proc", "/proc/loadavg", 1);
 	int vdo_sys_kernel_mm_ksm		= !config_get_boolean("plugin:proc", "/sys/kernel/mm/ksm", 1);
 	int vdo_cpu_netdata 			= !config_get_boolean("plugin:proc", "netdata server resources", 1);
 
@@ -68,7 +69,10 @@ void *proc_main(void *ptr)
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_sys_kernel_mm_ksm().");
 			vdo_sys_kernel_mm_ksm = do_sys_kernel_mm_ksm(rrd_update_every, usec+susec);
 		}
-
+		if(!vdo_proc_loadavg) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_loadavg().");
+			vdo_proc_loadavg = do_proc_loadavg(rrd_update_every, usec+susec);
+		}
 		if(!vdo_proc_interrupts) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_interrupts().");
 			vdo_proc_interrupts = do_proc_interrupts(rrd_update_every, usec+susec);
@@ -93,37 +97,30 @@ void *proc_main(void *ptr)
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_snmp().");
 			vdo_proc_net_snmp = do_proc_net_snmp(rrd_update_every, usec+susec);
 		}
-
 		if(!vdo_proc_net_netstat) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_netstat().");
 			vdo_proc_net_netstat = do_proc_net_netstat(rrd_update_every, usec+susec);
 		}
-
 		if(!vdo_proc_net_stat_conntrack) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_stat_conntrack().");
 			vdo_proc_net_stat_conntrack	= do_proc_net_stat_conntrack(rrd_update_every, usec+susec);
 		}
-
 		if(!vdo_proc_net_ip_vs_stats) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling vdo_proc_net_ip_vs_stats().");
 			vdo_proc_net_ip_vs_stats = do_proc_net_ip_vs_stats(rrd_update_every, usec+susec);
 		}
-
 		if(!vdo_proc_stat) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_stat().");
 			vdo_proc_stat = do_proc_stat(rrd_update_every, usec+susec);
 		}
-
 		if(!vdo_proc_meminfo) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling vdo_proc_meminfo().");
 			vdo_proc_meminfo = do_proc_meminfo(rrd_update_every, usec+susec);
 		}
-
 		if(!vdo_proc_vmstat) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling vdo_proc_vmstat().");
 			vdo_proc_vmstat = do_proc_vmstat(rrd_update_every, usec+susec);
 		}
-
 		if(!vdo_proc_net_rpc_nfsd) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_rpc_nfsd().");
 			vdo_proc_net_rpc_nfsd = do_proc_net_rpc_nfsd(rrd_update_every, usec+susec);
