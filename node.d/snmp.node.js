@@ -21,13 +21,13 @@
 					"priority": 1,
 					"dimensions": {
 						"in": {
-							"oid": "1.3.6.1.2.1.2.2.1.10.1",
+							"oid": ".1.3.6.1.2.1.2.2.1.10.1",
 							"algorithm": "incremental",
 							"multiplier": 8,
 							"divisor": 1024
 						},
 						"out": {
-							"oid": "1.3.6.1.2.1.2.2.1.16.1",
+							"oid": ".1.3.6.1.2.1.2.2.1.16.1",
 							"algorithm": "incremental",
 							"multiplier": -8,
 							"divisor": 1024
@@ -41,13 +41,13 @@
 					"priority": 1,
 					"dimensions": {
 						"in": {
-							"oid": "1.3.6.1.2.1.2.2.1.10.2",
+							"oid": ".1.3.6.1.2.1.2.2.1.10.2",
 							"algorithm": "incremental",
 							"multiplier": 8,
 							"divisor": 1024
 						},
 						"out": {
-							"oid": "1.3.6.1.2.1.2.2.1.16.2",
+							"oid": ".1.3.6.1.2.1.2.2.1.16.2",
 							"algorithm": "incremental",
 							"multiplier": -8,
 							"divisor": 1024
@@ -82,13 +82,13 @@
 					"multiply_range": [ 1, 24 ],
 					"dimensions": {
 						"in": {
-							"oid": "1.3.6.1.2.1.2.2.1.10",
+							"oid": ".1.3.6.1.2.1.2.2.1.10.",
 							"algorithm": "incremental",
 							"multiplier": 8,
 							"divisor": 1024
 						},
 						"out": {
-							"oid": "1.3.6.1.2.1.2.2.1.16",
+							"oid": ".1.3.6.1.2.1.2.2.1.16.",
 							"algorithm": "incremental",
 							"multiplier": -8,
 							"divisor": 1024
@@ -110,6 +110,13 @@ if(netdata.options.DEBUG === true) netdata.debug('loaded ' + __filename + ' plug
 netdata.processors.snmp = {
 	name: 'snmp',
 
+	fixoid: function(oid) {
+		if(oid.charAt(0) === '.')
+			return oid.substring(1, oid.length);
+
+		return oid;
+	},
+
 	process: function(service, callback) {
 		if(typeof service.snmp_oids === 'undefined' || service.snmp_oids === null || service.snmp_oids.length === 0) {
 			// this is the first time we see this service
@@ -128,11 +135,13 @@ netdata.processors.snmp = {
 				for(var d in service.request.charts[c].dimensions) {
 					// for each dimension in the chart
 
+					var oid = this.fixoid(service.request.charts[c].dimensions[d].oid);
+					
 					if(netdata.options.DEBUG === true)
-						netdata.debug(service.module.name + ': ' + service.name + ': indexing ' + this.name + ' chart: ' + c + ', dimension: ' + d + ', OID: ' + service.request.charts[c].dimensions[d].oid);
+						netdata.debug(service.module.name + ': ' + service.name + ': indexing ' + this.name + ' chart: ' + c + ', dimension: ' + d + ', OID: ' + oid);
 
 					// link it to the point we need to set the value to
-					service.snmp_oids_index[service.request.charts[c].dimensions[d].oid] = service.request.charts[c].dimensions[d];
+					service.snmp_oids_index[oid] = service.request.charts[c].dimensions[d];
 
 					// and set the value to null
 					service.request.charts[c].dimensions[d].value = null;
@@ -291,7 +300,7 @@ var snmp = {
 					chart.title += from.toString();
 					chart.priority = prio++;
 					for(var d in chart.dimensions) {
-						chart.dimensions[d].oid += '.' + from.toString();
+						chart.dimensions[d].oid += from.toString();
 					}
 					service.request.charts[id] = chart;
 					from++;
