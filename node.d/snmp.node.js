@@ -390,6 +390,10 @@ var snmp = {
 
 				delete service.request.charts[c];
 			}
+			else {
+				if(service.request.charts[c].priority < snmp.base_priority)
+					service.request.charts[c].priority += snmp.base_priority;
+			}
 		}
 
 		service.execute(this.processResponse);
