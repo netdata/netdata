@@ -341,6 +341,13 @@ int mysendfile(struct web_client *w, char *filename)
 	else if(strstr(filename, ".woff2")!= NULL)  w->response.data->contenttype = CT_APPLICATION_FONT_WOFF2;
 	else if(strstr(filename, ".woff") != NULL)  w->response.data->contenttype = CT_APPLICATION_FONT_WOFF;
 	else if(strstr(filename, ".eot")  != NULL)  w->response.data->contenttype = CT_APPLICATION_VND_MS_FONTOBJ;
+	else if(strstr(filename, ".png")  != NULL)  w->response.data->contenttype = CT_IMAGE_PNG;
+	else if(strstr(filename, ".jpg")  != NULL)  w->response.data->contenttype = CT_IMAGE_JPG;
+	else if(strstr(filename, ".jpeg") != NULL)  w->response.data->contenttype = CT_IMAGE_JPG;
+	else if(strstr(filename, ".gif")  != NULL)  w->response.data->contenttype = CT_IMAGE_GIF;
+	else if(strstr(filename, ".bmp")  != NULL)  w->response.data->contenttype = CT_IMAGE_BMP;
+	else if(strstr(filename, ".ico")  != NULL)  w->response.data->contenttype = CT_IMAGE_XICON;
+	else if(strstr(filename, ".icns") != NULL)  w->response.data->contenttype = CT_IMAGE_ICNS;
 	else w->response.data->contenttype = CT_APPLICATION_OCTET_STREAM;
 
 	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%ld bytes, ifd %d, ofd %d).", w->id, webfilename, stat.st_size, w->ifd, w->ofd);
@@ -1266,6 +1273,30 @@ void web_client_process(struct web_client *w) {
 			content_type_string = "application/vnd.ms-fontobject";
 			break;
 
+		case CT_IMAGE_PNG:
+			content_type_string = "image/png";
+			break;
+
+		case CT_IMAGE_JPG:
+			content_type_string = "image/jpeg";
+			break;
+
+		case CT_IMAGE_GIF:
+			content_type_string = "image/gif";
+			break;
+
+		case CT_IMAGE_XICON:
+			content_type_string = "image/x-icon";
+			break;
+
+		case CT_IMAGE_BMP:
+			content_type_string = "image/bmp";
+			break;
+
+		case CT_IMAGE_ICNS:
+			content_type_string = "image/icns";
+			break;
+
 		default:
 		case CT_TEXT_PLAIN:
 			content_type_string = "text/plain; charset=utf-8";
@@ -1330,7 +1361,7 @@ void web_client_process(struct web_client *w) {
 	}
 	else {
 		char edate[100];
-		time_t et = w->response.data->date + 86400;
+		time_t et = w->response.data->date + (86400 * 14);
 		struct tm etmbuf, *etm = gmtime_r(&et, &etmbuf);
 		strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", etm);
 

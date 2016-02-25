@@ -36,6 +36,12 @@ typedef struct web_buffer {
 #define CT_APPLICATION_FONT_WOFF2		13
 #define CT_APPLICATION_VND_MS_FONTOBJ	14
 #define CT_IMAGE_SVG_XML				15
+#define CT_IMAGE_PNG					16
+#define CT_IMAGE_JPG					17
+#define CT_IMAGE_GIF					18
+#define CT_IMAGE_XICON					19
+#define CT_IMAGE_ICNS					20
+#define CT_IMAGE_BMP					21
 
 #define buffer_strlen(wb) ((wb)->len)
 extern const char *buffer_tostring(BUFFER *wb);
