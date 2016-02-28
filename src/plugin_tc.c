@@ -557,7 +557,10 @@ void *tc_main(void *ptr)
 				// clear the last class
 				class = NULL;
 
-				if(words[1] && words[2] && words[3] && words[4] && (strcmp(words[3], "parent") == 0 || strcmp(words[3], "root") == 0)) {
+				// words[1] : class type
+				// words[2] : N:XX
+				// words[3] : parent or root
+				if(words[1] && words[2] && words[3] && (strcmp(words[3], "parent") == 0 || strcmp(words[3], "root") == 0)) {
 					//char *type     = words[1];  // the class: htb, fq_codel, etc
 
 					// we are only interested for HTB classes
