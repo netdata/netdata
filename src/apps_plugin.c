@@ -437,16 +437,36 @@ int read_process_groups(const char *name)
 
 		struct target *w = NULL;
 		long count = 0;
+		int blen = 0;
+		char buffer[4097] = "";
+		buffer[4096] = '\0';
 
 		// the process names
 		while((p = strsep(&s, " "))) {
 			p = trim(p);
 			if(!p || !*p) continue;
 
-			struct target *n = get_target(p, w);
+			strncpy(&buffer[blen], p, 4096 - blen);
+			blen = strlen(buffer);
+
+			while(buffer[blen - 1] == '\\') {
+				buffer[blen - 1] = ' ';
+
+				if((p = strsep(&s, " ")))
+					p = trim(p);
+
+				if(!p || !*p) p = " ";
+				strncpy(&buffer[blen], p, 4096 - blen);
+				blen = strlen(buffer);
+			}
+
+			struct target *n = get_target(buffer, w);
 			n->hidden = whidden;
 			n->debug = wdebug;
 			if(!w) w = n;
+
+			buffer[0] = '\0';
+			blen = 0;
 
 			count++;
 		}
