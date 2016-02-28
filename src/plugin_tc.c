@@ -558,10 +558,10 @@ void *tc_main(void *ptr)
 				class = NULL;
 
 				if(words[1] && words[2] && words[3] && words[4] && (strcmp(words[3], "parent") == 0 || strcmp(words[3], "root") == 0)) {
-					char *type     = words[1];  // the class: htb, fq_codel, etc
+					//char *type     = words[1];  // the class: htb, fq_codel, etc
 
 					// we are only interested for HTB classes
-					if(strcmp(type, "htb") != 0) continue;
+					//if(strcmp(type, "htb") != 0) continue;
 
 					char *id       = words[2];	// the class major:minor
 					char *parent   = words[3];	// 'parent' or 'root'
