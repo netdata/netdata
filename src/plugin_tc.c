@@ -42,6 +42,15 @@ struct tc_class {
 	char hasparent;
 	char isleaf;
 	unsigned long long bytes;
+	unsigned long long packets;
+	unsigned long long dropped;
+	unsigned long long overlimits;
+	unsigned long long requeues;
+	unsigned long long lended;
+	unsigned long long borrowed;
+	unsigned long long giants;
+	unsigned long long tokens;
+	unsigned long long ctokens;
 
 	char updated;	// updated bytes
 	char seen;		// seen in the tc list (even without bytes)
@@ -499,6 +508,8 @@ void *tc_main(void *ptr)
 	uint32_t END_HASH = simple_hash("END");
 	uint32_t CLASS_HASH = simple_hash("class");
 	uint32_t SENT_HASH = simple_hash("Sent");
+	uint32_t LENDED_HASH = simple_hash("lended:");
+	uint32_t TOKENS_HASH = simple_hash("tokens:");
 	uint32_t SETDEVICENAME_HASH = simple_hash("SETDEVICENAME");
 	uint32_t SETDEVICEGROUP_HASH = simple_hash("SETDEVICEGROUP");
 	uint32_t SETCLASSNAME_HASH = simple_hash("SETCLASSNAME");
@@ -540,11 +551,18 @@ void *tc_main(void *ptr)
 
 			first_hash = simple_hash(words[0]);
 
-			if(first_hash == CLASS_HASH && strcmp(words[0], "class") == 0 && device) {
+			if(device && first_hash == CLASS_HASH && strcmp(words[0], "class") == 0) {
 				// debug(D_TC_LOOP, "CLASS line on class id='%s', parent='%s', parentid='%s', leaf='%s', leafid='%s'", words[2], words[3], words[4], words[5], words[6]);
 
+				// clear the last class
+				class = NULL;
+
 				if(words[1] && words[2] && words[3] && words[4] && (strcmp(words[3], "parent") == 0 || strcmp(words[3], "root") == 0)) {
-					// char *type     = words[1];  // the class: htb, fq_codel, etc
+					char *type     = words[1];  // the class: htb, fq_codel, etc
+
+					// we are only interested for HTB classes
+					if(strcmp(type, "htb") != 0) continue;
+
 					char *id       = words[2];	// the class major:minor
 					char *parent   = words[3];	// 'parent' or 'root'
 					char *parentid = words[4];	// the parent's id
@@ -598,23 +616,53 @@ void *tc_main(void *ptr)
 					class = NULL;
 				}
 			}
-			else if(first_hash == SENT_HASH && strcmp(words[0], "Sent") == 0 && device && class) {
+			else if(device && class && first_hash == SENT_HASH && strcmp(words[0], "Sent") == 0) {
 				// debug(D_TC_LOOP, "SENT line '%s'", words[1]);
 				if(words[1] && *words[1]) {
 					class->bytes = strtoull(words[1], NULL, 10);
 					class->updated = 1;
 				}
-				else class->bytes = 0;
+
+				if(words[3] && *words[3])
+					class->packets = strtoull(words[3], NULL, 10);
+
+				if(words[6] && *words[6])
+					class->dropped = strtoull(words[6], NULL, 10);
+
+				if(words[8] && *words[8])
+					class->overlimits = strtoull(words[8], NULL, 10);
+
+				if(words[10] && *words[10])
+					class->requeues = strtoull(words[8], NULL, 10);
 			}
-			else if(first_hash == SETDEVICENAME_HASH && strcmp(words[0], "SETDEVICENAME") == 0 && device) {
+			else if(device && class && class->updated && first_hash == LENDED_HASH && strcmp(words[0], "lended:") == 0) {
+				// debug(D_TC_LOOP, "LENDED line '%s'", words[1]);
+				if(words[1] && *words[1])
+					class->lended = strtoull(words[1], NULL, 10);
+
+				if(words[3] && *words[3])
+					class->borrowed = strtoull(words[3], NULL, 10);
+
+				if(words[5] && *words[5])
+					class->giants = strtoull(words[5], NULL, 10);
+			}
+			else if(device && class && class->updated && first_hash == TOKENS_HASH && strcmp(words[0], "tokens:") == 0) {
+				// debug(D_TC_LOOP, "TOKENS line '%s'", words[1]);
+				if(words[1] && *words[1])
+					class->tokens = strtoull(words[1], NULL, 10);
+
+				if(words[3] && *words[3])
+					class->ctokens = strtoull(words[3], NULL, 10);
+			}
+			else if(device && first_hash == SETDEVICENAME_HASH && strcmp(words[0], "SETDEVICENAME") == 0) {
 				// debug(D_TC_LOOP, "SETDEVICENAME line '%s'", words[1]);
 				if(words[1] && *words[1]) tc_device_set_device_name(device, words[1]);
 			}
-			else if(first_hash == SETDEVICEGROUP_HASH && strcmp(words[0], "SETDEVICEGROUP") == 0 && device) {
+			else if(device && first_hash == SETDEVICEGROUP_HASH && strcmp(words[0], "SETDEVICEGROUP") == 0) {
 				// debug(D_TC_LOOP, "SETDEVICEGROUP line '%s'", words[1]);
 				if(words[1] && *words[1]) tc_device_set_device_family(device, words[1]);
 			}
-			else if(first_hash == SETCLASSNAME_HASH && strcmp(words[0], "SETCLASSNAME") == 0 && device) {
+			else if(device && first_hash == SETCLASSNAME_HASH && strcmp(words[0], "SETCLASSNAME") == 0) {
 				// debug(D_TC_LOOP, "SETCLASSNAME line '%s' '%s'", words[1], words[2]);
 				char *id    = words[1];
 				char *path  = words[2];
