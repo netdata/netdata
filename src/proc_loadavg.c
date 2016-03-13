@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "log.h"
 #include "common.h"
 #include "appconfig.h"
 #include "procfile.h"

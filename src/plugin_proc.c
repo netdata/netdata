@@ -15,6 +15,12 @@
 #include "plugin_proc.h"
 #include "main.h"
 
+unsigned long long sutime() {
+	struct timeval now;
+	gettimeofday(&now, NULL);
+	return now.tv_sec * 1000000ULL + now.tv_usec;
+}
+
 void *proc_main(void *ptr)
 {
 	if(ptr) { ; }
@@ -28,10 +34,6 @@ void *proc_main(void *ptr)
 		error("Cannot set pthread cancel state to ENABLE.");
 
 	struct rusage me, thread;
-	struct timeval last, now;
-
-	gettimeofday(&last, NULL);
-	last.tv_sec -= rrd_update_every;
 
 	// disable (by default) various interface that are not needed
 	config_get_boolean("plugin:proc:/proc/net/dev:lo", "enabled", 0);
@@ -55,88 +57,166 @@ void *proc_main(void *ptr)
 	int vdo_sys_kernel_mm_ksm		= !config_get_boolean("plugin:proc", "/sys/kernel/mm/ksm", 1);
 	int vdo_cpu_netdata 			= !config_get_boolean("plugin:proc", "netdata server resources", 1);
 
+	// keep track of the time each module was called
+	unsigned long long sutime_proc_net_dev = 0ULL;
+	unsigned long long sutime_proc_diskstats = 0ULL;
+	unsigned long long sutime_proc_net_snmp = 0ULL;
+	unsigned long long sutime_proc_net_netstat = 0ULL;
+	unsigned long long sutime_proc_net_stat_conntrack = 0ULL;
+	unsigned long long sutime_proc_net_ip_vs_stats = 0ULL;
+	unsigned long long sutime_proc_stat = 0ULL;
+	unsigned long long sutime_proc_meminfo = 0ULL;
+	unsigned long long sutime_proc_vmstat = 0ULL;
+	unsigned long long sutime_proc_net_rpc_nfsd = 0ULL;
+	unsigned long long sutime_proc_sys_kernel_random_entropy_avail = 0ULL;
+	unsigned long long sutime_proc_interrupts = 0ULL;
+	unsigned long long sutime_proc_softirqs = 0ULL;
+	unsigned long long sutime_proc_loadavg = 0ULL;
+	unsigned long long sutime_sys_kernel_mm_ksm = 0ULL;
+
+	// the next time we will run - aligned properly
+	unsigned long long sunext = (time(NULL) - (time(NULL) % rrd_update_every) + rrd_update_every) * 1000000ULL;
+	unsigned long long sunow;
+
 	RRDSET *stcpu = NULL, *stcpu_thread = NULL, *stclients = NULL, *streqs = NULL, *stbytes = NULL;
 
-	gettimeofday(&last, NULL);
-
-	unsigned long long usec = 0, susec = 0;
 	for(;1;) {
+		if(unlikely(netdata_exit)) break;
+
+		// delay until it is our time to run
+		while((sunow = sutime()) < sunext)
+			usleep((useconds_t)(sunext - sunow));
+
+		// find the next time we need to run
+		while(sutime() > sunext)
+			sunext += rrd_update_every * 1000000ULL;
+
 		if(unlikely(netdata_exit)) break;
 
 		// BEGIN -- the job to be done
 
 		if(!vdo_sys_kernel_mm_ksm) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_sys_kernel_mm_ksm().");
-			vdo_sys_kernel_mm_ksm = do_sys_kernel_mm_ksm(rrd_update_every, usec+susec);
-		}
-		if(!vdo_proc_loadavg) {
-			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_loadavg().");
-			vdo_proc_loadavg = do_proc_loadavg(rrd_update_every, usec+susec);
-		}
-		if(!vdo_proc_interrupts) {
-			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_interrupts().");
-			vdo_proc_interrupts = do_proc_interrupts(rrd_update_every, usec+susec);
-		}
-		if(!vdo_proc_softirqs) {
-			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_softirqs().");
-			vdo_proc_softirqs = do_proc_softirqs(rrd_update_every, usec+susec);
-		}
-		if(!vdo_proc_sys_kernel_random_entropy_avail) {
-			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_sys_kernel_random_entropy_avail().");
-			vdo_proc_sys_kernel_random_entropy_avail = do_proc_sys_kernel_random_entropy_avail(rrd_update_every, usec+susec);
-		}
-		if(!vdo_proc_net_dev) {
-			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_dev().");
-			vdo_proc_net_dev = do_proc_net_dev(rrd_update_every, usec+susec);
-		}
-		if(!vdo_proc_diskstats) {
-			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_diskstats().");
-			vdo_proc_diskstats = do_proc_diskstats(rrd_update_every, usec+susec);
-		}
-		if(!vdo_proc_net_snmp) {
-			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_snmp().");
-			vdo_proc_net_snmp = do_proc_net_snmp(rrd_update_every, usec+susec);
-		}
-		if(!vdo_proc_net_netstat) {
-			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_netstat().");
-			vdo_proc_net_netstat = do_proc_net_netstat(rrd_update_every, usec+susec);
-		}
-		if(!vdo_proc_net_stat_conntrack) {
-			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_stat_conntrack().");
-			vdo_proc_net_stat_conntrack	= do_proc_net_stat_conntrack(rrd_update_every, usec+susec);
-		}
-		if(!vdo_proc_net_ip_vs_stats) {
-			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling vdo_proc_net_ip_vs_stats().");
-			vdo_proc_net_ip_vs_stats = do_proc_net_ip_vs_stats(rrd_update_every, usec+susec);
-		}
-		if(!vdo_proc_stat) {
-			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_stat().");
-			vdo_proc_stat = do_proc_stat(rrd_update_every, usec+susec);
-		}
-		if(!vdo_proc_meminfo) {
-			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling vdo_proc_meminfo().");
-			vdo_proc_meminfo = do_proc_meminfo(rrd_update_every, usec+susec);
-		}
-		if(!vdo_proc_vmstat) {
-			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling vdo_proc_vmstat().");
-			vdo_proc_vmstat = do_proc_vmstat(rrd_update_every, usec+susec);
-		}
-		if(!vdo_proc_net_rpc_nfsd) {
-			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_rpc_nfsd().");
-			vdo_proc_net_rpc_nfsd = do_proc_net_rpc_nfsd(rrd_update_every, usec+susec);
-		}
 
-		// END -- the job is done
-
+			sunow = sutime();
+			vdo_sys_kernel_mm_ksm = do_sys_kernel_mm_ksm(rrd_update_every, (sutime_sys_kernel_mm_ksm > 0)?sunow - sutime_sys_kernel_mm_ksm:0ULL);
+			sutime_sys_kernel_mm_ksm = sunow;
+		}
 		if(unlikely(netdata_exit)) break;
 
-		// find the time to sleep in order to wait exactly update_every seconds
-		gettimeofday(&now, NULL);
-		usec = usecdiff(&now, &last) - susec;
-		debug(D_PROCNETDEV_LOOP, "PROCNETDEV: last loop took %llu usec (worked for %llu, sleeped for %llu).", usec + susec, usec, susec);
+		if(!vdo_proc_loadavg) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_loadavg().");
+			sunow = sutime();
+			vdo_proc_loadavg = do_proc_loadavg(rrd_update_every, (sutime_proc_loadavg > 0)?sunow - sutime_proc_loadavg:0ULL);
+			sutime_proc_loadavg = sunow;
+		}
+		if(unlikely(netdata_exit)) break;
 
-		if(usec < (rrd_update_every * 1000000ULL / 2ULL)) susec = (rrd_update_every * 1000000ULL) - usec;
-		else susec = rrd_update_every * 1000000ULL / 2ULL;
+		if(!vdo_proc_interrupts) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_interrupts().");
+			sunow = sutime();
+			vdo_proc_interrupts = do_proc_interrupts(rrd_update_every, (sutime_proc_interrupts > 0)?sunow - sutime_proc_interrupts:0ULL);
+			sutime_proc_interrupts = sunow;
+		}
+		if(unlikely(netdata_exit)) break;
+
+		if(!vdo_proc_softirqs) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_softirqs().");
+			sunow = sutime();
+			vdo_proc_softirqs = do_proc_softirqs(rrd_update_every, (sutime_proc_softirqs > 0)?sunow - sutime_proc_softirqs:0ULL);
+			sutime_proc_softirqs = sunow;
+		}
+		if(unlikely(netdata_exit)) break;
+
+		if(!vdo_proc_sys_kernel_random_entropy_avail) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_sys_kernel_random_entropy_avail().");
+			sunow = sutime();
+			vdo_proc_sys_kernel_random_entropy_avail = do_proc_sys_kernel_random_entropy_avail(rrd_update_every, (sutime_proc_sys_kernel_random_entropy_avail > 0)?sunow - sutime_proc_sys_kernel_random_entropy_avail:0ULL);
+			sutime_proc_sys_kernel_random_entropy_avail = sunow;
+		}
+		if(unlikely(netdata_exit)) break;
+
+		if(!vdo_proc_net_dev) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_dev().");
+			sunow = sutime();
+			vdo_proc_net_dev = do_proc_net_dev(rrd_update_every, (sutime_proc_net_dev > 0)?sunow - sutime_proc_net_dev:0ULL);
+			sutime_proc_net_dev = sunow;
+		}
+		if(unlikely(netdata_exit)) break;
+
+		if(!vdo_proc_diskstats) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_diskstats().");
+			sunow = sutime();
+			vdo_proc_diskstats = do_proc_diskstats(rrd_update_every, (sutime_proc_diskstats > 0)?sunow - sutime_proc_diskstats:0ULL);
+			sutime_proc_diskstats = sunow;
+		}
+		if(unlikely(netdata_exit)) break;
+
+		if(!vdo_proc_net_snmp) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_snmp().");
+			sunow = sutime();
+			vdo_proc_net_snmp = do_proc_net_snmp(rrd_update_every, (sutime_proc_net_snmp > 0)?sunow - sutime_proc_net_snmp:0ULL);
+			sutime_proc_net_snmp = sunow;
+		}
+		if(unlikely(netdata_exit)) break;
+
+		if(!vdo_proc_net_netstat) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_netstat().");
+			sunow = sutime();
+			vdo_proc_net_netstat = do_proc_net_netstat(rrd_update_every, (sutime_proc_net_netstat > 0)?sunow - sutime_proc_net_netstat:0ULL);
+			sutime_proc_net_netstat = sunow;
+		}
+		if(unlikely(netdata_exit)) break;
+
+		if(!vdo_proc_net_stat_conntrack) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_stat_conntrack().");
+			sunow = sutime();
+			vdo_proc_net_stat_conntrack	= do_proc_net_stat_conntrack(rrd_update_every, (sutime_proc_net_stat_conntrack > 0)?sunow - sutime_proc_net_stat_conntrack:0ULL);
+			sutime_proc_net_stat_conntrack = sunow;
+		}
+		if(unlikely(netdata_exit)) break;
+
+		if(!vdo_proc_net_ip_vs_stats) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling vdo_proc_net_ip_vs_stats().");
+			sunow = sutime();
+			vdo_proc_net_ip_vs_stats = do_proc_net_ip_vs_stats(rrd_update_every, (sutime_proc_net_ip_vs_stats > 0)?sunow - sutime_proc_net_ip_vs_stats:0ULL);
+			sutime_proc_net_ip_vs_stats = sunow;
+		}
+		if(unlikely(netdata_exit)) break;
+
+		if(!vdo_proc_stat) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_stat().");
+			sunow = sutime();
+			vdo_proc_stat = do_proc_stat(rrd_update_every, (sutime_proc_stat > 0)?sunow - sutime_proc_stat:0ULL);
+			sutime_proc_stat = sunow;
+		}
+		if(unlikely(netdata_exit)) break;
+
+		if(!vdo_proc_meminfo) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling vdo_proc_meminfo().");
+			sunow = sutime();
+			vdo_proc_meminfo = do_proc_meminfo(rrd_update_every, (sutime_proc_meminfo > 0)?sunow - sutime_proc_meminfo:0ULL);
+			sutime_proc_meminfo = sunow;
+		}
+		if(unlikely(netdata_exit)) break;
+
+		if(!vdo_proc_vmstat) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling vdo_proc_vmstat().");
+			sunow = sutime();
+			vdo_proc_vmstat = do_proc_vmstat(rrd_update_every, (sutime_proc_vmstat > 0)?sunow - sutime_proc_vmstat:0ULL);
+			sutime_proc_vmstat = sunow;
+		}
+		if(unlikely(netdata_exit)) break;
+
+		if(!vdo_proc_net_rpc_nfsd) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_rpc_nfsd().");
+			sunow = sutime();
+			vdo_proc_net_rpc_nfsd = do_proc_net_rpc_nfsd(rrd_update_every, (sutime_proc_net_rpc_nfsd > 0)?sunow - sutime_proc_net_rpc_nfsd:0ULL);
+			sutime_proc_net_rpc_nfsd = sunow;
+		}
+		if(unlikely(netdata_exit)) break;
+
+		// END -- the job is done
 
 		// --------------------------------------------------------------------
 
@@ -213,11 +293,6 @@ void *proc_main(void *ptr)
 			rrddim_set(stbytes, "out", global_statistics.bytes_sent);
 			rrdset_done(stbytes);
 		}
-
-		usleep((useconds_t) susec);
-
-		// copy current to last
-		bcopy(&now, &last, sizeof(struct timeval));
 	}
 
 	pthread_exit(NULL);
