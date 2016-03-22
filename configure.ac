@@ -7,10 +7,10 @@ define([VERSION_MAJOR], [1])
 define([VERSION_MINOR], [0])
 define([VERSION_FIX], [0])
 define([VERSION_NUMBER], VERSION_MAJOR[.]VERSION_MINOR[.]VERSION_FIX)
-define([VERSION_SUFFIX], [_master])
+define([VERSION_SUFFIX], [])
 
 dnl Set to "1" for a first RPM release of a new version
-PACKAGE_RPM_RELEASE="0.0.$(echo VERSION_SUFFIX | sed 's/^_//')"
+PACKAGE_RPM_RELEASE="1"
 
 AC_INIT([netdata], VERSION_NUMBER[]VERSION_SUFFIX)
 

@@ -24,6 +24,8 @@ EXTRA_DIST = \
 	autogen.sh \
 	netdata-9999.ebuild \
 	tests/stress.sh \
+	system/netdata-openrc \
+	system/netdata-systemd \
 	$(NULL)
 
 SUBDIRS = \

@@ -16,7 +16,7 @@ Requires:	zlib
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 %description
-Linux real time system monitoring, over the web!
+Real-time performance monitoring, in the greatest possible detail!
 
 %pre
 getent group netdata > /dev/null || groupadd -r netdata
@@ -53,5 +53,7 @@ find "%{buildroot}" -name .keep -exec rm {} \;
 %{_libexecdir}/%{name}/
 
 %changelog
-* Sun Nov 15 2015 Alon Bar-Lev <alonbl@redhat.com> - 1.0.0-1
+* Tue Mar 22 2016 Costa Tsaousis <costa@tsaousis.gr> - 1.0.0-1
+- First public release.
+* Sun Nov 15 2015 Alon Bar-Lev <alonbl@redhat.com> - 0.0.0-1
 - Initial add.
