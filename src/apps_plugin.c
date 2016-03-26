@@ -1104,7 +1104,9 @@ int update_from_proc(void)
 			if(!count_errors++ || debug || (p->target && p->target->debug))
 				error("Cannot process %s/proc/%d/io", host_prefix, pid);
 
-			continue;
+			// on systems without /proc/X/io
+			// allow proceeding without I/O information
+			// continue;
 		}
 
 		// --------------------------------------------------------------------
