@@ -357,6 +357,10 @@ if [ ! -s "${NETDATA_PREFIX}/etc/netdata/netdata.conf" ]
 	# remove a possibly obsolete download
 	[ -f "${NETDATA_PREFIX}/etc/netdata/netdata.conf.new" ] && rm "${NETDATA_PREFIX}/etc/netdata/netdata.conf.new"
 
+	# disable a proxy to get data from the local netdata
+	export http_proxy=
+	export https_proxy=
+
 	# try wget
 	wget 2>/dev/null -O "${NETDATA_PREFIX}/etc/netdata/netdata.conf.new" "http://localhost:${NETDATA_PORT}/netdata.conf"
 	ret=$?
