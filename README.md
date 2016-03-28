@@ -49,6 +49,9 @@ This is what it currently monitors (most with zero configuration):
 
 
 11. **Applications**, by grouping the process tree (CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets, etc)
+
+   ![apps](https://cloud.githubusercontent.com/assets/2662304/14093445/a3f21152-f556-11e5-8dcd-1d693edb2a1b.gif)
+
 12. **Apache web server** mod-status (v2.2, v2.4)
 13. **Nginx web server** stub-status
 14. **mySQL databases** (multiple servers, each showing: bandwidth, queries/s, handlers, locks, issues, tmp operations, connections, binlog metrics, threads, innodb metrics, etc)
