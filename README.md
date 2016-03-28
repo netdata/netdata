@@ -2,7 +2,7 @@
 
 **Real-time performance monitoring, done right!**
 
-![image](https://cloud.githubusercontent.com/assets/2662304/14090945/e9aea428-f545-11e5-8942-9f9cf03fc592.png)
+![test](https://cloud.githubusercontent.com/assets/2662304/14092712/93b039ea-f551-11e5-822c-beadbf2b2a2e.gif)
 
 ---
 
@@ -41,8 +41,8 @@ This is what it currently monitors (most with zero configuration):
 11. **Applications**, by grouping the process tree (CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets, etc)
 12. **Apache web server** mod-status (v2.2, v2.4)
 13. **Nginx web server** stub-status
-14. **mySQL databases** (multiple, each showing: bandwidth, queries/s, handlers, locks, issues, tmp operations, connections, binlog metrics, threads, innodb metrics, etc)
-15. **ISC Bind name server** (clients, requests, queries, updates, failures and several per view metrics)
+14. **mySQL databases** (multiple servers, each showing: bandwidth, queries/s, handlers, locks, issues, tmp operations, connections, binlog metrics, threads, innodb metrics, etc)
+15. **ISC Bind name server** (multiple servers, each showing: clients, requests, queries, updates, failures and several per view metrics)
 16. **Postfix email server** message queue (entries, size)
 17. **Squid proxy server** (clients bandwidth and requests, servers bandwidth and requests) 
 18. **Hardware sensors** (temperature, voltage, fans, power, humidity, etc)
