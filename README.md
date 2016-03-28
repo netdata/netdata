@@ -31,7 +31,13 @@ This is what it currently monitors (most with zero configuration):
 1. **CPU usage, interrupts, softirqs and frequency** (total and per core)
 2. **RAM, swap and kernel memory usage** (including KSM and kernel memory deduper)
 3. **Disk I/O** (per disk: bandwidth, operations, backlog, utilization, etc)
+
+   ![sda](https://cloud.githubusercontent.com/assets/2662304/14093195/c882bbf4-f554-11e5-8863-1788d643d2c0.gif)
+
 4. **Network interfaces** (per interface: bandwidth, packets, errors, drops, etc)
+
+   ![dsl0](https://cloud.githubusercontent.com/assets/2662304/14093128/4d566494-f554-11e5-8ee4-5392e0ac51f0.gif)
+
 5. **IPv4 networking** (packets, errors, fragments, tcp: connections, packets, errors, handshake, udp: packets, errors, broadcast: bandwidth, packets, multicast: bandwidth, packets)
 6. **netfilter / iptables Linux firewall** (connections, connection tracker events, errors, etc)
 7. **Processes** (running, blocked, forks, active, etc)
