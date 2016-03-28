@@ -2,7 +2,7 @@
 
 **Real-time performance monitoring, done right!**
 
-![test](https://cloud.githubusercontent.com/assets/2662304/14092712/93b039ea-f551-11e5-822c-beadbf2b2a2e.gif)
+![netdata](https://cloud.githubusercontent.com/assets/2662304/14092712/93b039ea-f551-11e5-822c-beadbf2b2a2e.gif)
 
 ---
 
@@ -38,6 +38,10 @@ This is what it currently monitors (most with zero configuration):
 8. **Entropy**
 9. **NFS file servers**, v2, v3, v4 (I/O, cache, read ahead, RPC calls)
 10. **Network QoS** (yes, the only tool that visualizes network `tc` classes in realtime)
+
+   ![qos-tc-classes](https://cloud.githubusercontent.com/assets/2662304/14093004/68966020-f553-11e5-98fe-ffee2086fafd.gif)
+
+
 11. **Applications**, by grouping the process tree (CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets, etc)
 12. **Apache web server** mod-status (v2.2, v2.4)
 13. **Nginx web server** stub-status
