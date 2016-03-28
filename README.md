@@ -4,6 +4,8 @@
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/14090945/e9aea428-f545-11e5-8942-9f9cf03fc592.png)
 
+---
+
 ## Features
 
 **netdata** is a highly optimized Linux daemon providing **real-time performance monitoring for Linux systems, Applications, SNMP devices, over the web**!
@@ -19,6 +21,10 @@ This is what you get:
 4. **Zero dependencies**, it is its own web server for its static web files and its web API
 4. **Extensible**, you can monitor anything you can get a metric for, using its Plugin API (anything can be a netdata plugin - from BASH to node.js)
 7. **Embeddable**, it can run anywhere a Linux kernel runs
+
+---
+
+## What is monitors?
 
 This is what it currently monitors (most with zero configuration):
 
@@ -42,7 +48,9 @@ This is what it currently monitors (most with zero configuration):
 18. **Hardware sensors** (temperature, voltage, fans, power, humidity, etc)
 19. **NUT UPSes** (load, charge, battery voltage, temperature, utility metrics, output metrics)
 
-You can also monitor any number of **SNMP devices**, although you will need to configure these.
+Any number of **SNMP devices** can be monitored, although you will need to configure these.
+
+And you can extend it, by writing plugins that collect data from any source, using any computer language.
 
 ---
 
