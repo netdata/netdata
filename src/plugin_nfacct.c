@@ -16,6 +16,7 @@
 #include <libmnl/libmnl.h>
 #include <libnetfilter_acct/libnetfilter_acct.h>
 
+#include "main.h"
 #include "global_statistics.h"
 #include "common.h"
 #include "appconfig.h"
@@ -169,7 +170,7 @@ void *nfacct_main(void *ptr) {
 
 			st = rrdset_find_bytype("nfacct", "packets");
 			if(!st) {
-				st = rrdset_create("nfacct", "packets", NULL, "netfilter", "Netfilter Accounting Packets", "packets/s", 1006, rrd_update_every, RRDSET_TYPE_STACKED);
+				st = rrdset_create("nfacct", "packets", NULL, "netfilter", NULL, "Netfilter Accounting Packets", "packets/s", 1006, rrd_update_every, RRDSET_TYPE_STACKED);
 
 				for(i = 0; i < nfacct_list->len ; i++)
 					rrddim_add(st, nfacct_list->data[i].name, NULL, 1, rrd_update_every, RRDDIM_INCREMENTAL);
@@ -189,7 +190,7 @@ void *nfacct_main(void *ptr) {
 
 			st = rrdset_find_bytype("nfacct", "bytes");
 			if(!st) {
-				st = rrdset_create("nfacct", "bytes", NULL, "netfilter", "Netfilter Accounting Bandwidth", "kilobytes/s", 1007, rrd_update_every, RRDSET_TYPE_STACKED);
+				st = rrdset_create("nfacct", "bytes", NULL, "netfilter", NULL, "Netfilter Accounting Bandwidth", "kilobytes/s", 1007, rrd_update_every, RRDSET_TYPE_STACKED);
 
 				for(i = 0; i < nfacct_list->len ; i++)
 					rrddim_add(st, nfacct_list->data[i].name, NULL, 1, 1000 * rrd_update_every, RRDDIM_INCREMENTAL);
