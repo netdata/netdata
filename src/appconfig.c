@@ -188,7 +188,7 @@ int load_config(char *filename, int overwrite_used)
 	if(!filename) filename = CONFIG_DIR "/" CONFIG_FILENAME;
 	FILE *fp = fopen(filename, "r");
 	if(!fp) {
-		error("Cannot open file '%s'", CONFIG_DIR "/" CONFIG_FILENAME);
+		error("Cannot open file '%s'", filename);
 		return 0;
 	}
 
