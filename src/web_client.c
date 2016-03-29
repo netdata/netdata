@@ -268,7 +268,7 @@ int mysendfile(struct web_client *w, char *filename)
 	for(s = filename; *s ;s++) {
 		if( !isalnum(*s) && *s != '/' && *s != '.' && *s != '-' && *s != '_') {
 			debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not acceptable.", w->id, filename);
-			buffer_sprintf(w->response.data, "File '%s' cannot be served. Filename contains invalid character '%c'", *s);
+			buffer_sprintf(w->response.data, "File '%s' cannot be served. Filename contains invalid character '%c'", filename, *s);
 			return 400;
 		}
 	}
