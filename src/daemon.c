@@ -13,7 +13,6 @@
 #include <pthread.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
-#include <execinfo.h>
 
 #include "common.h"
 #include "appconfig.h"

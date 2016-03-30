@@ -1994,7 +1994,7 @@ int main(int argc, char **argv)
 		if(usec < (update_every * 1000000ULL / 2)) susec = (update_every * 1000000ULL) - usec;
 		else susec = update_every * 1000000ULL / 2;
 
-		usleep((__useconds_t) susec);
+		usleep((useconds_t) susec);
 		bcopy(&now, &last, sizeof(struct timeval));
 
 		// restart once per day (14400 seconds)
