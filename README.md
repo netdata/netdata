@@ -24,7 +24,7 @@ This is what you get:
 
 ---
 
-## What is monitors?
+## What it monitors?
 
 This is what it currently monitors (most with zero configuration):
 
