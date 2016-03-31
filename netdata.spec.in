@@ -47,18 +47,25 @@ make %{?_smp_mflags}
 rm -rf "%{buildroot}"
 make %{?_smp_mflags} install DESTDIR="%{buildroot}"
 find "%{buildroot}" -name .keep -exec rm {} \;
+touch %{buildroot}/%{_sysconfdir}/netdata/netdata.conf
+%if 0%{?fedora} || 0%{?rhel} >= 7 
+install -m 0644 -D system/netdata-systemd ${RPM_BUILD_ROOT}%{_unitdir}/netdata.service
+%endif
 
 %files
 %attr(-, netdata, netdata) %dir %{_localstatedir}/cache/%{name}/
 %attr(-, netdata, netdata) %dir %{_localstatedir}/log/%{name}/
+%attr(-, netdata, netdata) %{_datadir}/%{name}/
 %config(noreplace) %{_sysconfdir}/%{name}/
 %if 0%{?rhel}
 %{_sbindir}/%{name}
 %else
 %{_bindir}/%{name}
 %endif
-%{_datadir}/%{name}/
 %{_libexecdir}/%{name}/
+%if 0%{?fedora} || 0%{?rhel} >= 7 
+%{_unitdir}/netdata.service
+%endif
 
 %changelog
 * Tue Mar 22 2016 Costa Tsaousis <costa@tsaousis.gr> - 1.0.0-1
