@@ -47,8 +47,8 @@ int do_proc_stat(int update_every, unsigned long long dt) {
 	for(l = 0; l < lines ;l++) {
 		if(strncmp(procfile_lineword(ff, l, 0), "cpu", 3) == 0) {
 			words = procfile_linewords(ff, l);
-			if(words < 10) {
-				error("Cannot read /proc/stat cpu line. Expected 10 params, read %d.", words);
+			if(words < 9) {
+				error("Cannot read /proc/stat cpu line. Expected 9 params, read %d.", words);
 				continue;
 			}
 
@@ -64,7 +64,7 @@ int do_proc_stat(int update_every, unsigned long long dt) {
 			irq			= strtoull(procfile_lineword(ff, l, 6), NULL, 10);
 			softirq		= strtoull(procfile_lineword(ff, l, 7), NULL, 10);
 			steal		= strtoull(procfile_lineword(ff, l, 8), NULL, 10);
-			guest		= strtoull(procfile_lineword(ff, l, 9), NULL, 10);
+			if(words >= 10) guest		= strtoull(procfile_lineword(ff, l, 9), NULL, 10);
 			if(words >= 11) guest_nice	= strtoull(procfile_lineword(ff, l, 10), NULL, 10);
 
 			char *title = "Core utilization";
