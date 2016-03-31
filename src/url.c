@@ -31,6 +31,9 @@ char *url_encode(char *str) {
 		*buf = malloc(strlen(str) * 3 + 1),
 		*pbuf = buf;
 
+	if(!buf)
+		fatal("Cannot allocate memory.");
+
 	while (*pstr) {
 		if (isalnum(*pstr) || *pstr == '-' || *pstr == '_' || *pstr == '.' || *pstr == '~')
 			*pbuf++ = *pstr;
@@ -56,7 +59,8 @@ char *url_decode(char *str) {
 		*buf = malloc(strlen(str) + 1),
 		*pbuf = buf;
 
-	if(!buf) fatal("Cannot allocate memory.");
+	if(!buf)
+		fatal("Cannot allocate memory.");
 
 	while (*pstr) {
 		if (*pstr == '%') {

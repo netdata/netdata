@@ -346,11 +346,15 @@ static struct tc_device *tc_device_create(char *id)
 
 		d->classes_index.root = NULL;
 		d->classes_index.compar = tc_class_compare;
+
+		int lock;
 #ifdef AVL_LOCK_WITH_MUTEX
-		pthread_mutex_init(&d->classes_index.mutex, NULL);
+		lock = pthread_mutex_init(&d->classes_index.mutex, NULL);
 #else
-		pthread_rwlock_init(&d->classes_index.rwlock, NULL);
+		lock = pthread_rwlock_init(&d->classes_index.rwlock, NULL);
 #endif
+		if(lock != 0)
+			fatal("Failed to initialize plugin_tc mutex/rwlock, return code %d.", lock);
 
 		tc_device_index_add(d);
 

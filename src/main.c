@@ -460,6 +460,8 @@ int main(int argc, char **argv)
 
 		if(st->enabled) {
 			st->thread = malloc(sizeof(pthread_t));
+			if(!st->thread)
+				fatal("Cannot allocate pthread_t memory");
 
 			info("Starting thread %s.", st->name);
 

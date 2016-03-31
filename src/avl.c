@@ -17,6 +17,7 @@
 #include <config.h>
 #endif
 #include "avl.h"
+#include "log.h"
 
 /* Private methods */
 int _avl_removeroot(avl_tree* t);
@@ -390,9 +391,14 @@ int avl_search(avl_tree* t, avl* a, int (*iter)(avl* a), avl** ret) {
 void avl_init(avl_tree* t, int (*compar)(void* a, void* b)) {
 	t->root = NULL;
 	t->compar = compar;
+
+	int lock;
 #ifdef AVL_LOCK_WITH_MUTEX
-	pthread_mutex_init(&t->mutex, NULL);
+	lock = pthread_mutex_init(&t->mutex, NULL);
 #else
-	pthread_rwlock_init(&t->rwlock, NULL);
+	lock = pthread_rwlock_init(&t->rwlock, NULL);
 #endif
+
+	if(lock != 0)
+		fatal("Failed to initialize AVL mutex/rwlock, error: %d", lock);
 }
