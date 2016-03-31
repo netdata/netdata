@@ -100,7 +100,7 @@ It will be installed at these locations:
 
   - the daemon    at ${NETDATA_PREFIX}/usr/sbin/netdata
   - config files  at ${NETDATA_PREFIX}/etc/netdata
-  - web files     at ${NETDATA_PREFIX}/usr/share/web/netdata
+  - web files     at ${NETDATA_PREFIX}/usr/share/netdata
   - plugins       at ${NETDATA_PREFIX}/usr/libexec/netdata
   - cache files   at ${NETDATA_PREFIX}/var/cache/netdata
   - log files     at ${NETDATA_PREFIX}/var/log/netdata
