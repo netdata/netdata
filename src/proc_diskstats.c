@@ -195,6 +195,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 			case 135: // scsi
 			case 153: // raid
 			case 202: // xen
+			case 253: // virtio
 			case 256: // flash
 			case 257: // flash
 				if(minor % 16) def_enabled = 0; // partitions
