@@ -24,7 +24,7 @@ This is what you get:
 
 ---
 
-## What it monitors?
+## What does it monitor?
 
 This is what it currently monitors (most with zero configuration):
 
