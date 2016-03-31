@@ -7,11 +7,13 @@ URL:		http://firehol.org
 Source:		%{name}-@PACKAGE_VERSION@.tar.bz2
 
 BuildRequires:	libmnl-devel
-BuildRequires:	libnetfilter_acct-devel
 BuildRequires:	zlib-devel
 Requires:	libmnl
-Requires:	libnetfilter_acct
 Requires:	zlib
+%if !0%{?rhel}
+Requires:	libnetfilter_acct
+BuildRequires:	libnetfilter_acct-devel
+%endif
 
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -32,7 +34,9 @@ getent passwd netdata > /dev/null || useradd -r -g netdata -c netdata -s /sbin/n
 %build
 %configure \
 	--docdir="%{_docdir}/%{name}-%{version}" \
+%if !0%{?rhel}
 	--enable-plugin-nfacct \
+%endif
 	--with-zlib \
 	--with-math \
 	--with-user=netdata \
@@ -48,7 +52,11 @@ find "%{buildroot}" -name .keep -exec rm {} \;
 %attr(-, netdata, netdata) %dir %{_localstatedir}/cache/%{name}/
 %attr(-, netdata, netdata) %dir %{_localstatedir}/log/%{name}/
 %config(noreplace) %{_sysconfdir}/%{name}/
+%if 0%{?rhel}
+%{_sbindir}/%{name}
+%else
 %{_bindir}/%{name}
+%endif
 %{_datadir}/%{name}/
 %{_libexecdir}/%{name}/
 
