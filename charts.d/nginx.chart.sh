@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # if this chart is called X.chart.sh, then all functions and global variables
 # must start with X_
