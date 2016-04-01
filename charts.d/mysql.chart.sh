@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # http://dev.mysql.com/doc/refman/5.0/en/server-status-variables.html
 #

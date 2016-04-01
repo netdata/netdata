@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # _update_every is a special variable - it holds the number of seconds
 # between the calls of the _update() function
