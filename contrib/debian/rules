@@ -1,0 +1,87 @@
+#!/usr/bin/make -f
+
+# Find the arch we are building for, as this determines
+# the location of plugins in /usr/lib
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+TOP = $(CURDIR)/debian/netdata
+
+%:
+	# For jessie and beyond
+	#
+	dh $@ --with autoreconf,systemd
+
+	# For wheezy or other non-systemd distributions use the following. You
+	# should also see contrib/README.md which gives details of updates to
+	# make to debian/control.
+	#
+	#dh $@ --with autoreconf
+
+override_dh_auto_configure:
+	dh_auto_configure -- --with-math --with-webdir=/var/lib/netdata/www
+
+debian/%.postinst: debian/%.postinst.in
+	sed 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g' $< > $@
+
+override_dh_install: debian/netdata.postinst
+	dh_install
+
+	# Remove unneeded .keep files
+	#
+	find "$(TOP)" -name .keep -exec rm '{}' ';'
+
+	# Move files that local user shouldn't be editing to /usr/share/netdata
+	#
+	mkdir -p "$(TOP)/usr/share/netdata"
+	for D in $$(find "$(TOP)/var/lib/netdata/www/" -maxdepth 1 -type d -printf '%f '); do \
+		echo Relocating $$D; \
+		mv "$(TOP)/var/lib/netdata/www/$$D" "$(TOP)/usr/share/netdata/$$D"; \
+		ln -s "/usr/share/netdata/$$D" "$(TOP)/var/lib/netdata/www/$$D"; \
+	done
+
+	# Update postinst to set correct group for www files on installation.
+	# Should probably be dpkg-statoverride really, but that gets *really*
+	# messy. We also set all web files in /var as conffiles so an upgrade
+	# doesn't splat them.
+	#
+	for D in $$(find "$(TOP)/var/lib/netdata/www/" -maxdepth 1 -type f -printf '%f '); do \
+		echo Updating postinst for $$D; \
+		sed -i "s/^#PERMS#/chgrp netdata \/var\/lib\/netdata\/www\/$$D\n#PERMS#/g" \
+			$(CURDIR)/debian/netdata.postinst; \
+		echo "/var/lib/netdata/www/$$D" >> $(CURDIR)/debian/netdata.conffiles; \
+	done
+	sed -i "/^#PERMS#/d" $(CURDIR)/debian/netdata.postinst
+
+override_dh_installdocs:
+	dh_installdocs
+
+	# Docs should not be under /usr/lib
+	#
+	mv $(TOP)/usr/lib/$(DEB_HOST_MULTIARCH)/netdata/plugins.d/README.md \
+		$(TOP)/usr/share/doc/netdata/README.plugins.md
+	mv $(TOP)/usr/lib/$(DEB_HOST_MULTIARCH)/netdata/charts.d/README.md \
+		$(TOP)/usr/share/doc/netdata/README.charts.md
+
+	# This doc is currently empty, so no point installing it.
+	#
+	rm $(TOP)/usr/lib/$(DEB_HOST_MULTIARCH)/netdata/node.d/README.md
+
+override_dh_fixperms:
+	dh_fixperms
+
+	# apps.plugin should only be runnable by the netdata user. It will be
+	# given extra capabilities in the postinst script.
+	#
+	chmod 0754 $(TOP)/usr/lib/$(DEB_HOST_MULTIARCH)/netdata/plugins.d/apps.plugin
+
+override_dh_installlogrotate:
+	cp system/netdata.logrotate debian/netdata.logrotate
+	dh_installlogrotate
+
+override_dh_clean:
+	dh_clean
+
+	# Tidy up copied/generated files
+	#
+	-[ -r $(CURDIR)/debian/netdata.logrotate ] && rm $(CURDIR)/debian/netdata.logrotate
+	-[ -r $(CURDIR)/debian/netdata.postinst ] && rm $(CURDIR)/debian/netdata.postinst
+	-[ -r $(CURDIR)/debian/netdata.conffiles ] && rm $(CURDIR)/debian/netdata.conffiles

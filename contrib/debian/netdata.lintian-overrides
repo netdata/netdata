@@ -1,0 +1,16 @@
+
+# See Debian policy 10.9. apps.plugin has extra capabilities, so don't let
+# normal users run it.
+netdata: non-standard-executable-perm usr/lib/*/netdata/plugins.d/apps.plugin 0754 != 0755
+
+
+# FontAwesome is at least in the fonts-font-awesome package, but this is
+# not available in wheezy. glyphicons-halflings-regular isn't currently in
+# a Debian package. Therefore don't complain about shipping them with netdata
+# for the time being.
+netdata: duplicate-font-file usr/share/netdata/fonts/*
+netdata: font-in-non-font-package usr/share/netdata/fonts/*
+
+# Files here are marked as conffiles so that local updates to the html files
+# isn't clobbered on upgrade.
+netdata: non-etc-file-marked-as-conffile var/lib/netdata/www/*
