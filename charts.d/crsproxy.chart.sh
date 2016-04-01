@@ -16,6 +16,9 @@ crsproxy_get() {
 }
 
 crsproxy_check() {
+	# make sure we have all the commands we need
+	require_cmd wget || return 1
+	
 	if [ -z "$crsproxy_url" ]
 		then
 		echo >&2 "$PROGRAM_NAME: crsproxy: not configured. Please set crsproxy_url='url' in $confd/crsproxy.conf"
