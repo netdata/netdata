@@ -8,6 +8,7 @@ dist_web_DATA = \
         index.html \
 	demo.html \
 	demo2.html \
+	tv.html \
         dashboard.html \
         dashboard.js \
         dashboard.css \

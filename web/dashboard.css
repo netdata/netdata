@@ -102,6 +102,7 @@ body {
 	height: calc(100% - 15px);	/* 10px for the resize handler and 5px for the top margin */
 	font-size: 10px;
 	margin-top: 5px;
+	text-align: left;
 	/* width and height is calculated (depends on the appearance of the legend) */
 }
 
