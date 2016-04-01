@@ -14,6 +14,9 @@ Requires:	zlib
 Requires:	libnetfilter_acct
 BuildRequires:	libnetfilter_acct-devel
 %endif
+%if 0%{?fedora} || 0%{?rhel} >= 7
+BuildRequires: systemd
+%endif
 
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -50,6 +53,17 @@ find "%{buildroot}" -name .keep -exec rm {} \;
 touch %{buildroot}/%{_sysconfdir}/netdata/netdata.conf
 %if 0%{?fedora} || 0%{?rhel} >= 7 
 install -m 0644 -D system/netdata-systemd ${RPM_BUILD_ROOT}%{_unitdir}/netdata.service
+%endif
+
+%if 0%{?fedora} || 0%{?rhel} >= 7
+%post
+%systemd_post netdata.service
+
+%preun
+%systemd_preun netdata.service
+
+%postun
+%systemd_postun_with_restart netdata.service
 %endif
 
 %files
