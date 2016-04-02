@@ -32,6 +32,7 @@ netdata.spec
 .idea/
 .project
 CMakeLists.txt
+README
 TODO.md
 asan_symbolize.py
 charts.d/bind.chart.sh
