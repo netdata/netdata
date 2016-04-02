@@ -47,28 +47,29 @@ This is what it currently monitors (most with zero configuration):
 
    ![dsl0](https://cloud.githubusercontent.com/assets/2662304/14093128/4d566494-f554-11e5-8ee4-5392e0ac51f0.gif)
 
-5. **IPv4 networking** (packets, errors, fragments, tcp: connections, packets, errors, handshake, udp: packets, errors, broadcast: bandwidth, packets, multicast: bandwidth, packets)
-6. **netfilter / iptables Linux firewall** (connections, connection tracker events, errors, etc)
-7. **Processes** (running, blocked, forks, active, etc)
-8. **Entropy**
-9. **NFS file servers**, v2, v3, v4 (I/O, cache, read ahead, RPC calls)
-10. **Network QoS** (yes, the only tool that visualizes network `tc` classes in realtime)
+5. **IPv4 networking** (bandwidth, packets, errors, fragments, tcp: connections, packets, errors, handshake, udp: packets, errors, broadcast: bandwidth, packets, multicast: bandwidth, packets)
+6. **IPv6 networking** (bandwidth, packets, errors, fragments, ECT, udp: packets, errors, udplite: packets, errors, broadcast: bandwidth, multicast: bandwidth, packets, icmp: messages, errors, echos, router, neighbor, MLDv2, group membership, break down by type)
+7. **netfilter / iptables Linux firewall** (connections, connection tracker events, errors, etc)
+8. **Processes** (running, blocked, forks, active, etc)
+9. **Entropy**
+10. **NFS file servers**, v2, v3, v4 (I/O, cache, read ahead, RPC calls)
+11. **Network QoS** (yes, the only tool that visualizes network `tc` classes in realtime)
 
    ![qos-tc-classes](https://cloud.githubusercontent.com/assets/2662304/14093004/68966020-f553-11e5-98fe-ffee2086fafd.gif)
 
 
-11. **Applications**, by grouping the process tree (CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets, etc)
+12. **Applications**, by grouping the process tree (CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets, etc)
 
    ![apps](https://cloud.githubusercontent.com/assets/2662304/14093565/67c4002c-f557-11e5-86bd-0154f5135def.gif)
 
-12. **Apache web server** mod-status (v2.2, v2.4)
-13. **Nginx web server** stub-status
-14. **mySQL databases** (multiple servers, each showing: bandwidth, queries/s, handlers, locks, issues, tmp operations, connections, binlog metrics, threads, innodb metrics, etc)
-15. **ISC Bind name server** (multiple servers, each showing: clients, requests, queries, updates, failures and several per view metrics)
-16. **Postfix email server** message queue (entries, size)
-17. **Squid proxy server** (clients bandwidth and requests, servers bandwidth and requests) 
-18. **Hardware sensors** (temperature, voltage, fans, power, humidity, etc)
-19. **NUT UPSes** (load, charge, battery voltage, temperature, utility metrics, output metrics)
+13. **Apache web server** mod-status (v2.2, v2.4)
+14. **Nginx web server** stub-status
+15. **mySQL databases** (multiple servers, each showing: bandwidth, queries/s, handlers, locks, issues, tmp operations, connections, binlog metrics, threads, innodb metrics, etc)
+16. **ISC Bind name server** (multiple servers, each showing: clients, requests, queries, updates, failures and several per view metrics)
+17. **Postfix email server** message queue (entries, size)
+18. **Squid proxy server** (clients bandwidth and requests, servers bandwidth and requests) 
+19. **Hardware sensors** (temperature, voltage, fans, power, humidity, etc)
+20. **NUT UPSes** (load, charge, battery voltage, temperature, utility metrics, output metrics)
 
 Any number of **SNMP devices** can be monitored, although you will need to configure these.
 

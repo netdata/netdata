@@ -23,7 +23,7 @@ int do_proc_net_snmp6(int update_every, unsigned long long dt) {
 	static int do_ip_packets = -1, do_ip_fragsout = -1, do_ip_fragsin = -1, do_ip_errors = -1,
 		do_udplite_packets = -1, do_udplite_errors = -1,
 		do_udp_packets = -1, do_udp_errors = -1,
-		do_bandwidth = -1, do_inerrors = -1, do_mcast = -1, do_bcast = -1, do_mcast_p = -1, do_bcast_p = -1,
+		do_bandwidth = -1, do_mcast = -1, do_bcast = -1, do_mcast_p = -1,
 		do_icmp = -1, do_icmp_redir = -1, do_icmp_errors = -1, do_icmp_echos = -1, do_icmp_groupmemb = -1,
 		do_icmp_router = -1, do_icmp_neighbor = -1, do_icmp_mldv2 = -1, do_icmp_types = -1, do_ect = -1;
 
@@ -236,11 +236,9 @@ int do_proc_net_snmp6(int update_every, unsigned long long dt) {
 	if(do_udplite_packets == -1)	do_udplite_packets	= config_get_boolean("plugin:proc:/proc/net/snmp6", "ipv6 UDPlite packets", 1);
 	if(do_udplite_errors == -1)		do_udplite_errors	= config_get_boolean("plugin:proc:/proc/net/snmp6", "ipv6 UDPlite errors", 1);
 	if(do_bandwidth == -1)			do_bandwidth		= config_get_boolean("plugin:proc:/proc/net/snmp6", "bandwidth", 1);
-	if(do_inerrors == -1)			do_inerrors			= config_get_boolean("plugin:proc:/proc/net/snmp6", "input errors", 1);
 	if(do_mcast == -1)				do_mcast 			= config_get_boolean("plugin:proc:/proc/net/snmp6", "multicast bandwidth", 1);
 	if(do_bcast == -1)				do_bcast 			= config_get_boolean("plugin:proc:/proc/net/snmp6", "broadcast bandwidth", 1);
 	if(do_mcast_p == -1)			do_mcast_p 			= config_get_boolean("plugin:proc:/proc/net/snmp6", "multicast packets", 1);
-	if(do_bcast_p == -1)			do_bcast_p 			= config_get_boolean("plugin:proc:/proc/net/snmp6", "broadcast packets", 1);
 	if(do_icmp == -1)				do_icmp 			= config_get_boolean("plugin:proc:/proc/net/snmp6", "icmp", 1);
 	if(do_icmp_redir == -1)			do_icmp_redir 		= config_get_boolean("plugin:proc:/proc/net/snmp6", "icmp redirects", 1);
 	if(do_icmp_errors == -1)		do_icmp_errors 		= config_get_boolean("plugin:proc:/proc/net/snmp6", "icmp errors", 1);
