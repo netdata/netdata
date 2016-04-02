@@ -12,7 +12,7 @@
 	<meta name="author" content="costa@tsaousis.gr">
 
 	<link rel="shortcut icon" href="images/seo-performance-multi-size.ico">
-	
+
 	<link rel="apple-touch-icon" href="images/seo-performance-72.png">
 	<link rel="apple-touch-icon" sizes="72x72" href="images/seo-performance-72.png">
 	<link rel="apple-touch-icon" sizes="114x114" href="images/seo-performance-114.png">
@@ -48,12 +48,12 @@
 		position: relative;
 		z-index: -2;
 	}
-	h1:before, h2:before { 
-		display: block; 
-		content: " "; 
+	h1:before, h2:before {
+		display: block;
+		content: " ";
 		margin-top: -70px;
 		height: 70px;
-		visibility: hidden; 
+		visibility: hidden;
 	}
 
 	.p {
@@ -74,7 +74,7 @@
 	}
 
 	.chart-message {
-		display: block; 
+		display: block;
 		margin-top: 10px;
 	}
 
@@ -769,10 +769,10 @@ function sortObjectByPriority(object) {
 function gaugeChart(title, width, dimensions, colors) {
 	if(typeof colors === 'undefined')
 		colors = '';
-	
+
 	if(typeof dimensions === 'undefined')
 		dimensions = '';
-	
+
 	return '<div data-netdata="CHART_UNIQUE_ID"'
 							+ ' data-dimensions="' + dimensions + '"'
 							+ ' data-chart-library="gauge"'
@@ -1434,7 +1434,7 @@ function renderChartsAndMenu(data) {
 				height: menuHeight(charts[c].menu, options.chartsHeight)
 			};
 		}
-		
+
 		if(charts[c].priority < menus[charts[c].menu].priority)
 			menus[charts[c].menu].priority = charts[c].priority;
 
@@ -1448,7 +1448,7 @@ function renderChartsAndMenu(data) {
 				height: submenuHeight(charts[c].menu, charts[c].submenu, menus[charts[c].menu].height)
 			};
 		}
-		
+
 		if(charts[c].priority < menus[charts[c].menu].submenus[charts[c].submenu].priority)
 			menus[charts[c].menu].submenus[charts[c].submenu].priority = charts[c].priority;
 
@@ -1485,7 +1485,7 @@ function downloadAllCharts(netdata_url) {
 			document.getElementById('hostname').innerHTML = options.hostname;
 			document.getElementById('hostname').href = NETDATA.serverDefault;
 			document.title = options.hostname + ' dashboard';
-			
+
 			renderChartsAndMenu(data);
 
 			// prepare our DOM
@@ -1533,7 +1533,7 @@ function finalizePage() {
 	$('#sidebar').on('affixed.bs.affix', function() {
 		$(this).removeAttr('style');
 	});
-	
+
 	/* activate bootstrap scrollspy (needed for sidebar) */
 	$(document.body).scrollspy({
 		target: '#sidebar',
@@ -1584,7 +1584,7 @@ function finalizePage() {
 	$('#stop_updates_when_focus_is_lost').change(function() { NETDATA.setOption('stop_updates_when_focus_is_lost', $(this).prop('checked')); });
 	$('#smooth_plot').change(function()                     { NETDATA.setOption('smooth_plot', $(this).prop('checked')); });
 	$('#pan_and_zoom_data_padding').change(function()       { NETDATA.setOption('pan_and_zoom_data_padding', $(this).prop('checked')); });
-	
+
 	if(document.location.hostname === demo_hostname)
 		setTimeout(function() {
 			$('#welcomeModal').modal();

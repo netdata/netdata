@@ -560,7 +560,7 @@
 		master: null,			// the master chart (state), to which all others
 								// are synchronized
 
-		force_before_ms: null,	// the timespan to sync all other charts 
+		force_before_ms: null,	// the timespan to sync all other charts
 		force_after_ms: null,
 
 		// set a new master
@@ -1228,7 +1228,7 @@
 					that.tm.last_hidden = new Date().getTime();
 				}
 			}
-			
+
 			that.___chartIsHidden___ = true;
 		}
 
@@ -1434,8 +1434,8 @@
 					};
 
 				// process end event
-				document.onmouseup = 
-				document.ontouchend = 
+				document.onmouseup =
+				document.ontouchend =
 				this.element_legend_childs.resize_handler.onmouseup =
 				this.element_legend_childs.resize_handler.ontouchend =
 					function(e) {
@@ -1773,7 +1773,7 @@
 
 			if(typeof this.fixed_min_duration === 'undefined')
 				this.fixed_min_duration = Math.round((this.chartWidth() / 30) * this.chart.update_every * 1000);
-			
+
 			var min_duration = this.fixed_min_duration;
 			var current_duration = Math.round(this.view_before - this.view_after);
 
@@ -1788,7 +1788,7 @@
 
 			// the final wanted duration
 			var wanted_duration = before - after;
-			
+
 			// to allow panning, accept just a point below our minimum
 			if((current_duration - this.data_update_every) < min_duration)
 				min_duration = current_duration - this.data_update_every;
@@ -2385,7 +2385,7 @@
 					// console.log('adusting view_after from ' + this.view_after + ' to ' + this.data_after);
 					this.view_after = this.data_after;
 				}
-				
+
 				if(this.view_before > this.data_before) {
 					// console.log('adusting view_before from ' + this.view_before + ' to ' + this.data_before);
 					this.view_before = this.data_before;
@@ -3108,7 +3108,7 @@
 		// bootstrap modal switching
 		$('.modal').on('hidden.bs.modal', NETDATA.onscroll);
 		$('.modal').on('shown.bs.modal', NETDATA.onscroll);
-		
+
 		NETDATA.parseDom(NETDATA.chartRefresher);
 	}
 
@@ -3197,7 +3197,7 @@
 		}
 		else {
 			NETDATA.chartLibraries.sparkline.enabled = false;
-			if(typeof callback === "function") 
+			if(typeof callback === "function")
 				callback();
 		}
 	};
@@ -3732,7 +3732,7 @@
 						state.log('interactionModel.mousewheel()');
 
 					// Take the offset of a mouse event on the dygraph canvas and
-					// convert it to a pair of percentages from the bottom left. 
+					// convert it to a pair of percentages from the bottom left.
 					// (Not top left, bottom is where the lower value is.)
 					function offsetToPercentage(g, offsetX, offsetY) {
 						// This is calculating the pixel offset of the leftmost date.
@@ -4003,7 +4003,7 @@
 		}
 		else // stacked
 			state.morris_instance = new Morris.Area(state.morris_options);
-		
+
 		return true;
 	};
 
@@ -4340,7 +4340,7 @@
 	NETDATA.percentFromValueMax = function(value, max) {
 		if(value === null) value = 0;
 		if(max < value) max = value;
-		
+
 		var pcent = 0;
 		if(max !== 0) {
 			pcent = Math.round(value * 100 / max);
@@ -4461,7 +4461,7 @@
 		var value = data.result[0];
 		var max = self.data('easypiechart-max-value') || null;
 		var adjust = self.data('easypiechart-adjust') || null;
-		
+
 		if(max === null) {
 			max = data.max;
 			state.easyPieChartMax = null;
@@ -4528,7 +4528,7 @@
 			animate: self.data('easypiechart-rotate') || {duration: 500, enabled: true},
 			easing: self.data('easypiechart-easing') || undefined
 		});
-		
+
 		// when we just re-create the chart
 		// do not animate the first update
 		var animate = true;
@@ -4578,7 +4578,7 @@
 			speed = 1000000000;
 		else if(typeof status === 'number')
 			speed = status;
-		
+
 		state.gauge_instance.animationSpeed = speed;
 		state.___gaugeOld__.speed = speed;
 	}
@@ -4834,7 +4834,7 @@
 			minLabel: null,
 			maxLabel: null
 		};
-		
+
 		// we will always feed a percentage
 		state.gauge_instance.minValue = 0;
 		state.gauge_instance.maxValue = 100;
