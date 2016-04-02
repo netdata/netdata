@@ -30,6 +30,7 @@
 
 #define INITIAL_WEB_DATA_LENGTH 16384
 #define WEB_REQUEST_LENGTH 16384
+#define TOO_BIG_REQUEST 16384
 
 int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
 int web_enable_gzip = 1;
@@ -1192,14 +1193,14 @@ void web_client_process(struct web_client *w) {
 		// free url_decode() buffer
 		if(pointer_to_free) free(pointer_to_free);
 	}
-	else if(w->response.data->len > 8192) {
+	else if(w->response.data->len > TOO_BIG_REQUEST) {
 		strcpy(w->last_url, "too big request");
 
-		debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big.", w->id);
+		debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big (%zd bytes).", w->id, w->response.data->len);
 
 		code = 400;
 		buffer_flush(w->response.data);
-		buffer_strcat(w->response.data, "Received request is too big.\r\n");
+		buffer_sprintf(w->response.data, "Received request is too big  (%zd bytes).\r\n", w->response.data->len);
 	}
 	else {
 		// wait for more data
