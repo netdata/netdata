@@ -138,3 +138,8 @@ connectivity is not available.
     Copyright 2015, Joseph Huckaby
     [MIT License](https://github.com/jhuckaby/pixl-xml)
     
+- [node-int64](https://github.com/broofa/node-int64)
+
+    Copyright 2014, Robert Kieffer
+    [MIT License](https://github.com/broofa/node-int64/blob/master/LICENSE)
+    
