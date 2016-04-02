@@ -48,6 +48,7 @@ src/.project
 src/.settings/
 src/TODO.txt
 src/rrddim_file.c
+system/netdata.service
 valgrind.log
 valgrind2.log
 web/chart-info/

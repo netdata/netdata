@@ -7,8 +7,8 @@ Type=forking
 WorkingDirectory=/tmp
 User=root
 Group=root
-PIDFile=/var/run/netdata.pid
-ExecStart=/usr/sbin/netdata
+PIDFile=@localstatedir_POST@/run/netdata.pid
+ExecStart=@sbindir_POST@/netdata
 ExecStop=/bin/kill -SIGTERM $MAINPID
 TimeoutStopSec=30
 
