@@ -7,11 +7,16 @@ URL:		http://firehol.org
 Source:		%{name}-@PACKAGE_VERSION@.tar.bz2
 
 BuildRequires:	libmnl-devel
-BuildRequires:	libnetfilter_acct-devel
 BuildRequires:	zlib-devel
 Requires:	libmnl
-Requires:	libnetfilter_acct
 Requires:	zlib
+%if !0%{?rhel}
+Requires:	libnetfilter_acct
+BuildRequires:	libnetfilter_acct-devel
+%endif
+%if 0%{?fedora} || 0%{?rhel} >= 7
+BuildRequires: systemd
+%endif
 
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -32,7 +37,9 @@ getent passwd netdata > /dev/null || useradd -r -g netdata -c netdata -s /sbin/n
 %build
 %configure \
 	--docdir="%{_docdir}/%{name}-%{version}" \
+%if !0%{?rhel}
 	--enable-plugin-nfacct \
+%endif
 	--with-zlib \
 	--with-math \
 	--with-user=netdata \
@@ -43,14 +50,36 @@ make %{?_smp_mflags}
 rm -rf "%{buildroot}"
 make %{?_smp_mflags} install DESTDIR="%{buildroot}"
 find "%{buildroot}" -name .keep -exec rm {} \;
+touch %{buildroot}/%{_sysconfdir}/netdata/netdata.conf
+%if 0%{?fedora} || 0%{?rhel} >= 7 
+install -m 0644 -D system/netdata-systemd ${RPM_BUILD_ROOT}%{_unitdir}/netdata.service
+%endif
+
+%if 0%{?fedora} || 0%{?rhel} >= 7
+%post
+%systemd_post netdata.service
+
+%preun
+%systemd_preun netdata.service
+
+%postun
+%systemd_postun_with_restart netdata.service
+%endif
 
 %files
 %attr(-, netdata, netdata) %dir %{_localstatedir}/cache/%{name}/
 %attr(-, netdata, netdata) %dir %{_localstatedir}/log/%{name}/
+%attr(-, netdata, netdata) %{_datadir}/%{name}/
 %config(noreplace) %{_sysconfdir}/%{name}/
+%if 0%{?rhel}
+%{_sbindir}/%{name}
+%else
 %{_bindir}/%{name}
-%{_datadir}/%{name}/
+%endif
 %{_libexecdir}/%{name}/
+%if 0%{?fedora} || 0%{?rhel} >= 7 
+%{_unitdir}/netdata.service
+%endif
 
 %changelog
 * Tue Mar 22 2016 Costa Tsaousis <costa@tsaousis.gr> - 1.0.0-1
