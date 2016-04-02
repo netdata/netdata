@@ -45,6 +45,7 @@ int update_every = 1;
 unsigned long long file_counter = 0;
 
 char *host_prefix = "";
+char *config_dir = CONFIG_DIR;
 
 // ----------------------------------------------------------------------------
 // memory debugger
@@ -386,7 +387,7 @@ int read_process_groups(const char *name)
 	char buffer[4096+1];
 	char filename[FILENAME_MAX + 1];
 
-	snprintf(filename, FILENAME_MAX, "%s/apps_%s.conf", CONFIG_DIR, name);
+	snprintf(filename, FILENAME_MAX, "%s/apps_%s.conf", config_dir, name);
 
 	if(debug) fprintf(stderr, "apps.plugin: process groups file: '%s'\n", filename);
 	FILE *fp = fopen(filename, "r");
@@ -1946,6 +1947,13 @@ int main(int argc, char **argv)
 		host_prefix = "";
 	}
 	else info("Found NETDATA_HOST_PREFIX='%s'", host_prefix);
+
+	config_dir = getenv("NETDATA_CONFIG_DIR");
+	if(config_dir == NULL) {
+		info("NETDATA_CONFIG_DIR is not passed from netdata");
+		config_dir = CONFIG_DIR;
+	}
+	else info("Found NETDATA_CONFIG_DIR='%s'", config_dir);
 
 	info("starting...");
 
