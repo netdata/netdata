@@ -575,7 +575,7 @@ struct pid_stat {
 	int *fds;					// array of fds it uses
 	int fds_size;				// the size of the fds array
 
-	int childs;					// number of processes directly referencing this
+	int children_count;			// number of processes directly referencing this
 	int updated;				// 1 when update
 	int merged;					// 1 when it has been merged to its parent
 	int new_entry;
@@ -804,7 +804,7 @@ int walk_down(pid_t pid, int level) {
 	if(p) {
 		if(!p->updated) ret += 1;
 		if(ret) fprintf(stderr, "%s %s %d [%s, %s] c=%d u=%llu+%llu, s=%llu+%llu, cu=%llu+%llu, cs=%llu+%llu, n=%llu+%llu, j=%llu+%llu, cn=%llu+%llu, cj=%llu+%llu\n"
-			, b, p->comm, p->pid, p->updated?"OK":"KILLED", p->target->name, p->childs
+			, b, p->comm, p->pid, p->updated?"OK":"KILLED", p->target->name, p->children_count
 			, p->utime, p->utime - p->old_utime
 			, p->stime, p->stime - p->old_stime
 			, p->cutime, p->cutime - p->old_cutime
@@ -1062,7 +1062,7 @@ int update_from_proc(void)
 		all_pids_count++;
 		p->parent = NULL;
 		p->updated = 0;
-		p->childs = 0;
+		p->children_count = 0;
 		p->merged = 0;
 		p->new_entry = 0;
 	}
@@ -1236,57 +1236,104 @@ void update_statistics(void)
 	int c;
 	struct pid_stat *p = NULL;
 
-	// link all parents and update childs count
+
+	// link all children to their parents
+	// and update children count on parents
 	for(p = root_of_pids; p ; p = p->next) {
-		if(p->ppid > 0 && p->ppid <= pid_max && all_pids[p->ppid]) {
-			if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: \tparent of %d %s is %d %s\n", p->pid, p->comm, p->ppid, all_pids[p->ppid]->comm);
+		// for each process found running
+
+		if(p->ppid > 0
+				&& p->ppid <= pid_max
+				&& all_pids[p->ppid]
+			) {
+			// for valid processes
+
+			if(debug || (p->target && p->target->debug))
+				fprintf(stderr, "apps.plugin: \tparent of %d (%s) is %d (%s)\n", p->pid, p->comm, p->ppid, all_pids[p->ppid]->comm);
 
 			p->parent = all_pids[p->ppid];
-			p->parent->childs++;
+			p->parent->children_count++;
 		}
-		else if(p->ppid != 0) error("pid %d %s states parent %d, but the later does not exist.", p->pid, p->comm, p->ppid);
+		else if(p->ppid != 0)
+			error("pid %d %s states parent %d, but the later does not exist.", p->pid, p->comm, p->ppid);
 	}
 
-	// find all the procs with 0 childs and merge them to their parents
-	// repeat, until nothing more can be done.
+
+	// children that do not have a target
+	// inherit their target from their parent
 	int found = 1;
 	while(found) {
 		found = 0;
 		for(p = root_of_pids; p ; p = p->next) {
-			// if this process does not have any childs, and
-			// is not already merged, and
-			// its parent has childs waiting to be merged, and
-			// the target of this process and its parent is the same, or the parent does not have a target, or this process does not have a parent
+			// if this process does not have a target
+			// and it has a parent
+			// and its parent has a target
+			// then, set the parent's target to this process
+			if(unlikely(!p->target && p->parent && p->parent->target)) {
+				p->target = p->parent->target;
+				found++;
+
+				if(debug || (p->target && p->target->debug))
+					fprintf(stderr, "apps.plugin: \t\tTARGET INHERITANCE: %s is inherited by %d (%s) from its parent %d (%s).\n", p->target->name, p->pid, p->comm, p->parent->pid, p->parent->comm);
+			}
+		}
+	}
+
+
+	// find all the procs with 0 childs and merge them to their parents
+	// repeat, until nothing more can be done.
+	found = 1;
+	while(found) {
+		found = 0;
+		for(p = root_of_pids; p ; p = p->next) {
+			// if this process does not have any children
+			// and is not already merged
+			// and has a parent
+			// and its parent has children
+			// and the target of this process and its parent is the same, or the parent does not have a target
 			// and its parent is not init
-			// then... merge them!
-			if(!p->childs && !p->merged && p->parent && p->parent->childs && (p->target == p->parent->target || !p->parent->target || !p->target) && p->ppid != 1) {
-				p->parent->childs--;
+			// then, mark them as merged.
+			if(unlikely(
+					!p->children_count
+					&& !p->merged
+					&& p->parent
+					&& p->parent->children_count
+					&& (p->target == p->parent->target || !p->parent->target)
+					&& p->ppid != 1
+				)) {
+				p->parent->children_count--;
 				p->merged = 1;
 
 				// the parent inherits the child's target, if it does not have a target itself
-				if(p->target && !p->parent->target) {
+				if(unlikely(p->target && !p->parent->target)) {
 					p->parent->target = p->target;
-					if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: \t\ttarget %s is inherited by %d %s from its child %d %s.\n", p->target->name, p->parent->pid, p->parent->comm, p->pid, p->comm);
+
+					if(debug || (p->target && p->target->debug))
+						fprintf(stderr, "apps.plugin: \t\tTARGET INHERITANCE: %s is inherited by %d (%s) from its child %d (%s).\n", p->target->name, p->parent->pid, p->parent->comm, p->pid, p->comm);
 				}
 
 				found++;
 			}
 		}
-		if(debug) fprintf(stderr, "apps.plugin: merged %d processes\n", found);
+
+		if(debug)
+			fprintf(stderr, "apps.plugin: merged %d processes\n", found);
 	}
 
-	// give a default target on all top level processes
 	// init goes always to default target
-	if(all_pids[1]) all_pids[1]->target = default_target;
+	if(all_pids[1])
+		all_pids[1]->target = default_target;
 
+	// give a default target on all top level processes
 	for(p = root_of_pids; p ; p = p->next) {
 		// if the process is not merged itself
 		// then is is a top level process
-		if(!p->merged && !p->target) p->target = default_target;
+		if(!p->merged && !p->target)
+			p->target = default_target;
 
 #ifdef INCLUDE_CHILDS
 		// by the way, update the diffs
-		// will be used later for substracting killed process times
+		// will be used later for subtracting killed process times
 		p->diff_cutime = p->utime - p->cutime;
 		p->diff_cstime = p->stime - p->cstime;
 		p->diff_cminflt = p->minflt - p->cminflt;
@@ -1299,9 +1346,12 @@ void update_statistics(void)
 	while(found) {
 		found = 0;
 		for(p = root_of_pids; p ; p = p->next) {
-			if(!p->target && p->merged && p->parent && p->parent->target) {
+			if(unlikely(!p->target && p->merged && p->parent && p->parent->target)) {
 				p->target = p->parent->target;
 				found++;
+
+				if(debug || (p->target && p->target->debug))
+					fprintf(stderr, "apps.plugin: \t\tTARGET INHERITANCE: %s is inherited by %d (%s) from its parent %d (%s) at phase 2.\n", p->target->name, p->pid, p->comm, p->parent->pid, p->parent->comm);
 			}
 		}
 	}
