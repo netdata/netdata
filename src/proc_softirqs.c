@@ -46,6 +46,11 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
 	uint32_t lines = procfile_lines(ff), l;
 	uint32_t words = procfile_linewords(ff, 0), w;
 
+	if(!lines) {
+		error("Cannot read /proc/softirqs, zero lines reported.");
+		return 1;
+	}
+
 	// find how many CPUs are there
 	if(cpus == -1) {
 		cpus = 0;
