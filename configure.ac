@@ -159,11 +159,12 @@ AC_SUBST([OPTIONAL_ZLIB_LIBS])
 AC_CONFIG_FILES([
 	Makefile
 	charts.d/Makefile
-	node.d/Makefile
 	conf.d/Makefile
 	netdata.spec
+	node.d/Makefile
 	plugins.d/Makefile
 	src/Makefile
+	system/Makefile
 	web/Makefile
 ])
 AC_OUTPUT

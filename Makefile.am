@@ -24,16 +24,15 @@ EXTRA_DIST = \
 	autogen.sh \
 	netdata-9999.ebuild \
 	tests/stress.sh \
-	system/netdata-openrc \
-	system/netdata-systemd \
 	$(NULL)
 
 SUBDIRS = \
 	charts.d \
-	node.d \
 	conf.d \
+	node.d \
 	plugins.d \
 	src \
+	system \
 	web \
 	$(NULL)
 

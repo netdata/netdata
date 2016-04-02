@@ -88,5 +88,5 @@ src_install() {
 	fowners ${PN} /var/log/netdata
 
 	newinitd system/netdata-openrc ${PN}
-	systemd_newunit system/netdata-systemd ${PN}.service
+	systemd_dounit system/netdata.service
 }
