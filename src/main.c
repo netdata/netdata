@@ -44,7 +44,7 @@ void netdata_cleanup_and_exit(int ret)
 	netdata_exit = 1;
 	rrdset_save_all();
 	// kill_childs();
-	unlink(RUN_DIR "netdata.pid");
+	unlink(RUN_DIR "/netdata.pid");
 	info("NetData exiting. Bye bye...");
 	exit(ret);
 }
