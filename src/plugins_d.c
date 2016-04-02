@@ -218,7 +218,7 @@ void *pluginsd_worker_thread(void *arg)
 					break;
 				}
 
-				if(unlikely(st->debug)) debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting a END on chart %s", cd->fullfilename, st->id);
+				if(unlikely(st->debug)) debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting an END on chart %s", cd->fullfilename, st->id);
 
 				rrdset_done(st);
 				st = NULL;
@@ -528,5 +528,3 @@ void *pluginsd_main(void *ptr)
 	pthread_exit(NULL);
 	return NULL;
 }
-
-
