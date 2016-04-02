@@ -295,7 +295,7 @@ int mysendfile(struct web_client *w, char *filename)
 	// check if the file is owned by expected user
 	if(stat.st_uid != web_files_uid()) {
 		error("%llu: File '%s' is owned by user %d (expected user %d). Access Denied.", w->id, webfilename, stat.st_uid, web_files_uid());
-		buffer_sprintf(w->response.data, "Access to file '%s' is not permitted.", filename);
+		buffer_sprintf(w->response.data, "Access to file '%s' is not permitted.", webfilename);
 		return 403;
 	}
 
