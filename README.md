@@ -6,6 +6,15 @@
 
 ---
 
+## Git sources
+
+You are looking at a version of the sources extracted directly from git.
+If you want a version of the source package where `configure` and any
+documentation has been built for you, please get an official
+[netdata package download](https://firehol.org/download/netdata/).
+The `unsigned/master` folder tracks the head of the git tree and
+released packages are also available.
+
 ## Features
 
 **netdata** is a highly optimized Linux daemon providing **real-time performance monitoring for Linux systems, Applications, SNMP devices, over the web**!
