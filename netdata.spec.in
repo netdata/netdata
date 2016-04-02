@@ -1,3 +1,9 @@
+%if 0%{?fedora} || 0%{?rhel} >= 7
+%global do_systemd 1
+%else
+%global do_systemd 0
+%endif
+
 Summary:	Linux real time system monitoring, over the web
 Name:		@PACKAGE_NAME@
 Version:	@PACKAGE_RPM_VERSION@
@@ -14,6 +20,12 @@ Requires:	zlib
 BuildRequires:	libnetfilter_acct-devel
 Requires:	libnetfilter_acct
 %endif
+%if 0%{do_systemd}
+BuildRequires:		systemd
+Requires(post):		systemd
+Requires(preun):	systemd
+Requires(postun):	systemd
+%endif
 
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -23,6 +35,15 @@ Real-time performance monitoring, in the greatest possible detail!
 %pre
 getent group netdata > /dev/null || groupadd -r netdata
 getent passwd netdata > /dev/null || useradd -r -g netdata -c netdata -s /sbin/nologin -d / netdata
+
+%if 0%{do_systemd}
+%post
+%systemd_post netdata.service
+%preun
+%systemd_preun netdata.service
+%postun
+%systemd_postun_with_restart netdata.service
+%endif
 
 %global ovirt_create_user_engine \
 %_ovirt_create_user %{engine_user} %{engine_uid} %{engine_group} %{engine_gid} "%{ovirt_user_description}" %{engine_state}
@@ -48,6 +69,11 @@ rm -rf "%{buildroot}"
 make %{?_smp_mflags} install DESTDIR="%{buildroot}"
 find "%{buildroot}" -name .keep -exec rm {} \;
 
+%if 0%{do_systemd}
+install -m 0755 -d "%{buildroot}/%{_unitdir}"
+install -m 0644 system/netdata.service "%{buildroot}/%{_unitdir}"
+%endif
+
 %files
 %attr(-, netdata, netdata) %dir %{_localstatedir}/cache/%{name}/
 %attr(-, netdata, netdata) %dir %{_localstatedir}/log/%{name}/
@@ -55,6 +81,10 @@ find "%{buildroot}" -name .keep -exec rm {} \;
 %{_datadir}/%{name}/
 %{_libexecdir}/%{name}/
 %{_sbindir}/%{name}
+
+%if 0%{do_systemd}
+%{_unitdir}/netdata.service
+%endif
 
 %changelog
 * Tue Mar 22 2016 Costa Tsaousis <costa@tsaousis.gr> - 1.0.0-1
