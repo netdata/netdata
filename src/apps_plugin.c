@@ -47,6 +47,7 @@ unsigned long long file_counter = 0;
 char *host_prefix = "";
 char *config_dir = CONFIG_DIR;
 
+#ifdef NETDATA_INTERNAL_CHECKS
 // ----------------------------------------------------------------------------
 // memory debugger
 
@@ -197,6 +198,9 @@ char *strdup_debug(const char *file, int line, const char *function, const char 
 #undef strdup
 #endif
 #define strdup(ptr) strdup_debug(__FILE__, __LINE__, __FUNCTION__, (ptr))
+
+#endif /* ifdef NETDATA_INTERNAL_CHECKS */
+
 
 // ----------------------------------------------------------------------------
 // helper functions
