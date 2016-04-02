@@ -1,3 +1,6 @@
+#include <sys/time.h>
+#include <sys/resource.h>
+
 #ifndef NETDATA_COMMON_H
 #define NETDATA_COMMON_H 1
 
@@ -31,5 +34,12 @@ extern unsigned int hz;
 extern void get_HZ(void);
 
 extern pid_t gettid(void);
+
+/* fix for alpine linux */
+#ifndef RUSAGE_THREAD
+#ifdef RUSAGE_CHILDREN
+#define RUSAGE_THREAD RUSAGE_CHILDREN
+#endif
+#endif
 
 #endif /* NETDATA_COMMON_H */

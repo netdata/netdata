@@ -30,6 +30,7 @@ int listen_backlog = LISTEN_BACKLOG;
 int listen_fd = -1;
 int listen_port = LISTEN_PORT;
 
+#ifdef NETDATA_INTERNAL_CHECKS
 static void log_allocations(void)
 {
 	static int mem = 0;
@@ -46,6 +47,7 @@ static void log_allocations(void)
 		mem = mi.uordblks;
 	}
 }
+#endif
 
 int create_listen_socket4(int port, int listen_backlog)
 {
@@ -210,7 +212,9 @@ void *socket_listen_main(void *ptr)
 				debug(D_WEB_CLIENT, "%llu: Removing client.", w->id);
 				// pthread_join(w->thread,  NULL);
 				w = web_client_free(w);
+#ifdef NETDATA_INTERNAL_CHECKS
 				log_allocations();
+#endif
 			}
 		}
 	}
