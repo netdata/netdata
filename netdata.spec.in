@@ -48,9 +48,9 @@ find "%{buildroot}" -name .keep -exec rm {} \;
 %attr(-, netdata, netdata) %dir %{_localstatedir}/cache/%{name}/
 %attr(-, netdata, netdata) %dir %{_localstatedir}/log/%{name}/
 %config(noreplace) %{_sysconfdir}/%{name}/
-%{_bindir}/%{name}
 %{_datadir}/%{name}/
 %{_libexecdir}/%{name}/
+%{_sbindir}/%{name}
 
 %changelog
 * Tue Mar 22 2016 Costa Tsaousis <costa@tsaousis.gr> - 1.0.0-1
