@@ -289,7 +289,7 @@ int mysendfile(struct web_client *w, char *filename)
 	struct stat stat;
 	if(lstat(webfilename, &stat) != 0) {
 		debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not found.", w->id, webfilename);
-		buffer_sprintf(w->response.data, "File '%s' does not exist, or is not accessible.", filename);
+		buffer_sprintf(w->response.data, "File '%s' does not exist, or is not accessible.", webfilename);
 		return 404;
 	}
 
@@ -307,7 +307,7 @@ int mysendfile(struct web_client *w, char *filename)
 
 	if((stat.st_mode & S_IFMT) != S_IFREG) {
 		error("%llu: File '%s' is not a regular file. Access Denied.", w->id, webfilename);
-		buffer_sprintf(w->response.data, "Access to file '%s' is not permitted.", filename);
+		buffer_sprintf(w->response.data, "Access to file '%s' is not permitted.", webfilename);
 		return 403;
 	}
 
@@ -319,12 +319,12 @@ int mysendfile(struct web_client *w, char *filename)
 		if(errno == EBUSY || errno == EAGAIN) {
 			error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, webfilename);
 			buffer_sprintf(w->response.header, "Location: /" WEB_PATH_FILE "/%s\r\n", filename);
-			buffer_sprintf(w->response.data, "The file '%s' is currently busy. Please try again later.", filename);
+			buffer_sprintf(w->response.data, "The file '%s' is currently busy. Please try again later.", webfilename);
 			return 307;
 		}
 		else {
 			error("%llu: Cannot open file '%s'.", w->id, webfilename);
-			buffer_sprintf(w->response.data, "Cannot open file '%s'.", filename);
+			buffer_sprintf(w->response.data, "Cannot open file '%s'.", webfilename);
 			return 404;
 		}
 	}
