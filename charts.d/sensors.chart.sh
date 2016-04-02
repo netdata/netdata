@@ -129,7 +129,7 @@ sensors_create() {
 					files="$( sensors_check_files $files )"
 					files="$( sensors_check_temp_type $files )"
 					[ -z "$files" ] && continue
-					echo "CHART sensors.temp_$id '' '$name Temperature' 'Celcius' 'temperature' 'sensors.temp' line $[sensors_priority + 1] $sensors_update_every"
+					echo "CHART sensors.temp_$id '' '$name Temperature' 'Celsius' 'temperature' 'sensors.temp' line $[sensors_priority + 1] $sensors_update_every"
 					echo >>$TMP_DIR/sensors.sh "echo \"BEGIN sensors.temp_$id \$1\""
 					divisor=1000
 					;;
