@@ -43,6 +43,7 @@ void *proc_main(void *ptr)
 	int vdo_proc_net_dev 			= !config_get_boolean("plugin:proc", "/proc/net/dev", 1);
 	int vdo_proc_diskstats 			= !config_get_boolean("plugin:proc", "/proc/diskstats", 1);
 	int vdo_proc_net_snmp 			= !config_get_boolean("plugin:proc", "/proc/net/snmp", 1);
+	int vdo_proc_net_snmp6 			= !config_get_boolean("plugin:proc", "/proc/net/snmp6", 1);
 	int vdo_proc_net_netstat 		= !config_get_boolean("plugin:proc", "/proc/net/netstat", 1);
 	int vdo_proc_net_stat_conntrack = !config_get_boolean("plugin:proc", "/proc/net/stat/conntrack", 1);
 	int vdo_proc_net_ip_vs_stats 	= !config_get_boolean("plugin:proc", "/proc/net/ip_vs/stats", 1);
@@ -61,6 +62,7 @@ void *proc_main(void *ptr)
 	unsigned long long sutime_proc_net_dev = 0ULL;
 	unsigned long long sutime_proc_diskstats = 0ULL;
 	unsigned long long sutime_proc_net_snmp = 0ULL;
+	unsigned long long sutime_proc_net_snmp6 = 0ULL;
 	unsigned long long sutime_proc_net_netstat = 0ULL;
 	unsigned long long sutime_proc_net_stat_conntrack = 0ULL;
 	unsigned long long sutime_proc_net_ip_vs_stats = 0ULL;
@@ -157,6 +159,14 @@ void *proc_main(void *ptr)
 			sunow = sutime();
 			vdo_proc_net_snmp = do_proc_net_snmp(rrd_update_every, (sutime_proc_net_snmp > 0)?sunow - sutime_proc_net_snmp:0ULL);
 			sutime_proc_net_snmp = sunow;
+		}
+		if(unlikely(netdata_exit)) break;
+
+		if(!vdo_proc_net_snmp6) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_snmp6().");
+			sunow = sutime();
+			vdo_proc_net_snmp6 = do_proc_net_snmp6(rrd_update_every, (sutime_proc_net_snmp6 > 0)?sunow - sutime_proc_net_snmp6:0ULL);
+			sutime_proc_net_snmp6 = sunow;
 		}
 		if(unlikely(netdata_exit)) break;
 

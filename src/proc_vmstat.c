@@ -13,9 +13,6 @@
 #include "rrd.h"
 #include "plugin_proc.h"
 
-#define MAX_PROC_VMSTAT_LINE 4096
-#define MAX_PROC_VMSTAT_NAME 1024
-
 int do_proc_vmstat(int update_every, unsigned long long dt) {
 	static procfile *ff = NULL;
 	static int do_swapio = -1, do_io = -1, do_pgfaults = -1, gen_hashes = -1;

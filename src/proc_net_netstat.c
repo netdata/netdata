@@ -98,12 +98,12 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
 					st->isdetail = 1;
 
 					rrddim_add(st, "noroutes", NULL, 1, 1, RRDDIM_INCREMENTAL);
-					rrddim_add(st, "trunkated", NULL, 1, 1, RRDDIM_INCREMENTAL);
+					rrddim_add(st, "truncated", NULL, 1, 1, RRDDIM_INCREMENTAL);
 				}
 				else rrdset_next(st);
 
 				rrddim_set(st, "noroutes", InNoRoutes);
-				rrddim_set(st, "trunkated", InTruncatedPkts);
+				rrddim_set(st, "truncated", InTruncatedPkts);
 				rrdset_done(st);
 			}
 

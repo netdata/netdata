@@ -814,6 +814,11 @@ var menuData = {
 		info: undefined
 	},
 
+	'ipv6': {
+		title: 'IPv6 Networking',
+		info: undefined
+	},
+
 	'ipvs': {
 		title: 'IP Virtual Server',
 		info: undefined
@@ -936,7 +941,11 @@ var chartData = {
 	},
 
 	'system.ipv4': {
-		info: 'Total IPv4 Traffic, read from <code>/proc/net/netstat</code>. This includes <code>lo</code> device traffic.'
+		info: 'Total IPv4 Traffic, read from <code>/proc/net/netstat</code>.'
+	},
+
+	'system.ipv6': {
+		info: 'Total IPv6 Traffic, read from <code>/proc/net/snmp6</code>.'
 	},
 
 	'system.ram': {
@@ -1290,6 +1299,29 @@ function headMain(charts, duration) {
 		+ ' data-dimensions="sent"'
 		+ ' data-chart-library="easypiechart"'
 		+ ' data-title="IPv4 Outbound"'
+		+ ' data-units="kbps"'
+		+ ' data-width="10%"'
+		+ ' data-before="0"'
+		+ ' data-after="-' + duration.toString() + '"'
+		+ ' data-points="' + duration.toString() + '"'
+		+ ' role="application"></div>';
+	}
+	else if(typeof charts['system.ipv6'] !== 'undefined') {
+		head += '<div style="margin-right: 10px;" data-netdata="system.ipv6"'
+		+ ' data-dimensions="received"'
+		+ ' data-chart-library="easypiechart"'
+		+ ' data-title="IPv6 Inbound"'
+		+ ' data-units="kbps"'
+		+ ' data-width="10%"'
+		+ ' data-before="0"'
+		+ ' data-after="-' + duration.toString() + '"'
+		+ ' data-points="' + duration.toString() + '"'
+		+ ' role="application"></div>';
+
+		head += '<div style="margin-right: 10px;" data-netdata="system.ipv6"'
+		+ ' data-dimensions="sent"'
+		+ ' data-chart-library="easypiechart"'
+		+ ' data-title="IPv6 Outbound"'
 		+ ' data-units="kbps"'
 		+ ' data-width="10%"'
 		+ ' data-before="0"'
