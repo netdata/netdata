@@ -1,6 +1,6 @@
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
-dist_node_SCRIPTS = \
+dist_node_DATA = \
 	README.md \
 	named.node.js \
 	sma_webbox.node.js \
