@@ -19,7 +19,7 @@ MAINTAINERCLEANFILES= \
 EXTRA_DIST = \
 	.gitignore \
 	autogen.sh \
-	README.md \
+	README \
 	LICENSE.md \
 	autogen.sh \
 	netdata-9999.ebuild \
@@ -36,6 +36,15 @@ SUBDIRS = \
 	src \
 	web \
 	$(NULL)
+
+if GIT_TREE
+
+all-local: README
+
+README: README.md
+	sed -e '/^## Features$$/p' -e '/^## Git/,/^## Features$$/d' $< > $@
+
+endif
 
 dist_noinst_DATA = netdata.spec
 

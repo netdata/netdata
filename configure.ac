@@ -14,6 +14,8 @@ PACKAGE_RPM_RELEASE="0.0.$(echo VERSION_SUFFIX | sed 's/^_//')"
 
 AC_INIT([netdata], VERSION_NUMBER[]VERSION_SUFFIX)
 
+AM_CONDITIONAL([GIT_TREE], [test -f README.md])
+
 AM_MAINTAINER_MODE([disable])
 if test x"$USE_MAINTAINER_MODE" = xyes; then
 AC_MSG_NOTICE(***************** MAINTAINER MODE *****************)
