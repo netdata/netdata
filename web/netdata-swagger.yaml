@@ -218,7 +218,7 @@ definitions:
       name:
         type: string
         description: 'The name of the dimension'
-  
+ 
   json_wrap:
     type: object
     properties:
