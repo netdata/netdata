@@ -190,6 +190,8 @@ int main(int argc, char **argv)
 	int i;
 	int config_loaded = 0;
 	int dont_fork = 0;
+	size_t wanted_stacksize = 0, stacksize = 0;
+	pthread_attr_t attr;
 
 	// global initialization
 	get_HZ();
@@ -216,6 +218,7 @@ int main(int argc, char **argv)
 		else if(strcmp(argv[i], "-l")  == 0 && (i+1) < argc) { config_set("global", "history",      argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-t")  == 0 && (i+1) < argc) { config_set("global", "update every", argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-ch") == 0 && (i+1) < argc) { config_set("global", "host access prefix", argv[i+1]); i++; }
+		else if(strcmp(argv[i], "-stacksize") == 0 && (i+1) < argc) { config_set("global", "pthread stack size", argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-nodaemon") == 0 || strcmp(argv[i], "-nd") == 0) dont_fork = 1;
 		else if(strcmp(argv[i], "--unittest")  == 0) {
 			rrd_update_every = 1;
@@ -235,6 +238,7 @@ int main(int argc, char **argv)
 			fprintf(stderr, "  -ch path to access host /proc and /sys when running in a container. Default: empty.\n");
 			fprintf(stderr, "  -nd or -nodeamon to disable forking in the background. Default: unset.\n");
 			fprintf(stderr, "  -df FLAGS debug options. Default: 0x%08llx.\n", debug_flags);
+			fprintf(stderr, "  -stacksize BYTES to overwrite the pthread stack size.\n");
 			exit(1);
 		}
 	}
@@ -374,6 +378,20 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
+		i = pthread_attr_init(&attr);
+		if(i != 0)
+			fatal("pthread_attr_init() failed with code %d.", i);
+
+		i = pthread_attr_getstacksize(&attr, &stacksize);
+		if(i != 0)
+			fatal("pthread_attr_getstacksize() failed with code %d.", i);
+		else
+			debug(D_OPTIONS, "initial pthread stack size is %zu bytes", stacksize);
+
+		wanted_stacksize = config_get_number("global", "pthread stack size", stacksize);
+
+		// --------------------------------------------------------------------
+
 		for (i = 0; static_threads[i].name != NULL ; i++) {
 			struct netdata_static_thread *st = &static_threads[i];
 
@@ -455,6 +473,20 @@ int main(int argc, char **argv)
 		}
 	}
 
+	// ------------------------------------------------------------------------
+	// get default pthread stack size
+
+	if(stacksize < wanted_stacksize) {
+		i = pthread_attr_setstacksize(&attr, wanted_stacksize);
+		if(i != 0)
+			fatal("pthread_attr_setstacksize() to %zu bytes, failed with code %d.", wanted_stacksize, i);
+		else
+			info("Successfully set pthread stacksize to %zu bytes", wanted_stacksize);
+	}
+
+	// ------------------------------------------------------------------------
+	// spawn the threads
+
 	for (i = 0; static_threads[i].name != NULL ; i++) {
 		struct netdata_static_thread *st = &static_threads[i];
 
@@ -465,7 +497,7 @@ int main(int argc, char **argv)
 
 			info("Starting thread %s.", st->name);
 
-			if(pthread_create(st->thread, NULL, st->start_routine, NULL))
+			if(pthread_create(st->thread, &attr, st->start_routine, NULL))
 				error("failed to create new thread for %s.", st->name);
 
 			else if(pthread_detach(*st->thread))
