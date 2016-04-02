@@ -8,6 +8,7 @@ AM_CPPFLAGS = \
 	-DCONFIG_DIR="\"$(configdir)\"" \
 	-DLOG_DIR="\"$(logdir)\"" \
 	-DPLUGINS_DIR="\"$(pluginsdir)\"" \
+	-DRUN_DIR="\"$(localstatedir)/run/netdata\"" \
 	-DWEB_DIR="\"$(webdir)\"" \
 	$(NULL)
 AM_CFLAGS = \
