@@ -86,6 +86,12 @@ int become_user(const char *username)
 		// we are dropping privileges
 		if(chown(pidfile, pw->pw_uid, pw->pw_gid) != 0)
 			error("Cannot chown pidfile '%s' to user '%s'", pidfile, username);
+
+		else if(pidfd != -1) {
+			// not need to keep it open
+			close(pidfd);
+			pidfd = -1;
+		}
 	}
 	else if(pidfd != -1) {
 		// not need to keep it open
