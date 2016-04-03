@@ -82,10 +82,11 @@ int become_user(const char *username)
 		return -1;
 	}
 
-	if(pidfile[0]) {
-		if(chown(pidfile, pw->pw_uid, pw->pw_gid) != 0)
-			error("Cannot chown pidfile '%s' to user '%s'", pidfile, username);
-	}
+	// issue #163
+	//if(pidfile[0]) {
+	//	if(chown(pidfile, pw->pw_uid, pw->pw_gid) != 0)
+	//		error("Cannot chown pidfile '%s' to user '%s'", pidfile, username);
+	//}
 
 	if(setresgid(pw->pw_gid, pw->pw_gid, pw->pw_gid) != 0) {
 		error("Cannot switch to user's %s group (gid: %d).", username, pw->pw_gid);
