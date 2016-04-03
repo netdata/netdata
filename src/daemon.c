@@ -292,8 +292,6 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 
 	// generate our pid file
 	if(pidfile[0]) {
-		unlink(pidfile);
-
 		pidfd = open(pidfile, O_RDWR | O_CREAT, 0644);
 		if(pidfd >= 0) {
 			if(ftruncate(pidfd, 0) != 0)
