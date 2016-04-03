@@ -44,7 +44,20 @@ void netdata_cleanup_and_exit(int ret)
 	netdata_exit = 1;
 	rrdset_save_all();
 	// kill_childs();
-	unlink(RUN_DIR "/netdata.pid");
+
+	if(pidfile[0]) {
+		if(unlink(pidfile) != 0)
+			error("Cannot unlink pidfile '%s'.", pidfile);
+	}
+
+	if(pidfd != -1) {
+		if(ftruncate(pidfd, 0) != 0)
+			error("Cannot truncate pidfile '%s'.", pidfile);
+
+		close(pidfd);
+		pidfd = -1;
+	}
+
 	info("NetData exiting. Bye bye...");
 	exit(ret);
 }
@@ -220,6 +233,11 @@ int main(int argc, char **argv)
 		else if(strcmp(argv[i], "-ch") == 0 && (i+1) < argc) { config_set("global", "host access prefix", argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-stacksize") == 0 && (i+1) < argc) { config_set("global", "pthread stack size", argv[i+1]); i++; }
 		else if(strcmp(argv[i], "-nodaemon") == 0 || strcmp(argv[i], "-nd") == 0) dont_fork = 1;
+		else if(strcmp(argv[i], "-pidfile") == 0 && (i+1) < argc) {
+			i++;
+			strncpy(pidfile, argv[i], FILENAME_MAX);
+			pidfile[FILENAME_MAX] = '\0';
+		}
 		else if(strcmp(argv[i], "--unittest")  == 0) {
 			rrd_update_every = 1;
 			if(run_all_mockup_tests()) exit(1);
@@ -239,6 +257,7 @@ int main(int argc, char **argv)
 			fprintf(stderr, "  -nd or -nodeamon to disable forking in the background. Default: unset.\n");
 			fprintf(stderr, "  -df FLAGS debug options. Default: 0x%08llx.\n", debug_flags);
 			fprintf(stderr, "  -stacksize BYTES to overwrite the pthread stack size.\n");
+			fprintf(stderr, "  -pidfile FILENAME to save a pid while running.\n");
 			exit(1);
 		}
 	}
@@ -401,7 +420,6 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		prepare_rundir();
 		user = config_get("global", "run as user"    , (getuid() == 0)?NETDATA_USER:"");
 		web_files_uid();
 

@@ -24,6 +24,9 @@
 #include "main.h"
 #include "daemon.h"
 
+char pidfile[FILENAME_MAX + 1] = "";
+int pidfd = -1;
+
 void sig_handler(int signo)
 {
 	switch(signo) {
@@ -71,23 +74,6 @@ void sig_handler(int signo)
 	}
 }
 
-char rundir[FILENAME_MAX + 1] = RUN_DIR;
-char pidfile[FILENAME_MAX + 1] = "";
-void prepare_rundir() {
-	if(getuid() != 0) {
-		mkdir("/run/user", 0775);
-		snprintf(rundir, FILENAME_MAX, "/run/user/%d", getuid());
-		mkdir(rundir, 0775);
-		snprintf(rundir, FILENAME_MAX, "/run/user/%d/netdata", getuid());
-	}
-
-	snprintf(pidfile, FILENAME_MAX, "%s/netdata.pid", rundir);
-
-	if(mkdir(rundir, 0775) != 0) {
-		if(errno != EEXIST) error("Cannot create directory '%s'.", rundir);
-	}
-}
-
 int become_user(const char *username)
 {
 	struct passwd *pw = getpwnam(username);
@@ -96,9 +82,9 @@ int become_user(const char *username)
 		return -1;
 	}
 
-	if(chown(rundir, pw->pw_uid, pw->pw_gid) != 0) {
-		error("Cannot chown directory '%s' to user %s.", rundir, username);
-		return -1;
+	if(pidfile[0]) {
+		if(chown(pidfile, pw->pw_uid, pw->pw_gid) != 0)
+			error("Cannot chown pidfile '%s' to user '%s'", pidfile, username);
 	}
 
 	if(setresgid(pw->pw_gid, pw->pw_gid, pw->pw_gid) != 0) {
@@ -293,15 +279,22 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 		close(dev_null);
 
 	// generate our pid file
-	{
+	if(pidfile[0]) {
 		unlink(pidfile);
-		int fd = open(pidfile, O_RDWR | O_CREAT, 0666);
-		if(fd >= 0) {
+
+		pidfd = open(pidfile, O_RDWR | O_CREAT, 0644);
+		if(pidfd >= 0) {
+			if(ftruncate(pidfd, 0) != 0)
+				error("Cannot truncate pidfile '%s'.", pidfile);
+
 			char b[100];
 			sprintf(b, "%d\n", getpid());
-			ssize_t i = write(fd, b, strlen(b));
-			if(i <= 0) perror("Cannot write pid to file.");
-			close(fd);
+			ssize_t i = write(pidfd, b, strlen(b));
+			if(i <= 0)
+				error("Cannot write pidfile '%s'.", pidfile);
+
+			// don't close it, we need it at exit
+			// close(pidfd);
 		}
 	}
 

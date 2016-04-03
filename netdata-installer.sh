@@ -314,7 +314,7 @@ do
 
 	count=$((count + 1))
 
-	pid=$(cat /var/run/netdata/netdata.pid 2>/dev/null)
+	pid=$(cat /var/run/netdata/netdata.pid 2>/dev/null || cat /var/run/netdata.pid 2>/dev/null)
 	isnetdata $pid || pid=
 	if [ ! -z "${pid}" ]
 		then
@@ -334,7 +334,7 @@ echo >&2
 # run netdata
 
 echo >&2 "Starting netdata..."
-run ${NETDATA_PREFIX}/usr/sbin/netdata "${@}"
+run ${NETDATA_PREFIX}/usr/sbin/netdata -pidfile /var/run/netdata.pid "${@}"
 
 if [ $? -ne 0 ]
 	then
