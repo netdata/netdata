@@ -198,6 +198,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 			case 253: // virtio
 			case 256: // flash
 			case 257: // flash
+			case 259: // nvme0n1 issue #119
 				if(minor % 16) def_enabled = 0; // partitions
 				else def_enabled = enable_new_disks;
 				break;
