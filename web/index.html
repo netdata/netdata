@@ -280,8 +280,43 @@
 	<!-- you can also give a different server per chart, with the attribute: data-host="http://netdata.server:19999" -->
 	<!-- <script> netdataServer = "http://box:19999"; </script> -->
 
+	<!-- check which theme to use -->
+	<script>
+		function getTheme(def) {
+			var ret = null;
+
+			try {
+				if(typeof Storage !== "undefined" && typeof localStorage === 'object')
+					ret = localStorage.getItem('netdataTheme');
+			}
+			catch(error) {
+				;
+			}
+
+			if(ret === null || ret === 'undefined') return def;
+			else return ret;
+		}
+		var netdataTheme = getTheme('slate');
+
+		function setTheme(theme) {
+			if(netdataTheme === theme)
+				return false;
+
+			try {
+				if(typeof Storage !== "undefined" && typeof localStorage === 'object') {
+					localStorage.setItem('netdataTheme', theme);
+					return true;
+				}
+			}
+			catch(error) {
+				;
+			}
+
+			return false;
+		}
+	</script>
+
 	<!-- load the dashboard manager - it will do the rest -->
-	<script>var netdataTheme = 'slate';</script>
 	<script type="text/javascript" src="dashboard.js?v25"></script>
 </head>
 
@@ -568,9 +603,11 @@
 				</div>
 				<div class="modal-body">
 					<center>
-						<small style="color: #BBBBBB;">Settings take effect immediately and are saved permanently to browser local storage (except the refresh on focus / always option).
+						<small style="color: #BBBBBB;">These are browser settings. Each viewer has its own. They do not affect the operation of your netdata server.
 						<br/>
-						To reset all options (including charts sizes) to their defaults, click <a href="#" onclick="NETDATA.resetOptions(); return false;">here</a>.</small>
+						Settings take effect immediately and are saved permanently to browser local storage (except the refresh on focus / always option).
+						<br/>
+						To reset all options (including charts sizes) to their defaults, click <a href="#" onclick="resetDashboardOptions(); return false;">here</a>.</small>
 					</center>
 					<div style="padding: 10px;"></div>
 
@@ -657,6 +694,12 @@
 							<form id="optionsForm" method="get" class="form-horizontal">
 								<div class="form-group">
 									<table>
+									<tr class="option-row">
+										<td class="option-control"><input id="netdata_theme_control" type="checkbox" checked data-toggle="toggle" data-offstyle="danger" data-onstyle="success" data-on="Dark" data-off="White" data-width="110px"></td>
+										<td class="option-info"><strong>Which theme to use?</strong><br/>
+											<small>Netdata comes with two themes: <b>Dark</b> (the default) and <b>White</b>.</small>
+										</td>
+										</tr>
 									<tr class="option-row">
 										<td class="option-control"><input id="pan_and_zoom_data_padding" type="checkbox" checked data-toggle="toggle"  data-on="Pad" data-off="Don't Pad" data-width="110px"></td>
 										<td class="option-info"><strong>Enable data padding when panning and zooming?</strong><br/>
@@ -1587,6 +1630,12 @@ function finalizePage() {
 			}
 		}
 
+		var theme_sync_option = function(option) {
+			var self = $('#' + option);
+
+			self.bootstrapToggle(netdataTheme === 'slate'?'on':'off');
+		}
+
 		sync_option('eliminate_zero_dimensions');
 		sync_option('destroy_on_hide');
 		sync_option('parallel_refresher');
@@ -1596,6 +1645,7 @@ function finalizePage() {
 		sync_option('stop_updates_when_focus_is_lost');
 		sync_option('smooth_plot');
 		sync_option('pan_and_zoom_data_padding');
+		theme_sync_option('netdata_theme_control');
 
 		if(NETDATA.getOption('parallel_refresher') === false) {
 			$('#concurrent_refreshes_row').hide();
@@ -1617,10 +1667,23 @@ function finalizePage() {
 	$('#smooth_plot').change(function()                     { NETDATA.setOption('smooth_plot', $(this).prop('checked')); });
 	$('#pan_and_zoom_data_padding').change(function()       { NETDATA.setOption('pan_and_zoom_data_padding', $(this).prop('checked')); });
 
+	// this has to be the last
+	// it reloads the page
+	$('#netdata_theme_control').change(function()           {
+		if(setTheme($(this).prop('checked')?'slate':'default'))
+			location.reload();
+	});
+
 	if(document.location.hostname === demo_hostname)
 		setTimeout(function() {
 			$('#welcomeModal').modal();
 		}, 1000);
+}
+
+function resetDashboardOptions() {
+	NETDATA.resetOptions();
+	if(setTheme('slate'))
+		location.reload();
 }
 
 downloadAllCharts();
