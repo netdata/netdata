@@ -8,38 +8,33 @@ inherit linux-info systemd user
 
 if [[ ${PV} == "9999" ]] ; then
 	EGIT_REPO_URI="git://github.com/firehol/${PN}.git"
-	EGIT_BRANCH="master"
 	inherit git-r3 autotools
 	SRC_URI=""
 	KEYWORDS=""
 else
 	SRC_URI="http://firehol.org/download/${PN}/releases/v${PV}/${P}.tar.xz"
+	KEYWORDS="~amd64 ~x86"
 fi
 
 
-DESCRIPTION="Linux real time system monitoring, over the web!"
-HOMEPAGE="https://github.com/firehol/netdata"
+DESCRIPTION="Linux real time system monitoring, done right!"
+HOMEPAGE="https://github.com/firehol/netdata http://netdata.firehol.org/"
 
-LICENSE="GPL-3+"
+LICENSE="GPL-3+ MIT BSD"
 SLOT="0"
-KEYWORDS="~amd64 ~x86"
-IUSE="+zlib nfacct nodejs"
+IUSE="+compression nfacct nodejs"
 
 # most unconditional dependencies are for plugins.d/charts.d.plugin:
-RDEPEND=">=app-shells/bash-4
-	sys-apps/sed
-	sys-apps/grep
-	virtual/awk
+RDEPEND="
+	>=app-shells/bash-4:0
 	net-misc/curl
 	net-misc/wget
-	
-	zlib? ( sys-libs/zlib )
-	
+	virtual/awk
+	compression? ( sys-libs/zlib )
 	nfacct? (
 		net-firewall/nfacct
 		net-libs/libmnl
 	)
-
 	nodejs? (
 		net-libs/nodejs
 	)"
@@ -52,6 +47,8 @@ CONFIG_CHECK="
 	~KSM
 "
 
+: ${NETDATA_USER:=netdata}
+
 pkg_setup() {
 	linux-info_pkg_setup
 
@@ -59,34 +56,59 @@ pkg_setup() {
 	enewuser ${PN} -1 -1 / ${PN}
 }
 
-src_unpack() {
-	if [[ ${PV} == "9999" ]] ; then
-		git-r3_src_unpack
-	fi
-	default
-}
-
 src_prepare() {
-	if [[ ${PV} == "9999" ]] ; then
-		eautoreconf
-	fi
 	default
+	[[ ${PV} == "9999" ]] && eautoreconf
 }
 
 src_configure() {
 	econf \
 		--localstatedir=/var \
+		--with-user=${NETDATA_USER} \
 		$(use_enable nfacct plugin-nfacct) \
-		$(use_with zlib) \
-		--with-user=${PN} \
-		|| die "configure failed"
+		$(use_with compression zlib)
 }
 
 src_install() {
 	default
 
-	fowners ${PN} /var/log/netdata
+	fowners ${NETDATA_USER} /var/log/netdata
+
+	chown -Rc ${NETDATA_USER} "${ED}"/usr/share/${PN} || die
+
+	cat >> "${T}"/${PN}-sysctl <<- EOF
+	kernel.mm.ksm.run = 1
+	kernel.mm.ksm.sleep_millisecs = 1000
+	EOF
+
+	dodoc "${T}"/${PN}-sysctl
 
 	newinitd system/netdata-openrc ${PN}
 	systemd_dounit system/netdata.service
+}
+
+pkg_postinst() {
+	if [[ -e "/sys/kernel/mm/ksm/run" ]]; then
+		elog "INFORMATION:"
+		echo ""
+		elog "I see you have kernel memory de-duper (called Kernel Same-page Merging,"
+		elog "or KSM) available, but it is not currently enabled."
+		echo ""
+		elog "To enable it run:"
+		echo ""
+		elog "echo 1 >/sys/kernel/mm/ksm/run"
+		elog "echo 1000 >/sys/kernel/mm/ksm/sleep_millisecs"
+		echo  ""
+		elog "If you enable it, you will save 20-60% of netdata memory."
+	else
+		elog "INFORMATION:"
+		echo ""
+		elog "I see you do not have kernel memory de-duper (called Kernel Same-page"
+		elog "Merging, or KSM) available."
+		echo ""
+		elog "To enable it, you need a kernel built with CONFIG_KSM=y"
+		echo ""
+		elog "If you can have it, you will save 20-60% of netdata memory."
+	fi
+
 }
