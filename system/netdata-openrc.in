@@ -1,0 +1,83 @@
+#!/sbin/runscript
+
+# The user netdata is configured to run as.
+# If you edit its configuration file to set a different
+# user, set it here too, to have its files switch ownership
+: ${NETDATA_OWNER:=netdata:netdata}
+
+# The URL to download netdata config.
+: ${NETDATA_CONFIG_URL:=http://localhost:19999/netdata.conf}
+
+# The timeout in seconds to wait for netdata
+# to save its database on disk and exit.
+: ${NETDATA_WAIT_EXIT_TIMEOUT:=15}
+
+# When set to 1, if netdata does not exit in
+# NETDATA_WAIT_EXIT_TIMEOUT, we will force it
+# to exit.
+: ${NETDATA_FORCE_EXIT:=0}
+
+# Netdata will use these services, only if they
+# are enabled to start.
+: ${NETDATA_START_AFTER_SERVICES:=apache2 squid nginx mysql named opensips upsd hostapd postfix lm_sensors}
+
+extra_started_commands="getconf"
+pidfile="/run/netdata/netdata.pid"
+command="${NETDATA_INSTALL_PATH}/usr/sbin/netdata"
+command_background="yes"
+command_args="${NETDATA_EXTRA_ARGS}"
+start_stop_daemon_args="-u ${NETDATA_OWNER}"
+
+depend() {
+	use logger
+	need net
+	after ${NETDATA_START_AFTER_SERVICES}
+
+	checkpath -o ${NETDATA_OWNER} -d @localstatedir_POST@/cache/netdata /run/netdata
+}
+
+start_post() {
+	if [[ ! -f @sysconfdir_POST@/netdata/netdata.conf ]]; then
+		ebegin "Downloading default configuration to @sysconfdir_POST@/netdata/netdata.conf"
+		sleep 2
+		curl -s -o @sysconfdir_POST@/netdata/netdata.conf.new "${NETDATA_CONFIG_URL}"
+		ret=$?
+		if [[ $ret -eq 0 && -s @sysconfdir_POST@/netdata/netdata.conf.new ]]; then
+			mv @sysconfdir_POST@/netdata/netdata.conf{.new,}
+		else
+			ret=1
+			rm @sysconfdir_POST@/netdata/netdata.conf.new 2>/dev/null
+		fi
+		eend $ret
+	fi
+}
+
+stop_post() {
+	local result ret=0 count=0 sigkill=0
+
+	ebegin "Waiting for netdata to save its database"
+	while [[ -f "${pidfile}" ]]; do
+		if [[ $count -gt ${NETDATA_WAIT_EXIT_TIMEOUT} ]]; then
+			sigkill=1
+			break
+		fi
+
+		count=$[count + 1]
+		kill -0 $(cat ${pidfile}) 2>/dev/null
+		ret=$?
+		test $ret -eq 0 && sleep 1
+	done
+	eend $sigkill
+
+	if [[ $sigkill -eq 1 && -f "${pidfile}" ]]; then
+		ebegin "Netdata is taking too long to exit, forcing it to quit"
+		kill -SIGKILL $(cat ${pidfile}) 2>/dev/null
+		eend $?
+	fi
+}
+
+getconf() {
+	ebegin "Downloading configuration from netdata to /tmp/netdata.conf"
+	curl -o /tmp/netdata.conf "${NETDATA_CONFIG_URL}"
+	eend $?
+}
