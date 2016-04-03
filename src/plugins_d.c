@@ -406,7 +406,7 @@ void *pluginsd_worker_thread(void *arg)
 		}
 
 		if(unlikely(!count && cd->enabled)) {
-			error("PLUGINSD: '%s' (pid %d) does not generate usefull output. Waiting a bit before starting it again.", cd->fullfilename, cd->pid);
+			error("PLUGINSD: '%s' (pid %d) does not generate useful output. Waiting a bit before starting it again.", cd->fullfilename, cd->pid);
 			sleep((unsigned int) (cd->update_every * 10));
 		}
 
