@@ -45,17 +45,17 @@ void netdata_cleanup_and_exit(int ret)
 	rrdset_save_all();
 	// kill_childs();
 
-	if(pidfile[0]) {
-		if(unlink(pidfile) != 0)
-			error("Cannot unlink pidfile '%s'.", pidfile);
-	}
-
 	if(pidfd != -1) {
 		if(ftruncate(pidfd, 0) != 0)
 			error("Cannot truncate pidfile '%s'.", pidfile);
 
 		close(pidfd);
 		pidfd = -1;
+	}
+
+	if(pidfile[0]) {
+		if(unlink(pidfile) != 0)
+			error("Cannot unlink pidfile '%s'.", pidfile);
 	}
 
 	info("NetData exiting. Bye bye...");

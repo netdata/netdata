@@ -305,7 +305,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 			if(i <= 0)
 				error("Cannot write pidfile '%s'.", pidfile);
 
-			// don't close it, we need it at exit
+			// don't close it, we might need it at exit
 			// close(pidfd);
 		}
 	}
