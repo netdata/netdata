@@ -16,12 +16,12 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
 	static int do_bandwidth = -1, do_inerrors = -1, do_mcast = -1, do_bcast = -1, do_mcast_p = -1, do_bcast_p = -1;
 	static procfile *ff = NULL;
 
-	if(do_bandwidth == -1)	do_bandwidth	= config_get_boolean("plugin:proc:/proc/net/netstat", "bandwidth", 1);
-	if(do_inerrors == -1)	do_inerrors		= config_get_boolean("plugin:proc:/proc/net/netstat", "input errors", 1);
-	if(do_mcast == -1)		do_mcast 		= config_get_boolean("plugin:proc:/proc/net/netstat", "multicast bandwidth", 1);
-	if(do_bcast == -1)		do_bcast 		= config_get_boolean("plugin:proc:/proc/net/netstat", "broadcast bandwidth", 1);
-	if(do_mcast_p == -1)	do_mcast_p 		= config_get_boolean("plugin:proc:/proc/net/netstat", "multicast packets", 1);
-	if(do_bcast_p == -1)	do_bcast_p 		= config_get_boolean("plugin:proc:/proc/net/netstat", "broadcast packets", 1);
+	if(do_bandwidth == -1)	do_bandwidth	= config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "bandwidth", CONFIG_ONDEMAND_ONDEMAND);
+	if(do_inerrors == -1)	do_inerrors		= config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "input errors", CONFIG_ONDEMAND_ONDEMAND);
+	if(do_mcast == -1)		do_mcast 		= config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "multicast bandwidth", CONFIG_ONDEMAND_ONDEMAND);
+	if(do_bcast == -1)		do_bcast 		= config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "broadcast bandwidth", CONFIG_ONDEMAND_ONDEMAND);
+	if(do_mcast_p == -1)	do_mcast_p 		= config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "multicast packets", CONFIG_ONDEMAND_ONDEMAND);
+	if(do_bcast_p == -1)	do_bcast_p 		= config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "broadcast packets", CONFIG_ONDEMAND_ONDEMAND);
 
 	if(dt) {};
 
@@ -74,7 +74,8 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
 
 			// --------------------------------------------------------------------
 
-			if(do_bandwidth) {
+			if(do_bandwidth == CONFIG_ONDEMAND_YES || (do_bandwidth == CONFIG_ONDEMAND_ONDEMAND && (InOctets || OutOctets))) {
+				do_bandwidth = CONFIG_ONDEMAND_YES;
 				st = rrdset_find("system.ipv4");
 				if(!st) {
 					st = rrdset_create("system", "ipv4", NULL, "network", NULL, "IPv4 Bandwidth", "kilobits/s", 500, update_every, RRDSET_TYPE_AREA);
@@ -91,7 +92,8 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
 
 			// --------------------------------------------------------------------
 
-			if(do_inerrors) {
+			if(do_inerrors == CONFIG_ONDEMAND_YES || (do_inerrors == CONFIG_ONDEMAND_ONDEMAND && (InNoRoutes || InTruncatedPkts))) {
+				do_inerrors = CONFIG_ONDEMAND_YES;
 				st = rrdset_find("ipv4.inerrors");
 				if(!st) {
 					st = rrdset_create("ipv4", "inerrors", NULL, "errors", NULL, "IPv4 Input Errors", "packets/s", 4000, update_every, RRDSET_TYPE_LINE);
@@ -109,7 +111,8 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
 
 			// --------------------------------------------------------------------
 
-			if(do_mcast) {
+			if(do_mcast == CONFIG_ONDEMAND_YES || (do_mcast == CONFIG_ONDEMAND_ONDEMAND && (InMcastOctets || OutMcastOctets))) {
+				do_mcast = CONFIG_ONDEMAND_YES;
 				st = rrdset_find("ipv4.mcast");
 				if(!st) {
 					st = rrdset_create("ipv4", "mcast", NULL, "multicast", NULL, "IPv4 Multicast Bandwidth", "kilobits/s", 9000, update_every, RRDSET_TYPE_AREA);
@@ -127,7 +130,8 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
 
 			// --------------------------------------------------------------------
 
-			if(do_bcast) {
+			if(do_bcast == CONFIG_ONDEMAND_YES || (do_bcast == CONFIG_ONDEMAND_ONDEMAND && (InBcastOctets || OutBcastOctets))) {
+				do_bcast = CONFIG_ONDEMAND_YES;
 				st = rrdset_find("ipv4.bcast");
 				if(!st) {
 					st = rrdset_create("ipv4", "bcast", NULL, "broadcast", NULL, "IPv4 Broadcast Bandwidth", "kilobits/s", 8000, update_every, RRDSET_TYPE_AREA);
@@ -145,7 +149,8 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
 
 			// --------------------------------------------------------------------
 
-			if(do_mcast_p) {
+			if(do_mcast_p == CONFIG_ONDEMAND_YES || (do_mcast_p == CONFIG_ONDEMAND_ONDEMAND && (InMcastPkts || OutMcastPkts))) {
+				do_mcast_p = CONFIG_ONDEMAND_YES;
 				st = rrdset_find("ipv4.mcastpkts");
 				if(!st) {
 					st = rrdset_create("ipv4", "mcastpkts", NULL, "multicast", NULL, "IPv4 Multicast Packets", "packets/s", 9500, update_every, RRDSET_TYPE_LINE);
@@ -163,7 +168,8 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
 
 			// --------------------------------------------------------------------
 
-			if(do_bcast_p) {
+			if(do_bcast_p == CONFIG_ONDEMAND_YES || (do_bcast_p == CONFIG_ONDEMAND_ONDEMAND && (InBcastPkts || OutBcastPkts))) {
+				do_bcast_p = CONFIG_ONDEMAND_YES;
 				st = rrdset_find("ipv4.bcastpkts");
 				if(!st) {
 					st = rrdset_create("ipv4", "bcastpkts", NULL, "broadcast", NULL, "IPv4 Broadcast Packets", "packets/s", 8500, update_every, RRDSET_TYPE_LINE);
