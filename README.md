@@ -81,6 +81,8 @@ And you can extend it, by writing plugins that collect data from any source, usi
 
 Read **[Why netdata?](https://github.com/firehol/netdata/wiki/Why-netdata%3F)**
 
+Or **[check what our users say about netdata](https://github.com/firehol/netdata/issues/148)**.
+
 ---
 
 ## Installation
