@@ -25,9 +25,27 @@ struct interrupt {
 	unsigned long long total;
 };
 
+static struct interrupt *alloc_interrupts(int lines) {
+	static struct interrupt *irrs = NULL;
+	static int alloced = 0;
+
+	if(lines < alloced) return irrs;
+	else {
+		irrs = (struct interrupt *)realloc(irrs, lines * sizeof(struct interrupt));
+		if(!irrs)
+			fatal("Cannot allocate memory for %d interrupts", lines);
+
+		alloced = lines;
+	}
+
+	return irrs;
+}
+
 int do_proc_softirqs(int update_every, unsigned long long dt) {
 	static procfile *ff = NULL;
 	static int cpus = -1, do_per_core = -1;
+
+	struct interrupt *irrs = NULL;
 
 	if(dt) {};
 
@@ -68,7 +86,7 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
 	}
 
 	// allocate the size we need;
-	struct interrupt irrs[lines];
+	irrs = alloc_interrupts(lines);
 	irrs[0].used = 0;
 
 	// loop through all lines
