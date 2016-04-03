@@ -314,6 +314,8 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 		}
 		else info("Successfully became user '%s'.", user);
 	}
+	else if(pidfd != -1)
+		close(pidfd);
 
 	return(0);
 }
