@@ -2,7 +2,8 @@
 .libs
 
 *.o
-*.in
+config.h.in
+Makefile.in
 *~
 
 Makefile
