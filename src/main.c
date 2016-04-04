@@ -441,9 +441,9 @@ int main(int argc, char **argv)
 		else if(!strcmp(ipv, "ipv6") || !strcmp(ipv, "IPV6") || !strcmp(ipv, "IPv6") || !strcmp(ipv, "6")) ip = 6;
 		else fprintf(stderr, "Cannot understand ip version '%s'. Assumming 'any'.", ipv);
 
-		if(ip == 0 || ip == 6) listen_fd = create_listen_socket6(listen_port, listen_backlog);
+		if(ip == 0 || ip == 6) listen_fd = create_listen_socket6(config_get("global", "bind socket to IP", "*"), listen_port, listen_backlog);
 		if(listen_fd < 0) {
-			listen_fd = create_listen_socket4(listen_port, listen_backlog);
+			listen_fd = create_listen_socket4(config_get("global", "bind socket to IP", "*"), listen_port, listen_backlog);
 			if(listen_fd >= 0 && ip != 4) fprintf(stderr, "Managed to open an IPv4 socket on port %d.", listen_port);
 		}
 
