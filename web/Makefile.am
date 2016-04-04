@@ -16,6 +16,7 @@ dist_web_DATA = \
 	favicon.ico \
 	netdata-swagger.yaml \
 	netdata-swagger.json \
+        version.txt \
         $(NULL)
 
 webolddir=$(webdir)/old
@@ -89,4 +90,8 @@ dist_webimages_DATA = \
 	images/seo-performance-multi-size.icns \
         $(NULL)
 
+version.txt:
+	git log -n 1 | grep ^commit\ | cut -d " " -f 2 > version.txt.tmp
+	mv version.txt.tmp version.txt
 
+.PHONY: version.txt
