@@ -49,81 +49,121 @@ static void log_allocations(void)
 }
 #endif
 
-int create_listen_socket4(int port, int listen_backlog)
+static int is_ip_anything(const char *ip)
 {
-		int sock;
-		int sockopt = 1;
-		struct sockaddr_in name;
+	if(!ip || !*ip
+			|| !strcmp(ip, "any")
+			|| !strcmp(ip, "all")
+			|| !strcmp(ip, "*")
+			|| !strcmp(ip, "::")
+			|| !strcmp(ip, "0.0.0.0")
+			) return 1;
 
-		debug(D_LISTENER, "IPv4 creating new listening socket on port %d", port);
-
-		sock = socket(AF_INET, SOCK_STREAM, 0);
-		if(sock < 0) {
-			error("IPv4 socket() failed.");
-			return -1;
-		}
-
-		/* avoid "address already in use" */
-		setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt));
-
-		memset(&name, 0, sizeof(struct sockaddr_in));
-		name.sin_family = AF_INET;
-		name.sin_port = htons (port);
-		name.sin_addr.s_addr = htonl (INADDR_ANY);
-
-		if(bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
-			close(sock);
-			error("IPv4 bind() failed.");
-			return -1;
-		}
-
-		if(listen(sock, listen_backlog) < 0) {
-			close(sock);
-			fatal("IPv4 listen() failed.");
-			return -1;
-		}
-
-		debug(D_LISTENER, "IPv4 listening port %d created", port);
-		return sock;
+	return 0;
 }
 
-int create_listen_socket6(int port, int listen_backlog)
+int create_listen_socket4(const char *ip, int port, int listen_backlog)
 {
-		int sock = -1;
-		int sockopt = 1;
-		struct sockaddr_in6 name;
+	int sock;
+	int sockopt = 1;
+	struct sockaddr_in name;
 
-		debug(D_LISTENER, "IPv6 creating new listening socket on port %d", port);
+	debug(D_LISTENER, "IPv4 creating new listening socket on port %d", port);
 
-		sock = socket(AF_INET6, SOCK_STREAM, 0);
-		if (sock < 0) {
-			error("IPv6 socket() failed.");
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if(sock < 0) {
+		error("IPv4 socket() failed.");
+		return -1;
+	}
+
+	/* avoid "address already in use" */
+	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt));
+
+	memset(&name, 0, sizeof(struct sockaddr_in));
+	name.sin_family = AF_INET;
+	name.sin_port = htons (port);
+
+	if(is_ip_anything(ip)) {
+		name.sin_addr.s_addr = htonl(INADDR_ANY);
+		info("Listening on any IPs (IPv4).");
+	}
+	else {
+		int ret = inet_pton(AF_INET, ip, (void *)&name.sin_addr.s_addr);
+		if(ret != 1) {
+			error("Failed to convert IP '%s' to a valid IPv4 address.", ip);
+			close(sock);
 			return -1;
 		}
+		info("Listening on IP '%s' (IPv4).", ip);
+	}
 
-		/* avoid "address already in use" */
-		setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt));
+	if(bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
+		close(sock);
+		error("IPv4 bind() failed.");
+		return -1;
+	}
 
-		memset(&name, 0, sizeof(struct sockaddr_in6));
-		name.sin6_family = AF_INET6;
-		name.sin6_port = htons ((uint16_t) port);
+	if(listen(sock, listen_backlog) < 0) {
+		close(sock);
+		fatal("IPv4 listen() failed.");
+		return -1;
+	}
+
+	debug(D_LISTENER, "IPv4 listening port %d created", port);
+	return sock;
+}
+
+int create_listen_socket6(const char *ip, int port, int listen_backlog)
+{
+	int sock = -1;
+	int sockopt = 1;
+	struct sockaddr_in6 name;
+
+	debug(D_LISTENER, "IPv6 creating new listening socket on port %d", port);
+
+	sock = socket(AF_INET6, SOCK_STREAM, 0);
+	if (sock < 0) {
+		error("IPv6 socket() failed. Disabling IPv6.");
+		return -1;
+	}
+
+	/* avoid "address already in use" */
+	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt));
+
+	memset(&name, 0, sizeof(struct sockaddr_in6));
+	name.sin6_family = AF_INET6;
+	name.sin6_port = htons ((uint16_t) port);
+
+	if(is_ip_anything(ip)) {
 		name.sin6_addr = in6addr_any;
-		name.sin6_scope_id = 0;
-
-		if (bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
+		info("Listening on all IPs (IPv6 and IPv4)");
+	}
+	else {
+		int ret = inet_pton(AF_INET6, ip, (void *)&name.sin6_addr.s6_addr);
+		if(ret != 1) {
+			error("Failed to convert IP '%s' to a valid IPv6 address. Disabling IPv6.", ip);
 			close(sock);
-			error("IPv6 bind() failed.");
 			return -1;
 		}
+		info("Listening on IP '%s' (IPv6)", ip);
+	}
 
-		if (listen(sock, listen_backlog) < 0) {
-			close(sock);
-			fatal("IPv6 listen() failed.");
-			return -1;
-		}
+	name.sin6_scope_id = 0;
 
-		debug(D_LISTENER, "IPv6 listening port %d created", port);
-		return sock;
+	if (bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
+		close(sock);
+		error("IPv6 bind() failed. Disabling IPv6.");
+		return -1;
+	}
+
+	if (listen(sock, listen_backlog) < 0) {
+		close(sock);
+		error("IPv6 listen() failed. Disabling IPv6.");
+		return -1;
+	}
+
+	debug(D_LISTENER, "IPv6 listening port %d created", port);
+	return sock;
 }
 
 
