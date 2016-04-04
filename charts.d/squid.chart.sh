@@ -9,14 +9,7 @@ squid_priority=60000
 
 squid_get_stats_internal() {
 	local host="$1" port="$2" url="$3"
-
-	nc -w $squid_timeout $host $port <<EOF
-GET $url HTTP/1.0
-Host: $host:$port
-Accept: */*
-User-Agent: netdata (charts.d/squid.chart.sh)
-
-EOF
+	squidclient -h $host -p $port $url
 }
 
 squid_get_stats() {
@@ -47,8 +40,8 @@ squid_autodetect() {
 }
 
 squid_check() {
-	require_cmd nc    || return 1
-	require_cmd sed   || return 1
+	require_cmd squidclient || return 1
+	require_cmd sed || return 1
 	require_cmd egrep || return 1
 
 	if [ -z "$squid_host" -o -z "$squid_port" -o -z "$squid_url" ]
