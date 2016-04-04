@@ -91,7 +91,14 @@ dist_webimages_DATA = \
         $(NULL)
 
 version.txt:
-	git log -n 1 | grep ^commit\ | cut -d " " -f 2 > version.txt.tmp
-	mv version.txt.tmp version.txt
+	if test -d ../.git; then \
+		if git log -n 1 > v.tmp; then \
+			grep ^commit\  v.tmp | cut -d " " -f2 > version.txt; \
+			rm -f v.tmp; \
+		else \
+			rm -f v.tmp; \
+			false; \
+		fi; \
+	fi
 
 .PHONY: version.txt
