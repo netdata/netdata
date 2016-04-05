@@ -14,8 +14,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/mman.h>
-#ifdef __FreeBSD__
-#else /*__FreeBSD__*/
+#ifndef __FreeBSD__
 #    include <sys/prctl.h>
 #endif /*__FreeBSD__*/
 #include "common.h"

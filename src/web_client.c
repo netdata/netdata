@@ -12,7 +12,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <netinet/tcp.h>
-#include <malloc.h>
+#ifndef __FreeBSD__
+#    include <malloc.h>
+#endif /*__FreeBSD__*/
 #include <pwd.h>
 #include <ctype.h>
 
