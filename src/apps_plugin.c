@@ -23,7 +23,9 @@
 #include <ctype.h>
 #include <fcntl.h>
 
-#include <malloc.h>
+#ifndef __FreeBSD__
+#    include <malloc.h>
+#endif /*__FreeBSD__*/
 #include <dirent.h>
 #include <arpa/inet.h>
 
