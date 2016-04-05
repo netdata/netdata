@@ -216,7 +216,7 @@ int load_config(char *filename, int overwrite_used)
 
 		if(!co) {
 			// line outside a section
-			error("Ignoring line %d ('%s'), it is outsize all sections.", line, s);
+			error("Ignoring line %d ('%s'), it is outside all sections.", line, s);
 			continue;
 		}
 
