@@ -282,29 +282,27 @@
 
 	<!-- check which theme to use -->
 	<script>
-		function getTheme(def) {
+		function loadLocalStorage(name) {
 			var ret = null;
 
 			try {
 				if(typeof Storage !== "undefined" && typeof localStorage === 'object')
-					ret = localStorage.getItem('netdataTheme');
+					ret = localStorage.getItem(name);
 			}
 			catch(error) {
 				;
 			}
 
-			if(ret === null || ret === 'undefined') return def;
-			else return ret;
+			if(typeof ret === 'undefined' || ret === null)
+				return null;
+
+			return ret;
 		}
-		var netdataTheme = getTheme('slate');
 
-		function setTheme(theme) {
-			if(netdataTheme === theme)
-				return false;
-
+		function saveLocalStorage(name, value) {
 			try {
 				if(typeof Storage !== "undefined" && typeof localStorage === 'object') {
-					localStorage.setItem('netdataTheme', theme);
+					localStorage.setItem(name, value.toString());
 					return true;
 				}
 			}
@@ -314,10 +312,23 @@
 
 			return false;
 		}
+
+		function getTheme(def) {
+			var ret = loadLocalStorage('netdataTheme');
+			if(typeof ret === 'undefined' || ret === null || ret === 'undefined')
+				return def;
+			else
+				return ret;
+		}
+		var netdataTheme = getTheme('slate');
+
+		function setTheme(theme) {
+			return saveLocalStorage('netdataTheme', theme);
+		}
 	</script>
 
 	<!-- load the dashboard manager - it will do the rest -->
-	<script type="text/javascript" src="dashboard.js?v25"></script>
+	<script type="text/javascript" src="dashboard.js?v26"></script>
 </head>
 
 <body data-spy="scroll" data-target="#sidebar">
@@ -336,6 +347,7 @@
 				<ul class="nav navbar-nav">
 					<li><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal"><i class="fa fa-cog"></i> settings</a></li>
 					<li><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank"><i class="fa fa-github"></i> community</a></li>
+					<li id="updateButton"><a href="#" class="btn" data-toggle="modal" data-target="#updateModal"><i class="fa fa-cloud-download"></i> update</a></li>
 <!--					<li><a href="old/" class="btn" target="_blank"><i class="fa fa-step-backward"></i> old dashboard</a></li> -->
 					<li><a href="#" class="btn" data-toggle="modal" data-target="#helpModal"><i class="fa fa-question-circle"></i> help</a></li>
 <!--					<li><a href="#sec">Visualize</a></li>
@@ -719,6 +731,28 @@
 					</div>
 				</div>
 				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+
+	<div class="modal fade" id="updateModal" tabindex="-1" role="dialog" aria-labelledby="updateModalLabel">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+					<h4 class="modal-title" id="updateModalLabel">Update Check</h4>
+				</div>
+				<div class="modal-body">
+					Your netdata version: <b><code><span id="netdataVersion">Unknown</span></code></b>
+					<br/>
+					<div style="padding: 10px;"></div>
+					<div id="versionCheckLog">Not checked yet. Please press the Check Now button.</div>
+				</div>
+				<div class="modal-footer">
+					<a href="#" onclick="notifyForUpdate(true);" type="button" class="btn btn-default">Check Now</a>
 					<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
 				</div>
 			</div>
@@ -1574,6 +1608,119 @@ function downloadAllCharts(netdata_url) {
 
 // ----------------------------------------------------------------------------
 
+function versionLog(msg) {
+	document.getElementById('versionCheckLog').innerHTML = msg;
+}
+
+function getNetdataVersion(callback) {
+	versionLog('Downloading installed version info from netdata...');
+
+	$.ajax({
+		url: 'version.txt',
+		async: true,
+		cache: false
+	})
+	.done(function(data) {
+		data = data.replace(/(\r\n|\n|\r)/gm,"")
+		console.log(data.length);
+		versionLog('Installed version of netdata is ' + data);
+		document.getElementById('netdataVersion').innerHTML = data;
+		callback(data);
+	})
+	.fail(function() {
+		versionLog('Failed to download installed version info from netdata!');
+		callback(null);
+	});
+}
+
+function getGithubLatestCommit(callback) {
+	versionLog('Downloading latest version info from github...');
+
+	$.ajax({
+		url: 'https://api.github.com/repos/firehol/netdata/commits',
+		async: true,
+		cache: false
+	})
+	.done(function(data) {
+		versionLog('Latest version info from github is ' + data[0].sha);
+		callback(data[0].sha);
+	})
+	.fail(function() {
+		versionLog('Failed to download installed version info from github!');
+		callback(null);
+	});
+}
+
+function checkForUpdate(callback) {
+	getNetdataVersion(function(sha1) {
+		if(sha1 === null) callback(null, null);
+
+		getGithubLatestCommit(function(sha2) {
+			callback(sha1, sha2);
+		});
+	});
+
+	return null;
+}
+
+var updateBlinkCounter = 0;
+function notifyForUpdate(force) {
+	var now = new Date().getTime();
+
+	if(typeof force === 'undefined' || force !== true) {
+		var last = loadLocalStorage('last_update_check');
+
+		if(typeof last === 'string')
+			last = parseInt(last);
+		else
+			last = 0;
+
+		if(now - last < 3600000 * 8) {
+			// no need to check it - too soon
+			return;
+		}
+	}
+
+	checkForUpdate(function(sha1, sha2) {
+		var save = false;
+
+		if(sha1 === null) {
+			save = false;
+			versionLog('<p><big>Failed to get your netdata version!</big></p>');
+		}
+		else if(sha2 === null) {
+			save = false;
+			versionLog('<p><big>Failed to get the latest version from github.</big></p>');
+		}
+		else if(sha1 === sha2) {
+			save = true;
+			versionLog('<p><big>You already have the latest version of netdata!</big></p>');
+		}
+		else {
+			save = true;
+			var compare = 'https://github.com/firehol/netdata/compare/' + sha1.toString() + '...' + sha2.toString();
+
+			versionLog('<p><big><strong>You don\'t have the latest version of netdata!</strong></big></p><p>Latest version: ' + sha2.toString() + '</p><p><a href="' + compare + '" target="_blank">Click here for the changes log</a> since your installed version, and<br/><a href="https://github.com/firehol/netdata/wiki/Updating-Netdata" target="_blank">click here for directions on updating</a> your netdata installation.</p><p>We suggest to review the changes log for new features you may be interested, or important bug fixes you may need.<br/>Keeping your netdata updated is generally a good idea.</p>');
+
+			function updateButtonBlink() {
+				updateBlinkCounter--;
+				if(updateBlinkCounter > 0)
+					$('#updateButton').fadeOut(500).fadeIn(500, updateButtonBlink);
+			}
+
+			if(updateBlinkCounter === 0) {
+				updateBlinkCounter = 300;
+				updateButtonBlink();
+			}
+		}
+
+		if(save)
+			saveLocalStorage('last_update_check', now.toString());
+	});
+}
+
+// ----------------------------------------------------------------------------
+
 function finalizePage() {
 	// resize all charts - without starting the background thread
 	// this has to be done while NETDATA is paused
@@ -1674,10 +1821,13 @@ function finalizePage() {
 			location.reload();
 	});
 
-	if(document.location.hostname === demo_hostname)
+	if(document.location.hostname === demo_hostname) {
 		setTimeout(function() {
 			$('#welcomeModal').modal();
 		}, 1000);
+	}
+	else
+		notifyForUpdate();
 }
 
 function resetDashboardOptions() {
