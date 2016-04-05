@@ -372,7 +372,7 @@ int main(int argc, char **argv)
 
 		rrd_default_history_entries = (int) config_get_number("global", "history", RRD_DEFAULT_HISTORY_ENTRIES);
 		if(rrd_default_history_entries < 5 || rrd_default_history_entries > RRD_HISTORY_ENTRIES_MAX) {
-			fprintf(stderr, "Invalid save lines %d given. Defaulting to %d.\n", rrd_default_history_entries, RRD_DEFAULT_HISTORY_ENTRIES);
+			info("Invalid save lines %d given. Defaulting to %d.", rrd_default_history_entries, RRD_DEFAULT_HISTORY_ENTRIES);
 			rrd_default_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
 		}
 		else {
@@ -383,7 +383,7 @@ int main(int argc, char **argv)
 
 		rrd_update_every = (int) config_get_number("global", "update every", UPDATE_EVERY);
 		if(rrd_update_every < 1 || rrd_update_every > 600) {
-			fprintf(stderr, "Invalid update timer %d given. Defaulting to %d.\n", rrd_update_every, UPDATE_EVERY_MAX);
+			info("Invalid update timer %d given. Defaulting to %d.", rrd_update_every, UPDATE_EVERY_MAX);
 			rrd_update_every = UPDATE_EVERY;
 		}
 		else debug(D_OPTIONS, "update timer set to %d.", rrd_update_every);
@@ -429,7 +429,7 @@ int main(int argc, char **argv)
 
 		listen_port = (int) config_get_number("global", "port", LISTEN_PORT);
 		if(listen_port < 1 || listen_port > 65535) {
-			fprintf(stderr, "Invalid listen port %d given. Defaulting to %d.\n", listen_port, LISTEN_PORT);
+			info("Invalid listen port %d given. Defaulting to %d.", listen_port, LISTEN_PORT);
 			listen_port = LISTEN_PORT;
 		}
 		else debug(D_OPTIONS, "Listen port set to %d.", listen_port);
@@ -439,12 +439,12 @@ int main(int argc, char **argv)
 		if(!strcmp(ipv, "any") || !strcmp(ipv, "both") || !strcmp(ipv, "all")) ip = 0;
 		else if(!strcmp(ipv, "ipv4") || !strcmp(ipv, "IPV4") || !strcmp(ipv, "IPv4") || !strcmp(ipv, "4")) ip = 4;
 		else if(!strcmp(ipv, "ipv6") || !strcmp(ipv, "IPV6") || !strcmp(ipv, "IPv6") || !strcmp(ipv, "6")) ip = 6;
-		else fprintf(stderr, "Cannot understand ip version '%s'. Assumming 'any'.", ipv);
+		else info("Cannot understand ip version '%s'. Assuming 'any'.", ipv);
 
 		if(ip == 0 || ip == 6) listen_fd = create_listen_socket6(config_get("global", "bind socket to IP", "*"), listen_port, listen_backlog);
 		if(listen_fd < 0) {
 			listen_fd = create_listen_socket4(config_get("global", "bind socket to IP", "*"), listen_port, listen_backlog);
-			if(listen_fd >= 0 && ip != 4) fprintf(stderr, "Managed to open an IPv4 socket on port %d.", listen_port);
+			if(listen_fd >= 0 && ip != 4) info("Managed to open an IPv4 socket on port %d.", listen_port);
 		}
 
 		if(listen_fd < 0) fatal("Cannot listen socket.");
