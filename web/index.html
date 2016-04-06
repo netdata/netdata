@@ -1622,7 +1622,6 @@ function getNetdataVersion(callback) {
 	})
 	.done(function(data) {
 		data = data.replace(/(\r\n|\n|\r)/gm,"")
-		console.log(data.length);
 		versionLog('Installed version of netdata is ' + data);
 		document.getElementById('netdataVersion').innerHTML = data;
 		callback(data);
@@ -1665,6 +1664,8 @@ function checkForUpdate(callback) {
 
 var updateBlinkCounter = 0;
 function notifyForUpdate(force) {
+	versionLog('<p>checking for updates...</p>');
+
 	var now = new Date().getTime();
 
 	if(typeof force === 'undefined' || force !== true) {
@@ -1694,13 +1695,13 @@ function notifyForUpdate(force) {
 		}
 		else if(sha1 === sha2) {
 			save = true;
-			versionLog('<p><big>You already have the latest version of netdata!</big></p>');
+			versionLog('<p><big>You already have the latest version of netdata!</big></p><p>No update yet?<br/>Probably, we need some motivation to keep going on!</p><p>If you haven\'t already, <a href="https://github.com/firehol/netdata" target="_blank">give netdata a <b>Star</b> at its github page</a>.</p>');
 		}
 		else {
 			save = true;
 			var compare = 'https://github.com/firehol/netdata/compare/' + sha1.toString() + '...' + sha2.toString();
 
-			versionLog('<p><big><strong>You don\'t have the latest version of netdata!</strong></big></p><p>Latest version: ' + sha2.toString() + '</p><p><a href="' + compare + '" target="_blank">Click here for the changes log</a> since your installed version, and<br/><a href="https://github.com/firehol/netdata/wiki/Updating-Netdata" target="_blank">click here for directions on updating</a> your netdata installation.</p><p>We suggest to review the changes log for new features you may be interested, or important bug fixes you may need.<br/>Keeping your netdata updated is generally a good idea.</p>');
+			versionLog('<p><big><strong>New version of netdata available!</strong></big></p><p>Latest version: ' + sha2.toString() + '</p><p><a href="' + compare + '" target="_blank">Click here for the changes log</a> since your installed version, and<br/><a href="https://github.com/firehol/netdata/wiki/Updating-Netdata" target="_blank">click here for directions on updating</a> your netdata installation.</p><p>We suggest to review the changes log for new features you may be interested, or important bug fixes you may need.<br/>Keeping your netdata updated, is generally a good idea.</p>');
 
 			function updateButtonBlink() {
 				updateBlinkCounter--;
@@ -1828,6 +1829,10 @@ function finalizePage() {
 	}
 	else
 		notifyForUpdate();
+
+	$('#updateModal').on('shown.bs.modal', function() {
+		notifyForUpdate(true);
+	})
 }
 
 function resetDashboardOptions() {
