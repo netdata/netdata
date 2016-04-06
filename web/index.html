@@ -323,6 +323,8 @@
 		var netdataTheme = getTheme('slate');
 
 		function setTheme(theme) {
+			if(theme === netdataTheme) return false;
+
 			return saveLocalStorage('netdataTheme', theme);
 		}
 	</script>
@@ -633,7 +635,7 @@
 					<!-- Tab panes -->
 					<div class="tab-content">
 						<div role="tabpanel" class="tab-pane active" id="settings_performance">
-							<form id="optionsForm" method="get" class="form-horizontal">
+							<form id="optionsForm1" method="get" class="form-horizontal">
 								<div class="form-group">
 									<table>
 									<tr class="option-row">
@@ -661,7 +663,7 @@
 							</form>
 						</div>
 						<div role="tabpanel" class="tab-pane" id="settings_sync">
-							<form id="optionsForm" method="get" class="form-horizontal">
+							<form id="optionsForm2" method="get" class="form-horizontal">
 								<div class="form-group">
 									<table>
 									<tr class="option-row">
@@ -703,7 +705,7 @@
 							</form>
 						</div>
 						<div role="tabpanel" class="tab-pane" id="settings_visual">
-							<form id="optionsForm" method="get" class="form-horizontal">
+							<form id="optionsForm3" method="get" class="form-horizontal">
 								<div class="form-group">
 									<table>
 									<tr class="option-row">
@@ -1817,7 +1819,7 @@ function finalizePage() {
 
 	// this has to be the last
 	// it reloads the page
-	$('#netdata_theme_control').change(function()           {
+	$('#netdata_theme_control').change(function() {
 		if(setTheme($(this).prop('checked')?'slate':'default'))
 			location.reload();
 	});
