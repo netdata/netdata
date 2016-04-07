@@ -1,0 +1,51 @@
+#!/bin/bash
+# chkconfig: 345 99 01
+# description: startup script
+
+# Source functions
+. /etc/rc.d/init.d/functions
+
+DAEMON="netdata"
+DAEMON_PATH=@sbindir_POST@
+PIDFILE=@localstatedir_POST@/$DAEMON.pid
+DAEMONOPTS="-pidfile $PIDFILE"
+STOP_TIMEOUT="10"
+
+service_start()
+{
+	printf "%-50s" "Starting $DAEMON..."
+	daemon $DAEMON_PATH/$DAEMON $DAEMONOPTS
+	echo
+}
+
+service_stop()
+{
+	printf "%-50s" "Stopping $DAEMON..."
+	killproc -p ${PIDFILE} -d ${STOP_TIMEOUT} $DAEMON
+	rm -f ${PIDFILE}
+	echo
+}
+
+service_status()
+{
+	status -p ${PIDFILE} $DAEMON_PATH/$DAEMON
+}
+
+case "$1" in
+start)
+	service_start
+;;
+status)
+	service_status
+;;
+stop)
+	service_stop
+;;
+restart)
+	service_stop
+	service_start
+;;
+*)
+	echo "Usage: $0 {status|start|stop|restart}"
+	exit 1
+esac

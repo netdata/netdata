@@ -5,6 +5,13 @@ LC_ALL=C
 # you can set CFLAGS before running installer
 CFLAGS="${CFLAGS--O3}"
 
+# keep a log of this command
+printf "\n# " >>netdata-installer.log
+date >>netdata-installer.log
+printf "CFLAGS=\"%s\" " "${CFLAGS}" >>netdata-installer.log
+printf "%q " "$0" "${@}" >>netdata-installer.log
+printf "\n" >>netdata-installer.log
+
 ME="$0"
 DONOTSTART=0
 DONOTWAIT=0
@@ -388,6 +395,8 @@ if [ ! -s "${NETDATA_PREFIX}/etc/netdata/netdata.conf" ]
 	fi
 fi
 
+# -----------------------------------------------------------------------------
+
 cat <<END
 
 
@@ -408,6 +417,9 @@ To start it, just run it:
 Enjoy!
 
 END
+
+# -----------------------------------------------------------------------------
+# Check for KSM
 
 ksm_is_available_but_disabled() {
 	cat <<KSM1
@@ -451,3 +463,97 @@ if [ -f "/sys/kernel/mm/ksm/run" ]
 else
 	ksm_is_not_available
 fi
+
+# -----------------------------------------------------------------------------
+# Check for version.txt
+
+if [ ! -s web/version.txt ]
+	then
+cat <<VERMSG
+
+VERSION UPDATE CHECK:
+
+The way you downloaded netdata, we cannot find its version.
+This means the Update check on the dashboard, will not work.
+
+If you want to have version update check, please re-install it
+following the procedure in:
+
+https://github.com/firehol/netdata/wiki/Installation
+
+
+VERMSG
+fi
+
+# -----------------------------------------------------------------------------
+# Keep un-install info
+
+cat >netdata-uninstaller.sh <<UNINSTALL
+#!/bin/bash
+
+# this script will uninstall netdata
+
+if [ "\$1" != "--force" ]
+	then
+	echo >&2 "This script will REMOVE netdata from your system."
+	echo >&2 "Run it again with --force to do it."
+	exit 1
+fi
+
+echo >&2 "Stopping a possibly running netdata..."
+killall netdata
+sleep 2
+
+deletedir() {
+	if [ ! -z "\$1" -a -d "\$1" ]
+		then
+		echo
+		echo "Deleting directory '\$1' ..."
+		rm -I -R "\$1"
+	fi
+}
+
+if [ ! -z "${NETDATA_PREFIX}" -a -d "${NETDATA_PREFIX}" ]
+	then
+	# installation prefix was given
+
+	deletedir "${NETDATA_PREFIX}"
+
+else
+	# installation prefix was NOT given
+
+	if [ -f "${NETDATA_PREFIX}/usr/sbin/netdata" ]
+		then
+		echo "Deleting ${NETDATA_PREFIX}/usr/sbin/netdata ..."
+		rm -i "${NETDATA_PREFIX}/usr/sbin/netdata"
+	fi
+
+	deletedir "${NETDATA_PREFIX}/etc/netdata"
+	deletedir "${NETDATA_PREFIX}/usr/share/netdata"
+	deletedir "${NETDATA_PREFIX}/usr/libexec/netdata"
+	deletedir "${NETDATA_PREFIX}/var/cache/netdata"
+	deletedir "${NETDATA_PREFIX}/var/log/netdata"
+fi
+
+getent passwd netdata > /dev/null
+if [ $? -eq 0 ]
+	then
+	echo
+	echo "You may also want to remove the user netdata"
+	echo "by running:"
+	echo "   userdel netdata"
+fi
+
+getent group netdata > /dev/null
+if [ $? -eq 0 ]
+	then
+	echo
+	echo "You may also want to remove the group netdata"
+	echo "by running:"
+	echo "   groupdel netdata"
+fi
+
+UNINSTALL
+chmod 750 netdata-uninstaller.sh
+
+echo >&2 "Uninstall script generated: ./netdata-uninstaller.sh"

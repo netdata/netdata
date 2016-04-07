@@ -2,7 +2,8 @@
 .libs
 
 *.o
-*.in
+config.h.in
+Makefile.in
 *~
 
 Makefile
@@ -57,4 +58,9 @@ web/datasource.css
 web/gadget.xml
 web/index_new.html
 web/version.txt
+
 system/netdata-openrc
+system/netdata-init-d
+
+netdata-installer.log
+netdata-uninstaller.sh

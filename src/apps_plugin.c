@@ -199,7 +199,7 @@ char *strdup_debug(const char *file, int line, const char *function, const char 
 #endif
 #define strdup(ptr) strdup_debug(__FILE__, __LINE__, __FUNCTION__, (ptr))
 
-#endif /* ifdef NETDATA_INTERNAL_CHECKS */
+#endif /* NETDATA_INTERNAL_CHECKS */
 
 
 // ----------------------------------------------------------------------------
@@ -268,10 +268,10 @@ unsigned long long get_hertz(void)
 
 #ifdef HZ
 	myhz = HZ;    /* <asm/param.h> */
-#else
+#else /* HZ */
 	/* If 32-bit or big-endian (not Alpha or ia64), assume HZ is 100. */
 	hz = (sizeof(long)==sizeof(int) || htons(999)==999) ? 100UL : 1024UL;
-#endif
+#endif /* HZ */
 
 	error("Unknown HZ value. Assuming %llu.", myhz);
 	return myhz;
@@ -574,7 +574,7 @@ struct pid_stat {
 	unsigned long long diff_cstime;
 	unsigned long long diff_cminflt;
 	unsigned long long diff_cmajflt;
-#endif
+#endif /* INCLUDE_CHILDS */
 
 	int *fds;					// array of fds it uses
 	int fds_size;				// the size of the fds array
@@ -822,7 +822,7 @@ int walk_down(pid_t pid, int level) {
 
 	return ret;
 }
-#endif
+#endif /* INCLUDE_CHILDS */
 
 
 // ----------------------------------------------------------------------------
@@ -834,7 +834,9 @@ int walk_down(pid_t pid, int level) {
 
 struct file_descriptor {
 	avl avl;
+#ifdef NETDATA_INTERNAL_CHECKS
 	uint32_t magic;
+#endif /* NETDATA_INTERNAL_CHECKS */
 	uint32_t hash;
 	const char *name;
 	int type;
@@ -846,15 +848,21 @@ int all_files_len = 0;
 int all_files_size = 0;
 
 int file_descriptor_compare(void* a, void* b) {
+#ifdef NETDATA_INTERNAL_CHECKS
 	if(((struct file_descriptor *)a)->magic != 0x0BADCAFE || ((struct file_descriptor *)b)->magic != 0x0BADCAFE)
 		error("Corrupted index data detected. Please report this.");
+#endif /* NETDATA_INTERNAL_CHECKS */
 
 	if(((struct file_descriptor *)a)->hash < ((struct file_descriptor *)b)->hash)
 		return -1;
+
 	else if(((struct file_descriptor *)a)->hash > ((struct file_descriptor *)b)->hash)
 		return 1;
-	else return strcmp(((struct file_descriptor *)a)->name, ((struct file_descriptor *)b)->name);
+
+	else
+		return strcmp(((struct file_descriptor *)a)->name, ((struct file_descriptor *)b)->name);
 }
+
 int file_descriptor_iterator(avl *a) { if(a) {}; return 0; }
 
 avl_tree all_files_index = {
@@ -873,7 +881,9 @@ static struct file_descriptor *file_descriptor_find(const char *name, uint32_t h
 	tmp.name = name;
 	tmp.count = 0;
 	tmp.pos = 0;
+#ifdef NETDATA_INTERNAL_CHECKS
 	tmp.magic = 0x0BADCAFE;
+#endif /* NETDATA_INTERNAL_CHECKS */
 
 	avl_search(&all_files_index, (avl *)&tmp, file_descriptor_iterator, (avl **)&result);
 	return result;
@@ -895,10 +905,13 @@ static struct file_descriptor *file_descriptor_find(const char *name, uint32_t h
 void file_descriptor_not_used(int id)
 {
 	if(id > 0 && id < all_files_size) {
+
+#ifdef NETDATA_INTERNAL_CHECKS
 		if(all_files[id].magic != 0x0BADCAFE) {
 			error("Ignoring request to remove empty file id %d.", id);
 			return;
 		}
+#endif /* NETDATA_INTERNAL_CHECKS */
 
 		if(debug) fprintf(stderr, "apps.plugin: decreasing slot %d (count = %d).\n", id, all_files[id].count);
 
@@ -908,7 +921,9 @@ void file_descriptor_not_used(int id)
 			if(!all_files[id].count) {
 				if(debug) fprintf(stderr, "apps.plugin:   >> slot %d is empty.\n", id);
 				file_descriptor_remove(&all_files[id]);
+#ifdef NETDATA_INTERNAL_CHECKS
 				all_files[id].magic = 0x00000000;
+#endif /* NETDATA_INTERNAL_CHECKS */
 				all_files_len--;
 			}
 		}
@@ -958,7 +973,9 @@ int file_descriptor_find_or_add(const char *name)
 		for(i = all_files_size; i < (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP); i++) {
 			all_files[i].count = 0;
 			all_files[i].name = NULL;
+#ifdef NETDATA_INTERNAL_CHECKS
 			all_files[i].magic = 0x00000000;
+#endif /* NETDATA_INTERNAL_CHECKS */
 			all_files[i].pos = i;
 		}
 
@@ -977,8 +994,10 @@ int file_descriptor_find_or_add(const char *name)
 		if(!all_files[c].count) {
 			if(debug) fprintf(stderr, "apps.plugin:   >> Examining slot %d.\n", c);
 
+#ifdef NETDATA_INTERNAL_CHECKS
 			if(all_files[c].magic == 0x0BADCAFE && all_files[c].name && file_descriptor_find(all_files[c].name, all_files[c].hash))
 				error("fd on position %d is not cleared properly. It still has %s in it.\n", c, all_files[c].name);
+#endif /* NETDATA_INTERNAL_CHECKS */
 
 			if(debug) fprintf(stderr, "apps.plugin:   >> %s fd position %d for %s (last name: %s)\n", all_files[c].name?"re-using":"using", c, name, all_files[c].name);
 			if(all_files[c].name) free((void *)all_files[c].name);
@@ -1020,8 +1039,9 @@ int file_descriptor_find_or_add(const char *name)
 	all_files[c].type = type;
 	all_files[c].pos  = c;
 	all_files[c].count = 1;
+#ifdef NETDATA_INTERNAL_CHECKS
 	all_files[c].magic = 0x0BADCAFE;
-
+#endif /* NETDATA_INTERNAL_CHECKS */
 	file_descriptor_add(&all_files[c]);
 
 	if(debug) fprintf(stderr, "apps.plugin: using fd position %d (name: %s)\n", c, all_files[c].name);
@@ -1342,7 +1362,7 @@ void update_statistics(void)
 		p->diff_cstime = p->stime - p->cstime;
 		p->diff_cminflt = p->minflt - p->cminflt;
 		p->diff_cmajflt = p->majflt - p->cmajflt;
-#endif
+#endif /* INCLUDE_CHILDS */
 	}
 
 	// give a target to all merged child processes
@@ -1413,7 +1433,7 @@ void update_statistics(void)
 		if(diff_minflt) error("Cannot fix up minflt %llu", diff_minflt);
 		if(diff_majflt) error("Cannot fix up majflt %llu", diff_majflt);
 	}
-#endif
+#endif /* INCLUDE_CHILDS */
 
 	// zero all the targets
 	targets = 0;
@@ -1456,7 +1476,7 @@ void update_statistics(void)
 
 #ifdef INCLUDE_CHILDS
 	if(debug) walk_down(0, 1);
-#endif
+#endif /* INCLUDE_CHILDS */
 
 	// concentrate everything on the targets
 	for(p = root_of_pids; p ; p = p->next) {
@@ -1532,7 +1552,7 @@ void update_statistics(void)
 			p->old_majflt = p->majflt;
 			p->old_cminflt = p->cminflt;
 			p->old_cmajflt = p->cmajflt;
-#endif
+#endif /* INCLUDE_CHILDS */
 		}
 		else {
 			// since the process has exited, the user
