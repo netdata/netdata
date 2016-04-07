@@ -14,6 +14,7 @@
 #include <netinet/tcp.h>
 #include <malloc.h>
 #include <pwd.h>
+#include <grp.h>
 #include <ctype.h>
 
 #include "common.h"
@@ -250,6 +251,31 @@ uid_t web_files_uid(void)
 	return(owner_uid);
 }
 
+gid_t web_files_gid(void)
+{
+	static char *web_group = NULL;
+	static gid_t owner_gid = 0;
+
+	if(unlikely(!web_group)) {
+		web_group = config_get("global", "web files group", config_get("global", "web files owner", NETDATA_USER));
+		if(!web_group || !*web_group)
+			owner_gid = getegid();
+		else {
+			struct group *gr = getgrnam(web_group);
+			if(!gr) {
+				error("Group %s is not present. Ignoring option.", web_group);
+				owner_gid = getegid();
+			}
+			else {
+				debug(D_WEB_CLIENT, "Web files group set to %s.\n", web_group);
+				owner_gid = gr->gr_gid;
+			}
+		}
+	}
+
+	return(owner_gid);
+}
+
 int mysendfile(struct web_client *w, char *filename)
 {
 	static char *web_dir = NULL;
@@ -296,6 +322,13 @@ int mysendfile(struct web_client *w, char *filename)
 	// check if the file is owned by expected user
 	if(stat.st_uid != web_files_uid()) {
 		error("%llu: File '%s' is owned by user %d (expected user %d). Access Denied.", w->id, webfilename, stat.st_uid, web_files_uid());
+		buffer_sprintf(w->response.data, "Access to file '%s' is not permitted.", webfilename);
+		return 403;
+	}
+
+	// check if the file is owned by expected group
+	if(stat.st_gid != web_files_gid()) {
+		error("%llu: File '%s' is owned by group %d (expected group %d). Access Denied.", w->id, webfilename, stat.st_gid, web_files_gid());
 		buffer_sprintf(w->response.data, "Access to file '%s' is not permitted.", webfilename);
 		return 403;
 	}
