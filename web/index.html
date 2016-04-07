@@ -1623,10 +1623,16 @@ function getNetdataVersion(callback) {
 		cache: false
 	})
 	.done(function(data) {
-		data = data.replace(/(\r\n|\n|\r)/gm,"")
-		versionLog('Installed version of netdata is ' + data);
-		document.getElementById('netdataVersion').innerHTML = data;
-		callback(data);
+		data = data.replace(/(\r\n|\n|\r| |\t)/gm,"");
+		if(data.length !== 40) {
+			versionLog('Received version string is invalid.');
+			callback(null);
+		}
+		else {
+			versionLog('Installed version of netdata is ' + data);
+			document.getElementById('netdataVersion').innerHTML = data;
+			callback(data);
+		}
 	})
 	.fail(function() {
 		versionLog('Failed to download installed version info from netdata!');
@@ -1689,11 +1695,11 @@ function notifyForUpdate(force) {
 
 		if(sha1 === null) {
 			save = false;
-			versionLog('<p><big>Failed to get your netdata version!</big></p>');
+			versionLog('<p><big>Failed to get your netdata version!</big></p><p>You can always get the latest version of netdata from <a href="https://github.com/firehol/netdata" target="_blank">its github page</a>.</p>');
 		}
 		else if(sha2 === null) {
 			save = false;
-			versionLog('<p><big>Failed to get the latest version from github.</big></p>');
+			versionLog('<p><big>Failed to get the latest version from github.</big></p><p>You can always get the latest version of netdata from <a href="https://github.com/firehol/netdata" target="_blank">its github page</a>.</p>');
 		}
 		else if(sha1 === sha2) {
 			save = true;
