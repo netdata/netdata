@@ -61,3 +61,6 @@ web/version.txt
 
 system/netdata-openrc
 system/netdata-init-d
+
+netdata-installer.log
+netdata-uninstaller.sh
