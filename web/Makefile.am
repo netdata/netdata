@@ -97,8 +97,10 @@ version.txt:
 			rm -f v.tmp; \
 		else \
 			rm -f v.tmp; \
-			false; \
+			echo "0" > version.txt; \
 		fi; \
+	else \
+		echo "0" > version.txt; \
 	fi
 
 .PHONY: version.txt
