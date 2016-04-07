@@ -99,6 +99,8 @@ version.txt:
 			rm -f v.tmp; \
 			false; \
 		fi; \
+	else \
+		echo > version.txt; \
 	fi
 
 .PHONY: version.txt
