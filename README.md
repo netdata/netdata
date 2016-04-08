@@ -22,15 +22,6 @@ Live demo: [http://netdata.firehol.org](http://netdata.firehol.org)
 
 ---
 
-## Git sources
-
-You are looking at a version of the sources extracted directly from git.
-If you want a version of the source package where `configure` and any
-documentation has been built for you, please get an official
-[netdata package download](https://firehol.org/download/netdata/).
-The `unsigned/master` folder tracks the head of the git tree and
-released packages are also available.
-
 ## Features
 
 **netdata** is a highly optimized Linux daemon providing **real-time performance monitoring for Linux systems, Applications, SNMP devices, over the web**!
@@ -118,4 +109,14 @@ It should run on any Linux system. We have tested it on:
 ## Documentation
 
 Check the **[netdata wiki](https://github.com/firehol/netdata/wiki)**.
+
+
+## Git sources
+
+You are looking at a version of the sources extracted directly from git.
+If you want a version of the source package where `configure` and any
+documentation has been built for you, please get an official
+[netdata package download](https://firehol.org/download/netdata/).
+The `unsigned/master` folder tracks the head of the git tree and
+released packages are also available.
 
