@@ -47,6 +47,7 @@ void *proc_main(void *ptr)
 	int vdo_proc_net_netstat 		= !config_get_boolean("plugin:proc", "/proc/net/netstat", 1);
 	int vdo_proc_net_stat_conntrack = !config_get_boolean("plugin:proc", "/proc/net/stat/conntrack", 1);
 	int vdo_proc_net_ip_vs_stats 	= !config_get_boolean("plugin:proc", "/proc/net/ip_vs/stats", 1);
+	int vdo_proc_net_stat_synproxy 	= !config_get_boolean("plugin:proc", "/proc/net/stat/synproxy", 1);
 	int vdo_proc_stat 				= !config_get_boolean("plugin:proc", "/proc/stat", 1);
 	int vdo_proc_meminfo 			= !config_get_boolean("plugin:proc", "/proc/meminfo", 1);
 	int vdo_proc_vmstat 			= !config_get_boolean("plugin:proc", "/proc/vmstat", 1);
@@ -66,6 +67,7 @@ void *proc_main(void *ptr)
 	unsigned long long sutime_proc_net_netstat = 0ULL;
 	unsigned long long sutime_proc_net_stat_conntrack = 0ULL;
 	unsigned long long sutime_proc_net_ip_vs_stats = 0ULL;
+	unsigned long long sutime_proc_net_stat_synproxy = 0ULL;
 	unsigned long long sutime_proc_stat = 0ULL;
 	unsigned long long sutime_proc_meminfo = 0ULL;
 	unsigned long long sutime_proc_vmstat = 0ULL;
@@ -191,6 +193,14 @@ void *proc_main(void *ptr)
 			sunow = sutime();
 			vdo_proc_net_ip_vs_stats = do_proc_net_ip_vs_stats(rrd_update_every, (sutime_proc_net_ip_vs_stats > 0)?sunow - sutime_proc_net_ip_vs_stats:0ULL);
 			sutime_proc_net_ip_vs_stats = sunow;
+		}
+		if(unlikely(netdata_exit)) break;
+
+		if(!vdo_proc_net_stat_synproxy) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling vdo_proc_net_stat_synproxy().");
+			sunow = sutime();
+			vdo_proc_net_stat_synproxy = do_proc_net_stat_synproxy(rrd_update_every, (sutime_proc_net_stat_synproxy > 0)?sunow - sutime_proc_net_stat_synproxy:0ULL);
+			sutime_proc_net_stat_synproxy = sunow;
 		}
 		if(unlikely(netdata_exit)) break;
 
