@@ -58,6 +58,8 @@ rm -rf $RPM_BUILD_ROOT
 %{__make} %{?_smp_mflags} install \
 	DESTDIR=$RPM_BUILD_ROOT
 
+install -m 644 -p system/netdata.conf $RPM_BUILD_ROOT%{_sysconfdir}/%{name}/*.conf
+
 find $RPM_BUILD_ROOT -name .keep | xargs rm
 
 %if %{with systemd}
@@ -89,9 +91,13 @@ rm -rf $RPM_BUILD_ROOT
 %config(noreplace) %verify(not md5 mtime size) %{_sysconfdir}/%{name}/*.conf
 %dir %{_sysconfdir}/%{name}
 %{?with_systemd:%{_unitdir}/netdata.service}
-%{_datadir}/%{name}
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
+%dir %{_datadir}/%{name}
+
+# override defattr for web files
+%defattr(755,root,netdata,644)
+%{_datadir}/%{name}/web
 
 %changelog
 * Tue Mar 22 2016 Costa Tsaousis <costa@tsaousis.gr> - 1.0.0-1
