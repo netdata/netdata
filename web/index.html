@@ -939,6 +939,18 @@ var menuData = {
 		height: 1.5
 	},
 
+	'users': {
+		title: 'Users',
+		info: 'Per user statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics per user.<br/><b>IMPORTANT</b>: The values shown here are not 100% accurate. They only include values for the processes running. If an application is spawning childs continiously, which are terminated in just a few milliseconds (like shell scripts do), the values reported will be inaccurate. Linux does report the values for the exited childs of a process. However, these values are reported to the parent process <b>only when the child exits</b>. If these values, of the exited child processes, were also aggregated in the charts below, the charts would have been full of spikes, presenting unrealisting utilization for each process group. So, we decided to ignore these values and present only the utilization of <b>the currently running processes</b>.',
+		height: 1.5
+	},
+
+	'groups': {
+		title: 'User Groups',
+		info: 'Per user group statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics per user group.<br/><b>IMPORTANT</b>: The values shown here are not 100% accurate. They only include values for the processes running. If an application is spawning childs continiously, which are terminated in just a few milliseconds (like shell scripts do), the values reported will be inaccurate. Linux does report the values for the exited childs of a process. However, these values are reported to the parent process <b>only when the child exits</b>. If these values, of the exited child processes, were also aggregated in the charts below, the charts would have been full of spikes, presenting unrealisting utilization for each process group. So, we decided to ignore these values and present only the utilization of <b>the currently running processes</b>.',
+		height: 1.5
+	},
+
 	'netdata': {
 		title: 'Netdata Monitoring',
 		info: undefined
@@ -1072,6 +1084,30 @@ var chartData = {
 	},
 
 	'apps.pwrites': {
+		height: 2.0
+	},
+
+	'users.cpu': {
+		height: 2.0
+	},
+
+	'users.preads': {
+		height: 2.0
+	},
+
+	'users.pwrites': {
+		height: 2.0
+	},
+
+	'groups.cpu': {
+		height: 2.0
+	},
+
+	'groups.preads': {
+		height: 2.0
+	},
+
+	'groups.pwrites': {
 		height: 2.0
 	},
 
@@ -1224,7 +1260,7 @@ function menuTitle(menu) {
 }
 
 function menuInfo(menu) {
-	return anyAttribute(menuData, 'title', menu, null);
+	return anyAttribute(menuData, 'info', menu, null);
 }
 
 function menuHeight(menu, relative) {

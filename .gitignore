@@ -64,3 +64,8 @@ system/netdata-init-d
 
 netdata-installer.log
 netdata-uninstaller.sh
+
+gmon.out
+gmon.txt
+
+apps.plugin-profiler.sh
