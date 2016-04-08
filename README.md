@@ -15,7 +15,8 @@ This is the default dashboard of **netdata**:
  - real-time, per second updates, snappy refreshes!
  - 300+ charts out of the box, 2000+ metrics monitored!
  - zero configuration, zero maintenance, zero dependencies!
- - live demo: [http://netdata.firehol.org](http://netdata.firehol.org)
+
+Live demo: [http://netdata.firehol.org](http://netdata.firehol.org)
 
 ![netdata](https://cloud.githubusercontent.com/assets/2662304/14092712/93b039ea-f551-11e5-822c-beadbf2b2a2e.gif)
 
