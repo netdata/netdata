@@ -2,7 +2,7 @@
 
 #### 180.000+ views, 50.000+ visitors, 15.000+ downloads, 8.000+ github stars, 400+ forks, 7 days!
 
-And we still run with 1.000+ downloads per day!
+And we still run with 1.000+ downloads... per day!
 
 Thank you!
 
@@ -15,6 +15,7 @@ This is the default dashboard of **netdata**:
  - real-time, per second updates, snappy refreshes!
  - 300+ charts out of the box, 2000+ metrics monitored!
  - zero configuration, zero maintenance, zero dependencies!
+ - live demo: [http://netdata.firehol.org](http://netdata.firehol.org)
 
 ![netdata](https://cloud.githubusercontent.com/assets/2662304/14092712/93b039ea-f551-11e5-822c-beadbf2b2a2e.gif)
 
