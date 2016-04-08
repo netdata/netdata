@@ -143,9 +143,7 @@ void log_access( const char *fmt, ... )
 		vfprintf( stdaccess, fmt, args );
 		va_end( args );
 		fprintf( stdaccess, "\n");
-#ifdef NETDATA_INTERNAL_CHECKS
 		fflush( stdaccess );
-#endif
 	}
 
 	if(access_log_syslog) {

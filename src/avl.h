@@ -15,7 +15,9 @@
 #ifndef _AVL_H
 #define _AVL_H 1
 
+#ifndef AVL_WITHOUT_PTHREADS
 #include <pthread.h>
+#endif /* AVL_WITHOUT_PTHREADS */
 
 // #define AVL_LOCK_WITH_MUTEX 1
 
@@ -33,11 +35,13 @@ typedef struct avl_tree {
 	avl* root;
 	int (*compar)(void* a, void* b);
 
+#ifndef AVL_WITHOUT_PTHREADS
 #ifdef AVL_LOCK_WITH_MUTEX
 	pthread_mutex_t mutex;
-#else
+#else /* AVL_LOCK_WITH_MUTEX */
 	pthread_rwlock_t rwlock;
-#endif
+#endif /* AVL_LOCK_WITH_MUTEX */
+#endif /* AVL_WITHOUT_PTHREADS */
 } avl_tree;
 
 /* Public methods */
