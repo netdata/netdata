@@ -1,6 +1,6 @@
 # netdata
 
-#### 180.000+ views, 50.000+ visitors, 15.000+ downloads, 8.000+ github stars, 400+ forks, in... 7 days!
+#### 180.000+ views, 50.000+ visitors, 15.000+ downloads, 8.000+ github stars, 400+ forks, 7 days!
 
 And we still run with 1.000+ downloads per day!
 
