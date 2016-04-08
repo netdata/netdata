@@ -8,7 +8,7 @@ WorkingDirectory=/tmp
 User=root
 Group=root
 PIDFile=@localstatedir_POST@/run/netdata/netdata.pid
-ExecStart=@sbindir_POST@/netdata -pidfile $PIDFile
+ExecStart=@sbindir_POST@/netdata -pidfile @localstatedir_POST@/run/netdata/netdata.pid
 ExecStop=/bin/kill -SIGTERM $MAINPID
 TimeoutStopSec=30
 
