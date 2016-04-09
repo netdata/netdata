@@ -2,7 +2,9 @@
 
 #### 180.000+ views, 50.000+ visitors, 15.000+ downloads, 8.000+ github stars, 400+ forks, 7 days!
 
-And we still run with 1.000+ downloads... per day!
+And it still runs with 1.000+ git downloads... per day!
+
+**[check what our users say about netdata](https://github.com/firehol/netdata/issues/148)**.
 
 Thank you!
 
@@ -30,13 +32,14 @@ It tries to visualize the **truth of now**, in its **greatest detail**, so that 
 
 This is what you get:
 
-1. **Beautiful out of the box** bootstrap dashboards
-2. **Custom dashboards** that can be built using simple HTML (no javascript necessary)
-3. **Blazingly fast** and **super efficient**, written in C (for default installations, expect just 2% of a single core CPU usage and a few MB of RAM)
+1. **Stunning bootstrap dashboards**, out of the box
+2. **Blazingly fast** and **super efficient**, mostly written in C (for default installations, expect just 2% of a single core CPU usage and a few MB of RAM)
 3. **Zero configuration** - you just install it and it autodetects everything
 4. **Zero dependencies**, it is its own web server for its static web files and its web API
-4. **Extensible**, you can monitor anything you can get a metric for, using its Plugin API (anything can be a netdata plugin - from BASH to node.js)
-7. **Embeddable**, it can run anywhere a Linux kernel runs
+5. **Zero maintenance**, you just run it, it does the rest
+5. **Custom dashboards** that can be built using simple HTML (no javascript necessary)
+6. **Extensible**, you can monitor anything you can get a metric for using its Plugin API (anything can be a netdata plugin - from BASH to node.js)
+7. **Embeddable**, it can run anywhere a Linux kernel runs and its charts can be embedded on your web pages too
 
 ---
 
@@ -44,39 +47,57 @@ This is what you get:
 
 This is what it currently monitors (most with zero configuration):
 
-1. **CPU usage, interrupts, softirqs and frequency** (total and per core)
-2. **RAM, swap and kernel memory usage** (including KSM and kernel memory deduper)
-3. **Disk I/O** (per disk: bandwidth, operations, backlog, utilization, etc)
+- **CPU usage, interrupts, softirqs and frequency** (total and per core)
+
+- **RAM, swap and kernel memory usage** (including KSM and kernel memory deduper)
+
+- **Disks** (per disk: I/O, operations, backlog, utilization, etc)
 
    ![sda](https://cloud.githubusercontent.com/assets/2662304/14093195/c882bbf4-f554-11e5-8863-1788d643d2c0.gif)
 
-4. **Network interfaces** (per interface: bandwidth, packets, errors, drops, etc)
+- **Network interfaces** (per interface: bandwidth, packets, errors, drops, etc)
 
    ![dsl0](https://cloud.githubusercontent.com/assets/2662304/14093128/4d566494-f554-11e5-8ee4-5392e0ac51f0.gif)
 
-5. **IPv4 networking** (bandwidth, packets, errors, fragments, tcp: connections, packets, errors, handshake, udp: packets, errors, broadcast: bandwidth, packets, multicast: bandwidth, packets)
-6. **IPv6 networking** (bandwidth, packets, errors, fragments, ECT, udp: packets, errors, udplite: packets, errors, broadcast: bandwidth, multicast: bandwidth, packets, icmp: messages, errors, echos, router, neighbor, MLDv2, group membership, break down by type)
-7. **netfilter / iptables Linux firewall** (connections, connection tracker events, errors, etc)
-8. **Processes** (running, blocked, forks, active, etc)
-9. **Entropy**
-10. **NFS file servers**, v2, v3, v4 (I/O, cache, read ahead, RPC calls)
-11. **Network QoS** (yes, the only tool that visualizes network `tc` classes in realtime)
+- **IPv4 networking** (bandwidth, packets, errors, fragments, tcp: connections, packets, errors, handshake, udp: packets, errors, broadcast: bandwidth, packets, multicast: bandwidth, packets)
+
+- **IPv6 networking** (bandwidth, packets, errors, fragments, ECT, udp: packets, errors, udplite: packets, errors, broadcast: bandwidth, multicast: bandwidth, packets, icmp: messages, errors, echos, router, neighbor, MLDv2, group membership, break down by type)
+
+- **netfilter / iptables Linux firewall** (connections, connection tracker events, errors, etc)
+
+- **Linux anti-DDoS protection** (SYNPROXY metrics)
+
+- **Processes** (running, blocked, forks, active, etc)
+
+- **Entropy** (random numbers pool, using in cryptography)
+
+- **NFS file servers**, v2, v3, v4 (I/O, cache, read ahead, RPC calls)
+
+- **Network QoS** (yes, the only tool that visualizes network `tc` classes in realtime)
 
    ![qos-tc-classes](https://cloud.githubusercontent.com/assets/2662304/14093004/68966020-f553-11e5-98fe-ffee2086fafd.gif)
 
-
-12. **Applications**, by grouping the process tree (CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets, etc)
+- **Applications**, by grouping the process tree (CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets, etc)
 
    ![apps](https://cloud.githubusercontent.com/assets/2662304/14093565/67c4002c-f557-11e5-86bd-0154f5135def.gif)
 
-13. **Apache web server** mod-status (v2.2, v2.4)
-14. **Nginx web server** stub-status
-15. **mySQL databases** (multiple servers, each showing: bandwidth, queries/s, handlers, locks, issues, tmp operations, connections, binlog metrics, threads, innodb metrics, etc)
-16. **ISC Bind name server** (multiple servers, each showing: clients, requests, queries, updates, failures and several per view metrics)
-17. **Postfix email server** message queue (entries, size)
-18. **Squid proxy server** (clients bandwidth and requests, servers bandwidth and requests) 
-19. **Hardware sensors** (temperature, voltage, fans, power, humidity, etc)
-20. **NUT UPSes** (load, charge, battery voltage, temperature, utility metrics, output metrics)
+- **Users and User Groups resource usage**, by summarizing the process tree per user and group (CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets, etc)
+
+- **Apache web server** mod-status (v2.2, v2.4)
+
+- **Nginx web server** stub-status
+
+- **mySQL databases** (multiple servers, each showing: bandwidth, queries/s, handlers, locks, issues, tmp operations, connections, binlog metrics, threads, innodb metrics, etc)
+
+- **ISC Bind name server** (multiple servers, each showing: clients, requests, queries, updates, failures and several per view metrics)
+
+- **Postfix email server** message queue (entries, size)
+
+- **Squid proxy server** (clients bandwidth and requests, servers bandwidth and requests) 
+
+- **Hardware sensors** (temperature, voltage, fans, power, humidity, etc)
+
+- **NUT UPSes** (load, charge, battery voltage, temperature, utility metrics, output metrics)
 
 Any number of **SNMP devices** can be monitored, although you will need to configure these.
 
@@ -87,8 +108,6 @@ And you can extend it, by writing plugins that collect data from any source, usi
 ## Still not convinced?
 
 Read **[Why netdata?](https://github.com/firehol/netdata/wiki/Why-netdata%3F)**
-
-Or **[check what our users say about netdata](https://github.com/firehol/netdata/issues/148)**.
 
 ---
 
