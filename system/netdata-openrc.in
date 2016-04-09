@@ -36,6 +36,11 @@ depend() {
 	checkpath -o ${NETDATA_OWNER} -d @localstatedir_POST@/cache/netdata /run/netdata
 }
 
+start_pre() {
+	piddir=$(dirname ${pidfile})
+	mkdir -p ${piddir}
+}
+
 start_post() {
 	if [[ ! -f @sysconfdir_POST@/netdata/netdata.conf ]]; then
 		ebegin "Downloading default configuration to @sysconfdir_POST@/netdata/netdata.conf"
