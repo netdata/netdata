@@ -32,13 +32,13 @@ It tries to visualize the **truth of now**, in its **greatest detail**, so that 
 
 This is what you get:
 
-- **Stunning bootstrap dashboards**, out of the box
+- **Stunning bootstrap dashboards**, out of the box (themable: dark, light)
 - **Blazingly fast** and **super efficient**, mostly written in C (for default installations, expect just 2% of a single core CPU usage and a few MB of RAM)
 - **Zero configuration** - you just install it and it autodetects everything
 - **Zero dependencies**, it is its own web server for its static web files and its web API
 - **Zero maintenance**, you just run it, it does the rest
 - **Custom dashboards** that can be built using simple HTML (no javascript necessary)
-- **Extensible**, you can monitor anything you can get a metric for using its Plugin API (anything can be a netdata plugin - from BASH to node.js)
+- **Extensible**, you can monitor anything you can get a metric for, using its Plugin API (anything can be a netdata plugin - from BASH to node.js, so you can easily monitor any application, any API)
 - **Embeddable**, it can run anywhere a Linux kernel runs and its charts can be embedded on your web pages too
 
 ---
@@ -99,7 +99,7 @@ This is what it currently monitors (most with zero configuration):
 
 - **NUT UPSes** (load, charge, battery voltage, temperature, utility metrics, output metrics)
 
-Any number of **SNMP devices** can be monitored, although you will need to configure these.
+- **SNMP devices** can be monitored too (although you will need to configure these)
 
 And you can extend it, by writing plugins that collect data from any source, using any computer language.
 
