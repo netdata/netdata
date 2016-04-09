@@ -970,7 +970,7 @@ var submenuData = {
 
 	'netfilter.conntrack': {
 		title: 'Connection Tracker',
-		info: 'The following information is taken from <code>/proc/net/stat/nf_conntrack</code>. The connection tracker keeps track of all connections of the machine, inbound and outbound. It works by keeping a database with all open connections, tracking network and address translation and connection expectations.'
+		info: 'Netfilter Connection Tracker operation monitoring, read from <code>/proc/net/stat/nf_conntrack</code>. The connection tracker keeps track of all connections of the machine, inbound and outbound. It works by keeping a database with all open connections, tracking network and address translation and connection expectations.'
 	},
 
 	'netfilter.nfacct': {
@@ -980,7 +980,7 @@ var submenuData = {
 
 	'netfilter.synproxy': {
 		title: 'Anti-DDoS Protection',
-		info: 'The following information is taken from <code>/proc/net/stat/synproxy</code>. <a href="https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY" target="_blank">SYNPROXY</a> is a TCP SYN packets proxy. It is used to protect any TCP server (like a web server) from SYN floods and similar DDoS attacks. It is a netfilter module, in the Linux kernel (since version 3.12). It is optimized to handle millions of packets per second utilizing all CPUs available without any concurrency locking between the connections. It can be used for any kind of TCP traffic (even encrypted), since it does not interfere with the content itself.'
+		info: 'Anti-DDoS Protection information read from <code>/proc/net/stat/synproxy</code>. <a href="https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY" target="_blank">SYNPROXY</a> is a TCP SYN packets proxy. It is used to protect any TCP server (like a web server) from SYN floods and similar DDoS attacks. It is a netfilter module, in the Linux kernel (since version 3.12). It is optimized to handle millions of packets per second utilizing all CPUs available without any concurrency locking between the connections. It can be used for any kind of TCP traffic (even encrypted), since it does not interfere with the content itself.'
 	}
 };
 
