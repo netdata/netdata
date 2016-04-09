@@ -42,7 +42,7 @@ if GIT_TREE
 all-local: README
 
 README: README.md
-	sed -e '/^## Features$$/p' -e '/^## Git/,/^## Features$$/d' $< > $@
+	sed -e '/^## Git/,/^$$/{d;p}' $< > $@
 
 endif
 
