@@ -127,6 +127,58 @@ if [ ! "${UID}" = 0 -o "$1" = "-h" -o "$1" = "--help" ]
 	exit 1
 fi
 
+have_autotools=
+if [ "$(type autoreconf 2> /dev/null)" ]
+then
+	autoconf_maj_min() {
+		local maj min IFS=.-
+
+		maj=$1
+		min=$2
+
+		set -- $(autoreconf -V | sed -ne '1s/.* \([^ ]*\)$/\1/p')
+		eval $maj=\$1 $min=\$2
+	}
+	autoconf_maj_min AMAJ AMIN
+
+	if [ "$AMAJ" -gt 2 ]
+	then
+		have_autotools=Y
+	elif [ "$AMAJ" -eq 2 -a "$AMIN" -ge 60 ]
+	then
+		have_autotools=Y
+	else
+		echo "Found autotools $AMAJ.$AMIN"
+	fi
+else
+	echo "No autotools found"
+fi
+
+if [ ! "$have_autotools" ]
+then
+	if [ -f configure ]
+	then
+		echo "Will skip autoreconf step"
+	else
+		cat <<-"EOF"
+
+	Sorry, you do not seem to have autotools 2.60 or later, which is
+	required to build from the git sources of netdata.
+
+	You can either install a suitable version of autotools and automake
+	or download a netdata package which does not have these dependencies.
+
+	Source packages where autotools have already been run are available
+	here:
+	       https://firehol.org/download/netdata/
+
+	The unsigned/master folder tracks the head of the git tree and released
+	packages are also available.
+	EOF
+		exit 1
+	fi
+fi
+
 if [ ${DONOTWAIT} -eq 0 ]
 	then
 	if [ ! -z "${NETDATA_PREFIX}" ]
@@ -154,6 +206,8 @@ You many need to check these:
 2. You need basic build tools installed, like:
 
    gcc make autoconf automake pkg-config
+
+   Autoconf version 2.60 or higher is required
 
 3. If your system cannot find ZLIB, although it is installed
    run me with the option:  --zlib-is-really-here
@@ -189,8 +243,11 @@ fi
 
 trap build_error EXIT
 
-echo >&2 "Running ./autogen.sh ..."
-run ./autogen.sh || exit 1
+if [ "$have_autotools" ]
+then
+	echo >&2 "Running ./autogen.sh ..."
+	run ./autogen.sh || exit 1
+fi
 
 echo >&2 "Running ./configure ..."
 run ./configure \
