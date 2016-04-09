@@ -115,13 +115,17 @@ Read **[Why netdata?](https://github.com/firehol/netdata/wiki/Why-netdata%3F)**
 
 Use our **[automatic installer](https://github.com/firehol/netdata/wiki/Installation)** to build and install it on your system
 
-It should run on any Linux system. We have tested it on:
+It should run on **any Linux** system. It has been tested on:
 
 - Gentoo
 - ArchLinux
 - Ubuntu / Debian
 - CentOS
 - Fedora
+- RedHat Enterprise Linux
+- SUSE
+- Alpine Linux
+- PLD Linux
 
 ---
 
