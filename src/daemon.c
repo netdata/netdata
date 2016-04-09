@@ -306,6 +306,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 			// don't close it, we might need it at exit
 			// close(pidfd);
 		}
+		else error("Failed to open pidfile '%s'.", pidfile);
 	}
 
 	if(user && *user) {
