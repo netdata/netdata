@@ -22,7 +22,7 @@
 : ${NETDATA_START_AFTER_SERVICES:=apache2 squid nginx mysql named opensips upsd hostapd postfix lm_sensors}
 
 extra_started_commands="getconf"
-pidfile="/run/netdata/netdata.pid"
+pidfile="/run/netdata.pid"
 command="${NETDATA_INSTALL_PATH}/usr/sbin/netdata"
 command_background="yes"
 command_args="-pidfile ${pidfile} ${NETDATA_EXTRA_ARGS}"
@@ -34,11 +34,6 @@ depend() {
 	after ${NETDATA_START_AFTER_SERVICES}
 
 	checkpath -o ${NETDATA_OWNER} -d @localstatedir_POST@/cache/netdata /run/netdata
-}
-
-start_pre() {
-	piddir=$(dirname ${pidfile})
-	mkdir -p ${piddir}
 }
 
 start_post() {
