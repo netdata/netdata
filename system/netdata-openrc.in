@@ -26,7 +26,8 @@ pidfile="/run/netdata.pid"
 command="${NETDATA_INSTALL_PATH}/usr/sbin/netdata"
 command_background="yes"
 command_args="-pidfile ${pidfile} ${NETDATA_EXTRA_ARGS}"
-start_stop_daemon_args="-u ${NETDATA_OWNER}"
+# start_stop_daemon_args="-u ${NETDATA_OWNER}"
+start_stop_daemon_args=""
 
 depend() {
 	use logger
