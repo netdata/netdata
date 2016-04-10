@@ -1781,12 +1781,34 @@ function notifyForUpdate(force) {
 
 // ----------------------------------------------------------------------------
 
+function getUrlParameter(sParam) {
+    var sPageURL = decodeURIComponent(window.location.search.substring(1)),
+        sURLVariables = sPageURL.split('&'),
+        sParameterName,
+        i;
+
+    for (i = 0; i < sURLVariables.length; i++) {
+        sParameterName = sURLVariables[i].split('=');
+
+        if (sParameterName[0] === sParam) {
+            return sParameterName[1] === undefined ? true : sParameterName[1];
+        }
+    }
+}
+
 function finalizePage() {
 	// resize all charts - without starting the background thread
 	// this has to be done while NETDATA is paused
 	// if we ommit this, the affix menu will be wrong, since all
 	// the Dom elements are initially zero-sized
 	NETDATA.parseDom();
+
+	var before = 0, after = 0;
+	after = getUrlParameter('force_after_ms');
+	before = getUrlParameter('force_before_ms');
+
+	if(before > 0 && after > 0)
+		NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], after, before);
 
 	// let it run (update the charts)
 	NETDATA.unpause();
