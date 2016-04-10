@@ -242,6 +242,8 @@
 
 			destroy_on_hide: false,		// destroy charts when they are not visible
 
+			show_help: true,			// when enabled the charts will show some help
+
 			eliminate_zero_dimensions: true, // do not show dimensions with just zeros
 
 			stop_updates_when_focus_is_lost: true, // boolean - shall we stop auto-refreshes when document does not have user focus
@@ -256,6 +258,8 @@
  			color_fill_opacity_line: 1.0,
  			color_fill_opacity_area: 0.2,
 			color_fill_opacity_stacked: 0.8,
+
+			pan_and_zoom_step: 0.1,		// the increment when panning and zooming with the toolbox
 
 			setOptionCallback: function() { ; }
 		},
@@ -2117,6 +2121,13 @@
 				this.element_legend_childs = {
 					content: content,
 					resize_handler: document.createElement('div'),
+					toolbox: document.createElement('div'),
+					toolbox_left: document.createElement('div'),
+					toolbox_right: document.createElement('div'),
+					toolbox_reset: document.createElement('div'),
+					toolbox_zoomin: document.createElement('div'),
+					toolbox_zoomout: document.createElement('div'),
+					toolbox_volume: document.createElement('div'),
 					title_date: document.createElement('span'),
 					title_time: document.createElement('span'),
 					title_units: document.createElement('span'),
@@ -2137,9 +2148,155 @@
 
 				this.element_legend.innerHTML = '';
 
+				if(this.library.toolboxPanAndZoom !== null) {
+					this.element_legend_childs.toolbox.className += ' netdata-legend-toolbox';
+					this.element.appendChild(this.element_legend_childs.toolbox);
+
+					this.element_legend_childs.toolbox_left.className += ' netdata-legend-toolbox-button';
+					this.element_legend_childs.toolbox_left.innerHTML = '<i class="fa fa-backward"></i>';
+					this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_left);
+					this.element_legend_childs.toolbox_left.onclick = function(e) {
+						e.preventDefault();
+						var dt = (that.view_before - that.view_after) * NETDATA.options.current.pan_and_zoom_step;
+						var before = that.view_before - dt;
+						var after = that.view_after - dt;
+						if(after >= that.netdata_first)
+							that.library.toolboxPanAndZoom(that, after, before);
+					}
+					if(NETDATA.options.current.show_help === true)
+						$(this.element_legend_childs.toolbox_left).popover({
+						container: "body",
+						animation: false,
+						html: true,
+						trigger: 'hover',
+						placement: 'bottom',
+						delay: 100,
+						title: 'Pan Left',
+						content: 'Pan the chart to the left. You can also <b>drag it</b> with your mouse or your finger (on touch devices).<br/><small>Help, can be disabled from the settings.</small>'
+					});
+
+
+					this.element_legend_childs.toolbox_reset.className += ' netdata-legend-toolbox-button';
+					this.element_legend_childs.toolbox_reset.innerHTML = '<i class="fa fa-play"></i>';
+					this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_reset);
+					this.element_legend_childs.toolbox_reset.onclick = function(e) {
+						e.preventDefault();
+						NETDATA.resetAllCharts(that);
+					}
+					if(NETDATA.options.current.show_help === true)
+						$(this.element_legend_childs.toolbox_reset).popover({
+						container: "body",
+						animation: false,
+						html: true,
+						trigger: 'hover',
+						placement: 'bottom',
+						delay: 100,
+						title: 'Chart Reset',
+						content: 'Reset all the charts to their default auto-refreshing state. You can also <b>double click</b> the chart contents with your mouse or your finger (on touch devices).<br/><small>Help, can be disabled from the settings.</small>'
+					});
+					
+					this.element_legend_childs.toolbox_right.className += ' netdata-legend-toolbox-button';
+					this.element_legend_childs.toolbox_right.innerHTML = '<i class="fa fa-forward"></i>';
+					this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_right);
+					this.element_legend_childs.toolbox_right.onclick = function(e) {
+						e.preventDefault();
+						var dt = (that.view_before - that.view_after) * NETDATA.options.current.pan_and_zoom_step;
+						var before = that.view_before + dt;
+						var after = that.view_after + dt;
+						if(before <= that.netdata_last)
+							that.library.toolboxPanAndZoom(that, after, before);
+					}
+					if(NETDATA.options.current.show_help === true)
+						$(this.element_legend_childs.toolbox_right).popover({
+						container: "body",
+						animation: false,
+						html: true,
+						trigger: 'hover',
+						placement: 'bottom',
+						delay: 100,
+						title: 'Pan Right',
+						content: 'Pan the chart to the right. You can also <b>drag it</b> with your mouse or your finger (on touch devices).<br/><small>Help, can be disabled from the settings.</small>'
+					});
+
+					
+					this.element_legend_childs.toolbox_zoomin.className += ' netdata-legend-toolbox-button';
+					this.element_legend_childs.toolbox_zoomin.innerHTML = '<i class="fa fa-plus"></i>';
+					this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_zoomin);
+					this.element_legend_childs.toolbox_zoomin.onclick = function(e) {
+						e.preventDefault();
+						var dt = (that.view_before - that.view_after) * NETDATA.options.current.pan_and_zoom_step;
+						var before = that.view_before - dt;
+						var after = that.view_after + dt;
+						that.library.toolboxPanAndZoom(that, after, before);
+					}
+					if(NETDATA.options.current.show_help === true)
+						$(this.element_legend_childs.toolbox_zoomin).popover({
+						container: "body",
+						animation: false,
+						html: true,
+						trigger: 'hover',
+						placement: 'bottom',
+						delay: 100,
+						title: 'Chart Zoom In',
+						content: 'Zoom in the chart. On Chrome and Opera, you can also press the SHIFT or the ALT keys and then use the mouse wheel to zoom in or out.<br/><small>Help, can be disabled from the settings.</small>'
+					});
+					
+					this.element_legend_childs.toolbox_zoomout.className += ' netdata-legend-toolbox-button';
+					this.element_legend_childs.toolbox_zoomout.innerHTML = '<i class="fa fa-minus"></i>';
+					this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_zoomout);
+					this.element_legend_childs.toolbox_zoomout.onclick = function(e) {
+						e.preventDefault();
+						var dt = (that.view_before - that.view_after) * NETDATA.options.current.pan_and_zoom_step;
+						var before = that.view_before + dt;
+						var after = that.view_after - dt;
+
+						that.library.toolboxPanAndZoom(that, after, before);
+					}
+					if(NETDATA.options.current.show_help === true)
+						$(this.element_legend_childs.toolbox_zoomout).popover({
+						container: "body",
+						animation: false,
+						html: true,
+						trigger: 'hover',
+						placement: 'bottom',
+						delay: 100,
+						title: 'Chart Zoom Out',
+						content: 'Zoom out the chart. On Chrome and Opera, you can also press the SHIFT or the ALT keys and then use the mouse wheel to zoom in or out.<br/><small>Help, can be disabled from the settings.</small>'
+					});
+					
+					//this.element_legend_childs.toolbox_volume.className += ' netdata-legend-toolbox-button';
+					//this.element_legend_childs.toolbox_volume.innerHTML = '<i class="fa fa-sort-amount-desc"></i>';
+					//this.element_legend_childs.toolbox_volume.title = 'Visible Volume';
+					//this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_volume);
+					//this.element_legend_childs.toolbox_volume.onclick = function(e) {
+						//e.preventDefault();
+						//alert('clicked toolbox_volume on ' + that.id);
+					//}
+				}
+				else {
+					this.element_legend_childs.toolbox = null;
+					this.element_legend_childs.toolbox_left = null;
+					this.element_legend_childs.toolbox_reset = null;
+					this.element_legend_childs.toolbox_right = null;
+					this.element_legend_childs.toolbox_zoomin = null;
+					this.element_legend_childs.toolbox_zoomout = null;
+					this.element_legend_childs.toolbox_volume = null;
+				}
+				
 				this.element_legend_childs.resize_handler.className += " netdata-legend-resize-handler";
 				this.element_legend_childs.resize_handler.innerHTML = '<i class="fa fa-chevron-up"></i><i class="fa fa-chevron-down"></i>';
 				this.element.appendChild(this.element_legend_childs.resize_handler);
+				if(NETDATA.options.current.show_help === true)
+					$(this.element_legend_childs.resize_handler).popover({
+					container: "body",
+					animation: false,
+					html: true,
+					trigger: 'hover',
+					placement: 'bottom',
+					delay: 100,
+					title: 'Chart Resize',
+					content: 'Drag this point with your mouse or your finger (on touch devices), to resize the chart vertically. You can also <b>double click it</b> or <b>double tap it</b> to reset between 2 states: the default and the one that fits all the values.<br/><small>Help, can be disabled from the settings.</small>'
+				});
 
 				// mousedown event
 				this.element_legend_childs.resize_handler.onmousedown =
@@ -2172,11 +2329,30 @@
 
 				content.className = 'netdata-legend-series-content';
 				this.element_legend_childs.nano.appendChild(content);
+
+				if(NETDATA.options.current.show_help === true)
+					$(content).popover({
+					container: "body",
+					animation: false,
+					html: true,
+					trigger: 'hover',
+					placement: 'bottom',
+					title: 'Chart Legend',
+					delay: 100,
+					content: 'You can click or tap on the values or the labels to select dimentions. By pressing SHIFT or ALT, you can enable or disable multiple dimensions.<br/><small>Help, can be disabled from the settings.</small>'
+				});
 			}
 			else {
 				this.element_legend_childs = {
 					content: content,
 					resize_handler: null,
+					toolbox: null,
+					toolbox_left: null,
+					toolbox_right: null,
+					toolbox_reset: null,
+					toolbox_zoomin: null,
+					toolbox_zoomout: null,
+					toolbox_volume: null,
 					title_date: null,
 					title_time: null,
 					title_units: null,
@@ -3319,6 +3495,22 @@
 
 	NETDATA.dygraph = {
 		smooth: false
+	};
+
+	NETDATA.dygraphToolboxPanAndZoom = function(state, after, before) {
+		if(after < state.netdata_first)
+			after = state.netdata_first;
+
+		if(before > state.netdata_last)
+			before = state.netdata_last;
+
+		state.setMode('zoom');
+		state.globalSelectionSyncStop();
+		state.globalSelectionSyncDelay();
+		state.dygraph_user_action = true;
+		state.dygraph_force_zoom = true;
+		state.updateChartPanOrZoom(after, before);
+		NETDATA.globalPanAndZoom.setMaster(state, after, before);
 	};
 
 	NETDATA.dygraphSetSelection = function(state, t) {
@@ -4860,6 +5052,7 @@
 			},
 			setSelection: NETDATA.dygraphSetSelection,
 			clearSelection:  NETDATA.dygraphClearSelection,
+			toolboxPanAndZoom: NETDATA.dygraphToolboxPanAndZoom,
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'json'; },
@@ -4898,6 +5091,7 @@
 			resize: null,
 			setSelection: undefined, // function(state, t) { return true; },
 			clearSelection: undefined, // function(state) { return true; },
+			toolboxPanAndZoom: null,
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'array'; },
@@ -4915,6 +5109,7 @@
 			resize: null,
 			setSelection: undefined, // function(state, t) { return true; },
 			clearSelection: undefined, // function(state) { return true; },
+			toolboxPanAndZoom: null,
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'ssvcomma'; },
@@ -4932,6 +5127,7 @@
 			resize: null,
 			setSelection: undefined, // function(state, t) { return true; },
 			clearSelection: undefined, // function(state) { return true; },
+			toolboxPanAndZoom: null,
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'json'; },
@@ -4949,6 +5145,7 @@
 			resize: null,
 			setSelection: undefined, //function(state, t) { return true; },
 			clearSelection: undefined, //function(state) { return true; },
+			toolboxPanAndZoom: null,
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'datatable'; },
@@ -4966,6 +5163,7 @@
 			resize: null,
 			setSelection: undefined, // function(state, t) { return true; },
 			clearSelection: undefined, // function(state) { return true; },
+			toolboxPanAndZoom: null,
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'json'; },
@@ -4983,6 +5181,7 @@
 			resize: null,
 			setSelection: undefined, // function(state, t) { return true; },
 			clearSelection: undefined, // function(state) { return true; },
+			toolboxPanAndZoom: null,
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'csvjsonarray'; },
@@ -5000,6 +5199,7 @@
 			resize: null,
 			setSelection: undefined, // function(state, t) { return true; },
 			clearSelection: undefined, // function(state) { return true; },
+			toolboxPanAndZoom: null,
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'json'; },
@@ -5017,6 +5217,7 @@
 			resize: null,
 			setSelection: NETDATA.easypiechartSetSelection,
 			clearSelection: NETDATA.easypiechartClearSelection,
+			toolboxPanAndZoom: null,
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'array'; },
@@ -5035,6 +5236,7 @@
 			resize: null,
 			setSelection: NETDATA.gaugeSetSelection,
 			clearSelection: NETDATA.gaugeClearSelection,
+			toolboxPanAndZoom: null,
 			initialized: false,
 			enabled: true,
 			format: function(state) { return 'array'; },

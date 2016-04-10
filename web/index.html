@@ -711,7 +711,19 @@
 									<tr class="option-row">
 										<td class="option-control"><input id="netdata_theme_control" type="checkbox" checked data-toggle="toggle" data-offstyle="danger" data-onstyle="success" data-on="Dark" data-off="White" data-width="110px"></td>
 										<td class="option-info"><strong>Which theme to use?</strong><br/>
-											<small>Netdata comes with two themes: <b>Dark</b> (the default) and <b>White</b>.</small>
+											<small>Netdata comes with two themes: <b>Dark</b> (the default) and <b>White</b>.
+											<br/>
+											<b>Switching this will reload the dashboard</b>.
+											</small>
+										</td>
+										</tr>
+									<tr class="option-row">
+										<td class="option-control"><input id="show_help" type="checkbox" checked data-toggle="toggle" data-on="Help Me" data-off="No Help" data-width="110px"></td>
+										<td class="option-info"><strong>Do you need help?</strong><br/>
+											<small>Netdata can show some help in some areas to help you use the dashboard. If all these balloons bother you, disable them using this switch.
+											<br/>
+											<b>Switching this will reload the dashboard</b>.
+											</small>
 										</td>
 										</tr>
 									<tr class="option-row">
@@ -723,7 +735,9 @@
 									<tr class="option-row">
 										<td class="option-control"><input id="smooth_plot" type="checkbox" checked data-toggle="toggle"  data-on="Smooth" data-off="Rough" data-width="110px"></td>
 										<td class="option-info"><strong>Enable Bézier lines on charts?</strong><br/>
-											<small>When set to <b>Smooth</b> the charts libraries that support it, will plot smooth curves instead of simple straight lines to connect the points.</small>
+											<small>When set to <b>Smooth</b> the charts libraries that support it, will plot smooth curves instead of simple straight lines to connect the points.
+											<br/>
+											Keep in mind <a href="http://dygraphs.com" target="_blank">dygraphs</a>, the main charting library in netdata dashboards, can only smooth line charts. It cannot smooth area or stacked charts. When set to <b>Rough</b>, this setting can lower the CPU resources consumed by your browser.</small>
 										</td>
 										</tr>
 									</table>
@@ -1854,7 +1868,7 @@ function finalizePage() {
 			var self = $('#' + option);
 
 			if(self.prop('checked') !== NETDATA.getOption(option)) {
-				// console.log('switching ' + option.toString());
+				console.log('switching ' + option.toString());
 				self.bootstrapToggle(NETDATA.getOption(option)?'on':'off');
 			}
 		}
@@ -1874,6 +1888,7 @@ function finalizePage() {
 		sync_option('stop_updates_when_focus_is_lost');
 		sync_option('smooth_plot');
 		sync_option('pan_and_zoom_data_padding');
+		sync_option('show_help');
 		theme_sync_option('netdata_theme_control');
 
 		if(NETDATA.getOption('parallel_refresher') === false) {
@@ -1895,6 +1910,7 @@ function finalizePage() {
 	$('#stop_updates_when_focus_is_lost').change(function() { NETDATA.setOption('stop_updates_when_focus_is_lost', $(this).prop('checked')); });
 	$('#smooth_plot').change(function()                     { NETDATA.setOption('smooth_plot', $(this).prop('checked')); });
 	$('#pan_and_zoom_data_padding').change(function()       { NETDATA.setOption('pan_and_zoom_data_padding', $(this).prop('checked')); });
+	$('#show_help').change(function()                       { NETDATA.setOption('show_help', $(this).prop('checked')); location.reload(); });
 
 	// this has to be the last
 	// it reloads the page
@@ -1913,12 +1929,17 @@ function finalizePage() {
 
 	$('#updateModal').on('shown.bs.modal', function() {
 		notifyForUpdate(true);
-	})
+	});
 }
 
 function resetDashboardOptions() {
+	var help = NETDATA.options.current.show_help;
+
 	NETDATA.resetOptions();
 	if(setTheme('slate'))
+		location.reload();
+
+	if(help !== NETDATA.options.current.show_help)
 		location.reload();
 }
 

@@ -74,6 +74,43 @@ body {
 	margin: 0px;
 }
 
+.netdata-legend-toolbox {
+	display: block;
+	position: absolute;
+	bottom: 0px;
+	right: 30px;
+	height: 15px;
+	width: 110px;
+	background-color: #272b30;
+	font-size: 12px;
+	vertical-align: middle;
+	line-height: 15px;
+	color: #373b40;
+	text-align: center;
+	overflow: hidden;
+	z-index: 20;
+	padding: 0px;
+	margin: 0px;
+}
+
+.netdata-legend-toolbox-button {
+	display: inline-block;
+	position: relative;
+	height: 15px;
+	width: 18px;
+	background-color: #272b30;
+	font-size: 12px;
+	vertical-align: middle;
+	line-height: 15px;
+	color: #474b50;
+	text-align: center;
+	overflow: hidden;
+	z-index: 21;
+	padding: 0px;
+	margin: 0px;
+	cursor: pointer;
+}
+
 .netdata-message {
 	display: inline-block;
 	text-align: left;
@@ -464,4 +501,12 @@ body {
 	text-align: right;
 	color: #676b70;
 	font-weight: normal;
+}
+
+.popover-title {
+	font-weight: bold;
+	font-size: 12px;
+}
+.popover-content {
+	font-size: 11px;
 }
