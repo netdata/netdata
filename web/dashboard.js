@@ -2339,7 +2339,7 @@
 					placement: 'bottom',
 					title: 'Chart Legend',
 					delay: 100,
-					content: 'You can click or tap on the values or the labels to select dimentions. By pressing SHIFT or ALT, you can enable or disable multiple dimensions.<br/><small>Help, can be disabled from the settings.</small>'
+					content: 'You can click or tap on the values or the labels to select dimentions. By pressing SHIFT or CONTROL, you can enable or disable multiple dimensions.<br/><small>Help, can be disabled from the settings.</small>'
 				});
 			}
 			else {
