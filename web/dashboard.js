@@ -2238,7 +2238,7 @@
 						placement: 'bottom',
 						delay: 100,
 						title: 'Chart Zoom In',
-						content: 'Zoom in the chart. On Chrome and Opera, you can also press the SHIFT or the ALT keys and then use the mouse wheel to zoom in or out.<br/><small>Help, can be disabled from the settings.</small>'
+						content: 'Zoom in the chart. You can also press SHIFT and select an area of the chart to zoom in. On Chrome and Opera, you can press the SHIFT or the ALT keys and then use the mouse wheel to zoom in or out.<br/><small>Help, can be disabled from the settings.</small>'
 					});
 					
 					this.element_legend_childs.toolbox_zoomout.className += ' netdata-legend-toolbox-button';
