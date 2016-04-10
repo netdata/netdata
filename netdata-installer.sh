@@ -111,6 +111,7 @@ It will be installed at these locations:
   - plugins       at ${NETDATA_PREFIX}/usr/libexec/netdata
   - cache files   at ${NETDATA_PREFIX}/var/cache/netdata
   - log files     at ${NETDATA_PREFIX}/var/log/netdata
+  - pid file      at ${NETDATA_PREFIX}/var/run
 
 This installer allows you to change the installation path.
 Press Control-C and run the same command with --help for help.
@@ -317,10 +318,17 @@ NETDATA_CACHE_DIR="$( config_option "cache directory" "${NETDATA_PREFIX}/var/cac
 NETDATA_WEB_DIR="$( config_option "web files directory" "${NETDATA_PREFIX}/usr/share/netdata/web" )"
 NETDATA_LOG_DIR="$( config_option "log directory" "${NETDATA_PREFIX}/var/log/netdata" )"
 NETDATA_CONF_DIR="$( config_option "config directory" "${NETDATA_PREFIX}/etc/netdata" )"
+NETDATA_RUN_DIR="${NETDATA_PREFIX}/var/run"
 
 
 # -----------------------------------------------------------------------------
 # prepare the directories
+
+# this is needed if NETDATA_PREFIX is not empty
+if [ ! -d "${NETDATA_RUN_DIR}" ]
+	then
+	mkdir -p "${NETDATA_RUN_DIR}" || exit 1
+fi
 
 echo >&2 "Fixing directory permissions for user ${NETDATA_USER}..."
 for x in "${NETDATA_WEB_DIR}" "${NETDATA_CONF_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}"
@@ -370,7 +378,7 @@ ret=0
 count=0
 while [ $ret -eq 0 ]
 do
-	if [ $count -gt 15 ]
+	if [ $count -gt 30 ]
 		then
 		echo >&2 "Cannot stop the running netdata."
 		exit 1
@@ -378,8 +386,9 @@ do
 
 	count=$((count + 1))
 
-	pid=$(cat /var/run/netdata.pid 2>/dev/null)
+	pid=$(cat "${NETDATA_RUN_DIR}/netdata.pid" 2>/dev/null)
 	# backwards compatibility
+	[ -z "${pid}" ] && pid=$(cat /var/run/netdata.pid 2>/dev/null)
 	[ -z "${pid}" ] && pid=$(cat /var/run/netdata/netdata.pid 2>/dev/null)
 	
 	isnetdata $pid || pid=
@@ -395,13 +404,14 @@ do
 	test $ret -eq 0 && printf >&2 "." && sleep 2
 done
 echo >&2
+echo >&2
 
 
 # -----------------------------------------------------------------------------
 # run netdata
 
 echo >&2 "Starting netdata..."
-run ${NETDATA_PREFIX}/usr/sbin/netdata -pidfile /var/run/netdata.pid "${@}"
+run ${NETDATA_PREFIX}/usr/sbin/netdata -pidfile ${NETDATA_RUN_DIR}/netdata.pid "${@}"
 
 if [ $? -ne 0 ]
 	then
