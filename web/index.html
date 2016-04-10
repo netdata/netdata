@@ -1868,7 +1868,7 @@ function finalizePage() {
 			var self = $('#' + option);
 
 			if(self.prop('checked') !== NETDATA.getOption(option)) {
-				console.log('switching ' + option.toString());
+				// console.log('switching ' + option.toString());
 				self.bootstrapToggle(NETDATA.getOption(option)?'on':'off');
 			}
 		}
