@@ -249,15 +249,26 @@ float2int() {
 	# the length of the multiplier - 1
 	l=$[ ${#m} - 1 ]
 
+	# check if the number is in scientific notation
+	if [[ ${f} =~ ^[[:space:]](-)?[0-9.]+(e|E)(\+|-)[0-9]+ ]]
+		then
+		# convert it to decimal
+		# unfortunately, this fork cannot be avoided
+		# if you know of a way to avoid it, please let me know
+		f=$(printf "%0.${l}f" ${f})
+	fi
+
 	# split the floating point number
 	# in integer (a) and decimal (b)
 	a=${f/.*/}
 	b=${f/*./}
 
-	# prepend a zero to the integer part
-	# if it is missing
+	# if the integer part is missing
+	# set it to zero
 	[ -z "${a}" ] && a="0"
-	# strip leading zeros - base 10 convertion
+
+	# strip leading zeros from the integer part
+	# base 10 convertion
 	a=$[10#$a]
 
 	# check the length of the decimal part
@@ -266,13 +277,16 @@ float2int() {
 		then
 		# too many digits - take the most significant
 		b=${b:0:${l}}
+
 	elif [ ${#b} -lt ${l} ]
 		then
 		# too few digits - pad with zero on the right
 		local z="00000000000000000000000" r=$[l - ${#b}]
 		b="${b}${z:0:${r}}"
 	fi
-	# strip leading zeros - base 10 convertion
+
+	# strip leading zeros from the decimal part
+	# base 10 convertion
 	b=$[10#$b]
 
 	# store the result
