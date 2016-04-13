@@ -206,7 +206,6 @@ definitions:
         type: number
         description: 'The update frequency of this chart, in seconds. One value every this amount of time is kept in the round robin database.'
       dimensions:
-        description: 'The dimensions of the chart.'
         type: object
         description: 'An object containing all the chart dimensions available for the chart. This is used as an indexed array. The key of the object the id of the dimension.'
         properties:
