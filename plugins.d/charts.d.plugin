@@ -250,7 +250,7 @@ float2int() {
 	l=$[ ${#m} - 1 ]
 
 	# check if the number is in scientific notation
-	if [[ ${f} =~ ^[[:space:]](-)?[0-9.]+(e|E)(\+|-)[0-9]+ ]]
+	if [[ ${f} =~ ^[[:space:]]*(-)?[0-9.]+(e|E)(\+|-)[0-9]+ ]]
 		then
 		# convert it to decimal
 		# unfortunately, this fork cannot be avoided
