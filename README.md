@@ -1,10 +1,10 @@
 # netdata
 
-#### 180.000+ views, 50.000+ visitors, 15.000+ downloads, 8.000+ github stars, 400+ forks, 7 days!
+#### 230.000+ views, 62.000+ visitors, 18.500+ downloads, 9.500+ github stars, 500+ forks, 14 days!
 
-And it still runs with 1.000+ git downloads... per day!
+And it still runs with 700+ git downloads... per day!
 
-**[check what our users say about netdata](https://github.com/firehol/netdata/issues/148)**.
+**[Check what our users say about netdata](https://github.com/firehol/netdata/issues/148)**.
 
 Thank you!
 
