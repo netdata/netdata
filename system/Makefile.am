@@ -22,4 +22,5 @@ dist_noinst_DATA = \
 	netdata-openrc.in \
 	netdata.service.in \
 	netdata-init-d.in \
+	netdata.conf \
 	$(NULL)
