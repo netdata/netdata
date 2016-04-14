@@ -1,90 +1,103 @@
+#
+# Conditional build:
+%bcond_without	systemd		# systemd
+%bcond_without	nfacct		# build with nfacct plugin
+
 %if 0%{?fedora} || 0%{?rhel} >= 7
-%global do_systemd 1
 %else
-%global do_systemd 0
+%undefine	with_systemd
 %endif
 
 Summary:	Linux real time system monitoring, over the web
 Name:		@PACKAGE_NAME@
 Version:	@PACKAGE_RPM_VERSION@
 Release:	@PACKAGE_RPM_RELEASE@%{?release_suffix}%{?dist}
-License:	GPLv2+
-URL:		http://firehol.org
-Source:		%{name}-@PACKAGE_VERSION@.tar.bz2
-
-BuildRequires:	libmnl-devel
+License:	GPL v3+
+Group:		Applications/System
+Source0:	http://firehol.org/download/netdata/releases/v@PACKAGE_VERSION@/%{name}-@PACKAGE_VERSION@.tar.xz
+URL:		http://netdata.firehol.org/
+BuildRequires:	pkgconfig
+BuildRequires:	xz
 BuildRequires:	zlib-devel
-Requires:	libmnl
-Requires:	zlib
-%if !0%{?rhel}
+%if %{with nfacct}
+BuildRequires:	libmnl-devel
 BuildRequires:	libnetfilter_acct-devel
-Requires:	libnetfilter_acct
 %endif
-%if 0%{do_systemd}
+%if %{with systemd}
 BuildRequires:		systemd
 Requires(post):		systemd
 Requires(preun):	systemd
 Requires(postun):	systemd
 %endif
-
-BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
 %description
-Real-time performance monitoring, in the greatest possible detail!
+netdata is the fastest way to visualize metrics. It is a resource
+efficient, highly optimized system for collecting and visualizing any
+type of realtime timeseries data, from CPU usage, disk activity, SQL
+queries, API calls, web site visitors, etc.
 
-%pre
-getent group netdata > /dev/null || groupadd -r netdata
-getent passwd netdata > /dev/null || useradd -r -g netdata -c netdata -s /sbin/nologin -d / netdata
-
-%if 0%{do_systemd}
-%post
-%systemd_post netdata.service
-%preun
-%systemd_preun netdata.service
-%postun
-%systemd_postun_with_restart netdata.service
-%endif
-
-%global ovirt_create_user_engine \
-%_ovirt_create_user %{engine_user} %{engine_uid} %{engine_group} %{engine_gid} "%{ovirt_user_description}" %{engine_state}
-
+netdata tries to visualize the truth of now, in its greatest detail,
+so that you can get insights of what is happening now and what just
+happened, on your systems and applications.
 
 %prep
 %setup -q -n %{name}-@PACKAGE_VERSION@
 
 %build
 %configure \
-	--docdir="%{_docdir}/%{name}-%{version}" \
+	--docdir=%{_docdir}/%{name}-%{version} \
 	--with-zlib \
 	--with-math \
-	--with-user=netdata \
-%if !0%{?rhel}
-	--enable-plugin-nfacct \
-%endif
-	%{?conf}
-make %{?_smp_mflags}
+	%{?with_nfacct:--enable-plugin-nfacct} \
+	--with-user=netdata
+%{__make} %{?_smp_mflags}
 
 %install
-rm -rf "%{buildroot}"
-make %{?_smp_mflags} install DESTDIR="%{buildroot}"
-find "%{buildroot}" -name .keep -exec rm {} \;
+rm -rf $RPM_BUILD_ROOT
+%{__make} %{?_smp_mflags} install \
+	DESTDIR=$RPM_BUILD_ROOT
 
-%if 0%{do_systemd}
-install -m 0755 -d "%{buildroot}/%{_unitdir}"
-install -m 0644 system/netdata.service "%{buildroot}/%{_unitdir}"
+install -m 644 -p system/netdata.conf $RPM_BUILD_ROOT%{_sysconfdir}/%{name}/*.conf
+
+find $RPM_BUILD_ROOT -name .keep | xargs rm
+
+%if %{with systemd}
+install -d $RPM_BUILD_ROOT%{_unitdir}
+install -m 644 -p system/netdata.service $RPM_BUILD_ROOT%{_unitdir}/netdata.service
 %endif
+
+%pre
+getent group netdata > /dev/null || groupadd -r netdata
+getent passwd netdata > /dev/null || useradd -r -g netdata -c netdata -s /sbin/nologin -d / netdata
+
+%if %{with systemd}
+%post
+%systemd_post netdata.service
+
+%preun
+%systemd_preun netdata.service
+
+%postun
+%systemd_postun_with_restart netdata.service
+%endif
+
+%clean
+rm -rf $RPM_BUILD_ROOT
 
 %files
-%attr(-, netdata, netdata) %dir %{_localstatedir}/cache/%{name}/
-%attr(-, netdata, netdata) %dir %{_localstatedir}/log/%{name}/
-%config(noreplace) %{_sysconfdir}/%{name}/
-%{_datadir}/%{name}/
-%{_libexecdir}/%{name}/
+%attr(-,netdata,netdata) %dir %{_localstatedir}/cache/%{name}
+%attr(-,netdata,netdata) %dir %{_localstatedir}/log/%{name}
+%config(noreplace) %verify(not md5 mtime size) %{_sysconfdir}/%{name}/*.conf
+%dir %{_sysconfdir}/%{name}
+%{?with_systemd:%{_unitdir}/netdata.service}
+%{_libexecdir}/%{name}
 %{_sbindir}/%{name}
+%dir %{_datadir}/%{name}
 
-%if 0%{do_systemd}
-%{_unitdir}/netdata.service
-%endif
+# override defattr for web files
+%defattr(755,root,netdata,644)
+%{_datadir}/%{name}/web
 
 %changelog
 * Tue Mar 22 2016 Costa Tsaousis <costa@tsaousis.gr> - 1.0.0-1
