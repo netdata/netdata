@@ -13,17 +13,23 @@ STOP_TIMEOUT="10"
 
 service_start()
 {
-	printf "%-50s" "Starting $DAEMON..."
+	echo "Starting $DAEMON..."
 	daemon $DAEMON_PATH/$DAEMON $DAEMONOPTS
+	RETVAL=$?
 	echo
+	return $RETVAL
 }
 
 service_stop()
 {
 	printf "%-50s" "Stopping $DAEMON..."
 	killproc -p ${PIDFILE} -d ${STOP_TIMEOUT} $DAEMON
-	rm -f ${PIDFILE}
+	RETVAL=$?
+	if [ $RETVAL -eq 0 ]; then
+		rm -f ${PIDFILE}
+	fi
 	echo
+	return $RETVAL
 }
 
 service_status()
