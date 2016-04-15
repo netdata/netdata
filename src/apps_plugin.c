@@ -53,6 +53,9 @@ unsigned long long file_counter = 0;
 char *host_prefix = "";
 char *config_dir = CONFIG_DIR;
 
+// disable syslog for apps.plugin
+int error_log_syslog = 0;
+
 #ifdef NETDATA_INTERNAL_CHECKS
 // ----------------------------------------------------------------------------
 // memory debugger
