@@ -24,6 +24,7 @@
 #include "global_statistics.h"
 #include "rrd.h"
 #include "rrd2json.h"
+#include "../config.h"
 
 int listen_backlog = LISTEN_BACKLOG;
 

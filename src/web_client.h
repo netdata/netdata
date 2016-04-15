@@ -81,6 +81,7 @@ struct web_client {
 extern struct web_client *web_clients;
 
 extern uid_t web_files_uid(void);
+extern uid_t web_files_gid(void);
 
 extern struct web_client *web_client_create(int listener);
 extern struct web_client *web_client_free(struct web_client *w);
