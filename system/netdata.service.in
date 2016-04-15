@@ -1,5 +1,5 @@
 [Unit]
-Description=netdata
+Description=Linux real time system monitoring, over the web
 After=network.target httpd.service squid.service nfs-server.service mysqld.service named.service postfix.service
 
 [Service]
