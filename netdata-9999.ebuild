@@ -48,6 +48,7 @@ CONFIG_CHECK="
 "
 
 : ${NETDATA_USER:=netdata}
+: ${NETDATA_GROUP:=netdata}
 
 pkg_setup() {
 	linux-info_pkg_setup
@@ -72,9 +73,10 @@ src_configure() {
 src_install() {
 	default
 
-	fowners ${NETDATA_USER} /var/log/netdata
+	fowners ${NETDATA_USER}:${NETDATA_GROUP} /var/log/netdata
+	fowners ${NETDATA_USER}:${NETDATA_GROUP} /var/cache/netdata
 
-	chown -Rc ${NETDATA_USER} "${ED}"/usr/share/${PN} || die
+	chown -Rc ${NETDATA_USER}:${NETDATA_GROUP} "${ED}"/usr/share/${PN} || die
 
 	cat >> "${T}"/${PN}-sysctl <<- EOF
 	kernel.mm.ksm.run = 1
