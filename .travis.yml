@@ -1,0 +1,8 @@
+language: c
+compiler:
+ - gcc
+ - clang
+before_install:
+ - sudo apt-get update -qq
+ - sudo apt-get install -qq automake make zlib1g-dev
+script: ./autogen.sh && ./configure && make -j4
