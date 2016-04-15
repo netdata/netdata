@@ -28,6 +28,7 @@
 #include "rrd2json.h"
 
 #include "web_client.h"
+#include "../config.h"
 
 #define INITIAL_WEB_DATA_LENGTH 16384
 #define WEB_REQUEST_LENGTH 16384
@@ -232,10 +233,13 @@ uid_t web_files_uid(void)
 	static uid_t owner_uid = 0;
 
 	if(unlikely(!web_owner)) {
-		web_owner = config_get("global", "web files owner", NETDATA_USER);
+		web_owner = config_get("global", "web files owner", config_get("global", "run as user", ""));
 		if(!web_owner || !*web_owner)
 			owner_uid = geteuid();
 		else {
+			// getpwnam() is not thread safe,
+			// but we have called this function once
+			// while single threaded
 			struct passwd *pw = getpwnam(web_owner);
 			if(!pw) {
 				error("User %s is not present. Ignoring option.", web_owner);
@@ -257,10 +261,13 @@ gid_t web_files_gid(void)
 	static gid_t owner_gid = 0;
 
 	if(unlikely(!web_group)) {
-		web_group = config_get("global", "web files group", config_get("global", "web files owner", NETDATA_USER));
+		web_group = config_get("global", "web files group", config_get("global", "web files owner", ""));
 		if(!web_group || !*web_group)
 			owner_gid = getegid();
 		else {
+			// getgrnam() is not thread safe,
+			// but we have called this function once
+			// while single threaded
 			struct group *gr = getgrnam(web_group);
 			if(!gr) {
 				error("Group %s is not present. Ignoring option.", web_group);

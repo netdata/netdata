@@ -420,8 +420,13 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
+		// get the user we should run
+		// IMPORTANT: this is required before web_files_uid()
 		user = config_get("global", "run as user"    , (getuid() == 0)?NETDATA_USER:"");
-		web_files_uid();
+
+		// IMPORTANT: these have to run once, while single threaded
+		web_files_uid(); // IMPORTANT: web_files_uid() before web_files_gid()
+		web_files_gid();
 
 		// --------------------------------------------------------------------
 

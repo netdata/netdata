@@ -82,9 +82,12 @@ int become_user(const char *username)
 		return -1;
 	}
 
-	if(pidfile[0] && getuid() != pw->pw_uid) {
+	uid_t uid = pw->pw_uid;
+	gid_t gid = pw->pw_gid;
+
+	if(pidfile[0] && getuid() != uid) {
 		// we are dropping privileges
-		if(chown(pidfile, pw->pw_uid, pw->pw_gid) != 0)
+		if(chown(pidfile, uid, gid) != 0)
 			error("Cannot chown pidfile '%s' to user '%s'", pidfile, username);
 
 		else if(pidfd != -1) {
@@ -99,30 +102,30 @@ int become_user(const char *username)
 		pidfd = -1;
 	}
 
-	if(setresgid(pw->pw_gid, pw->pw_gid, pw->pw_gid) != 0) {
-		error("Cannot switch to user's %s group (gid: %d).", username, pw->pw_gid);
+	if(setresgid(gid, gid, gid) != 0) {
+		error("Cannot switch to user's %s group (gid: %d).", username, gid);
 		return -1;
 	}
 
-	if(setresuid(pw->pw_uid, pw->pw_uid, pw->pw_uid) != 0) {
-		error("Cannot switch to user %s (uid: %d).", username, pw->pw_uid);
+	if(setresuid(uid, uid, uid) != 0) {
+		error("Cannot switch to user %s (uid: %d).", username, uid);
 		return -1;
 	}
 
-	if(setgid(pw->pw_gid) != 0) {
-		error("Cannot switch to user's %s group (gid: %d).", username, pw->pw_gid);
+	if(setgid(gid) != 0) {
+		error("Cannot switch to user's %s group (gid: %d).", username, gid);
 		return -1;
 	}
-	if(setegid(pw->pw_gid) != 0) {
-		error("Cannot effectively switch to user's %s group (gid: %d).", username, pw->pw_gid);
+	if(setegid(gid) != 0) {
+		error("Cannot effectively switch to user's %s group (gid: %d).", username, gid);
 		return -1;
 	}
-	if(setuid(pw->pw_uid) != 0) {
-		error("Cannot switch to user %s (uid: %d).", username, pw->pw_uid);
+	if(setuid(uid) != 0) {
+		error("Cannot switch to user %s (uid: %d).", username, uid);
 		return -1;
 	}
-	if(seteuid(pw->pw_uid) != 0) {
-		error("Cannot effectively switch to user %s (uid: %d).", username, pw->pw_uid);
+	if(seteuid(uid) != 0) {
+		error("Cannot effectively switch to user %s (uid: %d).", username, uid);
 		return -1;
 	}
 
