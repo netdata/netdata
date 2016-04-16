@@ -243,6 +243,8 @@
 			destroy_on_hide: false,		// destroy charts when they are not visible
 
 			show_help: true,			// when enabled the charts will show some help
+			show_help_delay_show_ms: 500,
+			show_help_delay_hide_ms: 0,
 
 			eliminate_zero_dimensions: true, // do not show dimensions with just zeros
 
@@ -260,6 +262,9 @@
 			color_fill_opacity_stacked: 0.8,
 
 			pan_and_zoom_step: 0.1,		// the increment when panning and zooming with the toolbox
+			pan_and_zoom_step_multiplier_shift: 2,
+			pan_and_zoom_step_multiplier_alt: 5,
+			pan_and_zoom_step_multiplier_control: 10,
 
 			setOptionCallback: function() { ; }
 		},
@@ -2149,6 +2154,18 @@
 				this.element_legend.innerHTML = '';
 
 				if(this.library.toolboxPanAndZoom !== null) {
+
+					function get_pan_and_zoom_step(event) {
+						if (event.shiftKey)
+							return NETDATA.options.current.pan_and_zoom_step * NETDATA.options.current.pan_and_zoom_step_multiplier_shift;
+						else if (event.altKey)
+							return NETDATA.options.current.pan_and_zoom_step * NETDATA.options.current.pan_and_zoom_step_multiplier_alt;
+						else if (event.ctrlKey)
+							return NETDATA.options.current.pan_and_zoom_step * NETDATA.options.current.pan_and_zoom_step_multiplier_control;
+						else
+							return NETDATA.options.current.pan_and_zoom_step;
+					}
+
 					this.element_legend_childs.toolbox.className += ' netdata-legend-toolbox';
 					this.element.appendChild(this.element_legend_childs.toolbox);
 
@@ -2157,7 +2174,8 @@
 					this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_left);
 					this.element_legend_childs.toolbox_left.onclick = function(e) {
 						e.preventDefault();
-						var dt = (that.view_before - that.view_after) * NETDATA.options.current.pan_and_zoom_step;
+
+						var dt = (that.view_before - that.view_after) * get_pan_and_zoom_step(e);
 						var before = that.view_before - dt;
 						var after = that.view_after - dt;
 						if(after >= that.netdata_first)
@@ -2170,7 +2188,7 @@
 						html: true,
 						trigger: 'hover',
 						placement: 'bottom',
-						delay: 100,
+						delay: { show: NETDATA.options.current.show_help_delay_show_ms, hide: NETDATA.options.current.show_help_delay_hide_ms },
 						title: 'Pan Left',
 						content: 'Pan the chart to the left. You can also <b>drag it</b> with your mouse or your finger (on touch devices).<br/><small>Help, can be disabled from the settings.</small>'
 					});
@@ -2190,7 +2208,7 @@
 						html: true,
 						trigger: 'hover',
 						placement: 'bottom',
-						delay: 100,
+						delay: { show: NETDATA.options.current.show_help_delay_show_ms, hide: NETDATA.options.current.show_help_delay_hide_ms },
 						title: 'Chart Reset',
 						content: 'Reset all the charts to their default auto-refreshing state. You can also <b>double click</b> the chart contents with your mouse or your finger (on touch devices).<br/><small>Help, can be disabled from the settings.</small>'
 					});
@@ -2200,7 +2218,7 @@
 					this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_right);
 					this.element_legend_childs.toolbox_right.onclick = function(e) {
 						e.preventDefault();
-						var dt = (that.view_before - that.view_after) * NETDATA.options.current.pan_and_zoom_step;
+						var dt = (that.view_before - that.view_after) * get_pan_and_zoom_step(e);
 						var before = that.view_before + dt;
 						var after = that.view_after + dt;
 						if(before <= that.netdata_last)
@@ -2213,7 +2231,7 @@
 						html: true,
 						trigger: 'hover',
 						placement: 'bottom',
-						delay: 100,
+						delay: { show: NETDATA.options.current.show_help_delay_show_ms, hide: NETDATA.options.current.show_help_delay_hide_ms },
 						title: 'Pan Right',
 						content: 'Pan the chart to the right. You can also <b>drag it</b> with your mouse or your finger (on touch devices).<br/><small>Help, can be disabled from the settings.</small>'
 					});
@@ -2224,7 +2242,7 @@
 					this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_zoomin);
 					this.element_legend_childs.toolbox_zoomin.onclick = function(e) {
 						e.preventDefault();
-						var dt = (that.view_before - that.view_after) * NETDATA.options.current.pan_and_zoom_step;
+						var dt = (that.view_before - that.view_after) * get_pan_and_zoom_step(e);
 						var before = that.view_before - dt;
 						var after = that.view_after + dt;
 						that.library.toolboxPanAndZoom(that, after, before);
@@ -2236,7 +2254,7 @@
 						html: true,
 						trigger: 'hover',
 						placement: 'bottom',
-						delay: 100,
+						delay: { show: NETDATA.options.current.show_help_delay_show_ms, hide: NETDATA.options.current.show_help_delay_hide_ms },
 						title: 'Chart Zoom In',
 						content: 'Zoom in the chart. You can also press SHIFT and select an area of the chart to zoom in. On Chrome and Opera, you can press the SHIFT or the ALT keys and then use the mouse wheel to zoom in or out.<br/><small>Help, can be disabled from the settings.</small>'
 					});
@@ -2246,7 +2264,7 @@
 					this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_zoomout);
 					this.element_legend_childs.toolbox_zoomout.onclick = function(e) {
 						e.preventDefault();
-						var dt = (that.view_before - that.view_after) * NETDATA.options.current.pan_and_zoom_step;
+						var dt = (that.view_before - that.view_after) * get_pan_and_zoom_step(e);
 						var before = that.view_before + dt;
 						var after = that.view_after - dt;
 
@@ -2259,7 +2277,7 @@
 						html: true,
 						trigger: 'hover',
 						placement: 'bottom',
-						delay: 100,
+						delay: { show: NETDATA.options.current.show_help_delay_show_ms, hide: NETDATA.options.current.show_help_delay_hide_ms },
 						title: 'Chart Zoom Out',
 						content: 'Zoom out the chart. On Chrome and Opera, you can also press the SHIFT or the ALT keys and then use the mouse wheel to zoom in or out.<br/><small>Help, can be disabled from the settings.</small>'
 					});
@@ -2293,7 +2311,7 @@
 					html: true,
 					trigger: 'hover',
 					placement: 'bottom',
-					delay: 100,
+					delay: { show: NETDATA.options.current.show_help_delay_show_ms, hide: NETDATA.options.current.show_help_delay_hide_ms },
 					title: 'Chart Resize',
 					content: 'Drag this point with your mouse or your finger (on touch devices), to resize the chart vertically. You can also <b>double click it</b> or <b>double tap it</b> to reset between 2 states: the default and the one that fits all the values.<br/><small>Help, can be disabled from the settings.</small>'
 				});
@@ -2338,7 +2356,7 @@
 					trigger: 'hover',
 					placement: 'bottom',
 					title: 'Chart Legend',
-					delay: 100,
+					delay: { show: NETDATA.options.current.show_help_delay_show_ms, hide: NETDATA.options.current.show_help_delay_hide_ms },
 					content: 'You can click or tap on the values or the labels to select dimentions. By pressing SHIFT or CONTROL, you can enable or disable multiple dimensions.<br/><small>Help, can be disabled from the settings.</small>'
 				});
 			}
