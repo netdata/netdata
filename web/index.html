@@ -28,7 +28,7 @@
 
 	<style>
 
-	/* prevent body from hidding under the navbar */
+	/* prevent body from hiding under the navbar */
 	body {
 		padding-top: 50px;
 	}
@@ -330,7 +330,7 @@
 	</script>
 
 	<!-- load the dashboard manager - it will do the rest -->
-	<script type="text/javascript" src="dashboard.js?v28"></script>
+	<script type="text/javascript" src="dashboard.js?v29"></script>
 </head>
 
 <body data-spy="scroll" data-target="#sidebar">
@@ -474,7 +474,7 @@
 				</div>
 				<div class="modal-body">
 						<div class="p">
-						<b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> is the fastest way to visualize metrics. It is a resource efficient, highly optimized system for collecting and visualizing any type of realtime timeseries data, from CPU usage, disk activity, SQL queries, API calls, web site visitors, etc.
+						<b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> is the fastest way to visualize metrics. It is a resource efficient, highly optimized system for collecting and visualizing any type of real-time time series data, from CPU usage, disk activity, SQL queries, API calls, web site visitors, etc.
 						</div>
 						<div class="p">
 						<b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> tries to visualize the truth of <b>now</b>, in its <b>greatest detail</b>, so that you can get insights of what is happening now and what just happened, on your systems and applications.
@@ -546,7 +546,7 @@
 								While pressing the shift key, click on the contents of a chart and move the mouse to select an area, to zoom in. The other charts will follow too. Zooming is performed in two phases:
 								<ul>
 									<li>The already loaded chart contents are zoomed (low resolution)</li>
-									<li>New data are transfered from the netdata server, to refresh the chart with possibly more detail.</li>
+									<li>New data are transferred from the netdata server, to refresh the chart with possibly more detail.</li>
 								</ul>
 								Once a chart is zoomed, auto refreshing stops for all charts. To enable it again, <b>double click</b> a zoomed chart.
 							</div>
@@ -560,9 +560,9 @@
 							<hr/>
 							<div class="p">
 								<h4>Legend Operations</h4>
-								Click on the label or value of a dimension, will select / unselect this dimension.
+								Click on the label or value of a dimension, will select / un-select this dimension.
 								<br/>
-								You can press any of the SHIFT or CONTROL keys and then click on legend labels or values, to select / unselect multiple dimensions.
+								You can press any of the SHIFT or CONTROL keys and then click on legend labels or values, to select / un-select multiple dimensions.
 							</div>
 						</div>
 						<div role="tabpanel" class="tab-pane" id="help_touch">
@@ -596,7 +596,7 @@
 							<hr/>
 							<div class="p">
 								<h4>Legend Operations</h4>
-								Tap on the label or value of a dimension, will select / unselect this dimension.
+								Tap on the label or value of a dimension, will select / un-select this dimension.
 							</div>
 						</div>
 					</div>
@@ -649,7 +649,7 @@
 										<input id="eliminate_zero_dimensions" type="checkbox" checked data-toggle="toggle" data-on="Non Zero" data-off="All" data-width="110px">
 										</td>
 										<td class="option-info"><strong>Which dimensions to show?</strong><br/>
-											<small>When set to <b>Non Zero</b>, dimensions that have all their values (within the current view) set to zero will not be transfered from the netdata server (except if all dimensions of the chart are zero, in which case this setting does nothing - all dimensions are transfered and shown). When set to <b>All</b>, all dimensions will always be shown. Set it to <b>Non Zero</b> to lower the data transfered between netdata and your browser, lower the CPU requirements of your browser (fewer lines to draw) and increase the focus on the legends (fewer entries at the legends).</small>
+											<small>When set to <b>Non Zero</b>, dimensions that have all their values (within the current view) set to zero will not be transferred from the netdata server (except if all dimensions of the chart are zero, in which case this setting does nothing - all dimensions are transferred and shown). When set to <b>All</b>, all dimensions will always be shown. Set it to <b>Non Zero</b> to lower the data transferred between netdata and your browser, lower the CPU requirements of your browser (fewer lines to draw) and increase the focus on the legends (fewer entries at the legends).</small>
 										</td>
 										</tr>
 									<tr class="option-row">
@@ -667,9 +667,9 @@
 								<div class="form-group">
 									<table>
 									<tr class="option-row">
-										<td class="option-control"><input id="parallel_refresher" type="checkbox" checked data-toggle="toggle" data-on="Parallel" data-off="Sequencial" data-width="110px"></td>
+										<td class="option-control"><input id="parallel_refresher" type="checkbox" checked data-toggle="toggle" data-on="Parallel" data-off="Sequential" data-width="110px"></td>
 										<td class="option-info"><strong>Which chart refresh policy to use?</strong><br/>
-											<small>When set to <b>parallel</b>, visible charts are refreshed in parallel (all queries are sent to netdata server in parallel) and are rendered asynchronously. When set to <b>sequencial</b> charts are refreshed one after another. Set it to parallel if your browser can cope with it (most modern browsers do), set it to sequencial if you work on an older/slower computer.</small>
+											<small>When set to <b>parallel</b>, visible charts are refreshed in parallel (all queries are sent to netdata server in parallel) and are rendered asynchronously. When set to <b>sequential</b> charts are refreshed one after another. Set it to parallel if your browser can cope with it (most modern browsers do), set it to sequential if you work on an older/slower computer.</small>
 										</td>
 										</tr>
 									<tr class="option-row" id="concurrent_refreshes_row">
@@ -949,19 +949,19 @@ var menuData = {
 
 	'apps': {
 		title: 'Applications',
-		info: 'Per application statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics for applications of interest, defined in <code>/etc/netdata/apps_groups.conf</code> (the default is <a href="https://github.com/firehol/netdata/blob/master/conf.d/apps_groups.conf" target="_blank">here</a>). The plugin internaly builds a process tree (much like <code>ps fax</code> does), and groups processes together (evaluating both child and parent processes) so that the result is always a chart with a predefined set of dimensions (of course, only application groups found running are reported).<br/><b>IMPORTANT</b>: The values shown here are not 100% accurate. They only include values for the processes running. If an application is spawning childs continiously, which are terminated in just a few milliseconds (like shell scripts do), the values reported will be inaccurate. Linux does report the values for the exited childs of a process. However, these values are reported to the parent process <b>only when the child exits</b>. If these values, of the exited child processes, were also aggregated in the charts below, the charts would have been full of spikes, presenting unrealisting utilization for each process group. So, we decided to ignore these values and present only the utilization of <b>the currently running processes</b>.',
+		info: 'Per application statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics for applications of interest, defined in <code>/etc/netdata/apps_groups.conf</code> (the default is <a href="https://github.com/firehol/netdata/blob/master/conf.d/apps_groups.conf" target="_blank">here</a>). The plugin internally builds a process tree (much like <code>ps fax</code> does), and groups processes together (evaluating both child and parent processes) so that the result is always a chart with a predefined set of dimensions (of course, only application groups found running are reported).<br/><b>IMPORTANT</b>: The values shown here are not 100% accurate. They only include values for the processes running. If an application is spawning children continuously, which are terminated in just a few milliseconds (like shell scripts do), the values reported will be inaccurate. Linux does report the values for the exited children of a process. However, these values are reported to the parent process <b>only when the child exits</b>. If these values, of the exited child processes, were also aggregated in the charts below, the charts would have been full of spikes, presenting unrealistic utilization for each process group. So, we decided to ignore these values and present only the utilization of <b>the currently running processes</b>.',
 		height: 1.5
 	},
 
 	'users': {
 		title: 'Users',
-		info: 'Per user statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics per user.<br/><b>IMPORTANT</b>: The values shown here are not 100% accurate. They only include values for the processes running. If an application is spawning childs continiously, which are terminated in just a few milliseconds (like shell scripts do), the values reported will be inaccurate. Linux does report the values for the exited childs of a process. However, these values are reported to the parent process <b>only when the child exits</b>. If these values, of the exited child processes, were also aggregated in the charts below, the charts would have been full of spikes, presenting unrealisting utilization for each process group. So, we decided to ignore these values and present only the utilization of <b>the currently running processes</b>.',
+		info: 'Per user statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics per user.<br/><b>IMPORTANT</b>: The values shown here are not 100% accurate. They only include values for the processes running. If an application is spawning children continuously, which are terminated in just a few milliseconds (like shell scripts do), the values reported will be inaccurate. Linux does report the values for the exited children of a process. However, these values are reported to the parent process <b>only when the child exits</b>. If these values, of the exited child processes, were also aggregated in the charts below, the charts would have been full of spikes, presenting unrealistic utilization for each process group. So, we decided to ignore these values and present only the utilization of <b>the currently running processes</b>.',
 		height: 1.5
 	},
 
 	'groups': {
 		title: 'User Groups',
-		info: 'Per user group statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics per user group.<br/><b>IMPORTANT</b>: The values shown here are not 100% accurate. They only include values for the processes running. If an application is spawning childs continiously, which are terminated in just a few milliseconds (like shell scripts do), the values reported will be inaccurate. Linux does report the values for the exited childs of a process. However, these values are reported to the parent process <b>only when the child exits</b>. If these values, of the exited child processes, were also aggregated in the charts below, the charts would have been full of spikes, presenting unrealisting utilization for each process group. So, we decided to ignore these values and present only the utilization of <b>the currently running processes</b>.',
+		info: 'Per user group statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics per user group.<br/><b>IMPORTANT</b>: The values shown here are not 100% accurate. They only include values for the processes running. If an application is spawning children continuously, which are terminated in just a few milliseconds (like shell scripts do), the values reported will be inaccurate. Linux does report the values for the exited children of a process. However, these values are reported to the parent process <b>only when the child exits</b>. If these values, of the exited child processes, were also aggregated in the charts below, the charts would have been full of spikes, presenting unrealistic utilization for each process group. So, we decided to ignore these values and present only the utilization of <b>the currently running processes</b>.',
 		height: 1.5
 	},
 
@@ -1057,7 +1057,7 @@ var chartData = {
 
 	'system.idlejitter': {
 		colors: '#5555AA',
-		info: 'Idle jitter is calculated by netdata. A thread is spawned that requests to sleep for a few microseconds. When the system wakes it up, it measures how many microseconds have passed. The difference between the requested and the actual duration of the sleep, is the <b>idle jitter</b>. This number is useful in realtime environments, where CPU jitter can affect the quality of the service (like VoIP media gateways).'
+		info: 'Idle jitter is calculated by netdata. A thread is spawned that requests to sleep for a few microseconds. When the system wakes it up, it measures how many microseconds have passed. The difference between the requested and the actual duration of the sleep, is the <b>idle jitter</b>. This number is useful in real-time environments, where CPU jitter can affect the quality of the service (like VoIP media gateways).'
 	},
 
 	'system.ipv4': {
