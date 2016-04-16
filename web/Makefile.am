@@ -92,15 +92,9 @@ dist_webimages_DATA = \
 
 version.txt:
 	if test -d "$(top_srcdir)/.git"; then \
-		if git --git-dir="$(top_srcdir)/.git" log -n 1 > v.tmp; then \
-			grep ^commit v.tmp | cut -d" " -f2 > version.txt; \
-			rm -f v.tmp; \
-		else \
-			rm -f v.tmp; \
-			echo "0" > version.txt; \
-		fi; \
-	else \
-		echo "0" > version.txt; \
-	fi
+		git --git-dir="$(top_srcdir)/.git" log -n 1 --format=%H; \
+	fi > $@.tmp
+	test -s $@.tmp || echo 0 > $@.tmp
+	mv $@.tmp $@
 
 .PHONY: version.txt
