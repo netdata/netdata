@@ -262,9 +262,9 @@
 			color_fill_opacity_stacked: 0.8,
 
 			pan_and_zoom_step: 0.1,		// the increment when panning and zooming with the toolbox
-			pan_and_zoom_step_multiplier_shift: 2,
-			pan_and_zoom_step_multiplier_alt: 5,
-			pan_and_zoom_step_multiplier_control: 10,
+			pan_and_zoom_step_multiplier_shift: 5,
+			pan_and_zoom_step_multiplier_alt: 10,
+			pan_and_zoom_step_multiplier_control: 2,
 
 			setOptionCallback: function() { ; }
 		},
