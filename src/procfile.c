@@ -20,6 +20,7 @@
 #include "common.h"
 #include "log.h"
 #include "procfile.h"
+#include "../config.h"
 
 #define PF_PREFIX "PROCFILE"
 
@@ -142,6 +143,9 @@ void pflines_free(pflines *fl) {
 #define PF_CHAR_IS_SEPARATOR	' '
 #define PF_CHAR_IS_NEWLINE		'N'
 #define PF_CHAR_IS_WORD			'W'
+#define PF_CHAR_IS_QUOTE        'Q'
+#define PF_CHAR_IS_OPEN         'O'
+#define PF_CHAR_IS_CLOSE        'C'
 
 void procfile_close(procfile *ff) {
 	debug(D_PROCFILE, PF_PREFIX ": Closing file '%s'", ff->filename);
@@ -156,17 +160,82 @@ void procfile_close(procfile *ff) {
 procfile *procfile_parser(procfile *ff) {
 	debug(D_PROCFILE, PF_PREFIX ": Parsing file '%s'", ff->filename);
 
-	char *s = ff->data, *e = ff->data, *t = ff->data;
+	char *s = ff->data, *e = &ff->data[ff->len], *t = ff->data, quote = 0;
 	uint32_t l = 0, w = 0;
-	e += ff->len;
+	int opened = 0;
 
 	ff->lines = pflines_add(ff->lines, w);
 	if(unlikely(!ff->lines)) goto cleanup;
 
 	while(likely(s < e)) {
+		// we are not at the end
+
 		switch(ff->separators[(int)(*s)]) {
+			case PF_CHAR_IS_OPEN:
+				if(s == t) {
+					opened++;
+					t = ++s;
+				}
+				else if(opened) {
+					opened++;
+					s++;
+				}
+				else
+					s++;
+				continue;
+
+			case PF_CHAR_IS_CLOSE:
+				if(opened) {
+					opened--;
+
+					if(!opened) {
+						*s = '\0';
+						ff->words = pfwords_add(ff->words, t);
+						if(unlikely(!ff->words)) goto cleanup;
+
+						ff->lines->lines[l].words++;
+						w++;
+
+						t = ++s;
+					}
+					else
+						s++;
+				}
+				else
+					s++;
+				continue;
+
+			case PF_CHAR_IS_QUOTE:
+				if(unlikely(!quote && s == t)) {
+					// quote opened at the beginning
+					quote = *s;
+					t = ++s;
+				}
+				else if(unlikely(quote && quote == *s)) {
+					// quote closed
+					quote = 0;
+
+					*s = '\0';
+					ff->words = pfwords_add(ff->words, t);
+					if(unlikely(!ff->words)) goto cleanup;
+
+					ff->lines->lines[l].words++;
+					w++;
+
+					t = ++s;
+				}
+				else
+					s++;
+				continue;
+
 			case PF_CHAR_IS_SEPARATOR:
-				if(likely(s == t)) {
+				if(unlikely(quote || opened)) {
+					// we are inside a quote
+					s++;
+					continue;
+				}
+
+				if(unlikely(s == t)) {
 					// skip all leading white spaces
 					t = ++s;
 					continue;
@@ -209,9 +278,10 @@ procfile *procfile_parser(procfile *ff) {
 		}
 	}
 
-	if(likely(s != t)) {
+	if(likely(s > t && t < e)) {
 		// the last word
-		if(likely(ff->len < ff->size)) *s = '\0';
+		if(likely(ff->len < ff->size))
+			*s = '\0';
 		else {
 			// we are going to loose the last byte
 			ff->data[ff->size - 1] = '\0';
@@ -309,10 +379,53 @@ static void procfile_set_separators(procfile *ff, const char *separators) {
 	while(likely(ffd != ffe)) *ffs++ = *ffd++;
 
 	// set the separators
-	if(unlikely(!separators)) separators = " \t=|";
+	if(unlikely(!separators))
+		separators = " \t=|";
+
 	ffs = ff->separators;
 	const char *s = separators;
-	while(likely(*s)) ffs[(int)*s++] = PF_CHAR_IS_SEPARATOR;
+	while(likely(*s))
+		ffs[(int)*s++] = PF_CHAR_IS_SEPARATOR;
+}
+
+void procfile_set_quotes(procfile *ff, const char *quotes) {
+	// remove all quotes
+	int i;
+	for(i = 0; i < 256 ; i++)
+		if(ff->separators[i] == PF_CHAR_IS_QUOTE)
+			ff->separators[i] = PF_CHAR_IS_WORD;
+
+	// if nothing given, return
+	if(unlikely(!quotes || !*quotes))
+		return;
+
+	// set the quotes
+	char *ffs = ff->separators;
+	const char *s = quotes;
+	while(likely(*s))
+		ffs[(int)*s++] = PF_CHAR_IS_QUOTE;
+}
+
+void procfile_set_open_close(procfile *ff, const char *open, const char *close) {
+	// remove all open/close
+	int i;
+	for(i = 0; i < 256 ; i++)
+		if(ff->separators[i] == PF_CHAR_IS_OPEN || ff->separators[i] == PF_CHAR_IS_CLOSE)
+			ff->separators[i] = PF_CHAR_IS_WORD;
+
+	// if nothing given, return
+	if(unlikely(!open || !*open || !close || !*close))
+		return;
+
+	// set the openings
+	char *ffs = ff->separators;
+	const char *s = open;
+	while(likely(*s))
+		ffs[(int)*s++] = PF_CHAR_IS_OPEN;
+
+	s = close;
+	while(likely(*s))
+		ffs[(int)*s++] = PF_CHAR_IS_CLOSE;
 }
 
 procfile *procfile_open(const char *filename, const char *separators, uint32_t flags) {
