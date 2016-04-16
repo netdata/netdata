@@ -5,4 +5,9 @@ compiler:
 before_install:
  - sudo apt-get update -qq
  - sudo apt-get install -qq automake make zlib1g-dev
-script: ./autogen.sh && ./configure && make -j4
+script:
+   # default build
+ - ./autogen.sh && ./configure && make -j4
+
+   # test installer
+ - fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
