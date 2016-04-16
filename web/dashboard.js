@@ -260,6 +260,7 @@
 			color_fill_opacity_stacked: 0.8,
 
 			pan_and_zoom_step: 0.1,		// the increment when panning and zooming with the toolbox
+			pan_and_zoom_large_step: 1.0,		// larger zoom out increment (900% > default) 
 
 			setOptionCallback: function() { ; }
 		},
@@ -2127,6 +2128,7 @@
 					toolbox_reset: document.createElement('div'),
 					toolbox_zoomin: document.createElement('div'),
 					toolbox_zoomout: document.createElement('div'),
+					toolbox_zoomout_large: document.createElement('div'),
 					toolbox_volume: document.createElement('div'),
 					title_date: document.createElement('span'),
 					title_time: document.createElement('span'),
@@ -2264,6 +2266,29 @@
 						content: 'Zoom out the chart. On Chrome and Opera, you can also press the SHIFT or the ALT keys and then use the mouse wheel to zoom in or out.<br/><small>Help, can be disabled from the settings.</small>'
 					});
 					
+					this.element_legend_childs.toolbox_zoomout_large.className += ' netdata-legend-toolbox-button';
+					this.element_legend_childs.toolbox_zoomout_large.innerHTML = '<i class="fa fa-minus-square"></i>';
+					this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_zoomout_large);
+					this.element_legend_childs.toolbox_zoomout_large.onclick = function(e) {
+						e.preventDefault();
+						var dt = (that.view_before - that.view_after) * NETDATA.options.current.pan_and_zoom_large_step;
+						var before = that.view_before + dt;
+						var after = that.view_after - dt;
+
+						that.library.toolboxPanAndZoom(that, after, before);
+					}
+					if(NETDATA.options.current.show_help === true)
+						$(this.element_legend_childs.toolbox_zoomout_large).popover({
+						container: "body",
+						animation: false,
+						html: true,
+						trigger: 'hover',
+						placement: 'bottom',
+						delay: 100,
+						title: 'Chart Zoom Out Large',
+						content: 'Zoom out chart at larger increments. Set size with pan_and_zoom_large_step, current setting is 900% > default.</small>'
+					});
+
 					//this.element_legend_childs.toolbox_volume.className += ' netdata-legend-toolbox-button';
 					//this.element_legend_childs.toolbox_volume.innerHTML = '<i class="fa fa-sort-amount-desc"></i>';
 					//this.element_legend_childs.toolbox_volume.title = 'Visible Volume';
@@ -2280,6 +2305,7 @@
 					this.element_legend_childs.toolbox_right = null;
 					this.element_legend_childs.toolbox_zoomin = null;
 					this.element_legend_childs.toolbox_zoomout = null;
+					this.element_legend_childs.toolbox_zoomout_large = null;
 					this.element_legend_childs.toolbox_volume = null;
 				}
 				
@@ -2352,6 +2378,7 @@
 					toolbox_reset: null,
 					toolbox_zoomin: null,
 					toolbox_zoomout: null,
+					toolbox_zoomout_large: null,
 					toolbox_volume: null,
 					title_date: null,
 					title_time: null,
