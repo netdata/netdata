@@ -86,6 +86,9 @@ extern procfile *procfile_reopen(procfile *ff, const char *filename, const char 
 // example walk-through a procfile parsed file
 extern void procfile_print(procfile *ff);
 
+extern void procfile_set_quotes(procfile *ff, const char *quotes);
+extern void procfile_set_open_close(procfile *ff, const char *open, const char *close);
+
 // ----------------------------------------------------------------------------
 
 // set this to 1, to have procfile adapt its initial buffer allocation to the max allocation used so far
