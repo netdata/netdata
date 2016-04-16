@@ -32,7 +32,6 @@ netdata.spec
 .cproject
 .idea/
 .project
-CMakeLists.txt
 README
 TODO.md
 asan_symbolize.py
@@ -67,5 +66,8 @@ netdata-uninstaller.sh
 
 gmon.out
 gmon.txt
-
 apps.plugin-profiler.sh
+
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake

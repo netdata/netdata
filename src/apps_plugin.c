@@ -37,9 +37,11 @@
 #include "common.h"
 #include "log.h"
 #include "procfile.h"
+#include "../config.h"
 
-#define MAX_COMPARE_NAME 15
+#define MAX_COMPARE_NAME 100
 #define MAX_NAME 100
+#define MAX_CMDLINE 1024
 
 unsigned long long Hertz = 1;
 
@@ -49,6 +51,7 @@ int debug = 0;
 
 int update_every = 1;
 unsigned long long file_counter = 0;
+int proc_pid_cmdline_is_needed = 0;
 
 char *host_prefix = "";
 char *config_dir = CONFIG_DIR;
@@ -213,20 +216,20 @@ char *strdup_debug(const char *file, int line, const char *function, const char 
 // system functions
 // to retrieve settings of the system
 
-procfile *ff = NULL;
-
 long get_system_cpus(void) {
+	procfile *ff = NULL;
+
 	int processors = 0;
 
 	char filename[FILENAME_MAX + 1];
 	snprintf(filename, FILENAME_MAX, "%s/proc/stat", host_prefix);
 
-	ff = procfile_reopen(ff, filename, "", PROCFILE_FLAG_DEFAULT);
+	ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
 	if(!ff) return 1;
 
 	ff = procfile_readall(ff);
 	if(!ff) {
-		// procfile_close(ff);
+		procfile_close(ff);
 		return 1;
 	}
 
@@ -239,28 +242,29 @@ long get_system_cpus(void) {
 	processors--;
 	if(processors < 1) processors = 1;
 
-	// procfile_close(ff);
+	procfile_close(ff);
 	return processors;
 }
 
 long get_system_pid_max(void) {
+	procfile *ff = NULL;
 	long mpid = 32768;
 
 	char filename[FILENAME_MAX + 1];
 	snprintf(filename, FILENAME_MAX, "%s/proc/sys/kernel/pid_max", host_prefix);
-	ff = procfile_reopen(ff, filename, "", PROCFILE_FLAG_DEFAULT);
+	ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
 	if(!ff) return mpid;
 
 	ff = procfile_readall(ff);
 	if(!ff) {
-		// procfile_close(ff);
+		procfile_close(ff);
 		return mpid;
 	}
 
 	mpid = atol(procfile_lineword(ff, 0, 0));
 	if(!mpid) mpid = 32768;
 
-	// procfile_close(ff);
+	procfile_close(ff);
 	return mpid;
 }
 
@@ -292,9 +296,12 @@ unsigned long long get_system_hertz(void)
 
 struct target {
 	char compare[MAX_COMPARE_NAME + 1];
-	uint32_t hash;
+	uint32_t comparehash;
+	size_t comparelen;
 
 	char id[MAX_NAME + 1];
+	uint32_t idhash;
+
 	char name[MAX_NAME + 1];
 
 	uid_t uid;
@@ -359,6 +366,9 @@ struct target {
 	int exposed;				// if set, we have sent this to netdata
 	int hidden;					// if set, we set the hidden flag on the dimension
 	int debug;
+	int ends_with;
+	int starts_with;            // if set, the compare string matches only the
+								// beginning of the command
 
 	struct target *target;		// the one that will be reported to netdata
 	struct target *next;
@@ -389,9 +399,11 @@ struct target *get_users_target(uid_t uid)
 	}
 
 	snprintf(w->compare, MAX_COMPARE_NAME, "%d", uid);
-	w->hash = simple_hash(w->compare);
+	w->comparehash = simple_hash(w->compare);
+	w->comparelen = strlen(w->compare);
 
 	snprintf(w->id, MAX_NAME, "%d", uid);
+	w->idhash = simple_hash(w->id);
 
 	struct passwd *pw = getpwuid(uid);
 	if(!pw)
@@ -423,9 +435,11 @@ struct target *get_groups_target(gid_t gid)
 	}
 
 	snprintf(w->compare, MAX_COMPARE_NAME, "%d", gid);
-	w->hash = simple_hash(w->compare);
+	w->comparehash = simple_hash(w->compare);
+	w->comparelen = strlen(w->compare);
 
 	snprintf(w->id, MAX_NAME, "%d", gid);
+	w->idhash = simple_hash(w->id);
 
 	struct group *gr = getgrgid(gid);
 	if(!gr)
@@ -448,12 +462,22 @@ struct target *get_groups_target(gid_t gid)
 // there are targets that are just aggregated to other target (the second argument)
 struct target *get_apps_groups_target(const char *id, struct target *target)
 {
+	int tdebug = 0, thidden = 0, ends_with = 0;
 	const char *nid = id;
-	if(nid[0] == '-') nid++;
+
+	while(nid[0] == '-' || nid[0] == '+' || nid[0] == '*') {
+		if(nid[0] == '-') thidden = 1;
+		if(nid[0] == '+') tdebug = 1;
+		if(nid[0] == '*') ends_with = 1;
+		nid++;
+	}
+	uint32_t hash = simple_hash(id);
 
 	struct target *w;
-	for(w = apps_groups_root_target ; w ; w = w->next)
-		if(strncmp(nid, w->id, MAX_NAME) == 0) return w;
+	for(w = apps_groups_root_target ; w ; w = w->next) {
+		if(w->idhash == hash && strncmp(nid, w->id, MAX_NAME) == 0)
+			return w;
+	}
 
 	w = calloc(sizeof(struct target), 1);
 	if(unlikely(!w)) {
@@ -462,19 +486,39 @@ struct target *get_apps_groups_target(const char *id, struct target *target)
 	}
 
 	strncpy(w->id, nid, MAX_NAME);
+	w->idhash = simple_hash(w->id);
+
 	strncpy(w->name, nid, MAX_NAME);
+
 	strncpy(w->compare, nid, MAX_COMPARE_NAME);
-	w->hash = simple_hash(w->compare);
+	int len = strlen(w->compare);
+	if(w->compare[len - 1] == '*') {
+		w->compare[len - 1] = '\0';
+		w->starts_with = 1;
+	}
+	w->ends_with = ends_with;
 
-	if(id[0] == '-') w->hidden = 1;
+	if(w->starts_with && w->ends_with)
+		proc_pid_cmdline_is_needed = 1;
 
+	w->comparehash = simple_hash(w->compare);
+	w->comparelen = strlen(w->compare);
+
+	w->hidden = thidden;
+	w->debug = tdebug;
 	w->target = target;
 
 	w->next = apps_groups_root_target;
 	apps_groups_root_target = w;
 
 	if(unlikely(debug))
-		fprintf(stderr, "apps.plugin: adding hook for process '%s', compare '%s' on target '%s'\n", w->id, w->compare, w->target?w->target->id:"");
+		fprintf(stderr, "apps.plugin: ADDING TARGET ID '%s', process name '%s' (%s), aggregated on target '%s', options: %s %s\n"
+		        , w->id
+				, w->compare, (w->starts_with && w->ends_with)?"substring":((w->starts_with)?"prefix":((w->ends_with)?"suffix":"exact"))
+				, w->target?w->target->id:w->id
+				, (w->hidden)?"hidden":"-"
+				, (w->debug)?"debug":"-"
+		);
 
 	return w;
 }
@@ -482,7 +526,6 @@ struct target *get_apps_groups_target(const char *id, struct target *target)
 // read the apps_groups.conf file
 int read_apps_groups_conf(const char *name)
 {
-	char buffer[4096+1];
 	char filename[FILENAME_MAX + 1];
 
 	snprintf(filename, FILENAME_MAX, "%s/apps_%s.conf", config_dir, name);
@@ -490,95 +533,77 @@ int read_apps_groups_conf(const char *name)
 	if(unlikely(debug))
 		fprintf(stderr, "apps.plugin: process groups file: '%s'\n", filename);
 
-	FILE *fp = fopen(filename, "r");
-	if(unlikely(!fp)) {
-		error("Cannot open file '%s'", filename);
+	// ----------------------------------------
+
+	procfile *ff = procfile_open(filename, " :\t", PROCFILE_FLAG_DEFAULT);
+	if(!ff) return 1;
+
+	procfile_set_quotes(ff, "'\"");
+
+	ff = procfile_readall(ff);
+	if(!ff) {
+		procfile_close(ff);
 		return 1;
 	}
 
-	long line = 0;
-	while(fgets(buffer, 4096, fp) != NULL) {
-		int whidden = 0, wdebug = 0;
-		line++;
+	unsigned long line, lines = procfile_lines(ff);
 
-		// if(debug) fprintf(stderr, "apps.plugin: \tread %s\n", buffer);
+	for(line = 0; line < lines ;line++) {
+		unsigned long word, words = procfile_linewords(ff, line);
+		struct target *w = NULL;
 
-		char *s = buffer, *t, *p;
-		s = trim(s);
-		if(!s || !*s || *s == '#') continue;
-
-		if(debug) fprintf(stderr, "apps.plugin: \tread %s\n", s);
-
-		// the target name
-		t = strsep(&s, ":");
-		if(t) t = trim(t);
+		char *t = procfile_lineword(ff, line, 0);
 		if(!t || !*t) continue;
 
-		while(t[0]) {
-			int stop = 1;
+		for(word = 0; word < words ;word++) {
+			char *s = procfile_lineword(ff, line, word);
+			if(!s || !*s) continue;
+			if(*s == '#') break;
 
-			switch(t[0]) {
-				case '-':
-					stop = 0;
-					whidden = 1;
-					t++;
-					break;
+			if(t == s) continue;
 
-				case '+':
-					stop = 0;
-					wdebug = 1;
-					t++;
-					break;
+			struct target *n = get_apps_groups_target(s, w);
+			if(!n) {
+				error("Cannot create target '%s' (line %d, word %d)", s, line, word);
+				continue;
 			}
 
-			if(stop) break;
-		}
-
-		if(debug) fprintf(stderr, "apps.plugin: \t\ttarget %s\n", t);
-
-		struct target *w = NULL;
-		long count = 0;
-		int blen = 0;
-		char buffer[4097] = "";
-		buffer[4096] = '\0';
-
-		// the process names
-		while((p = strsep(&s, " "))) {
-			p = trim(p);
-			if(!p || !*p) continue;
-
-			strncpy(&buffer[blen], p, 4096 - blen);
-			blen = strlen(buffer);
-
-			while(buffer[blen - 1] == '\\') {
-				buffer[blen - 1] = ' ';
-
-				if((p = strsep(&s, " ")))
-					p = trim(p);
-
-				if(!p || !*p) p = " ";
-				strncpy(&buffer[blen], p, 4096 - blen);
-				blen = strlen(buffer);
-			}
-
-			struct target *n = get_apps_groups_target(buffer, w);
-			n->hidden = whidden;
-			n->debug = wdebug;
 			if(!w) w = n;
-
-			buffer[0] = '\0';
-			blen = 0;
-
-			count++;
 		}
 
-		if(w) strncpy(w->name, t, MAX_NAME);
-		if(!count) error("The line %ld on file '%s', for group '%s' does not state any process names.", line, filename, t);
-	}
-	fclose(fp);
+		if(w) {
+			int tdebug = 0, thidden = 0;
 
-	apps_groups_default_target = get_apps_groups_target("+p!o@w#e$i^r&7*5(-i)l-o_", NULL); // match nothing
-	strncpy(apps_groups_default_target->name, "other", MAX_NAME);
+			while(t[0] == '-' || t[0] == '+') {
+				if(t[0] == '-') thidden = 1;
+				if(t[0] == '+') tdebug = 1;
+				t++;
+			}
+
+			strncpy(w->name, t, MAX_NAME);
+			w->name[MAX_NAME] = '\0';
+			w->hidden = thidden;
+			w->debug = tdebug;
+
+			if(unlikely(debug))
+				fprintf(stderr, "apps.plugin: AGGREGATION TARGET NAME '%s' on ID '%s', process name '%s' (%s), aggregated on target '%s', options: %s %s\n"
+						, w->name
+						, w->id
+						, w->compare, (w->starts_with && w->ends_with)?"substring":((w->starts_with)?"prefix":((w->ends_with)?"suffix":"exact"))
+						, w->target?w->target->id:w->id
+						, (w->hidden)?"hidden":"-"
+						, (w->debug)?"debug":"-"
+				);
+		}
+	}
+
+	procfile_close(ff);
+
+	apps_groups_default_target = get_apps_groups_target("p+!o@w#e$i^r&7*5(-i)l-o_", NULL); // match nothing
+	if(!apps_groups_default_target)
+		error("Cannot create default target");
+	else
+		strncpy(apps_groups_default_target->name, "other", MAX_NAME);
 
 	return 0;
 }
@@ -591,6 +616,8 @@ int read_apps_groups_conf(const char *name)
 struct pid_stat {
 	int32_t pid;
 	char comm[MAX_COMPARE_NAME + 1];
+	char cmdline[MAX_CMDLINE + 1];
+
 	// char state;
 	int32_t ppid;
 	// int32_t pgrp;
@@ -764,6 +791,33 @@ void del_pid_entry(pid_t pid)
 // ----------------------------------------------------------------------------
 // update pids from proc
 
+int read_proc_pid_cmdline(struct pid_stat *p) {
+	char filename[FILENAME_MAX + 1];
+	snprintf(filename, FILENAME_MAX, "%s/proc/%d/cmdline", host_prefix, p->pid);
+
+	int fd = open(filename, O_RDONLY, 0666);
+	if(unlikely(fd == -1)) return 1;
+
+	int i, bytes = read(fd, p->cmdline, MAX_CMDLINE);
+	close(fd);
+
+	if(bytes <= 0) {
+		// copy the command to the command line
+		strncpy(p->cmdline, p->comm, MAX_CMDLINE);
+		p->cmdline[MAX_CMDLINE] = '\0';
+		return 0;
+	}
+
+	p->cmdline[bytes] = '\0';
+	for(i = 0; i < bytes ; i++)
+		if(!p->cmdline[i]) p->cmdline[i] = ' ';
+
+	if(unlikely(debug))
+		fprintf(stderr, "Read file '%s' contents: %s\n", filename, p->cmdline);
+
+	return 0;
+}
+
 int read_proc_pid_ownership(struct pid_stat *p) {
 	char filename[FILENAME_MAX + 1];
 
@@ -783,14 +837,21 @@ int read_proc_pid_ownership(struct pid_stat *p) {
 }
 
 int read_proc_pid_stat(struct pid_stat *p) {
+	static procfile *ff = NULL;
+
 	char filename[FILENAME_MAX + 1];
 
 	snprintf(filename, FILENAME_MAX, "%s/proc/%d/stat", host_prefix, p->pid);
 
 	// ----------------------------------------
 
+	int set_quotes = (!ff)?1:0;
+
 	ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
 	if(!ff) return 1;
+
+	// if(set_quotes) procfile_set_quotes(ff, "()");
+	if(set_quotes) procfile_set_open_close(ff, "(", ")");
 
 	ff = procfile_readall(ff);
 	if(!ff) {
@@ -800,27 +861,10 @@ int read_proc_pid_stat(struct pid_stat *p) {
 
 	file_counter++;
 
-	p->comm[0] = '\0';
-	p->comm[MAX_COMPARE_NAME] = '\0';
-	size_t blen = 0;
-
-	char *s = procfile_lineword(ff, 0, 1);
-	if(*s == '(') s++;
-	size_t len = strlen(s);
+	// parse the process name
 	unsigned int i = 0;
-	while(len && s[len - 1] != ')') {
-		if(blen < MAX_COMPARE_NAME) {
-			strncpy(&p->comm[blen], s, MAX_COMPARE_NAME - blen);
-			blen = strlen(p->comm);
-		}
-
-		i++;
-		s = procfile_lineword(ff, 0, 1+i);
-		len = strlen(s);
-	}
-	if(len && s[len - 1] == ')') s[len - 1] = '\0';
-	if(blen < MAX_COMPARE_NAME)
-		strncpy(&p->comm[blen], s, MAX_COMPARE_NAME - blen);
+	strncpy(p->comm, procfile_lineword(ff, 0, 1), MAX_COMPARE_NAME);
+	p->comm[MAX_COMPARE_NAME] = '\0';
 
 	// p->pid			= atol(procfile_lineword(ff, 0, 0+i));
 	// comm is at 1
@@ -867,13 +911,16 @@ int read_proc_pid_stat(struct pid_stat *p) {
 	// p->guest_time	= strtoull(procfile_lineword(ff, 0, 42+i), NULL, 10);
 	// p->cguest_time	= strtoull(procfile_lineword(ff, 0, 43), NULL, 10);
 
-	if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: VALUES: %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu, threads=%d\n", p->comm, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
+	if(debug || (p->target && p->target->debug))
+		fprintf(stderr, "apps.plugin: READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' VALUES: utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu, threads=%d\n", host_prefix, p->pid, p->comm, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
 
 	// procfile_close(ff);
 	return 0;
 }
 
 int read_proc_pid_statm(struct pid_stat *p) {
+	static procfile *ff = NULL;
+
 	char filename[FILENAME_MAX + 1];
 
 	snprintf(filename, FILENAME_MAX, "%s/proc/%d/statm", host_prefix, p->pid);
@@ -902,6 +949,8 @@ int read_proc_pid_statm(struct pid_stat *p) {
 }
 
 int read_proc_pid_io(struct pid_stat *p) {
+	static procfile *ff = NULL;
+
 	char filename[FILENAME_MAX + 1];
 
 	snprintf(filename, FILENAME_MAX, "%s/proc/%d/io", host_prefix, p->pid);
@@ -1320,6 +1369,15 @@ int collect_data_for_all_processes_from_proc(void)
 			p->ppid = 0;
 		}
 
+		// --------------------------------------------------------------------
+		// /proc/<pid>/cmdline
+
+		if(proc_pid_cmdline_is_needed) {
+			if(unlikely(read_proc_pid_cmdline(p))) {
+				if(!count_errors++ || debug || (p->target && p->target->debug))
+					error("Cannot process %s/proc/%d/cmdline", host_prefix, pid);
+			}
+		}
 
 		// --------------------------------------------------------------------
 		// /proc/<pid>/statm
@@ -1361,12 +1419,22 @@ int collect_data_for_all_processes_from_proc(void)
 		if(unlikely(p->new_entry)) {
 			if(debug) fprintf(stderr, "apps.plugin: \tJust added %s\n", p->comm);
 			uint32_t hash = simple_hash(p->comm);
+			size_t pclen = strlen(p->comm);
 
 			struct target *w;
 			for(w = apps_groups_root_target; w ; w = w->next) {
 				// if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: \t\tcomparing '%s' with '%s'\n", w->compare, p->comm);
 
-				if(w->hash == hash && strcmp(w->compare, p->comm) == 0) {
+				// find it - 4 cases:
+				// 1. the target is not a pattern
+				// 2. the target has the prefix
+				// 3. the target has the suffix
+				// 4. the target is something inside cmdline
+				if(	(!w->starts_with && !w->ends_with && w->comparehash == hash && !strcmp(w->compare, p->comm))
+				       || (w->starts_with && !w->ends_with && !strncmp(w->compare, p->comm, w->comparelen))
+				       || (!w->starts_with && w->ends_with && pclen >= w->comparelen && !strcmp(w->compare, &p->comm[pclen - w->comparelen]))
+				       || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && strstr(p->cmdline, w->compare))
+						) {
 					if(w->target) p->target = w->target;
 					else p->target = w;
 
@@ -2366,6 +2434,9 @@ int main(int argc, char **argv)
 
 	// set the name for logging
 	program_name = "apps.plugin";
+
+	// disable syslog for apps.plugin
+	error_log_syslog = 0;
 
 	host_prefix = getenv("NETDATA_HOST_PREFIX");
 	if(host_prefix == NULL) {
