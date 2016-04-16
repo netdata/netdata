@@ -37,6 +37,7 @@
 #include "common.h"
 #include "log.h"
 #include "procfile.h"
+#include "../config.h"
 
 #define MAX_COMPARE_NAME 15
 #define MAX_NAME 100
@@ -52,9 +53,6 @@ unsigned long long file_counter = 0;
 
 char *host_prefix = "";
 char *config_dir = CONFIG_DIR;
-
-// disable syslog for apps.plugin
-int error_log_syslog = 0;
 
 #ifdef NETDATA_INTERNAL_CHECKS
 // ----------------------------------------------------------------------------
@@ -216,20 +214,20 @@ char *strdup_debug(const char *file, int line, const char *function, const char 
 // system functions
 // to retrieve settings of the system
 
-procfile *ff = NULL;
-
 long get_system_cpus(void) {
+	procfile *ff = NULL;
+
 	int processors = 0;
 
 	char filename[FILENAME_MAX + 1];
 	snprintf(filename, FILENAME_MAX, "%s/proc/stat", host_prefix);
 
-	ff = procfile_reopen(ff, filename, "", PROCFILE_FLAG_DEFAULT);
+	ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
 	if(!ff) return 1;
 
 	ff = procfile_readall(ff);
 	if(!ff) {
-		// procfile_close(ff);
+		procfile_close(ff);
 		return 1;
 	}
 
@@ -242,28 +240,29 @@ long get_system_cpus(void) {
 	processors--;
 	if(processors < 1) processors = 1;
 
-	// procfile_close(ff);
+	procfile_close(ff);
 	return processors;
 }
 
 long get_system_pid_max(void) {
+	procfile *ff = NULL;
 	long mpid = 32768;
 
 	char filename[FILENAME_MAX + 1];
 	snprintf(filename, FILENAME_MAX, "%s/proc/sys/kernel/pid_max", host_prefix);
-	ff = procfile_reopen(ff, filename, "", PROCFILE_FLAG_DEFAULT);
+	ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
 	if(!ff) return mpid;
 
 	ff = procfile_readall(ff);
 	if(!ff) {
-		// procfile_close(ff);
+		procfile_close(ff);
 		return mpid;
 	}
 
 	mpid = atol(procfile_lineword(ff, 0, 0));
 	if(!mpid) mpid = 32768;
 
-	// procfile_close(ff);
+	procfile_close(ff);
 	return mpid;
 }
 
@@ -594,6 +593,7 @@ int read_apps_groups_conf(const char *name)
 struct pid_stat {
 	int32_t pid;
 	char comm[MAX_COMPARE_NAME + 1];
+
 	// char state;
 	int32_t ppid;
 	// int32_t pgrp;
@@ -786,14 +786,21 @@ int read_proc_pid_ownership(struct pid_stat *p) {
 }
 
 int read_proc_pid_stat(struct pid_stat *p) {
+	static procfile *ff = NULL;
+
 	char filename[FILENAME_MAX + 1];
 
 	snprintf(filename, FILENAME_MAX, "%s/proc/%d/stat", host_prefix, p->pid);
 
 	// ----------------------------------------
 
+	int set_quotes = (!ff)?1:0;
+
 	ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
 	if(!ff) return 1;
+
+	// if(set_quotes) procfile_set_quotes(ff, "()");
+	if(set_quotes) procfile_set_open_close(ff, "(", ")");
 
 	ff = procfile_readall(ff);
 	if(!ff) {
@@ -803,27 +810,10 @@ int read_proc_pid_stat(struct pid_stat *p) {
 
 	file_counter++;
 
-	p->comm[0] = '\0';
+	// parse the process name
+	unsigned int i = 1;
+	strncpy(p->comm, procfile_lineword(ff, 0, i), MAX_COMPARE_NAME);
 	p->comm[MAX_COMPARE_NAME] = '\0';
-	size_t blen = 0;
-
-	char *s = procfile_lineword(ff, 0, 1);
-	if(*s == '(') s++;
-	size_t len = strlen(s);
-	unsigned int i = 0;
-	while(len && s[len - 1] != ')') {
-		if(blen < MAX_COMPARE_NAME) {
-			strncpy(&p->comm[blen], s, MAX_COMPARE_NAME - blen);
-			blen = strlen(p->comm);
-		}
-
-		i++;
-		s = procfile_lineword(ff, 0, 1+i);
-		len = strlen(s);
-	}
-	if(len && s[len - 1] == ')') s[len - 1] = '\0';
-	if(blen < MAX_COMPARE_NAME)
-		strncpy(&p->comm[blen], s, MAX_COMPARE_NAME - blen);
 
 	// p->pid			= atol(procfile_lineword(ff, 0, 0+i));
 	// comm is at 1
@@ -870,13 +860,16 @@ int read_proc_pid_stat(struct pid_stat *p) {
 	// p->guest_time	= strtoull(procfile_lineword(ff, 0, 42+i), NULL, 10);
 	// p->cguest_time	= strtoull(procfile_lineword(ff, 0, 43), NULL, 10);
 
-	if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: VALUES: %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu, threads=%d\n", p->comm, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
+	if(debug || (p->target && p->target->debug))
+		fprintf(stderr, "apps.plugin: READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' VALUES: utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu, threads=%d\n", host_prefix, p->pid, p->comm, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
 
 	// procfile_close(ff);
 	return 0;
 }
 
 int read_proc_pid_statm(struct pid_stat *p) {
+	static procfile *ff = NULL;
+
 	char filename[FILENAME_MAX + 1];
 
 	snprintf(filename, FILENAME_MAX, "%s/proc/%d/statm", host_prefix, p->pid);
@@ -905,6 +898,8 @@ int read_proc_pid_statm(struct pid_stat *p) {
 }
 
 int read_proc_pid_io(struct pid_stat *p) {
+	static procfile *ff = NULL;
+
 	char filename[FILENAME_MAX + 1];
 
 	snprintf(filename, FILENAME_MAX, "%s/proc/%d/io", host_prefix, p->pid);
@@ -2369,6 +2364,9 @@ int main(int argc, char **argv)
 
 	// set the name for logging
 	program_name = "apps.plugin";
+
+	// disable syslog for apps.plugin
+	error_log_syslog = 0;
 
 	host_prefix = getenv("NETDATA_HOST_PREFIX");
 	if(host_prefix == NULL) {
