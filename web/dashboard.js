@@ -260,6 +260,8 @@
 			color_fill_opacity_stacked: 0.8,
 
 			pan_and_zoom_step: 0.1,		// the increment when panning and zooming with the toolbox
+			pan_and_zoom_step_shift: 0.5,	// increment 5 x when panning and zooming with the toolbox
+			pan_and_zoom_step_alt: 1.0,		// increment 10 x when panning and zooming with the toolbox
 
 			setOptionCallback: function() { ; }
 		},
@@ -2246,10 +2248,15 @@
 					this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_zoomout);
 					this.element_legend_childs.toolbox_zoomout.onclick = function(e) {
 						e.preventDefault();
-						var dt = (that.view_before - that.view_after) * NETDATA.options.current.pan_and_zoom_step;
+						if(e.shiftKey === true) {
+							var dt = (that.view_before - that.view_after) * NETDATA.options.current.pan_and_zoom_step_shift;
+						} else if(e.altKey === true) {
+							var dt = (that.view_before - that.view_after) * NETDATA.options.current.pan_and_zoom_step_alt;
+						} else {
+							var dt = (that.view_before - that.view_after) * NETDATA.options.current.pan_and_zoom_step;
+						}
 						var before = that.view_before + dt;
 						var after = that.view_after - dt;
-
 						that.library.toolboxPanAndZoom(that, after, before);
 					}
 					if(NETDATA.options.current.show_help === true)
@@ -2261,7 +2268,7 @@
 						placement: 'bottom',
 						delay: 100,
 						title: 'Chart Zoom Out',
-						content: 'Zoom out the chart. On Chrome and Opera, you can also press the SHIFT or the ALT keys and then use the mouse wheel to zoom in or out.<br/><small>Help, can be disabled from the settings.</small>'
+						content: 'Zoom out the chart. On Chrome and Opera, you can also press the SHIFT or the ALT keys and then use the mouse wheel to zoom in or out. Pressing the SHIFT or ALT keys while clicking the - button will increment zoom out 5x, or 10x respectively.<br/><small>Help, can be disabled from the settings.</small>'
 					});
 					
 					//this.element_legend_childs.toolbox_volume.className += ' netdata-legend-toolbox-button';
