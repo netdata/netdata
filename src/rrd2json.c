@@ -1405,7 +1405,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	long slot = start_at_slot, counter = 0, stop_now = 0, added = 0, group_count = 0, add_this = 0;
 	for(; !stop_now ; now -= dt, slot--, counter++) {
 		if(unlikely(slot < 0)) slot = st->entries - 1;
-		if(unlikely(slot == stop_at_slot)) stop_now = counter;
+		if(unlikely(slot == stop_at_slot)) { stop_now = counter; add_this = 1; }
 
 		if(unlikely(debug)) debug(D_RRD_STATS, "ROW %s slot: %ld, entries_counter: %ld, group_count: %ld, added: %ld, now: %lu, %s %s"
 				, st->id
