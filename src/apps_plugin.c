@@ -1299,8 +1299,6 @@ int read_pid_file_descriptors(struct pid_stat *p) {
 
 int collect_data_for_all_processes_from_proc(void)
 {
-	static long count_errors = 0;
-
 	char dirname[FILENAME_MAX + 1];
 
 	snprintf(dirname, FILENAME_MAX, "%s/proc", host_prefix);
@@ -1354,7 +1352,6 @@ int collect_data_for_all_processes_from_proc(void)
 		// /proc/<pid>/stat
 
 		if(unlikely(read_proc_pid_stat(p))) {
-			if(!count_errors++ || debug || (p->target && p->target->debug))
 				error("Cannot process %s/proc/%d/stat", host_prefix, pid);
 
 			// there is no reason to proceed if we cannot get its status
@@ -1363,7 +1360,6 @@ int collect_data_for_all_processes_from_proc(void)
 
 		// check its parent pid
 		if(unlikely(p->ppid < 0 || p->ppid > pid_max)) {
-			if(unlikely(!count_errors++ || debug || (p->target && p->target->debug)))
 				error("Pid %d states invalid parent pid %d. Using 0.", pid, p->ppid);
 
 			p->ppid = 0;
@@ -1374,7 +1370,6 @@ int collect_data_for_all_processes_from_proc(void)
 
 		if(proc_pid_cmdline_is_needed) {
 			if(unlikely(read_proc_pid_cmdline(p))) {
-				if(!count_errors++ || debug || (p->target && p->target->debug))
 					error("Cannot process %s/proc/%d/cmdline", host_prefix, pid);
 			}
 		}
@@ -1383,7 +1378,6 @@ int collect_data_for_all_processes_from_proc(void)
 		// /proc/<pid>/statm
 
 		if(unlikely(read_proc_pid_statm(p))) {
-			if(unlikely(!count_errors++ || debug || (p->target && p->target->debug)))
 				error("Cannot process %s/proc/%d/statm", host_prefix, pid);
 
 			// there is no reason to proceed if we cannot get its memory status
@@ -1395,7 +1389,6 @@ int collect_data_for_all_processes_from_proc(void)
 		// /proc/<pid>/io
 
 		if(unlikely(read_proc_pid_io(p))) {
-			if(unlikely(!count_errors++ || debug || (p->target && p->target->debug)))
 				error("Cannot process %s/proc/%d/io", host_prefix, pid);
 
 			// on systems without /proc/X/io
@@ -1407,7 +1400,6 @@ int collect_data_for_all_processes_from_proc(void)
 		// <pid> ownership
 
 		if(unlikely(read_proc_pid_ownership(p))) {
-			if(unlikely(!count_errors++ || debug || (p->target && p->target->debug)))
 				error("Cannot stat %s/proc/%d", host_prefix, pid);
 		}
 
@@ -1448,7 +1440,6 @@ int collect_data_for_all_processes_from_proc(void)
 		// /proc/<pid>/fd
 
 		if(unlikely(read_pid_file_descriptors(p))) {
-			if(unlikely(!count_errors++ || debug || (p->target && p->target->debug)))
 				error("Cannot process entries in %s/proc/%d/fd", host_prefix, pid);
 		}
 
@@ -1457,11 +1448,6 @@ int collect_data_for_all_processes_from_proc(void)
 
 		// mark it as updated
 		p->updated = 1;
-	}
-
-	if(unlikely(count_errors > 1000)) {
-		error("%ld more errors encountered\n", count_errors - 1);
-		count_errors = 0;
 	}
 
 	closedir(dir);

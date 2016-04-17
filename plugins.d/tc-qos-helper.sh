@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
+
 # default time function
 now_ms=
 current_time_ms() {

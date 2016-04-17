@@ -15,6 +15,7 @@
 #include "popen.h"
 #include "plugin_tc.h"
 #include "main.h"
+#include "../config.h"
 
 #define RRD_TYPE_TC					"tc"
 #define RRD_TYPE_TC_LEN				strlen(RRD_TYPE_TC)
@@ -717,7 +718,8 @@ void *tc_main(void *ptr)
 			//	debug(D_TC_LOOP, "IGNORED line");
 			//}
 		}
-		mypclose(fp, tc_child_pid);
+		// fgets() failed or loop broke
+		int code = mypclose(fp, tc_child_pid);
 		tc_child_pid = 0;
 
 		if(device) {
@@ -732,10 +734,19 @@ void *tc_main(void *ptr)
 			return NULL;
 		}
 
+		if(code == 1 || code == 127) {
+			// 1 = DISABLE
+			// 127 = cannot even run it
+			error("TC: tc-qos-helper.sh exited with code %d. Disabling it.", code);
+
+			tc_device_free_all();
+			pthread_exit(NULL);
+			return NULL;
+		}
+
 		sleep((unsigned int) rrd_update_every);
 	}
 
 	pthread_exit(NULL);
 	return NULL;
 }
-
