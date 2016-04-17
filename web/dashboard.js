@@ -261,10 +261,10 @@
  			color_fill_opacity_area: 0.2,
 			color_fill_opacity_stacked: 0.8,
 
-			pan_and_zoom_step: 0.1,		// the increment when panning and zooming with the toolbox
-			pan_and_zoom_step_multiplier_shift: 5,
-			pan_and_zoom_step_multiplier_alt: 10,
-			pan_and_zoom_step_multiplier_control: 2,
+			pan_and_zoom_factor: 0.25,		// the increment when panning and zooming with the toolbox
+			pan_and_zoom_factor_multiplier_control: 2.0,
+			pan_and_zoom_factor_multiplier_shift: 3.0,
+			pan_and_zoom_factor_multiplier_alt: 4.0,
 
 			setOptionCallback: function() { ; }
 		},
@@ -2159,14 +2159,17 @@
 				if(this.library.toolboxPanAndZoom !== null) {
 
 					function get_pan_and_zoom_step(event) {
-						if (event.shiftKey)
-							return NETDATA.options.current.pan_and_zoom_step * NETDATA.options.current.pan_and_zoom_step_multiplier_shift;
+						if (event.ctrlKey)
+							return NETDATA.options.current.pan_and_zoom_factor * NETDATA.options.current.pan_and_zoom_factor_multiplier_control;
+
+						else if (event.shiftKey)
+							return NETDATA.options.current.pan_and_zoom_factor * NETDATA.options.current.pan_and_zoom_factor_multiplier_shift;
+
 						else if (event.altKey)
-							return NETDATA.options.current.pan_and_zoom_step * NETDATA.options.current.pan_and_zoom_step_multiplier_alt;
-						else if (event.ctrlKey)
-							return NETDATA.options.current.pan_and_zoom_step * NETDATA.options.current.pan_and_zoom_step_multiplier_control;
+							return NETDATA.options.current.pan_and_zoom_factor * NETDATA.options.current.pan_and_zoom_factor_multiplier_alt;
+
 						else
-							return NETDATA.options.current.pan_and_zoom_step;
+							return NETDATA.options.current.pan_and_zoom_factor;
 					}
 
 					this.element_legend_childs.toolbox.className += ' netdata-legend-toolbox';
@@ -2178,9 +2181,9 @@
 					this.element_legend_childs.toolbox_left.onclick = function(e) {
 						e.preventDefault();
 
-						var dt = (that.view_before - that.view_after) * get_pan_and_zoom_step(e);
-						var before = that.view_before - dt;
-						var after = that.view_after - dt;
+						var step = (that.view_before - that.view_after) * get_pan_and_zoom_step(e);
+						var before = that.view_before - step;
+						var after = that.view_after - step;
 						if(after >= that.netdata_first)
 							that.library.toolboxPanAndZoom(that, after, before);
 					};
@@ -2221,9 +2224,9 @@
 					this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_right);
 					this.element_legend_childs.toolbox_right.onclick = function(e) {
 						e.preventDefault();
-						var dt = (that.view_before - that.view_after) * get_pan_and_zoom_step(e);
-						var before = that.view_before + dt;
-						var after = that.view_after + dt;
+						var step = (that.view_before - that.view_after) * get_pan_and_zoom_step(e);
+						var before = that.view_before + step;
+						var after = that.view_after + step;
 						if(before <= that.netdata_last)
 							that.library.toolboxPanAndZoom(that, after, before);
 					};
@@ -2245,7 +2248,7 @@
 					this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_zoomin);
 					this.element_legend_childs.toolbox_zoomin.onclick = function(e) {
 						e.preventDefault();
-						var dt = (that.view_before - that.view_after) * get_pan_and_zoom_step(e);
+						var dt = ((that.view_before - that.view_after) * (get_pan_and_zoom_step(e) * 0.8) / 2);
 						var before = that.view_before - dt;
 						var after = that.view_after + dt;
 						that.library.toolboxPanAndZoom(that, after, before);
@@ -2267,7 +2270,7 @@
 					this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_zoomout);
 					this.element_legend_childs.toolbox_zoomout.onclick = function(e) {
 						e.preventDefault();
-						var dt = (that.view_before - that.view_after) * get_pan_and_zoom_step(e);
+						var dt = (((that.view_before - that.view_after) / (1.0 - (get_pan_and_zoom_step(e) * 0.8)) - (that.view_before - that.view_after)) / 2);
 						var before = that.view_before + dt;
 						var after = that.view_after - dt;
 
