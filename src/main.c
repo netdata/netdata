@@ -36,6 +36,7 @@
 #include "plugin_nfacct.h"
 
 #include "main.h"
+#include "../config.h"
 
 int netdata_exit = 0;
 
@@ -44,6 +45,9 @@ void netdata_cleanup_and_exit(int ret)
 	netdata_exit = 1;
 	rrdset_save_all();
 	// kill_childs();
+
+	// let it log a few more error messages
+	error_log_limit_reset();
 
 	if(pidfd != -1) {
 		if(ftruncate(pidfd, 0) != 0)
@@ -343,6 +347,12 @@ int main(int argc, char **argv)
 			// optimization - do not even generate debug log entries
 		}
 		else error_log_syslog = 0;
+
+		error_log_throttle_period = config_get_number("global", "errors throttle period", error_log_throttle_period);
+		setenv("NETDATA_ERRORS_THROTTLE_PERIOD", config_get("global", "errors throttle period"    , ""), 1);
+
+		error_log_errors_per_period = config_get_number("global", "errors per throttle period", error_log_errors_per_period);
+		setenv("NETDATA_ERRORS_PER_PERIOD"     , config_get("global", "errors per throttle period", ""), 1);
 
 		// --------------------------------------------------------------------
 

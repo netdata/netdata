@@ -16,6 +16,7 @@
 #include "rrd.h"
 #include "popen.h"
 #include "plugins_d.h"
+#include "../config.h"
 
 struct plugind *pluginsd_root = NULL;
 
