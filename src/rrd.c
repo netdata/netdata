@@ -682,6 +682,9 @@ void rrdset_save_all(void)
 {
 	debug(D_RRD_CALLS, "rrdset_save_all()");
 
+	// let it log a few error messages
+	error_log_limit_reset();
+
 	RRDSET *st;
 	RRDDIM *rd;
 
