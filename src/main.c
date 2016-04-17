@@ -348,11 +348,11 @@ int main(int argc, char **argv)
 		}
 		else error_log_syslog = 0;
 
-		error_log_throttle_period = config_get_number("global", "errors throttle period", error_log_throttle_period);
-		setenv("NETDATA_ERRORS_THROTTLE_PERIOD", config_get("global", "errors throttle period"    , ""), 1);
+		error_log_throttle_period = config_get_number("global", "errors flood protection period", error_log_throttle_period);
+		setenv("NETDATA_ERRORS_THROTTLE_PERIOD", config_get("global", "errors flood protection period"    , ""), 1);
 
-		error_log_errors_per_period = config_get_number("global", "errors per throttle", error_log_errors_per_period);
-		setenv("NETDATA_ERRORS_PER_PERIOD"     , config_get("global", "errors per throttle", ""), 1);
+		error_log_errors_per_period = config_get_number("global", "errors to trigger flood protection", error_log_errors_per_period);
+		setenv("NETDATA_ERRORS_PER_PERIOD"     , config_get("global", "errors to trigger flood protection", ""), 1);
 
 		// --------------------------------------------------------------------
 
