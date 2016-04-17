@@ -351,8 +351,8 @@ int main(int argc, char **argv)
 		error_log_throttle_period = config_get_number("global", "errors throttle period", error_log_throttle_period);
 		setenv("NETDATA_ERRORS_THROTTLE_PERIOD", config_get("global", "errors throttle period"    , ""), 1);
 
-		error_log_errors_per_period = config_get_number("global", "errors per throttle period", error_log_errors_per_period);
-		setenv("NETDATA_ERRORS_PER_PERIOD"     , config_get("global", "errors per throttle period", ""), 1);
+		error_log_errors_per_period = config_get_number("global", "errors per throttle", error_log_errors_per_period);
+		setenv("NETDATA_ERRORS_PER_PERIOD"     , config_get("global", "errors per throttle", ""), 1);
 
 		// --------------------------------------------------------------------
 
