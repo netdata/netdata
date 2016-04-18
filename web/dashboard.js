@@ -538,9 +538,11 @@
 				cache: false
 			})
 			.done(function(data) {
-				var h = NETDATA.chartRegistry.fixid(host);
-				//console.log('downloaded all charts from ' + host + ' (' + h + ')');
-				self.charts[h] = data.charts;
+				if(data !== null) {
+					var h = NETDATA.chartRegistry.fixid(host);
+					//console.log('downloaded all charts from ' + host + ' (' + h + ')');
+					self.charts[h] = data.charts;
+				}
 				if(typeof callback === 'function')
 					callback(data);
 			})
