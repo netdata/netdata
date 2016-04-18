@@ -11,6 +11,7 @@
 // var netdataNoC3 = true;				// do not use C3
 // var netdataNoBootstrap = true;		// do not load bootstrap
 // var netdataDontStart = true;			// do not start the thread to process the charts
+// var netdataErrorCallback = function(code,msg) {} // Callback function that will be invoked upon error
 //
 // You can also set the default netdata server, using the following.
 // When this variable is not set, we assume the page is hosted on your
@@ -473,6 +474,10 @@
 
 		console.log("ERROR " + code + ": " + NETDATA.errorCodes[code].message + ": " + msg);
 
+                if(typeof netdataErrorCallback === 'function') {
+                   netdataErrorCallback(code,msg);
+                }
+            
 		if(NETDATA.errorCodes[code].alert)
 			alert("ERROR " + code + ": " + NETDATA.errorCodes[code].message + ": " + msg);
 	};
@@ -867,7 +872,12 @@
 		/* error() - private
 		 * show an error instead of the chart
 		 */
-		var error = function(msg) {
+	        var error = function(msg) {
+
+                if(typeof netdataErrorCallback === 'function') {
+                   netdataErrorCallback("", msg);
+                }
+
 			that.element.innerHTML = that.id + ': ' + msg;
 			that.enabled = false;
 			that.current = that.pan;
