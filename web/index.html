@@ -780,7 +780,16 @@
 var this_is_demo = null;
 function isdemo() {
 	if(this_is_demo !== null) return this_is_demo;
-	this_is_demo = document.location.hostname.endsWith('.firehol.org');
+	this_is_demo = false;
+
+	try {
+		if(typeof document.location.hostname === 'string')
+			this_is_demo = document.location.hostname.endsWith('.firehol.org');
+	}
+	catch(error) {
+		;
+	}
+
 	return this_is_demo;
 }
 
