@@ -211,7 +211,6 @@ char *strdup_debug(const char *file, int line, const char *function, const char 
 
 #endif /* NETDATA_INTERNAL_CHECKS */
 
-
 // ----------------------------------------------------------------------------
 // system functions
 // to retrieve settings of the system
@@ -411,6 +410,8 @@ struct target *get_users_target(uid_t uid)
 	else
 		snprintf(w->name, MAX_NAME, "%s", pw->pw_name);
 
+	netdata_fix_id(w->name);
+
 	w->uid = uid;
 
 	w->next = users_root_target;
@@ -446,6 +447,8 @@ struct target *get_groups_target(gid_t gid)
 		snprintf(w->name, MAX_NAME, "%d", gid);
 	else
 		snprintf(w->name, MAX_NAME, "%s", gr->gr_name);
+
+	netdata_fix_id(w->name);
 
 	w->gid = gid;
 
