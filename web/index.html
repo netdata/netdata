@@ -777,10 +777,14 @@
 
 <script>
 
-var demo_hostname = 'netdata.firehol.org';
-// var demo_hostname = 'box';
+var this_is_demo = null;
+function isdemo() {
+	if(this_is_demo !== null) return this_is_demo;
+	this_is_demo = document.location.hostname.endsWith('.firehol.org');
+	return this_is_demo;
+}
 
-if(document.location.hostname === demo_hostname) {
+if(isdemo()) {
 	document.getElementById('masthead').style.display = 'block';
 }
 
@@ -1840,7 +1844,7 @@ function finalizePage() {
 	/* activate bootstrap sidebar (affix) */
 	$('#sidebar').affix({
 		offset: {
-			top: (document.location.hostname === demo_hostname)?150:0,
+			top: (isdemo())?150:0,
 			bottom: 0
 		}
 	});
@@ -1919,7 +1923,7 @@ function finalizePage() {
 			location.reload();
 	});
 
-	if(document.location.hostname === demo_hostname) {
+	if(isdemo()) {
 		setTimeout(function() {
 			$('#welcomeModal').modal();
 		}, 1000);
