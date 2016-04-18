@@ -459,7 +459,9 @@
 		101: { message: "Cannot load jQuery", alert: true },
 		402: { message: "Chart library not found", alert: false },
 		403: { message: "Chart library not enabled/is failed", alert: false },
-		404: { message: "Chart not found", alert: false }
+		404: { message: "Chart not found", alert: false },
+		405: { message: "Cannot download charts index from server", alert: true },
+		406: { message: "Invalid charts index downloaded from server", alert: true }
 	};
 	NETDATA.errorLast = {
 		code: 0,
@@ -546,13 +548,16 @@
 			.done(function(data) {
 				if(data !== null) {
 					var h = NETDATA.chartRegistry.fixid(host);
-					//console.log('downloaded all charts from ' + host + ' (' + h + ')');
 					self.charts[h] = data.charts;
 				}
+				else NETDATA.error(406, host + '/api/v1/charts');
+
 				if(typeof callback === 'function')
 					callback(data);
 			})
 			.fail(function() {
+				NETDATA.error(405, host + '/api/v1/charts');
+
 				if(typeof callback === 'function')
 					callback(null);
 			});
