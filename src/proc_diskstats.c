@@ -123,6 +123,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 			case 199: // veritas
 			case 201: // veritas
 			case 251: // dm
+			case 253: // virtio
 				def_enabled = enable_new_disks;
 				break;
 
@@ -195,7 +196,6 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 			case 135: // scsi
 			case 153: // raid
 			case 202: // xen
-			case 253: // virtio
 			case 256: // flash
 			case 257: // flash
 			case 259: // nvme0n1 issue #119
