@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "common.h"
 #include "log.h"
@@ -13,6 +16,73 @@
 #include "plugin_proc.h"
 
 #define RRD_TYPE_DISK "disk"
+
+struct disk {
+	unsigned long major;
+	unsigned long minor;
+	int partition_id;       // -1 = this is not a partition
+	struct disk *next;
+} *disk_root = NULL;
+
+struct disk *get_disk(unsigned long major, unsigned long minor) {
+	static char path_find_block_device_partition[FILENAME_MAX + 1] = "";
+	struct disk *d;
+
+	// search for it in our RAM list.
+	// this is sequential, but since we just walk through
+	// and the number of disks / partitions in a system
+	// should not be that many, it should be acceptable
+	for(d = disk_root; d ; d = d->next)
+		if(unlikely(d->major == major && d->minor == minor))
+			break;
+
+	// if we found it, return it
+	if(likely(d))
+		return d;
+
+	if(unlikely(!path_find_block_device_partition[0])) {
+		char filename[FILENAME_MAX + 1];
+		snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/dev/block/%lu:%lu/partition");
+		snprintf(path_find_block_device_partition, FILENAME_MAX, "%s", config_get("plugin:proc:/proc/diskstats", "path to get block device partition", filename));
+	}
+
+	// not found
+	// create a new disk structure
+	d = (struct disk *)malloc(sizeof(struct disk));
+	if(!d) fatal("Cannot allocate memory for struct disk in proc_diskstats.");
+
+	d->major = major;
+	d->minor = minor;
+	d->partition_id = -1;
+	d->next = NULL;
+
+	// append it to the list
+	if(!disk_root)
+		disk_root = d;
+	else {
+		struct disk *last;
+		for(last = disk_root; last->next ;last = last->next);
+		last->next = d;
+	}
+
+	// find if it is a partition
+	// by reading /sys/dev/block/MAJOR:MINOR/partition
+	char buffer[FILENAME_MAX + 1];
+	snprintf(buffer, FILENAME_MAX, path_find_block_device_partition, major, minor);
+
+	int fd = open(buffer, O_RDONLY, 0666);
+	if(likely(fd != -1)) {
+		// we opened it
+		int bytes = read(fd, buffer, FILENAME_MAX);
+		close(fd);
+
+		if(bytes > 0)
+			d->partition_id = strtoul(buffer, NULL, 10);
+	}
+	// if the /partition file does not exist, it is a disk, not a partition
+
+	return d;
+}
 
 int do_proc_diskstats(int update_every, unsigned long long dt) {
 	static procfile *ff = NULL;
@@ -40,7 +110,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 	if(!path_to_get_hw_sector_size[0]) {
 		char filename[FILENAME_MAX + 1];
 		snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/block/%s/queue/hw_sector_size");
-		snprintf(path_to_get_hw_sector_size, FILENAME_MAX, "%s%s", global_host_prefix, config_get("plugin:proc:/proc/diskstats", "path to get h/w sector size", filename));
+		snprintf(path_to_get_hw_sector_size, FILENAME_MAX, "%s", config_get("plugin:proc:/proc/diskstats", "path to get h/w sector size", filename));
 	}
 
 	ff = procfile_readall(ff);
@@ -107,13 +177,19 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 		// I/O completion time and the backlog that may be accumulating.
 		backlog_ms 		= strtoull(procfile_lineword(ff, l, 13), NULL, 10);	// rq_ticks
 
-
 		int def_enabled = 0;
 
 		// remove slashes from disk names
 		char *s;
 		for(s = disk; *s ;s++) if(*s == '/') *s = '_';
 
+		struct disk *d = get_disk(major, minor);
+		if(d->partition_id == -1)
+			def_enabled = enable_new_disks;
+		else
+			def_enabled = 0;
+
+/*
 		switch(major) {
 			case 9: // MDs
 			case 43: // network block
@@ -196,6 +272,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 			case 135: // scsi
 			case 153: // raid
 			case 202: // xen
+			case 254: // virtio3
 			case 256: // flash
 			case 257: // flash
 			case 259: // nvme0n1 issue #119
@@ -232,6 +309,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 				def_enabled = 0;
 				break;
 		}
+*/
 
 		int ddo_io = do_io, ddo_ops = do_ops, ddo_mops = do_mops, ddo_iotime = do_iotime, ddo_qops = do_qops, ddo_util = do_util, ddo_backlog = do_backlog;
 
