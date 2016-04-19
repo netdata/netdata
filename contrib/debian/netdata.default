@@ -1,0 +1,4 @@
+# Extra arguments to pass to netdata
+#
+#EXTRA_OPTS=""
+
