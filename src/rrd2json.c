@@ -936,7 +936,7 @@ static void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startlin
 			// generate the local date time
 			struct tm tmbuf, *tm = localtime_r(&now, &tmbuf);
 			if(!tm) { error("localtime() failed."); continue; }
-			buffer_date(wb, tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
+			buffer_date(wb, tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
 		}
 
 		if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
