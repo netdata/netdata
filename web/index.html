@@ -1357,11 +1357,22 @@ function enrichChartData(chart) {
 		case 'tc':
 			chart.menu = tmp;
 
-			// find the interface name from the name
-			if(typeof options.submenu_names[chart.family] === 'undefined' || options.submenu_names[chart.family] === chart.family)
-				options.submenu_names[chart.family] = chart.name.split('.')[1].split('_')[0];
+			// find a name for this device from fireqos info
+			// we strip '_(in|out)' or '(in|out)_'
+			if(typeof options.submenu_names[chart.family] === 'undefined' || options.submenu_names[chart.family] === chart.family) {
+				var n = chart.name.split('.')[1];
+				if(n.endsWith('_in'))
+					options.submenu_names[chart.family] = n.slice(0, n.lastIndexOf('_in'));
+				else if(n.endsWith('_out'))
+					options.submenu_names[chart.family] = n.slice(0, n.lastIndexOf('_out'));
+				else if(n.startsWith('in_'))
+					options.submenu_names[chart.family] = n.slice(3, n.length);
+				else if(n.startsWith('out_'))
+					options.submenu_names[chart.family] = n.slice(4, n.length);
+			}
 
 			// increase the priority of IFB devices
+			// to have inbound appear before outbound
 			if(chart.id.match(/.*-ifb$/))
 				chart.priority--;
 
