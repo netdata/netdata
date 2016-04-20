@@ -54,6 +54,8 @@ diff -r "$1" $MYTMP/unpack/* | grep "^Only" | sed \
 	-e '/: unittest$/d' \
 	-e '/: iprange$/d' \
 	-e '/: .*\.o$/d' \
+	-e '/: CMakeLists.txt/d' \
+	-e '/: .travis.yml/d' \
 	-e '/sbin: \(firehol\|fireqos\|link-balancer\)$/d' \
 	-e '/sbin: \(update-ipsets\|vnetbuild\|commands.sed\)$/d' > $MYTMP/out
 
