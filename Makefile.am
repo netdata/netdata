@@ -35,6 +35,7 @@ SUBDIRS = \
 	src \
 	system \
 	web \
+	contrib \
 	$(NULL)
 
 dist_noinst_DATA = netdata.spec

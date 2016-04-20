@@ -8,7 +8,7 @@
 %undefine	with_systemd
 %endif
 
-Summary:	Linux real time system monitoring, over the web
+Summary:	Real-time performance monitoring, done right
 Name:		@PACKAGE_NAME@
 Version:	@PACKAGE_RPM_VERSION@
 Release:	@PACKAGE_RPM_RELEASE@%{?release_suffix}%{?dist}
@@ -100,6 +100,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/%{name}/web
 
 %changelog
+* Wed Apr 20 2016 Costa Tsaousis <costa@tsaousis.gr> - 1.1.0-1
+- Several new features (IPv6, SYNPROXY, Users, Users Groups).
+- A lot of bug fixes and optimizations.
 * Tue Mar 22 2016 Costa Tsaousis <costa@tsaousis.gr> - 1.0.0-1
 - First public release.
 * Sun Nov 15 2015 Alon Bar-Lev <alonbl@redhat.com> - 0.0.0-1

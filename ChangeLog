@@ -1,3 +1,29 @@
+netdata (1.1.0) - 2016-04-20
+
+ Dozens of commits that improve netdata in several ways:
+
+ - Data collection: added IPv6 monitoring
+ - Data collection: added SYNPROXY DDoS protection monitoring
+ - Data collection: apps.plugin: added charts for users and user groups
+ - Data collection: apps.plugin: grouping of processes now support patterns
+ - Data collection: apps.plugin: now it is faster, after the new features added
+ - Data collection: better auto-detection of partitions for disk monitoring
+ - Data collection: better fireqos intergation for QoS monitoring
+ - Data collection: squid monitoring now uses squidclient
+ - Data collection: SNMP monitoring now supports 64bit counters
+ - API: fixed issues in CSV output generation
+ - API: netdata can now be restricted to listen on a specific IP
+ - Core and apps.plugin: error log flood protection
+ - Dashboard: better error handling when the netdata server is unreachable
+ - Dashboard: each chart now has a toolbox
+ - Dashboard: on-line help support
+ - Dashboard: check for netdata updates button
+ - Dashboard: added example /tv.html dashboard
+ - Packaging: now compiles with musl libc (alpine linux)
+ - Packaging: added debian packaging
+ - Packaging: support non-root installations
+ - Packaging: the installer generates uninstall script
+
 netdata (1.0.0) - 2016-03-22
 
  - first public release
