@@ -41,7 +41,13 @@ tomcat_check() {
 
 tomcat_get() {
 	# Collect tomcat values
-	mapfile -t lines < <(curl -s "$tomcat_url" | xmlstarlet sel -t -m "/status/jvm/memory" -v @free -n -m "/status/connector[@name='\"http-bio-8080\"']/threadInfo" -v @currentThreadCount -n -v @currentThreadsBusy -n -m "/status/connector[@name='\"http-bio-8080\"']/requestInfo" -v @requestCount -n -v @bytesSent -n -)
+	mapfile -t lines < <(curl -Ss "$tomcat_url" |\
+		xmlstarlet sel \
+			-t -m "/status/jvm/memory" -v @free \
+			-n -m "/status/connector[@name='\"http-bio-8080\"']/threadInfo" -v @currentThreadCount \
+			-n -v @currentThreadsBusy \
+			-n -m "/status/connector[@name='\"http-bio-8080\"']/requestInfo" -v @requestCount \
+			-n -v @bytesSent -n -)
 
 	tomcat_jvm_freememory="${lines[0]}"
 	tomcat_threads="${lines[1]}"

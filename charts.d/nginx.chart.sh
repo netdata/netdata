@@ -19,7 +19,7 @@ nginx_reading=0
 nginx_writing=0
 nginx_waiting=0
 nginx_get() {
-	nginx_response=($(curl -s "${nginx_url}"))
+	nginx_response=($(curl -Ss "${nginx_url}"))
 	[ $? -ne 0 -o "${#nginx_response[@]}" -eq 0 ] && return 1
 
 	if [ "${nginx_response[0]}" != "Active" \
