@@ -17,9 +17,11 @@ dist_charts_SCRIPTS = \
 	nginx.chart.sh \
 	nut.chart.sh \
 	opensips.chart.sh \
+	phpfpm.chart.sh \
 	postfix.chart.sh \
 	sensors.chart.sh \
 	squid.chart.sh \
+	tomcat.chart.sh \
 	$(NULL)
 
 dist_charts_DATA = \
