@@ -5310,6 +5310,7 @@
 		{
 			url: NETDATA.serverDefault + 'lib/bootstrap.min.js',
 			isAlreadyLoaded: function() {
+				// check if bootstrap is loaded
 				if(typeof $().emulateTransitionEnd == 'function')
 					return true;
 				else {
@@ -5406,6 +5407,11 @@
 
 	NETDATA._loadjQuery(function() {
 		NETDATA.loadRequiredJs(0, function() {
+			if(typeof $().emulateTransitionEnd == 'function') {
+				// bootstrap is not available
+				NETDATA.options.current.show_help = false;
+			}
+
 			if(typeof netdataDontStart === 'undefined' || !netdataDontStart) {
 				if(NETDATA.options.debug.main_loop === true)
 					console.log('starting chart refresh thread');
