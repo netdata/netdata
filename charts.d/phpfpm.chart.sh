@@ -30,7 +30,7 @@ phpfpm_max_children_reached=0
 phpfpm_slow_requests=0
 phpfpm_get() {
 	url=$1
-	phpfpm_response=($(curl -s "${url}"))
+	phpfpm_response=($(curl -Ss "${url}"))
 	[ $? -ne 0 -o "${#phpfpm_response[@]}" -eq 0 ] && return 1
 
 	if [[ "${phpfpm_response[0]}" != "pool:" \
