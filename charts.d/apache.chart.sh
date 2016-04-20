@@ -94,7 +94,7 @@ apache_detect() {
 
 apache_get() {
 	local oIFS="${IFS}" ret
-	IFS=$':\n' apache_response=($(curl -s "${apache_url}"))
+	IFS=$':\n' apache_response=($(curl -Ss "${apache_url}"))
 	ret=$?
 	IFS="${oIFS}"
 
