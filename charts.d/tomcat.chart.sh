@@ -1,10 +1,10 @@
-#!/bin/sh
+#!/bin/bash
 
 # Description: Tomcat netdata charts.d plugin
 # Author: Jorge Romero
 
 # the URL to download tomcat status info
-tomcat_url="http://<user>:<password>@localhost:8080/manager/status?XML=true"
+tomcat_url="http://localhost:8080/manager/status?XML=true"
 
 # _update_every is a special variable - it holds the number of seconds
 # between the calls of the _update() function
@@ -23,6 +23,8 @@ tomcat_decimal_KB_detail=1000
 
 tomcat_check() {
 
+	require_cmd xmlstarlet || return 1
+
 	tomcat_get
 	if [ $? -ne 0 ]
 		then
@@ -38,12 +40,14 @@ tomcat_check() {
 }
 
 tomcat_get() {
+	# Collect tomcat values
+	mapfile -t lines < <(curl -s "$tomcat_url" | xmlstarlet sel -t -m "/status/jvm/memory" -v @free -n -m "/status/connector[@name='\"http-bio-8080\"']/threadInfo" -v @currentThreadCount -n -v @currentThreadsBusy -n -m "/status/connector[@name='\"http-bio-8080\"']/requestInfo" -v @requestCount -n -v @bytesSent -n -)
 
-	tomcat_accesses=$(curl -s "${tomcat_url}" | xmllint --xpath "string(/status/connector[@name='\"http-bio-8080\"']/requestInfo/@requestCount)" - )
-	tomcat_volume=$(curl -s "${tomcat_url}" | xmllint --xpath "string(/status/connector[@name='\"http-bio-8080\"']/requestInfo/@bytesSent)" - )
-	tomcat_threads=$(curl -s "${tomcat_url}" | xmllint --xpath "string(/status/connector[@name='\"http-bio-8080\"']/threadInfo/@currentThreadCount)" -)
-	tomcat_threads_busy=$(curl -s "${tomcat_url}" | xmllint --xpath "string(/status/connector[@name='\"http-bio-8080\"']/threadInfo/@currentThreadsBusy)" -)
-	tomcat_jvm_freememory=$(curl -s "${tomcat_url}" | xmllint --xpath "string(/status/jvm/memory/@free)" - )
+	tomcat_jvm_freememory="${lines[0]}"
+	tomcat_threads="${lines[1]}"
+	tomcat_threads_busy="${lines[2]}"
+	tomcat_accesses="${lines[3]}"
+	tomcat_volume="${lines[4]}"
 
 	return 0
 }
