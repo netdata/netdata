@@ -7,7 +7,7 @@
 # second, you need add status location in nginx.conf
 # you can see, https://easyengine.io/tutorials/php/fpm-status-page/
 
-phpfpm_url="http://localhost/php-status"
+phpfpm_url="http://localhost/status"
 
 # _update_every is a special variable - it holds the number of seconds
 # between the calls of the _update() function
