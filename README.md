@@ -118,7 +118,7 @@ Use our **[automatic installer](https://github.com/firehol/netdata/wiki/Installa
 It should run on **any Linux** system. It has been tested on:
 
 - Gentoo
-- ArchLinux
+- Arch Linux
 - Ubuntu / Debian
 - CentOS
 - Fedora
