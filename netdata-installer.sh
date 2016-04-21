@@ -3,6 +3,9 @@
 # reload the user profile
 [ -f /etc/profile ] && . /etc/profile
 
+# fix PKG_CHECK_MODULES error
+export ACLOCAL_PATH=/usr/share/aclocal
+
 LC_ALL=C
 
 # you can set CFLAGS before running installer
