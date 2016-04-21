@@ -4,7 +4,11 @@
 [ -f /etc/profile ] && . /etc/profile
 
 # fix PKG_CHECK_MODULES error
-export ACLOCAL_PATH=/usr/share/aclocal
+if [ -d /usr/share/aclocal ]
+then
+        ACLOCAL_PATH=${ACLOCAL_PATH-/usr/share/aclocal}
+        export ACLOCAL_PATH
+fi
 
 LC_ALL=C
 
