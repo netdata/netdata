@@ -19,8 +19,28 @@
 // var netdataServer = "http://yourhost:19999"; // set your NetData server
 
 //(function(window, document, undefined) {
+
+	// ------------------------------------------------------------------------
+	// compatibility fixes
+
 	// fix IE issue with console
-	if(!window.console){ window.console = {log: function(){} }; }
+	if(!window.console) { window.console = { log: function(){} }; }
+
+	// if string.endsWith is not defined, define it
+	if(typeof String.prototype.endsWith !== 'function') {
+		String.prototype.endsWith = function(s) {
+			if(s.length > this.length) return false;
+			return this.slice(-s.length) === s;
+		};
+	}
+
+	// if string.startsWith is not defined, define it
+	if(typeof String.prototype.startsWith !== 'function') {
+		String.prototype.startsWith = function(s) {
+			if(s.length > this.length) return false;
+			return this.slice(s.length) === s;
+		};
+	}
 
 	// global namespace
 	var NETDATA = window.NETDATA || {};
@@ -53,7 +73,11 @@
 		NETDATA.serverDefault = netdataServer;
 	else {
 		var s = NETDATA._scriptSource();
-		NETDATA.serverDefault = s.replace(/\/dashboard.js(\?.*)*$/g, "");
+		if(s) NETDATA.serverDefault = s.replace(/\/dashboard.js(\?.*)*$/g, "");
+		else {
+			console.log('WARNING: Cannot detect the URL of the netdata server.');
+			NETDATA.serverDefault = null;
+		}
 	}
 
 	if(NETDATA.serverDefault === null)
@@ -80,7 +104,7 @@
 	NETDATA.google_js    		= 'https://www.google.com/jsapi';
 
 	NETDATA.themes = {
-		default: {
+		white: {
 			bootstrap_css: NETDATA.serverDefault + 'css/bootstrap.min.css',
 			dashboard_css: NETDATA.serverDefault + 'dashboard.css',
 			background: '#FFFFFF',
@@ -124,7 +148,7 @@
 	if(typeof netdataTheme !== 'undefined' && typeof NETDATA.themes[netdataTheme] !== 'undefined')
 		NETDATA.themes.current = NETDATA.themes[netdataTheme];
 	else
-		NETDATA.themes.current = NETDATA.themes.default;
+		NETDATA.themes.current = NETDATA.themes.white;
 
 	NETDATA.colors = NETDATA.themes.current.colors;
 
@@ -5407,7 +5431,7 @@
 
 	NETDATA._loadjQuery(function() {
 		NETDATA.loadRequiredJs(0, function() {
-			if(typeof $().emulateTransitionEnd == 'function') {
+			if(typeof $().emulateTransitionEnd !== 'function') {
 				// bootstrap is not available
 				NETDATA.options.current.show_help = false;
 			}
