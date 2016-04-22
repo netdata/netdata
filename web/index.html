@@ -330,7 +330,7 @@
 	</script>
 
 	<!-- load the dashboard manager - it will do the rest -->
-	<script type="text/javascript" src="dashboard.js?v32"></script>
+	<script type="text/javascript" src="dashboard.js?v33"></script>
 </head>
 
 <body data-spy="scroll" data-target="#sidebar">
@@ -1841,12 +1841,15 @@ function finalizePage() {
 	// the Dom elements are initially zero-sized
 	NETDATA.parseDom();
 
-	var before = 0, after = 0;
+	var before = 0, after = 0, nowelcome = 0;
 	after = getUrlParameter('force_after_ms');
 	before = getUrlParameter('force_before_ms');
+	nowelcome = (getUrlParameter('nowelcome') === true)?true:false;
 
-	if(before > 0 && after > 0)
+	if(before > 0 && after > 0) {
+		nowelcome = true;
 		NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], after, before);
+	}
 
 	// let it run (update the charts)
 	NETDATA.unpause();
@@ -1939,11 +1942,11 @@ function finalizePage() {
 	// this has to be the last
 	// it reloads the page
 	$('#netdata_theme_control').change(function() {
-		if(setTheme($(this).prop('checked')?'slate':'default'))
+		if(setTheme($(this).prop('checked')?'slate':'white'))
 			location.reload();
 	});
 
-	if(isdemo()) {
+	if(!nowelcome && isdemo()) {
 		setTimeout(function() {
 			$('#welcomeModal').modal();
 		}, 1000);
