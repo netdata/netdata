@@ -2,6 +2,8 @@
 #include <config.h>
 #endif
 #include <sys/syscall.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
@@ -501,5 +503,21 @@ void get_HZ(void)
 pid_t gettid(void)
 {
 	return syscall(SYS_gettid);
+}
+
+int mysnprintf(char *dest, size_t size, char *fmt, ...)
+{
+	int sz;
+	va_list args;
+	va_start(args, fmt);
+	sz = vsnprintf(dest, size, fmt, args);
+	va_end(args);
+
+	// Garantees the final terminate char.
+	if (sz > 0)
+ 		dest += sz;
+	*dest = '\0';
+
+	return sz;
 }
 

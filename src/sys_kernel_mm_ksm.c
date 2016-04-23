@@ -41,32 +41,32 @@ int do_sys_kernel_mm_ksm(int update_every, unsigned long long dt) {
 		page_size = sysconf(_SC_PAGESIZE);
 
 	if(!ff_pages_shared) {
-		snprintf(values[PAGES_SHARED].filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/kernel/mm/ksm/pages_shared");
-		snprintf(values[PAGES_SHARED].filename, FILENAME_MAX, "%s", config_get("plugin:proc:/sys/kernel/mm/ksm", "/sys/kernel/mm/ksm/pages_shared", values[PAGES_SHARED].filename));
+		mysnprintf(values[PAGES_SHARED].filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/kernel/mm/ksm/pages_shared");
+		mysnprintf(values[PAGES_SHARED].filename, FILENAME_MAX, "%s", config_get("plugin:proc:/sys/kernel/mm/ksm", "/sys/kernel/mm/ksm/pages_shared", values[PAGES_SHARED].filename));
 		ff_pages_shared = procfile_open(values[PAGES_SHARED].filename, " \t:", PROCFILE_FLAG_DEFAULT);
 	}
 
 	if(!ff_pages_sharing) {
-		snprintf(values[PAGES_SHARING].filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/kernel/mm/ksm/pages_sharing");
-		snprintf(values[PAGES_SHARING].filename, FILENAME_MAX, "%s", config_get("plugin:proc:/sys/kernel/mm/ksm", "/sys/kernel/mm/ksm/pages_sharing", values[PAGES_SHARING].filename));
+		mysnprintf(values[PAGES_SHARING].filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/kernel/mm/ksm/pages_sharing");
+		mysnprintf(values[PAGES_SHARING].filename, FILENAME_MAX, "%s", config_get("plugin:proc:/sys/kernel/mm/ksm", "/sys/kernel/mm/ksm/pages_sharing", values[PAGES_SHARING].filename));
 		ff_pages_sharing = procfile_open(values[PAGES_SHARING].filename, " \t:", PROCFILE_FLAG_DEFAULT);
 	}
 
 	if(!ff_pages_unshared) {
-		snprintf(values[PAGES_UNSHARED].filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/kernel/mm/ksm/pages_unshared");
-		snprintf(values[PAGES_UNSHARED].filename, FILENAME_MAX, "%s", config_get("plugin:proc:/sys/kernel/mm/ksm", "/sys/kernel/mm/ksm/pages_unshared", values[PAGES_UNSHARED].filename));
+		mysnprintf(values[PAGES_UNSHARED].filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/kernel/mm/ksm/pages_unshared");
+		mysnprintf(values[PAGES_UNSHARED].filename, FILENAME_MAX, "%s", config_get("plugin:proc:/sys/kernel/mm/ksm", "/sys/kernel/mm/ksm/pages_unshared", values[PAGES_UNSHARED].filename));
 		ff_pages_unshared = procfile_open(values[PAGES_UNSHARED].filename, " \t:", PROCFILE_FLAG_DEFAULT);
 	}
 
 	if(!ff_pages_volatile) {
-		snprintf(values[PAGES_VOLATILE].filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/kernel/mm/ksm/pages_volatile");
-		snprintf(values[PAGES_VOLATILE].filename, FILENAME_MAX, "%s", config_get("plugin:proc:/sys/kernel/mm/ksm", "/sys/kernel/mm/ksm/pages_volatile", values[PAGES_VOLATILE].filename));
+		mysnprintf(values[PAGES_VOLATILE].filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/kernel/mm/ksm/pages_volatile");
+		mysnprintf(values[PAGES_VOLATILE].filename, FILENAME_MAX, "%s", config_get("plugin:proc:/sys/kernel/mm/ksm", "/sys/kernel/mm/ksm/pages_volatile", values[PAGES_VOLATILE].filename));
 		ff_pages_volatile = procfile_open(values[PAGES_VOLATILE].filename, " \t:", PROCFILE_FLAG_DEFAULT);
 	}
 
 	if(!ff_pages_to_scan) {
-		snprintf(values[PAGES_TO_SCAN].filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/kernel/mm/ksm/pages_to_scan");
-		snprintf(values[PAGES_TO_SCAN].filename, FILENAME_MAX, "%s", config_get("plugin:proc:/sys/kernel/mm/ksm", "/sys/kernel/mm/ksm/pages_to_scan", values[PAGES_TO_SCAN].filename));
+		mysnprintf(values[PAGES_TO_SCAN].filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/kernel/mm/ksm/pages_to_scan");
+		mysnprintf(values[PAGES_TO_SCAN].filename, FILENAME_MAX, "%s", config_get("plugin:proc:/sys/kernel/mm/ksm", "/sys/kernel/mm/ksm/pages_to_scan", values[PAGES_TO_SCAN].filename));
 		ff_pages_to_scan = procfile_open(values[PAGES_TO_SCAN].filename, " \t:", PROCFILE_FLAG_DEFAULT);
 	}
 

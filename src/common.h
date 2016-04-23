@@ -44,4 +44,6 @@ extern pid_t gettid(void);
 #endif
 #endif
 
+extern int mysnprintf(char *dest, size_t size, char *fmt, ...);
+
 #endif /* NETDATA_COMMON_H */
