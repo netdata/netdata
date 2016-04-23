@@ -212,8 +212,6 @@
 
 		last_resized: new Date().getTime(), // the timestamp of the last resize request
 
-		crossDomainAjax: false,			// enable this to request crossDomain AJAX
-
 		last_page_scroll: 0,			// the timestamp the last time the page was scrolled
 
 		// the current profile
@@ -306,6 +304,12 @@
 			libraries: 			false,
 			dygraph: 			false
 		}
+	};
+
+	NETDATA.statistics = {
+		refreshes_total: 0,
+		refreshes_active: 0,
+		refreshes_active_max: 0
 	};
 
 
@@ -565,7 +569,6 @@
 
 			$.ajax({
 				url: host + '/api/v1/charts',
-				crossDomain: NETDATA.options.crossDomainAjax,
 				async: true,
 				cache: false
 			})
@@ -999,6 +1002,7 @@
 		this.units = self.data('units') || null;	// the units of the chart dimensions
 		this.append_options = self.data('append-options') || null;	// the units of the chart dimensions
 
+		this.running = false;						// boolean - true when the chart is being refreshed now
 		this.validated = false; 					// boolean - has the chart been validated?
 		this.enabled = true; 						// boolean - is the chart enabled for refresh?
 		this.paused = false;						// boolean - is the chart paused for any reason?
@@ -1191,7 +1195,7 @@
 			var lost = Math.max(h * 0.2, 5);
 			h -= lost;
 
-			// center the text, verically
+			// center the text, vertically
 			var paddingTop = (lost - 5) / 2;
 
 			// but check the width too
@@ -1271,8 +1275,8 @@
 			if(isHidden() === true) return;
 
 			if(that.chart_created === true) {
-				// we should destroy it
 				if(NETDATA.options.current.destroy_on_hide === true) {
+					// we should destroy it
 					init();
 				}
 				else {
@@ -1280,6 +1284,12 @@
 					that.element_chart.style.display = 'none';
 					if(that.element_legend !== null) that.element_legend.style.display = 'none';
 					that.tm.last_hidden = new Date().getTime();
+
+					// de-allocate data
+					// This works, but I not sure there are no corner cases somewhere
+					// so it is commented - if the user has memory issues he can
+					// set Destroy on Hide for all charts
+					// that.data = null;
 				}
 			}
 
@@ -2604,8 +2614,6 @@
 			if(this.debug === true)
 				this.log('updateChartWithData() called.');
 
-			this._updating = false;
-
 			// this may force the chart to be re-created
 			resizeChart();
 
@@ -2700,8 +2708,8 @@
 			if(NETDATA.globalPanAndZoom.isActive())
 				this.tm.last_autorefreshed = 0;
 			else {
-				if(NETDATA.options.current.parallel_refresher === true && NETDATA.options.current.concurrent_refreshes)
-					this.tm.last_autorefreshed = Math.round(now / this.data_update_every) * this.data_update_every;
+				if(NETDATA.options.current.parallel_refresher === true && NETDATA.options.current.concurrent_refreshes === true)
+					this.tm.last_autorefreshed = now - (now % this.data_update_every);
 				else
 					this.tm.last_autorefreshed = now;
 			}
@@ -2763,11 +2771,16 @@
 			if(this.debug === true)
 				this.log('updating from ' + this.data_url);
 
+			NETDATA.statistics.refreshes_total++;
+			NETDATA.statistics.refreshes_active++;
+
+			if(NETDATA.statistics.refreshes_active > NETDATA.statistics.refreshes_active_max)
+				NETDATA.statistics.refreshes_active_max = NETDATA.statistics.refreshes_active;
+
 			this._updating = true;
 
 			this.xhr = $.ajax( {
 				url: this.data_url,
-				crossDomain: NETDATA.options.crossDomainAjax,
 				cache: false,
 				async: true
 			})
@@ -2781,6 +2794,7 @@
 				error('data download failed for url: ' + that.data_url);
 			})
 			.always(function() {
+				NETDATA.statistics.refreshes_active--;
 				that._updating = false;
 				if(typeof callback === 'function') callback();
 			});
@@ -2837,12 +2851,19 @@
 			}
 		};
 
-		this.isAutoRefreshed = function() {
+		this.isAutoRefreshable = function() {
 			return (this.current.autorefresh);
 		};
 
 		this.canBeAutoRefreshed = function() {
 			var now = new Date().getTime();
+
+			if(this.running === true) {
+				if(this.debug === true)
+					this.log('I am already running');
+
+				return false;
+			}
 
 			if(this.enabled === false) {
 				if(this.debug === true)
@@ -2874,7 +2895,7 @@
 				return true;
 			}
 
-			if(this.isAutoRefreshed() === true) {
+			if(this.isAutoRefreshable() === true) {
 				// allow the first update, even if the page is not visible
 				if(this.updates_counter && this.updates_since_last_unhide && NETDATA.options.page_is_visible === false) {
 					if(NETDATA.options.debug.focus === true || this.debug === true)
@@ -2934,8 +2955,16 @@
 		};
 
 		this.autoRefresh = function(callback) {
-			if(this.canBeAutoRefreshed() === true) {
-				this.updateChart(callback);
+			if(this.canBeAutoRefreshed() === true && this.running === false) {
+				var state = this;
+
+				state.running = true;
+				state.updateChart(function() {
+					state.running = false;
+
+					if(typeof callback !== 'undefined')
+						callback();
+				});
 			}
 			else {
 				if(typeof callback !== 'undefined')
@@ -2972,7 +3001,6 @@
 
 				$.ajax( {
 					url:  this.host + this.chart_url,
-					crossDomain: NETDATA.options.crossDomainAjax,
 					cache: false,
 					async: true
 				})
@@ -3258,11 +3286,12 @@
 		var parallel = new Array();
 		var targets = NETDATA.options.targets;
 		var len = targets.length;
+		var state;
 		while(len--) {
-			if(targets[len].isVisible() === false)
+			state = targets[len];
+			if(state.isVisible() === false || state.running === true)
 				continue;
 
-			var state = targets[len];
 			if(state.library.initialized === false) {
 				if(state.library.enabled === true) {
 					state.library.initialize(NETDATA.chartRefresher);
@@ -3277,24 +3306,15 @@
 		}
 
 		if(parallel.length > 0) {
-			var parallel_jobs = parallel.length;
-
 			// this will execute the jobs in parallel
 			$(parallel).each(function() {
-				this.autoRefresh(function() {
-					parallel_jobs--;
-
-					if(parallel_jobs === 0) {
-						setTimeout(NETDATA.chartRefresher,
-							NETDATA.chartRefresherWaitTime());
-					}
-				});
+				this.autoRefresh();
 			})
 		}
-		else {
-			setTimeout(NETDATA.chartRefresher,
-				NETDATA.chartRefresherWaitTime());
-		}
+
+		// run the next refresh iteration
+		setTimeout(NETDATA.chartRefresher,
+			NETDATA.chartRefresherWaitTime());
 	};
 
 	NETDATA.parseDom = function(callback) {
@@ -4647,7 +4667,7 @@
 			state.easyPieChartEvent.timer = null;
 		}
 
-		if(state.isAutoRefreshed() === true && state.data !== null) {
+		if(state.isAutoRefreshable() === true && state.data !== null) {
 			NETDATA.easypiechartChartUpdate(state, state.data);
 		}
 		else {
@@ -4698,7 +4718,7 @@
 	NETDATA.easypiechartChartUpdate = function(state, data) {
 		var value, max, pcent;
 
-		if(NETDATA.globalPanAndZoom.isActive() === true || state.isAutoRefreshed() === false) {
+		if(NETDATA.globalPanAndZoom.isActive() === true || state.isAutoRefreshable() === false) {
 			value = null;
 			max = 0;
 			pcent = 0;
@@ -4901,7 +4921,7 @@
 			state.gaugeEvent.timer = null;
 		}
 
-		if(state.isAutoRefreshed() === true && state.data !== null) {
+		if(state.isAutoRefreshable() === true && state.data !== null) {
 			NETDATA.gaugeChartUpdate(state, state.data);
 		}
 		else {
@@ -4955,7 +4975,7 @@
 	NETDATA.gaugeChartUpdate = function(state, data) {
 		var value, min, max;
 
-		if(NETDATA.globalPanAndZoom.isActive() === true || state.isAutoRefreshed() === false) {
+		if(NETDATA.globalPanAndZoom.isActive() === true || state.isAutoRefreshable() === false) {
 			value = 0;
 			min = 0;
 			max = 1;

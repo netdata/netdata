@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<title>NetData TV Dashboard</title>
+	<title>NetData Demo Sites Dashboard</title>
 
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 	<meta charset="utf-8">
@@ -78,25 +78,23 @@
 
 <div style="width: 100%; text-align: center; display: inline-block;">
 
-	<b>PLEASE RESPECT OUR DEMO SITE RESOURCES - DON'T PUT THIS AS-IS ON TV - CLOSE IT WHEN YOU DON'T NEED IT !</b>
-	
-
-	<div style="width: 100%; height: 24vh; text-align: center; display: inline-block;">
+	<div style="width: 100%; height: 16vh; text-align: center; display: inline-block;">
 		<div style="width: 100%; height: 15px; text-align: center; display: inline-block;">
 			<b>CPU On both servers</b>
 		</div>
 		<div style="width: 100%; height: calc(100% - 15px); text-align: center; display: inline-block;">
 			<br/>
 			<div data-netdata="system.cpu"
-					data-host="http://netdata.firehol.org"
-					data-title="CPU usage of netdata.firehol.org"
+					data-host="//netdata.firehol.org"
+					data-title="CPU usage of EU Server"
 					data-chart-library="dygraph"
 					data-width="49%"
 					data-height="100%"
 					data-after="-300"
 					></div>
 			<div data-netdata="system.cpu"
-					data-title="CPU usage of your netdata server"
+					data-host="//netdata2.firehol.org"
+					data-title="CPU usage of US Server"
 					data-chart-library="dygraph"
 					data-width="49%"
 					data-height="100%"
@@ -106,21 +104,22 @@
 	</div>
 
 
-	<div style="width: 100%; height: 24vh; text-align: center; display: inline-block;">
+	<div style="width: 100%; height: 16vh; text-align: center; display: inline-block;">
 		<div style="width: 100%; height: 15px; text-align: center; display: inline-block;">
 			<b>Disk I/O on both servers</b>
 		</div>
 		<div style="width: 100%; height: calc(100% - 15px); text-align: center; display: inline-block;">
-			<div data-netdata="system.io"
-					data-host="http://netdata.firehol.org"
-					data-title="I/O on netdata.firehol.org"
+			<div data-netdata="tc.world_in"
+					data-host="//netdata.firehol.org"
+					data-title="I/O on EU Server"
 					data-chart-library="dygraph"
 					data-width="49%"
 					data-height="100%"
 					data-after="-300"
 					></div>
-			<div data-netdata="system.io"
-					data-title="I/O on your netdata server"
+			<div data-netdata="tc.world_in"
+					data-host="//netdata2.firehol.org"
+					data-title="I/O on US Server"
 					data-chart-library="dygraph"
 					data-width="49%"
 					data-height="100%"
@@ -129,26 +128,70 @@
 		</div>
 	</div>
 
-
-	<div style="width: 100%; height: 24vh; text-align: center; display: inline-block;">
-		<div style="width: 100%; height: 15px; text-align: center; display: inline-block;">
-			<b>IPv4 traffic on both servers</b>
-		</div>
+	<div style="width: 100%; height: 16vh; text-align: center; display: inline-block;">
 		<div style="width: 100%; height: calc(100% - 15px); text-align: center; display: inline-block;">
-			<div data-netdata="system.ipv4"
-					data-host="http://netdata.firehol.org"
-					data-title="IPv4 traffic on netdata.firehol.org"
+			<div data-netdata="tc.world_out"
+					data-host="//netdata.firehol.org"
+					data-title="I/O on EU Server"
 					data-chart-library="dygraph"
 					data-width="49%"
 					data-height="100%"
 					data-after="-300"
 					></div>
-			<div data-netdata="system.ipv4"
-					data-title="IPv4 traffic on your netdata server"
+			<div data-netdata="tc.world_out"
+					data-host="//netdata2.firehol.org"
+					data-title="I/O on US Server"
 					data-chart-library="dygraph"
 					data-width="49%"
 					data-height="100%"
 					data-after="-300"
+					></div>
+		</div>
+	</div>
+
+	<div style="width: 100%; height: 12vh; text-align: center; display: inline-block;">
+		<div style="width: 100%; height: 15px; text-align: center; display: inline-block;">
+			<b>NGINX performance on both servers</b>
+		</div>
+		<div style="width: 100%; height: calc(100% - 15px); text-align: center; display: inline-block;">
+			<div data-netdata="nginx.connections"
+					data-host="//netdata.firehol.org"
+					data-title="NGINX Connections on EU Server"
+					data-chart-library="dygraph"
+					data-width="49%"
+					data-height="100%"
+					data-after="-300"
+					></div>
+			<div data-netdata="nginx.connections"
+					data-host="//netdata2.firehol.org"
+					data-title="NGINX Connections on US Server"
+					data-chart-library="dygraph"
+					data-width="49%"
+					data-height="100%"
+					data-after="-300"
+					></div>
+		</div>
+	</div>
+
+	<div style="width: 100%; height: 12vh; text-align: center; display: inline-block;">
+		<div style="width: 100%; height: calc(100% - 15px); text-align: center; display: inline-block;">
+			<div data-netdata="nginx.requests"
+					data-host="//netdata.firehol.org"
+					data-title="NGINX Requests on EU Server"
+					data-chart-library="dygraph"
+					data-width="49%"
+					data-height="100%"
+					data-after="-300"
+					data-colors="#5555FF"
+					></div>
+			<div data-netdata="nginx.requests"
+					data-host="//netdata2.firehol.org"
+					data-title="NGINX Requests on US Server"
+					data-chart-library="dygraph"
+					data-width="49%"
+					data-height="100%"
+					data-after="-300"
+					data-colors="#5555FF"
 					></div>
 		</div>
 	</div>
@@ -159,63 +202,65 @@
 		</div>
 		<div style="width: 100%; max-height: calc(100% - 15px); text-align: center; display: inline-block;">
 			<div style="width: 49%; height:100%; align: center; display: inline-block;">
-				netdata.firehol.org
+				EU Server
 				<br/>
-				<div data-netdata="netdata.requests"
-						data-host="http://netdata.firehol.org"
-						data-title="Chart Refreshes/s"
-						data-chart-library="gauge"
-						data-width="20%"
+				<div data-netdata="netdata.net"
+						data-dimensions="out"
+						data-host="//netdata.firehol.org"
+						data-title="Chart Data Traffic"
+						data-chart-library="easypiechart"
+						data-width="16%"
+						data-height="100%"
+						data-after="-300"
+						data-points="300"
+						></div>
+				<div data-netdata="netdata.net"
+						data-dimensions="in"
+						data-host="//netdata.firehol.org"
+						data-title="Requests Traffic"
+						data-chart-library="easypiechart"
+						data-width="16%"
 						data-height="100%"
 						data-after="-300"
 						data-points="300"
 						></div>
 				<div data-netdata="netdata.clients"
-						data-host="http://netdata.firehol.org"
+						data-host="//netdata.firehol.org"
 						data-title="Sockets"
 						data-chart-library="gauge"
-						data-width="20%"
+						data-width="22%"
 						data-height="100%"
 						data-after="-300"
 						data-points="300"
 						data-colors="#AA5500"
 						></div>
-				<div data-netdata="netdata.net"
-						data-dimensions="in"
-						data-host="http://netdata.firehol.org"
-						data-title="Requests Traffic"
-						data-chart-library="easypiechart"
-						data-width="15%"
-						data-height="100%"
-						data-after="-300"
-						data-points="300"
-						></div>
-				<div data-netdata="netdata.net"
-						data-dimensions="out"
-						data-host="http://netdata.firehol.org"
-						data-title="Chart Data Traffic"
-						data-chart-library="easypiechart"
-						data-width="15%"
+				<div data-netdata="netdata.requests"
+						data-host="//netdata.firehol.org"
+						data-title="Chart Refreshes/s"
+						data-chart-library="gauge"
+						data-width="22%"
 						data-height="100%"
 						data-after="-300"
 						data-points="300"
 						></div>
 			</div>
 			<div style="width: 49%; height:100%; align: center; display: inline-block;">
-				your netdata server
+				US Server
 				<br/>
 				<div data-netdata="netdata.requests"
+						data-host="//netdata2.firehol.org"
 						data-title="Chart Refreshes/s"
 						data-chart-library="gauge"
-						data-width="20%"
+						data-width="22%"
 						data-height="100%"
 						data-after="-300"
 						data-points="300"
 						></div>
 				<div data-netdata="netdata.clients"
+						data-host="//netdata2.firehol.org"
 						data-title="Sockets"
 						data-chart-library="gauge"
-						data-width="20%"
+						data-width="22%"
 						data-height="100%"
 						data-after="-300"
 						data-points="300"
@@ -223,18 +268,20 @@
 						></div>
 				<div data-netdata="netdata.net"
 						data-dimensions="in"
+						data-host="//netdata2.firehol.org"
 						data-title="Requests Traffic"
 						data-chart-library="easypiechart"
-						data-width="15%"
+						data-width="16%"
 						data-height="100%"
 						data-after="-300"
 						data-points="300"
 						></div>
 				<div data-netdata="netdata.net"
 						data-dimensions="out"
+						data-host="//netdata2.firehol.org"
 						data-title="Chart Data Traffic"
 						data-chart-library="easypiechart"
-						data-width="15%"
+						data-width="16%"
 						data-height="100%"
 						data-after="-300"
 						data-points="300"
