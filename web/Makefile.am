@@ -4,18 +4,19 @@
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
 dist_web_DATA = \
-	robots.txt \
-	index.html \
 	demo.html \
 	demo2.html \
-	tv.html \
+	demosites.html \
 	dashboard.html \
 	dashboard.js \
 	dashboard.css \
 	dashboard.slate.css \
 	favicon.ico \
+	index.html \
 	netdata-swagger.yaml \
 	netdata-swagger.json \
+	robots.txt \
+	tv.html \
 	version.txt \
 	$(NULL)
 
