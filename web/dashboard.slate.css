@@ -22,8 +22,14 @@ body {
 	width: 100%;
 	text-align: center;
 	display: flex;
+	display: -webkit-flex;
+	display: -moz-flex;
 	align-items: baseline;
+	-moz-align-items: baseline;
+	-webkit-align-items: baseline;
 	justify-content: center;
+	-moz--webkit-justify-content: center;
+	-moz-justify-content: center;
 }
 
 .netdata-container {
