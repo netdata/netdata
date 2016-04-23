@@ -348,13 +348,20 @@ void strreverse(char* begin, char* end)
 {
     char aux;
     while (end > begin)
-        aux = *end, *end-- = *begin, *begin++ = aux;
+      // FIX: I think this can cause trouble... "aux = aux"?
+      //aux = *end, *end-- = *begin, *begin++ = aux;
+      { aux = *end; *end-- = *begin; *begin++ = aux; }
 }
 
 char *mystrsep(char **ptr, char *s)
 {
 	char *p = "";
-	while ( p && !p[0] && *ptr ) p = strsep(ptr, s);
+
+	//while ( p && !p[0] && *ptr ) p = strsep(ptr, s);
+  // FIX: Maybe this will be a little bit faster (just one memory reference
+  //      inside the loop) -- see asm code with -S option.
+  if (*ptr)
+    while ( *p && !*p ) p = strsep(ptr, s);
 	return(p);
 }
 
@@ -365,13 +372,19 @@ char *trim(char *s)
 	if(!*s || *s == '#') return NULL;
 
 	// skip tailing spaces
-	long c = (long) strlen(s) - 1;
-	while(c >= 0 && isspace(s[c])) {
-		s[c] = '\0';
-		c--;
-	}
-	if(c < 0) return NULL;
-	if(!*s) return NULL;
+	//long c = (long) strlen(s) - 1;
+	//while(c >= 0 && isspace(s[c])) {
+	//	s[c] = '\0';
+	//	c--;
+	//}
+	//if(c < 0) return NULL;
+	//if(!*s) return NULL;
+  // FIX: Using pointer is a little bit faster.
+  char *t = s + strlen(s) - 1;
+  for (; t >= s && isspace(*t); t--)
+    *t = '\0';
+  if (!*s) return NULL;
+
 	return s;
 }
 
