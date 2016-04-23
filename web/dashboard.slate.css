@@ -18,11 +18,16 @@ body {
 	margin-left: 55px;
 }
 
+.netdata-chart-row {
+	width: 100%;
+	text-align: center;
+	display: flex;
+	align-items: baseline;
+	justify-content: center;
+}
+
 .netdata-container {
-	display: -webkit-flex; /* Safari */
-	-webkit-flex-wrap: wrap; /* Safari 6.1+ */
 	display: inline-block;
-	flex-wrap: wrap;
 	overflow: hidden;
 
 	/* required for child elements to have absolute position */
@@ -39,10 +44,7 @@ body {
 }
 
 .netdata-container-with-legend {
-	display: -webkit-flex; /* Safari */
-	-webkit-flex-wrap: wrap; /* Safari 6.1+ */
 	display: inline-block;
-	flex-wrap: wrap;
 	overflow: hidden;
 
 	/* fix minimum scrollbar issue in firefox */
