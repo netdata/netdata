@@ -207,7 +207,7 @@ void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minu
   *p++ = '0' + year / 1000; year %= 1000;
   *p++ = '0' + year / 100;  year %= 100;
   *p++ = '0' + year / 10;
-  *p++ = '0' + year % 100;
+  *p++ = '0' + year % 10;
   *p++ = ',';
   *p   = '0' + month / 10; if (*p != '0') p++;
   *p++ = '0' + month % 10;
