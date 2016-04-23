@@ -10,14 +10,19 @@ body {
 	margin-left: 55px;
 }
 
-netdata-chart-row {
-	width: 100%;
-	text-align: center;
-	display: flex;
-	align-items: baseline;
-	justify-content: center;
+.netdata-chart-row {
+        width: 100%;
+        text-align: center;
+        display: flex;
+        display: -webkit-flex;
+        display: -moz-flex;
+        align-items: baseline;
+        -moz-align-items: baseline;
+        -webkit-align-items: baseline;
+        justify-content: center;
+        -webkit-justify-content: center;
+        -moz-justify-content: center;
 }
-
 
 .netdata-container {
 	display: inline-block;
