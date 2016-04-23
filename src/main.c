@@ -82,7 +82,7 @@ struct netdata_static_thread {
 
 struct netdata_static_thread static_threads[] = {
 	{"tc",			"plugins",	"tc",			1, NULL, NULL,	tc_main},
-	{"idlejitter",	"plugins",	"idlejitter",	1, NULL, NULL,	cpuidlejitter_main},
+	{"idlejitter",		"plugins",	"idlejitter",		1, NULL, NULL,	cpuidlejitter_main},
 	{"proc",		"plugins",	"proc",			1, NULL, NULL,	proc_main},
 
 #ifdef INTERNAL_PLUGIN_NFACCT
@@ -91,7 +91,7 @@ struct netdata_static_thread static_threads[] = {
 	{"nfacct",		"plugins",	"nfacct",		1, NULL, NULL, 	nfacct_main},
 #endif
 
-	{"plugins.d",	NULL,		NULL,			1, NULL, NULL,	pluginsd_main},
+	{"plugins.d",		NULL,		NULL,			1, NULL, NULL,	pluginsd_main},
 	{"check",		"plugins",	"checks",		0, NULL, NULL,	checks_main},
 	{"web",			NULL,		NULL,			1, NULL, NULL,	socket_listen_main},
 	{NULL,			NULL,		NULL,			0, NULL, NULL,	NULL}
