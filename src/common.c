@@ -361,7 +361,7 @@ char *mystrsep(char **ptr, char *s)
   // FIX: Maybe this will be a little bit faster (just one memory reference
   //      inside the loop) -- see asm code with -S option.
   if (*ptr)
-    while ( *p && !*p ) p = strsep(ptr, s);
+    while ( p && !*p ) p = strsep(ptr, s);
 	return(p);
 }
 
