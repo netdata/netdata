@@ -1428,17 +1428,22 @@ void web_client_process(struct web_client *w) {
 		"HTTP/1.1 %d %s\r\n"
 		"Connection: %s\r\n"
 		"Server: NetData Embedded HTTP Server\r\n"
-		"Content-Type: %s\r\n"
 		"Access-Control-Allow-Origin: *\r\n"
-		"Access-Control-Allow-Methods: GET, OPTIONS\r\n"
-		"Access-Control-Allow-Headers: accept, x-requested-with\r\n"
-		"Access-Control-Max-Age: 86400\r\n"
+		"Content-Type: %s\r\n"
 		"Date: %s\r\n"
 		, code, code_msg
 		, w->keepalive?"keep-alive":"close"
 		, content_type_string
 		, date
 		);
+
+	if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
+		buffer_strcat(w->response.header_output,
+			"Access-Control-Allow-Methods: GET, OPTIONS\r\n"
+			"Access-Control-Allow-Headers: accept, x-requested-with\r\n"
+			"Access-Control-Max-Age: 1209600\r\n" // 86400 * 14
+			);
+	}
 
 	if(buffer_strlen(w->response.header))
 		buffer_strcat(w->response.header_output, buffer_tostring(w->response.header));
@@ -1449,7 +1454,7 @@ void web_client_process(struct web_client *w) {
 			"Cache-Control: no-cache\r\n"
 			, date);
 	}
-	else {
+	else if(w->mode != WEB_CLIENT_MODE_OPTIONS) {
 		char edate[100];
 		time_t et = w->response.data->date + (86400 * 14);
 		struct tm etmbuf, *etm = gmtime_r(&et, &etmbuf);
