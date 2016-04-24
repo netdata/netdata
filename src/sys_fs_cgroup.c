@@ -77,16 +77,21 @@ struct memory {
 
 	char *filename;
 
+	int has_dirty_swap;
+
 	unsigned long long cache;
 	unsigned long long rss;
 	unsigned long long rss_huge;
 	unsigned long long mapped_file;
 	unsigned long long writeback;
+	unsigned long long dirty;
+	unsigned long long swap;
 	unsigned long long pgpgin;
 	unsigned long long pgpgout;
 	unsigned long long pgfault;
 	unsigned long long pgmajfault;
-/*	unsigned long long inactive_anon;
+/*
+	unsigned long long inactive_anon;
 	unsigned long long active_anon;
 	unsigned long long inactive_file;
 	unsigned long long active_file;
@@ -97,6 +102,8 @@ struct memory {
 	unsigned long long total_rss_huge;
 	unsigned long long total_mapped_file;
 	unsigned long long total_writeback;
+	unsigned long long total_dirty;
+	unsigned long long total_swap;
 	unsigned long long total_pgpgin;
 	unsigned long long total_pgpgout;
 	unsigned long long total_pgfault;
@@ -317,11 +324,14 @@ void cgroup_read_memory(struct memory *mem) {
 	static uint32_t rss_huge_hash = 0;
 	static uint32_t mapped_file_hash = 0;
 	static uint32_t writeback_hash = 0;
+	static uint32_t dirty_hash = 0;
+	static uint32_t swap_hash = 0;
 	static uint32_t pgpgin_hash = 0;
 	static uint32_t pgpgout_hash = 0;
 	static uint32_t pgfault_hash = 0;
 	static uint32_t pgmajfault_hash = 0;
-/*	static uint32_t inactive_anon_hash = 0;
+/*
+	static uint32_t inactive_anon_hash = 0;
 	static uint32_t active_anon_hash = 0;
 	static uint32_t inactive_file_hash = 0;
 	static uint32_t active_file_hash = 0;
@@ -332,6 +342,8 @@ void cgroup_read_memory(struct memory *mem) {
 	static uint32_t total_rss_huge_hash = 0;
 	static uint32_t total_mapped_file_hash = 0;
 	static uint32_t total_writeback_hash = 0;
+	static uint32_t total_dirty_hash = 0;
+	static uint32_t total_swap_hash = 0;
 	static uint32_t total_pgpgin_hash = 0;
 	static uint32_t total_pgpgout_hash = 0;
 	static uint32_t total_pgfault_hash = 0;
@@ -348,11 +360,14 @@ void cgroup_read_memory(struct memory *mem) {
 		rss_huge_hash = simple_hash("rss_huge");
 		mapped_file_hash = simple_hash("mapped_file");
 		writeback_hash = simple_hash("writeback");
+		dirty_hash = simple_hash("dirty");
+		swap_hash = simple_hash("swap");
 		pgpgin_hash = simple_hash("pgpgin");
 		pgpgout_hash = simple_hash("pgpgout");
 		pgfault_hash = simple_hash("pgfault");
 		pgmajfault_hash = simple_hash("pgmajfault");
-/*		inactive_anon_hash = simple_hash("inactive_anon");
+/*
+		inactive_anon_hash = simple_hash("inactive_anon");
 		active_anon_hash = simple_hash("active_anon");
 		inactive_file_hash = simple_hash("inactive_file");
 		active_file_hash = simple_hash("active_file");
@@ -363,6 +378,8 @@ void cgroup_read_memory(struct memory *mem) {
 		total_rss_huge_hash = simple_hash("total_rss_huge");
 		total_mapped_file_hash = simple_hash("total_mapped_file");
 		total_writeback_hash = simple_hash("total_writeback");
+		total_dirty_hash = simple_hash("total_dirty");
+		total_swap_hash = simple_hash("total_swap");
 		total_pgpgin_hash = simple_hash("total_pgpgin");
 		total_pgpgout_hash = simple_hash("total_pgpgout");
 		total_pgfault_hash = simple_hash("total_pgfault");
@@ -409,6 +426,16 @@ void cgroup_read_memory(struct memory *mem) {
 			else if(hash == writeback_hash && !strcmp(s, "writeback"))
 				mem->writeback = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
 
+			else if(hash == dirty_hash && !strcmp(s, "dirty")) {
+				mem->dirty = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
+				mem->has_dirty_swap = 1;
+			}
+
+			else if(hash == swap_hash && !strcmp(s, "swap")) {
+				mem->swap = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
+				mem->has_dirty_swap = 1;
+			}
+
 			else if(hash == pgpgin_hash && !strcmp(s, "pgpgin"))
 				mem->pgpgin = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
 
@@ -421,7 +448,8 @@ void cgroup_read_memory(struct memory *mem) {
 			else if(hash == pgmajfault_hash && !strcmp(s, "pgmajfault"))
 				mem->pgmajfault = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
 
-/*			else if(hash == inactive_anon_hash && !strcmp(s, "inactive_anon"))
+/*
+			else if(hash == inactive_anon_hash && !strcmp(s, "inactive_anon"))
 				mem->inactive_anon = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
 
 			else if(hash == active_anon_hash && !strcmp(s, "active_anon"))
@@ -454,6 +482,12 @@ void cgroup_read_memory(struct memory *mem) {
 			else if(hash == total_writeback_hash && !strcmp(s, "total_writeback"))
 				mem->total_writeback = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
 
+			else if(hash == total_dirty_hash && !strcmp(s, "total_dirty"))
+				mem->total_dirty = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
+
+			else if(hash == total_swap_hash && !strcmp(s, "total_swap"))
+				mem->total_swap = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
+
 			else if(hash == total_pgpgin_hash && !strcmp(s, "total_pgpgin"))
 				mem->total_pgpgin = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
 
@@ -483,7 +517,7 @@ void cgroup_read_memory(struct memory *mem) {
 */
 		}
 
-		// fprintf(stderr, "READ: '%s', cache: %llu, rss: %llu, rss_huge: %llu, mapped_file: %llu, writeback: %llu, pgpgin: %llu, pgpgout: %llu, pgfault: %llu, pgmajfault: %llu, inactive_anon: %llu, active_anon: %llu, inactive_file: %llu, active_file: %llu, unevictable: %llu, hierarchical_memory_limit: %llu, total_cache: %llu, total_rss: %llu, total_rss_huge: %llu, total_mapped_file: %llu, total_writeback: %llu, total_pgpgin: %llu, total_pgpgout: %llu, total_pgfault: %llu, total_pgmajfault: %llu, total_inactive_anon: %llu, total_active_anon: %llu, total_inactive_file: %llu, total_active_file: %llu, total_unevictable: %llu\n", mem->filename, mem->cache, mem->rss, mem->rss_huge, mem->mapped_file, mem->writeback, mem->pgpgin, mem->pgpgout, mem->pgfault, mem->pgmajfault, mem->inactive_anon, mem->active_anon, mem->inactive_file, mem->active_file, mem->unevictable, mem->hierarchical_memory_limit, mem->total_cache, mem->total_rss, mem->total_rss_huge, mem->total_mapped_file, mem->total_writeback, mem->total_pgpgin, mem->total_pgpgout, mem->total_pgfault, mem->total_pgmajfault, mem->total_inactive_anon, mem->total_active_anon, mem->total_inactive_file, mem->total_active_file, mem->total_unevictable);
+		// fprintf(stderr, "READ: '%s', cache: %llu, rss: %llu, rss_huge: %llu, mapped_file: %llu, writeback: %llu, dirty: %llu, swap: %llu, pgpgin: %llu, pgpgout: %llu, pgfault: %llu, pgmajfault: %llu, inactive_anon: %llu, active_anon: %llu, inactive_file: %llu, active_file: %llu, unevictable: %llu, hierarchical_memory_limit: %llu, total_cache: %llu, total_rss: %llu, total_rss_huge: %llu, total_mapped_file: %llu, total_writeback: %llu, total_dirty: %llu, total_swap: %llu, total_pgpgin: %llu, total_pgpgout: %llu, total_pgfault: %llu, total_pgmajfault: %llu, total_inactive_anon: %llu, total_active_anon: %llu, total_inactive_file: %llu, total_active_file: %llu, total_unevictable: %llu\n", mem->filename, mem->cache, mem->rss, mem->rss_huge, mem->mapped_file, mem->writeback, mem->dirty, mem->swap, mem->pgpgin, mem->pgpgout, mem->pgfault, mem->pgmajfault, mem->inactive_anon, mem->active_anon, mem->inactive_file, mem->active_file, mem->unevictable, mem->hierarchical_memory_limit, mem->total_cache, mem->total_rss, mem->total_rss_huge, mem->total_mapped_file, mem->total_writeback, mem->total_dirty, mem->total_swap, mem->total_pgpgin, mem->total_pgpgout, mem->total_pgfault, mem->total_pgmajfault, mem->total_inactive_anon, mem->total_active_anon, mem->total_inactive_file, mem->total_active_file, mem->total_unevictable);
 
 		mem->updated = 1;
 	}
@@ -829,6 +863,8 @@ void update_cgroup_charts(int update_every) {
 
 					rrddim_add(st, "cache", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
 					rrddim_add(st, "rss", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+					if(cg->memory.has_dirty_swap)
+						rrddim_add(st, "swap", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
 					rrddim_add(st, "rss_huge", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
 					rrddim_add(st, "mapped_file", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
 				}
@@ -836,6 +872,8 @@ void update_cgroup_charts(int update_every) {
 
 				rrddim_set(st, "cache", cg->memory.cache);
 				rrddim_set(st, "rss", cg->memory.rss);
+				if(cg->memory.has_dirty_swap)
+					rrddim_set(st, "swap", cg->memory.swap);
 				rrddim_set(st, "rss_huge", cg->memory.rss_huge);
 				rrddim_set(st, "mapped_file", cg->memory.mapped_file);
 				rrdset_done(st);
@@ -847,10 +885,14 @@ void update_cgroup_charts(int update_every) {
 				st = rrdset_create(type, "writeback", NULL, "mem", "cgroup.writeback", title, "MB", 40300,
 				                   update_every, RRDSET_TYPE_AREA);
 
+				if(cg->memory.has_dirty_swap)
+					rrddim_add(st, "dirty", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
 				rrddim_add(st, "writeback", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
 			}
 			else rrdset_next(st);
 
+			if(cg->memory.has_dirty_swap)
+				rrddim_set(st, "dirty", cg->memory.dirty);
 			rrddim_set(st, "writeback", cg->memory.writeback);
 			rrdset_done(st);
 
