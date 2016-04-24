@@ -53,7 +53,7 @@ void read_cgroup_plugin_configuration() {
 	cgroup_root_max = config_get_number("plugin:cgroups", "max cgroups to allow", cgroup_root_max);
 	cgroup_max_depth = config_get_number("plugin:cgroups", "max cgroups depth to monitor", cgroup_max_depth);
 
-	cgroup_enable_new_cgroups_detected_at_runtime = config_get_boolean("plugin:cgroups", "enable cgroups detected after first run", cgroup_enable_new_cgroups_detected_at_runtime);
+	cgroup_enable_new_cgroups_detected_at_runtime = config_get_boolean("plugin:cgroups", "enable new cgroups detected at run time", cgroup_enable_new_cgroups_detected_at_runtime);
 }
 
 // ----------------------------------------------------------------------------
@@ -843,7 +843,7 @@ void update_cgroup_charts(int update_every) {
 
 			st = rrdset_find_bytype(type, "writeback");
 			if(!st) {
-				snprintf(title, CHART_TITLE_MAX, "Writable Memory for cgroup %s", cg->name);
+				snprintf(title, CHART_TITLE_MAX, "Writeback Memory for cgroup %s", cg->name);
 				st = rrdset_create(type, "writeback", NULL, "mem", "cgroup.writeback", title, "MB", 40300,
 				                   update_every, RRDSET_TYPE_AREA);
 
