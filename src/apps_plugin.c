@@ -2387,12 +2387,6 @@ void parse_args(int argc, char **argv)
 	}
 }
 
-unsigned long long sutime() {
-	struct timeval now;
-	gettimeofday(&now, NULL);
-	return now.tv_sec * 1000000ULL + now.tv_usec;
-}
-
 int main(int argc, char **argv)
 {
 	// debug_flags = D_PROCFILE;
@@ -2456,11 +2450,11 @@ int main(int argc, char **argv)
 	for(;1; counter++) {
 #ifndef PROFILING_MODE
 		// delay until it is our time to run
-		while((sunow = sutime()) < sunext)
+		while((sunow = timems()) < sunext)
 			usleep((useconds_t)(sunext - sunow));
 
 		// find the next time we need to run
-		while(sutime() > sunext)
+		while(timems() > sunext)
 			sunext += update_every * 1000000ULL;
 #endif /* PROFILING_MODE */
 

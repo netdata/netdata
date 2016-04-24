@@ -37,6 +37,8 @@ extern void get_HZ(void);
 
 extern pid_t gettid(void);
 
+extern unsigned long long timems(void);
+
 /* fix for alpine linux */
 #ifndef RUSAGE_THREAD
 #ifdef RUSAGE_CHILDREN

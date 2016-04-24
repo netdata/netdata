@@ -20,6 +20,13 @@
 char *global_host_prefix = "";
 int enable_ksm = 1;
 
+// time(NULL) in milliseconds
+unsigned long long timems(void) {
+	struct timeval now;
+	gettimeofday(&now, NULL);
+	return now.tv_sec * 1000000ULL + now.tv_usec;
+}
+
 unsigned char netdata_map_chart_names[256] = {
 		[0] = '\0', //
 		[1] = '_', //
