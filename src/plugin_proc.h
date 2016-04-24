@@ -20,6 +20,5 @@ extern int do_proc_softirqs(int update_every, unsigned long long dt);
 extern int do_sys_kernel_mm_ksm(int update_every, unsigned long long dt);
 extern int do_proc_loadavg(int update_every, unsigned long long dt);
 extern int do_proc_net_stat_synproxy(int update_every, unsigned long long dt);
-extern int do_sys_fs_cgroup(int update_every, unsigned long long dt);
 
 #endif /* NETDATA_PLUGIN_PROC_H */

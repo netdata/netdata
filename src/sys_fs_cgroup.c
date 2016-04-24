@@ -14,6 +14,8 @@
 #include "procfile.h"
 #include "log.h"
 #include "rrd.h"
+#include "main.h"
+#include "popen.h"
 
 // ----------------------------------------------------------------------------
 // cgroup globals
@@ -545,6 +547,33 @@ void read_all_cgroups(struct cgroup *cg) {
 // ----------------------------------------------------------------------------
 // add/remove/find cgroup objects
 
+#define CGROUP_NAME_LINE_MAX 1024
+
+void cgroup_get_name(struct cgroup *cg) {
+	pid_t cgroup_pid;
+	char buffer[CGROUP_NAME_LINE_MAX + 1];
+
+	snprintf(buffer, CGROUP_NAME_LINE_MAX, "exec %s '%s'",
+	         config_get("plugin:cgroups", "script to get cgroup names", PLUGINS_DIR "/cgroup-name.sh"), cg->name);
+
+	FILE *fp = mypopen(buffer, &cgroup_pid);
+	if(!fp) {
+		error("CGROUP: Cannot popen(\"%s\", \"r\").", buffer);
+		return;
+	}
+	char *s = fgets(buffer, CGROUP_NAME_LINE_MAX, fp);
+	mypclose(fp, cgroup_pid);
+
+	if(s && *s && *s != '\n') {
+		trim(s);
+		netdata_fix_chart_name(s);
+		free(cg->name);
+		cg->name = strdup(s);
+		if(!cg->name)
+			fatal("CGROUP: Cannot allocate memory for name cgroup %s name: '%s'", cg->id, s);
+	}
+}
+
 struct cgroup *cgroup_add(const char *id) {
 	if(cgroup_root_count >= cgroup_root_max) {
 		info("Maximum number of cgroups reached (%d). Not adding cgroup '%s'", cgroup_root_count, id);
@@ -595,6 +624,9 @@ struct cgroup *cgroup_add(const char *id) {
 		cgroup_root_count++;
 
 		// fprintf(stderr, " > added cgroup No %d, with id '%s' (%u) and name '%s'\n", cgroup_root_count, cg->id, cg->hash, cg->name);
+
+		// fix the name by calling the external script
+		cgroup_get_name(cg);
 	}
 	else fatal("Cannot allocate memory for cgroup '%s'", id);
 
@@ -808,9 +840,9 @@ void update_cgroup_charts(int update_every) {
 		if(cg->id[0] == '\0')
 			strcpy(type, "cgroup_host");
 		else if(cg->id[0] == '/')
-			snprintf(type, RRD_ID_LENGTH_MAX, "cgroup%s", cg->id);
+			snprintf(type, RRD_ID_LENGTH_MAX, "cgroup_%s", cg->name);
 		else
-			snprintf(type, RRD_ID_LENGTH_MAX, "cgroup_%s", cg->id);
+			snprintf(type, RRD_ID_LENGTH_MAX, "cgroup_%s", cg->name);
 
 		netdata_fix_chart_id(type);
 
@@ -1060,4 +1092,80 @@ int do_sys_fs_cgroup(int update_every, unsigned long long dt) {
 	update_cgroup_charts(update_every);
 
 	return 0;
+}
+
+void *cgroups_main(void *ptr)
+{
+	if(ptr) { ; }
+
+	info("CGROUP Plugin thread created with task id %d", gettid());
+
+	if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
+		error("Cannot set pthread cancel type to DEFERRED.");
+
+	if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
+		error("Cannot set pthread cancel state to ENABLE.");
+
+	struct rusage thread;
+
+	// when ZERO, attempt to do it
+	int vdo_sys_fs_cgroup 			= 0;
+	int vdo_cpu_netdata 			= !config_get_boolean("plugin:cgroups", "netdata server resources", 1);
+
+	// keep track of the time each module was called
+	unsigned long long sutime_sys_fs_cgroup = 0ULL;
+
+	// the next time we will run - aligned properly
+	unsigned long long sunext = (time(NULL) - (time(NULL) % rrd_update_every) + rrd_update_every) * 1000000ULL;
+	unsigned long long sunow;
+
+	RRDSET *stcpu_thread = NULL;
+
+	for(;1;) {
+		if(unlikely(netdata_exit)) break;
+
+		// delay until it is our time to run
+		while((sunow = timems()) < sunext)
+			usleep((useconds_t)(sunext - sunow));
+
+		// find the next time we need to run
+		while(timems() > sunext)
+			sunext += rrd_update_every * 1000000ULL;
+
+		if(unlikely(netdata_exit)) break;
+
+		// BEGIN -- the job to be done
+
+		if(!vdo_sys_fs_cgroup) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_sys_fs_cgroup().");
+			sunow = timems();
+			vdo_sys_fs_cgroup = do_sys_fs_cgroup(rrd_update_every, (sutime_sys_fs_cgroup > 0)?sunow - sutime_sys_fs_cgroup:0ULL);
+			sutime_sys_fs_cgroup = sunow;
+		}
+		if(unlikely(netdata_exit)) break;
+
+		// END -- the job is done
+
+		// --------------------------------------------------------------------
+
+		if(!vdo_cpu_netdata) {
+			getrusage(RUSAGE_THREAD, &thread);
+
+			if(!stcpu_thread) stcpu_thread = rrdset_find("netdata.plugin_cgroups_cpu");
+			if(!stcpu_thread) {
+				stcpu_thread = rrdset_create("netdata", "plugin_cgroups_cpu", NULL, "proc.internal", NULL, "NetData CGroups Plugin CPU usage", "milliseconds/s", 131000, rrd_update_every, RRDSET_TYPE_STACKED);
+
+				rrddim_add(stcpu_thread, "user",  NULL,  1, 1000, RRDDIM_INCREMENTAL);
+				rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRDDIM_INCREMENTAL);
+			}
+			else rrdset_next(stcpu_thread);
+
+			rrddim_set(stcpu_thread, "user"  , thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
+			rrddim_set(stcpu_thread, "system", thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
+			rrdset_done(stcpu_thread);
+		}
+	}
+
+	pthread_exit(NULL);
+	return NULL;
 }
