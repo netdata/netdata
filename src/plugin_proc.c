@@ -58,6 +58,7 @@ void *proc_main(void *ptr)
 	int vdo_proc_loadavg			= !config_get_boolean("plugin:proc", "/proc/loadavg", 1);
 	int vdo_sys_kernel_mm_ksm		= !config_get_boolean("plugin:proc", "/sys/kernel/mm/ksm", 1);
 	int vdo_cpu_netdata 			= !config_get_boolean("plugin:proc", "netdata server resources", 1);
+	int vdo_sys_fs_cgroup 			= !config_get_boolean("plugin:proc", "cgroups", 1);
 
 	// keep track of the time each module was called
 	unsigned long long sutime_proc_net_dev = 0ULL;
@@ -77,6 +78,7 @@ void *proc_main(void *ptr)
 	unsigned long long sutime_proc_softirqs = 0ULL;
 	unsigned long long sutime_proc_loadavg = 0ULL;
 	unsigned long long sutime_sys_kernel_mm_ksm = 0ULL;
+	unsigned long long sutime_sys_fs_cgroup = 0ULL;
 
 	// the next time we will run - aligned properly
 	unsigned long long sunext = (time(NULL) - (time(NULL) % rrd_update_every) + rrd_update_every) * 1000000ULL;
@@ -233,6 +235,14 @@ void *proc_main(void *ptr)
 			sunow = sutime();
 			vdo_proc_net_rpc_nfsd = do_proc_net_rpc_nfsd(rrd_update_every, (sutime_proc_net_rpc_nfsd > 0)?sunow - sutime_proc_net_rpc_nfsd:0ULL);
 			sutime_proc_net_rpc_nfsd = sunow;
+		}
+		if(unlikely(netdata_exit)) break;
+
+		if(!vdo_sys_fs_cgroup) {
+			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_sys_fs_cgroup().");
+			sunow = sutime();
+			vdo_sys_fs_cgroup = do_sys_fs_cgroup(rrd_update_every, (sutime_sys_fs_cgroup > 0)?sunow - sutime_sys_fs_cgroup:0ULL);
+			sutime_sys_fs_cgroup = sunow;
 		}
 		if(unlikely(netdata_exit)) break;
 
