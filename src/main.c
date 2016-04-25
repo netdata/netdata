@@ -36,7 +36,8 @@
 #include "plugin_nfacct.h"
 
 #include "main.h"
-#include "../config.h"
+
+extern void *cgroups_main(void *ptr);
 
 int netdata_exit = 0;
 
@@ -84,6 +85,7 @@ struct netdata_static_thread static_threads[] = {
 	{"tc",			"plugins",	"tc",			1, NULL, NULL,	tc_main},
 	{"idlejitter",	"plugins",	"idlejitter",	1, NULL, NULL,	cpuidlejitter_main},
 	{"proc",		"plugins",	"proc",			1, NULL, NULL,	proc_main},
+	{"cgroups",		"plugins",	"cgroups",		1, NULL, NULL,	cgroups_main},
 
 #ifdef INTERNAL_PLUGIN_NFACCT
 	// nfacct requires root access

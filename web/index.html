@@ -1012,6 +1012,21 @@ var menuData = {
 		title: 'Example Charts',
 		info: undefined
 	},
+
+	'cgroup': {
+		title: 'Container',
+		info: undefined
+	},
+
+	'mysql': {
+		title: 'MySQL',
+		info: undefined
+	},
+
+	'named': {
+		title: 'named',
+		info: undefined
+	},
 };
 
 var submenuData = {
@@ -1322,8 +1337,13 @@ function anyAttribute(obj, attr, key, def) {
 	return def;
 }
 
-function menuTitle(menu) {
-	return anyAttribute(menuData, 'title', menu, menu);
+function menuTitle(chart) {
+	if(typeof chart.menu_pattern !== 'undefined') {
+		return anyAttribute(menuData, 'title', chart.menu_pattern, chart.menu_pattern).toString()
+				+ ': ' + chart.type.slice(-(chart.type.length - chart.menu_pattern.length - 1)).toString();
+	}
+
+	return anyAttribute(menuData, 'title', chart.menu, chart.menu);
 }
 
 function menuInfo(menu) {
@@ -1377,6 +1397,13 @@ function enrichChartData(chart) {
 		case 'net':
 		case 'disk':
 			chart.menu = tmp;
+			break;
+
+		case 'mysql':
+		case 'named':
+		case 'cgroup':
+			chart.menu = chart.type;
+			chart.menu_pattern = tmp;
 			break;
 
 		case 'tc':
@@ -1654,7 +1681,7 @@ function renderChartsAndMenu(data) {
 			menus[charts[c].menu] = {
 				priority: charts[c].priority,
 				submenus: {},
-				title: menuTitle(charts[c].menu),
+				title: menuTitle(charts[c]),
 				info: menuInfo(charts[c].menu),
 				height: menuHeight(charts[c].menu, options.chartsHeight)
 			};
@@ -1681,6 +1708,8 @@ function renderChartsAndMenu(data) {
 		menus[charts[c].menu].submenus[charts[c].submenu].charts.push(charts[c]);
 	}
 
+	// propagate the descriptive subname given to QoS
+	// to all the other submenus with the same name
 	for(var m in menus) {
 		for(var s in menus[m].submenus) {
 			// set the family using a name

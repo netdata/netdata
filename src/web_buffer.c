@@ -253,28 +253,28 @@ void buffer_date(BUFFER *wb, int year, int month, int day, int hours, int minute
 	buffer_need_bytes(wb, 36);
 
 	char *b = &wb->buffer[wb->len];
-	char *p = b;
+  char *p = b;
 
-	*p++ = '0' + year / 1000; year %= 1000;
-	*p++ = '0' + year / 100;  year %= 100;
-	*p++ = '0' + year / 10;
-	*p++ = '0' + year % 10;
-	*p++ = '-';
-	*p++ = '0' + month / 10;
-	*p++ = '0' + month % 10;
-	*p++ = '-';
-	*p++ = '0' + day / 10;
-	*p++ = '0' + day % 10;
-	*p++ = ' ';
-	*p++ = '0' + hours / 10;
-	*p++ = '0' + hours % 10;
-	*p++ = ' ';
-	*p++ = '0' + minutes / 10;
-	*p++ = '0' + minutes % 10;
-	*p++ = ' ';
-	*p++ = '0' + seconds / 10;
-	*p++ = '0' + seconds % 10;
-	*p = '\0';
+  *p++ = '0' + year / 1000; year %= 1000;
+  *p++ = '0' + year / 100;  year %= 100;
+  *p++ = '0' + year / 10;
+  *p++ = '0' + year % 10;
+  *p++ = '-';
+  *p++ = '0' + month / 10;
+  *p++ = '0' + month % 10;
+  *p++ = '-';
+  *p++ = '0' + day / 10;
+  *p++ = '0' + day % 10;
+  *p++ = ' ';
+  *p++ = '0' + hours / 10;
+  *p++ = '0' + hours % 10;
+  *p++ = ':';
+  *p++ = '0' + minutes / 10;
+  *p++ = '0' + minutes % 10;
+  *p++ = ':';
+  *p++ = '0' + seconds / 10;
+  *p++ = '0' + seconds % 10;
+  *p = '\0';
 
 	wb->len += (size_t)(p - b);
 
