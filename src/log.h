@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdarg.h>
+#include <time.h>
 
 #ifndef NETDATA_LOG_H
 #define NETDATA_LOG_H 1
