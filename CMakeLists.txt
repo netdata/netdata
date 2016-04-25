@@ -64,6 +64,7 @@ set(NETDATA_SOURCE_FILES
 	src/storage_number.c
 	src/storage_number.h
 	src/sys_kernel_mm_ksm.c
+	src/sys_fs_cgroup.c
 	src/unit_test.c
 	src/unit_test.h
 	src/url.c

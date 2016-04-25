@@ -55,6 +55,7 @@ netdata_SOURCES = \
 	proc_sys_kernel_random_entropy_avail.c \
 	proc_vmstat.c \
 	sys_kernel_mm_ksm.c \
+	sys_fs_cgroup.c \
 	procfile.c procfile.h \
 	rrd.c rrd.h \
 	rrd2json.c rrd2json.h \
