@@ -15,7 +15,7 @@ fi
 
 if [ -f "${CONFIG}" ]
 	then
-	NAME="$(cat "${CONFIG}" | grep "^${CGROUP}" | cut -d ' ' -f 2)"
+	NAME="$(cat "${CONFIG}" | grep "^${CGROUP} " | sed "s/[[:space:]]\+/ /g" | cut -d ' ' -f 2)"
 	if [ -z "${NAME}" ]
 		then
 		echo >&2 "${0}: cannot find cgroup '${CGROUP}' in '${CONFIG}'."
@@ -24,11 +24,17 @@ else
 	echo >&2 "${0}: configuration file '${CONFIG}' is not available."
 fi
 
+if [ -z "${NAME}" -a "${CGROUP:0:7}" = "docker/" ]
+	then
+	NAME="$(docker ps | grep "^${CGROUP:7:12}" | sed "s/[[:space:]]\+/ /g" | cut -d ' ' -f 2)"
+	[ -z "${NAME}" ] && NAME="${CGROUP:0:19}"
+fi
+
 if [ -z "${NAME}" ]
 	then
-	if [ ${#CGROUP} -gt 12 ]
+	if [ ${#CGROUP} -gt 20 ]
 		then
-		NAME="${CGROUP:0:12}"
+		NAME="${CGROUP:0:20}"
 	else
 		NAME="${CGROUP}"
 	fi

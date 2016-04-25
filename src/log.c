@@ -131,6 +131,7 @@ void debug_int( const char *file, const char *function, const unsigned long line
 	vfprintf( stdout, fmt, args );
 	va_end( args );
 	fprintf(stdout, "\n");
+	fflush( stdout );
 
 	if(output_log_syslog) {
 		va_start( args, fmt );
