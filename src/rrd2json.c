@@ -1785,7 +1785,7 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 	// initialize them
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 		group_values[c] = 0;
-		print_hidden[c] = (rd->flags & RRDDIM_FLAG_HIDDEN)?1:0;
+		print_hidden[c] = rd->flags & RRDDIM_FLAG_HIDDEN;
 		found_non_zero[c] = 0;
 		found_non_existing[c] = 0;
 	}

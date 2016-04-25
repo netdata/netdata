@@ -1197,9 +1197,9 @@ void web_client_process(struct web_client *w) {
 						else {
 							code = 200;
 							debug_flags |= D_RRD_STATS;
-							st->debug = st->debug?0:1;
-							buffer_sprintf(w->response.data, "Chart %s has now debug %s.\r\n", tok, st->debug?"enabled":"disabled");
-							debug(D_WEB_CLIENT_ACCESS, "%llu: debug for %s is %s.", w->id, tok, st->debug?"enabled":"disabled");
+							//st->debug = st->debug?0:1;
+							buffer_sprintf(w->response.data, "Chart %s has now debug %s.\r\n", tok, !st->debug?"enabled":"disabled");
+							debug(D_WEB_CLIENT_ACCESS, "%llu: debug for %s is %s.", w->id, tok, !st->debug?"enabled":"disabled");
 						}
 					}
 					else {
