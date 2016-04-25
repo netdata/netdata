@@ -1,3 +1,4 @@
+/* vim: set ts=4 noet sw=4 : */
 // TODO
 //
 // 1. disable RESET_OR_OVERFLOW check in charts
@@ -42,8 +43,6 @@
 #define MAX_COMPARE_NAME 100
 #define MAX_NAME 100
 #define MAX_CMDLINE 1024
-
-unsigned long long Hertz = 1;
 
 long processors = 1;
 long pid_max = 32768;
@@ -301,7 +300,6 @@ unsigned long long get_system_hertz(void)
 	return myhz;
 }
 
-
 // ----------------------------------------------------------------------------
 // target
 // target is the structure that process data are aggregated
@@ -429,7 +427,7 @@ struct target *get_users_target(uid_t uid)
 	else
 		mysnprintf(w->name, MAX_NAME, "%s", pw->pw_name);
 
-	netdata_fix_id(w->name);
+	netdata_fix_chart_name(w->name);
 
 	w->uid = uid;
 
@@ -472,7 +470,7 @@ struct target *get_groups_target(gid_t gid)
 	else
 		mysnprintf(w->name, MAX_NAME, "%s", gr->gr_name);
 
-	netdata_fix_id(w->name);
+	netdata_fix_chart_name(w->name);
 
 	w->gid = gid;
 
@@ -2321,7 +2319,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu %s\n", w->name, Hertz, w->hidden ? "hidden,noreset" : "noreset");
+		fprintf(stdout, "DIMENSION %s '' incremental 100 %u %s\n", w->name, hz, w->hidden ? "hidden,noreset" : "noreset");
 	}
 
 	fprintf(stdout, "CHART %s.mem '' '%s Dedicated Memory (w/o shared)' 'MB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
@@ -2349,14 +2347,14 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu noreset\n", w->name, Hertz * processors);
+		fprintf(stdout, "DIMENSION %s '' incremental 100 %ld noreset\n", w->name, hz * processors);
 	}
 
 	fprintf(stdout, "CHART %s.cpu_system '' '%s CPU System Time (%ld%% = %ld core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20021 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %llu noreset\n", w->name, Hertz * processors);
+		fprintf(stdout, "DIMENSION %s '' incremental 100 %ld noreset\n", w->name, hz * processors);
 	}
 
 	fprintf(stdout, "CHART %s.major_faults '' '%s Major Page Faults (swap read)' 'page faults/s' swap %s.major_faults stacked 20010 %d\n", type, title, type, update_every);
@@ -2465,12 +2463,6 @@ void parse_args(int argc, char **argv)
 	}
 }
 
-unsigned long long sutime() {
-	struct timeval now;
-	gettimeofday(&now, NULL);
-	return now.tv_sec * 1000000ULL + now.tv_usec;
-}
-
 int main(int argc, char **argv)
 {
 	// debug_flags = D_PROCFILE;
@@ -2480,6 +2472,10 @@ int main(int argc, char **argv)
 
 	// disable syslog for apps.plugin
 	error_log_syslog = 0;
+
+	// set errors flood protection to 100 logs per hour
+	error_log_errors_per_period = 100;
+	error_log_throttle_period = 3600;
 
 	host_prefix = getenv("NETDATA_HOST_PREFIX");
 	if(host_prefix == NULL) {
@@ -2501,7 +2497,7 @@ int main(int argc, char **argv)
 
 	time_t started_t = time(NULL);
 	time_t current_t;
-	Hertz = get_system_hertz();
+	get_HZ();
 	pid_max = get_system_pid_max();
 	processors = get_system_cpus();
 
@@ -2543,11 +2539,11 @@ int main(int argc, char **argv)
 	for(;; counter++) {
 #ifndef PROFILING_MODE
 		// delay until it is our time to run
-		while((sunow = sutime()) < sunext)
+		while((sunow = timems()) < sunext)
 			usleep((useconds_t)(sunext - sunow));
 
 		// find the next time we need to run
-		while(sutime() > sunext)
+		while(timems() > sunext)
 			sunext += update_every * 1000000ULL;
 #endif /* PROFILING_MODE */
 

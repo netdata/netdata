@@ -15,12 +15,6 @@
 #include "plugin_proc.h"
 #include "main.h"
 
-unsigned long long sutime() {
-	struct timeval now;
-	gettimeofday(&now, NULL);
-	return now.tv_sec * 1000000ULL + now.tv_usec;
-}
-
 void *proc_main(void *ptr)
 {
 	if(ptr) { ; }
@@ -88,11 +82,11 @@ void *proc_main(void *ptr)
 		if(unlikely(netdata_exit)) break;
 
 		// delay until it is our time to run
-		while((sunow = sutime()) < sunext)
+		while((sunow = timems()) < sunext)
 			usleep((useconds_t)(sunext - sunow));
 
 		// find the next time we need to run
-		while(sutime() > sunext)
+		while(timems() > sunext)
 			sunext += rrd_update_every * 1000000ULL;
 
 		if(unlikely(netdata_exit)) break;
@@ -102,7 +96,7 @@ void *proc_main(void *ptr)
 		if(!vdo_sys_kernel_mm_ksm) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_sys_kernel_mm_ksm().");
 
-			sunow = sutime();
+			sunow = timems();
 			vdo_sys_kernel_mm_ksm = do_sys_kernel_mm_ksm(rrd_update_every, (sutime_sys_kernel_mm_ksm > 0)?sunow - sutime_sys_kernel_mm_ksm:0ULL);
 			sutime_sys_kernel_mm_ksm = sunow;
 		}
@@ -110,7 +104,7 @@ void *proc_main(void *ptr)
 
 		if(!vdo_proc_loadavg) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_loadavg().");
-			sunow = sutime();
+			sunow = timems();
 			vdo_proc_loadavg = do_proc_loadavg(rrd_update_every, (sutime_proc_loadavg > 0)?sunow - sutime_proc_loadavg:0ULL);
 			sutime_proc_loadavg = sunow;
 		}
@@ -118,7 +112,7 @@ void *proc_main(void *ptr)
 
 		if(!vdo_proc_interrupts) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_interrupts().");
-			sunow = sutime();
+			sunow = timems();
 			vdo_proc_interrupts = do_proc_interrupts(rrd_update_every, (sutime_proc_interrupts > 0)?sunow - sutime_proc_interrupts:0ULL);
 			sutime_proc_interrupts = sunow;
 		}
@@ -126,7 +120,7 @@ void *proc_main(void *ptr)
 
 		if(!vdo_proc_softirqs) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_softirqs().");
-			sunow = sutime();
+			sunow = timems();
 			vdo_proc_softirqs = do_proc_softirqs(rrd_update_every, (sutime_proc_softirqs > 0)?sunow - sutime_proc_softirqs:0ULL);
 			sutime_proc_softirqs = sunow;
 		}
@@ -134,7 +128,7 @@ void *proc_main(void *ptr)
 
 		if(!vdo_proc_sys_kernel_random_entropy_avail) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_sys_kernel_random_entropy_avail().");
-			sunow = sutime();
+			sunow = timems();
 			vdo_proc_sys_kernel_random_entropy_avail = do_proc_sys_kernel_random_entropy_avail(rrd_update_every, (sutime_proc_sys_kernel_random_entropy_avail > 0)?sunow - sutime_proc_sys_kernel_random_entropy_avail:0ULL);
 			sutime_proc_sys_kernel_random_entropy_avail = sunow;
 		}
@@ -142,7 +136,7 @@ void *proc_main(void *ptr)
 
 		if(!vdo_proc_net_dev) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_dev().");
-			sunow = sutime();
+			sunow = timems();
 			vdo_proc_net_dev = do_proc_net_dev(rrd_update_every, (sutime_proc_net_dev > 0)?sunow - sutime_proc_net_dev:0ULL);
 			sutime_proc_net_dev = sunow;
 		}
@@ -150,7 +144,7 @@ void *proc_main(void *ptr)
 
 		if(!vdo_proc_diskstats) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_diskstats().");
-			sunow = sutime();
+			sunow = timems();
 			vdo_proc_diskstats = do_proc_diskstats(rrd_update_every, (sutime_proc_diskstats > 0)?sunow - sutime_proc_diskstats:0ULL);
 			sutime_proc_diskstats = sunow;
 		}
@@ -158,7 +152,7 @@ void *proc_main(void *ptr)
 
 		if(!vdo_proc_net_snmp) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_snmp().");
-			sunow = sutime();
+			sunow = timems();
 			vdo_proc_net_snmp = do_proc_net_snmp(rrd_update_every, (sutime_proc_net_snmp > 0)?sunow - sutime_proc_net_snmp:0ULL);
 			sutime_proc_net_snmp = sunow;
 		}
@@ -166,7 +160,7 @@ void *proc_main(void *ptr)
 
 		if(!vdo_proc_net_snmp6) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_snmp6().");
-			sunow = sutime();
+			sunow = timems();
 			vdo_proc_net_snmp6 = do_proc_net_snmp6(rrd_update_every, (sutime_proc_net_snmp6 > 0)?sunow - sutime_proc_net_snmp6:0ULL);
 			sutime_proc_net_snmp6 = sunow;
 		}
@@ -174,7 +168,7 @@ void *proc_main(void *ptr)
 
 		if(!vdo_proc_net_netstat) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_netstat().");
-			sunow = sutime();
+			sunow = timems();
 			vdo_proc_net_netstat = do_proc_net_netstat(rrd_update_every, (sutime_proc_net_netstat > 0)?sunow - sutime_proc_net_netstat:0ULL);
 			sutime_proc_net_netstat = sunow;
 		}
@@ -182,7 +176,7 @@ void *proc_main(void *ptr)
 
 		if(!vdo_proc_net_stat_conntrack) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_stat_conntrack().");
-			sunow = sutime();
+			sunow = timems();
 			vdo_proc_net_stat_conntrack	= do_proc_net_stat_conntrack(rrd_update_every, (sutime_proc_net_stat_conntrack > 0)?sunow - sutime_proc_net_stat_conntrack:0ULL);
 			sutime_proc_net_stat_conntrack = sunow;
 		}
@@ -190,7 +184,7 @@ void *proc_main(void *ptr)
 
 		if(!vdo_proc_net_ip_vs_stats) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling vdo_proc_net_ip_vs_stats().");
-			sunow = sutime();
+			sunow = timems();
 			vdo_proc_net_ip_vs_stats = do_proc_net_ip_vs_stats(rrd_update_every, (sutime_proc_net_ip_vs_stats > 0)?sunow - sutime_proc_net_ip_vs_stats:0ULL);
 			sutime_proc_net_ip_vs_stats = sunow;
 		}
@@ -198,7 +192,7 @@ void *proc_main(void *ptr)
 
 		if(!vdo_proc_net_stat_synproxy) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling vdo_proc_net_stat_synproxy().");
-			sunow = sutime();
+			sunow = timems();
 			vdo_proc_net_stat_synproxy = do_proc_net_stat_synproxy(rrd_update_every, (sutime_proc_net_stat_synproxy > 0)?sunow - sutime_proc_net_stat_synproxy:0ULL);
 			sutime_proc_net_stat_synproxy = sunow;
 		}
@@ -206,7 +200,7 @@ void *proc_main(void *ptr)
 
 		if(!vdo_proc_stat) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_stat().");
-			sunow = sutime();
+			sunow = timems();
 			vdo_proc_stat = do_proc_stat(rrd_update_every, (sutime_proc_stat > 0)?sunow - sutime_proc_stat:0ULL);
 			sutime_proc_stat = sunow;
 		}
@@ -214,7 +208,7 @@ void *proc_main(void *ptr)
 
 		if(!vdo_proc_meminfo) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling vdo_proc_meminfo().");
-			sunow = sutime();
+			sunow = timems();
 			vdo_proc_meminfo = do_proc_meminfo(rrd_update_every, (sutime_proc_meminfo > 0)?sunow - sutime_proc_meminfo:0ULL);
 			sutime_proc_meminfo = sunow;
 		}
@@ -222,7 +216,7 @@ void *proc_main(void *ptr)
 
 		if(!vdo_proc_vmstat) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling vdo_proc_vmstat().");
-			sunow = sutime();
+			sunow = timems();
 			vdo_proc_vmstat = do_proc_vmstat(rrd_update_every, (sutime_proc_vmstat > 0)?sunow - sutime_proc_vmstat:0ULL);
 			sutime_proc_vmstat = sunow;
 		}
@@ -230,7 +224,7 @@ void *proc_main(void *ptr)
 
 		if(!vdo_proc_net_rpc_nfsd) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_rpc_nfsd().");
-			sunow = sutime();
+			sunow = timems();
 			vdo_proc_net_rpc_nfsd = do_proc_net_rpc_nfsd(rrd_update_every, (sutime_proc_net_rpc_nfsd > 0)?sunow - sutime_proc_net_rpc_nfsd:0ULL);
 			sutime_proc_net_rpc_nfsd = sunow;
 		}

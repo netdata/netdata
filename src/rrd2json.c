@@ -1,3 +1,4 @@
+/* vim: set ts=4 noet sw=4 : */
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -1748,7 +1749,6 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 	char post_date[21];            mysnprintf(post_date,            20, "%s}", sq);
 	char pre_value[21];            mysnprintf(pre_value,            20, ",{%sv%s:", kq, kq);
 	char post_value[21];           strcpy(post_value, "}");
-
 
 	// -------------------------------------------------------------------------
 	// checks for debugging

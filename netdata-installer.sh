@@ -134,7 +134,7 @@ if [ "${UID}" -ne 0 ]
 		then
 		cat <<NONROOTNOPREFIX
 
-Sorry! This will wrong!
+Sorry! This will fail!
 
 You are attempting to install netdata as non-root, but you plan to install it
 in system paths.
@@ -415,7 +415,7 @@ do
 		fi
 	fi
 
-	run chmod 0775 "${x}" || echo >&2 "WARNING: Cannot change the permissions of the directory ${x} to 0755..."
+	run chmod 0755 "${x}" || echo >&2 "WARNING: Cannot change the permissions of the directory ${x} to 0755..."
 done
 
 if [ ${UID} -eq 0 ]
