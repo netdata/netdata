@@ -249,7 +249,7 @@ long get_system_pid_max(void) {
 	procfile *ff = NULL;
 
 	// FIXME: Is this a typical maximum system pid count, or just for Linux?
-  	//        Is it defined on POSIX.1 ABI X/Open and/or BSD specs?
+  //        Is it defined on POSIX.1 ABI X/Open and/or BSD specs?
 	long mpid = 32768;
 
 	char filename[FILENAME_MAX + 1];
@@ -284,8 +284,17 @@ unsigned long long get_system_hertz(void)
 	myhz = HZ;    /* <asm/param.h> */
 #else /* HZ */
 	/* If 32-bit or big-endian (not Alpha or ia64), assume HZ is 100. */
-  /* FIXME: Why!? */
-	hz = (sizeof(long)==sizeof(int) || htons(999)==999) ? 100UL : 1024UL;
+	/* FIXME: Why!? */
+
+	//hz = (sizeof(long)==sizeof(int) || htons(999)==999) ? 100UL : 1024UL;
+	/* FIX: No calculations needed! */
+	/* FIX: hz?! or myhz? */
+#if (__SIZEOF_LONG__ == __SIZEOF_INT__) || (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+	myhz = 100ULL
+#else
+	myhz = 1024ULL
+#endif
+
 #endif /* HZ */
 
 	error("Unknown HZ value. Assuming %llu.", myhz);
@@ -392,26 +401,31 @@ struct target *groups_root_target = NULL;
 struct target *get_users_target(uid_t uid)
 {
 	struct target *w;
-	for(w = users_root_target ; w ; w = w->next)
+
+  for(w = users_root_target ; w ; w = w->next)
 		if(w->uid == uid) return w;
 
 	// FIX: Just to use the 'correct' semantics.
-  	w = calloc(1, sizeof(struct target));
+	w = calloc(1, sizeof(struct target));
 	if(unlikely(!w)) {
 		error("Cannot allocate %lu bytes of memory", (unsigned long)sizeof(struct target));
 		return NULL;
 	}
 
-	mysnprintf(w->compare, MAX_COMPARE_NAME, "%d", uid);
+	// FIX: Convert only once.
+	char str_uid[MAX_NAME+1];
+	mysnprintf(str_uid, MAX_NAME, "%d", uid);
+
+	mystrncpy(w->compare, str_uid, MAX_COMPARE_NAME);
 	w->comparehash = simple_hash(w->compare);
 	w->comparelen = strlen(w->compare);
 
-	mysnprintf(w->id, MAX_NAME, "%d", uid);
+	mystrncpy(w->id, str_uid, MAX_NAME);
 	w->idhash = simple_hash(w->id);
 
 	struct passwd *pw = getpwuid(uid);
 	if(!pw)
-		mysnprintf(w->name, MAX_NAME, "%d", uid);
+		mystrncpy(w->name, str_uid, MAX_NAME);
 	else
 		mysnprintf(w->name, MAX_NAME, "%s", pw->pw_name);
 
@@ -423,7 +437,7 @@ struct target *get_users_target(uid_t uid)
 	users_root_target = w;
 
 	if(unlikely(debug))
-		fprintf(stderr, "apps.plugin: added uid %d ('%s') target\n", w->uid, w->name);
+		fprintf(stderr, "apps.plugin: added uid %s ('%s') target\n", str_uid, w->name);
 
 	return w;
 }
@@ -437,20 +451,24 @@ struct target *get_groups_target(gid_t gid)
 	// FIX: Just to use the 'correct' semantics.
 	w = calloc(1, sizeof(struct target));
 	if(unlikely(!w)) {
-		error("Cannot allocate %lu bytes of memory", (unsigned long)sizeof(struct target));
+		error("Cannot allocate %zu bytes of memory", sizeof(struct target));
 		return NULL;
 	}
 
-	mysnprintf(w->compare, MAX_COMPARE_NAME, "%d", gid);
+	// FIX: Convert only once.
+	char str_gid[MAX_NAME+1];
+	mysnprintf(str_gid, MAX_NAME, "%d", gid);
+
+	mystrncpy(w->compare, str_gid, MAX_COMPARE_NAME);
 	w->comparehash = simple_hash(w->compare);
 	w->comparelen = strlen(w->compare);
 
-	mysnprintf(w->id, MAX_NAME, "%d", gid);
+	mystrncpy(w->id, str_gid, MAX_NAME);
 	w->idhash = simple_hash(w->id);
 
 	struct group *gr = getgrgid(gid);
 	if(!gr)
-		mysnprintf(w->name, MAX_NAME, "%d", gid);
+		mystrncpy(w->name, str_gid, MAX_NAME);
 	else
 		mysnprintf(w->name, MAX_NAME, "%s", gr->gr_name);
 
@@ -462,7 +480,7 @@ struct target *get_groups_target(gid_t gid)
 	groups_root_target = w;
 
 	if(unlikely(debug))
-		fprintf(stderr, "apps.plugin: added gid %d ('%s') target\n", w->gid, w->name);
+		fprintf(stderr, "apps.plugin: added gid %s ('%s') target\n", str_gid, w->name);
 
 	return w;
 }
@@ -613,7 +631,7 @@ int read_apps_groups_conf(const char *name)
 	if(!apps_groups_default_target)
 		error("Cannot create default target");
 	else
-		mystrncpy(apps_groups_default_target->name, "other", MAX_NAME);
+		strcpy(apps_groups_default_target->name, "other"); // surely less than 100 chars.
 
 	return 0;
 }
@@ -756,6 +774,9 @@ long all_pids_count = 0;
 
 struct pid_stat *get_pid_entry(pid_t pid)
 {
+	// FIXME: The double linked list pointed by root_of_pids
+	//        is garanteed to be a sorted list?!
+
 	if(all_pids[pid]) {
 		all_pids[pid]->new_entry = 0;
 		return all_pids[pid];
@@ -768,6 +789,7 @@ struct pid_stat *get_pid_entry(pid_t pid)
 		return NULL;
 	}
 
+	// FIXME: Why the arbitrary value 100 was choosen for the maximum number of descriptors?
 	// FIX: Just to use the 'correct' semantics.
 	all_pids[pid]->fds = calloc(100, sizeof(int));
 	if(!all_pids[pid]->fds)
@@ -810,13 +832,13 @@ int read_proc_pid_cmdline(struct pid_stat *p) {
 	int fd = open(filename, O_RDONLY, 0666);
 	if(unlikely(fd == -1)) return 1;
 
-	int i, bytes = read(fd, p->cmdline, MAX_CMDLINE);
+	ssize_t i, bytes = read(fd, p->cmdline, MAX_CMDLINE);
 	close(fd);
 
 	if(bytes <= 0) {
 		// copy the command to the command line
-		strncpy(p->cmdline, p->comm, MAX_CMDLINE);
-		p->cmdline[MAX_CMDLINE] = '\0';
+		mystrncpy(p->cmdline, p->comm, MAX_CMDLINE);
+		//p->cmdline[MAX_CMDLINE] = '\0';
 		return 0;
 	}
 
@@ -857,13 +879,15 @@ int read_proc_pid_stat(struct pid_stat *p) {
 
 	// ----------------------------------------
 
-	int set_quotes = (!ff)?1:0;
+	// FIX: set_quotes will always be true!
+	//int set_quotes = (!ff)?1:0;
 
 	ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
 	if(!ff) return 1;
 
 	// if(set_quotes) procfile_set_quotes(ff, "()");
-	if(set_quotes) procfile_set_open_close(ff, "(", ")");
+	//if(set_quotes) procfile_set_open_close(ff, "(", ")");
+	procfile_set_open_close(ff, "(", ")");
 
 	ff = procfile_readall(ff);
 	if(!ff) {
@@ -881,7 +905,9 @@ int read_proc_pid_stat(struct pid_stat *p) {
 	// p->pid			= atol(procfile_lineword(ff, 0, 0+i));
 	// comm is at 1
 	// p->state			= *(procfile_lineword(ff, 0, 2+i));
+
 	p->ppid				= (int32_t) atol(procfile_lineword(ff, 0, 3 + i));
+
 	// p->pgrp			= atol(procfile_lineword(ff, 0, 4+i));
 	// p->session		= atol(procfile_lineword(ff, 0, 5+i));
 	// p->tty_nr		= atol(procfile_lineword(ff, 0, 6+i));
@@ -897,7 +923,9 @@ int read_proc_pid_stat(struct pid_stat *p) {
 	p->cstime			= strtoull(procfile_lineword(ff, 0, 16+i), NULL, 10);
 	// p->priority		= strtoull(procfile_lineword(ff, 0, 17+i), NULL, 10);
 	// p->nice			= strtoull(procfile_lineword(ff, 0, 18+i), NULL, 10);
+
 	p->num_threads		= (int32_t) atol(procfile_lineword(ff, 0, 19 + i));
+
 	// p->itrealvalue	= strtoull(procfile_lineword(ff, 0, 20+i), NULL, 10);
 	// p->starttime		= strtoull(procfile_lineword(ff, 0, 21+i), NULL, 10);
 	// p->vsize			= strtoull(procfile_lineword(ff, 0, 22+i), NULL, 10);
@@ -1127,7 +1155,7 @@ int file_descriptor_find_or_add(const char *name)
 		all_files = realloc(all_files, (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP) * sizeof(struct file_descriptor));
 
 		// FIXME: Unless realloc is redefined by NETDATA_INTERNAL_CHECKS symbol,
-		//        all_files can be NULL!
+		//        all_files can be NULL at this point!
 
 		// if the address changed, we have to rebuild the index
 		// since all pointers are now invalid
@@ -1447,10 +1475,10 @@ int collect_data_for_all_processes_from_proc(void)
 				// 2. the target has the prefix
 				// 3. the target has the suffix
 				// 4. the target is something inside cmdline
-				if(	(!w->starts_with && !w->ends_with && w->comparehash == hash && !strcmp(w->compare, p->comm))
-					   || (w->starts_with && !w->ends_with && !strncmp(w->compare, p->comm, w->comparelen))
-					   || (!w->starts_with && w->ends_with && pclen >= w->comparelen && !strcmp(w->compare, &p->comm[pclen - w->comparelen]))
-					   || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && strstr(p->cmdline, w->compare))
+				if(	(!w->starts_with && !w->ends_with && w->comparehash == hash && !strcmp(w->compare, p->comm)) || 
+						(w->starts_with && !w->ends_with && !strncmp(w->compare, p->comm, w->comparelen))            || 
+						(!w->starts_with && w->ends_with && pclen >= w->comparelen && !strcmp(w->compare, &p->comm[pclen - w->comparelen])) || 
+						(proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && strstr(p->cmdline, w->compare))
 						) {
 					if(w->target) p->target = w->target;
 					else p->target = w;
@@ -1789,7 +1817,7 @@ long zero_all_targets(struct target *root) {
 
 void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o) {
 	if(unlikely(!w->fds)) {
-	    // FIX: Just to use the 'correct' semantics.
+    // FIX: Just to use the 'correct' semantics.
 		w->fds = calloc((size_t)all_files_size, sizeof(int));
 		if(unlikely(!w->fds))
 			error("Cannot allocate memory for fds in %s", w->name);
@@ -2124,17 +2152,19 @@ unsigned long long send_resource_usage_to_netdata() {
 		memcpy(&me, &me_last, sizeof(struct rusage));
 	}
 
-	fprintf(stdout, "BEGIN netdata.apps_cpu %llu\n", usec);
-	fprintf(stdout, "SET user = %llu\n", cpuuser);
-	fprintf(stdout, "SET system = %llu\n", cpusyst);
-	fprintf(stdout, "END\n");
+	fprintf(stdout, "BEGIN netdata.apps_cpu %llu\n"
+					"SET user = %llu\n"
+					"SET system = %llu\n"
+					"END\n"
 
-	fprintf(stdout, "BEGIN netdata.apps_files %llu\n", usec);
-	fprintf(stdout, "SET files = %llu\n", file_counter);
-	fprintf(stdout, "SET pids = %ld\n", all_pids_count);
-	fprintf(stdout, "SET fds = %d\n", all_files_len);
-	fprintf(stdout, "SET targets = %ld\n", apps_groups_targets);
-	fprintf(stdout, "END\n");
+					"BEGIN netdata.apps_files %llu\n"
+					"SET files = %llu\n"
+					"SET pids = %ld\n"
+					"SET fds = %d\n"
+					"SET targets = %ld\n"
+					"END\n",
+					usec, cpuuser, cpusyst,
+					usec, file_counter, all_pids_count, all_files_count, apps_groups_targets);
 
 	return usec;
 }
@@ -2480,24 +2510,32 @@ int main(int argc, char **argv)
 	// FIX: Just to use the 'correct' semantics.
 	all_pids = calloc((size_t)pid_max, sizeof(struct pid_stat *));
 	if(!all_pids) {
-		error("Cannot allocate %lu bytes of memory.", sizeof(struct pid_stat *) * pid_max);
+		error("Cannot allocate %zu bytes of memory.", sizeof(struct pid_stat *) * pid_max);
 		printf("DISABLE\n");
 		exit(1);
 	}
 
-	fprintf(stdout, "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' apps.plugin netdata.apps_cpu stacked 140000 %d\n", update_every);
-	fprintf(stdout, "DIMENSION user '' incremental 1 %d\n", 1000);
-	fprintf(stdout, "DIMENSION system '' incremental 1 %d\n", 1000);
+	fprintf(stdout, "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' apps.plugin netdata.apps_cpu stacked 140000 %d\n"
+					"DIMENSION user '' incremental 1 1000\n"
+					"DIMENSION system '' incremental 1 1000\n"
 
-	fprintf(stdout, "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_files line 140001 %d\n", update_every);
-	fprintf(stdout, "DIMENSION files '' incremental 1 1\n");
-	fprintf(stdout, "DIMENSION pids '' absolute 1 1\n");
-	fprintf(stdout, "DIMENSION fds '' absolute 1 1\n");
-	fprintf(stdout, "DIMENSION targets '' absolute 1 1\n");
+					"CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_files line 140001 %d\n"
+					"DIMENSION files '' incremental 1 1\n"
+					"DIMENSION pids '' absolute 1 1\n"
+					"DIMENSION fds '' absolute 1 1\n"
+					"DIMENSION targets '' absolute 1 1\n",
+			update_every, update_query);
 
 
 #ifndef PROFILING_MODE
-	unsigned long long sunext = (time(NULL) - (time(NULL) % update_every) + update_every) * 1000000ULL;
+	// FIX: Two calls to time() can give us different timestamps.
+	//unsigned long long sunext = (time(NULL) - (time(NULL) % update_every) + update_every) * 1000000ULL;
+  unsigned long long sunext;
+	{
+		unsigned long long tmp = time(NULL);
+		sunext = (tmp - (tmp % update_every) + update_every) * 1000000ULL;
+	}
+
 	unsigned long long sunow;
 #endif /* PROFILING_MODE */
 
