@@ -2397,6 +2397,10 @@ int main(int argc, char **argv)
 	// disable syslog for apps.plugin
 	error_log_syslog = 0;
 
+	// set errors flood protection to 100 logs per hour
+	error_log_errors_per_period = 100;
+	error_log_throttle_period = 3600;
+
 	host_prefix = getenv("NETDATA_HOST_PREFIX");
 	if(host_prefix == NULL) {
 		info("NETDATA_HOST_PREFIX is not passed from netdata");
