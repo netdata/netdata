@@ -264,10 +264,10 @@ void buffer_date(BUFFER *wb, int year, int month, int day, int hours, int minute
   *p++ = ' ';
   *p++ = '0' + hours / 10;
   *p++ = '0' + hours % 10;
-  *p++ = ' ';
+  *p++ = ':';
   *p++ = '0' + minutes / 10;
   *p++ = '0' + minutes % 10;
-  *p++ = ' ';
+  *p++ = ':';
   *p++ = '0' + seconds / 10;
   *p++ = '0' + seconds % 10;
   *p = '\0';
