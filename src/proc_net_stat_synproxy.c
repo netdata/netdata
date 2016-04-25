@@ -28,7 +28,7 @@ int do_proc_net_stat_synproxy(int update_every, unsigned long long dt) {
 
 	if(!ff) {
 		char filename[FILENAME_MAX + 1];
-		snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/net/stat/synproxy");
+		mysnprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/net/stat/synproxy");
 		ff = procfile_open(config_get("plugin:proc:/proc/net/stat/synproxy", "filename to monitor", filename), " \t,:|", PROCFILE_FLAG_DEFAULT);
 	}
 	if(!ff) return 1;

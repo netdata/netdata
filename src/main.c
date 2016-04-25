@@ -401,7 +401,7 @@ int main(int argc, char **argv)
 		// let the plugins know the min update_every
 		{
 			char buf[50];
-			snprintf(buf, 50, "%d", rrd_update_every);
+			mysnprintf(buf, 50, "%d", rrd_update_every);
 			setenv("NETDATA_UPDATE_EVERY", buf, 1);
 		}
 

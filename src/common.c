@@ -2,6 +2,8 @@
 #include <config.h>
 #endif
 #include <sys/syscall.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
@@ -503,3 +505,28 @@ pid_t gettid(void)
 	return syscall(SYS_gettid);
 }
 
+/* FIX: Make sure snprintf terminates a string. */
+int mysnprintf(char *dest, size_t size, char *fmt, ...)
+{
+	int sz;
+
+  va_list args;
+	va_start(args, fmt);
+	sz = vsnprintf(dest, size, fmt, args);
+	va_end(args);
+
+	// Garantees the final terminate char.
+	if (sz > 0)
+ 		dest += sz;
+	*dest = '\0';
+
+	return sz;
+}
+
+char *mystrncpy(char *dest, const char *src, size_t size)
+{
+  char *p = dest;
+  for (; size && *src; dest++, src++, size--) *dest = *src;
+  *dest = '\0';
+  return p;
+}

@@ -53,7 +53,7 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 
 	if(!ff) {
 		char filename[FILENAME_MAX + 1];
-		snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/interrupts");
+		mysnprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/interrupts");
 		ff = procfile_open(config_get("plugin:proc:/proc/interrupts", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
 	}
 	if(!ff) return 1;
@@ -159,13 +159,13 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 
 		for(c = 0; c < cpus ; c++) {
 			char id[256];
-			snprintf(id, 256, "cpu%d_interrupts", c);
+			mysnprintf(id, 256, "cpu%d_interrupts", c);
 
 			st = rrdset_find_bytype("cpu", id);
 			if(!st) {
 				char name[256], title[256];
-				snprintf(name, 256, "cpu%d_interrupts", c);
-				snprintf(title, 256, "CPU%d Interrupts", c);
+				mysnprintf(name, 256, "cpu%d_interrupts", c);
+				mysnprintf(title, 256, "CPU%d Interrupts", c);
 				st = rrdset_create("cpu", id, name, "interrupts", "cpu.interrupts", title, "interrupts/s", 2000 + c, update_every, RRDSET_TYPE_STACKED);
 
 				for(l = 0; l < lines ;l++) {

@@ -316,7 +316,7 @@ int mysendfile(struct web_client *w, char *filename)
 
 	// access the file
 	char webfilename[FILENAME_MAX + 1];
-	snprintf(webfilename, FILENAME_MAX, "%s/%s", web_dir, filename);
+	mysnprintf(webfilename, FILENAME_MAX, "%s/%s", web_dir, filename);
 
 	// check if the file exists
 	struct stat stat;
@@ -341,7 +341,8 @@ int mysendfile(struct web_client *w, char *filename)
 	}
 
 	if((stat.st_mode & S_IFMT) == S_IFDIR) {
-		snprintf(webfilename, FILENAME_MAX+1, "%s/index.html", filename);
+    // FIX: Oops... snprintf with FILENAME_MAX+1?!
+    mysnprintf(webfilename, FILENAME_MAX, "%s/index.html", filename);
 		return mysendfile(w, webfilename);
 	}
 
