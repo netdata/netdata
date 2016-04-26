@@ -49,7 +49,7 @@ restart|force-reload) log_daemon_msg "Restarting real-time system monitoring" "n
 status)
         status_of_proc -p $PIDFILE $DAEMON $NAME && exit 0 || exit $?
         ;;
-*)	log_action_msg "Usage: /etc/init.d/cron {start|stop|status|restart|force-reload}"
+*)	log_action_msg "Usage: $SCRIPTNAME {start|stop|status|restart|force-reload}"
         exit 2
         ;;
 esac
