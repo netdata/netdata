@@ -199,12 +199,12 @@ void *socket_listen_main(void *ptr)
 
 	if(listen_fd < 0) fatal("LISTENER: Listen socket is not ready.");
 
-	fd_set ifds, ofds, efds;
+	fd_set ifds /*, ofds, efds */;
 	int fdmax = listen_fd;
 
 	FD_ZERO (&ifds);
-	FD_ZERO (&ofds);
-	FD_ZERO (&efds);
+	//FD_ZERO (&ofds);
+	//FD_ZERO (&efds);
 
 	for(;;) {
 		tv.tv_sec = 0;
@@ -212,11 +212,11 @@ void *socket_listen_main(void *ptr)
 
 		if(listen_fd >= 0) {
 			FD_SET(listen_fd, &ifds);
-			FD_SET(listen_fd, &efds);
+			//FD_SET(listen_fd, &efds);
 		}
 
 		// debug(D_WEB_CLIENT, "LISTENER: Waiting...");
-		retval = select(fdmax+1, &ifds, &ofds, &efds, &tv);
+		retval = select(fdmax+1, &ifds, /*&ofds, &efds,*/NULL, NULL, &tv);
 
 		if(retval == -1) {
 			error("LISTENER: select() failed.");
