@@ -42,8 +42,8 @@ struct disk *get_disk(unsigned long major, unsigned long minor) {
 
 	if(unlikely(!path_find_block_device_partition[0])) {
 		char filename[FILENAME_MAX + 1];
-		snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/dev/block/%lu:%lu/partition");
-		snprintf(path_find_block_device_partition, FILENAME_MAX, "%s", config_get("plugin:proc:/proc/diskstats", "path to get block device partition", filename));
+		snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/dev/block/%lu:%lu/partition");
+		snprintfz(path_find_block_device_partition, FILENAME_MAX, "%s", config_get("plugin:proc:/proc/diskstats", "path to get block device partition", filename));
 	}
 
 	// not found
@@ -68,7 +68,7 @@ struct disk *get_disk(unsigned long major, unsigned long minor) {
 	// find if it is a partition
 	// by reading /sys/dev/block/MAJOR:MINOR/partition
 	char buffer[FILENAME_MAX + 1];
-	snprintf(buffer, FILENAME_MAX, path_find_block_device_partition, major, minor);
+	snprintfz(buffer, FILENAME_MAX, path_find_block_device_partition, major, minor);
 
 	int fd = open(buffer, O_RDONLY, 0666);
 	if(likely(fd != -1)) {
@@ -102,15 +102,15 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 
 	if(!ff) {
 		char filename[FILENAME_MAX + 1];
-		snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/diskstats");
+		snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/diskstats");
 		ff = procfile_open(config_get("plugin:proc:/proc/diskstats", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
 	}
 	if(!ff) return 1;
 
 	if(!path_to_get_hw_sector_size[0]) {
 		char filename[FILENAME_MAX + 1];
-		snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/block/%s/queue/hw_sector_size");
-		snprintf(path_to_get_hw_sector_size, FILENAME_MAX, "%s", config_get("plugin:proc:/proc/diskstats", "path to get h/w sector size", filename));
+		snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/block/%s/queue/hw_sector_size");
+		snprintfz(path_to_get_hw_sector_size, FILENAME_MAX, "%s", config_get("plugin:proc:/proc/diskstats", "path to get h/w sector size", filename));
 	}
 
 	ff = procfile_readall(ff);
@@ -316,7 +316,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 		// check which charts are enabled for this disk
 		{
 			char var_name[4096 + 1];
-			snprintf(var_name, 4096, "plugin:proc:/proc/diskstats:%s", disk);
+			snprintfz(var_name, 4096, "plugin:proc:/proc/diskstats:%s", disk);
 			def_enabled = config_get_boolean_ondemand(var_name, "enabled", def_enabled);
 			if(def_enabled == CONFIG_ONDEMAND_NO) continue;
 			if(def_enabled == CONFIG_ONDEMAND_ONDEMAND && !reads && !writes) continue;
@@ -354,13 +354,13 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 				char tf[FILENAME_MAX + 1], *t;
 				char ssfilename[FILENAME_MAX + 1];
 
-				strncpy(tf, disk, FILENAME_MAX);
-				tf[FILENAME_MAX] = '\0';
+				strncpyz(tf, disk, FILENAME_MAX);
+				//tf[FILENAME_MAX] = '\0';
 
 				// replace all / with !
 				while((t = strchr(tf, '/'))) *t = '!';
 
-				snprintf(ssfilename, FILENAME_MAX, path_to_get_hw_sector_size, tf);
+				snprintfz(ssfilename, FILENAME_MAX, path_to_get_hw_sector_size, tf);
 				FILE *fpss = fopen(ssfilename, "r");
 				if(fpss) {
 					char ssbuffer[1025];

@@ -53,7 +53,7 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 
 	if(!ff) {
 		char filename[FILENAME_MAX + 1];
-		snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/interrupts");
+		snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/interrupts");
 		ff = procfile_open(config_get("plugin:proc:/proc/interrupts", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
 	}
 	if(!ff) return 1;
@@ -116,18 +116,18 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 		}
 
 		if(isdigit(irr->id[0]) && (uint32_t)(cpus + 2) < words) {
-			strncpy(irr->name, procfile_lineword(ff, l, words - 1), MAX_INTERRUPT_NAME);
-			irr->name[MAX_INTERRUPT_NAME] = '\0';
+			strncpyz(irr->name, procfile_lineword(ff, l, words - 1), MAX_INTERRUPT_NAME);
+			//irr->name[MAX_INTERRUPT_NAME] = '\0';
 			int nlen = strlen(irr->name);
 			if(nlen < (MAX_INTERRUPT_NAME-1)) {
 				irr->name[nlen] = '_';
-				strncpy(&irr->name[nlen + 1], irr->id, MAX_INTERRUPT_NAME - nlen);
-				irr->name[MAX_INTERRUPT_NAME] = '\0';
+				strncpyz(&irr->name[nlen + 1], irr->id, MAX_INTERRUPT_NAME - nlen);
+				//irr->name[MAX_INTERRUPT_NAME] = '\0';
 			}
 		}
 		else {
-			strncpy(irr->name, irr->id, MAX_INTERRUPT_NAME);
-			irr->name[MAX_INTERRUPT_NAME] = '\0';
+			strncpyz(irr->name, irr->id, MAX_INTERRUPT_NAME);
+			//irr->name[MAX_INTERRUPT_NAME] = '\0';
 		}
 
 		irr->used = 1;
@@ -158,14 +158,14 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 		int c;
 
 		for(c = 0; c < cpus ; c++) {
-			char id[256];
-			snprintf(id, 256, "cpu%d_interrupts", c);
+			char id[256+1];
+			snprintfz(id, 256, "cpu%d_interrupts", c);
 
 			st = rrdset_find_bytype("cpu", id);
 			if(!st) {
-				char name[256], title[256];
-				snprintf(name, 256, "cpu%d_interrupts", c);
-				snprintf(title, 256, "CPU%d Interrupts", c);
+				char name[256+1], title[256+1];
+				snprintfz(name, 256, "cpu%d_interrupts", c);
+				snprintfz(title, 256, "CPU%d Interrupts", c);
 				st = rrdset_create("cpu", id, name, "interrupts", "cpu.interrupts", title, "interrupts/s", 2000 + c, update_every, RRDSET_TYPE_STACKED);
 
 				for(l = 0; l < lines ;l++) {
