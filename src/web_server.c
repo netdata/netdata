@@ -204,7 +204,7 @@ void *socket_listen_main(void *ptr)
 
 	if(listen_fd < 0) fatal("LISTENER: Listen socket is not ready.");
 
-	fd_set ifds, /*ofds, efds */;
+	fd_set ifds /*, ofds, efds */;
 	int fdmax = listen_fd;
 
 	FD_ZERO (&ifds);
