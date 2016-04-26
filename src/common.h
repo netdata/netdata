@@ -46,4 +46,7 @@ extern unsigned long long timems(void);
 #endif
 #endif
 
+extern char *strncpyz(char *dest, const char *src, size_t size);
+extern int snprintfz(char *dest, size_t size, const char *fmt, ...);
+
 #endif /* NETDATA_COMMON_H */
