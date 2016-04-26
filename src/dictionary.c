@@ -69,7 +69,8 @@ static void dictionary_name_value_destroy(DICTIONARY *dict, NAME_VALUE *nv) {
 	debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", nv->name);
 
 	pthread_rwlock_wrlock(&dict->rwlock);
-	if(dict->values == nv) dict->values = nv->next;
+
+  if(dict->values == nv) dict->values = nv->next;
 	else {
 		NAME_VALUE *n = dict->values;
 		while(n && n->next && n->next != nv) nv = nv->next;
@@ -82,7 +83,10 @@ static void dictionary_name_value_destroy(DICTIONARY *dict, NAME_VALUE *nv) {
 	}
 	pthread_rwlock_unlock(&dict->rwlock);
 
-	free(nv->value);
+  // FIX: strdup() uses malloc to allocate new string. Must be freed.
+  free(nv->name);
+
+  free(nv->value);
 	free(nv);
 }
 
