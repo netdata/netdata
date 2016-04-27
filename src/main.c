@@ -242,7 +242,7 @@ int main(int argc, char **argv)
 		else if(strcmp(argv[i], "-pidfile") == 0 && (i+1) < argc) {
 			i++;
 			strncpyz(pidfile, argv[i], FILENAME_MAX);
-			pidfile[FILENAME_MAX] = '\0';
+			//pidfile[FILENAME_MAX] = '\0';
 		}
 		else if(strcmp(argv[i], "--unittest")  == 0) {
 			rrd_update_every = 1;

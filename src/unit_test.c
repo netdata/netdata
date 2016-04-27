@@ -1,3 +1,4 @@
+/* vim: set ts=4 noet sw=4 : */
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -30,7 +31,7 @@ int check_storage_number(calculated_number n, int debug) {
 	if(dcdiff < 0) dcdiff = -dcdiff;
 
 	size_t len = print_calculated_number(buffer, d);
-	calculated_number p = strtold(buffer, NULL);
+	calculated_number p = strtold(buffer, NULL);	// FIXME: strtold is dependant of calculated_number type?!
 	calculated_number pdiff = n - p;
 	calculated_number pcdiff = pdiff * 100.0 / n;
 	if(pcdiff < 0) pcdiff = -pcdiff;
@@ -78,10 +79,12 @@ void benchmark_storage_number(int loop, int multiplier) {
 	their = (calculated_number)sizeof(calculated_number) * (calculated_number)loop;
 
 	if(mine > their) {
-		fprintf(stderr, "\nNETDATA NEEDS %0.2Lf TIMES MORE MEMORY. Sorry!\n", (long double)(mine / their));
+		// FIX: Don't need 'long double' here.
+		fprintf(stderr, "\nNETDATA NEEDS %0.2f TIMES MORE MEMORY. Sorry!\n", (double)(mine / their));
 	}
 	else {
-		fprintf(stderr, "\nNETDATA INTERNAL FLOATING POINT ARITHMETICS NEEDS %0.2Lf TIMES LESS MEMORY.\n", (long double)(their / mine));
+		// FIX: Don't need 'long double' here.
+		fprintf(stderr, "\nNETDATA INTERNAL FLOATING POINT ARITHMETICS NEEDS %0.2f TIMES LESS MEMORY.\n", (double)(their / mine));
 	}
 
 	fprintf(stderr, "\nNETDATA FLOATING POINT\n");
@@ -114,7 +117,8 @@ void benchmark_storage_number(int loop, int multiplier) {
 	total  = user + system;
 	mine = total;
 
-	fprintf(stderr, "user %0.5Lf, system %0.5Lf, total %0.5Lf\n", (long double)(user / 1000000.0), (long double)(system / 1000000.0), (long double)(total / 1000000.0));
+	// FIX: Don't need 'long double' here.
+	fprintf(stderr, "user %0.5f, system %0.5f, total %0.5f\n", (double)(user / 1000000.0), (double)(system / 1000000.0), (double)(total / 1000000.0));
 
 	// ------------------------------------------------------------------------
 
@@ -138,13 +142,14 @@ void benchmark_storage_number(int loop, int multiplier) {
 	total  = user + system;
 	their = total;
 
-	fprintf(stderr, "user %0.5Lf, system %0.5Lf, total %0.5Lf\n", (long double)(user / 1000000.0), (long double)(system / 1000000.0), (long double)(total / 1000000.0));
+	// FIX: Don't need 'long double' here.
+	fprintf(stderr, "user %0.5f, system %0.5f, total %0.5f\n", (double)(user / 1000000.0), (double)(system / 1000000.0), (double)(total / 1000000.0));
 
 	if(mine > total) {
-		fprintf(stderr, "NETDATA CODE IS SLOWER %0.2Lf %%\n", (long double)(mine * 100.0 / their - 100.0));
+		fprintf(stderr, "NETDATA CODE IS SLOWER %0.2f %%\n", (double)(mine * 100.0 / their - 100.0));
 	}
 	else {
-		fprintf(stderr, "NETDATA CODE IS  F A S T E R  %0.2Lf %%\n", (long double)(their * 100.0 / mine - 100.0));
+		fprintf(stderr, "NETDATA CODE IS  F A S T E R  %0.2f %%\n", (double)(their * 100.0 / mine - 100.0));
 	}
 
 	// ------------------------------------------------------------------------
@@ -172,13 +177,14 @@ void benchmark_storage_number(int loop, int multiplier) {
 	total  = user + system;
 	mine = total;
 
-	fprintf(stderr, "user %0.5Lf, system %0.5Lf, total %0.5Lf\n", (long double)(user / 1000000.0), (long double)(system / 1000000.0), (long double)(total / 1000000.0));
+	// FIX: Don't need 'long double' here.
+	fprintf(stderr, "user %0.5f, system %0.5f, total %0.5f\n", (double)(user / 1000000.0), (double)(system / 1000000.0), (double)(total / 1000000.0));
 
 	if(mine > their) {
-		fprintf(stderr, "WITH PACKING UNPACKING NETDATA CODE IS SLOWER %0.2Lf %%\n", (long double)(mine * 100.0 / their - 100.0));
+		fprintf(stderr, "WITH PACKING UNPACKING NETDATA CODE IS SLOWER %0.2f %%\n", (double)(mine * 100.0 / their - 100.0));
 	}
 	else {
-		fprintf(stderr, "EVEN WITH PACKING AND UNPACKING, NETDATA CODE IS  F A S T E R  %0.2Lf %%\n", (long double)(their * 100.0 / mine - 100.0));
+		fprintf(stderr, "EVEN WITH PACKING AND UNPACKING, NETDATA CODE IS  F A S T E R  %0.2f %%\n", (double)(their * 100.0 / mine - 100.0));
 	}
 
 	// ------------------------------------------------------------------------
@@ -226,7 +232,7 @@ int unit_test_storage()
 		if(!g) continue;
 
 		for(j = 0; j < 9 ;j++) {
-			a += 0.0000001;
+			a += 0.0000001;	// FIXME: This shouldn't be a symbol?!
 			c = a * g;
 			for(i = 0; i < 21 ;i++, c *= 10) {
 				if(c > 0 && c < STORAGE_NUMBER_POSITIVE_MIN) continue;

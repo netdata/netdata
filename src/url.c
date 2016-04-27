@@ -1,3 +1,4 @@
+/* vim: set ts=4 noet sw=4 : */
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -65,7 +66,8 @@ char *url_decode(char *str) {
 	while (*pstr) {
 		if (*pstr == '%') {
 			if (pstr[1] && pstr[2]) {
-				*pbuf++ = from_hex(pstr[1]) << 4 | from_hex(pstr[2]);
+				// NOTE: previous code wasn't wrong. I use parentesis here just to be sure!
+				*pbuf++ = (from_hex(pstr[1]) << 4) | from_hex(pstr[2]);
 				pstr += 2;
 			}
 		}
@@ -82,4 +84,3 @@ char *url_decode(char *str) {
 
 	return buf;
 }
-

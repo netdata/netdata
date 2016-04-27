@@ -248,7 +248,7 @@ long get_system_pid_max(void) {
 	procfile *ff = NULL;
 
 	// FIXME: Is this a typical maximum system pid count, or just for Linux?
-  //        Is it defined on POSIX.1 ABI X/Open and/or BSD specs?
+	//        Is it defined on POSIX.1 ABI X/Open and/or BSD specs?
 	long mpid = 32768;
 
 	char filename[FILENAME_MAX + 1];
@@ -289,9 +289,9 @@ unsigned long long get_system_hertz(void)
 	/* FIX: No calculations needed! */
 	/* FIX: hz?! or myhz? */
 #if (__SIZEOF_LONG__ == __SIZEOF_INT__) || (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-	myhz = 100ULL
+	myhz = 100ULL;
 #else
-	myhz = 1024ULL
+	myhz = 1024ULL;
 #endif
 
 #endif /* HZ */
@@ -400,7 +400,7 @@ struct target *get_users_target(uid_t uid)
 {
 	struct target *w;
 
-  for(w = users_root_target ; w ; w = w->next)
+	for(w = users_root_target ; w ; w = w->next)
 		if(w->uid == uid) return w;
 
 	// FIX: Just to use the 'correct' semantics.
@@ -431,7 +431,7 @@ struct target *get_users_target(uid_t uid)
 	users_root_target = w;
 
 	if(unlikely(debug))
-		fprintf(stderr, "apps.plugin: added uid %s ('%s') target\n", str_uid, w->name);
+		fprintf(stderr, "apps.plugin: added uid %d ('%s') target\n", uid, w->name);
 
 	return w;
 }
@@ -470,7 +470,7 @@ struct target *get_groups_target(gid_t gid)
 	groups_root_target = w;
 
 	if(unlikely(debug))
-		fprintf(stderr, "apps.plugin: added gid %s ('%s') target\n", str_gid, w->name);
+		fprintf(stderr, "apps.plugin: added gid %d ('%s') target\n", gid, w->name);
 
 	return w;
 }
@@ -1358,22 +1358,22 @@ int collect_data_for_all_processes_from_proc(void)
 		p->merged = 0;
 		p->new_entry = 0;
 
-        p->last_minflt  = p->minflt;
-        p->last_cminflt  = p->cminflt;
-        p->last_majflt  = p->majflt;
-        p->last_cmajflt  = p->cmajflt;
-        p->last_utime  = p->utime;
-        p->last_stime  = p->stime;
-        p->last_cutime  = p->cutime;
-        p->last_cstime  = p->cstime;
+	      p->last_minflt  = p->minflt;
+	      p->last_cminflt  = p->cminflt;
+	      p->last_majflt  = p->majflt;
+	      p->last_cmajflt  = p->cmajflt;
+	      p->last_utime  = p->utime;
+	      p->last_stime  = p->stime;
+	      p->last_cutime  = p->cutime;
+	      p->last_cstime  = p->cstime;
 
-        p->last_io_logical_bytes_read  = p->io_logical_bytes_read;
-        p->last_io_logical_bytes_written  = p->io_logical_bytes_written;
-        p->last_io_read_calls  = p->io_read_calls;
-        p->last_io_write_calls  = p->io_write_calls;
-        p->last_io_storage_bytes_read  = p->io_storage_bytes_read;
-        p->last_io_storage_bytes_written  = p->io_storage_bytes_written;
-        p->last_io_cancelled_write_bytes  = p->io_cancelled_write_bytes;
+	      p->last_io_logical_bytes_read  = p->io_logical_bytes_read;
+	      p->last_io_logical_bytes_written  = p->io_logical_bytes_written;
+	      p->last_io_read_calls  = p->io_read_calls;
+	      p->last_io_write_calls  = p->io_write_calls;
+	      p->last_io_storage_bytes_read  = p->io_storage_bytes_read;
+	      p->last_io_storage_bytes_written  = p->io_storage_bytes_written;
+	      p->last_io_cancelled_write_bytes  = p->io_cancelled_write_bytes;
 	}
 
 	while((file = readdir(dir))) {
@@ -1804,7 +1804,7 @@ long zero_all_targets(struct target *root) {
 
 void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o) {
 	if(unlikely(!w->fds)) {
-    // FIX: Just to use the 'correct' semantics.
+	  // FIX: Just to use the 'correct' semantics.
 		w->fds = calloc((size_t)all_files_size, sizeof(int));
 		if(unlikely(!w->fds))
 			error("Cannot allocate memory for fds in %s", w->name);
@@ -2151,7 +2151,8 @@ unsigned long long send_resource_usage_to_netdata() {
 					"SET targets = %ld\n"
 					"END\n",
 					usec, cpuuser, cpusyst,
-					usec, file_counter, all_pids_count, all_files_count, apps_groups_targets);
+					usec, file_counter, all_pids_count, all_files_size, apps_groups_targets);
+					/* FIX: Is all_files_size correct? */
 
 	return usec;
 }
@@ -2504,18 +2505,18 @@ int main(int argc, char **argv)
 					"DIMENSION user '' incremental 1 1000\n"
 					"DIMENSION system '' incremental 1 1000\n"
 
-					"CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_files line 140001 %d\n"
+					"CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_files line 140001 %1$d\n"
 					"DIMENSION files '' incremental 1 1\n"
 					"DIMENSION pids '' absolute 1 1\n"
 					"DIMENSION fds '' absolute 1 1\n"
 					"DIMENSION targets '' absolute 1 1\n",
-			update_every, update_query);
+			update_every);
 
 
 #ifndef PROFILING_MODE
 	// FIX: Two calls to time() can give us different timestamps.
 	//unsigned long long sunext = (time(NULL) - (time(NULL) % update_every) + update_every) * 1000000ULL;
-  unsigned long long sunext;
+	unsigned long long sunext;
 	{
 		unsigned long long tmp = time(NULL);
 		sunext = (tmp - (tmp % update_every) + update_every) * 1000000ULL;

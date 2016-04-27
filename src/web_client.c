@@ -76,8 +76,10 @@ struct web_client *web_client_create(int listener)
 			strncpyz(w->client_ip,   "UNKNOWN", NI_MAXHOST);
 			strncpyz(w->client_port, "UNKNOWN", NI_MAXSERV);
 		}
-		w->client_ip[NI_MAXHOST]   = '\0';
-		w->client_port[NI_MAXSERV] = '\0';
+		else {
+			w->client_ip[NI_MAXHOST]   = '\0';
+			w->client_port[NI_MAXSERV] = '\0';
+		}
 
 		switch(sadr->sa_family) {
 
@@ -99,7 +101,8 @@ struct web_client *web_client_create(int listener)
 		}
 
 		int flag = 1;
-		if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0) error("%llu: Cannot set SO_KEEPALIVE on socket.", w->id);
+		if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0) 
+			error("%llu: Cannot set SO_KEEPALIVE on socket.", w->id);
 	}
 
 	w->response.data = buffer_create(INITIAL_WEB_DATA_LENGTH);
@@ -297,7 +300,10 @@ int mysendfile(struct web_client *w, char *filename)
 	while (*filename == '/') filename++;
 
 	// if the filename contain known paths, skip them
-	if(strncmp(filename, WEB_PATH_FILE "/", strlen(WEB_PATH_FILE) + 1) == 0) filename = &filename[strlen(WEB_PATH_FILE) + 1];
+	// FIX: sizeof() will avoid a function call.
+	//      sizeof("...") will count '\0' char.
+	if(strncmp(filename, WEB_PATH_FILE "/", sizeof(WEB_PATH_FILE "/") - 1) == 0) 
+		filename = &filename[strlen(WEB_PATH_FILE) + 1];
 
 	char *s;
 	for(s = filename; *s ;s++) {
@@ -317,7 +323,7 @@ int mysendfile(struct web_client *w, char *filename)
 
 	// access the file
 	char webfilename[FILENAME_MAX + 1];
-	mysnprintf(webfilename, FILENAME_MAX, "%s/%s", web_dir, filename);
+	snprintfz(webfilename, FILENAME_MAX, "%s/%s", web_dir, filename);
 
 	// check if the file exists
 	struct stat stat;
@@ -342,8 +348,8 @@ int mysendfile(struct web_client *w, char *filename)
 	}
 
 	if((stat.st_mode & S_IFMT) == S_IFDIR) {
-    // FIX: Oops... snprintf with FILENAME_MAX+1?!
-    mysnprintf(webfilename, FILENAME_MAX, "%s/index.html", filename);
+    	// FIX: Oops... snprintf with FILENAME_MAX+1?!
+		snprintfz(webfilename, FILENAME_MAX, "%s/index.html", filename);
 		return mysendfile(w, webfilename);
 	}
 
