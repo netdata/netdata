@@ -1,4 +1,4 @@
-
+# vim: set ts=4 noet :
 # This file is just a hack to make netdata
 # open in Clion
 # It cannot build netdata
@@ -63,6 +63,8 @@ set(NETDATA_SOURCE_FILES
 	src/rrd.h
 	src/storage_number.c
 	src/storage_number.h
+	src/fpconv.c
+	src/fpconv.h
 	src/sys_kernel_mm_ksm.c
 	src/sys_fs_cgroup.c
 	src/unit_test.c
@@ -75,7 +77,7 @@ set(NETDATA_SOURCE_FILES
 	src/web_client.h
 	src/web_server.c
 	src/web_server.h
-        config.h)
+	config.h)
 
 set(APPS_PLUGIN_SOURCE_FILES
 	src/appconfig.c
@@ -87,7 +89,7 @@ set(APPS_PLUGIN_SOURCE_FILES
 	src/common.h
 	src/log.c
 	src/log.h
-        config.h)
+	config.h)
 
 include_directories(AFTER .)
 
