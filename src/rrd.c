@@ -68,8 +68,8 @@ avl_tree rrdset_root_index = {
 
 static RRDSET *rrdset_index_find(const char *id, uint32_t hash) {
 	RRDSET *result = NULL, tmp;
-	strncpy(tmp.id, id, RRD_ID_LENGTH_MAX);
-	tmp.id[RRD_ID_LENGTH_MAX] = '\0';
+	strncpyz(tmp.id, id, RRD_ID_LENGTH_MAX);
+	//tmp.id[RRD_ID_LENGTH_MAX] = '\0';
 	tmp.hash = (hash)?hash:simple_hash(tmp.id);
 
 	avl_search(&(rrdset_root_index), (avl *)&tmp, rrdset_iterator, (avl **)&result);
@@ -151,8 +151,8 @@ static int rrddim_compare(void* a, void* b) {
 
 static RRDDIM *rrddim_index_find(RRDSET *st, const char *id, uint32_t hash) {
 	RRDDIM *result = NULL, tmp;
-	strncpy(tmp.id, id, RRD_ID_LENGTH_MAX);
-	tmp.id[RRD_ID_LENGTH_MAX] = '\0';
+	strncpyz(tmp.id, id, RRD_ID_LENGTH_MAX);
+	//tmp.id[RRD_ID_LENGTH_MAX] = '\0';
 	tmp.hash = (hash)?hash:simple_hash(tmp.id);
 
 	avl_search(&(st->dimensions_index), (avl *)&tmp, rrddim_iterator, (avl **)&result);
@@ -295,7 +295,7 @@ void rrdset_set_name(RRDSET *st, const char *name)
 	char b[CONFIG_MAX_VALUE + 1];
 	char n[RRD_ID_LENGTH_MAX + 1];
 
-	mysnprintf(n, RRD_ID_LENGTH_MAX, "%s.%s", st->type, name);
+	snprintfz(n, RRD_ID_LENGTH_MAX, "%s.%s", st->type, name);
 	rrdset_strncpy_name(b, n, CONFIG_MAX_VALUE);
 	st->name = config_get(st->id, "name", b);
 	st->hash_name = simple_hash(st->name);
@@ -317,7 +317,7 @@ char *rrdset_cache_dir(const char *id)
 	char n[FILENAME_MAX + 1];
 	rrdset_strncpy_name(b, id, FILENAME_MAX);
 
-	mysnprintf(n, FILENAME_MAX, "%s/%s", cache_dir, b);
+	snprintfz(n, FILENAME_MAX, "%s/%s", cache_dir, b);
 	ret = config_get(id, "cache directory", n);
 
 	if(rrd_memory_mode == RRD_MEMORY_MODE_MAP || rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
@@ -371,7 +371,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 	char fullfilename[FILENAME_MAX + 1];
 	RRDSET *st = NULL;
 
-	mysnprintf(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
+	snprintfz(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
 
 	st = rrdset_find(fullid);
 	if(st) {
@@ -391,7 +391,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 
 	debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
-	mysnprintf(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
+	snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
 	if(rrd_memory_mode != RRD_MEMORY_MODE_RAM) st = (RRDSET *)mymmap(fullfilename, size, ((rrd_memory_mode == RRD_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE), 0);
 	if(st) {
 		if(strcmp(st->magic, RRDSET_MAGIC) != 0) {
@@ -494,7 +494,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 
 	{
 		char varvalue[CONFIG_MAX_VALUE + 1];
-		mysnprintf(varvalue, CONFIG_MAX_VALUE, "%s (%s)", title?title:"", st->name);
+		snprintfz(varvalue, CONFIG_MAX_VALUE, "%s (%s)", title?title:"", st->name);
 		st->title = config_get(st->id, "title", varvalue);
 	}
 
@@ -520,7 +520,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 	debug(D_RRD_CALLS, "Adding dimension '%s/%s'.", st->id, id);
 
 	rrdset_strncpy_name(filename, id, FILENAME_MAX);
-	mysnprintf(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
+	snprintfz(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
 	if(rrd_memory_mode != RRD_MEMORY_MODE_RAM) rd = (RRDDIM *)mymmap(fullfilename, size, ((rrd_memory_mode == RRD_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE), 1);
 	if(rd) {
 		struct timeval now;
@@ -609,19 +609,19 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 
 	strcpy(rd->magic, RRDDIMENSION_MAGIC);
 	strcpy(rd->cache_filename, fullfilename);
-	strncpy(rd->id, id, RRD_ID_LENGTH_MAX);
+	strncpyz(rd->id, id, RRD_ID_LENGTH_MAX);
 	rd->hash = simple_hash(rd->id);
 
-	mysnprintf(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
+	snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
 	rd->name = config_get(st->id, varname, (name && *name)?name:rd->id);
 
-	mysnprintf(varname, CONFIG_MAX_NAME, "dim %s algorithm", rd->id);
+	snprintfz(varname, CONFIG_MAX_NAME, "dim %s algorithm", rd->id);
 	rd->algorithm = rrddim_algorithm_id(config_get(st->id, varname, rrddim_algorithm_name(algorithm)));
 
-	mysnprintf(varname, CONFIG_MAX_NAME, "dim %s multiplier", rd->id);
+	snprintfz(varname, CONFIG_MAX_NAME, "dim %s multiplier", rd->id);
 	rd->multiplier = config_get_number(st->id, varname, multiplier);
 
-	mysnprintf(varname, CONFIG_MAX_NAME, "dim %s divisor", rd->id);
+	snprintfz(varname, CONFIG_MAX_NAME, "dim %s divisor", rd->id);
 	rd->divisor = config_get_number(st->id, varname, divisor);
 	if(!rd->divisor) rd->divisor = 1;
 
@@ -652,7 +652,7 @@ void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name)
 	debug(D_RRD_CALLS, "rrddim_set_name() %s.%s", st->name, rd->name);
 
 	char varname[CONFIG_MAX_NAME + 1];
-	mysnprintf(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
+	snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
 	config_set_default(st->id, varname, name);
 }
 
@@ -772,12 +772,12 @@ RRDSET *rrdset_find_bytype(const char *type, const char *id)
 
 	char buf[RRD_ID_LENGTH_MAX + 1];
 
-	strncpy(buf, type, RRD_ID_LENGTH_MAX - 1);
-	buf[RRD_ID_LENGTH_MAX - 1] = '\0';
+	strncpyz(buf, type, RRD_ID_LENGTH_MAX - 1);
+	//buf[RRD_ID_LENGTH_MAX - 1] = '\0';
 	strcat(buf, ".");
 	int len = (int) strlen(buf);
-	strncpy(&buf[len], id, (size_t) (RRD_ID_LENGTH_MAX - len));
-	buf[RRD_ID_LENGTH_MAX] = '\0';
+	strncpyz(&buf[len], id, (size_t) (RRD_ID_LENGTH_MAX - len));
+	//buf[RRD_ID_LENGTH_MAX] = '\0';
 
 	return(rrdset_find(buf));
 }

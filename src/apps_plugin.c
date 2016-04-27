@@ -220,7 +220,7 @@ long get_system_cpus(void) {
 	int processors = 0;
 
 	char filename[FILENAME_MAX + 1];
-	mysnprintf(filename, FILENAME_MAX, "%s/proc/stat", host_prefix);
+	snprintfz(filename, FILENAME_MAX, "%s/proc/stat", host_prefix);
 
 	ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
 	if(!ff) return 1;
@@ -252,7 +252,7 @@ long get_system_pid_max(void) {
 	long mpid = 32768;
 
 	char filename[FILENAME_MAX + 1];
-	mysnprintf(filename, FILENAME_MAX, "%s/proc/sys/kernel/pid_max", host_prefix);
+	snprintfz(filename, FILENAME_MAX, "%s/proc/sys/kernel/pid_max", host_prefix);
 	ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
 	if(!ff) return mpid;
 
@@ -410,22 +410,18 @@ struct target *get_users_target(uid_t uid)
 		return NULL;
 	}
 
-	// FIX: Convert only once.
-	char str_uid[MAX_NAME+1];
-	mysnprintf(str_uid, MAX_NAME, "%d", uid);
-
-	mystrncpy(w->compare, str_uid, MAX_COMPARE_NAME);
+	w->comparelen = snprintfz(w->compare, MAX_COMPARE_NAME, "%d", uid);
 	w->comparehash = simple_hash(w->compare);
-	w->comparelen = strlen(w->compare);
+	//w->comparelen = strlen(w->compare);
 
-	mystrncpy(w->id, str_uid, MAX_NAME);
+	snprintfz(w->id, MAX_NAME, "%d", uid);
 	w->idhash = simple_hash(w->id);
 
 	struct passwd *pw = getpwuid(uid);
 	if(!pw)
-		mystrncpy(w->name, str_uid, MAX_NAME);
+		snprintfz(w->name, MAX_NAME, "%d", uid);
 	else
-		mysnprintf(w->name, MAX_NAME, "%s", pw->pw_name);
+		snprintfz(w->name, MAX_NAME, "%s", pw->pw_name);
 
 	netdata_fix_chart_name(w->name);
 
@@ -453,22 +449,18 @@ struct target *get_groups_target(gid_t gid)
 		return NULL;
 	}
 
-	// FIX: Convert only once.
-	char str_gid[MAX_NAME+1];
-	mysnprintf(str_gid, MAX_NAME, "%d", gid);
-
-	mystrncpy(w->compare, str_gid, MAX_COMPARE_NAME);
+	w->comparelen = snprintfz(w->compare, MAX_COMPARE_NAME, "%d", gid);
 	w->comparehash = simple_hash(w->compare);
-	w->comparelen = strlen(w->compare);
+	//w->comparelen = strlen(w->compare);
 
-	mystrncpy(w->id, str_gid, MAX_NAME);
+	snprintfz(w->id, MAX_NAME, "%d", gid);
 	w->idhash = simple_hash(w->id);
 
 	struct group *gr = getgrgid(gid);
 	if(!gr)
-		mystrncpy(w->name, str_gid, MAX_NAME);
+		snprintfz(w->name, MAX_NAME, "%d", gid);
 	else
-		mysnprintf(w->name, MAX_NAME, "%s", gr->gr_name);
+		snprintfz(w->name, MAX_NAME, "%s", gr->gr_name);
 
 	netdata_fix_chart_name(w->name);
 
@@ -511,12 +503,12 @@ struct target *get_apps_groups_target(const char *id, struct target *target)
 		return NULL;
 	}
 
-	strncpy(w->id, nid, MAX_NAME);
+	strncpyz(w->id, nid, MAX_NAME);
 	w->idhash = simple_hash(w->id);
 
-	mystrncpy(w->name, nid, MAX_NAME);
+	strncpyz(w->name, nid, MAX_NAME);
 
-	strncpy(w->compare, nid, MAX_COMPARE_NAME);
+	strncpyz(w->compare, nid, MAX_COMPARE_NAME);
 	int len = strlen(w->compare);
 	if(w->compare[len - 1] == '*') {
 		w->compare[len - 1] = '\0';
@@ -554,7 +546,7 @@ int read_apps_groups_conf(const char *name)
 {
 	char filename[FILENAME_MAX + 1];
 
-	mysnprintf(filename, FILENAME_MAX, "%s/apps_%s.conf", config_dir, name);
+	snprintfz(filename, FILENAME_MAX, "%s/apps_%s.conf", config_dir, name);
 
 	if(unlikely(debug))
 		fprintf(stderr, "apps.plugin: process groups file: '%s'\n", filename);
@@ -606,8 +598,7 @@ int read_apps_groups_conf(const char *name)
 				t++;
 			}
 
-			mystrncpy(w->name, t, MAX_NAME);
-			//w->name[MAX_NAME] = '\0';
+			strncpyz(w->name, t, MAX_NAME);
 			w->hidden = thidden;
 			w->debug = tdebug;
 
@@ -629,7 +620,7 @@ int read_apps_groups_conf(const char *name)
 	if(!apps_groups_default_target)
 		error("Cannot create default target");
 	else
-		strcpy(apps_groups_default_target->name, "other"); // surely less than 100 chars.
+		strncpyz(apps_groups_default_target->name, "other", MAX_NAME);
 
 	return 0;
 }
@@ -825,7 +816,7 @@ void del_pid_entry(pid_t pid)
 
 int read_proc_pid_cmdline(struct pid_stat *p) {
 	char filename[FILENAME_MAX + 1];
-	mysnprintf(filename, FILENAME_MAX, "%s/proc/%d/cmdline", host_prefix, p->pid);
+	snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", host_prefix, p->pid);
 
 	int fd = open(filename, O_RDONLY, 0666);
 	if(unlikely(fd == -1)) return 1;
@@ -835,8 +826,7 @@ int read_proc_pid_cmdline(struct pid_stat *p) {
 
 	if(bytes <= 0) {
 		// copy the command to the command line
-		mystrncpy(p->cmdline, p->comm, MAX_CMDLINE);
-		//p->cmdline[MAX_CMDLINE] = '\0';
+		strncpyz(p->cmdline, p->comm, MAX_CMDLINE);
 		return 0;
 	}
 
@@ -853,7 +843,7 @@ int read_proc_pid_cmdline(struct pid_stat *p) {
 int read_proc_pid_ownership(struct pid_stat *p) {
 	char filename[FILENAME_MAX + 1];
 
-	mysnprintf(filename, FILENAME_MAX, "%s/proc/%d", host_prefix, p->pid);
+	snprintfz(filename, FILENAME_MAX, "%s/proc/%d", host_prefix, p->pid);
 
 	// ----------------------------------------
 	// read uid and gid
@@ -873,7 +863,7 @@ int read_proc_pid_stat(struct pid_stat *p) {
 
 	char filename[FILENAME_MAX + 1];
 
-	mysnprintf(filename, FILENAME_MAX, "%s/proc/%d/stat", host_prefix, p->pid);
+	snprintfz(filename, FILENAME_MAX, "%s/proc/%d/stat", host_prefix, p->pid);
 
 	// ----------------------------------------
 
@@ -897,8 +887,7 @@ int read_proc_pid_stat(struct pid_stat *p) {
 
 	// parse the process name
 	unsigned int i = 0;
-	mystrncpy(p->comm, procfile_lineword(ff, 0, 1), MAX_COMPARE_NAME);
-	//p->comm[MAX_COMPARE_NAME] = '\0';
+	strncpyz(p->comm, procfile_lineword(ff, 0, 1), MAX_COMPARE_NAME);
 
 	// p->pid			= atol(procfile_lineword(ff, 0, 0+i));
 	// comm is at 1
@@ -961,7 +950,7 @@ int read_proc_pid_statm(struct pid_stat *p) {
 
 	char filename[FILENAME_MAX + 1];
 
-	mysnprintf(filename, FILENAME_MAX, "%s/proc/%d/statm", host_prefix, p->pid);
+	snprintfz(filename, FILENAME_MAX, "%s/proc/%d/statm", host_prefix, p->pid);
 
 	ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
 	if(!ff) return 1;
@@ -991,7 +980,7 @@ int read_proc_pid_io(struct pid_stat *p) {
 
 	char filename[FILENAME_MAX + 1];
 
-	mysnprintf(filename, FILENAME_MAX, "%s/proc/%d/io", host_prefix, p->pid);
+	snprintfz(filename, FILENAME_MAX, "%s/proc/%d/io", host_prefix, p->pid);
 
 	ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
 	if(!ff) return 1;
@@ -1254,7 +1243,7 @@ int file_descriptor_find_or_add(const char *name)
 int read_pid_file_descriptors(struct pid_stat *p) {
 	char dirname[FILENAME_MAX+1];
 
-	mysnprintf(dirname, FILENAME_MAX, "%s/proc/%d/fd", host_prefix, p->pid);
+	snprintfz(dirname, FILENAME_MAX, "%s/proc/%d/fd", host_prefix, p->pid);
 	DIR *fds = opendir(dirname);
 	if(fds) {
 		int c;
@@ -1352,7 +1341,7 @@ int collect_data_for_all_processes_from_proc(void)
 {
 	char dirname[FILENAME_MAX + 1];
 
-	mysnprintf(dirname, FILENAME_MAX, "%s/proc", host_prefix);
+	snprintfz(dirname, FILENAME_MAX, "%s/proc", host_prefix);
 	DIR *dir = opendir(dirname);
 	if(!dir) return 0;
 

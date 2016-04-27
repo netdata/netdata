@@ -471,7 +471,7 @@ void *pluginsd_main(void *ptr)
 			}
 
 			char pluginname[CONFIG_MAX_NAME + 1];
-			mysnprintf(pluginname, CONFIG_MAX_NAME, "%.*s", (int)(len - PLUGINSD_FILE_SUFFIX_LEN), file->d_name);
+			snprintfz(pluginname, CONFIG_MAX_NAME, "%.*s", (int)(len - PLUGINSD_FILE_SUFFIX_LEN), file->d_name);
 			int enabled = config_get_boolean("plugins", pluginname, automatic_run);
 
 			if(unlikely(!enabled)) {
@@ -495,17 +495,17 @@ void *pluginsd_main(void *ptr)
 				cd = calloc(1, sizeof(struct plugind));
 				if(unlikely(!cd)) fatal("Cannot allocate memory for plugin.");
 
-				mysnprintf(cd->id, CONFIG_MAX_NAME, "plugin:%s", pluginname);
+				snprintfz(cd->id, CONFIG_MAX_NAME, "plugin:%s", pluginname);
 
-				mystrncpy(cd->filename, file->d_name, FILENAME_MAX);
-				mysnprintf(cd->fullfilename, FILENAME_MAX, "%s/%s", dir_name, cd->filename);
+				strncpyz(cd->filename, file->d_name, FILENAME_MAX);
+				snprintfz(cd->fullfilename, FILENAME_MAX, "%s/%s", dir_name, cd->filename);
 
 				cd->enabled = enabled;
 				cd->update_every = (int) config_get_number(cd->id, "update every", rrd_update_every);
 				cd->started_t = time(NULL);
 
 				char *def = "";
-				mysnprintf(cd->cmd, PLUGINSD_CMD_MAX, "exec %s %d %s", cd->fullfilename, cd->update_every, config_get(cd->id, "command options", def));
+				snprintfz(cd->cmd, PLUGINSD_CMD_MAX, "exec %s %d %s", cd->fullfilename, cd->update_every, config_get(cd->id, "command options", def));
 
 				// link it
 				if(likely(pluginsd_root)) cd->next = pluginsd_root;

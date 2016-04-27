@@ -128,7 +128,7 @@ void benchmark_storage_number(int loop, int multiplier) {
 		for(i = 0; i < loop ;i++) {
 			n *= multiplier;
 			if(n > STORAGE_NUMBER_POSITIVE_MAX) n = STORAGE_NUMBER_POSITIVE_MIN;
-			mysnprintf(buffer, 100, CALCULATED_NUMBER_FORMAT, n);
+			snprintfz(buffer, 100, CALCULATED_NUMBER_FORMAT, n);
 		}
 	}
 
@@ -614,7 +614,7 @@ int run_test(struct test *test)
 	rrd_update_every = test->update_every;
 
 	char name[101];
-	mysnprintf(name, 100, "unittest-%s", test->name);
+	snprintfz(name, 100, "unittest-%s", test->name);
 
 	// create the chart
 	RRDSET *st = rrdset_create("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", 1, 1, RRDSET_TYPE_LINE);
@@ -703,7 +703,7 @@ int unit_test(long delay, long shift)
 	repeat++;
 
 	char name[101];
-	mysnprintf(name, 100, "unittest-%d-%ld-%ld", repeat, delay, shift);
+	snprintfz(name, 100, "unittest-%d-%ld-%ld", repeat, delay, shift);
 
 	//debug_flags = 0xffffffff;
 	rrd_memory_mode = RRD_MEMORY_MODE_RAM;

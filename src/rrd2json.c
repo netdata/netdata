@@ -682,18 +682,18 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 			sq[0] = '"';
 		}
 		row_annotations = 1;
-		mysnprintf(pre_date,   100, "		{%sc%s:[{%sv%s:%s", kq, kq, kq, kq, sq);
-		mysnprintf(post_date,  100, "%s}", sq);
-		mysnprintf(pre_label,  100, ",\n		{%sid%s:%s%s,%slabel%s:%s", kq, kq, sq, sq, kq, kq, sq);
-		mysnprintf(post_label, 100, "%s,%spattern%s:%s%s,%stype%s:%snumber%s}", sq, kq, kq, sq, sq, kq, kq, sq, sq);
-		mysnprintf(pre_value,  100, ",{%sv%s:", kq, kq);
+		snprintfz(pre_date,   100, "		{%sc%s:[{%sv%s:%s", kq, kq, kq, kq, sq);
+		snprintfz(post_date,  100, "%s}", sq);
+		snprintfz(pre_label,  100, ",\n		{%sid%s:%s%s,%slabel%s:%s", kq, kq, sq, sq, kq, kq, sq);
+		snprintfz(post_label, 100, "%s,%spattern%s:%s%s,%stype%s:%snumber%s}", sq, kq, kq, sq, sq, kq, kq, sq, sq);
+		snprintfz(pre_value,  100, ",{%sv%s:", kq, kq);
 		strcpy(post_value, "}");
 		strcpy(post_line, "]}");
-		mysnprintf(data_begin, 100, "\n	],\n	%srows%s:\n	[\n", kq, kq);
+		snprintfz(data_begin, 100, "\n	],\n	%srows%s:\n	[\n", kq, kq);
 		strcpy(finish, "\n	]\n}");
 
-		mysnprintf(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
-		mysnprintf(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
+		snprintfz(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
+		snprintfz(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
 
 		buffer_sprintf(wb, "{\n	%scols%s:\n	[\n", kq, kq, kq, kq);
 		buffer_sprintf(wb, "		{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
@@ -716,18 +716,24 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 			dates = JSON_DATES_JS;
 			dates_with_new = 1;
 		}
-		if( options & RRDR_OPTION_OBJECTSROWS )
-			strcpy(pre_date, "  {");
-		else
-			strcpy(pre_date,  "   [");
+
+		//if( options & RRDR_OPTION_OBJECTSROWS )
+		//	snprintfz(pre_date,   100, "		{ ");
+		//else
+		//	snprintfz(pre_date,   100, "		[ ");
+		strcpy(pre_date, (options & RRDR_OPTION_OBJECTSROWS) ? "		{ " : "		[ ");
+
 		strcpy(pre_label, ", \"");
 		strcpy(post_label, "\"");
-		strcpy(pre_value,  ", ");
-		if( options & RRDR_OPTION_OBJECTSROWS )
-			strcpy(post_line, "}");
-		else
-			strcpy(post_line, "]");
-		mysnprintf(data_begin, 100, "],\n	%sdata%s:\n	[\n", kq, kq);
+		strcpy(pre_value, ", ");
+
+		//if( options & RRDR_OPTION_OBJECTSROWS )
+		//	snprintfz(post_line,  100, "}");
+		//else
+		//	snprintfz(post_line,  100, "]");
+		strcpy(post_line, (options & RRDR_OPTION_OBJECTSROWS) ? "}" : "]");
+
+		snprintfz(data_begin, 100, "],\n	%sdata%s:\n	[\n", kq, kq);
 		strcpy(finish, "\n	]\n}");
 
 		buffer_sprintf(wb, "{\n	%slabels%s: [", kq, kq);
@@ -1743,11 +1749,11 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 	// -------------------------------------------------------------------------
 	// prepare various strings, to speed up the loop
 
-	char overflow_annotation[201]; mysnprintf(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
-	char normal_annotation[201];   mysnprintf(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
-	char pre_date[51];             mysnprintf(pre_date,             50, "		{%sc%s:[{%sv%s:%s", kq, kq, kq, kq, sq);
-	char post_date[21];            mysnprintf(post_date,            20, "%s}", sq);
-	char pre_value[21];            mysnprintf(pre_value,            20, ",{%sv%s:", kq, kq);
+	char overflow_annotation[201]; snprintfz(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
+	char normal_annotation[201];   snprintfz(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
+	char pre_date[51];             snprintfz(pre_date,             50, "		{%sc%s:[{%sv%s:%s", kq, kq, kq, kq, sq);
+	char post_date[21];            snprintfz(post_date,            20, "%s}", sq);
+	char pre_value[21];            snprintfz(pre_value,            20, ",{%sv%s:", kq, kq);
 	char post_value[21];           strcpy(post_value, "}");
 
 	// -------------------------------------------------------------------------
