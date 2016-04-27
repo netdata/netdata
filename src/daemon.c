@@ -10,6 +10,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <pwd.h>
+#include <grp.h>
 #include <pthread.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
@@ -85,6 +86,21 @@ int become_user(const char *username)
 	uid_t uid = pw->pw_uid;
 	gid_t gid = pw->pw_gid;
 
+	int ngroups =  sysconf(_SC_NGROUPS_MAX);
+	gid_t *supplementary_groups = NULL;
+	if(ngroups) {
+		supplementary_groups = malloc(sizeof(gid_t) * ngroups);
+		if(supplementary_groups) {
+			if(getgrouplist(username, gid, supplementary_groups, &ngroups) == -1) {
+				error("Cannot get supplementary groups of user '%s'.", username);
+				free(supplementary_groups);
+				supplementary_groups = NULL;
+				ngroups = 0;
+			}
+		}
+		else fatal("Cannot allocate memory for %d supplementary groups", ngroups);
+	}
+
 	if(pidfile[0] && getuid() != uid) {
 		// we are dropping privileges
 		if(chown(pidfile, uid, gid) != 0)
@@ -100,6 +116,15 @@ int become_user(const char *username)
 		// not need to keep it open
 		close(pidfd);
 		pidfd = -1;
+	}
+
+	if(supplementary_groups && ngroups) {
+		if(setgroups(ngroups, supplementary_groups) == -1)
+			error("Cannot set supplementary groups for user '%s'", username);
+
+		free(supplementary_groups);
+		supplementary_groups = NULL;
+		ngroups = 0;
 	}
 
 	if(setresgid(gid, gid, gid) != 0) {

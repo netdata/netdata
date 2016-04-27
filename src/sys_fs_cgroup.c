@@ -241,12 +241,13 @@ void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
 
 		if(i != ca->cpus) {
 			free(ca->cpu_percpu);
-		}
-		ca->cpu_percpu = malloc(sizeof(unsigned long long) * i);
-		if(!ca->cpu_percpu)
-			fatal("Cannot allocate memory (%z bytes)", sizeof(unsigned long long) * i);
 
-		ca->cpus = i;
+			ca->cpu_percpu = malloc(sizeof(unsigned long long) * i);
+			if(!ca->cpu_percpu)
+				fatal("Cannot allocate memory (%z bytes)", sizeof(unsigned long long) * i);
+
+			ca->cpus = i;
+		}
 
 		for(i = 0; i < ca->cpus ;i++) {
 			ca->cpu_percpu[i] = strtoull(procfile_lineword(ff, 0, i), NULL, 10);
