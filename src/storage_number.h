@@ -1,8 +1,9 @@
+/* vim: set ts=4 noet sw=4 : */
 #ifndef NETDATA_STORAGE_NUMBER_H
 #define NETDATA_STORAGE_NUMBER_H
 
-typedef long double calculated_number;
-#define CALCULATED_NUMBER_FORMAT "%0.7Lf"
+typedef double calculated_number;
+#define CALCULATED_NUMBER_FORMAT "%0.7f"
 //typedef long long calculated_number;
 //#define CALCULATED_NUMBER_FORMAT "%lld"
 

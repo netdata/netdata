@@ -1,3 +1,4 @@
+/* vim: set ts=4 noet sw=4 : */
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -129,7 +130,7 @@ static char *print_calculated_number_lu_r(char *str, unsigned long uvalue) {
 	char *wstr = str;
 
 	// print each digit
-	do *wstr++ = (char)(48 + (uvalue % 10)); while(uvalue /= 10);
+	do *wstr++ = (char)('0' + (uvalue % 10)); while(uvalue /= 10);
 	return wstr;
 }
 
@@ -137,7 +138,7 @@ static char *print_calculated_number_llu_r(char *str, unsigned long long uvalue)
 	char *wstr = str;
 
 	// print each digit
-	do *wstr++ = (char)(48 + (uvalue % 10)); while((uvalue /= 10) && uvalue > (unsigned long long)0xffffffff);
+	do *wstr++ = (char)('0' + (uvalue % 10)); while((uvalue /= 10) && uvalue > (unsigned long long)0xffffffff);
 	if(uvalue) return print_calculated_number_lu_r(wstr, uvalue);
 	return wstr;
 }
@@ -164,7 +165,7 @@ int print_calculated_number(char *str, calculated_number value)
 	else
 		wstr = print_calculated_number_lu_r(str, uvalue);
 #else
-	do *wstr++ = (char)(48 + (uvalue % 10)); while(uvalue /= 10);
+	do *wstr++ = (char)('0' + (uvalue % 10)); while(uvalue /= 10);
 #endif
 
 	// make sure we have 6 bytes at least
@@ -174,8 +175,8 @@ int print_calculated_number(char *str, calculated_number value)
 	if(sign) *wstr++ = '-';
 
 	// reverse it
-    char *begin = str, *end = --wstr, aux;
-    while (end > begin) aux = *end, *end-- = *begin, *begin++ = aux;
+	char *begin = str, *end = --wstr, aux;
+	while (end > begin) aux = *end, *end-- = *begin, *begin++ = aux;
 	// wstr--;
 	// strreverse(str, wstr);
 
