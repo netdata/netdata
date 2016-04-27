@@ -845,8 +845,8 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 
 	char *args = strchr(url, '?');
 	if(args) {
-		*args='\0';
-		args = &args[1];
+		*args++='\0';
+		//args = &args[1];
 	}
 
 	// get the name of the data to show
@@ -1110,7 +1110,7 @@ void web_client_process(struct web_client *w) {
 
 		if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
 			strncpyz(w->last_url, url, URL_MAX);
-			w->last_url[URL_MAX] = '\0';
+			//w->last_url[URL_MAX] = '\0';
 
 			code = 200;
 			w->response.data->contenttype = CT_TEXT_PLAIN;
@@ -1124,7 +1124,7 @@ void web_client_process(struct web_client *w) {
 #endif
 
 			strncpyz(w->last_url, url, URL_MAX);
-			w->last_url[URL_MAX] = '\0';
+			//w->last_url[URL_MAX] = '\0';
 
 			tok = mystrsep(&url, "/?");
 			if(tok && *tok) {
@@ -1258,7 +1258,7 @@ void web_client_process(struct web_client *w) {
 					char filename[FILENAME_MAX+1];
 					url = filename;
 					strncpyz(filename, w->last_url, FILENAME_MAX);
-					filename[FILENAME_MAX] = '\0';
+					//filename[FILENAME_MAX] = '\0';
 					tok = mystrsep(&url, "?");
 					buffer_flush(w->response.data);
 					code = mysendfile(w, (tok && *tok)?tok:"/");
@@ -1268,7 +1268,7 @@ void web_client_process(struct web_client *w) {
 				char filename[FILENAME_MAX+1];
 				url = filename;
 				strncpyz(filename, w->last_url, FILENAME_MAX);
-				filename[FILENAME_MAX] = '\0';
+				//filename[FILENAME_MAX] = '\0';
 				tok = mystrsep(&url, "?");
 				buffer_flush(w->response.data);
 				code = mysendfile(w, (tok && *tok)?tok:"/");

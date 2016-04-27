@@ -277,10 +277,9 @@ void buffer_date(BUFFER *wb, int year, int month, int day, int hours, int minute
 	*p++ = '0' + seconds % 10;
 	*p = '\0';
 
-	wb->len += (size_t)(p - b);
-
-	// terminate it
-	wb->buffer[wb->len] = '\0';
+	// FIX: Don't need to terminate.
+	//wb->len += (size_t)(p - b);
+	//wb->buffer[wb->len] = '\0';
 	buffer_overflow_check(wb);
 }
 

@@ -1,3 +1,4 @@
+/* vim: set ts=4 noet sw=4 : */
 #include <stdarg.h>
 #include <time.h>
 #include "storage_number.h"
@@ -9,11 +10,11 @@
 
 typedef struct web_buffer {
 	size_t size;		// allocation size of buffer
-	size_t len;		// current data length in buffer
-	char *buffer;	// the buffer
+	size_t len;			// current data length in buffer
+	char *buffer;		// the buffer
 	uint8_t contenttype;
 	uint8_t options;
-	time_t date;	// the date this content has been generated
+	time_t date;		// the date this content has been generated
 } BUFFER;
 
 // options
@@ -47,8 +48,8 @@ typedef struct web_buffer {
 extern const char *buffer_tostring(BUFFER *wb);
 
 #define buffer_need_bytes(buffer, needed_free_size) do { if(unlikely((buffer)->size - (buffer)->len < (size_t)(needed_free_size))) buffer_increase((buffer), (size_t)(needed_free_size)); } while(0)
+#define buffer_flush(wb) do { (wb)->buffer[(wb)->len = 0] = '\0'; } while (0)
 
-#define buffer_flush(wb) wb->buffer[wb->len = 0] = '\0'
 extern void buffer_reset(BUFFER *wb);
 
 extern void buffer_strcat(BUFFER *wb, const char *txt);

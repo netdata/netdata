@@ -446,7 +446,7 @@ procfile *procfile_open(const char *filename, const char *separators, uint32_t f
 	}
 
 	strncpyz(ff->filename, filename, FILENAME_MAX);
-	ff->filename[FILENAME_MAX] = '\0';
+	//ff->filename[FILENAME_MAX] = '\0';
 
 	ff->fd = fd;
 	ff->size = size;
@@ -480,7 +480,7 @@ procfile *procfile_reopen(procfile *ff, const char *filename, const char *separa
 	}
 
 	strncpyz(ff->filename, filename, FILENAME_MAX);
-	ff->filename[FILENAME_MAX] = '\0';
+	//ff->filename[FILENAME_MAX] = '\0';
 
 	ff->flags = flags;
 
