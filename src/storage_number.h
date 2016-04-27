@@ -31,9 +31,10 @@ typedef double ustorage_number;
 #define did_storage_number_reset(v) ((v).flag_reset)
 
 storage_number pack_storage_number(calculated_number value, int flags);
-
 int print_calculated_number(char *str, calculated_number value);
 
+// FIXME: Using double we can store integer values from 0 to ±9007199254740991 (53 bits) precisely.
+//        Do we need only 24 bits?
 #define STORAGE_NUMBER_POSITIVE_MAX 167772150000000.0
 #define STORAGE_NUMBER_POSITIVE_MIN 0.00001
 #define STORAGE_NUMBER_NEGATIVE_MAX -0.00001
