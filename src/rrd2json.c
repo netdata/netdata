@@ -1457,6 +1457,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 
 			switch(group_method) {
 				case GROUP_MAX:
+					// FIXME: abs() or fabs()?
 					if(unlikely(abs(value) > abs(group_values[c])))
 						group_values[c] = value;
 					break;
@@ -1927,6 +1928,7 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 
 				switch(group_method) {
 					case GROUP_MAX:
+						// FIXME: abs() or fabs()?
 						if(abs(value) > abs(group_values[c])) group_values[c] = value;
 						break;
 

@@ -1,3 +1,4 @@
+/* vim: set ts=4 noet sw=4 : */
 #include <sys/time.h>
 #include <pthread.h>
 #include <stdint.h>
