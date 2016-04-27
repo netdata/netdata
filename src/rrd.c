@@ -1,3 +1,4 @@
+/* vim: set ts=4 noet sw=4 : */
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -898,7 +899,8 @@ unsigned long long rrdset_done(RRDSET *st)
 
 	// check if the chart has a long time to be updated
 	if(unlikely(st->usec_since_last_update > st->entries * st->update_every * 1000000ULL)) {
-		info("%s: took too long to be updated (%0.3Lf secs). Reseting it.", st->name, (long double)(st->usec_since_last_update / 1000000.0));
+    // FIX: Don't need 'long double' here.
+    info("%s: took too long to be updated (%0.3f secs). Reseting it.", st->name, (double)(st->usec_since_last_update / 1000000.0));
 		rrdset_reset(st);
 		st->usec_since_last_update = st->update_every * 1000000ULL;
 		first_entry = 1;
@@ -938,7 +940,9 @@ unsigned long long rrdset_done(RRDSET *st)
 		store_this_entry = 0;
 		first_entry = 1;
 
-		if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: initializing last_updated to now - %llu microseconds (%0.3Lf). Will not store the next entry.", st->name, st->usec_since_last_update, (long double)ut/1000000.0);
+		if(unlikely(st->debug)) 
+			// FIX: Don't need 'long double' here.
+			debug(D_RRD_STATS, "%s: initializing last_updated to now - %llu microseconds (%0.3f). Will not store the next entry.", st->name, st->usec_since_last_update, (double)ut/1000000.0);
 	}
 
 	// check if we will re-write the entire data set
@@ -972,9 +976,10 @@ unsigned long long rrdset_done(RRDSET *st)
 	}
 
 	if(unlikely(st->debug)) {
-		debug(D_RRD_STATS, "%s: last ut = %0.3Lf (last updated time)", st->name, (long double)last_ut/1000000.0);
-		debug(D_RRD_STATS, "%s: now  ut = %0.3Lf (current update time)", st->name, (long double)now_ut/1000000.0);
-		debug(D_RRD_STATS, "%s: next ut = %0.3Lf (next interpolation point)", st->name, (long double)next_ut/1000000.0);
+		// FIX: Don't need 'long double' here.
+		debug(D_RRD_STATS, "%s: last ut = %0.3f (last updated time)", st->name, (double)last_ut/1000000.0);
+		debug(D_RRD_STATS, "%s: now  ut = %0.3f (current update time)", st->name, (double)now_ut/1000000.0);
+		debug(D_RRD_STATS, "%s: next ut = %0.3f (next interpolation point)", st->name, (double)next_ut/1000000.0);
 	}
 
 	if(unlikely(!st->counter_done)) {
@@ -1153,8 +1158,9 @@ unsigned long long rrdset_done(RRDSET *st)
 #endif
 
 		if(unlikely(st->debug)) {
-			debug(D_RRD_STATS, "%s: last ut = %0.3Lf (last updated time)", st->name, (long double)last_ut/1000000.0);
-			debug(D_RRD_STATS, "%s: next ut = %0.3Lf (next interpolation point)", st->name, (long double)next_ut/1000000.0);
+			// FIX: Don't need 'long double' here.
+			debug(D_RRD_STATS, "%s: last ut = %0.3Lf (last updated time)", st->name, (double)last_ut/1000000.0);
+			debug(D_RRD_STATS, "%s: next ut = %0.3Lf (next interpolation point)", st->name, (double)next_ut/1000000.0);
 		}
 
 		st->last_updated.tv_sec = (time_t) (next_ut / 1000000ULL);
