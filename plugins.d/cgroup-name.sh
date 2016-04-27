@@ -26,8 +26,9 @@ fi
 
 if [ -z "${NAME}" -a "${CGROUP:0:7}" = "docker/" ]
 	then
-	NAME="$(docker ps | grep "^${CGROUP:7:12}" | sed "s/[[:space:]]\+/ /g" | cut -d ' ' -f 2)"
+	NAME="$(docker ps --filter=id="${CGROUP:7:64}" --format="{{.Names}}")"
 	[ -z "${NAME}" ] && NAME="${CGROUP:0:19}"
+	[ ${#NAME} -gt 20 ] && NAME="${NAME:0:20}"
 fi
 
 if [ -z "${NAME}" ]

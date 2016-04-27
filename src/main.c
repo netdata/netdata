@@ -277,6 +277,7 @@ int main(int argc, char **argv)
 	setenv("NETDATA_CACHE_DIR"  , config_get("global", "cache directory"    , CACHE_DIR)  , 1);
 	setenv("NETDATA_LOG_DIR"    , config_get("global", "log directory"      , LOG_DIR)    , 1);
 	setenv("NETDATA_HOST_PREFIX", config_get("global", "host access prefix" , "")         , 1);
+	setenv("HOME"               , config_get("global", "home directory"     , CACHE_DIR)  , 1);
 
 	// avoid extended to stat(/etc/localtime)
 	// http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
