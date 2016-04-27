@@ -116,14 +116,31 @@ mysql_check() {
 	#  - 0 to enable the chart
 	#  - 1 to disable the chart
 
-	local x m mysql_cmd
+	local x m mysql_cmd tryroot=0 unconfigured=0
+
+	if [ "${1}" = "tryroot" ]
+		then
+		tryroot=1
+		shift
+	fi
 
 	[ -z "${mysql_cmd}" ] && mysql_cmd="$(which mysql)"
 
 	if [ ${#mysql_opts[@]} -eq 0 ]
 		then
+		unconfigured=1
+
 		mysql_cmds[local]="$mysql_cmd"
-		mysql_opts[local]=
+
+		if [ $tryroot -eq 1 ]
+			then
+			# the user has not configured us for mysql access
+			# if the root user is passwordless in mysql, we can
+			# attempt to connect to mysql as root
+			mysql_opts[local]="-u root"
+		else
+			mysql_opts[local]=
+		fi
 	fi
 
 	# check once if the url works
@@ -150,30 +167,36 @@ mysql_check() {
 
 	if [ ${#mysql_opts[@]} -eq 0 ]
 		then
-		echo >&2 "$PROGRAM_NAME: mysql: no mysql servers found. Please set mysql_opts[name]='options' to whatever needed to get connected to the mysql server, in $confd/mysql.conf"
-		return 1
+		if [ ${unconfigured} -eq 1 && ${tryroot} -eq 0 ]
+			then
+			mysql_check tryroot "${@}"
+			return $?
+		else
+			echo >&2 "$PROGRAM_NAME: mysql: no mysql servers found. Please set mysql_opts[name]='options' to whatever needed to get connected to the mysql server, in $confd/mysql.conf"
+			return 1
+		fi
 	fi
 
 	return 0
 }
 
 mysql_create() {
-	local m
+	local x
 
 	# create the charts
-	for m in "${mysql_ids[@]}"
+	for x in "${mysql_ids[@]}"
 	do
 		cat <<EOF
-CHART mysql_$m.net '' "mysql Bandwidth" "kilobits/s" bandwidth mysql.net area $[mysql_priority + 1] $mysql_update_every
+CHART mysql_$x.net '' "mysql Bandwidth" "kilobits/s" bandwidth mysql.net area $[mysql_priority + 1] $mysql_update_every
 DIMENSION Bytes_received in incremental 8 1024
 DIMENSION Bytes_sent out incremental -8 1024
 
-CHART mysql_$m.queries '' "mysql Queries" "queries/s" queries mysql.queries line $[mysql_priority + 2] $mysql_update_every
+CHART mysql_$x.queries '' "mysql Queries" "queries/s" queries mysql.queries line $[mysql_priority + 2] $mysql_update_every
 DIMENSION Queries queries incremental 1 1
 DIMENSION Questions questions incremental 1 1
 DIMENSION Slow_queries slow_queries incremental -1 1
 
-CHART mysql_$m.handlers '' "mysql Handlers" "handlers/s" handlers mysql.handlers line $[mysql_priority + 3] $mysql_update_every
+CHART mysql_$x.handlers '' "mysql Handlers" "handlers/s" handlers mysql.handlers line $[mysql_priority + 3] $mysql_update_every
 DIMENSION Handler_commit commit incremental 1 1
 DIMENSION Handler_delete delete incremental 1 1
 DIMENSION Handler_prepare prepare incremental 1 1
@@ -189,75 +212,75 @@ DIMENSION Handler_savepoint_rollback savepoint_rollback incremental 1 1
 DIMENSION Handler_update update incremental 1 1
 DIMENSION Handler_write write incremental 1 1
 
-CHART mysql_$m.table_locks '' "mysql Tables Locks" "locks/s" locks mysql.table_locks line $[mysql_priority + 4] $mysql_update_every
+CHART mysql_$x.table_locks '' "mysql Tables Locks" "locks/s" locks mysql.table_locks line $[mysql_priority + 4] $mysql_update_every
 DIMENSION Table_locks_immediate immediate incremental 1 1
 DIMENSION Table_locks_waited waited incremental -1 1
 
-CHART mysql_$m.join_issues '' "mysql Select Join Issues" "joins/s" issues mysql.join_issues line $[mysql_priority + 5] $mysql_update_every
+CHART mysql_$x.join_issues '' "mysql Select Join Issues" "joins/s" issues mysql.join_issues line $[mysql_priority + 5] $mysql_update_every
 DIMENSION Select_full_join full_join incremental 1 1
 DIMENSION Select_full_range_join full_range_join incremental 1 1
 DIMENSION Select_range range incremental 1 1
 DIMENSION Select_range_check range_check incremental 1 1
 DIMENSION Select_scan scan incremental 1 1
 
-CHART mysql_$m.sort_issues '' "mysql Sort Issues" "issues/s" issues mysql.sort.issues line $[mysql_priority + 6] $mysql_update_every
+CHART mysql_$x.sort_issues '' "mysql Sort Issues" "issues/s" issues mysql.sort.issues line $[mysql_priority + 6] $mysql_update_every
 DIMENSION Sort_merge_passes merge_passes incremental 1 1
 DIMENSION Sort_range range incremental 1 1
 DIMENSION Sort_scan scan incremental 1 1
 
-CHART mysql_$m.tmp '' "mysql Tmp Operations" "counter" temporaries mysql.tmp line $[mysql_priority + 7] $mysql_update_every
+CHART mysql_$x.tmp '' "mysql Tmp Operations" "counter" temporaries mysql.tmp line $[mysql_priority + 7] $mysql_update_every
 DIMENSION Created_tmp_disk_tables disk_tables incremental 1 1
 DIMENSION Created_tmp_files files incremental 1 1
 DIMENSION Created_tmp_tables tables incremental 1 1
 
-CHART mysql_$m.connections '' "mysql Connections" "connections/s" connections mysql.connections line $[mysql_priority + 8] $mysql_update_every
+CHART mysql_$x.connections '' "mysql Connections" "connections/s" connections mysql.connections line $[mysql_priority + 8] $mysql_update_every
 DIMENSION Connections all incremental 1 1
 DIMENSION Aborted_connects aborded incremental 1 1
 
-CHART mysql_$m.binlog_cache '' "mysql Binlog Cache" "transactions/s" binlog mysql.binlog_cache line $[mysql_priority + 9] $mysql_update_every
+CHART mysql_$x.binlog_cache '' "mysql Binlog Cache" "transactions/s" binlog mysql.binlog_cache line $[mysql_priority + 9] $mysql_update_every
 DIMENSION Binlog_cache_disk_use disk incremental 1 1
 DIMENSION Binlog_cache_use all incremental 1 1
 
-CHART mysql_$m.threads '' "mysql Threads" "threads" threads mysql.threads line $[mysql_priority + 10] $mysql_update_every
+CHART mysql_$x.threads '' "mysql Threads" "threads" threads mysql.threads line $[mysql_priority + 10] $mysql_update_every
 DIMENSION Threads_connected connected absolute 1 1
 DIMENSION Threads_created created incremental 1 1
 DIMENSION Threads_cached cached absolute -1 1
 DIMENSION Threads_running running absolute 1 1
 
-CHART mysql_$m.thread_cache_misses '' "mysql Threads Cache Misses" "misses" threads mysql.thread_cache_misses area $[mysql_priority + 11] $mysql_update_every
+CHART mysql_$x.thread_cache_misses '' "mysql Threads Cache Misses" "misses" threads mysql.thread_cache_misses area $[mysql_priority + 11] $mysql_update_every
 DIMENSION misses misses absolute 1 100
 
-CHART mysql_$m.innodb_io '' "mysql InnoDB I/O Bandwidth" "kilobytes/s" innodb mysql.innodb_io area $[mysql_priority + 12] $mysql_update_every
+CHART mysql_$x.innodb_io '' "mysql InnoDB I/O Bandwidth" "kilobytes/s" innodb mysql.innodb_io area $[mysql_priority + 12] $mysql_update_every
 DIMENSION Innodb_data_read read incremental 1 1024
 DIMENSION Innodb_data_written write incremental -1 1024
 
-CHART mysql_$m.innodb_io_ops '' "mysql InnoDB I/O Operations" "operations/s" innodb mysql.innodb_io_ops line $[mysql_priority + 13] $mysql_update_every
+CHART mysql_$x.innodb_io_ops '' "mysql InnoDB I/O Operations" "operations/s" innodb mysql.innodb_io_ops line $[mysql_priority + 13] $mysql_update_every
 DIMENSION Innodb_data_reads reads incremental 1 1
 DIMENSION Innodb_data_writes writes incremental -1 1
 DIMENSION Innodb_data_fsyncs fsyncs incremental 1 1
 
-CHART mysql_$m.innodb_io_pending_ops '' "mysql InnoDB Pending I/O Operations" "operations" innodb mysql.innodb_io_pending_ops line $[mysql_priority + 14] $mysql_update_every
+CHART mysql_$x.innodb_io_pending_ops '' "mysql InnoDB Pending I/O Operations" "operations" innodb mysql.innodb_io_pending_ops line $[mysql_priority + 14] $mysql_update_every
 DIMENSION Innodb_data_pending_reads reads absolute 1 1
 DIMENSION Innodb_data_pending_writes writes absolute -1 1
 DIMENSION Innodb_data_pending_fsyncs fsyncs absolute 1 1
 
-CHART mysql_$m.innodb_log '' "mysql InnoDB Log Operations" "operations/s" innodb mysql.innodb_log line $[mysql_priority + 15] $mysql_update_every
+CHART mysql_$x.innodb_log '' "mysql InnoDB Log Operations" "operations/s" innodb mysql.innodb_log line $[mysql_priority + 15] $mysql_update_every
 DIMENSION Innodb_log_waits waits incremental 1 1
 DIMENSION Innodb_log_write_requests write_requests incremental -1 1
 DIMENSION Innodb_log_writes writes incremental -1 1
 
-CHART mysql_$m.innodb_os_log '' "mysql InnoDB OS Log Operations" "operations" innodb mysql.innodb_os_log line $[mysql_priority + 16] $mysql_update_every
+CHART mysql_$x.innodb_os_log '' "mysql InnoDB OS Log Operations" "operations" innodb mysql.innodb_os_log line $[mysql_priority + 16] $mysql_update_every
 DIMENSION Innodb_os_log_fsyncs fsyncs incremental 1 1
 DIMENSION Innodb_os_log_pending_fsyncs pending_fsyncs absolute 1 1
 DIMENSION Innodb_os_log_pending_writes pending_writes absolute -1 1
 
-CHART mysql_$m.innodb_os_log_io '' "mysql InnoDB OS Log Bandwidth" "kilobytes/s" innodb mysql.innodb_os_log_io area $[mysql_priority + 17] $mysql_update_every
+CHART mysql_$x.innodb_os_log_io '' "mysql InnoDB OS Log Bandwidth" "kilobytes/s" innodb mysql.innodb_os_log_io area $[mysql_priority + 17] $mysql_update_every
 DIMENSION Innodb_os_log_written write incremental -1 1024
 
-CHART mysql_$m.innodb_cur_row_lock '' "mysql InnoDB Current Row Locks" "operations" innodb mysql.innodb_cur_row_lock area $[mysql_priority + 18] $mysql_update_every
+CHART mysql_$x.innodb_cur_row_lock '' "mysql InnoDB Current Row Locks" "operations" innodb mysql.innodb_cur_row_lock area $[mysql_priority + 18] $mysql_update_every
 DIMENSION Innodb_row_lock_current_waits current_waits absolute 1 1
 
-CHART mysql_$m.innodb_rows '' "mysql InnoDB Row Operations" "operations/s" innodb mysql.innodb_rows area $[mysql_priority + 19] $mysql_update_every
+CHART mysql_$x.innodb_rows '' "mysql InnoDB Row Operations" "operations/s" innodb mysql.innodb_rows area $[mysql_priority + 19] $mysql_update_every
 DIMENSION Innodb_rows_read read incremental 1 1
 DIMENSION Innodb_rows_deleted deleted incremental -1 1
 DIMENSION Innodb_rows_inserted inserted incremental 1 1
@@ -268,7 +291,7 @@ EOF
 	if [ ! -z "$mysql_Binlog_stmt_cache_disk_use" ]
 		then
 		cat <<EOF
-CHART mysql_$m.binlog_stmt_cache '' "mysql Binlog Statement Cache" "statements/s" binlog mysql.binlog_stmt_cache line $[mysql_priority + 20] $mysql_update_every
+CHART mysql_$x.binlog_stmt_cache '' "mysql Binlog Statement Cache" "statements/s" binlog mysql.binlog_stmt_cache line $[mysql_priority + 20] $mysql_update_every
 DIMENSION Binlog_stmt_cache_disk_use disk incremental 1 1
 DIMENSION Binlog_stmt_cache_use all incremental 1 1
 EOF
@@ -277,7 +300,7 @@ EOF
 	if [ ! -z "$mysql_Connection_errors_accept" ]
 		then
 		cat <<EOF
-CHART mysql_$m.connection_errors '' "mysql Connection Errors" "connections/s" connections mysql.connection_errors line $[mysql_priority + 21] $mysql_update_every
+CHART mysql_$x.connection_errors '' "mysql Connection Errors" "connections/s" connections mysql.connection_errors line $[mysql_priority + 21] $mysql_update_every
 DIMENSION Connection_errors_accept accept incremental 1 1
 DIMENSION Connection_errors_internal internal incremental 1 1
 DIMENSION Connection_errors_max_connections max incremental 1 1
@@ -369,59 +392,59 @@ SET Sort_merge_passes = $mysql_Sort_merge_passes
 SET Sort_range = $mysql_Sort_range
 SET Sort_scan = $mysql_Sort_scan
 END
-BEGIN mysql_$m.tmp $1
+BEGIN mysql_$x.tmp $1
 SET Created_tmp_disk_tables = $mysql_Created_tmp_disk_tables
 SET Created_tmp_files = $mysql_Created_tmp_files
 SET Created_tmp_tables = $mysql_Created_tmp_tables
 END
-BEGIN mysql_$m.connections $1
+BEGIN mysql_$x.connections $1
 SET Connections = $mysql_Connections
 SET Aborted_connects = $mysql_Aborted_connects
 END
-BEGIN mysql_$m.binlog_cache $1
+BEGIN mysql_$x.binlog_cache $1
 SET Binlog_cache_disk_use = $mysql_Binlog_cache_disk_use
 SET Binlog_cache_use = $mysql_Binlog_cache_use
 END
-BEGIN mysql_$m.threads $1
+BEGIN mysql_$x.threads $1
 SET Threads_connected = $mysql_Threads_connected
 SET Threads_created = $mysql_Threads_created
 SET Threads_cached = $mysql_Threads_cached
 SET Threads_running = $mysql_Threads_running
 END
-BEGIN mysql_$m.thread_cache_misses $1
+BEGIN mysql_$x.thread_cache_misses $1
 SET misses = $mysql_Thread_cache_misses
 END
-BEGIN mysql_$m.innodb_io $1
+BEGIN mysql_$x.innodb_io $1
 SET Innodb_data_read = $mysql_Innodb_data_read
 SET Innodb_data_written = $mysql_Innodb_data_written
 END
-BEGIN mysql_$m.innodb_io_ops $1
+BEGIN mysql_$x.innodb_io_ops $1
 SET Innodb_data_reads = $mysql_Innodb_data_reads
 SET Innodb_data_writes = $mysql_Innodb_data_writes
 SET Innodb_data_fsyncs = $mysql_Innodb_data_fsyncs
 END
-BEGIN mysql_$m.innodb_io_pending_ops $1
+BEGIN mysql_$x.innodb_io_pending_ops $1
 SET Innodb_data_pending_reads = $mysql_Innodb_data_pending_reads
 SET Innodb_data_pending_writes = $mysql_Innodb_data_pending_writes
 SET Innodb_data_pending_fsyncs = $mysql_Innodb_data_pending_fsyncs
 END
-BEGIN mysql_$m.innodb_log $1
+BEGIN mysql_$x.innodb_log $1
 SET Innodb_log_waits = $mysql_Innodb_log_waits
 SET Innodb_log_write_requests = $mysql_Innodb_log_write_requests
 SET Innodb_log_writes = $mysql_Innodb_log_writes
 END
-BEGIN mysql_$m.innodb_os_log $1
+BEGIN mysql_$x.innodb_os_log $1
 SET Innodb_os_log_fsyncs = $mysql_Innodb_os_log_fsyncs
 SET Innodb_os_log_pending_fsyncs = $mysql_Innodb_os_log_pending_fsyncs
 SET Innodb_os_log_pending_writes = $mysql_Innodb_os_log_pending_writes
 END
-BEGIN mysql_$m.innodb_os_log_io $1
+BEGIN mysql_$x.innodb_os_log_io $1
 SET Innodb_os_log_written = $mysql_Innodb_os_log_written
 END
-BEGIN mysql_$m.innodb_cur_row_lock $1
+BEGIN mysql_$x.innodb_cur_row_lock $1
 SET Innodb_row_lock_current_waits = $mysql_Innodb_row_lock_current_waits
 END
-BEGIN mysql_$m.innodb_rows $1
+BEGIN mysql_$x.innodb_rows $1
 SET Innodb_rows_inserted = $mysql_Innodb_rows_inserted
 SET Innodb_rows_read = $mysql_Innodb_rows_read
 SET Innodb_rows_updated = $mysql_Innodb_rows_updated
@@ -432,7 +455,7 @@ VALUESEOF
 		if [ ! -z "$mysql_Binlog_stmt_cache_disk_use" ]
 			then
 			cat <<VALUESEOF
-BEGIN mysql_$m.binlog_stmt_cache $1
+BEGIN mysql_$x.binlog_stmt_cache $1
 SET Binlog_stmt_cache_disk_use = $mysql_Binlog_stmt_cache_disk_use
 SET Binlog_stmt_cache_use = $mysql_Binlog_stmt_cache_use
 END
@@ -442,7 +465,7 @@ VALUESEOF
 		if [ ! -z "$mysql_Connection_errors_accept" ]
 			then
 			cat <<VALUESEOF
-BEGIN mysql_$m.connection_errors $1
+BEGIN mysql_$x.connection_errors $1
 SET Connection_errors_accept = $mysql_Connection_errors_accept
 SET Connection_errors_internal = $mysql_Connection_errors_internal
 SET Connection_errors_max_connections = $mysql_Connection_errors_max_connections
