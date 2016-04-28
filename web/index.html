@@ -1442,11 +1442,11 @@ function enrichChartData(chart) {
 
 function name2id(s) {
 	return s
-		.replace(' ', '_')
-		.replace('(', '_')
-		.replace(')', '_')
-		.replace('.', '_')
-		.replace('/', '_');
+		.replace(/ /g, '_')
+		.replace(/\(/g, '_')
+		.replace(/\)/g, '_')
+		.replace(/\./g, '_')
+		.replace(/\//g, '_');
 }
 
 function headMain(charts, duration) {
@@ -1601,7 +1601,7 @@ function renderPage(menus, data) {
 
 		// generate an entry at the main menu
 
-		sidebar += '<li class=""><a href="#' + menu + '">' + menus[menu].title + '</a><ul class="nav">';
+		sidebar += '<li class=""><a href="#' + name2id(menu) + '">' + menus[menu].title + '</a><ul class="nav">';
 		html += '<div role="section"><div role="sectionhead"><h1 id="' + menu + '" role="heading">' + menus[menu].title + '</h1></div><div id="' + menu + '" role="document">';
 
 		if(menus[menu].info !== null)
