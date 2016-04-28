@@ -11,6 +11,8 @@
 	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
 	<script>
+	// --- OPTIONS FOR THE DASHBOARD --
+
 	// this section has to appear before loading dashboard.js
 
 	// Select a theme.
@@ -28,7 +30,7 @@
 	</script>
 
 	<!--
-		Load dashboard.js
+		--- LOAD dashboard.js ---
 
 		to host this HTML file on your web server,
 		you have to load dashboard.js from the netdata server.
@@ -43,24 +45,23 @@
 	<script type="text/javascript" src="dashboard.js"></script>
 
 	<script>
-	// Set options for TV operation
-	// This has to be done, after dashboard.js is loaded
+	// --- OPTIONS FOR THE CHARTS --
 
-	// destroy charts not shown (lowers memory on the browser)
+	// destroy charts not shown (lowers memory on the browsers)
+	// set this to 'yes' to destroy, 'false' to hide the charts
 	NETDATA.options.current.destroy_on_hide = false;
 	
 	// set this to false, to always show all dimensions
 	NETDATA.options.current.eliminate_zero_dimensions = true;
 	
-	// lower the pressure on this browser
+	// set this to false, to lower the pressure on the browser
 	NETDATA.options.current.concurrent_refreshes = true;
 
-	// if the tv browser is too slow (a pi?)
-	// set this to false
+	// if you need to support slow mobile phones, set this to false
 	NETDATA.options.current.parallel_refresher = true;
 
-	// always update the charts, even if focus is lost
-	// NETDATA.options.current.stop_updates_when_focus_is_lost = false;
+	// set this to false, to always update the charts, even if focus is lost
+	NETDATA.options.current.stop_updates_when_focus_is_lost = true;
 	</script>
 
 	<style>
@@ -111,7 +112,7 @@
 		done... <strong>real-time</strong>!
 	</div>
 	<div style="padding-top: 3vw; padding-bottom: 1vw; text-align: center; font-size: 2vw;">
-		enter a <b>netdata</b> demo server
+		this dashboard gets its charts, from <b>3 netdata</b> servers
 	</div>
 
 	<div style="width: 100%; text-align: center; padding-top: 2vw;">
@@ -169,9 +170,17 @@
 	</div>
 
 	<div style="padding-top: 4vw; width: 100%; text-align: center; font-size: 2vw;">
-		we love real-time charts, so our home page
+		the servers are not aware of this unified dashboard,
 		<br/>
-		 ...is a netdata dashboard too!
+		each server is not aware of the other 2 servers,
+		<br/>
+		but on this dashboard they <b>behave like one</b>!
+	</div>
+	<div style="padding-top: 1vw; width: 100%; text-align: center; font-size: 1.5vw;">
+		<i class="fa fa-comment" aria-hidden="true"></i>
+		hover on a chart below, or drag it to show the past - <b>the others will follow</b>!
+		<br/>
+		(double click on a chart to reset them all)
 	</div>
 
 	<div style="padding-top: 4vw; width: 100%; text-align: center; font-size: 1.5vw;">
@@ -514,6 +523,15 @@
 		<br/>and including the chart refreshes for the dashboards of all viewers.</i>
 	</div>
 
+	<div style="padding-top: 6vw; width: 100%; text-align: center; font-size: 2vw;">
+		want to know more?
+		<br/>
+		jump to <a href="https://github.com/firehol/netdata/">the netdata page at github</a>!
+		<br/>
+		remember to motivate us with a <b>Github Star</b>.
+		<br/>
+		&nbsp;
+	</div>
 </div>
 </body>
 </html>
