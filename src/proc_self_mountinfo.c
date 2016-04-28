@@ -26,6 +26,20 @@ struct mountinfo *mountinfo_find(struct mountinfo *root, unsigned long major, un
 	return NULL;
 }
 
+// find the mount info with the given filesystem and mount_source
+// in the supplied linked list of mountinfo structures
+struct mountinfo *mountinfo_find_by_filesystem_mount_source(struct mountinfo *root, const char *filesystem, const char *mount_source) {
+	struct mountinfo *mi;
+	uint32_t filesystem_hash = simple_hash(filesystem), mount_source_hash = simple_hash(mount_source);
+
+	for(mi = root; mi ; mi = mi->next)
+		if(mi->filesystem_hash == filesystem_hash && mi->mount_source_hash == mount_source_hash
+				&& !strcmp(mi->filesystem, filesystem) && !strcmp(mi->mount_source, mount_source))
+			return mi;
+
+	return NULL;
+}
+
 // free a linked list of mountinfo structures
 void mountinfo_free(struct mountinfo *mi) {
 	if(unlikely(!mi))
@@ -70,7 +84,6 @@ struct mountinfo *mountinfo_read() {
 	struct mountinfo *root = NULL, *last = NULL, *mi = NULL;
 
 	unsigned long l, lines = procfile_lines(ff);
-	error("MOUNTINFO: file has %u lines", lines);
 	for(l = 0; l < lines ;l++) {
 		if(procfile_linewords(ff, l) < 5)
 			continue;
@@ -100,9 +113,11 @@ struct mountinfo *mountinfo_read() {
 
 		mi->root = strdup(procfile_lineword(ff, l, w)); w++;
 		if(unlikely(!mi->root)) fatal("Cannot allocate memory");
+		mi->root_hash = simple_hash(mi->root);
 
 		mi->mount_point = strdup(procfile_lineword(ff, l, w)); w++;
 		if(unlikely(!mi->mount_point)) fatal("Cannot allocate memory");
+		mi->mount_point_hash = simple_hash(mi->mount_point);
 
 		mi->mount_options = strdup(procfile_lineword(ff, l, w)); w++;
 		if(unlikely(!mi->mount_options)) fatal("Cannot allocate memory");
@@ -136,11 +151,15 @@ struct mountinfo *mountinfo_read() {
 			mi->optional_fields = NULL;
 
 		if(likely(*s == '-')) {
+			w++;
+
 			mi->filesystem = strdup(procfile_lineword(ff, l, w)); w++;
 			if(!mi->filesystem) fatal("Cannot allocate memory");
+			mi->filesystem_hash = simple_hash(mi->filesystem);
 
 			mi->mount_source = strdup(procfile_lineword(ff, l, w)); w++;
 			if(!mi->mount_source) fatal("Cannot allocate memory");
+			mi->mount_source_hash = simple_hash(mi->mount_source);
 
 			mi->super_options = strdup(procfile_lineword(ff, l, w)); w++;
 			if(!mi->super_options) fatal("Cannot allocate memory");
@@ -151,18 +170,20 @@ struct mountinfo *mountinfo_read() {
 			mi->super_options = NULL;
 		}
 
-		//info("MOUNTINFO: %u %u %u:%u root '%s', mount point '%s', mount options '%s', filesystem '%s', mount source '%s', super options '%s'",
-		//     mi->id,
-		//     mi->parentid,
-		//     mi->major,
-		//     mi->minor,
-		//     mi->root,
-		//     mi->mount_point,
-		//     mi->mount_options,
-		//     mi->filesystem,
-		//     mi->mount_source,
-		//     mi->super_options
-		//);
+/*
+		info("MOUNTINFO: %u %u %u:%u root '%s', mount point '%s', mount options '%s', filesystem '%s', mount source '%s', super options '%s'",
+		     mi->id,
+		     mi->parentid,
+		     mi->major,
+		     mi->minor,
+		     mi->root,
+		     mi->mount_point,
+		     mi->mount_options,
+		     mi->filesystem,
+		     mi->mount_source,
+		     mi->super_options
+		);
+*/
 	}
 
 	procfile_close(ff);
