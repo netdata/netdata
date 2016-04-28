@@ -96,7 +96,7 @@ rm -rf $RPM_BUILD_ROOT
 %dir %{_datadir}/%{name}
 
 # override defattr for web files
-%defattr(755,root,netdata,644)
+%defattr(644,root,netdata,755)
 %{_datadir}/%{name}/web
 
 %changelog
