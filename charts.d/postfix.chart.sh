@@ -43,9 +43,9 @@ postfix_check() {
 
 postfix_create() {
 cat <<EOF
-CHART postfix.qemails '' "Postfix Queue Emails" "emails" queue postfix.queued.emails line $[postfix_priority + 1] $postfix_update_every
+CHART postfix.qemails '' "Postfix Queue Emails" "emails" queue postfix.queued.emails line $((postfix_priority + 1)) $postfix_update_every
 DIMENSION emails '' absolute 1 1
-CHART postfix.qsize '' "Postfix Queue Emails Size" "emails size in KB" queue postfix.queued.size area $[postfix_priority + 2] $postfix_update_every
+CHART postfix.qsize '' "Postfix Queue Emails Size" "emails size in KB" queue postfix.queued.size area $((postfix_priority + 2)) $postfix_update_every
 DIMENSION size '' absolute 1 1
 EOF
 
