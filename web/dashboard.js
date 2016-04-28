@@ -1126,7 +1126,7 @@
 				var w = that.element.offsetWidth;
 				if(w === null || w === 0) {
 					// the div is hidden
-					// this is resize the chart when next viewed
+					// this will resize the chart when next viewed
 					that.tm.last_resized = 0;
 				}
 				else
