@@ -24,9 +24,9 @@ body {
 	display: flex;
 	display: -webkit-flex;
 	display: -moz-flex;
-	align-items: baseline;
-	-moz-align-items: baseline;
-	-webkit-align-items: baseline;
+	align-items: flex-end;
+	-moz-align-items: flex-end;
+	-webkit-align-items: flex-end;
 	justify-content: center;
 	-moz--webkit-justify-content: center;
 	-moz-justify-content: center;
