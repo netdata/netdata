@@ -822,9 +822,9 @@ void mark_all_cgroups_as_not_available() {
 }
 
 void cleanup_all_cgroups() {
-	struct cgroup *cg, *last;
+	struct cgroup *cg = cgroup_root, *last = NULL;
 
-	for(cg = cgroup_root, last = NULL; cg ; last = cg) {
+	for(; cg ;) {
 		if(!cg->available) {
 
 			if(!last)
@@ -838,10 +838,12 @@ void cleanup_all_cgroups() {
 				cg = cgroup_root;
 			else
 				cg = last->next;
-
-			continue;
+			
 		}
-		cg = cg->next;
+		else {
+			last = cg;
+			cg = cg->next;
+		}
 	}
 }
 
