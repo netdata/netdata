@@ -120,15 +120,15 @@ phpfpm_create() {
 	for m in "${!phpfpm_urls[@]}"
 	do
 		cat <<EOF
-CHART phpfpm_$m.connections '' "PHP-FPM Active Connections" "connections" phpfpm phpfpm.connections line $[phpfpm_priority + 1] $phpfpm_update_every
+CHART phpfpm_$m.connections '' "PHP-FPM Active Connections" "connections" phpfpm phpfpm.connections line $((phpfpm_priority + 1)) $phpfpm_update_every
 DIMENSION active '' absolute 1 1
 DIMENSION maxActive 'max active' absolute 1 1
 DIMENSION idle '' absolute 1 1
 
-CHART phpfpm_$m.requests '' "PHP-FPM Requests" "requests/s" phpfpm phpfpm.requests line $[phpfpm_priority + 2] $phpfpm_update_every
+CHART phpfpm_$m.requests '' "PHP-FPM Requests" "requests/s" phpfpm phpfpm.requests line $((phpfpm_priority + 2)) $phpfpm_update_every
 DIMENSION requests '' incremental 1 1
 
-CHART phpfpm_$m.performance '' "PHP-FPM Performance" "status" phpfpm phpfpm.performance line $[phpfpm_priority + 3] $phpfpm_update_every
+CHART phpfpm_$m.performance '' "PHP-FPM Performance" "status" phpfpm phpfpm.performance line $((phpfpm_priority + 3)) $phpfpm_update_every
 DIMENSION reached 'max children reached' absolute 1 1
 DIMENSION slow 'slow requests' absolute 1 1
 EOF
@@ -157,16 +157,16 @@ phpfpm_update() {
 		# write the result of the work.
 		cat <<EOF
 BEGIN phpfpm_$m.connections $1
-SET active = $[phpfpm_active_processes]
-SET maxActive = $[phpfpm_max_active_processes]
-SET idle = $[phpfpm_idle_processes]
+SET active = $((phpfpm_active_processes))
+SET maxActive = $((phpfpm_max_active_processes))
+SET idle = $((phpfpm_idle_processes))
 END
 BEGIN phpfpm_$m.requests $1
-SET requests = $[phpfpm_accepted_conn]
+SET requests = $((phpfpm_accepted_conn))
 END
 BEGIN phpfpm_$m.performance $1
-SET reached = $[phpfpm_max_children_reached]
-SET slow = $[phpfpm_slow_requests]
+SET reached = $((phpfpm_max_children_reached))
+SET slow = $((phpfpm_slow_requests))
 END
 EOF
 	done

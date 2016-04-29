@@ -81,18 +81,18 @@ nginx_check() {
 # _create is called once, to create the charts
 nginx_create() {
 	cat <<EOF
-CHART nginx.connections '' "nginx Active Connections" "connections" nginx nginx.connections line $[nginx_priority + 1] $nginx_update_every
+CHART nginx.connections '' "nginx Active Connections" "connections" nginx nginx.connections line $((nginx_priority + 1)) $nginx_update_every
 DIMENSION active '' absolute 1 1
 
-CHART nginx.requests '' "nginx Requests" "requests/s" nginx nginx.requests line $[nginx_priority + 2] $nginx_update_every
+CHART nginx.requests '' "nginx Requests" "requests/s" nginx nginx.requests line $((nginx_priority + 2)) $nginx_update_every
 DIMENSION requests '' incremental 1 1
 
-CHART nginx.connections_status '' "nginx Active Connections by Status" "connections" nginx nginx.connections.status line $[nginx_priority + 3] $nginx_update_every
+CHART nginx.connections_status '' "nginx Active Connections by Status" "connections" nginx nginx.connections.status line $((nginx_priority + 3)) $nginx_update_every
 DIMENSION reading '' absolute 1 1
 DIMENSION writing '' absolute 1 1
 DIMENSION waiting idle absolute 1 1
 
-CHART nginx.connect_rate '' "nginx Connections Rate" "connections/s" nginx nginx.connections.rate line $[nginx_priority + 4] $nginx_update_every
+CHART nginx.connect_rate '' "nginx Connections Rate" "connections/s" nginx nginx.connections.rate line $((nginx_priority + 4)) $nginx_update_every
 DIMENSION accepts accepted incremental 1 1
 DIMENSION handled '' incremental 1 1
 EOF
@@ -114,19 +114,19 @@ nginx_update() {
 	# write the result of the work.
 	cat <<VALUESEOF
 BEGIN nginx.connections $1
-SET active = $[nginx_active_connections]
+SET active = $((nginx_active_connections))
 END
 BEGIN nginx.requests $1
-SET requests = $[nginx_requests]
+SET requests = $((nginx_requests))
 END
 BEGIN nginx.connections_status $1
-SET reading = $[nginx_reading]
-SET writing = $[nginx_writing]
-SET waiting = $[nginx_waiting]
+SET reading = $((nginx_reading))
+SET writing = $((nginx_writing))
+SET waiting = $((nginx_waiting))
 END
 BEGIN nginx.connect_rate $1
-SET accepts = $[nginx_accepts]
-SET handled = $[nginx_handled]
+SET accepts = $((nginx_accepts))
+SET handled = $((nginx_handled))
 END
 VALUESEOF
 

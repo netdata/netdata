@@ -61,14 +61,14 @@ tomcat_get() {
 # _create is called once, to create the charts
 tomcat_create() {
 	cat <<EOF
-CHART tomcat.accesses '' "tomcat requests" "requests/s" statistics tomcat.accesses area $[tomcat_priority + 8] $tomcat_update_every
+CHART tomcat.accesses '' "tomcat requests" "requests/s" statistics tomcat.accesses area $((tomcat_priority + 8)) $tomcat_update_every
 DIMENSION accesses '' incremental
-CHART tomcat.volume '' "tomcat volume" "KB/s" volume tomcat.volume area $[tomcat_priority + 5] $tomcat_update_every
+CHART tomcat.volume '' "tomcat volume" "KB/s" volume tomcat.volume area $((tomcat_priority + 5)) $tomcat_update_every
 DIMENSION volume '' incremental divisor ${tomcat_decimal_KB_detail}
-CHART tomcat.threads '' "tomcat threads" "current threads" statistics tomcat.threads line $[tomcat_priority + 6] $tomcat_update_every
+CHART tomcat.threads '' "tomcat threads" "current threads" statistics tomcat.threads line $((tomcat_priority + 6)) $tomcat_update_every
 DIMENSION current '' absolute 1
 DIMENSION busy '' absolute 1
-CHART tomcat.jvm '' "JVM Free Memory" "MB" statistics tomcat.jvm area $[tomcat_priority + 8] $tomcat_update_every
+CHART tomcat.jvm '' "JVM Free Memory" "MB" statistics tomcat.jvm area $((tomcat_priority + 8)) $tomcat_update_every
 DIMENSION jvm '' absolute 1 ${tomcat_decimal_detail}
 EOF
 	return 0
@@ -89,17 +89,17 @@ tomcat_update() {
 	# write the result of the work.
 	cat <<VALUESEOF
 BEGIN tomcat.accesses $1
-SET accesses = $[tomcat_accesses]
+SET accesses = $((tomcat_accesses))
 END
 BEGIN tomcat.volume $1
-SET volume = $[tomcat_volume]
+SET volume = $((tomcat_volume))
 END
 BEGIN tomcat.threads $1
-SET current = $[tomcat_threads]
-SET busy = $[tomcat_threads_busy]
+SET current = $((tomcat_threads))
+SET busy = $((tomcat_threads_busy))
 END
 BEGIN tomcat.jvm $1
-SET jvm = $[tomcat_jvm_freememory]
+SET jvm = $((tomcat_jvm_freememory))
 END
 VALUESEOF
 
