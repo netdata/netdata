@@ -56,11 +56,10 @@ void mountinfo_free(struct mountinfo *mi) {
 	if(mi->optional_fields_count) {
 		int i;
 		for(i = 0; i < mi->optional_fields_count ; i++)
-			free(mi->optional_fields[i]);
+			free(*mi->optional_fields[i]);
 	}
 	free(mi->optional_fields);
 */
-
 	free(mi->filesystem);
 	free(mi->mount_source);
 	free(mi->super_options);
@@ -147,7 +146,7 @@ struct mountinfo *mountinfo_read() {
 
 			int i;
 			for(i = 0; i < mi->optional_fields_count ; i++) {
-				mi->optional_fields[wo] = strdup(procfile_lineword(ff, l, w));
+				*mi->optional_fields[wo] = strdup(procfile_lineword(ff, l, w));
 				if(!mi->optional_fields[wo]) fatal("Cannot allocate memory");
 				wo++;
 			}
