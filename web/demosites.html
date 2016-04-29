@@ -11,6 +11,8 @@
 	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
 	<script>
+	// --- OPTIONS FOR THE DASHBOARD --
+
 	// this section has to appear before loading dashboard.js
 
 	// Select a theme.
@@ -28,7 +30,7 @@
 	</script>
 
 	<!--
-		Load dashboard.js
+		--- LOAD dashboard.js ---
 
 		to host this HTML file on your web server,
 		you have to load dashboard.js from the netdata server.
@@ -43,251 +45,492 @@
 	<script type="text/javascript" src="dashboard.js"></script>
 
 	<script>
-	// Set options for TV operation
-	// This has to be done, after dashboard.js is loaded
+	// --- OPTIONS FOR THE CHARTS --
 
-	// destroy charts not shown (lowers memory on the browser)
-	NETDATA.options.current.destroy_on_hide = true;
+	// destroy charts not shown (lowers memory on the browsers)
+	// set this to 'yes' to destroy, 'false' to hide the charts
+	NETDATA.options.current.destroy_on_hide = false;
 	
 	// set this to false, to always show all dimensions
 	NETDATA.options.current.eliminate_zero_dimensions = true;
 	
-	// lower the pressure on this browser
-	NETDATA.options.current.concurrent_refreshes = false;
+	// set this to false, to lower the pressure on the browser
+	NETDATA.options.current.concurrent_refreshes = true;
 
-	// if the tv browser is too slow (a pi?)
-	// set this to false
+	// if you need to support slow mobile phones, set this to false
 	NETDATA.options.current.parallel_refresher = true;
 
-	// always update the charts, even if focus is lost
-	// NETDATA.options.current.stop_updates_when_focus_is_lost = false;
-
-	// Since you may render charts from many servers and any of them may
-	// become offline for some time, the charts will break.
-	// This will reload the page every RELOAD_EVERY minutes
-
-	var RELOAD_EVERY = 5;
-	setTimeout(function(){
-		location.reload();
-	}, RELOAD_EVERY * 60 * 1000);
-
+	// set this to false, to always update the charts, even if focus is lost
+	NETDATA.options.current.stop_updates_when_focus_is_lost = true;
 	</script>
 
+	<style>
+
+.mysparkline {
+	position: relative;
+	display: inline-block;
+	min-height: 50px;
+}
+
+.mysparkline-overchart-label {
+	position: absolute;
+	display: block;
+	top: 0;
+	left: 10px;
+	bottom: 0;
+	right: 0;
+	font-size: 1vw;
+	z-index: 1;
+}
+
+.mysparkline-overchart-value {
+	position: absolute;
+	display: block;
+	top: 1.1vw;
+	left: 10px;
+	bottom: 0;
+	right: 0;
+	font-size: 3vw;
+	z-index: 2;
+	text-shadow: #333 0px 0px 2px;
+}
+
+	</style>
+
 </head>
-<body>
+<body style="text-align: center;">
 
-<div style="width: 100%; text-align: center; display: inline-block;">
+<div class="container">
 
-	<div style="width: 100%; height: 16vh; text-align: center; display: inline-block;">
-		<div style="width: 100%; height: 15px; text-align: center; display: inline-block;">
-			<b>CPU On both servers</b>
+	<div style="text-align: center; font-size: 13vw; height: 14vw;">
+		<b>netdata</b>
+	</div>
+	<div style="text-align: center; font-size: 2vw; height: 2.5vw;">
+		real-time performance monitoring
+	</div>
+	<div style="width:80%; text-align: right; font-size: 2.7vw;">
+		done... <strong>real-time</strong>!
+	</div>
+	<div style="padding-top: 3vw; padding-bottom: 1vw; text-align: center; font-size: 2vw;">
+		this dashboard gets its charts, from <b>3 netdata</b> servers
+	</div>
+
+	<div style="width: 100%; text-align: center; padding-top: 2vw;">
+		<div style="width: 100%; text-align: center;">
+
+			<div style="width: 25%; display: inline-block;">
+				<div data-netdata="netdata.requests"
+						data-host="//netdata1.firehol.org"
+						data-title="EU - London"
+						data-chart-library="gauge"
+						data-width="100%"
+						data-after="-300"
+						data-points="300"
+						data-colors="#558855"
+						></div>
+				<br/>&nbsp;<br/>
+				<button type="button" class="btn btn-default" data-toggle="button" aria-pressed="false" autocomplete="off" onclick="window.location='//netdata1.firehol.org'" style="font-size: 1.5vw;">Enter London!</button>
+				<div style="font-size: 0.8vw;">
+					Donated by DigitalOcean.com
+				</div>
+			</div>
+			<div style="width: 25%; display: inline-block;">
+				<div data-netdata="netdata.requests"
+						data-host="//netdata2.firehol.org"
+						data-title="US - Atlanta"
+						data-chart-library="gauge"
+						data-width="100%"
+						data-after="-300"
+						data-points="300"
+						data-colors="#AA5555"
+						></div>
+				<br/>&nbsp;<br/>
+				<button type="button" class="btn btn-default" data-toggle="button" aria-pressed="false" autocomplete="off" onclick="window.location='//netdata2.firehol.org'" style="font-size: 1.5vw;">Enter Atlanta!</button>
+				<div style="font-size: 0.8vw;">
+					Donated by CDN77.com
+				</div>
+			</div>
+			<div style="width: 25%; display: inline-block;">
+				<div data-netdata="netdata.requests"
+						data-host="//netdata3.firehol.org"
+						data-title="EU - Greece"
+						data-chart-library="gauge"
+						data-width="100%"
+						data-after="-300"
+						data-points="300"
+						data-colors="#5555AA"
+						></div>
+				<br/>&nbsp;<br/>
+				<button type="button" class="btn btn-default" data-toggle="button" aria-pressed="false" autocomplete="off" onclick="window.location='//netdata3.firehol.org'" style="font-size: 1.5vw;">Come to Greece!</button>
+				<div style="font-size: 0.8vw;">
+					&nbsp;
+				</div>
+			</div>
 		</div>
-		<div style="width: 100%; height: calc(100% - 15px); text-align: center; display: inline-block;">
+	</div>
+
+	<div style="padding-top: 4vw; width: 100%; text-align: center; font-size: 2vw;">
+		the servers are not aware of this unified dashboard,
+		<br/>
+		each server is not aware of the other 2 servers,
+		<br/>
+		but on this dashboard they <b>behave like one</b>!
+	</div>
+	<div style="padding-top: 1vw; width: 100%; text-align: center; font-size: 1.5vw;">
+		<i class="fa fa-comment" aria-hidden="true"></i>
+		hover on a chart below, or drag it to show the past - <b>the others will follow</b>!
+		<br/>
+		(double click on a chart to reset them all)
+	</div>
+
+	<div style="padding-top: 4vw; width: 100%; text-align: center; font-size: 1.5vw;">
+		<div style="padding-top: 1vw; padding-bottom: 1vw;">
+			Our <code>nginx</code> web servers recent requests/s:
+		</div>
+
+		<div class="mysparkline" style="width: 100%; height: 5vw; text-align: left;">
+			<div class="mysparkline-overchart-label">
+				<b>EU - London</b> web requests/s
+			</div>
+			<div class="mysparkline-overchart-value" id="nginx.requests.netdata" >
+			</div>
+			<div data-netdata="nginx.requests"
+					data-dimensions="requests"
+					data-host="//netdata1.firehol.org"
+					data-chart-library="dygraph"
+					data-dygraph-theme="sparkline"
+					data-dygraph-type="area"
+					data-width="100%"
+					data-height="100%"
+					data-after="-300"
+					data-colors="#558855"
+					data-show-value-of-requests-at="nginx.requests.netdata"
+					></div>
+		</div>
+
+		<div class="mysparkline" style="width: 100%; height: 5vw; text-align: left;">
+			<div class="mysparkline-overchart-label">
+				<b>US - Atlanta</b> web requests/s
+			</div>
+			<div class="mysparkline-overchart-value" id="nginx.requests.netdata2" >
+			</div>
+			<div data-netdata="nginx.requests"
+					data-dimensions="requests"
+					data-host="//netdata2.firehol.org"
+					data-chart-library="dygraph"
+					data-dygraph-theme="sparkline"
+					data-dygraph-type="area"
+					data-width="100%"
+					data-height="100%"
+					data-after="-300"
+					data-colors="#AA5555"
+					data-show-value-of-requests-at="nginx.requests.netdata2"
+					></div>
+		</div>
+
+		<div class="mysparkline" style="width: 100%; height: 5vw; text-align: left;">
+			<div class="mysparkline-overchart-label">
+				<b>EU - Greece</b> web requests/s
+			</div>
+			<div class="mysparkline-overchart-value" id="nginx.requests.netdata3" >
+			</div>
+			<div data-netdata="nginx.requests"
+					data-dimensions="requests"
+					data-host="//netdata3.firehol.org"
+					data-chart-library="dygraph"
+					data-dygraph-theme="sparkline"
+					data-dygraph-type="area"
+					data-width="100%"
+					data-height="100%"
+					data-after="-300"
+					data-colors="#5555AA"
+					data-show-value-of-requests-at="nginx.requests.netdata3"
+					></div>
+		</div>
+	</div>
+
+	<div style="width: 100%; text-align: right; font-size: 1vw;">
+		<i class="fa fa-comment" aria-hidden="true"></i> these charts are draggable and touchable, double click them to reset them
+	</div>
+
+
+	<div style="padding-top: 4vw; font-size: 1.5vw;">
+		Our bandwidth consumption per service
+		<br/>
+		(Linux QoS configured by our <a href="https://github.com/firehol/netdata/wiki/You-should-install-QoS-on-all-your-servers">FireQOS</a>):
+	</div>
+
+	<!-- Nav tabs -->
+	<ul class="nav nav-tabs" role="tablist" style="padding-top: 1vw;">
+		<li role="presentation" class="active"><a href="#outbout" aria-controls="outbout" role="tab" data-toggle="tab">Outbound</a></li>
+		<li role="presentation"><a href="#inbound" aria-controls="inbound" role="tab" data-toggle="tab">Inbound</a></li>
+	</ul>
+
+	<!-- Tab panes -->
+	<div class="tab-content">
+		<div role="tabpanel" class="tab-pane active" id="outbout">
+			<div data-netdata="tc.world_out"
+					data-host="//netdata1.firehol.org"
+					data-chart-library="dygraph"
+					data-title="EU - London, traffic we send per service"
+					data-width="100%"
+					data-height="10vw"
+					data-min-height="150px"
+					data-after="-300"
+					></div>
+
+			<div data-netdata="tc.world_out"
+					data-host="//netdata2.firehol.org"
+					data-chart-library="dygraph"
+					data-title="US - Atlanta, traffic we send per service"
+					data-width="100%"
+					data-height="10vw"
+					data-min-height="150px"
+					data-after="-300"
+					></div>
+
+			<div data-netdata="tc.world_out"
+					data-host="//netdata3.firehol.org"
+					data-chart-library="dygraph"
+					data-title="EU - Greece, traffic we send per service"
+					data-width="100%"
+					data-height="10vw"
+					data-min-height="150px"
+					data-after="-300"
+					></div>
+		</div>
+		<div role="tabpanel" class="tab-pane" id="inbound">
+			<div data-netdata="tc.world_in"
+					data-host="//netdata1.firehol.org"
+					data-chart-library="dygraph"
+					data-title="EU - London, traffic we receive per service"
+					data-width="100%"
+					data-height="10vw"
+					data-min-height="150px"
+					data-after="-300"
+					></div>
+
+			<div data-netdata="tc.world_in"
+					data-host="//netdata2.firehol.org"
+					data-chart-library="dygraph"
+					data-title="US - Atlanta, traffic we receive per service"
+					data-width="100%"
+					data-height="10vw"
+					data-min-height="150px"
+					data-after="-300"
+					></div>
+
+			<div data-netdata="tc.world_in"
+					data-host="//netdata3.firehol.org"
+					data-chart-library="dygraph"
+					data-title="EU - Greece, traffic we receive per service"
+					data-width="100%"
+					data-height="10vw"
+					data-min-height="150px"
+					data-after="-300"
+					></div>
+		</div>
+	</div>
+	<div style="width: 100%; text-align: right; font-size: 1vw;">
+		<i class="fa fa-comment" aria-hidden="true"></i> <i>these legends are interactive and the charts are resizable here ^^^</i>
+	</div>
+
+	<div style="padding-top: 4vw; width: 100%; text-align: center; font-size: 1.5vw;">
+		<div style="padding-top: 1vw; padding-bottom: 1vw;">
+			Our DDoS protection
 			<br/>
-			<div data-netdata="system.cpu"
-					data-host="//netdata.firehol.org"
-					data-title="CPU usage of EU Server"
-					data-chart-library="dygraph"
-					data-width="49%"
-					data-height="100%"
-					data-after="-300"
-					></div>
-			<div data-netdata="system.cpu"
-					data-host="//netdata2.firehol.org"
-					data-title="CPU usage of US Server"
-					data-chart-library="dygraph"
-					data-width="49%"
-					data-height="100%"
-					data-after="-300"
-					></div>
+			(iptables SYNPROXY configured by our <a href="https://github.com/firehol/netdata/wiki/Monitoring-SYNPROXY">FireHOL</a>):
 		</div>
-	</div>
 
-
-	<div style="width: 100%; height: 16vh; text-align: center; display: inline-block;">
-		<div style="width: 100%; height: 15px; text-align: center; display: inline-block;">
-			<b>Disk I/O on both servers</b>
-		</div>
-		<div style="width: 100%; height: calc(100% - 15px); text-align: center; display: inline-block;">
-			<div data-netdata="tc.world_in"
-					data-host="//netdata.firehol.org"
-					data-title="Inbound QoS on EU Server"
-					data-chart-library="dygraph"
-					data-width="49%"
-					data-height="100%"
-					data-after="-300"
-					></div>
-			<div data-netdata="tc.world_in"
-					data-host="//netdata2.firehol.org"
-					data-title="Inbound QoS on US Server"
-					data-chart-library="dygraph"
-					data-width="49%"
-					data-height="100%"
-					data-after="-300"
-					></div>
-		</div>
-	</div>
-
-	<div style="width: 100%; height: 16vh; text-align: center; display: inline-block;">
-		<div style="width: 100%; height: calc(100% - 15px); text-align: center; display: inline-block;">
-			<div data-netdata="tc.world_out"
-					data-host="//netdata.firehol.org"
-					data-title="Outbound QoS on Server"
-					data-chart-library="dygraph"
-					data-width="49%"
-					data-height="100%"
-					data-after="-300"
-					></div>
-			<div data-netdata="tc.world_out"
-					data-host="//netdata2.firehol.org"
-					data-title="Outbound QoS on US Server"
-					data-chart-library="dygraph"
-					data-width="49%"
-					data-height="100%"
-					data-after="-300"
-					></div>
-		</div>
-	</div>
-
-	<div style="width: 100%; height: 12vh; text-align: center; display: inline-block;">
-		<div style="width: 100%; height: 15px; text-align: center; display: inline-block;">
-			<b>NGINX performance on both servers</b>
-		</div>
-		<div style="width: 100%; height: calc(100% - 15px); text-align: center; display: inline-block;">
-			<div data-netdata="nginx.connections"
-					data-host="//netdata.firehol.org"
-					data-title="NGINX Connections on EU Server"
-					data-chart-library="dygraph"
-					data-width="49%"
-					data-height="100%"
-					data-after="-300"
-					></div>
-			<div data-netdata="nginx.connections"
-					data-host="//netdata2.firehol.org"
-					data-title="NGINX Connections on US Server"
-					data-chart-library="dygraph"
-					data-width="49%"
-					data-height="100%"
-					data-after="-300"
-					></div>
-		</div>
-	</div>
-
-	<div style="width: 100%; height: 12vh; text-align: center; display: inline-block;">
-		<div style="width: 100%; height: calc(100% - 15px); text-align: center; display: inline-block;">
-			<div data-netdata="nginx.requests"
-					data-host="//netdata.firehol.org"
-					data-title="NGINX Requests on EU Server"
-					data-chart-library="dygraph"
-					data-width="49%"
-					data-height="100%"
-					data-after="-300"
-					data-colors="#5555FF"
-					></div>
-			<div data-netdata="nginx.requests"
-					data-host="//netdata2.firehol.org"
-					data-title="NGINX Requests on US Server"
-					data-chart-library="dygraph"
-					data-width="49%"
-					data-height="100%"
-					data-after="-300"
-					data-colors="#5555FF"
-					></div>
-		</div>
-	</div>
-
-	<div style="width: 100%; height: 23vh; text-align: center; display: inline-block;">
-		<div style="width: 100%; height: 15px; text-align: center; display: inline-block;">
-			<b>Netdata statistics on both servers</b>
-		</div>
-		<div style="width: 100%; max-height: calc(100% - 15px); text-align: center; display: inline-block;">
-			<div style="width: 49%; height:100%; align: center; display: inline-block;">
-				EU Server
-				<br/>
-				<div data-netdata="netdata.net"
-						data-dimensions="out"
-						data-host="//netdata.firehol.org"
-						data-title="Chart Data Traffic"
-						data-chart-library="easypiechart"
-						data-width="16%"
-						data-height="100%"
-						data-after="-300"
-						data-points="300"
-						></div>
-				<div data-netdata="netdata.net"
-						data-dimensions="in"
-						data-host="//netdata.firehol.org"
-						data-title="Requests Traffic"
-						data-chart-library="easypiechart"
-						data-width="16%"
-						data-height="100%"
-						data-after="-300"
-						data-points="300"
-						></div>
-				<div data-netdata="netdata.clients"
-						data-host="//netdata.firehol.org"
-						data-title="Sockets"
-						data-chart-library="gauge"
-						data-width="22%"
-						data-height="100%"
-						data-after="-300"
-						data-points="300"
-						data-colors="#AA5500"
-						></div>
-				<div data-netdata="netdata.requests"
-						data-host="//netdata.firehol.org"
-						data-title="Chart Refreshes/s"
-						data-chart-library="gauge"
-						data-width="22%"
-						data-height="100%"
-						data-after="-300"
-						data-points="300"
-						></div>
+		<div class="mysparkline" style="width: 100%; height: 5vw; text-align: left;">
+			<div class="mysparkline-overchart-label">
+				<b>EU - London</b>, TCP SYN packets/s received
 			</div>
-			<div style="width: 49%; height:100%; align: center; display: inline-block;">
-				US Server
-				<br/>
-				<div data-netdata="netdata.requests"
-						data-host="//netdata2.firehol.org"
-						data-title="Chart Refreshes/s"
-						data-chart-library="gauge"
-						data-width="22%"
-						data-height="100%"
-						data-after="-300"
-						data-points="300"
-						></div>
-				<div data-netdata="netdata.clients"
-						data-host="//netdata2.firehol.org"
-						data-title="Sockets"
-						data-chart-library="gauge"
-						data-width="22%"
-						data-height="100%"
-						data-after="-300"
-						data-points="300"
-						data-colors="#AA5500"
-						></div>
-				<div data-netdata="netdata.net"
-						data-dimensions="in"
-						data-host="//netdata2.firehol.org"
-						data-title="Requests Traffic"
-						data-chart-library="easypiechart"
-						data-width="16%"
-						data-height="100%"
-						data-after="-300"
-						data-points="300"
-						></div>
-				<div data-netdata="netdata.net"
-						data-dimensions="out"
-						data-host="//netdata2.firehol.org"
-						data-title="Chart Data Traffic"
-						data-chart-library="easypiechart"
-						data-width="16%"
-						data-height="100%"
-						data-after="-300"
-						data-points="300"
-						></div>
+			<div class="mysparkline-overchart-value" id="netfilter.synproxy_syn_received.netdata1" >
 			</div>
+			<div data-netdata="netfilter.synproxy_syn_received"
+					data-dimensions="received"
+					data-host="//netdata1.firehol.org"
+					data-chart-library="dygraph"
+					data-dygraph-theme="sparkline"
+					data-dygraph-type="area"
+					data-width="100%"
+					data-height="100%"
+					data-after="-300"
+					data-colors="#558855"
+					data-show-value-of-received-at="netfilter.synproxy_syn_received.netdata1"
+					></div>
 		</div>
+
+		<div class="mysparkline" style="width: 100%; height: 5vw; text-align: left;">
+			<div class="mysparkline-overchart-label">
+				<b>US - Atlanta</b>, TCP SYN packets/s received
+			</div>
+			<div class="mysparkline-overchart-value" id="netfilter.synproxy_syn_received.netdata2" >
+			</div>
+			<div data-netdata="netfilter.synproxy_syn_received"
+					data-dimensions="received"
+					data-host="//netdata2.firehol.org"
+					data-chart-library="dygraph"
+					data-dygraph-theme="sparkline"
+					data-dygraph-type="area"
+					data-width="100%"
+					data-height="100%"
+					data-after="-300"
+					data-colors="#885555"
+					data-show-value-of-received-at="netfilter.synproxy_syn_received.netdata2"
+					></div>
+		</div>
+
+		<div class="mysparkline" style="width: 100%; height: 5vw; text-align: left;">
+			<div class="mysparkline-overchart-label">
+				<b>EU - Greece</b>, TCP SYN packets/s received
+			</div>
+			<div class="mysparkline-overchart-value" id="netfilter.synproxy_syn_received.netdata3" >
+			</div>
+			<div data-netdata="netfilter.synproxy_syn_received"
+					data-dimensions="received"
+					data-host="//netdata3.firehol.org"
+					data-chart-library="dygraph"
+					data-dygraph-theme="sparkline"
+					data-dygraph-type="area"
+					data-width="100%"
+					data-height="100%"
+					data-after="-300"
+					data-colors="#555588"
+					data-show-value-of-received-at="netfilter.synproxy_syn_received.netdata3"
+					></div>
+		</div>
+	</div>
+	<div style="width: 100%; text-align: right; font-size: 1vw;">
+		<i class="fa fa-comment" aria-hidden="true"></i> <i>did you notice the decimal numbers?
+		<br/>netdata interpolates collected values at second boundaries, with nanosecond detail!</i>
+	</div>
+
+
+	<div style="padding-top: 4vw; font-size: 1.5vw;">
+		CPU Utilization on our servers
+	</div>
+
+	<div style="padding-top: 1vw;">
+		<div data-netdata="system.cpu"
+				data-host="//netdata1.firehol.org"
+				data-chart-library="dygraph"
+				data-title="EU - London, CPU Usage"
+				data-width="100%"
+				data-height="10vw"
+				data-min-height="150px"
+				data-after="-300"
+				></div>
+
+		<div data-netdata="system.cpu"
+				data-host="//netdata2.firehol.org"
+				data-chart-library="dygraph"
+				data-title="US - Atlanta, CPU Usage"
+				data-width="100%"
+				data-height="10vw"
+				data-min-height="150px"
+				data-after="-300"
+				></div>
+
+		<div data-netdata="system.cpu"
+				data-host="//netdata3.firehol.org"
+				data-chart-library="dygraph"
+				data-title="EU - Greece, CPU Usage"
+				data-width="100%"
+				data-height="10vw"
+				data-min-height="150px"
+				data-after="-300"
+				></div>
+	</div>
+	<div style="width: 100%; text-align: right; font-size: 1vw;">
+		<i class="fa fa-comment" aria-hidden="true"></i> <i>what does it take so much CPU?
+		<br/>The site <a href="//iplists.firehol.org/">iplists.firehol.org</a> is maintained by FireHOL - the CPU is used for comparing security IP Lists.</i>
+	</div>
+
+	<div style="padding-top: 4vw; width: 100%; text-align: center; font-size: 1.5vw;">
+		<div style="padding-top: 1vw; padding-bottom: 1vw;">
+			CPU Usage of the netdata user
+			<br/>
+			netdata monitors <b>users</b>, <b>user groups</b>, <b>applications (process trees)</b>
+			<br/>
+			and <b>containers</b> (<code>lxc</code>, <code>docker</code>, etc.)
+		</div>
+
+		<div class="mysparkline" style="width: 100%; height: 5vw; text-align: left;">
+			<div class="mysparkline-overchart-label">
+				<b>EU - London</b>, CPU % of a single core
+			</div>
+			<div class="mysparkline-overchart-value" id="users.cpu.netdata1" >
+			</div>
+			<div data-netdata="users.cpu"
+					data-dimensions="netdata"
+					data-host="//netdata1.firehol.org"
+					data-chart-library="dygraph"
+					data-dygraph-theme="sparkline"
+					data-dygraph-type="area"
+					data-width="100%"
+					data-height="100%"
+					data-after="-300"
+					data-colors="#558855"
+					data-show-value-of-netdata-at="users.cpu.netdata1"
+					></div>
+		</div>
+
+		<div class="mysparkline" style="width: 100%; height: 5vw; text-align: left;">
+			<div class="mysparkline-overchart-label">
+				<b>US - Atlanta</b>, CPU % of a single core
+			</div>
+			<div class="mysparkline-overchart-value" id="users.cpu.netdata2" >
+			</div>
+			<div data-netdata="users.cpu"
+					data-dimensions="netdata"
+					data-host="//netdata2.firehol.org"
+					data-chart-library="dygraph"
+					data-dygraph-theme="sparkline"
+					data-dygraph-type="area"
+					data-width="100%"
+					data-height="100%"
+					data-after="-300"
+					data-colors="#885555"
+					data-show-value-of-netdata-at="users.cpu.netdata2"
+					></div>
+		</div>
+
+		<div class="mysparkline" style="width: 100%; height: 5vw; text-align: left;">
+			<div class="mysparkline-overchart-label">
+				<b>EU - Greece</b>, CPU % of a single core
+			</div>
+			<div class="mysparkline-overchart-value" id="users.cpu.netdata3" >
+			</div>
+			<div data-netdata="users.cpu"
+					data-dimensions="netdata"
+					data-host="//netdata3.firehol.org"
+					data-chart-library="dygraph"
+					data-dygraph-theme="sparkline"
+					data-dygraph-type="area"
+					data-width="100%"
+					data-height="100%"
+					data-after="-300"
+					data-colors="#555588"
+					data-show-value-of-netdata-at="users.cpu.netdata3"
+					></div>
+		</div>
+	</div>
+	<div style="width: 100%; text-align: right; font-size: 1vw;">
+		<i class="fa fa-comment" aria-hidden="true"></i> <i>this utilization is about the whole netdata process tree and the percentage is of <b>a single core</b>!
+		<br/>including <b>BASH</b> plugins (it monitors <code>mysql</code> on the demo sites), <b>node.js</b> plugins (it monitors <code>bind9</code> on the demo sites), etc.
+		<br/>and including the chart refreshes for the dashboards of all viewers.</i>
+	</div>
+
+	<div style="padding-top: 6vw; width: 100%; text-align: center; font-size: 2vw;">
+		want to know more?
+		<br/>
+		jump to <a href="https://github.com/firehol/netdata/">the netdata page at github</a>!
+		<br/>
+		remember to motivate us with a <b>Github Star</b>.
+		<br/>
+		&nbsp;
 	</div>
 </div>
 </body>
