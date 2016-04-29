@@ -334,13 +334,40 @@ do
 	fi
 done
 
+NETDATA_ADDED_TO_DOCKER=0
 if [ ${UID} -eq 0 ]
 	then
-	echo >&2 "Adding netdata user group ..."
-	getent group netdata > /dev/null || run groupadd -r netdata
+	getent group netdata > /dev/null
+	if [ $? -ne 0 ]
+		then
+		echo >&2 "Adding netdata user group ..."
+		run groupadd -r netdata
+	fi
 
-	echo >&2 "Adding netdata user account ..."
-	getent passwd netdata > /dev/null || run useradd -r -g netdata -c netdata -s /sbin/nologin -d / netdata
+	getent passwd netdata > /dev/null
+	if [ $? -ne 0 ]
+		then
+		echo >&2 "Adding netdata user account ..."
+		run useradd -r -g netdata -c netdata -s /sbin/nologin -d / netdata
+	fi
+
+	getent group docker > /dev/null
+	if [ $? -eq 0 ]
+		then
+		# find the users in the docker group
+		docker=$(getent group docker | cut -d ':' -f 4)
+		if [[ ",${docker}," =~ ,netdata, ]]
+			then
+			# netdata is already there
+			:
+		else
+			# netdata is not in docker group
+			echo >&2 "Adding netdata user to the docker group (needed to get container names) ..."
+			run usermod -a -G docker netdata
+		fi
+		# let the uninstall script know
+		NETDATA_ADDED_TO_DOCKER=1
+	fi
 fi
 
 
@@ -384,6 +411,7 @@ NETDATA_CACHE_DIR="$( config_option "cache directory" "${NETDATA_PREFIX}/var/cac
 NETDATA_WEB_DIR="$( config_option "web files directory" "${NETDATA_PREFIX}/usr/share/netdata/web" )"
 NETDATA_LOG_DIR="$( config_option "log directory" "${NETDATA_PREFIX}/var/log/netdata" )"
 NETDATA_CONF_DIR="$( config_option "config directory" "${NETDATA_PREFIX}/etc/netdata" )"
+NETDATA_BIND="$( config_option "bind socket to IP" "*" )"
 NETDATA_RUN_DIR="${NETDATA_PREFIX}/var/run"
 
 
@@ -710,22 +738,38 @@ if [ $? -eq 0 ]
 	echo "   groupdel netdata"
 fi
 
+getent group docker > /dev/null
+if [ $? -eq 0 -a "${NETDATA_ADDED_TO_DOCKER}" = "1" ]
+	then
+	echo
+	echo "You may also want to remove the netdata user from the docker group"
+	echo "by running:"
+	echo "   gpasswd -d netdata docker"
+fi
+
 UNINSTALL
 chmod 750 netdata-uninstaller.sh
 
 # -----------------------------------------------------------------------------
+
+if [ "${NETDATA_BIND}" = "*" ]
+	then
+	access="localhost"
+else
+	access="${NETDATA_BIND}"
+fi
 
 cat <<END
 
 
 -------------------------------------------------------------------------------
 
-OK. NetData is installed and it is running.
+OK. NetData is installed and it is running (listening to ${NETDATA_BIND}:${NETDATA_PORT}).
 
 -------------------------------------------------------------------------------
 
 
-Hit http://localhost:${NETDATA_PORT}/ from your browser.
+Hit http://${access}:${NETDATA_PORT}/ from your browser.
 
 To stop netdata, just kill it, with:
 
