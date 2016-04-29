@@ -269,37 +269,6 @@ long get_system_pid_max(void) {
 	return mpid;
 }
 
-unsigned long long get_system_hertz(void)
-{
-	unsigned long long myhz = 1;
-
-#ifdef _SC_CLK_TCK
-	if((myhz = (unsigned long long int) sysconf(_SC_CLK_TCK)) > 0) {
-		return myhz;
-	}
-#endif
-
-#ifdef HZ
-	myhz = HZ;    /* <asm/param.h> */
-#else /* HZ */
-	/* If 32-bit or big-endian (not Alpha or ia64), assume HZ is 100. */
-	/* FIXME: Why!? */
-
-	//hz = (sizeof(long)==sizeof(int) || htons(999)==999) ? 100UL : 1024UL;
-	/* FIX: No calculations needed! */
-	/* FIX: hz?! or myhz? */
-#if (__SIZEOF_LONG__ == __SIZEOF_INT__) || (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-	myhz = 100ULL;
-#else
-	myhz = 1024ULL;
-#endif
-
-#endif /* HZ */
-
-	error("Unknown HZ value. Assuming %llu.", myhz);
-	return myhz;
-}
-
 // ----------------------------------------------------------------------------
 // target
 // target is the structure that process data are aggregated
