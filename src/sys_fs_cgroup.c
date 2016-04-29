@@ -36,7 +36,7 @@ static int cgroup_root_max = 50;
 static int cgroup_max_depth = 0;
 
 void read_cgroup_plugin_configuration() {
-	cgroup_check_for_new_every = config_get_number("plugin:cgroups", "check for new plugin every", cgroup_check_for_new_every);
+	cgroup_check_for_new_every = config_get_number("plugin:cgroups", "check for new cgroups every", cgroup_check_for_new_every);
 
 	cgroup_enable_cpuacct_stat = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct stat", cgroup_enable_cpuacct_stat);
 	cgroup_enable_cpuacct_usage = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct usage", cgroup_enable_cpuacct_usage);
@@ -155,8 +155,8 @@ struct cpuacct_usage {
 };
 
 struct cgroup {
-	int available;
-	int enabled;
+	int available;		// found in the filesystem
+	int enabled;		// enabled in the config
 
 	char *id;
 	uint32_t hash;
@@ -570,7 +570,7 @@ void read_all_cgroups(struct cgroup *root) {
 	struct cgroup *cg;
 
 	for(cg = root; cg ; cg = cg->next)
-		if(cg->enabled)
+		if(cg->enabled && cg->available)
 			cgroup_read(cg);
 }
 
@@ -637,7 +637,12 @@ struct cgroup *cgroup_add(const char *id) {
 
 		// disable by default the parent cgroup
 		// for known cgroup managers
-		if(!strcmp(chart_id, "lxc") || !strcmp(chart_id, "docker")) {
+		if(!strcmp(chart_id, "lxc") ||
+				!strcmp(chart_id, "docker") ||
+				!strcmp(chart_id, "systemd") ||
+				!strncmp(chart_id, "user.slice", 10) ||
+				!strncmp(chart_id, "system.slice", 12)
+				) {
 			def = 0;
 			debug(D_CGROUP, "cgroup '%s' is container manager (by default %s)", id, (def)?"enabled":"disabled");
 		}
@@ -667,21 +672,26 @@ struct cgroup *cgroup_add(const char *id) {
 
 	cgroup_root_count++;
 
-	// fprintf(stderr, " > added cgroup No %d, with id '%s' (%u) and name '%s'\n", cgroup_root_count, cg->id, cg->hash, cg->name);
-
 	// fix the name by calling the external script
 	cgroup_get_chart_id(cg);
 
 	char option[FILENAME_MAX + 1];
-	snprintf(option, FILENAME_MAX, "enable cgroup %s", cg->chart_id);
+	snprintf(option, FILENAME_MAX, "enable cgroup %s", chart_id);
 	cg->enabled = config_get_boolean("plugin:cgroups", option, def);
-	debug(D_CGROUP, "finally: new cgroup '%s' is named '%s' and is %s (default was %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (def)?"enabled":"disabled");
+
+	// FIXME
+	// switch this to debug(D_CGROUP, ...
+	info("Added cgroup '%s' with chart id '%s' as %s (default was %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (def)?"enabled":"disabled");
 
 	return cg;
 }
 
 void cgroup_remove(struct cgroup *cg) {
 	debug(D_CGROUP, "removing cgroup '%s'", cg->id);
+
+	// FIXME
+	// switch this to debug(D_CGROUP, ...
+	info("Removing cgroup '%s' with chart id '%s' (was %s and %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (cg->available)?"available":"not available");
 
 	if(cg == cgroup_root) {
 		cgroup_root = cg->next;
@@ -715,6 +725,8 @@ void cgroup_remove(struct cgroup *cg) {
 	free(cg->id);
 	free(cg->chart_id);
 	free(cg);
+
+	cgroup_root_count--;
 }
 
 // find if a given cgroup exists
@@ -723,15 +735,13 @@ struct cgroup *cgroup_find(const char *id) {
 
 	uint32_t hash = simple_hash(id);
 
-	// fprintf(stderr, " > searching for '%s' (%u)\n", id, hash);
-
 	struct cgroup *cg;
 	for(cg = cgroup_root; cg ; cg = cg->next) {
 		if(hash == cg->hash && strcmp(id, cg->id) == 0)
 			break;
 	}
 
-	debug(D_CGROUP, "cgroup '%s' %s", id, (cg)?"found":"not found");
+	debug(D_CGROUP, "cgroup_find('%s') %s", id, (cg)?"found":"not found");
 	return cg;
 }
 
@@ -765,6 +775,7 @@ void found_dir_in_subdir(const char *dir) {
 }
 
 void find_dir_in_subdirs(const char *base, const char *this, void (*callback)(const char *)) {
+	int enabled = -1;
 	if(!this) this = base;
 	size_t dirlen = strlen(this), baselen = strlen(base);
 
@@ -785,13 +796,31 @@ void find_dir_in_subdirs(const char *base, const char *this, void (*callback)(co
 		debug(D_CGROUP, "examining '%s/%s'", this, de->d_name);
 
 		if(de->d_type == DT_DIR) {
-			char *s = malloc(dirlen + strlen(de->d_name) + 2);
-			if(s) {
-				strcpy(s, this);
-				strcat(s, "/");
-				strcat(s, de->d_name);
-				find_dir_in_subdirs(base, s, callback);
-				free(s);
+			if(enabled == -1) {
+				// we check for this option here
+				// so that the config will not have settings
+				// for leaf directories
+				char option[FILENAME_MAX + 1];
+				snprintf(option, FILENAME_MAX, "search for cgroups under %s", (this == base)?"/":this);
+
+				int def = 1;
+				if(!strcmp(this, "system.slice") ||
+					!strcmp(this, "user.slice") ||
+					!strcmp(this, "systemd"))
+					def = 0;
+
+				enabled = config_get_boolean("plugin:cgroups", option, def);
+			}
+
+			if(enabled) {
+				char *s = malloc(dirlen + strlen(de->d_name) + 2);
+				if(s) {
+					strcpy(s, this);
+					strcat(s, "/");
+					strcat(s, de->d_name);
+					find_dir_in_subdirs(base, s, callback);
+					free(s);
+				}
 			}
 		}
 	}
@@ -828,9 +857,7 @@ struct cgroup *find_all_cgroups() {
 		// fprintf(stderr, " >>> CGROUP '%s' (%u - %s) with name '%s'\n", cg->id, cg->hash, cg->available?"available":"stopped", cg->name);
 
 		if(!cg->available) {
-			// do not remove the cgroup
-			// it will be added back on the next scan
-			// cgroup_remove(cg);
+			cgroup_remove(cg);
 			continue;
 		}
 
@@ -907,7 +934,8 @@ void update_cgroup_charts(int update_every) {
 	RRDSET *st;
 
 	for(cg = cgroup_root; cg ; cg = cg->next) {
-		if(!cg->available || !cg->enabled) continue;
+		if(!cg->available || !cg->enabled)
+			continue;
 
 		if(cg->id[0] == '\0')
 			strcpy(type, "cgroup_host");
@@ -1184,7 +1212,7 @@ void *cgroups_main(void *ptr)
 
 	// when ZERO, attempt to do it
 	int vdo_sys_fs_cgroup 			= 0;
-	int vdo_cpu_netdata 			= !config_get_boolean("plugin:cgroups", "netdata server resources", 1);
+	int vdo_cpu_netdata 			= !config_get_boolean("plugin:cgroups", "cgroups plugin resources", 1);
 
 	// keep track of the time each module was called
 	unsigned long long sutime_sys_fs_cgroup = 0ULL;
