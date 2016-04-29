@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <fcntl.h>
 
 #include "common.h"
@@ -23,6 +24,7 @@ struct disk {
 	unsigned long major;
 	unsigned long minor;
 	int partition_id;       // -1 = this is not a partition
+	char *mount_point;
 	char *family;
 	struct disk *next;
 } *disk_root = NULL;
@@ -102,10 +104,10 @@ struct disk *get_disk(unsigned long major, unsigned long minor) {
 	}
 
 	if(mi)
-		d->family = strdup(mi->mount_point);
+		d->mount_point = strdup(mi->mount_point);
 		// no need to check for NULL
 	else
-		d->family = NULL;
+		d->mount_point = NULL;
 
 	return d;
 }
@@ -114,7 +116,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 	static procfile *ff = NULL;
 	static char path_to_get_hw_sector_size[FILENAME_MAX + 1] = "";
 	static int enable_new_disks = -1;
-	static int do_io = -1, do_ops = -1, do_mops = -1, do_iotime = -1, do_qops = -1, do_util = -1, do_backlog = -1;
+	static int do_io = -1, do_ops = -1, do_mops = -1, do_iotime = -1, do_qops = -1, do_util = -1, do_backlog = -1, do_space = -1;
 
 	if(enable_new_disks == -1)	enable_new_disks = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "enable new disks detected at runtime", CONFIG_ONDEMAND_ONDEMAND);
 
@@ -125,6 +127,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 	if(do_qops == -1)	do_qops 	= config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "queued operations for all disks", CONFIG_ONDEMAND_ONDEMAND);
 	if(do_util == -1)	do_util 	= config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "utilization percentage for all disks", CONFIG_ONDEMAND_ONDEMAND);
 	if(do_backlog == -1)do_backlog 	= config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "backlog for all disks", CONFIG_ONDEMAND_ONDEMAND);
+	if(do_space == -1)  do_space 	= config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "space usage for all disks", CONFIG_ONDEMAND_ONDEMAND);
 
 	if(!ff) {
 		char filename[FILENAME_MAX + 1];
@@ -142,6 +145,12 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 	ff = procfile_readall(ff);
 	if(!ff) return 0; // we return 0, so that we will retry to open it next time
 
+	struct statvfs * buff_statvfs;
+	if ( !(buff_statvfs = (struct statvfs *)
+				malloc(sizeof(struct statvfs)))) {
+		error("Failed to allocate memory to buffer.");
+	}
+
 	uint32_t lines = procfile_lines(ff), l;
 	uint32_t words;
 
@@ -150,7 +159,8 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 		unsigned long long 	major = 0, minor = 0,
 							reads = 0,  mreads = 0,  readsectors = 0,  readms = 0,
 							writes = 0, mwrites = 0, writesectors = 0, writems = 0,
-							queued_ios = 0, busy_ms = 0, backlog_ms = 0;
+							queued_ios = 0, busy_ms = 0, backlog_ms = 0,
+							space_avail = 0, space_avail_root = 0, space_used = 0;
 
 		unsigned long long 	last_reads = 0,  last_readsectors = 0,  last_readms = 0,
 							last_writes = 0, last_writesectors = 0, last_writems = 0,
@@ -215,7 +225,8 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 		else
 			def_enabled = 0;
 
-		char *family = d->family;
+		char *mount_point = d->mount_point;
+		char *family = d->mount_point;
 		if(!family) family = disk;
 
 /*
@@ -340,7 +351,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 		}
 */
 
-		int ddo_io = do_io, ddo_ops = do_ops, ddo_mops = do_mops, ddo_iotime = do_iotime, ddo_qops = do_qops, ddo_util = do_util, ddo_backlog = do_backlog;
+		int ddo_io = do_io, ddo_ops = do_ops, ddo_mops = do_mops, ddo_iotime = do_iotime, ddo_qops = do_qops, ddo_util = do_util, ddo_backlog = do_backlog, ddo_space = do_space;
 
 		// check which charts are enabled for this disk
 		{
@@ -358,6 +369,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 			ddo_qops 	= config_get_boolean_ondemand(var_name, "queued operations", ddo_qops);
 			ddo_util 	= config_get_boolean_ondemand(var_name, "utilization percentage", ddo_util);
 			ddo_backlog = config_get_boolean_ondemand(var_name, "backlog", ddo_backlog);
+			ddo_space   = config_get_boolean_ondemand(var_name, "space", ddo_space);
 
 			// by default, do not add charts that do not have values
 			if(ddo_io == CONFIG_ONDEMAND_ONDEMAND && !reads && !writes) ddo_io = 0;
@@ -523,6 +535,42 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 		}
 
 		// --------------------------------------------------------------------
+
+		if(ddo_space) {
+			if(mount_point) {
+				st = rrdset_find_bytype("disk_space", disk);
+				if(!st) {
+					st = rrdset_create("disk_space", disk, NULL, family, "disk.space", "Disk Space Usage", "Megabyte", 2023, update_every, RRDSET_TYPE_AREA);
+					st->isdetail = 1;
+
+					rrddim_add(st, "avail", NULL, 1, 1048576, RRDDIM_ABSOLUTE);
+					rrddim_add(st, "reserved for root", NULL, 1, 1048576, RRDDIM_ABSOLUTE);
+					rrddim_add(st, "used" , NULL, 1, 1045576, RRDDIM_ABSOLUTE);
+				}
+				else rrdset_next_usec(st, dt);
+
+
+
+				if (statvfs(family, buff_statvfs) < 0) {
+					error("Faild checking disk space usage of %s", family);
+				} else {
+					space_avail = buff_statvfs->f_bavail * buff_statvfs->f_bsize;
+					space_avail_root = (buff_statvfs->f_bfree - buff_statvfs->f_bavail) * buff_statvfs->f_bsize;
+					space_used = (buff_statvfs->f_blocks - buff_statvfs->f_bfree) * buff_statvfs->f_bsize;
+				}
+
+				rrddim_set(st, "avail", space_avail);
+				rrddim_set(st, "reserved for root", space_avail_root);
+				rrddim_set(st, "used", space_used);
+				rrdset_done(st);
+			} else {
+				if(ddo_space != CONFIG_ONDEMAND_ONDEMAND) {
+					error("Cannot find space usage for disk %s. It does not have a mount point.", family);
+				}
+			}
+		}
+
+		// --------------------------------------------------------------------
 		// calculate differential charts
 		// only if this is not the first time we run
 
@@ -574,6 +622,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 			}
 		}
 	}
+	free(buff_statvfs);
 
 	return 0;
 }
