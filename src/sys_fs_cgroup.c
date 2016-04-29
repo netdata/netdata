@@ -732,7 +732,7 @@ struct cgroup *cgroup_find(const char *id) {
 // detect running cgroups
 
 // callback for find_file_in_subdirs()
-void found_dir_in_subdir(const char *dir) {
+void found_subdir_in_dir(const char *dir) {
 	debug(D_CGROUP, "examining cgroup dir '%s'", dir);
 
 	struct cgroup *cg = cgroup_find(dir);
@@ -761,11 +761,12 @@ void find_dir_in_subdirs(const char *base, const char *this, void (*callback)(co
 	int enabled = -1;
 	if(!this) this = base;
 	size_t dirlen = strlen(this), baselen = strlen(base);
+	const char *relative_path = &this[baselen];
 
 	DIR *dir = opendir(this);
 	if(!dir) return;
 
-	callback(&this[baselen]);
+	callback(relative_path);
 
 	struct dirent *de = NULL;
 	while((de = readdir(dir))) {
@@ -784,7 +785,7 @@ void find_dir_in_subdirs(const char *base, const char *this, void (*callback)(co
 				// so that the config will not have settings
 				// for leaf directories
 				char option[FILENAME_MAX + 1];
-				snprintf(option, FILENAME_MAX, "search for cgroups under %s", (this == base)?"/":this);
+				snprintf(option, FILENAME_MAX, "search for cgroups under %s", (*relative_path == '\0')?"/":relative_path);
 
 				int def = 1;
 				if(!strcmp(this, "system.slice") ||
@@ -852,13 +853,13 @@ void find_all_cgroups() {
 	mark_all_cgroups_as_not_available();
 
 	if(cgroup_enable_cpuacct_stat || cgroup_enable_cpuacct_usage)
-		find_dir_in_subdirs(cgroup_cpuacct_base, NULL, found_dir_in_subdir);
+		find_dir_in_subdirs(cgroup_cpuacct_base, NULL, found_subdir_in_dir);
 
 	if(cgroup_enable_blkio)
-		find_dir_in_subdirs(cgroup_blkio_base, NULL, found_dir_in_subdir);
+		find_dir_in_subdirs(cgroup_blkio_base, NULL, found_subdir_in_dir);
 
 	if(cgroup_enable_memory)
-		find_dir_in_subdirs(cgroup_memory_base, NULL, found_dir_in_subdir);
+		find_dir_in_subdirs(cgroup_memory_base, NULL, found_subdir_in_dir);
 
 	// remove any non-existing cgroups
 	cleanup_all_cgroups();
