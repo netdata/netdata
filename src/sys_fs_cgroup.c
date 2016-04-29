@@ -16,6 +16,7 @@
 #include "rrd.h"
 #include "main.h"
 #include "popen.h"
+#include "proc_self_mountinfo.h"
 
 // ----------------------------------------------------------------------------
 // cgroup globals
@@ -42,20 +43,33 @@ void read_cgroup_plugin_configuration() {
 	cgroup_enable_memory = config_get_boolean_ondemand("plugin:cgroups", "enable memory", cgroup_enable_memory);
 	cgroup_enable_blkio = config_get_boolean_ondemand("plugin:cgroups", "enable blkio", cgroup_enable_blkio);
 
-	char filename[FILENAME_MAX + 1];
-	snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/fs/cgroup/cpuacct");
+	char filename[FILENAME_MAX + 1], *s;
+	struct mountinfo *mi, *root = mountinfo_read();
+
+	mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuacct");
+	if(!mi) s = "/sys/fs/cgroup/cpuacct";
+	else s = mi->mount_point;
+	snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, s);
 	cgroup_cpuacct_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/cpuacct", filename);
 
-	snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/fs/cgroup/blkio");
+	mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "blkio");
+	if(!mi) s = "/sys/fs/cgroup/blkio";
+	else s = mi->mount_point;
+	snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, s);
 	cgroup_blkio_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/blkio", filename);
 
-	snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/fs/cgroup/memory");
+	mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "memory");
+	if(!mi) s = "/sys/fs/cgroup/memory";
+	else s = mi->mount_point;
+	snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, s);
 	cgroup_memory_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/memory", filename);
 
 	cgroup_root_max = config_get_number("plugin:cgroups", "max cgroups to allow", cgroup_root_max);
 	cgroup_max_depth = config_get_number("plugin:cgroups", "max cgroups depth to monitor", cgroup_max_depth);
 
 	cgroup_enable_new_cgroups_detected_at_runtime = config_get_boolean("plugin:cgroups", "enable new cgroups detected at run time", cgroup_enable_new_cgroups_detected_at_runtime);
+
+	mountinfo_free(root);
 }
 
 // ----------------------------------------------------------------------------
