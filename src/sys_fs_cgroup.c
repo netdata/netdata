@@ -838,7 +838,6 @@ void cleanup_all_cgroups() {
 				cg = cgroup_root;
 			else
 				cg = last->next;
-			
 		}
 		else {
 			last = cg;
