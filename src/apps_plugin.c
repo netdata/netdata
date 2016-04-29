@@ -867,15 +867,13 @@ int read_proc_pid_stat(struct pid_stat *p) {
 
 	// ----------------------------------------
 
-	// FIX: set_quotes will always be true!
-	//int set_quotes = (!ff)?1:0;
+	int set_quotes = (!ff)?1:0;
 
 	ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
 	if(!ff) return 1;
 
 	// if(set_quotes) procfile_set_quotes(ff, "()");
-	//if(set_quotes) procfile_set_open_close(ff, "(", ")");
-	procfile_set_open_close(ff, "(", ")");
+	if(set_quotes) procfile_set_open_close(ff, "(", ")");
 
 	ff = procfile_readall(ff);
 	if(!ff) {
