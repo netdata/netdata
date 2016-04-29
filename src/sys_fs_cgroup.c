@@ -686,29 +686,12 @@ struct cgroup *cgroup_add(const char *id) {
 	return cg;
 }
 
-void cgroup_remove(struct cgroup *cg) {
+void cgroup_free(struct cgroup *cg) {
 	debug(D_CGROUP, "removing cgroup '%s'", cg->id);
 
 	// FIXME
 	// switch this to debug(D_CGROUP, ...
 	info("Removing cgroup '%s' with chart id '%s' (was %s and %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (cg->available)?"available":"not available");
-
-	if(cg == cgroup_root) {
-		cgroup_root = cg->next;
-	}
-	else {
-		struct cgroup *e;
-		for(e = cgroup_root; e->next ;e = e->next)
-			if(unlikely(e->next == cg)) break;
-
-		if(e->next != cg) {
-			error("Cannot find cgroup '%s' in list of cgroups", cg->id);
-		}
-		else {
-			e->next = cg->next;
-			cg->next = NULL;
-		}
-	}
 
 	free(cg->cpuacct_usage.cpu_percpu);
 
@@ -838,7 +821,31 @@ void mark_all_cgroups_as_not_available() {
 		cg->available = 0;
 }
 
-struct cgroup *find_all_cgroups() {
+void cleanup_all_cgroups() {
+	struct cgroup *cg, *last;
+
+	for(cg = cgroup_root, last = NULL; cg ; last = cg) {
+		if(!cg->available) {
+
+			if(!last)
+				cgroup_root = cg->next;
+			else
+				last->next = cg->next;
+
+			cgroup_free(cg);
+
+			if(!last)
+				cg = cgroup_root;
+			else
+				cg = last->next;
+
+			continue;
+		}
+		cg = cg->next;
+	}
+}
+
+void find_all_cgroups() {
 	debug(D_CGROUP, "searching for cgroups");
 
 	mark_all_cgroups_as_not_available();
@@ -852,14 +859,15 @@ struct cgroup *find_all_cgroups() {
 	if(cgroup_enable_memory)
 		find_dir_in_subdirs(cgroup_memory_base, NULL, found_dir_in_subdir);
 
+	// remove any non-existing cgroups
+	cleanup_all_cgroups();
+
 	struct cgroup *cg;
 	for(cg = cgroup_root; cg ; cg = cg->next) {
 		// fprintf(stderr, " >>> CGROUP '%s' (%u - %s) with name '%s'\n", cg->id, cg->hash, cg->available?"available":"stopped", cg->name);
 
-		if(!cg->available) {
-			cgroup_remove(cg);
+		if(unlikely(!cg->available))
 			continue;
-		}
 
 		debug(D_CGROUP, "checking paths for cgroup '%s'", cg->id);
 
@@ -916,7 +924,7 @@ struct cgroup *find_all_cgroups() {
 	}
 
 	debug(D_CGROUP, "done searching for cgroups");
-	return cgroup_root;
+	return;
 }
 
 // ----------------------------------------------------------------------------
