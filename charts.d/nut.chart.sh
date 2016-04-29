@@ -61,34 +61,34 @@ nut_create() {
 	for x in "${nut_ids[@]}"
 	do
 		cat <<EOF
-CHART nut_$x.charge '' "UPS Charge" "percentage" ups nut.charge area $[nut_priority + 1] $nut_update_every
+CHART nut_$x.charge '' "UPS Charge" "percentage" ups nut.charge area $((nut_priority + 1)) $nut_update_every
 DIMENSION battery_charge charge absolute 1 100
 
-CHART nut_$x.battery_voltage '' "UPS Battery Voltage" "Volts" ups nut.battery.voltage line $[nut_priority + 2] $nut_update_every
+CHART nut_$x.battery_voltage '' "UPS Battery Voltage" "Volts" ups nut.battery.voltage line $((nut_priority + 2)) $nut_update_every
 DIMENSION battery_voltage voltage absolute 1 100
 DIMENSION battery_voltage_high high absolute 1 100
 DIMENSION battery_voltage_low low absolute 1 100
 DIMENSION battery_voltage_nominal nominal absolute 1 100
 
-CHART nut_$x.input_voltage '' "UPS Input Voltage" "Volts" input nut.input.voltage line $[nut_priority + 3] $nut_update_every
+CHART nut_$x.input_voltage '' "UPS Input Voltage" "Volts" input nut.input.voltage line $((nut_priority + 3)) $nut_update_every
 DIMENSION input_voltage voltage absolute 1 100
 DIMENSION input_voltage_fault fault absolute 1 100
 DIMENSION input_voltage_nominal nominal absolute 1 100
 
-CHART nut_$x.input_current '' "UPS Input Current" "Ampere" input nut.input.current line $[nut_priority + 4] $nut_update_every
+CHART nut_$x.input_current '' "UPS Input Current" "Ampere" input nut.input.current line $((nut_priority + 4)) $nut_update_every
 DIMENSION input_current_nominal nominal absolute 1 100
 
-CHART nut_$x.input_frequency '' "UPS Input Frequency" "Hz" input nut.input.frequency line $[nut_priority + 5] $nut_update_every
+CHART nut_$x.input_frequency '' "UPS Input Frequency" "Hz" input nut.input.frequency line $((nut_priority + 5)) $nut_update_every
 DIMENSION input_frequency frequency absolute 1 100
 DIMENSION input_frequency_nominal nominal absolute 1 100
 
-CHART nut_$x.output_voltage '' "UPS Output Voltage" "Volts" output nut.output.voltage line $[nut_priority + 6] $nut_update_every
+CHART nut_$x.output_voltage '' "UPS Output Voltage" "Volts" output nut.output.voltage line $((nut_priority + 6)) $nut_update_every
 DIMENSION output_voltage voltage absolute 1 100
 
-CHART nut_$x.load '' "UPS Load" "percentage" ups nut.load area $[nut_priority] $nut_update_every
+CHART nut_$x.load '' "UPS Load" "percentage" ups nut.load area $((nut_priority)) $nut_update_every
 DIMENSION load load absolute 1 100
 
-CHART nut_$x.temp '' "UPS Temperature" "temperature" ups nut.temperature line $[nut_priority + 7] $nut_update_every
+CHART nut_$x.temp '' "UPS Temperature" "temperature" ups nut.temperature line $((nut_priority + 7)) $nut_update_every
 DIMENSION temp temp absolute 1 100
 EOF
 	done

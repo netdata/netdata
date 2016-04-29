@@ -22,11 +22,11 @@ example_check() {
 example_create() {
 	# create the chart with 3 dimensions
 	cat <<EOF
-CHART example.random '' "Random Numbers Stacked Chart" "% of random numbers" random random stacked $[example_priority] $example_update_every
+CHART example.random '' "Random Numbers Stacked Chart" "% of random numbers" random random stacked $((example_priority)) $example_update_every
 DIMENSION random1 '' percentage-of-absolute-row 1 1
 DIMENSION random2 '' percentage-of-absolute-row 1 1
 DIMENSION random3 '' percentage-of-absolute-row 1 1
-CHART example.random2 '' "A random number" "random number" random random area $[example_priority + 1] $example_update_every
+CHART example.random2 '' "A random number" "random number" random random area $((example_priority + 1)) $example_update_every
 DIMENSION random '' absolute 1 1
 EOF
 
@@ -49,19 +49,19 @@ example_update() {
 	value1=$RANDOM
 	value2=$RANDOM
 	value3=$RANDOM
-	value4=$[8192 + (RANDOM * 16383 / 32767) ]
+	value4=$((8192 + (RANDOM * 16383 / 32767) ))
 
 	if [ $example_count -gt 0 ]
 		then
-		example_count=$[example_count - 1]
+		example_count=$((example_count - 1))
 
-		[ $example_last -gt 16383 ] && value4=$[example_last + (RANDOM * ( (32767 - example_last) / 2) / 32767)]
-		[ $example_last -le 16383 ] && value4=$[example_last - (RANDOM * (example_last / 2) / 32767)]
+		[ $example_last -gt 16383 ] && value4=$((example_last + (RANDOM * ( (32767 - example_last) / 2) / 32767)))
+		[ $example_last -le 16383 ] && value4=$((example_last - (RANDOM * (example_last / 2) / 32767)))
 	else
-		example_count=$[1 + (RANDOM * 5 / 32767) ]
+		example_count=$((1 + (RANDOM * 5 / 32767) ))
 
-		[ $example_last -gt 16383 -a $value4 -gt 16383 ] && value4=$[value4 - 16383]
-		[ $example_last -le 16383 -a $value4 -lt 16383 ] && value4=$[value4 + 16383]
+		[ $example_last -gt 16383 -a $value4 -gt 16383 ] && value4=$((value4 - 16383))
+		[ $example_last -le 16383 -a $value4 -lt 16383 ] && value4=$((value4 + 16383))
 	fi
 	example_last=$value4
 
