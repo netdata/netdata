@@ -18,7 +18,9 @@ struct mountinfo {
 	char *mount_options;    // mount options: per-mount options.
 
 	int optional_fields_count;
-	char **optional_fields; // optional fields: zero or more fields of the form "tag[:value]".
+/*
+	char *(*optional_fields); // optional fields: zero or more fields of the form "tag[:value]".
+*/
 
 	char *filesystem;       // filesystem type: name of filesystem in the form "type[.subtype]".
 	uint32_t filesystem_hash;
