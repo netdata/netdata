@@ -84,7 +84,7 @@ time_divisor=50
 # number of seconds to run without restart
 # after this time, charts.d.plugin will exit
 # netdata will restart it
-restart_timeout=$[3600 * 4]
+restart_timeout=$((3600 * 4))
 
 # check if the charts.d plugins are using global variables
 # they should not.
@@ -247,7 +247,7 @@ float2int() {
 	# echo >&2 "value='${1}' f='${f}', m='${m}'"
 
 	# the length of the multiplier - 1
-	l=$[ ${#m} - 1 ]
+	l=$(( ${#m} - 1 ))
 
 	# check if the number is in scientific notation
 	if [[ ${f} =~ ^[[:space:]]*(-)?[0-9.]+(e|E)(\+|-)[0-9]+ ]]
@@ -269,7 +269,7 @@ float2int() {
 
 	# strip leading zeros from the integer part
 	# base 10 convertion
-	a=$[10#$a]
+	a=$((10#$a))
 
 	# check the length of the decimal part
 	# against the length of the multiplier
@@ -281,16 +281,16 @@ float2int() {
 	elif [ ${#b} -lt ${l} ]
 		then
 		# too few digits - pad with zero on the right
-		local z="00000000000000000000000" r=$[l - ${#b}]
+		local z="00000000000000000000000" r=$((l - ${#b}))
 		b="${b}${z:0:${r}}"
 	fi
 
 	# strip leading zeros from the decimal part
 	# base 10 convertion
-	b=$[10#$b]
+	b=$((10#$b))
 
 	# store the result
-	FLOAT2INT_RESULT=$[ (a * m) + b ]
+	FLOAT2INT_RESULT=$(( (a * m) + b ))
 	#echo >&2 "FLOAT2INT_RESULT='${FLOAT2INT_RESULT}'"
 }
 
