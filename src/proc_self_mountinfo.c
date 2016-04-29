@@ -48,16 +48,18 @@ void mountinfo_free(struct mountinfo *mi) {
 	if(likely(mi->next))
 		mountinfo_free(mi->next);
 
-	free(mi->root);
-	free(mi->mount_point);
-	free(mi->mount_options);
+	if(mi->root) free(mi->root);
+	if(mi->mount_point) free(mi->mount_point);
+	if(mi->mount_options) free(mi->mount_options);
 
+/*
 	if(mi->optional_fields_count) {
 		int i;
 		for(i = 0; i < mi->optional_fields_count ; i++)
 			free(mi->optional_fields[i]);
 	}
 	free(mi->optional_fields);
+*/
 
 	free(mi->filesystem);
 	free(mi->mount_source);
@@ -123,7 +125,9 @@ struct mountinfo *mountinfo_read() {
 		if(unlikely(!mi->mount_options)) fatal("Cannot allocate memory");
 
 		// count the optional fields
+/*
 		unsigned long wo = w;
+*/
 		mi->optional_fields_count = 0;
 		char *s = procfile_lineword(ff, l, w);
 		while(*s && *s != '-') {
@@ -132,6 +136,7 @@ struct mountinfo *mountinfo_read() {
 			mi->optional_fields_count++;
 		}
 
+/*
 		if(unlikely(mi->optional_fields_count)) {
 			// we have some optional fields
 			// read them into a new array of pointers;
@@ -149,6 +154,7 @@ struct mountinfo *mountinfo_read() {
 		}
 		else
 			mi->optional_fields = NULL;
+*/
 
 		if(likely(*s == '-')) {
 			w++;
