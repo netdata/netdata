@@ -19,7 +19,8 @@ extern int rrd_default_history_entries;
 
 // time in seconds to delete unupdated dimensions
 // set to zero to disable this feature
-extern int rrd_delete_unupdated_dimensions;
+// FIX: Not used anywhere else.
+//extern int rrd_delete_unupdated_dimensions;
 
 #define RRD_ID_LENGTH_MAX 1024
 
@@ -59,7 +60,6 @@ extern int rrd_memory_mode;
 
 extern const char *rrd_memory_mode_name(int id);
 extern int rrd_memory_mode_id(const char *name);
-
 
 // ----------------------------------------------------------------------------
 // algorithms types
@@ -252,7 +252,9 @@ struct rrdset {
 };
 typedef struct rrdset RRDSET;
 
-extern RRDSET *rrdset_root;
+// FIX: Not used anywhere else
+//extern RRDSET *rrdset_root;
+
 extern pthread_rwlock_t rrdset_root_rwlock;
 
 // ----------------------------------------------------------------------------

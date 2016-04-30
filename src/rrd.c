@@ -29,7 +29,8 @@
 // if not zero it gives the time (in seconds) to remove un-updated dimensions
 // DO NOT ENABLE
 // if dimensions are removed, the chart generation will have to run again
-int rrd_delete_unupdated_dimensions = 0;
+// FIX: Not used anywhere else.
+static int rrd_delete_unupdated_dimensions = 0;
 
 int rrd_update_every = UPDATE_EVERY;
 int rrd_default_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
@@ -39,7 +40,7 @@ pthread_rwlock_t rrdset_root_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 
 int rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
 
-
+// FIX: All other interators in this code seems to be like this.
 static int _iterator(avl *a) { if (a) {}; return 0; }
 
 // ----------------------------------------------------------------------------
@@ -54,7 +55,8 @@ static int rrdset_compare(void* a, void* b) {
 	else return strcmp(((RRDSET *)a)->id, ((RRDSET *)b)->id);
 }
 
-avl_tree rrdset_root_index = {
+// FIX: Not used anywhere else.
+static avl_tree rrdset_root_index = {
 		NULL,
 		rrdset_compare,
 #ifdef AVL_LOCK_WITH_MUTEX
