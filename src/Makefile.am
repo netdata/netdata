@@ -52,6 +52,7 @@ netdata_SOURCES = \
 	proc_net_stat_conntrack.c \
 	proc_net_stat_synproxy.c \
 	proc_stat.c \
+	proc_self_mountinfo.c proc_self_mountinfo.h \
 	proc_sys_kernel_random_entropy_avail.c \
 	proc_vmstat.c \
 	sys_kernel_mm_ksm.c \

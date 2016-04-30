@@ -350,8 +350,9 @@
 					<li class="dropdown">
 						<a href="#" class="dropdown-toggle" data-toggle="dropdown" id="current_view">demo sites <strong class="caret"></strong></a>
 						<ul class="dropdown-menu scrollable-menu inpagemenu" role="menu">
-							<li id="demo_eu"><a href="//netdata.firehol.org?nowelcome">EU - London (DigitalOcean.com)</a></li>
+							<li id="demo_eu"><a href="//netdata1.firehol.org?nowelcome">EU - London (DigitalOcean.com)</a></li>
 							<li id="demo_us"><a href="//netdata2.firehol.org?nowelcome">US - Atlanta (CDN77.com)</a></li>
+							<li id="demo_gr"><a href="//netdata3.firehol.org?nowelcome">EU - Greece</a></li>
 							<li role="separator" class="divider"></li>
 							<li id="demo_tv"><a href="tv.html">TV Dashboard for 2 servers</a></li>
 							<li id="demosites"><a href="demosites.html">Dashboard for monitoring netdata demo sites</a></li>
@@ -798,12 +799,16 @@ function isdemo() {
 
 	try {
 		if(typeof document.location.hostname === 'string') {
-			if(document.location.hostname === 'netdata.firehol.org') {
+			if(document.location.hostname === 'netdata.firehol.org' || document.location.hostname === 'netdata1.firehol.org') {
 				document.getElementById("demo_eu").className = "active";
 				this_is_demo = true;
 			}
 			else if(document.location.hostname === 'netdata2.firehol.org') {
 				document.getElementById("demo_us").className = "active";
+				this_is_demo = true;
+			}
+			else if(document.location.hostname === 'netdata3.firehol.org') {
+				document.getElementById("demo_gr").className = "active";
 				this_is_demo = true;
 			}
 		}
@@ -1442,11 +1447,11 @@ function enrichChartData(chart) {
 
 function name2id(s) {
 	return s
-		.replace(' ', '_')
-		.replace('(', '_')
-		.replace(')', '_')
-		.replace('.', '_')
-		.replace('/', '_');
+		.replace(/ /g, '_')
+		.replace(/\(/g, '_')
+		.replace(/\)/g, '_')
+		.replace(/\./g, '_')
+		.replace(/\//g, '_');
 }
 
 function headMain(charts, duration) {
@@ -1601,7 +1606,7 @@ function renderPage(menus, data) {
 
 		// generate an entry at the main menu
 
-		sidebar += '<li class=""><a href="#' + menu + '">' + menus[menu].title + '</a><ul class="nav">';
+		sidebar += '<li class=""><a href="#' + name2id(menu) + '">' + menus[menu].title + '</a><ul class="nav">';
 		html += '<div role="section"><div role="sectionhead"><h1 id="' + menu + '" role="heading">' + menus[menu].title + '</h1></div><div id="' + menu + '" role="document">';
 
 		if(menus[menu].info !== null)

@@ -72,3 +72,5 @@ apps.plugin-profiler.sh
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
+
+.jetbrains*
