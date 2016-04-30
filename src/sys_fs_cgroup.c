@@ -960,7 +960,7 @@ void update_cgroup_charts(int update_every) {
 		if(cg->id[0] == '\0')
 			strcpy(type, "cgroup_host");
 		else if(cg->id[0] == '/')
-			snprintf(type, RRD_ID_LENGTH_MAX, "cgroup_%s", "host");
+			snprintf(type, RRD_ID_LENGTH_MAX, "cgroup_%s", cg->chart_id);
 		else
 			snprintf(type, RRD_ID_LENGTH_MAX, "cgroup_%s", cg->chart_id);
 
