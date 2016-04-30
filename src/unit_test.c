@@ -39,17 +39,22 @@ int check_storage_number(calculated_number n, int debug) {
 	if(debug) {
 		fprintf(stderr,
 			CALCULATED_NUMBER_FORMAT " original\n"
-			CALCULATED_NUMBER_FORMAT " packed and unpacked, (stored as 0x%08X, diff " CALCULATED_NUMBER_FORMAT ", " CALCULATED_NUMBER_FORMAT "%%)\n"
+			CALCULATED_NUMBER_FORMAT " packed and unpacked, (stored as " STORAGE_NUMBER_FORMAT ", diff " CALCULATED_NUMBER_FORMAT ", " CALCULATED_NUMBER_FORMAT "%%)\n"
 			"%s printed after unpacked (%zu bytes)\n"
 			CALCULATED_NUMBER_FORMAT " re-parsed from printed (diff " CALCULATED_NUMBER_FORMAT ", " CALCULATED_NUMBER_FORMAT "%%)\n\n",
 			n,
-			d, s, ddiff, dcdiff,
+			d, 
+			s.value, 
+			ddiff, 
+			dcdiff,
 			buffer,
-			len, p, pdiff, pcdiff
-		);
+			len, 
+			p, 
+			pdiff, 
+			pcdiff);
 		if(len != strlen(buffer)) fprintf(stderr, "ERROR: printed number %s is reported to have length %zu but it has %zu\n", buffer, len, strlen(buffer));
-		if(dcdiff > ACCURACY_LOSS) fprintf(stderr, "WARNING: packing number " CALCULATED_NUMBER_FORMAT " has accuracy loss %0.7Lf %%\n", n, dcdiff);
-		if(pcdiff > ACCURACY_LOSS) fprintf(stderr, "WARNING: re-parsing the packed, unpacked and printed number " CALCULATED_NUMBER_FORMAT " has accuracy loss %0.7Lf %%\n", n, pcdiff);
+		if(dcdiff > ACCURACY_LOSS) fprintf(stderr, "WARNING: packing number " CALCULATED_NUMBER_FORMAT " has accuracy loss " CALCULATED_NUMBER_FORMAT "%%\n", n, dcdiff);
+		if(pcdiff > ACCURACY_LOSS) fprintf(stderr, "WARNING: re-parsing the packed, unpacked and printed number " CALCULATED_NUMBER_FORMAT " has accuracy loss " CALCULATED_NUMBER_FORMAT "%%\n", n, pcdiff);
 	}
 
 	if(len != strlen(buffer)) return 1;
@@ -776,7 +781,7 @@ int unit_test(long delay, long shift)
 		for(rd = st->dimensions ; rd ; rd = rd->next) {
 			sn = rd->values[c];
 			cn = unpack_storage_number(sn);
-			fprintf(stderr, "\t %s " CALCULATED_NUMBER_FORMAT " (PACKED AS " STORAGE_NUMBER_FORMAT ")   ->   ", rd->id, cn, sn);
+			fprintf(stderr, "\t %s " CALCULATED_NUMBER_FORMAT " (PACKED AS " STORAGE_NUMBER_FORMAT ")   ->   ", rd->id, cn, sn.value);
 
 			if(rd == rdabs) v =
 				(	  oincrement

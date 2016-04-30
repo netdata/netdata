@@ -1435,7 +1435,7 @@ unsigned long long rrdset_done(RRDSET *st)
 	}
 	/* interpolation ends here. */
 
-	rrdset_set_last_collected(st, store_entries, store_this_entry);
+	rrdset_set_last_collected(st, stored_entries, store_this_entry);
 
 	// ALL DONE ABOUT THE DATA UPDATE
 	// --------------------------------------------------------------------

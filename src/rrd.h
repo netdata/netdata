@@ -252,8 +252,7 @@ struct rrdset {
 };
 typedef struct rrdset RRDSET;
 
-// FIX: Not used anywhere else
-//extern RRDSET *rrdset_root;
+extern RRDSET *rrdset_root;
 
 extern pthread_rwlock_t rrdset_root_rwlock;
 

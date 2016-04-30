@@ -1109,7 +1109,10 @@ int file_descriptor_find_or_add(const char *name)
 		// FIX: Unless realloc is redefined by NETDATA_INTERNAL_CHECKS symbol,
 		//      all_files can be NULL at this point!
 		if (!all_files)
-			fatal_error("Cannot reallocate all_files."); // FIXME: Write a better error msg!
+		{
+			error("Cannot reallocate all_files. Aborted."); // FIXME: Write a better error msg!
+			exit(1);
+		}
 
 		// if the address changed, we have to rebuild the index
 		// since all pointers are now invalid
@@ -2471,16 +2474,18 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wformat"
 	fprintf(stdout, "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' apps.plugin netdata.apps_cpu stacked 140000 %d\n"
 					"DIMENSION user '' incremental 1 1000\n"
 					"DIMENSION system '' incremental 1 1000\n"
-
 					"CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_files line 140001 %1$d\n"
 					"DIMENSION files '' incremental 1 1\n"
 					"DIMENSION pids '' absolute 1 1\n"
 					"DIMENSION fds '' absolute 1 1\n"
 					"DIMENSION targets '' absolute 1 1\n",
 			update_every);
+	#pragma GCC diagnostic pop
 
 
 #ifndef PROFILING_MODE
