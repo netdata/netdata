@@ -47,18 +47,21 @@ void read_cgroup_plugin_configuration() {
 	struct mountinfo *mi, *root = mountinfo_read();
 
 	mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuacct");
+	if(!mi) mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuacct");
 	if(!mi) s = "/sys/fs/cgroup/cpuacct";
 	else s = mi->mount_point;
 	snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, s);
 	cgroup_cpuacct_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/cpuacct", filename);
 
 	mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "blkio");
+	if(!mi) mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "blkio");
 	if(!mi) s = "/sys/fs/cgroup/blkio";
 	else s = mi->mount_point;
 	snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, s);
 	cgroup_blkio_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/blkio", filename);
 
 	mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "memory");
+	if(!mi) mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "memory");
 	if(!mi) s = "/sys/fs/cgroup/memory";
 	else s = mi->mount_point;
 	snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, s);

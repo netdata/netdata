@@ -33,12 +33,47 @@ struct mountinfo *mountinfo_find_by_filesystem_mount_source(struct mountinfo *ro
 	uint32_t filesystem_hash = simple_hash(filesystem), mount_source_hash = simple_hash(mount_source);
 
 	for(mi = root; mi ; mi = mi->next)
-		if(mi->filesystem_hash == filesystem_hash && mi->mount_source_hash == mount_source_hash
-				&& !strcmp(mi->filesystem, filesystem) && !strcmp(mi->mount_source, mount_source))
+		if(mi->filesystem
+		   		&& mi->mount_source
+				&& mi->filesystem_hash == filesystem_hash
+		   		&& mi->mount_source_hash == mount_source_hash
+				&& !strcmp(mi->filesystem, filesystem)
+		   		&& !strcmp(mi->mount_source, mount_source))
 			return mi;
 
 	return NULL;
 }
+
+struct mountinfo *mountinfo_find_by_filesystem_super_option(struct mountinfo *root, const char *filesystem, const char *super_options) {
+	struct mountinfo *mi;
+	uint32_t filesystem_hash = simple_hash(filesystem);
+
+	size_t solen = strlen(super_options);
+
+	for(mi = root; mi ; mi = mi->next)
+		if(mi->filesystem
+		   		&& mi->super_options
+				&& mi->filesystem_hash == filesystem_hash
+		   		&& !strcmp(mi->filesystem, filesystem)) {
+
+			// super_options is a comma separated list
+			char *s = mi->super_options, *e;
+			while(*s) {
+				e = ++s;
+				while(*e && *e != ',') e++;
+
+				size_t len = e - s;
+				if(len == solen && !strncmp(s, super_options, len))
+					return mi;
+
+				if(*e == ',') s = ++e;
+				else s = e;
+			}
+		}
+
+	return NULL;
+}
+
 
 // free a linked list of mountinfo structures
 void mountinfo_free(struct mountinfo *mi) {
