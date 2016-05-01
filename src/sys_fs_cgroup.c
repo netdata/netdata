@@ -614,12 +614,14 @@ void cgroup_get_chart_id(struct cgroup *cg) {
 		if(!cg->chart_title)
 			fatal("CGROUP: Cannot allocate memory for chart name of cgroup '%s' chart name: '%s'", cg->id, s);
 
-		netdata_fix_chart_id(s);
+		netdata_fix_chart_name(cg->chart_title);
 
 		free(cg->chart_id);
 		cg->chart_id = strdup(s);
 		if(!cg->chart_id)
 			fatal("CGROUP: Cannot allocate memory for chart id of cgroup '%s' chart id: '%s'", cg->id, s);
+
+		netdata_fix_chart_id(cg->chart_id);
 
 		debug(D_CGROUP, "cgroup '%s' renamed to '%s' (title: '%s')", cg->id, cg->chart_id, cg->chart_title);
 	}
