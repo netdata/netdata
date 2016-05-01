@@ -32,7 +32,7 @@ int do_proc_meminfo(int update_every, unsigned long long dt) {
 
 	if(!ff) {
 		char filename[FILENAME_MAX + 1];
-		mysnprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/meminfo");
+		snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/meminfo");
 		ff = procfile_open(config_get("plugin:proc:/proc/meminfo", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
 	}
 	if(!ff) return 1;

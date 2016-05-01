@@ -1,3 +1,4 @@
+/* vim: set ts=4 noet sw=4 : */
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -198,12 +199,12 @@ void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minu
 	buffer_need_bytes(wb, 30);
 
 	char *b = &wb->buffer[wb->len], *p;
-	unsigned int *q = (unsigned int *)b;  
+	unsigned int *q = (unsigned int *)b;
 
 	#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-	  *q++ = 0x65746144;  // "Date" backwards.
+		*q++ = 0x65746144;  // "Date" backwards.
 	#else
-	  *q++ = 0x44617465;  // "Date"
+		*q++ = 0x44617465;  // "Date"
 	#endif
 	p = (char *)q;
 
@@ -231,9 +232,9 @@ void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minu
 	unsigned short *r = (unsigned short *)p;
 
 	#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-	  *r++ = 0x0029;  // ")\0" backwards.  
+		*r++ = 0x0029;  // ")\0" backwards.
 	#else
-	  *r++ = 0x2900;  // ")\0"
+		*r++ = 0x2900;  // ")\0"
 	#endif
 
 	wb->len += (size_t)((char *)r - b - 1);
@@ -253,33 +254,32 @@ void buffer_date(BUFFER *wb, int year, int month, int day, int hours, int minute
 	buffer_need_bytes(wb, 36);
 
 	char *b = &wb->buffer[wb->len];
-  char *p = b;
+	char *p = b;
 
-  *p++ = '0' + year / 1000; year %= 1000;
-  *p++ = '0' + year / 100;  year %= 100;
-  *p++ = '0' + year / 10;
-  *p++ = '0' + year % 10;
-  *p++ = '-';
-  *p++ = '0' + month / 10;
-  *p++ = '0' + month % 10;
-  *p++ = '-';
-  *p++ = '0' + day / 10;
-  *p++ = '0' + day % 10;
-  *p++ = ' ';
-  *p++ = '0' + hours / 10;
-  *p++ = '0' + hours % 10;
-  *p++ = ':';
-  *p++ = '0' + minutes / 10;
-  *p++ = '0' + minutes % 10;
-  *p++ = ':';
-  *p++ = '0' + seconds / 10;
-  *p++ = '0' + seconds % 10;
-  *p = '\0';
+	*p++ = '0' + year / 1000; year %= 1000;
+	*p++ = '0' + year / 100;  year %= 100;
+	*p++ = '0' + year / 10;
+	*p++ = '0' + year % 10;
+	*p++ = '-';
+	*p++ = '0' + month / 10;
+	*p++ = '0' + month % 10;
+	*p++ = '-';
+	*p++ = '0' + day / 10;
+	*p++ = '0' + day % 10;
+	*p++ = ' ';
+	*p++ = '0' + hours / 10;
+	*p++ = '0' + hours % 10;
+	*p++ = ':';
+	*p++ = '0' + minutes / 10;
+	*p++ = '0' + minutes % 10;
+	*p++ = ':';
+	*p++ = '0' + seconds / 10;
+	*p++ = '0' + seconds % 10;
+	*p = '\0';
 
-	wb->len += (size_t)(p - b);
-
-	// terminate it
-	wb->buffer[wb->len] = '\0';
+	// FIX: Don't need to terminate.
+	//wb->len += (size_t)(p - b);
+	//wb->buffer[wb->len] = '\0';
 	buffer_overflow_check(wb);
 }
 

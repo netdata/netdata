@@ -1,3 +1,4 @@
+/* vim: set ts=4 noet sw=4 : */
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -72,11 +73,13 @@ struct web_client *web_client_create(int listener)
 
 		if(getnameinfo(sadr, addrlen, w->client_ip, NI_MAXHOST, w->client_port, NI_MAXSERV, NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
 			error("Cannot getnameinfo() on received client connection.");
-			strncpy(w->client_ip,   "UNKNOWN", NI_MAXHOST);
-			strncpy(w->client_port, "UNKNOWN", NI_MAXSERV);
+			strncpyz(w->client_ip,   "UNKNOWN", NI_MAXHOST);
+			strncpyz(w->client_port, "UNKNOWN", NI_MAXSERV);
 		}
-		w->client_ip[NI_MAXHOST]   = '\0';
-		w->client_port[NI_MAXSERV] = '\0';
+		else {
+			w->client_ip[NI_MAXHOST]   = '\0';
+			w->client_port[NI_MAXSERV] = '\0';
+		}
 
 		switch(sadr->sa_family) {
 
@@ -98,7 +101,8 @@ struct web_client *web_client_create(int listener)
 		}
 
 		int flag = 1;
-		if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0) error("%llu: Cannot set SO_KEEPALIVE on socket.", w->id);
+		if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0) 
+			error("%llu: Cannot set SO_KEEPALIVE on socket.", w->id);
 	}
 
 	w->response.data = buffer_create(INITIAL_WEB_DATA_LENGTH);
@@ -296,7 +300,10 @@ int mysendfile(struct web_client *w, char *filename)
 	while (*filename == '/') filename++;
 
 	// if the filename contain known paths, skip them
-	if(strncmp(filename, WEB_PATH_FILE "/", strlen(WEB_PATH_FILE) + 1) == 0) filename = &filename[strlen(WEB_PATH_FILE) + 1];
+	// FIX: sizeof() will avoid a function call.
+	//      sizeof("...") will count '\0' char.
+	if(strncmp(filename, WEB_PATH_FILE "/", sizeof(WEB_PATH_FILE "/") - 1) == 0) 
+		filename = &filename[strlen(WEB_PATH_FILE) + 1];
 
 	char *s;
 	for(s = filename; *s ;s++) {
@@ -316,7 +323,7 @@ int mysendfile(struct web_client *w, char *filename)
 
 	// access the file
 	char webfilename[FILENAME_MAX + 1];
-	mysnprintf(webfilename, FILENAME_MAX, "%s/%s", web_dir, filename);
+	snprintfz(webfilename, FILENAME_MAX, "%s/%s", web_dir, filename);
 
 	// check if the file exists
 	struct stat stat;
@@ -341,7 +348,8 @@ int mysendfile(struct web_client *w, char *filename)
 	}
 
 	if((stat.st_mode & S_IFMT) == S_IFDIR) {
-		mysnprintf(webfilename, FILENAME_MAX, "%s/index.html", filename);
+    	// FIX: Oops... snprintf with FILENAME_MAX+1?!
+		snprintfz(webfilename, FILENAME_MAX, "%s/index.html", filename);
 		return mysendfile(w, webfilename);
 	}
 
@@ -837,8 +845,8 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 
 	char *args = strchr(url, '?');
 	if(args) {
-		*args='\0';
-		args = &args[1];
+		*args++='\0';
+		//args = &args[1];
 	}
 
 	// get the name of the data to show
@@ -1101,8 +1109,8 @@ void web_client_process(struct web_client *w) {
 		w->last_url[0] = '\0';
 
 		if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
-			strncpy(w->last_url, url, URL_MAX);
-			w->last_url[URL_MAX] = '\0';
+			strncpyz(w->last_url, url, URL_MAX);
+			//w->last_url[URL_MAX] = '\0';
 
 			code = 200;
 			w->response.data->contenttype = CT_TEXT_PLAIN;
@@ -1115,8 +1123,8 @@ void web_client_process(struct web_client *w) {
 				web_client_enable_deflate(w);
 #endif
 
-			strncpy(w->last_url, url, URL_MAX);
-			w->last_url[URL_MAX] = '\0';
+			strncpyz(w->last_url, url, URL_MAX);
+			//w->last_url[URL_MAX] = '\0';
 
 			tok = mystrsep(&url, "/?");
 			if(tok && *tok) {
@@ -1196,9 +1204,9 @@ void web_client_process(struct web_client *w) {
 						else {
 							code = 200;
 							debug_flags |= D_RRD_STATS;
-							st->debug = st->debug?0:1;
-							buffer_sprintf(w->response.data, "Chart %s has now debug %s.\r\n", tok, st->debug?"enabled":"disabled");
-							debug(D_WEB_CLIENT_ACCESS, "%llu: debug for %s is %s.", w->id, tok, st->debug?"enabled":"disabled");
+							//st->debug = st->debug?0:1;
+							buffer_sprintf(w->response.data, "Chart %s has now debug %s.\r\n", tok, !st->debug?"enabled":"disabled");
+							debug(D_WEB_CLIENT_ACCESS, "%llu: debug for %s is %s.", w->id, tok, !st->debug?"enabled":"disabled");
 						}
 					}
 					else {
@@ -1249,8 +1257,8 @@ void web_client_process(struct web_client *w) {
 				else {
 					char filename[FILENAME_MAX+1];
 					url = filename;
-					strncpy(filename, w->last_url, FILENAME_MAX);
-					filename[FILENAME_MAX] = '\0';
+					strncpyz(filename, w->last_url, FILENAME_MAX);
+					//filename[FILENAME_MAX] = '\0';
 					tok = mystrsep(&url, "?");
 					buffer_flush(w->response.data);
 					code = mysendfile(w, (tok && *tok)?tok:"/");
@@ -1259,8 +1267,8 @@ void web_client_process(struct web_client *w) {
 			else {
 				char filename[FILENAME_MAX+1];
 				url = filename;
-				strncpy(filename, w->last_url, FILENAME_MAX);
-				filename[FILENAME_MAX] = '\0';
+				strncpyz(filename, w->last_url, FILENAME_MAX);
+				//filename[FILENAME_MAX] = '\0';
 				tok = mystrsep(&url, "?");
 				buffer_flush(w->response.data);
 				code = mysendfile(w, (tok && *tok)?tok:"/");

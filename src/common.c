@@ -1,3 +1,4 @@
+/* vim: set ts=4 noet sw=4 : */
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -620,11 +621,14 @@ uint32_t simple_hash(const char *name) {
 
 void strreverse(char* begin, char* end)
 {
-    char aux;
-    while (end > begin)
-      // FIX: I think this can cause trouble... "aux = aux"?
-      //aux = *end, *end-- = *begin, *begin++ = aux;
-      { aux = *end; *end-- = *begin; *begin++ = aux; }
+	char aux;
+	while (end > begin) {
+		// FIX: This seems ambiguous to me!
+		//aux = *end, *end-- = *begin, *begin++ = aux;
+		aux = *end;
+		*end-- = *begin;
+		*begin++ = aux;
+	}
 }
 
 char *mystrsep(char **ptr, char *s)
@@ -632,10 +636,10 @@ char *mystrsep(char **ptr, char *s)
 	char *p = "";
 
 	//while ( p && !p[0] && *ptr ) p = strsep(ptr, s);
-  // FIX: Maybe this will be a little bit faster (just one memory reference
-  //      inside the loop) -- see asm code with -S option.
-  if (*ptr)
-    while ( p && !*p ) p = strsep(ptr, s);
+  	// FIX: Maybe this will be a little bit faster (just one memory reference
+  	//      inside the loop) -- see asm code with -S option.
+	if (*ptr)
+		while ( p && !*p ) p = strsep(ptr, s);
 	return(p);
 }
 
@@ -646,6 +650,15 @@ char *trim(char *s)
 	if(!*s || *s == '#') return NULL;
 
 	// skip tailing spaces
+
+	/* FIX: Writes '\0' just once. 
+			This is 20 times faster. */
+	char *t = s + strlen(s) - 1;
+	for (; t >= s && isspace(*t); t--) {;}
+	if (*++t) *t = '\0';
+	if (t == s || !*s) return NULL;
+
+	//--- ORIGINAL.
 	//long c = (long) strlen(s) - 1;
 	//while(c >= 0 && isspace(s[c])) {
 	//	s[c] = '\0';
@@ -653,11 +666,6 @@ char *trim(char *s)
 	//}
 	//if(c < 0) return NULL;
 	//if(!*s) return NULL;
-  // FIX: Using pointer is a little bit faster.
-  char *t = s + strlen(s) - 1;
-  for (; t >= s && isspace(*t); t--)
-    *t = '\0';
-  if (!*s) return NULL;
 
 	return s;
 }
@@ -725,7 +733,7 @@ int savememory(const char *filename, void *mem, unsigned long size)
 {
 	char tmpfilename[FILENAME_MAX + 1];
 
-	snprintf(tmpfilename, FILENAME_MAX, "%s.%ld.tmp", filename, (long)getpid());
+	snprintfz(tmpfilename, FILENAME_MAX, "%s.%ld.tmp", filename, (long)getpid());
 
 	int fd = open(tmpfilename, O_RDWR|O_CREAT|O_NOATIME, 0664);
 	if(fd < 0) {
@@ -777,19 +785,30 @@ pid_t gettid(void)
 	return syscall(SYS_gettid);
 }
 
-int mysnprintf(char *dest, size_t size, char *fmt, ...)
+// FIX: strncpy fills the entire buffer, this one will stop at NUL byte
+//      and is 10 times faster!
+char *strncpyz(char *dest, const char *src, size_t size)
 {
-	int sz;
-	va_list args;
-	va_start(args, fmt);
-	sz = vsnprintf(dest, size, fmt, args);
-	va_end(args);
+  char *d = dest;
 
-	// Garantees the final terminate char.
-	if (sz > 0)
- 		dest += sz;
-	*dest = '\0';
+  while (size-- && *src)
+    *d++ = *src++;
+  *d = '\0';
 
-	return sz;
+  return dest;
 }
 
+// FIX: snprintf don't garantee the NUL byte at the end of destination buffer.
+//      This does!
+int snprintfz(char *dest, size_t size, const char *fmt, ...)
+{
+  va_list ap;
+  int chrs;
+
+  va_start(ap, fmt);
+  chrs = vsnprintf(dest, size, fmt, ap);
+  va_end(ap);
+  if ((size_t)chrs == size) dest[size] = '\0';
+
+  return chrs;
+}
