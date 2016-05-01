@@ -657,8 +657,10 @@ struct cgroup *cgroup_add(const char *id) {
 				!strcmp(chart_id, "systemd") ||
 				!strcmp(chart_id, "user.slice") ||
 				!strcmp(chart_id, "system.slice") ||
+				!strcmp(chart_id, "machine.slice") ||
 				!strcmp(chart_id, "user") ||
 				!strcmp(chart_id, "system") ||
+				!strcmp(chart_id, "machine") ||
 				(len >  5 && !strncmp(&chart_id[len -  5], ".user", 5)) ||
 				(len >  6 && !strncmp(&chart_id[len -  6], ".scope", 6)) ||
 				(len > 10 && !strncmp(&chart_id[len - 10], ".partition", 10))
