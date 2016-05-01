@@ -639,23 +639,32 @@ struct cgroup *cgroup_add(const char *id) {
 	if(!*chart_id) {
 		chart_id = "/";
 
-		// disable by default the host cgroup
+		// disable by default the root cgroup
 		def = 0;
-		debug(D_CGROUP, "cgroup '%s' is the host container (by default %s)", id, (def)?"enabled":"disabled");
+		debug(D_CGROUP, "cgroup '%s' is the root container (by default %s)", id, (def)?"enabled":"disabled");
 	}
 	else {
 		if(*chart_id == '/') chart_id++;
+
+		size_t len = strlen(chart_id);
 
 		// disable by default the parent cgroup
 		// for known cgroup managers
 		if(!strcmp(chart_id, "lxc") ||
 				!strcmp(chart_id, "docker") ||
+				!strcmp(chart_id, "libvirt") ||
+				!strcmp(chart_id, "qemu") ||
 				!strcmp(chart_id, "systemd") ||
-				!strncmp(chart_id, "user.slice", 10) ||
-				!strncmp(chart_id, "system.slice", 12)
+				!strcmp(chart_id, "user.slice") ||
+				!strcmp(chart_id, "system.slice") ||
+				!strcmp(chart_id, "user") ||
+				!strcmp(chart_id, "system") ||
+				(len >  5 && !strncmp(&chart_id[len -  5], ".user", 5)) ||
+				(len >  6 && !strncmp(&chart_id[len -  6], ".scope", 6)) ||
+				(len > 10 && !strncmp(&chart_id[len - 10], ".partition", 10))
 				) {
 			def = 0;
-			debug(D_CGROUP, "cgroup '%s' is container manager (by default %s)", id, (def)?"enabled":"disabled");
+			debug(D_CGROUP, "cgroup '%s' is cgroup parent (by default %s)", id, (def)?"enabled":"disabled");
 		}
 	}
 
@@ -699,11 +708,7 @@ struct cgroup *cgroup_add(const char *id) {
 }
 
 void cgroup_free(struct cgroup *cg) {
-	debug(D_CGROUP, "removing cgroup '%s'", cg->id);
-
-	// FIXME
-	// switch this to debug(D_CGROUP, ...
-	info("Removing cgroup '%s' with chart id '%s' (was %s and %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (cg->available)?"available":"not available");
+	debug(D_CGROUP, "Removing cgroup '%s' with chart id '%s' (was %s and %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (cg->available)?"available":"not available");
 
 	free(cg->cpuacct_usage.cpu_percpu);
 
@@ -801,8 +806,12 @@ void find_dir_in_subdirs(const char *base, const char *this, void (*callback)(co
 				snprintf(option, FILENAME_MAX, "search for cgroups under %s", (*relative_path == '\0')?"/":relative_path);
 
 				int def = 1;
-				if(!strcmp(this, "system.slice") ||
+				size_t len = strlen(this);
+				if((len > 5 && !strncmp(&this[len - 5], ".user", 5)) ||
+					!strcmp(this, "system.slice") ||
 					!strcmp(this, "user.slice") ||
+					!strcmp(this, "system") ||
+					!strcmp(this, "user") ||
 					!strcmp(this, "systemd"))
 					def = 0;
 
@@ -961,7 +970,7 @@ void update_cgroup_charts(int update_every) {
 			continue;
 
 		if(cg->id[0] == '\0')
-			strcpy(type, "cgroup_host");
+			strcpy(type, "cgroup_root");
 		else if(cg->id[0] == '/')
 			snprintf(type, RRD_ID_LENGTH_MAX, "cgroup_%s", cg->chart_id);
 		else
