@@ -803,20 +803,25 @@ void find_dir_in_subdirs(const char *base, const char *this, void (*callback)(co
 
 		if(de->d_type == DT_DIR) {
 			if(enabled == -1) {
+				const char *r = relative_path;
+				if(*r == '\0') r = "/";
+				else if (*r == '/') r++;
+
 				// we check for this option here
 				// so that the config will not have settings
 				// for leaf directories
 				char option[FILENAME_MAX + 1];
-				snprintf(option, FILENAME_MAX, "search for cgroups under %s", (*relative_path == '\0')?"/":relative_path);
+				snprintf(option, FILENAME_MAX, "search for cgroups under %s", r);
+				option[FILENAME_MAX] = '\0';
 
 				int def = 1;
-				size_t len = strlen(this);
-				if((len > 5 && !strncmp(&this[len - 5], ".user", 5)) ||
-					!strcmp(this, "system.slice") ||
-					!strcmp(this, "user.slice") ||
-					!strcmp(this, "system") ||
-					!strcmp(this, "user") ||
-					!strcmp(this, "systemd"))
+				size_t len = strlen(r);
+				if((len > 5 && !strncmp(&r[len - 5], ".user", 5)) ||
+					!strcmp(r, "system.slice") ||
+					!strcmp(r, "user.slice") ||
+					!strcmp(r, "system") ||
+					!strcmp(r, "user") ||
+					!strcmp(r, "systemd"))
 					def = 0;
 
 				enabled = config_get_boolean("plugin:cgroups", option, def);
