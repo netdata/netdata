@@ -1,13 +1,15 @@
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
+#include <dirent.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/statvfs.h>
-#include <fcntl.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 
 #include "common.h"
 #include "log.h"
@@ -20,17 +22,20 @@
 
 #define RRD_TYPE_DISK "disk"
 
+#define DISK_TYPE_PHYSICAL  1
+#define DISK_TYPE_PARTITION 2
+#define DISK_TYPE_CONTAINER 3
+
 struct disk {
 	unsigned long major;
 	unsigned long minor;
-	int partition_id;       // -1 = this is not a partition
+	int type;
 	char *mount_point;
-	char *family;
 	struct disk *next;
 } *disk_root = NULL;
 
 struct disk *get_disk(unsigned long major, unsigned long minor) {
-	static char path_find_block_device_partition[FILENAME_MAX + 1] = "";
+	static char path_find_block_device[FILENAME_MAX + 1] = "";
 	static struct mountinfo *mountinfo_root = NULL;
 	struct disk *d;
 
@@ -46,10 +51,10 @@ struct disk *get_disk(unsigned long major, unsigned long minor) {
 	if(likely(d))
 		return d;
 
-	if(unlikely(!path_find_block_device_partition[0])) {
-		char filename[FILENAME_MAX + 1];
-		snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/dev/block/%lu:%lu/partition");
-		snprintf(path_find_block_device_partition, FILENAME_MAX, "%s", config_get("plugin:proc:/proc/diskstats", "path to get block device partition", filename));
+	if(unlikely(!path_find_block_device[0])) {
+		char dirname[FILENAME_MAX + 1];
+		snprintf(dirname, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/dev/block/%lu:%lu/%s");
+		snprintf(path_find_block_device, FILENAME_MAX, "%s", config_get("plugin:proc:/proc/diskstats", "path to get block device infos", dirname));
 	}
 
 	// not found
@@ -59,7 +64,7 @@ struct disk *get_disk(unsigned long major, unsigned long minor) {
 
 	d->major = major;
 	d->minor = minor;
-	d->partition_id = -1;
+	d->type = DISK_TYPE_PHYSICAL; // Default type. Changed later if not correct.
 	d->next = NULL;
 
 	// append it to the list
@@ -71,21 +76,36 @@ struct disk *get_disk(unsigned long major, unsigned long minor) {
 		last->next = d;
 	}
 
+	// ------------------------------------------------------------------------
+	// find the type of the device
+
 	// find if it is a partition
-	// by reading /sys/dev/block/MAJOR:MINOR/partition
+	// by checking if /sys/dev/block/MAJOR:MINOR/partition is readable.
 	char buffer[FILENAME_MAX + 1];
-	snprintf(buffer, FILENAME_MAX, path_find_block_device_partition, major, minor);
-
-	int fd = open(buffer, O_RDONLY, 0666);
-	if(likely(fd != -1)) {
-		// we opened it
-		int bytes = read(fd, buffer, FILENAME_MAX);
-		close(fd);
-
-		if(bytes > 0)
-			d->partition_id = strtoul(buffer, NULL, 10);
+	snprintf(buffer, FILENAME_MAX, path_find_block_device, major, minor, "partition");
+	if(access(buffer, R_OK) == 0) {
+		d->type = DISK_TYPE_PARTITION;
+	} else {
+		// find if it is a container
+		// by checking if /sys/dev/block/MAJOR:MINOR/slaves has entries
+		int is_container = 0;
+		snprintf(buffer, FILENAME_MAX, path_find_block_device, major, minor, "slaves/");
+		DIR *dirp = opendir(buffer);	
+		if (dirp != NULL) {
+		struct dirent *dp;
+			while(dp = readdir(dirp)) {
+				// . and .. are also files in empty folders.
+				if(strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0) {
+					continue;
+				}
+				d->type = DISK_TYPE_CONTAINER;
+				// Stop the loop after we found one file.
+				break;
+			}
+			if(closedir(dirp) == -1)
+				error("Unable to close dir %s", buffer);
+		}
 	}
-	// if the /partition file does not exist, it is a disk, not a partition
 
 	// ------------------------------------------------------------------------
 	// check if we can find its mount point
@@ -117,6 +137,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 	static char path_to_get_hw_sector_size[FILENAME_MAX + 1] = "";
 	static int enable_new_disks = -1;
 	static int do_io = -1, do_ops = -1, do_mops = -1, do_iotime = -1, do_qops = -1, do_util = -1, do_backlog = -1, do_space = -1;
+	static struct statvfs buff_statvfs;
 
 	if(enable_new_disks == -1)	enable_new_disks = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "enable new disks detected at runtime", CONFIG_ONDEMAND_ONDEMAND);
 
@@ -144,12 +165,6 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 
 	ff = procfile_readall(ff);
 	if(!ff) return 0; // we return 0, so that we will retry to open it next time
-
-	struct statvfs * buff_statvfs;
-	if ( !(buff_statvfs = (struct statvfs *)
-				malloc(sizeof(struct statvfs)))) {
-		error("Failed to allocate memory to buffer.");
-	}
 
 	uint32_t lines = procfile_lines(ff), l;
 	uint32_t words;
@@ -221,16 +236,17 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 
 		struct disk *d = get_disk(major, minor);
 
-		/*
-		if(d->partition_id == -1)
+		// Enable statistics for physical disks and mount points by default.
+		if( (d->type == DISK_TYPE_PHYSICAL) || (d->mount_point != NULL) ) {
 			def_enabled = enable_new_disks;
-		else
-			def_enabled = 0;
-		*/
+		}
 
-		// Enable real disks by default.
+		/*
+		// Enable physical disks by default.
 		// To fine out if it is a harddrive we use
 		// Linux Assigned Names and Numbers Authority (http://www.lanana.org/)
+		// We can't do that because proprietary disk drivers do not stick to
+		// the standard. To detect re
 		switch(major) {
 			case 8: // SCSI disk devices (0-15)
 				if(!(minor % 16)) {
@@ -461,6 +477,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 				def_enabled = 0;
 				break;
 		}
+		*/
 
 		char *mount_point = d->mount_point;
 		char *family = d->mount_point;
@@ -652,35 +669,33 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 		// --------------------------------------------------------------------
 
 		if(ddo_space) {
-			if(mount_point) {
-				st = rrdset_find_bytype("disk_space", disk);
-				if(!st) {
-					st = rrdset_create("disk_space", disk, NULL, family, "disk.space", "Disk Space Usage", "Megabyte", 2023, update_every, RRDSET_TYPE_AREA);
-					st->isdetail = 1;
-
-					rrddim_add(st, "avail", NULL, 1, 1048576, RRDDIM_ABSOLUTE);
-					rrddim_add(st, "reserved for root", NULL, 1, 1048576, RRDDIM_ABSOLUTE);
-					rrddim_add(st, "used" , NULL, 1, 1045576, RRDDIM_ABSOLUTE);
-				}
-				else rrdset_next_usec(st, dt);
-
-
-
-				if (statvfs(family, buff_statvfs) < 0) {
-					error("Faild checking disk space usage of %s", family);
-				} else {
-					space_avail = buff_statvfs->f_bavail * buff_statvfs->f_bsize;
-					space_avail_root = (buff_statvfs->f_bfree - buff_statvfs->f_bavail) * buff_statvfs->f_bsize;
-					space_used = (buff_statvfs->f_blocks - buff_statvfs->f_bfree) * buff_statvfs->f_bsize;
-				}
-
-				rrddim_set(st, "avail", space_avail);
-				rrddim_set(st, "reserved for root", space_avail_root);
-				rrddim_set(st, "used", space_used);
-				rrdset_done(st);
-			} else {
+			if(!mount_point) {
 				if(ddo_space != CONFIG_ONDEMAND_ONDEMAND) {
 					error("Cannot find space usage for disk %s. It does not have a mount point.", family);
+				}
+			} else {
+				if (statvfs(family, &buff_statvfs) < 0) {
+					error("Failed checking disk space usage of %s", family);
+				} else {
+					space_avail = buff_statvfs.f_bavail * buff_statvfs.f_bsize;
+					space_avail_root = (buff_statvfs.f_bfree - buff_statvfs.f_bavail) * buff_statvfs.f_bsize;
+					space_used = (buff_statvfs.f_blocks - buff_statvfs.f_bfree) * buff_statvfs.f_bsize;
+
+					st = rrdset_find_bytype("disk_space", disk);
+					if(!st) {
+						st = rrdset_create("disk_space", disk, NULL, family, "disk.space", "Disk Space Usage", "GB", 2023, update_every, RRDSET_TYPE_STACKED);
+						st->isdetail = 1;
+
+						rrddim_add(st, "avail", NULL, 1, 1000*1000*1000, RRDDIM_ABSOLUTE);
+						rrddim_add(st, "reserved_for_root", "reserved for root", 1, 1000*1000*1000, RRDDIM_ABSOLUTE);
+						rrddim_add(st, "used" , NULL, 1, 1000*1000*1000, RRDDIM_ABSOLUTE);
+					}
+					else rrdset_next_usec(st, dt);
+
+					rrddim_set(st, "avail", space_avail);
+					rrddim_set(st, "reserved_for_root", space_avail_root);
+					rrddim_set(st, "used", space_used);
+					rrdset_done(st);
 				}
 			}
 		}
@@ -737,7 +752,6 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 			}
 		}
 	}
-	free(buff_statvfs);
 
 	return 0;
 }
