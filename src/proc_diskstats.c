@@ -220,136 +220,251 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 		for(s = disk; *s ;s++) if(*s == '/') *s = '_';
 
 		struct disk *d = get_disk(major, minor);
+
+		/*
 		if(d->partition_id == -1)
 			def_enabled = enable_new_disks;
 		else
 			def_enabled = 0;
+		*/
 
-		char *mount_point = d->mount_point;
-		char *family = d->mount_point;
-		if(!family) family = disk;
-
-/*
+		// Enable real disks by default.
+		// To fine out if it is a harddrive we use
+		// Linux Assigned Names and Numbers Authority (http://www.lanana.org/)
 		switch(major) {
-			case 9: // MDs
-			case 43: // network block
-			case 144: // nfs
-			case 145: // nfs
-			case 146: // nfs
-			case 199: // veritas
-			case 201: // veritas
-			case 251: // dm
-			case 253: // virtio
-				def_enabled = enable_new_disks;
+			case 8: // SCSI disk devices (0-15)
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
 				break;
-
-			case 48: // RAID
-			case 49: // RAID
-			case 50: // RAID
-			case 51: // RAID
-			case 52: // RAID
-			case 53: // RAID
-			case 54: // RAID
-			case 55: // RAID
-			case 112: // RAID
-			case 136: // RAID
-			case 137: // RAID
-			case 138: // RAID
-			case 139: // RAID
-			case 140: // RAID
-			case 141: // RAID
-			case 142: // RAID
-			case 143: // RAID
-			case 179: // MMC
-			case 180: // USB
-				if(minor % 8) def_enabled = 0; // partitions
-				else def_enabled = enable_new_disks;
+			case 21: // Acorn MFM hard drive interface
+				if(!(minor % 64)) {
+					def_enabled = enable_new_disks;
+				}
 				break;
-
-			case 8: // scsi disks
-			case 65: // scsi disks
-			case 66: // scsi disks
-			case 67: // scsi disks
-			case 68: // scsi disks
-			case 69: // scsi disks
-			case 70: // scsi disks
-			case 71: // scsi disks
-			case 72: // scsi disks
-			case 73: // scsi disks
-			case 74: // scsi disks
-			case 75: // scsi disks
-			case 76: // scsi disks
-			case 77: // scsi disks
-			case 78: // scsi disks
-			case 79: // scsi disks
-			case 80: // i2o
-			case 81: // i2o
-			case 82: // i2o
-			case 83: // i2o
-			case 84: // i2o
-			case 85: // i2o
-			case 86: // i2o
-			case 87: // i2o
-			case 101: // hyperdisk
-			case 102: // compressed
-			case 104: // scsi
-			case 105: // scsi
-			case 106: // scsi
-			case 107: // scsi
-			case 108: // scsi
-			case 109: // scsi
-			case 110: // scsi
-			case 111: // scsi
-			case 114: // bios raid
-			case 116: // ram board
-			case 128: // scsi
-			case 129: // scsi
-			case 130: // scsi
-			case 131: // scsi
-			case 132: // scsi
-			case 133: // scsi
-			case 134: // scsi
-			case 135: // scsi
-			case 153: // raid
-			case 202: // xen
-			case 254: // virtio3
-			case 256: // flash
-			case 257: // flash
-			case 259: // nvme0n1 issue #119
-				if(minor % 16) def_enabled = 0; // partitions
-				else def_enabled = enable_new_disks;
+			case 28: // ACSI disk (68k/Atari)
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
 				break;
-
-			case 160: // raid
-			case 161: // raid
-				if(minor % 32) def_enabled = 0; // partitions
-				else def_enabled = enable_new_disks;
+			case 36: // MCA ESDI hard disk
+				if(!(minor % 64)) {
+					def_enabled = enable_new_disks;
+				}
 				break;
-
-			case 3: // ide
-			case 13: // 8bit ide
-			case 22: // ide
-			case 33: // ide
-			case 34: // ide
-			case 56: // ide
-			case 57: // ide
-			case 88: // ide
-			case 89: // ide
-			case 90: // ide
-			case 91: // ide
-				if(minor % 64) def_enabled = 0; // partitions
-				else def_enabled = enable_new_disks;
+			case 48: // Mylex DAC960 PCI RAID controller; first controller
+				if(!(minor % 8)) {
+					def_enabled = enable_new_disks;
+				}
 				break;
-
-			case 252: // zram
-				def_enabled = 0;
+			case 49: // Mylex DAC960 PCI RAID controller; second controller
+				if(!(minor % 8)) {
+					def_enabled = enable_new_disks;
+				}
 				break;
-
+			case 50: // Mylex DAC960 PCI RAID controller; third controller
+				if(!(minor % 8)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 51: // Mylex DAC960 PCI RAID controller; fourth controller
+				if(!(minor % 8)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 52: // Mylex DAC960 PCI RAID controller; fifth controller
+				if(!(minor % 8)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 53: // Mylex DAC960 PCI RAID controller; sixth controller
+				if(!(minor % 8)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 54: // Mylex DAC960 PCI RAID controller; seventh controller
+				if(!(minor % 8)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 55: // Mylex DAC960 PCI RAID controller; eigth controller
+				if(!(minor % 8)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 65: // SCSI disk devices (16-31)
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 66: // SCSI disk devices (32-47)
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 67: // SCSI disk devices (48-63)
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 68: // SCSI disk devices (64-79)
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 69: // SCSI disk devices (80-95)
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 70: // SCSI disk devices (96-111)
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 71: // SCSI disk devices (112-127)
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 80: // I2O hard disk
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 81: // I2O hard disk
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 82: // I2O hard disk
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 83: // I2O hard disk
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 84: // I2O hard disk
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 85: // I2O hard disk
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 86: // I2O hard disk
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 87: // I2O hard disk
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 128: // SCSI disk devices (128-143)
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 129: // SCSI disk devices (144-159)
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 130: // SCSI disk devices (160-175)
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 131: // SCSI disk devices (176-191)
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 132: // SCSI disk devices (192-207)
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 133: // SCSI disk devices (208-223)
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 134: // SCSI disk devices (224-239)
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 135: // SCSI disk devices (240-255)
+				if(!(minor % 16)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 136: // Mylex DAC960 PCI RAID controller; nineth controller
+				if(!(minor % 8)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 137: // Mylex DAC960 PCI RAID controller; tenth controller
+				if(!(minor % 8)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 138: // Mylex DAC960 PCI RAID controller; eleventh controller
+				if(!(minor % 8)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 139: // Mylex DAC960 PCI RAID controller; twelfth controller
+				if(!(minor % 8)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 140: // Mylex DAC960 PCI RAID controller; thirteenth controller
+				if(!(minor % 8)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 141: // Mylex DAC960 PCI RAID controller; fourteenth controller
+				if(!(minor % 8)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 142: // Mylex DAC960 PCI RAID controller; fifteenth controller
+				if(!(minor % 8)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 143: // Mylex DAC960 PCI RAID controller; sixteenth controller
+				if(!(minor % 8)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 160: // Carmel 8-port SATA Disks on First Controller
+				if(!(minor % 32)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
+			case 161: // Carmel 8-port SATA Disks on Second Controller
+				if(!(minor % 32)) {
+					def_enabled = enable_new_disks;
+				}
+				break;
 			default:
 				def_enabled = 0;
 				break;
 		}
-*/
+
+		char *mount_point = d->mount_point;
+		char *family = d->mount_point;
+		if(!family) family = disk;
 
 		int ddo_io = do_io, ddo_ops = do_ops, ddo_mops = do_mops, ddo_iotime = do_iotime, ddo_qops = do_qops, ddo_util = do_util, ddo_backlog = do_backlog, ddo_space = do_space;
 
