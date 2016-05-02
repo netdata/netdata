@@ -32,7 +32,7 @@ static char *cgroup_blkio_base = NULL;
 static char *cgroup_memory_base = NULL;
 
 static int cgroup_root_count = 0;
-static int cgroup_root_max = 50;
+static int cgroup_root_max = 500;
 static int cgroup_max_depth = 0;
 
 void read_cgroup_plugin_configuration() {
@@ -657,18 +657,23 @@ struct cgroup *cgroup_add(const char *id) {
 				!strcmp(chart_id, "libvirt") ||
 				!strcmp(chart_id, "qemu") ||
 				!strcmp(chart_id, "systemd") ||
-				!strcmp(chart_id, "user.slice") ||
 				!strcmp(chart_id, "system.slice") ||
 				!strcmp(chart_id, "machine.slice") ||
 				!strcmp(chart_id, "user") ||
 				!strcmp(chart_id, "system") ||
 				!strcmp(chart_id, "machine") ||
+		   		// starts with them
+				(len >  6 && !strncmp(chart_id, "user/", 6)) ||
+				(len > 11 && !strncmp(chart_id, "user.slice/", 11)) ||
+				// ends with them
 				(len >  5 && !strncmp(&chart_id[len -  5], ".user", 5)) ||
-				(len >  6 && !strncmp(&chart_id[len -  6], ".scope", 6)) ||
+				(len >  6 && !strncmp(&chart_id[len -  6], ".slice", 6)) ||
+				(len >  8 && !strncmp(&chart_id[len -  8], ".session", 8)) ||
+				(len >  8 && !strncmp(&chart_id[len -  8], ".service", 8)) ||
 				(len > 10 && !strncmp(&chart_id[len - 10], ".partition", 10))
 				) {
 			def = 0;
-			debug(D_CGROUP, "cgroup '%s' is cgroup parent (by default %s)", id, (def)?"enabled":"disabled");
+			debug(D_CGROUP, "cgroup '%s' is %s (by default)", id, (def)?"enabled":"disabled");
 		}
 	}
 
@@ -813,18 +818,7 @@ void find_dir_in_subdirs(const char *base, const char *this, void (*callback)(co
 				char option[FILENAME_MAX + 1];
 				snprintf(option, FILENAME_MAX, "search for cgroups under %s", r);
 				option[FILENAME_MAX] = '\0';
-
-				int def = 1;
-				size_t len = strlen(r);
-				if((len > 5 && !strncmp(&r[len - 5], ".user", 5)) ||
-					!strcmp(r, "system.slice") ||
-					!strcmp(r, "user.slice") ||
-					!strcmp(r, "system") ||
-					!strcmp(r, "user") ||
-					!strcmp(r, "systemd"))
-					def = 0;
-
-				enabled = config_get_boolean("plugin:cgroups", option, def);
+				enabled = config_get_boolean("plugin:cgroups", option, 1);
 			}
 
 			if(enabled) {
