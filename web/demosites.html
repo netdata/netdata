@@ -106,7 +106,7 @@ body {
 	position: relative;
 	display: inline-block;
 	width: 100%;
-	height: 16vw;
+	height: 15vw;
 	min-height: 150px;
 	text-align: left;
 }
@@ -126,6 +126,25 @@ body {
 	display: block;
 }
 
+.mytitle {
+	padding-top: 6vw;
+	padding-bottom: 1vw;
+	text-align: center;
+	font-size: 2.4vw;
+}
+
+.mysubtitle {
+	padding-top: 2vw;
+	padding-bottom: 1vw;
+	text-align: center;
+	font-size: 1.8vw;
+}
+
+.mycontent {
+	text-align: center;
+	font-size: 1.5vw;
+}
+
 	</style>
 
 </head>
@@ -140,10 +159,16 @@ body {
 		real-time performance monitoring
 	</div>
 	<div style="width:80%; text-align: right; font-size: 2.7vw;">
-		done... <strong>real-time</strong>!
+		<strong>scaled out</strong>!
 	</div>
-	<div style="padding-top: 3vw; padding-bottom: 1vw; text-align: center; font-size: 2vw;">
-		this dashboard gets its charts, from <b>3 netdata</b> servers
+	<div class="mytitle">
+		welcome to <b>netdata</b>
+	</div>
+	<div class="mysubtitle">
+		pick a demo server, to view its dashboard
+	</div>
+	<div class="mycontent">
+		these dashboards is what you will get by installing <b>netdata</b>
 	</div>
 
 	<div style="width: 100%; text-align: center; padding-top: 2vw;">
@@ -164,7 +189,7 @@ body {
 				<div class="mygauge-button">
 					<br/>&nbsp;<br/>
 					<button type="button" class="btn btn-default" data-toggle="button" aria-pressed="false" autocomplete="off" onclick="window.location='//netdata1.firehol.org'" style="font-size: 1.5vw;">Enter London!</button>
-					<div style="font-size: 0.8vw;">
+					<div style="font-size: 1vw;">
 						Donated by DigitalOcean.com
 					</div>
 				</div>
@@ -184,7 +209,7 @@ body {
 				<div class="mygauge-button">
 					<br/>&nbsp;<br/>
 					<button type="button" class="btn btn-default" data-toggle="button" aria-pressed="false" autocomplete="off" onclick="window.location='//netdata2.firehol.org'" style="font-size: 1.5vw;">Enter Atlanta!</button>
-					<div style="font-size: 0.8vw;">
+					<div style="font-size: 1vw;">
 						Donated by CDN77.com
 					</div>
 				</div>
@@ -212,83 +237,162 @@ body {
 		</div>
 	</div>
 
-	<div style="padding-top: 4vw; width: 100%; text-align: center; font-size: 2vw;">
-		the servers are not aware of this unified dashboard,
+	<div class="mytitle">
+		this page is a custom <b>netdata</b> dashboard
+	</div>
+	<div class="mycontent">
+		charts are coming from 3 servers, in parallel
+		<br/>
+		the servers are not aware of this multi-server dashboard,
 		<br/>
 		each server is not aware of the other 2 servers,
 		<br/>
-		but on this dashboard they <b>behave like one</b>!
+		but on this dashboard <b>they are one</b>!
 	</div>
 	<div style="padding-top: 1vw; width: 100%; text-align: center; font-size: 1.5vw;">
 		<i class="fa fa-comment" aria-hidden="true"></i>
 		hover on a chart below, or drag it to show the past - <b>the others will follow</b>!
 		<br/>
-		(double click on a chart to reset them all)
+		double click on a chart to reset them all
 	</div>
 
-	<div style="padding-top: 4vw; width: 100%; text-align: center; font-size: 1.5vw;">
-		<div style="padding-top: 1vw; padding-bottom: 1vw;">
-			Our <code>nginx</code> web servers recent requests/s:
+	<div class="mytitle">
+		our <code>ngnix</code> performance
+	</div>
+	<div class="mycontent">
+		(we proxy netdata through nginx, on the demo sites)
+	</div>
+
+	<!-- Nav tabs -->
+	<ul class="nav nav-tabs" role="tablist" style="padding-top: 1vw;">
+		<li role="presentation" class="active"><a href="#nginx_requests" aria-controls="nginx_requests" role="tab" data-toggle="tab">Requests</a></li>
+		<li role="presentation"><a href="#nginx_connections" aria-controls="nginx_connections" role="tab" data-toggle="tab">Connections</a></li>
+	</ul>
+
+	<!-- Tab panes -->
+	<div class="tab-content">
+		<div role="tabpanel" class="tab-pane active" id="nginx_requests">
+			<div class="mysparkline">
+				<div class="mysparkline-overchart-label">
+					<b>EU - London</b> web requests/s
+				</div>
+				<div class="mysparkline-overchart-value" id="nginx.requests.netdata" >
+				</div>
+				<div data-netdata="nginx.requests"
+						data-dimensions="requests"
+						data-host="//netdata1.firehol.org"
+						data-chart-library="dygraph"
+						data-dygraph-theme="sparkline"
+						data-dygraph-type="area"
+						data-width="100%"
+						data-height="100%"
+						data-after="-300"
+						data-colors="#558855"
+						data-show-value-of-requests-at="nginx.requests.netdata"
+						></div>
+			</div>
+
+			<div class="mysparkline">
+				<div class="mysparkline-overchart-label">
+					<b>US - Atlanta</b> web requests/s
+				</div>
+				<div class="mysparkline-overchart-value" id="nginx.requests.netdata2" >
+				</div>
+				<div data-netdata="nginx.requests"
+						data-dimensions="requests"
+						data-host="//netdata2.firehol.org"
+						data-chart-library="dygraph"
+						data-dygraph-theme="sparkline"
+						data-dygraph-type="area"
+						data-width="100%"
+						data-height="100%"
+						data-after="-300"
+						data-colors="#AA5555"
+						data-show-value-of-requests-at="nginx.requests.netdata2"
+						></div>
+			</div>
+
+			<div class="mysparkline">
+				<div class="mysparkline-overchart-label">
+					<b>EU - Greece</b> web requests/s
+				</div>
+				<div class="mysparkline-overchart-value" id="nginx.requests.netdata3" >
+				</div>
+				<div data-netdata="nginx.requests"
+						data-dimensions="requests"
+						data-host="//netdata3.firehol.org"
+						data-chart-library="dygraph"
+						data-dygraph-theme="sparkline"
+						data-dygraph-type="area"
+						data-width="100%"
+						data-height="100%"
+						data-after="-300"
+						data-colors="#5555AA"
+						data-show-value-of-requests-at="nginx.requests.netdata3"
+						></div>
+			</div>
 		</div>
 
-		<div class="mysparkline">
-			<div class="mysparkline-overchart-label">
-				<b>EU - London</b> web requests/s
+		<div role="tabpanel" class="tab-pane" id="nginx_connections">
+			<div class="mysparkline">
+				<div class="mysparkline-overchart-label">
+					<b>EU - London</b> web requests/s
+				</div>
+				<div class="mysparkline-overchart-value" id="nginx.connections.netdata1" >
+				</div>
+				<div data-netdata="nginx.connections"
+						data-dimensions="active"
+						data-host="//netdata1.firehol.org"
+						data-chart-library="dygraph"
+						data-dygraph-theme="sparkline"
+						data-dygraph-type="area"
+						data-width="100%"
+						data-height="100%"
+						data-after="-300"
+						data-colors="#558855"
+						data-show-value-of-active-at="nginx.connections.netdata1"
+						></div>
 			</div>
-			<div class="mysparkline-overchart-value" id="nginx.requests.netdata" >
-			</div>
-			<div data-netdata="nginx.requests"
-					data-dimensions="requests"
-					data-host="//netdata1.firehol.org"
-					data-chart-library="dygraph"
-					data-dygraph-theme="sparkline"
-					data-dygraph-type="area"
-					data-width="100%"
-					data-height="100%"
-					data-after="-300"
-					data-colors="#558855"
-					data-show-value-of-requests-at="nginx.requests.netdata"
-					></div>
-		</div>
 
-		<div class="mysparkline">
-			<div class="mysparkline-overchart-label">
-				<b>US - Atlanta</b> web requests/s
+			<div class="mysparkline">
+				<div class="mysparkline-overchart-label">
+					<b>US - Atlanta</b> web requests/s
+				</div>
+				<div class="mysparkline-overchart-value" id="nginx.connections.netdata2" >
+				</div>
+				<div data-netdata="nginx.connections"
+						data-dimensions="active"
+						data-host="//netdata2.firehol.org"
+						data-chart-library="dygraph"
+						data-dygraph-theme="sparkline"
+						data-dygraph-type="area"
+						data-width="100%"
+						data-height="100%"
+						data-after="-300"
+						data-colors="#AA5555"
+						data-show-value-of-active-at="nginx.connections.netdata2"
+						></div>
 			</div>
-			<div class="mysparkline-overchart-value" id="nginx.requests.netdata2" >
-			</div>
-			<div data-netdata="nginx.requests"
-					data-dimensions="requests"
-					data-host="//netdata2.firehol.org"
-					data-chart-library="dygraph"
-					data-dygraph-theme="sparkline"
-					data-dygraph-type="area"
-					data-width="100%"
-					data-height="100%"
-					data-after="-300"
-					data-colors="#AA5555"
-					data-show-value-of-requests-at="nginx.requests.netdata2"
-					></div>
-		</div>
 
-		<div class="mysparkline">
-			<div class="mysparkline-overchart-label">
-				<b>EU - Greece</b> web requests/s
+			<div class="mysparkline">
+				<div class="mysparkline-overchart-label">
+					<b>EU - Greece</b> web requests/s
+				</div>
+				<div class="mysparkline-overchart-value" id="nginx.connections.netdata3" >
+				</div>
+				<div data-netdata="nginx.connections"
+						data-dimensions="active"
+						data-host="//netdata3.firehol.org"
+						data-chart-library="dygraph"
+						data-dygraph-theme="sparkline"
+						data-dygraph-type="area"
+						data-width="100%"
+						data-height="100%"
+						data-after="-300"
+						data-colors="#5555AA"
+						data-show-value-of-active-at="nginx.connections.netdata3"
+						></div>
 			</div>
-			<div class="mysparkline-overchart-value" id="nginx.requests.netdata3" >
-			</div>
-			<div data-netdata="nginx.requests"
-					data-dimensions="requests"
-					data-host="//netdata3.firehol.org"
-					data-chart-library="dygraph"
-					data-dygraph-theme="sparkline"
-					data-dygraph-type="area"
-					data-width="100%"
-					data-height="100%"
-					data-after="-300"
-					data-colors="#5555AA"
-					data-show-value-of-requests-at="nginx.requests.netdata3"
-					></div>
 		</div>
 	</div>
 
@@ -297,10 +401,11 @@ body {
 	</div>
 
 
-	<div style="padding-top: 4vw; font-size: 1.5vw;">
-		Our bandwidth consumption per service
-		<br/>
-		(Linux QoS configured by our <a href="https://github.com/firehol/netdata/wiki/You-should-install-QoS-on-all-your-servers">FireQOS</a>):
+	<div class="mytitle">
+		bandwidth consumption on the demo sites
+	</div>
+	<div class="mycontent">
+		Linux QoS is configured by <a href="https://github.com/firehol/netdata/wiki/You-should-install-QoS-on-all-your-servers">FireQOS</a>
 	</div>
 
 	<!-- Nav tabs -->
@@ -387,12 +492,14 @@ body {
 		<i class="fa fa-comment" aria-hidden="true"></i> <i>these legends are interactive and the charts are resizable here ^^^</i>
 	</div>
 
+	<div class="mytitle">
+		DDoS protection performance on the demo sites
+	</div>
+	<div class="mycontent">
+		iptables SYNPROXY configured by our <a href="https://github.com/firehol/netdata/wiki/Monitoring-SYNPROXY">FireHOL</a>
+	</div>
+
 	<div style="padding-top: 4vw; width: 100%; text-align: center; font-size: 1.5vw;">
-		<div style="padding-top: 1vw; padding-bottom: 1vw;">
-			Our DDoS protection
-			<br/>
-			(iptables SYNPROXY configured by our <a href="https://github.com/firehol/netdata/wiki/Monitoring-SYNPROXY">FireHOL</a>):
-		</div>
 
 		<div class="mysparkline">
 			<div class="mysparkline-overchart-label">
@@ -460,8 +567,8 @@ body {
 	</div>
 
 
-	<div style="padding-top: 4vw; font-size: 1.5vw;">
-		CPU Utilization on our servers
+	<div class="mytitle">
+		CPU Utilization of the demo sites
 	</div>
 
 	<div style="padding-top: 1vw;">
@@ -503,14 +610,16 @@ body {
 		<br/>The site <a href="//iplists.firehol.org/">iplists.firehol.org</a> is maintained by FireHOL - the CPU is used for comparing security IP Lists.</i>
 	</div>
 
+	<div class="mytitle">
+		CPU Usage of the netdata user
+	</div>
+	<div class="mycontent">
+		netdata monitors <b>users</b>, <b>user groups</b>, <b>applications (process trees)</b>
+		<br/>
+		and <b>containers</b> (<code>lxc</code>, <code>docker</code>, etc.)
+	</div>
+
 	<div style="padding-top: 4vw; width: 100%; text-align: center; font-size: 1.5vw;">
-		<div style="padding-top: 1vw; padding-bottom: 1vw;">
-			CPU Usage of the netdata user
-			<br/>
-			netdata monitors <b>users</b>, <b>user groups</b>, <b>applications (process trees)</b>
-			<br/>
-			and <b>containers</b> (<code>lxc</code>, <code>docker</code>, etc.)
-		</div>
 
 		<div class="mysparkline">
 			<div class="mysparkline-overchart-label">
@@ -583,7 +692,9 @@ body {
 		<br/>
 		jump to <a href="https://github.com/firehol/netdata/">the netdata page at github</a>!
 		<br/>
-		remember to motivate us with a <b>Github Star</b>.
+		<b>netdata</b> monitors 1.000 - 5.000 metrics out of the box
+		<br/>
+		and it needs just 3 mins to be installed!
 		<br/>
 		&nbsp;
 	</div>
