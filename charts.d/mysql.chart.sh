@@ -91,7 +91,40 @@ mysql_get() {
 		mysql_Innodb_rows_inserted \
 		mysql_Innodb_rows_read \
 		mysql_Innodb_rows_updated \
-		mysql_Innodb_rows_deleted
+		mysql_Innodb_rows_deleted \
+		mysql_Innodb_buffer_pool_pages_data \
+		mysql_Innodb_buffer_pool_pages_dirty \
+		mysql_Innodb_buffer_pool_pages_flushed \
+		mysql_Innodb_buffer_pool_pages_free \
+		mysql_Innodb_buffer_pool_pages_misc \
+		mysql_Innodb_buffer_pool_pages_total \
+		mysql_Innodb_buffer_pool_bytes_data \
+		mysql_Innodb_buffer_pool_bytes_dirty \
+		mysql_Innodb_buffer_pool_read_ahead_rnd \
+		mysql_Innodb_buffer_pool_read_ahead \
+		mysql_Innodb_buffer_pool_read_ahead_evicted \
+		mysql_Innodb_buffer_pool_read_requests \
+		mysql_Innodb_buffer_pool_reads \
+		mysql_Innodb_buffer_pool_wait_free \
+		mysql_Innodb_buffer_pool_write_requests \
+		mysql_Qcache_free_blocks \
+		mysql_Qcache_free_memory \
+		mysql_Qcache_hits \
+		mysql_Qcache_inserts \
+		mysql_Qcache_lowmem_prunes \
+		mysql_Qcache_not_cached \
+		mysql_Qcache_queries_in_cache \
+		mysql_Qcache_total_blocks \
+		mysql_Key_blocks_not_flushed \
+		mysql_Key_blocks_unused \
+		mysql_Key_blocks_used \
+		mysql_Key_read_requests \
+		mysql_Key_reads \
+		mysql_Key_write_requests \
+		mysql_Key_writes \
+		mysql_Open_files \
+		mysql_Opened_files
+
 
 	mysql_plugin_command_failure=0
 
@@ -286,6 +319,65 @@ DIMENSION Innodb_rows_deleted deleted incremental -1 1
 DIMENSION Innodb_rows_inserted inserted incremental 1 1
 DIMENSION Innodb_rows_updated updated incremental -1 1
 
+CHART mysql_$x.innodb_buffer_pool_pages '' "mysql InnoDB Buffer Pool Pages" "pages" innodb mysql.innodb_buffer_pool_pages line $((mysql_priority + 20)) $mysql_update_every
+DIMENSION Innodb_buffer_pool_pages_data data absolute 1 1
+DIMENSION Innodb_buffer_pool_pages_dirty dirty absolute -1 1
+DIMENSION Innodb_buffer_pool_pages_free free absolute 1 1
+DIMENSION Innodb_buffer_pool_pages_flushed flushed incremental -1 1
+DIMENSION Innodb_buffer_pool_pages_misc misc absolute -1 1
+DIMENSION Innodb_buffer_pool_pages_total total absolute 1 1
+
+CHART mysql_$x.innodb_buffer_pool_bytes '' "mysql InnoDB Buffer Pool Bytes" "MB" innodb mysql.innodb_buffer_pool_bytes area $((mysql_priority + 21)) $mysql_update_every
+DIMENSION Innodb_buffer_pool_bytes_data data absolute 1 $((1024 * 1024))
+DIMENSION Innodb_buffer_pool_bytes_dirty dirty absolute -1 $((1024 * 1024))
+
+CHART mysql_$x.innodb_buffer_pool_read_ahead '' "mysql InnoDB Buffer Pool Read Ahead" "operations/s" innodb mysql.innodb_buffer_pool_read_ahead area $((mysql_priority + 22)) $mysql_update_every
+DIMENSION Innodb_buffer_pool_read_ahead all incremental 1 1
+DIMENSION Innodb_buffer_pool_read_ahead_evicted evicted incremental -1 1
+DIMENSION Innodb_buffer_pool_read_ahead_rnd random incremental 1 1
+
+CHART mysql_$x.innodb_buffer_pool_reqs '' "mysql InnoDB Buffer Pool Requests" "requests/s" innodb mysql.innodb_buffer_pool_reqs area $((mysql_priority + 23)) $mysql_update_every
+DIMENSION Innodb_buffer_pool_read_requests reads incremental 1 1
+DIMENSION Innodb_buffer_pool_write_requests writes incremental -1 1
+
+CHART mysql_$x.innodb_buffer_pool_ops '' "mysql InnoDB Buffer Pool Operations" "operations/s" innodb mysql.innodb_buffer_pool_ops area $((mysql_priority + 24)) $mysql_update_every
+DIMENSION Innodb_buffer_pool_reads 'disk reads' incremental 1 1
+DIMENSION Innodb_buffer_pool_wait_free 'wait free' incremental -1 1
+
+CHART mysql_$x.qcache_ops '' "mysql QCache Operations" "queries/s" qcache mysql.qcache_ops line $((mysql_priority + 25)) $mysql_update_every
+DIMENSION Qcache_hits hits incremental 1 1
+DIMENSION Qcache_lowmem_prunes 'lowmem prunes' incremental -1 1
+DIMENSION Qcache_inserts inserts incremental 1 1
+DIMENSION Qcache_not_cached 'not cached' incremental -1 1
+
+CHART mysql_$x.qcache '' "mysql QCache Queries in Cache" "queries" qcache mysql.qcache line $((mysql_priority + 26)) $mysql_update_every
+DIMENSION Qcache_queries_in_cache queries absolute 1 1
+
+CHART mysql_$x.qcache_freemem '' "mysql QCache Free Memory" "MB" qcache mysql.qcache_freemem area $((mysql_priority + 27)) $mysql_update_every
+DIMENSION Qcache_free_memory free absolute 1 $((1024 * 1024))
+
+CHART mysql_$x.qcache_memblocks '' "mysql QCache Memory Blocks" "blocks" qcache mysql.qcache_memblocks line $((mysql_priority + 28)) $mysql_update_every
+DIMENSION Qcache_free_blocks free absolute 1 1
+DIMENSION Qcache_total_blocks total absolute 1 1
+
+CHART mysql_$x.key_blocks '' "mysql MyISAM Key Cache Blocks" "blocks" myisam mysql.key_blocks line $((mysql_priority + 29)) $mysql_update_every
+DIMENSION Key_blocks_unused unused absolute 1 1
+DIMENSION Key_blocks_used used absolute -1 1
+DIMENSION Key_blocks_not_flushed 'not flushed' absolute 1 1
+
+CHART mysql_$x.key_requests '' "mysql MyISAM Key Cache Requests" "requests/s" myisam mysql.key_requests area $((mysql_priority + 30)) $mysql_update_every
+DIMENSION Key_read_requests reads incremental 1 1
+DIMENSION Key_write_requests writes incremental -1 1
+
+CHART mysql_$x.key_disk_ops '' "mysql MyISAM Key Cache Disk Operations" "operations/s" myisam mysql.key_disk_ops area $((mysql_priority + 31)) $mysql_update_every
+DIMENSION Key_reads reads incremental 1 1
+DIMENSION Key_writes writes incremental -1 1
+
+CHART mysql_$x.files '' "mysql Open Files" "files" files mysql.files line $((mysql_priority + 32)) $mysql_update_every
+DIMENSION Open_files files absolute 1 1
+
+CHART mysql_$x.files_rate '' "mysql Opened Files Rate" "files/s" files mysql.files_rate line $((mysql_priority + 33)) $mysql_update_every
+DIMENSION Opened_files files incremental 1 1
 EOF
 
 	if [ ! -z "$mysql_Binlog_stmt_cache_disk_use" ]
@@ -449,6 +541,66 @@ SET Innodb_rows_inserted = $mysql_Innodb_rows_inserted
 SET Innodb_rows_read = $mysql_Innodb_rows_read
 SET Innodb_rows_updated = $mysql_Innodb_rows_updated
 SET Innodb_rows_deleted = $mysql_Innodb_rows_deleted
+END
+BEGIN mysql_$x.innodb_buffer_pool_pages $1
+SET Innodb_buffer_pool_pages_data = $mysql_Innodb_buffer_pool_pages_data
+SET Innodb_buffer_pool_pages_dirty = $mysql_Innodb_buffer_pool_pages_dirty
+SET Innodb_buffer_pool_pages_free = $mysql_Innodb_buffer_pool_pages_free
+SET Innodb_buffer_pool_pages_flushed = $mysql_Innodb_buffer_pool_pages_flushed
+SET Innodb_buffer_pool_pages_misc = $mysql_Innodb_buffer_pool_pages_misc
+SET Innodb_buffer_pool_pages_total = $mysql_Innodb_buffer_pool_pages_total
+END
+BEGIN mysql_$x.innodb_buffer_pool_bytes $1
+SET Innodb_buffer_pool_bytes_data = $mysql_Innodb_buffer_pool_bytes_data
+SET Innodb_buffer_pool_bytes_dirty = $mysql_Innodb_buffer_pool_bytes_dirty
+END
+BEGIN mysql_$x.innodb_buffer_pool_read_ahead $1
+SET Innodb_buffer_pool_read_ahead = $mysql_Innodb_buffer_pool_read_ahead
+SET Innodb_buffer_pool_read_ahead_evicted = $mysql_Innodb_buffer_pool_read_ahead_evicted
+SET Innodb_buffer_pool_read_ahead_rnd = $mysql_Innodb_buffer_pool_read_ahead_rnd
+END
+BEGIN mysql_$x.innodb_buffer_pool_reqs $1
+SET Innodb_buffer_pool_read_requests = $mysql_Innodb_buffer_pool_read_requests
+SET Innodb_buffer_pool_write_requests = $mysql_Innodb_buffer_pool_write_requests
+END
+BEGIN mysql_$x.innodb_buffer_pool_ops $1
+SET Innodb_buffer_pool_reads = $mysql_Innodb_buffer_pool_reads
+SET Innodb_buffer_pool_wait_free = $mysql_Innodb_buffer_pool_wait_free
+END
+BEGIN mysql_$x.qcache_ops $1
+SET Qcache_hits hits = $mysql_Qcache_hits
+SET Qcache_lowmem_prunes = $mysql_Qcache_lowmem_prunes
+SET Qcache_inserts inserts = $mysql_Qcache_inserts inserts
+SET Qcache_not_cached = $mysql_Qcache_not_cached
+END
+BEGIN mysql_$x.qcache $1
+SET Qcache_queries_in_cache = $mysql_Qcache_queries_in_cache
+END
+BEGIN mysql_$x.qcache_freemem $1
+SET Qcache_free_memory = $mysql_Qcache_free_memory
+END
+BEGIN mysql_$x.qcache_memblocks $1
+SET Qcache_free_blocks = $mysql_Qcache_free_blocks
+SET Qcache_total_blocks = $mysql_Qcache_total_blocks
+END
+BEGIN mysql_$x.key_blocks $1
+SET Key_blocks_unused = $mysql_Key_blocks_unused
+SET Key_blocks_used = $mysql_Key_blocks_used
+SET Key_blocks_not_flushed = $mysql_Key_blocks_not_flushed
+END
+BEGIN mysql_$x.key_requests $1
+SET Key_read_requests = $mysql_Key_read_requests
+SET Key_write_requests = $mysql_Key_write_requests
+END
+BEGIN mysql_$x.key_disk_ops $1
+SET Key_reads = $mysql_Key_reads
+SET Key_writes = $mysql_Key_writes
+END
+BEGIN mysql_$x.files $1
+SET Open_files = $mysql_Open_files
+END
+BEGIN mysql_$x.files_rate $1
+SET Opened_files = $mysql_Opened_files
 END
 VALUESEOF
 
