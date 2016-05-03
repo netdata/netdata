@@ -383,7 +383,7 @@ EOF
 	if [ ! -z "$mysql_Binlog_stmt_cache_disk_use" ]
 		then
 		cat <<EOF
-CHART mysql_$x.binlog_stmt_cache '' "mysql Binlog Statement Cache" "statements/s" binlog mysql.binlog_stmt_cache line $((mysql_priority + 20)) $mysql_update_every
+CHART mysql_$x.binlog_stmt_cache '' "mysql Binlog Statement Cache" "statements/s" binlog mysql.binlog_stmt_cache line $((mysql_priority + 50)) $mysql_update_every
 DIMENSION Binlog_stmt_cache_disk_use disk incremental 1 1
 DIMENSION Binlog_stmt_cache_use all incremental 1 1
 EOF
@@ -392,7 +392,7 @@ EOF
 	if [ ! -z "$mysql_Connection_errors_accept" ]
 		then
 		cat <<EOF
-CHART mysql_$x.connection_errors '' "mysql Connection Errors" "connections/s" connections mysql.connection_errors line $((mysql_priority + 21)) $mysql_update_every
+CHART mysql_$x.connection_errors '' "mysql Connection Errors" "connections/s" connections mysql.connection_errors line $((mysql_priority + 51)) $mysql_update_every
 DIMENSION Connection_errors_accept accept incremental 1 1
 DIMENSION Connection_errors_internal internal incremental 1 1
 DIMENSION Connection_errors_max_connections max incremental 1 1
