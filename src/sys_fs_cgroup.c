@@ -667,7 +667,9 @@ struct cgroup *cgroup_add(const char *id) {
 				(len > 11 && !strncmp(chart_id, "user.slice/", 11)) ||
 				// ends with them
 				(len >  5 && !strncmp(&chart_id[len -  5], ".user", 5)) ||
+				(len >  5 && !strncmp(&chart_id[len -  5], ".swap", 5)) ||
 				(len >  6 && !strncmp(&chart_id[len -  6], ".slice", 6)) ||
+				(len >  6 && !strncmp(&chart_id[len -  6], ".mount", 6)) ||
 				(len >  8 && !strncmp(&chart_id[len -  8], ".session", 8)) ||
 				(len >  8 && !strncmp(&chart_id[len -  8], ".service", 8)) ||
 				(len > 10 && !strncmp(&chart_id[len - 10], ".partition", 10))
