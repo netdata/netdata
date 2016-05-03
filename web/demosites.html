@@ -75,7 +75,7 @@ body {
 	display: inline-block;
 	min-height: 50px;
 	width: 100%;
-	height: 8vw;
+	height: 8vmax;
 	text-align: left;
 }
 
@@ -86,18 +86,18 @@ body {
 	left: 10px;
 	bottom: 0;
 	right: 0;
-	font-size: 1vw;
+	font-size: 1vmax;
 	z-index: 1;
 }
 
 .mysparkline-overchart-value {
 	position: absolute;
 	display: block;
-	top: 1.1vw;
+	top: 1.1vmax;
 	left: 10px;
 	bottom: 0;
 	right: 0;
-	font-size: 5vw;
+	font-size: 5vmax;
 	z-index: 2;
 	text-shadow: #333 0px 0px 2px;
 }
@@ -106,7 +106,7 @@ body {
 	position: relative;
 	display: inline-block;
 	width: 100%;
-	height: 15vw;
+	height: 14vmax;
 	min-height: 150px;
 	text-align: left;
 }
@@ -145,6 +145,16 @@ body {
 	font-size: 1.5vw;
 }
 
+@media only screen and (min-width : 992px) {
+	.container {
+		width: 90%;
+	}
+}
+@media only screen and (max-width : 992px) {
+	.container {
+		width: 100%;
+	}
+}
 	</style>
 
 </head>
@@ -165,7 +175,7 @@ body {
 		pick a <b>netdata</b> demo server
 	</div>
 	<div class="mycontent">
-		these demo servers is what you will get by installing <b>netdata</b>
+		these demo servers show what you will get by installing <b>netdata</b>
 	</div>
 
 	<div style="width: 100%; text-align: center; padding-top: 2vw;">
@@ -687,14 +697,25 @@ body {
 	<div style="padding-top: 6vw; width: 100%; text-align: center; font-size: 2vw;">
 		want to know more?
 		<br/>
-		jump to <a href="https://github.com/firehol/netdata/">the netdata page at github</a>!
+		jump to <a href="https://github.com/firehol/netdata/">the netdata page at github</a>
 		<br/>
-		<b>netdata</b> monitors 1.000 - 5.000 metrics out of the box
-		<br/>
-		and it needs just 3 mins to be installed!
+		it needs just 3 mins to be installed on your servers!
 		<br/>
 		&nbsp;
 	</div>
 </div>
 </body>
+<script>
+	// google analytics when this is used for the home page of the demo sites
+	// you don't need this if you customize this dashboard for your needs
+	setTimeout(function() {
+		(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+		(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+		m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+		})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+		ga('create', 'UA-64295674-3', 'auto');
+		ga('send', 'pageview');
+	}, 2000);
+</script>
 </html>
