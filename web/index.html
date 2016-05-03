@@ -1616,7 +1616,7 @@ function renderPage(menus, data) {
 		// console.log(' >> ' + menu + ' (' + menus[menu].priority + '): ' + menus[menu].title);
 
 		var shtml = '';
-		var mhead = '<div style="width: 100%; text-align: center;">' + mainhead;
+		var mhead = '<div class="netdata-chart-row">' + mainhead;
 		mainhead = '';
 
 		// sort the submenus of this menu
@@ -1633,7 +1633,7 @@ function renderPage(menus, data) {
 			if(menus[menu].submenus[submenu].info !== null)
 				shtml += '<div class="chart-message netdata-chart-alignment" role="document">' + menus[menu].submenus[submenu].info + '</div>';
 
-			var head = '<div style="width: 100%; text-align: center;">';
+			var head = '<div class="netdata-chart-row">';
 			var chtml = '';
 
 			// console.log('    \------- ' + submenu + ' (' + menus[menu].submenus[submenu].priority + '): ' + menus[menu].submenus[submenu].title);
