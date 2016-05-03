@@ -1606,8 +1606,9 @@ function renderPage(menus, data) {
 
 		// generate an entry at the main menu
 
-		sidebar += '<li class=""><a href="#' + name2id(menu) + '">' + menus[menu].title + '</a><ul class="nav">';
-		html += '<div role="section"><div role="sectionhead"><h1 id="' + menu + '" role="heading">' + menus[menu].title + '</h1></div><div id="' + menu + '" role="document">';
+		var menuid = name2id(menu);
+		sidebar += '<li class=""><a href="#' + menuid + '">' + menus[menu].title + '</a><ul class="nav">';
+		html += '<div role="section"><div role="sectionhead"><h1 id="' + menuid + '" role="heading">' + menus[menu].title + '</h1></div><div id="menu_' + menuid + '" role="document">';
 
 		if(menus[menu].info !== null)
 			html += menus[menu].info;
@@ -1625,8 +1626,9 @@ function renderPage(menus, data) {
 			var submenu = sub[si++];
 
 			// generate an entry at the submenu
-			sidebar += '<li class><a href="#' + name2id(menu + '_' + submenu) + '">' + menus[menu].submenus[submenu].title + '</a></li>';
-			shtml += '<div class="netdata-group-container" id="submenu_' + name2id(menu + '_' + submenu) + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + name2id(menu + '_' + submenu) + '" class="netdata-chart-alignment" role="heading">' + menus[menu].submenus[submenu].title + '</h2>';
+			var submenuid = name2id(menu + '_' + submenu);
+			sidebar += '<li class><a href="#' + submenuid + '">' + menus[menu].submenus[submenu].title + '</a></li>';
+			shtml += '<div class="netdata-group-container" id="submenu_' + submenuid + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + submenuid + '" class="netdata-chart-alignment" role="heading">' + menus[menu].submenus[submenu].title + '</h2>';
 
 			if(menus[menu].submenus[submenu].info !== null)
 				shtml += '<div class="chart-message netdata-chart-alignment" role="document">' + menus[menu].submenus[submenu].info + '</div>';
