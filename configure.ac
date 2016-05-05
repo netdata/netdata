@@ -53,6 +53,10 @@ AC_SEARCH_LIBS([clock_gettime], [rt posix4])
 AC_CHECK_FUNCS([clock_gettime])
 AC_CHECK_FUNCS([sched_setscheduler sched_get_priority_min sched_get_priority_max nice])
 
+# Doxygen support
+m4_pattern_allow(AM_DEFAULT_VERBOSITY)
+DX_INIT_DOXYGEN(AC_PACKAGE_NAME, doxygen.conf, doc)
+
 # Check system type
 case "$host_os" in
 freebsd*)

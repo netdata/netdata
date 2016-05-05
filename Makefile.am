@@ -4,6 +4,11 @@
 AUTOMAKE_OPTIONS=foreign dist-bzip2 dist-xz 1.10
 ACLOCAL_AMFLAGS = -I m4
 
+# Targets to build doxygen
+@DX_RULES@
+
+MOSTLYCLEANFILES = $(DX_CLEANFILES)
+
 MAINTAINERCLEANFILES= \
 	config.log config.status \
 	$(srcdir)/Makefile.in \
