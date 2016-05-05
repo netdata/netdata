@@ -119,7 +119,7 @@
 			easypiechart_scale: '#dfe0e0',
 			gauge_pointer: '#C0C0C0',
 			gauge_stroke: '#F0F0F0',
-			gauge_gradient: true
+			gauge_gradient: false
 		},
 		slate: {
 			bootstrap_css: NETDATA.serverDefault + 'css/bootstrap.slate.min.css',
@@ -5041,11 +5041,33 @@
 			colorStop: stopColor,		// just experiment with them
 			strokeColor: strokeColor,	// to see which ones work best for you
 			limitMax: true,
-			generateGradient: generateGradient,
+			generateGradient: (generateGradient === true)?true:false,
 			gradientType: 0
 		};
 
-		if(generateGradient === false && NETDATA.themes.current.gauge_gradient === true) {
+		if (generateGradient.constructor === Array) {
+			// example options:
+			// data-gauge-generate-gradient="[0, 50, 100]"
+			// data-gauge-gradient-percent-color-0="#FFFFFF"
+			// data-gauge-gradient-percent-color-50="#999900"
+			// data-gauge-gradient-percent-color-100="#000000"
+
+			options.percentColors = new Array();
+			var len = generateGradient.length;
+			while(len--) {
+				var pcent = generateGradient[len];
+				var color = self.data('gauge-gradient-percent-color-' + pcent.toString()) || false;
+				if(color !== false) {
+					var a = new Array();
+					a[0] = pcent / 100;
+					a[1] = color;
+					options.percentColors.unshift(a);
+				}
+			}
+			if(options.percentColors.length === 0)
+				delete options.percentColors;
+		}
+		else if(generateGradient === false && NETDATA.themes.current.gauge_gradient === true) {
 			options.percentColors = [
 				[0.0, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 0))],
 				[0.1, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 1))],
