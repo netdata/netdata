@@ -3374,6 +3374,10 @@
 		$('.modal').on('hidden.bs.modal', NETDATA.onscroll);
 		$('.modal').on('shown.bs.modal', NETDATA.onscroll);
 
+		// bootstrap collapse switching
+		$('.collapse').on('hidden.bs.collapse', NETDATA.onscroll);
+		$('.collapse').on('shown.bs.collapse', NETDATA.onscroll);
+
 		NETDATA.parseDom(NETDATA.chartRefresher);
 	};
 
