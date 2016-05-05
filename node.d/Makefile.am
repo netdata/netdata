@@ -14,7 +14,6 @@ dist_nodemodules_DATA = \
 	node_modules/pixl-xml.js \
 	node_modules/net-snmp.js \
 	node_modules/asn1.js \
-	node_modules/node-int64.js \
 	$(NULL)
 
 nodemodulesberdir=$(nodedir)/node_modules/ber
