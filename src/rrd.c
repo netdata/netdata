@@ -53,10 +53,12 @@ static int rrdset_compare(void* a, void* b) {
 avl_tree rrdset_root_index = {
 		NULL,
 		rrdset_compare,
+#ifndef AVL_WITHOUT_PTHREADS
 #ifdef AVL_LOCK_WITH_MUTEX
 		PTHREAD_MUTEX_INITIALIZER
 #else
 		PTHREAD_RWLOCK_INITIALIZER
+#endif
 #endif
 };
 
@@ -94,10 +96,12 @@ static int rrdset_compare_name(void* a, void* b) {
 avl_tree rrdset_root_index_name = {
 		NULL,
 		rrdset_compare_name,
+#ifndef AVL_WITHOUT_PTHREADS
 #ifdef AVL_LOCK_WITH_MUTEX
 		PTHREAD_MUTEX_INITIALIZER
 #else
 		PTHREAD_RWLOCK_INITIALIZER
+#endif
 #endif
 };
 
@@ -846,7 +850,8 @@ unsigned long long rrdset_done(RRDSET *st)
 	pthread_rwlock_rdlock(&st->rwlock);
 
 	// enable the chart, if it was disabled
-	st->enabled = 1;
+	if(unlikely(rrd_delete_unupdated_dimensions) && !st->enabled)
+		st->enabled = 1;
 
 	// check if the chart has a long time to be updated
 	if(unlikely(st->usec_since_last_update > st->entries * st->update_every * 1000000ULL)) {
