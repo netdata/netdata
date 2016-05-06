@@ -6,6 +6,10 @@
 # the URL to download tomcat status info
 tomcat_url="http://localhost:8080/manager/status?XML=true"
 
+# set tomcat user/password here
+tomcatUser=""
+tomcatPassword=""
+
 # _update_every is a special variable - it holds the number of seconds
 # between the calls of the _update() function
 tomcat_update_every=
@@ -41,7 +45,7 @@ tomcat_check() {
 
 tomcat_get() {
 	# Collect tomcat values
-	mapfile -t lines < <(curl -Ss "$tomcat_url" |\
+	mapfile -t lines < <(curl -u "$tomcatUser":"$tomcatPassword" -Ss "$tomcat_url" |\
 		xmlstarlet sel \
 			-t -m "/status/jvm/memory" -v @free \
 			-n -m "/status/connector[@name='\"http-bio-8080\"']/threadInfo" -v @currentThreadCount \
