@@ -49,7 +49,8 @@ tomcat_check() {
 	tomcat_get
 	if [ $? -ne 0 ]
 		then
-		echo >&2 "tomcat: couldn't get to status page on URL '${tomcat_url}'. Please make sure tomcat url, username and password are correct."
+		echo >&2 "tomcat: couldn't get to status page on URL '${tomcat_url}'."\
+		"Please make sure tomcat url, username and password are correct."
 		return 1
 	fi
 
