@@ -32,7 +32,7 @@ tomcat_check() {
 	tomcat_get
 	if [ $? -ne 0 ]
 		then
-		echo >&2 "tomcat: cannot find stub_status on URL '${tomcat_url}'. Please set tomcat_url='http://<user>:<password>@localhost:8080/manager/status?XML=true'"
+		echo >&2 "tomcat: cannot find status page on URL '${tomcat_url}'. Please set tomcat_url='http://localhost:8080/manager/status?XML=true'"
 		return 1
 	fi
 
