@@ -33,15 +33,15 @@ tomcat_check() {
 
 	# check if url, username, passwords are set
 	if [ -z "${tomcat_url}" ]; then
-	  echo "tomcat url is unset or set to the empty string"
+	  	echo >&2 "tomcat url is unset or set to the empty string"
 		return 1
 	fi
 	if [ -z "${tomcatUser}" ]; then
-    	  echo "tomcat user is unset or set to the empty string"
+    	  	echo >&2 "tomcat user is unset or set to the empty string"
 		return 1
 	fi
 	if [ -z "${tomcatPassword}" ]; then
-    	  echo "tomcat password is unset or set to the empty string"
+    	  	echo >&2 "tomcat password is unset or set to the empty string"
 		return 1
 	fi
 
