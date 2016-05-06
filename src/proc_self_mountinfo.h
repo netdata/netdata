@@ -1,5 +1,14 @@
 #ifndef NETDATA_PROC_SELF_MOUNTINFO_H
 #define NETDATA_PROC_SELF_MOUNTINFO_H 1
+/**
+ * @file proc_self_mountinfo.h
+ * @brief This file holds the API, used to find mounted filesystems.
+ *
+ * mountinfo_read() reads the file /proc/mountinfo and stores it's content in a linked list.
+ * Entries of this list can be searched with mountinfo_find*().
+ *
+ * To free the list, run mountinfo_free().
+ */
 
 #define MOUNTINFO_IS_DUMMY      0x00000001
 #define MOUNTINFO_IS_REMOTE     0x00000002
@@ -45,11 +54,52 @@ struct mountinfo {
     struct mountinfo *next;
 };
 
+/**
+ * @brief Get struct mountinfo for the specified disk.
+ *
+ * @param root  Head of the list
+ * @param major value of st_dev for files on filesystem (see stat(2)).
+ * @param minor value of st_dev for files on filesystem (see stat(2)).
+ *
+ * @return The wanted filesystem or NULL.
+ */
 extern struct mountinfo *mountinfo_find(struct mountinfo *root, unsigned long major, unsigned long minor);
+/**
+ * @brief Get a list of mounted filesystems matching the parameters.
+ *
+ * @param root         Head of the list
+ * @param filesystem   filesystem type
+ * @param mount_source filesystem-specified information or "none".
+ *
+ * @return The wanted filesystem list or NULL.
+ */
 extern struct mountinfo *mountinfo_find_by_filesystem_mount_source(struct mountinfo *root, const char *filesystem, const char *mount_source);
+/**
+ * @brief Get a list of mounted filesystems matching the parameters.
+ *
+ * @param root          Head of the list
+ * @param filesystem    filesystem type
+ * @param super_options per-superblock options
+ *
+ * @return The wanted filesystem list or NULL.
+ */
 extern struct mountinfo *mountinfo_find_by_filesystem_super_option(struct mountinfo *root, const char *filesystem, const char *super_options);
 
+/**
+ * @brief Free the whole list.
+ *
+ * @param mi The head of the list.
+ */
 extern void mountinfo_free(struct mountinfo *mi);
+
+/**
+ * @brief Parse /proc/mountinfo and initialize a list containing the parsed information.
+ *
+ * @see man 3 statvfs
+ *
+ * @param do_statvfs boolean if statvfs() should be used in addition.
+ * @return  The head of the list.
+ */
 extern struct mountinfo *mountinfo_read(int do_statvfs);
 
 #endif /* NETDATA_PROC_SELF_MOUNTINFO_H */
