@@ -4,9 +4,10 @@
 # Author: Jorge Romero
 
 # the URL to download tomcat status info
-tomcat_url="http://localhost:8080/manager/status?XML=true"
+# usually http://localhost:8080/manager/status?XML=true
+tomcat_url=""
 
-# set tomcat user/password here
+# set tomcat username/password here
 tomcatUser=""
 tomcatPassword=""
 
@@ -29,10 +30,26 @@ tomcat_check() {
 
 	require_cmd xmlstarlet || return 1
 
+
+	# check if url, username, passwords are set
+	if [ -z "${tomcat_url}" ]; then
+	  echo "tomcat url is unset or set to the empty string"
+		return 1
+	fi
+	if [ -z "${tomcatUser}" ]; then
+    	  echo "tomcat user is unset or set to the empty string"
+		return 1
+	fi
+	if [ -z "${tomcatPassword}" ]; then
+    	  echo "tomcat password is unset or set to the empty string"
+		return 1
+	fi
+
+	# check if we can get to tomcat's status page
 	tomcat_get
 	if [ $? -ne 0 ]
 		then
-		echo >&2 "tomcat: cannot find status page on URL '${tomcat_url}'. Please set tomcat_url='http://localhost:8080/manager/status?XML=true'"
+		echo >&2 "tomcat: couldn't get to status page on URL '${tomcat_url}'. Please make sure tomcat url, username and password are correct."
 		return 1
 	fi
 
