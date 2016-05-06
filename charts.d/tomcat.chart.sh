@@ -4,7 +4,12 @@
 # Author: Jorge Romero
 
 # the URL to download tomcat status info
-tomcat_url="http://localhost:8080/manager/status?XML=true"
+# usually http://localhost:8080/manager/status?XML=true
+tomcat_url=""
+
+# set tomcat username/password here
+tomcatUser=""
+tomcatPassword=""
 
 # _update_every is a special variable - it holds the number of seconds
 # between the calls of the _update() function
@@ -25,10 +30,27 @@ tomcat_check() {
 
 	require_cmd xmlstarlet || return 1
 
+
+	# check if url, username, passwords are set
+	if [ -z "${tomcat_url}" ]; then
+	  	echo >&2 "tomcat url is unset or set to the empty string"
+		return 1
+	fi
+	if [ -z "${tomcatUser}" ]; then
+    	  	echo >&2 "tomcat user is unset or set to the empty string"
+		return 1
+	fi
+	if [ -z "${tomcatPassword}" ]; then
+    	  	echo >&2 "tomcat password is unset or set to the empty string"
+		return 1
+	fi
+
+	# check if we can get to tomcat's status page
 	tomcat_get
 	if [ $? -ne 0 ]
 		then
-		echo >&2 "tomcat: cannot find stub_status on URL '${tomcat_url}'. Please set tomcat_url='http://<user>:<password>@localhost:8080/manager/status?XML=true'"
+		echo >&2 "tomcat: couldn't get to status page on URL '${tomcat_url}'."\
+		"Please make sure tomcat url, username and password are correct."
 		return 1
 	fi
 
@@ -41,7 +63,7 @@ tomcat_check() {
 
 tomcat_get() {
 	# Collect tomcat values
-	mapfile -t lines < <(curl -Ss "$tomcat_url" |\
+	mapfile -t lines < <(curl -u "$tomcatUser":"$tomcatPassword" -Ss "$tomcat_url" |\
 		xmlstarlet sel \
 			-t -m "/status/jvm/memory" -v @free \
 			-n -m "/status/connector[@name='\"http-bio-8080\"']/threadInfo" -v @currentThreadCount \
