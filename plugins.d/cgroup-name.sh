@@ -25,6 +25,24 @@ if [ -f "${CONFIG}" ]
 #	echo >&2 "${0}: configuration file '${CONFIG}' is not available."
 fi
 
+function get_name_classic {
+	DOCKERID=$1
+	echo >&2 "Running command: docker ps --filter=id=\"${DOCKERID}\" --format=\"{{.Names}}\""
+	NAME="$( docker ps --filter=id="${DOCKERID}" --format="{{.Names}}" )"
+}
+
+function get_name_api {
+	DOCKERID=$1
+	if [ ! -S "/var/run/docker.sock" ]
+		then
+		echo >&2 "Can't find /var/run/docker.sock"
+		return
+	fi
+	echo >&2 "Running API command: /containers/${DOCKERID}/json"
+	JSON=$(echo -e "GET /containers/${DOCKERID}/json HTTP/1.0\r\n" | nc -U /var/run/docker.sock | egrep '^{.*')
+	NAME=$(echo $JSON | jq -r .Name,.Config.Hostname | grep -v null | head -n1 | sed 's|^/||')
+}
+
 if [ -z "${NAME}" ]
 	then
 	if [[ "${CGROUP}" =~ ^.*docker[-/\.][a-fA-F0-9]+[-\.]?.*$ ]]
@@ -33,8 +51,12 @@ if [ -z "${NAME}" ]
 
 		if [ ! -z "${DOCKERID}" -a \( ${#DOCKERID} -eq 64 -o ${#DOCKERID} -eq 12 \) ]
 			then
-			echo >&2 "Running command: docker ps --filter=id=\"${DOCKERID}\" --format=\"{{.Names}}\""
-			NAME="$( docker ps --filter=id="${DOCKERID}" --format="{{.Names}}" )"
+			if hash docker 2>/dev/null
+				then
+				get_name_classic $DOCKERID
+			else
+				get_name_api $DOCKERID
+			fi
 			if [ -z "${NAME}" ]
 				then
 				echo >&2 "Cannot find the name of docker container '${DOCKERID}'"
