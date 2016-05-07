@@ -74,3 +74,5 @@ CMakeFiles/
 cmake_install.cmake
 
 .jetbrains*
+
+contrib/debian/changelog
