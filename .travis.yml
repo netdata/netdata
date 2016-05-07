@@ -4,7 +4,7 @@ compiler:
  - clang
 before_install:
  - sudo apt-get update -qq
- - sudo apt-get install -qq automake make zlib1g-dev
+ - sudo apt-get install -qq automake make zlib1g-dev uuid-dev
 script:
    # default build
  - ./autogen.sh && ./configure && make -j4
