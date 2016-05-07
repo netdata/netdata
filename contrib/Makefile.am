@@ -21,3 +21,9 @@ dist_noinst_DATA = \
 dist_noinst_SCRIPTS = \
 	debian/netdata.init \
 	$(NULL)
+
+debian/changelog:
+	echo "netdata ($(PACKAGE_VERSION)) UNRELEASED; urgency=medium" | \
+		tr '_' '~' > $@
+	echo "  * Latest release" >> $@
+	echo " -- Netdata Team <>  `date -R`" >> $@
