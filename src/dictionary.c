@@ -1,6 +1,7 @@
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
+
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
@@ -58,9 +59,13 @@ static NAME_VALUE *dictionary_name_value_create_nolock(DICTIONARY *dict, const c
 	NAME_VALUE *nv = calloc(1, sizeof(NAME_VALUE));
 	if(unlikely(!nv)) fatal("Cannot allocate name_value of size %z", sizeof(NAME_VALUE));
 
-	nv->name = strdup(name);
-	if(unlikely(!nv->name))
-		fatal("Cannot allocate name_value.name of size %z", strlen(name));
+	if(dict->flags & DICTIONARY_FLAG_NAME_LINK_DONT_CLONE)
+		nv->name = (char *)name;
+	else {
+		nv->name = strdup(name);
+		if (unlikely(!nv->name))
+			fatal("Cannot allocate name_value.name of size %z", strlen(name));
+	}
 
 	nv->hash = (hash)?hash:simple_hash(nv->name);
 

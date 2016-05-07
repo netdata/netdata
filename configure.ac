@@ -92,6 +92,10 @@ if test -z "${MATH_LIBS}"; then
 	)
 fi
 
+AC_CHECK_LIB([uuid], [uuid_generate_time_safe], [], \
+             [AC_MSG_ERROR([Function uuid_generate_time_safe was not found in libuuid.
+Is uuid-dev installed? Try running 'sudo apt-get install uuid-dev'.])])
+
 if test "${enable_plugin_nfacct}" = "yes"; then
 	PKG_CHECK_MODULES(
 		[NFACCT],
