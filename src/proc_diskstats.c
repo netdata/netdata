@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -138,6 +139,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 	static int enable_new_disks = -1;
 	static int do_io = -1, do_ops = -1, do_mops = -1, do_iotime = -1, do_qops = -1, do_util = -1, do_backlog = -1, do_space = -1;
 	static struct statvfs buff_statvfs;
+	static struct stat buff_stat;
 
 	if(enable_new_disks == -1)	enable_new_disks = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "enable new disks detected at runtime", CONFIG_ONDEMAND_ONDEMAND);
 
@@ -667,34 +669,37 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 
 		// --------------------------------------------------------------------
 
-		if(ddo_space) {
-			if(!mount_point) {
-				if(ddo_space != CONFIG_ONDEMAND_ONDEMAND) {
-					error("Cannot find space usage for disk %s. It does not have a mount point.", family);
-				}
+		if(ddo_space && mount_point) {
+			// collect space metrics using statvfs
+			if (statvfs(mount_point, &buff_statvfs) < 0) {
+				error("Failed checking disk space usage of %s", family);
 			} else {
-				if (statvfs(family, &buff_statvfs) < 0) {
-					error("Failed checking disk space usage of %s", family);
+				// verify we collected the metrics for the right disk.
+				// if not the mountpoint has changed.
+				if(stat(mount_point, &buff_stat) == -1) {
 				} else {
-					space_avail = buff_statvfs.f_bavail * buff_statvfs.f_bsize;
-					space_avail_root = (buff_statvfs.f_bfree - buff_statvfs.f_bavail) * buff_statvfs.f_bsize;
-					space_used = (buff_statvfs.f_blocks - buff_statvfs.f_bfree) * buff_statvfs.f_bsize;
+					if(major(buff_stat.st_dev) == major && minor(buff_stat.st_dev) == minor)
+					{
+						space_avail = buff_statvfs.f_bavail * buff_statvfs.f_bsize;
+						space_avail_root = (buff_statvfs.f_bfree - buff_statvfs.f_bavail) * buff_statvfs.f_bsize;
+						space_used = (buff_statvfs.f_blocks - buff_statvfs.f_bfree) * buff_statvfs.f_bsize;
 
-					st = rrdset_find_bytype("disk_space", disk);
-					if(!st) {
-						st = rrdset_create("disk_space", disk, NULL, family, "disk.space", "Disk Space Usage", "GB", 2023, update_every, RRDSET_TYPE_STACKED);
-						st->isdetail = 1;
+						st = rrdset_find_bytype("disk_space", disk);
+						if(!st) {
+							st = rrdset_create("disk_space", disk, NULL, family, "disk.space", "Disk Space Usage", "GB", 2023, update_every, RRDSET_TYPE_STACKED);
+							st->isdetail = 1;
 
-						rrddim_add(st, "avail", NULL, 1, 1000*1000*1000, RRDDIM_ABSOLUTE);
-						rrddim_add(st, "reserved_for_root", "reserved for root", 1, 1000*1000*1000, RRDDIM_ABSOLUTE);
-						rrddim_add(st, "used" , NULL, 1, 1000*1000*1000, RRDDIM_ABSOLUTE);
+							rrddim_add(st, "avail", NULL, 1, 1000*1000*1000, RRDDIM_ABSOLUTE);
+							rrddim_add(st, "reserved_for_root", "reserved for root", 1, 1000*1000*1000, RRDDIM_ABSOLUTE);
+							rrddim_add(st, "used" , NULL, 1, 1000*1000*1000, RRDDIM_ABSOLUTE);
+						}
+						else rrdset_next_usec(st, dt);
+
+						rrddim_set(st, "avail", space_avail);
+						rrddim_set(st, "reserved_for_root", space_avail_root);
+						rrddim_set(st, "used", space_used);
+						rrdset_done(st);
 					}
-					else rrdset_next_usec(st, dt);
-
-					rrddim_set(st, "avail", space_avail);
-					rrddim_set(st, "reserved_for_root", space_avail_root);
-					rrddim_set(st, "used", space_used);
-					rrdset_done(st);
 				}
 			}
 		}
