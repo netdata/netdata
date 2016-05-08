@@ -208,6 +208,8 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 				*access_fd = -1;
 				return -1;
 			}
+			if(setvbuf(*access_fp, NULL, _IOLBF, 0) != 0)
+				error("Cannot set line buffering on access.log");
 		}
 	}
 
@@ -301,6 +303,10 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 			dup2(output_fd, STDOUT_FILENO);
 			close(output_fd);
 		}
+
+		if(setvbuf(stdout, NULL, _IOLBF, 0) != 0)
+			error("Cannot set line buffering on debug.log");
+
 		output_fd = -1;
 	}
 	else dup2(dev_null, STDOUT_FILENO);
@@ -310,6 +316,10 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 			dup2(error_fd, STDERR_FILENO);
 			close(error_fd);
 		}
+
+		if(setvbuf(stderr, NULL, _IOLBF, 0) != 0)
+			error("Cannot set line buffering on error.log");
+
 		error_fd = -1;
 	}
 	else dup2(dev_null, STDERR_FILENO);
