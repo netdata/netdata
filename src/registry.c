@@ -25,6 +25,9 @@ struct registry {
 	unsigned long long persons_count;
 	unsigned long long machines_count;
 	unsigned long long usages_count;
+	unsigned long long urls_count;
+	unsigned long long persons_urls_count;
+	unsigned long long machines_urls_count;
 
 	DICTIONARY *persons; 	// dictionary of PERSON *, with key the PERSON.guid
 	DICTIONARY *machines; 	// dictionary of MACHINE *, with key the MACHINE.guid
@@ -119,6 +122,8 @@ static inline URL *registry_url_get(const char *url) {
 
 		debug(D_DICTIONARY, "Registry: registry_url_get('%s'): indexing it", url);
 		dictionary_set(registry.urls, url, u, sizeof(URL) + len + 1);
+
+		registry.urls_count++;
 	}
 
 	return u;
@@ -236,7 +241,10 @@ MACHINE *registry_machine_get(const char *machine_guid) {
 
 			machine_guid = buf;
 			m = registry_machine_find(machine_guid);
-			if(!m) m = registry_machine_allocate(machine_guid);
+			if(!m) {
+				m = registry_machine_allocate(machine_guid);
+				registry.machines_count++;
+			}
 		}
 	}
 
@@ -366,7 +374,10 @@ PERSON *registry_person_get(const char *person_guid) {
 		}
 	}
 
-	if(!p) p = registry_person_allocate(NULL);
+	if(!p) {
+		p = registry_person_allocate(NULL);
+		registry.persons_count++;
+	}
 
 	return p;
 }
@@ -391,6 +402,7 @@ PERSON_URL *registry_person_link_to_url(PERSON *p, MACHINE *m, URL *u) {
 		debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): indexing URL in person", p->guid, m->guid, u->url);
 		dictionary_set(p->urls, u->url, pu, sizeof(PERSON_URL));
 		registry_url_link(u);
+		registry.persons_urls_count++;
 	}
 	else {
 		debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): found", p->guid, m->guid, u->url);
@@ -432,6 +444,7 @@ MACHINE_URL *registry_machine_link_to_url(PERSON *p, MACHINE *m, URL *u) {
 		debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s', '%s'): indexing URL in machine", p->guid, m->guid, u->url);
 		dictionary_set(m->urls, u->url, mu, sizeof(MACHINE_URL));
 		registry_url_link(u);
+		registry.machines_urls_count++;
 	}
 	else {
 		debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s', '%s'): found", p->guid, m->guid, u->url);
@@ -472,6 +485,8 @@ PERSON *registry_request(const char *person_guid, const char *machine_guid, cons
 	debug(D_REGISTRY, "Registry: registry_request('%s', '%s', '%s'): saving", person_guid, machine_guid, url);
 	registry_person_save(p);
 	registry_machine_save(m);
+
+	registry.usages_count++;
 	registry_save();
 
 	return p;
@@ -481,6 +496,13 @@ PERSON *registry_request(const char *person_guid, const char *machine_guid, cons
 // REGISTRY
 
 void registry_init(void) {
+	registry.persons_count = 0;
+	registry.machines_count = 0;
+	registry.usages_count = 0;
+	registry.urls_count = 0;
+	registry.persons_urls_count = 0;
+	registry.machines_urls_count = 0;
+
 	debug(D_REGISTRY, "Registry: creating global registry dictionary for persons.");
 	registry.persons = dictionary_create(DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE|DICTIONARY_FLAG_NAME_LINK_DONT_CLONE|DICTIONARY_FLAG_SINGLE_THREADED);
 
@@ -574,17 +596,27 @@ void registry_free(void) {
 }
 
 int test1(int argc, char **argv) {
+
+	void print_stats(uint32_t requests, unsigned long long start, unsigned long long end) {
+		fprintf(stderr, " > SPEED: %u requests served in %0.2f seconds ( >>> %llu per second <<< )\n",
+				requests, (end-start) / 1000000.0, (unsigned long long)requests * 1000000ULL / (end-start));
+
+		fprintf(stderr, " > DB   : persons %llu, machines %llu, unique URLs %llu, accesses %llu, URLs: for persons %llu, for machines %llu\n",
+				registry.persons_count, registry.machines_count, registry.urls_count, registry.usages_count,
+				registry.persons_urls_count, registry.machines_urls_count);
+	}
+
 	(void) argc;
 	(void) argv;
 
-	uint32_t u, users = 1000000;
+	uint32_t u, users = 500000;
 	uint32_t m, machines = 50000;
 	uint32_t machines2 = machines * 2;
 
 	char **users_guids = malloc(users * sizeof(char *));
 	char **machines_guids = malloc(machines2 * sizeof(char *));
 	char **machines_urls = malloc(machines2 * sizeof(char *));
-	unsigned long long start, end;
+	unsigned long long start;
 
 	registry_init();
 
@@ -611,8 +643,7 @@ int test1(int argc, char **argv) {
 		PERSON *p = registry_request(NULL, machines_guids[m], machines_urls[m]);
 		users_guids[u] = p->guid;
 	}
-	end = timems();
-	fprintf(stderr, "%u accesses served in %0.2f seconds (%llu per second)\n", u, (end-start) / 1000000.0, (unsigned long long)u * 1000000ULL / (end-start));
+	print_stats(u, start, timems());
 
 	start = timems();
 	fprintf(stderr, "\nAll %u users accessing again the same %u servers\n", users, machines);
@@ -625,8 +656,7 @@ int test1(int argc, char **argv) {
 		if(p->guid != users_guids[u])
 			fprintf(stderr, "ERROR: expected to get user guid '%s' but git '%s'", users_guids[u], p->guid);
 	}
-	end = timems();
-	fprintf(stderr, "%u accesses served in %0.2f seconds (%llu per second)\n", u, (end-start) / 1000000.0, (unsigned long long)u * 1000000ULL / (end-start));
+	print_stats(u, start, timems());
 
 	start = timems();
 	fprintf(stderr, "\nAll %u users accessing a new server, out of the %u servers\n", users, machines);
@@ -639,8 +669,7 @@ int test1(int argc, char **argv) {
 		if(p->guid != users_guids[u])
 			fprintf(stderr, "ERROR: expected to get user guid '%s' but git '%s'", users_guids[u], p->guid);
 	}
-	end = timems();
-	fprintf(stderr, "%u accesses served in %0.2f seconds (%llu per second)\n", u, (end-start) / 1000000.0, (unsigned long long)u * 1000000ULL / (end-start));
+	print_stats(u, start, timems());
 
 	start = timems();
 	fprintf(stderr, "\n%u random users accessing a random server, out of the %u servers\n", users, machines);
@@ -653,8 +682,7 @@ int test1(int argc, char **argv) {
 		if(p->guid != users_guids[tu])
 			fprintf(stderr, "ERROR: expected to get user guid '%s' but git '%s'", users_guids[tu], p->guid);
 	}
-	end = timems();
-	fprintf(stderr, "%u accesses served in %0.2f seconds (%llu per second)\n", u, (end-start) / 1000000.0, (unsigned long long)u * 1000000ULL / (end-start));
+	print_stats(u, start, timems());
 
 	start = timems();
 	fprintf(stderr, "\n%u random users accessing a random server, out of %u servers\n", users, machines2);
@@ -667,33 +695,38 @@ int test1(int argc, char **argv) {
 		if(p->guid != users_guids[tu])
 			fprintf(stderr, "ERROR: expected to get user guid '%s' but git '%s'", users_guids[tu], p->guid);
 	}
-	end = timems();
-	fprintf(stderr, "%u accesses served in %0.2f seconds (%llu per second)\n", u, (end-start) / 1000000.0, (unsigned long long)u * 1000000ULL / (end-start));
+	print_stats(u, start, timems());
 
-	start = timems();
-	fprintf(stderr, "\n%u random user accesses to a random server, out of %u servers, using 1 out of 3 a random url\n", users * 2, machines2);
-	for(u = 0; u < users * 2 ; u++) {
-		uint32_t tu = random() * users / RAND_MAX;
-		uint32_t tm = random() * machines2 / RAND_MAX;
+	for(m = 0; m < 10; m++) {
+		start = timems();
+		fprintf(stderr,
+				"\n%u random user accesses to a random server, out of %u servers,\n > using 1/10000 with a random url, 1/1000 with a mismatched url\n",
+				users * 2, machines2);
+		for (u = 0; u < users * 2; u++) {
+			uint32_t tu = random() * users / RAND_MAX;
+			uint32_t tm = random() * machines2 / RAND_MAX;
 
-		char *url = machines_urls[tm];
-		char buf[FILENAME_MAX + 1];
-		if(random() % 3 == 1) {
-			snprintf(buf, FILENAME_MAX, "http://random.%ld.netdata.rocks/", random());
-			url = buf;
+			char *url = machines_urls[tm];
+			char buf[FILENAME_MAX + 1];
+			if (random() % 10000 == 1234) {
+				snprintf(buf, FILENAME_MAX, "http://random.%ld.netdata.rocks/", random());
+				url = buf;
+			}
+			else if (random() % 1000 == 123)
+				url = machines_urls[random() * machines2 / RAND_MAX];
+
+			PERSON *p = registry_request(users_guids[tu], machines_guids[tm], url);
+
+			if (p->guid != users_guids[tu])
+				fprintf(stderr, "ERROR: expected to get user guid '%s' but git '%s'", users_guids[tu], p->guid);
 		}
-
-		PERSON *p = registry_request(users_guids[tu], machines_guids[tm], url);
-
-		if(p->guid != users_guids[tu])
-			fprintf(stderr, "ERROR: expected to get user guid '%s' but git '%s'", users_guids[tu], p->guid);
+		print_stats(u, start, timems());
 	}
-	end = timems();
-	fprintf(stderr, "%u accesses served in %0.2f seconds (%llu per second)\n", u, (end-start) / 1000000.0, (unsigned long long)u * 1000000ULL / (end-start));
 
-	exit(0);
-
+	fprintf(stderr, "\n\nCLEANUP\n");
+	start = timems();
 	registry_free();
+	print_stats(registry.persons_count, start, timems());
 	return 0;
 }
 
