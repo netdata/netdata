@@ -91,7 +91,7 @@ set(APPS_PLUGIN_SOURCE_FILES
 
 include_directories(AFTER .)
 
-add_definitions(-DHAVE_CONFIG_H -DNETDATA_INTERNAL_CHECKS=1 -DCACHE_DIR="/tmp" -DCONFIG_DIR="/tmp" -DLOG_DIR="/tmp" -DPLUGINS_DIR="/tmp" -DWEB_DIR="/tmp")
+add_definitions(-DHAVE_CONFIG_H -DNETDATA_INTERNAL_CHECKS=1 -DCACHE_DIR="/tmp" -DCONFIG_DIR="/tmp" -DLOG_DIR="/tmp" -DPLUGINS_DIR="/tmp" -DWEB_DIR="/tmp" -DVARLIB_DIR="/tmp")
 
 add_executable(netdata ${NETDATA_SOURCE_FILES})
 add_executable(apps.plugin ${APPS_PLUGIN_SOURCE_FILES})

@@ -275,6 +275,7 @@ int main(int argc, char **argv)
 	setenv("NETDATA_PLUGINS_DIR", config_get("global", "plugins directory"  , PLUGINS_DIR), 1);
 	setenv("NETDATA_WEB_DIR"    , config_get("global", "web files directory", WEB_DIR)    , 1);
 	setenv("NETDATA_CACHE_DIR"  , config_get("global", "cache directory"    , CACHE_DIR)  , 1);
+	setenv("NETDATA_LIB_DIR"    , config_get("global", "lib directory"      , VARLIB_DIR) , 1);
 	setenv("NETDATA_LOG_DIR"    , config_get("global", "log directory"      , LOG_DIR)    , 1);
 	setenv("NETDATA_HOST_PREFIX", config_get("global", "host access prefix" , "")         , 1);
 	setenv("HOME"               , config_get("global", "home directory"     , CACHE_DIR)  , 1);
