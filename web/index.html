@@ -471,9 +471,6 @@
 						<i class="fa fa-circle"></i> <a href="http://D3js.org/" target="_blank">D3</a>,
 						<i class="fa fa-copyright"></i> Copyright 2015, Mike Bostock, <a href="http://opensource.org/licenses/BSD-3-Clause" target="_blank">BSD License</a>
 
-						<i class="fa fa-circle"></i> <a href="https://github.com/broofa/node-int64" target="_blank">node-int64</a>,
-						<i class="fa fa-copyright"></i> Copyright 2014, Robert Kieffer, <a href="https://github.com/broofa/node-int64/blob/master/LICENSE" target="_blank">MIT License</a>
-
 					</small>
 				</div>
 			</div>
@@ -1606,8 +1603,9 @@ function renderPage(menus, data) {
 
 		// generate an entry at the main menu
 
-		sidebar += '<li class=""><a href="#' + name2id(menu) + '">' + menus[menu].title + '</a><ul class="nav">';
-		html += '<div role="section"><div role="sectionhead"><h1 id="' + menu + '" role="heading">' + menus[menu].title + '</h1></div><div id="' + menu + '" role="document">';
+		var menuid = name2id(menu);
+		sidebar += '<li class=""><a href="#' + menuid + '">' + menus[menu].title + '</a><ul class="nav">';
+		html += '<div role="section"><div role="sectionhead"><h1 id="' + menuid + '" role="heading">' + menus[menu].title + '</h1></div><div id="menu_' + menuid + '" role="document">';
 
 		if(menus[menu].info !== null)
 			html += menus[menu].info;
@@ -1615,7 +1613,7 @@ function renderPage(menus, data) {
 		// console.log(' >> ' + menu + ' (' + menus[menu].priority + '): ' + menus[menu].title);
 
 		var shtml = '';
-		var mhead = '<div style="width: 100%; text-align: center;">' + mainhead;
+		var mhead = '<div class="netdata-chart-row">' + mainhead;
 		mainhead = '';
 
 		// sort the submenus of this menu
@@ -1625,13 +1623,14 @@ function renderPage(menus, data) {
 			var submenu = sub[si++];
 
 			// generate an entry at the submenu
-			sidebar += '<li class><a href="#' + name2id(menu + '_' + submenu) + '">' + menus[menu].submenus[submenu].title + '</a></li>';
-			shtml += '<div class="netdata-group-container" id="submenu_' + name2id(menu + '_' + submenu) + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + name2id(menu + '_' + submenu) + '" class="netdata-chart-alignment" role="heading">' + menus[menu].submenus[submenu].title + '</h2>';
+			var submenuid = name2id(menu + '_' + submenu);
+			sidebar += '<li class><a href="#' + submenuid + '">' + menus[menu].submenus[submenu].title + '</a></li>';
+			shtml += '<div class="netdata-group-container" id="submenu_' + submenuid + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + submenuid + '" class="netdata-chart-alignment" role="heading">' + menus[menu].submenus[submenu].title + '</h2>';
 
 			if(menus[menu].submenus[submenu].info !== null)
 				shtml += '<div class="chart-message netdata-chart-alignment" role="document">' + menus[menu].submenus[submenu].info + '</div>';
 
-			var head = '<div style="width: 100%; text-align: center;">';
+			var head = '<div class="netdata-chart-row">';
 			var chtml = '';
 
 			// console.log('    \------- ' + submenu + ' (' + menus[menu].submenus[submenu].priority + '): ' + menus[menu].submenus[submenu].title);
@@ -2005,17 +2004,30 @@ function finalizePage() {
 			location.reload();
 	});
 
-	if(!nowelcome && isdemo()) {
-		setTimeout(function() {
-			$('#welcomeModal').modal();
-		}, 1000);
-	}
-	else
-		notifyForUpdate();
-
 	$('#updateModal').on('shown.bs.modal', function() {
 		notifyForUpdate(true);
 	});
+
+	if(isdemo()) {
+		if(!nowelcome) {
+			setTimeout(function() {
+				$('#welcomeModal').modal();
+			}, 1000);
+		}
+
+		// google analytics when this is used for the home page of the demo sites
+		// this does not run on user's installations
+		setTimeout(function() {
+			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+			})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+			ga('create', 'UA-64295674-3', 'auto');
+			ga('send', 'pageview');
+		}, 2000);
+	}
+	else notifyForUpdate();
 }
 
 function resetDashboardOptions() {

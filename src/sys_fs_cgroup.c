@@ -32,7 +32,7 @@ static char *cgroup_blkio_base = NULL;
 static char *cgroup_memory_base = NULL;
 
 static int cgroup_root_count = 0;
-static int cgroup_root_max = 50;
+static int cgroup_root_max = 500;
 static int cgroup_max_depth = 0;
 
 void read_cgroup_plugin_configuration() {
@@ -614,12 +614,14 @@ void cgroup_get_chart_id(struct cgroup *cg) {
 		if(!cg->chart_title)
 			fatal("CGROUP: Cannot allocate memory for chart name of cgroup '%s' chart name: '%s'", cg->id, s);
 
-		netdata_fix_chart_id(s);
+		netdata_fix_chart_name(cg->chart_title);
 
 		free(cg->chart_id);
 		cg->chart_id = strdup(s);
 		if(!cg->chart_id)
 			fatal("CGROUP: Cannot allocate memory for chart id of cgroup '%s' chart id: '%s'", cg->id, s);
+
+		netdata_fix_chart_id(cg->chart_id);
 
 		debug(D_CGROUP, "cgroup '%s' renamed to '%s' (title: '%s')", cg->id, cg->chart_id, cg->chart_title);
 	}
@@ -639,23 +641,41 @@ struct cgroup *cgroup_add(const char *id) {
 	if(!*chart_id) {
 		chart_id = "/";
 
-		// disable by default the host cgroup
+		// disable by default the root cgroup
 		def = 0;
-		debug(D_CGROUP, "cgroup '%s' is the host container (by default %s)", id, (def)?"enabled":"disabled");
+		debug(D_CGROUP, "cgroup '%s' is the root container (by default %s)", id, (def)?"enabled":"disabled");
 	}
 	else {
 		if(*chart_id == '/') chart_id++;
+
+		size_t len = strlen(chart_id);
 
 		// disable by default the parent cgroup
 		// for known cgroup managers
 		if(!strcmp(chart_id, "lxc") ||
 				!strcmp(chart_id, "docker") ||
+				!strcmp(chart_id, "libvirt") ||
+				!strcmp(chart_id, "qemu") ||
 				!strcmp(chart_id, "systemd") ||
-				!strncmp(chart_id, "user.slice", 10) ||
-				!strncmp(chart_id, "system.slice", 12)
+				!strcmp(chart_id, "system.slice") ||
+				!strcmp(chart_id, "machine.slice") ||
+				!strcmp(chart_id, "user") ||
+				!strcmp(chart_id, "system") ||
+				!strcmp(chart_id, "machine") ||
+		   		// starts with them
+				(len >  6 && !strncmp(chart_id, "user/", 6)) ||
+				(len > 11 && !strncmp(chart_id, "user.slice/", 11)) ||
+				// ends with them
+				(len >  5 && !strncmp(&chart_id[len -  5], ".user", 5)) ||
+				(len >  5 && !strncmp(&chart_id[len -  5], ".swap", 5)) ||
+				(len >  6 && !strncmp(&chart_id[len -  6], ".slice", 6)) ||
+				(len >  6 && !strncmp(&chart_id[len -  6], ".mount", 6)) ||
+				(len >  8 && !strncmp(&chart_id[len -  8], ".session", 8)) ||
+				(len >  8 && !strncmp(&chart_id[len -  8], ".service", 8)) ||
+				(len > 10 && !strncmp(&chart_id[len - 10], ".partition", 10))
 				) {
 			def = 0;
-			debug(D_CGROUP, "cgroup '%s' is container manager (by default %s)", id, (def)?"enabled":"disabled");
+			debug(D_CGROUP, "cgroup '%s' is %s (by default)", id, (def)?"enabled":"disabled");
 		}
 	}
 
@@ -699,11 +719,7 @@ struct cgroup *cgroup_add(const char *id) {
 }
 
 void cgroup_free(struct cgroup *cg) {
-	debug(D_CGROUP, "removing cgroup '%s'", cg->id);
-
-	// FIXME
-	// switch this to debug(D_CGROUP, ...
-	info("Removing cgroup '%s' with chart id '%s' (was %s and %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (cg->available)?"available":"not available");
+	debug(D_CGROUP, "Removing cgroup '%s' with chart id '%s' (was %s and %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (cg->available)?"available":"not available");
 
 	free(cg->cpuacct_usage.cpu_percpu);
 
@@ -794,19 +810,17 @@ void find_dir_in_subdirs(const char *base, const char *this, void (*callback)(co
 
 		if(de->d_type == DT_DIR) {
 			if(enabled == -1) {
+				const char *r = relative_path;
+				if(*r == '\0') r = "/";
+				else if (*r == '/') r++;
+
 				// we check for this option here
 				// so that the config will not have settings
 				// for leaf directories
 				char option[FILENAME_MAX + 1];
-				snprintf(option, FILENAME_MAX, "search for cgroups under %s", (*relative_path == '\0')?"/":relative_path);
-
-				int def = 1;
-				if(!strcmp(this, "system.slice") ||
-					!strcmp(this, "user.slice") ||
-					!strcmp(this, "systemd"))
-					def = 0;
-
-				enabled = config_get_boolean("plugin:cgroups", option, def);
+				snprintf(option, FILENAME_MAX, "search for cgroups under %s", r);
+				option[FILENAME_MAX] = '\0';
+				enabled = config_get_boolean("plugin:cgroups", option, 1);
 			}
 
 			if(enabled) {
@@ -961,7 +975,7 @@ void update_cgroup_charts(int update_every) {
 			continue;
 
 		if(cg->id[0] == '\0')
-			strcpy(type, "cgroup_host");
+			strcpy(type, "cgroup_root");
 		else if(cg->id[0] == '/')
 			snprintf(type, RRD_ID_LENGTH_MAX, "cgroup_%s", cg->chart_id);
 		else

@@ -94,10 +94,12 @@ static int config_compare(void* a, void* b) {
 avl_tree config_root_index = {
 		NULL,
 		config_compare,
+#ifndef AVL_WITHOUT_PTHREADS
 #ifdef AVL_LOCK_WITH_MUTEX
 		PTHREAD_MUTEX_INITIALIZER
 #else
 		PTHREAD_RWLOCK_INITIALIZER
+#endif
 #endif
 };
 

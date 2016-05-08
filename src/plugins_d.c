@@ -182,7 +182,7 @@ void *pluginsd_worker_thread(void *arg)
 
 				if(unlikely(st->debug)) debug(D_PLUGINSD, "PLUGINSD: '%s' is setting dimension %s/%s to %s", cd->fullfilename, st->id, dimension, value?value:"<nothing>");
 
-				if(value) rrddim_set(st, dimension, atoll(value));
+				if(value) rrddim_set(st, dimension, strtoll(value, NULL, 0));
 
 				count++;
 			}
@@ -312,11 +312,11 @@ void *pluginsd_worker_thread(void *arg)
 				}
 
 				long multiplier = 1;
-				if(multiplier_s && *multiplier_s) multiplier = atol(multiplier_s);
+				if(multiplier_s && *multiplier_s) multiplier = strtol(multiplier_s, NULL, 0);
 				if(unlikely(!multiplier)) multiplier = 1;
 
 				long divisor = 1;
-				if(likely(divisor_s && *divisor_s)) divisor = atol(divisor_s);
+				if(likely(divisor_s && *divisor_s)) divisor = strtol(divisor_s, NULL, 0);
 				if(unlikely(!divisor)) divisor = 1;
 
 				if(unlikely(!algorithm || !*algorithm)) algorithm = "absolute";
@@ -352,7 +352,7 @@ void *pluginsd_worker_thread(void *arg)
 #ifdef DETACH_PLUGINS_FROM_NETDATA
 			else if(likely(hash == MYPID_HASH && !strcmp(s, "MYPID"))) {
 				char *pid_s = words[1];
-				pid_t pid = atol(pid_s);
+				pid_t pid = strtod(pid_s, NULL, 0);
 
 				if(likely(pid)) cd->pid = pid;
 				debug(D_PLUGINSD, "PLUGINSD: %s is on pid %d", cd->id, cd->pid);

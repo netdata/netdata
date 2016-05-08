@@ -59,10 +59,12 @@ static int rrdset_compare(void* a, void* b) {
 static avl_tree rrdset_root_index = {
 		NULL,
 		rrdset_compare,
+#ifndef AVL_WITHOUT_PTHREADS
 #ifdef AVL_LOCK_WITH_MUTEX
 		PTHREAD_MUTEX_INITIALIZER
 #else
 		PTHREAD_RWLOCK_INITIALIZER
+#endif
 #endif
 };
 
@@ -101,10 +103,12 @@ static int rrdset_compare_name(void* a, void* b) {
 avl_tree rrdset_root_index_name = {
 		NULL,
 		rrdset_compare_name,
+#ifndef AVL_WITHOUT_PTHREADS
 #ifdef AVL_LOCK_WITH_MUTEX
 		PTHREAD_MUTEX_INITIALIZER
 #else
 		PTHREAD_RWLOCK_INITIALIZER
+#endif
 #endif
 };
 
@@ -887,6 +891,13 @@ static void last_update_too_long(RRDSET *st, unsigned long long delta_t, int *fi
 	    // FIX: Don't need 'long double' here.
     	info("%s: took too long to be updated (%0.3f secs). Reseting it.", st->name, (double)(st->usec_since_last_update / 1000000.0));
 
+	// enable the chart, if it was disabled
+	if(unlikely(rrd_delete_unupdated_dimensions) && !st->enabled)
+		st->enabled = 1;
+
+	// check if the chart has a long time to be updated
+	if(unlikely(st->usec_since_last_update > st->entries * st->update_every * 1000000ULL)) {
+		info("%s: took too long to be updated (%0.3Lf secs). Reseting it.", st->name, (long double)(st->usec_since_last_update / 1000000.0));
 		rrdset_reset(st);
 		st->usec_since_last_update = delta_t;
 		*first_entry = 1;
