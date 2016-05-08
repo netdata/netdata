@@ -11,6 +11,7 @@ typedef struct name_value {
 
 	uint32_t hash;			// a simple hash to speed up searching
 							// we first compare hashes, and only if the hashes are equal we do string comparisons
+
 	char *name;
 	void *value;
 } NAME_VALUE;
@@ -38,6 +39,6 @@ extern void *dictionary_set(DICTIONARY *dict, const char *name, void *value, siz
 extern void *dictionary_get(DICTIONARY *dict, const char *name);
 extern int dictionary_del(DICTIONARY *dict, const char *name);
 
-extern void dictionary_get_all(DICTIONARY *dict, int (*callback)(void *entry, void *data), void *data);
+extern int dictionary_get_all(DICTIONARY *dict, int (*callback)(void *entry, void *data), void *data);
 
 #endif /* NETDATA_DICTIONARY_H */

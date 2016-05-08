@@ -4,6 +4,7 @@
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
 AM_CPPFLAGS = \
+	-DVARLIB_DIR="\"$(varlibdir)\"" \
 	-DCACHE_DIR="\"$(cachedir)\"" \
 	-DCONFIG_DIR="\"$(configdir)\"" \
 	-DLOG_DIR="\"$(logdir)\"" \

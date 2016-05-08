@@ -33,6 +33,7 @@ static inline NAME_VALUE *dictionary_name_value_index_find_nolock(DICTIONARY *di
 
 	dict->searches++;
 	avl_search(&(dict->values_index), (avl *)&tmp, name_value_iterator, (avl **)&result);
+
 	return result;
 }
 
@@ -226,20 +227,37 @@ int dictionary_del(DICTIONARY *dict, const char *name) {
 }
 
 
-static void dictionary_walker(avl *a, int (*callback)(void *entry, void *data), void *data) {
-	if(unlikely(!a)) return;
+static int dictionary_walker(avl *a, int (*callback)(void *entry, void *data), void *data) {
+	int total = 0, ret = 0;
 
-	if(a->right)
-		dictionary_walker(a->right, callback, data);
+	if(a->right) {
+		ret = dictionary_walker(a->right, callback, data);
+		if(ret < 0) return ret;
+		total += ret;
+	}
 
-	callback(((NAME_VALUE *)a)->value, data);
+	ret = callback(((NAME_VALUE *)a)->value, data);
+	if(ret < 0) return ret;
+	total += ret;
 
-	if(a->left)
+	if(a->left) {
 		dictionary_walker(a->left, callback, data);
+		if (ret < 0) return ret;
+		total += ret;
+	}
+
+	return total;
 }
 
-void dictionary_get_all(DICTIONARY *dict, int (*callback)(void *entry, void *data), void *data) {
+int dictionary_get_all(DICTIONARY *dict, int (*callback)(void *entry, void *data), void *data) {
+	int ret = 0;
+
 	dictionary_read_lock(dict);
-	dictionary_walker(dict->values_index.root, callback, data);
+
+	if(likely(dict->values_index.root))
+		ret = dictionary_walker(dict->values_index.root, callback, data);
+
 	dictionary_unlock(dict);
+
+	return ret;
 }

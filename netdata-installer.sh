@@ -120,6 +120,7 @@ It will be installed at these locations:
   - web files     at ${NETDATA_PREFIX}/usr/share/netdata
   - plugins       at ${NETDATA_PREFIX}/usr/libexec/netdata
   - cache files   at ${NETDATA_PREFIX}/var/cache/netdata
+  - db files      at ${NETDATA_PREFIX}/var/lib/netdata
   - log files     at ${NETDATA_PREFIX}/var/log/netdata
   - pid file      at ${NETDATA_PREFIX}/var/run
 
@@ -407,6 +408,7 @@ defport=19999
 NETDATA_PORT="$( config_option "port" ${defport} )"
 
 # directories
+NETDATA_LIB_DIR="$( config_option "lib directory" "${NETDATA_PREFIX}/var/lib/netdata" )"
 NETDATA_CACHE_DIR="$( config_option "cache directory" "${NETDATA_PREFIX}/var/cache/netdata" )"
 NETDATA_WEB_DIR="$( config_option "web files directory" "${NETDATA_PREFIX}/usr/share/netdata/web" )"
 NETDATA_LOG_DIR="$( config_option "log directory" "${NETDATA_PREFIX}/var/log/netdata" )"
@@ -425,7 +427,7 @@ if [ ! -d "${NETDATA_RUN_DIR}" ]
 fi
 
 echo >&2 "Fixing directories (user: ${NETDATA_USER})..."
-for x in "${NETDATA_WEB_DIR}" "${NETDATA_CONF_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}"
+for x in "${NETDATA_WEB_DIR}" "${NETDATA_CONF_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}" "${NETDATA_LIB_DIR}"
 do
 	if [ ! -d "${x}" ]
 		then
@@ -716,6 +718,7 @@ else
 	deletedir "${NETDATA_PREFIX}/etc/netdata"
 	deletedir "${NETDATA_PREFIX}/usr/share/netdata"
 	deletedir "${NETDATA_PREFIX}/usr/libexec/netdata"
+	deletedir "${NETDATA_PREFIX}/var/lib/netdata"
 	deletedir "${NETDATA_PREFIX}/var/cache/netdata"
 	deletedir "${NETDATA_PREFIX}/var/log/netdata"
 fi

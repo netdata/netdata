@@ -1,5 +1,6 @@
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <stdio.h>
 
 #ifndef NETDATA_COMMON_H
 #define NETDATA_COMMON_H 1
@@ -38,6 +39,8 @@ extern void get_HZ(void);
 extern pid_t gettid(void);
 
 extern unsigned long long timems(void);
+
+extern char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len);
 
 /* fix for alpine linux */
 #ifndef RUSAGE_THREAD
