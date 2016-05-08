@@ -1211,7 +1211,7 @@ int read_pid_file_descriptors(struct pid_stat *p) {
 				if(debug) fprintf(stderr, "apps.plugin: extending fd memory slots for %s from %d to %d\n", p->comm, p->fds_size, fdid + 100);
 				p->fds = realloc(p->fds, (fdid + 100) * sizeof(int));
 				if(!p->fds) {
-					error("Cannot re-allocate fds for %s", p->comm);
+					fatal("Cannot re-allocate fds for %s", p->comm);
 					break;
 				}
 
@@ -2434,16 +2434,14 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	fprintf(stdout, "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' apps.plugin netdata.apps_cpu stacked 140000 %d\n", update_every);
-	fprintf(stdout, "DIMENSION user '' incremental 1 %d\n", 1000);
-	fprintf(stdout, "DIMENSION system '' incremental 1 %d\n", 1000);
-
-	fprintf(stdout, "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_files line 140001 %d\n", update_every);
-	fprintf(stdout, "DIMENSION files '' incremental 1 1\n");
-	fprintf(stdout, "DIMENSION pids '' absolute 1 1\n");
-	fprintf(stdout, "DIMENSION fds '' absolute 1 1\n");
-	fprintf(stdout, "DIMENSION targets '' absolute 1 1\n");
-
+	fprintf(stdout, "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' apps.plugin netdata.apps_cpu stacked 140000 %1$d\n"
+	                "DIMENSION user '' incremental 1 1000\n"
+	                "DIMENSION system '' incremental 1 1000\n"
+	                "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_files line 140001 %1$d\n"
+	                "DIMENSION files '' incremental 1 1\n"  
+                  "DIMENSION pids '' absolute 1 1\n"  
+	                "DIMENSION fds '' absolute 1 1\n"  
+	                "DIMENSION targets '' absolute 1 1\n", update_every);
 
 #ifndef PROFILING_MODE
 	unsigned long long sunext = (time(NULL) - (time(NULL) % update_every) + update_every) * 1000000ULL;
@@ -2482,7 +2480,6 @@ int main(int argc, char **argv)
 		send_collected_data_to_netdata(groups_root_target, "groups", dt);
 
 		if(debug) fprintf(stderr, "apps.plugin: done Loop No %llu\n", counter);
-		fflush(NULL);
 
 		current_t = time(NULL);
 

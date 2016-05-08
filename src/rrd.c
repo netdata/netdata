@@ -226,8 +226,8 @@ int rrd_memory_mode_id(const char *name)
 
 int rrddim_algorithm_id(const char *name)
 {
-	if(strcmp(name, RRDDIM_ABSOLUTE_NAME) == 0) 			return RRDDIM_ABSOLUTE;
 	if(strcmp(name, RRDDIM_INCREMENTAL_NAME) == 0) 			return RRDDIM_INCREMENTAL;
+	if(strcmp(name, RRDDIM_ABSOLUTE_NAME) == 0) 			return RRDDIM_ABSOLUTE;
 	if(strcmp(name, RRDDIM_PCENT_OVER_ROW_TOTAL_NAME) == 0) 		return RRDDIM_PCENT_OVER_ROW_TOTAL;
 	if(strcmp(name, RRDDIM_PCENT_OVER_DIFF_TOTAL_NAME) == 0) 	return RRDDIM_PCENT_OVER_DIFF_TOTAL;
 	return RRDDIM_ABSOLUTE;
