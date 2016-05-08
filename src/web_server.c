@@ -230,6 +230,7 @@ void *socket_listen_main(void *ptr)
 		}
 
 		// debug(D_WEB_CLIENT, "LISTENER: Waiting...");
+		// FIXME: select is slow on busy systems... Maybe we can substitute to use libevent.
 		// FIX: Why use ofds and efds if we don't need them?
 		retval = select(fdmax+1, &ifds, /*&ofds*/NULL, /*&efds*/NULL, &tv);
 
@@ -263,7 +264,8 @@ void *socket_listen_main(void *ptr)
 		//}
 
 		// cleanup unused clients
-		for(w = web_clients; w ; w = w?w->next:NULL) {
+		// FIX: Why re-check w?
+		for(w = web_clients; w; w = w->next) {
 			if(w->obsolete) {
 				debug(D_WEB_CLIENT, "%llu: Removing client.", w->id);
 				// pthread_join(w->thread,  NULL);
@@ -284,4 +286,3 @@ void *socket_listen_main(void *ptr)
 
 	return NULL;
 }
-

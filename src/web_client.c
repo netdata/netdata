@@ -1852,6 +1852,8 @@ void *web_client_main(void *ptr)
 		tv.tv_usec = 0;
 
 		debug(D_WEB_CLIENT, "%llu: Waiting socket async I/O for %s %s", w->id, w->wait_receive?"INPUT":"", w->wait_send?"OUTPUT":"");
+
+		// FIXME: select is slow on busy systems. Maybe we can use libevent instead?
 		retval = select(fdmax+1, &ifds, &ofds, &efds, &tv);
 
 		if(retval == -1) {
