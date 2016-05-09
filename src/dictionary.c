@@ -13,7 +13,46 @@
 #include "dictionary.h"
 
 // ----------------------------------------------------------------------------
-// name_value index
+// dictionary locks
+
+static inline void dictionary_atomic_updates_lock(DICTIONARY *dict) {
+	if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
+		// debug(D_DICTIONARY, "Dictionary ATOMIC lock");
+		pthread_mutex_lock(&dict->atomic_mutex);
+	}
+}
+
+static inline void dictionary_atomic_updates_unlock(DICTIONARY *dict) {
+	if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
+		// debug(D_DICTIONARY, "Dictionary ATOMIC unlock");
+		pthread_mutex_unlock(&dict->atomic_mutex);
+	}
+}
+
+static inline void dictionary_read_lock(DICTIONARY *dict) {
+	if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
+		// debug(D_DICTIONARY, "Dictionary READ lock");
+		pthread_rwlock_rdlock(&dict->rwlock);
+	}
+}
+
+static inline void dictionary_write_lock(DICTIONARY *dict) {
+	if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
+		// debug(D_DICTIONARY, "Dictionary WRITE lock");
+		pthread_rwlock_wrlock(&dict->rwlock);
+	}
+}
+
+static inline void dictionary_unlock(DICTIONARY *dict) {
+	if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
+		// debug(D_DICTIONARY, "Dictionary UNLOCK lock");
+		pthread_rwlock_unlock(&dict->rwlock);
+	}
+}
+
+
+// ----------------------------------------------------------------------------
+// avl index
 
 static int name_value_iterator(avl *a) { if(a) {}; return 0; }
 
@@ -37,28 +76,8 @@ static inline NAME_VALUE *dictionary_name_value_index_find_nolock(DICTIONARY *di
 	return result;
 }
 
-static void dictionary_read_lock(DICTIONARY *dict) {
-	if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
-		// debug(D_DICTIONARY, "Dictionary READ lock");
-		pthread_rwlock_rdlock(&dict->rwlock);
-	}
-}
-
-static void dictionary_write_lock(DICTIONARY *dict) {
-	if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
-		// debug(D_DICTIONARY, "Dictionary WRITE lock");
-		pthread_rwlock_wrlock(&dict->rwlock);
-	}
-}
-
-static void dictionary_unlock(DICTIONARY *dict) {
-	if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
-		// debug(D_DICTIONARY, "Dictionary UNLOCK lock");
-		pthread_rwlock_unlock(&dict->rwlock);
-	}
-}
-
 // ----------------------------------------------------------------------------
+// internal methods
 
 static NAME_VALUE *dictionary_name_value_create_nolock(DICTIONARY *dict, const char *name, void *value, size_t value_len, uint32_t hash) {
 	debug(D_DICTIONARY, "Creating name value entry for name '%s'.", name);
@@ -114,6 +133,7 @@ static void dictionary_name_value_destroy_nolock(DICTIONARY *dict, NAME_VALUE *n
 }
 
 // ----------------------------------------------------------------------------
+// API - basic methods
 
 DICTIONARY *dictionary_create(uint32_t flags) {
 	debug(D_DICTIONARY, "Creating dictionary.");
@@ -123,6 +143,7 @@ DICTIONARY *dictionary_create(uint32_t flags) {
 
 	avl_init(&dict->values_index, name_value_compare);
 	pthread_rwlock_init(&dict->rwlock, NULL);
+	pthread_mutex_init(&dict->atomic_mutex, NULL);
 
 	dict->flags = flags;
 
@@ -132,12 +153,16 @@ DICTIONARY *dictionary_create(uint32_t flags) {
 void dictionary_destroy(DICTIONARY *dict) {
 	debug(D_DICTIONARY, "Destroying dictionary.");
 
+	dictionary_atomic_updates_lock(dict);
+
 	dictionary_write_lock(dict);
 
 	while(dict->values_index.root)
 		dictionary_name_value_destroy_nolock(dict, (NAME_VALUE *)dict->values_index.root);
 
 	dictionary_unlock(dict);
+
+	dictionary_atomic_updates_unlock(dict);
 
 	free(dict);
 }
@@ -148,6 +173,8 @@ void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t val
 	debug(D_DICTIONARY, "SET dictionary entry with name '%s'.", name);
 
 	uint32_t hash = simple_hash(name);
+
+	dictionary_atomic_updates_lock(dict);
 
 	dictionary_read_lock(dict);
 	NAME_VALUE *nv = dictionary_name_value_index_find_nolock(dict, name, hash);
@@ -187,6 +214,8 @@ void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t val
 		}
 	}
 
+	dictionary_atomic_updates_unlock(dict);
+
 	return nv->value;
 }
 
@@ -207,7 +236,11 @@ void *dictionary_get(DICTIONARY *dict, const char *name) {
 }
 
 int dictionary_del(DICTIONARY *dict, const char *name) {
+	int ret;
+
 	debug(D_DICTIONARY, "DEL dictionary entry with name '%s'.", name);
+
+	dictionary_atomic_updates_lock(dict);
 
 	dictionary_read_lock(dict);
 	NAME_VALUE *nv = dictionary_name_value_index_find_nolock(dict, name, 0);
@@ -215,17 +248,26 @@ int dictionary_del(DICTIONARY *dict, const char *name) {
 
 	if(unlikely(!nv)) {
 		debug(D_DICTIONARY, "Not found dictionary entry with name '%s'.", name);
-		return -1;
+		ret = -1;
+	}
+	else {
+		debug(D_DICTIONARY, "Found dictionary entry with name '%s'.", name);
+		dictionary_write_lock(dict);
+		dictionary_name_value_destroy_nolock(dict, nv);
+		dictionary_unlock(dict);
+		ret = 0;
 	}
 
-	debug(D_DICTIONARY, "Found dictionary entry with name '%s'.", name);
-	dictionary_write_lock(dict);
-	dictionary_name_value_destroy_nolock(dict, nv);
-	dictionary_unlock(dict);
+	dictionary_atomic_updates_unlock(dict);
 
-	return 0;
+	return ret;
 }
 
+
+// ----------------------------------------------------------------------------
+// API - walk through the dictionary
+// the dictionary is locked for reading while this happens
+// do not user other dictionary calls while walking the dictionary - deadlock!
 
 static int dictionary_walker(avl *a, int (*callback)(void *entry, void *data), void *data) {
 	int total = 0, ret = 0;
