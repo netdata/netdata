@@ -26,6 +26,7 @@ typedef struct dictionary {
 
 	avl_tree values_index;
 	pthread_rwlock_t rwlock;
+	pthread_mutex_t atomic_mutex;
 } DICTIONARY;
 
 #define DICTIONARY_FLAG_DEFAULT					0x00000000
