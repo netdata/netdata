@@ -566,7 +566,7 @@ echo >&2
 # run netdata
 
 echo >&2 "Starting netdata..."
-run ${NETDATA_PREFIX}/usr/sbin/netdata -pidfile ${NETDATA_RUN_DIR}/netdata.pid "${@}"
+run ${NETDATA_PREFIX}/usr/sbin/netdata -P ${NETDATA_RUN_DIR}/netdata.pid "${@}"
 
 if [ $? -ne 0 ]
 	then
