@@ -72,8 +72,8 @@ struct web_client *web_client_create(int listener)
 
 		if(getnameinfo(sadr, addrlen, w->client_ip, NI_MAXHOST, w->client_port, NI_MAXSERV, NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
 			error("Cannot getnameinfo() on received client connection.");
-			strncpy(w->client_ip,   "UNKNOWN", NI_MAXHOST);
-			strncpy(w->client_port, "UNKNOWN", NI_MAXSERV);
+			strncpyz(w->client_ip,   "UNKNOWN", NI_MAXHOST);
+			strncpyz(w->client_port, "UNKNOWN", NI_MAXSERV);
 		}
 		w->client_ip[NI_MAXHOST]   = '\0';
 		w->client_port[NI_MAXSERV] = '\0';
@@ -316,7 +316,7 @@ int mysendfile(struct web_client *w, char *filename)
 
 	// access the file
 	char webfilename[FILENAME_MAX + 1];
-	snprintf(webfilename, FILENAME_MAX, "%s/%s", web_dir, filename);
+	snprintfz(webfilename, FILENAME_MAX, "%s/%s", web_dir, filename);
 
 	// check if the file exists
 	struct stat stat;
@@ -341,7 +341,7 @@ int mysendfile(struct web_client *w, char *filename)
 	}
 
 	if((stat.st_mode & S_IFMT) == S_IFDIR) {
-		snprintf(webfilename, FILENAME_MAX+1, "%s/index.html", filename);
+		snprintfz(webfilename, FILENAME_MAX, "%s/index.html", filename);
 		return mysendfile(w, webfilename);
 	}
 
@@ -1101,8 +1101,7 @@ void web_client_process(struct web_client *w) {
 		w->last_url[0] = '\0';
 
 		if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
-			strncpy(w->last_url, url, URL_MAX);
-			w->last_url[URL_MAX] = '\0';
+			strncpyz(w->last_url, url, URL_MAX);
 
 			code = 200;
 			w->response.data->contenttype = CT_TEXT_PLAIN;
@@ -1115,8 +1114,7 @@ void web_client_process(struct web_client *w) {
 				web_client_enable_deflate(w);
 #endif
 
-			strncpy(w->last_url, url, URL_MAX);
-			w->last_url[URL_MAX] = '\0';
+			strncpyz(w->last_url, url, URL_MAX);
 
 			tok = mystrsep(&url, "/?");
 			if(tok && *tok) {
@@ -1249,8 +1247,7 @@ void web_client_process(struct web_client *w) {
 				else {
 					char filename[FILENAME_MAX+1];
 					url = filename;
-					strncpy(filename, w->last_url, FILENAME_MAX);
-					filename[FILENAME_MAX] = '\0';
+					strncpyz(filename, w->last_url, FILENAME_MAX);
 					tok = mystrsep(&url, "?");
 					buffer_flush(w->response.data);
 					code = mysendfile(w, (tok && *tok)?tok:"/");
@@ -1259,8 +1256,7 @@ void web_client_process(struct web_client *w) {
 			else {
 				char filename[FILENAME_MAX+1];
 				url = filename;
-				strncpy(filename, w->last_url, FILENAME_MAX);
-				filename[FILENAME_MAX] = '\0';
+				strncpyz(filename, w->last_url, FILENAME_MAX);
 				tok = mystrsep(&url, "?");
 				buffer_flush(w->response.data);
 				code = mysendfile(w, (tok && *tok)?tok:"/");

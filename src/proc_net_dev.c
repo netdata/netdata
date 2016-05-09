@@ -20,7 +20,7 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 
 	if(!ff) {
 		char filename[FILENAME_MAX + 1];
-		snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/net/dev");
+		snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/net/dev");
 		ff = procfile_open(config_get("plugin:proc:/proc/net/dev", "filename to monitor", filename), " \t,:|", PROCFILE_FLAG_DEFAULT);
 	}
 	if(!ff) return 1;
@@ -86,7 +86,7 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
 		// check if the user wants it
 		{
 			char var_name[512 + 1];
-			snprintf(var_name, 512, "plugin:proc:/proc/net/dev:%s", iface);
+			snprintfz(var_name, 512, "plugin:proc:/proc/net/dev:%s", iface);
 			default_enable = config_get_boolean_ondemand(var_name, "enabled", default_enable);
 			if(default_enable == CONFIG_ONDEMAND_NO) continue;
 			if(default_enable == CONFIG_ONDEMAND_ONDEMAND && !rbytes && !tbytes) continue;
