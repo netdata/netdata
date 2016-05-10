@@ -1292,7 +1292,7 @@ void *cgroups_main(void *ptr)
 
 			if(!stcpu_thread) stcpu_thread = rrdset_find("netdata.plugin_cgroups_cpu");
 			if(!stcpu_thread) {
-				stcpu_thread = rrdset_create("netdata", "plugin_cgroups_cpu", NULL, "proc.internal", NULL, "NetData CGroups Plugin CPU usage", "milliseconds/s", 131000, rrd_update_every, RRDSET_TYPE_STACKED);
+				stcpu_thread = rrdset_create("netdata", "plugin_cgroups_cpu", NULL, "proc.internal", NULL, "NetData CGroups Plugin CPU usage", "milliseconds/s", 132000, rrd_update_every, RRDSET_TYPE_STACKED);
 
 				rrddim_add(stcpu_thread, "user",  NULL,  1, 1000, RRDDIM_INCREMENTAL);
 				rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRDDIM_INCREMENTAL);

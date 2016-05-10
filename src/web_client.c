@@ -794,7 +794,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 
 	char *cookie = strstr(w->response.data->buffer, " " NETDATA_REGISTRY_COOKIE_NAME "=");
 	if(cookie) {
-		strncpy(person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME) + 2], 36);
+		strncpy(person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME) + 1], 36);
 		person_guid[36] = '\0';
 	}
 

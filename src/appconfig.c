@@ -442,7 +442,7 @@ void generate_config(BUFFER *wb, int only_changed)
 
 		pthread_rwlock_wrlock(&config_rwlock);
 		for(co = config_root; co ; co = co->next) {
-			if(strcmp(co->name, "global") == 0 || strcmp(co->name, "plugins") == 0) pri = 0;
+			if(strcmp(co->name, "global") == 0 || strcmp(co->name, "plugins") == 0 || strcmp(co->name, "registry") == 0) pri = 0;
 			else if(strncmp(co->name, "plugin:", 7) == 0) pri = 1;
 			else pri = 2;
 

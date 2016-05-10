@@ -34,6 +34,7 @@
 #include "plugin_checks.h"
 #include "plugin_proc.h"
 #include "plugin_nfacct.h"
+#include "registry.h"
 
 #include "main.h"
 
@@ -520,6 +521,12 @@ int main(int argc, char **argv)
 		else
 			info("Successfully set pthread stacksize to %zu bytes", wanted_stacksize);
 	}
+
+	// --------------------------------------------------------------------
+	// initialize the registry
+
+	registry_init();
+
 
 	// ------------------------------------------------------------------------
 	// spawn the threads
