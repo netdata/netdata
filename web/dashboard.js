@@ -5472,6 +5472,60 @@
 		NETDATA.loadRequiredCSS(++index);
 	};
 
+	NETDATA.registry = {
+		host: null,
+		machine_guid: null,
+		urls: null,
+
+		init: function() {
+			NETDATA.registry.hello(function() {
+				console.log('hello completed');
+				NETDATA.registry.access(function() {
+					console.log('access completed');
+					console.log(NETDATA.registry);
+				})
+			});
+		},
+
+		hello: function(callback) {
+			$.ajax({
+					url: NETDATA.serverDefault + '/api/v1/registry?action=hello',
+					async: true,
+					cache: false,
+					xhrFields: { withCredentials: true }
+				})
+				.done(function(data) {
+					NETDATA.registry.host = data.registry;
+					NETDATA.registry.machine_guid = data.machine_guid;
+
+					if(typeof callback === 'function')
+						callback();
+				})
+				.fail(function() {
+					console.log('failed to hello (registry) netdata server: ' + NETDATA.serverDefault);
+				});
+		},
+
+		access: function(callback) {
+			$.ajax({
+					url: NETDATA.registry.host + '/api/v1/registry?action=access&machine=' + NETDATA.registry.machine_guid + '&name=test&url=' + document.location,
+					async: true,
+					cache: false,
+					xhrFields: { withCredentials: true }
+				})
+				.done(function(data) {
+					NETDATA.registry.urls = data.urls;
+
+					if(typeof callback === 'function')
+						callback();
+				})
+				.fail(function() {
+					console.log('failed to access (registry) netdata server: ' + NETDATA.registry.host);
+				});
+		}
+
+	};
+
 	NETDATA.errorReset();
 	NETDATA.loadRequiredCSS(0);
 
@@ -5485,6 +5539,8 @@
 			if(typeof netdataDontStart === 'undefined' || !netdataDontStart) {
 				if(NETDATA.options.debug.main_loop === true)
 					console.log('starting chart refresh thread');
+
+				setTimeout(NETDATA.registry.init, 500);
 
 				NETDATA.start();
 			}
