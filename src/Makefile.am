@@ -59,6 +59,7 @@ netdata_SOURCES = \
 	sys_kernel_mm_ksm.c \
 	sys_fs_cgroup.c \
 	procfile.c procfile.h \
+	registry.c registry.h \
 	rrd.c rrd.h \
 	rrd2json.c rrd2json.h \
 	storage_number.c storage_number.h \

@@ -26,6 +26,7 @@
 #include "global_statistics.h"
 #include "rrd.h"
 #include "rrd2json.h"
+#include "registry.h"
 
 #include "web_client.h"
 #include "../config.h"
@@ -173,6 +174,7 @@ void web_client_reset(struct web_client *w)
 	}
 
 	w->last_url[0] = '\0';
+	w->cookie[0] = '\0';
 
 	w->mode = WEB_CLIENT_MODE_NORMAL;
 
@@ -644,7 +646,7 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 		if(!name || !*name) continue;
 		if(!value || !*value) continue;
 
-		debug(D_WEB_CLIENT, "%llu: API v1 query param '%s' with value '%s'", w->id, name, value);
+		debug(D_WEB_CLIENT, "%llu: API v1 data query param '%s' with value '%s'", w->id, name, value);
 
 		// name and value are now the parameters
 		// they are not null and not empty
@@ -784,19 +786,111 @@ cleanup:
 	return ret;
 }
 
+int web_client_api_request_v1_registry(struct web_client *w, char *url)
+{
+	char person_guid[36 + 1] = "";
+
+	debug(D_WEB_CLIENT, "%llu: API v1 registry with URL '%s'", w->id, url);
+
+	char *cookie = strstr(w->response.data->buffer, " " NETDATA_REGISTRY_COOKIE_NAME "=");
+	if(cookie) {
+		strncpy(person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME) + 2], 36);
+		person_guid[36] = '\0';
+	}
+
+	char action = '\0';
+	char *machine_guid = NULL,
+			*machine_url = NULL,
+			*url_name = NULL,
+			*search_machine_guid = NULL,
+			*delete_url = NULL;
+
+	while(url) {
+		char *value = mystrsep(&url, "?&[]");
+		if (!value || !*value) continue;
+
+		char *name = mystrsep(&value, "=");
+		if (!name || !*name) continue;
+		if (!value || !*value) continue;
+
+		debug(D_WEB_CLIENT, "%llu: API v1 registry query param '%s' with value '%s'", w->id, name, value);
+
+		if(!strcmp(name, "action")) {
+			if(!strcmp(value, "access")) action = 'A';
+			else if(!strcmp(value, "delete")) action = 'D';
+			else if(!strcmp(value, "search")) action = 'S';
+		}
+		else if(!strcmp(name, "machine"))
+			machine_guid = value;
+
+		else if(!strcmp(name, "url"))
+			machine_url = value;
+
+		else if(action == 'A') {
+			if(!strcmp(name, "name"))
+				url_name = value;
+		}
+		else if(action == 'D') {
+			if(!strcmp(name, "delete_url"))
+				delete_url = value;
+		}
+		else if(action == 'S') {
+			if(!strcmp(name, "for"))
+				search_machine_guid = value;
+		}
+	}
+
+	if((!action || !machine_guid || !machine_url) || (action == 'A' && !url_name) || (action == 'D' && !delete_url) || (action == 'S' && !search_machine_guid)) {
+		buffer_flush(w->response.data);
+		buffer_sprintf(w->response.data, "Invalid registry request - required parameters missing.");
+		return 400;
+	}
+
+	switch(action) {
+		case 'A':
+			return registry_request_access_json(w, person_guid, machine_guid, machine_url, url_name, time(NULL));
+
+		case 'D':
+			return registry_request_delete_json(w, person_guid, machine_guid, machine_url, delete_url, time(NULL));
+
+		case 'S':
+			return registry_request_search_json(w, person_guid, machine_guid, machine_url, search_machine_guid, time(NULL));
+	}
+
+	buffer_flush(w->response.data);
+	buffer_sprintf(w->response.data, "Invalid or no registry action.");
+	return 400;
+}
+
 int web_client_api_request_v1(struct web_client *w, char *url)
 {
+	static uint32_t data_hash = 0, chart_hash = 0, charts_hash = 0, registry_hash = 0;
+
+	if(unlikely(data_hash == 0)) {
+		data_hash = simple_hash("data");
+		chart_hash = simple_hash("chart");
+		charts_hash = simple_hash("charts");
+		registry_hash = simple_hash("registry");
+	}
+
 	// get the command
 	char *tok = mystrsep(&url, "/?&");
 	if(tok && *tok) {
 		debug(D_WEB_CLIENT, "%llu: Searching for API v1 command '%s'.", w->id, tok);
+		uint32_t hash = simple_hash(tok);
 
-		if(strcmp(tok, "data") == 0)
+		if(hash == data_hash && !strcmp(tok, "data"))
 			return web_client_api_request_v1_data(w, url);
-		else if(strcmp(tok, "chart") == 0)
+
+		else if(hash == chart_hash && !strcmp(tok, "chart"))
 			return web_client_api_request_v1_chart(w, url);
-		else if(strcmp(tok, "charts") == 0)
+
+		else if(hash == charts_hash && !strcmp(tok, "charts"))
 			return web_client_api_request_v1_charts(w, url);
+
+		else if(hash == registry_hash && !strcmp(tok, "registry"))
+			return web_client_api_request_v1_registry(w, url);
+
 		else {
 			buffer_flush(w->response.data);
 			buffer_sprintf(w->response.data, "Unsupported v1 API command: %s", tok);
@@ -1043,6 +1137,32 @@ cleanup:
 }
 */
 
+// get the request buffer, just after the GET or OPTIONS
+// and find the url to be decoded, decode it and return
+// a newly allocated buffer with it
+static inline char *find_url_and_decode_it(char *request) {
+	char *e = request, *url = NULL;
+
+	// find the SPACE + "HTTP/"
+	while(*e) {
+		// find the space
+		while (*e && *e != ' ') e++;
+
+		// is it SPACE + "HTTP/" ?
+		if(*e && !strncmp(e, " HTTP/", 6))
+			break;
+	}
+
+	if(*e) {
+		// we have the end
+		*e = '\0';
+		url = url_decode(request);
+		*e = ' ';
+	}
+
+	return url;
+}
+
 void web_client_process(struct web_client *w) {
 	int code = 500;
 	ssize_t bytes;
@@ -1069,33 +1189,24 @@ void web_client_process(struct web_client *w) {
 			enable_gzip = 1;
 #endif // NETDATA_WITH_ZLIB
 
-		int datasource_type = DATASOURCE_DATATABLE_JSONP;
-		//if(strstr(w->response.data->buffer, "X-DataSource-Auth"))
-		//	datasource_type = DATASOURCE_GOOGLE_JSON;
-
-		char *buf = (char *)buffer_tostring(w->response.data);
-		char *tok = strsep(&buf, " \r\n");
-		char *url = NULL;
-		char *pointer_to_free = NULL; // keep url_decode() allocated buffer
-
 		w->mode = WEB_CLIENT_MODE_NORMAL;
 
-		if(buf && strcmp(tok, "GET") == 0) {
-			tok = strsep(&buf, " \r\n");
-			pointer_to_free = url = url_decode(tok);
-			debug(D_WEB_CLIENT, "%llu: Processing HTTP GET on url '%s'.", w->id, url);
-		}
-		else if(buf && strcmp(tok, "OPTIONS") == 0) {
-			tok = strsep(&buf, " \r\n");
-			pointer_to_free = url = url_decode(tok);
-			debug(D_WEB_CLIENT, "%llu: Processing HTTP OPTIONS on url '%s'.", w->id, url);
+		char *tok = (char *)buffer_tostring(w->response.data);
+		char *url = NULL, *encoded_url = NULL;
+		char *pointer_to_free = NULL; // keep url_decode() allocated buffer
+
+		if(!strncmp(tok, "GET ", 4))
+			encoded_url = &tok[4];
+		else if(!strncmp(tok, "OPTIONS ", 8)) {
+			encoded_url = &tok[8];
 			w->mode = WEB_CLIENT_MODE_OPTIONS;
 		}
-		else if (buf && strcmp(tok, "POST") == 0) {
-			w->keepalive = 0;
-			tok = strsep(&buf, " \r\n");
-			pointer_to_free = url = url_decode(tok);
-			debug(D_WEB_CLIENT, "%llu: I don't know how to handle POST with form data. Assuming it is a GET on url '%s'.", w->id, url);
+
+		if(encoded_url) {
+			pointer_to_free = url = find_url_and_decode_it(encoded_url);
+
+			if(url) debug(D_WEB_CLIENT, "%llu: Processing url '%s'.", w->id, url);
+			else debug(D_WEB_CLIENT, "%llu: Cannot find a valid URL in '%s'", w->id, encoded_url);
 		}
 
 		w->last_url[0] = '\0';
@@ -1124,26 +1235,29 @@ void web_client_process(struct web_client *w) {
 
 				if(strcmp(tok, "api") == 0) {
 					// the client is requesting api access
-					datasource_type = DATASOURCE_JSON;
 					code = web_client_api_request(w, url);
 				}
 #ifdef NETDATA_INTERNAL_CHECKS
 				else if(strcmp(tok, "exit") == 0) {
-					netdata_exit = 1;
 					code = 200;
 					w->response.data->contenttype = CT_TEXT_PLAIN;
 					buffer_flush(w->response.data);
-					buffer_strcat(w->response.data, "will do");
+
+					if(!netdata_exit)
+						buffer_strcat(w->response.data, "ok, will do...");
+					else
+						buffer_strcat(w->response.data, "I am doing it already");
+
+					netdata_exit = 1;
 				}
 #endif
 				else if(strcmp(tok, WEB_PATH_DATA) == 0) { // "data"
 					// the client is requesting rrd data
-					datasource_type = DATASOURCE_JSON;
-					code = web_client_data_request(w, url, datasource_type);
+					code = web_client_data_request(w, url, DATASOURCE_JSON);
 				}
 				else if(strcmp(tok, WEB_PATH_DATASOURCE) == 0) { // "datasource"
 					// the client is requesting google datasource
-					code = web_client_data_request(w, url, datasource_type);
+					code = web_client_data_request(w, url, DATASOURCE_DATATABLE_JSONP);
 				}
 				else if(strcmp(tok, WEB_PATH_GRAPH) == 0) { // "graph"
 					// the client is requesting an rrd graph
@@ -1269,7 +1383,7 @@ void web_client_process(struct web_client *w) {
 		else {
 			strcpy(w->last_url, "not a valid response");
 
-			if(buf) debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, buf);
+			debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, w->response.data->buffer);
 
 			code = 500;
 			buffer_flush(w->response.data);
@@ -1437,10 +1551,17 @@ void web_client_process(struct web_client *w) {
 		, date
 		);
 
+	if(w->cookie[0]) {
+		buffer_sprintf(w->response.header_output,
+		   "Set-Cookie: %s\r\n",
+		   w->cookie);
+	}
+
 	if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
 		buffer_strcat(w->response.header_output,
 			"Access-Control-Allow-Methods: GET, OPTIONS\r\n"
-			"Access-Control-Allow-Headers: accept, x-requested-with\r\n"
+			"Access-Control-Allow-Credentials: true\r\n"
+			"Access-Control-Allow-Headers: Accept, X-Requested-With, Content-Type, Cookie\r\n"
 			"Access-Control-Max-Age: 1209600\r\n" // 86400 * 14
 			);
 	}
