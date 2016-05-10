@@ -13,6 +13,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #include "log.h"
 #include "common.h"
@@ -20,7 +21,30 @@
 #include "appconfig.h"
 
 #include "web_client.h"
+#include "rrd.h"
 #include "registry.h"
+
+
+// ----------------------------------------------------------------------------
+// TODO
+//
+// 1. the default tracking cookie expires in 1 year, but the persons are not
+//    removed from the db - this means the database only grows - ideally the
+//    database should be cleaned in registry_save() for both on-disk and
+//    on-memory entries.
+//
+// 2. add protection to prevent abusing the registry by flooding it with
+//    requests to fill the memory and crash it.
+//
+//    Possible protections:
+//    - limit the number of URLs per person
+//    - limit the number of URLs per machine
+//    - limit the number of persons
+//    - limit the number of machines
+//    - limit the number of requests that add data to the registry,
+//      per client IP per hour
+
+
 
 #define REGISTRY_URL_FLAGS_DEFAULT 0x00
 #define REGISTRY_URL_FLAGS_EXPIRED 0x01
@@ -33,19 +57,38 @@
 struct registry {
 	int enabled;
 
-	// counters / statistics
+	char machine_guid[36 + 1];
+
+	// entries counters / statistics
 	unsigned long long persons_count;
 	unsigned long long machines_count;
 	unsigned long long usages_count;
 	unsigned long long urls_count;
 	unsigned long long persons_urls_count;
 	unsigned long long machines_urls_count;
+	unsigned long long log_count;
 
-	// files
+	// memory counters / statistics
+	unsigned long long persons_memory;
+	unsigned long long machines_memory;
+	unsigned long long urls_memory;
+	unsigned long long persons_urls_memory;
+	unsigned long long machines_urls_memory;
+
+	// configuration
+	unsigned long long save_registry_every_entries;
+	char *registry_domain;
+	char *registry_to_announce;
+	time_t persons_expiration; // seconds to expire idle persons
+
+	// file/path names
 	char *pathname;
 	char *db_filename;
 	char *log_filename;
-	FILE *registry_log_fp;
+	char *machine_guid_filename;
+
+	// open files
+	FILE *log_fp;
 
 	// the database
 	DICTIONARY *persons; 	// dictionary of PERSON *, with key the PERSON.guid
@@ -62,6 +105,7 @@ struct registry {
 	pthread_mutex_t machine_urls_lock;
 	pthread_mutex_t log_lock;
 } registry;
+
 
 // ----------------------------------------------------------------------------
 // URL structures
@@ -284,6 +328,8 @@ static inline URL *registry_url_allocate_nolock(const char *url, size_t urllen) 
 	u->len = urllen;
 	u->links = 0;
 
+	registry.urls_memory += sizeof(URL) + urllen;
+
 	debug(D_REGISTRY, "Registry: registry_url_allocate_nolock('%s'): indexing it", url);
 	dictionary_set(registry.urls, u->url, u, sizeof(URL));
 
@@ -345,6 +391,8 @@ static inline MACHINE_URL *registry_machine_url_allocate(MACHINE *m, URL *u, tim
 	mu->url = u;
 	mu->flags = REGISTRY_URL_FLAGS_DEFAULT;
 
+	registry.machines_urls_memory += sizeof(MACHINE_URL);
+
 	debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s'): indexing URL in machine", m->guid, u->url);
 	dictionary_set(m->urls, u->url, mu, sizeof(MACHINE_URL));
 	registry_url_link_nolock(u);
@@ -355,7 +403,7 @@ static inline MACHINE_URL *registry_machine_url_allocate(MACHINE *m, URL *u, tim
 static inline MACHINE *registry_machine_allocate(const char *machine_guid, time_t when) {
 	debug(D_REGISTRY, "Registry: registry_machine_allocate('%s'): creating new machine, sizeof(MACHINE)=%zu", machine_guid, sizeof(MACHINE));
 
-	MACHINE *m = calloc(1, sizeof(MACHINE));
+	MACHINE *m = malloc(sizeof(MACHINE));
 	if(!m) fatal("Registry: cannot allocate memory for new machine '%s'", machine_guid);
 
 	strncpy(m->guid, machine_guid, 36);
@@ -365,6 +413,8 @@ static inline MACHINE *registry_machine_allocate(const char *machine_guid, time_
 
 	m->first_t = m->last_t = when;
 	m->usages = 0;
+
+	registry.machines_memory += sizeof(MACHINE);
 
 	dictionary_set(registry.machines, m->guid, m, sizeof(MACHINE));
 
@@ -409,9 +459,11 @@ static inline PERSON *registry_person_find(const char *person_guid) {
 }
 
 static inline PERSON_URL *registry_person_url_allocate(PERSON *p, MACHINE *m, URL *u, char *name, size_t namelen, time_t when) {
-	debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): allocating %zu bytes", p->guid, m->guid, u->url, sizeof(PERSON_URL) + namelen);
+	debug(D_REGISTRY, "registry_person_url_allocate('%s', '%s', '%s'): allocating %zu bytes", p->guid, m->guid, u->url,
+		  sizeof(PERSON_URL) + namelen);
+
 	PERSON_URL *pu = malloc(sizeof(PERSON_URL) + namelen);
-	if(!pu) fatal("registry_person_link_to_url('%s', '%s', '%s'): cannot allocate %zu bytes.", p->guid, m->guid, u->url, sizeof(PERSON_URL) + namelen);
+	if(!pu) fatal("registry_person_url_allocate('%s', '%s', '%s'): cannot allocate %zu bytes.", p->guid, m->guid, u->url, sizeof(PERSON_URL) + namelen);
 
 	// a simple strcpy() should do the job
 	// but I prefer to be safe, since the caller specified urllen
@@ -424,11 +476,34 @@ static inline PERSON_URL *registry_person_url_allocate(PERSON *p, MACHINE *m, UR
 	pu->url = u;
 	pu->flags = REGISTRY_URL_FLAGS_DEFAULT;
 
-	debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): indexing URL in person", p->guid, m->guid, u->url);
+	registry.persons_urls_memory += sizeof(PERSON_URL) + namelen;
+
+	debug(D_REGISTRY, "registry_person_url_allocate('%s', '%s', '%s'): indexing URL in person", p->guid, m->guid, u->url);
 	dictionary_set(p->urls, u->url, pu, sizeof(PERSON_URL));
 	registry_url_link_nolock(u);
 
 	return pu;
+}
+
+static inline PERSON_URL *registry_person_url_reallocate(PERSON *p, MACHINE *m, URL *u, char *name, size_t namelen, time_t when, PERSON_URL *pu) {
+	// this function is needed to change the name of a PERSON_URL
+
+	debug(D_REGISTRY, "registry_person_url_reallocate('%s', '%s', '%s'): allocating %zu bytes", p->guid, m->guid, u->url,
+		  sizeof(PERSON_URL) + namelen);
+
+	PERSON_URL *tpu = registry_person_url_allocate(p, m, u, name, namelen, when);
+	tpu->first_t = pu->first_t;
+	tpu->last_t = pu->last_t;
+	tpu->usages = pu->usages;
+
+	// ok, these are a hack - since the registry_person_url_allocate() is
+	// adding these, we have to subtract them
+	registry.persons_urls_memory -= sizeof(PERSON_URL) + strlen(pu->name);
+	registry_url_unlink_nolock(u);
+
+	free(pu);
+
+	return tpu;
 }
 
 static inline PERSON *registry_person_allocate(const char *person_guid, time_t when) {
@@ -436,7 +511,7 @@ static inline PERSON *registry_person_allocate(const char *person_guid, time_t w
 
 	debug(D_REGISTRY, "Registry: registry_person_allocate('%s'): allocating new person, sizeof(PERSON)=%zu", (person_guid)?person_guid:"", sizeof(PERSON));
 
-	p = calloc(1, sizeof(PERSON));
+	p = malloc(sizeof(PERSON));
 	if(!p) fatal("Registry: cannot allocate memory for new person.");
 
 	if(!person_guid) {
@@ -466,6 +541,8 @@ static inline PERSON *registry_person_allocate(const char *person_guid, time_t w
 
 	p->first_t = p->last_t = when;
 	p->usages = 0;
+
+	registry.persons_memory += sizeof(PERSON);
 
 	dictionary_set(registry.persons, p->guid, p, sizeof(PERSON));
 	return p;
@@ -531,6 +608,11 @@ static inline PERSON_URL *registry_person_link_to_url(PERSON *p, MACHINE *m, URL
 
 			pu->machine = m;
 		}
+
+		if(strcmp(pu->name, name)) {
+			// the name of the PERSON_URL has changed !
+			pu = registry_person_url_reallocate(p, m, u, name, namelen, when, pu);
+		}
 	}
 
 	p->usages++;
@@ -581,52 +663,76 @@ static inline MACHINE_URL *registry_machine_link_to_url(PERSON *p, MACHINE *m, U
 // ----------------------------------------------------------------------------
 // REGISTRY LOG LOAD/SAVE
 
+static inline int registry_should_save_db(void) {
+	debug(D_REGISTRY, "log entries %llu, max %llu", registry.log_count, registry.save_registry_every_entries);
+	return registry.log_count > registry.save_registry_every_entries;
+}
+
 static inline void registry_log(const char action, PERSON *p, MACHINE *m, URL *u, char *name) {
-	if(likely(registry.registry_log_fp)) {
+	if(likely(registry.log_fp)) {
 		// we lock only if the file is open
 		// to allow replaying the log at registry_log_load()
 		registry_log_lock();
 
-		fprintf(registry.registry_log_fp, "%c\t%08x\t%s\t%s\t%s\t%s\n",
+		if(unlikely(fprintf(registry.log_fp, "%c\t%08x\t%s\t%s\t%s\t%s\n",
 				action,
 				p->last_t,
 				p->guid,
 				m->guid,
 				name,
-				u->url
-		);
+				u->url) < 0))
+			error("Registry: failed to save log. Registry data may be lost in case of abnormal restart.");
+
+		// we increase the counter even on failures
+		// so that the registry will be saved periodically
+		registry.log_count++;
 
 		registry_log_unlock();
+
+		// this must be outside the log_lock(), or a deadlock will happen.
+		// registry_save() checks the same inside the log_lock, so only
+		// one thread will save the db
+		if(unlikely(registry_should_save_db()))
+			registry_save();
 	}
 }
 
-void registry_log_open_nolock(void) {
-	registry.registry_log_fp = fopen(registry.log_filename, "a");
+static inline int registry_log_open_nolock(void) {
+	if(registry.log_fp)
+		fclose(registry.log_fp);
 
-	if(registry.registry_log_fp) {
-		if (setvbuf(registry.registry_log_fp, NULL, _IOLBF, 0) != 0)
+	registry.log_fp = fopen(registry.log_filename, "a");
+
+	if(registry.log_fp) {
+		if (setvbuf(registry.log_fp, NULL, _IOLBF, 0) != 0)
 			error("Cannot set line buffering on registry log file.");
+		return 0;
+	}
+
+	error("Cannot open registry log file '%s'. Registry data will be lost in case of netdata or server crash.", registry.log_filename);
+	return -1;
+}
+
+static inline void registry_log_close_nolock(void) {
+	if(registry.log_fp) {
+		fclose(registry.log_fp);
+		registry.log_fp = NULL;
 	}
 }
 
-void registry_log_close_nolock(void) {
-	if(registry.registry_log_fp)
-		fclose(registry.registry_log_fp);
-
-	registry.registry_log_fp = NULL;
-}
-
-void registry_log_recreate_nolock(void) {
-	if(registry.registry_log_fp != NULL) {
+static inline void registry_log_recreate_nolock(void) {
+	if(registry.log_fp != NULL) {
 		registry_log_close_nolock();
 
-		registry.registry_log_fp = fopen(registry.log_filename, "w");
-		if(registry.registry_log_fp) fclose(registry.registry_log_fp);
-		registry.registry_log_fp = NULL;
+		// open it with truncate
+		registry.log_fp = fopen(registry.log_filename, "w");
+		if(registry.log_fp) fclose(registry.log_fp);
+		else error("Cannot truncate registry log '%s'", registry.log_filename);
+
+		registry.log_fp = NULL;
 
 		registry_log_open_nolock();
 	}
-
 }
 
 int registry_log_load(void) {
@@ -656,11 +762,16 @@ int registry_log_load(void) {
 						error("Registry: log line %u is wrong (len = %zu).", line, len);
 						continue;
 					}
-
 					s[1] = s[10] = s[47] = s[84] = '\0';
 
+					// get the variables
+					time_t when = strtoul(&s[2], NULL, 16);
+					char *person_guid = &s[11];
+					char *machine_guid = &s[48];
+					char *name = &s[85];
+
 					// skip the name to find the url
-					char *url = &s[85];
+					char *url = name;
 					while(*url && *url != '\t') url++;
 					if(!*url) {
 						error("Registry: log line %u does not have a url.", line);
@@ -668,10 +779,15 @@ int registry_log_load(void) {
 					}
 					*url++ = '\0';
 
+					// make sure the person exists
+					// without this, a new person guid will be created
+					PERSON *p = registry_person_find(person_guid);
+					if(!p) p = registry_person_allocate(person_guid, when);
+
 					if(s[0] == 'A')
-						registry_request_access(&s[11], &s[48], url, &s[85], strtoul(&s[2], NULL, 16));
+						registry_request_access(p->guid, machine_guid, url, name, when);
 					else
-						registry_request_delete(&s[11], &s[48], url, &s[85], strtoul(&s[2], NULL, 16));
+						registry_request_delete(p->guid, machine_guid, url, name, when);
 
 					break;
 
@@ -871,9 +987,27 @@ MACHINE *registry_request_machine(char *person_guid, char *machine_guid, char *u
 
 #ifndef REGISTRY_STANDALONE_TESTS
 
+static inline void registry_set_person_cookie(struct web_client *w, PERSON *p) {
+	char edate[100];
+	time_t et = time(NULL) + registry.persons_expiration;
+	struct tm etmbuf, *etm = gmtime_r(&et, &etmbuf);
+	strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", etm);
+
+	if(registry.registry_domain && registry.registry_domain[0])
+		snprintf(w->cookie, COOKIE_MAX, NETDATA_REGISTRY_COOKIE_NAME "=%s; Domain=%s; Expires=%s", p->guid, registry.registry_domain, edate);
+	else
+		snprintf(w->cookie, COOKIE_MAX, NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s", p->guid, edate);
+
+	w->cookie[COOKIE_MAX] = '\0';
+}
+
+
 static inline void registry_json_header(struct web_client *w, int status) {
+	w->response.data->contenttype = CT_APPLICATION_JSON;
 	buffer_flush(w->response.data);
-	buffer_sprintf(w->response.data, "{\n\"success\": %s", status?"true":"false");
+	buffer_sprintf(w->response.data, "{\n\t\"success\": %s,\n\t\"machine_guid\": \"%s\"",
+				   status?"true":"false",
+				   registry.machine_guid);
 }
 
 static inline void registry_json_footer(struct web_client *w) {
@@ -882,11 +1016,55 @@ static inline void registry_json_footer(struct web_client *w) {
 
 static inline int registry_json_redirect(struct web_client *w) {
 	registry_json_header(w, 0);
-	buffer_sprintf(w->response.data, "\"registries\": \"%s\"", config_get("global", "users registries", "reg1.mynetdata.io reg2.mynetdata.io reg3.mynetdata.io"));
+
+	buffer_sprintf(w->response.data, ",\n\t\"registry\": \"%s\"",
+				   registry.registry_to_announce);
+
 	registry_json_footer(w);
 	return 200;
 }
 
+// structure used be the callbacks below
+struct registry_json_walk_person_urls_callback {
+	PERSON *p;
+	MACHINE *m;
+	struct web_client *w;
+	int count;
+};
+
+// callback for rendering PERSON_URLs
+static inline int registry_json_person_url_callback(void *entry, void *data) {
+	PERSON_URL *pu = (PERSON_URL *)entry;
+	struct registry_json_walk_person_urls_callback *c = (struct registry_json_walk_person_urls_callback *)data;
+	struct web_client *w = c->w;
+
+	if(unlikely(c->count++))
+		buffer_strcat(w->response.data, ",");
+
+	buffer_sprintf(w->response.data, "\n\t\t[ \"%s\", \"%s\", %u000, %u, \"%s\" ]",
+				   pu->machine->guid, pu->url->url, pu->last_t, pu->usages, pu->name);
+
+	return 1;
+}
+
+// callback for rendering MACHINE_URLs
+static inline int registry_json_machine_url_callback(void *entry, void *data) {
+	MACHINE_URL *mu = (MACHINE_URL *)entry;
+	struct registry_json_walk_person_urls_callback *c = (struct registry_json_walk_person_urls_callback *)data;
+	struct web_client *w = c->w;
+	MACHINE *m = c->m;
+
+	if(unlikely(c->count++))
+		buffer_strcat(w->response.data, ",");
+
+	buffer_sprintf(w->response.data, "\n\t\t[ \"%s\", \"%s\", %u000, %u ]",
+				   m->guid, mu->url->url, mu->last_t, mu->usages);
+
+	return 1;
+}
+
+
+// the main method for registering an access
 int registry_request_access_json(struct web_client *w, char *person_guid, char *machine_guid, char *url, char *name, time_t when) {
 	if(!registry.enabled)
 		return registry_json_redirect(w);
@@ -898,18 +1076,22 @@ int registry_request_access_json(struct web_client *w, char *person_guid, char *
 		return 400;
 	}
 
-	// FIXME -- make this a permanent cookie
-	strncpy(w->cookie, p->guid, COOKIE_MAX);
-	w->cookie[COOKIE_MAX] = '\0';
+	// set the cookie
+	registry_set_person_cookie(w, p);
 
+	// generate the response
 	registry_json_header(w, 1);
 
-	// FIXME - print an array of all URLs / Machines / Names
+	buffer_strcat(w->response.data, ",\n\t\"urls\": [");
+	struct registry_json_walk_person_urls_callback c = { p, NULL, w, 0 };
+	dictionary_get_all(p->urls, registry_json_person_url_callback, &c);
+	buffer_strcat(w->response.data, "\n\t]\n");
 
-	buffer_strcat(w->response.data, "\n}\n");
+	registry_json_footer(w);
 	return 200;
 }
 
+// the main method for deleting a URL from a person
 int registry_request_delete_json(struct web_client *w, char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when) {
 	if(!registry.enabled)
 		return registry_json_redirect(w);
@@ -921,11 +1103,13 @@ int registry_request_delete_json(struct web_client *w, char *person_guid, char *
 		return 400;
 	}
 
+	// generate the response
 	registry_json_header(w, 1);
 	registry_json_footer(w);
 	return 200;
 }
 
+// the main method for searching the URLs of a netdata
 int registry_request_search_json(struct web_client *w, char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when) {
 	if(!registry.enabled)
 		return registry_json_redirect(w);
@@ -939,13 +1123,69 @@ int registry_request_search_json(struct web_client *w, char *person_guid, char *
 
 	registry_json_header(w, 1);
 
-	// FIXME - print an array of all URLs the machine is accessible
+	buffer_strcat(w->response.data, ",\n\t\"urls\": [");
+	struct registry_json_walk_person_urls_callback c = { NULL, m, w, 0 };
+	dictionary_get_all(m->urls, registry_json_machine_url_callback, &c);
+	buffer_strcat(w->response.data, "\n\t]\n");
 
 	registry_json_footer(w);
 	return 200;
 }
 
-#endif /* REGISTRY_STANDALONE_TESTS */
+#endif /* ! REGISTRY_STANDALONE_TESTS */
+
+
+// ----------------------------------------------------------------------------
+// REGISTRY THIS MACHINE UNIQUE ID
+
+char *registry_get_this_machine_guid(void) {
+	if(likely(registry.machine_guid[0]))
+		return registry.machine_guid;
+
+	// read it from disk
+	int fd = open(registry.machine_guid_filename, O_RDONLY);
+	if(fd != -1) {
+		char buf[36 + 1];
+		if(read(fd, buf, 36) != 36)
+			error("Failed to read machine GUID from '%s'", registry.machine_guid_filename);
+		else {
+			buf[36] = '\0';
+			if(registry_regenerate_guid(buf, registry.machine_guid) == -1) {
+				error("Failed to validate machine GUID '%s' from '%s'. Ignoring it - this might mean this netdata will appear as duplicate in the registry.",
+					  buf, registry.machine_guid_filename);
+
+				registry.machine_guid[0] = '\0';
+			}
+		}
+		close(fd);
+	}
+
+	// generate a new one?
+	if(!registry.machine_guid[0]) {
+		int count = 10, ret = 0;
+		uuid_t uuid;
+
+		// for some reason it reports unsafe generation the first time
+		while(count-- && (ret = uuid_generate_time_safe(uuid)) == -1) ;
+		uuid_unparse_lower(uuid, registry.machine_guid);
+		registry.machine_guid[36] = '\0';
+
+		if(ret == -1)
+			info("Warning: generated machine GUID '%s' was not generated using a safe method.", registry.machine_guid);
+
+		// save it
+		fd = open(registry.machine_guid_filename, O_WRONLY|O_CREAT|O_TRUNC, 444);
+		if(fd == -1)
+			fatal("Cannot create unique machine id file '%s'. Please fix this.", registry.machine_guid_filename);
+
+		if(write(fd, registry.machine_guid, 36) != 36)
+			fatal("Cannot write the unique machine id file '%s'. Please fix this.", registry.machine_guid_filename);
+
+		close(fd);
+	}
+
+	return registry.machine_guid;
+}
 
 
 // ----------------------------------------------------------------------------
@@ -1042,14 +1282,19 @@ static inline int registry_person_save(void *entry, void *file) {
 int registry_save(void) {
 	if(!registry.enabled) return -1;
 
+	// make sure the log is not updated
+	registry_log_lock();
+
+	if(unlikely(!registry_should_save_db())) {
+		registry_log_unlock();
+		return -2;
+	}
+
 	char tmp_filename[FILENAME_MAX + 1];
 	char old_filename[FILENAME_MAX + 1];
 
 	snprintf(old_filename, FILENAME_MAX, "%s.old", registry.db_filename);
 	snprintf(tmp_filename, FILENAME_MAX, "%s.tmp", registry.db_filename);
-
-	// make sure the log is not updated
-	registry_log_lock();
 
 	debug(D_REGISTRY, "Registry: Creating file '%s'", tmp_filename);
 	FILE *fp = fopen(tmp_filename, "w");
@@ -1058,6 +1303,8 @@ int registry_save(void) {
 		registry_log_unlock();
 		return -1;
 	}
+
+	// dictionary_get_all() has its own locking, so this is safe to do
 
 	debug(D_REGISTRY, "Saving all machines");
 	int bytes1 = dictionary_get_all(registry.machines, registry_machine_save, fp);
@@ -1083,7 +1330,7 @@ int registry_save(void) {
 	fprintf(fp, "T\t%016llx\t%016llx\t%016llx\t%016llx\t%016llx\t%016llx\n",
 			registry.persons_count,
 			registry.machines_count,
-			registry.usages_count,
+			registry.usages_count + 1, // this is required - it is lost on db rotation
 			registry.urls_count,
 			registry.persons_urls_count,
 			registry.machines_urls_count
@@ -1128,6 +1375,8 @@ int registry_save(void) {
 			// it has been moved successfully
 			// discard the current registry log
 			registry_log_recreate_nolock();
+
+			registry.log_count = 0;
 		}
 	}
 
@@ -1144,10 +1393,10 @@ static inline size_t registry_load(void) {
 	URL *u = NULL;
 	size_t line = 0;
 
-	debug(D_REGISTRY, "Registry: loading active db from: %s", registry.db_filename);
+	debug(D_REGISTRY, "Registry: loading active db from: '%s'", registry.db_filename);
 	FILE *fp = fopen(registry.db_filename, "r");
 	if(!fp) {
-		error("Registry: cannot open registry file: %s", registry.db_filename);
+		error("Registry: cannot open registry file: '%s'", registry.db_filename);
 		return 0;
 	}
 
@@ -1266,26 +1515,44 @@ static inline size_t registry_load(void) {
 	}
 	fclose(fp);
 
-	registry_log_load();
-
 	return line;
 }
 
 // ----------------------------------------------------------------------------
 // REGISTRY
 
-void registry_init(void) {
+int registry_init(void) {
 	char filename[FILENAME_MAX + 1];
-	registry.pathname = config_get("registry", "registry db directory", VARLIB_DIR);
-	if(mkdir(registry.pathname, 0644) == -1 && errno != EEXIST)
-		error("Cannot create directory '%s'", registry.pathname);
 
-	snprintf(filename, FILENAME_MAX, "%s/%s", registry.pathname, "registry.db");
+	// registry enabled?
+	registry.enabled = config_get_boolean("registry", "enabled", 0);
+
+	// pathnames
+	registry.pathname = config_get("registry", "registry db directory", VARLIB_DIR "/registry");
+	if(mkdir(registry.pathname, 0755) == -1 && errno != EEXIST) {
+		error("Cannot create directory '%s'. Registry disabled.", registry.pathname);
+		registry.enabled = 0;
+		return -1;
+	}
+
+	// filenames
+	snprintf(filename, FILENAME_MAX, "%s/netdata.public.unique.id", registry.pathname);
+	registry.machine_guid_filename = config_get("registry", "netdata unique id file", filename);
+	registry_get_this_machine_guid();
+
+	snprintf(filename, FILENAME_MAX, "%s/registry.db", registry.pathname);
 	registry.db_filename = config_get("registry", "registry db file", filename);
 
-	snprintf(filename, FILENAME_MAX, "%s/%s", registry.pathname, "registry-log.db");
+	snprintf(filename, FILENAME_MAX, "%s/registry-log.db", registry.pathname);
 	registry.log_filename = config_get("registry", "registry log file", filename);
 
+	// configuration options
+	registry.save_registry_every_entries = config_get_number("registry", "registry save db every new entries", 1000000);
+	registry.persons_expiration = config_get_number("registry", "registry expire idle persons days", 365) * 86400;
+	registry.registry_domain = config_get("registry", "registry domain", "");
+	registry.registry_to_announce = config_get("registry", "registry to announce", "https://registry.netdata.online");
+
+	// initialize entries counters
 	registry.persons_count = 0;
 	registry.machines_count = 0;
 	registry.usages_count = 0;
@@ -1293,25 +1560,33 @@ void registry_init(void) {
 	registry.persons_urls_count = 0;
 	registry.machines_urls_count = 0;
 
-	debug(D_REGISTRY, "Registry: creating global registry dictionary for persons.");
-	registry.persons = dictionary_create(DICTIONARY_FLAGS);
+	// initialize memory counters
+	registry.persons_memory = 0;
+	registry.machines_memory = 0;
+	registry.urls_memory = 0;
+	registry.persons_urls_memory = 0;
+	registry.machines_urls_memory = 0;
 
-	debug(D_REGISTRY, "Registry: creating global registry dictionary for machines.");
-	registry.machines = dictionary_create(DICTIONARY_FLAGS);
-
-	debug(D_REGISTRY, "Registry: creating global registry dictionary for urls.");
-	registry.urls = dictionary_create(DICTIONARY_FLAGS);
-
+	// initialize locks
 	pthread_mutex_init(&registry.persons_lock, NULL);
 	pthread_mutex_init(&registry.machines_lock, NULL);
 	pthread_mutex_init(&registry.urls_lock, NULL);
 	pthread_mutex_init(&registry.person_urls_lock, NULL);
 	pthread_mutex_init(&registry.machine_urls_lock, NULL);
 
-	registry_log_open_nolock();
-	registry_load();
+	// create dictionaries
+	registry.persons = dictionary_create(DICTIONARY_FLAGS);
+	registry.machines = dictionary_create(DICTIONARY_FLAGS);
+	registry.urls = dictionary_create(DICTIONARY_FLAGS);
 
-	registry.enabled = 1;
+	// load the registry database
+	if(registry.enabled) {
+		registry_log_open_nolock();
+		registry_load();
+		registry_log_load();
+	}
+
+	return 0;
 }
 
 void registry_free(void) {
@@ -1393,6 +1668,68 @@ void registry_free(void) {
 
 	debug(D_REGISTRY, "Registry: destroying urls dictionary");
 	dictionary_destroy(registry.urls);
+}
+
+// ----------------------------------------------------------------------------
+// STATISTICS
+
+void registry_statistics(void) {
+	if(!registry.enabled) return;
+
+	static RRDSET *sts = NULL, *stc = NULL, *stm = NULL;
+
+	if(!sts) sts = rrdset_find("netdata.registry_sessions");
+	if(!sts) {
+		sts = rrdset_create("netdata", "registry_sessions", NULL, "registry", NULL, "NetData Registry Sessions", "session", 131000, rrd_update_every, RRDSET_TYPE_LINE);
+
+		rrddim_add(sts, "sessions",  NULL,  1, 1, RRDDIM_ABSOLUTE);
+	}
+	else rrdset_next(sts);
+
+	rrddim_set(sts, "sessions", registry.usages_count);
+	rrdset_done(sts);
+
+	// ------------------------------------------------------------------------
+
+	if(!stc) stc = rrdset_find("netdata.registry_entries");
+	if(!stc) {
+		stc = rrdset_create("netdata", "registry_entries", NULL, "registry", NULL, "NetData Registry Entries", "entries", 131100, rrd_update_every, RRDSET_TYPE_LINE);
+
+		rrddim_add(stc, "persons",        NULL,  1, 1, RRDDIM_ABSOLUTE);
+		rrddim_add(stc, "machines",       NULL,  1, 1, RRDDIM_ABSOLUTE);
+		rrddim_add(stc, "urls",           NULL,  1, 1, RRDDIM_ABSOLUTE);
+		rrddim_add(stc, "persons_urls",   NULL,  1, 1, RRDDIM_ABSOLUTE);
+		rrddim_add(stc, "machines_urls",  NULL,  1, 1, RRDDIM_ABSOLUTE);
+	}
+	else rrdset_next(stc);
+
+	rrddim_set(stc, "persons",       registry.persons_count);
+	rrddim_set(stc, "machines",      registry.machines_count);
+	rrddim_set(stc, "urls",          registry.urls_count);
+	rrddim_set(stc, "persons_urls",  registry.persons_urls_count);
+	rrddim_set(stc, "machines_urls", registry.machines_urls_count);
+	rrdset_done(stc);
+
+	// ------------------------------------------------------------------------
+
+	if(!stm) stm = rrdset_find("netdata.registry_mem");
+	if(!stm) {
+		stm = rrdset_create("netdata", "registry_mem", NULL, "registry", NULL, "NetData Registry Memory", "KB", 131300, rrd_update_every, RRDSET_TYPE_STACKED);
+
+		rrddim_add(stm, "persons",        NULL,  1, 1024, RRDDIM_ABSOLUTE);
+		rrddim_add(stm, "machines",       NULL,  1, 1024, RRDDIM_ABSOLUTE);
+		rrddim_add(stm, "urls",           NULL,  1, 1024, RRDDIM_ABSOLUTE);
+		rrddim_add(stm, "persons_urls",   NULL,  1, 1024, RRDDIM_ABSOLUTE);
+		rrddim_add(stm, "machines_urls",  NULL,  1, 1024, RRDDIM_ABSOLUTE);
+	}
+	else rrdset_next(stm);
+
+	rrddim_set(stm, "persons",       registry.persons_memory + registry.persons_count * sizeof(NAME_VALUE) + sizeof(DICTIONARY));
+	rrddim_set(stm, "machines",      registry.machines_memory + registry.machines_count * sizeof(NAME_VALUE) + sizeof(DICTIONARY));
+	rrddim_set(stm, "urls",          registry.urls_memory + registry.urls_count * sizeof(NAME_VALUE) + sizeof(DICTIONARY));
+	rrddim_set(stm, "persons_urls",  registry.persons_urls_memory + registry.persons_count * sizeof(DICTIONARY) + registry.persons_urls_count * sizeof(NAME_VALUE));
+	rrddim_set(stm, "machines_urls", registry.machines_urls_memory + registry.machines_count * sizeof(DICTIONARY) + registry.machines_urls_count * sizeof(NAME_VALUE));
+	rrdset_done(stm);
 }
 
 
