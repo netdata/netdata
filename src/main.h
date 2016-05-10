@@ -1,7 +1,9 @@
 #ifndef NETDATA_MAIN_H
 #define NETDATA_MAIN_H 1
 
-extern int netdata_exit;
+#include <signal.h>
+
+extern volatile sig_atomic_t netdata_exit;
 
 extern void kill_childs(void);
 extern int killpid(pid_t pid, int signal);

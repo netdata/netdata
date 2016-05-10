@@ -114,10 +114,26 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 #endif
 
 	// reset all signals
-	for (i = 1 ; i < 65 ;i++) if(i != SIGSEGV) signal(i, SIG_DFL);
+	{
+		sigset_t sigset;
+		sigfillset(&sigset);
+
+		if(pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) == -1) {
+			error("Could not block signals for threads");
+		}
+		// We only need to reset ignored signals.
+		// Signals with signal handlers are reset by default.
+		struct sigaction sa;
+		sigemptyset(&sa.sa_mask);
+		sa.sa_handler = SIG_DFL;
+		if(sigaction(SIGPIPE, &sa, NULL) == -1) {
+			error("Failed to change signal handler for SIGTERM");
+		}
+	}
+
 
 	info("executing command: '%s' on pid %d.", command, getpid());
- 	execl("/bin/sh", "sh", "-c", command, NULL);
+	execl("/bin/sh", "sh", "-c", command, NULL);
 	exit(1);
 }
 
