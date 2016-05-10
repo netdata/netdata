@@ -454,7 +454,7 @@ void generate_config(BUFFER *wb, int only_changed)
 				pthread_rwlock_wrlock(&co->rwlock);
 
 				for(cv = co->values; cv ; cv = cv->next) {
-					used += (cv->flags && CONFIG_VALUE_USED)?1:0;
+					used += (cv->flags & CONFIG_VALUE_USED)?1:0;
 					changed += (cv->flags & CONFIG_VALUE_CHANGED)?1:0;
 					count++;
 				}
