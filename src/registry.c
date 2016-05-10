@@ -803,6 +803,27 @@ PERSON *registry_request_delete(char *person_guid, char *machine_guid, char *url
 	return p;
 }
 
+
+// a structure to pass to the dictionary_get_all() callback handler
+struct machine_request_callback_data {
+	MACHINE *find_this_machine;
+	PERSON_URL *result;
+};
+
+// the callback function
+// this will be run for every PERSON_URL of this PERSON
+int machine_request_callback(void *entry, void *data) {
+	PERSON_URL *mypu = (PERSON_URL *)entry;
+	struct machine_request_callback_data *myrdata = (struct machine_request_callback_data *)data;
+
+	if(mypu->machine == myrdata->find_this_machine) {
+		myrdata->result = mypu;
+		return -1; // this will also stop the walk through
+	}
+
+	return 0; // continue
+}
+
 MACHINE *registry_request_machine(char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when) {
 	(void)when;
 
@@ -831,27 +852,8 @@ MACHINE *registry_request_machine(char *person_guid, char *machine_guid, char *u
 	// We will walk through the PERSON_URLs to find the machine
 	// linking to our machine
 
-	// C magic !
-
 	// a structure to pass to the dictionary_get_all() callback handler
-	struct machine_request_callback_data {
-		MACHINE *find_this_machine;
-		PERSON_URL *result;
-	} rdata = { m, NULL };
-
-	// the callback function
-	// this will be run for every PERSON_URL of this PERSON
-	int machine_request_callback(void *entry, void *data) {
-		PERSON_URL *mypu = (PERSON_URL *)entry;
-		struct machine_request_callback_data *myrdata = (struct machine_request_callback_data *)data;
-
-		if(mypu->machine == myrdata->find_this_machine) {
-			myrdata->result = mypu;
-			return -1; // this will also stop the walk through
-		}
-
-		return 0; // continue
-	}
+	struct machine_request_callback_data rdata = { m, NULL };
 
 	// request a walk through on the dictionary
 	// no need for locking here, the underlying dictionary has its own
