@@ -1014,7 +1014,7 @@ static inline void registry_json_footer(struct web_client *w) {
 	buffer_strcat(w->response.data, "\n}\n");
 }
 
-static inline int registry_json_redirect(struct web_client *w) {
+int registry_json_redirect(struct web_client *w) {
 	registry_json_header(w, 0);
 
 	buffer_sprintf(w->response.data, ",\n\t\"registry\": \"%s\"",

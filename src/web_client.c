@@ -817,6 +817,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 
 		if(!strcmp(name, "action")) {
 			if(!strcmp(value, "access")) action = 'A';
+			else if(!strcmp(value, "hello")) action = 'H';
 			else if(!strcmp(value, "delete")) action = 'D';
 			else if(!strcmp(value, "search")) action = 'S';
 		}
@@ -840,11 +841,33 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 		}
 	}
 
-	if((!action || !machine_guid || !machine_url) || (action == 'A' && !url_name) || (action == 'D' && !delete_url) || (action == 'S' && !search_machine_guid)) {
+	if(action == 'A' && (!machine_guid || !machine_url || !url_name)) {
 		buffer_flush(w->response.data);
-		buffer_sprintf(w->response.data, "Invalid registry request - required parameters missing.");
+		buffer_sprintf(w->response.data, "Invalid registry request - access requires these parameters: machine ('%s'), url ('%s'), name ('%s')",
+					   machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", url_name?url_name:"UNSET");
 		return 400;
 	}
+	else if(action == 'D' && (!machine_guid || !machine_url || !delete_url)) {
+		buffer_flush(w->response.data);
+		buffer_sprintf(w->response.data, "Invalid registry request - delete requires these parameters: machine ('%s'), url ('%s'), delete_url ('%s')",
+					   machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", delete_url?delete_url:"UNSET");
+		return 400;
+	}
+	else if(action == 'S' && (!machine_guid || !machine_url || !search_machine_guid)) {
+		buffer_flush(w->response.data);
+		buffer_sprintf(w->response.data, "Invalid registry request - search requires these parameters: machine ('%s'), url ('%s'), for ('%s')",
+					   machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", search_machine_guid?search_machine_guid:"UNSET");
+		return 400;
+	}
+
+	/*
+	 * No, this is not right
+	if(action != 'H' && !person_guid[0]) {
+		buffer_flush(w->response.data);
+		buffer_sprintf(w->response.data, "Invalid registry request - you need to send your cookie for this action.");
+		return 400;
+	}
+	*/
 
 	switch(action) {
 		case 'A':
@@ -855,6 +878,14 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 
 		case 'S':
 			return registry_request_search_json(w, person_guid, machine_guid, machine_url, search_machine_guid, time(NULL));
+
+		case 'H':
+			return registry_json_redirect(w);
+
+		default:
+			buffer_flush(w->response.data);
+			buffer_sprintf(w->response.data, "Invalid registry request - you need to set an action: hello, access, delete, search");
+			return 400;
 	}
 
 	buffer_flush(w->response.data);
