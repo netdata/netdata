@@ -434,6 +434,7 @@ static inline MACHINE *registry_machine_allocate(const char *machine_guid, time_
 
 	registry.machines_memory += sizeof(MACHINE);
 
+	registry.machines_count++;
 	dictionary_set(registry.machines, m->guid, m, sizeof(MACHINE));
 
 	return m;
@@ -455,10 +456,7 @@ static inline MACHINE *registry_machine_get(const char *machine_guid, time_t whe
 		else {
 			machine_guid = buf;
 			m = registry_machine_find(machine_guid);
-			if(!m) {
-				m = registry_machine_allocate(machine_guid, when);
-				registry.machines_count++;
-			}
+			if(!m) m = registry_machine_allocate(machine_guid, when);
 		}
 	}
 
@@ -568,7 +566,9 @@ static inline PERSON *registry_person_allocate(const char *person_guid, time_t w
 
 	registry.persons_memory += sizeof(PERSON);
 
+	registry.persons_count++;
 	dictionary_set(registry.persons, p->guid, p, sizeof(PERSON));
+
 	return p;
 }
 
@@ -594,10 +594,7 @@ static inline PERSON *registry_person_get(const char *person_guid, time_t when) 
 		}
 	}
 
-	if(!p) {
-		p = registry_person_allocate(NULL, when);
-		registry.persons_count++;
-	}
+	if(!p) p = registry_person_allocate(NULL, when);
 
 	registry_persons_unlock();
 
