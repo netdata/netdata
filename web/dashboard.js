@@ -5473,8 +5473,9 @@
 	};
 
 	NETDATA.registry = {
-		host: null,
+		server: null,
 		machine_guid: null,
+		hostname: null,
 		urls: null,
 
 		init: function() {
@@ -5495,8 +5496,9 @@
 					xhrFields: { withCredentials: true }
 				})
 				.done(function(data) {
-					NETDATA.registry.host = data.registry;
+					NETDATA.registry.server = data.registry;
 					NETDATA.registry.machine_guid = data.machine_guid;
+					NETDATA.registry.hostname = data.hostname;
 
 					if(typeof callback === 'function')
 						callback();
@@ -5508,7 +5510,7 @@
 
 		access: function(callback) {
 			$.ajax({
-					url: NETDATA.registry.host + '/api/v1/registry?action=access&machine=' + NETDATA.registry.machine_guid + '&name=test&url=' + document.location,
+					url: NETDATA.registry.server + '/api/v1/registry?action=access&machine=' + NETDATA.registry.machine_guid + '&name=' + encodeURIComponent(NETDATA.registry.hostname) + '&url=' + encodeURIComponent(document.location),
 					async: true,
 					cache: false,
 					xhrFields: { withCredentials: true }

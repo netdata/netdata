@@ -22,6 +22,7 @@
 
 #include "web_client.h"
 #include "rrd.h"
+#include "rrd2json.h"
 #include "registry.h"
 
 
@@ -78,6 +79,7 @@ struct registry {
 	// configuration
 	unsigned long long save_registry_every_entries;
 	char *registry_domain;
+	char *hostname;
 	char *registry_to_announce;
 	time_t persons_expiration; // seconds to expire idle persons
 
@@ -1005,9 +1007,8 @@ static inline void registry_set_person_cookie(struct web_client *w, PERSON *p) {
 static inline void registry_json_header(struct web_client *w, int status) {
 	w->response.data->contenttype = CT_APPLICATION_JSON;
 	buffer_flush(w->response.data);
-	buffer_sprintf(w->response.data, "{\n\t\"success\": %s,\n\t\"machine_guid\": \"%s\"",
-				   status?"true":"false",
-				   registry.machine_guid);
+	buffer_sprintf(w->response.data, "{\n\t\"success\": %s,\n\t\"hostname\": \"%s\",\n\t\"machine_guid\": \"%s\"",
+				   status?"true":"false", registry.hostname, registry.machine_guid);
 }
 
 static inline void registry_json_footer(struct web_client *w) {
@@ -1551,6 +1552,7 @@ int registry_init(void) {
 	registry.persons_expiration = config_get_number("registry", "registry expire idle persons days", 365) * 86400;
 	registry.registry_domain = config_get("registry", "registry domain", "");
 	registry.registry_to_announce = config_get("registry", "registry to announce", "https://registry.netdata.online");
+	registry.hostname = config_get("registry", "registry hostname", config_get("global", "hostname", hostname));
 
 	// initialize entries counters
 	registry.persons_count = 0;

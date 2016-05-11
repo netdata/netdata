@@ -129,6 +129,7 @@ struct web_client *web_client_create(int listener)
 		return NULL;
 	}
 
+	w->origin[0] = '*';
 	w->wait_receive = 1;
 
 	if(web_clients) web_clients->prev = w;
@@ -175,8 +176,16 @@ void web_client_reset(struct web_client *w)
 
 	w->last_url[0] = '\0';
 	w->cookie[0] = '\0';
+	w->origin[0] = '*';
+	w->origin[1] = '\0';
 
 	w->mode = WEB_CLIENT_MODE_NORMAL;
+	w->enable_gzip = 0;
+	w->keepalive = 0;
+	if(w->decoded_url) {
+		free(w->decoded_url);
+		w->decoded_url = NULL;
+	}
 
 	buffer_reset(w->response.header_output);
 	buffer_reset(w->response.header);
@@ -1168,99 +1177,191 @@ cleanup:
 }
 */
 
-// get the request buffer, just after the GET or OPTIONS
-// and find the url to be decoded, decode it and return
-// a newly allocated buffer with it
-static inline char *find_url_and_decode_it(char *request) {
-	char *e = request, *url = NULL;
+
+static inline char *http_header_parse(struct web_client *w, char *s) {
+	static uint32_t connection_hash = 0, accept_encoding_hash = 0, origin_hash = 0;
+
+	if(unlikely(connection_hash == 0)) {
+		connection_hash = simple_hash("Connection");
+		accept_encoding_hash = simple_hash("Accept-Encoding");
+		origin_hash = simple_hash("Origin");
+	}
+
+	char *e = s;
+
+	// find the :
+	while(*e && *e != ':') e++;
+	if(!*e || e[1] != ' ') return e;
+
+	// get the name
+	*e = '\0';
+	uint32_t hash = simple_hash(s);
+
+	// find the value
+	char *v, *ve;
+	v = ve = e + 2;
+
+	// find the \r
+	while(*ve && *ve != '\r') ve++;
+	if(!*ve || ve[1] != '\n') {
+		*e = ':';
+		return ve;
+	}
+
+	// terminate the value
+	*ve = '\0';
+
+	if(hash == origin_hash && !strcmp(s, "Origin")) {
+		strncpy(w->origin, v, ORIGIN_MAX);
+	}
+	else if(hash == connection_hash && !strcmp(s, "Connection")) {
+		if(!strcasestr(v, "keep-alive"))
+			w->keepalive = 1;
+	}
+#ifdef NETDATA_WITH_ZLIB
+	else if(hash == accept_encoding_hash && !strcmp(s, "Accept-Encoding")) {
+		if(web_enable_gzip && !strcasestr(v, "gzip"))
+			w->enable_gzip = 1;
+	}
+#endif // NETDATA_WITH_ZLIB
+
+	*e = ':';
+	*ve = '\r';
+	return ve;
+}
+
+// http_request_validate()
+// returns:
+// = 0 : all good, process the request
+// > 0 : request is complete, but is not supported
+// < 0 : request is incomplete - wait for more data
+
+static inline int http_request_validate(struct web_client *w) {
+	char *s = w->response.data->buffer, *encoded_url = NULL;
+
+	// is is a valid request?
+	if(!strncmp(s, "GET ", 4)) {
+		encoded_url = s = &s[4];
+		w->mode = WEB_CLIENT_MODE_NORMAL;
+	}
+	else if(!strncmp(s, "OPTIONS ", 8)) {
+		encoded_url = s = &s[8];
+		w->mode = WEB_CLIENT_MODE_OPTIONS;
+	}
+	else {
+		w->wait_receive = 0;
+		return 1;
+	}
 
 	// find the SPACE + "HTTP/"
-	while(*e) {
+	while(*s) {
 		// find the space
-		while (*e && *e != ' ') e++;
+		while (*s && *s != ' ') s++;
 
 		// is it SPACE + "HTTP/" ?
-		if(*e && !strncmp(e, " HTTP/", 6))
-			break;
+		if(*s && !strncmp(s, " HTTP/", 6)) break;
+		else s++;
 	}
 
-	if(*e) {
-		// we have the end
-		*e = '\0';
-		url = url_decode(request);
-		*e = ' ';
+	// incomplete requests
+	if(!*s) {
+		w->wait_receive = 1;
+		return -2;
 	}
 
-	return url;
+	// we have the end of encoded_url - remember it
+	char *ue = s;
+
+	while(*s) {
+		// find a line feed
+		while (*s && *s != '\r') s++;
+
+		// did we reach the end?
+		if(unlikely(!*s)) break;
+
+		// is it \r\n ?
+		if (likely(s[1] == '\n')) {
+
+			// is it again \r\n ? (header end)
+			if(unlikely(s[2] == '\r' && s[3] == '\n')) {
+				// a valid complete HTTP request found
+
+				*ue = '\0';
+				w->decoded_url = url_decode(encoded_url);
+				*ue = ' ';
+
+				w->wait_receive = 0;
+				return 0;
+			}
+
+			// another header line
+			s = http_header_parse(w, &s[2]);
+		}
+		else s++;
+	}
+
+	// incomplete request
+	w->wait_receive = 1;
+	return -3;
 }
 
 void web_client_process(struct web_client *w) {
 	int code = 500;
 	ssize_t bytes;
-	int enable_gzip = 0;
 
-	w->wait_receive = 0;
+	int what_to_do = http_request_validate(w);
 
-	// check if we have an empty line (end of HTTP header)
-	if(strstr(w->response.data->buffer, "\r\n\r\n")) {
+	// wait for more data
+	if(what_to_do < 0) {
+		if(w->response.data->len > TOO_BIG_REQUEST) {
+			strcpy(w->last_url, "too big request");
+
+			debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big (%zd bytes).", w->id, w->response.data->len);
+
+			code = 400;
+			buffer_flush(w->response.data);
+			buffer_sprintf(w->response.data, "Received request is too big  (%zd bytes).\r\n", w->response.data->len);
+		}
+		else {
+			// wait for more data
+			return;
+		}
+	}
+	else if(what_to_do > 0) {
+		strcpy(w->last_url, "not a valid response");
+
+		debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, w->response.data->buffer);
+
+		code = 500;
+		buffer_flush(w->response.data);
+		buffer_strcat(w->response.data, "I don't understand you...\r\n");
+	}
+	else { // what_to_do == 0
+		gettimeofday(&w->tv_in, NULL);
+
 		global_statistics_lock();
 		global_statistics.web_requests++;
 		global_statistics_unlock();
 
-		gettimeofday(&w->tv_in, NULL);
-		debug(D_WEB_DATA, "%llu: Processing data buffer of %d bytes: '%s'.", w->id, w->response.data->len, w->response.data->buffer);
-
-		// check if the client requested keep-alive HTTP
-		if(strcasestr(w->response.data->buffer, "Connection: keep-alive")) w->keepalive = 1;
-		else w->keepalive = 0;
-
-#ifdef NETDATA_WITH_ZLIB
-		// check if the client accepts deflate
-		if(web_enable_gzip && strstr(w->response.data->buffer, "gzip"))
-			enable_gzip = 1;
-#endif // NETDATA_WITH_ZLIB
-
-		w->mode = WEB_CLIENT_MODE_NORMAL;
-
-		char *tok = (char *)buffer_tostring(w->response.data);
-		char *url = NULL, *encoded_url = NULL;
-		char *pointer_to_free = NULL; // keep url_decode() allocated buffer
-
-		if(!strncmp(tok, "GET ", 4))
-			encoded_url = &tok[4];
-		else if(!strncmp(tok, "OPTIONS ", 8)) {
-			encoded_url = &tok[8];
-			w->mode = WEB_CLIENT_MODE_OPTIONS;
-		}
-
-		if(encoded_url) {
-			pointer_to_free = url = find_url_and_decode_it(encoded_url);
-
-			if(url) debug(D_WEB_CLIENT, "%llu: Processing url '%s'.", w->id, url);
-			else debug(D_WEB_CLIENT, "%llu: Cannot find a valid URL in '%s'", w->id, encoded_url);
-		}
-
-		w->last_url[0] = '\0';
+		// copy the URL - we are going to overwrite parts of it
+		// FIXME -- we should avoid it
+		strncpy(w->last_url, w->decoded_url, URL_MAX);
+		w->last_url[URL_MAX] = '\0';
 
 		if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
-			strncpy(w->last_url, url, URL_MAX);
-			w->last_url[URL_MAX] = '\0';
-
 			code = 200;
 			w->response.data->contenttype = CT_TEXT_PLAIN;
 			buffer_flush(w->response.data);
 			buffer_strcat(w->response.data, "OK");
 		}
-		else if(url) {
+		else {
 #ifdef NETDATA_WITH_ZLIB
-			if(enable_gzip)
+			if(w->enable_gzip)
 				web_client_enable_deflate(w);
 #endif
 
-			strncpy(w->last_url, url, URL_MAX);
-			w->last_url[URL_MAX] = '\0';
-
-			tok = mystrsep(&url, "/?");
+			char *url = w->decoded_url;
+			char *tok = mystrsep(&url, "/?");
 			if(tok && *tok) {
 				debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
 
@@ -1411,35 +1512,6 @@ void web_client_process(struct web_client *w) {
 				code = mysendfile(w, (tok && *tok)?tok:"/");
 			}
 		}
-		else {
-			strcpy(w->last_url, "not a valid response");
-
-			debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, w->response.data->buffer);
-
-			code = 500;
-			buffer_flush(w->response.data);
-			buffer_strcat(w->response.data, "I don't understand you...\r\n");
-		}
-
-		// free url_decode() buffer
-		if(pointer_to_free) {
-			free(pointer_to_free);
-			pointer_to_free = NULL;
-		}
-	}
-	else if(w->response.data->len > TOO_BIG_REQUEST) {
-		strcpy(w->last_url, "too big request");
-
-		debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big (%zd bytes).", w->id, w->response.data->len);
-
-		code = 400;
-		buffer_flush(w->response.data);
-		buffer_sprintf(w->response.data, "Received request is too big  (%zd bytes).\r\n", w->response.data->len);
-	}
-	else {
-		// wait for more data
-		w->wait_receive = 1;
-		return;
 	}
 
 	gettimeofday(&w->tv_ready, NULL);
@@ -1573,11 +1645,13 @@ void web_client_process(struct web_client *w) {
 		"HTTP/1.1 %d %s\r\n"
 		"Connection: %s\r\n"
 		"Server: NetData Embedded HTTP Server\r\n"
-		"Access-Control-Allow-Origin: *\r\n"
+		"Access-Control-Allow-Origin: %s\r\n"
+		"Access-Control-Allow-Credentials: true\r\n"
 		"Content-Type: %s\r\n"
 		"Date: %s\r\n"
 		, code, code_msg
 		, w->keepalive?"keep-alive":"close"
+		, w->origin
 		, content_type_string
 		, date
 		);
@@ -1591,7 +1665,6 @@ void web_client_process(struct web_client *w) {
 	if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
 		buffer_strcat(w->response.header_output,
 			"Access-Control-Allow-Methods: GET, OPTIONS\r\n"
-			"Access-Control-Allow-Credentials: true\r\n"
 			"Access-Control-Allow-Headers: Accept, X-Requested-With, Content-Type, Cookie\r\n"
 			"Access-Control-Max-Age: 1209600\r\n" // 86400 * 14
 			);

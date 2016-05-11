@@ -28,6 +28,7 @@ extern int web_enable_gzip;
 #define ZLIB_CHUNK 	16384
 #define HTTP_RESPONSE_HEADER_SIZE 4096
 #define COOKIE_MAX 1024
+#define ORIGIN_MAX 1024
 
 struct response {
 	BUFFER *header;					// our response header
@@ -61,9 +62,12 @@ struct web_client {
 	struct timeval tv_in, tv_ready;
 
 	char cookie[COOKIE_MAX+1];
+	char origin[ORIGIN_MAX+1];
 
 	int mode;
 	int keepalive;
+	int enable_gzip;
+	char *decoded_url;
 
 	struct sockaddr_storage clientaddr;
 
