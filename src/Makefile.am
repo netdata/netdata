@@ -44,6 +44,7 @@ netdata_SOURCES = \
 	plugin_nfacct.c plugin_nfacct.h \
 	plugin_tc.c plugin_tc.h \
 	plugins_d.c plugins_d.h \
+	poll.c poll.h \
 	popen.c popen.h \
 	socket.c socket.h \
 	sys_fs_cgroup.c \

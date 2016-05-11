@@ -1,4 +1,24 @@
 #include "common.h"
+#include "daemon.h"
+#include "log.h"
+#include "poll.h"
+#include "popen.h"
+#include "rrd.h"
+#include "rrd2json.h"
+#include "web_client.h"
+#include "web_server.h"
+
+#include "unit_test.h"
+
+#include "plugin_checks.h"
+#include "plugin_idlejitter.h"
+#include "plugin_nfacct.h"
+#include "registry.h"
+#include "plugin_proc.h"
+#include "plugin_tc.h"
+#include "plugins_d.h"
+
+#include "main.h"
 
 extern void *cgroups_main(void *ptr);
 
@@ -42,7 +62,6 @@ struct netdata_static_thread {
     // so, we build it as an external plugin with setuid to root
     {"nfacct",              "plugins",  "nfacct",     1, NULL, NULL, nfacct_main},
 #endif
-
     {"tc",                 "plugins",   "tc",         1, NULL, NULL, tc_main},
     {"idlejitter",         "plugins",   "idlejitter", 1, NULL, NULL, cpuidlejitter_main},
 #if defined(__FreeBSD__)
