@@ -2,8 +2,6 @@
 #include <config.h>
 #endif
 
-// gcc -O1 -ggdb -Wall -Wextra -I ../src/ -I ../ -o registry ../src/registry.c ../src/dictionary.o ../src/log.o ../src/avl.o ../src/common.o ../src/appconfig.o ../src/web_buffer.o ../src/storage_number.o  -pthread -luuid -lm -DHAVE_CONFIG_H -DVARLIB_DIR="\"/tmp\""
-
 #include <uuid/uuid.h>
 #include <inttypes.h>
 #include <stdlib.h>
@@ -34,6 +32,13 @@
 //    database should be cleaned in registry_save() for both on-disk and
 //    on-memory entries.
 //
+//    Cleanup:
+//    i. Find all the PERSONs that have expired cookie
+//    ii. For each of their PERSON_URLs:
+//     - decrement the linked MACHINE links
+//     - if the linked MACHINE has no other links, remove the linked MACHINE too
+//     - remove the PERSON_URL
+//
 // 2. add protection to prevent abusing the registry by flooding it with
 //    requests to fill the memory and crash it.
 //
@@ -42,6 +47,8 @@
 //    - limit the number of URLs per machine
 //    - limit the number of persons
 //    - limit the number of machines
+//    - [DONE] limit the size of URLs
+//    - [DONE] limit the size of PERSON_URL names
 //    - limit the number of requests that add data to the registry,
 //      per client IP per hour
 
@@ -82,6 +89,9 @@ struct registry {
 	char *hostname;
 	char *registry_to_announce;
 	time_t persons_expiration; // seconds to expire idle persons
+
+	size_t max_url_length;
+	size_t max_name_length;
 
 	// file/path names
 	char *pathname;
@@ -141,6 +151,8 @@ typedef struct machine_url MACHINE_URL;
 // A machine
 struct machine {
 	char guid[36 + 1];			// the GUID
+
+	uint32_t links;				// the number of PERSON_URLs linked to this machine
 
 	DICTIONARY *urls; 			// MACHINE_URL *
 
@@ -318,6 +330,10 @@ extern PERSON *registry_request_delete(char *person_guid, char *machine_guid, ch
 // URL
 
 static inline URL *registry_url_allocate_nolock(const char *url, size_t urllen) {
+	// protection from too big URLs
+	if(urllen > registry.max_url_length)
+		urllen = registry.max_url_length;
+
 	debug(D_REGISTRY, "Registry: registry_url_allocate_nolock('%s'): allocating %zu bytes", url, sizeof(URL) + urllen);
 	URL *u = malloc(sizeof(URL) + urllen);
 	if(!u) fatal("Cannot allocate %zu bytes for URL '%s'", sizeof(URL) + urllen);
@@ -461,6 +477,10 @@ static inline PERSON *registry_person_find(const char *person_guid) {
 }
 
 static inline PERSON_URL *registry_person_url_allocate(PERSON *p, MACHINE *m, URL *u, char *name, size_t namelen, time_t when) {
+	// protection from too big names
+	if(namelen > registry.max_name_length)
+		namelen = registry.max_name_length;
+
 	debug(D_REGISTRY, "registry_person_url_allocate('%s', '%s', '%s'): allocating %zu bytes", p->guid, m->guid, u->url,
 		  sizeof(PERSON_URL) + namelen);
 
@@ -477,6 +497,7 @@ static inline PERSON_URL *registry_person_url_allocate(PERSON *p, MACHINE *m, UR
 	pu->usages = 1;
 	pu->url = u;
 	pu->flags = REGISTRY_URL_FLAGS_DEFAULT;
+	m->links++;
 
 	registry.persons_urls_memory += sizeof(PERSON_URL) + namelen;
 
@@ -500,6 +521,7 @@ static inline PERSON_URL *registry_person_url_reallocate(PERSON *p, MACHINE *m, 
 
 	// ok, these are a hack - since the registry_person_url_allocate() is
 	// adding these, we have to subtract them
+	tpu->machine->links--;
 	registry.persons_urls_memory -= sizeof(PERSON_URL) + strlen(pu->name);
 	registry_url_unlink_nolock(u);
 
@@ -607,7 +629,12 @@ static inline PERSON_URL *registry_person_link_to_url(PERSON *p, MACHINE *m, URL
 					 p->guid, m->guid, u->url, pu->machine->guid);
 				mu->flags |= REGISTRY_URL_FLAGS_EXPIRED;
 			}
+			else {
+				info("registry_person_link_to_url('%s', '%s', '%s'): URL switched machines (old was '%s') - but the URL is not linked to the old machine.",
+					 p->guid, m->guid, u->url, pu->machine->guid);
+			}
 
+			pu->machine->links--;
 			pu->machine = m;
 		}
 
@@ -1553,6 +1580,10 @@ int registry_init(void) {
 	registry.registry_domain = config_get("registry", "registry domain", "");
 	registry.registry_to_announce = config_get("registry", "registry to announce", "https://registry.netdata.online");
 	registry.hostname = config_get("registry", "registry hostname", config_get("global", "hostname", hostname));
+
+	registry.max_url_length = config_get("registry", "max URL length", 1024);
+	registry.max_name_length = config_get("registry", "max URL name length", 50);
+
 
 	// initialize entries counters
 	registry.persons_count = 0;
