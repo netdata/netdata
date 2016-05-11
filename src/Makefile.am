@@ -37,6 +37,7 @@ netdata_SOURCES = \
 	plugin_proc.c plugin_proc.h \
 	plugin_tc.c plugin_tc.h \
 	plugins_d.c plugins_d.h \
+	poll.c poll.h \
 	popen.c popen.h \
 	proc_diskstats.c \
 	proc_interrupts.c \

@@ -16,15 +16,16 @@
 #include <sys/mman.h>
 #include <sys/prctl.h>
 
-#include "common.h"
-#include "log.h"
-#include "daemon.h"
-#include "web_server.h"
-#include "popen.h"
 #include "appconfig.h"
-#include "web_client.h"
+#include "common.h"
+#include "daemon.h"
+#include "log.h"
+#include "poll.h"
+#include "popen.h"
 #include "rrd.h"
 #include "rrd2json.h"
+#include "web_client.h"
+#include "web_server.h"
 
 #include "unit_test.h"
 
@@ -96,6 +97,7 @@ struct netdata_static_thread static_threads[] = {
 	{"plugins.d",	NULL,		NULL,			1, NULL, NULL,	pluginsd_main},
 	{"check",		"plugins",	"checks",		0, NULL, NULL,	checks_main},
 	{"web",			NULL,		NULL,			1, NULL, NULL,	socket_listen_main},
+	{"poll",		NULL,		NULL,			1, NULL, NULL,	poll_main},
 	{NULL,			NULL,		NULL,			0, NULL, NULL,	NULL}
 };
 

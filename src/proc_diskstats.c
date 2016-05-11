@@ -18,6 +18,7 @@
 #include "procfile.h"
 #include "rrd.h"
 #include "plugin_proc.h"
+#include "poll.h"
 
 #include "proc_self_mountinfo.h"
 
@@ -89,12 +90,11 @@ struct disk *get_disk(unsigned long major, unsigned long minor) {
 	} else {
 		// find if it is a container
 		// by checking if /sys/dev/block/MAJOR:MINOR/slaves has entries
-		int is_container = 0;
 		snprintf(buffer, FILENAME_MAX, path_find_block_device, major, minor, "slaves/");
 		DIR *dirp = opendir(buffer);	
 		if (dirp != NULL) {
 		struct dirent *dp;
-			while(dp = readdir(dirp)) {
+			while((dp = readdir(dirp))) {
 				// . and .. are also files in empty folders.
 				if(strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0) {
 					continue;
@@ -163,6 +163,21 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 		char filename[FILENAME_MAX + 1];
 		snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/block/%s/queue/hw_sector_size");
 		snprintf(path_to_get_hw_sector_size, FILENAME_MAX, "%s", config_get("plugin:proc:/proc/diskstats", "path to get h/w sector size", filename));
+	}
+
+	// Check for changed mountpoints.
+	// This is just a simple implementation to test the methods.
+	static struct timeval mounts_up_local;
+	static struct timeval *mounts_up_system = NULL;
+	if(!mounts_up_system) {
+		mounts_up_system = poll_file_register("/proc/mounts", POLLERR);
+		mounts_up_local.tv_sec = mounts_up_system->tv_sec;
+		mounts_up_local.tv_usec = mounts_up_system->tv_usec;
+	}
+	if(mounts_up_system && timercmp(&mounts_up_local, mounts_up_system, <)) {
+		mounts_up_system = poll_file_erase("/proc/mounts", POLLERR);
+		free(mounts_up_system);
+		mounts_up_system = NULL;
 	}
 
 	ff = procfile_readall(ff);

@@ -6,9 +6,8 @@
 
 #if defined(HAVE_INTTYPES_H)
 #include <inttypes.h>
-#elif defined(HAVE_STDINT_H)
-#include <stdint.h>
 #endif
+#include <stdint.h>
 #include <sys/types.h>
 #include <unistd.h>
 
