@@ -1581,8 +1581,8 @@ int registry_init(void) {
 	registry.registry_to_announce = config_get("registry", "registry to announce", "https://registry.netdata.online");
 	registry.hostname = config_get("registry", "registry hostname", config_get("global", "hostname", hostname));
 
-	registry.max_url_length = config_get("registry", "max URL length", 1024);
-	registry.max_name_length = config_get("registry", "max URL name length", 50);
+	registry.max_url_length = config_get_number("registry", "max URL length", 1024);
+	registry.max_name_length = config_get_number("registry", "max URL name length", 50);
 
 
 	// initialize entries counters
