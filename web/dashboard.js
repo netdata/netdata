@@ -5510,7 +5510,7 @@
 
 		access: function(callback) {
 			$.ajax({
-					url: NETDATA.registry.server + '/api/v1/registry?action=access&machine=' + NETDATA.registry.machine_guid + '&name=' + encodeURIComponent(NETDATA.registry.hostname) + '&url=' + encodeURIComponent(document.location),
+					url: NETDATA.registry.server + '/api/v1/registry?action=access&machine=' + NETDATA.registry.machine_guid + '&name=' + encodeURIComponent(NETDATA.registry.hostname) + '&url=' + encodeURIComponent(NETDATA.serverDefault),
 					async: true,
 					cache: false,
 					xhrFields: { withCredentials: true }
