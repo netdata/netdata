@@ -66,7 +66,7 @@ If you need to pass different CFLAGS, use something like this:
 For the installer to complete successfully, you will need
 these packages installed:
 
-   gcc make autoconf automake pkg-config zlib1g-dev
+   gcc make autoconf automake pkg-config zlib1g-dev uuid-dev
 
 For the plugins, you will at least need:
 
@@ -248,15 +248,16 @@ You many need to check these:
 
 1. The package zlib1g-dev has to be installed.
 
-2. You need basic build tools installed, like:
+   If your system cannot find ZLIB, although it is installed
+   run me with the option:  --zlib-is-really-here
+
+2. The package uuid-dev has to be installed.
+
+3. You need basic build tools installed, like:
 
    gcc make autoconf automake pkg-config
 
-   Autoconf version 2.60 or higher is required
-
-3. If your system cannot find ZLIB, although it is installed
-   run me with the option:  --zlib-is-really-here
-
+   Autoconf version 2.60 or higher is required.
 
 If you still cannot get it to build, ask for help at github:
 
