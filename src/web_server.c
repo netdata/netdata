@@ -1,3 +1,4 @@
+/* vim: set ts=4 noet sw=4 : */
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -67,12 +68,14 @@ int create_listen_socket4(const char *ip, int port, int listen_backlog)
 {
 	int sock;
 	int sockopt = 1;
-	struct sockaddr_in name;
 
 	debug(D_LISTENER, "IPv4 creating new listening socket on port %d", port);
 
-	sock = socket(AF_INET, SOCK_STREAM, 0);
-	if(sock < 0) {
+	// FIX: unspecified protocol are problematic in some *nix implementations.
+	sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+	// FIX: The specification is clean: socket() returns -1 on error.
+	if(sock == -1) {
 		error("IPv4 socket() failed.");
 		return -1;
 	}
@@ -80,9 +83,11 @@ int create_listen_socket4(const char *ip, int port, int listen_backlog)
 	/* avoid "address already in use" */
 	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt));
 
-	memset(&name, 0, sizeof(struct sockaddr_in));
-	name.sin_family = AF_INET;
-	name.sin_port = htons (port);
+	// FIX: No need to use memset.
+	//memset(&name, 0, sizeof(struct sockaddr_in));
+	//name.sin_family = AF_INET;
+	//name.sin_port = htons (port);
+	struct sockaddr_in name = { .sin_family = AF_INET, .sin_port = htons(port) };
 
 	if(is_ip_anything(ip)) {
 		name.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -98,13 +103,15 @@ int create_listen_socket4(const char *ip, int port, int listen_backlog)
 		info("Listening on IP '%s' (IPv4).", ip);
 	}
 
-	if(bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
+	// FIX: The spec is clear: bind() returns -1 on error.
+	if(bind (sock, (struct sockaddr *) &name, sizeof (name)) == -1) {
 		close(sock);
 		error("IPv4 bind() failed.");
 		return -1;
 	}
 
-	if(listen(sock, listen_backlog) < 0) {
+	// FIX: The spec is clear: listen() returns -1 on error.
+	if(listen(sock, listen_backlog)  == -1) {
 		close(sock);
 		fatal("IPv4 listen() failed.");
 		return -1;
@@ -118,12 +125,14 @@ int create_listen_socket6(const char *ip, int port, int listen_backlog)
 {
 	int sock = -1;
 	int sockopt = 1;
-	struct sockaddr_in6 name;
 
 	debug(D_LISTENER, "IPv6 creating new listening socket on port %d", port);
 
-	sock = socket(AF_INET6, SOCK_STREAM, 0);
-	if (sock < 0) {
+	// FIX: unspecified protocol are problematic in some *nix implementations.
+	sock = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
+
+	// FIX: The specification is clean: socket() returns -1 on error.
+	if (sock == -1) {
 		error("IPv6 socket() failed. Disabling IPv6.");
 		return -1;
 	}
@@ -131,9 +140,11 @@ int create_listen_socket6(const char *ip, int port, int listen_backlog)
 	/* avoid "address already in use" */
 	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt));
 
-	memset(&name, 0, sizeof(struct sockaddr_in6));
-	name.sin6_family = AF_INET6;
-	name.sin6_port = htons ((uint16_t) port);
+	// FIX: No need to use memset.
+	//memset(&name, 0, sizeof(struct sockaddr_in6));
+	//name.sin6_family = AF_INET6;
+	//name.sin6_port = htons ((uint16_t) port);
+	struct sockaddr_in6 name = { .sin6_family = AF_INET6, .sin6_port = htons(port) };
 
 	if(is_ip_anything(ip)) {
 		name.sin6_addr = in6addr_any;
@@ -149,15 +160,18 @@ int create_listen_socket6(const char *ip, int port, int listen_backlog)
 		info("Listening on IP '%s' (IPv6)", ip);
 	}
 
-	name.sin6_scope_id = 0;
+	// FIX: Already zero!
+	//name.sin6_scope_id = 0;
 
-	if (bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
+	// FIX: The spec is clean: bind() returns -1 on error.
+	if (bind (sock, (struct sockaddr *) &name, sizeof (name)) == -1) {
 		close(sock);
 		error("IPv6 bind() failed. Disabling IPv6.");
 		return -1;
 	}
 
-	if (listen(sock, listen_backlog) < 0) {
+	// FIX: The spec is clean: listen() returns -1 on error.
+	if (listen(sock, listen_backlog) == -1) {
 		close(sock);
 		error("IPv6 listen() failed. Disabling IPv6.");
 		return -1;
@@ -199,12 +213,12 @@ void *socket_listen_main(void *ptr)
 
 	if(listen_fd < 0) fatal("LISTENER: Listen socket is not ready.");
 
-	fd_set ifds, ofds, efds;
+	fd_set ifds /*, ofds, efds */;
 	int fdmax = listen_fd;
 
 	FD_ZERO (&ifds);
-	FD_ZERO (&ofds);
-	FD_ZERO (&efds);
+	//FD_ZERO (&ofds);
+	//FD_ZERO (&efds);
 
 	for(;;) {
 		tv.tv_sec = 0;
@@ -212,11 +226,13 @@ void *socket_listen_main(void *ptr)
 
 		if(listen_fd >= 0) {
 			FD_SET(listen_fd, &ifds);
-			FD_SET(listen_fd, &efds);
+			//FD_SET(listen_fd, &efds);
 		}
 
 		// debug(D_WEB_CLIENT, "LISTENER: Waiting...");
-		retval = select(fdmax+1, &ifds, &ofds, &efds, &tv);
+		// FIXME: select is slow on busy systems... Maybe we can substitute to use libevent.
+		// FIX: Why use ofds and efds if we don't need them?
+		retval = select(fdmax+1, &ifds, /*&ofds*/NULL, /*&efds*/NULL, &tv);
 
 		if(retval == -1) {
 			error("LISTENER: select() failed.");
@@ -248,7 +264,8 @@ void *socket_listen_main(void *ptr)
 		//}
 
 		// cleanup unused clients
-		for(w = web_clients; w ; w = w?w->next:NULL) {
+		// FIX: Why re-check w?
+		for(w = web_clients; w; w = w->next) {
 			if(w->obsolete) {
 				debug(D_WEB_CLIENT, "%llu: Removing client.", w->id);
 				// pthread_join(w->thread,  NULL);
@@ -262,9 +279,10 @@ void *socket_listen_main(void *ptr)
 
 	error("LISTENER: exit!");
 
-	if(listen_fd >= 0) close(listen_fd);
+	// FIX: Maybe I am beeing paranoid... don't allow to close stdin!
+	if(listen_fd > 0) close(listen_fd);
+
 	exit(2);
 
 	return NULL;
 }
-

@@ -61,6 +61,7 @@ netdata_SOURCES = \
 	rrd.c rrd.h \
 	rrd2json.c rrd2json.h \
 	storage_number.c storage_number.h \
+	fpconv.c fpconv.h \
 	unit_test.c unit_test.h \
 	url.c url.h \
 	web_buffer.c web_buffer.h \

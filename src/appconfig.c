@@ -53,10 +53,13 @@ struct config {
 } *config_root = NULL;
 
 
+static int _iterator(avl *a) { if (a) {}; return 0; }
+
 // ----------------------------------------------------------------------------
 // config value
 
-static int config_value_iterator(avl *a) { if(a) {}; return 0; }
+//static int config_value_iterator(avl *a) { if(a) {}; return 0; }
+#define config_value_iterator _iterator
 
 static int config_value_compare(void* a, void* b) {
 	if(((struct config_value *)a)->hash < ((struct config_value *)b)->hash) return -1;
@@ -79,7 +82,8 @@ static struct config_value *config_value_index_find(struct config *co, const cha
 // ----------------------------------------------------------------------------
 // config
 
-static int config_iterator(avl *a) { if(a) {}; return 0; }
+//static int config_iterator(avl *a) { if(a) {}; return 0; }
+#define config_iterator _iterator
 
 static int config_compare(void* a, void* b) {
 	if(((struct config *)a)->hash < ((struct config *)b)->hash) return -1;

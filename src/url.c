@@ -1,3 +1,4 @@
+/* vim: set ts=4 noet sw=4 : */
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -21,32 +22,31 @@ char from_hex(char ch) {
 /* Converts an integer value to its hex character*/
 char to_hex(char code) {
 	static char hex[] = "0123456789abcdef";
-	return hex[code & 15];
+	return hex[code & 0x0f];
 }
 
 /* Returns a url-encoded version of str */
 /* IMPORTANT: be sure to free() the returned string after use */
 char *url_encode(char *str) {
-	char *pstr = str,
-		*buf = malloc(strlen(str) * 3 + 1),
-		*pbuf = buf;
+	char *pstr, *buf, *pbuf;
 
+	pstr = str;
+	pbuf = buf = malloc(strlen(str) * 3 + 1);
+	
 	if(!buf)
 		fatal("Cannot allocate memory.");
 
-	while (*pstr) {
+	for (; *pstr; pstr++, pbuf++)
 		if (isalnum(*pstr) || *pstr == '-' || *pstr == '_' || *pstr == '.' || *pstr == '~')
-			*pbuf++ = *pstr;
-
+			*pbuf = *pstr;
 		else if (*pstr == ' ')
-			*pbuf++ = '+';
-
-		else
-			*pbuf++ = '%', *pbuf++ = to_hex(*pstr >> 4), *pbuf++ = to_hex(*pstr & 15);
-
-		pstr++;
-	}
-
+			*pbuf = '+';
+		else {
+			/* NOTE: Sometimes using , operator can lead to ambiguous code. */
+			*pbuf++ = '%';
+			*pbuf++ = to_hex(*pstr >> 4);
+			*pbuf = to_hex(*pstr);	// FIXME: to_hex already isolates the 4 lsb bits.
+		}
 	*pbuf = '\0';
 
 	return buf;
@@ -55,31 +55,31 @@ char *url_encode(char *str) {
 /* Returns a url-decoded version of str */
 /* IMPORTANT: be sure to free() the returned string after use */
 char *url_decode(char *str) {
-	char *pstr = str,
-		*buf = malloc(strlen(str) + 1),
-		*pbuf = buf;
+	char *pstr, *buf, *pbuf;
+
+	pstr = str;
+	pbuf = buf = strdup(str);
 
 	if(!buf)
 		fatal("Cannot allocate memory.");
 
-	while (*pstr) {
-		if (*pstr == '%') {
+	for (; *pstr; pstr++)
+		/* NOTE: Let the compiler find the best comparison strategy. */
+		switch (*pstr) {
+		case '%':
 			if (pstr[1] && pstr[2]) {
-				*pbuf++ = from_hex(pstr[1]) << 4 | from_hex(pstr[2]);
+				*pbuf++ = (from_hex(pstr[1]) << 4) | from_hex(pstr[2]);
 				pstr += 2;
 			}
-		}
-		else if (*pstr == '+')
+			break;
+		case '+':
 			*pbuf++ = ' ';
-
-		else
+			break;
+		default:
 			*pbuf++ = *pstr;
-
-		pstr++;
-	}
+		}
 
 	*pbuf = '\0';
 
 	return buf;
 }
-

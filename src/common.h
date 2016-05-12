@@ -1,3 +1,4 @@
+/* vim: set ts=4 noet sw=4 : */
 #include <sys/time.h>
 #include <sys/resource.h>
 
@@ -45,5 +46,8 @@ extern unsigned long long timems(void);
 #define RUSAGE_THREAD RUSAGE_CHILDREN
 #endif
 #endif
+
+extern char *strncpyz(char *dest, const char *src, size_t size);
+extern int snprintfz(char *dest, size_t size, const char *fmt, ...);
 
 #endif /* NETDATA_COMMON_H */

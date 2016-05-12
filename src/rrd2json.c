@@ -1,3 +1,4 @@
+/* vim: set ts=4 noet sw=4 : */
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -490,16 +491,16 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t opti
 	}
 
 	buffer_sprintf(wb, "{\n"
-			"	%sapi%s: 1,\n"
-			"	%sid%s: %s%s%s,\n"
-			"	%sname%s: %s%s%s,\n"
-			"	%sview_update_every%s: %d,\n"
-			"	%supdate_every%s: %d,\n"
-			"	%sfirst_entry%s: %u,\n"
-			"	%slast_entry%s: %u,\n"
-			"	%sbefore%s: %u,\n"
-			"	%safter%s: %u,\n"
-			"	%sdimension_names%s: ["
+			"\t%sapi%s: 1,\n"
+			"\t%sid%s: %s%s%s,\n"
+			"\t%sname%s: %s%s%s,\n"
+			"\t%sview_update_every%s: %d,\n"
+			"\t%supdate_every%s: %d,\n"
+			"\t%sfirst_entry%s: %u,\n"
+			"\t%slast_entry%s: %u,\n"
+			"\t%sbefore%s: %u,\n"
+			"\t%safter%s: %u,\n"
+			"\t%sdimension_names%s: ["
 			, kq, kq
 			, kq, kq, sq, r->st->id, sq
 			, kq, kq, sq, r->st->name, sq
@@ -532,7 +533,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t opti
 	}
 
 	buffer_sprintf(wb, "],\n"
-			"	%sdimension_ids%s: ["
+			"\t%sdimension_ids%s: ["
 			, kq, kq);
 
 	for(c = 0, i = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
@@ -553,7 +554,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t opti
 	}
 
 	buffer_sprintf(wb, "],\n"
-			"	%slatest_values%s: ["
+			"\t%slatest_values%s: ["
 			, kq, kq);
 
 	for(c = 0, i = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
@@ -576,7 +577,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t opti
 	}
 
 	buffer_sprintf(wb, "],\n"
-			"	%sview_latest_values%s: ["
+			"\t%sview_latest_values%s: ["
 			, kq, kq);
 
 	i = 0;
@@ -603,9 +604,9 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t opti
 	}
 
 	buffer_sprintf(wb, "],\n"
-			"	%sdimensions%s: %d,\n"
-			"	%spoints%s: %d,\n"
-			"	%sformat%s: %s"
+			"\t%sdimensions%s: %d,\n"
+			"\t%spoints%s: %d,\n"
+			"\t%sformat%s: %s"
 			, kq, kq, i
 			, kq, kq, rows
 			, kq, kq, sq
@@ -614,7 +615,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t opti
 	rrdr_buffer_print_format(wb, format);
 
 	buffer_sprintf(wb, "%s,\n"
-			"	%sresult%s: "
+			"\t%sresult%s: "
 			, sq
 			, kq, kq
 			);
@@ -642,9 +643,9 @@ void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb, uint32_t format, uint32_t option
 
 	if(string_value) buffer_strcat(wb, sq);
 
-	buffer_sprintf(wb, ",\n	%smin%s: ", kq, kq);
+	buffer_sprintf(wb, ",\n\t%smin%s: ", kq, kq);
 	buffer_rrd_value(wb, r->min);
-	buffer_sprintf(wb, ",\n	%smax%s: ", kq, kq);
+	buffer_sprintf(wb, ",\n\t%smax%s: ", kq, kq);
 	buffer_rrd_value(wb, r->max);
 	buffer_strcat(wb, "\n}\n");
 }
@@ -681,23 +682,23 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 			sq[0] = '"';
 		}
 		row_annotations = 1;
-		snprintf(pre_date,   100, "		{%sc%s:[{%sv%s:%s", kq, kq, kq, kq, sq);
-		snprintf(post_date,  100, "%s}", sq);
-		snprintf(pre_label,  100, ",\n		{%sid%s:%s%s,%slabel%s:%s", kq, kq, sq, sq, kq, kq, sq);
-		snprintf(post_label, 100, "%s,%spattern%s:%s%s,%stype%s:%snumber%s}", sq, kq, kq, sq, sq, kq, kq, sq, sq);
-		snprintf(pre_value,  100, ",{%sv%s:", kq, kq);
-		snprintf(post_value, 100, "}");
-		snprintf(post_line,  100, "]}");
-		snprintf(data_begin, 100, "\n	],\n	%srows%s:\n	[\n", kq, kq);
-		snprintf(finish,     100, "\n	]\n}");
+		snprintfz(pre_date,   100, "\t\t{%sc%s:[{%sv%s:%s", kq, kq, kq, kq, sq);
+		snprintfz(post_date,  100, "%s}", sq);
+		snprintfz(pre_label,  100, ",\n\t\t{%sid%s:%s%s,%slabel%s:%s", kq, kq, sq, sq, kq, kq, sq);
+		snprintfz(post_label, 100, "%s,%spattern%s:%s%s,%stype%s:%snumber%s}", sq, kq, kq, sq, sq, kq, kq, sq, sq);
+		snprintfz(pre_value,  100, ",{%sv%s:", kq, kq);
+		strcpy(post_value, "}");
+		strcpy(post_line, "]}");
+		snprintfz(data_begin, 100, "\n\t],\n\t%srows%s:\n\t[\n", kq, kq);
+		strcpy(finish, "\n	]\n}");
 
-		snprintf(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
-		snprintf(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
+		snprintfz(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
+		snprintfz(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
 
-		buffer_sprintf(wb, "{\n	%scols%s:\n	[\n", kq, kq, kq, kq);
-		buffer_sprintf(wb, "		{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
-		buffer_sprintf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotation%s}},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
-		buffer_sprintf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotationText%s}}", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
+		buffer_sprintf(wb, "{\n\t%scols%s:\n\t[\n", kq, kq, kq, kq);
+		buffer_sprintf(wb, "\t\t{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
+		buffer_sprintf(wb, "\t\t{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotation%s}},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
+		buffer_sprintf(wb, "\t\t{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotationText%s}}", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
 
 		// remove the valueobjects flag
 		// google wants its own keys
@@ -715,21 +716,27 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 			dates = JSON_DATES_JS;
 			dates_with_new = 1;
 		}
-		if( options & RRDR_OPTION_OBJECTSROWS )
-			snprintf(pre_date,   100, "		{ ");
-		else
-			snprintf(pre_date,   100, "		[ ");
-		snprintf(pre_label,  100, ", \"");
-		snprintf(post_label, 100, "\"");
-		snprintf(pre_value,  100, ", ");
-		if( options & RRDR_OPTION_OBJECTSROWS )
-			snprintf(post_line,  100, "}");
-		else
-			snprintf(post_line,  100, "]");
-		snprintf(data_begin, 100, "],\n	%sdata%s:\n	[\n", kq, kq);
-		snprintf(finish,     100, "\n	]\n}");
 
-		buffer_sprintf(wb, "{\n	%slabels%s: [", kq, kq);
+		//if( options & RRDR_OPTION_OBJECTSROWS )
+		//	snprintfz(pre_date,   100, "\t\t{ ");
+		//else
+		//	snprintfz(pre_date,   100, "\t\t[ ");
+		strcpy(pre_date, (options & RRDR_OPTION_OBJECTSROWS) ? "\t\t{ " : "\t\t[ ");
+
+		strcpy(pre_label, ", \"");
+		strcpy(post_label, "\"");
+		strcpy(pre_value, ", ");
+
+		//if( options & RRDR_OPTION_OBJECTSROWS )
+		//	snprintfz(post_line,  100, "}");
+		//else
+		//	snprintfz(post_line,  100, "]");
+		strcpy(post_line, (options & RRDR_OPTION_OBJECTSROWS) ? "}" : "]");
+
+		snprintfz(data_begin, 100, "],\n\t%sdata%s:\n\t[\n", kq, kq);
+		strcpy(finish, "\n\t]\n}");
+
+		buffer_sprintf(wb, "{\n\t%slabels%s: [", kq, kq);
 		buffer_sprintf(wb, "%stime%s", sq, sq);
 	}
 
@@ -1450,6 +1457,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 
 			switch(group_method) {
 				case GROUP_MAX:
+					// FIXME: abs() or fabs()?
 					if(unlikely(abs(value) > abs(group_values[c])))
 						group_values[c] = value;
 					break;
@@ -1742,13 +1750,12 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 	// -------------------------------------------------------------------------
 	// prepare various strings, to speed up the loop
 
-	char overflow_annotation[201]; snprintf(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
-	char normal_annotation[201];   snprintf(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
-	char pre_date[51];             snprintf(pre_date,             50, "		{%sc%s:[{%sv%s:%s", kq, kq, kq, kq, sq);
-	char post_date[21];            snprintf(post_date,            20, "%s}", sq);
-	char pre_value[21];            snprintf(pre_value,            20, ",{%sv%s:", kq, kq);
-	char post_value[21];           snprintf(post_value,           20, "}");
-
+	char overflow_annotation[201]; snprintfz(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
+	char normal_annotation[201];   snprintfz(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
+	char pre_date[51];             snprintfz(pre_date,             50, "\t\t{%sc%s:[{%sv%s:%s", kq, kq, kq, kq, sq);
+	char post_date[21];            snprintfz(post_date,            20, "%s}", sq);
+	char pre_value[21];            snprintfz(pre_value,            20, ",{%sv%s:", kq, kq);
+	char post_value[21];           strcpy(post_value, "}");
 
 	// -------------------------------------------------------------------------
 	// checks for debugging
@@ -1785,7 +1792,7 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 	// initialize them
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 		group_values[c] = 0;
-		print_hidden[c] = (rd->flags & RRDDIM_FLAG_HIDDEN)?1:0;
+		print_hidden[c] = rd->flags & RRDDIM_FLAG_HIDDEN;
 		found_non_zero[c] = 0;
 		found_non_existing[c] = 0;
 	}
@@ -1806,10 +1813,10 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 		// -------------------------------------------------------------------------
 		// print the JSON header
 
-		buffer_sprintf(wb, "{\n	%scols%s:\n	[\n", kq, kq);
-		buffer_sprintf(wb, "		{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
-		buffer_sprintf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotation%s}},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
-		buffer_sprintf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotationText%s}}", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
+		buffer_sprintf(wb, "{\n\t%scols%s:\n\t[\n", kq, kq);
+		buffer_sprintf(wb, "\t\t{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
+		buffer_sprintf(wb, "\t\t{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotation%s}},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
+		buffer_sprintf(wb, "\t\t{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotationText%s}}", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
 
 		// print the header for each dimension
 		// and update the print_hidden array for the dimensions that should be hidden
@@ -1817,15 +1824,15 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 		for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
 			if(!print_hidden[c]) {
 				pc++;
-				buffer_sprintf(wb, ",\n		{%sid%s:%s%s,%slabel%s:%s%s%s,%spattern%s:%s%s,%stype%s:%snumber%s}", kq, kq, sq, sq, kq, kq, sq, rd->name, sq, kq, kq, sq, sq, kq, kq, sq, sq);
+				buffer_sprintf(wb, ",\n\t\t{%sid%s:%s%s,%slabel%s:%s%s%s,%spattern%s:%s%s,%stype%s:%snumber%s}", kq, kq, sq, sq, kq, kq, sq, rd->name, sq, kq, kq, sq, sq, kq, kq, sq, sq);
 			}
 		}
 		if(!pc) {
-			buffer_sprintf(wb, ",\n		{%sid%s:%s%s,%slabel%s:%s%s%s,%spattern%s:%s%s,%stype%s:%snumber%s}", kq, kq, sq, sq, kq, kq, sq, "no data", sq, kq, kq, sq, sq, kq, kq, sq, sq);
+			buffer_sprintf(wb, ",\n\t\t{%sid%s:%s%s,%slabel%s:%s%s%s,%spattern%s:%s%s,%stype%s:%snumber%s}", kq, kq, sq, sq, kq, kq, sq, "no data", sq, kq, kq, sq, sq, kq, kq, sq, sq);
 		}
 
 		// print the begin of row data
-		buffer_sprintf(wb, "\n	],\n	%srows%s:\n	[\n", kq, kq);
+		buffer_sprintf(wb, "\n\t],\n\t%srows%s:\n\t[\n", kq, kq);
 
 
 		// -------------------------------------------------------------------------
@@ -1834,13 +1841,13 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 		int annotate_reset = 0;
 		int annotation_count = 0;
 
-		long 	t = rrdset_time2slot(st, before),
+		long t = rrdset_time2slot(st, before),
 				stop_at_t = rrdset_time2slot(st, after),
 				stop_now = 0;
 
 		t -= t % group;
 
-		time_t 	now = rrdset_slot2time(st, t),
+		time_t now = rrdset_slot2time(st, t),
 				dt = st->update_every;
 
 		long count = 0, printed = 0, group_count = 0;
@@ -1921,6 +1928,7 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 
 				switch(group_method) {
 					case GROUP_MAX:
+						// FIXME: abs() or fabs()?
 						if(abs(value) > abs(group_values[c])) group_values[c] = value;
 						break;
 
@@ -1981,7 +1989,7 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 		}
 
 		if(printed) buffer_strcat(wb, "]}");
-		buffer_strcat(wb, "\n	]\n}\n");
+		buffer_strcat(wb, "\n\t]\n}\n");
 
 		if(only_non_zero && max_loop > 1) {
 			int changed = 0;

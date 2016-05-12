@@ -241,8 +241,8 @@ int main(int argc, char **argv)
 		else if(strcmp(argv[i], "-nodaemon") == 0 || strcmp(argv[i], "-nd") == 0) dont_fork = 1;
 		else if(strcmp(argv[i], "-pidfile") == 0 && (i+1) < argc) {
 			i++;
-			strncpy(pidfile, argv[i], FILENAME_MAX);
-			pidfile[FILENAME_MAX] = '\0';
+			strncpyz(pidfile, argv[i], FILENAME_MAX);
+			//pidfile[FILENAME_MAX] = '\0';
 		}
 		else if(strcmp(argv[i], "--unittest")  == 0) {
 			rrd_update_every = 1;
@@ -404,7 +404,7 @@ int main(int argc, char **argv)
 		// let the plugins know the min update_every
 		{
 			char buf[50];
-			snprintf(buf, 50, "%d", rrd_update_every);
+			snprintfz(buf, 50, "%d", rrd_update_every);
 			setenv("NETDATA_UPDATE_EVERY", buf, 1);
 		}
 
