@@ -1,3 +1,20 @@
+
+/*
+ * TODO
+ *
+ * 1. Re-write this using DICTIONARY
+ *
+ *    FIXME
+ *    The way it is now, concurrency locking is incomplete!
+ *    It makes sure that only one writes to the structures
+ *    but at the same time there may be unlimited readers.
+ *    This can cause crashes.
+ *
+ *    Of course, rewriting this to use DICTIONARY instead of
+ *    directly accessing AVL structures, will solve the problem.
+ *
+ */
+
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -54,7 +71,35 @@ struct config {
 
 
 // ----------------------------------------------------------------------------
-// config value
+// locking
+
+static inline void config_global_read_lock(void) {
+	pthread_rwlock_rdlock(&config_rwlock);
+}
+
+static inline void config_global_write_lock(void) {
+	pthread_rwlock_wrlock(&config_rwlock);
+}
+
+static inline void config_global_unlock(void) {
+	pthread_rwlock_unlock(&config_rwlock);
+}
+
+static inline void config_section_read_lock(struct config *co) {
+	pthread_rwlock_rdlock(&co->rwlock);
+}
+
+static inline void config_section_write_lock(struct config *co) {
+	pthread_rwlock_wrlock(&co->rwlock);
+}
+
+static inline void config_section_unlock(struct config *co) {
+	pthread_rwlock_unlock(&co->rwlock);
+}
+
+
+// ----------------------------------------------------------------------------
+// config name-value index
 
 static int config_value_iterator(avl *a) { if(a) {}; return 0; }
 
@@ -76,8 +121,9 @@ static struct config_value *config_value_index_find(struct config *co, const cha
 	return result;
 }
 
+
 // ----------------------------------------------------------------------------
-// config
+// config sections index
 
 static int config_iterator(avl *a) { if(a) {}; return 0; }
 
@@ -104,7 +150,48 @@ static struct config *config_index_find(const char *name, uint32_t hash) {
 	return result;
 }
 
-struct config_value *config_value_create(struct config *co, const char *name, const char *value)
+
+// ----------------------------------------------------------------------------
+// config section methods
+
+static inline struct config *config_section_find(const char *section) {
+	return config_index_find(section, 0);
+}
+
+static inline struct config *config_section_create(const char *section)
+{
+	debug(D_CONFIG, "Creating section '%s'.", section);
+
+	struct config *co = calloc(1, sizeof(struct config));
+	if(!co) fatal("Cannot allocate config");
+
+	co->name = strdup(section);
+	if(!co->name) fatal("Cannot allocate config.name");
+	co->hash = simple_hash(co->name);
+
+	avl_init_lock(&co->values_index, config_value_compare);
+
+	config_global_write_lock();
+
+	config_index_add(co);
+
+	struct config *co2 = config_root;
+	if(co2) {
+		while (co2->next) co2 = co2->next;
+		co2->next = co;
+	}
+	else config_root = co;
+
+	config_global_unlock();
+
+	return co;
+}
+
+
+// ----------------------------------------------------------------------------
+// config name-value methods
+
+static inline struct config_value *config_value_create(struct config *co, const char *name, const char *value)
 {
 	debug(D_CONFIG, "Creating config entry for name '%s', value '%s', in section '%s'.", name, value, co->name);
 
@@ -118,11 +205,9 @@ struct config_value *config_value_create(struct config *co, const char *name, co
 	cv->value = strdup(value);
 	if(!cv->value) fatal("Cannot allocate config.value");
 
+	config_section_write_lock(co);
+
 	config_value_index_add(co, cv);
-
-	// no need for string termination, due to calloc()
-
-	pthread_rwlock_wrlock(&co->rwlock);
 
 	struct config_value *cv2 = co->values;
 	if(cv2) {
@@ -131,130 +216,9 @@ struct config_value *config_value_create(struct config *co, const char *name, co
 	}
 	else co->values = cv;
 
-	pthread_rwlock_unlock(&co->rwlock);
+	config_section_unlock(co);
 
 	return cv;
-}
-
-struct config *config_create(const char *section)
-{
-	debug(D_CONFIG, "Creating section '%s'.", section);
-
-	struct config *co = calloc(1, sizeof(struct config));
-	if(!co) fatal("Cannot allocate config");
-
-	co->name = strdup(section);
-	if(!co->name) fatal("Cannot allocate config.name");
-	co->hash = simple_hash(co->name);
-
-	pthread_rwlock_init(&co->rwlock, NULL);
-	avl_init_lock(&co->values_index, config_value_compare);
-
-	config_index_add(co);
-
-	// no need for string termination, due to calloc()
-
-	pthread_rwlock_wrlock(&config_rwlock);
-
-	struct config *co2 = config_root;
-	if(co2) {
-		while (co2->next) co2 = co2->next;
-		co2->next = co;
-	}
-	else config_root = co;
-
-	pthread_rwlock_unlock(&config_rwlock);
-
-	return co;
-}
-
-struct config *config_find_section(const char *section)
-{
-	return config_index_find(section, 0);
-}
-
-int load_config(char *filename, int overwrite_used)
-{
-	int line = 0;
-	struct config *co = NULL;
-
-	char buffer[CONFIG_FILE_LINE_MAX + 1], *s;
-
-	if(!filename) filename = CONFIG_DIR "/" CONFIG_FILENAME;
-	FILE *fp = fopen(filename, "r");
-	if(!fp) {
-		error("Cannot open file '%s'", filename);
-		return 0;
-	}
-
-	while(fgets(buffer, CONFIG_FILE_LINE_MAX, fp) != NULL) {
-		buffer[CONFIG_FILE_LINE_MAX] = '\0';
-		line++;
-
-		s = trim(buffer);
-		if(!s) {
-			debug(D_CONFIG, "Ignoring line %d, it is empty.", line);
-			continue;
-		}
-
-		int len = (int) strlen(s);
-		if(*s == '[' && s[len - 1] == ']') {
-			// new section
-			s[len - 1] = '\0';
-			s++;
-
-			co = config_find_section(s);
-			if(!co) co = config_create(s);
-
-			continue;
-		}
-
-		if(!co) {
-			// line outside a section
-			error("Ignoring line %d ('%s'), it is outside all sections.", line, s);
-			continue;
-		}
-
-		char *name = s;
-		char *value = strchr(s, '=');
-		if(!value) {
-			error("Ignoring line %d ('%s'), there is no = in it.", line, s);
-			continue;
-		}
-		*value = '\0';
-		value++;
-
-		name = trim(name);
-		value = trim(value);
-
-		if(!name) {
-			error("Ignoring line %d, name is empty.", line);
-			continue;
-		}
-		if(!value) {
-			debug(D_CONFIG, "Ignoring line %d, value is empty.", line);
-			continue;
-		}
-
-		struct config_value *cv = config_value_index_find(co, name, 0);
-
-		if(!cv) cv = config_value_create(co, name, value);
-		else {
-			if(((cv->flags & CONFIG_VALUE_USED) && overwrite_used) || !(cv->flags & CONFIG_VALUE_USED)) {
-				debug(D_CONFIG, "Overwriting '%s/%s'.", line, co->name, cv->name);
-				free(cv->value);
-				cv->value = strdup(value);
-				if(!cv->value) fatal("Cannot allocate config.value");
-			}
-			else
-				debug(D_CONFIG, "Ignoring line %d, '%s/%s' is already present and used.", line, co->name, cv->name);
-		}
-		cv->flags |= CONFIG_VALUE_LOADED;
-	}
-
-	fclose(fp);
-
-	return 1;
 }
 
 char *config_get(const char *section, const char *name, const char *default_value)
@@ -263,8 +227,8 @@ char *config_get(const char *section, const char *name, const char *default_valu
 
 	debug(D_CONFIG, "request to get config in section '%s', name '%s', default_value '%s'", section, name, default_value);
 
-	struct config *co = config_find_section(section);
-	if(!co) co = config_create(section);
+	struct config *co = config_section_find(section);
+	if(!co) co = config_section_create(section);
 
 	cv = config_value_index_find(co, name, 0);
 	if(!cv) {
@@ -341,7 +305,7 @@ const char *config_set_default(const char *section, const char *name, const char
 
 	debug(D_CONFIG, "request to set config in section '%s', name '%s', value '%s'", section, name, value);
 
-	struct config *co = config_find_section(section);
+	struct config *co = config_section_find(section);
 	if(!co) return config_set(section, name, value);
 
 	cv = config_value_index_find(co, name, 0);
@@ -369,8 +333,8 @@ const char *config_set(const char *section, const char *name, const char *value)
 
 	debug(D_CONFIG, "request to set config in section '%s', name '%s', value '%s'", section, name, value);
 
-	struct config *co = config_find_section(section);
-	if(!co) co = config_create(section);
+	struct config *co = config_section_find(section);
+	if(!co) co = config_section_create(section);
 
 	cv = config_value_index_find(co, name, 0);
 	if(!cv) cv = config_value_create(co, name, value);
@@ -408,6 +372,94 @@ int config_set_boolean(const char *section, const char *name, int value)
 	return value;
 }
 
+
+// ----------------------------------------------------------------------------
+// config load/save
+
+int load_config(char *filename, int overwrite_used)
+{
+	int line = 0;
+	struct config *co = NULL;
+
+	char buffer[CONFIG_FILE_LINE_MAX + 1], *s;
+
+	if(!filename) filename = CONFIG_DIR "/" CONFIG_FILENAME;
+	FILE *fp = fopen(filename, "r");
+	if(!fp) {
+		error("Cannot open file '%s'", filename);
+		return 0;
+	}
+
+	while(fgets(buffer, CONFIG_FILE_LINE_MAX, fp) != NULL) {
+		buffer[CONFIG_FILE_LINE_MAX] = '\0';
+		line++;
+
+		s = trim(buffer);
+		if(!s) {
+			debug(D_CONFIG, "Ignoring line %d, it is empty.", line);
+			continue;
+		}
+
+		int len = (int) strlen(s);
+		if(*s == '[' && s[len - 1] == ']') {
+			// new section
+			s[len - 1] = '\0';
+			s++;
+
+			co = config_section_find(s);
+			if(!co) co = config_section_create(s);
+
+			continue;
+		}
+
+		if(!co) {
+			// line outside a section
+			error("Ignoring line %d ('%s'), it is outside all sections.", line, s);
+			continue;
+		}
+
+		char *name = s;
+		char *value = strchr(s, '=');
+		if(!value) {
+			error("Ignoring line %d ('%s'), there is no = in it.", line, s);
+			continue;
+		}
+		*value = '\0';
+		value++;
+
+		name = trim(name);
+		value = trim(value);
+
+		if(!name) {
+			error("Ignoring line %d, name is empty.", line);
+			continue;
+		}
+		if(!value) {
+			debug(D_CONFIG, "Ignoring line %d, value is empty.", line);
+			continue;
+		}
+
+		struct config_value *cv = config_value_index_find(co, name, 0);
+
+		if(!cv) cv = config_value_create(co, name, value);
+		else {
+			if(((cv->flags & CONFIG_VALUE_USED) && overwrite_used) || !(cv->flags & CONFIG_VALUE_USED)) {
+				debug(D_CONFIG, "Overwriting '%s/%s'.", line, co->name, cv->name);
+				free(cv->value);
+				cv->value = strdup(value);
+				if(!cv->value) fatal("Cannot allocate config.value");
+			}
+			else
+				debug(D_CONFIG, "Ignoring line %d, '%s/%s' is already present and used.", line, co->name, cv->name);
+		}
+		cv->flags |= CONFIG_VALUE_LOADED;
+	}
+
+	fclose(fp);
+
+	return 1;
+}
+
 void generate_config(BUFFER *wb, int only_changed)
 {
 	int i, pri;
@@ -433,7 +485,7 @@ void generate_config(BUFFER *wb, int only_changed)
 				break;
 		}
 
-		pthread_rwlock_wrlock(&config_rwlock);
+		config_global_write_lock();
 		for(co = config_root; co ; co = co->next) {
 			if(strcmp(co->name, "global") == 0 || strcmp(co->name, "plugins") == 0 || strcmp(co->name, "registry") == 0) pri = 0;
 			else if(strncmp(co->name, "plugin:", 7) == 0) pri = 1;
@@ -444,15 +496,13 @@ void generate_config(BUFFER *wb, int only_changed)
 				int changed = 0;
 				int count = 0;
 
-				pthread_rwlock_wrlock(&co->rwlock);
-
+				config_section_write_lock(co);
 				for(cv = co->values; cv ; cv = cv->next) {
 					used += (cv->flags & CONFIG_VALUE_USED)?1:0;
 					changed += (cv->flags & CONFIG_VALUE_CHANGED)?1:0;
 					count++;
 				}
-
-				pthread_rwlock_unlock(&co->rwlock);
+				config_section_unlock(co);
 
 				if(!count) continue;
 				if(only_changed && !changed) continue;
@@ -463,7 +513,7 @@ void generate_config(BUFFER *wb, int only_changed)
 
 				buffer_sprintf(wb, "\n[%s]\n", co->name);
 
-				pthread_rwlock_wrlock(&co->rwlock);
+				config_section_write_lock(co);
 				for(cv = co->values; cv ; cv = cv->next) {
 
 					if(used && !(cv->flags & CONFIG_VALUE_USED)) {
@@ -471,10 +521,9 @@ void generate_config(BUFFER *wb, int only_changed)
 					}
 					buffer_sprintf(wb, "\t%s%s = %s\n", ((!(cv->flags & CONFIG_VALUE_CHANGED)) && (cv->flags & CONFIG_VALUE_USED))?"# ":"", cv->name, cv->value);
 				}
-				pthread_rwlock_unlock(&co->rwlock);
+				config_section_unlock(co);
 			}
 		}
-		pthread_rwlock_unlock(&config_rwlock);
+		config_global_unlock();
 	}
 }
-
