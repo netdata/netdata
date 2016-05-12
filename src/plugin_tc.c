@@ -93,25 +93,18 @@ static int tc_device_compare(void* a, void* b) {
 
 avl_tree tc_device_root_index = {
 		NULL,
-		tc_device_compare,
-#ifndef AVL_WITHOUT_PTHREADS
-#ifdef AVL_LOCK_WITH_MUTEX
-		PTHREAD_MUTEX_INITIALIZER
-#else
-		PTHREAD_RWLOCK_INITIALIZER
-#endif
-#endif
+		tc_device_compare
 };
 
 #define tc_device_index_add(st) avl_insert(&tc_device_root_index, (avl *)(st))
 #define tc_device_index_del(st) avl_remove(&tc_device_root_index, (avl *)(st))
 
-static struct tc_device *tc_device_index_find(const char *id, uint32_t hash) {
+static inline struct tc_device *tc_device_index_find(const char *id, uint32_t hash) {
 	struct tc_device *result = NULL, tmp;
 	tmp.id = (char *)id;
 	tmp.hash = (hash)?hash:simple_hash(tmp.id);
 
-	avl_search(&(tc_device_root_index), (avl *)&tmp, tc_device_iterator, (avl **)&result);
+	avl_search(&(tc_device_root_index), (avl *) &tmp, tc_device_iterator, (avl **) &result);
 	return result;
 }
 
@@ -130,18 +123,18 @@ static int tc_class_compare(void* a, void* b) {
 #define tc_class_index_add(st, rd) avl_insert(&((st)->classes_index), (avl *)(rd))
 #define tc_class_index_del(st, rd) avl_remove(&((st)->classes_index), (avl *)(rd))
 
-static struct tc_class *tc_class_index_find(struct tc_device *st, const char *id, uint32_t hash) {
+static inline struct tc_class *tc_class_index_find(struct tc_device *st, const char *id, uint32_t hash) {
 	struct tc_class *result = NULL, tmp;
 	tmp.id = (char *)id;
 	tmp.hash = (hash)?hash:simple_hash(tmp.id);
 
-	avl_search(&(st->classes_index), (avl *)&tmp, tc_class_iterator, (avl **)&result);
+	avl_search(&(st->classes_index), (avl *) &tmp, tc_class_iterator, (avl **) &result);
 	return result;
 }
 
 // ----------------------------------------------------------------------------
 
-static void tc_class_free(struct tc_device *n, struct tc_class *c) {
+static inline void tc_class_free(struct tc_device *n, struct tc_class *c) {
 	debug(D_TC_LOOP, "Removing from device '%s' class '%s', parentid '%s', leafid '%s', seen=%d", n->id, c->id, c->parentid?c->parentid:"", c->leafid?c->leafid:"", c->seen);
 
 	if(c->next) c->next->prev = c->prev;
@@ -161,7 +154,7 @@ static void tc_class_free(struct tc_device *n, struct tc_class *c) {
 	free(c);
 }
 
-static void tc_device_classes_cleanup(struct tc_device *d) {
+static inline void tc_device_classes_cleanup(struct tc_device *d) {
 	static int cleanup_every = 999;
 
 	if(cleanup_every > 0) {
@@ -186,7 +179,7 @@ static void tc_device_classes_cleanup(struct tc_device *d) {
 	}
 }
 
-static void tc_device_commit(struct tc_device *d)
+static inline void tc_device_commit(struct tc_device *d)
 {
 	static int enable_new_interfaces = -1;
 
@@ -296,7 +289,7 @@ static void tc_device_commit(struct tc_device *d)
 	tc_device_classes_cleanup(d);
 }
 
-static void tc_device_set_class_name(struct tc_device *d, char *id, char *name)
+static inline void tc_device_set_class_name(struct tc_device *d, char *id, char *name)
 {
 	struct tc_class *c = tc_class_index_find(d, id, 0);
 	if(c) {
@@ -310,7 +303,7 @@ static void tc_device_set_class_name(struct tc_device *d, char *id, char *name)
 	}
 }
 
-static void tc_device_set_device_name(struct tc_device *d, char *name) {
+static inline void tc_device_set_device_name(struct tc_device *d, char *name) {
 	if(d->name) free(d->name);
 	d->name = NULL;
 
@@ -320,7 +313,7 @@ static void tc_device_set_device_name(struct tc_device *d, char *name) {
 	}
 }
 
-static void tc_device_set_device_family(struct tc_device *d, char *family) {
+static inline void tc_device_set_device_family(struct tc_device *d, char *family) {
 	if(d->family) free(d->family);
 	d->family = NULL;
 
@@ -331,7 +324,7 @@ static void tc_device_set_device_family(struct tc_device *d, char *family) {
 	// no need for null termination - it is already null
 }
 
-static struct tc_device *tc_device_create(char *id)
+static inline struct tc_device *tc_device_create(char *id)
 {
 	struct tc_device *d = tc_device_index_find(id, 0);
 
@@ -347,20 +340,7 @@ static struct tc_device *tc_device_create(char *id)
 		d->id = strdup(id);
 		d->hash = simple_hash(d->id);
 
-		d->classes_index.root = NULL;
-		d->classes_index.compar = tc_class_compare;
-
-		int lock;
-#ifndef AVL_WITHOUT_PTHREADS
-#ifdef AVL_LOCK_WITH_MUTEX
-		lock = pthread_mutex_init(&d->classes_index.mutex, NULL);
-#else
-		lock = pthread_rwlock_init(&d->classes_index.rwlock, NULL);
-#endif
-#endif
-		if(lock != 0)
-			fatal("Failed to initialize plugin_tc mutex/rwlock, return code %d.", lock);
-
+		avl_init(&d->classes_index, tc_class_compare);
 		tc_device_index_add(d);
 
 		if(!tc_device_root) {
@@ -376,7 +356,7 @@ static struct tc_device *tc_device_create(char *id)
 	return(d);
 }
 
-static struct tc_class *tc_class_add(struct tc_device *n, char *id, char *parentid, char *leafid)
+static inline struct tc_class *tc_class_add(struct tc_device *n, char *id, char *parentid, char *leafid)
 {
 	struct tc_class *c = tc_class_index_find(n, id, 0);
 
@@ -418,7 +398,7 @@ static struct tc_class *tc_class_add(struct tc_device *n, char *id, char *parent
 	return(c);
 }
 
-static void tc_device_free(struct tc_device *n)
+static inline void tc_device_free(struct tc_device *n)
 {
 	if(n->next) n->next->prev = n->prev;
 	if(n->prev) n->prev->next = n->next;
@@ -438,7 +418,7 @@ static void tc_device_free(struct tc_device *n)
 	free(n);
 }
 
-static void tc_device_free_all()
+static inline void tc_device_free_all()
 {
 	while(tc_device_root)
 		tc_device_free(tc_device_root);
@@ -459,7 +439,7 @@ static inline int tc_space(char c) {
 	}
 }
 
-static void tc_split_words(char *str, char **words, int max_words) {
+static inline void tc_split_words(char *str, char **words, int max_words) {
 	char *s = str;
 	int i = 0;
 

@@ -1000,14 +1000,7 @@ int file_descriptor_iterator(avl *a) { if(a) {}; return 0; }
 
 avl_tree all_files_index = {
 		NULL,
-		file_descriptor_compare,
-#ifndef AVL_WITHOUT_PTHREADS
-#ifdef AVL_LOCK_WITH_MUTEX
-		PTHREAD_MUTEX_INITIALIZER
-#else
-		PTHREAD_RWLOCK_INITIALIZER
-#endif
-#endif /* AVL_WITHOUT_PTHREADS */
+		file_descriptor_compare
 };
 
 static struct file_descriptor *file_descriptor_find(const char *name, uint32_t hash) {
@@ -1020,7 +1013,7 @@ static struct file_descriptor *file_descriptor_find(const char *name, uint32_t h
 	tmp.magic = 0x0BADCAFE;
 #endif /* NETDATA_INTERNAL_CHECKS */
 
-	avl_search(&all_files_index, (avl *)&tmp, file_descriptor_iterator, (avl **)&result);
+	avl_search(&all_files_index, (avl *) &tmp, file_descriptor_iterator, (avl **) &result);
 	return result;
 }
 

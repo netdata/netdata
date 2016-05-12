@@ -17,16 +17,16 @@ typedef struct name_value {
 } NAME_VALUE;
 
 typedef struct dictionary {
-	uint32_t flags;
+	avl_tree values_index;
+
+	uint8_t flags;
 
 	unsigned long long inserts;
 	unsigned long long deletes;
 	unsigned long long searches;
 	unsigned long long entries;
 
-	avl_tree values_index;
 	pthread_rwlock_t rwlock;
-	pthread_mutex_t atomic_mutex;
 } DICTIONARY;
 
 #define DICTIONARY_FLAG_DEFAULT					0x00000000
