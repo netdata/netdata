@@ -361,25 +361,30 @@
 		}
 
 		var netdataRegistryCallback = function(urls) {
-			var el = '';
-			var a1 = '';
-
-			$.each(urls, function(i, u) {
-				// if(u.guid === NETDATA.registry.machine_guid)
-				el += '<li id="registry_server_' + u.guid + '"><a href="' + u.url + '">' + u.name + '</a></li>';
-				a1 += '<li id="registry_action_' + u.guid + '"><a href="#" onclick="deleteRegistryModalHandler(\'' + u.guid + '\',\'' + u.name + '\',\'' + u.url + '\'); return false;"><i class="fa fa-trash-o" aria-hidden="true" style="color: #999;"></i></a></li>';
-			});
-
-			el += '<li role="separator" class="divider"></li>';
-			a1 += '<li role="separator" class="divider"></li>';
-
-			el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #999;" target="_blank">How this works?</a></li>';
-			a1 += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #999;" target="_blank"><i class="fa fa-question" aria-hidden="true" style="color: #999;"></i></a></li>'
-
-			document.getElementById('mynetdata_servers').innerHTML = el;
-			document.getElementById('mynetdata_actions1').innerHTML = a1;
-
-			document.getElementById('mynetdata_servers2').innerHTML = el;
+			if(urls) {
+				var el = '';
+				var a1 = '';
+	
+				$.each(urls, function(i, u) {
+					if(u.guid === NETDATA.registry.machine_guid)
+						el += '<li id="registry_server_' + u.guid + '" class="active"><a href="' + u.url + '">' + u.name + '</a></li>';
+					else
+						el += '<li id="registry_server_' + u.guid + '"><a href="' + u.url + '">' + u.name + '</a></li>';
+	
+					a1 += '<li id="registry_action_' + u.guid + '"><a href="#" onclick="deleteRegistryModalHandler(\'' + u.guid + '\',\'' + u.name + '\',\'' + u.url + '\'); return false;"><i class="fa fa-trash-o" aria-hidden="true" style="color: #999;"></i></a></li>';
+				});
+		
+				el += '<li role="separator" class="divider"></li>';
+				a1 += '<li role="separator" class="divider"></li>';
+	
+				el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #999;" target="_blank">What is this?</a></li>';
+				a1 += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #999;" target="_blank"><i class="fa fa-question" aria-hidden="true" style="color: #999;"></i></a></li>'
+	
+				document.getElementById('mynetdata_servers').innerHTML = el;
+				document.getElementById('mynetdata_actions1').innerHTML = a1;
+	
+				document.getElementById('mynetdata_servers2').innerHTML = el;
+			}
 		};
 
 	</script>
@@ -399,12 +404,12 @@
 							<div class="row">
 								<div class="col-sm-6" style="width: 85%; padding-right: 0;">
 									<ul id="mynetdata_servers" class="multi-column-dropdown">
-										<li id="demo_eu"><a href="//london.netdata.rocks/default.html">EU - London (DigitalOcean.com)</a></li>
-										<li id="demo_us"><a href="//atlanda.netdata.rocks/default.html">US - Atlanta (CDN77.com)</a></li>
-										<li id="demo_gr"><a href="//athens.netdata.rocks/default.html">EU - Greece</a></li>
+										<li><a href="//london.netdata.rocks/default.html">EU - London (DigitalOcean.com)</a></li>
+										<li><a href="//atlanda.netdata.rocks/default.html">US - Atlanta (CDN77.com)</a></li>
+										<li><a href="//athens.netdata.rocks/default.html">EU - Greece</a></li>
 										<li role="separator" class="divider"></li>
-										<li id="demo_tv"><a href="tv.html">TV Dashboard for 2 servers</a></li>
-										<li id="demosites"><a href="demosites.html">Dashboard for monitoring netdata demo sites</a></li>
+										<li><a href="tv.html">TV Dashboard for 2 servers</a></li>
+										<li><a href="demosites.html">Dashboard for monitoring netdata demo sites</a></li>
 									</ul>
 								</div>
 								<div class="col-sm-3 hidden-xs" style="width: 15%; padding-left: 0;">
@@ -442,6 +447,12 @@
 					<li class="dropdown hidden-sm hidden-md hidden-lg">
 						<a href="#" class="dropdown-toggle" data-toggle="dropdown" id="current_view">my-netdata <strong class="caret"></strong></a>
 						<ul id="mynetdata_servers2" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
+							<li><a href="//london.netdata.rocks/default.html">EU - London (DigitalOcean.com)</a></li>
+							<li><a href="//atlanda.netdata.rocks/default.html">US - Atlanta (CDN77.com)</a></li>
+							<li><a href="//athens.netdata.rocks/default.html">EU - Greece</a></li>
+							<li role="separator" class="divider"></li>
+							<li><a href="tv.html">TV Dashboard for 2 servers</a></li>
+							<li><a href="demosites.html">Dashboard for monitoring netdata demo sites</a></li>
 						</ul>
 					</li>
 				</ul>
@@ -898,25 +909,12 @@ function isdemo() {
 
 	try {
 		if(typeof document.location.hostname === 'string') {
-			if(document.location.hostname.endsWith('.firehol.org') ||
+			if(document.location.hostname.endsWith('.my-netdata.io') ||
+					document.location.hostname.endsWith('.mynetdata.io') ||
 					document.location.hostname.endsWith('.netdata.rocks') ||
+					document.location.hostname.endsWith('.firehol.org') ||
 					document.location.hostname.endsWith('.netdata.online'))
 					this_is_demo = true;
-
-			/*
-			if(document.location.hostname === 'netdata.firehol.org' || document.location.hostname === 'netdata1.firehol.org') {
-				document.getElementById("demo_eu").className = "active";
-				this_is_demo = true;
-			}
-			else if(document.location.hostname === 'netdata2.firehol.org') {
-				document.getElementById("demo_us").className = "active";
-				this_is_demo = true;
-			}
-			else if(document.location.hostname === 'netdata3.firehol.org') {
-				document.getElementById("demo_gr").className = "active";
-				this_is_demo = true;
-			}
-			*/
 		}
 	}
 	catch(error) {
