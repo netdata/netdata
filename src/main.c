@@ -40,7 +40,7 @@
 
 extern void *cgroups_main(void *ptr);
 
-int netdata_exit = 0;
+volatile sig_atomic_t netdata_exit = 0;
 
 void netdata_cleanup_and_exit(int ret)
 {
@@ -123,19 +123,7 @@ int killpid(pid_t pid, int sig)
 	}
 	else {
 		errno = 0;
-
-		void (*old)(int);
-		old = signal(sig, SIG_IGN);
-		if(old == SIG_ERR) {
-			error("Cannot overwrite signal handler for signal %d", sig);
-			old = sig_handler;
-		}
-
 		ret = kill(pid, sig);
-
-		if(signal(sig, old) == SIG_ERR)
-			error("Cannot restore signal handler for signal %d", sig);
-
 		if(ret == -1) {
 			switch(errno) {
 				case ESRCH:
@@ -412,6 +400,41 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
+		// block signals while initializing threads.
+		// this causes the threads to block signals.
+		sigset_t sigset;
+		sigfillset(&sigset);
+
+		if(pthread_sigmask(SIG_BLOCK, &sigset, NULL) == -1) {
+			error("Could not block signals for threads");
+		}
+
+		// Catch signals which we want to use to quit savely
+		struct sigaction sa;
+		sigemptyset(&sa.sa_mask);
+		sigaddset(&sa.sa_mask, SIGHUP);
+		sigaddset(&sa.sa_mask, SIGINT);
+		sigaddset(&sa.sa_mask, SIGTERM);
+		sa.sa_handler = sig_handler;
+		if(sigaction(SIGHUP, &sa, NULL) == -1) {
+			error("Failed to change signal handler for SIGHUP");
+		}
+		if(sigaction(SIGINT, &sa, NULL) == -1) {
+			error("Failed to change signal handler for SIGINT");
+		}
+		if(sigaction(SIGTERM, &sa, NULL) == -1) {
+			error("Failed to change signal handler for SIGTERM");
+		}
+		// Ignore SIGPIPE completely.
+		// INFO: If we add signals here we have to unblock them
+		// at popen.c when running a external plugin.
+		sa.sa_handler = SIG_IGN;
+		if(sigaction(SIGPIPE, &sa, NULL) == -1) {
+			error("Failed to change signal handler for SIGTERM");
+		}
+
+		// --------------------------------------------------------------------
+
 		i = pthread_attr_init(&attr);
 		if(i != 0)
 			fatal("pthread_attr_init() failed with code %d.", i);
@@ -492,24 +515,6 @@ int main(int argc, char **argv)
 	info("NetData started on pid %d", getpid());
 
 
-	// catch all signals
-	for (i = 1 ; i < 65 ;i++) {
-		switch(i) {
-			case SIGKILL: // not catchable
-			case SIGSTOP: // not catchable
-				break;
-
-			case SIGSEGV:
-			case SIGFPE:
-			case SIGCHLD:
-				signal(i, SIG_DFL);
-				break;
-
-			default:
-				signal(i,  sig_handler);
-				break;
-		}
-	}
 
 	// ------------------------------------------------------------------------
 	// get default pthread stack size
@@ -550,18 +555,22 @@ int main(int argc, char **argv)
 		else info("Not starting thread %s.", st->name);
 	}
 
-	// for future use - the main thread
-	while(1) {
-		if(netdata_exit != 0) {
-			netdata_exit++;
+	// ------------------------------------------------------------------------
+	// block signals while initializing threads.
+	sigset_t sigset;
+	sigfillset(&sigset);
 
-			if(netdata_exit > 5) {
-				netdata_cleanup_and_exit(0);
-				exit(0);
-			}
-		}
-		sleep(2);
+	if(pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) == -1) {
+		error("Could not unblock signals for threads");
 	}
 
-	exit(0);
+	// Handle flags set in the signal handler.
+	while(1) {
+		pause();
+		if(netdata_exit) {
+			info("Exit main loop of netdata.");
+			netdata_cleanup_and_exit(0);
+			exit(0);
+		}
+	}
 }

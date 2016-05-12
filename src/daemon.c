@@ -30,49 +30,8 @@ int pidfd = -1;
 
 void sig_handler(int signo)
 {
-	switch(signo) {
-		case SIGILL:
-		case SIGABRT:
-		case SIGFPE:
-		case SIGSEGV:
-		case SIGBUS:
-		case SIGSYS:
-		case SIGTRAP:
-		case SIGXCPU:
-		case SIGXFSZ:
-			infoerr("Death signaled exit (signal %d).", signo);
-			signal(signo, SIG_DFL);
-			break;
-
-		case SIGKILL:
-		case SIGTERM:
-		case SIGQUIT:
-		case SIGINT:
-		case SIGHUP:
-		case SIGUSR1:
-		case SIGUSR2:
-			infoerr("Signaled exit (signal %d).", signo);
-			signal(SIGPIPE, SIG_IGN);
-			signal(SIGTERM, SIG_IGN);
-			signal(SIGQUIT, SIG_IGN);
-			signal(SIGHUP,  SIG_IGN);
-			signal(SIGINT,  SIG_IGN);
-			signal(SIGCHLD, SIG_IGN);
-			netdata_cleanup_and_exit(1);
-			break;
-
-		case SIGPIPE:
-			infoerr("Signaled PIPE (signal %d).", signo);
-			// this is received when web clients send a reset
-			// no need to log it.
-			// infoerr("Ignoring signal %d.", signo);
-			break;
-
-		default:
-			info("Signal %d received. Falling back to default action for it.", signo);
-			signal(signo, SIG_DFL);
-			break;
-	}
+	if(signo)
+		netdata_exit = 1;
 }
 
 int become_user(const char *username)
@@ -248,10 +207,6 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 			exit(2);
 		}
 	}
-
-	signal(SIGCHLD,  SIG_IGN);
-	signal(SIGHUP,   SIG_IGN);
-	signal(SIGWINCH, SIG_IGN);
 
 	// fork() again
 	if(!dont_fork) {

@@ -11,6 +11,7 @@ then
 fi
 
 LC_ALL=C
+umask 022
 
 # you can set CFLAGS before running installer
 CFLAGS="${CFLAGS--O3}"
