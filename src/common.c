@@ -780,7 +780,7 @@ char *strncpyz(char *dest, const char *src, size_t n)
 {
   char *p = dest;
 
-	while (n--)
+	while (*src && n--)
 		*dest++ = *src++;
   *dest = '\0';
 
