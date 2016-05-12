@@ -414,6 +414,7 @@ int main(int argc, char **argv)
 		sigaddset(&sa.sa_mask, SIGINT);
 		sigaddset(&sa.sa_mask, SIGTERM);
 		sa.sa_handler = sig_handler;
+		sa.sa_flags = 0;
 		if(sigaction(SIGHUP, &sa, NULL) == -1) {
 			error("Failed to change signal handler for SIGHUP");
 		}
