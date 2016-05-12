@@ -530,7 +530,6 @@ int main(int argc, char **argv)
 
 	registry_init();
 
-
 	// ------------------------------------------------------------------------
 	// spawn the threads
 

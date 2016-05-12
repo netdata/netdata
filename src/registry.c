@@ -425,6 +425,7 @@ static inline MACHINE *registry_machine_allocate(const char *machine_guid, time_
 	if(!m) fatal("Registry: cannot allocate memory for new machine '%s'", machine_guid);
 
 	strncpy(m->guid, machine_guid, 36);
+	m->guid[36] = '\0';
 
 	debug(D_REGISTRY, "Registry: registry_machine_allocate('%s'): creating dictionary of urls", machine_guid);
 	m->urls = dictionary_create(DICTIONARY_FLAGS);
@@ -1435,6 +1436,7 @@ static inline size_t registry_load(void) {
 	}
 
 	size_t len = 0;
+	buf[4096] = '\0';
 	while((s = fgets_trim_len(buf, 4096, fp, &len))) {
 		line++;
 
