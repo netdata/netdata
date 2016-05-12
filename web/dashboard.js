@@ -496,7 +496,11 @@
 		407: { message: "Cannot HELLO netdata server", alert: false },
 		408: { message: "Netdata servers sent invalid response to HELLO", alert: false },
 		409: { message: "Cannot ACCESS netdata registry", alert: false },
-		410: { message: "Netdata registry ACCESS failed", alert: false }
+		410: { message: "Netdata registry ACCESS failed", alert: false },
+		411: { message: "Netdata registry server send invalid response to DELETE ", alert: false },
+		412: { message: "Netdata registry DELETE failed", alert: false },
+		413: { message: "Netdata registry server send invalid response to SWITCH ", alert: false },
+		414: { message: "Netdata registry SWITCH failed", alert: false }
 	};
 	NETDATA.errorLast = {
 		code: 0,
@@ -5487,28 +5491,11 @@
 	// Registry of netdata hosts
 
 	NETDATA.registry = {
-		server: null,
-		machine_guid: null,
-		hostname: null,
-		urls: null,
-
-		init: function() {
-			if(typeof netdataNoRegistry !== 'undefined' && netdataNoRegistry)
-				return;
-
-			NETDATA.registry.hello(NETDATA.serverDefault, function(data) {
-				if(data) {
-					NETDATA.registry.server = data.registry;
-					NETDATA.registry.machine_guid = data.machine_guid;
-					NETDATA.registry.hostname = data.hostname;
-
-					NETDATA.registry.access(10, function (person_urls) {
-						NETDATA.registry.parsePersonUrls(person_urls);
-
-					});
-				}
-			});
-		},
+		server: null,		// the netdata registry server
+		person_guid: null,	// the unique ID of this browser / user
+		machine_guid: null,	// the unique ID the netdata server that served dashboard.js
+		hostname: null,		// the hostname of the netdata server that served dashboard.js
+		urls: null,			// the user's other URLs
 
 		parsePersonUrls: function(person_urls) {
 			if(person_urls) {
@@ -5543,6 +5530,24 @@
 				netdataRegistryCallback(NETDATA.registry.urls);
 		},
 
+		init: function() {
+			if(typeof netdataNoRegistry !== 'undefined' && netdataNoRegistry)
+				return;
+
+			NETDATA.registry.hello(NETDATA.serverDefault, function(data) {
+				if(data) {
+					NETDATA.registry.server = data.registry;
+					NETDATA.registry.machine_guid = data.machine_guid;
+					NETDATA.registry.hostname = data.hostname;
+
+					NETDATA.registry.access(10, function (person_urls) {
+						NETDATA.registry.parsePersonUrls(person_urls);
+
+					});
+				}
+			});
+		},
+
 		hello: function(host, callback) {
 			// send HELLO to a netdata server:
 			// 1. verifies the server is reachable
@@ -5572,11 +5577,12 @@
 
 		access: function(max_redirects, callback) {
 			// send ACCESS to a netdata registry:
-			// 1. it let it know we are accessing a netdata server (in the URL)
+			// 1. it lets it know we are accessing a netdata server (its machine GUID and its URL)
 			// 2. it responds with a list of netdata servers we know
 			// the registry identifies us using a cookie it sets the first time we access it
+			// the registry may respond with a redirect URL to send us to another registry
 			$.ajax({
-					url: NETDATA.registry.server + '/api/v1/registry?action=access&machine=' + NETDATA.registry.machine_guid + '&name=' + encodeURIComponent(NETDATA.registry.hostname) + '&url=' + encodeURIComponent(NETDATA.serverDefault) + '&visible_url=' + encodeURIComponent(document.location),
+					url: NETDATA.registry.server + '/api/v1/registry?action=access&machine=' + NETDATA.registry.machine_guid + '&name=' + encodeURIComponent(NETDATA.registry.hostname) + '&url=' + encodeURIComponent(NETDATA.serverDefault), // + '&visible_url=' + encodeURIComponent(document.location),
 					async: true,
 					cache: false,
 					xhrFields: { withCredentials: true } // required for the cookie
@@ -5586,24 +5592,76 @@
 					if(typeof data.registry === 'string')
 						redirect = data.registry;
 
-					if(typeof data.status !== 'string' || data.status !== 'ok')
+					if(typeof data.status !== 'string' || data.status !== 'ok') {
+						NETDATA.error(409, NETDATA.registry.server + ' responded with: ' + JSON.stringify(data));
 						data = null;
+					}
 
 					if(data === null && redirect !== null && max_redirects > 0) {
+						NETDATA.registry.server = redirect;
 						NETDATA.registry.access(max_redirects - 1, callback);
 					}
-					else if(data === null) {
-						NETDATA.error(409, NETDATA.registry.server + ' response: ' + JSON.stringify(data));
-						if(typeof callback === 'function')
-							callback(null);
-					}
 					else {
+						if(typeof data.person_guid === 'string')
+							NETDATA.registry.person_guid = data.person_guid;
+
 						if(typeof callback === 'function')
 							callback(data.urls);
 					}
 				})
 				.fail(function() {
 					NETDATA.error(410, NETDATA.registry.server);
+
+					if(typeof callback === 'function')
+						callback(null);
+				});
+		},
+
+		delete: function(delete_url, callback) {
+			// send DELETE to a netdata registry:
+			$.ajax({
+				url: NETDATA.registry.server + '/api/v1/registry?action=delete&machine=' + NETDATA.registry.machine_guid + '&name=' + encodeURIComponent(NETDATA.registry.hostname) + '&url=' + encodeURIComponent(NETDATA.serverDefault) + '&delete_url=' + encodeURIComponent(delete_url),
+				async: true,
+				cache: false,
+				xhrFields: { withCredentials: true } // required for the cookie
+			})
+				.done(function(data) {
+					if(typeof data.status !== 'string' || data.status !== 'ok') {
+						NETDATA.error(411, NETDATA.registry.server + ' responded with: ' + JSON.stringify(data));
+						data = null;
+					}
+
+					if(typeof callback === 'function')
+						callback(data);
+				})
+				.fail(function() {
+					NETDATA.error(412, NETDATA.registry.server);
+
+					if(typeof callback === 'function')
+						callback(null);
+				});
+		},
+		
+		switch: function(new_person_guid, callback) {
+			// impersonate
+			$.ajax({
+				url: NETDATA.registry.server + '/api/v1/registry?action=switch&machine=' + NETDATA.registry.machine_guid + '&name=' + encodeURIComponent(NETDATA.registry.hostname) + '&url=' + encodeURIComponent(NETDATA.serverDefault) + '&to=' + new_person_guid,
+				async: true,
+				cache: false,
+				xhrFields: { withCredentials: true } // required for the cookie
+			})
+				.done(function(data) {
+					if(typeof data.status !== 'string' || data.status !== 'ok') {
+						NETDATA.error(413, NETDATA.registry.server + ' responded with: ' + JSON.stringify(data));
+						data = null;
+					}
+
+					if(typeof callback === 'function')
+						callback(data);
+				})
+				.fail(function() {
+					NETDATA.error(414, NETDATA.registry.server);
+
 					if(typeof callback === 'function')
 						callback(null);
 				});

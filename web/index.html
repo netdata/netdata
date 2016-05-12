@@ -362,23 +362,37 @@
 
 		var netdataRegistryCallback = function(urls) {
 			if(urls) {
+				var found = 0;
 				var el = '';
 				var a1 = '';
 	
 				$.each(urls, function(i, u) {
-					if(u.guid === NETDATA.registry.machine_guid)
-						el += '<li id="registry_server_' + u.guid + '" class="active"><a href="' + u.url + '">' + u.name + '</a></li>';
-					else
+					if(u.guid !== NETDATA.registry.machine_guid) {
+						found++;
 						el += '<li id="registry_server_' + u.guid + '"><a href="' + u.url + '">' + u.name + '</a></li>';
-	
-					a1 += '<li id="registry_action_' + u.guid + '"><a href="#" onclick="deleteRegistryModalHandler(\'' + u.guid + '\',\'' + u.name + '\',\'' + u.url + '\'); return false;"><i class="fa fa-trash-o" aria-hidden="true" style="color: #999;"></i></a></li>';
+						a1 += '<li id="registry_action_' + u.guid + '"><a href="#" onclick="deleteRegistryModalHandler(\'' + u.guid + '\',\'' + u.name + '\',\'' + u.url + '\'); return false;"><i class="fa fa-trash-o" aria-hidden="true" style="color: #999;"></i></a></li>';
+					}
 				});
+
+				if(!found) {
+					el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #666;" target="_blank">your netdata server list is empty...</a></li>';
+					a1 += '<li><a href="#">&nbsp;</a></li>';
+
+					el += '<li role="separator" class="divider"></li>' +
+							'<li><a href="//london.netdata.rocks/default.html">EU - London (DigitalOcean.com)</a></li>' +
+							'<li><a href="//atlanta.netdata.rocks/default.html">US - Atlanta (CDN77.com)</a></li>' +
+							'<li><a href="//athens.netdata.rocks/default.html">EU - Athens</a></li>';
+					a1 += '<li role="separator" class="divider"></li>' +
+							'<li><a href="#">&nbsp;</a></li>' +
+							'<li><a href="#">&nbsp;</a></li>'+
+							'<li><a href="#">&nbsp;</a></li>';
+				}
 		
 				el += '<li role="separator" class="divider"></li>';
 				a1 += '<li role="separator" class="divider"></li>';
 	
 				el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #999;" target="_blank">What is this?</a></li>';
-				a1 += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #999;" target="_blank"><i class="fa fa-question" aria-hidden="true" style="color: #999;"></i></a></li>'
+				a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fa fa-cog" aria-hidden="true" style="color: #999;"></i></a></li>'
 	
 				document.getElementById('mynetdata_servers').innerHTML = el;
 				document.getElementById('mynetdata_actions1').innerHTML = a1;
@@ -404,12 +418,6 @@
 							<div class="row">
 								<div class="col-sm-6" style="width: 85%; padding-right: 0;">
 									<ul id="mynetdata_servers" class="multi-column-dropdown">
-										<li><a href="//london.netdata.rocks/default.html">EU - London (DigitalOcean.com)</a></li>
-										<li><a href="//atlanda.netdata.rocks/default.html">US - Atlanta (CDN77.com)</a></li>
-										<li><a href="//athens.netdata.rocks/default.html">EU - Greece</a></li>
-										<li role="separator" class="divider"></li>
-										<li><a href="tv.html">TV Dashboard for 2 servers</a></li>
-										<li><a href="demosites.html">Dashboard for monitoring netdata demo sites</a></li>
 									</ul>
 								</div>
 								<div class="col-sm-3 hidden-xs" style="width: 15%; padding-left: 0;">
@@ -447,12 +455,6 @@
 					<li class="dropdown hidden-sm hidden-md hidden-lg">
 						<a href="#" class="dropdown-toggle" data-toggle="dropdown" id="current_view">my-netdata <strong class="caret"></strong></a>
 						<ul id="mynetdata_servers2" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
-							<li><a href="//london.netdata.rocks/default.html">EU - London (DigitalOcean.com)</a></li>
-							<li><a href="//atlanda.netdata.rocks/default.html">US - Atlanta (CDN77.com)</a></li>
-							<li><a href="//athens.netdata.rocks/default.html">EU - Greece</a></li>
-							<li role="separator" class="divider"></li>
-							<li><a href="tv.html">TV Dashboard for 2 servers</a></li>
-							<li><a href="demosites.html">Dashboard for monitoring netdata demo sites</a></li>
 						</ul>
 					</li>
 				</ul>
@@ -892,10 +894,48 @@
 					<br/>
 					<div style="padding: 10px;"></div>
 					<small>Keep in mind, this server will be added back if and when you visit it again.</small>
+					<br/>
+					<div id="deleteRegistryResponse" style="display: block; width: 100%; text-align: center; padding-top: 20px; color: #fff;"></div>
 				</div>
 				<div class="modal-footer">
 					<button type="button" class="btn btn-success" data-dismiss="modal">keep it</button>
 					<a href="#" onclick="notifyForDeleteRegistry(true);" type="button" class="btn btn-danger">delete it</a>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="modal fade" id="switchRegistryModal" tabindex="-1" role="dialog" aria-labelledby="switchRegistryModalLabel">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+					<h4 class="modal-title" id="switchRegistryModalLabel">Switch Netdata Registry Identity</h4>
+				</div>
+				<div class="modal-body">
+					You can copy and paste the following ID to all your browsers (e.g. work and home).
+					<br/>
+					All the browsers with the same ID will identify <b>you</b>, so please don't share this with others.
+					<p style="text-align: center; padding-top: 10px; padding-bottom: 10px; line-height: 2;">
+					<form action="#">
+					<input type="text" class="form-control" id="switchRegistryPersonGUID" placeholder="your personal ID" maxlength="36" autocomplete="off" style="text-align: center; font-size: 1.4em;">
+					</form>
+					</p>
+					Either copy this ID and paste it to another browser, or paste here the ID you have taken from another browser.
+					<p style="padding-top: 10px;"><small>
+						Keep in mind that:
+						<ul>
+							<li>when you switch ID, your previous ID will be lost forever - this is irreversible.</li>
+							<li>both IDs (your old and the new) must list this netdata at their personal lists.</li>
+							<li>both IDs have to be known by the registry: <b><span id="switchRegistryURL"></span></b>.</li>
+							<li>to get a new ID, just clear your browser cookies.</li>
+						</ul>
+					</small></p>
+					<div id="switchRegistryResponse" style="display: block; width: 100%; text-align: center; padding-top: 20px; color: #fff;"></div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-success" data-dismiss="modal">cancel</button>
+					<a href="#" onclick="notifyForSwitchRegistry(true);" type="button" class="btn btn-danger">impersonate</a>
 				</div>
 			</div>
 		</div>
@@ -928,9 +968,33 @@ if(isdemo()) {
 	document.getElementById('masthead').style.display = 'block';
 }
 
-var deleteRegistryGuid = null;
+function switchRegistryModalHandler() {
+	document.getElementById('switchRegistryPersonGUID').value = NETDATA.registry.person_guid;
+	document.getElementById('switchRegistryURL').innerHTML = NETDATA.registry.server;
+	$('#switchRegistryModal').modal('show');
+}
+
+function notifyForSwitchRegistry() {
+	var n = document.getElementById('switchRegistryPersonGUID').value;
+
+	if(n !== '' && n.length === 36) {
+		NETDATA.registry.switch(n, function(result) {
+			if(result !== null) {
+				$('#switchRegistryModal').modal('hide');
+				NETDATA.registry.init();
+			}
+			else {
+				document.getElementById('switchRegistryResponse').innerHTML = "<b>Sorry! The registry rejected your request.</b>";
+			}
+		});
+	}
+	else
+		document.getElementById('switchRegistryResponse').innerHTML = "<b>The ID you have entered is not a GUID.</b>";
+}
+
+var deleteRegistryUrl = null;
 function deleteRegistryModalHandler(guid, name, url) {
-	deleteRegistryGuid = guid;
+	deleteRegistryUrl = url;
 	document.getElementById('deleteRegistryServerName').innerHTML = name;
 	document.getElementById('deleteRegistryServerName2').innerHTML = name;
 	document.getElementById('deleteRegistryServerURL').innerHTML = url;
@@ -938,16 +1002,18 @@ function deleteRegistryModalHandler(guid, name, url) {
 }
 
 function notifyForDeleteRegistry() {
-/*	if(deleteRegistryGuid) {
-		NETDATA.registry.delete(deleteRegistryGuid, function() {
-			console.log('delete called callback');
-			NETDATA.registry.init();
+	if(deleteRegistryUrl) {
+		NETDATA.registry.delete(deleteRegistryUrl, function(result) {
+			if(result !== null) {
+				deleteRegistryUrl = null;
+				$('#deleteRegistryModal').modal('hide');
+				NETDATA.registry.init();
+			}
+			else {
+				document.getElementById('deleteRegistryResponse').innerHTML = "<b>Sorry! this command was rejected by the registry server.</b>";
+			}
 		});
 	}
-
-	deleteRegistryGuid = null;
-	$('#deleteRegistryModal').modal('hide');
-*/
 }
 
 var options = {

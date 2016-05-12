@@ -540,9 +540,7 @@ static inline PERSON *registry_person_allocate(const char *person_guid, time_t w
 	if(!person_guid) {
 		for (; ;) {
 			uuid_t uuid;
-			if (uuid_generate_time_safe(uuid) == -1)
-				info("Registry: uuid_generate_time_safe() reports UUID generation is not safe for uniqueness.");
-
+			uuid_generate(uuid);
 			uuid_unparse_lower(uuid, p->guid);
 
 			debug(D_REGISTRY, "Registry: Checking if the generated person guid '%s' is unique", p->guid);
@@ -923,7 +921,7 @@ PERSON *registry_request_delete(char *person_guid, char *machine_guid, char *url
 
 	// make sure the user is not deleting the url it uses
 	if(!strcmp(delete_url, pu->url->url)) {
-		info("Registry Delete Request: delete URL is the one currently accessing, person: '%s', machine '%s', url '%s', delete url '%s'", p->guid, m->guid, pu->url->url, delete_url);
+		info("Registry Delete Request: delete URL is the one currently accessed, person: '%s', machine '%s', url '%s', delete url '%s'", p->guid, m->guid, pu->url->url, delete_url);
 		return NULL;
 	}
 
@@ -931,7 +929,7 @@ PERSON *registry_request_delete(char *person_guid, char *machine_guid, char *url
 
 	PERSON_URL *dpu = dictionary_get(p->urls, delete_url);
 	if(!dpu) {
-		info("Registry Delete Request: URL not found for person, person: '%s', machine '%s', url '%s', delete url '%s'", p->guid, m->guid, pu->url->url, delete_url);
+		info("Registry Delete Request: URL not found for person: '%s', machine '%s', url '%s', delete url '%s'", p->guid, m->guid, pu->url->url, delete_url);
 		registry_person_urls_unlock(p);
 		return NULL;
 	}
@@ -1110,7 +1108,7 @@ int registry_request_access_json(struct web_client *w, char *person_guid, char *
 	if(!p) {
 		registry_json_header(w, "access", REGISTRY_STATUS_FAILED);
 		registry_json_footer(w);
-		return 400;
+		return 412;
 	}
 
 	// set the cookie
@@ -1119,7 +1117,7 @@ int registry_request_access_json(struct web_client *w, char *person_guid, char *
 	// generate the response
 	registry_json_header(w, "access", REGISTRY_STATUS_OK);
 
-	buffer_strcat(w->response.data, ",\n\t\"urls\": [");
+	buffer_sprintf(w->response.data, ",\n\t\"person_guid\": \"%s\",\n\t\"urls\": [", p->guid);
 	struct registry_json_walk_person_urls_callback c = { p, NULL, w, 0 };
 	dictionary_get_all(p->urls, registry_json_person_url_callback, &c);
 	buffer_strcat(w->response.data, "\n\t]\n");
@@ -1137,7 +1135,7 @@ int registry_request_delete_json(struct web_client *w, char *person_guid, char *
 	if(!p) {
 		registry_json_header(w, "delete", REGISTRY_STATUS_FAILED);
 		registry_json_footer(w);
-		return 400;
+		return 412;
 	}
 
 	// generate the response
@@ -1155,7 +1153,7 @@ int registry_request_search_json(struct web_client *w, char *person_guid, char *
 	if(!m) {
 		registry_json_header(w, "search", REGISTRY_STATUS_FAILED);
 		registry_json_footer(w);
-		return 400;
+		return 404;
 	}
 
 	registry_json_header(w, "search", REGISTRY_STATUS_OK);
@@ -1165,6 +1163,73 @@ int registry_request_search_json(struct web_client *w, char *person_guid, char *
 	dictionary_get_all(m->urls, registry_json_machine_url_callback, &c);
 	buffer_strcat(w->response.data, "\n\t]\n");
 
+	registry_json_footer(w);
+	return 200;
+}
+
+
+int registry_person_url_callback_verify_machine_exists(void *entry, void *machine) {
+	PERSON_URL *pu = (PERSON_URL *)entry;
+	MACHINE *m = (MACHINE *)machine;
+
+	if(pu->machine == m)
+		return 1;
+	else
+		return 0;
+}
+
+// the main method for switching user identity
+int registry_request_switch_json(struct web_client *w, char *person_guid, char *machine_guid, char *url, char *new_person_guid, time_t when) {
+	(void)url;
+	(void)when;
+
+	if(!registry.enabled)
+		return registry_json_disabled(w, "switch");
+
+	PERSON *op = registry_person_find(person_guid);
+	if(!op) {
+		registry_json_header(w, "switch", REGISTRY_STATUS_FAILED);
+		registry_json_footer(w);
+		return 430;
+	}
+
+	PERSON *np = registry_person_find(new_person_guid);
+	if(!np) {
+		registry_json_header(w, "switch", REGISTRY_STATUS_FAILED);
+		registry_json_footer(w);
+		return 431;
+	}
+
+	MACHINE *m = registry_machine_find(machine_guid);
+	if(!m) {
+		registry_json_header(w, "switch", REGISTRY_STATUS_FAILED);
+		registry_json_footer(w);
+		return 432;
+	}
+
+	// verify the old person has access to this machine
+	int count = dictionary_get_all(op->urls, registry_person_url_callback_verify_machine_exists, m);
+	if(!count) {
+		registry_json_header(w, "switch", REGISTRY_STATUS_FAILED);
+		registry_json_footer(w);
+		return 433;
+	}
+
+	// verify the new person has access to this machine
+	count = dictionary_get_all(np->urls, registry_person_url_callback_verify_machine_exists, m);
+	if(!count) {
+		registry_json_header(w, "switch", REGISTRY_STATUS_FAILED);
+		registry_json_footer(w);
+		return 434;
+	}
+
+	// set the cookie of the new person
+	// the user just switched identity
+	registry_set_person_cookie(w, np);
+
+	// generate the response
+	registry_json_header(w, "switch", REGISTRY_STATUS_OK);
+	buffer_sprintf(w->response.data, ",\n\t\"person_guid\": \"%s\"", np->guid);
 	registry_json_footer(w);
 	return 200;
 }
