@@ -13,29 +13,34 @@
 #include "plugin_proc.h"
 #include "log.h"
 
-#define MAX_INTERRUPTS 256
-#define MAX_INTERRUPT_CPUS 256
 #define MAX_INTERRUPT_NAME 50
 
 struct interrupt {
 	int used;
 	char *id;
 	char name[MAX_INTERRUPT_NAME + 1];
-	unsigned long long value[MAX_INTERRUPT_CPUS];
 	unsigned long long total;
+	unsigned long long value[];
 };
 
-static struct interrupt *alloc_interrupts(int lines) {
-	static struct interrupt *irrs = NULL;
-	static int alloced = 0;
+// since each interrupt is variable in size
+// we use this to calculate its record size
+#define recordsize(cpus) (sizeof(struct interrupt) + (cpus * sizeof(unsigned long long)))
 
-	if(lines < alloced) return irrs;
+// given a base, get a pointer to each record
+#define irrindex(base, line, cpus) ((struct interrupt *)&((char *)(base))[line * recordsize(cpus)])
+
+static inline struct interrupt *get_interrupts_array(int lines, int cpus) {
+	static struct interrupt *irrs = NULL;
+	static int allocated = 0;
+
+	if(lines < allocated) return irrs;
 	else {
-		irrs = (struct interrupt *)realloc(irrs, lines * sizeof(struct interrupt));
+		irrs = (struct interrupt *)realloc(irrs, lines * recordsize(cpus));
 		if(!irrs)
 			fatal("Cannot allocate memory for %d interrupts", lines);
 
-		alloced = lines;
+		allocated = lines;
 	}
 
 	return irrs;
@@ -76,8 +81,6 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
 			if(strncmp(procfile_lineword(ff, 0, w), "CPU", 3) == 0)
 				cpus++;
 		}
-
-		if(cpus > MAX_INTERRUPT_CPUS) cpus = MAX_INTERRUPT_CPUS;
 	}
 
 	if(!cpus) {
@@ -86,12 +89,12 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
 	}
 
 	// allocate the size we need;
-	irrs = alloc_interrupts(lines);
+	irrs = get_interrupts_array(lines, cpus);
 	irrs[0].used = 0;
 
 	// loop through all lines
 	for(l = 1; l < lines ;l++) {
-		struct interrupt *irr = &irrs[l];
+		struct interrupt *irr = irrindex(irrs, l, cpus);
 		irr->used = 0;
 		irr->total = 0;
 
@@ -130,15 +133,17 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
 		st = rrdset_create("system", "softirqs", NULL, "softirqs", NULL, "System softirqs", "softirqs/s", 950, update_every, RRDSET_TYPE_STACKED);
 
 		for(l = 0; l < lines ;l++) {
-			if(!irrs[l].used) continue;
-			rrddim_add(st, irrs[l].id, irrs[l].name, 1, 1, RRDDIM_INCREMENTAL);
+			struct interrupt *irr = irrindex(irrs, l, cpus);
+			if(!irr->used) continue;
+			rrddim_add(st, irr->id, irr->name, 1, 1, RRDDIM_INCREMENTAL);
 		}
 	}
 	else rrdset_next(st);
 
 	for(l = 0; l < lines ;l++) {
-		if(!irrs[l].used) continue;
-		rrddim_set(st, irrs[l].id, irrs[l].total);
+		struct interrupt *irr = irrindex(irrs, l, cpus);
+		if(!irr->used) continue;
+		rrddim_set(st, irr->id, irr->total);
 	}
 	rrdset_done(st);
 
@@ -154,8 +159,9 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
 				// find if everything is zero
 				unsigned long long core_sum = 0 ;
 				for(l = 0; l < lines ;l++) {
-					if(!irrs[l].used) continue;
-					core_sum += irrs[l].value[c];
+					struct interrupt *irr = irrindex(irrs, l, cpus);
+					if(!irr->used) continue;
+					core_sum += irr->value[c];
 				}
 				if(core_sum == 0) continue; // try next core
 
@@ -165,15 +171,17 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
 				st = rrdset_create("cpu", id, name, "softirqs", "cpu.softirqs", title, "softirqs/s", 3000 + c, update_every, RRDSET_TYPE_STACKED);
 
 				for(l = 0; l < lines ;l++) {
-					if(!irrs[l].used) continue;
-					rrddim_add(st, irrs[l].id, irrs[l].name, 1, 1, RRDDIM_INCREMENTAL);
+					struct interrupt *irr = irrindex(irrs, l, cpus);
+					if(!irr->used) continue;
+					rrddim_add(st, irr->id, irr->name, 1, 1, RRDDIM_INCREMENTAL);
 				}
 			}
 			else rrdset_next(st);
 
 			for(l = 0; l < lines ;l++) {
-				if(!irrs[l].used) continue;
-				rrddim_set(st, irrs[l].id, irrs[l].value[c]);
+				struct interrupt *irr = irrindex(irrs, l, cpus);
+				if(!irr->used) continue;
+				rrddim_set(st, irr->id, irr->value[c]);
 			}
 			rrdset_done(st);
 		}
