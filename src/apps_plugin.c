@@ -39,6 +39,10 @@
 #include "procfile.h"
 #include "../config.h"
 
+#ifdef NETDATA_INTERNAL_CHECKS
+#include <sys/prctl.h>
+#endif
+
 #define MAX_COMPARE_NAME 100
 #define MAX_NAME 100
 #define MAX_CMDLINE 1024
@@ -2407,6 +2411,15 @@ int main(int argc, char **argv)
 		config_dir = CONFIG_DIR;
 	}
 	else info("Found NETDATA_CONFIG_DIR='%s'", config_dir);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+	if(debug_flags != 0) {
+		struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
+		if(setrlimit(RLIMIT_CORE, &rl) != 0)
+			info("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
+		prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
+	}
+#endif /* NETDATA_INTERNAL_CHECKS */
 
 	info("starting...");
 

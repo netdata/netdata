@@ -316,7 +316,17 @@ void avl_init(avl_tree *t, int (*compar)(void *a, void *b)) {
 
 /* ------------------------------------------------------------------------- */
 
-void avl_lock(avl_tree_lock *t) {
+void avl_read_lock(avl_tree_lock *t) {
+#ifndef AVL_WITHOUT_PTHREADS
+#ifdef AVL_LOCK_WITH_MUTEX
+	pthread_mutex_lock(&t->mutex);
+#else
+	pthread_rwlock_rdlock(&t->rwlock);
+#endif
+#endif /* AVL_WITHOUT_PTHREADS */
+}
+
+void avl_write_lock(avl_tree_lock *t) {
 #ifndef AVL_WITHOUT_PTHREADS
 #ifdef AVL_LOCK_WITH_MUTEX
 	pthread_mutex_lock(&t->mutex);
@@ -357,29 +367,29 @@ void avl_init_lock(avl_tree_lock *t, int (*compar)(void *a, void *b)) {
 }
 
 int avl_range_lock(avl_tree_lock *t, avl *a, avl *b, int (*iter)(avl *), avl **ret) {
-	avl_lock(t);
+	avl_read_lock(t);
 	int ret2 = avl_range(&t->avl_tree, a, b, iter, ret);
 	avl_unlock(t);
 	return ret2;
 }
 
 int avl_removeroot_lock(avl_tree_lock *t) {
-	avl_lock(t);
+	avl_write_lock(t);
 	int ret = avl_removeroot(&t->avl_tree);
 	avl_unlock(t);
 	return ret;
 }
 
 int avl_remove_lock(avl_tree_lock *t, avl *a) {
-	avl_lock(t);
+	avl_write_lock(t);
 	int ret = avl_remove(&t->avl_tree, a);
 	avl_unlock(t);
 	return ret;
 }
 
 int avl_insert_lock(avl_tree_lock *t, avl *a) {
-	avl_lock(t);
+	avl_write_lock(t);
 	int ret = avl_insert(&t->avl_tree, a);
-	avl_lock(t);
+	avl_unlock(t);
 	return ret;
 }

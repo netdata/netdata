@@ -496,24 +496,22 @@ int main(int argc, char **argv)
 	// never become a problem
 	if(nice(20) == -1) error("Cannot lower my CPU priority.");
 
-	if(become_daemon(dont_fork, 0, user, input_log_file, output_log_file, error_log_file, access_log_file, &access_fd, &stdaccess) == -1) {
+	if(become_daemon(dont_fork, 0, user, input_log_file, output_log_file, error_log_file, access_log_file, &access_fd, &stdaccess) == -1)
 		fatal("Cannot demonize myself.");
-		exit(1);
-	}
 
+#ifdef NETDATA_INTERNAL_CHECKS
 	if(debug_flags != 0) {
 		struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
 		if(setrlimit(RLIMIT_CORE, &rl) != 0)
 			info("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
-
 		prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
 	}
+#endif /* NETDATA_INTERNAL_CHECKS */
 
 	if(output_log_syslog || error_log_syslog || access_log_syslog)
 		openlog("netdata", LOG_PID, LOG_DAEMON);
 
 	info("NetData started on pid %d", getpid());
-
 
 
 	// ------------------------------------------------------------------------
