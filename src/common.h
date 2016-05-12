@@ -46,4 +46,6 @@ extern unsigned long long timems(void);
 #endif
 #endif
 
+extern int mysnprintf(char *dest, size_t size, char *fmt, ...);
+
 #endif /* NETDATA_COMMON_H */

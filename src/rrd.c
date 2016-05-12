@@ -39,10 +39,13 @@ pthread_rwlock_t rrdset_root_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 int rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
 
 
+static int _iterator(avl *a) { if (a) {}; return 0; }
+
 // ----------------------------------------------------------------------------
 // RRDSET index
 
-static int rrdset_iterator(avl *a) { if(a) {}; return 0; }
+//static int rrdset_iterator(avl *a) { if(a) {}; return 0; }
+#define rrdset_iterator _iterator
 
 static int rrdset_compare(void* a, void* b) {
 	if(((RRDSET *)a)->hash < ((RRDSET *)b)->hash) return -1;
@@ -80,7 +83,8 @@ static RRDSET *rrdset_index_find(const char *id, uint32_t hash) {
 
 #define rrdset_from_avlname(avlname_ptr) ((RRDSET *)((avlname_ptr) - offsetof(RRDSET, avlname)))
 
-static int rrdset_iterator_name(avl *a) { if(a) {}; return 0; }
+//static int rrdset_iterator_name(avl *a) { if(a) {}; return 0; }
+#define rrdset_iterator_name _iterator
 
 static int rrdset_compare_name(void* a, void* b) {
 	RRDSET *A = rrdset_from_avlname(a);
@@ -136,7 +140,9 @@ static RRDSET *rrdset_index_find_name(const char *name, uint32_t hash) {
 // ----------------------------------------------------------------------------
 // RRDDIM index
 
-static int rrddim_iterator(avl *a) { if(a) {}; return 0; }
+//static int rrddim_iterator(avl *a) { if(a) {}; return 0; }
+// FIX: All 'iterators' share the same code.
+#define rrddim_iterator _iterator
 
 static int rrddim_compare(void* a, void* b) {
 	if(((RRDDIM *)a)->hash < ((RRDDIM *)b)->hash) return -1;
@@ -164,7 +170,8 @@ int rrdset_type_id(const char *name)
 {
 	if(unlikely(strcmp(name, RRDSET_TYPE_AREA_NAME) == 0)) return RRDSET_TYPE_AREA;
 	else if(unlikely(strcmp(name, RRDSET_TYPE_STACKED_NAME) == 0)) return RRDSET_TYPE_STACKED;
-	else if(unlikely(strcmp(name, RRDSET_TYPE_LINE_NAME) == 0)) return RRDSET_TYPE_LINE;
+	// FIX: Superfluous comparison.
+	//else if(unlikely(strcmp(name, RRDSET_TYPE_LINE_NAME) == 0)) return RRDSET_TYPE_LINE;
 	return RRDSET_TYPE_LINE;
 }
 
@@ -175,8 +182,9 @@ const char *rrdset_type_name(int chart_type)
 	static char stacked[] = RRDSET_TYPE_STACKED_NAME;
 
 	switch(chart_type) {
-		case RRDSET_TYPE_LINE:
-			return line;
+		// FIX: Superfluous comparison.
+		//case RRDSET_TYPE_LINE:
+		//	return line;
 
 		case RRDSET_TYPE_AREA:
 			return area;
@@ -203,9 +211,10 @@ const char *rrd_memory_mode_name(int id)
 		case RRD_MEMORY_MODE_MAP:
 			return map;
 
-		case RRD_MEMORY_MODE_SAVE:
-		default:
-			return save;
+		// FIX: Superfluous comparisons.
+		//case RRD_MEMORY_MODE_SAVE:
+		//default:
+		//	return save;
 	}
 
 	return save;
@@ -226,6 +235,7 @@ int rrd_memory_mode_id(const char *name)
 
 int rrddim_algorithm_id(const char *name)
 {
+	// NOTE: Not superfluous first comparison IF the majority of 'algorithms' are 'absolute'.
 	if(strcmp(name, RRDDIM_ABSOLUTE_NAME) == 0) 			return RRDDIM_ABSOLUTE;
 	if(strcmp(name, RRDDIM_INCREMENTAL_NAME) == 0) 			return RRDDIM_INCREMENTAL;
 	if(strcmp(name, RRDDIM_PCENT_OVER_ROW_TOTAL_NAME) == 0) 		return RRDDIM_PCENT_OVER_ROW_TOTAL;
@@ -241,8 +251,9 @@ const char *rrddim_algorithm_name(int chart_type)
 	static char percentage_of_incremental_row[] = RRDDIM_PCENT_OVER_DIFF_TOTAL_NAME;
 
 	switch(chart_type) {
-		case RRDDIM_ABSOLUTE:
-			return absolute;
+		// FIX: Superfluous comparison.
+		//case RRDDIM_ABSOLUTE:
+		//	return absolute;
 
 		case RRDDIM_INCREMENTAL:
 			return incremental;
@@ -261,13 +272,20 @@ const char *rrddim_algorithm_name(int chart_type)
 
 char *rrdset_strncpy_name(char *to, const char *from, int length)
 {
-	int i;
-	for(i = 0; i < length && from[i] ;i++) {
-		if(from[i] == '.' || isalpha(from[i]) || isdigit(from[i])) to[i] = from[i];
-		else to[i] = '_';
-	}
-	if(i < length) to[i] = '\0';
-	to[length - 1] = '\0';
+	//int i;
+	//for(i = 0; i < length && from[i] ;i++) {
+	//	//if(from[i] == '.' || isalpha(from[i]) || isdigit(from[i])) to[i] = from[i];
+	//	//else to[i] = '_';
+	//}
+	//if(i < length) to[i] = '\0';
+	//to[length - 1] = '\0';
+
+	// FIX: Using pointer for better performance.
+	char *p = to;
+    for (; *from && length > 0; length--, from++, p++)
+      if (*from == '.' || isalpha(*from) || isdigit(*from)) *p = *from;
+      else *p = '_';
+    *p = '\0';
 
 	return to;
 }
@@ -281,7 +299,7 @@ void rrdset_set_name(RRDSET *st, const char *name)
 	char b[CONFIG_MAX_VALUE + 1];
 	char n[RRD_ID_LENGTH_MAX + 1];
 
-	snprintf(n, RRD_ID_LENGTH_MAX, "%s.%s", st->type, name);
+	mysnprintf(n, RRD_ID_LENGTH_MAX, "%s.%s", st->type, name);
 	rrdset_strncpy_name(b, n, CONFIG_MAX_VALUE);
 	st->name = config_get(st->id, "name", b);
 	st->hash_name = simple_hash(st->name);
@@ -303,7 +321,7 @@ char *rrdset_cache_dir(const char *id)
 	char n[FILENAME_MAX + 1];
 	rrdset_strncpy_name(b, id, FILENAME_MAX);
 
-	snprintf(n, FILENAME_MAX, "%s/%s", cache_dir, b);
+	mysnprintf(n, FILENAME_MAX, "%s/%s", cache_dir, b);
 	ret = config_get(id, "cache directory", n);
 
 	if(rrd_memory_mode == RRD_MEMORY_MODE_MAP || rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
@@ -335,7 +353,9 @@ void rrdset_reset(RRDSET *st)
 		rd->last_collected_time.tv_sec = 0;
 		rd->last_collected_time.tv_usec = 0;
 		rd->counter = 0;
-		bzero(rd->values, rd->entries * sizeof(storage_number));
+		//bzero(rd->values, rd->entries * sizeof(storage_number));
+		// FIX: bzero is not POSIX.1-2008.
+		memset(rd->values, 0, rd->entries * sizeof(storage_number));
 	}
 }
 
@@ -355,7 +375,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 	char fullfilename[FILENAME_MAX + 1];
 	RRDSET *st = NULL;
 
-	snprintf(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
+	mysnprintf(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
 
 	st = rrdset_find(fullid);
 	if(st) {
@@ -375,35 +395,46 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 
 	debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
-	snprintf(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
+	mysnprintf(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
 	if(rrd_memory_mode != RRD_MEMORY_MODE_RAM) st = (RRDSET *)mymmap(fullfilename, size, ((rrd_memory_mode == RRD_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE), 0);
 	if(st) {
 		if(strcmp(st->magic, RRDSET_MAGIC) != 0) {
 			errno = 0;
 			info("Initializing file %s.", fullfilename);
-			bzero(st, size);
+			//bzero(st, size);
+			// FIX: bzero is not POSIX.1-2008.
+			memset(st, 0, size);
 		}
 		else if(strcmp(st->id, fullid) != 0) {
 			errno = 0;
 			error("File %s contents are not for chart %s. Clearing it.", fullfilename, fullid);
 			// munmap(st, size);
 			// st = NULL;
-			bzero(st, size);
+
+			//bzero(st, size);
+			// FIX: bzero is not POSIX.1-2008.
+			memset(st, 0, size);
 		}
 		else if(st->memsize != size || st->entries != entries) {
 			errno = 0;
 			error("File %s does not have the desired size. Clearing it.", fullfilename);
-			bzero(st, size);
+			// FIX: bzero is not POSIX.1-2008.
+			//bzero(st, size);
+			memset(st, 0, size);
 		}
 		else if(st->update_every != update_every) {
 			errno = 0;
 			error("File %s does not have the desired update frequency. Clearing it.", fullfilename);
-			bzero(st, size);
+			// FIX: bzero is not POSIX.1-2008.
+			//bzero(st, size);
+			memset(st, 0, size);
 		}
 		else if((time(NULL) - st->last_updated.tv_sec) > update_every * entries) {
 			errno = 0;
 			error("File %s is too old. Clearing it.", fullfilename);
-			bzero(st, size);
+			// FIX: bzero is not POSIX.1-2008.
+			//bzero(st, size);
+			memset(st, 0, size);
 		}
 	}
 
@@ -467,7 +498,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 
 	{
 		char varvalue[CONFIG_MAX_VALUE + 1];
-		snprintf(varvalue, CONFIG_MAX_VALUE, "%s (%s)", title?title:"", st->name);
+		mysnprintf(varvalue, CONFIG_MAX_VALUE, "%s (%s)", title?title:"", st->name);
 		st->title = config_get(st->id, "title", varvalue);
 	}
 
@@ -493,7 +524,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 	debug(D_RRD_CALLS, "Adding dimension '%s/%s'.", st->id, id);
 
 	rrdset_strncpy_name(filename, id, FILENAME_MAX);
-	snprintf(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
+	mysnprintf(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
 	if(rrd_memory_mode != RRD_MEMORY_MODE_RAM) rd = (RRDDIM *)mymmap(fullfilename, size, ((rrd_memory_mode == RRD_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE), 1);
 	if(rd) {
 		struct timeval now;
@@ -502,44 +533,61 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 		if(strcmp(rd->magic, RRDDIMENSION_MAGIC) != 0) {
 			errno = 0;
 			info("Initializing file %s.", fullfilename);
-			bzero(rd, size);
+			// FIX: bzero is not POSIX.1-2008.
+			//bzero(rd, size);
+			memset(rd, 0, size);
 		}
 		else if(rd->memsize != size) {
 			errno = 0;
 			error("File %s does not have the desired size. Clearing it.", fullfilename);
-			bzero(rd, size);
+			// FIX: bzero is not POSIX.1-2008.
+			//bzero(rd, size);
+			memset(rd, 0, size);
 		}
 		else if(rd->multiplier != multiplier) {
 			errno = 0;
 			error("File %s does not have the same multiplier. Clearing it.", fullfilename);
-			bzero(rd, size);
+			// FIX: bzero is not POSIX.1-2008.
+			//bzero(rd, size);
+			memset(rd, 0, size);
 		}
 		else if(rd->divisor != divisor) {
 			errno = 0;
 			error("File %s does not have the same divisor. Clearing it.", fullfilename);
-			bzero(rd, size);
+			// FIX: bzero is not POSIX.1-2008.
+			//bzero(rd, size);
+			memset(rd, 0, size);
 		}
 		else if(rd->algorithm != algorithm) {
 			errno = 0;
 			error("File %s does not have the same algorithm. Clearing it.", fullfilename);
-			bzero(rd, size);
+			// FIX: bzero is not POSIX.1-2008.
+			//bzero(rd, size);
+			memset(rd, 0, size);
 		}
 		else if(rd->update_every != st->update_every) {
 			errno = 0;
 			error("File %s does not have the same refresh frequency. Clearing it.", fullfilename);
-			bzero(rd, size);
+			// FIX: bzero is not POSIX.1-2008.
+			//bzero(rd, size);
+			memset(rd, 0, size);
 		}
 		else if(usecdiff(&now, &rd->last_collected_time) > (rd->entries * rd->update_every * 1000000ULL)) {
 			errno = 0;
 			error("File %s is too old. Clearing it.", fullfilename);
-			bzero(rd, size);
+			// FIX: bzero is not POSIX.1-2008.
+			//bzero(rd, size);
+			memset(rd, 0, size);
 		}
 		else if(strcmp(rd->id, id) != 0) {
 			errno = 0;
 			error("File %s contents are not for dimension %s. Clearing it.", fullfilename, id);
 			// munmap(rd, size);
 			// rd = NULL;
-			bzero(rd, size);
+
+			// FIX: bzero is not POSIX.1-2008.
+			//bzero(rd, size);
+			memset(rd, 0, size);
 		}
 	}
 
@@ -568,16 +616,16 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 	strncpy(rd->id, id, RRD_ID_LENGTH_MAX);
 	rd->hash = simple_hash(rd->id);
 
-	snprintf(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
+	mysnprintf(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
 	rd->name = config_get(st->id, varname, (name && *name)?name:rd->id);
 
-	snprintf(varname, CONFIG_MAX_NAME, "dim %s algorithm", rd->id);
+	mysnprintf(varname, CONFIG_MAX_NAME, "dim %s algorithm", rd->id);
 	rd->algorithm = rrddim_algorithm_id(config_get(st->id, varname, rrddim_algorithm_name(algorithm)));
 
-	snprintf(varname, CONFIG_MAX_NAME, "dim %s multiplier", rd->id);
+	mysnprintf(varname, CONFIG_MAX_NAME, "dim %s multiplier", rd->id);
 	rd->multiplier = config_get_number(st->id, varname, multiplier);
 
-	snprintf(varname, CONFIG_MAX_NAME, "dim %s divisor", rd->id);
+	mysnprintf(varname, CONFIG_MAX_NAME, "dim %s divisor", rd->id);
 	rd->divisor = config_get_number(st->id, varname, divisor);
 	if(!rd->divisor) rd->divisor = 1;
 
@@ -608,7 +656,7 @@ void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name)
 	debug(D_RRD_CALLS, "rrddim_set_name() %s.%s", st->name, rd->name);
 
 	char varname[CONFIG_MAX_NAME + 1];
-	snprintf(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
+	mysnprintf(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
 	config_set_default(st->id, varname, name);
 }
 

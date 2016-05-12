@@ -114,6 +114,8 @@ void buffer_snprintf(BUFFER *wb, size_t len, const char *fmt, ...)
 
 	va_list args;
 	va_start(args, fmt);
+	// FIXME: What if vsnprintf returns -1?
+	// FIXME: len+1 is correct?!
 	wb->len += vsnprintf(&wb->buffer[wb->len], len+1, fmt, args);
 	va_end(args);
 
@@ -130,6 +132,7 @@ void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args)
 
 	size_t len = wb->size - wb->len;
 
+	// FIXME: What if vsnprintf returns -1?
 	wb->len += vsnprintf(&wb->buffer[wb->len], len, fmt, args);
 
 	buffer_overflow_check(wb);
@@ -147,6 +150,7 @@ void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
 
 	va_list args;
 	va_start(args, fmt);
+	// FIXME: What if vsnprintf returns -1?
 	wrote = (size_t) vsnprintf(&wb->buffer[wb->len], len, fmt, args);
 	va_end(args);
 
@@ -187,50 +191,50 @@ void buffer_rrd_value(BUFFER *wb, calculated_number value)
 // generate a javascript date, the fastest possible way...
 void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minutes, int seconds)
 {
-  //         10        20        30      = 35
+	//         10        20        30      = 35
 	// 01234567890123456789012345678901234
 	// Date(2014,04,01,03,28,20)
 
 	buffer_need_bytes(wb, 30);
 
 	char *b = &wb->buffer[wb->len], *p;
-  unsigned int *q = (unsigned int *)b;  
+	unsigned int *q = (unsigned int *)b;  
 
-  #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    *q++ = 0x65746144;  // "Date" backwards.
-  #else
-    *q++ = 0x44617465;  // "Date"
-  #endif
-  p = (char *)q;
+	#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	  *q++ = 0x65746144;  // "Date" backwards.
+	#else
+	  *q++ = 0x44617465;  // "Date"
+	#endif
+	p = (char *)q;
 
-  *p++ = '(';
-  *p++ = '0' + year / 1000; year %= 1000;
-  *p++ = '0' + year / 100;  year %= 100;
-  *p++ = '0' + year / 10;
-  *p++ = '0' + year % 10;
-  *p++ = ',';
-  *p   = '0' + month / 10; if (*p != '0') p++;
-  *p++ = '0' + month % 10;
-  *p++ = ',';
-  *p   = '0' + day / 10; if (*p != '0') p++;
-  *p++ = '0' + day % 10;
-  *p++ = ',';
-  *p   = '0' + hours / 10; if (*p != '0') p++;
-  *p++ = '0' + hours % 10;
-  *p++ = ',';
-  *p   = '0' + minutes / 10; if (*p != '0') p++;
-  *p++ = '0' + minutes % 10;
-  *p++ = ',';
-  *p   = '0' + seconds / 10; if (*p != '0') p++;
-  *p++ = '0' + seconds % 10;
+	*p++ = '(';
+	*p++ = '0' + year / 1000; year %= 1000;
+	*p++ = '0' + year / 100;  year %= 100;
+	*p++ = '0' + year / 10;
+	*p++ = '0' + year % 10;
+	*p++ = ',';
+	*p   = '0' + month / 10; if (*p != '0') p++;
+	*p++ = '0' + month % 10;
+	*p++ = ',';
+	*p   = '0' + day / 10; if (*p != '0') p++;
+	*p++ = '0' + day % 10;
+	*p++ = ',';
+	*p   = '0' + hours / 10; if (*p != '0') p++;
+	*p++ = '0' + hours % 10;
+	*p++ = ',';
+	*p   = '0' + minutes / 10; if (*p != '0') p++;
+	*p++ = '0' + minutes % 10;
+	*p++ = ',';
+	*p   = '0' + seconds / 10; if (*p != '0') p++;
+	*p++ = '0' + seconds % 10;
 
-  unsigned short *r = (unsigned short *)p;
+	unsigned short *r = (unsigned short *)p;
 
-#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    *r++ = 0x0029;  // ")\0" backwards.  
-  #else
-    *r++ = 0x2900;  // ")\0"
-  #endif
+	#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	  *r++ = 0x0029;  // ")\0" backwards.  
+	#else
+	  *r++ = 0x2900;  // ")\0"
+	#endif
 
 	wb->len += (size_t)((char *)r - b - 1);
 
