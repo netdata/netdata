@@ -812,7 +812,8 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 			*machine_url = NULL,
 			*url_name = NULL,
 			*search_machine_guid = NULL,
-			*delete_url = NULL;
+			*delete_url = NULL,
+			*to_person_guid = NULL;
 
 	while(url) {
 		char *value = mystrsep(&url, "?&[]");
@@ -829,6 +830,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 			else if(!strcmp(value, "hello")) action = 'H';
 			else if(!strcmp(value, "delete")) action = 'D';
 			else if(!strcmp(value, "search")) action = 'S';
+			else if(!strcmp(value, "switch")) action = 'W';
 		}
 		else if(!strcmp(name, "machine"))
 			machine_guid = value;
@@ -847,6 +849,10 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 		else if(action == 'S') {
 			if(!strcmp(name, "for"))
 				search_machine_guid = value;
+		}
+		else if(action == 'W') {
+			if(!strcmp(name, "to"))
+				to_person_guid = value;
 		}
 	}
 
@@ -868,15 +874,12 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 					   machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", search_machine_guid?search_machine_guid:"UNSET");
 		return 400;
 	}
-
-	/*
-	 * No, this is not right
-	if(action != 'H' && !person_guid[0]) {
+	else if(action == 'W' && (!machine_guid || !machine_url || !to_person_guid)) {
 		buffer_flush(w->response.data);
-		buffer_sprintf(w->response.data, "Invalid registry request - you need to send your cookie for this action.");
+		buffer_sprintf(w->response.data, "Invalid registry request - switching identity requires these parameters: machine ('%s'), url ('%s'), to ('%s')",
+					   machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", to_person_guid?to_person_guid:"UNSET");
 		return 400;
 	}
-	*/
 
 	switch(action) {
 		case 'A':
@@ -887,6 +890,9 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 
 		case 'S':
 			return registry_request_search_json(w, person_guid, machine_guid, machine_url, search_machine_guid, time(NULL));
+
+		case 'W':
+			return registry_request_switch_json(w, person_guid, machine_guid, machine_url, to_person_guid, time(NULL));
 
 		case 'H':
 			return registry_request_hello_json(w);
@@ -1630,6 +1636,10 @@ void web_client_process(struct web_client *w) {
 
 		case 404:
 			code_msg = "Not Found";
+			break;
+
+		case 412:
+			code_msg = "Preconditions Failed";
 			break;
 
 		default:
