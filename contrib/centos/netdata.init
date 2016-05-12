@@ -1,0 +1,110 @@
+#!/bin/bash
+#
+# NetData 		NetData Realtime performance monitor
+#
+# chkconfig: 	2345 80 30
+# description: 	Real-time charts for system monitoring
+# processname:	netdata
+# pidfile: 		/var/run/netdata.pid
+# lockfile: 	/var/lock/subsys/netdata
+#
+# Added init info from d
+
+### BEGIN INIT INFO
+# Provides: 			netdata
+# Required-Start:	 	$local_fs 
+# Required-Stop: 		$local_fs 
+# Default-Start: 		2 3 4 5
+# Default-Stop:			0 1 6
+# Short-Description:	Real-time charts for system monitoring
+# Description:      	Netdata is a daemon that collects data in realtime (per second)
+#                   	and presents a web site to view and analyze them. The presentation
+#                   	is also real-time and full of interactive charts that precisely
+#                   	render all collected values.
+### END INIT INFO
+
+. /etc/init.d/functions
+
+SERVICE_NAME=netdata
+PROGNAME=netdata
+PID_PATH_NAME=/var/run/netdata.pid
+LOCK_PATH_NAME=/var/lock/subsys/netdata
+LOG_FILE=/var/log/netdata/startup.log
+RETVAL="0"
+
+conf_check() {
+  [ -x /usr/sbin/netdata ] || exit 5
+}
+
+check_retval() {
+  if [ $RETVAL -eq "0" ]; then
+     success
+     echo
+     exit 0
+  else
+     failure
+     echo
+     exit 1
+  fi
+}
+
+run_start() {
+        RETMSG=$(status -p $PID_PATH_NAME $PROGNAME 2>&1)
+	RETVAL=$?
+	case $RETVAL in
+	  0|1|2)
+	    echo -n $RETMSG
+   	    ;;
+          3)
+            echo -n "Starting $SERVICE_NAME"
+	    conf_check
+            if [[ ( ! -f $PID_PATH_NAME )  ]]; then
+              /usr/sbin/netdata -pidfile ${PID_PATH_NAME}
+              RETVAL=$?
+	      touch $LOCK_PATH_NAME
+            else
+              echo ", but is already running ..."
+            fi
+	esac
+}
+
+run_stop() {
+        echo -n "Stopping $SERVICE_NAME"
+	status -p $PID_PATH_NAME $PROGNAME > /dev/null
+        RETVAL=$?
+        if [[ ( $RETVAL -eq "0" ) ]]; then
+            PID=$(cat $PID_PATH_NAME);
+            kill $PID;
+            RETVAL=$?
+            rm $PID_PATH_NAME
+            rm $LOCK_PATH_NAME
+        else
+	    RETVAL=0
+            echo -n ", but is not running ..."
+            if [ -f $PID_PATH_NAME ]; then rm $PID_PATH_NAME; fi
+            if [ -f $LOCK_PATH_NAME ]; then rm $LOCK_PATH_NAME; fi
+        fi
+}
+
+run_status() {
+ 	status -p $PID_PATH_NAME $PROGNAME
+}
+case $1 in
+    start)
+ 	run_start
+	check_retval
+    ;;
+    stop)
+        run_stop
+	check_retval
+    ;;
+    restart)
+        run_stop
+	echo
+        run_start
+	check_retval
+    ;;
+    status)
+        run_status
+    ;;
+esac
