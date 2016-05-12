@@ -50,20 +50,13 @@ static int rrdset_compare(void* a, void* b) {
 	else return strcmp(((RRDSET *)a)->id, ((RRDSET *)b)->id);
 }
 
-avl_tree rrdset_root_index = {
-		NULL,
-		rrdset_compare,
-#ifndef AVL_WITHOUT_PTHREADS
-#ifdef AVL_LOCK_WITH_MUTEX
-		PTHREAD_MUTEX_INITIALIZER
-#else
-		PTHREAD_RWLOCK_INITIALIZER
-#endif
-#endif
+avl_tree_lock rrdset_root_index = {
+		{ NULL, rrdset_compare },
+		AVL_LOCK_INITIALIZER
 };
 
-#define rrdset_index_add(st) avl_insert(&rrdset_root_index, (avl *)(st))
-#define rrdset_index_del(st) avl_remove(&rrdset_root_index, (avl *)(st))
+#define rrdset_index_add(st) avl_insert_lock(&rrdset_root_index, (avl *)(st))
+#define rrdset_index_del(st) avl_remove_lock(&rrdset_root_index, (avl *)(st))
 
 static RRDSET *rrdset_index_find(const char *id, uint32_t hash) {
 	RRDSET *result = NULL, tmp;
@@ -71,7 +64,7 @@ static RRDSET *rrdset_index_find(const char *id, uint32_t hash) {
 	tmp.id[RRD_ID_LENGTH_MAX] = '\0';
 	tmp.hash = (hash)?hash:simple_hash(tmp.id);
 
-	avl_search(&(rrdset_root_index), (avl *)&tmp, rrdset_iterator, (avl **)&result);
+	avl_search_lock(&(rrdset_root_index), (avl *) &tmp, rrdset_iterator, (avl **) &result);
 	return result;
 }
 
@@ -93,24 +86,17 @@ static int rrdset_compare_name(void* a, void* b) {
 	else return strcmp(A->name, B->name);
 }
 
-avl_tree rrdset_root_index_name = {
-		NULL,
-		rrdset_compare_name,
-#ifndef AVL_WITHOUT_PTHREADS
-#ifdef AVL_LOCK_WITH_MUTEX
-		PTHREAD_MUTEX_INITIALIZER
-#else
-		PTHREAD_RWLOCK_INITIALIZER
-#endif
-#endif
+avl_tree_lock rrdset_root_index_name = {
+		{ NULL, rrdset_compare_name },
+		AVL_LOCK_INITIALIZER
 };
 
 int rrdset_index_add_name(RRDSET *st) {
 	// fprintf(stderr, "ADDING: %s (name: %s)\n", st->id, st->name);
-	return avl_insert(&rrdset_root_index_name, (avl *)(&st->avlname));
+	return avl_insert_lock(&rrdset_root_index_name, (avl *) (&st->avlname));
 }
 
-#define rrdset_index_del_name(st) avl_remove(&rrdset_root_index_name, (avl *)(&st->avlname))
+#define rrdset_index_del_name(st) avl_remove_lock(&rrdset_root_index_name, (avl *)(&st->avlname))
 
 static RRDSET *rrdset_index_find_name(const char *name, uint32_t hash) {
 	void *result = NULL;
@@ -119,7 +105,7 @@ static RRDSET *rrdset_index_find_name(const char *name, uint32_t hash) {
 	tmp.hash_name = (hash)?hash:simple_hash(tmp.name);
 
 	// fprintf(stderr, "SEARCHING: %s\n", name);
-	avl_search(&(rrdset_root_index_name), (avl *)(&(tmp.avlname)), rrdset_iterator_name, (avl **)&result);
+	avl_search_lock(&(rrdset_root_index_name), (avl *) (&(tmp.avlname)), rrdset_iterator_name, (avl **) &result);
 	if(result) {
 		RRDSET *st = rrdset_from_avlname(result);
 		if(strcmp(st->magic, RRDSET_MAGIC))
@@ -144,8 +130,8 @@ static int rrddim_compare(void* a, void* b) {
 	else return strcmp(((RRDDIM *)a)->id, ((RRDDIM *)b)->id);
 }
 
-#define rrddim_index_add(st, rd) avl_insert(&((st)->dimensions_index), (avl *)(rd))
-#define rrddim_index_del(st,rd ) avl_remove(&((st)->dimensions_index), (avl *)(rd))
+#define rrddim_index_add(st, rd) avl_insert_lock(&((st)->dimensions_index), (avl *)(rd))
+#define rrddim_index_del(st,rd ) avl_remove_lock(&((st)->dimensions_index), (avl *)(rd))
 
 static RRDDIM *rrddim_index_find(RRDSET *st, const char *id, uint32_t hash) {
 	RRDDIM *result = NULL, tmp;
@@ -153,7 +139,7 @@ static RRDDIM *rrddim_index_find(RRDSET *st, const char *id, uint32_t hash) {
 	tmp.id[RRD_ID_LENGTH_MAX] = '\0';
 	tmp.hash = (hash)?hash:simple_hash(tmp.id);
 
-	avl_search(&(st->dimensions_index), (avl *)&tmp, rrddim_iterator, (avl **)&result);
+	avl_search_lock(&(st->dimensions_index), (avl *) &tmp, rrddim_iterator, (avl **) &result);
 	return result;
 }
 
@@ -457,7 +443,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 	st->gap_when_lost_iterations_above = (int) (
 			config_get_number(st->id, "gap when lost iterations above", RRD_DEFAULT_GAP_INTERPOLATIONS) + 2);
 
-	avl_init(&st->dimensions_index, rrddim_compare);
+	avl_init_lock(&st->dimensions_index, rrddim_compare);
 
 	pthread_rwlock_init(&st->rwlock, NULL);
 	pthread_rwlock_wrlock(&rrdset_root_rwlock);

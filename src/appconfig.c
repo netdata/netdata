@@ -45,7 +45,7 @@ struct config {
 	char *name;
 
 	struct config_value *values;
-	avl_tree values_index;
+	avl_tree_lock values_index;
 
 	struct config *next;
 
@@ -64,15 +64,15 @@ static int config_value_compare(void* a, void* b) {
 	else return strcmp(((struct config_value *)a)->name, ((struct config_value *)b)->name);
 }
 
-#define config_value_index_add(co, cv) avl_insert(&((co)->values_index), (avl *)(cv))
-#define config_value_index_del(co, cv) avl_remove(&((co)->values_index), (avl *)(cv))
+#define config_value_index_add(co, cv) avl_insert_lock(&((co)->values_index), (avl *)(cv))
+#define config_value_index_del(co, cv) avl_remove_lock(&((co)->values_index), (avl *)(cv))
 
 static struct config_value *config_value_index_find(struct config *co, const char *name, uint32_t hash) {
 	struct config_value *result = NULL, tmp;
 	tmp.hash = (hash)?hash:simple_hash(name);
 	tmp.name = (char *)name;
 
-	avl_search(&(co->values_index), (avl *)&tmp, config_value_iterator, (avl **)&result);
+	avl_search_lock(&(co->values_index), (avl *) &tmp, config_value_iterator, (avl **) &result);
 	return result;
 }
 
@@ -87,27 +87,20 @@ static int config_compare(void* a, void* b) {
 	else return strcmp(((struct config *)a)->name, ((struct config *)b)->name);
 }
 
-avl_tree config_root_index = {
-		NULL,
-		config_compare,
-#ifndef AVL_WITHOUT_PTHREADS
-#ifdef AVL_LOCK_WITH_MUTEX
-		PTHREAD_MUTEX_INITIALIZER
-#else
-		PTHREAD_RWLOCK_INITIALIZER
-#endif
-#endif
+avl_tree_lock config_root_index = {
+		{ NULL, config_compare },
+		AVL_LOCK_INITIALIZER
 };
 
-#define config_index_add(cfg) avl_insert(&config_root_index, (avl *)(cfg))
-#define config_index_del(cfg) avl_remove(&config_root_index, (avl *)(cfg))
+#define config_index_add(cfg) avl_insert_lock(&config_root_index, (avl *)(cfg))
+#define config_index_del(cfg) avl_remove_lock(&config_root_index, (avl *)(cfg))
 
 static struct config *config_index_find(const char *name, uint32_t hash) {
 	struct config *result = NULL, tmp;
 	tmp.hash = (hash)?hash:simple_hash(name);
 	tmp.name = (char *)name;
 
-	avl_search(&config_root_index, (avl *)&tmp, config_iterator, (avl **)&result);
+	avl_search_lock(&config_root_index, (avl *) &tmp, config_iterator, (avl **) &result);
 	return result;
 }
 
@@ -155,7 +148,7 @@ struct config *config_create(const char *section)
 	co->hash = simple_hash(co->name);
 
 	pthread_rwlock_init(&co->rwlock, NULL);
-	avl_init(&co->values_index, config_value_compare);
+	avl_init_lock(&co->values_index, config_value_compare);
 
 	config_index_add(co);
 
