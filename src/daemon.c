@@ -30,7 +30,8 @@ int pidfd = -1;
 
 void sig_handler(int signo)
 {
-	netdata_exit = 1;
+	if(signo)
+		netdata_exit = 1;
 }
 
 int become_user(const char *username)
