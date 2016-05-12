@@ -889,7 +889,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 			return registry_request_search_json(w, person_guid, machine_guid, machine_url, search_machine_guid, time(NULL));
 
 		case 'H':
-			return registry_json_redirect(w);
+			return registry_request_hello_json(w);
 
 		default:
 			buffer_flush(w->response.data);
@@ -1223,7 +1223,7 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
 		if(web_enable_gzip && !strcasestr(v, "gzip"))
 			w->enable_gzip = 1;
 	}
-#endif // NETDATA_WITH_ZLIB
+#endif /* NETDATA_WITH_ZLIB */
 
 	*e = ':';
 	*ve = '\r';
@@ -1369,30 +1369,24 @@ void web_client_process(struct web_client *w) {
 					// the client is requesting api access
 					code = web_client_api_request(w, url);
 				}
-#ifdef NETDATA_INTERNAL_CHECKS
-				else if(strcmp(tok, "exit") == 0) {
+				else if(strcmp(tok, "netdata.conf") == 0) {
 					code = 200;
+					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending netdata.conf ...", w->id);
+
 					w->response.data->contenttype = CT_TEXT_PLAIN;
 					buffer_flush(w->response.data);
-
-					if(!netdata_exit)
-						buffer_strcat(w->response.data, "ok, will do...");
-					else
-						buffer_strcat(w->response.data, "I am doing it already");
-
-					netdata_exit = 1;
+					generate_config(w->response.data, 0);
 				}
-#endif
 				else if(strcmp(tok, WEB_PATH_DATA) == 0) { // "data"
-					// the client is requesting rrd data
+					// the client is requesting rrd data -- OLD API
 					code = web_client_data_request(w, url, DATASOURCE_JSON);
 				}
 				else if(strcmp(tok, WEB_PATH_DATASOURCE) == 0) { // "datasource"
-					// the client is requesting google datasource
+					// the client is requesting google datasource -- OLD API
 					code = web_client_data_request(w, url, DATASOURCE_DATATABLE_JSONP);
 				}
 				else if(strcmp(tok, WEB_PATH_GRAPH) == 0) { // "graph"
-					// the client is requesting an rrd graph
+					// the client is requesting an rrd graph -- OLD API
 
 					// get the name of the data to show
 					tok = mystrsep(&url, "/?&");
@@ -1422,7 +1416,40 @@ void web_client_process(struct web_client *w) {
 						buffer_strcat(w->response.data, "Graph name?\r\n");
 					}
 				}
+				else if(strcmp(tok, "list") == 0) {
+					// OLD API
+					code = 200;
+
+					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending list of RRD_STATS...", w->id);
+
+					buffer_flush(w->response.data);
+					RRDSET *st = rrdset_root;
+
+					for ( ; st ; st = st->next )
+						buffer_sprintf(w->response.data, "%s\n", st->name);
+				}
+				else if(strcmp(tok, "all.json") == 0) {
+					// OLD API
+					code = 200;
+					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending JSON list of all monitors of RRD_STATS...", w->id);
+
+					w->response.data->contenttype = CT_APPLICATION_JSON;
+					buffer_flush(w->response.data);
+					rrd_stats_all_json(w->response.data);
+				}
 #ifdef NETDATA_INTERNAL_CHECKS
+				else if(strcmp(tok, "exit") == 0) {
+					code = 200;
+					w->response.data->contenttype = CT_TEXT_PLAIN;
+					buffer_flush(w->response.data);
+
+					if(!netdata_exit)
+						buffer_strcat(w->response.data, "ok, will do...");
+					else
+						buffer_strcat(w->response.data, "I am doing it already");
+
+					netdata_exit = 1;
+				}
 				else if(strcmp(tok, "debug") == 0) {
 					buffer_flush(w->response.data);
 
@@ -1464,34 +1491,7 @@ void web_client_process(struct web_client *w) {
 					// just leave the buffer as is
 					// it will be copied back to the client
 				}
-#endif
-				else if(strcmp(tok, "list") == 0) {
-					code = 200;
-
-					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending list of RRD_STATS...", w->id);
-
-					buffer_flush(w->response.data);
-					RRDSET *st = rrdset_root;
-
-					for ( ; st ; st = st->next )
-						buffer_sprintf(w->response.data, "%s\n", st->name);
-				}
-				else if(strcmp(tok, "all.json") == 0) {
-					code = 200;
-					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending JSON list of all monitors of RRD_STATS...", w->id);
-
-					w->response.data->contenttype = CT_APPLICATION_JSON;
-					buffer_flush(w->response.data);
-					rrd_stats_all_json(w->response.data);
-				}
-				else if(strcmp(tok, "netdata.conf") == 0) {
-					code = 200;
-					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending netdata.conf ...", w->id);
-
-					w->response.data->contenttype = CT_TEXT_PLAIN;
-					buffer_flush(w->response.data);
-					generate_config(w->response.data, 0);
-				}
+#endif	/* NETDATA_INTERNAL_CHECKS */
 				else {
 					char filename[FILENAME_MAX+1];
 					url = filename;

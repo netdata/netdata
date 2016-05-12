@@ -1011,7 +1011,9 @@ MACHINE *registry_request_machine(char *person_guid, char *machine_guid, char *u
 // ----------------------------------------------------------------------------
 // REGISTRY JSON generation
 
-#ifndef REGISTRY_STANDALONE_TESTS
+#define REGISTRY_STATUS_OK "ok"
+#define REGISTRY_STATUS_FAILED "failed"
+#define REGISTRY_STATUS_DISABLED "disabled"
 
 static inline void registry_set_person_cookie(struct web_client *w, PERSON *p) {
 	char edate[100];
@@ -1027,20 +1029,29 @@ static inline void registry_set_person_cookie(struct web_client *w, PERSON *p) {
 	w->cookie[COOKIE_MAX] = '\0';
 }
 
-
-static inline void registry_json_header(struct web_client *w, int status) {
+static inline void registry_json_header(struct web_client *w, const char *action, const char *status) {
 	w->response.data->contenttype = CT_APPLICATION_JSON;
 	buffer_flush(w->response.data);
-	buffer_sprintf(w->response.data, "{\n\t\"success\": %s,\n\t\"hostname\": \"%s\",\n\t\"machine_guid\": \"%s\"",
-				   status?"true":"false", registry.hostname, registry.machine_guid);
+	buffer_sprintf(w->response.data, "{\n\t\"action\": \"%s\",\n\t\"status\": \"%s\",\n\t\"hostname\": \"%s\",\n\t\"machine_guid\": \"%s\"",
+				   action, status, registry.hostname, registry.machine_guid);
 }
 
 static inline void registry_json_footer(struct web_client *w) {
 	buffer_strcat(w->response.data, "\n}\n");
 }
 
-int registry_json_redirect(struct web_client *w) {
-	registry_json_header(w, 0);
+int registry_request_hello_json(struct web_client *w) {
+	registry_json_header(w, "hello", REGISTRY_STATUS_OK);
+
+	buffer_sprintf(w->response.data, ",\n\t\"registry\": \"%s\"",
+				   registry.registry_to_announce);
+
+	registry_json_footer(w);
+	return 200;
+}
+
+static inline int registry_json_disabled(struct web_client *w, const char *action) {
+	registry_json_header(w, action, REGISTRY_STATUS_DISABLED);
 
 	buffer_sprintf(w->response.data, ",\n\t\"registry\": \"%s\"",
 				   registry.registry_to_announce);
@@ -1092,11 +1103,11 @@ static inline int registry_json_machine_url_callback(void *entry, void *data) {
 // the main method for registering an access
 int registry_request_access_json(struct web_client *w, char *person_guid, char *machine_guid, char *url, char *name, time_t when) {
 	if(!registry.enabled)
-		return registry_json_redirect(w);
+		return registry_json_disabled(w, "access");
 
 	PERSON *p = registry_request_access(person_guid, machine_guid, url, name, when);
 	if(!p) {
-		registry_json_header(w, 0);
+		registry_json_header(w, "access", REGISTRY_STATUS_FAILED);
 		registry_json_footer(w);
 		return 400;
 	}
@@ -1105,7 +1116,7 @@ int registry_request_access_json(struct web_client *w, char *person_guid, char *
 	registry_set_person_cookie(w, p);
 
 	// generate the response
-	registry_json_header(w, 1);
+	registry_json_header(w, "access", REGISTRY_STATUS_OK);
 
 	buffer_strcat(w->response.data, ",\n\t\"urls\": [");
 	struct registry_json_walk_person_urls_callback c = { p, NULL, w, 0 };
@@ -1119,17 +1130,17 @@ int registry_request_access_json(struct web_client *w, char *person_guid, char *
 // the main method for deleting a URL from a person
 int registry_request_delete_json(struct web_client *w, char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when) {
 	if(!registry.enabled)
-		return registry_json_redirect(w);
+		return registry_json_disabled(w, "delete");
 
 	PERSON *p = registry_request_delete(person_guid, machine_guid, url, delete_url, when);
 	if(!p) {
-		registry_json_header(w, 0);
+		registry_json_header(w, "delete", REGISTRY_STATUS_FAILED);
 		registry_json_footer(w);
 		return 400;
 	}
 
 	// generate the response
-	registry_json_header(w, 1);
+	registry_json_header(w, "delete", REGISTRY_STATUS_OK);
 	registry_json_footer(w);
 	return 200;
 }
@@ -1137,16 +1148,16 @@ int registry_request_delete_json(struct web_client *w, char *person_guid, char *
 // the main method for searching the URLs of a netdata
 int registry_request_search_json(struct web_client *w, char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when) {
 	if(!registry.enabled)
-		return registry_json_redirect(w);
+		return registry_json_disabled(w, "search");
 
 	MACHINE *m = registry_request_machine(person_guid, machine_guid, url, request_machine, when);
 	if(!m) {
-		registry_json_header(w, 0);
+		registry_json_header(w, "search", REGISTRY_STATUS_FAILED);
 		registry_json_footer(w);
 		return 400;
 	}
 
-	registry_json_header(w, 1);
+	registry_json_header(w, "search", REGISTRY_STATUS_OK);
 
 	buffer_strcat(w->response.data, ",\n\t\"urls\": [");
 	struct registry_json_walk_person_urls_callback c = { NULL, m, w, 0 };
@@ -1156,8 +1167,6 @@ int registry_request_search_json(struct web_client *w, char *person_guid, char *
 	registry_json_footer(w);
 	return 200;
 }
-
-#endif /* ! REGISTRY_STANDALONE_TESTS */
 
 
 // ----------------------------------------------------------------------------
