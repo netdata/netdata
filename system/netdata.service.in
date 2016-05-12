@@ -9,7 +9,8 @@ User=root
 Group=root
 PIDFile=@localstatedir_POST@/run/netdata.pid
 ExecStart=@sbindir_POST@/netdata -pidfile @localstatedir_POST@/run/netdata.pid
-ExecStop=/bin/kill -SIGTERM $MAINPID
+KillMode=mixed
+KillSignal=SIGTERM
 TimeoutStopSec=30
 
 [Install]
