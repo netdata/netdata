@@ -126,6 +126,7 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 		struct sigaction sa;
 		sigemptyset(&sa.sa_mask);
 		sa.sa_handler = SIG_DFL;
+		sa.sa_flags = 0;
 		if(sigaction(SIGPIPE, &sa, NULL) == -1) {
 			error("Failed to change signal handler for SIGTERM");
 		}
