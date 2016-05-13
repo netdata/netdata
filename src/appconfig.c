@@ -4,15 +4,6 @@
  *
  * 1. Re-write this using DICTIONARY
  *
- *    FIXME
- *    The way it is now, concurrency locking is incomplete!
- *    It makes sure that only one writes to the structures
- *    but at the same time there may be unlimited readers.
- *    This can cause crashes.
- *
- *    Of course, rewriting this to use DICTIONARY instead of
- *    directly accessing AVL structures, will solve the problem.
- *
  */
 
 #ifdef HAVE_CONFIG_H
@@ -29,7 +20,7 @@
 
 #define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 
-pthread_rwlock_t config_rwlock = PTHREAD_RWLOCK_INITIALIZER;
+pthread_mutex_t config_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // ----------------------------------------------------------------------------
 // definitions
@@ -42,15 +33,14 @@ pthread_rwlock_t config_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 struct config_value {
 	avl avl;				// the index - this has to be first!
 
+	uint8_t	flags;
 	uint32_t hash;			// a simple hash to speed up searching
 							// we first compare hashes, and only if the hashes are equal we do string comparisons
 
 	char *name;
 	char *value;
 
-	uint8_t	flags;
-
-	struct config_value *next;
+	struct config_value *next; // config->mutex protects just this
 };
 
 struct config {
@@ -61,40 +51,33 @@ struct config {
 
 	char *name;
 
+	struct config *next;	// gloabl config_mutex protects just this
+
 	struct config_value *values;
 	avl_tree_lock values_index;
 
-	struct config *next;
-
-	pthread_rwlock_t rwlock;
+	pthread_mutex_t mutex; 	// this locks only the writers, to ensure atomic updates
+							// readers are protected using the rwlock in avl_tree_lock
 } *config_root = NULL;
 
 
 // ----------------------------------------------------------------------------
 // locking
 
-static inline void config_global_read_lock(void) {
-	pthread_rwlock_rdlock(&config_rwlock);
-}
-
 static inline void config_global_write_lock(void) {
-	pthread_rwlock_wrlock(&config_rwlock);
+	pthread_mutex_lock(&config_mutex);
 }
 
 static inline void config_global_unlock(void) {
-	pthread_rwlock_unlock(&config_rwlock);
-}
-
-static inline void config_section_read_lock(struct config *co) {
-	pthread_rwlock_rdlock(&co->rwlock);
+	pthread_mutex_unlock(&config_mutex);
 }
 
 static inline void config_section_write_lock(struct config *co) {
-	pthread_rwlock_wrlock(&co->rwlock);
+	pthread_mutex_lock(&co->mutex);
 }
 
 static inline void config_section_unlock(struct config *co) {
-	pthread_rwlock_unlock(&co->rwlock);
+	pthread_mutex_unlock(&co->mutex);
 }
 
 
@@ -171,17 +154,15 @@ static inline struct config *config_section_create(const char *section)
 
 	avl_init_lock(&co->values_index, config_value_compare);
 
-	config_global_write_lock();
-
 	config_index_add(co);
 
+	config_global_write_lock();
 	struct config *co2 = config_root;
 	if(co2) {
 		while (co2->next) co2 = co2->next;
 		co2->next = co;
 	}
 	else config_root = co;
-
 	config_global_unlock();
 
 	return co;
@@ -205,17 +186,15 @@ static inline struct config_value *config_value_create(struct config *co, const 
 	cv->value = strdup(value);
 	if(!cv->value) fatal("Cannot allocate config.value");
 
-	config_section_write_lock(co);
-
 	config_value_index_add(co, cv);
 
+	config_section_write_lock(co);
 	struct config_value *cv2 = co->values;
 	if(cv2) {
 		while (cv2->next) cv2 = cv2->next;
 		cv2->next = cv;
 	}
 	else co->values = cv;
-
 	config_section_unlock(co);
 
 	return cv;
