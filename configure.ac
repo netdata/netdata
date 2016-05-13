@@ -93,7 +93,7 @@ if test -z "${MATH_LIBS}"; then
 fi
 
 AC_CHECK_LIB([uuid], [uuid_generate_time_safe], [], \
-             [AC_MSG_ERROR([libuuid required but not found. Try installing 'uuid-dev' or 'uuid-devel'.])])
+             [AC_MSG_ERROR([libuuid required but not found. Try installing 'uuid-dev' or 'libuuid-devel'.])])
 
 if test "${enable_plugin_nfacct}" = "yes"; then
 	PKG_CHECK_MODULES(
