@@ -234,7 +234,7 @@ static inline void tc_device_commit(struct tc_device *d)
 	}
 
 	char var_name[CONFIG_MAX_NAME + 1];
-	snprintf(var_name, CONFIG_MAX_NAME, "qos for %s", d->id);
+	snprintfz(var_name, CONFIG_MAX_NAME, "qos for %s", d->id);
 	if(config_get_boolean("plugin:tc", var_name, enable_new_interfaces)) {
 		RRDSET *st = rrdset_find_bytype(RRD_TYPE_TC, d->id);
 		if(!st) {
@@ -515,7 +515,7 @@ void *tc_main(void *ptr)
 		struct tc_device *device = NULL;
 		struct tc_class *class = NULL;
 
-		snprintf(buffer, TC_LINE_MAX, "exec %s %d", config_get("plugin:tc", "script to run to get tc values", PLUGINS_DIR "/tc-qos-helper.sh"), rrd_update_every);
+		snprintfz(buffer, TC_LINE_MAX, "exec %s %d", config_get("plugin:tc", "script to run to get tc values", PLUGINS_DIR "/tc-qos-helper.sh"), rrd_update_every);
 		debug(D_TC_LOOP, "executing '%s'", buffer);
 		// fp = popen(buffer, "r");
 		fp = mypopen(buffer, &tc_child_pid);
@@ -570,7 +570,7 @@ void *tc_main(void *ptr)
 
 					char leafbuf[20 + 1] = "";
 					if(leafid && leafid[strlen(leafid) - 1] == ':') {
-						strncpy(leafbuf, leafid, 20 - 1);
+						strncpyz(leafbuf, leafid, 20 - 1);
 						strcat(leafbuf, "1");
 						leafid = leafbuf;
 					}

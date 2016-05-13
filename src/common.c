@@ -582,8 +582,11 @@ uint32_t simple_hash(const char *name) {
 	// FNV-1a algorithm
 	while (*s) {
 		// multiply by the 32 bit FNV magic prime mod 2^32
-		// gcc optimized
-		hval += (hval<<1) + (hval<<4) + (hval<<7) + (hval<<8) + (hval<<24);
+		// NOTE: No need to optimize with left shifts.
+		//       GCC will use imul instruction anyway.
+		//       Tested with 'gcc -O3 -S'
+		//hval += (hval<<1) + (hval<<4) + (hval<<7) + (hval<<8) + (hval<<24);
+		hval *= 16777619;
 
 		// xor the bottom with the current octet
 		hval ^= (uint32_t)*s++;
@@ -618,9 +621,15 @@ uint32_t simple_hash(const char *name) {
 
 void strreverse(char* begin, char* end)
 {
-    char aux;
-    while (end > begin)
-        aux = *end, *end-- = *begin, *begin++ = aux;
+	char aux;
+
+	while (end > begin)
+	{
+		// clearer code.
+		aux = *end;
+		*end-- = *begin;
+		*begin++ = aux;
+	}
 }
 
 char *mystrsep(char **ptr, char *s)
@@ -633,17 +642,22 @@ char *mystrsep(char **ptr, char *s)
 char *trim(char *s)
 {
 	// skip leading spaces
+	// and 'comments' as well!?
 	while(*s && isspace(*s)) s++;
 	if(!*s || *s == '#') return NULL;
 
 	// skip tailing spaces
-	long c = (long) strlen(s) - 1;
-	while(c >= 0 && isspace(s[c])) {
-		s[c] = '\0';
-		c--;
+	// this way is way faster. Writes only one NUL char.
+	ssize_t l = strlen(s);
+  if (--l >= 0)
+	{
+		char *p = s + l;
+		while (p > s && isspace(*p)) p--;
+		*++p = '\0';
 	}
-	if(c < 0) return NULL;
+
 	if(!*s) return NULL;
+
 	return s;
 }
 
@@ -710,7 +724,7 @@ int savememory(const char *filename, void *mem, unsigned long size)
 {
 	char tmpfilename[FILENAME_MAX + 1];
 
-	snprintf(tmpfilename, FILENAME_MAX, "%s.%ld.tmp", filename, (long)getpid());
+	snprintfz(tmpfilename, FILENAME_MAX, "%s.%ld.tmp", filename, (long)getpid());
 
 	int fd = open(tmpfilename, O_RDWR|O_CREAT|O_NOATIME, 0664);
 	if(fd < 0) {
@@ -782,3 +796,31 @@ char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len) {
 	return s;
 }
 
+char *strncpyz(char *dest, const char *src, size_t n)
+{
+  char *p = dest;
+
+	while (*src && n--)
+		*dest++ = *src++;
+  *dest = '\0';
+
+	return p;
+}
+
+int vsnprintfz(char *sout, size_t n, const char *fmt, va_list args)
+{
+	int size;
+
+  size = vsnprintf(sout, n, fmt, args);
+  sout[size] = '\0';
+  return size;
+}
+
+int snprintfz(char *sout, size_t n, const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	return vsnprintfz(sout, n, fmt, args);
+  // args will vanish!
+}

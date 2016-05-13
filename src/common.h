@@ -1,3 +1,4 @@
+#include <stdarg.h>
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <stdio.h>
@@ -23,6 +24,9 @@ extern uint32_t simple_hash(const char *name);
 extern void strreverse(char* begin, char* end);
 extern char *mystrsep(char **ptr, char *s);
 extern char *trim(char *s);
+extern char *strncpyz(char *dest, const char *src, size_t n);
+extern int  vsnprintfz(char *sout, size_t n, const char *fmt, va_list args);
+extern int  snprintfz(char *sout, size_t n, const char *fmt, ...);
 
 extern void *mymmap(const char *filename, size_t size, int flags, int ksm);
 extern int savememory(const char *filename, void *mem, unsigned long size);

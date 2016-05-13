@@ -106,10 +106,10 @@ struct mountinfo *mountinfo_read() {
 	procfile *ff = NULL;
 
 	char filename[FILENAME_MAX + 1];
-	snprintf(filename, FILENAME_MAX, "%s/proc/self/mountinfo", global_host_prefix);
+	snprintfz(filename, FILENAME_MAX, "%s/proc/self/mountinfo", global_host_prefix);
 	ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
 	if(!ff) {
-		snprintf(filename, FILENAME_MAX, "%s/proc/1/mountinfo", global_host_prefix);
+		snprintfz(filename, FILENAME_MAX, "%s/proc/1/mountinfo", global_host_prefix);
 		ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
 		if(!ff) return NULL;
 	}
