@@ -93,8 +93,7 @@ if test -z "${MATH_LIBS}"; then
 fi
 
 AC_CHECK_LIB([uuid], [uuid_generate_time_safe], [], \
-             [AC_MSG_ERROR([Function uuid_generate_time_safe was not found in libuuid.
-Is uuid-dev installed? Try running 'sudo apt-get install uuid-dev'.])])
+             [AC_MSG_ERROR([libuuid required but not found. Try installing 'uuid-dev' or 'uuid-devel'.])])
 
 if test "${enable_plugin_nfacct}" = "yes"; then
 	PKG_CHECK_MODULES(
@@ -106,7 +105,7 @@ if test "${enable_plugin_nfacct}" = "yes"; then
 		[libmnl],
 	)
 	test -z "${NFACCT_LIBS}" && AC_MSG_ERROR([netfilter_acct required but not found])
-	test -z "${LIBMNL_LIBS}" && AC_MSG_ERROR([libmnl required but not found])
+	test -z "${LIBMNL_LIBS}" && AC_MSG_ERROR([libmnl required but not found. Try installing 'libmnl-dev' or 'libmnl-devel'])
 	AC_DEFINE([INTERNAL_PLUGIN_NFACCT], [1], [nfacct plugin settings])
 	OPTIONAL_NFACCT_CLFAGS="${NFACCT_CFLAGS} ${LIBMNL_CFLAGS}"
 	OPTIONAL_NFACCT_LIBS="${NFACCT_LIBS} ${LIBMNL_LIBS}"
@@ -116,7 +115,7 @@ if test "${with_zlib}" = "yes"; then
 		[ZLIB],
 		[zlib],
 	)
-	test -z "${ZLIB_LIBS}" && AC_MSG_ERROR([zlib required but not found])
+	test -z "${ZLIB_LIBS}" && AC_MSG_ERROR([zlib required but not found. Try installing 'zlib1g-dev' or 'zlib-devel'.])
 	AC_DEFINE([NETDATA_WITH_ZLIB], [1], [zlib settings])
 	OPTIONAL_ZLIB_CLFAGS="${ZLIB_CFLAGS}"
 	OPTIONAL_ZLIB_LIBS="${ZLIB_LIBS}"
