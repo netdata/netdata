@@ -1214,7 +1214,7 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
 		strncpy(w->origin, v, ORIGIN_MAX);
 	}
 	else if(!strcasecmp(s, "Connection")) {
-		if(!strcasestr(v, "keep-alive"))
+		if(strcasestr(v, "keep-alive"))
 			w->keepalive = 1;
 	}
 #ifdef NETDATA_WITH_ZLIB
