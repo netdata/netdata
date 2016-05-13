@@ -138,3 +138,7 @@ It should run on **any Linux** system. It has been tested on:
 ## Documentation
 
 Check the **[netdata wiki](https://github.com/firehol/netdata/wiki)**.
+
+
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/firehol/netdata/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+
