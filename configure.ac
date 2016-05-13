@@ -92,8 +92,14 @@ if test -z "${MATH_LIBS}"; then
 	)
 fi
 
-AC_CHECK_LIB([uuid], [uuid_generate_time_safe], [], \
-             [AC_MSG_ERROR([libuuid required but not found. Try installing 'uuid-dev' or 'libuuid-devel'.])])
+PKG_CHECK_MODULES(
+	[UUID],
+	[uuid],
+)
+test -z "${UUID_LIBS}" && AC_MSG_ERROR([libuuid required but not found. Try installing 'uuid-dev' or 'libuuid-devel'.])
+AC_DEFINE([NETDATA_WITH_UUID], [1], [uuid settings])
+OPTIONAL_UUID_CLFAGS="${UUID_CFLAGS}"
+OPTIONAL_UUID_LIBS="${UUID_LIBS}"
 
 if test "${enable_plugin_nfacct}" = "yes"; then
 	PKG_CHECK_MODULES(
@@ -157,6 +163,8 @@ AC_SUBST([OPTIONAL_NFACCT_CLFAGS])
 AC_SUBST([OPTIONAL_NFACCT_LIBS])
 AC_SUBST([OPTIONAL_ZLIB_CLFAGS])
 AC_SUBST([OPTIONAL_ZLIB_LIBS])
+AC_SUBST([OPTIONAL_UUID_CLFAGS])
+AC_SUBST([OPTIONAL_UUID_LIBS])
 
 AC_CONFIG_FILES([
 	Makefile
