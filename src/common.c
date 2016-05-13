@@ -796,31 +796,37 @@ char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len) {
 	return s;
 }
 
-char *strncpyz(char *dest, const char *src, size_t n)
-{
-  char *p = dest;
+char *strncpyz(char *dst, const char *src, size_t n) {
+	char *p = dst;
 
-	while (*src && n--)
-		*dest++ = *src++;
-  *dest = '\0';
+	while(*src && n--)
+		*dst++ = *src++;
+
+	*dst = '\0';
 
 	return p;
 }
 
-int vsnprintfz(char *sout, size_t n, const char *fmt, va_list args)
-{
+int vsnprintfz(char *dst, size_t n, const char *fmt, va_list args) {
 	int size;
 
-  size = vsnprintf(sout, n, fmt, args);
-  sout[size] = '\0';
-  return size;
+	size = vsnprintf(dst, n, fmt, args);
+
+	if(unlikely((size_t)size > n)) {
+		// there is bug in vsnprintf() and it returns
+		// a number higher to len, but it does not
+		// overflow the buffer.
+		size = n;
+	}
+
+	dst[size] = '\0';
+	return size;
 }
 
-int snprintfz(char *sout, size_t n, const char *fmt, ...)
-{
+int snprintfz(char *dst, size_t n, const char *fmt, ...) {
 	va_list args;
 
 	va_start(args, fmt);
-	return vsnprintfz(sout, n, fmt, args);
-  // args will vanish!
+	return vsnprintfz(dst, n, fmt, args);
+	va_end(args);
 }
