@@ -558,6 +558,7 @@ if [ $? -ne 0 ]
 else
 	echo >&2 "OK. NetData Started!"
 fi
+echo >&2
 
 
 # -----------------------------------------------------------------------------
@@ -565,6 +566,9 @@ fi
 
 if [ ! -s "${NETDATA_PREFIX}/etc/netdata/netdata.conf" ]
 	then
+	echo >&2
+	echo >&2 "-------------------------------------------------------------------------------"
+	echo >&2
 	echo >&2 "Downloading default configuration from netdata..."
 	sleep 5
 
@@ -817,11 +821,6 @@ cat <<-END
 
 
 	Enjoy!
-
-					 Give netdata a Github Star, at:
-
-				 https://github.com/firehol/netdata/wiki
-
 
 END
 echo >&2 "Uninstall script generated: ./netdata-uninstaller.sh"
