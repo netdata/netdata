@@ -1651,7 +1651,7 @@ int registry_init(void) {
 	registry.save_registry_every_entries = config_get_number("registry", "registry save db every new entries", 1000000);
 	registry.persons_expiration = config_get_number("registry", "registry expire idle persons days", 365) * 86400;
 	registry.registry_domain = config_get("registry", "registry domain", "");
-	registry.registry_to_announce = config_get("registry", "registry to announce", "https://registry.my-netdata.io");
+	registry.registry_to_announce = config_get("registry", "registry to announce", "//registry.my-netdata.io");
 	registry.hostname = config_get("registry", "registry hostname", config_get("global", "hostname", hostname));
 
 	registry.max_url_length = config_get_number("registry", "max URL length", 1024);
