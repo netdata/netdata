@@ -1262,16 +1262,11 @@ char *registry_get_this_machine_guid(void) {
 
 	// generate a new one?
 	if(!registry.machine_guid[0]) {
-		int count = 10, ret = 0;
 		uuid_t uuid;
 
-		// for some reason it reports unsafe generation the first time
-		while(count-- && (ret = uuid_generate_time_safe(uuid)) == -1) ;
+		uuid_generate_time(uuid);
 		uuid_unparse_lower(uuid, registry.machine_guid);
 		registry.machine_guid[36] = '\0';
-
-		if(ret == -1)
-			info("Warning: generated machine GUID '%s' was not generated using a safe method.", registry.machine_guid);
 
 		// save it
 		fd = open(registry.machine_guid_filename, O_WRONLY|O_CREAT|O_TRUNC, 444);
