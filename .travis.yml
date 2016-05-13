@@ -10,4 +10,4 @@ script:
  - ./autogen.sh && ./configure && make -j4
 
    # test installer
- - fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
+ - ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
