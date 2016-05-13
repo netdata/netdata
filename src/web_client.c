@@ -802,10 +802,8 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 	debug(D_WEB_CLIENT, "%llu: API v1 registry with URL '%s'", w->id, url);
 
 	char *cookie = strstr(w->response.data->buffer, " " NETDATA_REGISTRY_COOKIE_NAME "=");
-	if(cookie) {
-		strncpy(person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME) + 1], 36);
-		person_guid[36] = '\0';
-	}
+	if(cookie)
+		strncpyz(person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME) + 1], 36);
 
 	char action = '\0';
 	char *machine_guid = NULL,
@@ -1210,9 +1208,9 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
 
 	// fprintf(stderr, "HEADER: '%s' = '%s'\n", s, v);
 
-	if(!strcasecmp(s, "Origin")) {
-		strncpy(w->origin, v, ORIGIN_MAX);
-	}
+	if(!strcasecmp(s, "Origin"))
+		strncpyz(w->origin, v, ORIGIN_MAX);
+
 	else if(!strcasecmp(s, "Connection")) {
 		if(strcasestr(v, "keep-alive"))
 			w->keepalive = 1;
@@ -1332,7 +1330,6 @@ void web_client_process(struct web_client *w) {
 
 		debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, w->response.data->buffer);
 
-<<<<<<< HEAD
 		code = 500;
 		buffer_flush(w->response.data);
 		buffer_strcat(w->response.data, "I don't understand you...\r\n");
@@ -1343,15 +1340,10 @@ void web_client_process(struct web_client *w) {
 		global_statistics_lock();
 		global_statistics.web_requests++;
 		global_statistics_unlock();
-=======
-		if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
-			strncpyz(w->last_url, url, URL_MAX);
->>>>>>> fredericopissarra/changes
 
 		// copy the URL - we are going to overwrite parts of it
 		// FIXME -- we should avoid it
-		strncpy(w->last_url, w->decoded_url, URL_MAX);
-		w->last_url[URL_MAX] = '\0';
+		strncpyz(w->last_url, w->decoded_url, URL_MAX);
 
 		if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
 			code = 200;
@@ -1365,14 +1357,8 @@ void web_client_process(struct web_client *w) {
 				web_client_enable_deflate(w);
 #endif
 
-<<<<<<< HEAD
 			char *url = w->decoded_url;
 			char *tok = mystrsep(&url, "/?");
-=======
-			strncpyz(w->last_url, url, URL_MAX);
-
-			tok = mystrsep(&url, "/?");
->>>>>>> fredericopissarra/changes
 			if(tok && *tok) {
 				debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
 
