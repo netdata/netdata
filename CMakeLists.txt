@@ -57,6 +57,8 @@ set(NETDATA_SOURCE_FILES
 	src/proc_stat.c
 	src/proc_sys_kernel_random_entropy_avail.c
 	src/proc_vmstat.c
+	src/registry.c
+	src/registry.h
 	src/rrd2json.c
 	src/rrd2json.h
 	src/rrd.c
