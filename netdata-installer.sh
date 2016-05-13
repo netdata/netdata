@@ -67,7 +67,8 @@ usage() {
 	For the installer to complete successfully, you will need
 	these packages installed:
 
-	   gcc make autoconf automake pkg-config zlib1g-dev uuid-dev
+	   gcc make autoconf automake pkg-config zlib1g-dev (or zlib-devel)
+	   uuid-dev (or libuuid-devel)
 
 	For the plugins, you will at least need:
 
@@ -247,9 +248,9 @@ build_error() {
 
 	You many need to check these:
 
-	1. The package uuid-dev has to be installed.
+	1. The package uuid-dev (or libuuid-devel) has to be installed.
 
-	2. The package zlib1g-dev has to be installed.
+	2. The package zlib1g-dev (or zlib-devel) has to be installed.
 
 	   If your system cannot find ZLIB, although it is installed
 	   run me with the option:  --zlib-is-really-here
