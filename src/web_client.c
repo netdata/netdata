@@ -1185,14 +1185,6 @@ cleanup:
 
 
 static inline char *http_header_parse(struct web_client *w, char *s) {
-	static uint32_t connection_hash = 0, accept_encoding_hash = 0, origin_hash = 0;
-
-	if(unlikely(connection_hash == 0)) {
-		connection_hash = simple_hash("Connection");
-		accept_encoding_hash = simple_hash("Accept-Encoding");
-		origin_hash = simple_hash("Origin");
-	}
-
 	char *e = s;
 
 	// find the :
@@ -1201,7 +1193,6 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
 
 	// get the name
 	*e = '\0';
-	uint32_t hash = simple_hash(s);
 
 	// find the value
 	char *v, *ve;
@@ -1217,17 +1208,20 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
 	// terminate the value
 	*ve = '\0';
 
-	if(hash == origin_hash && !strcmp(s, "Origin")) {
+	// fprintf(stderr, "HEADER: '%s' = '%s'\n", s, v);
+
+	if(!strcasecmp(s, "Origin")) {
 		strncpy(w->origin, v, ORIGIN_MAX);
 	}
-	else if(hash == connection_hash && !strcmp(s, "Connection")) {
+	else if(!strcasecmp(s, "Connection")) {
 		if(!strcasestr(v, "keep-alive"))
 			w->keepalive = 1;
 	}
 #ifdef NETDATA_WITH_ZLIB
-	else if(hash == accept_encoding_hash && !strcmp(s, "Accept-Encoding")) {
-		if(web_enable_gzip && !strcasestr(v, "gzip"))
+	else if(!strcasecmp(s, "Accept-Encoding")) {
+		if(web_enable_gzip && strcasestr(v, "gzip")) {
 			w->enable_gzip = 1;
+		}
 	}
 #endif /* NETDATA_WITH_ZLIB */
 
@@ -1675,7 +1669,7 @@ void web_client_process(struct web_client *w) {
 	if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
 		buffer_strcat(w->response.header_output,
 			"Access-Control-Allow-Methods: GET, OPTIONS\r\n"
-			"Access-Control-Allow-Headers: Accept, X-Requested-With, Content-Type, Cookie\r\n"
+			"Access-Control-Allow-Headers: accept, x-requested-with, origin, content-type, cookie\r\n"
 			"Access-Control-Max-Age: 1209600\r\n" // 86400 * 14
 			);
 	}
