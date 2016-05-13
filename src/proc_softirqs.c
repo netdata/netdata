@@ -58,7 +58,7 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
 
 	if(!ff) {
 		char filename[FILENAME_MAX + 1];
-		snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/softirqs");
+		snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/softirqs");
 		ff = procfile_open(config_get("plugin:proc:/proc/softirqs", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
 	}
 	if(!ff) return 1;
@@ -118,8 +118,7 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
 			irr->total += irr->value[c];
 		}
 
-		strncpy(irr->name, irr->id, MAX_INTERRUPT_NAME);
-		irr->name[MAX_INTERRUPT_NAME] = '\0';
+		strncpyz(irr->name, irr->id, MAX_INTERRUPT_NAME);
 
 		irr->used = 1;
 	}
@@ -151,8 +150,8 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
 		int c;
 
 		for(c = 0; c < cpus ; c++) {
-			char id[256];
-			snprintf(id, 256, "cpu%d_softirqs", c);
+			char id[256+1];
+			snprintfz(id, 256, "cpu%d_softirqs", c);
 
 			st = rrdset_find_bytype("cpu", id);
 			if(!st) {
@@ -165,9 +164,9 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
 				}
 				if(core_sum == 0) continue; // try next core
 
-				char name[256], title[256];
-				snprintf(name, 256, "cpu%d_softirqs", c);
-				snprintf(title, 256, "CPU%d softirqs", c);
+				char name[256+1], title[256+1];
+				snprintfz(name, 256, "cpu%d_softirqs", c);
+				snprintfz(title, 256, "CPU%d softirqs", c);
 				st = rrdset_create("cpu", id, name, "softirqs", "cpu.softirqs", title, "softirqs/s", 3000 + c, update_every, RRDSET_TYPE_STACKED);
 
 				for(l = 0; l < lines ;l++) {
