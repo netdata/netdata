@@ -361,11 +361,11 @@
 		}
 
 		var netdataRegistryCallback = function(urls) {
+			var el = '';
+			var a1 = '';
+			var found = 0;
+
 			if(urls) {
-				var found = 0;
-				var el = '';
-				var a1 = '';
-	
 				$.each(urls, function(i, u) {
 					if(u.guid !== NETDATA.registry.machine_guid) {
 						found++;
@@ -373,32 +373,36 @@
 						a1 += '<li id="registry_action_' + u.guid + '"><a href="#" onclick="deleteRegistryModalHandler(\'' + u.guid + '\',\'' + u.name + '\',\'' + u.url + '\'); return false;"><i class="fa fa-trash-o" aria-hidden="true" style="color: #999;"></i></a></li>';
 					}
 				});
-
-				if(!found) {
-					el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #666;" target="_blank">your netdata server list is empty...</a></li>';
-					a1 += '<li><a href="#">&nbsp;</a></li>';
-
-					el += '<li role="separator" class="divider"></li>' +
-							'<li><a href="//london.netdata.rocks/default.html">EU - London (DigitalOcean.com)</a></li>' +
-							'<li><a href="//atlanta.netdata.rocks/default.html">US - Atlanta (CDN77.com)</a></li>' +
-							'<li><a href="//athens.netdata.rocks/default.html">EU - Athens</a></li>';
-					a1 += '<li role="separator" class="divider"></li>' +
-							'<li><a href="#">&nbsp;</a></li>' +
-							'<li><a href="#">&nbsp;</a></li>'+
-							'<li><a href="#">&nbsp;</a></li>';
-				}
-		
-				el += '<li role="separator" class="divider"></li>';
-				a1 += '<li role="separator" class="divider"></li>';
-	
-				el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #999;" target="_blank">What is this?</a></li>';
-				a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fa fa-cog" aria-hidden="true" style="color: #999;"></i></a></li>'
-	
-				document.getElementById('mynetdata_servers').innerHTML = el;
-				document.getElementById('mynetdata_actions1').innerHTML = a1;
-	
-				document.getElementById('mynetdata_servers2').innerHTML = el;
 			}
+
+			if(!found) {
+				if(urls)
+					el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #666;" target="_blank">your netdata server list is empty...</a></li>';
+				else
+					el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #666;" target="_blank">failed to contact the registry...</a></li>';
+
+				a1 += '<li><a href="#">&nbsp;</a></li>';
+
+				el += '<li role="separator" class="divider"></li>' +
+						'<li><a href="//london.netdata.rocks/default.html">EU - London (DigitalOcean.com)</a></li>' +
+						'<li><a href="//atlanta.netdata.rocks/default.html">US - Atlanta (CDN77.com)</a></li>' +
+						'<li><a href="//athens.netdata.rocks/default.html">EU - Athens</a></li>';
+				a1 += '<li role="separator" class="divider"></li>' +
+						'<li><a href="#">&nbsp;</a></li>' +
+						'<li><a href="#">&nbsp;</a></li>'+
+						'<li><a href="#">&nbsp;</a></li>';
+			}
+
+			el += '<li role="separator" class="divider"></li>';
+			a1 += '<li role="separator" class="divider"></li>';
+
+			el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #999;" target="_blank">What is this?</a></li>';
+			a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fa fa-cog" aria-hidden="true" style="color: #999;"></i></a></li>'
+
+			document.getElementById('mynetdata_servers').innerHTML = el;
+			document.getElementById('mynetdata_actions1').innerHTML = a1;
+
+			document.getElementById('mynetdata_servers2').innerHTML = el;
 		};
 
 	</script>
