@@ -27,7 +27,7 @@ ME="$0"
 DONOTSTART=0
 DONOTWAIT=0
 NETDATA_PREFIX=
-ZLIB_IS_HERE=0
+LIBS_ARE_HERE=0
 
 usage() {
 	cat <<-USAGE
@@ -52,9 +52,10 @@ usage() {
 			Start immediately building it.
 
 	   --zlib-is-really-here
+	   --libs-are-really-here
 
 			If you get errors about missing zlib,
-			but you know it is available,
+			or libuuid but you know it is available,
 			you have a broken pkg-config.
 			Use this option to allow it continue
 			without checking pkg-config.
@@ -83,9 +84,9 @@ do
 		then
 		NETDATA_PREFIX="${2}/netdata"
 		shift 2
-	elif [ "$1" = "--zlib-is-really-here" ]
+	elif [ "$1" = "--zlib-is-really-here" -o "$1" = "--libs-are-really-here" ]
 		then
-		ZLIB_IS_HERE=1
+		LIBS_ARE_HERE=1
 		shift 1
 	elif [ "$1" = "--dont-start-it" ]
 		then
@@ -250,10 +251,13 @@ build_error() {
 
 	1. The package uuid-dev (or libuuid-devel) has to be installed.
 
+	   If your system cannot find libuuid, although it is installed
+	   run me with the option:  --libs-are-really-here
+
 	2. The package zlib1g-dev (or zlib-devel) has to be installed.
 
-	   If your system cannot find ZLIB, although it is installed
-	   run me with the option:  --zlib-is-really-here
+	   If your system cannot find zlib, although it is installed
+	   run me with the option:  --libs-are-really-here
 
 	3. You need basic build tools installed, like:
 
@@ -296,12 +300,14 @@ run() {
 	return ${ret}
 }
 
-if [ ${ZLIB_IS_HERE} -eq 1 ]
+if [ ${LIBS_ARE_HERE} -eq 1 ]
 	then
 	shift
 	echo >&2 "ok, assuming zlib is really installed."
 	export ZLIB_CFLAGS=" "
 	export ZLIB_LIBS="-lz"
+	export UUID_CFLAGS=" "
+	export UUID_LIBS="-luuid"
 fi
 
 trap build_error EXIT
