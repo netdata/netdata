@@ -17,6 +17,12 @@
 #include "appconfig.h"
 #include "../config.h"
 
+#ifdef __FreeBSD__
+#    include <sys/thr.h>
+#    define O_NOATIME     0
+#    define MADV_DONTFORK INHERIT_NONE
+#endif /*__FreeBSD__*/
+
 char *global_host_prefix = "";
 int enable_ksm = 1;
 
@@ -759,6 +765,12 @@ void get_HZ(void)
 
 pid_t gettid(void)
 {
+#ifdef __FreeBSD__
+        long pid;
+        thr_self( &pid );
+        return (unsigned) pid;
+#else /*__FreeBSD__*/
 	return syscall(SYS_gettid);
+#endif /*__FreeBSD__*/
 }
 

@@ -14,8 +14,9 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/mman.h>
-#include <sys/prctl.h>
-
+#ifndef __FreeBSD__
+#    include <sys/prctl.h>
+#endif /*__FreeBSD__*/
 #include "common.h"
 #include "log.h"
 #include "daemon.h"
@@ -290,13 +291,14 @@ int main(int argc, char **argv)
 
 		debug_flags = strtoull(flags, NULL, 0);
 		debug(D_OPTIONS, "Debug flags set to '0x%8llx'.", debug_flags);
-
+#ifndef __FreeBSD__
 		if(debug_flags != 0) {
 			struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
 			if(setrlimit(RLIMIT_CORE, &rl) != 0)
 				info("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
 			prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
 		}
+#endif /*__FreeBSD__*/
 
 		// --------------------------------------------------------------------
 
@@ -499,15 +501,14 @@ int main(int argc, char **argv)
 		fatal("Cannot demonize myself.");
 		exit(1);
 	}
-
+#ifndef __FreeBSD__
 	if(debug_flags != 0) {
 		struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
 		if(setrlimit(RLIMIT_CORE, &rl) != 0)
 			info("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
-
 		prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
 	}
-
+#endif /*__FreeBSD__*/
 	if(output_log_syslog || error_log_syslog || access_log_syslog)
 		openlog("netdata", LOG_PID, LOG_DAEMON);
 
