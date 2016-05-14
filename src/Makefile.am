@@ -88,15 +88,16 @@ apps_plugin_SOURCES = \
 install-data-hook:
 	if [ `id -u` == 0 ]; then \
 		chown root '$(DESTDIR)$(pluginsdir)/apps.plugin' && \
-			chmod 0755 '$(DESTDIR)$(pluginsdir)/apps.plugin' && \
-				setcap cap_dac_read_search,cap_sys_ptrace+ep '$(DESTDIR)$(pluginsdir)/apps.plugin'; \
+		chmod 0755 '$(DESTDIR)$(pluginsdir)/apps.plugin' && \
+		( setcap cap_dac_read_search,cap_sys_ptrace+ep '$(DESTDIR)$(pluginsdir)/apps.plugin' || \
+		  chmod 4755 '$(DESTDIR)$(pluginsdir)/apps.plugin' ); \
 	else \
 		echo; \
 		echo "ATTENTION"; \
 		echo; \
 		echo "$(pluginsdir)/apps.plugin requires escalated capabilities:"; \
 		echo "sudo chown root '$(DESTDIR)$(pluginsdir)/apps.plugin'"; \
-		echo "sudo chmod 4755 '$(DESTDIR)$(pluginsdir)/apps.plugin'"; \
+		echo "sudo chmod 0755 '$(DESTDIR)$(pluginsdir)/apps.plugin'"; \
 		echo "sudo setcap cap_dac_read_search,cap_sys_ptrace+ep '$(DESTDIR)$(pluginsdir)/apps.plugin'"; \
 		echo; \
 	fi
