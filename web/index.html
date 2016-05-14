@@ -908,7 +908,7 @@
 				</div>
 				<div class="modal-footer">
 					<button type="button" class="btn btn-success" data-dismiss="modal">keep it</button>
-					<a href="#" onclick="notifyForDeleteRegistry(true);" type="button" class="btn btn-danger">delete it</a>
+					<a href="#" onclick="notifyForDeleteRegistry(true); return false;" type="button" class="btn btn-danger">delete it</a>
 				</div>
 			</div>
 		</div>
@@ -944,7 +944,7 @@
 				</div>
 				<div class="modal-footer">
 					<button type="button" class="btn btn-success" data-dismiss="modal">cancel</button>
-					<a href="#" onclick="notifyForSwitchRegistry(true);" type="button" class="btn btn-danger">impersonate</a>
+					<a href="#" onclick="notifyForSwitchRegistry(true); return false;" type="button" class="btn btn-danger">impersonate</a>
 				</div>
 			</div>
 		</div>
