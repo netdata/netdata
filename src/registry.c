@@ -617,6 +617,7 @@ static inline PERSON_URL *registry_person_link_to_url(PERSON *p, MACHINE *m, URL
 	else {
 		debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): found", p->guid, m->guid, u->url);
 		pu->usages++;
+		if(likely(pu->last_t < when)) pu->last_t = when;
 
 		if(pu->machine != m) {
 			MACHINE_URL *mu = dictionary_get(pu->machine->urls, u->url);
@@ -641,7 +642,7 @@ static inline PERSON_URL *registry_person_link_to_url(PERSON *p, MACHINE *m, URL
 	}
 
 	p->usages++;
-	p->last_t = when;
+	if(likely(p->last_t < when)) p->last_t = when;
 
 	if(pu->flags & REGISTRY_URL_FLAGS_EXPIRED) {
 		info("registry_person_link_to_url('%s', '%s', '%s'): accessing an expired URL. Re-enabling URL.", p->guid, m->guid, u->url);
@@ -667,13 +668,14 @@ static inline MACHINE_URL *registry_machine_link_to_url(PERSON *p, MACHINE *m, U
 	else {
 		debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s', '%s'): found", p->guid, m->guid, u->url);
 		mu->usages++;
+		if(likely(mu->last_t < when)) mu->last_t = when;
 	}
 
 	//debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s', '%s'): indexing person in machine", p->guid, m->guid, u->url);
 	//dictionary_set(mu->persons, p->guid, p, sizeof(PERSON));
 
 	m->usages++;
-	m->last_t = when;
+	if(likely(m->last_t < when)) m->last_t = when;
 
 	if(mu->flags & REGISTRY_URL_FLAGS_EXPIRED) {
 		info("registry_machine_link_to_url('%s', '%s', '%s'): accessing an expired URL.", p->guid, m->guid, u->url);

@@ -5496,38 +5496,51 @@
 		machine_guid: null,	// the unique ID the netdata server that served dashboard.js
 		hostname: null,		// the hostname of the netdata server that served dashboard.js
 		urls: null,			// the user's other URLs
+		urls_array: null,	// the user's other URLs in an array
 
 		parsePersonUrls: function(person_urls) {
+			// console.log(person_urls);
+
 			if(person_urls) {
 				NETDATA.registry.urls = {};
+				NETDATA.registry.urls_array = new Array();
 
-				// sort based on the timestamp of the last access
-				function pu_comparator_asc(a, b) {
-					if (a[2] < b[2]) return -1;
-					if (a[2] > b[2]) return 1;
-					return 0;
-				}
+				var now = new Date().getTime();
+				var apu = person_urls;
+				var i = apu.length;
+				while(i--) {
+					if(typeof NETDATA.registry.urls[apu[i][0]] === 'undefined') {
+						// console.log('adding: ' + apu[i][4] + ', ' + ((now - apu[i][2]) / 1000).toString());
 
-				var apu = person_urls.sort(pu_comparator_asc);
-				var len = apu.length;
-				while(len--) {
-					if(typeof NETDATA.registry.urls[apu[len][0]] === 'undefined') {
-						NETDATA.registry.urls[apu[len][0]] = {
-							guid: apu[len][0],
-							url: apu[len][1],
-							last_t: apu[len][2],
-							accesses: apu[len][3],
-							name: apu[len][4],
+						var obj = {
+							guid: apu[i][0],
+							url: apu[i][1],
+							last_t: apu[i][2],
+							accesses: apu[i][3],
+							name: apu[i][4],
 							alternate_urls: new Array()
 						};
+
+						NETDATA.registry.urls[apu[i][0]] = obj;
+						NETDATA.registry.urls_array.push(obj);
 					}
-					else
-						NETDATA.registry.urls[apu[len][0]].alternate_urls.push(apu[len][1]);
+					else {
+						// console.log('appending: ' + apu[i][4] + ', ' + ((now - apu[i][2]) / 1000).toString());
+
+						var pu = NETDATA.registry.urls[apu[i][0]];
+						if(pu.last_t < apu[i][2]) {
+							pu.url = apu[i][1];
+							pu.last_t = apu[i][2];
+							pu.name = apu[i][4];
+						}
+						pu.accesses += apu[i][3];
+						pu.alternate_urls.push(apu[i][1]);
+					}
 				}
 			}
 
 			if(typeof netdataRegistryCallback === 'function')
-				netdataRegistryCallback(NETDATA.registry.urls);
+				netdataRegistryCallback(NETDATA.registry.urls_array);
 		},
 
 		init: function() {
