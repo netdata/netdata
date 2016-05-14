@@ -365,19 +365,32 @@
 			return saveLocalStorage('netdataTheme', theme);
 		}
 
-		var netdataRegistryCallback = function(urls) {
+		var netdataRegistryCallback = function(urls_array) {
 			var el = '';
 			var a1 = '';
 			var found = 0;
 
-			if(urls) {
-				$.each(urls, function(i, u) {
-					if(u.guid !== NETDATA.registry.machine_guid) {
-						found++;
-						el += '<li id="registry_server_' + u.guid + '"><a href="' + u.url + '">' + u.name + '</a></li>';
-						a1 += '<li id="registry_action_' + u.guid + '"><a href="#" onclick="deleteRegistryModalHandler(\'' + u.guid + '\',\'' + u.name + '\',\'' + u.url + '\'); return false;"><i class="fa fa-trash-o" aria-hidden="true" style="color: #999;"></i></a></li>';
-					}
-				});
+			if(urls_array) {
+				function name_comparator_desc(a, b) {
+					if (a.name > b.name) return -1;
+					if (a.name < b.name) return 1;
+					return 0;
+				}
+
+				var urls = urls_array.sort(name_comparator_desc);
+				var len = urls.length;
+				while(len--) {
+					var u = urls[len];
+
+					var status = "enabled";
+					found++;
+
+					if(u.guid === NETDATA.registry.machine_guid)
+						status = "disabled"
+
+					el += '<li id="registry_server_' + u.guid + '" class="' + status + '"><a href="' + u.url + '">' + u.name + '</a></li>';
+					a1 += '<li id="registry_action_' + u.guid + '"><a href="#" onclick="deleteRegistryModalHandler(\'' + u.guid + '\',\'' + u.name + '\',\'' + u.url + '\'); return false;"><i class="fa fa-trash-o" aria-hidden="true" style="color: #999;"></i></a></li>';
+				}
 			}
 
 			if(!found) {
@@ -405,15 +418,14 @@
 			a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fa fa-cog" aria-hidden="true" style="color: #999;"></i></a></li>'
 
 			document.getElementById('mynetdata_servers').innerHTML = el;
-			document.getElementById('mynetdata_actions1').innerHTML = a1;
-
 			document.getElementById('mynetdata_servers2').innerHTML = el;
+			document.getElementById('mynetdata_actions1').innerHTML = a1;
 		};
 
 	</script>
 
 	<!-- load the dashboard manager - it will do the rest -->
-	<script type="text/javascript" src="dashboard.js?v35"></script>
+	<script type="text/javascript" src="dashboard.js?v36"></script>
 </head>
 
 <body data-spy="scroll" data-target="#sidebar">
@@ -904,11 +916,11 @@
 					<div style="padding: 10px;"></div>
 					<small>Keep in mind, this server will be added back if and when you visit it again.</small>
 					<br/>
-					<div id="deleteRegistryResponse" style="display: block; width: 100%; text-align: center; padding-top: 20px; color: #fff;"></div>
+					<div id="deleteRegistryResponse" style="display: block; width: 100%; text-align: center; padding-top: 20px;"></div>
 				</div>
 				<div class="modal-footer">
 					<button type="button" class="btn btn-success" data-dismiss="modal">keep it</button>
-					<a href="#" onclick="notifyForDeleteRegistry(true);" type="button" class="btn btn-danger">delete it</a>
+					<a href="#" onclick="notifyForDeleteRegistry(true); return false;" type="button" class="btn btn-danger">delete it</a>
 				</div>
 			</div>
 		</div>
@@ -940,11 +952,11 @@
 							<li>to get a new ID, just clear your browser cookies.</li>
 						</ul>
 					</small></p>
-					<div id="switchRegistryResponse" style="display: block; width: 100%; text-align: center; padding-top: 20px; color: #fff;"></div>
+					<div id="switchRegistryResponse" style="display: block; width: 100%; text-align: center; padding-top: 20px;"></div>
 				</div>
 				<div class="modal-footer">
 					<button type="button" class="btn btn-success" data-dismiss="modal">cancel</button>
-					<a href="#" onclick="notifyForSwitchRegistry(true);" type="button" class="btn btn-danger">impersonate</a>
+					<a href="#" onclick="notifyForSwitchRegistry(true); return false;" type="button" class="btn btn-danger">impersonate</a>
 				</div>
 			</div>
 		</div>
@@ -980,6 +992,7 @@ if(isdemo()) {
 function switchRegistryModalHandler() {
 	document.getElementById('switchRegistryPersonGUID').value = NETDATA.registry.person_guid;
 	document.getElementById('switchRegistryURL').innerHTML = NETDATA.registry.server;
+	document.getElementById('switchRegistryResponse').innerHTML = '';
 	$('#switchRegistryModal').modal('show');
 }
 
@@ -1007,6 +1020,7 @@ function deleteRegistryModalHandler(guid, name, url) {
 	document.getElementById('deleteRegistryServerName').innerHTML = name;
 	document.getElementById('deleteRegistryServerName2').innerHTML = name;
 	document.getElementById('deleteRegistryServerURL').innerHTML = url;
+	document.getElementById('deleteRegistryResponse').innerHTML = '';
 	$('#deleteRegistryModal').modal('show');
 }
 
