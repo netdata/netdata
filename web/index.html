@@ -425,7 +425,7 @@
 	</script>
 
 	<!-- load the dashboard manager - it will do the rest -->
-	<script type="text/javascript" src="dashboard.js?v36"></script>
+	<script type="text/javascript" src="dashboard.js?v37"></script>
 </head>
 
 <body data-spy="scroll" data-target="#sidebar">
@@ -439,10 +439,12 @@
 							<div class="row">
 								<div class="col-sm-6" style="width: 85%; padding-right: 0;">
 									<ul id="mynetdata_servers" class="multi-column-dropdown">
+										<li><a href="#" onclck="return false;" style="color: #999;">loading...</a></li>
 									</ul>
 								</div>
 								<div class="col-sm-3 hidden-xs" style="width: 15%; padding-left: 0;">
 									<ul id="mynetdata_actions1" class="multi-column-dropdown">
+									<li style="color: #999;">&nbsp;</li>
 									</ul>
 								</div>
 							</div>
@@ -476,6 +478,7 @@
 					<li class="dropdown hidden-sm hidden-md hidden-lg">
 						<a href="#" class="dropdown-toggle" data-toggle="dropdown" id="current_view">my-netdata <strong class="caret"></strong></a>
 						<ul id="mynetdata_servers2" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
+							<li><a href="#" onclck="return false;" style="color: #999;">loading...</a></li>
 						</ul>
 					</li>
 				</ul>

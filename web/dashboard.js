@@ -3392,7 +3392,7 @@
 		NETDATA.parseDom(NETDATA.chartRefresher);
 
 		// Registry initialization
-		setTimeout(NETDATA.registry.init, 1000);
+		setTimeout(NETDATA.registry.init, 3000);
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------
