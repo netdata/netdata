@@ -175,7 +175,8 @@ void web_client_reset(struct web_client *w)
 	}
 
 	w->last_url[0] = '\0';
-	w->cookie[0] = '\0';
+	w->cookie1[0] = '\0';
+	w->cookie2[0] = '\0';
 	w->origin[0] = '*';
 	w->origin[1] = '\0';
 
@@ -801,6 +802,9 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 
 	debug(D_WEB_CLIENT, "%llu: API v1 registry with URL '%s'", w->id, url);
 
+	// FIXME
+	// The browser may send multiple cookies with our id
+	
 	char *cookie = strstr(w->response.data->buffer, " " NETDATA_REGISTRY_COOKIE_NAME "=");
 	if(cookie)
 		strncpyz(person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME) + 1], 36);
@@ -1655,10 +1659,16 @@ void web_client_process(struct web_client *w) {
 		, date
 		);
 
-	if(w->cookie[0]) {
+	if(w->cookie1[0]) {
 		buffer_sprintf(w->response.header_output,
 		   "Set-Cookie: %s\r\n",
-		   w->cookie);
+		   w->cookie1);
+	}
+
+	if(w->cookie2[0]) {
+		buffer_sprintf(w->response.header_output,
+		   "Set-Cookie: %s\r\n",
+		   w->cookie2);
 	}
 
 	if(w->mode == WEB_CLIENT_MODE_OPTIONS) {

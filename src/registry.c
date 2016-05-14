@@ -340,8 +340,7 @@ static inline URL *registry_url_allocate_nolock(const char *url, size_t urllen) 
 
 	// a simple strcpy() should do the job
 	// but I prefer to be safe, since the caller specified urllen
-	strncpy(u->url, url, urllen);
-	u->url[urllen] = '\0';
+	strncpyz(u->url, url, urllen);
 
 	u->len = urllen;
 	u->links = 0;
@@ -424,8 +423,7 @@ static inline MACHINE *registry_machine_allocate(const char *machine_guid, time_
 	MACHINE *m = malloc(sizeof(MACHINE));
 	if(!m) fatal("Registry: cannot allocate memory for new machine '%s'", machine_guid);
 
-	strncpy(m->guid, machine_guid, 36);
-	m->guid[36] = '\0';
+	strncpyz(m->guid, machine_guid, 36);
 
 	debug(D_REGISTRY, "Registry: registry_machine_allocate('%s'): creating dictionary of urls", machine_guid);
 	m->urls = dictionary_create(DICTIONARY_FLAGS);
@@ -488,8 +486,7 @@ static inline PERSON_URL *registry_person_url_allocate(PERSON *p, MACHINE *m, UR
 
 	// a simple strcpy() should do the job
 	// but I prefer to be safe, since the caller specified urllen
-	strncpy(pu->name, name, namelen);
-	pu->name[namelen] = '\0';
+	strncpyz(pu->name, name, namelen);
 
 	pu->machine = m;
 	pu->first_t = pu->last_t = when;
@@ -552,10 +549,8 @@ static inline PERSON *registry_person_allocate(const char *person_guid, time_t w
 				info("Registry: generated person guid '%s' found in the registry. Retrying...", p->guid);
 		}
 	}
-	else {
-		strncpy(p->guid, person_guid, 36);
-		p->guid[36] = '\0';
-	}
+	else
+		strncpyz(p->guid, person_guid, 36);
 
 	debug(D_REGISTRY, "Registry: registry_person_allocate('%s'): creating dictionary of urls", p->guid);
 	p->urls = dictionary_create(DICTIONARY_FLAGS);
@@ -1022,12 +1017,10 @@ static inline void registry_set_person_cookie(struct web_client *w, PERSON *p) {
 	struct tm etmbuf, *etm = gmtime_r(&et, &etmbuf);
 	strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", etm);
 
-	if(registry.registry_domain && registry.registry_domain[0])
-		snprintf(w->cookie, COOKIE_MAX, NETDATA_REGISTRY_COOKIE_NAME "=%s; Domain=%s; Expires=%s", p->guid, registry.registry_domain, edate);
-	else
-		snprintf(w->cookie, COOKIE_MAX, NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s", p->guid, edate);
+	snprintfz(w->cookie1, COOKIE_MAX, NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s", p->guid, edate);
 
-	w->cookie[COOKIE_MAX] = '\0';
+	if(registry.registry_domain && registry.registry_domain[0])
+		snprintfz(w->cookie2, COOKIE_MAX, NETDATA_REGISTRY_COOKIE_NAME "=%s; Domain=%s; Expires=%s", p->guid, registry.registry_domain, edate);
 }
 
 static inline void registry_json_header(struct web_client *w, const char *action, const char *status) {
@@ -1399,8 +1392,8 @@ int registry_save(void) {
 	char tmp_filename[FILENAME_MAX + 1];
 	char old_filename[FILENAME_MAX + 1];
 
-	snprintf(old_filename, FILENAME_MAX, "%s.old", registry.db_filename);
-	snprintf(tmp_filename, FILENAME_MAX, "%s.tmp", registry.db_filename);
+	snprintfz(old_filename, FILENAME_MAX, "%s.old", registry.db_filename);
+	snprintfz(tmp_filename, FILENAME_MAX, "%s.tmp", registry.db_filename);
 
 	debug(D_REGISTRY, "Registry: Creating file '%s'", tmp_filename);
 	FILE *fp = fopen(tmp_filename, "w");
@@ -1643,14 +1636,14 @@ int registry_init(void) {
 	}
 
 	// filenames
-	snprintf(filename, FILENAME_MAX, "%s/netdata.public.unique.id", registry.pathname);
+	snprintfz(filename, FILENAME_MAX, "%s/netdata.public.unique.id", registry.pathname);
 	registry.machine_guid_filename = config_get("registry", "netdata unique id file", filename);
 	registry_get_this_machine_guid();
 
-	snprintf(filename, FILENAME_MAX, "%s/registry.db", registry.pathname);
+	snprintfz(filename, FILENAME_MAX, "%s/registry.db", registry.pathname);
 	registry.db_filename = config_get("registry", "registry db file", filename);
 
-	snprintf(filename, FILENAME_MAX, "%s/registry-log.db", registry.pathname);
+	snprintfz(filename, FILENAME_MAX, "%s/registry-log.db", registry.pathname);
 	registry.log_filename = config_get("registry", "registry log file", filename);
 
 	// configuration options
@@ -1883,7 +1876,7 @@ int test1(int argc, char **argv) {
 		uuid_unparse(uuid, machines_guids[m]);
 
 		char buf[FILENAME_MAX + 1];
-		snprintf(buf, FILENAME_MAX, "http://%u.netdata.rocks/", m+1);
+		snprintfz(buf, FILENAME_MAX, "http://%u.netdata.rocks/", m+1);
 		machines_urls[m] = strdup(buf);
 
 		// fprintf(stderr, "\tmachine %u: '%s', url: '%s'\n", m + 1, machines_guids[m], machines_urls[m]);
@@ -1970,7 +1963,7 @@ int test1(int argc, char **argv) {
 			char *url = machines_urls[tm];
 			char buf[FILENAME_MAX + 1];
 			if (random() % 10000 == 1234) {
-				snprintf(buf, FILENAME_MAX, "http://random.%ld.netdata.rocks/", random());
+				snprintfz(buf, FILENAME_MAX, "http://random.%ld.netdata.rocks/", random());
 				url = buf;
 			}
 			else if (random() % 1000 == 123)
