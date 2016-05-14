@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/firehol/netdata.svg?branch=master)](https://travis-ci.org/firehol/netdata)
+
 # netdata
 
 ##### 320.000+ views, 92.000+ visitors, 28.500+ downloads, 11.000+ github stars, 700+ forks, 1 month!
@@ -138,7 +140,4 @@ It should run on **any Linux** system. It has been tested on:
 ## Documentation
 
 Check the **[netdata wiki](https://github.com/firehol/netdata/wiki)**.
-
-
-[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/firehol/netdata/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
 

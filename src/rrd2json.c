@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <math.h>
 
 #include "log.h"
 #include "common.h"
@@ -681,18 +682,18 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 			sq[0] = '"';
 		}
 		row_annotations = 1;
-		snprintf(pre_date,   100, "		{%sc%s:[{%sv%s:%s", kq, kq, kq, kq, sq);
-		snprintf(post_date,  100, "%s}", sq);
-		snprintf(pre_label,  100, ",\n		{%sid%s:%s%s,%slabel%s:%s", kq, kq, sq, sq, kq, kq, sq);
-		snprintf(post_label, 100, "%s,%spattern%s:%s%s,%stype%s:%snumber%s}", sq, kq, kq, sq, sq, kq, kq, sq, sq);
-		snprintf(pre_value,  100, ",{%sv%s:", kq, kq);
-		snprintf(post_value, 100, "}");
-		snprintf(post_line,  100, "]}");
-		snprintf(data_begin, 100, "\n	],\n	%srows%s:\n	[\n", kq, kq);
-		snprintf(finish,     100, "\n	]\n}");
+		snprintfz(pre_date,   100, "		{%sc%s:[{%sv%s:%s", kq, kq, kq, kq, sq);
+		snprintfz(post_date,  100, "%s}", sq);
+		snprintfz(pre_label,  100, ",\n		{%sid%s:%s%s,%slabel%s:%s", kq, kq, sq, sq, kq, kq, sq);
+		snprintfz(post_label, 100, "%s,%spattern%s:%s%s,%stype%s:%snumber%s}", sq, kq, kq, sq, sq, kq, kq, sq, sq);
+		snprintfz(pre_value,  100, ",{%sv%s:", kq, kq);
+		strcpy(post_value,         "}");
+		strcpy(post_line,          "]}");
+		snprintfz(data_begin, 100, "\n	],\n	%srows%s:\n	[\n", kq, kq);
+		strcpy(finish,             "\n	]\n}");
 
-		snprintf(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
-		snprintf(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
+		snprintfz(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
+		snprintfz(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
 
 		buffer_sprintf(wb, "{\n	%scols%s:\n	[\n", kq, kq, kq, kq);
 		buffer_sprintf(wb, "		{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
@@ -716,18 +717,18 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 			dates_with_new = 1;
 		}
 		if( options & RRDR_OPTION_OBJECTSROWS )
-			snprintf(pre_date,   100, "		{ ");
+			strcpy(pre_date, "		{ ");
 		else
-			snprintf(pre_date,   100, "		[ ");
-		snprintf(pre_label,  100, ", \"");
-		snprintf(post_label, 100, "\"");
-		snprintf(pre_value,  100, ", ");
+			strcpy(pre_date, "		[ ");
+		strcpy(pre_label,  ", \"");
+		strcpy(post_label, "\"");
+		strcpy(pre_value,  ", ");
 		if( options & RRDR_OPTION_OBJECTSROWS )
-			snprintf(post_line,  100, "}");
+			strcpy(post_line, "}");
 		else
-			snprintf(post_line,  100, "]");
-		snprintf(data_begin, 100, "],\n	%sdata%s:\n	[\n", kq, kq);
-		snprintf(finish,     100, "\n	]\n}");
+			strcpy(post_line, "]");
+		snprintfz(data_begin, 100, "],\n	%sdata%s:\n	[\n", kq, kq);
+		strcpy(finish,             "\n	]\n}");
 
 		buffer_sprintf(wb, "{\n	%slabels%s: [", kq, kq);
 		buffer_sprintf(wb, "%stime%s", sq, sq);
@@ -1450,7 +1451,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 
 			switch(group_method) {
 				case GROUP_MAX:
-					if(unlikely(abs(value) > abs(group_values[c])))
+					if(unlikely(fabsl(value) > fabsl(group_values[c])))
 						group_values[c] = value;
 					break;
 
@@ -1742,12 +1743,12 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 	// -------------------------------------------------------------------------
 	// prepare various strings, to speed up the loop
 
-	char overflow_annotation[201]; snprintf(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
-	char normal_annotation[201];   snprintf(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
-	char pre_date[51];             snprintf(pre_date,             50, "		{%sc%s:[{%sv%s:%s", kq, kq, kq, kq, sq);
-	char post_date[21];            snprintf(post_date,            20, "%s}", sq);
-	char pre_value[21];            snprintf(pre_value,            20, ",{%sv%s:", kq, kq);
-	char post_value[21];           snprintf(post_value,           20, "}");
+	char overflow_annotation[201]; snprintfz(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
+	char normal_annotation[201];   snprintfz(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
+	char pre_date[51];             snprintfz(pre_date,             50, "		{%sc%s:[{%sv%s:%s", kq, kq, kq, kq, sq);
+	char post_date[21];            snprintfz(post_date,            20, "%s}", sq);
+	char pre_value[21];            snprintfz(pre_value,            20, ",{%sv%s:", kq, kq);
+	char post_value[21];           strcpy(post_value,                  "}");
 
 
 	// -------------------------------------------------------------------------

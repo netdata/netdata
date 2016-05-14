@@ -246,7 +246,7 @@ struct rrdset {
 	// ------------------------------------------------------------------------
 	// the dimensions
 
-	avl_tree dimensions_index;						// the root of the dimensions index
+	avl_tree_lock dimensions_index;						// the root of the dimensions index
 	RRDDIM *dimensions;								// the actual data for every dimension
 };
 typedef struct rrdset RRDSET;

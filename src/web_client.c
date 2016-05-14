@@ -26,6 +26,7 @@
 #include "global_statistics.h"
 #include "rrd.h"
 #include "rrd2json.h"
+#include "registry.h"
 
 #include "web_client.h"
 #include "../config.h"
@@ -72,8 +73,8 @@ struct web_client *web_client_create(int listener)
 
 		if(getnameinfo(sadr, addrlen, w->client_ip, NI_MAXHOST, w->client_port, NI_MAXSERV, NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
 			error("Cannot getnameinfo() on received client connection.");
-			strncpy(w->client_ip,   "UNKNOWN", NI_MAXHOST);
-			strncpy(w->client_port, "UNKNOWN", NI_MAXSERV);
+			strncpyz(w->client_ip,   "UNKNOWN", NI_MAXHOST);
+			strncpyz(w->client_port, "UNKNOWN", NI_MAXSERV);
 		}
 		w->client_ip[NI_MAXHOST]   = '\0';
 		w->client_port[NI_MAXSERV] = '\0';
@@ -128,6 +129,7 @@ struct web_client *web_client_create(int listener)
 		return NULL;
 	}
 
+	w->origin[0] = '*';
 	w->wait_receive = 1;
 
 	if(web_clients) web_clients->prev = w;
@@ -173,8 +175,17 @@ void web_client_reset(struct web_client *w)
 	}
 
 	w->last_url[0] = '\0';
+	w->cookie[0] = '\0';
+	w->origin[0] = '*';
+	w->origin[1] = '\0';
 
 	w->mode = WEB_CLIENT_MODE_NORMAL;
+	w->enable_gzip = 0;
+	w->keepalive = 0;
+	if(w->decoded_url) {
+		free(w->decoded_url);
+		w->decoded_url = NULL;
+	}
 
 	buffer_reset(w->response.header_output);
 	buffer_reset(w->response.header);
@@ -316,7 +327,7 @@ int mysendfile(struct web_client *w, char *filename)
 
 	// access the file
 	char webfilename[FILENAME_MAX + 1];
-	snprintf(webfilename, FILENAME_MAX, "%s/%s", web_dir, filename);
+	snprintfz(webfilename, FILENAME_MAX, "%s/%s", web_dir, filename);
 
 	// check if the file exists
 	struct stat stat;
@@ -341,7 +352,7 @@ int mysendfile(struct web_client *w, char *filename)
 	}
 
 	if((stat.st_mode & S_IFMT) == S_IFDIR) {
-		snprintf(webfilename, FILENAME_MAX+1, "%s/index.html", filename);
+		snprintfz(webfilename, FILENAME_MAX, "%s/index.html", filename);
 		return mysendfile(w, webfilename);
 	}
 
@@ -644,7 +655,7 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 		if(!name || !*name) continue;
 		if(!value || !*value) continue;
 
-		debug(D_WEB_CLIENT, "%llu: API v1 query param '%s' with value '%s'", w->id, name, value);
+		debug(D_WEB_CLIENT, "%llu: API v1 data query param '%s' with value '%s'", w->id, name, value);
 
 		// name and value are now the parameters
 		// they are not null and not empty
@@ -784,19 +795,146 @@ cleanup:
 	return ret;
 }
 
+int web_client_api_request_v1_registry(struct web_client *w, char *url)
+{
+	char person_guid[36 + 1] = "";
+
+	debug(D_WEB_CLIENT, "%llu: API v1 registry with URL '%s'", w->id, url);
+
+	char *cookie = strstr(w->response.data->buffer, " " NETDATA_REGISTRY_COOKIE_NAME "=");
+	if(cookie)
+		strncpyz(person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME) + 1], 36);
+
+	char action = '\0';
+	char *machine_guid = NULL,
+			*machine_url = NULL,
+			*url_name = NULL,
+			*search_machine_guid = NULL,
+			*delete_url = NULL,
+			*to_person_guid = NULL;
+
+	while(url) {
+		char *value = mystrsep(&url, "?&[]");
+		if (!value || !*value) continue;
+
+		char *name = mystrsep(&value, "=");
+		if (!name || !*name) continue;
+		if (!value || !*value) continue;
+
+		debug(D_WEB_CLIENT, "%llu: API v1 registry query param '%s' with value '%s'", w->id, name, value);
+
+		if(!strcmp(name, "action")) {
+			if(!strcmp(value, "access")) action = 'A';
+			else if(!strcmp(value, "hello")) action = 'H';
+			else if(!strcmp(value, "delete")) action = 'D';
+			else if(!strcmp(value, "search")) action = 'S';
+			else if(!strcmp(value, "switch")) action = 'W';
+		}
+		else if(!strcmp(name, "machine"))
+			machine_guid = value;
+
+		else if(!strcmp(name, "url"))
+			machine_url = value;
+
+		else if(action == 'A') {
+			if(!strcmp(name, "name"))
+				url_name = value;
+		}
+		else if(action == 'D') {
+			if(!strcmp(name, "delete_url"))
+				delete_url = value;
+		}
+		else if(action == 'S') {
+			if(!strcmp(name, "for"))
+				search_machine_guid = value;
+		}
+		else if(action == 'W') {
+			if(!strcmp(name, "to"))
+				to_person_guid = value;
+		}
+	}
+
+	if(action == 'A' && (!machine_guid || !machine_url || !url_name)) {
+		buffer_flush(w->response.data);
+		buffer_sprintf(w->response.data, "Invalid registry request - access requires these parameters: machine ('%s'), url ('%s'), name ('%s')",
+					   machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", url_name?url_name:"UNSET");
+		return 400;
+	}
+	else if(action == 'D' && (!machine_guid || !machine_url || !delete_url)) {
+		buffer_flush(w->response.data);
+		buffer_sprintf(w->response.data, "Invalid registry request - delete requires these parameters: machine ('%s'), url ('%s'), delete_url ('%s')",
+					   machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", delete_url?delete_url:"UNSET");
+		return 400;
+	}
+	else if(action == 'S' && (!machine_guid || !machine_url || !search_machine_guid)) {
+		buffer_flush(w->response.data);
+		buffer_sprintf(w->response.data, "Invalid registry request - search requires these parameters: machine ('%s'), url ('%s'), for ('%s')",
+					   machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", search_machine_guid?search_machine_guid:"UNSET");
+		return 400;
+	}
+	else if(action == 'W' && (!machine_guid || !machine_url || !to_person_guid)) {
+		buffer_flush(w->response.data);
+		buffer_sprintf(w->response.data, "Invalid registry request - switching identity requires these parameters: machine ('%s'), url ('%s'), to ('%s')",
+					   machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", to_person_guid?to_person_guid:"UNSET");
+		return 400;
+	}
+
+	switch(action) {
+		case 'A':
+			return registry_request_access_json(w, person_guid, machine_guid, machine_url, url_name, time(NULL));
+
+		case 'D':
+			return registry_request_delete_json(w, person_guid, machine_guid, machine_url, delete_url, time(NULL));
+
+		case 'S':
+			return registry_request_search_json(w, person_guid, machine_guid, machine_url, search_machine_guid, time(NULL));
+
+		case 'W':
+			return registry_request_switch_json(w, person_guid, machine_guid, machine_url, to_person_guid, time(NULL));
+
+		case 'H':
+			return registry_request_hello_json(w);
+
+		default:
+			buffer_flush(w->response.data);
+			buffer_sprintf(w->response.data, "Invalid registry request - you need to set an action: hello, access, delete, search");
+			return 400;
+	}
+
+	buffer_flush(w->response.data);
+	buffer_sprintf(w->response.data, "Invalid or no registry action.");
+	return 400;
+}
+
 int web_client_api_request_v1(struct web_client *w, char *url)
 {
+	static uint32_t data_hash = 0, chart_hash = 0, charts_hash = 0, registry_hash = 0;
+
+	if(unlikely(data_hash == 0)) {
+		data_hash = simple_hash("data");
+		chart_hash = simple_hash("chart");
+		charts_hash = simple_hash("charts");
+		registry_hash = simple_hash("registry");
+	}
+
 	// get the command
 	char *tok = mystrsep(&url, "/?&");
 	if(tok && *tok) {
 		debug(D_WEB_CLIENT, "%llu: Searching for API v1 command '%s'.", w->id, tok);
+		uint32_t hash = simple_hash(tok);
 
-		if(strcmp(tok, "data") == 0)
+		if(hash == data_hash && !strcmp(tok, "data"))
 			return web_client_api_request_v1_data(w, url);
-		else if(strcmp(tok, "chart") == 0)
+
+		else if(hash == chart_hash && !strcmp(tok, "chart"))
 			return web_client_api_request_v1_chart(w, url);
-		else if(strcmp(tok, "charts") == 0)
+
+		else if(hash == charts_hash && !strcmp(tok, "charts"))
 			return web_client_api_request_v1_charts(w, url);
+
+		else if(hash == registry_hash && !strcmp(tok, "registry"))
+			return web_client_api_request_v1_registry(w, url);
+
 		else {
 			buffer_flush(w->response.data);
 			buffer_sprintf(w->response.data, "Unsupported v1 API command: %s", tok);
@@ -1043,110 +1181,209 @@ cleanup:
 }
 */
 
+
+static inline char *http_header_parse(struct web_client *w, char *s) {
+	char *e = s;
+
+	// find the :
+	while(*e && *e != ':') e++;
+	if(!*e || e[1] != ' ') return e;
+
+	// get the name
+	*e = '\0';
+
+	// find the value
+	char *v, *ve;
+	v = ve = e + 2;
+
+	// find the \r
+	while(*ve && *ve != '\r') ve++;
+	if(!*ve || ve[1] != '\n') {
+		*e = ':';
+		return ve;
+	}
+
+	// terminate the value
+	*ve = '\0';
+
+	// fprintf(stderr, "HEADER: '%s' = '%s'\n", s, v);
+
+	if(!strcasecmp(s, "Origin"))
+		strncpyz(w->origin, v, ORIGIN_MAX);
+
+	else if(!strcasecmp(s, "Connection")) {
+		if(strcasestr(v, "keep-alive"))
+			w->keepalive = 1;
+	}
+#ifdef NETDATA_WITH_ZLIB
+	else if(!strcasecmp(s, "Accept-Encoding")) {
+		if(web_enable_gzip && strcasestr(v, "gzip")) {
+			w->enable_gzip = 1;
+		}
+	}
+#endif /* NETDATA_WITH_ZLIB */
+
+	*e = ':';
+	*ve = '\r';
+	return ve;
+}
+
+// http_request_validate()
+// returns:
+// = 0 : all good, process the request
+// > 0 : request is complete, but is not supported
+// < 0 : request is incomplete - wait for more data
+
+static inline int http_request_validate(struct web_client *w) {
+	char *s = w->response.data->buffer, *encoded_url = NULL;
+
+	// is is a valid request?
+	if(!strncmp(s, "GET ", 4)) {
+		encoded_url = s = &s[4];
+		w->mode = WEB_CLIENT_MODE_NORMAL;
+	}
+	else if(!strncmp(s, "OPTIONS ", 8)) {
+		encoded_url = s = &s[8];
+		w->mode = WEB_CLIENT_MODE_OPTIONS;
+	}
+	else {
+		w->wait_receive = 0;
+		return 1;
+	}
+
+	// find the SPACE + "HTTP/"
+	while(*s) {
+		// find the space
+		while (*s && *s != ' ') s++;
+
+		// is it SPACE + "HTTP/" ?
+		if(*s && !strncmp(s, " HTTP/", 6)) break;
+		else s++;
+	}
+
+	// incomplete requests
+	if(!*s) {
+		w->wait_receive = 1;
+		return -2;
+	}
+
+	// we have the end of encoded_url - remember it
+	char *ue = s;
+
+	while(*s) {
+		// find a line feed
+		while (*s && *s != '\r') s++;
+
+		// did we reach the end?
+		if(unlikely(!*s)) break;
+
+		// is it \r\n ?
+		if (likely(s[1] == '\n')) {
+
+			// is it again \r\n ? (header end)
+			if(unlikely(s[2] == '\r' && s[3] == '\n')) {
+				// a valid complete HTTP request found
+
+				*ue = '\0';
+				w->decoded_url = url_decode(encoded_url);
+				*ue = ' ';
+
+				w->wait_receive = 0;
+				return 0;
+			}
+
+			// another header line
+			s = http_header_parse(w, &s[2]);
+		}
+		else s++;
+	}
+
+	// incomplete request
+	w->wait_receive = 1;
+	return -3;
+}
+
 void web_client_process(struct web_client *w) {
 	int code = 500;
 	ssize_t bytes;
-	int enable_gzip = 0;
 
-	w->wait_receive = 0;
+	int what_to_do = http_request_validate(w);
 
-	// check if we have an empty line (end of HTTP header)
-	if(strstr(w->response.data->buffer, "\r\n\r\n")) {
+	// wait for more data
+	if(what_to_do < 0) {
+		if(w->response.data->len > TOO_BIG_REQUEST) {
+			strcpy(w->last_url, "too big request");
+
+			debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big (%zd bytes).", w->id, w->response.data->len);
+
+			code = 400;
+			buffer_flush(w->response.data);
+			buffer_sprintf(w->response.data, "Received request is too big  (%zd bytes).\r\n", w->response.data->len);
+		}
+		else {
+			// wait for more data
+			return;
+		}
+	}
+	else if(what_to_do > 0) {
+		strcpy(w->last_url, "not a valid response");
+
+		debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, w->response.data->buffer);
+
+		code = 500;
+		buffer_flush(w->response.data);
+		buffer_strcat(w->response.data, "I don't understand you...\r\n");
+	}
+	else { // what_to_do == 0
+		gettimeofday(&w->tv_in, NULL);
+
 		global_statistics_lock();
 		global_statistics.web_requests++;
 		global_statistics_unlock();
 
-		gettimeofday(&w->tv_in, NULL);
-		debug(D_WEB_DATA, "%llu: Processing data buffer of %d bytes: '%s'.", w->id, w->response.data->len, w->response.data->buffer);
-
-		// check if the client requested keep-alive HTTP
-		if(strcasestr(w->response.data->buffer, "Connection: keep-alive")) w->keepalive = 1;
-		else w->keepalive = 0;
-
-#ifdef NETDATA_WITH_ZLIB
-		// check if the client accepts deflate
-		if(web_enable_gzip && strstr(w->response.data->buffer, "gzip"))
-			enable_gzip = 1;
-#endif // NETDATA_WITH_ZLIB
-
-		int datasource_type = DATASOURCE_DATATABLE_JSONP;
-		//if(strstr(w->response.data->buffer, "X-DataSource-Auth"))
-		//	datasource_type = DATASOURCE_GOOGLE_JSON;
-
-		char *buf = (char *)buffer_tostring(w->response.data);
-		char *tok = strsep(&buf, " \r\n");
-		char *url = NULL;
-		char *pointer_to_free = NULL; // keep url_decode() allocated buffer
-
-		w->mode = WEB_CLIENT_MODE_NORMAL;
-
-		if(buf && strcmp(tok, "GET") == 0) {
-			tok = strsep(&buf, " \r\n");
-			pointer_to_free = url = url_decode(tok);
-			debug(D_WEB_CLIENT, "%llu: Processing HTTP GET on url '%s'.", w->id, url);
-		}
-		else if(buf && strcmp(tok, "OPTIONS") == 0) {
-			tok = strsep(&buf, " \r\n");
-			pointer_to_free = url = url_decode(tok);
-			debug(D_WEB_CLIENT, "%llu: Processing HTTP OPTIONS on url '%s'.", w->id, url);
-			w->mode = WEB_CLIENT_MODE_OPTIONS;
-		}
-		else if (buf && strcmp(tok, "POST") == 0) {
-			w->keepalive = 0;
-			tok = strsep(&buf, " \r\n");
-			pointer_to_free = url = url_decode(tok);
-			debug(D_WEB_CLIENT, "%llu: I don't know how to handle POST with form data. Assuming it is a GET on url '%s'.", w->id, url);
-		}
-
-		w->last_url[0] = '\0';
+		// copy the URL - we are going to overwrite parts of it
+		// FIXME -- we should avoid it
+		strncpyz(w->last_url, w->decoded_url, URL_MAX);
 
 		if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
-			strncpy(w->last_url, url, URL_MAX);
-			w->last_url[URL_MAX] = '\0';
-
 			code = 200;
 			w->response.data->contenttype = CT_TEXT_PLAIN;
 			buffer_flush(w->response.data);
 			buffer_strcat(w->response.data, "OK");
 		}
-		else if(url) {
+		else {
 #ifdef NETDATA_WITH_ZLIB
-			if(enable_gzip)
+			if(w->enable_gzip)
 				web_client_enable_deflate(w);
 #endif
 
-			strncpy(w->last_url, url, URL_MAX);
-			w->last_url[URL_MAX] = '\0';
-
-			tok = mystrsep(&url, "/?");
+			char *url = w->decoded_url;
+			char *tok = mystrsep(&url, "/?");
 			if(tok && *tok) {
 				debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
 
 				if(strcmp(tok, "api") == 0) {
 					// the client is requesting api access
-					datasource_type = DATASOURCE_JSON;
 					code = web_client_api_request(w, url);
 				}
-#ifdef NETDATA_INTERNAL_CHECKS
-				else if(strcmp(tok, "exit") == 0) {
-					netdata_exit = 1;
+				else if(strcmp(tok, "netdata.conf") == 0) {
 					code = 200;
+					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending netdata.conf ...", w->id);
+
 					w->response.data->contenttype = CT_TEXT_PLAIN;
 					buffer_flush(w->response.data);
-					buffer_strcat(w->response.data, "will do");
+					generate_config(w->response.data, 0);
 				}
-#endif
 				else if(strcmp(tok, WEB_PATH_DATA) == 0) { // "data"
-					// the client is requesting rrd data
-					datasource_type = DATASOURCE_JSON;
-					code = web_client_data_request(w, url, datasource_type);
+					// the client is requesting rrd data -- OLD API
+					code = web_client_data_request(w, url, DATASOURCE_JSON);
 				}
 				else if(strcmp(tok, WEB_PATH_DATASOURCE) == 0) { // "datasource"
-					// the client is requesting google datasource
-					code = web_client_data_request(w, url, datasource_type);
+					// the client is requesting google datasource -- OLD API
+					code = web_client_data_request(w, url, DATASOURCE_DATATABLE_JSONP);
 				}
 				else if(strcmp(tok, WEB_PATH_GRAPH) == 0) { // "graph"
-					// the client is requesting an rrd graph
+					// the client is requesting an rrd graph -- OLD API
 
 					// get the name of the data to show
 					tok = mystrsep(&url, "/?&");
@@ -1176,7 +1413,40 @@ void web_client_process(struct web_client *w) {
 						buffer_strcat(w->response.data, "Graph name?\r\n");
 					}
 				}
+				else if(strcmp(tok, "list") == 0) {
+					// OLD API
+					code = 200;
+
+					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending list of RRD_STATS...", w->id);
+
+					buffer_flush(w->response.data);
+					RRDSET *st = rrdset_root;
+
+					for ( ; st ; st = st->next )
+						buffer_sprintf(w->response.data, "%s\n", st->name);
+				}
+				else if(strcmp(tok, "all.json") == 0) {
+					// OLD API
+					code = 200;
+					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending JSON list of all monitors of RRD_STATS...", w->id);
+
+					w->response.data->contenttype = CT_APPLICATION_JSON;
+					buffer_flush(w->response.data);
+					rrd_stats_all_json(w->response.data);
+				}
 #ifdef NETDATA_INTERNAL_CHECKS
+				else if(strcmp(tok, "exit") == 0) {
+					code = 200;
+					w->response.data->contenttype = CT_TEXT_PLAIN;
+					buffer_flush(w->response.data);
+
+					if(!netdata_exit)
+						buffer_strcat(w->response.data, "ok, will do...");
+					else
+						buffer_strcat(w->response.data, "I am doing it already");
+
+					netdata_exit = 1;
+				}
 				else if(strcmp(tok, "debug") == 0) {
 					buffer_flush(w->response.data);
 
@@ -1196,7 +1466,7 @@ void web_client_process(struct web_client *w) {
 						else {
 							code = 200;
 							debug_flags |= D_RRD_STATS;
-							st->debug = st->debug?0:1;
+							st->debug = !st->debug;
 							buffer_sprintf(w->response.data, "Chart %s has now debug %s.\r\n", tok, st->debug?"enabled":"disabled");
 							debug(D_WEB_CLIENT_ACCESS, "%llu: debug for %s is %s.", w->id, tok, st->debug?"enabled":"disabled");
 						}
@@ -1218,39 +1488,11 @@ void web_client_process(struct web_client *w) {
 					// just leave the buffer as is
 					// it will be copied back to the client
 				}
-#endif
-				else if(strcmp(tok, "list") == 0) {
-					code = 200;
-
-					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending list of RRD_STATS...", w->id);
-
-					buffer_flush(w->response.data);
-					RRDSET *st = rrdset_root;
-
-					for ( ; st ; st = st->next )
-						buffer_sprintf(w->response.data, "%s\n", st->name);
-				}
-				else if(strcmp(tok, "all.json") == 0) {
-					code = 200;
-					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending JSON list of all monitors of RRD_STATS...", w->id);
-
-					w->response.data->contenttype = CT_APPLICATION_JSON;
-					buffer_flush(w->response.data);
-					rrd_stats_all_json(w->response.data);
-				}
-				else if(strcmp(tok, "netdata.conf") == 0) {
-					code = 200;
-					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending netdata.conf ...", w->id);
-
-					w->response.data->contenttype = CT_TEXT_PLAIN;
-					buffer_flush(w->response.data);
-					generate_config(w->response.data, 0);
-				}
+#endif	/* NETDATA_INTERNAL_CHECKS */
 				else {
 					char filename[FILENAME_MAX+1];
 					url = filename;
-					strncpy(filename, w->last_url, FILENAME_MAX);
-					filename[FILENAME_MAX] = '\0';
+					strncpyz(filename, w->last_url, FILENAME_MAX);
 					tok = mystrsep(&url, "?");
 					buffer_flush(w->response.data);
 					code = mysendfile(w, (tok && *tok)?tok:"/");
@@ -1259,42 +1501,12 @@ void web_client_process(struct web_client *w) {
 			else {
 				char filename[FILENAME_MAX+1];
 				url = filename;
-				strncpy(filename, w->last_url, FILENAME_MAX);
-				filename[FILENAME_MAX] = '\0';
+				strncpyz(filename, w->last_url, FILENAME_MAX);
 				tok = mystrsep(&url, "?");
 				buffer_flush(w->response.data);
 				code = mysendfile(w, (tok && *tok)?tok:"/");
 			}
 		}
-		else {
-			strcpy(w->last_url, "not a valid response");
-
-			if(buf) debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, buf);
-
-			code = 500;
-			buffer_flush(w->response.data);
-			buffer_strcat(w->response.data, "I don't understand you...\r\n");
-		}
-
-		// free url_decode() buffer
-		if(pointer_to_free) {
-			free(pointer_to_free);
-			pointer_to_free = NULL;
-		}
-	}
-	else if(w->response.data->len > TOO_BIG_REQUEST) {
-		strcpy(w->last_url, "too big request");
-
-		debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big (%zd bytes).", w->id, w->response.data->len);
-
-		code = 400;
-		buffer_flush(w->response.data);
-		buffer_sprintf(w->response.data, "Received request is too big  (%zd bytes).\r\n", w->response.data->len);
-	}
-	else {
-		// wait for more data
-		w->wait_receive = 1;
-		return;
 	}
 
 	gettimeofday(&w->tv_ready, NULL);
@@ -1415,6 +1627,10 @@ void web_client_process(struct web_client *w) {
 			code_msg = "Not Found";
 			break;
 
+		case 412:
+			code_msg = "Preconditions Failed";
+			break;
+
 		default:
 			code_msg = "Internal Server Error";
 			break;
@@ -1428,19 +1644,27 @@ void web_client_process(struct web_client *w) {
 		"HTTP/1.1 %d %s\r\n"
 		"Connection: %s\r\n"
 		"Server: NetData Embedded HTTP Server\r\n"
-		"Access-Control-Allow-Origin: *\r\n"
+		"Access-Control-Allow-Origin: %s\r\n"
+		"Access-Control-Allow-Credentials: true\r\n"
 		"Content-Type: %s\r\n"
 		"Date: %s\r\n"
 		, code, code_msg
 		, w->keepalive?"keep-alive":"close"
+		, w->origin
 		, content_type_string
 		, date
 		);
 
+	if(w->cookie[0]) {
+		buffer_sprintf(w->response.header_output,
+		   "Set-Cookie: %s\r\n",
+		   w->cookie);
+	}
+
 	if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
 		buffer_strcat(w->response.header_output,
 			"Access-Control-Allow-Methods: GET, OPTIONS\r\n"
-			"Access-Control-Allow-Headers: accept, x-requested-with\r\n"
+			"Access-Control-Allow-Headers: accept, x-requested-with, origin, content-type, cookie\r\n"
 			"Access-Control-Max-Age: 1209600\r\n" // 86400 * 14
 			);
 	}

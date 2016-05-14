@@ -13,29 +13,34 @@
 #include "plugin_proc.h"
 #include "log.h"
 
-#define MAX_INTERRUPTS 256
-#define MAX_INTERRUPT_CPUS 256
 #define MAX_INTERRUPT_NAME 50
 
 struct interrupt {
 	int used;
 	char *id;
 	char name[MAX_INTERRUPT_NAME + 1];
-	unsigned long long value[MAX_INTERRUPT_CPUS];
 	unsigned long long total;
+	unsigned long long value[];
 };
 
-static struct interrupt *alloc_interrupts(int lines) {
-	static struct interrupt *irrs = NULL;
-	static int alloced = 0;
+// since each interrupt is variable in size
+// we use this to calculate its record size
+#define recordsize(cpus) (sizeof(struct interrupt) + (cpus * sizeof(unsigned long long)))
 
-	if(lines < alloced) return irrs;
+// given a base, get a pointer to each record
+#define irrindex(base, line, cpus) ((struct interrupt *)&((char *)(base))[line * recordsize(cpus)])
+
+static inline struct interrupt *get_interrupts_array(int lines, int cpus) {
+	static struct interrupt *irrs = NULL;
+	static int allocated = 0;
+
+	if(lines < allocated) return irrs;
 	else {
-		irrs = (struct interrupt *)realloc(irrs, lines * sizeof(struct interrupt));
+		irrs = (struct interrupt *)realloc(irrs, lines * recordsize(cpus));
 		if(!irrs)
 			fatal("Cannot allocate memory for %d interrupts", lines);
 
-		alloced = lines;
+		allocated = lines;
 	}
 
 	return irrs;
@@ -44,7 +49,6 @@ static struct interrupt *alloc_interrupts(int lines) {
 int do_proc_interrupts(int update_every, unsigned long long dt) {
 	static procfile *ff = NULL;
 	static int cpus = -1, do_per_core = -1;
-
 	struct interrupt *irrs = NULL;
 
 	if(dt) {};
@@ -53,7 +57,7 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 
 	if(!ff) {
 		char filename[FILENAME_MAX + 1];
-		snprintf(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/interrupts");
+		snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/interrupts");
 		ff = procfile_open(config_get("plugin:proc:/proc/interrupts", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
 	}
 	if(!ff) return 1;
@@ -76,8 +80,6 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 			if(strncmp(procfile_lineword(ff, 0, w), "CPU", 3) == 0)
 				cpus++;
 		}
-
-		if(cpus > MAX_INTERRUPT_CPUS) cpus = MAX_INTERRUPT_CPUS;
 	}
 
 	if(!cpus) {
@@ -86,12 +88,12 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 	}
 
 	// allocate the size we need;
-	irrs = alloc_interrupts(lines);
+	irrs = get_interrupts_array(lines, cpus);
 	irrs[0].used = 0;
 
 	// loop through all lines
 	for(l = 1; l < lines ;l++) {
-		struct interrupt *irr = &irrs[l];
+		struct interrupt *irr = irrindex(irrs, l, cpus);
 		irr->used = 0;
 		irr->total = 0;
 
@@ -116,18 +118,15 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 		}
 
 		if(isdigit(irr->id[0]) && (uint32_t)(cpus + 2) < words) {
-			strncpy(irr->name, procfile_lineword(ff, l, words - 1), MAX_INTERRUPT_NAME);
-			irr->name[MAX_INTERRUPT_NAME] = '\0';
+			strncpyz(irr->name, procfile_lineword(ff, l, words - 1), MAX_INTERRUPT_NAME);
 			int nlen = strlen(irr->name);
 			if(nlen < (MAX_INTERRUPT_NAME-1)) {
 				irr->name[nlen] = '_';
-				strncpy(&irr->name[nlen + 1], irr->id, MAX_INTERRUPT_NAME - nlen);
-				irr->name[MAX_INTERRUPT_NAME] = '\0';
+				strncpyz(&irr->name[nlen + 1], irr->id, MAX_INTERRUPT_NAME - nlen);
 			}
 		}
 		else {
-			strncpy(irr->name, irr->id, MAX_INTERRUPT_NAME);
-			irr->name[MAX_INTERRUPT_NAME] = '\0';
+			strncpyz(irr->name, irr->id, MAX_INTERRUPT_NAME);
 		}
 
 		irr->used = 1;
@@ -142,15 +141,17 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 		st = rrdset_create("system", "interrupts", NULL, "interrupts", NULL, "System interrupts", "interrupts/s", 1000, update_every, RRDSET_TYPE_STACKED);
 
 		for(l = 0; l < lines ;l++) {
-			if(!irrs[l].used) continue;
-			rrddim_add(st, irrs[l].id, irrs[l].name, 1, 1, RRDDIM_INCREMENTAL);
+			struct interrupt *irr = irrindex(irrs, l, cpus);
+			if(!irr->used) continue;
+			rrddim_add(st, irr->id, irr->name, 1, 1, RRDDIM_INCREMENTAL);
 		}
 	}
 	else rrdset_next(st);
 
 	for(l = 0; l < lines ;l++) {
-		if(!irrs[l].used) continue;
-		rrddim_set(st, irrs[l].id, irrs[l].total);
+		struct interrupt *irr = irrindex(irrs, l, cpus);
+		if(!irr->used) continue;
+		rrddim_set(st, irr->id, irr->total);
 	}
 	rrdset_done(st);
 
@@ -158,26 +159,28 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 		int c;
 
 		for(c = 0; c < cpus ; c++) {
-			char id[256];
-			snprintf(id, 256, "cpu%d_interrupts", c);
+			char id[256+1];
+			snprintfz(id, 256, "cpu%d_interrupts", c);
 
 			st = rrdset_find_bytype("cpu", id);
 			if(!st) {
-				char name[256], title[256];
-				snprintf(name, 256, "cpu%d_interrupts", c);
-				snprintf(title, 256, "CPU%d Interrupts", c);
+				char name[256+1], title[256+1];
+				snprintfz(name, 256, "cpu%d_interrupts", c);
+				snprintfz(title, 256, "CPU%d Interrupts", c);
 				st = rrdset_create("cpu", id, name, "interrupts", "cpu.interrupts", title, "interrupts/s", 2000 + c, update_every, RRDSET_TYPE_STACKED);
 
 				for(l = 0; l < lines ;l++) {
-					if(!irrs[l].used) continue;
-					rrddim_add(st, irrs[l].id, irrs[l].name, 1, 1, RRDDIM_INCREMENTAL);
+					struct interrupt *irr = irrindex(irrs, l, cpus);
+					if(!irr->used) continue;
+					rrddim_add(st, irr->id, irr->name, 1, 1, RRDDIM_INCREMENTAL);
 				}
 			}
 			else rrdset_next(st);
 
 			for(l = 0; l < lines ;l++) {
-				if(!irrs[l].used) continue;
-				rrddim_set(st, irrs[l].id, irrs[l].value[c]);
+				struct interrupt *irr = irrindex(irrs, l, cpus);
+				if(!irr->used) continue;
+				rrddim_set(st, irr->id, irr->value[c]);
 			}
 			rrdset_done(st);
 		}

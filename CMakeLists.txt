@@ -57,6 +57,8 @@ set(NETDATA_SOURCE_FILES
 	src/proc_stat.c
 	src/proc_sys_kernel_random_entropy_avail.c
 	src/proc_vmstat.c
+	src/registry.c
+	src/registry.h
 	src/rrd2json.c
 	src/rrd2json.h
 	src/rrd.c
@@ -91,7 +93,7 @@ set(APPS_PLUGIN_SOURCE_FILES
 
 include_directories(AFTER .)
 
-add_definitions(-DHAVE_CONFIG_H -DNETDATA_INTERNAL_CHECKS=1 -DCACHE_DIR="/tmp" -DCONFIG_DIR="/tmp" -DLOG_DIR="/tmp" -DPLUGINS_DIR="/tmp" -DWEB_DIR="/tmp")
+add_definitions(-DHAVE_CONFIG_H -DNETDATA_INTERNAL_CHECKS=1 -DCACHE_DIR="/tmp" -DCONFIG_DIR="/tmp" -DLOG_DIR="/tmp" -DPLUGINS_DIR="/tmp" -DWEB_DIR="/tmp" -DVARLIB_DIR="/tmp")
 
 add_executable(netdata ${NETDATA_SOURCE_FILES})
 add_executable(apps.plugin ${APPS_PLUGIN_SOURCE_FILES})

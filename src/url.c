@@ -27,27 +27,35 @@ char to_hex(char code) {
 /* Returns a url-encoded version of str */
 /* IMPORTANT: be sure to free() the returned string after use */
 char *url_encode(char *str) {
-	char *pstr = str,
-		*buf = malloc(strlen(str) * 3 + 1),
-		*pbuf = buf;
+	char *buf, *pbuf;
+
+	pbuf = buf = malloc(strlen(str) * 3 + 1);
 
 	if(!buf)
 		fatal("Cannot allocate memory.");
 
-	while (*pstr) {
-		if (isalnum(*pstr) || *pstr == '-' || *pstr == '_' || *pstr == '.' || *pstr == '~')
-			*pbuf++ = *pstr;
+	while (*str) {
+		if (isalnum(*str) || *str == '-' || *str == '_' || *str == '.' || *str == '~')
+			*pbuf++ = *str;
 
-		else if (*pstr == ' ')
+		else if (*str == ' ')
 			*pbuf++ = '+';
 
 		else
-			*pbuf++ = '%', *pbuf++ = to_hex(*pstr >> 4), *pbuf++ = to_hex(*pstr & 15);
+			*pbuf++ = '%', *pbuf++ = to_hex(*str >> 4), *pbuf++ = to_hex(*str & 15);
 
-		pstr++;
+		str++;
 	}
-
 	*pbuf = '\0';
+
+	// FIX: I think this is prudent. URLs can be as long as 2 KiB or more.
+	//      We allocated 3 times more space to accomodate %NN encoding of
+	//      non ASCII chars. If URL has none of these kind of chars we will
+	//      end up with a big unused buffer.
+	//
+	//      Try to shrink the buffer...
+	if (!!(pbuf = (char *)realloc(buf, strlen(buf)+1)))
+		buf = pbuf;
 
 	return buf;
 }
