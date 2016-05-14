@@ -61,7 +61,8 @@ struct web_client {
 
 	struct timeval tv_in, tv_ready;
 
-	char cookie[COOKIE_MAX+1];
+	char cookie1[COOKIE_MAX+1];
+	char cookie2[COOKIE_MAX+1];
 	char origin[ORIGIN_MAX+1];
 
 	int mode;
