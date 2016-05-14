@@ -1169,19 +1169,21 @@ int registry_request_search_json(struct web_client *w, char *person_guid, char *
 	return 200;
 }
 
+// structure used be the callbacks below
+struct registry_person_url_callback_verify_machine_exists_data {
+	MACHINE *m;
+	int count;
+};
 
-int registry_person_url_callback_verify_machine_exists(void *entry, void *machine) {
+int registry_person_url_callback_verify_machine_exists(void *entry, void *data) {
+	struct registry_person_url_callback_verify_machine_exists_data *d = (struct registry_person_url_callback_verify_machine_exists_data *)data;
 	PERSON_URL *pu = (PERSON_URL *)entry;
-	MACHINE *m = (MACHINE *)machine;
+	MACHINE *m = d->m;
 
-	if(pu->machine == m) {
-		info("registry_person_url_callback_verify_machine_exists('%s', '%s'): no", pu->machine->guid, m->guid);
-		return 1;
-	}
-	else {
-		info("registry_person_url_callback_verify_machine_exists('%s', '%s'): yes", pu->machine->guid, m->guid);
-		return 0;
-	}
+	if(pu->machine == m)
+		d->count++;
+
+	return 0;
 }
 
 // the main method for switching user identity
@@ -1213,17 +1215,20 @@ int registry_request_switch_json(struct web_client *w, char *person_guid, char *
 		return 432;
 	}
 
+	struct registry_person_url_callback_verify_machine_exists_data data = { m, 0 };
+
 	// verify the old person has access to this machine
-	int count = dictionary_get_all(op->urls, registry_person_url_callback_verify_machine_exists, m);
-	if(!count) {
+	dictionary_get_all(op->urls, registry_person_url_callback_verify_machine_exists, &data);
+	if(!data.count) {
 		registry_json_header(w, "switch", REGISTRY_STATUS_FAILED);
 		registry_json_footer(w);
 		return 433;
 	}
 
 	// verify the new person has access to this machine
-	count = dictionary_get_all(np->urls, registry_person_url_callback_verify_machine_exists, m);
-	if(!count) {
+	data.count = 0;
+	dictionary_get_all(np->urls, registry_person_url_callback_verify_machine_exists, &data);
+	if(!data.count) {
 		registry_json_header(w, "switch", REGISTRY_STATUS_FAILED);
 		registry_json_footer(w);
 		return 434;
@@ -1652,7 +1657,7 @@ int registry_init(void) {
 	registry.save_registry_every_entries = config_get_number("registry", "registry save db every new entries", 1000000);
 	registry.persons_expiration = config_get_number("registry", "registry expire idle persons days", 365) * 86400;
 	registry.registry_domain = config_get("registry", "registry domain", "");
-	registry.registry_to_announce = config_get("registry", "registry to announce", "https://registry.my-netdata.io");
+	registry.registry_to_announce = config_get("registry", "registry to announce", "//registry.my-netdata.io");
 	registry.hostname = config_get("registry", "registry hostname", config_get("global", "hostname", hostname));
 
 	registry.max_url_length = config_get_number("registry", "max URL length", 1024);
