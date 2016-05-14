@@ -34,6 +34,7 @@
 #include "plugin_checks.h"
 #include "plugin_proc.h"
 #include "plugin_nfacct.h"
+#include "registry.h"
 
 #include "main.h"
 
@@ -229,8 +230,7 @@ int main(int argc, char **argv)
 		else if(strcmp(argv[i], "-nodaemon") == 0 || strcmp(argv[i], "-nd") == 0) dont_fork = 1;
 		else if(strcmp(argv[i], "-pidfile") == 0 && (i+1) < argc) {
 			i++;
-			strncpy(pidfile, argv[i], FILENAME_MAX);
-			pidfile[FILENAME_MAX] = '\0';
+			strncpyz(pidfile, argv[i], FILENAME_MAX);
 		}
 		else if(strcmp(argv[i], "--unittest")  == 0) {
 			rrd_update_every = 1;
@@ -263,6 +263,7 @@ int main(int argc, char **argv)
 	setenv("NETDATA_PLUGINS_DIR", config_get("global", "plugins directory"  , PLUGINS_DIR), 1);
 	setenv("NETDATA_WEB_DIR"    , config_get("global", "web files directory", WEB_DIR)    , 1);
 	setenv("NETDATA_CACHE_DIR"  , config_get("global", "cache directory"    , CACHE_DIR)  , 1);
+	setenv("NETDATA_LIB_DIR"    , config_get("global", "lib directory"      , VARLIB_DIR) , 1);
 	setenv("NETDATA_LOG_DIR"    , config_get("global", "log directory"      , LOG_DIR)    , 1);
 	setenv("NETDATA_HOST_PREFIX", config_get("global", "host access prefix" , "")         , 1);
 	setenv("HOME"               , config_get("global", "home directory"     , CACHE_DIR)  , 1);
@@ -391,8 +392,8 @@ int main(int argc, char **argv)
 
 		// let the plugins know the min update_every
 		{
-			char buf[50];
-			snprintf(buf, 50, "%d", rrd_update_every);
+			char buf[51];
+			snprintfz(buf, 50, "%d", rrd_update_every);
 			setenv("NETDATA_UPDATE_EVERY", buf, 1);
 		}
 
@@ -495,24 +496,22 @@ int main(int argc, char **argv)
 	// never become a problem
 	if(nice(20) == -1) error("Cannot lower my CPU priority.");
 
-	if(become_daemon(dont_fork, 0, user, input_log_file, output_log_file, error_log_file, access_log_file, &access_fd, &stdaccess) == -1) {
+	if(become_daemon(dont_fork, 0, user, input_log_file, output_log_file, error_log_file, access_log_file, &access_fd, &stdaccess) == -1)
 		fatal("Cannot demonize myself.");
-		exit(1);
-	}
 
+#ifdef NETDATA_INTERNAL_CHECKS
 	if(debug_flags != 0) {
 		struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
 		if(setrlimit(RLIMIT_CORE, &rl) != 0)
 			info("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
-
 		prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
 	}
+#endif /* NETDATA_INTERNAL_CHECKS */
 
 	if(output_log_syslog || error_log_syslog || access_log_syslog)
 		openlog("netdata", LOG_PID, LOG_DAEMON);
 
 	info("NetData started on pid %d", getpid());
-
 
 
 	// ------------------------------------------------------------------------
@@ -525,6 +524,11 @@ int main(int argc, char **argv)
 		else
 			info("Successfully set pthread stacksize to %zu bytes", wanted_stacksize);
 	}
+
+	// --------------------------------------------------------------------
+	// initialize the registry
+
+	registry_init();
 
 	// ------------------------------------------------------------------------
 	// spawn the threads

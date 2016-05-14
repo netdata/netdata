@@ -131,7 +131,7 @@ void debug_int( const char *file, const char *function, const unsigned long line
 	vfprintf( stdout, fmt, args );
 	va_end( args );
 	fprintf(stdout, "\n");
-	fflush( stdout );
+	// fflush( stdout );
 
 	if(output_log_syslog) {
 		va_start( args, fmt );
@@ -229,7 +229,7 @@ void log_access( const char *fmt, ... )
 		vfprintf( stdaccess, fmt, args );
 		va_end( args );
 		fprintf( stdaccess, "\n");
-		fflush( stdaccess );
+		// fflush( stdaccess );
 	}
 
 	if(access_log_syslog) {

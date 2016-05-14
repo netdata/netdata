@@ -53,7 +53,7 @@ void buffer_reset(BUFFER *wb)
 
 const char *buffer_tostring(BUFFER *wb)
 {
-	buffer_need_bytes(wb, (size_t)1);
+	buffer_need_bytes(wb, 1);
 	wb->buffer[wb->len] = '\0';
 
 	buffer_overflow_check(wb);
@@ -78,15 +78,16 @@ void buffer_strcat(BUFFER *wb, const char *txt)
 {
 	if(unlikely(!txt || !*txt)) return;
 
-	buffer_need_bytes(wb, (size_t)(1));
+	buffer_need_bytes(wb, 1);
 
-	char *s = &wb->buffer[wb->len], *end = &wb->buffer[wb->size];
+	char *s = &wb->buffer[wb->len], *start, *end = &wb->buffer[wb->size];
 	long len = wb->len;
 
-	while(*txt && s != end) {
+	start = s;
+	while(*txt && s != end)
 		*s++ = *txt++;
-		len++;
-	}
+
+	len += s - start;
 
 	wb->len = len;
 	buffer_overflow_check(wb);
@@ -110,44 +111,45 @@ void buffer_snprintf(BUFFER *wb, size_t len, const char *fmt, ...)
 {
 	if(unlikely(!fmt || !*fmt)) return;
 
-	buffer_need_bytes(wb, len+1);
+	buffer_need_bytes(wb, len + 1);
 
 	va_list args;
 	va_start(args, fmt);
-	wb->len += vsnprintf(&wb->buffer[wb->len], len+1, fmt, args);
+	wb->len += vsnprintfz(&wb->buffer[wb->len], len, fmt, args);
 	va_end(args);
 
 	buffer_overflow_check(wb);
 
-	// the buffer is \0 terminated by vsnprintf
+	// the buffer is \0 terminated by vsnprintfz
 }
 
 void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args)
 {
 	if(unlikely(!fmt || !*fmt)) return;
 
-	buffer_need_bytes(wb, 1);
+	buffer_need_bytes(wb, 2);
 
-	size_t len = wb->size - wb->len;
+	size_t len = wb->size - wb->len - 1;
 
-	wb->len += vsnprintf(&wb->buffer[wb->len], len, fmt, args);
+	wb->len += vsnprintfz(&wb->buffer[wb->len], len, fmt, args);
 
 	buffer_overflow_check(wb);
 
-	// the buffer is \0 terminated by vsnprintf
+	// the buffer is \0 terminated by vsnprintfz
 }
 
 void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
 {
 	if(unlikely(!fmt || !*fmt)) return;
 
-	buffer_need_bytes(wb, 1);
+	buffer_need_bytes(wb, 2);
 
-	size_t len = wb->size - wb->len, wrote;
+	size_t len = wb->size - wb->len - 1;
+	size_t wrote;
 
 	va_list args;
 	va_start(args, fmt);
-	wrote = (size_t) vsnprintf(&wb->buffer[wb->len], len, fmt, args);
+	wrote = (size_t) vsnprintfz(&wb->buffer[wb->len], len, fmt, args);
 	va_end(args);
 
 	if(unlikely(wrote >= len)) {

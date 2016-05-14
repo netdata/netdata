@@ -4,6 +4,7 @@
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
 AM_CPPFLAGS = \
+	-DVARLIB_DIR="\"$(varlibdir)\"" \
 	-DCACHE_DIR="\"$(cachedir)\"" \
 	-DCONFIG_DIR="\"$(configdir)\"" \
 	-DLOG_DIR="\"$(logdir)\"" \
@@ -15,6 +16,7 @@ AM_CFLAGS = \
 	$(OPTIONAL_MATH_CFLAGS) \
 	$(OPTIONAL_NFACCT_CLFAGS) \
 	$(OPTIONAL_ZLIB_CFLAGS) \
+	$(OPTIONAL_UUID_CFLAGS) \
 	$(NULL)
 
 sbin_PROGRAMS = netdata
@@ -58,6 +60,7 @@ netdata_SOURCES = \
 	sys_kernel_mm_ksm.c \
 	sys_fs_cgroup.c \
 	procfile.c procfile.h \
+	registry.c registry.h \
 	rrd.c rrd.h \
 	rrd2json.c rrd2json.h \
 	storage_number.c storage_number.h \
@@ -71,6 +74,7 @@ netdata_LDADD = \
 	$(OPTIONAL_MATH_LIBS) \
 	$(OPTIONAL_NFACCT_LIBS) \
 	$(OPTIONAL_ZLIB_LIBS) \
+	$(OPTIONAL_UUID_LIBS) \
 	$(NULL)
 
 apps_plugin_SOURCES = \
@@ -84,12 +88,16 @@ apps_plugin_SOURCES = \
 install-data-hook:
 	if [ `id -u` == 0 ]; then \
 		chown root '$(DESTDIR)$(pluginsdir)/apps.plugin' && \
-			chmod 4755 '$(DESTDIR)$(pluginsdir)/apps.plugin'; \
+		chmod 0755 '$(DESTDIR)$(pluginsdir)/apps.plugin' && \
+		( setcap cap_dac_read_search,cap_sys_ptrace+ep '$(DESTDIR)$(pluginsdir)/apps.plugin' || \
+		  chmod 4755 '$(DESTDIR)$(pluginsdir)/apps.plugin' ); \
 	else \
 		echo; \
 		echo "ATTENTION"; \
 		echo; \
-		echo "setuid bit of $(pluginsdir)/apps.plugin must be set, please execute as root:"; \
-		echo "chown root '$(pluginsdir)/apps.plugin' && chmod 4755 '$(pluginsdir)/apps.plugin'"; \
+		echo "$(pluginsdir)/apps.plugin requires escalated capabilities:"; \
+		echo "sudo chown root '$(DESTDIR)$(pluginsdir)/apps.plugin'"; \
+		echo "sudo chmod 0755 '$(DESTDIR)$(pluginsdir)/apps.plugin'"; \
+		echo "sudo setcap cap_dac_read_search,cap_sys_ptrace+ep '$(DESTDIR)$(pluginsdir)/apps.plugin'"; \
 		echo; \
 	fi

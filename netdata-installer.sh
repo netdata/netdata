@@ -27,51 +27,53 @@ ME="$0"
 DONOTSTART=0
 DONOTWAIT=0
 NETDATA_PREFIX=
-ZLIB_IS_HERE=0
+LIBS_ARE_HERE=0
 
 usage() {
-	cat <<USAGE
+	cat <<-USAGE
 
-${ME} <installer options>
+	${ME} <installer options>
 
-Valid <installer options> are:
+	Valid <installer options> are:
 
-   --install /PATH/TO/INSTALL
+	   --install /PATH/TO/INSTALL
 
-        If your give: --install /opt
-        netdata will be installed in /opt/netdata
+			If your give: --install /opt
+			netdata will be installed in /opt/netdata
 
-   --dont-start-it
+	   --dont-start-it
 
-        Do not (re)start netdata.
-        Just install it.
+			Do not (re)start netdata.
+			Just install it.
 
-   --dont-wait
+	   --dont-wait
 
-        Do not wait for the user to press ENTER.
-        Start immediately building it.
+			Do not wait for the user to press ENTER.
+			Start immediately building it.
 
-   --zlib-is-really-here
+	   --zlib-is-really-here
+	   --libs-are-really-here
 
-        If you get errors about missing zlib,
-        but you know it is available,
-        you have a broken pkg-config.
-        Use this option to allow it continue
-        without checking pkg-config.
+			If you get errors about missing zlib,
+			or libuuid but you know it is available,
+			you have a broken pkg-config.
+			Use this option to allow it continue
+			without checking pkg-config.
 
-Netdata will by default be compiled with gcc optimization -O3
-If you need to pass different CFLAGS, use something like this:
+	Netdata will by default be compiled with gcc optimization -O3
+	If you need to pass different CFLAGS, use something like this:
 
-  CFLAGS="<gcc options>" $ME <installer options>
+	  CFLAGS="<gcc options>" ${ME} <installer options>
 
-For the installer to complete successfully, you will need
-these packages installed:
+	For the installer to complete successfully, you will need
+	these packages installed:
 
-   gcc make autoconf automake pkg-config zlib1g-dev
+	   gcc make autoconf automake pkg-config zlib1g-dev (or zlib-devel)
+	   uuid-dev (or libuuid-devel)
 
-For the plugins, you will at least need:
+	For the plugins, you will at least need:
 
-   curl node
+	   curl nodejs
 
 USAGE
 }
@@ -82,9 +84,9 @@ do
 		then
 		NETDATA_PREFIX="${2}/netdata"
 		shift 2
-	elif [ "$1" = "--zlib-is-really-here" ]
+	elif [ "$1" = "--zlib-is-really-here" -o "$1" = "--libs-are-really-here" ]
 		then
-		ZLIB_IS_HERE=1
+		LIBS_ARE_HERE=1
 		shift 1
 	elif [ "$1" = "--dont-start-it" ]
 		then
@@ -107,25 +109,26 @@ do
 	fi
 done
 
-cat <<BANNER
+cat <<-BANNER
 
-Welcome to netdata!
-Nice to see you are giving it a try!
+	Welcome to netdata!
+	Nice to see you are giving it a try!
 
-You are about to build and install netdata to your system.
+	You are about to build and install netdata to your system.
 
-It will be installed at these locations:
+	It will be installed at these locations:
 
-  - the daemon    at ${NETDATA_PREFIX}/usr/sbin/netdata
-  - config files  at ${NETDATA_PREFIX}/etc/netdata
-  - web files     at ${NETDATA_PREFIX}/usr/share/netdata
-  - plugins       at ${NETDATA_PREFIX}/usr/libexec/netdata
-  - cache files   at ${NETDATA_PREFIX}/var/cache/netdata
-  - log files     at ${NETDATA_PREFIX}/var/log/netdata
-  - pid file      at ${NETDATA_PREFIX}/var/run
+	  - the daemon    at ${NETDATA_PREFIX}/usr/sbin/netdata
+	  - config files  at ${NETDATA_PREFIX}/etc/netdata
+	  - web files     at ${NETDATA_PREFIX}/usr/share/netdata
+	  - plugins       at ${NETDATA_PREFIX}/usr/libexec/netdata
+	  - cache files   at ${NETDATA_PREFIX}/var/cache/netdata
+	  - db files      at ${NETDATA_PREFIX}/var/lib/netdata
+	  - log files     at ${NETDATA_PREFIX}/var/log/netdata
+	  - pid file      at ${NETDATA_PREFIX}/var/run
 
-This installer allows you to change the installation path.
-Press Control-C and run the same command with --help for help.
+	This installer allows you to change the installation path.
+	Press Control-C and run the same command with --help for help.
 
 BANNER
 
@@ -133,40 +136,40 @@ if [ "${UID}" -ne 0 ]
 	then
 	if [ -z "${NETDATA_PREFIX}" ]
 		then
-		cat <<NONROOTNOPREFIX
+		cat <<-NONROOTNOPREFIX
 
-Sorry! This will fail!
+		Sorry! This will fail!
 
-You are attempting to install netdata as non-root, but you plan to install it
-in system paths.
+		You are attempting to install netdata as non-root, but you plan to install it
+		in system paths.
 
-Please set an installation prefix, like this:
+		Please set an installation prefix, like this:
 
-    $0 ${@} --install /tmp
+			$0 ${@} --install /tmp
 
-or, run the installer as root:
+		or, run the installer as root:
 
-    sudo $0 ${@}
+			sudo $0 ${@}
 
-We suggest to install it as root, or certain data collectors will not be able
-to work. Netdata drops root privileges when running. So, if you plan to keep
-it, install it as root to get the full functionality.
+		We suggest to install it as root, or certain data collectors will not be able
+		to work. Netdata drops root privileges when running. So, if you plan to keep
+		it, install it as root to get the full functionality.
 
 NONROOTNOPREFIX
 		exit 1
 
 	else
-		cat <<NONROOT
+		cat <<-NONROOT
 
-IMPORTANT:
-You are about to install netdata as a non-root user.
-Netdata will work, but a few data collection modules that
-require root access will fail.
+		IMPORTANT:
+		You are about to install netdata as a non-root user.
+		Netdata will work, but a few data collection modules that
+		require root access will fail.
 
-If you installing permanently on your system, run the
-installer like this:
+		If you installing permanently on your system, run the
+		installer like this:
 
-    sudo $0 ${@}
+			sudo $0 ${@}
 
 NONROOT
 	fi
@@ -207,22 +210,22 @@ then
 	else
 		cat <<-"EOF"
 
-	-------------------------------------------------------------------------------
-	autotools 2.60 or later is required
+		-------------------------------------------------------------------------------
+		autotools 2.60 or later is required
 
-	Sorry, you do not seem to have autotools 2.60 or later, which is
-	required to build from the git sources of netdata.
+		Sorry, you do not seem to have autotools 2.60 or later, which is
+		required to build from the git sources of netdata.
 
-	You can either install a suitable version of autotools and automake
-	or download a netdata package which does not have these dependencies.
+		You can either install a suitable version of autotools and automake
+		or download a netdata package which does not have these dependencies.
 
-	Source packages where autotools have already been run are available
-	here:
-	       https://firehol.org/download/netdata/
+		Source packages where autotools have already been run are available
+		here:
+			   https://firehol.org/download/netdata/
 
-	The unsigned/master folder tracks the head of the git tree and released
-	packages are also available.
-	EOF
+		The unsigned/master folder tracks the head of the git tree and released
+		packages are also available.
+EOF
 		exit 1
 	fi
 fi
@@ -238,29 +241,33 @@ if [ ${DONOTWAIT} -eq 0 ]
 fi
 
 build_error() {
-	cat <<EOF
+	cat <<-EOF
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+	^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Sorry! NetData failed to build...
+	Sorry! NetData failed to build...
 
-You many need to check these:
+	You many need to check these:
 
-1. The package zlib1g-dev has to be installed.
+	1. The package uuid-dev (or libuuid-devel) has to be installed.
 
-2. You need basic build tools installed, like:
+	   If your system cannot find libuuid, although it is installed
+	   run me with the option:  --libs-are-really-here
 
-   gcc make autoconf automake pkg-config
+	2. The package zlib1g-dev (or zlib-devel) has to be installed.
 
-   Autoconf version 2.60 or higher is required
+	   If your system cannot find zlib, although it is installed
+	   run me with the option:  --libs-are-really-here
 
-3. If your system cannot find ZLIB, although it is installed
-   run me with the option:  --zlib-is-really-here
+	3. You need basic build tools installed, like:
 
+	   gcc make autoconf automake pkg-config
 
-If you still cannot get it to build, ask for help at github:
+	   Autoconf version 2.60 or higher is required.
 
-   https://github.com/firehol/netdata/issues
+	If you still cannot get it to build, ask for help at github:
+
+	   https://github.com/firehol/netdata/issues
 
 
 EOF
@@ -269,23 +276,38 @@ EOF
 }
 
 run() {
+	printf >>netdata-installer.log "# "
+	printf >>netdata-installer.log "%q " "${@}"
+	printf >>netdata-installer.log " ... "
+
 	printf >&2 "\n"
 	printf >&2 ":-----------------------------------------------------------------------------\n"
 	printf >&2 "Running command:\n"
 	printf >&2 "\n"
 	printf >&2 "%q " "${@}"
 	printf >&2 "\n"
-	printf >&2 "\n"
 
 	"${@}"
+
+	local ret=$?
+	if [ ${ret} -ne 0 ]
+		then
+		printf >>netdata-installer.log "FAILED!\n"
+	else
+		printf >>netdata-installer.log "OK\n"
+	fi
+
+	return ${ret}
 }
 
-if [ ${ZLIB_IS_HERE} -eq 1 ]
+if [ ${LIBS_ARE_HERE} -eq 1 ]
 	then
 	shift
 	echo >&2 "ok, assuming zlib is really installed."
 	export ZLIB_CFLAGS=" "
 	export ZLIB_LIBS="-lz"
+	export UUID_CFLAGS=" "
+	export UUID_LIBS="-luuid"
 fi
 
 trap build_error EXIT
@@ -408,6 +430,7 @@ defport=19999
 NETDATA_PORT="$( config_option "port" ${defport} )"
 
 # directories
+NETDATA_LIB_DIR="$( config_option "lib directory" "${NETDATA_PREFIX}/var/lib/netdata" )"
 NETDATA_CACHE_DIR="$( config_option "cache directory" "${NETDATA_PREFIX}/var/cache/netdata" )"
 NETDATA_WEB_DIR="$( config_option "web files directory" "${NETDATA_PREFIX}/usr/share/netdata/web" )"
 NETDATA_LOG_DIR="$( config_option "log directory" "${NETDATA_PREFIX}/var/log/netdata" )"
@@ -426,7 +449,7 @@ if [ ! -d "${NETDATA_RUN_DIR}" ]
 fi
 
 echo >&2 "Fixing directories (user: ${NETDATA_USER})..."
-for x in "${NETDATA_WEB_DIR}" "${NETDATA_CONF_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}"
+for x in "${NETDATA_WEB_DIR}" "${NETDATA_CONF_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}" "${NETDATA_LIB_DIR}"
 do
 	if [ ! -d "${x}" ]
 		then
@@ -449,9 +472,15 @@ done
 
 if [ ${UID} -eq 0 ]
 	then
-	# fix apps.plugin to be setuid to root
 	run chown root "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
-	run chmod 4755 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+	run chmod 0755 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+	run setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+	if [ $? -ne 0 ]
+		then
+		# fix apps.plugin to be setuid to root
+		run chown root "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+		run chmod 4755 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+	fi
 fi
 
 # -----------------------------------------------------------------------------
@@ -484,6 +513,9 @@ isnetdata() {
 }
 
 
+echo >&2
+echo >&2 "-------------------------------------------------------------------------------"
+echo >&2
 printf >&2 "Stopping a (possibly) running netdata..."
 ret=0
 count=0
@@ -532,6 +564,7 @@ if [ $? -ne 0 ]
 else
 	echo >&2 "OK. NetData Started!"
 fi
+echo >&2
 
 
 # -----------------------------------------------------------------------------
@@ -539,6 +572,9 @@ fi
 
 if [ ! -s "${NETDATA_PREFIX}/etc/netdata/netdata.conf" ]
 	then
+	echo >&2
+	echo >&2 "-------------------------------------------------------------------------------"
+	echo >&2
 	echo >&2 "Downloading default configuration from netdata..."
 	sleep 5
 
@@ -580,36 +616,36 @@ fi
 # Check for KSM
 
 ksm_is_available_but_disabled() {
-	cat <<KSM1
+	cat <<-KSM1
 
--------------------------------------------------------------------------------
-Memory de-duplication instructions
+	-------------------------------------------------------------------------------
+	Memory de-duplication instructions
 
-I see you have kernel memory de-duper (called Kernel Same-page Merging,
-or KSM) available, but it is not currently enabled.
+	I see you have kernel memory de-duper (called Kernel Same-page Merging,
+	or KSM) available, but it is not currently enabled.
 
-To enable it run:
+	To enable it run:
 
-echo 1 >/sys/kernel/mm/ksm/run
-echo 1000 >/sys/kernel/mm/ksm/sleep_millisecs
+	echo 1 >/sys/kernel/mm/ksm/run
+	echo 1000 >/sys/kernel/mm/ksm/sleep_millisecs
 
-If you enable it, you will save 40-60% of netdata memory.
+	If you enable it, you will save 40-60% of netdata memory.
 
 KSM1
 }
 
 ksm_is_not_available() {
-	cat <<KSM2
+	cat <<-KSM2
 
--------------------------------------------------------------------------------
-Memory de-duplication not present in your kernel
+	-------------------------------------------------------------------------------
+	Memory de-duplication not present in your kernel
 
-It seems you do not have kernel memory de-duper (called Kernel Same-page
-Merging, or KSM) available.
+	It seems you do not have kernel memory de-duper (called Kernel Same-page
+	Merging, or KSM) available.
 
-To enable it, you need a kernel built with CONFIG_KSM=y
+	To enable it, you need a kernel built with CONFIG_KSM=y
 
-If you can have it, you will save 40-60% of netdata memory.
+	If you can have it, you will save 40-60% of netdata memory.
 
 KSM2
 }
@@ -629,18 +665,18 @@ fi
 
 if [ ! -s web/version.txt ]
 	then
-cat <<VERMSG
+	cat <<-VERMSG
 
--------------------------------------------------------------------------------
-Version update check warning
+	-------------------------------------------------------------------------------
+	Version update check warning
 
-The way you downloaded netdata, we cannot find its version. This means the
-Update check on the dashboard, will not work.
+	The way you downloaded netdata, we cannot find its version. This means the
+	Update check on the dashboard, will not work.
 
-If you want to have version update check, please re-install it
-following the procedure in:
+	If you want to have version update check, please re-install it
+	following the procedure in:
 
-https://github.com/firehol/netdata/wiki/Installation
+	https://github.com/firehol/netdata/wiki/Installation
 
 VERMSG
 fi
@@ -650,23 +686,31 @@ fi
 
 if [ "${UID}" -ne 0 ]
 	then
-cat <<SETUID_WARNING
+	cat <<-SETUID_WARNING
 
--------------------------------------------------------------------------------
-apps.plugin needs privileges
+	-------------------------------------------------------------------------------
+	apps.plugin needs privileges
 
-Since you have installed netdata as a normal user, to have apps.plugin collect
-all the needed data, you have to give it the access rights it needs, by running
-these commands:
+	Since you have installed netdata as a normal user, to have apps.plugin collect
+	all the needed data, you have to give it the access rights it needs, by running
+	either of the following sets of commands:
 
-	sudo chown root "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
-	sudo chmod 4755 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+	To run apps.plugin with escalated capabilities:
 
-The commands allow apps.plugin to run as root.
+		sudo chown root:${NETDATA_USER} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+		sudo chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+		sudo setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
 
-apps.plugin is performing a hard-coded function of data collection for all
-running processes. It cannot be instructed from the netdata daemon to perform
-any task, so it is pretty safe to do this.
+	or, to run apps.plugin as root:
+
+		sudo chown root "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+		sudo chmod 4755 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+
+	These commands allow apps.plugin to run as root.
+
+	apps.plugin is performing a hard-coded function of data collection for all
+	running processes. It cannot be instructed from the netdata daemon to perform
+	any task, so it is pretty safe to do this.
 
 SETUID_WARNING
 fi
@@ -674,79 +718,80 @@ fi
 # -----------------------------------------------------------------------------
 # Keep un-install info
 
-cat >netdata-uninstaller.sh <<UNINSTALL
-#!/bin/bash
+cat >netdata-uninstaller.sh <<-UNINSTALL
+	#!/bin/bash
 
-# this script will uninstall netdata
+	# this script will uninstall netdata
 
-if [ "\$1" != "--force" ]
-	then
-	echo >&2 "This script will REMOVE netdata from your system."
-	echo >&2 "Run it again with --force to do it."
-	exit 1
-fi
+	if [ "\$1" != "--force" ]
+		then
+		echo >&2 "This script will REMOVE netdata from your system."
+		echo >&2 "Run it again with --force to do it."
+		exit 1
+	fi
 
-echo >&2 "Stopping a possibly running netdata..."
-killall netdata
-sleep 2
+	echo >&2 "Stopping a possibly running netdata..."
+	killall netdata
+	sleep 2
 
-deletedir() {
-	if [ ! -z "\$1" -a -d "\$1" ]
+	deletedir() {
+		if [ ! -z "\$1" -a -d "\$1" ]
+			then
+			echo
+			echo "Deleting directory '\$1' ..."
+			rm -I -R "\$1"
+		fi
+	}
+
+	if [ ! -z "${NETDATA_PREFIX}" -a -d "${NETDATA_PREFIX}" ]
+		then
+		# installation prefix was given
+
+		deletedir "${NETDATA_PREFIX}"
+
+	else
+		# installation prefix was NOT given
+
+		if [ -f "${NETDATA_PREFIX}/usr/sbin/netdata" ]
+			then
+			echo "Deleting ${NETDATA_PREFIX}/usr/sbin/netdata ..."
+			rm -i "${NETDATA_PREFIX}/usr/sbin/netdata"
+		fi
+
+		deletedir "${NETDATA_PREFIX}/etc/netdata"
+		deletedir "${NETDATA_PREFIX}/usr/share/netdata"
+		deletedir "${NETDATA_PREFIX}/usr/libexec/netdata"
+		deletedir "${NETDATA_PREFIX}/var/lib/netdata"
+		deletedir "${NETDATA_PREFIX}/var/cache/netdata"
+		deletedir "${NETDATA_PREFIX}/var/log/netdata"
+	fi
+
+	getent passwd netdata > /dev/null
+	if [ $? -eq 0 ]
 		then
 		echo
-		echo "Deleting directory '\$1' ..."
-		rm -I -R "\$1"
+		echo "You may also want to remove the user netdata"
+		echo "by running:"
+		echo "   userdel netdata"
 	fi
-}
 
-if [ ! -z "${NETDATA_PREFIX}" -a -d "${NETDATA_PREFIX}" ]
-	then
-	# installation prefix was given
-
-	deletedir "${NETDATA_PREFIX}"
-
-else
-	# installation prefix was NOT given
-
-	if [ -f "${NETDATA_PREFIX}/usr/sbin/netdata" ]
+	getent group netdata > /dev/null
+	if [ $? -eq 0 ]
 		then
-		echo "Deleting ${NETDATA_PREFIX}/usr/sbin/netdata ..."
-		rm -i "${NETDATA_PREFIX}/usr/sbin/netdata"
+		echo
+		echo "You may also want to remove the group netdata"
+		echo "by running:"
+		echo "   groupdel netdata"
 	fi
 
-	deletedir "${NETDATA_PREFIX}/etc/netdata"
-	deletedir "${NETDATA_PREFIX}/usr/share/netdata"
-	deletedir "${NETDATA_PREFIX}/usr/libexec/netdata"
-	deletedir "${NETDATA_PREFIX}/var/cache/netdata"
-	deletedir "${NETDATA_PREFIX}/var/log/netdata"
-fi
-
-getent passwd netdata > /dev/null
-if [ $? -eq 0 ]
-	then
-	echo
-	echo "You may also want to remove the user netdata"
-	echo "by running:"
-	echo "   userdel netdata"
-fi
-
-getent group netdata > /dev/null
-if [ $? -eq 0 ]
-	then
-	echo
-	echo "You may also want to remove the group netdata"
-	echo "by running:"
-	echo "   groupdel netdata"
-fi
-
-getent group docker > /dev/null
-if [ $? -eq 0 -a "${NETDATA_ADDED_TO_DOCKER}" = "1" ]
-	then
-	echo
-	echo "You may also want to remove the netdata user from the docker group"
-	echo "by running:"
-	echo "   gpasswd -d netdata docker"
-fi
+	getent group docker > /dev/null
+	if [ $? -eq 0 -a "${NETDATA_ADDED_TO_DOCKER}" = "1" ]
+		then
+		echo
+		echo "You may also want to remove the netdata user from the docker group"
+		echo "by running:"
+		echo "   gpasswd -d netdata docker"
+	fi
 
 UNINSTALL
 chmod 750 netdata-uninstaller.sh
@@ -760,33 +805,28 @@ else
 	access="${NETDATA_BIND}"
 fi
 
-cat <<END
+cat <<-END
 
 
--------------------------------------------------------------------------------
+	-------------------------------------------------------------------------------
 
-OK. NetData is installed and it is running (listening to ${NETDATA_BIND}:${NETDATA_PORT}).
+	OK. NetData is installed and it is running (listening to ${NETDATA_BIND}:${NETDATA_PORT}).
 
--------------------------------------------------------------------------------
-
-
-Hit http://${access}:${NETDATA_PORT}/ from your browser.
-
-To stop netdata, just kill it, with:
-
-  killall netdata
-
-To start it, just run it:
-
-  ${NETDATA_PREFIX}/usr/sbin/netdata
+	-------------------------------------------------------------------------------
 
 
-Enjoy!
+	Hit http://${access}:${NETDATA_PORT}/ from your browser.
 
-                 Give netdata a Github Star, at:
+	To stop netdata, just kill it, with:
 
-             https://github.com/firehol/netdata/wiki
+	  killall netdata
 
+	To start it, just run it:
+
+	  ${NETDATA_PREFIX}/usr/sbin/netdata
+
+
+	Enjoy!
 
 END
 echo >&2 "Uninstall script generated: ./netdata-uninstaller.sh"

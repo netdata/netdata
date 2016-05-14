@@ -67,7 +67,6 @@ int create_listen_socket4(const char *ip, int port, int listen_backlog)
 {
 	int sock;
 	int sockopt = 1;
-	struct sockaddr_in name;
 
 	debug(D_LISTENER, "IPv4 creating new listening socket on port %d", port);
 
@@ -80,6 +79,7 @@ int create_listen_socket4(const char *ip, int port, int listen_backlog)
 	/* avoid "address already in use" */
 	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt));
 
+	struct sockaddr_in name;
 	memset(&name, 0, sizeof(struct sockaddr_in));
 	name.sin_family = AF_INET;
 	name.sin_port = htons (port);
@@ -118,7 +118,6 @@ int create_listen_socket6(const char *ip, int port, int listen_backlog)
 {
 	int sock = -1;
 	int sockopt = 1;
-	struct sockaddr_in6 name;
 
 	debug(D_LISTENER, "IPv6 creating new listening socket on port %d", port);
 
@@ -131,6 +130,7 @@ int create_listen_socket6(const char *ip, int port, int listen_backlog)
 	/* avoid "address already in use" */
 	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt));
 
+	struct sockaddr_in6 name;
 	memset(&name, 0, sizeof(struct sockaddr_in6));
 	name.sin6_family = AF_INET6;
 	name.sin6_port = htons ((uint16_t) port);
