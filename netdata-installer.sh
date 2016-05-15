@@ -459,6 +459,7 @@ if [ ! -d "${NETDATA_RUN_DIR}" ]
 	mkdir -p "${NETDATA_RUN_DIR}" || exit 1
 fi
 
+echo >&2
 echo >&2 "Fixing directories (user: ${NETDATA_USER})..."
 for x in "${NETDATA_WEB_DIR}" "${NETDATA_CONF_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}" "${NETDATA_LIB_DIR}"
 do
