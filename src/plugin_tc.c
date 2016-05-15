@@ -83,8 +83,6 @@ struct tc_device *tc_device_root = NULL;
 // ----------------------------------------------------------------------------
 // tc_device index
 
-static int tc_device_iterator(avl *a) { if(a) {}; return 0; }
-
 static int tc_device_compare(void* a, void* b) {
 	if(((struct tc_device *)a)->hash < ((struct tc_device *)b)->hash) return -1;
 	else if(((struct tc_device *)a)->hash > ((struct tc_device *)b)->hash) return 1;
@@ -100,19 +98,16 @@ avl_tree tc_device_root_index = {
 #define tc_device_index_del(st) avl_remove(&tc_device_root_index, (avl *)(st))
 
 static inline struct tc_device *tc_device_index_find(const char *id, uint32_t hash) {
-	struct tc_device *result = NULL, tmp;
+	struct tc_device tmp;
 	tmp.id = (char *)id;
 	tmp.hash = (hash)?hash:simple_hash(tmp.id);
 
-	avl_search(&(tc_device_root_index), (avl *) &tmp, tc_device_iterator, (avl **) &result);
-	return result;
+	return (struct tc_device *)avl_search(&(tc_device_root_index), (avl *)&tmp);
 }
 
 
 // ----------------------------------------------------------------------------
 // tc_class index
-
-static int tc_class_iterator(avl *a) { if(a) {}; return 0; }
 
 static int tc_class_compare(void* a, void* b) {
 	if(((struct tc_class *)a)->hash < ((struct tc_class *)b)->hash) return -1;
@@ -124,12 +119,11 @@ static int tc_class_compare(void* a, void* b) {
 #define tc_class_index_del(st, rd) avl_remove(&((st)->classes_index), (avl *)(rd))
 
 static inline struct tc_class *tc_class_index_find(struct tc_device *st, const char *id, uint32_t hash) {
-	struct tc_class *result = NULL, tmp;
+	struct tc_class tmp;
 	tmp.id = (char *)id;
 	tmp.hash = (hash)?hash:simple_hash(tmp.id);
 
-	avl_search(&(st->classes_index), (avl *) &tmp, tc_class_iterator, (avl **) &result);
-	return result;
+	return (struct tc_class *)avl_search(&(st->classes_index), (avl *) &tmp);
 }
 
 // ----------------------------------------------------------------------------

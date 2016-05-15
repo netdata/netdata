@@ -1005,7 +1005,7 @@ avl_tree all_files_index = {
 };
 
 static struct file_descriptor *file_descriptor_find(const char *name, uint32_t hash) {
-	struct file_descriptor *result = NULL, tmp;
+	struct file_descriptor tmp;
 	tmp.hash = (hash)?hash:simple_hash(name);
 	tmp.name = name;
 	tmp.count = 0;
@@ -1014,8 +1014,7 @@ static struct file_descriptor *file_descriptor_find(const char *name, uint32_t h
 	tmp.magic = 0x0BADCAFE;
 #endif /* NETDATA_INTERNAL_CHECKS */
 
-	avl_search(&all_files_index, (avl *) &tmp, file_descriptor_iterator, (avl **) &result);
-	return result;
+	return (struct file_descriptor *)avl_search(&all_files_index, (avl *) &tmp);
 }
 
 #define file_descriptor_add(fd) avl_insert(&all_files_index, (avl *)(fd))
