@@ -303,7 +303,7 @@ run() {
 if [ ${LIBS_ARE_HERE} -eq 1 ]
 	then
 	shift
-	echo >&2 "ok, assuming zlib is really installed."
+	echo >&2 "ok, assuming libs are really installed."
 	export ZLIB_CFLAGS=" "
 	export ZLIB_LIBS="-lz"
 	export UUID_CFLAGS=" "
@@ -337,11 +337,16 @@ echo >&2 "Compiling netdata ..."
 run make || exit 1
 
 # backup user configurations
+installer_backup_suffix="${PID}.${RANDOM}"
 for x in apps_groups.conf charts.d.conf
 do
 	if [ -f "${NETDATA_PREFIX}/etc/netdata/${x}" ]
 		then
-		cp -p "${NETDATA_PREFIX}/etc/netdata/${x}" "${NETDATA_PREFIX}/etc/netdata/${x}.installer_backup"
+		cp -p "${NETDATA_PREFIX}/etc/netdata/${x}" "${NETDATA_PREFIX}/etc/netdata/${x}.installer_backup.${installer_backup_suffix}"
+
+	elif [ -f "${NETDATA_PREFIX}/etc/netdata/${x}.installer_backup.${installer_backup_suffix}" ]
+		then
+		rm -f "${NETDATA_PREFIX}/etc/netdata/${x}.installer_backup.${installer_backup_suffix}"
 	fi
 done
 
@@ -351,9 +356,9 @@ run make install || exit 1
 # restore user configurations
 for x in apps_groups.conf charts.d.conf
 do
-	if [ -f "${NETDATA_PREFIX}/etc/netdata/${x}.installer_backup" ]
+	if [ -f "${NETDATA_PREFIX}/etc/netdata/${x}.installer_backup.${installer_backup_suffix}" ]
 		then
-		cp -p "${NETDATA_PREFIX}/etc/netdata/${x}.installer_backup" "${NETDATA_PREFIX}/etc/netdata/${x}"
+		cp -p "${NETDATA_PREFIX}/etc/netdata/${x}.installer_backup.${installer_backup_suffix}" "${NETDATA_PREFIX}/etc/netdata/${x}"
 	fi
 done
 
@@ -390,6 +395,12 @@ if [ ${UID} -eq 0 ]
 		fi
 		# let the uninstall script know
 		NETDATA_ADDED_TO_DOCKER=1
+	fi
+
+	if [ -d /etc/logrotate.d -a ! -f /etc/logrotate.d/netdata ]
+		then
+		echo >&2 "Adding netdata logrotate configuration ..."
+		run cp system/netdata.logrotate /etc/logrotate.d/netdata
 	fi
 fi
 
@@ -448,6 +459,7 @@ if [ ! -d "${NETDATA_RUN_DIR}" ]
 	mkdir -p "${NETDATA_RUN_DIR}" || exit 1
 fi
 
+echo >&2
 echo >&2 "Fixing directories (user: ${NETDATA_USER})..."
 for x in "${NETDATA_WEB_DIR}" "${NETDATA_CONF_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}" "${NETDATA_LIB_DIR}"
 do
@@ -706,8 +718,6 @@ if [ "${UID}" -ne 0 ]
 		sudo chown root "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
 		sudo chmod 4755 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
 
-	These commands allow apps.plugin to run as root.
-
 	apps.plugin is performing a hard-coded function of data collection for all
 	running processes. It cannot be instructed from the netdata daemon to perform
 	any task, so it is pretty safe to do this.
@@ -764,6 +774,12 @@ cat >netdata-uninstaller.sh <<-UNINSTALL
 		deletedir "${NETDATA_PREFIX}/var/lib/netdata"
 		deletedir "${NETDATA_PREFIX}/var/cache/netdata"
 		deletedir "${NETDATA_PREFIX}/var/log/netdata"
+	fi
+
+	if [ -f /etc/logrotate.d/netdata ]
+		then
+		echo "Deleting /etc/logrotate.d/netdata ..."
+		rm -i /etc/logrotate.d/netdata
 	fi
 
 	getent passwd netdata > /dev/null
