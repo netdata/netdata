@@ -40,8 +40,6 @@ static inline void dictionary_unlock(DICTIONARY *dict) {
 // ----------------------------------------------------------------------------
 // avl index
 
-static int name_value_iterator(avl *a) { if(a) {}; return 0; }
-
 static int name_value_compare(void* a, void* b) {
 	if(((NAME_VALUE *)a)->hash < ((NAME_VALUE *)b)->hash) return -1;
 	else if(((NAME_VALUE *)a)->hash > ((NAME_VALUE *)b)->hash) return 1;
@@ -52,14 +50,12 @@ static int name_value_compare(void* a, void* b) {
 #define dictionary_name_value_index_del_nolock(dict, nv) do { (dict)->deletes++; avl_remove(&(dict->values_index), (avl *)(nv)); } while(0)
 
 static inline NAME_VALUE *dictionary_name_value_index_find_nolock(DICTIONARY *dict, const char *name, uint32_t hash) {
-	NAME_VALUE *result = NULL, tmp;
+	NAME_VALUE tmp;
 	tmp.hash = (hash)?hash:simple_hash(name);
 	tmp.name = (char *)name;
 
 	dict->searches++;
-	avl_search(&(dict->values_index), (avl *) &tmp, name_value_iterator, (avl **) &result);
-
-	return result;
+	return (NAME_VALUE *)avl_search(&(dict->values_index), (avl *) &tmp);
 }
 
 // ----------------------------------------------------------------------------

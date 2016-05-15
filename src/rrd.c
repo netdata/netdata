@@ -42,8 +42,6 @@ int rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
 // ----------------------------------------------------------------------------
 // RRDSET index
 
-static int rrdset_iterator(avl *a) { if(a) {}; return 0; }
-
 static int rrdset_compare(void* a, void* b) {
 	if(((RRDSET *)a)->hash < ((RRDSET *)b)->hash) return -1;
 	else if(((RRDSET *)a)->hash > ((RRDSET *)b)->hash) return 1;
@@ -59,20 +57,17 @@ avl_tree_lock rrdset_root_index = {
 #define rrdset_index_del(st) avl_remove_lock(&rrdset_root_index, (avl *)(st))
 
 static RRDSET *rrdset_index_find(const char *id, uint32_t hash) {
-	RRDSET *result = NULL, tmp;
+	RRDSET tmp;
 	strncpyz(tmp.id, id, RRD_ID_LENGTH_MAX);
 	tmp.hash = (hash)?hash:simple_hash(tmp.id);
 
-	avl_search_lock(&(rrdset_root_index), (avl *) &tmp, rrdset_iterator, (avl **) &result);
-	return result;
+	return (RRDSET *)avl_search_lock(&(rrdset_root_index), (avl *) &tmp);
 }
 
 // ----------------------------------------------------------------------------
 // RRDSET name index
 
 #define rrdset_from_avlname(avlname_ptr) ((RRDSET *)((avlname_ptr) - offsetof(RRDSET, avlname)))
-
-static int rrdset_iterator_name(avl *a) { if(a) {}; return 0; }
 
 static int rrdset_compare_name(void* a, void* b) {
 	RRDSET *A = rrdset_from_avlname(a);
@@ -104,7 +99,7 @@ static RRDSET *rrdset_index_find_name(const char *name, uint32_t hash) {
 	tmp.hash_name = (hash)?hash:simple_hash(tmp.name);
 
 	// fprintf(stderr, "SEARCHING: %s\n", name);
-	avl_search_lock(&(rrdset_root_index_name), (avl *) (&(tmp.avlname)), rrdset_iterator_name, (avl **) &result);
+	result = avl_search_lock(&(rrdset_root_index_name), (avl *) (&(tmp.avlname)));
 	if(result) {
 		RRDSET *st = rrdset_from_avlname(result);
 		if(strcmp(st->magic, RRDSET_MAGIC))
@@ -121,8 +116,6 @@ static RRDSET *rrdset_index_find_name(const char *name, uint32_t hash) {
 // ----------------------------------------------------------------------------
 // RRDDIM index
 
-static int rrddim_iterator(avl *a) { if(a) {}; return 0; }
-
 static int rrddim_compare(void* a, void* b) {
 	if(((RRDDIM *)a)->hash < ((RRDDIM *)b)->hash) return -1;
 	else if(((RRDDIM *)a)->hash > ((RRDDIM *)b)->hash) return 1;
@@ -133,12 +126,11 @@ static int rrddim_compare(void* a, void* b) {
 #define rrddim_index_del(st,rd ) avl_remove_lock(&((st)->dimensions_index), (avl *)(rd))
 
 static RRDDIM *rrddim_index_find(RRDSET *st, const char *id, uint32_t hash) {
-	RRDDIM *result = NULL, tmp;
+	RRDDIM tmp;
 	strncpyz(tmp.id, id, RRD_ID_LENGTH_MAX);
 	tmp.hash = (hash)?hash:simple_hash(tmp.id);
 
-	avl_search_lock(&(st->dimensions_index), (avl *) &tmp, rrddim_iterator, (avl **) &result);
-	return result;
+	return (RRDDIM *)avl_search_lock(&(st->dimensions_index), (avl *) &tmp);
 }
 
 // ----------------------------------------------------------------------------
