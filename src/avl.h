@@ -93,8 +93,8 @@ int avl_range(avl_tree *t, avl *a, avl *b, int (*iter)(avl *), avl **ret);
  * for each element calls iter(a) until it returns 0
  * returns the last value returned by iterator or 0 if there were no calls
  */
-#define avl_search_lock(t, a, iter, ret) avl_range_lock(t, a, a, iter, ret)
-#define avl_search(t, a, iter, ret) avl_range(t, a, a, iter, ret)
+avl *avl_search_lock(avl_tree_lock *t, avl *a);
+avl *avl_search(avl_tree *t, avl *a);
 
 /* Initialize the avl_tree_lock
  */

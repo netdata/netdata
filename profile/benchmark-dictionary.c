@@ -22,14 +22,14 @@ struct myvalue {
 int main(int argc, char **argv) {
 	if(argc || argv) {;}
 
-	DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_NAME_CORRUPTION_CHECK);
+	DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
 	if(!dict) fatal("Cannot create dictionary.");
 
 	struct rusage start, end;
 	unsigned long long dt;
 	char buf[100 + 1];
 	struct myvalue value, *v;
-	int i, max = 100000, max2;
+	int i, max = 10000000, max2;
 
 	// ------------------------------------------------------------------------
 

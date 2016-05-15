@@ -309,6 +309,29 @@ int avl_range(avl_tree* t, avl* a, avl* b, int (*iter)(avl*), avl** ret) {
 	return c;
 }
 
+/* high performance searching - by ktsaou */
+avl *avl_search(avl_tree *t, avl *a) {
+	avl *root = t->root;
+
+	while(root) {
+		int x = t->compar(root, a);
+
+		if(x > 0) {
+			root = root->left;
+			continue;
+		}
+
+		if(x < 0) {
+			root = root->right;
+			continue;
+		}
+
+		return root;
+	}
+
+	return NULL;
+}
+
 void avl_init(avl_tree *t, int (*compar)(void *a, void *b)) {
 	t->root = NULL;
 	t->compar = compar;
@@ -364,6 +387,13 @@ void avl_init_lock(avl_tree_lock *t, int (*compar)(void *a, void *b)) {
 		fatal("Failed to initialize AVL mutex/rwlock, error: %d", lock);
 
 #endif /* AVL_WITHOUT_PTHREADS */
+}
+
+avl *avl_search_lock(avl_tree_lock *t, avl *a) {
+	avl_read_lock(t);
+	avl *ret = avl_search(&t->avl_tree, a);
+	avl_unlock(t);
+	return ret;
 }
 
 int avl_range_lock(avl_tree_lock *t, avl *a, avl *b, int (*iter)(avl *), avl **ret) {
