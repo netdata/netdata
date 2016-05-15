@@ -84,8 +84,6 @@ static inline void config_section_unlock(struct config *co) {
 // ----------------------------------------------------------------------------
 // config name-value index
 
-static int config_value_iterator(avl *a) { if(a) {}; return 0; }
-
 static int config_value_compare(void* a, void* b) {
 	if(((struct config_value *)a)->hash < ((struct config_value *)b)->hash) return -1;
 	else if(((struct config_value *)a)->hash > ((struct config_value *)b)->hash) return 1;
@@ -96,19 +94,16 @@ static int config_value_compare(void* a, void* b) {
 #define config_value_index_del(co, cv) avl_remove_lock(&((co)->values_index), (avl *)(cv))
 
 static struct config_value *config_value_index_find(struct config *co, const char *name, uint32_t hash) {
-	struct config_value *result = NULL, tmp;
+	struct config_value tmp;
 	tmp.hash = (hash)?hash:simple_hash(name);
 	tmp.name = (char *)name;
 
-	avl_search_lock(&(co->values_index), (avl *) &tmp, config_value_iterator, (avl **) &result);
-	return result;
+	return (struct config_value *)avl_search_lock(&(co->values_index), (avl *) &tmp);
 }
 
 
 // ----------------------------------------------------------------------------
 // config sections index
-
-static int config_iterator(avl *a) { if(a) {}; return 0; }
 
 static int config_compare(void* a, void* b) {
 	if(((struct config *)a)->hash < ((struct config *)b)->hash) return -1;
@@ -125,12 +120,11 @@ avl_tree_lock config_root_index = {
 #define config_index_del(cfg) avl_remove_lock(&config_root_index, (avl *)(cfg))
 
 static struct config *config_index_find(const char *name, uint32_t hash) {
-	struct config *result = NULL, tmp;
+	struct config tmp;
 	tmp.hash = (hash)?hash:simple_hash(name);
 	tmp.name = (char *)name;
 
-	avl_search_lock(&config_root_index, (avl *) &tmp, config_iterator, (avl **) &result);
-	return result;
+	return (struct config *)avl_search_lock(&config_root_index, (avl *) &tmp);
 }
 
 
