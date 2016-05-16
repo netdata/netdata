@@ -1,0 +1,4 @@
+site_name: Netdata
+theme: readthedocs
+markdown_extensions:
+    - wikilinks
