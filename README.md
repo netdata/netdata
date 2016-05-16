@@ -2,13 +2,21 @@
 
 # netdata
 
-##### 320.000+ views, 92.000+ visitors, 28.500+ downloads, 11.000+ github stars, 700+ forks, 1 month!
+May 16th, 2016
+
+##### **netdata v1.2.0 released!**
+
+**[Check it here](https://github.com/firehol/netdata/releases)**
+
+---
+
+May 1st, 2016
+
+##### **320.000+ views, 92.000+ visitors, 28.500+ downloads, 11.000+ github stars, 700+ forks, 1 month!**
 
 And it still runs with 600+ git downloads... per day!
 
 **[Check what our users say about netdata](https://github.com/firehol/netdata/issues/148)**.
-
-Thank you!
 
 ---
 
