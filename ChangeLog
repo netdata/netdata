@@ -1,3 +1,70 @@
+netdata (1.2.0) - 2016-05-16
+
+ At a glance:
+
+ - netdata is now 30% faster
+ - netdata now has a registry (my-netdata dashboard menu)
+ - netdata now monitors Linux Containers (docker, lxc, etc)
+
+ IMPORTANT:
+ This version requires libuuid. The package you need is:
+
+  - uuid-dev (debian/ubuntu), or
+  - libuuid-devel (centos/fedora/redhat)
+
+ In detail:
+
+ * netdata is now 30% faster !
+
+   - Patches submitted by @fredericopissarra improved overall
+     netdata performance by 10%.
+
+   - A new improved search function in the internal indexes
+     made all searches faster by 50%, resulting in about
+     20% better performance for the core of netdata.
+
+   - More efficient threads locking in key components
+     contributed to the overal efficiency.
+
+ * netdata now has a CENTRAL REGISTRY !
+
+   The central registry tracks all your netdata servers
+   and bookmarks them for you at the 'my-netdata' menu
+   on all dashboards.
+
+   Every netdata can act as a registry, but there is also
+   a global registry provided for free for all netdata users!
+
+ * netdata now monitors CONTAINERS !
+   
+   docker, lxc, or anything else. For each container it monitors
+   CPU, RAM, DISK I/O (network interfaces were already monitored)
+
+ * apps.plugin: now uses linux capabilities by default
+   without setuid to root
+
+ * netdata has now an improved signal handler
+   thanks to @simonnagl
+
+ * API: new improved CORS support
+
+ * SNMP: counter64 support fixed
+
+ * MYSQL: more charts, about QCache, MyISAM key cache,
+   InnoDB buffer pools, open files
+
+ * DISK charts now show mount point when available
+
+ * Dashboard: improved support for older web browsers
+   and mobile web browsers (thanks to @simonnagl)
+
+ * Multi-server dashboards now allow de-coupled refreshes for
+   each chart, so that if one netdata has a network latency
+   the other charts are not affected
+
+ * Several other minor improvements and bugfixes
+ 
+ 
 netdata (1.1.0) - 2016-04-20
 
  Dozens of commits that improve netdata in several ways:
