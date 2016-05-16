@@ -2,11 +2,14 @@
 
 # netdata
 
-May 16th, 2016
-
-##### netdata v1.2.0 released!
-
-**[Check it here](https://github.com/firehol/netdata/releases)**
+> May 16th, 2016
+>
+> [netdata v1.2.0 released!](https://github.com/firehol/netdata/releases)
+>
+> - 30% faster!
+> - **[netdata registry](https://github.com/firehol/netdata/wiki/mynetdata-menu-item)**, the first step towards scaling out performance monitoring!
+> - real-time Linux Containers monitoring!
+> - dozens of additional new features, optimizations, bug-fixes
 
 ---
 
