@@ -136,21 +136,28 @@ struct disk *get_disk(unsigned long major, unsigned long minor) {
 int do_proc_diskstats(int update_every, unsigned long long dt) {
 	static procfile *ff = NULL;
 	static char path_to_get_hw_sector_size[FILENAME_MAX + 1] = "";
-	static int enable_new_disks = -1;
-	static int do_io = -1, do_ops = -1, do_mops = -1, do_iotime = -1, do_qops = -1, do_util = -1, do_backlog = -1, do_space = -1;
+	static int enable_autodetection;
+	static int enable_physical_disks, enable_virtual_disks, enable_partitions, enable_mountpoints, enable_space_metrics;
+	static int do_io, do_ops, do_mops, do_iotime, do_qops, do_util, do_backlog, do_space;
 	static struct statvfs buff_statvfs;
 	static struct stat buff_stat;
 
-	if(enable_new_disks == -1)	enable_new_disks = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "enable new disks detected at runtime", CONFIG_ONDEMAND_ONDEMAND);
+	enable_autodetection = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "enable new disks detected at runtime", CONFIG_ONDEMAND_ONDEMAND);
 
-	if(do_io == -1)		do_io 		= config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "bandwidth for all disks", CONFIG_ONDEMAND_ONDEMAND);
-	if(do_ops == -1)	do_ops 		= config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "operations for all disks", CONFIG_ONDEMAND_ONDEMAND);
-	if(do_mops == -1)	do_mops 	= config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "merged operations for all disks", CONFIG_ONDEMAND_ONDEMAND);
-	if(do_iotime == -1)	do_iotime 	= config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "i/o time for all disks", CONFIG_ONDEMAND_ONDEMAND);
-	if(do_qops == -1)	do_qops 	= config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "queued operations for all disks", CONFIG_ONDEMAND_ONDEMAND);
-	if(do_util == -1)	do_util 	= config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "utilization percentage for all disks", CONFIG_ONDEMAND_ONDEMAND);
-	if(do_backlog == -1)do_backlog 	= config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "backlog for all disks", CONFIG_ONDEMAND_ONDEMAND);
-	if(do_space == -1)  do_space 	= config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "space usage for all disks", CONFIG_ONDEMAND_ONDEMAND);
+	enable_physical_disks = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for physical disks", CONFIG_ONDEMAND_ONDEMAND);
+	enable_virtual_disks = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for virtual disks", CONFIG_ONDEMAND_NO);
+	enable_partitions = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for partitions", CONFIG_ONDEMAND_NO);
+	enable_mountpoints = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for mounted filesystems", CONFIG_ONDEMAND_NO);
+	enable_space_metrics = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "space metrics for mounted filesystems", CONFIG_ONDEMAND_ONDEMAND);
+
+	do_io 	   = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "bandwidth for all disks", CONFIG_ONDEMAND_ONDEMAND);
+	do_ops 	   = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "operations for all disks", CONFIG_ONDEMAND_ONDEMAND);
+	do_mops    = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "merged operations for all disks", CONFIG_ONDEMAND_ONDEMAND);
+	do_iotime  = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "i/o time for all disks", CONFIG_ONDEMAND_ONDEMAND);
+	do_qops    = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "queued operations for all disks", CONFIG_ONDEMAND_ONDEMAND);
+	do_util    = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "utilization percentage for all disks", CONFIG_ONDEMAND_ONDEMAND);
+	do_backlog = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "backlog for all disks", CONFIG_ONDEMAND_ONDEMAND);
+	do_space   = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "space usage for all disks", CONFIG_ONDEMAND_ONDEMAND);
 
 	if(!ff) {
 		char filename[FILENAME_MAX + 1];
@@ -172,6 +179,8 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 	uint32_t words;
 
 	for(l = 0; l < lines ;l++) {
+		// --------------------------------------------------------------------------
+		// Read parameters
 		char *disk;
 		unsigned long long 	major = 0, minor = 0,
 							reads = 0,  mreads = 0,  readsectors = 0,  readms = 0,
@@ -230,271 +239,49 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 		// I/O completion time and the backlog that may be accumulating.
 		backlog_ms 		= strtoull(procfile_lineword(ff, l, 13), NULL, 10);	// rq_ticks
 
-		int def_enabled = 0;
-
+		// --------------------------------------------------------------------------
 		// remove slashes from disk names
 		char *s;
 		for(s = disk; *s ;s++) if(*s == '/') *s = '_';
-
 		struct disk *d = get_disk(major, minor);
-
-		// Enable statistics for physical disks and mount points by default.
-		if( (d->type == DISK_TYPE_PHYSICAL) || (d->mount_point != NULL) ) {
-			def_enabled = enable_new_disks;
-		}
-
-		/*
-		// Enable physical disks by default.
-		// To fine out if it is a harddrive we use
-		// Linux Assigned Names and Numbers Authority (http://www.lanana.org/)
-		// We can't do that because proprietary disk drivers do not stick to
-		// the standard. To detect re
-		switch(major) {
-			case 8: // SCSI disk devices (0-15)
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 21: // Acorn MFM hard drive interface
-				if(!(minor % 64)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 28: // ACSI disk (68k/Atari)
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 36: // MCA ESDI hard disk
-				if(!(minor % 64)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 48: // Mylex DAC960 PCI RAID controller; first controller
-				if(!(minor % 8)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 49: // Mylex DAC960 PCI RAID controller; second controller
-				if(!(minor % 8)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 50: // Mylex DAC960 PCI RAID controller; third controller
-				if(!(minor % 8)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 51: // Mylex DAC960 PCI RAID controller; fourth controller
-				if(!(minor % 8)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 52: // Mylex DAC960 PCI RAID controller; fifth controller
-				if(!(minor % 8)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 53: // Mylex DAC960 PCI RAID controller; sixth controller
-				if(!(minor % 8)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 54: // Mylex DAC960 PCI RAID controller; seventh controller
-				if(!(minor % 8)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 55: // Mylex DAC960 PCI RAID controller; eigth controller
-				if(!(minor % 8)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 65: // SCSI disk devices (16-31)
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 66: // SCSI disk devices (32-47)
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 67: // SCSI disk devices (48-63)
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 68: // SCSI disk devices (64-79)
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 69: // SCSI disk devices (80-95)
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 70: // SCSI disk devices (96-111)
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 71: // SCSI disk devices (112-127)
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 80: // I2O hard disk
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 81: // I2O hard disk
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 82: // I2O hard disk
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 83: // I2O hard disk
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 84: // I2O hard disk
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 85: // I2O hard disk
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 86: // I2O hard disk
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 87: // I2O hard disk
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 128: // SCSI disk devices (128-143)
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 129: // SCSI disk devices (144-159)
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 130: // SCSI disk devices (160-175)
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 131: // SCSI disk devices (176-191)
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 132: // SCSI disk devices (192-207)
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 133: // SCSI disk devices (208-223)
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 134: // SCSI disk devices (224-239)
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 135: // SCSI disk devices (240-255)
-				if(!(minor % 16)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 136: // Mylex DAC960 PCI RAID controller; nineth controller
-				if(!(minor % 8)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 137: // Mylex DAC960 PCI RAID controller; tenth controller
-				if(!(minor % 8)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 138: // Mylex DAC960 PCI RAID controller; eleventh controller
-				if(!(minor % 8)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 139: // Mylex DAC960 PCI RAID controller; twelfth controller
-				if(!(minor % 8)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 140: // Mylex DAC960 PCI RAID controller; thirteenth controller
-				if(!(minor % 8)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 141: // Mylex DAC960 PCI RAID controller; fourteenth controller
-				if(!(minor % 8)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 142: // Mylex DAC960 PCI RAID controller; fifteenth controller
-				if(!(minor % 8)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 143: // Mylex DAC960 PCI RAID controller; sixteenth controller
-				if(!(minor % 8)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 160: // Carmel 8-port SATA Disks on First Controller
-				if(!(minor % 32)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			case 161: // Carmel 8-port SATA Disks on Second Controller
-				if(!(minor % 32)) {
-					def_enabled = enable_new_disks;
-				}
-				break;
-			default:
-				def_enabled = 0;
-				break;
-		}
-		*/
-
+		// Find mount point and family
 		char *mount_point = d->mount_point;
 		char *family = d->mount_point;
 		if(!family) family = disk;
 
-		int ddo_io = do_io, ddo_ops = do_ops, ddo_mops = do_mops, ddo_iotime = do_iotime, ddo_qops = do_qops, ddo_util = do_util, ddo_backlog = do_backlog, ddo_space = do_space;
+		// --------------------------------------------------------------------------
+		// Check if device is enabled by autodetection or config
+		int def_enable = -1;
+		char var_name[4096 + 1];
+		snprintfz(var_name, 4096, "plugin:proc:/proc/diskstats:%s", disk);
 
-		// check which charts are enabled for this disk
-		{
-			char var_name[4096 + 1];
-			snprintfz(var_name, 4096, "plugin:proc:/proc/diskstats:%s", disk);
-			def_enabled = config_get_boolean_ondemand(var_name, "enabled", def_enabled);
-			if(def_enabled == CONFIG_ONDEMAND_NO) continue;
-			if(def_enabled == CONFIG_ONDEMAND_ONDEMAND && !reads && !writes) continue;
+		if(def_enable == -1) def_enable = config_get_boolean_ondemand(var_name, "enable", CONFIG_ONDEMAND_ONDEMAND);
+		if(def_enable == CONFIG_ONDEMAND_NO) continue;
 
+		int def_performance = CONFIG_ONDEMAND_NO, def_space = CONFIG_ONDEMAND_NO;
+		if(enable_autodetection)  {
+			if(enable_physical_disks && (d->type == DISK_TYPE_PHYSICAL)) {
+				def_performance = enable_physical_disks;
+			} else if(enable_virtual_disks && (d->type == DISK_TYPE_CONTAINER)) {
+				def_performance = enable_virtual_disks;
+			} else if(enable_partitions && (d->type == DISK_TYPE_PARTITION)) {
+				def_performance = enable_partitions;
+			} else if(enable_mountpoints && (d->mount_point != NULL)) {
+				def_performance = enable_mountpoints;
+			}
+
+			if(enable_space_metrics && (d->mount_point != NULL)) {
+				def_space = enable_space_metrics;
+			}
+		}
+
+		RRDSET *st;
+
+		// --------------------------------------------------------------------------
+		// Do performance metrics
+		def_performance = config_get_boolean_ondemand(var_name, "enable performance metrics", def_performance);
+		if( (def_performance == CONFIG_ONDEMAND_YES) || (def_performance == CONFIG_ONDEMAND_ONDEMAND && reads && writes) ) {
+			int ddo_io = do_io, ddo_ops = do_ops, ddo_mops = do_mops, ddo_iotime = do_iotime, ddo_qops = do_qops, ddo_util = do_util, ddo_backlog = do_backlog;
 
 			ddo_io 		= config_get_boolean_ondemand(var_name, "bandwidth", ddo_io);
 			ddo_ops 	= config_get_boolean_ondemand(var_name, "operations", ddo_ops);
@@ -503,7 +290,6 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 			ddo_qops 	= config_get_boolean_ondemand(var_name, "queued operations", ddo_qops);
 			ddo_util 	= config_get_boolean_ondemand(var_name, "utilization percentage", ddo_util);
 			ddo_backlog = config_get_boolean_ondemand(var_name, "backlog", ddo_backlog);
-			ddo_space   = config_get_boolean_ondemand(var_name, "space", ddo_space);
 
 			// by default, do not add charts that do not have values
 			if(ddo_io == CONFIG_ONDEMAND_ONDEMAND && !reads && !writes) ddo_io = 0;
@@ -516,246 +302,241 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 			// for absolute values, we need to switch the setting to 'yes'
 			// to allow it refresh from now on
 			if(ddo_qops == CONFIG_ONDEMAND_ONDEMAND) config_set(var_name, "queued operations", "yes");
-		}
 
-		RRDSET *st;
+			// --------------------------------------------------------------------
+			int sector_size = 512;
+			if(ddo_io) {
+				st = rrdset_find_bytype(RRD_TYPE_DISK, disk);
+				if(!st) {
+					char tf[FILENAME_MAX + 1], *t;
+					char ssfilename[FILENAME_MAX + 1];
 
-		// --------------------------------------------------------------------
+					strncpyz(tf, disk, FILENAME_MAX);
 
-		int sector_size = 512;
-		if(ddo_io) {
-			st = rrdset_find_bytype(RRD_TYPE_DISK, disk);
-			if(!st) {
-				char tf[FILENAME_MAX + 1], *t;
-				char ssfilename[FILENAME_MAX + 1];
+					// replace all / with !
+					while((t = strchr(tf, '/'))) *t = '!';
 
-				strncpyz(tf, disk, FILENAME_MAX);
+					snprintfz(ssfilename, FILENAME_MAX, path_to_get_hw_sector_size, tf);
+					FILE *fpss = fopen(ssfilename, "r");
+					if(fpss) {
+						char ssbuffer[1025];
+						char *tmp = fgets(ssbuffer, 1024, fpss);
 
-				// replace all / with !
-				while((t = strchr(tf, '/'))) *t = '!';
-
-				snprintfz(ssfilename, FILENAME_MAX, path_to_get_hw_sector_size, tf);
-				FILE *fpss = fopen(ssfilename, "r");
-				if(fpss) {
-					char ssbuffer[1025];
-					char *tmp = fgets(ssbuffer, 1024, fpss);
-
-					if(tmp) {
-						sector_size = atoi(tmp);
-						if(sector_size <= 0) {
-							error("Invalid sector size %d for device %s in %s. Assuming 512.", sector_size, disk, ssfilename);
-							sector_size = 512;
+						if(tmp) {
+							sector_size = atoi(tmp);
+							if(sector_size <= 0) {
+								error("Invalid sector size %d for device %s in %s. Assuming 512.", sector_size, disk, ssfilename);
+								sector_size = 512;
+							}
 						}
+						else error("Cannot read data for sector size for device %s from %s. Assuming 512.", disk, ssfilename);
+
+						fclose(fpss);
 					}
-					else error("Cannot read data for sector size for device %s from %s. Assuming 512.", disk, ssfilename);
+					else error("Cannot read sector size for device %s from %s. Assuming 512.", disk, ssfilename);
 
-					fclose(fpss);
+					st = rrdset_create(RRD_TYPE_DISK, disk, NULL, family, "disk.io", "Disk I/O Bandwidth", "kilobytes/s", 2000, update_every, RRDSET_TYPE_AREA);
+
+					rrddim_add(st, "reads", NULL, sector_size, 1024, RRDDIM_INCREMENTAL);
+					rrddim_add(st, "writes", NULL, sector_size * -1, 1024, RRDDIM_INCREMENTAL);
 				}
-				else error("Cannot read sector size for device %s from %s. Assuming 512.", disk, ssfilename);
+				else rrdset_next_usec(st, dt);
 
-				st = rrdset_create(RRD_TYPE_DISK, disk, NULL, family, "disk.io", "Disk I/O Bandwidth", "kilobytes/s", 2000, update_every, RRDSET_TYPE_AREA);
-
-				rrddim_add(st, "reads", NULL, sector_size, 1024, RRDDIM_INCREMENTAL);
-				rrddim_add(st, "writes", NULL, sector_size * -1, 1024, RRDDIM_INCREMENTAL);
+				last_readsectors  = rrddim_set(st, "reads", readsectors);
+				last_writesectors = rrddim_set(st, "writes", writesectors);
+				rrdset_done(st);
 			}
-			else rrdset_next_usec(st, dt);
 
-			last_readsectors  = rrddim_set(st, "reads", readsectors);
-			last_writesectors = rrddim_set(st, "writes", writesectors);
-			rrdset_done(st);
+			// --------------------------------------------------------------------
+			if(ddo_ops) {
+				st = rrdset_find_bytype("disk_ops", disk);
+				if(!st) {
+					st = rrdset_create("disk_ops", disk, NULL, family, "disk.ops", "Disk Completed I/O Operations", "operations/s", 2001, update_every, RRDSET_TYPE_LINE);
+					st->isdetail = 1;
+
+					rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_INCREMENTAL);
+					rrddim_add(st, "writes", NULL, -1, 1, RRDDIM_INCREMENTAL);
+				}
+				else rrdset_next_usec(st, dt);
+
+				last_reads  = rrddim_set(st, "reads", reads);
+				last_writes = rrddim_set(st, "writes", writes);
+				rrdset_done(st);
+			}
+
+			// --------------------------------------------------------------------
+			if(ddo_qops) {
+				st = rrdset_find_bytype("disk_qops", disk);
+				if(!st) {
+					st = rrdset_create("disk_qops", disk, NULL, family, "disk.qops", "Disk Current I/O Operations", "operations", 2002, update_every, RRDSET_TYPE_LINE);
+					st->isdetail = 1;
+
+					rrddim_add(st, "operations", NULL, 1, 1, RRDDIM_ABSOLUTE);
+				}
+				else rrdset_next_usec(st, dt);
+
+				rrddim_set(st, "operations", queued_ios);
+				rrdset_done(st);
+			}
+
+			// --------------------------------------------------------------------
+			if(ddo_backlog) {
+				st = rrdset_find_bytype("disk_backlog", disk);
+				if(!st) {
+					st = rrdset_create("disk_backlog", disk, NULL, family, "disk.backlog", "Disk Backlog", "backlog (ms)", 2003, update_every, RRDSET_TYPE_AREA);
+					st->isdetail = 1;
+
+					rrddim_add(st, "backlog", NULL, 1, 10, RRDDIM_INCREMENTAL);
+				}
+				else rrdset_next_usec(st, dt);
+
+				rrddim_set(st, "backlog", backlog_ms);
+				rrdset_done(st);
+			}
+
+			// --------------------------------------------------------------------
+			if(ddo_util) {
+				st = rrdset_find_bytype("disk_util", disk);
+				if(!st) {
+					st = rrdset_create("disk_util", disk, NULL, family, "disk.util", "Disk Utilization Time", "% of time working", 2004, update_every, RRDSET_TYPE_AREA);
+					st->isdetail = 1;
+
+					rrddim_add(st, "utilization", NULL, 1, 10, RRDDIM_INCREMENTAL);
+				}
+				else rrdset_next_usec(st, dt);
+
+				last_busy_ms = rrddim_set(st, "utilization", busy_ms);
+				rrdset_done(st);
+			}
+
+			// --------------------------------------------------------------------
+			if(ddo_mops) {
+				st = rrdset_find_bytype("disk_mops", disk);
+				if(!st) {
+					st = rrdset_create("disk_mops", disk, NULL, family, "disk.mops", "Disk Merged Operations", "merged operations/s", 2021, update_every, RRDSET_TYPE_LINE);
+					st->isdetail = 1;
+
+					rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_INCREMENTAL);
+					rrddim_add(st, "writes", NULL, -1, 1, RRDDIM_INCREMENTAL);
+				}
+				else rrdset_next_usec(st, dt);
+
+				rrddim_set(st, "reads", mreads);
+				rrddim_set(st, "writes", mwrites);
+				rrdset_done(st);
+			}
+
+			// --------------------------------------------------------------------
+			if(ddo_iotime) {
+				st = rrdset_find_bytype("disk_iotime", disk);
+				if(!st) {
+					st = rrdset_create("disk_iotime", disk, NULL, family, "disk.iotime", "Disk Total I/O Time", "milliseconds/s", 2022, update_every, RRDSET_TYPE_LINE);
+					st->isdetail = 1;
+
+					rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_INCREMENTAL);
+					rrddim_add(st, "writes", NULL, -1, 1, RRDDIM_INCREMENTAL);
+				}
+				else rrdset_next_usec(st, dt);
+
+				last_readms  = rrddim_set(st, "reads", readms);
+				last_writems = rrddim_set(st, "writes", writems);
+				rrdset_done(st);
+			}
+
+			// --------------------------------------------------------------------
+			// calculate differential charts
+			// only if this is not the first time we run
+			if(dt) {
+				if(ddo_iotime && ddo_ops) {
+					st = rrdset_find_bytype("disk_await", disk);
+					if(!st) {
+						st = rrdset_create("disk_await", disk, NULL, family, "disk.await", "Average Completed I/O Operation Time", "ms per operation", 2005, update_every, RRDSET_TYPE_LINE);
+						st->isdetail = 1;
+
+						rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_ABSOLUTE);
+						rrddim_add(st, "writes", NULL, -1, 1, RRDDIM_ABSOLUTE);
+					}
+					else rrdset_next_usec(st, dt);
+
+					rrddim_set(st, "reads", (reads - last_reads) ? (readms - last_readms) / (reads - last_reads) : 0);
+					rrddim_set(st, "writes", (writes - last_writes) ? (writems - last_writems) / (writes - last_writes) : 0);
+					rrdset_done(st);
+				}
+
+				if(ddo_io && ddo_ops) {
+					st = rrdset_find_bytype("disk_avgsz", disk);
+					if(!st) {
+						st = rrdset_create("disk_avgsz", disk, NULL, family, "disk.avgsz", "Average Completed I/O Operation Bandwidth", "kilobytes per operation", 2006, update_every, RRDSET_TYPE_AREA);
+						st->isdetail = 1;
+
+						rrddim_add(st, "reads", NULL, sector_size, 1024, RRDDIM_ABSOLUTE);
+						rrddim_add(st, "writes", NULL, -sector_size, 1024, RRDDIM_ABSOLUTE);
+					}
+					else rrdset_next_usec(st, dt);
+
+					rrddim_set(st, "reads", (reads - last_reads) ? (readsectors - last_readsectors) / (reads - last_reads) : 0);
+					rrddim_set(st, "writes", (writes - last_writes) ? (writesectors - last_writesectors) / (writes - last_writes) : 0);
+					rrdset_done(st);
+				}
+
+				if(ddo_util && ddo_ops) {
+					st = rrdset_find_bytype("disk_svctm", disk);
+					if(!st) {
+						st = rrdset_create("disk_svctm", disk, NULL, family, "disk.svctm", "Average Service Time", "ms per operation", 2007, update_every, RRDSET_TYPE_LINE);
+						st->isdetail = 1;
+
+						rrddim_add(st, "svctm", NULL, 1, 1, RRDDIM_ABSOLUTE);
+					}
+					else rrdset_next_usec(st, dt);
+
+					rrddim_set(st, "svctm", ((reads - last_reads) + (writes - last_writes)) ? (busy_ms - last_busy_ms) / ((reads - last_reads) + (writes - last_writes)) : 0);
+					rrdset_done(st);
+				}
+			}
 		}
 
-		// --------------------------------------------------------------------
+		// --------------------------------------------------------------------------
+		// Do space metrics
+		def_space = config_get_boolean_ondemand(var_name, "enable space metrics", def_space);		
+		if(def_space != CONFIG_ONDEMAND_NO) {
+			int ddo_space = do_space;
 
-		if(ddo_ops) {
-			st = rrdset_find_bytype("disk_ops", disk);
-			if(!st) {
-				st = rrdset_create("disk_ops", disk, NULL, family, "disk.ops", "Disk Completed I/O Operations", "operations/s", 2001, update_every, RRDSET_TYPE_LINE);
-				st->isdetail = 1;
-
-				rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_INCREMENTAL);
-				rrddim_add(st, "writes", NULL, -1, 1, RRDDIM_INCREMENTAL);
-			}
-			else rrdset_next_usec(st, dt);
-
-			last_reads  = rrddim_set(st, "reads", reads);
-			last_writes = rrddim_set(st, "writes", writes);
-			rrdset_done(st);
-		}
-
-		// --------------------------------------------------------------------
-
-		if(ddo_qops) {
-			st = rrdset_find_bytype("disk_qops", disk);
-			if(!st) {
-				st = rrdset_create("disk_qops", disk, NULL, family, "disk.qops", "Disk Current I/O Operations", "operations", 2002, update_every, RRDSET_TYPE_LINE);
-				st->isdetail = 1;
-
-				rrddim_add(st, "operations", NULL, 1, 1, RRDDIM_ABSOLUTE);
-			}
-			else rrdset_next_usec(st, dt);
-
-			rrddim_set(st, "operations", queued_ios);
-			rrdset_done(st);
-		}
-
-		// --------------------------------------------------------------------
-
-		if(ddo_backlog) {
-			st = rrdset_find_bytype("disk_backlog", disk);
-			if(!st) {
-				st = rrdset_create("disk_backlog", disk, NULL, family, "disk.backlog", "Disk Backlog", "backlog (ms)", 2003, update_every, RRDSET_TYPE_AREA);
-				st->isdetail = 1;
-
-				rrddim_add(st, "backlog", NULL, 1, 10, RRDDIM_INCREMENTAL);
-			}
-			else rrdset_next_usec(st, dt);
-
-			rrddim_set(st, "backlog", backlog_ms);
-			rrdset_done(st);
-		}
-
-		// --------------------------------------------------------------------
-
-		if(ddo_util) {
-			st = rrdset_find_bytype("disk_util", disk);
-			if(!st) {
-				st = rrdset_create("disk_util", disk, NULL, family, "disk.util", "Disk Utilization Time", "% of time working", 2004, update_every, RRDSET_TYPE_AREA);
-				st->isdetail = 1;
-
-				rrddim_add(st, "utilization", NULL, 1, 10, RRDDIM_INCREMENTAL);
-			}
-			else rrdset_next_usec(st, dt);
-
-			last_busy_ms = rrddim_set(st, "utilization", busy_ms);
-			rrdset_done(st);
-		}
-
-		// --------------------------------------------------------------------
-
-		if(ddo_mops) {
-			st = rrdset_find_bytype("disk_mops", disk);
-			if(!st) {
-				st = rrdset_create("disk_mops", disk, NULL, family, "disk.mops", "Disk Merged Operations", "merged operations/s", 2021, update_every, RRDSET_TYPE_LINE);
-				st->isdetail = 1;
-
-				rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_INCREMENTAL);
-				rrddim_add(st, "writes", NULL, -1, 1, RRDDIM_INCREMENTAL);
-			}
-			else rrdset_next_usec(st, dt);
-
-			rrddim_set(st, "reads", mreads);
-			rrddim_set(st, "writes", mwrites);
-			rrdset_done(st);
-		}
-
-		// --------------------------------------------------------------------
-
-		if(ddo_iotime) {
-			st = rrdset_find_bytype("disk_iotime", disk);
-			if(!st) {
-				st = rrdset_create("disk_iotime", disk, NULL, family, "disk.iotime", "Disk Total I/O Time", "milliseconds/s", 2022, update_every, RRDSET_TYPE_LINE);
-				st->isdetail = 1;
-
-				rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_INCREMENTAL);
-				rrddim_add(st, "writes", NULL, -1, 1, RRDDIM_INCREMENTAL);
-			}
-			else rrdset_next_usec(st, dt);
-
-			last_readms  = rrddim_set(st, "reads", readms);
-			last_writems = rrddim_set(st, "writes", writems);
-			rrdset_done(st);
-		}
-
-		// --------------------------------------------------------------------
-
-		if(ddo_space && mount_point) {
-			// collect space metrics using statvfs
-			if (statvfs(mount_point, &buff_statvfs) < 0) {
-				error("Failed checking disk space usage of %s", family);
-			} else {
-				// verify we collected the metrics for the right disk.
-				// if not the mountpoint has changed.
-				if(stat(mount_point, &buff_stat) == -1) {
+			ddo_space = config_get_boolean_ondemand(var_name, "space", ddo_space);
+			if(ddo_space && mount_point) {
+				// collect space metrics using statvfs
+				if (statvfs(mount_point, &buff_statvfs) < 0) {
+					error("Failed checking disk space usage of %s", family);
 				} else {
-					if(major(buff_stat.st_dev) == major && minor(buff_stat.st_dev) == minor)
-					{
-						space_avail = buff_statvfs.f_bavail * buff_statvfs.f_bsize;
-						space_avail_root = (buff_statvfs.f_bfree - buff_statvfs.f_bavail) * buff_statvfs.f_bsize;
-						space_used = (buff_statvfs.f_blocks - buff_statvfs.f_bfree) * buff_statvfs.f_bsize;
+					// verify we collected the metrics for the right disk.
+					// if not the mountpoint has changed.
+					if(stat(mount_point, &buff_stat) == -1) {
+					} else {
+						if(major(buff_stat.st_dev) == major && minor(buff_stat.st_dev) == minor)
+						{
+							space_avail = buff_statvfs.f_bavail * buff_statvfs.f_bsize;
+							space_avail_root = (buff_statvfs.f_bfree - buff_statvfs.f_bavail) * buff_statvfs.f_bsize;
+							space_used = (buff_statvfs.f_blocks - buff_statvfs.f_bfree) * buff_statvfs.f_bsize;
 
-						st = rrdset_find_bytype("disk_space", disk);
-						if(!st) {
-							st = rrdset_create("disk_space", disk, NULL, family, "disk.space", "Disk Space Usage", "GB", 2023, update_every, RRDSET_TYPE_STACKED);
-							st->isdetail = 1;
+							st = rrdset_find_bytype("disk_space", disk);
+							if(!st) {
+								st = rrdset_create("disk_space", disk, NULL, family, "disk.space", "Disk Space Usage", "GB", 2023, update_every, RRDSET_TYPE_STACKED);
+								st->isdetail = 1;
 
-							rrddim_add(st, "avail", NULL, 1, 1000*1000*1000, RRDDIM_ABSOLUTE);
-							rrddim_add(st, "reserved_for_root", "reserved for root", 1, 1000*1000*1000, RRDDIM_ABSOLUTE);
-							rrddim_add(st, "used" , NULL, 1, 1000*1000*1000, RRDDIM_ABSOLUTE);
+								rrddim_add(st, "avail", NULL, 1, 1000*1000*1000, RRDDIM_ABSOLUTE);
+								rrddim_add(st, "reserved_for_root", "reserved for root", 1, 1000*1000*1000, RRDDIM_ABSOLUTE);
+								rrddim_add(st, "used" , NULL, 1, 1000*1000*1000, RRDDIM_ABSOLUTE);
+							}
+							else rrdset_next_usec(st, dt);
+
+							rrddim_set(st, "avail", space_avail);
+							rrddim_set(st, "reserved_for_root", space_avail_root);
+							rrddim_set(st, "used", space_used);
+							rrdset_done(st);
 						}
-						else rrdset_next_usec(st, dt);
-
-						rrddim_set(st, "avail", space_avail);
-						rrddim_set(st, "reserved_for_root", space_avail_root);
-						rrddim_set(st, "used", space_used);
-						rrdset_done(st);
 					}
 				}
-			}
-		}
-
-		// --------------------------------------------------------------------
-		// calculate differential charts
-		// only if this is not the first time we run
-
-		if(dt) {
-			if(ddo_iotime && ddo_ops) {
-				st = rrdset_find_bytype("disk_await", disk);
-				if(!st) {
-					st = rrdset_create("disk_await", disk, NULL, family, "disk.await", "Average Completed I/O Operation Time", "ms per operation", 2005, update_every, RRDSET_TYPE_LINE);
-					st->isdetail = 1;
-
-					rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_ABSOLUTE);
-					rrddim_add(st, "writes", NULL, -1, 1, RRDDIM_ABSOLUTE);
-				}
-				else rrdset_next_usec(st, dt);
-
-				rrddim_set(st, "reads", (reads - last_reads) ? (readms - last_readms) / (reads - last_reads) : 0);
-				rrddim_set(st, "writes", (writes - last_writes) ? (writems - last_writems) / (writes - last_writes) : 0);
-				rrdset_done(st);
-			}
-
-			if(ddo_io && ddo_ops) {
-				st = rrdset_find_bytype("disk_avgsz", disk);
-				if(!st) {
-					st = rrdset_create("disk_avgsz", disk, NULL, family, "disk.avgsz", "Average Completed I/O Operation Bandwidth", "kilobytes per operation", 2006, update_every, RRDSET_TYPE_AREA);
-					st->isdetail = 1;
-
-					rrddim_add(st, "reads", NULL, sector_size, 1024, RRDDIM_ABSOLUTE);
-					rrddim_add(st, "writes", NULL, -sector_size, 1024, RRDDIM_ABSOLUTE);
-				}
-				else rrdset_next_usec(st, dt);
-
-				rrddim_set(st, "reads", (reads - last_reads) ? (readsectors - last_readsectors) / (reads - last_reads) : 0);
-				rrddim_set(st, "writes", (writes - last_writes) ? (writesectors - last_writesectors) / (writes - last_writes) : 0);
-				rrdset_done(st);
-			}
-
-			if(ddo_util && ddo_ops) {
-				st = rrdset_find_bytype("disk_svctm", disk);
-				if(!st) {
-					st = rrdset_create("disk_svctm", disk, NULL, family, "disk.svctm", "Average Service Time", "ms per operation", 2007, update_every, RRDSET_TYPE_LINE);
-					st->isdetail = 1;
-
-					rrddim_add(st, "svctm", NULL, 1, 1, RRDDIM_ABSOLUTE);
-				}
-				else rrdset_next_usec(st, dt);
-
-				rrddim_set(st, "svctm", ((reads - last_reads) + (writes - last_writes)) ? (busy_ms - last_busy_ms) / ((reads - last_reads) + (writes - last_writes)) : 0);
-				rrdset_done(st);
 			}
 		}
 	}
-
 	return 0;
 }
