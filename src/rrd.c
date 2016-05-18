@@ -235,15 +235,18 @@ const char *rrddim_algorithm_name(int chart_type)
 // ----------------------------------------------------------------------------
 // chart names
 
-char *rrdset_strncpy_name(char *to, const char *from, int length)
+char *rrdset_strncpyz_name(char *to, const char *from, size_t length)
 {
-	int i;
-	for(i = 0; i < length && from[i] ;i++) {
-		if(from[i] == '.' || isalpha(from[i]) || isdigit(from[i])) to[i] = from[i];
-		else to[i] = '_';
+	char c, *p = to;
+
+	while (length-- && (c = *from++)) {
+		if(c != '.' && !isalnum(c))
+			c = '_';
+
+		*p++ = c;
 	}
-	if(i < length) to[i] = '\0';
-	to[length - 1] = '\0';
+
+	*p = '\0';
 
 	return to;
 }
@@ -258,7 +261,7 @@ void rrdset_set_name(RRDSET *st, const char *name)
 	char n[RRD_ID_LENGTH_MAX + 1];
 
 	snprintfz(n, RRD_ID_LENGTH_MAX, "%s.%s", st->type, name);
-	rrdset_strncpy_name(b, n, CONFIG_MAX_VALUE);
+	rrdset_strncpyz_name(b, n, CONFIG_MAX_VALUE);
 	st->name = config_get(st->id, "name", b);
 	st->hash_name = simple_hash(st->name);
 
@@ -277,7 +280,7 @@ char *rrdset_cache_dir(const char *id)
 
 	char b[FILENAME_MAX + 1];
 	char n[FILENAME_MAX + 1];
-	rrdset_strncpy_name(b, id, FILENAME_MAX);
+	rrdset_strncpyz_name(b, id, FILENAME_MAX);
 
 	snprintfz(n, FILENAME_MAX, "%s/%s", cache_dir, b);
 	ret = config_get(id, "cache directory", n);
@@ -468,7 +471,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 
 	debug(D_RRD_CALLS, "Adding dimension '%s/%s'.", st->id, id);
 
-	rrdset_strncpy_name(filename, id, FILENAME_MAX);
+	rrdset_strncpyz_name(filename, id, FILENAME_MAX);
 	snprintfz(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
 	if(rrd_memory_mode != RRD_MEMORY_MODE_RAM) rd = (RRDDIM *)mymmap(fullfilename, size, ((rrd_memory_mode == RRD_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE), 1);
 	if(rd) {
