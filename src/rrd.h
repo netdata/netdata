@@ -257,7 +257,7 @@ extern pthread_rwlock_t rrdset_root_rwlock;
 // ----------------------------------------------------------------------------
 // RRD SET functions
 
-extern char *rrdset_strncpy_name(char *to, const char *from, int length);
+extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
 extern void rrdset_set_name(RRDSET *st, const char *name);
 
 extern char *rrdset_cache_dir(const char *id);
