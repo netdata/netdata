@@ -280,12 +280,13 @@ int main(int argc, char **argv)
 	char *error_log_file = NULL;
 	char *access_log_file = NULL;
 	char *user = NULL;
-	{
-		char buffer[1024];
+
+  {
+		char buffer[HOSTNAME_MAX+1] = "0x00000000";
 
 		// --------------------------------------------------------------------
 
-		sprintf(buffer, "0x%08llx", 0ULL);
+		//sprintf(buffer, "0x%08llx", 0ULL);
 		char *flags = config_get("global", "debug flags", buffer);
 		setenv("NETDATA_DEBUG_FLAGS", flags, 1);
 
@@ -392,8 +393,8 @@ int main(int argc, char **argv)
 
 		// let the plugins know the min update_every
 		{
-			char buf[51];
-			snprintfz(buf, 50, "%d", rrd_update_every);
+			char buf[16];
+			snprintfz(buf, 15, "%d", rrd_update_every);
 			setenv("NETDATA_UPDATE_EVERY", buf, 1);
 		}
 
