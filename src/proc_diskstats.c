@@ -89,12 +89,11 @@ struct disk *get_disk(unsigned long major, unsigned long minor) {
 	} else {
 		// find if it is a container
 		// by checking if /sys/dev/block/MAJOR:MINOR/slaves has entries
-		int is_container = 0;
 		snprintfz(buffer, FILENAME_MAX, path_find_block_device, major, minor, "slaves/");
 		DIR *dirp = opendir(buffer);	
 		if (dirp != NULL) {
 		struct dirent *dp;
-			while(dp = readdir(dirp)) {
+			while( (dp = readdir(dirp)) ) {
 				// . and .. are also files in empty folders.
 				if(strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0) {
 					continue;
