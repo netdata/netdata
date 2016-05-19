@@ -73,11 +73,15 @@ struct web_client *web_client_create(int listener)
 
 		if(getnameinfo(sadr, addrlen, w->client_ip, NI_MAXHOST, w->client_port, NI_MAXSERV, NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
 			error("Cannot getnameinfo() on received client connection.");
-			strncpyz(w->client_ip,   "UNKNOWN", NI_MAXHOST);
-			strncpyz(w->client_port, "UNKNOWN", NI_MAXSERV);
+
+			/* Surely will fit! */
+			strcpy(w->client_ip,   "UNKNOWN");
+			strcpy(w->client_port, "UNKNOWN");
 		}
-		w->client_ip[NI_MAXHOST]   = '\0';
-		w->client_port[NI_MAXSERV] = '\0';
+		else {
+			w->client_ip[NI_MAXHOST]   = '\0';
+			w->client_port[NI_MAXSERV] = '\0';
+		}
 
 		switch(sadr->sa_family) {
 
@@ -146,21 +150,21 @@ void web_client_reset(struct web_client *w)
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 
-	long sent = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
+	ssize_t sent = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
 
 #ifdef NETDATA_WITH_ZLIB
-	if(likely(w->response.zoutput)) sent = (long)w->response.zstream.total_out;
+	if(likely(w->response.zoutput)) sent = w->response.zstream.total_out;
 #endif
 
-	long size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
+	ssize_t size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
 
 	if(likely(w->last_url[0]))
 		log_access("%llu: (sent/all = %ld/%ld bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: %d '%s'",
 			w->id,
-			sent, size, -((size>0)?((float)(size-sent)/(float)size * 100.0):0.0),
-			(float)usecdiff(&w->tv_ready, &w->tv_in) / 1000.0,
-			(float)usecdiff(&tv, &w->tv_ready) / 1000.0,
-			(float)usecdiff(&tv, &w->tv_in) / 1000.0,
+			sent, size, -((size>0)?((size-sent)/(double)size * 100.0):0.0),
+			usecdiff(&w->tv_ready, &w->tv_in) / 1000.0,
+			usecdiff(&tv, &w->tv_ready) / 1000.0,
+			usecdiff(&tv, &w->tv_in) / 1000.0,
 			(w->mode == WEB_CLIENT_MODE_FILECOPY)?"filecopy":((w->mode == WEB_CLIENT_MODE_OPTIONS)?"options":"data"),
 			w->response.code,
 			w->last_url
@@ -308,7 +312,8 @@ int mysendfile(struct web_client *w, char *filename)
 	while (*filename == '/') filename++;
 
 	// if the filename contain known paths, skip them
-	if(strncmp(filename, WEB_PATH_FILE "/", strlen(WEB_PATH_FILE) + 1) == 0) filename = &filename[strlen(WEB_PATH_FILE) + 1];
+	if(strncmp(filename, WEB_PATH_FILE "/", strlen(WEB_PATH_FILE) + 1) == 0) 
+	  filename = &filename[strlen(WEB_PATH_FILE) + 1];
 
 	char *s;
 	for(s = filename; *s ;s++) {
@@ -1004,8 +1009,8 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	debug(D_WEB_CLIENT, "%llu: Found RRD data with name '%s'.", w->id, tok);
 
 	// how many entries does the client want?
-	long lines = rrd_default_history_entries;
-	long group_count = 1;
+	int lines = rrd_default_history_entries;
+	int group_count = 1;
 	time_t after = 0, before = 0;
 	int group_method = GROUP_AVERAGE;
 	int nonzero = 0;
@@ -1016,6 +1021,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 		if(tok) lines = atoi(tok);
 		if(lines < 1) lines = 1;
 	}
+
 	if(url) {
 		// parse the group count required
 		tok = mystrsep(&url, "/");
@@ -1023,6 +1029,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 		if(group_count < 1) group_count = 1;
 		//if(group_count > save_history / 20) group_count = save_history / 20;
 	}
+
 	if(url) {
 		// parse the grouping method required
 		tok = mystrsep(&url, "/");
@@ -1033,18 +1040,21 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 			else debug(D_WEB_CLIENT, "%llu: Unknown group method '%s'", w->id, tok);
 		}
 	}
+
 	if(url) {
 		// parse after time
 		tok = mystrsep(&url, "/");
 		if(tok && *tok) after = strtoul(tok, NULL, 10);
 		if(after < 0) after = 0;
 	}
+
 	if(url) {
 		// parse before time
 		tok = mystrsep(&url, "/");
 		if(tok && *tok) before = strtoul(tok, NULL, 10);
 		if(before < 0) before = 0;
 	}
+
 	if(url) {
 		// parse nonzero
 		tok = mystrsep(&url, "/");
@@ -1118,7 +1128,7 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 			google_responseHandler, google_version, google_reqId, st->last_updated.tv_sec);
 	}
 
-	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group, %d group_method, %lu after, %lu before).", w->id, st->name, st->id, lines, group_count, group_method, after, before);
+	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group, %d group_method, %d after, %lu before).", w->id, st->name, st->id, lines, group_count, group_method, after, before);
 	time_t timestamp_in_data = rrd_stats_json(datasource_type, st, w->response.data, lines, group_count, group_method, after, before, nonzero);
 
 	if(datasource_type == DATASOURCE_DATATABLE_JSONP) {
@@ -1640,7 +1650,7 @@ void web_client_process(struct web_client *w) {
 			break;
 	}
 
-	char date[100];
+	char date[32];
 	struct tm tmbuf, *tm = gmtime_r(&w->response.data->date, &tmbuf);
 	strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S %Z", tm);
 
@@ -1689,7 +1699,7 @@ void web_client_process(struct web_client *w) {
 			, date);
 	}
 	else if(w->mode != WEB_CLIENT_MODE_OPTIONS) {
-		char edate[100];
+		char edate[32];
 		time_t et = w->response.data->date + (86400 * 14);
 		struct tm etmbuf, *etm = gmtime_r(&et, &etmbuf);
 		strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", etm);
@@ -1789,7 +1799,7 @@ void web_client_process(struct web_client *w) {
 long web_client_send_chunk_header(struct web_client *w, long len)
 {
 	debug(D_DEFLATE, "%llu: OPEN CHUNK of %d bytes (hex: %x).", w->id, len, len);
-	char buf[1024];
+	char buf[24];
 	sprintf(buf, "%lX\r\n", len);
 	ssize_t bytes = send(w->ofd, buf, strlen(buf), MSG_DONTWAIT);
 
@@ -1829,7 +1839,7 @@ long web_client_send_chunk_finalize(struct web_client *w)
 #ifdef NETDATA_WITH_ZLIB
 long web_client_send_deflate(struct web_client *w)
 {
-	long len = 0, t = 0;
+	ssize_t len = 0, t = 0;
 
 	// when using compression,
 	// w->response.sent is the amount of bytes passed through compression
@@ -1930,10 +1940,10 @@ long web_client_send_deflate(struct web_client *w)
 	}
 	else if(len == 0) debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client (zhave = %ld, zsent = %ld, need to send = %ld).", w->id, w->response.zhave, w->response.zsent, w->response.zhave - w->response.zsent);
 	else {
-    /* Oops: This code is for multi-threads! */
-    char errbuf[1024];
-    debug(D_WEB_CLIENT, "%llu: Failed to send data to client. Reason: %s", w->id, strerror_r(errno, errbuf, 1023));
-  }
+    	/* Oops: This code is for multi-threads! */
+		char errbuf[1024];
+		debug(D_WEB_CLIENT, "%llu: Failed to send data to client. Reason: %s", w->id, strerror_r(errno, errbuf, 1023));
+	}
 
 	return(len);
 }
@@ -1945,7 +1955,7 @@ long web_client_send(struct web_client *w)
 	if(likely(w->response.zoutput)) return web_client_send_deflate(w);
 #endif // NETDATA_WITH_ZLIB
 
-	long bytes;
+	ssize_t bytes;
 
 	if(unlikely(w->response.data->len - w->response.sent == 0)) {
 		// there is nothing to send
@@ -1990,8 +2000,8 @@ long web_client_receive(struct web_client *w)
 	// do we have any space for more data?
 	buffer_need_bytes(w->response.data, WEB_REQUEST_LENGTH);
 
-	long left = w->response.data->size - w->response.data->len;
-	long bytes;
+	size_t left = w->response.data->size - w->response.data->len;
+	ssize_t bytes;
 
 	if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY))
 		bytes = read(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
@@ -2118,7 +2128,7 @@ void *web_client_main(void *ptr)
 		}
 
 		if(w->wait_receive && FD_ISSET(w->ifd, &ifds)) {
-			long bytes;
+			ssize_t bytes;
 			if((bytes = web_client_receive(w)) < 0) {
 				debug(D_WEB_CLIENT, "%llu: Cannot receive data from client. Closing client.", w->id);
 				errno = 0;
