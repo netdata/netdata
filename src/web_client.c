@@ -1929,7 +1929,12 @@ long web_client_send_deflate(struct web_client *w)
 		debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, len);
 	}
 	else if(len == 0) debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client (zhave = %ld, zsent = %ld, need to send = %ld).", w->id, w->response.zhave, w->response.zsent, w->response.zhave - w->response.zsent);
-	else debug(D_WEB_CLIENT, "%llu: Failed to send data to client. Reason: %s", w->id, strerror(errno));
+	else {
+    /* Oops: This code is for multithreads! */
+    char errbuf[1024];
+    strerror_r(errno, errbuf, 1023);
+    debug(D_WEB_CLIENT, "%llu: Failed to send data to client. Reason: %s", w->id, errbuf);
+  }
 
 	return(len);
 }

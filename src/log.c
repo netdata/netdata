@@ -108,7 +108,7 @@ int error_log_limit(int reset) {
 
 void log_date(FILE *out)
 {
-		char outstr[200];
+		char outstr[24];
 		time_t t;
 		struct tm *tmp, tmbuf;
 
@@ -180,8 +180,12 @@ void error_int( const char *prefix, const char *file, const char *function, cons
 	va_end( args );
 
 	if(errno) {
-		char buf[200];
-		char *s = strerror_r(errno, buf, 200);
+    /* Why 1024? Internacionalization... eglibc errno strings are
+     * 50 chars long, but other languages and charsets (utf-8) could
+     * use 5 bytes per char. The previous buffer was 200 chars long, so
+     * to avoid problems with other languages I'll use 1 KiB. */
+    char buf[1024];
+		char *s = strerror_r(errno, buf, 1023);
 		fprintf(stderr, " (errno %d, %s)\n", errno, s);
 		errno = 0;
 	}
