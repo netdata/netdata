@@ -146,6 +146,19 @@ void web_client_reset(struct web_client *w)
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 
+	debug(D_WEB_CLIENT, "%llu: Reseting client.", w->id);
+
+	if(w->stats_received_bytes || w->stats_sent_bytes) {
+		global_statistics_lock();
+		global_statistics.web_requests++;
+		global_statistics.web_usec += usecdiff(&tv, &w->tv_in);
+		global_statistics.bytes_received += w->stats_received_bytes;
+		global_statistics.bytes_sent += w->stats_sent_bytes;
+		global_statistics_unlock();
+	}
+	w->stats_received_bytes = 0;
+	w->stats_sent_bytes = 0;
+
 	long sent = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
 
 #ifdef NETDATA_WITH_ZLIB
@@ -165,8 +178,6 @@ void web_client_reset(struct web_client *w)
 			w->response.code,
 			w->last_url
 		);
-
-	debug(D_WEB_CLIENT, "%llu: Reseting client.", w->id);
 
 	if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
 		debug(D_WEB_CLIENT, "%llu: Closing filecopy input file.", w->id);
@@ -1341,10 +1352,6 @@ void web_client_process(struct web_client *w) {
 	else { // what_to_do == 0
 		gettimeofday(&w->tv_in, NULL);
 
-		global_statistics_lock();
-		global_statistics.web_requests++;
-		global_statistics_unlock();
-
 		// copy the URL - we are going to overwrite parts of it
 		// FIXME -- we should avoid it
 		strncpyz(w->last_url, w->decoded_url, URL_MAX);
@@ -1736,11 +1743,8 @@ void web_client_process(struct web_client *w) {
 				, w->id
 				, buffer_strlen(w->response.header_output)
 				, bytes);
-	else {
-		global_statistics_lock();
-		global_statistics.bytes_sent += bytes;
-		global_statistics_unlock();
-	}
+	else 
+		w->stats_sent_bytes += bytes;
 
 	// enable TCP_NODELAY, to send all data immediately at the next send()
 	flag = 1;
@@ -2107,10 +2111,8 @@ void *web_client_main(void *ptr)
 				errno = 0;
 				break;
 			}
-
-			global_statistics_lock();
-			global_statistics.bytes_sent += bytes;
-			global_statistics_unlock();
+			else
+				w->stats_sent_bytes += bytes;
 		}
 
 		if(w->wait_receive && FD_ISSET(w->ifd, &ifds)) {
@@ -2120,6 +2122,8 @@ void *web_client_main(void *ptr)
 				errno = 0;
 				break;
 			}
+			else
+				w->stats_received_bytes += bytes;
 
 			if(w->mode == WEB_CLIENT_MODE_NORMAL) {
 				debug(D_WEB_CLIENT, "%llu: Attempting to process received data (%ld bytes).", w->id, bytes);
@@ -2127,9 +2131,6 @@ void *web_client_main(void *ptr)
 				web_client_process(w);
 			}
 
-			global_statistics_lock();
-			global_statistics.bytes_received += bytes;
-			global_statistics_unlock();
 		}
 	}
 
