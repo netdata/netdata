@@ -57,7 +57,8 @@ struct web_client {
 	char client_ip[NI_MAXHOST+1];
 	char client_port[NI_MAXSERV+1];
 
-	char last_url[URL_MAX+1];
+	char decoded_url[URL_MAX + 1];	// we decode the URL in this buffer
+	char last_url[URL_MAX+1];		// we keep a copy of the decoded URL here
 
 	struct timeval tv_in, tv_ready;
 
@@ -68,7 +69,6 @@ struct web_client {
 	int mode;
 	int keepalive;
 	int enable_gzip;
-	char *decoded_url;
 
 	struct sockaddr_storage clientaddr;
 
