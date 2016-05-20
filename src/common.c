@@ -678,7 +678,7 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm)
 				if(flags & MAP_SHARED || !enable_ksm || !ksm) {
 #endif
 					/* FIX: mmap() returns MAP_FAILED in case of error, not a NULL pointer! */
-					mmap(NULL, size, PROT_READ|PROT_WRITE, flags, fd, 0);
+					mem = mmap(NULL, size, PROT_READ|PROT_WRITE, flags, fd, 0);
 					if(mem != MAP_FAILED) {
 						int advise = MADV_SEQUENTIAL|MADV_DONTFORK;
 						if(flags & MAP_SHARED) advise |= MADV_WILLNEED;
