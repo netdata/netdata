@@ -63,31 +63,37 @@ char *url_encode(char *str) {
 /* Returns a url-decoded version of str */
 /* IMPORTANT: be sure to free() the returned string after use */
 char *url_decode(char *str) {
-	char *pstr = str,
-		*buf = malloc(strlen(str) + 1),
-		*pbuf = buf;
+	size_t size = strlen(str) + 1;
 
+	char *buf = malloc(size);
 	if(!buf)
-		fatal("Cannot allocate memory.");
+		fatal("Cannot allocate %zu bytes of memory.", size);
 
-	while (*pstr) {
-		if (*pstr == '%') {
-			if (pstr[1] && pstr[2]) {
-				*pbuf++ = from_hex(pstr[1]) << 4 | from_hex(pstr[2]);
-				pstr += 2;
-			}
-		}
-		else if (*pstr == '+')
-			*pbuf++ = ' ';
-
-		else
-			*pbuf++ = *pstr;
-
-		pstr++;
-	}
-
-	*pbuf = '\0';
-
-	return buf;
+	return url_decode_r(buf, str, size);
 }
 
+char *url_decode_r(char *to, char *url, size_t size) {
+	char *s = url,           // source
+		 *d = to,            // destination
+		 *e = &to[size - 1]; // destination end
+
+	while(*s && d < e) {
+		if(unlikely(*s == '%')) {
+			if(likely(s[1] && s[2])) {
+				*d++ = from_hex(s[1]) << 4 | from_hex(s[2]);
+				s += 2;
+			}
+		}
+		else if(unlikely(*s == '+'))
+			*d++ = ' ';
+
+		else
+			*d++ = *s;
+
+		s++;
+	}
+
+	*d = '\0';
+
+	return to;
+}

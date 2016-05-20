@@ -194,10 +194,7 @@ void web_client_reset(struct web_client *w)
 	w->mode = WEB_CLIENT_MODE_NORMAL;
 	w->enable_gzip = 0;
 	w->keepalive = 0;
-	if(w->decoded_url) {
-		free(w->decoded_url);
-		w->decoded_url = NULL;
-	}
+	w->decoded_url[0] = '\0';
 
 	buffer_reset(w->response.header_output);
 	buffer_reset(w->response.header);
@@ -1246,7 +1243,7 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
 // http_request_validate()
 // returns:
 // = 0 : all good, process the request
-// > 0 : request is complete, but is not supported
+// > 0 : request is not supported
 // < 0 : request is incomplete - wait for more data
 
 static inline int http_request_validate(struct web_client *w) {
@@ -1268,7 +1265,7 @@ static inline int http_request_validate(struct web_client *w) {
 
 	// find the SPACE + "HTTP/"
 	while(*s) {
-		// find the space
+		// find the next space
 		while (*s && *s != ' ') s++;
 
 		// is it SPACE + "HTTP/" ?
@@ -1277,7 +1274,7 @@ static inline int http_request_validate(struct web_client *w) {
 	}
 
 	// incomplete requests
-	if(!*s) {
+	if(unlikely(!*s)) {
 		w->wait_receive = 1;
 		return -2;
 	}
@@ -1285,32 +1282,37 @@ static inline int http_request_validate(struct web_client *w) {
 	// we have the end of encoded_url - remember it
 	char *ue = s;
 
+	// make sure we have complete request
+	// complete requests contain: \r\n\r\n
 	while(*s) {
 		// find a line feed
-		while (*s && *s != '\r') s++;
+		while(*s && *s++ != '\r');
 
 		// did we reach the end?
 		if(unlikely(!*s)) break;
 
 		// is it \r\n ?
-		if (likely(s[1] == '\n')) {
+		if(likely(*s++ == '\n')) {
 
 			// is it again \r\n ? (header end)
-			if(unlikely(s[2] == '\r' && s[3] == '\n')) {
+			if(unlikely(*s == '\r' && s[1] == '\n')) {
 				// a valid complete HTTP request found
 
 				*ue = '\0';
-				w->decoded_url = url_decode(encoded_url);
+				url_decode_r(w->decoded_url, encoded_url, URL_MAX + 1);
 				*ue = ' ';
+				
+				// copy the URL - we are going to overwrite parts of it
+				// FIXME -- we should avoid it
+				strncpyz(w->last_url, w->decoded_url, URL_MAX);
 
 				w->wait_receive = 0;
 				return 0;
 			}
 
 			// another header line
-			s = http_header_parse(w, &s[2]);
+			s = http_header_parse(w, s);
 		}
-		else s++;
 	}
 
 	// incomplete request
@@ -1351,10 +1353,6 @@ void web_client_process(struct web_client *w) {
 	}
 	else { // what_to_do == 0
 		gettimeofday(&w->tv_in, NULL);
-
-		// copy the URL - we are going to overwrite parts of it
-		// FIXME -- we should avoid it
-		strncpyz(w->last_url, w->decoded_url, URL_MAX);
 
 		if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
 			code = 200;
