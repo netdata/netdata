@@ -30,7 +30,7 @@ extern int  vsnprintfz(char *dst, size_t n, const char *fmt, va_list args);
 extern int  snprintfz(char *dst, size_t n, const char *fmt, ...);
 
 extern void *mymmap(const char *filename, size_t size, int flags, int ksm);
-extern int savememory(const char *filename, void *mem, unsigned long size);
+extern int savememory(const char *filename, void *mem, size_t size);
 
 extern int fd_is_valid(int fd);
 

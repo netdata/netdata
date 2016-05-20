@@ -50,7 +50,7 @@ int error_log_limit(int reset) {
 			log_date(stderr);
 			fprintf(stderr, "%s: Resetting logging for process '%s' (prevented %lu logs in the last %ld seconds).\n"
 					, program_name
-			        , program_name
+					, program_name
 					, prevented
 					, now - start
 			);
@@ -69,7 +69,7 @@ int error_log_limit(int reset) {
 			log_date(stderr);
 			fprintf(stderr, "%s: Resuming logging from process '%s' (prevented %lu logs in the last %ld seconds).\n"
 					, program_name
-			        , program_name
+					, program_name
 					, prevented
 					, error_log_throttle_period
 			);
@@ -89,11 +89,11 @@ int error_log_limit(int reset) {
 			log_date(stderr);
 			fprintf(stderr, "%s: Too many logs (%lu logs in %ld seconds, threshold is set to %lu logs in %ld seconds). Preventing more logs from process '%s' for %ld seconds.\n"
 					, program_name
-			        , counter
-			        , now - start
-			        , error_log_errors_per_period
-			        , error_log_throttle_period
-			        , program_name
+					, counter
+					, now - start
+					, error_log_errors_per_period
+					, error_log_throttle_period
+					, program_name
 					, start + error_log_throttle_period - now);
 		}
 
@@ -116,7 +116,7 @@ void log_date(FILE *out)
 		tmp = localtime_r(&t, &tmbuf);
 
 		if (tmp == NULL) return;
-		if (strftime(outstr, sizeof(outstr), "%y-%m-%d %H:%M:%S", tmp) == 0) return;
+		if (unlikely(strftime(outstr, sizeof(outstr), "%y-%m-%d %H:%M:%S", tmp) == 0)) return;
 
 		fprintf(out, "%s: ", outstr);
 }
@@ -127,10 +127,10 @@ void debug_int( const char *file, const char *function, const unsigned long line
 
 	log_date(stdout);
 	va_start( args, fmt );
-	fprintf(stdout, "DEBUG (%04lu@%-10.10s:%-15.15s): %s: ", line, file, function, program_name);
-	vfprintf( stdout, fmt, args );
+	printf("DEBUG (%04lu@%-10.10s:%-15.15s): %s: ", line, file, function, program_name);
+	vprintf(fmt, args );
 	va_end( args );
-	fprintf(stdout, "\n");
+	putchar('\n');
 	// fflush( stdout );
 
 	if(output_log_syslog) {
@@ -154,8 +154,7 @@ void info_int( const char *file, const char *function, const unsigned long line,
 	else            fprintf(stderr, "INFO: %s: ", program_name);
 	vfprintf( stderr, fmt, args );
 	va_end( args );
-
-	fprintf(stderr, "\n");
+	fputc('\n', stderr);
 
 	if(error_log_syslog) {
 		va_start( args, fmt );
@@ -180,13 +179,12 @@ void error_int( const char *prefix, const char *file, const char *function, cons
 	va_end( args );
 
 	if(errno) {
-    /* Why 1024? Internacionalization... eglibc errno strings are
-     * 50 chars long, but other languages and charsets (utf-8) could
-     * use 5 bytes per char. The previous buffer was 200 chars long, so
-     * to avoid problems with other languages I'll use 1 KiB. */
-    char buf[1024];
-		char *s = strerror_r(errno, buf, 1023);
-		fprintf(stderr, " (errno %d, %s)\n", errno, s);
+		/* Why 1024? Internacionalization... eglibc errno strings are
+		 * 50 chars long, but other languages and charsets (utf-8) could
+		 * use 5 bytes per char. The previous buffer was 200 chars long, so
+		 * to avoid problems with other languages use 1 KiB. */
+		char buf[1024];
+		fprintf(stderr, " (errno %d, %s)\n", errno, strerror_r(errno, buf, 1023));
 		errno = 0;
 	}
 	else fprintf(stderr, "\n");
@@ -211,7 +209,7 @@ void fatal_int( const char *file, const char *function, const unsigned long line
 	va_end( args );
 
 	perror(" # ");
-	fprintf(stderr, "\n");
+	fputc('\n', stderr);
 
 	if(error_log_syslog) {
 		va_start( args, fmt );
@@ -232,13 +230,13 @@ void log_access( const char *fmt, ... )
 		va_start( args, fmt );
 		vfprintf( stdaccess, fmt, args );
 		va_end( args );
-		fprintf( stdaccess, "\n");
+		fputc('\n', stdaccess);
 		// fflush( stdaccess );
 	}
 
 	if(access_log_syslog) {
 		va_start( args, fmt );
-		vsyslog(LOG_INFO,  fmt, args );
+		vsyslog(LOG_INFO, fmt, args );
 		va_end( args );
 	}
 }
