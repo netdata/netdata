@@ -83,6 +83,9 @@ struct web_client {
 	int wait_receive;
 	int wait_send;
 
+	unsigned long stats_received_bytes;
+	unsigned long stats_sent_bytes;
+
 	struct web_client *prev;
 	struct web_client *next;
 };
