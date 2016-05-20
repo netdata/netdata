@@ -62,13 +62,14 @@ tomcat_check() {
 }
 
 tomcat_get() {
-	# Collect tomcat values
+	# collect tomcat values
+	tomcat_port="$(IFS=/ read -ra a <<< "$tomcat_url"; hostport=${a[2]}; echo "${hostport#*:}")"
 	mapfile -t lines < <(curl -u "$tomcatUser":"$tomcatPassword" -Ss "$tomcat_url" |\
 		xmlstarlet sel \
 			-t -m "/status/jvm/memory" -v @free \
-			-n -m "/status/connector[@name='\"http-bio-8080\"']/threadInfo" -v @currentThreadCount \
+			-n -m "/status/connector[@name='\"http-bio-$tomcat_port\"']/threadInfo" -v @currentThreadCount \
 			-n -v @currentThreadsBusy \
-			-n -m "/status/connector[@name='\"http-bio-8080\"']/requestInfo" -v @requestCount \
+			-n -m "/status/connector[@name='\"http-bio-$tomcat_port\"']/requestInfo" -v @requestCount \
 			-n -v @bytesSent -n -)
 
 	tomcat_jvm_freememory="${lines[0]}"
