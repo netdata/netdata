@@ -1,4 +1,3 @@
-
 #ifdef NETDATA_WITH_ZLIB
 #include <zlib.h>
 #endif
@@ -44,8 +43,8 @@ struct response {
 #ifdef NETDATA_WITH_ZLIB
 	z_stream zstream;				// zlib stream for sending compressed output to client
 	Bytef zbuffer[ZLIB_CHUNK];		// temporary buffer for storing compressed output
-	long zsent;						// the compressed bytes we have sent to the client
-	long zhave;						// the compressed bytes that we have to send
+	ssize_t zsent;						// the compressed bytes we have sent to the client
+	ssize_t zhave;						// the compressed bytes that we have to send
 	int zinitialized;
 #endif
 

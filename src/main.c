@@ -280,12 +280,13 @@ int main(int argc, char **argv)
 	char *error_log_file = NULL;
 	char *access_log_file = NULL;
 	char *user = NULL;
+
 	{
-		char buffer[1024];
+		char buffer[HOSTNAME_MAX+1] = "0x00000000";
 
 		// --------------------------------------------------------------------
 
-		sprintf(buffer, "0x%08llx", 0ULL);
+		//sprintf(buffer, "0x%08llx", 0ULL);
 		char *flags = config_get("global", "debug flags", buffer);
 		setenv("NETDATA_DEBUG_FLAGS", flags, 1);
 
@@ -392,8 +393,8 @@ int main(int argc, char **argv)
 
 		// let the plugins know the min update_every
 		{
-			char buf[51];
-			snprintfz(buf, 50, "%d", rrd_update_every);
+			char buf[16];
+			snprintfz(buf, 15, "%d", rrd_update_every);
 			setenv("NETDATA_UPDATE_EVERY", buf, 1);
 		}
 
@@ -484,13 +485,14 @@ int main(int argc, char **argv)
 		else if(!strcmp(ipv, "ipv6") || !strcmp(ipv, "IPV6") || !strcmp(ipv, "IPv6") || !strcmp(ipv, "6")) ip = 6;
 		else info("Cannot understand ip version '%s'. Assuming 'any'.", ipv);
 
-		if(ip == 0 || ip == 6) listen_fd = create_listen_socket6(config_get("global", "bind socket to IP", "*"), listen_port, listen_backlog);
-		if(listen_fd < 0) {
+		if(ip == 0 || ip == 6) 
+			listen_fd = create_listen_socket6(config_get("global", "bind socket to IP", "*"), listen_port, listen_backlog);
+		if(listen_fd == -1) {
 			listen_fd = create_listen_socket4(config_get("global", "bind socket to IP", "*"), listen_port, listen_backlog);
-			if(listen_fd >= 0 && ip != 4) info("Managed to open an IPv4 socket on port %d.", listen_port);
+			if(listen_fd != -1 && ip != 4) info("Managed to open an IPv4 socket on port %d.", listen_port);
 		}
 
-		if(listen_fd < 0) fatal("Cannot listen socket.");
+		if(listen_fd == -1) fatal("Cannot listen socket.");
 	}
 
 	// never become a problem

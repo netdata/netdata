@@ -649,7 +649,7 @@ char *trim(char *s)
 	// skip tailing spaces
 	// this way is way faster. Writes only one NUL char.
 	ssize_t l = strlen(s);
-  if (--l >= 0)
+	if (--l >= 0)
 	{
 		char *p = s + l;
 		while (p > s && isspace(*p)) p--;
@@ -669,7 +669,7 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm)
 	errno = 0;
 	fd = open(filename, O_RDWR|O_CREAT|O_NOATIME, 0664);
 	if(fd != -1) {
-		if(lseek(fd, size, SEEK_SET) == (long)size) {
+		if(lseek(fd, size, SEEK_SET) == (off_t)size) {
 			if(write(fd, "", 1) == 1) {
 				if(ftruncate(fd, size))
 					error("Cannot truncate file '%s' to size %ld. Will use the larger file.", filename, size);
@@ -677,8 +677,9 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm)
 #ifdef MADV_MERGEABLE
 				if(flags & MAP_SHARED || !enable_ksm || !ksm) {
 #endif
+					/* FIX: mmap() returns MAP_FAILED in case of error, not a NULL pointer! */
 					mem = mmap(NULL, size, PROT_READ|PROT_WRITE, flags, fd, 0);
-					if(mem) {
+					if(mem != MAP_FAILED) {
 						int advise = MADV_SEQUENTIAL|MADV_DONTFORK;
 						if(flags & MAP_SHARED) advise |= MADV_WILLNEED;
 
@@ -688,8 +689,9 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm)
 #ifdef MADV_MERGEABLE
 				}
 				else {
+					/* FIX: mmap() returns MAP_FAILED in case of error, not a NULL pointer! */
 					mem = mmap(NULL, size, PROT_READ|PROT_WRITE, flags|MAP_ANONYMOUS, -1, 0);
-					if(mem) {
+					if(mem != MAP_FAILED) {
 						if(lseek(fd, 0, SEEK_SET) == 0) {
 							if(read(fd, mem, size) != (ssize_t)size)
 								error("Cannot read from file '%s'", filename);
@@ -720,19 +722,22 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm)
 	return mem;
 }
 
-int savememory(const char *filename, void *mem, unsigned long size)
+int savememory(const char *filename, void *mem, size_t size)
 {
 	char tmpfilename[FILENAME_MAX + 1];
 
-	snprintfz(tmpfilename, FILENAME_MAX, "%s.%ld.tmp", filename, (long)getpid());
+	/* FIX: getpid() is always successful, so it will not return -1 as errorcode. */
+	snprintfz(tmpfilename, FILENAME_MAX, "%s.%lu.tmp", filename, (unsigned long)getpid());
 
-	int fd = open(tmpfilename, O_RDWR|O_CREAT|O_NOATIME, 0664);
-	if(fd < 0) {
+	int fd = open(tmpfilename, O_RDWR | O_CREAT | O_NOATIME, 0664);
+
+	/* FIX: syscalls return -1 on error! */
+	if(fd == -1) {
 		error("Cannot create/open file '%s'.", filename);
 		return -1;
 	}
 
-	if(write(fd, mem, size) != (long)size) {
+	if(write(fd, mem, size) != (ssize_t)size) {
 		error("Cannot write to file '%s' %ld bytes.", filename, (long)size);
 		close(fd);
 		return -1;
@@ -740,17 +745,16 @@ int savememory(const char *filename, void *mem, unsigned long size)
 
 	close(fd);
 
-	int ret = 0;
 	if(rename(tmpfilename, filename)) {
 		error("Cannot rename '%s' to '%s'", tmpfilename, filename);
-		ret = -1;
+		return -1;
 	}
 
-	return ret;
+	return 0;
 }
 
 int fd_is_valid(int fd) {
-    return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
+		return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
 }
 
 /*
