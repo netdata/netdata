@@ -10,6 +10,14 @@
 	<meta name="apple-mobile-web-app-capable" content="yes">
 	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
+	<meta property="og:locale" content="en_US" />
+	<meta property="og:image" content="images/seo-performance-512.png"/>
+	<meta property="og:url" content="http://my-netdata.io/"/>
+	<meta property="og:type" content="website"/>
+	<meta property="og:site_name" content="netdata"/>
+	<meta property="og:title" content="netdata - real-time performance monitoring, done right!"/>
+	<meta property="og:description" content="netdata is an embeddable real-time performance monitoring solution, for Linux systems, micro services, applications, APIs, SNMP devices. Stunning dashboards, blazzingly fast and extremely interactive." />
+
 	<script>
 	// --- OPTIONS FOR THE DASHBOARD --
 
@@ -42,7 +50,7 @@
 		and that you have chown it to be owned by netdata:netdata
 	-->
 	<!-- <script type="text/javascript" src="http://my.server:19999/dashboard.js"></script> -->
-	<script type="text/javascript" src="dashboard.js?v37"></script>
+	<script type="text/javascript" src="dashboard.js?v38"></script>
 
 	<script>
 	// --- OPTIONS FOR THE CHARTS --
@@ -618,80 +626,157 @@ body {
 	</div>
 
 	<div class="mytitle">
-		CPU Usage of the netdata user
+		Netdata performance
 	</div>
 	<div class="mycontent">
 		netdata monitors <b>users</b>, <b>user groups</b>, <b>applications (process trees)</b>
 		<br/>
-		and <b>containers</b> (<code>lxc</code>, <code>docker</code>, etc.)
+		<b>containers</b> (<code>lxc</code>, <code>docker</code>, etc.) and SNMP devices.
 	</div>
 
-	<div style="padding-top: 4vw; width: 100%; text-align: center; font-size: 1.5vw;">
+	<!-- Nav tabs -->
+	<ul class="nav nav-tabs" role="tablist" style="padding-top: 1vw;">
+		<li role="presentation" class="active"><a href="#netdata_cpu" aria-controls="netdata_cpu" role="tab" data-toggle="tab">CPU</a></li>
+		<li role="presentation"><a href="#netdata_avgtime" aria-controls="netdata_avgtime" role="tab" data-toggle="tab">Average Response Time</a></li>
+	</ul>
 
-		<div class="mysparkline">
-			<div class="mysparkline-overchart-label">
-				<b>EU - London</b>, CPU % of a single core
+	<!-- Tab panes -->
+	<div class="tab-content">
+		<div role="tabpanel" class="tab-pane active" id="netdata_cpu">
+			<div class="mysparkline">
+				<div class="mysparkline-overchart-label">
+					<b>EU - London</b>, CPU % of a single core
+				</div>
+				<div class="mysparkline-overchart-value" id="users.cpu.netdata1" >
+				</div>
+				<div data-netdata="users.cpu"
+						data-dimensions="netdata"
+						data-host="//london.my-netdata.io"
+						data-chart-library="dygraph"
+						data-dygraph-theme="sparkline"
+						data-dygraph-type="area"
+						data-width="100%"
+						data-height="100%"
+						data-after="-300"
+						data-colors="#558855"
+						data-show-value-of-netdata-at="users.cpu.netdata1"
+						></div>
 			</div>
-			<div class="mysparkline-overchart-value" id="users.cpu.netdata1" >
+
+			<div class="mysparkline">
+				<div class="mysparkline-overchart-label">
+					<b>US - Atlanta</b>, CPU % of a single core
+				</div>
+				<div class="mysparkline-overchart-value" id="users.cpu.netdata2" >
+				</div>
+				<div data-netdata="users.cpu"
+						data-dimensions="netdata"
+						data-host="//atlanta.my-netdata.io"
+						data-chart-library="dygraph"
+						data-dygraph-theme="sparkline"
+						data-dygraph-type="area"
+						data-width="100%"
+						data-height="100%"
+						data-after="-300"
+						data-colors="#885555"
+						data-show-value-of-netdata-at="users.cpu.netdata2"
+						></div>
 			</div>
-			<div data-netdata="users.cpu"
-					data-dimensions="netdata"
-					data-host="//london.my-netdata.io"
-					data-chart-library="dygraph"
-					data-dygraph-theme="sparkline"
-					data-dygraph-type="area"
-					data-width="100%"
-					data-height="100%"
-					data-after="-300"
-					data-colors="#558855"
-					data-show-value-of-netdata-at="users.cpu.netdata1"
-					></div>
+
+			<div class="mysparkline">
+				<div class="mysparkline-overchart-label">
+					<b>EU - Greece</b>, CPU % of a single core
+				</div>
+				<div class="mysparkline-overchart-value" id="users.cpu.netdata3" >
+				</div>
+				<div data-netdata="users.cpu"
+						data-dimensions="netdata"
+						data-host="//athens.my-netdata.io"
+						data-chart-library="dygraph"
+						data-dygraph-theme="sparkline"
+						data-dygraph-type="area"
+						data-width="100%"
+						data-height="100%"
+						data-after="-300"
+						data-colors="#555588"
+						data-show-value-of-netdata-at="users.cpu.netdata3"
+						></div>
+			</div>
+
+			<div style="width: 100%; text-align: right; font-size: 1vw;">
+				<i class="fa fa-comment" aria-hidden="true"></i> <i>this utilization is about the whole netdata process tree and the percentage is of <b>a single core</b>!
+				<br/>including <b>BASH</b> plugins (it monitors <code>mysql</code> on the demo sites), <b>node.js</b> plugins (it monitors <code>bind9</code> on the demo sites), etc.
+				<br/>and including the chart refreshes for the dashboards of all viewers.</i>
+			</div>
 		</div>
 
-		<div class="mysparkline">
-			<div class="mysparkline-overchart-label">
-				<b>US - Atlanta</b>, CPU % of a single core
+		<div role="tabpanel" class="tab-pane" id="netdata_avgtime">
+			<div class="mysparkline">
+				<div class="mysparkline-overchart-label">
+					<b>EU - London</b>, API average response time in milliseconds
+				</div>
+				<div class="mysparkline-overchart-value" id="netdata.response_time1" >
+				</div>
+				<div data-netdata="netdata.response_time"
+						data-host="//london.my-netdata.io"
+						data-chart-library="dygraph"
+						data-dygraph-theme="sparkline"
+						data-dygraph-type="area"
+						data-width="100%"
+						data-height="100%"
+						data-after="-300"
+						data-colors="#558855"
+						data-show-value-of-response_time-at="netdata.response_time1"
+						></div>
 			</div>
-			<div class="mysparkline-overchart-value" id="users.cpu.netdata2" >
-			</div>
-			<div data-netdata="users.cpu"
-					data-dimensions="netdata"
-					data-host="//atlanta.my-netdata.io"
-					data-chart-library="dygraph"
-					data-dygraph-theme="sparkline"
-					data-dygraph-type="area"
-					data-width="100%"
-					data-height="100%"
-					data-after="-300"
-					data-colors="#885555"
-					data-show-value-of-netdata-at="users.cpu.netdata2"
-					></div>
-		</div>
 
-		<div class="mysparkline">
-			<div class="mysparkline-overchart-label">
-				<b>EU - Greece</b>, CPU % of a single core
+			<div class="mysparkline">
+				<div class="mysparkline-overchart-label">
+					<b>US - Atlanta</b>, API average response time in milliseconds
+				</div>
+				<div class="mysparkline-overchart-value" id="netdata.response_time2" >
+				</div>
+				<div data-netdata="netdata.response_time"
+						data-host="//atlanta.my-netdata.io"
+						data-chart-library="dygraph"
+						data-dygraph-theme="sparkline"
+						data-dygraph-type="area"
+						data-width="100%"
+						data-height="100%"
+						data-after="-300"
+						data-colors="#885555"
+						data-show-value-of-response_time-at="netdata.response_time2"
+						></div>
 			</div>
-			<div class="mysparkline-overchart-value" id="users.cpu.netdata3" >
+
+			<div class="mysparkline">
+				<div class="mysparkline-overchart-label">
+					<b>EU - Greece</b>, API average response time in milliseconds
+				</div>
+				<div class="mysparkline-overchart-value" id="netdata.response_time3" >
+				</div>
+				<div data-netdata="netdata.response_time"
+						data-host="//athens.my-netdata.io"
+						data-chart-library="dygraph"
+						data-dygraph-theme="sparkline"
+						data-dygraph-type="area"
+						data-width="100%"
+						data-height="100%"
+						data-after="-300"
+						data-colors="#555588"
+						data-show-value-of-response_time-at="netdata.response_time3"
+						></div>
 			</div>
-			<div data-netdata="users.cpu"
-					data-dimensions="netdata"
-					data-host="//athens.my-netdata.io"
-					data-chart-library="dygraph"
-					data-dygraph-theme="sparkline"
-					data-dygraph-type="area"
-					data-width="100%"
-					data-height="100%"
-					data-after="-300"
-					data-colors="#555588"
-					data-show-value-of-netdata-at="users.cpu.netdata3"
-					></div>
+
+			<div style="width: 100%; text-align: right; font-size: 1vw;">
+				<i class="fa fa-comment" aria-hidden="true"></i> <i>netdata is really <b>fast</b> (the values are milliseconds!)
+				<br/>
+				These values include everything, from the reception of the first byte to the dispatch of the last, including gzip compression.
+				<br/>
+				Values above 2-3ms are usually chart refreshes of charts with several dimensions, charts with very long durations (zoomed out), or file transfers.
+				</i>
+			</div>
 		</div>
-	</div>
-	<div style="width: 100%; text-align: right; font-size: 1vw;">
-		<i class="fa fa-comment" aria-hidden="true"></i> <i>this utilization is about the whole netdata process tree and the percentage is of <b>a single core</b>!
-		<br/>including <b>BASH</b> plugins (it monitors <code>mysql</code> on the demo sites), <b>node.js</b> plugins (it monitors <code>bind9</code> on the demo sites), etc.
-		<br/>and including the chart refreshes for the dashboards of all viewers.</i>
 	</div>
 
 	<div style="padding-top: 6vw; width: 100%; text-align: center; font-size: 2vw;">
