@@ -1229,7 +1229,7 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
 	}
 #ifdef NETDATA_WITH_ZLIB
 	else if(!strcasecmp(s, "Accept-Encoding")) {
-		if(web_enable_gzip && strcasestr(v, "gzip")) {
+		if(web_enable_gzip && (strcasestr(v, "gzip") || strcasestr(v, "deflate"))) {
 			w->enable_gzip = 1;
 		}
 	}
