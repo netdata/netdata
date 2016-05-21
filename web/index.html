@@ -1192,7 +1192,7 @@ var menuData = {
 
 	'disk': {
 		title: 'Disks',
-		info: undefined
+		info: 'Charts with performance information for all the system disks. Special care has been given to present disk performance metrics in a way compatible with <code>iostat -x</code>. netdata by default prevents rendering performance charts for individual partitions and unmounted virtual disks. Disabled charts can still be enabled by altering the relative settings in the netdata configuration file.'
 	},
 
 	'sensors': {
@@ -1435,18 +1435,29 @@ var chartData = {
 		colors: '#FF5588',
 		heads: [
 			gaugeChart('Utilization', '12%', '', '#FF5588')
-		]
+		],
+		info: 'Disk Utilization measures the amount of time the disk was busy with something. This is not related to its performance. 100% means that the Linux kernel always had an outstanding operation on the disk. Keep in mind that depending on the underlying technology of the disk, 100% here may or may not be an indication of congestion.'
 	},
 
 	'disk.backlog': {
-		colors: '#0099CC'
+		colors: '#0099CC',
+		info: 'Backlog is an indication of the duration of pending disk operations. On every I/O event the Linux kernel is multiplying the time spent doing I/O since the last update of this field with the number of pending operations. While not accurate, this metric can provide an indication of the expected completion time of the operations in progress.'
 	},
 
 	'disk.io': {
 		heads: [
 			gaugeChart('Read', '12%', 'reads'),
 			gaugeChart('Write', '12%', 'writes')
-		]
+		],
+		info: 'Amount of data transferred to and from disk.'
+	},
+
+	'disk.ops': {
+		info: 'Completed disk I/O operations. Keep in mind the number of operations requested might be higher, since the Linux kernel is able to merge adjacent to each other (see merged operations chart).'
+	},
+
+	'disk.qops': {
+		info: 'I/O operations currently in progress. This metric is a snapshot - it is not an average over the last interval.'
 	},
 
 	'netfilter.sockets': {
@@ -1463,21 +1474,32 @@ var chartData = {
 	},
 
 	'disk.iotime': {
-		height: 0.5
+		height: 0.5,
+		info: 'The sum of the duration of all completed I/O operations. This number can exceed the interval if the disk is able to execute I/O operations in parallel.'
 	},
 	'disk.mops': {
-		height: 0.5
+		height: 0.5,
+		info: 'The number of merged disk operations. The Linux kernel is able to merge adjacent I/O operations, for example two 4KB reads can become one 8KB read before given to disk.'
 	},
 	'disk.svctm': {
-		height: 0.5
+		height: 0.5,
+		info: 'The average service time for completed I/O operations. This metric is calculated using the total busy time of the disk and the number of completed operations. If the disk is able to execute multiple parallel operations the reporting average service time will be misleading.'
 	},
 	'disk.avgsz': {
-		height: 0.5
+		height: 0.5,
+		info: 'The average I/O operation size.'
 	},
 	'disk.await': {
-		height: 0.5
+		height: 0.5,
+		info: 'The average time for I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.'
 	},
 
+	'disk.space': {
+		info: 'Disk space utilization. reserved for root is automatically reserved by the system to prevent the root user from getting out of space.'
+	},
+	'disk.inodes': {
+		info: 'inodes (or index nodes) are filesystem objects (e.g. files and directories). On many types of file system implementations, the maximum number of inodes is fixed at filesystem creation, limiting the maximum number of files the filesystem can hold. It is possible for a device to run out of inodes. When this happens, new files cannot be created on the device, even though there may be free space available.'
+	},
 	'apache.connections': {
 		colors: NETDATA.colors[4],
 		mainheads: [
