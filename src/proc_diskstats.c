@@ -598,7 +598,8 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 		// only if this is not the first time we run
 
 		if(dt) {
-			if(d->do_iotime && d->do_ops) {
+			if( (d->do_iotime == CONFIG_ONDEMAND_YES || (d->do_iotime == CONFIG_ONDEMAND_ONDEMAND && (readms || writems))) &&
+				(d->do_ops    == CONFIG_ONDEMAND_YES || (d->do_ops    == CONFIG_ONDEMAND_ONDEMAND && (reads || writes)))) {
 				st = rrdset_find_bytype("disk_await", disk);
 				if(!st) {
 					st = rrdset_create("disk_await", disk, NULL, family, "disk.await", "Average Completed I/O Operation Time", "ms per operation", 2005, update_every, RRDSET_TYPE_LINE);
@@ -614,7 +615,8 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 				rrdset_done(st);
 			}
 
-			if(d->do_io && d->do_ops) {
+			if( (d->do_io  == CONFIG_ONDEMAND_YES || (d->do_io  == CONFIG_ONDEMAND_ONDEMAND && (readsectors || writesectors))) &&
+				(d->do_ops == CONFIG_ONDEMAND_YES || (d->do_ops == CONFIG_ONDEMAND_ONDEMAND && (reads || writes)))) {
 				st = rrdset_find_bytype("disk_avgsz", disk);
 				if(!st) {
 					st = rrdset_create("disk_avgsz", disk, NULL, family, "disk.avgsz", "Average Completed I/O Operation Bandwidth", "kilobytes per operation", 2006, update_every, RRDSET_TYPE_AREA);
@@ -630,7 +632,8 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 				rrdset_done(st);
 			}
 
-			if(d->do_util && d->do_ops) {
+			if( (d->do_util == CONFIG_ONDEMAND_YES || (d->do_util == CONFIG_ONDEMAND_ONDEMAND && busy_ms)) &&
+				(d->do_ops  == CONFIG_ONDEMAND_YES || (d->do_ops  == CONFIG_ONDEMAND_ONDEMAND && (reads || writes)))) {
 				st = rrdset_find_bytype("disk_svctm", disk);
 				if(!st) {
 					st = rrdset_create("disk_svctm", disk, NULL, family, "disk.svctm", "Average Service Time", "ms per operation", 2007, update_every, RRDSET_TYPE_LINE);
