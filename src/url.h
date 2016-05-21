@@ -19,4 +19,6 @@ extern char *url_encode(char *str);
 /* IMPORTANT: be sure to free() the returned string after use */
 extern char *url_decode(char *str);
 
+extern char *url_decode_r(char *to, char *url, size_t size);
+
 #endif /* NETDATA_URL_H */

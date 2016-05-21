@@ -21,13 +21,29 @@ typedef struct dictionary {
 
 	uint8_t flags;
 
+#ifdef NETDATA_DICTIONARY_WITH_STATISTICS
 	unsigned long long inserts;
 	unsigned long long deletes;
 	unsigned long long searches;
 	unsigned long long entries;
+#endif /* NETDATA_DICTIONARY_WITH_STATISTICS */
 
 	pthread_rwlock_t rwlock;
 } DICTIONARY;
+
+#ifdef NETDATA_DICTIONARY_WITH_STATISTICS
+#define NETDATA_DICTIONARY_STATS_INSERTS_PLUS1(dict) (dict)->inserts++
+#define NETDATA_DICTIONARY_STATS_DELETES_PLUS1(dict) (dict)->deletes++
+#define NETDATA_DICTIONARY_STATS_SEARCHES_PLUS1(dict) (dict)->searches++
+#define NETDATA_DICTIONARY_STATS_ENTRIES_PLUS1(dict) (dict)->entries++
+#define NETDATA_DICTIONARY_STATS_ENTRIES_MINUS1(dict) (dict)->entries--
+#else /* NETDATA_DICTIONARY_WITH_STATISTICS */
+#define NETDATA_DICTIONARY_STATS_INSERTS_PLUS1(dict)
+#define NETDATA_DICTIONARY_STATS_DELETES_PLUS1(dict)
+#define NETDATA_DICTIONARY_STATS_SEARCHES_PLUS1(dict)
+#define NETDATA_DICTIONARY_STATS_ENTRIES_PLUS1(dict)
+#define NETDATA_DICTIONARY_STATS_ENTRIES_MINUS1(dict)
+#endif /* NETDATA_DICTIONARY_WITH_STATISTICS */
 
 #define DICTIONARY_FLAG_DEFAULT					0x00000000
 #define DICTIONARY_FLAG_SINGLE_THREADED			0x00000001

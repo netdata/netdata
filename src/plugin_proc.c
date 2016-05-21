@@ -18,7 +18,8 @@
 
 void *proc_main(void *ptr)
 {
-	if(ptr) { ; }
+	static unsigned long long old_web_requests = 0, old_web_usec = 0;
+	(void)ptr;
 
 	info("PROC Plugin thread created with task id %d", gettid());
 
@@ -77,7 +78,7 @@ void *proc_main(void *ptr)
 	unsigned long long sunext = (time(NULL) - (time(NULL) % rrd_update_every) + rrd_update_every) * 1000000ULL;
 	unsigned long long sunow;
 
-	RRDSET *stcpu = NULL, *stcpu_thread = NULL, *stclients = NULL, *streqs = NULL, *stbytes = NULL;
+	RRDSET *stcpu = NULL, *stcpu_thread = NULL, *stclients = NULL, *streqs = NULL, *stbytes = NULL, *stduration = NULL;
 
 	for(;1;) {
 		if(unlikely(netdata_exit)) break;
@@ -307,6 +308,30 @@ void *proc_main(void *ptr)
 			rrddim_set(stbytes, "in", global_statistics.bytes_received);
 			rrddim_set(stbytes, "out", global_statistics.bytes_sent);
 			rrdset_done(stbytes);
+
+			// ----------------------------------------------------------------
+
+			if(!stduration) stduration = rrdset_find("netdata.response_time");
+			if(!stduration) {
+				stduration = rrdset_create("netdata", "response_time", NULL, "netdata", NULL, "NetData Average API Response Time", "ms/request", 130400, rrd_update_every, RRDSET_TYPE_LINE);
+
+				rrddim_add(stduration, "response_time", "response time",  1, 1000, RRDDIM_ABSOLUTE);
+			}
+			else rrdset_next(stduration);
+
+			unsigned long long gweb_usec     = global_statistics.web_usec;
+			unsigned long long gweb_requests = global_statistics.web_requests;
+
+			unsigned long long web_usec     = gweb_usec     - old_web_usec;
+			unsigned long long web_requests = gweb_requests - old_web_requests;
+
+			old_web_usec     = gweb_usec;
+			old_web_requests = gweb_requests;
+
+			if(!web_requests) web_requests = 1;
+
+			rrddim_set(stduration, "response_time", web_usec / web_requests);
+			rrdset_done(stduration);
 
 			// ----------------------------------------------------------------
 
