@@ -242,8 +242,8 @@ int config_get_boolean(const char *section, const char *name, int value)
 	s = config_get(section, name, s);
 	if(!s) return value;
 
-	if(!strcmp(s, "yes")) return 1;
-	else return 0;
+	if(!strcmp(s, "yes") || !strcmp(s, "auto") || !strcmp(s, "on demand")) return 1;
+	return 0;
 }
 
 int config_get_boolean_ondemand(const char *section, const char *name, int value)
@@ -251,7 +251,7 @@ int config_get_boolean_ondemand(const char *section, const char *name, int value
 	char *s;
 
 	if(value == CONFIG_ONDEMAND_ONDEMAND)
-		s = "on demand";
+		s = "auto";
 
 	else if(value == CONFIG_ONDEMAND_NO)
 		s = "no";
@@ -266,7 +266,7 @@ int config_get_boolean_ondemand(const char *section, const char *name, int value
 		return CONFIG_ONDEMAND_YES;
 	else if(!strcmp(s, "no"))
 		return CONFIG_ONDEMAND_NO;
-	else if(!strcmp(s, "on demand"))
+	else if(!strcmp(s, "auto") || !strcmp(s, "on demand"))
 		return CONFIG_ONDEMAND_ONDEMAND;
 
 	return value;
