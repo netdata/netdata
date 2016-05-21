@@ -146,6 +146,19 @@ void web_client_reset(struct web_client *w)
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 
+	debug(D_WEB_CLIENT, "%llu: Reseting client.", w->id);
+
+	if(w->stats_received_bytes || w->stats_sent_bytes) {
+		global_statistics_lock();
+		global_statistics.web_requests++;
+		global_statistics.web_usec += usecdiff(&tv, &w->tv_in);
+		global_statistics.bytes_received += w->stats_received_bytes;
+		global_statistics.bytes_sent += w->stats_sent_bytes;
+		global_statistics_unlock();
+	}
+	w->stats_received_bytes = 0;
+	w->stats_sent_bytes = 0;
+
 	long sent = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
 
 #ifdef NETDATA_WITH_ZLIB
@@ -166,8 +179,6 @@ void web_client_reset(struct web_client *w)
 			w->last_url
 		);
 
-	debug(D_WEB_CLIENT, "%llu: Reseting client.", w->id);
-
 	if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
 		debug(D_WEB_CLIENT, "%llu: Closing filecopy input file.", w->id);
 		close(w->ifd);
@@ -181,12 +192,8 @@ void web_client_reset(struct web_client *w)
 	w->origin[1] = '\0';
 
 	w->mode = WEB_CLIENT_MODE_NORMAL;
-	w->enable_gzip = 0;
 	w->keepalive = 0;
-	if(w->decoded_url) {
-		free(w->decoded_url);
-		w->decoded_url = NULL;
-	}
+	w->decoded_url[0] = '\0';
 
 	buffer_reset(w->response.header_output);
 	buffer_reset(w->response.header);
@@ -417,7 +424,7 @@ int mysendfile(struct web_client *w, char *filename)
 
 
 #ifdef NETDATA_WITH_ZLIB
-void web_client_enable_deflate(struct web_client *w) {
+void web_client_enable_deflate(struct web_client *w, int gzip) {
 	if(w->response.zinitialized == 1) {
 		error("%llu: Compression has already be initialized for this client.", w->id);
 		return;
@@ -450,7 +457,7 @@ void web_client_enable_deflate(struct web_client *w) {
 //	}
 
 	// Select GZIP compression: windowbits = 15 + 16 = 31
-	if(deflateInit2(&w->response.zstream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 31, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
+	if(deflateInit2(&w->response.zstream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 15 + ((gzip)?16:0), 8, Z_DEFAULT_STRATEGY) != Z_OK) {
 		error("%llu: Failed to initialize zlib. Proceeding without compression.", w->id);
 		return;
 	}
@@ -1221,8 +1228,13 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
 	}
 #ifdef NETDATA_WITH_ZLIB
 	else if(!strcasecmp(s, "Accept-Encoding")) {
-		if(web_enable_gzip && strcasestr(v, "gzip")) {
-			w->enable_gzip = 1;
+		if(web_enable_gzip) {
+			if(strcasestr(v, "gzip"))
+				web_client_enable_deflate(w, 1);
+			//
+			// does not seem to work
+			// else if(strcasestr(v, "deflate"))
+			//	web_client_enable_deflate(w, 0);
 		}
 	}
 #endif /* NETDATA_WITH_ZLIB */
@@ -1235,7 +1247,7 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
 // http_request_validate()
 // returns:
 // = 0 : all good, process the request
-// > 0 : request is complete, but is not supported
+// > 0 : request is not supported
 // < 0 : request is incomplete - wait for more data
 
 static inline int http_request_validate(struct web_client *w) {
@@ -1257,7 +1269,7 @@ static inline int http_request_validate(struct web_client *w) {
 
 	// find the SPACE + "HTTP/"
 	while(*s) {
-		// find the space
+		// find the next space
 		while (*s && *s != ' ') s++;
 
 		// is it SPACE + "HTTP/" ?
@@ -1266,7 +1278,7 @@ static inline int http_request_validate(struct web_client *w) {
 	}
 
 	// incomplete requests
-	if(!*s) {
+	if(unlikely(!*s)) {
 		w->wait_receive = 1;
 		return -2;
 	}
@@ -1274,32 +1286,37 @@ static inline int http_request_validate(struct web_client *w) {
 	// we have the end of encoded_url - remember it
 	char *ue = s;
 
+	// make sure we have complete request
+	// complete requests contain: \r\n\r\n
 	while(*s) {
 		// find a line feed
-		while (*s && *s != '\r') s++;
+		while(*s && *s++ != '\r');
 
 		// did we reach the end?
 		if(unlikely(!*s)) break;
 
 		// is it \r\n ?
-		if (likely(s[1] == '\n')) {
+		if(likely(*s++ == '\n')) {
 
 			// is it again \r\n ? (header end)
-			if(unlikely(s[2] == '\r' && s[3] == '\n')) {
+			if(unlikely(*s == '\r' && s[1] == '\n')) {
 				// a valid complete HTTP request found
 
 				*ue = '\0';
-				w->decoded_url = url_decode(encoded_url);
+				url_decode_r(w->decoded_url, encoded_url, URL_MAX + 1);
 				*ue = ' ';
+				
+				// copy the URL - we are going to overwrite parts of it
+				// FIXME -- we should avoid it
+				strncpyz(w->last_url, w->decoded_url, URL_MAX);
 
 				w->wait_receive = 0;
 				return 0;
 			}
 
 			// another header line
-			s = http_header_parse(w, &s[2]);
+			s = http_header_parse(w, s);
 		}
-		else s++;
 	}
 
 	// incomplete request
@@ -1341,14 +1358,6 @@ void web_client_process(struct web_client *w) {
 	else { // what_to_do == 0
 		gettimeofday(&w->tv_in, NULL);
 
-		global_statistics_lock();
-		global_statistics.web_requests++;
-		global_statistics_unlock();
-
-		// copy the URL - we are going to overwrite parts of it
-		// FIXME -- we should avoid it
-		strncpyz(w->last_url, w->decoded_url, URL_MAX);
-
 		if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
 			code = 200;
 			w->response.data->contenttype = CT_TEXT_PLAIN;
@@ -1356,11 +1365,6 @@ void web_client_process(struct web_client *w) {
 			buffer_strcat(w->response.data, "OK");
 		}
 		else {
-#ifdef NETDATA_WITH_ZLIB
-			if(w->enable_gzip)
-				web_client_enable_deflate(w);
-#endif
-
 			char *url = w->decoded_url;
 			char *tok = mystrsep(&url, "/?");
 			if(tok && *tok) {
@@ -1736,11 +1740,8 @@ void web_client_process(struct web_client *w) {
 				, w->id
 				, buffer_strlen(w->response.header_output)
 				, bytes);
-	else {
-		global_statistics_lock();
-		global_statistics.bytes_sent += bytes;
-		global_statistics_unlock();
-	}
+	else 
+		w->stats_sent_bytes += bytes;
 
 	// enable TCP_NODELAY, to send all data immediately at the next send()
 	flag = 1;
@@ -2107,10 +2108,8 @@ void *web_client_main(void *ptr)
 				errno = 0;
 				break;
 			}
-
-			global_statistics_lock();
-			global_statistics.bytes_sent += bytes;
-			global_statistics_unlock();
+			else
+				w->stats_sent_bytes += bytes;
 		}
 
 		if(w->wait_receive && FD_ISSET(w->ifd, &ifds)) {
@@ -2120,6 +2119,8 @@ void *web_client_main(void *ptr)
 				errno = 0;
 				break;
 			}
+			else
+				w->stats_received_bytes += bytes;
 
 			if(w->mode == WEB_CLIENT_MODE_NORMAL) {
 				debug(D_WEB_CLIENT, "%llu: Attempting to process received data (%ld bytes).", w->id, bytes);
@@ -2127,9 +2128,6 @@ void *web_client_main(void *ptr)
 				web_client_process(w);
 			}
 
-			global_statistics_lock();
-			global_statistics.bytes_received += bytes;
-			global_statistics_unlock();
 		}
 	}
 
