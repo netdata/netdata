@@ -64,7 +64,7 @@ This is what it currently monitors (most with zero configuration):
 
 - **RAM, swap and kernel memory usage** (including KSM and kernel memory deduper)
 
-- **Disks** (per disk: I/O, operations, backlog, utilization, etc)
+- **Disks** (per disk: I/O, operations, backlog, utilization, space, etc)
 
    ![sda](https://cloud.githubusercontent.com/assets/2662304/14093195/c882bbf4-f554-11e5-8863-1788d643d2c0.gif)
 
