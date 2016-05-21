@@ -136,7 +136,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 	static procfile *ff = NULL;
 	static char path_to_get_hw_sector_size[FILENAME_MAX + 1] = "";
 	static int enable_autodetection;
-	static int enable_physical_disks, enable_virtual_disks, enable_partitions, enable_mountpoints, enable_space_metrics;
+	static int enable_physical_disks, enable_virtual_disks, enable_partitions, enable_mountpoints, enable_virtual_mountpoints, enable_space_metrics;
 	static int do_io, do_ops, do_mops, do_iotime, do_qops, do_util, do_backlog, do_space, do_inodes;
 	static struct statvfs buff_statvfs;
 	static struct stat buff_stat;
@@ -147,6 +147,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 	enable_virtual_disks = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for virtual disks", CONFIG_ONDEMAND_NO);
 	enable_partitions = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for partitions", CONFIG_ONDEMAND_NO);
 	enable_mountpoints = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for mounted filesystems", CONFIG_ONDEMAND_NO);
+	enable_virtual_mountpoints = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for mounted virtual disks", CONFIG_ONDEMAND_ONDEMAND);
 	enable_space_metrics = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "space metrics for mounted filesystems", CONFIG_ONDEMAND_ONDEMAND);
 
 	do_io 	   = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "bandwidth for all disks", CONFIG_ONDEMAND_ONDEMAND);
@@ -267,6 +268,8 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 				def_performance = enable_virtual_disks;
 			} else if(enable_partitions && (d->type == DISK_TYPE_PARTITION)) {
 				def_performance = enable_partitions;
+			} else if(enable_virtual_mountpoints && (d->type == DISK_TYPE_CONTAINER) && (d->mount_point != NULL)) {
+				def_performance = enable_virtual_mountpoints;
 			} else if(enable_mountpoints && (d->mount_point != NULL)) {
 				def_performance = enable_mountpoints;
 			}
