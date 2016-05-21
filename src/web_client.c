@@ -192,7 +192,6 @@ void web_client_reset(struct web_client *w)
 	w->origin[1] = '\0';
 
 	w->mode = WEB_CLIENT_MODE_NORMAL;
-	w->enable_gzip = 0;
 	w->keepalive = 0;
 	w->decoded_url[0] = '\0';
 
@@ -425,7 +424,7 @@ int mysendfile(struct web_client *w, char *filename)
 
 
 #ifdef NETDATA_WITH_ZLIB
-void web_client_enable_deflate(struct web_client *w) {
+void web_client_enable_deflate(struct web_client *w, int gzip) {
 	if(w->response.zinitialized == 1) {
 		error("%llu: Compression has already be initialized for this client.", w->id);
 		return;
@@ -458,7 +457,7 @@ void web_client_enable_deflate(struct web_client *w) {
 //	}
 
 	// Select GZIP compression: windowbits = 15 + 16 = 31
-	if(deflateInit2(&w->response.zstream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 31, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
+	if(deflateInit2(&w->response.zstream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 15 + ((gzip)?16:0), 8, Z_DEFAULT_STRATEGY) != Z_OK) {
 		error("%llu: Failed to initialize zlib. Proceeding without compression.", w->id);
 		return;
 	}
@@ -1229,8 +1228,13 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
 	}
 #ifdef NETDATA_WITH_ZLIB
 	else if(!strcasecmp(s, "Accept-Encoding")) {
-		if(web_enable_gzip && (strcasestr(v, "gzip") || strcasestr(v, "deflate"))) {
-			w->enable_gzip = 1;
+		if(web_enable_gzip) {
+			if(strcasestr(v, "gzip"))
+				web_client_enable_deflate(w, 1);
+			//
+			// does not seem to work
+			// else if(strcasestr(v, "deflate"))
+			//	web_client_enable_deflate(w, 0);
 		}
 	}
 #endif /* NETDATA_WITH_ZLIB */
@@ -1361,11 +1365,6 @@ void web_client_process(struct web_client *w) {
 			buffer_strcat(w->response.data, "OK");
 		}
 		else {
-#ifdef NETDATA_WITH_ZLIB
-			if(w->enable_gzip)
-				web_client_enable_deflate(w);
-#endif
-
 			char *url = w->decoded_url;
 			char *tok = mystrsep(&url, "/?");
 			if(tok && *tok) {
