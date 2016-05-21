@@ -2149,11 +2149,11 @@
 			// mark all dimensions as invalid
 			this.dimensions_visibility.invalidateAll();
 
-			var genLabel = function(state, parent, name, count) {
+			var genLabel = function(state, parent, dim, name, count) {
 				var color = state._chartDimensionColor(name);
 
 				var user_element = null;
-				var user_id = self.data('show-value-of-' + name + '-at') || null;
+				var user_id = self.data('show-value-of-' + dim + '-at') || null;
 				if(user_id !== null) {
 					user_element = document.getElementById(user_id) || null;
 					if(user_element === null)
@@ -2458,14 +2458,14 @@
 					this.log('labels from data: "' + this.element_legend_childs.series.labels_key + '"');
 
 				for(var i = 0, len = this.data.dimension_names.length; i < len ;i++) {
-					genLabel(this, content, this.data.dimension_names[i], i);
+					genLabel(this, content, this.data.dimension_ids[i], this.data.dimension_names[i], i);
 				}
 			}
 			else {
 				var tmp = new Array();
 				for(var dim in this.chart.dimensions) {
 					tmp.push(this.chart.dimensions[dim].name);
-					genLabel(this, content, this.chart.dimensions[dim].name, i);
+					genLabel(this, content, dim, this.chart.dimensions[dim].name, i);
 				}
 				this.element_legend_childs.series.labels_key = tmp.toString();
 				if(this.debug === true)
@@ -3787,6 +3787,10 @@
 			showLabelsOnHighlight: self.data('dygraph-showlabelsonhighlight') || true,
 			hideOverlayOnMouseOut: self.data('dygraph-hideoverlayonmouseout') || true,
 
+			includeZero: self.data('dygraph-includezero') || false,
+			xRangePad: self.data('dygraph-xrangepad') || 0,
+			yRangePad: self.data('dygraph-yrangepad') || 1,
+
 			ylabel: state.units,
 			yLabelWidth: self.data('dygraph-ylabelwidth') || 12,
 
@@ -4204,6 +4208,7 @@
 			state.dygraph_options.labelsDivStyles.width = '120px';
 			state.dygraph_options.labelsSeparateLines = true;
 			state.dygraph_options.rightGap = 0;
+			state.dygraph_options.yRangePad = 1;
 		}
 
 		if(smooth === true) {
