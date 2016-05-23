@@ -199,9 +199,9 @@ struct option_def options[] = {
 	{'p', "Port to listen. Can be from 1 to 65535.",                         "port_number",                          "19999"},
 	{'s', "Path to access host /proc and /sys when running in a container.", "PATH",                                 NULL},
 	{'t', "The frequency in seconds, for data collection. \
-		Same as 'update every' config file option.",                         "seconds",                              "1"},
+Same as 'update every' config file option.",                                 "seconds",                              "1"},
 	{'l', "The number of entries the netdata daemon will keep in memory \
-		for each chart dimension. Same as 'history config file option.",     "lines_to_save",                        NULL},
+for each chart dimension. Same as 'history config file option.",             "lines_to_save",                        NULL},
 	{'u', "System username to run as.",                                      "username",                             "netdata"},
 	{'v', "Version of the program",                                          NULL,                                   NULL},
 	{'W', "vendor options.",                                                 "stacksize=<size>|unittest|debug_flag", NULL},
