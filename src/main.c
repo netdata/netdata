@@ -201,8 +201,6 @@ struct option_def options[] = {
 	{'s', "Path to access host /proc and /sys when running in a container.", "PATH",                                 NULL},
 	{'t', "The frequency in seconds, for data collection. \
 Same as 'update every' config file option.",                                 "seconds",                              "1"},
-	{'l', "The number of entries the netdata daemon will keep in memory \
-for each chart dimension. Same as 'history config file option.",             "lines_to_save",                        NULL},
 	{'u', "System username to run as.",                                      "username",                             "netdata"},
 	{'v', "Version of the program",                                          NULL,                                   NULL},
 	{'W', "vendor options.",                                                 "stacksize=<size>|unittest|debug_flag", NULL},
@@ -295,6 +293,11 @@ int main(int argc, char **argv)
 				fprintf(stderr, "%s: deprecate option -- %s -- please use -s instead.\n", argv[0], argv[i]);
 				remove_option(i, &argc, argv);
 			}
+			else if(strcmp(argv[i], "-l") == 0 && (i+1) < argc) {
+				config_set("global", "history", argv[i+1]);
+				fprintf(stderr, "%s: deprecate option -- %s -- This option will be rmoved with V2.*.\n", argv[0], argv[i]);
+				remove_option(i, &argc, argv);
+			}
 			else i++;
 		}
 	}
@@ -356,9 +359,6 @@ int main(int argc, char **argv)
 					// TODO: Outsource version to makefile which can compute version from git.
 					printf("netdata 1.1.0\n");
 					return 0;
-					break;
-				case 'l':
-					config_set("global", "history", optarg);
 					break;
 				case 'W': 
 					{
