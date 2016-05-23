@@ -14,7 +14,7 @@
 DAEMON="netdata"
 DAEMON_PATH=@sbindir_POST@
 PIDFILE=@localstatedir_POST@/$DAEMON.pid
-DAEMONOPTS="-pidfile $PIDFILE"
+DAEMONOPTS="-P $PIDFILE"
 STOP_TIMEOUT="10"
 
 service_start()

@@ -566,7 +566,7 @@ echo >&2
 # run netdata
 
 echo >&2 "Starting netdata..."
-run ${NETDATA_PREFIX}/usr/sbin/netdata -pidfile ${NETDATA_RUN_DIR}/netdata.pid "${@}"
+run ${NETDATA_PREFIX}/usr/sbin/netdata -P ${NETDATA_RUN_DIR}/netdata.pid "${@}"
 
 if [ $? -ne 0 ]
 	then
@@ -830,6 +830,9 @@ cat <<-END
 
 	-------------------------------------------------------------------------------
 
+	INFO: Command line options changed. -pidfile, -nd and -ch are deprecated.
+	If you use custom stratup scripts please run netdata -h to see the 
+	corresponding options and update your scripts.
 
 	Hit http://${access}:${NETDATA_PORT}/ from your browser.
 

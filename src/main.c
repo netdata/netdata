@@ -1,40 +1,38 @@
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
+#include <errno.h>
+#include <getopt.h>
+#include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <signal.h>
-#include <syslog.h>
-#include <pthread.h>
 #include <string.h>
-#include <errno.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <sys/time.h>
-#include <sys/resource.h>
 #include <sys/mman.h>
 #include <sys/prctl.h>
+#include <sys/wait.h>
+#include <syslog.h>
+#include <unistd.h>
 
-#include "common.h"
-#include "log.h"
-#include "daemon.h"
-#include "web_server.h"
-#include "popen.h"
 #include "appconfig.h"
-#include "web_client.h"
+#include "common.h"
+#include "daemon.h"
+#include "log.h"
+#include "popen.h"
 #include "rrd.h"
 #include "rrd2json.h"
+#include "web_client.h"
+#include "web_server.h"
 
 #include "unit_test.h"
 
-#include "plugins_d.h"
-#include "plugin_idlejitter.h"
-#include "plugin_tc.h"
 #include "plugin_checks.h"
-#include "plugin_proc.h"
+#include "plugin_idlejitter.h"
 #include "plugin_nfacct.h"
 #include "registry.h"
+#include "plugin_proc.h"
+#include "plugin_tc.h"
+#include "plugins_d.h"
 
 #include "main.h"
 
@@ -192,6 +190,72 @@ void kill_childs()
 	debug(D_EXIT, "All threads/childs stopped.");
 }
 
+struct option_def options[] = {
+	// opt description                                                       arg name                     default value
+	{'c', "Load alternate configuration file",                               "config_file",                          CONFIG_DIR "/" CONFIG_FILENAME},
+	{'D', "Disable fork into background",                                    NULL,                                   NULL},
+	{'h', "Display help message",                                            NULL,                                   NULL},
+	{'P', "File to save a pid while running",                                "FILE",                                 NULL},
+	{'i', "The IP address to listen to.",                                    "address",                              "All addresses"},
+	{'p', "Port to listen. Can be from 1 to 65535.",                         "port_number",                          "19999"},
+	{'s', "Path to access host /proc and /sys when running in a container.", "PATH",                                 NULL},
+	{'t', "The frequency in seconds, for data collection. \
+Same as 'update every' config file option.",                                 "seconds",                              "1"},
+	{'u', "System username to run as.",                                      "username",                             "netdata"},
+	{'v', "Version of the program",                                          NULL,                                   NULL},
+	{'W', "vendor options.",                                                 "stacksize=<size>|unittest|debug_flag", NULL},
+};
+
+void help(int exitcode) {
+	FILE *stream;
+	if(exitcode == 0)
+		stream = stdout;
+	else
+		stream = stderr;
+
+	int num_opts = sizeof(options) / sizeof(struct option_def);
+	int i;
+	int max_len_arg = 0;
+
+	// Compute maximum argument length
+	for( i = 0; i < num_opts; i++ ) {
+		if(options[i].arg_name) {
+			int len_arg = strlen(options[i].arg_name);
+			if(len_arg > max_len_arg) max_len_arg = len_arg;
+		}
+	}
+
+	fprintf(stream, "SYNOPSIS: netdata [options]\n");
+	fprintf(stream, "\n");
+	fprintf(stream, "Options:\n");
+
+	// Output options description.
+	for( i = 0; i < num_opts; i++ ) {
+		fprintf(stream, "  -%c %-*s  %s", options[i].val, max_len_arg, options[i].arg_name ? options[i].arg_name : "", options[i].description);
+		if(options[i].default_value) {
+			fprintf(stream, " Default: %s\n", options[i].default_value);
+		} else {
+			fprintf(stream, "\n");
+		}
+	}
+
+	fflush(stream);
+	exit(exitcode);
+}
+
+// TODO: Remove this function with the nix major release.
+void remove_option(int opt_index, int *argc, char **argv) {
+	int i = opt_index;
+	// remove the options.
+	do {
+		*argc = *argc - 1;
+		for(i = opt_index; i < *argc; i++) {
+			argv[i] = argv[i+1];
+		}
+		i = opt_index;
+	} while(argv[i][0] != '-' && opt_index >= *argc);
+}
+
 
 int main(int argc, char **argv)
 {
@@ -207,53 +271,120 @@ int main(int argc, char **argv)
 	// set the name for logging
 	program_name = "netdata";
 
-	// parse  the arguments
-	for(i = 1; i < argc ; i++) {
-		if(strcmp(argv[i], "-c") == 0 && (i+1) < argc) {
-			if(load_config(argv[i+1], 1) != 1) {
-				error("Cannot load configuration file %s.", argv[i+1]);
-				exit(1);
+	// parse command line.
+
+	// parse depercated options
+	// TODO: Remove this block with the next major release.
+	{
+		i = 1;
+		while(i < argc) {
+			if(strcmp(argv[i], "-pidfile") == 0 && (i+1) < argc) {
+				strncpyz(pidfile, argv[i+1], FILENAME_MAX);
+				fprintf(stderr, "%s: deprecate option -- %s -- please use -P instead.\n", argv[0], argv[i]);
+				remove_option(i, &argc, argv);
 			}
-			else {
-				debug(D_OPTIONS, "Configuration loaded from %s.", argv[i+1]);
-				config_loaded = 1;
+			else if(strcmp(argv[i], "-nodaemon") == 0 || strcmp(argv[i], "-nd") == 0) {
+				dont_fork = 1;
+				fprintf(stderr, "%s: deprecate option -- %s -- please use -D instead.\n ", argv[0], argv[i]);
+				remove_option(i, &argc, argv);
 			}
-			i++;
+			else if(strcmp(argv[i], "-ch") == 0 && (i+1) < argc) {
+				config_set("global", "host access prefix", argv[i+1]);
+				fprintf(stderr, "%s: deprecate option -- %s -- please use -s instead.\n", argv[0], argv[i]);
+				remove_option(i, &argc, argv);
+			}
+			else if(strcmp(argv[i], "-l") == 0 && (i+1) < argc) {
+				config_set("global", "history", argv[i+1]);
+				fprintf(stderr, "%s: deprecate option -- %s -- This option will be rmoved with V2.*.\n", argv[0], argv[i]);
+				remove_option(i, &argc, argv);
+			}
+			else i++;
 		}
-		else if(strcmp(argv[i], "-df") == 0 && (i+1) < argc) { config_set("global", "debug flags",  argv[i+1]); debug_flags = strtoull(argv[i+1], NULL, 0); i++; }
-		else if(strcmp(argv[i], "-p")  == 0 && (i+1) < argc) { config_set("global", "port",         argv[i+1]); i++; }
-		else if(strcmp(argv[i], "-u")  == 0 && (i+1) < argc) { config_set("global", "run as user",  argv[i+1]); i++; }
-		else if(strcmp(argv[i], "-l")  == 0 && (i+1) < argc) { config_set("global", "history",      argv[i+1]); i++; }
-		else if(strcmp(argv[i], "-t")  == 0 && (i+1) < argc) { config_set("global", "update every", argv[i+1]); i++; }
-		else if(strcmp(argv[i], "-ch") == 0 && (i+1) < argc) { config_set("global", "host access prefix", argv[i+1]); i++; }
-		else if(strcmp(argv[i], "-stacksize") == 0 && (i+1) < argc) { config_set("global", "pthread stack size", argv[i+1]); i++; }
-		else if(strcmp(argv[i], "-nodaemon") == 0 || strcmp(argv[i], "-nd") == 0) dont_fork = 1;
-		else if(strcmp(argv[i], "-pidfile") == 0 && (i+1) < argc) {
-			i++;
-			strncpyz(pidfile, argv[i], FILENAME_MAX);
+	}
+
+	// parse options
+	{
+		int num_opts = sizeof(options) / sizeof(struct option_def);
+		char optstring[(num_opts * 2) + 1];
+
+		int string_i = 0;
+		for( i = 0; i < num_opts; i++ ) {
+			optstring[string_i] = options[i].val;
+			string_i++;
+			if(options[i].arg_name) {
+				optstring[string_i] = ':';
+				string_i++;
+			}
 		}
-		else if(strcmp(argv[i], "--unittest")  == 0) {
-			rrd_update_every = 1;
-			if(run_all_mockup_tests()) exit(1);
-			if(unit_test_storage()) exit(1);
-			fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
-			exit(0);
-		}
-		else {
-			fprintf(stderr, "Cannot understand option '%s'.\n", argv[i]);
-			fprintf(stderr, "\nUSAGE: %s [-d] [-l LINES_TO_SAVE] [-u UPDATE_TIMER] [-p LISTEN_PORT] [-df debug flags].\n\n", argv[0]);
-			fprintf(stderr, "  -c CONFIG FILE the configuration file to load. Default: %s.\n", CONFIG_DIR "/" CONFIG_FILENAME);
-			fprintf(stderr, "  -l LINES_TO_SAVE can be from 5 to %d lines in JSON data. Default: %d.\n", RRD_HISTORY_ENTRIES_MAX, RRD_DEFAULT_HISTORY_ENTRIES);
-			fprintf(stderr, "  -t UPDATE_TIMER can be from 1 to %d seconds. Default: %d.\n", UPDATE_EVERY_MAX, UPDATE_EVERY);
-			fprintf(stderr, "  -p LISTEN_PORT can be from 1 to %d. Default: %d.\n", 65535, LISTEN_PORT);
-			fprintf(stderr, "  -u USERNAME can be any system username to run as. Default: none.\n");
-			fprintf(stderr, "  -ch path to access host /proc and /sys when running in a container. Default: empty.\n");
-			fprintf(stderr, "  -nd or -nodeamon to disable forking in the background. Default: unset.\n");
-			fprintf(stderr, "  -df FLAGS debug options. Default: 0x%08llx.\n", debug_flags);
-			fprintf(stderr, "  -stacksize BYTES to overwrite the pthread stack size.\n");
-			fprintf(stderr, "  -pidfile FILENAME to save a pid while running.\n");
-			exit(1);
-		}
+
+		int opt;
+		while( (opt = getopt(argc, argv, optstring)) != -1 ) {
+			switch(opt) {
+				case 'c':
+					if(load_config(optarg, 1) != 1) {
+						error("Cannot load configuration file %s.", optarg);
+						exit(1);
+					}
+					else {
+						debug(D_OPTIONS, "Configuration loaded from %s.", optarg);
+						config_loaded = 1;
+					}
+					break;
+				case 'D':
+					dont_fork = 1;
+					break;
+				case 'h':
+					help(0);
+					break;
+				case 'i':
+					config_set("global", "bind socket to IP", optarg);
+					break;
+				case 'P':
+					strncpy(pidfile, optarg, FILENAME_MAX);
+					pidfile[FILENAME_MAX] = '\0';
+					break;
+				case 'p':
+					config_set("global", "port", optarg);
+					break;
+				case 's':
+					config_set("global", "host access prefix", optarg);
+					break;
+				case 't':
+					config_set("global", "update every", optarg);
+					break;
+				case 'u':
+					config_set("global", "run as user", optarg);
+					break;
+				case 'v':
+					// TODO: Outsource version to makefile which can compute version from git.
+					printf("netdata 1.1.0\n");
+					return 0;
+					break;
+				case 'W': 
+					{
+						char* stacksize = "stacksize=";
+						char* debug_flags_string = "debug_flags=";
+						if(strcmp(optarg, "unittest") == 0) {
+							rrd_update_every = 1;
+							if(run_all_mockup_tests()) exit(1);
+							if(unit_test_storage()) exit(1);
+							fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
+							exit(0);
+						} else if(strncmp(optarg, stacksize, strlen(stacksize)) == 0) {
+							optarg += strlen(stacksize);
+							config_set("global", "pthread stack size", optarg);
+						} else if(strncmp(optarg, debug_flags_string, strlen(debug_flags_string)) == 0) {
+							optarg += strlen(debug_flags_string);
+							config_set("global", "debug flags",  optarg);
+							debug_flags = strtoull(optarg, NULL, 0);
+						}
+					}
+					break;
+				default: /* ? */
+					help(1);
+					break;
+			}
+		} 
 	}
 
 	if(!config_loaded) load_config(NULL, 0);
