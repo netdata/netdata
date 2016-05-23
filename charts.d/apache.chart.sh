@@ -2,6 +2,7 @@
 
 # the URL to download apache status info
 apache_url="http://127.0.0.1:80/server-status?auto"
+apache_curl_opts=
 
 # _update_every is a special variable - it holds the number of seconds
 # between the calls of the _update() function
@@ -94,7 +95,7 @@ apache_detect() {
 
 apache_get() {
 	local oIFS="${IFS}" ret
-	IFS=$':\n' apache_response=($(curl -Ss "${apache_url}"))
+	IFS=$':\n' apache_response=($(curl -Ss ${apache_curl_opts} "${apache_url}"))
 	ret=$?
 	IFS="${oIFS}"
 
