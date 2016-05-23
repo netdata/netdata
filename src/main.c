@@ -196,6 +196,7 @@ struct option_def options[] = {
 	{'D', "Disable fork into background",                                    NULL,                                   NULL},
 	{'h', "Display help message",                                            NULL,                                   NULL},
 	{'P', "File to save a pid while running",                                "FILE",                                 NULL},
+	{'i', "The IP address to listen to.",                                    "address",                              "All addresses"},
 	{'p', "Port to listen. Can be from 1 to 65535.",                         "port_number",                          "19999"},
 	{'s', "Path to access host /proc and /sys when running in a container.", "PATH",                                 NULL},
 	{'t', "The frequency in seconds, for data collection. \
@@ -331,6 +332,9 @@ int main(int argc, char **argv)
 					break;
 				case 'h':
 					help(0);
+					break;
+				case 'i':
+					config_set("global", "bind socket to IP", optarg);
 					break;
 				case 'P':
 					strncpy(pidfile, optarg, FILENAME_MAX);
