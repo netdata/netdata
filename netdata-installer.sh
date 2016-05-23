@@ -13,8 +13,14 @@ fi
 LC_ALL=C
 umask 022
 
+DEFCFLAGS=
+case "$((arch))" in
+	i386|i686) DEFCFLAGS="-O3 -msse2 -mfpmath=sse" ;;
+	*) DEFCFLAGS="-O3" ;;
+esac
+
 # you can set CFLAGS before running installer
-CFLAGS="${CFLAGS--O3}"
+CFLAGS="${CFLAGS-${DEFCFLAGS}}"
 
 # keep a log of this command
 printf "\n# " >>netdata-installer.log
