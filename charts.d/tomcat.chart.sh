@@ -6,6 +6,7 @@
 # the URL to download tomcat status info
 # usually http://localhost:8080/manager/status?XML=true
 tomcat_url=""
+tomcat_curl_opts=""
 
 # set tomcat username/password here
 tomcatUser=""
@@ -64,7 +65,7 @@ tomcat_check() {
 tomcat_get() {
 	# collect tomcat values
 	tomcat_port="$(IFS=/ read -ra a <<< "$tomcat_url"; hostport=${a[2]}; echo "${hostport#*:}")"
-	mapfile -t lines < <(curl -u "$tomcatUser":"$tomcatPassword" -Ss "$tomcat_url" |\
+	mapfile -t lines < <(curl -u "$tomcatUser":"$tomcatPassword" -Ss ${tomcat_curl_opts} "$tomcat_url" |\
 		xmlstarlet sel \
 			-t -m "/status/jvm/memory" -v @free \
 			-n -m "/status/connector[@name='\"http-bio-$tomcat_port\"']/threadInfo" -v @currentThreadCount \
