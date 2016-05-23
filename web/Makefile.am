@@ -77,6 +77,8 @@ dist_webfonts_DATA = \
 
 webimagesdir=$(webdir)/images
 dist_webimages_DATA = \
+	images/animated.gif \
+	images/post.png \
 	images/seo-performance-16.png \
 	images/seo-performance-24.png \
 	images/seo-performance-32.png \
