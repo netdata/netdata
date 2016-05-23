@@ -1,6 +1,12 @@
-#!/bin/bash
+#!/bin/sh
+#
+# netdata	Real-time charts for system monitoring
 # chkconfig: 345 99 01
-# description: startup script
+# description:  Netdata is a daemon that collects data in realtime (per second)
+#               and presents a web site to view and analyze them. The presentation
+#               is also real-time and full of interactive charts that precisely
+#               render all collected values.
+# processname:	netdata
 
 # Source functions
 . /etc/rc.d/init.d/functions
@@ -32,6 +38,17 @@ service_stop()
 	return $RETVAL
 }
 
+condrestart()
+{
+	if ! service_status > /dev/null; then
+		RETVAL=$1
+		return
+	fi
+
+	service_stop
+	service_start
+}
+
 service_status()
 {
 	status -p ${PIDFILE} $DAEMON_PATH/$DAEMON
@@ -41,9 +58,6 @@ case "$1" in
 start)
 	service_start
 ;;
-status)
-	service_status
-;;
 stop)
 	service_stop
 ;;
@@ -51,7 +65,16 @@ restart)
 	service_stop
 	service_start
 ;;
+try-restart)
+	condrestart 0
+	;;
+force-reload)
+	condrestart 7
+;;
+status)
+	service_status
+;;
 *)
-	echo "Usage: $0 {status|start|stop|restart}"
-	exit 1
+	echo "Usage: $0 {start|stop|restart|try-restart|force-reload|status}"
+	exit 3
 esac
