@@ -14,8 +14,8 @@ LC_ALL=C
 umask 022
 
 DEFCFLAGS=
-case "$((arch))" in
-	i386|i686) DEFCFLAGS="-O3 -msse2 -mfpmath=sse" ;;
+case "$(arch)" in
+	i386|i686) DEFCFLAGS="-O3 -mfpmath=sse" ;;
 	*) DEFCFLAGS="-O3" ;;
 esac
 
