@@ -14,8 +14,6 @@
 	copytruncate
 	#
 	#postrotate
-	#	if service netdata status > /dev/null ; then \
-	#		service netdata restart > /dev/null; \
-	#	fi;
+	#	/sbin/service netdata try-restart >/dev/null
 	#endscript
 }
