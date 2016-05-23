@@ -244,6 +244,19 @@ void help(int exitcode) {
 	exit(exitcode);
 }
 
+// TODO: Remove this function with the nix major release.
+void remove_option(int opt_index, int *argc, char **argv) {
+	int i = opt_index;
+	// remove the options.
+	do {
+		*argc = *argc - 1;
+		for(i = opt_index; i < *argc; i++) {
+			argv[i] = argv[i+1];
+		}
+		i = opt_index;
+	} while(argv[i][0] != '-' && opt_index >= *argc);
+}
+
 
 int main(int argc, char **argv)
 {
@@ -264,18 +277,6 @@ int main(int argc, char **argv)
 	// parse depercated options
 	// TODO: Remove this block with the next major release.
 	{
-		void remove_option(int opt_index, int *argc, char **argv) {
-			int i = opt_index;
-			// remove the options.
-			do {
-				*argc = *argc - 1;
-				for(i = opt_index; i < *argc; i++) {
-					argv[i] = argv[i+1];
-				}
-				i = opt_index;
-			} while(argv[i][0] != '-' && opt_index >= *argc);
-		}
-
 		i = 1;
 		while(i < argc) {
 			if(strcmp(argv[i], "-pidfile") == 0 && (i+1) < argc) {
