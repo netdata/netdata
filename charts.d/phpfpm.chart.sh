@@ -8,6 +8,7 @@
 # you can see, https://easyengine.io/tutorials/php/fpm-status-page/
 
 declare -A phpfpm_urls=()
+declare -A phpfpm_curl_opts=()
 
 # _update_every is a special variable - it holds the number of seconds
 # between the calls of the _update() function
@@ -29,8 +30,9 @@ phpfpm_max_active_processes=0
 phpfpm_max_children_reached=0
 phpfpm_slow_requests=0
 phpfpm_get() {
-	url=$1
-	phpfpm_response=($(curl -Ss "${url}"))
+	local opts="${1}" url="${2}"
+
+	phpfpm_response=($(curl -Ss ${opts} "${url}"))
 	[ $? -ne 0 -o "${#phpfpm_response[@]}" -eq 0 ] && return 1
 
 	if [[ "${phpfpm_response[0]}" != "pool:" \
@@ -94,7 +96,7 @@ phpfpm_check() {
 	local m
 	for m in "${!phpfpm_urls[@]}"
 	do
-		phpfpm_get "${phpfpm_urls[$m]}"
+		phpfpm_get "${phpfpm_curl_opts[$m]}" "${phpfpm_urls[$m]}"
 		if [ $? -ne 0 ]; then
 			echo >&2 "phpfpm: cannot find status on URL '${phpfpm_url[$m]}'. Please set phpfpm_urls[$m]='http://localhost/status' in $confd/phpfpm.conf"
 			unset phpfpm_urls[$m]
@@ -149,7 +151,7 @@ phpfpm_update() {
 	local m
 	for m in "${!phpfpm_urls[@]}"
 	do
-		phpfpm_get "${phpfpm_urls[$m]}"
+		phpfpm_get "${phpfpm_curl_opts[$m]}" "${phpfpm_urls[$m]}"
 		if [ $? -ne 0 ]; then
 			continue
 		fi

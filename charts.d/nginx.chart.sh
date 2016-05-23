@@ -4,6 +4,7 @@
 # must start with X_
 
 nginx_url="http://127.0.0.1:80/stub_status"
+nginx_curl_opts=""
 
 # _update_every is a special variable - it holds the number of seconds
 # between the calls of the _update() function
@@ -19,7 +20,7 @@ nginx_reading=0
 nginx_writing=0
 nginx_waiting=0
 nginx_get() {
-	nginx_response=($(curl -Ss "${nginx_url}"))
+	nginx_response=($(curl -Ss ${nginx_curl_opts} "${nginx_url}"))
 	[ $? -ne 0 -o "${#nginx_response[@]}" -eq 0 ] && return 1
 
 	if [ "${nginx_response[0]}" != "Active" \
