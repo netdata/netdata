@@ -146,6 +146,18 @@ if test "${enable_pedantic}" = "yes"; then
 	CFLAGS="${CFLAGS} -pedantic -Wall -Wextra -Wno-long-long"
 fi
 
+
+# Check for SSE/SSE2 flags if compile supports
+AC_ARG_ENABLE([sse],
+AS_HELP_STRING([--enable-sse=yes|no], [enable SSE/SS2 optimizations [default=no]]),
+[case "${enableval}" in
+yes)
+	opt="-msse2 -mfpmath=sse"
+	AX_CHECK_COMPILE_FLAG($opt, [CFLAGS="$CFLAGS $opt"], []) ;;
+no) ;;
+*)  AC_MSG_ERROR([bad value ${enableval} for --enable-sse]) ;;
+esac])
+
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 
 AC_SUBST([varlibdir], ["\$(localstatedir)/lib/netdata"])
