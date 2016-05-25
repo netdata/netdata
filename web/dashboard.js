@@ -3541,6 +3541,10 @@
 		var numberDigitGroupCount = self.data('sparkline-numberdigitgroupcount') || undefined;
 		var animatedZooms = self.data('sparkline-animatedzooms') || false;
 
+		if(spotColor === 'disable') spotColor='';
+		if(minSpotColor === 'disable') minSpotColor='';
+		if(maxSpotColor === 'disable') maxSpotColor='';
+
 		state.sparkline_options = {
 			type: type,
 			lineColor: lineColor,
@@ -3714,20 +3718,22 @@
 				state.log('dygraphChartUpdate() forced zoom update');
 
 			options.dateWindow = (state.requested_padding !== null)?[ state.view_after, state.view_before ]:null;
-			options.valueRange = null;
+			options.valueRange = state.dygraph_options.valueRange;
 			options.isZoomedIgnoreProgrammaticZoom = true;
 			state.dygraph_force_zoom = false;
 		}
 		else if(state.current.name !== 'auto') {
 			if(NETDATA.options.debug.dygraph === true || state.debug === true)
 				state.log('dygraphChartUpdate() loose update');
+
+			options.valueRange = state.dygraph_options.valueRange;
 		}
 		else {
 			if(NETDATA.options.debug.dygraph === true || state.debug === true)
 				state.log('dygraphChartUpdate() strict update');
 
 			options.dateWindow = (state.requested_padding !== null)?[ state.view_after, state.view_before ]:null;
-			options.valueRange = null;
+			options.valueRange = state.dygraph_options.valueRange;
 			options.isZoomedIgnoreProgrammaticZoom = true;
 		}
 
@@ -3790,6 +3796,8 @@
 			includeZero: self.data('dygraph-includezero') || false,
 			xRangePad: self.data('dygraph-xrangepad') || 0,
 			yRangePad: self.data('dygraph-yrangepad') || 1,
+
+			valueRange: self.data('dygraph-valuerange') || null,
 
 			ylabel: state.units,
 			yLabelWidth: self.data('dygraph-ylabelwidth') || 12,
@@ -5500,21 +5508,23 @@
 		person_guid: null,	// the unique ID of this browser / user
 		machine_guid: null,	// the unique ID the netdata server that served dashboard.js
 		hostname: null,		// the hostname of the netdata server that served dashboard.js
-		urls: null,			// the user's other URLs
-		urls_array: null,	// the user's other URLs in an array
+		machines: null,			// the user's other URLs
+		machines_array: null,	// the user's other URLs in an array
+		person_urls: null,
 
 		parsePersonUrls: function(person_urls) {
 			// console.log(person_urls);
+			NETDATA.registry.person_urls = person_urls;
 
 			if(person_urls) {
-				NETDATA.registry.urls = {};
-				NETDATA.registry.urls_array = new Array();
+				NETDATA.registry.machines = {};
+				NETDATA.registry.machines_array = new Array();
 
 				var now = new Date().getTime();
 				var apu = person_urls;
 				var i = apu.length;
 				while(i--) {
-					if(typeof NETDATA.registry.urls[apu[i][0]] === 'undefined') {
+					if(typeof NETDATA.registry.machines[apu[i][0]] === 'undefined') {
 						// console.log('adding: ' + apu[i][4] + ', ' + ((now - apu[i][2]) / 1000).toString());
 
 						var obj = {
@@ -5525,14 +5535,15 @@
 							name: apu[i][4],
 							alternate_urls: new Array()
 						};
+						obj.alternate_urls.push(apu[i][1]);
 
-						NETDATA.registry.urls[apu[i][0]] = obj;
-						NETDATA.registry.urls_array.push(obj);
+						NETDATA.registry.machines[apu[i][0]] = obj;
+						NETDATA.registry.machines_array.push(obj);
 					}
 					else {
 						// console.log('appending: ' + apu[i][4] + ', ' + ((now - apu[i][2]) / 1000).toString());
 
-						var pu = NETDATA.registry.urls[apu[i][0]];
+						var pu = NETDATA.registry.machines[apu[i][0]];
 						if(pu.last_t < apu[i][2]) {
 							pu.url = apu[i][1];
 							pu.last_t = apu[i][2];
@@ -5545,7 +5556,7 @@
 			}
 
 			if(typeof netdataRegistryCallback === 'function')
-				netdataRegistryCallback(NETDATA.registry.urls_array);
+				netdataRegistryCallback(NETDATA.registry.machines_array);
 		},
 
 		init: function() {
