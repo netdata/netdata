@@ -16,6 +16,7 @@ dist_web_DATA = \
 	netdata-swagger.yaml \
 	netdata-swagger.json \
 	robots.txt \
+	registry.html \
 	tv.html \
 	version.txt \
 	$(NULL)

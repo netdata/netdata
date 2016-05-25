@@ -373,41 +373,35 @@
 			return saveLocalStorage('netdataTheme', theme);
 		}
 
-		var netdataRegistryCallback = function(urls_array) {
+		var netdataRegistryCallback = function(machines_array) {
 			var el = '';
 			var a1 = '';
 			var found = 0;
 
-			if(urls_array) {
+			if(machines_array) {
 				function name_comparator_desc(a, b) {
 					if (a.name > b.name) return -1;
 					if (a.name < b.name) return 1;
 					return 0;
 				}
 
-				var urls = urls_array.sort(name_comparator_desc);
-				var len = urls.length;
+				var machines = machines_array.sort(name_comparator_desc);
+				var len = machines.length;
 				while(len--) {
-					var u = urls[len];
-
-					var status = "enabled";
+					var u = machines[len];
 					found++;
-
-					if(u.guid === NETDATA.registry.machine_guid)
-						status = "disabled"
-
-					el += '<li id="registry_server_' + u.guid + '" class="' + status + '"><a href="' + u.url + '">' + u.name + '</a></li>';
+					el += '<li id="registry_server_' + u.guid + '"><a href="#" onClick="return gotoServerModalHandler(\'' + u.guid + '\');">' + u.name + '</a></li>';
 					a1 += '<li id="registry_action_' + u.guid + '"><a href="#" onclick="deleteRegistryModalHandler(\'' + u.guid + '\',\'' + u.name + '\',\'' + u.url + '\'); return false;"><i class="fa fa-trash-o" aria-hidden="true" style="color: #999;"></i></a></li>';
 				}
 			}
 
 			if(!found) {
-				if(urls)
+				if(machines)
 					el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #666;" target="_blank">your netdata server list is empty...</a></li>';
 				else
 					el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #666;" target="_blank">failed to contact the registry...</a></li>';
 
-				a1 += '<li><a href="#">&nbsp;</a></li>';
+				a1 += '<li><a href="#" onClick="return false;">&nbsp;</a></li>';
 
 				el += '<li role="separator" class="divider"></li>' +
 						'<li><a href="//london.netdata.rocks/default.html">EU - London (DigitalOcean.com)</a></li>' +
@@ -973,6 +967,28 @@
 		</div>
 	</div>
 
+	<div class="modal fade" id="gotoServerModal" tabindex="-1" role="dialog" aria-labelledby="gotoServerModalLabel">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+					<h4 class="modal-title" id="gotoServerModalLabel"><span id="gotoServerName"></span></h4>
+				</div>
+				<div class="modal-body">
+					Checking known URLs for this server...
+					<div  style="padding-top: 20px;">
+						<table id="gotoServerList">
+						</table>
+					</div>
+					<div id="gotoServerResponse" style="display: block; width: 100%; text-align: center; padding-top: 20px;"></div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
 <script>
 var this_is_demo = null;
 function isdemo() {
@@ -998,6 +1014,42 @@ function isdemo() {
 
 if(isdemo()) {
 	document.getElementById('masthead').style.display = 'block';
+}
+var gotoServerValidateRemaining = 0;
+function gotoServerValidateUrl(id, guid, url) {
+	setTimeout(function() {
+		document.getElementById('gotoServerList').innerHTML += '<tr><td style="padding-left: 20px;">' + url + '</td><td style="padding-left: 30px;"><code id="' + guid + '-' + id + '-status">checking...</code></td></tr>';
+		NETDATA.registry.hello(url, function(data) {
+			if (data) {
+				console.log('OK ' + id + ' URL: ' + url);
+				document.getElementById(guid + '-' + id + '-status').innerHTML = "OK";
+				document.location = url;
+			}
+			else {
+				document.getElementById(guid + '-' + id + '-status').innerHTML = "failed!";
+				gotoServerValidateRemaining--;
+				if(gotoServerValidateRemaining <= 0)
+					document.getElementById('gotoServerResponse').innerHTML = '<b>Sorry! I cannot find any operational URL for this server</b>';
+			}
+		});
+	}, id * 50);
+}
+
+function gotoServerModalHandler(guid) {
+	console.log('goto server: ' + guid);
+
+	var len = NETDATA.registry.machines[guid].alternate_urls.length;
+
+	document.getElementById('gotoServerResponse').innerHTML = '';
+	document.getElementById('gotoServerList').innerHTML = '';
+	document.getElementById('gotoServerName').innerHTML = NETDATA.registry.machines[guid].name;
+	$('#gotoServerModal').modal('show');
+
+	gotoServerValidateRemaining = len;
+	while(len--)
+		gotoServerValidateUrl(len, guid, NETDATA.registry.machines[guid].alternate_urls[len]);
+
+	return false;
 }
 
 function switchRegistryModalHandler() {
