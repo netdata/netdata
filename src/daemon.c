@@ -34,6 +34,22 @@ void sig_handler(int signo)
 		netdata_exit = 1;
 }
 
+static void properly_chown_netdata_generated_file(int fd, uid_t uid, gid_t gid) {
+	if(fd == -1) return;
+
+	struct stat buf;
+
+	if(fstat(fd, &buf) == -1) {
+		error("Cannot fstat() fd %d", fd);
+		return;
+	}
+
+	if((buf.st_uid != uid || buf.st_gid != gid) && S_ISREG(buf.st_mode)) {
+		if(fchown(fd, uid, gid) == -1)
+			error("Cannot fchown() fd %d.", fd);
+	}
+}
+
 int become_user(const char *username, int access_fd, int output_fd, int error_fd, int pid_fd)
 {
 	struct passwd *pw = getpwnam(username);
@@ -60,27 +76,10 @@ int become_user(const char *username, int access_fd, int output_fd, int error_fd
 		else fatal("Cannot allocate memory for %d supplementary groups", ngroups);
 	}
 
-	if(getuid() != uid || getgid() != gid) {
-		if (access_fd != -1) {
-			if (fchown(access_fd, uid, gid) == -1)
-				error("Cannot set the ownership of access log file.");
-		}
-
-		if (output_fd != -1) {
-			if (fchown(output_fd, uid, gid) == -1)
-				error("Cannot set the ownership of output log file.");
-		}
-
-		if (error_fd != -1) {
-			if (fchown(error_fd, uid, gid) == -1)
-				error("Cannot set the ownership of error log file.");
-		}
-
-		if (pid_fd != -1) {
-			if(fchown(pid_fd, uid, gid) != 0)
-				error("Cannot set the ownership of pid file.");
-		}
-	}
+	properly_chown_netdata_generated_file(access_fd, uid, gid);
+	properly_chown_netdata_generated_file(output_fd, uid, gid);
+	properly_chown_netdata_generated_file(error_fd, uid, gid);
+	properly_chown_netdata_generated_file(pid_fd, uid, gid);
 
 	if(supplementary_groups && ngroups) {
 		if(setgroups(ngroups, supplementary_groups) == -1)
