@@ -34,7 +34,7 @@ void sig_handler(int signo)
 		netdata_exit = 1;
 }
 
-int become_user(const char *username)
+int become_user(const char *username, int access_fd, int output_fd, int error_fd, int pid_fd)
 {
 	struct passwd *pw = getpwnam(username);
 	if(!pw) {
@@ -60,21 +60,26 @@ int become_user(const char *username)
 		else fatal("Cannot allocate memory for %d supplementary groups", ngroups);
 	}
 
-	if(pidfile[0] && getuid() != uid) {
-		// we are dropping privileges
-		if(chown(pidfile, uid, gid) != 0)
-			error("Cannot chown pidfile '%s' to user '%s'", pidfile, username);
-
-		else if(pidfd != -1) {
-			// not need to keep it open
-			close(pidfd);
-			pidfd = -1;
+	if(getuid() != uid || getgid() != gid) {
+		if (access_fd != -1) {
+			if (fchown(access_fd, uid, gid) == -1)
+				error("Cannot set the ownership of access log file.");
 		}
-	}
-	else if(pidfd != -1) {
-		// not need to keep it open
-		close(pidfd);
-		pidfd = -1;
+
+		if (output_fd != -1) {
+			if (fchown(output_fd, uid, gid) == -1)
+				error("Cannot set the ownership of output log file.");
+		}
+
+		if (error_fd != -1) {
+			if (fchown(error_fd, uid, gid) == -1)
+				error("Cannot set the ownership of error log file.");
+		}
+
+		if (pid_fd != -1) {
+			if(fchown(pid_fd, uid, gid) != 0)
+				error("Cannot set the ownership of pid file.");
+		}
 	}
 
 	if(supplementary_groups && ngroups) {
@@ -130,7 +135,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 		}
 	}
 
-	if(output && *output) {
+	if(output && *output && strcmp(output, "/dev/null") != 0) {
 		if((output_fd = open(output, O_RDWR | O_APPEND | O_CREAT, 0666)) == -1) {
 			error("Cannot open output log file '%s'", output);
 			if(input_fd != -1) close(input_fd);
@@ -138,7 +143,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 		}
 	}
 
-	if(error && *error) {
+	if(error && *error && strcmp(error, "/dev/null") != 0) {
 		if((error_fd = open(error, O_RDWR | O_APPEND | O_CREAT, 0666)) == -1) {
 			error("Cannot open error log file '%s'.", error);
 			if(input_fd != -1) close(input_fd);
@@ -147,7 +152,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 		}
 	}
 
-	if(access && *access && access_fd) {
+	if(access && *access && access_fd && strcmp(access, "/dev/null") != 0) {
 		if((*access_fd = open(access, O_RDWR | O_APPEND | O_CREAT, 0666)) == -1) {
 			error("Cannot open access log file '%s'", access);
 			if(input_fd != -1) close(input_fd);
@@ -262,7 +267,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 		if(setvbuf(stdout, NULL, _IOLBF, 0) != 0)
 			error("Cannot set line buffering on debug.log");
 
-		output_fd = -1;
+		output_fd = STDOUT_FILENO;
 	}
 	else dup2(dev_null, STDOUT_FILENO);
 
@@ -275,7 +280,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 		if(setvbuf(stderr, NULL, _IOLBF, 0) != 0)
 			error("Cannot set line buffering on error.log");
 
-		error_fd = -1;
+		error_fd = STDERR_FILENO;
 	}
 	else dup2(dev_null, STDERR_FILENO);
 
@@ -284,6 +289,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 		close(dev_null);
 
 	// generate our pid file
+	int pidfd = -1;
 	if(pidfile[0]) {
 		pidfd = open(pidfile, O_RDWR | O_CREAT, 0644);
 		if(pidfd >= 0) {
@@ -295,21 +301,21 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 			ssize_t i = write(pidfd, b, strlen(b));
 			if(i <= 0)
 				error("Cannot write pidfile '%s'.", pidfile);
-
-			// don't close it, we might need it at exit
-			// close(pidfd);
 		}
 		else error("Failed to open pidfile '%s'.", pidfile);
 	}
 
 	if(user && *user) {
-		if(become_user(user) != 0) {
+		if(become_user(user, (*access_fd)?*access_fd:-1, output_fd, error_fd, pidfd) != 0) {
 			error("Cannot become user '%s'. Continuing as we are.", user);
 		}
 		else info("Successfully became user '%s'.", user);
 	}
-	else if(pidfd != -1)
+
+	if(pidfd != -1) {
 		close(pidfd);
+		pidfd = -1;
+	}
 
 	return(0);
 }
