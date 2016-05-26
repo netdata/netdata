@@ -1018,7 +1018,7 @@ if(isdemo()) {
 var gotoServerValidateRemaining = 0;
 function gotoServerValidateUrl(id, guid, url) {
 	setTimeout(function() {
-		document.getElementById('gotoServerList').innerHTML += '<tr><td style="padding-left: 20px;">' + url + '</td><td style="padding-left: 30px;"><code id="' + guid + '-' + id + '-status">checking...</code></td></tr>';
+		document.getElementById('gotoServerList').innerHTML += '<tr><td style="padding-left: 20px;"><a href="' + url + '" target="_blank">' + url + '</a></td><td style="padding-left: 30px;"><code id="' + guid + '-' + id + '-status">checking...</code></td></tr>';
 		NETDATA.registry.hello(url, function(data) {
 			if (data) {
 				console.log('OK ' + id + ' URL: ' + url);
