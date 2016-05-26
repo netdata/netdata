@@ -21,7 +21,7 @@ struct poll_file {
 	// One of POLLIN, POLLOUT or POLLERR
 	short type;
 	// Last update timestamp
-	struct timeval tv;
+	struct timeval *tv;
 	int num_checker;
 	struct poll_file *next;
 };
@@ -74,6 +74,32 @@ int poll_time_update_nolock(struct timeval *tv) {
 	if(retv != 0) {
 		error("Could not get current time");
 	}
+	return retv;
+}
+
+// Updates p->tv to current time.
+// Ensure this method is only called in one thread.
+// Ensure there are no writes to p in other threads.
+// Other writes are permitted without locks.
+int poll_file_time_update_readsave_nolock(struct poll_file *p) {
+	static struct timeval *buff;
+	static struct timeval *tv;
+	if(!tv) {
+		tv = malloc(sizeof(struct timeval));
+		if(!tv) {
+			error("Could not allocate buffer for poll_file_time_update_readsave_nolock()");
+		}
+	}
+
+	tv->tv_sec = p->tv->tv_sec;
+	tv->tv_usec = p->tv->tv_sec;
+	int retv = poll_time_update_nolock(tv);
+
+	// Switch pointers.
+	buff = p->tv;
+	p->tv = tv;
+	tv = buff;
+
 	return retv;
 }
 
@@ -159,9 +185,16 @@ struct poll_file *poll_file_init(char *path, int type) {
 		return NULL;
 	}
 
-	if(poll_time_update_nolock(&p->tv) != 0) {
-		p->tv.tv_sec = 0;
-		p->tv.tv_usec = 0;
+	p->tv = malloc(sizeof(struct timeval));
+	if(!p->tv) {
+		error("Cannot allocate memory for timeval");
+		free(p->path);
+		free(p);
+		return NULL;
+	}
+	if(poll_time_update_nolock(p->tv) != 0) {
+		p->tv->tv_sec = 0;
+		p->tv->tv_usec = 0;
 	}
 
 	p->num_checker = 0;
@@ -172,6 +205,7 @@ struct poll_file *poll_file_init(char *path, int type) {
 
 void poll_file_free(struct poll_file *p) {
 	free(p->path);
+	free(p->tv);
 	close(p->fd);
 	free(p);
 }
@@ -184,8 +218,8 @@ struct poll_check *poll_check_init_nolock(struct poll_file *p) {
 	}
 
 	retv->poll_file = p;
-	retv->tv.tv_sec = p->tv.tv_sec;
-	retv->tv.tv_usec = p->tv.tv_usec;
+	retv->tv.tv_sec = p->tv->tv_sec;
+	retv->tv.tv_usec = p->tv->tv_usec;
 	p->num_checker++;
 
 	return retv;
@@ -282,17 +316,17 @@ void *poll_main(void *ptr) {
 			switch(p->type) {
 				case POLLIN:
 					if(FD_ISSET(p->fd, &readfds)) {
-						poll_time_update_nolock(&p->tv);
+						poll_file_time_update_readsave_nolock(p);
 					}
 					break;
 				case POLLOUT:
 					if(FD_ISSET(p->fd, &writefds)) {
-						poll_time_update_nolock(&p->tv);
+						poll_file_time_update_readsave_nolock(p);
 					}
 					break;
 				case POLLERR:
 					if(FD_ISSET(p->fd, &exceptfds)) {
-						poll_time_update_nolock(&p->tv);
+						poll_file_time_update_readsave_nolock(p);
 					}
 					break;
 			}
@@ -335,9 +369,7 @@ unsigned long long poll_occured(void *poll_descriptor) {
 	struct poll_check *p_check = poll_descriptor;
 	unsigned long long retv;
 
-	poll_file_list_lock();
-	retv = poll_time_difference_nolock(&p_check->poll_file->tv, &p_check->tv);
-	poll_file_list_unlock();
+	retv = poll_time_difference_nolock(p_check->poll_file->tv, &p_check->tv);
 
 	if(poll_time_update_nolock(&p_check->tv) != 0) return 0;
 
@@ -353,7 +385,7 @@ unsigned long long poll_file_unregister(void *poll_descriptor) {
 	poll_interrupt();
 
 	struct poll_check *p_check = poll_descriptor;
-	unsigned long long retv = poll_time_difference_nolock(&p_check->poll_file->tv, &p_check->tv);
+	unsigned long long retv = poll_time_difference_nolock(p_check->poll_file->tv, &p_check->tv);
 
 	if(!(p_check->poll_file->num_checker--)) {
 		// Remove poll file from the list.
