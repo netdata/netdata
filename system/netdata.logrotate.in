@@ -10,7 +10,7 @@
 	# if you add netdata to your init.d/system.d
 	# comment su & copytruncate and uncomment postrotate
 	# to have netdata restart when logs are rotated
-	su netdata
+	create 0640 netdata netdata
 	copytruncate
 	#
 	#postrotate
