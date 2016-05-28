@@ -805,6 +805,25 @@ cleanup:
 
 int web_client_api_request_v1_registry(struct web_client *w, char *url)
 {
+	static uint32_t hash_action = 0, hash_access = 0, hash_hello = 0, hash_delete = 0, hash_search = 0,
+			hash_switch = 0, hash_machine = 0, hash_url = 0, hash_name = 0, hash_delete_url = 0, hash_for = 0,
+			hash_to = 0;
+
+	if(unlikely(!hash_action)) {
+		hash_action = simple_hash("action");
+		hash_access = simple_hash("access");
+		hash_hello = simple_hash("hello");
+		hash_delete = simple_hash("delete");
+		hash_search = simple_hash("search");
+		hash_switch = simple_hash("switch");
+		hash_machine = simple_hash("machine");
+		hash_url = simple_hash("url");
+		hash_name = simple_hash("name");
+		hash_delete_url = simple_hash("delete_url");
+		hash_for = simple_hash("for");
+		hash_to = simple_hash("to");
+	}
+
 	char person_guid[36 + 1] = "";
 
 	debug(D_WEB_CLIENT, "%llu: API v1 registry with URL '%s'", w->id, url);
@@ -834,33 +853,37 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 
 		debug(D_WEB_CLIENT, "%llu: API v1 registry query param '%s' with value '%s'", w->id, name, value);
 
-		if(!strcmp(name, "action")) {
-			if(!strcmp(value, "access")) action = 'A';
-			else if(!strcmp(value, "hello")) action = 'H';
-			else if(!strcmp(value, "delete")) action = 'D';
-			else if(!strcmp(value, "search")) action = 'S';
-			else if(!strcmp(value, "switch")) action = 'W';
+		uint32_t hash = simple_hash(name);
+
+		if(hash == hash_action && !strcmp(name, "action")) {
+			uint32_t vhash = simple_hash(value);
+
+			if(vhash == hash_access && !strcmp(value, "access")) action = 'A';
+			else if(vhash == hash_hello && !strcmp(value, "hello")) action = 'H';
+			else if(vhash == hash_delete && !strcmp(value, "delete")) action = 'D';
+			else if(vhash == hash_search && !strcmp(value, "search")) action = 'S';
+			else if(vhash == hash_switch && !strcmp(value, "switch")) action = 'W';
 		}
-		else if(!strcmp(name, "machine"))
+		else if(hash == hash_machine && !strcmp(name, "machine"))
 			machine_guid = value;
 
-		else if(!strcmp(name, "url"))
+		else if(hash == hash_url && !strcmp(name, "url"))
 			machine_url = value;
 
 		else if(action == 'A') {
-			if(!strcmp(name, "name"))
+			if(hash == hash_name && !strcmp(name, "name"))
 				url_name = value;
 		}
 		else if(action == 'D') {
-			if(!strcmp(name, "delete_url"))
+			if(hash == hash_delete_url && !strcmp(name, "delete_url"))
 				delete_url = value;
 		}
 		else if(action == 'S') {
-			if(!strcmp(name, "for"))
+			if(hash == hash_for && !strcmp(name, "for"))
 				search_machine_guid = value;
 		}
 		else if(action == 'W') {
-			if(!strcmp(name, "to"))
+			if(hash == hash_to && !strcmp(name, "to"))
 				to_person_guid = value;
 		}
 	}
@@ -919,13 +942,13 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 
 int web_client_api_request_v1(struct web_client *w, char *url)
 {
-	static uint32_t data_hash = 0, chart_hash = 0, charts_hash = 0, registry_hash = 0;
+	static uint32_t hash_data = 0, hash_chart = 0, hash_charts = 0, hash_registry = 0;
 
-	if(unlikely(data_hash == 0)) {
-		data_hash = simple_hash("data");
-		chart_hash = simple_hash("chart");
-		charts_hash = simple_hash("charts");
-		registry_hash = simple_hash("registry");
+	if(unlikely(hash_data == 0)) {
+		hash_data = simple_hash("data");
+		hash_chart = simple_hash("chart");
+		hash_charts = simple_hash("charts");
+		hash_registry = simple_hash("registry");
 	}
 
 	// get the command
@@ -934,16 +957,16 @@ int web_client_api_request_v1(struct web_client *w, char *url)
 		debug(D_WEB_CLIENT, "%llu: Searching for API v1 command '%s'.", w->id, tok);
 		uint32_t hash = simple_hash(tok);
 
-		if(hash == data_hash && !strcmp(tok, "data"))
+		if(hash == hash_data && !strcmp(tok, "data"))
 			return web_client_api_request_v1_data(w, url);
 
-		else if(hash == chart_hash && !strcmp(tok, "chart"))
+		else if(hash == hash_chart && !strcmp(tok, "chart"))
 			return web_client_api_request_v1_chart(w, url);
 
-		else if(hash == charts_hash && !strcmp(tok, "charts"))
+		else if(hash == hash_charts && !strcmp(tok, "charts"))
 			return web_client_api_request_v1_charts(w, url);
 
-		else if(hash == registry_hash && !strcmp(tok, "registry"))
+		else if(hash == hash_registry && !strcmp(tok, "registry"))
 			return web_client_api_request_v1_registry(w, url);
 
 		else {
@@ -980,7 +1003,7 @@ int web_client_api_request(struct web_client *w, char *url)
 	}
 }
 
-int web_client_data_request(struct web_client *w, char *url, int datasource_type)
+int web_client_api_old_data_request(struct web_client *w, char *url, int datasource_type)
 {
 	RRDSET *st = NULL;
 
@@ -1144,56 +1167,124 @@ int web_client_data_request(struct web_client *w, char *url, int datasource_type
 	return 200;
 }
 
-/*
-int web_client_parse_request(struct web_client *w) {
-	// protocol
-	// hostname
-	// path
-	// query string name-value
-	// http version
-	// method
-	// http request headers name-value
+const char *web_content_type_to_string(uint8_t contenttype) {
+	switch(contenttype) {
+		case CT_TEXT_HTML:
+			return "text/html; charset=utf-8";
 
-	web_client_clean_request(w);
+		case CT_APPLICATION_XML:
+			return "application/xml; charset=utf-8";
 
-	debug(D_WEB_DATA, "%llu: Processing data buffer of %d bytes: '%s'.", w->id, w->response.data->bytes, w->response.data->buffer);
+		case CT_APPLICATION_JSON:
+			return "application/json; charset=utf-8";
 
-	char *buf = w->response.data->buffer;
-	char *line, *tok;
+		case CT_APPLICATION_X_JAVASCRIPT:
+			return "application/x-javascript; charset=utf-8";
 
-	// ------------------------------------------------------------------------
-	// the first line
+		case CT_TEXT_CSS:
+			return "text/css; charset=utf-8";
 
-	if(buf && (line = strsep(&buf, "\r\n"))) {
-		// method
-		if(line && (tok = strsep(&line, " "))) {
-			w->request.protocol = strdup(tok);
-		}
-		else goto cleanup;
+		case CT_TEXT_XML:
+			return "text/xml; charset=utf-8";
 
-		// url
+		case CT_TEXT_XSL:
+			return "text/xsl; charset=utf-8";
+
+		case CT_APPLICATION_OCTET_STREAM:
+			return "application/octet-stream";
+
+		case CT_IMAGE_SVG_XML:
+			return "image/svg+xml";
+
+		case CT_APPLICATION_X_FONT_TRUETYPE:
+			return "application/x-font-truetype";
+
+		case CT_APPLICATION_X_FONT_OPENTYPE:
+			return "application/x-font-opentype";
+
+		case CT_APPLICATION_FONT_WOFF:
+			return "application/font-woff";
+
+		case CT_APPLICATION_FONT_WOFF2:
+			return "application/font-woff2";
+
+		case CT_APPLICATION_VND_MS_FONTOBJ:
+			return "application/vnd.ms-fontobject";
+
+		case CT_IMAGE_PNG:
+			return "image/png";
+
+		case CT_IMAGE_JPG:
+			return "image/jpeg";
+
+		case CT_IMAGE_GIF:
+			return "image/gif";
+
+		case CT_IMAGE_XICON:
+			return "image/x-icon";
+
+		case CT_IMAGE_BMP:
+			return "image/bmp";
+
+		case CT_IMAGE_ICNS:
+			return "image/icns";
+
+		default:
+		case CT_TEXT_PLAIN:
+			return "text/plain; charset=utf-8";
 	}
-	else goto cleanup;
-
-	// ------------------------------------------------------------------------
-	// the rest of the lines
-
-	while(buf && (line = strsep(&buf, "\r\n"))) {
-		while(line && (tok = strsep(&line, ": "))) {
-		}
-	}
-
-	char *url = NULL;
-
-
-cleanup:
-	web_client_clean_request(w);
-	return 0;
 }
-*/
 
+
+const char *web_response_code_to_string(int code) {
+	switch(code) {
+		case 200:
+			return "OK";
+
+		case 307:
+			return "Temporary Redirect";
+
+		case 400:
+			return "Bad Request";
+
+		case 403:
+			return "Forbidden";
+
+		case 404:
+			return "Not Found";
+
+		case 412:
+			return "Preconditions Failed";
+
+		default:
+			if(code >= 100 && code < 200)
+				return "Informational";
+
+			if(code >= 200 && code < 300)
+				return "Successful";
+
+			if(code >= 300 && code < 400)
+				return "Redirection";
+
+			if(code >= 400 && code < 500)
+				return "Bad Request";
+
+			if(code >= 500 && code < 600)
+				return "Server Error";
+
+			return "Undefined Error";
+	}
+}
 
 static inline char *http_header_parse(struct web_client *w, char *s) {
+	static uint32_t hash_origin = 0, hash_connection = 0, hash_accept_encoding = 0;
+
+	if(unlikely(!hash_origin)) {
+		hash_origin = simple_uhash("Origin");
+		hash_connection = simple_uhash("Connection");
+		hash_accept_encoding = simple_uhash("Accept-Encoding");
+	}
+
 	char *e = s;
 
 	// find the :
@@ -1218,16 +1309,17 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
 	*ve = '\0';
 
 	// fprintf(stderr, "HEADER: '%s' = '%s'\n", s, v);
+	uint32_t hash = simple_uhash(s);
 
-	if(!strcasecmp(s, "Origin"))
+	if(hash == hash_origin && !strcasecmp(s, "Origin"))
 		strncpyz(w->origin, v, ORIGIN_MAX);
 
-	else if(!strcasecmp(s, "Connection")) {
+	else if(hash == hash_connection && !strcasecmp(s, "Connection")) {
 		if(strcasestr(v, "keep-alive"))
 			w->keepalive = 1;
 	}
 #ifdef NETDATA_WITH_ZLIB
-	else if(!strcasecmp(s, "Accept-Encoding")) {
+	else if(hash == hash_accept_encoding && !strcasecmp(s, "Accept-Encoding")) {
 		if(web_enable_gzip) {
 			if(strcasestr(v, "gzip"))
 				web_client_enable_deflate(w, 1);
@@ -1325,6 +1417,22 @@ static inline int http_request_validate(struct web_client *w) {
 }
 
 void web_client_process(struct web_client *w) {
+	static uint32_t hash_api = 0, hash_netdata_conf = 0, hash_data = 0, hash_datasource = 0, hash_graph = 0,
+			hash_list = 0, hash_all_json = 0, hash_exit = 0, hash_debug = 0, hash_mirror = 0;
+
+	if(unlikely(!hash_api)) {
+		hash_api = simple_hash("api");
+		hash_netdata_conf = simple_hash("netdata.conf");
+		hash_data = simple_hash(WEB_PATH_DATA);
+		hash_datasource = simple_hash(WEB_PATH_DATASOURCE);
+		hash_graph = simple_hash(WEB_PATH_GRAPH);
+		hash_list = simple_hash("list");
+		hash_all_json = simple_hash("all.json");
+		hash_exit = simple_hash("exit");
+		hash_debug = simple_hash("debug");
+		hash_mirror = simple_hash("mirror");
+	}
+
 	int code = 500;
 	ssize_t bytes;
 
@@ -1347,7 +1455,7 @@ void web_client_process(struct web_client *w) {
 		}
 	}
 	else if(what_to_do > 0) {
-		strcpy(w->last_url, "not a valid response");
+		strcpy(w->last_url, "not a valid request");
 
 		debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, w->response.data->buffer);
 
@@ -1368,13 +1476,14 @@ void web_client_process(struct web_client *w) {
 			char *url = w->decoded_url;
 			char *tok = mystrsep(&url, "/?");
 			if(tok && *tok) {
+				uint32_t hash = simple_hash(tok);
 				debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
 
-				if(strcmp(tok, "api") == 0) {
+				if(hash == hash_api && strcmp(tok, "api") == 0) {
 					// the client is requesting api access
 					code = web_client_api_request(w, url);
 				}
-				else if(strcmp(tok, "netdata.conf") == 0) {
+				else if(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0) {
 					code = 200;
 					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending netdata.conf ...", w->id);
 
@@ -1382,15 +1491,15 @@ void web_client_process(struct web_client *w) {
 					buffer_flush(w->response.data);
 					generate_config(w->response.data, 0);
 				}
-				else if(strcmp(tok, WEB_PATH_DATA) == 0) { // "data"
+				else if(hash == hash_data && strcmp(tok, WEB_PATH_DATA) == 0) { // "data"
 					// the client is requesting rrd data -- OLD API
-					code = web_client_data_request(w, url, DATASOURCE_JSON);
+					code = web_client_api_old_data_request(w, url, DATASOURCE_JSON);
 				}
-				else if(strcmp(tok, WEB_PATH_DATASOURCE) == 0) { // "datasource"
+				else if(hash == hash_datasource && strcmp(tok, WEB_PATH_DATASOURCE) == 0) { // "datasource"
 					// the client is requesting google datasource -- OLD API
-					code = web_client_data_request(w, url, DATASOURCE_DATATABLE_JSONP);
+					code = web_client_api_old_data_request(w, url, DATASOURCE_DATATABLE_JSONP);
 				}
-				else if(strcmp(tok, WEB_PATH_GRAPH) == 0) { // "graph"
+				else if(hash == hash_graph && strcmp(tok, WEB_PATH_GRAPH) == 0) { // "graph"
 					// the client is requesting an rrd graph -- OLD API
 
 					// get the name of the data to show
@@ -1421,7 +1530,7 @@ void web_client_process(struct web_client *w) {
 						buffer_strcat(w->response.data, "Graph name?\r\n");
 					}
 				}
-				else if(strcmp(tok, "list") == 0) {
+				else if(hash == hash_list && strcmp(tok, "list") == 0) {
 					// OLD API
 					code = 200;
 
@@ -1433,7 +1542,7 @@ void web_client_process(struct web_client *w) {
 					for ( ; st ; st = st->next )
 						buffer_sprintf(w->response.data, "%s\n", st->name);
 				}
-				else if(strcmp(tok, "all.json") == 0) {
+				else if(hash == hash_all_json && strcmp(tok, "all.json") == 0) {
 					// OLD API
 					code = 200;
 					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending JSON list of all monitors of RRD_STATS...", w->id);
@@ -1443,7 +1552,7 @@ void web_client_process(struct web_client *w) {
 					rrd_stats_all_json(w->response.data);
 				}
 #ifdef NETDATA_INTERNAL_CHECKS
-				else if(strcmp(tok, "exit") == 0) {
+				else if(hash == hash_exit && strcmp(tok, "exit") == 0) {
 					code = 200;
 					w->response.data->contenttype = CT_TEXT_PLAIN;
 					buffer_flush(w->response.data);
@@ -1455,7 +1564,7 @@ void web_client_process(struct web_client *w) {
 
 					netdata_exit = 1;
 				}
-				else if(strcmp(tok, "debug") == 0) {
+				else if(hash == hash_debug && strcmp(tok, "debug") == 0) {
 					buffer_flush(w->response.data);
 
 					// get the name of the data to show
@@ -1485,7 +1594,7 @@ void web_client_process(struct web_client *w) {
 						buffer_strcat(w->response.data, "debug which chart?\r\n");
 					}
 				}
-				else if(strcmp(tok, "mirror") == 0) {
+				else if(hash == hash_mirror && strcmp(tok, "mirror") == 0) {
 					code = 200;
 
 					debug(D_WEB_CLIENT_ACCESS, "%llu: Mirroring...", w->id);
@@ -1525,124 +1634,8 @@ void web_client_process(struct web_client *w) {
 	// prepare the HTTP response header
 	debug(D_WEB_CLIENT, "%llu: Generating HTTP header with response %d.", w->id, code);
 
-	char *content_type_string;
-	switch(w->response.data->contenttype) {
-		case CT_TEXT_HTML:
-			content_type_string = "text/html; charset=utf-8";
-			break;
-
-		case CT_APPLICATION_XML:
-			content_type_string = "application/xml; charset=utf-8";
-			break;
-
-		case CT_APPLICATION_JSON:
-			content_type_string = "application/json; charset=utf-8";
-			break;
-
-		case CT_APPLICATION_X_JAVASCRIPT:
-			content_type_string = "application/x-javascript; charset=utf-8";
-			break;
-
-		case CT_TEXT_CSS:
-			content_type_string = "text/css; charset=utf-8";
-			break;
-
-		case CT_TEXT_XML:
-			content_type_string = "text/xml; charset=utf-8";
-			break;
-
-		case CT_TEXT_XSL:
-			content_type_string = "text/xsl; charset=utf-8";
-			break;
-
-		case CT_APPLICATION_OCTET_STREAM:
-			content_type_string = "application/octet-stream";
-			break;
-
-		case CT_IMAGE_SVG_XML:
-			content_type_string = "image/svg+xml";
-			break;
-
-		case CT_APPLICATION_X_FONT_TRUETYPE:
-			content_type_string = "application/x-font-truetype";
-			break;
-
-		case CT_APPLICATION_X_FONT_OPENTYPE:
-			content_type_string = "application/x-font-opentype";
-			break;
-
-		case CT_APPLICATION_FONT_WOFF:
-			content_type_string = "application/font-woff";
-			break;
-
-		case CT_APPLICATION_FONT_WOFF2:
-			content_type_string = "application/font-woff2";
-			break;
-
-		case CT_APPLICATION_VND_MS_FONTOBJ:
-			content_type_string = "application/vnd.ms-fontobject";
-			break;
-
-		case CT_IMAGE_PNG:
-			content_type_string = "image/png";
-			break;
-
-		case CT_IMAGE_JPG:
-			content_type_string = "image/jpeg";
-			break;
-
-		case CT_IMAGE_GIF:
-			content_type_string = "image/gif";
-			break;
-
-		case CT_IMAGE_XICON:
-			content_type_string = "image/x-icon";
-			break;
-
-		case CT_IMAGE_BMP:
-			content_type_string = "image/bmp";
-			break;
-
-		case CT_IMAGE_ICNS:
-			content_type_string = "image/icns";
-			break;
-
-		default:
-		case CT_TEXT_PLAIN:
-			content_type_string = "text/plain; charset=utf-8";
-			break;
-	}
-
-	char *code_msg;
-	switch(code) {
-		case 200:
-			code_msg = "OK";
-			break;
-
-		case 307:
-			code_msg = "Temporary Redirect";
-			break;
-
-		case 400:
-			code_msg = "Bad Request";
-			break;
-
-		case 403:
-			code_msg = "Forbidden";
-			break;
-
-		case 404:
-			code_msg = "Not Found";
-			break;
-
-		case 412:
-			code_msg = "Preconditions Failed";
-			break;
-
-		default:
-			code_msg = "Internal Server Error";
-			break;
-	}
+	const char *content_type_string = web_content_type_to_string(w->response.data->contenttype);
+	const char *code_msg = web_response_code_to_string(code);
 
 	char date[100];
 	struct tm tmbuf, *tm = gmtime_r(&w->response.data->date, &tmbuf);
