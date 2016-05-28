@@ -159,16 +159,16 @@ void web_client_reset(struct web_client *w)
 	w->stats_received_bytes = 0;
 	w->stats_sent_bytes = 0;
 
-	long sent = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
+	size_t sent = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
 
 #ifdef NETDATA_WITH_ZLIB
-	if(likely(w->response.zoutput)) sent = (long)w->response.zstream.total_out;
+	if(likely(w->response.zoutput)) sent = (size_t)w->response.zstream.total_out;
 #endif
 
-	long size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
+	size_t size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
 
 	if(likely(w->last_url[0]))
-		log_access("%llu: (sent/all = %ld/%ld bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: %d '%s'",
+		log_access("%llu: (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: %d '%s'",
 			w->id,
 			sent, size, -((size>0)?((float)(size-sent)/(float)size * 100.0):0.0),
 			(float)usecdiff(&w->tv_ready, &w->tv_in) / 1000.0,
@@ -180,9 +180,11 @@ void web_client_reset(struct web_client *w)
 		);
 
 	if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
-		debug(D_WEB_CLIENT, "%llu: Closing filecopy input file.", w->id);
-		close(w->ifd);
-		w->ifd = w->ofd;
+		if(w->ifd != w->ofd) {
+			debug(D_WEB_CLIENT, "%llu: Closing filecopy input file descriptor %d.", w->id, w->ifd);
+			close(w->ifd);
+			w->ifd = w->ofd;
+		}
 	}
 
 	w->last_url[0] = '\0';
@@ -192,6 +194,7 @@ void web_client_reset(struct web_client *w)
 	w->origin[1] = '\0';
 
 	w->mode = WEB_CLIENT_MODE_NORMAL;
+
 	w->keepalive = 0;
 	w->decoded_url[0] = '\0';
 
@@ -226,19 +229,17 @@ void web_client_reset(struct web_client *w)
 struct web_client *web_client_free(struct web_client *w)
 {
 	struct web_client *n = w->next;
+	if(w == web_clients) web_clients = n;
 
 	debug(D_WEB_CLIENT_ACCESS, "%llu: Closing web client from %s port %s.", w->id, w->client_ip, w->client_port);
 
 	if(w->prev)	w->prev->next = w->next;
 	if(w->next) w->next->prev = w->prev;
-
-	if(w == web_clients) web_clients = w->next;
-
 	if(w->response.header_output) buffer_free(w->response.header_output);
 	if(w->response.header) buffer_free(w->response.header);
 	if(w->response.data) buffer_free(w->response.data);
-	close(w->ifd);
-	if(w->ofd != w->ifd) close(w->ofd);
+	if(w->ifd != -1) close(w->ifd);
+	if(w->ofd != -1 && w->ofd != w->ifd) close(w->ofd);
 	free(w);
 
 	global_statistics.connected_clients--;
@@ -425,7 +426,7 @@ int mysendfile(struct web_client *w, char *filename)
 
 #ifdef NETDATA_WITH_ZLIB
 void web_client_enable_deflate(struct web_client *w, int gzip) {
-	if(w->response.zinitialized == 1) {
+	if(w->response.zinitialized) {
 		error("%llu: Compression has already be initialized for this client.", w->id);
 		return;
 	}
@@ -1715,11 +1716,11 @@ void web_client_process(struct web_client *w) {
 
 	buffer_strcat(w->response.header_output, "\r\n");
 
-	// disable TCP_NODELAY, to buffer the header
+/*	// disable TCP_NODELAY, to buffer the header
 	int flag = 0;
 	if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0)
 		error("%llu: failed to disable TCP_NODELAY on socket.", w->id);
-
+*/
 	// sent the HTTP header
 	debug(D_WEB_DATA, "%llu: Sending response HTTP header of size %d: '%s'"
 			, w->id
@@ -1728,18 +1729,23 @@ void web_client_process(struct web_client *w) {
 			);
 
 	bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0);
-	if(bytes != (ssize_t) buffer_strlen(w->response.header_output))
-		error("%llu: HTTP Header failed to be sent (I sent %d bytes but the system sent %d bytes)."
-				, w->id
-				, buffer_strlen(w->response.header_output)
-				, bytes);
+	if(bytes != (ssize_t) buffer_strlen(w->response.header_output)) {
+		if(bytes > 0)
+			w->stats_sent_bytes += bytes;
+
+		error("%llu: HTTP Header failed to be sent (I sent %d bytes but the system sent %d bytes). Closing web client.", w->id,
+			  buffer_strlen(w->response.header_output), bytes);
+
+		WEB_CLIENT_IS_DEAD(w);
+		return;
+	}
 	else 
 		w->stats_sent_bytes += bytes;
 
-	// enable TCP_NODELAY, to send all data immediately at the next send()
+/*	// enable TCP_NODELAY, to send all data immediately at the next send()
 	flag = 1;
 	if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0) error("%llu: failed to enable TCP_NODELAY on socket.", w->id);
-
+*/
 	// enable sending immediately if we have data
 	if(w->response.data->len) w->wait_send = 1;
 	else w->wait_send = 0;
@@ -1780,50 +1786,78 @@ void web_client_process(struct web_client *w) {
 	}
 }
 
-long web_client_send_chunk_header(struct web_client *w, long len)
+ssize_t web_client_send_chunk_header(struct web_client *w, size_t len)
 {
 	debug(D_DEFLATE, "%llu: OPEN CHUNK of %d bytes (hex: %x).", w->id, len, len);
 	char buf[1024];
 	sprintf(buf, "%lX\r\n", len);
-	ssize_t bytes = send(w->ofd, buf, strlen(buf), MSG_DONTWAIT);
+	
+	ssize_t bytes = send(w->ofd, buf, strlen(buf), 0);
+	if(bytes > 0) {
+		debug(D_DEFLATE, "%llu: Sent chunk header %d bytes.", w->id, bytes);
+		w->stats_sent_bytes += bytes;
+	}
 
-	if(bytes > 0) debug(D_DEFLATE, "%llu: Sent chunk header %d bytes.", w->id, bytes);
-	else if(bytes == 0) debug(D_DEFLATE, "%llu: Did not send chunk header to the client.", w->id);
-	else debug(D_DEFLATE, "%llu: Failed to send chunk header to client.", w->id);
+	else if(bytes == 0) {
+		error("%llu: Did not send chunk header to the client.", w->id);
+		WEB_CLIENT_IS_DEAD(w);
+	}
+	else {
+		error("%llu: Failed to send chunk header to client.", w->id);
+		WEB_CLIENT_IS_DEAD(w);
+	}
 
 	return bytes;
 }
 
-long web_client_send_chunk_close(struct web_client *w)
+ssize_t web_client_send_chunk_close(struct web_client *w)
 {
 	//debug(D_DEFLATE, "%llu: CLOSE CHUNK.", w->id);
 
-	ssize_t bytes = send(w->ofd, "\r\n", 2, MSG_DONTWAIT);
+	ssize_t bytes = send(w->ofd, "\r\n", 2, 0);
+	if(bytes > 0) {
+		debug(D_DEFLATE, "%llu: Sent chunk suffix %d bytes.", w->id, bytes);
+		w->stats_sent_bytes += bytes;
+	}
 
-	if(bytes > 0) debug(D_DEFLATE, "%llu: Sent chunk suffix %d bytes.", w->id, bytes);
-	else if(bytes == 0) debug(D_DEFLATE, "%llu: Did not send chunk suffix to the client.", w->id);
-	else debug(D_DEFLATE, "%llu: Failed to send chunk suffix to client.", w->id);
+	else if(bytes == 0) {
+		error("%llu: Did not send chunk suffix to the client.", w->id);
+		WEB_CLIENT_IS_DEAD(w);
+	}
+	else {
+		error("%llu: Failed to send chunk suffix to client.", w->id);
+		WEB_CLIENT_IS_DEAD(w);
+	}
 
 	return bytes;
 }
 
-long web_client_send_chunk_finalize(struct web_client *w)
+ssize_t web_client_send_chunk_finalize(struct web_client *w)
 {
 	//debug(D_DEFLATE, "%llu: FINALIZE CHUNK.", w->id);
 
-	ssize_t bytes = send(w->ofd, "\r\n0\r\n\r\n", 7, MSG_DONTWAIT);
+	ssize_t bytes = send(w->ofd, "\r\n0\r\n\r\n", 7, 0);
+	if(bytes > 0) {
+		debug(D_DEFLATE, "%llu: Sent chunk suffix %d bytes.", w->id, bytes);
+		w->stats_sent_bytes += bytes;
+	}
 
-	if(bytes > 0) debug(D_DEFLATE, "%llu: Sent chunk suffix %d bytes.", w->id, bytes);
-	else if(bytes == 0) debug(D_DEFLATE, "%llu: Did not send chunk suffix to the client.", w->id);
-	else debug(D_DEFLATE, "%llu: Failed to send chunk suffix to client.", w->id);
+	else if(bytes == 0) {
+		error("%llu: Did not send chunk suffix to the client.", w->id);
+		WEB_CLIENT_IS_DEAD(w);
+	}
+	else {
+		error("%llu: Failed to send chunk suffix to client.", w->id);
+		WEB_CLIENT_IS_DEAD(w);
+	}
 
 	return bytes;
 }
 
 #ifdef NETDATA_WITH_ZLIB
-long web_client_send_deflate(struct web_client *w)
+ssize_t web_client_send_deflate(struct web_client *w)
 {
-	long len = 0, t = 0;
+	ssize_t len = 0, t = 0;
 
 	// when using compression,
 	// w->response.sent is the amount of bytes passed through compression
@@ -1836,21 +1870,19 @@ long web_client_send_deflate(struct web_client *w)
 		debug(D_WEB_CLIENT, "%llu: Out of output data.", w->id);
 
 		// finalize the chunk
-		if(w->response.sent != 0)
-			t += web_client_send_chunk_finalize(w);
+		if(w->response.sent != 0) {
+			t = web_client_send_chunk_finalize(w);
+			if(t < 0) return t;
+		}
 
-		// there can be two cases for this
-		// A. we have done everything
-		// B. we temporarily have nothing to send, waiting for the buffer to be filled by ifd
-
-		if(w->mode == WEB_CLIENT_MODE_FILECOPY && w->wait_receive && w->ifd != w->ofd && w->response.rlen && w->response.rlen > w->response.data->len) {
+		if(w->mode == WEB_CLIENT_MODE_FILECOPY && w->wait_receive && w->response.rlen && w->response.rlen > w->response.data->len) {
 			// we have to wait, more data will come
 			debug(D_WEB_CLIENT, "%llu: Waiting for more data to become available.", w->id);
 			w->wait_send = 0;
-			return(0);
+			return t;
 		}
 
-		if(w->keepalive == 0) {
+		if(unlikely(w->keepalive == 0)) {
 			debug(D_WEB_CLIENT, "%llu: Closing (keep-alive is not enabled). %ld bytes sent.", w->id, w->response.sent);
 			errno = 0;
 			return(-1);
@@ -1858,24 +1890,23 @@ long web_client_send_deflate(struct web_client *w)
 
 		// reset the client
 		web_client_reset(w);
-		debug(D_WEB_CLIENT, "%llu: Done sending all data on socket. Waiting for next request on the same socket.", w->id);
-		return(0);
+		debug(D_WEB_CLIENT, "%llu: Done sending all data on socket.", w->id);
+		return t;
 	}
 
 	if(w->response.zhave == w->response.zsent) {
 		// compress more input data
 
 		// close the previous open chunk
-		if(w->response.sent != 0) t += web_client_send_chunk_close(w);
+		if(w->response.sent != 0) {
+			t = web_client_send_chunk_close(w);
+			if(t < 0) return t;
+		}
 
 		debug(D_DEFLATE, "%llu: Compressing %d new bytes starting from %d (and %d left behind).", w->id, (w->response.data->len - w->response.sent), w->response.sent, w->response.zstream.avail_in);
 
 		// give the compressor all the data not passed through the compressor yet
 		if(w->response.data->len > w->response.sent) {
-#ifdef NETDATA_INTERNAL_CHECKS
-			if((long)w->response.sent - (long)w->response.zstream.avail_in < 0)
-				error("internal error: avail_in is corrupted.");
-#endif
 			w->response.zstream.next_in = (Bytef *)&w->response.data->buffer[w->response.sent - w->response.zstream.avail_in];
 			w->response.zstream.avail_in += (uInt) (w->response.data->len - w->response.sent);
 		}
@@ -1911,31 +1942,39 @@ long web_client_send_deflate(struct web_client *w)
 		debug(D_DEFLATE, "%llu: Compression produced %d bytes.", w->id, w->response.zhave);
 
 		// open a new chunk
-		t += web_client_send_chunk_header(w, w->response.zhave);
+		ssize_t t2 = web_client_send_chunk_header(w, w->response.zhave);
+		if(t2 < 0) return t2;
+		t += t2;
 	}
 	
 	debug(D_WEB_CLIENT, "%llu: Sending %d bytes of data (+%d of chunk header).", w->id, w->response.zhave - w->response.zsent, t);
 
 	len = send(w->ofd, &w->response.zbuffer[w->response.zsent], (size_t) (w->response.zhave - w->response.zsent), MSG_DONTWAIT);
 	if(len > 0) {
+		w->stats_sent_bytes += len;
 		w->response.zsent += len;
-		if(t > 0) len += t;
+		len += t;
 		debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, len);
 	}
-	else if(len == 0) debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client (zhave = %ld, zsent = %ld, need to send = %ld).", w->id, w->response.zhave, w->response.zsent, w->response.zhave - w->response.zsent);
-	else debug(D_WEB_CLIENT, "%llu: Failed to send data to client. Reason: %s", w->id, strerror(errno));
+	else if(len == 0) {
+		error("%llu: Did not send any bytes to the client (zhave = %ld, zsent = %ld, need to send = %ld).", w->id, w->response.zhave, w->response.zsent, w->response.zhave - w->response.zsent);
+		WEB_CLIENT_IS_DEAD(w);
+	}
+	else {
+		error("%llu: Failed to send data to client.", w->id);
+		WEB_CLIENT_IS_DEAD(w);
+	}
 
 	return(len);
 }
 #endif // NETDATA_WITH_ZLIB
 
-long web_client_send(struct web_client *w)
-{
+ssize_t web_client_send(struct web_client *w) {
 #ifdef NETDATA_WITH_ZLIB
 	if(likely(w->response.zoutput)) return web_client_send_deflate(w);
 #endif // NETDATA_WITH_ZLIB
 
-	long bytes;
+	ssize_t bytes;
 
 	if(unlikely(w->response.data->len - w->response.sent == 0)) {
 		// there is nothing to send
@@ -1946,7 +1985,7 @@ long web_client_send(struct web_client *w)
 		// A. we have done everything
 		// B. we temporarily have nothing to send, waiting for the buffer to be filled by ifd
 
-		if(w->mode == WEB_CLIENT_MODE_FILECOPY && w->wait_receive && w->ifd != w->ofd && w->response.rlen && w->response.rlen > w->response.data->len) {
+		if(w->mode == WEB_CLIENT_MODE_FILECOPY && w->wait_receive && w->response.rlen && w->response.rlen > w->response.data->len) {
 			// we have to wait, more data will come
 			debug(D_WEB_CLIENT, "%llu: Waiting for more data to become available.", w->id);
 			w->wait_send = 0;
@@ -1966,22 +2005,29 @@ long web_client_send(struct web_client *w)
 
 	bytes = send(w->ofd, &w->response.data->buffer[w->response.sent], w->response.data->len - w->response.sent, MSG_DONTWAIT);
 	if(likely(bytes > 0)) {
+		w->stats_sent_bytes += bytes;
 		w->response.sent += bytes;
 		debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, bytes);
 	}
-	else if(likely(bytes == 0)) debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client.", w->id);
-	else debug(D_WEB_CLIENT, "%llu: Failed to send data to client.", w->id);
+	else if(likely(bytes == 0)) {
+		error("%llu: Did not send any bytes to the client.", w->id);
+		WEB_CLIENT_IS_DEAD(w);
+	}
+	else {
+		error("%llu: Failed to send data to client.", w->id);
+		WEB_CLIENT_IS_DEAD(w);
+	}
 
 	return(bytes);
 }
 
-long web_client_receive(struct web_client *w)
+ssize_t web_client_receive(struct web_client *w)
 {
 	// do we have any space for more data?
 	buffer_need_bytes(w->response.data, WEB_REQUEST_LENGTH);
 
-	long left = w->response.data->size - w->response.data->len;
-	long bytes;
+	ssize_t left = w->response.data->size - w->response.data->len;
+	ssize_t bytes;
 
 	if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY))
 		bytes = read(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
@@ -1989,6 +2035,9 @@ long web_client_receive(struct web_client *w)
 		bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
 
 	if(likely(bytes > 0)) {
+		if(w->mode != WEB_CLIENT_MODE_FILECOPY)
+			w->stats_received_bytes += bytes;
+
 		size_t old = w->response.data->len;
 		w->response.data->len += bytes;
 		w->response.data->buffer[w->response.data->len] = '\0';
@@ -1998,7 +2047,9 @@ long web_client_receive(struct web_client *w)
 
 		if(w->mode == WEB_CLIENT_MODE_FILECOPY) {
 			w->wait_send = 1;
-			if(w->response.rlen && w->response.data->len >= w->response.rlen) w->wait_receive = 0;
+
+			if(w->response.rlen && w->response.data->len >= w->response.rlen)
+				w->wait_receive = 0;
 		}
 	}
 	else if(likely(bytes == 0)) {
@@ -2012,12 +2063,19 @@ long web_client_receive(struct web_client *w)
 			// we are copying data from ifd to ofd
 			// let it finish copying...
 			w->wait_receive = 0;
-			debug(D_WEB_CLIENT, "%llu: Disabling input.", w->id);
+
+			debug(D_WEB_CLIENT, "%llu: Read the whole file.", w->id);
+			if(w->ifd != w->ofd) close(w->ifd);
+			w->ifd = w->ofd;
 		}
 		else {
-			bytes = -1;
-			errno = 0;
+			error("%llu: failed to receive data.", w->id);
+			WEB_CLIENT_IS_DEAD(w);
 		}
+	}
+	else {
+		error("%llu: receive data failed.", w->id);
+		WEB_CLIENT_IS_DEAD(w);
 	}
 
 	return(bytes);
@@ -2040,7 +2098,6 @@ void *web_client_main(void *ptr)
 	if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
 		error("Cannot set pthread cancel state to ENABLE.");
 
-	struct timeval tv;
 	struct web_client *w = ptr;
 	int retval;
 	fd_set ifds, ofds, efds;
@@ -2049,6 +2106,15 @@ void *web_client_main(void *ptr)
 	log_access("%llu: %s port %s connected on thread task id %d", w->id, w->client_ip, w->client_port, gettid());
 
 	for(;;) {
+		if(unlikely(w->dead)) {
+			error("%llu: client is dead.");
+			break;
+		}
+		else if(unlikely(!w->wait_receive && !w->wait_send)) {
+			error("%llu: client is not set for neither receiving nor sending data.");
+			break;
+		}
+
 		FD_ZERO (&ifds);
 		FD_ZERO (&ofds);
 		FD_ZERO (&efds);
@@ -2068,15 +2134,13 @@ void *web_client_main(void *ptr)
 			if(w->ofd > fdmax) fdmax = w->ofd;
 		}
 
-		tv.tv_sec = web_client_timeout;
-		tv.tv_usec = 0;
-
 		debug(D_WEB_CLIENT, "%llu: Waiting socket async I/O for %s %s", w->id, w->wait_receive?"INPUT":"", w->wait_send?"OUTPUT":"");
+		struct timeval tv = { .tv_sec = web_client_timeout, .tv_usec = 0 };
 		retval = select(fdmax+1, &ifds, &ofds, &efds, &tv);
 
 		if(retval == -1) {
-			debug(D_WEB_CLIENT_ACCESS, "%llu: LISTENER: select() failed.", w->id);
-			continue;
+			error("%llu: LISTENER: select() failed (input fd = %d, output fd = %d). Closing client.", w->id, w->ifd, w->ofd);
+			break;
 		}
 		else if(!retval) {
 			// timeout
@@ -2095,25 +2159,21 @@ void *web_client_main(void *ptr)
 		}
 
 		if(w->wait_send && FD_ISSET(w->ofd, &ofds)) {
-			long bytes;
+			ssize_t bytes;
 			if((bytes = web_client_send(w)) < 0) {
 				debug(D_WEB_CLIENT, "%llu: Cannot send data to client. Closing client.", w->id);
 				errno = 0;
 				break;
 			}
-			else
-				w->stats_sent_bytes += bytes;
 		}
 
 		if(w->wait_receive && FD_ISSET(w->ifd, &ifds)) {
-			long bytes;
+			ssize_t bytes;
 			if((bytes = web_client_receive(w)) < 0) {
 				debug(D_WEB_CLIENT, "%llu: Cannot receive data from client. Closing client.", w->id);
 				errno = 0;
 				break;
 			}
-			else
-				w->stats_received_bytes += bytes;
 
 			if(w->mode == WEB_CLIENT_MODE_NORMAL) {
 				debug(D_WEB_CLIENT, "%llu: Attempting to process received data (%ld bytes).", w->id, bytes);
@@ -2129,6 +2189,7 @@ void *web_client_main(void *ptr)
 
 	web_client_reset(w);
 	w->obsolete = 1;
+	pthread_exit(NULL);
 
 	return NULL;
 }

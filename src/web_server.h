@@ -15,6 +15,8 @@ extern int listen_port;
 
 extern int create_listen_socket4(const char *ip, int port, int listen_backlog);
 extern int create_listen_socket6(const char *ip, int port, int listen_backlog);
-extern void *socket_listen_main(void *ptr);
+extern void *socket_listen_main_multi_threaded(void *ptr);
+extern void *socket_listen_main_single_threaded(void *ptr);
+extern int create_listen_socket(void);
 
 #endif /* NETDATA_WEB_SERVER_H */

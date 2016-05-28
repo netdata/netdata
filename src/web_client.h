@@ -37,22 +37,39 @@ struct response {
 
 	int code;						// the HTTP response code
 
-	size_t rlen;					// if non-zero, the excepted size of ifd (input)
+	size_t rlen;					// if non-zero, the excepted size of ifd (input of firecopy)
 	size_t sent;					// current data length sent to output
 
 	int zoutput;					// if set to 1, web_client_send() will send compressed data
 #ifdef NETDATA_WITH_ZLIB
 	z_stream zstream;				// zlib stream for sending compressed output to client
 	Bytef zbuffer[ZLIB_CHUNK];		// temporary buffer for storing compressed output
-	long zsent;						// the compressed bytes we have sent to the client
-	long zhave;						// the compressed bytes that we have to send
-	int zinitialized;
+	size_t zsent;					// the compressed bytes we have sent to the client
+	size_t zhave;					// the compressed bytes that we have received from zlib
+	int zinitialized:1;
 #endif
 
 };
 
 struct web_client {
 	unsigned long long id;
+
+	uint8_t obsolete:1;					// if set to 1, the listener will remove this client
+										// after setting this to 1, you should not touch
+										// this web_client
+
+	uint8_t dead:1;						// if set to 1, this client is dead
+
+	uint8_t keepalive:1;				// if set to 1, the web client will be re-used
+	uint8_t enable_gzip:1;				// if set to 1, the response will be compressed
+
+	uint8_t mode:3;						// the operational mode of the client
+
+	uint8_t wait_receive:1;				// 1 = we are waiting more input data
+	uint8_t wait_send:1;				// 1 = we have data to send to the client
+
+	int ifd;
+	int ofd;
 
 	char client_ip[NI_MAXHOST+1];
 	char client_port[NI_MAXSERV+1];
@@ -66,29 +83,19 @@ struct web_client {
 	char cookie2[COOKIE_MAX+1];
 	char origin[ORIGIN_MAX+1];
 
-	int mode;
-	int keepalive;
-	int enable_gzip;
-
 	struct sockaddr_storage clientaddr;
-
-	pthread_t thread;				// the thread servicing this client
-	int obsolete;					// if set to 1, the listener will remove this client
-
-	int ifd;
-	int ofd;
-
 	struct response response;
 
-	int wait_receive;
-	int wait_send;
+	size_t stats_received_bytes;
+	size_t stats_sent_bytes;
 
-	unsigned long stats_received_bytes;
-	unsigned long stats_sent_bytes;
+	pthread_t thread;				// the thread servicing this client
 
 	struct web_client *prev;
 	struct web_client *next;
 };
+
+#define WEB_CLIENT_IS_DEAD(w) (w)->dead=1
 
 extern struct web_client *web_clients;
 
@@ -97,6 +104,10 @@ extern uid_t web_files_gid(void);
 
 extern struct web_client *web_client_create(int listener);
 extern struct web_client *web_client_free(struct web_client *w);
+extern ssize_t web_client_send(struct web_client *w);
+extern ssize_t web_client_receive(struct web_client *w);
+extern void web_client_process(struct web_client *w);
+extern void web_client_reset(struct web_client *w);
 
 extern void *web_client_main(void *ptr);
 
