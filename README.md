@@ -2,6 +2,8 @@
 
 # netdata
 
+[![Join the chat at https://gitter.im/firehol/netdata](https://badges.gitter.im/firehol/netdata.svg)](https://gitter.im/firehol/netdata?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 > May 16th, 2016
 >
 > [netdata v1.2.0 released!](https://github.com/firehol/netdata/releases)
