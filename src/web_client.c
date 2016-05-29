@@ -273,7 +273,7 @@ uid_t web_files_uid(void)
 				owner_uid = geteuid();
 			}
 			else {
-				debug(D_WEB_CLIENT, "Web files owner set to %s.\n", web_owner);
+				debug(D_WEB_CLIENT, "Web files owner set to %s.", web_owner);
 				owner_uid = pw->pw_uid;
 			}
 		}
@@ -301,7 +301,7 @@ gid_t web_files_gid(void)
 				owner_gid = getegid();
 			}
 			else {
-				debug(D_WEB_CLIENT, "Web files group set to %s.\n", web_group);
+				debug(D_WEB_CLIENT, "Web files group set to %s.", web_group);
 				owner_gid = gr->gr_gid;
 			}
 		}
