@@ -594,9 +594,21 @@ then
 	run service netdata start && running=1
 fi
 
+if [ ${running} -eq 0 -a "${UID}" -eq 0 ]
+then
+	service netdata status >/dev/null 2>&1
+	if [ $? -eq 0 ]
+	then
+		# nice guy, he installed netdata to his system
+		run service netdata stop
+		stop_all_netdata
+		run service netdata start && running=1
+	fi
+fi
+
 if [ ${running} -eq 0 ]
 then
-	# no systemd (or not running as root, or systemd failed)
+	# still not running...
 
 	stop_all_netdata
 
