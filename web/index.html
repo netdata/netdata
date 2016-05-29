@@ -980,6 +980,9 @@
 						<table id="gotoServerList">
 						</table>
 					</div>
+					<p style="padding-top: 10px;"><small>
+						Checks may fail if you are viewing an HTTPS page and the server to be checked is HTTP only.
+					</small></p>
 					<div id="gotoServerResponse" style="display: block; width: 100%; text-align: center; padding-top: 20px;"></div>
 				</div>
 				<div class="modal-footer">
@@ -1017,6 +1020,12 @@ if(isdemo()) {
 }
 var gotoServerValidateRemaining = 0;
 function gotoServerValidateUrl(id, guid, url) {
+	var penaldy = 0;
+	if(document.location.toString().startsWith('http://') && url.toString().startsWith('https://'))
+			// we penalize https only if the current url is http
+			// to allow the user walk through all its servers.
+			penaldy = 500;
+
 	setTimeout(function() {
 		document.getElementById('gotoServerList').innerHTML += '<tr><td style="padding-left: 20px;"><a href="' + url + '" target="_blank">' + url + '</a></td><td style="padding-left: 30px;"><code id="' + guid + '-' + id + '-status">checking...</code></td></tr>';
 		NETDATA.registry.hello(url, function(data) {
@@ -1032,7 +1041,7 @@ function gotoServerValidateUrl(id, guid, url) {
 					document.getElementById('gotoServerResponse').innerHTML = '<b>Sorry! I cannot find any operational URL for this server</b>';
 			}
 		});
-	}, id * 50);
+	}, (id * 50) + penaldy);
 }
 
 function gotoServerModalHandler(guid) {
