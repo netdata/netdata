@@ -524,60 +524,107 @@ isnetdata() {
 	return 1
 }
 
+stop_netdata_on_pid() {
+	local pid="$1" ret=0 count=0
 
-echo >&2
-echo >&2 "-------------------------------------------------------------------------------"
-echo >&2
-printf >&2 "Stopping a (possibly) running netdata..."
-ret=0
-count=0
-while [ $ret -eq 0 ]
-do
-	if [ $count -gt 30 ]
-		then
-		echo >&2 "Cannot stop the running netdata."
-		exit 1
-	fi
+	isnetdata $pid || return 0
 
-	count=$((count + 1))
+	printf >&2 "Stopping netdata on pid $pid ..."
+	while [ ! -z "$pid" -a $ret -eq 0 ]
+	do
+		if [ $count -gt 45 ]
+			then
+			echo >&2 "Cannot stop the running netdata on pid $pid."
+			return 1
+		fi
 
-	pid=$(cat "${NETDATA_RUN_DIR}/netdata.pid" 2>/dev/null)
-	# backwards compatibility
-	[ -z "${pid}" ] && pid=$(cat /var/run/netdata.pid 2>/dev/null)
-	[ -z "${pid}" ] && pid=$(cat /var/run/netdata/netdata.pid 2>/dev/null)
-	
-	isnetdata $pid || pid=
-	if [ ! -z "${pid}" ]
-		then
+		count=$(( count + 1 ))
+
 		run kill $pid 2>/dev/null
 		ret=$?
-	else
-		run killall netdata 2>/dev/null
-		ret=$?
+
+		test $ret -eq 0 && printf >&2 "." && sleep 2
+	done
+
+	echo >&2
+	if [ $ret -eq 0 ]
+	then
+		echo >&2 "SORRY! CANNOT STOP netdata ON PID $pid !"
+		return 1
 	fi
 
-	test $ret -eq 0 && printf >&2 "." && sleep 2
-done
-echo >&2
-echo >&2
+	echo >&2 "netdata on pid $pid stopped."
+	return 0
+}
 
+stop_all_netdata() {
+	local p
+
+	echo >&2 "Stopping a (possibly) running netdata..."
+
+	for p in $(cat "${NETDATA_RUN_DIR}/netdata.pid" 2>/dev/null) \
+		$(cat /var/run/netdata.pid 2>/dev/null) \
+		$(cat /var/run/netdata/netdata.pid 2>/dev/null) \
+		$(pidof netdata 2>/dev/null)
+	do
+		stop_netdata_on_pid $p
+	done
+}
 
 # -----------------------------------------------------------------------------
-# run netdata
+# check netdata for systemd
 
-echo >&2 "Starting netdata..."
-run ${NETDATA_PREFIX}/usr/sbin/netdata -P ${NETDATA_RUN_DIR}/netdata.pid "${@}"
+running=0
+pidof systemd >/dev/null 2>&1
+if [ $? -eq 0 -a "${UID}" -eq 0 ]
+then
+	# systemd is running on this system
 
-if [ $? -ne 0 ]
+	if [ ! -f /etc/systemd/system/netdata.service ]
 	then
-	echo >&2
-	echo >&2 "SORRY! FAILED TO START NETDATA!"
-	exit 1
-else
-	echo >&2 "OK. NetData Started!"
-fi
-echo >&2
+		echo >&2 "Installing systemd service..."
+		run cp system/netdata.service /etc/systemd/system/netdata.service && \
+			run systemctl daemon-reload && \
+			run systemctl enable netdata
+	else
+		run service netdata stop
+	fi
 
+	stop_all_netdata
+	run service netdata start && running=1
+fi
+
+if [ ${running} -eq 0 -a "${UID}" -eq 0 ]
+then
+	service netdata status >/dev/null 2>&1
+	if [ $? -eq 0 ]
+	then
+		# nice guy, he installed netdata to his system
+		run service netdata stop
+		stop_all_netdata
+		run service netdata start && running=1
+	fi
+fi
+
+if [ ${running} -eq 0 ]
+then
+	# still not running...
+
+	stop_all_netdata
+
+	echo >&2 "Starting netdata..."
+	run ${NETDATA_PREFIX}/usr/sbin/netdata -P ${NETDATA_RUN_DIR}/netdata.pid "${@}"
+	if [ $? -ne 0 ]
+		then
+		echo >&2
+		echo >&2 "SORRY! FAILED TO START NETDATA!"
+		exit 1
+	else
+		echo >&2 "OK. NetData Started!"
+	fi
+
+	echo >&2
+fi
 
 # -----------------------------------------------------------------------------
 # save a config file, if it is not already there
@@ -633,7 +680,7 @@ ksm_is_available_but_disabled() {
 	-------------------------------------------------------------------------------
 	Memory de-duplication instructions
 
-	I see you have kernel memory de-duper (called Kernel Same-page Merging,
+	You have kernel memory de-duper (called Kernel Same-page Merging,
 	or KSM) available, but it is not currently enabled.
 
 	To enable it run:
@@ -741,7 +788,7 @@ cat >netdata-uninstaller.sh <<-UNINSTALL
 	fi
 
 	echo >&2 "Stopping a possibly running netdata..."
-	killall netdata
+	for p in \$(pidof netdata); do kill \$x; done
 	sleep 2
 
 	deletedir() {
@@ -780,6 +827,12 @@ cat >netdata-uninstaller.sh <<-UNINSTALL
 		then
 		echo "Deleting /etc/logrotate.d/netdata ..."
 		rm -i /etc/logrotate.d/netdata
+	fi
+
+	if [ -f /etc/systemd/system/netdata.service ]
+		then
+		echo "Deleting /etc/systemd/system/netdata.service ..."
+		rm -i /etc/systemd/system/netdata.service
 	fi
 
 	getent passwd netdata > /dev/null

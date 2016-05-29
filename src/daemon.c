@@ -26,7 +26,6 @@
 #include "daemon.h"
 
 char pidfile[FILENAME_MAX + 1] = "";
-int pidfd = -1;
 
 void sig_handler(int signo)
 {

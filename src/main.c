@@ -70,25 +70,40 @@ struct netdata_static_thread {
 
 	void (*init_routine) (void);
 	void *(*start_routine) (void *);
-};
-
-struct netdata_static_thread static_threads[] = {
-	{"tc",			"plugins",	"tc",			1, NULL, NULL,	tc_main},
-	{"idlejitter",	"plugins",	"idlejitter",	1, NULL, NULL,	cpuidlejitter_main},
-	{"proc",		"plugins",	"proc",			1, NULL, NULL,	proc_main},
-	{"cgroups",		"plugins",	"cgroups",		1, NULL, NULL,	cgroups_main},
-
+} static_threads[] = {
 #ifdef INTERNAL_PLUGIN_NFACCT
-	// nfacct requires root access
+// nfacct requires root access
 	// so, we build it as an external plugin with setuid to root
-	{"nfacct",		"plugins",	"nfacct",		1, NULL, NULL, 	nfacct_main},
+	{"nfacct",              "plugins",  "nfacct",     1, NULL, NULL, nfacct_main},
 #endif
 
-	{"plugins.d",	NULL,		NULL,			1, NULL, NULL,	pluginsd_main},
-	{"check",		"plugins",	"checks",		0, NULL, NULL,	checks_main},
-	{"web",			NULL,		NULL,			1, NULL, NULL,	socket_listen_main},
-	{NULL,			NULL,		NULL,			0, NULL, NULL,	NULL}
+	{"tc",                 "plugins",   "tc",         1, NULL, NULL, tc_main},
+	{"idlejitter",         "plugins",   "idlejitter", 1, NULL, NULL, cpuidlejitter_main},
+	{"proc",               "plugins",   "proc",       1, NULL, NULL, proc_main},
+	{"cgroups",            "plugins",   "cgroups",    1, NULL, NULL, cgroups_main},
+	{"plugins.d",           NULL,       NULL,         1, NULL, NULL, pluginsd_main},
+	{"check",               "plugins",  "checks",     0, NULL, NULL, checks_main},
+	{"web",                 NULL,       NULL,         1, NULL, NULL, socket_listen_main_multi_threaded},
+	{"web-single-threaded",	NULL,       NULL,         0, NULL, NULL, socket_listen_main_single_threaded},
+	{NULL,                  NULL,       NULL,         0, NULL, NULL, NULL}
 };
+
+void web_server_threading_selection(void) {
+	int threaded = config_get_boolean("global", "multi threaded web server", 1);
+
+	int i;
+	for(i = 0; static_threads[i].name ; i++) {
+		if(static_threads[i].start_routine == socket_listen_main_multi_threaded)
+			static_threads[i].enabled = threaded?1:0;
+
+		if(static_threads[i].start_routine == socket_listen_main_single_threaded)
+			static_threads[i].enabled = threaded?0:1;
+	}
+
+	web_client_timeout = (int) config_get_number("global", "disconnect idle web clients after seconds", DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS);
+	web_enable_gzip = config_get_boolean("global", "enable web responses gzip compression", web_enable_gzip);
+}
+
 
 int killpid(pid_t pid, int sig)
 {
@@ -591,28 +606,7 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		listen_backlog = (int) config_get_number("global", "http port listen backlog", LISTEN_BACKLOG);
-
-		listen_port = (int) config_get_number("global", "port", LISTEN_PORT);
-		if(listen_port < 1 || listen_port > 65535) {
-			info("Invalid listen port %d given. Defaulting to %d.", listen_port, LISTEN_PORT);
-			listen_port = LISTEN_PORT;
-		}
-		else debug(D_OPTIONS, "Listen port set to %d.", listen_port);
-
-		int ip = 0;
-		char *ipv = config_get("global", "ip version", "any");
-		if(!strcmp(ipv, "any") || !strcmp(ipv, "both") || !strcmp(ipv, "all")) ip = 0;
-		else if(!strcmp(ipv, "ipv4") || !strcmp(ipv, "IPV4") || !strcmp(ipv, "IPv4") || !strcmp(ipv, "4")) ip = 4;
-		else if(!strcmp(ipv, "ipv6") || !strcmp(ipv, "IPV6") || !strcmp(ipv, "IPv6") || !strcmp(ipv, "6")) ip = 6;
-		else info("Cannot understand ip version '%s'. Assuming 'any'.", ipv);
-
-		if(ip == 0 || ip == 6) listen_fd = create_listen_socket6(config_get("global", "bind socket to IP", "*"), listen_port, listen_backlog);
-		if(listen_fd < 0) {
-			listen_fd = create_listen_socket4(config_get("global", "bind socket to IP", "*"), listen_port, listen_backlog);
-			if(listen_fd >= 0 && ip != 4) info("Managed to open an IPv4 socket on port %d.", listen_port);
-		}
-
+		listen_fd = create_listen_socket();
 		if(listen_fd < 0) fatal("Cannot listen socket.");
 	}
 
@@ -655,6 +649,8 @@ int main(int argc, char **argv)
 
 	// ------------------------------------------------------------------------
 	// spawn the threads
+
+	web_server_threading_selection();
 
 	for (i = 0; static_threads[i].name != NULL ; i++) {
 		struct netdata_static_thread *st = &static_threads[i];
