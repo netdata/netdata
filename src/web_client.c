@@ -2191,8 +2191,21 @@ void *web_client_main(void *ptr)
 	debug(D_WEB_CLIENT, "%llu: done...", w->id);
 
 	web_client_reset(w);
-	w->obsolete = 1;
-	pthread_exit(NULL);
 
+	// close the sockets/files now
+	// to free file descriptors
+	if(w->ifd == w->ofd) {
+		if(w->ifd != -1) close(w->ifd);
+	}
+	else {
+		if(w->ifd != -1) close(w->ifd);
+		if(w->ofd != -1) close(w->ifd);
+	}
+	w->ifd = -1;
+	w->ofd = -1;
+
+	w->obsolete = 1;
+
+	pthread_exit(NULL);
 	return NULL;
 }
