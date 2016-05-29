@@ -202,6 +202,8 @@ int create_listen_socket(void) {
 // 3. spawns a new pthread to serve the client (this is optimal for keep-alive clients)
 // 4. cleans up old web_clients that their pthreads have been exited
 
+#define CLEANUP_EVERY_EVENTS 1000
+
 void *socket_listen_main_multi_threaded(void *ptr) {
 	if(ptr) { ; }
 
@@ -210,7 +212,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
 
 	struct web_client *w;
 	struct timeval tv;
-	int retval, failures = 0;
+	int retval, failures = 0, counter = 0;
 
 	if(ptr) { ; }
 
@@ -227,7 +229,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
 
 	for(;;) {
 		tv.tv_sec = 0;
-		tv.tv_usec = 200000;
+		tv.tv_usec = 100000;
 
 		if(likely(listen_fd >= 0))
 			FD_SET(listen_fd, &ifds);
@@ -274,25 +276,30 @@ void *socket_listen_main_multi_threaded(void *ptr) {
 			else debug(D_WEB_CLIENT, "LISTENER: select() didn't do anything.");
 
 		}
-		//else {
-		//	debug(D_WEB_CLIENT, "LISTENER: select() timeout.");
-		//}
-
-		failures = 0;
+		else {
+			debug(D_WEB_CLIENT, "LISTENER: select() timeout.");
+			counter = CLEANUP_EVERY_EVENTS;
+		}
 
 		// cleanup unused clients
-		for (w = web_clients; w; ) {
-			if (w->obsolete) {
-				debug(D_WEB_CLIENT, "%llu: Removing client.", w->id);
-				// pthread_cancel(w->thread);
-				// pthread_join(w->thread, NULL);
-				w = web_client_free(w);
+		counter++;
+		if(counter > CLEANUP_EVERY_EVENTS) {
+			counter = 0;
+			for (w = web_clients; w;) {
+				if (w->obsolete) {
+					debug(D_WEB_CLIENT, "%llu: Removing client.", w->id);
+					// pthread_cancel(w->thread);
+					// pthread_join(w->thread, NULL);
+					w = web_client_free(w);
 #ifdef NETDATA_INTERNAL_CHECKS
-				log_allocations();
+					log_allocations();
 #endif
+				}
+				else w = w->next;
 			}
-			else w = w->next;
 		}
+
+		failures = 0;
 	}
 
 	error("LISTENER: exit!");
