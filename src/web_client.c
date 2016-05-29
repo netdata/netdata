@@ -149,12 +149,16 @@ void web_client_reset(struct web_client *w)
 	debug(D_WEB_CLIENT, "%llu: Reseting client.", w->id);
 
 	if(w->stats_received_bytes || w->stats_sent_bytes) {
-		global_statistics_lock();
+		if(web_server_mode == WEB_SERVER_MODE_MULTI_THREADED)
+			global_statistics_lock();
+
 		global_statistics.web_requests++;
 		global_statistics.web_usec += usecdiff(&tv, &w->tv_in);
 		global_statistics.bytes_received += w->stats_received_bytes;
 		global_statistics.bytes_sent += w->stats_sent_bytes;
-		global_statistics_unlock();
+
+		if(web_server_mode == WEB_SERVER_MODE_MULTI_THREADED)
+			global_statistics_unlock();
 	}
 	w->stats_received_bytes = 0;
 	w->stats_sent_bytes = 0;
@@ -1882,10 +1886,10 @@ ssize_t web_client_send_deflate(struct web_client *w)
 			return t;
 		}
 
-		if(unlikely(w->keepalive == 0)) {
+		if(unlikely(!w->keepalive)) {
 			debug(D_WEB_CLIENT, "%llu: Closing (keep-alive is not enabled). %ld bytes sent.", w->id, w->response.sent);
-			errno = 0;
-			return(-1);
+			WEB_CLIENT_IS_DEAD(w);
+			return t;
 		}
 
 		// reset the client
@@ -1989,18 +1993,18 @@ ssize_t web_client_send(struct web_client *w) {
 			// we have to wait, more data will come
 			debug(D_WEB_CLIENT, "%llu: Waiting for more data to become available.", w->id);
 			w->wait_send = 0;
-			return(0);
+			return 0;
 		}
 
-		if(unlikely(w->keepalive == 0)) {
+		if(unlikely(!w->keepalive)) {
 			debug(D_WEB_CLIENT, "%llu: Closing (keep-alive is not enabled). %ld bytes sent.", w->id, w->response.sent);
-			errno = 0;
-			return(-1);
+			WEB_CLIENT_IS_DEAD(w);
+			return 0;
 		}
 
 		web_client_reset(w);
 		debug(D_WEB_CLIENT, "%llu: Done sending all data on socket. Waiting for next request on the same socket.", w->id);
-		return(0);
+		return 0;
 	}
 
 	bytes = send(w->ofd, &w->response.data->buffer[w->response.sent], w->response.data->len - w->response.sent, MSG_DONTWAIT);
@@ -2107,7 +2111,7 @@ void *web_client_main(void *ptr)
 
 	for(;;) {
 		if(unlikely(w->dead)) {
-			error("%llu: client is dead.");
+			error("%llu: client is dead.", w->id);
 			break;
 		}
 		else if(unlikely(!w->wait_receive && !w->wait_send)) {
@@ -2118,6 +2122,11 @@ void *web_client_main(void *ptr)
 		FD_ZERO (&ifds);
 		FD_ZERO (&ofds);
 		FD_ZERO (&efds);
+
+		if(w->ifd < 0 || w->ifd >= FD_SETSIZE || w->ofd < 0 || w->ofd >= FD_SETSIZE) {
+			error("%llu: invalid file descriptor, ifd = %d, ofd = %d (required 0 <= fd < FD_SETSIZE (%d)", w->id, w->ifd, w->ofd, FD_SETSIZE);
+			break;
+		}
 
 		FD_SET(w->ifd, &efds);
 
@@ -2159,28 +2168,22 @@ void *web_client_main(void *ptr)
 		}
 
 		if(w->wait_send && FD_ISSET(w->ofd, &ofds)) {
-			ssize_t bytes;
-			if((bytes = web_client_send(w)) < 0) {
+			if(web_client_send(w) < 0) {
 				debug(D_WEB_CLIENT, "%llu: Cannot send data to client. Closing client.", w->id);
-				errno = 0;
 				break;
 			}
 		}
 
 		if(w->wait_receive && FD_ISSET(w->ifd, &ifds)) {
-			ssize_t bytes;
-			if((bytes = web_client_receive(w)) < 0) {
+			if(web_client_receive(w) < 0) {
 				debug(D_WEB_CLIENT, "%llu: Cannot receive data from client. Closing client.", w->id);
-				errno = 0;
 				break;
 			}
 
 			if(w->mode == WEB_CLIENT_MODE_NORMAL) {
-				debug(D_WEB_CLIENT, "%llu: Attempting to process received data (%ld bytes).", w->id, bytes);
-				// info("%llu: Attempting to process received data (%ld bytes).", w->id, bytes);
+				debug(D_WEB_CLIENT, "%llu: Attempting to process received data.", w->id);
 				web_client_process(w);
 			}
-
 		}
 	}
 
