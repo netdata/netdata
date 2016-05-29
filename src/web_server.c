@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <netinet/tcp.h>
 #include <malloc.h>
+#include <poll.h>
 
 #include "common.h"
 #include "log.h"
@@ -205,16 +206,13 @@ int create_listen_socket(void) {
 #define CLEANUP_EVERY_EVENTS 1000
 
 void *socket_listen_main_multi_threaded(void *ptr) {
-	if(ptr) { ; }
+	(void)ptr;
 
 	web_server_mode = WEB_SERVER_MODE_MULTI_THREADED;
 	info("Multi-threaded WEB SERVER thread created with task id %d", gettid());
 
 	struct web_client *w;
-	struct timeval tv;
 	int retval, failures = 0, counter = 0;
-
-	if(ptr) { ; }
 
 	if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
 		error("Cannot set pthread cancel type to DEFERRED.");
@@ -222,23 +220,18 @@ void *socket_listen_main_multi_threaded(void *ptr) {
 	if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
 		error("Cannot set pthread cancel state to ENABLE.");
 
-	if(listen_fd < 0 || listen_fd >= FD_SETSIZE) fatal("LISTENER: Listen socket %d is not ready, or invalid.", listen_fd);
-
-	fd_set ifds;
-	FD_ZERO (&ifds);
+	if(listen_fd < 0)
+		fatal("LISTENER: Listen socket %d is not ready, or invalid.", listen_fd);
 
 	for(;;) {
-		tv.tv_sec = 0;
-		tv.tv_usec = 100000;
-
-		if(likely(listen_fd >= 0))
-			FD_SET(listen_fd, &ifds);
+		struct pollfd fd = { .fd = listen_fd, .events = POLLIN, .revents = 0 };
+		int timeout = 10 * 1000;
 
 		// debug(D_WEB_CLIENT, "LISTENER: Waiting...");
-		retval = select(listen_fd + 1, &ifds, NULL, NULL, &tv);
+		retval = poll(&fd, 1, timeout);
 
 		if(unlikely(retval == -1)) {
-			error("LISTENER: select() failed.");
+			error("LISTENER: poll() failed.");
 			failures++;
 
 			if(failures > 10) {
@@ -257,7 +250,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
 		}
 		else if(likely(retval)) {
 			// check for new incoming connections
-			if(likely(FD_ISSET(listen_fd, &ifds))) {
+			if(fd.revents & POLLIN || fd.revents & POLLPRI) {
 				w = web_client_create(listen_fd);
 				if(unlikely(!w)) {
 					// no need for error log - web_client_create already logged the error
@@ -273,8 +266,11 @@ void *socket_listen_main_multi_threaded(void *ptr) {
 					w->obsolete = 1;
 				}
 			}
-			else debug(D_WEB_CLIENT, "LISTENER: select() didn't do anything.");
-
+			else {
+				failures++;
+				debug(D_WEB_CLIENT, "LISTENER: select() didn't do anything.");
+				continue;
+			}
 		}
 		else {
 			debug(D_WEB_CLIENT, "LISTENER: select() timeout.");
