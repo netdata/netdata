@@ -2134,8 +2134,8 @@ void *web_client_main(void *ptr)
 			fds[0].events = 0;
 			fds[0].revents = 0;
 
-			if(w->wait_receive) fds[0].events += POLLIN;
-			if(w->wait_send)    fds[0].events += POLLOUT;
+			if(w->wait_receive) fds[0].events |= POLLIN;
+			if(w->wait_send)    fds[0].events |= POLLOUT;
 
 			fds[1].fd = -1;
 			fds[1].events = 0;
@@ -2149,13 +2149,13 @@ void *web_client_main(void *ptr)
 			fds[0].fd = w->ifd;
 			fds[0].events = 0;
 			fds[0].revents = 0;
-			if(w->wait_receive) fds[0].events += POLLIN;
+			if(w->wait_receive) fds[0].events |= POLLIN;
 			ifd = &fds[0];
 
 			fds[1].fd = w->ofd;
 			fds[1].events = 0;
 			fds[1].revents = 0;
-			if(w->wait_send)    fds[1].events += POLLOUT;
+			if(w->wait_send)    fds[1].events |= POLLOUT;
 			ofd = &fds[1];
 
 			fdmax = 2;
