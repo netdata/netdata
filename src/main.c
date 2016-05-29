@@ -99,6 +99,9 @@ void web_server_threading_selection(void) {
 		if(static_threads[i].start_routine == socket_listen_main_single_threaded)
 			static_threads[i].enabled = threaded?0:1;
 	}
+
+	web_client_timeout = (int) config_get_number("global", "disconnect idle web clients after seconds", DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS);
+	web_enable_gzip = config_get_boolean("global", "enable web responses gzip compression", web_enable_gzip);
 }
 
 
