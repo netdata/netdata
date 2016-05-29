@@ -27,9 +27,9 @@
 #include "../config.h"
 
 int listen_backlog = LISTEN_BACKLOG;
-
 int listen_fd = -1;
 int listen_port = LISTEN_PORT;
+int web_server_mode = WEB_SERVER_MODE_MULTI_THREADED;
 
 #ifdef NETDATA_INTERNAL_CHECKS
 static void log_allocations(void)
@@ -205,6 +205,7 @@ int create_listen_socket(void) {
 void *socket_listen_main_multi_threaded(void *ptr) {
 	if(ptr) { ; }
 
+	web_server_mode = WEB_SERVER_MODE_MULTI_THREADED;
 	info("Multi-threaded WEB SERVER thread created with task id %d", gettid());
 
 	struct web_client *w;
@@ -308,6 +309,8 @@ void *socket_listen_main_multi_threaded(void *ptr) {
 void *socket_listen_main_single_threaded(void *ptr) {
 	if(ptr) { ; }
 
+	web_server_mode = WEB_SERVER_MODE_SINGLE_THREADED;
+
 	info("Single threaded WEB SERVER thread created with task id %d", gettid());
 
 	struct web_client *w;
@@ -343,11 +346,16 @@ void *socket_listen_main_single_threaded(void *ptr) {
 
 		for(w = web_clients; w ; w = w->next) {
 			if(unlikely(w->dead)) {
-				error("%llu: client is dead.");
+				error("%llu: client is dead.", w->id);
 				w->obsolete = 1;
 			}
 			else if(unlikely(!w->wait_receive && !w->wait_send)) {
 				error("%llu: client is not set for neither receiving nor sending data.");
+				w->obsolete = 1;
+			}
+
+			if(w->ifd < 0 || w->ifd >= FD_SETSIZE || w->ofd < 0 || w->ofd >= FD_SETSIZE) {
+				error("%llu: invalid file descriptor, ifd = %d, ofd = %d (required 0 <= fd < FD_SETSIZE (%d)", w->id, w->ifd, w->ofd, FD_SETSIZE);
 				w->obsolete = 1;
 			}
 
