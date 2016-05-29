@@ -101,7 +101,8 @@ struct web_client *web_client_create(int listener)
 		}
 
 		int flag = 1;
-		if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0) error("%llu: Cannot set SO_KEEPALIVE on socket.", w->id);
+		if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0)
+			error("%llu: Cannot set SO_KEEPALIVE on socket.", w->id);
 	}
 
 	w->response.data = buffer_create(INITIAL_WEB_DATA_LENGTH);
@@ -268,7 +269,7 @@ uid_t web_files_uid(void)
 			// while single threaded
 			struct passwd *pw = getpwnam(web_owner);
 			if(!pw) {
-				error("User %s is not present. Ignoring option.", web_owner);
+				error("User '%s' is not present. Ignoring option.", web_owner);
 				owner_uid = geteuid();
 			}
 			else {
@@ -296,7 +297,7 @@ gid_t web_files_gid(void)
 			// while single threaded
 			struct group *gr = getgrnam(web_group);
 			if(!gr) {
-				error("Group %s is not present. Ignoring option.", web_group);
+				error("Group '%s' is not present. Ignoring option.", web_group);
 				owner_gid = getegid();
 			}
 			else {
@@ -432,12 +433,12 @@ int mysendfile(struct web_client *w, char *filename)
 
 #ifdef NETDATA_WITH_ZLIB
 void web_client_enable_deflate(struct web_client *w, int gzip) {
-	if(w->response.zinitialized) {
+	if(unlikely(w->response.zinitialized)) {
 		error("%llu: Compression has already be initialized for this client.", w->id);
 		return;
 	}
 
-	if(w->response.sent) {
+	if(unlikely(w->response.sent)) {
 		error("%llu: Cannot enable compression in the middle of a conversation.", w->id);
 		return;
 	}
@@ -765,7 +766,7 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 
 	if(outFileName && *outFileName) {
 		buffer_sprintf(w->response.header, "Content-Disposition: attachment; filename=\"%s\"\r\n", outFileName);
-		error("generating outfilename header: '%s'", outFileName);
+		debug(D_WEB_CLIENT, "%llu: generating outfilename header: '%s'", w->id, outFileName);
 	}
 
 	if(format == DATASOURCE_DATATABLE_JSONP) {
@@ -1739,7 +1740,7 @@ void web_client_process(struct web_client *w) {
 		if(bytes > 0)
 			w->stats_sent_bytes += bytes;
 
-		error("%llu: HTTP Header failed to be sent (I sent %d bytes but the system sent %d bytes). Closing web client.", w->id,
+		debug(D_WEB_CLIENT, "%llu: HTTP Header failed to be sent (I sent %d bytes but the system sent %d bytes). Closing web client.", w->id,
 			  buffer_strlen(w->response.header_output), bytes);
 
 		WEB_CLIENT_IS_DEAD(w);
@@ -1750,7 +1751,8 @@ void web_client_process(struct web_client *w) {
 
 /*	// enable TCP_NODELAY, to send all data immediately at the next send()
 	flag = 1;
-	if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0) error("%llu: failed to enable TCP_NODELAY on socket.", w->id);
+	if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0)
+ 		error("%llu: failed to enable TCP_NODELAY on socket.", w->id);
 */
 	// enable sending immediately if we have data
 	if(w->response.data->len) w->wait_send = 1;
@@ -1777,8 +1779,10 @@ void web_client_process(struct web_client *w) {
 				// when it is commented, the program will copy the data using async I/O.
 				{
 					long len = sendfile(w->ofd, w->ifd, NULL, w->response.data->rbytes);
-					if(len != w->response.data->rbytes) error("%llu: sendfile() should copy %ld bytes, but copied %ld. Falling back to manual copy.", w->id, w->response.data->rbytes, len);
-					else web_client_reset(w);
+					if(len != w->response.data->rbytes)
+				 		error("%llu: sendfile() should copy %ld bytes, but copied %ld. Falling back to manual copy.", w->id, w->response.data->rbytes, len);
+					else
+				 		web_client_reset(w);
 				}
 				*/
 			}
@@ -1805,11 +1809,11 @@ ssize_t web_client_send_chunk_header(struct web_client *w, size_t len)
 	}
 
 	else if(bytes == 0) {
-		error("%llu: Did not send chunk header to the client.", w->id);
+		debug(D_WEB_CLIENT, "%llu: Did not send chunk header to the client.", w->id);
 		WEB_CLIENT_IS_DEAD(w);
 	}
 	else {
-		error("%llu: Failed to send chunk header to client.", w->id);
+		debug(D_WEB_CLIENT, "%llu: Failed to send chunk header to client.", w->id);
 		WEB_CLIENT_IS_DEAD(w);
 	}
 
@@ -1827,11 +1831,11 @@ ssize_t web_client_send_chunk_close(struct web_client *w)
 	}
 
 	else if(bytes == 0) {
-		error("%llu: Did not send chunk suffix to the client.", w->id);
+		debug(D_WEB_CLIENT, "%llu: Did not send chunk suffix to the client.", w->id);
 		WEB_CLIENT_IS_DEAD(w);
 	}
 	else {
-		error("%llu: Failed to send chunk suffix to client.", w->id);
+		debug(D_WEB_CLIENT, "%llu: Failed to send chunk suffix to client.", w->id);
 		WEB_CLIENT_IS_DEAD(w);
 	}
 
@@ -1849,11 +1853,11 @@ ssize_t web_client_send_chunk_finalize(struct web_client *w)
 	}
 
 	else if(bytes == 0) {
-		error("%llu: Did not send chunk suffix to the client.", w->id);
+		debug(D_WEB_CLIENT, "%llu: Did not send chunk finalize suffix to the client.", w->id);
 		WEB_CLIENT_IS_DEAD(w);
 	}
 	else {
-		error("%llu: Failed to send chunk suffix to client.", w->id);
+		debug(D_WEB_CLIENT, "%llu: Failed to send chunk finalize suffix to client.", w->id);
 		WEB_CLIENT_IS_DEAD(w);
 	}
 
@@ -1963,11 +1967,11 @@ ssize_t web_client_send_deflate(struct web_client *w)
 		debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, len);
 	}
 	else if(len == 0) {
-		error("%llu: Did not send any bytes to the client (zhave = %ld, zsent = %ld, need to send = %ld).", w->id, w->response.zhave, w->response.zsent, w->response.zhave - w->response.zsent);
+		debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client (zhave = %ld, zsent = %ld, need to send = %ld).", w->id, w->response.zhave, w->response.zsent, w->response.zhave - w->response.zsent);
 		WEB_CLIENT_IS_DEAD(w);
 	}
 	else {
-		error("%llu: Failed to send data to client.", w->id);
+		debug(D_WEB_CLIENT, "%llu: Failed to send data to client.", w->id);
 		WEB_CLIENT_IS_DEAD(w);
 	}
 
@@ -2016,11 +2020,11 @@ ssize_t web_client_send(struct web_client *w) {
 		debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, bytes);
 	}
 	else if(likely(bytes == 0)) {
-		error("%llu: Did not send any bytes to the client.", w->id);
+		debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client.", w->id);
 		WEB_CLIENT_IS_DEAD(w);
 	}
 	else {
-		error("%llu: Failed to send data to client.", w->id);
+		debug(D_WEB_CLIENT, "%llu: Failed to send data to client.", w->id);
 		WEB_CLIENT_IS_DEAD(w);
 	}
 
@@ -2075,12 +2079,12 @@ ssize_t web_client_receive(struct web_client *w)
 			w->ifd = w->ofd;
 		}
 		else {
-			error("%llu: failed to receive data.", w->id);
+			debug(D_WEB_CLIENT, "%llu: failed to receive data.", w->id);
 			WEB_CLIENT_IS_DEAD(w);
 		}
 	}
 	else {
-		error("%llu: receive data failed.", w->id);
+		debug(D_WEB_CLIENT, "%llu: receive data failed.", w->id);
 		WEB_CLIENT_IS_DEAD(w);
 	}
 
@@ -2112,11 +2116,11 @@ void *web_client_main(void *ptr)
 
 	for(;;) {
 		if(unlikely(w->dead)) {
-			error("%llu: client is dead.", w->id);
+			debug(D_WEB_CLIENT, "%llu: client is dead.", w->id);
 			break;
 		}
 		else if(unlikely(!w->wait_receive && !w->wait_send)) {
-			error("%llu: client is not set for neither receiving nor sending data.");
+			debug(D_WEB_CLIENT, "%llu: client is not set for neither receiving nor sending data.");
 			break;
 		}
 
@@ -2168,7 +2172,7 @@ void *web_client_main(void *ptr)
 				continue;
 			}
 
-			error("%llu: LISTENER: poll() failed (input fd = %d, output fd = %d). Closing client.", w->id, w->ifd, w->ofd);
+			debug(D_WEB_CLIENT, "%llu: LISTENER: poll() failed (input fd = %d, output fd = %d). Closing client.", w->id, w->ifd, w->ofd);
 			break;
 		}
 		else if(unlikely(!retval)) {

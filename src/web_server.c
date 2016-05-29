@@ -231,7 +231,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
 		retval = poll(&fd, 1, timeout);
 
 		if(unlikely(retval == -1)) {
-			error("LISTENER: poll() failed.");
+			debug(D_WEB_CLIENT, "LISTENER: poll() failed.");
 			failures++;
 
 			if(failures > 10) {
@@ -298,7 +298,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
 		failures = 0;
 	}
 
-	error("LISTENER: exit!");
+	debug(D_WEB_CLIENT, "LISTENER: exit!");
 	close(listen_fd);
 	listen_fd = -1;
 	return NULL;
@@ -391,7 +391,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
 		retval = select(fdmax+1, &rifds, &rofds, &refds, &tv);
 
 		if(unlikely(retval == -1)) {
-			error("LISTENER: select() failed.");
+			debug(D_WEB_CLIENT, "LISTENER: select() failed.");
 			failures++;
 			if(failures > 10) {
 				if(global_statistics.connected_clients) {
@@ -483,7 +483,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
 		}
 	}
 
-	error("LISTENER: exit!");
+	debug(D_WEB_CLIENT, "LISTENER: exit!");
 	close(listen_fd);
 	listen_fd = -1;
 	return NULL;
