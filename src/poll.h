@@ -8,10 +8,10 @@
 #define NETDATA_POLL_H
 
 #include <time.h>
+#include <sys/poll.h>
 
-#define POLLIN 1
-#define POLLOUT 2
-#define POLLERR 3
+#define POLLREAD  1
+#define POLLWRITE 2
 
 extern void *poll_main(void *ptr);
 
@@ -25,12 +25,13 @@ extern void *poll_main(void *ptr);
  * To stop polling a file call poll_unregister().
  *
  * @param path Absolute paht to a file.
- * @param type One of POLLIN, POLLOUT or POLLERR
+ * @param events The events passed to poll. Mostly a combination of POLLIN, 
+ * POLLOUT or POLLERR. For more details read poll(2)
  *
  * @return A poll descriptor. Only use it for poll_occured() and 
  * poll_file_unregister().
  */
-extern void *poll_file_register(char *path, int type);
+extern void *poll_file_register(char *path, int events);
 
 /**
  * @brief Check if event occured since the last call of poll_occured or 

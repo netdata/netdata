@@ -3,34 +3,39 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/select.h>
+#include <sys/poll.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
 #include "common.h"
+#include "poll.h"
 #include "log.h"
 
-#include "poll.h"
 
 // ---------------------------------------------------------------------------
 // internal data structures
-struct poll_file {
-	int fd;
+
+/*
+ * We maintain two concurrent arrays.
+ * poll_fd_array which is the data structue given to poll and
+ * poll_data_array which contains metadata we also need.
+ */
+struct pollfd *poll_fd_array = NULL;
+struct poll_data {
 	char *path;
 	uint32_t path_hash;
-	// One of POLLIN, POLLOUT or POLLERR
-	short type;
 	// Last update timestamp
 	struct timeval *tv;
 	int num_checker;
-	struct poll_file *next;
-};
-// Linked list of files to poll.
-struct poll_file *poll_file_head;
+} *poll_data_array;
+
+int poll_num = 0; // Size of poll_fd_array|poll_data_array
+int poll_first_deprecated = -1; // First index in poll_fd_array|poll_data_array that can be overwritten.
 
 // Every registrator holds a void pointer to one of these.
 struct poll_check {
-	struct poll_file *poll_file;
+	int poll_array_index;
+	// Last check timestamp.
 	struct timeval tv;
 };
 
@@ -39,11 +44,12 @@ pthread_t poll_thread;
 // ---------------------------------------------------------------------------
 // poll locks
 
-// lock the global linked list.
-pthread_mutex_t poll_file_list_mtx = PTHREAD_MUTEX_INITIALIZER;
+// Lock poll data structure (poll_fd_array, poll_data_array, poll_num and 
+// poll_first_deprecated.
+pthread_mutex_t poll_array_mtx = PTHREAD_MUTEX_INITIALIZER;
 
-static inline int poll_file_list_lock() {
-	if(pthread_mutex_lock(&poll_file_list_mtx) == 0) {
+static inline int poll_array_lock() {
+	if(pthread_mutex_lock(&poll_array_mtx) == 0) {
 		return 0;
 	} else {
 		error("Unable to lock poll file list");
@@ -51,8 +57,8 @@ static inline int poll_file_list_lock() {
 	}
 }
 
-static inline int poll_file_list_unlock() {
-	if(pthread_mutex_unlock(&poll_file_list_mtx) == 0) {
+static inline int poll_array_unlock() {
+	if(pthread_mutex_unlock(&poll_array_mtx) == 0) {
 		return 0;
 	} else {
 		error("Unable to unlock poll file list");
@@ -61,7 +67,7 @@ static inline int poll_file_list_unlock() {
 }
 
 // ---------------------------------------------------------------------------
-// internal signal handler.
+// internal signal handler used to interrupt poll.
 void poll_handler(int signo)
 {
 	if(signo){} // Remove compiler warning
@@ -78,27 +84,26 @@ int poll_time_update_nolock(struct timeval *tv) {
 }
 
 // Updates p->tv to current time.
-// Ensure this method is only called in one thread.
-// Ensure there are no writes to p in other threads.
-// Other writes are permitted without locks.
-int poll_file_time_update_readsave_nolock(struct poll_file *p) {
+// This is not thread save.
+// concurrent reads are save. Concurrent writes need to be syncronized.
+int poll_data_time_update_readsave_nolock(struct poll_data *d) {
 	static struct timeval *buff;
-	static struct timeval *tv;
-	if(!tv) {
-		tv = malloc(sizeof(struct timeval));
-		if(!tv) {
-			error("Could not allocate buffer for poll_file_time_update_readsave_nolock()");
+	if(!buff) {
+		buff = malloc(sizeof(struct timeval));
+		if(!buff) {
+			error("Could not allocate buffer for poll_data_time_update_readsave_nolock()");
+			return -1;
 		}
 	}
 
-	tv->tv_sec = p->tv->tv_sec;
-	tv->tv_usec = p->tv->tv_sec;
-	int retv = poll_time_update_nolock(tv);
+	buff->tv_sec = d->tv->tv_sec;
+	buff->tv_usec = d->tv->tv_sec;
+	int retv = poll_time_update_nolock(buff);
 
 	// Switch pointers.
-	buff = p->tv;
-	p->tv = tv;
-	tv = buff;
+	struct timeval *tv = d->tv;
+	d->tv = buff;
+	buff = tv;
 
 	return retv;
 }
@@ -114,113 +119,121 @@ unsigned long long poll_time_difference_nolock(struct timeval *bigger, struct ti
 	}
 }
 
-struct poll_file *poll_file_list_search_nolock(char *path, int type) {
-	struct poll_file *p = NULL;
+int poll_array_search_nolock(char *path, int type) {
 	uint32_t hash = simple_hash(path);
-	for(p = poll_file_head; p ; p = p->next)
-		if(p->path_hash == hash && p->type == type && strncmp(p->path, path, FILENAME_MAX) == 0)
-			break;
-	return p;
+	int i;
+	for(i = 0; i < poll_num; i++)
+		if(poll_fd_array[i].fd < 0 && poll_data_array[i].path_hash == hash && poll_fd_array[i].events == type && \
+				strncmp(poll_data_array[i].path, path, strlen(poll_data_array[i].path)) == 0)
+			return i;
+	return -1;
 }
 
-void poll_file_list_prepend_nolock(struct poll_file *p) {
-	struct poll_file *buff = poll_file_head;
-	poll_file_head = p;
-	p->next = buff;
+int poll_array_find_next_deprecated_nolock(int index) {
+	for(index++; index<poll_num; index++)
+		if(poll_fd_array[index].fd < 0)
+			return index;
+	return -1;
 }
 
-struct poll_file *poll_file_list_remove_nolock(struct poll_file *p) {
-	struct poll_file *curr = poll_file_head;
+void poll_array_remove_nolock(int index) {
+	if(poll_fd_array[index].fd >= 0)
+		if(close(poll_fd_array[index].fd) != 0)
+			error("Failed to proper close file descriptor %d", poll_fd_array[index].fd);
+	poll_fd_array[index].fd = -1;	
+	if(poll_first_deprecated < index)
+		poll_first_deprecated = index;
+}
 
-	if(!curr)
-		return NULL;
+int poll_array_add_nolock(char *path, int type) {
+	int index;
 
-	if(curr == p) {
-		poll_file_head = curr->next;
-		return curr->next;
-	}
-
-	while(curr->next != NULL) {
-		if(curr->next == p) {
-			struct poll_file *retv = curr->next;
-			curr->next=curr->next->next;
-			return retv;
-		} else {
-			curr = curr->next;
+	if(poll_first_deprecated >= 0) {
+		index = poll_first_deprecated;
+		poll_first_deprecated = poll_array_find_next_deprecated_nolock(index);
+	} else {
+		poll_num++;
+		poll_fd_array = realloc(poll_fd_array, sizeof(struct pollfd) * poll_num);
+		if(!poll_fd_array) {
+			error("Cannot allocate memory for poll_file");
+			poll_num--;
+			return -1;
 		}
-	}  
-	return NULL;
-}
 
-struct poll_file *poll_file_init(char *path, int type) {
-	struct poll_file *p;
+		poll_data_array = realloc(poll_data_array, sizeof(struct poll_data) * poll_num);
+		if(!poll_data_array) {
+			error("Cannot allocate memory for poll_data");
+			poll_num--;
+			return -1;
+		}
 
-	p = malloc(sizeof(struct poll_file));
-	if(!p) {
-		error("Cannot allocate memory for poll file.");
-		return NULL;
+		index = poll_num - 1;
+
+		// Initialize data structure.
+		poll_data_array[index].path = NULL;
+		poll_data_array[index].path_hash = 0;
+		poll_data_array[index].tv = NULL;
+		poll_fd_array[index].fd = -1;
+		poll_fd_array[index].events = 0;
+		poll_fd_array[index].revents = 0;
 	}
 
 	// Open file pathname
-	if( (p->fd = open(path, O_RDONLY)) == -1 ) {
+	int access_mode = O_RDONLY;
+	if(type & POLLOUT) {
+		if(type & (POLLIN | POLLPRI)) {
+			access_mode = O_RDWR;
+		} else {
+			access_mode = O_WRONLY;
+		}
+	}
+	if( (poll_fd_array[index].fd = open(path, access_mode)) == -1 ) {
 		error("Cannot open %s for reading", path);
-		free(p);
-		return NULL;
+		poll_array_remove_nolock(index);
+		return -1;
 	}
 
-	if(!(p->path = strndup(path, FILENAME_MAX))) {
+	if(poll_data_array[index].path)
+		free(poll_data_array[index].path);
+	if(!(poll_data_array[index].path = strndup(path, FILENAME_MAX))) {
 		error("Cannot duplicate %s", path);
-		free(p);
-		return NULL;
+		poll_array_remove_nolock(index);
+		return -1;
+	}
+	poll_data_array[index].path_hash = simple_hash(path);
+
+	if(!poll_data_array[index].tv) {
+		poll_data_array[index].tv = malloc(sizeof(struct timeval));
+		if(!poll_data_array[index].tv) {
+			error("Cannot allocate memory for timeval");
+			poll_array_remove_nolock(index);
+			return -1;
+		}
+	}
+	if(poll_time_update_nolock(poll_data_array[index].tv) != 0) {
+		poll_data_array[index].tv->tv_sec = 0;
+		poll_data_array[index].tv->tv_usec = 0;
 	}
 
-	p->path_hash = simple_hash(path);
+	poll_fd_array[index].events = type;
+	poll_fd_array[index].revents = 0;
 
-	if( type == POLLIN || type == POLLOUT || type == POLLERR ) {
-		p->type = type;
-	} else {
-		error("poll_file_register: Wrong type specified");
-		free(p->path);
-		free(p);
-		return NULL;
-	}
+	poll_data_array[index].num_checker = 0;
 
-	p->tv = malloc(sizeof(struct timeval));
-	if(!p->tv) {
-		error("Cannot allocate memory for timeval");
-		free(p->path);
-		free(p);
-		return NULL;
-	}
-	if(poll_time_update_nolock(p->tv) != 0) {
-		p->tv->tv_sec = 0;
-		p->tv->tv_usec = 0;
-	}
-
-	p->num_checker = 0;
-	p->next = NULL;
-
-	return p;
+	return index;
 }
 
-void poll_file_free(struct poll_file *p) {
-	free(p->path);
-	free(p->tv);
-	close(p->fd);
-	free(p);
-}
-
-struct poll_check *poll_check_init_nolock(struct poll_file *p) {
+struct poll_check *poll_check_init_nolock(int poll_array_index) {
 	struct poll_check *retv = malloc(sizeof(struct poll_check));
 	if(!retv) {
 		error("Cannot allocate memory for poll_check");
 		return NULL;
 	}
 
-	retv->poll_file = p;
-	retv->tv.tv_sec = p->tv->tv_sec;
-	retv->tv.tv_usec = p->tv->tv_usec;
-	p->num_checker++;
+	retv->poll_array_index = poll_array_index;
+	retv->tv.tv_sec = poll_data_array[poll_array_index].tv->tv_sec;
+	retv->tv.tv_usec = poll_data_array[poll_array_index].tv->tv_usec;
+	poll_data_array[poll_array_index].num_checker++;
 
 	return retv;
 }
@@ -274,64 +287,21 @@ void *poll_main(void *ptr) {
 		}
 	}
 
-	fd_set readfds, writefds, exceptfds;
-	struct poll_file *p;
-	int nfds;
+	int i;
 
 	// Infinite Poll
 	while(1) {
-		FD_ZERO(&readfds);
-		FD_ZERO(&writefds);
-		FD_ZERO(&exceptfds);
-		nfds = 0;
-
-		//-------------------------------------------------------------------------
-		// Initialize select
-		poll_file_list_lock();
-		for(p = poll_file_head; p ; p = p->next) {
-			switch(p->type) {
-				case POLLIN:
-					FD_SET(p->fd, &readfds);
-					break;
-				case POLLOUT:
-					FD_SET(p->fd, &writefds);
-					break;
-				case POLLERR:
-					FD_SET(p->fd, &exceptfds);
-					break;
-				default: continue;
-			}
-			if(p->fd > nfds)
-				nfds = p->fd;
-		}
-		poll_file_list_unlock();
-		//-------------------------------------------------------------------------
-
-		select(nfds + 1, &readfds, &writefds, &exceptfds, NULL);
+		poll(poll_fd_array, poll_num, -1);
 
 		//-------------------------------------------------------------------------
 		// Handle polled files
-		poll_file_list_lock();
-		for(p = poll_file_head; p ; p = p->next) {
-			switch(p->type) {
-				case POLLIN:
-					if(FD_ISSET(p->fd, &readfds)) {
-						poll_file_time_update_readsave_nolock(p);
-					}
-					break;
-				case POLLOUT:
-					if(FD_ISSET(p->fd, &writefds)) {
-						poll_file_time_update_readsave_nolock(p);
-					}
-					break;
-				case POLLERR:
-					if(FD_ISSET(p->fd, &exceptfds)) {
-						poll_file_time_update_readsave_nolock(p);
-					}
-					break;
+		poll_array_lock();
+		for(i = 0; i < poll_num; i++) {
+			if(poll_fd_array[i].events & poll_fd_array[i].revents) {
+				poll_data_time_update_readsave_nolock(&poll_data_array[i]);
 			}
 		}
-		poll_file_list_unlock();
+		poll_array_unlock();
 		//-------------------------------------------------------------------------
 	}
 }
@@ -339,37 +309,38 @@ void *poll_main(void *ptr) {
 // ---------------------------------------------------------------------------
 // API - basic methods
 void *poll_file_register(char *path, int type) {
-	struct poll_file *p;
+	int i;
 
 	// Search if we already poll this file.
-	poll_file_list_lock();
-	p = poll_file_list_search_nolock(path, type);
-	poll_file_list_unlock();
+	poll_array_lock();
+	i = poll_array_search_nolock(path, type);
+	poll_array_unlock();
 
 	// If not found, init and add poll_file.
-	if(!p) {
-		p = poll_file_init(path, type);
-		poll_file_list_lock();
-		poll_file_list_prepend_nolock(p);
-		poll_file_list_unlock();
+	if(i < 0) {
+		poll_array_lock();
+		i = poll_array_add_nolock(path, type);
+		poll_array_unlock();
 	}
 
 	// Add a new checker
-	poll_file_list_lock();
-	struct poll_check *retv = poll_check_init_nolock(p);
-	poll_file_list_unlock();
-
-	// Notify poll thread to start watching the new file
-	poll_interrupt();
-
-	return retv;
+	if(i >= 0) {
+		struct poll_check *retv = poll_check_init_nolock(i);
+		// Notify poll thread to start watching the new file
+		poll_interrupt();
+		return retv;
+	} else {
+		return NULL;
+	}
 }
 
 unsigned long long poll_occured(void *poll_descriptor) {
+	if(!poll_descriptor) return 0;
+
 	struct poll_check *p_check = poll_descriptor;
 	unsigned long long retv;
 
-	retv = poll_time_difference_nolock(p_check->poll_file->tv, &p_check->tv);
+	retv = poll_time_difference_nolock(poll_data_array[p_check->poll_array_index].tv, &p_check->tv);
 
 	if(poll_time_update_nolock(&p_check->tv) != 0) return 0;
 
@@ -378,27 +349,24 @@ unsigned long long poll_occured(void *poll_descriptor) {
 
 // Remove a file from the list of polled files
 unsigned long long poll_file_unregister(void *poll_descriptor) {
+	if(!poll_descriptor) return 0;
+
 	// Lock the mutex and interrupt select at the polling thread.
 	// We close the file handler at the end.
 	// We do this because closing a file handler used by select is unspecified.
-	poll_file_list_lock();
+	poll_array_lock();
 	poll_interrupt();
 
 	struct poll_check *p_check = poll_descriptor;
-	unsigned long long retv = poll_time_difference_nolock(p_check->poll_file->tv, &p_check->tv);
+	unsigned long long retv = poll_time_difference_nolock(poll_data_array[p_check->poll_array_index].tv, &p_check->tv);
 
-	if(!(p_check->poll_file->num_checker--)) {
+	if(!(poll_data_array[p_check->poll_array_index].num_checker--)) {
 		// Remove poll file from the list.
-		if(!poll_file_list_remove_nolock(p_check->poll_file)) {
-			error("Could not remove poll file from the list.");
-			poll_file_list_unlock();
-			return -1;
-		}
-		poll_file_free(p_check->poll_file);
+		poll_array_remove_nolock(p_check->poll_array_index);
 	}
 
 	poll_check_free(p_check);
 
-	poll_file_list_unlock();
+	poll_array_unlock();
 	return retv;
 }
