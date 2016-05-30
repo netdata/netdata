@@ -575,12 +575,20 @@ stop_all_netdata() {
 # check netdata for systemd
 
 issystemd() {
-	pidof systemd >/dev/null 2>&1 && return 0
+	# if the directory /etc/systemd/system does not exit, it is not systemd
+	[ ! -d /etc/systemd/system ] && return 1
+
+	# if pid 1 is systemd, it is systemd
 	[ "$(basename $(readlink /proc/1/exe) 2>/dev/null)" = "systemd" ] && return 0
+
+	# if systemd is running, it is systemd
+	pidof systemd >/dev/null 2>&1 && return 0
+
+	# else, it is not systemd
 	return 1
 }
 
-running=0
+started=0
 if [ "${UID}" -eq 0 ]
 	then
 
@@ -599,26 +607,21 @@ if [ "${UID}" -eq 0 ]
 		fi
 
 		stop_all_netdata
-		run service netdata start && running=1
+		run service netdata start && started=1
 	fi
 
-	if [ ${running} -eq 0 ]
+	if [ ${started} -eq 0 ]
 	then
-		service netdata status >/dev/null 2>&1
-		if [ $? -eq 0 ]
-		then
-			# nice guy, he installed netdata to his system
-			run service netdata stop
-			stop_all_netdata
-			run service netdata start && running=1
-		fi
+		# check if we can use the system service
+		run service netdata stop
+		stop_all_netdata
+		run service netdata start && started=1
 	fi
-	
 fi
 
-if [ ${running} -eq 0 ]
+if [ ${started} -eq 0 ]
 then
-	# still not running...
+	# still not started...
 
 	stop_all_netdata
 
