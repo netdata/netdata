@@ -574,41 +574,54 @@ stop_all_netdata() {
 # -----------------------------------------------------------------------------
 # check netdata for systemd
 
-running=0
-pidof systemd >/dev/null 2>&1
-if [ $? -eq 0 -a "${UID}" -eq 0 ]
-then
-	# systemd is running on this system
+issystemd() {
+	# if the directory /etc/systemd/system does not exit, it is not systemd
+	[ ! -d /etc/systemd/system ] && return 1
 
-	if [ ! -f /etc/systemd/system/netdata.service ]
+	# if pid 1 is systemd, it is systemd
+	[ "$(basename $(readlink /proc/1/exe) 2>/dev/null)" = "systemd" ] && return 0
+
+	# if systemd is running, it is systemd
+	pidof systemd >/dev/null 2>&1 && return 0
+
+	# else, it is not systemd
+	return 1
+}
+
+started=0
+if [ "${UID}" -eq 0 ]
 	then
-		echo >&2 "Installing systemd service..."
-		run cp system/netdata.service /etc/systemd/system/netdata.service && \
-			run systemctl daemon-reload && \
-			run systemctl enable netdata
-	else
-		run service netdata stop
+
+	if issystemd
+	then
+		# systemd is running on this system
+
+		if [ ! -f /etc/systemd/system/netdata.service ]
+		then
+			echo >&2 "Installing systemd service..."
+			run cp system/netdata.service /etc/systemd/system/netdata.service && \
+				run systemctl daemon-reload && \
+				run systemctl enable netdata
+		else
+			run service netdata stop
+		fi
+
+		stop_all_netdata
+		run service netdata start && started=1
 	fi
 
-	stop_all_netdata
-	run service netdata start && running=1
-fi
-
-if [ ${running} -eq 0 -a "${UID}" -eq 0 ]
-then
-	service netdata status >/dev/null 2>&1
-	if [ $? -eq 0 ]
+	if [ ${started} -eq 0 ]
 	then
-		# nice guy, he installed netdata to his system
+		# check if we can use the system service
 		run service netdata stop
 		stop_all_netdata
-		run service netdata start && running=1
+		run service netdata start && started=1
 	fi
 fi
 
-if [ ${running} -eq 0 ]
+if [ ${started} -eq 0 ]
 then
-	# still not running...
+	# still not started...
 
 	stop_all_netdata
 
