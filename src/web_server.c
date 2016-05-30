@@ -203,7 +203,7 @@ int create_listen_socket(void) {
 // 3. spawns a new pthread to serve the client (this is optimal for keep-alive clients)
 // 4. cleans up old web_clients that their pthreads have been exited
 
-#define CLEANUP_EVERY_EVENTS 1000
+#define CLEANUP_EVERY_EVENTS 100
 
 void *socket_listen_main_multi_threaded(void *ptr) {
 	(void)ptr;
