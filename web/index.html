@@ -2433,7 +2433,7 @@ function finalizePage() {
 		if (el.find('ul').size() == 0)
 		{
 			var href = el.find('a').attr('href');
-			document.location.hash = href;
+			history.pushState(null, document.title, href);
 		};
 	});
 
