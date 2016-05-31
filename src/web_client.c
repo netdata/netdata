@@ -30,7 +30,6 @@
 #include "registry.h"
 
 #include "web_client.h"
-#include "../config.h"
 
 #define INITIAL_WEB_DATA_LENGTH 16384
 #define WEB_REQUEST_LENGTH 16384
@@ -43,6 +42,36 @@ extern int netdata_exit;
 
 struct web_client *web_clients = NULL;
 unsigned long long web_clients_count = 0;
+
+inline int web_client_crock_socket(struct web_client *w) {
+#ifdef TCP_CORK
+	if(likely(!w->tcp_cork && w->ofd != -1)) {
+		w->tcp_cork = 1;
+		if(unlikely(setsockopt(w->ofd, IPPROTO_TCP, TCP_CORK, (char *) &w->tcp_cork, sizeof(int)) != 0)) {
+			error("%llu: failed to enable TCP_CORK on socket.", w->id);
+			w->tcp_cork = 0;
+			return -1;
+		}
+	}
+#endif /* TCP_CORK */
+
+	return 0;
+}
+
+inline int web_client_uncrock_socket(struct web_client *w) {
+#ifdef TCP_CORK
+	if(likely(w->tcp_cork && w->ofd != -1)) {
+		w->tcp_cork = 0;
+		if(unlikely(setsockopt(w->ofd, IPPROTO_TCP, TCP_CORK, (char *) &w->tcp_cork, sizeof(int)) != 0)) {
+			error("%llu: failed to disable TCP_CORK on socket.", w->id);
+			w->tcp_cork = 1;
+			return -1;
+		}
+	}
+#endif /* TCP_CORK */
+
+	return 0;
+}
 
 struct web_client *web_client_create(int listener)
 {
@@ -81,7 +110,6 @@ struct web_client *web_client_create(int listener)
 		w->client_port[NI_MAXSERV] = '\0';
 
 		switch(sadr->sa_family) {
-
 		case AF_INET:
 			debug(D_WEB_CLIENT_ACCESS, "%llu: New IPv4 web client from %s port %s on socket %d.", w->id, w->client_ip, w->client_port, w->ifd);
 			break;
@@ -101,8 +129,14 @@ struct web_client *web_client_create(int listener)
 		}
 
 		int flag = 1;
+		if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0)
+			error("%llu: failed to enable TCP_NODELAY on socket.", w->id);
+
+		flag = 1;
 		if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0)
 			error("%llu: Cannot set SO_KEEPALIVE on socket.", w->id);
+
+
 	}
 
 	w->response.data = buffer_create(INITIAL_WEB_DATA_LENGTH);
@@ -146,6 +180,8 @@ struct web_client *web_client_create(int listener)
 
 void web_client_reset(struct web_client *w)
 {
+	web_client_uncrock_socket(w);
+
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 
@@ -234,15 +270,16 @@ void web_client_reset(struct web_client *w)
 }
 
 struct web_client *web_client_free(struct web_client *w) {
+	web_client_uncrock_socket(w);
+
 	struct web_client *n = w->next;
 	if(w == web_clients) web_clients = n;
 
 	debug(D_WEB_CLIENT_ACCESS, "%llu: Closing web client from %s port %s.", w->id, w->client_ip, w->client_port);
 
 #ifdef NETDATA_WITH_ZLIB
-	if(w->response.zinitialized) {
+	if(w->response.zinitialized)
 		deflateEnd(&w->response.zstream);
-	}
 #endif // NETDATA_WITH_ZLIB
 
 	if(w->prev)	w->prev->next = w->next;
@@ -1726,17 +1763,14 @@ void web_client_process(struct web_client *w) {
 
 	buffer_strcat(w->response.header_output, "\r\n");
 
-	// disable TCP_NODELAY, to buffer the header
-	int flag = 0;
-	if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0)
-		error("%llu: failed to disable TCP_NODELAY on socket.", w->id);
-
 	// sent the HTTP header
 	debug(D_WEB_DATA, "%llu: Sending response HTTP header of size %d: '%s'"
 			, w->id
 			, buffer_strlen(w->response.header_output)
 			, buffer_tostring(w->response.header_output)
 			);
+
+	web_client_crock_socket(w);
 
 	bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0);
 	if(bytes != (ssize_t) buffer_strlen(w->response.header_output)) {
@@ -1751,11 +1785,6 @@ void web_client_process(struct web_client *w) {
 	}
 	else 
 		w->stats_sent_bytes += bytes;
-
-	// enable TCP_NODELAY, to send all data immediately at the next send()
-	flag = 1;
-	if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0)
- 		error("%llu: failed to enable TCP_NODELAY on socket.", w->id);
 
 	// enable sending immediately if we have data
 	if(w->response.data->len) w->wait_send = 1;
