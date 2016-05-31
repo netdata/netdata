@@ -5,6 +5,7 @@
 
 #include <sys/time.h>
 #include <string.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -67,6 +68,10 @@ struct web_client {
 
 	uint8_t wait_receive:1;				// 1 = we are waiting more input data
 	uint8_t wait_send:1;				// 1 = we have data to send to the client
+
+#ifdef TCP_CORK
+	int tcp_cork;						// 1 = we have a cork on the socket
+#endif /* TCP_CORK */
 
 	int ifd;
 	int ofd;
