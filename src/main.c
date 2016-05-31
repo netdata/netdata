@@ -101,7 +101,36 @@ void web_server_threading_selection(void) {
 	}
 
 	web_client_timeout = (int) config_get_number("global", "disconnect idle web clients after seconds", DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS);
+
+#ifdef NETDATA_WITH_ZLIB
 	web_enable_gzip = config_get_boolean("global", "enable web responses gzip compression", web_enable_gzip);
+
+	char *s = config_get("global", "web compression strategy", "default");
+	if(!strcmp(s, "default"))
+		web_gzip_strategy = Z_DEFAULT_STRATEGY;
+	else if(!strcmp(s, "filtered"))
+		web_gzip_strategy = Z_FILTERED;
+	else if(!strcmp(s, "huffman only"))
+		web_gzip_strategy = Z_HUFFMAN_ONLY;
+	else if(!strcmp(s, "rle"))
+		web_gzip_strategy = Z_RLE;
+	else if(!strcmp(s, "fixed"))
+		web_gzip_strategy = Z_FIXED;
+	else {
+		error("Invalid compression strategy '%s'. Valid strategies are 'default', 'filtered', 'huffman only', 'rle' and 'fixed'. Proceeding with 'default'.");
+		web_gzip_strategy = Z_DEFAULT_STRATEGY;
+	}
+
+	web_gzip_level = (int)config_get_number("global", "web compression level", 3);
+	if(web_gzip_level < 1) {
+		error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 1 (fastest compression).");
+		web_gzip_level = 1;
+	}
+	else if(web_gzip_level > 9) {
+		error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 9 (best compression).");
+		web_gzip_level = 9;
+	}
+#endif /* NETDATA_WITH_ZLIB */
 }
 
 
@@ -481,7 +510,7 @@ int main(int argc, char **argv)
 		error_log_throttle_period = config_get_number("global", "errors flood protection period", error_log_throttle_period);
 		setenv("NETDATA_ERRORS_THROTTLE_PERIOD", config_get("global", "errors flood protection period"    , ""), 1);
 
-		error_log_errors_per_period = config_get_number("global", "errors to trigger flood protection", error_log_errors_per_period);
+		error_log_errors_per_period = (unsigned long)config_get_number("global", "errors to trigger flood protection", error_log_errors_per_period);
 		setenv("NETDATA_ERRORS_PER_PERIOD"     , config_get("global", "errors to trigger flood protection", ""), 1);
 
 		// --------------------------------------------------------------------

@@ -18,8 +18,12 @@
 
 void *proc_main(void *ptr)
 {
-	static unsigned long long old_web_requests = 0, old_web_usec = 0;
 	(void)ptr;
+
+	unsigned long long old_web_requests = 0, old_web_usec = 0,
+			old_content_size = 0, old_compressed_content_size = 0;
+
+	collected_number compression_ratio = -1, average_response_time = -1;
 
 	info("PROC Plugin thread created with task id %d", gettid());
 
@@ -78,7 +82,8 @@ void *proc_main(void *ptr)
 	unsigned long long sunext = (time(NULL) - (time(NULL) % rrd_update_every) + rrd_update_every) * 1000000ULL;
 	unsigned long long sunow;
 
-	RRDSET *stcpu = NULL, *stcpu_thread = NULL, *stclients = NULL, *streqs = NULL, *stbytes = NULL, *stduration = NULL;
+	RRDSET *stcpu = NULL, *stcpu_thread = NULL, *stclients = NULL, *streqs = NULL, *stbytes = NULL, *stduration = NULL,
+			*stcompression = NULL;
 
 	for(;1;) {
 		if(unlikely(netdata_exit)) break;
@@ -328,10 +333,40 @@ void *proc_main(void *ptr)
 			old_web_usec     = gweb_usec;
 			old_web_requests = gweb_requests;
 
-			if(!web_requests) web_requests = 1;
+			if(web_requests)
+				average_response_time =  web_usec / web_requests;
 
-			rrddim_set(stduration, "response_time", web_usec / web_requests);
+			if(average_response_time != -1)
+				rrddim_set(stduration, "response_time", average_response_time);
+
 			rrdset_done(stduration);
+
+			// ----------------------------------------------------------------
+
+			if(!stcompression) stcompression = rrdset_find("netdata.compression_ratio");
+			if(!stcompression) {
+				stcompression = rrdset_create("netdata", "compression_ratio", NULL, "netdata", NULL, "NetData API Responses Compression Savings Ratio", "percentage", 130500, rrd_update_every, RRDSET_TYPE_LINE);
+
+				rrddim_add(stcompression, "savings", NULL,  1, 1000, RRDDIM_ABSOLUTE);
+			}
+			else rrdset_next(stcompression);
+
+			unsigned long long gcontent_size            = global_statistics.content_size;
+			unsigned long long gcompressed_content_size = global_statistics.compressed_content_size;
+
+			unsigned long long content_size             = gcontent_size            - old_content_size;
+			unsigned long long compressed_content_size  = gcompressed_content_size - old_compressed_content_size;
+
+			old_content_size            = gcontent_size;
+			old_compressed_content_size = gcompressed_content_size;
+
+			if(content_size)
+				compression_ratio = (content_size - compressed_content_size) * 100 * 1000 / content_size;
+
+			if(compression_ratio != -1)
+				rrddim_set(stcompression, "savings", compression_ratio);
+
+			rrdset_done(stcompression);
 
 			// ----------------------------------------------------------------
 
