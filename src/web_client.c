@@ -36,7 +36,10 @@
 #define TOO_BIG_REQUEST 16384
 
 int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
-int web_enable_gzip = 1;
+
+#ifdef NETDATA_WITH_ZLIB
+int web_enable_gzip = 1, web_gzip_level = 3, web_gzip_strategy = Z_DEFAULT_STRATEGY;
+#endif /* NETDATA_WITH_ZLIB */
 
 extern int netdata_exit;
 
@@ -178,16 +181,24 @@ struct web_client *web_client_create(int listener)
 	return(w);
 }
 
-void web_client_reset(struct web_client *w)
-{
+void web_client_reset(struct web_client *w) {
 	web_client_uncrock_socket(w);
-
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
 
 	debug(D_WEB_CLIENT, "%llu: Reseting client.", w->id);
 
-	if(w->stats_received_bytes || w->stats_sent_bytes) {
+	if(likely(w->last_url[0])) {
+		struct timeval tv;
+		gettimeofday(&tv, NULL);
+
+		size_t size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
+		size_t sent = size;
+#ifdef NETDATA_WITH_ZLIB
+		if(likely(w->response.zoutput)) sent = (size_t)w->response.zstream.total_out;
+#endif
+
+		// --------------------------------------------------------------------
+		// global statistics
+
 		if(web_server_mode == WEB_SERVER_MODE_MULTI_THREADED)
 			global_statistics_lock();
 
@@ -195,32 +206,31 @@ void web_client_reset(struct web_client *w)
 		global_statistics.web_usec += usecdiff(&tv, &w->tv_in);
 		global_statistics.bytes_received += w->stats_received_bytes;
 		global_statistics.bytes_sent += w->stats_sent_bytes;
+		global_statistics.content_size += size;
+		global_statistics.compressed_content_size += sent;
 
 		if(web_server_mode == WEB_SERVER_MODE_MULTI_THREADED)
 			global_statistics_unlock();
-	}
-	w->stats_received_bytes = 0;
-	w->stats_sent_bytes = 0;
 
-	size_t sent = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
+		w->stats_received_bytes = 0;
+		w->stats_sent_bytes = 0;
 
-#ifdef NETDATA_WITH_ZLIB
-	if(likely(w->response.zoutput)) sent = (size_t)w->response.zstream.total_out;
-#endif
 
-	size_t size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
+		// --------------------------------------------------------------------
+		// access log
 
-	if(likely(w->last_url[0]))
 		log_access("%llu: (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: %d '%s'",
-			w->id,
-			sent, size, -((size>0)?((float)(size-sent)/(float)size * 100.0):0.0),
-			(float)usecdiff(&w->tv_ready, &w->tv_in) / 1000.0,
-			(float)usecdiff(&tv, &w->tv_ready) / 1000.0,
-			(float)usecdiff(&tv, &w->tv_in) / 1000.0,
-			(w->mode == WEB_CLIENT_MODE_FILECOPY)?"filecopy":((w->mode == WEB_CLIENT_MODE_OPTIONS)?"options":"data"),
-			w->response.code,
-			w->last_url
+				   w->id,
+				   sent, size, -((size > 0) ? ((float) (size - sent) / (float) size * 100.0) : 0.0),
+				   (float) usecdiff(&w->tv_ready, &w->tv_in) / 1000.0,
+				   (float) usecdiff(&tv, &w->tv_ready) / 1000.0,
+				   (float) usecdiff(&tv, &w->tv_in) / 1000.0,
+				   (w->mode == WEB_CLIENT_MODE_FILECOPY) ? "filecopy" : ((w->mode == WEB_CLIENT_MODE_OPTIONS)
+																		 ? "options" : "data"),
+				   w->response.code,
+				   w->last_url
 		);
+	}
 
 	if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
 		if(w->ifd != w->ofd) {
@@ -256,7 +266,7 @@ void web_client_reset(struct web_client *w)
 	// if we had enabled compression, release it
 #ifdef NETDATA_WITH_ZLIB
 	if(w->response.zinitialized) {
-		debug(D_DEFLATE, "%llu: Reseting compression.", w->id);
+		debug(D_DEFLATE, "%llu: Freeing compression resources.", w->id);
 		deflateEnd(&w->response.zstream);
 		w->response.zsent = 0;
 		w->response.zhave = 0;
@@ -270,17 +280,12 @@ void web_client_reset(struct web_client *w)
 }
 
 struct web_client *web_client_free(struct web_client *w) {
-	web_client_uncrock_socket(w);
+	web_client_reset(w);
 
 	struct web_client *n = w->next;
 	if(w == web_clients) web_clients = n;
 
 	debug(D_WEB_CLIENT_ACCESS, "%llu: Closing web client from %s port %s.", w->id, w->client_ip, w->client_port);
-
-#ifdef NETDATA_WITH_ZLIB
-	if(w->response.zinitialized)
-		deflateEnd(&w->response.zstream);
-#endif // NETDATA_WITH_ZLIB
 
 	if(w->prev)	w->prev->next = w->next;
 	if(w->next) w->next->prev = w->prev;
@@ -505,7 +510,7 @@ void web_client_enable_deflate(struct web_client *w, int gzip) {
 //	}
 
 	// Select GZIP compression: windowbits = 15 + 16 = 31
-	if(deflateInit2(&w->response.zstream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 15 + ((gzip)?16:0), 8, Z_DEFAULT_STRATEGY) != Z_OK) {
+	if(deflateInit2(&w->response.zstream, web_gzip_level, Z_DEFLATED, 15 + ((gzip)?16:0), 8, web_gzip_strategy) != Z_OK) {
 		error("%llu: Failed to initialize zlib. Proceeding without compression.", w->id);
 		return;
 	}

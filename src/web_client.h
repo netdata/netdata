@@ -16,7 +16,10 @@
 
 #define DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS 60
 extern int web_client_timeout;
-extern int web_enable_gzip;
+
+#ifdef NETDATA_WITH_ZLIB
+extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
+#endif /* NETDATA_WITH_ZLIB */
 
 #ifndef NETDATA_WEB_CLIENT_H
 #define NETDATA_WEB_CLIENT_H 1
@@ -48,7 +51,7 @@ struct response {
 	size_t zsent;					// the compressed bytes we have sent to the client
 	size_t zhave;					// the compressed bytes that we have received from zlib
 	int zinitialized:1;
-#endif
+#endif /* NETDATA_WITH_ZLIB */
 
 };
 
