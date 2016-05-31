@@ -11,12 +11,14 @@
 #include <pthread.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <netinet/tcp.h>
 #include <malloc.h>
 #include <pwd.h>
 #include <grp.h>
 #include <ctype.h>
 #include <poll.h>
+
+// TCP_CORK
+#include <netinet/tcp.h>
 
 #include "common.h"
 #include "log.h"

@@ -1024,8 +1024,8 @@ static inline void registry_set_person_cookie(struct web_client *w, PERSON *p) {
 }
 
 static inline void registry_json_header(struct web_client *w, const char *action, const char *status) {
-	w->response.data->contenttype = CT_APPLICATION_JSON;
 	buffer_flush(w->response.data);
+	w->response.data->contenttype = CT_APPLICATION_JSON;
 	buffer_sprintf(w->response.data, "{\n\t\"action\": \"%s\",\n\t\"status\": \"%s\",\n\t\"hostname\": \"%s\",\n\t\"machine_guid\": \"%s\"",
 				   action, status, registry.hostname, registry.machine_guid);
 }
