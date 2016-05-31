@@ -5,11 +5,13 @@
 // global statistics
 
 struct global_statistics {
-	unsigned long volatile connected_clients;
-	unsigned long long volatile web_requests;
-	unsigned long long volatile web_usec;
-	unsigned long long volatile bytes_received;
-	unsigned long long volatile bytes_sent;
+	volatile unsigned long volatile connected_clients;
+	volatile unsigned long long volatile web_requests;
+	volatile unsigned long long volatile web_usec;
+	volatile unsigned long long volatile bytes_received;
+	volatile unsigned long long volatile bytes_sent;
+	volatile unsigned long long volatile content_size;
+	volatile unsigned long long volatile compressed_content_size;
 };
 
 extern struct global_statistics global_statistics;

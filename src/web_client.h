@@ -5,6 +5,7 @@
 
 #include <sys/time.h>
 #include <string.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -15,7 +16,10 @@
 
 #define DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS 60
 extern int web_client_timeout;
-extern int web_enable_gzip;
+
+#ifdef NETDATA_WITH_ZLIB
+extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
+#endif /* NETDATA_WITH_ZLIB */
 
 #ifndef NETDATA_WEB_CLIENT_H
 #define NETDATA_WEB_CLIENT_H 1
@@ -47,7 +51,7 @@ struct response {
 	size_t zsent;					// the compressed bytes we have sent to the client
 	size_t zhave;					// the compressed bytes that we have received from zlib
 	int zinitialized:1;
-#endif
+#endif /* NETDATA_WITH_ZLIB */
 
 };
 
@@ -61,12 +65,13 @@ struct web_client {
 	uint8_t dead:1;						// if set to 1, this client is dead
 
 	uint8_t keepalive:1;				// if set to 1, the web client will be re-used
-	uint8_t enable_gzip:1;				// if set to 1, the response will be compressed
 
 	uint8_t mode:3;						// the operational mode of the client
 
 	uint8_t wait_receive:1;				// 1 = we are waiting more input data
 	uint8_t wait_send:1;				// 1 = we have data to send to the client
+
+	int tcp_cork;						// 1 = we have a cork on the socket
 
 	int ifd;
 	int ofd;
