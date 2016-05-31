@@ -7,6 +7,7 @@ CLEANFILES = \
 	netdata.logrotate \
 	netdata.service \
 	netdata-init-d \
+	netdata-lsb \
 	$(NULL)
 
 include $(top_srcdir)/build/subst.inc
@@ -18,6 +19,7 @@ nodist_noinst_DATA = \
 	netdata.logrotate \
 	netdata.service \
 	netdata-init-d \
+	netdata-lsb \
 	$(NULL)
 
 dist_noinst_DATA = \
@@ -25,5 +27,6 @@ dist_noinst_DATA = \
 	netdata.logrotate.in \
 	netdata.service.in \
 	netdata-init-d.in \
+	netdata-lsb.in \
 	netdata.conf \
 	$(NULL)

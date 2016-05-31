@@ -1,0 +1,100 @@
+#!/bin/bash
+#
+### BEGIN INIT INFO
+# Provides:          netdata
+# Required-Start:    $local_fs $remote_fs $network $named $time apache2 httpd squid nginx mysql named opensips upsd hostapd postfix lm_sensors
+# Required-Stop:     $local_fs $remote_fs $network $named $time apache2 httpd squid nginx mysql named opensips upsd hostapd postfix lm_sensors
+# Should-Start:      $local_fs $network $named $remote_fs $time $all
+# Should-Stop:       $local_fs $network $named $remote_fs $time $all
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start and stop the netdata real-time monitoring server daemon
+# Description:       Controls the main netdata monitoring server daemon "netdata".
+#                    and all its plugins.
+### END INIT INFO
+#
+set -e
+set -u
+${DEBIAN_SCRIPT_DEBUG:+ set -v -x}
+
+DAEMON="netdata"
+DAEMON_PATH=@sbindir_POST@
+PIDFILE=@localstatedir_POST@/$DAEMON.pid
+DAEMONOPTS="-P $PIDFILE"
+
+test -x $DAEMON_PATH/$DAEMON || exit 0
+
+. /lib/lsb/init-functions
+
+# Safeguard (relative paths, core dumps..)
+cd /
+umask 022
+
+service_start() {
+	log_daemon_msg "Starting real-time performance monitoring" "netdata"
+	start_daemon -p $PIDFILE $DAEMON_PATH/$DAEMON $DAEMONOPTS
+	RETVAL=$?
+	log_end_msg $RETVAL
+	return $RETVAL
+}
+
+service_stop() {
+	log_daemon_msg "Stopping real-time performance monitoring" "netdata"
+	killproc -p ${PIDFILE} $DAEMON_PATH/$DAEMON
+	RETVAL=$?
+	log_end_msg $RETVAL
+
+	if [ $RETVAL -eq 0 ]; then
+		rm -f ${PIDFILE}
+	fi
+	return $RETVAL
+}
+
+condrestart() {
+	if ! service_status > /dev/null; then
+		RETVAL=$1
+		return
+	fi
+
+	service_stop
+	service_start
+}
+
+service_status() {
+	status_of_proc -p $PIDFILE $DAEMON_PATH/$DAEMON netdata
+}
+
+
+#
+# main()
+#
+
+case "${1:-''}" in
+	'start')
+		service_start
+		;;
+
+	'stop')
+		service_stop
+		;;
+
+	'restart')
+		service_stop
+		service_start
+		;;
+
+	'try-restart')
+		condrestart 0
+		;;
+
+	'force-reload')
+		condrestart 7
+		;;
+
+	'status')
+		service_status && exit 0 || exit $?
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart|try-restart|force-reload|status}"
+		exit 1
+esac
