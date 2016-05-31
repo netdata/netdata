@@ -240,6 +240,12 @@ struct web_client *web_client_free(struct web_client *w)
 
 	debug(D_WEB_CLIENT_ACCESS, "%llu: Closing web client from %s port %s.", w->id, w->client_ip, w->client_port);
 
+#ifdef NETDATA_WITH_ZLIB
+	if(w->response.zinitialized) {
+		deflateEnd(&w->response.zstream);
+	}
+#endif // NETDATA_WITH_ZLIB
+		
 	if(w->prev)	w->prev->next = w->next;
 	if(w->next) w->next->prev = w->prev;
 	if(w->response.header_output) buffer_free(w->response.header_output);
