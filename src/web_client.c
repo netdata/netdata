@@ -1837,7 +1837,7 @@ ssize_t web_client_send_chunk_header(struct web_client *w, size_t len)
 {
 	debug(D_DEFLATE, "%llu: OPEN CHUNK of %d bytes (hex: %x).", w->id, len, len);
 	char buf[1024];
-	sprintf(buf, "%lX\r\n", len);
+	sprintf(buf, "%zX\r\n", len);
 	
 	ssize_t bytes = send(w->ofd, buf, strlen(buf), 0);
 	if(bytes > 0) {
