@@ -189,7 +189,7 @@ void web_client_reset(struct web_client *w)
 	if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
 		if(w->ifd != w->ofd) {
 			debug(D_WEB_CLIENT, "%llu: Closing filecopy input file descriptor %d.", w->id, w->ifd);
-			close(w->ifd);
+			if(w->ifd != -1) close(w->ifd);
 			w->ifd = w->ofd;
 		}
 	}
@@ -233,8 +233,7 @@ void web_client_reset(struct web_client *w)
 #endif // NETDATA_WITH_ZLIB
 }
 
-struct web_client *web_client_free(struct web_client *w)
-{
+struct web_client *web_client_free(struct web_client *w) {
 	struct web_client *n = w->next;
 	if(w == web_clients) web_clients = n;
 
@@ -245,7 +244,7 @@ struct web_client *web_client_free(struct web_client *w)
 		deflateEnd(&w->response.zstream);
 	}
 #endif // NETDATA_WITH_ZLIB
-		
+
 	if(w->prev)	w->prev->next = w->next;
 	if(w->next) w->next->prev = w->prev;
 	if(w->response.header_output) buffer_free(w->response.header_output);
@@ -260,8 +259,7 @@ struct web_client *web_client_free(struct web_client *w)
 	return(n);
 }
 
-uid_t web_files_uid(void)
-{
+uid_t web_files_uid(void) {
 	static char *web_owner = NULL;
 	static uid_t owner_uid = 0;
 
@@ -288,8 +286,7 @@ uid_t web_files_uid(void)
 	return(owner_uid);
 }
 
-gid_t web_files_gid(void)
-{
+gid_t web_files_gid(void) {
 	static char *web_group = NULL;
 	static gid_t owner_gid = 0;
 
@@ -2213,6 +2210,8 @@ void *web_client_main(void *ptr)
 			break;
 		}
 	}
+
+	web_client_reset(w);
 
 	log_access("%llu: %s port %s disconnected from thread task id %d", w->id, w->client_ip, w->client_port, gettid());
 	debug(D_WEB_CLIENT, "%llu: done...", w->id);
