@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 	<title>netdata dashboard</title>
@@ -2425,6 +2425,16 @@ function finalizePage() {
 	$(document.body).scrollspy({
 		target: '#sidebar',
 		offset: $(window).height() / 3 // controls the diff of the <hX> element to the top, to select it
+	});
+
+	$('#sidebar').on('activate.bs.scrollspy', function (e)
+	{
+		var el = $(e.target);
+		if (el.find('ul').size() == 0)
+		{
+			var href = el.find('a').attr('href');
+			history.pushState(null, document.title, href);
+		};
 	});
 
 	document.getElementById('footer').style.display = 'block';
