@@ -2267,8 +2267,8 @@ function finalizePage() {
 			showChars: 750,
 			minHideChars: 10,
 			ellipsesText: "...",
-			moreText: "show more information",
-			lessText: "show less information",
+			moreText: '<i class="fa fa-expand" aria-hidden="true"></i> show more information',
+			lessText: '<i class="fa fa-compress" aria-hidden="true"></i> show less information',
 			onLess: function() { NETDATA.onscroll(); },
 			onMore: function() { NETDATA.onscroll(); },
 			errMsg: null,
@@ -2293,14 +2293,14 @@ function finalizePage() {
 				if ($this.hasClass('less')) {
 					$this.removeClass('less');
 					$this.html(config.moreText);
-					$this.parent().prev().animate({'height':'0'+'%'}, 50, function () { $this.parent().prev().prev().show(); }).hide('fast', function() {
+					$this.parent().prev().animate({'height':'0'+'%'}, 0, function () { $this.parent().prev().prev().show(); }).hide(0, function() {
 						config.onLess();
 					});
 
 				} else {
 					$this.addClass('less');
 					$this.html(config.lessText);
-					$this.parent().prev().animate({'height':'100'+'%'}, 50, function () { $this.parent().prev().prev().hide(); }).show('fast', function() {
+					$this.parent().prev().animate({'height':'100'+'%'}, 0, function () { $this.parent().prev().prev().hide(); }).show(0, function() {
 						config.onMore();
 					});
 				}
