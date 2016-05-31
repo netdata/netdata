@@ -1726,11 +1726,11 @@ void web_client_process(struct web_client *w) {
 
 	buffer_strcat(w->response.header_output, "\r\n");
 
-/*	// disable TCP_NODELAY, to buffer the header
+	// disable TCP_NODELAY, to buffer the header
 	int flag = 0;
 	if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0)
 		error("%llu: failed to disable TCP_NODELAY on socket.", w->id);
-*/
+
 	// sent the HTTP header
 	debug(D_WEB_DATA, "%llu: Sending response HTTP header of size %d: '%s'"
 			, w->id
@@ -1752,11 +1752,11 @@ void web_client_process(struct web_client *w) {
 	else 
 		w->stats_sent_bytes += bytes;
 
-/*	// enable TCP_NODELAY, to send all data immediately at the next send()
+	// enable TCP_NODELAY, to send all data immediately at the next send()
 	flag = 1;
 	if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0)
  		error("%llu: failed to enable TCP_NODELAY on socket.", w->id);
-*/
+
 	// enable sending immediately if we have data
 	if(w->response.data->len) w->wait_send = 1;
 	else w->wait_send = 0;
