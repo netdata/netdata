@@ -65,16 +65,13 @@ struct web_client {
 	uint8_t dead:1;						// if set to 1, this client is dead
 
 	uint8_t keepalive:1;				// if set to 1, the web client will be re-used
-	uint8_t enable_gzip:1;				// if set to 1, the response will be compressed
 
 	uint8_t mode:3;						// the operational mode of the client
 
 	uint8_t wait_receive:1;				// 1 = we are waiting more input data
 	uint8_t wait_send:1;				// 1 = we have data to send to the client
 
-#ifdef TCP_CORK
 	int tcp_cork;						// 1 = we have a cork on the socket
-#endif /* TCP_CORK */
 
 	int ifd;
 	int ofd;
