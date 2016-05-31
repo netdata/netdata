@@ -6,6 +6,19 @@ body {
 	font-variant: normal;
 }
 
+.morelink {
+	color: #765d9c;
+	text-decoration: none;
+}
+.morelink:hover {
+	color: #563d7c;
+	text-decoration: none;
+}
+.morelink:focus {
+	color: #765d9c;
+	text-decoration: none;
+}
+
 .netdata-chart-alignment {
 	margin-left: 55px;
 }
