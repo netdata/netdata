@@ -5,7 +5,7 @@
 
 #include "global_statistics.h"
 
-struct global_statistics global_statistics = { 0, 0ULL, 0ULL, 0ULL, 0ULL};
+struct global_statistics global_statistics = { 0, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL};
 
 pthread_mutex_t global_statistics_mutex = PTHREAD_MUTEX_INITIALIZER;
 
