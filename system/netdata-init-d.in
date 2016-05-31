@@ -1,8 +1,8 @@
 #!/bin/sh
 #
-# netdata	Real-time charts for system monitoring
+# netdata	Real-time performance monitoring, done right
 # chkconfig: 345 99 01
-# description:  Netdata is a daemon that collects data in realtime (per second)
+# description:  Netdata is a daemon that collects data in real-time (per second)
 #               and presents a web site to view and analyze them. The presentation
 #               is also real-time and full of interactive charts that precisely
 #               render all collected values.

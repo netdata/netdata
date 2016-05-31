@@ -200,7 +200,7 @@ mysql_check() {
 
 	if [ ${#mysql_opts[@]} -eq 0 ]
 		then
-		if [ ${unconfigured} -eq 1 && ${tryroot} -eq 0 ]
+		if [ ${unconfigured} -eq 1 -a ${tryroot} -eq 0 ]
 			then
 			mysql_check tryroot "${@}"
 			return $?
