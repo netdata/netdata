@@ -351,17 +351,19 @@ void *proc_main(void *ptr)
 			}
 			else rrdset_next(stcompression);
 
-			unsigned long long gcontent_size            = global_statistics.content_size;
+			// since we don't lock here to read the global statistics
+			// read the smaller value first
 			unsigned long long gcompressed_content_size = global_statistics.compressed_content_size;
+			unsigned long long gcontent_size            = global_statistics.content_size;
 
-			unsigned long long content_size             = gcontent_size            - old_content_size;
 			unsigned long long compressed_content_size  = gcompressed_content_size - old_compressed_content_size;
+			unsigned long long content_size             = gcontent_size            - old_content_size;
 
-			old_content_size            = gcontent_size;
 			old_compressed_content_size = gcompressed_content_size;
+			old_content_size            = gcontent_size;
 
-			if(content_size)
-				compression_ratio = (content_size - compressed_content_size) * 100 * 1000 / content_size;
+			if(content_size && content_size >= compressed_content_size)
+				compression_ratio = ((content_size - compressed_content_size) * 100 * 1000) / content_size;
 
 			if(compression_ratio != -1)
 				rrddim_set(stcompression, "savings", compression_ratio);
