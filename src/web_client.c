@@ -991,6 +991,10 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 
 				redirects++;
 
+				registry_set_cookie(w, "give-me-back-this-cookie-please");
+				buffer_sprintf(w->response.data, "{ \"status\": \"redirect\", \"registry\": \"%s\" }", registry_to_announce());
+
+/*
 				char *encoded_url = url_encode(machine_url);
 				if(!encoded_url) {
 					error("%llu: Cannot URL encode string '%s'", w->id, machine_url);
@@ -1012,13 +1016,14 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 					return 500;
 				}
 
-				registry_set_cookie(w, "give-me-back-this-cookie-please");
 				buffer_sprintf(w->response.header, "Location: %s/api/v1/registry?action=access&machine=%s&name=%s&url=%s&redirects=%d\r\n",
 							   registry_to_announce(), encoded_guid, encoded_name, encoded_url, redirects);
+
 				free(encoded_guid);
 				free(encoded_name);
 				free(encoded_url);
-				return 307;
+*/
+				return 200;
 			}
 			return registry_request_access_json(w, person_guid, machine_guid, machine_url, url_name, time(NULL));
 
