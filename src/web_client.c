@@ -862,7 +862,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 {
 	static uint32_t hash_action = 0, hash_access = 0, hash_hello = 0, hash_delete = 0, hash_search = 0,
 			hash_switch = 0, hash_machine = 0, hash_url = 0, hash_name = 0, hash_delete_url = 0, hash_for = 0,
-			hash_to = 0;
+			hash_to = 0, hash_redirects = 0;
 
 	if(unlikely(!hash_action)) {
 		hash_action = simple_hash("action");
@@ -877,6 +877,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 		hash_delete_url = simple_hash("delete_url");
 		hash_for = simple_hash("for");
 		hash_to = simple_hash("to");
+		hash_redirects = simple_hash("redirects");
 	}
 
 	char person_guid[36 + 1] = "";
@@ -886,9 +887,9 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 	// FIXME
 	// The browser may send multiple cookies with our id
 	
-	char *cookie = strstr(w->response.data->buffer, " " NETDATA_REGISTRY_COOKIE_NAME "=");
+	char *cookie = strstr(w->response.data->buffer, NETDATA_REGISTRY_COOKIE_NAME "=");
 	if(cookie)
-		strncpyz(person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME) + 1], 36);
+		strncpyz(person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME)], 36);
 
 	char action = '\0';
 	char *machine_guid = NULL,
@@ -897,6 +898,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 			*search_machine_guid = NULL,
 			*delete_url = NULL,
 			*to_person_guid = NULL;
+	int redirects = 0;
 
 	while(url) {
 		char *value = mystrsep(&url, "?&[]");
@@ -918,7 +920,13 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 			else if(vhash == hash_delete && !strcmp(value, "delete")) action = 'D';
 			else if(vhash == hash_search && !strcmp(value, "search")) action = 'S';
 			else if(vhash == hash_switch && !strcmp(value, "switch")) action = 'W';
+#ifdef NETDATA_INTERNAL_CHECKS
+            else error("unknown registry action '%s'", value);
+#endif /* NETDATA_INTERNAL_CHECKS */
 		}
+		else if(hash == hash_redirects && !strcmp(name, "redirects"))
+			redirects = atoi(value);
+
 		else if(hash == hash_machine && !strcmp(name, "machine"))
 			machine_guid = value;
 
@@ -941,6 +949,9 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 			if(hash == hash_to && !strcmp(name, "to"))
 				to_person_guid = value;
 		}
+#ifdef NETDATA_INTERNAL_CHECKS
+		else error("unused registry URL parameter '%s' with value '%s'", name, value);
+#endif /* NETDATA_INTERNAL_CHECKS */
 	}
 
 	if(action == 'A' && (!machine_guid || !machine_url || !url_name)) {
@@ -970,6 +981,45 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 
 	switch(action) {
 		case 'A':
+			if(registry_verify_cookies_redirects() > 0 && (!cookie || !person_guid[0])) {
+				buffer_flush(w->response.data);
+
+				if(redirects > registry_verify_cookies_redirects()) {
+					buffer_sprintf(w->response.data, "Your browser does not support cookies");
+					return 400;
+				}
+
+				redirects++;
+
+				char *encoded_url = url_encode(machine_url);
+				if(!encoded_url) {
+					error("%llu: Cannot URL encode string '%s'", w->id, machine_url);
+					return 500;
+				}
+
+				char *encoded_name = url_encode(url_name);
+				if(!encoded_name) {
+					free(encoded_url);
+					error("%llu: Cannot URL encode string '%s'", w->id, url_name);
+					return 500;
+				}
+
+				char *encoded_guid = url_encode(machine_guid);
+				if(!encoded_guid) {
+					free(encoded_url);
+					free(encoded_name);
+					error("%llu: Cannot URL encode string '%s'", w->id, machine_guid);
+					return 500;
+				}
+
+				registry_set_cookie(w, "give-me-back-this-cookie-please");
+				buffer_sprintf(w->response.header, "Location: %s/api/v1/registry?action=access&machine=%s&name=%s&url=%s&redirects=%d\r\n",
+							   registry_to_announce(), encoded_guid, encoded_name, encoded_url, redirects);
+				free(encoded_guid);
+				free(encoded_name);
+				free(encoded_url);
+				return 307;
+			}
 			return registry_request_access_json(w, person_guid, machine_guid, machine_url, url_name, time(NULL));
 
 		case 'D':
