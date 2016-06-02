@@ -22,19 +22,20 @@ struct myvalue {
 int main(int argc, char **argv) {
 	if(argc || argv) {;}
 
-	DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+//	DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED|DICTIONARY_FLAG_WITH_STATISTICS);
+	DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_WITH_STATISTICS);
 	if(!dict) fatal("Cannot create dictionary.");
 
 	struct rusage start, end;
 	unsigned long long dt;
 	char buf[100 + 1];
 	struct myvalue value, *v;
-	int i, max = 10000000, max2;
+	int i, max = 100000, max2;
 
 	// ------------------------------------------------------------------------
 
 	getrusage(RUSAGE_SELF, &start);
-	dict->inserts = dict->deletes = dict->searches = 0ULL;
+	dict->stats->inserts = dict->stats->deletes = dict->stats->searches = 0ULL;
 	fprintf(stderr, "Inserting %d entries in the dictionary\n", max);
 	for(i = 0; i < max; i++) {
 		value.i = i;
@@ -45,12 +46,12 @@ int main(int argc, char **argv) {
 	getrusage(RUSAGE_SELF, &end);
 	dt = (end.ru_utime.tv_sec * 1000000ULL + end.ru_utime.tv_usec) - (start.ru_utime.tv_sec * 1000000ULL + start.ru_utime.tv_usec);
 	fprintf(stderr, "Added %d entries in %llu nanoseconds: %llu inserts per second\n", max, dt, max * 1000000ULL / dt);
-	fprintf(stderr, " > Dictionary: %llu inserts, %llu deletes, %llu searches\n\n", dict->inserts, dict->deletes, dict->searches);
+	fprintf(stderr, " > Dictionary: %llu inserts, %llu deletes, %llu searches\n\n", dict->stats->inserts, dict->stats->deletes, dict->stats->searches);
 
 	// ------------------------------------------------------------------------
 
 	getrusage(RUSAGE_SELF, &start);
-	dict->inserts = dict->deletes = dict->searches = 0ULL;
+	dict->stats->inserts = dict->stats->deletes = dict->stats->searches = 0ULL;
 	fprintf(stderr, "Retrieving %d entries from the dictionary\n", max);
 	for(i = 0; i < max; i++) {
 		value.i = i;
@@ -65,12 +66,12 @@ int main(int argc, char **argv) {
 	getrusage(RUSAGE_SELF, &end);
 	dt = (end.ru_utime.tv_sec * 1000000ULL + end.ru_utime.tv_usec) - (start.ru_utime.tv_sec * 1000000ULL + start.ru_utime.tv_usec);
 	fprintf(stderr, "Read %d entries in %llu nanoseconds: %llu searches per second\n", max, dt, max * 1000000ULL / dt);
-	fprintf(stderr, " > Dictionary: %llu inserts, %llu deletes, %llu searches\n\n", dict->inserts, dict->deletes, dict->searches);
+	fprintf(stderr, " > Dictionary: %llu inserts, %llu deletes, %llu searches\n\n", dict->stats->inserts, dict->stats->deletes, dict->stats->searches);
 
 	// ------------------------------------------------------------------------
 
 	getrusage(RUSAGE_SELF, &start);
-	dict->inserts = dict->deletes = dict->searches = 0ULL;
+	dict->stats->inserts = dict->stats->deletes = dict->stats->searches = 0ULL;
 	fprintf(stderr, "Resetting %d entries in the dictionary\n", max);
 	for(i = 0; i < max; i++) {
 		value.i = i;
@@ -80,13 +81,13 @@ int main(int argc, char **argv) {
 	}
 	getrusage(RUSAGE_SELF, &end);
 	dt = (end.ru_utime.tv_sec * 1000000ULL + end.ru_utime.tv_usec) - (start.ru_utime.tv_sec * 1000000ULL + start.ru_utime.tv_usec);
-	fprintf(stderr, "Reset %d entries in %llu nanoseconds: %llu inserts per second\n", max, dt, max * 1000000ULL / dt);
-	fprintf(stderr, " > Dictionary: %llu inserts, %llu deletes, %llu searches\n\n", dict->inserts, dict->deletes, dict->searches);
+	fprintf(stderr, "Reset %d entries in %llu nanoseconds: %llu resets per second\n", max, dt, max * 1000000ULL / dt);
+	fprintf(stderr, " > Dictionary: %llu inserts, %llu deletes, %llu searches\n\n", dict->stats->inserts, dict->stats->deletes, dict->stats->searches);
 
 	// ------------------------------------------------------------------------
 
 	getrusage(RUSAGE_SELF, &start);
-	dict->inserts = dict->deletes = dict->searches = 0ULL;
+	dict->stats->inserts = dict->stats->deletes = dict->stats->searches = 0ULL;
 	fprintf(stderr, "Searching  %d non-existing entries in the dictionary\n", max);
 	max2 = max * 2;
 	for(i = max; i < max2; i++) {
@@ -99,13 +100,13 @@ int main(int argc, char **argv) {
 	}
 	getrusage(RUSAGE_SELF, &end);
 	dt = (end.ru_utime.tv_sec * 1000000ULL + end.ru_utime.tv_usec) - (start.ru_utime.tv_sec * 1000000ULL + start.ru_utime.tv_usec);
-	fprintf(stderr, "Searched %d non-existing entries in %llu nanoseconds: %llu searches per second\n", max, dt, max * 1000000ULL / dt);
-	fprintf(stderr, " > Dictionary: %llu inserts, %llu deletes, %llu searches\n\n", dict->inserts, dict->deletes, dict->searches);
+	fprintf(stderr, "Searched %d non-existing entries in %llu nanoseconds: %llu not found searches per second\n", max, dt, max * 1000000ULL / dt);
+	fprintf(stderr, " > Dictionary: %llu inserts, %llu deletes, %llu searches\n\n", dict->stats->inserts, dict->stats->deletes, dict->stats->searches);
 
 	// ------------------------------------------------------------------------
 
 	getrusage(RUSAGE_SELF, &start);
-	dict->inserts = dict->deletes = dict->searches = 0ULL;
+	dict->stats->inserts = dict->stats->deletes = dict->stats->searches = 0ULL;
 	fprintf(stderr, "Deleting %d entries from the dictionary\n", max);
 	for(i = 0; i < max; i++) {
 		value.i = i;
@@ -116,12 +117,12 @@ int main(int argc, char **argv) {
 	getrusage(RUSAGE_SELF, &end);
 	dt = (end.ru_utime.tv_sec * 1000000ULL + end.ru_utime.tv_usec) - (start.ru_utime.tv_sec * 1000000ULL + start.ru_utime.tv_usec);
 	fprintf(stderr, "Deleted %d entries in %llu nanoseconds: %llu deletes per second\n", max, dt, max * 1000000ULL / dt);
-	fprintf(stderr, " > Dictionary: %llu inserts, %llu deletes, %llu searches\n\n", dict->inserts, dict->deletes, dict->searches);
+	fprintf(stderr, " > Dictionary: %llu inserts, %llu deletes, %llu searches\n\n", dict->stats->inserts, dict->stats->deletes, dict->stats->searches);
 
 	// ------------------------------------------------------------------------
 
 	getrusage(RUSAGE_SELF, &start);
-	dict->inserts = dict->deletes = dict->searches = 0ULL;
+	dict->stats->inserts = dict->stats->deletes = dict->stats->searches = 0ULL;
 	fprintf(stderr, "Destroying dictionary\n");
 	dictionary_destroy(dict);
 	getrusage(RUSAGE_SELF, &end);
