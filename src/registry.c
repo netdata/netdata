@@ -89,6 +89,7 @@ struct registry {
 	char *hostname;
 	char *registry_to_announce;
 	time_t persons_expiration; // seconds to expire idle persons
+	int verify_cookies_redirects;
 
 	size_t max_url_length;
 	size_t max_name_length;
@@ -1011,16 +1012,28 @@ MACHINE *registry_request_machine(char *person_guid, char *machine_guid, char *u
 #define REGISTRY_STATUS_FAILED "failed"
 #define REGISTRY_STATUS_DISABLED "disabled"
 
-static inline void registry_set_person_cookie(struct web_client *w, PERSON *p) {
+int registry_verify_cookies_redirects(void) {
+	return registry.verify_cookies_redirects;
+}
+
+const char *registry_to_announce(void) {
+	return registry.registry_to_announce;
+}
+
+void registry_set_cookie(struct web_client *w, const char *guid) {
 	char edate[100];
 	time_t et = time(NULL) + registry.persons_expiration;
 	struct tm etmbuf, *etm = gmtime_r(&et, &etmbuf);
 	strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", etm);
 
-	snprintfz(w->cookie1, COOKIE_MAX, NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s", p->guid, edate);
+	snprintfz(w->cookie1, COOKIE_MAX, NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s", guid, edate);
 
 	if(registry.registry_domain && registry.registry_domain[0])
-		snprintfz(w->cookie2, COOKIE_MAX, NETDATA_REGISTRY_COOKIE_NAME "=%s; Domain=%s; Expires=%s", p->guid, registry.registry_domain, edate);
+		snprintfz(w->cookie2, COOKIE_MAX, NETDATA_REGISTRY_COOKIE_NAME "=%s; Domain=%s; Expires=%s", guid, registry.registry_domain, edate);
+}
+
+static inline void registry_set_person_cookie(struct web_client *w, PERSON *p) {
+	registry_set_cookie(w, p->guid);
 }
 
 static inline void registry_json_header(struct web_client *w, const char *action, const char *status) {
@@ -1653,9 +1666,23 @@ int registry_init(void) {
 	registry.registry_to_announce = config_get("registry", "registry to announce", "https://registry.my-netdata.io");
 	registry.hostname = config_get("registry", "registry hostname", config_get("global", "hostname", hostname));
 
-	registry.max_url_length = config_get_number("registry", "max URL length", 1024);
-	registry.max_name_length = config_get_number("registry", "max URL name length", 50);
+	registry.verify_cookies_redirects = config_get_number("registry", "verify browser cookies support max redirects", 2);
+	if(registry.verify_cookies_redirects < 0) {
+		registry.verify_cookies_redirects = 0;
+		config_set_number("registry", "verify browser cookies support max redirects", registry.verify_cookies_redirects);
+	}
 
+	registry.max_url_length = config_get_number("registry", "max URL length", 1024);
+	if(registry.max_url_length < 10) {
+		registry.max_url_length = 10;
+		config_set_number("registry", "max URL length", registry.max_url_length);
+	}
+
+	registry.max_name_length = config_get_number("registry", "max URL name length", 50);
+	if(registry.max_name_length < 10) {
+		registry.max_name_length = 10;
+		config_set_number("registry", "max URL name length", registry.max_name_length);
+	}
 
 	// initialize entries counters
 	registry.persons_count = 0;
