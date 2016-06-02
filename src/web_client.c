@@ -992,6 +992,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 				redirects++;
 
 				registry_set_cookie(w, "give-me-back-this-cookie-please");
+				w->response.data->contenttype = CT_APPLICATION_JSON;
 				buffer_sprintf(w->response.data, "{ \"status\": \"redirect\", \"registry\": \"%s\" }", registry_to_announce());
 
 /*
