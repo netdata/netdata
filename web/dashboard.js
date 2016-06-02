@@ -5578,6 +5578,9 @@
 		},
 
 		hello: function(host, callback) {
+			while(host.slice(-1) === '/')
+				host = host.substring(0, host.length - 1);
+
 			// send HELLO to a netdata server:
 			// 1. verifies the server is reachable
 			// 2. responds with the registry URL, the machine GUID of this netdata server and its hostname
