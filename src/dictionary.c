@@ -13,26 +13,51 @@
 #include "dictionary.h"
 
 // ----------------------------------------------------------------------------
+// dictionary statistics
+
+static inline void NETDATA_DICTIONARY_STATS_INSERTS_PLUS1(DICTIONARY *dict) {
+	if(likely(dict->stats))
+		dict->stats->inserts++;
+}
+static inline void NETDATA_DICTIONARY_STATS_DELETES_PLUS1(DICTIONARY *dict) {
+	if(likely(dict->stats))
+		dict->stats->deletes++;
+}
+static inline void NETDATA_DICTIONARY_STATS_SEARCHES_PLUS1(DICTIONARY *dict) {
+	if(likely(dict->stats))
+		dict->stats->searches++;
+}
+static inline void NETDATA_DICTIONARY_STATS_ENTRIES_PLUS1(DICTIONARY *dict) {
+	if(likely(dict->stats))
+		dict->stats->entries++;
+}
+static inline void NETDATA_DICTIONARY_STATS_ENTRIES_MINUS1(DICTIONARY *dict) {
+	if(likely(dict->stats))
+		dict->stats->entries--;
+}
+
+
+// ----------------------------------------------------------------------------
 // dictionary locks
 
 static inline void dictionary_read_lock(DICTIONARY *dict) {
-	if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
+	if(likely(dict->rwlock)) {
 		// debug(D_DICTIONARY, "Dictionary READ lock");
-		pthread_rwlock_rdlock(&dict->rwlock);
+		pthread_rwlock_rdlock(dict->rwlock);
 	}
 }
 
 static inline void dictionary_write_lock(DICTIONARY *dict) {
-	if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
+	if(likely(dict->rwlock)) {
 		// debug(D_DICTIONARY, "Dictionary WRITE lock");
-		pthread_rwlock_wrlock(&dict->rwlock);
+		pthread_rwlock_wrlock(dict->rwlock);
 	}
 }
 
 static inline void dictionary_unlock(DICTIONARY *dict) {
-	if(likely(!(dict->flags & DICTIONARY_FLAG_SINGLE_THREADED))) {
+	if(likely(dict->rwlock)) {
 		// debug(D_DICTIONARY, "Dictionary UNLOCK lock");
-		pthread_rwlock_unlock(&dict->rwlock);
+		pthread_rwlock_unlock(dict->rwlock);
 	}
 }
 
@@ -123,9 +148,18 @@ DICTIONARY *dictionary_create(uint32_t flags) {
 	DICTIONARY *dict = calloc(1, sizeof(DICTIONARY));
 	if(unlikely(!dict)) fatal("Cannot allocate DICTIONARY");
 
-	avl_init(&dict->values_index, name_value_compare);
-	pthread_rwlock_init(&dict->rwlock, NULL);
+	if(flags & DICTIONARY_FLAG_WITH_STATISTICS) {
+		dict->stats = calloc(1, sizeof(struct dictionary_stats));
+		if(!dict->stats) fatal("Cannot allocate statistics for DICTIONARY");
+	}
 
+	if(!(flags & DICTIONARY_FLAG_SINGLE_THREADED)) {
+		dict->rwlock = calloc(1, sizeof(pthread_rwlock_t));
+		if(!dict->rwlock) fatal("Cannot allocate pthread_rwlock_t for DICTIONARY");
+		pthread_rwlock_init(dict->rwlock, NULL);
+	}
+
+	avl_init(&dict->values_index, name_value_compare);
 	dict->flags = flags;
 
 	return dict;
@@ -140,6 +174,12 @@ void dictionary_destroy(DICTIONARY *dict) {
 		dictionary_name_value_destroy_nolock(dict, (NAME_VALUE *)dict->values_index.root);
 
 	dictionary_unlock(dict);
+
+	if(dict->stats)
+		free(dict->stats);
+
+	if(dict->rwlock)
+		free(dict->rwlock);
 
 	free(dict);
 }
