@@ -1666,11 +1666,7 @@ int registry_init(void) {
 	registry.registry_to_announce = config_get("registry", "registry to announce", "https://registry.my-netdata.io");
 	registry.hostname = config_get("registry", "registry hostname", config_get("global", "hostname", hostname));
 
-	registry.verify_cookies_redirects = config_get_number("registry", "verify browser cookies support max redirects", 2);
-	if(registry.verify_cookies_redirects < 0) {
-		registry.verify_cookies_redirects = 0;
-		config_set_number("registry", "verify browser cookies support max redirects", registry.verify_cookies_redirects);
-	}
+	registry.verify_cookies_redirects = config_get_boolean("registry", "verify browser cookies support max redirects", 1);
 
 	registry.max_url_length = config_get_number("registry", "max URL length", 1024);
 	if(registry.max_url_length < 10) {
