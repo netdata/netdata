@@ -581,7 +581,8 @@
 			$.ajax({
 				url: host + '/api/v1/charts',
 				async: true,
-				cache: false
+				cache: false,
+				xhrFields: { withCredentials: true } // required for the cookie
 			})
 			.done(function(data) {
 				if(data !== null) {
@@ -2793,7 +2794,8 @@
 			this.xhr = $.ajax( {
 				url: this.data_url,
 				cache: false,
-				async: true
+				async: true,
+				xhrFields: { withCredentials: true } // required for the cookie
 			})
 			.success(function(data) {
 				if(that.debug === true)
@@ -3013,7 +3015,8 @@
 				$.ajax( {
 					url:  this.host + this.chart_url,
 					cache: false,
-					async: true
+					async: true,
+					xhrFields: { withCredentials: true } // required for the cookie
 				})
 				.done(function(chart) {
 					chart.url = that.chart_url;
@@ -3403,7 +3406,8 @@
 			$.ajax({
 				url: NETDATA.peity_js,
 				cache: true,
-				dataType: "script"
+				dataType: "script",
+				xhrFields: { withCredentials: true } // required for the cookie
 			})
 			.done(function() {
 				NETDATA.registerChartLibrary('peity', NETDATA.peity_js);
@@ -3464,7 +3468,8 @@
 			$.ajax({
 				url: NETDATA.sparkline_js,
 				cache: true,
-				dataType: "script"
+				dataType: "script",
+				xhrFields: { withCredentials: true } // required for the cookie
 			})
 			.done(function() {
 				NETDATA.registerChartLibrary('sparkline', NETDATA.sparkline_js);
@@ -3648,7 +3653,8 @@
 		$.ajax({
 			url: NETDATA.dygraph_smooth_js,
 			cache: true,
-			dataType: "script"
+			dataType: "script",
+			xhrFields: { withCredentials: true } // required for the cookie
 		})
 		.done(function() {
 			NETDATA.dygraph.smooth = true;
@@ -3668,7 +3674,8 @@
 			$.ajax({
 				url: NETDATA.dygraph_js,
 				cache: true,
-				dataType: "script"
+				dataType: "script",
+				xhrFields: { withCredentials: true } // required for the cookie
 			})
 			.done(function() {
 				NETDATA.registerChartLibrary('dygraph', NETDATA.dygraph_js);
@@ -4261,7 +4268,8 @@
 				$.ajax({
 					url: NETDATA.morris_js,
 					cache: true,
-					dataType: "script"
+					dataType: "script",
+					xhrFields: { withCredentials: true } // required for the cookie
 				})
 				.done(function() {
 					NETDATA.registerChartLibrary('morris', NETDATA.morris_js);
@@ -4326,7 +4334,8 @@
 			$.ajax({
 				url: NETDATA.raphael_js,
 				cache: true,
-				dataType: "script"
+				dataType: "script",
+				xhrFields: { withCredentials: true } // required for the cookie
 			})
 			.done(function() {
 				NETDATA.registerChartLibrary('raphael', NETDATA.raphael_js);
@@ -4390,7 +4399,8 @@
 				$.ajax({
 					url: NETDATA.c3_js,
 					cache: true,
-					dataType: "script"
+					dataType: "script",
+					xhrFields: { withCredentials: true } // required for the cookie
 				})
 				.done(function() {
 					NETDATA.registerChartLibrary('c3', NETDATA.c3_js);
@@ -4488,7 +4498,8 @@
 			$.ajax({
 				url: NETDATA.d3_js,
 				cache: true,
-				dataType: "script"
+				dataType: "script",
+				xhrFields: { withCredentials: true } // required for the cookie
 			})
 			.done(function() {
 				NETDATA.registerChartLibrary('d3', NETDATA.d3_js);
@@ -4525,7 +4536,8 @@
 			$.ajax({
 				url: NETDATA.google_js,
 				cache: true,
-				dataType: "script"
+				dataType: "script",
+				xhrFields: { withCredentials: true } // required for the cookie
 			})
 			.done(function() {
 				NETDATA.registerChartLibrary('google', NETDATA.google_js);
@@ -4669,7 +4681,8 @@
 			$.ajax({
 				url: NETDATA.easypiechart_js,
 				cache: true,
-				dataType: "script"
+				dataType: "script",
+				xhrFields: { withCredentials: true } // required for the cookie
 			})
 				.done(function() {
 					NETDATA.registerChartLibrary('easypiechart', NETDATA.easypiechart_js);
@@ -4861,7 +4874,8 @@
 			$.ajax({
 				url: NETDATA.gauge_js,
 				cache: true,
-				dataType: "script"
+				dataType: "script",
+				xhrFields: { withCredentials: true } // required for the cookie
 			})
 				.done(function() {
 					NETDATA.registerChartLibrary('gauge', NETDATA.gauge_js);
@@ -5470,7 +5484,8 @@
 		$.ajax({
 			url: NETDATA.requiredJs[index].url,
 			cache: true,
-			dataType: "script"
+			dataType: "script",
+			xhrFields: { withCredentials: true } // required for the cookie
 		})
 		.success(function() {
 			if(NETDATA.options.debug.main_loop === true)
