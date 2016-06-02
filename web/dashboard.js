@@ -5569,7 +5569,7 @@
 					NETDATA.registry.machine_guid = data.machine_guid;
 					NETDATA.registry.hostname = data.hostname;
 
-					NETDATA.registry.access(10, function (person_urls) {
+					NETDATA.registry.access(2, function (person_urls) {
 						NETDATA.registry.parsePersonUrls(person_urls);
 
 					});
