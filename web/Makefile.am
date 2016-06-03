@@ -94,6 +94,16 @@ dist_webimages_DATA = \
 	images/seo-performance-multi-size.icns \
 	$(NULL)
 
+
+webwellknowndir=$(webdir)/.well-known
+dist_webwellknown_DATA = \
+	$(NULL)
+
+webdntdir=$(webdir)/.well-known/dnt
+dist_webdnt_DATA = \
+	.well-known/dnt/cookies \
+	$(NULL)
+
 version.txt:
 	if test -d "$(top_srcdir)/.git"; then \
 		git --git-dir="$(top_srcdir)/.git" log -n 1 --format=%H; \

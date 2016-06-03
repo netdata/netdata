@@ -1,0 +1,14 @@
+{
+  "tracking": "T",
+  "compliance": ["https://github.com/firehol/netdata/wiki/cookies#compliance"],
+  "qualifiers": "afc",
+  "controller": ["https://github.com/firehol/netdata/wiki/cookies#controller"],
+  "same-party": [
+    "my-netdata.io",
+    "mynetdata.io",
+    "netdata.online",
+    "netdata.rocks",
+    "registry.my-netdata.io"
+  ],
+  "policy": "https://github.com/firehol/netdata/wiki/cookies#policy",
+}
