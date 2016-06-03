@@ -38,6 +38,7 @@
 #define TOO_BIG_REQUEST 16384
 
 int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
+int web_donotrack_comply = 0;
 
 #ifdef NETDATA_WITH_ZLIB
 int web_enable_gzip = 1, web_gzip_level = 3, web_gzip_strategy = Z_DEFAULT_STRATEGY;
@@ -250,6 +251,9 @@ void web_client_reset(struct web_client *w) {
 
 	w->mode = WEB_CLIENT_MODE_NORMAL;
 
+	w->tcp_cork = 0;
+	w->donottrack = 0;
+	w->tracking_required = 0;
 	w->keepalive = 0;
 	w->decoded_url[0] = '\0';
 
@@ -959,6 +963,12 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 #endif /* NETDATA_INTERNAL_CHECKS */
 	}
 
+	if(web_donotrack_comply && w->donottrack) {
+		buffer_flush(w->response.data);
+		buffer_sprintf(w->response.data, "Your web browser is sending 'DNT: 1' (Do Not Track). The registry requires persistent cookies on your browser to work.");
+		return 400;
+	}
+
 	if(action == 'A' && (!machine_guid || !machine_url || !url_name)) {
 		buffer_flush(w->response.data);
 		buffer_sprintf(w->response.data, "Invalid registry request - access requires these parameters: machine ('%s'), url ('%s'), name ('%s')",
@@ -986,6 +996,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 
 	switch(action) {
 		case 'A':
+			w->tracking_required = 1;
 			if(registry_verify_cookies_redirects() > 0 && (!cookie || !person_guid[0])) {
 				buffer_flush(w->response.data);
 
@@ -1040,12 +1051,15 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 			return registry_request_access_json(w, person_guid, machine_guid, machine_url, url_name, time(NULL));
 
 		case 'D':
+			w->tracking_required = 1;
 			return registry_request_delete_json(w, person_guid, machine_guid, machine_url, delete_url, time(NULL));
 
 		case 'S':
+			w->tracking_required = 1;
 			return registry_request_search_json(w, person_guid, machine_guid, machine_url, search_machine_guid, time(NULL));
 
 		case 'W':
+			w->tracking_required = 1;
 			return registry_request_switch_json(w, person_guid, machine_guid, machine_url, to_person_guid, time(NULL));
 
 		case 'H':
@@ -1399,26 +1413,30 @@ const char *web_response_code_to_string(int code) {
 }
 
 static inline char *http_header_parse(struct web_client *w, char *s) {
-	static uint32_t hash_origin = 0, hash_connection = 0, hash_accept_encoding = 0;
+	static uint32_t hash_origin = 0, hash_connection = 0, hash_accept_encoding = 0, hash_donottrack = 0;
 
 	if(unlikely(!hash_origin)) {
 		hash_origin = simple_uhash("Origin");
 		hash_connection = simple_uhash("Connection");
 		hash_accept_encoding = simple_uhash("Accept-Encoding");
+		hash_donottrack = simple_uhash("DNT");
 	}
 
 	char *e = s;
 
 	// find the :
 	while(*e && *e != ':') e++;
-	if(!*e || e[1] != ' ') return e;
+	if(!*e) return e;
 
 	// get the name
 	*e = '\0';
 
 	// find the value
-	char *v, *ve;
-	v = ve = e + 2;
+	char *v = e + 1, *ve;
+
+	// skip leading spaces from value
+	while(*v == ' ') v++;
+	ve = v;
 
 	// find the \r
 	while(*ve && *ve != '\r') ve++;
@@ -1439,6 +1457,10 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
 	else if(hash == hash_connection && !strcasecmp(s, "Connection")) {
 		if(strcasestr(v, "keep-alive"))
 			w->keepalive = 1;
+	}
+	else if(web_donotrack_comply && hash == hash_donottrack && !strcasecmp(s, "DNT")) {
+		if(*v == '0') w->donottrack = 0;
+		else if(*v == '1') w->donottrack = 1;
 	}
 #ifdef NETDATA_WITH_ZLIB
 	else if(hash == hash_accept_encoding && !strcasecmp(s, "Accept-Encoding")) {
@@ -1778,16 +1800,32 @@ void web_client_process(struct web_client *w) {
 		, date
 		);
 
-	if(w->cookie1[0]) {
-		buffer_sprintf(w->response.header_output,
-		   "Set-Cookie: %s\r\n",
-		   w->cookie1);
-	}
+	if(w->cookie1[0] || w->cookie2[0]) {
+		if(w->cookie1[0]) {
+			buffer_sprintf(w->response.header_output,
+			   "Set-Cookie: %s\r\n",
+			   w->cookie1);
+		}
 
-	if(w->cookie2[0]) {
-		buffer_sprintf(w->response.header_output,
-		   "Set-Cookie: %s\r\n",
-		   w->cookie2);
+		if(w->cookie2[0]) {
+			buffer_sprintf(w->response.header_output,
+			   "Set-Cookie: %s\r\n",
+			   w->cookie2);
+		}
+
+		if(web_donotrack_comply)
+			buffer_sprintf(w->response.header_output,
+			   "Tk: T;cookies\r\n");
+	}
+	else {
+		if(web_donotrack_comply) {
+			if(w->tracking_required)
+				buffer_sprintf(w->response.header_output,
+				   "Tk: T;cookies\r\n");
+			else
+				buffer_sprintf(w->response.header_output,
+				   "Tk: N\r\n");
+		}
 	}
 
 	if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
