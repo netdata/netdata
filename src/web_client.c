@@ -740,9 +740,6 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
 		else if(!strcmp(name, "group")) {
 			group = web_client_api_request_v1_data_group(value);
 		}
-		else if(!strcmp(name, "format")) {
-			format = web_client_api_request_v1_data_format(value);
-		}
 		else if(!strcmp(name, "options")) {
 			options |= web_client_api_request_v1_data_options(value);
 		}
