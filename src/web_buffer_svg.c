@@ -380,7 +380,7 @@ cleanup:
 }
 
 static inline const char *fix_units(const char *units) {
-	if(!units || !*units || !strcmp(units, "emtpy") || !strcmp(units, "null")) return "";
+	if(!units || !*units || !strcmp(units, "empty") || !strcmp(units, "null")) return "";
 	if(!strcmp(units, "percentage") || !strcmp(units, "percent") || !strcmp(units, "pcent")) return "%";
 	return units;
 }
