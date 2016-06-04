@@ -1,7 +1,7 @@
 [![Build Status](https://travis-ci.org/firehol/netdata.svg?branch=master)](https://travis-ci.org/firehol/netdata)
-[![Global Netdata Registry Tracking Sessions](http://london.my-netdata.io/#netdata_registry)](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&points=1&after=-1&value_color=grey:null|green&label=user%20sessions&units=%20)
-[![Global Netdata Registry Users](http://london.my-netdata.io/#netdata_registry)](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&points=1&after=-1&value_color=grey:null|green&label=user%20base&units=persons)
-[![Global Netdata Registry Machines](http://london.my-netdata.io/#netdata_registry)](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&points=1&after=-1&value_color=grey:null|green&label=monitoring&units=devices)
+[![Global Netdata Registry Tracking Sessions](http://london.my-netdata.io/#netdata_registry)](https://registry.my-netdata.io/api/v1/badge.svg/chart=netdata.registry_sessions/points=1/after=-1/value_color=grey:null%7Cgreen/label=user%20sessions/units=%20)
+[![Global Netdata Registry Users](http://london.my-netdata.io/#netdata_registry)](https://registry.my-netdata.io/api/v1/badge.svg/chart=netdata.registry_entries/dimensions=persons/points=1/after=-1/value_color=grey:null%7Cgreen/label=user%20base/units=persons)
+[![Global Netdata Registry Machines](http://london.my-netdata.io/#netdata_registry)](https://registry.my-netdata.io/api/v1/badge.svg/chart=netdata.registry_entries/dimensions=machines/points=1/after=-1/value_color=grey:null%7Cgreen/label=monitoring/units=devices)
 
 # netdata
 
