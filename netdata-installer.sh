@@ -607,7 +607,7 @@ if [ "${UID}" -eq 0 ]
 		fi
 
 		stop_all_netdata
-		run service netdata start && started=1
+		run service netdata restart && started=1
 	fi
 
 	if [ ${started} -eq 0 ]
@@ -615,7 +615,11 @@ if [ "${UID}" -eq 0 ]
 		# check if we can use the system service
 		run service netdata stop
 		stop_all_netdata
-		run service netdata start && started=1
+		run service netdata restart && started=1
+		if [ ${started} -eq 0 ]
+		then
+			run service netdata start && started=1
+		fi
 	fi
 fi
 
