@@ -11,6 +11,7 @@ dist_charts_SCRIPTS = \
 	cpufreq.chart.sh \
 	crsproxy.chart.sh \
 	example.chart.sh \
+	exim.chart.sh \
 	load_average.chart.sh \
 	mem_apps.chart.sh \
 	mysql.chart.sh \
