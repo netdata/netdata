@@ -30,7 +30,7 @@
 #include "rrd.h"
 #include "rrd2json.h"
 #include "registry.h"
-
+#include "web_buffer_svg.h"
 #include "web_client.h"
 
 #define INITIAL_WEB_DATA_LENGTH 16384
@@ -38,6 +38,7 @@
 #define TOO_BIG_REQUEST 16384
 
 int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
+int web_donotrack_comply = 0;
 
 #ifdef NETDATA_WITH_ZLIB
 int web_enable_gzip = 1, web_gzip_level = 3, web_gzip_strategy = Z_DEFAULT_STRATEGY;
@@ -250,6 +251,9 @@ void web_client_reset(struct web_client *w) {
 
 	w->mode = WEB_CLIENT_MODE_NORMAL;
 
+	w->tcp_cork = 0;
+	w->donottrack = 0;
+	w->tracking_required = 0;
 	w->keepalive = 0;
 	w->decoded_url[0] = '\0';
 
@@ -682,6 +686,133 @@ cleanup:
 	return ret;
 }
 
+int web_client_api_v1_badge(struct web_client *w, char *url) {
+	// chart
+	// dimensions
+	// before
+	// after
+	// points
+
+	int ret = 400;
+	buffer_flush(w->response.data);
+
+	BUFFER *dimensions = NULL;
+	
+	const char *chart = NULL
+			, *before_str = NULL
+			, *after_str = NULL
+			, *points_str = NULL
+			, *multiply_str = NULL
+			, *divide_str = NULL
+			, *label = NULL
+			, *units = NULL
+			, *label_color = NULL
+			, *value_color = NULL;
+
+	int group = GROUP_MAX;
+	uint32_t format = DATASOURCE_JSON;
+	uint32_t options = 0x00000000;
+
+	while(url) {
+		char *value = mystrsep(&url, "/?&[]");
+		if(!value || !*value) continue;
+
+		char *name = mystrsep(&value, "=");
+		if(!name || !*name) continue;
+		if(!value || !*value) continue;
+
+		debug(D_WEB_CLIENT, "%llu: API v1 badge.svg query param '%s' with value '%s'", w->id, name, value);
+
+		// name and value are now the parameters
+		// they are not null and not empty
+
+		if(!strcmp(name, "chart")) chart = value;
+		else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
+			if(!dimensions) dimensions = buffer_create(strlen(value));
+			if(dimensions) {
+				buffer_strcat(dimensions, "|");
+				buffer_strcat(dimensions, value);
+			}
+		}
+		else if(!strcmp(name, "after")) after_str = value;
+		else if(!strcmp(name, "before")) before_str = value;
+		else if(!strcmp(name, "points")) points_str = value;
+		else if(!strcmp(name, "group")) {
+			group = web_client_api_request_v1_data_group(value);
+		}
+		else if(!strcmp(name, "format")) {
+			format = web_client_api_request_v1_data_format(value);
+		}
+		else if(!strcmp(name, "options")) {
+			options |= web_client_api_request_v1_data_options(value);
+		}
+		else if(!strcmp(name, "label")) label = value;
+		else if(!strcmp(name, "units")) units = value;
+		else if(!strcmp(name, "label_color")) label_color = value;
+		else if(!strcmp(name, "value_color")) value_color = value;
+		else if(!strcmp(name, "multiply")) multiply_str = value;
+		else if(!strcmp(name, "divide")) divide_str = value;
+	}
+
+	if(!chart || !*chart) {
+		buffer_sprintf(w->response.data, "No chart id is given at the request.");
+		goto cleanup;
+	}
+
+	RRDSET *st = rrdset_find(chart);
+	if(!st) st = rrdset_find_byname(chart);
+	if(!st) {
+		buffer_sprintf(w->response.data, "Chart '%s' is not found.", chart);
+		ret = 404;
+		goto cleanup;
+	}
+
+	long long multiply = (multiply_str && *multiply_str)?atol(multiply_str):1;
+	long long divide   = (divide_str   && *divide_str  )?atol(divide_str):1;
+	long long before   = (before_str   && *before_str  )?atol(before_str):0;
+	long long after    = (after_str    && *after_str   )?atol(after_str):0;
+	int       points   = (points_str   && *points_str  )?atoi(points_str):0;
+
+	if(!label) {
+		if(dimensions) {
+			const char *dim = buffer_tostring(dimensions);
+			if(*dim == '|') dim++;
+			label = dim;
+		}
+		else
+			label = st->name;
+	}
+	if(!units) {
+		if(options & RRDR_OPTION_PERCENTAGE)
+			units="%";
+		else
+			units = st->units;
+	}
+
+	debug(D_WEB_CLIENT, "%llu: API command 'badge.svg' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%u', format '%u', options '0x%08x'"
+			, w->id
+			, chart
+			, (dimensions)?buffer_tostring(dimensions):""
+			, after
+			, before
+			, points
+			, group
+			, format
+			, options
+			);
+
+	time_t latest_timestamp = 0;
+	int value_is_null = 1;
+	calculated_number n = 0;
+	ret = rrd2value(st, w->response.data, &n, dimensions, points, after, before, group, options, &latest_timestamp, &value_is_null);
+	buffer_svg(w->response.data, label, n * multiply / divide, units, label_color, value_color, value_is_null);
+	return ret;
+
+cleanup:
+	if(dimensions) buffer_free(dimensions);
+	return ret;
+}
+
 // returns the HTTP code
 int web_client_api_request_v1_data(struct web_client *w, char *url)
 {
@@ -959,6 +1090,12 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 #endif /* NETDATA_INTERNAL_CHECKS */
 	}
 
+	if(web_donotrack_comply && w->donottrack) {
+		buffer_flush(w->response.data);
+		buffer_sprintf(w->response.data, "Your web browser is sending 'DNT: 1' (Do Not Track). The registry requires persistent cookies on your browser to work.");
+		return 400;
+	}
+
 	if(action == 'A' && (!machine_guid || !machine_url || !url_name)) {
 		buffer_flush(w->response.data);
 		buffer_sprintf(w->response.data, "Invalid registry request - access requires these parameters: machine ('%s'), url ('%s'), name ('%s')",
@@ -986,6 +1123,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 
 	switch(action) {
 		case 'A':
+			w->tracking_required = 1;
 			if(registry_verify_cookies_redirects() > 0 && (!cookie || !person_guid[0])) {
 				buffer_flush(w->response.data);
 
@@ -1040,12 +1178,15 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 			return registry_request_access_json(w, person_guid, machine_guid, machine_url, url_name, time(NULL));
 
 		case 'D':
+			w->tracking_required = 1;
 			return registry_request_delete_json(w, person_guid, machine_guid, machine_url, delete_url, time(NULL));
 
 		case 'S':
+			w->tracking_required = 1;
 			return registry_request_search_json(w, person_guid, machine_guid, machine_url, search_machine_guid, time(NULL));
 
 		case 'W':
+			w->tracking_required = 1;
 			return registry_request_switch_json(w, person_guid, machine_guid, machine_url, to_person_guid, time(NULL));
 
 		case 'H':
@@ -1062,15 +1203,15 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 	return 400;
 }
 
-int web_client_api_request_v1(struct web_client *w, char *url)
-{
-	static uint32_t hash_data = 0, hash_chart = 0, hash_charts = 0, hash_registry = 0;
+int web_client_api_request_v1(struct web_client *w, char *url) {
+	static uint32_t hash_data = 0, hash_chart = 0, hash_charts = 0, hash_registry = 0, hash_badge = 0;
 
 	if(unlikely(hash_data == 0)) {
 		hash_data = simple_hash("data");
 		hash_chart = simple_hash("chart");
 		hash_charts = simple_hash("charts");
 		hash_registry = simple_hash("registry");
+		hash_badge = simple_hash("badge.svg");
 	}
 
 	// get the command
@@ -1090,6 +1231,9 @@ int web_client_api_request_v1(struct web_client *w, char *url)
 
 		else if(hash == hash_registry && !strcmp(tok, "registry"))
 			return web_client_api_request_v1_registry(w, url);
+
+		else if(hash == hash_badge && !strcmp(tok, "badge.svg"))
+			return web_client_api_v1_badge(w, url);
 
 		else {
 			buffer_flush(w->response.data);
@@ -1399,26 +1543,30 @@ const char *web_response_code_to_string(int code) {
 }
 
 static inline char *http_header_parse(struct web_client *w, char *s) {
-	static uint32_t hash_origin = 0, hash_connection = 0, hash_accept_encoding = 0;
+	static uint32_t hash_origin = 0, hash_connection = 0, hash_accept_encoding = 0, hash_donottrack = 0;
 
 	if(unlikely(!hash_origin)) {
 		hash_origin = simple_uhash("Origin");
 		hash_connection = simple_uhash("Connection");
 		hash_accept_encoding = simple_uhash("Accept-Encoding");
+		hash_donottrack = simple_uhash("DNT");
 	}
 
 	char *e = s;
 
 	// find the :
 	while(*e && *e != ':') e++;
-	if(!*e || e[1] != ' ') return e;
+	if(!*e) return e;
 
 	// get the name
 	*e = '\0';
 
 	// find the value
-	char *v, *ve;
-	v = ve = e + 2;
+	char *v = e + 1, *ve;
+
+	// skip leading spaces from value
+	while(*v == ' ') v++;
+	ve = v;
 
 	// find the \r
 	while(*ve && *ve != '\r') ve++;
@@ -1439,6 +1587,10 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
 	else if(hash == hash_connection && !strcasecmp(s, "Connection")) {
 		if(strcasestr(v, "keep-alive"))
 			w->keepalive = 1;
+	}
+	else if(web_donotrack_comply && hash == hash_donottrack && !strcasecmp(s, "DNT")) {
+		if(*v == '0') w->donottrack = 0;
+		else if(*v == '1') w->donottrack = 1;
 	}
 #ifdef NETDATA_WITH_ZLIB
 	else if(hash == hash_accept_encoding && !strcasecmp(s, "Accept-Encoding")) {
@@ -1778,16 +1930,32 @@ void web_client_process(struct web_client *w) {
 		, date
 		);
 
-	if(w->cookie1[0]) {
-		buffer_sprintf(w->response.header_output,
-		   "Set-Cookie: %s\r\n",
-		   w->cookie1);
-	}
+	if(w->cookie1[0] || w->cookie2[0]) {
+		if(w->cookie1[0]) {
+			buffer_sprintf(w->response.header_output,
+			   "Set-Cookie: %s\r\n",
+			   w->cookie1);
+		}
 
-	if(w->cookie2[0]) {
-		buffer_sprintf(w->response.header_output,
-		   "Set-Cookie: %s\r\n",
-		   w->cookie2);
+		if(w->cookie2[0]) {
+			buffer_sprintf(w->response.header_output,
+			   "Set-Cookie: %s\r\n",
+			   w->cookie2);
+		}
+
+		if(web_donotrack_comply)
+			buffer_sprintf(w->response.header_output,
+			   "Tk: T;cookies\r\n");
+	}
+	else {
+		if(web_donotrack_comply) {
+			if(w->tracking_required)
+				buffer_sprintf(w->response.header_output,
+				   "Tk: T;cookies\r\n");
+			else
+				buffer_sprintf(w->response.header_output,
+				   "Tk: N\r\n");
+		}
 	}
 
 	if(w->mode == WEB_CLIENT_MODE_OPTIONS) {

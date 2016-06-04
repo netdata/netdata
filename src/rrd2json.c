@@ -985,11 +985,87 @@ static void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startlin
 	//info("RRD2CSV(): %s: END", r->st->id);
 }
 
+inline static calculated_number rrdr2value(RRDR *r, long i, uint32_t options, int *all_values_are_null) {
+	long c;
+	RRDDIM *d;
+
+	calculated_number *cn = &r->v[ i * r->d ];
+	uint8_t *co = &r->o[ i * r->d ];
+
+	calculated_number sum = 0, min = 0, max = 0, v;
+	int all_null = 1, init = 1;
+
+	calculated_number total = 1;
+	if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
+		total = 0;
+		for(c = 0, d = r->st->dimensions; d && c < r->d ;c++, d = d->next) {
+			calculated_number n = cn[c];
+
+			if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
+				n = -n;
+
+			total += n;
+		}
+		// prevent a division by zero
+		if(total == 0) total = 1;
+	}
+
+	// for each dimension
+	for(c = 0, d = r->st->dimensions; d && c < r->d ;c++, d = d->next) {
+		if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
+		if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
+
+		calculated_number n = cn[c];
+
+		if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
+			n = -n;
+
+		if(unlikely(options & RRDR_OPTION_PERCENTAGE))
+			n = n * 100 / total;
+
+		if(unlikely(init)) {
+			if(n > 0) {
+				min = 0;
+				max = n;
+			}
+			else {
+				min = n;
+				max = 0;
+			}
+			init = 0;
+		}
+
+		if(likely(!(co[c] & RRDR_EMPTY))) {
+			all_null = 0;
+			sum += n;
+		}
+
+		if(n < min) min = n;
+		if(n > max) max = n;
+	}
+
+	if(unlikely(all_null)) {
+		if(likely(*all_values_are_null))
+			*all_values_are_null = 1;
+		return 0;
+	}
+	else {
+		if(likely(*all_values_are_null))
+			*all_values_are_null = 0;
+	}
+
+	if(options & RRDR_OPTION_MIN2MAX)
+		v = max - min;
+	else
+		v = sum;
+
+	return v;
+}
+
 static void rrdr2ssv(RRDR *r, BUFFER *wb, uint32_t options, const char *prefix, const char *separator, const char *suffix)
 {
 	//info("RRD2SSV(): %s: BEGIN", r->st->id);
-	long c, i;
-	RRDDIM *d;
+	long i;
 
 	buffer_strcat(wb, prefix);
 	long start = 0, end = rrdr_rows(r), step = 1;
@@ -1000,89 +1076,30 @@ static void rrdr2ssv(RRDR *r, BUFFER *wb, uint32_t options, const char *prefix, 
 	}
 
 	// for each line in the array
-	calculated_number total = 1;
 	for(i = start; i != end ;i += step) {
+		int all_values_are_null = 0;
+		calculated_number v = rrdr2value(r, i, options, &all_values_are_null);
 
-		calculated_number *cn = &r->v[ i * r->d ];
-		uint8_t *co = &r->o[ i * r->d ];
-
-		calculated_number sum = 0, min = 0, max = 0, v;
-		int all_null = 1, init = 1;
-
-		if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
-			total = 0;
-			for(c = 0, d = r->st->dimensions; d && c < r->d ;c++, d = d->next) {
-				calculated_number n = cn[c];
-
-				if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
-					n = -n;
-
-				total += n;
-			}
-			// prevent a division by zero
-			if(total == 0) total = 1;
+		if(likely(i != start)) {
+			if(r->min > v) r->min = v;
+			if(r->max < v) r->max = v;
 		}
-
-		// for each dimension
-		for(c = 0, d = r->st->dimensions; d && c < r->d ;c++, d = d->next) {
-			if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
-			if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
-
-			calculated_number n = cn[c];
-
-			if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
-				n = -n;
-
-			if(unlikely(options & RRDR_OPTION_PERCENTAGE))
-				n = n * 100 / total;
-
-			if(unlikely(init)) {
-				if(n > 0) {
-					min = 0;
-					max = n;
-				}
-				else {
-					min = n;
-					max = 0;
-				}
-				init = 0;
-			}
-
-			if(likely(!(co[c] & RRDR_EMPTY))) {
-				all_null = 0;
-				sum += n;
-			}
-
-			if(n < min) min = n;
-			if(n > max) max = n;
+		else {
+			r->min = v;
+			r->max = v;
 		}
 
 		if(likely(i != start))
 			buffer_strcat(wb, separator);
 
-		if(all_null) {
+		if(all_values_are_null) {
 			if(options & RRDR_OPTION_NULL2ZERO)
 				buffer_strcat(wb, "0");
 			else
 				buffer_strcat(wb, "null");
 		}
-		else {
-			if(options & RRDR_OPTION_MIN2MAX)
-				v = max - min;
-			else
-				v = sum;
-
-			if(likely(i != start)) {
-				if(r->min > v) r->min = v;
-				if(r->max < v) r->max = v;
-			}
-			else {
-				r->min = v;
-				r->max = v;
-			}
-
+		else
 			buffer_rrd_value(wb, v);
-		}
 	}
 	buffer_strcat(wb, suffix);
 	//info("RRD2SSV(): %s: END", r->st->id);
@@ -1511,6 +1528,40 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	//info("RRD2RRDR(): %s: END %ld loops made, %ld points generated", st->id, counter, rrdr_rows(r));
 	//error("SHIFT: %s: wanted %ld points, got %ld", st->id, points, rrdr_rows(r));
 	return r;
+}
+
+int rrd2value(RRDSET *st, BUFFER *wb, calculated_number *n, BUFFER *dimensions, long points, long long after, long long before, int group_method, uint32_t options, time_t *latest_timestamp, int *value_is_null)
+{
+	RRDR *r = rrd2rrdr(st, points, after, before, group_method);
+	if(!r) {
+		if(value_is_null) *value_is_null = 1;
+		return 500;
+	}
+
+	if(rrdr_rows(r) == 0) {
+		rrdr_free(r);
+		if(value_is_null) *value_is_null = 1;
+		return 400;
+	}
+
+	if(r->result_options & RRDR_RESULT_OPTION_RELATIVE)
+		wb->options |= WB_CONTENT_NO_CACHEABLE;
+	else if(r->result_options & RRDR_RESULT_OPTION_ABSOLUTE)
+		wb->options |= WB_CONTENT_CACHEABLE;
+
+	options = rrdr_check_options(r, options, (dimensions)?buffer_tostring(dimensions):NULL);
+
+	if(dimensions)
+		rrdr_disable_not_selected_dimensions(r, buffer_tostring(dimensions));
+
+	if(latest_timestamp)
+		*latest_timestamp = r->before;
+
+	long i = (options & RRDR_OPTION_REVERSED)?rrdr_rows(r) - 1:0;
+	*n = rrdr2value(r, i, options, value_is_null);
+
+	rrdr_free(r);
+	return 200;
 }
 
 int rrd2format(RRDSET *st, BUFFER *wb, BUFFER *dimensions, uint32_t format, long points, long long after, long long before, int group_method, uint32_t options, time_t *latest_timestamp)

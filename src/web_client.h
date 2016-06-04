@@ -14,15 +14,15 @@
 #include "web_buffer.h"
 #include "dictionary.h"
 
+#ifndef NETDATA_WEB_CLIENT_H
+#define NETDATA_WEB_CLIENT_H 1
+
 #define DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS 60
 extern int web_client_timeout;
 
 #ifdef NETDATA_WITH_ZLIB
-extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
+extern int web_enable_gzip, web_gzip_level, web_gzip_strategy, web_donotrack_comply;
 #endif /* NETDATA_WITH_ZLIB */
-
-#ifndef NETDATA_WEB_CLIENT_H
-#define NETDATA_WEB_CLIENT_H 1
 
 #define WEB_CLIENT_MODE_NORMAL		0
 #define WEB_CLIENT_MODE_FILECOPY	1
@@ -70,6 +70,9 @@ struct web_client {
 
 	uint8_t wait_receive:1;				// 1 = we are waiting more input data
 	uint8_t wait_send:1;				// 1 = we have data to send to the client
+
+	uint8_t donottrack:1;				// 1 = we should not set cookies on this client
+	uint8_t tracking_required:1;		// 1 = if the request requires cookies
 
 	int tcp_cork;						// 1 = we have a cork on the socket
 
