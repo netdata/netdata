@@ -67,6 +67,7 @@ netdata_SOURCES = \
 	unit_test.c unit_test.h \
 	url.c url.h \
 	web_buffer.c web_buffer.h \
+	web_buffer_svg.c web_buffer_svg.h \
 	web_client.c web_client.h \
 	web_server.c web_server.h \
 	$(NULL)

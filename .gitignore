@@ -58,6 +58,7 @@ web/gadget.xml
 web/index_new.html
 web/version.txt
 
+system/netdata-lsb
 system/netdata-openrc
 system/netdata-init-d
 system/netdata.logrotate
