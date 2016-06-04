@@ -897,7 +897,7 @@ cat <<-END
 	-------------------------------------------------------------------------------
 
 	INFO: Command line options changed. -pidfile, -nd and -ch are deprecated.
-	If you use custom stratup scripts please run netdata -h to see the 
+	If you use custom startup scripts, please run netdata -h to see the 
 	corresponding options and update your scripts.
 
 	Hit http://${access}:${NETDATA_PORT}/ from your browser.
