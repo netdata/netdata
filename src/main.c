@@ -102,6 +102,8 @@ void web_server_threading_selection(void) {
 
 	web_client_timeout = (int) config_get_number("global", "disconnect idle web clients after seconds", DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS);
 
+	web_donotrack_comply = config_get_boolean("global", "respect web browser do not track policy", web_donotrack_comply);
+
 #ifdef NETDATA_WITH_ZLIB
 	web_enable_gzip = config_get_boolean("global", "enable web responses gzip compression", web_enable_gzip);
 
