@@ -1379,6 +1379,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	// -------------------------------------------------------------------------
 	// temp arrays for keeping values per dimension
 
+	calculated_number 	last_values[dimensions]; // keep the last value of each dimension
 	calculated_number 	group_values[dimensions]; // keep sums when grouping
 	long 				group_counts[dimensions]; // keep the number of values added to group_values
 	uint8_t 			group_options[dimensions];
@@ -1389,6 +1390,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	RRDDIM *rd;
 	long c;
 	for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
+		last_values[c] = 0;
 		group_values[c] = 0;
 		group_counts[c] = 0;
 		group_options[c] = 0;
@@ -1478,6 +1480,14 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 				case GROUP_AVERAGE:
 					group_values[c] += value;
 					break;
+
+				case GROUP_INCREMENTAL_SUM:
+					if(unlikely(slot == start_at_slot))
+						last_values[c] = value;
+
+					group_values[c] = value - last_values[c];
+					last_values[c] = value;
+					break;
 			}
 		}
 
@@ -1504,9 +1514,13 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 					co[c] |= RRDR_EMPTY;
 				}
 				else if(unlikely(group_method == GROUP_AVERAGE)) {
+					// GROUP_AVERAGE
 					cn[c] = group_values[c] / group_counts[c];
 				}
 				else {
+					// GROUP_SUM
+					// GROUP_MAX
+					// GROUP_INCREMENTAL_SUM
 					cn[c] = group_values[c];
 				}
 
