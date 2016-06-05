@@ -509,7 +509,7 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
 	int label_width, value_width, total_width;
 
 	if(!label_color || !*label_color) label_color = "#555";
-	if(!value_color || !*value_color) value_color = "#4c1";
+	if(!value_color || !*value_color) value_color = (value_is_null)?"#999":"#4c1";
 
 	units = fix_units(units);
 	calc_colorz(value_color, value_color_buffer, 256, value, value_is_null);
