@@ -1224,7 +1224,7 @@ cleanup:
 	return NULL;
 }
 
-RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int group_method)
+RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int group_method, int aligned)
 {
 	int debug = st->debug;
 	int absolute_period_requested = -1;
@@ -1253,10 +1253,10 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 		absolute_period_requested = 1;
 
 	// make sure they are within our timeframe
-	if(before > last_entry_t) before = last_entry_t;
+	if(before > last_entry_t)  before = last_entry_t;
 	if(before < first_entry_t) before = first_entry_t;
 
-	if(after > last_entry_t) after = last_entry_t;
+	if(after > last_entry_t)  after = last_entry_t;
 	if(after < first_entry_t) after = first_entry_t;
 
 	// check if they are upside down
@@ -1285,13 +1285,13 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	// round group to the closest integer
 	if(available_points % points > points / 2) group++;
 
-	time_t after_new = after - (after % (group * st->update_every));
-	time_t before_new = before - (before % (group * st->update_every));
-	long points_new = (before_new - after_new) / st->update_every / group;
+	time_t after_new  = (aligned) ? (after  - (after  % (group * st->update_every))) : after;
+	time_t before_new = (aligned) ? (before - (before % (group * st->update_every))) : before;
+	long points_new   = (before_new - after_new) / st->update_every / group;
 
 	// find the starting and ending slots in our round robin db
 	long    start_at_slot = rrdset_time2slot(st, before_new),
-			stop_at_slot = rrdset_time2slot(st, after_new);
+			stop_at_slot  = rrdset_time2slot(st, after_new);
 
 #ifdef NETDATA_INTERNAL_CHECKS
 	if(after_new < first_entry_t) {
@@ -1532,7 +1532,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 
 int rrd2value(RRDSET *st, BUFFER *wb, calculated_number *n, BUFFER *dimensions, long points, long long after, long long before, int group_method, uint32_t options, time_t *latest_timestamp, int *value_is_null)
 {
-	RRDR *r = rrd2rrdr(st, points, after, before, group_method);
+	RRDR *r = rrd2rrdr(st, points, after, before, group_method, !(options & RRDR_OPTION_NOT_ALIGNED));
 	if(!r) {
 		if(value_is_null) *value_is_null = 1;
 		return 500;
@@ -1566,7 +1566,7 @@ int rrd2value(RRDSET *st, BUFFER *wb, calculated_number *n, BUFFER *dimensions, 
 
 int rrd2format(RRDSET *st, BUFFER *wb, BUFFER *dimensions, uint32_t format, long points, long long after, long long before, int group_method, uint32_t options, time_t *latest_timestamp)
 {
-	RRDR *r = rrd2rrdr(st, points, after, before, group_method);
+	RRDR *r = rrd2rrdr(st, points, after, before, group_method, !(options & RRDR_OPTION_NOT_ALIGNED));
 	if(!r) {
 		buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
 		return 500;
