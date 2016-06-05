@@ -710,7 +710,6 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
 			, *value_color = NULL;
 
 	int group = GROUP_MAX;
-	uint32_t format = DATASOURCE_JSON;
 	uint32_t options = 0x00000000;
 
 	while(url) {
@@ -767,8 +766,8 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
 	long long multiply = (multiply_str && *multiply_str)?atol(multiply_str):1;
 	long long divide   = (divide_str   && *divide_str  )?atol(divide_str):1;
 	long long before   = (before_str   && *before_str  )?atol(before_str):0;
-	long long after    = (after_str    && *after_str   )?atol(after_str):0;
-	int       points   = (points_str   && *points_str  )?atoi(points_str):0;
+	long long after    = (after_str    && *after_str   )?atol(after_str):-st->update_every;
+	int       points   = (points_str   && *points_str  )?atoi(points_str):1;
 
 	if(!label) {
 		if(dimensions) {
@@ -786,7 +785,7 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
 			units = st->units;
 	}
 
-	debug(D_WEB_CLIENT, "%llu: API command 'badge.svg' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%u', format '%u', options '0x%08x'"
+	debug(D_WEB_CLIENT, "%llu: API command 'badge.svg' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%u', options '0x%08x'"
 			, w->id
 			, chart
 			, (dimensions)?buffer_tostring(dimensions):""
@@ -794,14 +793,26 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
 			, before
 			, points
 			, group
-			, format
 			, options
 			);
 
 	time_t latest_timestamp = 0;
 	int value_is_null = 1;
 	calculated_number n = 0;
-	ret = rrd2value(st, w->response.data, &n, dimensions, points, after, before, group, options, &latest_timestamp, &value_is_null);
+	ret = 500;
+
+	// if the collected value is too old, don't calculate its value
+	if(st->last_updated.tv_sec >= (time(NULL) - (st->update_every * st->gap_when_lost_iterations_above)))
+		ret = rrd2value(st, w->response.data, &n, dimensions, points, after, before, group, options, &latest_timestamp, &value_is_null);
+
+	// if the value cannot be calculated, show empty badge
+	if(ret != 200) {
+		value_is_null = 1;
+		n = 0;
+		ret = 200;
+	}
+
+	// render the badge
 	buffer_svg(w->response.data, label, n * multiply / divide, units, label_color, value_color, value_is_null);
 	return ret;
 
