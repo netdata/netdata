@@ -559,6 +559,8 @@ uint32_t web_client_api_request_v1_data_options(char *o)
 			ret |= RRDR_OPTION_GOOGLE_JSON;
 		else if(!strcmp(tok, "percentage"))
 			ret |= RRDR_OPTION_PERCENTAGE;
+		else if(!strcmp(tok, "unaligned"))
+			ret |= RRDR_OPTION_NOT_ALIGNED;
 	}
 
 	return ret;
@@ -802,7 +804,7 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
 	ret = 500;
 
 	// if the collected value is too old, don't calculate its value
-	if(st->last_updated.tv_sec >= (time(NULL) - (st->update_every * st->gap_when_lost_iterations_above)))
+	if(rrdset_last_entry_t(st) >= (time(NULL) - (st->update_every * st->gap_when_lost_iterations_above)))
 		ret = rrd2value(st, w->response.data, &n, dimensions, points, after, before, group, options, &latest_timestamp, &value_is_null);
 
 	// if the value cannot be calculated, show empty badge
