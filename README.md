@@ -1,13 +1,12 @@
-[![Build Status](https://travis-ci.org/firehol/netdata.svg?branch=master)](https://travis-ci.org/firehol/netdata) <a href="http://registry.my-netdata.io/#netdata_registry">
-	<img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=null&value_color=blue"
-	     alt="netdata default registry reported users since 16 May 2016">
-</a> <a href="http://registry.my-netdata.io/#netdata_registry">
-	<img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=null&value_color=orange"
-	     alt="netdata default registry reported installations since 16 May 2016">
-</a> <a href="http://registry.my-netdata.io/#netdata_registry">
-	<img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=null&value_color=yellowgreen"
-	     alt="netdata default registry reported sessions since 16 May 2016">
-</a>
+[![Build Status](https://travis-ci.org/firehol/netdata.svg?branch=master)](https://travis-ci.org/firehol/netdata)
+[![User Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=null&value_color=blue&precision=0)](https://registry.my-netdata.io/#netdata_registry)
+[![Monitored Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=null&value_color=orange&precision=0)](https://registry.my-netdata.io/#netdata_registry)
+[![Sessions Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=null&value_color=yellowgreen&precision=0)](https://registry.my-netdata.io/#netdata_registry)
+
+[![New Users Today](http://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0)](https://registry.my-netdata.io/#netdata_registry)
+[![New Machines Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0)](https://registry.my-netdata.io/#netdata_registry)
+[![Sessions Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0)](https://registry.my-netdata.io/#netdata_registry)
+
 
 # netdata
 
