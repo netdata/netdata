@@ -66,7 +66,7 @@ paths:
           allowEmptyValue: false
         - name: after
           in: query
-          description: 'This parameter can either be an absolute timestamp specifying the starting point of the data to be returned, or a relative number of seconds, to the last collected timestamp. Netdata will assume it is a relative number if it is smaller than the duration of the round robin database for this chart. So, if the round robin database is 3600 seconds, any value from -3600 to 3600 will trigger relative arithmetics. Netdata will adapt this parameter to the boundaries of the round robin database.'
+          description: 'This parameter can either be an absolute timestamp specifying the starting point of the data to be returned, or a relative number of seconds (relative to parameter: before). Netdata will assume it is a relative number if it is smaller than the duration of the round robin database for this chart. So, if the round robin database is 3600 seconds, any value from -3600 to 3600 will trigger relative arithmetics. Netdata will adapt this parameter to the boundaries of the round robin database.'
           required: true
           type: number
           format: integer
