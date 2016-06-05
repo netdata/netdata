@@ -1485,7 +1485,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 					if(unlikely(slot == start_at_slot))
 						last_values[c] = value;
 
-					group_values[c] = value - last_values[c];
+					group_values[c] += value - last_values[c];
 					last_values[c] = value;
 					break;
 			}
