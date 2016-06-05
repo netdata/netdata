@@ -110,7 +110,7 @@ paths:
           type: array
           items:
             type: string
-            enum: [ 'nonzero', 'flip', 'jsonwrap', 'min2max', 'seconds', 'milliseconds', 'abs', 'absolute', 'absolute-sum', 'null2zero', 'objectrows', 'google_json', 'percentage' ]
+            enum: [ 'nonzero', 'flip', 'jsonwrap', 'min2max', 'seconds', 'milliseconds', 'abs', 'absolute', 'absolute-sum', 'null2zero', 'objectrows', 'google_json', 'percentage', 'unaligned' ]
             collectionFormat: pipes
           default: [seconds, jsonwrap]
           allowEmptyValue: false
@@ -182,14 +182,6 @@ paths:
           type: number
           format: integer
           default: 0
-        - name: points
-          in: query
-          description: 'The number of points to be returned. If not given, or it is <= 0, or it is bigger than the points stored in the round robin database for this chart for the given duration, all the available collected values for the given duration are returned.'
-          required: true
-          type: number
-          format: integer
-          allowEmptyValue: false
-          default: 20
         - name: group
           in: query
           description: 'The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. Two methods are supported, "max" and "average". "max" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).'
@@ -205,7 +197,7 @@ paths:
           type: array
           items:
             type: string
-            enum: [ 'nonzero', 'flip', 'abs', 'absolute', 'absolute-sum', 'null2zero', 'percentage' ]
+            enum: [ 'abs', 'absolute', 'absolute-sum', 'null2zero', 'percentage', 'unaligned' ]
             collectionFormat: pipes
           default: ['absolute']
           allowEmptyValue: true
