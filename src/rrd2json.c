@@ -1230,7 +1230,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	int absolute_period_requested = -1;
 
 	time_t first_entry_t = rrdset_first_entry_t(st);
-	time_t last_entry_t = rrdset_last_entry_t(st);
+	time_t last_entry_t  = rrdset_last_entry_t(st);
 
 	if(before == 0 && after == 0) {
 		before = last_entry_t;
@@ -1239,13 +1239,14 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	}
 
 	// allow relative for before and after
-	if(before <= st->update_every * st->entries) {
+	if(((before < 0)?-before:before) <= (st->update_every * st->entries)) {
 		before = last_entry_t + before;
 		absolute_period_requested = 0;
 	}
 
-	if(after <= st->update_every * st->entries) {
-		after = last_entry_t + after;
+	if(((after < 0)?-after:after) <= (st->update_every * st->entries)) {
+		if(after == 0) after = -st->update_every;
+		after = before + after;
 		absolute_period_requested = 0;
 	}
 
