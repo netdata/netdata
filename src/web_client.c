@@ -629,7 +629,13 @@ int web_client_api_request_v1_data_group(char *name)
 	else if(!strcmp(name, "average"))
 		return GROUP_AVERAGE;
 
-	return GROUP_MAX;
+	else if(!strcmp(name, "sum"))
+		return GROUP_SUM;
+
+	else if(!strcmp(name, "incremental-sum"))
+		return GROUP_INCREMENTAL_SUM;
+
+	return GROUP_AVERAGE;
 }
 
 int web_client_api_request_v1_charts(struct web_client *w, char *url)
@@ -711,7 +717,7 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
 			, *label_color = NULL
 			, *value_color = NULL;
 
-	int group = GROUP_MAX;
+	int group = GROUP_AVERAGE;
 	uint32_t options = 0x00000000;
 
 	while(url) {
@@ -847,7 +853,7 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 			, *after_str = NULL
 			, *points_str = NULL;
 
-	int group = GROUP_MAX;
+	int group = GROUP_AVERAGE;
 	uint32_t format = DATASOURCE_JSON;
 	uint32_t options = 0x00000000;
 

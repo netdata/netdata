@@ -89,10 +89,10 @@ paths:
           default: 20
         - name: group
           in: query
-          description: 'The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. Two methods are supported, "max" and "average". "max" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).'
+          description: 'The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. 4 methods are supported, "max", "average", "sum", "incremental-sum". "max" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).'
           required: true
           type: string
-          enum: [ 'max', 'average' ]
+          enum: [ 'max', 'average', 'sum', 'incremental-sum' ]
           default: 'average'
           allowEmptyValue: false
         - name: format
@@ -184,10 +184,10 @@ paths:
           default: 0
         - name: group
           in: query
-          description: 'The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. Two methods are supported, "max" and "average". "max" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).'
+          description: 'The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. 4 methods are supported, "max", "average", "sum", "incremental-sum". "max" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).'
           required: true
           type: string
-          enum: [ 'max', 'average' ]
+          enum: [ 'max', 'average', 'sum', 'incremental-sum' ]
           default: 'average'
           allowEmptyValue: false
         - name: options
