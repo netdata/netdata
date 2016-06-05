@@ -503,7 +503,7 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
 	strncpyz(final, b, len);
 }
 
-void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int value_is_null) {
+void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int value_is_null, int precision) {
 	char label_buffer[256 + 1], value_string[512 + 1], value_color_buffer[256 + 1];
 	char label_escaped[256 + 1], value_escaped[512 + 1], label_color_escaped[256 + 1], value_color_escaped[256 + 1];
 	int label_width, value_width, total_width;
@@ -519,13 +519,17 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
 
 	if(value_is_null)
 		strcpy(value_string, "-");
-	else {
+	else if(precision < 0) {
 		calculated_number abs = (value < (calculated_number)0)?-value:value;
 		if(abs > (calculated_number)1000.0)      snprintfz(value_string, 512, "%0.0Lf%s%s", (long double)value, separator, units);
 		else if(abs > (calculated_number)100.0)  snprintfz(value_string, 512, "%0.1Lf%s%s", (long double)value, separator, units);
 		else if(abs > (calculated_number)1.0)    snprintfz(value_string, 512, "%0.2Lf%s%s", (long double)value, separator, units);
 		else if(abs > (calculated_number)0.1)    snprintfz(value_string, 512, "%0.3Lf%s%s", (long double)value, separator, units);
 		else                                     snprintfz(value_string, 512, "%0.4Lf%s%s", (long double)value, separator, units);
+	}
+	else {
+		if(precision > 50) precision = 50;
+		snprintfz(value_string, 512, "%0.*Lf%s%s", precision, (long double)value, separator, units);
 	}
 
 	// we need to copy the label, since verdana11_width may write to it

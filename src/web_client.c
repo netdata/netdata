@@ -716,7 +716,8 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
 			, *units = NULL
 			, *label_color = NULL
 			, *value_color = NULL
-			, *refresh_str = NULL;
+			, *refresh_str = NULL
+			, *precision_str = NULL;
 
 	int group = GROUP_AVERAGE;
 	uint32_t options = 0x00000000;
@@ -758,6 +759,7 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
 		else if(!strcmp(name, "multiply")) multiply_str = value;
 		else if(!strcmp(name, "divide")) divide_str = value;
 		else if(!strcmp(name, "refresh")) refresh_str = value;
+		else if(!strcmp(name, "precision")) precision_str = value;
 	}
 
 	if(!chart || !*chart) {
@@ -768,16 +770,17 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
 	RRDSET *st = rrdset_find(chart);
 	if(!st) st = rrdset_find_byname(chart);
 	if(!st) {
-		buffer_svg(w->response.data, "chart not found", 0, "", NULL, NULL, 1);
+		buffer_svg(w->response.data, "chart not found", 0, "", NULL, NULL, 1, -1);
 		ret = 200;
 		goto cleanup;
 	}
 
-	long long multiply = (multiply_str && *multiply_str)?atol(multiply_str):1;
-	long long divide   = (divide_str   && *divide_str  )?atol(divide_str):1;
-	long long before   = (before_str   && *before_str  )?atol(before_str):0;
-	long long after    = (after_str    && *after_str   )?atol(after_str):-st->update_every;
-	int       points   = (points_str   && *points_str  )?atoi(points_str):1;
+	long long multiply  = (multiply_str  && *multiply_str )?atol(multiply_str):1;
+	long long divide    = (divide_str    && *divide_str   )?atol(divide_str):1;
+	long long before    = (before_str    && *before_str   )?atol(before_str):0;
+	long long after     = (after_str     && *after_str    )?atol(after_str):-st->update_every;
+	int       points    = (points_str    && *points_str   )?atoi(points_str):1;
+	int       precision = (precision_str && *precision_str)?atoi(precision_str):-1;
 
 	int refresh = 0;
 	if(refresh_str && *refresh_str) {
@@ -841,7 +844,7 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
 		buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
 
 	// render the badge
-	buffer_svg(w->response.data, label, n * multiply / divide, units, label_color, value_color, value_is_null);
+	buffer_svg(w->response.data, label, n * multiply / divide, units, label_color, value_color, value_is_null, precision);
 	return ret;
 
 cleanup:
