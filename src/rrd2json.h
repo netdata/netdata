@@ -35,9 +35,10 @@ extern char *hostname;
 #define DATASOURCE_FORMAT_SSV_COMMA "ssvcomma"
 #define DATASOURCE_FORMAT_CSV_JSON_ARRAY "csvjsonarray"
 
-#define GROUP_AVERAGE	0
-#define GROUP_MAX 		1
-#define GROUP_SUM		2
+#define GROUP_AVERAGE			0
+#define GROUP_MAX 				1
+#define GROUP_SUM				2
+#define GROUP_INCREMENTAL_SUM	3
 
 #define RRDR_OPTION_NONZERO 		0x00000001 // don't output dimensions will just zero values
 #define RRDR_OPTION_REVERSED		0x00000002 // output the rows in reverse order (oldest to newest)
