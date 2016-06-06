@@ -318,22 +318,22 @@ int main(int argc, char **argv)
 		while(i < argc) {
 			if(strcmp(argv[i], "-pidfile") == 0 && (i+1) < argc) {
 				strncpyz(pidfile, argv[i+1], FILENAME_MAX);
-				fprintf(stderr, "%s: deprecate option -- %s -- please use -P instead.\n", argv[0], argv[i]);
+				fprintf(stderr, "%s: deprecated option -- %s -- please use -P instead.\n", argv[0], argv[i]);
 				remove_option(i, &argc, argv);
 			}
 			else if(strcmp(argv[i], "-nodaemon") == 0 || strcmp(argv[i], "-nd") == 0) {
 				dont_fork = 1;
-				fprintf(stderr, "%s: deprecate option -- %s -- please use -D instead.\n ", argv[0], argv[i]);
+				fprintf(stderr, "%s: deprecated option -- %s -- please use -D instead.\n ", argv[0], argv[i]);
 				remove_option(i, &argc, argv);
 			}
 			else if(strcmp(argv[i], "-ch") == 0 && (i+1) < argc) {
 				config_set("global", "host access prefix", argv[i+1]);
-				fprintf(stderr, "%s: deprecate option -- %s -- please use -s instead.\n", argv[0], argv[i]);
+				fprintf(stderr, "%s: deprecated option -- %s -- please use -s instead.\n", argv[0], argv[i]);
 				remove_option(i, &argc, argv);
 			}
 			else if(strcmp(argv[i], "-l") == 0 && (i+1) < argc) {
 				config_set("global", "history", argv[i+1]);
-				fprintf(stderr, "%s: deprecate option -- %s -- This option will be rmoved with V2.*.\n", argv[0], argv[i]);
+				fprintf(stderr, "%s: deprecated option -- %s -- This option will be removed with V2.*.\n", argv[0], argv[i]);
 				remove_option(i, &argc, argv);
 			}
 			else i++;
@@ -398,7 +398,7 @@ int main(int argc, char **argv)
 					printf("netdata 1.1.0\n");
 					return 0;
 					break;
-				case 'W': 
+				case 'W':
 					{
 						char* stacksize = "stacksize=";
 						char* debug_flags_string = "debug_flags=";
@@ -422,7 +422,7 @@ int main(int argc, char **argv)
 					help(1);
 					break;
 			}
-		} 
+		}
 	}
 
 	if(!config_loaded) load_config(NULL, 0);
