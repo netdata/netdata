@@ -114,6 +114,9 @@ struct rrddim {
 													// instead of strcmp() every item in the binary index
 													// we first compare the hashes
 
+	// FIXME
+	// we need the hash_name too!
+
 	uint32_t flags;
 
 	char cache_filename[FILENAME_MAX+1];			// the filename we load/save from/to this set
