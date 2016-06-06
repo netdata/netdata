@@ -374,12 +374,14 @@ void rrdr_disable_not_selected_dimensions(RRDR *r, const char *dims)
 	for(c = 0, d = r->st->dimensions; d ;c++, d = d->next)
 		r->od[c] |= RRDR_HIDDEN;
 
-	while(o && *o && (tok = mystrsep(&o, ", |"))) {
+	while(o && *o && (tok = mystrsep(&o, ",|"))) {
 		if(!*tok) continue;
+		
+		uint32_t hash = simple_hash(tok);
 
 		// find it and enable it
 		for(c = 0, d = r->st->dimensions; d ;c++, d = d->next) {
-			if(!strcmp(d->name, tok)) {
+			if(unlikely((hash == d->hash && !strcmp(d->id, tok)) || !strcmp(d->name, tok))) {
 				r->od[c] &= ~RRDR_HIDDEN;
 
 				// since the user needs this dimension
