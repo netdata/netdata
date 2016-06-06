@@ -737,7 +737,9 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
 
 		if(!strcmp(name, "chart")) chart = value;
 		else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
-			if(!dimensions) dimensions = buffer_create(strlen(value));
+			if(!dimensions)
+				dimensions = buffer_create(strlen(value));
+
 			if(dimensions) {
 				buffer_strcat(dimensions, "|");
 				buffer_strcat(dimensions, value);
@@ -845,10 +847,10 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
 
 	// render the badge
 	buffer_svg(w->response.data, label, n * multiply / divide, units, label_color, value_color, value_is_null, precision);
-	return ret;
 
 cleanup:
-	if(dimensions) buffer_free(dimensions);
+	if(dimensions)
+		buffer_free(dimensions);
 	return ret;
 }
 
