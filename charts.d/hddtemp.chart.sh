@@ -24,12 +24,13 @@ hddtemp_create() {
 		unset hddtemp_disks
 		hddtemp_disks=( `grep -Po '/dev/[^|]+' <<< "$all" | cut -c 6-` )
 	fi
-	local disk_names
-	disk_names=(`sed -e 's/||/\n/g;s/^|//' <<< "$all" | cut -d '|' -f2 | tr ' ' '_'`)
+#	local disk_names
+#	disk_names=(`sed -e 's/||/\n/g;s/^|//' <<< "$all" | cut -d '|' -f2 | tr ' ' '_'`)
 
 	echo "CHART hddtemp.temperature 'disks_temp' 'temperature' 'Celsius' 'Disks temperature' 'hddtemp.temp' line $((hddtemp_priority)) $hddtemp_update_every"
 	for i in `seq 0 $((${#hddtemp_disks[@]}-1))`; do
-		echo "DIMENSION ${hddtemp_disks[i]} ${disk_names[i]} absolute 1 1"
+		#echo "DIMENSION ${hddtemp_disks[i]} ${disk_names[i]} absolute 1 1"
+		echo "DIMENSION ${hddtemp_disks[i]} '' absolute 1 1"
 	done
 	return 0
 }
@@ -38,14 +39,14 @@ hddtemp_create() {
 hddtemp_last=0
 hddtemp_count=0
 hddtemp_update() {
-	#local all
-
-        local all=( `nc $hddtemp_host $hddtemp_port | sed -e 's/||/\n/g;s/^|//' | cut -d '|' -f3` )
+#        local all=( `nc $hddtemp_host $hddtemp_port | sed -e 's/||/\n/g;s/^|//' | cut -d '|' -f3` )
+	local all=( `nc $hddtemp_host $hddtemp_port | awk 'BEGIN { FS="|" };{i=4; while (i <= NF) {print $i+0;i+=5;};}'` )
 
 	# write the result of the work.
 	echo "BEGIN hddtemp.temperature $1"
-	for i in `seq 0 $((${#hddtemp_disks[@]}-1))`; do
-		echo "SET ${hddtemp_disks[i]} = ${all[i]}"
+	end=${#hddtemp_disks[@]}
+	for ((i=0; i<end; i++)); do
+		echo "SET ${hddtemp_disks[$i]} = ${all[$i]}"
 	done
 	echo "END"
 
