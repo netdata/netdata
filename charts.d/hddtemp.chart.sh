@@ -41,9 +41,11 @@ hddtemp_count=0
 hddtemp_update() {
 #        local all=( `nc $hddtemp_host $hddtemp_port | sed -e 's/||/\n/g;s/^|//' | cut -d '|' -f3` )
 #	local all=( `nc $hddtemp_host $hddtemp_port | awk 'BEGIN { FS="|" };{i=4; while (i <= NF) {print $i+0;i+=5;};}'` )
+	OLD_IFS=$IFS
 	set -f
 	IFS="|" all=( $(nc $hddtemp_host $hddtemp_port) )
 	set +f
+	IFS=$OLD_IFS
 
 	# write the result of the work.
 	echo "BEGIN hddtemp.temperature $1"
