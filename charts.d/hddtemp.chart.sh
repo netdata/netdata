@@ -29,8 +29,8 @@ hddtemp_create() {
 
 	echo "CHART hddtemp.temperature 'disks_temp' 'temperature' 'Celsius' 'Disks temperature' 'hddtemp.temp' line $((hddtemp_priority)) $hddtemp_update_every"
 	for i in `seq 0 $((${#hddtemp_disks[@]}-1))`; do
-		#echo "DIMENSION ${hddtemp_disks[i]} ${disk_names[i]} absolute 1 1"
-		echo "DIMENSION ${hddtemp_disks[i]} '' absolute 1 1"
+#		echo "DIMENSION ${hddtemp_disks[i]} ${disk_names[i]} absolute 1 1"
+		echo "DIMENSION ${hddtemp_disks[$i]} '' absolute 1 1"
 	done
 	return 0
 }
@@ -40,13 +40,16 @@ hddtemp_last=0
 hddtemp_count=0
 hddtemp_update() {
 #        local all=( `nc $hddtemp_host $hddtemp_port | sed -e 's/||/\n/g;s/^|//' | cut -d '|' -f3` )
-	local all=( `nc $hddtemp_host $hddtemp_port | awk 'BEGIN { FS="|" };{i=4; while (i <= NF) {print $i+0;i+=5;};}'` )
+#	local all=( `nc $hddtemp_host $hddtemp_port | awk 'BEGIN { FS="|" };{i=4; while (i <= NF) {print $i+0;i+=5;};}'` )
+	IFS="|" all=( $(nc $hddtemp_host $hddtemp_port) )
 
 	# write the result of the work.
 	echo "BEGIN hddtemp.temperature $1"
 	end=${#hddtemp_disks[@]}
 	for ((i=0; i<end; i++)); do
-		echo "SET ${hddtemp_disks[$i]} = ${all[$i]}"
+		# temperature - this will turn SLP to zero
+                t=$(( ${all[ $((i * 5 + 3)) ]} ))
+		echo "SET ${hddtemp_disks[$i]} = $t"
 	done
 	echo "END"
 
