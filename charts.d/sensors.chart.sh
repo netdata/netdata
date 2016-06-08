@@ -23,6 +23,8 @@ sensors_update_every=
 
 sensors_priority=90000
 
+declare -A sensors_excluded=()
+
 sensors_find_all_files() {
 	find $1 -maxdepth $sensors_sys_depth -name \*_input -o -name temp 2>/dev/null
 }
@@ -47,13 +49,17 @@ sensors_check() {
 
 sensors_check_files() {
 	# we only need sensors that report a non-zero value
+	# also remove not needed sensors
 
-	local f= v=
+	local f= v= excluded=
 	for f in $*
 	do
 		[ ! -f "$f" ] && continue
+		for ex in ${sensors_excluded[@]}; do
+			[[ $f =~ .*$ex$ ]] && excluded='1' && break
+		done
 
-		v="$( cat $f )"
+		[ "$excluded" != "1" ] && v="$( cat $f )" || v=0
 		v=$(( v + 1 - 1 ))
 		[ $v -ne 0 ] && echo "$f" && continue
 
