@@ -94,7 +94,7 @@ int do_sys_kernel_mm_ksm(int update_every, unsigned long long dt) {
 	if(!ff_pages_to_scan) return 0; // we return 0, so that we will retry to open it next time
 	pages_to_scan = strtoull(procfile_lineword(ff_pages_to_scan, 0, 0), NULL, 10);
 
-	offered = pages_sharing + pages_unshared + pages_volatile;
+	offered = pages_sharing + pages_shared + pages_unshared + pages_volatile;
 	saved = pages_sharing - pages_shared;
 
 	if(!offered || !pages_to_scan) return 0;
