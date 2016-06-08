@@ -213,7 +213,7 @@ sensors_create() {
 				fi
 
 				echo "DIMENSION $fid '$labelname' $algorithm $multiplier $divisor"
-				echo >>$TMP_DIR/sensors.sh "printf \"SET $fid = \"; cat $file "
+				echo >>$TMP_DIR/sensors.sh "echo \"SET $fid = \"\$(< $file )"
 			done
 
 			echo >>$TMP_DIR/sensors.sh "echo END"
