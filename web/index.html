@@ -390,7 +390,7 @@
 				while(len--) {
 					var u = machines[len];
 					found++;
-					el += '<li id="registry_server_' + u.guid + '"><a href="#" onClick="return gotoServerModalHandler(\'' + u.guid + '\');">' + u.name + '</a></li>';
+					el += '<li id="registry_server_' + u.guid + '"><a class="registry_link" href="#" onClick="return gotoServerModalHandler(\'' + u.guid + '\');">' + u.name + '</a></li>';
 					a1 += '<li id="registry_action_' + u.guid + '"><a href="#" onclick="deleteRegistryModalHandler(\'' + u.guid + '\',\'' + u.name + '\',\'' + u.url + '\'); return false;"><i class="fa fa-trash-o" aria-hidden="true" style="color: #999;"></i></a></li>';
 				}
 			}
@@ -422,6 +422,8 @@
 			document.getElementById('mynetdata_servers').innerHTML = el;
 			document.getElementById('mynetdata_servers2').innerHTML = el;
 			document.getElementById('mynetdata_actions1').innerHTML = a1;
+
+			gotoServerInit();
 		};
 
 	</script>
@@ -1019,6 +1021,8 @@ if(isdemo()) {
 	document.getElementById('masthead').style.display = 'block';
 }
 var gotoServerValidateRemaining = 0;
+var gotoServerMiddleClick = false;
+var gotoServerStop = false;
 function gotoServerValidateUrl(id, guid, url) {
 	var penaldy = 0;
 	if(document.location.toString().startsWith('http://') && url.toString().startsWith('https://'))
@@ -1028,25 +1032,41 @@ function gotoServerValidateUrl(id, guid, url) {
 
 	setTimeout(function() {
 		document.getElementById('gotoServerList').innerHTML += '<tr><td style="padding-left: 20px;"><a href="' + url + '" target="_blank">' + url + '</a></td><td style="padding-left: 30px;"><code id="' + guid + '-' + id + '-status">checking...</code></td></tr>';
+
 		NETDATA.registry.hello(url, function(data) {
 			if (data) {
-				console.log('OK ' + id + ' URL: ' + url);
+				// console.log('OK ' + id + ' URL: ' + url);
 				document.getElementById(guid + '-' + id + '-status').innerHTML = "OK";
-				document.location = url;
+				var hash = document.location.hash || '';
+
+				if(!gotoServerStop) {
+					gotoServerStop = true;
+
+					if(gotoServerMiddleClick) {
+						window.open(url + hash, '_blank');
+						gotoServerMiddleClick = false;
+						document.getElementById('gotoServerResponse').innerHTML = '<b>Opening new window to ' + NETDATA.registry.machines[guid].name + '<br/><a href="' + url + hash + '">' + url + hash + '</a></b><br/>(check your pop-up blocker if it fails)';
+					}
+					else
+						document.location = url + hash;
+				}
 			}
 			else {
 				document.getElementById(guid + '-' + id + '-status').innerHTML = "failed!";
 				gotoServerValidateRemaining--;
-				if(gotoServerValidateRemaining <= 0)
+				if(gotoServerValidateRemaining <= 0) {
+					gotoServerMiddleClick = false;
 					document.getElementById('gotoServerResponse').innerHTML = '<b>Sorry! I cannot find any operational URL for this server</b>';
+				}
 			}
 		});
 	}, (id * 50) + penaldy);
 }
 
 function gotoServerModalHandler(guid) {
-	console.log('goto server: ' + guid);
+	// console.log('goto server: ' + guid);
 
+	gotoServerStop = false;
 	var len = NETDATA.registry.machines[guid].alternate_urls.length;
 
 	document.getElementById('gotoServerResponse').innerHTML = '';
@@ -1059,6 +1079,17 @@ function gotoServerModalHandler(guid) {
 		gotoServerValidateUrl(len, guid, NETDATA.registry.machines[guid].alternate_urls[len]);
 
 	return false;
+}
+
+function gotoServerInit() {
+	$(".registry_link").on('click', function(e) { 
+		if(e.which == 2) {
+			e.preventDefault();
+			gotoServerMiddleClick = true;
+		}
+		else
+			gotoServerMiddleClick = false;
+	});
 }
 
 function switchRegistryModalHandler() {
@@ -1124,7 +1155,7 @@ var options = {
 	chartsPerRow: 0,
 	chartsMinWidth: 1450,
 	chartsHeight: 180,
-	sparklinesHeight: 60
+	sparklinesHeight: 60,
 };
 
 // generate a sparkline
@@ -1182,6 +1213,21 @@ function sortObjectByPriority(object) {
 	});
 
 	return sorted;
+}
+
+
+// ----------------------------------------------------------------------------
+// scroll to a section, without changing the browser history
+
+function scrollToId(hash) {
+	if(hash && hash != '') {
+		var offset = $('#' + hash).offset();
+		if(typeof offset !== 'undefined')
+			$('html, body').animate({ scrollTop: offset.top }, 0);
+	}
+
+	// we must return false to prevent the default action
+	return false;
 }
 
 // ----------------------------------------------------------------------------
@@ -1953,7 +1999,7 @@ function renderPage(menus, data) {
 		// generate an entry at the main menu
 
 		var menuid = name2id(menu);
-		sidebar += '<li class=""><a href="#' + menuid + '">' + menus[menu].title + '</a><ul class="nav">';
+		sidebar += '<li class=""><a href="#' + menuid + '" onClick="return scrollToId(\'' + menuid + '\');">' + menus[menu].title + '</a><ul class="nav">';
 		html += '<div role="section"><div role="sectionhead"><h1 id="' + menuid + '" role="heading">' + menus[menu].title + '</h1></div><div id="menu_' + menuid + '" role="document">';
 
 		if(menus[menu].info !== null)
@@ -1973,7 +2019,7 @@ function renderPage(menus, data) {
 
 			// generate an entry at the submenu
 			var submenuid = name2id(menu + '_' + submenu);
-			sidebar += '<li class><a href="#' + submenuid + '">' + menus[menu].submenus[submenu].title + '</a></li>';
+			sidebar += '<li class><a href="#' + submenuid + '" onClick="return scrollToId(\'' + submenuid + '\');">' + menus[menu].submenus[submenu].title + '</a></li>';
 			shtml += '<div class="netdata-group-container" id="submenu_' + submenuid + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + submenuid + '" class="netdata-chart-alignment" role="heading">' + menus[menu].submenus[submenu].title + '</h2>';
 
 			if(menus[menu].submenus[submenu].info !== null)
@@ -2091,7 +2137,7 @@ function downloadAllCharts(netdata_url) {
 			options.hostname = data.hostname;
 			document.getElementById('hostname').innerHTML = options.hostname;
 			document.getElementById('hostname').href = NETDATA.serverDefault;
-			document.title = options.hostname + ' dashboard';
+			document.title = options.hostname + ' netdata dashboard';
 
 			renderChartsAndMenu(data);
 
@@ -2397,14 +2443,7 @@ function finalizePage() {
 	NETDATA.unpause();
 
 	// check if we have to jump to a specific section
-	var hash = location.hash.replace('#','');
-	if(hash != '') {
-		// Clear the hash in the URL
-		// location.hash = '';   // delete front "//" if you want to change the address bar
-		var offset = $(location.hash).offset();
-		if(typeof offset !== 'undefined')
-			$('html, body').animate({ scrollTop: offset.top }, 0);
-	}
+	scrollToId(location.hash.replace('#',''));
 
 	/* activate bootstrap sidebar (affix) */
 	$('#sidebar').affix({
@@ -2427,18 +2466,14 @@ function finalizePage() {
 		offset: $(window).height() / 3 // controls the diff of the <hX> element to the top, to select it
 	});
 
-	$('#sidebar').on('activate.bs.scrollspy', function (e)
-	{
+	// change the URL based on the current position of the screen
+	$('#sidebar').on('activate.bs.scrollspy', function (e) {
 		var el = $(e.target);
-		if (el.find('ul').size() == 0)
-		{
-			var href = el.find('a').attr('href');
-			history.pushState(null, document.title, href);
-		};
+		if(el.find('ul').size() == 0)
+			history.replaceState(null, document.title, el.find('a').attr('href'));
 	});
 
 	document.getElementById('footer').style.display = 'block';
-
 
 	var update_options_modal = function() {
 		// console.log('update_options_modal');
