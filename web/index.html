@@ -390,7 +390,7 @@
 				while(len--) {
 					var u = machines[len];
 					found++;
-					el += '<li id="registry_server_' + u.guid + '"><a class="registry_link" href="#" onClick="return gotoServerModalHandler(\'' + u.guid + '\');">' + u.name + '</a></li>';
+					el += '<li id="registry_server_' + u.guid + '"><a class="registry_link" href="' + u.url + '" onClick="return gotoServerModalHandler(\'' + u.guid + '\');">' + u.name + '</a></li>';
 					a1 += '<li id="registry_action_' + u.guid + '"><a href="#" onclick="deleteRegistryModalHandler(\'' + u.guid + '\',\'' + u.name + '\',\'' + u.url + '\'); return false;"><i class="fa fa-trash-o" aria-hidden="true" style="color: #999;"></i></a></li>';
 				}
 			}
@@ -1082,13 +1082,16 @@ function gotoServerModalHandler(guid) {
 }
 
 function gotoServerInit() {
-	$(".registry_link").on('click', function(e) { 
-		if(e.which == 2) {
+	$(".registry_link").on('click', function(e) {
+		if(e.which === 2) {
 			e.preventDefault();
 			gotoServerMiddleClick = true;
 		}
-		else
+		else {
 			gotoServerMiddleClick = false;
+		}
+
+		return true;
 	});
 }
 
