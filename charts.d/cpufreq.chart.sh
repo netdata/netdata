@@ -54,7 +54,7 @@ cpufreq_create() {
 		echo >&2 "charts.d: cpufreq: on file='$file', dir='$dir', cpu='$cpu', id='$id'"
 
 		echo "DIMENSION $id '$id' absolute 1 1000"
-		echo >>$TMP_DIR/cpufreq.sh "echo \"SET $fid = \"\$(< $file )"
+		echo >>$TMP_DIR/cpufreq.sh "echo \"SET $id = \"\$(< $file )"
 	done
 	echo >>$TMP_DIR/cpufreq.sh "echo END"
 
