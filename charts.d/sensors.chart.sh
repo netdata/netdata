@@ -62,6 +62,7 @@ sensors_check_files() {
 		[ "$excluded" != "1" ] && v="$( cat $f )" || v=0
 		v=$(( v + 1 - 1 ))
 		[ $v -ne 0 ] && echo "$f" && continue
+		excluded=
 
 		echo >&2 "$PROGRAM_NAME: sensors: $f gives zero values"
 	done
@@ -81,7 +82,6 @@ sensors_check_temp_type() {
 		v="$( cat $t )"
 		v=$(( v + 1 - 1 ))
 		[ $v -ne 0 ] && echo "$f" && continue
-		excluded=
 
 		echo >&2 "$PROGRAM_NAME: sensors: $f is disabled"
 	done
