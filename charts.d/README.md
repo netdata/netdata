@@ -181,6 +181,36 @@ sensors_source_update=1
 # how frequently to collect sensor data
 # the default is to collect it at every iteration of charts.d
 sensors_update_every=
+
+# array of sensors which are excluded
+# the default is to include all
+sensors_excluded=()
+```
+
+---
+
+# hddtemp
+
+The plugin will collect temperatures from disks 
+
+It will create one chart with all active disks
+
+1. **temperature in Celsius**
+
+### configuration
+
+hddtemp needs to be running in daemonized mode
+
+```sh
+# host with daemonized hddtemp
+hddtemp_host="localhost"
+
+# port on which hddtemp is showing data
+hddtemp_port="7634"
+
+# array of included disks
+# the default is to include all
+hddtemp_disks=()
 ```
 
 ---

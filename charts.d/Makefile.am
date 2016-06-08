@@ -12,6 +12,7 @@ dist_charts_SCRIPTS = \
 	crsproxy.chart.sh \
 	example.chart.sh \
 	exim.chart.sh \
+	hddtemp.chart.sh \
 	load_average.chart.sh \
 	mem_apps.chart.sh \
 	mysql.chart.sh \
