@@ -376,7 +376,7 @@ if [ ${UID} -eq 0 ]
 	if [ $? -ne 0 ]
 		then
 		echo >&2 "Adding netdata user account ..."
-		run useradd -r -g netdata -c netdata -s $(which nologin) -d / netdata
+		run useradd -r -g netdata -c netdata -s $(which nologin || echo '/bin/false') -d / netdata
 	fi
 
 	getent group docker > /dev/null
