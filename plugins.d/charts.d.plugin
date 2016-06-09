@@ -504,7 +504,7 @@ if [ -z "$run_charts" ]
 	exit 1
 fi
 
-declare -A charts_last_update=() charts_update_every=() charts_next_update=() charts_run_counter=()
+declare -A charts_last_update=() charts_update_every=() charts_next_update=() charts_run_counter=() charts_serial_failures=()
 global_update() {
 	local exit_at \
 		c=0 dt ret last_ms exec_start_ms exec_end_ms \
@@ -522,13 +522,14 @@ global_update() {
 		charts_last_update[$chart]=$((now_ms - (now_ms % (charts_update_every[$chart] * 1000) ) ))
 		charts_next_update[$chart]=$(( charts_last_update[$chart] + (charts_update_every[$chart] * 1000) ))
 		charts_run_counter[$chart]=0
+		charts_serial_failures[$chart]=0
 
 		echo "CHART netdata.plugin_chartsd_$chart '' 'Execution time for $chart plugin' 'milliseconds / run' charts.d netdata.plugin_charts area 145000 ${charts_update_every[$chart]}"
 		echo "DIMENSION run_time 'run time' absolute 1 1"
 	done
 
 	# the main loop
-	while [ 1 ]
+	while [ "${#next_charts[@]}" -gt 0 ]
 	do
 		c=$((c + 1))
 		now_charts=("${next_charts[@]}")
@@ -570,15 +571,24 @@ global_update() {
 				current_time_ms; exec_end_ms=$now_ms
 
 				echo "BEGIN netdata.plugin_chartsd_$chart $dt"
+				echo "SET run_time = $(( exec_end_ms - exec_start_ms ))"
+				echo "END"
+
 				if [ $ret -eq 0 ]
 				then
-					echo "SET run_time = $(( exec_end_ms - exec_start_ms ))"
+					charts_serial_failures[$chart]=0
 					next_charts+=($chart)
 				else
-					echo "SET run_time = $(( (exec_end_ms - exec_start_ms) * -1 ))"
-					echo >&2 "$PROGRAM_NAME: chart '$chart' update() function reports failure. Disabling it."
+					charts_serial_failures[$chart]=$(( charts_serial_failures[$chart] + 1 ))
+
+					if [ charts_serial_failures[$chart] -gt 10 ]
+						then
+						echo >&2 "$PROGRAM_NAME: chart '$chart' update() function reported failure ${charts_serial_failures[$chart]} times. Disabling it."
+					else
+						echo >&2 "$PROGRAM_NAME: chart '$chart' update() function reports failure. Will keep trying for a while."
+						next_charts+=($chart)
+					fi
 				fi
-				echo "END"
 			else
 				next_charts+=($chart)
 			fi
@@ -601,6 +611,9 @@ global_update() {
 
 		test ${now_ms} -ge ${exit_at} && exit 0
 	done
+
+	echo >&2 "$PROGRAM_NAME: Nothing left to do. Disabling charts.d.plugin."
+	echo "DISABLE"
 }
 
 global_update

@@ -67,19 +67,14 @@ apache_detect() {
 
 	# we will not check of the Conns*
 	# keys, since these are apache 2.4 specific
-	if [ -z "${apache_key_accesses}" \
-		-o -z "${apache_key_kbytes}" \
-		-o -z "${apache_key_reqpersec}" \
-		-o -z "${apache_key_bytespersec}" \
-		-o -z "${apache_key_bytesperreq}" \
-		-o -z "${apache_key_busyworkers}" \
-		-o -z "${apache_key_idleworkers}" \
-		-o -z "${apache_key_scoreboard}" \
-		]
-		then
-		echo >&2 "apache: Invalid response or missing keys from apache server: ${*}"
-		return 1
-	fi
+	[ -z "${apache_key_accesses}"    ] && echo >&2 "apache: missing 'Total Accesses' from apache server: ${*}" && return 1
+	[ -z "${apache_key_kbytes}"      ] && echo >&2 "apache: missing 'Total kBytes' from apache server: ${*}" && return 1
+	[ -z "${apache_key_reqpersec}"   ] && echo >&2 "apache: missing 'ReqPerSec' from apache server: ${*}" && return 1
+	[ -z "${apache_key_bytespersec}" ] && echo >&2 "apache: missing 'BytesPerSec' from apache server: ${*}" && return 1
+	[ -z "${apache_key_bytesperreq}" ] && echo >&2 "apache: missing 'BytesPerReq' from apache server: ${*}" && return 1
+	[ -z "${apache_key_busyworkers}" ] && echo >&2 "apache: missing 'BusyWorkers' from apache server: ${*}" && return 1
+	[ -z "${apache_key_idleworkers}" ] && echo >&2 "apache: missing 'IdleWorkers' from apache server: ${*}" && return 1
+	[ -z "${apache_key_scoreboard}"  ] && echo >&2 "apache: missing 'Scoreboard' from apache server: ${*}" && return 1
 
 	if [ ! -z "${apache_key_connstotal}" \
 		-a ! -z "${apache_key_connsasyncwriting}" \
@@ -88,6 +83,8 @@ apache_detect() {
 		]
 		then
 		apache_has_conns=1
+	else
+		apache_has_conns=0
 	fi
 
 	return 0
