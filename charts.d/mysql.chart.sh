@@ -10,136 +10,26 @@
 mysql_update_every=5
 mysql_priority=60000
 
-declare -A mysql_cmds=() mysql_opts=() mysql_ids=()
-
-mysql_exec() {
-	local ret
-
-	"${@}" -s -e "show global status;"
-	ret=$?
-
-	[ $ret -ne 0 ] && echo "plugin_command_failure $ret"
-	return $ret
-}
+declare -A mysql_cmds=() mysql_opts=() mysql_ids=() mysql_data=()
 
 mysql_get() {
-	unset \
-		mysql_Bytes_received \
-		mysql_Bytes_sent \
-		mysql_Queries \
-		mysql_Questions \
-		mysql_Slow_queries \
-		mysql_Handler_commit \
-		mysql_Handler_delete \
-		mysql_Handler_prepare \
-		mysql_Handler_read_first \
-		mysql_Handler_read_key \
-		mysql_Handler_read_next \
-		mysql_Handler_read_prev \
-		mysql_Handler_read_rnd \
-		mysql_Handler_read_rnd_next \
-		mysql_Handler_rollback \
-		mysql_Handler_savepoint \
-		mysql_Handler_savepoint_rollback \
-		mysql_Handler_update \
-		mysql_Handler_write \
-		mysql_Table_locks_immediate \
-		mysql_Table_locks_waited \
-		mysql_Select_full_join \
-		mysql_Select_full_range_join \
-		mysql_Select_range \
-		mysql_Select_range_check \
-		mysql_Select_scan \
-		mysql_Sort_merge_passes \
-		mysql_Sort_range \
-		mysql_Sort_scan \
-		mysql_Created_tmp_disk_tables \
-		mysql_Created_tmp_files \
-		mysql_Created_tmp_tables \
-		mysql_Connection_errors_accept \
-		mysql_Connection_errors_internal \
-		mysql_Connection_errors_max_connections \
-		mysql_Connection_errors_peer_addr \
-		mysql_Connection_errors_select \
-		mysql_Connection_errors_tcpwrap \
-		mysql_Connections \
-		mysql_Aborted_connects \
-		mysql_Binlog_cache_disk_use \
-		mysql_Binlog_cache_use \
-		mysql_Binlog_stmt_cache_disk_use \
-		mysql_Binlog_stmt_cache_use \
-		mysql_Threads_connected \
-		mysql_Threads_created \
-		mysql_Threads_cached \
-		mysql_Threads_running \
-		mysql_Innodb_data_read \
-		mysql_Innodb_data_written \
-		mysql_Innodb_data_reads \
-		mysql_Innodb_data_writes \
-		mysql_Innodb_data_fsyncs \
-		mysql_Innodb_data_pending_reads \
-		mysql_Innodb_data_pending_writes \
-		mysql_Innodb_data_pending_fsyncs \
-		mysql_Innodb_log_waits \
-		mysql_Innodb_log_write_requests \
-		mysql_Innodb_log_writes \
-		mysql_Innodb_os_log_fsyncs \
-		mysql_Innodb_os_log_pending_fsyncs \
-		mysql_Innodb_os_log_pending_writes \
-		mysql_Innodb_os_log_written \
-		mysql_Innodb_row_lock_current_waits \
-		mysql_Innodb_rows_inserted \
-		mysql_Innodb_rows_read \
-		mysql_Innodb_rows_updated \
-		mysql_Innodb_rows_deleted \
-		mysql_Innodb_buffer_pool_pages_data \
-		mysql_Innodb_buffer_pool_pages_dirty \
-		mysql_Innodb_buffer_pool_pages_flushed \
-		mysql_Innodb_buffer_pool_pages_free \
-		mysql_Innodb_buffer_pool_pages_misc \
-		mysql_Innodb_buffer_pool_pages_total \
-		mysql_Innodb_buffer_pool_bytes_data \
-		mysql_Innodb_buffer_pool_bytes_dirty \
-		mysql_Innodb_buffer_pool_read_ahead_rnd \
-		mysql_Innodb_buffer_pool_read_ahead \
-		mysql_Innodb_buffer_pool_read_ahead_evicted \
-		mysql_Innodb_buffer_pool_read_requests \
-		mysql_Innodb_buffer_pool_reads \
-		mysql_Innodb_buffer_pool_wait_free \
-		mysql_Innodb_buffer_pool_write_requests \
-		mysql_Qcache_free_blocks \
-		mysql_Qcache_free_memory \
-		mysql_Qcache_hits \
-		mysql_Qcache_inserts \
-		mysql_Qcache_lowmem_prunes \
-		mysql_Qcache_not_cached \
-		mysql_Qcache_queries_in_cache \
-		mysql_Qcache_total_blocks \
-		mysql_Key_blocks_not_flushed \
-		mysql_Key_blocks_unused \
-		mysql_Key_blocks_used \
-		mysql_Key_read_requests \
-		mysql_Key_reads \
-		mysql_Key_write_requests \
-		mysql_Key_writes \
-		mysql_Open_files \
-		mysql_Opened_files
+	local arr
+	local oIFS="${IFS}"
+	mysql_data=()
+	IFS=$'\t'$'\n'
+	arr=($("${@}" -e "SHOW GLOBAL STATUS WHERE value REGEXP '^[0-9]';" | egrep "^(Bytes|Slow_|Queri|Handl|Table|Selec|Sort_|Creat|Conne|Abort|Binlo|Threa|Innod|Qcach|Key_|Open)" ))
+	IFS="${oIFS}"
 
+	[ "${#arr[@]}" -lt 3 ] && return 1
+	local end=${#arr[@]}
+	for ((i=2;i<end;i+=2)); do
+		mysql_data["${arr[$i]}"]=${arr[$i+1]}
+	done
 
-	mysql_plugin_command_failure=0
+	[ -z "${mysql_data[Connections]}" ] && return 1
 
-	eval "$(mysql_exec "${@}" |\
-		sed \
-			-e "s/[[:space:]]\+/ /g" \
-			-e "s/\./_/g" \
-			-e "s/^\([a-zA-Z0-9_]\+\)[[:space:]]\+\([0-9]\+\)$/mysql_\1=\2/g" |\
-		egrep "^mysql_[a-zA-Z0-9_]+=[[:digit:]]+$")"
-
-	[ $mysql_plugin_command_failure -eq 1 ] && return 1
-	[ -z "$mysql_Connections" ] && return 1
-
-	mysql_Thread_cache_misses=0
-	[ $(( mysql_Connections + 1 - 1 )) -gt 0 ] && mysql_Thread_cache_misses=$(( mysql_Threads_created * 10000 / mysql_Connections ))
+	mysql_data[Thread_cache_misses]=0
+	[ $(( mysql_data[Connections] + 1 - 1 )) -gt 0 ] && mysql_data[Thread_cache_misses]=$(( mysql_data[Threads_created] * 10000 / mysql_data[Connections] ))
 
 	return 0
 }
@@ -380,7 +270,7 @@ CHART mysql_$x.files_rate '' "mysql Opened Files Rate" "files/s" files mysql.fil
 DIMENSION Opened_files files incremental 1 1
 EOF
 
-	if [ ! -z "$mysql_Binlog_stmt_cache_disk_use" ]
+	if [ ! -z "${mysql_data[Binlog_stmt_cache_disk_use]}" ]
 		then
 		cat <<EOF
 CHART mysql_$x.binlog_stmt_cache '' "mysql Binlog Statement Cache" "statements/s" binlog mysql.binlog_stmt_cache line $((mysql_priority + 50)) $mysql_update_every
@@ -389,7 +279,7 @@ DIMENSION Binlog_stmt_cache_use all incremental 1 1
 EOF
 	fi
 
-	if [ ! -z "$mysql_Connection_errors_accept" ]
+	if [ ! -z "${mysql_data[Connection_errors_accept]}" ]
 		then
 		cat <<EOF
 CHART mysql_$x.connection_errors '' "mysql Connection Errors" "connections/s" connections mysql.connection_errors line $((mysql_priority + 51)) $mysql_update_every
@@ -415,23 +305,12 @@ mysql_update() {
 	# for each dimension
 	# remember: KEEP IT SIMPLE AND SHORT
 
-	# 1. get the counters page from mysql
-	# 2. sed to remove spaces; replace . with _; remove spaces around =; prepend each line with: local mysql_
-	# 3. egrep lines starting with:
-	#    local mysql_client_http_ then one or more of these a-z 0-9 _ then = and one of more of 0-9
-	#    local mysql_server_all_ then one or more of these a-z 0-9 _ then = and one of more of 0-9
-	# 4. then execute this as a script with the eval
-	#
-	# be very carefull with eval:
-	# prepare the script and always grep at the end the lines that are usefull, so that
-	# even if something goes wrong, no other code can be executed
-
 	local m x
 	for m in "${!mysql_ids[@]}"
 	do
 		x="${mysql_ids[$m]}"
-
 		mysql_get "${mysql_cmds[$m]}" ${mysql_opts[$m]}
+
 		if [ $? -ne 0 ]
 			then
 			unset mysql_ids[$m]
@@ -444,186 +323,186 @@ mysql_update() {
 		# write the result of the work.
 		cat <<VALUESEOF
 BEGIN mysql_$x.net $1
-SET Bytes_received = $mysql_Bytes_received
-SET Bytes_sent = $mysql_Bytes_sent
+SET Bytes_received = ${mysql_data[Bytes_received]}
+SET Bytes_sent = ${mysql_data[Bytes_sent]}
 END
 BEGIN mysql_$x.queries $1
-SET Queries = $mysql_Queries
-SET Questions = $mysql_Questions
-SET Slow_queries = $mysql_Slow_queries
+SET Queries = ${mysql_data[Queries]}
+SET Questions = ${mysql_data[Questions]}
+SET Slow_queries = ${mysql_data[Slow_queries]}
 END
 BEGIN mysql_$x.handlers $1
-SET Handler_commit = $mysql_Handler_commit
-SET Handler_delete = $mysql_Handler_delete
-SET Handler_prepare = $mysql_Handler_prepare
-SET Handler_read_first = $mysql_Handler_read_first
-SET Handler_read_key = $mysql_Handler_read_key
-SET Handler_read_next = $mysql_Handler_read_next
-SET Handler_read_prev = $mysql_Handler_read_prev
-SET Handler_read_rnd = $mysql_Handler_read_rnd
-SET Handler_read_rnd_next = $mysql_Handler_read_rnd_next
-SET Handler_rollback = $mysql_Handler_rollback
-SET Handler_savepoint = $mysql_Handler_savepoint
-SET Handler_savepoint_rollback = $mysql_Handler_savepoint_rollback
-SET Handler_update = $mysql_Handler_update
-SET Handler_write = $mysql_Handler_write
+SET Handler_commit = ${mysql_data[Handler_commit]}
+SET Handler_delete = ${mysql_data[Handler_delete]}
+SET Handler_prepare = ${mysql_data[Handler_prepare]}
+SET Handler_read_first = ${mysql_data[Handler_read_first]}
+SET Handler_read_key = ${mysql_data[Handler_read_key]}
+SET Handler_read_next = ${mysql_data[Handler_read_next]}
+SET Handler_read_prev = ${mysql_data[Handler_read_prev]}
+SET Handler_read_rnd = ${mysql_data[Handler_read_rnd]}
+SET Handler_read_rnd_next = ${mysql_data[Handler_read_rnd_next]}
+SET Handler_rollback = ${mysql_data[Handler_rollback]}
+SET Handler_savepoint = ${mysql_data[Handler_savepoint]}
+SET Handler_savepoint_rollback = ${mysql_data[Handler_savepoint_rollback]}
+SET Handler_update = ${mysql_data[Handler_update]}
+SET Handler_write = ${mysql_data[Handler_write]}
 END
 BEGIN mysql_$x.table_locks $1
-SET Table_locks_immediate = $mysql_Table_locks_immediate
-SET Table_locks_waited = $mysql_Table_locks_waited
+SET Table_locks_immediate = ${mysql_data[Table_locks_immediate]}
+SET Table_locks_waited = ${mysql_data[Table_locks_waited]}
 END
 BEGIN mysql_$x.join_issues $1
-SET Select_full_join = $mysql_Select_full_join
-SET Select_full_range_join = $mysql_Select_full_range_join
-SET Select_range = $mysql_Select_range
-SET Select_range_check = $mysql_Select_range_check
-SET Select_scan = $mysql_Select_scan
+SET Select_full_join = ${mysql_data[Select_full_join]}
+SET Select_full_range_join = ${mysql_data[Select_full_range_join]}
+SET Select_range = ${mysql_data[Select_range]}
+SET Select_range_check = ${mysql_data[Select_range_check]}
+SET Select_scan = ${mysql_data[Select_scan]}
 END
 BEGIN mysql_$x.sort_issues $1
-SET Sort_merge_passes = $mysql_Sort_merge_passes
-SET Sort_range = $mysql_Sort_range
-SET Sort_scan = $mysql_Sort_scan
+SET Sort_merge_passes = ${mysql_data[Sort_merge_passes]}
+SET Sort_range = ${mysql_data[Sort_range]}
+SET Sort_scan = ${mysql_data[Sort_scan]}
 END
 BEGIN mysql_$x.tmp $1
-SET Created_tmp_disk_tables = $mysql_Created_tmp_disk_tables
-SET Created_tmp_files = $mysql_Created_tmp_files
-SET Created_tmp_tables = $mysql_Created_tmp_tables
+SET Created_tmp_disk_tables = ${mysql_data[Created_tmp_disk_tables]}
+SET Created_tmp_files = ${mysql_data[Created_tmp_files]}
+SET Created_tmp_tables = ${mysql_data[Created_tmp_tables]}
 END
 BEGIN mysql_$x.connections $1
-SET Connections = $mysql_Connections
-SET Aborted_connects = $mysql_Aborted_connects
+SET Connections = ${mysql_data[Connections]}
+SET Aborted_connects = ${mysql_data[Aborted_connects]}
 END
 BEGIN mysql_$x.binlog_cache $1
-SET Binlog_cache_disk_use = $mysql_Binlog_cache_disk_use
-SET Binlog_cache_use = $mysql_Binlog_cache_use
+SET Binlog_cache_disk_use = ${mysql_data[Binlog_cache_disk_use]}
+SET Binlog_cache_use = ${mysql_data[Binlog_cache_use]}
 END
 BEGIN mysql_$x.threads $1
-SET Threads_connected = $mysql_Threads_connected
-SET Threads_created = $mysql_Threads_created
-SET Threads_cached = $mysql_Threads_cached
-SET Threads_running = $mysql_Threads_running
+SET Threads_connected = ${mysql_data[Threads_connected]}
+SET Threads_created = ${mysql_data[Threads_created]}
+SET Threads_cached = ${mysql_data[Threads_cached]}
+SET Threads_running = ${mysql_data[Threads_running]}
 END
 BEGIN mysql_$x.thread_cache_misses $1
-SET misses = $mysql_Thread_cache_misses
+SET misses = ${mysql_data[Thread_cache_misses]}
 END
 BEGIN mysql_$x.innodb_io $1
-SET Innodb_data_read = $mysql_Innodb_data_read
-SET Innodb_data_written = $mysql_Innodb_data_written
+SET Innodb_data_read = ${mysql_data[Innodb_data_read]}
+SET Innodb_data_written = ${mysql_data[Innodb_data_written]}
 END
 BEGIN mysql_$x.innodb_io_ops $1
-SET Innodb_data_reads = $mysql_Innodb_data_reads
-SET Innodb_data_writes = $mysql_Innodb_data_writes
-SET Innodb_data_fsyncs = $mysql_Innodb_data_fsyncs
+SET Innodb_data_reads = ${mysql_data[Innodb_data_reads]}
+SET Innodb_data_writes = ${mysql_data[Innodb_data_writes]}
+SET Innodb_data_fsyncs = ${mysql_data[Innodb_data_fsyncs]}
 END
 BEGIN mysql_$x.innodb_io_pending_ops $1
-SET Innodb_data_pending_reads = $mysql_Innodb_data_pending_reads
-SET Innodb_data_pending_writes = $mysql_Innodb_data_pending_writes
-SET Innodb_data_pending_fsyncs = $mysql_Innodb_data_pending_fsyncs
+SET Innodb_data_pending_reads = ${mysql_data[Innodb_data_pending_reads]}
+SET Innodb_data_pending_writes = ${mysql_data[Innodb_data_pending_writes]}
+SET Innodb_data_pending_fsyncs = ${mysql_data[Innodb_data_pending_fsyncs]}
 END
 BEGIN mysql_$x.innodb_log $1
-SET Innodb_log_waits = $mysql_Innodb_log_waits
-SET Innodb_log_write_requests = $mysql_Innodb_log_write_requests
-SET Innodb_log_writes = $mysql_Innodb_log_writes
+SET Innodb_log_waits = ${mysql_data[Innodb_log_waits]}
+SET Innodb_log_write_requests = ${mysql_data[Innodb_log_write_requests]}
+SET Innodb_log_writes = ${mysql_data[Innodb_log_writes]}
 END
 BEGIN mysql_$x.innodb_os_log $1
-SET Innodb_os_log_fsyncs = $mysql_Innodb_os_log_fsyncs
-SET Innodb_os_log_pending_fsyncs = $mysql_Innodb_os_log_pending_fsyncs
-SET Innodb_os_log_pending_writes = $mysql_Innodb_os_log_pending_writes
+SET Innodb_os_log_fsyncs = ${mysql_data[Innodb_os_log_fsyncs]}
+SET Innodb_os_log_pending_fsyncs = ${mysql_data[Innodb_os_log_pending_fsyncs]}
+SET Innodb_os_log_pending_writes = ${mysql_data[Innodb_os_log_pending_writes]}
 END
 BEGIN mysql_$x.innodb_os_log_io $1
-SET Innodb_os_log_written = $mysql_Innodb_os_log_written
+SET Innodb_os_log_written = ${mysql_data[Innodb_os_log_written]}
 END
 BEGIN mysql_$x.innodb_cur_row_lock $1
-SET Innodb_row_lock_current_waits = $mysql_Innodb_row_lock_current_waits
+SET Innodb_row_lock_current_waits = ${mysql_data[Innodb_row_lock_current_waits]}
 END
 BEGIN mysql_$x.innodb_rows $1
-SET Innodb_rows_inserted = $mysql_Innodb_rows_inserted
-SET Innodb_rows_read = $mysql_Innodb_rows_read
-SET Innodb_rows_updated = $mysql_Innodb_rows_updated
-SET Innodb_rows_deleted = $mysql_Innodb_rows_deleted
+SET Innodb_rows_inserted = ${mysql_data[Innodb_rows_inserted]}
+SET Innodb_rows_read = ${mysql_data[Innodb_rows_read]}
+SET Innodb_rows_updated = ${mysql_data[Innodb_rows_updated]}
+SET Innodb_rows_deleted = ${mysql_data[Innodb_rows_deleted]}
 END
 BEGIN mysql_$x.innodb_buffer_pool_pages $1
-SET Innodb_buffer_pool_pages_data = $mysql_Innodb_buffer_pool_pages_data
-SET Innodb_buffer_pool_pages_dirty = $mysql_Innodb_buffer_pool_pages_dirty
-SET Innodb_buffer_pool_pages_free = $mysql_Innodb_buffer_pool_pages_free
-SET Innodb_buffer_pool_pages_flushed = $mysql_Innodb_buffer_pool_pages_flushed
-SET Innodb_buffer_pool_pages_misc = $mysql_Innodb_buffer_pool_pages_misc
-SET Innodb_buffer_pool_pages_total = $mysql_Innodb_buffer_pool_pages_total
+SET Innodb_buffer_pool_pages_data = ${mysql_data[Innodb_buffer_pool_pages_data]}
+SET Innodb_buffer_pool_pages_dirty = ${mysql_data[Innodb_buffer_pool_pages_dirty]}
+SET Innodb_buffer_pool_pages_free = ${mysql_data[Innodb_buffer_pool_pages_free]}
+SET Innodb_buffer_pool_pages_flushed = ${mysql_data[Innodb_buffer_pool_pages_flushed]}
+SET Innodb_buffer_pool_pages_misc = ${mysql_data[Innodb_buffer_pool_pages_misc]}
+SET Innodb_buffer_pool_pages_total = ${mysql_data[Innodb_buffer_pool_pages_total]}
 END
 BEGIN mysql_$x.innodb_buffer_pool_bytes $1
-SET Innodb_buffer_pool_bytes_data = $mysql_Innodb_buffer_pool_bytes_data
-SET Innodb_buffer_pool_bytes_dirty = $mysql_Innodb_buffer_pool_bytes_dirty
+SET Innodb_buffer_pool_bytes_data = ${mysql_data[Innodb_buffer_pool_bytes_data]}
+SET Innodb_buffer_pool_bytes_dirty = ${mysql_data[Innodb_buffer_pool_bytes_dirty]}
 END
 BEGIN mysql_$x.innodb_buffer_pool_read_ahead $1
-SET Innodb_buffer_pool_read_ahead = $mysql_Innodb_buffer_pool_read_ahead
-SET Innodb_buffer_pool_read_ahead_evicted = $mysql_Innodb_buffer_pool_read_ahead_evicted
-SET Innodb_buffer_pool_read_ahead_rnd = $mysql_Innodb_buffer_pool_read_ahead_rnd
+SET Innodb_buffer_pool_read_ahead = ${mysql_data[Innodb_buffer_pool_read_ahead]}
+SET Innodb_buffer_pool_read_ahead_evicted = ${mysql_data[Innodb_buffer_pool_read_ahead_evicted]}
+SET Innodb_buffer_pool_read_ahead_rnd = ${mysql_data[Innodb_buffer_pool_read_ahead_rnd]}
 END
 BEGIN mysql_$x.innodb_buffer_pool_reqs $1
-SET Innodb_buffer_pool_read_requests = $mysql_Innodb_buffer_pool_read_requests
-SET Innodb_buffer_pool_write_requests = $mysql_Innodb_buffer_pool_write_requests
+SET Innodb_buffer_pool_read_requests = ${mysql_data[Innodb_buffer_pool_read_requests]}
+SET Innodb_buffer_pool_write_requests = ${mysql_data[Innodb_buffer_pool_write_requests]}
 END
 BEGIN mysql_$x.innodb_buffer_pool_ops $1
-SET Innodb_buffer_pool_reads = $mysql_Innodb_buffer_pool_reads
-SET Innodb_buffer_pool_wait_free = $mysql_Innodb_buffer_pool_wait_free
+SET Innodb_buffer_pool_reads = ${mysql_data[Innodb_buffer_pool_reads]}
+SET Innodb_buffer_pool_wait_free = ${mysql_data[Innodb_buffer_pool_wait_free]}
 END
 BEGIN mysql_$x.qcache_ops $1
-SET Qcache_hits hits = $mysql_Qcache_hits
-SET Qcache_lowmem_prunes = $mysql_Qcache_lowmem_prunes
-SET Qcache_inserts inserts = $mysql_Qcache_inserts inserts
-SET Qcache_not_cached = $mysql_Qcache_not_cached
+SET Qcache_hits hits = ${mysql_data[Qcache_hits]}
+SET Qcache_lowmem_prunes = ${mysql_data[Qcache_lowmem_prunes]}
+SET Qcache_inserts_inserts = ${mysql_data[Qcache_inserts_inserts]}
+SET Qcache_not_cached = ${mysql_data[Qcache_not_cached]}
 END
 BEGIN mysql_$x.qcache $1
-SET Qcache_queries_in_cache = $mysql_Qcache_queries_in_cache
+SET Qcache_queries_in_cache = ${mysql_data[Qcache_queries_in_cache]}
 END
 BEGIN mysql_$x.qcache_freemem $1
-SET Qcache_free_memory = $mysql_Qcache_free_memory
+SET Qcache_free_memory = ${mysql_data[Qcache_free_memory]}
 END
 BEGIN mysql_$x.qcache_memblocks $1
-SET Qcache_free_blocks = $mysql_Qcache_free_blocks
-SET Qcache_total_blocks = $mysql_Qcache_total_blocks
+SET Qcache_free_blocks = ${mysql_data[Qcache_free_blocks]}
+SET Qcache_total_blocks = ${mysql_data[Qcache_total_blocks]}
 END
 BEGIN mysql_$x.key_blocks $1
-SET Key_blocks_unused = $mysql_Key_blocks_unused
-SET Key_blocks_used = $mysql_Key_blocks_used
-SET Key_blocks_not_flushed = $mysql_Key_blocks_not_flushed
+SET Key_blocks_unused = ${mysql_data[Key_blocks_unused]}
+SET Key_blocks_used = ${mysql_data[Key_blocks_used]}
+SET Key_blocks_not_flushed = ${mysql_data[Key_blocks_not_flushed]}
 END
 BEGIN mysql_$x.key_requests $1
-SET Key_read_requests = $mysql_Key_read_requests
-SET Key_write_requests = $mysql_Key_write_requests
+SET Key_read_requests = ${mysql_data[Key_read_requests]}
+SET Key_write_requests = ${mysql_data[Key_write_requests]}
 END
 BEGIN mysql_$x.key_disk_ops $1
-SET Key_reads = $mysql_Key_reads
-SET Key_writes = $mysql_Key_writes
+SET Key_reads = ${mysql_data[Key_reads]}
+SET Key_writes = ${mysql_data[Key_writes]}
 END
 BEGIN mysql_$x.files $1
-SET Open_files = $mysql_Open_files
+SET Open_files = ${mysql_data[Open_files]}
 END
 BEGIN mysql_$x.files_rate $1
-SET Opened_files = $mysql_Opened_files
+SET Opened_files = ${mysql_data[Opened_files]}
 END
 VALUESEOF
 
-		if [ ! -z "$mysql_Binlog_stmt_cache_disk_use" ]
+		if [ ! -z "${mysql_data[Binlog_stmt_cache_disk_use]}" ]
 			then
 			cat <<VALUESEOF
 BEGIN mysql_$x.binlog_stmt_cache $1
-SET Binlog_stmt_cache_disk_use = $mysql_Binlog_stmt_cache_disk_use
-SET Binlog_stmt_cache_use = $mysql_Binlog_stmt_cache_use
+SET Binlog_stmt_cache_disk_use = ${mysql_data[Binlog_stmt_cache_disk_use]}
+SET Binlog_stmt_cache_use = ${mysql_data[Binlog_stmt_cache_use]}
 END
 VALUESEOF
 		fi
 
-		if [ ! -z "$mysql_Connection_errors_accept" ]
+		if [ ! -z "${mysql_data[Connection_errors_accept]}" ]
 			then
 			cat <<VALUESEOF
 BEGIN mysql_$x.connection_errors $1
-SET Connection_errors_accept = $mysql_Connection_errors_accept
-SET Connection_errors_internal = $mysql_Connection_errors_internal
-SET Connection_errors_max_connections = $mysql_Connection_errors_max_connections
-SET Connection_errors_peer_addr = $mysql_Connection_errors_peer_addr
-SET Connection_errors_select = $mysql_Connection_errors_select
-SET Connection_errors_tcpwrap = $mysql_Connection_errors_tcpwrap
+SET Connection_errors_accept = ${mysql_data[Connection_errors_accept]}
+SET Connection_errors_internal = ${mysql_data[Connection_errors_internal]}
+SET Connection_errors_max_connections = ${mysql_data[Connection_errors_max_connections]}
+SET Connection_errors_peer_addr = ${mysql_data[Connection_errors_peer_addr]}
+SET Connection_errors_select = ${mysql_data[Connection_errors_select]}
+SET Connection_errors_tcpwrap = ${mysql_data[Connection_errors_tcpwrap]}
 END
 VALUESEOF
 		fi
