@@ -7,7 +7,13 @@
 # between the calls of the _update() function
 example_update_every=
 
+# the priority is used to sort the charts on the dashboard
+# 1 = the first chart
 example_priority=150000
+
+# to enable this chart, you have to set this to 12345
+# (just a demonstration for something that needs to be checked)
+example_magic_number=
 
 # _check is called once, to find out if this chart should be enabled or not
 example_check() {
@@ -15,6 +21,7 @@ example_check() {
 	#  - 0 to enable the chart
 	#  - 1 to disable the chart
 
+	[ "${example_magic_number}" != "12345" ] && return 1
 	return 0
 }
 
