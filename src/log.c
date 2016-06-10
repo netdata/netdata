@@ -108,7 +108,7 @@ int error_log_limit(int reset) {
 
 void log_date(FILE *out)
 {
-		char outstr[200];
+		char outstr[24];
 		time_t t;
 		struct tm *tmp, tmbuf;
 
@@ -116,7 +116,7 @@ void log_date(FILE *out)
 		tmp = localtime_r(&t, &tmbuf);
 
 		if (tmp == NULL) return;
-		if (strftime(outstr, sizeof(outstr), "%y-%m-%d %H:%M:%S", tmp) == 0) return;
+		if (unlikely(strftime(outstr, sizeof(outstr), "%y-%m-%d %H:%M:%S", tmp) == 0)) return;
 
 		fprintf(out, "%s: ", outstr);
 }
@@ -127,11 +127,10 @@ void debug_int( const char *file, const char *function, const unsigned long line
 
 	log_date(stdout);
 	va_start( args, fmt );
-	fprintf(stdout, "DEBUG (%04lu@%-10.10s:%-15.15s): %s: ", line, file, function, program_name);
-	vfprintf( stdout, fmt, args );
+	printf("DEBUG (%04lu@%-10.10s:%-15.15s): %s: ", line, file, function, program_name);
+	printf(fmt, args);
 	va_end( args );
-	fprintf(stdout, "\n");
-	// fflush( stdout );
+	putchar('\n');
 
 	if(output_log_syslog) {
 		va_start( args, fmt );
@@ -155,7 +154,7 @@ void info_int( const char *file, const char *function, const unsigned long line,
 	vfprintf( stderr, fmt, args );
 	va_end( args );
 
-	fprintf(stderr, "\n");
+	fputc('\n', stderr);
 
 	if(error_log_syslog) {
 		va_start( args, fmt );
@@ -180,12 +179,12 @@ void error_int( const char *prefix, const char *file, const char *function, cons
 	va_end( args );
 
 	if(errno) {
-		char buf[200];
-		char *s = strerror_r(errno, buf, 200);
-		fprintf(stderr, " (errno %d, %s)\n", errno, s);
+		char buf[1024];
+		fprintf(stderr, " (errno %d, %s)\n", errno, strerror_r(errno, buf, 1023));
 		errno = 0;
 	}
-	else fprintf(stderr, "\n");
+	else
+		fputc('\n', stderr);
 
 	if(error_log_syslog) {
 		va_start( args, fmt );
@@ -207,7 +206,7 @@ void fatal_int( const char *file, const char *function, const unsigned long line
 	va_end( args );
 
 	perror(" # ");
-	fprintf(stderr, "\n");
+	fputc('\n', stderr);
 
 	if(error_log_syslog) {
 		va_start( args, fmt );
@@ -228,8 +227,7 @@ void log_access( const char *fmt, ... )
 		va_start( args, fmt );
 		vfprintf( stdaccess, fmt, args );
 		va_end( args );
-		fprintf( stdaccess, "\n");
-		// fflush( stdaccess );
+		fputc('\n', stdaccess);
 	}
 
 	if(access_log_syslog) {

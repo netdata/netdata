@@ -682,7 +682,7 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm)
 	errno = 0;
 	fd = open(filename, O_RDWR|O_CREAT|O_NOATIME, 0664);
 	if(fd != -1) {
-		if(lseek(fd, size, SEEK_SET) == (long)size) {
+		if(lseek(fd, size, SEEK_SET) == (off_t)size) {
 			if(write(fd, "", 1) == 1) {
 				if(ftruncate(fd, size))
 					error("Cannot truncate file '%s' to size %ld. Will use the larger file.", filename, size);
@@ -691,7 +691,7 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm)
 				if(flags & MAP_SHARED || !enable_ksm || !ksm) {
 #endif
 					mem = mmap(NULL, size, PROT_READ|PROT_WRITE, flags, fd, 0);
-					if(mem) {
+					if(mem != MAP_FAILED) {
 						int advise = MADV_SEQUENTIAL|MADV_DONTFORK;
 						if(flags & MAP_SHARED) advise |= MADV_WILLNEED;
 
@@ -702,7 +702,7 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm)
 				}
 				else {
 					mem = mmap(NULL, size, PROT_READ|PROT_WRITE, flags|MAP_ANONYMOUS, -1, 0);
-					if(mem) {
+					if(mem != MAP_FAILED) {
 						if(lseek(fd, 0, SEEK_SET) == 0) {
 							if(read(fd, mem, size) != (ssize_t)size)
 								error("Cannot read from file '%s'", filename);
@@ -733,7 +733,7 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm)
 	return mem;
 }
 
-int savememory(const char *filename, void *mem, unsigned long size)
+int savememory(const char *filename, void *mem, size_t size)
 {
 	char tmpfilename[FILENAME_MAX + 1];
 
@@ -745,7 +745,7 @@ int savememory(const char *filename, void *mem, unsigned long size)
 		return -1;
 	}
 
-	if(write(fd, mem, size) != (long)size) {
+	if(write(fd, mem, size) != (ssize_t)size) {
 		error("Cannot write to file '%s' %ld bytes.", filename, (long)size);
 		close(fd);
 		return -1;
@@ -753,13 +753,12 @@ int savememory(const char *filename, void *mem, unsigned long size)
 
 	close(fd);
 
-	int ret = 0;
 	if(rename(tmpfilename, filename)) {
 		error("Cannot rename '%s' to '%s'", tmpfilename, filename);
-		ret = -1;
+		return -1;
 	}
 
-	return ret;
+	return 0;
 }
 
 int fd_is_valid(int fd) {

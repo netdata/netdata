@@ -219,10 +219,13 @@ int create_listen_socket(void) {
 	else if(!strcmp(ipv, "ipv6") || !strcmp(ipv, "IPV6") || !strcmp(ipv, "IPv6") || !strcmp(ipv, "6")) ip = 6;
 	else error("Cannot understand ip version '%s'. Assuming 'any'.", ipv);
 
-	if(ip == 0 || ip == 6) listen_fd = create_listen_socket6(config_get("global", "bind socket to IP", "*"), listen_port, listen_backlog);
-	if(listen_fd < 0) {
+	if(ip == 0 || ip == 6)
+		listen_fd = create_listen_socket6(config_get("global", "bind socket to IP", "*"), listen_port, listen_backlog);
+
+	if(listen_fd == -1) {
 		listen_fd = create_listen_socket4(config_get("global", "bind socket to IP", "*"), listen_port, listen_backlog);
-		// if(listen_fd >= 0 && ip != 4) info("Managed to open an IPv4 socket on port %d.", listen_port);
+		//if(listen_fd != -1 && ip != 4)
+		//	info("Managed to open an IPv4 socket on port %d.", listen_port);
 	}
 
 	return listen_fd;
