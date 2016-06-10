@@ -40,14 +40,14 @@ extern void *cgroups_main(void *ptr);
 
 volatile sig_atomic_t netdata_exit = 0;
 
-void netdata_cleanup_and_exit(int ret)
-{
+void netdata_cleanup_and_exit(int ret) {
 	netdata_exit = 1;
+
+	error_log_limit_unlimited();
+
+	info("Called: netdata_cleanup_and_exit()");
 	rrdset_save_all();
 	// kill_childs();
-
-	// let it log a few more error messages
-	error_log_limit_reset();
 
 	if(pidfile[0]) {
 		if(unlink(pidfile) != 0)
