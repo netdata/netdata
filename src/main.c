@@ -450,12 +450,7 @@ int main(int argc, char **argv)
 	char *access_log_file = NULL;
 	char *user = NULL;
 	{
-		char buffer[1024];
-
-		// --------------------------------------------------------------------
-
-		sprintf(buffer, "0x%08llx", 0ULL);
-		char *flags = config_get("global", "debug flags", buffer);
+		char *flags = config_get("global", "debug flags",  "0x00000000");
 		setenv("NETDATA_DEBUG_FLAGS", flags, 1);
 
 		debug_flags = strtoull(flags, NULL, 0);
@@ -534,10 +529,13 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		if(gethostname(buffer, HOSTNAME_MAX) == -1)
-			error("WARNING: Cannot get machine hostname.");
-		hostname = config_get("global", "hostname", buffer);
-		debug(D_OPTIONS, "hostname set to '%s'", hostname);
+		{
+			char hostnamebuf[HOSTNAME_MAX + 1];
+			if(gethostname(hostnamebuf, HOSTNAME_MAX) == -1)
+				error("WARNING: Cannot get machine hostname.");
+			hostname = config_get("global", "hostname", hostnamebuf);
+			debug(D_OPTIONS, "hostname set to '%s'", hostname);
+		}
 
 		// --------------------------------------------------------------------
 
@@ -561,8 +559,8 @@ int main(int argc, char **argv)
 
 		// let the plugins know the min update_every
 		{
-			char buf[51];
-			snprintfz(buf, 50, "%d", rrd_update_every);
+			char buf[16];
+			snprintfz(buf, 15, "%d", rrd_update_every);
 			setenv("NETDATA_UPDATE_EVERY", buf, 1);
 		}
 
@@ -638,7 +636,8 @@ int main(int argc, char **argv)
 		// --------------------------------------------------------------------
 
 		listen_fd = create_listen_socket();
-		if(listen_fd < 0) fatal("Cannot listen socket.");
+		if(listen_fd == -1)
+			fatal("Cannot listen socket.");
 	}
 
 	// never become a problem
