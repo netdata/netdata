@@ -50,6 +50,7 @@ extern unsigned long error_log_errors_per_period;
 extern int error_log_limit(int reset);
 
 #define error_log_limit_reset() do { error_log_limit(1); } while(0)
+#define error_log_limit_unlimited() do { error_log_throttle_period = 0; } while(0)
 
 #define debug(type, args...) do { if(unlikely(!silent && (debug_flags & type))) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #define info(args...)    info_int(__FILE__, __FUNCTION__, __LINE__, ##args)
