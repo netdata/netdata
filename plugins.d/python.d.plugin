@@ -106,7 +106,7 @@ class PythonCharts(object):
     def update_module(self,mod):
         t1 = time.time()
         try:
-#            t=int((t1- self.timetable[mod.__name__]) * 1000000)
+#            t=int((t1- self.timetable[mod.__name__]) * 1000)
 #            if t == 0: t=""
             t = "" #FIXME
             if not mod.update(t):
@@ -124,7 +124,7 @@ class PythonCharts(object):
 #        if dt == 0: dt=""
         dt="" #FIXME
         sys.stdout.write("BEGIN netdata.plugin_pythond_"+mod.__name__+" "+str(dt)+'\n')
-        sys.stdout.write("SET run_time = "+str(int((t2 - t1))*1000)+'\n')
+        sys.stdout.write("SET run_time = "+str(int((t2 - t1)*1000))+'\n')
         sys.stdout.write("END\n")
         sys.stdout.flush()
         self.timetable[mod.__name__] = t1
