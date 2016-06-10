@@ -221,10 +221,10 @@ void web_client_reset(struct web_client *w) {
 
 		log_access("%llu: (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: %d '%s'",
 				   w->id,
-				   sent, size, -((size > 0) ? ((float) (size - sent) / (float) size * 100.0) : 0.0),
-				   (float) usecdiff(&w->tv_ready, &w->tv_in) / 1000.0,
-				   (float) usecdiff(&tv, &w->tv_ready) / 1000.0,
-				   (float) usecdiff(&tv, &w->tv_in) / 1000.0,
+				   sent, size, -((size > 0) ? ((size - sent) / (double) size * 100.0) : 0.0),
+				   usecdiff(&w->tv_ready, &w->tv_in) / 1000.0,
+				   usecdiff(&tv, &w->tv_ready) / 1000.0,
+				   usecdiff(&tv, &w->tv_in) / 1000.0,
 				   (w->mode == WEB_CLIENT_MODE_FILECOPY) ? "filecopy" : ((w->mode == WEB_CLIENT_MODE_OPTIONS)
 																		 ? "options" : "data"),
 				   w->response.code,
@@ -371,7 +371,8 @@ int mysendfile(struct web_client *w, char *filename)
 	while (*filename == '/') filename++;
 
 	// if the filename contain known paths, skip them
-	if(strncmp(filename, WEB_PATH_FILE "/", strlen(WEB_PATH_FILE) + 1) == 0) filename = &filename[strlen(WEB_PATH_FILE) + 1];
+	if(strncmp(filename, WEB_PATH_FILE "/", strlen(WEB_PATH_FILE) + 1) == 0)
+		filename = &filename[strlen(WEB_PATH_FILE) + 1];
 
 	char *s;
 	for(s = filename; *s ;s++) {
@@ -1340,8 +1341,8 @@ int web_client_api_old_data_request(struct web_client *w, char *url, int datasou
 	debug(D_WEB_CLIENT, "%llu: Found RRD data with name '%s'.", w->id, tok);
 
 	// how many entries does the client want?
-	long lines = rrd_default_history_entries;
-	long group_count = 1;
+	int lines = rrd_default_history_entries;
+	int group_count = 1;
 	time_t after = 0, before = 0;
 	int group_method = GROUP_AVERAGE;
 	int nonzero = 0;
@@ -1454,8 +1455,10 @@ int web_client_api_old_data_request(struct web_client *w, char *url, int datasou
 			google_responseHandler, google_version, google_reqId, st->last_updated.tv_sec);
 	}
 
-	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group, %d group_method, %lu after, %lu before).", w->id, st->name, st->id, lines, group_count, group_method, after, before);
-	time_t timestamp_in_data = rrd_stats_json(datasource_type, st, w->response.data, lines, group_count, group_method, after, before, nonzero);
+	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group, %d group_method, %lu after, %lu before).",
+		w->id, st->name, st->id, lines, group_count, group_method, after, before);
+
+	time_t timestamp_in_data = rrd_stats_json(datasource_type, st, w->response.data, lines, group_count, group_method, (unsigned long)after, (unsigned long)before, nonzero);
 
 	if(datasource_type == DATASOURCE_DATATABLE_JSONP) {
 		if(timestamp_in_data > last_timestamp_in_data)
@@ -1952,7 +1955,7 @@ void web_client_process(struct web_client *w) {
 	const char *content_type_string = web_content_type_to_string(w->response.data->contenttype);
 	const char *code_msg = web_response_code_to_string(code);
 
-	char date[100];
+	char date[32];
 	struct tm tmbuf, *tm = gmtime_r(&w->response.data->date, &tmbuf);
 	strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S %Z", tm);
 
@@ -2017,7 +2020,7 @@ void web_client_process(struct web_client *w) {
 			, date);
 	}
 	else if(w->mode != WEB_CLIENT_MODE_OPTIONS) {
-		char edate[100];
+		char edate[32];
 		time_t et = w->response.data->date + (86400 * 14);
 		struct tm etmbuf, *etm = gmtime_r(&et, &etmbuf);
 		strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", etm);
@@ -2114,7 +2117,7 @@ void web_client_process(struct web_client *w) {
 ssize_t web_client_send_chunk_header(struct web_client *w, size_t len)
 {
 	debug(D_DEFLATE, "%llu: OPEN CHUNK of %d bytes (hex: %x).", w->id, len, len);
-	char buf[1024];
+	char buf[24];
 	sprintf(buf, "%zX\r\n", len);
 	
 	ssize_t bytes = send(w->ofd, buf, strlen(buf), 0);
@@ -2187,7 +2190,8 @@ ssize_t web_client_send_deflate(struct web_client *w)
 	// when using compression,
 	// w->response.sent is the amount of bytes passed through compression
 
-	debug(D_DEFLATE, "%llu: web_client_send_deflate(): w->response.data->len = %d, w->response.sent = %d, w->response.zhave = %d, w->response.zsent = %d, w->response.zstream.avail_in = %d, w->response.zstream.avail_out = %d, w->response.zstream.total_in = %d, w->response.zstream.total_out = %d.", w->id, w->response.data->len, w->response.sent, w->response.zhave, w->response.zsent, w->response.zstream.avail_in, w->response.zstream.avail_out, w->response.zstream.total_in, w->response.zstream.total_out);
+	debug(D_DEFLATE, "%llu: web_client_send_deflate(): w->response.data->len = %d, w->response.sent = %d, w->response.zhave = %zu, w->response.zsent = %zu, w->response.zstream.avail_in = %d, w->response.zstream.avail_out = %d, w->response.zstream.total_in = %d, w->response.zstream.total_out = %d.",
+		w->id, w->response.data->len, w->response.sent, w->response.zhave, w->response.zsent, w->response.zstream.avail_in, w->response.zstream.avail_out, w->response.zstream.total_in, w->response.zstream.total_out);
 
 	if(w->response.data->len - w->response.sent == 0 && w->response.zstream.avail_in == 0 && w->response.zhave == w->response.zsent && w->response.zstream.avail_out != 0) {
 		// there is nothing to send
@@ -2282,7 +2286,9 @@ ssize_t web_client_send_deflate(struct web_client *w)
 		debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, len);
 	}
 	else if(len == 0) {
-		debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client (zhave = %ld, zsent = %ld, need to send = %ld).", w->id, w->response.zhave, w->response.zsent, w->response.zhave - w->response.zsent);
+		debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client (zhave = %zu, zsent = %zu, need to send = %zu).",
+			w->id, w->response.zhave, w->response.zsent, w->response.zhave - w->response.zsent);
+		
 		WEB_CLIENT_IS_DEAD(w);
 	}
 	else {
