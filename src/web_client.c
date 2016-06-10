@@ -22,6 +22,7 @@
 
 #include "common.h"
 #include "log.h"
+#include "main.h"
 #include "appconfig.h"
 #include "url.h"
 #include "web_buffer.h"
@@ -43,8 +44,6 @@ int web_donotrack_comply = 0;
 #ifdef NETDATA_WITH_ZLIB
 int web_enable_gzip = 1, web_gzip_level = 3, web_gzip_strategy = Z_DEFAULT_STRATEGY;
 #endif /* NETDATA_WITH_ZLIB */
-
-extern int netdata_exit;
 
 struct web_client *web_clients = NULL;
 unsigned long long web_clients_count = 0;
@@ -99,7 +98,7 @@ struct web_client *web_client_create(int listener)
 		sadr = (struct sockaddr*) &w->clientaddr;
 		addrlen = sizeof(w->clientaddr);
 
-		w->ifd = accept(listener, sadr, &addrlen);
+		w->ifd = accept4(listener, sadr, &addrlen, SOCK_NONBLOCK);
 		if (w->ifd == -1) {
 			error("%llu: Cannot accept new incoming connection.", w->id);
 			free(w);
@@ -141,8 +140,6 @@ struct web_client *web_client_create(int listener)
 		flag = 1;
 		if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0)
 			error("%llu: Cannot set SO_KEEPALIVE on socket.", w->id);
-
-
 	}
 
 	w->response.data = buffer_create(INITIAL_WEB_DATA_LENGTH);
@@ -446,6 +443,8 @@ int mysendfile(struct web_client *w, char *filename)
 			return 404;
 		}
 	}
+	if(fcntl(w->ifd, F_SETFL, O_NONBLOCK) < 0)
+		error("%llu: Cannot set O_NONBLOCK on file '%s'.", w->id, webfilename);
 
 	// pick a Content-Type for the file
 		 if(strstr(filename, ".html") != NULL)	w->response.data->contenttype = CT_TEXT_HTML;
@@ -1877,6 +1876,7 @@ void web_client_process(struct web_client *w) {
 					else
 						buffer_strcat(w->response.data, "I am doing it already");
 
+					error("web request to exit received.");
 					netdata_exit = 1;
 				}
 				else if(hash == hash_debug && strcmp(tok, "debug") == 0) {

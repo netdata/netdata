@@ -661,12 +661,8 @@ void rrdset_free_all(void)
 	info("Memory cleanup completed...");
 }
 
-void rrdset_save_all(void)
-{
-	debug(D_RRD_CALLS, "rrdset_save_all()");
-
-	// let it log a few error messages
-	error_log_limit_reset();
+void rrdset_save_all(void) {
+	info("Saving database...");
 
 	RRDSET *st;
 	RRDDIM *rd;

@@ -51,6 +51,39 @@ static void log_allocations(void)
 }
 #endif
 
+#ifndef HAVE_ACCEPT4
+int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
+	int fd = accept(sock, addr, addrlen);
+	int newflags = 0;
+
+	if (fd < 0) return fd;
+
+	if (flags & SOCK_NONBLOCK) {
+		newflags |= O_NONBLOCK;
+		flags &= ~SOCK_NONBLOCK;
+	}
+
+	if (flags & SOCK_CLOEXEC) {
+		newflags |= O_CLOEXEC;
+		flags &= ~SOCK_CLOEXEC;
+	}
+
+	if (flags) {
+		errno = -EINVAL;
+		return -1;
+	}
+
+	if (fcntl(fd, F_SETFL, newflags) < 0) {
+		int saved_errno = errno;
+		close(fd);
+		errno = saved_errno;
+		return -1;
+	}
+
+	return fd;
+}
+#endif
+
 static int is_ip_anything(const char *ip)
 {
 	if(!ip || !*ip

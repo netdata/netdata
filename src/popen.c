@@ -93,7 +93,9 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 
 	// fork again to become session leader
 	pid = fork();
-	if(pid == -1) fprintf(stderr, "Cannot fork again on pid %d\n", getpid());
+	if(pid == -1)
+		error("pre-execution of command '%s' on pid %d: Cannot fork 2nd time.", command, getpid());
+
 	if(pid != 0) {
 		// the parent
 		exit(0);
@@ -101,13 +103,13 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 
 	// set a new process group id for just this child
 	if( setpgid(0, 0) != 0 )
-		error("Cannot set a new process group for pid %d (%s)", getpid(), strerror(errno));
+		error("pre-execution of command '%s' on pid %d: Cannot set a new process group.", command, getpid());
 
 	if( getpgid(0) != getpid() )
-		error("Process group set is incorrect. Expected %d, found %d", getpid(), getpgid(0));
+		error("pre-execution of command '%s' on pid %d: Cannot set a new process group. Process group set is incorrect. Expected %d, found %d", command, getpid(), getpid(), getpgid(0));
 
 	if( setsid() != 0 )
-		error("Cannot set session id for pid %d (%s)", getpid(), strerror(errno));
+		error("pre-execution of command '%s' on pid %d: Cannot set session id.", command, getpid());
 
 	fprintf(stdout, "MYPID %d\n", getpid());
 	fflush(NULL);
@@ -118,18 +120,17 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 		sigset_t sigset;
 		sigfillset(&sigset);
 
-		if(pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) == -1) {
-			error("Could not block signals for threads");
-		}
+		if(pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) == -1)
+			error("pre-execution of command '%s' on pid %d: could not unblock signals for threads.", command, getpid());
+		
 		// We only need to reset ignored signals.
 		// Signals with signal handlers are reset by default.
 		struct sigaction sa;
 		sigemptyset(&sa.sa_mask);
 		sa.sa_handler = SIG_DFL;
 		sa.sa_flags = 0;
-		if(sigaction(SIGPIPE, &sa, NULL) == -1) {
-			error("Failed to change signal handler for SIGTERM");
-		}
+		if(sigaction(SIGPIPE, &sa, NULL) == -1)
+			error("pre-execution of command '%s' on pid %d: failed to set default signal handler for SIGPIPE.", command, getpid());
 	}
 
 
@@ -148,41 +149,43 @@ int mypclose(FILE *fp, pid_t pid) {
 	if(waitid(P_PID, (id_t) pid, &info, WEXITED) != -1) {
 		switch(info.si_code) {
 			case CLD_EXITED:
-				error("pid %d exited with code %d.", info.si_pid, info.si_status);
+				error("child pid %d exited with code %d.", info.si_pid, info.si_status);
 				return(info.si_status);
 				break;
 
 			case CLD_KILLED:
-				error("pid %d killed by signal %d.", info.si_pid, info.si_status);
+				error("child pid %d killed by signal %d.", info.si_pid, info.si_status);
 				return(-1);
 				break;
 
 			case CLD_DUMPED:
-				error("pid %d core dumped by signal %d.", info.si_pid, info.si_status);
+				error("child pid %d core dumped by signal %d.", info.si_pid, info.si_status);
 				return(-2);
 				break;
 
 			case CLD_STOPPED:
-				error("pid %d stopped by signal %d.", info.si_pid, info.si_status);
+				error("child pid %d stopped by signal %d.", info.si_pid, info.si_status);
 				return(0);
 				break;
 
 			case CLD_TRAPPED:
-				error("pid %d trapped by signal %d.", info.si_pid, info.si_status);
+				error("child pid %d trapped by signal %d.", info.si_pid, info.si_status);
 				return(-4);
 				break;
 
 			case CLD_CONTINUED:
-				error("pid %d continued by signal %d.", info.si_pid, info.si_status);
+				error("child pid %d continued by signal %d.", info.si_pid, info.si_status);
 				return(0);
 				break;
 
 			default:
-				error("pid %d gave us a SIGCHLD with code %d and status %d.", info.si_pid, info.si_code, info.si_status);
+				error("child pid %d gave us a SIGCHLD with code %d and status %d.", info.si_pid, info.si_code, info.si_status);
 				return(-5);
 				break;
 		}
 	}
-	else error("Cannot waitid() for pid %d", pid);
+	else
+		error("Cannot waitid() for pid %d", pid);
+	
 	return 0;
 }
