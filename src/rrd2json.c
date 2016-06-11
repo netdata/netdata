@@ -292,7 +292,7 @@ typedef struct rrdresult {
 	long c;					// current line ( -1 ~ n ), ( -1 = none, use rrdr_rows() to get number of rows )
 
 	long group;				// how many collected values were grouped for each row
-	long update_every;		// what is the suggested update frequency in seconds
+	int update_every;		// what is the suggested update frequency in seconds
 
 	calculated_number min;
 	calculated_number max;
@@ -508,10 +508,10 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t opti
 			, kq, kq, sq, r->st->name, sq
 			, kq, kq, r->update_every
 			, kq, kq, r->st->update_every
-			, kq, kq, rrdset_first_entry_t(r->st)
-			, kq, kq, rrdset_last_entry_t(r->st)
-			, kq, kq, r->before
-			, kq, kq, r->after
+			, kq, kq, (uint32_t)rrdset_first_entry_t(r->st)
+			, kq, kq, (uint32_t)rrdset_last_entry_t(r->st)
+			, kq, kq, (uint32_t)r->before
+			, kq, kq, (uint32_t)r->after
 			, kq, kq);
 
 	for(c = 0, i = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
@@ -606,8 +606,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t opti
 	}
 
 	buffer_sprintf(wb, "],\n"
-			"	%sdimensions%s: %d,\n"
-			"	%spoints%s: %d,\n"
+			"	%sdimensions%s: %ld,\n"
+			"	%spoints%s: %ld,\n"
 			"	%sformat%s: %s"
 			, kq, kq, i
 			, kq, kq, rows
@@ -697,7 +697,7 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 		snprintfz(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
 		snprintfz(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
 
-		buffer_sprintf(wb, "{\n	%scols%s:\n	[\n", kq, kq, kq, kq);
+		buffer_sprintf(wb, "{\n	%scols%s:\n	[\n", kq, kq);
 		buffer_sprintf(wb, "		{%sid%s:%s%s,%slabel%s:%stime%s,%spattern%s:%s%s,%stype%s:%sdatetime%s},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq);
 		buffer_sprintf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotation%s}},\n", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
 		buffer_sprintf(wb, "		{%sid%s:%s%s,%slabel%s:%s%s,%spattern%s:%s%s,%stype%s:%sstring%s,%sp%s:{%srole%s:%sannotationText%s}}", kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, sq, sq, kq, kq, kq, kq, sq, sq);
@@ -1221,7 +1221,7 @@ static RRDR *rrdr_create(RRDSET *st, long n)
 	return r;
 
 cleanup:
-	error("Cannot allocate RRDR memory for %d entries", n);
+	error("Cannot allocate RRDR memory for %ld entries", n);
 	if(likely(r)) rrdr_free(r);
 	return NULL;
 }
@@ -1298,22 +1298,22 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 
 #ifdef NETDATA_INTERNAL_CHECKS
 	if(after_new < first_entry_t) {
-		error("after_new %u is too small, minimum %u", after_new, first_entry_t);
+		error("after_new %u is too small, minimum %u", (uint32_t)after_new, (uint32_t)first_entry_t);
 	}
 	if(after_new > last_entry_t) {
-		error("after_new %u is too big, maximum %u", after_new, last_entry_t);
+		error("after_new %u is too big, maximum %u", (uint32_t)after_new, (uint32_t)last_entry_t);
 	}
 	if(before_new < first_entry_t) {
-		error("before_new %u is too small, minimum %u", before_new, first_entry_t);
+		error("before_new %u is too small, minimum %u", (uint32_t)before_new, (uint32_t)first_entry_t);
 	}
 	if(before_new > last_entry_t) {
-		error("before_new %u is too big, maximum %u", before_new, last_entry_t);
+		error("before_new %u is too big, maximum %u", (uint32_t)before_new, (uint32_t)last_entry_t);
 	}
 	if(start_at_slot < 0 || start_at_slot >= st->entries) {
-		error("start_at_slot is invalid %ld, expected %ld to %ld", start_at_slot, 0, st->entries - 1);
+		error("start_at_slot is invalid %ld, expected 0 to %ld", start_at_slot, st->entries - 1);
 	}
 	if(stop_at_slot < 0 || stop_at_slot >= st->entries) {
-		error("stop_at_slot is invalid %ld, expected %ld to %ld", stop_at_slot, 0, st->entries - 1);
+		error("stop_at_slot is invalid %ld, expected 0 to %ld", stop_at_slot, st->entries - 1);
 	}
 	if(points_new > (before_new - after_new) / group / st->update_every + 1) {
 		error("points_new %ld is more than points %ld", points_new, (before_new - after_new) / group / st->update_every + 1);
@@ -1342,13 +1342,13 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	RRDR *r = rrdr_create(st, points);
 	if(!r) {
 #ifdef NETDATA_INTERNAL_CHECKS
-		error("Cannot create RRDR for %s, after=%u, before=%u, duration=%u, points=%d", st->id, after, before, duration, points);
+		error("Cannot create RRDR for %s, after=%u, before=%u, duration=%u, points=%ld", st->id, (uint32_t)after, (uint32_t)before, (uint32_t)duration, points);
 #endif
 		return NULL;
 	}
 	if(!r->d) {
 #ifdef NETDATA_INTERNAL_CHECKS
-		error("Returning empty RRDR (no dimensions in RRDSET) for %s, after=%u, before=%u, duration=%u, points=%d", st->id, after, before, duration, points);
+		error("Returning empty RRDR (no dimensions in RRDSET) for %s, after=%u, before=%u, duration=%u, points=%ld", st->id, (uint32_t)after, (uint32_t)before, (uint32_t)duration, points);
 #endif
 		return r;
 	}
@@ -1365,14 +1365,14 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 	// -------------------------------------------------------------------------
 	// checks for debugging
 
-	if(debug) debug(D_RRD_STATS, "INFO %s first_t: %lu, last_t: %lu, all_duration: %lu, after: %lu, before: %lu, duration: %lu, points: %ld, group: %ld"
+	if(debug) debug(D_RRD_STATS, "INFO %s first_t: %u, last_t: %u, all_duration: %u, after: %u, before: %u, duration: %u, points: %ld, group: %ld"
 			, st->id
-			, first_entry_t
-			, last_entry_t
-			, last_entry_t - first_entry_t
-			, after
-			, before
-			, duration
+			, (uint32_t)first_entry_t
+			, (uint32_t)last_entry_t
+			, (uint32_t)(last_entry_t - first_entry_t)
+			, (uint32_t)after
+			, (uint32_t)before
+			, (uint32_t)duration
 			, points
 			, group
 			);
@@ -1407,13 +1407,13 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 			dt = st->update_every,
 			group_start_t = 0;
 
-	if(unlikely(debug)) debug(D_RRD_STATS, "BEGIN %s after_t: %lu (stop_at_t: %ld), before_t: %lu (start_at_t: %ld), start_t(now): %lu, current_entry: %ld, entries: %ld"
+	if(unlikely(debug)) debug(D_RRD_STATS, "BEGIN %s after_t: %u (stop_at_t: %ld), before_t: %u (start_at_t: %ld), start_t(now): %u, current_entry: %ld, entries: %ld"
 			, st->id
-			, after
+			, (uint32_t)after
 			, stop_at_slot
-			, before
+			, (uint32_t)before
 			, start_at_slot
-			, now
+			, (uint32_t)now
 			, st->current_entry
 			, st->entries
 			);
@@ -1915,15 +1915,15 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 		long count = 0, printed = 0, group_count = 0;
 		last_timestamp = 0;
 
-		if(st->debug) debug(D_RRD_STATS, "%s: REQUEST after:%lu before:%lu, points:%d, group:%d, CHART cur:%ld first: %lu last:%lu, CALC start_t:%ld, stop_t:%ld"
+		if(st->debug) debug(D_RRD_STATS, "%s: REQUEST after:%u before:%u, points:%ld, group:%ld, CHART cur:%ld first: %u last:%u, CALC start_t:%ld, stop_t:%ld"
 					, st->id
-					, after
-					, before
+					, (uint32_t)after
+					, (uint32_t)before
 					, points
 					, group
 					, st->current_entry
-					, rrdset_first_entry_t(st)
-					, rrdset_last_entry_t(st)
+					, (uint32_t)rrdset_first_entry_t(st)
+					, (uint32_t)rrdset_last_entry_t(st)
 					, t
 					, stop_at_t
 					);

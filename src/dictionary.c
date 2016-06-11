@@ -90,14 +90,14 @@ static NAME_VALUE *dictionary_name_value_create_nolock(DICTIONARY *dict, const c
 	debug(D_DICTIONARY, "Creating name value entry for name '%s'.", name);
 
 	NAME_VALUE *nv = calloc(1, sizeof(NAME_VALUE));
-	if(unlikely(!nv)) fatal("Cannot allocate name_value of size %z", sizeof(NAME_VALUE));
+	if(unlikely(!nv)) fatal("Cannot allocate name_value of size %zu", sizeof(NAME_VALUE));
 
 	if(dict->flags & DICTIONARY_FLAG_NAME_LINK_DONT_CLONE)
 		nv->name = (char *)name;
 	else {
 		nv->name = strdup(name);
 		if (unlikely(!nv->name))
-			fatal("Cannot allocate name_value.name of size %z", strlen(name));
+			fatal("Cannot allocate name_value.name of size %zu", strlen(name));
 	}
 
 	nv->hash = (hash)?hash:simple_hash(nv->name);
@@ -107,7 +107,7 @@ static NAME_VALUE *dictionary_name_value_create_nolock(DICTIONARY *dict, const c
 	else {
 		nv->value = malloc(value_len);
 		if (unlikely(!nv->value))
-			fatal("Cannot allocate name_value.value of size %z", value_len);
+			fatal("Cannot allocate name_value.value of size %zu", value_len);
 
 		memcpy(nv->value, value, value_len);
 	}
@@ -215,7 +215,7 @@ void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t val
 					*old = nv->value;
 
 			if(unlikely(!nv->value))
-				fatal("Cannot allocate value of size %z", value_len);
+				fatal("Cannot allocate value of size %zu", value_len);
 
 			memcpy(value, value, value_len);
 			nv->value = value;
