@@ -18,6 +18,7 @@
 #include "log.h"
 #include "appconfig.h"
 
+#include "main.h"
 #include "rrd.h"
 
 #define RRD_DEFAULT_GAP_INTERPOLATIONS 1
@@ -810,6 +811,8 @@ void rrdset_next_plugins(RRDSET *st)
 
 unsigned long long rrdset_done(RRDSET *st)
 {
+	if(unlikely(netdata_exit)) return 0;
+
 	debug(D_RRD_CALLS, "rrdset_done() for chart %s", st->name);
 
 	RRDDIM *rd, *last;
