@@ -6,18 +6,19 @@ import time
 import importlib.machinery
 import configparser
 
-
 class PythonCharts(object):
-
+    
     def __init__(self,
                  interval=1,
                  modules=[],
                  modules_path='../python.d/',
                  modules_configs='../conf.d/'):
+        self.first_run = True
         self.interval = interval
         # check if plugin directory exists
         if not os.path.isdir(modules_path):
             debug("cannot find charts directory ", modules_path)
+            sys.stdout.write("DISABLE\n")
             sys.exit(1)
         self.configs = modules_configs
 
@@ -31,21 +32,29 @@ class PythonCharts(object):
             self.load_modules(modules_path)
             if len(self.modules) == 0:
                 debug("cannot find modules directory", modules_path)
-                # sys.stdout.write("DISABLE\n")
+                sys.stdout.write("DISABLE\n")
                 sys.exit(1)
 
         self.load_configs()
 
         # set last execution and execution frequency dict
         self.timetable = {}
-        #last_exec = time.time()
-        last_exec = 0
         for m in self.modules:
             try:
                 interval = m.update_every
+                interval = int(interval)
             except AttributeError:
                 interval = self.interval
-            self.timetable[m.__name__] = [last_exec, int(interval)]
+            except ValueError:
+                interval = self.interval
+                debug(m.__name__ + 
+                      ": wrong value of 'update_every' setting to " +
+                      str(self.interval))
+            # ensure module update frequency is not less than execution of this program
+            if interval < self.interval:
+                interval = self.interval
+            # charts updates are twice as frequent as user specified
+            self.timetable[m.__name__] = [0, interval/2]
 
     def import_plugin(self, path, name=None):
         if name is None:
@@ -75,11 +84,10 @@ class PythonCharts(object):
                 for k, v in read_config(configfile).items():
                     setattr(m, k, v)
             else:
-                debug(
-                    m.__name__ +
-                    ": configuration file '" +
-                    configfile +
-                    "' not found. Using defaults.")
+                debug(m.__name__ +
+                      ": configuration file '" +
+                      configfile +
+                      "' not found. Using defaults.")
 
     def disable_module(self, mod, reason=None):
         self.modules.remove(mod)
@@ -87,28 +95,24 @@ class PythonCharts(object):
         if reason is None:
             return
         elif reason[:3] == "no ":
-            debug(
-                "chart '" +
-                mod.__name__,
-                "' does not seem to have " +
-                reason[3:] +
-                "() function. Disabling it.")
+            debug("chart '" +
+                  mod.__name__,
+                  "' does not seem to have " +
+                  reason[3:] +
+                  "() function. Disabling it.")
         elif reason[:7] == "failed ":
-            debug(
-                "chart '" +
-                mod.__name__ +
-                reason[3:] +
-                "() function. reports failure.")
+            debug("chart '" +
+                  mod.__name__ +
+                  reason[3:] +
+                  "() function. reports failure.")
         elif reason[:13] == "configuration":
-            debug(
-                mod.__name__,
-                "configuration file '" +
-                self.configs +
-                mod.__name__ +
-                ".conf' not found. Using defaults.")
+            debug(mod.__name__,
+                  "configuration file '" +
+                  self.configs +
+                  mod.__name__ +
+                  ".conf' not found. Using defaults.")
         elif reason[:11] == "misbehaving":
             debug(mod.__name__, "is misbeaving. Disabling it")
-        # sys.stdout.write('DISABLE')
 
     def check(self):
         for mod in self.modules:
@@ -127,7 +131,6 @@ class PythonCharts(object):
                     self.disable_module(mod, "failed create")
                 else:
                     chart = mod.__name__
-                    # sys.stdout.write("CHART netdata.plugin_pythond_"+chart+" '' 'Execution time for "+chart+" plugin' 'milliseconds / run' python.d netdata.plugin_python area 145000 "+str(self.interval)+'\n')
                     sys.stdout.write(
                         "CHART netdata.plugin_pythond_" +
                         chart +
@@ -136,8 +139,7 @@ class PythonCharts(object):
                         " plugin' 'milliseconds / run' python.d netdata.plugin_python area 145000 " +
                         str(self.timetable[mod.__name__][1]) +
                         '\n')
-                    sys.stdout.write(
-                        "DIMENSION run_time 'run time' absolute 1 1\n\n")
+                    sys.stdout.write("DIMENSION run_time 'run time' absolute 1 1\n\n")
                     sys.stdout.flush()
             except AttributeError:
                 self.disable_module(mod, "no create")
@@ -150,12 +152,11 @@ class PythonCharts(object):
         if (t1 - self.timetable[mod.__name__][0]) < self.timetable[mod.__name__][1]:
             return
         try:
-            #            t=int((t1- self.timetable[mod.__name__][0]) * 1000)
-            #            if t == 0: t=""
-            t = ""  # FIXME
+            if not self.first_run:
+                t = ""
+            else:
+                t=int((t1- self.timetable[mod.__name__][0]) * 1000000)
             if not mod.update(t):
-                # if not mod.update(int((t1- self.timetable[mod.__name__][0]) *
-                # 1000)):
                 self.disable_module(mod, "update failed")
                 return
         except AttributeError:
@@ -165,11 +166,11 @@ class PythonCharts(object):
             self.disable_module(mod, "misbehaving")
             return
         t2 = time.time()
-#        dt = int((t2 - self.timetable[mod.__name__][0]) * 1000)
-#        if dt == 0: dt=""
-        # dt="" #FIXME
-        #sys.stdout.write("BEGIN netdata.plugin_pythond_"+mod.__name__+" "+str(dt)+'\n')
-        sys.stdout.write("BEGIN netdata.plugin_pythond_" + mod.__name__ + "\n")
+        if self.first_run:
+            dt = ""
+        else:
+            dt = int((t2 - self.timetable[mod.__name__][0]) * 1000000)
+        sys.stdout.write("BEGIN netdata.plugin_pythond_"+mod.__name__+" "+str(dt)+'\n')
         sys.stdout.write("SET run_time = " + str(int((t2 - t1) * 1000)) + '\n')
         sys.stdout.write("END\n")
         sys.stdout.flush()
@@ -181,10 +182,10 @@ class PythonCharts(object):
             for mod in self.modules:
                 self.update_module(mod)
             time.sleep((self.interval - (time.time() - t_begin)) / 2)
+            self.first_run = False
 
 
 def read_config(path):
-    # TODO make it bulletproof
     config = configparser.ConfigParser()
     config_str = ""
     try:
@@ -208,6 +209,7 @@ def debug(*args):
 
 
 def parse_cmdline(directory, *commands):
+    # TODO number -> interval
     global DEBUG_FLAG, PROGRAM
     DEBUG_FLAG = False
 
@@ -235,7 +237,6 @@ def run():
     main_dir = os.getenv('NETDATA_PLUGINS_DIR',
                          os.path.abspath(__file__).strip("python.d.plugin.py"))
     config_dir = os.getenv('NETDATA_CONFIG_DIR', "/etc/netdata/")
-  #  logs_dir = os.getenv('NETDATA_LOGS_DIR',None) #TODO logging?
     interval = int(os.getenv('NETDATA_UPDATE_EVERY', 1))
 
     # read configuration file
@@ -249,6 +250,7 @@ def run():
         try:
             if str(conf['enable']) == "no":
                 debug("disabled in configuration file")
+                sys.stdout.write("DISABLE\n")
                 sys.exit(1)
         except (KeyError, TypeError):
             pass
