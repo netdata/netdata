@@ -359,6 +359,7 @@ do
 	if [ -f "${NETDATA_PREFIX}/etc/netdata/${x}.installer_backup.${installer_backup_suffix}" ]
 		then
 		cp -p "${NETDATA_PREFIX}/etc/netdata/${x}.installer_backup.${installer_backup_suffix}" "${NETDATA_PREFIX}/etc/netdata/${x}"
+		rm -f "${NETDATA_PREFIX}/etc/netdata/${x}.installer_backup.${installer_backup_suffix}"
 	fi
 done
 
