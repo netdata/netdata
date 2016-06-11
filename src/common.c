@@ -701,6 +701,18 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm)
 #ifdef MADV_MERGEABLE
 				}
 				else {
+/*
+					// test - load the file into memory
+					mem = calloc(1, size);
+					if(mem) {
+						if(lseek(fd, 0, SEEK_SET) == 0) {
+							if(read(fd, mem, size) != (ssize_t)size)
+								error("Cannot read from file '%s'", filename);
+						}
+						else
+							error("Cannot seek to beginning of file '%s'.", filename);
+					}
+*/
 					mem = mmap(NULL, size, PROT_READ|PROT_WRITE, flags|MAP_ANONYMOUS, -1, 0);
 					if(mem != MAP_FAILED) {
 						if(lseek(fd, 0, SEEK_SET) == 0) {

@@ -277,7 +277,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
 				sleep(5);
 				create_listen_socket();
 				if(listen_fd < 0)
-					fatal("Cannot listen for web clients (connected clients %llu).", global_statistics.connected_clients);
+					fatal("Cannot listen for web clients (connected clients %lu).", global_statistics.connected_clients);
 
 				failures = 0;
 			}
@@ -294,7 +294,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
 				}
 
 				if(pthread_create(&w->thread, NULL, web_client_main, w) != 0) {
-					error("%llu: failed to create new thread for web client.");
+					error("%llu: failed to create new thread for web client.", w->id);
 					w->obsolete = 1;
 				}
 				else if(pthread_detach(w->thread) != 0) {
@@ -446,7 +446,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
 
 				create_listen_socket();
 				if(listen_fd < 0 || listen_fd >= FD_SETSIZE)
-					fatal("Cannot listen for web clients (connected clients %llu).", global_statistics.connected_clients);
+					fatal("Cannot listen for web clients (connected clients %lu).", global_statistics.connected_clients);
 
 				FD_ZERO (&ifds);
 				FD_ZERO (&ofds);

@@ -119,17 +119,17 @@ void web_server_threading_selection(void) {
 	else if(!strcmp(s, "fixed"))
 		web_gzip_strategy = Z_FIXED;
 	else {
-		error("Invalid compression strategy '%s'. Valid strategies are 'default', 'filtered', 'huffman only', 'rle' and 'fixed'. Proceeding with 'default'.");
+		error("Invalid compression strategy '%s'. Valid strategies are 'default', 'filtered', 'huffman only', 'rle' and 'fixed'. Proceeding with 'default'.", s);
 		web_gzip_strategy = Z_DEFAULT_STRATEGY;
 	}
 
 	web_gzip_level = (int)config_get_number("global", "web compression level", 3);
 	if(web_gzip_level < 1) {
-		error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 1 (fastest compression).");
+		error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 1 (fastest compression).", web_gzip_level);
 		web_gzip_level = 1;
 	}
 	else if(web_gzip_level > 9) {
-		error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 9 (best compression).");
+		error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 9 (best compression).", web_gzip_level);
 		web_gzip_level = 9;
 	}
 #endif /* NETDATA_WITH_ZLIB */
