@@ -212,6 +212,7 @@ def parse_cmdline(directory, *commands):
     # TODO number -> interval
     global DEBUG_FLAG, PROGRAM
     DEBUG_FLAG = False
+    interval = None
 
     mods = []
     for cmd in commands[1:]:
@@ -223,11 +224,17 @@ def parse_cmdline(directory, *commands):
         elif os.path.isfile(directory + cmd + ".chart.py") or os.path.isfile(directory + cmd):
             DEBUG_FLAG = True
             mods.append(cmd.replace(".chart.py", ""))
+        else:
+            try:
+                interval = int(cmd)
+            except ValueError:
+                pass
 
     PROGRAM = commands[0].split('/')[-1].split('.plugin')[0]
     debug("started from", commands[0], "with options:", *commands[1:])
 
-    return mods
+    return {'interval': interval,
+            'modules': mods}
 
 
 # if __name__ == '__main__':
@@ -282,7 +289,10 @@ def run():
         modules_conf += "/"
 
     # parse passed command line arguments
-    modules = parse_cmdline(modules_dir, *sys.argv)
+    out = parse_cmdline(modules_dir, *sys.argv)
+    modules = out['modules']
+    if out['interval'] is not None:
+        interval = out['interval']
 
     # run plugins
     charts = PythonCharts(interval, modules, modules_dir, modules_conf)
