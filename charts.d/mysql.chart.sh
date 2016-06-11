@@ -7,7 +7,7 @@
 # This statement does not require any privilege.
 # It requires only the ability to connect to the server.
 
-mysql_update_every=5
+mysql_update_every=2
 mysql_priority=60000
 
 declare -A mysql_cmds=() mysql_opts=() mysql_ids=() mysql_data=()
