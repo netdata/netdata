@@ -172,7 +172,7 @@ void *realloc_debug(const char *file, int line, const char *function, void *ptr,
 	allocations.allocated -= old_size;
 
 	debug(D_MEMORY, "MEMORY: Re-allocated from %zu to %zu bytes for %s/%u@%s."
-		" Status: allocated %z in %zu allocs."
+		" Status: allocated %zu in %zu allocs."
 		, old_size, size
 		, function, line, file
 		, allocations.allocated
@@ -547,7 +547,7 @@ int read_apps_groups_conf(const char *name)
 
 			struct target *n = get_apps_groups_target(s, w);
 			if(!n) {
-				error("Cannot create target '%s' (line %d, word %d)", s, line, word);
+				error("Cannot create target '%s' (line %lu, word %lu)", s, line, word);
 				continue;
 			}
 
