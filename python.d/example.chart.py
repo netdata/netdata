@@ -1,12 +1,13 @@
 import random
 
-update_every=5
+update_every = 5
+priority = 30000
 
 def check():
     return True
 
 def create():
-    print("CHART python_example.random '' 'A random number' 'random number' random random line 90000 1")
+    print("CHART python_example.random '' 'A random number' 'random number' random random line "+str(priority)+" 1")
     print("DIMENSION random1 '' absolute 1 1")
     return True
 
