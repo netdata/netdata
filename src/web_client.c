@@ -2050,7 +2050,7 @@ void web_client_process(struct web_client *w) {
 	buffer_strcat(w->response.header_output, "\r\n");
 
 	// sent the HTTP header
-	debug(D_WEB_DATA, "%llu: Sending response HTTP header of size %d: '%s'"
+	debug(D_WEB_DATA, "%llu: Sending response HTTP header of size %zu: '%s'"
 			, w->id
 			, buffer_strlen(w->response.header_output)
 			, buffer_tostring(w->response.header_output)
@@ -2063,8 +2063,10 @@ void web_client_process(struct web_client *w) {
 		if(bytes > 0)
 			w->stats_sent_bytes += bytes;
 
-		debug(D_WEB_CLIENT, "%llu: HTTP Header failed to be sent (I sent %d bytes but the system sent %d bytes). Closing web client.", w->id,
-			  buffer_strlen(w->response.header_output), bytes);
+		debug(D_WEB_CLIENT, "%llu: HTTP Header failed to be sent (I sent %zu bytes but the system sent %zd bytes). Closing web client."
+			, w->id
+			, buffer_strlen(w->response.header_output)
+			, bytes);
 
 		WEB_CLIENT_IS_DEAD(w);
 		return;
@@ -2079,16 +2081,16 @@ void web_client_process(struct web_client *w) {
 	// pretty logging
 	switch(w->mode) {
 		case WEB_CLIENT_MODE_OPTIONS:
-			debug(D_WEB_CLIENT, "%llu: Done preparing the OPTIONS response. Sending data (%d bytes) to client.", w->id, w->response.data->len);
+			debug(D_WEB_CLIENT, "%llu: Done preparing the OPTIONS response. Sending data (%zu bytes) to client.", w->id, w->response.data->len);
 			break;
 
 		case WEB_CLIENT_MODE_NORMAL:
-			debug(D_WEB_CLIENT, "%llu: Done preparing the response. Sending data (%d bytes) to client.", w->id, w->response.data->len);
+			debug(D_WEB_CLIENT, "%llu: Done preparing the response. Sending data (%zu bytes) to client.", w->id, w->response.data->len);
 			break;
 
 		case WEB_CLIENT_MODE_FILECOPY:
 			if(w->response.rlen) {
-				debug(D_WEB_CLIENT, "%llu: Done preparing the response. Will be sending data file of %d bytes to client.", w->id, w->response.rlen);
+				debug(D_WEB_CLIENT, "%llu: Done preparing the response. Will be sending data file of %zu bytes to client.", w->id, w->response.rlen);
 				w->wait_receive = 1;
 
 				/*
@@ -2116,13 +2118,13 @@ void web_client_process(struct web_client *w) {
 
 ssize_t web_client_send_chunk_header(struct web_client *w, size_t len)
 {
-	debug(D_DEFLATE, "%llu: OPEN CHUNK of %d bytes (hex: %x).", w->id, len, len);
+	debug(D_DEFLATE, "%llu: OPEN CHUNK of %zu bytes (hex: %zx).", w->id, len, len);
 	char buf[24];
 	sprintf(buf, "%zX\r\n", len);
 	
 	ssize_t bytes = send(w->ofd, buf, strlen(buf), 0);
 	if(bytes > 0) {
-		debug(D_DEFLATE, "%llu: Sent chunk header %d bytes.", w->id, bytes);
+		debug(D_DEFLATE, "%llu: Sent chunk header %zd bytes.", w->id, bytes);
 		w->stats_sent_bytes += bytes;
 	}
 
@@ -2144,7 +2146,7 @@ ssize_t web_client_send_chunk_close(struct web_client *w)
 
 	ssize_t bytes = send(w->ofd, "\r\n", 2, 0);
 	if(bytes > 0) {
-		debug(D_DEFLATE, "%llu: Sent chunk suffix %d bytes.", w->id, bytes);
+		debug(D_DEFLATE, "%llu: Sent chunk suffix %zd bytes.", w->id, bytes);
 		w->stats_sent_bytes += bytes;
 	}
 
@@ -2166,7 +2168,7 @@ ssize_t web_client_send_chunk_finalize(struct web_client *w)
 
 	ssize_t bytes = send(w->ofd, "\r\n0\r\n\r\n", 7, 0);
 	if(bytes > 0) {
-		debug(D_DEFLATE, "%llu: Sent chunk suffix %d bytes.", w->id, bytes);
+		debug(D_DEFLATE, "%llu: Sent chunk suffix %zd bytes.", w->id, bytes);
 		w->stats_sent_bytes += bytes;
 	}
 
@@ -2190,7 +2192,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
 	// when using compression,
 	// w->response.sent is the amount of bytes passed through compression
 
-	debug(D_DEFLATE, "%llu: web_client_send_deflate(): w->response.data->len = %d, w->response.sent = %d, w->response.zhave = %zu, w->response.zsent = %zu, w->response.zstream.avail_in = %d, w->response.zstream.avail_out = %d, w->response.zstream.total_in = %d, w->response.zstream.total_out = %d.",
+	debug(D_DEFLATE, "%llu: web_client_send_deflate(): w->response.data->len = %zu, w->response.sent = %zu, w->response.zhave = %zu, w->response.zsent = %zu, w->response.zstream.avail_in = %d, w->response.zstream.avail_out = %d, w->response.zstream.total_in = %lu, w->response.zstream.total_out = %lu.",
 		w->id, w->response.data->len, w->response.sent, w->response.zhave, w->response.zsent, w->response.zstream.avail_in, w->response.zstream.avail_out, w->response.zstream.total_in, w->response.zstream.total_out);
 
 	if(w->response.data->len - w->response.sent == 0 && w->response.zstream.avail_in == 0 && w->response.zhave == w->response.zsent && w->response.zstream.avail_out != 0) {
@@ -2232,7 +2234,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
 			if(t < 0) return t;
 		}
 
-		debug(D_DEFLATE, "%llu: Compressing %d new bytes starting from %d (and %d left behind).", w->id, (w->response.data->len - w->response.sent), w->response.sent, w->response.zstream.avail_in);
+		debug(D_DEFLATE, "%llu: Compressing %zu new bytes starting from %zu (and %u left behind).", w->id, (w->response.data->len - w->response.sent), w->response.sent, w->response.zstream.avail_in);
 
 		// give the compressor all the data not passed through the compressor yet
 		if(w->response.data->len > w->response.sent) {
@@ -2268,7 +2270,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
 		// keep track of the bytes passed through the compressor
 		w->response.sent = w->response.data->len;
 
-		debug(D_DEFLATE, "%llu: Compression produced %d bytes.", w->id, w->response.zhave);
+		debug(D_DEFLATE, "%llu: Compression produced %zu bytes.", w->id, w->response.zhave);
 
 		// open a new chunk
 		ssize_t t2 = web_client_send_chunk_header(w, w->response.zhave);
@@ -2276,19 +2278,19 @@ ssize_t web_client_send_deflate(struct web_client *w)
 		t += t2;
 	}
 	
-	debug(D_WEB_CLIENT, "%llu: Sending %d bytes of data (+%d of chunk header).", w->id, w->response.zhave - w->response.zsent, t);
+	debug(D_WEB_CLIENT, "%llu: Sending %zu bytes of data (+%zd of chunk header).", w->id, w->response.zhave - w->response.zsent, t);
 
 	len = send(w->ofd, &w->response.zbuffer[w->response.zsent], (size_t) (w->response.zhave - w->response.zsent), MSG_DONTWAIT);
 	if(len > 0) {
 		w->stats_sent_bytes += len;
 		w->response.zsent += len;
 		len += t;
-		debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, len);
+		debug(D_WEB_CLIENT, "%llu: Sent %zu bytes.", w->id, len);
 	}
 	else if(len == 0) {
 		debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client (zhave = %zu, zsent = %zu, need to send = %zu).",
 			w->id, w->response.zhave, w->response.zsent, w->response.zhave - w->response.zsent);
-		
+
 		WEB_CLIENT_IS_DEAD(w);
 	}
 	else {
@@ -2338,7 +2340,7 @@ ssize_t web_client_send(struct web_client *w) {
 	if(likely(bytes > 0)) {
 		w->stats_sent_bytes += bytes;
 		w->response.sent += bytes;
-		debug(D_WEB_CLIENT, "%llu: Sent %d bytes.", w->id, bytes);
+		debug(D_WEB_CLIENT, "%llu: Sent %zu bytes.", w->id, bytes);
 	}
 	else if(likely(bytes == 0)) {
 		debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client.", w->id);
@@ -2373,7 +2375,7 @@ ssize_t web_client_receive(struct web_client *w)
 		w->response.data->len += bytes;
 		w->response.data->buffer[w->response.data->len] = '\0';
 
-		debug(D_WEB_CLIENT, "%llu: Received %d bytes.", w->id, bytes);
+		debug(D_WEB_CLIENT, "%llu: Received %zu bytes.", w->id, bytes);
 		debug(D_WEB_DATA, "%llu: Received data: '%s'.", w->id, &w->response.data->buffer[old]);
 
 		if(w->mode == WEB_CLIENT_MODE_FILECOPY) {
@@ -2441,7 +2443,7 @@ void *web_client_main(void *ptr)
 			break;
 		}
 		else if(unlikely(!w->wait_receive && !w->wait_send)) {
-			debug(D_WEB_CLIENT, "%llu: client is not set for neither receiving nor sending data.");
+			debug(D_WEB_CLIENT, "%llu: client is not set for neither receiving nor sending data.", w->id);
 			break;
 		}
 

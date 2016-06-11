@@ -876,7 +876,7 @@ unsigned long long rrdset_done(RRDSET *st)
 
 	// check if we will re-write the entire data set
 	if(unlikely(usecdiff(&st->last_collected_time, &st->last_updated) > st->update_every * st->entries * 1000000ULL)) {
-		info("%s: too old data (last updated at %u.%u, last collected at %u.%u). Reseting it. Will not store the next entry.", st->name, st->last_updated.tv_sec, st->last_updated.tv_usec, st->last_collected_time.tv_sec, st->last_collected_time.tv_usec);
+		info("%s: too old data (last updated at %zu.%zu, last collected at %zu.%zu). Reseting it. Will not store the next entry.", st->name, st->last_updated.tv_sec, st->last_updated.tv_usec, st->last_collected_time.tv_sec, st->last_collected_time.tv_usec);
 		rrdset_reset(st);
 
 		st->usec_since_last_update = st->update_every * 1000000ULL;
