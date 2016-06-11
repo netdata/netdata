@@ -219,7 +219,7 @@ def debug(*args):
 
 def parse_cmdline(directory, *commands):
     # TODO number -> interval
-    global DEBUG_FLAG, PROGRAM
+    global DEBUG_FLAG
     DEBUG_FLAG = False
     interval = None
 
@@ -239,7 +239,6 @@ def parse_cmdline(directory, *commands):
             except ValueError:
                 pass
 
-    PROGRAM = commands[0].split('/')[-1].split('.plugin')[0]
     debug("started from", commands[0], "with options:", *commands[1:])
 
     return {'interval': interval,
@@ -248,6 +247,9 @@ def parse_cmdline(directory, *commands):
 
 # if __name__ == '__main__':
 def run():
+    global DEBUG_FLAG, PROGRAM
+    DEBUG_FLAG = True
+    PROGRAM = sys.argv[0].split('/')[-1].split('.plugin')[0]
     # parse env variables
     # https://github.com/firehol/netdata/wiki/External-Plugins#environment-variables
     main_dir = os.getenv('NETDATA_PLUGINS_DIR',
@@ -282,7 +284,6 @@ def run():
             interval = int(conf['interval'])
         except (KeyError, TypeError):
             pass  # default interval
-        global DEBUG_FLAG
         try:
             DEBUG_FLAG = bool(conf['debug'])
         except (KeyError, TypeError):
