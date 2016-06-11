@@ -24,6 +24,7 @@ class PythonCharts(object):
                  modules_configs='../conf.d/'):
         self.first_run = True
         self.interval = interval
+        self.default_priority = 60000
         # check if plugin directory exists
         if not os.path.isdir(modules_path):
             debug("cannot find charts directory ", modules_path)
@@ -64,6 +65,15 @@ class PythonCharts(object):
                 interval = self.interval
             # charts updates are twice as frequent as user specified
             self.timetable[m.__name__] = [0, interval/2.0]
+        
+        # set priorities
+        for m in self.modules:
+            print(m.priority)
+            try:
+                m.priority = int(m.priority)
+            except (AttributeError,ValueError):
+                m.priority = self.default_priority
+                
 
     def import_plugin(self, path, name=None):
         if name is None:
