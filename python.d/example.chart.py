@@ -1,5 +1,7 @@
 import random
 
+update_every=10
+
 def check():
     return True
 
