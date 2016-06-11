@@ -79,3 +79,5 @@ cmake_install.cmake
 contrib/debian/changelog
 profile/benchmark-dictionary
 profile/benchmark-registry
+
+*.pyc

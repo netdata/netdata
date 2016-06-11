@@ -12,6 +12,7 @@ dist_plugins_SCRIPTS = \
 	charts.d.dryrun-helper.sh \
 	charts.d.plugin \
 	node.d.plugin \
+	python.d.plugin \
 	tc-qos-helper.sh \
 	loopsleepms.sh.inc \
 	$(NULL)
