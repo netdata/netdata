@@ -682,14 +682,14 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 								st->isdetail = 1;
 
 								rrddim_add(st, "avail", NULL, 1, 1024*1024*1024, RRDDIM_ABSOLUTE);
-								rrddim_add(st, "reserved_for_root", "reserved for root", 1, 1024*1024*1024, RRDDIM_ABSOLUTE);
 								rrddim_add(st, "used" , NULL, 1, 1024*1024*1024, RRDDIM_ABSOLUTE);
+								rrddim_add(st, "reserved_for_root", "reserved for root", 1, 1024*1024*1024, RRDDIM_ABSOLUTE);
 							}
 							else rrdset_next_usec(st, dt);
 
 							rrddim_set(st, "avail", space_avail);
-							rrddim_set(st, "reserved_for_root", space_avail_root);
 							rrddim_set(st, "used", space_used);
+							rrddim_set(st, "reserved_for_root", space_avail_root);
 							rrdset_done(st);
 						}
 
@@ -702,14 +702,14 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 								st->isdetail = 1;
 
 								rrddim_add(st, "avail", NULL, 1, 1, RRDDIM_ABSOLUTE);
-								rrddim_add(st, "reserved_for_root", "reserved for root", 1, 1, RRDDIM_ABSOLUTE);
 								rrddim_add(st, "used" , NULL, 1, 1, RRDDIM_ABSOLUTE);
+								rrddim_add(st, "reserved_for_root", "reserved for root", 1, 1, RRDDIM_ABSOLUTE);
 							}
 							else rrdset_next_usec(st, dt);
 
 							rrddim_set(st, "avail", inodes_avail);
-							rrddim_set(st, "reserved_for_root", inodes_avail_root);
 							rrddim_set(st, "used", inodes_used);
+							rrddim_set(st, "reserved_for_root", inodes_avail_root);
 							rrdset_done(st);
 						}
 					}

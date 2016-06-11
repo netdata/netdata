@@ -4,7 +4,7 @@ squid_host=
 squid_port=
 squid_url=
 squid_timeout=2
-squid_update_every=5
+squid_update_every=2
 squid_priority=60000
 
 squid_get_stats_internal() {

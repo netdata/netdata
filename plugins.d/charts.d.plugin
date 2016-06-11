@@ -508,7 +508,8 @@ declare -A charts_last_update=() charts_update_every=() charts_next_update=() ch
 global_update() {
 	local exit_at \
 		c=0 dt ret last_ms exec_start_ms exec_end_ms \
-		chart now_charts=() next_charts=($run_charts)
+		chart now_charts=() next_charts=($run_charts) \
+		next_ms x seconds millis
 
 	# return the current time in ms in $now_ms
 	current_time_ms
@@ -600,12 +601,20 @@ global_update() {
 			suspend || ( echo >&2 "$PROGRAM_NAME: suspend returned error $?, falling back to sleep."; loopsleepms $debug_time $update_every $time_divisor)
 		else
 			# wait the time you are required to
-			#loopsleepms $debug_time $update_every $time_divisor
-			if [ ${LOOPSLEEPMS_HIGHRES} -eq 1 ]
+			next_ms=$((now_ms + (update_every * 1000 * 100) ))
+			for x in "${charts_next_update[@]}"; do [ ${x} -lt ${next_ms} ] && next_ms=${x}; done
+			next_ms=$((next_ms - now_ms))
+
+			if [ ${LOOPSLEEPMS_HIGHRES} -eq 1 -a ${next_ms} -gt 0 ]
 				then
-				sleep 0.2
+				seconds=$(( next_ms / 1000 ))
+				millis=$(( next_ms % 1000 ))
+				[ ${millis} -lt 10  ] && millis="0${millis}"
+				[ ${millis} -lt 100 ] && millis="0${millis}"
+				[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: sleeping for ${seconds}.${millis} seconds."
+				sleep ${seconds}.${millis}
 			else
-				sleep 1
+				sleep $update_every
 			fi
 		fi
 
