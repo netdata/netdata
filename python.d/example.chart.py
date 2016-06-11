@@ -1,6 +1,6 @@
 import random
 
-update_every=10
+update_every=5
 
 def check():
     return True
