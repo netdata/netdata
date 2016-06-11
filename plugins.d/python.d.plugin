@@ -54,7 +54,7 @@ class PythonCharts(object):
             if interval < self.interval:
                 interval = self.interval
             # charts updates are twice as frequent as user specified
-            self.timetable[m.__name__] = [0, interval/2]
+            self.timetable[m.__name__] = [0, interval/2.0]
 
     def import_plugin(self, path, name=None):
         if name is None:
