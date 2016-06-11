@@ -35,9 +35,13 @@ class PythonCharts(object):
         self.modules = []
         if len(modules) > 0:
             for m in modules:
-                self.modules.append(
-                    self.import_plugin(
-                        modules_path + m + ".chart.py"))
+                mod = self.import_plugin(modules_path + m + ".chart.py")
+                if mod is not None:
+                    self.modules.append(mod)
+            if len(self.modules) == 0:
+                debug("cannot find provided module(s)", modules_path)
+                sys.stdout.write("DISABLE\n")
+                sys.exit(1)
         else:
             self.load_modules(modules_path)
             if len(self.modules) == 0:
