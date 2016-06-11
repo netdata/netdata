@@ -3,8 +3,17 @@
 import os
 import sys
 import time
-import importlib.machinery
-import configparser
+#import configparser
+#import importlib.machinery
+try:
+    assert sys.version_info >= (3,1)
+    import configparser
+    import importlib.machinery
+except AssertionError:
+    sys.stderr.write('Not supported python version. Needed python >= 3.1\n')
+    sys.stdout.write('DISABLE\n')
+    sys.exit(1)
+
 
 class PythonCharts(object):
     
