@@ -128,7 +128,7 @@ void debug_int( const char *file, const char *function, const unsigned long line
 	log_date(stdout);
 	va_start( args, fmt );
 	printf("DEBUG (%04lu@%-10.10s:%-15.15s): %s: ", line, file, function, program_name);
-	printf(fmt, args);
+	vprintf(fmt, args);
 	va_end( args );
 	putchar('\n');
 
