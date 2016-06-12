@@ -695,12 +695,6 @@ cleanup:
 }
 
 int web_client_api_v1_badge(struct web_client *w, char *url) {
-	// chart
-	// dimensions
-	// before
-	// after
-	// points
-
 	int ret = 400;
 	buffer_flush(w->response.data);
 
