@@ -153,6 +153,7 @@ AC_SUBST([varlibdir], ["\$(localstatedir)/lib/netdata"])
 AC_SUBST([cachedir], ["\$(localstatedir)/cache/netdata"])
 AC_SUBST([chartsdir], ["\$(libexecdir)/netdata/charts.d"])
 AC_SUBST([nodedir], ["\$(libexecdir)/netdata/node.d"])
+AC_SUBST([pythondir], ["\$(libexecdir)/netdata/python.d"])
 AC_SUBST([configdir], ["\$(sysconfdir)/netdata"])
 AC_SUBST([logdir], ["\$(localstatedir)/log/netdata"])
 AC_SUBST([pluginsdir], ["\$(libexecdir)/netdata/plugins.d"])
@@ -172,6 +173,7 @@ AC_CONFIG_FILES([
 	charts.d/Makefile
 	conf.d/Makefile
 	netdata.spec
+	python.d/Makefile
 	node.d/Makefile
 	plugins.d/Makefile
 	src/Makefile
