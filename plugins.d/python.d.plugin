@@ -128,7 +128,7 @@ class PythonCharts(object):
                   mod.__name__ +
                   ".conf' not found. Using defaults.")
         elif reason[:11] == "misbehaving":
-            debug(mod.__name__, "is misbeaving. Disabling it")
+            debug(mod.__name__, "is "+reason)
 
     def check(self):
         for mod in self.modules:
@@ -178,8 +178,8 @@ class PythonCharts(object):
         except AttributeError:
             self.disable_module(mod, "no update")
             return
-        except (UnboundLocalError, Exception):
-            self.disable_module(mod, "misbehaving")
+        except (UnboundLocalError, Exception) as e:
+            self.disable_module(mod, "misbehaving. Reason: " + str(e))
             return
         t_end = time.time()
         self.timetable[mod.__name__]['next'] = t_end - (t_end % self.timetable[mod.__name__]['freq']) + self.timetable[mod.__name__]['freq']
