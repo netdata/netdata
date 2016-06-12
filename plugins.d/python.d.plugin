@@ -178,7 +178,7 @@ class PythonCharts(object):
         except AttributeError:
             self.disable_module(mod, "no update")
             return
-        except UnboundLocalError:
+        except (UnboundLocalError, Exception):
             self.disable_module(mod, "misbehaving")
             return
         t_end = time.time()
@@ -201,7 +201,14 @@ class PythonCharts(object):
             next_runs = []
             for mod in self.modules:
                 self.update_module(mod)
-                next_runs.append(self.timetable[mod.__name__]['next'])
+                try:
+                    next_runs.append(self.timetable[mod.__name__]['next'])
+                except KeyError:
+                    pass
+            if len(next_runs) == 0:
+                debug("No plugins loaded")
+                sys.stdout.write("DISABLE\n")
+                sys.exit(1)
             time.sleep(min(next_runs) - time.time())
 
 
