@@ -18,12 +18,15 @@ except AssertionError:
 class PythonCharts(object):
     
     def __init__(self,
-                 interval=1,
+                 interval=None,
                  modules=[],
                  modules_path='../python.d/',
                  modules_configs='../conf.d/'):
         self.first_run = True
-        self.interval = interval
+        if interval is None:
+            self.interval = 1
+        else:
+            self.interval = interval
         self.default_priority = 90000
         # check if plugin directory exists
         if not os.path.isdir(modules_path):
@@ -54,22 +57,18 @@ class PythonCharts(object):
         # set last execution and execution frequency dict
         self.timetable = {}
         for m in self.modules:
-            try:
-                interval = m.update_every
-                interval = int(interval)
-            except AttributeError:
+            if self.interval is not None:
                 interval = self.interval
-            except ValueError:
-                interval = self.interval
-                debug(m.__name__ + 
-                      ": wrong value of 'update_every' setting to " +
-                      str(self.interval))
-            # ensure module update frequency is not less than execution of this program
-            if interval < self.interval:
-                interval = self.interval
-            # charts updates are twice as frequent as user specified
-            self.timetable[m.__name__] = [0, interval/2.0]
-        
+            else:
+                try:
+                    interval = int(m.update_every)
+                except (AttributeError, ValueError):
+                    interval = 1
+            
+            now = time.time()
+            self.timetable[m.__name__] = {'last' : 0,
+                                          'next' : now,
+                                          'freq' : interval}
         # set priorities
         for m in self.modules:
             try:
@@ -159,7 +158,7 @@ class PythonCharts(object):
                         " '' 'Execution time for " +
                         chart +
                         " plugin' 'milliseconds / run' python.d netdata.plugin_python area 145000 " +
-                        str(self.timetable[mod.__name__][1]) +
+                        str(self.timetable[mod.__name__]['freq']) +
                         '\n')
                     sys.stdout.write("DIMENSION run_time 'run time' absolute 1 1\n\n")
                     sys.stdout.flush()
@@ -169,16 +168,16 @@ class PythonCharts(object):
                 self.disable_module(mod, "misbehaving")
 
     def update_module(self, mod):
-        t1 = time.time()
+        t_start = time.time()
         # check if it is time to execute module update() function
-        if (t1 - self.timetable[mod.__name__][0]) < self.timetable[mod.__name__][1]:
+        if self.timetable[mod.__name__]['next'] > t_start:
             return
         try:
-            if not self.first_run:
-                t = ""
+            if self.first_run:
+                since_last = 0
             else:
-                t=int((t1- self.timetable[mod.__name__][0]) * 1000000)
-            if not mod.update(t):
+                since_last = int((t_start - self.timetable[mod.__name__]['last']) * 1000000)
+            if not mod.update(since_last):
                 self.disable_module(mod, "update failed")
                 return
         except AttributeError:
@@ -187,23 +186,27 @@ class PythonCharts(object):
         except UnboundLocalError:
             self.disable_module(mod, "misbehaving")
             return
-        t2 = time.time()
-        if not self.first_run:
-            dt = ""
+        t_end = time.time()
+        self.timetable[mod.__name__]['next'] = t_end - (t_end % self.timetable[mod.__name__]['freq']) + self.timetable[mod.__name__]['freq']
+        if self.first_run:
+            dt = 0
         else:
-            dt = int((t2 - self.timetable[mod.__name__][0]) * 1000000)
-        sys.stdout.write("BEGIN netdata.plugin_pythond_"+mod.__name__+" "+str(dt)+'\n')
-        sys.stdout.write("SET run_time = " + str(int((t2 - t1) * 1000)) + '\n')
+            dt = int((t_end - self.timetable[mod.__name__]['last']) * 1000000)
+        sys.stdout.write("BEGIN netdata.plugin_pythond_"+mod.__name__+" "+str(since_last)+'\n')
+        sys.stdout.write("SET run_time = " + str(int((t_end - t_start) * 1000)) + '\n')
         sys.stdout.write("END\n")
         sys.stdout.flush()
-        self.timetable[mod.__name__][0] = t1
+        self.timetable[mod.__name__]['last'] = t_start
 
     def update(self):
+        self.first_run = True
         while True:
             t_begin = time.time()
+            next_runs = []
             for mod in self.modules:
                 self.update_module(mod)
-            time.sleep((self.interval - (time.time() - t_begin)) / 2)
+                next_runs.append(self.timetable[mod.__name__]['next'])
+            time.sleep(min(next_runs) - time.time())
             self.first_run = False
 
 
@@ -314,14 +317,15 @@ def run():
     # parse passed command line arguments
     out = parse_cmdline(modules_dir, *sys.argv)
     modules = out['modules']
-    if out['interval'] is not None:
-        interval = out['interval']
+#    if out['interval'] is not None:
+#        interval = out['interval']
 
     # configure environement to run modules
     #sys.path.append(modules_dir+"python_modules") # append path to directory with modules dependencies
 
     # run plugins
-    charts = PythonCharts(interval, modules, modules_dir, modules_conf)
+#    charts = PythonCharts(interval, modules, modules_dir, modules_conf)
+    charts = PythonCharts(out['interval'], modules, modules_dir, modules_conf)
     charts.check()
     charts.create()
     charts.update()
