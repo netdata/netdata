@@ -24,9 +24,7 @@ class PythonCharts(object):
                  modules_configs='../conf.d/'):
         self.first_run = True
         if interval is None:
-            self.interval = 1
-        else:
-            self.interval = interval
+            interval = 1
         self.default_priority = 90000
         # check if plugin directory exists
         if not os.path.isdir(modules_path):
@@ -54,28 +52,25 @@ class PythonCharts(object):
 
         self.load_configs()
 
-        # set last execution and execution frequency dict
+        # set timetable dict (last execution, next execution and frequency)
+        # set priorities
         self.timetable = {}
         for m in self.modules:
-            if self.interval is not None:
-                interval = self.interval
-            else:
+            try:
+                m.priority = int(m.priority)
+            except (AttributeError,ValueError):
+                m.priority = self.default_priority
+             
+            if interval is None:
                 try:
                     interval = int(m.update_every)
                 except (AttributeError, ValueError):
                     interval = 1
             
             now = time.time()
-            self.timetable[m.__name__] = {'last' : 0,
-                                          'next' : now,
+            self.timetable[m.__name__] = {'last' : now,
+                                          'next' : now - (now % interval) + interval,
                                           'freq' : interval}
-        # set priorities
-        for m in self.modules:
-            try:
-                m.priority = int(m.priority)
-            except (AttributeError,ValueError):
-                m.priority = self.default_priority
-                
 
     def import_plugin(self, path, name=None):
         if name is None:
@@ -197,6 +192,7 @@ class PythonCharts(object):
         sys.stdout.write("END\n")
         sys.stdout.flush()
         self.timetable[mod.__name__]['last'] = t_start
+        self.first_run = False
 
     def update(self):
         self.first_run = True
@@ -207,7 +203,6 @@ class PythonCharts(object):
                 self.update_module(mod)
                 next_runs.append(self.timetable[mod.__name__]['next'])
             time.sleep(min(next_runs) - time.time())
-            self.first_run = False
 
 
 def read_config(path):
