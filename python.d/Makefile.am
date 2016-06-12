@@ -1,9 +1,9 @@
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
-dist_charts_SCRIPTS = \
+dist_python_SCRIPTS = \
 	example.chart.py \
 	$(NULL)
 
-dist_charts_DATA = \
+dist_python_DATA = \
 	README.md \
 	$(NULL)
