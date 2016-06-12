@@ -137,8 +137,8 @@ class PythonCharts(object):
                     self.disable_module(mod, "failed check")
             except AttributeError:
                 self.disable_module(mod, "no check")
-            except UnboundLocalError:
-                self.disable_module(mod, "misbehaving")
+            except (UnboundLocalError, Exception) as e:
+                self.disable_module(mod, "misbehaving. Reason: " + str(e))
 
     def create(self):
         for mod in self.modules:
@@ -159,8 +159,8 @@ class PythonCharts(object):
                     sys.stdout.flush()
             except AttributeError:
                 self.disable_module(mod, "no create")
-            except UnboundLocalError:
-                self.disable_module(mod, "misbehaving")
+            except (UnboundLocalError, Exception) as e:
+                self.disable_module(mod, "misbehaving. Reason: " + str(e))
 
     def update_module(self, mod):
         t_start = time.time()
@@ -221,7 +221,11 @@ def read_config(path):
     except IsADirectoryError:
         debug(str(path), "is a directory")
         return
-    config.read_string(config_str)
+    try:
+        config.read_string(config_str)
+    except configparser.ParsingError as e:
+        debug("Malformed configuration file: "+str(e))
+        return
     return dict(config.items('config'))
 
 
