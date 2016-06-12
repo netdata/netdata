@@ -1,7 +1,7 @@
 import random
 
 update_every = 5
-priority = 30000
+priority = 150000
 
 def check():
     return True
