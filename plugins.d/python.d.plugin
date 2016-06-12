@@ -24,7 +24,7 @@ class PythonCharts(object):
                  modules_configs='../conf.d/'):
         self.first_run = True
         self.interval = interval
-        self.default_priority = 60000
+        self.default_priority = 90000
         # check if plugin directory exists
         if not os.path.isdir(modules_path):
             debug("cannot find charts directory ", modules_path)
@@ -72,7 +72,6 @@ class PythonCharts(object):
         
         # set priorities
         for m in self.modules:
-            print(m.priority)
             try:
                 m.priority = int(m.priority)
             except (AttributeError,ValueError):
@@ -189,7 +188,7 @@ class PythonCharts(object):
             self.disable_module(mod, "misbehaving")
             return
         t2 = time.time()
-        if self.first_run:
+        if not self.first_run:
             dt = ""
         else:
             dt = int((t2 - self.timetable[mod.__name__][0]) * 1000000)
@@ -317,6 +316,9 @@ def run():
     modules = out['modules']
     if out['interval'] is not None:
         interval = out['interval']
+
+    # configure environement to run modules
+    #sys.path.append(modules_dir+"python_modules") # append path to directory with modules dependencies
 
     # run plugins
     charts = PythonCharts(interval, modules, modules_dir, modules_conf)
