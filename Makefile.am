@@ -32,6 +32,7 @@ SUBDIRS = \
 	conf.d \
 	node.d \
 	plugins.d \
+	python.d \
 	src \
 	system \
 	web \

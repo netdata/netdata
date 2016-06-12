@@ -1,0 +1,336 @@
+#!/usr/bin/python3 -u
+
+import os
+import sys
+import time
+#import configparser
+#import importlib.machinery
+try:
+    assert sys.version_info >= (3,1)
+    import configparser
+    import importlib.machinery
+except AssertionError:
+    sys.stderr.write('Not supported python version. Needed python >= 3.1\n')
+    sys.stdout.write('DISABLE\n')
+    sys.exit(1)
+
+
+class PythonCharts(object):
+    
+    def __init__(self,
+                 interval=None,
+                 modules=[],
+                 modules_path='../python.d/',
+                 modules_configs='../conf.d/'):
+        self.first_run = True
+        if interval is None:
+            interval = 1
+        self.default_priority = 90000
+        # check if plugin directory exists
+        if not os.path.isdir(modules_path):
+            debug("cannot find charts directory ", modules_path)
+            sys.stdout.write("DISABLE\n")
+            sys.exit(1)
+        self.configs = modules_configs
+
+        self.modules = []
+        if len(modules) > 0:
+            for m in modules:
+                mod = self.import_plugin(modules_path + m + ".chart.py")
+                if mod is not None:
+                    self.modules.append(mod)
+            if len(self.modules) == 0:
+                debug("cannot find provided module(s)", modules_path)
+                sys.stdout.write("DISABLE\n")
+                sys.exit(1)
+        else:
+            self.load_modules(modules_path)
+            if len(self.modules) == 0:
+                debug("cannot find modules directory", modules_path)
+                sys.stdout.write("DISABLE\n")
+                sys.exit(1)
+
+        self.load_configs()
+
+        # set timetable dict (last execution, next execution and frequency)
+        # set priorities
+        self.timetable = {}
+        for m in self.modules:
+            try:
+                m.priority = int(m.priority)
+            except (AttributeError,ValueError):
+                m.priority = self.default_priority
+             
+            if interval is None:
+                try:
+                    interval = int(m.update_every)
+                except (AttributeError, ValueError):
+                    interval = 1
+            
+            now = time.time()
+            self.timetable[m.__name__] = {'last' : now,
+                                          'next' : now - (now % interval) + interval,
+                                          'freq' : interval}
+
+    def import_plugin(self, path, name=None):
+        if name is None:
+            name = path.split('/')[-1]
+            if name[-9:] != ".chart.py":
+                return None
+            name = name[:-9]
+        try:
+            return importlib.machinery.SourceFileLoader(name, path).load_module()
+        except Exception as e:
+            debug(str(e))
+            return None
+
+    def load_modules(self, path):
+        names = os.listdir(path)
+        for mod in names:
+            m = self.import_plugin(path + mod)
+            if m is not None:
+                debug("loading chart: '" + path + mod + "'")
+                self.modules.append(m)
+
+    def load_configs(self):
+        for m in self.modules:
+            configfile = self.configs + m.__name__ + ".conf"
+            if os.path.isfile(configfile):
+                debug("loading chart options: '" + configfile + "'")
+                for k, v in read_config(configfile).items():
+                    setattr(m, k, v)
+            else:
+                debug(m.__name__ +
+                      ": configuration file '" +
+                      configfile +
+                      "' not found. Using defaults.")
+
+    def disable_module(self, mod, reason=None):
+        self.modules.remove(mod)
+        del self.timetable[mod.__name__]
+        if reason is None:
+            return
+        elif reason[:3] == "no ":
+            debug("chart '" +
+                  mod.__name__,
+                  "' does not seem to have " +
+                  reason[3:] +
+                  "() function. Disabling it.")
+        elif reason[:7] == "failed ":
+            debug("chart '" +
+                  mod.__name__ +
+                  reason[3:] +
+                  "() function. reports failure.")
+        elif reason[:13] == "configuration":
+            debug(mod.__name__,
+                  "configuration file '" +
+                  self.configs +
+                  mod.__name__ +
+                  ".conf' not found. Using defaults.")
+        elif reason[:11] == "misbehaving":
+            debug(mod.__name__, "is "+reason)
+
+    def check(self):
+        for mod in self.modules:
+            try:
+                if not mod.check():
+                    self.disable_module(mod, "failed check")
+            except AttributeError:
+                self.disable_module(mod, "no check")
+            except UnboundLocalError:
+                self.disable_module(mod, "misbehaving")
+
+    def create(self):
+        for mod in self.modules:
+            try:
+                if not mod.create():
+                    self.disable_module(mod, "failed create")
+                else:
+                    chart = mod.__name__
+                    sys.stdout.write(
+                        "CHART netdata.plugin_pythond_" +
+                        chart +
+                        " '' 'Execution time for " +
+                        chart +
+                        " plugin' 'milliseconds / run' python.d netdata.plugin_python area 145000 " +
+                        str(self.timetable[mod.__name__]['freq']) +
+                        '\n')
+                    sys.stdout.write("DIMENSION run_time 'run time' absolute 1 1\n\n")
+                    sys.stdout.flush()
+            except AttributeError:
+                self.disable_module(mod, "no create")
+            except UnboundLocalError:
+                self.disable_module(mod, "misbehaving")
+
+    def update_module(self, mod):
+        t_start = time.time()
+        # check if it is time to execute module update() function
+        if self.timetable[mod.__name__]['next'] > t_start:
+            return
+        try:
+            if self.first_run:
+                since_last = 0
+            else:
+                since_last = int((t_start - self.timetable[mod.__name__]['last']) * 1000000)
+            if not mod.update(since_last):
+                self.disable_module(mod, "update failed")
+                return
+        except AttributeError:
+            self.disable_module(mod, "no update")
+            return
+        except (UnboundLocalError, Exception) as e:
+            self.disable_module(mod, "misbehaving. Reason: " + str(e))
+            return
+        t_end = time.time()
+        self.timetable[mod.__name__]['next'] = t_end - (t_end % self.timetable[mod.__name__]['freq']) + self.timetable[mod.__name__]['freq']
+        if self.first_run:
+            dt = 0
+        else:
+            dt = int((t_end - self.timetable[mod.__name__]['last']) * 1000000)
+        sys.stdout.write("BEGIN netdata.plugin_pythond_"+mod.__name__+" "+str(since_last)+'\n')
+        sys.stdout.write("SET run_time = " + str(int((t_end - t_start) * 1000)) + '\n')
+        sys.stdout.write("END\n")
+        sys.stdout.flush()
+        self.timetable[mod.__name__]['last'] = t_start
+        self.first_run = False
+
+    def update(self):
+        self.first_run = True
+        while True:
+            t_begin = time.time()
+            next_runs = []
+            for mod in self.modules:
+                self.update_module(mod)
+                try:
+                    next_runs.append(self.timetable[mod.__name__]['next'])
+                except KeyError:
+                    pass
+            if len(next_runs) == 0:
+                debug("No plugins loaded")
+                sys.stdout.write("DISABLE\n")
+                sys.exit(1)
+            time.sleep(min(next_runs) - time.time())
+
+
+def read_config(path):
+    config = configparser.ConfigParser()
+    config_str = ""
+    try:
+        with open(path, 'r', encoding="utf_8") as f:
+            config_str = '[config]\n' + f.read()
+    except IsADirectoryError:
+        debug(str(path), "is a directory")
+        return
+    config.read_string(config_str)
+    return dict(config.items('config'))
+
+
+def debug(*args):
+    if not DEBUG_FLAG:
+        return
+    sys.stderr.write(PROGRAM + ":")
+    for i in args:
+        sys.stderr.write(" " + str(i))
+    sys.stderr.write("\n")
+    sys.stderr.flush()
+
+
+def parse_cmdline(directory, *commands):
+    # TODO number -> interval
+    global DEBUG_FLAG
+    DEBUG_FLAG = False
+    interval = None
+
+    mods = []
+    for cmd in commands[1:]:
+        if cmd == "check":
+            pass
+        elif cmd == "debug" or cmd == "all":
+            DEBUG_FLAG = True
+            # redirect stderr to stdout?
+        elif os.path.isfile(directory + cmd + ".chart.py") or os.path.isfile(directory + cmd):
+            DEBUG_FLAG = True
+            mods.append(cmd.replace(".chart.py", ""))
+        else:
+            try:
+                interval = int(cmd)
+            except ValueError:
+                pass
+
+    debug("started from", commands[0], "with options:", *commands[1:])
+
+    return {'interval': interval,
+            'modules': mods}
+
+
+# if __name__ == '__main__':
+def run():
+    global DEBUG_FLAG, PROGRAM
+    DEBUG_FLAG = True
+    PROGRAM = sys.argv[0].split('/')[-1].split('.plugin')[0]
+    # parse env variables
+    # https://github.com/firehol/netdata/wiki/External-Plugins#environment-variables
+    main_dir = os.getenv('NETDATA_PLUGINS_DIR',
+                         os.path.abspath(__file__).strip("python.d.plugin.py"))
+    config_dir = os.getenv('NETDATA_CONFIG_DIR', "/etc/netdata/")
+    interval = int(os.getenv('NETDATA_UPDATE_EVERY', 1))
+
+    # read configuration file
+    if config_dir[-1] != '/':
+        configfile = config_dir + '/' + "python.d.conf"
+    else:
+        configfile = config_dir + "python.d.conf"
+
+    try:
+        conf = read_config(configfile)
+        try:
+            if str(conf['enable']) == "no":
+                debug("disabled in configuration file")
+                sys.stdout.write("DISABLE\n")
+                sys.exit(1)
+        except (KeyError, TypeError):
+            pass
+        try:
+            modules_conf = conf['plugins_config_dir']
+        except (KeyError, TypeError):
+            modules_conf = config_dir  # default configuration directory
+        try:
+            modules_dir = conf['plugins_dir']
+        except (KeyError, TypeError):
+            modules_dir = main_dir.replace("plugins.d", "python.d")
+        try:
+            interval = int(conf['interval'])
+        except (KeyError, TypeError):
+            pass  # default interval
+        try:
+            DEBUG_FLAG = bool(conf['debug'])
+        except (KeyError, TypeError):
+            pass
+    except FileNotFoundError:
+        modules_conf = config_dir
+        modules_dir = main_dir.replace("plugins.d", "python.d")
+
+    # directories should end with '/'
+    if modules_dir[-1] != '/':
+        modules_dir += "/"
+    if modules_conf[-1] != '/':
+        modules_conf += "/"
+
+    # parse passed command line arguments
+    out = parse_cmdline(modules_dir, *sys.argv)
+    modules = out['modules']
+#    if out['interval'] is not None:
+#        interval = out['interval']
+
+    # configure environement to run modules
+    #sys.path.append(modules_dir+"python_modules") # append path to directory with modules dependencies
+
+    # run plugins
+#    charts = PythonCharts(interval, modules, modules_dir, modules_conf)
+    charts = PythonCharts(out['interval'], modules, modules_dir, modules_conf)
+    charts.check()
+    charts.create()
+    charts.update()
+
+if __name__ == '__main__':
+    run()
