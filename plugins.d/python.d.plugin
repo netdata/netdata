@@ -313,7 +313,7 @@ def run():
         try:
             modules_conf = conf['plugins_config_dir']
         except (KeyError):
-            modules_conf = config_dir  # default configuration directory
+            modules_conf = config_dir + "python.d/"  # default configuration directory
         try:
             modules_dir = conf['plugins_dir']
         except (KeyError):
