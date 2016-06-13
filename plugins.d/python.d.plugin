@@ -326,10 +326,11 @@ def run():
             DEBUG_FLAG = bool(conf['debug'])
         except (KeyError, TypeError):
             pass
-        try:
-            disabled = conf['disabled'].split(',')
-        except (KeyError):
-            pass
+        for k, v in conf.items():
+            if k in ("plugins_config_dir", "plugins_dir", "interval", "debug"):
+                continue
+            if v == 'no':
+                disabled.append(k)
     except FileNotFoundError:
         modules_conf = config_dir
         modules_dir = main_dir.replace("plugins.d", "python.d")
@@ -345,7 +346,7 @@ def run():
     modules = out['modules']
     if out['interval'] is not None:
         interval = out['interval']
-
+    
     # configure environement to run modules
     sys.path.append(modules_dir+"python_modules") # append path to directory with modules dependencies
     
