@@ -819,6 +819,8 @@ int registry_log_load(void) {
 					break;
 			}
 		}
+		
+		fclose(fp);
 	}
 
 	// open the log again

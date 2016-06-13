@@ -851,6 +851,8 @@ int snprintfz(char *dst, size_t n, const char *fmt, ...) {
 	va_list args;
 
 	va_start(args, fmt);
-	return vsnprintfz(dst, n, fmt, args);
+	int ret = vsnprintfz(dst, n, fmt, args);
 	va_end(args);
+
+	return ret;
 }
