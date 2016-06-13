@@ -3,8 +3,6 @@
 import os
 import sys
 import time
-#import configparser
-#import importlib.machinery
 try:
     assert sys.version_info >= (3,1)
     import configparser
@@ -21,7 +19,8 @@ class PythonCharts(object):
                  interval=None,
                  modules=[],
                  modules_path='../python.d/',
-                 modules_configs='../conf.d/'):
+                 modules_configs='../conf.d/',
+                 modules_disabled=[]):
         self.first_run = True
         if interval is None:
             interval = 1
@@ -31,25 +30,31 @@ class PythonCharts(object):
             debug("cannot find charts directory ", modules_path)
             sys.stdout.write("DISABLE\n")
             sys.exit(1)
+        # set configuration directory
         self.configs = modules_configs
 
+        # load modules
         self.modules = []
         if len(modules) > 0:
             for m in modules:
                 mod = self.import_plugin(modules_path + m + ".chart.py")
                 if mod is not None:
                     self.modules.append(mod)
-            if len(self.modules) == 0:
-                debug("cannot find provided module(s)", modules_path)
-                sys.stdout.write("DISABLE\n")
-                sys.exit(1)
         else:
-            self.load_modules(modules_path)
-            if len(self.modules) == 0:
-                debug("cannot find modules directory", modules_path)
-                sys.stdout.write("DISABLE\n")
-                sys.exit(1)
+            self.autoload_modules(modules_path)
+        
+        # check if there are any modules loaded
+        if len(self.modules) == 0:
+            debug("cannot find modules", modules_path)
+            sys.stdout.write("DISABLE\n")
+            sys.exit(1)
 
+        # check if loaded modules is on disabled modules list
+        for mod in self.modules:
+            if mod.__name__ in modules_disabled:
+                self.modules.remove(mod)
+        
+        # load configuration files
         self.load_configs()
 
         # set timetable dict (last execution, next execution and frequency)
@@ -73,6 +78,7 @@ class PythonCharts(object):
                                           'freq' : interval}
 
     def import_plugin(self, path, name=None):
+    # try to import module using only its path
         if name is None:
             name = path.split('/')[-1]
             if name[-9:] != ".chart.py":
@@ -84,7 +90,9 @@ class PythonCharts(object):
             debug(str(e))
             return None
 
-    def load_modules(self, path):
+    def autoload_modules(self, path):
+    # scan directory specified in path and load all modules from there
+    # function modifies self.modules
         names = os.listdir(path)
         for mod in names:
             m = self.import_plugin(path + mod)
@@ -93,6 +101,7 @@ class PythonCharts(object):
                 self.modules.append(m)
 
     def load_configs(self):
+    # function modifies every loaded module in self.modules
         for m in self.modules:
             configfile = self.configs + m.__name__ + ".conf"
             if os.path.isfile(configfile):
@@ -106,6 +115,7 @@ class PythonCharts(object):
                       "' not found. Using defaults.")
 
     def disable_module(self, mod, reason=None):
+    # modifies self.modules
         self.modules.remove(mod)
         del self.timetable[mod.__name__]
         if reason is None:
@@ -131,6 +141,7 @@ class PythonCharts(object):
             debug(mod.__name__, "is "+reason)
 
     def check(self):
+    # try to execute check() on every loaded module
         for mod in self.modules:
             try:
                 if not mod.check():
@@ -141,6 +152,7 @@ class PythonCharts(object):
                 self.disable_module(mod, "misbehaving. Reason: " + str(e))
 
     def create(self):
+    # try to execute create() on every loaded module
         for mod in self.modules:
             try:
                 if not mod.create():
@@ -163,6 +175,7 @@ class PythonCharts(object):
                 self.disable_module(mod, "misbehaving. Reason: " + str(e))
 
     def update_module(self, mod):
+    # try to execute update() on every module and draw run time graph 
         t_start = time.time()
         # check if it is time to execute module update() function
         if self.timetable[mod.__name__]['next'] > t_start:
@@ -183,6 +196,7 @@ class PythonCharts(object):
             return
         t_end = time.time()
         self.timetable[mod.__name__]['next'] = t_end - (t_end % self.timetable[mod.__name__]['freq']) + self.timetable[mod.__name__]['freq']
+        # draw performance graph
         if self.first_run:
             dt = 0
         else:
@@ -195,6 +209,7 @@ class PythonCharts(object):
         self.first_run = False
 
     def update(self):
+    # run updates (this will stay forever and ever and ever forever and ever it'll be the one...)
         self.first_run = True
         while True:
             t_begin = time.time()
@@ -280,6 +295,7 @@ def run():
     interval = int(os.getenv('NETDATA_UPDATE_EVERY', 1))
 
     # read configuration file
+    disabled = []
     if config_dir[-1] != '/':
         configfile = config_dir + '/' + "python.d.conf"
     else:
@@ -296,19 +312,23 @@ def run():
             pass
         try:
             modules_conf = conf['plugins_config_dir']
-        except (KeyError, TypeError):
+        except (KeyError):
             modules_conf = config_dir  # default configuration directory
         try:
             modules_dir = conf['plugins_dir']
-        except (KeyError, TypeError):
+        except (KeyError):
             modules_dir = main_dir.replace("plugins.d", "python.d")
         try:
             interval = int(conf['interval'])
         except (KeyError, TypeError):
-            pass  # default interval
+            pass  # use default interval from NETDATA_UPDATE_EVERY
         try:
             DEBUG_FLAG = bool(conf['debug'])
         except (KeyError, TypeError):
+            pass
+        try:
+            disabled = conf['disabled'].split(',')
+        except (KeyError):
             pass
     except FileNotFoundError:
         modules_conf = config_dir
@@ -323,15 +343,14 @@ def run():
     # parse passed command line arguments
     out = parse_cmdline(modules_dir, *sys.argv)
     modules = out['modules']
-#    if out['interval'] is not None:
-#        interval = out['interval']
+    if out['interval'] is not None:
+        interval = out['interval']
 
     # configure environement to run modules
-    #sys.path.append(modules_dir+"python_modules") # append path to directory with modules dependencies
-
+    sys.path.append(modules_dir+"python_modules") # append path to directory with modules dependencies
+    
     # run plugins
-#    charts = PythonCharts(interval, modules, modules_dir, modules_conf)
-    charts = PythonCharts(out['interval'], modules, modules_dir, modules_conf)
+    charts = PythonCharts(interval, modules, modules_dir, modules_conf, disabled)
     charts.check()
     charts.create()
     charts.update()
