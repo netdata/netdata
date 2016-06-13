@@ -170,7 +170,7 @@ procfile *procfile_parser(procfile *ff) {
 	while(likely(s < e)) {
 		// we are not at the end
 
-		switch(ff->separators[(int)(*s)]) {
+		switch(ff->separators[(uint8_t)(*s)]) {
 			case PF_CHAR_IS_OPEN:
 				if(s == t) {
 					opened++;

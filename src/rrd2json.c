@@ -628,8 +628,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t opti
 
 void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb, uint32_t format, uint32_t options, int string_value)
 {
-	if(r) {;}
-	if(format) {;}
+	(void)format;
 
 	char kq[2] = "",					// key quote
 		sq[2] = "";						// string quote

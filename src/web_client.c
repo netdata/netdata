@@ -121,7 +121,7 @@ struct web_client *web_client_create(int listener)
 
 		case AF_INET6:
 			if(strncmp(w->client_ip, "::ffff:", 7) == 0) {
-				strcpy(w->client_ip, &w->client_ip[7]);
+				memmove(w->client_ip, &w->client_ip[7], strlen(&w->client_ip[7]) + 1);
 				debug(D_WEB_CLIENT_ACCESS, "%llu: New IPv4 web client from %s port %s on socket %d.", w->id, w->client_ip, w->client_port, w->ifd);
 			}
 			else
@@ -778,6 +778,9 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
 	int       points    = (points_str    && *points_str   )?atoi(points_str):1;
 	int       precision = (precision_str && *precision_str)?atoi(precision_str):-1;
 
+	if(!multiply) multiply = 1;
+	if(!divide) divide = 1;
+
 	int refresh = 0;
 	if(refresh_str && *refresh_str) {
 		if(!strcmp(refresh_str, "auto")) {
@@ -1316,9 +1319,10 @@ int web_client_api_old_data_request(struct web_client *w, char *url, int datasou
 
 	// get the name of the data to show
 	char *tok = mystrsep(&url, "/");
+	if(!tok) tok = "";
 
 	// do we have such a data set?
-	if(tok && *tok) {
+	if(*tok) {
 		debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
 		st = rrdset_find_byname(tok);
 		if(!st) st = rrdset_find(tok);
