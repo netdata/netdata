@@ -22,8 +22,6 @@ class PythonCharts(object):
                  modules_configs='../conf.d/',
                  modules_disabled=[]):
         self.first_run = True
-        if interval is None:
-            interval = 1
         self.default_priority = 90000
         # set configuration directory
         self.configs = modules_configs
@@ -42,6 +40,7 @@ class PythonCharts(object):
         # set timetable dict (last execution, next execution and frequency)
         # set priorities
         self.timetable = {}
+        freq = 1
         for m in self.modules:
             try:
                 m.priority = int(m.priority)
@@ -50,14 +49,14 @@ class PythonCharts(object):
              
             if interval is None:
                 try:
-                    interval = int(m.update_every)
+                    freq = int(m.update_every)
                 except (AttributeError, ValueError):
-                    interval = 1
+                    freq = 1
             
             now = time.time()
             self.timetable[m.__name__] = {'last' : now,
-                                          'next' : now - (now % interval) + interval,
-                                          'freq' : interval}
+                                          'next' : now - (now % freq) + freq,
+                                          'freq' : freq}
 
     def _import_plugin(self, path, name=None):
     # try to import module using only its path
@@ -288,7 +287,7 @@ def run():
     main_dir = os.getenv('NETDATA_PLUGINS_DIR',
                          os.path.abspath(__file__).strip("python.d.plugin.py"))
     config_dir = os.getenv('NETDATA_CONFIG_DIR', "/etc/netdata/")
-    interval = int(os.getenv('NETDATA_UPDATE_EVERY', 1))
+    interval = os.getenv('NETDATA_UPDATE_EVERY', None)
 
     # read configuration file
     disabled = []
