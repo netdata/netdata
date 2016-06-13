@@ -211,14 +211,16 @@ void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t val
 		else {
 			debug(D_REGISTRY, "Dictionary: cloning value to '%s'", name);
 
-			void *value = malloc(value_len),
+			// copy the new value without breaking
+			// any other thread accessing the same entry
+			void *new = malloc(value_len),
 					*old = nv->value;
 
-			if(unlikely(!nv->value))
+			if(unlikely(!new))
 				fatal("Cannot allocate value of size %zu", value_len);
 
-			memcpy(value, value, value_len);
-			nv->value = value;
+			memcpy(new, value, value_len);
+			nv->value = new;
 
 			debug(D_REGISTRY, "Dictionary: freeing old value of '%s'", name);
 			free(old);
@@ -289,7 +291,7 @@ static int dictionary_walker(avl *a, int (*callback)(void *entry, void *data), v
 	total += ret;
 
 	if(a->left) {
-		dictionary_walker(a->left, callback, data);
+		ret = dictionary_walker(a->left, callback, data);
 		if (ret < 0) return ret;
 		total += ret;
 	}
