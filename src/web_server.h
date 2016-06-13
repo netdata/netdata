@@ -23,4 +23,17 @@ extern void *socket_listen_main_multi_threaded(void *ptr);
 extern void *socket_listen_main_single_threaded(void *ptr);
 extern int create_listen_socket(void);
 
+#ifndef HAVE_ACCEPT4
+extern int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags);
+
+#ifndef SOCK_NONBLOCK
+#define SOCK_NONBLOCK 00004000
+#endif  /* #ifndef SOCK_NONBLOCK */
+
+#ifndef SOCK_CLOEXEC
+#define SOCK_CLOEXEC 02000000
+#endif /* #ifndef SOCK_CLOEXEC */
+
+#endif /* #ifndef HAVE_ACCEPT4 */
+
 #endif /* NETDATA_WEB_SERVER_H */

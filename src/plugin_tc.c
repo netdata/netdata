@@ -257,7 +257,7 @@ static inline void tc_device_commit(struct tc_device *d)
 				RRDDIM *rd = rrddim_find(st, c->id);
 
 				if(!rd) {
-					debug(D_TC_LOOP, "TC: Adding to chart '%s', dimension '%s'", st->id, c->id, c->name);
+					debug(D_TC_LOOP, "TC: Adding to chart '%s', dimension '%s' (name: '%s')", st->id, c->id, c->name);
 
 					// new class, we have to add it
 					rd = rrddim_add(st, c->id, c->name?c->name:c->id, 8, 1024, RRDDIM_INCREMENTAL);

@@ -281,11 +281,11 @@ void buffer_date(BUFFER *wb, int year, int month, int day, int hours, int minute
 	buffer_overflow_check(wb);
 }
 
-BUFFER *buffer_create(long size)
+BUFFER *buffer_create(size_t size)
 {
 	BUFFER *b;
 
-	debug(D_WEB_BUFFER, "Creating new web buffer of size %d.", size);
+	debug(D_WEB_BUFFER, "Creating new web buffer of size %zu.", size);
 
 	b = calloc(1, sizeof(BUFFER));
 	if(!b) {
@@ -295,7 +295,7 @@ BUFFER *buffer_create(long size)
 
 	b->buffer = malloc(size + sizeof(BUFFER_OVERFLOW_EOF) + 2);
 	if(!b->buffer) {
-		error("Cannot allocate a buffer of size %u.", size + sizeof(BUFFER_OVERFLOW_EOF) + 2);
+		error("Cannot allocate a buffer of size %zu.", size + sizeof(BUFFER_OVERFLOW_EOF) + 2);
 		free(b);
 		return NULL;
 	}
@@ -312,7 +312,7 @@ void buffer_free(BUFFER *b)
 {
 	buffer_overflow_check(b);
 
-	debug(D_WEB_BUFFER, "Freeing web buffer of size %d.", b->size);
+	debug(D_WEB_BUFFER, "Freeing web buffer of size %zu.", b->size);
 
 	if(b->buffer) free(b->buffer);
 	free(b);
@@ -329,10 +329,13 @@ void buffer_increase(BUFFER *b, size_t free_size_required)
 	size_t increase = free_size_required - left;
 	if(increase < WEB_DATA_LENGTH_INCREASE_STEP) increase = WEB_DATA_LENGTH_INCREASE_STEP;
 
-	debug(D_WEB_BUFFER, "Increasing data buffer from size %d to %d.", b->size, b->size + increase);
+	debug(D_WEB_BUFFER, "Increasing data buffer from size %zu to %zu.", b->size, b->size + increase);
 
 	b->buffer = realloc(b->buffer, b->size + increase + sizeof(BUFFER_OVERFLOW_EOF) + 2);
-	if(!b->buffer) fatal("Failed to increase data buffer from size %d to %d.", b->size + sizeof(BUFFER_OVERFLOW_EOF) + 2, b->size + increase + sizeof(BUFFER_OVERFLOW_EOF) + 2);
+	if(!b->buffer)
+		fatal("Failed to increase data buffer from size %zu to %zu.",
+			b->size + sizeof(BUFFER_OVERFLOW_EOF) + 2,
+			b->size + increase + sizeof(BUFFER_OVERFLOW_EOF) + 2);
 
 	b->size += increase;
 

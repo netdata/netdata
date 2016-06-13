@@ -423,7 +423,7 @@ void *pluginsd_worker_thread(void *arg)
 					sleep((unsigned int) (cd->update_every * 10));
 				}
 				else {
-					error("PLUGINSD: '%s' exited with error code %d, but has given useful output in the past (%zu times). We tried %d times to restart it, but it failed to generate data. Disabling it.", cd->fullfilename, code, cd->successful_collections, cd->serial_failures);
+					error("PLUGINSD: '%s' exited with error code %d, but has given useful output in the past (%zu times). We tried %zu times to restart it, but it failed to generate data. Disabling it.", cd->fullfilename, code, cd->successful_collections, cd->serial_failures);
 					cd->enabled = 0;
 				}
 			}
@@ -439,7 +439,7 @@ void *pluginsd_worker_thread(void *arg)
 					sleep((unsigned int) (cd->update_every * 10));
 				}
 				else {
-					error("PLUGINSD: '%s' (pid %d) does not generate useful output, although it reports success (exits with 0), but we have tried %d times to collect something. Disabling it.", cd->fullfilename, cd->pid, cd->serial_failures);
+					error("PLUGINSD: '%s' (pid %d) does not generate useful output, although it reports success (exits with 0), but we have tried %zu times to collect something. Disabling it.", cd->fullfilename, cd->pid, cd->serial_failures);
 					cd->enabled = 0;
 				}
 			}

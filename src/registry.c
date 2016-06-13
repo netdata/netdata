@@ -337,7 +337,7 @@ static inline URL *registry_url_allocate_nolock(const char *url, size_t urllen) 
 
 	debug(D_REGISTRY, "Registry: registry_url_allocate_nolock('%s'): allocating %zu bytes", url, sizeof(URL) + urllen);
 	URL *u = malloc(sizeof(URL) + urllen);
-	if(!u) fatal("Cannot allocate %zu bytes for URL '%s'", sizeof(URL) + urllen);
+	if(!u) fatal("Cannot allocate %zu bytes for URL '%s'", sizeof(URL) + urllen, url);
 
 	// a simple strcpy() should do the job
 	// but I prefer to be safe, since the caller specified urllen
@@ -782,7 +782,7 @@ int registry_log_load(void) {
 
 					// verify it is valid
 					if (unlikely(len < 85 || s[1] != '\t' || s[10] != '\t' || s[47] != '\t' || s[84] != '\t')) {
-						error("Registry: log line %u is wrong (len = %zu).", line, len);
+						error("Registry: log line %zu is wrong (len = %zu).", line, len);
 						continue;
 					}
 					s[1] = s[10] = s[47] = s[84] = '\0';
@@ -797,7 +797,7 @@ int registry_log_load(void) {
 					char *url = name;
 					while(*url && *url != '\t') url++;
 					if(!*url) {
-						error("Registry: log line %u does not have a url.", line);
+						error("Registry: log line %zu does not have a url.", line);
 						continue;
 					}
 					*url++ = '\0';
@@ -1521,7 +1521,7 @@ static inline size_t registry_load(void) {
 		switch(*s) {
 			case 'T': // totals
 				if(unlikely(len != 103 || s[1] != '\t' || s[18] != '\t' || s[35] != '\t' || s[52] != '\t' || s[69] != '\t' || s[86] != '\t' || s[103] != '\0')) {
-					error("Registry totals line %u is wrong (len = %zu).", line, len);
+					error("Registry totals line %zu is wrong (len = %zu).", line, len);
 					continue;
 				}
 				registry.persons_count = strtoull(&s[2], NULL, 16);
@@ -1536,7 +1536,7 @@ static inline size_t registry_load(void) {
 				m = NULL;
 				// verify it is valid
 				if(unlikely(len != 65 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[65] != '\0')) {
-					error("Registry person line %u is wrong (len = %zu).", line, len);
+					error("Registry person line %zu is wrong (len = %zu).", line, len);
 					continue;
 				}
 
@@ -1551,7 +1551,7 @@ static inline size_t registry_load(void) {
 				p = NULL;
 				// verify it is valid
 				if(unlikely(len != 65 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[65] != '\0')) {
-					error("Registry person line %u is wrong (len = %zu).", line, len);
+					error("Registry person line %zu is wrong (len = %zu).", line, len);
 					continue;
 				}
 
@@ -1570,7 +1570,7 @@ static inline size_t registry_load(void) {
 
 				// verify it is valid
 				if(len < 69 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[31] != '\t' || s[68] != '\t') {
-					error("Registry person URL line %u is wrong (len = %zu).", line, len);
+					error("Registry person URL line %zu is wrong (len = %zu).", line, len);
 					continue;
 				}
 
@@ -1580,7 +1580,7 @@ static inline size_t registry_load(void) {
 				char *url = &s[69];
 				while(*url && *url != '\t') url++;
 				if(!*url) {
-					error("Registry person URL line %u does not have a url.", line);
+					error("Registry person URL line %zu does not have a url.", line);
 					continue;
 				}
 				*url++ = '\0';
@@ -1607,7 +1607,7 @@ static inline size_t registry_load(void) {
 
 				// verify it is valid
 				if(len < 32 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[31] != '\t') {
-					error("Registry person URL line %u is wrong (len = %zu).", line, len);
+					error("Registry person URL line %zu is wrong (len = %zu).", line, len);
 					continue;
 				}
 

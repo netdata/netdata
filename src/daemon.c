@@ -29,8 +29,11 @@ char pidfile[FILENAME_MAX + 1] = "";
 
 void sig_handler(int signo)
 {
-	if(signo)
+	if(signo) {
+		error_log_limit_unlimited();
+		error("Received signal %d. Exiting...", signo);
 		netdata_exit = 1;
+	}
 }
 
 static void properly_chown_netdata_generated_file(int fd, uid_t uid, gid_t gid) {
