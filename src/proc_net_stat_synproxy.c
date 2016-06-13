@@ -37,9 +37,9 @@ int do_proc_net_stat_synproxy(int update_every, unsigned long long dt) {
 	if(!ff) return 0; // we return 0, so that we will retry to open it next time
 
 	// make sure we have 3 lines
-	unsigned long lines = procfile_lines(ff), l;
+	size_t lines = procfile_lines(ff), l;
 	if(lines < 2) {
-		error("/proc/net/stat/synproxy has %d lines, expected no less than 2. Disabling it.", lines);
+		error("/proc/net/stat/synproxy has %zu lines, expected no less than 2. Disabling it.", lines);
 		return 1;
 	}
 

@@ -40,14 +40,14 @@ extern void *cgroups_main(void *ptr);
 
 volatile sig_atomic_t netdata_exit = 0;
 
-void netdata_cleanup_and_exit(int ret)
-{
+void netdata_cleanup_and_exit(int ret) {
 	netdata_exit = 1;
+
+	error_log_limit_unlimited();
+
+	info("Called: netdata_cleanup_and_exit()");
 	rrdset_save_all();
 	// kill_childs();
-
-	// let it log a few more error messages
-	error_log_limit_reset();
 
 	if(pidfile[0]) {
 		if(unlink(pidfile) != 0)
@@ -119,17 +119,17 @@ void web_server_threading_selection(void) {
 	else if(!strcmp(s, "fixed"))
 		web_gzip_strategy = Z_FIXED;
 	else {
-		error("Invalid compression strategy '%s'. Valid strategies are 'default', 'filtered', 'huffman only', 'rle' and 'fixed'. Proceeding with 'default'.");
+		error("Invalid compression strategy '%s'. Valid strategies are 'default', 'filtered', 'huffman only', 'rle' and 'fixed'. Proceeding with 'default'.", s);
 		web_gzip_strategy = Z_DEFAULT_STRATEGY;
 	}
 
 	web_gzip_level = (int)config_get_number("global", "web compression level", 3);
 	if(web_gzip_level < 1) {
-		error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 1 (fastest compression).");
+		error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 1 (fastest compression).", web_gzip_level);
 		web_gzip_level = 1;
 	}
 	else if(web_gzip_level > 9) {
-		error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 9 (best compression).");
+		error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 9 (best compression).", web_gzip_level);
 		web_gzip_level = 9;
 	}
 #endif /* NETDATA_WITH_ZLIB */
@@ -450,12 +450,7 @@ int main(int argc, char **argv)
 	char *access_log_file = NULL;
 	char *user = NULL;
 	{
-		char buffer[1024];
-
-		// --------------------------------------------------------------------
-
-		sprintf(buffer, "0x%08llx", 0ULL);
-		char *flags = config_get("global", "debug flags", buffer);
+		char *flags = config_get("global", "debug flags",  "0x00000000");
 		setenv("NETDATA_DEBUG_FLAGS", flags, 1);
 
 		debug_flags = strtoull(flags, NULL, 0);
@@ -534,10 +529,13 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		if(gethostname(buffer, HOSTNAME_MAX) == -1)
-			error("WARNING: Cannot get machine hostname.");
-		hostname = config_get("global", "hostname", buffer);
-		debug(D_OPTIONS, "hostname set to '%s'", hostname);
+		{
+			char hostnamebuf[HOSTNAME_MAX + 1];
+			if(gethostname(hostnamebuf, HOSTNAME_MAX) == -1)
+				error("WARNING: Cannot get machine hostname.");
+			hostname = config_get("global", "hostname", hostnamebuf);
+			debug(D_OPTIONS, "hostname set to '%s'", hostname);
+		}
 
 		// --------------------------------------------------------------------
 
@@ -561,8 +559,8 @@ int main(int argc, char **argv)
 
 		// let the plugins know the min update_every
 		{
-			char buf[51];
-			snprintfz(buf, 50, "%d", rrd_update_every);
+			char buf[16];
+			snprintfz(buf, 15, "%d", rrd_update_every);
 			setenv("NETDATA_UPDATE_EVERY", buf, 1);
 		}
 
@@ -638,7 +636,8 @@ int main(int argc, char **argv)
 		// --------------------------------------------------------------------
 
 		listen_fd = create_listen_socket();
-		if(listen_fd < 0) fatal("Cannot listen socket.");
+		if(listen_fd == -1)
+			fatal("Cannot listen socket.");
 	}
 
 	// never become a problem

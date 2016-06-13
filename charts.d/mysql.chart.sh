@@ -7,7 +7,7 @@
 # This statement does not require any privilege.
 # It requires only the ability to connect to the server.
 
-mysql_update_every=5
+mysql_update_every=2
 mysql_priority=60000
 
 declare -A mysql_cmds=() mysql_opts=() mysql_ids=() mysql_data=()
@@ -17,7 +17,7 @@ mysql_get() {
 	local oIFS="${IFS}"
 	mysql_data=()
 	IFS=$'\t'$'\n'
-	arr=($("${@}" -e "SHOW GLOBAL STATUS WHERE value REGEXP '^[0-9]';" | egrep "^(Bytes|Slow_|Queri|Handl|Table|Selec|Sort_|Creat|Conne|Abort|Binlo|Threa|Innod|Qcach|Key_|Open)" ))
+	arr=($("${@}" -e "SHOW GLOBAL STATUS WHERE value REGEXP '^[0-9]';" | egrep "^(Bytes|Slow_|Que|Handl|Table|Selec|Sort_|Creat|Conne|Abort|Binlo|Threa|Innod|Qcach|Key_|Open)" ))
 	IFS="${oIFS}"
 
 	[ "${#arr[@]}" -lt 3 ] && return 1
@@ -449,7 +449,7 @@ END
 BEGIN mysql_$x.qcache_ops $1
 SET Qcache_hits hits = ${mysql_data[Qcache_hits]}
 SET Qcache_lowmem_prunes = ${mysql_data[Qcache_lowmem_prunes]}
-SET Qcache_inserts_inserts = ${mysql_data[Qcache_inserts_inserts]}
+SET Qcache_inserts = ${mysql_data[Qcache_inserts]}
 SET Qcache_not_cached = ${mysql_data[Qcache_not_cached]}
 END
 BEGIN mysql_$x.qcache $1

@@ -549,24 +549,24 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
 	// svg template from:
 	// https://raw.githubusercontent.com/badges/shields/master/templates/flat-template.svg
 	buffer_sprintf(wb,
-		"<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"%zu\" height=\"20\">"
+		"<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"%d\" height=\"20\">"
 			"<linearGradient id=\"smooth\" x2=\"0\" y2=\"100%%\">"
 				"<stop offset=\"0\" stop-color=\"#bbb\" stop-opacity=\".1\"/>"
 				"<stop offset=\"1\" stop-opacity=\".1\"/>"
 			"</linearGradient>"
 			"<mask id=\"round\">"
-				"<rect width=\"%zu\" height=\"20\" rx=\"3\" fill=\"#fff\"/>"
+				"<rect width=\"%d\" height=\"20\" rx=\"3\" fill=\"#fff\"/>"
 			"</mask>"
 			"<g mask=\"url(#round)\">"
-				"<rect width=\"%zu\" height=\"20\" fill=\"%s\"/>"
-				"<rect x=\"%zu\" width=\"%zu\" height=\"20\" fill=\"%s\"/>"
-				"<rect width=\"%zu\" height=\"20\" fill=\"url(#smooth)\"/>"
+				"<rect width=\"%d\" height=\"20\" fill=\"%s\"/>"
+				"<rect x=\"%d\" width=\"%d\" height=\"20\" fill=\"%s\"/>"
+				"<rect width=\"%d\" height=\"20\" fill=\"url(#smooth)\"/>"
 			"</g>"
 			"<g fill=\"#fff\" text-anchor=\"middle\" font-family=\"DejaVu Sans,Verdana,Geneva,sans-serif\" font-size=\"11\">"
-				"<text x=\"%zu\" y=\"15\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
-				"<text x=\"%zu\" y=\"14\">%s</text>"
-				"<text x=\"%zu\" y=\"15\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
-				"<text x=\"%zu\" y=\"14\">%s</text>"
+				"<text x=\"%d\" y=\"15\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
+				"<text x=\"%d\" y=\"14\">%s</text>"
+				"<text x=\"%d\" y=\"15\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
+				"<text x=\"%d\" y=\"14\">%s</text>"
 			"</g>"
 		"</svg>",
 		total_width, total_width,

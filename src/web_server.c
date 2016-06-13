@@ -51,6 +51,39 @@ static void log_allocations(void)
 }
 #endif
 
+#ifndef HAVE_ACCEPT4
+int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
+	int fd = accept(sock, addr, addrlen);
+	int newflags = 0;
+
+	if (fd < 0) return fd;
+
+	if (flags & SOCK_NONBLOCK) {
+		newflags |= O_NONBLOCK;
+		flags &= ~SOCK_NONBLOCK;
+	}
+
+	if (flags & SOCK_CLOEXEC) {
+		newflags |= O_CLOEXEC;
+		flags &= ~SOCK_CLOEXEC;
+	}
+
+	if (flags) {
+		errno = -EINVAL;
+		return -1;
+	}
+
+	if (fcntl(fd, F_SETFL, newflags) < 0) {
+		int saved_errno = errno;
+		close(fd);
+		errno = saved_errno;
+		return -1;
+	}
+
+	return fd;
+}
+#endif
+
 static int is_ip_anything(const char *ip)
 {
 	if(!ip || !*ip
@@ -186,10 +219,13 @@ int create_listen_socket(void) {
 	else if(!strcmp(ipv, "ipv6") || !strcmp(ipv, "IPV6") || !strcmp(ipv, "IPv6") || !strcmp(ipv, "6")) ip = 6;
 	else error("Cannot understand ip version '%s'. Assuming 'any'.", ipv);
 
-	if(ip == 0 || ip == 6) listen_fd = create_listen_socket6(config_get("global", "bind socket to IP", "*"), listen_port, listen_backlog);
-	if(listen_fd < 0) {
+	if(ip == 0 || ip == 6)
+		listen_fd = create_listen_socket6(config_get("global", "bind socket to IP", "*"), listen_port, listen_backlog);
+
+	if(listen_fd == -1) {
 		listen_fd = create_listen_socket4(config_get("global", "bind socket to IP", "*"), listen_port, listen_backlog);
-		// if(listen_fd >= 0 && ip != 4) info("Managed to open an IPv4 socket on port %d.", listen_port);
+		//if(listen_fd != -1 && ip != 4)
+		//	info("Managed to open an IPv4 socket on port %d.", listen_port);
 	}
 
 	return listen_fd;
@@ -241,7 +277,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
 				sleep(5);
 				create_listen_socket();
 				if(listen_fd < 0)
-					fatal("Cannot listen for web clients (connected clients %llu).", global_statistics.connected_clients);
+					fatal("Cannot listen for web clients (connected clients %lu).", global_statistics.connected_clients);
 
 				failures = 0;
 			}
@@ -258,7 +294,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
 				}
 
 				if(pthread_create(&w->thread, NULL, web_client_main, w) != 0) {
-					error("%llu: failed to create new thread for web client.");
+					error("%llu: failed to create new thread for web client.", w->id);
 					w->obsolete = 1;
 				}
 				else if(pthread_detach(w->thread) != 0) {
@@ -410,7 +446,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
 
 				create_listen_socket();
 				if(listen_fd < 0 || listen_fd >= FD_SETSIZE)
-					fatal("Cannot listen for web clients (connected clients %llu).", global_statistics.connected_clients);
+					fatal("Cannot listen for web clients (connected clients %lu).", global_statistics.connected_clients);
 
 				FD_ZERO (&ifds);
 				FD_ZERO (&ofds);

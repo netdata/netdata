@@ -172,7 +172,7 @@ void *realloc_debug(const char *file, int line, const char *function, void *ptr,
 	allocations.allocated -= old_size;
 
 	debug(D_MEMORY, "MEMORY: Re-allocated from %zu to %zu bytes for %s/%u@%s."
-		" Status: allocated %z in %zu allocs."
+		" Status: allocated %zu in %zu allocs."
 		, old_size, size
 		, function, line, file
 		, allocations.allocated
@@ -547,7 +547,7 @@ int read_apps_groups_conf(const char *name)
 
 			struct target *n = get_apps_groups_target(s, w);
 			if(!n) {
-				error("Cannot create target '%s' (line %d, word %d)", s, line, word);
+				error("Cannot create target '%s' (line %lu, word %lu)", s, line, word);
 				continue;
 			}
 
@@ -1793,7 +1793,7 @@ void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target
 		}
 
 		if(unlikely(debug || w->debug))
-			fprintf(stderr, "apps.plugin: \tAgregating %s pid %d on %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, w->name, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+			fprintf(stderr, "apps.plugin: \tAggregating %s pid %d on %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, w->name, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
 
 /*		if(p->utime - p->old_utime > 100) fprintf(stderr, "BIG CHANGE: %d %s utime increased by %llu from %llu to %llu\n", p->pid, p->comm, p->utime - p->old_utime, p->old_utime, p->utime);
 		if(p->cutime - p->old_cutime > 100) fprintf(stderr, "BIG CHANGE: %d %s cutime increased by %llu from %llu to %llu\n", p->pid, p->comm, p->cutime - p->old_cutime, p->old_cutime, p->cutime);
