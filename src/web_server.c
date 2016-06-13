@@ -111,7 +111,8 @@ int create_listen_socket4(const char *ip, int port, int listen_backlog)
 	}
 
 	/* avoid "address already in use" */
-	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt));
+	if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt)) != 0)
+		error("Cannot set SO_REUSEADDR on port's %d socket.", port);
 
 	struct sockaddr_in name;
 	memset(&name, 0, sizeof(struct sockaddr_in));
@@ -162,7 +163,8 @@ int create_listen_socket6(const char *ip, int port, int listen_backlog)
 	}
 
 	/* avoid "address already in use" */
-	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt));
+	if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt)) != 0)
+		error("Cannot set SO_REUSEADDR on port's %d socket.", port);
 
 	struct sockaddr_in6 name;
 	memset(&name, 0, sizeof(struct sockaddr_in6));

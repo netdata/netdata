@@ -307,7 +307,7 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 	}
 
 	if(user && *user) {
-		if(become_user(user, (*access_fd)?*access_fd:-1, output_fd, error_fd, pidfd) != 0) {
+		if(become_user(user, (access_fd)?*access_fd:-1, output_fd, error_fd, pidfd) != 0) {
 			error("Cannot become user '%s'. Continuing as we are.", user);
 		}
 		else info("Successfully became user '%s'.", user);

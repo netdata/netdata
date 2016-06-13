@@ -314,7 +314,7 @@ void buffer_free(BUFFER *b)
 
 	debug(D_WEB_BUFFER, "Freeing web buffer of size %zu.", b->size);
 
-	if(b->buffer) free(b->buffer);
+	free(b->buffer);
 	free(b);
 }
 
