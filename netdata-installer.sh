@@ -338,15 +338,15 @@ run make || exit 1
 
 # backup user configurations
 installer_backup_suffix="${PID}.${RANDOM}"
-for x in apps_groups.conf charts.d.conf
+for x in $(find "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
 do
-	if [ -f "${NETDATA_PREFIX}/etc/netdata/${x}" ]
+	if [ -f "${x}" ]
 		then
-		cp -p "${NETDATA_PREFIX}/etc/netdata/${x}" "${NETDATA_PREFIX}/etc/netdata/${x}.installer_backup.${installer_backup_suffix}"
+		cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
 
-	elif [ -f "${NETDATA_PREFIX}/etc/netdata/${x}.installer_backup.${installer_backup_suffix}" ]
+	elif [ -f "${x}.installer_backup.${installer_backup_suffix}" ]
 		then
-		rm -f "${NETDATA_PREFIX}/etc/netdata/${x}.installer_backup.${installer_backup_suffix}"
+		rm -f "${x}.installer_backup.${installer_backup_suffix}"
 	fi
 done
 
@@ -354,12 +354,12 @@ echo >&2 "Installing netdata ..."
 run make install || exit 1
 
 # restore user configurations
-for x in apps_groups.conf charts.d.conf
+for x in $(find "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
 do
-	if [ -f "${NETDATA_PREFIX}/etc/netdata/${x}.installer_backup.${installer_backup_suffix}" ]
+	if [ -f "${x}.installer_backup.${installer_backup_suffix}" ]
 		then
-		cp -p "${NETDATA_PREFIX}/etc/netdata/${x}.installer_backup.${installer_backup_suffix}" "${NETDATA_PREFIX}/etc/netdata/${x}"
-		rm -f "${NETDATA_PREFIX}/etc/netdata/${x}.installer_backup.${installer_backup_suffix}"
+		cp -p "${x}.installer_backup.${installer_backup_suffix}" "${x}"
+		rm -f "${x}.installer_backup.${installer_backup_suffix}"
 	fi
 done
 
