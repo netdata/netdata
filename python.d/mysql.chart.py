@@ -5,7 +5,7 @@ try:
     # https://github.com/PyMySQL/PyMySQL
 except ImportError:
     import sys
-    sys.stderr.write("You need to install PyMySQL module to use mysql.chart.py plugin")
+    sys.stderr.write("mysql.chart.d: You need to install PyMySQL module to use mysql.chart.py plugin")
 
 config = [
     {
