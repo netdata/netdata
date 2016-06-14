@@ -350,16 +350,16 @@ def check():
         if 'my.cnf' in config[i]:
             config[i]['socket'] = None
             config[i]['host'] = None
-            config[i]['port'] = None
+            config[i]['port'] = 0
         elif 'socket' in config[i]:
             config[i]['my.cnf'] = None
             config[i]['host'] = None
-            config[i]['port'] = None
+            config[i]['port'] = 0
         elif 'host' in config[i]:
             config[i]['my.cnf'] = None
             config[i]['socket'] = None
             if 'port' in config[i]:
-                config[i]['port'] = str(config[i]['port'])
+                config[i]['port'] = int(config[i]['port'])
             else:
                 config[i]['port'] = 3306
 
