@@ -346,7 +346,7 @@ def check():
         if 'user' not in config[i]:
             config[i]['user'] = 'root'
         if 'password' not in config[i]:
-            config[i]['password'] = None
+            config[i]['password'] = ''
         if 'my.cnf' in config[i]:
             config[i]['socket'] = None
             config[i]['host'] = None
