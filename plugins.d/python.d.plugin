@@ -100,7 +100,10 @@ class PythonCharts(object):
             if os.path.isfile(configfile):
                 debug("loading chart options: '" + configfile + "'")
                 for k, v in read_config(configfile).items():
-                    setattr(m, k, v)
+                    try:
+                        setattr(m, k, v)
+                    except AttributeError:
+                        self._disable_module(m,"misbehaving having bad configuration")
             else:
                 debug(m.__name__ +
                       ": configuration file '" +
