@@ -1,11 +1,12 @@
 #!/usr/bin/python3 -u
 
+NAME = "mysql.chart.py"
+from sys import stderr
 try:
     import pymysql.cursors
     # https://github.com/PyMySQL/PyMySQL
 except ImportError:
-    import sys
-    sys.stderr.write("mysql.chart.d: You need to install PyMySQL module to use mysql.chart.py plugin")
+    stderr.write(NAME + ": You need to install PyMySQL module to use mysql.chart.py plugin\n")
 
 config = [
     {
@@ -308,7 +309,8 @@ def get_data(config):
     global connections
     try:
         cnx = connections[config['name']]
-    except KeyError:
+    except KeyError as e:
+        stderr.write(NAME + ": reconnecting\n")
         cnx = pymysql.connect(user=config['user'],
                               password=config['password'],
                               unix_socket=config['socket'],
@@ -321,7 +323,8 @@ def get_data(config):
         with cnx.cursor() as cursor:
             cursor.execute(QUERY)
             raw_data = cursor.fetchall()
-    except Exception:
+    except Exception as e:
+        stderr.write(NAME + ": cannot execute query." + str(e) + "\n")
         cnx.close()
         del connections[config['name']]
         return None
@@ -365,7 +368,8 @@ def check():
                                   port=srv['port'],
                                   connect_timeout=int(update_every))
             cnx.close()
-        except:
+        except Exception as e:
+            stderr.write(NAME + " has problem connecting to server: "+str(e)+"\n")
             config.remove(srv)
 
     if len(config) == 0:
