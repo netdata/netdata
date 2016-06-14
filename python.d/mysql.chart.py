@@ -313,6 +313,7 @@ def get_data(config):
         stderr.write(NAME + ": reconnecting\n")
         cnx = pymysql.connect(user=config['user'],
                               password=config['password'],
+                              read_default_file=config['my.cnf'],
                               unix_socket=config['socket'],
                               host=config['host'],
                               port=config['port'],
@@ -341,35 +342,39 @@ def check():
         config = cfg
     for i in range(len(config)):
         if 'name' not in config[i]:
-            config[i]['name'] = "mysql_srv_"+str(i)
+            config[i]['name'] = "srv_"+str(i)
         if 'user' not in config[i]:
             config[i]['user'] = 'root'
         if 'password' not in config[i]:
             config[i]['password'] = None
-        if 'socket' not in config[i]:
+        if 'my.cnf' in config[i]:
             config[i]['socket'] = None
-        if 'host' not in config[i]:
             config[i]['host'] = None
-        if 'port' in config[i]:
-            config[i]['port'] = int(config[i]['port'])
-        else:
-            config[i]['port'] = 3306
-        if config[i]['host'] is None:
             config[i]['port'] = None
-        if config[i]['host'] is None and config[i]['socket'] is None:
-            remove.append(i)
+        elif 'socket' in config[i]:
+            config[i]['my.cnf'] = None
+            config[i]['host'] = None
+            config[i]['port'] = None
+        elif 'host' in config[i]:
+            config[i]['my.cnf'] = None
+            config[i]['socket'] = None
+            if 'port' in config[i]:
+                config[i]['port'] = str(config[i]['port'])
+            else:
+                config[i]['port'] = 3306
 
     for srv in config:
         try:
             cnx = pymysql.connect(user=srv['user'],
                                   password=srv['password'],
+                                  read_default_file=srv['my.cnf'],
                                   unix_socket=srv['socket'],
                                   host=srv['host'],
                                   port=srv['port'],
                                   connect_timeout=int(update_every))
             cnx.close()
         except Exception as e:
-            stderr.write(NAME + " has problem connecting to server: "+str(e)+"\n")
+            stderr.write(NAME + " has problem connecting to server: "+str(e).replace("\n"," ")+"\n")
             config.remove(srv)
 
     if len(config) == 0:
