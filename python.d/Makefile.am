@@ -7,3 +7,7 @@ dist_python_SCRIPTS = \
 dist_python_DATA = \
 	README.md \
 	$(NULL)
+
+pythonmodulesdir=$(pythondir)/python_modules
+dist_pythonmodules_DATA = \
+	$(NULL)
