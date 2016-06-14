@@ -1,4 +1,8 @@
-Every plugin supports changing its data collection frequency by setting `update_every` variable in its configuration file.
+# Disclaimer
+
+Currently every plugin must be written in python3
+Also plugins support changing their data collection frequency by setting `update_every` variable in their configuration file.
+
 
 The following python.d plugins are supported:
 
@@ -58,18 +62,22 @@ You can provide, per server, the following:
 1. a name, anything you like, but keep it short
 2. username which have access to database (deafults to 'root')
 3. password (defaults to none)
-4. mysql socket (optional)
-5. mysql host (ip or hostname)
-3. mysql port (defaults to 3306)
+4. mysql my.cnf configuration file
+5. mysql socket (optional)
+6. mysql host (ip or hostname)
+7. mysql port (defaults to 3306)
 
-Here is an example for 2 servers updating data every 10 seconds
+Here is an example for 3 servers updating data every 10 seconds
 
 ```js
 update_every = 10
 
 config=[
     {
-    	'name'     : 'local',
+        'name'     : 'local',
+        'my.cnf'   : '/etc/mysql/my.cnf'
+    },{
+    	'name'     : 'local_2',
         'user'     : 'root',
         'password' : 'blablablabla',
         'socket'   : '/var/run/mysqld/mysqld.sock'
