@@ -5,6 +5,7 @@ The following python.d plugins are supported:
 # mysql
 
 The plugin will monitor one or more mysql servers
+Plugins needs installed pymysql in `python_modules` directory or system-wide.
 
 It will produce the following charts (if data is available):
 
