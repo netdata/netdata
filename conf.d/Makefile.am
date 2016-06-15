@@ -19,7 +19,8 @@ dist_nodeconfig_DATA = \
 
 pythonconfigdir=$(configdir)/python.d
 dist_pythonconfig_DATA = \
-	python.d/example.conf
+	python.d/example.conf \
+	python.d/mysql.conf \
 	$(NULL)
 
 

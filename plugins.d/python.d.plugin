@@ -27,12 +27,10 @@ class PythonCharts(object):
         self.configs = modules_configs
 
         # load modules
-        self.modules = self._load_modules(modules_path,modules)
+        modules = self._load_modules(modules_path,modules)
         
         # check if loaded modules are on disabled modules list
-        for mod in self.modules:
-            if mod.__name__ in modules_disabled:
-                self.modules.remove(mod)
+        self.modules = [ m for m in modules if m.__name__ not in modules_disabled ]
         
         # load configuration files
         self._load_configs()
@@ -102,7 +100,10 @@ class PythonCharts(object):
             if os.path.isfile(configfile):
                 debug("loading chart options: '" + configfile + "'")
                 for k, v in read_config(configfile).items():
-                    setattr(m, k, v)
+                    try:
+                        setattr(m, k, v)
+                    except AttributeError:
+                        self._disable_module(m,"misbehaving having bad configuration")
             else:
                 debug(m.__name__ +
                       ": configuration file '" +
@@ -123,9 +124,9 @@ class PythonCharts(object):
                   "() function. Disabling it.")
         elif reason[:7] == "failed ":
             debug("chart '" +
-                  mod.__name__ +
-                  reason[3:] +
-                  "() function. reports failure.")
+                  mod.__name__ + "' " +
+                  reason[7:] +
+                  "() function reports failure.")
         elif reason[:13] == "configuration":
             debug(mod.__name__,
                   "configuration file '" +
@@ -272,6 +273,8 @@ def parse_cmdline(directory, *commands):
                 pass
 
     debug("started from", commands[0], "with options:", *commands[1:])
+    if len(mods) == 0 and DEBUG_FLAG is False:
+        interval = None
 
     return {'interval': interval,
             'modules': mods}
@@ -292,9 +295,8 @@ def run():
     # read configuration file
     disabled = []
     if config_dir[-1] != '/':
-        configfile = config_dir + '/' + "python.d.conf"
-    else:
-        configfile = config_dir + "python.d.conf"
+        config_dir += '/'
+    configfile = config_dir + "python.d.conf"
 
     try:
         conf = read_config(configfile)
