@@ -2,6 +2,7 @@ MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
 dist_python_SCRIPTS = \
 	example.chart.py \
+	mysql.chart.py \
 	$(NULL)
 
 dist_python_DATA = \
@@ -10,4 +11,6 @@ dist_python_DATA = \
 
 pythonmodulesdir=$(pythondir)/python_modules
 dist_pythonmodules_DATA = \
+	python_modules/__init__.py
 	$(NULL)
+
