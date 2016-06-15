@@ -17,7 +17,8 @@ mysql_get() {
 	local oIFS="${IFS}"
 	mysql_data=()
 	IFS=$'\t'$'\n'
-	arr=($("${@}" -e "SHOW GLOBAL STATUS WHERE value REGEXP '^[0-9]';" | egrep "^(Bytes|Slow_|Que|Handl|Table|Selec|Sort_|Creat|Conne|Abort|Binlo|Threa|Innod|Qcach|Key_|Open)" ))
+	#arr=($("${@}" -e "SHOW GLOBAL STATUS WHERE value REGEXP '^[0-9]';" | egrep "^(Bytes|Slow_|Que|Handl|Table|Selec|Sort_|Creat|Conne|Abort|Binlo|Threa|Innod|Qcach|Key_|Open)" ))
+	arr=($("${@}" -N -e "SHOW GLOBAL STATUS;" | egrep "^(Bytes|Slow_|Que|Handl|Table|Selec|Sort_|Creat|Conne|Abort|Binlo|Threa|Innod|Qcach|Key_|Open)[^ ]+\s[0-9]" ))
 	IFS="${oIFS}"
 
 	[ "${#arr[@]}" -lt 3 ] && return 1
