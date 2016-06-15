@@ -372,7 +372,7 @@ def check():
     for srv in config:
         try:
             cnx = MySQLdb.connect(user=srv['user'],
-                                  password=srv['password'],
+                                  passwd=srv['password'],
                                   read_default_file=srv['my.cnf'],
                                   unix_socket=srv['socket'],
                                   host=srv['host'],
