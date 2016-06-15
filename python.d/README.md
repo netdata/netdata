@@ -1,6 +1,7 @@
 # Disclaimer
 
-Currently every plugin must be written in python3
+Currently every plugin must be written in python3.
+All third party libraries should be installed system-wide or in `python_modules` directory.
 Also plugins support changing their data collection frequency by setting `update_every` variable in their configuration file.
 
 
@@ -9,9 +10,11 @@ The following python.d plugins are supported:
 # mysql
 
 The plugin will monitor one or more mysql servers
-Plugins needs installed MySQLdb or pymysql in `python_modules` directory or system-wide.
 
-It will produce the following charts (if data is available):
+**Requirements:**
+ * python module [MySQLdb](https://github.com/PyMySQL/mysqlclient-python) (faster) or [PyMySQL](https://github.com/PyMySQL/PyMySQL) (slower)
+
+It will produce following charts (if data is available):
 
 1. **Bandwidth** in kbps
  * in
