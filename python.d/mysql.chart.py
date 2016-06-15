@@ -3,16 +3,22 @@
 NAME = "mysql.chart.py"
 from sys import stderr
 try:
-    import pymysql.cursors
-    # https://github.com/PyMySQL/PyMySQL
+    import MySQLdb
+    stderr.write(NAME + ": using MySQLdb")
+    # https://github.com/PyMySQL/mysqlclient-python
 except ImportError:
-    stderr.write(NAME + ": You need to install PyMySQL module to use mysql.chart.py plugin\n")
+    try:
+        import pymysql as MySQLdb
+        # https://github.com/PyMySQL/PyMySQL
+        stderr.write(NAME + ": using pymysql")
+    except ImportError:
+        stderr.write(NAME + ": You need to install PyMySQL module to use mysql.chart.py plugin\n")
 
 config = [
     {
         'name'     : 'local',
         'user'     : 'root',
-        'password' : None,
+        'password' : '',
         'socket'   : '/var/run/mysqld/mysqld.sock'
     }
 ]
@@ -311,8 +317,8 @@ def get_data(config):
         cnx = connections[config['name']]
     except KeyError as e:
         stderr.write(NAME + ": reconnecting\n")
-        cnx = pymysql.connect(user=config['user'],
-                              password=config['password'],
+        cnx = MySQLdb.connect(user=config['user'],
+                              passwd=config['password'],
                               read_default_file=config['my.cnf'],
                               unix_socket=config['socket'],
                               host=config['host'],
@@ -348,16 +354,16 @@ def check():
         if 'password' not in config[i]:
             config[i]['password'] = ''
         if 'my.cnf' in config[i]:
-            config[i]['socket'] = None
-            config[i]['host'] = None
+            config[i]['socket'] = ''
+            config[i]['host'] = ''
             config[i]['port'] = 0
         elif 'socket' in config[i]:
-            config[i]['my.cnf'] = None
-            config[i]['host'] = None
+            config[i]['my.cnf'] = ''
+            config[i]['host'] = ''
             config[i]['port'] = 0
         elif 'host' in config[i]:
-            config[i]['my.cnf'] = None
-            config[i]['socket'] = None
+            config[i]['my.cnf'] = ''
+            config[i]['socket'] = ''
             if 'port' in config[i]:
                 config[i]['port'] = int(config[i]['port'])
             else:
@@ -365,7 +371,7 @@ def check():
 
     for srv in config:
         try:
-            cnx = pymysql.connect(user=srv['user'],
+            cnx = MySQLdb.connect(user=srv['user'],
                                   password=srv['password'],
                                   read_default_file=srv['my.cnf'],
                                   unix_socket=srv['socket'],
