@@ -62,7 +62,7 @@ phpfpm_get() {
 	phpfpm_total_processes="${phpfpm_response[34]}"
 	phpfpm_max_active_processes="${phpfpm_response[38]}"
 	phpfpm_max_children_reached="${phpfpm_response[42]}"
-	if [[ "${phpfpm_response[43]}" == "slow" ]]
+	if [ "${phpfpm_response[43]}" == "slow" ]
 		then
 	  	phpfpm_slow_requests="${phpfpm_response[45]}"
 	else
@@ -127,7 +127,7 @@ phpfpm_create() {
 		cat <<EOF
 CHART phpfpm_$m.connections '' "PHP-FPM Active Connections" "connections" phpfpm phpfpm.connections line $((phpfpm_priority + 1)) $phpfpm_update_every
 DIMENSION active '' absolute 1 1
-DDIMENSION maxActive 'max active' absolute 1 1
+DIMENSION maxActive 'max active' absolute 1 1
 DIMENSION idle '' absolute 1 1
 
 CHART phpfpm_$m.requests '' "PHP-FPM Requests" "requests/s" phpfpm phpfpm.requests line $((phpfpm_priority + 2)) $phpfpm_update_every
@@ -136,11 +136,9 @@ DIMENSION requests '' incremental 1 1
 CHART phpfpm_$m.performance '' "PHP-FPM Performance" "status" phpfpm phpfpm.performance line $((phpfpm_priority + 3)) $phpfpm_update_every
 DIMENSION reached 'max children reached' absolute 1 1
 EOF
-		if [[ ${phpfpm_slow_requests} != "-1" ]]
+		if [ $((phpfpm_slow_requests)) -ne -1 ]
 			then
-			cat <<EOF
-DIMENSION slow 'slow requests' absolute 1 1
-EOF
+			echo "DIMENSION slow 'slow requests' absolute 1 1"
 		fi
 	done
 	
@@ -177,14 +175,16 @@ END
 BEGIN phpfpm_$m.performance $1
 SET reached = $((phpfpm_max_children_reached))
 EOF
-		if [[ ${phpfpm_slow_requests} != "-1" ]]
+		if [ $((phpfpm_slow_requests)) -ne -1 ]
 			then
-			cat << EOF
-SET slow = $((phpfpm_slow_requests))
-EOF
+			echo "SET slow = $((phpfpm_slow_requests))"
 		fi
 		echo "END"
 	done
 	
 	return 0
 }
+
+phpfpm_check
+phpfpm_create
+phpfpm_update
