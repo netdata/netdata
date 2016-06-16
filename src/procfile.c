@@ -325,7 +325,7 @@ procfile *procfile_readall(procfile *ff) {
 			ff->size += PROCFILE_INCREMENT_BUFFER;
 		}
 
-		debug(D_PROCFILE, "Reading file '%s', from position %ld with length %ld", ff->filename, s, ff->size - s);
+		debug(D_PROCFILE, "Reading file '%s', from position %ld with length %lu", ff->filename, s, ff->size - s);
 		r = read(ff->fd, &ff->data[s], ff->size - s);
 		if(unlikely(r == -1)) {
 			if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) error(PF_PREFIX ": Cannot read from file '%s'", ff->filename);
@@ -496,16 +496,16 @@ void procfile_print(procfile *ff) {
 	uint32_t words, w;
 	char *s;
 
-	debug(D_PROCFILE, "File '%s' with %d lines and %d words", ff->filename, ff->lines->len, ff->words->len);
+	debug(D_PROCFILE, "File '%s' with %u lines and %u words", ff->filename, ff->lines->len, ff->words->len);
 
 	for(l = 0; likely(l < lines) ;l++) {
 		words = procfile_linewords(ff, l);
 
-		debug(D_PROCFILE, "	line %d starts at word %d and has %d words", l, ff->lines->lines[l].first, ff->lines->lines[l].words);
+		debug(D_PROCFILE, "	line %u starts at word %u and has %u words", l, ff->lines->lines[l].first, ff->lines->lines[l].words);
 
 		for(w = 0; likely(w < words) ;w++) {
 			s = procfile_lineword(ff, l, w);
-			debug(D_PROCFILE, "		[%d.%d] '%s'", l, w, s);
+			debug(D_PROCFILE, "		[%u.%u] '%s'", l, w, s);
 		}
 	}
 }
