@@ -760,7 +760,7 @@ int unit_test(long delay, long shift)
 
 	unsigned long oincrement = increment;
 	increment = increment * st->update_every * 1000000 / delay;
-	fprintf(stderr, "\n\nORIGINAL INCREMENT: %lu, INCREMENT %lu, DELAY %lu, SHIFT %lu\n", oincrement * 10, increment * 10, delay, shift);
+	fprintf(stderr, "\n\nORIGINAL INCREMENT: %lu, INCREMENT %ld, DELAY %ld, SHIFT %ld\n", oincrement * 10, increment * 10, delay, shift);
 
 	int ret = 0;
 	storage_number sn;
