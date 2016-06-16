@@ -92,12 +92,12 @@ void *check_allocation(const char *file, int line, const char *function, void *m
 
 	// fprintf(stderr, "MEMORY_POINTER: Checking pointer at %p, real %p for %s/%u@%s.\n", marked_ptr, (void *)(marked_ptr - MALLOC_PREFIX), function, line, file);
 
-	if(real_ptr[0] != MALLOC_MARK) fatal("MEMORY: prefix MARK is not valid for %s/%u@%s.", function, line, file);
+	if(real_ptr[0] != MALLOC_MARK) fatal("MEMORY: prefix MARK is not valid for %s/%d@%s.", function, line, file);
 
 	size_t size = real_ptr[1];
 
 	uint32_t *end_ptr = (uint32_t *)(marked_ptr + size);
-	if(end_ptr[0] != MALLOC_MARK) fatal("MEMORY: suffix MARK of allocation with size %zu is not valid for %s/%u@%s.", size, function, line, file);
+	if(end_ptr[0] != MALLOC_MARK) fatal("MEMORY: suffix MARK of allocation with size %zu is not valid for %s/%d@%s.", size, function, line, file);
 
 	if(size_without_overheads_ptr) *size_without_overheads_ptr = size;
 
@@ -106,12 +106,12 @@ void *check_allocation(const char *file, int line, const char *function, void *m
 
 void *malloc_debug(const char *file, int line, const char *function, size_t size) {
 	void *ptr = malloc(size + MALLOC_OVERHEAD);
-	if(!ptr) fatal("MEMORY: Cannot allocate %zu bytes for %s/%u@%s.", size, function, line, file);
+	if(!ptr) fatal("MEMORY: Cannot allocate %zu bytes for %s/%d@%s.", size, function, line, file);
 
 	allocations.allocated += size;
 	allocations.allocations++;
 
-	debug(D_MEMORY, "MEMORY: Allocated %zu bytes for %s/%u@%s."
+	debug(D_MEMORY, "MEMORY: Allocated %zu bytes for %s/%d@%s."
 		" Status: allocated %zu in %zu allocs."
 		, size
 		, function, line, file
