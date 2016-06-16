@@ -93,29 +93,29 @@ int become_user(const char *username, int access_fd, int output_fd, int error_fd
 	}
 
 	if(setresgid(gid, gid, gid) != 0) {
-		error("Cannot switch to user's %s group (gid: %d).", username, gid);
+		error("Cannot switch to user's %s group (gid: %u).", username, gid);
 		return -1;
 	}
 
 	if(setresuid(uid, uid, uid) != 0) {
-		error("Cannot switch to user %s (uid: %d).", username, uid);
+		error("Cannot switch to user %s (uid: %u).", username, uid);
 		return -1;
 	}
 
 	if(setgid(gid) != 0) {
-		error("Cannot switch to user's %s group (gid: %d).", username, gid);
+		error("Cannot switch to user's %s group (gid: %u).", username, gid);
 		return -1;
 	}
 	if(setegid(gid) != 0) {
-		error("Cannot effectively switch to user's %s group (gid: %d).", username, gid);
+		error("Cannot effectively switch to user's %s group (gid: %u).", username, gid);
 		return -1;
 	}
 	if(setuid(uid) != 0) {
-		error("Cannot switch to user %s (uid: %d).", username, uid);
+		error("Cannot switch to user %s (uid: %u).", username, uid);
 		return -1;
 	}
 	if(seteuid(uid) != 0) {
-		error("Cannot effectively switch to user %s (uid: %d).", username, uid);
+		error("Cannot effectively switch to user %s (uid: %u).", username, uid);
 		return -1;
 	}
 

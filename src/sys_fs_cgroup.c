@@ -252,7 +252,7 @@ void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
 		if(!ff) return;
 
 		if(procfile_lines(ff) < 1) {
-			error("File '%s' should have 1+ lines but has %d.", ca->filename, procfile_lines(ff));
+			error("File '%s' should have 1+ lines but has %u.", ca->filename, procfile_lines(ff));
 			return;
 		}
 
@@ -1018,14 +1018,14 @@ void update_cgroup_charts(int update_every) {
 				st = rrdset_create(type, "cpu_per_core", NULL, "cpu", "cgroup.cpu_per_core", title, "%", 40100, update_every, RRDSET_TYPE_STACKED);
 
 				for(i = 0; i < cg->cpuacct_usage.cpus ;i++) {
-					snprintfz(id, CHART_TITLE_MAX, "cpu%d", i);
+					snprintfz(id, CHART_TITLE_MAX, "cpu%u", i);
 					rrddim_add(st, id, NULL, 100, 1000000, RRDDIM_INCREMENTAL);
 				}
 			}
 			else rrdset_next(st);
 
 			for(i = 0; i < cg->cpuacct_usage.cpus ;i++) {
-				snprintfz(id, CHART_TITLE_MAX, "cpu%d", i);
+				snprintfz(id, CHART_TITLE_MAX, "cpu%u", i);
 				rrddim_set(st, id, cg->cpuacct_usage.cpu_percpu[i]);
 			}
 			rrdset_done(st);
