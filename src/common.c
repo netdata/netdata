@@ -685,7 +685,7 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm)
 		if(lseek(fd, size, SEEK_SET) == (off_t)size) {
 			if(write(fd, "", 1) == 1) {
 				if(ftruncate(fd, size))
-					error("Cannot truncate file '%s' to size %ld. Will use the larger file.", filename, size);
+					error("Cannot truncate file '%s' to size %zu. Will use the larger file.", filename, size);
 
 #ifdef MADV_MERGEABLE
 				if(flags & MAP_SHARED || !enable_ksm || !ksm) {
@@ -734,9 +734,9 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm)
 				}
 #endif
 			}
-			else error("Cannot write to file '%s' at position %ld.", filename, size);
+			else error("Cannot write to file '%s' at position %zu.", filename, size);
 		}
-		else error("Cannot seek file '%s' to size %ld.", filename, size);
+		else error("Cannot seek file '%s' to size %zu.", filename, size);
 
 		close(fd);
 	}
