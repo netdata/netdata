@@ -398,7 +398,7 @@ struct target *get_users_target(uid_t uid)
 	users_root_target = w;
 
 	if(unlikely(debug))
-		fprintf(stderr, "apps.plugin: added uid %d ('%s') target\n", w->uid, w->name);
+		fprintf(stderr, "apps.plugin: added uid %u ('%s') target\n", w->uid, w->name);
 
 	return w;
 }
@@ -436,7 +436,7 @@ struct target *get_groups_target(gid_t gid)
 	groups_root_target = w;
 
 	if(unlikely(debug))
-		fprintf(stderr, "apps.plugin: added gid %d ('%s') target\n", w->gid, w->name);
+		fprintf(stderr, "apps.plugin: added gid %u ('%s') target\n", w->gid, w->name);
 
 	return w;
 }
@@ -1995,7 +1995,7 @@ void calculate_netdata_statistics(void)
 			w = p->user_target;
 		else {
 			if(unlikely(debug && p->user_target))
-					fprintf(stderr, "apps.plugin: \t\tpid %d (%s) switched user from %d (%s) to %d.\n", p->pid, p->comm, p->user_target->uid, p->user_target->name, p->uid);
+					fprintf(stderr, "apps.plugin: \t\tpid %d (%s) switched user from %u (%s) to %u.\n", p->pid, p->comm, p->user_target->uid, p->user_target->name, p->uid);
 
 			w = p->user_target = get_users_target(p->uid);
 		}
@@ -2013,7 +2013,7 @@ void calculate_netdata_statistics(void)
 			w = p->group_target;
 		else {
 			if(unlikely(debug && p->group_target))
-					fprintf(stderr, "apps.plugin: \t\tpid %d (%s) switched group from %d (%s) to %d.\n", p->pid, p->comm, p->group_target->gid, p->group_target->name, p->gid);
+					fprintf(stderr, "apps.plugin: \t\tpid %d (%s) switched group from %u (%s) to %u.\n", p->pid, p->comm, p->group_target->gid, p->group_target->name, p->gid);
 
 			w = p->group_target = get_groups_target(p->gid);
 		}
