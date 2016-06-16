@@ -32,8 +32,8 @@ void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb)
 		"\t\t\t\"data_url\": \"/api/v1/data?chart=%s\",\n"
 		"\t\t\t\"chart_type\": \"%s\",\n"
 		"\t\t\t\"duration\": %ld,\n"
-		"\t\t\t\"first_entry\": %lu,\n"
-		"\t\t\t\"last_entry\": %lu,\n"
+		"\t\t\t\"first_entry\": %ld,\n"
+		"\t\t\t\"last_entry\": %ld,\n"
 		"\t\t\t\"update_every\": %d,\n"
 		"\t\t\t\"dimensions\": {\n"
 		, st->id
@@ -132,12 +132,12 @@ unsigned long rrd_stats_one_json(RRDSET *st, char *options, BUFFER *wb)
 		"\t\t\t\"units\": \"%s\",\n"
 		"\t\t\t\"url\": \"/data/%s/%s\",\n"
 		"\t\t\t\"chart_type\": \"%s\",\n"
-		"\t\t\t\"counter\": %ld,\n"
+		"\t\t\t\"counter\": %lu,\n"
 		"\t\t\t\"entries\": %ld,\n"
-		"\t\t\t\"first_entry_t\": %lu,\n"
-		"\t\t\t\"last_entry\": %ld,\n"
-		"\t\t\t\"last_entry_t\": %lu,\n"
-		"\t\t\t\"last_entry_secs_ago\": %lu,\n"
+		"\t\t\t\"first_entry_t\": %ld,\n"
+		"\t\t\t\"last_entry\": %lu,\n"
+		"\t\t\t\"last_entry_t\": %ld,\n"
+		"\t\t\t\"last_entry_secs_ago\": %ld,\n"
 		"\t\t\t\"update_every\": %d,\n"
 		"\t\t\t\"isdetail\": %d,\n"
 		"\t\t\t\"usec_since_last_update\": %llu,\n"
@@ -184,7 +184,7 @@ unsigned long rrd_stats_one_json(RRDSET *st, char *options, BUFFER *wb)
 			"\t\t\t\t\t\"algorithm\": \"%s\",\n"
 			"\t\t\t\t\t\"multiplier\": %ld,\n"
 			"\t\t\t\t\t\"divisor\": %ld,\n"
-			"\t\t\t\t\t\"last_entry_t\": %lu,\n"
+			"\t\t\t\t\t\"last_entry_t\": %ld,\n"
 			"\t\t\t\t\t\"collected_value\": " COLLECTED_NUMBER_FORMAT ",\n"
 			"\t\t\t\t\t\"calculated_value\": " CALCULATED_NUMBER_FORMAT ",\n"
 			"\t\t\t\t\t\"last_collected_value\": " COLLECTED_NUMBER_FORMAT ",\n"
@@ -1429,7 +1429,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 		if(unlikely(slot < 0)) slot = st->entries - 1;
 		if(unlikely(slot == stop_at_slot)) stop_now = counter;
 
-		if(unlikely(debug)) debug(D_RRD_STATS, "ROW %s slot: %ld, entries_counter: %ld, group_count: %ld, added: %ld, now: %lu, %s %s"
+		if(unlikely(debug)) debug(D_RRD_STATS, "ROW %s slot: %ld, entries_counter: %ld, group_count: %ld, added: %ld, now: %ld, %s %s"
 				, st->id
 				, slot
 				, counter
@@ -1822,7 +1822,7 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 	// checks for debugging
 
 	if(st->debug) {
-		debug(D_RRD_STATS, "%s first_entry_t = %lu, last_entry_t = %lu, duration = %lu, after = %lu, before = %lu, duration = %lu, entries_to_show = %lu, group = %lu"
+		debug(D_RRD_STATS, "%s first_entry_t = %ld, last_entry_t = %ld, duration = %ld, after = %ld, before = %ld, duration = %ld, entries_to_show = %ld, group = %ld"
 			, st->id
 			, rrdset_first_entry_t(st)
 			, rrdset_last_entry_t(st)
@@ -1835,10 +1835,10 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 			);
 
 		if(before < after)
-			debug(D_RRD_STATS, "WARNING: %s The newest value in the database (%lu) is earlier than the oldest (%lu)", st->name, before, after);
+			debug(D_RRD_STATS, "WARNING: %s The newest value in the database (%ld) is earlier than the oldest (%ld)", st->name, before, after);
 
 		if((before - after) > st->entries * st->update_every)
-			debug(D_RRD_STATS, "WARNING: %s The time difference between the oldest and the newest entries (%lu) is higher than the capacity of the database (%lu)", st->name, before - after, st->entries * st->update_every);
+			debug(D_RRD_STATS, "WARNING: %s The time difference between the oldest and the newest entries (%ld) is higher than the capacity of the database (%ld)", st->name, before - after, st->entries * st->update_every);
 	}
 
 
@@ -1934,7 +1934,7 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 
 			int print_this = 0;
 
-			if(st->debug) debug(D_RRD_STATS, "%s t = %ld, count = %ld, group_count = %ld, printed = %ld, now = %lu, %s %s"
+			if(st->debug) debug(D_RRD_STATS, "%s t = %ld, count = %ld, group_count = %ld, printed = %ld, now = %ld, %s %s"
 					, st->id
 					, t
 					, count + 1
@@ -2070,7 +2070,7 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 
 	} // max_loop
 
-	debug(D_RRD_STATS, "RRD_STATS_JSON: %s total %ld bytes", st->name, wb->len);
+	debug(D_RRD_STATS, "RRD_STATS_JSON: %s total %lu bytes", st->name, wb->len);
 
 	pthread_rwlock_unlock(&st->rwlock);
 	return last_timestamp;

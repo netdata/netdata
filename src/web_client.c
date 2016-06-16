@@ -404,14 +404,14 @@ int mysendfile(struct web_client *w, char *filename)
 
 	// check if the file is owned by expected user
 	if(stat.st_uid != web_files_uid()) {
-		error("%llu: File '%s' is owned by user %d (expected user %d). Access Denied.", w->id, webfilename, stat.st_uid, web_files_uid());
+		error("%llu: File '%s' is owned by user %u (expected user %u). Access Denied.", w->id, webfilename, stat.st_uid, web_files_uid());
 		buffer_sprintf(w->response.data, "Access to file '%s' is not permitted.", webfilename);
 		return 403;
 	}
 
 	// check if the file is owned by expected group
 	if(stat.st_gid != web_files_gid()) {
-		error("%llu: File '%s' is owned by group %d (expected group %d). Access Denied.", w->id, webfilename, stat.st_gid, web_files_gid());
+		error("%llu: File '%s' is owned by group %u (expected group %u). Access Denied.", w->id, webfilename, stat.st_gid, web_files_gid());
 		buffer_sprintf(w->response.data, "Access to file '%s' is not permitted.", webfilename);
 		return 403;
 	}
@@ -813,7 +813,7 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
 			units = st->units;
 	}
 
-	debug(D_WEB_CLIENT, "%llu: API command 'badge.svg' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%u', options '0x%08x'"
+	debug(D_WEB_CLIENT, "%llu: API command 'badge.svg' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%d', options '0x%08x'"
 			, w->id
 			, chart
 			, (dimensions)?buffer_tostring(dimensions):""
@@ -968,7 +968,7 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 	long long after  = (after_str  && *after_str) ?atol(after_str):0;
 	int       points = (points_str && *points_str)?atoi(points_str):0;
 
-	debug(D_WEB_CLIENT, "%llu: API command 'data' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%u', format '%u', options '0x%08x'"
+	debug(D_WEB_CLIENT, "%llu: API command 'data' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%d', format '%u', options '0x%08x'"
 			, w->id
 			, chart
 			, (dimensions)?buffer_tostring(dimensions):""
@@ -994,7 +994,7 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 			);
 
 		buffer_sprintf(w->response.data,
-			"%s({version:'%s',reqId:'%s',status:'ok',sig:'%lu',table:",
+			"%s({version:'%s',reqId:'%s',status:'ok',sig:'%ld',table:",
 			responseHandler, google_version, google_reqId, st->last_updated.tv_sec);
 	}
 	else if(format == DATASOURCE_JSONP) {
@@ -1449,11 +1449,11 @@ int web_client_api_old_data_request(struct web_client *w, char *url, int datasou
 
 	if(datasource_type == DATASOURCE_DATATABLE_JSONP) {
 		buffer_sprintf(w->response.data,
-			"%s({version:'%s',reqId:'%s',status:'ok',sig:'%lu',table:",
+			"%s({version:'%s',reqId:'%s',status:'ok',sig:'%ld',table:",
 			google_responseHandler, google_version, google_reqId, st->last_updated.tv_sec);
 	}
 
-	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group, %d group_method, %lu after, %lu before).",
+	debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group, %d group_method, %ld after, %ld before).",
 		w->id, st->name, st->id, lines, group_count, group_method, after, before);
 
 	time_t timestamp_in_data = rrd_stats_json(datasource_type, st, w->response.data, lines, group_count, group_method, (unsigned long)after, (unsigned long)before, nonzero);
@@ -1758,11 +1758,11 @@ void web_client_process(struct web_client *w) {
 		if(w->response.data->len > TOO_BIG_REQUEST) {
 			strcpy(w->last_url, "too big request");
 
-			debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big (%zd bytes).", w->id, w->response.data->len);
+			debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big (%zu bytes).", w->id, w->response.data->len);
 
 			code = 400;
 			buffer_flush(w->response.data);
-			buffer_sprintf(w->response.data, "Received request is too big  (%zd bytes).\r\n", w->response.data->len);
+			buffer_sprintf(w->response.data, "Received request is too big  (%zu bytes).\r\n", w->response.data->len);
 		}
 		else {
 			// wait for more data
@@ -2032,7 +2032,7 @@ void web_client_process(struct web_client *w) {
 	// if we know the content length, put it
 	if(!w->response.zoutput && (w->response.data->len || w->response.rlen))
 		buffer_sprintf(w->response.header_output,
-			"Content-Length: %ld\r\n"
+			"Content-Length: %zu\r\n"
 			, w->response.data->len? w->response.data->len: w->response.rlen
 			);
 	else if(!w->response.zoutput)
@@ -2190,7 +2190,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
 	// when using compression,
 	// w->response.sent is the amount of bytes passed through compression
 
-	debug(D_DEFLATE, "%llu: web_client_send_deflate(): w->response.data->len = %zu, w->response.sent = %zu, w->response.zhave = %zu, w->response.zsent = %zu, w->response.zstream.avail_in = %d, w->response.zstream.avail_out = %d, w->response.zstream.total_in = %lu, w->response.zstream.total_out = %lu.",
+	debug(D_DEFLATE, "%llu: web_client_send_deflate(): w->response.data->len = %zu, w->response.sent = %zu, w->response.zhave = %zu, w->response.zsent = %zu, w->response.zstream.avail_in = %u, w->response.zstream.avail_out = %u, w->response.zstream.total_in = %lu, w->response.zstream.total_out = %lu.",
 		w->id, w->response.data->len, w->response.sent, w->response.zhave, w->response.zsent, w->response.zstream.avail_in, w->response.zstream.avail_out, w->response.zstream.total_in, w->response.zstream.total_out);
 
 	if(w->response.data->len - w->response.sent == 0 && w->response.zstream.avail_in == 0 && w->response.zhave == w->response.zsent && w->response.zstream.avail_out != 0) {
@@ -2212,7 +2212,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
 		}
 
 		if(unlikely(!w->keepalive)) {
-			debug(D_WEB_CLIENT, "%llu: Closing (keep-alive is not enabled). %ld bytes sent.", w->id, w->response.sent);
+			debug(D_WEB_CLIENT, "%llu: Closing (keep-alive is not enabled). %zu bytes sent.", w->id, w->response.sent);
 			WEB_CLIENT_IS_DEAD(w);
 			return t;
 		}
@@ -2283,7 +2283,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
 		w->stats_sent_bytes += len;
 		w->response.zsent += len;
 		len += t;
-		debug(D_WEB_CLIENT, "%llu: Sent %zu bytes.", w->id, len);
+		debug(D_WEB_CLIENT, "%llu: Sent %zd bytes.", w->id, len);
 	}
 	else if(len == 0) {
 		debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client (zhave = %zu, zsent = %zu, need to send = %zu).",
@@ -2324,7 +2324,7 @@ ssize_t web_client_send(struct web_client *w) {
 		}
 
 		if(unlikely(!w->keepalive)) {
-			debug(D_WEB_CLIENT, "%llu: Closing (keep-alive is not enabled). %ld bytes sent.", w->id, w->response.sent);
+			debug(D_WEB_CLIENT, "%llu: Closing (keep-alive is not enabled). %zu bytes sent.", w->id, w->response.sent);
 			WEB_CLIENT_IS_DEAD(w);
 			return 0;
 		}
@@ -2338,7 +2338,7 @@ ssize_t web_client_send(struct web_client *w) {
 	if(likely(bytes > 0)) {
 		w->stats_sent_bytes += bytes;
 		w->response.sent += bytes;
-		debug(D_WEB_CLIENT, "%llu: Sent %zu bytes.", w->id, bytes);
+		debug(D_WEB_CLIENT, "%llu: Sent %zd bytes.", w->id, bytes);
 	}
 	else if(likely(bytes == 0)) {
 		debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client.", w->id);
@@ -2373,7 +2373,7 @@ ssize_t web_client_receive(struct web_client *w)
 		w->response.data->len += bytes;
 		w->response.data->buffer[w->response.data->len] = '\0';
 
-		debug(D_WEB_CLIENT, "%llu: Received %zu bytes.", w->id, bytes);
+		debug(D_WEB_CLIENT, "%llu: Received %zd bytes.", w->id, bytes);
 		debug(D_WEB_DATA, "%llu: Received data: '%s'.", w->id, &w->response.data->buffer[old]);
 
 		if(w->mode == WEB_CLIENT_MODE_FILECOPY) {

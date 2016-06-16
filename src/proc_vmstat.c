@@ -321,7 +321,7 @@ int do_proc_vmstat(int update_every, unsigned long long dt) {
 	for(l = 0; l < lines ;l++) {
 		words = procfile_linewords(ff, l);
 		if(words < 2) {
-			if(words) error("Cannot read /proc/vmstat line %d. Expected 2 params, read %d.", l, words);
+			if(words) error("Cannot read /proc/vmstat line %u. Expected 2 params, read %u.", l, words);
 			continue;
 		}
 

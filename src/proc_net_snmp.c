@@ -60,7 +60,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 
 			words = procfile_linewords(ff, l);
 			if(words < 20) {
-				error("Cannot read /proc/net/snmp Ip line. Expected 20 params, read %d.", words);
+				error("Cannot read /proc/net/snmp Ip line. Expected 20 params, read %u.", words);
 				continue;
 			}
 
@@ -193,7 +193,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 
 			words = procfile_linewords(ff, l);
 			if(words < 15) {
-				error("Cannot read /proc/net/snmp Tcp line. Expected 15 params, read %d.", words);
+				error("Cannot read /proc/net/snmp Tcp line. Expected 15 params, read %u.", words);
 				continue;
 			}
 
@@ -306,7 +306,7 @@ int do_proc_net_snmp(int update_every, unsigned long long dt) {
 
 			words = procfile_linewords(ff, l);
 			if(words < 7) {
-				error("Cannot read /proc/net/snmp Udp line. Expected 7 params, read %d.", words);
+				error("Cannot read /proc/net/snmp Udp line. Expected 7 params, read %u.", words);
 				continue;
 			}
 

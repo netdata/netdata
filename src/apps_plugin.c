@@ -92,12 +92,12 @@ void *check_allocation(const char *file, int line, const char *function, void *m
 
 	// fprintf(stderr, "MEMORY_POINTER: Checking pointer at %p, real %p for %s/%u@%s.\n", marked_ptr, (void *)(marked_ptr - MALLOC_PREFIX), function, line, file);
 
-	if(real_ptr[0] != MALLOC_MARK) fatal("MEMORY: prefix MARK is not valid for %s/%u@%s.", function, line, file);
+	if(real_ptr[0] != MALLOC_MARK) fatal("MEMORY: prefix MARK is not valid for %s/%d@%s.", function, line, file);
 
 	size_t size = real_ptr[1];
 
 	uint32_t *end_ptr = (uint32_t *)(marked_ptr + size);
-	if(end_ptr[0] != MALLOC_MARK) fatal("MEMORY: suffix MARK of allocation with size %zu is not valid for %s/%u@%s.", size, function, line, file);
+	if(end_ptr[0] != MALLOC_MARK) fatal("MEMORY: suffix MARK of allocation with size %zu is not valid for %s/%d@%s.", size, function, line, file);
 
 	if(size_without_overheads_ptr) *size_without_overheads_ptr = size;
 
@@ -106,12 +106,12 @@ void *check_allocation(const char *file, int line, const char *function, void *m
 
 void *malloc_debug(const char *file, int line, const char *function, size_t size) {
 	void *ptr = malloc(size + MALLOC_OVERHEAD);
-	if(!ptr) fatal("MEMORY: Cannot allocate %zu bytes for %s/%u@%s.", size, function, line, file);
+	if(!ptr) fatal("MEMORY: Cannot allocate %zu bytes for %s/%d@%s.", size, function, line, file);
 
 	allocations.allocated += size;
 	allocations.allocations++;
 
-	debug(D_MEMORY, "MEMORY: Allocated %zu bytes for %s/%u@%s."
+	debug(D_MEMORY, "MEMORY: Allocated %zu bytes for %s/%d@%s."
 		" Status: allocated %zu in %zu allocs."
 		, size
 		, function, line, file
@@ -149,7 +149,7 @@ void free_debug(const char *file, int line, const char *function, void *ptr) {
 	allocations.allocated -= size;
 	allocations.allocations--;
 
-	debug(D_MEMORY, "MEMORY: freed %zu bytes for %s/%u@%s."
+	debug(D_MEMORY, "MEMORY: freed %zu bytes for %s/%d@%s."
 		" Status: allocated %zu in %zu allocs."
 		, size
 		, function, line, file
@@ -166,12 +166,12 @@ void *realloc_debug(const char *file, int line, const char *function, void *ptr,
 	void *real_ptr = check_allocation(file, line, function, ptr, &old_size);
 
 	void *new_ptr = realloc(real_ptr, size + MALLOC_OVERHEAD);
-	if(!new_ptr) fatal("MEMORY: Cannot allocate %zu bytes for %s/%u@%s.", size, function, line, file);
+	if(!new_ptr) fatal("MEMORY: Cannot allocate %zu bytes for %s/%d@%s.", size, function, line, file);
 
 	allocations.allocated += size;
 	allocations.allocated -= old_size;
 
-	debug(D_MEMORY, "MEMORY: Re-allocated from %zu to %zu bytes for %s/%u@%s."
+	debug(D_MEMORY, "MEMORY: Re-allocated from %zu to %zu bytes for %s/%d@%s."
 		" Status: allocated %zu in %zu allocs."
 		, old_size, size
 		, function, line, file
@@ -377,16 +377,16 @@ struct target *get_users_target(uid_t uid)
 		return NULL;
 	}
 
-	snprintfz(w->compare, MAX_COMPARE_NAME, "%d", uid);
+	snprintfz(w->compare, MAX_COMPARE_NAME, "%u", uid);
 	w->comparehash = simple_hash(w->compare);
 	w->comparelen = strlen(w->compare);
 
-	snprintfz(w->id, MAX_NAME, "%d", uid);
+	snprintfz(w->id, MAX_NAME, "%u", uid);
 	w->idhash = simple_hash(w->id);
 
 	struct passwd *pw = getpwuid(uid);
 	if(!pw)
-		snprintfz(w->name, MAX_NAME, "%d", uid);
+		snprintfz(w->name, MAX_NAME, "%u", uid);
 	else
 		snprintfz(w->name, MAX_NAME, "%s", pw->pw_name);
 
@@ -398,7 +398,7 @@ struct target *get_users_target(uid_t uid)
 	users_root_target = w;
 
 	if(unlikely(debug))
-		fprintf(stderr, "apps.plugin: added uid %d ('%s') target\n", w->uid, w->name);
+		fprintf(stderr, "apps.plugin: added uid %u ('%s') target\n", w->uid, w->name);
 
 	return w;
 }
@@ -415,16 +415,16 @@ struct target *get_groups_target(gid_t gid)
 		return NULL;
 	}
 
-	snprintfz(w->compare, MAX_COMPARE_NAME, "%d", gid);
+	snprintfz(w->compare, MAX_COMPARE_NAME, "%u", gid);
 	w->comparehash = simple_hash(w->compare);
 	w->comparelen = strlen(w->compare);
 
-	snprintfz(w->id, MAX_NAME, "%d", gid);
+	snprintfz(w->id, MAX_NAME, "%u", gid);
 	w->idhash = simple_hash(w->id);
 
 	struct group *gr = getgrgid(gid);
 	if(!gr)
-		snprintfz(w->name, MAX_NAME, "%d", gid);
+		snprintfz(w->name, MAX_NAME, "%u", gid);
 	else
 		snprintfz(w->name, MAX_NAME, "%s", gr->gr_name);
 
@@ -436,7 +436,7 @@ struct target *get_groups_target(gid_t gid)
 	groups_root_target = w;
 
 	if(unlikely(debug))
-		fprintf(stderr, "apps.plugin: added gid %d ('%s') target\n", w->gid, w->name);
+		fprintf(stderr, "apps.plugin: added gid %u ('%s') target\n", w->gid, w->name);
 
 	return w;
 }
@@ -735,13 +735,13 @@ struct pid_stat *get_pid_entry(pid_t pid)
 
 	all_pids[pid] = calloc(sizeof(struct pid_stat), 1);
 	if(!all_pids[pid]) {
-		error("Cannot allocate %lu bytes of memory", (unsigned long)sizeof(struct pid_stat));
+		error("Cannot allocate %zu bytes of memory", (size_t)sizeof(struct pid_stat));
 		return NULL;
 	}
 
 	all_pids[pid]->fds = calloc(sizeof(int), 100);
 	if(!all_pids[pid]->fds)
-		error("Cannot allocate %ld bytes of memory", (unsigned long)(sizeof(int) * 100));
+		error("Cannot allocate %zu bytes of memory", (size_t)(sizeof(int) * 100));
 	else all_pids[pid]->fds_size = 100;
 
 	if(root_of_pids) root_of_pids->prev = all_pids[pid];
@@ -1995,7 +1995,7 @@ void calculate_netdata_statistics(void)
 			w = p->user_target;
 		else {
 			if(unlikely(debug && p->user_target))
-					fprintf(stderr, "apps.plugin: \t\tpid %d (%s) switched user from %d (%s) to %d.\n", p->pid, p->comm, p->user_target->uid, p->user_target->name, p->uid);
+					fprintf(stderr, "apps.plugin: \t\tpid %d (%s) switched user from %u (%s) to %u.\n", p->pid, p->comm, p->user_target->uid, p->user_target->name, p->uid);
 
 			w = p->user_target = get_users_target(p->uid);
 		}
@@ -2013,7 +2013,7 @@ void calculate_netdata_statistics(void)
 			w = p->group_target;
 		else {
 			if(unlikely(debug && p->group_target))
-					fprintf(stderr, "apps.plugin: \t\tpid %d (%s) switched group from %d (%s) to %d.\n", p->pid, p->comm, p->group_target->gid, p->group_target->name, p->gid);
+					fprintf(stderr, "apps.plugin: \t\tpid %d (%s) switched group from %u (%s) to %u.\n", p->pid, p->comm, p->group_target->gid, p->group_target->name, p->gid);
 
 			w = p->group_target = get_groups_target(p->gid);
 		}
