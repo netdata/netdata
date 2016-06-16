@@ -29,7 +29,7 @@ static inline void buffer_overflow_init(BUFFER *b)
 static inline void _buffer_overflow_check(BUFFER *b, const char *file, const char *function, const unsigned long line)
 {
 	if(b->len > b->size) {
-		error("BUFFER: length %ld is above size %ld, at line %lu, at function %s() of file '%s'.", b->len, b->size, line, function, file);
+		error("BUFFER: length %zu is above size %zu, at line %lu, at function %s() of file '%s'.", b->len, b->size, line, function, file);
 		b->len = b->size;
 	}
 
@@ -93,7 +93,7 @@ void buffer_strcat(BUFFER *wb, const char *txt)
 	buffer_overflow_check(wb);
 
 	if(*txt) {
-		debug(D_WEB_BUFFER, "strcat(): increasing web_buffer at position %ld, size = %ld\n", wb->len, wb->size);
+		debug(D_WEB_BUFFER, "strcat(): increasing web_buffer at position %zu, size = %zu\n", wb->len, wb->size);
 		len = strlen(txt);
 		buffer_increase(wb, len);
 		buffer_strcat(wb, txt);
@@ -160,7 +160,7 @@ void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
 		// if it does.
 		buffer_overflow_check(wb);
 
-		debug(D_WEB_BUFFER, "web_buffer_sprintf(): increasing web_buffer at position %ld, size = %ld\n", wb->len, wb->size);
+		debug(D_WEB_BUFFER, "web_buffer_sprintf(): increasing web_buffer at position %zu, size = %zu\n", wb->len, wb->size);
 		buffer_need_bytes(wb, len + WEB_DATA_LENGTH_INCREASE_STEP);
 
 		va_start(args, fmt);
