@@ -437,7 +437,10 @@ int main(int argc, char **argv)
 	setenv("NETDATA_HOST_PREFIX", config_get("global", "host access prefix" , "")         , 1);
 	setenv("HOME"               , config_get("global", "home directory"     , CACHE_DIR)  , 1);
 
-	// avoid extended to stat(/etc/localtime)
+	// disable buffering for python plugins
+	setenv("PYTHONUNBUFFERED", "1", 1);
+
+	// avoid flood calls to stat(/etc/localtime)
 	// http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
 	setenv("TZ", ":/etc/localtime", 0);
 
