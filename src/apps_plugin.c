@@ -166,7 +166,7 @@ void *realloc_debug(const char *file, int line, const char *function, void *ptr,
 	void *real_ptr = check_allocation(file, line, function, ptr, &old_size);
 
 	void *new_ptr = realloc(real_ptr, size + MALLOC_OVERHEAD);
-	if(!new_ptr) fatal("MEMORY: Cannot allocate %zu bytes for %s/%u@%s.", size, function, line, file);
+	if(!new_ptr) fatal("MEMORY: Cannot allocate %zu bytes for %s/%d@%s.", size, function, line, file);
 
 	allocations.allocated += size;
 	allocations.allocated -= old_size;

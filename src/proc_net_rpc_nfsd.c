@@ -196,7 +196,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 
 		if(do_rc == 1 && strcmp(type, "rc") == 0) {
 			if(words < 4) {
-				error("%s line of /proc/net/rpc/nfsd has %d words, expected %d", type, words, 4);
+				error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 4);
 				continue;
 			}
 
@@ -210,7 +210,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 		}
 		else if(do_fh == 1 && strcmp(type, "fh") == 0) {
 			if(words < 6) {
-				error("%s line of /proc/net/rpc/nfsd has %d words, expected %d", type, words, 6);
+				error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 6);
 				continue;
 			}
 
@@ -226,7 +226,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 		}
 		else if(do_io == 1 && strcmp(type, "io") == 0) {
 			if(words < 3) {
-				error("%s line of /proc/net/rpc/nfsd has %d words, expected %d", type, words, 3);
+				error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 3);
 				continue;
 			}
 
@@ -239,7 +239,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 		}
 		else if(do_th == 1 && strcmp(type, "th") == 0) {
 			if(words < 13) {
-				error("%s line of /proc/net/rpc/nfsd has %d words, expected %d", type, words, 13);
+				error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 13);
 				continue;
 			}
 
@@ -270,7 +270,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 		}
 		else if(do_ra == 1 && strcmp(type, "ra") == 0) {
 			if(words < 13) {
-				error("%s line of /proc/net/rpc/nfsd has %d words, expected %d", type, words, 13);
+				error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 13);
 				continue;
 			}
 
@@ -299,7 +299,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 		}
 		else if(do_net == 1 && strcmp(type, "net") == 0) {
 			if(words < 5) {
-				error("%s line of /proc/net/rpc/nfsd has %d words, expected %d", type, words, 5);
+				error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 5);
 				continue;
 			}
 
@@ -314,7 +314,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 		}
 		else if(do_rpc == 1 && strcmp(type, "rpc") == 0) {
 			if(words < 6) {
-				error("%s line of /proc/net/rpc/nfsd has %d words, expected %d", type, words, 6);
+				error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 6);
 				continue;
 			}
 

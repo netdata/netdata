@@ -48,7 +48,7 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
 			}
 			words = procfile_linewords(ff, l);
 			if(words < 12) {
-				error("Cannot read /proc/net/netstat IpExt line. Expected 12 params, read %d.", words);
+				error("Cannot read /proc/net/netstat IpExt line. Expected 12 params, read %u.", words);
 				continue;
 			}
 
