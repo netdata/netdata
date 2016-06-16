@@ -1,4 +1,3 @@
-#!/usr/bin/python3 -u
 
 NAME = "mysql.chart.py"
 from sys import stderr
@@ -307,97 +306,85 @@ CHARTS = {
             ("Connection_errors_tcpwrap", "tcpwrap incremental 1 1")
         ))
 }
-mysql_def = {}
-valid = []
-connections = {}
-
-def get_data(config):
-    global connections
-    try:
-        cnx = connections[config['name']]
-    except KeyError as e:
-        stderr.write(NAME + ": reconnecting\n")
-        cnx = MySQLdb.connect(user=config['user'],
-                              passwd=config['password'],
-                              read_default_file=config['my.cnf'],
-                              unix_socket=config['socket'],
-                              host=config['host'],
-                              port=config['port'],
-                              connect_timeout=int(update_every))
-        connections[config['name']] = cnx
-
-    try:
-        with cnx.cursor() as cursor:
-            cursor.execute(QUERY)
-            raw_data = cursor.fetchall()
-    except Exception as e:
-        stderr.write(NAME + ": cannot execute query." + str(e) + "\n")
-        cnx.close()
-        del connections[config['name']]
-        return None
-    
-    return dict(raw_data)
 
 
-def check():
-    # TODO what are the default credentials
-    global valid, config
-    if type(config) is str:
-        from json import loads
-        cfg = loads(config.replace("'",'"').replace('\n',' '))
-        config = cfg
-    for i in range(len(config)):
-        if 'name' not in config[i]:
-            config[i]['name'] = "srv_"+str(i)
-        if 'user' not in config[i]:
-            config[i]['user'] = 'root'
-        if 'password' not in config[i]:
-            config[i]['password'] = ''
-        if 'my.cnf' in config[i]:
-            config[i]['socket'] = ''
-            config[i]['host'] = ''
-            config[i]['port'] = 0
-        elif 'socket' in config[i]:
-            config[i]['my.cnf'] = ''
-            config[i]['host'] = ''
-            config[i]['port'] = 0
-        elif 'host' in config[i]:
-            config[i]['my.cnf'] = ''
-            config[i]['socket'] = ''
-            if 'port' in config[i]:
-                config[i]['port'] = int(config[i]['port'])
+def Service(object):
+    def __init__(self,config=None):
+        if config is None:
+            pass # TODO use defaults
+        if 'name' not in config:
+            from random import randint
+            config['name'] = "srv_"+str(randint(0,99)
+        if 'user' not in config:
+            config['user'] = 'root'
+        if 'password' not in config:
+            config['password'] = ''
+        if 'my.cnf' in config:
+            config['socket'] = ''
+            config['host'] = ''
+            config['port'] = 0
+        elif 'socket' in config:
+            config['my.cnf'] = ''
+            config['host'] = ''
+            config['port'] = 0
+        elif 'host' in config:
+            config['my.cnf'] = ''
+            config['socket'] = ''
+            if 'port' in config:
+                config['port'] = int(config['port'])
             else:
-                config[i]['port'] = 3306
+                config['port'] = 3306
 
-    for srv in config:
+        self.config = config
+        self.connection = None
+        self.mysql_def = {}
+
+    def check(self):
         try:
-            cnx = MySQLdb.connect(user=srv['user'],
-                                  passwd=srv['password'],
-                                  read_default_file=srv['my.cnf'],
-                                  unix_socket=srv['socket'],
-                                  host=srv['host'],
-                                  port=srv['port'],
-                                  connect_timeout=int(update_every))
-            cnx.close()
+            self.connection = self._connect()
+            return True
+        except RuntimeError:
+            self.connection = None
+            return False
+
+    
+
+    def _connect(self):
+        try:
+            self.connection = MySQLdb.connect(user=self.config['user'],
+                                              passwd=self.config['password'],
+                                              read_default_file=self.config['my.cnf'],
+                                              unix_socket=self.config['socket'],
+                                              host=self.config['host'],
+                                              port=self.config['port'],
+                                              connect_timeout=int(update_every))
         except Exception as e:
             stderr.write(NAME + " has problem connecting to server: "+str(e).replace("\n"," ")+"\n")
-            config.remove(srv)
+            raise RuntimeError #stop creating module, need to catch it in supervisor
 
-    if len(config) == 0:
-        return False
-    return True
+    
+    def _get_data(self):
+        try:
+            with self.connection.cursor() as cursor:
+                cursor.execute(QUERY)
+                raw_data = cursor.fetchall()
+        except Exception as e:
+            stderr.write(NAME + ": cannot execute query." + str(e) + "\n")
+            self.connection.close()
+            return None
+        
+        return dict(raw_data)
 
 
-def create():
-    global config, mysql_def
-    for name in ORDER:
-        mysql_def[name] = []
-        for line in CHARTS[name][1]:
-            mysql_def[name].append(line[0])
 
-    idx = 0
-    for srv in config:
-        data = get_data(srv)
+    def create(self):
+        for name in ORDER:
+            self.mysql_def[name] = []
+            for line in CHARTS[name][1]:
+                self.mysql_def[name].append(line[0])
+   
+        idx = 0
+        data = self._get_data(self.config)
         for name in ORDER:
             header = "CHART mysql_" + \
                      str(srv['name']) + "." + \
@@ -414,26 +401,22 @@ def create():
                 print(header)
                 print(content)
                 idx += 1
+    
+        if idx == 0:
+            return False
+        return True
 
-    if idx == 0:
-        return False
-    return True
 
-
-def update(interval):
-    global config
-    for srv in config:
-        data = get_data(srv)
+    def update(self,interval):
+        data = self._get_data(self.config)
         if data is None:
-            config.remove(srv)
-            # TODO notify user about problems with server
-            continue
+            return False
         try:
             data['Thread cache misses'] = int( int(data['Threads_created']) * 10000 / int(data['Connections']))
         except Exception:
             pass
-        for chart, dimensions in mysql_def.items():
-            header = "BEGIN mysql_" + str(srv['name']) + "." + chart + " " + str(interval) + '\n'
+        for chart, dimensions in self._mysql_def.items():
+            header = "BEGIN mysql_" + str(self.config['name']) + "." + chart + " " + str(interval) + '\n'
             lines = ""
             for d in dimensions:
                 try:
@@ -442,7 +425,5 @@ def update(interval):
                     pass
             if len(lines) > 0:
                 print(header + lines + "END")
-            
-    if len(config) == 0:
-        return False 
-    return True
+        
+        return True
