@@ -252,7 +252,7 @@ void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
 		if(!ff) return;
 
 		if(procfile_lines(ff) < 1) {
-			error("File '%s' should have 1+ lines but has %d.", ca->filename, procfile_lines(ff));
+			error("File '%s' should have 1+ lines but has %u.", ca->filename, procfile_lines(ff));
 			return;
 		}
 
