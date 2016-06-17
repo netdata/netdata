@@ -37,7 +37,7 @@ updates first.
 
 * rename `contrib/debian/control.wheezy` to `contrib/debian/control`.
 
-* uncomment `EXTRA_OPTS="-pidfile /var/run/netdata.pid"` in
+* uncomment `EXTRA_OPTS="-P /var/run/netdata.pid"` in
  `contrib/debian/netdata.default`
 
 * edit `contrib/debian/netdata.init` and change `PIDFILE` to
