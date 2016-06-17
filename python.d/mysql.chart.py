@@ -34,6 +34,11 @@ config = [
     }
 ]
 
+# default module values (can be overridden per job in `config`)
+update_every = 3
+priority = 90000
+retries = 7
+
 # query executed on MySQL server
 QUERY = "SHOW GLOBAL STATUS"
 
@@ -329,8 +334,8 @@ CHARTS = {
 
 
 class Service(BaseService):
-    def __init__(self,configuration=None,update_every=3,priority=90000,retries=2):
-        super().__init__(configuration,update_every,priority,retries)
+    def __init__(self,configuration=None):
+        super().__init__(configuration)
         self.configuration = self._parse_config(configuration)
         self.connection = None
         self.defs = {}
