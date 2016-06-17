@@ -5649,7 +5649,7 @@
 						NETDATA.registry.access(max_redirects - 1, callback);
 					}
 					else {
-						if(typeof data.person_guid === 'string')
+						if(data !== null && typeof data.person_guid === 'string')
 							NETDATA.registry.person_guid = data.person_guid;
 
 						if(typeof callback === 'function')
@@ -5688,7 +5688,7 @@
 						callback(null);
 				});
 		},
-		
+
 		switch: function(new_person_guid, callback) {
 			// impersonate
 			$.ajax({
