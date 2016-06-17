@@ -150,6 +150,7 @@ fi
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 
 AC_SUBST([varlibdir], ["\$(localstatedir)/lib/netdata"])
+AC_SUBST([registrydir], ["\$(localstatedir)/lib/netdata/registry"])
 AC_SUBST([cachedir], ["\$(localstatedir)/cache/netdata"])
 AC_SUBST([chartsdir], ["\$(libexecdir)/netdata/charts.d"])
 AC_SUBST([nodedir], ["\$(libexecdir)/netdata/node.d"])

@@ -21,6 +21,8 @@ AM_CFLAGS = \
 
 sbin_PROGRAMS = netdata
 dist_cache_DATA = .keep
+dist_varlib_DATA = .keep
+dist_registry_DATA = .keep
 dist_log_DATA = .keep
 plugins_PROGRAMS = apps.plugin
 
