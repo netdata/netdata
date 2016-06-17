@@ -2,13 +2,13 @@
 # Author: Pawel Krupa (paulfantom)
 
 class BaseService(object):
-    def __init__(self,configuration,update_every,priority,retries):
-        if configuration is None:
+    def __init__(self,configuration=None,update_every=None,priority=None,retries=None):
+        if None in (configuration,update_every,priority,retries):
             # use defaults
-            configuration = config
-            self.error(NAME+": no configuration supplied. using defaults.")
-
-        self._parse_base_config(configuration)
+            self.error("BaseService: no configuration parameters supplied. Cannot create Service.")
+            raise RuntimeError
+        else:
+            self._parse_base_config(configuration,update_every,priority,retries)
 
     def _parse_base_config(self,config,update_every,priority,retries):
         # parse configuration options to run this Service
