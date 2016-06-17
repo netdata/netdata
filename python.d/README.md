@@ -1,5 +1,7 @@
 # Disclaimer
 
+**Python plugin support is experimental and implementation may change in the future**
+
 Currently every plugin must be written in python3.
 All third party libraries should be installed system-wide or in `python_modules` directory.
 Also plugins support changing their data collection frequency by setting `update_every` variable in their configuration file.
