@@ -1,5 +1,3 @@
-#!/usr/bin/python3 -u
-
 NAME = "mysql.chart.py"
 from sys import stderr
 try:
