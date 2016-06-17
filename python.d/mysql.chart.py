@@ -8,12 +8,12 @@ import sys
 try:
     import MySQLdb
     # https://github.com/PyMySQL/mysqlclient-python
-    sys.stderr.write(NAME + ": using MySQLdb")
+    sys.stderr.write(NAME + ": using MySQLdb\n")
 except ImportError:
     try:
         import pymysql as MySQLdb
         # https://github.com/PyMySQL/PyMySQL
-        sys.stderr.write(NAME + ": using pymysql")
+        sys.stderr.write(NAME + ": using pymysql\n")
     except ImportError:
         sys.stderr.write(NAME + ": You need to install PyMySQL module to use mysql.chart.py plugin\n")
 
@@ -22,7 +22,7 @@ config = [
     {
         'name'     : 'local',
         'user'     : 'root',
-        'password' : '',
+        'password' : 'a',
         'socket'   : '/var/run/mysqld/mysqld.sock',
         'update_every' : 3,
         'retries'  : 4
@@ -330,7 +330,7 @@ class BaseService(object):
             configuration = config
             self.error(NAME+": no configuration supplied. using defaults.")
 
-        self._parse_base_config(configuration)
+        self._parse_base_config(configuration,update_every,priority,retries)
 
     def _parse_base_config(self,config,update_every,priority,retries):
         # parse configuration options to run this Service
@@ -372,12 +372,12 @@ class BaseService(object):
 
 class Service(BaseService):
     def __init__(self,configuration=None,update_every=3,priority=90000,retries=2):
-        super().__init__(*args,**kwargs)
+        super().__init__(configuration,update_every,priority,retries)
         self.configuration = self._parse_config(configuration)
         self.connection = None
-        self.defs = None
+        self.defs = {}
 
-    def _parse_config(configuration):
+    def _parse_config(self,configuration):
         # parse configuration to collect data from mysql server
         if 'name' not in configuration:
             configuration['name'] = 'local'
@@ -417,6 +417,8 @@ class Service(BaseService):
             raise RuntimeError #stop creating module, need to catch it in supervisor
     
     def _get_data(self):
+        if self.connection is None:
+            self._connect()
         try:
             with self.connection.cursor() as cursor:
                 cursor.execute(QUERY)
@@ -424,6 +426,7 @@ class Service(BaseService):
         except Exception as e:
             self.error(NAME + ": cannot execute query.", e)
             self.connection.close()
+            self.connection = None
             return None
         
         return dict(raw_data)
@@ -438,19 +441,20 @@ class Service(BaseService):
 
     def create(self):
         for name in ORDER:
-            self.mysql_def[name] = []
+            print(name)
+            self.defs[name] = []
             for line in CHARTS[name][1]:
                 self.defs[name].append(line[0])
    
         idx = 0
-        data = self._get_data(self.configuration)
+        data = self._get_data()
         for name in ORDER:
             header = "CHART mysql_" + \
-                     str(srv['name']) + "." + \
+                     str(self.configuration['name']) + "." + \
                      name + " " + \
                      CHARTS[name][0] + " " + \
-                     str(priority + idx) + " " + \
-                     str(update_every)
+                     str(self.priority + idx) + " " + \
+                     str(self.update_every)
             content = ""
             # check if server has this datapoint
             for line in CHARTS[name][1]:
@@ -466,7 +470,7 @@ class Service(BaseService):
         return True
 
     def update(self,interval):
-        data = self._get_data(self.configuration)
+        data = self._get_data()
         if data is None:
             return False
         try:
@@ -487,7 +491,7 @@ class Service(BaseService):
         return True
 
 if __name__ == "__main__":
-    my = Service(config)
+    my = Service(config[0])
     my.check()
     my.create()
     my.update(1)
