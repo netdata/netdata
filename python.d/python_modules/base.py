@@ -1,30 +1,32 @@
 # Description: base for netdata python.d plugins
 # Author: Pawel Krupa (paulfantom)
 
+from time import time
+
+
 class BaseService(object):
-    def __init__(self,configuration=None,update_every=None,priority=None,retries=None):
-        if None in (configuration,update_every,priority,retries):
+    def __init__(self,configuration=None):
+        if configuration is None:
             # use defaults
             self.error("BaseService: no configuration parameters supplied. Cannot create Service.")
             raise RuntimeError
         else:
-            self._parse_base_config(configuration,update_every,priority,retries)
+            self._extract_base_config(configuration)
+            self._create_timetable()
+            self.execution_name = ""
 
-    def _parse_base_config(self,config,update_every,priority,retries):
-        # parse configuration options to run this Service
-        try:
-            self.update_every = int(config['update_every'])
-        except (KeyError, ValueError):
-            self.update_every = update_every
-        try:
-            self.priority = int(config['priority'])
-        except (KeyError, ValueError):
-            self.priority = priority
-        try:
-            self.retries = int(config['retries'])
-        except (KeyError, ValueError):
-            self.retries = retries
+    def _extract_base_config(self,config):
+        self.update_every = int(config['update_every'])
+        self.priority = int(config['priority'])
+        self.retries = int(config['retries'])
         self.retries_left = self.retries
+
+    def _create_timetable(self):
+        now = time()
+        self.timetable = {'last' : now,
+                          'next' : now - (now % self.update_every) + self.update_every,
+                          'freq' : self.update_every}
+
 
     def error(self, msg, exception=""):
         if exception != "":
