@@ -44,7 +44,6 @@ phpfpm_get() {
 		|| "${phpfpm_response[26]}" != "idle" \
 		|| "${phpfpm_response[29]}" != "active" \
 		|| "${phpfpm_response[32]}" != "total" \
-		|| "${phpfpm_response[43]}" != "slow" \
 	]]
 		then
 		echo >&2 "phpfpm: invalid response from phpfpm status server: ${phpfpm_response[*]}"
@@ -63,7 +62,12 @@ phpfpm_get() {
 	phpfpm_total_processes="${phpfpm_response[34]}"
 	phpfpm_max_active_processes="${phpfpm_response[38]}"
 	phpfpm_max_children_reached="${phpfpm_response[42]}"
-	phpfpm_slow_requests="${phpfpm_response[45]}"
+	if [ "${phpfpm_response[43]}" == "slow" ]
+		then
+	  	phpfpm_slow_requests="${phpfpm_response[45]}"
+	else
+	  	phpfpm_slow_requests="-1"
+	fi
 	
 	if [[ -z "${phpfpm_pool}" \
 		|| -z "${phpfpm_start_time}" \
@@ -77,7 +81,6 @@ phpfpm_get() {
 		|| -z "${phpfpm_total_processes}" \
 		|| -z "${phpfpm_max_active_processes}" \
 		|| -z "${phpfpm_max_children_reached}" \
-		|| -z "${phpfpm_slow_requests}" \
 	]]
 		then
 		echo >&2 "phpfpm: empty values got from phpfpm status server: ${phpfpm_response[*]}"
@@ -132,8 +135,11 @@ DIMENSION requests '' incremental 1 1
 
 CHART phpfpm_$m.performance '' "PHP-FPM Performance" "status" phpfpm phpfpm.performance line $((phpfpm_priority + 3)) $phpfpm_update_every
 DIMENSION reached 'max children reached' absolute 1 1
-DIMENSION slow 'slow requests' absolute 1 1
 EOF
+		if [ $((phpfpm_slow_requests)) -ne -1 ]
+			then
+			echo "DIMENSION slow 'slow requests' absolute 1 1"
+		fi
 	done
 	
 	return 0
@@ -168,10 +174,17 @@ SET requests = $((phpfpm_accepted_conn))
 END
 BEGIN phpfpm_$m.performance $1
 SET reached = $((phpfpm_max_children_reached))
-SET slow = $((phpfpm_slow_requests))
-END
 EOF
+		if [ $((phpfpm_slow_requests)) -ne -1 ]
+			then
+			echo "SET slow = $((phpfpm_slow_requests))"
+		fi
+		echo "END"
 	done
 	
 	return 0
 }
+
+phpfpm_check
+phpfpm_create
+phpfpm_update

@@ -1361,6 +1361,11 @@ var menuData = {
 		info: undefined
 	},
 
+	'phpfpm': {
+		title: 'PHP-FPM',
+		info: undefined,
+	}
+
 	'named': {
 		title: 'named',
 		info: undefined
@@ -1800,6 +1805,7 @@ function enrichChartData(chart) {
 			break;
 
 		case 'mysql':
+		case 'phpfpm':
 		case 'named':
 		case 'cgroup':
 			chart.menu = chart.type;
