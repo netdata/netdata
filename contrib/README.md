@@ -35,8 +35,16 @@ updates first.
 * edit `contrib/debian/rules` and adjust the `dh` rule near the
   top to remove systemd (see comments in that file).
 
-* edit `contrib/debian/control`: remove `dh-systemd` from the
-  Build-Depends list, and add `pkg-config` to it.
+* rename `contrib/debian/control.wheezy` to `contrib/debian/control`.
+
+* uncomment `EXTRA_OPTS="-pidfile /var/run/netdata.pid"` in
+ `contrib/debian/netdata.default`
+
+* edit `contrib/debian/netdata.init` and change `PIDFILE` to
+  `/var/run/netdata.pid`
+
+* uncomment `postrotate` in `system/netdata.logrotate.in` and change
+  `try-restart` to `restart`
 
 Then proceed as the main instructions above.
 
@@ -46,4 +54,3 @@ The recommended way to upgrade netdata packages built from this
 source is to remove the current package from your system, then
 install the new package. Upgrading on wheezy is known to not
 work cleanly; Jessie may behave as expected.
-
