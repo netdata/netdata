@@ -4,6 +4,8 @@
 NAME = "mysql.chart.py"
 import sys
 
+sys.path.append("./python_modules") #FIXME it is here for debug only
+
 # import 3rd party library to handle MySQL communication
 try:
     import MySQLdb
@@ -20,6 +22,7 @@ except ImportError:
 from base import BaseService
 
 # default configuration (overriden by python.d.plugin)
+# FIXME change password
 config = [
     {
         'name'     : 'local',
@@ -445,8 +448,8 @@ class Service(BaseService):
         
         return True
 
+#FIXME debug only:
 if __name__ == "__main__":
-    sys.path.append("./python_modules")
     my = Service(config[0])
     my.check()
     my.create()
