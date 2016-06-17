@@ -5644,12 +5644,18 @@
 						data = null;
 					}
 
-					if(data === null && redirect !== null && max_redirects > 0) {
-						NETDATA.registry.server = redirect;
-						NETDATA.registry.access(max_redirects - 1, callback);
+					if(data === null) {
+						if(redirect !== null && max_redirects > 0) {
+							NETDATA.registry.server = redirect;
+							NETDATA.registry.access(max_redirects - 1, callback);
+						}
+						else {
+							if(typeof callback === 'function')
+								callback(null);
+						}
 					}
 					else {
-						if(data !== null && typeof data.person_guid === 'string')
+						if(typeof data.person_guid === 'string')
 							NETDATA.registry.person_guid = data.person_guid;
 
 						if(typeof callback === 'function')
