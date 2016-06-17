@@ -1,0 +1,25 @@
+Source: netdata
+Build-Depends: debhelper (>= 9),
+               dh-autoreconf,
+               pkg-config,
+               dpkg-dev (>= 1.13.19),
+               zlib1g-dev,
+               uuid-dev
+Section: net
+Priority: optional
+Maintainer: Costa Tsaousis <costa@tsaousis.gr>
+Standards-Version: 3.9.6
+Homepage: https://github.com/firehol/netdata/wiki
+
+Package: netdata
+Architecture: any
+Depends: adduser,
+         libcap2-bin (>= 1:2.0),
+         lsb-base (>= 3.1-23.2),
+         ${misc:Depends},
+         ${shlibs:Depends}
+Description: real-time charts for system monitoring
+ Netdata is a daemon that collects data in realtime (per second)
+ and presents a web site to view and analyze them. The presentation
+ is also real-time and full of interactive charts that precisely
+ render all collected values.
