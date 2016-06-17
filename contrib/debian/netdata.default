@@ -2,4 +2,4 @@
 #
 #EXTRA_OPTS=""
 #uncomment following line if you are building a wheezy-package
-#EXTRA_OPTS="-pidfile /var/run/netdata.pid"
+#EXTRA_OPTS="-P /var/run/netdata.pid"
