@@ -214,7 +214,7 @@ void fatal_int( const char *file, const char *function, const unsigned long line
 		va_end( args );
 	}
 
-	exit(1);
+	netdata_cleanup_and_exit(1);
 }
 
 void log_access( const char *fmt, ... )

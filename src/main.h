@@ -30,6 +30,6 @@ extern struct option_def options[];
 
 extern void kill_childs(void);
 extern int killpid(pid_t pid, int signal);
-extern void netdata_cleanup_and_exit(int ret);
+extern void netdata_cleanup_and_exit(int ret) __attribute__ ((noreturn));
 
 #endif /* NETDATA_MAIN_H */

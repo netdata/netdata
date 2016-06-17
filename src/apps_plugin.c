@@ -214,6 +214,13 @@ char *strdup_debug(const char *file, int line, const char *function, const char 
 #endif /* NETDATA_INTERNAL_CHECKS */
 
 // ----------------------------------------------------------------------------
+
+void netdata_cleanup_and_exit(int ret) {
+	exit(ret);
+}
+
+
+// ----------------------------------------------------------------------------
 // system functions
 // to retrieve settings of the system
 
