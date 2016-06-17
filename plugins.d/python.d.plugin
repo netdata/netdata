@@ -35,26 +35,75 @@ class PythonCharts(object):
         # load configuration files
         self._load_configs()
 
+        self.jobs = self._create_jobs(self.modules)
+        
         # set timetable dict (last execution, next execution and frequency)
         # set priorities
         self.timetable = {}
         freq = 1
-        for m in self.modules:
+        for job in self.jobs:
             try:
-                m.priority = int(m.priority)
+                job.priority = int(job.priority)
             except (AttributeError,ValueError):
-                m.priority = self.default_priority
+                job.priority = self.default_priority
              
             if interval is None:
                 try:
-                    freq = int(m.update_every)
+                    freq = int(job.update_every)
                 except (AttributeError, ValueError):
                     freq = 1
             
             now = time.time()
-            self.timetable[m.__name__] = {'last' : now,
-                                          'next' : now - (now % freq) + freq,
-                                          'freq' : freq}
+            self.timetable[job.__name__] = {'last' : now,
+                                            'next' : now - (now % freq) + freq,
+                                            'freq' : freq}
+
+
+    def _create_jobs(self,modules):
+        # modules are a list of modules to load
+        # module store a definition of Service class
+        # module store configuration in module.config
+        # configs are list of dicts or a dict
+        # one dict is one service
+        # iterate over list of modules and inside one loop iterate over configs
+        jobs = []
+        for module in modules:
+            if type(module.config) is dict:
+                jobs.append(self._job(module,module.config))
+            elif type(module.config) is list:
+                for conf in module.config:
+                    jobs.append(self._job(module,conf))
+        
+        return [j for j in jobs if j is not None]
+
+
+    def _job(self,module,conf):
+        update = 0
+        prio = 0
+        retries = 0
+        try:
+            update = int(conf['update_every'])
+        except (KeyError,ValueError):
+            update = module.update_every
+        try:
+            priority = int(conf['priority'])
+        except (KeyError,ValueError):
+            priority = module.priority
+        try:
+            retries = int(conf['retries'])
+        except (KeyError,ValueError):
+            retries = module.retries
+
+        try:
+            return module.Service(configuration=conf,
+                                  update_every=update,
+                                  priority=prio,
+                                  retries=retries)
+        except Exception as e:
+            print(e)
+            #TODO print some error
+            return None
+
 
     def _import_plugin(self, path, name=None):
     # try to import module using only its path
@@ -95,6 +144,7 @@ class PythonCharts(object):
 
     def _load_configs(self):
     # function modifies every loaded module in self.modules
+    # TODO ensure module has update_every, priority and retries variables
         for m in self.modules:
             configfile = self.configs + m.__name__ + ".conf"
             if os.path.isfile(configfile):
