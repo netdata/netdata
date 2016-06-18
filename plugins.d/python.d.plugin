@@ -45,7 +45,6 @@ class PythonCharts(object):
 
         # good economy and prosperity:
         self.jobs = self._create_jobs(configured_modules)
-        debug(self.jobs)
 
 
     def _create_jobs(self,modules):
@@ -70,7 +69,9 @@ class PythonCharts(object):
                     return None
                 else:
                     # set execution_name (needed to plot run time graphs)
-                    job.execution_name = module.__name__ + "_" + name
+                    job.execution_name = module.__name__
+                    if name is not None:
+                        job.execution_name += "_" + name
                 jobs.append(job)
         
         return [j for j in jobs if j is not None]
@@ -145,13 +146,25 @@ class PythonCharts(object):
                 except (KeyError,ValueError):
                     # if above failed, get defaults from global dict
                     defaults[key] = BASE_CONFIG[key]
-
-        # assign variables needed by supervisor to every job configuration
+      
+        # check if there are dict in config dict
+        many_jobs = False
         for name in config:
-            for key in BASE_CONFIG:
-                if key not in config[name]:
-                    config[name][key] = defaults[key] 
+            if type(config[name]) is dict:
+                many_jobs = True
+                break
         
+        # assign variables needed by supervisor to every job configuration
+        if many_jobs:
+            for name in config:
+                for key in defaults:
+                    if key not in config[name]:
+                        config[name][key] = defaults[key]
+        # if only one job is needed, values doesn't have to be in dict (in YAML)
+        else:
+            config = {None: config.copy()}
+            config[None].update(defaults)
+            
         # return dictionary of jobs where every job has BASE_CONFIG variables
         return config
 
@@ -190,6 +203,7 @@ class PythonCharts(object):
                 self._stop(job, "no check")
             except (UnboundLocalError, Exception) as e:
                 self._stop(job, "misbehaving. Reason: " + str(e))
+        print("CHECK OK")
 
     def create(self):
     # try to execute create() on every job
@@ -213,6 +227,7 @@ class PythonCharts(object):
                 self._stop(job, "no create")
             except (UnboundLocalError, Exception) as e:
                 self._stop(job, "misbehaving. Reason: " + str(e))
+        print("CREATE OK")
 
     def _update_job(self, job):
     # try to execute update() on every job and draw run time graph 
@@ -341,7 +356,7 @@ def run():
     try:
         conf = read_config(configfile)
         try:
-            if str(conf['enable']) == "no":
+            if str(conf['enable']) is False:
                 debug("disabled in configuration file")
                 sys.stdout.write("DISABLE\n")
                 sys.exit(1)
@@ -349,24 +364,24 @@ def run():
             pass
         try:
             modules_conf = conf['plugins_config_dir']
-        except (KeyError):
+        except KeyError:
             modules_conf = config_dir + "python.d/"  # default configuration directory
         try:
             modules_dir = conf['plugins_dir']
-        except (KeyError):
+        except KeyError:
             modules_dir = main_dir.replace("plugins.d", "python.d")
         try:
-            interval = int(conf['interval'])
-        except (KeyError, TypeError):
+            interval = conf['interval']
+        except KeyError:
             pass  # use default interval from NETDATA_UPDATE_EVERY
         try:
-            DEBUG_FLAG = bool(conf['debug'])
-        except (KeyError, TypeError):
+            DEBUG_FLAG = conf['debug']
+        except KeyError:
             pass
         for k, v in conf.items():
             if k in ("plugins_config_dir", "plugins_dir", "interval", "debug"):
                 continue
-            if v == 'no':
+            if v is False:
                 disabled.append(k)
     except FileNotFoundError:
         modules_conf = config_dir
