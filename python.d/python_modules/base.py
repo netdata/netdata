@@ -5,7 +5,7 @@ from time import time
 
 
 class BaseService(object):
-    def __init__(self,configuration=None):
+    def __init__(self,name=None,configuration=None):
         if configuration is None:
             # use defaults
             self.error("BaseService: no configuration parameters supplied. Cannot create Service.")

@@ -334,16 +334,17 @@ CHARTS = {
 
 
 class Service(BaseService):
-    def __init__(self,configuration=None):
+    def __init__(self,configuration=None,name=None):
         super().__init__(configuration)
         self.configuration = self._parse_config(configuration)
         self.connection = None
         self.defs = {}
+        self.name = name
 
     def _parse_config(self,configuration):
         # parse configuration to collect data from mysql server
-        if 'name' not in configuration:
-            configuration['name'] = 'local'
+        if self.name is None:
+            self.name = 'local'
         if 'user' not in configuration:
             configuration['user'] = 'root'
         if 'password' not in configuration:
@@ -413,7 +414,7 @@ class Service(BaseService):
         data = self._get_data()
         for name in ORDER:
             header = "CHART mysql_" + \
-                     str(self.configuration['name']) + "." + \
+                     str(self.name) + "." + \
                      name + " " + \
                      CHARTS[name][0] + " " + \
                      str(self.priority + idx) + " " + \
@@ -441,7 +442,7 @@ class Service(BaseService):
         except Exception:
             pass
         for chart, dimensions in self.defs.items():
-            header = "BEGIN mysql_" + str(self.configuration['name']) + "." + chart + " " + str(interval) + '\n'
+            header = "BEGIN mysql_" + str(self.name) + "." + chart + " " + str(interval) + '\n'
             lines = ""
             for d in dimensions:
                 try:
@@ -455,7 +456,7 @@ class Service(BaseService):
 
 #FIXME debug only:
 if __name__ == "__main__":
-    my = Service(config[0])
+    my = Service(config[0],'loc')
     my.check()
     my.create()
     my.update(1)
