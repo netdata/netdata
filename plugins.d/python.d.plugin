@@ -5,12 +5,22 @@ import sys
 import time
 try:
     assert sys.version_info >= (3,1)
-    import configparser
     import importlib.machinery
 except AssertionError:
-    sys.stderr.write('Not supported python version. Needed python >= 3.1\n')
+    sys.stderr.write('python.d.plugin: Not supported python version. Needed python >= 3.1\n')
     sys.stdout.write('DISABLE\n')
     sys.exit(1)
+try:
+    import yaml
+except ImportError:
+    sys.stderr.write('python.d.plugin: Cannot find yaml library\n')
+    sys.stdout.write('DISABLE\n')
+    sys.exit(1)
+
+MODULE_EXTENSION = ".chart.py"
+BASE_CONFIG = {'update_every' : 10,
+               'priority': 12345,
+               'retries' : 0}
 
 
 class PythonCharts(object):
@@ -22,54 +32,65 @@ class PythonCharts(object):
                  modules_configs='../conf.d/',
                  modules_disabled=[]):
         self.first_run = True
-        self.default_priority = 90000
         # set configuration directory
         self.configs = modules_configs
 
         # load modules
-        modules = self._load_modules(modules_path,modules)
-        
-        # check if loaded modules are on disabled modules list
-        self.modules = [ m for m in modules if m.__name__ not in modules_disabled ]
-        
+        loaded_modules = self._load_modules(modules_path,modules, modules_disabled)
+
         # load configuration files
-        self._load_configs()
+        configured_modules = self._load_configs(loaded_modules)
 
-        # set timetable dict (last execution, next execution and frequency)
-        # set priorities
-        self.timetable = {}
-        freq = 1
-        for m in self.modules:
-            try:
-                m.priority = int(m.priority)
-            except (AttributeError,ValueError):
-                m.priority = self.default_priority
-             
-            if interval is None:
+        # good economy and prosperity:
+        self.jobs = self._create_jobs(configured_modules)
+        if DEBUG_FLAG and interval is not None:
+            for job in self.jobs:
+                job._create_timetable(interval)
+
+
+    def _create_jobs(self,modules):
+    # module store a definition of Service class
+    # module store configuration in module.config
+    # configs are list of dicts or a dict
+    # one dict is one service
+    # iterate over list of modules and inside one loop iterate over configs
+        jobs = []
+        for module in modules:
+            for name in module.config:
+                # register a new job
+                conf = module.config[name]
                 try:
-                    freq = int(m.update_every)
-                except (AttributeError, ValueError):
-                    freq = 1
-            
-            now = time.time()
-            self.timetable[m.__name__] = {'last' : now,
-                                          'next' : now - (now % freq) + freq,
-                                          'freq' : freq}
+                    job = module.Service(configuration=conf, name=name)
+                except Exception as e:
+                    debug(module.__name__ +
+                          ": Couldn't start job named " +
+                          str(name) + 
+                          ": " +
+                          str(e))
+                    return None
+                else:
+                    # set execution_name (needed to plot run time graphs)
+                    job.execution_name = module.__name__
+                    if name is not None:
+                        job.execution_name += "_" + name
+                jobs.append(job)
+        
+        return [j for j in jobs if j is not None]
 
-    def _import_plugin(self, path, name=None):
+    def _import_module(self, path, name=None):
     # try to import module using only its path
         if name is None:
             name = path.split('/')[-1]
-            if name[-9:] != ".chart.py":
+            if name[-len(MODULE_EXTENSION):] != MODULE_EXTENSION:
                 return None
-            name = name[:-9]
+            name = name[:-len(MODULE_EXTENSION)]
         try:
             return importlib.machinery.SourceFileLoader(name, path).load_module()
         except Exception as e:
             debug(str(e))
             return None
 
-    def _load_modules(self, path, modules):
+    def _load_modules(self, path, modules, disabled):
         # check if plugin directory exists
         if not os.path.isdir(path):
             debug("cannot find charts directory ", path)
@@ -80,128 +101,170 @@ class PythonCharts(object):
         loaded = []
         if len(modules) > 0:
             for m in modules:
-                mod = self._import_plugin(path + m + ".chart.py")
+                if m in disabled:
+                    continue
+                mod = self._import_module(path + m + MODULE_EXTENSION)
                 if mod is not None:
                     loaded.append(mod)
         else:
             # scan directory specified in path and load all modules from there
             names = os.listdir(path)
             for mod in names:
-                m = self._import_plugin(path + mod)
+                if mod.strip(MODULE_EXTENSION) in disabled:
+                    debug("disabling:",mod.strip(MODULE_EXTENSION))
+                    continue
+                m = self._import_module(path + mod)
                 if m is not None:
                     debug("loading chart: '" + path + mod + "'")
                     loaded.append(m)
         return loaded
 
-    def _load_configs(self):
-    # function modifies every loaded module in self.modules
-        for m in self.modules:
-            configfile = self.configs + m.__name__ + ".conf"
+    def _load_configs(self,modules):
+    # function loads configuration files to modules
+        for mod in modules:
+            configfile = self.configs + mod.__name__ + ".conf"
             if os.path.isfile(configfile):
                 debug("loading chart options: '" + configfile + "'")
-                for k, v in read_config(configfile).items():
-                    try:
-                        setattr(m, k, v)
-                    except AttributeError:
-                        self._disable_module(m,"misbehaving having bad configuration")
+                try:
+                    setattr(mod,
+                            'config',
+                            self._parse_config(mod,read_config(configfile)))
+                except Exception as e:
+                    debug("something went wrong while loading configuration",e)
             else:
-                debug(m.__name__ +
+                debug(mod.__name__ +
                       ": configuration file '" +
                       configfile +
                       "' not found. Using defaults.")
+        return modules
 
-    def _disable_module(self, mod, reason=None):
-    # modifies self.modules
-        self.modules.remove(mod)
-        del self.timetable[mod.__name__]
+    def _parse_config(self,module,config):
+        # get default values
+        defaults = {}
+        for key in BASE_CONFIG:
+            try:
+                # get defaults from module config
+                defaults[key] = int(config.pop(key))
+            except (KeyError,ValueError):
+                try:
+                    # get defaults from module source code
+                    defaults[key] = getattr(module, key)
+                except (KeyError,ValueError):
+                    # if above failed, get defaults from global dict
+                    defaults[key] = BASE_CONFIG[key]
+      
+        # check if there are dict in config dict
+        many_jobs = False
+        for name in config:
+            if type(config[name]) is dict:
+                many_jobs = True
+                break
+        
+        # assign variables needed by supervisor to every job configuration
+        if many_jobs:
+            for name in config:
+                for key in defaults:
+                    if key not in config[name]:
+                        config[name][key] = defaults[key]
+        # if only one job is needed, values doesn't have to be in dict (in YAML)
+        else:
+            config = {None: config.copy()}
+            config[None].update(defaults)
+            
+        # return dictionary of jobs where every job has BASE_CONFIG variables
+        return config
+
+    def _stop(self, job, reason=None): #FIXME test if Service has __name__
+    # modifies self.jobs
+        self.jobs.remove(job)
         if reason is None:
             return
         elif reason[:3] == "no ":
             debug("chart '" +
-                  mod.__name__,
+                  job.execution_name,
                   "' does not seem to have " +
                   reason[3:] +
                   "() function. Disabling it.")
         elif reason[:7] == "failed ":
             debug("chart '" +
-                  mod.__name__ + "' " +
+                  job.execution_name + "' " +
                   reason[7:] +
                   "() function reports failure.")
         elif reason[:13] == "configuration":
-            debug(mod.__name__,
+            debug(job.execution_name,
                   "configuration file '" +
                   self.configs +
-                  mod.__name__ +
+                  job.execution_name +
                   ".conf' not found. Using defaults.")
         elif reason[:11] == "misbehaving":
-            debug(mod.__name__, "is "+reason)
+            debug(job.execution_name, "is "+reason)
 
     def check(self):
-    # try to execute check() on every loaded module
-        for mod in self.modules:
+    # try to execute check() on every job
+        for job in self.jobs:
             try:
-                if not mod.check():
-                    self._disable_module(mod, "failed check")
+                if not job.check():
+                    self._stop(job, "failed check")
             except AttributeError:
-                self._disable_module(mod, "no check")
+                self._stop(job, "no check")
             except (UnboundLocalError, Exception) as e:
-                self._disable_module(mod, "misbehaving. Reason: " + str(e))
+                self._stop(job, "misbehaving. Reason: " + str(e))
 
     def create(self):
-    # try to execute create() on every loaded module
-        for mod in self.modules:
+    # try to execute create() on every job
+        for job in self.jobs:
             try:
-                if not mod.create():
-                    self._disable_module(mod, "failed create")
+                if not job.create():
+                    self._stop(job, "failed create")
                 else:
-                    chart = mod.__name__
+                    chart = job.execution_name
                     sys.stdout.write(
                         "CHART netdata.plugin_pythond_" +
                         chart +
                         " '' 'Execution time for " +
                         chart +
                         " plugin' 'milliseconds / run' python.d netdata.plugin_python area 145000 " +
-                        str(self.timetable[mod.__name__]['freq']) +
+                        str(job.timetable['freq']) +
                         '\n')
                     sys.stdout.write("DIMENSION run_time 'run time' absolute 1 1\n\n")
                     sys.stdout.flush()
             except AttributeError:
-                self._disable_module(mod, "no create")
+                self._stop(job, "no create")
             except (UnboundLocalError, Exception) as e:
-                self._disable_module(mod, "misbehaving. Reason: " + str(e))
+                self._stop(job, "misbehaving. Reason: " + str(e))
 
-    def _update_module(self, mod):
-    # try to execute update() on every module and draw run time graph 
+    def _update_job(self, job):
+    # try to execute update() on every job and draw run time graph 
         t_start = time.time()
-        # check if it is time to execute module update() function
-        if self.timetable[mod.__name__]['next'] > t_start:
+        # check if it is time to execute job update() function
+        if job.timetable['next'] > t_start:
             return
         try:
             if self.first_run:
                 since_last = 0
             else:
-                since_last = int((t_start - self.timetable[mod.__name__]['last']) * 1000000)
-            if not mod.update(since_last):
-                self._disable_module(mod, "update failed")
+                since_last = int((t_start - job.timetable['last']) * 1000000)
+            if not job.update(since_last):
+                self._stop(job, "update failed")
                 return
         except AttributeError:
-            self._disable_module(mod, "no update")
+            self._stop(job, "no update")
             return
         except (UnboundLocalError, Exception) as e:
-            self._disable_module(mod, "misbehaving. Reason: " + str(e))
+            self._stop(job, "misbehaving. Reason: " + str(e))
             return
         t_end = time.time()
-        self.timetable[mod.__name__]['next'] = t_end - (t_end % self.timetable[mod.__name__]['freq']) + self.timetable[mod.__name__]['freq']
+        job.timetable['next'] = t_end - (t_end % job.timetable['freq']) + job.timetable['freq']
         # draw performance graph
         if self.first_run:
             dt = 0
         else:
-            dt = int((t_end - self.timetable[mod.__name__]['last']) * 1000000)
-        sys.stdout.write("BEGIN netdata.plugin_pythond_"+mod.__name__+" "+str(since_last)+'\n')
+            dt = int((t_end - job.timetable['last']) * 1000000)
+        sys.stdout.write("BEGIN netdata.plugin_pythond_"+job.execution_name+" "+str(since_last)+'\n')
         sys.stdout.write("SET run_time = " + str(int((t_end - t_start) * 1000)) + '\n')
         sys.stdout.write("END\n")
         sys.stdout.flush()
-        self.timetable[mod.__name__]['last'] = t_start
+        job.timetable['last'] = t_start
         self.first_run = False
 
     def update(self):
@@ -210,10 +273,10 @@ class PythonCharts(object):
         while True:
             t_begin = time.time()
             next_runs = []
-            for mod in self.modules:
-                self._update_module(mod)
+            for job in self.jobs:
+                self._update_job(job)
                 try:
-                    next_runs.append(self.timetable[mod.__name__]['next'])
+                    next_runs.append(job.timetable['next'])
                 except KeyError:
                     pass
             if len(next_runs) == 0:
@@ -224,20 +287,16 @@ class PythonCharts(object):
 
 
 def read_config(path):
-    config = configparser.ConfigParser()
-    config_str = ""
     try:
-        with open(path, 'r', encoding="utf_8") as f:
-            config_str = '[config]\n' + f.read()
+        with open(path, 'r') as stream:
+            config = yaml.load(stream)
     except IsADirectoryError:
         debug(str(path), "is a directory")
-        return
-    try:
-        config.read_string(config_str)
-    except configparser.ParsingError as e:
-        debug("Malformed configuration file: "+str(e))
-        return
-    return dict(config.items('config'))
+        return None
+    except yaml.YAMLError as e:
+        debug(str(path), "is malformed:", e)
+        return None
+    return config
 
 
 def debug(*args):
@@ -301,7 +360,7 @@ def run():
     try:
         conf = read_config(configfile)
         try:
-            if str(conf['enable']) == "no":
+            if str(conf['enable']) is False:
                 debug("disabled in configuration file")
                 sys.stdout.write("DISABLE\n")
                 sys.exit(1)
@@ -309,24 +368,24 @@ def run():
             pass
         try:
             modules_conf = conf['plugins_config_dir']
-        except (KeyError):
+        except KeyError:
             modules_conf = config_dir + "python.d/"  # default configuration directory
         try:
             modules_dir = conf['plugins_dir']
-        except (KeyError):
+        except KeyError:
             modules_dir = main_dir.replace("plugins.d", "python.d")
         try:
-            interval = int(conf['interval'])
-        except (KeyError, TypeError):
+            interval = conf['interval']
+        except KeyError:
             pass  # use default interval from NETDATA_UPDATE_EVERY
         try:
-            DEBUG_FLAG = bool(conf['debug'])
-        except (KeyError, TypeError):
+            DEBUG_FLAG = conf['debug']
+        except KeyError:
             pass
         for k, v in conf.items():
             if k in ("plugins_config_dir", "plugins_dir", "interval", "debug"):
                 continue
-            if v == 'no':
+            if v is False:
                 disabled.append(k)
     except FileNotFoundError:
         modules_conf = config_dir
