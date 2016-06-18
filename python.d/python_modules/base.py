@@ -2,12 +2,13 @@
 # Author: Pawel Krupa (paulfantom)
 
 from time import time
+import sys
 
 
 class BaseService(object):
     def __init__(self,name=None,configuration=None):
+        print(configuration)
         if configuration is None:
-            # use defaults
             self.error("BaseService: no configuration parameters supplied. Cannot create Service.")
             raise RuntimeError
         else:

@@ -23,16 +23,16 @@ from base import BaseService
 
 # default configuration (overriden by python.d.plugin)
 # FIXME change password
-config = [
-    {
-        'name'     : 'local',
+config = {
+    'local': {
         'user'     : 'root',
         'password' : 'a',
         'socket'   : '/var/run/mysqld/mysqld.sock',
         'update_every' : 3,
-        'retries'  : 4
+        'retries'  : 4,
+        'priority' : 100
     }
-]
+}
 
 # default module values (can be overridden per job in `config`)
 update_every = 3
@@ -335,11 +335,11 @@ CHARTS = {
 
 class Service(BaseService):
     def __init__(self,configuration=None,name=None):
-        super().__init__(configuration)
+        super().__init__(configuration=configuration)
+        self.name = name
         self.configuration = self._parse_config(configuration)
         self.connection = None
         self.defs = {}
-        self.name = name
 
     def _parse_config(self,configuration):
         # parse configuration to collect data from mysql server
@@ -405,7 +405,6 @@ class Service(BaseService):
 
     def create(self):
         for name in ORDER:
-            print(name)
             self.defs[name] = []
             for line in CHARTS[name][1]:
                 self.defs[name].append(line[0])
@@ -456,7 +455,7 @@ class Service(BaseService):
 
 #FIXME debug only:
 if __name__ == "__main__":
-    my = Service(config[0],'loc')
+    my = Service(config['local'],'loc')
     my.check()
     my.create()
     my.update(1)
