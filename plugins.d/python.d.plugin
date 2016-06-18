@@ -17,6 +17,7 @@ except ImportError:
     sys.stdout.write('DISABLE\n')
     sys.exit(1)
 
+MODULE_EXTENSION = ".chart.py"
 BASE_CONFIG = {'update_every' : 10,
                'priority': 12345,
                'retries' : 0}
@@ -35,11 +36,8 @@ class PythonCharts(object):
         self.configs = modules_configs
 
         # load modules
-        modules = self._load_modules(modules_path,modules)
-        
-        # check if loaded modules are on disabled modules list
-        loaded_modules = [ m for m in modules if m.__name__ not in modules_disabled ]
-        
+        loaded_modules = self._load_modules(modules_path,modules, modules_disabled)
+
         # load configuration files
         configured_modules = self._load_configs(loaded_modules)
 
@@ -83,16 +81,16 @@ class PythonCharts(object):
     # try to import module using only its path
         if name is None:
             name = path.split('/')[-1]
-            if name[-9:] != ".chart.py":
+            if name[-len(MODULE_EXTENSION):] != MODULE_EXTENSION:
                 return None
-            name = name[:-9]
+            name = name[:-len(MODULE_EXTENSION)]
         try:
             return importlib.machinery.SourceFileLoader(name, path).load_module()
         except Exception as e:
             debug(str(e))
             return None
 
-    def _load_modules(self, path, modules):
+    def _load_modules(self, path, modules, disabled):
         # check if plugin directory exists
         if not os.path.isdir(path):
             debug("cannot find charts directory ", path)
@@ -103,13 +101,18 @@ class PythonCharts(object):
         loaded = []
         if len(modules) > 0:
             for m in modules:
-                mod = self._import_module(path + m + ".chart.py")
+                if m in disabled:
+                    continue
+                mod = self._import_module(path + m + MODULE_EXTENSION)
                 if mod is not None:
                     loaded.append(mod)
         else:
             # scan directory specified in path and load all modules from there
             names = os.listdir(path)
             for mod in names:
+                if mod.strip(MODULE_EXTENSION) in disabled:
+                    debug("disabling:",mod.strip(MODULE_EXTENSION))
+                    continue
                 m = self._import_module(path + mod)
                 if m is not None:
                     debug("loading chart: '" + path + mod + "'")
