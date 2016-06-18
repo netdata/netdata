@@ -3,14 +3,23 @@
 import os
 import sys
 import time
-import json
 try:
     assert sys.version_info >= (3,1)
     import importlib.machinery
 except AssertionError:
-    sys.stderr.write('Not supported python version. Needed python >= 3.1\n')
+    sys.stderr.write('python.d.plugin: Not supported python version. Needed python >= 3.1\n')
     sys.stdout.write('DISABLE\n')
     sys.exit(1)
+try:
+    import yaml
+except ImportError:
+    sys.stderr.write('python.d.plugin: Cannot find yaml library\n')
+    sys.stdout.write('DISABLE\n')
+    sys.exit(1)
+
+BASE_CONFIG = {'update_every' : 10,
+               'priority': 12345,
+               'retries' : 0}
 
 
 class PythonCharts(object):
@@ -29,13 +38,13 @@ class PythonCharts(object):
         modules = self._load_modules(modules_path,modules)
         
         # check if loaded modules are on disabled modules list
-        self.modules = [ m for m in modules if m.__name__ not in modules_disabled ]
+        loaded_modules = [ m for m in modules if m.__name__ not in modules_disabled ]
         
         # load configuration files
-        self._load_configs()
+        confiured_modules = self._load_configs(loaded_modules)
 
         # good economy and prosperity:
-        self.jobs = self._create_jobs(self.modules)
+        self.jobs = self._create_jobs(configured_modules)
 
 
     def _create_jobs(self,modules):
@@ -46,49 +55,24 @@ class PythonCharts(object):
     # iterate over list of modules and inside one loop iterate over configs
         jobs = []
         for module in modules:
-            if type(module.config) is dict:
-                jobs.append(self._job(module,module.config))
-            elif type(module.config) is list:
-                for conf in module.config:
-                    jobs.append(self._job(module,conf))
+            for name in module.config:
+                # register a new job
+                conf = module.config[name]
+                try:
+                    job = module.Service(configuration=conf, name=name)
+                except Exception as e:
+                    debug(module.__name__ +
+                          ": Couldn't start job named " +
+                          str(name) + 
+                          ": " +
+                          str(e))
+                    return None
+                else:
+                    # set execution_name (needed to plot run time graphs)
+                    job.execution_name = module.__name__ + "_" + name
+                jobs.append(job)
         
         return [j for j in jobs if j is not None]
-
-
-    def _job(self,module,conf):
-    # register a new job
-        # default job settings:
-        settings = {'update_every' : 11,
-                    'priority'     : 12345,
-                    'retries'      : 0}
-        # ensure job has basic variables
-        # first check in job config
-        # next check in module
-        # at last assign defaults
-        for key in settings:
-            try:
-                settings[key] = int(conf[key])
-            except (KeyError,ValueError):
-                try:
-                    settings[key] = int(getattr(module, key))
-                except (AttributeError,ValueError):
-                    pass
-
-        try:
-            job = module.Service(configuration=conf)
-        except Exception as e:
-            sys.stderr.write(module.__name__ +
-                             ": Couldn't start one of jobs " +
-                             str(e))
-            return None
-        else:
-            # set execution_name (needed to plot run time graphs)
-            try:
-                job.execution_name = module.__name__ + \
-                                     "_" + \
-                                     str(conf['name'])
-            except KeyError:
-                job.execution_name = module.__name__
 
     def _import_module(self, path, name=None):
     # try to import module using only its path
@@ -127,22 +111,51 @@ class PythonCharts(object):
                     loaded.append(m)
         return loaded
 
-    def _load_configs(self):
-    # function modifies every loaded module in self.modules
-        for m in self.modules:
-            configfile = self.configs + m.__name__ + ".conf"
+    def _load_configs(self,modules):
+    # function loads configuration files to modules
+        for mod in modules:
+            configfile = self.configs + mod.__name__ + ".conf"
             if os.path.isfile(configfile):
                 debug("loading chart options: '" + configfile + "'")
-                for k, v in read_config(configfile).items():
-                    try:
-                        setattr(m, k, v)
-                    except AttributeError:
-                        self._disable_module(m,"misbehaving having bad configuration")
+                try:
+                    setattr(mod,
+                            'config',
+                            self._parse_config(mod,read_config(config_file))
+                except Exception as e:
+                    debug("something went wrong while loading configuration",e)
             else:
-                debug(m.__name__ +
+                debug(mod.__name__ +
                       ": configuration file '" +
                       configfile +
                       "' not found. Using defaults.")
+        return modules
+
+    def _parse_config(self,module,config):
+        # get default values
+        defaults = {}
+        for key in BASE_CONFIG:
+            try:
+                # get defaults from module config
+                defaults[key] = int(config.pop(key))
+            except (KeyError,ValueError):
+                try:
+                    # get defaults from module source code
+                    defaults[key] = getattr(module, key)
+                except (KeyError,ValueError):
+                    # if above failed, get defaults from global dict
+                    defaults[key] = BASE_CONFIG[key]
+
+        # assign variables needed by supervisor to every job configuration
+        out = {}
+        for name in config:
+            out[name] = {}
+            for key in BASE_CONFIG:
+                if key not in config[name]:
+                    out[name][key] = defaults[key] 
+                except (KeyError,ValueError):
+
+        # return dictionary of jobs where every job has BASE_CONFIG variables
+        return out
 
     def _stop(self, job, reason=None): #FIXME test if Service has __name__
     # modifies self.jobs
@@ -257,17 +270,16 @@ class PythonCharts(object):
 
 
 def read_config(path):
-    # FIXME move to JSON configurations
-#    try:
-#        with open(path, 'r') as f:
-#            config_str = '[config]\n' + f.read()
-#    except IsADirectoryError:
-#        debug(str(path), "is a directory")
-#        return
-#    try:
-#        debug("Malformed configuration file: "+str(e))
-#        return
-    return None
+    try:
+        with open(path, 'r') as stream:
+            config = yaml.load(stream)
+    except IsADirectoryError:
+        debug(str(path), "is a directory")
+        return None
+    except yaml.YAMLError as e:
+        debug(str(path), "is malformed:", e)
+        return None
+    return config
 
 
 def debug(*args):
