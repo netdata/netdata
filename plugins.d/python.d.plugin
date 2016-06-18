@@ -41,10 +41,11 @@ class PythonCharts(object):
         loaded_modules = [ m for m in modules if m.__name__ not in modules_disabled ]
         
         # load configuration files
-        confiured_modules = self._load_configs(loaded_modules)
+        configured_modules = self._load_configs(loaded_modules)
 
         # good economy and prosperity:
         self.jobs = self._create_jobs(configured_modules)
+        debug(self.jobs)
 
 
     def _create_jobs(self,modules):
@@ -120,7 +121,7 @@ class PythonCharts(object):
                 try:
                     setattr(mod,
                             'config',
-                            self._parse_config(mod,read_config(config_file))
+                            self._parse_config(mod,read_config(configfile)))
                 except Exception as e:
                     debug("something went wrong while loading configuration",e)
             else:
@@ -146,16 +147,13 @@ class PythonCharts(object):
                     defaults[key] = BASE_CONFIG[key]
 
         # assign variables needed by supervisor to every job configuration
-        out = {}
         for name in config:
-            out[name] = {}
             for key in BASE_CONFIG:
                 if key not in config[name]:
-                    out[name][key] = defaults[key] 
-                except (KeyError,ValueError):
-
+                    config[name][key] = defaults[key] 
+        
         # return dictionary of jobs where every job has BASE_CONFIG variables
-        return out
+        return config
 
     def _stop(self, job, reason=None): #FIXME test if Service has __name__
     # modifies self.jobs
@@ -164,23 +162,23 @@ class PythonCharts(object):
             return
         elif reason[:3] == "no ":
             debug("chart '" +
-                  job.__name__,
+                  job.execution_name,
                   "' does not seem to have " +
                   reason[3:] +
                   "() function. Disabling it.")
         elif reason[:7] == "failed ":
             debug("chart '" +
-                  job.__name__ + "' " +
+                  job.execution_name + "' " +
                   reason[7:] +
                   "() function reports failure.")
         elif reason[:13] == "configuration":
-            debug(job.__name__,
+            debug(job.execution_name,
                   "configuration file '" +
                   self.configs +
-                  job.__name__ +
+                  job.execution_name +
                   ".conf' not found. Using defaults.")
         elif reason[:11] == "misbehaving":
-            debug(job.__name__, "is "+reason)
+            debug(job.execution_name, "is "+reason)
 
     def check(self):
     # try to execute check() on every job
