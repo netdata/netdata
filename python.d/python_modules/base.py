@@ -22,11 +22,13 @@ class BaseService(object):
         self.retries = int(config['retries'])
         self.retries_left = self.retries
 
-    def _create_timetable(self):
+    def _create_timetable(self,freq=None):
+        if freq is None:
+            freq = self.update_every
         now = time()
         self.timetable = {'last' : now,
-                          'next' : now - (now % self.update_every) + self.update_every,
-                          'freq' : self.update_every}
+                          'next' : now - (now % freq) + freq,
+                          'freq' : freq}
 
 
     def error(self, msg, exception=""):

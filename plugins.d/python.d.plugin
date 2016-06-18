@@ -45,6 +45,11 @@ class PythonCharts(object):
 
         # good economy and prosperity:
         self.jobs = self._create_jobs(configured_modules)
+        if DEBUG_FLAG:
+            if interval is None:
+                interval = 1
+            for job in self.jobs:
+                job._create_timetable(interval)
 
 
     def _create_jobs(self,modules):
