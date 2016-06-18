@@ -206,7 +206,6 @@ class PythonCharts(object):
                 self._stop(job, "no check")
             except (UnboundLocalError, Exception) as e:
                 self._stop(job, "misbehaving. Reason: " + str(e))
-        print("CHECK OK")
 
     def create(self):
     # try to execute create() on every job
@@ -230,7 +229,6 @@ class PythonCharts(object):
                 self._stop(job, "no create")
             except (UnboundLocalError, Exception) as e:
                 self._stop(job, "misbehaving. Reason: " + str(e))
-        print("CREATE OK")
 
     def _update_job(self, job):
     # try to execute update() on every job and draw run time graph 
