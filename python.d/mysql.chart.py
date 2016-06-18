@@ -4,8 +4,6 @@
 NAME = "mysql.chart.py"
 import sys
 
-sys.path.append("./python_modules") #FIXME it is here for debug only
-
 # import 3rd party library to handle MySQL communication
 try:
     import MySQLdb
@@ -17,7 +15,8 @@ except ImportError:
         # https://github.com/PyMySQL/PyMySQL
         sys.stderr.write(NAME + ": using pymysql\n")
     except ImportError:
-        sys.stderr.write(NAME + ": You need to install PyMySQL module to use mysql.chart.py plugin\n")
+        sys.stderr.write(NAME + ": You need to install MySQLdb or PyMySQL module to use mysql.chart.py plugin\n")
+        raise ImportError
 
 from base import BaseService
 
