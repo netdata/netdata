@@ -7,10 +7,25 @@ import time
 try:
     assert sys.version_info >= (3, 1)
     import importlib.machinery
-except AssertionError:
-    sys.stderr.write('python.d.plugin: Not supported python version. Needed python >= 3.1\n')
-    sys.stdout.write('DISABLE\n')
-    sys.exit(1)
+
+    # change this hack below if we want PY_VERSION to be used in modules
+    # import builtins
+    # builtins.PY_VERSION = 3
+    PY_VERSION = 3
+    sys.stderr.write('python.d.plugin: Using python 3\n')
+except (AssertionError, ImportError):
+    try:
+        import imp
+
+        # change this hack below if we want PY_VERSION to be used in modules
+        # import __builtin__
+        # __builtin__.PY_VERSION = 2
+        PY_VERSION = 2
+        sys.stderr.write('python.d.plugin: Using python 2\n')
+    except (AssertionError, ImportError):
+        sys.stderr.write('python.d.plugin: Not supported python version. Needed python >= 3.1\n')
+        sys.stdout.write('DISABLE\n')
+        sys.exit(1)
 try:
     import yaml
 except ImportError:
@@ -29,10 +44,16 @@ BASE_CONFIG = {'update_every': 10,
 class PythonCharts(object):
     def __init__(self,
                  interval=None,
-                 modules=[],
+                 modules=None,
                  modules_path='../python.d/',
                  modules_configs='../conf.d/',
-                 modules_disabled=[]):
+                 modules_disabled=None):
+
+        if modules is None:
+            modules = []
+        if modules_disabled is None:
+            modules_disabled = []
+
         self.first_run = True
         # set configuration directory
         self.configs = modules_configs
@@ -50,36 +71,6 @@ class PythonCharts(object):
                 job.create_timetable(interval)
 
     @staticmethod
-    def _create_jobs(modules):
-        # module store a definition of Service class
-        # module store configuration in module.config
-        # configs are list of dicts or a dict
-        # one dict is one service
-        # iterate over list of modules and inside one loop iterate over configs
-        jobs = []
-        for module in modules:
-            for name in module.config:
-                # register a new job
-                conf = module.config[name]
-                try:
-                    job = module.Service(configuration=conf, name=name)
-                except Exception as e:
-                    debug(module.__name__ +
-                          ": Couldn't start job named " +
-                          str(name) +
-                          ": " +
-                          str(e))
-                    return None
-                else:
-                    # set execution_name (needed to plot run time graphs)
-                    job.execution_name = module.__name__
-                    if name is not None:
-                        job.execution_name += "_" + name
-                jobs.append(job)
-
-        return [j for j in jobs if j is not None]
-
-    @staticmethod
     def _import_module(path, name=None):
         # try to import module using only its path
         if name is None:
@@ -88,7 +79,11 @@ class PythonCharts(object):
                 return None
             name = name[:-len(MODULE_EXTENSION)]
         try:
-            return importlib.machinery.SourceFileLoader(name, path).load_module()
+            if PY_VERSION == 3:
+                return importlib.machinery.SourceFileLoader(name, path).load_module()
+            else:
+                return imp.load_source(name, path)
+                # return importlib.import_module(path, name)
         except Exception as e:
             debug(str(e))
             return None
@@ -109,6 +104,10 @@ class PythonCharts(object):
                 mod = self._import_module(path + m + MODULE_EXTENSION)
                 if mod is not None:
                     loaded.append(mod)
+                else:  # exit if plugin is not found
+                    sys.stdout.write("DISABLE")
+                    sys.stdout.flush()
+                    sys.exit(1)
         else:
             # scan directory specified in path and load all modules from there
             names = os.listdir(path)
@@ -185,6 +184,35 @@ class PythonCharts(object):
 
         # return dictionary of jobs where every job has BASE_CONFIG variables
         return config
+
+    @staticmethod
+    def _create_jobs(modules):
+        # module store a definition of Service class
+        # module store configuration in module.config
+        # configs are list of dicts or a dict
+        # one dict is one service
+        # iterate over list of modules and inside one loop iterate over configs
+        jobs = []
+        for module in modules:
+            for name in module.config:
+                # register a new job
+                conf = module.config[name]
+                try:
+                    job = module.Service(configuration=conf, name=name)
+                except Exception as e:
+                    debug(module.__name__ +
+                          ": Couldn't start job named " +
+                          str(name) +
+                          ": " +
+                          str(e))
+                    return None
+                else:
+                    # set execution_name (needed to plot run time graphs)
+                    job.execution_name = module.__name__
+                    if name is not None:
+                        job.execution_name += "_" + name
+                jobs.append(job)
+        return [j for j in jobs if j is not None]
 
     def _stop(self, job, reason=None):
         # modifies self.jobs
@@ -297,8 +325,8 @@ def read_config(path):
     try:
         with open(path, 'r') as stream:
             config = yaml.load(stream)
-    except IsADirectoryError:
-        debug(str(path), "is a directory")
+    except (OSError, IOError):
+        debug(str(path), "is not a valid configuration file")
         return None
     except yaml.YAMLError as e:
         debug(str(path), "is malformed:", e)
@@ -331,6 +359,7 @@ def parse_cmdline(directory, *commands):
             DEBUG_FLAG = True
             mods.append(cmd.replace(".chart.py", ""))
         else:
+            DEBUG_FLAG = False
             try:
                 interval = int(cmd)
             except ValueError:
@@ -346,8 +375,7 @@ def parse_cmdline(directory, *commands):
 
 # if __name__ == '__main__':
 def run():
-    global DEBUG_FLAG, PROGRAM
-    DEBUG_FLAG = True
+    global PROGRAM, DEBUG_FLAG
     PROGRAM = sys.argv[0].split('/')[-1].split('.plugin')[0]
     # parse env variables
     # https://github.com/firehol/netdata/wiki/External-Plugins#environment-variables
@@ -362,9 +390,8 @@ def run():
         config_dir += '/'
     configfile = config_dir + "python.d.conf"
 
-    try:
-        conf = read_config(configfile)
-        print(conf)
+    conf = read_config(configfile)
+    if conf is not None:
         try:
             if str(conf['enable']) is False:
                 debug("disabled in configuration file")
@@ -374,26 +401,26 @@ def run():
             pass
         try:
             modules_conf = conf['plugins_config_dir']
-        except KeyError:
+        except (KeyError, TypeError):
             modules_conf = config_dir + "python.d/"  # default configuration directory
         try:
             modules_dir = conf['plugins_dir']
-        except KeyError:
+        except (KeyError, TypeError):
             modules_dir = main_dir.replace("plugins.d", "python.d")
         try:
             interval = conf['interval']
-        except KeyError:
+        except (KeyError, TypeError):
             pass  # use default interval from NETDATA_UPDATE_EVERY
         try:
             DEBUG_FLAG = conf['debug']
-        except KeyError:
+        except (KeyError, TypeError):
             pass
         for k, v in conf.items():
             if k in ("plugins_config_dir", "plugins_dir", "interval", "debug"):
                 continue
             if v is False:
                 disabled.append(k)
-    except FileNotFoundError:
+    else:
         modules_conf = config_dir + "python.d/"
         modules_dir = main_dir.replace("plugins.d", "python.d")
 

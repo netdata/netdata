@@ -6,7 +6,7 @@ import sys
 
 
 class BaseService(object):
-    def __init__(self, configuration=None):
+    def __init__(self, configuration=None, name=None):
         if configuration is None:
             self.error("BaseService: no configuration parameters supplied. Cannot create Service.")
             raise RuntimeError

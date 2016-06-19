@@ -21,7 +21,6 @@ except ImportError:
 from base import BaseService
 
 # default configuration (overridden by python.d.plugin)
-# FIXME change password
 config = {
     'local': {
         'user'     : 'root',
@@ -334,7 +333,7 @@ CHARTS = {
 
 class Service(BaseService):
     def __init__(self,configuration=None,name=None):
-        super().__init__(configuration=configuration)
+        super(self.__class__, self).__init__(configuration=configuration)
         self.name = name
         self.configuration = self._parse_config(configuration)
         self.connection = None
