@@ -23,7 +23,7 @@ except (AssertionError, ImportError):
         PY_VERSION = 2
         sys.stderr.write('python.d.plugin: Using python 2\n')
     except (AssertionError, ImportError):
-        sys.stderr.write('python.d.plugin: Not supported python version. Needed python >= 3.1\n')
+        sys.stderr.write('python.d.plugin: Cannot start. No importlib.machinery on python3 or lack of imp on python2\n')
         sys.stdout.write('DISABLE\n')
         sys.exit(1)
 try:
