@@ -38,16 +38,13 @@ class BaseService(object):
         sys.stderr.flush()
 
     def check(self):
-        # TODO notify about not overridden function
-        self.error("Where is your check()?")
+        self.error("Service " + str(self.__name__) + "doesn't implement check() function")
         return False
 
     def create(self):
-        # TODO notify about not overridden function
-        self.error("Where is your create()?")
+        self.error("Service " + str(self.__name__) + "doesn't implement create() function?")
         return False
 
     def update(self):
-        # TODO notify about not overridden function
-        self.error("Where is your update()?")
+        self.error("Service " + str(self.__name__) + "doesn't implement update() function")
         return False
