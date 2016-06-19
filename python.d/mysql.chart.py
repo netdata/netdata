@@ -1,8 +1,8 @@
 # Description: MySQL netdata python.d plugin
 # Author: Pawel Krupa (paulfantom)
 
-NAME = "mysql.chart.py"
 import sys
+NAME = "mysql.chart.py"
 
 # import 3rd party library to handle MySQL communication
 try:
@@ -20,7 +20,7 @@ except ImportError:
 
 from base import BaseService
 
-# default configuration (overriden by python.d.plugin)
+# default configuration (overridden by python.d.plugin)
 # FIXME change password
 config = {
     'local': {
@@ -41,19 +41,19 @@ retries = 7
 # query executed on MySQL server
 QUERY = "SHOW GLOBAL STATUS"
 
-# charts order (can be overriden if you want less charts, or different order)
-ORDER = ['net', 
-         'queries', 
-         'handlers', 
-         'table_locks', 
-         'join_issues', 
-         'sort_issues', 
-         'tmp', 
-         'connections', 
-         'binlog_cache', 
-         'threads', 
-         'thread_cache_misses', 
-         'innodb_io', 
+# charts order (can be overridden if you want less charts, or different order)
+ORDER = ['net',
+         'queries',
+         'handlers',
+         'table_locks',
+         'join_issues',
+         'sort_issues',
+         'tmp',
+         'connections',
+         'binlog_cache',
+         'threads',
+         'thread_cache_misses',
+         'innodb_io',
          'innodb_io_ops',
          'innodb_io_pending_ops',
          'innodb_log',
@@ -83,7 +83,7 @@ ORDER = ['net',
 #    'chart_name_in_netdata': (
 #        "parameters defining chart (passed to CHART statement)",
 #        [ # dimensions (lines) definitions
-#            ("dimension_name", "dimension parameters (passed to DIMENSION statement)", "additional parameter (optional)")
+#            ("dimension_name", "dimension parameters (passed to DIMENSION statement)")
 #        ])
 #    }
 
@@ -377,8 +377,8 @@ class Service(BaseService):
                                               connect_timeout=self.configuration['update_every'])
         except Exception as e:
             self.error(NAME + " has problem connecting to server:", e)
-            raise RuntimeError #stop creating module, need to catch it in supervisor
-    
+            raise RuntimeError  # stop creating module, need to catch it in supervisor
+
     def _get_data(self):
         if self.connection is None:
             self._connect()
@@ -391,7 +391,7 @@ class Service(BaseService):
             self.connection.close()
             self.connection = None
             return None
-        
+
         return dict(raw_data)
 
     def check(self):
@@ -407,7 +407,7 @@ class Service(BaseService):
             self.defs[name] = []
             for line in CHARTS[name][1]:
                 self.defs[name].append(line[0])
-   
+
         idx = 0
         data = self._get_data()
         for name in ORDER:
@@ -418,7 +418,7 @@ class Service(BaseService):
                      str(self.priority + idx) + " " + \
                      str(self.update_every)
             content = ""
-            # check if server has this datapoint
+            # check if server has this data point
             for line in CHARTS[name][1]:
                 if line[0] in data:
                      content += "DIMENSION " + line[0] + " " + line[1] + "\n"
@@ -426,17 +426,17 @@ class Service(BaseService):
                 print(header)
                 print(content)
                 idx += 1
-    
+
         if idx == 0:
             return False
         return True
 
-    def update(self,interval):
+    def update(self, interval):
         data = self._get_data()
         if data is None:
             return False
         try:
-            data['Thread cache misses'] = int( int(data['Threads_created']) * 10000 / int(data['Connections']))
+            data['Thread cache misses'] = int(int(data['Threads_created']) * 10000 / int(data['Connections']))
         except Exception:
             pass
         for chart, dimensions in self.defs.items():
@@ -449,5 +449,5 @@ class Service(BaseService):
                     pass
             if len(lines) > 0:
                 print(header + lines + "END")
-        
+
         return True

@@ -144,8 +144,8 @@ class PythonCharts(object):
                     mod.config = {None: {}}
                     for var in BASE_CONFIG:
                         try:
-                            mod.config[None][var] = getattr(var, mod)
-                        except Exception:
+                            mod.config[None][var] = getattr(mod, var)
+                        except AttributeError:
                             mod.config[None][var] = BASE_CONFIG[var]
         return modules
 
@@ -361,7 +361,6 @@ def run():
     if config_dir[-1] != '/':
         config_dir += '/'
     configfile = config_dir + "python.d.conf"
-    print(config_dir)
 
     try:
         conf = read_config(configfile)
@@ -395,7 +394,7 @@ def run():
             if v is False:
                 disabled.append(k)
     except FileNotFoundError:
-        modules_conf = config_dir
+        modules_conf = config_dir + "python.d/"
         modules_dir = main_dir.replace("plugins.d", "python.d")
 
     # directories should end with '/'
