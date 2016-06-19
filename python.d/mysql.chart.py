@@ -343,7 +343,11 @@ class Service(BaseService):
         self.defs = {}
 
     def _parse_config(self, configuration):
-        # parse configuration to collect data from mysql server
+        """
+        Parse configuration to collect data from MySQL server
+        :param configuration: dict
+        :return: dict
+        """
         if self.name is None:
             self.name = 'local'
         if 'user' not in configuration:
@@ -369,6 +373,9 @@ class Service(BaseService):
         return configuration
 
     def _connect(self):
+        """
+        Try to connect to MySQL server
+        """
         try:
             self.connection = MySQLdb.connect(user=self.configuration['user'],
                                               passwd=self.configuration['password'],
@@ -382,6 +389,10 @@ class Service(BaseService):
             raise RuntimeError
 
     def _get_data(self):
+        """
+        Get raw data from MySQL server
+        :return: dict
+        """
         if self.connection is None:
             try:
                 self._connect()
@@ -400,6 +411,10 @@ class Service(BaseService):
         return dict(raw_data)
 
     def check(self):
+        """
+        Check if service is able to connect to server
+        :return: boolean
+        """
         try:
             self.connection = self._connect()
             return True
@@ -408,6 +423,10 @@ class Service(BaseService):
             return False
 
     def create(self):
+        """
+        Create graphs
+        :return: boolean
+        """
         for name in ORDER:
             self.defs[name] = []
             for line in CHARTS[name][1]:
@@ -437,6 +456,11 @@ class Service(BaseService):
         return True
 
     def update(self, interval):
+        """
+        Update data on graphs
+        :param interval: int
+        :return: boolean
+        """
         data = self._get_data()
         if data is None:
             return False
