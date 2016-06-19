@@ -335,7 +335,8 @@ class PythonCharts(object):
         """
         Tries to execute update() on specified job.
         This cannot fail thus it is catching every exception.
-        If job.update() returns False, number of retries is decremented. If there are no more retries, job is stopped.
+        If job.update() returns False, number of retries_left is decremented.
+        If there are no more retries, job is stopped.
         Job is also stopped if it throws an exception.
         This is also updating job run time chart.
         :param job: object
@@ -350,11 +351,10 @@ class PythonCharts(object):
             else:
                 since_last = int((t_start - job.timetable['last']) * 1000000)
             if not job.update(since_last):
-                if job.retries <= 0:
+                if job.retries_left <= 0:
                     self._stop(job, "update failed")
-                else:
-                    job.retries -= 1
-                    job.timetable['next'] += job.timetable['freq']
+                job.retries_left -= 1
+                job.timetable['next'] += job.timetable['freq']
                 return
         except AttributeError:
             self._stop(job, "no update")
@@ -370,6 +370,7 @@ class PythonCharts(object):
         sys.stdout.write("END\n")
         sys.stdout.flush()
         job.timetable['last'] = t_start
+        job.retries_left = job.retries
         self.first_run = False
 
     def update(self):
