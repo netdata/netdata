@@ -136,6 +136,14 @@ class PythonCharts(object):
                       ": configuration file '" +
                       configfile +
                       "' not found. Using defaults.")
+                # set config if not found
+                if not hasattr(mod, 'config'):
+                    mod.config = {None:{}}
+                    for var in BASE_CONFIG:
+                        try:
+                            mod.config[None][var] = getattr(var, mod)
+                        except Exception:
+                            mod.config[None][var] = BASE_CONFIG[var]
         return modules
 
     def _parse_config(self,module,config):
@@ -174,7 +182,7 @@ class PythonCharts(object):
         # return dictionary of jobs where every job has BASE_CONFIG variables
         return config
 
-    def _stop(self, job, reason=None): #FIXME test if Service has __name__
+    def _stop(self, job, reason=None):
     # modifies self.jobs
         self.jobs.remove(job)
         if reason is None:
@@ -356,9 +364,11 @@ def run():
     if config_dir[-1] != '/':
         config_dir += '/'
     configfile = config_dir + "python.d.conf"
+    print(config_dir)
 
     try:
         conf = read_config(configfile)
+        print(conf)
         try:
             if str(conf['enable']) is False:
                 debug("disabled in configuration file")
@@ -411,6 +421,7 @@ def run():
     charts.check()
     charts.create()
     charts.update()
+    sys.stdout.write("DISABLE")
 
 if __name__ == '__main__':
     run()
