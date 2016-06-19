@@ -152,7 +152,6 @@ class PythonCharts(object):
         :param modules: list
         :return: list
         """
-
         for mod in modules:
             configfile = self.configs + mod.__name__ + ".conf"
             if os.path.isfile(configfile):
@@ -192,7 +191,6 @@ class PythonCharts(object):
         :param config: dict
         :return: dict
         """
-
         # get default values
         defaults = {}
         for key in BASE_CONFIG:
