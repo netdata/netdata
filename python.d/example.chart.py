@@ -19,7 +19,10 @@ class Service(BaseService):
         return True
     
     def create(self):
-        print("CHART example.python_random '' 'A random number' 'random number' random random line "+str(self.priority)+" "+str(self.update_every))
+        print("CHART example.python_random '' 'A random number' 'random number' random random line " +
+              str(self.priority) +
+              " " +
+              str(self.update_every))
         print("DIMENSION random1 '' absolute 1 1")
         return True
     
