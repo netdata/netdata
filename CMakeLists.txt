@@ -7,7 +7,7 @@ project(netdata C)
 
 find_package (Threads)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wformat-signedness")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wformat-signedness -Werror=format-security")
 
 set(NETDATA_SOURCE_FILES
         src/appconfig.c
@@ -54,8 +54,8 @@ set(NETDATA_SOURCE_FILES
         src/proc_net_snmp.c
         src/proc_net_stat_conntrack.c
         src/proc_net_stat_synproxy.c
-		src/proc_self_mountinfo.c
-		src/proc_self_mountinfo.h
+        src/proc_self_mountinfo.c
+        src/proc_self_mountinfo.h
         src/proc_softirqs.c
         src/proc_stat.c
         src/proc_sys_kernel_random_entropy_avail.c
@@ -77,7 +77,7 @@ set(NETDATA_SOURCE_FILES
         src/web_buffer.c
         src/web_buffer.h
         src/web_buffer_svg.c
-		src/web_buffer_svg.h
+        src/web_buffer_svg.h
         src/web_client.c
         src/web_client.h
         src/web_server.c
@@ -98,8 +98,8 @@ set(APPS_PLUGIN_SOURCE_FILES
         src/procfile.h
         src/storage_number.c
         src/storage_number.h
-		src/web_buffer.c
-		src/web_buffer.h
+        src/web_buffer.c
+        src/web_buffer.h
         config.h)
 
 include_directories(AFTER .)
