@@ -42,12 +42,22 @@ BASE_CONFIG = {'update_every': 10,
 
 
 class PythonCharts(object):
+    """
+    Main class used to control every python module.
+    """
     def __init__(self,
                  interval=None,
                  modules=None,
                  modules_path='../python.d/',
                  modules_configs='../conf.d/',
                  modules_disabled=None):
+        """
+        :param interval: int
+        :param modules: list
+        :param modules_path: str
+        :param modules_configs: str
+        :param modules_disabled: list
+        """
 
         if modules is None:
             modules = []
@@ -65,14 +75,20 @@ class PythonCharts(object):
         configured_modules = self._load_configs(loaded_modules)
 
         # good economy and prosperity:
-        self.jobs = self._create_jobs(configured_modules)
+        self.jobs = self._create_jobs(configured_modules)  # type: list
         if DEBUG_FLAG and interval is not None:
             for job in self.jobs:
                 job.create_timetable(interval)
 
     @staticmethod
     def _import_module(path, name=None):
-        # try to import module using only its path
+        """
+        Try to import module using only its path.
+        :param path: str
+        :param name: str
+        :return: object
+        """
+
         if name is None:
             name = path.split('/')[-1]
             if name[-len(MODULE_EXTENSION):] != MODULE_EXTENSION:
@@ -83,12 +99,19 @@ class PythonCharts(object):
                 return importlib.machinery.SourceFileLoader(name, path).load_module()
             else:
                 return imp.load_source(name, path)
-                # return importlib.import_module(path, name)
         except Exception as e:
             debug(str(e))
             return None
 
     def _load_modules(self, path, modules, disabled):
+        """
+        Load modules from 'modules' list or dynamically every file from 'path' (only .chart.py files)
+        :param path: str
+        :param modules: list
+        :param disabled: list
+        :return: list
+        """
+
         # check if plugin directory exists
         if not os.path.isdir(path):
             debug("cannot find charts directory ", path)
@@ -122,7 +145,14 @@ class PythonCharts(object):
         return loaded
 
     def _load_configs(self, modules):
-        # function loads configuration files to modules
+        """
+        Append configuration in list named `config` to every module.
+        For multi-job modules `config` list is created in _parse_config,
+        otherwise it is created here based on BASE_CONFIG prototype with None as identifier.
+        :param modules: list
+        :return: list
+        """
+
         for mod in modules:
             configfile = self.configs + mod.__name__ + ".conf"
             if os.path.isfile(configfile):
@@ -150,6 +180,19 @@ class PythonCharts(object):
 
     @staticmethod
     def _parse_config(module, config):
+        """
+        Parse configuration file or extract configuration from module file.
+        Example of returned dictionary:
+            config = {'name': {
+                            'update_every': 2,
+                            'retries': 3,
+                            'priority': 30000
+                            'other_val': 123}}
+        :param module: object
+        :param config: dict
+        :return: dict
+        """
+
         # get default values
         defaults = {}
         for key in BASE_CONFIG:
@@ -187,11 +230,11 @@ class PythonCharts(object):
 
     @staticmethod
     def _create_jobs(modules):
-        # module store a definition of Service class
-        # module store configuration in module.config
-        # configs are list of dicts or a dict
-        # one dict is one service
-        # iterate over list of modules and inside one loop iterate over configs
+        """
+        Create jobs based on module.config dictionary and module.Service class definition.
+        :param modules: list
+        :return: list
+        """
         jobs = []
         for module in modules:
             for name in module.config:
@@ -212,10 +255,16 @@ class PythonCharts(object):
                     if name is not None:
                         job.execution_name += "_" + name
                 jobs.append(job)
+
         return [j for j in jobs if j is not None]
 
     def _stop(self, job, reason=None):
-        # modifies self.jobs
+        """
+        Stop specified job and remove it from self.jobs list
+        Also notifies user about job failure if DEBUG_FLAG is set
+        :param job: object
+        :param reason: str
+        """
         self.jobs.remove(job)
         if reason is None:
             return
@@ -240,7 +289,11 @@ class PythonCharts(object):
             debug(job.execution_name, "is " + reason)
 
     def check(self):
-        # try to execute check() on every job
+        """
+        Tries to execute check() on every job.
+        This cannot fail thus it is catching every exception
+        If job.check() fails job is stopped
+        """
         for job in self.jobs:
             try:
                 if not job.check():
@@ -251,7 +304,12 @@ class PythonCharts(object):
                 self._stop(job, "misbehaving. Reason: " + str(e))
 
     def create(self):
-        # try to execute create() on every job
+        """
+        Tries to execute create() on every job.
+        This cannot fail thus it is catching every exception.
+        If job.create() fails job is stopped.
+        This is also creating job run time chart.
+        """
         for job in self.jobs:
             try:
                 if not job.create():
@@ -274,7 +332,14 @@ class PythonCharts(object):
                 self._stop(job, "misbehaving. Reason: " + str(e))
 
     def _update_job(self, job):
-        # try to execute update() on every job and draw run time graph
+        """
+        Tries to execute update() on specified job.
+        This cannot fail thus it is catching every exception.
+        If job.update() returns False, number of retries is decremented. If there are no more retries, job is stopped.
+        Job is also stopped if it throws an exception.
+        This is also updating job run time chart.
+        :param job: object
+        """
         t_start = time.time()
         # check if it is time to execute job update() function
         if job.timetable['next'] > t_start:
@@ -285,7 +350,11 @@ class PythonCharts(object):
             else:
                 since_last = int((t_start - job.timetable['last']) * 1000000)
             if not job.update(since_last):
-                self._stop(job, "update failed")
+                if job.retries <= 0:
+                    self._stop(job, "update failed")
+                else:
+                    job.retries -= 1
+                    job.timetable['next'] += job.timetable['freq']
                 return
         except AttributeError:
             self._stop(job, "no update")
@@ -304,7 +373,10 @@ class PythonCharts(object):
         self.first_run = False
 
     def update(self):
-        # run updates (this will stay forever and ever and ever forever and ever it'll be the one...)
+        """
+        Tries to execute update() on every job by using _update_job()
+        This will stay forever and ever and ever forever and ever it'll be the one...
+        """
         self.first_run = True
         while True:
             next_runs = []
@@ -322,6 +394,11 @@ class PythonCharts(object):
 
 
 def read_config(path):
+    """
+    Read YAML configuration from specified file
+    :param path: str
+    :return: dict
+    """
     try:
         with open(path, 'r') as stream:
             config = yaml.load(stream)
@@ -335,6 +412,9 @@ def read_config(path):
 
 
 def debug(*args):
+    """
+    Print message on stderr.
+    """
     if not DEBUG_FLAG:
         return
     sys.stderr.write(PROGRAM + ":")
@@ -345,6 +425,12 @@ def debug(*args):
 
 
 def parse_cmdline(directory, *commands):
+    """
+    Parse parameters from command line.
+    :param directory: str
+    :param commands: list of str
+    :return: dict
+    """
     global DEBUG_FLAG
     interval = None
 
@@ -375,6 +461,9 @@ def parse_cmdline(directory, *commands):
 
 # if __name__ == '__main__':
 def run():
+    """
+    Main program.
+    """
     global PROGRAM, DEBUG_FLAG
     PROGRAM = sys.argv[0].split('/')[-1].split('.plugin')[0]
     # parse env variables
