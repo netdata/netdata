@@ -3,8 +3,9 @@
 import os
 import sys
 import time
+
 try:
-    assert sys.version_info >= (3,1)
+    assert sys.version_info >= (3, 1)
     import importlib.machinery
 except AssertionError:
     sys.stderr.write('python.d.plugin: Not supported python version. Needed python >= 3.1\n')
@@ -17,14 +18,15 @@ except ImportError:
     sys.stdout.write('DISABLE\n')
     sys.exit(1)
 
+DEBUG_FLAG = False
+PROGRAM = "python.d.plugin"
 MODULE_EXTENSION = ".chart.py"
-BASE_CONFIG = {'update_every' : 10,
+BASE_CONFIG = {'update_every': 10,
                'priority': 12345,
-               'retries' : 0}
+               'retries': 0}
 
 
 class PythonCharts(object):
-    
     def __init__(self,
                  interval=None,
                  modules=[],
@@ -36,7 +38,7 @@ class PythonCharts(object):
         self.configs = modules_configs
 
         # load modules
-        loaded_modules = self._load_modules(modules_path,modules, modules_disabled)
+        loaded_modules = self._load_modules(modules_path, modules, modules_disabled)
 
         # load configuration files
         configured_modules = self._load_configs(loaded_modules)
@@ -45,15 +47,15 @@ class PythonCharts(object):
         self.jobs = self._create_jobs(configured_modules)
         if DEBUG_FLAG and interval is not None:
             for job in self.jobs:
-                job._create_timetable(interval)
+                job.create_timetable(interval)
 
-
-    def _create_jobs(self,modules):
-    # module store a definition of Service class
-    # module store configuration in module.config
-    # configs are list of dicts or a dict
-    # one dict is one service
-    # iterate over list of modules and inside one loop iterate over configs
+    @staticmethod
+    def _create_jobs(modules):
+        # module store a definition of Service class
+        # module store configuration in module.config
+        # configs are list of dicts or a dict
+        # one dict is one service
+        # iterate over list of modules and inside one loop iterate over configs
         jobs = []
         for module in modules:
             for name in module.config:
@@ -64,7 +66,7 @@ class PythonCharts(object):
                 except Exception as e:
                     debug(module.__name__ +
                           ": Couldn't start job named " +
-                          str(name) + 
+                          str(name) +
                           ": " +
                           str(e))
                     return None
@@ -74,11 +76,12 @@ class PythonCharts(object):
                     if name is not None:
                         job.execution_name += "_" + name
                 jobs.append(job)
-        
+
         return [j for j in jobs if j is not None]
 
-    def _import_module(self, path, name=None):
-    # try to import module using only its path
+    @staticmethod
+    def _import_module(path, name=None):
+        # try to import module using only its path
         if name is None:
             name = path.split('/')[-1]
             if name[-len(MODULE_EXTENSION):] != MODULE_EXTENSION:
@@ -111,7 +114,7 @@ class PythonCharts(object):
             names = os.listdir(path)
             for mod in names:
                 if mod.strip(MODULE_EXTENSION) in disabled:
-                    debug("disabling:",mod.strip(MODULE_EXTENSION))
+                    debug("disabling:", mod.strip(MODULE_EXTENSION))
                     continue
                 m = self._import_module(path + mod)
                 if m is not None:
@@ -119,8 +122,8 @@ class PythonCharts(object):
                     loaded.append(m)
         return loaded
 
-    def _load_configs(self,modules):
-    # function loads configuration files to modules
+    def _load_configs(self, modules):
+        # function loads configuration files to modules
         for mod in modules:
             configfile = self.configs + mod.__name__ + ".conf"
             if os.path.isfile(configfile):
@@ -128,9 +131,9 @@ class PythonCharts(object):
                 try:
                     setattr(mod,
                             'config',
-                            self._parse_config(mod,read_config(configfile)))
+                            self._parse_config(mod, read_config(configfile)))
                 except Exception as e:
-                    debug("something went wrong while loading configuration",e)
+                    debug("something went wrong while loading configuration", e)
             else:
                 debug(mod.__name__ +
                       ": configuration file '" +
@@ -138,7 +141,7 @@ class PythonCharts(object):
                       "' not found. Using defaults.")
                 # set config if not found
                 if not hasattr(mod, 'config'):
-                    mod.config = {None:{}}
+                    mod.config = {None: {}}
                     for var in BASE_CONFIG:
                         try:
                             mod.config[None][var] = getattr(var, mod)
@@ -146,28 +149,29 @@ class PythonCharts(object):
                             mod.config[None][var] = BASE_CONFIG[var]
         return modules
 
-    def _parse_config(self,module,config):
+    @staticmethod
+    def _parse_config(module, config):
         # get default values
         defaults = {}
         for key in BASE_CONFIG:
             try:
                 # get defaults from module config
                 defaults[key] = int(config.pop(key))
-            except (KeyError,ValueError):
+            except (KeyError, ValueError):
                 try:
                     # get defaults from module source code
                     defaults[key] = getattr(module, key)
-                except (KeyError,ValueError):
+                except (KeyError, ValueError):
                     # if above failed, get defaults from global dict
                     defaults[key] = BASE_CONFIG[key]
-      
+
         # check if there are dict in config dict
         many_jobs = False
         for name in config:
             if type(config[name]) is dict:
                 many_jobs = True
                 break
-        
+
         # assign variables needed by supervisor to every job configuration
         if many_jobs:
             for name in config:
@@ -178,12 +182,12 @@ class PythonCharts(object):
         else:
             config = {None: config.copy()}
             config[None].update(defaults)
-            
+
         # return dictionary of jobs where every job has BASE_CONFIG variables
         return config
 
     def _stop(self, job, reason=None):
-    # modifies self.jobs
+        # modifies self.jobs
         self.jobs.remove(job)
         if reason is None:
             return
@@ -205,10 +209,10 @@ class PythonCharts(object):
                   job.execution_name +
                   ".conf' not found. Using defaults.")
         elif reason[:11] == "misbehaving":
-            debug(job.execution_name, "is "+reason)
+            debug(job.execution_name, "is " + reason)
 
     def check(self):
-    # try to execute check() on every job
+        # try to execute check() on every job
         for job in self.jobs:
             try:
                 if not job.check():
@@ -219,7 +223,7 @@ class PythonCharts(object):
                 self._stop(job, "misbehaving. Reason: " + str(e))
 
     def create(self):
-    # try to execute create() on every job
+        # try to execute create() on every job
         for job in self.jobs:
             try:
                 if not job.create():
@@ -242,7 +246,7 @@ class PythonCharts(object):
                 self._stop(job, "misbehaving. Reason: " + str(e))
 
     def _update_job(self, job):
-    # try to execute update() on every job and draw run time graph 
+        # try to execute update() on every job and draw run time graph
         t_start = time.time()
         # check if it is time to execute job update() function
         if job.timetable['next'] > t_start:
@@ -264,11 +268,7 @@ class PythonCharts(object):
         t_end = time.time()
         job.timetable['next'] = t_end - (t_end % job.timetable['freq']) + job.timetable['freq']
         # draw performance graph
-        if self.first_run:
-            dt = 0
-        else:
-            dt = int((t_end - job.timetable['last']) * 1000000)
-        sys.stdout.write("BEGIN netdata.plugin_pythond_"+job.execution_name+" "+str(since_last)+'\n')
+        sys.stdout.write("BEGIN netdata.plugin_pythond_" + job.execution_name + " " + str(since_last) + '\n')
         sys.stdout.write("SET run_time = " + str(int((t_end - t_start) * 1000)) + '\n')
         sys.stdout.write("END\n")
         sys.stdout.flush()
@@ -276,10 +276,9 @@ class PythonCharts(object):
         self.first_run = False
 
     def update(self):
-    # run updates (this will stay forever and ever and ever forever and ever it'll be the one...)
+        # run updates (this will stay forever and ever and ever forever and ever it'll be the one...)
         self.first_run = True
         while True:
-            t_begin = time.time()
             next_runs = []
             for job in self.jobs:
                 self._update_job(job)
@@ -318,9 +317,7 @@ def debug(*args):
 
 
 def parse_cmdline(directory, *commands):
-    # TODO number -> interval
     global DEBUG_FLAG
-    DEBUG_FLAG = False
     interval = None
 
     mods = []
@@ -412,16 +409,17 @@ def run():
     modules = out['modules']
     if out['interval'] is not None:
         interval = out['interval']
-    
-    # configure environement to run modules
-    sys.path.append(modules_dir+"python_modules") # append path to directory with modules dependencies
-    
+
+    # configure environment to run modules
+    sys.path.append(modules_dir + "python_modules")  # append path to directory with modules dependencies
+
     # run plugins
     charts = PythonCharts(interval, modules, modules_dir, modules_conf, disabled)
     charts.check()
     charts.create()
     charts.update()
     sys.stdout.write("DISABLE")
+
 
 if __name__ == '__main__':
     run()
