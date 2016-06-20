@@ -13,7 +13,7 @@ retries = 7
 
 class Service(BaseService):
     def __init__(self, configuration=None, name=None):
-        super(self.__class__,self).__init__(configuration=configuration)
+        super(self.__class__,self).__init__(configuration=configuration, name=name)
 
     def check(self):
         return True

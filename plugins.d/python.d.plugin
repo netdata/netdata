@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 import os
 import sys
@@ -140,7 +140,7 @@ class PythonCharts(object):
                     continue
                 m = self._import_module(path + mod)
                 if m is not None:
-                    debug("loading chart: '" + path + mod + "'")
+                    debug("loading module: '" + path + mod + "'")
                     loaded.append(m)
         return loaded
 
@@ -155,7 +155,7 @@ class PythonCharts(object):
         for mod in modules:
             configfile = self.configs + mod.__name__ + ".conf"
             if os.path.isfile(configfile):
-                debug("loading chart options: '" + configfile + "'")
+                debug("loading module configuration: '" + configfile + "'")
                 try:
                     setattr(mod,
                             'config',
@@ -248,10 +248,10 @@ class PythonCharts(object):
                           str(e))
                     return None
                 else:
-                    # set execution_name (needed to plot run time graphs)
-                    job.execution_name = module.__name__
+                    # set chart_name (needed to plot run time graphs)
+                    job.chart_name = module.__name__
                     if name is not None:
-                        job.execution_name += "_" + name
+                        job.chart_name += "_" + name
                 jobs.append(job)
 
         return [j for j in jobs if j is not None]
@@ -263,28 +263,31 @@ class PythonCharts(object):
         :param job: object
         :param reason: str
         """
+        prefix = ""
+        if job.name is not None:
+            prefix = "'" + job.name + "' in "
+
+        prefix += "'" + job.__module__ + "' "
         self.jobs.remove(job)
         if reason is None:
             return
         elif reason[:3] == "no ":
-            debug("chart '" +
-                  job.execution_name,
-                  "' does not seem to have " +
+            debug(prefix +
+                  "does not seem to have " +
                   reason[3:] +
                   "() function. Disabling it.")
         elif reason[:7] == "failed ":
-            debug("chart '" +
-                  job.execution_name + "' " +
+            debug(prefix +
                   reason[7:] +
                   "() function reports failure.")
         elif reason[:13] == "configuration":
-            debug(job.execution_name,
+            debug(prefix +
                   "configuration file '" +
                   self.configs +
-                  job.execution_name +
+                  job.__module__ +
                   ".conf' not found. Using defaults.")
         elif reason[:11] == "misbehaving":
-            debug(job.execution_name, "is " + reason)
+            debug(prefix + "is " + reason)
 
     def check(self):
         """
@@ -313,7 +316,7 @@ class PythonCharts(object):
                 if not job.create():
                     self._stop(job, "failed create")
                 else:
-                    chart = job.execution_name
+                    chart = job.chart_name
                     sys.stdout.write(
                         "CHART netdata.plugin_pythond_" +
                         chart +
@@ -363,7 +366,7 @@ class PythonCharts(object):
         t_end = time.time()
         job.timetable['next'] = t_end - (t_end % job.timetable['freq']) + job.timetable['freq']
         # draw performance graph
-        sys.stdout.write("BEGIN netdata.plugin_pythond_" + job.execution_name + " " + str(since_last) + '\n')
+        sys.stdout.write("BEGIN netdata.plugin_pythond_" + job.chart_name + " " + str(since_last) + '\n')
         sys.stdout.write("SET run_time = " + str(int((t_end - t_start) * 1000)) + '\n')
         sys.stdout.write("END\n")
         sys.stdout.flush()
