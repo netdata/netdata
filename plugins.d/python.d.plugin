@@ -527,8 +527,6 @@ def run():
                 continue
             if v is False:
                 disabled.append(k)
-    else:
-        modules_conf = CONFIG_DIR + "python.d/"
 
     # parse passed command line arguments
     out = parse_cmdline(MODULES_DIR, *sys.argv)
@@ -537,7 +535,7 @@ def run():
         interval = out['interval']
 
     # run plugins
-    charts = PythonCharts(interval, modules, MODULES_DIR, modules_conf, disabled)
+    charts = PythonCharts(interval, modules, MODULES_DIR, CONFIG_DIR + "python.d/", disabled)
     charts.check()
     charts.create()
     charts.update()
