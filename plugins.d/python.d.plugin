@@ -12,7 +12,7 @@ import time
 MODULES_DIR = os.getenv('NETDATA_PLUGINS_DIR',
                         os.path.abspath(__file__).strip("python.d.plugin.py").replace("plugins.d", "python.d"))
 CONFIG_DIR = os.getenv('NETDATA_CONFIG_DIR', "/etc/netdata/")
-INTERVAL = os.getenv('NETDATA_UPDATE_EVERY', 1)
+INTERVAL = os.getenv('NETDATA_UPDATE_EVERY', None)
 # directories should end with '/'
 if MODULES_DIR[-1] != "/":
     MODULES_DIR += "/"

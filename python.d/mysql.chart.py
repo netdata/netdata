@@ -398,9 +398,9 @@ class Service(BaseService):
             except RuntimeError:
                 return None
         try:
-            with self.connection.cursor() as cursor:
-                cursor.execute(QUERY)
-                raw_data = cursor.fetchall()
+            cursor = self.connection.cursor()
+            cursor.execute(QUERY)
+            raw_data = cursor.fetchall()
         except Exception as e:
             self.error(NAME + ": cannot execute query.", e)
             self.connection.close()
@@ -433,6 +433,8 @@ class Service(BaseService):
 
         idx = 0
         data = self._get_data()
+        if data is None:
+            return False
         for name in ORDER:
             header = "CHART mysql_" + \
                      str(self.name) + "." + \
