@@ -1,8 +1,25 @@
 #!/usr/bin/env python
 
+# Description: netdata python modules supervisor
+# Author: Pawel Krupa (paulfantom)
+
 import os
 import sys
 import time
+
+# setup environment
+# https://github.com/firehol/netdata/wiki/External-Plugins#environment-variables
+MODULES_DIR = os.getenv('NETDATA_PLUGINS_DIR',
+                        os.path.abspath(__file__).strip("python.d.plugin.py").replace("plugins.d", "python.d"))
+CONFIG_DIR = os.getenv('NETDATA_CONFIG_DIR', "/etc/netdata/")
+INTERVAL = os.getenv('NETDATA_UPDATE_EVERY', 1)
+# directories should end with '/'
+if MODULES_DIR[-1] != "/":
+    MODULES_DIR += "/"
+if CONFIG_DIR[-1] != "/":
+    CONFIG_DIR += "/"
+sys.path.append(MODULES_DIR + "python_modules")
+
 
 try:
     assert sys.version_info >= (3, 1)
@@ -22,7 +39,7 @@ except (AssertionError, ImportError):
         # __builtin__.PY_VERSION = 2
         PY_VERSION = 2
         sys.stderr.write('python.d.plugin: Using python 2\n')
-    except (AssertionError, ImportError):
+    except ImportError:
         sys.stderr.write('python.d.plugin: Cannot start. No importlib.machinery on python3 or lack of imp on python2\n')
         sys.stdout.write('DISABLE\n')
         sys.exit(1)
@@ -482,19 +499,12 @@ def run():
     """
     global PROGRAM, DEBUG_FLAG
     PROGRAM = sys.argv[0].split('/')[-1].split('.plugin')[0]
-    # parse env variables
-    # https://github.com/firehol/netdata/wiki/External-Plugins#environment-variables
-    main_dir = os.getenv('NETDATA_PLUGINS_DIR',
-                         os.path.abspath(__file__).strip("python.d.plugin.py"))
-    config_dir = os.getenv('NETDATA_CONFIG_DIR', "/etc/netdata/")
-    interval = os.getenv('NETDATA_UPDATE_EVERY', None)
 
     # read configuration file
     disabled = []
-    if config_dir[-1] != '/':
-        config_dir += '/'
-    configfile = config_dir + "python.d.conf"
+    configfile = CONFIG_DIR + "python.d.conf"
 
+    interval = INTERVAL
     conf = read_config(configfile)
     if conf is not None:
         try:
@@ -505,14 +515,6 @@ def run():
         except (KeyError, TypeError):
             pass
         try:
-            modules_conf = conf['plugins_config_dir']
-        except (KeyError, TypeError):
-            modules_conf = config_dir + "python.d/"  # default configuration directory
-        try:
-            modules_dir = conf['plugins_dir']
-        except (KeyError, TypeError):
-            modules_dir = main_dir.replace("plugins.d", "python.d")
-        try:
             interval = conf['interval']
         except (KeyError, TypeError):
             pass  # use default interval from NETDATA_UPDATE_EVERY
@@ -521,31 +523,21 @@ def run():
         except (KeyError, TypeError):
             pass
         for k, v in conf.items():
-            if k in ("plugins_config_dir", "plugins_dir", "interval", "debug"):
+            if k in ("interval", "debug", "enable"):
                 continue
             if v is False:
                 disabled.append(k)
     else:
-        modules_conf = config_dir + "python.d/"
-        modules_dir = main_dir.replace("plugins.d", "python.d")
-
-    # directories should end with '/'
-    if modules_dir[-1] != '/':
-        modules_dir += "/"
-    if modules_conf[-1] != '/':
-        modules_conf += "/"
+        modules_conf = CONFIG_DIR + "python.d/"
 
     # parse passed command line arguments
-    out = parse_cmdline(modules_dir, *sys.argv)
+    out = parse_cmdline(MODULES_DIR, *sys.argv)
     modules = out['modules']
     if out['interval'] is not None:
         interval = out['interval']
 
-    # configure environment to run modules
-    sys.path.append(modules_dir + "python_modules")  # append path to directory with modules dependencies
-
     # run plugins
-    charts = PythonCharts(interval, modules, modules_dir, modules_conf, disabled)
+    charts = PythonCharts(interval, modules, MODULES_DIR, modules_conf, disabled)
     charts.check()
     charts.create()
     charts.update()
