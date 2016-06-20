@@ -267,7 +267,7 @@ class PythonCharts(object):
         if job.name is not None:
             prefix = "'" + job.name + "' in "
 
-        prefix += "'" + job.__module__ + "' "
+        prefix += "'" + job.__module__ + MODULE_EXTENSION + "' "
         self.jobs.remove(job)
         if reason is None:
             return
@@ -295,10 +295,14 @@ class PythonCharts(object):
         This cannot fail thus it is catching every exception
         If job.check() fails job is stopped
         """
-        for job in self.jobs:
+        i = 0
+        while i < len(self.jobs):
+            job = self.jobs[i]
             try:
                 if not job.check():
                     self._stop(job, "failed check")
+                else:
+                    i += 1
             except AttributeError:
                 self._stop(job, "no check")
             except (UnboundLocalError, Exception) as e:
@@ -311,7 +315,9 @@ class PythonCharts(object):
         If job.create() fails job is stopped.
         This is also creating job run time chart.
         """
-        for job in self.jobs:
+        i = 0
+        while i < len(self.jobs):
+            job = self.jobs[i]
             try:
                 if not job.create():
                     self._stop(job, "failed create")
@@ -327,6 +333,7 @@ class PythonCharts(object):
                         '\n')
                     sys.stdout.write("DIMENSION run_time 'run time' absolute 1 1\n\n")
                     sys.stdout.flush()
+                    i += 1
             except AttributeError:
                 self._stop(job, "no create")
             except (UnboundLocalError, Exception) as e:
@@ -340,12 +347,14 @@ class PythonCharts(object):
         If there are no more retries, job is stopped.
         Job is also stopped if it throws an exception.
         This is also updating job run time chart.
+        Return False if job is stopped
         :param job: object
+        :return: boolean
         """
         t_start = time.time()
         # check if it is time to execute job update() function
         if job.timetable['next'] > t_start:
-            return
+            return True
         try:
             if self.first_run:
                 since_last = 0
@@ -354,15 +363,16 @@ class PythonCharts(object):
             if not job.update(since_last):
                 if job.retries_left <= 0:
                     self._stop(job, "update failed")
+                    return False
                 job.retries_left -= 1
                 job.timetable['next'] += job.timetable['freq']
-                return
+                return True
         except AttributeError:
             self._stop(job, "no update")
-            return
+            return False
         except (UnboundLocalError, Exception) as e:
             self._stop(job, "misbehaving. Reason: " + str(e))
-            return
+            return False
         t_end = time.time()
         job.timetable['next'] = t_end - (t_end % job.timetable['freq']) + job.timetable['freq']
         # draw performance graph
@@ -373,6 +383,7 @@ class PythonCharts(object):
         job.timetable['last'] = t_start
         job.retries_left = job.retries
         self.first_run = False
+        return True
 
     def update(self):
         """
@@ -382,12 +393,15 @@ class PythonCharts(object):
         self.first_run = True
         while True:
             next_runs = []
-            for job in self.jobs:
-                self._update_job(job)
-                try:
-                    next_runs.append(job.timetable['next'])
-                except KeyError:
-                    pass
+            i = 0
+            while i < len(self.jobs):
+                job = self.jobs[i]
+                if self._update_job(job):
+                    try:
+                        next_runs.append(job.timetable['next'])
+                    except KeyError:
+                        pass
+                    i += 1
             if len(next_runs) == 0:
                 debug("No plugins loaded")
                 sys.stdout.write("DISABLE\n")
