@@ -336,8 +336,7 @@ CHARTS = {
 
 class Service(BaseService):
     def __init__(self, configuration=None, name=None):
-        super(self.__class__, self).__init__(configuration=configuration)
-        self.name = name
+        super(self.__class__, self).__init__(configuration=configuration, name=name)
         self.configuration = self._parse_config(configuration)
         self.connection = None
         self.defs = {}

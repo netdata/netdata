@@ -16,6 +16,7 @@ class BaseService(object):
         :param configuration: dict
         :param name: str
         """
+        self.name = name
         if configuration is None:
             self.error("BaseService: no configuration parameters supplied. Cannot create Service.")
             raise RuntimeError
@@ -23,7 +24,7 @@ class BaseService(object):
             self._extract_base_config(configuration)
             self.timetable = {}
             self.create_timetable()
-            self.execution_name = ""
+            self.chart_name = ""
 
     def _extract_base_config(self, config):
         """
