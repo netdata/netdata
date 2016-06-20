@@ -2,12 +2,14 @@
 
 **Python plugin support is experimental and implementation may change in the future**
 
-Currently every plugin must be written in python3.
+Every plugin should be compatible with python2 and python3.
 All third party libraries should be installed system-wide or in `python_modules` directory.
 Module configurations are written in YAML and **pyYAML is required**.
 
 Every configuration file must have one of two formats:
-1. Configuration for only one job:
+
+- Configuration for only one job:
+
 ```yaml
 update_every : 2 # update frequency
 retries      : 1 # how many failures in update() is tolerated
@@ -16,7 +18,9 @@ priority     : 20000 # where it is shown on dashboard
 other_var1   : bla  # variables passed to module
 other_var2   : alb
 ```
-2. Configuration for many jobs (ex. mysql):
+
+- Configuration for many jobs (ex. mysql):
+
 ```yaml
 # module defaults:
 update_every : 2
@@ -35,6 +39,7 @@ other_job:
 ```
 
 `update_every`, `retries`, and `priority` are always optional.
+
 ---
 
 The following python.d plugins are supported:
