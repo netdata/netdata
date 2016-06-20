@@ -10,12 +10,13 @@ import time
 # setup environment
 # https://github.com/firehol/netdata/wiki/External-Plugins#environment-variables
 MODULES_DIR = os.getenv('NETDATA_PLUGINS_DIR',
-                        os.path.abspath(__file__).strip("python.d.plugin.py").replace("plugins.d", "python.d"))
+                        os.path.abspath(__file__).strip("python.d.plugin.py").replace("plugins.d", ""))
 CONFIG_DIR = os.getenv('NETDATA_CONFIG_DIR', "/etc/netdata/")
 INTERVAL = os.getenv('NETDATA_UPDATE_EVERY', None)
 # directories should end with '/'
 if MODULES_DIR[-1] != "/":
     MODULES_DIR += "/"
+MODULES_DIR += "python.d/"
 if CONFIG_DIR[-1] != "/":
     CONFIG_DIR += "/"
 sys.path.append(MODULES_DIR + "python_modules")
