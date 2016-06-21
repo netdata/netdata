@@ -2,9 +2,10 @@
 # Description: MySQL netdata python.d plugin
 # Author: Pawel Krupa (paulfantom)
 
+import os
 import sys
 
-NAME = "mysql.chart.py"
+NAME = os.path.basename(__file__).replace(".chart.py", "")
 
 # import 3rd party library to handle MySQL communication
 try:
@@ -24,22 +25,22 @@ except ImportError:
 
 from base import BaseService
 
+# default module values (can be overridden per job in `config`)
+update_every = 3
+priority = 90000
+retries = 7
+
 # default configuration (overridden by python.d.plugin)
 config = {
     'local': {
         'user': 'root',
         'password': '',
         'socket': '/var/run/mysqld/mysqld.sock',
-        'update_every': 3,
-        'retries': 4,
-        'priority': 100
+        'update_every': update_every,
+        'retries': retries,
+        'priority': priority
     }
 }
-
-# default module values (can be overridden per job in `config`)
-update_every = 3
-priority = 90000
-retries = 7
 
 # query executed on MySQL server
 QUERY = "SHOW GLOBAL STATUS"
