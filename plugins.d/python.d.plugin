@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 # Description: netdata python modules supervisor
 # Author: Pawel Krupa (paulfantom)
