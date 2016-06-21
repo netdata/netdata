@@ -2,10 +2,45 @@
 
 **Python plugin support is experimental and implementation may change in the future**
 
-Currently every plugin must be written in python3.
+Every plugin should be compatible with python2 and python3.
 All third party libraries should be installed system-wide or in `python_modules` directory.
-Also plugins support changing their data collection frequency by setting `update_every` variable in their configuration file.
+Module configurations are written in YAML and **pyYAML is required**.
 
+Every configuration file must have one of two formats:
+
+- Configuration for only one job:
+
+```yaml
+update_every : 2 # update frequency
+retries      : 1 # how many failures in update() is tolerated
+priority     : 20000 # where it is shown on dashboard
+
+other_var1   : bla  # variables passed to module
+other_var2   : alb
+```
+
+- Configuration for many jobs (ex. mysql):
+
+```yaml
+# module defaults:
+update_every : 2
+retries      : 1
+priority     : 20000
+
+local:  # job name
+  update_every : 5 # job update frequency
+  retries      : 2 # job retries
+  other_var1   : some_val # module specific variable
+
+other_job: 
+  priority     : 5 # job position on dashboard
+  retries      : 20 # job retries
+  other_var2   : val # module specific variable
+```
+
+`update_every`, `retries`, and `priority` are always optional.
+
+---
 
 The following python.d plugins are supported:
 
@@ -72,30 +107,32 @@ You can provide, per server, the following:
 6. mysql host (ip or hostname)
 7. mysql port (defaults to 3306)
 
-Here is an example for 3 servers updating data every 10 seconds
+Here is an example for 3 servers:
 
-```js
-update_every = 10
+```yaml
+update_every : 10
+priority     : 90100
+retries      : 5
 
-config=[
-    {
-        'name'     : 'local',
-        'my.cnf'   : '/etc/mysql/my.cnf'
-    },{
-    	'name'     : 'local_2',
-        'user'     : 'root',
-        'password' : 'blablablabla',
-        'socket'   : '/var/run/mysqld/mysqld.sock'
-    },{
-        'name'     : 'remote',
-        'user'     : 'admin',
-        'password' : 'bla',
-        'host'     : 'example.org',
-        'port'     : '9000'
-    }]
+local:
+  'my.cnf'   : '/etc/mysql/my.cnf'
+  priority   : 90000
+
+local_2:
+  user     : 'root'
+  password : 'blablablabla'
+  socket   : '/var/run/mysqld/mysqld.sock'
+  update_every : 1
+
+remote:
+  user     : 'admin'
+  password : 'bla'
+  host     : 'example.org'
+  port     : 9000
+  retries  : 20
 ```
 
-If no configuration is given, the plugin will attempt to connect to mysql server via unix socket at `/var/run/mysqld/mysqld.sock` without password and username `root`
+If no configuration is given, the plugin will attempt to connect to mysql server via unix socket at `/var/run/mysqld/mysqld.sock` without password and with username `root`
 
 ---
 
