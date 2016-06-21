@@ -167,7 +167,7 @@ class PythonCharts(object):
             else:
                 return imp.load_source(name, path)
         except Exception as e:
-            debug(str(e))
+            debug("Problem loading", name, str(e))
             return None
 
     def _load_modules(self, path, modules, disabled):
