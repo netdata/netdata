@@ -31,50 +31,51 @@ OVERRIDE_UPDATE_EVERY = False
 
 # -----------------------------------------------------------------------------
 # logging functions
-def debug(*args):
+def log_msg(msg_type, *args):
     """
     Print message on stderr.
+    :param msg_type: str
+    """
+    sys.stderr.write(PROGRAM)
+    sys.stderr.write(" ")
+    sys.stderr.write(msg_type)
+    sys.stderr.write(": ")
+    for i in args:
+        sys.stderr.write(" ")
+        sys.stderr.write(str(i))
+    sys.stderr.write("\n")
+    sys.stderr.flush()
+
+
+def debug(*args):
+    """
+    Print debug message on stderr.
     """
     if not DEBUG_FLAG:
         return
-    sys.stderr.write(PROGRAM + " DEBUG :")
-    for i in args:
-        sys.stderr.write(" " + str(i))
-    sys.stderr.write("\n")
-    sys.stderr.flush()
+
+    log_msg("DEBUG", *args)
 
 
 def error(*args):
     """
     Print message on stderr.
     """
-    sys.stderr.write(PROGRAM + " ERROR :")
-    for i in args:
-        sys.stderr.write(" " + str(i))
-    sys.stderr.write("\n")
-    sys.stderr.flush()
+    log_msg("ERROR", *args)
 
 
 def info(*args):
     """
     Print message on stderr.
     """
-    sys.stderr.write(PROGRAM + " INFO :")
-    for i in args:
-        sys.stderr.write(" " + str(i))
-    sys.stderr.write("\n")
-    sys.stderr.flush()
+    log_msg("INFO", *args)
 
 
 def fatal(*args):
     """
     Print message on stderr and exit.
     """
-    sys.stderr.write(PROGRAM + " FATAL :")
-    for i in args:
-        sys.stderr.write(" " + str(i))
-    sys.stderr.write("\n")
-    sys.stderr.flush()
+    log_msg("FATAL", *args)
     sys.stdout.write('DISABLE\n')
     sys.exit(1)
 
@@ -228,6 +229,7 @@ class PythonCharts(object):
                 error(mod.__name__ + ": configuration file '" + configfile + "' not found. Using defaults.")
                 # set config if not found
                 if not hasattr(mod, 'config'):
+                    debug(mod.__name__ + ": setting configuration for only one job")
                     mod.config = {None: {}}
                     for var in BASE_CONFIG:
                         try:
@@ -253,6 +255,7 @@ class PythonCharts(object):
         # get default values
         defaults = {}
         for key in BASE_CONFIG:
+            debug(module.__name__ + ": reading configuration")
             try:
                 # get defaults from module config
                 defaults[key] = int(config.pop(key))
@@ -381,6 +384,7 @@ class PythonCharts(object):
                 if not job.create():
                     self._stop(job, "failed create")
                 else:
+                    debug("created charts for", job.chart_name)
                     chart = job.chart_name
                     sys.stdout.write(
                         "CHART netdata.plugin_pythond_" +
@@ -435,8 +439,10 @@ class PythonCharts(object):
         t_end = time.time()
         job.timetable['next'] = t_end - (t_end % job.timetable['freq']) + job.timetable['freq']
         # draw performance graph
+        run_time = str(int((t_end - t_start) * 1000))
+        debug(job.chart_name, "updated in", run_time)
         sys.stdout.write("BEGIN netdata.plugin_pythond_" + job.chart_name + " " + str(since_last) + '\n')
-        sys.stdout.write("SET run_time = " + str(int((t_end - t_start) * 1000)) + '\n')
+        sys.stdout.write("SET run_time = " + run_time + '\n')
         sys.stdout.write("END\n")
         # sys.stdout.flush()
         job.timetable['last'] = t_start
@@ -509,6 +515,7 @@ def parse_cmdline(directory, *commands):
             try:
                 BASE_CONFIG['update_every'] = int(cmd)
                 OVERRIDE_UPDATE_EVERY = True
+                debug(PROGRAM, "overriding update interval to", str(int(cmd)))
             except ValueError:
                 pass
 
@@ -527,6 +534,7 @@ def run():
     # read configuration file
     disabled = []
     configfile = CONFIG_DIR + "python.d.conf"
+    debug(PROGRAM, "reading configuration file:", configfile)
 
     conf = read_config(configfile)
     if conf is not None:
@@ -559,6 +567,7 @@ def run():
          ", ONLY_MODULES=" + str(modules))
 
     # run plugins
+    modules = ['nginx']
     charts = PythonCharts(modules, MODULES_DIR, CONFIG_DIR + "python.d/", disabled)
     charts.check()
     charts.create()

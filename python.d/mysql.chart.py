@@ -4,6 +4,7 @@
 
 import os
 import sys
+from base import BaseService
 
 NAME = os.path.basename(__file__).replace(".chart.py", "")
 
@@ -22,8 +23,6 @@ except ImportError:
     except ImportError:
         sys.stderr.write(NAME + ": You need to install MySQLdb or PyMySQL module to use mysql.chart.py plugin\n")
         raise ImportError
-
-from base import BaseService
 
 # default module values (can be overridden per job in `config`)
 update_every = 3
