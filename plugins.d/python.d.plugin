@@ -8,19 +8,29 @@ import os
 import sys
 import time
 
-
+# -----------------------------------------------------------------------------
+# globals & environment setup
+# https://github.com/firehol/netdata/wiki/External-Plugins#environment-variables
 MODULE_EXTENSION = ".chart.py"
-BASE_CONFIG = {'update_every': 1,
+BASE_CONFIG = {'update_every': os.getenv('NETDATA_UPDATE_EVERY', 1),
                'priority': 90000,
                'retries': 10}
 
-# -----------------------------------------------------------------------------
-# logging functions
+MODULES_DIR = os.path.abspath(os.getenv('NETDATA_PLUGINS_DIR',
+                              os.path.dirname(__file__)) + "/../python.d") + "/"
+CONFIG_DIR = os.getenv('NETDATA_CONFIG_DIR', "/etc/netdata/")
+# directories should end with '/'
+if CONFIG_DIR[-1] != "/":
+    CONFIG_DIR += "/"
+sys.path.append(MODULES_DIR + "python_modules")
 
 PROGRAM = os.path.basename(__file__).replace(".plugin", "")
 DEBUG_FLAG = False
+OVERRIDE_UPDATE_EVERY = False
 
 
+# -----------------------------------------------------------------------------
+# logging functions
 def debug(*args):
     """
     Print message on stderr.
@@ -70,20 +80,7 @@ def fatal(*args):
 
 
 # -----------------------------------------------------------------------------
-# globals & python modules management
-
-# setup environment
-# https://github.com/firehol/netdata/wiki/External-Plugins#environment-variables
-MODULES_DIR = os.path.abspath(os.getenv('NETDATA_PLUGINS_DIR',
-                              os.path.dirname(__file__)) + "/../python.d") + "/"
-CONFIG_DIR = os.getenv('NETDATA_CONFIG_DIR', "/etc/netdata/")
-UPDATE_EVERY = os.getenv('NETDATA_UPDATE_EVERY', None)
-# directories should end with '/'
-if CONFIG_DIR[-1] != "/":
-    CONFIG_DIR += "/"
-sys.path.append(MODULES_DIR + "python_modules")
-
-
+# third party and version specific python modules management
 try:
     assert sys.version_info >= (3, 1)
     import importlib.machinery
@@ -115,7 +112,6 @@ class PythonCharts(object):
     Main class used to control every python module.
     """
     def __init__(self,
-                 update_every=None,
                  modules=None,
                  modules_path='../python.d/',
                  modules_configs='../conf.d/',
@@ -147,9 +143,9 @@ class PythonCharts(object):
         self.jobs = self._create_jobs(configured_modules)  # type: list
 
         # enable timetable override like `python.d.plugin mysql debug 1`
-        if DEBUG_FLAG and update_every is not None:
+        if DEBUG_FLAG and OVERRIDE_UPDATE_EVERY:
             for job in self.jobs:
-                job.create_timetable(update_every)
+                job.create_timetable(BASE_CONFIG['update_every'])
 
     @staticmethod
     def _import_module(path, name=None):
@@ -497,7 +493,8 @@ def parse_cmdline(directory, *commands):
     :return: dict
     """
     global DEBUG_FLAG
-    global UPDATE_EVERY
+    global OVERRIDE_UPDATE_EVERY
+    global BASE_CONFIG
 
     mods = []
     for cmd in commands[1:]:
@@ -511,7 +508,8 @@ def parse_cmdline(directory, *commands):
             mods.append(cmd.replace(".chart.py", ""))
         else:
             try:
-                UPDATE_EVERY = int(cmd)
+                BASE_CONFIG['update_every'] = int(cmd)
+                OVERRIDE_UPDATE_EVERY = True
             except ValueError:
                 pass
 
@@ -525,13 +523,12 @@ def run():
     """
     Main program.
     """
-    global DEBUG_FLAG
+    global DEBUG_FLAG, BASE_CONFIG
 
     # read configuration file
     disabled = []
     configfile = CONFIG_DIR + "python.d.conf"
 
-    update_every = UPDATE_EVERY
     conf = read_config(configfile)
     if conf is not None:
         try:
@@ -541,7 +538,8 @@ def run():
         except (KeyError, TypeError):
             pass
         try:
-            update_every = conf['update_every']
+            for param in BASE_CONFIG:
+                BASE_CONFIG[param] = conf[param]
         except (KeyError, TypeError):
             pass  # use default update_every from NETDATA_UPDATE_EVERY
         try:
@@ -558,11 +556,11 @@ def run():
     modules = parse_cmdline(MODULES_DIR, *sys.argv)
     info("MODULES_DIR='" + MODULES_DIR +
          "', CONFIG_DIR='" + CONFIG_DIR +
-         "', UPDATE_EVERY=" + str(UPDATE_EVERY) +
+         "', UPDATE_EVERY=" + str(BASE_CONFIG['update_every']) +
          ", ONLY_MODULES=" + str(modules))
 
     # run plugins
-    charts = PythonCharts(update_every, modules, MODULES_DIR, CONFIG_DIR + "python.d/", disabled)
+    charts = PythonCharts(modules, MODULES_DIR, CONFIG_DIR + "python.d/", disabled)
     charts.check()
     charts.create()
     charts.update()
