@@ -369,7 +369,7 @@ class PythonCharts(object):
             except AttributeError:
                 self._stop(job, "no check")
             except (UnboundLocalError, Exception) as e:
-                self._stop(job, "misbehaving. Reason:", str(e))
+                self._stop(job, "misbehaving. Reason:" + str(e))
 
     def create(self):
         """
