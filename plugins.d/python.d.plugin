@@ -167,7 +167,7 @@ class PythonCharts(object):
             else:
                 return imp.load_source(name, path)
         except Exception as e:
-            debug("Problem loading", name, str(e))
+            error("Problem loading", name, str(e))
             return None
 
     def _load_modules(self, path, modules, disabled):
@@ -255,6 +255,7 @@ class PythonCharts(object):
         # get default values
         defaults = {}
         for key in BASE_CONFIG:
+            # FIXME for some reason this is called 3 times per module
             debug(module.__name__ + ": reading configuration")
             try:
                 # get defaults from module config
@@ -364,6 +365,8 @@ class PythonCharts(object):
                 if not job.check():
                     self._stop(job, "failed check")
                 else:
+                    # FIXME job.name is incomplete here
+                    # it shows None is example and only the job name without the module in mysql
                     debug(job.name, ": check succeeded")
                     i += 1
             except AttributeError:
@@ -418,13 +421,14 @@ class PythonCharts(object):
         t_start = time.time()
         # check if it is time to execute job update() function
         if job.timetable['next'] > t_start:
-            debug("it is not a time to invoke update on", job.chart_name)
+            debug(job.chart_name + " will be run in " + str(int((job.timetable['next'] - t_start) * 1000)) + " ms")
             return True
         try:
             if self.first_run:
                 since_last = 0
             else:
                 since_last = int((t_start - job.timetable['last']) * 1000000)
+                debug(job.chart_name + " ready to run, after " + str(int((t_start - job.timetable['last']) * 1000)) + " ms (update_every: " + str(job.timetable['freq'] * 1000) + " ms, latency: " + str(int((t_start - job.timetable['next']) * 1000)) + " ms)")
             if not job.update(since_last):
                 if job.retries_left <= 0:
                     self._stop(job, "update failed")
@@ -442,7 +446,7 @@ class PythonCharts(object):
         job.timetable['next'] = t_end - (t_end % job.timetable['freq']) + job.timetable['freq']
         # draw performance graph
         run_time = str(int((t_end - t_start) * 1000))
-        debug(job.chart_name, "updated in", run_time)
+        debug(job.chart_name, "updated in", run_time, "ms")
         sys.stdout.write("BEGIN netdata.plugin_pythond_" + job.chart_name + " " + str(since_last) + '\n')
         sys.stdout.write("SET run_time = " + run_time + '\n')
         sys.stdout.write("END\n")
@@ -515,6 +519,9 @@ def parse_cmdline(directory, *commands):
             mods.append(cmd.replace(".chart.py", ""))
         else:
             try:
+                # FIXME for some reason this overwrites the module configuration
+                # it should not - it is always passed by netdata to its plugins
+                # so, the update_every in modules configurations will never be used
                 BASE_CONFIG['update_every'] = int(cmd)
                 OVERRIDE_UPDATE_EVERY = True
                 debug(PROGRAM, "overriding update interval to", str(int(cmd)))
