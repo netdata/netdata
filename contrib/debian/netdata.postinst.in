@@ -21,6 +21,10 @@ case "$1" in
               dpkg-statoverride --update --add root netdata 0755 /var/lib/netdata/www
           fi
 
+          if ! dpkg-statoverride --list /var/lib/netdata/www >/dev/null 2>&1; then
+              dpkg-statoverride --update --add root netdata 0775 /var/lib/netdata/registry
+          fi
+
           if ! dpkg-statoverride --list /var/cache/netdata >/dev/null 2>&1; then
               dpkg-statoverride --update --add netdata netdata 0755 /var/cache/netdata
           fi
@@ -38,4 +42,3 @@ esac
 #DEBHELPER#
 
 exit 0
-
