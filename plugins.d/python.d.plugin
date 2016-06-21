@@ -117,7 +117,6 @@ class PythonCharts(object):
                  modules_configs='../conf.d/',
                  modules_disabled=None):
         """
-        :param update_every: int
         :param modules: list
         :param modules_path: str
         :param modules_configs: str
@@ -532,8 +531,8 @@ def run():
     conf = read_config(configfile)
     if conf is not None:
         try:
-            # exit the whole plugin when 'enable: no' is set in 'python.d.conf'
-            if str(conf['enable']) is False:
+            # exit the whole plugin when 'enabled: no' is set in 'python.d.conf'
+            if str(conf['enabled']) is False:
                 fatal('disabled in configuration file.\n')
         except (KeyError, TypeError):
             pass
@@ -560,6 +559,7 @@ def run():
          ", ONLY_MODULES=" + str(modules))
 
     # run plugins
+    modules = ['phpfpm']
     charts = PythonCharts(modules, MODULES_DIR, CONFIG_DIR + "python.d/", disabled)
     charts.check()
     charts.create()
