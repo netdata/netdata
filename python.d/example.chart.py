@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Description: example netdata python.d plugin
 # Author: Pawel Krupa (paulfantom)
 
