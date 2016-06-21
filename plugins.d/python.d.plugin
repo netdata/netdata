@@ -559,7 +559,6 @@ def run():
          ", ONLY_MODULES=" + str(modules))
 
     # run plugins
-    modules = ['phpfpm']
     charts = PythonCharts(modules, MODULES_DIR, CONFIG_DIR + "python.d/", disabled)
     charts.check()
     charts.create()
