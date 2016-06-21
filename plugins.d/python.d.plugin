@@ -546,7 +546,7 @@ def run():
         except (KeyError, TypeError):
             pass
         for k, v in conf.items():
-            if k in ("update_every", "debug", "enable"):
+            if k in ("update_every", "debug", "enabled"):
                 continue
             if v is False:
                 disabled.append(k)
