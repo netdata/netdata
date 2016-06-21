@@ -36,10 +36,11 @@ class BaseService(object):
                       'retries':0}
         :param config: dict
         """
-        self.update_every = int(config['update_every'])
-        self.priority = int(config['priority'])
-        self.retries = int(config['retries'])
+        self.update_every = int(config.pop('update_every'))
+        self.priority = int(config.pop('priority'))
+        self.retries = int(config.pop('retries'))
         self.retries_left = self.retries
+        self.configuration = config
 
     def create_timetable(self, freq=None):
         """
