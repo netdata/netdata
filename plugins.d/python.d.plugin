@@ -517,7 +517,7 @@ def parse_cmdline(directory, *commands):
     debug("started from", commands[0], "with options:", *commands[1:])
 
     UPDATE_EVERY = update_every
-    return {'modules': mods}
+    return mods
 
 
 # if __name__ == '__main__':

@@ -384,7 +384,7 @@ class Service(BaseService):
                                               unix_socket=self.configuration['socket'],
                                               host=self.configuration['host'],
                                               port=self.configuration['port'],
-                                              connect_timeout=self.configuration['update_every'])
+                                              connect_timeout=self.update_every)
         except Exception as e:
             self.error(NAME + " has problem connecting to server:", e)
             raise RuntimeError
