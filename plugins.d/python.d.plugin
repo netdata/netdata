@@ -74,13 +74,13 @@ def fatal(*args):
 MODULES_DIR = os.path.abspath(os.getenv('NETDATA_PLUGINS_DIR',
                               os.path.dirname(__file__)) + "/../python.d") + "/"
 CONFIG_DIR = os.getenv('NETDATA_CONFIG_DIR', "/etc/netdata/")
-UPDATE_EVERY = os.getenv('NETDATA_UPDATE_EVERY', 1)
+UPDATE_EVERY = os.getenv('NETDATA_UPDATE_EVERY', None)
 # directories should end with '/'
 if CONFIG_DIR[-1] != "/":
     CONFIG_DIR += "/"
 sys.path.append(MODULES_DIR + "python_modules")
 
-BASE_CONFIG = {'update_every': UPDATE_EVERY,
+BASE_CONFIG = {'update_every': 1,
                'priority': 90000,
                'retries': 10}
 
@@ -115,7 +115,7 @@ class PythonCharts(object):
     Main class used to control every python module.
     """
     def __init__(self,
-                 update_every=None,  # TODO remove this
+                 update_every=None,
                  modules=None,
                  modules_path='../python.d/',
                  modules_configs='../conf.d/',
@@ -145,9 +145,11 @@ class PythonCharts(object):
 
         # good economy and prosperity:
         self.jobs = self._create_jobs(configured_modules)  # type: list
-#        if DEBUG_FLAG and update_every is not None:
-#            for job in self.jobs:
-#                job.create_timetable(update_every)
+
+        # enable timetable override like `python.d.plugin mysql debug 1`
+        if DEBUG_FLAG and update_every is not None:
+            for job in self.jobs:
+                job.create_timetable(update_every)
 
     @staticmethod
     def _import_module(path, name=None):
@@ -496,7 +498,6 @@ def parse_cmdline(directory, *commands):
     """
     global DEBUG_FLAG
     global UPDATE_EVERY
-    update_every = UPDATE_EVERY
 
     mods = []
     for cmd in commands[1:]:
@@ -510,13 +511,12 @@ def parse_cmdline(directory, *commands):
             mods.append(cmd.replace(".chart.py", ""))
         else:
             try:
-                update_every = int(cmd)
+                UPDATE_EVERY = int(cmd)
             except ValueError:
-                update_every = UPDATE_EVERY
+                pass
 
     debug("started from", commands[0], "with options:", *commands[1:])
 
-    UPDATE_EVERY = update_every
     return mods
 
 
@@ -525,8 +525,7 @@ def run():
     """
     Main program.
     """
-    global PROGRAM, DEBUG_FLAG
-    PROGRAM = sys.argv[0].split('/')[-1].split('.plugin')[0]
+    global DEBUG_FLAG
 
     # read configuration file
     disabled = []
