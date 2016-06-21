@@ -532,7 +532,7 @@ def run():
     if conf is not None:
         try:
             # exit the whole plugin when 'enabled: no' is set in 'python.d.conf'
-            if str(conf['enabled']) is False:
+            if conf['enabled'] is False:
                 fatal('disabled in configuration file.\n')
         except (KeyError, TypeError):
             pass
