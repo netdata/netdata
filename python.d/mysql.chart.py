@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Description: MySQL netdata python.d plugin
 # Author: Pawel Krupa (paulfantom)
 
