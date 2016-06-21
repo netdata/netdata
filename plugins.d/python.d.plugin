@@ -10,6 +10,9 @@ import time
 
 
 MODULE_EXTENSION = ".chart.py"
+BASE_CONFIG = {'update_every': 1,
+               'priority': 90000,
+               'retries': 10}
 
 # -----------------------------------------------------------------------------
 # logging functions
@@ -80,9 +83,6 @@ if CONFIG_DIR[-1] != "/":
     CONFIG_DIR += "/"
 sys.path.append(MODULES_DIR + "python_modules")
 
-BASE_CONFIG = {'update_every': 1,
-               'priority': 90000,
-               'retries': 10}
 
 try:
     assert sys.version_info >= (3, 1)
