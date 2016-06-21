@@ -364,11 +364,12 @@ class PythonCharts(object):
                 if not job.check():
                     self._stop(job, "failed check")
                 else:
+                    debug(job.name, ": check succeeded")
                     i += 1
             except AttributeError:
                 self._stop(job, "no check")
             except (UnboundLocalError, Exception) as e:
-                self._stop(job, "misbehaving. Reason: " + str(e))
+                self._stop(job, "misbehaving. Reason:", str(e))
 
     def create(self):
         """
@@ -384,7 +385,6 @@ class PythonCharts(object):
                 if not job.create():
                     self._stop(job, "failed create")
                 else:
-                    debug("created charts for", job.chart_name)
                     chart = job.chart_name
                     sys.stdout.write(
                         "CHART netdata.plugin_pythond_" +
@@ -395,6 +395,7 @@ class PythonCharts(object):
                         str(job.timetable['freq']) +
                         '\n')
                     sys.stdout.write("DIMENSION run_time 'run time' absolute 1 1\n\n")
+                    debug("created charts for", job.chart_name)
                     # sys.stdout.flush()
                     i += 1
             except AttributeError:
@@ -417,6 +418,7 @@ class PythonCharts(object):
         t_start = time.time()
         # check if it is time to execute job update() function
         if job.timetable['next'] > t_start:
+            debug("it is not a time to invoke update on", job.chart_name)
             return True
         try:
             if self.first_run:
