@@ -2,15 +2,16 @@
 # Description: example netdata python.d plugin
 # Author: Pawel Krupa (paulfantom)
 
+import os
 import random
 from base import BaseService
 
-NAME = "example.chart.py"
+NAME = os.path.basename(__file__).replace(".chart.py", "")
+
 # default module values
-update_every = 3
+update_every = 4
 priority = 90000
 retries = 7
-
 
 class Service(BaseService):
     def __init__(self, configuration=None, name=None):

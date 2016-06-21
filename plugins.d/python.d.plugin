@@ -8,20 +8,78 @@ import os
 import sys
 import time
 
+
+MODULE_EXTENSION = ".chart.py"
+BASE_CONFIG = {'update_every': 1,
+               'priority': 90000,
+               'retries': 10}
+
+
+# -----------------------------------------------------------------------------
+# logging functions
+
+PROGRAM = os.path.basename(__file__).replace(".plugin", "")
+DEBUG_FLAG = False
+
+def debug(*args):
+    """
+    Print message on stderr.
+    """
+    if not DEBUG_FLAG:
+        return
+    sys.stderr.write(PROGRAM + " DEBUG :")
+    for i in args:
+        sys.stderr.write(" " + str(i))
+    sys.stderr.write("\n")
+    sys.stderr.flush()
+
+def error(*args):
+    """
+    Print message on stderr.
+    """
+    sys.stderr.write(PROGRAM + " ERROR :")
+    for i in args:
+        sys.stderr.write(" " + str(i))
+    sys.stderr.write("\n")
+    sys.stderr.flush()
+
+def info(*args):
+    """
+    Print message on stderr.
+    """
+    sys.stderr.write(PROGRAM + " INFO :")
+    for i in args:
+        sys.stderr.write(" " + str(i))
+    sys.stderr.write("\n")
+    sys.stderr.flush()
+
+def fatal(*args):
+    """
+    Print message on stderr and exit.
+    """
+    sys.stderr.write(PROGRAM + " FATAL :")
+    for i in args:
+        sys.stderr.write(" " + str(i))
+    sys.stderr.write("\n")
+    sys.stderr.flush()
+    sys.stdout.write('DISABLE\n')
+    sys.exit(1)
+
+
+
+# -----------------------------------------------------------------------------
+# globals & python modules management
+
 # setup environment
 # https://github.com/firehol/netdata/wiki/External-Plugins#environment-variables
-MODULES_DIR = os.getenv('NETDATA_PLUGINS_DIR',
-                        os.path.abspath(__file__).strip("python.d.plugin.py").replace("plugins.d", ""))
+MODULES_DIR = os.path.abspath(os.getenv('NETDATA_PLUGINS_DIR',
+                        os.path.dirname(__file__)) + "/../python.d") + "/"
 CONFIG_DIR = os.getenv('NETDATA_CONFIG_DIR', "/etc/netdata/")
-INTERVAL = os.getenv('NETDATA_UPDATE_EVERY', None)
+UPDATE_EVERY = os.getenv('NETDATA_UPDATE_EVERY', 1)
 # directories should end with '/'
-if MODULES_DIR[-1] != "/":
-    MODULES_DIR += "/"
-MODULES_DIR += "python.d/"
 if CONFIG_DIR[-1] != "/":
     CONFIG_DIR += "/"
 sys.path.append(MODULES_DIR + "python_modules")
-
 
 try:
     assert sys.version_info >= (3, 1)
@@ -31,7 +89,7 @@ try:
     # import builtins
     # builtins.PY_VERSION = 3
     PY_VERSION = 3
-    sys.stderr.write('python.d.plugin: Using python 3\n')
+    info('Using python v3')
 except (AssertionError, ImportError):
     try:
         import imp
@@ -40,38 +98,26 @@ except (AssertionError, ImportError):
         # import __builtin__
         # __builtin__.PY_VERSION = 2
         PY_VERSION = 2
-        sys.stderr.write('python.d.plugin: Using python 2\n')
+        info('Using python v2')
     except ImportError:
-        sys.stderr.write('python.d.plugin: Cannot start. No importlib.machinery on python3 or lack of imp on python2\n')
-        sys.stdout.write('DISABLE\n')
-        sys.exit(1)
+        fatal('Cannot start. No importlib.machinery on python3 or lack of imp on python2')
 try:
     import yaml
 except ImportError:
-    sys.stderr.write('python.d.plugin: Cannot find yaml library\n')
-    sys.stdout.write('DISABLE\n')
-    sys.exit(1)
-
-DEBUG_FLAG = False
-PROGRAM = "python.d.plugin"
-MODULE_EXTENSION = ".chart.py"
-BASE_CONFIG = {'update_every': 10,
-               'priority': 12345,
-               'retries': 0}
-
+    fatal('Cannot find yaml library')
 
 class PythonCharts(object):
     """
     Main class used to control every python module.
     """
     def __init__(self,
-                 interval=None,
+                 update_every=None,
                  modules=None,
                  modules_path='../python.d/',
                  modules_configs='../conf.d/',
                  modules_disabled=None):
         """
-        :param interval: int
+        :param update_every: int
         :param modules: list
         :param modules_path: str
         :param modules_configs: str
@@ -95,9 +141,9 @@ class PythonCharts(object):
 
         # good economy and prosperity:
         self.jobs = self._create_jobs(configured_modules)  # type: list
-        if DEBUG_FLAG and interval is not None:
+        if DEBUG_FLAG and update_every is not None:
             for job in self.jobs:
-                job.create_timetable(interval)
+                job.create_timetable(update_every)
 
     @staticmethod
     def _import_module(path, name=None):
@@ -133,9 +179,7 @@ class PythonCharts(object):
 
         # check if plugin directory exists
         if not os.path.isdir(path):
-            debug("cannot find charts directory ", path)
-            sys.stdout.write("DISABLE\n")
-            sys.exit(1)
+            fatal("cannot find charts directory ", path)
 
         # load modules
         loaded = []
@@ -147,19 +191,17 @@ class PythonCharts(object):
                 if mod is not None:
                     loaded.append(mod)
                 else:  # exit if plugin is not found
-                    sys.stdout.write("DISABLE")
-                    sys.stdout.flush()
-                    sys.exit(1)
+                    fatal('no modules found.')
         else:
             # scan directory specified in path and load all modules from there
             names = os.listdir(path)
             for mod in names:
                 if mod.strip(MODULE_EXTENSION) in disabled:
-                    debug("disabling:", mod.strip(MODULE_EXTENSION))
+                    error(mod + ": disabled module ", mod.strip(MODULE_EXTENSION))
                     continue
                 m = self._import_module(path + mod)
                 if m is not None:
-                    debug("loading module: '" + path + mod + "'")
+                    debug(mod + ": loading module '" + path + mod + "'")
                     loaded.append(m)
         return loaded
 
@@ -174,18 +216,15 @@ class PythonCharts(object):
         for mod in modules:
             configfile = self.configs + mod.__name__ + ".conf"
             if os.path.isfile(configfile):
-                debug("loading module configuration: '" + configfile + "'")
+                debug(mod.__name__ + ": loading module configuration: '" + configfile + "'")
                 try:
                     setattr(mod,
                             'config',
                             self._parse_config(mod, read_config(configfile)))
                 except Exception as e:
-                    debug("something went wrong while loading configuration", e)
+                    error(mod.__name__ + ": cannot parse configuration file '" + configfile + "':", str(e))
             else:
-                debug(mod.__name__ +
-                      ": configuration file '" +
-                      configfile +
-                      "' not found. Using defaults.")
+                error(mod.__name__ + ": configuration file '" + configfile + "' not found. Using defaults.")
                 # set config if not found
                 if not hasattr(mod, 'config'):
                     mod.config = {None: {}}
@@ -260,10 +299,9 @@ class PythonCharts(object):
                 try:
                     job = module.Service(configuration=conf, name=name)
                 except Exception as e:
-                    debug(module.__name__ +
-                          ": Couldn't start job named " +
-                          str(name) +
-                          ": " +
+                    error(module.__name__ +
+                          ("/" + str(name) if name is not None else "") +
+                          ": cannot start job: '" +
                           str(e))
                     return None
                 else:
@@ -272,6 +310,7 @@ class PythonCharts(object):
                     if name is not None:
                         job.chart_name += "_" + name
                 jobs.append(job)
+                debug(module.__name__ + ("/" + str(name) if name is not None else "") + ": job added")
 
         return [j for j in jobs if j is not None]
 
@@ -282,31 +321,31 @@ class PythonCharts(object):
         :param job: object
         :param reason: str
         """
-        prefix = ""
+        prefix = job.__module__
         if job.name is not None:
-            prefix = "'" + job.name + "' in "
+            prefix += "/" + job.name
+        prefix += ": "
 
-        prefix += "'" + job.__module__ + MODULE_EXTENSION + "' "
         self.jobs.remove(job)
         if reason is None:
             return
         elif reason[:3] == "no ":
-            debug(prefix +
+            error(prefix +
                   "does not seem to have " +
                   reason[3:] +
                   "() function. Disabling it.")
         elif reason[:7] == "failed ":
-            debug(prefix +
+            error(prefix +
                   reason[7:] +
                   "() function reports failure.")
         elif reason[:13] == "configuration":
-            debug(prefix +
+            error(prefix +
                   "configuration file '" +
                   self.configs +
                   job.__module__ +
                   ".conf' not found. Using defaults.")
         elif reason[:11] == "misbehaving":
-            debug(prefix + "is " + reason)
+            error(prefix + "is " + reason)
 
     def check(self):
         """
@@ -351,7 +390,7 @@ class PythonCharts(object):
                         str(job.timetable['freq']) +
                         '\n')
                     sys.stdout.write("DIMENSION run_time 'run time' absolute 1 1\n\n")
-                    sys.stdout.flush()
+                    # sys.stdout.flush()
                     i += 1
             except AttributeError:
                 self._stop(job, "no create")
@@ -398,7 +437,7 @@ class PythonCharts(object):
         sys.stdout.write("BEGIN netdata.plugin_pythond_" + job.chart_name + " " + str(since_last) + '\n')
         sys.stdout.write("SET run_time = " + str(int((t_end - t_start) * 1000)) + '\n')
         sys.stdout.write("END\n")
-        sys.stdout.flush()
+        # sys.stdout.flush()
         job.timetable['last'] = t_start
         job.retries_left = job.retries
         self.first_run = False
@@ -422,9 +461,7 @@ class PythonCharts(object):
                         pass
                     i += 1
             if len(next_runs) == 0:
-                debug("No plugins loaded")
-                sys.stdout.write("DISABLE\n")
-                sys.exit(1)
+                fatal('no python.d modules loaded.')
             time.sleep(min(next_runs) - time.time())
 
 
@@ -438,25 +475,12 @@ def read_config(path):
         with open(path, 'r') as stream:
             config = yaml.load(stream)
     except (OSError, IOError):
-        debug(str(path), "is not a valid configuration file")
+        error(str(path), "is not a valid configuration file")
         return None
     except yaml.YAMLError as e:
-        debug(str(path), "is malformed:", e)
+        error(str(path), "is malformed:", e)
         return None
     return config
-
-
-def debug(*args):
-    """
-    Print message on stderr.
-    """
-    if not DEBUG_FLAG:
-        return
-    sys.stderr.write(PROGRAM + ":")
-    for i in args:
-        sys.stderr.write(" " + str(i))
-    sys.stderr.write("\n")
-    sys.stderr.flush()
 
 
 def parse_cmdline(directory, *commands):
@@ -467,7 +491,8 @@ def parse_cmdline(directory, *commands):
     :return: dict
     """
     global DEBUG_FLAG
-    interval = None
+    global UPDATE_EVERY
+    update_every = UPDATE_EVERY
 
     mods = []
     for cmd in commands[1:]:
@@ -480,18 +505,15 @@ def parse_cmdline(directory, *commands):
             DEBUG_FLAG = True
             mods.append(cmd.replace(".chart.py", ""))
         else:
-            DEBUG_FLAG = False
             try:
-                interval = int(cmd)
+                update_every = int(cmd)
             except ValueError:
-                pass
+                update_every = UPDATE_EVERY
 
     debug("started from", commands[0], "with options:", *commands[1:])
-    if len(mods) == 0 and DEBUG_FLAG is False:
-        interval = None
 
-    return {'interval': interval,
-            'modules': mods}
+    UPDATE_EVERY = update_every
+    return {'modules': mods}
 
 
 # if __name__ == '__main__':
@@ -506,26 +528,25 @@ def run():
     disabled = []
     configfile = CONFIG_DIR + "python.d.conf"
 
-    interval = INTERVAL
+    update_every = UPDATE_EVERY
     conf = read_config(configfile)
     if conf is not None:
         try:
+            # FIXME: is this right? exit the whole plugin?
             if str(conf['enable']) is False:
-                debug("disabled in configuration file")
-                sys.stdout.write("DISABLE\n")
-                sys.exit(1)
+                fatal('disabled in configuration file.\n')
         except (KeyError, TypeError):
             pass
         try:
-            interval = conf['interval']
+            update_every = conf['update_every']
         except (KeyError, TypeError):
-            pass  # use default interval from NETDATA_UPDATE_EVERY
+            pass  # use default update_every from NETDATA_UPDATE_EVERY
         try:
             DEBUG_FLAG = conf['debug']
         except (KeyError, TypeError):
             pass
         for k, v in conf.items():
-            if k in ("interval", "debug", "enable"):
+            if k in ("update_every", "debug", "enable"):
                 continue
             if v is False:
                 disabled.append(k)
@@ -533,15 +554,14 @@ def run():
     # parse passed command line arguments
     out = parse_cmdline(MODULES_DIR, *sys.argv)
     modules = out['modules']
-    if out['interval'] is not None:
-        interval = out['interval']
+    info("MODULES_DIR='" + MODULES_DIR + "', CONFIG_DIR='" + CONFIG_DIR + "', UPDATE_EVERY=" + str(UPDATE_EVERY) + ", ONLY_MODULES=" + str(out['modules']))
 
     # run plugins
-    charts = PythonCharts(interval, modules, MODULES_DIR, CONFIG_DIR + "python.d/", disabled)
+    charts = PythonCharts(update_every, modules, MODULES_DIR, CONFIG_DIR + "python.d/", disabled)
     charts.check()
     charts.create()
     charts.update()
-    sys.stdout.write("DISABLE")
+    fatal("finished")
 
 
 if __name__ == '__main__':
