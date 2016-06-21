@@ -2,7 +2,6 @@
 # Author: Pawel Krupa (paulfantom)
 
 import os
-import sys
 import random
 from base import BaseService
 
