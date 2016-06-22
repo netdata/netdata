@@ -524,9 +524,9 @@ def parse_cmdline(directory, *commands):
                 changed_update = True
             except ValueError:
                 pass
-        if changed_update and DEBUG_FLAG:
-            OVERRIDE_UPDATE_EVERY = True
-            debug(PROGRAM, "overriding update interval to", str(int(cmd)))
+    if changed_update and DEBUG_FLAG:
+        OVERRIDE_UPDATE_EVERY = True
+        debug(PROGRAM, "overriding update interval to", str(int(cmd)))
 
     debug("started from", commands[0], "with options:", *commands[1:])
 
