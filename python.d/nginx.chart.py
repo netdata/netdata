@@ -41,13 +41,13 @@ CHARTS = {
             {"name": "writing",
              "options": "'' absolute 1 1"},
             {"name": "waiting",
-             "options": "'' absolute 1 1"}
+             "options": "idle absolute 1 1"}
         ]},
     'connect_rate': {
         'options': "'' 'nginx Connections Rate' 'connections/s' nginx nginx.performance line",
         'lines': [
             {"name": "accepts",
-             "options": "'accepted' incremental 1 1"},
+             "options": "accepted incremental 1 1"},
             {"name": "handled",
              "options": "'' incremental 1 1"}
         ]}
@@ -71,10 +71,10 @@ class Service(UrlService):
         try:
             return {'active': int(raw[2]),
                     'requests': int(raw[7]),
-                    'reading': int(raw[8]),
-                    'writing': int(raw[9]),
-                    'waiting': int(raw[11]),
-                    'accepts': int(raw[13]),
-                    'handled': int(raw[15])}
+                    'reading': int(raw[11]),
+                    'writing': int(raw[13]),
+                    'waiting': int(raw[15]),
+                    'accepts': int(raw[8]),
+                    'handled': int(raw[9])}
         except ValueError:
             return None

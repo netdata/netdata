@@ -18,14 +18,14 @@ retries = 5
 #          }}
 
 # charts order (can be overridden if you want less charts, or different order)
-ORDER = ['bytesperreq', 'workers', 'reqpersec', 'bytespersec', 'requests', 'net', 'connections', 'conns_async']
+ORDER = ['requests', 'connections', 'conns_async', 'net', 'workers', 'reqpersec', 'bytespersec', 'bytesperreq']
 
 CHARTS = {
     'bytesperreq': {
         'options': "'' 'apache Lifetime Avg. Response Size' 'bytes/request' statistics apache.bytesperreq area",
         'lines': [
             {"name": "size_req",
-             "options": "'' absolute 1"}
+             "options": "'' absolute 1 1000000"}
         ]},
     'workers': {
         'options': "'' 'apache Workers' 'workers' workers apache.workers stacked",
@@ -42,7 +42,7 @@ CHARTS = {
              "options": "'' absolute 1 1000000"}
         ]},
     'bytespersec': {
-        'options': "'' 'apache Lifetime Avg. Response Size' 'bytes/request' statistics apache.bytesperreq area",
+        'options': "'' 'apache Lifetime Avg. Bandwidth/s' 'kilbits/s' statistics apache.bytesperreq area",
         'lines': [
             {"name": "size_sec",
              "options": "'' absolute 8 1000000000"}
@@ -108,7 +108,10 @@ class Service(UrlService):
             tmp = row.split(":")
             if str(tmp[0]) in self.assignment:
                 try:
-                    data[self.assignment[tmp[0]]] = int(float(tmp[1]))
+                    multiplier = 1
+                    if tmp[0] in ("BytesPerReq", "ReqPerSec", "BytesPerSec"):
+                        multiplier = 1000
+                    data[self.assignment[tmp[0]]] = int(float(tmp[1])*multiplier)
                 except (IndexError, ValueError) as a:
                     print(a)
                     pass
