@@ -67,8 +67,8 @@ class Service(UrlService):
         Format data received from http request
         :return: dict
         """
-        raw = self._get_data().split(" ")
         try:
+            raw = self._get_data().split(" ")
             return {'active': int(raw[2]),
                     'requests': int(raw[7]),
                     'reading': int(raw[11]),
@@ -76,5 +76,5 @@ class Service(UrlService):
                     'waiting': int(raw[15]),
                     'accepts': int(raw[8]),
                     'handled': int(raw[9])}
-        except ValueError:
+        except (ValueError, AttributeError):
             return None

@@ -477,7 +477,10 @@ class PythonCharts(object):
                     i += 1
             if len(next_runs) == 0:
                 fatal('no python.d modules loaded.')
-            time.sleep(min(next_runs) - time.time())
+            try:
+                time.sleep(min(next_runs) - time.time())
+            except IOError:
+                pass
 
 
 def read_config(path):
