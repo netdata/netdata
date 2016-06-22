@@ -1,8 +1,13 @@
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
+include $(top_srcdir)/build/subst.inc
+
+SUFFIXES = .in
+
 dist_python_SCRIPTS = \
 	example.chart.py \
 	mysql.chart.py \
+	python-modules-installer.sh \
 	$(NULL)
 
 dist_python_DATA = \
