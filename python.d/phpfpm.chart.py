@@ -5,9 +5,9 @@
 from base import UrlService
 
 # default module values (can be overridden per job in `config`)
-update_every = 2
-priority = 60000
-retries = 5
+#update_every = 2
+#priority = 60000
+#retries = 5
 
 # default job configuration (overridden by python.d.plugin)
 config = {'local': {
