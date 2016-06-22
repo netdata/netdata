@@ -82,8 +82,7 @@ class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
         if len(self.url) == 0:
-            # url = "http://localhost/server-status?auto"  # FIXME
-            self.url = "http://www.apache.org/server-status?auto"
+            self.url = "http://localhost/server-status?auto"
         self.order = ORDER
         self.charts = CHARTS
         self.assignment = {"BytesPerReq": 'size_req',
