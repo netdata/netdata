@@ -62,6 +62,7 @@ system/netdata-lsb
 system/netdata-openrc
 system/netdata-init-d
 system/netdata.logrotate
+python.d/python-modules-installer.sh
 
 netdata-installer.log
 netdata-uninstaller.sh
