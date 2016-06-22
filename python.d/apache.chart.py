@@ -42,7 +42,7 @@ CHARTS = {
              "options": "'' absolute 1 1000000"}
         ]},
     'bytespersec': {
-        'options': "'' 'apache Lifetime Avg. Bandwidth/s' 'kilbits/s' statistics apache.bytesperreq area",
+        'options': "'' 'apache Lifetime Avg. Bandwidth/s' 'kilobits/s' statistics apache.bytesperreq area",
         'lines': [
             {"name": "size_sec",
              "options": "'' absolute 8 1000000000"}
