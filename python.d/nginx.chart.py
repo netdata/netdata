@@ -6,8 +6,8 @@ from base import UrlService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
-# priority = 60000
-# retries = 5
+priority = 60000
+retries = 5
 
 # default job configuration (overridden by python.d.plugin)
 # config = {'local': {
@@ -55,7 +55,8 @@ CHARTS = {
 
 
 class Service(UrlService):
-    url = "http://localhost/stub_status"
+    # url = "http://localhost/stub_status"
+    url = "http://toothless.dragon/stub_status"
     order = ORDER
     charts = CHARTS
 

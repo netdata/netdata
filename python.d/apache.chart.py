@@ -6,8 +6,8 @@ from base import UrlService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
-# priority = 60000
-# retries = 5
+priority = 60000
+retries = 5
 
 # default job configuration (overridden by python.d.plugin)
 # config = {'local': {
@@ -25,7 +25,7 @@ CHARTS = {
         'options': "'' 'apache Lifetime Avg. Response Size' 'bytes/request' statistics apache.bytesperreq area",
         'lines': [
             {"name": "size_req",
-             "options": "'' absolute 1"},
+             "options": "'' absolute 1"}
         ]},
     'workers': {
         'options': "'' 'apache Workers' 'workers' workers apache.workers stacked",
@@ -45,7 +45,7 @@ CHARTS = {
         'options': "'' 'apache Lifetime Avg. Response Size' 'bytes/request' statistics apache.bytesperreq area",
         'lines': [
             {"name": "size_sec",
-             "options": "'' absolute 8 1000000*1000"}
+             "options": "'' absolute 8 1000000000"}
         ]},
     'requests': {
         'options': "''' 'apache Requests' 'requests/s' requests apache.requests line",
@@ -73,13 +73,14 @@ CHARTS = {
             {"name": "closing",
              "options": "'' absolute 1 1"},
             {"name": "writing",
-             "options": "'' absolute 1 1"},
+             "options": "'' absolute 1 1"}
         ]}
 }
 
 
 class Service(UrlService):
-    url = "http://localhost/server-status?auto"
+    # url = "http://localhost/server-status?auto"
+    url = "http://www.apache.org/server-status?auto"
     order = ORDER
     charts = CHARTS
     assignment = {"BytesPerReq": 'size_req',

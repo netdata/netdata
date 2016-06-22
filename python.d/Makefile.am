@@ -7,6 +7,9 @@ SUFFIXES = .in
 dist_python_SCRIPTS = \
 	example.chart.py \
 	mysql.chart.py \
+	phpfpm.chart.py \
+	apache.chart.py \
+	nginx.chart.py \
 	python-modules-installer.sh \
 	$(NULL)
 

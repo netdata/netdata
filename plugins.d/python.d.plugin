@@ -198,8 +198,8 @@ class PythonCharts(object):
             # scan directory specified in path and load all modules from there
             names = os.listdir(path)
             for mod in names:
-                if mod.strip(MODULE_EXTENSION) in disabled:
-                    error(mod + ": disabled module ", mod.strip(MODULE_EXTENSION))
+                if mod.replace(MODULE_EXTENSION,"") in disabled:
+                    error(mod + ": disabled module ", mod.replace(MODULE_EXTENSION,""))
                     continue
                 m = self._import_module(path + mod)
                 if m is not None:
@@ -526,7 +526,7 @@ def parse_cmdline(directory, *commands):
                 pass
     if changed_update and DEBUG_FLAG:
         OVERRIDE_UPDATE_EVERY = True
-        debug(PROGRAM, "overriding update interval to", str(int(cmd)))
+        debug(PROGRAM, "overriding update interval to", str(BASE_CONFIG['update_every']))
 
     debug("started from", commands[0], "with options:", *commands[1:])
 
@@ -576,6 +576,7 @@ def run():
          ", ONLY_MODULES=" + str(modules))
 
     # run plugins
+    modules = ['apache', 'nginx']
     charts = PythonCharts(modules, MODULES_DIR, CONFIG_DIR + "python.d/", disabled)
     charts.check()
     charts.create()
