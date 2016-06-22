@@ -100,17 +100,19 @@ class UrlService(BaseService):
     charts = {}
     # charts definitions in format:
     # charts = {
-    #    'chart_name_in_netdata': (
-    #        "parameters defining chart (passed to CHART statement)",
-    #        [ # dimensions (lines) definitions
-    #            ("dimension_name", "dimension parameters (passed to DIMENSION statement)")
-    #        ])
+    #    'chart_name_in_netdata': {
+    #        'options': "parameters defining chart (passed to CHART statement)",
+    #        'lines': [
+    #           { 'name': 'dimension_name',
+    #             'options': 'dimension parameters (passed to DIMENSION statement)"
+    #           }
+    #        ]}
     #    }
     order = []
     definitions = {}
     # definitions are created dynamically in create() method based on 'charts' dictionary. format:
     # definitions = {
-    #     'chart_name_in_netdata' : (charts['chart_name_in_netdata'][1], charts['chart_name_in_netdata'][0])
+    #     'chart_name_in_netdata' : [ charts['chart_name_in_netdata']['lines']['name'] ]
     # }
     url = ""
 
