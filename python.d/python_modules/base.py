@@ -118,7 +118,6 @@ class UrlService(BaseService):
         self.url = ""
         BaseService.__init__(self, configuration=configuration, name=name)
 
-
     def _get_data(self):
         """
         Get raw data from http request

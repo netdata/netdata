@@ -86,16 +86,16 @@ class Service(UrlService):
         self.order = ORDER
         self.charts = CHARTS
         self.assignment = {"BytesPerReq": 'size_req',
-                          "IdleWorkers": 'idle',
-                          "BusyWorkers": 'busy',
-                          "ReqPerSec": 'requests_sec',
-                          "BytesPerSec": 'size_sec',
-                          "Total Accesses": 'requests',
-                          "Total kBytes": 'sent',
-                          "ConnsTotal": 'connections',
-                          "ConnsAsyncKeepAlive": 'keepalive',
-                          "ConnsAsyncClosing": 'closing',
-                          "ConnsAsyncWriting": 'writing'}
+                           "IdleWorkers": 'idle',
+                           "BusyWorkers": 'busy',
+                           "ReqPerSec": 'requests_sec',
+                           "BytesPerSec": 'size_sec',
+                           "Total Accesses": 'requests',
+                           "Total kBytes": 'sent',
+                           "ConnsTotal": 'connections',
+                           "ConnsAsyncKeepAlive": 'keepalive',
+                           "ConnsAsyncClosing": 'closing',
+                           "ConnsAsyncWriting": 'writing'}
 
     def _formatted_data(self):
         """
