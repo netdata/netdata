@@ -425,7 +425,10 @@ class PythonCharts(object):
                 since_last = 0
             else:
                 since_last = int((t_start - job.timetable['last']) * 1000000)
-                debug(job.chart_name + " ready to run, after " + str(int((t_start - job.timetable['last']) * 1000)) + " ms (update_every: " + str(job.timetable['freq'] * 1000) + " ms, latency: " + str(int((t_start - job.timetable['next']) * 1000)) + " ms)")
+                debug(job.chart_name +
+                      " ready to run, after " + str(int((t_start - job.timetable['last']) * 1000)) +
+                      " ms (update_every: " + str(job.timetable['freq'] * 1000) +
+                      " ms, latency: " + str(int((t_start - job.timetable['next']) * 1000)) + " ms)")
             if not job.update(since_last):
                 if job.retries_left <= 0:
                     self._stop(job, "update failed")
@@ -504,6 +507,7 @@ def parse_cmdline(directory, *commands):
     global OVERRIDE_UPDATE_EVERY
     global BASE_CONFIG
 
+    changed_update = False
     mods = []
     for cmd in commands[1:]:
         if cmd == "check":
@@ -517,11 +521,12 @@ def parse_cmdline(directory, *commands):
         else:
             try:
                 BASE_CONFIG['update_every'] = int(cmd)
-                if DEBUG_FLAG:
-                    OVERRIDE_UPDATE_EVERY = True
-                    debug(PROGRAM, "overriding update interval to", str(int(cmd)))
+                changed_update = True
             except ValueError:
                 pass
+    if changed_update and DEBUG_FLAG:
+        OVERRIDE_UPDATE_EVERY = True
+        debug(PROGRAM, "overriding update interval to", str(int(cmd)))
 
     debug("started from", commands[0], "with options:", *commands[1:])
 
