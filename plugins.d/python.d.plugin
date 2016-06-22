@@ -198,8 +198,8 @@ class PythonCharts(object):
             # scan directory specified in path and load all modules from there
             names = os.listdir(path)
             for mod in names:
-                if mod.strip(MODULE_EXTENSION) in disabled:
-                    error(mod + ": disabled module ", mod.strip(MODULE_EXTENSION))
+                if mod.replace(MODULE_EXTENSION, "") in disabled:
+                    error(mod + ": disabled module ", mod.replace(MODULE_EXTENSION, ""))
                     continue
                 m = self._import_module(path + mod)
                 if m is not None:
@@ -220,6 +220,8 @@ class PythonCharts(object):
             if os.path.isfile(configfile):
                 debug(mod.__name__ + ": loading module configuration: '" + configfile + "'")
                 try:
+                    if not hasattr(mod, 'config'):
+                        mod.config = {}
                     setattr(mod,
                             'config',
                             self._parse_config(mod, read_config(configfile)))
@@ -263,7 +265,7 @@ class PythonCharts(object):
                 try:
                     # get defaults from module source code
                     defaults[key] = getattr(module, key)
-                except (KeyError, ValueError):
+                except (KeyError, ValueError, AttributeError):
                     # if above failed, get defaults from global dict
                     defaults[key] = BASE_CONFIG[key]
 
@@ -475,7 +477,10 @@ class PythonCharts(object):
                     i += 1
             if len(next_runs) == 0:
                 fatal('no python.d modules loaded.')
-            time.sleep(min(next_runs) - time.time())
+            try:
+                time.sleep(min(next_runs) - time.time())
+            except IOError:
+                pass
 
 
 def read_config(path):
@@ -526,7 +531,7 @@ def parse_cmdline(directory, *commands):
                 pass
     if changed_update and DEBUG_FLAG:
         OVERRIDE_UPDATE_EVERY = True
-        debug(PROGRAM, "overriding update interval to", str(int(cmd)))
+        debug(PROGRAM, "overriding update interval to", str(BASE_CONFIG['update_every']))
 
     debug("started from", commands[0], "with options:", *commands[1:])
 

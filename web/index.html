@@ -1366,6 +1366,16 @@ var menuData = {
 		info: undefined,
 	},
 
+/*	'nginx': {
+		title: 'nginx',
+		info: undefined,
+	},
+
+	'apache': {
+		title: 'Apache',
+		info: undefined,
+	},*/
+
 	'named': {
 		title: 'named',
 		info: undefined
@@ -1806,6 +1816,8 @@ function enrichChartData(chart) {
 
 		case 'mysql':
 		case 'phpfpm':
+/*		case 'nginx':
+		case 'apache':*/
 		case 'named':
 		case 'cgroup':
 			chart.menu = chart.type;

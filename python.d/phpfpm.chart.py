@@ -6,8 +6,8 @@ from base import UrlService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
-# priority = 60000
-# retries = 5
+priority = 60000
+retries = 5
 
 # default job configuration (overridden by python.d.plugin)
 # config = {'local': {
@@ -50,28 +50,36 @@ CHARTS = {
 
 
 class Service(UrlService):
-    url = "http://localhost/status"
-    order = ORDER
-    charts = CHARTS
-    assignment = {"active processes": 'active',
-                  "max active processes": 'maxActive',
-                  "idle processes": 'idle',
-                  "accepted conn": 'requests',
-                  "max children reached": 'reached',
-                  "slow requests": 'slow'}
+    def __init__(self, configuration=None, name=None):
+        UrlService.__init__(self, configuration=configuration, name=name)
+        if len(self.url) == 0:
+            self.url = "http://localhost/status"
+        self.order = ORDER
+        self.charts = CHARTS
+        self.assignment = {"active processes": 'active',
+                           "max active processes": 'maxActive',
+                           "idle processes": 'idle',
+                           "accepted conn": 'requests',
+                           "max children reached": 'reached',
+                           "slow requests": 'slow'}
 
     def _formatted_data(self):
         """
         Format data received from http request
         :return: dict
         """
-        raw = self._get_data().split('\n')
+        try:
+            raw = self._get_data().split('\n')
+        except AttributeError:
+            return None
         data = {}
         for row in raw:
             tmp = row.split(":")
             if str(tmp[0]) in self.assignment:
                 try:
                     data[self.assignment[tmp[0]]] = int(tmp[1])
-                except (IndexError, ValueError) as a:
+                except (IndexError, ValueError):
                     pass
+        if len(data) == 0:
+            return None
         return data

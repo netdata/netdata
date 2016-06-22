@@ -238,7 +238,7 @@ SET connections = $((apache_connstotal))
 END
 BEGIN apache.conns_async $1
 SET keepalive = $((apache_connsasynckeepalive))
-SET closing = $((apache_connsasyncwriting))
+SET closing = $((apache_connsasyncclosing))
 SET writing = $((apache_connsasyncwriting))
 END
 VALUESEOF2

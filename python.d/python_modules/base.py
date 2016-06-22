@@ -97,37 +97,43 @@ class BaseService(object):
 
 
 class UrlService(BaseService):
-    charts = {}
-    # charts definitions in format:
-    # charts = {
-    #    'chart_name_in_netdata': {
-    #        'options': "parameters defining chart (passed to CHART statement)",
-    #        'lines': [
-    #           { 'name': 'dimension_name',
-    #             'options': 'dimension parameters (passed to DIMENSION statement)"
-    #           }
-    #        ]}
-    #    }
-    order = []
-    definitions = {}
-    # definitions are created dynamically in create() method based on 'charts' dictionary. format:
-    # definitions = {
-    #     'chart_name_in_netdata' : [ charts['chart_name_in_netdata']['lines']['name'] ]
-    # }
-    url = ""
+    def __init__(self, configuration=None, name=None):
+        self.charts = {}
+        # charts definitions in format:
+        # charts = {
+        #    'chart_name_in_netdata': {
+        #        'options': "parameters defining chart (passed to CHART statement)",
+        #        'lines': [
+        #           { 'name': 'dimension_name',
+        #             'options': 'dimension parameters (passed to DIMENSION statement)"
+        #           }
+        #        ]}
+        #    }
+        self.order = []
+        self.definitions = {}
+        # definitions are created dynamically in create() method based on 'charts' dictionary. format:
+        # definitions = {
+        #     'chart_name_in_netdata' : [ charts['chart_name_in_netdata']['lines']['name'] ]
+        # }
+        self.url = ""
+        BaseService.__init__(self, configuration=configuration, name=name)
 
     def _get_data(self):
         """
         Get raw data from http request
         :return: str
         """
+        raw = None
         try:
-            f = urlopen(self.url)
+            f = urlopen(self.url, timeout=self.update_every)
             raw = f.read().decode('utf-8')
-            f.close()
         except Exception as e:
             self.error(self.__module__, str(e))
-            return None
+        finally:
+            try:
+                f.close()
+            except:
+                pass
         return raw
 
     def _formatted_data(self):
