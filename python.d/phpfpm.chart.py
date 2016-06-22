@@ -68,7 +68,10 @@ class Service(UrlService):
         Format data received from http request
         :return: dict
         """
-        raw = self._get_data().split('\n')
+        try:
+            raw = self._get_data().split('\n')
+        except AttributeError:
+            return None
         data = {}
         for row in raw:
             tmp = row.split(":")

@@ -123,13 +123,17 @@ class UrlService(BaseService):
         Get raw data from http request
         :return: str
         """
+        raw = None
         try:
             f = urlopen(self.url, timeout=self.update_every)
             raw = f.read().decode('utf-8')
-            f.close()
         except Exception as e:
             self.error(self.__module__, str(e))
-            return None
+        finally:
+            try:
+                f.close()
+            except:
+                pass
         return raw
 
     def _formatted_data(self):
