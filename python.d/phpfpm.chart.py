@@ -74,4 +74,6 @@ class Service(UrlService):
                     data[self.assignment[tmp[0]]] = int(tmp[1])
                 except (IndexError, ValueError) as a:
                     pass
+        if len(data) == 0:
+            return None
         return data
