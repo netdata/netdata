@@ -50,15 +50,18 @@ CHARTS = {
 
 
 class Service(UrlService):
-    url = "http://localhost/status"
-    order = ORDER
-    charts = CHARTS
-    assignment = {"active processes": 'active',
-                  "max active processes": 'maxActive',
-                  "idle processes": 'idle',
-                  "accepted conn": 'requests',
-                  "max children reached": 'reached',
-                  "slow requests": 'slow'}
+    def __init__(self, configuration=None, name=None):
+        UrlService.__init__(self, configuration=configuration, name=name)
+        if len(self.url) == 0:
+            self.url = "http://localhost/status"
+        self.order = ORDER
+        self.charts = CHARTS
+        self.assignment = {"active processes": 'active',
+                           "max active processes": 'maxActive',
+                           "idle processes": 'idle',
+                           "accepted conn": 'requests',
+                           "max children reached": 'reached',
+                           "slow requests": 'slow'}
 
     def _formatted_data(self):
         """

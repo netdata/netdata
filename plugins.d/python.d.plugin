@@ -220,6 +220,8 @@ class PythonCharts(object):
             if os.path.isfile(configfile):
                 debug(mod.__name__ + ": loading module configuration: '" + configfile + "'")
                 try:
+                    if not hasattr(mod, 'config'):
+                        mod.config = {}
                     setattr(mod,
                             'config',
                             self._parse_config(mod, read_config(configfile)))
@@ -263,7 +265,7 @@ class PythonCharts(object):
                 try:
                     # get defaults from module source code
                     defaults[key] = getattr(module, key)
-                except (KeyError, ValueError):
+                except (KeyError, ValueError, AttributeError):
                     # if above failed, get defaults from global dict
                     defaults[key] = BASE_CONFIG[key]
 
@@ -576,7 +578,6 @@ def run():
          ", ONLY_MODULES=" + str(modules))
 
     # run plugins
-    modules = ['apache', 'nginx']
     charts = PythonCharts(modules, MODULES_DIR, CONFIG_DIR + "python.d/", disabled)
     charts.check()
     charts.create()

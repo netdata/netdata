@@ -48,7 +48,7 @@ CHARTS = {
              "options": "'' absolute 8 1000000000"}
         ]},
     'requests': {
-        'options': "''' 'apache Requests' 'requests/s' requests apache.requests line",
+        'options': "'' 'apache Requests' 'requests/s' requests apache.requests line",
         'lines': [
             {"name": "requests",
              "options": "'' incremental 1 1"}
@@ -79,21 +79,24 @@ CHARTS = {
 
 
 class Service(UrlService):
-    # url = "http://localhost/server-status?auto"
-    url = "http://www.apache.org/server-status?auto"
-    order = ORDER
-    charts = CHARTS
-    assignment = {"BytesPerReq": 'size_req',
-                  "IdleWorkers": 'idle',
-                  "BusyWorkers": 'busy',
-                  "ReqPerSec": 'requests_sec',
-                  "BytesPerSec": 'size_sec',
-                  "Total Accesses": 'requests',
-                  "Total kBytes": 'sent',
-                  "ConnsTotal": 'connections',
-                  "ConnsAsyncKeepAlive": 'keepalive',
-                  "ConnsAsyncClosing": 'closing',
-                  "ConnsAsyncWriting": 'writing'}
+    def __init__(self, configuration=None, name=None):
+        UrlService.__init__(self, configuration=configuration, name=name)
+        if len(self.url) == 0:
+            # url = "http://localhost/server-status?auto"  # FIXME
+            self.url = "http://www.apache.org/server-status?auto"
+        self.order = ORDER
+        self.charts = CHARTS
+        self.assignment = {"BytesPerReq": 'size_req',
+                          "IdleWorkers": 'idle',
+                          "BusyWorkers": 'busy',
+                          "ReqPerSec": 'requests_sec',
+                          "BytesPerSec": 'size_sec',
+                          "Total Accesses": 'requests',
+                          "Total kBytes": 'sent',
+                          "ConnsTotal": 'connections',
+                          "ConnsAsyncKeepAlive": 'keepalive',
+                          "ConnsAsyncClosing": 'closing',
+                          "ConnsAsyncWriting": 'writing'}
 
     def _formatted_data(self):
         """

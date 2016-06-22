@@ -25,7 +25,7 @@ CHARTS = {
         'options': "'' 'nginx Active Connections' 'connections' nginx nginx.connections line",
         'lines': [
             {"name": "active",
-             "options": "'' absolute 1 1"},
+             "options": "'' absolute 1 1"}
         ]},
     'requests': {
         'options': "'' 'nginx Requests' 'requests/s' nginx nginx.requests line",
@@ -55,10 +55,13 @@ CHARTS = {
 
 
 class Service(UrlService):
-    # url = "http://localhost/stub_status"
-    url = "http://toothless.dragon/stub_status"
-    order = ORDER
-    charts = CHARTS
+    def __init__(self, configuration=None, name=None):
+        UrlService.__init__(self, configuration=configuration, name=name)
+        if len(self.url) == 0:
+            self.url = "http://toothless.dragon/stub_status"
+            # self.url = "http://localhost/stub_status"  # FIXME
+        self.order = ORDER
+        self.charts = CHARTS
 
     def _formatted_data(self):
         """
