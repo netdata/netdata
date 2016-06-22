@@ -5,17 +5,17 @@
 from base import UrlService
 
 # default module values (can be overridden per job in `config`)
-#update_every = 2
-#priority = 60000
-#retries = 5
+# update_every = 2
+# priority = 60000
+# retries = 5
 
 # default job configuration (overridden by python.d.plugin)
-config = {'local': {
-    'update_every': update_every,
-    'retries': retries,
-    'priority': priority,
-    'url': 'http://localhost/status'
-}}
+# config = {'local': {
+#     'update_every': update_every,
+#     'retries': retries,
+#     'priority': priority,
+#     'url': 'http://localhost/status'
+# }}
 
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = ['connections', 'requests', 'performance']
