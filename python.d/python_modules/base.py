@@ -97,24 +97,27 @@ class BaseService(object):
 
 
 class UrlService(BaseService):
-    charts = {}
-    # charts definitions in format:
-    # charts = {
-    #    'chart_name_in_netdata': {
-    #        'options': "parameters defining chart (passed to CHART statement)",
-    #        'lines': [
-    #           { 'name': 'dimension_name',
-    #             'options': 'dimension parameters (passed to DIMENSION statement)"
-    #           }
-    #        ]}
-    #    }
-    order = []
-    definitions = {}
-    # definitions are created dynamically in create() method based on 'charts' dictionary. format:
-    # definitions = {
-    #     'chart_name_in_netdata' : [ charts['chart_name_in_netdata']['lines']['name'] ]
-    # }
-    url = ""
+    def __init__(self, configuration=None, name=None):
+        self.charts = {}
+        # charts definitions in format:
+        # charts = {
+        #    'chart_name_in_netdata': {
+        #        'options': "parameters defining chart (passed to CHART statement)",
+        #        'lines': [
+        #           { 'name': 'dimension_name',
+        #             'options': 'dimension parameters (passed to DIMENSION statement)"
+        #           }
+        #        ]}
+        #    }
+        self.order = []
+        self.definitions = {}
+        # definitions are created dynamically in create() method based on 'charts' dictionary. format:
+        # definitions = {
+        #     'chart_name_in_netdata' : [ charts['chart_name_in_netdata']['lines']['name'] ]
+        # }
+        self.url = ""
+        BaseService.__init__(self, configuration=configuration, name=name)
+
 
     def _get_data(self):
         """
