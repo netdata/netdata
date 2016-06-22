@@ -25,7 +25,7 @@ CHARTS = {
         'options': "'' 'apache Lifetime Avg. Response Size' 'bytes/request' statistics apache.bytesperreq area",
         'lines': [
             {"name": "size_req",
-             "options": "'' absolute 1 1000000"}
+             "options": "'' absolute 1 1"}
         ]},
     'workers': {
         'options': "'' 'apache Workers' 'workers' workers apache.workers stacked",
@@ -39,13 +39,13 @@ CHARTS = {
         'options': "'' 'apache Lifetime Avg. Requests/s' 'requests/s' statistics apache.reqpersec area",
         'lines': [
             {"name": "requests_sec",
-             "options": "'' absolute 1 1000000"}
+             "options": "'' absolute 1 1"}
         ]},
     'bytespersec': {
-        'options': "'' 'apache Lifetime Avg. Bandwidth/s' 'kilobits/s' statistics apache.bytesperreq area",
+        'options': "'' 'apache Lifetime Avg. Bandwidth/s' 'kilobytes/s' statistics apache.bytesperreq area",
         'lines': [
             {"name": "size_sec",
-             "options": "'' absolute 8 1000000000"}
+             "options": "'' absolute 1 1000"}
         ]},
     'requests': {
         'options': "'' 'apache Requests' 'requests/s' requests apache.requests line",
@@ -54,10 +54,10 @@ CHARTS = {
              "options": "'' incremental 1 1"}
         ]},
     'net': {
-        'options': "'' 'apache Bandwidth' 'kilobits/s' bandwidth apache.net area",
+        'options': "'' 'apache Bandwidth' 'kilobytes/s' bandwidth apache.net area",
         'lines': [
             {"name": "sent",
-             "options": "'' incremental 8 1"}
+             "options": "'' incremental 1 1"}
         ]},
     'connections': {
         'options': "'' 'apache Connections' 'connections' connections apache.connections line",
@@ -111,10 +111,7 @@ class Service(UrlService):
             tmp = row.split(":")
             if str(tmp[0]) in self.assignment:
                 try:
-                    multiplier = 1
-                    if tmp[0] in ("BytesPerReq", "ReqPerSec", "BytesPerSec"):
-                        multiplier = 1000
-                    data[self.assignment[tmp[0]]] = int(float(tmp[1])*multiplier)
+                    data[self.assignment[tmp[0]]] = int(float(tmp[1]))
                 except (IndexError, ValueError) as a:
                     print(a)
                     pass
