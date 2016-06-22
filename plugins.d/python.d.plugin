@@ -198,8 +198,8 @@ class PythonCharts(object):
             # scan directory specified in path and load all modules from there
             names = os.listdir(path)
             for mod in names:
-                if mod.replace(MODULE_EXTENSION,"") in disabled:
-                    error(mod + ": disabled module ", mod.replace(MODULE_EXTENSION,""))
+                if mod.replace(MODULE_EXTENSION, "") in disabled:
+                    error(mod + ": disabled module ", mod.replace(MODULE_EXTENSION, ""))
                     continue
                 m = self._import_module(path + mod)
                 if m is not None:
