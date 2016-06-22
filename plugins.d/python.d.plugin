@@ -254,9 +254,8 @@ class PythonCharts(object):
         """
         # get default values
         defaults = {}
+        debug(module.__name__ + ": reading configuration")
         for key in BASE_CONFIG:
-            # FIXME for some reason this is called 3 times per module
-            debug(module.__name__ + ": reading configuration")
             try:
                 # get defaults from module config
                 defaults[key] = int(config.pop(key))
@@ -365,9 +364,7 @@ class PythonCharts(object):
                 if not job.check():
                     self._stop(job, "failed check")
                 else:
-                    # FIXME job.name is incomplete here
-                    # it shows None is example and only the job name without the module in mysql
-                    debug(job.name, ": check succeeded")
+                    debug(job.chart_name, ": check succeeded")
                     i += 1
             except AttributeError:
                 self._stop(job, "no check")
