@@ -516,12 +516,10 @@ def parse_cmdline(directory, *commands):
             mods.append(cmd.replace(".chart.py", ""))
         else:
             try:
-                # FIXME for some reason this overwrites the module configuration
-                # it should not - it is always passed by netdata to its plugins
-                # so, the update_every in modules configurations will never be used
                 BASE_CONFIG['update_every'] = int(cmd)
-                OVERRIDE_UPDATE_EVERY = True
-                debug(PROGRAM, "overriding update interval to", str(int(cmd)))
+                if DEBUG_FLAG:
+                    OVERRIDE_UPDATE_EVERY = True
+                    debug(PROGRAM, "overriding update interval to", str(int(cmd)))
             except ValueError:
                 pass
 
