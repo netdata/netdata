@@ -124,7 +124,7 @@ class UrlService(BaseService):
         :return: str
         """
         try:
-            f = urlopen(self.url)
+            f = urlopen(self.url, timeout=self.update_every)
             raw = f.read().decode('utf-8')
             f.close()
         except Exception as e:
