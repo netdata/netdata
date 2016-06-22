@@ -58,8 +58,7 @@ class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
         if len(self.url) == 0:
-            self.url = "http://toothless.dragon/stub_status"
-            # self.url = "http://localhost/stub_status"  # FIXME
+            self.url = "http://localhost/stub_status"
         self.order = ORDER
         self.charts = CHARTS
 
