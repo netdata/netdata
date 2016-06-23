@@ -312,14 +312,26 @@ class PythonCharts(object):
         If job.check() fails job is stopped
         """
         i = 0
+        overridden = []
         while i < len(self.jobs):
             job = self.jobs[i]
+            if job.name in overridden:
+                self._stop(job)
+                msg.error(job.name + " already exists")
             try:
                 if not job.check():
                     self._stop(job, "failed check")
                 else:
                     msg.debug(job.chart_name, ": check succeeded")
                     i += 1
+                    try:
+                        if job.override_name is not None:
+                            job.name = job.override_name
+                            msg.debug(job.chart_name + " changing chart name to: " + job.__module__ + job.name)
+                            job.chart_name = job.__module__ + job.name
+                            overridden.append(job.name)
+                    except Exception:
+                        pass
             except AttributeError:
                 self._stop(job, "no check")
             except (UnboundLocalError, Exception) as e:
