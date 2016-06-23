@@ -137,20 +137,22 @@ class BaseService(threading.Thread):
                 else:
                     time.sleep(self.timetable['freq'])
 
-    def _line(self, *params):
+    def _line(self, instruction, *params):
         """
         Converts *params to string and joins them with one space between every one.
         :param params: str/int/float
         """
+        self.data_stream += instruction + " "
         for p in params:
+            p = str(p)
             if len(p) == 0:
-                p = "''"
-            self.data_stream += str(p)
-            self.data_stream += " "
+                p = ""
+            self.data_stream += "'" + p
+            self.data_stream += "' "
         self.data_stream += "\n"
 
-    def chart(self, type_id, name="''", title="''", units="''", family="''",
-              category="''", charttype="line", priority="''", update_every="''"):
+    def chart(self, type_id, name="", title="", units="", family="",
+              category="", charttype="line", priority="", update_every=""):
         """
         Defines a new chart.
         :param type_id: str
@@ -211,7 +213,7 @@ class BaseService(threading.Thread):
             int(microseconds)
         except TypeError:
             self.error("malformed begin statement: microseconds are not a number:", microseconds)
-            microseconds = "''"
+            microseconds = ""
 
         self._line("BEGIN", type_id, microseconds)
         return True
@@ -237,7 +239,7 @@ class BaseService(threading.Thread):
     def end(self):
         self._line("END")
 
-    def send(self):
+    def commit(self):
         """
         Upload new data to netdata
         """
