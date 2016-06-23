@@ -24,7 +24,7 @@ class Service(BaseService):
     def create(self):
         self.chart("example.python_random", '', 'A random number', 'random number',
                    'random', 'random', 'line', self.priority, self.update_every)
-        self.dimension('random1', '', 'absolute', 1, 1)
+        self.dimension('random1')
         self.commit()
         return True
     

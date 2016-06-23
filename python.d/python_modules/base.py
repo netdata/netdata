@@ -142,13 +142,14 @@ class BaseService(threading.Thread):
         Converts *params to string and joins them with one space between every one.
         :param params: str/int/float
         """
-        self.data_stream += instruction + " "
+        self.data_stream += instruction
         for p in params:
             p = str(p)
             if len(p) == 0:
-                p = ""
-            self.data_stream += "'" + p
-            self.data_stream += "' "
+                p = "''"
+            if ' ' in p:
+                p = "'" + p + "'"
+            self.data_stream += " " + p
         self.data_stream += "\n"
 
     def chart(self, type_id, name="", title="", units="", family="",
@@ -192,6 +193,8 @@ class BaseService(threading.Thread):
             divisor = 1
         if name is None:
             name = id
+        if algorithm not in ("absolute", "incremental", "percentage-of-absolute-row", "percentage-of-incremental-row"):
+            algorithm = "absolute"
 
         self.dimensions.append(id)
         if hidden:
