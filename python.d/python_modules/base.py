@@ -75,6 +75,11 @@ class BaseService(threading.Thread):
                           'freq': freq}
 
     def _run_once(self):
+        """
+        Executes self.update(interval) and draws run time chart.
+        Return value presents exit status of update()
+        :return: boolean
+        """
         t_start = time.time()
         # check if it is time to execute job update() function
         if self.timetable['next'] > t_start:
@@ -103,6 +108,11 @@ class BaseService(threading.Thread):
         return True
 
     def run(self):
+        """
+        Runs job in thread. Handles retries.
+        Exits when job failed or timed out.
+        :return: None
+        """
         self.timetable['last'] = time.time()
         while True:
             try:
