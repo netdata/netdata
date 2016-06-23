@@ -432,7 +432,8 @@ def run():
     # read configuration file
     disabled = []
     configfile = CONFIG_DIR + "python.d.conf"
-    msg.info(PROGRAM, "reading configuration file:", configfile)
+    msg.PROGRAM = PROGRAM
+    msg.info("reading configuration file:", configfile)
 
     conf = read_config(configfile)
     if conf is not None:
@@ -457,11 +458,9 @@ def run():
             if v is False:
                 disabled.append(k)
 
-    DEBUG_FLAG = True
-    msg.DEBUG_FLAG = DEBUG_FLAG
-    msg.PROGRAM = PROGRAM
     # parse passed command line arguments
     modules = parse_cmdline(MODULES_DIR, *sys.argv)
+    msg.DEBUG_FLAG = DEBUG_FLAG
     msg.info("MODULES_DIR='" + MODULES_DIR +
              "', CONFIG_DIR='" + CONFIG_DIR +
              "', UPDATE_EVERY=" + str(BASE_CONFIG['update_every']) +
