@@ -112,8 +112,7 @@ class Service(UrlService):
             if str(tmp[0]) in self.assignment:
                 try:
                     data[self.assignment[tmp[0]]] = int(float(tmp[1]))
-                except (IndexError, ValueError) as a:
-                    print(a)
+                except (IndexError, ValueError):
                     pass
         if len(data) == 0:
             return None

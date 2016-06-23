@@ -13,6 +13,7 @@ update_every = 4
 priority = 90000
 retries = 7
 
+
 class Service(BaseService):
     def __init__(self, configuration=None, name=None):
         super(self.__class__,self).__init__(configuration=configuration, name=name)
@@ -21,15 +22,15 @@ class Service(BaseService):
         return True
     
     def create(self):
-        print("CHART example.python_random '' 'A random number' 'random number' random random line " +
-              str(self.priority) +
-              " " +
-              str(self.update_every))
-        print("DIMENSION random1 '' absolute 1 1")
+        self.chart("example.python_random", '', 'A random number', 'random number',
+                   'random', 'random', 'line', self.priority, self.update_every)
+        self.dimension('random1')
+        self.commit()
         return True
     
     def update(self, interval):
-        print("BEGIN example.python_random "+str(interval))
-        print("SET random1 = "+str(random.randint(0,100)))
-        print("END")
+        self.begin("example.python_random", interval)
+        self.set("random1", random.randint(0, 100))
+        self.end()
+        self.commit()
         return True
