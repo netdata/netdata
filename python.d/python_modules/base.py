@@ -33,6 +33,7 @@ class BaseService(threading.Thread):
         self.priority = 140000
         self.update_every = 1
         self.name = name
+        self.override_name = None
         if configuration is None:
             self.error("BaseService: no configuration parameters supplied. Cannot create Service.")
             raise RuntimeError
@@ -51,6 +52,10 @@ class BaseService(threading.Thread):
                       'retries':0}
         :param config: dict
         """
+        try:
+            self.override_name = config.pop('override_name')
+        except KeyError:
+            pass
         self.update_every = int(config.pop('update_every'))
         self.priority = int(config.pop('priority'))
         self.retries = int(config.pop('retries'))
