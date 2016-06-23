@@ -35,6 +35,7 @@ class BaseService(threading.Thread):
         self.update_every = 1
         self.name = name
         self.override_name = None
+        self.chart_name = ""
         if configuration is None:
             self.error("BaseService: no configuration parameters supplied. Cannot create Service.")
             raise RuntimeError
@@ -42,7 +43,6 @@ class BaseService(threading.Thread):
             self._extract_base_config(configuration)
             self.timetable = {}
             self.create_timetable()
-            self.chart_name = ""
 
     def _extract_base_config(self, config):
         """
