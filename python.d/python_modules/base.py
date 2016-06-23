@@ -2,25 +2,36 @@
 # Description: prototypes for netdata python.d modules
 # Author: Pawel Krupa (paulfantom)
 
-from time import time
+import time
 import sys
 try:
     from urllib.request import urlopen
 except ImportError:
     from urllib2 import urlopen
 
+import threading
+import msg
 
-class BaseService(object):
+
+class BaseService(threading.Thread):
     """
     Prototype of Service class.
     Implemented basic functionality to run jobs by `python.d.plugin`
     """
+    debugging = False
+
     def __init__(self, configuration=None, name=None):
         """
         This needs to be initialized in child classes
         :param configuration: dict
         :param name: str
         """
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self.retries = 0
+        self.retries_left = 0
+        self.priority = 140000
+        self.update_every = 1
         self.name = name
         if configuration is None:
             self.error("BaseService: no configuration parameters supplied. Cannot create Service.")
@@ -58,24 +69,64 @@ class BaseService(object):
         """
         if freq is None:
             freq = self.update_every
-        now = time()
+        now = time.time()
         self.timetable = {'last': now,
                           'next': now - (now % freq) + freq,
                           'freq': freq}
 
-    @staticmethod
-    def error(msg, exception=""):
-        if exception != "":
-            exception = " " + str(exception).replace("\n", " ")
-        sys.stderr.write(str(msg)+exception+"\n")
-        sys.stderr.flush()
+    def _run_once(self):
+        t_start = time.time()
+        # check if it is time to execute job update() function
+        if self.timetable['next'] > t_start:
+            msg.debug(self.chart_name + " will be run in " +
+                      str(int((self.timetable['next'] - t_start) * 1000)) + " ms")
+            return True
+
+        since_last = int((t_start - self.timetable['last']) * 1000000)
+        msg.debug(self.chart_name +
+                  " ready to run, after " + str(int((t_start - self.timetable['last']) * 1000)) +
+                  " ms (update_every: " + str(self.timetable['freq'] * 1000) +
+                  " ms, latency: " + str(int((t_start - self.timetable['next']) * 1000)) + " ms)")
+        if not self.update(since_last):
+            return False
+        t_end = time.time()
+        self.timetable['next'] = t_end - (t_end % self.timetable['freq']) + self.timetable['freq']
+
+        # draw performance graph
+        run_time = str(int((t_end - t_start) * 1000))
+        run_time_chart = "BEGIN netdata.plugin_pythond_" + self.chart_name + " " + str(since_last) + '\n'
+        run_time_chart += "SET run_time = " + run_time + '\n'
+        run_time_chart += "END\n"
+        sys.stdout.write(run_time_chart)
+        msg.debug(self.chart_name + " updated in " + str(run_time) + " ms")
+        self.timetable['last'] = t_start
+        return True
+
+    def run(self):
+        self.timetable['last'] = time.time()
+        while True:
+            try:
+                status = self._run_once()
+            except Exception as e:
+                msg.error("Something wrong: " + str(e))
+                return
+            if status:
+                time.sleep(self.timetable['next'] - time.time())
+                self.retries_left = self.retries
+            else:
+                self.retries -= 1
+                if self.retries_left <= 0:
+                    msg.error("no more retries. Exiting")
+                    return
+                else:
+                    time.sleep(self.timetable['freq'])
 
     def check(self):
         """
         check() prototype
         :return: boolean
         """
-        self.error("Service " + str(self.__module__) + "doesn't implement check() function")
+        msg.error("Service " + str(self.__module__) + "doesn't implement check() function")
         return False
 
     def create(self):
@@ -83,7 +134,7 @@ class BaseService(object):
         create() prototype
         :return: boolean
         """
-        self.error("Service " + str(self.__module__) + "doesn't implement create() function?")
+        msg.error("Service " + str(self.__module__) + "doesn't implement create() function?")
         return False
 
     def update(self, interval):
@@ -92,7 +143,7 @@ class BaseService(object):
         :param interval: int
         :return: boolean
         """
-        self.error("Service " + str(self.__module__) + "doesn't implement update() function")
+        msg.error("Service " + str(self.__module__) + "doesn't implement update() function")
         return False
 
 
@@ -128,7 +179,7 @@ class UrlService(BaseService):
             f = urlopen(self.url, timeout=self.update_every)
             raw = f.read().decode('utf-8')
         except Exception as e:
-            self.error(self.__module__, str(e))
+            msg.error(self.__module__, str(e))
         finally:
             try:
                 f.close()
@@ -148,7 +199,7 @@ class UrlService(BaseService):
         Format configuration data and try to connect to server
         :return: boolean
         """
-        if self.name is None:
+        if self.name is None or self.name == str(None):
             self.name = 'local'
         else:
             self.name = str(self.name)
@@ -193,8 +244,7 @@ class UrlService(BaseService):
                     content += "DIMENSION " + line['name'] + " " + line['options'] + "\n"
 
             if len(content) > 0:
-                print(header)
-                print(content)
+                print(header + "\n" + content)
                 idx += 1
 
         if idx == 0:
@@ -220,7 +270,6 @@ class UrlService(BaseService):
                 except KeyError:
                     pass
             if len(c) != 0:
-                print(header + c)
-                print("END")
+                print(header + c + "\nEND")
 
         return True
