@@ -138,6 +138,10 @@ class BaseService(threading.Thread):
                     time.sleep(self.timetable['freq'])
 
     def _line(self, *params):
+        """
+        Converts *params to string and joins them with one space between every one.
+        :param params: str/int/float
+        """
         for p in params:
             if len(p) == 0:
                 p = "''"
@@ -146,70 +150,116 @@ class BaseService(threading.Thread):
         self.data_stream += "\n"
 
     def chart(self, type_id, name="''", title="''", units="''", family="''",
-              category="''", charttype="''", priority="''", update_every="''"):
+              category="''", charttype="line", priority="''", update_every="''"):
+        """
+        Defines a new chart.
+        :param type_id: str
+        :param name: str
+        :param title: str
+        :param units: str
+        :param family: str
+        :param category: str
+        :param charttype: str
+        :param priority: int/str
+        :param update_every: int/str
+        """
         self.charts.append(type_id)
 
         self._line("CHART", type_id, name, title, units, family, category, charttype, priority, update_every)
-        pass
 
-    def dimension(self, id, name="''", algorithm="''", multiplier=1, divisor=1, hidden=False):
+    def dimension(self, id, name=None, algorithm="absolute", multiplier=1, divisor=1, hidden=False):
+        """
+        Defines a new dimension for the chart
+        :param id: str
+        :param name: str
+        :param algorithm: str
+        :param multiplier: int/str
+        :param divisor: int/str
+        :param hidden: boolean
+        :return:
+        """
         try:
             int(multiplier)
         except TypeError:
-            self.error("malformed dimension: multiplier is not a number")
+            self.error("malformed dimension: multiplier is not a number:", multiplier)
             multiplier = 1
         try:
             int(divisor)
         except TypeError:
-            self.error("malformed dimension: divisor is not a number")
+            self.error("malformed dimension: divisor is not a number:", divisor)
             divisor = 1
+        if name is None:
+            name = id
 
         self.dimensions.append(id)
         if hidden:
             self._line("DIMENSION", id, name, algorithm, multiplier, divisor, "hidden")
         else:
             self._line("DIMENSION", id, name, algorithm, multiplier, divisor)
-        pass
 
-    def begin(self, type_id, microseconds="''"):
+    def begin(self, type_id, microseconds=0):
+        """
+        Begin data set
+        :param type_id: str
+        :param microseconds: int
+        :return: boolean
+        """
         if type_id not in self.charts:
-            self.error("wrong chart type_id")
+            self.error("wrong chart type_id:", type_id)
+            return False
         try:
             int(microseconds)
         except TypeError:
-            self.error("malformed begin statement: microseconds are not a number")
+            self.error("malformed begin statement: microseconds are not a number:", microseconds)
             microseconds = "''"
 
         self._line("BEGIN", type_id, microseconds)
-        pass
+        return True
 
     def set(self, id, value):
+        """
+        Set value to dimension
+        :param id: str
+        :param value: int/float
+        :return: boolean
+        """
         if id not in self.dimensions:
-            self.error("wrong dimension id")
-            return
+            self.error("wrong dimension id:", id)
+            return False
         try:
             value = str(int(value))
         except TypeError:
-            self.error("cannot set non-numeric value")
-            return
+            self.error("cannot set non-numeric value:", value)
+            return False
         self._line("SET", id, "=", value)
-        pass
+        return True
 
     def end(self):
         self._line("END")
-        pass
 
     def send(self):
+        """
+        Upload new data to netdata
+        """
         print(self.data_stream)
         self.data_stream = ""
 
     def error(self, *params):
+        """
+        Show error message on stderr
+        """
         msg.error(self.chart_name, *params)
 
     def debug(self, *params):
+        """
+        Show debug message on stderr
+        """
         msg.debug(self.chart_name, *params)
 
     def info(self, *params):
+        """
+        Show information message on stderr
+        """
         msg.info(self.chart_name, *params)
 
     def check(self):
