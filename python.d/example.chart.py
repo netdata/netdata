@@ -22,15 +22,15 @@ class Service(BaseService):
         return True
     
     def create(self):
-        chart = "CHART example.python_random '' 'A random number' 'random number' random random line " + \
-                str(self.priority) + " " + \
-                str(self.update_every) + "\n" + \
-                "DIMENSION random1 '' absolute 1 1"
-        print(chart)
+        self.chart("example.python_random", '', 'A random number', 'random number',
+                   'random', 'random', 'line', self.priority, self.update_every)
+        self.dimension('random1', '', 'absolute', 1, 1)
+        self.commit()
         return True
     
     def update(self, interval):
-        chart = "BEGIN example.python_random "+str(interval)+"\n"
-        chart += "SET random1 = "+str(random.randint(0,100))+"\n"
-        print(chart + "END")
+        self.begin("example.python_random", interval)
+        self.set("random1", random.randint(0, 100))
+        self.end()
+        self.commit()
         return True
