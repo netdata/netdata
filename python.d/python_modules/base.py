@@ -18,8 +18,6 @@ class BaseService(threading.Thread):
     Prototype of Service class.
     Implemented basic functionality to run jobs by `python.d.plugin`
     """
-    debugging = False
-
     def __init__(self, configuration=None, name=None):
         """
         This needs to be initialized in child classes
@@ -36,6 +34,8 @@ class BaseService(threading.Thread):
         self.name = name
         self.override_name = None
         self.chart_name = ""
+        self.dimensions = []
+        self.charts = []
         if configuration is None:
             self.error("BaseService: no configuration parameters supplied. Cannot create Service.")
             raise RuntimeError
@@ -145,20 +145,54 @@ class BaseService(threading.Thread):
             self.data_stream += " "
         self.data_stream += "\n"
 
-    def chart(self, *params):
-        self._line("CHART", *params)
+    def chart(self, type_id, name="''", title="''", units="''", family="''",
+              category="''", charttype="''", priority="''", update_every="''"):
+        self.charts.append(type_id)
+
+        self._line("CHART", type_id, name, title, units, family, category, charttype, priority, update_every)
         pass
 
-    def dimension(self, *params):
-        self._line("DIMENSION", *params)
+    def dimension(self, id, name="''", algorithm="''", multiplier=1, divisor=1, hidden=False):
+        try:
+            int(multiplier)
+        except TypeError:
+            self.error("malformed dimension: multiplier is not a number")
+            multiplier = 1
+        try:
+            int(divisor)
+        except TypeError:
+            self.error("malformed dimension: divisor is not a number")
+            divisor = 1
+
+        self.dimensions.append(id)
+        if hidden:
+            self._line("DIMENSION", id, name, algorithm, multiplier, divisor, "hidden")
+        else:
+            self._line("DIMENSION", id, name, algorithm, multiplier, divisor)
         pass
 
-    def begin(self, *params):
-        self._line("BEGIN", *params)
+    def begin(self, type_id, microseconds="''"):
+        if type_id not in self.charts:
+            self.error("wrong chart type_id")
+        try:
+            int(microseconds)
+        except TypeError:
+            self.error("malformed begin statement: microseconds are not a number")
+            microseconds = "''"
+
+        self._line("BEGIN", type_id, microseconds)
         pass
 
-    def set(self, name, value):
-        self._line("SET", name, "=", value)
+    def set(self, id, value):
+        if id not in self.dimensions:
+            self.error("wrong dimension id")
+            return
+        try:
+            value = str(int(value))
+        except TypeError:
+            self.error("cannot set non-numeric value")
+            return
+        self._line("SET", id, "=", value)
         pass
 
     def end(self):
