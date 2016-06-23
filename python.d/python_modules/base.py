@@ -229,6 +229,7 @@ class UrlService(BaseService):
         data = self._formatted_data()
         if data is None:
             return False
+        data_stream = ""
         for name in self.order:
             header = "CHART " + \
                      self.__module__ + "_" + \
@@ -241,11 +242,13 @@ class UrlService(BaseService):
             # check if server has this datapoint
             for line in self.charts[name]['lines']:
                 if line['name'] in data:
-                    content += "DIMENSION " + line['name'] + " " + line['options'] + "\n"
+                    content += "\nDIMENSION " + line['name'] + " " + line['options']
 
             if len(content) > 0:
-                print(header + "\n" + content)
+                data_stream += header + content + "\n"
                 idx += 1
+
+        print(data_stream)
 
         if idx == 0:
             return False
@@ -261,6 +264,7 @@ class UrlService(BaseService):
         if data is None:
             return False
 
+        data_stream = ""
         for chart, dimensions in self.definitions.items():
             header = "BEGIN " + self.__module__ + "_" + str(self.name) + "." + chart + " " + str(interval)
             c = ""
@@ -270,6 +274,7 @@ class UrlService(BaseService):
                 except KeyError:
                     pass
             if len(c) != 0:
-                print(header + c + "\nEND")
+                data_stream += header + c + "\nEND\n"
+        print(data_stream)
 
         return True
