@@ -169,6 +169,15 @@ class BaseService(threading.Thread):
         print(self.data_stream)
         self.data_stream = ""
 
+    def error(self, *params):
+        msg.error(self.chart_name, *params)
+
+    def debug(self, *params):
+        msg.debug(self.chart_name, *params)
+
+    def info(self, *params):
+        msg.info(self.chart_name, *params)
+
     def check(self):
         """
         check() prototype
