@@ -358,6 +358,10 @@ class PythonCharts(object):
                 self._stop(job, "misbehaving. Reason: " + str(e))
 
     def update(self):
+        """
+        Creates and supervises every job thread.
+        This will stay forever and ever and ever forever and ever it'll be the one...
+        """
         for job in self.jobs:
             job.start()
 
