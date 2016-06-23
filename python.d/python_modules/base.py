@@ -27,6 +27,7 @@ class BaseService(threading.Thread):
         :param name: str
         """
         threading.Thread.__init__(self)
+        self.data_stream = ""
         self.daemon = True
         self.retries = 0
         self.retries_left = 0
@@ -135,6 +136,38 @@ class BaseService(threading.Thread):
                     return
                 else:
                     time.sleep(self.timetable['freq'])
+
+    def _line(self, *params):
+        for p in params:
+            if len(p) == 0:
+                p = "''"
+            self.data_stream += str(p)
+            self.data_stream += " "
+        self.data_stream += "\n"
+
+    def chart(self, *params):
+        self._line("CHART", *params)
+        pass
+
+    def dimension(self, *params):
+        self._line("DIMENSION", *params)
+        pass
+
+    def begin(self, *params):
+        self._line("BEGIN", *params)
+        pass
+
+    def set(self, name, value):
+        self._line("SET", name, "=", value)
+        pass
+
+    def end(self):
+        self._line("END")
+        pass
+
+    def send(self):
+        print(self.data_stream)
+        self.data_stream = ""
 
     def check(self):
         """
