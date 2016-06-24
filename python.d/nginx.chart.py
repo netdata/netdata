@@ -22,34 +22,27 @@ ORDER = ['connections', 'requests', 'connection_status', 'connect_rate']
 
 CHARTS = {
     'connections': {
-        'options': "'' 'nginx Active Connections' 'connections' nginx nginx.connections line",
+        'options': [None, 'nginx Active Connections', 'connections', 'nginx', 'nginx.connections', 'line'],
         'lines': [
-            {"name": "active",
-             "options": "'' absolute 1 1"}
+            ["active"]
         ]},
     'requests': {
-        'options': "'' 'nginx Requests' 'requests/s' nginx nginx.requests line",
+        'options': [None, 'nginx Requests', 'requests/s', 'nginx', 'nginx.requests', 'line'],
         'lines': [
-            {"name": "requests",
-             "options": "'' incremental 1 1"}
+            ["requests", None, 'incremental']
         ]},
     'connection_status': {
-        'options': "'' 'nginx Active Connections by Status' 'connections' nginx nginx.connection.status line",
+        'options': [None, 'nginx Active Connections by Status', 'connections', 'nginx', 'nginx.connection.status', 'line'],
         'lines': [
-            {"name": "reading",
-             "options": "'' absolute 1 1"},
-            {"name": "writing",
-             "options": "'' absolute 1 1"},
-            {"name": "waiting",
-             "options": "idle absolute 1 1"}
+            ["reading"],
+            ["writing"],
+            ["waiting", "idle"]
         ]},
     'connect_rate': {
-        'options': "'' 'nginx Connections Rate' 'connections/s' nginx nginx.performance line",
+        'options': [None, 'nginx Connections Rate', 'connections/s', 'nginx', 'nginx.performance', 'line'],
         'lines': [
-            {"name": "accepts",
-             "options": "accepted incremental 1 1"},
-            {"name": "handled",
-             "options": "'' incremental 1 1"}
+            ["accepts", "accepted", "incremental"],
+            ["handled", None, "incremental"]
         ]}
 }
 
@@ -60,7 +53,7 @@ class Service(UrlService):
         if len(self.url) == 0:
             self.url = "http://localhost/stub_status"
         self.order = ORDER
-        self.charts = CHARTS
+        self.definitions = CHARTS
 
     def _formatted_data(self):
         """
