@@ -295,25 +295,10 @@ class BaseService(threading.Thread):
         return False
 
 
-class UrlService(BaseService):
+class SimpleService(BaseService):
     def __init__(self, configuration=None, name=None):
-        self.charts = {}
-        # charts definitions in format:
-        # charts = {
-        #    'chart_name_in_netdata': {
-        #        'options': "parameters defining chart (passed to CHART statement)",
-        #        'lines': [
-        #           { 'name': 'dimension_name',
-        #             'options': 'dimension parameters (passed to DIMENSION statement)"
-        #           }
-        #        ]}
-        #    }
         self.order = []
         self.definitions = {}
-        # definitions are created dynamically in create() method based on 'charts' dictionary. format:
-        # definitions = {
-        #     'chart_name_in_netdata' : [ charts['chart_name_in_netdata']['lines']['name'] ]
-        # }
         self.url = ""
         BaseService.__init__(self, configuration=configuration, name=name)
 
@@ -322,18 +307,7 @@ class UrlService(BaseService):
         Get raw data from http request
         :return: str
         """
-        raw = None
-        try:
-            f = urlopen(self.url, timeout=self.update_every)
-            raw = f.read().decode('utf-8')
-        except Exception as e:
-            msg.error(self.__module__, str(e))
-        finally:
-            try:
-                f.close()
-            except:
-                pass
-        return raw
+        return ""
 
     def _formatted_data(self):
         """
@@ -407,3 +381,31 @@ class UrlService(BaseService):
         self.commit()
 
         return updated
+
+
+class UrlService(SimpleService):
+    def __init__(self, configuration=None, name=None):
+        # definitions are created dynamically in create() method based on 'charts' dictionary. format:
+        # definitions = {
+        #     'chart_name_in_netdata' : [ charts['chart_name_in_netdata']['lines']['name'] ]
+        # }
+        self.url = ""
+        SimpleService.__init__(self, configuration=configuration, name=name)
+
+    def _get_data(self):
+        """
+        Get raw data from http request
+        :return: str
+        """
+        raw = None
+        try:
+            f = urlopen(self.url, timeout=self.update_every)
+            raw = f.read().decode('utf-8')
+        except Exception as e:
+            msg.error(self.__module__, str(e))
+        finally:
+            try:
+                f.close()
+            except:
+                pass
+        return raw
