@@ -25,7 +25,7 @@ class BaseService(threading.Thread):
         :param name: str
         """
         threading.Thread.__init__(self)
-        self.data_stream = ""
+        self._data_stream = ""
         self.daemon = True
         self.retries = 0
         self.retries_left = 0
@@ -34,8 +34,8 @@ class BaseService(threading.Thread):
         self.name = name
         self.override_name = None
         self.chart_name = ""
-        self.dimensions = []
-        self.charts = []
+        self._dimensions = []
+        self._charts = []
         if configuration is None:
             self.error("BaseService: no configuration parameters supplied. Cannot create Service.")
             raise RuntimeError
@@ -142,15 +142,18 @@ class BaseService(threading.Thread):
         Converts *params to string and joins them with one space between every one.
         :param params: str/int/float
         """
-        self.data_stream += instruction
+        self._data_stream += instruction
         for p in params:
-            p = str(p)
+            if p is None:
+                p = ""
+            else:
+                p = str(p)
             if len(p) == 0:
                 p = "''"
             if ' ' in p:
                 p = "'" + p + "'"
-            self.data_stream += " " + p
-        self.data_stream += "\n"
+            self._data_stream += " " + p
+        self._data_stream += "\n"
 
     def chart(self, type_id, name="", title="", units="", family="",
               category="", charttype="line", priority="", update_every=""):
@@ -166,8 +169,7 @@ class BaseService(threading.Thread):
         :param priority: int/str
         :param update_every: int/str
         """
-        self.charts.append(type_id)
-
+        self._charts.append(type_id)
         self._line("CHART", type_id, name, title, units, family, category, charttype, priority, update_every)
 
     def dimension(self, id, name=None, algorithm="absolute", multiplier=1, divisor=1, hidden=False):
@@ -196,7 +198,7 @@ class BaseService(threading.Thread):
         if algorithm not in ("absolute", "incremental", "percentage-of-absolute-row", "percentage-of-incremental-row"):
             algorithm = "absolute"
 
-        self.dimensions.append(id)
+        self._dimensions.append(id)
         if hidden:
             self._line("DIMENSION", id, name, algorithm, multiplier, divisor, "hidden")
         else:
@@ -209,7 +211,7 @@ class BaseService(threading.Thread):
         :param microseconds: int
         :return: boolean
         """
-        if type_id not in self.charts:
+        if type_id not in self._charts:
             self.error("wrong chart type_id:", type_id)
             return False
         try:
@@ -228,7 +230,7 @@ class BaseService(threading.Thread):
         :param value: int/float
         :return: boolean
         """
-        if id not in self.dimensions:
+        if id not in self._dimensions:
             self.error("wrong dimension id:", id)
             return False
         try:
@@ -246,8 +248,8 @@ class BaseService(threading.Thread):
         """
         Upload new data to netdata
         """
-        print(self.data_stream)
-        self.data_stream = ""
+        print(self._data_stream)
+        self._data_stream = ""
 
     def error(self, *params):
         """
@@ -364,40 +366,21 @@ class UrlService(BaseService):
         Create charts
         :return: boolean
         """
-        for name in self.order:
-            if name not in self.charts:
-                continue
-            self.definitions[name] = []
-            for line in self.charts[name]['lines']:
-                self.definitions[name].append(line['name'])
-
-        idx = 0
         data = self._formatted_data()
         if data is None:
             return False
-        data_stream = ""
+
+        idx = 0
         for name in self.order:
-            header = "CHART " + \
-                     self.__module__ + "_" + \
-                     self.name + "." + \
-                     name + " " + \
-                     self.charts[name]['options'] + " " + \
-                     str(self.priority + idx) + " " + \
-                     str(self.update_every)
-            content = ""
+            options = self.definitions[name]['options'] + [self.priority + idx, self.update_every]
+            self.chart(self.__module__ + "_" + self.name + "." + name, *options)
             # check if server has this datapoint
-            for line in self.charts[name]['lines']:
-                if line['name'] in data:
-                    content += "\nDIMENSION " + line['name'] + " " + line['options']
+            for line in self.definitions[name]['lines']:
+                if line[0] in data:
+                    self.dimension(*line)
+            idx += 1
 
-            if len(content) > 0:
-                data_stream += header + content + "\n"
-                idx += 1
-
-        print(data_stream)
-
-        if idx == 0:
-            return False
+        self.commit()
         return True
 
     def update(self, interval):
@@ -410,17 +393,17 @@ class UrlService(BaseService):
         if data is None:
             return False
 
-        data_stream = ""
-        for chart, dimensions in self.definitions.items():
-            header = "BEGIN " + self.__module__ + "_" + str(self.name) + "." + chart + " " + str(interval)
-            c = ""
-            for dim in dimensions:
-                try:
-                    c += "\nSET " + dim + " = " + str(data[dim])
-                except KeyError:
-                    pass
-            if len(c) != 0:
-                data_stream += header + c + "\nEND\n"
-        print(data_stream)
+        updated = False
+        for chart in self.order:
+            if self.begin(self.__module__ + "_" + str(self.name) + "." + chart, interval):
+                updated = True
+                for dim in self.definitions[chart]['lines']:
+                    try:
+                        self.set(dim[0], data[dim[0]])
+                    except KeyError:
+                        pass
+                self.end()
 
-        return True
+        self.commit()
+
+        return updated
