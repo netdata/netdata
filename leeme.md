@@ -26,21 +26,21 @@ May 1st, 2016
 
 ##### 320.000+ views, 92.000+ visitors, 28.500+ downloads, 11.000+ github stars, 700+ forks, 1 month!
 
-And it still runs with 600+ git downloads... per day!
+Y todavia corre con  600+ git bajadas... por dia!
 
 **[Check what our users say about netdata](https://github.com/firehol/netdata/issues/148)**.
 
 ---
 
-**Real-time performance monitoring, done right!**
+**Resultados en tiempo real y monitoriar echo correcto!**
 
-This is the default dashboard of **netdata**:
+Esta es la tabla basica de  **netdata**:
 
- - real-time, per second updates, snappy refreshes!
- - 300+ charts out of the box, 2000+ metrics monitored!
- - zero configuration, zero maintenance, zero dependencies!
+ - Echo en tiempo real, cambios en segundos y rapido!
+ - mas de 300+ graficas fuera de la caja y mas de  2000+ metricas que monitorea!
+ - 3. Zero configuración, No tienes que mantenerlo y Zero dependencias!
 
-Live demo: [http://netdata.firehol.org](http://netdata.firehol.org)
+ demo: [http://netdata.firehol.org](http://netdata.firehol.org)
 
 ![netdata](https://cloud.githubusercontent.com/assets/2662304/14092712/93b039ea-f551-11e5-822c-beadbf2b2a2e.gif)
 
@@ -81,43 +81,43 @@ Esto es lo que monitorea (la mayoría con cambios mínimos a la configuración):
 
    ![dsl0](https://cloud.githubusercontent.com/assets/2662304/14093128/4d566494-f554-11e5-8ee4-5392e0ac51f0.gif)
 
-- **IPv4 networking** (bandwidth, packets, errors, fragments, tcp: connections, packets, errors, handshake, udp: packets, errors, broadcast: bandwidth, packets, multicast: bandwidth, packets)
+- **IPv4 networking** (trafico, paquetes, errores, fragmentos, tcp: coneciones, paquetes, errores, handshake, udp: paquetes, errores, broadcast: trafico, paquetes, multicast: trafico, paquetes)
 
-- **IPv6 networking** (bandwidth, packets, errors, fragments, ECT, udp: packets, errors, udplite: packets, errors, broadcast: bandwidth, multicast: bandwidth, packets, icmp: messages, errors, echos, router, neighbor, MLDv2, group membership, break down by type)
+- **IPv6 networking** (bandwidth, paquetes, errors, fragments, ECT, udp: paquetes, errors, udplite: paquetes, errors, broadcast: bandwidth, multicast: bandwidth, paquetes, icmp: messages, errors, echos, router, neighbor, MLDv2, group membership, break down by type)
 
-- **netfilter / iptables Linux firewall** (connections, connection tracker events, errors, etc)
+- **netfilter / iptables Linux firewall** (connections, connection tracker events, errores, etc)
 
-- **Linux DDoS protection** (SYNPROXY metrics)
+- **Linux protecion contra DDoS** (metricas SYNPROXY)
 
-- **Processes** (running, blocked, forks, active, etc)
+- **Procesos** (running, blocked, forks, active, etc)
 
 - **Entropy** (random numbers pool, using in cryptography)
 
-- **NFS file servers**, v2, v3, v4 (I/O, cache, read ahead, RPC calls)
+- **NFS file servidores**, v2, v3, v4 (I/O, cache, read ahead, RPC calls)
 
 - **Network QoS** (yes, the only tool that visualizes network `tc` classes in realtime)
 
    ![qos-tc-classes](https://cloud.githubusercontent.com/assets/2662304/14093004/68966020-f553-11e5-98fe-ffee2086fafd.gif)
 
-- **Linux Control Groups** (containers), systemd, lxc, docker, etc
+- **Grupos de control Linux** (containers), systemd, lxc, docker, etc
 
-- **Applications**, by grouping the process tree (CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets, etc)
+- **Applicaciones**, poniendo los grupos de los procesos juntos. (CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets, etc)
 
    ![apps](https://cloud.githubusercontent.com/assets/2662304/14093565/67c4002c-f557-11e5-86bd-0154f5135def.gif)
 
 - **Users and User Groups resource usage**, by summarizing the process tree per user and group (CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets, etc)
 
-- **Apache web server** mod-status (v2.2, v2.4)
+- **Apache web Servidores** mod-status (v2.2, v2.4)
 
-- **Nginx web server** stub-status
+- **Nginx web Servidores** stub-status
 
-- **mySQL databases** (multiple servers, each showing: bandwidth, queries/s, handlers, locks, issues, tmp operations, connections, binlog metrics, threads, innodb metrics, etc)
+- **mySQL databases** (multiple servidores, each showing: bandwidth, queries/s, handlers, locks, issues, tmp operations, connections, binlog metrics, threads, innodb metrics, etc)
 
-- **ISC Bind name server** (multiple servers, each showing: clients, requests, queries, updates, failures and several per view metrics)
+- **ISC Bind name Servidores** (multiple servidores, each showing: clients, requests, queries, updates, failures and several per view metrics)
 
-- **Postfix email server** message queue (entries, size)
+- **Postfix email Servidores** message queue (entries, size)
 
-- **Squid proxy server** (clients bandwidth and requests, servers bandwidth and requests)
+- **Squid proxy Servidores** (clients bandwidth and requests, servidores bandwidth and requests)
 
 - **Hardware sensors** (temperature, voltage, fans, power, humidity, etc)
 
@@ -129,21 +129,21 @@ Esto es lo que monitorea (la mayoría con cambios mínimos a la configuración):
 
 - **SNMP devices** can be monitored too (although you will need to configure these)
 
-And you can extend it, by writing plugins that collect data from any source, using any computer language.
+Y lo puedes extender  by writing plugins that collect data from any source, using any computer language.
 
 ---
 
-## Still not convinced?
+## ¿Todavia no estas convencido?
 
-Read **[Why netdata?](https://github.com/firehol/netdata/wiki/Why-netdata%3F)**
+Lee **[Why netdata?](https://github.com/firehol/netdata/wiki/Why-netdata%3F)**
 
 ---
 
-## Installation
+## Instalacion
 
-Use our **[automatic installer](https://github.com/firehol/netdata/wiki/Installation)** to build and install it on your system
+Usa nuestra  **[instalacion automatica](https://github.com/firehol/netdata/wiki/Installation)** para crear y instalar en tu sistema.
 
-It should run on **any Linux** system. It has been tested on:
+Funciona en  **cualquier systema Linux**. Fue testiado en:
 
 - Gentoo
 - Arch Linux
@@ -157,6 +157,6 @@ It should run on **any Linux** system. It has been tested on:
 
 ---
 
-## Documentation
+## Documentacion
 
 Check the **[netdata wiki](https://github.com/firehol/netdata/wiki)**.
