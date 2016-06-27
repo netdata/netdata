@@ -47,8 +47,8 @@
 #define MAX_NAME 100
 #define MAX_CMDLINE 1024
 
-long processors = 1;
-long pid_max = 32768;
+int processors = 1;
+pid_t pid_max = 32768;
 int debug = 0;
 
 int update_every = 1;
@@ -58,160 +58,6 @@ int proc_pid_cmdline_is_needed = 0;
 char *host_prefix = "";
 char *config_dir = CONFIG_DIR;
 
-#ifdef NETDATA_INTERNAL_CHECKS
-// ----------------------------------------------------------------------------
-// memory debugger
-// do not use in production systems - it mis-aligns allocated memory
-
-struct allocations {
-	size_t allocations;
-	size_t allocated;
-	size_t allocated_max;
-} allocations = { 0, 0, 0 };
-
-#define MALLOC_MARK (uint32_t)(0x0BADCAFE)
-#define MALLOC_PREFIX (sizeof(uint32_t) * 2)
-#define MALLOC_SUFFIX (sizeof(uint32_t))
-#define MALLOC_OVERHEAD (MALLOC_PREFIX + MALLOC_SUFFIX)
-
-void *mark_allocation(void *allocated_ptr, size_t size_without_overheads) {
-	uint32_t *real_ptr = (uint32_t *)allocated_ptr;
-	real_ptr[0] = MALLOC_MARK;
-	real_ptr[1] = (uint32_t) size_without_overheads;
-
-	uint32_t *end_ptr = (uint32_t *)(allocated_ptr + MALLOC_PREFIX + size_without_overheads);
-	end_ptr[0] = MALLOC_MARK;
-
-	// fprintf(stderr, "MEMORY_POINTER: Allocated at %p, returning %p.\n", allocated_ptr, (void *)(allocated_ptr + MALLOC_PREFIX));
-
-	return allocated_ptr + MALLOC_PREFIX;
-}
-
-void *check_allocation(const char *file, int line, const char *function, void *marked_ptr, size_t *size_without_overheads_ptr) {
-	uint32_t *real_ptr = (uint32_t *)(marked_ptr - MALLOC_PREFIX);
-
-	// fprintf(stderr, "MEMORY_POINTER: Checking pointer at %p, real %p for %s/%u@%s.\n", marked_ptr, (void *)(marked_ptr - MALLOC_PREFIX), function, line, file);
-
-	if(real_ptr[0] != MALLOC_MARK) fatal("MEMORY: prefix MARK is not valid for %s/%d@%s.", function, line, file);
-
-	size_t size = real_ptr[1];
-
-	uint32_t *end_ptr = (uint32_t *)(marked_ptr + size);
-	if(end_ptr[0] != MALLOC_MARK) fatal("MEMORY: suffix MARK of allocation with size %zu is not valid for %s/%d@%s.", size, function, line, file);
-
-	if(size_without_overheads_ptr) *size_without_overheads_ptr = size;
-
-	return real_ptr;
-}
-
-void *malloc_debug(const char *file, int line, const char *function, size_t size) {
-	void *ptr = malloc(size + MALLOC_OVERHEAD);
-	if(!ptr) fatal("MEMORY: Cannot allocate %zu bytes for %s/%d@%s.", size, function, line, file);
-
-	allocations.allocated += size;
-	allocations.allocations++;
-
-	debug(D_MEMORY, "MEMORY: Allocated %zu bytes for %s/%d@%s."
-		" Status: allocated %zu in %zu allocs."
-		, size
-		, function, line, file
-		, allocations.allocated
-		, allocations.allocations
-	);
-
-	if(allocations.allocated > allocations.allocated_max) {
-		debug(D_MEMORY, "MEMORY: total allocation peak increased from %zu to %zu", allocations.allocated_max, allocations.allocated);
-		allocations.allocated_max = allocations.allocated;
-	}
-
-	size_t csize;
-	check_allocation(file, line, function, mark_allocation(ptr, size), &csize);
-	if(size != csize) {
-		fatal("Invalid size.");
-	}
-
-	return mark_allocation(ptr, size);
-}
-
-void *calloc_debug(const char *file, int line, const char *function, size_t nmemb, size_t size) {
-	void *ptr = malloc_debug(file, line, function, (nmemb * size));
-	bzero(ptr, nmemb * size);
-	return ptr;
-}
-
-void free_debug(const char *file, int line, const char *function, void *ptr) {
-	size_t size;
-	void *real_ptr = check_allocation(file, line, function, ptr, &size);
-
-	bzero(real_ptr, size + MALLOC_OVERHEAD);
-
-	free(real_ptr);
-	allocations.allocated -= size;
-	allocations.allocations--;
-
-	debug(D_MEMORY, "MEMORY: freed %zu bytes for %s/%d@%s."
-		" Status: allocated %zu in %zu allocs."
-		, size
-		, function, line, file
-		, allocations.allocated
-		, allocations.allocations
-	);
-}
-
-void *realloc_debug(const char *file, int line, const char *function, void *ptr, size_t size) {
-	if(!ptr) return malloc_debug(file, line, function, size);
-	if(!size) { free_debug(file, line, function, ptr); return NULL; }
-
-	size_t old_size;
-	void *real_ptr = check_allocation(file, line, function, ptr, &old_size);
-
-	void *new_ptr = realloc(real_ptr, size + MALLOC_OVERHEAD);
-	if(!new_ptr) fatal("MEMORY: Cannot allocate %zu bytes for %s/%d@%s.", size, function, line, file);
-
-	allocations.allocated += size;
-	allocations.allocated -= old_size;
-
-	debug(D_MEMORY, "MEMORY: Re-allocated from %zu to %zu bytes for %s/%d@%s."
-		" Status: allocated %zu in %zu allocs."
-		, old_size, size
-		, function, line, file
-		, allocations.allocated
-		, allocations.allocations
-	);
-
-	if(allocations.allocated > allocations.allocated_max) {
-		debug(D_MEMORY, "MEMORY: total allocation peak increased from %zu to %zu", allocations.allocated_max, allocations.allocated);
-		allocations.allocated_max = allocations.allocated;
-	}
-
-	return mark_allocation(new_ptr, size);
-}
-
-char *strdup_debug(const char *file, int line, const char *function, const char *ptr) {
-	size_t size = 0;
-	const char *s = ptr;
-
-	while(*s++) size++;
-	size++;
-
-	char *p = malloc_debug(file, line, function, size);
-	if(!p) fatal("Cannot allocate %zu bytes.", size);
-
-	memcpy(p, ptr, size);
-	return p;
-}
-
-#define malloc(size) malloc_debug(__FILE__, __LINE__, __FUNCTION__, (size))
-#define calloc(nmemb, size) calloc_debug(__FILE__, __LINE__, __FUNCTION__, (nmemb), (size))
-#define realloc(ptr, size) realloc_debug(__FILE__, __LINE__, __FUNCTION__, (ptr), (size))
-#define free(ptr) free_debug(__FILE__, __LINE__, __FUNCTION__, (ptr))
-
-#ifdef strdup
-#undef strdup
-#endif
-#define strdup(ptr) strdup_debug(__FILE__, __LINE__, __FUNCTION__, (ptr))
-
-#endif /* NETDATA_INTERNAL_CHECKS */
 
 // ----------------------------------------------------------------------------
 
@@ -254,9 +100,9 @@ long get_system_cpus(void) {
 	return processors;
 }
 
-long get_system_pid_max(void) {
+pid_t get_system_pid_max(void) {
 	procfile *ff = NULL;
-	long mpid = 32768;
+	pid_t mpid = 32768;
 
 	char filename[FILENAME_MAX + 1];
 	snprintfz(filename, FILENAME_MAX, "%s/proc/sys/kernel/pid_max", host_prefix);
@@ -269,7 +115,7 @@ long get_system_pid_max(void) {
 		return mpid;
 	}
 
-	mpid = atol(procfile_lineword(ff, 0, 0));
+	mpid = (pid_t)atoi(procfile_lineword(ff, 0, 0));
 	if(!mpid) mpid = 32768;
 
 	procfile_close(ff);
@@ -304,14 +150,14 @@ struct target {
 	unsigned long long num_threads;
 	unsigned long long rss;
 
-	unsigned long long fix_minflt;
-	unsigned long long fix_cminflt;
-	unsigned long long fix_majflt;
-	unsigned long long fix_cmajflt;
-	unsigned long long fix_utime;
-	unsigned long long fix_stime;
-	unsigned long long fix_cutime;
-	unsigned long long fix_cstime;
+	long long fix_minflt;
+	long long fix_cminflt;
+	long long fix_majflt;
+	long long fix_cmajflt;
+	long long fix_utime;
+	long long fix_stime;
+	long long fix_cutime;
+	long long fix_cstime;
 
 	unsigned long long statm_size;
 	unsigned long long statm_resident;
@@ -675,13 +521,19 @@ struct pid_stat {
 	// we will subtract these values from the old
 	// target
 	unsigned long long last_minflt;
-	unsigned long long last_cminflt;
 	unsigned long long last_majflt;
-	unsigned long long last_cmajflt;
 	unsigned long long last_utime;
 	unsigned long long last_stime;
+
+	unsigned long long last_cminflt;
+	unsigned long long last_cmajflt;
 	unsigned long long last_cutime;
 	unsigned long long last_cstime;
+
+	unsigned long long last_fix_cminflt;
+	unsigned long long last_fix_cmajflt;
+	unsigned long long last_fix_cutime;
+	unsigned long long last_fix_cstime;
 
 	unsigned long long last_io_logical_bytes_read;
 	unsigned long long last_io_logical_bytes_written;
@@ -691,27 +543,10 @@ struct pid_stat {
 	unsigned long long last_io_storage_bytes_written;
 	unsigned long long last_io_cancelled_write_bytes;
 
-#ifdef AGGREGATE_CHILDREN_TO_PARENTS
-	unsigned long long old_utime;
-	unsigned long long old_stime;
-	unsigned long long old_minflt;
-	unsigned long long old_majflt;
-
-	unsigned long long old_cutime;
-	unsigned long long old_cstime;
-	unsigned long long old_cminflt;
-	unsigned long long old_cmajflt;
-
-	unsigned long long fix_cutime;
-	unsigned long long fix_cstime;
 	unsigned long long fix_cminflt;
 	unsigned long long fix_cmajflt;
-
-	unsigned long long diff_cutime;
-	unsigned long long diff_cstime;
-	unsigned long long diff_cminflt;
-	unsigned long long diff_cmajflt;
-#endif /* AGGREGATE_CHILDREN_TO_PARENTS */
+	unsigned long long fix_cutime;
+	unsigned long long fix_cstime;
 
 	int *fds;						// array of fds it uses
 	int fds_size;					// the size of the fds array
@@ -765,7 +600,8 @@ void del_pid_entry(pid_t pid)
 {
 	if(!all_pids[pid]) return;
 
-	if(debug) fprintf(stderr, "apps.plugin: process %d %s exited, deleting it.\n", pid, all_pids[pid]->comm);
+	if(unlikely(debug))
+		fprintf(stderr, "apps.plugin: process %d %s exited, deleting it.\n", pid, all_pids[pid]->comm);
 
 	if(root_of_pids == all_pids[pid]) root_of_pids = all_pids[pid]->next;
 	if(all_pids[pid]->next) all_pids[pid]->next->prev = all_pids[pid]->prev;
@@ -898,7 +734,7 @@ int read_proc_pid_stat(struct pid_stat *p) {
 	// p->guest_time	= strtoull(procfile_lineword(ff, 0, 42+i), NULL, 10);
 	// p->cguest_time	= strtoull(procfile_lineword(ff, 0, 43), NULL, 10);
 
-	if(debug || (p->target && p->target->debug))
+	if(unlikely(debug || (p->target && p->target->debug)))
 		fprintf(stderr, "apps.plugin: READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' VALUES: utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu, threads=%d\n", host_prefix, p->pid, p->comm, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
 
 	// procfile_close(ff);
@@ -1048,13 +884,16 @@ void file_descriptor_not_used(int id)
 		}
 #endif /* NETDATA_INTERNAL_CHECKS */
 
-		if(debug) fprintf(stderr, "apps.plugin: decreasing slot %d (count = %d).\n", id, all_files[id].count);
+		if(unlikely(debug))
+			fprintf(stderr, "apps.plugin: decreasing slot %d (count = %d).\n", id, all_files[id].count);
 
 		if(all_files[id].count > 0) {
 			all_files[id].count--;
 
 			if(!all_files[id].count) {
-				if(debug) fprintf(stderr, "apps.plugin:   >> slot %d is empty.\n", id);
+				if(unlikely(debug))
+					fprintf(stderr, "apps.plugin:   >> slot %d is empty.\n", id);
+
 				file_descriptor_remove(&all_files[id]);
 #ifdef NETDATA_INTERNAL_CHECKS
 				all_files[id].magic = 0x00000000;
@@ -1073,12 +912,15 @@ int file_descriptor_find_or_add(const char *name)
 	static int last_pos = 0;
 	uint32_t hash = simple_hash(name);
 
-	if(debug) fprintf(stderr, "apps.plugin: adding or finding name '%s' with hash %u\n", name, hash);
+	if(unlikely(debug))
+		fprintf(stderr, "apps.plugin: adding or finding name '%s' with hash %u\n", name, hash);
 
 	struct file_descriptor *fd = file_descriptor_find(name, hash);
 	if(fd) {
 		// found
-		if(debug) fprintf(stderr, "apps.plugin:   >> found on slot %d\n", fd->pos);
+		if(unlikely(debug))
+			fprintf(stderr, "apps.plugin:   >> found on slot %d\n", fd->pos);
+
 		fd->count++;
 		return fd->pos;
 	}
@@ -1090,19 +932,25 @@ int file_descriptor_find_or_add(const char *name)
 		int i;
 
 		// there is no empty slot
-		if(debug) fprintf(stderr, "apps.plugin: extending fd array to %d entries\n", all_files_size + FILE_DESCRIPTORS_INCREASE_STEP);
+		if(unlikely(debug))
+			fprintf(stderr, "apps.plugin: extending fd array to %d entries\n", all_files_size + FILE_DESCRIPTORS_INCREASE_STEP);
+
 		all_files = realloc(all_files, (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP) * sizeof(struct file_descriptor));
 
 		// if the address changed, we have to rebuild the index
 		// since all pointers are now invalid
 		if(old && old != (void *)all_files) {
-			if(debug) fprintf(stderr, "apps.plugin:   >> re-indexing.\n");
+			if(unlikely(debug))
+				fprintf(stderr, "apps.plugin:   >> re-indexing.\n");
+
 			all_files_index.root = NULL;
 			for(i = 0; i < all_files_size; i++) {
 				if(!all_files[i].count) continue;
 				file_descriptor_add(&all_files[i]);
 			}
-			if(debug) fprintf(stderr, "apps.plugin:   >> re-indexing done.\n");
+
+			if(unlikely(debug))
+				fprintf(stderr, "apps.plugin:   >> re-indexing done.\n");
 		}
 
 		for(i = all_files_size; i < (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP); i++) {
@@ -1118,7 +966,8 @@ int file_descriptor_find_or_add(const char *name)
 		all_files_size += FILE_DESCRIPTORS_INCREASE_STEP;
 	}
 
-	if(debug) fprintf(stderr, "apps.plugin:   >> searching for empty slot.\n");
+	if(unlikely(debug))
+		fprintf(stderr, "apps.plugin:   >> searching for empty slot.\n");
 
 	// search for an empty slot
 	int i, c;
@@ -1127,14 +976,17 @@ int file_descriptor_find_or_add(const char *name)
 		if(c == 0) continue;
 
 		if(!all_files[c].count) {
-			if(debug) fprintf(stderr, "apps.plugin:   >> Examining slot %d.\n", c);
+			if(unlikely(debug))
+				fprintf(stderr, "apps.plugin:   >> Examining slot %d.\n", c);
 
 #ifdef NETDATA_INTERNAL_CHECKS
 			if(all_files[c].magic == 0x0BADCAFE && all_files[c].name && file_descriptor_find(all_files[c].name, all_files[c].hash))
 				error("fd on position %d is not cleared properly. It still has %s in it.\n", c, all_files[c].name);
 #endif /* NETDATA_INTERNAL_CHECKS */
 
-			if(debug) fprintf(stderr, "apps.plugin:   >> %s fd position %d for %s (last name: %s)\n", all_files[c].name?"re-using":"using", c, name, all_files[c].name);
+			if(unlikely(debug))
+				fprintf(stderr, "apps.plugin:   >> %s fd position %d for %s (last name: %s)\n", all_files[c].name?"re-using":"using", c, name, all_files[c].name);
+
 			if(all_files[c].name) free((void *)all_files[c].name);
 			all_files[c].name = NULL;
 			last_pos = c;
@@ -1145,7 +997,9 @@ int file_descriptor_find_or_add(const char *name)
 		fatal("We should find an empty slot, but there isn't any");
 		exit(1);
 	}
-	if(debug) fprintf(stderr, "apps.plugin:   >> updating slot %d.\n", c);
+
+	if(unlikely(debug))
+		fprintf(stderr, "apps.plugin:   >> updating slot %d.\n", c);
 
 	all_files_len++;
 
@@ -1161,11 +1015,15 @@ int file_descriptor_find_or_add(const char *name)
 	else if(strcmp(name, "anon_inode:[timerfd]") == 0) type = FILETYPE_TIMERFD;
 	else if(strcmp(name, "anon_inode:[signalfd]") == 0) type = FILETYPE_SIGNALFD;
 	else if(strncmp(name, "anon_inode:", 11) == 0) {
-		if(debug) fprintf(stderr, "apps.plugin: FIXME: unknown anonymous inode: %s\n", name);
+		if(unlikely(debug))
+			fprintf(stderr, "apps.plugin: FIXME: unknown anonymous inode: %s\n", name);
+
 		type = FILETYPE_OTHER;
 	}
 	else {
-		if(debug) fprintf(stderr, "apps.plugin: FIXME: cannot understand linkname: %s\n", name);
+		if(unlikely(debug))
+			fprintf(stderr, "apps.plugin: FIXME: cannot understand linkname: %s\n", name);
+
 		type = FILETYPE_OTHER;
 	}
 
@@ -1179,7 +1037,8 @@ int file_descriptor_find_or_add(const char *name)
 #endif /* NETDATA_INTERNAL_CHECKS */
 	file_descriptor_add(&all_files[c]);
 
-	if(debug) fprintf(stderr, "apps.plugin: using fd position %d (name: %s)\n", c, all_files[c].name);
+	if(unlikely(debug))
+		fprintf(stderr, "apps.plugin: using fd position %d (name: %s)\n", c, all_files[c].name);
 
 	return c;
 }
@@ -1208,7 +1067,9 @@ int read_pid_file_descriptors(struct pid_stat *p) {
 			if(fdid < 0) continue;
 			if(fdid >= p->fds_size) {
 				// it is small, extend it
-				if(debug) fprintf(stderr, "apps.plugin: extending fd memory slots for %s from %d to %d\n", p->comm, p->fds_size, fdid + 100);
+				if(unlikely(debug))
+					fprintf(stderr, "apps.plugin: extending fd memory slots for %s from %d to %d\n", p->comm, p->fds_size, fdid + 100);
+
 				p->fds = realloc(p->fds, (fdid + 100) * sizeof(int));
 				if(!p->fds) {
 					fatal("Cannot re-allocate fds for %s", p->comm);
@@ -1297,14 +1158,20 @@ int collect_data_for_all_processes_from_proc(void)
 		p->merged = 0;
 		p->new_entry = 0;
 
-        p->last_minflt  = p->minflt;
-        p->last_cminflt  = p->cminflt;
-        p->last_majflt  = p->majflt;
-        p->last_cmajflt  = p->cmajflt;
+        p->last_minflt = p->minflt;
+        p->last_majflt = p->majflt;
         p->last_utime  = p->utime;
         p->last_stime  = p->stime;
+
+        p->last_cminflt = p->cminflt;
+        p->last_cmajflt = p->cmajflt;
         p->last_cutime  = p->cutime;
         p->last_cstime  = p->cstime;
+
+        p->last_fix_cminflt = p->fix_cminflt;
+        p->last_fix_cmajflt = p->fix_cmajflt;
+        p->last_fix_cutime  = p->fix_cutime;
+        p->last_fix_cstime  = p->fix_cstime;
 
         p->last_io_logical_bytes_read  = p->io_logical_bytes_read;
         p->last_io_logical_bytes_written  = p->io_logical_bytes_written;
@@ -1320,8 +1187,13 @@ int collect_data_for_all_processes_from_proc(void)
 		pid_t pid = (pid_t) strtoul(file->d_name, &endptr, 10);
 
 		// make sure we read a valid number
-		if(unlikely(pid <= 0 || pid > pid_max || endptr == file->d_name || *endptr != '\0'))
+		if(unlikely(endptr == file->d_name || *endptr != '\0'))
 			continue;
+
+		if(unlikely(pid <= 0 || pid > pid_max)) {
+			error("Invalid pid %d read (expected 1 to %d). Ignoring process.", pid, pid_max);
+			continue;
+		}
 
 		p = get_pid_entry(pid);
 		if(unlikely(!p)) continue;
@@ -1388,7 +1260,9 @@ int collect_data_for_all_processes_from_proc(void)
 		// check if it is target
 		// we do this only once, the first time this pid is loaded
 		if(unlikely(p->new_entry)) {
-			if(debug) fprintf(stderr, "apps.plugin: \tJust added %s\n", p->comm);
+			if(unlikely(debug))
+				fprintf(stderr, "apps.plugin: \tJust added %s\n", p->comm);
+
 			uint32_t hash = simple_hash(p->comm);
 			size_t pclen = strlen(p->comm);
 
@@ -1434,49 +1308,6 @@ int collect_data_for_all_processes_from_proc(void)
 	return 1;
 }
 
-
-// ----------------------------------------------------------------------------
-
-#ifdef AGGREGATE_CHILDREN_TO_PARENTS
-// print a tree view of all processes
-int debug_childrens_aggregations(pid_t pid, int level) {
-	struct pid_stat *p = NULL;
-	char b[level+3];
-	int i, ret = 0;
-
-	for(i = 0; i < level; i++) b[i] = '\t';
-	b[level] = '|';
-	b[level+1] = '-';
-	b[level+2] = '\0';
-
-	for(p = root_of_pids; p ; p = p->next) {
-		if(p->ppid == pid) {
-			ret += debug_childrens_aggregations(p->pid, level+1);
-		}
-	}
-
-	p = all_pids[pid];
-	if(p) {
-		if(!p->updated) ret += 1;
-		if(ret) fprintf(stderr, "%s %s %d [%s, %s] c=%d u=%llu+%llu, s=%llu+%llu, cu=%llu+%llu, cs=%llu+%llu, n=%llu+%llu, j=%llu+%llu, cn=%llu+%llu, cj=%llu+%llu\n"
-			, b, p->comm, p->pid, p->updated?"OK":"KILLED", p->target->name, p->children_count
-			, p->utime, p->utime - p->old_utime
-			, p->stime, p->stime - p->old_stime
-			, p->cutime, p->cutime - p->old_cutime
-			, p->cstime, p->cstime - p->old_cstime
-			, p->minflt, p->minflt - p->old_minflt
-			, p->majflt, p->majflt - p->old_majflt
-			, p->cminflt, p->cminflt - p->old_cminflt
-			, p->cmajflt, p->cmajflt - p->old_cmajflt
-			);
-	}
-
-	return ret;
-}
-#endif /* AGGREGATE_CHILDREN_TO_PARENTS */
-
-
-
 // ----------------------------------------------------------------------------
 // update statistics on the targets
 
@@ -1501,81 +1332,41 @@ void link_all_processes_to_their_parents(void) {
 	for(p = root_of_pids; p ; p = p->next) {
 		// for each process found running
 
-		if(p->ppid > 0
-				&& p->ppid <= pid_max
-				&& all_pids[p->ppid]
-			) {
+		if(likely(p->ppid > 0 && all_pids[p->ppid])) {
 			// for valid processes
 
-			if(debug || (p->target && p->target->debug))
+			if(unlikely(debug || (p->target && p->target->debug)))
 				fprintf(stderr, "apps.plugin: \tparent of %d (%s) is %d (%s)\n", p->pid, p->comm, p->ppid, all_pids[p->ppid]->comm);
 
 			p->parent = all_pids[p->ppid];
 			p->parent->children_count++;
+
+			if(unlikely(!p->updated)) {
+				struct pid_stat *pp = p;
+
+				// find the first parent that
+				// has been updated
+				while(pp && !pp->updated)
+					pp = pp->parent;
+
+				if(likely(pp)) {
+					// this is an exited child with a parent
+					// remove the known time from the parent's data
+					pp->fix_cminflt += p->minflt + p->cminflt + p->fix_cminflt;
+					pp->fix_cmajflt += p->majflt + p->cmajflt + p->fix_cmajflt;
+					pp->fix_cutime  += p->utime  + p->cutime  + p->fix_cutime;
+					pp->fix_cstime  += p->stime  + p->cstime  + p->fix_cstime;
+
+					if(unlikely(debug))
+						fprintf(stderr, "apps.plugin: \tfixing child counters of %d (%s) to %d (%s). Fixes: cutime=%llu, cstime=%llu, cminflt=%llu, cmajflt=%llu\n", p->pid, p->comm, pp->pid, pp->comm, pp->fix_cutime, pp->fix_cstime, pp->fix_cminflt, pp->fix_cmajflt);
+				}
+			}
 		}
-		else if(p->ppid != 0)
+		else if(unlikely(p->ppid != 0))
 			error("pid %d %s states parent %d, but the later does not exist.", p->pid, p->comm, p->ppid);
 	}
 }
 
-#ifdef AGGREGATE_CHILDREN_TO_PARENTS
-void aggregate_children_to_parents(void) {
-	struct pid_stat *p = NULL;
-
-	// for each killed process, remove its values from the parents
-	// sums (we had already added them in a previous loop)
-	for(p = root_of_pids; p ; p = p->next) {
-		if(p->updated) continue;
-
-		if(debug) fprintf(stderr, "apps.plugin: UNMERGING %d %s\n", p->pid, p->comm);
-
-		unsigned long long diff_utime = p->utime + p->cutime + p->fix_cutime;
-		unsigned long long diff_stime = p->stime + p->cstime + p->fix_cstime;
-		unsigned long long diff_minflt = p->minflt + p->cminflt + p->fix_cminflt;
-		unsigned long long diff_majflt = p->majflt + p->cmajflt + p->fix_cmajflt;
-
-		struct pid_stat *t = p;
-		while((t = t->parent)) {
-			if(!t->updated) continue;
-
-			unsigned long long x;
-			if(diff_utime && t->diff_cutime) {
-				x = (t->diff_cutime < diff_utime)?t->diff_cutime:diff_utime;
-				diff_utime -= x;
-				t->diff_cutime -= x;
-				t->fix_cutime += x;
-				if(debug) fprintf(stderr, "apps.plugin: \t cutime %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
-			}
-			if(diff_stime && t->diff_cstime) {
-				x = (t->diff_cstime < diff_stime)?t->diff_cstime:diff_stime;
-				diff_stime -= x;
-				t->diff_cstime -= x;
-				t->fix_cstime += x;
-				if(debug) fprintf(stderr, "apps.plugin: \t cstime %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
-			}
-			if(diff_minflt && t->diff_cminflt) {
-				x = (t->diff_cminflt < diff_minflt)?t->diff_cminflt:diff_minflt;
-				diff_minflt -= x;
-				t->diff_cminflt -= x;
-				t->fix_cminflt += x;
-				if(debug) fprintf(stderr, "apps.plugin: \t cminflt %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
-			}
-			if(diff_majflt && t->diff_cmajflt) {
-				x = (t->diff_cmajflt < diff_majflt)?t->diff_cmajflt:diff_majflt;
-				diff_majflt -= x;
-				t->diff_cmajflt -= x;
-				t->fix_cmajflt += x;
-				if(debug) fprintf(stderr, "apps.plugin: \t cmajflt %llu from %d %s %s\n", x, t->pid, t->comm, t->target->name);
-			}
-		}
-
-		if(diff_utime) error("Cannot fix up utime %llu", diff_utime);
-		if(diff_stime) error("Cannot fix up stime %llu", diff_stime);
-		if(diff_minflt) error("Cannot fix up minflt %llu", diff_minflt);
-		if(diff_majflt) error("Cannot fix up majflt %llu", diff_majflt);
-	}
-}
-#endif /* AGGREGATE_CHILDREN_TO_PARENTS */
 
 void cleanup_non_existing_pids(void) {
 	int c;
@@ -1603,8 +1394,9 @@ void apply_apps_groups_targets_inheritance(void) {
 
 	// children that do not have a target
 	// inherit their target from their parent
-	int found = 1;
+	int found = 1, loops = 0;
 	while(found) {
+		if(unlikely(debug)) loops++;
 		found = 0;
 		for(p = root_of_pids; p ; p = p->next) {
 			// if this process does not have a target
@@ -1626,6 +1418,7 @@ void apply_apps_groups_targets_inheritance(void) {
 	// repeat, until nothing more can be done.
 	found = 1;
 	while(found) {
+		if(unlikely(debug)) loops++;
 		found = 0;
 		for(p = root_of_pids; p ; p = p->next) {
 			// if this process does not have any children
@@ -1658,7 +1451,7 @@ void apply_apps_groups_targets_inheritance(void) {
 			}
 		}
 
-		if(debug)
+		if(unlikely(debug))
 			fprintf(stderr, "apps.plugin: merged %d processes\n", found);
 	}
 
@@ -1667,25 +1460,18 @@ void apply_apps_groups_targets_inheritance(void) {
 		all_pids[1]->target = apps_groups_default_target;
 
 	// give a default target on all top level processes
+	if(unlikely(debug)) loops++;
 	for(p = root_of_pids; p ; p = p->next) {
 		// if the process is not merged itself
 		// then is is a top level process
 		if(!p->merged && !p->target)
 			p->target = apps_groups_default_target;
-
-#ifdef AGGREGATE_CHILDREN_TO_PARENTS
-		// by the way, update the diffs
-		// will be used later for subtracting killed process times
-		p->diff_cutime = p->utime - p->cutime;
-		p->diff_cstime = p->stime - p->cstime;
-		p->diff_cminflt = p->minflt - p->cminflt;
-		p->diff_cmajflt = p->majflt - p->cmajflt;
-#endif /* AGGREGATE_CHILDREN_TO_PARENTS */
 	}
 
 	// give a target to all merged child processes
 	found = 1;
 	while(found) {
+		if(unlikely(debug)) loops++;
 		found = 0;
 		for(p = root_of_pids; p ; p = p->next) {
 			if(unlikely(!p->target && p->merged && p->parent && p->parent->target)) {
@@ -1697,6 +1483,9 @@ void apply_apps_groups_targets_inheritance(void) {
 			}
 		}
 	}
+
+	if(unlikely(debug))
+		fprintf(stderr, "apps.plugin: apply_apps_groups_targets_inheritance() made %d loops on the process tree\n", loops);
 }
 
 long zero_all_targets(struct target *root) {
@@ -1749,10 +1538,13 @@ void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target
 	}
 
 	if(likely(p->updated)) {
-		w->cutime += p->cutime; // - p->fix_cutime;
-		w->cstime += p->cstime; // - p->fix_cstime;
-		w->cminflt += p->cminflt; // - p->fix_cminflt;
-		w->cmajflt += p->cmajflt; // - p->fix_cmajflt;
+		if(unlikely(debug && (p->fix_cutime || p->fix_cstime || p->fix_cminflt || p->fix_cmajflt)))
+			fprintf(stderr, "apps.plugin: \tadding child counters of %d (%s) to target %s. Currents: cutime=%llu, cstime=%llu, cminflt=%llu, cmajflt=%llu, Fixes: cutime=%llu, cstime=%llu, cminflt=%llu, cmajflt=%llu\n", p->pid, p->comm, w->name, p->cutime, p->cstime, p->cminflt, p->cmajflt, p->fix_cutime, p->fix_cstime, p->fix_cminflt, p->fix_cmajflt);
+
+		w->cutime  += p->cutime  - p->fix_cutime;
+		w->cstime  += p->cstime  - p->fix_cstime;
+		w->cminflt += p->cminflt - p->fix_cminflt;
+		w->cmajflt += p->cmajflt - p->fix_cmajflt;
 
 		w->utime += p->utime; //+ (p->pid != 1)?(p->cutime - p->fix_cutime):0;
 		w->stime += p->stime; //+ (p->pid != 1)?(p->cstime - p->fix_cstime):0;
@@ -1800,7 +1592,7 @@ void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target
 		}
 
 		if(unlikely(debug || w->debug))
-			fprintf(stderr, "apps.plugin: \tAggregating %s pid %d on %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, w->name, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+			fprintf(stderr, "apps.plugin: \tAggregating %s pid %d on %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu, fix_cutime=%llu, fix_cstime=%llu, fix_cminflt=%llu, fix_cmajflt=%llu\n", p->comm, p->pid, w->name, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->fix_cutime, p->fix_cstime, p->fix_cminflt, p->fix_cmajflt);
 
 /*		if(p->utime - p->old_utime > 100) fprintf(stderr, "BIG CHANGE: %d %s utime increased by %llu from %llu to %llu\n", p->pid, p->comm, p->utime - p->old_utime, p->old_utime, p->utime);
 		if(p->cutime - p->old_cutime > 100) fprintf(stderr, "BIG CHANGE: %d %s cutime increased by %llu from %llu to %llu\n", p->pid, p->comm, p->cutime - p->old_cutime, p->old_cutime, p->cutime);
@@ -1811,16 +1603,6 @@ void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target
 		if(p->cminflt - p->old_cminflt > 15000) fprintf(stderr, "BIG CHANGE: %d %s cminflt increased by %llu from %llu to %llu\n", p->pid, p->comm, p->cminflt - p->old_cminflt, p->old_cminflt, p->cminflt);
 		if(p->cmajflt - p->old_cmajflt > 15000) fprintf(stderr, "BIG CHANGE: %d %s cmajflt increased by %llu from %llu to %llu\n", p->pid, p->comm, p->cmajflt - p->old_cmajflt, p->old_cmajflt, p->cmajflt);
 */
-#ifdef AGGREGATE_CHILDREN_TO_PARENTS
-		p->old_utime = p->utime;
-		p->old_cutime = p->cutime;
-		p->old_stime = p->stime;
-		p->old_cstime = p->cstime;
-		p->old_minflt = p->minflt;
-		p->old_majflt = p->majflt;
-		p->old_cminflt = p->cminflt;
-		p->old_cmajflt = p->cmajflt;
-#endif /* AGGREGATE_CHILDREN_TO_PARENTS */
 
 		if(o) {
 			// since the process switched target
@@ -1831,16 +1613,15 @@ void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target
 			// IMPORTANT
 			// We add/subtract the last/OLD values we added to the target
 
-			w->fix_cutime -= p->last_cutime;
-			w->fix_cstime -= p->last_cstime;
-			w->fix_cminflt -= p->last_cminflt;
-			w->fix_cmajflt -= p->last_cmajflt;
+			w->fix_cutime -= (p->last_cutime - p->last_fix_cutime);
+			w->fix_cstime -= (p->last_cstime - p->last_fix_cstime);
+			w->fix_cminflt -= (p->last_cminflt - p->last_fix_cminflt);
+			w->fix_cmajflt -= (p->last_cmajflt - p->last_fix_cmajflt);
 
 			w->fix_utime -= p->last_utime;
 			w->fix_stime -= p->last_stime;
 			w->fix_minflt -= p->last_minflt;
 			w->fix_majflt -= p->last_majflt;
-
 
 			w->fix_io_logical_bytes_read -= p->last_io_logical_bytes_read;
 			w->fix_io_logical_bytes_written -= p->last_io_logical_bytes_written;
@@ -1852,10 +1633,10 @@ void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target
 
 			// ---
 
-			o->fix_cutime += p->last_cutime;
-			o->fix_cstime += p->last_cstime;
-			o->fix_cminflt += p->last_cminflt;
-			o->fix_cmajflt += p->last_cmajflt;
+			o->fix_cutime += (p->last_cutime - p->last_fix_cutime);
+			o->fix_cstime += (p->last_cstime - p->last_fix_cstime);
+			o->fix_cminflt += (p->last_cminflt - p->last_fix_cminflt);
+			o->fix_cmajflt += (p->last_cmajflt - p->last_fix_cmajflt);
 
 			o->fix_utime += p->last_utime;
 			o->fix_stime += p->last_stime;
@@ -1884,10 +1665,11 @@ void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target
 		w->fix_majflt += p->majflt;
 		w->fix_utime += p->utime;
 		w->fix_stime += p->stime;
-		w->fix_cminflt += p->cminflt;
-		w->fix_cmajflt += p->cmajflt;
-		w->fix_cutime += p->cutime;
-		w->fix_cstime += p->cstime;
+
+		w->fix_cminflt += (p->cminflt - p->fix_cminflt);
+		w->fix_cmajflt += (p->cmajflt - p->fix_cmajflt);
+		w->fix_cutime += (p->cutime - p->fix_cutime);
+		w->fix_cstime += (p->cstime - p->fix_cstime);
 
 		w->fix_io_logical_bytes_read += p->io_logical_bytes_read;
 		w->fix_io_logical_bytes_written += p->io_logical_bytes_written;
@@ -1967,18 +1749,9 @@ void calculate_netdata_statistics(void)
 	link_all_processes_to_their_parents();
 	apply_apps_groups_targets_inheritance();
 
-#ifdef AGGREGATE_CHILDREN_TO_PARENTS
-	aggregate_children_to_parents();
-#endif /* AGGREGATE_CHILDREN_TO_PARENTS */
-
 	zero_all_targets(users_root_target);
 	zero_all_targets(groups_root_target);
 	apps_groups_targets = zero_all_targets(apps_groups_root_target);
-
-#ifdef AGGREGATE_CHILDREN_TO_PARENTS
-	if(debug)
-		debug_childrens_aggregations(0, 1);
-#endif /* AGGREGATE_CHILDREN_TO_PARENTS */
 
 	// this has to be done, before the cleanup
 	struct pid_stat *p = NULL;
@@ -2099,7 +1872,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + w->stime + w->fix_utime + w->fix_stime);
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + w->stime + w->fix_utime + w->fix_stime + w->cutime + w->cstime + w->fix_cutime + w->fix_cstime);
 	}
 	fprintf(stdout, "END\n");
 
@@ -2107,7 +1880,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + w->fix_utime);
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + w->fix_utime + w->cutime + w->fix_cutime);
 	}
 	fprintf(stdout, "END\n");
 
@@ -2115,7 +1888,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->stime + w->fix_stime);
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->stime + w->fix_stime + w->cstime + w->fix_cstime);
 	}
 	fprintf(stdout, "END\n");
 
@@ -2147,7 +1920,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->minflt + w->fix_minflt);
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->minflt + w->fix_minflt + w->cminflt + w->fix_cminflt);
 	}
 	fprintf(stdout, "END\n");
 
@@ -2155,7 +1928,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->majflt + w->fix_majflt);
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->majflt + w->fix_majflt + w->cmajflt + w->fix_cmajflt);
 	}
 	fprintf(stdout, "END\n");
 
@@ -2239,7 +2012,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 
 	// we have something new to show
 	// update the charts
-	fprintf(stdout, "CHART %s.cpu '' '%s CPU Time (%ld%% = %ld core%s)' 'cpu time %%' cpu %s.cpu stacked 20001 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
+	fprintf(stdout, "CHART %s.cpu '' '%s CPU Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu stacked 20001 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
@@ -2267,18 +2040,18 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 		fprintf(stdout, "DIMENSION %s '' absolute 1 1 noreset\n", w->name);
 	}
 
-	fprintf(stdout, "CHART %s.cpu_user '' '%s CPU User Time (%ld%% = %ld core%s)' 'cpu time %%' cpu %s.cpu_user stacked 20020 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
+	fprintf(stdout, "CHART %s.cpu_user '' '%s CPU User Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_user stacked 20020 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %ld noreset\n", w->name, hz * processors);
+		fprintf(stdout, "DIMENSION %s '' incremental 100 %d noreset\n", w->name, hz);
 	}
 
-	fprintf(stdout, "CHART %s.cpu_system '' '%s CPU System Time (%ld%% = %ld core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20021 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
+	fprintf(stdout, "CHART %s.cpu_system '' '%s CPU System Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20021 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %ld noreset\n", w->name, hz * processors);
+		fprintf(stdout, "DIMENSION %s '' incremental 100 %d noreset\n", w->name, hz);
 	}
 
 	fprintf(stdout, "CHART %s.major_faults '' '%s Major Page Faults (swap read)' 'page faults/s' swap %s.major_faults stacked 20010 %d\n", type, title, type, update_every);
@@ -2488,7 +2261,8 @@ int main(int argc, char **argv)
 		send_collected_data_to_netdata(users_root_target, "users", dt);
 		send_collected_data_to_netdata(groups_root_target, "groups", dt);
 
-		if(debug) fprintf(stderr, "apps.plugin: done Loop No %llu\n", counter);
+		if(unlikely(debug))
+			fprintf(stderr, "apps.plugin: done Loop No %llu\n", counter);
 
 		current_t = time(NULL);
 
