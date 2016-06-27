@@ -567,7 +567,7 @@ global_update() {
 				exec_start_ms=$now_ms
 				$chart$charts_update $dt
 				ret=$?
-				
+
 				# return the current time in ms in $now_ms
 				current_time_ms; exec_end_ms=$now_ms
 
@@ -582,7 +582,7 @@ global_update() {
 				else
 					charts_serial_failures[$chart]=$(( charts_serial_failures[$chart] + 1 ))
 
-					if [ charts_serial_failures[$chart] -gt 10 ]
+					if [ ${charts_serial_failures[$chart]} -gt 10 ]
 						then
 						echo >&2 "$PROGRAM_NAME: chart '$chart' update() function reported failure ${charts_serial_failures[$chart]} times. Disabling it."
 					else
