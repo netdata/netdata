@@ -54,7 +54,7 @@ int debug = 0;
 int update_every = 1;
 unsigned long long file_counter = 0;
 int proc_pid_cmdline_is_needed = 0;
-
+int include_exited_childs = 1;
 char *host_prefix = "";
 char *config_dir = CONFIG_DIR;
 
@@ -1334,15 +1334,16 @@ void link_all_processes_to_their_parents(void) {
 			// the first time we see an entry
 			// we remove the exited children figures
 			// to avoid spikes
-			p->fix_cminflt += p->cminflt;
-			p->fix_cmajflt += p->cmajflt;
-			p->fix_cutime  += p->cutime;
-			p->fix_cstime  += p->cstime;
+			p->fix_cminflt = p->cminflt;
+			p->fix_cmajflt = p->cmajflt;
+			p->fix_cutime  = p->cutime;
+			p->fix_cstime  = p->cstime;
 		}
 
 		if(likely(p->ppid > 0 && all_pids[p->ppid])) {
+			// valid parent processes
+
 			struct pid_stat *pp;
-			// for valid processes
 
 			p->parent = pp = all_pids[p->ppid];
 			p->parent->children_count++;
@@ -1370,6 +1371,11 @@ void link_all_processes_to_their_parents(void) {
 					pp->fix_cmajflt += p->majflt + p->cmajflt + p->fix_cmajflt;
 					pp->fix_cutime  += p->utime  + p->cutime  + p->fix_cutime;
 					pp->fix_cstime  += p->stime  + p->cstime  + p->fix_cstime;
+
+					if(unlikely(pp->cminflt < pp->fix_cminflt)) pp->fix_cminflt = pp->cminflt;
+					if(unlikely(pp->cmajflt < pp->fix_cmajflt)) pp->fix_cmajflt = pp->cmajflt;
+					if(unlikely(pp->cutime  < pp->fix_cutime))  pp->fix_cutime  = pp->cutime;
+					if(unlikely(pp->cstime  < pp->fix_cstime))  pp->fix_cstime  = pp->cstime;
 
 					if(unlikely(debug))
 						fprintf(stderr, "apps.plugin: \tupdating child metrics of %d (%s, %s) to its parent %d (%s, %s). Parent has now: utime=%llu, stime=%llu, minflt=%llu, majflt=%llu, cutime=%llu, cstime=%llu, cminflt=%llu, cmajflt=%llu, fix_cutime=%llu, fix_cstime=%llu, fix_cminflt=%llu, fix_cmajflt=%llu\n", p->pid, p->comm, p->updated?"running":"exited", pp->pid, pp->comm, pp->updated?"running":"exited", pp->utime, pp->stime, pp->minflt, pp->majflt, pp->cutime, pp->cstime, pp->cminflt, pp->cmajflt, pp->fix_cutime, pp->fix_cstime, pp->fix_cminflt, pp->fix_cmajflt);
@@ -1627,41 +1633,46 @@ void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target
 			// IMPORTANT
 			// We add/subtract the last/OLD values we added to the target
 
-			w->fix_cutime -= (p->last_cutime - p->last_fix_cutime);
-			w->fix_cstime -= (p->last_cstime - p->last_fix_cstime);
-			w->fix_cminflt -= (p->last_cminflt - p->last_fix_cminflt);
-			w->fix_cmajflt -= (p->last_cmajflt - p->last_fix_cmajflt);
+			unsigned long long cutime  = p->last_cutime - p->last_fix_cutime;
+			unsigned long long cstime  = p->last_cstime - p->last_fix_cstime;
+			unsigned long long cminflt = p->last_cminflt - p->last_fix_cminflt;
+			unsigned long long cmajflt = p->last_cmajflt - p->last_fix_cmajflt;
 
-			w->fix_utime -= p->last_utime;
-			w->fix_stime -= p->last_stime;
+			w->fix_cutime  -= cutime;
+			w->fix_cstime  -= cstime;
+			w->fix_cminflt -= cminflt;
+			w->fix_cmajflt -= cmajflt;
+
+			w->fix_utime  -= p->last_utime;
+			w->fix_stime  -= p->last_stime;
 			w->fix_minflt -= p->last_minflt;
 			w->fix_majflt -= p->last_majflt;
 
-			w->fix_io_logical_bytes_read -= p->last_io_logical_bytes_read;
+			w->fix_io_logical_bytes_read    -= p->last_io_logical_bytes_read;
 			w->fix_io_logical_bytes_written -= p->last_io_logical_bytes_written;
-			w->fix_io_read_calls -= p->last_io_read_calls;
-			w->fix_io_write_calls -= p->last_io_write_calls;
-			w->fix_io_storage_bytes_read -= p->last_io_storage_bytes_read;
+			w->fix_io_read_calls            -= p->last_io_read_calls;
+			w->fix_io_write_calls           -= p->last_io_write_calls;
+			w->fix_io_storage_bytes_read    -= p->last_io_storage_bytes_read;
 			w->fix_io_storage_bytes_written -= p->last_io_storage_bytes_written;
 			w->fix_io_cancelled_write_bytes -= p->last_io_cancelled_write_bytes;
 
 			// ---
 
-			o->fix_cutime += (p->last_cutime - p->last_fix_cutime);
-			o->fix_cstime += (p->last_cstime - p->last_fix_cstime);
-			o->fix_cminflt += (p->last_cminflt - p->last_fix_cminflt);
-			o->fix_cmajflt += (p->last_cmajflt - p->last_fix_cmajflt);
+			o->fix_cutime  += cutime;
+			o->fix_cstime  += cstime;
+			o->fix_cminflt += cminflt;
+			o->fix_cmajflt += cmajflt;
 
-			o->fix_utime += p->last_utime;
-			o->fix_stime += p->last_stime;
+			o->fix_utime  += p->last_utime;
+			o->fix_stime  += p->last_stime;
 			o->fix_minflt += p->last_minflt;
 			o->fix_majflt += p->last_majflt;
 
-			o->fix_io_logical_bytes_read += p->last_io_logical_bytes_read;
+			o->fix_io_logical_bytes_read    += p->last_io_logical_bytes_read;
 			o->fix_io_logical_bytes_written += p->last_io_logical_bytes_written;
-			o->fix_io_read_calls += p->last_io_read_calls;
-			o->fix_io_write_calls += p->last_io_write_calls;
-			o->fix_io_storage_bytes_read += p->last_io_storage_bytes_read;
+			o->fix_io_read_calls            += p->last_io_read_calls;
+			o->fix_io_write_calls           += p->last_io_write_calls;
+			o->fix_io_storage_bytes_read    += p->last_io_storage_bytes_read;
 			o->fix_io_storage_bytes_written += p->last_io_storage_bytes_written;
 			o->fix_io_cancelled_write_bytes += p->last_io_cancelled_write_bytes;
 		}
@@ -1671,29 +1682,33 @@ void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target
 
 		// since the process has exited, the user
 		// will see a drop in our charts, because the incremental
-		// values of this process will not be there
+		// values of this process will not be there from now on
 
 		// add them to the fix_* values and they will be added to
 		// the reported values, so that the report goes steady
-		w->fix_minflt += p->minflt;
-		w->fix_majflt += p->majflt;
-		w->fix_utime += p->utime;
-		w->fix_stime += p->stime;
 
-		w->fix_cminflt += (p->cminflt - p->fix_cminflt);
-		w->fix_cmajflt += (p->cmajflt - p->fix_cmajflt);
-		w->fix_cutime += (p->cutime - p->fix_cutime);
-		w->fix_cstime += (p->cstime - p->fix_cstime);
+		w->fix_minflt  += p->last_minflt;
+		w->fix_majflt  += p->last_majflt;
+		w->fix_utime   += p->last_utime;
+		w->fix_stime   += p->last_stime;
 
-		w->fix_io_logical_bytes_read += p->io_logical_bytes_read;
-		w->fix_io_logical_bytes_written += p->io_logical_bytes_written;
-		w->fix_io_read_calls += p->io_read_calls;
-		w->fix_io_write_calls += p->io_write_calls;
-		w->fix_io_storage_bytes_read += p->io_storage_bytes_read;
-		w->fix_io_storage_bytes_written += p->io_storage_bytes_written;
-		w->fix_io_cancelled_write_bytes += p->io_cancelled_write_bytes;
+		w->fix_cminflt += (p->last_cminflt - p->last_fix_cminflt);
+		w->fix_cmajflt += (p->last_cmajflt - p->last_fix_cmajflt);
+		w->fix_cutime  += (p->last_cutime  - p->last_fix_cutime);
+		w->fix_cstime  += (p->last_cstime  - p->last_fix_cstime);
+
+		w->fix_io_logical_bytes_read    += p->last_io_logical_bytes_read;
+		w->fix_io_logical_bytes_written += p->last_io_logical_bytes_written;
+		w->fix_io_read_calls            += p->last_io_read_calls;
+		w->fix_io_write_calls           += p->last_io_write_calls;
+		w->fix_io_storage_bytes_read    += p->last_io_storage_bytes_read;
+		w->fix_io_storage_bytes_written += p->last_io_storage_bytes_written;
+		w->fix_io_cancelled_write_bytes += p->last_io_cancelled_write_bytes;
 	}
 
+	//if((long long)w->cutime + w->fix_cutime < 0)
+	//	error("Negative total cutime (%llu - %lld) on target %s after adding process %d (%s, %s) with utime=%llu, stime=%llu, minflt=%llu, majflt=%llu, cutime=%llu, cstime=%llu, cminflt=%llu, cmajflt=%llu, fix_cutime=%llu, fix_cstime=%llu, fix_cminflt=%llu, fix_cmajflt=%llu\n",
+	//		  w->cutime, w->fix_cutime, w->name, p->pid, p->comm, p->updated?"running":"exited", p->utime, p->stime, p->minflt, p->majflt, p->cutime, p->cstime, p->cminflt, p->cmajflt, p->fix_cutime, p->fix_cstime, p->fix_cminflt, p->fix_cmajflt);
 }
 
 void count_targets_fds(struct target *root) {
@@ -1886,7 +1901,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + w->stime + w->fix_utime + w->fix_stime + w->cutime + w->cstime + w->fix_cutime + w->fix_cstime);
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + w->stime + w->fix_utime + w->fix_stime + (include_exited_childs?(w->cutime + w->cstime + w->fix_cutime + w->fix_cstime):0));
 	}
 	fprintf(stdout, "END\n");
 
@@ -1894,7 +1909,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + w->fix_utime + w->cutime + w->fix_cutime);
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + w->fix_utime + (include_exited_childs?(w->cutime + w->fix_cutime):0));
 	}
 	fprintf(stdout, "END\n");
 
@@ -1902,7 +1917,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->stime + w->fix_stime + w->cstime + w->fix_cstime);
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->stime + w->fix_stime + (include_exited_childs?(w->cstime + w->fix_cstime):0));
 	}
 	fprintf(stdout, "END\n");
 
@@ -1934,7 +1949,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->minflt + w->fix_minflt + w->cminflt + w->fix_cminflt);
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->minflt + w->fix_minflt + (include_exited_childs?(w->cminflt + w->fix_cminflt):0));
 	}
 	fprintf(stdout, "END\n");
 
@@ -1942,7 +1957,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->majflt + w->fix_majflt + w->cmajflt + w->fix_cmajflt);
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->majflt + w->fix_majflt + (include_exited_childs?(w->cmajflt + w->fix_cmajflt):0));
 	}
 	fprintf(stdout, "END\n");
 
@@ -2156,6 +2171,16 @@ void parse_args(int argc, char **argv)
 			continue;
 		}
 
+		if(strcmp("no-childs", argv[i]) == 0) {
+			include_exited_childs = 0;
+			continue;
+		}
+
+		if(strcmp("with-childs", argv[i]) == 0) {
+			include_exited_childs = 1;
+			continue;
+		}
+
 		if(!name) {
 			name = argv[i];
 			continue;
@@ -2211,8 +2236,6 @@ int main(int argc, char **argv)
 	}
 #endif /* NETDATA_INTERNAL_CHECKS */
 
-	info("starting...");
-
 	procfile_adaptive_initial_allocation = 1;
 
 	time_t started_t = time(NULL);
@@ -2231,13 +2254,13 @@ int main(int argc, char **argv)
 	}
 
 	fprintf(stdout, "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' apps.plugin netdata.apps_cpu stacked 140000 %1$d\n"
-	                "DIMENSION user '' incremental 1 1000\n"
-	                "DIMENSION system '' incremental 1 1000\n"
-	                "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_files line 140001 %1$d\n"
-	                "DIMENSION files '' incremental 1 1\n"  
-                  "DIMENSION pids '' absolute 1 1\n"  
-	                "DIMENSION fds '' absolute 1 1\n"  
-	                "DIMENSION targets '' absolute 1 1\n", update_every);
+			"DIMENSION user '' incremental 1 1000\n"
+			"DIMENSION system '' incremental 1 1000\n"
+			"CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_files line 140001 %1$d\n"
+			"DIMENSION files '' incremental 1 1\n"
+			"DIMENSION pids '' absolute 1 1\n"
+			"DIMENSION fds '' absolute 1 1\n"
+			"DIMENSION targets '' absolute 1 1\n", update_every);
 
 #ifndef PROFILING_MODE
 	unsigned long long sunext = (time(NULL) - (time(NULL) % update_every) + update_every) * 1000000ULL;
