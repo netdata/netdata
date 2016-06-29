@@ -1203,16 +1203,14 @@ int collect_data_for_all_processes_from_proc(void)
 		// /proc/<pid>/stat
 
 		if(unlikely(read_proc_pid_stat(p))) {
-				error("Cannot process %s/proc/%d/stat", host_prefix, pid);
-
+			error("Cannot process %s/proc/%d/stat", host_prefix, pid);
 			// there is no reason to proceed if we cannot get its status
 			continue;
 		}
 
 		// check its parent pid
 		if(unlikely(p->ppid < 0 || p->ppid > pid_max)) {
-				error("Pid %d states invalid parent pid %d. Using 0.", pid, p->ppid);
-
+			error("Pid %d states invalid parent pid %d. Using 0.", pid, p->ppid);
 			p->ppid = 0;
 		}
 
@@ -1332,22 +1330,38 @@ void link_all_processes_to_their_parents(void) {
 	for(p = root_of_pids; p ; p = p->next) {
 		// for each process found running
 
+		if(likely(p->new_entry && p->updated)) {
+			// the first time we see an entry
+			// we remove the exited children figures
+			// to avoid spikes
+			p->fix_cminflt += p->cminflt;
+			p->fix_cmajflt += p->cmajflt;
+			p->fix_cutime  += p->cutime;
+			p->fix_cstime  += p->cstime;
+		}
+
 		if(likely(p->ppid > 0 && all_pids[p->ppid])) {
+			struct pid_stat *pp;
 			// for valid processes
 
-			if(unlikely(debug || (p->target && p->target->debug)))
-				fprintf(stderr, "apps.plugin: \tparent of %d (%s) is %d (%s)\n", p->pid, p->comm, p->ppid, all_pids[p->ppid]->comm);
-
-			p->parent = all_pids[p->ppid];
+			p->parent = pp = all_pids[p->ppid];
 			p->parent->children_count++;
 
-			if(unlikely(!p->updated)) {
-				struct pid_stat *pp = p;
+			if(unlikely(debug || (p->target && p->target->debug)))
+				fprintf(stderr, "apps.plugin: \tchild %d (%s, %s) has parent %d (%s, %s). Parent: utime=%llu, stime=%llu, minflt=%llu, majflt=%llu, cutime=%llu, cstime=%llu, cminflt=%llu, cmajflt=%llu, fix_cutime=%llu, fix_cstime=%llu, fix_cminflt=%llu, fix_cmajflt=%llu\n", p->pid, p->comm, p->updated?"running":"exited", pp->pid, pp->comm, pp->updated?"running":"exited", pp->utime, pp->stime, pp->minflt, pp->majflt, pp->cutime, pp->cstime, pp->cminflt, pp->cmajflt, pp->fix_cutime, pp->fix_cstime, pp->fix_cminflt, pp->fix_cmajflt);
 
-				// find the first parent that
-				// has been updated
-				while(pp && !pp->updated)
+			if(unlikely(!p->updated)) {
+				// this process has exit
+
+				// find the first parent that has been updated
+				while(pp && !pp->updated) {
+					// we may have to forward link it to its parent
+					if(unlikely(!pp->parent && pp->ppid > 0 && all_pids[pp->ppid]))
+						pp->parent = all_pids[pp->ppid];
+
+					// check again for parent
 					pp = pp->parent;
+				}
 
 				if(likely(pp)) {
 					// this is an exited child with a parent
@@ -1358,7 +1372,7 @@ void link_all_processes_to_their_parents(void) {
 					pp->fix_cstime  += p->stime  + p->cstime  + p->fix_cstime;
 
 					if(unlikely(debug))
-						fprintf(stderr, "apps.plugin: \tfixing child counters of %d (%s) to %d (%s). Fixes: cutime=%llu, cstime=%llu, cminflt=%llu, cmajflt=%llu\n", p->pid, p->comm, pp->pid, pp->comm, pp->fix_cutime, pp->fix_cstime, pp->fix_cminflt, pp->fix_cmajflt);
+						fprintf(stderr, "apps.plugin: \tupdating child metrics of %d (%s, %s) to its parent %d (%s, %s). Parent has now: utime=%llu, stime=%llu, minflt=%llu, majflt=%llu, cutime=%llu, cstime=%llu, cminflt=%llu, cmajflt=%llu, fix_cutime=%llu, fix_cstime=%llu, fix_cminflt=%llu, fix_cmajflt=%llu\n", p->pid, p->comm, p->updated?"running":"exited", pp->pid, pp->comm, pp->updated?"running":"exited", pp->utime, pp->stime, pp->minflt, pp->majflt, pp->cutime, pp->cstime, pp->cminflt, pp->cmajflt, pp->fix_cutime, pp->fix_cstime, pp->fix_cminflt, pp->fix_cmajflt);
 				}
 			}
 		}
