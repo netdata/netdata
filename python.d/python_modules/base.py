@@ -315,6 +315,12 @@ class SimpleService(BaseService):
         """
         return {}
 
+    def check(self):
+        """
+        :return:
+        """
+        return True
+
     def create(self):
         """
         Create charts
