@@ -299,7 +299,6 @@ class SimpleService(BaseService):
     def __init__(self, configuration=None, name=None):
         self.order = []
         self.definitions = {}
-        self.url = ""
         BaseService.__init__(self, configuration=configuration, name=name)
 
     def _get_data(self):
@@ -315,25 +314,6 @@ class SimpleService(BaseService):
         :return: dict
         """
         return {}
-
-    def check(self):
-        """
-        Format configuration data and try to connect to server
-        :return: boolean
-        """
-        if self.name is None or self.name == str(None):
-            self.name = 'local'
-        else:
-            self.name = str(self.name)
-        try:
-            self.url = str(self.configuration['url'])
-        except (KeyError, TypeError):
-            pass
-
-        if self._formatted_data() is not None:
-            return True
-        else:
-            return False
 
     def create(self):
         """
@@ -409,3 +389,22 @@ class UrlService(SimpleService):
             except:
                 pass
         return raw
+
+    def check(self):
+        """
+        Format configuration data and try to connect to server
+        :return: boolean
+        """
+        if self.name is None or self.name == str(None):
+            self.name = 'local'
+        else:
+            self.name = str(self.name)
+        try:
+            self.url = str(self.configuration['url'])
+        except (KeyError, TypeError):
+            pass
+
+        if self._formatted_data() is not None:
+            return True
+        else:
+            return False
