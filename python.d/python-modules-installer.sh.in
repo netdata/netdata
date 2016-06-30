@@ -63,7 +63,7 @@ fi
 [ -z "${pip}" ] && pip="$(which pip 2>/dev/null)"
 if [ -z "${pip}" ]
 then
-    echo >& "pip command is required to install python v${pv} modules"
+    echo >&2 "pip command is required to install python v${pv} modules"
     exit 1
 fi
 
