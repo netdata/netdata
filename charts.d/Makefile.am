@@ -13,6 +13,7 @@ dist_charts_SCRIPTS = \
 	example.chart.sh \
 	exim.chart.sh \
 	hddtemp.chart.sh \
+	httpdmodcache.chart.sh \
 	load_average.chart.sh \
 	mem_apps.chart.sh \
 	mysql.chart.sh \

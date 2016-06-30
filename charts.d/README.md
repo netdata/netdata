@@ -215,6 +215,23 @@ hddtemp_disks=()
 
 ---
 
+# httpdmodcache
+
+The plugin will collect cache hit/miss ratios from Apache
+
+1. **percentage of requests served by mod_cache**
+
+### configuration
+
+the logfile needs to be readable by the netdata user.
+
+```sh
+# Apache log file with cache-status information
+httpdmodcache_logfile="/var/log/httpd/cache.log"
+```
+
+---
+
 # postfix
 
 The plugin will collect the postfix queue size.
