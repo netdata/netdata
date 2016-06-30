@@ -1,7 +1,3 @@
-// TODO
-//
-// 1. disable RESET_OR_OVERFLOW check in charts
-
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -309,10 +305,12 @@ struct target *get_apps_groups_target(const char *id, struct target *target)
 	}
 	uint32_t hash = simple_hash(id);
 
-	struct target *w;
+	struct target *w, *last = apps_groups_root_target;
 	for(w = apps_groups_root_target ; w ; w = w->next) {
 		if(w->idhash == hash && strncmp(nid, w->id, MAX_NAME) == 0)
 			return w;
+
+		last = w;
 	}
 
 	w = calloc(sizeof(struct target), 1);
@@ -344,8 +342,9 @@ struct target *get_apps_groups_target(const char *id, struct target *target)
 	w->debug = tdebug;
 	w->target = target;
 
-	w->next = apps_groups_root_target;
-	apps_groups_root_target = w;
+	// append it, to maintain the order in apps_groups.conf
+	if(last) last->next = w;
+	else apps_groups_root_target = w;
 
 	if(unlikely(debug))
 		fprintf(stderr, "apps.plugin: ADDING TARGET ID '%s', process name '%s' (%s), aggregated on target '%s', options: %s %s\n"
@@ -1152,32 +1151,34 @@ int collect_data_for_all_processes_from_proc(void)
 	all_pids_count = 0;
 	for(p = root_of_pids; p ; p = p->next) {
 		all_pids_count++;
-		p->parent = NULL;
-		p->updated = 0;
-		p->children_count = 0;
-		p->merged = 0;
-		p->new_entry = 0;
 
-        p->last_minflt = p->minflt;
-        p->last_majflt = p->majflt;
-        p->last_utime  = p->utime;
-        p->last_stime  = p->stime;
+		p->parent           = NULL;
 
-        p->last_cminflt = p->cminflt;
-        p->last_cmajflt = p->cmajflt;
-        p->last_cutime  = p->cutime;
-        p->last_cstime  = p->cstime;
+		p->updated          = 0;
+		p->children_count   = 0;
+		p->merged           = 0;
+		p->new_entry        = 0;
+
+        p->last_minflt      = p->minflt;
+        p->last_majflt      = p->majflt;
+        p->last_utime       = p->utime;
+        p->last_stime       = p->stime;
+
+        p->last_cminflt     = p->cminflt;
+        p->last_cmajflt     = p->cmajflt;
+        p->last_cutime      = p->cutime;
+        p->last_cstime      = p->cstime;
 
         p->last_fix_cminflt = p->fix_cminflt;
         p->last_fix_cmajflt = p->fix_cmajflt;
         p->last_fix_cutime  = p->fix_cutime;
         p->last_fix_cstime  = p->fix_cstime;
 
-        p->last_io_logical_bytes_read  = p->io_logical_bytes_read;
+        p->last_io_logical_bytes_read     = p->io_logical_bytes_read;
         p->last_io_logical_bytes_written  = p->io_logical_bytes_written;
-        p->last_io_read_calls  = p->io_read_calls;
-        p->last_io_write_calls  = p->io_write_calls;
-        p->last_io_storage_bytes_read  = p->io_storage_bytes_read;
+        p->last_io_read_calls             = p->io_read_calls;
+        p->last_io_write_calls            = p->io_write_calls;
+        p->last_io_storage_bytes_read     = p->io_storage_bytes_read;
         p->last_io_storage_bytes_written  = p->io_storage_bytes_written;
         p->last_io_cancelled_write_bytes  = p->io_cancelled_write_bytes;
 	}
@@ -1215,20 +1216,10 @@ int collect_data_for_all_processes_from_proc(void)
 		}
 
 		// --------------------------------------------------------------------
-		// /proc/<pid>/cmdline
-
-		if(proc_pid_cmdline_is_needed) {
-			if(unlikely(read_proc_pid_cmdline(p))) {
-					error("Cannot process %s/proc/%d/cmdline", host_prefix, pid);
-			}
-		}
-
-		// --------------------------------------------------------------------
 		// /proc/<pid>/statm
 
 		if(unlikely(read_proc_pid_statm(p))) {
-				error("Cannot process %s/proc/%d/statm", host_prefix, pid);
-
+			error("Cannot process %s/proc/%d/statm", host_prefix, pid);
 			// there is no reason to proceed if we cannot get its memory status
 			continue;
 		}
@@ -1258,11 +1249,18 @@ int collect_data_for_all_processes_from_proc(void)
 		// check if it is target
 		// we do this only once, the first time this pid is loaded
 		if(unlikely(p->new_entry)) {
+			// /proc/<pid>/cmdline
+			if(proc_pid_cmdline_is_needed) {
+				if(unlikely(read_proc_pid_cmdline(p))) {
+						error("Cannot process %s/proc/%d/cmdline", host_prefix, pid);
+				}
+			}
+
 			if(unlikely(debug))
-				fprintf(stderr, "apps.plugin: \tJust added %s\n", p->comm);
+				fprintf(stderr, "apps.plugin: \tJust added %d (%s)\n", pid, p->comm);
 
 			uint32_t hash = simple_hash(p->comm);
-			size_t pclen = strlen(p->comm);
+			size_t pclen  = strlen(p->comm);
 
 			struct target *w;
 			for(w = apps_groups_root_target; w ; w = w->next) {
@@ -1283,6 +1281,8 @@ int collect_data_for_all_processes_from_proc(void)
 
 					if(debug || (p->target && p->target->debug))
 						fprintf(stderr, "apps.plugin: \t\t%s linked to target %s\n", p->comm, p->target->name);
+
+					break;
 				}
 			}
 		}
