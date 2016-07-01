@@ -806,7 +806,7 @@ cat >netdata-uninstaller.sh <<-UNINSTALL
 	fi
 
 	echo >&2 "Stopping a possibly running netdata..."
-	for p in \$(pidof netdata); do kill \$x; done
+	for p in \$(pidof netdata); do kill \$p; done
 	sleep 2
 
 	deletedir() {
