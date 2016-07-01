@@ -1367,10 +1367,10 @@ void link_all_processes_to_their_parents(void) {
 				if(likely(pp)) {
 					// this is an exited child with a parent
 					// remove the known time from the parent's data
-					pp->fix_cminflt += p->minflt + p->cminflt + p->fix_cminflt;
-					pp->fix_cmajflt += p->majflt + p->cmajflt + p->fix_cmajflt;
-					pp->fix_cutime  += p->utime  + p->cutime  + p->fix_cutime;
-					pp->fix_cstime  += p->stime  + p->cstime  + p->fix_cstime;
+					pp->fix_cminflt += p->last_minflt + p->last_cminflt + p->last_fix_cminflt;
+					pp->fix_cmajflt += p->last_majflt + p->last_cmajflt + p->last_fix_cmajflt;
+					pp->fix_cutime  += p->last_utime  + p->last_cutime  + p->last_fix_cutime;
+					pp->fix_cstime  += p->last_stime  + p->last_cstime  + p->last_fix_cstime;
 
 					if(unlikely(pp->cminflt < pp->fix_cminflt)) pp->fix_cminflt = pp->cminflt;
 					if(unlikely(pp->cmajflt < pp->fix_cmajflt)) pp->fix_cmajflt = pp->cmajflt;
@@ -2073,14 +2073,14 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %d noreset\n", w->name, hz);
+		fprintf(stdout, "DIMENSION %s '' incremental 100 %u noreset\n", w->name, hz);
 	}
 
 	fprintf(stdout, "CHART %s.cpu_system '' '%s CPU System Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20021 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %d noreset\n", w->name, hz);
+		fprintf(stdout, "DIMENSION %s '' incremental 100 %u noreset\n", w->name, hz);
 	}
 
 	fprintf(stdout, "CHART %s.major_faults '' '%s Major Page Faults (swap read)' 'page faults/s' swap %s.major_faults stacked 20010 %d\n", type, title, type, update_every);
