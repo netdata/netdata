@@ -425,9 +425,13 @@ class LogService(SimpleService):
         #     'chart_name_in_netdata' : [ charts['chart_name_in_netdata']['lines']['name'] ]
         # }
         self.log_path = ""
-        self._last_line = 0
+        self._last_line = -1
         # self._log_reader = None
         SimpleService.__init__(self, configuration=configuration, name=name)
+        # FIXME Remove preventing of frequent log parsing
+        if self.timetable['freq'] < 3:
+            self.timetable['freq'] = 3
+        self.retries = 100000  # basically always retry
 
     def _get_data(self):
         # FIXME find faster solution of reading data. Maybe implement reading in subprocess?
@@ -436,7 +440,7 @@ class LogService(SimpleService):
         # if self._log_reader.poll() is not None:
         #    self._log_reader = Popen(['tail', '-F', self.log_path], stdout=PIPE, stderr=STDOUT)
         lines = []
-        last = 0
+        last = -1
         total = 0
         try:
             with open(self.log_path) as fp:
@@ -447,10 +451,10 @@ class LogService(SimpleService):
                     total += 1
         except Exception as e:
             msg.error(self.__module__, str(e))
-        if last != 0:
+        if last != -1:
             self._last_line = last
-        elif self._last_line > total:
-            self._last_line = 0
+        if self._last_line > total:
+            self._last_line = -1
 
         if len(lines) != 0:
             return lines
@@ -466,12 +470,14 @@ class LogService(SimpleService):
         except (KeyError, TypeError):
             self.error("No path to log specified. Using: '" + self.log_path + "'")
 
-        # FIXME Remove preventing of frequent log parsing
-        if self.update_every < 3:
-            self.update_every = 3
-
         if os.access(self.log_path, os.R_OK):
             return True
         else:
             self.error("Cannot access file: '" + self.log_path + "'")
             return False
+
+    def create(self):
+        status = SimpleService.create(self)
+        self._last_line = -1
+        return status
+

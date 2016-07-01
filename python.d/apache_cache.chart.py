@@ -6,6 +6,7 @@ from base import LogService
 
 priority = 60000
 retries = 5
+update_every = 3
 
 ORDER = ['cache']
 CHARTS = {
@@ -22,7 +23,7 @@ class Service(LogService):
     def __init__(self, configuration=None, name=None):
         LogService.__init__(self, configuration=configuration, name=name)
         if len(self.log_path) == 0:
-            self.log_path = "/var/log/httpd/cache.log"
+            self.log_path = "/var/log/apache2/cache.log"
         self.order = ORDER
         self.definitions = CHARTS
 
@@ -33,19 +34,24 @@ class Service(LogService):
         """
         try:
             raw = self._get_data()
+            if raw is None:
+                return None
         except (ValueError, AttributeError):
             return None
 
         hit = 0
         miss = 0
+
         for line in raw:
             if "cache hit" in line:
                 hit += 1
             elif "cache miss" in line:
                 miss += 1
 
-        if hit + miss == 0:
+        total = hit + miss
+        if total == 0:
             return None
 
-        return {'hit': int(hit/float(hit+miss) * 100),
-                'miss': int(miss/float(hit+miss) * 100)}
+        hit_percent = int(hit/float(total) * 100)
+        return {'hit': hit_percent,
+                'miss': 100 - hit_percent}
