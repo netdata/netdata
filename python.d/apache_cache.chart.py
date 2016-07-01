@@ -41,7 +41,6 @@ class Service(LogService):
 
         hit = 0
         miss = 0
-
         for line in raw:
             if "cache hit" in line:
                 hit += 1
@@ -52,6 +51,5 @@ class Service(LogService):
         if total == 0:
             return None
 
-        hit_percent = int(hit/float(total) * 100)
-        return {'hit': hit_percent,
-                'miss': 100 - hit_percent}
+        return {'hit': int(hit/float(total) * 100),
+                'miss': int(miss/float(total) * 100)}
