@@ -2,6 +2,31 @@
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
 
+PROGRAM_FILE="$0"
+PROGRAM_NAME="$(basename $0)"
+PROGRAM_NAME="${PROGRAM_NAME/.plugin}"
+
+plugins_dir="${NETDATA_PLUGINS_DIR}"
+[ -z "$plugins_dir" ] && plugins_dir="$( dirname $PROGRAM_FILE )"
+
+config_dir=${NETDATA_CONFIG_DIR-/etc/netdata}
+tc="$(which tc 2>/dev/null)"
+fireqos_run_dir="/var/run/fireqos"
+qos_get_class_names_every=120
+qos_exit_every=3600
+
+# check if we have a valid number for interval
+t=${1}
+update_every=$((t))
+[ $((update_every)) -lt 1 ] && update_every=${NETDATA_UPDATE_EVERY}
+[ $((update_every)) -lt 1 ] && update_every=1
+
+# allow the user to override our defaults
+if [ -f "${config_dir}/tc-qos-helper.conf" ]
+	then
+	source "${config_dir}/tc-qos-helper.conf"
+fi
+
 # default time function
 now_ms=
 current_time_ms() {
@@ -17,18 +42,11 @@ loopsleepms() {
 
 # if found and included, this file overwrites loopsleepms()
 # with a high resolution timer function for precise looping.
-. "$NETDATA_PLUGINS_DIR/loopsleepms.sh.inc"
+. "${plugins_dir}/loopsleepms.sh.inc"
 
-# check if we have a valid number for interval
-t=$1
-sleep_time=$((t))
-[ $((sleep_time)) -lt 1 ] && $NETDATA_UPDATE_EVERY
-[ $((sleep_time)) -lt 1 ] && sleep_time=1
-
-tc_cmd="$(which tc)"
-if [ -z "$tc_cmd" ]
+if [ -z "${tc}" -o ! -x "${tc}" ]
 	then
-	echo >&2 "tc: Cannot find a 'tc' command in this system."
+	echo >&2 "${PROGRAM_NAME}: Cannot find command 'tc' in this system."
 	exit 1
 fi
 
@@ -40,44 +58,45 @@ setclassname() {
 }
 
 show_tc() {
-	local x="$1"
+	local x="${1}" interface_dev interface_classes interface_classes_monitor
 
-	echo "BEGIN $x"
-	$tc_cmd -s class show dev $x
+	echo "BEGIN ${x}"
+	${tc} -s class show dev ${x}
 
 	# check FireQOS names for classes
-	if [ ! -z "$fix_names" -a -f /var/run/fireqos/ifaces/$x ]
+	if [ ! -z "${fix_names}" -a -f "${fireqos_run_dir}/ifaces/${x}" ]
 	then
-		name="$(cat /var/run/fireqos/ifaces/$x)"
-		echo "SETDEVICENAME $name"
+		name="$(<"${fireqos_run_dir}/ifaces/${x}")"
+		echo "SETDEVICENAME ${name}"
 
+		interface_dev=
 		interface_classes=
 		interface_classes_monitor=
-		. /var/run/fireqos/$name.conf
-		for n in $interface_classes_monitor
+		source "${fireqos_run_dir}/${name}.conf"
+		for n in ${interface_classes_monitor}
 		do
-			setclassname $(echo $n | tr '|' ' ')
+			setclassname ${n//|/ }
 		done
-		echo "SETDEVICEGROUP $interface_dev"
+		[ ! -z "${interface_dev}" ] && echo "SETDEVICEGROUP ${interface_dev}"
 	fi
-	echo "END $x"
+	echo "END ${x}"
 }
 
 all_devices() {
 	cat /proc/net/dev | grep ":" | cut -d ':' -f 1 | while read dev
 	do
-		l=$($tc_cmd class show dev $dev | wc -l)
-		[ $l -ne 0 ] && echo $dev
+		l=$(${tc} class show dev ${dev} | wc -l)
+		[ $l -ne 0 ] && echo ${dev}
 	done
 }
 
 # update devices and class names
 # once every 2 minutes
-names_every=$((120 / sleep_time))
+names_every=$((qos_get_class_names_every / update_every))
 
 # exit this script every hour
 # it will be restarted automatically
-exit_after=$((3600 / sleep_time))
+exit_after=$((qos_exit_every / update_every))
 
 c=0
 gc=0
@@ -87,21 +106,21 @@ do
 	c=$((c + 1))
 	gc=$((gc + 1))
 
-	if [ $c -le 1 -o $c -ge $names_every ]
+	if [ ${c} -le 1 -o ${c} -ge ${names_every} ]
 	then
 		c=1
 		fix_names="YES"
 		devices="$( all_devices )"
 	fi
 
-	for d in $devices
+	for d in ${devices}
 	do
-		show_tc $d
+		show_tc ${d}
 	done
 
-	echo "WORKTIME $LOOPSLEEPMS_LASTWORK"
+	echo "WORKTIME ${LOOPSLEEPMS_LASTWORK}"
 
-	loopsleepms $sleep_time
+	loopsleepms ${update_every}
 
-	[ $gc -gt $exit_after ] && exit 0
+	[ ${gc} -gt ${exit_after} ] && exit 0
 done
