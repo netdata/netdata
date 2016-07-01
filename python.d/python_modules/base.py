@@ -4,11 +4,13 @@
 
 import time
 import sys
+import os
 try:
     from urllib.request import urlopen
 except ImportError:
     from urllib2 import urlopen
 
+# from subprocess import STDOUT, PIPE, Popen
 import threading
 import msg
 
@@ -413,4 +415,61 @@ class UrlService(SimpleService):
         if self._formatted_data() is not None:
             return True
         else:
+            return False
+
+
+class LogService(SimpleService):
+    def __init__(self, configuration=None, name=None):
+        # definitions are created dynamically in create() method based on 'charts' dictionary. format:
+        # definitions = {
+        #     'chart_name_in_netdata' : [ charts['chart_name_in_netdata']['lines']['name'] ]
+        # }
+        self.log_path = ""
+        self._last_line = 0
+        # self._log_reader = None
+        SimpleService.__init__(self, configuration=configuration, name=name)
+
+    def _get_data(self):
+        # FIXME find faster solution of reading data. Maybe implement reading in subprocess?
+        # if self._log_reader is None:
+        #    self._log_reader = Popen(['tail', '-F', self.log_path], stdout=PIPE, stderr=STDOUT)
+        # if self._log_reader.poll() is not None:
+        #    self._log_reader = Popen(['tail', '-F', self.log_path], stdout=PIPE, stderr=STDOUT)
+        lines = []
+        last = 0
+        try:
+            with open(self.log_path) as fp:
+                for i, line in enumerate(fp):
+                    if i > self._last_line:
+                        lines.append(line)
+                        last = i
+        except Exception as e:
+            msg.error(self.__module__, str(e))
+        if last != 0:
+            self._last_line = last
+
+        if len(lines) != 0:
+            return lines
+        return None
+
+    def check(self):
+        if self.name is None or self.name == str(None):
+            self.error("Log service doesn't have name.")
+            return False
+        else:
+            self.name = str(self.name)
+        try:
+            self.log_path = str(self.configuration['path'])
+        except (KeyError, TypeError):
+            self.error("Malformed path to log: '" + self.log_path + "'")
+            return False
+
+        # FIXME Remove preventing of frequent log parsing
+        if self.update_every < 3:
+            self.update_every = 3
+
+        if os.access(self.log_path, os.R_OK):
+            return True
+        else:
+            self.error("Cannot access file. No read permission.")
             return False
