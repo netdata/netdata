@@ -2073,14 +2073,14 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %d noreset\n", w->name, hz);
+		fprintf(stdout, "DIMENSION %s '' incremental 100 %u noreset\n", w->name, hz);
 	}
 
 	fprintf(stdout, "CHART %s.cpu_system '' '%s CPU System Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20021 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %d noreset\n", w->name, hz);
+		fprintf(stdout, "DIMENSION %s '' incremental 100 %u noreset\n", w->name, hz);
 	}
 
 	fprintf(stdout, "CHART %s.major_faults '' '%s Major Page Faults (swap read)' 'page faults/s' swap %s.major_faults stacked 20010 %d\n", type, title, type, update_every);
