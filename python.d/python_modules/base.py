@@ -425,7 +425,7 @@ class LogService(SimpleService):
         #     'chart_name_in_netdata' : [ charts['chart_name_in_netdata']['lines']['name'] ]
         # }
         self.log_path = ""
-        self._last_line = -1
+        self._last_position = 0
         # self._log_reader = None
         SimpleService.__init__(self, configuration=configuration, name=name)
         # FIXME Remove preventing of frequent log parsing
@@ -434,27 +434,17 @@ class LogService(SimpleService):
         self.retries = 100000  # basically always retry
 
     def _get_data(self):
-        # FIXME find faster solution of reading data. Maybe implement reading in subprocess?
-        # if self._log_reader is None:
-        #    self._log_reader = Popen(['tail', '-F', self.log_path], stdout=PIPE, stderr=STDOUT)
-        # if self._log_reader.poll() is not None:
-        #    self._log_reader = Popen(['tail', '-F', self.log_path], stdout=PIPE, stderr=STDOUT)
         lines = []
-        last = -1
-        total = 0
         try:
-            with open(self.log_path) as fp:
+            if os.path.getsize(self.log_path) < self._last_position:
+                self._last_position = 0
+            with open(self.log_path, "r") as fp:
+                fp.seek(self._last_position)
                 for i, line in enumerate(fp):
-                    if i > self._last_line:
-                        lines.append(line)
-                        last = i
-                    total += 1
+                    lines.append(line)
+                self._last_position = fp.tell()
         except Exception as e:
             msg.error(self.__module__, str(e))
-        if last != -1:
-            self._last_line = last
-        if self._last_line > total:
-            self._last_line = -1
 
         if len(lines) != 0:
             return lines
@@ -478,6 +468,6 @@ class LogService(SimpleService):
 
     def create(self):
         status = SimpleService.create(self)
-        self._last_line = -1
+        self._last_position = 0
         return status
 
