@@ -453,16 +453,14 @@ class LogService(SimpleService):
         return None
 
     def check(self):
-        if self.name is None or self.name == str(None):
-            self.error("Log service doesn't have name.")
-            return False
+        if self.name is not None or self.name != str(None):
+            self.name = ""
         else:
             self.name = str(self.name)
         try:
             self.log_path = str(self.configuration['path'])
         except (KeyError, TypeError):
-            self.error("Malformed path to log: '" + self.log_path + "'")
-            return False
+            self.error("No path to log specified. Using: '" + self.log_path + "'")
 
         # FIXME Remove preventing of frequent log parsing
         if self.update_every < 3:
@@ -471,5 +469,5 @@ class LogService(SimpleService):
         if os.access(self.log_path, os.R_OK):
             return True
         else:
-            self.error("Cannot access file. No read permission.")
+            self.error("Cannot access file: '" + self.log_path + "'")
             return False
