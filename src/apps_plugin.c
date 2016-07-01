@@ -1367,10 +1367,10 @@ void link_all_processes_to_their_parents(void) {
 				if(likely(pp)) {
 					// this is an exited child with a parent
 					// remove the known time from the parent's data
-					pp->fix_cminflt += p->minflt + p->cminflt + p->fix_cminflt;
-					pp->fix_cmajflt += p->majflt + p->cmajflt + p->fix_cmajflt;
-					pp->fix_cutime  += p->utime  + p->cutime  + p->fix_cutime;
-					pp->fix_cstime  += p->stime  + p->cstime  + p->fix_cstime;
+					pp->fix_cminflt += p->last_minflt + p->last_cminflt + p->last_fix_cminflt;
+					pp->fix_cmajflt += p->last_majflt + p->last_cmajflt + p->last_fix_cmajflt;
+					pp->fix_cutime  += p->last_utime  + p->last_cutime  + p->last_fix_cutime;
+					pp->fix_cstime  += p->last_stime  + p->last_cstime  + p->last_fix_cstime;
 
 					if(unlikely(pp->cminflt < pp->fix_cminflt)) pp->fix_cminflt = pp->cminflt;
 					if(unlikely(pp->cmajflt < pp->fix_cmajflt)) pp->fix_cmajflt = pp->cmajflt;
