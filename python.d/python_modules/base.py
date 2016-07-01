@@ -437,16 +437,20 @@ class LogService(SimpleService):
         #    self._log_reader = Popen(['tail', '-F', self.log_path], stdout=PIPE, stderr=STDOUT)
         lines = []
         last = 0
+        total = 0
         try:
             with open(self.log_path) as fp:
                 for i, line in enumerate(fp):
                     if i > self._last_line:
                         lines.append(line)
                         last = i
+                    total += 1
         except Exception as e:
             msg.error(self.__module__, str(e))
         if last != 0:
             self._last_line = last
+        elif self._last_line > total:
+            self._last_line = 0
 
         if len(lines) != 0:
             return lines
