@@ -10,6 +10,7 @@ dist_python_SCRIPTS = \
 	phpfpm.chart.py \
 	apache.chart.py \
 	nginx.chart.py \
+	apache_cache.chart.py \
 	python-modules-installer.sh \
 	$(NULL)
 
