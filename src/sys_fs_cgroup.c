@@ -668,6 +668,7 @@ struct cgroup *cgroup_add(const char *id) {
 				!strcmp(chart_id, "systemd") ||
 				!strcmp(chart_id, "system.slice") ||
 				!strcmp(chart_id, "machine.slice") ||
+				!strcmp(chart_id, "init.scope") ||
 				!strcmp(chart_id, "user") ||
 				!strcmp(chart_id, "system") ||
 				!strcmp(chart_id, "machine") ||
