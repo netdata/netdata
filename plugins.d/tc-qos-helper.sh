@@ -58,7 +58,7 @@ setclassname() {
 }
 
 show_tc() {
-	local x="${1}"
+	local x="${1}" interface_dev interface_classes interface_classes_monitor
 
 	echo "BEGIN ${x}"
 	${tc} -s class show dev ${x}
@@ -66,17 +66,18 @@ show_tc() {
 	# check FireQOS names for classes
 	if [ ! -z "${fix_names}" -a -f "${fireqos_run_dir}/ifaces/${x}" ]
 	then
-		name="$(cat "${fireqos_run_dir}/ifaces/${x}")"
+		name="$(<"${fireqos_run_dir}/ifaces/${x}")"
 		echo "SETDEVICENAME ${name}"
 
+		interface_dev=
 		interface_classes=
 		interface_classes_monitor=
 		source "${fireqos_run_dir}/${name}.conf"
 		for n in ${interface_classes_monitor}
 		do
-			setclassname $(echo ${n} | tr '|' ' ')
+			setclassname ${n//|/ }
 		done
-		echo "SETDEVICEGROUP ${interface_dev}"
+		[ ! -z "${interface_dev}" ] && echo "SETDEVICEGROUP ${interface_dev}"
 	fi
 	echo "END ${x}"
 }
