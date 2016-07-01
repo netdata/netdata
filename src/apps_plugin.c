@@ -1323,6 +1323,7 @@ int collect_data_for_all_processes_from_proc(void)
 // check: update_apps_groups_statistics()
 
 void link_all_processes_to_their_parents(void) {
+	struct pid_stat *init = all_pids[1];
 	struct pid_stat *p = NULL;
 
 	// link all children to their parents
@@ -1372,10 +1373,57 @@ void link_all_processes_to_their_parents(void) {
 					pp->fix_cutime  += p->last_utime  + p->last_cutime  + p->last_fix_cutime;
 					pp->fix_cstime  += p->last_stime  + p->last_cstime  + p->last_fix_cstime;
 
-					if(unlikely(pp->cminflt < pp->fix_cminflt)) pp->fix_cminflt = pp->cminflt;
-					if(unlikely(pp->cmajflt < pp->fix_cmajflt)) pp->fix_cmajflt = pp->cmajflt;
-					if(unlikely(pp->cutime  < pp->fix_cutime))  pp->fix_cutime  = pp->cutime;
-					if(unlikely(pp->cstime  < pp->fix_cstime))  pp->fix_cstime  = pp->cstime;
+					// The known exited children (the ones we track) may have
+					// contributed more than the value accumulated into the process
+					// by the kernel.
+					// This can happen if the parent process has not waited-for
+					// its children (check: man 2 times).
+					// In this case, the kernel adds these resources to init (pid 1).
+					//
+					// The following code, attempts to fix this.
+					// Without this code, the charts will have random spikes
+					// for example, when an SSH session ends (sshd forks a child
+					// to serve the session, but when this session ends, sshd
+					// does not wait-for its child, thus all the resources of the
+					// ssh session get added to init, resulting in a huge spike on
+					// the charts).
+
+					if(unlikely(pp->cminflt < pp->fix_cminflt)) {
+						if(likely(init && pp != init)) {
+							unsigned long long have = pp->fix_cminflt - pp->cminflt;
+							unsigned long long max = init->cminflt - init->fix_cminflt;
+							if(have > max) have = max;
+							init->fix_cminflt += have;
+						}
+						pp->fix_cminflt = pp->cminflt;
+					}
+					if(unlikely(pp->cmajflt < pp->fix_cmajflt)) {
+						if(likely(init && pp != init)) {
+							unsigned long long have = pp->fix_cmajflt - pp->cmajflt;
+							unsigned long long max = init->cmajflt - init->fix_cmajflt;
+							if(have > max) have = max;
+							init->fix_cmajflt += have;
+						}
+						pp->fix_cmajflt = pp->cmajflt;
+					}
+					if(unlikely(pp->cutime < pp->fix_cutime)) {
+						if(likely(init && pp != init)) {
+							unsigned long long have = pp->fix_cutime - pp->cutime;
+							unsigned long long max = init->cutime - init->fix_cutime;
+							if(have > max) have = max;
+							init->fix_cutime += have;
+						}
+						pp->fix_cutime  = pp->cutime;
+					}
+					if(unlikely(pp->cstime < pp->fix_cstime)) {
+						if(likely(init && pp != init)) {
+							unsigned long long have = pp->fix_cstime - pp->cstime;
+							unsigned long long max = init->cstime - init->fix_cstime;
+							if(have > max) have = max;
+							init->fix_cstime += have;
+						}
+						pp->fix_cstime = pp->cstime;
+					}
 
 					if(unlikely(debug))
 						fprintf(stderr, "apps.plugin: \tupdating child metrics of %d (%s, %s) to its parent %d (%s, %s). Parent has now: utime=%llu, stime=%llu, minflt=%llu, majflt=%llu, cutime=%llu, cstime=%llu, cminflt=%llu, cmajflt=%llu, fix_cutime=%llu, fix_cstime=%llu, fix_cminflt=%llu, fix_cmajflt=%llu\n", p->pid, p->comm, p->updated?"running":"exited", pp->pid, pp->comm, pp->updated?"running":"exited", pp->utime, pp->stime, pp->minflt, pp->majflt, pp->cutime, pp->cstime, pp->cminflt, pp->cmajflt, pp->fix_cutime, pp->fix_cstime, pp->fix_cminflt, pp->fix_cmajflt);
