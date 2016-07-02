@@ -2,11 +2,8 @@
 # Description: MySQL netdata python.d plugin
 # Author: Pawel Krupa (paulfantom)
 
-import os
 from base import SimpleService
 import msg
-
-NAME = os.path.basename(__file__).replace(".chart.py", "")
 
 # import 3rd party library to handle MySQL communication
 try:
@@ -355,7 +352,7 @@ class Service(SimpleService):
                                               port=self.configuration['port'],
                                               connect_timeout=self.update_every)
         except Exception as e:
-            self.error(NAME + " has problem connecting to server:", e)
+            self.error("problem connecting to server:", e)
             raise RuntimeError
 
     def _format_data(self):
@@ -373,7 +370,7 @@ class Service(SimpleService):
             cursor.execute(QUERY)
             raw_data = cursor.fetchall()
         except Exception as e:
-            self.error(NAME + ": cannot execute query.", e)
+            self.error("cannot execute query.", e)
             self.connection.close()
             self.connection = None
             return None
