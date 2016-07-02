@@ -428,9 +428,6 @@ class LogService(SimpleService):
         self._last_position = 0
         # self._log_reader = None
         SimpleService.__init__(self, configuration=configuration, name=name)
-        # FIXME Remove preventing of frequent log parsing
-        if self.timetable['freq'] < 3:
-            self.timetable['freq'] = 3
         self.retries = 100000  # basically always retry
 
     def _get_data(self):
