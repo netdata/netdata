@@ -153,8 +153,8 @@ CHARTS = {
             ["Innodb_data_written", "write", "incremental", -1, 1024]
         ]},
     'innodb_io_ops': {
-        'lines': [None, 'mysql InnoDB I/O Operations', 'operations/s', 'innodb', 'mysql.innodb_io_ops', 'line'],
-        'options': [
+        'options': [None, 'mysql InnoDB I/O Operations', 'operations/s', 'innodb', 'mysql.innodb_io_ops', 'line'],
+        'lines': [
             ["Innodb_data_reads", "reads"],
             ["Innodb_data_writes", "writes", "incremental", -1, 1],
             ["Innodb_data_fsyncs", "fsyncs"]
@@ -358,7 +358,7 @@ class Service(SimpleService):
             self.error(NAME + " has problem connecting to server:", e)
             raise RuntimeError
 
-    def _get_data(self):
+    def _format_data(self):
         """
         Get raw data from MySQL server
         :return: dict
@@ -380,9 +380,6 @@ class Service(SimpleService):
 
         return dict(raw_data)
 
-    def _formatted_data(self):
-        return self._get_data()
-
     def check(self):
         """
         Check if service is able to connect to server
@@ -394,64 +391,3 @@ class Service(SimpleService):
         except RuntimeError:
             self.connection = None
             return False
-
-    # def create(self):
-    #     """
-    #     Create graphs
-    #     :return: boolean
-    #     """
-    #     for name in ORDER:
-    #         self.defs[name] = []
-    #         for line in CHARTS[name][1]:
-    #             self.defs[name].append(line[0])
-    #
-    #     idx = 0
-    #     data = self._get_data()
-    #     if data is None:
-    #         return False
-    #     for name in ORDER:
-    #         header = "CHART mysql_" + \
-    #                  str(self.name) + "." + \
-    #                  name + " " + \
-    #                  CHARTS[name][0] + " " + \
-    #                  str(self.priority + idx) + " " + \
-    #                  str(self.update_every)
-    #         content = ""
-    #         # check if server has this data point
-    #         for line in CHARTS[name][1]:
-    #             if line[0] in data:
-    #                 content += "DIMENSION " + line[0] + " " + line[1] + "\n"
-    #         if len(content) > 0:
-    #             print(header)
-    #             print(content)
-    #             idx += 1
-    #
-    #     if idx == 0:
-    #         return False
-    #     return True
-    #
-    # def update(self, interval):
-    #     """
-    #     Update data on graphs
-    #     :param interval: int
-    #     :return: boolean
-    #     """
-    #     data = self._get_data()
-    #     if data is None:
-    #         return False
-    #     try:
-    #         data['Thread cache misses'] = int(int(data['Threads_created']) * 10000 / int(data['Connections']))
-    #     except Exception:
-    #         pass
-    #     for chart, dimensions in self.defs.items():
-    #         header = "BEGIN mysql_" + str(self.name) + "." + chart + " " + str(interval) + '\n'
-    #         lines = ""
-    #         for d in dimensions:
-    #             try:
-    #                 lines += "SET " + d + " = " + data[d] + '\n'
-    #             except KeyError:
-    #                 pass
-    #         if len(lines) > 0:
-    #             print(header + lines + "END")
-    #
-    #     return True

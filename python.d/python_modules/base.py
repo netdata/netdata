@@ -310,7 +310,7 @@ class SimpleService(BaseService):
         """
         return ""
 
-    def _formatted_data(self):
+    def _format_data(self):
         """
         Format data received from http request
         :return: dict
@@ -328,7 +328,7 @@ class SimpleService(BaseService):
         Create charts
         :return: boolean
         """
-        data = self._formatted_data()
+        data = self._format_data()
         if data is None:
             return False
 
@@ -351,7 +351,7 @@ class SimpleService(BaseService):
         :param interval: int
         :return: boolean
         """
-        data = self._formatted_data()
+        data = self._format_data()
         if data is None:
             return False
 
@@ -412,7 +412,7 @@ class UrlService(SimpleService):
         except (KeyError, TypeError):
             pass
 
-        if self._formatted_data() is not None:
+        if self._format_data() is not None:
             return True
         else:
             return False
