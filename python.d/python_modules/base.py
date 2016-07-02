@@ -438,6 +438,8 @@ class LogService(SimpleService):
         try:
             if os.path.getsize(self.log_path) < self._last_position:
                 self._last_position = 0
+            elif os.path.getsize(self.log_path) == self._last_position:
+                return None
             with open(self.log_path, "r") as fp:
                 fp.seek(self._last_position)
                 for i, line in enumerate(fp):
