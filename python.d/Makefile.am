@@ -1,4 +1,7 @@
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
+CLEANFILES = \
+	python-modules-installer.sh \
+	$(NULL)
 
 include $(top_srcdir)/build/subst.inc
 
