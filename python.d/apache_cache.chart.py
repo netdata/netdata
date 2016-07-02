@@ -47,9 +47,5 @@ class Service(LogService):
             elif "cache miss" in line:
                 miss += 1
 
-        total = hit + miss
-        if total == 0:
-            return None
-
-        return {'hit': int(hit/float(total) * 100),
-                'miss': int(miss/float(total) * 100)}
+        return {'hit': hit,
+                'miss': miss}
