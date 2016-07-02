@@ -14,7 +14,8 @@ CHARTS = {
         'options': [None, 'apache cached responses', 'percent cached', 'cached', 'apache_cache.cache', 'stacked'],
         'lines': [
             ["hit", 'cache', "percentage-of-absolute-row"],
-            ["miss", None, "percentage-of-absolute-row"]
+            ["miss", None, "percentage-of-absolute-row"],
+            ["other", None, "percentage-of-absolute-row"]
         ]}
 }
 
@@ -41,11 +42,15 @@ class Service(LogService):
 
         hit = 0
         miss = 0
+        other = 0
         for line in raw:
             if "cache hit" in line:
                 hit += 1
             elif "cache miss" in line:
                 miss += 1
+            else:
+                other += 1
 
         return {'hit': hit,
-                'miss': miss}
+                'miss': miss,
+                'other': other}
