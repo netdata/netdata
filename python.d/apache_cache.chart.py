@@ -28,7 +28,7 @@ class Service(LogService):
         self.order = ORDER
         self.definitions = CHARTS
 
-    def _formatted_data(self):
+    def _format_data(self):
         """
         Parse new log lines
         :return: dict
