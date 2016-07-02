@@ -310,7 +310,7 @@ class SimpleService(BaseService):
         """
         return ""
 
-    def _formatted_data(self):
+    def _format_data(self):
         """
         Format data received from http request
         :return: dict
@@ -328,7 +328,7 @@ class SimpleService(BaseService):
         Create charts
         :return: boolean
         """
-        data = self._formatted_data()
+        data = self._format_data()
         if data is None:
             return False
 
@@ -351,7 +351,7 @@ class SimpleService(BaseService):
         :param interval: int
         :return: boolean
         """
-        data = self._formatted_data()
+        data = self._format_data()
         if data is None:
             return False
 
@@ -412,7 +412,7 @@ class UrlService(SimpleService):
         except (KeyError, TypeError):
             pass
 
-        if self._formatted_data() is not None:
+        if self._format_data() is not None:
             return True
         else:
             return False
@@ -428,9 +428,6 @@ class LogService(SimpleService):
         self._last_position = 0
         # self._log_reader = None
         SimpleService.__init__(self, configuration=configuration, name=name)
-        # FIXME Remove preventing of frequent log parsing
-        if self.timetable['freq'] < 3:
-            self.timetable['freq'] = 3
         self.retries = 100000  # basically always retry
 
     def _get_data(self):
@@ -438,6 +435,8 @@ class LogService(SimpleService):
         try:
             if os.path.getsize(self.log_path) < self._last_position:
                 self._last_position = 0
+            elif os.path.getsize(self.log_path) == self._last_position:
+                return None
             with open(self.log_path, "r") as fp:
                 fp.seek(self._last_position)
                 for i, line in enumerate(fp):

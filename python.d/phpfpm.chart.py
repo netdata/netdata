@@ -56,7 +56,7 @@ class Service(UrlService):
                            "max children reached": 'reached',
                            "slow requests": 'slow'}
 
-    def _formatted_data(self):
+    def _format_data(self):
         """
         Format data received from http request
         :return: dict
