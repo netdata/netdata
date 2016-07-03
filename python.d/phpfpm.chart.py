@@ -62,7 +62,7 @@ class Service(UrlService):
         :return: dict
         """
         try:
-            raw = self._get_data().split('\n')
+            raw = self._get_raw_data().split('\n')
         except AttributeError:
             return None
         data = {}

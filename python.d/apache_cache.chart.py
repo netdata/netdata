@@ -34,7 +34,7 @@ class Service(LogService):
         :return: dict
         """
         try:
-            raw = self._get_data()
+            raw = self._get_raw_data()
             if raw is None:
                 return None
         except (ValueError, AttributeError):
