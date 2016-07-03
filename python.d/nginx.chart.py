@@ -61,7 +61,7 @@ class Service(UrlService):
         :return: dict
         """
         try:
-            raw = self._get_data().split(" ")
+            raw = self._get_raw_data().split(" ")
             return {'active': int(raw[2]),
                     'requests': int(raw[7]),
                     'reading': int(raw[11]),

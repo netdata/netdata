@@ -303,16 +303,9 @@ class SimpleService(BaseService):
         self.definitions = {}
         BaseService.__init__(self, configuration=configuration, name=name)
 
-    def _get_raw_data(self):
-        """
-        Get raw data from http request
-        :return: str
-        """
-        return ""
-
     def _get_data(self):
         """
-        Format data received from request
+        Get some data
         :return: dict
         """
         return {}
