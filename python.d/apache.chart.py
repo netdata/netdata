@@ -86,7 +86,7 @@ class Service(UrlService):
                            "ConnsAsyncClosing": 'closing',
                            "ConnsAsyncWriting": 'writing'}
 
-    def _format_data(self):
+    def _get_data(self):
         """
         Format data received from http request
         :return: dict

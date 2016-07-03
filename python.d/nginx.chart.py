@@ -55,7 +55,7 @@ class Service(UrlService):
         self.order = ORDER
         self.definitions = CHARTS
 
-    def _format_data(self):
+    def _get_data(self):
         """
         Format data received from http request
         :return: dict
