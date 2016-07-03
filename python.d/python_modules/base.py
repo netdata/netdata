@@ -303,16 +303,16 @@ class SimpleService(BaseService):
         self.definitions = {}
         BaseService.__init__(self, configuration=configuration, name=name)
 
-    def _get_data(self):
+    def _get_raw_data(self):
         """
         Get raw data from http request
         :return: str
         """
         return ""
 
-    def _format_data(self):
+    def _get_data(self):
         """
-        Format data received from http request
+        Format data received from request
         :return: dict
         """
         return {}
@@ -328,7 +328,7 @@ class SimpleService(BaseService):
         Create charts
         :return: boolean
         """
-        data = self._format_data()
+        data = self._get_data()
         if data is None:
             return False
 
@@ -351,7 +351,7 @@ class SimpleService(BaseService):
         :param interval: int
         :return: boolean
         """
-        data = self._format_data()
+        data = self._get_data()
         if data is None:
             return False
 
@@ -380,7 +380,7 @@ class UrlService(SimpleService):
         self.url = ""
         SimpleService.__init__(self, configuration=configuration, name=name)
 
-    def _get_data(self):
+    def _get_raw_data(self):
         """
         Get raw data from http request
         :return: str
@@ -412,7 +412,7 @@ class UrlService(SimpleService):
         except (KeyError, TypeError):
             pass
 
-        if self._format_data() is not None:
+        if self._get_data() is not None:
             return True
         else:
             return False
@@ -430,7 +430,7 @@ class LogService(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.retries = 100000  # basically always retry
 
-    def _get_data(self):
+    def _get_raw_data(self):
         lines = []
         try:
             if os.path.getsize(self.log_path) < self._last_position:
