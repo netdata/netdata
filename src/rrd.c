@@ -920,7 +920,7 @@ unsigned long long rrdset_done(RRDSET *st)
 	int dimensions;
 	st->collected_total = 0;
 	for( rd = st->dimensions, dimensions = 0 ; likely(rd) ; rd = rd->next, dimensions++ )
-		st->collected_total += rd->collected_value;
+		if(likely(rd->updated)) st->collected_total += rd->collected_value;
 
 	uint32_t storage_flags = SN_EXISTS;
 
@@ -928,6 +928,11 @@ unsigned long long rrdset_done(RRDSET *st)
 	// based on the collected figures only
 	// at this stage we do not interpolate anything
 	for( rd = st->dimensions ; likely(rd) ; rd = rd->next ) {
+
+		if(unlikely(!rd->updated)) {
+			rd->calculated_value = 0;
+			continue;
+		}
 
 		if(unlikely(st->debug)) debug(D_RRD_STATS, "%s/%s: START "
 			" last_collected_value = " COLLECTED_NUMBER_FORMAT
@@ -942,34 +947,35 @@ unsigned long long rrdset_done(RRDSET *st)
 			);
 
 		switch(rd->algorithm) {
-		case RRDDIM_ABSOLUTE:
-			rd->calculated_value = (calculated_number)rd->collected_value
-				* (calculated_number)rd->multiplier
-				/ (calculated_number)rd->divisor;
+			case RRDDIM_ABSOLUTE:
+				rd->calculated_value = (calculated_number)rd->collected_value
+					* (calculated_number)rd->multiplier
+					/ (calculated_number)rd->divisor;
 
-			if(unlikely(st->debug))
-				debug(D_RRD_STATS, "%s/%s: CALC ABS/ABS-NO-IN "
-					CALCULATED_NUMBER_FORMAT " = "
-					COLLECTED_NUMBER_FORMAT
-					" * " CALCULATED_NUMBER_FORMAT
-					" / " CALCULATED_NUMBER_FORMAT
-					, st->id, rd->name
-					, rd->calculated_value
-					, rd->collected_value
-					, (calculated_number)rd->multiplier
-					, (calculated_number)rd->divisor
-					);
-			break;
+				if(unlikely(st->debug))
+					debug(D_RRD_STATS, "%s/%s: CALC ABS/ABS-NO-IN "
+						CALCULATED_NUMBER_FORMAT " = "
+						COLLECTED_NUMBER_FORMAT
+						" * " CALCULATED_NUMBER_FORMAT
+						" / " CALCULATED_NUMBER_FORMAT
+						, st->id, rd->name
+						, rd->calculated_value
+						, rd->collected_value
+						, (calculated_number)rd->multiplier
+						, (calculated_number)rd->divisor
+						);
+				break;
 
 			case RRDDIM_PCENT_OVER_ROW_TOTAL:
-				if(unlikely(!st->collected_total)) rd->calculated_value = 0;
+				if(unlikely(!st->collected_total))
+					rd->calculated_value = 0;
 				else
-				// the percentage of the current value
-				// over the total of all dimensions
-				rd->calculated_value =
-					  (calculated_number)100
-					* (calculated_number)rd->collected_value
-					/ (calculated_number)st->collected_total;
+					// the percentage of the current value
+					// over the total of all dimensions
+					rd->calculated_value =
+					      (calculated_number)100
+					    * (calculated_number)rd->collected_value
+					    / (calculated_number)st->collected_total;
 
 				if(unlikely(st->debug))
 					debug(D_RRD_STATS, "%s/%s: CALC PCENT-ROW "
@@ -984,7 +990,7 @@ unsigned long long rrdset_done(RRDSET *st)
 				break;
 
 			case RRDDIM_INCREMENTAL:
-				if(unlikely(!rd->updated || rd->counter <= 1)) {
+				if(unlikely(rd->counter <= 1)) {
 					rd->calculated_value = 0;
 					continue;
 				}
@@ -1000,9 +1006,10 @@ unsigned long long rrdset_done(RRDSET *st)
 					rd->last_collected_value = rd->collected_value;
 				}
 
-				rd->calculated_value = (calculated_number)(rd->collected_value - rd->last_collected_value)
-					* (calculated_number)rd->multiplier
-					/ (calculated_number)rd->divisor;
+				rd->calculated_value =
+				      (calculated_number)(rd->collected_value - rd->last_collected_value)
+				    * (calculated_number)rd->multiplier
+				    / (calculated_number)rd->divisor;
 
 				if(unlikely(st->debug))
 					debug(D_RRD_STATS, "%s/%s: CALC INC PRE "
@@ -1020,18 +1027,20 @@ unsigned long long rrdset_done(RRDSET *st)
 				break;
 
 			case RRDDIM_PCENT_OVER_DIFF_TOTAL:
-				if(unlikely(!rd->updated || rd->counter <= 1)) {
+				if(unlikely(rd->counter <= 1)) {
 					rd->calculated_value = 0;
 					continue;
 				}
 
 				// the percentage of the current increment
 				// over the increment of all dimensions together
-				if(unlikely(st->collected_total == st->last_collected_total)) rd->calculated_value = rd->last_calculated_value;
-				else rd->calculated_value =
-					  (calculated_number)100
-					* (calculated_number)(rd->collected_value - rd->last_collected_value)
-					/ (calculated_number)(st->collected_total  - st->last_collected_total);
+				if(unlikely(st->collected_total == st->last_collected_total))
+					rd->calculated_value = 0;
+				else
+					rd->calculated_value =
+						  (calculated_number)100
+						* (calculated_number)(rd->collected_value - rd->last_collected_value)
+						/ (calculated_number)(st->collected_total - st->last_collected_total);
 
 				if(unlikely(st->debug))
 					debug(D_RRD_STATS, "%s/%s: CALC PCENT-DIFF "
