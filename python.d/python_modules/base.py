@@ -367,10 +367,6 @@ class SimpleService(BaseService):
 
 class UrlService(SimpleService):
     def __init__(self, configuration=None, name=None):
-        # definitions are created dynamically in create() method based on 'charts' dictionary. format:
-        # definitions = {
-        #     'chart_name_in_netdata' : [ charts['chart_name_in_netdata']['lines']['name'] ]
-        # }
         self.url = ""
         SimpleService.__init__(self, configuration=configuration, name=name)
 
@@ -414,10 +410,6 @@ class UrlService(SimpleService):
 
 class NetSocketService(SimpleService):
     def __init__(self, configuration=None, name=None):
-        # definitions are created dynamically in create() method based on 'charts' dictionary. format:
-        # definitions = {
-        #     'chart_name_in_netdata' : [ charts['chart_name_in_netdata']['lines']['name'] ]
-        # }
         self.host = "localhost"
         self.port = None
         self.sock = None
@@ -490,10 +482,6 @@ class NetSocketService(SimpleService):
 
 class LogService(SimpleService):
     def __init__(self, configuration=None, name=None):
-        # definitions are created dynamically in create() method based on 'charts' dictionary. format:
-        # definitions = {
-        #     'chart_name_in_netdata' : [ charts['chart_name_in_netdata']['lines']['name'] ]
-        # }
         self.log_path = ""
         self._last_position = 0
         # self._log_reader = None
