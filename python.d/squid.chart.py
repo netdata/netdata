@@ -14,27 +14,27 @@ ORDER = ['clients_net', 'clients_requests', 'servers_net', 'servers_requests']
 
 CHARTS = {
     'clients_net': {
-        'options': [None, "Squid Client Bandwidth", "kilobits / sec", "clients", "squid.clients.net" "area"],
+        'options': [None, "Squid Client Bandwidth", "kilobits/s", "clients", "squid.clients.net" "area"],
         'lines': [
             ["client_http_kbytes_in", "in", "incremental", 8, 1],
             ["client_http_kbytes_out", "out", "incremental", -8, 1],
             ["client_http_hit_kbytes_out", "hits", "incremental", -8, 1]
         ]},
     'clients_requests': {
-        'options': [None, "Squid Client Requests", "requests / sec", "clients", "squid.clients.requests", 'line'],
+        'options': [None, "Squid Client Requests", "requests/s", "clients", "squid.clients.requests", 'line'],
         'lines': [
             ["client_http_requests", "requests"],
             ["client_http_hits", "hits"],
             ["client_http_errors", "errors", "incremental", -1, 1]
         ]},
     'servers_net': {
-        'options': [None, "Squid Server Bandwidth", "kilobits / sec", "servers", "squid.servers.net" "area"],
+        'options': [None, "Squid Server Bandwidth", "kilobits/s", "servers", "squid.servers.net" "area"],
         'lines': [
             ["server_all_kbytes_in", "in", "incremental", 8, 1],
             ["server_all_kbytes_out", "out", "incremental", -8, 1]
         ]},
     'servers_requests': {
-        'options': [None, "Squid Server Requests", "requests / sec", "servers", "squid.servers.requests", 'line'],
+        'options': [None, "Squid Server Requests", "requests/s", "servers", "squid.servers.requests", 'line'],
         'lines': [
             ["server_all_requests", "requests"],
             ["server_all_errors", "errors", "incremental", -1, 1]
