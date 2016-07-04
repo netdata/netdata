@@ -4,12 +4,10 @@
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
 dist_charts_SCRIPTS = \
-	airsearches.chart.sh \
 	ap.chart.sh \
 	apache.chart.sh \
 	cpu_apps.chart.sh \
 	cpufreq.chart.sh \
-	crsproxy.chart.sh \
 	example.chart.sh \
 	exim.chart.sh \
 	hddtemp.chart.sh \
