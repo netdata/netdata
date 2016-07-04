@@ -7,9 +7,11 @@ import sys
 import os
 import socket
 try:
-    from urllib.request import urlopen
+    # from urllib.request import urlopen, Request, HTTPPasswordMgrWithDefaultRealm
+    import urllib.request as urllib2
 except ImportError:
-    from urllib2 import urlopen
+    # from urllib2 import urlopen, Request, HTTPPasswordMgrWithDefaultRealm
+    import urllib2
 
 # from subprocess import STDOUT, PIPE, Popen
 import threading
@@ -366,13 +368,18 @@ class SimpleService(BaseService):
 
 
 class UrlService(SimpleService):
-    # TODO HTTP Basic Authentication
     def __init__(self, configuration=None, name=None):
         self.url = ""
         self.user = None
         self.password = None
-        self.request = None
         SimpleService.__init__(self, configuration=configuration, name=name)
+
+    def __add_auth(self):
+        passman = urllib2.HTTPPasswordMgrWithDefaultRealm()
+        passman.add_password(None, self.url, self.user, self.password)
+        authhandler = urllib2.HTTPBasicAuthHandler(passman)
+        opener = urllib2.build_opener(authhandler)
+        urllib2.install_opener(opener)
 
     def _get_raw_data(self):
         """
@@ -381,15 +388,17 @@ class UrlService(SimpleService):
         """
         raw = None
         try:
-            f = urlopen(self.url, timeout=self.update_every)
+            f = urllib2.urlopen(self.url, timeout=self.update_every)
+        except Exception as e:
+            msg.error(self.__module__, str(e))
+            return None
+
+        try:
             raw = f.read().decode('utf-8')
         except Exception as e:
             msg.error(self.__module__, str(e))
         finally:
-            try:
-                f.close()
-            except:
-                pass
+            f.close()
         return raw
 
     def check(self):
@@ -405,6 +414,17 @@ class UrlService(SimpleService):
             self.url = str(self.configuration['url'])
         except (KeyError, TypeError):
             pass
+        try:
+            self.user = str(self.configuration['user'])
+        except (KeyError, TypeError):
+            pass
+        try:
+            self.password = str(self.configuration['password'])
+        except (KeyError, TypeError):
+            pass
+
+        if self.user is not None and self.password is not None:
+            self.__add_auth()
 
         if self._get_data() is not None:
             return True
