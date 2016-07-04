@@ -366,8 +366,12 @@ class SimpleService(BaseService):
 
 
 class UrlService(SimpleService):
+    # TODO HTTP Basic Authentication
     def __init__(self, configuration=None, name=None):
         self.url = ""
+        self.user = None
+        self.password = None
+        self.request = None
         SimpleService.__init__(self, configuration=configuration, name=name)
 
     def _get_raw_data(self):
@@ -458,7 +462,7 @@ class NetSocketService(SimpleService):
 
     def _parse_config(self):
         """
-        Format configuration data and try to connect to server
+        Parse configuration data
         :return: boolean
         """
         if self.name is not None or self.name != str(None):
@@ -489,6 +493,10 @@ class LogService(SimpleService):
         self.retries = 100000  # basically always retry
 
     def _get_raw_data(self):
+        """
+        Get log lines since last poll
+        :return: list
+        """
         lines = []
         try:
             if os.path.getsize(self.log_path) < self._last_position:
@@ -508,6 +516,10 @@ class LogService(SimpleService):
         return None
 
     def check(self):
+        """
+        Parse basic configuration and check if log file exists
+        :return: boolean
+        """
         if self.name is not None or self.name != str(None):
             self.name = ""
         else:

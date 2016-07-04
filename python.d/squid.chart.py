@@ -9,14 +9,6 @@ from base import NetSocketService
 priority = 60000
 retries = 5
 
-# default job configuration (overridden by python.d.plugin)
-# config = {'local': {
-#             'update_every': update_every,
-#             'retries': retries,
-#             'priority': priority,
-#             'url': 'http://localhost/stub_status'
-#          }}
-
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = ['clients_net', 'clients_requests', 'servers_net', 'servers_requests']
 
@@ -61,7 +53,7 @@ class Service(NetSocketService):
 
     def _get_data(self):
         """
-        Get data from http request
+        Get data via http request
         :return: dict
         """
         try:
@@ -79,6 +71,10 @@ class Service(NetSocketService):
             return None
 
     def check(self):
+        """
+        Parse essential configuration, autodetect squid configuration (if needed), and check if data is available
+        :return: boolean
+        """
         self._parse_config()
         # format request
         self.request.decode()
