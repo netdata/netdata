@@ -23,7 +23,6 @@ EXTRA_DIST = \
 	LICENSE.md \
 	COPYING \
 	autogen.sh \
-	netdata-9999.ebuild \
 	tests/stress.sh \
 	$(NULL)
 
