@@ -2,8 +2,7 @@
 # Description: hddtemp netdata python.d plugin
 # Author: Pawel Krupa (paulfantom)
 
-from base import SimpleService
-import socket
+from base import NetSocketService
 
 # default module values (can be overridden per job in `config`)
 #update_every = 2
@@ -30,11 +29,12 @@ CHARTS = {
 }
 
 
-class Service(SimpleService):
+class Service(NetSocketService):
     def __init__(self, configuration=None, name=None):
-        self.host = "localhost"
+        NetSocketService.__init__(self, configuration=configuration, name=name)
+        self.request = ""
+        self.host = "127.0.0.1"
         self.port = 7634
-        SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
 
@@ -43,14 +43,7 @@ class Service(SimpleService):
         Get data from TCP/IP socket
         :return: dict
         """
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect((self.host, self.port))
-            raw = s.recv(4096).split("|")[:-1]
-            s.close()
-        except Exception:
-            return None
-
+        raw = self._get_raw_data().split("|")[:-1]
         data = {}
         for i in range(len(raw) // 5):
             try:
@@ -61,18 +54,7 @@ class Service(SimpleService):
         return data
 
     def check(self):
-        if self.name is not None or self.name != str(None):
-            self.name = ""
-        else:
-            self.name = str(self.name)
-        try:
-            self.host = str(self.configuration['host'])
-        except (KeyError, TypeError):
-            self.error("No host specified. Using: '" + self.host + "'")
-        try:
-            self.port = int(self.configuration['port'])
-        except (KeyError, TypeError):
-            self.error("No port specified. Using: '" + str(self.port) + "'")
+        self._parse_config()
 
         data = self._get_data()
         if data is None:

@@ -5,6 +5,7 @@
 import time
 import sys
 import os
+import socket
 try:
     from urllib.request import urlopen
 except ImportError:
@@ -132,7 +133,7 @@ class BaseService(threading.Thread):
                 time.sleep(self.timetable['next'] - time.time())
                 self.retries_left = self.retries
             else:
-                self.retries -= 1
+                self.retries_left -= 1
                 if self.retries_left <= 0:
                     msg.error("no more retries. Exiting")
                     return
@@ -409,6 +410,82 @@ class UrlService(SimpleService):
             return True
         else:
             return False
+
+
+class NetSocketService(SimpleService):
+    def __init__(self, configuration=None, name=None):
+        # definitions are created dynamically in create() method based on 'charts' dictionary. format:
+        # definitions = {
+        #     'chart_name_in_netdata' : [ charts['chart_name_in_netdata']['lines']['name'] ]
+        # }
+        self.host = "localhost"
+        self.port = None
+        self.sock = None
+        self.request = ""
+        SimpleService.__init__(self, configuration=configuration, name=name)
+
+    def _get_raw_data(self):
+        """
+        Get raw data with low-level "socket" module.
+        :return: str
+        """
+        if self.sock is None:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(self.update_every)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                sock.connect((self.host, self.port))
+            except Exception as e:
+                self.sock = None
+                return None
+
+        try:
+            sock.send(self.request)
+        except Exception:
+            try:
+                sock.shutdown(1)
+                sock.close()
+            except:
+                pass
+            self.sock = None
+            return None
+
+        data = sock.recv(1024)
+        try:
+            while True:
+                buf = sock.recv(1024)
+                if not buf:
+                    break
+                else:
+                    data += buf
+        except:
+            sock.close()
+            return None
+
+        return data.decode()
+
+    def _parse_config(self):
+        """
+        Format configuration data and try to connect to server
+        :return: boolean
+        """
+        if self.name is not None or self.name != str(None):
+            self.name = ""
+        else:
+            self.name = str(self.name)
+        try:
+            self.host = str(self.configuration['host'])
+        except (KeyError, TypeError):
+            self.error("No host specified. Using: '" + self.host + "'")
+        try:
+            self.port = int(self.configuration['port'])
+        except (KeyError, TypeError):
+            self.error("No port specified. Using: '" + str(self.port) + "'")
+        try:
+            self.port = int(self.configuration['request'])
+        except (KeyError, TypeError):
+            self.error("No request specified. Using: '" + str(self.request) + "'")
+        self.request = self.request.encode()
 
 
 class LogService(SimpleService):
