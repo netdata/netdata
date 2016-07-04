@@ -4,11 +4,13 @@
 
 import time
 import sys
+import os
 try:
     from urllib.request import urlopen
 except ImportError:
     from urllib2 import urlopen
 
+# from subprocess import STDOUT, PIPE, Popen
 import threading
 import msg
 
@@ -25,7 +27,7 @@ class BaseService(threading.Thread):
         :param name: str
         """
         threading.Thread.__init__(self)
-        self.data_stream = ""
+        self._data_stream = ""
         self.daemon = True
         self.retries = 0
         self.retries_left = 0
@@ -34,8 +36,8 @@ class BaseService(threading.Thread):
         self.name = name
         self.override_name = None
         self.chart_name = ""
-        self.dimensions = []
-        self.charts = []
+        self._dimensions = []
+        self._charts = []
         if configuration is None:
             self.error("BaseService: no configuration parameters supplied. Cannot create Service.")
             raise RuntimeError
@@ -142,15 +144,18 @@ class BaseService(threading.Thread):
         Converts *params to string and joins them with one space between every one.
         :param params: str/int/float
         """
-        self.data_stream += instruction
+        self._data_stream += instruction
         for p in params:
-            p = str(p)
+            if p is None:
+                p = ""
+            else:
+                p = str(p)
             if len(p) == 0:
                 p = "''"
             if ' ' in p:
                 p = "'" + p + "'"
-            self.data_stream += " " + p
-        self.data_stream += "\n"
+            self._data_stream += " " + p
+        self._data_stream += "\n"
 
     def chart(self, type_id, name="", title="", units="", family="",
               category="", charttype="line", priority="", update_every=""):
@@ -166,8 +171,7 @@ class BaseService(threading.Thread):
         :param priority: int/str
         :param update_every: int/str
         """
-        self.charts.append(type_id)
-
+        self._charts.append(type_id)
         self._line("CHART", type_id, name, title, units, family, category, charttype, priority, update_every)
 
     def dimension(self, id, name=None, algorithm="absolute", multiplier=1, divisor=1, hidden=False):
@@ -196,7 +200,7 @@ class BaseService(threading.Thread):
         if algorithm not in ("absolute", "incremental", "percentage-of-absolute-row", "percentage-of-incremental-row"):
             algorithm = "absolute"
 
-        self.dimensions.append(id)
+        self._dimensions.append(id)
         if hidden:
             self._line("DIMENSION", id, name, algorithm, multiplier, divisor, "hidden")
         else:
@@ -209,7 +213,7 @@ class BaseService(threading.Thread):
         :param microseconds: int
         :return: boolean
         """
-        if type_id not in self.charts:
+        if type_id not in self._charts:
             self.error("wrong chart type_id:", type_id)
             return False
         try:
@@ -228,7 +232,7 @@ class BaseService(threading.Thread):
         :param value: int/float
         :return: boolean
         """
-        if id not in self.dimensions:
+        if id not in self._dimensions:
             self.error("wrong dimension id:", id)
             return False
         try:
@@ -246,8 +250,8 @@ class BaseService(threading.Thread):
         """
         Upload new data to netdata
         """
-        print(self.data_stream)
-        self.data_stream = ""
+        print(self._data_stream)
+        self._data_stream = ""
 
     def error(self, *params):
         """
@@ -293,27 +297,88 @@ class BaseService(threading.Thread):
         return False
 
 
-class UrlService(BaseService):
+class SimpleService(BaseService):
     def __init__(self, configuration=None, name=None):
-        self.charts = {}
-        # charts definitions in format:
-        # charts = {
-        #    'chart_name_in_netdata': {
-        #        'options': "parameters defining chart (passed to CHART statement)",
-        #        'lines': [
-        #           { 'name': 'dimension_name',
-        #             'options': 'dimension parameters (passed to DIMENSION statement)"
-        #           }
-        #        ]}
-        #    }
         self.order = []
         self.definitions = {}
+        BaseService.__init__(self, configuration=configuration, name=name)
+
+    def _get_data(self):
+        """
+        Get raw data from http request
+        :return: str
+        """
+        return ""
+
+    def _format_data(self):
+        """
+        Format data received from http request
+        :return: dict
+        """
+        return {}
+
+    def check(self):
+        """
+        :return:
+        """
+        return True
+
+    def create(self):
+        """
+        Create charts
+        :return: boolean
+        """
+        data = self._format_data()
+        if data is None:
+            return False
+
+        idx = 0
+        for name in self.order:
+            options = self.definitions[name]['options'] + [self.priority + idx, self.update_every]
+            self.chart(self.__module__ + "_" + self.name + "." + name, *options)
+            # check if server has this datapoint
+            for line in self.definitions[name]['lines']:
+                if line[0] in data:
+                    self.dimension(*line)
+            idx += 1
+
+        self.commit()
+        return True
+
+    def update(self, interval):
+        """
+        Update charts
+        :param interval: int
+        :return: boolean
+        """
+        data = self._format_data()
+        if data is None:
+            return False
+
+        updated = False
+        for chart in self.order:
+            if self.begin(self.__module__ + "_" + str(self.name) + "." + chart, interval):
+                updated = True
+                for dim in self.definitions[chart]['lines']:
+                    try:
+                        self.set(dim[0], data[dim[0]])
+                    except KeyError:
+                        pass
+                self.end()
+
+        self.commit()
+
+        return updated
+
+
+class UrlService(SimpleService):
+    def __init__(self, configuration=None, name=None):
         # definitions are created dynamically in create() method based on 'charts' dictionary. format:
         # definitions = {
         #     'chart_name_in_netdata' : [ charts['chart_name_in_netdata']['lines']['name'] ]
         # }
         self.url = ""
-        BaseService.__init__(self, configuration=configuration, name=name)
+        SimpleService.__init__(self, configuration=configuration, name=name)
 
     def _get_data(self):
         """
@@ -333,13 +398,6 @@ class UrlService(BaseService):
                 pass
         return raw
 
-    def _formatted_data(self):
-        """
-        Format data received from http request
-        :return: dict
-        """
-        return {}
-
     def check(self):
         """
         Format configuration data and try to connect to server
@@ -354,73 +412,61 @@ class UrlService(BaseService):
         except (KeyError, TypeError):
             pass
 
-        if self._formatted_data() is not None:
+        if self._format_data() is not None:
             return True
         else:
             return False
 
+
+class LogService(SimpleService):
+    def __init__(self, configuration=None, name=None):
+        # definitions are created dynamically in create() method based on 'charts' dictionary. format:
+        # definitions = {
+        #     'chart_name_in_netdata' : [ charts['chart_name_in_netdata']['lines']['name'] ]
+        # }
+        self.log_path = ""
+        self._last_position = 0
+        # self._log_reader = None
+        SimpleService.__init__(self, configuration=configuration, name=name)
+        self.retries = 100000  # basically always retry
+
+    def _get_data(self):
+        lines = []
+        try:
+            if os.path.getsize(self.log_path) < self._last_position:
+                self._last_position = 0
+            elif os.path.getsize(self.log_path) == self._last_position:
+                return None
+            with open(self.log_path, "r") as fp:
+                fp.seek(self._last_position)
+                for i, line in enumerate(fp):
+                    lines.append(line)
+                self._last_position = fp.tell()
+        except Exception as e:
+            msg.error(self.__module__, str(e))
+
+        if len(lines) != 0:
+            return lines
+        return None
+
+    def check(self):
+        if self.name is not None or self.name != str(None):
+            self.name = ""
+        else:
+            self.name = str(self.name)
+        try:
+            self.log_path = str(self.configuration['path'])
+        except (KeyError, TypeError):
+            self.error("No path to log specified. Using: '" + self.log_path + "'")
+
+        if os.access(self.log_path, os.R_OK):
+            return True
+        else:
+            self.error("Cannot access file: '" + self.log_path + "'")
+            return False
+
     def create(self):
-        """
-        Create charts
-        :return: boolean
-        """
-        for name in self.order:
-            if name not in self.charts:
-                continue
-            self.definitions[name] = []
-            for line in self.charts[name]['lines']:
-                self.definitions[name].append(line['name'])
+        status = SimpleService.create(self)
+        self._last_position = 0
+        return status
 
-        idx = 0
-        data = self._formatted_data()
-        if data is None:
-            return False
-        data_stream = ""
-        for name in self.order:
-            header = "CHART " + \
-                     self.__module__ + "_" + \
-                     self.name + "." + \
-                     name + " " + \
-                     self.charts[name]['options'] + " " + \
-                     str(self.priority + idx) + " " + \
-                     str(self.update_every)
-            content = ""
-            # check if server has this datapoint
-            for line in self.charts[name]['lines']:
-                if line['name'] in data:
-                    content += "\nDIMENSION " + line['name'] + " " + line['options']
-
-            if len(content) > 0:
-                data_stream += header + content + "\n"
-                idx += 1
-
-        print(data_stream)
-
-        if idx == 0:
-            return False
-        return True
-
-    def update(self, interval):
-        """
-        Update charts
-        :param interval: int
-        :return: boolean
-        """
-        data = self._formatted_data()
-        if data is None:
-            return False
-
-        data_stream = ""
-        for chart, dimensions in self.definitions.items():
-            header = "BEGIN " + self.__module__ + "_" + str(self.name) + "." + chart + " " + str(interval)
-            c = ""
-            for dim in dimensions:
-                try:
-                    c += "\nSET " + dim + " = " + str(data[dim])
-                except KeyError:
-                    pass
-            if len(c) != 0:
-                data_stream += header + c + "\nEND\n"
-        print(data_stream)
-
-        return True

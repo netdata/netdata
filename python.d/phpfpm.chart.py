@@ -22,29 +22,22 @@ ORDER = ['connections', 'requests', 'performance']
 
 CHARTS = {
     'connections': {
-        'options': "'' 'PHP-FPM Active Connections' 'connections' phpfpm phpfpm.connections line",
+        'options': [None, 'PHP-FPM Active Connections', 'connections', 'phpfpm', 'phpfpm.connections', 'line'],
         'lines': [
-            {"name": "active",
-             "options": "'' absolute 1 1"},
-            {"name": "maxActive",
-             "options": "'max active' absolute 1 1"},
-            {"name": "idle",
-             "options": "'' absolute 1 1"}
+            ["active"],
+            ["maxActive", 'max active'],
+            ["idle"]
         ]},
     'requests': {
-        'options': "'' 'PHP-FPM Requests' 'requests/s' phpfpm phpfpm.requests line",
+        'options': [None, 'PHP-FPM Requests', 'requests/s', 'phpfpm', 'phpfpm.requests', 'line'],
         'lines': [
-            {"name": "requests",
-             "options": "'' incremental 1 1"}
+            ["requests", None, "incremental"]
         ]},
     'performance': {
-
-        'options': "'' 'PHP-FPM Performance' 'status' phpfpm phpfpm.performance line",
+        'options': [None, 'PHP-FPM Performance', 'status', 'phpfpm', 'phpfpm.performance', 'line'],
         'lines': [
-            {"name": "reached",
-             "options": "'max children reached' absolute 1 1"},
-            {"name": "slow",
-             "options": "'slow requests' absolute 1 1"}
+            ["reached", 'max children reached'],
+            ["slow", 'slow requests']
         ]}
 }
 
@@ -55,7 +48,7 @@ class Service(UrlService):
         if len(self.url) == 0:
             self.url = "http://localhost/status"
         self.order = ORDER
-        self.charts = CHARTS
+        self.definitions = CHARTS
         self.assignment = {"active processes": 'active',
                            "max active processes": 'maxActive',
                            "idle processes": 'idle',
@@ -63,7 +56,7 @@ class Service(UrlService):
                            "max children reached": 'reached',
                            "slow requests": 'slow'}
 
-    def _formatted_data(self):
+    def _format_data(self):
         """
         Format data received from http request
         :return: dict

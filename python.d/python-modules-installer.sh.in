@@ -143,11 +143,14 @@ echo >&2
 if [ ${errors} -ne 0 ]
 then
     echo >&2 "Failed to install ${errors} modules: ${failed}"
-    echo >&2
-    echo >&2 "If you are getting errors during cleanup from pip, there is a known bug"
-    echo >&2 "in certain versions of pip that prevents installing packages local to an"
-    echo >&2 "application. To install them system-wide please run:"
-    echo >&2 "$0 --system"
+    if [ ! -z "${target}" ]
+    then
+		echo >&2
+		echo >&2 "If you are getting errors during cleanup from pip, there is a known bug"
+		echo >&2 "in certain versions of pip that prevents installing packages local to an"
+		echo >&2 "application. To install them system-wide please run:"
+		echo >&2 "$0 --system"
+	fi
     exit 1
 else
     echo >&2 "All done. We have: ${installed}"
