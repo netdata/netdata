@@ -54,6 +54,10 @@ class Service(NetSocketService):
         return data
 
     def check(self):
+        """
+        Parse configuration, check if hddtemp is available, and dynamically create chart lines data
+        :return: boolean
+        """
         self._parse_config()
 
         data = self._get_data()
