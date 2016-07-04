@@ -22,58 +22,47 @@ ORDER = ['requests', 'connections', 'conns_async', 'net', 'workers', 'reqpersec'
 
 CHARTS = {
     'bytesperreq': {
-        'options': "'' 'apache Lifetime Avg. Response Size' 'bytes/request' statistics apache.bytesperreq area",
+        'options': [None, 'apache Lifetime Avg. Response Size', 'bytes/request', 'statistics', 'apache.bytesperreq', 'area'],
         'lines': [
-            {"name": "size_req",
-             "options": "'' absolute 1 1"}
+            ["size_req"]
         ]},
     'workers': {
-        'options': "'' 'apache Workers' 'workers' workers apache.workers stacked",
+        'options': [None, 'apache Workers', 'workers', 'workers', 'apache.workers', 'stacked'],
         'lines': [
-            {"name": "idle",
-             "options": "'' absolute 1 1"},
-            {"name": "busy",
-             "options": "'' absolute 1 1"}
+            ["idle"],
+            ["busy"]
         ]},
     'reqpersec': {
-        'options': "'' 'apache Lifetime Avg. Requests/s' 'requests/s' statistics apache.reqpersec area",
+        'options': [None, 'apache Lifetime Avg. Requests/s', 'requests/s', 'statistics', 'apache.reqpersec', 'area'],
         'lines': [
-            {"name": "requests_sec",
-             "options": "'' absolute 1 1"}
+            ["requests_sec"]
         ]},
     'bytespersec': {
-        'options': "'' 'apache Lifetime Avg. Bandwidth/s' 'kilobytes/s' statistics apache.bytesperreq area",
+        'options': [None, 'apache Lifetime Avg. Bandwidth/s', 'kilobytes/s', 'statistics', 'apache.bytesperreq', 'area'],
         'lines': [
-            {"name": "size_sec",
-             "options": "'' absolute 1 1000"}
+            ["size_sec", None, 'absolute', 1, 1000]
         ]},
     'requests': {
-        'options': "'' 'apache Requests' 'requests/s' requests apache.requests line",
+        'options': [None, 'apache Requests', 'requests/s', 'requests', 'apache.requests', 'line'],
         'lines': [
-            {"name": "requests",
-             "options": "'' incremental 1 1"}
+            ["requests", None, 'incremental']
         ]},
     'net': {
-        'options': "'' 'apache Bandwidth' 'kilobytes/s' bandwidth apache.net area",
+        'options': [None, 'apache Bandwidth', 'kilobytes/s', 'bandwidth', 'apache.net', 'area'],
         'lines': [
-            {"name": "sent",
-             "options": "'' incremental 1 1"}
+            ["sent", None, 'incremental']
         ]},
     'connections': {
-        'options': "'' 'apache Connections' 'connections' connections apache.connections line",
+        'options': [None, 'apache Connections', 'connections', 'connections', 'apache.connections', 'line'],
         'lines': [
-            {"name": "connections",
-             "options": "'' absolute 1 1"}
+            ["connections"]
         ]},
     'conns_async': {
-        'options': "'' 'apache Async Connections' 'connections' connections apache.conns_async stacked",
+        'options': [None, 'apache Async Connections', 'connections', 'connections', 'apache.conns_async', 'stacked'],
         'lines': [
-            {"name": "keepalive",
-             "options": "'' absolute 1 1"},
-            {"name": "closing",
-             "options": "'' absolute 1 1"},
-            {"name": "writing",
-             "options": "'' absolute 1 1"}
+            ["keepalive"],
+            ["closing"],
+            ["writing"]
         ]}
 }
 
@@ -84,7 +73,7 @@ class Service(UrlService):
         if len(self.url) == 0:
             self.url = "http://localhost/server-status?auto"
         self.order = ORDER
-        self.charts = CHARTS
+        self.definitions = CHARTS
         self.assignment = {"BytesPerReq": 'size_req',
                            "IdleWorkers": 'idle',
                            "BusyWorkers": 'busy',
@@ -97,7 +86,7 @@ class Service(UrlService):
                            "ConnsAsyncClosing": 'closing',
                            "ConnsAsyncWriting": 'writing'}
 
-    def _formatted_data(self):
+    def _format_data(self):
         """
         Format data received from http request
         :return: dict
