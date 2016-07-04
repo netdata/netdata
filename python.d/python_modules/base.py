@@ -7,13 +7,12 @@ import sys
 import os
 import socket
 try:
-    # from urllib.request import urlopen, Request, HTTPPasswordMgrWithDefaultRealm
     import urllib.request as urllib2
 except ImportError:
-    # from urllib2 import urlopen, Request, HTTPPasswordMgrWithDefaultRealm
     import urllib2
 
-# from subprocess import STDOUT, PIPE, Popen
+from subprocess import Popen, PIPE
+
 import threading
 import msg
 
@@ -529,7 +528,7 @@ class LogService(SimpleService):
                     lines.append(line)
                 self._last_position = fp.tell()
         except Exception as e:
-            msg.error(self.__module__, str(e))
+            self.error(self.__module__, str(e))
 
         if len(lines) != 0:
             return lines
@@ -560,3 +559,50 @@ class LogService(SimpleService):
         self._last_position = 0
         return status
 
+
+class ExecutableService(SimpleService):
+    command_whitelist = ['exim']
+
+    def __init__(self, configuration=None, name=None):
+        self.command = ""
+        SimpleService.__init__(self, configuration=configuration, name=name)
+
+    def _get_raw_data(self):
+        """
+        Get raw data from executed command
+        :return: str
+        """
+        try:
+            p = Popen(self.command, stdout=PIPE, stderr=PIPE)
+        except Exception as e:
+            self.error(self.__module__, str(e))
+            return None
+        data = []
+        for line in p.stdout.readlines():
+            data.append(line)
+
+        return data
+
+    def check(self):
+        """
+        Parse basic configuration, check if command is whitelisted and is returning values
+        :return: boolean
+        """
+        if self.name is not None or self.name != str(None):
+            self.name = ""
+        else:
+            self.name = str(self.name)
+        # try:
+        #     self.command = str(self.configuration['path'])
+        # except (KeyError, TypeError):
+        #     self.error("No command specified. Using: '" + self.command + "'")
+        self.command = self.command.split(' ')
+        for i in self.command:
+            if i.startswith('-') or i in self.command_whitelist:
+                pass
+            else:
+                self.error("Wrong command. Probably not on whitelist.")
+                return False
+        if len(self._get_data()) == 0:
+            return False
+        return True
