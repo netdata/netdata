@@ -1247,6 +1247,7 @@ unsigned long long rrdset_done(RRDSET *st)
 	if(likely(stored_entries || !store_this_entry)) {
 		st->last_updated.tv_sec = st->last_collected_time.tv_sec;
 		st->last_updated.tv_usec = st->last_collected_time.tv_usec;
+		st->last_collected_total  = st->collected_total;
 	}
 
 	for( rd = st->dimensions; likely(rd) ; rd = rd->next ) {
@@ -1276,7 +1277,6 @@ unsigned long long rrdset_done(RRDSET *st)
 			, rd->calculated_value
 			);
 	}
-	st->last_collected_total  = st->collected_total;
 
 	// ALL DONE ABOUT THE DATA UPDATE
 	// --------------------------------------------------------------------
