@@ -860,7 +860,7 @@ unsigned long long rrdset_done(RRDSET *st)
 		// calculate the proper last_collected_time, using usec_since_last_update
 		unsigned long long ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec + st->usec_since_last_update;
 		st->last_collected_time.tv_sec = (time_t) (ut / 1000000ULL);
-		st->last_collected_time.tv_usec = (useconds_t) (ut % 1000000ULL);
+		st->last_collected_time.tv_usec = (suseconds_t) (ut % 1000000ULL);
 	}
 
 	// if this set has not been updated in the past
@@ -870,7 +870,7 @@ unsigned long long rrdset_done(RRDSET *st)
 		// set a fake last_updated, in the past using usec_since_last_update
 		unsigned long long ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec - st->usec_since_last_update;
 		st->last_updated.tv_sec = (time_t) (ut / 1000000ULL);
-		st->last_updated.tv_usec = (useconds_t) (ut % 1000000ULL);
+		st->last_updated.tv_usec = (suseconds_t) (ut % 1000000ULL);
 
 		// the first entry should not be stored
 		store_this_entry = 0;
@@ -890,7 +890,7 @@ unsigned long long rrdset_done(RRDSET *st)
 
 		unsigned long long ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec - st->usec_since_last_update;
 		st->last_updated.tv_sec = (time_t) (ut / 1000000ULL);
-		st->last_updated.tv_usec = (useconds_t) (ut % 1000000ULL);
+		st->last_updated.tv_usec = (suseconds_t) (ut % 1000000ULL);
 
 		// the first entry should not be stored
 		store_this_entry = 0;

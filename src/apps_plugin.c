@@ -2320,7 +2320,7 @@ int main(int argc, char **argv)
 #ifndef PROFILING_MODE
 		// delay until it is our time to run
 		while((sunow = timems()) < sunext)
-			usleep((useconds_t)(sunext - sunow));
+			usecsleep(sunext - sunow);
 
 		// find the next time we need to run
 		while(timems() > sunext)

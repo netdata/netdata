@@ -90,7 +90,7 @@ void *proc_main(void *ptr)
 
 		// delay until it is our time to run
 		while((sunow = timems()) < sunext)
-			usleep((useconds_t)(sunext - sunow));
+			usecsleep(sunext - sunow);
 
 		// find the next time we need to run
 		while(timems() > sunext)
