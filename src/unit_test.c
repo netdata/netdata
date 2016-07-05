@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/resource.h>
+#include <math.h>
 
 #include "common.h"
 #include "storage_number.h"
@@ -246,7 +247,7 @@ int unit_test_storage()
 
 struct feed_values {
 		unsigned long long microseconds;
-		calculated_number value;
+		collected_number value;
 };
 
 struct test {
@@ -262,6 +263,9 @@ struct test {
 	unsigned long result_entries;
 	struct feed_values *feed;
 	calculated_number *results;
+
+	collected_number *feed2;
+	calculated_number *results2;
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -295,7 +299,9 @@ struct test test1 = {
 		10,					// feed entries
 		9,					// result entries
 		test1_feed,			// feed
-		test1_results		// results
+		test1_results,		// results
+		NULL,				// feed2
+		NULL				// results2
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -329,7 +335,9 @@ struct test test2 = {
 		10,					// feed entries
 		9,					// result entries
 		test2_feed,			// feed
-		test2_results		// results
+		test2_results,		// results
+		NULL,				// feed2
+		NULL				// results2
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -362,7 +370,9 @@ struct test test3 = {
 		10,					// feed entries
 		9,					// result entries
 		test3_feed,			// feed
-		test3_results		// results
+		test3_results,		// results
+		NULL,				// feed2
+		NULL				// results2
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -395,7 +405,9 @@ struct test test4 = {
 		10,					// feed entries
 		9,					// result entries
 		test4_feed,			// feed
-		test4_results		// results
+		test4_results,		// results
+		NULL,				// feed2
+		NULL				// results2
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -428,7 +440,9 @@ struct test test5 = {
 		10,					// feed entries
 		9,					// result entries
 		test5_feed,			// feed
-		test5_results		// results
+		test5_results,		// results
+		NULL,				// feed2
+		NULL				// results2
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -467,7 +481,9 @@ struct test test6 = {
 		16,					// feed entries
 		4,					// result entries
 		test6_feed,			// feed
-		test6_results		// results
+		test6_results,		// results
+		NULL,				// feed2
+		NULL				// results2
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -500,7 +516,9 @@ struct test test7 = {
 		10,					// feed entries
 		18,					// result entries
 		test7_feed,			// feed
-		test7_results		// results
+		test7_results,		// results
+		NULL,				// feed2
+		NULL				// results2
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -529,7 +547,9 @@ struct test test8 = {
 		6,					// feed entries
 		10,					// result entries
 		test8_feed,			// feed
-		test8_results		// results
+		test8_results,		// results
+		NULL,				// feed2
+		NULL				// results2
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -568,7 +588,9 @@ struct test test9 = {
 		16,					// feed entries
 		4,					// result entries
 		test9_feed,			// feed
-		test9_results		// results
+		test9_results,		// results
+		NULL,				// feed2
+		NULL				// results2
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -600,8 +622,131 @@ struct test test10 = {
 		RRDDIM_INCREMENTAL,	// algorithm
 		10,					// feed entries
 		7,					// result entries
-		test10_feed,			// feed
-		test10_results		// results
+		test10_feed,		// feed
+		test10_results,		// results
+		NULL,				// feed2
+		NULL				// results2
+};
+
+// --------------------------------------------------------------------------------------------------------------------
+// test11
+
+struct feed_values test11_feed[] = {
+		{ 0, 10 },
+		{ 1000000, 20 },
+		{ 1000000, 30 },
+		{ 1000000, 40 },
+		{ 1000000, 50 },
+		{ 1000000, 60 },
+		{ 1000000, 70 },
+		{ 1000000, 80 },
+		{ 1000000, 90 },
+		{ 1000000, 100 },
+};
+
+collected_number test11_feed2[] = {
+	10, 20, 30, 40, 50, 60, 70, 80, 90, 100
+};
+
+calculated_number test11_results[] = {
+		50, 50, 50, 50, 50, 50, 50, 50, 50
+};
+
+calculated_number test11_results2[] = {
+		50, 50, 50, 50, 50, 50, 50, 50, 50
+};
+
+struct test test11 = {
+		"test11",			// name
+		"test percentage-of-incremental-row with equal values",
+		1,					// update_every
+		1,					// multiplier
+		1,					// divisor
+		RRDDIM_PCENT_OVER_DIFF_TOTAL,	// algorithm
+		10,					// feed entries
+		9,					// result entries
+		test11_feed,		// feed
+		test11_results,		// results
+		test11_feed2,		// feed2
+		test11_results2		// results2
+};
+
+// --------------------------------------------------------------------------------------------------------------------
+// test12
+
+struct feed_values test12_feed[] = {
+		{ 0, 10 },
+		{ 1000000, 20 },
+		{ 1000000, 30 },
+		{ 1000000, 40 },
+		{ 1000000, 50 },
+		{ 1000000, 60 },
+		{ 1000000, 70 },
+		{ 1000000, 80 },
+		{ 1000000, 90 },
+		{ 1000000, 100 },
+};
+
+collected_number test12_feed2[] = {
+	10*3, 20*3, 30*3, 40*3, 50*3, 60*3, 70*3, 80*3, 90*3, 100*3
+};
+
+calculated_number test12_results[] = {
+		25, 25, 25, 25, 25, 25, 25, 25, 25
+};
+
+calculated_number test12_results2[] = {
+		75, 75, 75, 75, 75, 75, 75, 75, 75
+};
+
+struct test test12 = {
+		"test12",			// name
+		"test percentage-of-incremental-row with equal values",
+		1,					// update_every
+		1,					// multiplier
+		1,					// divisor
+		RRDDIM_PCENT_OVER_DIFF_TOTAL,	// algorithm
+		10,					// feed entries
+		9,					// result entries
+		test12_feed,		// feed
+		test12_results,		// results
+		test12_feed2,		// feed2
+		test12_results2		// results2
+};
+
+// --------------------------------------------------------------------------------------------------------------------
+// test13
+
+struct feed_values test13_feed[] = {
+		{ 500000,  1000 },
+		{ 600000,  1000 +  600 },
+		{ 200000,  1600 +  200 },
+		{ 1000000, 1800 + 1000 },
+		{ 200000,  2800 +  200 },
+		{ 2000000, 3000 + 2000 },
+		{ 600000,  5000 +  600 },
+		{ 400000,  5600 +  400 },
+		{ 900000,  6000 +  900 },
+		{ 1000000, 6900 + 1000 },
+};
+
+calculated_number test13_results[] = {
+		83.3333300, 100, 100, 100, 100, 100, 100
+};
+
+struct test test13 = {
+		"test13",			// name
+		"test incremental values updated in short and long durations",
+		1,					// update_every
+		1,					// multiplier
+		1,					// divisor
+		RRDDIM_PCENT_OVER_DIFF_TOTAL,	// algorithm
+		10,					// feed entries
+		7,					// result entries
+		test13_feed,		// feed
+		test13_results,		// results
+		NULL,				// feed2
+		NULL				// results2
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -618,7 +763,12 @@ int run_test(struct test *test)
 
 	// create the chart
 	RRDSET *st = rrdset_create("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", 1, 1, RRDSET_TYPE_LINE);
-	RRDDIM *rd = rrddim_add(st, "dimension", NULL, test->multiplier, test->divisor, test->algorithm);
+	RRDDIM *rd = rrddim_add(st, "dim1", NULL, test->multiplier, test->divisor, test->algorithm);
+	
+	RRDDIM *rd2 = NULL;
+	if(test->feed2)
+		rd2 = rrddim_add(st, "dim2", NULL, test->multiplier, test->divisor, test->algorithm);
+
 	st->debug = 1;
 
 	// feed it with the test data
@@ -627,14 +777,21 @@ int run_test(struct test *test)
 		if(debug_flags) fprintf(stderr, "\n\n");
 
 		if(c) {
-			fprintf(stderr, "    > %s: feeding position %lu, after %llu microseconds, with value " CALCULATED_NUMBER_FORMAT "\n", test->name, c+1, test->feed[c].microseconds, test->feed[c].value);
+			fprintf(stderr, "    > %s: feeding position %lu, after %llu microseconds\n", test->name, c+1, test->feed[c].microseconds);
 			rrdset_next_usec(st, test->feed[c].microseconds);
 		}
 		else {
-			fprintf(stderr, "    > %s: feeding position %lu with value " CALCULATED_NUMBER_FORMAT "\n", test->name, c+1, test->feed[c].value);
+			fprintf(stderr, "    > %s: feeding position %lu\n", test->name, c+1);
 		}
 
-		rrddim_set(st, "dimension", test->feed[c].value);
+		fprintf(stderr, "       >> %s with value " COLLECTED_NUMBER_FORMAT "\n", rd->name, test->feed[c].value);
+		rrddim_set(st, "dim1", test->feed[c].value);
+
+		if(rd2) {
+			fprintf(stderr, "       >> %s with value " COLLECTED_NUMBER_FORMAT "\n", rd2->name, test->feed2[c]);
+			rrddim_set(st, "dim2", test->feed2[c]);
+		}
+
 		rrdset_done(st);
 
 		// align the first entry to second boundary
@@ -654,9 +811,19 @@ int run_test(struct test *test)
 
 	unsigned long max = (st->counter < test->result_entries)?st->counter:test->result_entries;
 	for(c = 0 ; c < max ; c++) {
-		calculated_number v = unpack_storage_number(rd->values[c]), n = test->results[c];
-		fprintf(stderr, "    %s: checking position %lu, expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n", test->name, c+1, n, v, (v == n)?"OK":"### E R R O R ###");
-		if(v != n) errors++;
+		calculated_number v = unpack_storage_number(rd->values[c]);
+		calculated_number n = test->results[c];
+		int same = (roundl(v * 10000000.0) == roundl(n * 10000000.0))?1:0;
+		fprintf(stderr, "    %s/%s: checking position %lu, expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n", test->name, rd->name, c+1, n, v, (same)?"OK":"### E R R O R ###");
+		if(!same) errors++;
+
+		if(rd2) {
+			v = unpack_storage_number(rd2->values[c]);
+			n = test->results2[c];
+			same = (roundl(v * 10000000.0) == roundl(n * 10000000.0))?1:0;
+			fprintf(stderr, "    %s/%s: checking position %lu, expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n", test->name, rd2->name, c+1, n, v, (same)?"OK":"### E R R O R ###");
+			if(!same) errors++;
+		}
 	}
 
 	return errors;
@@ -692,6 +859,15 @@ int run_all_mockup_tests(void)
 		return 1;
 
 	if(run_test(&test10))
+		return 1;
+
+	if(run_test(&test11))
+		return 1;
+
+	if(run_test(&test12))
+		return 1;
+
+	if(run_test(&test13))
 		return 1;
 
 	return 0;
