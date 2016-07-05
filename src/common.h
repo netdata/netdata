@@ -46,6 +46,7 @@ extern void get_HZ(void);
 extern pid_t gettid(void);
 
 extern unsigned long long timems(void);
+extern int usecsleep(unsigned long long usec);
 
 extern char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len);
 
