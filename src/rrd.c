@@ -277,7 +277,12 @@ char *rrdset_cache_dir(const char *id)
 	char *ret = NULL;
 
 	static char *cache_dir = NULL;
-	if(!cache_dir) cache_dir = config_get("global", "cache directory", CACHE_DIR);
+	if(!cache_dir) {
+		cache_dir = config_get("global", "cache directory", CACHE_DIR);
+		int r = mkdir(cache_dir, 0755);
+		if(r != 0 && errno != EEXIST)
+			error("Cannot create directory '%s'", cache_dir);
+	}
 
 	char b[FILENAME_MAX + 1];
 	char n[FILENAME_MAX + 1];
