@@ -1642,6 +1642,9 @@ int registry_init(void) {
 	// registry enabled?
 	registry.enabled = config_get_boolean("registry", "enabled", 0);
 
+	if(mkdir(VARLIB_DIR, 0755) == -1 && errno != EEXIST)
+		error("Cannot create directory '" VARLIB_DIR "'");
+
 	// pathnames
 	registry.pathname = config_get("registry", "registry db directory", VARLIB_DIR "/registry");
 	if(mkdir(registry.pathname, 0755) == -1 && errno != EEXIST) {

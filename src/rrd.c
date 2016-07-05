@@ -277,7 +277,12 @@ char *rrdset_cache_dir(const char *id)
 	char *ret = NULL;
 
 	static char *cache_dir = NULL;
-	if(!cache_dir) cache_dir = config_get("global", "cache directory", CACHE_DIR);
+	if(!cache_dir) {
+		cache_dir = config_get("global", "cache directory", CACHE_DIR);
+		int r = mkdir(cache_dir, 0755);
+		if(r != 0 && errno != EEXIST)
+			error("Cannot create directory '%s'", cache_dir);
+	}
 
 	char b[FILENAME_MAX + 1];
 	char n[FILENAME_MAX + 1];
@@ -1242,6 +1247,7 @@ unsigned long long rrdset_done(RRDSET *st)
 	if(likely(stored_entries || !store_this_entry)) {
 		st->last_updated.tv_sec = st->last_collected_time.tv_sec;
 		st->last_updated.tv_usec = st->last_collected_time.tv_usec;
+		st->last_collected_total  = st->collected_total;
 	}
 
 	for( rd = st->dimensions; likely(rd) ; rd = rd->next ) {
@@ -1271,7 +1277,6 @@ unsigned long long rrdset_done(RRDSET *st)
 			, rd->calculated_value
 			);
 	}
-	st->last_collected_total  = st->collected_total;
 
 	// ALL DONE ABOUT THE DATA UPDATE
 	// --------------------------------------------------------------------
