@@ -1,4 +1,4 @@
-#!/sbin/runscript
+#!/sbin/openrc-run
 
 # The user netdata is configured to run as.
 # If you edit its configuration file to set a different
