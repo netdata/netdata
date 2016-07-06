@@ -43,7 +43,10 @@ class Service(NetSocketService):
         Get data from TCP/IP socket
         :return: dict
         """
-        raw = self._get_raw_data().split("|")[:-1]
+        try:
+            raw = self._get_raw_data().split("|")[:-1]
+        except AttributeError:
+            return None
         data = {}
         for i in range(len(raw) // 5):
             try:
@@ -59,7 +62,6 @@ class Service(NetSocketService):
         :return: boolean
         """
         self._parse_config()
-
         data = self._get_data()
         if data is None:
             self.error("No data received")
