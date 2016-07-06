@@ -77,12 +77,12 @@ class Service(NetSocketService):
         """
         self._parse_config()
         # format request
-        self.request.decode()
-        if not self.request.startswith("GET"):
-            self.request = "GET " + self.request
-        if not self.request.endswith(" HTTP/1.0\r\n\r\n"):
-            self.request += " HTTP/1.0\r\n\r\n"
-        self.request = self.request.encode()
+        req = self.request.decode()
+        if not req.startswith("GET"):
+            req = "GET " + req
+        if not req.endswith(" HTTP/1.0\r\n\r\n"):
+            req += " HTTP/1.0\r\n\r\n"
+        self.request = req.encode()
 
         # autodetect squid
         if type(self.port) is tuple:
