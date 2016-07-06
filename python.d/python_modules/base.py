@@ -407,9 +407,9 @@ class UrlService(SimpleService):
         """
         if self.name is None or self.name == str(None):
             self.name = 'local'
+            self.chart_name += "_" + self.name
         else:
             self.name = str(self.name)
-        self.chart_name += "_" + self.name
         try:
             self.url = str(self.configuration['url'])
         except (KeyError, TypeError):
