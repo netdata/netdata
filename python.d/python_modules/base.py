@@ -497,7 +497,7 @@ class NetSocketService(SimpleService):
         except (KeyError, TypeError):
             self.error("No port specified. Using: '" + str(self.port) + "'")
         try:
-            self.port = int(self.configuration['request'])
+            self.request = int(self.configuration['request'])
         except (KeyError, TypeError):
             self.error("No request specified. Using: '" + str(self.request) + "'")
         self.request = self.request.encode()
