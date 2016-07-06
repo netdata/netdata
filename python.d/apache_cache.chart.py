@@ -6,7 +6,7 @@ from base import LogService
 
 priority = 60000
 retries = 5
-update_every = 3
+# update_every = 3
 
 ORDER = ['cache']
 CHARTS = {
@@ -28,13 +28,13 @@ class Service(LogService):
         self.order = ORDER
         self.definitions = CHARTS
 
-    def _format_data(self):
+    def _get_data(self):
         """
         Parse new log lines
         :return: dict
         """
         try:
-            raw = self._get_data()
+            raw = self._get_raw_data()
             if raw is None:
                 return None
         except (ValueError, AttributeError):

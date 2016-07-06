@@ -56,13 +56,13 @@ class Service(UrlService):
                            "max children reached": 'reached',
                            "slow requests": 'slow'}
 
-    def _format_data(self):
+    def _get_data(self):
         """
         Format data received from http request
         :return: dict
         """
         try:
-            raw = self._get_data().split('\n')
+            raw = self._get_raw_data().split('\n')
         except AttributeError:
             return None
         data = {}

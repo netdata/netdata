@@ -5,12 +5,14 @@
 import time
 import sys
 import os
+import socket
 try:
-    from urllib.request import urlopen
+    import urllib.request as urllib2
 except ImportError:
-    from urllib2 import urlopen
+    import urllib2
 
-# from subprocess import STDOUT, PIPE, Popen
+from subprocess import Popen, PIPE
+
 import threading
 import msg
 
@@ -56,7 +58,7 @@ class BaseService(threading.Thread):
         :param config: dict
         """
         try:
-            self.override_name = config.pop('override_name')
+            self.override_name = config.pop('name')
         except KeyError:
             pass
         self.update_every = int(config.pop('update_every'))
@@ -132,7 +134,7 @@ class BaseService(threading.Thread):
                 time.sleep(self.timetable['next'] - time.time())
                 self.retries_left = self.retries
             else:
-                self.retries -= 1
+                self.retries_left -= 1
                 if self.retries_left <= 0:
                     msg.error("no more retries. Exiting")
                     return
@@ -305,14 +307,7 @@ class SimpleService(BaseService):
 
     def _get_data(self):
         """
-        Get raw data from http request
-        :return: str
-        """
-        return ""
-
-    def _format_data(self):
-        """
-        Format data received from http request
+        Get some data
         :return: dict
         """
         return {}
@@ -328,14 +323,18 @@ class SimpleService(BaseService):
         Create charts
         :return: boolean
         """
-        data = self._format_data()
+        data = self._get_data()
         if data is None:
             return False
 
         idx = 0
         for name in self.order:
             options = self.definitions[name]['options'] + [self.priority + idx, self.update_every]
-            self.chart(self.__module__ + "_" + self.name + "." + name, *options)
+            if self.name == "":
+                type_id = self.__module__
+            else:
+                type_id = self.__module__ + "_" + self.name
+            self.chart(type_id + "." + name, *options)
             # check if server has this datapoint
             for line in self.definitions[name]['lines']:
                 if line[0] in data:
@@ -351,13 +350,17 @@ class SimpleService(BaseService):
         :param interval: int
         :return: boolean
         """
-        data = self._format_data()
+        data = self._get_data()
         if data is None:
             return False
 
         updated = False
         for chart in self.order:
-            if self.begin(self.__module__ + "_" + str(self.name) + "." + chart, interval):
+            if str(self.name) == "":
+                type_id = self.__module__
+            else:
+                type_id = self.__module__ + "_" + self.name
+            if self.begin(type_id + "." + chart, interval):
                 updated = True
                 for dim in self.definitions[chart]['lines']:
                     try:
@@ -373,29 +376,36 @@ class SimpleService(BaseService):
 
 class UrlService(SimpleService):
     def __init__(self, configuration=None, name=None):
-        # definitions are created dynamically in create() method based on 'charts' dictionary. format:
-        # definitions = {
-        #     'chart_name_in_netdata' : [ charts['chart_name_in_netdata']['lines']['name'] ]
-        # }
         self.url = ""
+        self.user = None
+        self.password = None
         SimpleService.__init__(self, configuration=configuration, name=name)
 
-    def _get_data(self):
+    def __add_auth(self):
+        passman = urllib2.HTTPPasswordMgrWithDefaultRealm()
+        passman.add_password(None, self.url, self.user, self.password)
+        authhandler = urllib2.HTTPBasicAuthHandler(passman)
+        opener = urllib2.build_opener(authhandler)
+        urllib2.install_opener(opener)
+
+    def _get_raw_data(self):
         """
         Get raw data from http request
         :return: str
         """
         raw = None
         try:
-            f = urlopen(self.url, timeout=self.update_every)
+            f = urllib2.urlopen(self.url, timeout=self.update_every)
+        except Exception as e:
+            msg.error(self.__module__, str(e))
+            return None
+
+        try:
             raw = f.read().decode('utf-8')
         except Exception as e:
             msg.error(self.__module__, str(e))
         finally:
-            try:
-                f.close()
-            except:
-                pass
+            f.close()
         return raw
 
     def check(self):
@@ -411,26 +421,111 @@ class UrlService(SimpleService):
             self.url = str(self.configuration['url'])
         except (KeyError, TypeError):
             pass
+        try:
+            self.user = str(self.configuration['user'])
+        except (KeyError, TypeError):
+            pass
+        try:
+            self.password = str(self.configuration['password'])
+        except (KeyError, TypeError):
+            pass
 
-        if self._format_data() is not None:
+        if self.user is not None and self.password is not None:
+            self.__add_auth()
+
+        if self._get_data() is not None:
             return True
         else:
             return False
 
 
+class NetSocketService(SimpleService):
+    def __init__(self, configuration=None, name=None):
+        self.host = "localhost"
+        self.port = None
+        self.sock = None
+        self.request = ""
+        SimpleService.__init__(self, configuration=configuration, name=name)
+
+    def _get_raw_data(self):
+        """
+        Get raw data with low-level "socket" module.
+        :return: str
+        """
+        if self.sock is None:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(self.update_every)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                sock.connect((self.host, self.port))
+            except Exception as e:
+                print(e)
+                self.sock = None
+                return None
+
+        if self.request != "".encode():
+            try:
+                sock.send(self.request)
+            except Exception:
+                try:
+                    sock.shutdown(1)
+                    sock.close()
+                except:
+                    pass
+                self.sock = None
+                return None
+
+        data = sock.recv(1024)
+        try:
+            while True:
+                buf = sock.recv(1024)
+                if not buf:
+                    break
+                else:
+                    data += buf
+        except:
+            sock.close()
+            return None
+
+        return data.decode()
+
+    def _parse_config(self):
+        """
+        Parse configuration data
+        :return: boolean
+        """
+        if self.name is not None or self.name != str(None):
+            self.name = ""
+        else:
+            self.name = str(self.name)
+        try:
+            self.host = str(self.configuration['host'])
+        except (KeyError, TypeError):
+            self.error("No host specified. Using: '" + self.host + "'")
+        try:
+            self.port = int(self.configuration['port'])
+        except (KeyError, TypeError):
+            self.error("No port specified. Using: '" + str(self.port) + "'")
+        try:
+            self.request = str(self.configuration['request'])
+        except (KeyError, TypeError):
+            self.error("No request specified. Using: '" + str(self.request) + "'")
+        self.request = self.request.encode()
+
+
 class LogService(SimpleService):
     def __init__(self, configuration=None, name=None):
-        # definitions are created dynamically in create() method based on 'charts' dictionary. format:
-        # definitions = {
-        #     'chart_name_in_netdata' : [ charts['chart_name_in_netdata']['lines']['name'] ]
-        # }
         self.log_path = ""
         self._last_position = 0
         # self._log_reader = None
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.retries = 100000  # basically always retry
 
-    def _get_data(self):
+    def _get_raw_data(self):
+        """
+        Get log lines since last poll
+        :return: list
+        """
         lines = []
         try:
             if os.path.getsize(self.log_path) < self._last_position:
@@ -443,13 +538,17 @@ class LogService(SimpleService):
                     lines.append(line)
                 self._last_position = fp.tell()
         except Exception as e:
-            msg.error(self.__module__, str(e))
+            self.error(self.__module__, str(e))
 
         if len(lines) != 0:
             return lines
         return None
 
     def check(self):
+        """
+        Parse basic configuration and check if log file exists
+        :return: boolean
+        """
         if self.name is not None or self.name != str(None):
             self.name = ""
         else:
@@ -470,3 +569,50 @@ class LogService(SimpleService):
         self._last_position = 0
         return status
 
+
+class ExecutableService(SimpleService):
+    command_whitelist = ['exim']
+
+    def __init__(self, configuration=None, name=None):
+        self.command = ""
+        SimpleService.__init__(self, configuration=configuration, name=name)
+
+    def _get_raw_data(self):
+        """
+        Get raw data from executed command
+        :return: str
+        """
+        try:
+            p = Popen(self.command, stdout=PIPE, stderr=PIPE)
+        except Exception as e:
+            self.error(self.__module__, str(e))
+            return None
+        data = []
+        for line in p.stdout.readlines():
+            data.append(line)
+
+        return data
+
+    def check(self):
+        """
+        Parse basic configuration, check if command is whitelisted and is returning values
+        :return: boolean
+        """
+        if self.name is not None or self.name != str(None):
+            self.name = ""
+        else:
+            self.name = str(self.name)
+        # try:
+        #     self.command = str(self.configuration['path'])
+        # except (KeyError, TypeError):
+        #     self.error("No command specified. Using: '" + self.command + "'")
+        self.command = self.command.split(' ')
+        for i in self.command:
+            if i.startswith('-') or i in self.command_whitelist:
+                pass
+            else:
+                self.error("Wrong command. Probably not on whitelist.")
+                return False
+        if self._get_data() is None or len(self._get_data()) == 0:
+            return False
+        return True
