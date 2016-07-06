@@ -27,6 +27,7 @@ dist_pythonconfig_DATA = \
 	python.d/nginx.conf \
 	python.d/phpfpm.conf \
 	python.d/squid.conf \
+	python.d/tomcat.conf \
 	$(NULL)
 
 
