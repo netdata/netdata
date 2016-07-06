@@ -22,6 +22,7 @@ dist_pythonconfig_DATA = \
 	python.d/example.conf \
 	python.d/mysql.conf \
 	python.d/phpfpm.conf \
+	python.d/squid.conf \
 	$(NULL)
 
 
