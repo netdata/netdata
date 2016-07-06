@@ -452,7 +452,7 @@ class NetSocketService(SimpleService):
                 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 sock.connect((self.host, self.port))
             except Exception as e:
-                print(e)
+                self.error(e)
                 self.sock = None
                 return None
 
