@@ -330,7 +330,11 @@ class SimpleService(BaseService):
         idx = 0
         for name in self.order:
             options = self.definitions[name]['options'] + [self.priority + idx, self.update_every]
-            self.chart(self.__module__ + "_" + self.name + "." + name, *options)
+            if self.name == "":
+                type_id = self.__module__
+            else:
+                type_id = self.__module__ + "_" + self.name
+            self.chart(type_id + "." + name, *options)
             # check if server has this datapoint
             for line in self.definitions[name]['lines']:
                 if line[0] in data:
@@ -352,7 +356,11 @@ class SimpleService(BaseService):
 
         updated = False
         for chart in self.order:
-            if self.begin(self.__module__ + "_" + str(self.name) + "." + chart, interval):
+            if str(self.name) == "":
+                type_id = self.__module__
+            else:
+                type_id = self.__module__ + "_" + self.name
+            if self.begin(type_id + "." + chart, interval):
                 updated = True
                 for dim in self.definitions[chart]['lines']:
                     try:
