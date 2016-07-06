@@ -83,20 +83,21 @@ class Service(NetSocketService):
         if not req.endswith(" HTTP/1.0\r\n\r\n"):
             req += " HTTP/1.0\r\n\r\n"
         self.request = req.encode()
-
-        # autodetect squid
-        if type(self.port) is tuple:
-            ports = self.port
-            for port in ports:
-                self.port = port
-                urls = ["cache_object://" + self.host + ":" + str(port) + "/counters",
-                        "/squid-internal-mgr/counters"]
-                for url in urls:
-                    tmp = "GET " + url + " HTTP/1.0\r\n\r\n"
-                    self.request = tmp.encode()
-                    if self._get_data() is not None:
-                        return True
-        else:
+        #
+        # # autodetect squid
+        # if type(self.port) is tuple:
+        #     ports = self.port
+        #     for port in ports:
+        #         self.port = port
+        #         urls = ["cache_object://" + self.host + ":" + str(port) + "/counters",
+        #                 "/squid-internal-mgr/counters"]
+        #         for url in urls:
+        #             tmp = "GET " + url + " HTTP/1.0\r\n\r\n"
+        #             self.request = tmp.encode()
+        #             if self._get_data() is not None:
+        #                 return True
+        # else:
+        if True:
             if self._get_data() is not None:
                 return True
             else:
