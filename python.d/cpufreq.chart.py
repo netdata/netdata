@@ -2,7 +2,8 @@
 # Description: cpufreq netdata python.d plugin
 # Author: Pawel Krupa (paulfantom)
 
-from base import SysFileService
+import os
+from base import SimpleService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -18,16 +19,33 @@ CHARTS = {
 }
 
 
-class Service(SysFileService):
+class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
-        SysFileService.__init__(self, configuration=configuration, name=name)
+        self.sys_dir = "/sys/devices"
+        self.filename = "scaling_cur_freq"
+        SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
         self._orig_name = ""
+        self.assignment = {}
+        self.paths = []
+
+    def _get_data(self):
+        raw = {}
+        for path in self.paths:
+            with open(path, 'r') as f:
+                raw[path] = f.read()
+        data = {}
+        for path in self.paths:
+            data[self.assignment[path]] = raw[path]
+        return data
 
     def check(self):
         self._orig_name = self.chart_name
-        self.paths = self._find("scaling_cur_freq")
+
+        for dirpath, _, filenames in os.walk(self.sys_dir):
+            if self.filename in filenames:
+                self.paths.append(dirpath + "/" + self.filename)
 
         if len(self.paths) == 0:
             return False
@@ -46,12 +64,12 @@ class Service(SysFileService):
 
     def create(self):
         self.chart_name = "cpu"
-        status = SysFileService.create(self)
+        status = SimpleService.create(self)
         self.chart_name = self._orig_name
         return status
 
     def update(self, interval):
         self.chart_name = "cpu"
-        status = SysFileService.update(self, interval=interval)
+        status = SimpleService.update(self, interval=interval)
         self.chart_name = self._orig_name
         return status
