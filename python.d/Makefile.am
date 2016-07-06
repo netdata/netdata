@@ -13,6 +13,7 @@ dist_python_SCRIPTS = \
 	apache_cache.chart.py \
 	hddtemp.chart.py \
 	squid.chart.py \
+	tomcat.chart.py \
 	python-modules-installer.sh \
 	$(NULL)
 
