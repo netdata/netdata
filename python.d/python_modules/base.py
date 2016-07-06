@@ -58,7 +58,7 @@ class BaseService(threading.Thread):
         :param config: dict
         """
         try:
-            self.override_name = config.pop('override_name')
+            self.override_name = config.pop('name')
         except KeyError:
             pass
         self.update_every = int(config.pop('update_every'))
@@ -603,6 +603,6 @@ class ExecutableService(SimpleService):
             else:
                 self.error("Wrong command. Probably not on whitelist.")
                 return False
-        if len(self._get_data()) == 0:
+        if self._get_data() is None or len(self._get_data()) == 0:
             return False
         return True
