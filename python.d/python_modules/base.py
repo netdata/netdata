@@ -609,3 +609,33 @@ class ExecutableService(SimpleService):
         if self._get_data() is None or len(self._get_data()) == 0:
             return False
         return True
+
+
+class SysFileService(SimpleService):
+    def __init__(self, configuration=None, name=None):
+        self.paths = []
+        self.sys_dir = "/sys/devices"
+        SimpleService.__init__(self, configuration=configuration, name=name)
+        self.assignment = {}
+
+    def _find(self, query):
+        """
+        Find path to file in /sys/devices
+        :param query: str
+        :return: list
+        """
+        paths = []
+        for dirpath, _, filenames in os.walk(self.sys_dir):
+            if query in filenames:
+                paths.append(dirpath + "/" + query)
+        return paths
+
+    def _get_data(self):
+        raw = {}
+        for path in self.paths:
+            with open(path, 'r') as f:
+                raw[path] = f.read()
+        data = {}
+        for path in self.paths:
+            data[self.assignment[path]] = raw[path]
+        return data
