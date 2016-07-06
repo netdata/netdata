@@ -47,7 +47,7 @@ class Service(NetSocketService):
         NetSocketService.__init__(self, configuration=configuration, name=name)
         self.request = ""
         self.host = "localhost"
-        self.port = (3128, 8080)
+        self.port = 3128
         self.order = ORDER
         self.definitions = CHARTS
 
