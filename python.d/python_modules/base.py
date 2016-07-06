@@ -330,11 +330,7 @@ class SimpleService(BaseService):
         idx = 0
         for name in self.order:
             options = self.definitions[name]['options'] + [self.priority + idx, self.update_every]
-            if self.name == "":
-                type_id = self.__module__
-            else:
-                type_id = self.__module__ + "_" + self.name
-            self.chart(type_id + "." + name, *options)
+            self.chart(self.chart_name + "." + name, *options)
             # check if server has this datapoint
             for line in self.definitions[name]['lines']:
                 if line[0] in data:
@@ -356,11 +352,7 @@ class SimpleService(BaseService):
 
         updated = False
         for chart in self.order:
-            if str(self.name) == "":
-                type_id = self.__module__
-            else:
-                type_id = self.__module__ + "_" + self.name
-            if self.begin(type_id + "." + chart, interval):
+            if self.begin(self.chart_name + "." + chart, interval):
                 updated = True
                 for dim in self.definitions[chart]['lines']:
                     try:
@@ -415,6 +407,7 @@ class UrlService(SimpleService):
         """
         if self.name is None or self.name == str(None):
             self.name = 'local'
+            self.chart_name += "_" + self.name
         else:
             self.name = str(self.name)
         try:
@@ -459,7 +452,7 @@ class NetSocketService(SimpleService):
                 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 sock.connect((self.host, self.port))
             except Exception as e:
-                print(e)
+                self.error(e)
                 self.sock = None
                 return None
 
