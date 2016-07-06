@@ -451,19 +451,21 @@ class NetSocketService(SimpleService):
                 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 sock.connect((self.host, self.port))
             except Exception as e:
+                print(e)
                 self.sock = None
                 return None
 
-        try:
-            sock.send(self.request)
-        except Exception:
+        if self.request != "".encode():
             try:
-                sock.shutdown(1)
-                sock.close()
-            except:
-                pass
-            self.sock = None
-            return None
+                sock.send(self.request)
+            except Exception:
+                try:
+                    sock.shutdown(1)
+                    sock.close()
+                except:
+                    pass
+                self.sock = None
+                return None
 
         data = sock.recv(1024)
         try:
@@ -497,7 +499,7 @@ class NetSocketService(SimpleService):
         except (KeyError, TypeError):
             self.error("No port specified. Using: '" + str(self.port) + "'")
         try:
-            self.request = int(self.configuration['request'])
+            self.request = str(self.configuration['request'])
         except (KeyError, TypeError):
             self.error("No request specified. Using: '" + str(self.request) + "'")
         self.request = self.request.encode()
