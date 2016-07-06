@@ -355,7 +355,7 @@ class Service(SimpleService):
             self.error("problem connecting to server:", e)
             raise RuntimeError
 
-    def _format_data(self):
+    def _get_data(self):
         """
         Get raw data from MySQL server
         :return: dict

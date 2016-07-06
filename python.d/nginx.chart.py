@@ -55,13 +55,13 @@ class Service(UrlService):
         self.order = ORDER
         self.definitions = CHARTS
 
-    def _format_data(self):
+    def _get_data(self):
         """
         Format data received from http request
         :return: dict
         """
         try:
-            raw = self._get_data().split(" ")
+            raw = self._get_raw_data().split(" ")
             return {'active': int(raw[2]),
                     'requests': int(raw[7]),
                     'reading': int(raw[11]),
