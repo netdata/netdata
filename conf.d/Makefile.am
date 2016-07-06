@@ -19,12 +19,12 @@ dist_nodeconfig_DATA = \
 
 pythonconfigdir=$(configdir)/python.d
 dist_pythonconfig_DATA = \
-    python.d/apache.conf \
-    python.d/apache_cache.conf \
+	python.d/apache.conf \
+	python.d/apache_cache.conf \
 	python.d/example.conf \
 	python.d/hddtemp.conf \
 	python.d/mysql.conf \
-    python.d/nginx.conf \
+	python.d/nginx.conf \
 	python.d/phpfpm.conf \
 	python.d/squid.conf \
 	$(NULL)
