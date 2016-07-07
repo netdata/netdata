@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Description: example netdata python.d plugin
+# Description: example netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
 import os

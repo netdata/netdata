@@ -8,13 +8,16 @@ include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
 
 dist_python_SCRIPTS = \
-	example.chart.py \
-	mysql.chart.py \
-	phpfpm.chart.py \
 	apache.chart.py \
-	nginx.chart.py \
 	apache_cache.chart.py \
+	cpufreq.chart.py \
+	example.chart.py \
+	exim.chart.py \
 	hddtemp.chart.py \
+	mysql.chart.py \
+	nginx.chart.py \
+	phpfpm.chart.py \
+	postfix.chart.py \
 	squid.chart.py \
 	tomcat.chart.py \
 	python-modules-installer.sh \

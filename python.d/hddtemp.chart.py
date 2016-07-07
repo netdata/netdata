@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Description: hddtemp netdata python.d plugin
+# Description: hddtemp netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
 from base import NetSocketService
