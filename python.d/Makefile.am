@@ -18,6 +18,7 @@ dist_python_SCRIPTS = \
 	nginx.chart.py \
 	phpfpm.chart.py \
 	postfix.chart.py \
+	sensors.chart.py \
 	squid.chart.py \
 	tomcat.chart.py \
 	python-modules-installer.sh \
@@ -32,5 +33,5 @@ dist_pythonmodules_DATA = \
 	python_modules/__init__.py \
 	python_modules/base.py \
 	python_modules/msg.py \
+	python_modules/lm_sensors.py \
 	$(NULL)
-
