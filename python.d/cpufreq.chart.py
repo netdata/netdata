@@ -41,6 +41,11 @@ class Service(SimpleService):
         return data
 
     def check(self):
+        try:
+            self.sys_dir = str(self.configuration['sys_dir'])
+        except (KeyError, TypeError):
+            self.error("No path to log specified. Using: '" + self.sys_dir + "'")
+
         self._orig_name = self.chart_name
 
         for dirpath, _, filenames in os.walk(self.sys_dir):
