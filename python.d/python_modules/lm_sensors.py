@@ -32,10 +32,10 @@ TYPE_DICT = {
     5: 'current',
     6: 'humidity',
     7: 'max_main',
-    10: 'vid',
-    11: 'intrusion',
-    12: 'max_other',
-    18: 'beep_enable'
+    16: 'vid',
+    17: 'intrusion',
+    18: 'max_other',
+    24: 'beep_enable'
 }
 
 class SensorsError(Exception):

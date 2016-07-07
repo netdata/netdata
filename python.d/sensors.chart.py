@@ -8,7 +8,7 @@ import lm_sensors as sensors
 # default module values (can be overridden per job in `config`)
 # update_every = 2
 
-ORDER = ['temperature', 'voltage', 'fan', 'power', 'current', 'energy', 'humidity']
+ORDER = ['temperature', 'fan', 'voltage', 'current', 'power', 'energy', 'humidity']
 
 # This is a prototype of chart definition which is used to dynamically create self.definitions
 CHARTS = {
@@ -63,7 +63,7 @@ class Service(SimpleService):
                 prefix = '_'.join(str(chip.path.decode()).split('/')[3:])
                 lines = {}
                 for feature in chip:
-                    data[prefix + "_" + str(feature.name.decode())] = feature.get_value()
+                    data[prefix + "_" + str(feature.name.decode())] = feature.get_value() * 1000
         except Exception as e:
             self.error(e)
             return None
@@ -79,6 +79,8 @@ class Service(SimpleService):
                 name = ""
                 lines = []
                 for feature in chip:
+                    if feature.get_value() != 0:
+                        continue
                     if sensors.TYPE_DICT[feature.type] == type:
                         name = str(chip.prefix.decode()) + "_" + sensors.TYPE_DICT[feature.type]
                         if name not in self.order:
@@ -90,14 +92,13 @@ class Service(SimpleService):
                         line = list(CHARTS[type]['lines'][0])
                         line[0] = prefix + "_" + str(feature.name.decode())
                         line[1] = str(feature.label)
-                        print(line)
                         self.definitions[name]['lines'].append(line)
 
     def check(self):
         try:
             sensors.init()
         except Exception as e:
-            print(e)
+            self.error(e)
             return False
         try:
             self._create_definitions()
