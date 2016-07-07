@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Description: cpufreq netdata python.d plugin
+# Description: cpufreq netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
 import os

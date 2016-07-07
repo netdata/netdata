@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Description: nginx netdata python.d plugin
+# Description: nginx netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
 from base import UrlService

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Description: squid netdata python.d plugin
+# Description: squid netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
 from base import NetSocketService

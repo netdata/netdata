@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Description: apache cache netdata python.d plugin
+# Description: apache cache netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
 from base import LogService

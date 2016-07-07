@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Description: postfix netdata python.d plugin
+# Description: postfix netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
 from base import ExecutableService
@@ -8,14 +8,6 @@ from base import ExecutableService
 # update_every = 2
 priority = 60000
 retries = 5
-
-# default job configuration (overridden by python.d.plugin)
-# config = {'local': {
-#             'update_every': update_every,
-#             'retries': retries,
-#             'priority': priority,
-#             'url': 'http://localhost/stub_status'
-#          }}
 
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = ['qemails', 'qsize']
