@@ -564,7 +564,7 @@ class LogService(SimpleService):
 
 
 class ExecutableService(SimpleService):
-    command_whitelist = ['exim']
+    command_whitelist = ['exim', 'postqueue']
 
     def __init__(self, configuration=None, name=None):
         self.command = ""
