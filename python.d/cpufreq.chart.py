@@ -44,7 +44,7 @@ class Service(SimpleService):
         try:
             self.sys_dir = str(self.configuration['sys_dir'])
         except (KeyError, TypeError):
-            self.error("No path to log specified. Using: '" + self.sys_dir + "'")
+            self.error("No path specified. Using: '" + self.sys_dir + "'")
 
         self._orig_name = self.chart_name
 
