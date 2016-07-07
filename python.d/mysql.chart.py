@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Description: MySQL netdata python.d plugin
+# Description: MySQL netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
 from base import SimpleService

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Description: PHP-FPM netdata python.d plugin
+# Description: PHP-FPM netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
 from base import UrlService
