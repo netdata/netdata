@@ -606,6 +606,14 @@ class ExecutableService(SimpleService):
             else:
                 self.error("Wrong command. Probably not on whitelist.")
                 return False
+        # test command and search for it in /usr/sbin or /sbin when failed
+        base = self.command[0]
+        if self._get_raw_data() is None:
+            for prefix in ['/sbin/', '/usr/sbin/']:
+                self.command[0] = prefix + base
+                if self._get_raw_data() is not None:
+                    break
+
         if self._get_data() is None or len(self._get_data()) == 0:
             return False
         return True
