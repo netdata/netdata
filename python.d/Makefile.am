@@ -12,6 +12,7 @@ dist_python_SCRIPTS = \
 	apache_cache.chart.py \
 	cpufreq.chart.py \
 	example.chart.py \
+	exim.chart.py \
 	hddtemp.chart.py \
 	mysql.chart.py \
 	nginx.chart.py \
