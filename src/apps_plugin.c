@@ -48,12 +48,14 @@ pid_t pid_max = 32768;
 int debug = 0;
 
 int update_every = 1;
+unsigned long long global_iterations_counter = 1;
 unsigned long long file_counter = 0;
 int proc_pid_cmdline_is_needed = 0;
 int include_exited_childs = 1;
 char *host_prefix = "";
 char *config_dir = CONFIG_DIR;
 
+pid_t *all_pids_sortlist = NULL;
 
 // ----------------------------------------------------------------------------
 
@@ -146,15 +148,6 @@ struct target {
 	unsigned long long num_threads;
 	unsigned long long rss;
 
-	long long fix_minflt;
-	long long fix_cminflt;
-	long long fix_majflt;
-	long long fix_cmajflt;
-	long long fix_utime;
-	long long fix_stime;
-	long long fix_cutime;
-	long long fix_cstime;
-
 	unsigned long long statm_size;
 	unsigned long long statm_resident;
 	unsigned long long statm_share;
@@ -170,14 +163,6 @@ struct target {
 	unsigned long long io_storage_bytes_read;
 	unsigned long long io_storage_bytes_written;
 	unsigned long long io_cancelled_write_bytes;
-
-	unsigned long long fix_io_logical_bytes_read;
-	unsigned long long fix_io_logical_bytes_written;
-	unsigned long long fix_io_read_calls;
-	unsigned long long fix_io_write_calls;
-	unsigned long long fix_io_storage_bytes_read;
-	unsigned long long fix_io_storage_bytes_written;
-	unsigned long long fix_io_cancelled_write_bytes;
 
 	int *fds;
 	unsigned long long openfiles;
@@ -459,6 +444,18 @@ struct pid_stat {
 	// int32_t tty_nr;
 	// int32_t tpgid;
 	// uint64_t flags;
+
+	// these are raw values collected
+	unsigned long long minflt_raw;
+	unsigned long long cminflt_raw;
+	unsigned long long majflt_raw;
+	unsigned long long cmajflt_raw;
+	unsigned long long utime_raw;
+	unsigned long long stime_raw;
+	unsigned long long cutime_raw;
+	unsigned long long cstime_raw;
+
+	// these are rates
 	unsigned long long minflt;
 	unsigned long long cminflt;
 	unsigned long long majflt;
@@ -467,6 +464,7 @@ struct pid_stat {
 	unsigned long long stime;
 	unsigned long long cutime;
 	unsigned long long cstime;
+
 	// int64_t priority;
 	// int64_t nice;
 	int32_t num_threads;
@@ -506,6 +504,14 @@ struct pid_stat {
 	unsigned long long statm_data;
 	unsigned long long statm_dirty;
 
+	unsigned long long io_logical_bytes_read_raw;
+	unsigned long long io_logical_bytes_written_raw;
+	unsigned long long io_read_calls_raw;
+	unsigned long long io_write_calls_raw;
+	unsigned long long io_storage_bytes_read_raw;
+	unsigned long long io_storage_bytes_written_raw;
+	unsigned long long io_cancelled_write_bytes_raw;
+
 	unsigned long long io_logical_bytes_read;
 	unsigned long long io_logical_bytes_written;
 	unsigned long long io_read_calls;
@@ -514,61 +520,42 @@ struct pid_stat {
 	unsigned long long io_storage_bytes_written;
 	unsigned long long io_cancelled_write_bytes;
 
-	// we need the last values
-	// for all incremental counters
-	// so that when a process switches users/groups
-	// we will subtract these values from the old
-	// target
-	unsigned long long last_minflt;
-	unsigned long long last_majflt;
-	unsigned long long last_utime;
-	unsigned long long last_stime;
-
-	unsigned long long last_cminflt;
-	unsigned long long last_cmajflt;
-	unsigned long long last_cutime;
-	unsigned long long last_cstime;
-
-	unsigned long long last_fix_cminflt;
-	unsigned long long last_fix_cmajflt;
-	unsigned long long last_fix_cutime;
-	unsigned long long last_fix_cstime;
-
-	unsigned long long last_io_logical_bytes_read;
-	unsigned long long last_io_logical_bytes_written;
-	unsigned long long last_io_read_calls;
-	unsigned long long last_io_write_calls;
-	unsigned long long last_io_storage_bytes_read;
-	unsigned long long last_io_storage_bytes_written;
-	unsigned long long last_io_cancelled_write_bytes;
-
-	unsigned long long fix_cminflt;
-	unsigned long long fix_cmajflt;
-	unsigned long long fix_cutime;
-	unsigned long long fix_cstime;
-
 	int *fds;						// array of fds it uses
 	int fds_size;					// the size of the fds array
 
 	int children_count;				// number of processes directly referencing this
-	int updated;					// 1 when update
+	int keep;						// 1 when we need to keep this process in memory even after it exited
+	int keeploops;					// increases by 1 every time keep is 1 and updated 0
+	int updated;					// 1 when the process is currently running
 	int merged;						// 1 when it has been merged to its parent
-	int new_entry;
+	int new_entry;					// 1 when this is a new process, just saw for the first time
+	int read;						// 1 when we have already read this process for this iteration
+	int sortlist;					// higher numbers = top on the process tree
+									// each process gets a unique number
 
 	struct target *target;			// app_groups.conf targets
 	struct target *user_target;		// uid based targets
 	struct target *group_target;	// gid based targets
 
+	unsigned long long stat_collected_usec;
+	unsigned long long last_stat_collected_usec;
+
+	unsigned long long io_collected_usec;
+	unsigned long long last_io_collected_usec;
+
+	char *stat_filename;
+	char *statm_filename;
+	char *io_filename;
+	char *cmdline_filename;
+
 	struct pid_stat *parent;
 	struct pid_stat *prev;
 	struct pid_stat *next;
-
 } *root_of_pids = NULL, **all_pids;
 
 long all_pids_count = 0;
 
-struct pid_stat *get_pid_entry(pid_t pid)
-{
+struct pid_stat *get_pid_entry(pid_t pid) {
 	if(all_pids[pid]) {
 		all_pids[pid]->new_entry = 0;
 		return all_pids[pid];
@@ -592,12 +579,16 @@ struct pid_stat *get_pid_entry(pid_t pid)
 	all_pids[pid]->pid = pid;
 	all_pids[pid]->new_entry = 1;
 
+	all_pids_count++;
+
 	return all_pids[pid];
 }
 
-void del_pid_entry(pid_t pid)
-{
-	if(!all_pids[pid]) return;
+void del_pid_entry(pid_t pid) {
+	if(!all_pids[pid]) {
+		error("attempted to free pid %d that is not allocated.", pid);
+		return;
+	}
 
 	if(unlikely(debug))
 		fprintf(stderr, "apps.plugin: process %d %s exited, deleting it.\n", pid, all_pids[pid]->comm);
@@ -607,8 +598,14 @@ void del_pid_entry(pid_t pid)
 	if(all_pids[pid]->prev) all_pids[pid]->prev->next = all_pids[pid]->next;
 
 	if(all_pids[pid]->fds) free(all_pids[pid]->fds);
+	if(all_pids[pid]->stat_filename) free(all_pids[pid]->stat_filename);
+	if(all_pids[pid]->statm_filename) free(all_pids[pid]->statm_filename);
+	if(all_pids[pid]->io_filename) free(all_pids[pid]->io_filename);
+	if(all_pids[pid]->cmdline_filename) free(all_pids[pid]->cmdline_filename);
 	free(all_pids[pid]);
+
 	all_pids[pid] = NULL;
+	all_pids_count--;
 }
 
 
@@ -616,42 +613,51 @@ void del_pid_entry(pid_t pid)
 // update pids from proc
 
 int read_proc_pid_cmdline(struct pid_stat *p) {
-	char filename[FILENAME_MAX + 1];
-	snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", host_prefix, p->pid);
+	
+	if(unlikely(!p->cmdline_filename)) {
+		char filename[FILENAME_MAX + 1];
+		snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", host_prefix, p->pid);
+		if(!(p->cmdline_filename = strdup(filename)))
+			fatal("Cannot allocate memory for filename '%s'", filename);
+	}
 
-	int fd = open(filename, O_RDONLY, 0666);
-	if(unlikely(fd == -1)) return 1;
+	int fd = open(p->cmdline_filename, O_RDONLY, 0666);
+	if(unlikely(fd == -1)) goto cleanup;
 
 	int i, bytes = read(fd, p->cmdline, MAX_CMDLINE);
 	close(fd);
 
-	if(bytes <= 0) {
-		// copy the command to the command line
-		strncpyz(p->cmdline, p->comm, MAX_CMDLINE);
-		return 0;
-	}
+	if(unlikely(bytes <= 0)) goto cleanup;
 
 	p->cmdline[bytes] = '\0';
 	for(i = 0; i < bytes ; i++)
-		if(!p->cmdline[i]) p->cmdline[i] = ' ';
+		if(unlikely(!p->cmdline[i])) p->cmdline[i] = ' ';
 
 	if(unlikely(debug))
-		fprintf(stderr, "Read file '%s' contents: %s\n", filename, p->cmdline);
+		fprintf(stderr, "Read file '%s' contents: %s\n", p->cmdline_filename, p->cmdline);
 
+	return 0;
+
+cleanup:
+	// copy the command to the command line
+	strncpyz(p->cmdline, p->comm, MAX_CMDLINE);
 	return 0;
 }
 
 int read_proc_pid_ownership(struct pid_stat *p) {
-	char filename[FILENAME_MAX + 1];
-
-	snprintfz(filename, FILENAME_MAX, "%s/proc/%d", host_prefix, p->pid);
+	if(unlikely(!p->stat_filename)) {
+		error("pid %d does not have a stat_filename", p->pid);
+		return 1;
+	}
 
 	// ----------------------------------------
 	// read uid and gid
 
 	struct stat st;
-	if(stat(filename, &st) != 0)
+	if(stat(p->stat_filename, &st) != 0) {
+		error("Cannot stat file '%s'", p->stat_filename);
 		return 1;
+	}
 
 	p->uid = st.st_uid;
 	p->gid = st.st_gid;
@@ -662,26 +668,26 @@ int read_proc_pid_ownership(struct pid_stat *p) {
 int read_proc_pid_stat(struct pid_stat *p) {
 	static procfile *ff = NULL;
 
-	char filename[FILENAME_MAX + 1];
-
-	snprintfz(filename, FILENAME_MAX, "%s/proc/%d/stat", host_prefix, p->pid);
-
-	// ----------------------------------------
+	if(unlikely(!p->stat_filename)) {
+		char filename[FILENAME_MAX + 1];
+		snprintfz(filename, FILENAME_MAX, "%s/proc/%d/stat", host_prefix, p->pid);
+		if(!(p->stat_filename = strdup(filename)))
+			fatal("Cannot allocate memory for filename '%s'", filename);
+	}
 
 	int set_quotes = (!ff)?1:0;
 
-	ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
-	if(!ff) return 1;
+	ff = procfile_reopen(ff, p->stat_filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
+	if(unlikely(!ff)) goto cleanup;
 
 	// if(set_quotes) procfile_set_quotes(ff, "()");
 	if(set_quotes) procfile_set_open_close(ff, "(", ")");
 
 	ff = procfile_readall(ff);
-	if(!ff) {
-		// procfile_close(ff);
-		return 1;
-	}
+	if(unlikely(!ff)) goto cleanup;
 
+	p->last_stat_collected_usec = p->stat_collected_usec;
+	p->stat_collected_usec = timems();
 	file_counter++;
 
 	// parse the process name
@@ -697,14 +703,41 @@ int read_proc_pid_stat(struct pid_stat *p) {
 	// p->tty_nr		= atol(procfile_lineword(ff, 0, 6+i));
 	// p->tpgid			= atol(procfile_lineword(ff, 0, 7+i));
 	// p->flags			= strtoull(procfile_lineword(ff, 0, 8+i), NULL, 10);
-	p->minflt			= strtoull(procfile_lineword(ff, 0, 9+i), NULL, 10);
-	p->cminflt			= strtoull(procfile_lineword(ff, 0, 10+i), NULL, 10);
-	p->majflt			= strtoull(procfile_lineword(ff, 0, 11+i), NULL, 10);
-	p->cmajflt			= strtoull(procfile_lineword(ff, 0, 12+i), NULL, 10);
-	p->utime			= strtoull(procfile_lineword(ff, 0, 13+i), NULL, 10);
-	p->stime			= strtoull(procfile_lineword(ff, 0, 14+i), NULL, 10);
-	p->cutime			= strtoull(procfile_lineword(ff, 0, 15+i), NULL, 10);
-	p->cstime			= strtoull(procfile_lineword(ff, 0, 16+i), NULL, 10);
+
+	unsigned long long last;
+
+	last = p->minflt_raw;
+	p->minflt_raw		= strtoull(procfile_lineword(ff, 0, 9+i), NULL, 10);
+	p->minflt = (p->minflt_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+
+	last = p->cminflt_raw;
+	p->cminflt_raw		= strtoull(procfile_lineword(ff, 0, 10+i), NULL, 10);
+	p->cminflt = (p->cminflt_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+
+	last = p->majflt_raw;
+	p->majflt_raw		= strtoull(procfile_lineword(ff, 0, 11+i), NULL, 10);
+	p->majflt = (p->majflt_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+
+	last = p->cmajflt_raw;
+	p->cmajflt_raw		= strtoull(procfile_lineword(ff, 0, 12+i), NULL, 10);
+	p->cmajflt = (p->cmajflt_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+
+	last = p->utime_raw;
+	p->utime_raw		= strtoull(procfile_lineword(ff, 0, 13+i), NULL, 10);
+	p->utime = (p->utime_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+
+	last = p->stime_raw;
+	p->stime_raw		= strtoull(procfile_lineword(ff, 0, 14+i), NULL, 10);
+	p->stime = (p->stime_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+
+	last = p->cutime_raw;
+	p->cutime_raw		= strtoull(procfile_lineword(ff, 0, 15+i), NULL, 10);
+	p->cutime = (p->cutime_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+
+	last = p->cstime_raw;
+	p->cstime_raw		= strtoull(procfile_lineword(ff, 0, 16+i), NULL, 10);
+	p->cstime = (p->cstime_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+
 	// p->priority		= strtoull(procfile_lineword(ff, 0, 17+i), NULL, 10);
 	// p->nice			= strtoull(procfile_lineword(ff, 0, 18+i), NULL, 10);
 	p->num_threads		= (int32_t) atol(procfile_lineword(ff, 0, 19 + i));
@@ -734,27 +767,50 @@ int read_proc_pid_stat(struct pid_stat *p) {
 	// p->cguest_time	= strtoull(procfile_lineword(ff, 0, 43), NULL, 10);
 
 	if(unlikely(debug || (p->target && p->target->debug)))
-		fprintf(stderr, "apps.plugin: READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' VALUES: utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu, threads=%d\n", host_prefix, p->pid, p->comm, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
+		fprintf(stderr, "apps.plugin: READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu, threads=%d\n", host_prefix, p->pid, p->comm, (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
 
-	// procfile_close(ff);
+	if(unlikely(global_iterations_counter == 1)) {
+		p->minflt			= 0;
+		p->cminflt			= 0;
+		p->majflt			= 0;
+		p->cmajflt			= 0;
+		p->utime			= 0;
+		p->stime			= 0;
+		p->cutime			= 0;
+		p->cstime			= 0;
+	}
+
 	return 0;
+
+cleanup:
+	p->minflt			= 0;
+	p->cminflt			= 0;
+	p->majflt			= 0;
+	p->cmajflt			= 0;
+	p->utime			= 0;
+	p->stime			= 0;
+	p->cutime			= 0;
+	p->cstime			= 0;
+	p->num_threads		= 0;
+	p->rss				= 0;
+	return 1;
 }
 
 int read_proc_pid_statm(struct pid_stat *p) {
 	static procfile *ff = NULL;
 
-	char filename[FILENAME_MAX + 1];
+	if(unlikely(!p->statm_filename)) {
+		char filename[FILENAME_MAX + 1];
+		snprintfz(filename, FILENAME_MAX, "%s/proc/%d/statm", host_prefix, p->pid);
+		if(!(p->statm_filename = strdup(filename)))
+			fatal("Cannot allocate memory for filename '%s'", filename);
+	}
 
-	snprintfz(filename, FILENAME_MAX, "%s/proc/%d/statm", host_prefix, p->pid);
-
-	ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
-	if(!ff) return 1;
+	ff = procfile_reopen(ff, p->statm_filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
+	if(unlikely(!ff)) goto cleanup;
 
 	ff = procfile_readall(ff);
-	if(!ff) {
-		// procfile_close(ff);
-		return 1;
-	}
+	if(unlikely(!ff)) goto cleanup;
 
 	file_counter++;
 
@@ -766,38 +822,92 @@ int read_proc_pid_statm(struct pid_stat *p) {
 	p->statm_data			= strtoull(procfile_lineword(ff, 0, 5), NULL, 10);
 	p->statm_dirty			= strtoull(procfile_lineword(ff, 0, 6), NULL, 10);
 
-	// procfile_close(ff);
 	return 0;
+
+cleanup:
+	p->statm_size			= 0;
+	p->statm_resident		= 0;
+	p->statm_share			= 0;
+	p->statm_text			= 0;
+	p->statm_lib			= 0;
+	p->statm_data			= 0;
+	p->statm_dirty			= 0;
+	return 1;
 }
 
 int read_proc_pid_io(struct pid_stat *p) {
 	static procfile *ff = NULL;
 
-	char filename[FILENAME_MAX + 1];
+	if(unlikely(!p->io_filename)) {
+		char filename[FILENAME_MAX + 1];
+		snprintfz(filename, FILENAME_MAX, "%s/proc/%d/io", host_prefix, p->pid);
+		if(!(p->io_filename = strdup(filename)))
+			fatal("Cannot allocate memory for filename '%s'", filename);
+	}
 
-	snprintfz(filename, FILENAME_MAX, "%s/proc/%d/io", host_prefix, p->pid);
-
-	ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
-	if(!ff) return 1;
+	// open the file
+	ff = procfile_reopen(ff, p->io_filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
+	if(unlikely(!ff)) goto cleanup;
 
 	ff = procfile_readall(ff);
-	if(!ff) {
-		// procfile_close(ff);
-		return 1;
-	}
+	if(unlikely(!ff)) goto cleanup;
 
 	file_counter++;
 
-	p->io_logical_bytes_read 		= strtoull(procfile_lineword(ff, 0, 1), NULL, 10);
-	p->io_logical_bytes_written 	= strtoull(procfile_lineword(ff, 1, 1), NULL, 10);
-	p->io_read_calls 				= strtoull(procfile_lineword(ff, 2, 1), NULL, 10);
-	p->io_write_calls 				= strtoull(procfile_lineword(ff, 3, 1), NULL, 10);
-	p->io_storage_bytes_read 		= strtoull(procfile_lineword(ff, 4, 1), NULL, 10);
-	p->io_storage_bytes_written 	= strtoull(procfile_lineword(ff, 5, 1), NULL, 10);
-	p->io_cancelled_write_bytes		= strtoull(procfile_lineword(ff, 6, 1), NULL, 10);
+	p->last_io_collected_usec = p->io_collected_usec;
+	p->io_collected_usec = timems();
 
-	// procfile_close(ff);
+	unsigned long long last;
+
+	last = p->io_logical_bytes_read_raw;
+	p->io_logical_bytes_read_raw = strtoull(procfile_lineword(ff, 0, 1), NULL, 10);
+	p->io_logical_bytes_read = (p->io_logical_bytes_read_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+
+	last = p->io_logical_bytes_written_raw;
+	p->io_logical_bytes_written_raw = strtoull(procfile_lineword(ff, 1, 1), NULL, 10);
+	p->io_logical_bytes_written = (p->io_logical_bytes_written_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+
+	last = p->io_read_calls_raw;
+	p->io_read_calls_raw = strtoull(procfile_lineword(ff, 2, 1), NULL, 10);
+	p->io_read_calls = (p->io_read_calls_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+
+	last = p->io_write_calls_raw;
+	p->io_write_calls_raw = strtoull(procfile_lineword(ff, 3, 1), NULL, 10);
+	p->io_write_calls = (p->io_write_calls_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+
+	last = p->io_storage_bytes_read_raw;
+	p->io_storage_bytes_read_raw = strtoull(procfile_lineword(ff, 4, 1), NULL, 10);
+	p->io_storage_bytes_read = (p->io_storage_bytes_read_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+
+	last = p->io_storage_bytes_written_raw;
+	p->io_storage_bytes_written_raw = strtoull(procfile_lineword(ff, 5, 1), NULL, 10);
+	p->io_storage_bytes_written = (p->io_storage_bytes_written_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+
+	last = p->io_cancelled_write_bytes_raw;
+	p->io_cancelled_write_bytes_raw = strtoull(procfile_lineword(ff, 6, 1), NULL, 10);
+	p->io_cancelled_write_bytes = (p->io_cancelled_write_bytes_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+
+	if(unlikely(global_iterations_counter == 1)) {
+		p->io_logical_bytes_read 		= 0;
+		p->io_logical_bytes_written 	= 0;
+		p->io_read_calls 				= 0;
+		p->io_write_calls 				= 0;
+		p->io_storage_bytes_read 		= 0;
+		p->io_storage_bytes_written 	= 0;
+		p->io_cancelled_write_bytes		= 0;
+	}
+
 	return 0;
+
+cleanup:
+	p->io_logical_bytes_read 		= 0;
+	p->io_logical_bytes_written 	= 0;
+	p->io_read_calls 				= 0;
+	p->io_write_calls 				= 0;
+	p->io_storage_bytes_read 		= 0;
+	p->io_storage_bytes_written 	= 0;
+	p->io_cancelled_write_bytes		= 0;
+	return 1;
 }
 
 
@@ -1120,6 +1230,175 @@ int read_pid_file_descriptors(struct pid_stat *p) {
 
 // ----------------------------------------------------------------------------
 
+#ifdef NETDATA_INTERNAL_CHECKS
+void find_lost_child_debug(struct pid_stat *pe, struct pid_stat *ppe, unsigned long long lost, int type) {
+	int found = 0;
+	struct pid_stat *p = NULL, *pp = pe->parent;
+
+	log_date(stderr);
+	fprintf(stderr, "Searching for candidate of lost resources of process %d (%s, %s) which is aggregated on %d (%s, %s)\n", pe->pid, pe->comm, pe->updated?"running":"exited", ppe->pid, ppe->comm, ppe->updated?"running":"exited");
+	while(pp) {
+		fprintf(stderr, " >> parent %d (%s, %s)\n", pp->pid, pp->comm, pp->updated?"running":"exited");
+		pp = pp->parent;
+	}
+
+	for(p = root_of_pids; p ; p = p->next) {
+		if(p == pe) continue;
+
+		switch(type) {
+			case 1:
+				if(p->cminflt > lost) {
+					fprintf(stderr, " > process %d (%s) could use the lost exited child minflt %llu of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
+					found++;
+				}
+				break;
+				
+			case 2:
+				if(p->cmajflt > lost) {
+					fprintf(stderr, " > process %d (%s) could use the lost exited child majflt %llu of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
+					found++;
+				}
+				break;
+				
+			case 3:
+				if(p->cutime > lost) {
+					fprintf(stderr, " > process %d (%s) could use the lost exited child utime %llu of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
+					found++;
+				}
+				break;
+				
+			case 4:
+				if(p->cstime > lost) {
+					fprintf(stderr, " > process %d (%s) could use the lost exited child stime %llu of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
+					found++;
+				}
+				break;
+		}
+	}
+
+	if(!found) {
+		switch(type) {
+			case 1:
+				fprintf(stderr, " > cannot find any process to use the lost exited child minflt %llu of process %d (%s)\n", lost, pe->pid, pe->comm);
+				break;
+				
+			case 2:
+				fprintf(stderr, " > cannot find any process to use the lost exited child majflt %llu of process %d (%s)\n", lost, pe->pid, pe->comm);
+				break;
+				
+			case 3:
+				fprintf(stderr, " > cannot find any process to use the lost exited child utime %llu of process %d (%s)\n", lost, pe->pid, pe->comm);
+				break;
+				
+			case 4:
+				fprintf(stderr, " > cannot find any process to use the lost exited child stime %llu of process %d (%s)\n", lost, pe->pid, pe->comm);
+				break;
+		}
+	}
+}
+#endif /* NETDATA_INTERNAL_CHECKS */
+
+void remove_exited_child_from_parent(unsigned long long *field, unsigned long long *pfield, unsigned long long *ifield, struct pid_stat *pe, struct pid_stat *ppe, int type) {
+	if(pfield) {
+		if(*field > *pfield) {
+			*field -= *pfield;
+			*pfield = 0;
+		}
+		else {
+			*pfield -= *field;
+			*field = 0;
+		}
+	}
+
+	if(*field) {
+		if(ifield && ifield != pfield) {
+			if(*field > *ifield) {
+				*field -= *ifield;
+				*ifield = 0;
+			}
+			else {
+				*ifield -= *field;
+				*field = 0;
+			}
+		}
+	}
+
+	if(*field) {
+#ifdef NETDATA_INTERNAL_CHECKS
+		find_lost_child_debug(pe, ppe, *field, type);
+#endif
+		while(pe && !pe->updated) {
+			pe->keep = 1;
+			pe = pe->parent;
+		}
+	}
+}
+
+void process_exited_processes() {
+	struct pid_stat *init = all_pids[1];
+	struct pid_stat *p;
+
+	for(p = root_of_pids; p ; p = p->next) {
+		if(p->updated || !p->stat_collected_usec) continue;
+
+		struct pid_stat *pp = p->parent;
+
+		// find the first parent that is running
+		while(pp && !pp->updated)
+			pp = pp->parent;
+		
+		unsigned long long rate;
+
+		rate = (p->utime_raw + p->cutime_raw) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+		remove_exited_child_from_parent(&rate,  (pp)?&pp->cutime:NULL,  (init)?&init->cutime:NULL, p, pp, 3);
+		p->cutime_raw = 0;
+		p->utime_raw = rate * (p->stat_collected_usec - p->last_stat_collected_usec) / (1000000 * 100);
+
+		rate = (p->stime_raw + p->cstime_raw) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+		remove_exited_child_from_parent(&rate,  (pp)?&pp->cstime:NULL,  (init)?&init->cstime:NULL, p, pp, 4);
+		p->cstime_raw = 0;
+		p->stime_raw = rate * (p->stat_collected_usec - p->last_stat_collected_usec) / (1000000 * 100);
+
+		rate = (p->minflt_raw + p->cminflt_raw) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+		remove_exited_child_from_parent(&rate, (pp)?&pp->cminflt:NULL, (init)?&init->cminflt:NULL, p, pp, 1);
+		p->cminflt_raw = 0;
+		p->minflt_raw = rate * (p->stat_collected_usec - p->last_stat_collected_usec) / (1000000 * 100);
+
+		rate = (p->majflt_raw + p->cmajflt_raw) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+		remove_exited_child_from_parent(&rate, (pp)?&pp->cmajflt:NULL, (init)?&init->cmajflt:NULL, p, pp, 2);
+		p->cmajflt_raw = 0;
+		p->majflt_raw = rate * (p->stat_collected_usec - p->last_stat_collected_usec) / (1000000 * 100);
+	}
+}
+
+void link_all_processes_to_their_parents(void) {
+	struct pid_stat *p = NULL;
+
+	// link all children to their parents
+	// and update children count on parents
+	for(p = root_of_pids; p ; p = p->next) {
+		// for each process found running
+
+		if(likely(p->ppid > 0 && all_pids[p->ppid])) {
+			// valid parent processes
+
+			struct pid_stat *pp;
+
+			p->parent = pp = all_pids[p->ppid];
+			p->parent->children_count++;
+
+			if(unlikely(debug || (p->target && p->target->debug)))
+				fprintf(stderr, "apps.plugin: \tchild %d (%s, %s) on target '%s' has parent %d (%s, %s). Parent: utime=%llu, stime=%llu, minflt=%llu, majflt=%llu, cutime=%llu, cstime=%llu, cminflt=%llu, cmajflt=%llu\n", p->pid, p->comm, p->updated?"running":"exited", (p->target)?p->target->name:"UNSET", pp->pid, pp->comm, pp->updated?"running":"exited", pp->utime, pp->stime, pp->minflt, pp->majflt, pp->cutime, pp->cstime, pp->cminflt, pp->cmajflt);
+		}
+		else if(unlikely(p->ppid != 0))
+			error("pid %d %s states parent %d, but the later does not exist.", p->pid, p->comm, p->ppid);
+
+		p->sortlist = 0;
+	}
+}
+
+// ----------------------------------------------------------------------------
+
 // 1. read all files in /proc
 // 2. for each numeric directory:
 //    i.   read /proc/pid/stat
@@ -1136,8 +1415,157 @@ int read_pid_file_descriptors(struct pid_stat *p) {
 // to avoid filling up all disk space
 // if debug is enabled, all errors are printed
 
-int collect_data_for_all_processes_from_proc(void)
-{
+static int compar_pid(const void *pid1, const void *pid2) {
+
+	struct pid_stat *p1 = all_pids[*((pid_t *)pid1)];
+	struct pid_stat *p2 = all_pids[*((pid_t *)pid2)];
+
+	if(p1->sortlist > p2->sortlist)
+		return -1;
+	else
+		return 1;
+}
+
+void collect_data_for_pid(pid_t pid) {
+	if(unlikely(pid <= 0 || pid > pid_max)) {
+		error("Invalid pid %d read (expected 1 to %d). Ignoring process.", pid, pid_max);
+		return;
+	}
+
+	struct pid_stat *p = get_pid_entry(pid);
+	if(unlikely(!p || p->read)) return;
+	p->read             = 1;
+
+	// fprintf(stderr, "Reading process %d (%s), sortlist %d\n", p->pid, p->comm, p->sortlist);
+
+	// --------------------------------------------------------------------
+	// /proc/<pid>/stat
+
+	if(unlikely(read_proc_pid_stat(p))) {
+		error("Cannot process %s/proc/%d/stat", host_prefix, pid);
+		// there is no reason to proceed if we cannot get its status
+		return;
+	}
+
+	read_proc_pid_ownership(p);
+
+	// check its parent pid
+	if(unlikely(p->ppid < 0 || p->ppid > pid_max)) {
+		error("Pid %d states invalid parent pid %d. Using 0.", pid, p->ppid);
+		p->ppid = 0;
+	}
+
+	// --------------------------------------------------------------------
+	// /proc/<pid>/io
+
+	if(unlikely(read_proc_pid_io(p)))
+		error("Cannot process %s/proc/%d/io", host_prefix, pid);
+
+	// --------------------------------------------------------------------
+	// /proc/<pid>/statm
+
+	if(unlikely(read_proc_pid_statm(p))) {
+		error("Cannot process %s/proc/%d/statm", host_prefix, pid);
+		// there is no reason to proceed if we cannot get its memory status
+		return;
+	}
+
+	// --------------------------------------------------------------------
+	// link it
+
+	// check if it is target
+	// we do this only once, the first time this pid is loaded
+	if(unlikely(p->new_entry)) {
+		// /proc/<pid>/cmdline
+		if(likely(proc_pid_cmdline_is_needed)) {
+			if(unlikely(read_proc_pid_cmdline(p)))
+				error("Cannot process %s/proc/%d/cmdline", host_prefix, pid);
+		}
+
+		if(unlikely(debug))
+			fprintf(stderr, "apps.plugin: \tJust added %d (%s)\n", pid, p->comm);
+
+		uint32_t hash = simple_hash(p->comm);
+		size_t pclen  = strlen(p->comm);
+
+		struct target *w;
+		for(w = apps_groups_root_target; w ; w = w->next) {
+			// if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: \t\tcomparing '%s' with '%s'\n", w->compare, p->comm);
+
+			// find it - 4 cases:
+			// 1. the target is not a pattern
+			// 2. the target has the prefix
+			// 3. the target has the suffix
+			// 4. the target is something inside cmdline
+			if(	(!w->starts_with && !w->ends_with && w->comparehash == hash && !strcmp(w->compare, p->comm))
+			       || (w->starts_with && !w->ends_with && !strncmp(w->compare, p->comm, w->comparelen))
+			       || (!w->starts_with && w->ends_with && pclen >= w->comparelen && !strcmp(w->compare, &p->comm[pclen - w->comparelen]))
+			       || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && strstr(p->cmdline, w->compare))
+					) {
+				if(w->target) p->target = w->target;
+				else p->target = w;
+
+				if(debug || (p->target && p->target->debug))
+					fprintf(stderr, "apps.plugin: \t\t%s linked to target %s\n", p->comm, p->target->name);
+
+				break;
+			}
+		}
+	}
+
+	// --------------------------------------------------------------------
+	// /proc/<pid>/fd
+
+	if(unlikely(read_pid_file_descriptors(p))) {
+		error("Cannot process entries in %s/proc/%d/fd", host_prefix, pid);
+	}
+
+	// --------------------------------------------------------------------
+	// done!
+
+#ifdef NETDATA_INTERNAL_CHECKS
+	if(unlikely(all_pids_count && p->ppid && all_pids[p->ppid] && !all_pids[p->ppid]->read))
+		fprintf(stderr, "Read process %d (%s) sortlisted %d, but its parent %d (%s) sortlisted %d, is not read\n", p->pid, p->comm, p->sortlist, all_pids[p->ppid]->pid, all_pids[p->ppid]->comm, all_pids[p->ppid]->sortlist);
+#endif
+
+	// mark it as updated
+	p->updated = 1;
+	p->keep = 0;
+	p->keeploops = 0;
+}
+
+int collect_data_for_all_processes_from_proc(void) {
+	struct pid_stat *p = NULL;
+
+	if(all_pids_count) {
+		// read parents before childs
+		// this is needed to prevent a situation where
+		// a child is found running, but until we read
+		// its parent, it has exited and its parent
+		// has accumulated its resources
+
+		long slc = 0;
+		for(p = root_of_pids; p ; p = p->next) {
+			p->read             = 0;
+			p->updated          = 0;
+			p->new_entry        = 0;
+			p->merged           = 0;
+			p->children_count   = 0;
+			p->parent           = NULL;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+			if(unlikely(slc >= all_pids_count))
+				error("Internal error: I was thinking I had %ld processes in my arrays, but it seems there are more.", all_pids_count);
+#endif
+			all_pids_sortlist[slc++] = p->pid;
+		}
+
+		qsort((void *)all_pids_sortlist, all_pids_count, sizeof(pid_t), compar_pid);
+
+		for(slc = 0; slc < all_pids_count; slc++)
+			collect_data_for_pid(all_pids_sortlist[slc]);
+	}
+
 	char dirname[FILENAME_MAX + 1];
 
 	snprintfz(dirname, FILENAME_MAX, "%s/proc", host_prefix);
@@ -1145,43 +1573,6 @@ int collect_data_for_all_processes_from_proc(void)
 	if(!dir) return 0;
 
 	struct dirent *file = NULL;
-	struct pid_stat *p = NULL;
-
-	// mark them all as un-updated
-	all_pids_count = 0;
-	for(p = root_of_pids; p ; p = p->next) {
-		all_pids_count++;
-
-		p->parent           = NULL;
-
-		p->updated          = 0;
-		p->children_count   = 0;
-		p->merged           = 0;
-		p->new_entry        = 0;
-
-        p->last_minflt      = p->minflt;
-        p->last_majflt      = p->majflt;
-        p->last_utime       = p->utime;
-        p->last_stime       = p->stime;
-
-        p->last_cminflt     = p->cminflt;
-        p->last_cmajflt     = p->cmajflt;
-        p->last_cutime      = p->cutime;
-        p->last_cstime      = p->cstime;
-
-        p->last_fix_cminflt = p->fix_cminflt;
-        p->last_fix_cmajflt = p->fix_cmajflt;
-        p->last_fix_cutime  = p->fix_cutime;
-        p->last_fix_cstime  = p->fix_cstime;
-
-        p->last_io_logical_bytes_read     = p->io_logical_bytes_read;
-        p->last_io_logical_bytes_written  = p->io_logical_bytes_written;
-        p->last_io_read_calls             = p->io_read_calls;
-        p->last_io_write_calls            = p->io_write_calls;
-        p->last_io_storage_bytes_read     = p->io_storage_bytes_read;
-        p->last_io_storage_bytes_written  = p->io_storage_bytes_written;
-        p->last_io_cancelled_write_bytes  = p->io_cancelled_write_bytes;
-	}
 
 	while((file = readdir(dir))) {
 		char *endptr = file->d_name;
@@ -1191,117 +1582,18 @@ int collect_data_for_all_processes_from_proc(void)
 		if(unlikely(endptr == file->d_name || *endptr != '\0'))
 			continue;
 
-		if(unlikely(pid <= 0 || pid > pid_max)) {
-			error("Invalid pid %d read (expected 1 to %d). Ignoring process.", pid, pid_max);
-			continue;
-		}
-
-		p = get_pid_entry(pid);
-		if(unlikely(!p)) continue;
-
-
-		// --------------------------------------------------------------------
-		// /proc/<pid>/stat
-
-		if(unlikely(read_proc_pid_stat(p))) {
-			error("Cannot process %s/proc/%d/stat", host_prefix, pid);
-			// there is no reason to proceed if we cannot get its status
-			continue;
-		}
-
-		// check its parent pid
-		if(unlikely(p->ppid < 0 || p->ppid > pid_max)) {
-			error("Pid %d states invalid parent pid %d. Using 0.", pid, p->ppid);
-			p->ppid = 0;
-		}
-
-		// --------------------------------------------------------------------
-		// /proc/<pid>/statm
-
-		if(unlikely(read_proc_pid_statm(p))) {
-			error("Cannot process %s/proc/%d/statm", host_prefix, pid);
-			// there is no reason to proceed if we cannot get its memory status
-			continue;
-		}
-
-
-		// --------------------------------------------------------------------
-		// /proc/<pid>/io
-
-		if(unlikely(read_proc_pid_io(p))) {
-				error("Cannot process %s/proc/%d/io", host_prefix, pid);
-
-			// on systems without /proc/X/io
-			// allow proceeding without I/O information
-			// continue;
-		}
-
-		// --------------------------------------------------------------------
-		// <pid> ownership
-
-		if(unlikely(read_proc_pid_ownership(p))) {
-				error("Cannot stat %s/proc/%d", host_prefix, pid);
-		}
-
-		// --------------------------------------------------------------------
-		// link it
-
-		// check if it is target
-		// we do this only once, the first time this pid is loaded
-		if(unlikely(p->new_entry)) {
-			// /proc/<pid>/cmdline
-			if(proc_pid_cmdline_is_needed) {
-				if(unlikely(read_proc_pid_cmdline(p))) {
-						error("Cannot process %s/proc/%d/cmdline", host_prefix, pid);
-				}
-			}
-
-			if(unlikely(debug))
-				fprintf(stderr, "apps.plugin: \tJust added %d (%s)\n", pid, p->comm);
-
-			uint32_t hash = simple_hash(p->comm);
-			size_t pclen  = strlen(p->comm);
-
-			struct target *w;
-			for(w = apps_groups_root_target; w ; w = w->next) {
-				// if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: \t\tcomparing '%s' with '%s'\n", w->compare, p->comm);
-
-				// find it - 4 cases:
-				// 1. the target is not a pattern
-				// 2. the target has the prefix
-				// 3. the target has the suffix
-				// 4. the target is something inside cmdline
-				if(	(!w->starts_with && !w->ends_with && w->comparehash == hash && !strcmp(w->compare, p->comm))
-				       || (w->starts_with && !w->ends_with && !strncmp(w->compare, p->comm, w->comparelen))
-				       || (!w->starts_with && w->ends_with && pclen >= w->comparelen && !strcmp(w->compare, &p->comm[pclen - w->comparelen]))
-				       || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && strstr(p->cmdline, w->compare))
-						) {
-					if(w->target) p->target = w->target;
-					else p->target = w;
-
-					if(debug || (p->target && p->target->debug))
-						fprintf(stderr, "apps.plugin: \t\t%s linked to target %s\n", p->comm, p->target->name);
-
-					break;
-				}
-			}
-		}
-
-		// --------------------------------------------------------------------
-		// /proc/<pid>/fd
-
-		if(unlikely(read_pid_file_descriptors(p))) {
-				error("Cannot process entries in %s/proc/%d/fd", host_prefix, pid);
-		}
-
-		// --------------------------------------------------------------------
-		// done!
-
-		// mark it as updated
-		p->updated = 1;
+		collect_data_for_pid(pid);
 	}
-
 	closedir(dir);
+
+	// normally this is done
+	// however we may have processes exited while we collected values
+	// so let's find the exited ones
+	// we do this by collecting the ownership of process
+	// if we manage to get the ownership, the process still runs
+
+	link_all_processes_to_their_parents();
+	process_exited_processes();
 
 	return 1;
 }
@@ -1322,127 +1614,18 @@ int collect_data_for_all_processes_from_proc(void)
 // 9. find the unique file count for each target
 // check: update_apps_groups_statistics()
 
-void link_all_processes_to_their_parents(void) {
-	struct pid_stat *init = all_pids[1];
-	struct pid_stat *p = NULL;
-
-	// link all children to their parents
-	// and update children count on parents
-	for(p = root_of_pids; p ; p = p->next) {
-		// for each process found running
-
-		if(likely(p->new_entry && p->updated)) {
-			// the first time we see an entry
-			// we remove the exited children figures
-			// to avoid spikes
-			p->fix_cminflt = p->cminflt;
-			p->fix_cmajflt = p->cmajflt;
-			p->fix_cutime  = p->cutime;
-			p->fix_cstime  = p->cstime;
-		}
-
-		if(likely(p->ppid > 0 && all_pids[p->ppid])) {
-			// valid parent processes
-
-			struct pid_stat *pp;
-
-			p->parent = pp = all_pids[p->ppid];
-			p->parent->children_count++;
-
-			if(unlikely(debug || (p->target && p->target->debug)))
-				fprintf(stderr, "apps.plugin: \tchild %d (%s, %s) has parent %d (%s, %s). Parent: utime=%llu, stime=%llu, minflt=%llu, majflt=%llu, cutime=%llu, cstime=%llu, cminflt=%llu, cmajflt=%llu, fix_cutime=%llu, fix_cstime=%llu, fix_cminflt=%llu, fix_cmajflt=%llu\n", p->pid, p->comm, p->updated?"running":"exited", pp->pid, pp->comm, pp->updated?"running":"exited", pp->utime, pp->stime, pp->minflt, pp->majflt, pp->cutime, pp->cstime, pp->cminflt, pp->cmajflt, pp->fix_cutime, pp->fix_cstime, pp->fix_cminflt, pp->fix_cmajflt);
-
-			if(unlikely(!p->updated)) {
-				// this process has exit
-
-				// find the first parent that has been updated
-				while(pp && !pp->updated) {
-					// we may have to forward link it to its parent
-					if(unlikely(!pp->parent && pp->ppid > 0 && all_pids[pp->ppid]))
-						pp->parent = all_pids[pp->ppid];
-
-					// check again for parent
-					pp = pp->parent;
-				}
-
-				if(likely(pp)) {
-					// this is an exited child with a parent
-					// remove the known time from the parent's data
-					pp->fix_cminflt += p->last_minflt + p->last_cminflt + p->last_fix_cminflt;
-					pp->fix_cmajflt += p->last_majflt + p->last_cmajflt + p->last_fix_cmajflt;
-					pp->fix_cutime  += p->last_utime  + p->last_cutime  + p->last_fix_cutime;
-					pp->fix_cstime  += p->last_stime  + p->last_cstime  + p->last_fix_cstime;
-
-					// The known exited children (the ones we track) may have
-					// contributed more than the value accumulated into the process
-					// by the kernel.
-					// This can happen if the parent process has not waited-for
-					// its children (check: man 2 times).
-					// In this case, the kernel adds these resources to init (pid 1).
-					//
-					// The following code, attempts to fix this.
-					// Without this code, the charts will have random spikes
-					// for example, when an SSH session ends (sshd forks a child
-					// to serve the session, but when this session ends, sshd
-					// does not wait-for its child, thus all the resources of the
-					// ssh session get added to init, resulting in a huge spike on
-					// the charts).
-
-					if(unlikely(pp->cminflt < pp->fix_cminflt)) {
-						if(likely(init && pp != init)) {
-							unsigned long long have = pp->fix_cminflt - pp->cminflt;
-							unsigned long long max = init->cminflt - init->fix_cminflt;
-							if(have > max) have = max;
-							init->fix_cminflt += have;
-						}
-						pp->fix_cminflt = pp->cminflt;
-					}
-					if(unlikely(pp->cmajflt < pp->fix_cmajflt)) {
-						if(likely(init && pp != init)) {
-							unsigned long long have = pp->fix_cmajflt - pp->cmajflt;
-							unsigned long long max = init->cmajflt - init->fix_cmajflt;
-							if(have > max) have = max;
-							init->fix_cmajflt += have;
-						}
-						pp->fix_cmajflt = pp->cmajflt;
-					}
-					if(unlikely(pp->cutime < pp->fix_cutime)) {
-						if(likely(init && pp != init)) {
-							unsigned long long have = pp->fix_cutime - pp->cutime;
-							unsigned long long max = init->cutime - init->fix_cutime;
-							if(have > max) have = max;
-							init->fix_cutime += have;
-						}
-						pp->fix_cutime  = pp->cutime;
-					}
-					if(unlikely(pp->cstime < pp->fix_cstime)) {
-						if(likely(init && pp != init)) {
-							unsigned long long have = pp->fix_cstime - pp->cstime;
-							unsigned long long max = init->cstime - init->fix_cstime;
-							if(have > max) have = max;
-							init->fix_cstime += have;
-						}
-						pp->fix_cstime = pp->cstime;
-					}
-
-					if(unlikely(debug))
-						fprintf(stderr, "apps.plugin: \tupdating child metrics of %d (%s, %s) to its parent %d (%s, %s). Parent has now: utime=%llu, stime=%llu, minflt=%llu, majflt=%llu, cutime=%llu, cstime=%llu, cminflt=%llu, cmajflt=%llu, fix_cutime=%llu, fix_cstime=%llu, fix_cminflt=%llu, fix_cmajflt=%llu\n", p->pid, p->comm, p->updated?"running":"exited", pp->pid, pp->comm, pp->updated?"running":"exited", pp->utime, pp->stime, pp->minflt, pp->majflt, pp->cutime, pp->cstime, pp->cminflt, pp->cmajflt, pp->fix_cutime, pp->fix_cstime, pp->fix_cminflt, pp->fix_cmajflt);
-				}
-			}
-		}
-		else if(unlikely(p->ppid != 0))
-			error("pid %d %s states parent %d, but the later does not exist.", p->pid, p->comm, p->ppid);
-	}
-}
-
-
-void cleanup_non_existing_pids(void) {
+void cleanup_exited_pids(void) {
 	int c;
 	struct pid_stat *p = NULL;
 
 	for(p = root_of_pids; p ;) {
-		if(!p->updated) {
+		if(!p->updated && (!p->keep || p->keeploops > 1)) {
 //			fprintf(stderr, "\tEXITED %d %s [parent %d %s, target %s] utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->pid, p->comm, p->parent->pid, p->parent->comm, p->target->name,  p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+			if(p->keep)
+				fprintf(stderr, " > cannot keep exited process %d (%s) anymore - removing it.\n", p->pid, p->comm);
+#endif
 
 			for(c = 0 ; c < p->fds_size ; c++) if(p->fds[c] > 0) {
 				file_descriptor_not_used(p->fds[c]);
@@ -1453,7 +1636,11 @@ void cleanup_non_existing_pids(void) {
 			p = p->next;
 			del_pid_entry(r);
 		}
-		else p = p->next;
+		else {
+			if(unlikely(p->keep)) p->keeploops++;
+			p->keep = 0;
+			p = p->next;
+		}
 	}
 }
 
@@ -1481,13 +1668,14 @@ void apply_apps_groups_targets_inheritance(void) {
 		}
 	}
 
-
 	// find all the procs with 0 childs and merge them to their parents
 	// repeat, until nothing more can be done.
+	int sortlist = 1;
 	found = 1;
 	while(found) {
 		if(unlikely(debug)) loops++;
 		found = 0;
+
 		for(p = root_of_pids; p ; p = p->next) {
 			// if this process does not have any children
 			// and is not already merged
@@ -1517,10 +1705,15 @@ void apply_apps_groups_targets_inheritance(void) {
 
 				found++;
 			}
+
+			// since this process does not have any childs
+			// assign it to the current sortlist
+			if(unlikely(!p->sortlist && !p->children_count))
+				p->sortlist = sortlist++;
 		}
 
 		if(unlikely(debug))
-			fprintf(stderr, "apps.plugin: merged %d processes\n", found);
+			fprintf(stderr, "apps.plugin: TARGET INHERITANCE: merged %d processes\n", found);
 	}
 
 	// init goes always to default target
@@ -1532,8 +1725,12 @@ void apply_apps_groups_targets_inheritance(void) {
 	for(p = root_of_pids; p ; p = p->next) {
 		// if the process is not merged itself
 		// then is is a top level process
-		if(!p->merged && !p->target)
+		if(unlikely(!p->merged && !p->target))
 			p->target = apps_groups_default_target;
+
+		// make sure all processes have a sortlist
+		if(unlikely(!p->sortlist))
+			p->sortlist = sortlist++;
 	}
 
 	// give a target to all merged child processes
@@ -1599,6 +1796,8 @@ long zero_all_targets(struct target *root) {
 }
 
 void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o) {
+	(void)o;
+
 	if(unlikely(!w->fds)) {
 		w->fds = calloc(sizeof(int), (size_t) all_files_size);
 		if(unlikely(!w->fds))
@@ -1606,26 +1805,16 @@ void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target
 	}
 
 	if(likely(p->updated)) {
-		if(unlikely(debug && (p->fix_cutime || p->fix_cstime || p->fix_cminflt || p->fix_cmajflt)))
-			fprintf(stderr, "apps.plugin: \tadding child counters of %d (%s) to target %s. Currents: cutime=%llu, cstime=%llu, cminflt=%llu, cmajflt=%llu, Fixes: cutime=%llu, cstime=%llu, cminflt=%llu, cmajflt=%llu\n", p->pid, p->comm, w->name, p->cutime, p->cstime, p->cminflt, p->cmajflt, p->fix_cutime, p->fix_cstime, p->fix_cminflt, p->fix_cmajflt);
+		w->cutime  += p->cutime;
+		w->cstime  += p->cstime;
+		w->cminflt += p->cminflt;
+		w->cmajflt += p->cmajflt;
 
-		w->cutime  += p->cutime  - p->fix_cutime;
-		w->cstime  += p->cstime  - p->fix_cstime;
-		w->cminflt += p->cminflt - p->fix_cminflt;
-		w->cmajflt += p->cmajflt - p->fix_cmajflt;
+		w->utime  += p->utime;
+		w->stime  += p->stime;
+		w->minflt += p->minflt;
+		w->majflt += p->majflt;
 
-		w->utime += p->utime; //+ (p->pid != 1)?(p->cutime - p->fix_cutime):0;
-		w->stime += p->stime; //+ (p->pid != 1)?(p->cstime - p->fix_cstime):0;
-		w->minflt += p->minflt; //+ (p->pid != 1)?(p->cminflt - p->fix_cminflt):0;
-		w->majflt += p->majflt; //+ (p->pid != 1)?(p->cmajflt - p->fix_cmajflt):0;
-
-		//if(p->num_threads < 0)
-		//	error("Negative threads number for pid '%s' (%d): %d", p->comm, p->pid, p->num_threads);
-
-		//if(p->num_threads > 10000)
-		//	error("Excessive threads number for pid '%s' (%d): %d", p->comm, p->pid, p->num_threads);
-
-		w->num_threads += p->num_threads;
 		w->rss += p->rss;
 
 		w->statm_size += p->statm_size;
@@ -1636,15 +1825,16 @@ void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target
 		w->statm_data += p->statm_data;
 		w->statm_dirty += p->statm_dirty;
 
-		w->io_logical_bytes_read += p->io_logical_bytes_read;
+		w->io_logical_bytes_read    += p->io_logical_bytes_read;
 		w->io_logical_bytes_written += p->io_logical_bytes_written;
-		w->io_read_calls += p->io_read_calls;
-		w->io_write_calls += p->io_write_calls;
-		w->io_storage_bytes_read += p->io_storage_bytes_read;
+		w->io_read_calls            += p->io_read_calls;
+		w->io_write_calls           += p->io_write_calls;
+		w->io_storage_bytes_read    += p->io_storage_bytes_read;
 		w->io_storage_bytes_written += p->io_storage_bytes_written;
 		w->io_cancelled_write_bytes += p->io_cancelled_write_bytes;
 
 		w->processes++;
+		w->num_threads += p->num_threads;
 
 		if(likely(w->fds)) {
 			int c;
@@ -1660,103 +1850,8 @@ void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target
 		}
 
 		if(unlikely(debug || w->debug))
-			fprintf(stderr, "apps.plugin: \tAggregating %s pid %d on %s utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu, fix_cutime=%llu, fix_cstime=%llu, fix_cminflt=%llu, fix_cmajflt=%llu\n", p->comm, p->pid, w->name, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->fix_cutime, p->fix_cstime, p->fix_cminflt, p->fix_cmajflt);
-
-/*		if(p->utime - p->old_utime > 100) fprintf(stderr, "BIG CHANGE: %d %s utime increased by %llu from %llu to %llu\n", p->pid, p->comm, p->utime - p->old_utime, p->old_utime, p->utime);
-		if(p->cutime - p->old_cutime > 100) fprintf(stderr, "BIG CHANGE: %d %s cutime increased by %llu from %llu to %llu\n", p->pid, p->comm, p->cutime - p->old_cutime, p->old_cutime, p->cutime);
-		if(p->stime - p->old_stime > 100) fprintf(stderr, "BIG CHANGE: %d %s stime increased by %llu from %llu to %llu\n", p->pid, p->comm, p->stime - p->old_stime, p->old_stime, p->stime);
-		if(p->cstime - p->old_cstime > 100) fprintf(stderr, "BIG CHANGE: %d %s cstime increased by %llu from %llu to %llu\n", p->pid, p->comm, p->cstime - p->old_cstime, p->old_cstime, p->cstime);
-		if(p->minflt - p->old_minflt > 5000) fprintf(stderr, "BIG CHANGE: %d %s minflt increased by %llu from %llu to %llu\n", p->pid, p->comm, p->minflt - p->old_minflt, p->old_minflt, p->minflt);
-		if(p->majflt - p->old_majflt > 5000) fprintf(stderr, "BIG CHANGE: %d %s majflt increased by %llu from %llu to %llu\n", p->pid, p->comm, p->majflt - p->old_majflt, p->old_majflt, p->majflt);
-		if(p->cminflt - p->old_cminflt > 15000) fprintf(stderr, "BIG CHANGE: %d %s cminflt increased by %llu from %llu to %llu\n", p->pid, p->comm, p->cminflt - p->old_cminflt, p->old_cminflt, p->cminflt);
-		if(p->cmajflt - p->old_cmajflt > 15000) fprintf(stderr, "BIG CHANGE: %d %s cmajflt increased by %llu from %llu to %llu\n", p->pid, p->comm, p->cmajflt - p->old_cmajflt, p->old_cmajflt, p->cmajflt);
-*/
-
-		if(o) {
-			// since the process switched target
-			// for all incremental values
-			// we have to subtract its OLD values from the new target
-			// and add its OLD values to the old target
-
-			// IMPORTANT
-			// We add/subtract the last/OLD values we added to the target
-
-			unsigned long long cutime  = p->last_cutime - p->last_fix_cutime;
-			unsigned long long cstime  = p->last_cstime - p->last_fix_cstime;
-			unsigned long long cminflt = p->last_cminflt - p->last_fix_cminflt;
-			unsigned long long cmajflt = p->last_cmajflt - p->last_fix_cmajflt;
-
-			w->fix_cutime  -= cutime;
-			w->fix_cstime  -= cstime;
-			w->fix_cminflt -= cminflt;
-			w->fix_cmajflt -= cmajflt;
-
-			w->fix_utime  -= p->last_utime;
-			w->fix_stime  -= p->last_stime;
-			w->fix_minflt -= p->last_minflt;
-			w->fix_majflt -= p->last_majflt;
-
-			w->fix_io_logical_bytes_read    -= p->last_io_logical_bytes_read;
-			w->fix_io_logical_bytes_written -= p->last_io_logical_bytes_written;
-			w->fix_io_read_calls            -= p->last_io_read_calls;
-			w->fix_io_write_calls           -= p->last_io_write_calls;
-			w->fix_io_storage_bytes_read    -= p->last_io_storage_bytes_read;
-			w->fix_io_storage_bytes_written -= p->last_io_storage_bytes_written;
-			w->fix_io_cancelled_write_bytes -= p->last_io_cancelled_write_bytes;
-
-			// ---
-
-			o->fix_cutime  += cutime;
-			o->fix_cstime  += cstime;
-			o->fix_cminflt += cminflt;
-			o->fix_cmajflt += cmajflt;
-
-			o->fix_utime  += p->last_utime;
-			o->fix_stime  += p->last_stime;
-			o->fix_minflt += p->last_minflt;
-			o->fix_majflt += p->last_majflt;
-
-			o->fix_io_logical_bytes_read    += p->last_io_logical_bytes_read;
-			o->fix_io_logical_bytes_written += p->last_io_logical_bytes_written;
-			o->fix_io_read_calls            += p->last_io_read_calls;
-			o->fix_io_write_calls           += p->last_io_write_calls;
-			o->fix_io_storage_bytes_read    += p->last_io_storage_bytes_read;
-			o->fix_io_storage_bytes_written += p->last_io_storage_bytes_written;
-			o->fix_io_cancelled_write_bytes += p->last_io_cancelled_write_bytes;
-		}
+			fprintf(stderr, "apps.plugin: \taggregating '%s' pid %d on target '%s' utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, w->name, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
 	}
-	else {
-		// if(o) fprintf(stderr, "apps.plugin: \t\tpid %d (%s) is not updated by OLD target %s (%s) is present.\n", p->pid, p->comm, o->id, o->name);
-
-		// since the process has exited, the user
-		// will see a drop in our charts, because the incremental
-		// values of this process will not be there from now on
-
-		// add them to the fix_* values and they will be added to
-		// the reported values, so that the report goes steady
-
-		w->fix_minflt  += p->last_minflt;
-		w->fix_majflt  += p->last_majflt;
-		w->fix_utime   += p->last_utime;
-		w->fix_stime   += p->last_stime;
-
-		w->fix_cminflt += (p->last_cminflt - p->last_fix_cminflt);
-		w->fix_cmajflt += (p->last_cmajflt - p->last_fix_cmajflt);
-		w->fix_cutime  += (p->last_cutime  - p->last_fix_cutime);
-		w->fix_cstime  += (p->last_cstime  - p->last_fix_cstime);
-
-		w->fix_io_logical_bytes_read    += p->last_io_logical_bytes_read;
-		w->fix_io_logical_bytes_written += p->last_io_logical_bytes_written;
-		w->fix_io_read_calls            += p->last_io_read_calls;
-		w->fix_io_write_calls           += p->last_io_write_calls;
-		w->fix_io_storage_bytes_read    += p->last_io_storage_bytes_read;
-		w->fix_io_storage_bytes_written += p->last_io_storage_bytes_written;
-		w->fix_io_cancelled_write_bytes += p->last_io_cancelled_write_bytes;
-	}
-
-	//if((long long)w->cutime + w->fix_cutime < 0)
-	//	error("Negative total cutime (%llu - %lld) on target %s after adding process %d (%s, %s) with utime=%llu, stime=%llu, minflt=%llu, majflt=%llu, cutime=%llu, cstime=%llu, cminflt=%llu, cmajflt=%llu, fix_cutime=%llu, fix_cstime=%llu, fix_cminflt=%llu, fix_cmajflt=%llu\n",
-	//		  w->cutime, w->fix_cutime, w->name, p->pid, p->comm, p->updated?"running":"exited", p->utime, p->stime, p->minflt, p->majflt, p->cutime, p->cstime, p->cminflt, p->cmajflt, p->fix_cutime, p->fix_cstime, p->fix_cminflt, p->fix_cmajflt);
 }
 
 void count_targets_fds(struct target *root) {
@@ -1821,9 +1916,7 @@ void count_targets_fds(struct target *root) {
 	}
 }
 
-void calculate_netdata_statistics(void)
-{
-	link_all_processes_to_their_parents();
+void calculate_netdata_statistics(void) {
 	apply_apps_groups_targets_inheritance();
 
 	zero_all_targets(users_root_target);
@@ -1886,7 +1979,7 @@ void calculate_netdata_statistics(void)
 	count_targets_fds(users_root_target);
 	count_targets_fds(groups_root_target);
 
-	cleanup_non_existing_pids();
+	cleanup_exited_pids();
 }
 
 // ----------------------------------------------------------------------------
@@ -1944,12 +2037,68 @@ unsigned long long send_resource_usage_to_netdata() {
 void send_collected_data_to_netdata(struct target *root, const char *type, unsigned long long usec)
 {
 	struct target *w;
+	int childs = include_exited_childs;
+
+	{
+		// childs processing introduces spikes
+		// here we try to eliminate them by disabling childs processing either for specific dimensions
+		// or entirely. Of course, either way, we disable it just a single iteration.
+
+		unsigned long long max = processors * hz * 100;
+		unsigned long long utime = 0, cutime = 0, stime = 0, cstime = 0, minflt = 0, cminflt = 0, majflt = 0, cmajflt = 0;
+
+		for (w = root; w ; w = w->next) {
+			if(w->target || (!w->processes && !w->exposed)) continue;
+
+			if((w->utime + w->stime + w->cutime + w->cstime) > max) {
+#ifdef NETDATA_INTERNAL_CHECKS
+				log_date(stderr);
+				fprintf(stderr, "Prevented a spike on target '%s', reported CPU time = %llu (without childs = %llu)\n", w->name, (w->utime + w->stime + w->cutime + w->cstime) / 100, (w->utime + w->stime) / 100);
+#endif
+				w->cutime = w->cstime = w->cminflt = w->majflt = 0;
+			}
+
+			utime   += w->utime;
+			cutime  += w->cutime;
+			stime   += w->stime;
+			cstime  += w->cstime;
+			minflt  += w->minflt;
+			cminflt += w->cminflt;
+			majflt  += w->majflt;
+			cmajflt += w->cmajflt;
+		}
+
+		if((utime + stime + cutime + cstime) > max) {
+			childs = 0;
+#ifdef NETDATA_INTERNAL_CHECKS
+			log_date(stderr);
+			fprintf(stderr, "Prevented a spike because the total CPU of all dimensions = %llu (without childs = %llu)\n", (utime + stime + cutime + cstime) / 100, (utime + stime) / 100);
+#endif
+		}
+
+		if((utime + stime) > max) {
+			childs = 0;
+			unsigned long long multiplier = max, divider = utime + stime;
+			for (w = root; w ; w = w->next) {
+				w->utime  = w->utime * multiplier / divider;
+				w->stime  = w->stime * multiplier / divider;
+				w->minflt = w->minflt * multiplier / divider;
+				w->majflt = w->majflt * multiplier / divider;
+			}
+
+#ifdef NETDATA_INTERNAL_CHECKS
+			log_date(stderr);
+			fprintf(stderr, "Reduced processes utilization (without childs) by %0.2f%% (CPU was %llu)\n", (float)(((utime + stime - max) * 100.0)/(float)max), (utime + stime) / 100);
+#endif
+		}
+
+	}
 
 	fprintf(stdout, "BEGIN %s.cpu %llu\n", type, usec);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + w->stime + w->fix_utime + w->fix_stime + (include_exited_childs?(w->cutime + w->cstime + w->fix_cutime + w->fix_cstime):0));
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + w->stime + (childs?(w->cutime + w->cstime):0));
 	}
 	fprintf(stdout, "END\n");
 
@@ -1957,7 +2106,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + w->fix_utime + (include_exited_childs?(w->cutime + w->fix_cutime):0));
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + (childs?(w->cutime):0));
 	}
 	fprintf(stdout, "END\n");
 
@@ -1965,7 +2114,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->stime + w->fix_stime + (include_exited_childs?(w->cstime + w->fix_cstime):0));
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->stime + (childs?(w->cstime):0));
 	}
 	fprintf(stdout, "END\n");
 
@@ -1997,7 +2146,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->minflt + w->fix_minflt + (include_exited_childs?(w->cminflt + w->fix_cminflt):0));
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->minflt + (childs?(w->cminflt):0));
 	}
 	fprintf(stdout, "END\n");
 
@@ -2005,7 +2154,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->majflt + w->fix_majflt + (include_exited_childs?(w->cmajflt + w->fix_cmajflt):0));
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->majflt + (childs?(w->cmajflt):0));
 	}
 	fprintf(stdout, "END\n");
 
@@ -2013,7 +2162,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_logical_bytes_read + w->fix_io_logical_bytes_read);
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_logical_bytes_read);
 	}
 	fprintf(stdout, "END\n");
 
@@ -2021,7 +2170,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_logical_bytes_written + w->fix_io_logical_bytes_written);
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_logical_bytes_written);
 	}
 	fprintf(stdout, "END\n");
 
@@ -2029,7 +2178,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_storage_bytes_read + w->fix_io_storage_bytes_read);
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_storage_bytes_read);
 	}
 	fprintf(stdout, "END\n");
 
@@ -2037,7 +2186,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_storage_bytes_written + w->fix_io_storage_bytes_written);
+		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_storage_bytes_written);
 	}
 	fprintf(stdout, "END\n");
 
@@ -2093,7 +2242,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %u %s\n", w->name, hz, w->hidden ? "hidden,noreset" : "noreset");
+		fprintf(stdout, "DIMENSION %s '' absolute 1 %u %s\n", w->name, hz, w->hidden ? "hidden,noreset" : "noreset");
 	}
 
 	fprintf(stdout, "CHART %s.mem '' '%s Dedicated Memory (w/o shared)' 'MB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
@@ -2121,56 +2270,56 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %u noreset\n", w->name, hz);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 %u noreset\n", w->name, hz);
 	}
 
 	fprintf(stdout, "CHART %s.cpu_system '' '%s CPU System Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20021 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 100 %u noreset\n", w->name, hz);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 %u noreset\n", w->name, hz);
 	}
 
 	fprintf(stdout, "CHART %s.major_faults '' '%s Major Page Faults (swap read)' 'page faults/s' swap %s.major_faults stacked 20010 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 1 1 noreset\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 100 noreset\n", w->name);
 	}
 
 	fprintf(stdout, "CHART %s.minor_faults '' '%s Minor Page Faults' 'page faults/s' mem %s.minor_faults stacked 20011 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 1 1 noreset\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 100 noreset\n", w->name);
 	}
 
 	fprintf(stdout, "CHART %s.lreads '' '%s Disk Logical Reads' 'kilobytes/s' disk %s.lreads stacked 20042 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 1 %d noreset\n", w->name, 1024);
+		fprintf(stdout, "DIMENSION %s '' incremental 1 %d noreset\n", w->name, 1024*100);
 	}
 
 	fprintf(stdout, "CHART %s.lwrites '' '%s I/O Logical Writes' 'kilobytes/s' disk %s.lwrites stacked 20042 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 1 %d noreset\n", w->name, 1024);
+		fprintf(stdout, "DIMENSION %s '' incremental 1 %d noreset\n", w->name, 1024*100);
 	}
 
 	fprintf(stdout, "CHART %s.preads '' '%s Disk Reads' 'kilobytes/s' disk %s.preads stacked 20002 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 1 %d noreset\n", w->name, 1024);
+		fprintf(stdout, "DIMENSION %s '' incremental 1 %d noreset\n", w->name, 1024*100);
 	}
 
 	fprintf(stdout, "CHART %s.pwrites '' '%s Disk Writes' 'kilobytes/s' disk %s.pwrites stacked 20002 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 1 %d noreset\n", w->name, 1024);
+		fprintf(stdout, "DIMENSION %s '' incremental 1 %d noreset\n", w->name, 1024*100);
 	}
 
 	fprintf(stdout, "CHART %s.files '' '%s Open Files' 'open files' disk %s.files stacked 20050 %d\n", type, title, type, update_every);
@@ -2215,7 +2364,7 @@ void parse_args(int argc, char **argv)
 
 		if(strcmp("debug", argv[i]) == 0) {
 			debug = 1;
-			debug_flags = 0xffffffff;
+			// debug_flags = 0xffffffff;
 			continue;
 		}
 
@@ -2294,9 +2443,16 @@ int main(int argc, char **argv)
 
 	parse_args(argc, argv);
 
+	all_pids_sortlist = calloc(sizeof(pid_t), (size_t)pid_max);
+	if(!all_pids_sortlist) {
+		error("Cannot allocate %zu bytes of memory.", sizeof(pid_t) * pid_max);
+		printf("DISABLE\n");
+		exit(1);
+	}
+
 	all_pids = calloc(sizeof(struct pid_stat *), (size_t) pid_max);
 	if(!all_pids) {
-		error("Cannot allocate %lu bytes of memory.", sizeof(struct pid_stat *) * pid_max);
+		error("Cannot allocate %zu bytes of memory.", sizeof(struct pid_stat *) * pid_max);
 		printf("DISABLE\n");
 		exit(1);
 	}
@@ -2315,8 +2471,8 @@ int main(int argc, char **argv)
 	unsigned long long sunow;
 #endif /* PROFILING_MODE */
 
-	unsigned long long counter = 1;
-	for(;1; counter++) {
+	global_iterations_counter = 1;
+	for(;1; global_iterations_counter++) {
 #ifndef PROFILING_MODE
 		// delay until it is our time to run
 		while((sunow = timems()) < sunext)
@@ -2347,7 +2503,7 @@ int main(int argc, char **argv)
 		send_collected_data_to_netdata(groups_root_target, "groups", dt);
 
 		if(unlikely(debug))
-			fprintf(stderr, "apps.plugin: done Loop No %llu\n", counter);
+			fprintf(stderr, "apps.plugin: done Loop No %llu\n", global_iterations_counter);
 
 		current_t = time(NULL);
 
