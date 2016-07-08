@@ -708,35 +708,35 @@ int read_proc_pid_stat(struct pid_stat *p) {
 
 	last = p->minflt_raw;
 	p->minflt_raw		= strtoull(procfile_lineword(ff, 0, 9+i), NULL, 10);
-	p->minflt = (p->minflt_raw - last) * (update_every * 1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+	p->minflt = (p->minflt_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
 	last = p->cminflt_raw;
 	p->cminflt_raw		= strtoull(procfile_lineword(ff, 0, 10+i), NULL, 10);
-	p->cminflt = (p->cminflt_raw - last) * (update_every * 1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+	p->cminflt = (p->cminflt_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
 	last = p->majflt_raw;
 	p->majflt_raw		= strtoull(procfile_lineword(ff, 0, 11+i), NULL, 10);
-	p->majflt = (p->majflt_raw - last) * (update_every * 1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+	p->majflt = (p->majflt_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
 	last = p->cmajflt_raw;
 	p->cmajflt_raw		= strtoull(procfile_lineword(ff, 0, 12+i), NULL, 10);
-	p->cmajflt = (p->cmajflt_raw - last) * (update_every * 1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+	p->cmajflt = (p->cmajflt_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
 	last = p->utime_raw;
 	p->utime_raw		= strtoull(procfile_lineword(ff, 0, 13+i), NULL, 10);
-	p->utime = (p->utime_raw - last) * (update_every * 1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+	p->utime = (p->utime_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
 	last = p->stime_raw;
 	p->stime_raw		= strtoull(procfile_lineword(ff, 0, 14+i), NULL, 10);
-	p->stime = (p->stime_raw - last) * (update_every * 1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+	p->stime = (p->stime_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
 	last = p->cutime_raw;
 	p->cutime_raw		= strtoull(procfile_lineword(ff, 0, 15+i), NULL, 10);
-	p->cutime = (p->cutime_raw - last) * (update_every * 1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+	p->cutime = (p->cutime_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
 	last = p->cstime_raw;
 	p->cstime_raw		= strtoull(procfile_lineword(ff, 0, 16+i), NULL, 10);
-	p->cstime = (p->cstime_raw - last) * (update_every * 1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+	p->cstime = (p->cstime_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
 	// p->priority		= strtoull(procfile_lineword(ff, 0, 17+i), NULL, 10);
 	// p->nice			= strtoull(procfile_lineword(ff, 0, 18+i), NULL, 10);
@@ -861,31 +861,31 @@ int read_proc_pid_io(struct pid_stat *p) {
 
 	last = p->io_logical_bytes_read_raw;
 	p->io_logical_bytes_read_raw = strtoull(procfile_lineword(ff, 0, 1), NULL, 10);
-	p->io_logical_bytes_read = (p->io_logical_bytes_read_raw - last) * (update_every * 1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+	p->io_logical_bytes_read = (p->io_logical_bytes_read_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
 
 	last = p->io_logical_bytes_written_raw;
 	p->io_logical_bytes_written_raw = strtoull(procfile_lineword(ff, 1, 1), NULL, 10);
-	p->io_logical_bytes_written = (p->io_logical_bytes_written_raw - last) * (update_every * 1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+	p->io_logical_bytes_written = (p->io_logical_bytes_written_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
 
 	last = p->io_read_calls_raw;
 	p->io_read_calls_raw = strtoull(procfile_lineword(ff, 2, 1), NULL, 10);
-	p->io_read_calls = (p->io_read_calls_raw - last) * (update_every * 1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+	p->io_read_calls = (p->io_read_calls_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
 
 	last = p->io_write_calls_raw;
 	p->io_write_calls_raw = strtoull(procfile_lineword(ff, 3, 1), NULL, 10);
-	p->io_write_calls = (p->io_write_calls_raw - last) * (update_every * 1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+	p->io_write_calls = (p->io_write_calls_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
 
 	last = p->io_storage_bytes_read_raw;
 	p->io_storage_bytes_read_raw = strtoull(procfile_lineword(ff, 4, 1), NULL, 10);
-	p->io_storage_bytes_read = (p->io_storage_bytes_read_raw - last) * (update_every * 1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+	p->io_storage_bytes_read = (p->io_storage_bytes_read_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
 
 	last = p->io_storage_bytes_written_raw;
 	p->io_storage_bytes_written_raw = strtoull(procfile_lineword(ff, 5, 1), NULL, 10);
-	p->io_storage_bytes_written = (p->io_storage_bytes_written_raw - last) * (update_every * 1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+	p->io_storage_bytes_written = (p->io_storage_bytes_written_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
 
 	last = p->io_cancelled_write_bytes_raw;
 	p->io_cancelled_write_bytes_raw = strtoull(procfile_lineword(ff, 6, 1), NULL, 10);
-	p->io_cancelled_write_bytes = (p->io_cancelled_write_bytes_raw - last) * (update_every * 1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+	p->io_cancelled_write_bytes = (p->io_cancelled_write_bytes_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
 
 	if(unlikely(global_iterations_counter == 1)) {
 		p->io_logical_bytes_read 		= 0;
@@ -1349,25 +1349,25 @@ void process_exited_processes() {
 		
 		unsigned long long rate;
 
-		rate = (p->utime_raw + p->cutime_raw) * (update_every * 1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+		rate = (p->utime_raw + p->cutime_raw) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
 		remove_exited_child_from_parent(&rate,  (pp)?&pp->cutime:NULL,  (init)?&init->cutime:NULL, p, pp, 3);
 		p->cutime_raw = 0;
-		p->utime_raw = rate * (p->stat_collected_usec - p->last_stat_collected_usec) / (update_every * 1000000 * 100);
+		p->utime_raw = rate * (p->stat_collected_usec - p->last_stat_collected_usec) / (1000000 * 100);
 
-		rate = (p->stime_raw + p->cstime_raw) * (update_every * 1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+		rate = (p->stime_raw + p->cstime_raw) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
 		remove_exited_child_from_parent(&rate,  (pp)?&pp->cstime:NULL,  (init)?&init->cstime:NULL, p, pp, 4);
 		p->cstime_raw = 0;
-		p->stime_raw = rate * (p->stat_collected_usec - p->last_stat_collected_usec) / (update_every * 1000000 * 100);
+		p->stime_raw = rate * (p->stat_collected_usec - p->last_stat_collected_usec) / (1000000 * 100);
 
-		rate = (p->minflt_raw + p->cminflt_raw) * (update_every * 1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+		rate = (p->minflt_raw + p->cminflt_raw) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
 		remove_exited_child_from_parent(&rate, (pp)?&pp->cminflt:NULL, (init)?&init->cminflt:NULL, p, pp, 1);
 		p->cminflt_raw = 0;
-		p->minflt_raw = rate * (p->stat_collected_usec - p->last_stat_collected_usec) / (update_every * 1000000 * 100);
+		p->minflt_raw = rate * (p->stat_collected_usec - p->last_stat_collected_usec) / (1000000 * 100);
 
-		rate = (p->majflt_raw + p->cmajflt_raw) * (update_every * 1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+		rate = (p->majflt_raw + p->cmajflt_raw) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
 		remove_exited_child_from_parent(&rate, (pp)?&pp->cmajflt:NULL, (init)?&init->cmajflt:NULL, p, pp, 2);
 		p->cmajflt_raw = 0;
-		p->majflt_raw = rate * (p->stat_collected_usec - p->last_stat_collected_usec) / (update_every * 1000000 * 100);
+		p->majflt_raw = rate * (p->stat_collected_usec - p->last_stat_collected_usec) / (1000000 * 100);
 	}
 }
 
@@ -1392,6 +1392,8 @@ void link_all_processes_to_their_parents(void) {
 		}
 		else if(unlikely(p->ppid != 0))
 			error("pid %d %s states parent %d, but the later does not exist.", p->pid, p->comm, p->ppid);
+
+		p->sortlist = 0;
 	}
 }
 
@@ -1432,11 +1434,9 @@ void collect_data_for_pid(pid_t pid) {
 
 	struct pid_stat *p = get_pid_entry(pid);
 	if(unlikely(!p || p->read)) return;
+	p->read             = 1;
 
 	// fprintf(stderr, "Reading process %d (%s), sortlist %d\n", p->pid, p->comm, p->sortlist);
-
-	p->read             = 1;
-	p->sortlist         = 0;
 
 	// --------------------------------------------------------------------
 	// /proc/<pid>/stat
@@ -1523,8 +1523,10 @@ void collect_data_for_pid(pid_t pid) {
 	// --------------------------------------------------------------------
 	// done!
 
-	if(p->ppid && all_pids[p->ppid] && !all_pids[p->ppid]->read)
-		error("read process %d (%s), but its parent %d (%s) is not read\n", p->pid, p->comm, all_pids[p->ppid]->pid, all_pids[p->ppid]->comm);
+#ifdef NETDATA_INTERNAL_CHECKS
+	if(unlikely(all_pids_count && p->ppid && all_pids[p->ppid] && !all_pids[p->ppid]->read))
+		fprintf(stderr, "Read process %d (%s) sortlisted %d, but its parent %d (%s) sortlisted %d, is not read\n", p->pid, p->comm, p->sortlist, all_pids[p->ppid]->pid, all_pids[p->ppid]->comm, all_pids[p->ppid]->sortlist);
+#endif
 
 	// mark it as updated
 	p->updated = 1;
@@ -2042,7 +2044,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 		// here we try to eliminate them by disabling childs processing either for specific dimensions
 		// or entirely. Of course, either way, we disable it just a single iteration.
 
-		unsigned long long max = update_every * processors * 100 * 100;
+		unsigned long long max = processors * hz * 100;
 		unsigned long long utime = 0, cutime = 0, stime = 0, cstime = 0, minflt = 0, cminflt = 0, majflt = 0, cmajflt = 0;
 
 		for (w = root; w ; w = w->next) {
@@ -2086,7 +2088,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 
 #ifdef NETDATA_INTERNAL_CHECKS
 			log_date(stderr);
-			fprintf(stderr, "Reduced processes utilization (without childs) by %0.2f%% (CPU was %llu)\n", (float)((utime + stime - max * 100.0)/(float)max), (utime + stime) / 100);
+			fprintf(stderr, "Reduced processes utilization (without childs) by %0.2f%% (CPU was %llu)\n", (float)(((utime + stime - max) * 100.0)/(float)max), (utime + stime) / 100);
 #endif
 		}
 
@@ -2443,14 +2445,14 @@ int main(int argc, char **argv)
 
 	all_pids_sortlist = calloc(sizeof(pid_t), (size_t)pid_max);
 	if(!all_pids_sortlist) {
-		error("Cannot allocate %lu bytes of memory.", sizeof(pid_t) * pid_max);
+		error("Cannot allocate %zu bytes of memory.", sizeof(pid_t) * pid_max);
 		printf("DISABLE\n");
 		exit(1);
 	}
 
 	all_pids = calloc(sizeof(struct pid_stat *), (size_t) pid_max);
 	if(!all_pids) {
-		error("Cannot allocate %lu bytes of memory.", sizeof(struct pid_stat *) * pid_max);
+		error("Cannot allocate %zu bytes of memory.", sizeof(struct pid_stat *) * pid_max);
 		printf("DISABLE\n");
 		exit(1);
 	}
