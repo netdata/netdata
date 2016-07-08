@@ -29,15 +29,14 @@ unsigned long long timems(void) {
 
 int usecsleep(unsigned long long usec) {
 
-#ifdef NETDATA_WITH_NANOSLEEP
+#ifndef NETDATA_WITH_USLEEP
 	// we expect microseconds (1.000.000 per second)
 	// but timespec is nanoseconds (1.000.000.000 per second)
 	struct timespec req = { .tv_sec = usec / 1000000, .tv_nsec = (usec % 1000000) * 1000 }, rem;
 
 	while(nanosleep(&req, &rem) == -1) {
-		error("nanosleep() failed for %llu microseconds.", usec);
-
 		if(likely(errno == EINTR)) {
+			info("nanosleep() interrupted (while sleeping for %llu microseconds).", usec);
 			req.tv_sec = rem.tv_sec;
 			req.tv_nsec = rem.tv_nsec;
 		}
