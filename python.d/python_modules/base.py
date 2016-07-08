@@ -437,7 +437,7 @@ class SocketService(SimpleService):
         self.host = "localhost"
         self.port = None
         self.sock = None
-        self.unix_socket = ""
+        self.unix_socket = None
         self.request = ""
         SimpleService.__init__(self, configuration=configuration, name=name)
 
@@ -448,7 +448,7 @@ class SocketService(SimpleService):
         """
         if self.sock is None:
             try:
-                if len(self.unix_socket) == 0:
+                if self.unix_socket is None:
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                     sock.settimeout(self.update_every)
