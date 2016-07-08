@@ -55,6 +55,7 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = []
         self.definitions = {}
+        self.chips = []
 
     def _get_data(self):
         data = {}
@@ -78,14 +79,17 @@ class Service(SimpleService):
                 prefix = '_'.join(str(chip.path.decode()).split('/')[3:])
                 name = ""
                 lines = []
+                pref = str(chip.prefix.decode())
+                if len(self.chips) != 0 and not any([ex.startswith(pref) for ex in self.chips]):
+                    continue
                 for feature in chip:
-                    if feature.get_value() != 0:
+                    if feature.get_value() == 0:
                         continue
                     if sensors.TYPE_DICT[feature.type] == type:
-                        name = str(chip.prefix.decode()) + "_" + sensors.TYPE_DICT[feature.type]
+                        name = pref + "_" + sensors.TYPE_DICT[feature.type]
                         if name not in self.order:
                             options = list(CHARTS[type]['options'])
-                            options[1] = str(chip.prefix) + options[1]
+                            options[1] = pref + options[1]
                             self.definitions[name] = {'options': options}
                             self.definitions[name]['lines'] = []
                             self.order.append(name)
@@ -96,12 +100,28 @@ class Service(SimpleService):
 
     def check(self):
         try:
+            self.chips = list(self.configuration['chips'])
+        except (KeyError, TypeError):
+            self.error("No path to log specified. Using all chips.")
+        try:
+            global ORDER
+            ORDER = list(self.configuration['types'])
+        except (KeyError, TypeError):
+            self.error("No path to log specified. Using all sensor types.")
+        print(ORDER)
+        try:
             sensors.init()
         except Exception as e:
             self.error(e)
             return False
         try:
             self._create_definitions()
-        except:
+        except Exception as e:
+            print(e)
             return False
+
+        if len(self.definitions) == 0:
+            self.error("No sensors found")
+            return False
+
         return True
