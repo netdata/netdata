@@ -108,7 +108,6 @@ class Service(SimpleService):
             ORDER = list(self.configuration['types'])
         except (KeyError, TypeError):
             self.error("No path to log specified. Using all sensor types.")
-        print(ORDER)
         try:
             sensors.init()
         except Exception as e:
@@ -116,8 +115,7 @@ class Service(SimpleService):
             return False
         try:
             self._create_definitions()
-        except Exception as e:
-            print(e)
+        except:
             return False
 
         if len(self.definitions) == 0:
