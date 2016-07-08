@@ -206,6 +206,8 @@ class PythonCharts(object):
         :param config: dict
         :return: dict
         """
+        if config is None:
+            config = {}
         # get default values
         defaults = {}
         msg.debug(module.__name__ + ": reading configuration")
