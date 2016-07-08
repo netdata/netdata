@@ -43,6 +43,15 @@
 #define MAX_NAME 100
 #define MAX_CMDLINE 1024
 
+// the rates we are going to send to netdata
+// will have this detail
+// a value of:
+// 1 will send just integer parts to netdata
+// 100 will send 2 decimal points
+// 1000 will send 3 decimal points
+// etc.
+#define RATES_DETAIL 10000ULL
+
 int processors = 1;
 pid_t pid_max = 32768;
 int debug = 0;
@@ -708,35 +717,35 @@ int read_proc_pid_stat(struct pid_stat *p) {
 
 	last = p->minflt_raw;
 	p->minflt_raw		= strtoull(procfile_lineword(ff, 0, 9+i), NULL, 10);
-	p->minflt = (p->minflt_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+	p->minflt = (p->minflt_raw - last) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
 	last = p->cminflt_raw;
 	p->cminflt_raw		= strtoull(procfile_lineword(ff, 0, 10+i), NULL, 10);
-	p->cminflt = (p->cminflt_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+	p->cminflt = (p->cminflt_raw - last) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
 	last = p->majflt_raw;
 	p->majflt_raw		= strtoull(procfile_lineword(ff, 0, 11+i), NULL, 10);
-	p->majflt = (p->majflt_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+	p->majflt = (p->majflt_raw - last) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
 	last = p->cmajflt_raw;
 	p->cmajflt_raw		= strtoull(procfile_lineword(ff, 0, 12+i), NULL, 10);
-	p->cmajflt = (p->cmajflt_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+	p->cmajflt = (p->cmajflt_raw - last) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
 	last = p->utime_raw;
 	p->utime_raw		= strtoull(procfile_lineword(ff, 0, 13+i), NULL, 10);
-	p->utime = (p->utime_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+	p->utime = (p->utime_raw - last) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
 	last = p->stime_raw;
 	p->stime_raw		= strtoull(procfile_lineword(ff, 0, 14+i), NULL, 10);
-	p->stime = (p->stime_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+	p->stime = (p->stime_raw - last) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
 	last = p->cutime_raw;
 	p->cutime_raw		= strtoull(procfile_lineword(ff, 0, 15+i), NULL, 10);
-	p->cutime = (p->cutime_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+	p->cutime = (p->cutime_raw - last) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
 	last = p->cstime_raw;
 	p->cstime_raw		= strtoull(procfile_lineword(ff, 0, 16+i), NULL, 10);
-	p->cstime = (p->cstime_raw - last) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
+	p->cstime = (p->cstime_raw - last) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
 	// p->priority		= strtoull(procfile_lineword(ff, 0, 17+i), NULL, 10);
 	// p->nice			= strtoull(procfile_lineword(ff, 0, 18+i), NULL, 10);
@@ -861,31 +870,31 @@ int read_proc_pid_io(struct pid_stat *p) {
 
 	last = p->io_logical_bytes_read_raw;
 	p->io_logical_bytes_read_raw = strtoull(procfile_lineword(ff, 0, 1), NULL, 10);
-	p->io_logical_bytes_read = (p->io_logical_bytes_read_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+	p->io_logical_bytes_read = (p->io_logical_bytes_read_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
 	last = p->io_logical_bytes_written_raw;
 	p->io_logical_bytes_written_raw = strtoull(procfile_lineword(ff, 1, 1), NULL, 10);
-	p->io_logical_bytes_written = (p->io_logical_bytes_written_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+	p->io_logical_bytes_written = (p->io_logical_bytes_written_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
 	last = p->io_read_calls_raw;
 	p->io_read_calls_raw = strtoull(procfile_lineword(ff, 2, 1), NULL, 10);
-	p->io_read_calls = (p->io_read_calls_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+	p->io_read_calls = (p->io_read_calls_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
 	last = p->io_write_calls_raw;
 	p->io_write_calls_raw = strtoull(procfile_lineword(ff, 3, 1), NULL, 10);
-	p->io_write_calls = (p->io_write_calls_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+	p->io_write_calls = (p->io_write_calls_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
 	last = p->io_storage_bytes_read_raw;
 	p->io_storage_bytes_read_raw = strtoull(procfile_lineword(ff, 4, 1), NULL, 10);
-	p->io_storage_bytes_read = (p->io_storage_bytes_read_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+	p->io_storage_bytes_read = (p->io_storage_bytes_read_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
 	last = p->io_storage_bytes_written_raw;
 	p->io_storage_bytes_written_raw = strtoull(procfile_lineword(ff, 5, 1), NULL, 10);
-	p->io_storage_bytes_written = (p->io_storage_bytes_written_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+	p->io_storage_bytes_written = (p->io_storage_bytes_written_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
 	last = p->io_cancelled_write_bytes_raw;
 	p->io_cancelled_write_bytes_raw = strtoull(procfile_lineword(ff, 6, 1), NULL, 10);
-	p->io_cancelled_write_bytes = (p->io_cancelled_write_bytes_raw - last) * (1000000 * 100) / (p->io_collected_usec - p->last_io_collected_usec);
+	p->io_cancelled_write_bytes = (p->io_cancelled_write_bytes_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
 	if(unlikely(global_iterations_counter == 1)) {
 		p->io_logical_bytes_read 		= 0;
@@ -907,6 +916,55 @@ cleanup:
 	p->io_storage_bytes_read 		= 0;
 	p->io_storage_bytes_written 	= 0;
 	p->io_cancelled_write_bytes		= 0;
+	return 1;
+}
+
+unsigned long long global_utime = 0;
+unsigned long long global_stime = 0;
+
+int read_proc_stat() {
+	static char filename[FILENAME_MAX + 1] = "";
+	static procfile *ff = NULL;
+	static unsigned long long utime_raw = 0, stime_raw = 0, ntime_raw = 0, collected_usec = 0, last_collected_usec = 0;
+
+	if(unlikely(!ff)) {
+		snprintfz(filename, FILENAME_MAX, "%s/proc/stat", host_prefix);
+		ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
+		if(unlikely(!ff)) goto cleanup;
+	}
+
+	ff = procfile_readall(ff);
+	if(unlikely(!ff)) goto cleanup;
+
+	last_collected_usec = collected_usec;
+	collected_usec = timems();
+
+	file_counter++;
+
+	unsigned long long last;
+
+	last = utime_raw;
+	utime_raw = strtoull(procfile_lineword(ff, 0, 1), NULL, 10);
+	global_utime = (utime_raw - last) * (1000000ULL * RATES_DETAIL) / (collected_usec - last_collected_usec);
+
+	last = ntime_raw;
+	ntime_raw = strtoull(procfile_lineword(ff, 0, 2), NULL, 10);
+	global_utime += (ntime_raw - last) * (1000000ULL * RATES_DETAIL) / (collected_usec - last_collected_usec);
+
+	last = stime_raw;
+	stime_raw = strtoull(procfile_lineword(ff, 0, 3), NULL, 10);
+	global_stime = (stime_raw - last) * (1000000ULL * RATES_DETAIL) / (collected_usec - last_collected_usec);
+
+	if(unlikely(global_iterations_counter == 1)) {
+		global_utime = 0;
+		global_stime = 0;
+	}
+
+	return 0;
+
+cleanup:
+	global_utime = 0;
+	global_stime = 0;
 	return 1;
 }
 
@@ -1230,17 +1288,52 @@ int read_pid_file_descriptors(struct pid_stat *p) {
 
 // ----------------------------------------------------------------------------
 
-#ifdef NETDATA_INTERNAL_CHECKS
-void find_lost_child_debug(struct pid_stat *pe, struct pid_stat *ppe, unsigned long long lost, int type) {
-	int found = 0;
-	struct pid_stat *p = NULL, *pp = pe->parent;
+int print_process_and_parents(struct pid_stat *p, unsigned long long time) {
+	char *prefix = "\\_ ";
+	int indent = 0;
 
+	if(p->parent)
+		indent = print_process_and_parents(p->parent, p->stat_collected_usec);
+	else
+		prefix = " > ";
+
+	char buffer[indent + 1];
+	int i;
+
+	for(i = 0; i < indent ;i++) buffer[i] = ' ';
+	buffer[i] = '\0';
+
+	fprintf(stderr, "  %s %s%s (%d %s %lld"
+		, buffer
+		, prefix
+		, p->comm
+		, p->pid
+		, p->updated?"running":"exited"
+		, (long long)p->stat_collected_usec - (long long)time
+		);
+
+	if(p->utime)   fprintf(stderr, " utime=%llu",   p->utime);
+	if(p->cutime)  fprintf(stderr, " cutime=%llu",  p->cutime);
+	if(p->stime)   fprintf(stderr, " stime=%llu",   p->stime);
+	if(p->cstime)  fprintf(stderr, " cstime=%llu",  p->cstime);
+	if(p->minflt)  fprintf(stderr, " minflt=%llu",  p->minflt);
+	if(p->cminflt) fprintf(stderr, " cminflt=%llu", p->cminflt);
+	if(p->majflt)  fprintf(stderr, " majflt=%llu",  p->majflt);
+	if(p->cmajflt) fprintf(stderr, " cmajflt=%llu", p->cmajflt);
+	fprintf(stderr, ")\n");
+
+	return indent + 1;
+}
+
+void print_process_tree(struct pid_stat *p, char *msg) {
 	log_date(stderr);
-	fprintf(stderr, "Searching for candidate of lost resources of process %d (%s, %s) which is aggregated on %d (%s, %s)\n", pe->pid, pe->comm, pe->updated?"running":"exited", ppe->pid, ppe->comm, ppe->updated?"running":"exited");
-	while(pp) {
-		fprintf(stderr, " >> parent %d (%s, %s)\n", pp->pid, pp->comm, pp->updated?"running":"exited");
-		pp = pp->parent;
-	}
+	fprintf(stderr, "%s: process %s (%d, %s) with parents:\n", msg, p->comm, p->pid, p->updated?"running":"exited");
+	print_process_and_parents(p, p->stat_collected_usec);
+}
+
+void find_lost_child_debug(struct pid_stat *pe, unsigned long long lost, int type) {
+	int found = 0;
+	struct pid_stat *p = NULL;
 
 	for(p = root_of_pids; p ; p = p->next) {
 		if(p == pe) continue;
@@ -1296,104 +1389,156 @@ void find_lost_child_debug(struct pid_stat *pe, struct pid_stat *ppe, unsigned l
 		}
 	}
 }
-#endif /* NETDATA_INTERNAL_CHECKS */
 
-void remove_exited_child_from_parent(unsigned long long *field, unsigned long long *pfield, unsigned long long *ifield, struct pid_stat *pe, struct pid_stat *ppe, int type) {
-	if(pfield) {
-		if(*field > *pfield) {
-			*field -= *pfield;
-			*pfield = 0;
-		}
-		else {
-			*pfield -= *field;
-			*field = 0;
-		}
+unsigned long long remove_exited_child_from_parent(unsigned long long *field, unsigned long long *pfield) {
+	unsigned long long absorbed = 0;
+
+	if(*field > *pfield) {
+		absorbed += *pfield;
+		*field -= *pfield;
+		*pfield = 0;
+	}
+	else {
+		absorbed += *field;
+		*pfield -= *field;
+		*field = 0;
 	}
 
-	if(*field) {
-		if(ifield && ifield != pfield) {
-			if(*field > *ifield) {
-				*field -= *ifield;
-				*ifield = 0;
-			}
-			else {
-				*ifield -= *field;
-				*field = 0;
-			}
-		}
-	}
-
-	if(*field) {
-#ifdef NETDATA_INTERNAL_CHECKS
-		find_lost_child_debug(pe, ppe, *field, type);
-#endif
-		while(pe && !pe->updated) {
-			pe->keep = 1;
-			pe = pe->parent;
-		}
-	}
+	return absorbed;
 }
 
 void process_exited_processes() {
-	struct pid_stat *init = all_pids[1];
 	struct pid_stat *p;
 
 	for(p = root_of_pids; p ; p = p->next) {
-		if(p->updated || !p->stat_collected_usec) continue;
+		if(p->updated || !p->stat_collected_usec)
+			continue;
 
 		struct pid_stat *pp = p->parent;
 
-		// find the first parent that is running
-		while(pp && !pp->updated)
-			pp = pp->parent;
-		
-		unsigned long long rate;
+		unsigned long long utime  = (p->utime_raw + p->cutime_raw)   * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+		unsigned long long stime  = (p->stime_raw + p->cstime_raw)   * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+		unsigned long long minflt = (p->minflt_raw + p->cminflt_raw) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+		unsigned long long majflt = (p->majflt_raw + p->cmajflt_raw) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
-		rate = (p->utime_raw + p->cutime_raw) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
-		remove_exited_child_from_parent(&rate,  (pp)?&pp->cutime:NULL,  (init)?&init->cutime:NULL, p, pp, 3);
-		p->cutime_raw = 0;
-		p->utime_raw = rate * (p->stat_collected_usec - p->last_stat_collected_usec) / (1000000 * 100);
+		if(utime + stime + minflt + majflt == 0)
+			continue;
 
-		rate = (p->stime_raw + p->cstime_raw) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
-		remove_exited_child_from_parent(&rate,  (pp)?&pp->cstime:NULL,  (init)?&init->cstime:NULL, p, pp, 4);
-		p->cstime_raw = 0;
-		p->stime_raw = rate * (p->stat_collected_usec - p->last_stat_collected_usec) / (1000000 * 100);
+		if(unlikely(debug)) {
+			log_date(stderr);
+			fprintf(stderr, "Absorb %s (%d %s total resources: utime=%llu stime=%llu minflt=%llu majflt=%llu)\n"
+				, p->comm
+				, p->pid
+				, p->updated?"running":"exited"
+				, utime
+				, stime
+				, minflt
+				, majflt
+				);
+			print_process_tree(p, "Searching parents");
+		}
 
-		rate = (p->minflt_raw + p->cminflt_raw) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
-		remove_exited_child_from_parent(&rate, (pp)?&pp->cminflt:NULL, (init)?&init->cminflt:NULL, p, pp, 1);
-		p->cminflt_raw = 0;
-		p->minflt_raw = rate * (p->stat_collected_usec - p->last_stat_collected_usec) / (1000000 * 100);
+		for(pp = p->parent; pp ; pp = pp->parent) {
+			if(!pp->updated) continue;
 
-		rate = (p->majflt_raw + p->cmajflt_raw) * (1000000 * 100) / (p->stat_collected_usec - p->last_stat_collected_usec);
-		remove_exited_child_from_parent(&rate, (pp)?&pp->cmajflt:NULL, (init)?&init->cmajflt:NULL, p, pp, 2);
-		p->cmajflt_raw = 0;
-		p->majflt_raw = rate * (p->stat_collected_usec - p->last_stat_collected_usec) / (1000000 * 100);
+			unsigned long long absorbed;
+			absorbed = remove_exited_child_from_parent(&utime,  &pp->cutime);
+			if(unlikely(debug && absorbed))
+				fprintf(stderr, " > process %s (%d %s) absorbed %llu utime (remaining: %llu)\n", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, utime);
+
+			absorbed = remove_exited_child_from_parent(&stime,  &pp->cstime);
+			if(unlikely(debug && absorbed))
+				fprintf(stderr, " > process %s (%d %s) absorbed %llu stime (remaining: %llu)\n", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, stime);
+
+			absorbed = remove_exited_child_from_parent(&minflt, &pp->cminflt);
+			if(unlikely(debug && absorbed))
+				fprintf(stderr, " > process %s (%d %s) absorbed %llu minflt (remaining: %llu)\n", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, minflt);
+
+			absorbed = remove_exited_child_from_parent(&majflt, &pp->cmajflt);
+			if(unlikely(debug && absorbed))
+				fprintf(stderr, " > process %s (%d %s) absorbed %llu majflt (remaining: %llu)\n", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, majflt);
+		}
+
+		if(unlikely(utime + stime + minflt + majflt > 0)) {
+			if(unlikely(debug)) {
+				if(utime)  find_lost_child_debug(p, utime,  3);
+				if(stime)  find_lost_child_debug(p, stime,  4);
+				if(minflt) find_lost_child_debug(p, minflt, 1);
+				if(majflt) find_lost_child_debug(p, majflt, 2);
+			}
+
+			p->keep = 1;
+
+			if(unlikely(debug))
+				fprintf(stderr, " > remaining resources - KEEP - for another loop: %s (%d %s total resources: utime=%llu stime=%llu minflt=%llu majflt=%llu)\n"
+					, p->comm
+					, p->pid
+					, p->updated?"running":"exited"
+					, utime
+					, stime
+					, minflt
+					, majflt
+					);
+
+			for(pp = p->parent; pp ; pp = pp->parent) {
+				if(pp->updated) break;
+				pp->keep = 1;
+
+				if(unlikely(debug))
+					fprintf(stderr, " > - KEEP - parent for another loop: %s (%d %s)\n"
+						, pp->comm
+						, pp->pid
+						, pp->updated?"running":"exited"
+						);
+			}
+
+			p->utime_raw   = utime  * (p->stat_collected_usec - p->last_stat_collected_usec) / (1000000ULL * RATES_DETAIL);
+			p->stime_raw   = stime  * (p->stat_collected_usec - p->last_stat_collected_usec) / (1000000ULL * RATES_DETAIL);
+			p->minflt_raw  = minflt * (p->stat_collected_usec - p->last_stat_collected_usec) / (1000000ULL * RATES_DETAIL);
+			p->majflt_raw  = majflt * (p->stat_collected_usec - p->last_stat_collected_usec) / (1000000ULL * RATES_DETAIL);
+			p->cutime_raw = p->cstime_raw = p->cminflt_raw = p->cmajflt_raw = 0;
+
+			if(unlikely(debug))
+				fprintf(stderr, "\n");
+		}
+		else if(unlikely(debug)) {
+			fprintf(stderr, " > totally absorbed - DONE - %s (%d %s)\n"
+				, p->comm
+				, p->pid
+				, p->updated?"running":"exited"
+				);
+		}
 	}
 }
 
 void link_all_processes_to_their_parents(void) {
-	struct pid_stat *p = NULL;
+	struct pid_stat *p, *pp;
 
 	// link all children to their parents
 	// and update children count on parents
 	for(p = root_of_pids; p ; p = p->next) {
-		// for each process found running
+		// for each process found
 
-		if(likely(p->ppid > 0 && all_pids[p->ppid])) {
-			// valid parent processes
+		p->sortlist = 0;
+		p->parent = NULL;
 
-			struct pid_stat *pp;
+		if(unlikely(!p->ppid)) {
+			p->parent = NULL;
+			continue;
+		}
 
-			p->parent = pp = all_pids[p->ppid];
-			p->parent->children_count++;
+		pp = all_pids[p->ppid];
+		if(likely(pp)) {
+			p->parent = pp;
+			pp->children_count++;
 
 			if(unlikely(debug || (p->target && p->target->debug)))
 				fprintf(stderr, "apps.plugin: \tchild %d (%s, %s) on target '%s' has parent %d (%s, %s). Parent: utime=%llu, stime=%llu, minflt=%llu, majflt=%llu, cutime=%llu, cstime=%llu, cminflt=%llu, cmajflt=%llu\n", p->pid, p->comm, p->updated?"running":"exited", (p->target)?p->target->name:"UNSET", pp->pid, pp->comm, pp->updated?"running":"exited", pp->utime, pp->stime, pp->minflt, pp->majflt, pp->cutime, pp->cstime, pp->cminflt, pp->cmajflt);
 		}
-		else if(unlikely(p->ppid != 0))
+		else {
+			p->parent = NULL;
 			error("pid %d %s states parent %d, but the later does not exist.", p->pid, p->comm, p->ppid);
-
-		p->sortlist = 0;
+		}
 	}
 }
 
@@ -1523,10 +1668,8 @@ void collect_data_for_pid(pid_t pid) {
 	// --------------------------------------------------------------------
 	// done!
 
-#ifdef NETDATA_INTERNAL_CHECKS
-	if(unlikely(all_pids_count && p->ppid && all_pids[p->ppid] && !all_pids[p->ppid]->read))
+	if(unlikely(debug && include_exited_childs && all_pids_count && p->ppid && all_pids[p->ppid] && !all_pids[p->ppid]->read))
 		fprintf(stderr, "Read process %d (%s) sortlisted %d, but its parent %d (%s) sortlisted %d, is not read\n", p->pid, p->comm, p->sortlist, all_pids[p->ppid]->pid, all_pids[p->ppid]->comm, all_pids[p->ppid]->sortlist);
-#endif
 
 	// mark it as updated
 	p->updated = 1;
@@ -1553,17 +1696,19 @@ int collect_data_for_all_processes_from_proc(void) {
 			p->children_count   = 0;
 			p->parent           = NULL;
 
-#ifdef NETDATA_INTERNAL_CHECKS
-			if(unlikely(slc >= all_pids_count))
-				error("Internal error: I was thinking I had %ld processes in my arrays, but it seems there are more.", all_pids_count);
-#endif
 			all_pids_sortlist[slc++] = p->pid;
 		}
 
-		qsort((void *)all_pids_sortlist, all_pids_count, sizeof(pid_t), compar_pid);
+		if(unlikely(slc != all_pids_count)) {
+			error("Internal error: I was thinking I had %ld processes in my arrays, but it seems there are more.", all_pids_count);
+			all_pids_count = slc;
+		}
 
-		for(slc = 0; slc < all_pids_count; slc++)
-			collect_data_for_pid(all_pids_sortlist[slc]);
+		if(include_exited_childs) {
+			qsort((void *)all_pids_sortlist, all_pids_count, sizeof(pid_t), compar_pid);
+			for(slc = 0; slc < all_pids_count; slc++)
+				collect_data_for_pid(all_pids_sortlist[slc]);
+		}
 	}
 
 	char dirname[FILENAME_MAX + 1];
@@ -1592,6 +1737,7 @@ int collect_data_for_all_processes_from_proc(void) {
 	// we do this by collecting the ownership of process
 	// if we manage to get the ownership, the process still runs
 
+	read_proc_stat();
 	link_all_processes_to_their_parents();
 	process_exited_processes();
 
@@ -1619,13 +1765,11 @@ void cleanup_exited_pids(void) {
 	struct pid_stat *p = NULL;
 
 	for(p = root_of_pids; p ;) {
-		if(!p->updated && (!p->keep || p->keeploops > 1)) {
+		if(!p->updated && (!p->keep || p->keeploops > 0)) {
 //			fprintf(stderr, "\tEXITED %d %s [parent %d %s, target %s] utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->pid, p->comm, p->parent->pid, p->parent->comm, p->target->name,  p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
 
-#ifdef NETDATA_INTERNAL_CHECKS
-			if(p->keep)
-				fprintf(stderr, " > cannot keep exited process %d (%s) anymore - removing it.\n", p->pid, p->comm);
-#endif
+			if(unlikely(debug && (p->keep || p->keeploops)))
+				fprintf(stderr, " > CLEANUP cannot keep exited process %d (%s) anymore - removing it.\n", p->pid, p->comm);
 
 			for(c = 0 ; c < p->fds_size ; c++) if(p->fds[c] > 0) {
 				file_descriptor_not_used(p->fds[c]);
@@ -1677,6 +1821,9 @@ void apply_apps_groups_targets_inheritance(void) {
 		found = 0;
 
 		for(p = root_of_pids; p ; p = p->next) {
+			if(unlikely(!p->sortlist && !p->children_count))
+				p->sortlist = sortlist++;
+
 			// if this process does not have any children
 			// and is not already merged
 			// and has a parent
@@ -1705,11 +1852,6 @@ void apply_apps_groups_targets_inheritance(void) {
 
 				found++;
 			}
-
-			// since this process does not have any childs
-			// assign it to the current sortlist
-			if(unlikely(!p->sortlist && !p->children_count))
-				p->sortlist = sortlist++;
 		}
 
 		if(unlikely(debug))
@@ -1732,6 +1874,9 @@ void apply_apps_groups_targets_inheritance(void) {
 		if(unlikely(!p->sortlist))
 			p->sortlist = sortlist++;
 	}
+
+	if(all_pids[1])
+		all_pids[1]->sortlist = sortlist++;
 
 	// give a target to all merged child processes
 	found = 1;
@@ -1985,6 +2130,9 @@ void calculate_netdata_statistics(void) {
 // ----------------------------------------------------------------------------
 // update chart dimensions
 
+double utime_fix_ratio = 1.0, stime_fix_ratio = 1.0, cutime_fix_ratio = 1.0, cstime_fix_ratio = 1.0;
+double minflt_fix_ratio = 1.0, majflt_fix_ratio = 1.0, cminflt_fix_ratio = 1.0, cmajflt_fix_ratio = 1.0;
+
 unsigned long long send_resource_usage_to_netdata() {
 	static struct timeval last = { 0, 0 };
 	static struct rusage me_last;
@@ -2019,86 +2167,193 @@ unsigned long long send_resource_usage_to_netdata() {
 		bcopy(&me, &me_last, sizeof(struct rusage));
 	}
 
-	fprintf(stdout, "BEGIN netdata.apps_cpu %llu\n", usec);
-	fprintf(stdout, "SET user = %llu\n", cpuuser);
-	fprintf(stdout, "SET system = %llu\n", cpusyst);
-	fprintf(stdout, "END\n");
+	fprintf(stdout,
+		"BEGIN netdata.apps_cpu %llu\n"
+		"SET user = %llu\n"
+		"SET system = %llu\n"
+		"END\n"
+		"BEGIN netdata.apps_files %llu\n"
+		"SET files = %llu\n"
+		"SET pids = %ld\n"
+		"SET fds = %d\n"
+		"SET targets = %ld\n"
+		"END\n"
+		"BEGIN netdata.apps_fix %llu\n"
+		"SET utime = %llu\n"
+		"SET stime = %llu\n"
+		"SET minflt = %llu\n"
+		"SET majflt = %llu\n"
+		"END\n"
+		, usec
+		, cpuuser
+		, cpusyst
+		, usec
+		, file_counter
+		, all_pids_count
+		, all_files_len
+		, apps_groups_targets
+		, usec
+		, (unsigned long long)(utime_fix_ratio   * 100 * RATES_DETAIL)
+		, (unsigned long long)(stime_fix_ratio   * 100 * RATES_DETAIL)
+		, (unsigned long long)(minflt_fix_ratio  * 100 * RATES_DETAIL)
+		, (unsigned long long)(majflt_fix_ratio  * 100 * RATES_DETAIL)
+		);
 
-	fprintf(stdout, "BEGIN netdata.apps_files %llu\n", usec);
-	fprintf(stdout, "SET files = %llu\n", file_counter);
-	fprintf(stdout, "SET pids = %ld\n", all_pids_count);
-	fprintf(stdout, "SET fds = %d\n", all_files_len);
-	fprintf(stdout, "SET targets = %ld\n", apps_groups_targets);
-	fprintf(stdout, "END\n");
+	if(include_exited_childs)
+		fprintf(stdout,
+			"BEGIN netdata.apps_children_fix %llu\n"
+			"SET cutime = %llu\n"
+			"SET cstime = %llu\n"
+			"SET cminflt = %llu\n"
+			"SET cmajflt = %llu\n"
+			"END\n"
+			, usec
+			, (unsigned long long)(cutime_fix_ratio  * 100 * RATES_DETAIL)
+			, (unsigned long long)(cstime_fix_ratio  * 100 * RATES_DETAIL)
+			, (unsigned long long)(cminflt_fix_ratio * 100 * RATES_DETAIL)
+			, (unsigned long long)(cmajflt_fix_ratio * 100 * RATES_DETAIL)
+			);
 
 	return usec;
 }
 
-void send_collected_data_to_netdata(struct target *root, const char *type, unsigned long long usec)
-{
+void normalize_data(struct target *root) {
 	struct target *w;
-	int childs = include_exited_childs;
 
-	{
-		// childs processing introduces spikes
-		// here we try to eliminate them by disabling childs processing either for specific dimensions
-		// or entirely. Of course, either way, we disable it just a single iteration.
+	// childs processing introduces spikes
+	// here we try to eliminate them by disabling childs processing either for specific dimensions
+	// or entirely. Of course, either way, we disable it just a single iteration.
 
-		unsigned long long max = processors * hz * 100;
-		unsigned long long utime = 0, cutime = 0, stime = 0, cstime = 0, minflt = 0, cminflt = 0, majflt = 0, cmajflt = 0;
+	unsigned long long max = processors * hz * RATES_DETAIL;
+	unsigned long long utime = 0, cutime = 0, stime = 0, cstime = 0, minflt = 0, cminflt = 0, majflt = 0, cmajflt = 0;
 
-		for (w = root; w ; w = w->next) {
-			if(w->target || (!w->processes && !w->exposed)) continue;
+	if(global_utime > max) global_utime = max;
+	if(global_stime > max) global_stime = max;
 
-			if((w->utime + w->stime + w->cutime + w->cstime) > max) {
-#ifdef NETDATA_INTERNAL_CHECKS
-				log_date(stderr);
-				fprintf(stderr, "Prevented a spike on target '%s', reported CPU time = %llu (without childs = %llu)\n", w->name, (w->utime + w->stime + w->cutime + w->cstime) / 100, (w->utime + w->stime) / 100);
-#endif
-				w->cutime = w->cstime = w->cminflt = w->majflt = 0;
-			}
+	for(w = root; w ; w = w->next) {
+		if(w->target || (!w->processes && !w->exposed)) continue;
 
-			utime   += w->utime;
-			cutime  += w->cutime;
-			stime   += w->stime;
-			cstime  += w->cstime;
-			minflt  += w->minflt;
-			cminflt += w->cminflt;
-			majflt  += w->majflt;
-			cmajflt += w->cmajflt;
-		}
-
-		if((utime + stime + cutime + cstime) > max) {
-			childs = 0;
-#ifdef NETDATA_INTERNAL_CHECKS
-			log_date(stderr);
-			fprintf(stderr, "Prevented a spike because the total CPU of all dimensions = %llu (without childs = %llu)\n", (utime + stime + cutime + cstime) / 100, (utime + stime) / 100);
-#endif
-		}
-
-		if((utime + stime) > max) {
-			childs = 0;
-			unsigned long long multiplier = max, divider = utime + stime;
-			for (w = root; w ; w = w->next) {
-				w->utime  = w->utime * multiplier / divider;
-				w->stime  = w->stime * multiplier / divider;
-				w->minflt = w->minflt * multiplier / divider;
-				w->majflt = w->majflt * multiplier / divider;
-			}
-
-#ifdef NETDATA_INTERNAL_CHECKS
-			log_date(stderr);
-			fprintf(stderr, "Reduced processes utilization (without childs) by %0.2f%% (CPU was %llu)\n", (float)(((utime + stime - max) * 100.0)/(float)max), (utime + stime) / 100);
-#endif
-		}
-
+		utime   += w->utime;
+		cutime  += w->cutime;
+		stime   += w->stime;
+		cstime  += w->cstime;
+		minflt  += w->minflt;
+		cminflt += w->cminflt;
+		majflt  += w->majflt;
+		cmajflt += w->cmajflt;
 	}
+
+	if(global_utime && utime) {
+		if(global_utime > utime + cutime) {
+			// everything we collected is short
+			cutime_fix_ratio =
+			utime_fix_ratio = (double)global_utime / (double)(utime + cutime);
+		}
+		else if(global_utime > utime) {
+			// cutime seems unrealistic
+			cutime_fix_ratio = (double)(global_utime - utime) / (double)cutime;
+			utime_fix_ratio  = 1.0;
+		}
+		else {
+			// even utime is unrealistic
+			cutime_fix_ratio = 0.0;
+			utime_fix_ratio = (double)global_utime / (double)utime;
+		}
+	}
+	else {
+		cutime_fix_ratio = 0.0;
+		utime_fix_ratio = 0.0;
+	}
+
+	if(utime_fix_ratio > 1.0) utime_fix_ratio = 1.0;
+	if(cutime_fix_ratio > 1.0) cutime_fix_ratio = 1.0;
+
+	if(global_utime && utime) {
+		if(global_stime > stime + cstime) {
+			// everything we collected is short
+			cstime_fix_ratio =
+			stime_fix_ratio = (double)global_stime / (double)(stime + cstime);
+		}
+		else if(global_stime > stime) {
+			// cstime seems unrealistic
+			cstime_fix_ratio = (double)(global_stime - stime) / (double)cstime;
+			stime_fix_ratio  = 1.0;
+		}
+		else {
+			// even stime is unrealistic
+			cstime_fix_ratio = 0.0;
+			stime_fix_ratio = (double)global_stime / (double)stime;
+		}
+	}
+	else {
+		cstime_fix_ratio = 0.0;
+		stime_fix_ratio = 0.0;
+	}
+
+	if(stime_fix_ratio > 1.0) stime_fix_ratio = 1.0;
+	if(cstime_fix_ratio > 1.0) cstime_fix_ratio = 1.0;
+
+	// FIXME
+	// we use cpu time to normalize page faults
+	// the problem is that to find the proper max values
+	// for page faults we have to parse /proc/vmstat
+	// which is quite big to do it again (netdata does it already)
+	//
+	// a better solution could be to somehow have netdata
+	// do this normalization for us
+
+	if(cutime || cstime)
+		cmajflt_fix_ratio =
+		cminflt_fix_ratio = (double)(cutime * cutime_fix_ratio + cstime * cstime_fix_ratio) / (double)(cutime + cstime);
+	else
+		cminflt_fix_ratio =
+		cmajflt_fix_ratio = 1.0;
+
+	if(utime || stime)
+		majflt_fix_ratio =
+		minflt_fix_ratio = (double)(utime * utime_fix_ratio + stime * stime_fix_ratio) / (double)(utime + stime);
+	else
+		minflt_fix_ratio =
+		majflt_fix_ratio = 1.0;
+
+	// the report
+
+	if(unlikely(debug)) {
+		fprintf(stderr,
+			"SYSTEM: u=%llu s=%llu "
+			"COLLECTED: u=%llu s=%llu cu=%llu cs=%llu "
+			"DELTA: u=%lld s=%lld "
+			"FIX: u=%0.2f s=%0.2f cu=%0.2f cs=%0.2f "
+			"FINALLY: u=%llu s=%llu cu=%llu cs=%llu "
+			"\n"
+			, global_utime
+			, global_stime
+			, utime
+			, stime
+			, cutime
+			, cstime
+			, (long long)utime + (long long)cutime - (long long)global_utime
+			, (long long)stime + (long long)cstime - (long long)global_stime
+			, utime_fix_ratio
+			, stime_fix_ratio
+			, cutime_fix_ratio
+			, cstime_fix_ratio
+			, (unsigned long long)(utime * utime_fix_ratio)
+			, (unsigned long long)(stime * stime_fix_ratio)
+			, (unsigned long long)(cutime * cutime_fix_ratio)
+			, (unsigned long long)(cstime * cstime_fix_ratio)
+			);
+	}
+}
+
+void send_collected_data_to_netdata(struct target *root, const char *type, unsigned long long usec) {
+	struct target *w;
 
 	fprintf(stdout, "BEGIN %s.cpu %llu\n", type, usec);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + w->stime + (childs?(w->cutime + w->cstime):0));
+		fprintf(stdout, "SET %s = %llu\n", w->name, (unsigned long long)(w->utime * utime_fix_ratio) + (unsigned long long)(w->stime * stime_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cutime * cutime_fix_ratio) + (unsigned long long)(w->cstime * cstime_fix_ratio)):0ULL));
 	}
 	fprintf(stdout, "END\n");
 
@@ -2106,7 +2361,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->utime + (childs?(w->cutime):0));
+		fprintf(stdout, "SET %s = %llu\n", w->name, (unsigned long long)(w->utime * utime_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cutime * cutime_fix_ratio)):0ULL));
 	}
 	fprintf(stdout, "END\n");
 
@@ -2114,7 +2369,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->stime + (childs?(w->cstime):0));
+		fprintf(stdout, "SET %s = %llu\n", w->name, (unsigned long long)(w->stime * stime_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cstime * cstime_fix_ratio)):0ULL));
 	}
 	fprintf(stdout, "END\n");
 
@@ -2146,7 +2401,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->minflt + (childs?(w->cminflt):0));
+		fprintf(stdout, "SET %s = %llu\n", w->name, (unsigned long long)(w->minflt * minflt_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cminflt * cminflt_fix_ratio)):0ULL));
 	}
 	fprintf(stdout, "END\n");
 
@@ -2154,7 +2409,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->majflt + (childs?(w->cmajflt):0));
+		fprintf(stdout, "SET %s = %llu\n", w->name, (unsigned long long)(w->majflt * majflt_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cmajflt * cmajflt_fix_ratio)):0ULL));
 	}
 	fprintf(stdout, "END\n");
 
@@ -2242,105 +2497,105 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' absolute 1 %u %s\n", w->name, hz, w->hidden ? "hidden,noreset" : "noreset");
+		fprintf(stdout, "DIMENSION %s '' absolute 1 %llu %s\n", w->name, hz * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
 	}
 
 	fprintf(stdout, "CHART %s.mem '' '%s Dedicated Memory (w/o shared)' 'MB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' absolute %ld %ld noreset\n", w->name, sysconf(_SC_PAGESIZE), 1024L*1024L);
+		fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, sysconf(_SC_PAGESIZE), 1024L*1024L);
 	}
 
 	fprintf(stdout, "CHART %s.threads '' '%s Threads' 'threads' processes %s.threads stacked 20005 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' absolute 1 1 noreset\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART %s.processes '' '%s Processes' 'processes' processes %s.processes stacked 20004 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' absolute 1 1 noreset\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART %s.cpu_user '' '%s CPU User Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_user stacked 20020 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' absolute 1 %u noreset\n", w->name, hz);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, hz * RATES_DETAIL / 100LLU);
 	}
 
 	fprintf(stdout, "CHART %s.cpu_system '' '%s CPU System Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20021 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' absolute 1 %u noreset\n", w->name, hz);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, hz * RATES_DETAIL / 100LLU);
 	}
 
 	fprintf(stdout, "CHART %s.major_faults '' '%s Major Page Faults (swap read)' 'page faults/s' swap %s.major_faults stacked 20010 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' absolute 1 100 noreset\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
 	}
 
 	fprintf(stdout, "CHART %s.minor_faults '' '%s Minor Page Faults' 'page faults/s' mem %s.minor_faults stacked 20011 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' absolute 1 100 noreset\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
 	}
 
 	fprintf(stdout, "CHART %s.lreads '' '%s Disk Logical Reads' 'kilobytes/s' disk %s.lreads stacked 20042 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 1 %d noreset\n", w->name, 1024*100);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
 	}
 
 	fprintf(stdout, "CHART %s.lwrites '' '%s I/O Logical Writes' 'kilobytes/s' disk %s.lwrites stacked 20042 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 1 %d noreset\n", w->name, 1024*100);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
 	}
 
 	fprintf(stdout, "CHART %s.preads '' '%s Disk Reads' 'kilobytes/s' disk %s.preads stacked 20002 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 1 %d noreset\n", w->name, 1024*100);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
 	}
 
 	fprintf(stdout, "CHART %s.pwrites '' '%s Disk Writes' 'kilobytes/s' disk %s.pwrites stacked 20002 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' incremental 1 %d noreset\n", w->name, 1024*100);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
 	}
 
 	fprintf(stdout, "CHART %s.files '' '%s Open Files' 'open files' disk %s.files stacked 20050 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' absolute 1 1 noreset\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART %s.sockets '' '%s Open Sockets' 'open sockets' net %s.sockets stacked 20051 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' absolute 1 1 noreset\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
 	fprintf(stdout, "CHART %s.pipes '' '%s Pipes' 'open pipes' processes %s.pipes stacked 20053 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
-		fprintf(stdout, "DIMENSION %s '' absolute 1 1 noreset\n", w->name);
+		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 }
 
@@ -2457,14 +2712,34 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	fprintf(stdout, "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' apps.plugin netdata.apps_cpu stacked 140000 %1$d\n"
-			"DIMENSION user '' incremental 1 1000\n"
-			"DIMENSION system '' incremental 1 1000\n"
-			"CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_files line 140001 %1$d\n"
-			"DIMENSION files '' incremental 1 1\n"
-			"DIMENSION pids '' absolute 1 1\n"
-			"DIMENSION fds '' absolute 1 1\n"
-			"DIMENSION targets '' absolute 1 1\n", update_every);
+	fprintf(stdout,
+		"CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' apps.plugin netdata.apps_cpu stacked 140000 %1$d\n"
+		"DIMENSION user '' incremental 1 1000\n"
+		"DIMENSION system '' incremental 1 1000\n"
+		"CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_files line 140001 %1$d\n"
+		"DIMENSION files '' incremental 1 1\n"
+		"DIMENSION pids '' absolute 1 1\n"
+		"DIMENSION fds '' absolute 1 1\n"
+		"DIMENSION targets '' absolute 1 1\n"
+		"CHART netdata.apps_fix '' 'Apps Plugin Normalization Ratios' 'percentage' apps.plugin netdata.apps_fix line 140002 %1$d\n"
+		"DIMENSION utime '' absolute 1 %2$llu\n"
+		"DIMENSION stime '' absolute 1 %2$llu\n"
+		"DIMENSION minflt '' absolute 1 %2$llu\n"
+		"DIMENSION majflt '' absolute 1 %2$llu\n"
+		, update_every
+		, RATES_DETAIL
+		);
+
+	if(include_exited_childs)
+		fprintf(stdout,
+			"CHART netdata.apps_children_fix '' 'Apps Plugin Exited Children Normalization Ratios' 'percentage' apps.plugin netdata.apps_children_fix line 140003 %1$d\n"
+			"DIMENSION cutime '' absolute 1 %2$llu\n"
+			"DIMENSION cstime '' absolute 1 %2$llu\n"
+			"DIMENSION cminflt '' absolute 1 %2$llu\n"
+			"DIMENSION cmajflt '' absolute 1 %2$llu\n"
+			, update_every
+			, RATES_DETAIL
+			);
 
 #ifndef PROFILING_MODE
 	unsigned long long sunext = (time(NULL) - (time(NULL) % update_every) + update_every) * 1000000ULL;
@@ -2490,6 +2765,7 @@ int main(int argc, char **argv)
 		}
 
 		calculate_netdata_statistics();
+		normalize_data(apps_groups_root_target);
 
 		unsigned long long dt = send_resource_usage_to_netdata();
 
