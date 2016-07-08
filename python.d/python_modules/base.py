@@ -432,11 +432,12 @@ class UrlService(SimpleService):
             return False
 
 
-class NetSocketService(SimpleService):
+class SocketService(SimpleService):
     def __init__(self, configuration=None, name=None):
         self.host = "localhost"
         self.port = None
         self.sock = None
+        self.unix_socket = ""
         self.request = ""
         SimpleService.__init__(self, configuration=configuration, name=name)
 
@@ -447,10 +448,16 @@ class NetSocketService(SimpleService):
         """
         if self.sock is None:
             try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(self.update_every)
-                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                sock.connect((self.host, self.port))
+                if len(self.unix_socket) == 0:
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    sock.settimeout(self.update_every)
+                    sock.connect((self.host, self.port))
+                else:
+                    sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+                    sock.settimeout(self.update_every)
+                    sock.connect(self.unix_socket)
+
             except Exception as e:
                 self.error(e)
                 self.sock = None
@@ -492,13 +499,17 @@ class NetSocketService(SimpleService):
         else:
             self.name = str(self.name)
         try:
-            self.host = str(self.configuration['host'])
+            self.unix_socket = int(self.configuration['unix_socket'])
         except (KeyError, TypeError):
-            self.error("No host specified. Using: '" + self.host + "'")
-        try:
-            self.port = int(self.configuration['port'])
-        except (KeyError, TypeError):
-            self.error("No port specified. Using: '" + str(self.port) + "'")
+            self.error("No unix socket specified. Trying TCP/IP socket.")
+            try:
+                self.host = str(self.configuration['host'])
+            except (KeyError, TypeError):
+                self.error("No host specified. Using: '" + self.host + "'")
+            try:
+                self.port = int(self.configuration['port'])
+            except (KeyError, TypeError):
+                self.error("No port specified. Using: '" + str(self.port) + "'")
         try:
             self.request = str(self.configuration['request'])
         except (KeyError, TypeError):
