@@ -565,6 +565,7 @@ class LogService(SimpleService):
 
 class ExecutableService(SimpleService):
     command_whitelist = ['exim', 'postqueue']
+    bad_substrings = ('&', '|', ';', '>', '<')
 
     def __init__(self, configuration=None, name=None):
         self.command = ""
@@ -582,7 +583,7 @@ class ExecutableService(SimpleService):
             return None
         data = []
         for line in p.stdout.readlines():
-            data.append(line)
+            data.append(str(line.decode()))
 
         return data
 
@@ -600,19 +601,23 @@ class ExecutableService(SimpleService):
         # except (KeyError, TypeError):
         #     self.error("No command specified. Using: '" + self.command + "'")
         self.command = self.command.split(' ')
-        for i in self.command:
-            if i.startswith('-') or i in self.command_whitelist:
-                pass
-            else:
-                self.error("Wrong command. Probably not on whitelist.")
+        if self.command[0] not in self.command_whitelist:
+            self.error("Command is not whitelisted.")
+            return False
+
+        for arg in self.command[1:]:
+            if any(st in arg for st in self.bad_substrings):
+                self.error("Bad command argument:" + " ".join(self.command[1:]))
                 return False
         # test command and search for it in /usr/sbin or /sbin when failed
         base = self.command[0]
         if self._get_raw_data() is None:
             for prefix in ['/sbin/', '/usr/sbin/']:
                 self.command[0] = prefix + base
-                if self._get_raw_data() is not None:
+                if os.path.isfile(self.command[0]):
                     break
+                #if self._get_raw_data() is not None:
+                #    break
 
         if self._get_data() is None or len(self._get_data()) == 0:
             return False
