@@ -2234,66 +2234,56 @@ void normalize_data(struct target *root) {
 		if(w->target || (!w->processes && !w->exposed)) continue;
 
 		utime   += w->utime;
-		cutime  += w->cutime;
 		stime   += w->stime;
+		cutime  += w->cutime;
 		cstime  += w->cstime;
+
 		minflt  += w->minflt;
-		cminflt += w->cminflt;
 		majflt  += w->majflt;
+		cminflt += w->cminflt;
 		cmajflt += w->cmajflt;
 	}
 
-	if(global_utime && utime) {
-		if(global_utime > utime + cutime) {
-			// everything we collected is short
+	if((global_utime || global_stime) && (utime || stime)) {
+		if(global_utime + global_stime > utime + cutime + stime + cstime) {
+			// everything we collected fits
+			utime_fix_ratio  =
+			stime_fix_ratio  =
 			cutime_fix_ratio =
-			utime_fix_ratio = (double)global_utime / (double)(utime + cutime);
+			cstime_fix_ratio = 1.0; //(double)(global_utime + global_stime) / (double)(utime + cutime + stime + cstime);
 		}
-		else if(global_utime > utime) {
-			// cutime seems unrealistic
-			cutime_fix_ratio = (double)(global_utime - utime) / (double)cutime;
-			utime_fix_ratio  = 1.0;
-		}
-		else {
-			// even utime is unrealistic
-			cutime_fix_ratio = 0.0;
-			utime_fix_ratio = (double)global_utime / (double)utime;
-		}
-	}
-	else {
-		cutime_fix_ratio = 0.0;
-		utime_fix_ratio = 0.0;
-	}
-
-	if(utime_fix_ratio > 1.0) utime_fix_ratio = 1.0;
-	if(cutime_fix_ratio > 1.0) cutime_fix_ratio = 1.0;
-	// if(utime_fix_ratio < 0.0) utime_fix_ratio = 0.0;
-	// if(cutime_fix_ratio < 0.0) cutime_fix_ratio = 0.0;
-
-	if(global_stime && stime) {
-		if(global_stime > stime + cstime) {
-			// everything we collected is short
-			cstime_fix_ratio =
-			stime_fix_ratio = (double)global_stime / (double)(stime + cstime);
-		}
-		else if(global_stime > stime) {
-			// cstime seems unrealistic
-			cstime_fix_ratio = (double)(global_stime - stime) / (double)cstime;
+		else if(global_utime + global_stime > utime + stime) {
+			// childrens resources are too high
+			// lower only the children resources
+			utime_fix_ratio  =
 			stime_fix_ratio  = 1.0;
+			cutime_fix_ratio =
+			cstime_fix_ratio = (double)((global_utime + global_stime) - (utime + stime)) / (double)(cutime + cstime);
 		}
 		else {
-			// even stime is unrealistic
+			// even running processes are unrealistic
+			// zero the children resources
+			// lower the running processes resources
+			utime_fix_ratio  =
+			stime_fix_ratio  = (double)(global_utime + global_stime) / (double)(utime + stime);
+			cutime_fix_ratio =
 			cstime_fix_ratio = 0.0;
-			stime_fix_ratio = (double)global_stime / (double)stime;
 		}
 	}
 	else {
+		utime_fix_ratio  =
+		stime_fix_ratio  =
+		cutime_fix_ratio =
 		cstime_fix_ratio = 0.0;
-		stime_fix_ratio = 0.0;
 	}
 
+	if(utime_fix_ratio  > 1.0) utime_fix_ratio  = 1.0;
+	if(cutime_fix_ratio > 1.0) cutime_fix_ratio = 1.0;
 	if(stime_fix_ratio  > 1.0) stime_fix_ratio  = 1.0;
 	if(cstime_fix_ratio > 1.0) cstime_fix_ratio = 1.0;
+
+	// if(utime_fix_ratio  < 0.0) utime_fix_ratio  = 0.0;
+	// if(cutime_fix_ratio < 0.0) cutime_fix_ratio = 0.0;
 	// if(stime_fix_ratio  < 0.0) stime_fix_ratio  = 0.0;
 	// if(cstime_fix_ratio < 0.0) cstime_fix_ratio = 0.0;
 
