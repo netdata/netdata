@@ -2267,8 +2267,10 @@ void normalize_data(struct target *root) {
 
 	if(utime_fix_ratio > 1.0) utime_fix_ratio = 1.0;
 	if(cutime_fix_ratio > 1.0) cutime_fix_ratio = 1.0;
+	// if(utime_fix_ratio < 0.0) utime_fix_ratio = 0.0;
+	// if(cutime_fix_ratio < 0.0) cutime_fix_ratio = 0.0;
 
-	if(global_utime && utime) {
+	if(global_stime && stime) {
 		if(global_stime > stime + cstime) {
 			// everything we collected is short
 			cstime_fix_ratio =
@@ -2290,8 +2292,10 @@ void normalize_data(struct target *root) {
 		stime_fix_ratio = 0.0;
 	}
 
-	if(stime_fix_ratio > 1.0) stime_fix_ratio = 1.0;
+	if(stime_fix_ratio  > 1.0) stime_fix_ratio  = 1.0;
 	if(cstime_fix_ratio > 1.0) cstime_fix_ratio = 1.0;
+	// if(stime_fix_ratio  < 0.0) stime_fix_ratio  = 0.0;
+	// if(cstime_fix_ratio < 0.0) cstime_fix_ratio = 0.0;
 
 	// FIXME
 	// we use cpu time to normalize page faults
