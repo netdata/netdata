@@ -475,14 +475,17 @@ class SocketService(SimpleService):
                 self.sock = None
                 return None
 
-        data = sock.recv(1024)
+        data = sock.recv(2)
         try:
             while True:
                 buf = sock.recv(1024)
-                if not buf:
+#                if not buf:
+#                    break
+#                else:
+#                    data += buf
+                data += buf
+                if len(buf) < 1024:
                     break
-                else:
-                    data += buf
         except:
             sock.close()
             return None
