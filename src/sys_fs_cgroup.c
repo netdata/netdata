@@ -1041,7 +1041,7 @@ void update_cgroup_charts(int update_every) {
 
 				for(i = 0; i < cg->cpuacct_usage.cpus ;i++) {
 					snprintfz(id, CHART_TITLE_MAX, "cpu%u", i);
-					rrddim_add(st, id, NULL, 100, 1000000, RRDDIM_INCREMENTAL);
+					rrddim_add(st, id, NULL, 100, 1000000000, RRDDIM_INCREMENTAL);
 				}
 			}
 			else rrdset_next(st);
