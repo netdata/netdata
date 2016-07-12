@@ -817,7 +817,10 @@ void find_dir_in_subdirs(const char *base, const char *this, void (*callback)(co
 	const char *relative_path = &this[baselen];
 
 	DIR *dir = opendir(this);
-	if(!dir) return;
+	if(!dir) {
+		error("Cannot read cgroups directory '%s'", base);
+		return;
+	}
 
 	callback(relative_path);
 
@@ -856,6 +859,7 @@ void find_dir_in_subdirs(const char *base, const char *this, void (*callback)(co
 					find_dir_in_subdirs(base, s, callback);
 					free(s);
 				}
+				else error("Cannot allocate memory.");
 			}
 		}
 	}
