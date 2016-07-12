@@ -24,12 +24,14 @@
 static int cgroup_enable_cpuacct_stat = CONFIG_ONDEMAND_ONDEMAND;
 static int cgroup_enable_cpuacct_usage = CONFIG_ONDEMAND_ONDEMAND;
 static int cgroup_enable_memory = CONFIG_ONDEMAND_ONDEMAND;
+static int cgroup_enable_devices = CONFIG_ONDEMAND_ONDEMAND;
 static int cgroup_enable_blkio = CONFIG_ONDEMAND_ONDEMAND;
 static int cgroup_enable_new_cgroups_detected_at_runtime = 1;
 static int cgroup_check_for_new_every = 10;
 static char *cgroup_cpuacct_base = NULL;
 static char *cgroup_blkio_base = NULL;
 static char *cgroup_memory_base = NULL;
+static char *cgroup_devices_base = NULL;
 
 static int cgroup_root_count = 0;
 static int cgroup_root_max = 500;
@@ -75,6 +77,16 @@ void read_cgroup_plugin_configuration() {
 	else s = mi->mount_point;
 	snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, s);
 	cgroup_memory_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/memory", filename);
+
+	mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "devices");
+	if(!mi) mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "devices");
+	if(!mi) {
+		error("Cannot find cgroup devices mountinfo. Assuming default: /sys/fs/cgroup/devices");
+		s = "/sys/fs/cgroup/devices";
+	}
+	else s = mi->mount_point;
+	snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, s);
+	cgroup_devices_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/devices", filename);
 
 	cgroup_root_max = config_get_number("plugin:cgroups", "max cgroups to allow", cgroup_root_max);
 	cgroup_max_depth = config_get_number("plugin:cgroups", "max cgroups depth to monitor", cgroup_max_depth);
@@ -797,6 +809,8 @@ void found_subdir_in_dir(const char *dir) {
 }
 
 void find_dir_in_subdirs(const char *base, const char *this, void (*callback)(const char *)) {
+	debug(D_CGROUP, "searching for directories in '%s'", base);
+
 	int enabled = -1;
 	if(!this) this = base;
 	size_t dirlen = strlen(this), baselen = strlen(base);
@@ -897,6 +911,9 @@ void find_all_cgroups() {
 
 	if(cgroup_enable_memory)
 		find_dir_in_subdirs(cgroup_memory_base, NULL, found_subdir_in_dir);
+
+	if(cgroup_enable_devices)
+		find_dir_in_subdirs(cgroup_devices_base, NULL, found_subdir_in_dir);
 
 	// remove any non-existing cgroups
 	cleanup_all_cgroups();
