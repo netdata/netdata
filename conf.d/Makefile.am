@@ -29,6 +29,7 @@ dist_pythonconfig_DATA = \
 	python.d/nginx.conf \
 	python.d/phpfpm.conf \
 	python.d/postfix.conf \
+	python.d/redis.conf \
 	python.d/sensors.conf \
 	python.d/squid.conf \
 	python.d/tomcat.conf \
