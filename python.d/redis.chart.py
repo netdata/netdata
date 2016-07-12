@@ -25,19 +25,18 @@ CHARTS = {
     'operations': {
         'options': [None, 'Operations', 'operations/s', 'Statistics', 'redis.statistics', 'line'],
         'lines': [
-            ['instantaneous_ops_per_sec', None, 'absolute']
+            ['instantaneous_ops_per_sec', 'operations', 'absolute']
         ]},
     'hit_rate': {
         'options': [None, 'Hit rate', 'percent', 'Statistics', 'redis.statistics', 'line'],
         'lines': [
-            ['hit_rate', None, 'absolute']
+            ['hit_rate', 'rate', 'absolute']
         ]},
     'memory': {
-        'options': [None, 'Memory utilization', 'bytes', 'Memory', 'redis.memory', 'line'],
+        'options': [None, 'Memory utilization', 'kilobytes', 'Memory', 'redis.memory', 'line'],
         'lines': [
-            ['used_memory', None, 'absolute'],
-            ['memory_', None, 'absolute'],
-            ['memory_', None, 'absolute']
+            ['used_memory', 'total', 'absolute', 1, 1024],
+            ['used_memory_lua', 'lua', 'absolute', 1, 1024]
         ]},
     'keys': {
         'options': [None, 'Database keys', 'keys', 'Keys', 'redis.keys', 'line'],
@@ -47,13 +46,13 @@ CHARTS = {
     'clients': {
         'options': [None, 'Clients', 'clients', 'Clients', 'redis.clients', 'line'],
         'lines': [
-            ['connected_clients', None, 'absolute'],
-            ['blocked_clients', None, 'absolute']
+            ['connected_clients', 'connected', 'absolute'],
+            ['blocked_clients', 'blocked', 'absolute']
         ]},
     'slaves': {
         'options': [None, 'Slaves', 'slaves', 'Replication', 'redis.replication', 'line'],
         'lines': [
-            ['connected_slaves', None, 'absolute']
+            ['connected_slaves', 'connected', 'absolute']
         ]}
 }
 
@@ -90,7 +89,7 @@ class Service(SocketService):
                 record = tmp.split(':')
                 data[record[0]] = int(record[1])
         try:
-            data['hit_rate'] = int((data['keyspace_hits'] / (data['keyspace_hits'] + data['keyspace_misses'])) * 100)
+            data['hit_rate'] = int((data['keyspace_hits'] / float(data['keyspace_hits'] + data['keyspace_misses'])) * 100)
         except:
             data['hit_rate'] = 0
 
@@ -109,6 +108,6 @@ class Service(SocketService):
 
         for name in data:
             if name.startswith('db'):
-                self.definitions['keys']['lines'].append(data[name, None, 'absolute'])
+                self.definitions['keys']['lines'].append([name.decode(), None, 'absolute'])
 
         return True
