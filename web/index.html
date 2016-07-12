@@ -1362,6 +1362,11 @@ var menuData = {
 		info: undefined
 	},
 
+	'redis': {
+		title: 'Redis',
+		info: undefined
+	},
+
 	'phpfpm': {
 		title: 'PHP-FPM',
 		info: undefined,
@@ -1816,6 +1821,7 @@ function enrichChartData(chart) {
 			break;
 
 		case 'mysql':
+		case 'redis':
 		case 'phpfpm':
 		case 'nginx':
 /*		case 'apache':*/

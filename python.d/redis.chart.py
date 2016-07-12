@@ -101,6 +101,9 @@ class Service(SocketService):
         :return: boolean
         """
         self._parse_config()
+        if self.name == "":
+            self.name = "local"
+        self.chart_name += "_" + self.name
         data = self._get_data()
         if data is None:
             self.error("No data received")
