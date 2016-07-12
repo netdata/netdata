@@ -331,7 +331,7 @@ class PythonCharts(object):
                         if job.override_name is not None:
                             job.name = job.override_name
                             msg.debug(job.chart_name + " changing chart name to: " + job.__module__ + job.name)
-                            job.chart_name = job.__module__ + job.name
+                            job.chart_name = job.__module__ + '_' + job.name
                             overridden.append(job.name)
                     except Exception:
                         pass
