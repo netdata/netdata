@@ -207,8 +207,6 @@ class BaseService(threading.Thread):
         p = self._format(type_id, name, title, units, family, category, charttype, priority, update_every)
         self._line("CHART", *p)
 
-
-
     def dimension(self, id, name=None, algorithm="absolute", multiplier=1, divisor=1, hidden=False):
         """
         Defines a new dimension for the chart
@@ -235,7 +233,7 @@ class BaseService(threading.Thread):
         if algorithm not in ("absolute", "incremental", "percentage-of-absolute-row", "percentage-of-incremental-row"):
             algorithm = "absolute"
 
-        self._dimensions.append(id)
+        self._dimensions.append(str(id))
         if hidden:
             p = self._format(id, name, algorithm, multiplier, divisor, "hidden")
             #self._line("DIMENSION", id, name, algorithm, str(multiplier), str(divisor), "hidden")
@@ -272,7 +270,7 @@ class BaseService(threading.Thread):
         :return: boolean
         """
         if id not in self._dimensions:
-            self.error("wrong dimension id:", id)
+            self.error("wrong dimension id:", id, "Available dimensions are:", *self._dimensions)
             return False
         try:
             value = str(int(value))
