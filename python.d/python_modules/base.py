@@ -486,11 +486,11 @@ class SocketService(SimpleService):
                 if self.unix_socket is None:
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                    #sock.settimeout(self.update_every)
+                    sock.settimeout(self.update_every)
                     sock.connect((self.host, self.port))
                 else:
                     sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-                    #sock.settimeout(self.update_every)
+                    sock.settimeout(self.update_every)
                     sock.connect(self.unix_socket)
 
             except Exception as e:
@@ -510,23 +510,24 @@ class SocketService(SimpleService):
                 self.sock = None
                 return None
 
-        data = sock.recv(2)
+        #data = sock.recv(2)
+        data = ""
         try:
             while True:
-                try:
-                    buf = sock.recv(1024, 0x40)  # get 1024 bytes in NON-BLOCKING mode
-                except socket.error:
-                    break
+                #try:
+                buf = sock.recv(1024, 0x40)  # get 1024 bytes in NON-BLOCKING mode
+                #except socket.error:
+                #    break
 
                 if len(buf) == 0:
                     break
                 else:
-                    data += buf
+                    data += buf.decode()
         except:
             sock.close()
             return None
 
-        return data.decode()
+        return data
 
     def _parse_config(self):
         """

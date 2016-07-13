@@ -319,7 +319,6 @@ class PythonCharts(object):
         i = 0
         overridden = []
         while i < len(self.jobs):
-            msg.error(*overridden)
             job = self.jobs[i]
             try:
                 if not job.check():
