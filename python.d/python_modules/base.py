@@ -621,7 +621,7 @@ class LogService(SimpleService):
 
 
 class ExecutableService(SimpleService):
-    command_whitelist = ['exim', 'postqueue']
+    #command_whitelist = ['exim', 'postqueue']
     bad_substrings = ('&', '|', ';', '>', '<')
 
     def __init__(self, configuration=None, name=None):
@@ -653,21 +653,21 @@ class ExecutableService(SimpleService):
             self.name = ""
         else:
             self.name = str(self.name)
-        # try:
-        #     self.command = str(self.configuration['path'])
-        # except (KeyError, TypeError):
-        #     self.error("No command specified. Using: '" + self.command + "'")
+        try:
+            self.command = str(self.configuration['command'])
+        except (KeyError, TypeError):
+            self.error("No command specified. Using: '" + self.command + "'")
         self.command = self.command.split(' ')
-        if self.command[0] not in self.command_whitelist:
-            self.error("Command is not whitelisted.")
-            return False
+        #if self.command[0] not in self.command_whitelist:
+        #    self.error("Command is not whitelisted.")
+        #    return False
 
         for arg in self.command[1:]:
             if any(st in arg for st in self.bad_substrings):
                 self.error("Bad command argument:" + " ".join(self.command[1:]))
                 return False
         # test command and search for it in /usr/sbin or /sbin when failed
-        base = self.command[0]
+        base = self.command[0].split('/')[-1]
         if self._get_raw_data() is None:
             for prefix in ['/sbin/', '/usr/sbin/']:
                 self.command[0] = prefix + base
