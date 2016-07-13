@@ -6,6 +6,7 @@ import time
 import sys
 import os
 import socket
+import resource
 try:
     import urllib.request as urllib2
 except ImportError:
@@ -93,27 +94,35 @@ class BaseService(threading.Thread):
         t_start = time.time()
         # check if it is time to execute job update() function
         if self.timetable['next'] > t_start:
-            msg.debug(self.chart_name + " will be run in " +
-                      str(int((self.timetable['next'] - t_start) * 1000)) + " ms")
+            #msg.debug(self.chart_name + " will be run in " +
+            #          str(int((self.timetable['next'] - t_start) * 1000)) + " ms")
+            msg.debug(self.chart_name,"will be run in", str(int((self.timetable['next'] - t_start) * 1000)), "ms")
             return True
 
         since_last = int((t_start - self.timetable['last']) * 1000000)
-        msg.debug(self.chart_name +
-                  " ready to run, after " + str(int((t_start - self.timetable['last']) * 1000)) +
-                  " ms (update_every: " + str(self.timetable['freq'] * 1000) +
-                  " ms, latency: " + str(int((t_start - self.timetable['next']) * 1000)) + " ms)")
+        #msg.debug(self.chart_name +
+        #          " ready to run, after " + str(int((t_start - self.timetable['last']) * 1000)) +
+        #          " ms (update_every: " + str(self.timetable['freq'] * 1000) +
+        #          " ms, latency: " + str(int((t_start - self.timetable['next']) * 1000)) + " ms)")
+        msg.debug(self.chart_name,
+                  "ready to run, after", str(int((t_start - self.timetable['last']) * 1000)),
+                  "ms (update_every:", str(self.timetable['freq'] * 1000),
+                  "ms, latency:", str(int((t_start - self.timetable['next']) * 1000)), "ms")
         if not self.update(since_last):
             return False
         t_end = time.time()
         self.timetable['next'] = t_end - (t_end % self.timetable['freq']) + self.timetable['freq']
-
         # draw performance graph
         run_time = str(int((t_end - t_start) * 1000))
-        run_time_chart = "BEGIN netdata.plugin_pythond_" + self.chart_name + " " + str(since_last) + '\n'
-        run_time_chart += "SET run_time = " + run_time + '\n'
-        run_time_chart += "END\n"
-        sys.stdout.write(run_time_chart)
-        msg.debug(self.chart_name + " updated in " + str(run_time) + " ms")
+        #run_time_chart = "BEGIN netdata.plugin_pythond_" + self.chart_name + " " + str(since_last) + '\n'
+        #run_time_chart += "SET run_time = " + run_time + '\n'
+        #run_time_chart += "END\n"
+        #sys.stdout.write(run_time_chart)
+        sys.stdout.write("BEGIN netdata.plugin_pythond_%s %s\nSET run_time = %s\nEND\n" % \
+                         (self.chart_name, str(since_last), run_time))
+
+        #msg.debug(self.chart_name + " updated in " + str(run_time) + " ms")
+        msg.debug(self.chart_name, "updated in", str(run_time), "ms")
         self.timetable['last'] = t_start
         return True
 
@@ -141,23 +150,42 @@ class BaseService(threading.Thread):
                 else:
                     time.sleep(self.timetable['freq'])
 
+    def _format(self, *args):
+        params = []
+        append = params.append
+        for p in args:
+            if p is None:
+                append(p)
+                continue
+            if type(p) is not str:
+                p = str(p)
+            if ' ' in p:
+                p = "'" + p + "'"
+            append(p)
+        return params
+
     def _line(self, instruction, *params):
         """
         Converts *params to string and joins them with one space between every one.
         :param params: str/int/float
         """
-        self._data_stream += instruction
-        for p in params:
-            if p is None:
-                p = ""
-            else:
-                p = str(p)
-            if len(p) == 0:
-                p = "''"
-            if ' ' in p:
-                p = "'" + p + "'"
-            self._data_stream += " " + p
-        self._data_stream += "\n"
+        #self._data_stream += instruction
+        tmp = list(map((lambda x: "''" if x is None or len(x) == 0 else x), params))
+
+        self._data_stream += "%s %s\n" % (instruction, str(" ".join(tmp)))
+
+        # self.error(str(" ".join(tmp)))
+        # for p in params:
+        #     if p is None:
+        #         p = ""
+        #     else:
+        #         p = str(p)
+        #     if len(p) == 0:
+        #         p = "''"
+        #     if ' ' in p:
+        #         p = "'" + p + "'"
+        #     self._data_stream += " " + p
+        #self._data_stream += "\n"
 
     def chart(self, type_id, name="", title="", units="", family="",
               category="", charttype="line", priority="", update_every=""):
@@ -174,7 +202,12 @@ class BaseService(threading.Thread):
         :param update_every: int/str
         """
         self._charts.append(type_id)
-        self._line("CHART", type_id, name, title, units, family, category, charttype, priority, update_every)
+        #self._line("CHART", type_id, name, title, units, family, category, charttype, priority, update_every)
+
+        p = self._format(type_id, name, title, units, family, category, charttype, priority, update_every)
+        self._line("CHART", *p)
+
+
 
     def dimension(self, id, name=None, algorithm="absolute", multiplier=1, divisor=1, hidden=False):
         """
@@ -204,9 +237,13 @@ class BaseService(threading.Thread):
 
         self._dimensions.append(id)
         if hidden:
-            self._line("DIMENSION", id, name, algorithm, multiplier, divisor, "hidden")
+            p = self._format(id, name, algorithm, multiplier, divisor, "hidden")
+            #self._line("DIMENSION", id, name, algorithm, str(multiplier), str(divisor), "hidden")
         else:
-            self._line("DIMENSION", id, name, algorithm, multiplier, divisor)
+            p = self._format(id, name, algorithm, multiplier, divisor)
+            #self._line("DIMENSION", id, name, algorithm, str(multiplier), str(divisor))
+
+        self._line("DIMENSION", *p)
 
     def begin(self, type_id, microseconds=0):
         """
@@ -224,7 +261,7 @@ class BaseService(threading.Thread):
             self.error("malformed begin statement: microseconds are not a number:", microseconds)
             microseconds = ""
 
-        self._line("BEGIN", type_id, microseconds)
+        self._line("BEGIN", type_id, str(microseconds))
         return True
 
     def set(self, id, value):
@@ -242,7 +279,7 @@ class BaseService(threading.Thread):
         except TypeError:
             self.error("cannot set non-numeric value:", value)
             return False
-        self._line("SET", id, "=", value)
+        self._line("SET", id, "=", str(value))
         return True
 
     def end(self):
@@ -432,11 +469,12 @@ class UrlService(SimpleService):
             return False
 
 
-class NetSocketService(SimpleService):
+class SocketService(SimpleService):
     def __init__(self, configuration=None, name=None):
         self.host = "localhost"
         self.port = None
         self.sock = None
+        self.unix_socket = None
         self.request = ""
         SimpleService.__init__(self, configuration=configuration, name=name)
 
@@ -447,10 +485,16 @@ class NetSocketService(SimpleService):
         """
         if self.sock is None:
             try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(self.update_every)
-                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                sock.connect((self.host, self.port))
+                if self.unix_socket is None:
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    #sock.settimeout(self.update_every)
+                    sock.connect((self.host, self.port))
+                else:
+                    sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+                    #sock.settimeout(self.update_every)
+                    sock.connect(self.unix_socket)
+
             except Exception as e:
                 self.error(e)
                 self.sock = None
@@ -468,11 +512,15 @@ class NetSocketService(SimpleService):
                 self.sock = None
                 return None
 
-        data = sock.recv(1024)
+        data = sock.recv(2)
         try:
             while True:
-                buf = sock.recv(1024)
-                if not buf:
+                try:
+                    buf = sock.recv(1024, 0x40)  # get 1024 bytes in NON-BLOCKING mode
+                except socket.error:
+                    break
+
+                if len(buf) == 0:
                     break
                 else:
                     data += buf
@@ -492,13 +540,17 @@ class NetSocketService(SimpleService):
         else:
             self.name = str(self.name)
         try:
-            self.host = str(self.configuration['host'])
+            self.unix_socket = str(self.configuration['socket'])
         except (KeyError, TypeError):
-            self.error("No host specified. Using: '" + self.host + "'")
-        try:
-            self.port = int(self.configuration['port'])
-        except (KeyError, TypeError):
-            self.error("No port specified. Using: '" + str(self.port) + "'")
+            self.error("No unix socket specified. Trying TCP/IP socket.")
+            try:
+                self.host = str(self.configuration['host'])
+            except (KeyError, TypeError):
+                self.error("No host specified. Using: '" + self.host + "'")
+            try:
+                self.port = int(self.configuration['port'])
+            except (KeyError, TypeError):
+                self.error("No port specified. Using: '" + str(self.port) + "'")
         try:
             self.request = str(self.configuration['request'])
         except (KeyError, TypeError):
@@ -565,6 +617,7 @@ class LogService(SimpleService):
 
 class ExecutableService(SimpleService):
     command_whitelist = ['exim', 'postqueue']
+    bad_substrings = ('&', '|', ';', '>', '<')
 
     def __init__(self, configuration=None, name=None):
         self.command = ""
@@ -582,7 +635,7 @@ class ExecutableService(SimpleService):
             return None
         data = []
         for line in p.stdout.readlines():
-            data.append(line)
+            data.append(str(line.decode()))
 
         return data
 
@@ -600,19 +653,23 @@ class ExecutableService(SimpleService):
         # except (KeyError, TypeError):
         #     self.error("No command specified. Using: '" + self.command + "'")
         self.command = self.command.split(' ')
-        for i in self.command:
-            if i.startswith('-') or i in self.command_whitelist:
-                pass
-            else:
-                self.error("Wrong command. Probably not on whitelist.")
+        if self.command[0] not in self.command_whitelist:
+            self.error("Command is not whitelisted.")
+            return False
+
+        for arg in self.command[1:]:
+            if any(st in arg for st in self.bad_substrings):
+                self.error("Bad command argument:" + " ".join(self.command[1:]))
                 return False
         # test command and search for it in /usr/sbin or /sbin when failed
         base = self.command[0]
         if self._get_raw_data() is None:
             for prefix in ['/sbin/', '/usr/sbin/']:
                 self.command[0] = prefix + base
-                if self._get_raw_data() is not None:
+                if os.path.isfile(self.command[0]):
                     break
+                #if self._get_raw_data() is not None:
+                #    break
 
         if self._get_data() is None or len(self._get_data()) == 0:
             return False

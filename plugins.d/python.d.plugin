@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/env bash
+'''':; exec "$(command -v python2 || command -v python3 || echo "ERROR python IS NOT AVAILABLE IN THIS SYSTEM")" "$0" "$@" # '''
 # -*- coding: utf-8 -*-
 
 # Description: netdata python modules supervisor
@@ -206,6 +207,8 @@ class PythonCharts(object):
         :param config: dict
         :return: dict
         """
+        if config is None:
+            config = {}
         # get default values
         defaults = {}
         msg.debug(module.__name__ + ": reading configuration")
@@ -280,11 +283,13 @@ class PythonCharts(object):
         :param reason: str
         """
         prefix = job.__module__
-        if job.name is not None:
+        if job.name is not None and len(job.name) != 0:
             prefix += "/" + job.name
         prefix += ": "
-
-        self.jobs.remove(job)
+        try:
+            self.jobs.remove(job)
+        except Exception as e:
+            msg.debug("This shouldn't happen. NO " + prefix + " IN LIST:" + str(self.jobs))
         if reason is None:
             return
         elif reason[:3] == "no ":
@@ -327,8 +332,8 @@ class PythonCharts(object):
                     try:
                         if job.override_name is not None:
                             job.name = job.override_name
-                            msg.debug(job.chart_name + " changing chart name to: " + job.__module__ + job.name)
-                            job.chart_name = job.__module__ + job.name
+                            msg.debug(job.chart_name + " changing chart name to: " + job.__module__ + '_' + job.name)
+                            job.chart_name = job.__module__ + '_' + job.name
                             overridden.append(job.name)
                     except Exception:
                         pass
@@ -421,7 +426,7 @@ def parse_cmdline(directory, *commands):
             DEBUG_FLAG = True
             # redirect stderr to stdout?
         elif os.path.isfile(directory + cmd + ".chart.py") or os.path.isfile(directory + cmd):
-            DEBUG_FLAG = True
+            #DEBUG_FLAG = True
             mods.append(cmd.replace(".chart.py", ""))
         else:
             try:

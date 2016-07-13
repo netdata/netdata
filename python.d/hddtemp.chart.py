@@ -2,7 +2,7 @@
 # Description: hddtemp netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
-from base import NetSocketService
+from base import SocketService
 
 # default module values (can be overridden per job in `config`)
 #update_every = 2
@@ -29,9 +29,9 @@ CHARTS = {
 }
 
 
-class Service(NetSocketService):
+class Service(SocketService):
     def __init__(self, configuration=None, name=None):
-        NetSocketService.__init__(self, configuration=configuration, name=name)
+        SocketService.__init__(self, configuration=configuration, name=name)
         self.request = ""
         self.host = "127.0.0.1"
         self.port = 7634

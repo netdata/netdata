@@ -18,6 +18,7 @@ dist_python_SCRIPTS = \
 	nginx.chart.py \
 	phpfpm.chart.py \
 	postfix.chart.py \
+	redis.chart.py \
 	sensors.chart.py \
 	squid.chart.py \
 	tomcat.chart.py \
