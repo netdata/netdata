@@ -150,10 +150,10 @@ class BaseService(threading.Thread):
                 else:
                     time.sleep(self.timetable['freq'])
 
-    def _format(self, *input):
+    def _format(self, *args):
         params = []
         append = params.append
-        for p in input:
+        for p in args:
             if p is None:
                 append(p)
                 continue
@@ -515,14 +515,15 @@ class SocketService(SimpleService):
         data = sock.recv(2)
         try:
             while True:
-                buf = sock.recv(1024)
-#                if not buf:
-#                    break
-#                else:
-#                    data += buf
-                data += buf
-                if len(buf) < 1024:
+                try:
+                    buf = sock.recv(1024, 0x40)  # get 1024 bytes in NON-BLOCKING mode
+                except socket.error:
                     break
+
+                if len(buf) == 0:
+                    break
+                else:
+                    data += buf
         except:
             sock.close()
             return None
