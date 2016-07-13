@@ -283,7 +283,7 @@ class PythonCharts(object):
         :param reason: str
         """
         prefix = job.__module__
-        if job.name is not None:
+        if job.name is not None and len(job.name) != 0:
             prefix += "/" + job.name
         prefix += ": "
         try:
