@@ -485,7 +485,6 @@ def run():
     # parse passed command line arguments
     modules = parse_cmdline(MODULES_DIR, *sys.argv)
     msg.DEBUG_FLAG = DEBUG_FLAG
-    modules = ['sensors']
     msg.info("MODULES_DIR='" + MODULES_DIR +
              "', CONFIG_DIR='" + CONFIG_DIR +
              "', UPDATE_EVERY=" + str(BASE_CONFIG['update_every']) +
