@@ -141,7 +141,7 @@ CHARTS = {
     'thread_cache_misses': {
         'options': [None, 'mysql Threads Cache Misses', 'misses', 'threads', 'mysql.thread_cache_misses', 'area'],
         'lines': [
-            ["Thread_cache_misses", "misses", "misses", "absolute", 1, 100]
+            ["Thread_cache_misses", "misses", "absolute", 1, 100]
         ]},
     'innodb_io': {
         'options': [None, 'mysql InnoDB I/O Bandwidth', 'kilobytes/s', 'innodb', 'mysql.innodb_io', 'area'],
