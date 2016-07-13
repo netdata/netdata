@@ -40,6 +40,10 @@ class Service(ExecutableService):
         """
         try:
             raw = self._get_raw_data()[-1].split(' ')
+            if raw[0] == 'Mail' and raw[1] == 'queue':
+                return {'emails': 0,
+                        'size': 0}
+
             return {'emails': raw[4],
                     'size': raw[1]}
         except (ValueError, AttributeError):
