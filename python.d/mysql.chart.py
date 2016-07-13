@@ -22,21 +22,21 @@ except ImportError:
         raise ImportError
 
 # default module values (can be overridden per job in `config`)
-update_every = 3
+# update_every = 3
 priority = 90000
 retries = 7
 
 # default configuration (overridden by python.d.plugin)
-config = {
-    'local': {
-        'user': 'root',
-        'password': '',
-        'socket': '/var/run/mysqld/mysqld.sock',
-        'update_every': update_every,
-        'retries': retries,
-        'priority': priority
-    }
-}
+# config = {
+#     'local': {
+#         'user': 'root',
+#         'pass': '',
+#         'socket': '/var/run/mysqld/mysqld.sock',
+#         'update_every': update_every,
+#         'retries': retries,
+#         'priority': priority
+#     }
+#}
 
 # query executed on MySQL server
 QUERY = "SHOW GLOBAL STATUS"
@@ -141,7 +141,7 @@ CHARTS = {
     'thread_cache_misses': {
         'options': [None, 'mysql Threads Cache Misses', 'misses', 'threads', 'mysql.thread_cache_misses', 'area'],
         'lines': [
-            ["Thread_cache_misses", "misses", "misses", "absolute", 1, 100]
+            ["Thread_cache_misses", "misses", "absolute", 1, 100]
         ]},
     'innodb_io': {
         'options': [None, 'mysql InnoDB I/O Bandwidth', 'kilobytes/s', 'innodb', 'mysql.innodb_io', 'area'],
@@ -321,8 +321,8 @@ class Service(SimpleService):
             self.name = 'local'
         if 'user' not in configuration:
             self.configuration['user'] = 'root'
-        if 'password' not in configuration:
-            self.configuration['password'] = ''
+        if 'pass' not in configuration:
+            self.configuration['pass'] = ''
         if 'my.cnf' in configuration:
             self.configuration['socket'] = ''
             self.configuration['host'] = ''
@@ -345,7 +345,7 @@ class Service(SimpleService):
         """
         try:
             self.connection = MySQLdb.connect(user=self.configuration['user'],
-                                              passwd=self.configuration['password'],
+                                              passwd=self.configuration['pass'],
                                               read_default_file=self.configuration['my.cnf'],
                                               unix_socket=self.configuration['socket'],
                                               host=self.configuration['host'],

@@ -207,8 +207,6 @@ class BaseService(threading.Thread):
         p = self._format(type_id, name, title, units, family, category, charttype, priority, update_every)
         self._line("CHART", *p)
 
-
-
     def dimension(self, id, name=None, algorithm="absolute", multiplier=1, divisor=1, hidden=False):
         """
         Defines a new dimension for the chart
@@ -235,7 +233,7 @@ class BaseService(threading.Thread):
         if algorithm not in ("absolute", "incremental", "percentage-of-absolute-row", "percentage-of-incremental-row"):
             algorithm = "absolute"
 
-        self._dimensions.append(id)
+        self._dimensions.append(str(id))
         if hidden:
             p = self._format(id, name, algorithm, multiplier, divisor, "hidden")
             #self._line("DIMENSION", id, name, algorithm, str(multiplier), str(divisor), "hidden")
@@ -272,7 +270,7 @@ class BaseService(threading.Thread):
         :return: boolean
         """
         if id not in self._dimensions:
-            self.error("wrong dimension id:", id)
+            self.error("wrong dimension id:", id, "Available dimensions are:", *self._dimensions)
             return False
         try:
             value = str(int(value))
@@ -456,7 +454,7 @@ class UrlService(SimpleService):
         except (KeyError, TypeError):
             pass
         try:
-            self.password = str(self.configuration['password'])
+            self.password = str(self.configuration['pass'])
         except (KeyError, TypeError):
             pass
 
@@ -488,15 +486,21 @@ class SocketService(SimpleService):
                 if self.unix_socket is None:
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    #sock.setsockopt(socket.SOL_SOCKET, socket.TCP_NODELAY, 1)
+                    #sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
                     #sock.settimeout(self.update_every)
+                    sock.settimeout(0.5)
                     sock.connect((self.host, self.port))
+                    sock.settimeout(0.5)  # Just to be sure
                 else:
                     sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
                     #sock.settimeout(self.update_every)
+                    sock.settimeout(0.05)
                     sock.connect(self.unix_socket)
+                    sock.settimeout(0.05)  # Just to be sure
 
             except Exception as e:
-                self.error(e)
+                self.error(str(e))
                 self.sock = None
                 return None
 
@@ -512,23 +516,24 @@ class SocketService(SimpleService):
                 self.sock = None
                 return None
 
-        data = sock.recv(2)
+        size = 2
         try:
-            while True:
-                try:
-                    buf = sock.recv(1024, 0x40)  # get 1024 bytes in NON-BLOCKING mode
-                except socket.error:
-                    break
-
-                if len(buf) == 0:
-                    break
-                else:
-                    data += buf
-        except:
+            data = sock.recv(size).decode()
+        except Exception as e:
+            self.error(str(e))
             sock.close()
             return None
 
-        return data.decode()
+        while True:
+            # implement something like TCP Window Scaling
+            if size < 4096:
+                size *= 2
+            buf = sock.recv(size)
+            data += buf.decode()
+            if len(buf) < size:
+                break
+
+        return data
 
     def _parse_config(self):
         """
@@ -616,7 +621,7 @@ class LogService(SimpleService):
 
 
 class ExecutableService(SimpleService):
-    command_whitelist = ['exim', 'postqueue']
+    #command_whitelist = ['exim', 'postqueue']
     bad_substrings = ('&', '|', ';', '>', '<')
 
     def __init__(self, configuration=None, name=None):
@@ -637,6 +642,9 @@ class ExecutableService(SimpleService):
         for line in p.stdout.readlines():
             data.append(str(line.decode()))
 
+        if len(data) == 0:
+            return None
+
         return data
 
     def check(self):
@@ -648,21 +656,21 @@ class ExecutableService(SimpleService):
             self.name = ""
         else:
             self.name = str(self.name)
-        # try:
-        #     self.command = str(self.configuration['path'])
-        # except (KeyError, TypeError):
-        #     self.error("No command specified. Using: '" + self.command + "'")
+        try:
+            self.command = str(self.configuration['command'])
+        except (KeyError, TypeError):
+            self.error("No command specified. Using: '" + self.command + "'")
         self.command = self.command.split(' ')
-        if self.command[0] not in self.command_whitelist:
-            self.error("Command is not whitelisted.")
-            return False
+        #if self.command[0] not in self.command_whitelist:
+        #    self.error("Command is not whitelisted.")
+        #    return False
 
         for arg in self.command[1:]:
             if any(st in arg for st in self.bad_substrings):
                 self.error("Bad command argument:" + " ".join(self.command[1:]))
                 return False
         # test command and search for it in /usr/sbin or /sbin when failed
-        base = self.command[0]
+        base = self.command[0].split('/')[-1]
         if self._get_raw_data() is None:
             for prefix in ['/sbin/', '/usr/sbin/']:
                 self.command[0] = prefix + base
