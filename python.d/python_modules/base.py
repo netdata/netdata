@@ -454,7 +454,7 @@ class UrlService(SimpleService):
         except (KeyError, TypeError):
             pass
         try:
-            self.password = str(self.configuration['password'])
+            self.password = str(self.configuration['pass'])
         except (KeyError, TypeError):
             pass
 
