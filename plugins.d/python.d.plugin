@@ -426,7 +426,7 @@ def parse_cmdline(directory, *commands):
             DEBUG_FLAG = True
             # redirect stderr to stdout?
         elif os.path.isfile(directory + cmd + ".chart.py") or os.path.isfile(directory + cmd):
-            DEBUG_FLAG = True
+            #DEBUG_FLAG = True
             mods.append(cmd.replace(".chart.py", ""))
         else:
             try:
@@ -481,6 +481,7 @@ def run():
 
     # parse passed command line arguments
     modules = parse_cmdline(MODULES_DIR, *sys.argv)
+    msg.DEBUG_FLAG = DEBUG_FLAG
     msg.info("MODULES_DIR='" + MODULES_DIR +
              "', CONFIG_DIR='" + CONFIG_DIR +
              "', UPDATE_EVERY=" + str(BASE_CONFIG['update_every']) +
