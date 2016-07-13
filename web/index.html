@@ -1362,16 +1362,21 @@ var menuData = {
 		info: undefined
 	},
 
+	'redis': {
+		title: 'Redis',
+		info: undefined
+	},
+
 	'phpfpm': {
 		title: 'PHP-FPM',
 		info: undefined,
 	},
 
-/*	'nginx': {
+	'nginx': {
 		title: 'nginx',
 		info: undefined,
 	},
-
+/*
 	'apache': {
 		title: 'Apache',
 		info: undefined,
@@ -1730,14 +1735,14 @@ var chartData = {
 		height: 0.5
 	},
 
-	'nginx.connections': {
+	'nginx_local.connections': {
 		colors: NETDATA.colors[4],
 		mainheads: [
 			gaugeChart('Connections', '12%', '', NETDATA.colors[4])
 		]
 	},
 
-	'nginx.requests': {
+	'nginx_local.requests': {
 		colors: NETDATA.colors[0],
 		mainheads: [
 			gaugeChart('Requests', '12%', '', NETDATA.colors[0])
@@ -1816,9 +1821,10 @@ function enrichChartData(chart) {
 			break;
 
 		case 'mysql':
+		case 'redis':
 		case 'phpfpm':
-/*		case 'nginx':
-		case 'apache':*/
+		case 'nginx':
+/*		case 'apache':*/
 		case 'named':
 		case 'cgroup':
 			chart.menu = chart.type;

@@ -34,8 +34,6 @@ class Service(ExecutableService):
         :return: dict
         """
         try:
-            raw = self._get_raw_data()[-1].split(' ')
-            return {'emails': raw[4],
-                    'size': raw[1]}
+            return {'emails': int(self._get_raw_data()[0])}
         except (ValueError, AttributeError):
             return None
