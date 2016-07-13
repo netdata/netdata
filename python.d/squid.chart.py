@@ -65,7 +65,7 @@ class Service(SocketService):
                 if row.startswith(("client", "server.all")):
                     tmp = row.split("=")
                     data[tmp[0].replace('.', '_').strip(' ')] = int(tmp[1])
-        except (ValueError, AttributeError):
+        except (ValueError, AttributeError, TypeError):
             return None
 
         if len(data) == 0:
@@ -86,31 +86,8 @@ class Service(SocketService):
         if not req.endswith(" HTTP/1.0\r\n\r\n"):
             req += " HTTP/1.0\r\n\r\n"
         self.request = req.encode()
-        #
-        # # autodetect squid
-        # if type(self.port) is tuple:
-        #     ports = self.port
-        #     for port in ports:
-        #         self.port = port
-        #         urls = ["cache_object://" + self.host + ":" + str(port) + "/counters",
-        #                 "/squid-internal-mgr/counters"]
-        #         for url in urls:
-        #             tmp = "GET " + url + " HTTP/1.0\r\n\r\n"
-        #             self.request = tmp.encode()
-        #             if self._get_data() is not None:
-        #                 return True
-        # else:
-        if True:
-            if self._get_data() is not None:
-                return True
-            else:
-                self.error("No data returned")
-                return False
-            
-                
-                
-                
-            
-                
-            
-
+        if self._get_data() is not None:
+            return True
+        else:
+            self.error("No data returned")
+            return False
