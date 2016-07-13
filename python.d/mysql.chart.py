@@ -30,7 +30,7 @@ retries = 7
 # config = {
 #     'local': {
 #         'user': 'root',
-#         'password': '',
+#         'pass': '',
 #         'socket': '/var/run/mysqld/mysqld.sock',
 #         'update_every': update_every,
 #         'retries': retries,
