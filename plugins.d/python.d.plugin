@@ -286,8 +286,10 @@ class PythonCharts(object):
         if job.name is not None:
             prefix += "/" + job.name
         prefix += ": "
-
-        self.jobs.remove(job)
+        try:
+            self.jobs.remove(job)
+        except Exception as e:
+            msg.debug("This shouldn't happen. NO " + prefix + " IN LIST:" + str(self.jobs))
         if reason is None:
             return
         elif reason[:3] == "no ":
