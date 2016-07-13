@@ -321,8 +321,8 @@ class Service(SimpleService):
             self.name = 'local'
         if 'user' not in configuration:
             self.configuration['user'] = 'root'
-        if 'password' not in configuration:
-            self.configuration['password'] = ''
+        if 'pass' not in configuration:
+            self.configuration['pass'] = ''
         if 'my.cnf' in configuration:
             self.configuration['socket'] = ''
             self.configuration['host'] = ''
@@ -345,7 +345,7 @@ class Service(SimpleService):
         """
         try:
             self.connection = MySQLdb.connect(user=self.configuration['user'],
-                                              passwd=self.configuration['password'],
+                                              passwd=self.configuration['pass'],
                                               read_default_file=self.configuration['my.cnf'],
                                               unix_socket=self.configuration['socket'],
                                               host=self.configuration['host'],
