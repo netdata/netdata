@@ -488,12 +488,16 @@ class SocketService(SimpleService):
                     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                     #sock.setsockopt(socket.SOL_SOCKET, socket.TCP_NODELAY, 1)
                     #sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-                    sock.settimeout(self.update_every)
+                    #sock.settimeout(self.update_every)
+                    sock.settimeout(0.5)
                     sock.connect((self.host, self.port))
+                    sock.settimeout(0.5)  # Just to be sure
                 else:
                     sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-                    sock.settimeout(self.update_every)
+                    #sock.settimeout(self.update_every)
+                    sock.settimeout(0.05)
                     sock.connect(self.unix_socket)
+                    sock.settimeout(0.05)  # Just to be sure
 
             except Exception as e:
                 self.error(str(e))
@@ -512,29 +516,22 @@ class SocketService(SimpleService):
                 self.sock = None
                 return None
 
-        #data = sock.recv(2)
-        # data = ""
-        # try:
-        #     while True:
-        #         #try:
-        #         buf = sock.recv(1024, 0x40)  # get 1024 bytes in NON-BLOCKING mode
-        #         #except socket.error:
-        #         #    break
-        #
-        #         if len(buf) == 0:
-        #             break
-        #         else:
-        #             data += buf.decode()
-        # except Exception as e:
-        #     self.error(str(e))
-        #     sock.close()
-        #     return None
+        size = 2
         try:
-            data = sock.recv(65535, 0x40).decode()
+            data = sock.recv(size).decode()
         except Exception as e:
             self.error(str(e))
             sock.close()
             return None
+
+        while True:
+            # implement something like TCP Window Scaling
+            if size < 4096:
+                size *= 2
+            buf = sock.recv(size)
+            data += buf.decode()
+            if len(buf) < size:
+                break
 
         return data
 
