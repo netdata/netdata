@@ -494,7 +494,7 @@ class SocketService(SimpleService):
                     sock.connect(self.unix_socket)
 
             except Exception as e:
-                self.error(e)
+                self.error(str(e))
                 self.sock = None
                 return None
 
