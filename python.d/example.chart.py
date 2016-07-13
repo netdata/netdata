@@ -9,7 +9,7 @@ from base import BaseService
 NAME = os.path.basename(__file__).replace(".chart.py", "")
 
 # default module values
-update_every = 4
+# update_every = 4
 priority = 90000
 retries = 7
 

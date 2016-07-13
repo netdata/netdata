@@ -22,21 +22,21 @@ except ImportError:
         raise ImportError
 
 # default module values (can be overridden per job in `config`)
-update_every = 3
+# update_every = 3
 priority = 90000
 retries = 7
 
 # default configuration (overridden by python.d.plugin)
-config = {
-    'local': {
-        'user': 'root',
-        'password': '',
-        'socket': '/var/run/mysqld/mysqld.sock',
-        'update_every': update_every,
-        'retries': retries,
-        'priority': priority
-    }
-}
+# config = {
+#     'local': {
+#         'user': 'root',
+#         'password': '',
+#         'socket': '/var/run/mysqld/mysqld.sock',
+#         'update_every': update_every,
+#         'retries': retries,
+#         'priority': priority
+#     }
+#}
 
 # query executed on MySQL server
 QUERY = "SHOW GLOBAL STATUS"
