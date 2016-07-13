@@ -12,10 +12,8 @@ def log_msg(msg_type, *args):
     Print message on stderr.
     :param msg_type: str
     """
-    msg = PROGRAM + " " + str(msg_type) + ":"
-    for i in args:
-        msg += " "
-        msg += str(i)
+    msg = "%s %s: %s" % (PROGRAM, str(msg_type), " ".join(args))
+
     sys.stderr.write(msg + "\n")
     sys.stderr.flush()
 

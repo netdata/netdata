@@ -93,27 +93,34 @@ class BaseService(threading.Thread):
         t_start = time.time()
         # check if it is time to execute job update() function
         if self.timetable['next'] > t_start:
-            msg.debug(self.chart_name + " will be run in " +
-                      str(int((self.timetable['next'] - t_start) * 1000)) + " ms")
+            #msg.debug(self.chart_name + " will be run in " +
+            #          str(int((self.timetable['next'] - t_start) * 1000)) + " ms")
+            msg.debug(self.chart_name,"will be run in", str(int((self.timetable['next'] - t_start) * 1000)), "ms")
             return True
 
         since_last = int((t_start - self.timetable['last']) * 1000000)
-        msg.debug(self.chart_name +
-                  " ready to run, after " + str(int((t_start - self.timetable['last']) * 1000)) +
-                  " ms (update_every: " + str(self.timetable['freq'] * 1000) +
-                  " ms, latency: " + str(int((t_start - self.timetable['next']) * 1000)) + " ms)")
+        #msg.debug(self.chart_name +
+        #          " ready to run, after " + str(int((t_start - self.timetable['last']) * 1000)) +
+        #          " ms (update_every: " + str(self.timetable['freq'] * 1000) +
+        #          " ms, latency: " + str(int((t_start - self.timetable['next']) * 1000)) + " ms)")
+        msg.debug(self.chart_name,
+                  "ready to run, after", str(int((t_start - self.timetable['last']) * 1000)),
+                  "ms (update_every:", str(self.timetable['freq'] * 1000),
+                  "ms, latency:", str(int((t_start - self.timetable['next']) * 1000)), "ms")
         if not self.update(since_last):
             return False
         t_end = time.time()
         self.timetable['next'] = t_end - (t_end % self.timetable['freq']) + self.timetable['freq']
-
         # draw performance graph
         run_time = str(int((t_end - t_start) * 1000))
-        run_time_chart = "BEGIN netdata.plugin_pythond_" + self.chart_name + " " + str(since_last) + '\n'
-        run_time_chart += "SET run_time = " + run_time + '\n'
-        run_time_chart += "END\n"
+        #run_time_chart = "BEGIN netdata.plugin_pythond_" + self.chart_name + " " + str(since_last) + '\n'
+        #run_time_chart += "SET run_time = " + run_time + '\n'
+        #run_time_chart += "END\n"
+        run_time_chart = "BEGIN netdata.plugin_pythond_%s %s\nSET run_time = %s\nEND\n" % \
+                         (self.chart_name, str(since_last), run_time)
         sys.stdout.write(run_time_chart)
-        msg.debug(self.chart_name + " updated in " + str(run_time) + " ms")
+        #msg.debug(self.chart_name + " updated in " + str(run_time) + " ms")
+        msg.debug(self.chart_name, "updated in", str(run_time), "ms")
         self.timetable['last'] = t_start
         return True
 
@@ -141,23 +148,42 @@ class BaseService(threading.Thread):
                 else:
                     time.sleep(self.timetable['freq'])
 
+    def _format(self, *input):
+        params = []
+        append = params.append
+        for p in input:
+            if p is None:
+                append(p)
+                continue
+            if type(p) is not str:
+                p = str(p)
+            if ' ' in p:
+                p = "'" + p + "'"
+            append(p)
+        return params
+
     def _line(self, instruction, *params):
         """
         Converts *params to string and joins them with one space between every one.
         :param params: str/int/float
         """
-        self._data_stream += instruction
-        for p in params:
-            if p is None:
-                p = ""
-            else:
-                p = str(p)
-            if len(p) == 0:
-                p = "''"
-            if ' ' in p:
-                p = "'" + p + "'"
-            self._data_stream += " " + p
-        self._data_stream += "\n"
+        #self._data_stream += instruction
+        tmp = list(map((lambda x: "''" if x is None or len(x) == 0 else x), params))
+
+        self._data_stream += "%s %s\n" % (instruction, str(" ".join(tmp)))
+
+        # self.error(str(" ".join(tmp)))
+        # for p in params:
+        #     if p is None:
+        #         p = ""
+        #     else:
+        #         p = str(p)
+        #     if len(p) == 0:
+        #         p = "''"
+        #     if ' ' in p:
+        #         p = "'" + p + "'"
+        #     self._data_stream += " " + p
+        #self._data_stream += "\n"
 
     def chart(self, type_id, name="", title="", units="", family="",
               category="", charttype="line", priority="", update_every=""):
@@ -174,7 +200,12 @@ class BaseService(threading.Thread):
         :param update_every: int/str
         """
         self._charts.append(type_id)
-        self._line("CHART", type_id, name, title, units, family, category, charttype, priority, update_every)
+        #self._line("CHART", type_id, name, title, units, family, category, charttype, priority, update_every)
+
+        p = self._format(type_id, name, title, units, family, category, charttype, priority, update_every)
+        self._line("CHART", *p)
+
+
 
     def dimension(self, id, name=None, algorithm="absolute", multiplier=1, divisor=1, hidden=False):
         """
@@ -204,9 +235,13 @@ class BaseService(threading.Thread):
 
         self._dimensions.append(id)
         if hidden:
-            self._line("DIMENSION", id, name, algorithm, multiplier, divisor, "hidden")
+            p = self._format(id, name, algorithm, multiplier, divisor, "hidden")
+            #self._line("DIMENSION", id, name, algorithm, str(multiplier), str(divisor), "hidden")
         else:
-            self._line("DIMENSION", id, name, algorithm, multiplier, divisor)
+            p = self._format(id, name, algorithm, multiplier, divisor)
+            #self._line("DIMENSION", id, name, algorithm, str(multiplier), str(divisor))
+
+        self._line("DIMENSION", *p)
 
     def begin(self, type_id, microseconds=0):
         """
@@ -224,7 +259,7 @@ class BaseService(threading.Thread):
             self.error("malformed begin statement: microseconds are not a number:", microseconds)
             microseconds = ""
 
-        self._line("BEGIN", type_id, microseconds)
+        self._line("BEGIN", type_id, str(microseconds))
         return True
 
     def set(self, id, value):
@@ -242,7 +277,7 @@ class BaseService(threading.Thread):
         except TypeError:
             self.error("cannot set non-numeric value:", value)
             return False
-        self._line("SET", id, "=", value)
+        self._line("SET", id, "=", str(value))
         return True
 
     def end(self):
