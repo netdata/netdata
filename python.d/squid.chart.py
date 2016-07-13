@@ -36,7 +36,7 @@ CHARTS = {
     'servers_requests': {
         'options': [None, "Squid Server Requests", "requests/s", "servers", "squid.servers.requests", 'line'],
         'lines': [
-            ["server_all_requests", "requests"],
+            ["server_all_requests", "requests", "incremental"],
             ["server_all_errors", "errors", "incremental", -1, 1]
         ]}
 }
