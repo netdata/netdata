@@ -486,6 +486,8 @@ class SocketService(SimpleService):
                 if self.unix_socket is None:
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    #sock.setsockopt(socket.SOL_SOCKET, socket.TCP_NODELAY, 1)
+                    #sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
                     sock.settimeout(self.update_every)
                     sock.connect((self.host, self.port))
                 else:
@@ -511,19 +513,26 @@ class SocketService(SimpleService):
                 return None
 
         #data = sock.recv(2)
-        data = ""
+        # data = ""
+        # try:
+        #     while True:
+        #         #try:
+        #         buf = sock.recv(1024, 0x40)  # get 1024 bytes in NON-BLOCKING mode
+        #         #except socket.error:
+        #         #    break
+        #
+        #         if len(buf) == 0:
+        #             break
+        #         else:
+        #             data += buf.decode()
+        # except Exception as e:
+        #     self.error(str(e))
+        #     sock.close()
+        #     return None
         try:
-            while True:
-                #try:
-                buf = sock.recv(1024, 0x40)  # get 1024 bytes in NON-BLOCKING mode
-                #except socket.error:
-                #    break
-
-                if len(buf) == 0:
-                    break
-                else:
-                    data += buf.decode()
-        except:
+            data = sock.recv(65535, 0x40).decode()
+        except Exception as e:
+            self.error(str(e))
             sock.close()
             return None
 
