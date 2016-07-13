@@ -502,7 +502,7 @@ class SocketService(SimpleService):
         else:
             self.name = str(self.name)
         try:
-            self.unix_socket = int(self.configuration['socket'])
+            self.unix_socket = str(self.configuration['socket'])
         except (KeyError, TypeError):
             self.error("No unix socket specified. Trying TCP/IP socket.")
             try:
