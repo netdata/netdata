@@ -66,6 +66,8 @@ class Service(SocketService):
                     tmp = row.split("=")
                     data[tmp[0].replace('.', '_').strip(' ')] = int(tmp[1])
 
+            if len(data) == 0:
+                return None
             return data
         except (ValueError, AttributeError):
             return None
@@ -98,6 +100,7 @@ class Service(SocketService):
         #                 return True
         # else:
         if True:
+            self.error("NEED: " + str(self._get_data()))
             if self._get_data() is not None:
                 return True
             else:
