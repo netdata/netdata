@@ -83,7 +83,11 @@ class Service(SimpleService):
                 if len(self.chips) != 0 and not any([ex.startswith(pref) for ex in self.chips]):
                     continue
                 for feature in chip:
-                    if feature.get_value() == 0:
+                    try:
+                        float(feature.get_value())
+                    except ValueError:
+                        continue
+                    if feature.get_value() < 0:
                         continue
                     if sensors.TYPE_DICT[feature.type] == type:
                         name = pref + "_" + sensors.TYPE_DICT[feature.type]

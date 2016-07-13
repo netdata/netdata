@@ -67,74 +67,74 @@ CHARTS = {
     'queries': {
         'options': [None, 'mysql Queries', 'queries/s', 'queries', 'mysql.queries', 'line'],
         'lines': [
-            ["Queries", "queries"],
-            ["Questions", "questions"],
-            ["Slow_queries", "slow_queries"]
+            ["Queries", "queries", "incremental"],
+            ["Questions", "questions", "incremental"],
+            ["Slow_queries", "slow_queries", "incremental"]
         ]},
     'handlers': {
         'options': [None, 'mysql Handlers', 'handlers/s', 'handlers', 'mysql.handlers', 'line'],
         'lines': [
-            ["Handler_commit", "commit"],
-            ["Handler_delete", "delete"],
-            ["Handler_prepare", "prepare"],
-            ["Handler_read_first", "read_first"],
-            ["Handler_read_key", "read_key"],
-            ["Handler_read_next", "read_next"],
-            ["Handler_read_prev", "read_prev"],
-            ["Handler_read_rnd", "read_rnd"],
-            ["Handler_read_rnd_next", "read_rnd_next"],
-            ["Handler_rollback", "rollback"],
-            ["Handler_savepoint", "savepoint"],
-            ["Handler_savepoint_rollback", "savepoint_rollback"],
-            ["Handler_update", "update"],
-            ["Handler_write", "write"]
+            ["Handler_commit", "commit", "incremental"],
+            ["Handler_delete", "delete", "incremental"],
+            ["Handler_prepare", "prepare", "incremental"],
+            ["Handler_read_first", "read_first", "incremental"],
+            ["Handler_read_key", "read_key", "incremental"],
+            ["Handler_read_next", "read_next", "incremental"],
+            ["Handler_read_prev", "read_prev", "incremental"],
+            ["Handler_read_rnd", "read_rnd", "incremental"],
+            ["Handler_read_rnd_next", "read_rnd_next", "incremental"],
+            ["Handler_rollback", "rollback", "incremental"],
+            ["Handler_savepoint", "savepoint", "incremental"],
+            ["Handler_savepoint_rollback", "savepoint_rollback", "incremental"],
+            ["Handler_update", "update", "incremental"],
+            ["Handler_write", "write", "incremental"]
         ]},
     'table_locks': {
         'options': [None, 'mysql Tables Locks', 'locks/s', 'locks', 'mysql.table_locks', 'line'],
         'lines': [
-            ["Table_locks_immediate", "immediate"],
+            ["Table_locks_immediate", "immediate", "incremental"],
             ["Table_locks_waited", "waited", "incremental", -1, 1]
         ]},
     'join_issues': {
         'options': [None, 'mysql Select Join Issues', 'joins/s', 'issues', 'mysql.join_issues', 'line'],
         'lines': [
-            ["Select_full_join", "full_join"],
-            ["Select_full_range_join", "full_range_join"],
-            ["Select_range", "range"],
-            ["Select_range_check", "range_check"],
-            ["Select_scan", "scan"]
+            ["Select_full_join", "full_join", "incremental"],
+            ["Select_full_range_join", "full_range_join", "incremental"],
+            ["Select_range", "range", "incremental"],
+            ["Select_range_check", "range_check", "incremental"],
+            ["Select_scan", "scan", "incremental"]
         ]},
     'sort_issues': {
         'options': [None, 'mysql Sort Issues', 'issues/s', 'issues', 'mysql.sort.issues', 'line'],
         'lines': [
-            ["Sort_merge_passes", "merge_passes"],
-            ["Sort_range", "range"],
-            ["Sort_scan", "scan"]
+            ["Sort_merge_passes", "merge_passes", "incremental"],
+            ["Sort_range", "range", "incremental"],
+            ["Sort_scan", "scan", "incremental"]
         ]},
     'tmp': {
         'options': [None, 'mysql Tmp Operations', 'counter', 'temporaries', 'mysql.tmp', 'line'],
         'lines': [
-            ["Created_tmp_disk_tables", "disk_tables"],
-            ["Created_tmp_files", "files"],
-            ["Created_tmp_tables", "tables"]
+            ["Created_tmp_disk_tables", "disk_tables", "incremental"],
+            ["Created_tmp_files", "files", "incremental"],
+            ["Created_tmp_tables", "tables", "incremental"]
         ]},
     'connections': {
         'options': [None, 'mysql Connections', 'connections/s', 'connections', 'mysql.connections', 'line'],
         'lines': [
-            ["Connections", "all"],
-            ["Aborted_connects", "aborted"]
+            ["Connections", "all", "incremental"],
+            ["Aborted_connects", "aborted", "incremental"]
         ]},
     'binlog_cache': {
         'options': [None, 'mysql Binlog Cache', 'transactions/s', 'binlog', 'mysql.binlog_cache', 'line'],
         'lines': [
-            ["Binlog_cache_disk_use", "disk"],
-            ["Binlog_cache_use", "all"]
+            ["Binlog_cache_disk_use", "disk", "incremental"],
+            ["Binlog_cache_use", "all", "incremental"]
         ]},
     'threads': {
         'options': [None, 'mysql Threads', 'threads', 'threads', 'mysql.threads', 'line'],
         'lines': [
             ["Threads_connected", "connected", "absolute"],
-            ["Threads_created", "created"],
+            ["Threads_created", "created", "incremental"],
             ["Threads_cached", "cached", "absolute", -1, 1],
             ["Threads_running", "running", "absolute"],
         ]},
@@ -152,28 +152,28 @@ CHARTS = {
     'innodb_io_ops': {
         'options': [None, 'mysql InnoDB I/O Operations', 'operations/s', 'innodb', 'mysql.innodb_io_ops', 'line'],
         'lines': [
-            ["Innodb_data_reads", "reads"],
+            ["Innodb_data_reads", "reads", "incremental"],
             ["Innodb_data_writes", "writes", "incremental", -1, 1],
-            ["Innodb_data_fsyncs", "fsyncs"]
+            ["Innodb_data_fsyncs", "fsyncs", "incremental"]
         ]},
     'innodb_io_pending_ops': {
         'options': [None, 'mysql InnoDB Pending I/O Operations', 'operations', 'innodb', 'mysql.innodb_io_pending_ops', 'line'],
         'lines': [
             ["Innodb_data_pending_reads", "reads", "absolute"],
             ["Innodb_data_pending_writes", "writes", "absolute", -1, 1],
-            ["Innodb_data_pending_fsyncs", "fsyncs"]
+            ["Innodb_data_pending_fsyncs", "fsyncs", "absolute"]
         ]},
     'innodb_log': {
         'options': [None, 'mysql InnoDB Log Operations', 'operations/s', 'innodb', 'mysql.innodb_log', 'line'],
         'lines': [
-            ["Innodb_log_waits", "waits"],
+            ["Innodb_log_waits", "waits", "incremental"],
             ["Innodb_log_write_requests", "write_requests", "incremental", -1, 1],
             ["Innodb_log_writes", "incremental", -1, 1],
         ]},
     'innodb_os_log': {
         'options': [None, 'mysql InnoDB OS Log Operations', 'operations', 'innodb', 'mysql.innodb_os_log', 'line'],
         'lines': [
-            ["Innodb_os_log_fsyncs", "fsyncs"],
+            ["Innodb_os_log_fsyncs", "fsyncs", "incremental"],
             ["Innodb_os_log_pending_fsyncs", "pending_fsyncs", "absolute"],
             ["Innodb_os_log_pending_writes", "pending_writes", "absolute", -1, 1],
         ]},
@@ -190,7 +190,7 @@ CHARTS = {
     'innodb_rows': {
         'options': [None, 'mysql InnoDB Row Operations', 'operations/s', 'innodb', 'mysql.innodb_rows', 'area'],
         'lines': [
-            ["Innodb_rows_inserted", "read"],
+            ["Innodb_rows_inserted", "read", "incremental"],
             ["Innodb_rows_read", "deleted", "incremental", -1, 1],
             ["Innodb_rows_updated", "inserted", "incremental", 1, 1],
             ["Innodb_rows_deleted", "updated", "incremental", -1, 1],
@@ -214,28 +214,28 @@ CHARTS = {
     'innodb_buffer_pool_read_ahead': {
         'options': [None, 'mysql InnoDB Buffer Pool Read Ahead', 'operations/s', 'innodb', 'mysql.innodb_buffer_pool_read_ahead', 'area'],
         'lines': [
-            ["Innodb_buffer_pool_read_ahead", "all"],
+            ["Innodb_buffer_pool_read_ahead", "all", "incremental"],
             ["Innodb_buffer_pool_read_ahead_evicted", "evicted", "incremental", -1, 1],
-            ["Innodb_buffer_pool_read_ahead_rnd", "random"]
+            ["Innodb_buffer_pool_read_ahead_rnd", "random", "incremental"]
         ]},
     'innodb_buffer_pool_reqs': {
         'options': [None, 'mysql InnoDB Buffer Pool Requests', 'requests/s', 'innodb', 'mysql.innodb_buffer_pool_reqs', 'area'],
         'lines': [
-            ["Innodb_buffer_pool_read_requests", "reads"],
+            ["Innodb_buffer_pool_read_requests", "reads", "incremental"],
             ["Innodb_buffer_pool_write_requests", "writes", "incremental", -1, 1]
         ]},
     'innodb_buffer_pool_ops': {
         'options': [None, 'mysql InnoDB Buffer Pool Operations', 'operations/s', 'innodb', 'mysql.innodb_buffer_pool_ops', 'area'],
         'lines': [
-            ["Innodb_buffer_pool_reads", "disk reads"],
+            ["Innodb_buffer_pool_reads", "disk reads", "incremental"],
             ["Innodb_buffer_pool_wait_free", "wait free", "incremental", -1, 1]
         ]},
     'qcache_ops': {
         'options': [None, 'mysql QCache Operations', 'queries/s', 'qcache', 'mysql.qcache_ops', 'line'],
         'lines': [
-            ["Qcache_hits", "hits"],
+            ["Qcache_hits", "hits", "incremental"],
             ["Qcache_lowmem_prunes", "lowmem prunes", "incremental", -1, 1],
-            ["Qcache_inserts", "inserts"],
+            ["Qcache_inserts", "inserts", "incremental"],
             ["Qcache_not_cached", "not cached", "incremental", -1, 1]
         ]},
     'qcache': {
@@ -264,13 +264,13 @@ CHARTS = {
     'key_requests': {
         'options': [None, 'mysql MyISAM Key Cache Requests', 'requests/s', 'myisam', 'mysql.key_requests', 'area'],
         'lines': [
-            ["Key_read_requests", "reads"],
+            ["Key_read_requests", "reads", "incremental"],
             ["Key_write_requests", "writes", "incremental", -1, 1]
         ]},
     'key_disk_ops': {
         'options': [None, 'mysql MyISAM Key Cache Disk Operations', 'operations/s', 'myisam', 'mysql.key_disk_ops', 'area'],
         'lines': [
-            ["Key_reads", "reads"],
+            ["Key_reads", "reads", "incremental"],
             ["Key_writes", "writes", "incremental", -1, 1]
         ]},
     'files': {
@@ -281,23 +281,23 @@ CHARTS = {
     'files_rate': {
         'options': [None, 'mysql Opened Files Rate', 'files/s', 'files', 'mysql.files_rate', 'line'],
         'lines': [
-            ["Opened_files", "files"]
+            ["Opened_files", "files", "incremental"]
         ]},
     'binlog_stmt_cache': {
         'options': [None, 'mysql Binlog Statement Cache', 'statements/s', 'binlog', 'mysql.binlog_stmt_cache', 'line'],
         'lines': [
-            ["Binlog_stmt_cache_disk_use", "disk"],
-            ["Binlog_stmt_cache_use", "all"]
+            ["Binlog_stmt_cache_disk_use", "disk", "incremental"],
+            ["Binlog_stmt_cache_use", "all", "incremental"]
         ]},
     'connection_errors': {
         'options': [None, 'mysql Connection Errors', 'connections/s', 'connections', 'mysql.connection_errors', 'line'],
         'lines': [
-            ["Connection_errors_accept", "accept"],
-            ["Connection_errors_internal", "internal"],
-            ["Connection_errors_max_connections", "max"],
-            ["Connection_errors_peer_address", "peer_addr"],
-            ["Connection_errors_select", "select"],
-            ["Connection_errors_tcpwrap", "tcpwrap"]
+            ["Connection_errors_accept", "accept", "incremental"],
+            ["Connection_errors_internal", "internal", "incremental"],
+            ["Connection_errors_max_connections", "max", "incremental"],
+            ["Connection_errors_peer_address", "peer_addr", "incremental"],
+            ["Connection_errors_select", "select", "incremental"],
+            ["Connection_errors_tcpwrap", "tcpwrap", "incremental"]
         ]}
 
 }
@@ -374,8 +374,13 @@ class Service(SimpleService):
             self.connection.close()
             self.connection = None
             return None
+        data = dict(raw_data)
+        try:
+            data["Thread_cache_misses"] = int(data["Threads_created"] * 10000 / float(data["Connections"]))
+        except:
+            data["Thread_cache_misses"] = 0
 
-        return dict(raw_data)
+        return data
 
     def check(self):
         """
