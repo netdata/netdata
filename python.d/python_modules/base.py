@@ -642,6 +642,9 @@ class ExecutableService(SimpleService):
         for line in p.stdout.readlines():
             data.append(str(line.decode()))
 
+        if len(data) == 0:
+            return None
+
         return data
 
     def check(self):
