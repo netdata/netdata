@@ -6,6 +6,7 @@ import time
 import sys
 import os
 import socket
+import resource
 try:
     import urllib.request as urllib2
 except ImportError:
@@ -116,9 +117,10 @@ class BaseService(threading.Thread):
         #run_time_chart = "BEGIN netdata.plugin_pythond_" + self.chart_name + " " + str(since_last) + '\n'
         #run_time_chart += "SET run_time = " + run_time + '\n'
         #run_time_chart += "END\n"
-        run_time_chart = "BEGIN netdata.plugin_pythond_%s %s\nSET run_time = %s\nEND\n" % \
-                         (self.chart_name, str(since_last), run_time)
-        sys.stdout.write(run_time_chart)
+        #sys.stdout.write(run_time_chart)
+        sys.stdout.write("BEGIN netdata.plugin_pythond_%s %s\nSET run_time = %s\nEND\n" % \
+                         (self.chart_name, str(since_last), run_time))
+
         #msg.debug(self.chart_name + " updated in " + str(run_time) + " ms")
         msg.debug(self.chart_name, "updated in", str(run_time), "ms")
         self.timetable['last'] = t_start
