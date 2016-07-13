@@ -319,10 +319,8 @@ class PythonCharts(object):
         i = 0
         overridden = []
         while i < len(self.jobs):
+            msg.error(*overridden)
             job = self.jobs[i]
-            if job.name in overridden:
-                self._stop(job)
-                msg.error(job.name + " already exists")
             try:
                 if not job.check():
                     self._stop(job, "failed check")
@@ -331,10 +329,15 @@ class PythonCharts(object):
                     i += 1
                     try:
                         if job.override_name is not None:
+                            tmp = job.name
                             job.name = job.override_name
                             msg.debug(job.chart_name + " changing chart name to: " + job.__module__ + '_' + job.name)
                             job.chart_name = job.__module__ + '_' + job.name
-                            overridden.append(job.name)
+                            if job.chart_name in overridden:
+                                self._stop(job)
+                                msg.error(job.chart_name + " already exists. Created with '" + tmp + "'")
+                            else:
+                                overridden.append(job.chart_name)
                     except Exception:
                         pass
             except AttributeError:
@@ -482,6 +485,7 @@ def run():
     # parse passed command line arguments
     modules = parse_cmdline(MODULES_DIR, *sys.argv)
     msg.DEBUG_FLAG = DEBUG_FLAG
+    modules = ['sensors']
     msg.info("MODULES_DIR='" + MODULES_DIR +
              "', CONFIG_DIR='" + CONFIG_DIR +
              "', UPDATE_EVERY=" + str(BASE_CONFIG['update_every']) +
