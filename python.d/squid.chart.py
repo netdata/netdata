@@ -56,21 +56,22 @@ class Service(SocketService):
         Get data via http request
         :return: dict
         """
+        data = {}
         try:
-            raw = self._get_raw_data().split('\n')
-            if "200 OK" not in raw[0]:
+            raw = self._get_raw_data().split('\r\n')[-1]
+            if raw.startswith('<'):
                 return None
-            data = {}
-            for row in raw:
+            for row in raw.split('\n'):
                 if row.startswith(("client", "server.all")):
                     tmp = row.split("=")
                     data[tmp[0].replace('.', '_').strip(' ')] = int(tmp[1])
-
-            if len(data) == 0:
-                return None
-            return data
         except (ValueError, AttributeError):
             return None
+
+        if len(data) == 0:
+            return None
+        else:
+            return data
 
     def check(self):
         """
@@ -100,7 +101,6 @@ class Service(SocketService):
         #                 return True
         # else:
         if True:
-            self.error("NEED: " + str(self._get_data()))
             if self._get_data() is not None:
                 return True
             else:
