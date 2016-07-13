@@ -104,6 +104,7 @@ class Service(SocketService):
             if self._get_data() is not None:
                 return True
             else:
+                self.error("No data returned")
                 return False
             
                 
