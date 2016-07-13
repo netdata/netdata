@@ -87,7 +87,7 @@ class Service(SimpleService):
                         float(feature.get_value())
                     except ValueError:
                         continue
-                    if feature.get_value() == 0:
+                    if feature.get_value() < 0:
                         continue
                     if sensors.TYPE_DICT[feature.type] == type:
                         name = pref + "_" + sensors.TYPE_DICT[feature.type]
