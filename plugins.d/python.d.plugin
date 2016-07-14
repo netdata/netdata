@@ -289,7 +289,7 @@ class PythonCharts(object):
             self.jobs.remove(job)
             msg.info("Disabled", prefix)
         except Exception as e:
-            msg.debug("This shouldn't happen. NO " + prefix + " IN LIST:" + str(self.jobs))
+            msg.debug("This shouldn't happen. NO " + prefix + " IN LIST:" + str(self.jobs) + " ERROR: " + str(e))
 
         prefix += ": "
         if reason is None:
