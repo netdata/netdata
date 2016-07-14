@@ -394,16 +394,32 @@ for x in $(find "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
 do
 	if [ -f "${x}" ]
 		then
+		# make a backup of the configuration file
+		cp -p "${x}" "${x}.old"
+
 		if [ -z "${md5sum}" -o ! -x "${md5sum}" ]
 			then
+			# we don't have md5sum - keep it
 			cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
 		else
+			# find it relative filename
 			f="${x/*\/etc\/netdata\//}"
+
+			# find its checksum
 			md5="$(cat "${x}" | ${md5sum} | cut -d ' ' -f 1)"
+
+			# copy the original
+			if [ -f "conf.d/${f}" ]
+				then
+				cp "conf.d/${f}" "${x}.orig"
+			fi
+
 			if [ "${configs_signatures[${md5}]}" = "${f}" ]
 				then
+				# it is a stock version - don't keep it
 				echo >&2 "File '${x}' is stock version."
 			else
+				# edited by user - keep it
 				echo >&2 "File '${x}' has been edited by user."
 				cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
 			fi
