@@ -78,6 +78,48 @@ usage() {
 USAGE
 }
 
+md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null)"
+get_git_config_signatures() {
+	local x s file md5
+
+	[ ! -d "conf.d" ] && echo >&2 "Wrong directory." && return 1
+	[ -z "${md5sum}" -o ! -x "${md5sum}" ] && echo >&2 "No md5sum command." && return 1
+
+	echo >configs.signatures.tmp
+
+	for x in $(find conf.d -name \*.conf)
+	do
+	        x="${x/conf.d\//}"
+	        echo "${x}"
+	        for c in $(git log --follow "conf.d/${x}" | grep ^commit | cut -d ' ' -f 2)
+	        do
+	                git checkout ${c} "conf.d/${x}" || continue
+	                s="$(cat "conf.d/${x}" | md5sum | cut -d ' ' -f 1)"
+	                echo >>configs.signatures.tmp "${x}:${s}"
+	                echo "    ${s}"
+	        done
+	        git checkout HEAD "conf.d/${x}" || break
+	done
+
+	cat configs.signatures.tmp |\
+		grep -v "^$" |\
+		sort -u |\
+		{
+			echo "declare -A configs_signatures=("
+			IFS=":"
+			while read file md5
+			do
+				echo "	['${md5}']='${file}'"
+			done
+			echo ")"
+		} >configs.signatures
+
+	rm configs.signatures.tmp
+
+	return 0
+}
+
+
 while [ ! -z "${1}" ]
 do
 	if [ "$1" = "--install" ]
@@ -99,6 +141,10 @@ do
 	elif [ "$1" = "--help" -o "$1" = "-h" ]
 		then
 		usage
+		exit 1
+	elif [ "$1" = "get_git_config_signatures" ]
+		then
+		get_git_config_signatures && exit 0
 		exit 1
 	else
 		echo >&2
@@ -336,13 +382,32 @@ fi
 echo >&2 "Compiling netdata ..."
 run make || exit 1
 
+declare -A configs_signatures=()
+if [ -f "configs.signatures" ]
+	then
+	source "configs.signatures" || echo >&2 "ERROR: Failed to load configs.signatures !"
+fi
+
 # backup user configurations
 installer_backup_suffix="${PID}.${RANDOM}"
 for x in $(find "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
 do
 	if [ -f "${x}" ]
 		then
-		cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
+		if [ -z "${md5sum}" -o ! -x "${md5sum}" ]
+			then
+			cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
+		else
+			f="${x/*\/etc\/netdata\//}"
+			md5="$(cat "${x}" | ${md5sum} | cut -d ' ' -f 1)"
+			if [ "${configs_signatures[${md5}]}" = "${f}" ]
+				then
+				echo >&2 "File '${x}' is stock version."
+			else
+				echo >&2 "File '${x}' has been edited by user."
+				cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
+			fi
+		fi
 
 	elif [ -f "${x}.installer_backup.${installer_backup_suffix}" ]
 		then
