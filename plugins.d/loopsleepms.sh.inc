@@ -1,4 +1,4 @@
-#!/bin/bash
+# no need for shebang - this file is included from other scripts
 
 # this function is used to sleep a fraction of a second
 # it calculates the difference between every time is called
