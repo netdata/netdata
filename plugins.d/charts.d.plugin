@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 PROGRAM_FILE="$0"
 PROGRAM_NAME="$(basename $0)"
@@ -411,12 +411,16 @@ do
 	[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: loading chart: '$chartsd/$chart.chart.sh'"
 	. "$chartsd/$chart.chart.sh"
 
-	if [ -f "$confd/$chart.conf" ]
+	if [ -f "$confd/charts.d/$chart.conf" ]
+	then
+		[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: loading chart options: '$confd/charts.d/$chart.conf'"
+		. "$confd/charts.d/$chart.conf"
+	elif [ -f "$confd/$chart.conf" ]
 	then
 		[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: loading chart options: '$confd/$chart.conf'"
 		. "$confd/$chart.conf"
 	else
-		echo >&2 "$PROGRAM_NAME: $chart: configuration file '$confd/$chart.conf' not found. Using defaults."
+		echo >&2 "$PROGRAM_NAME: $chart: configuration file '$confd/charts.d/$chart.conf' not found. Using defaults."
 	fi
 
 	eval "dt=\$$chart$suffix_update_every"

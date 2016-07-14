@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # reload the user profile
 [ -f /etc/profile ] && . /etc/profile
@@ -388,6 +388,47 @@ if [ -f "configs.signatures" ]
 	source "configs.signatures" || echo >&2 "ERROR: Failed to load configs.signatures !"
 fi
 
+# migrate existing configuration files
+# for node.d and charts.d
+if [ -d "${NETDATA_PREFIX}/etc/netdata" ]
+	then
+	# the configuration directory exists
+	
+	if [ ! -d "${NETDATA_PREFIX}/etc/netdata/charts.d" ]
+		then
+		run mkdir "${NETDATA_PREFIX}/etc/netdata/charts.d"
+	fi
+
+	# move the charts.d config files
+	for x in apache ap cpu_apps cpufreq example exim hddtemp load_average mem_apps mysql nginx nut opensips phpfpm postfix sensors squid tomcat
+	do
+		for y in "" ".old" ".orig"
+		do
+			if [ -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" ]
+				then
+				run mv -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" "${NETDATA_PREFIX}/etc/netdata/charts.d/${x}.conf${y}"
+			fi
+		done
+	done
+
+	if [ ! -d "${NETDATA_PREFIX}/etc/netdata/node.d" ]
+		then
+		run mkdir "${NETDATA_PREFIX}/etc/netdata/node.d"
+	fi
+
+	# move the node.d config files
+	for x in named sma_webbox snmp
+	do
+		for y in "" ".old" ".orig"
+		do
+			if [ -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" ]
+				then
+				run mv -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" "${NETDATA_PREFIX}/etc/netdata/node.d/${x}.conf${y}"
+			fi
+		done
+	done
+fi
+
 # backup user configurations
 installer_backup_suffix="${PID}.${RANDOM}"
 for x in $(find "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
@@ -543,7 +584,7 @@ fi
 
 echo >&2
 echo >&2 "Fixing directories (user: ${NETDATA_USER})..."
-for x in "${NETDATA_WEB_DIR}" "${NETDATA_CONF_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}" "${NETDATA_LIB_DIR}"
+for x in "${NETDATA_WEB_DIR}" "${NETDATA_CONF_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}" "${NETDATA_LIB_DIR}" "${NETDATA_CONF_DIR}/python.d" "${NETDATA_CONF_DIR}/charts.d" "${NETDATA_CONF_DIR}/node.d"
 do
 	if [ ! -d "${x}" ]
 		then
