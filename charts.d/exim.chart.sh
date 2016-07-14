@@ -38,14 +38,14 @@ exim_check() {
 
 exim_create() {
 cat <<EOF
-CHART exim.qemails '' "Exim Queue Emails" "emails" queue exim.queued.emails line $((exim_priority + 1)) $exim_update_every
+CHART exim_local.qemails '' "Exim Queue Emails" "emails" queue exim.queued.emails line $((exim_priority + 1)) $exim_update_every
 DIMENSION emails '' absolute 1 1
 EOF
 return 0
 }
 
 exim_update() {
-echo "BEGIN exim.qemails $1"
+echo "BEGIN exim_local.qemails $1"
 echo "SET emails = " `$exim_command -bpc`
 echo "END"
 return 0
