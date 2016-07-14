@@ -1,4 +1,4 @@
-#!/bin/sh
+# no need for shebang - this file is loaded from charts.d.plugin
 
 opensips_opts="fifo get_statistics all"
 opensips_cmd=

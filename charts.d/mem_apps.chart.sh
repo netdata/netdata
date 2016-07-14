@@ -1,4 +1,4 @@
-#!/bin/sh
+# no need for shebang - this file is loaded from charts.d.plugin
 
 mem_apps_apps=
 

@@ -1,4 +1,4 @@
-#!/bin/sh
+# no need for shebang - this file is loaded from charts.d.plugin
 
 # sensors docs
 # https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface

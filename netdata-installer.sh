@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # reload the user profile
 [ -f /etc/profile ] && . /etc/profile
@@ -78,6 +78,48 @@ usage() {
 USAGE
 }
 
+md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null)"
+get_git_config_signatures() {
+	local x s file md5
+
+	[ ! -d "conf.d" ] && echo >&2 "Wrong directory." && return 1
+	[ -z "${md5sum}" -o ! -x "${md5sum}" ] && echo >&2 "No md5sum command." && return 1
+
+	echo >configs.signatures.tmp
+
+	for x in $(find conf.d -name \*.conf)
+	do
+	        x="${x/conf.d\//}"
+	        echo "${x}"
+	        for c in $(git log --follow "conf.d/${x}" | grep ^commit | cut -d ' ' -f 2)
+	        do
+	                git checkout ${c} "conf.d/${x}" || continue
+	                s="$(cat "conf.d/${x}" | md5sum | cut -d ' ' -f 1)"
+	                echo >>configs.signatures.tmp "${x}:${s}"
+	                echo "    ${s}"
+	        done
+	        git checkout HEAD "conf.d/${x}" || break
+	done
+
+	cat configs.signatures.tmp |\
+		grep -v "^$" |\
+		sort -u |\
+		{
+			echo "declare -A configs_signatures=("
+			IFS=":"
+			while read file md5
+			do
+				echo "	['${md5}']='${file}'"
+			done
+			echo ")"
+		} >configs.signatures
+
+	rm configs.signatures.tmp
+
+	return 0
+}
+
+
 while [ ! -z "${1}" ]
 do
 	if [ "$1" = "--install" ]
@@ -99,6 +141,10 @@ do
 	elif [ "$1" = "--help" -o "$1" = "-h" ]
 		then
 		usage
+		exit 1
+	elif [ "$1" = "get_git_config_signatures" ]
+		then
+		get_git_config_signatures && exit 0
 		exit 1
 	else
 		echo >&2
@@ -336,13 +382,89 @@ fi
 echo >&2 "Compiling netdata ..."
 run make || exit 1
 
+declare -A configs_signatures=()
+if [ -f "configs.signatures" ]
+	then
+	source "configs.signatures" || echo >&2 "ERROR: Failed to load configs.signatures !"
+fi
+
+# migrate existing configuration files
+# for node.d and charts.d
+if [ -d "${NETDATA_PREFIX}/etc/netdata" ]
+	then
+	# the configuration directory exists
+	
+	if [ ! -d "${NETDATA_PREFIX}/etc/netdata/charts.d" ]
+		then
+		run mkdir "${NETDATA_PREFIX}/etc/netdata/charts.d"
+	fi
+
+	# move the charts.d config files
+	for x in apache ap cpu_apps cpufreq example exim hddtemp load_average mem_apps mysql nginx nut opensips phpfpm postfix sensors squid tomcat
+	do
+		for y in "" ".old" ".orig"
+		do
+			if [ -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" ]
+				then
+				run mv -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" "${NETDATA_PREFIX}/etc/netdata/charts.d/${x}.conf${y}"
+			fi
+		done
+	done
+
+	if [ ! -d "${NETDATA_PREFIX}/etc/netdata/node.d" ]
+		then
+		run mkdir "${NETDATA_PREFIX}/etc/netdata/node.d"
+	fi
+
+	# move the node.d config files
+	for x in named sma_webbox snmp
+	do
+		for y in "" ".old" ".orig"
+		do
+			if [ -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" ]
+				then
+				run mv -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" "${NETDATA_PREFIX}/etc/netdata/node.d/${x}.conf${y}"
+			fi
+		done
+	done
+fi
+
 # backup user configurations
 installer_backup_suffix="${PID}.${RANDOM}"
 for x in $(find "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
 do
 	if [ -f "${x}" ]
 		then
-		cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
+		# make a backup of the configuration file
+		cp -p "${x}" "${x}.old"
+
+		if [ -z "${md5sum}" -o ! -x "${md5sum}" ]
+			then
+			# we don't have md5sum - keep it
+			cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
+		else
+			# find it relative filename
+			f="${x/*\/etc\/netdata\//}"
+
+			# find its checksum
+			md5="$(cat "${x}" | ${md5sum} | cut -d ' ' -f 1)"
+
+			# copy the original
+			if [ -f "conf.d/${f}" ]
+				then
+				cp "conf.d/${f}" "${x}.orig"
+			fi
+
+			if [ "${configs_signatures[${md5}]}" = "${f}" ]
+				then
+				# it is a stock version - don't keep it
+				echo >&2 "File '${x}' is stock version."
+			else
+				# edited by user - keep it
+				echo >&2 "File '${x}' has been edited by user."
+				cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
+			fi
+		fi
 
 	elif [ -f "${x}.installer_backup.${installer_backup_suffix}" ]
 		then
@@ -462,7 +584,7 @@ fi
 
 echo >&2
 echo >&2 "Fixing directories (user: ${NETDATA_USER})..."
-for x in "${NETDATA_WEB_DIR}" "${NETDATA_CONF_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}" "${NETDATA_LIB_DIR}"
+for x in "${NETDATA_WEB_DIR}" "${NETDATA_CONF_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}" "${NETDATA_LIB_DIR}" "${NETDATA_CONF_DIR}/python.d" "${NETDATA_CONF_DIR}/charts.d" "${NETDATA_CONF_DIR}/node.d"
 do
 	if [ ! -d "${x}" ]
 		then

@@ -1,4 +1,4 @@
-#!/bin/bash
+# no need for shebang - this file is loaded from charts.d.plugin
 
 # http://dev.mysql.com/doc/refman/5.0/en/server-status-variables.html
 #

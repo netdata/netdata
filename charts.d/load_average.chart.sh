@@ -1,4 +1,4 @@
-#!/bin/sh
+# no need for shebang - this file is loaded from charts.d.plugin
 
 load_average_update_every=5
 load_priority=100

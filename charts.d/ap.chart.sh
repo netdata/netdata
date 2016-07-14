@@ -1,4 +1,4 @@
-#!/bin/bash
+# no need for shebang - this file is loaded from charts.d.plugin
 
 # _update_every is a special variable - it holds the number of seconds
 # between the calls of the _update() function
@@ -11,6 +11,8 @@ export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
 
 # _check is called once, to find out if this chart should be enabled or not
 ap_check() {
+	require_cmd iw || return 1
+	
 	local ev=$(iw dev | awk '
 		BEGIN {
 			i = "";

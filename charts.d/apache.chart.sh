@@ -1,4 +1,4 @@
-#!/bin/bash
+# no need for shebang - this file is loaded from charts.d.plugin
 
 # the URL to download apache status info
 apache_url="http://127.0.0.1:80/server-status?auto"
