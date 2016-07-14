@@ -1,4 +1,4 @@
-#!/bin/bash
+# no need for shebang - this file is loaded from charts.d.plugin
 
 # if this chart is called X.chart.sh, then all functions and global variables
 # must start with X_
@@ -48,8 +48,8 @@ example_get() {
 	else
 		example_count=$((1 + (RANDOM * 5 / 32767) ))
 
-		[ $example_last -gt 16383 -a $value4 -gt 16383 ] && example_value4=$((value4 - 16383))
-		[ $example_last -le 16383 -a $value4 -lt 16383 ] && example_value4=$((value4 + 16383))
+		[ $example_last -gt 16383 -a $example_value4 -gt 16383 ] && example_value4=$((value4 - 16383))
+		[ $example_last -le 16383 -a $example_value4 -lt 16383 ] && example_value4=$((value4 + 16383))
 	fi
 	example_last=$example_value4
 
