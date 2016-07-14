@@ -11,6 +11,8 @@ export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
 
 # _check is called once, to find out if this chart should be enabled or not
 ap_check() {
+	require_cmd iw || return 1
+	
 	local ev=$(iw dev | awk '
 		BEGIN {
 			i = "";
