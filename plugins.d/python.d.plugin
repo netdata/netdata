@@ -485,8 +485,6 @@ def run():
 
     # parse passed command line arguments
     modules = parse_cmdline(MODULES_DIR, *sys.argv)
-    modules = ['sensors']
-    DEBUG_FLAG = True
     msg.DEBUG_FLAG = DEBUG_FLAG
     msg.info("MODULES_DIR='" + MODULES_DIR +
              "', CONFIG_DIR='" + CONFIG_DIR +
