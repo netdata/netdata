@@ -43,9 +43,9 @@ postfix_check() {
 
 postfix_create() {
 cat <<EOF
-CHART postfix.qemails '' "Postfix Queue Emails" "emails" queue postfix.queued.emails line $((postfix_priority + 1)) $postfix_update_every
+CHART postfix_local.qemails '' "Postfix Queue Emails" "emails" queue postfix.queued.emails line $((postfix_priority + 1)) $postfix_update_every
 DIMENSION emails '' absolute 1 1
-CHART postfix.qsize '' "Postfix Queue Emails Size" "emails size in KB" queue postfix.queued.size area $((postfix_priority + 2)) $postfix_update_every
+CHART postfix_local.qsize '' "Postfix Queue Emails Size" "emails size in KB" queue postfix.queued.size area $((postfix_priority + 2)) $postfix_update_every
 DIMENSION size '' absolute 1 1
 EOF
 
@@ -80,10 +80,10 @@ postfix_update() {
 
 	# write the result of the work.
 	cat <<VALUESEOF
-BEGIN postfix.qemails $1
+BEGIN postfix_local.qemails $1
 SET emails = $postfix_q_emails
 END
-BEGIN postfix.qsize $1
+BEGIN postfix_local.qsize $1
 SET size = $postfix_q_size
 END
 VALUESEOF
