@@ -285,11 +285,13 @@ class PythonCharts(object):
         prefix = job.__module__
         if job.name is not None and len(job.name) != 0:
             prefix += "/" + job.name
-        prefix += ": "
         try:
             self.jobs.remove(job)
+            msg.info("Disabled", prefix)
         except Exception as e:
             msg.debug("This shouldn't happen. NO " + prefix + " IN LIST:" + str(self.jobs))
+
+        prefix += ": "
         if reason is None:
             return
         elif reason[:3] == "no ":
@@ -328,14 +330,14 @@ class PythonCharts(object):
                     i += 1
                     try:
                         if job.override_name is not None:
-                            tmp = job.name
-                            job.name = job.override_name
-                            msg.debug(job.chart_name + " changing chart name to: " + job.__module__ + '_' + job.name)
-                            job.chart_name = job.__module__ + '_' + job.name
-                            if job.chart_name in overridden:
+                            new_name = job.__module__ + '_' + job.override_name
+                            if new_name in overridden:
+                                msg.error(job.chart_name + " already exists. Stopping '" + job.name + "'")
                                 self._stop(job)
-                                msg.error(job.chart_name + " already exists. Created with '" + tmp + "'")
                             else:
+                                job.name = job.override_name
+                                msg.debug(job.chart_name + " changing chart name to: '" + new_name + "'")
+                                job.chart_name = new_name
                                 overridden.append(job.chart_name)
                     except Exception:
                         pass
@@ -483,6 +485,8 @@ def run():
 
     # parse passed command line arguments
     modules = parse_cmdline(MODULES_DIR, *sys.argv)
+    modules = ['sensors']
+    DEBUG_FLAG = True
     msg.DEBUG_FLAG = DEBUG_FLAG
     msg.info("MODULES_DIR='" + MODULES_DIR +
              "', CONFIG_DIR='" + CONFIG_DIR +
