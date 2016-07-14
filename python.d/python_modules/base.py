@@ -540,7 +540,7 @@ class SocketService(SimpleService):
         Parse configuration data
         :return: boolean
         """
-        if self.name is not None or self.name != str(None):
+        if self.name is None or self.name == str(None):
             self.name = ""
         else:
             self.name = str(self.name)
