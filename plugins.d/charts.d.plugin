@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 PROGRAM_FILE="$0"
 PROGRAM_NAME="$(basename $0)"
@@ -305,8 +305,26 @@ all_charts() {
 	ls *.chart.sh | sed "s/\.chart\.sh$//g"
 }
 
+declare -A charts_enable_keyword=(
+	      ['apache']="force"
+	    ['cpu_apps']="force"
+	     ['cpufreq']="force"
+	     ['example']="force"
+	        ['exim']="force"
+	     ['hddtemp']="force"
+	['load_average']="force"
+	    ['mem_apps']="force"
+	       ['mysql']="force"
+	       ['nginx']="force"
+	      ['phpfpm']="force"
+	     ['postfix']="force"
+	     ['sensors']="force"
+	       ['squid']="force"
+	      ['tomcat']="force"
+	)
+
 all_enabled_charts() {
-	local charts= enabled=
+	local charts= enabled= required=
 
 	# find all enabled charts
 
@@ -318,9 +336,12 @@ all_enabled_charts() {
 			enabled="${enable_all_charts}"
 		fi
 
-		if [ ! "${enabled}" = "yes" ]
+		required="${charts_enable_keyword[${chart}]}"
+		[ -z "${required}" ] && required="yes"
+
+		if [ ! "${enabled}" = "${required}" ]
 		then
-			echo >&2 "$PROGRAM_NAME: '$chart' is NOT enabled. Add a line with $chart=yes in $myconfig to enable it (or remove the line that disables it)."
+			echo >&2 "$PROGRAM_NAME: '$chart' is NOT enabled. Add a line with $chart=$required in $myconfig to enable it (or remove the line that disables it)."
 		else
 			[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: '$chart' is enabled."
 			local charts="$charts $chart"
@@ -390,12 +411,16 @@ do
 	[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: loading chart: '$chartsd/$chart.chart.sh'"
 	. "$chartsd/$chart.chart.sh"
 
-	if [ -f "$confd/$chart.conf" ]
+	if [ -f "$confd/charts.d/$chart.conf" ]
+	then
+		[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: loading chart options: '$confd/charts.d/$chart.conf'"
+		. "$confd/charts.d/$chart.conf"
+	elif [ -f "$confd/$chart.conf" ]
 	then
 		[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: loading chart options: '$confd/$chart.conf'"
 		. "$confd/$chart.conf"
 	else
-		echo >&2 "$PROGRAM_NAME: $chart: configuration file '$confd/$chart.conf' not found. Using defaults."
+		echo >&2 "$PROGRAM_NAME: $chart: configuration file '$confd/charts.d/$chart.conf' not found. Using defaults."
 	fi
 
 	eval "dt=\$$chart$suffix_update_every"

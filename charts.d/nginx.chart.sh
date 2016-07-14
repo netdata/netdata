@@ -1,4 +1,4 @@
-#!/bin/bash
+# no need for shebang - this file is loaded from charts.d.plugin
 
 # if this chart is called X.chart.sh, then all functions and global variables
 # must start with X_

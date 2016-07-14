@@ -1376,11 +1376,11 @@ var menuData = {
 		title: 'nginx',
 		info: undefined,
 	},
-/*
+
 	'apache': {
 		title: 'Apache',
 		info: undefined,
-	},*/
+	},
 
 	'named': {
 		title: 'named',
@@ -1410,47 +1410,17 @@ var submenuData = {
 	}
 };
 
+//
+// chartData works on the context of a chart
+// Its purpose is to set:
+//
+// info: the text above the charts
+// heads: the representation of the chart at the top the subsection (second level menu)
+// mainheads: the representation of the chart at the top of the section (first level menu)
+// colors: the dimension colors of the chart (the default colors are appended)
+// height: the ratio of the chart height relative to the default
+//
 var chartData = {
-	'mysql.net': {
-		info: 'The amount of data sent to mysql clients (<strong>out</strong>) and received from mysql clients (<strong>in</strong>).'
-	},
-
-	'mysql.queries': {
-		info: 'The number of statements executed by the server.<ul>' +
-		'<li><strong>queries</strong> counts the statements executed within stored SQL programs.</li>' +
-		'<li><strong>questions</strong> counts the statements sent to the mysql server by mysql clients.</li>' +
-		'<li><strong>slow queries</strong> counts the number of statements that took more than <a href="http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_long_query_time" target="_blank">long_query_time</a> seconds to be executed.' +
-		' For more information about slow queries check the mysql <a href="http://dev.mysql.com/doc/refman/5.7/en/slow-query-log.html" target="_blank">slow query log</a>.</li>' +
-		'</ul>'
-	},
-
-	'mysql.handlers': {
-		info: 'Usage of the internal handlers of mysql. This chart provides very good insights of what the mysql server is actually doing.' +
-		' (if the chart is not showing all these dimensions it is because they are zero - set <strong>Which dimensions to show?</strong> to <strong>All</strong> from the dashboard settings, to render even the zero values)<ul>' +
-		'<li><strong>commit</strong>, the number of internal <a href="http://dev.mysql.com/doc/refman/5.7/en/commit.html" target="_blank">COMMIT</a> statements.</li>' +
-		'<li><strong>delete</strong>, the number of times that rows have been deleted from tables.</li>' +
-		'<li><strong>prepare</strong>, a counter for the prepare phase of two-phase commit operations.</li>' +
-		'<li><strong>read first</strong>, the number of times the first entry in an index was read. A high value suggests that the server is doing a lot of full index scans; e.g. <strong>SELECT col1 FROM foo</strong>, with col1 indexed.</li>' +
-		'<li><strong>read key</strong>, the number of requests to read a row based on a key. If this value is high, it is a good indication that your tables are properly indexed for your queries.</li>' +
-		'<li><strong>read next</strong>, the number of requests to read the next row in key order. This value is incremented if you are querying an index column with a range constraint or if you are doing an index scan.</li>' +
-		'<li><strong>read prev</strong>, the number of requests to read the previous row in key order. This read method is mainly used to optimize <strong>ORDER BY ... DESC</strong>.</li>' +
-		'<li><strong>read rnd</strong>, the number of requests to read a row based on a fixed position. A high value indicates you are doing a lot of queries that require sorting of the result. You probably have a lot of queries that require MySQL to scan entire tables or you have joins that do not use keys properly.</li>' +
-		'<li><strong>read rnd next</strong>, the number of requests to read the next row in the data file. This value is high if you are doing a lot of table scans. Generally this suggests that your tables are not properly indexed or that your queries are not written to take advantage of the indexes you have.</li>' +
-		'<li><strong>rollback</strong>, the number of requests for a storage engine to perform a rollback operation.</li>' +
-		'<li><strong>savepoint</strong>, the number of requests for a storage engine to place a savepoint.</li>' +
-		'<li><strong>savepoint rollback</strong>, the number of requests for a storage engine to roll back to a savepoint.</li>' +
-		'<li><strong>update</strong>, the number of requests to update a row in a table.</li>' +
-		'<li><strong>write</strong>, the number of requests to insert a row in a table.</li>' +
-		'</ul>'
-	},
-
-	'mysql.table_locks': {
-		info: 'MySQL table locks counters: <ul>' +
-		'<li><strong>immediate</strong>, the number of times that a request for a table lock could be granted immediately.</li>' +
-		'<li><strong>waited</strong>, the number of times that a request for a table lock could not be granted immediately and a wait was needed. If this is high and you have performance problems, you should first optimize your queries, and then either split your table or tables or use replication.</li>' +
-		'</ul>'
-	},
-
 	'system.cpu': {
 		info: 'Total CPU utilization (all cores). 100% here means there is no CPU idle time at all. You can get per core usage at the <a href="#cpu">CPUs</a> section and per application usage at the <a href="#apps">Applications Monitoring</a> section.<br/>Keep an eye on <b>iowait</b> ' + sparkline('system.cpu', 'iowait', '%') + '. If it is constantly high, your disks are a bottleneck and they slow your system down.<br/>Another important metric worth monitoring, is <b>softirq</b> ' + sparkline('system.cpu', 'softirq', '%') + '. A constantly high percentage of softirq may indicate network drivers issues.'
 	},
@@ -1528,6 +1498,9 @@ var chartData = {
 		info: 'System swap memory, read from <code>/proc/meminfo</code>.'
 	},
 
+	// ------------------------------------------------------------------------
+	// MEMORY
+
 	'mem.ksm_savings': {
 		heads: [
 			gaugeChart('Saved', '12%', 'savings', '#0099CC')
@@ -1556,6 +1529,9 @@ var chartData = {
 		colors: NETDATA.colors[3]
 	},
 
+	// ------------------------------------------------------------------------
+	// APPS
+
 	'apps.cpu': {
 		height: 2.0
 	},
@@ -1567,6 +1543,9 @@ var chartData = {
 	'apps.pwrites': {
 		height: 2.0
 	},
+
+	// ------------------------------------------------------------------------
+	// USERS
 
 	'users.cpu': {
 		height: 2.0
@@ -1580,6 +1559,9 @@ var chartData = {
 		height: 2.0
 	},
 
+	// ------------------------------------------------------------------------
+	// GROUPS
+
 	'groups.cpu': {
 		height: 2.0
 	},
@@ -1592,6 +1574,9 @@ var chartData = {
 		height: 2.0
 	},
 
+	// ------------------------------------------------------------------------
+	// NETWORK QoS
+
 	'tc.qos': {
 		heads: [
 			function(id) {
@@ -1603,12 +1588,34 @@ var chartData = {
 		]
 	},
 
+	// ------------------------------------------------------------------------
+	// NETWORK INTERFACES
+
 	'net.net': {
 		heads: [
 			gaugeChart('Received', '12%', 'received'),
 			gaugeChart('Sent', '12%', 'sent')
 		]
 	},
+
+	// ------------------------------------------------------------------------
+	// NETFILTER
+
+	'netfilter.sockets': {
+		colors: '#88AA00',
+		heads: [
+			gaugeChart('Active Connections', '12%', '', '#88AA00')
+		]
+	},
+
+	'netfilter.new': {
+		heads: [
+			gaugeChart('New Connections', '12%', 'new', '#5555AA')
+		]
+	},
+
+	// ------------------------------------------------------------------------
+	// DISKS
 
 	'disk.util': {
 		colors: '#FF5588',
@@ -1639,19 +1646,6 @@ var chartData = {
 		info: 'I/O operations currently in progress. This metric is a snapshot - it is not an average over the last interval.'
 	},
 
-	'netfilter.sockets': {
-		colors: '#88AA00',
-		heads: [
-			gaugeChart('Active Connections', '12%', '', '#88AA00')
-		]
-	},
-
-	'netfilter.new': {
-		heads: [
-			gaugeChart('New Connections', '12%', 'new', '#5555AA')
-		]
-	},
-
 	'disk.iotime': {
 		height: 0.5,
 		info: 'The sum of the duration of all completed I/O operations. This number can exceed the interval if the disk is able to execute I/O operations in parallel.'
@@ -1679,6 +1673,53 @@ var chartData = {
 	'disk.inodes': {
 		info: 'inodes (or index nodes) are filesystem objects (e.g. files and directories). On many types of file system implementations, the maximum number of inodes is fixed at filesystem creation, limiting the maximum number of files the filesystem can hold. It is possible for a device to run out of inodes. When this happens, new files cannot be created on the device, even though there may be free space available.'
 	},
+
+	'mysql.net': {
+		info: 'The amount of data sent to mysql clients (<strong>out</strong>) and received from mysql clients (<strong>in</strong>).'
+	},
+
+	// ------------------------------------------------------------------------
+	// MYSQL
+
+	'mysql.queries': {
+		info: 'The number of statements executed by the server.<ul>' +
+		'<li><strong>queries</strong> counts the statements executed within stored SQL programs.</li>' +
+		'<li><strong>questions</strong> counts the statements sent to the mysql server by mysql clients.</li>' +
+		'<li><strong>slow queries</strong> counts the number of statements that took more than <a href="http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_long_query_time" target="_blank">long_query_time</a> seconds to be executed.' +
+		' For more information about slow queries check the mysql <a href="http://dev.mysql.com/doc/refman/5.7/en/slow-query-log.html" target="_blank">slow query log</a>.</li>' +
+		'</ul>'
+	},
+
+	'mysql.handlers': {
+		info: 'Usage of the internal handlers of mysql. This chart provides very good insights of what the mysql server is actually doing.' +
+		' (if the chart is not showing all these dimensions it is because they are zero - set <strong>Which dimensions to show?</strong> to <strong>All</strong> from the dashboard settings, to render even the zero values)<ul>' +
+		'<li><strong>commit</strong>, the number of internal <a href="http://dev.mysql.com/doc/refman/5.7/en/commit.html" target="_blank">COMMIT</a> statements.</li>' +
+		'<li><strong>delete</strong>, the number of times that rows have been deleted from tables.</li>' +
+		'<li><strong>prepare</strong>, a counter for the prepare phase of two-phase commit operations.</li>' +
+		'<li><strong>read first</strong>, the number of times the first entry in an index was read. A high value suggests that the server is doing a lot of full index scans; e.g. <strong>SELECT col1 FROM foo</strong>, with col1 indexed.</li>' +
+		'<li><strong>read key</strong>, the number of requests to read a row based on a key. If this value is high, it is a good indication that your tables are properly indexed for your queries.</li>' +
+		'<li><strong>read next</strong>, the number of requests to read the next row in key order. This value is incremented if you are querying an index column with a range constraint or if you are doing an index scan.</li>' +
+		'<li><strong>read prev</strong>, the number of requests to read the previous row in key order. This read method is mainly used to optimize <strong>ORDER BY ... DESC</strong>.</li>' +
+		'<li><strong>read rnd</strong>, the number of requests to read a row based on a fixed position. A high value indicates you are doing a lot of queries that require sorting of the result. You probably have a lot of queries that require MySQL to scan entire tables or you have joins that do not use keys properly.</li>' +
+		'<li><strong>read rnd next</strong>, the number of requests to read the next row in the data file. This value is high if you are doing a lot of table scans. Generally this suggests that your tables are not properly indexed or that your queries are not written to take advantage of the indexes you have.</li>' +
+		'<li><strong>rollback</strong>, the number of requests for a storage engine to perform a rollback operation.</li>' +
+		'<li><strong>savepoint</strong>, the number of requests for a storage engine to place a savepoint.</li>' +
+		'<li><strong>savepoint rollback</strong>, the number of requests for a storage engine to roll back to a savepoint.</li>' +
+		'<li><strong>update</strong>, the number of requests to update a row in a table.</li>' +
+		'<li><strong>write</strong>, the number of requests to insert a row in a table.</li>' +
+		'</ul>'
+	},
+
+	'mysql.table_locks': {
+		info: 'MySQL table locks counters: <ul>' +
+		'<li><strong>immediate</strong>, the number of times that a request for a table lock could be granted immediately.</li>' +
+		'<li><strong>waited</strong>, the number of times that a request for a table lock could not be granted immediately and a wait was needed. If this is high and you have performance problems, you should first optimize your queries, and then either split your table or tables or use replication.</li>' +
+		'</ul>'
+	},
+
+	// ------------------------------------------------------------------------
+	// APACHE
+
 	'apache.connections': {
 		colors: NETDATA.colors[4],
 		mainheads: [
@@ -1689,7 +1730,7 @@ var chartData = {
 	'apache.requests': {
 		colors: NETDATA.colors[0],
 		mainheads: [
-			gaugeChart('Connections', '12%', '', NETDATA.colors[0])
+			gaugeChart('Requests', '12%', '', NETDATA.colors[0])
 		]
 	},
 
@@ -1735,14 +1776,18 @@ var chartData = {
 		height: 0.5
 	},
 
-	'nginx_local.connections': {
+
+	// ------------------------------------------------------------------------
+	// NGINX
+
+	'nginx.connections': {
 		colors: NETDATA.colors[4],
 		mainheads: [
 			gaugeChart('Connections', '12%', '', NETDATA.colors[4])
 		]
 	},
 
-	'nginx_local.requests': {
+	'nginx.requests': {
 		colors: NETDATA.colors[0],
 		mainheads: [
 			gaugeChart('Requests', '12%', '', NETDATA.colors[0])
@@ -1820,13 +1865,18 @@ function enrichChartData(chart) {
 			chart.menu = tmp;
 			break;
 
-		case 'mysql':
-		case 'redis':
-		case 'phpfpm':
-		case 'nginx':
-/*		case 'apache':*/
-		case 'named':
+		case 'apache':
 		case 'cgroup':
+		case 'exim':
+		case 'mysql':
+		case 'named':
+		case 'nginx':
+		case 'phpfpm':
+		case 'postfix':
+		case 'redis':
+		case 'squid':
+		case 'snmp':
+		case 'tomcat':
 			chart.menu = chart.type;
 			chart.menu_pattern = tmp;
 			break;
@@ -1897,7 +1947,6 @@ function headMain(charts, duration) {
 		+ ' data-dimensions="in"'
 		+ ' data-chart-library="easypiechart"'
 		+ ' data-title="Disk Read"'
-		+ ' data-units="KB / s"'
 		+ ' data-width="10%"'
 		+ ' data-before="0"'
 		+ ' data-after="-' + duration.toString() + '"'
@@ -1908,7 +1957,6 @@ function headMain(charts, duration) {
 		+ ' data-dimensions="out"'
 		+ ' data-chart-library="easypiechart"'
 		+ ' data-title="Disk Write"'
-		+ ' data-units="KB / s"'
 		+ ' data-width="10%"'
 		+ ' data-before="0"'
 		+ ' data-after="-' + duration.toString() + '"'
@@ -1933,7 +1981,6 @@ function headMain(charts, duration) {
 		+ ' data-dimensions="received"'
 		+ ' data-chart-library="easypiechart"'
 		+ ' data-title="IPv4 Inbound"'
-		+ ' data-units="kbps"'
 		+ ' data-width="10%"'
 		+ ' data-before="0"'
 		+ ' data-after="-' + duration.toString() + '"'
@@ -1944,7 +1991,6 @@ function headMain(charts, duration) {
 		+ ' data-dimensions="sent"'
 		+ ' data-chart-library="easypiechart"'
 		+ ' data-title="IPv4 Outbound"'
-		+ ' data-units="kbps"'
 		+ ' data-width="10%"'
 		+ ' data-before="0"'
 		+ ' data-after="-' + duration.toString() + '"'

@@ -1,4 +1,4 @@
-#!/bin/bash
+# no need for shebang - this file is loaded from charts.d.plugin
 
 # if this chart is called X.chart.sh, then all functions and global variables
 # must start with X_
@@ -15,13 +15,63 @@ example_priority=150000
 # (just a demonstration for something that needs to be checked)
 example_magic_number=
 
+# global variables to store our collected data
+# remember: they need to start with the module name example_
+example_value1=
+example_value2=
+example_value3=
+example_value4=
+example_last=0
+example_count=0
+
+example_get() {
+	# do all the work to collect / calculate the values
+	# for each dimension
+	#
+	# Remember:
+	# 1. KEEP IT SIMPLE AND SHORT
+	# 2. AVOID FORKS (avoid piping commands)
+	# 3. AVOID CALLING TOO MANY EXTERNAL PROGRAMS
+	# 4. USE LOCAL VARIABLES (global variables may overlap with other modules)
+
+	example_value1=$RANDOM
+	example_value2=$RANDOM
+	example_value3=$RANDOM
+	example_value4=$((8192 + (RANDOM * 16383 / 32767) ))
+
+	if [ $example_count -gt 0 ]
+		then
+		example_count=$((example_count - 1))
+
+		[ $example_last -gt 16383 ] && example_value4=$((example_last + (RANDOM * ( (32767 - example_last) / 2) / 32767)))
+		[ $example_last -le 16383 ] && example_value4=$((example_last - (RANDOM * (example_last / 2) / 32767)))
+	else
+		example_count=$((1 + (RANDOM * 5 / 32767) ))
+
+		[ $example_last -gt 16383 -a $example_value4 -gt 16383 ] && example_value4=$((value4 - 16383))
+		[ $example_last -le 16383 -a $example_value4 -lt 16383 ] && example_value4=$((value4 + 16383))
+	fi
+	example_last=$example_value4
+
+	# this should return:
+	#  - 0 to send the data to netdata
+	#  - 1 to report a failure to collect the data
+
+	return 0
+}
+
 # _check is called once, to find out if this chart should be enabled or not
 example_check() {
 	# this should return:
 	#  - 0 to enable the chart
 	#  - 1 to disable the chart
 
-	[ "${example_magic_number}" != "12345" ] && return 1
+	# check something
+	[ "${example_magic_number}" != "12345" ] && echo >&2 "example: you have to set example_magic_number=$example_magic_number in example.conf to start example chart." && return 1
+
+	# check that we can collect data
+	example_get || return 1
+
 	return 0
 }
 
@@ -41,46 +91,21 @@ EOF
 }
 
 # _update is called continiously, to collect the values
-example_last=0
-example_count=0
 example_update() {
-	local value1 value2 value3 value4 mode
-
 	# the first argument to this function is the microseconds since last update
 	# pass this parameter to the BEGIN statement (see bellow).
 
-	# do all the work to collect / calculate the values
-	# for each dimension
-	# remember: KEEP IT SIMPLE AND SHORT
-
-	value1=$RANDOM
-	value2=$RANDOM
-	value3=$RANDOM
-	value4=$((8192 + (RANDOM * 16383 / 32767) ))
-
-	if [ $example_count -gt 0 ]
-		then
-		example_count=$((example_count - 1))
-
-		[ $example_last -gt 16383 ] && value4=$((example_last + (RANDOM * ( (32767 - example_last) / 2) / 32767)))
-		[ $example_last -le 16383 ] && value4=$((example_last - (RANDOM * (example_last / 2) / 32767)))
-	else
-		example_count=$((1 + (RANDOM * 5 / 32767) ))
-
-		[ $example_last -gt 16383 -a $value4 -gt 16383 ] && value4=$((value4 - 16383))
-		[ $example_last -le 16383 -a $value4 -lt 16383 ] && value4=$((value4 + 16383))
-	fi
-	example_last=$value4
+	example_get || return 1
 
 	# write the result of the work.
 	cat <<VALUESEOF
 BEGIN example.random $1
-SET random1 = $value1
-SET random2 = $value2
-SET random3 = $value3
+SET random1 = $example_value1
+SET random2 = $example_value2
+SET random3 = $example_value3
 END
 BEGIN example.random2 $1
-SET random = $value4
+SET random = $example_value4
 END
 VALUESEOF
 	# echo >&2 "example_count = $example_count value = $value4"
