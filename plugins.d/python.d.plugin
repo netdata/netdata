@@ -334,6 +334,7 @@ class PythonCharts(object):
                             if new_name in overridden:
                                 msg.error(job.chart_name + " already exists. Stopping '" + job.name + "'")
                                 self._stop(job)
+                                i -= 1
                             else:
                                 job.name = job.override_name
                                 msg.debug(job.chart_name + " changing chart name to: '" + new_name + "'")
