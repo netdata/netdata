@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 ':' //; exec "$(command -v nodejs || command -v node || command -v js || echo "ERROR node.js IS NOT AVAILABLE IN THIS SYSTEM")" "$0" "$@"
 
 // shebang hack from:
@@ -42,12 +42,17 @@ var netdata = require('netdata');
 function pluginConfig(filename) {
 	var f = path.basename(filename);
 
+	// node.d.plugin configuration
 	var m = f.match('.plugin' + '$');
-	if(m === null) m = f.match('.node.js' + '$');
 	if(m !== null)
 		return netdata.options.paths.config + '/' + f.substring(0, m.index) + '.conf';
 
-	return netdata.options.paths.config + '/' + f + '.conf';
+	// node.d modules configuration
+	m = f.match('.node.js' + '$');
+	if(m !== null)
+		return netdata.options.paths.config + '/node.d/' + f.substring(0, m.index) + '.conf';
+
+	return netdata.options.paths.config + '/node.d/' + f + '.conf';
 }
 
 // internal defaults

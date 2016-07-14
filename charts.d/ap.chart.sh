@@ -1,4 +1,4 @@
-#!/bin/bash
+# no need for shebang - this file is loaded from charts.d.plugin
 
 # _update_every is a special variable - it holds the number of seconds
 # between the calls of the _update() function
