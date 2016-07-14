@@ -1,4 +1,4 @@
-#!/bin/sh
+# no need for shebang - this file is loaded from charts.d.plugin
 
 # the postqueue command
 # if empty, it will use the one found in the system path

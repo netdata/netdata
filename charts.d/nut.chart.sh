@@ -1,4 +1,4 @@
-#!/bin/bash
+# no need for shebang - this file is loaded from charts.d.plugin
 
 # a space separated list of UPS names
 # if empty, the list returned by 'upsc -l' will be used
