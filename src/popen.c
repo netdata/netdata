@@ -129,6 +129,10 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 		sigemptyset(&sa.sa_mask);
 		sa.sa_handler = SIG_DFL;
 		sa.sa_flags = 0;
+		
+		if(sigaction(SIGUSR1, &sa, NULL) == -1)
+			error("pre-execution of command '%s' on pid %d: failed to set default signal handler for SIGUSR1.", command, getpid());
+
 		if(sigaction(SIGPIPE, &sa, NULL) == -1)
 			error("pre-execution of command '%s' on pid %d: failed to set default signal handler for SIGPIPE.", command, getpid());
 	}
