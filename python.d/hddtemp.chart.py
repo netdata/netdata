@@ -46,6 +46,7 @@ class Service(SocketService):
         try:
             raw = self._get_raw_data().split("|")[:-1]
         except AttributeError:
+            self.error("no data received")
             return None
         data = {}
         for i in range(len(raw) // 5):
@@ -54,7 +55,12 @@ class Service(SocketService):
             except ValueError:
                 val = 0
             data[raw[i*5+1].replace("/dev/", "")] = val
-        return data
+
+        if len(data) == 0:
+            self.error("received data doesn't have needed records")
+            return None
+        else:
+            return data
 
     def check(self):
         """
@@ -64,7 +70,6 @@ class Service(SocketService):
         self._parse_config()
         data = self._get_data()
         if data is None:
-            self.error("No data received")
             return False
 
         for name in data:
