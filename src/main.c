@@ -591,7 +591,7 @@ int main(int argc, char **argv)
 		sigaddset(&sa.sa_mask, SIGHUP);
 		sigaddset(&sa.sa_mask, SIGINT);
 		sigaddset(&sa.sa_mask, SIGTERM);
-		sa.sa_handler = sig_handler;
+		sa.sa_handler = sig_handler_exit;
 		sa.sa_flags = 0;
 		if(sigaction(SIGHUP, &sa, NULL) == -1) {
 			error("Failed to change signal handler for SIGHUP");
@@ -602,12 +602,19 @@ int main(int argc, char **argv)
 		if(sigaction(SIGTERM, &sa, NULL) == -1) {
 			error("Failed to change signal handler for SIGTERM");
 		}
+
+		// save database on SIGUSR1
+		sa.sa_handler = sig_handler_save;
+		if(sigaction(SIGUSR1, &sa, NULL) == -1) {
+			error("Failed to change signal handler for SIGUSR1");
+		}
+
 		// Ignore SIGPIPE completely.
 		// INFO: If we add signals here we have to unblock them
 		// at popen.c when running a external plugin.
 		sa.sa_handler = SIG_IGN;
 		if(sigaction(SIGPIPE, &sa, NULL) == -1) {
-			error("Failed to change signal handler for SIGTERM");
+			error("Failed to change signal handler for SIGPIPE");
 		}
 
 		// --------------------------------------------------------------------
