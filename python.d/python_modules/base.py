@@ -398,6 +398,8 @@ class SimpleService(BaseService):
                 self.end()
 
         self.commit()
+        if not updated:
+            self.error("no charts to update")
 
         return updated
 
