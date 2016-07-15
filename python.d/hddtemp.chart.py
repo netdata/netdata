@@ -32,6 +32,7 @@ CHARTS = {
 class Service(SocketService):
     def __init__(self, configuration=None, name=None):
         SocketService.__init__(self, configuration=configuration, name=name)
+        self._keep_alive = False
         self.request = ""
         self.host = "127.0.0.1"
         self.port = 7634
