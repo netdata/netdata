@@ -552,19 +552,19 @@ class SocketService(SimpleService):
         try:
             self.unix_socket = str(self.configuration['socket'])
         except (KeyError, TypeError):
-            self.error("No unix socket specified. Trying TCP/IP socket.")
+            self.debug("No unix socket specified. Trying TCP/IP socket.")
             try:
                 self.host = str(self.configuration['host'])
             except (KeyError, TypeError):
-                self.error("No host specified. Using: '" + self.host + "'")
+                self.debug("No host specified. Using: '" + self.host + "'")
             try:
                 self.port = int(self.configuration['port'])
             except (KeyError, TypeError):
-                self.error("No port specified. Using: '" + str(self.port) + "'")
+                self.debug("No port specified. Using: '" + str(self.port) + "'")
         try:
             self.request = str(self.configuration['request'])
         except (KeyError, TypeError):
-            self.error("No request specified. Using: '" + str(self.request) + "'")
+            self.debug("No request specified. Using: '" + str(self.request) + "'")
         self.request = self.request.encode()
 
 
