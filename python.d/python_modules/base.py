@@ -485,8 +485,8 @@ class SocketService(SimpleService):
         Get raw data with low-level "socket" module.
         :return: str
         """
-        #if self._sock is None:
-        if True:
+        # Recreate socket since they cannot be reused
+        if self._sock is None:
             try:
                 if self.unix_socket is None:
                     self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -503,12 +503,15 @@ class SocketService(SimpleService):
                     self._sock.settimeout(0.05)
                     self._sock.connect(self.unix_socket)
                     self._sock.settimeout(0.05)  # Just to be sure
-
             except Exception as e:
-                self.error(str(e), "used configuration: host:", str(self.host), "port:", str(self.port), "socket:", str(self.unix_socket))
+                self.error(str(e),
+                           "Cannot create socket with following configuration: host:", str(self.host),
+                           "port:", str(self.port),
+                           "socket:", str(self.unix_socket))
                 self._sock = None
                 return None
 
+        # Send request if it is needed
         if self.request != "".encode():
             try:
                 self._sock.send(self.request)
@@ -516,33 +519,45 @@ class SocketService(SimpleService):
                 try:
                     self._sock.shutdown(0)
                     self._sock.close()
+                    self._sock = None
                 except:
                     pass
-                self._sock = None
-                self.error(str(e), "used configuration: host:", str(self.host), "port:", str(self.port), "socket:", str(self.unix_socket))
+                self.error(str(e),
+                           "used configuration: host:", str(self.host),
+                           "port:", str(self.port),
+                           "socket:", str(self.unix_socket))
                 return None
 
+        # Receive first two bytes from socket. This will test if there is anything to receive
         size = 2
         try:
             data = self._sock.recv(size).decode()
         except Exception as e:
-            self.error(str(e), "used configuration: host:", str(self.host), "port:", str(self.port), "socket:", str(self.unix_socket))
+            self.error(str(e),
+                       "used configuration: host:", str(self.host),
+                       "port:", str(self.port),
+                       "socket:", str(self.unix_socket))
             self._sock.shutdown(0)
             self._sock.close()
             self._sock = None
             return None
 
+        # Receive the rest
         while True:
             # implement something like TCP Window Scaling
             if size < 4096:
                 size *= 2
             buf = self._sock.recv(size)
             data += buf.decode()
-            if len(buf) == 0: break
+            if len(buf) == 0: break  # precaution
             if len(buf) < size and not self._more_data_available():
                 break
             else:
                 size = 4
+
+        self._sock.shutdown(0)
+        self._sock.close()
+        self._sock = None
 
         return data
 
