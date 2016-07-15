@@ -474,6 +474,7 @@ class UrlService(SimpleService):
 class SocketService(SimpleService):
     def __init__(self, configuration=None, name=None):
         self._sock = None
+        self._keep_alive = True
         self.host = "localhost"
         self.port = None
         self.unix_socket = None
@@ -555,9 +556,10 @@ class SocketService(SimpleService):
             else:
                 size = 4
 
-        self._sock.shutdown(0)
-        self._sock.close()
-        self._sock = None
+        if not self._keep_alive:
+            self._sock.shutdown(0)
+            self._sock.close()
+            self._sock = None
 
         return data
 
