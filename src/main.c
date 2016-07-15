@@ -444,6 +444,13 @@ int main(int argc, char **argv)
 	// http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
 	setenv("TZ", ":/etc/localtime", 0);
 
+	{
+		char path[1024 + 1], *p = getenv("PATH");
+		if(!p) p = "/bin:/usr/bin";
+		snprintfz(path, 1024, "%s:%s", p, "/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin");
+		setenv("PATH", config_get("plugins", "PATH environment variable", path), 1);
+	}
+
 	// cd to /tmp to avoid any plugins writing files at random places
 	if(chdir("/tmp")) error("netdata: ERROR: Cannot cd to /tmp");
 
