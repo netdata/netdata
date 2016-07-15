@@ -504,7 +504,7 @@ class SocketService(SimpleService):
                     sock.settimeout(0.05)  # Just to be sure
 
             except Exception as e:
-                self.error(str(e), "used configuration: host:", self.host, "port:", self.port, "socket:", self.unix_socket)
+                self.error(str(e), "used configuration: host:", str(self.host), "port:", str(self.port), "socket:", str(self.unix_socket))
                 self.sock = None
                 return None
 
@@ -518,14 +518,14 @@ class SocketService(SimpleService):
                 except:
                     pass
                 self.sock = None
-                self.error(str(e), "used configuration: host:", self.host, "port:", self.port, "socket:", self.unix_socket)
+                self.error(str(e), "used configuration: host:", str(self.host), "port:", str(self.port), "socket:", str(self.unix_socket))
                 return None
 
         size = 2
         try:
             data = sock.recv(size).decode()
         except Exception as e:
-            self.error(str(e), "used configuration: host:", self.host, "port:", self.port, "socket:", self.unix_socket)
+            self.error(str(e), "used configuration: host:", str(self.host), "port:", str(self.port), "socket:", str(self.unix_socket))
             sock.close()
             return None
 
