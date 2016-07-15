@@ -6,7 +6,6 @@ import time
 import sys
 import os
 import socket
-import resource
 try:
     import urllib.request as urllib2
 except ImportError:
@@ -96,7 +95,7 @@ class BaseService(threading.Thread):
         if self.timetable['next'] > t_start:
             #msg.debug(self.chart_name + " will be run in " +
             #          str(int((self.timetable['next'] - t_start) * 1000)) + " ms")
-            msg.debug(self.chart_name,"will be run in", str(int((self.timetable['next'] - t_start) * 1000)), "ms")
+            msg.debug(self.chart_name, "will be run in", str(int((self.timetable['next'] - t_start) * 1000)), "ms")
             return True
 
         since_last = int((t_start - self.timetable['last']) * 1000000)
@@ -109,6 +108,7 @@ class BaseService(threading.Thread):
                   "ms (update_every:", str(self.timetable['freq'] * 1000),
                   "ms, latency:", str(int((t_start - self.timetable['next']) * 1000)), "ms")
         if not self.update(since_last):
+            self.error("update function failed.")
             return False
         t_end = time.time()
         self.timetable['next'] = t_end - (t_end % self.timetable['freq']) + self.timetable['freq']
@@ -137,7 +137,7 @@ class BaseService(threading.Thread):
             try:
                 status = self._run_once()
             except Exception as e:
-                msg.error("Something wrong: " + str(e))
+                msg.error("Something wrong: ", str(e))
                 return
             if status:
                 time.sleep(self.timetable['next'] - time.time())
@@ -150,7 +150,8 @@ class BaseService(threading.Thread):
                 else:
                     time.sleep(self.timetable['freq'])
 
-    def _format(self, *args):
+    @staticmethod
+    def _format(*args):
         params = []
         append = params.append
         for p in args:
@@ -424,13 +425,13 @@ class UrlService(SimpleService):
         try:
             f = urllib2.urlopen(self.url, timeout=self.update_every)
         except Exception as e:
-            msg.error(self.__module__, str(e))
+            msg.error(str(e))
             return None
 
         try:
             raw = f.read().decode('utf-8')
         except Exception as e:
-            msg.error(self.__module__, str(e))
+            msg.error(str(e))
         finally:
             f.close()
         return raw
@@ -507,13 +508,14 @@ class SocketService(SimpleService):
         if self.request != "".encode():
             try:
                 sock.send(self.request)
-            except Exception:
+            except Exception as e:
                 try:
                     sock.shutdown(1)
                     sock.close()
                 except:
                     pass
                 self.sock = None
+                self.error(str(e))
                 return None
 
         size = 2
@@ -581,6 +583,7 @@ class LogService(SimpleService):
             if os.path.getsize(self.log_path) < self._last_position:
                 self._last_position = 0
             elif os.path.getsize(self.log_path) == self._last_position:
+                self.debug("Log file hasn't changed. No new data.")
                 return None
             with open(self.log_path, "r") as fp:
                 fp.seek(self._last_position)
@@ -588,11 +591,13 @@ class LogService(SimpleService):
                     lines.append(line)
                 self._last_position = fp.tell()
         except Exception as e:
-            self.error(self.__module__, str(e))
+            self.error(str(e))
 
         if len(lines) != 0:
             return lines
-        return None
+        else:
+            self.error("No data collected.")
+            return None
 
     def check(self):
         """
@@ -636,13 +641,14 @@ class ExecutableService(SimpleService):
         try:
             p = Popen(self.command, stdout=PIPE, stderr=PIPE)
         except Exception as e:
-            self.error(self.__module__, str(e))
+            self.error(str(e))
             return None
         data = []
         for line in p.stdout.readlines():
             data.append(str(line.decode()))
 
         if len(data) == 0:
+            self.error("No data collected.")
             return None
 
         return data
