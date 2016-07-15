@@ -1,7 +1,8 @@
 #ifndef NETDATA_DAEMON_H
 #define NETDATA_DAEMON_H 1
 
-extern void sig_handler(int signo);
+extern void sig_handler_exit(int signo);
+extern void sig_handler_save(int signo);
 
 extern int become_user(const char *username, int access_fd, int output_fd, int error_fd, int pid_fd);
 
