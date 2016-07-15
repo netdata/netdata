@@ -384,6 +384,7 @@ class SimpleService(BaseService):
         """
         data = self._get_data()
         if data is None:
+            self.debug("_get_data() returned no data")
             return False
 
         updated = False
