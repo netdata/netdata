@@ -289,7 +289,7 @@ class PythonCharts(object):
             self.jobs.remove(job)
             msg.info("Disabled", prefix)
         except Exception as e:
-            msg.debug("This shouldn't happen. NO " + prefix + " IN LIST:" + str(self.jobs))
+            msg.debug("This shouldn't happen. NO " + prefix + " IN LIST:" + str(self.jobs) + " ERROR: " + str(e))
 
         prefix += ": "
         if reason is None:
@@ -334,6 +334,7 @@ class PythonCharts(object):
                             if new_name in overridden:
                                 msg.error(job.chart_name + " already exists. Stopping '" + job.name + "'")
                                 self._stop(job)
+                                i -= 1
                             else:
                                 job.name = job.override_name
                                 msg.debug(job.chart_name + " changing chart name to: '" + new_name + "'")
