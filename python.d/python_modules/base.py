@@ -485,7 +485,8 @@ class SocketService(SimpleService):
         Get raw data with low-level "socket" module.
         :return: str
         """
-        if self._sock is None:
+        #if self._sock is None:
+        if True:
             try:
                 if self.unix_socket is None:
                     self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -513,37 +514,22 @@ class SocketService(SimpleService):
                 self._sock.send(self.request)
             except Exception as e:
                 try:
-                    self._sock.shutdown(1)
+                    self._sock.shutdown(0)
                     self._sock.close()
                 except:
                     pass
                 self._sock = None
                 self.error(str(e), "used configuration: host:", str(self.host), "port:", str(self.port), "socket:", str(self.unix_socket))
                 return None
-        # data = ""
-        # import select
-        # while True:
-        #     try:
-        #         ready_to_read, _, in_error = select.select([sock, ], [], [], 0.01)
-        #     except Exception as e:
-        #         self.debug("SELECT", str(e))
-        #         sock.shutdown(0)
-        #         break
-        #     if len(ready_to_read) > 0:
-        #         buf = sock.recv(1024)
-        #         if len(buf) == 0 or buf is None:
-        #             break
-        #         data += buf.decode()
-        # if data == "":
-        #     return None
-        # return data
 
         size = 2
         try:
             data = self._sock.recv(size).decode()
         except Exception as e:
             self.error(str(e), "used configuration: host:", str(self.host), "port:", str(self.port), "socket:", str(self.unix_socket))
+            self._sock.shutdown(0)
             self._sock.close()
+            self._sock = None
             return None
 
         while True:
@@ -552,11 +538,11 @@ class SocketService(SimpleService):
                 size *= 2
             buf = self._sock.recv(size)
             data += buf.decode()
-            if len(buf) < size:
-                if self._more_data_available():
-                    size = 2
-                else:
-                    break
+            if len(buf) == 0: break
+            if len(buf) < size and not self._more_data_available():
+                break
+            else:
+                size = 4
 
         return data
 
