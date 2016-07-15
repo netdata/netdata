@@ -5,7 +5,7 @@
 from base import LogService
 
 priority = 60000
-retries = 5
+retries = 60
 # update_every = 3
 
 ORDER = ['cache']
