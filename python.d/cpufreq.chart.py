@@ -53,6 +53,7 @@ class Service(SimpleService):
                 self.paths.append(dirpath + "/" + self.filename)
 
         if len(self.paths) == 0:
+            self.error("cannot find", self.filename)
             return False
 
         self.paths.sort()

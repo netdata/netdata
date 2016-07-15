@@ -291,6 +291,7 @@ class PythonCharts(object):
         except Exception as e:
             msg.debug("This shouldn't happen. NO " + prefix + " IN LIST:" + str(self.jobs) + " ERROR: " + str(e))
 
+        # TODO remove section below and remove `reason`.
         prefix += ": "
         if reason is None:
             return
@@ -320,13 +321,15 @@ class PythonCharts(object):
         """
         i = 0
         overridden = []
+        msg.debug("all job objects", str(self.jobs))
         while i < len(self.jobs):
             job = self.jobs[i]
             try:
                 if not job.check():
-                    self._stop(job, "failed check")
+                    msg.error(job.chart_name, "check function failed.")
+                    self._stop(job)
                 else:
-                    msg.debug(job.chart_name, ": check succeeded")
+                    msg.debug(job.chart_name, "check succeeded")
                     i += 1
                     try:
                         if job.override_name is not None:
@@ -343,9 +346,13 @@ class PythonCharts(object):
                     except Exception:
                         pass
             except AttributeError:
-                self._stop(job, "no check")
+                self._stop(job)
+                msg.error(job.chart_name, "cannot find check() function.")
             except (UnboundLocalError, Exception) as e:
-                self._stop(job, "misbehaving. Reason:" + str(e))
+                msg.error(job.chart_name, str(e))
+                self._stop(job)
+        msg.debug("overridden job names:", str(overridden))
+        msg.debug("all remaining job objects:", str(self.jobs))
 
     def create(self):
         """
@@ -359,7 +366,8 @@ class PythonCharts(object):
             job = self.jobs[i]
             try:
                 if not job.create():
-                    self._stop(job, "failed create")
+                    msg.error(job.chart_name, "create function failed.")
+                    self._stop(job)
                 else:
                     chart = job.chart_name
                     sys.stdout.write(
@@ -375,9 +383,11 @@ class PythonCharts(object):
                     # sys.stdout.flush()
                     i += 1
             except AttributeError:
-                self._stop(job, "no create")
+                msg.error(job.chart_name, "cannot find create() function.")
+                self._stop(job)
             except (UnboundLocalError, Exception) as e:
-                self._stop(job, "misbehaving. Reason: " + str(e))
+                msg.error(job.chart_name, str(e))
+                self._stop(job)
 
     def update(self):
         """
