@@ -24,7 +24,7 @@ except ImportError:
 # default module values (can be overridden per job in `config`)
 # update_every = 3
 priority = 90000
-retries = 7
+retries = 60
 
 # default configuration (overridden by python.d.plugin)
 # config = {
