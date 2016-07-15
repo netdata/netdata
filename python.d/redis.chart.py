@@ -75,6 +75,7 @@ class Service(SocketService):
         try:
             raw = self._get_raw_data().split("\n")
         except AttributeError:
+            self.error("no data received")
             return None
         data = {}
         for line in raw:
@@ -93,7 +94,11 @@ class Service(SocketService):
         except:
             data['hit_rate'] = 0
 
-        return data
+        if len(data) == 0:
+            self.error("received data doesn't have needed records")
+            return None
+        else:
+            return data
 
     def check(self):
         """
@@ -106,7 +111,6 @@ class Service(SocketService):
         self.chart_name += "_" + self.name
         data = self._get_data()
         if data is None:
-            self.error("No data received")
             return False
 
         for name in data:

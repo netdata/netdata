@@ -60,15 +60,18 @@ class Service(SocketService):
         try:
             raw = self._get_raw_data().split('\r\n')[-1]
             if raw.startswith('<'):
+                self.error("invalid data received")
                 return None
             for row in raw.split('\n'):
                 if row.startswith(("client", "server.all")):
                     tmp = row.split("=")
                     data[tmp[0].replace('.', '_').strip(' ')] = int(tmp[1])
         except (ValueError, AttributeError, TypeError):
+            self.error("invalid data received")
             return None
 
         if len(data) == 0:
+            self.error("no data received")
             return None
         else:
             return data
@@ -89,5 +92,4 @@ class Service(SocketService):
         if self._get_data() is not None:
             return True
         else:
-            self.error("No data returned")
             return False
