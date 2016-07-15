@@ -321,15 +321,15 @@ class PythonCharts(object):
         """
         i = 0
         overridden = []
-        self.debug("all job objects:", str(self.jobs))
+        msg.debug("all job objects", str(self.jobs))
         while i < len(self.jobs):
             job = self.jobs[i]
             try:
                 if not job.check():
-                    self.error("check function failed.")
+                    msg.error(job.chart_name, "check function failed.")
                     self._stop(job)
                 else:
-                    msg.debug(job.chart_name, ": check succeeded")
+                    msg.debug(job.chart_name, "check succeeded")
                     i += 1
                     try:
                         if job.override_name is not None:
@@ -347,12 +347,12 @@ class PythonCharts(object):
                         pass
             except AttributeError:
                 self._stop(job)
-                self.error("cannot find check() function.")
+                msg.error(job.chart_name, "cannot find check() function.")
             except (UnboundLocalError, Exception) as e:
-                self.error(str(e))
+                msg.error(job.chart_name, str(e))
                 self._stop(job)
-        self.debug("overridden job names:", str(overridden))
-        self.debug("all remaining job objects:", str(self.jobs))
+        msg.debug("overridden job names:", str(overridden))
+        msg.debug("all remaining job objects:", str(self.jobs))
 
     def create(self):
         """
@@ -366,7 +366,7 @@ class PythonCharts(object):
             job = self.jobs[i]
             try:
                 if not job.create():
-                    self.error("create function failed.")
+                    msg.error(job.chart_name, "create function failed.")
                     self._stop(job)
                 else:
                     chart = job.chart_name
@@ -383,10 +383,10 @@ class PythonCharts(object):
                     # sys.stdout.flush()
                     i += 1
             except AttributeError:
-                self.error("cannot find create() function.")
+                msg.error(job.chart_name, "cannot find create() function.")
                 self._stop(job)
             except (UnboundLocalError, Exception) as e:
-                self.error(str(e))
+                msg.error(job.chart_name, str(e))
                 self._stop(job)
 
     def update(self):
