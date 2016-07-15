@@ -425,13 +425,13 @@ class UrlService(SimpleService):
         try:
             f = urllib2.urlopen(self.url, timeout=self.update_every)
         except Exception as e:
-            msg.error(str(e))
+            self.error(str(e))
             return None
 
         try:
             raw = f.read().decode('utf-8')
         except Exception as e:
-            msg.error(str(e))
+            self.error(str(e))
         finally:
             f.close()
         return raw
