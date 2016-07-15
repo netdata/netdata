@@ -3,6 +3,7 @@
 # Author: Pawel Krupa (paulfantom)
 
 from base import SocketService
+import select
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -45,6 +46,7 @@ CHARTS = {
 class Service(SocketService):
     def __init__(self, configuration=None, name=None):
         SocketService.__init__(self, configuration=configuration, name=name)
+        self._keep_alive = False
         self.request = ""
         self.host = "localhost"
         self.port = 3128
@@ -75,6 +77,16 @@ class Service(SocketService):
             return None
         else:
             return data
+
+    def _more_data_available(self):
+        try:
+            ready_to_read, _, in_error = select.select([self._sock, ], [], [], 0.05)
+        except Exception as e:
+            self.debug("select returned exception", str(e))
+        if len(ready_to_read) > 0:
+            return True
+        else:
+            return False
 
     def check(self):
         """
