@@ -27,12 +27,20 @@
 
 char pidfile[FILENAME_MAX + 1] = "";
 
-void sig_handler(int signo)
+void sig_handler_exit(int signo)
 {
 	if(signo) {
 		error_log_limit_unlimited();
 		error("Received signal %d. Exiting...", signo);
 		netdata_exit = 1;
+	}
+}
+
+void sig_handler_save(int signo)
+{
+	if(signo) {
+		info("Received signal %d to save the database...", signo);
+		rrdset_save_all();
 	}
 }
 
