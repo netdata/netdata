@@ -670,7 +670,7 @@ class ExecutableService(SimpleService):
         try:
             p = Popen(self.command, stdout=PIPE, stderr=PIPE)
         except Exception as e:
-            self.error(str(e))
+            self.error("Executing command", self.command, "resulted in error:", str(e))
             return None
         data = []
         for line in p.stdout.readlines():
@@ -715,5 +715,6 @@ class ExecutableService(SimpleService):
                 #    break
 
         if self._get_data() is None or len(self._get_data()) == 0:
+            self.error("Command", self.command, "returned no data")
             return False
         return True
