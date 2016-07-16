@@ -142,4 +142,8 @@ connectivity is not available.
 
     Copyright 2014, Marc 'BlackJack' Rintsch
     [LGPL 2.1 License](https://bitbucket.org/blackjack/pysensors)
-    
+
+- [PyYAML](https://bitbucket.org/blackjack/pysensors)
+
+    Copyright 2006, Kirill Simonov
+    [MIT License](http://pyyaml.org)

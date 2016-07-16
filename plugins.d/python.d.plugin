@@ -37,11 +37,10 @@ import msg
 try:
     assert sys.version_info >= (3, 1)
     import importlib.machinery
-
+    PY_VERSION = 3
     # change this hack below if we want PY_VERSION to be used in modules
     # import builtins
     # builtins.PY_VERSION = 3
-    PY_VERSION = 3
     msg.info('Using python v3')
 except (AssertionError, ImportError):
     try:
@@ -54,8 +53,15 @@ except (AssertionError, ImportError):
         msg.info('Using python v2')
     except ImportError:
         msg.fatal('Cannot start. No importlib.machinery on python3 or lack of imp on python2')
+# try:
+#     import yaml
+# except ImportError:
+#     msg.fatal('Cannot find yaml library')
 try:
-    import yaml
+    if PY_VERSION == 3:
+        import pyyaml3 as yaml
+    else:
+        import pyyaml2 as yaml
 except ImportError:
     msg.fatal('Cannot find yaml library')
 
