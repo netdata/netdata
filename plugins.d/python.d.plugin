@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-'''':; exec "$(command -v python2 || command -v python3 || echo "ERROR python IS NOT AVAILABLE IN THIS SYSTEM")" "$0" "$@" # '''
+'''':; exec "$(command -v python || command -v python3 || command -v python2 || echo "ERROR python IS NOT AVAILABLE IN THIS SYSTEM")" "$0" "$@" # '''
 # -*- coding: utf-8 -*-
 
 # Description: netdata python modules supervisor
