@@ -404,7 +404,7 @@ if [ -d "${NETDATA_PREFIX}/etc/netdata" ]
 	do
 		for y in "" ".old" ".orig"
 		do
-			if [ -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" ]
+			if [ -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" -a ! -f "${NETDATA_PREFIX}/etc/netdata/charts.d/${x}.conf${y}" ]
 				then
 				run mv -f "${NETDATA_PREFIX}/etc/netdata/${x}.conf${y}" "${NETDATA_PREFIX}/etc/netdata/charts.d/${x}.conf${y}"
 			fi
