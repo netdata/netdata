@@ -415,6 +415,8 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 	st->entries = entries;
 	st->update_every = update_every;
 
+	if(st->current_entry >= st->entries) st->current_entry = 0;
+
 	strcpy(st->cache_filename, fullfilename);
 	strcpy(st->magic, RRDSET_MAGIC);
 
@@ -571,6 +573,16 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 
 	// prevent incremental calculation spikes
 	rd->counter = 0;
+	rd->updated = 0;
+	rd->calculated_value = 0;
+	rd->last_calculated_value = 0;
+	rd->collected_value = 0;
+	rd->last_collected_value = 0;
+	rd->collected_volume = 0;
+	rd->stored_volume = 0;
+	rd->values[st->current_entry] = pack_storage_number(0, SN_NOT_EXISTS);
+	rd->last_collected_time.tv_sec = 0;
+	rd->last_collected_time.tv_usec = 0;
 
 	// append this dimension
 	pthread_rwlock_wrlock(&st->rwlock);
