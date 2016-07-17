@@ -15,7 +15,6 @@
 #include "popen.h"
 #include "plugin_tc.h"
 #include "main.h"
-#include "../config.h"
 
 #define RRD_TYPE_TC					"tc"
 #define RRD_TYPE_TC_LEN				strlen(RRD_TYPE_TC)
@@ -78,6 +77,10 @@ struct tc_device {
 	char family_updated;
 
 	char enabled;
+	char enabled_bytes;
+	char enabled_packets;
+	char enabled_dropped;
+
 	RRDSET *st_bytes;
 	RRDSET *st_packets;
 	RRDSET *st_dropped;
@@ -189,12 +192,19 @@ static inline void tc_device_classes_cleanup(struct tc_device *d) {
 }
 
 static inline void tc_device_commit(struct tc_device *d) {
-	static int enable_new_interfaces = -1;
+	static int enable_new_interfaces = -1, enable_bytes = -1, enable_packets = -1, enable_dropped = -1;
 
-	if(enable_new_interfaces == -1)	enable_new_interfaces = config_get_boolean("plugin:tc", "enable new interfaces detected at runtime", 1);
+	if(unlikely(enable_new_interfaces == -1)) {
+		enable_new_interfaces = config_get_boolean_ondemand("plugin:tc", "enable new interfaces detected at runtime", CONFIG_ONDEMAND_YES);
+		enable_bytes          = config_get_boolean_ondemand("plugin:tc", "enable traffic charts for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
+		enable_packets        = config_get_boolean_ondemand("plugin:tc", "enable packets charts for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
+		enable_dropped        = config_get_boolean_ondemand("plugin:tc", "enable dropped charts for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
+	}
 
 	// we only need to add leaf classes
 	struct tc_class *c, *x;
+	unsigned long long bytes_sum = 0, packets_sum = 0, dropped_sum = 0;
+	int active_classes = 0;
 
 	// set all classes
 	for(c = d->classes ; c ; c = c->next) {
@@ -204,12 +214,12 @@ static inline void tc_device_commit(struct tc_device *d) {
 
 	// mark the classes as leafs and parents
 	for(c = d->classes ; c ; c = c->next) {
-		if(!c->updated) continue;
+		if(unlikely(!c->updated)) continue;
 
 		for(x = d->classes ; x ; x = x->next) {
-			if(!x->updated) continue;
+			if(unlikely(!x->updated)) continue;
 
-			if(c == x) continue;
+			if(unlikely(c == x)) continue;
 
 			if(x->parentid && (
 				(               c->hash      == x->parent_hash && strcmp(c->id,     x->parentid) == 0) ||
@@ -233,9 +243,15 @@ static inline void tc_device_commit(struct tc_device *d) {
 	for(c = d->classes ; c ; c = c->next) {
 		// debug(D_TC_LOOP, "TC: Device '%s', class '%s', isLeaf=%d, HasParent=%d, Seen=%d", d->name?d->name:d->id, c->name?c->name:c->id, c->isleaf, c->hasparent, c->seen);
 		if(!c->updated) continue;
-		if(c->isleaf && c->hasparent) break;
+		if(c->isleaf && c->hasparent) {
+			active_classes++;
+			bytes_sum += c->bytes;
+			packets_sum += c->packets;
+			dropped_sum += c->dropped;
+		}
 	}
-	if(!c) {
+
+	if(unlikely(!active_classes)) {
 		debug(D_TC_LOOP, "TC: Ignoring TC device '%s'. No leaf classes.", d->name?d->name:d->id);
 		tc_device_classes_cleanup(d);
 		return;
@@ -244,165 +260,182 @@ static inline void tc_device_commit(struct tc_device *d) {
 	if(unlikely(d->enabled == -1)) {
 		char var_name[CONFIG_MAX_NAME + 1];
 		snprintfz(var_name, CONFIG_MAX_NAME, "qos for %s", d->id);
-		d-> enabled = config_get_boolean("plugin:tc", var_name, enable_new_interfaces);
+		d->enabled         = config_get_boolean_ondemand("plugin:tc", var_name, enable_new_interfaces);
+
+		snprintfz(var_name, CONFIG_MAX_NAME, "traffic chart for %s", d->id);
+		d->enabled_bytes   = config_get_boolean_ondemand("plugin:tc", var_name, enable_bytes);
+
+		snprintfz(var_name, CONFIG_MAX_NAME, "packets chart for %s", d->id);
+		d->enabled_packets = config_get_boolean_ondemand("plugin:tc", var_name, enable_packets);
+
+		snprintfz(var_name, CONFIG_MAX_NAME, "dropped packets chart for %s", d->id);
+		d->enabled_dropped = config_get_boolean_ondemand("plugin:tc", var_name, enable_dropped);
 	}
 
 	if(likely(d->enabled)) {
 		// --------------------------------------------------------------------
 		// bytes
 
-		if(unlikely(!d->st_bytes)) {
-			d->st_bytes = rrdset_find_bytype(RRD_TYPE_TC, d->id);
+		if(d->enabled_bytes == CONFIG_ONDEMAND_YES || (d->enabled_bytes == CONFIG_ONDEMAND_ONDEMAND && bytes_sum)) {
+			d->enabled_bytes = CONFIG_ONDEMAND_YES;
+
 			if(unlikely(!d->st_bytes)) {
-				debug(D_TC_LOOP, "TC: Creating new chart for device '%s'", d->name?d->name:d->id);
-				d->st_bytes = rrdset_create(RRD_TYPE_TC, d->id, d->name?d->name:d->id, d->family?d->family:d->id, RRD_TYPE_TC ".qos", "Class Usage", "kilobits/s", 7000, rrd_update_every, RRDSET_TYPE_STACKED);
+				d->st_bytes = rrdset_find_bytype(RRD_TYPE_TC, d->id);
+				if(unlikely(!d->st_bytes)) {
+					debug(D_TC_LOOP, "TC: Creating new chart for device '%s'", d->name?d->name:d->id);
+					d->st_bytes = rrdset_create(RRD_TYPE_TC, d->id, d->name?d->name:d->id, d->family?d->family:d->id, RRD_TYPE_TC ".qos", "Class Usage", "kilobits/s", 7000, rrd_update_every, RRDSET_TYPE_STACKED);
+				}
 			}
-		}
-		else {
-			debug(D_TC_LOOP, "TC: Updating chart for device '%s'", d->name?d->name:d->id);
-			rrdset_next_plugins(d->st_bytes);
+			else {
+				debug(D_TC_LOOP, "TC: Updating chart for device '%s'", d->name?d->name:d->id);
+				rrdset_next_plugins(d->st_bytes);
 
-			if(unlikely(d->name_updated && d->name && strcmp(d->id, d->name) != 0)) {
-				rrdset_set_name(d->st_bytes, d->name);
-				d->name_updated = 0;
+				if(unlikely(d->name_updated && d->name && strcmp(d->id, d->name) != 0)) {
+					rrdset_set_name(d->st_bytes, d->name);
+					d->name_updated = 0;
+				}
+
+				// FIXME
+				// update the family
 			}
 
-			// FIXME
-			// update the family
-		}
+			for(c = d->classes ; c ; c = c->next) {
+				if(unlikely(!c->updated)) continue;
 
-		for(c = d->classes ; c ; c = c->next) {
-			if(unlikely(!c->updated)) continue;
+				if(c->isleaf && c->hasparent) {
+					c->seen++;
 
-			c->seen++;
-
-			if(c->isleaf && c->hasparent) {
-				if(unlikely(!c->rd_bytes)) {
-					c->rd_bytes = rrddim_find(d->st_bytes, c->id);
 					if(unlikely(!c->rd_bytes)) {
-						debug(D_TC_LOOP, "TC: Adding to chart '%s', dimension '%s' (name: '%s')", d->st_bytes->id, c->id, c->name);
+						c->rd_bytes = rrddim_find(d->st_bytes, c->id);
+						if(unlikely(!c->rd_bytes)) {
+							debug(D_TC_LOOP, "TC: Adding to chart '%s', dimension '%s' (name: '%s')", d->st_bytes->id, c->id, c->name);
 
-						// new class, we have to add it
-						c->rd_bytes = rrddim_add(d->st_bytes, c->id, c->name?c->name:c->id, 8, 1024, RRDDIM_INCREMENTAL);
+							// new class, we have to add it
+							c->rd_bytes = rrddim_add(d->st_bytes, c->id, c->name?c->name:c->id, 8, 1024, RRDDIM_INCREMENTAL);
+						}
+						else debug(D_TC_LOOP, "TC: Updating chart '%s', dimension '%s'", d->st_bytes->id, c->id);
 					}
-					else debug(D_TC_LOOP, "TC: Updating chart '%s', dimension '%s'", d->st_bytes->id, c->id);
-				}
 
-				rrddim_set_by_pointer(d->st_bytes, c->rd_bytes, c->bytes);
+					rrddim_set_by_pointer(d->st_bytes, c->rd_bytes, c->bytes);
 
-				// if it has a name, different to the id
-				if(unlikely(c->name_updated && c->name && strcmp(c->id, c->name) != 0)) {
-					// update the rrd dimension with the new name
-					debug(D_TC_LOOP, "TC: Setting chart '%s', dimension '%s' name to '%s'", d->st_bytes->id, c->rd_bytes->id, c->name);
-					rrddim_set_name(d->st_bytes, c->rd_bytes, c->name);
+					// if it has a name, different to the id
+					if(unlikely(c->name_updated && c->name && strcmp(c->id, c->name) != 0)) {
+						// update the rrd dimension with the new name
+						debug(D_TC_LOOP, "TC: Setting chart '%s', dimension '%s' name to '%s'", d->st_bytes->id, c->rd_bytes->id, c->name);
+						rrddim_set_name(d->st_bytes, c->rd_bytes, c->name);
+					}
 				}
 			}
+			rrdset_done(d->st_bytes);
 		}
-		rrdset_done(d->st_bytes);
 
 		// --------------------------------------------------------------------
 		// packets
 		
-		if(unlikely(!d->st_packets)) {
-			char id[RRD_ID_LENGTH_MAX + 1];
-			char name[RRD_ID_LENGTH_MAX + 1];
-			snprintfz(id, RRD_ID_LENGTH_MAX, "%s_packets", d->id);
-			snprintfz(name, RRD_ID_LENGTH_MAX, "%s_packets", d->name?d->name:d->id);
+		if(d->enabled_packets == CONFIG_ONDEMAND_YES || (d->enabled_packets == CONFIG_ONDEMAND_ONDEMAND && packets_sum)) {
+			d->enabled_packets = CONFIG_ONDEMAND_YES;
 
-			d->st_packets = rrdset_find_bytype(RRD_TYPE_TC, id);
 			if(unlikely(!d->st_packets)) {
-				debug(D_TC_LOOP, "TC: Creating new _packets chart for device '%s'", d->name?d->name:d->id);
-				d->st_packets = rrdset_create(RRD_TYPE_TC, id, name, d->family?d->family:d->id, RRD_TYPE_TC ".qos_packets", "Class Packets", "packets/s", 7010, rrd_update_every, RRDSET_TYPE_STACKED);
+				char id[RRD_ID_LENGTH_MAX + 1];
+				char name[RRD_ID_LENGTH_MAX + 1];
+				snprintfz(id, RRD_ID_LENGTH_MAX, "%s_packets", d->id);
+				snprintfz(name, RRD_ID_LENGTH_MAX, "%s_packets", d->name?d->name:d->id);
+
+				d->st_packets = rrdset_find_bytype(RRD_TYPE_TC, id);
+				if(unlikely(!d->st_packets)) {
+					debug(D_TC_LOOP, "TC: Creating new _packets chart for device '%s'", d->name?d->name:d->id);
+					d->st_packets = rrdset_create(RRD_TYPE_TC, id, name, d->family?d->family:d->id, RRD_TYPE_TC ".qos_packets", "Class Packets", "packets/s", 7010, rrd_update_every, RRDSET_TYPE_STACKED);
+				}
 			}
-		}
-		else {
-			debug(D_TC_LOOP, "TC: Updating _packets chart for device '%s'", d->name?d->name:d->id);
-			rrdset_next_plugins(d->st_packets);
+			else {
+				debug(D_TC_LOOP, "TC: Updating _packets chart for device '%s'", d->name?d->name:d->id);
+				rrdset_next_plugins(d->st_packets);
 
-			// FIXME
-			// update the family
-		}
+				// FIXME
+				// update the family
+			}
 
-		for(c = d->classes ; c ; c = c->next) {
-			if(unlikely(!c->updated)) continue;
+			for(c = d->classes ; c ; c = c->next) {
+				if(unlikely(!c->updated)) continue;
 
-			c->seen++;
-
-			if(c->isleaf && c->hasparent) {
-				if(unlikely(!c->rd_packets)) {
-					c->rd_packets = rrddim_find(d->st_packets, c->id);
+				if(c->isleaf && c->hasparent) {
 					if(unlikely(!c->rd_packets)) {
-						debug(D_TC_LOOP, "TC: Adding to chart '%s', dimension '%s' (name: '%s')", d->st_packets->id, c->id, c->name);
+						c->rd_packets = rrddim_find(d->st_packets, c->id);
+						if(unlikely(!c->rd_packets)) {
+							debug(D_TC_LOOP, "TC: Adding to chart '%s', dimension '%s' (name: '%s')", d->st_packets->id, c->id, c->name);
 
-						// new class, we have to add it
-						c->rd_packets = rrddim_add(d->st_packets, c->id, c->name?c->name:c->id, 1, 1, RRDDIM_INCREMENTAL);
+							// new class, we have to add it
+							c->rd_packets = rrddim_add(d->st_packets, c->id, c->name?c->name:c->id, 1, 1, RRDDIM_INCREMENTAL);
+						}
+						else debug(D_TC_LOOP, "TC: Updating chart '%s', dimension '%s'", d->st_packets->id, c->id);
 					}
-					else debug(D_TC_LOOP, "TC: Updating chart '%s', dimension '%s'", d->st_packets->id, c->id);
-				}
 
-				rrddim_set_by_pointer(d->st_packets, c->rd_packets, c->packets);
+					rrddim_set_by_pointer(d->st_packets, c->rd_packets, c->packets);
 
-				// if it has a name, different to the id
-				if(unlikely(c->name_updated && c->name && strcmp(c->id, c->name) != 0)) {
-					// update the rrd dimension with the new name
-					debug(D_TC_LOOP, "TC: Setting chart '%s', dimension '%s' name to '%s'", d->st_packets->id, c->rd_packets->id, c->name);
-					rrddim_set_name(d->st_packets, c->rd_packets, c->name);
+					// if it has a name, different to the id
+					if(unlikely(c->name_updated && c->name && strcmp(c->id, c->name) != 0)) {
+						// update the rrd dimension with the new name
+						debug(D_TC_LOOP, "TC: Setting chart '%s', dimension '%s' name to '%s'", d->st_packets->id, c->rd_packets->id, c->name);
+						rrddim_set_name(d->st_packets, c->rd_packets, c->name);
+					}
 				}
 			}
+			rrdset_done(d->st_packets);
 		}
-		rrdset_done(d->st_packets);
 
 		// --------------------------------------------------------------------
 		// dropped
 		
-		if(unlikely(!d->st_dropped)) {
-			char id[RRD_ID_LENGTH_MAX + 1];
-			char name[RRD_ID_LENGTH_MAX + 1];
-			snprintfz(id, RRD_ID_LENGTH_MAX, "%s_dropped", d->id);
-			snprintfz(name, RRD_ID_LENGTH_MAX, "%s_dropped", d->name?d->name:d->id);
-
-			d->st_dropped = rrdset_find_bytype(RRD_TYPE_TC, id);
+		if(d->enabled_dropped == CONFIG_ONDEMAND_YES || (d->enabled_dropped == CONFIG_ONDEMAND_ONDEMAND && dropped_sum)) {
+			d->enabled_dropped = CONFIG_ONDEMAND_YES;
+			
 			if(unlikely(!d->st_dropped)) {
-				debug(D_TC_LOOP, "TC: Creating new _dropped chart for device '%s'", d->name?d->name:d->id);
-				d->st_dropped = rrdset_create(RRD_TYPE_TC, id, name, d->family?d->family:d->id, RRD_TYPE_TC ".qos_dropped", "Class Dropped Packets", "packets/s", 7020, rrd_update_every, RRDSET_TYPE_STACKED);
+				char id[RRD_ID_LENGTH_MAX + 1];
+				char name[RRD_ID_LENGTH_MAX + 1];
+				snprintfz(id, RRD_ID_LENGTH_MAX, "%s_dropped", d->id);
+				snprintfz(name, RRD_ID_LENGTH_MAX, "%s_dropped", d->name?d->name:d->id);
+
+				d->st_dropped = rrdset_find_bytype(RRD_TYPE_TC, id);
+				if(unlikely(!d->st_dropped)) {
+					debug(D_TC_LOOP, "TC: Creating new _dropped chart for device '%s'", d->name?d->name:d->id);
+					d->st_dropped = rrdset_create(RRD_TYPE_TC, id, name, d->family?d->family:d->id, RRD_TYPE_TC ".qos_dropped", "Class Dropped Packets", "packets/s", 7020, rrd_update_every, RRDSET_TYPE_STACKED);
+				}
 			}
-		}
-		else {
-			debug(D_TC_LOOP, "TC: Updating _dropped chart for device '%s'", d->name?d->name:d->id);
-			rrdset_next_plugins(d->st_dropped);
+			else {
+				debug(D_TC_LOOP, "TC: Updating _dropped chart for device '%s'", d->name?d->name:d->id);
+				rrdset_next_plugins(d->st_dropped);
 
-			// FIXME
-			// update the family
-		}
+				// FIXME
+				// update the family
+			}
 
-		for(c = d->classes ; c ; c = c->next) {
-			if(unlikely(!c->updated)) continue;
+			for(c = d->classes ; c ; c = c->next) {
+				if(unlikely(!c->updated)) continue;
 
-			c->seen++;
-
-			if(c->isleaf && c->hasparent) {
-				if(unlikely(!c->rd_dropped)) {
-					c->rd_dropped = rrddim_find(d->st_dropped, c->id);
+				if(c->isleaf && c->hasparent) {
 					if(unlikely(!c->rd_dropped)) {
-						debug(D_TC_LOOP, "TC: Adding to chart '%s', dimension '%s' (name: '%s')", d->st_dropped->id, c->id, c->name);
+						c->rd_dropped = rrddim_find(d->st_dropped, c->id);
+						if(unlikely(!c->rd_dropped)) {
+							debug(D_TC_LOOP, "TC: Adding to chart '%s', dimension '%s' (name: '%s')", d->st_dropped->id, c->id, c->name);
 
-						// new class, we have to add it
-						c->rd_dropped = rrddim_add(d->st_dropped, c->id, c->name?c->name:c->id, 1, 1, RRDDIM_INCREMENTAL);
+							// new class, we have to add it
+							c->rd_dropped = rrddim_add(d->st_dropped, c->id, c->name?c->name:c->id, 1, 1, RRDDIM_INCREMENTAL);
+						}
+						else debug(D_TC_LOOP, "TC: Updating chart '%s', dimension '%s'", d->st_dropped->id, c->id);
 					}
-					else debug(D_TC_LOOP, "TC: Updating chart '%s', dimension '%s'", d->st_dropped->id, c->id);
-				}
 
-				rrddim_set_by_pointer(d->st_dropped, c->rd_dropped, c->dropped);
+					rrddim_set_by_pointer(d->st_dropped, c->rd_dropped, c->dropped);
 
-				// if it has a name, different to the id
-				if(unlikely(c->name_updated && c->name && strcmp(c->id, c->name) != 0)) {
-					// update the rrd dimension with the new name
-					debug(D_TC_LOOP, "TC: Setting chart '%s', dimension '%s' name to '%s'", d->st_dropped->id, c->rd_dropped->id, c->name);
-					rrddim_set_name(d->st_dropped, c->rd_dropped, c->name);
+					// if it has a name, different to the id
+					if(unlikely(c->name_updated && c->name && strcmp(c->id, c->name) != 0)) {
+						// update the rrd dimension with the new name
+						debug(D_TC_LOOP, "TC: Setting chart '%s', dimension '%s' name to '%s'", d->st_dropped->id, c->rd_dropped->id, c->name);
+						rrddim_set_name(d->st_dropped, c->rd_dropped, c->name);
+					}
 				}
 			}
+			rrdset_done(d->st_dropped);
 		}
-		rrdset_done(d->st_dropped);
 	}
 
 	tc_device_classes_cleanup(d);
@@ -607,9 +640,8 @@ static inline void tc_split_words(char *str, char **words, int max_words) {
 }
 
 pid_t tc_child_pid = 0;
-void *tc_main(void *ptr)
-{
-	if(ptr) { ; }
+void *tc_main(void *ptr) {
+	(void)ptr;
 
 	info("TC thread created with task id %d", gettid());
 
@@ -649,9 +681,9 @@ void *tc_main(void *ptr)
 
 		snprintfz(buffer, TC_LINE_MAX, "exec %s %d", config_get("plugin:tc", "script to run to get tc values", PLUGINS_DIR "/tc-qos-helper.sh"), rrd_update_every);
 		debug(D_TC_LOOP, "executing '%s'", buffer);
-		// fp = popen(buffer, "r");
+
 		fp = mypopen(buffer, &tc_child_pid);
-		if(!fp) {
+		if(unlikely(!fp)) {
 			error("TC: Cannot popen(\"%s\", \"r\").", buffer);
 			pthread_exit(NULL);
 			return NULL;
@@ -664,6 +696,7 @@ void *tc_main(void *ptr)
 			// debug(D_TC_LOOP, "TC: read '%s'", buffer);
 
 			tc_split_words(buffer, words, MAX_WORDS);
+
 			if(unlikely(!words[0] || !*words[0])) {
 				// debug(D_TC_LOOP, "empty line");
 				continue;
@@ -675,13 +708,10 @@ void *tc_main(void *ptr)
 			if(unlikely(device && first_hash == CLASS_HASH && strcmp(words[0], "class") == 0)) {
 				// debug(D_TC_LOOP, "CLASS line on class id='%s', parent='%s', parentid='%s', leaf='%s', leafid='%s'", words[2], words[3], words[4], words[5], words[6]);
 
-				// clear the last class
-				class = NULL;
-
 				// words[1] : class type
 				// words[2] : N:XX
 				// words[3] : parent or root
-				if(words[1] && words[2] && words[3] && (strcmp(words[3], "parent") == 0 || strcmp(words[3], "root") == 0)) {
+				if(likely(words[1] && words[2] && words[3] && (strcmp(words[3], "parent") == 0 || strcmp(words[3], "root") == 0))) {
 					//char *type     = words[1];  // the class: htb, fq_codel, etc
 
 					// we are only interested for HTB classes
@@ -709,95 +739,105 @@ void *tc_main(void *ptr)
 
 					class = tc_class_add(device, id, parentid, leafid);
 				}
+				else {
+					// clear the last class
+					class = NULL;
+				}
 			}
 			else if(unlikely(first_hash == END_HASH && strcmp(words[0], "END") == 0)) {
 				// debug(D_TC_LOOP, "END line");
 
-				if(device) {
+				if(likely(device)) {
 					if(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL) != 0)
 						error("Cannot set pthread cancel state to DISABLE.");
 
 					tc_device_commit(device);
 					// tc_device_free(device);
-					device = NULL;
-					class = NULL;
 
 					if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
 						error("Cannot set pthread cancel state to ENABLE.");
 				}
+
+				device = NULL;
+				class = NULL;
 			}
 			else if(unlikely(first_hash == BEGIN_HASH && strcmp(words[0], "BEGIN") == 0)) {
 				// debug(D_TC_LOOP, "BEGIN line on device '%s'", words[1]);
 
-				if(device) {
+				if(likely(words[1] && *words[1])) {
+					device = tc_device_create(words[1]);
+				}
+				else {
 					// tc_device_free(device);
 					device = NULL;
-					class = NULL;
 				}
 
-				if(words[1] && *words[1]) {
-					device = tc_device_create(words[1]);
-					class = NULL;
-				}
+				class = NULL;
 			}
 			else if(unlikely(device && class && first_hash == SENT_HASH && strcmp(words[0], "Sent") == 0)) {
 				// debug(D_TC_LOOP, "SENT line '%s'", words[1]);
-				if(words[1] && *words[1]) {
+				if(likely(words[1] && *words[1])) {
 					class->bytes = strtoull(words[1], NULL, 10);
 					class->updated = 1;
 				}
+				else {
+					class->updated = 0;
+				}
 
-				if(words[3] && *words[3])
+				if(likely(words[3] && *words[3]))
 					class->packets = strtoull(words[3], NULL, 10);
 
-				if(words[6] && *words[6])
+				if(likely(words[6] && *words[6]))
 					class->dropped = strtoull(words[6], NULL, 10);
 
-				if(words[8] && *words[8])
+				if(likely(words[8] && *words[8]))
 					class->overlimits = strtoull(words[8], NULL, 10);
 
-				if(words[10] && *words[10])
+				if(likely(words[10] && *words[10]))
 					class->requeues = strtoull(words[8], NULL, 10);
 			}
 			else if(unlikely(device && class && class->updated && first_hash == LENDED_HASH && strcmp(words[0], "lended:") == 0)) {
 				// debug(D_TC_LOOP, "LENDED line '%s'", words[1]);
-				if(words[1] && *words[1])
+				if(likely(words[1] && *words[1]))
 					class->lended = strtoull(words[1], NULL, 10);
 
-				if(words[3] && *words[3])
+				if(likely(words[3] && *words[3]))
 					class->borrowed = strtoull(words[3], NULL, 10);
 
-				if(words[5] && *words[5])
+				if(likely(words[5] && *words[5]))
 					class->giants = strtoull(words[5], NULL, 10);
 			}
 			else if(unlikely(device && class && class->updated && first_hash == TOKENS_HASH && strcmp(words[0], "tokens:") == 0)) {
 				// debug(D_TC_LOOP, "TOKENS line '%s'", words[1]);
-				if(words[1] && *words[1])
+				if(likely(words[1] && *words[1]))
 					class->tokens = strtoull(words[1], NULL, 10);
 
-				if(words[3] && *words[3])
+				if(likely(words[3] && *words[3]))
 					class->ctokens = strtoull(words[3], NULL, 10);
 			}
 			else if(unlikely(device && first_hash == SETDEVICENAME_HASH && strcmp(words[0], "SETDEVICENAME") == 0)) {
 				// debug(D_TC_LOOP, "SETDEVICENAME line '%s'", words[1]);
-				if(words[1] && *words[1]) tc_device_set_device_name(device, words[1]);
+				if(likely(words[1] && *words[1]))
+					tc_device_set_device_name(device, words[1]);
 			}
 			else if(unlikely(device && first_hash == SETDEVICEGROUP_HASH && strcmp(words[0], "SETDEVICEGROUP") == 0)) {
 				// debug(D_TC_LOOP, "SETDEVICEGROUP line '%s'", words[1]);
-				if(words[1] && *words[1]) tc_device_set_device_family(device, words[1]);
+				if(likely(words[1] && *words[1]))
+					tc_device_set_device_family(device, words[1]);
 			}
 			else if(unlikely(device && first_hash == SETCLASSNAME_HASH && strcmp(words[0], "SETCLASSNAME") == 0)) {
 				// debug(D_TC_LOOP, "SETCLASSNAME line '%s' '%s'", words[1], words[2]);
 				char *id    = words[1];
 				char *path  = words[2];
-				if(id && *id && path && *path) tc_device_set_class_name(device, id, path);
+				if(likely(id && *id && path && *path))
+					tc_device_set_class_name(device, id, path);
 			}
 			else if(unlikely(first_hash == WORKTIME_HASH && strcmp(words[0], "WORKTIME") == 0)) {
 				// debug(D_TC_LOOP, "WORKTIME line '%s' '%s'", words[1], words[2]);
 				getrusage(RUSAGE_THREAD, &thread);
 
-				if(!stcpu) stcpu = rrdset_find("netdata.plugin_tc_cpu");
-				if(!stcpu) {
+				if(unlikely(!stcpu)) stcpu = rrdset_find("netdata.plugin_tc_cpu");
+				if(unlikely(!stcpu)) {
 					stcpu = rrdset_create("netdata", "plugin_tc_cpu", NULL, "tc.helper", NULL, "NetData TC CPU usage", "milliseconds/s", 135000, rrd_update_every, RRDSET_TYPE_STACKED);
 					rrddim_add(stcpu, "user",  NULL,  1, 1000, RRDDIM_INCREMENTAL);
 					rrddim_add(stcpu, "system", NULL, 1, 1000, RRDDIM_INCREMENTAL);
@@ -808,8 +848,8 @@ void *tc_main(void *ptr)
 				rrddim_set(stcpu, "system", thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
 				rrdset_done(stcpu);
 
-				if(!sttime) stcpu = rrdset_find("netdata.plugin_tc_time");
-				if(!sttime) {
+				if(unlikely(!sttime)) stcpu = rrdset_find("netdata.plugin_tc_time");
+				if(unlikely(!sttime)) {
 					sttime = rrdset_create("netdata", "plugin_tc_time", NULL, "tc.helper", NULL, "NetData TC script execution", "milliseconds/run", 135001, rrd_update_every, RRDSET_TYPE_AREA);
 					rrddim_add(sttime, "run_time",  "run time",  1, 1, RRDDIM_ABSOLUTE);
 				}
@@ -825,7 +865,7 @@ void *tc_main(void *ptr)
 				char *id = words[1];
 				pid_t pid = atol(id);
 
-				if(pid) tc_child_pid = pid;
+				if(likely(pid)) tc_child_pid = pid;
 
 				debug(D_TC_LOOP, "TC: Child PID is %d.", tc_child_pid);
 			}
@@ -834,17 +874,18 @@ void *tc_main(void *ptr)
 			//	debug(D_TC_LOOP, "IGNORED line");
 			//}
 		}
+
 		// fgets() failed or loop broke
 		int code = mypclose(fp, tc_child_pid);
 		tc_child_pid = 0;
 
-		if(device) {
+		if(unlikely(device)) {
 			// tc_device_free(device);
 			device = NULL;
 			class = NULL;
 		}
 
-		if(netdata_exit) {
+		if(unlikely(netdata_exit)) {
 			tc_device_free_all();
 			pthread_exit(NULL);
 			return NULL;
