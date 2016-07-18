@@ -46,7 +46,7 @@ CHARTS = {
 class Service(SocketService):
     def __init__(self, configuration=None, name=None):
         SocketService.__init__(self, configuration=configuration, name=name)
-        self._keep_alive = False
+        self._keep_alive = True
         self.request = ""
         self.host = "localhost"
         self.port = 3128
@@ -60,7 +60,11 @@ class Service(SocketService):
         """
         data = {}
         try:
-            raw = self._get_raw_data().split('\r\n')[-1]
+            raw = ""
+            for tmp in self._get_raw_data().split('\r\n'):
+                if tmp.startswith("sample_time"):
+                    raw = tmp
+                    break
             if raw.startswith('<'):
                 self.error("invalid data received")
                 return None
@@ -72,7 +76,6 @@ class Service(SocketService):
             self.error("invalid data received")
             return None
 
-        self.debug("DATA:", str(len(raw)))
         if len(data) == 0:
             self.error("no data received")
             return None
@@ -80,21 +83,31 @@ class Service(SocketService):
             return data
 
     def _check_raw_data(self, data):
-        if "Content-Length" not in data[:1024]:  # assuming headers should be in first 1024 bytes (performance)
-            return True  # "Content-Length" not found, assume everything is ok
+        if "Connection: keep-alive" in data[:1024]:
+            self._keep_alive = True
+        else:
+            self._keep_alive = False
 
-        # TODO write some parser of "Content-Length"
-        return True
-        length = len(data)
-
-
-        supposed = 0
-        if length >= supposed:
+        if "client" in data and "server.all" in data:
             return True
         else:
             return False
-
-        return False
+    #     # TODO write some parser of "Transfer-Encoding: chunked"
+    #     if "Transfer-Encoding: chunked" in data[:1024]:
+    #         data = data[self.__last:]
+    #
+    #
+    #     print(data)
+    #     import time
+    #     time.sleep(10)
+    #     return False
+    #     supposed = 0
+    #     if length >= supposed:
+    #         return True
+    #     else:
+    #         return False
+    #
+    #     return False
 
     def check(self):
         """
@@ -106,8 +119,8 @@ class Service(SocketService):
         req = self.request.decode()
         if not req.startswith("GET"):
             req = "GET " + req
-        if not req.endswith(" HTTP/1.0\r\n\r\n"):
-            req += " HTTP/1.0\r\n\r\n"
+        if not req.endswith(" HTTP/1.1\r\n\r\n"):
+            req += " HTTP/1.1\r\n\r\n"
         self.request = req.encode()
         if self._get_data() is not None:
             return True

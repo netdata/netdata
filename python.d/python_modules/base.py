@@ -475,7 +475,7 @@ class UrlService(SimpleService):
 class SocketService(SimpleService):
     def __init__(self, configuration=None, name=None):
         self._sock = None
-        self._keep_alive = True
+        self._keep_alive = False
         self.host = "localhost"
         self.port = None
         self.unix_socket = None
@@ -485,7 +485,7 @@ class SocketService(SimpleService):
 
     def _connect(self):
         """
-        Recreate socket and connect to it since they cannot be reused
+        Recreate socket and connect to it since sockets cannot be reused after closing
         Available configurations are IPv6, IPv4 or UNIX socket
         :return:
         """
@@ -565,7 +565,7 @@ class SocketService(SimpleService):
         data = ""
         while True:
             try:
-                ready_to_read, _, in_error = select.select([self._sock], [], [], 0.01)
+                ready_to_read, _, in_error = select.select([self._sock], [], [], 60)
             except Exception as e:
                 self.debug("SELECT", str(e))
                 self._disconnect()
@@ -575,8 +575,10 @@ class SocketService(SimpleService):
                 if len(buf) == 0 or buf is None:
                     break
                 data += buf.decode()
+                if self._check_raw_data(data):
+                    break
             else:
-                self._disconnect()
+                # self._disconnect()
                 break
 
         return data
@@ -593,16 +595,7 @@ class SocketService(SimpleService):
         if not self._send():
             return None
 
-        finished = False
-        data = ""
-        prevent_infinite_loop = 1000000
-        while not finished:
-            data += self._receive()
-            finished = self._check_raw_data(data)
-            prevent_infinite_loop -= 1
-            if prevent_infinite_loop <= 0:
-                self.debug("Almost got into infinite loop while grabbing data. Is _check_raw_data() ok?")
-                break
+        data = self._receive()
 
         if not self._keep_alive:
             self._disconnect()
