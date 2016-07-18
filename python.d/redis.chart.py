@@ -100,6 +100,24 @@ class Service(SocketService):
         else:
             return data
 
+    def _check_raw_data(self, data):
+        """
+        Check if all data has been gathered from socket.
+        Parse first line containing message length and check against received message
+        :param data: str
+        :return: boolean
+        """
+        length = len(data)
+        supposed = data.split('\n')[0][1:]
+        offset = len(supposed) + 4  # 1 dollar sing, 1 new line character + 1 ending sequence '\r\n'
+        supposed = int(supposed)
+        if length - offset >= supposed:
+            return True
+        else:
+            return False
+
+        return False
+
     def check(self):
         """
         Parse configuration, check if redis is available, and dynamically create chart lines data
@@ -108,7 +126,7 @@ class Service(SocketService):
         self._parse_config()
         if self.name == "":
             self.name = "local"
-        self.chart_name += "_" + self.name
+            self.chart_name += "_" + self.name
         data = self._get_data()
         if data is None:
             return False

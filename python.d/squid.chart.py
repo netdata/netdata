@@ -72,21 +72,29 @@ class Service(SocketService):
             self.error("invalid data received")
             return None
 
+        self.debug("DATA:", str(len(raw)))
         if len(data) == 0:
             self.error("no data received")
             return None
         else:
             return data
 
-    def _more_data_available(self):
-        try:
-            ready_to_read, _, in_error = select.select([self._sock, ], [], [], 0.05)
-        except Exception as e:
-            self.debug("select returned exception", str(e))
-        if len(ready_to_read) > 0:
+    def _check_raw_data(self, data):
+        if "Content-Length" not in data[:1024]:  # assuming headers should be in first 1024 bytes (performance)
+            return True  # "Content-Length" not found, assume everything is ok
+
+        # TODO write some parser of "Content-Length"
+        return True
+        length = len(data)
+
+
+        supposed = 0
+        if length >= supposed:
             return True
         else:
             return False
+
+        return False
 
     def check(self):
         """
