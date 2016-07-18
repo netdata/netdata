@@ -168,7 +168,7 @@ CHARTS = {
         'lines': [
             ["Innodb_log_waits", "waits", "incremental"],
             ["Innodb_log_write_requests", "write_requests", "incremental", -1, 1],
-            ["Innodb_log_writes", "incremental", -1, 1],
+            ["Innodb_log_writes", "writes", "incremental", -1, 1],
         ]},
     'innodb_os_log': {
         'options': [None, 'mysql InnoDB OS Log Operations', 'operations', 'innodb', 'mysql.innodb_os_log', 'line'],
@@ -208,8 +208,8 @@ CHARTS = {
     'innodb_buffer_pool_bytes': {
         'options': [None, 'mysql InnoDB Buffer Pool Bytes', 'MB', 'innodb', 'mysql.innodb_buffer_pool_bytes', 'area'],
         'lines': [
-            ["Innodb_buffer_pool_bytes_data", "data", "absolute"],
-            ["Innodb_buffer_pool_bytes_dirty", "dirty", "absolute", -1, 1]
+            ["Innodb_buffer_pool_bytes_data", "data", "absolute", 1, 1024 * 1024],
+            ["Innodb_buffer_pool_bytes_dirty", "dirty", "absolute", -1, 1024 * 1024]
         ]},
     'innodb_buffer_pool_read_ahead': {
         'options': [None, 'mysql InnoDB Buffer Pool Read Ahead', 'operations/s', 'innodb', 'mysql.innodb_buffer_pool_read_ahead', 'area'],
@@ -246,7 +246,7 @@ CHARTS = {
     'qcache_freemem': {
         'options': [None, 'mysql QCache Free Memory', 'MB', 'qcache', 'mysql.qcache_freemem', 'area'],
         'lines': [
-            ["Qcache_free_memory", "free", "absolute"]
+            ["Qcache_free_memory", "free", "absolute", 1, 1024 * 1024]
         ]},
     'qcache_memblocks': {
         'options': [None, 'mysql QCache Memory Blocks', 'blocks', 'qcache', 'mysql.qcache_memblocks', 'line'],
