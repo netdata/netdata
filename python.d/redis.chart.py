@@ -66,6 +66,7 @@ class Service(SocketService):
         self.unix_socket = None
         self.order = ORDER
         self.definitions = CHARTS
+        self._keep_alive = True
 
     def _get_data(self):
         """
