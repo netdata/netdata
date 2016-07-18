@@ -42,7 +42,7 @@ condrestart()
 {
 	if ! service_status > /dev/null; then
 		RETVAL=$1
-		return
+		return $RETVAL
 	fi
 
 	service_stop
