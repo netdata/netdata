@@ -574,11 +574,13 @@ class SocketService(SimpleService):
                 buf = self._sock.recv(4096)
                 if len(buf) == 0 or buf is None:
                     break
+
                 data += buf.decode()
                 if self._check_raw_data(data):
                     break
             else:
-                # self._disconnect()
+                self.error("Socket timed out.")
+                self._disconnect()
                 break
 
         return data

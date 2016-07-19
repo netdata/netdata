@@ -341,7 +341,7 @@ class PythonCharts(object):
                         if job.override_name is not None:
                             new_name = job.__module__ + '_' + job.override_name
                             if new_name in overridden:
-                                msg.error(job.chart_name + " already exists. Stopping '" + job.name + "'")
+                                msg.error(job.override_name + " already exists. Stopping '" + job.name + "'")
                                 self._stop(job)
                                 i -= 1
                             else:
@@ -351,9 +351,10 @@ class PythonCharts(object):
                                 overridden.append(job.chart_name)
                     except Exception:
                         pass
-            except AttributeError:
+            except AttributeError as e:
                 self._stop(job)
                 msg.error(job.chart_name, "cannot find check() function.")
+                msg.debug(str(e))
             except (UnboundLocalError, Exception) as e:
                 msg.error(job.chart_name, str(e))
                 self._stop(job)
