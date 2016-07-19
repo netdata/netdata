@@ -46,7 +46,7 @@ CHARTS = {
 class Service(SocketService):
     def __init__(self, configuration=None, name=None):
         SocketService.__init__(self, configuration=configuration, name=name)
-        self._keep_alive = False
+        self._keep_alive = True
         self.request = ""
         self.host = "localhost"
         self.port = 3128
@@ -60,7 +60,11 @@ class Service(SocketService):
         """
         data = {}
         try:
-            raw = self._get_raw_data().split('\r\n')[-1]
+            raw = ""
+            for tmp in self._get_raw_data().split('\r\n'):
+                if tmp.startswith("sample_time"):
+                    raw = tmp
+                    break
             if raw.startswith('<'):
                 self.error("invalid data received")
                 return None
@@ -78,12 +82,13 @@ class Service(SocketService):
         else:
             return data
 
-    def _more_data_available(self):
-        try:
-            ready_to_read, _, in_error = select.select([self._sock, ], [], [], 0.05)
-        except Exception as e:
-            self.debug("select returned exception", str(e))
-        if len(ready_to_read) > 0:
+    def _check_raw_data(self, data):
+        if "Connection: keep-alive" in data[:1024]:
+            self._keep_alive = True
+        else:
+            self._keep_alive = False
+
+        if data[-7:] == "\r\n0\r\n\r\n" and "Transfer-Encoding: chunked" in data[:1024]:  # HTTP/1.1 response
             return True
         else:
             return False
@@ -98,8 +103,8 @@ class Service(SocketService):
         req = self.request.decode()
         if not req.startswith("GET"):
             req = "GET " + req
-        if not req.endswith(" HTTP/1.0\r\n\r\n"):
-            req += " HTTP/1.0\r\n\r\n"
+        if not req.endswith(" HTTP/1.1\r\n\r\n"):
+            req += " HTTP/1.1\r\n\r\n"
         self.request = req.encode()
         if self._get_data() is not None:
             return True

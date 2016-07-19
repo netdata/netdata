@@ -21,7 +21,10 @@ CHARTS = {
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
-        self.sys_dir = "/sys/devices"
+        prefix = os.getenv('NETDATA_HOST_PREFIX', "")
+        if prefix.endswith('/'):
+            prefix = prefix[:-1]
+        self.sys_dir = prefix + "/sys/devices"
         self.filename = "scaling_cur_freq"
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
