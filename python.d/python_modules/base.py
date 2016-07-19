@@ -6,6 +6,7 @@ import time
 import sys
 import os
 import socket
+import select
 try:
     import urllib.request as urllib2
 except ImportError:
@@ -40,6 +41,7 @@ class BaseService(threading.Thread):
         self.chart_name = ""
         self._dimensions = []
         self._charts = []
+        self.__chart_set = False
         if configuration is None:
             self.error("BaseService: no configuration parameters supplied. Cannot create Service.")
             raise RuntimeError
@@ -279,10 +281,16 @@ class BaseService(threading.Thread):
             self.error("cannot set non-numeric value:", value)
             return False
         self._line("SET", id, "=", str(value))
+        self.__chart_set = True
         return True
 
     def end(self):
-        self._line("END")
+        if self.__chart_set:
+            self._line("END")
+            self.__chart_set = False
+        else:
+            pos = self._data_stream.rfind("BEGIN")
+            self._data_stream = self._data_stream[:pos]
 
     def commit(self):
         """
@@ -474,97 +482,141 @@ class UrlService(SimpleService):
 class SocketService(SimpleService):
     def __init__(self, configuration=None, name=None):
         self._sock = None
-        self._keep_alive = True
+        self._keep_alive = False
         self.host = "localhost"
         self.port = None
         self.unix_socket = None
         self.request = ""
+        self.__socket_config = None
         SimpleService.__init__(self, configuration=configuration, name=name)
+
+    def _connect(self):
+        """
+        Recreate socket and connect to it since sockets cannot be reused after closing
+        Available configurations are IPv6, IPv4 or UNIX socket
+        :return:
+        """
+        try:
+            if self.unix_socket is None:
+                if self.__socket_config is None:
+                    # establish ipv6 or ipv4 connection.
+                    for res in socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM):
+                        try:
+                            af, socktype, proto, canonname, sa = res
+                            self._sock = socket.socket(af, socktype, proto)
+                        except socket.error as msg:
+                            self._sock = None
+                            continue
+                        try:
+                            self._sock.connect(sa)
+                        except socket.error as msg:
+                            self._disconnect()
+                            continue
+                        self.__socket_config = res
+                        break
+                else:
+                    # connect to socket with previously established configuration
+                    try:
+                        af, socktype, proto, canonname, sa = self.__socket_config
+                        self._sock = socket.socket(af, socktype, proto)
+                        self._sock.connect(sa)
+                    except socket.error as msg:
+                        self._disconnect()
+            else:
+                # connect to unix socket
+                self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+                self._sock.connect(self.unix_socket)
+        except Exception as e:
+            self.error(str(e),
+                       "Cannot create socket with following configuration: host:", str(self.host),
+                       "port:", str(self.port),
+                       "socket:", str(self.unix_socket))
+            self._sock = None
+        self._sock.setblocking(0)
+
+    def _disconnect(self):
+        """
+        Close socket connection
+        :return:
+        """
+        try:
+            self._sock.shutdown(2)  # 0 - read, 1 - write, 2 - all
+            self._sock.close()
+        except Exception:
+            pass
+        self._sock = None
+
+    def _send(self):
+        """
+        Send request.
+        :return: boolean
+        """
+        # Send request if it is needed
+        if self.request != "".encode():
+            try:
+                self._sock.send(self.request)
+            except Exception as e:
+                self._disconnect()
+                self.error(str(e),
+                           "used configuration: host:", str(self.host),
+                           "port:", str(self.port),
+                           "socket:", str(self.unix_socket))
+                return False
+        return True
+
+    def _receive(self):
+        """
+        Receive data from socket
+        :return: str
+        """
+        data = ""
+        while True:
+            try:
+                ready_to_read, _, in_error = select.select([self._sock], [], [], 15)
+            except Exception as e:
+                self.debug("SELECT", str(e))
+                self._disconnect()
+                break
+            if len(ready_to_read) > 0:
+                buf = self._sock.recv(4096)
+                if len(buf) == 0 or buf is None:  # handle server disconnect
+                    break
+                data += buf.decode()
+                if self._check_raw_data(data):
+                    break
+            else:
+                self.error("Socket timed out.")
+                self._disconnect()
+                break
+
+        return data
 
     def _get_raw_data(self):
         """
         Get raw data with low-level "socket" module.
         :return: str
         """
-        # Recreate socket since they cannot be reused
         if self._sock is None:
-            try:
-                if self.unix_socket is None:
-                    self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                    #sock.setsockopt(socket.SOL_SOCKET, socket.TCP_NODELAY, 1)
-                    #sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-                    #sock.settimeout(self.update_every)
-                    self._sock.settimeout(0.5)
-                    self._sock.connect((self.host, self.port))
-                    self._sock.settimeout(0.5)  # Just to be sure
-                else:
-                    self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-                    #self._sock.settimeout(self.update_every)
-                    self._sock.settimeout(0.05)
-                    self._sock.connect(self.unix_socket)
-                    self._sock.settimeout(0.05)  # Just to be sure
-            except Exception as e:
-                self.error(str(e),
-                           "Cannot create socket with following configuration: host:", str(self.host),
-                           "port:", str(self.port),
-                           "socket:", str(self.unix_socket))
-                self._sock = None
-                return None
+            self._connect()
 
         # Send request if it is needed
-        if self.request != "".encode():
-            try:
-                self._sock.send(self.request)
-            except Exception as e:
-                try:
-                    self._sock.shutdown(0)
-                    self._sock.close()
-                    self._sock = None
-                except:
-                    pass
-                self.error(str(e),
-                           "used configuration: host:", str(self.host),
-                           "port:", str(self.port),
-                           "socket:", str(self.unix_socket))
-                return None
-
-        # Receive first two bytes from socket. This will test if there is anything to receive
-        size = 2
-        try:
-            data = self._sock.recv(size).decode()
-        except Exception as e:
-            self.error(str(e),
-                       "used configuration: host:", str(self.host),
-                       "port:", str(self.port),
-                       "socket:", str(self.unix_socket))
-            self._sock.shutdown(0)
-            self._sock.close()
-            self._sock = None
+        if not self._send():
             return None
 
-        # Receive the rest
-        while True:
-            # implement something like TCP Window Scaling
-            if size < 4096:
-                size *= 2
-            buf = self._sock.recv(size)
-            data += buf.decode()
-            if len(buf) == 0: break  # precaution
-            if len(buf) < size and not self._more_data_available():
-                break
-            else:
-                size = 4
+        data = self._receive()
 
         if not self._keep_alive:
-            self._sock.shutdown(0)
-            self._sock.close()
-            self._sock = None
+            self._disconnect()
 
         return data
 
-    def _more_data_available(self):
-        return False
+    def _check_raw_data(self, data):
+        """
+        Check if all data has been gathered from socket
+        :param data: str
+        :return: boolean
+        """
+        return True
 
     def _parse_config(self):
         """
