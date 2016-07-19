@@ -103,8 +103,8 @@ class Service(SocketService):
         req = self.request.decode()
         if not req.startswith("GET"):
             req = "GET " + req
-        if not req.endswith(" HTTP/1.0\r\n\r\n"):
-            req += " HTTP/1.0\r\n\r\n"
+        if not req.endswith(" HTTP/1.1\r\n\r\n"):
+            req += " HTTP/1.1\r\n\r\n"
         self.request = req.encode()
         if self._get_data() is not None:
             return True
