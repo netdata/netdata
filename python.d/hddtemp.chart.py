@@ -39,6 +39,15 @@ class Service(SocketService):
         self.order = ORDER
         self.definitions = CHARTS
 
+    def _check_raw_data(self, data):
+        if not data.endswith('|'):
+            return False
+
+        if data.count('|') % 5 == 0:
+            return True
+
+        return False
+
     def _get_data(self):
         """
         Get data from TCP/IP socket
