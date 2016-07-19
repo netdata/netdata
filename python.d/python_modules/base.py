@@ -41,6 +41,7 @@ class BaseService(threading.Thread):
         self.chart_name = ""
         self._dimensions = []
         self._charts = []
+        self.__chart_set = False
         if configuration is None:
             self.error("BaseService: no configuration parameters supplied. Cannot create Service.")
             raise RuntimeError
@@ -280,10 +281,16 @@ class BaseService(threading.Thread):
             self.error("cannot set non-numeric value:", value)
             return False
         self._line("SET", id, "=", str(value))
+        self.__chart_set = True
         return True
 
     def end(self):
-        self._line("END")
+        if self.__chart_set:
+            self._line("END")
+            self.__chart_set = False
+        else:
+            pos = self._data_stream.rfind("BEGIN")
+            self._data_stream = self._data_stream[:pos]
 
     def commit(self):
         """
