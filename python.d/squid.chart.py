@@ -88,30 +88,10 @@ class Service(SocketService):
         else:
             self._keep_alive = False
 
-        # if "client" in data and "server.all" in data:
-        #     return True
-        # else:
-        #     return False
-        if data[-7:] == "\r\n0\r\n\r\n":
+        if data[-7:] == "\r\n0\r\n\r\n" and "Transfer-Encoding: chunked" in data[:1024]:  # HTTP/1.1 response
             return True
         else:
             return False
-    #     # TODO write some parser of "Transfer-Encoding: chunked"
-    #     if "Transfer-Encoding: chunked" in data[:1024]:
-    #         data = data[self.__last:]
-    #
-    #
-    #     print(data)
-    #     import time
-    #     time.sleep(10)
-    #     return False
-    #     supposed = 0
-    #     if length >= supposed:
-    #         return True
-    #     else:
-    #         return False
-    #
-    #     return False
 
     def check(self):
         """
@@ -123,8 +103,8 @@ class Service(SocketService):
         req = self.request.decode()
         if not req.startswith("GET"):
             req = "GET " + req
-        if not req.endswith(" HTTP/1.1\r\n\r\n"):
-            req += " HTTP/1.1\r\n\r\n"
+        if not req.endswith(" HTTP/1.0\r\n\r\n"):
+            req += " HTTP/1.0\r\n\r\n"
         self.request = req.encode()
         if self._get_data() is not None:
             return True
