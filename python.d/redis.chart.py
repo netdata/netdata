@@ -135,6 +135,6 @@ class Service(SocketService):
 
         for name in data:
             if name.startswith('db'):
-                self.definitions['keys']['lines'].append([name.decode(), None, 'absolute'])
+                self.definitions['keys']['lines'].append([name, None, 'absolute'])
 
         return True
