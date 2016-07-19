@@ -88,7 +88,11 @@ class Service(SocketService):
         else:
             self._keep_alive = False
 
-        if "client" in data and "server.all" in data:
+        # if "client" in data and "server.all" in data:
+        #     return True
+        # else:
+        #     return False
+        if data[-7:] == "\r\n0\r\n\r\n":
             return True
         else:
             return False

@@ -67,6 +67,7 @@ class Service(SocketService):
         self.order = ORDER
         self.definitions = CHARTS
         self._keep_alive = True
+        self.chart_name = ""
 
     def _get_data(self):
         """
