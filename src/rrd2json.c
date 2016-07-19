@@ -98,7 +98,7 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
 
 	pthread_rwlock_rdlock(&rrdset_root_rwlock);
 	for(st = rrdset_root, c = 0; st ; st = st->next) {
-		if(st->enabled) {
+		if(st->enabled && st->dimensions) {
 			if(c) buffer_strcat(wb, ",");
 			buffer_strcat(wb, "\n\t\t\"");
 			buffer_strcat(wb, st->id);
@@ -239,7 +239,7 @@ void rrd_stats_all_json(BUFFER *wb)
 
 	pthread_rwlock_rdlock(&rrdset_root_rwlock);
 	for(st = rrdset_root, c = 0; st ; st = st->next) {
-		if(st->enabled) {
+		if(st->enabled && st->dimensions) {
 			if(c) buffer_strcat(wb, ",\n");
 			memory += rrd_stats_one_json(st, NULL, wb);
 			c++;
