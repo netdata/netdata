@@ -572,7 +572,6 @@ class SocketService(SimpleService):
                 break
             if len(ready_to_read) > 0:
                 buf = self._sock.recv(4096)
-                print(buf)
                 if len(buf) == 0 or buf is None:  # handle server disconnect
                     break
                 data += buf.decode()
