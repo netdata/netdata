@@ -48,8 +48,8 @@ void read_cgroup_plugin_configuration() {
 	char filename[FILENAME_MAX + 1], *s;
 	struct mountinfo *mi, *root = mountinfo_read();
 
-	mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuacct");
-	if(!mi) mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuacct");
+	mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuacct");
+	if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuacct");
 	if(!mi) {
 		error("Cannot find cgroup cpuacct mountinfo. Assuming default: /sys/fs/cgroup/cpuacct");
 		s = "/sys/fs/cgroup/cpuacct";
@@ -58,8 +58,8 @@ void read_cgroup_plugin_configuration() {
 	snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, s);
 	cgroup_cpuacct_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/cpuacct", filename);
 
-	mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "blkio");
-	if(!mi) mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "blkio");
+	mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "blkio");
+	if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "blkio");
 	if(!mi) {
 		error("Cannot find cgroup blkio mountinfo. Assuming default: /sys/fs/cgroup/blkio");
 		s = "/sys/fs/cgroup/blkio";
@@ -68,8 +68,8 @@ void read_cgroup_plugin_configuration() {
 	snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, s);
 	cgroup_blkio_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/blkio", filename);
 
-	mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "memory");
-	if(!mi) mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "memory");
+	mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "memory");
+	if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "memory");
 	if(!mi) {
 		error("Cannot find cgroup memory mountinfo. Assuming default: /sys/fs/cgroup/memory");
 		s = "/sys/fs/cgroup/memory";
@@ -78,8 +78,8 @@ void read_cgroup_plugin_configuration() {
 	snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, s);
 	cgroup_memory_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/memory", filename);
 
-	mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "devices");
-	if(!mi) mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "devices");
+	mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "devices");
+	if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "devices");
 	if(!mi) {
 		error("Cannot find cgroup devices mountinfo. Assuming default: /sys/fs/cgroup/devices");
 		s = "/sys/fs/cgroup/devices";
