@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <ctype.h>
 
 #include "common.h"
 #include "log.h"
@@ -59,7 +60,7 @@ struct mountinfo *mountinfo_find_by_filesystem_super_option(struct mountinfo *ro
 			// super_options is a comma separated list
 			char *s = mi->super_options, *e;
 			while(*s) {
-				e = ++s;
+				e = s + 1;
 				while(*e && *e != ',') e++;
 
 				size_t len = e - s;
@@ -99,6 +100,33 @@ void mountinfo_free(struct mountinfo *mi) {
 	free(mi->mount_source);
 	free(mi->super_options);
 	free(mi);
+}
+
+static char *strdup_decoding_octal(const char *string) {
+	char *buffer = strdup(string);
+	if(!buffer) fatal("Cannot allocate memory.");
+
+	char *d = buffer;
+	const char *s = string;
+
+	while(*s) {
+		if(unlikely(*s == '\\')) {
+			s++;
+			if(likely(isdigit(*s) && isdigit(s[1]) && isdigit(s[2]))) {
+				char c = *s++ - '0';
+				c <<= 3;
+				c |= *s++ - '0';
+				c <<= 3;
+				c |= *s++ - '0';
+				*d++ = c;
+			}
+			else *d++ = '_';
+		}
+		else *d++ = *s++;
+	}
+	*d = '\0';
+
+	return buffer;
 }
 
 // read the whole mountinfo into a linked list
@@ -151,7 +179,7 @@ struct mountinfo *mountinfo_read() {
 		if(unlikely(!mi->root)) fatal("Cannot allocate memory");
 		mi->root_hash = simple_hash(mi->root);
 
-		mi->mount_point = strdup(procfile_lineword(ff, l, w)); w++;
+		mi->mount_point = strdup_decoding_octal(procfile_lineword(ff, l, w)); w++;
 		if(unlikely(!mi->mount_point)) fatal("Cannot allocate memory");
 		mi->mount_point_hash = simple_hash(mi->mount_point);
 
