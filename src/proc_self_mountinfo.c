@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <ctype.h>
 
 #include "common.h"
 #include "log.h"
@@ -101,6 +102,35 @@ void mountinfo_free(struct mountinfo *mi) {
 	free(mi);
 }
 
+static char *strdup_decoding_octal(const char *string) {
+	char *buffer = strdup(string);
+	if(!buffer) fatal("Cannot allocate memory.");
+
+	char *d = buffer;
+	const char *s = string;
+
+	while(*s) {
+		if(unlikely(*s == '\\')) {
+			if(likely(isdigit(s[1]) && isdigit(s[2]) && isdigit(s[3]))) {
+				char c = *s++ - '0';
+				c <<= 3;
+				c |= *s++ - '0';
+				c <<= 3;
+				c |= *s++ - '0';
+				*d++ = c;
+			}
+			else {
+				*d++ = '_';
+				s++;
+			}
+		}
+		else *d++ = *s++;
+	}
+	*d = '\0';
+
+	return buffer;
+}
+
 // read the whole mountinfo into a linked list
 struct mountinfo *mountinfo_read() {
 	procfile *ff = NULL;
@@ -151,7 +181,7 @@ struct mountinfo *mountinfo_read() {
 		if(unlikely(!mi->root)) fatal("Cannot allocate memory");
 		mi->root_hash = simple_hash(mi->root);
 
-		mi->mount_point = strdup(procfile_lineword(ff, l, w)); w++;
+		mi->mount_point = strdup_decoding_octal(procfile_lineword(ff, l, w)); w++;
 		if(unlikely(!mi->mount_point)) fatal("Cannot allocate memory");
 		mi->mount_point_hash = simple_hash(mi->mount_point);
 
