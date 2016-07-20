@@ -111,7 +111,8 @@ static char *strdup_decoding_octal(const char *string) {
 
 	while(*s) {
 		if(unlikely(*s == '\\')) {
-			if(likely(isdigit(s[1]) && isdigit(s[2]) && isdigit(s[3]))) {
+			s++;
+			if(likely(isdigit(*s) && isdigit(s[1]) && isdigit(s[2]))) {
 				char c = *s++ - '0';
 				c <<= 3;
 				c |= *s++ - '0';
@@ -119,10 +120,7 @@ static char *strdup_decoding_octal(const char *string) {
 				c |= *s++ - '0';
 				*d++ = c;
 			}
-			else {
-				*d++ = '_';
-				s++;
-			}
+			else *d++ = '_';
 		}
 		else *d++ = *s++;
 	}
