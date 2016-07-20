@@ -60,7 +60,7 @@ struct mountinfo *mountinfo_find_by_filesystem_super_option(struct mountinfo *ro
 			// super_options is a comma separated list
 			char *s = mi->super_options, *e;
 			while(*s) {
-				e = ++s;
+				e = s + 1;
 				while(*e && *e != ',') e++;
 
 				size_t len = e - s;
