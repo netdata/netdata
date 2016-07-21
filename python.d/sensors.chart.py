@@ -80,8 +80,10 @@ class Service(SimpleService):
                 name = ""
                 lines = []
                 pref = str(chip.prefix.decode())
+                print(pref)
                 if len(self.chips) != 0 and not any([ex.startswith(pref) for ex in self.chips]):
                     continue
+                pref = pref + '_' + str(chip.addr)
                 for feature in chip:
                     try:
                         float(feature.get_value())
