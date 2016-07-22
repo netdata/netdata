@@ -37,6 +37,10 @@ class Service(LogService):
             raw = self._get_raw_data()
             if raw is None:
                 return None
+            elif not raw:
+                return {'hit': 0,
+                        'miss': 0,
+                        'other': 0}
         except (ValueError, AttributeError):
             return None
 
