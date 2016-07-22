@@ -51,6 +51,7 @@ declare -A configs_signatures=(
 	['ae5ac0a3521e50aa6f6eda2a330b4075']='python.d/example.conf'
 	['e5f32f54d6d6728f21f9ac26f37d6573']='python.d/example.conf'
 	['15e32114994b92be7853b88091e7c6fb']='python.d/exim.conf'
+	['54614490a14e1a4b7b3d9fecb6b4cfa5']='python.d/exim.conf'
 	['73125ae64d5c6e9361944cd9bd14844e']='python.d/exim.conf'
 	['a94af1c808aafdf00537d85ff2197ec8']='python.d/exim.conf'
 	['2a0794fd43eadf30a51805bc9ba2c64d']='python.d/hddtemp.conf'
