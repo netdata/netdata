@@ -561,7 +561,16 @@ NETDATA_DEBUG="$( config_option "debug flags" ${defdebug} )"
 
 # port
 defport=19999
-NETDATA_PORT="$( config_option "port" ${defport} )"
+NETDATA_PORT="$( config_option "default port" ${defport} )"
+NETDATA_PORT2="$( config_option "port" ${defport} )"
+
+if [ "${NETDATA_PORT}" != "${NETDATA_PORT2}" ]
+then
+    if [ "${NETDATA_PORT2}" != "${defport}" ]
+    then
+        NETDATA_PORT="${NETDATA_PORT2}"
+    fi
+fi
 
 # directories
 NETDATA_LIB_DIR="$( config_option "lib directory" "${NETDATA_PREFIX}/var/lib/netdata" )"
@@ -569,7 +578,6 @@ NETDATA_CACHE_DIR="$( config_option "cache directory" "${NETDATA_PREFIX}/var/cac
 NETDATA_WEB_DIR="$( config_option "web files directory" "${NETDATA_PREFIX}/usr/share/netdata/web" )"
 NETDATA_LOG_DIR="$( config_option "log directory" "${NETDATA_PREFIX}/var/log/netdata" )"
 NETDATA_CONF_DIR="$( config_option "config directory" "${NETDATA_PREFIX}/etc/netdata" )"
-NETDATA_BIND="$( config_option "bind socket to IP" "*" )"
 NETDATA_RUN_DIR="${NETDATA_PREFIX}/var/run"
 
 
@@ -1007,27 +1015,19 @@ chmod 750 netdata-uninstaller.sh
 
 # -----------------------------------------------------------------------------
 
-if [ "${NETDATA_BIND}" = "*" ]
-	then
-	access="localhost"
-else
-	access="${NETDATA_BIND}"
-fi
-
 cat <<-END
 
 
 	-------------------------------------------------------------------------------
 
-	OK. NetData is installed and it is running (listening to ${NETDATA_BIND}:${NETDATA_PORT}).
+	OK. NetData is installed and it is running.
 
 	-------------------------------------------------------------------------------
 
-	INFO: Command line options changed. -pidfile, -nd and -ch are deprecated.
-	If you use custom startup scripts, please run netdata -h to see the 
-	corresponding options and update your scripts.
+	By default netdata listens on all IPs on port ${NETDATA_PORT},
+	so you can access it with:
 
-	Hit http://${access}:${NETDATA_PORT}/ from your browser.
+	http://this.machine.ip:${NETDATA_PORT}/
 
 	To stop netdata, just kill it, with:
 
