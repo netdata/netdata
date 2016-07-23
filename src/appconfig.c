@@ -194,6 +194,52 @@ static inline struct config_value *config_value_create(struct config *co, const 
 	return cv;
 }
 
+int config_exists(const char *section, const char *name) {
+	struct config_value *cv;
+
+	debug(D_CONFIG, "request to get config in section '%s', name '%s'", section, name);
+
+	struct config *co = config_section_find(section);
+	if(!co) return 0;
+
+	cv = config_value_index_find(co, name, 0);
+	if(!cv) return 0;
+
+	return 1;
+}
+
+int config_rename(const char *section, const char *old, const char *new) {
+	struct config_value *cv, *cv2;
+
+	debug(D_CONFIG, "request to rename config in section '%s', old name '%s', new name '%s'", section, old, new);
+
+	struct config *co = config_section_find(section);
+	if(!co) return -1;
+
+	config_section_write_lock(co);
+
+	cv = config_value_index_find(co, old, 0);
+	if(!cv) goto cleanup;
+
+	cv2 = config_value_index_find(co, new, 0);
+	if(cv2) goto cleanup;
+
+	config_value_index_del(co, cv);
+
+	free(cv->name);
+	cv->name = strdup(new);
+	if(!cv->name) fatal("Cannot allocate memory for config_rename()");
+
+	config_value_index_add(co, cv);
+	config_section_unlock(co);
+
+	return 0;
+
+cleanup:
+	config_section_unlock(co);
+	return -1;
+}
+
 char *config_get(const char *section, const char *name, const char *default_value)
 {
 	struct config_value *cv;
