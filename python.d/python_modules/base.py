@@ -416,24 +416,24 @@ class UrlService(SimpleService):
 
         # Proxy handling
         # TODO currently self.proxies isn't parsed from configuration file
-        if len(self.proxies) > 0:
-            for proxy in self.proxies:
-                url = proxy['url']
-                # TODO test this:
-                if "user" in proxy and "pass" in proxy:
-                    if url.lower().startswith('https://'):
-                        url = 'https://' + proxy['user'] + ':' + proxy['pass'] + '@' + url[8:]
-                    else:
-                        url = 'http://' + proxy['user'] + ':' + proxy['pass'] + '@' + url[7:]
-                # FIXME move proxy auth to sth like this:
-                #     passman = urllib2.HTTPPasswordMgrWithDefaultRealm()
-                #     passman.add_password(None, url, proxy['user'], proxy['password'])
-                #     opener.add_handler(urllib2.HTTPBasicAuthHandler(passman))
-
-                if url.lower().startswith('https://'):
-                    opener.add_handler(urllib2.ProxyHandler({'https': url}))
-                else:
-                    opener.add_handler(urllib2.ProxyHandler({'https': url}))
+        # if len(self.proxies) > 0:
+        #     for proxy in self.proxies:
+        #         url = proxy['url']
+        #         # TODO test this:
+        #         if "user" in proxy and "pass" in proxy:
+        #             if url.lower().startswith('https://'):
+        #                 url = 'https://' + proxy['user'] + ':' + proxy['pass'] + '@' + url[8:]
+        #             else:
+        #                 url = 'http://' + proxy['user'] + ':' + proxy['pass'] + '@' + url[7:]
+        #         # FIXME move proxy auth to sth like this:
+        #         #     passman = urllib2.HTTPPasswordMgrWithDefaultRealm()
+        #         #     passman.add_password(None, url, proxy['user'], proxy['password'])
+        #         #     opener.add_handler(urllib2.HTTPBasicAuthHandler(passman))
+        #
+        #         if url.lower().startswith('https://'):
+        #             opener.add_handler(urllib2.ProxyHandler({'https': url}))
+        #         else:
+        #             opener.add_handler(urllib2.ProxyHandler({'https': url}))
 
         # HTTP Basic Auth
         if self.user is not None and self.password is not None:
