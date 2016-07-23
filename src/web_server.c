@@ -14,6 +14,7 @@
 #include <netinet/tcp.h>
 #include <malloc.h>
 #include <poll.h>
+#include <ctype.h>
 
 #include "common.h"
 #include "log.h"
@@ -28,7 +29,8 @@
 #include "../config.h"
 
 int listen_backlog = LISTEN_BACKLOG;
-int listen_fd = -1;
+int listen_fds_count = 0;
+int listen_fds[MAX_LISTEN_FDS] = { [0 ... 99] = -1 };
 int listen_port = LISTEN_PORT;
 int web_server_mode = WEB_SERVER_MODE_MULTI_THREADED;
 
@@ -84,157 +86,268 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
 }
 #endif
 
-static int is_ip_anything(const char *ip)
-{
-	if(!ip || !*ip
-			|| !strcmp(ip, "any")
-			|| !strcmp(ip, "all")
-			|| !strcmp(ip, "*")
-			|| !strcmp(ip, "::")
-			|| !strcmp(ip, "0.0.0.0")
-			) return 1;
-
-	return 0;
-}
-
-int create_listen_socket4(const char *ip, int port, int listen_backlog)
-{
+int create_listen_socket4(const char *ip, int port, int listen_backlog) {
 	int sock;
 	int sockopt = 1;
 
-	debug(D_LISTENER, "IPv4 creating new listening socket on port %d", port);
+	debug(D_LISTENER, "IPv4 creating new listening socket on ip '%s' port %d", ip, port);
 
 	sock = socket(AF_INET, SOCK_STREAM, 0);
 	if(sock < 0) {
-		error("IPv4 socket() failed.");
+		error("IPv4 socket() on ip '%s' port %d failed.", ip, port);
 		return -1;
 	}
 
 	/* avoid "address already in use" */
 	if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt)) != 0)
-		error("Cannot set SO_REUSEADDR on port's %d socket.", port);
+		error("Cannot set SO_REUSEADDR on ip '%s' port's %d.", ip, port);
 
 	struct sockaddr_in name;
 	memset(&name, 0, sizeof(struct sockaddr_in));
 	name.sin_family = AF_INET;
 	name.sin_port = htons (port);
 
-	if(is_ip_anything(ip)) {
-		name.sin_addr.s_addr = htonl(INADDR_ANY);
-		// info("Listening on any IPs (IPv4).");
-	}
-	else {
-		int ret = inet_pton(AF_INET, ip, (void *)&name.sin_addr.s_addr);
-		if(ret != 1) {
-			error("Failed to convert IP '%s' to a valid IPv4 address.", ip);
-			close(sock);
-			return -1;
-		}
-		// info("Listening on IP '%s' (IPv4).", ip);
-	}
+    int ret = inet_pton(AF_INET, ip, (void *)&name.sin_addr.s_addr);
+    if(ret != 1) {
+        error("Failed to convert IP '%s' to a valid IPv4 address.", ip);
+        close(sock);
+        return -1;
+    }
 
 	if(bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
 		close(sock);
-		error("IPv4 bind() failed.");
+		error("IPv4 bind() on ip '%s' port %d failed.", ip, port);
 		return -1;
 	}
 
 	if(listen(sock, listen_backlog) < 0) {
 		close(sock);
-		fatal("IPv4 listen() failed.");
+		fatal("IPv4 listen() on ip '%s' port %d failed.", ip, port);
 		return -1;
 	}
 
-	debug(D_LISTENER, "IPv4 listening port %d created", port);
+	debug(D_LISTENER, "Listening on IPv4 ip '%s' port %d", ip, port);
 	return sock;
 }
 
-int create_listen_socket6(const char *ip, int port, int listen_backlog)
-{
+int create_listen_socket6(const char *ip, int port, int listen_backlog) {
 	int sock = -1;
 	int sockopt = 1;
+    int ipv6only = 1;
 
-	debug(D_LISTENER, "IPv6 creating new listening socket on port %d", port);
+	debug(D_LISTENER, "IPv6 creating new listening socket on ip '%s' port %d", ip, port);
 
 	sock = socket(AF_INET6, SOCK_STREAM, 0);
 	if (sock < 0) {
-		error("IPv6 socket() failed. Disabling IPv6.");
+		error("IPv6 socket() on ip '%s' port %d failed.", ip, port);
 		return -1;
 	}
 
-	/* avoid "address already in use" */
-	if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt)) != 0)
-		error("Cannot set SO_REUSEADDR on port's %d socket.", port);
+    /* avoid "address already in use" */
+    if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt)) != 0)
+        error("Cannot set SO_REUSEADDR on ip '%s' port's %d.", ip, port);
 
-	struct sockaddr_in6 name;
+    /* IPv6 only */
+    if(setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (void*)&ipv6only, sizeof(ipv6only)) != 0)
+        error("Cannot set IPV6_V6ONLY on ip '%s' port's %d.", ip, port);
+
+    struct sockaddr_in6 name;
 	memset(&name, 0, sizeof(struct sockaddr_in6));
 	name.sin6_family = AF_INET6;
 	name.sin6_port = htons ((uint16_t) port);
 
-	if(is_ip_anything(ip)) {
-		name.sin6_addr = in6addr_any;
-		// info("Listening on all IPs (IPv6 and IPv4)");
-	}
-	else {
-		int ret = inet_pton(AF_INET6, ip, (void *)&name.sin6_addr.s6_addr);
-		if(ret != 1) {
-			error("Failed to convert IP '%s' to a valid IPv6 address. Disabling IPv6.", ip);
-			close(sock);
-			return -1;
-		}
-		// info("Listening on IP '%s' (IPv6)", ip);
-	}
+    int ret = inet_pton(AF_INET6, ip, (void *)&name.sin6_addr.s6_addr);
+    if(ret != 1) {
+        error("Failed to convert IP '%s' to a valid IPv6 address.", ip);
+        close(sock);
+        return -1;
+    }
 
 	name.sin6_scope_id = 0;
 
 	if (bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
 		close(sock);
-		error("IPv6 bind() failed. Disabling IPv6.");
+		error("IPv6 bind() on ip '%s' port %d failed.", ip, port);
 		return -1;
 	}
 
 	if (listen(sock, listen_backlog) < 0) {
 		close(sock);
-		error("IPv6 listen() failed. Disabling IPv6.");
+		error("IPv6 listen() on ip '%s' port %d failed.", ip, port);
 		return -1;
 	}
 
-	debug(D_LISTENER, "IPv6 listening port %d created", port);
+	debug(D_LISTENER, "Listening on IPv6 ip '%s' port %d", ip, port);
 	return sock;
 }
 
+static inline int add_listen_socket(int fd) {
+    if(listen_fds_count >= MAX_LISTEN_FDS)
+        return -1;
 
-int create_listen_socket(void) {
+    listen_fds[listen_fds_count++] = fd;
+
+    return 0;
+}
+
+int is_listen_socket(int fd) {
+    int i;
+    for(i = 0; i < listen_fds_count ;i++)
+        if(listen_fds[i] == fd) return 1;
+
+    return 0;
+}
+
+static inline void close_listen_sockets(void) {
+    int i;
+    for(i = 0; i < listen_fds_count ;i++)
+        close(listen_fds[i]);
+    listen_fds_count = 0;
+}
+
+static inline int bind_to_one(const char *definition, int default_port, int listen_backlog) {
+    int added = 0;
+    struct addrinfo hints;
+    struct addrinfo *result, *rp;
+
+    char buffer[strlen(definition) + 1];
+    strcpy(buffer, definition);
+
+    char buffer2[10 + 1];
+    snprintfz(buffer2, 10, "%d", default_port);
+
+    char *ip = buffer, *port = buffer2;
+
+    char *e = ip;
+    if(*e == '[') {
+        e = ++ip;
+        while(*e && *e != ']') e++;
+        if(*e == ']') {
+            *e = '\0';
+            e++;
+        }
+    }
+    else {
+        while(*e && *e != ':') e++;
+    }
+
+    if(*e == ':') {
+        port = e + 1;
+        *e = '\0';
+    }
+
+    if(!*ip || *ip == '*' || !strcmp(ip, "any") || !strcmp(ip, "all"))
+        ip = NULL;
+    if(!*port)
+        port = buffer2;
+
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+    hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
+    hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
+    hints.ai_protocol = 0;          /* Any protocol */
+    hints.ai_canonname = NULL;
+    hints.ai_addr = NULL;
+    hints.ai_next = NULL;
+
+    int r = getaddrinfo(ip, port, &hints, &result);
+    if (r != 0) {
+        error("getaddrinfo('%s', '%s'): %s\n", ip, port, gai_strerror(r));
+        return -1;
+    }
+
+    for (rp = result; rp != NULL; rp = rp->ai_next) {
+        int fd = -1;
+
+        char rip[INET_ADDRSTRLEN + INET6_ADDRSTRLEN] = "INVALID";
+        switch (rp->ai_addr->sa_family) {
+            case AF_INET: {
+                struct sockaddr_in *sin = (struct sockaddr_in *) rp->ai_addr;
+                inet_ntop(AF_INET, &sin->sin_addr, rip, INET_ADDRSTRLEN);
+                fd = create_listen_socket4(rip, ntohs(sin->sin_port), listen_backlog);
+                break;
+            }
+
+            case AF_INET6: {
+                struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) rp->ai_addr;
+                inet_ntop(AF_INET6, &sin6->sin6_addr, rip, INET6_ADDRSTRLEN);
+                fd = create_listen_socket6(rip, ntohs(sin6->sin6_port), listen_backlog);
+                break;
+            }
+        }
+
+        if (fd == -1)
+            error("Cannot bind to ip '%s', port %d", rip, default_port);
+        else {
+            add_listen_socket(fd);
+            added++;
+        }
+    }
+
+    return added;
+}
+
+int create_listen_sockets(void) {
 	listen_backlog = (int) config_get_number("global", "http port listen backlog", LISTEN_BACKLOG);
 
-	listen_port = (int) config_get_number("global", "port", LISTEN_PORT);
+    if(config_exists("global", "bind socket to IP") && !config_exists("global", "bind to"))
+        config_rename("global", "bind socket to IP", "bind to");
+
+    if(config_exists("global", "port") && !config_exists("global", "default port"))
+        config_rename("global", "port", "default port");
+
+    listen_port = (int) config_get_number("global", "default port", LISTEN_PORT);
 	if(listen_port < 1 || listen_port > 65535) {
 		error("Invalid listen port %d given. Defaulting to %d.", listen_port, LISTEN_PORT);
-		listen_port = LISTEN_PORT;
+        listen_port = (int) config_set_number("global", "default port", LISTEN_PORT);
 	}
-	else debug(D_OPTIONS, "Listen port set to %d.", listen_port);
+	debug(D_OPTIONS, "Default listen port set to %d.", listen_port);
 
-	int ip = 0;
-	char *ipv = config_get("global", "ip version", "any");
-	if(!strcmp(ipv, "any") || !strcmp(ipv, "both") || !strcmp(ipv, "all")) ip = 0;
-	else if(!strcmp(ipv, "ipv4") || !strcmp(ipv, "IPV4") || !strcmp(ipv, "IPv4") || !strcmp(ipv, "4")) ip = 4;
-	else if(!strcmp(ipv, "ipv6") || !strcmp(ipv, "IPV6") || !strcmp(ipv, "IPv6") || !strcmp(ipv, "6")) ip = 6;
-	else error("Cannot understand ip version '%s'. Assuming 'any'.", ipv);
+    char *s = config_get("global", "bind to", "*");
+    while(*s) {
+        char *e = s;
 
-	if(ip == 0 || ip == 6)
-		listen_fd = create_listen_socket6(config_get("global", "bind socket to IP", "*"), listen_port, listen_backlog);
+        // skip separators, moving both s(tart) and e(nd)
+        while(isspace(*e) || *e == ',') s = ++e;
 
-	if(listen_fd == -1) {
-		listen_fd = create_listen_socket4(config_get("global", "bind socket to IP", "*"), listen_port, listen_backlog);
-		//if(listen_fd != -1 && ip != 4)
-		//	info("Managed to open an IPv4 socket on port %d.", listen_port);
-	}
+        // move e(nd) to the first separator
+        while(*e && !isspace(*e) && *e != ',') e++;
 
-	return listen_fd;
+        // is there anything?
+        if(!*s || s == e) break;
+
+        char buf[e - s + 1];
+        strncpyz(buf, s, e - s);
+        bind_to_one(buf, listen_port, listen_backlog);
+
+        s = e;
+    }
+
+    if(!listen_fds_count)
+        fatal("Cannot listen on any socket. Exiting...");
+
+	return listen_fds_count;
 }
 
 // --------------------------------------------------------------------------------------
 // the main socket listener
+
+static inline void cleanup_web_clients(void) {
+	struct web_client *w;
+
+	for (w = web_clients; w;) {
+		if (w->obsolete) {
+			debug(D_WEB_CLIENT, "%llu: Removing client.", w->id);
+			// pthread_cancel(w->thread);
+			// pthread_join(w->thread, NULL);
+			w = web_client_free(w);
+#ifdef NETDATA_INTERNAL_CHECKS
+			log_allocations();
+#endif
+		}
+		else w = w->next;
+	}
+}
 
 // 1. it accepts new incoming requests on our port
 // 2. creates a new web_client for each connection received
@@ -250,7 +363,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
 	info("Multi-threaded WEB SERVER thread created with task id %d", gettid());
 
 	struct web_client *w;
-	int retval, failures = 0, counter = 0;
+	int retval, counter = 0;
 
 	if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
 		error("Cannot set pthread cancel type to DEFERRED.");
@@ -258,38 +371,45 @@ void *socket_listen_main_multi_threaded(void *ptr) {
 	if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
 		error("Cannot set pthread cancel state to ENABLE.");
 
-	if(listen_fd < 0)
-		fatal("LISTENER: Listen socket %d is not ready, or invalid.", listen_fd);
+	if(!listen_fds_count)
+		fatal("LISTENER: No sockets to listen to.");
+
+	struct pollfd *fds = calloc(sizeof(struct pollfd), listen_fds_count);
+	if(!fds)
+		fatal("LISTENER: Cannot allocate memory for poll fds.");
+
+	int i;
+	for(i = 0; i < listen_fds_count ;i++) {
+		fds[i].fd = listen_fds[i];
+		fds[i].events = POLLIN;
+		fds[i].revents = 0;
+	}
+
+	int timeout = 10 * 1000;
 
 	for(;;) {
-		struct pollfd fd = { .fd = listen_fd, .events = POLLIN, .revents = 0 };
-		int timeout = 10 * 1000;
-
 		// debug(D_WEB_CLIENT, "LISTENER: Waiting...");
-		retval = poll(&fd, 1, timeout);
+		retval = poll(fds, listen_fds_count, timeout);
 
 		if(unlikely(retval == -1)) {
-			debug(D_WEB_CLIENT, "LISTENER: poll() failed.");
-			failures++;
-
-			if(failures > 10) {
-				error("LISTENER: our listen port %d seems dead. Re-opening it.", listen_fd);
-				close(listen_fd);
-				listen_fd = -1;
-				sleep(5);
-				create_listen_socket();
-				if(listen_fd < 0)
-					fatal("Cannot listen for web clients (connected clients %lu).", global_statistics.connected_clients);
-
-				failures = 0;
-			}
-
+			error("LISTENER: poll() failed.");
 			continue;
 		}
-		else if(likely(retval)) {
+		else if(unlikely(!retval)) {
+			debug(D_WEB_CLIENT, "LISTENER: select() timeout.");
+			counter = 0;
+			cleanup_web_clients();
+			continue;
+		}
+
+		for(i = 0 ; i < listen_fds_count ; i++) {
+			short int revents = fds[i].revents;
+
 			// check for new incoming connections
-			if(fd.revents & POLLIN || fd.revents & POLLPRI) {
-				w = web_client_create(listen_fd);
+			if(revents & POLLIN || revents & POLLPRI) {
+				fds[i].revents = 0;
+
+				w = web_client_create(fds[i].fd);
 				if(unlikely(!w)) {
 					// no need for error log - web_client_create already logged the error
 					continue;
@@ -304,41 +424,19 @@ void *socket_listen_main_multi_threaded(void *ptr) {
 					w->obsolete = 1;
 				}
 			}
-			else {
-				failures++;
-				debug(D_WEB_CLIENT, "LISTENER: select() didn't do anything.");
-				continue;
-			}
-		}
-		else {
-			debug(D_WEB_CLIENT, "LISTENER: select() timeout.");
-			counter = CLEANUP_EVERY_EVENTS;
 		}
 
 		// cleanup unused clients
 		counter++;
-		if(counter > CLEANUP_EVERY_EVENTS) {
+		if(counter >= CLEANUP_EVERY_EVENTS) {
 			counter = 0;
-			for (w = web_clients; w;) {
-				if (w->obsolete) {
-					debug(D_WEB_CLIENT, "%llu: Removing client.", w->id);
-					// pthread_cancel(w->thread);
-					// pthread_join(w->thread, NULL);
-					w = web_client_free(w);
-#ifdef NETDATA_INTERNAL_CHECKS
-					log_allocations();
-#endif
-				}
-				else w = w->next;
-			}
+			cleanup_web_clients();
 		}
-
-		failures = 0;
 	}
 
 	debug(D_WEB_CLIENT, "LISTENER: exit!");
-	close(listen_fd);
-	listen_fd = -1;
+    close_listen_sockets();
+
 	return NULL;
 }
 
@@ -394,7 +492,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
 	info("Single threaded WEB SERVER thread created with task id %d", gettid());
 
 	struct web_client *w;
-	int retval, failures = 0;
+	int retval;
 
 	if(ptr) { ; }
 
@@ -404,10 +502,11 @@ void *socket_listen_main_single_threaded(void *ptr) {
 	if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
 		error("Cannot set pthread cancel state to ENABLE.");
 
-	if(listen_fd < 0 || listen_fd >= FD_SETSIZE)
-		fatal("LISTENER: Listen socket %d is not ready, or invalid.", listen_fd);
-
 	int i;
+
+	if(!listen_fds_count)
+		fatal("LISTENER: no listen sockets available.");
+
 	for(i = 0; i < FD_SETSIZE ; i++)
 		single_threaded_clients[i] = NULL;
 
@@ -415,12 +514,20 @@ void *socket_listen_main_single_threaded(void *ptr) {
 	FD_ZERO (&ifds);
 	FD_ZERO (&ofds);
 	FD_ZERO (&efds);
-	FD_SET(listen_fd, &ifds);
-	FD_SET(listen_fd, &efds);
-	int fdmax = listen_fd;
+	int fdmax = 0;
+
+	for(i = 0; i < listen_fds_count ; i++) {
+		if (listen_fds[i] < 0 || listen_fds[i] >= FD_SETSIZE)
+			fatal("LISTENER: Listen socket %d is not ready, or invalid.", listen_fds[i]);
+
+		FD_SET(listen_fds[i], &ifds);
+		FD_SET(listen_fds[i], &efds);
+		if(fdmax < listen_fds[i])
+            fdmax = listen_fds[i];
+	}
 
 	for(;;) {
-		debug(D_WEB_CLIENT_ACCESS, "LISTENER: single threaded web server waiting (listen fd = %d, fdmax = %d)...", listen_fd, fdmax);
+		debug(D_WEB_CLIENT_ACCESS, "LISTENER: single threaded web server waiting (fdmax = %d)...", fdmax);
 
 		struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
 		rifds = ifds;
@@ -429,44 +536,19 @@ void *socket_listen_main_single_threaded(void *ptr) {
 		retval = select(fdmax+1, &rifds, &rofds, &refds, &tv);
 
 		if(unlikely(retval == -1)) {
-			debug(D_WEB_CLIENT, "LISTENER: select() failed.");
-			failures++;
-			if(failures > 10) {
-				if(global_statistics.connected_clients) {
-					error("REMOVING ALL %lu WEB CLIENTS !", global_statistics.connected_clients);
-					while (web_clients) {
-						single_threaded_unlink_client(web_clients, &ifds, &ofds, &efds);
-						web_client_free(web_clients);
-					}
-				}
-
-				error("LISTENER: our listen port %d seems dead. Re-opening it.", listen_fd);
-
-				close(listen_fd);
-				listen_fd = -1;
-				sleep(5);
-
-				create_listen_socket();
-				if(listen_fd < 0 || listen_fd >= FD_SETSIZE)
-					fatal("Cannot listen for web clients (connected clients %lu).", global_statistics.connected_clients);
-
-				FD_ZERO (&ifds);
-				FD_ZERO (&ofds);
-				FD_ZERO (&efds);
-				FD_SET(listen_fd, &ifds);
-				FD_SET(listen_fd, &efds);
-				failures = 0;
-			}
+			error("LISTENER: select() failed.");
+			continue;
 		}
 		else if(likely(retval)) {
-			failures = 0;
 			debug(D_WEB_CLIENT_ACCESS, "LISTENER: got something.");
 
-			if(FD_ISSET(listen_fd, &rifds)) {
-				debug(D_WEB_CLIENT_ACCESS, "LISTENER: new connection.");
-				w = web_client_create(listen_fd);
-				if(single_threaded_link_client(w, &ifds, &ofds, &ifds, &fdmax) != 0) {
-					web_client_free(w);
+			for(i = 0; i < listen_fds_count ; i++) {
+				if (FD_ISSET(listen_fds[i], &rifds)) {
+					debug(D_WEB_CLIENT_ACCESS, "LISTENER: new connection.");
+					w = web_client_create(listen_fds[i]);
+					if (single_threaded_link_client(w, &ifds, &ofds, &ifds, &fdmax) != 0) {
+						web_client_free(w);
+					}
 				}
 			}
 
@@ -522,7 +604,6 @@ void *socket_listen_main_single_threaded(void *ptr) {
 	}
 
 	debug(D_WEB_CLIENT, "LISTENER: exit!");
-	close(listen_fd);
-	listen_fd = -1;
+    close_listen_sockets();
 	return NULL;
 }

@@ -652,9 +652,7 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		listen_fd = create_listen_socket();
-		if(listen_fd == -1)
-			fatal("Cannot listen socket.");
+		create_listen_sockets();
 	}
 
 	// never become a problem

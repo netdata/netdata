@@ -9,19 +9,18 @@
 #define LISTEN_PORT 19999
 #define LISTEN_BACKLOG 100
 
-extern int listen_backlog;
-extern int listen_fd;
-extern int listen_port;
+#ifndef MAX_LISTEN_FDS
+#define MAX_LISTEN_FDS 100
+#endif
 
 #define WEB_SERVER_MODE_MULTI_THREADED 0
 #define WEB_SERVER_MODE_SINGLE_THREADED 1
 extern int web_server_mode;
 
-extern int create_listen_socket4(const char *ip, int port, int listen_backlog);
-extern int create_listen_socket6(const char *ip, int port, int listen_backlog);
 extern void *socket_listen_main_multi_threaded(void *ptr);
 extern void *socket_listen_main_single_threaded(void *ptr);
-extern int create_listen_socket(void);
+extern int create_listen_sockets(void);
+extern int is_listen_socket(int fd);
 
 #ifndef HAVE_ACCEPT4
 extern int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags);
