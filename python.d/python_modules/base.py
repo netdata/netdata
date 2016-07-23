@@ -681,10 +681,10 @@ class LogService(SimpleService):
         lines = []
         try:
             if os.path.getsize(self.log_path) < self._last_position:
-                self._last_position = 0
+                self._last_position = 0  # read from beginning if file has shrunk
             elif os.path.getsize(self.log_path) == self._last_position:
                 self.debug("Log file hasn't changed. No new data.")
-                return False
+                return []  # return empty list if nothing has changed
             with open(self.log_path, "r") as fp:
                 fp.seek(self._last_position)
                 for i, line in enumerate(fp):
@@ -720,6 +720,7 @@ class LogService(SimpleService):
             return False
 
     def create(self):
+        # set cursor at last byte of log file
         self._last_position = os.path.getsize(self.log_path)
         status = SimpleService.create(self)
         # self._last_position = 0
