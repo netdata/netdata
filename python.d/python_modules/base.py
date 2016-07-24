@@ -289,7 +289,7 @@ class SimpleService(threading.Thread):
         try:
             value = str(int(value))
         except TypeError:
-            self.error("cannot set non-numeric value:", value)
+            self.error("cannot set non-numeric value:", str(value))
             return False
         self._line("SET", id, "=", str(value))
         self.__chart_set = True
