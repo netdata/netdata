@@ -76,3 +76,5 @@ class Service(UrlService):
                     'jvm': memory.attrib['free']}
         except (ValueError, AttributeError):
             return None
+        except Exception as e:
+            self.debug(str(e))
