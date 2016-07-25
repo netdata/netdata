@@ -31,6 +31,7 @@
 int listen_backlog = LISTEN_BACKLOG;
 int listen_fds_count = 0;
 int listen_fds[MAX_LISTEN_FDS] = { [0 ... 99] = -1 };
+char *listen_fds_names[MAX_LISTEN_FDS] = { [0 ... 99] = NULL };
 int listen_port = LISTEN_PORT;
 int web_server_mode = WEB_SERVER_MODE_MULTI_THREADED;
 
@@ -181,12 +182,20 @@ int create_listen_socket6(const char *ip, int port, int listen_backlog) {
 	return sock;
 }
 
-static inline int add_listen_socket(int fd) {
-    if(listen_fds_count >= MAX_LISTEN_FDS)
+static inline int add_listen_socket(int fd, const char *ip, int port) {
+    if(listen_fds_count >= MAX_LISTEN_FDS) {
+        error("Too many listening sockets. Failed to add listening socket at ip '%s' port %d", ip, port);
+        close(fd);
         return -1;
+    }
 
-    listen_fds[listen_fds_count++] = fd;
+    listen_fds[listen_fds_count] = fd;
 
+    char buffer[100 + 1];
+    snprintfz(buffer, 100, "[%s]:%d", ip, port);
+    listen_fds_names[listen_fds_count] = strdup(buffer);
+
+    listen_fds_count++;
     return 0;
 }
 
@@ -200,8 +209,14 @@ int is_listen_socket(int fd) {
 
 static inline void close_listen_sockets(void) {
     int i;
-    for(i = 0; i < listen_fds_count ;i++)
+    for(i = 0; i < listen_fds_count ;i++) {
         close(listen_fds[i]);
+        listen_fds[i] = -1;
+
+        if(listen_fds_names[i]) free(listen_fds_names[i]);
+        listen_fds_names[i] = NULL;
+    }
+
     listen_fds_count = 0;
 }
 
@@ -260,18 +275,22 @@ static inline int bind_to_one(const char *definition, int default_port, int list
         int fd = -1;
 
         char rip[INET_ADDRSTRLEN + INET6_ADDRSTRLEN] = "INVALID";
+        int rport = default_port;
+
         switch (rp->ai_addr->sa_family) {
             case AF_INET: {
                 struct sockaddr_in *sin = (struct sockaddr_in *) rp->ai_addr;
                 inet_ntop(AF_INET, &sin->sin_addr, rip, INET_ADDRSTRLEN);
-                fd = create_listen_socket4(rip, ntohs(sin->sin_port), listen_backlog);
+                rport = ntohs(sin->sin_port);
+                fd = create_listen_socket4(rip, rport, listen_backlog);
                 break;
             }
 
             case AF_INET6: {
                 struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) rp->ai_addr;
                 inet_ntop(AF_INET6, &sin6->sin6_addr, rip, INET6_ADDRSTRLEN);
-                fd = create_listen_socket6(rip, ntohs(sin6->sin6_port), listen_backlog);
+                rport = ntohs(sin6->sin6_port);
+                fd = create_listen_socket6(rip, rport, listen_backlog);
                 break;
             }
         }
@@ -279,7 +298,7 @@ static inline int bind_to_one(const char *definition, int default_port, int list
         if (fd == -1)
             error("Cannot bind to ip '%s', port %d", rip, default_port);
         else {
-            add_listen_socket(fd);
+            add_listen_socket(fd, rip, rport);
             added++;
         }
     }
@@ -383,7 +402,9 @@ void *socket_listen_main_multi_threaded(void *ptr) {
 		fds[i].fd = listen_fds[i];
 		fds[i].events = POLLIN;
 		fds[i].revents = 0;
-	}
+
+        info("Listening on '%s'", (listen_fds_names[i])?listen_fds_names[i]:"UNKNOWN");
+    }
 
 	int timeout = 10 * 1000;
 
@@ -489,7 +510,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
 
 	web_server_mode = WEB_SERVER_MODE_SINGLE_THREADED;
 
-	info("Single threaded WEB SERVER thread created with task id %d", gettid());
+	info("Single-threaded WEB SERVER thread created with task id %d", gettid());
 
 	struct web_client *w;
 	int retval;
@@ -519,6 +540,8 @@ void *socket_listen_main_single_threaded(void *ptr) {
 	for(i = 0; i < listen_fds_count ; i++) {
 		if (listen_fds[i] < 0 || listen_fds[i] >= FD_SETSIZE)
 			fatal("LISTENER: Listen socket %d is not ready, or invalid.", listen_fds[i]);
+
+        info("Listening on '%s'", (listen_fds_names[i])?listen_fds_names[i]:"UNKNOWN");
 
 		FD_SET(listen_fds[i], &ifds);
 		FD_SET(listen_fds[i], &efds);
