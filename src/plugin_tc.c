@@ -672,6 +672,9 @@ void *tc_main(void *ptr) {
 #endif
 	uint32_t first_hash;
 
+	snprintfz(buffer, TC_LINE_MAX, "%s/tc-qos-helper.sh", config_get("plugins", "plugins directory", PLUGINS_DIR));
+	char *tc_script = config_get("plugin:tc", "script to run to get tc values", buffer);
+	
 	for(;1;) {
 		if(unlikely(netdata_exit)) break;
 
@@ -679,7 +682,7 @@ void *tc_main(void *ptr) {
 		struct tc_device *device = NULL;
 		struct tc_class *class = NULL;
 
-		snprintfz(buffer, TC_LINE_MAX, "exec %s %d", config_get("plugin:tc", "script to run to get tc values", PLUGINS_DIR "/tc-qos-helper.sh"), rrd_update_every);
+		snprintfz(buffer, TC_LINE_MAX, "exec %s %d", tc_script, rrd_update_every);
 		debug(D_TC_LOOP, "executing '%s'", buffer);
 
 		fp = mypopen(buffer, &tc_child_pid);
