@@ -1,4 +1,10 @@
 %define contentdir %{_datadir}/netdata
+
+# This is temporary and should eventually be resolved. This bypasses
+# the default rhel __os_install_post which throws a python compile
+# error.
+%define __os_install_post %{nil}
+
 #
 # Conditional build:
 %bcond_without  systemd  # systemd
