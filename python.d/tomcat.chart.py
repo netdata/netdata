@@ -6,7 +6,7 @@
 
 from base import UrlService
 import xml.etree.ElementTree as ET  # phone home...
-import xml.parsers.expat.errors as errors
+#from xml.parsers.expat import errors
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -81,7 +81,8 @@ class Service(UrlService):
             try:
                 data = ET.fromstring(raw)
             except ET.ParseError as e:
-                if e.code == errors.codes[errors.XML_ERROR_JUNK_AFTER_DOC_ELEMENT]:
+                #if e.code == errors.codes[errors.XML_ERROR_JUNK_AFTER_DOC_ELEMENT]:
+                if e.code == 9:
                     # cut rest of invalid string
                     pos = 0
                     for i in range(e.position[0] - 1):
@@ -89,7 +90,7 @@ class Service(UrlService):
                     raw = raw[:47604 + pos + e.position[0] - 1]
                     data = ET.fromstring(raw)
                 else:
-                    raise ET.ParseError(e)
+                    raise Exception(e)
 
             memory = data.find('./jvm/memory')
             threads = data.find("./connector[@name='\"http-bio-" + str(self.port) + "\"']/threadInfo")
