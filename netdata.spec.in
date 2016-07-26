@@ -113,6 +113,8 @@ exit 0
 %post
 # Register the netdata service
 /sbin/chkconfig --add netdata
+# Start the netdata service
+/sbin/service netdata start
 
 %preun
 if [ $1 = 0 ]; then
