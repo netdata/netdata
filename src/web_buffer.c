@@ -73,6 +73,54 @@ void buffer_char_replace(BUFFER *wb, char from, char to)
 	buffer_overflow_check(wb);
 }
 
+// This trick seems to give an 80% speed increase in 32bit systems
+// print_calculated_number_llu_r() will just print the digits up to the
+// point the remaining value fits in 32 bits, and then calls
+// print_calculated_number_lu_r() to print the rest with 32 bit arithmetic.
+
+inline char *print_number_lu_r(char *str, unsigned long uvalue) {
+	char *wstr = str;
+
+	// print each digit
+	do *wstr++ = (char)('0' + (uvalue % 10)); while(uvalue /= 10);
+	return wstr;
+}
+
+inline char *print_number_llu_r(char *str, unsigned long long uvalue) {
+	char *wstr = str;
+
+	// print each digit
+	do *wstr++ = (char)('0' + (uvalue % 10)); while((uvalue /= 10) && uvalue > (unsigned long long)0xffffffff);
+	if(uvalue) return print_number_lu_r(wstr, uvalue);
+	return wstr;
+}
+
+void buffer_print_llu(BUFFER *wb, unsigned long long uvalue)
+{
+	buffer_need_bytes(wb, 50);
+
+	char *str = &wb->buffer[wb->len];
+	char *wstr = str;
+
+#ifdef ENVIRONMENT32
+	if(uvalue > (unsigned long long)0xffffffff)
+		wstr = print_number_llu_r(wstr, uvalue);
+	else
+		wstr = print_number_lu_r(wstr, uvalue);
+#else
+	do *wstr++ = (char)('0' + (uvalue % 10)); while(uvalue /= 10);
+#endif
+
+	// terminate it
+	*wstr = '\0';
+
+	// reverse it
+	char *begin = str, *end = wstr - 1, aux;
+	while (end > begin) aux = *end, *end-- = *begin, *begin++ = aux;
+
+	// return the buffer length
+	wb->len += wstr - str;
+}
 
 void buffer_strcat(BUFFER *wb, const char *txt)
 {
