@@ -71,6 +71,8 @@ pid_t *all_pids_sortlist = NULL;
 int show_guest_time = 0;
 int show_guest_time_old = 0;
 
+int enable_guest_charts = 0;
+
 // ----------------------------------------------------------------------------
 
 void netdata_cleanup_and_exit(int ret) {
@@ -788,11 +790,13 @@ int read_proc_pid_stat(struct pid_stat *p) {
 	p->cgtime_raw		= strtoull(procfile_lineword(ff, 0, 43), NULL, 10);
 	p->cgtime = (p->cgtime_raw - last) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
-	if(show_guest_time || p->gtime || p->cgtime) {
-		p->utime  -= (p->utime  >= p->gtime )?p->gtime :p->utime;
-		p->cutime -= (p->cutime >= p->cgtime)?p->cgtime:p->cutime;
-		show_guest_time = 1;
-	}
+    if(enable_guest_charts) {
+        if (show_guest_time || p->gtime || p->cgtime) {
+            p->utime -= (p->utime >= p->gtime) ? p->gtime : p->utime;
+            p->cutime -= (p->cutime >= p->cgtime) ? p->cgtime : p->cutime;
+            show_guest_time = 1;
+        }
+    }
 
 	if(unlikely(debug || (p->target && p->target->debug)))
 		fprintf(stderr, "apps.plugin: READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu, threads=%d\n", host_prefix, p->pid, p->comm, (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
@@ -989,8 +993,10 @@ int read_proc_stat() {
     gntime_raw = strtoull(procfile_lineword(ff, 0, 11), NULL, 10);
     global_gtime += (gntime_raw - last) * (1000000ULL * RATES_DETAIL) / (collected_usec - last_collected_usec);
 
-    // remove guest time from user time
-    global_utime -= (global_utime > global_gtime)?global_gtime:global_utime;
+    if(enable_guest_charts) {
+        // remove guest time from user time
+        global_utime -= (global_utime > global_gtime) ? global_gtime : global_utime;
+    }
 
 	if(unlikely(global_iterations_counter == 1)) {
 		global_utime = 0;
@@ -2725,7 +2731,7 @@ void parse_args(int argc, char **argv)
 			continue;
 		}
 
-		if(strcmp("no-childs", argv[i]) == 0) {
+		if(strcmp("no-childs", argv[i]) == 0 || strcmp("without-childs", argv[i]) == 0) {
 			include_exited_childs = 0;
 			continue;
 		}
@@ -2735,7 +2741,17 @@ void parse_args(int argc, char **argv)
 			continue;
 		}
 
-		if(!name) {
+        if(strcmp("with-guest", argv[i]) == 0) {
+            enable_guest_charts = 1;
+            continue;
+        }
+
+        if(strcmp("no-guest", argv[i]) == 0 || strcmp("without-guest", argv[i]) == 0) {
+            enable_guest_charts = 0;
+            continue;
+        }
+
+        if(!name) {
 			name = argv[i];
 			continue;
 		}
