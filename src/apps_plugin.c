@@ -2751,6 +2751,35 @@ void parse_args(int argc, char **argv)
             continue;
         }
 
+		if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
+            fprintf(stderr,
+                    "apps.plugin\n"
+                    "(C) 2016 Costa Tsaousis"
+                    "GPL v3+\n"
+                    "This program is a data collector plugin for netdata.\n"
+                    "\n"
+                    "Valid command line options:\n"
+                    "\n"
+                    "SECONDS           set the data collection frequency\n"
+                    "\n"
+                    "debug             enable debugging (lot of output)\n"
+                    "\n"
+                    "with-childs\n"
+                    "without-childs    enable / disable aggregating exited\n"
+                    "                  children resources into parents\n"
+                    "                  (default is enabled)\n"
+                    "\n"
+                    "with-guest\n"
+                    "without-guest     enable / disable reporting guest charts\n"
+                    "                  (default is disabled)\n"
+                    "\n"
+                    "NAME              read apps_NAME.conf instead of\n"
+                    "                  apps_groups.conf\n"
+                    "                  (default NAME=groups)\n"
+            );
+            exit(1);
+        }
+
         if(!name) {
 			name = argv[i];
 			continue;
