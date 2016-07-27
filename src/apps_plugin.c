@@ -34,6 +34,7 @@
 #include "log.h"
 #include "procfile.h"
 #include "../config.h"
+#include "web_buffer.h"
 
 #ifdef NETDATA_INTERNAL_CHECKS
 #include <sys/prctl.h>
@@ -65,6 +66,10 @@ char *host_prefix = "";
 char *config_dir = CONFIG_DIR;
 
 pid_t *all_pids_sortlist = NULL;
+
+// will be automatically set to 1, if guest values are collected
+int show_guest_time = 0;
+int show_guest_time_old = 0;
 
 // ----------------------------------------------------------------------------
 
@@ -779,8 +784,11 @@ int read_proc_pid_stat(struct pid_stat *p) {
 	p->gtime_raw		= strtoull(procfile_lineword(ff, 0, 42+i), NULL, 10);
 	p->cgtime_raw		= strtoull(procfile_lineword(ff, 0, 43+i), NULL, 10);
 
-	p->utime_raw  -= p->gtime_raw;
-	p->cutime_raw -= p->cgtime_raw;
+	if(show_guest_time || p->gtime_raw || p->cgtime_raw) {
+		p->utime_raw -= p->gtime_raw;
+		p->cutime_raw -= p->cgtime_raw;
+		show_guest_time = 1;
+	}
 
 	if(unlikely(debug || (p->target && p->target->debug)))
 		fprintf(stderr, "apps.plugin: READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu, threads=%d\n", host_prefix, p->pid, p->comm, (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
@@ -2174,6 +2182,34 @@ void calculate_netdata_statistics(void) {
 // ----------------------------------------------------------------------------
 // update chart dimensions
 
+BUFFER *output = NULL;
+int print_calculated_number(char *str, calculated_number value) { (void)str; (void)value; return 0; }
+
+static inline void send_BEGIN(const char *type, const char *id, unsigned long long usec) {
+	// fprintf(stdout, "BEGIN %s.%s %llu\n", type, id, usec);
+	buffer_strcat(output, "BEGIN ");
+	buffer_strcat(output, type);
+	buffer_strcat(output, ".");
+	buffer_strcat(output, id);
+	buffer_strcat(output, " ");
+	buffer_print_llu(output, usec);
+	buffer_strcat(output, "\n");
+}
+
+static inline void send_SET(const char *name, unsigned long long value) {
+	// fprintf(stdout, "SET %s = %llu\n", name, value);
+	buffer_strcat(output, "SET ");
+	buffer_strcat(output, name);
+	buffer_strcat(output, " = ");
+	buffer_print_llu(output, value);
+	buffer_strcat(output, "\n");
+}
+
+static inline void send_END(void) {
+	// fprintf(stdout, "END\n");
+	buffer_strcat(output, "END\n");
+}
+
 double utime_fix_ratio = 1.0, stime_fix_ratio = 1.0, gtime_fix_ratio = 1.0, cutime_fix_ratio = 1.0, cstime_fix_ratio = 1.0, cgtime_fix_ratio = 1.0;
 double minflt_fix_ratio = 1.0, majflt_fix_ratio = 1.0, cminflt_fix_ratio = 1.0, cmajflt_fix_ratio = 1.0;
 
@@ -2211,7 +2247,7 @@ unsigned long long send_resource_usage_to_netdata() {
 		bcopy(&me, &me_last, sizeof(struct rusage));
 	}
 
-	fprintf(stdout,
+	buffer_sprintf(output,
 		"BEGIN netdata.apps_cpu %llu\n"
 		"SET user = %llu\n"
 		"SET system = %llu\n"
@@ -2246,7 +2282,7 @@ unsigned long long send_resource_usage_to_netdata() {
 		);
 
 	if(include_exited_childs)
-		fprintf(stdout,
+		buffer_sprintf(output,
 			"BEGIN netdata.apps_children_fix %llu\n"
 			"SET cutime = %llu\n"
 			"SET cstime = %llu\n"
@@ -2414,135 +2450,119 @@ void normalize_data(struct target *root) {
 void send_collected_data_to_netdata(struct target *root, const char *type, unsigned long long usec) {
 	struct target *w;
 
-	fprintf(stdout, "BEGIN %s.cpu %llu\n", type, usec);
+	send_BEGIN(type, "cpu", usec);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "SET %s = %llu\n", w->name, (unsigned long long)(w->utime * utime_fix_ratio) + (unsigned long long)(w->stime * stime_fix_ratio) + (unsigned long long)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cutime * cutime_fix_ratio) + (unsigned long long)(w->cstime * cstime_fix_ratio) + (unsigned long long)(w->cgtime * cgtime_fix_ratio)):0ULL));
+		if(unlikely(w->exposed))
+			send_SET(w->name, (unsigned long long)(w->utime * utime_fix_ratio) + (unsigned long long)(w->stime * stime_fix_ratio) + (unsigned long long)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cutime * cutime_fix_ratio) + (unsigned long long)(w->cstime * cstime_fix_ratio) + (unsigned long long)(w->cgtime * cgtime_fix_ratio)):0ULL));
 	}
-	fprintf(stdout, "END\n");
+	send_END();
 
-	fprintf(stdout, "BEGIN %s.cpu_user %llu\n", type, usec);
+	send_BEGIN(type, "cpu_user", usec);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "SET %s = %llu\n", w->name, (unsigned long long)(w->utime * utime_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cutime * cutime_fix_ratio)):0ULL));
+		if(unlikely(w->exposed))
+			send_SET(w->name, (unsigned long long)(w->utime * utime_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cutime * cutime_fix_ratio)):0ULL));
 	}
-	fprintf(stdout, "END\n");
+	send_END();
 
-	fprintf(stdout, "BEGIN %s.cpu_system %llu\n", type, usec);
+	send_BEGIN(type, "cpu_system", usec);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "SET %s = %llu\n", w->name, (unsigned long long)(w->stime * stime_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cstime * cstime_fix_ratio)):0ULL));
+		if(unlikely(w->exposed))
+			send_SET(w->name, (unsigned long long)(w->stime * stime_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cstime * cstime_fix_ratio)):0ULL));
 	}
-	fprintf(stdout, "END\n");
+	send_END();
 
-	fprintf(stdout, "BEGIN %s.cpu_guest %llu\n", type, usec);
+	if(show_guest_time) {
+		send_BEGIN(type, "cpu_guest", usec);
+		for (w = root; w ; w = w->next) {
+			if(unlikely(w->exposed))
+				send_SET(w->name, (unsigned long long)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cgtime * cgtime_fix_ratio)):0ULL));
+		}
+		send_END();
+	}
+
+	send_BEGIN(type, "threads", usec);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "SET %s = %llu\n", w->name, (unsigned long long)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cgtime * cgtime_fix_ratio)):0ULL));
+		if(unlikely(w->exposed))
+			send_SET(w->name, w->num_threads);
 	}
-	fprintf(stdout, "END\n");
+	send_END();
 
-	fprintf(stdout, "BEGIN %s.threads %llu\n", type, usec);
+	send_BEGIN(type, "processes", usec);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->num_threads);
+		if(unlikely(w->exposed))
+			send_SET(w->name, w->processes);
 	}
-	fprintf(stdout, "END\n");
+	send_END();
 
-	fprintf(stdout, "BEGIN %s.processes %llu\n", type, usec);
+	send_BEGIN(type, "mem", usec);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "SET %s = %lu\n", w->name, w->processes);
+		if(unlikely(w->exposed))
+			send_SET(w->name, (w->statm_resident > w->statm_share)?(w->statm_resident - w->statm_share):0ULL);
 	}
-	fprintf(stdout, "END\n");
+	send_END();
 
-	fprintf(stdout, "BEGIN %s.mem %llu\n", type, usec);
+	send_BEGIN(type, "minor_faults", usec);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "SET %s = %lld\n", w->name, (long long)w->statm_resident - (long long)w->statm_share);
+		if(unlikely(w->exposed))
+			send_SET(w->name, (unsigned long long)(w->minflt * minflt_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cminflt * cminflt_fix_ratio)):0ULL));
 	}
-	fprintf(stdout, "END\n");
+	send_END();
 
-	fprintf(stdout, "BEGIN %s.minor_faults %llu\n", type, usec);
+	send_BEGIN(type, "major_faults", usec);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "SET %s = %llu\n", w->name, (unsigned long long)(w->minflt * minflt_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cminflt * cminflt_fix_ratio)):0ULL));
+		if(unlikely(w->exposed))
+			send_SET(w->name, (unsigned long long)(w->majflt * majflt_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cmajflt * cmajflt_fix_ratio)):0ULL));
 	}
-	fprintf(stdout, "END\n");
+	send_END();
 
-	fprintf(stdout, "BEGIN %s.major_faults %llu\n", type, usec);
+	send_BEGIN(type, "lreads", usec);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "SET %s = %llu\n", w->name, (unsigned long long)(w->majflt * majflt_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cmajflt * cmajflt_fix_ratio)):0ULL));
+		if(unlikely(w->exposed))
+			send_SET(w->name, w->io_logical_bytes_read);
 	}
-	fprintf(stdout, "END\n");
+	send_END();
 
-	fprintf(stdout, "BEGIN %s.lreads %llu\n", type, usec);
+	send_BEGIN(type, "lwrites", usec);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_logical_bytes_read);
+		if(unlikely(w->exposed))
+			send_SET(w->name, w->io_logical_bytes_written);
 	}
-	fprintf(stdout, "END\n");
+	send_END();
 
-	fprintf(stdout, "BEGIN %s.lwrites %llu\n", type, usec);
+	send_BEGIN(type, "preads", usec);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_logical_bytes_written);
+		if(unlikely(w->exposed))
+			send_SET(w->name, w->io_storage_bytes_read);
 	}
-	fprintf(stdout, "END\n");
+	send_END();
 
-	fprintf(stdout, "BEGIN %s.preads %llu\n", type, usec);
+	send_BEGIN(type, "pwrites", usec);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_storage_bytes_read);
+		if(unlikely(w->exposed))
+			send_SET(w->name, w->io_storage_bytes_written);
 	}
-	fprintf(stdout, "END\n");
+	send_END();
 
-	fprintf(stdout, "BEGIN %s.pwrites %llu\n", type, usec);
+	send_BEGIN(type, "files", usec);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->io_storage_bytes_written);
+		if(unlikely(w->exposed))
+			send_SET(w->name, w->openfiles);
 	}
-	fprintf(stdout, "END\n");
+	send_END();
 
-	fprintf(stdout, "BEGIN %s.files %llu\n", type, usec);
+	send_BEGIN(type, "sockets", usec);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->openfiles);
+		if(unlikely(w->exposed))
+			send_SET(w->name, w->opensockets);
 	}
-	fprintf(stdout, "END\n");
+	send_END();
 
-	fprintf(stdout, "BEGIN %s.sockets %llu\n", type, usec);
+	send_BEGIN(type, "pipes", usec);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->opensockets);
+		if(unlikely(w->exposed))
+			send_SET(w->name, w->openpipes);
 	}
-	fprintf(stdout, "END\n");
-
-	fprintf(stdout, "BEGIN %s.pipes %llu\n", type, usec);
-	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "SET %s = %llu\n", w->name, w->openpipes);
-	}
-	fprintf(stdout, "END\n");
-
-	fflush(stdout);
+	send_END();
 }
 
 
@@ -2554,128 +2574,117 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 	struct target *w;
 	int newly_added = 0;
 
-	for(w = root ; w ; w = w->next)
-		if(!w->exposed && w->processes) {
+	for(w = root ; w ; w = w->next) {
+		if (w->target) continue;
+
+		if (!w->exposed && w->processes) {
 			newly_added++;
 			w->exposed = 1;
-			if(debug || w->debug) fprintf(stderr, "apps.plugin: %s just added - regenerating charts.\n", w->name);
+			if (debug || w->debug) fprintf(stderr, "apps.plugin: %s just added - regenerating charts.\n", w->name);
 		}
+	}
 
 	// nothing more to show
-	if(!newly_added) return;
+	if(!newly_added && show_guest_time == show_guest_time_old) return;
 
 	// we have something new to show
 	// update the charts
-	fprintf(stdout, "CHART %s.cpu '' '%s CPU Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu stacked 20001 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
+	buffer_sprintf(output, "CHART %s.cpu '' '%s CPU Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu stacked 20001 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "DIMENSION %s '' absolute 1 %llu %s\n", w->name, hz * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
+		if(unlikely(w->exposed))
+			buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu %s\n", w->name, hz * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
 	}
 
-	fprintf(stdout, "CHART %s.mem '' '%s Dedicated Memory (w/o shared)' 'MB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
+	buffer_sprintf(output, "CHART %s.mem '' '%s Dedicated Memory (w/o shared)' 'MB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, sysconf(_SC_PAGESIZE), 1024L*1024L);
+		if(unlikely(w->exposed))
+			buffer_sprintf(output, "DIMENSION %s '' absolute %ld %ld\n", w->name, sysconf(_SC_PAGESIZE), 1024L*1024L);
 	}
 
-	fprintf(stdout, "CHART %s.threads '' '%s Threads' 'threads' processes %s.threads stacked 20005 %d\n", type, title, type, update_every);
+	buffer_sprintf(output, "CHART %s.threads '' '%s Threads' 'threads' processes %s.threads stacked 20005 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+		if(unlikely(w->exposed))
+			buffer_sprintf(output, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
-	fprintf(stdout, "CHART %s.processes '' '%s Processes' 'processes' processes %s.processes stacked 20004 %d\n", type, title, type, update_every);
+	buffer_sprintf(output, "CHART %s.processes '' '%s Processes' 'processes' processes %s.processes stacked 20004 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+		if(unlikely(w->exposed))
+			buffer_sprintf(output, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
-	fprintf(stdout, "CHART %s.cpu_user '' '%s CPU User Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_user stacked 20020 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
+	buffer_sprintf(output, "CHART %s.cpu_user '' '%s CPU User Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_user stacked 20020 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, hz * RATES_DETAIL / 100LLU);
+		if(unlikely(w->exposed))
+			buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu\n", w->name, hz * RATES_DETAIL / 100LLU);
 	}
 
-	fprintf(stdout, "CHART %s.cpu_system '' '%s CPU System Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20021 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
+	buffer_sprintf(output, "CHART %s.cpu_system '' '%s CPU System Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20021 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, hz * RATES_DETAIL / 100LLU);
+		if(unlikely(w->exposed))
+			buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu\n", w->name, hz * RATES_DETAIL / 100LLU);
 	}
 
-	fprintf(stdout, "CHART %s.cpu_guest '' '%s CPU Guest Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20022 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
-	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, hz * RATES_DETAIL / 100LLU);
+	if(show_guest_time) {
+		buffer_sprintf(output, "CHART %s.cpu_guest '' '%s CPU Guest Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20022 %d\n", type, title, (processors * 100), processors, (processors > 1) ? "s" : "", type, update_every);
+		for (w = root; w; w = w->next) {
+			if(unlikely(w->exposed))
+				buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu\n", w->name, hz * RATES_DETAIL / 100LLU);
+		}
 	}
 
-	fprintf(stdout, "CHART %s.major_faults '' '%s Major Page Faults (swap read)' 'page faults/s' swap %s.major_faults stacked 20010 %d\n", type, title, type, update_every);
+	buffer_sprintf(output, "CHART %s.major_faults '' '%s Major Page Faults (swap read)' 'page faults/s' swap %s.major_faults stacked 20010 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
+		if(unlikely(w->exposed))
+			buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
 	}
 
-	fprintf(stdout, "CHART %s.minor_faults '' '%s Minor Page Faults' 'page faults/s' mem %s.minor_faults stacked 20011 %d\n", type, title, type, update_every);
+	buffer_sprintf(output, "CHART %s.minor_faults '' '%s Minor Page Faults' 'page faults/s' mem %s.minor_faults stacked 20011 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
+		if(unlikely(w->exposed))
+			buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
 	}
 
-	fprintf(stdout, "CHART %s.lreads '' '%s Disk Logical Reads' 'kilobytes/s' disk %s.lreads stacked 20042 %d\n", type, title, type, update_every);
+	buffer_sprintf(output, "CHART %s.lreads '' '%s Disk Logical Reads' 'kilobytes/s' disk %s.lreads stacked 20042 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
+		if(unlikely(w->exposed))
+			buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
 	}
 
-	fprintf(stdout, "CHART %s.lwrites '' '%s I/O Logical Writes' 'kilobytes/s' disk %s.lwrites stacked 20042 %d\n", type, title, type, update_every);
+	buffer_sprintf(output, "CHART %s.lwrites '' '%s I/O Logical Writes' 'kilobytes/s' disk %s.lwrites stacked 20042 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
+		if(unlikely(w->exposed))
+			buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
 	}
 
-	fprintf(stdout, "CHART %s.preads '' '%s Disk Reads' 'kilobytes/s' disk %s.preads stacked 20002 %d\n", type, title, type, update_every);
+	buffer_sprintf(output, "CHART %s.preads '' '%s Disk Reads' 'kilobytes/s' disk %s.preads stacked 20002 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
+		if(unlikely(w->exposed))
+			buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
 	}
 
-	fprintf(stdout, "CHART %s.pwrites '' '%s Disk Writes' 'kilobytes/s' disk %s.pwrites stacked 20002 %d\n", type, title, type, update_every);
+	buffer_sprintf(output, "CHART %s.pwrites '' '%s Disk Writes' 'kilobytes/s' disk %s.pwrites stacked 20002 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
+		if(unlikely(w->exposed))
+			buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
 	}
 
-	fprintf(stdout, "CHART %s.files '' '%s Open Files' 'open files' disk %s.files stacked 20050 %d\n", type, title, type, update_every);
+	buffer_sprintf(output, "CHART %s.files '' '%s Open Files' 'open files' disk %s.files stacked 20050 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+		if(unlikely(w->exposed))
+			buffer_sprintf(output, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
-	fprintf(stdout, "CHART %s.sockets '' '%s Open Sockets' 'open sockets' net %s.sockets stacked 20051 %d\n", type, title, type, update_every);
+	buffer_sprintf(output, "CHART %s.sockets '' '%s Open Sockets' 'open sockets' net %s.sockets stacked 20051 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+		if(unlikely(w->exposed))
+			buffer_sprintf(output, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 
-	fprintf(stdout, "CHART %s.pipes '' '%s Pipes' 'open pipes' processes %s.pipes stacked 20053 %d\n", type, title, type, update_every);
+	buffer_sprintf(output, "CHART %s.pipes '' '%s Pipes' 'open pipes' processes %s.pipes stacked 20053 %d\n", type, title, type, update_every);
 	for (w = root; w ; w = w->next) {
-		if(w->target || (!w->processes && !w->exposed)) continue;
-
-		fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+		if(unlikely(w->exposed))
+			buffer_sprintf(output, "DIMENSION %s '' absolute 1 1\n", w->name);
 	}
 }
 
@@ -2792,7 +2801,11 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	fprintf(stdout,
+	output = buffer_create(1024);
+	if(!output)
+		fatal("Cannot create BUFFER.");
+
+	buffer_sprintf(output,
 		"CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' apps.plugin netdata.apps_cpu stacked 140000 %1$d\n"
 		"DIMENSION user '' incremental 1 1000\n"
 		"DIMENSION system '' incremental 1 1000\n"
@@ -2812,7 +2825,7 @@ int main(int argc, char **argv)
 		);
 
 	if(include_exited_childs)
-		fprintf(stdout,
+		buffer_sprintf(output,
 			"CHART netdata.apps_children_fix '' 'Apps Plugin Exited Children Normalization Ratios' 'percentage' apps.plugin netdata.apps_children_fix line 140003 %1$d\n"
 			"DIMENSION cutime '' absolute 1 %2$llu\n"
 			"DIMENSION cstime '' absolute 1 %2$llu\n"
@@ -2859,6 +2872,15 @@ int main(int argc, char **argv)
 		send_collected_data_to_netdata(apps_groups_root_target, "apps", dt);
 		send_collected_data_to_netdata(users_root_target, "users", dt);
 		send_collected_data_to_netdata(groups_root_target, "groups", dt);
+
+		show_guest_time_old = show_guest_time;
+
+		//if(puts(buffer_tostring(output)) == EOF)
+		if(write(STDOUT_FILENO, buffer_tostring(output), buffer_strlen(output)) == -1)
+			fatal("Cannot send chart values to netdata.");
+
+		// fflush(stdout);
+		buffer_flush(output);
 
 		if(unlikely(debug))
 			fprintf(stderr, "apps.plugin: done Loop No %llu\n", global_iterations_counter);
