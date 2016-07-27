@@ -782,15 +782,15 @@ int read_proc_pid_stat(struct pid_stat *p) {
 	// p->policy		= strtoul(procfile_lineword(ff, 0, 40), NULL, 10);
 	// p->delayacct_blkio_ticks = strtoull(procfile_lineword(ff, 0, 41), NULL, 10);
 
-	last = p->gtime_raw;
-	p->gtime_raw		= strtoull(procfile_lineword(ff, 0, 42), NULL, 10);
-	p->gtime = (p->gtime_raw - last) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-
-	last = p->cgtime_raw;
-	p->cgtime_raw		= strtoull(procfile_lineword(ff, 0, 43), NULL, 10);
-	p->cgtime = (p->cgtime_raw - last) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-
     if(enable_guest_charts) {
+        last = p->gtime_raw;
+        p->gtime_raw		= strtoull(procfile_lineword(ff, 0, 42), NULL, 10);
+        p->gtime = (p->gtime_raw - last) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+
+        last = p->cgtime_raw;
+        p->cgtime_raw		= strtoull(procfile_lineword(ff, 0, 43), NULL, 10);
+        p->cgtime = (p->cgtime_raw - last) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+
         if (show_guest_time || p->gtime || p->cgtime) {
             p->utime -= (p->utime >= p->gtime) ? p->gtime : p->utime;
             p->cutime -= (p->cutime >= p->cgtime) ? p->cgtime : p->cutime;
@@ -988,12 +988,12 @@ int read_proc_stat() {
     gtime_raw = strtoull(procfile_lineword(ff, 0, 10), NULL, 10);
     global_gtime = (gtime_raw - last) * (1000000ULL * RATES_DETAIL) / (collected_usec - last_collected_usec);
 
-    // guest nice time, on guest time
-    last = gntime_raw;
-    gntime_raw = strtoull(procfile_lineword(ff, 0, 11), NULL, 10);
-    global_gtime += (gntime_raw - last) * (1000000ULL * RATES_DETAIL) / (collected_usec - last_collected_usec);
-
     if(enable_guest_charts) {
+        // guest nice time, on guest time
+        last = gntime_raw;
+        gntime_raw = strtoull(procfile_lineword(ff, 0, 11), NULL, 10);
+        global_gtime += (gntime_raw - last) * (1000000ULL * RATES_DETAIL) / (collected_usec - last_collected_usec);
+
         // remove guest time from user time
         global_utime -= (global_utime > global_gtime) ? global_gtime : global_utime;
     }
