@@ -949,7 +949,7 @@ unsigned long long global_gtime = 0;
 int read_proc_stat() {
 	static char filename[FILENAME_MAX + 1] = "";
 	static procfile *ff = NULL;
-	static unsigned long long utime_raw = 0, stime_raw = 0, gtime_raw = 0, ntime_raw = 0, collected_usec = 0, last_collected_usec = 0;
+	static unsigned long long utime_raw = 0, stime_raw = 0, gtime_raw = 0, gntime_raw = 0, ntime_raw = 0, collected_usec = 0, last_collected_usec = 0;
 
 	if(unlikely(!ff)) {
 		snprintfz(filename, FILENAME_MAX, "%s/proc/stat", host_prefix);
@@ -971,6 +971,7 @@ int read_proc_stat() {
 	utime_raw = strtoull(procfile_lineword(ff, 0, 1), NULL, 10);
 	global_utime = (utime_raw - last) * (1000000ULL * RATES_DETAIL) / (collected_usec - last_collected_usec);
 
+    // nice time, on user time
 	last = ntime_raw;
 	ntime_raw = strtoull(procfile_lineword(ff, 0, 2), NULL, 10);
 	global_utime += (ntime_raw - last) * (1000000ULL * RATES_DETAIL) / (collected_usec - last_collected_usec);
@@ -979,9 +980,17 @@ int read_proc_stat() {
 	stime_raw = strtoull(procfile_lineword(ff, 0, 3), NULL, 10);
 	global_stime = (stime_raw - last) * (1000000ULL * RATES_DETAIL) / (collected_usec - last_collected_usec);
 
-	last = gtime_raw;
-	gtime_raw = strtoull(procfile_lineword(ff, 0, 3), NULL, 10);
-	global_gtime = (gtime_raw - last) * (1000000ULL * RATES_DETAIL) / (collected_usec - last_collected_usec);
+    last = gtime_raw;
+    gtime_raw = strtoull(procfile_lineword(ff, 0, 10), NULL, 10);
+    global_gtime = (gtime_raw - last) * (1000000ULL * RATES_DETAIL) / (collected_usec - last_collected_usec);
+
+    // guest nice time, on guest time
+    last = gntime_raw;
+    gntime_raw = strtoull(procfile_lineword(ff, 0, 11), NULL, 10);
+    global_gtime += (gntime_raw - last) * (1000000ULL * RATES_DETAIL) / (collected_usec - last_collected_usec);
+
+    // remove guest time from user time
+    global_utime -= (global_utime > global_gtime)?global_gtime:global_utime;
 
 	if(unlikely(global_iterations_counter == 1)) {
 		global_utime = 0;
