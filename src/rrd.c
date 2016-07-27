@@ -1049,6 +1049,17 @@ unsigned long long rrdset_done(RRDSET *st)
 					continue;
 				}
 
+				// if the new is smaller than the old (an overflow, or reset), set the old equal to the new
+				// to reset the calculation (it will give zero as the calculation for this second)
+				if(unlikely(rd->last_collected_value > rd->collected_value)) {
+					debug(D_RRD_STATS, "%s.%s: RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
+					, st->name, rd->name
+					, rd->last_collected_value
+					, rd->collected_value);
+					if(!(rd->flags & RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)) storage_flags = SN_EXISTS_RESET;
+					rd->last_collected_value = rd->collected_value;
+				}
+
 				// the percentage of the current increment
 				// over the increment of all dimensions together
 				if(unlikely(st->collected_total == st->last_collected_total))
