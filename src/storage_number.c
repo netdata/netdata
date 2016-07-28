@@ -17,6 +17,9 @@
 #endif
 #endif
 
+extern char *print_number_lu_r(char *str, unsigned long uvalue);
+extern char *print_number_llu_r(char *str, unsigned long long uvalue);
+
 storage_number pack_storage_number(calculated_number value, uint32_t flags)
 {
 	// bit 32 = sign 0:positive, 1:negative
@@ -119,30 +122,6 @@ calculated_number unpack_storage_number(storage_number value)
 	return n;
 }
 
-#ifdef ENVIRONMENT32
-// This trick seems to give an 80% speed increase in 32bit systems
-// print_calculated_number_llu_r() will just print the digits up to the
-// point the remaining value fits in 32 bits, and then calls
-// print_calculated_number_lu_r() to print the rest with 32 bit arithmetic.
-
-static char *print_calculated_number_lu_r(char *str, unsigned long uvalue) {
-	char *wstr = str;
-
-	// print each digit
-	do *wstr++ = (char)('0' + (uvalue % 10)); while(uvalue /= 10);
-	return wstr;
-}
-
-static char *print_calculated_number_llu_r(char *str, unsigned long long uvalue) {
-	char *wstr = str;
-
-	// print each digit
-	do *wstr++ = (char)('0' + (uvalue % 10)); while((uvalue /= 10) && uvalue > (unsigned long long)0xffffffff);
-	if(uvalue) return print_calculated_number_lu_r(wstr, uvalue);
-	return wstr;
-}
-#endif
-
 int print_calculated_number(char *str, calculated_number value)
 {
 	char *wstr = str;
@@ -160,9 +139,9 @@ int print_calculated_number(char *str, calculated_number value)
 
 #ifdef ENVIRONMENT32
 	if(uvalue > (unsigned long long)0xffffffff)
-		wstr = print_calculated_number_llu_r(str, uvalue);
+		wstr = print_number_llu_r(str, uvalue);
 	else
-		wstr = print_calculated_number_lu_r(str, uvalue);
+		wstr = print_number_lu_r(str, uvalue);
 #else
 	do *wstr++ = (char)('0' + (uvalue % 10)); while(uvalue /= 10);
 #endif

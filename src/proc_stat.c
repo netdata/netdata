@@ -74,8 +74,12 @@ int do_proc_stat(int update_every, unsigned long long dt) {
 			irq			= strtoull(procfile_lineword(ff, l, 6), NULL, 10);
 			softirq		= strtoull(procfile_lineword(ff, l, 7), NULL, 10);
 			steal		= strtoull(procfile_lineword(ff, l, 8), NULL, 10);
-			if(words >= 10) guest		= strtoull(procfile_lineword(ff, l, 9), NULL, 10);
-			if(words >= 11) guest_nice	= strtoull(procfile_lineword(ff, l, 10), NULL, 10);
+
+			guest		= strtoull(procfile_lineword(ff, l, 9), NULL, 10);
+			user -= guest;
+
+			guest_nice	= strtoull(procfile_lineword(ff, l, 10), NULL, 10);
+			nice -= guest_nice;
 
 			char *title, *type, *context, *family;
 			long priority;
