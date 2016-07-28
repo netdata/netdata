@@ -75,6 +75,9 @@ find $RPM_BUILD_ROOT -name .keep -print0 | xargs --null --no-run-if-empty rm
 
 install -m 644 -p system/netdata.conf $RPM_BUILD_ROOT%{_sysconfdir}/%{name}
 
+mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d
+install -m 644 -p system/netdata.logrotate $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/%{name}
+
 %if %{with systemd}
 install -d $RPM_BUILD_ROOT%{_unitdir}
 install -m 644 -p system/netdata.service $RPM_BUILD_ROOT%{_unitdir}/netdata.service
@@ -131,12 +134,14 @@ rm -rf $RPM_BUILD_ROOT
 %config(noreplace) %{_sysconfdir}/%{name}/*.conf
 %config(noreplace) %{_sysconfdir}/%{name}/python.d/*.conf
 %dir %{_sysconfdir}/%{name}
-%{?with_systemd:%{_unitdir}/netdata.service}
+%{_sysconfdir}/logrotate.d/%{name}
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
 %dir %{_datadir}/%{name}
+%dir %{_sharedstatedir}/%{name}
 
 %if %{with systemd}
+%{_unitdir}/netdata.service
 %else
 %{_sysconfdir}/rc.d/init.d/netdata
 %endif
