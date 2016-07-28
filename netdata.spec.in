@@ -115,14 +115,27 @@ exit 0
 %post
 # Register the netdata service
 /sbin/chkconfig --add netdata
-# Start the netdata service
-/sbin/service netdata start
+# Only gets run on initial install (not upgrades or uninstalls)
+if [ $1 = 1 ]; then
+        # Start the netdata service
+        /sbin/service netdata start
+fi
+exit 0
 
 %preun
+# Only gets run on uninstall (not upgrades)
 if [ $1 = 0 ]; then
         /sbin/service netdata stop > /dev/null 2>&1
         /sbin/chkconfig --del netdata
 fi
+exit 0
+
+%postun
+# Only gets run on upgrade (not uninstalls)
+if [ $1 != 0 ]; then
+        /sbin/service netdata condrestart 2>&1 > /dev/null
+fi
+exit 0
 %endif
 
 %clean
