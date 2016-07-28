@@ -69,12 +69,11 @@ happened, on your systems and applications.
 
 %install
 rm -rf $RPM_BUILD_ROOT
-%{__make} %{?_smp_mflags} install \
-	DESTDIR=$RPM_BUILD_ROOT
+%{__make} %{?_smp_mflags} DESTDIR=$RPM_BUILD_ROOT install
+
+find $RPM_BUILD_ROOT -name .keep -print0 | xargs --null --no-run-if-empty rm
 
 install -m 644 -p system/netdata.conf $RPM_BUILD_ROOT%{_sysconfdir}/%{name}
-
-find $RPM_BUILD_ROOT -name .keep | xargs -r rm
 
 %if %{with systemd}
 install -d $RPM_BUILD_ROOT%{_unitdir}
