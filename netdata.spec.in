@@ -142,9 +142,10 @@ rm -rf $RPM_BUILD_ROOT
 %attr(0700,netdata,netdata) %dir %{_localstatedir}/cache/%{name}
 %attr(0700,netdata,netdata) %dir %{_localstatedir}/log/%{name}
 %attr(0700,netdata,netdata) %dir %{_localstatedir}/lib/%{name}
+%attr(0700,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/registry
 
 %dir %{_datadir}/%{name}
-%attr(-,root,netdata) %{_datadir}/%{name}/web
+%attr(0644,root,netdata,0755) %{_datadir}/%{name}/web
 
 %if %{with systemd}
 %{_unitdir}/netdata.service
