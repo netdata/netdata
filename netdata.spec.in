@@ -155,16 +155,19 @@ rm -rf $RPM_BUILD_ROOT
 %attr(0700,netdata,netdata) %dir %{_localstatedir}/cache/%{name}
 %attr(0700,netdata,netdata) %dir %{_localstatedir}/log/%{name}
 %attr(0700,netdata,netdata) %dir %{_localstatedir}/lib/%{name}
-%attr(0700,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/registry
 
 %dir %{_datadir}/%{name}
-%attr(0644,root,netdata,0755) %{_datadir}/%{name}/web
 
 %if %{with systemd}
 %{_unitdir}/netdata.service
 %else
 %{_sysconfdir}/rc.d/init.d/netdata
 %endif
+
+# Enforce 0644 for files and 0755 for directories
+# for the netdata web directory
+%defattr(0644,root,netdata,0755)
+%{_datadir}/%{name}/web
 
 %changelog
 * Tue Jul 26 2016 Jason Barnett <J@sonBarnett.com> - 1.2.0-2
