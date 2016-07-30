@@ -23,6 +23,23 @@ printf "CFLAGS=\"%s\" " "${CFLAGS}" >>netdata-installer.log
 printf "%q " "$0" "${@}" >>netdata-installer.log
 printf "\n" >>netdata-installer.log
 
+service="$(which service 2>/dev/null || command -v service 2>/dev/null)"
+systemctl="$(which systemctl 2>/dev/null || command -v systemctl 2>/dev/null)"
+service() {
+	local cmd="${1}" action="${2}"
+
+	if [ ! -z "${service}" ]
+	then
+		run "${service}" "${cmd}" "${action}"
+		return $?
+	elif [ ! -z "${systemctl}" ]
+	then
+		run "${systemctl}" "${action}" "${cmd}"
+		return $?
+	fi
+	return 1
+}
+
 ME="$0"
 DONOTSTART=0
 DONOTWAIT=0
@@ -382,10 +399,13 @@ fi
 echo >&2 "Compiling netdata ..."
 run make || exit 1
 
-declare -A configs_signatures=()
-if [ -f "configs.signatures" ]
-	then
-	source "configs.signatures" || echo >&2 "ERROR: Failed to load configs.signatures !"
+if [ "${BASH_VERSINFO[0]}" -ge "4" ]
+then
+	declare -A configs_signatures=()
+	if [ -f "configs.signatures" ]
+		then
+		source "configs.signatures" || echo >&2 "ERROR: Failed to load configs.signatures !"
+	fi
 fi
 
 # migrate existing configuration files
@@ -393,7 +413,7 @@ fi
 if [ -d "${NETDATA_PREFIX}/etc/netdata" ]
 	then
 	# the configuration directory exists
-	
+
 	if [ ! -d "${NETDATA_PREFIX}/etc/netdata/charts.d" ]
 		then
 		run mkdir "${NETDATA_PREFIX}/etc/netdata/charts.d"
@@ -455,13 +475,19 @@ do
 				cp "conf.d/${f}" "${x}.orig"
 			fi
 
-			if [ "${configs_signatures[${md5}]}" = "${f}" ]
+			if [ "${BASH_VERSINFO[0]}" -ge "4" ]
+			then
+				if [ "${configs_signatures[${md5}]}" = "${f}" ]
 				then
-				# it is a stock version - don't keep it
-				echo >&2 "File '${x}' is stock version."
+					# it is a stock version - don't keep it
+					echo >&2 "File '${x}' is stock version."
+				else
+					# edited by user - keep it
+					echo >&2 "File '${x}' has been edited by user."
+					cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
+				fi
 			else
-				# edited by user - keep it
-				echo >&2 "File '${x}' has been edited by user."
+				echo >&2 "File '${x}' cannot be check for custom edits."
 				cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
 			fi
 		fi
@@ -734,22 +760,22 @@ if [ "${UID}" -eq 0 ]
 				run systemctl daemon-reload && \
 				run systemctl enable netdata
 		else
-			run service netdata stop
+			service netdata stop
 		fi
 
 		stop_all_netdata
-		run service netdata restart && started=1
+		service netdata restart && started=1
 	fi
 
 	if [ ${started} -eq 0 ]
 	then
 		# check if we can use the system service
-		run service netdata stop
+		service netdata stop
 		stop_all_netdata
-		run service netdata restart && started=1
+		service netdata restart && started=1
 		if [ ${started} -eq 0 ]
 		then
-			run service netdata start && started=1
+			service netdata start && started=1
 		fi
 	fi
 fi
