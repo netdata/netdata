@@ -2,6 +2,8 @@
 # Description: tomcat netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
+# Python version higher than 2.7 is needed to run this module.
+
 from base import UrlService
 import xml.etree.ElementTree as ET  # phone home...
 
@@ -76,3 +78,8 @@ class Service(UrlService):
                     'jvm': memory.attrib['free']}
         except (ValueError, AttributeError):
             return None
+        except SyntaxError as e:
+            self.error("Tomcat module needs python 2.7 at least. Stopping")
+            self.debug(str(e))
+        except Exception as e:
+            self.debug(str(e))
