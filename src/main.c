@@ -375,14 +375,14 @@ int main(int argc, char **argv)
 					help(0);
 					break;
 				case 'i':
-					config_set("global", "bind socket to IP", optarg);
+					config_set("global", "bind to", optarg);
 					break;
 				case 'P':
 					strncpy(pidfile, optarg, FILENAME_MAX);
 					pidfile[FILENAME_MAX] = '\0';
 					break;
 				case 'p':
-					config_set("global", "port", optarg);
+					config_set("global", "default port", optarg);
 					break;
 				case 's':
 					config_set("global", "host access prefix", optarg);
@@ -395,7 +395,7 @@ int main(int argc, char **argv)
 					break;
 				case 'v':
 					// TODO: Outsource version to makefile which can compute version from git.
-					printf("netdata 1.1.0\n");
+					printf("netdata 1.2.1_master\n");
 					return 0;
 					break;
 				case 'W':
@@ -652,9 +652,7 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-		listen_fd = create_listen_socket();
-		if(listen_fd == -1)
-			fatal("Cannot listen socket.");
+		create_listen_sockets();
 	}
 
 	// never become a problem

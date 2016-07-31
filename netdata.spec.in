@@ -1,7 +1,14 @@
+%define contentdir %{_datadir}/netdata
+
+# This is temporary and should eventually be resolved. This bypasses
+# the default rhel __os_install_post which throws a python compile
+# error.
+%define __os_install_post %{nil}
+
 #
 # Conditional build:
-%bcond_without	systemd		# systemd
-%bcond_without	nfacct		# build with nfacct plugin
+%bcond_without  systemd  # systemd
+%bcond_with     nfacct   # build with nfacct plugin
 
 %if 0%{?fedora} || 0%{?rhel} >= 7
 %else
@@ -11,7 +18,7 @@
 Summary:	Real-time performance monitoring, done right
 Name:		@PACKAGE_NAME@
 Version:	@PACKAGE_RPM_VERSION@
-Release:	@PACKAGE_RPM_RELEASE@%{?release_suffix}%{?dist}
+Release:	1%{?dist}
 License:	GPL v3+
 Group:		Applications/System
 Source0:	http://firehol.org/download/netdata/releases/v@PACKAGE_VERSION@/%{name}-@PACKAGE_VERSION@.tar.xz
@@ -19,16 +26,24 @@ URL:		http://netdata.firehol.org/
 BuildRequires:	pkgconfig
 BuildRequires:	xz
 BuildRequires:	zlib-devel
+
+# Packages can be found in the EPEL repo
 %if %{with nfacct}
 BuildRequires:	libmnl-devel
 BuildRequires:	libnetfilter_acct-devel
 %endif
+
+Requires(pre): /usr/sbin/groupadd
+Requires(pre): /usr/sbin/useradd
+
 %if %{with systemd}
-BuildRequires:		systemd
-Requires(post):		systemd
-Requires(preun):	systemd
-Requires(postun):	systemd
+Requires(preun):  systemd-units
+Requires(postun): systemd-units
+Requires(post):   systemd-units
+%else
+Requires(post):   chkconfig
 %endif
+
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
 %description
@@ -46,7 +61,6 @@ happened, on your systems and applications.
 
 %build
 %configure \
-	--docdir=%{_docdir}/%{name}-%{version} \
 	--with-zlib \
 	--with-math \
 	%{?with_nfacct:--enable-plugin-nfacct} \
@@ -55,23 +69,32 @@ happened, on your systems and applications.
 
 %install
 rm -rf $RPM_BUILD_ROOT
-%{__make} %{?_smp_mflags} install \
-	DESTDIR=$RPM_BUILD_ROOT
+%{__make} %{?_smp_mflags} DESTDIR=$RPM_BUILD_ROOT install
 
-install -m 644 -p system/netdata.conf $RPM_BUILD_ROOT%{_sysconfdir}/%{name}/*.conf
+find $RPM_BUILD_ROOT -name .keep -print0 | xargs --null --no-run-if-empty rm
 
-find $RPM_BUILD_ROOT -name .keep | xargs rm
+install -m 644 -p system/netdata.conf $RPM_BUILD_ROOT%{_sysconfdir}/%{name}
+
+mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d
+install -m 644 -p system/netdata.logrotate $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/%{name}
 
 %if %{with systemd}
 install -d $RPM_BUILD_ROOT%{_unitdir}
 install -m 644 -p system/netdata.service $RPM_BUILD_ROOT%{_unitdir}/netdata.service
+%else
+# install SYSV init stuff
+mkdir -p $RPM_BUILD_ROOT/etc/rc.d/init.d
+install -m755 system/netdata-init-d \
+        $RPM_BUILD_ROOT/etc/rc.d/init.d/netdata
 %endif
 
-%pre
-getent group netdata > /dev/null || groupadd -r netdata
-getent passwd netdata > /dev/null || useradd -r -g netdata -c netdata -s /sbin/nologin -d / netdata
-
 %if %{with systemd}
+%pre
+# Add the "netdata" user
+/usr/sbin/groupadd -r netdata 2> /dev/null || :
+/usr/sbin/useradd -c "netdata" -g netdata \
+        -s /sbin/nologin -r -d %{contentdir} netdata 2> /dev/null || :
+
 %post
 %systemd_post netdata.service
 
@@ -80,26 +103,78 @@ getent passwd netdata > /dev/null || useradd -r -g netdata -c netdata -s /sbin/n
 
 %postun
 %systemd_postun_with_restart netdata.service
+%else
+%pre
+# Add the "netdata" user
+getent group netdata >/dev/null || groupadd -r netdata
+getent passwd netdata >/dev/null || \
+  useradd -r -g netdata -s /sbin/nologin \
+    -d %{contentdir} -c "netdata" netdata
+exit 0
+
+%post
+# Register the netdata service
+/sbin/chkconfig --add netdata
+# Only gets run on initial install (not upgrades or uninstalls)
+if [ $1 = 1 ]; then
+        # Start the netdata service
+        /sbin/service netdata start
+fi
+exit 0
+
+%preun
+# Only gets run on uninstall (not upgrades)
+if [ $1 = 0 ]; then
+        /sbin/service netdata stop > /dev/null 2>&1
+        /sbin/chkconfig --del netdata
+fi
+exit 0
+
+%postun
+# Only gets run on upgrade (not uninstalls)
+if [ $1 != 0 ]; then
+        /sbin/service netdata condrestart 2>&1 > /dev/null
+fi
+exit 0
 %endif
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %files
-%attr(-,netdata,netdata) %dir %{_localstatedir}/cache/%{name}
-%attr(-,netdata,netdata) %dir %{_localstatedir}/log/%{name}
-%config(noreplace) %verify(not md5 mtime size) %{_sysconfdir}/%{name}/*.conf
+%defattr(-,root,root)
+
 %dir %{_sysconfdir}/%{name}
-%{?with_systemd:%{_unitdir}/netdata.service}
+%config(noreplace) %{_sysconfdir}/%{name}/*.conf
+%config(noreplace) %{_sysconfdir}/%{name}/python.d/*.conf
+%config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
+
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
+
+%attr(0700,netdata,netdata) %dir %{_localstatedir}/cache/%{name}
+%attr(0700,netdata,netdata) %dir %{_localstatedir}/log/%{name}
+%attr(0700,netdata,netdata) %dir %{_localstatedir}/lib/%{name}
+
 %dir %{_datadir}/%{name}
 
-# override defattr for web files
-%defattr(644,root,netdata,755)
+%if %{with systemd}
+%{_unitdir}/netdata.service
+%else
+%{_sysconfdir}/rc.d/init.d/netdata
+%endif
+
+# Enforce 0644 for files and 0755 for directories
+# for the netdata web directory
+%defattr(0644,root,netdata,0755)
 %{_datadir}/%{name}/web
 
 %changelog
+* Tue Jul 26 2016 Jason Barnett <J@sonBarnett.com> - 1.2.0-2
+- Added support for EL6
+- Corrected several Requires statements
+- Changed default to build without nfacct
+- Removed --docdir from configure
 * Mon May 16 2016 Costa Tsaousis <costa@tsaousis.gr> - 1.2.0-1
 - netdata is now 30% faster.
 - netdata now has a registry (my-netdata menu on the dashboard).

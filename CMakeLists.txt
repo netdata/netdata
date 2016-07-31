@@ -96,8 +96,6 @@ set(APPS_PLUGIN_SOURCE_FILES
         src/log.h
         src/procfile.c
         src/procfile.h
-        src/storage_number.c
-        src/storage_number.h
         src/web_buffer.c
         src/web_buffer.h
         config.h)

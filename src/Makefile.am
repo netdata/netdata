@@ -86,6 +86,7 @@ apps_plugin_SOURCES = \
 	common.c common.h \
 	log.c log.h \
 	procfile.c procfile.h \
+	web_buffer.c web_buffer.h \
 	$(NULL)
 
 install-data-hook:
