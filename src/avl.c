@@ -1,343 +1,290 @@
-/*
- * ANSI C Library for maintainance of AVL Balanced Trees
- *
- * ref.:
- *  G. M. Adelson-Velskij & E. M. Landis
- *  Doklady Akad. Nauk SSSR 146 (1962), 263-266
- *
- * see also:
- *  D. E. Knuth: The Art of Computer Programming Vol.3 (Sorting and Searching)
- *
- * (C) 2000 Daniel Nagy, Budapest University of Technology and Economics
- * Released under GNU General Public License (GPL) version 2
- *
- */
-
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
+// #include <assert.h>
+
 #include "avl.h"
 #include "log.h"
 
-/* Swing to the left
- * Warning: no balance maintainance
+/* ------------------------------------------------------------------------- */
+/*
+ * avl_insert(), avl_remove() and avl_search()
+ * are adaptations (by Costa Tsaousis) of the AVL algorithm found in libavl
+ * v2.0.3, so that they do not use any memory allocations and their memory
+ * footprint is optimized (by eliminating non-necessary data members).
+ *
+ * libavl - library for manipulation of binary trees.
+ * Copyright (C) 1998, 1999, 2000, 2001, 2002, 2004 Free Software
+ * Foundation, Inc.
+ * GNU Lesser General Public License
+*/
+
+
+/* Search |tree| for an item matching |item|, and return it if found.
+	 Otherwise return |NULL|. */
+avl *avl_search(avl_tree *tree, avl *item) {
+    avl *p;
+
+    // assert (tree != NULL && item != NULL);
+
+    for (p = tree->root; p != NULL; ) {
+        int cmp = tree->compar(item, p);
+
+        if (cmp < 0)
+            p = p->avl_link[0];
+        else if (cmp > 0)
+            p = p->avl_link[1];
+        else /* |cmp == 0| */
+            return p;
+    }
+
+    return NULL;
+}
+
+/* Inserts |item| into |tree| and returns a pointer to |item|'s address.
+	 If a duplicate item is found in the tree,
+	 returns a pointer to the duplicate without inserting |item|.
  */
-void avl_swl(avl** root) {
-	avl* a = *root;
-	avl* b = a->right;
-	*root = b;
-	a->right = b->left;
-	b->left = a;
+avl *avl_insert(avl_tree *tree, avl *item) {
+    avl *y, *z; /* Top node to update balance factor, and parent. */
+    avl *p, *q; /* Iterator, and parent. */
+    avl *n;     /* Newly inserted node. */
+    avl *w;     /* New root of rebalanced subtree. */
+    int dir;                /* Direction to descend. */
+
+    unsigned char da[AVL_MAX_HEIGHT]; /* Cached comparison results. */
+    int k = 0;              /* Number of cached results. */
+
+    // assert(tree != NULL && item != NULL);
+
+    z = (avl *) &tree->root;
+    y = tree->root;
+    dir = 0;
+    for (q = z, p = y; p != NULL; q = p, p = p->avl_link[dir]) {
+        int cmp = tree->compar(item, p);
+        if (cmp == 0)
+            return p;
+
+        if (p->avl_balance != 0)
+            z = q, y = p, k = 0;
+        da[k++] = dir = (cmp > 0);
+    }
+
+    n = q->avl_link[dir] = item;
+
+    // tree->avl_count++;
+    n->avl_link[0] = n->avl_link[1] = NULL;
+    n->avl_balance = 0;
+    if (y == NULL) return n;
+
+    for (p = y, k = 0; p != n; p = p->avl_link[da[k]], k++)
+        if (da[k] == 0)
+            p->avl_balance--;
+        else
+            p->avl_balance++;
+
+    if (y->avl_balance == -2) {
+        avl *x = y->avl_link[0];
+        if (x->avl_balance == -1) {
+            w = x;
+            y->avl_link[0] = x->avl_link[1];
+            x->avl_link[1] = y;
+            x->avl_balance = y->avl_balance = 0;
+        }
+        else {
+            // assert (x->avl_balance == +1);
+            w = x->avl_link[1];
+            x->avl_link[1] = w->avl_link[0];
+            w->avl_link[0] = x;
+            y->avl_link[0] = w->avl_link[1];
+            w->avl_link[1] = y;
+            if (w->avl_balance == -1)
+                x->avl_balance = 0, y->avl_balance = +1;
+            else if (w->avl_balance == 0)
+                x->avl_balance = y->avl_balance = 0;
+            else /* |w->avl_balance == +1| */
+                x->avl_balance = -1, y->avl_balance = 0;
+            w->avl_balance = 0;
+        }
+    }
+    else if (y->avl_balance == +2) {
+        avl *x = y->avl_link[1];
+        if (x->avl_balance == +1) {
+            w = x;
+            y->avl_link[1] = x->avl_link[0];
+            x->avl_link[0] = y;
+            x->avl_balance = y->avl_balance = 0;
+        }
+        else {
+            // assert (x->avl_balance == -1);
+            w = x->avl_link[0];
+            x->avl_link[0] = w->avl_link[1];
+            w->avl_link[1] = x;
+            y->avl_link[1] = w->avl_link[0];
+            w->avl_link[0] = y;
+            if (w->avl_balance == +1)
+                x->avl_balance = 0, y->avl_balance = -1;
+            else if (w->avl_balance == 0)
+                x->avl_balance = y->avl_balance = 0;
+            else /* |w->avl_balance == -1| */
+                x->avl_balance = +1, y->avl_balance = 0;
+            w->avl_balance = 0;
+        }
+    }
+    else return n;
+
+    z->avl_link[y != z->avl_link[0]] = w;
+
+    // tree->avl_generation++;
+    return n;
 }
 
-/* Swing to the right
- * Warning: no balance maintainance
- */
-void avl_swr(avl** root) {
-	avl* a = *root;
-	avl* b = a->left;
-	*root = b;
-	a->left = b->right;
-	b->right = a;
-}
+/* Deletes from |tree| and returns an item matching |item|.
+	 Returns a null pointer if no matching item found. */
+avl *avl_remove(avl_tree *tree, avl *item) {
+    /* Stack of nodes. */
+    avl *pa[AVL_MAX_HEIGHT]; /* Nodes. */
+    unsigned char da[AVL_MAX_HEIGHT];    /* |avl_link[]| indexes. */
+    int k;                               /* Stack pointer. */
 
-/* Balance maintainance after especially nasty swings
- */
-void avl_nasty(avl* root) {
-	switch (root->balance) {
-	case -1:
-		root->left->balance = 0;
-		root->right->balance = 1;
-		break;
-	case 1:
-		root->left->balance = -1;
-		root->right->balance = 0;
-		break;
-	case 0:
-		root->left->balance = 0;
-		root->right->balance = 0;
-	}
-	root->balance = 0;
-}
+    avl *p;   /* Traverses tree to find node to delete. */
+    int cmp;              /* Result of comparison between |item| and |p|. */
 
-/* Public methods */
+    // assert (tree != NULL && item != NULL);
 
-/* Insert element a into the AVL tree t
- * returns 1 if the depth of the tree has grown
- * Warning: do not insert elements already present
- */
-int avl_insert(avl_tree* t, avl* a) {
-	/* initialize */
-	a->left = 0;
-	a->right = 0;
-	a->balance = 0;
-	/* insert into an empty tree */
-	if (!t->root) {
-		t->root = a;
-		return 1;
-	}
+    k = 0;
+    p = (avl *) &tree->root;
+    for(cmp = -1; cmp != 0; cmp = tree->compar(item, p)) {
+        int dir = (cmp > 0);
 
-	if (t->compar(t->root, a) > 0) {
-		/* insert into the left subtree */
-		if (t->root->left) {
-			avl_tree left_subtree;
-			left_subtree.root = t->root->left;
-			left_subtree.compar = t->compar;
-			if (avl_insert(&left_subtree, a)) {
-				switch (t->root->balance--) {
-				case 1:
-					return 0;
-				case 0:
-					return 1;
-				}
-				if (t->root->left->balance < 0) {
-					avl_swr(&(t->root));
-					t->root->balance = 0;
-					t->root->right->balance = 0;
-				} else {
-					avl_swl(&(t->root->left));
-					avl_swr(&(t->root));
-					avl_nasty(t->root);
-				}
-			} else
-				t->root->left = left_subtree.root;
-			return 0;
-		} else {
-			t->root->left = a;
-			if (t->root->balance--)
-				return 0;
-			return 1;
-		}
-	} else {
-		/* insert into the right subtree */
-		if (t->root->right) {
-			avl_tree right_subtree;
-			right_subtree.root = t->root->right;
-			right_subtree.compar = t->compar;
-			if (avl_insert(&right_subtree, a)) {
-				switch (t->root->balance++) {
-				case -1:
-					return 0;
-				case 0:
-					return 1;
-				}
-				if (t->root->right->balance > 0) {
-					avl_swl(&(t->root));
-					t->root->balance = 0;
-					t->root->left->balance = 0;
-				} else {
-					avl_swr(&(t->root->right));
-					avl_swl(&(t->root));
-					avl_nasty(t->root);
-				}
-			} else
-				t->root->right = right_subtree.root;
-			return 0;
-		} else {
-			t->root->right = a;
-			if (t->root->balance++)
-				return 0;
-			return 1;
-		}
-	}
-}
+        pa[k] = p;
+        da[k++] = dir;
 
-/* Remove an element a from the AVL tree t
- * returns -1 if the depth of the tree has shrunk
- * Warning: if the element is not present in the tree,
- *          returns 0 as if it had been removed succesfully.
- */
-int avl_remove(avl_tree* t, avl* a) {
-	int b;
-	if (t->root == a)
-		return avl_removeroot(t);
-	b = t->compar(t->root, a);
-	if (b >= 0) {
-		/* remove from the left subtree */
-		int ch;
-		avl_tree left_subtree;
-		if ((left_subtree.root = t->root->left)) {
-			left_subtree.compar = t->compar;
-			ch = avl_remove(&left_subtree, a);
-			t->root->left = left_subtree.root;
-			if (ch) {
-				switch (t->root->balance++) {
-				case -1:
-					return -1;
-				case 0:
-					return 0;
-				}
-				switch (t->root->right->balance) {
-				case 0:
-					avl_swl(&(t->root));
-					t->root->balance = -1;
-					t->root->left->balance = 1;
-					return 0;
-				case 1:
-					avl_swl(&(t->root));
-					t->root->balance = 0;
-					t->root->left->balance = 0;
-					return -1;
-				}
-				avl_swr(&(t->root->right));
-				avl_swl(&(t->root));
-				avl_nasty(t->root);
-				return -1;
-			}
-		}
-	}
-	if (b <= 0) {
-		/* remove from the right subtree */
-		int ch;
-		avl_tree right_subtree;
-		if ((right_subtree.root = t->root->right)) {
-			right_subtree.compar = t->compar;
-			ch = avl_remove(&right_subtree, a);
-			t->root->right = right_subtree.root;
-			if (ch) {
-				switch (t->root->balance--) {
-				case 1:
-					return -1;
-				case 0:
-					return 0;
-				}
-				switch (t->root->left->balance) {
-				case 0:
-					avl_swr(&(t->root));
-					t->root->balance = 1;
-					t->root->right->balance = -1;
-					return 0;
-				case -1:
-					avl_swr(&(t->root));
-					t->root->balance = 0;
-					t->root->right->balance = 0;
-					return -1;
-				}
-				avl_swl(&(t->root->left));
-				avl_swr(&(t->root));
-				avl_nasty(t->root);
-				return -1;
-			}
-		}
-	}
-	return 0;
-}
+        p = p->avl_link[dir];
+        if(p == NULL) return NULL;
+    }
 
-/* Remove the root of the AVL tree t
- * Warning: dumps core if t is empty
- */
-int avl_removeroot(avl_tree* t) {
-	int ch;
-	avl* a;
-	if (!t->root->left) {
-		if (!t->root->right) {
-			t->root = 0;
-			return -1;
-		}
-		t->root = t->root->right;
-		return -1;
-	}
-	if (!t->root->right) {
-		t->root = t->root->left;
-		return -1;
-	}
-	if (t->root->balance < 0) {
-		/* remove from the left subtree */
-		a = t->root->left;
-		while (a->right)
-			a = a->right;
-	} else {
-		/* remove from the right subtree */
-		a = t->root->right;
-		while (a->left)
-			a = a->left;
-	}
-	ch = avl_remove(t, a);
-	a->left = t->root->left;
-	a->right = t->root->right;
-	a->balance = t->root->balance;
-	t->root = a;
-	if (a->balance == 0)
-		return ch;
-	return 0;
-}
+    item = p;
 
-/* Iterate through elements in t from a range between a and b (inclusive)
- * for each element calls iter(a) until it returns 0
- * returns the last value returned by iterator or 0 if there were no calls
- * Warning: a<=b must hold
- */
-int avl_range(avl_tree* t, avl* a, avl* b, int (*iter)(avl*), avl** ret) {
-	int x, c = 0;
-	if (!t->root)
-		return 0;
-	x = t->compar(t->root, a);
-	if (a != b) {
-		if (x < 0) {
-			x = t->compar(t->root, b);
-			if (x > 0)
-				x = 0;
-		}
-	}
-	if (x >= 0) {
-		/* search in the left subtree */
-		avl_tree left_subtree;
-		if ((left_subtree.root = t->root->left)) {
-			left_subtree.compar = t->compar;
-			if (!(c = avl_range(&left_subtree, a, b, iter, ret)))
-				if (x > 0)
-					return 0;
-		}
-	}
-	if (x == 0) {
-		if (!(c = iter(t->root))) {
-			if (ret)
-				*ret = t->root;
-			return 0;
-		}
-	}
-	if (x <= 0) {
-		/* search in the right subtree */
-		avl_tree right_subtree;
-		if ((right_subtree.root = t->root->right)) {
-			right_subtree.compar = t->compar;
-			if (!(c = avl_range(&right_subtree, a, b, iter, ret)))
-				if (x < 0)
-					return 0;
-		}
-	}
-	return c;
-}
+    if (p->avl_link[1] == NULL)
+        pa[k - 1]->avl_link[da[k - 1]] = p->avl_link[0];
+    else {
+        avl *r = p->avl_link[1];
+        if (r->avl_link[0] == NULL) {
+            r->avl_link[0] = p->avl_link[0];
+            r->avl_balance = p->avl_balance;
+            pa[k - 1]->avl_link[da[k - 1]] = r;
+            da[k] = 1;
+            pa[k++] = r;
+        }
+        else {
+            avl *s;
+            int j = k++;
 
-/* high performance searching - by ktsaou */
-avl *avl_search(avl_tree *t, avl *a) {
-	avl *root = t->root;
+            for (;;) {
+                da[k] = 0;
+                pa[k++] = r;
+                s = r->avl_link[0];
+                if (s->avl_link[0] == NULL) break;
 
-	while(root) {
-		int x = t->compar(root, a);
+                r = s;
+            }
 
-		if(x > 0) {
-			root = root->left;
-			continue;
-		}
+            s->avl_link[0] = p->avl_link[0];
+            r->avl_link[0] = s->avl_link[1];
+            s->avl_link[1] = p->avl_link[1];
+            s->avl_balance = p->avl_balance;
 
-		if(x < 0) {
-			root = root->right;
-			continue;
-		}
+            pa[j - 1]->avl_link[da[j - 1]] = s;
+            da[j] = 1;
+            pa[j] = s;
+        }
+    }
 
-		return root;
-	}
+    // assert (k > 0);
+    while (--k > 0) {
+        avl *y = pa[k];
 
-	return NULL;
-}
+        if (da[k] == 0) {
+            y->avl_balance++;
+            if (y->avl_balance == +1) break;
+            else if (y->avl_balance == +2) {
+                avl *x = y->avl_link[1];
+                if (x->avl_balance == -1) {
+                    avl *w;
+                    // assert (x->avl_balance == -1);
+                    w = x->avl_link[0];
+                    x->avl_link[0] = w->avl_link[1];
+                    w->avl_link[1] = x;
+                    y->avl_link[1] = w->avl_link[0];
+                    w->avl_link[0] = y;
+                    if (w->avl_balance == +1)
+                        x->avl_balance = 0, y->avl_balance = -1;
+                    else if (w->avl_balance == 0)
+                        x->avl_balance = y->avl_balance = 0;
+                    else /* |w->avl_balance == -1| */
+                        x->avl_balance = +1, y->avl_balance = 0;
+                    w->avl_balance = 0;
+                    pa[k - 1]->avl_link[da[k - 1]] = w;
+                }
+                else {
+                    y->avl_link[1] = x->avl_link[0];
+                    x->avl_link[0] = y;
+                    pa[k - 1]->avl_link[da[k - 1]] = x;
+                    if (x->avl_balance == 0) {
+                        x->avl_balance = -1;
+                        y->avl_balance = +1;
+                        break;
+                    }
+                    else x->avl_balance = y->avl_balance = 0;
+                }
+            }
+        }
+        else
+        {
+            y->avl_balance--;
+            if (y->avl_balance == -1) break;
+            else if (y->avl_balance == -2) {
+                avl *x = y->avl_link[0];
+                if (x->avl_balance == +1) {
+                    avl *w;
+                    // assert (x->avl_balance == +1);
+                    w = x->avl_link[1];
+                    x->avl_link[1] = w->avl_link[0];
+                    w->avl_link[0] = x;
+                    y->avl_link[0] = w->avl_link[1];
+                    w->avl_link[1] = y;
+                    if (w->avl_balance == -1)
+                        x->avl_balance = 0, y->avl_balance = +1;
+                    else if (w->avl_balance == 0)
+                        x->avl_balance = y->avl_balance = 0;
+                    else /* |w->avl_balance == +1| */
+                        x->avl_balance = -1, y->avl_balance = 0;
+                    w->avl_balance = 0;
+                    pa[k - 1]->avl_link[da[k - 1]] = w;
+                }
+                else {
+                    y->avl_link[0] = x->avl_link[1];
+                    x->avl_link[1] = y;
+                    pa[k - 1]->avl_link[da[k - 1]] = x;
+                    if (x->avl_balance == 0) {
+                        x->avl_balance = +1;
+                        y->avl_balance = -1;
+                        break;
+                    }
+                    else x->avl_balance = y->avl_balance = 0;
+                }
+            }
+        }
+    }
 
-void avl_init(avl_tree *t, int (*compar)(void *a, void *b)) {
-	t->root = NULL;
-	t->compar = compar;
+    // tree->avl_count--;
+    // tree->avl_generation++;
+    return item;
 }
 
 /* ------------------------------------------------------------------------- */
+// these functions are (C) Costa Tsaousis
 
 void avl_read_lock(avl_tree_lock *t) {
 #ifndef AVL_WITHOUT_PTHREADS
@@ -396,30 +343,22 @@ avl *avl_search_lock(avl_tree_lock *t, avl *a) {
 	return ret;
 }
 
-int avl_range_lock(avl_tree_lock *t, avl *a, avl *b, int (*iter)(avl *), avl **ret) {
-	avl_read_lock(t);
-	int ret2 = avl_range(&t->avl_tree, a, b, iter, ret);
-	avl_unlock(t);
-	return ret2;
-}
-
-int avl_removeroot_lock(avl_tree_lock *t) {
+avl * avl_remove_lock(avl_tree_lock *t, avl *a) {
 	avl_write_lock(t);
-	int ret = avl_removeroot(&t->avl_tree);
+	avl *ret = avl_remove(&t->avl_tree, a);
 	avl_unlock(t);
 	return ret;
 }
 
-int avl_remove_lock(avl_tree_lock *t, avl *a) {
+avl *avl_insert_lock(avl_tree_lock *t, avl *a) {
 	avl_write_lock(t);
-	int ret = avl_remove(&t->avl_tree, a);
+    avl * ret = avl_insert(&t->avl_tree, a);
 	avl_unlock(t);
 	return ret;
 }
 
-int avl_insert_lock(avl_tree_lock *t, avl *a) {
-	avl_write_lock(t);
-	int ret = avl_insert(&t->avl_tree, a);
-	avl_unlock(t);
-	return ret;
+void avl_init(avl_tree *t, int (*compar)(void *a, void *b)) {
+    t->root = NULL;
+    t->compar = compar;
 }
+

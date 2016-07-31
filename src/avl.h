@@ -1,19 +1,11 @@
-/*
- * ANSI C Library for maintainance of AVL Balanced Trees
- *
- * ref.:
- *  G. M. Adelson-Velskij & E. M. Landis
- *  Doklady Akad. Nauk SSSR 146 (1962), 263-266
- *
- * see also:
- *  D. E. Knuth: The Art of Computer Programming Vol.3 (Sorting and Searching)
- *
- * (C) 2000 Daniel Nagy, Budapest University of Technology and Economics
- * Released under GNU General Public License (GPL) version 2
- *
- */
+
 #ifndef _AVL_H
 #define _AVL_H 1
+
+/* Maximum AVL tree height. */
+#ifndef AVL_MAX_HEIGHT
+#define AVL_MAX_HEIGHT 92
+#endif
 
 #ifndef AVL_WITHOUT_PTHREADS
 #include <pthread.h>
@@ -34,15 +26,13 @@
 
 /* One element of the AVL tree */
 typedef struct avl {
-	struct avl* left;
-	struct avl* right;
-	signed char balance;
+    struct avl *avl_link[2];  /* Subtrees. */
+    signed char avl_balance;       /* Balance factor. */
 } avl;
 
 /* An AVL tree */
 typedef struct avl_tree {
 	avl *root;
-
 	int (*compar)(void *a, void *b);
 } avl_tree;
 
@@ -64,30 +54,16 @@ typedef struct avl_tree_lock {
  * returns 1 if the depth of the tree has grown
  * Warning: do not insert elements already present
  */
-int avl_insert_lock(avl_tree_lock *t, avl *a);
-int avl_insert(avl_tree *t, avl *a);
+avl *avl_insert_lock(avl_tree_lock *t, avl *a);
+avl *avl_insert(avl_tree *t, avl *a);
 
 /* Remove an element a from the AVL tree t
  * returns -1 if the depth of the tree has shrunk
  * Warning: if the element is not present in the tree,
  *          returns 0 as if it had been removed succesfully.
  */
-int avl_remove_lock(avl_tree_lock *t, avl *a);
-int avl_remove(avl_tree *t, avl *a);
-
-/* Remove the root of the AVL tree t
- * Warning: dumps core if t is empty
- */
-int avl_removeroot_lock(avl_tree_lock *t);
-int avl_removeroot(avl_tree *t);
-
-/* Iterate through elements in t from a range between a and b (inclusive)
- * for each element calls iter(a) until it returns 0
- * returns the last value returned by iterator or 0 if there were no calls
- * Warning: a<=b must hold
- */
-int avl_range_lock(avl_tree_lock *t, avl *a, avl *b, int (*iter)(avl *), avl **ret);
-int avl_range(avl_tree *t, avl *a, avl *b, int (*iter)(avl *), avl **ret);
+avl *avl_remove_lock(avl_tree_lock *t, avl *a);
+avl *avl_remove(avl_tree *t, avl *a);
 
 /* Iterate through elements in t equal to a
  * for each element calls iter(a) until it returns 0

@@ -86,9 +86,9 @@ avl_tree_lock rrdset_root_index_name = {
 		AVL_LOCK_INITIALIZER
 };
 
-int rrdset_index_add_name(RRDSET *st) {
+RRDSET *rrdset_index_add_name(RRDSET *st) {
 	// fprintf(stderr, "ADDING: %s (name: %s)\n", st->id, st->name);
-	return avl_insert_lock(&rrdset_root_index_name, (avl *) (&st->avlname));
+	return (RRDSET *)avl_insert_lock(&rrdset_root_index_name, (avl *) (&st->avlname));
 }
 
 #define rrdset_index_del_name(st) avl_remove_lock(&rrdset_root_index_name, (avl *)(&st->avlname))

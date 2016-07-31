@@ -280,8 +280,8 @@ int dictionary_del(DICTIONARY *dict, const char *name) {
 static int dictionary_walker(avl *a, int (*callback)(void *entry, void *data), void *data) {
 	int total = 0, ret = 0;
 
-	if(a->right) {
-		ret = dictionary_walker(a->right, callback, data);
+	if(a->avl_link[0]) {
+		ret = dictionary_walker(a->avl_link[0], callback, data);
 		if(ret < 0) return ret;
 		total += ret;
 	}
@@ -290,8 +290,8 @@ static int dictionary_walker(avl *a, int (*callback)(void *entry, void *data), v
 	if(ret < 0) return ret;
 	total += ret;
 
-	if(a->left) {
-		ret = dictionary_walker(a->left, callback, data);
+	if(a->avl_link[1]) {
+		ret = dictionary_walker(a->avl_link[1], callback, data);
 		if (ret < 0) return ret;
 		total += ret;
 	}
