@@ -51,23 +51,25 @@ typedef struct avl_tree_lock {
 /* Public methods */
 
 /* Insert element a into the AVL tree t
- * returns 1 if the depth of the tree has grown
- * Warning: do not insert elements already present
+ * returns the added element a, or a pointer the
+ * element that is equal to a (as returned by t->compar())
+ * a is linked directly to the tree, so it has to
+ * be properly allocated by the caller.
  */
 avl *avl_insert_lock(avl_tree_lock *t, avl *a);
 avl *avl_insert(avl_tree *t, avl *a);
 
 /* Remove an element a from the AVL tree t
- * returns -1 if the depth of the tree has shrunk
- * Warning: if the element is not present in the tree,
- *          returns 0 as if it had been removed succesfully.
+ * returns a pointer to the removed element
+ * or NULL if an element equal to a is not found
+ * (equal as returned by t->compar())
  */
 avl *avl_remove_lock(avl_tree_lock *t, avl *a);
 avl *avl_remove(avl_tree *t, avl *a);
 
-/* Iterate through elements in t equal to a
- * for each element calls iter(a) until it returns 0
- * returns the last value returned by iterator or 0 if there were no calls
+/* Find the element into the tree that equal to a
+ * (equal as returned by t->compar())
+ * returns NULL is no element is equal to a
  */
 avl *avl_search_lock(avl_tree_lock *t, avl *a);
 avl *avl_search(avl_tree *t, avl *a);
