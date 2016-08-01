@@ -1654,7 +1654,10 @@ void collect_data_for_pid(pid_t pid) {
 	// /proc/<pid>/stat
 
 	if(unlikely(read_proc_pid_stat(p))) {
-		error("Cannot process %s/proc/%d/stat (command '%s')", host_prefix, pid, p->comm);
+		if(errno != ENOENT || debug)
+			error("Cannot process %s/proc/%d/stat (command '%s')", host_prefix, pid, p->comm);
+		else
+			errno = 0;
 		// there is no reason to proceed if we cannot get its status
 		return;
 	}
@@ -1670,14 +1673,21 @@ void collect_data_for_pid(pid_t pid) {
 	// --------------------------------------------------------------------
 	// /proc/<pid>/io
 
-	if(unlikely(read_proc_pid_io(p)))
-		error("Cannot process %s/proc/%d/io (command '%s')", host_prefix, pid, p->comm);
+	if(unlikely(read_proc_pid_io(p))) {
+		if(errno != ENOENT || debug)
+			error("Cannot process %s/proc/%d/io (command '%s')", host_prefix, pid, p->comm);
+		else
+			errno = 0;
+	}
 
 	// --------------------------------------------------------------------
 	// /proc/<pid>/statm
 
 	if(unlikely(read_proc_pid_statm(p))) {
-		error("Cannot process %s/proc/%d/statm (command '%s')", host_prefix, pid, p->comm);
+		if(errno != ENOENT || debug)
+			error("Cannot process %s/proc/%d/statm (command '%s')", host_prefix, pid, p->comm);
+		else
+			errno = 0;
 		// there is no reason to proceed if we cannot get its memory status
 		return;
 	}
@@ -1690,8 +1700,12 @@ void collect_data_for_pid(pid_t pid) {
 	if(unlikely(p->new_entry)) {
 		// /proc/<pid>/cmdline
 		if(likely(proc_pid_cmdline_is_needed)) {
-			if(unlikely(read_proc_pid_cmdline(p)))
-				error("Cannot process %s/proc/%d/cmdline (command '%s')", host_prefix, pid, p->comm);
+			if(unlikely(read_proc_pid_cmdline(p))) {
+				if(errno != ENOENT || debug)
+					error("Cannot process %s/proc/%d/cmdline (command '%s')", host_prefix, pid, p->comm);
+				else
+					errno = 0;
+			}
 		}
 
 		if(unlikely(debug))
@@ -1729,7 +1743,10 @@ void collect_data_for_pid(pid_t pid) {
 	// /proc/<pid>/fd
 
 	if(unlikely(read_pid_file_descriptors(p))) {
-		error("Cannot process entries in %s/proc/%d/fd (command '%s')", host_prefix, pid, p->comm);
+		if(errno != ENOENT || debug)
+			error("Cannot process entries in %s/proc/%d/fd (command '%s')", host_prefix, pid, p->comm);
+		else
+			errno = 0;
 	}
 
 	// --------------------------------------------------------------------
