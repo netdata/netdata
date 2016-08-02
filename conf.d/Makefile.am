@@ -25,6 +25,7 @@ dist_pythonconfig_DATA = \
 	python.d/example.conf \
 	python.d/exim.conf \
 	python.d/hddtemp.conf \
+	python.d/memcached.conf \
 	python.d/mysql.conf \
 	python.d/nginx.conf \
 	python.d/phpfpm.conf \
