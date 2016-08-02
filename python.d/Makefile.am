@@ -14,6 +14,7 @@ dist_python_SCRIPTS = \
 	example.chart.py \
 	exim.chart.py \
 	hddtemp.chart.py \
+	memcached.chart.py \
 	mysql.chart.py \
 	nginx.chart.py \
 	phpfpm.chart.py \

@@ -1,0 +1,160 @@
+# -*- coding: utf-8 -*-
+# Description: memcached netdata python.d module
+# Author: Pawel Krupa (paulfantom)
+
+from base import SocketService
+
+# default module values (can be overridden per job in `config`)
+#update_every = 2
+priority = 60000
+retries = 60
+
+# default job configuration (overridden by python.d.plugin)
+# config = {'local': {
+#             'update_every': update_every,
+#             'retries': retries,
+#             'priority': priority,
+#             'host': 'localhost',
+#             'port': 11211,
+#             'unix_socket': None
+#          }}
+
+ORDER = ['net', 'connections', 'items', 'evicted_reclaimed', 'get', 'get_rate', 'set_rate', 'delete', 'cas', 'increment', 'decrement', 'touch', 'touch_rate']
+
+CHARTS = {
+    'net': {
+        'options': [None, 'Network', 'bytes', 'Network', 'memcached.net', 'line'],
+        'lines': [
+            ['bytes_read', 'read', 'absolute'],
+            ['bytes_written', 'written', 'absolute']
+        ]},
+    'connections': {
+        'options': [None, 'Connections', 'connections', 'Cluster', 'memcached.cluster', 'line'],
+        'lines': [
+            ['curr_connections', 'current', 'absolute'],
+            ['rejected_connections', 'rejected', 'absolute'],
+            ['total_connections', 'total', 'absolute']
+        ]},
+    'items': {
+        'options': [None, 'Items', 'items', 'Cluster', 'memcached.cluster', 'line'],
+        'lines': [
+            ['curr_items', 'current', 'absolute'],
+            ['total_items', 'total', 'absolute']
+        ]},
+    'evicted_reclaimed': {
+        'options': [None, 'Items', 'items', 'Evicted & Reclaimed', 'memcached.evicted_reclaimed', 'line'],
+        'lines': [
+            ['evictions', 'evicted', 'absolute'],
+            ['reclaimed', 'reclaimed', 'absolute']
+        ]},
+    'get': {
+        'options': [None, 'Requests', 'requests', 'GET', 'memcached.get', 'stacked'],
+        'lines': [
+            ['get_hits', 'hits', 'percent-of-absolute-row'],
+            ['get_misses', 'misses', 'percent-of-absolute-row']
+        ]},
+    'get_rate': {
+        'options': [None, 'Rate', 'requests/s', 'GET', 'memcached.get', 'line'],
+        'lines': [
+            ['cmd_get', 'rate', 'incremental']
+        ]},
+    'set_rate': {
+        'options': [None, 'Rate', 'requests/s', 'SET', 'memcached.set', 'line'],
+        'lines': [
+            ['cmd_set', 'rate', 'incremental']
+        ]},
+    'delete': {
+        'options': [None, 'Requests', 'requests', 'DELETE', 'memcached.delete', 'stacked'],
+        'lines': [
+            ['delete_hits', 'hits', 'percent-of-absolute-row'],
+            ['delete_misses', 'misses', 'percent-of-absolute-row'],
+        ]},
+    'cas': {
+        'options': [None, 'Requests', 'requests', 'CAS', 'memcached.cas', 'stacked'],
+        'lines': [
+            ['cas_hits', 'hits', 'percent-of-absolute-row'],
+            ['cas_misses', 'misses', 'percent-of-absolute-row'],
+            ['cas_badval', 'bad value', 'percent-of-absolute-row']
+        ]},
+    'increment': {
+        'options': [None, 'Requests', 'requests', 'Increment', 'memcached.incr', 'stacked'],
+        'lines': [
+            ['incr_hits', 'hits', 'percent-of-absolute-row'],
+            ['incr_misses', 'misses', 'percent-of-absolute-row']
+        ]},
+    'decrement': {
+        'options': [None, 'Requests', 'requests', 'Decrement', 'memcached.decr', 'stacked'],
+        'lines': [
+            ['decr_hits', 'hits', 'percent-of-absolute-row'],
+            ['decr_misses', 'misses', 'percent-of-absolute-row']
+        ]},
+    'touch': {
+        'options': [None, 'Requests', 'requests', 'Touch', 'memcached.touch', 'stacked'],
+        'lines': [
+            ['touch_hits', 'hits', 'percent-of-absolute-row'],
+            ['touch_misses', 'misses', 'percent-of-absolute-row']
+        ]},
+    'touch_rate': {
+        'options': [None, 'Rate', 'requests/s', 'Touch', 'memcached.touch', 'line'],
+        'lines': [
+            ['cmd_touch', 'rate', 'incremental']
+        ]}
+}
+
+
+class Service(SocketService):
+    def __init__(self, configuration=None, name=None):
+        SocketService.__init__(self, configuration=configuration, name=name)
+        self.request = "stats\r\n"
+        self.host = "localhost"
+        self.port = 11211
+        self.unix_socket = None
+        self.order = ORDER
+        self.definitions = CHARTS
+
+    def _get_data(self):
+        """
+        Get data from socket
+        :return: dict
+        """
+        try:
+            raw = self._get_raw_data().split("\n")
+        except AttributeError:
+            self.error("no data received")
+            return None
+        if raw[0].startswith('ERROR'):
+            self.error("Memcached returned ERROR")
+            return None
+        data = {}
+        for line in raw:
+            if line.startswith('STAT'):
+                try:
+                    t = line[5:].split(' ')
+                    data[t[0]] = int(t[1])
+                except (IndexError, ValueError):
+                    pass
+        try:
+            data['hit_rate'] = int((data['keyspace_hits'] / float(data['keyspace_hits'] + data['keyspace_misses'])) * 100)
+        except:
+            data['hit_rate'] = 0
+
+        if len(data) == 0:
+            self.error("received data doesn't have needed records")
+            return None
+        else:
+            return data
+
+    def check(self):
+        """
+        Parse configuration, check if memcached is available
+        :return: boolean
+        """
+        self._parse_config()
+        if self.name == "":
+            self.name = "local"
+        self.chart_name += "_" + self.name
+        data = self._get_data()
+        if data is None:
+            return False
+
+        return True
