@@ -718,8 +718,11 @@ char *trim(char *s)
 	return s;
 }
 
-void *mymmap(const char *filename, size_t size, int flags, int ksm)
-{
+void *mymmap(const char *filename, size_t size, int flags, int ksm) {
+	static int log_madvise_1 = 1;
+#ifdef MADV_MERGEABLE
+	static int log_madvise_2 = 1, log_madvise_3 = 1;
+#endif
 	int fd;
 	void *mem = NULL;
 
@@ -739,8 +742,10 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm)
 						int advise = MADV_SEQUENTIAL|MADV_DONTFORK;
 						if(flags & MAP_SHARED) advise |= MADV_WILLNEED;
 
-						if(madvise(mem, size, advise) != 0)
+						if(madvise(mem, size, advise) != 0 && log_madvise_1) {
 							error("Cannot advise the kernel about the memory usage of file '%s'.", filename);
+							log_madvise_1--;
+						}
 					}
 #ifdef MADV_MERGEABLE
 				}
@@ -767,11 +772,15 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm)
 							error("Cannot seek to beginning of file '%s'.", filename);
 
 						// don't use MADV_SEQUENTIAL|MADV_DONTFORK, they disable MADV_MERGEABLE
-						if(madvise(mem, size, MADV_SEQUENTIAL|MADV_DONTFORK) != 0)
+						if(madvise(mem, size, MADV_SEQUENTIAL|MADV_DONTFORK) != 0 && log_madvise_2) {
 							error("Cannot advise the kernel about the memory usage (MADV_SEQUENTIAL|MADV_DONTFORK) of file '%s'.", filename);
+							log_madvise_2--;
+						}
 
-						if(madvise(mem, size, MADV_MERGEABLE) != 0)
+						if(madvise(mem, size, MADV_MERGEABLE) != 0 && log_madvise_3) {
 							error("Cannot advise the kernel about the memory usage (MADV_MERGEABLE) of file '%s'.", filename);
+							log_madvise_3--;
+						}
 					}
 					else
 						error("Cannot allocate PRIVATE ANONYMOUS memory for KSM for file '%s'.", filename);

@@ -153,7 +153,8 @@ int mypclose(FILE *fp, pid_t pid) {
 	if(waitid(P_PID, (id_t) pid, &info, WEXITED) != -1) {
 		switch(info.si_code) {
 			case CLD_EXITED:
-				error("child pid %d exited with code %d.", info.si_pid, info.si_status);
+				if(info.si_status)
+					error("child pid %d exited with code %d.", info.si_pid, info.si_status);
 				return(info.si_status);
 				break;
 
