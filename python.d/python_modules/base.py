@@ -543,8 +543,13 @@ class SocketService(SimpleService):
                         self._disconnect()
             else:
                 # connect to unix socket
-                self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-                self._sock.connect(self.unix_socket)
+                try:
+                    self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+                    self._sock.connect(self.unix_socket)
+                except socket.error:
+                    self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                    self._sock.connect(self.unix_socket)
+
         except Exception as e:
             self.error(str(e),
                        "Cannot create socket with following configuration: host:", str(self.host),
