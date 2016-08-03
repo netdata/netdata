@@ -6,6 +6,7 @@
 
 from base import UrlService
 import xml.etree.ElementTree as ET  # phone home...
+#from xml.parsers.expat import errors
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -47,6 +48,12 @@ class Service(UrlService):
             self.url = "http://localhost:8080/manager/status?XML=true"
         self.order = ORDER
         self.definitions = CHARTS
+        self.port = 8080
+
+    def check(self):
+        if UrlService.check(self):
+            return True
+
         # get port from url
         self.port = 0
         for i in self.url.split('/'):
@@ -59,6 +66,11 @@ class Service(UrlService):
         if self.port == 0:
             self.port = 80
 
+        if self._get_data() is None or len(self._get_data()) == 0:
+            return False
+        else:
+            return True
+
     def _get_data(self):
         """
         Format data received from http request
@@ -66,7 +78,20 @@ class Service(UrlService):
         """
         try:
             raw = self._get_raw_data()
-            data = ET.fromstring(raw)
+            try:
+                data = ET.fromstring(raw)
+            except ET.ParseError as e:
+                #if e.code == errors.codes[errors.XML_ERROR_JUNK_AFTER_DOC_ELEMENT]:
+                if e.code == 9:
+                    # cut rest of invalid string
+                    pos = 0
+                    for i in range(e.position[0] - 1):
+                        pos += raw.find('\n', pos)
+                    raw = raw[:47604 + pos + e.position[0] - 1]
+                    data = ET.fromstring(raw)
+                else:
+                    raise Exception(e)
+
             memory = data.find('./jvm/memory')
             threads = data.find("./connector[@name='\"http-bio-" + str(self.port) + "\"']/threadInfo")
             requests = data.find("./connector[@name='\"http-bio-" + str(self.port) + "\"']/requestInfo")
@@ -76,7 +101,8 @@ class Service(UrlService):
                     'current': threads.attrib['currentThreadCount'],
                     'busy': threads.attrib['currentThreadsBusy'],
                     'jvm': memory.attrib['free']}
-        except (ValueError, AttributeError):
+        except (ValueError, AttributeError) as e:
+            self.debug(str(e))
             return None
         except SyntaxError as e:
             self.error("Tomcat module needs python 2.7 at least. Stopping")
