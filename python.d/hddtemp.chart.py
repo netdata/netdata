@@ -65,7 +65,6 @@ class Service(SocketService):
         Get data from TCP/IP socket
         :return: dict
         """
-        self.disk_count = self._get_disk_count()
         try:
             raw = self._get_raw_data().split("|")[:-1]
         except AttributeError:
@@ -96,6 +95,14 @@ class Service(SocketService):
         except (KeyError, TypeError) as e:
             self.info("No excluded disks")
             self.debug(str(e))
+
+        try:
+            self.disk_count = int(self.configuration['disk_count'])
+        except (KeyError, TypeError) as e:
+            self.info("Autodetecting number of disks")
+            self.disk_count = self._get_disk_count()
+            self.debug(str(e))
+
         data = self._get_data()
         if data is None:
             return False
