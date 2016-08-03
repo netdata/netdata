@@ -42,7 +42,7 @@ CHARTS = {
             ['total_items', 'total', 'absolute']
         ]},
     'evicted_reclaimed': {
-        'options': [None, 'Items', 'items', 'Evicted & Reclaimed', 'memcached.evicted_reclaimed', 'line'],
+        'options': [None, 'Items', 'items', 'Evicted and Reclaimed', 'memcached.evicted_reclaimed', 'line'],
         'lines': [
             ['evictions', 'evicted', 'absolute'],
             ['reclaimed', 'reclaimed', 'absolute']
