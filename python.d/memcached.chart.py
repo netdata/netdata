@@ -23,10 +23,10 @@ ORDER = ['net', 'connections', 'items', 'evicted_reclaimed', 'get', 'get_rate', 
 
 CHARTS = {
     'net': {
-        'options': [None, 'Network', 'bytes', 'Network', 'memcached.net', 'line'],
+        'options': [None, 'Network', 'kilobytes/s', 'Network', 'memcached.net', 'line'],
         'lines': [
-            ['bytes_read', 'read', 'absolute'],
-            ['bytes_written', 'written', 'absolute']
+            ['bytes_read', 'read', 'incremental', 1, 1024],
+            ['bytes_written', 'written', 'incremental', 1, 1024]
         ]},
     'connections': {
         'options': [None, 'Connections', 'connections', 'Cluster', 'memcached.cluster', 'line'],
@@ -108,6 +108,7 @@ class Service(SocketService):
         self.request = "stats\r\n"
         self.host = "localhost"
         self.port = 11211
+        self._keep_alive = True
         self.unix_socket = None
         self.order = ORDER
         self.definitions = CHARTS
@@ -143,6 +144,12 @@ class Service(SocketService):
             return None
         else:
             return data
+
+    def _check_raw_data(self, data):
+        if data.endswith('END\r\n'):
+            return True
+        else:
+            return False
 
     def check(self):
         """
