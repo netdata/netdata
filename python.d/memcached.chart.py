@@ -29,11 +29,11 @@ CHARTS = {
             ['bytes_written', 'written', 'incremental', 1, 1024]
         ]},
     'connections': {
-        'options': [None, 'Connections', 'connections', 'Cluster', 'memcached.cluster', 'line'],
+        'options': [None, 'Connections', 'connections/s', 'Cluster', 'memcached.cluster', 'line'],
         'lines': [
-            ['curr_connections', 'current', 'absolute'],
-            ['rejected_connections', 'rejected', 'absolute'],
-            ['total_connections', 'total', 'absolute']
+            ['curr_connections', 'current', 'incremental'],
+            ['rejected_connections', 'rejected', 'incremental'],
+            ['total_connections', 'total', 'incremental']
         ]},
     'items': {
         'options': [None, 'Items', 'items', 'Cluster', 'memcached.cluster', 'line'],
