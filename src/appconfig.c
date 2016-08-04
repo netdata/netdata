@@ -230,6 +230,8 @@ int config_rename(const char *section, const char *old, const char *new) {
 	cv->name = strdup(new);
 	if(!cv->name) fatal("Cannot allocate memory for config_rename()");
 
+	cv->hash = simple_hash(cv->name);
+
 	config_value_index_add(co, cv);
 	config_section_unlock(co);
 
