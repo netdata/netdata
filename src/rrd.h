@@ -22,7 +22,7 @@ extern int rrd_delete_unupdated_dimensions;
 
 #define RRD_ID_LENGTH_MAX 1024
 
-#define RRDSET_MAGIC		"NETDATA RRD SET FILE V017"
+#define RRDSET_MAGIC		"NETDATA RRD SET FILE V018"
 #define RRDDIMENSION_MAGIC	"NETDATA RRD DIMENSION FILE V017"
 
 typedef long long total_number;
@@ -81,6 +81,21 @@ extern const char *rrddim_algorithm_name(int chart_type);
 
 #define RRDDIM_FLAG_HIDDEN 0x00000001 // this dimension will not be offered to callers
 #define RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS 0x00000002 // do not offer RESET or OVERFLOW info to callers
+
+// ----------------------------------------------------------------------------
+// RRD CONTEXT
+
+struct rrdcontext {
+    avl avl;
+
+    const char *id;
+    uint32_t hash;
+
+    size_t use_count;
+
+    // avl_tree_lock variables_root_index;
+};
+typedef struct rrdcontext RRDCONTEXT;
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION
@@ -237,6 +252,7 @@ struct rrdset {
 	total_number collected_total;					// used internally to calculate percentages
 	total_number last_collected_total;				// used internally to calculate percentages
 
+    RRDCONTEXT *rrdcontext;
 	struct rrdset *next;							// linking of rrdsets
 
 	// ------------------------------------------------------------------------
@@ -255,20 +271,11 @@ struct rrdset {
 typedef struct rrdset RRDSET;
 
 // ----------------------------------------------------------------------------
-// RRD CONTEXT
-
-struct rrdcontext {
-    avl avl;
-
-    char *context;
-};
-typedef struct rrdcontext RRDCONTEXT;
-
-
-// ----------------------------------------------------------------------------
 // RRD HOST
 
 struct rrdhost {
+    avl avl;
+
     char *hostname;
 
     RRDSET *rrdset_root;
@@ -276,6 +283,9 @@ struct rrdhost {
 
     avl_tree_lock rrdset_root_index;
     avl_tree_lock rrdset_root_index_name;
+
+    avl_tree_lock rrdcontext_root_index;
+    // avl_tree_lock variables_root_index;
 };
 typedef struct rrdhost RRDHOST;
 

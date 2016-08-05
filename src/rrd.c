@@ -37,6 +37,7 @@ int rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
 
 static int rrdset_compare(void* a, void* b);
 static int rrdset_compare_name(void* a, void* b);
+static int rrdcontext_compare(void* a, void* b);
 
 RRDHOST localhost = {
 		.hostname = "localhost",
@@ -49,27 +50,81 @@ RRDHOST localhost = {
         .rrdset_root_index_name = {
             { NULL, rrdset_compare_name },
             AVL_LOCK_INITIALIZER
+        },
+        .rrdcontext_root_index = {
+            { NULL, rrdcontext_compare },
+            AVL_LOCK_INITIALIZER
         }
 };
+
+// ----------------------------------------------------------------------------
+// RRDCONTEXT index
+
+static int rrdcontext_compare(void* a, void* b) {
+    if(((RRDCONTEXT *)a)->hash < ((RRDCONTEXT *)b)->hash) return -1;
+    else if(((RRDCONTEXT *)a)->hash > ((RRDCONTEXT *)b)->hash) return 1;
+    else return strcmp(((RRDCONTEXT *)a)->id, ((RRDCONTEXT *)b)->id);
+}
+
+#define rrdcontext_index_add(host, rc) (RRDCONTEXT *)avl_insert_lock(&((host)->rrdcontext_root_index), (avl *)(rc))
+#define rrdcontext_index_del(host, rc) (RRDCONTEXT *)avl_remove_lock(&((host)->rrdcontext_root_index), (avl *)(rc))
+
+static RRDCONTEXT *rrdcontext_index_find(RRDHOST *host, const char *id, uint32_t hash) {
+    RRDCONTEXT tmp;
+    tmp.id = id;
+    tmp.hash = (hash)?hash:simple_hash(tmp.id);
+
+    return (RRDCONTEXT *)avl_search_lock(&(host->rrdcontext_root_index), (avl *) &tmp);
+}
+
+RRDCONTEXT *rrdcontext_create(const char *id) {
+    RRDCONTEXT *rc = rrdcontext_index_find(&localhost, id, 0);
+    if(!rc) {
+        rc = calloc(1, sizeof(RRDCONTEXT));
+        if(!rc) fatal("Cannot allocate RRDCONTEXT memory");
+        rc->id = strdup(id);
+        if(!rc->id) fatal("Cannot allocate RRDCONTEXT.id memory");
+        rc->hash = simple_hash(rc->id);
+        // avl_init_lock(&rc->variables_root_index, compar);
+        RRDCONTEXT *ret = rrdcontext_index_add(&localhost, rc);
+        if(ret != rc)
+            fatal("INTERNAL ERROR: Expected to INSERT RRDCONTEXT '%s' into index, but inserted '%s'.", rc->id, (ret)?ret->id:"NONE");
+    }
+
+    rc->use_count++;
+    return rc;
+}
+
+void rrdcontext_free(RRDCONTEXT *rc) {
+    rc->use_count--;
+    if(!rc->use_count) {
+        RRDCONTEXT *ret = rrdcontext_index_del(&localhost, rc);
+        if(ret != rc)
+            fatal("INTERNAL ERROR: Expected to DELETE RRDCONTEXT '%s' from index, but deleted '%s'.", rc->id, (ret)?ret->id:"NONE");
+
+        free((void *)rc->id);
+        free(rc);
+    }
+}
 
 // ----------------------------------------------------------------------------
 // RRDSET index
 
 static int rrdset_compare(void* a, void* b) {
-	if(((RRDSET *)a)->hash < ((RRDSET *)b)->hash) return -1;
-	else if(((RRDSET *)a)->hash > ((RRDSET *)b)->hash) return 1;
-	else return strcmp(((RRDSET *)a)->id, ((RRDSET *)b)->id);
+    if(((RRDSET *)a)->hash < ((RRDSET *)b)->hash) return -1;
+    else if(((RRDSET *)a)->hash > ((RRDSET *)b)->hash) return 1;
+    else return strcmp(((RRDSET *)a)->id, ((RRDSET *)b)->id);
 }
 
-#define rrdset_index_add(host, st) avl_insert_lock(&((host)->rrdset_root_index), (avl *)(st))
-#define rrdset_index_del(host, st) avl_remove_lock(&((host)->rrdset_root_index), (avl *)(st))
+#define rrdset_index_add(host, st) (RRDSET *)avl_insert_lock(&((host)->rrdset_root_index), (avl *)(st))
+#define rrdset_index_del(host, st) (RRDSET *)avl_remove_lock(&((host)->rrdset_root_index), (avl *)(st))
 
 static RRDSET *rrdset_index_find(RRDHOST *host, const char *id, uint32_t hash) {
-	RRDSET tmp;
-	strncpyz(tmp.id, id, RRD_ID_LENGTH_MAX);
-	tmp.hash = (hash)?hash:simple_hash(tmp.id);
+    RRDSET tmp;
+    strncpyz(tmp.id, id, RRD_ID_LENGTH_MAX);
+    tmp.hash = (hash)?hash:simple_hash(tmp.id);
 
-	return (RRDSET *)avl_search_lock(&(host->rrdset_root_index), (avl *) &tmp);
+    return (RRDSET *)avl_search_lock(&(host->rrdset_root_index), (avl *) &tmp);
 }
 
 // ----------------------------------------------------------------------------
@@ -89,11 +144,20 @@ static int rrdset_compare_name(void* a, void* b) {
 }
 
 RRDSET *rrdset_index_add_name(RRDHOST *host, RRDSET *st) {
+    void *result;
 	// fprintf(stderr, "ADDING: %s (name: %s)\n", st->id, st->name);
-	return (RRDSET *)avl_insert_lock(&host->rrdset_root_index_name, (avl *) (&st->avlname));
+	result = avl_insert_lock(&host->rrdset_root_index_name, (avl *) (&st->avlname));
+    if(result) return rrdset_from_avlname(result);
+    return NULL;
 }
 
-#define rrdset_index_del_name(host, st) avl_remove_lock(&((host)->rrdset_root_index_name), (avl *)(&st->avlname))
+RRDSET *rrdset_index_del_name(RRDHOST *host, RRDSET *st) {
+    void *result;
+    // fprintf(stderr, "DELETING: %s (name: %s)\n", st->id, st->name);
+    return (RRDSET *)avl_remove_lock(&((host)->rrdset_root_index_name), (avl *)(&st->avlname));
+    if(result) return rrdset_from_avlname(result);
+    return NULL;
+}
 
 static RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name, uint32_t hash) {
 	void *result = NULL;
@@ -465,6 +529,8 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 
 	rrdset_index_add(&localhost, st);
 
+    st->rrdcontext = rrdcontext_create(st->context);
+
 	pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
 
 	return(st);
@@ -659,6 +725,10 @@ void rrdset_free_all(void)
 			rrddim_free(st, st->dimensions);
 
 		rrdset_index_del(&localhost, st);
+
+        st->rrdcontext->use_count--;
+        if(!st->rrdcontext->use_count)
+            rrdcontext_free(st->rrdcontext);
 
 		if(st->mapped == RRD_MEMORY_MODE_SAVE) {
 			debug(D_RRD_CALLS, "Saving stats '%s' to '%s'.", st->name, st->cache_filename);
