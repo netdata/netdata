@@ -33,12 +33,24 @@ int rrd_delete_unupdated_dimensions = 0;
 
 int rrd_update_every = UPDATE_EVERY;
 int rrd_default_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
-
-RRDSET *rrdset_root = NULL;
-pthread_rwlock_t rrdset_root_rwlock = PTHREAD_RWLOCK_INITIALIZER;
-
 int rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
 
+static int rrdset_compare(void* a, void* b);
+static int rrdset_compare_name(void* a, void* b);
+
+RRDHOST localhost = {
+		.hostname = "localhost",
+		.rrdset_root = NULL,
+		.rrdset_root_rwlock = PTHREAD_RWLOCK_INITIALIZER,
+        .rrdset_root_index = {
+            { NULL, rrdset_compare },
+            AVL_LOCK_INITIALIZER
+        },
+        .rrdset_root_index_name = {
+            { NULL, rrdset_compare_name },
+            AVL_LOCK_INITIALIZER
+        }
+};
 
 // ----------------------------------------------------------------------------
 // RRDSET index
@@ -49,20 +61,15 @@ static int rrdset_compare(void* a, void* b) {
 	else return strcmp(((RRDSET *)a)->id, ((RRDSET *)b)->id);
 }
 
-avl_tree_lock rrdset_root_index = {
-		{ NULL, rrdset_compare },
-		AVL_LOCK_INITIALIZER
-};
+#define rrdset_index_add(host, st) avl_insert_lock(&((host)->rrdset_root_index), (avl *)(st))
+#define rrdset_index_del(host, st) avl_remove_lock(&((host)->rrdset_root_index), (avl *)(st))
 
-#define rrdset_index_add(st) avl_insert_lock(&rrdset_root_index, (avl *)(st))
-#define rrdset_index_del(st) avl_remove_lock(&rrdset_root_index, (avl *)(st))
-
-static RRDSET *rrdset_index_find(const char *id, uint32_t hash) {
+static RRDSET *rrdset_index_find(RRDHOST *host, const char *id, uint32_t hash) {
 	RRDSET tmp;
 	strncpyz(tmp.id, id, RRD_ID_LENGTH_MAX);
 	tmp.hash = (hash)?hash:simple_hash(tmp.id);
 
-	return (RRDSET *)avl_search_lock(&(rrdset_root_index), (avl *) &tmp);
+	return (RRDSET *)avl_search_lock(&(host->rrdset_root_index), (avl *) &tmp);
 }
 
 // ----------------------------------------------------------------------------
@@ -81,26 +88,21 @@ static int rrdset_compare_name(void* a, void* b) {
 	else return strcmp(A->name, B->name);
 }
 
-avl_tree_lock rrdset_root_index_name = {
-		{ NULL, rrdset_compare_name },
-		AVL_LOCK_INITIALIZER
-};
-
-RRDSET *rrdset_index_add_name(RRDSET *st) {
+RRDSET *rrdset_index_add_name(RRDHOST *host, RRDSET *st) {
 	// fprintf(stderr, "ADDING: %s (name: %s)\n", st->id, st->name);
-	return (RRDSET *)avl_insert_lock(&rrdset_root_index_name, (avl *) (&st->avlname));
+	return (RRDSET *)avl_insert_lock(&host->rrdset_root_index_name, (avl *) (&st->avlname));
 }
 
-#define rrdset_index_del_name(st) avl_remove_lock(&rrdset_root_index_name, (avl *)(&st->avlname))
+#define rrdset_index_del_name(host, st) avl_remove_lock(&((host)->rrdset_root_index_name), (avl *)(&st->avlname))
 
-static RRDSET *rrdset_index_find_name(const char *name, uint32_t hash) {
+static RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name, uint32_t hash) {
 	void *result = NULL;
 	RRDSET tmp;
 	tmp.name = name;
 	tmp.hash_name = (hash)?hash:simple_hash(tmp.name);
 
 	// fprintf(stderr, "SEARCHING: %s\n", name);
-	result = avl_search_lock(&(rrdset_root_index_name), (avl *) (&(tmp.avlname)));
+	result = avl_search_lock(&host->rrdset_root_index_name, (avl *) (&(tmp.avlname)));
 	if(result) {
 		RRDSET *st = rrdset_from_avlname(result);
 		if(strcmp(st->magic, RRDSET_MAGIC))
@@ -256,7 +258,7 @@ void rrdset_set_name(RRDSET *st, const char *name)
 {
 	debug(D_RRD_CALLS, "rrdset_set_name() old: %s, new: %s", st->name, name);
 
-	if(st->name) rrdset_index_del_name(st);
+	if(st->name) rrdset_index_del_name(&localhost, st);
 
 	char b[CONFIG_MAX_VALUE + 1];
 	char n[RRD_ID_LENGTH_MAX + 1];
@@ -266,7 +268,7 @@ void rrdset_set_name(RRDSET *st, const char *name)
 	st->name = config_get(st->id, "name", b);
 	st->hash_name = simple_hash(st->name);
 
-	rrdset_index_add_name(st);
+	rrdset_index_add_name(&localhost, st);
 }
 
 // ----------------------------------------------------------------------------
@@ -447,7 +449,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 	avl_init_lock(&st->dimensions_index, rrddim_compare);
 
 	pthread_rwlock_init(&st->rwlock, NULL);
-	pthread_rwlock_wrlock(&rrdset_root_rwlock);
+	pthread_rwlock_wrlock(&localhost.rrdset_root_rwlock);
 
 	if(name && *name) rrdset_set_name(st, name);
 	else rrdset_set_name(st, id);
@@ -458,12 +460,12 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 		st->title = config_get(st->id, "title", varvalue);
 	}
 
-	st->next = rrdset_root;
-	rrdset_root = st;
+	st->next = localhost.rrdset_root;
+    localhost.rrdset_root = st;
 
-	rrdset_index_add(st);
+	rrdset_index_add(&localhost, st);
 
-	pthread_rwlock_unlock(&rrdset_root_rwlock);
+	pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
 
 	return(st);
 }
@@ -650,13 +652,13 @@ void rrdset_free_all(void)
 	info("Freeing all memory...");
 
 	RRDSET *st;
-	for(st = rrdset_root; st ;) {
+	for(st = localhost.rrdset_root; st ;) {
 		RRDSET *next = st->next;
 
 		while(st->dimensions)
 			rrddim_free(st, st->dimensions);
 
-		rrdset_index_del(st);
+		rrdset_index_del(&localhost, st);
 
 		if(st->mapped == RRD_MEMORY_MODE_SAVE) {
 			debug(D_RRD_CALLS, "Saving stats '%s' to '%s'.", st->name, st->cache_filename);
@@ -674,7 +676,7 @@ void rrdset_free_all(void)
 
 		st = next;
 	}
-	rrdset_root = NULL;
+    localhost.rrdset_root = NULL;
 
 	info("Memory cleanup completed...");
 }
@@ -685,8 +687,8 @@ void rrdset_save_all(void) {
 	RRDSET *st;
 	RRDDIM *rd;
 
-	pthread_rwlock_wrlock(&rrdset_root_rwlock);
-	for(st = rrdset_root; st ; st = st->next) {
+	pthread_rwlock_wrlock(&localhost.rrdset_root_rwlock);
+	for(st = localhost.rrdset_root; st ; st = st->next) {
 		pthread_rwlock_wrlock(&st->rwlock);
 
 		if(st->mapped == RRD_MEMORY_MODE_SAVE) {
@@ -703,7 +705,7 @@ void rrdset_save_all(void) {
 
 		pthread_rwlock_unlock(&st->rwlock);
 	}
-	pthread_rwlock_unlock(&rrdset_root_rwlock);
+	pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
 }
 
 
@@ -711,7 +713,7 @@ RRDSET *rrdset_find(const char *id)
 {
 	debug(D_RRD_CALLS, "rrdset_find() for chart %s", id);
 
-	RRDSET *st = rrdset_index_find(id, 0);
+	RRDSET *st = rrdset_index_find(&localhost, id, 0);
 	return(st);
 }
 
@@ -733,7 +735,7 @@ RRDSET *rrdset_find_byname(const char *name)
 {
 	debug(D_RRD_CALLS, "rrdset_find_byname() for chart %s", name);
 
-	RRDSET *st = rrdset_index_find_name(name, 0);
+	RRDSET *st = rrdset_index_find_name(&localhost, name, 0);
 	return(st);
 }
 

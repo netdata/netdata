@@ -254,8 +254,32 @@ struct rrdset {
 };
 typedef struct rrdset RRDSET;
 
-extern RRDSET *rrdset_root;
-extern pthread_rwlock_t rrdset_root_rwlock;
+// ----------------------------------------------------------------------------
+// RRD CONTEXT
+
+struct rrdcontext {
+    avl avl;
+
+    char *context;
+};
+typedef struct rrdcontext RRDCONTEXT;
+
+
+// ----------------------------------------------------------------------------
+// RRD HOST
+
+struct rrdhost {
+    char *hostname;
+
+    RRDSET *rrdset_root;
+    pthread_rwlock_t rrdset_root_rwlock;
+
+    avl_tree_lock rrdset_root_index;
+    avl_tree_lock rrdset_root_index_name;
+};
+typedef struct rrdhost RRDHOST;
+
+extern RRDHOST localhost;
 
 // ----------------------------------------------------------------------------
 // RRD SET functions
