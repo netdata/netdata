@@ -96,8 +96,8 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
 		, rrd_default_history_entries
 		);
 
-	pthread_rwlock_rdlock(&rrdset_root_rwlock);
-	for(st = rrdset_root, c = 0; st ; st = st->next) {
+	pthread_rwlock_rdlock(&localhost.rrdset_root_rwlock);
+	for(st = localhost.rrdset_root, c = 0; st ; st = st->next) {
 		if(st->enabled && st->dimensions) {
 			if(c) buffer_strcat(wb, ",");
 			buffer_strcat(wb, "\n\t\t\"");
@@ -107,7 +107,7 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
 			c++;
 		}
 	}
-	pthread_rwlock_unlock(&rrdset_root_rwlock);
+	pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
 
 	buffer_strcat(wb, "\n\t}\n}\n");
 }
@@ -237,15 +237,15 @@ void rrd_stats_all_json(BUFFER *wb)
 
 	buffer_strcat(wb, RRD_GRAPH_JSON_HEADER);
 
-	pthread_rwlock_rdlock(&rrdset_root_rwlock);
-	for(st = rrdset_root, c = 0; st ; st = st->next) {
+	pthread_rwlock_rdlock(&localhost.rrdset_root_rwlock);
+	for(st = localhost.rrdset_root, c = 0; st ; st = st->next) {
 		if(st->enabled && st->dimensions) {
 			if(c) buffer_strcat(wb, ",\n");
 			memory += rrd_stats_one_json(st, NULL, wb);
 			c++;
 		}
 	}
-	pthread_rwlock_unlock(&rrdset_root_rwlock);
+	pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
 
 	buffer_sprintf(wb, "\n\t],\n"
 		"\t\"hostname\": \"%s\",\n"

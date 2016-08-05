@@ -1852,7 +1852,7 @@ void web_client_process(struct web_client *w) {
 					debug(D_WEB_CLIENT_ACCESS, "%llu: Sending list of RRD_STATS...", w->id);
 
 					buffer_flush(w->response.data);
-					RRDSET *st = rrdset_root;
+					RRDSET *st = localhost.rrdset_root;
 
 					for ( ; st ; st = st->next )
 						buffer_sprintf(w->response.data, "%s\n", st->name);
