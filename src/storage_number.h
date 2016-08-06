@@ -1,5 +1,3 @@
-#include <stdint.h>
-
 #ifndef NETDATA_STORAGE_NUMBER_H
 #define NETDATA_STORAGE_NUMBER_H
 

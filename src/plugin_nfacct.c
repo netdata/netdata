@@ -1,28 +1,8 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
 #ifdef INTERNAL_PLUGIN_NFACCT
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <dirent.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <time.h>
-#include <errno.h>
-
 #include <libmnl/libmnl.h>
 #include <libnetfilter_acct/libnetfilter_acct.h>
 
-#include "main.h"
-#include "global_statistics.h"
 #include "common.h"
-#include "appconfig.h"
-#include "log.h"
-#include "rrd.h"
-#include "plugin_proc.h"
 
 struct mynfacct {
 	const char *name;

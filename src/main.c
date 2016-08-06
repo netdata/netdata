@@ -1,40 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <errno.h>
-#include <getopt.h>
-#include <pthread.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/mman.h>
-#include <sys/prctl.h>
-#include <sys/wait.h>
-#include <syslog.h>
-#include <unistd.h>
-
-#include "appconfig.h"
 #include "common.h"
-#include "daemon.h"
-#include "log.h"
-#include "popen.h"
-#include "rrd.h"
-#include "rrd2json.h"
-#include "web_client.h"
-#include "web_server.h"
-
-#include "unit_test.h"
-
-#include "plugin_checks.h"
-#include "plugin_idlejitter.h"
-#include "plugin_nfacct.h"
-#include "registry.h"
-#include "plugin_proc.h"
-#include "plugin_tc.h"
-#include "plugins_d.h"
-
-#include "main.h"
 
 extern void *cgroups_main(void *ptr);
 

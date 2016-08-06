@@ -1,28 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-
-#include <uuid/uuid.h>
-#include <inttypes.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <errno.h>
-#include <fcntl.h>
-
-#include "log.h"
 #include "common.h"
-#include "dictionary.h"
-#include "appconfig.h"
-
-#include "web_client.h"
-#include "rrd.h"
-#include "rrd2json.h"
-#include "registry.h"
-
 
 // ----------------------------------------------------------------------------
 // TODO

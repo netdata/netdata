@@ -1,7 +1,3 @@
-#include <sys/types.h>
-#include <unistd.h>
-
-
 #ifndef NETDATA_PLUGINS_D_H
 #define NETDATA_PLUGINS_D_H 1
 

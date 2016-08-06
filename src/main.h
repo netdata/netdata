@@ -1,9 +1,5 @@
-#include <getopt.h>
-
 #ifndef NETDATA_MAIN_H
 #define NETDATA_MAIN_H 1
-
-#include <signal.h>
 
 extern volatile sig_atomic_t netdata_exit;
 

@@ -1,10 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-// #include <assert.h>
-
-#include "avl.h"
-#include "log.h"
+#include "common.h"
 
 /* ------------------------------------------------------------------------- */
 /*

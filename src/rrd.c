@@ -1,25 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <stddef.h>
-#include <string.h>
-#include <unistd.h>
-#include <time.h>
-#include <sys/time.h>
-#include <sys/mman.h>
-#include <pthread.h>
-#include <errno.h>
-#include <ctype.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <stdlib.h>
-
 #include "common.h"
-#include "log.h"
-#include "appconfig.h"
-
-#include "main.h"
-#include "rrd.h"
 
 #define RRD_DEFAULT_GAP_INTERPOLATIONS 1
 
@@ -54,6 +33,10 @@ RRDHOST localhost = {
         .rrdcontext_root_index = {
             { NULL, rrdcontext_compare },
             AVL_LOCK_INITIALIZER
+        },
+        .variables_root_index = {
+            { NULL, rrdvar_compare },
+            AVL_LOCK_INITIALIZER
         }
 };
 
@@ -82,10 +65,15 @@ RRDCONTEXT *rrdcontext_create(const char *id) {
     if(!rc) {
         rc = calloc(1, sizeof(RRDCONTEXT));
         if(!rc) fatal("Cannot allocate RRDCONTEXT memory");
+
         rc->id = strdup(id);
         if(!rc->id) fatal("Cannot allocate RRDCONTEXT.id memory");
+
         rc->hash = simple_hash(rc->id);
-        // avl_init_lock(&rc->variables_root_index, compar);
+
+        // initialize the variables index
+        avl_init_lock(&rc->variables_root_index, rrdvar_compare);
+
         RRDCONTEXT *ret = rrdcontext_index_add(&localhost, rc);
         if(ret != rc)
             fatal("INTERNAL ERROR: Expected to INSERT RRDCONTEXT '%s' into index, but inserted '%s'.", rc->id, (ret)?ret->id:"NONE");
@@ -101,6 +89,9 @@ void rrdcontext_free(RRDCONTEXT *rc) {
         RRDCONTEXT *ret = rrdcontext_index_del(&localhost, rc);
         if(ret != rc)
             fatal("INTERNAL ERROR: Expected to DELETE RRDCONTEXT '%s' from index, but deleted '%s'.", rc->id, (ret)?ret->id:"NONE");
+
+        if(rc->variables_root_index.avl_tree.root != NULL)
+            fatal("INTERNAL ERROR: Variables index of RRDCONTEXT '%s' that is freed, is not empty.", rc->id);
 
         free((void *)rc->id);
         free(rc);
@@ -511,6 +502,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 			config_get_number(st->id, "gap when lost iterations above", RRD_DEFAULT_GAP_INTERPOLATIONS) + 2);
 
 	avl_init_lock(&st->dimensions_index, rrddim_compare);
+    avl_init_lock(&st->variables_root_index, rrdvar_compare);
 
 	pthread_rwlock_init(&st->rwlock, NULL);
 	pthread_rwlock_wrlock(&localhost.rrdset_root_rwlock);

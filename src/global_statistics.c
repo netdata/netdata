@@ -1,9 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <pthread.h>
-
-#include "global_statistics.h"
+#include "common.h"
 
 struct global_statistics global_statistics = { 0, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL};
 

@@ -1,15 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include "common.h"
-#include "appconfig.h"
-#include "procfile.h"
-#include "rrd.h"
-#include "plugin_proc.h"
 
 int do_proc_net_dev(int update_every, unsigned long long dt) {
 	static procfile *ff = NULL;

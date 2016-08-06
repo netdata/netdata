@@ -1,44 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <sys/wait.h>
-#include <sys/stat.h>
-
-#include <sys/resource.h>
-#include <sys/stat.h>
-
-#include <errno.h>
-#include <stdarg.h>
-#include <locale.h>
-#include <ctype.h>
-#include <fcntl.h>
-
-#include <malloc.h>
-#include <dirent.h>
-#include <arpa/inet.h>
-
-#include <sys/types.h>
-#include <pwd.h>
-#include <grp.h>
-
-#include "avl.h"
-
 #include "common.h"
-#include "log.h"
-#include "procfile.h"
-#include "../config.h"
-#include "web_buffer.h"
-
-#ifdef NETDATA_INTERNAL_CHECKS
-#include <sys/prctl.h>
-#endif
 
 #define MAX_COMPARE_NAME 100
 #define MAX_NAME 100

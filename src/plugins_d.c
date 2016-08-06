@@ -1,22 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <sys/types.h>
-#include <dirent.h>
-#include <pthread.h>
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <signal.h>
-
-#include "main.h"
 #include "common.h"
-#include "appconfig.h"
-#include "log.h"
-#include "rrd.h"
-#include "popen.h"
-#include "plugins_d.h"
-#include "../config.h"
 
 struct plugind *pluginsd_root = NULL;
 

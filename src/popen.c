@@ -1,14 +1,3 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <signal.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-
-#include "log.h"
-#include "popen.h"
 #include "common.h"
 
 /*

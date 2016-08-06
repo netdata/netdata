@@ -1,19 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <ctype.h>
-
 #include "common.h"
-#include "log.h"
-#include "appconfig.h"
-
-#include "proc_self_mountinfo.h"
 
 // find the mount info with the given major:minor
 // in the supplied linked list of mountinfo structures

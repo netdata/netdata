@@ -1,17 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/resource.h>
-#include <math.h>
-
 #include "common.h"
-#include "storage_number.h"
-#include "rrd.h"
-#include "log.h"
-#include "web_buffer.h"
 
 int check_storage_number(calculated_number n, int debug) {
 	char buffer[100];

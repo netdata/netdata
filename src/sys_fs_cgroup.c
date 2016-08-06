@@ -1,23 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <inttypes.h>
-#include <sys/types.h>
-#include <dirent.h>
-#include <string.h>
-#include <sys/stat.h>
-
 #include "common.h"
-#include "appconfig.h"
-#include "procfile.h"
-#include "log.h"
-#include "rrd.h"
-#include "main.h"
-#include "popen.h"
-#include "proc_self_mountinfo.h"
 
 // ----------------------------------------------------------------------------
 // cgroup globals

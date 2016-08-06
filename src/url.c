@@ -1,13 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
-
 #include "common.h"
-#include "log.h"
-#include "url.h"
 
 // ----------------------------------------------------------------------------
 // URL encode / decode

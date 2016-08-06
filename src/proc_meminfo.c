@@ -1,16 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include "common.h"
-#include "log.h"
-#include "appconfig.h"
-#include "procfile.h"
-#include "rrd.h"
-#include "plugin_proc.h"
 
 #define MAX_PROC_MEMINFO_LINE 4096
 #define MAX_PROC_MEMINFO_NAME 1024

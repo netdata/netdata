@@ -1,32 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <unistd.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <errno.h>
-#include <pthread.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <netinet/tcp.h>
-#include <malloc.h>
-#include <poll.h>
-#include <ctype.h>
-
 #include "common.h"
-#include "log.h"
-#include "appconfig.h"
-#include "url.h"
-#include "web_buffer.h"
-#include "web_client.h"
-#include "web_server.h"
-#include "global_statistics.h"
-#include "rrd.h"
-#include "rrd2json.h"
-#include "../config.h"
 
 int listen_backlog = LISTEN_BACKLOG;
 int listen_fds_count = 0;

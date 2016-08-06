@@ -1,8 +1,3 @@
-#include <time.h>
-
-#include "web_buffer.h"
-#include "rrd.h"
-
 #ifndef NETDATA_RRD2JSON_H
 #define NETDATA_RRD2JSON_H 1
 

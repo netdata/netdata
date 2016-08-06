@@ -1,16 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <time.h>
-#include <syslog.h>
-#include <errno.h>
-#include <string.h>
-#include <unistd.h>
-#include <stdlib.h>
-
-#include "log.h"
 #include "common.h"
-
 
 // ----------------------------------------------------------------------------
 // LOG

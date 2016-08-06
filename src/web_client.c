@@ -1,38 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <unistd.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <errno.h>
-#include <pthread.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <malloc.h>
-#include <pwd.h>
-#include <grp.h>
-#include <ctype.h>
-#include <poll.h>
-
-// TCP_CORK
-#include <netinet/tcp.h>
-
 #include "common.h"
-#include "log.h"
-#include "main.h"
-#include "appconfig.h"
-#include "url.h"
-#include "web_buffer.h"
-#include "web_server.h"
-#include "global_statistics.h"
-#include "rrd.h"
-#include "rrd2json.h"
-#include "registry.h"
-#include "web_buffer_svg.h"
-#include "web_client.h"
 
 #define INITIAL_WEB_DATA_LENGTH 16384
 #define WEB_REQUEST_LENGTH 16384

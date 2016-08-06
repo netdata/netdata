@@ -1,15 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <stdio.h>
-#include <stdlib.h>
-
 #include "common.h"
-#include "appconfig.h"
-#include "procfile.h"
-#include "rrd.h"
-#include "plugin_proc.h"
-#include "log.h"
 
 #define RRD_TYPE_NET_STAT_NETFILTER			"netfilter"
 #define RRD_TYPE_NET_STAT_SYNPROXY 			"synproxy"

@@ -1,16 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include "common.h"
-#include "log.h"
-#include "appconfig.h"
-#include "procfile.h"
-#include "rrd.h"
-#include "plugin_proc.h"
 
 int do_proc_net_netstat(int update_every, unsigned long long dt) {
 	static int do_bandwidth = -1, do_inerrors = -1, do_mcast = -1, do_bcast = -1, do_mcast_p = -1, do_bcast_p = -1;

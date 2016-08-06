@@ -1,20 +1,114 @@
-#include <stdarg.h>
-#include <sys/time.h>
-#include <sys/resource.h>
-#include <stdio.h>
-
 #ifndef NETDATA_COMMON_H
 #define NETDATA_COMMON_H 1
+
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#include <pthread.h>
+#include <errno.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <stddef.h>
+
+#include <ctype.h>
+#include <string.h>
+#include <strings.h>
+
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+
+#include <dirent.h>
+#include <fcntl.h>
+#include <getopt.h>
+#include <grp.h>
+#include <pwd.h>
+#include <locale.h>
+#include <malloc.h>
+#include <netdb.h>
+#include <poll.h>
+#include <signal.h>
+#include <syslog.h>
+#include <sys/mman.h>
+#include <sys/resource.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/statvfs.h>
+#include <sys/syscall.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <time.h>
+#include <unistd.h>
+#include <uuid/uuid.h>
+
+#ifdef STORAGE_WITH_MATH
+#include <math.h>
+#endif
 
 #if defined(HAVE_INTTYPES_H)
 #include <inttypes.h>
 #elif defined(HAVE_STDINT_H)
 #include <stdint.h>
 #endif
-#include <sys/types.h>
-#include <unistd.h>
 
+#ifdef NETDATA_INTERNAL_CHECKS
+#include <sys/prctl.h>
+#endif
+
+#ifdef NETDATA_WITH_ZLIB
+#include <zlib.h>
+#endif
+
+#include "avl.h"
+#include "log.h"
+#include "global_statistics.h"
+#include "storage_number.h"
+#include "web_buffer.h"
+#include "web_buffer_svg.h"
+#include "url.h"
+#include "popen.h"
+
+#include "procfile.h"
+#include "appconfig.h"
+#include "dictionary.h"
+#include "proc_self_mountinfo.h"
+#include "plugin_checks.h"
+#include "plugin_idlejitter.h"
+#include "plugin_nfacct.h"
+#include "plugin_proc.h"
+#include "plugin_tc.h"
+#include "plugins_d.h"
+
+#include "health.h"
+
+#include "rrd.h"
+#include "rrd2json.h"
+
+#include "web_client.h"
+#include "web_server.h"
+
+#include "registry.h"
+#include "daemon.h"
+#include "main.h"
+#include "unit_test.h"
+
+#if __GNUC__
+#if __x86_64__ || __ppc64__
+#define ENVIRONMENT64
+#else
+#define ENVIRONMENT32
+#endif
+#endif
+
+#ifdef abs
+#undef abs
+#endif
 #define abs(x) ((x < 0)? -x : x)
+
 #define usecdiff(now, last) (((((now)->tv_sec * 1000000ULL) + (now)->tv_usec) - (((last)->tv_sec * 1000000ULL) + (last)->tv_usec)))
 
 extern void netdata_fix_chart_id(char *s);
