@@ -1,16 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <stdlib.h>
-#include <string.h>
-
-#ifdef STORAGE_WITH_MATH
-#include <math.h>
-#endif
-
 #include "common.h"
-#include "web_buffer.h"
-#include "log.h"
 
 #define BUFFER_OVERFLOW_EOF "EOF"
 

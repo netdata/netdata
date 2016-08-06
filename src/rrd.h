@@ -1,10 +1,3 @@
-#include <sys/time.h>
-#include <pthread.h>
-#include <stdint.h>
-
-#include "avl.h"
-#include "storage_number.h"
-
 #ifndef NETDATA_RRD_H
 #define NETDATA_RRD_H 1
 
@@ -93,7 +86,7 @@ struct rrdcontext {
 
     size_t use_count;
 
-    // avl_tree_lock variables_root_index;
+    avl_tree_lock variables_root_index;
 };
 typedef struct rrdcontext RRDCONTEXT;
 
@@ -267,6 +260,11 @@ struct rrdset {
 
 	avl_tree_lock dimensions_index;						// the root of the dimensions index
 	RRDDIM *dimensions;								// the actual data for every dimension
+
+    // ------------------------------------------------------------------------
+    // local variables
+
+    avl_tree_lock variables_root_index;
 };
 typedef struct rrdset RRDSET;
 
@@ -285,7 +283,7 @@ struct rrdhost {
     avl_tree_lock rrdset_root_index_name;
 
     avl_tree_lock rrdcontext_root_index;
-    // avl_tree_lock variables_root_index;
+    avl_tree_lock variables_root_index;
 };
 typedef struct rrdhost RRDHOST;
 

@@ -1,22 +1,4 @@
-
-/*
- * TODO
- *
- * 1. Re-write this using DICTIONARY
- *
- */
-
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <pthread.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include "avl.h"
 #include "common.h"
-#include "appconfig.h"
-#include "log.h"
 
 #define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 

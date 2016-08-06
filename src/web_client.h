@@ -1,19 +1,3 @@
-
-#ifdef NETDATA_WITH_ZLIB
-#include <zlib.h>
-#endif
-
-#include <sys/time.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-
-#include "web_buffer.h"
-#include "dictionary.h"
-
 #ifndef NETDATA_WEB_CLIENT_H
 #define NETDATA_WEB_CLIENT_H 1
 

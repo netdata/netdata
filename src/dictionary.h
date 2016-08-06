@@ -1,8 +1,3 @@
-#include <pthread.h>
-
-#include "web_buffer.h"
-#include "avl.h"
-
 #ifndef NETDATA_DICTIONARY_H
 #define NETDATA_DICTIONARY_H 1
 

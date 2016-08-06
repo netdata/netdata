@@ -1,20 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/resource.h>
-
-#include "avl.h"
-#include "log.h"
 #include "common.h"
-#include "appconfig.h"
-#include "rrd.h"
-#include "popen.h"
-#include "plugin_tc.h"
-#include "main.h"
 
 #define RRD_TYPE_TC					"tc"
 #define RRD_TYPE_TC_LEN				strlen(RRD_TYPE_TC)

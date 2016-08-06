@@ -1,21 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <sys/syscall.h>
-#include <string.h>
-#include <ctype.h>
-#include <errno.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <time.h>
-
-#include "log.h"
 #include "common.h"
-#include "appconfig.h"
-#include "../config.h"
 
 char *global_host_prefix = "";
 int enable_ksm = 1;

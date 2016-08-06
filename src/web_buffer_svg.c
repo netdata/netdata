@@ -1,17 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <math.h>
-#include <string.h>
-#include <ctype.h>
-#include <stdlib.h>
-
 #include "common.h"
-#include "log.h"
-#include "appconfig.h"
-#include "url.h"
-#include "web_buffer.h"
-#include "web_buffer_svg.h"
 
 #define BADGE_HORIZONTAL_PADDING 4
 #define VERDANA_KERNING 0.5

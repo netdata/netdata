@@ -1,16 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include "common.h"
-#include "log.h"
-#include "appconfig.h"
-#include "procfile.h"
-#include "rrd.h"
-#include "plugin_proc.h"
 
 #define RRD_TYPE_NET_SNMP			"ipv4"
 #define RRD_TYPE_NET_SNMP_LEN		strlen(RRD_TYPE_NET_SNMP)

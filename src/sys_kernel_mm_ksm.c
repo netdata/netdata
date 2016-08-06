@@ -1,21 +1,9 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include "common.h"
-#include "log.h"
-#include "appconfig.h"
-#include "procfile.h"
-#include "rrd.h"
-#include "plugin_proc.h"
 
-typedef struct name_value {
+typedef struct ksm_name_value {
 	char filename[FILENAME_MAX + 1];
 	unsigned long long value;
-} NAME_VALUE;
+} KSM_NAME_VALUE;
 
 #define PAGES_SHARED 0
 #define PAGES_SHARING 1
@@ -23,7 +11,7 @@ typedef struct name_value {
 #define PAGES_VOLATILE 3
 #define PAGES_TO_SCAN 4
 
-NAME_VALUE values[] = {
+KSM_NAME_VALUE values[] = {
 		[PAGES_SHARED] = { "/sys/kernel/mm/ksm/pages_shared", 0ULL },
 		[PAGES_SHARING] = { "/sys/kernel/mm/ksm/pages_sharing", 0ULL },
 		[PAGES_UNSHARED] = { "/sys/kernel/mm/ksm/pages_unshared", 0ULL },

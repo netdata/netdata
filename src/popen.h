@@ -1,7 +1,3 @@
-#include <stdio.h>
-#include <unistd.h>
-#include <sys/types.h>
-
 #ifndef NETDATA_POPEN_H
 #define NETDATA_POPEN_H 1
 

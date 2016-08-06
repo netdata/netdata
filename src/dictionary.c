@@ -1,16 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-
-#include <pthread.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include "avl.h"
 #include "common.h"
-#include "log.h"
-
-#include "dictionary.h"
 
 // ----------------------------------------------------------------------------
 // dictionary statistics

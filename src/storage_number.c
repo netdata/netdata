@@ -1,21 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#ifdef STORAGE_WITH_MATH
-#include <math.h>
-#endif
-
 #include "common.h"
-#include "log.h"
-#include "storage_number.h"
-
-#if __GNUC__
-#if __x86_64__ || __ppc64__
-#define ENVIRONMENT64
-#else
-#define ENVIRONMENT32
-#endif
-#endif
 
 extern char *print_number_lu_r(char *str, unsigned long uvalue);
 extern char *print_number_llu_r(char *str, unsigned long long uvalue);

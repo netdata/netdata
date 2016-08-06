@@ -1,15 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <pthread.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
-#include <math.h>
-
-#include "log.h"
 #include "common.h"
-#include "rrd2json.h"
 
 #define HOSTNAME_MAX 1024
 char *hostname = "unknown";

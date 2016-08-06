@@ -1,5 +1,3 @@
-#include "procfile.h"
-
 #ifndef NETDATA_PROC_SELF_MOUNTINFO_H
 #define NETDATA_PROC_SELF_MOUNTINFO_H 1
 

@@ -1,7 +1,3 @@
-#include <stdarg.h>
-#include <time.h>
-#include "storage_number.h"
-
 #ifndef NETDATA_WEB_BUFFER_H
 #define NETDATA_WEB_BUFFER_H 1
 
