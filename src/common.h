@@ -33,6 +33,7 @@
 #include <signal.h>
 #include <syslog.h>
 #include <sys/mman.h>
+#include <sys/prctl.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -53,10 +54,6 @@
 #include <inttypes.h>
 #elif defined(HAVE_STDINT_H)
 #include <stdint.h>
-#endif
-
-#ifdef NETDATA_INTERNAL_CHECKS
-#include <sys/prctl.h>
 #endif
 
 #ifdef NETDATA_WITH_ZLIB
