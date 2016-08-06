@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Description: IPFS netdata python.d module
-# Author: Pawel Krupa (paulfantom)
+# Authors: Pawel Krupa (paulfantom), davidak
 
 from base import UrlService
 import json
@@ -15,13 +15,19 @@ retries = 60
 #     'update_every': update_every,
 #     'retries': retries,
 #     'priority': priority,
-#     'url': 'http://localhost:5001/api/v0/swarm/peers'
+#     'url': 'http://localhost:5001/'
 # }}
 
 # charts order (can be overridden if you want less charts, or different order)
-ORDER = ['peers']
+ORDER = ['bandwidth', 'peers']
 
 CHARTS = {
+    'bandwidth': {
+        'options': [None, 'IPFS Bandwidth', 'kbits/s', 'Bandwidth', 'ipfs.bandwidth', 'line'],
+        'lines': [
+            ["in", None, "absolute", 8, 1000],
+            ["out", None, "absolute", -8, 1000]
+        ]},
     'peers': {
         'options': [None, 'IPFS Peers', 'peers', 'Peers', 'ipfs.peers', 'line'],
         'lines': [
@@ -34,15 +40,38 @@ class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
         if len(self.url) == 0:
-            self.url = "http://localhost:5001/api/v0/swarm/peers"
+            self.baseurl = "http://localhost:5001/"
+        else:
+            self.baseurl = self.url
         self.order = ORDER
         self.definitions = CHARTS
 
-    def _get_data(self):
+    def _get_bandwidth(self):
         """
         Format data received from http request
-        :return: dict
+        :return: int, int
         """
+        self.url = self.baseurl + "api/v0/stats/bw"
+        try:
+            raw = self._get_raw_data()
+        except AttributeError:
+            return None
+
+        try:
+            parsed = json.loads(raw)
+            bw_in = int(parsed['RateIn'])
+            bw_out = int(parsed['RateOut'])
+        except:
+            return None
+
+        return bw_in, bw_out
+
+    def _get_peers(self):
+        """
+        Format data received from http request
+        :return: int
+        """
+        self.url = self.baseurl + "api/v0/swarm/peers"
         try:
             raw = self._get_raw_data()
         except AttributeError:
@@ -54,4 +83,14 @@ class Service(UrlService):
         except:
             return None
 
-        return {'peers': peers}
+        return peers
+
+    def _get_data(self):
+        """
+        Get data from API
+        :return: dict
+        """
+        peers = self._get_peers()
+        bandwidth_in, bandwidth_out = self._get_bandwidth()
+
+        return {'peers': peers, 'in': bandwidth_in, 'out': bandwidth_out}
