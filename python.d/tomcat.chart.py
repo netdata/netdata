@@ -66,7 +66,8 @@ class Service(UrlService):
         if self.port == 0:
             self.port = 80
 
-        if self._get_data() is None or len(self._get_data()) == 0:
+        test = self._get_data()
+        if test is None or len(test) == 0:
             return False
         else:
             return True
@@ -81,13 +82,12 @@ class Service(UrlService):
             try:
                 data = ET.fromstring(raw)
             except ET.ParseError as e:
-                #if e.code == errors.codes[errors.XML_ERROR_JUNK_AFTER_DOC_ELEMENT]:
+                # if e.code == errors.codes[errors.XML_ERROR_JUNK_AFTER_DOC_ELEMENT]:
                 if e.code == 9:
-                    # cut rest of invalid string
-                    pos = 0
-                    for i in range(e.position[0] - 1):
-                        pos += raw.find('\n', pos)
-                    raw = raw[:47604 + pos + e.position[0] - 1]
+                    end = raw.find('</status>')
+                    end += 9
+                    raw = raw[:end]
+                    self.debug(raw)
                     data = ET.fromstring(raw)
                 else:
                     raise Exception(e)

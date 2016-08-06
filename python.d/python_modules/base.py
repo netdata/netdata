@@ -412,7 +412,7 @@ class UrlService(SimpleService):
 
     def __add_openers(self):
         # TODO add error handling
-        opener = urllib2.build_opener()
+        self.opener = urllib2.build_opener()
 
         # Proxy handling
         # TODO currently self.proxies isn't parsed from configuration file
@@ -439,9 +439,10 @@ class UrlService(SimpleService):
         if self.user is not None and self.password is not None:
             passman = urllib2.HTTPPasswordMgrWithDefaultRealm()
             passman.add_password(None, self.url, self.user, self.password)
-            opener.add_handler(urllib2.HTTPBasicAuthHandler(passman))
+            self.opener.add_handler(urllib2.HTTPBasicAuthHandler(passman))
+            self.debug("Enabling HTTP basic auth")
 
-        urllib2.install_opener(opener)
+        #urllib2.install_opener(opener)
 
     def _get_raw_data(self):
         """
@@ -450,7 +451,8 @@ class UrlService(SimpleService):
         """
         raw = None
         try:
-            f = urllib2.urlopen(self.url, timeout=self.update_every * 2)
+            f = self.opener.open(self.url, timeout=self.update_every * 2)
+            # f = urllib2.urlopen(self.url, timeout=self.update_every * 2)
         except Exception as e:
             self.error(str(e))
             return None
@@ -488,7 +490,8 @@ class UrlService(SimpleService):
 
         self.__add_openers()
 
-        if self._get_data() is None or len(self._get_data()) == 0:
+        test = self._get_data()
+        if test is None or len(test) == 0:
             return False
         else:
             return True
