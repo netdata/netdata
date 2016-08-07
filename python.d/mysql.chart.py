@@ -369,11 +369,20 @@ class Service(SimpleService):
             cursor = self.connection.cursor()
             cursor.execute(QUERY)
             raw_data = cursor.fetchall()
+        except MySQLdb.OperationalError as e:
+            self.debug("Reconnecting due to", str(e))
+            self._connect()
+            cursor = self.connection.cursor()
+            cursor.execute(QUERY)
+            raw_data = cursor.fetchall()
+
+
         except Exception as e:
             self.error("cannot execute query.", e)
             self.connection.close()
             self.connection = None
             return None
+
         data = dict(raw_data)
         try:
             data["Thread_cache_misses"] = int(data["Threads_created"] * 10000 / float(data["Connections"]))
