@@ -351,6 +351,10 @@ class Service(SimpleService):
                                               host=self.configuration['host'],
                                               port=self.configuration['port'],
                                               connect_timeout=self.update_every)
+        except MySQLdb.OperationalError as e:
+            self.error("Cannot establish connection to MySQL.")
+            self.debug(str(e))
+            raise RuntimeError
         except Exception as e:
             self.error("problem connecting to server:", e)
             raise RuntimeError
