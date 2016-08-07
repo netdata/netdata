@@ -313,7 +313,10 @@ void rrdset_set_name(RRDSET *st, const char *name)
 {
 	debug(D_RRD_CALLS, "rrdset_set_name() old: %s, new: %s", st->name, name);
 
-	if(st->name) rrdset_index_del_name(&localhost, st);
+	if(st->name) {
+        rrdset_index_del_name(&localhost, st);
+        rrdsetvar_rename_all(st);
+    }
 
 	char b[CONFIG_MAX_VALUE + 1];
 	char n[RRD_ID_LENGTH_MAX + 1];
@@ -459,6 +462,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 		st->dimensions = NULL;
 		st->next = NULL;
 		st->mapped = rrd_memory_mode;
+        st->variables = NULL;
 	}
 	else {
 		st = calloc(1, size);
@@ -516,12 +520,16 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 		st->title = config_get(st->id, "title", varvalue);
 	}
 
-	st->next = localhost.rrdset_root;
+    st->rrdcontext = rrdcontext_create(st->context);
+    st->rrdhost = &localhost;
+
+    st->next = localhost.rrdset_root;
     localhost.rrdset_root = st;
 
-	rrdset_index_add(&localhost, st);
+    rrdsetvar_create(st, "last_collected", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, 0);
+    rrdsetvar_create(st, "raw_total", RRDVAR_TYPE_TOTAL, &st->collected_total, 0);
 
-    st->rrdcontext = rrdcontext_create(st->context);
+    rrdset_index_add(&localhost, st);
 
 	pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
 
@@ -594,6 +602,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 		// we have a file mapped for rd
 		rd->mapped = rrd_memory_mode;
 		rd->flags = 0x00000000;
+        rd->variables = NULL;
 		rd->next = NULL;
 		rd->name = NULL;
 	}
@@ -609,6 +618,8 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 		rd->mapped = RRD_MEMORY_MODE_RAM;
 	}
 	rd->memsize = size;
+
+    rd->rrdset = st;
 
 	strcpy(rd->magic, RRDDIMENSION_MAGIC);
 	strcpy(rd->cache_filename, fullfilename);
@@ -653,6 +664,11 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 		for(; td->next; td = td->next) ;
 		td->next = rd;
 	}
+
+    rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->calculated_value, 0);
+    rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->collected_value, 0);
+    rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected", &rd->last_collected_time.tv_sec, 0);
+
 	pthread_rwlock_unlock(&st->rwlock);
 
 	rrddim_index_add(st, rd);
@@ -667,6 +683,8 @@ void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name)
 	char varname[CONFIG_MAX_NAME + 1];
 	snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
 	config_set_default(st->id, varname, name);
+
+    rrddimvar_rename_all(rd);
 }
 
 void rrddim_free(RRDSET *st, RRDDIM *rd)
@@ -685,7 +703,10 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
 	else st->dimensions = rd->next;
 	rd->next = NULL;
 
-	rrddim_index_del(st, rd);
+    while(rd->variables)
+        rrddimvar_free(rd->variables);
+
+    rrddim_index_del(st, rd);
 
 	// free(rd->annotations);
 	if(rd->mapped == RRD_MEMORY_MODE_SAVE) {
@@ -715,6 +736,9 @@ void rrdset_free_all(void)
 
 		while(st->dimensions)
 			rrddim_free(st, st->dimensions);
+
+        while(st->variables)
+            rrdsetvar_free(st->variables);
 
 		rrdset_index_del(&localhost, st);
 
