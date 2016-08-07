@@ -1844,6 +1844,7 @@ void web_client_process(struct web_client *w) {
 						buffer_strcat(w->response.data, "I am doing it already");
 
 					error("web request to exit received.");
+					netdata_cleanup_and_exit(0);
 					netdata_exit = 1;
 				}
 				else if(hash == hash_debug && strcmp(tok, "debug") == 0) {

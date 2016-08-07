@@ -46,6 +46,7 @@ static inline RRDVAR *rrdvar_create(const char *name, uint32_t hash, int type, c
 }
 
 static inline void rrdvar_free(RRDVAR *rv) {
+    // FIXME: find all references of this and NULL them.
     free(rv);
 }
 
@@ -64,6 +65,24 @@ static inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *
         else
             debug(D_VARIABLES, "Variable '%s' created in scope '%s'", name, scope);
     }
+    else {
+        // already exists
+        rv = NULL;
+    }
+
+    /*
+     * check
+    if(rv) {
+        RRDVAR *ret = rrdvar_index_find(tree, name, hash);
+        if(ret != rv) fatal("oops! 1");
+
+        ret = rrdvar_index_del(tree, rv);
+        if(ret != rv) fatal("oops! 2");
+
+        ret = rrdvar_index_add(tree, rv);
+        if(ret != rv) fatal("oops! 3");
+    }
+    */
 
     return rv;
 }
@@ -74,16 +93,17 @@ static inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *
 #define RRDSETVAR_ID_MAX 1024
 
 RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, int type, void *value, uint32_t options) {
+    debug(D_VARIABLES, "RRDVARSET create for chart id '%s' name '%s' with variable name '%s'", st->id, st->name, variable);
     RRDSETVAR *rs = (RRDSETVAR *)calloc(1, sizeof(RRDSETVAR));
     if(!rs) fatal("Cannot allocate memory for RRDSETVAR");
 
     char buffer[RRDSETVAR_ID_MAX + 1];
-    snprintfz(buffer, RRDSETVAR_ID_MAX, "%s.%s.%s", st->type, st->id, variable);
+    snprintfz(buffer, RRDSETVAR_ID_MAX, "%s.%s", st->id, variable);
     rs->fullid = strdup(buffer);
     if(!rs->fullid) fatal("Cannot allocate memory for RRDVASET id");
     rs->hash_fullid = simple_hash(rs->fullid);
 
-    snprintfz(buffer, RRDSETVAR_ID_MAX, "%s.%s.%s", st->type, st->name, variable);
+    snprintfz(buffer, RRDSETVAR_ID_MAX, "%s.%s", st->name, variable);
     rs->fullname = strdup(buffer);
     if(!rs->fullname) fatal("Cannot allocate memory for RRDVASET name");
     rs->hash_fullname = simple_hash(rs->fullname);
@@ -95,6 +115,7 @@ RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, int type, void *va
     rs->type = type;
     rs->value = value;
     rs->options = options;
+    rs->rrdset = st;
 
     rs->local        = rrdvar_create_and_index("local",   &st->variables_root_index, rs->variable, rs->hash_variable, rs->type, rs->value);
     rs->context      = rrdvar_create_and_index("context", &st->rrdcontext->variables_root_index, rs->fullid, rs->hash_fullid, rs->type, rs->value);
@@ -109,6 +130,8 @@ RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, int type, void *va
 }
 
 void rrdsetvar_rename_all(RRDSET *st) {
+    debug(D_VARIABLES, "RRDSETVAR rename for chart id '%s' name '%s'", st->id, st->name);
+
     // only these 2 can change name
     // rs->context_name
     // rs->host_name
@@ -118,7 +141,7 @@ void rrdsetvar_rename_all(RRDSET *st) {
     while((rs = next)) {
         next = rs->next;
 
-        snprintfz(buffer, RRDSETVAR_ID_MAX, "%s.%s.%s", st->type, st->name, rs->variable);
+        snprintfz(buffer, RRDSETVAR_ID_MAX, "%s.%s", st->name, rs->variable);
 
         if (strcmp(buffer, rs->fullname)) {
             // name changed
@@ -144,6 +167,7 @@ void rrdsetvar_rename_all(RRDSET *st) {
 
 void rrdsetvar_free(RRDSETVAR *rs) {
     RRDSET *st = rs->rrdset;
+    debug(D_VARIABLES, "RRDSETVAR free for chart id '%s' name '%s', variable '%s'", st->id, st->name, rs->variable);
 
     if(rs->local) {
         rrdvar_index_del(&st->variables_root_index, rs->local);
@@ -194,6 +218,8 @@ void rrdsetvar_free(RRDSETVAR *rs) {
 RRDDIMVAR *rrddimvar_create(RRDDIM *rd, int type, const char *prefix, const char *suffix, void *value, uint32_t options) {
     RRDSET *st = rd->rrdset;
 
+    debug(D_VARIABLES, "RRDDIMSET create for chart id '%s' name '%s', dimension id '%s', name '%s%s%s'", st->id, st->name, rd->id, (prefix)?prefix:"", rd->name, (suffix)?suffix:"");
+
     if(!prefix) prefix = "";
     if(!suffix) suffix = "";
 
@@ -217,22 +243,22 @@ RRDDIMVAR *rrddimvar_create(RRDDIM *rd, int type, const char *prefix, const char
     if(!rs->name) fatal("Cannot allocate memory for RRDIM name");
     rs->hash_name = simple_hash(rs->name);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s.%s", rd->rrdset->type, rd->rrdset->id, rs->id);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->id, rs->id);
     rs->fullidid = strdup(buffer);
     if(!rs->fullidid) fatal("Cannot allocate memory for RRDDIMVAR fullidid");
     rs->hash_fullidid = simple_hash(rs->fullidid);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s.%s", rd->rrdset->type, rd->rrdset->id, rs->name);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->id, rs->name);
     rs->fullidname = strdup(buffer);
     if(!rs->fullidname) fatal("Cannot allocate memory for RRDDIMVAR fullidname");
     rs->hash_fullidname = simple_hash(rs->fullidname);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s.%s", rd->rrdset->type, rd->rrdset->name, rs->id);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->name, rs->id);
     rs->fullnameid = strdup(buffer);
     if(!rs->fullnameid) fatal("Cannot allocate memory for RRDDIMVAR fullnameid");
     rs->hash_fullnameid = simple_hash(rs->fullnameid);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s.%s", rd->rrdset->type, rd->rrdset->name, rs->name);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->name, rs->name);
     rs->fullnamename = strdup(buffer);
     if(!rs->fullnamename) fatal("Cannot allocate memory for RRDDIMVAR fullnamename");
     rs->hash_fullnamename = simple_hash(rs->fullnamename);
@@ -240,6 +266,7 @@ RRDDIMVAR *rrddimvar_create(RRDDIM *rd, int type, const char *prefix, const char
     rs->type = type;
     rs->value = value;
     rs->options = options;
+    rs->rrddim = rd;
 
     rs->local_id     = rrdvar_create_and_index("local",   &st->variables_root_index, rs->id, rs->hash, rs->type, rs->value);
     rs->local_name   = rrdvar_create_and_index("local",   &st->variables_root_index, rs->name, rs->hash_name, rs->type, rs->value);
@@ -262,6 +289,7 @@ RRDDIMVAR *rrddimvar_create(RRDDIM *rd, int type, const char *prefix, const char
 
 void rrddimvar_rename_all(RRDDIM *rd) {
     RRDSET *st = rd->rrdset;
+    debug(D_VARIABLES, "RRDDIMSET rename for chart id '%s' name '%s', dimension id '%s', name '%s'", st->id, st->name, rd->id, rd->name);
 
     RRDDIMVAR *rs, *next = rd->variables;
     while((rs = next)) {
@@ -293,7 +321,7 @@ void rrddimvar_rename_all(RRDDIM *rd) {
                 rrdvar_free(rs->host_fullidname);
             }
             free(rs->fullidname);
-            snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s.%s", st->type, st->id, rs->name);
+            snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->id, rs->name);
             rs->fullidname = strdup(buffer);
             if(!rs->fullidname) fatal("Cannot allocate memory for RRDDIMVAR fullidname");
             rs->hash_fullidname = simple_hash(rs->fullidname);
@@ -312,7 +340,7 @@ void rrddimvar_rename_all(RRDDIM *rd) {
                 rrdvar_free(rs->host_fullnameid);
             }
             free(rs->fullnameid);
-            snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s.%s", st->type, st->name, rs->id);
+            snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->id);
             rs->fullnameid = strdup(buffer);
             if(!rs->fullnameid) fatal("Cannot allocate memory for RRDDIMVAR fullnameid");
             rs->hash_fullnameid = simple_hash(rs->fullnameid);
@@ -331,7 +359,7 @@ void rrddimvar_rename_all(RRDDIM *rd) {
                 rrdvar_free(rs->host_fullnamename);
             }
             free(rs->fullnamename);
-            snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s.%s", st->type, st->name, rs->name);
+            snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->name);
             rs->fullnamename = strdup(buffer);
             if(!rs->fullnamename) fatal("Cannot allocate memory for RRDDIMVAR fullnamename");
             rs->hash_fullnamename = simple_hash(rs->fullnamename);
@@ -344,56 +372,62 @@ void rrddimvar_rename_all(RRDDIM *rd) {
 }
 
 void rrddimvar_free(RRDDIMVAR *rs) {
+    RRDDIM *rd = rs->rrddim;
+    RRDSET *st = rd->rrdset;
+    debug(D_VARIABLES, "RRDDIMSET free for chart id '%s' name '%s', dimension id '%s', name '%s', prefix='%s', suffix='%s'", st->id, st->name, rd->id, rd->name, rs->prefix, rs->suffix);
+
     if(rs->local_id) {
-        rrdvar_index_del(&rs->rrddim->rrdset->variables_root_index, rs->local_id);
+        rrdvar_index_del(&st->variables_root_index, rs->local_id);
         rrdvar_free(rs->local_id);
     }
     if(rs->local_name) {
-        rrdvar_index_del(&rs->rrddim->rrdset->variables_root_index, rs->local_name);
+        rrdvar_index_del(&st->variables_root_index, rs->local_name);
         rrdvar_free(rs->local_name);
     }
 
     if(rs->context_fullidid) {
-        rrdvar_index_del(&rs->rrddim->rrdset->rrdcontext->variables_root_index, rs->context_fullidid);
+        rrdvar_index_del(&st->rrdcontext->variables_root_index, rs->context_fullidid);
         rrdvar_free(rs->context_fullidid);
     }
     if(rs->context_fullidname) {
-        rrdvar_index_del(&rs->rrddim->rrdset->rrdcontext->variables_root_index, rs->context_fullidname);
+        rrdvar_index_del(&st->rrdcontext->variables_root_index, rs->context_fullidname);
         rrdvar_free(rs->context_fullidname);
     }
     if(rs->context_fullnameid) {
-        rrdvar_index_del(&rs->rrddim->rrdset->rrdcontext->variables_root_index, rs->context_fullnameid);
+        rrdvar_index_del(&st->rrdcontext->variables_root_index, rs->context_fullnameid);
         rrdvar_free(rs->context_fullnameid);
     }
     if(rs->context_fullnamename) {
-        rrdvar_index_del(&rs->rrddim->rrdset->rrdcontext->variables_root_index, rs->context_fullnamename);
+        rrdvar_index_del(&st->rrdcontext->variables_root_index, rs->context_fullnamename);
         rrdvar_free(rs->context_fullnamename);
     }
 
     if(rs->host_fullidid) {
-        rrdvar_index_del(&rs->rrddim->rrdset->rrdhost->variables_root_index, rs->host_fullidid);
+        rrdvar_index_del(&st->rrdhost->variables_root_index, rs->host_fullidid);
         rrdvar_free(rs->host_fullidid);
     }
     if(rs->host_fullidname) {
-        rrdvar_index_del(&rs->rrddim->rrdset->rrdhost->variables_root_index, rs->host_fullidname);
+        rrdvar_index_del(&st->rrdhost->variables_root_index, rs->host_fullidname);
         rrdvar_free(rs->host_fullidname);
     }
     if(rs->host_fullnameid) {
-        rrdvar_index_del(&rs->rrddim->rrdset->rrdhost->variables_root_index, rs->host_fullnameid);
+        rrdvar_index_del(&st->rrdhost->variables_root_index, rs->host_fullnameid);
         rrdvar_free(rs->host_fullnameid);
     }
     if(rs->host_fullnamename) {
-        rrdvar_index_del(&rs->rrddim->rrdset->rrdhost->variables_root_index, rs->host_fullnamename);
+        rrdvar_index_del(&st->rrdhost->variables_root_index, rs->host_fullnamename);
         rrdvar_free(rs->host_fullnamename);
     }
 
-    if(rs->rrddim->variables == rs) {
-        rs->rrddim->variables = rs->next;
+    if(rd->variables == rs) {
+        debug(D_VARIABLES, "RRDDIMSET removing first entry for chart id '%s' name '%s', dimension id '%s', name '%s'", st->id, st->name, rd->id, rd->name);
+        rd->variables = rs->next;
     }
     else {
+        debug(D_VARIABLES, "RRDDIMSET removing non-first entry for chart id '%s' name '%s', dimension id '%s', name '%s'", st->id, st->name, rd->id, rd->name);
         RRDDIMVAR *t;
-        for (t = rs->rrddim->variables; t && t->next != rs; t = t->next);
-        if(!t) error("RRDDIMVAR '%s' not found in dimension '%s.%s/%s' variables linked list", rs->name, rs->rrddim->rrdset->type, rs->rrddim->rrdset->id, rs->rrddim->id);
+        for (t = rd->variables; t && t->next != rs; t = t->next) ;
+        if(!t) error("RRDDIMVAR '%s' not found in dimension '%s/%s' variables linked list", rs->name, st->id, rd->id);
         else t->next = rs->next;
     }
 

@@ -10,7 +10,11 @@ void netdata_cleanup_and_exit(int ret) {
 	error_log_limit_unlimited();
 
 	info("Called: netdata_cleanup_and_exit()");
+#ifdef NETDATA_INTERNAL_CHECKS
+    rrdset_free_all();
+#else
 	rrdset_save_all();
+#endif
 	// kill_childs();
 
 	if(pidfile[0]) {

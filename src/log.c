@@ -125,6 +125,8 @@ void debug_int( const char *file, const char *function, const unsigned long line
 		vsyslog(LOG_ERR,  fmt, args );
 		va_end( args );
 	}
+
+	fflush(stdout);
 }
 
 void info_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... )
