@@ -15,7 +15,7 @@ retries = 60
 #     'update_every': update_every,
 #     'retries': retries,
 #     'priority': priority,
-#     'url': 'http://localhost:5001/'
+#     'url': 'http://localhost:5001'
 # }}
 
 # charts order (can be overridden if you want less charts, or different order)
@@ -39,10 +39,10 @@ CHARTS = {
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-        if len(self.url) == 0:
-            self.baseurl = "http://localhost:5001/"
-        else:
-            self.baseurl = self.url
+        try:
+            self.baseurl = str(self.configuration['url'])
+        except (KeyError, TypeError):
+            self.baseurl = "http://localhost:5001"
         self.order = ORDER
         self.definitions = CHARTS
 
@@ -51,7 +51,7 @@ class Service(UrlService):
         Format data received from http request
         :return: int, int
         """
-        self.url = self.baseurl + "api/v0/stats/bw"
+        self.url = self.baseurl + "/api/v0/stats/bw"
         try:
             raw = self._get_raw_data()
         except AttributeError:
@@ -71,7 +71,7 @@ class Service(UrlService):
         Format data received from http request
         :return: int
         """
-        self.url = self.baseurl + "api/v0/swarm/peers"
+        self.url = self.baseurl + "/api/v0/swarm/peers"
         try:
             raw = self._get_raw_data()
         except AttributeError:
@@ -90,7 +90,18 @@ class Service(UrlService):
         Get data from API
         :return: dict
         """
-        peers = self._get_peers()
-        bandwidth_in, bandwidth_out = self._get_bandwidth()
+        try:
+            peers = self._get_peers()
+            bandwidth_in, bandwidth_out = self._get_bandwidth()
+        except:
+            return None
+        data = {}
+        if peers is not None:
+            data['peers'] = peers
+        if bandwidth_in is not None and bandwidth_out is not None:
+            data['in'] = bandwidth_in
+            data['out'] = bandwidth_out
 
-        return {'peers': peers, 'in': bandwidth_in, 'out': bandwidth_out}
+        if len(data) == 0:
+            return None
+        return data
