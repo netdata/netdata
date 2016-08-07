@@ -20,12 +20,12 @@ CHARTS = {
     'accesses': {
         'options': [None, "tomcat requests", "requests/s", "statistics", "tomcat.accesses", "area"],
         'lines': [
-            ["accesses"]
+            ["accesses", None, 'incremental']
         ]},
     'volume': {
         'options': [None, "tomcat volume", "KB/s", "volume", "tomcat.volume", "area"],
         'lines': [
-            ["volume", None, 'incremental']
+            ["volume", None, 'incremental', 1, 1024]
         ]},
     'threads': {
         'options': [None, "tomcat threads", "current threads", "statistics", "tomcat.threads", "line"],
@@ -36,7 +36,7 @@ CHARTS = {
     'jvm': {
         'options': [None, "JVM Free Memory", "MB", "statistics", "tomcat.jvm", "area"],
         'lines': [
-            ["jvm", None, "absolute"]
+            ["jvm", None, "absolute", 1, 1048576]
         ]}
 }
 
