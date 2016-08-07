@@ -619,8 +619,6 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 	}
 	rd->memsize = size;
 
-    rd->rrdset = st;
-
 	strcpy(rd->magic, RRDDIMENSION_MAGIC);
 	strcpy(rd->cache_filename, fullfilename);
 	strncpyz(rd->id, id, RRD_ID_LENGTH_MAX);
@@ -654,8 +652,9 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 	rd->values[st->current_entry] = pack_storage_number(0, SN_NOT_EXISTS);
 	rd->last_collected_time.tv_sec = 0;
 	rd->last_collected_time.tv_usec = 0;
+    rd->rrdset = st;
 
-	// append this dimension
+    // append this dimension
 	pthread_rwlock_wrlock(&st->rwlock);
 	if(!st->dimensions)
 		st->dimensions = rd;
@@ -730,21 +729,27 @@ void rrdset_free_all(void)
 {
 	info("Freeing all memory...");
 
+    pthread_rwlock_wrlock(&localhost.rrdset_root_rwlock);
+
 	RRDSET *st;
 	for(st = localhost.rrdset_root; st ;) {
 		RRDSET *next = st->next;
 
-		while(st->dimensions)
-			rrddim_free(st, st->dimensions);
+        pthread_rwlock_wrlock(&st->rwlock);
 
         while(st->variables)
             rrdsetvar_free(st->variables);
 
-		rrdset_index_del(&localhost, st);
+        while(st->dimensions)
+			rrddim_free(st, st->dimensions);
+
+        rrdset_index_del(&localhost, st);
 
         st->rrdcontext->use_count--;
         if(!st->rrdcontext->use_count)
             rrdcontext_free(st->rrdcontext);
+
+        pthread_rwlock_unlock(&st->rwlock);
 
 		if(st->mapped == RRD_MEMORY_MODE_SAVE) {
 			debug(D_RRD_CALLS, "Saving stats '%s' to '%s'.", st->name, st->cache_filename);
@@ -763,6 +768,8 @@ void rrdset_free_all(void)
 		st = next;
 	}
     localhost.rrdset_root = NULL;
+
+    pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
 
 	info("Memory cleanup completed...");
 }
