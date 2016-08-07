@@ -16,7 +16,7 @@ extern int rrd_delete_unupdated_dimensions;
 #define RRD_ID_LENGTH_MAX 1024
 
 #define RRDSET_MAGIC		"NETDATA RRD SET FILE V018"
-#define RRDDIMENSION_MAGIC	"NETDATA RRD DIMENSION FILE V017"
+#define RRDDIMENSION_MAGIC	"NETDATA RRD DIMENSION FILE V018"
 
 typedef long long total_number;
 #define TOTAL_NUMBER_FORMAT "%lld"
@@ -150,6 +150,7 @@ struct rrddim {
 	calculated_number stored_volume;				// the sum of all stored values so far
 
 	struct rrddim *next;							// linking of dimensions within the same data set
+    struct rrdset *rrdset;
 
 	// ------------------------------------------------------------------------
 	// members for checking the data when loading from disk
@@ -163,6 +164,8 @@ struct rrddim {
 	unsigned long memsize;							// the memory allocated for this dimension
 
 	char magic[sizeof(RRDDIMENSION_MAGIC) + 1];		// a string to be saved, used to identify our data file
+
+    struct rrddimvar *variables;
 
 	// ------------------------------------------------------------------------
 	// the values stored in this dimension, using our floating point numbers
@@ -246,6 +249,8 @@ struct rrdset {
 	total_number last_collected_total;				// used internally to calculate percentages
 
     RRDCONTEXT *rrdcontext;
+    struct rrdhost *rrdhost;
+
 	struct rrdset *next;							// linking of rrdsets
 
 	// ------------------------------------------------------------------------
@@ -265,6 +270,7 @@ struct rrdset {
     // local variables
 
     avl_tree_lock variables_root_index;
+    RRDSETVAR *variables;
 };
 typedef struct rrdset RRDSET;
 

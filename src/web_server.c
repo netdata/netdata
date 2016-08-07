@@ -195,7 +195,7 @@ static inline void close_listen_sockets(void) {
 static inline int bind_to_one(const char *definition, int default_port, int listen_backlog) {
     int added = 0;
     struct addrinfo hints;
-    struct addrinfo *result, *rp;
+    struct addrinfo *result = NULL, *rp = NULL;
 
     char buffer[strlen(definition) + 1];
     strcpy(buffer, definition);
@@ -274,6 +274,8 @@ static inline int bind_to_one(const char *definition, int default_port, int list
             added++;
         }
     }
+
+	freeaddrinfo(result);
 
     return added;
 }
