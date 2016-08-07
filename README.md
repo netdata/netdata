@@ -117,7 +117,9 @@ This is what it currently monitors (most with zero configuration):
 
 - **Postfix email server** message queue (entries, size)
 
-- **Squid proxy server** (clients bandwidth and requests, servers bandwidth and requests) 
+  **IPFS** (Bandwidth, Peers)
+
+- **Squid proxy server** (clients bandwidth and requests, servers bandwidth and requests)
 
 - **Hardware sensors** (temperature, voltage, fans, power, humidity, etc)
 
@@ -160,4 +162,3 @@ It should run on **any Linux** system. It has been tested on:
 ## Documentation
 
 Check the **[netdata wiki](https://github.com/firehol/netdata/wiki)**.
-
