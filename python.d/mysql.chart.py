@@ -39,7 +39,7 @@ retries = 60
 #}
 
 # query executed on MySQL server
-QUERY = "SHOW GLOBAL STATUS"
+QUERY = "SHOW GLOBAL STATUS;"
 
 ORDER = ['net',
          'queries',
@@ -375,8 +375,6 @@ class Service(SimpleService):
             cursor = self.connection.cursor()
             cursor.execute(QUERY)
             raw_data = cursor.fetchall()
-
-
         except Exception as e:
             self.error("cannot execute query.", e)
             self.connection.close()
