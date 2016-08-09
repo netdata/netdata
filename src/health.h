@@ -44,6 +44,10 @@ typedef struct rrdvar {
 } RRDVAR;
 
 // variables linked to charts
+// We link variables to point the values that are already
+// calculated / processed by the normal data collection process
+// This means, there will be no speed penalty for using
+// these variables
 typedef struct rrdsetvar {
     char *fullid;               // chart type.chart id.variable
     uint32_t hash_fullid;
@@ -72,6 +76,10 @@ typedef struct rrdsetvar {
 
 
 // variables linked to dimensions
+// We link variables to point the values that are already
+// calculated / processed by the normal data collection process
+// This means, there will be no speed penalty for using
+// these variables
 typedef struct rrddimvar {
     char *prefix;
     char *suffix;
@@ -117,24 +125,70 @@ typedef struct rrddimvar {
     struct rrddimvar *next;
 } RRDDIMVAR;
 
+// additional calculated variables
+// These aggregate time-series data at fixed intervals
+// (defined in their update_every member below)
+// These increase the overhead of netdata.
+//
+// These calculations are allocated and linked (->next)
+// to RRDHOST.
+// Then are also linked to RRDSET (of course only when the
+// chart is found, via ->rrdset_next and ->rrdset_prev).
+// This double-linked list is maintained sorted at all times
+// having as RRDSET->calculations the RRDCALC to be processed
+// next.
 typedef struct rrdcalc {
-    avl avl;
+    char *name;
+    uint32_t hash;
+
+    char *chart;        // the chart name
+    uint32_t hash_chart;
+
+    char *dimensions;   // the chart dimensions
 
     int group;          // grouping method: average, max, etc.
     int before;         // ending point in time-series
     int after;          // starting point in time-series
+    uint32_t options;   // calculation options
     int update_every;   // update frequency for the calculation
 
-    const char *name;
+    time_t last_updated;
+    time_t next_update;
+
     calculated_number value;
 
     RRDVAR *local;
     RRDVAR *context;
     RRDVAR *host;
 
+    struct rrdset *rrdset;
+    struct rrdcalc *rrdset_next;
+    struct rrdcalc *rrdset_prev;
+
     struct rrdcalc *next;
-    struct rrdcalc *prev;
 } RRDCALC;
+
+
+// RRDCALCTEMPLATE
+// these are to be applied to charts found dynamically
+// based on their context.
+typedef struct rrdcalctemplate {
+    char *name;
+    uint32_t hash_name;
+
+    char *context;
+    uint32_t hash_context;
+
+    char *dimensions;
+
+    int group;          // grouping method: average, max, etc.
+    int before;         // ending point in time-series
+    int after;          // starting point in time-series
+    uint32_t options;   // calculation options
+    int update_every;   // update frequency for the calculation
+
+    struct rrdcalctemplate *next;
+} RRDCALCTEMPLATE;
 
 #include "rrd.h"
 
@@ -145,5 +199,8 @@ extern void rrdsetvar_free(RRDSETVAR *rs);
 extern void rrddimvar_rename_all(RRDDIM *rd);
 extern RRDDIMVAR *rrddimvar_create(RRDDIM *rd, int type, const char *prefix, const char *suffix, void *value, uint32_t options);
 extern void rrddimvar_free(RRDDIMVAR *rs);
+
+extern void rrdsetcalc_link_matching(RRDSET *st);
+extern void rrdsetcalc_unlink(RRDCALC *rc);
 
 #endif //NETDATA_HEALTH_H

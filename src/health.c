@@ -45,8 +45,15 @@ static inline RRDVAR *rrdvar_create(const char *name, uint32_t hash, int type, c
     return rv;
 }
 
-static inline void rrdvar_free(RRDVAR *rv) {
-    // FIXME: find all references of this and NULL them.
+static inline void rrdvar_free(RRDHOST *host, RRDVAR *rv) {
+    if(host) {
+        // FIXME: we may need some kind of locking here
+        // to have mutually exclusive access with eval()
+        VARIABLE *rf;
+        for (rf = host->references; rf; rf = rf->next)
+            if (rf->rrdvar == rv) rf->rrdvar = NULL;
+    }
+
     free(rv);
 }
 
@@ -59,7 +66,7 @@ static inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *
         RRDVAR *ret = rrdvar_index_add(tree, rv);
         if(unlikely(ret != rv)) {
             debug(D_VARIABLES, "Variable '%s' in scope '%s' already exists", name, scope);
-            rrdvar_free(rv);
+            rrdvar_free(NULL, rv);
             rv = NULL;
         }
         else
@@ -147,12 +154,12 @@ void rrdsetvar_rename_all(RRDSET *st) {
             // name changed
             if (rs->context_name) {
                 rrdvar_index_del(&st->rrdcontext->variables_root_index, rs->context_name);
-                rrdvar_free(rs->context_name);
+                rrdvar_free(st->rrdhost, rs->context_name);
             }
 
             if (rs->host_name) {
                 rrdvar_index_del(&st->rrdhost->variables_root_index, rs->host_name);
-                rrdvar_free(rs->host_name);
+                rrdvar_free(st->rrdhost, rs->host_name);
             }
 
             free(rs->fullname);
@@ -163,6 +170,8 @@ void rrdsetvar_rename_all(RRDSET *st) {
             rs->host_name    = rrdvar_create_and_index("host",    &st->rrdhost->variables_root_index, rs->fullname, rs->hash_fullname, rs->type, rs->value);
         }
     }
+
+    rrdsetcalc_link_matching(st);
 }
 
 void rrdsetvar_free(RRDSETVAR *rs) {
@@ -171,27 +180,27 @@ void rrdsetvar_free(RRDSETVAR *rs) {
 
     if(rs->local) {
         rrdvar_index_del(&st->variables_root_index, rs->local);
-        rrdvar_free(rs->local);
+        rrdvar_free(st->rrdhost, rs->local);
     }
 
     if(rs->context) {
         rrdvar_index_del(&st->rrdcontext->variables_root_index, rs->context);
-        rrdvar_free(rs->context);
+        rrdvar_free(st->rrdhost, rs->context);
     }
 
     if(rs->host) {
         rrdvar_index_del(&st->rrdhost->variables_root_index, rs->host);
-        rrdvar_free(rs->host);
+        rrdvar_free(st->rrdhost, rs->host);
     }
 
     if(rs->context_name) {
         rrdvar_index_del(&st->rrdcontext->variables_root_index, rs->context_name);
-        rrdvar_free(rs->context_name);
+        rrdvar_free(st->rrdhost, rs->context_name);
     }
 
     if(rs->host_name) {
         rrdvar_index_del(&st->rrdhost->variables_root_index, rs->host_name);
-        rrdvar_free(rs->host_name);
+        rrdvar_free(st->rrdhost, rs->host_name);
     }
 
     if(st->variables == rs) {
@@ -302,7 +311,7 @@ void rrddimvar_rename_all(RRDDIM *rd) {
             // name
             if (rs->local_name) {
                 rrdvar_index_del(&st->variables_root_index, rs->local_name);
-                rrdvar_free(rs->local_name);
+                rrdvar_free(st->rrdhost, rs->local_name);
             }
             free(rs->name);
             snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", rs->prefix, rd->name, rs->suffix);
@@ -314,11 +323,11 @@ void rrddimvar_rename_all(RRDDIM *rd) {
             // fullidname
             if (rs->context_fullidname) {
                 rrdvar_index_del(&st->rrdcontext->variables_root_index, rs->context_fullidname);
-                rrdvar_free(rs->context_fullidname);
+                rrdvar_free(st->rrdhost, rs->context_fullidname);
             }
             if (rs->host_fullidname) {
                 rrdvar_index_del(&st->rrdhost->variables_root_index, rs->context_fullidname);
-                rrdvar_free(rs->host_fullidname);
+                rrdvar_free(st->rrdhost, rs->host_fullidname);
             }
             free(rs->fullidname);
             snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->id, rs->name);
@@ -333,11 +342,11 @@ void rrddimvar_rename_all(RRDDIM *rd) {
             // fullnameid
             if (rs->context_fullnameid) {
                 rrdvar_index_del(&st->rrdcontext->variables_root_index, rs->context_fullnameid);
-                rrdvar_free(rs->context_fullnameid);
+                rrdvar_free(st->rrdhost, rs->context_fullnameid);
             }
             if (rs->host_fullnameid) {
                 rrdvar_index_del(&st->rrdhost->variables_root_index, rs->context_fullnameid);
-                rrdvar_free(rs->host_fullnameid);
+                rrdvar_free(st->rrdhost, rs->host_fullnameid);
             }
             free(rs->fullnameid);
             snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->id);
@@ -352,11 +361,11 @@ void rrddimvar_rename_all(RRDDIM *rd) {
             // fullnamename
             if (rs->context_fullnamename) {
                 rrdvar_index_del(&st->rrdcontext->variables_root_index, rs->context_fullnamename);
-                rrdvar_free(rs->context_fullnamename);
+                rrdvar_free(st->rrdhost, rs->context_fullnamename);
             }
             if (rs->host_fullnamename) {
                 rrdvar_index_del(&st->rrdhost->variables_root_index, rs->context_fullnamename);
-                rrdvar_free(rs->host_fullnamename);
+                rrdvar_free(st->rrdhost, rs->host_fullnamename);
             }
             free(rs->fullnamename);
             snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->name);
@@ -378,45 +387,45 @@ void rrddimvar_free(RRDDIMVAR *rs) {
 
     if(rs->local_id) {
         rrdvar_index_del(&st->variables_root_index, rs->local_id);
-        rrdvar_free(rs->local_id);
+        rrdvar_free(st->rrdhost, rs->local_id);
     }
     if(rs->local_name) {
         rrdvar_index_del(&st->variables_root_index, rs->local_name);
-        rrdvar_free(rs->local_name);
+        rrdvar_free(st->rrdhost, rs->local_name);
     }
 
     if(rs->context_fullidid) {
         rrdvar_index_del(&st->rrdcontext->variables_root_index, rs->context_fullidid);
-        rrdvar_free(rs->context_fullidid);
+        rrdvar_free(st->rrdhost, rs->context_fullidid);
     }
     if(rs->context_fullidname) {
         rrdvar_index_del(&st->rrdcontext->variables_root_index, rs->context_fullidname);
-        rrdvar_free(rs->context_fullidname);
+        rrdvar_free(st->rrdhost, rs->context_fullidname);
     }
     if(rs->context_fullnameid) {
         rrdvar_index_del(&st->rrdcontext->variables_root_index, rs->context_fullnameid);
-        rrdvar_free(rs->context_fullnameid);
+        rrdvar_free(st->rrdhost, rs->context_fullnameid);
     }
     if(rs->context_fullnamename) {
         rrdvar_index_del(&st->rrdcontext->variables_root_index, rs->context_fullnamename);
-        rrdvar_free(rs->context_fullnamename);
+        rrdvar_free(st->rrdhost, rs->context_fullnamename);
     }
 
     if(rs->host_fullidid) {
         rrdvar_index_del(&st->rrdhost->variables_root_index, rs->host_fullidid);
-        rrdvar_free(rs->host_fullidid);
+        rrdvar_free(st->rrdhost, rs->host_fullidid);
     }
     if(rs->host_fullidname) {
         rrdvar_index_del(&st->rrdhost->variables_root_index, rs->host_fullidname);
-        rrdvar_free(rs->host_fullidname);
+        rrdvar_free(st->rrdhost, rs->host_fullidname);
     }
     if(rs->host_fullnameid) {
         rrdvar_index_del(&st->rrdhost->variables_root_index, rs->host_fullnameid);
-        rrdvar_free(rs->host_fullnameid);
+        rrdvar_free(st->rrdhost, rs->host_fullnameid);
     }
     if(rs->host_fullnamename) {
         rrdvar_index_del(&st->rrdhost->variables_root_index, rs->host_fullnamename);
-        rrdvar_free(rs->host_fullnamename);
+        rrdvar_free(st->rrdhost, rs->host_fullnamename);
     }
 
     if(rd->variables == rs) {
@@ -440,4 +449,142 @@ void rrddimvar_free(RRDDIMVAR *rs) {
     free(rs->fullnameid);
     free(rs->fullnamename);
     free(rs);
+}
+
+// ----------------------------------------------------------------------------
+// RRDCALC management
+
+// this has to be called while the caller has locked
+// the RRDHOST
+static inline void rrdhostcalc_linked(RRDHOST *host, RRDCALC *rc) {
+    // move it to be last
+
+    if(!rc->next)
+        // we are last already
+        return;
+
+    RRDCALC *t, *last = NULL, *prev = NULL;
+    for (t = host->calculations; t ; t = t->next) {
+        if(t->next == rc)
+            prev = t;
+
+        if(!t->next)
+            last = t;
+    }
+
+    if(!last) {
+        error("RRDCALC '%s' cannot be linked to the end of host '%s' list", rc->name, host->hostname);
+        return;
+    }
+
+    if(prev)
+        prev->next = rc->next;
+    else {
+        if(host->calculations == rc)
+            host->calculations = rc->next;
+        else {
+            error("RRDCALC '%s' is not found in host '%s' list", rc->name, host->hostname);
+            return;
+        }
+    }
+
+    last->next = rc;
+    rc->next = NULL;
+}
+
+// this has to be called while the caller has locked
+// the RRDHOST
+static inline void rrdhostcalc_unlinked(RRDHOST *host, RRDCALC *rc) {
+    // move it to be first
+
+    if(host->calculations == rc) {
+        // ok, we are the first
+        return;
+    }
+    else {
+        // find the previous one
+        RRDCALC *t;
+        for (t = host->calculations; t && t->next != rc; rc = rc->next) ;
+        if(unlikely(!t)) {
+            error("RRDCALC '%s' is not linked to host '%s'.", rc->name, host->hostname);
+            return;
+        }
+        t->next = rc->next;
+        rc->next = host->calculations;
+        host->calculations = rc;
+    }
+}
+
+static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
+    rc->rrdset = st;
+
+    rc->local   = rrdvar_create_and_index("local", &st->variables_root_index, rc->name, rc->hash, RRDVAR_TYPE_CALCULATED, &rc->value);
+    rc->context = rrdvar_create_and_index("context", &st->rrdcontext->variables_root_index, rc->name, rc->hash, RRDVAR_TYPE_CALCULATED, &rc->value);
+    rc->host    = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rc->name, rc->hash, RRDVAR_TYPE_CALCULATED, &rc->value);
+
+    rrdhostcalc_linked(st->rrdhost, rc);
+}
+
+// this has to be called while the RRDHOST is locked
+void rrdsetcalc_link_matching(RRDSET *st) {
+    RRDCALC *rc;
+
+    for(rc = st->rrdhost->calculations; rc ; rc = rc->next) {
+        // since unlinked ones are in front and linked at the end
+        // we stop on the first linked RRDCALC
+        if(rc->rrdset != NULL) break;
+
+        if((rc->hash_chart == st->hash && !strcmp(rc->name, st->id)) ||
+                (rc->hash_chart == st->hash_name && !strcmp(rc->name, st->name))) {
+            rrdsetcalc_link(st, rc);
+        }
+    }
+}
+
+// this has to be called while the RRDHOST is locked
+void rrdsetcalc_unlink(RRDCALC *rc) {
+    RRDSET *st = rc->rrdset;
+
+    if(!st) {
+        error("Requested to unlink RRDCALC '%s' which is not linked to any RRDSET", rc->name);
+        return;
+    }
+
+    RRDHOST *host = st->rrdhost;
+
+    // unlink it
+    if(rc->rrdset_prev)
+        rc->rrdset_prev->rrdset_next = rc->rrdset_next;
+
+    if(rc->rrdset_next)
+        rc->rrdset_next->rrdset_prev = rc->rrdset_prev;
+
+    if(st->calculations == rc)
+        st->calculations = rc->rrdset_next;
+
+    rc->rrdset_prev = rc->rrdset_next = NULL;
+
+    if(rc->local) {
+        rrdvar_index_del(&st->variables_root_index, rc->local);
+        rrdvar_free(st->rrdhost, rc->local);
+        rc->local = NULL;
+    }
+
+    if(rc->context) {
+        rrdvar_index_del(&st->rrdcontext->variables_root_index, rc->context);
+        rc->context = NULL;
+    }
+
+    if(rc->host) {
+        rrdvar_index_del(&st->rrdhost->variables_root_index, rc->host);
+        rc->host = NULL;
+    }
+
+    rc->rrdset = NULL;
+
+    // RRDCALC will remain in RRDHOST
+    // so that if the matching chart is found in the future
+    // it will be applied automatically
+
+    rrdhostcalc_unlinked(host, rc);
 }

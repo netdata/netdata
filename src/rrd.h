@@ -254,6 +254,13 @@ struct rrdset {
 	struct rrdset *next;							// linking of rrdsets
 
 	// ------------------------------------------------------------------------
+	// local variables
+
+	avl_tree_lock variables_root_index;
+	RRDSETVAR *variables;
+	RRDCALC *calculations;
+
+	// ------------------------------------------------------------------------
 	// members for checking the data when loading from disk
 
 	unsigned long memsize;							// how much mem we have allocated for this (without dimensions)
@@ -266,11 +273,6 @@ struct rrdset {
 	avl_tree_lock dimensions_index;						// the root of the dimensions index
 	RRDDIM *dimensions;								// the actual data for every dimension
 
-    // ------------------------------------------------------------------------
-    // local variables
-
-    avl_tree_lock variables_root_index;
-    RRDSETVAR *variables;
 };
 typedef struct rrdset RRDSET;
 
@@ -290,6 +292,16 @@ struct rrdhost {
 
     avl_tree_lock rrdcontext_root_index;
     avl_tree_lock variables_root_index;
+
+	// all RRDCALCs are primarily allocated and linked here
+	// RRDCALCs may be linked to charts at any point
+	// (charts may or may not exist when these are loaded)
+	RRDCALC *calculations;
+
+    // all variable references are linked here
+    // RRDVARs may be free'd, so every time this happens
+    // we need to find all their references and invalidate them
+    VARIABLE *references;
 };
 typedef struct rrdhost RRDHOST;
 
