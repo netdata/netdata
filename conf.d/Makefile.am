@@ -22,6 +22,7 @@ dist_pythonconfig_DATA = \
 	python.d/apache.conf \
 	python.d/apache_cache.conf \
 	python.d/cpufreq.conf \
+	python.d/dovecot.conf \
 	python.d/example.conf \
 	python.d/exim.conf \
 	python.d/hddtemp.conf \

@@ -39,7 +39,7 @@ retries = 60
 #}
 
 # query executed on MySQL server
-QUERY = "SHOW GLOBAL STATUS"
+QUERY = "SHOW GLOBAL STATUS;"
 
 ORDER = ['net',
          'queries',
@@ -351,6 +351,10 @@ class Service(SimpleService):
                                               host=self.configuration['host'],
                                               port=self.configuration['port'],
                                               connect_timeout=self.update_every)
+        except MySQLdb.OperationalError as e:
+            self.error("Cannot establish connection to MySQL.")
+            self.debug(str(e))
+            raise RuntimeError
         except Exception as e:
             self.error("problem connecting to server:", e)
             raise RuntimeError
@@ -369,11 +373,18 @@ class Service(SimpleService):
             cursor = self.connection.cursor()
             cursor.execute(QUERY)
             raw_data = cursor.fetchall()
+        except MySQLdb.OperationalError as e:
+            self.debug("Reconnecting due to", str(e))
+            self._connect()
+            cursor = self.connection.cursor()
+            cursor.execute(QUERY)
+            raw_data = cursor.fetchall()
         except Exception as e:
             self.error("cannot execute query.", e)
             self.connection.close()
             self.connection = None
             return None
+
         data = dict(raw_data)
         try:
             data["Thread_cache_misses"] = int(data["Threads_created"] * 10000 / float(data["Connections"]))
