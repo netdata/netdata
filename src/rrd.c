@@ -531,6 +531,8 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 
     rrdset_index_add(&localhost, st);
 
+    rrdsetcalc_link_matching(st);
+
 	pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
 
 	return(st);
@@ -739,6 +741,9 @@ void rrdset_free_all(void)
 
         while(st->variables)
             rrdsetvar_free(st->variables);
+
+        while(st->calculations)
+            rrdsetcalc_unlink(st->calculations);
 
         while(st->dimensions)
 			rrddim_free(st, st->dimensions);

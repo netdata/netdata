@@ -32,6 +32,7 @@ netdata_SOURCES = \
 	common.c common.h \
 	daemon.c daemon.h \
 	dictionary.c dictionary.h \
+	eval.c eval.h \
 	global_statistics.c global_statistics.h \
 	health.c health.h \
 	log.c log.h \

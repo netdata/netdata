@@ -82,7 +82,7 @@ set(NETDATA_SOURCE_FILES
         src/web_client.h
         src/web_server.c
         src/web_server.h
-        config.h src/health.h src/health.c)
+        config.h src/health.h src/health.c src/eval.h src/eval.c)
 
 set(APPS_PLUGIN_SOURCE_FILES
         src/appconfig.c

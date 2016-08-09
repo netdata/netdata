@@ -80,6 +80,7 @@
 #include "plugin_tc.h"
 #include "plugins_d.h"
 
+#include "eval.h"
 #include "health.h"
 
 #include "rrd.h"
