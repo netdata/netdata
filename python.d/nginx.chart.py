@@ -63,11 +63,11 @@ class Service(UrlService):
         try:
             raw = self._get_raw_data().split(" ")
             return {'active': int(raw[2]),
-                    'requests': int(raw[7]),
+                    'requests': int(raw[9]),
                     'reading': int(raw[11]),
                     'writing': int(raw[13]),
                     'waiting': int(raw[15]),
-                    'accepts': int(raw[8]),
-                    'handled': int(raw[9])}
+                    'accepts': int(raw[7]),
+                    'handled': int(raw[8])}
         except (ValueError, AttributeError):
             return None
