@@ -56,82 +56,181 @@ void print_operand(EVAL_OPERAND *op, int level) {
 	while(i--) print_value(&op->ops[i], level + 1);
 }
 
-calculated_number evaluate(EVAL_OPERAND *op);
+calculated_number evaluate(EVAL_OPERAND *op, int depth);
 
-calculated_number evaluate_value(EVAL_VALUE *v) {
+calculated_number evaluate_value(EVAL_VALUE *v, int depth) {
 	switch(v->type) {
 		case EVAL_VALUE_NUMBER:
 			return v->number;
 
 		case EVAL_VALUE_EXPRESSION:
-			return evaluate(v->expression);
+			return evaluate(v->expression, depth);
 
 		default:
 			fatal("I don't know how to handle EVAL_VALUE type %d", v->type);
 	}
 }
 
-calculated_number evaluate(EVAL_OPERAND *op) {
+void print_depth(int depth) {
+	static int count = 0;
+
+	printf("%d. ", ++count);
+	while(depth--) printf("    ");
+}
+
+calculated_number evaluate(EVAL_OPERAND *op, int depth) {
 	calculated_number n1, n2, r;
 
 	switch(op->operator) {
 		case EVAL_OPERATOR_SIGN_PLUS:
-			r = evaluate_value(&op->ops[0]);
+			r = evaluate_value(&op->ops[0], depth);
 			break;
 
 		case EVAL_OPERATOR_SIGN_MINUS:
-			r = -evaluate_value(&op->ops[0]);
+			r = -evaluate_value(&op->ops[0], depth);
 			break;
 
 		case EVAL_OPERATOR_PLUS:
 			if(op->count != 2)
 				fatal("Operator '%c' requires 2 values, but we have %d", op->operator, op->count);
-			n1 = evaluate_value(&op->ops[0]);
-			n2 = evaluate_value(&op->ops[1]);
+			n1 = evaluate_value(&op->ops[0], depth);
+			n2 = evaluate_value(&op->ops[1], depth);
 			r = n1 + n2;
-			printf("%Lf = %Lf %c %Lf\n", r, n1, op->operator, n2);
+			print_depth(depth);
+			printf("%Lf = %Lf + %Lf\n", r, n1, n2);
 			break;
 
 		case EVAL_OPERATOR_MINUS:
 			if(op->count != 2)
 				fatal("Operator '%c' requires 2 values, but we have %d", op->operator, op->count);
-			n1 = evaluate_value(&op->ops[0]);
-			n2 = evaluate_value(&op->ops[1]);
+			n1 = evaluate_value(&op->ops[0], depth);
+			n2 = evaluate_value(&op->ops[1], depth);
 			r = n1 - n2;
-			printf("%Lf = %Lf %c %Lf\n", r, n1, op->operator, n2);
+			print_depth(depth);
+			printf("%Lf = %Lf - %Lf\n", r, n1, n2);
 			break;
 
 		case EVAL_OPERATOR_MULTIPLY:
 			if(op->count != 2)
 				fatal("Operator '%c' requires 2 values, but we have %d", op->operator, op->count);
-			n1 = evaluate_value(&op->ops[0]);
-			n2 = evaluate_value(&op->ops[1]);
+			n1 = evaluate_value(&op->ops[0], depth);
+			n2 = evaluate_value(&op->ops[1], depth);
 			r = n1 * n2;
-			printf("%Lf = %Lf %c %Lf\n", r, n1, op->operator, n2);
+			print_depth(depth);
+			printf("%Lf = %Lf * %Lf\n", r, n1, n2);
 			break;
 
 		case EVAL_OPERATOR_DIVIDE:
 			if(op->count != 2)
 				fatal("Operator '%c' requires 2 values, but we have %d", op->operator, op->count);
-			n1 = evaluate_value(&op->ops[0]);
-			n2 = evaluate_value(&op->ops[1]);
+			n1 = evaluate_value(&op->ops[0], depth);
+			n2 = evaluate_value(&op->ops[1], depth);
 			r = n1 / n2;
-			printf("%Lf = %Lf %c %Lf\n", r, n1, op->operator, n2);
+			print_depth(depth);
+			printf("%Lf = %Lf / %Lf\n", r, n1, n2);
+			break;
+
+		case EVAL_OPERATOR_NOT:
+			n1 = evaluate_value(&op->ops[0], depth);
+			r = !n1;
+			print_depth(depth);
+			printf("%Lf = NOT %Lf\n", r, n1);
+			break;
+
+		case EVAL_OPERATOR_AND:
+			if(op->count != 2)
+				fatal("Operator '%c' requires 2 values, but we have %d", op->operator, op->count);
+			n1 = evaluate_value(&op->ops[0], depth);
+			n2 = evaluate_value(&op->ops[1], depth);
+			r = n1 && n2;
+			print_depth(depth);
+			printf("%Lf = %Lf AND %Lf\n", r, n1, n2);
+			break;
+
+		case EVAL_OPERATOR_OR:
+			if(op->count != 2)
+				fatal("Operator '%c' requires 2 values, but we have %d", op->operator, op->count);
+			n1 = evaluate_value(&op->ops[0], depth);
+			n2 = evaluate_value(&op->ops[1], depth);
+			r = n1 || n2;
+			print_depth(depth);
+			printf("%Lf = %Lf OR %Lf\n", r, n1, n2);
+			break;
+
+		case EVAL_OPERATOR_GREATER_THAN_OR_EQUAL:
+			if(op->count != 2)
+				fatal("Operator '%c' requires 2 values, but we have %d", op->operator, op->count);
+			n1 = evaluate_value(&op->ops[0], depth);
+			n2 = evaluate_value(&op->ops[1], depth);
+			r = n1 >= n2;
+			print_depth(depth);
+			printf("%Lf = %Lf >= %Lf\n", r, n1, n2);
+			break;
+
+		case EVAL_OPERATOR_LESS_THAN_OR_EQUAL:
+			if(op->count != 2)
+				fatal("Operator '%c' requires 2 values, but we have %d", op->operator, op->count);
+			n1 = evaluate_value(&op->ops[0], depth);
+			n2 = evaluate_value(&op->ops[1], depth);
+			r = n1 <= n2;
+			print_depth(depth);
+			printf("%Lf = %Lf <= %Lf\n", r, n1, n2);
+			break;
+
+		case EVAL_OPERATOR_GREATER:
+			if(op->count != 2)
+				fatal("Operator '%c' requires 2 values, but we have %d", op->operator, op->count);
+			n1 = evaluate_value(&op->ops[0], depth);
+			n2 = evaluate_value(&op->ops[1], depth);
+			r = n1 > n2;
+			print_depth(depth);
+			printf("%Lf = %Lf > %Lf\n", r, n1, n2);
+			break;
+
+		case EVAL_OPERATOR_LESS:
+			if(op->count != 2)
+				fatal("Operator '%c' requires 2 values, but we have %d", op->operator, op->count);
+			n1 = evaluate_value(&op->ops[0], depth);
+			n2 = evaluate_value(&op->ops[1], depth);
+			r = n1 < n2;
+			print_depth(depth);
+			printf("%Lf = %Lf < %Lf\n", r, n1, n2);
+			break;
+
+		case EVAL_OPERATOR_NOT_EQUAL:
+			if(op->count != 2)
+				fatal("Operator '%c' requires 2 values, but we have %d", op->operator, op->count);
+			n1 = evaluate_value(&op->ops[0], depth);
+			n2 = evaluate_value(&op->ops[1], depth);
+			r = n1 != n2;
+			print_depth(depth);
+			printf("%Lf = %Lf <> %Lf\n", r, n1, n2);
+			break;
+
+		case EVAL_OPERATOR_EQUAL:
+			if(op->count != 2)
+				fatal("Operator '%c' requires 2 values, but we have %d", op->operator, op->count);
+			n1 = evaluate_value(&op->ops[0], depth);
+			n2 = evaluate_value(&op->ops[1], depth);
+			r = n1 == n2;
+			print_depth(depth);
+			printf("%Lf = %Lf == %Lf\n", r, n1, n2);
 			break;
 
 		case EVAL_OPERATOR_EXPRESSION_OPEN:
 			printf("BEGIN SUB-EXPRESSION\n");
-			r = evaluate_value(&op->ops[0]);
+			r = evaluate_value(&op->ops[0], depth + 1);
 			printf("END SUB-EXPRESSION\n");
 			break;
 
 		case EVAL_OPERATOR_NOP:
 		case EVAL_OPERATOR_VALUE:
-			r = evaluate_value(&op->ops[0]);
+			r = evaluate_value(&op->ops[0], depth);
 			break;
 
 		default:
-			fatal("I don't know how to handle operator '%c'", op->operator);
+			error("I don't know how to handle operator '%c'", op->operator);
+			r = 0;
 			break;
 	}
 
@@ -140,9 +239,16 @@ calculated_number evaluate(EVAL_OPERAND *op) {
 
 void print_expression(EVAL_OPERAND *op, const char *failed_at, int error) {
 	if(op) {
-		printf("<expression root>\n");
+		printf("expression tree:\n");
 		print_operand(op, 0);
-		evaluate(op);
+
+		printf("\nevaluation steps:\n");
+		evaluate(op, 0);
+		
+		int error;
+		calculated_number ret = evaluate_expression(op, &error);
+		printf("\ninternal evaluator:\nSTATUS: %d, RESULT = %Lf\n", error, ret);
+
 		free_expression(op);
 	}
 	else {

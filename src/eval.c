@@ -1,5 +1,12 @@
 #include "common.h"
 
+// forward definitions
+static inline void operand_free(EVAL_OPERAND *op);
+static inline EVAL_OPERAND *parse_operand(const char **string, int *error);
+static inline EVAL_OPERAND *parse_operand1(const char **string, int *error);
+static inline calculated_number eval_operand(EVAL_OPERAND *op, int *error);
+
+
 static inline void skip_spaces(const char **string) {
     const char *s = *string;
     while(isspace(*s)) s++;
@@ -212,8 +219,12 @@ static inline int parse_close_subexpression(const char **string) {
 
 static inline int parse_literal(const char **string, calculated_number *number) {
     char *end = NULL;
-    *number = strtold(*string, &end);
-    if(!end || *string == end) return 0;
+    calculated_number n = strtold(*string, &end);
+    if(unlikely(!end || *string == end || isnan(n) || isinf(n))) {
+        *number = 0;
+        return 0;
+    }
+    *number = n;
 
     *string = end;
     return 1;
@@ -276,87 +287,137 @@ static struct operator_parser {
 // ----------------------------------------------------------------------------
 // evaluation of operations
 
-calculated_number eval_and(EVAL_OPERAND *op) {
-    return 0;
+static inline calculated_number eval_check_number(calculated_number n, int *error) {
+    if(unlikely(isnan(n))) {
+        *error = EVAL_ERROR_VALUE_IS_NAN;
+        return 0;
+    }
+
+    if(unlikely(isinf(n))) {
+        *error = EVAL_ERROR_VALUE_IS_INFINITE;
+        return 0;
+    }
+
+    return n;
 }
-calculated_number eval_or(EVAL_OPERAND *op) {
-    return 0;
+
+static inline calculated_number eval_value(EVAL_VALUE *v, int *error) {
+    calculated_number n;
+
+    switch(v->type) {
+        case EVAL_VALUE_EXPRESSION:
+            n = eval_operand(v->expression, error);
+            break;
+
+        case EVAL_VALUE_NUMBER:
+            n = v->number;
+            break;
+
+//        case EVAL_VALUE_VARIABLE:
+//            break;
+
+        default:
+            *error = EVAL_ERROR_INVALID_VALUE;
+            n = 0;
+            break;
+    }
+
+    return eval_check_number(n, error);
 }
-calculated_number eval_greater_than_or_equal(EVAL_OPERAND *op) {
-    return 0;
+
+calculated_number eval_and(EVAL_OPERAND *op, int *error) {
+    return eval_value(&op->ops[0], error) && eval_value(&op->ops[1], error);
 }
-calculated_number eval_less_than_or_equal(EVAL_OPERAND *op) {
-    return 0;
+calculated_number eval_or(EVAL_OPERAND *op, int *error) {
+    return eval_value(&op->ops[0], error) || eval_value(&op->ops[1], error);
 }
-calculated_number eval_not_equal(EVAL_OPERAND *op) {
-    return 0;
+calculated_number eval_greater_than_or_equal(EVAL_OPERAND *op, int *error) {
+    return eval_value(&op->ops[0], error) >= eval_value(&op->ops[1], error);
 }
-calculated_number eval_equal(EVAL_OPERAND *op) {
-    return 0;
+calculated_number eval_less_than_or_equal(EVAL_OPERAND *op, int *error) {
+    return eval_value(&op->ops[0], error) <= eval_value(&op->ops[1], error);
 }
-calculated_number eval_less(EVAL_OPERAND *op) {
-    return 0;
+calculated_number eval_not_equal(EVAL_OPERAND *op, int *error) {
+    return eval_value(&op->ops[0], error) != eval_value(&op->ops[1], error);
 }
-calculated_number eval_greater(EVAL_OPERAND *op) {
-    return 0;
+calculated_number eval_equal(EVAL_OPERAND *op, int *error) {
+    return eval_value(&op->ops[0], error) == eval_value(&op->ops[1], error);
 }
-calculated_number eval_plus(EVAL_OPERAND *op) {
-    return 0;
+calculated_number eval_less(EVAL_OPERAND *op, int *error) {
+    return eval_value(&op->ops[0], error) < eval_value(&op->ops[1], error);
 }
-calculated_number eval_minus(EVAL_OPERAND *op) {
-    return 0;
+calculated_number eval_greater(EVAL_OPERAND *op, int *error) {
+    return eval_value(&op->ops[0], error) > eval_value(&op->ops[1], error);
 }
-calculated_number eval_multiply(EVAL_OPERAND *op) {
-    return 0;
+calculated_number eval_plus(EVAL_OPERAND *op, int *error) {
+    return eval_value(&op->ops[0], error) + eval_value(&op->ops[1], error);
 }
-calculated_number eval_divide(EVAL_OPERAND *op) {
-    return 0;
+calculated_number eval_minus(EVAL_OPERAND *op, int *error) {
+    return eval_value(&op->ops[0], error) - eval_value(&op->ops[1], error);
 }
-calculated_number eval_nop(EVAL_OPERAND *op) {
-    return 0;
+calculated_number eval_multiply(EVAL_OPERAND *op, int *error) {
+    return eval_value(&op->ops[0], error) * eval_value(&op->ops[1], error);
 }
-calculated_number eval_not(EVAL_OPERAND *op) {
-    return 0;
+calculated_number eval_divide(EVAL_OPERAND *op, int *error) {
+    return eval_value(&op->ops[0], error) / eval_value(&op->ops[1], error);
 }
-calculated_number eval_sign_plus(EVAL_OPERAND *op) {
-    return 0;
+calculated_number eval_nop(EVAL_OPERAND *op, int *error) {
+    return eval_value(&op->ops[0], error);
 }
-calculated_number eval_sign_minus(EVAL_OPERAND *op) {
-    return 0;
+calculated_number eval_not(EVAL_OPERAND *op, int *error) {
+    return !eval_value(&op->ops[0], error);
+}
+calculated_number eval_sign_plus(EVAL_OPERAND *op, int *error) {
+    return eval_value(&op->ops[0], error);
+}
+calculated_number eval_sign_minus(EVAL_OPERAND *op, int *error) {
+    return -eval_value(&op->ops[0], error);
 }
 
 static struct operator {
     const char *print_as;
     char precedence;
-    calculated_number (*eval)(EVAL_OPERAND *op);
+    char parameters;
+    calculated_number (*eval)(EVAL_OPERAND *op, int *error);
 } operators[256] = {
         // this is a random access array
         // we always access it with a known EVAL_OPERATOR_X
 
-        [EVAL_OPERATOR_AND]                   = { "&&", 2, eval_and },
-        [EVAL_OPERATOR_OR]                    = { "||", 2, eval_or },
-        [EVAL_OPERATOR_GREATER_THAN_OR_EQUAL] = { ">=", 3, eval_greater_than_or_equal },
-        [EVAL_OPERATOR_LESS_THAN_OR_EQUAL]    = { "<=", 3, eval_less_than_or_equal },
-        [EVAL_OPERATOR_NOT_EQUAL]             = { "!=", 3, eval_not_equal },
-        [EVAL_OPERATOR_EQUAL]                 = { "==", 3, eval_equal },
-        [EVAL_OPERATOR_LESS]                  = { "<",  3, eval_less },
-        [EVAL_OPERATOR_GREATER]               = { ">",  3, eval_greater },
-        [EVAL_OPERATOR_PLUS]                  = { "+",  4, eval_plus },
-        [EVAL_OPERATOR_MINUS]                 = { "-",  4, eval_minus },
-        [EVAL_OPERATOR_MULTIPLY]              = { "*",  5, eval_multiply },
-        [EVAL_OPERATOR_DIVIDE]                = { "/",  5, eval_divide },
-        [EVAL_OPERATOR_NOT]                   = { "!",  6, eval_not },
-        [EVAL_OPERATOR_SIGN_PLUS]             = { "+",  6, eval_sign_plus },
-        [EVAL_OPERATOR_SIGN_MINUS]            = { "-",  6, eval_sign_minus },
-        [EVAL_OPERATOR_NOP]                   = { NULL, 7, eval_nop },
-        [EVAL_OPERATOR_VALUE]                 = { NULL, 7, eval_nop },
-        [EVAL_OPERATOR_EXPRESSION_OPEN]       = { "(",  7, eval_nop },
+        [EVAL_OPERATOR_AND]                   = { "&&", 2, 2, eval_and },
+        [EVAL_OPERATOR_OR]                    = { "||", 2, 2, eval_or },
+        [EVAL_OPERATOR_GREATER_THAN_OR_EQUAL] = { ">=", 3, 2, eval_greater_than_or_equal },
+        [EVAL_OPERATOR_LESS_THAN_OR_EQUAL]    = { "<=", 3, 2, eval_less_than_or_equal },
+        [EVAL_OPERATOR_NOT_EQUAL]             = { "!=", 3, 2, eval_not_equal },
+        [EVAL_OPERATOR_EQUAL]                 = { "==", 3, 2, eval_equal },
+        [EVAL_OPERATOR_LESS]                  = { "<",  3, 2, eval_less },
+        [EVAL_OPERATOR_GREATER]               = { ">",  3, 2, eval_greater },
+        [EVAL_OPERATOR_PLUS]                  = { "+",  4, 2, eval_plus },
+        [EVAL_OPERATOR_MINUS]                 = { "-",  4, 2, eval_minus },
+        [EVAL_OPERATOR_MULTIPLY]              = { "*",  5, 2, eval_multiply },
+        [EVAL_OPERATOR_DIVIDE]                = { "/",  5, 2, eval_divide },
+        [EVAL_OPERATOR_NOT]                   = { "!",  6, 1, eval_not },
+        [EVAL_OPERATOR_SIGN_PLUS]             = { "+",  6, 1, eval_sign_plus },
+        [EVAL_OPERATOR_SIGN_MINUS]            = { "-",  6, 1, eval_sign_minus },
+        [EVAL_OPERATOR_NOP]                   = { NULL, 7, 1, eval_nop },
+        [EVAL_OPERATOR_VALUE]                 = { NULL, 7, 1, eval_nop },
+        [EVAL_OPERATOR_EXPRESSION_OPEN]       = { "(",  7, 1, eval_nop },
 
         // this should exist in our evaluation list
-        [EVAL_OPERATOR_EXPRESSION_CLOSE]      = { ")",  7, eval_nop }
+        [EVAL_OPERATOR_EXPRESSION_CLOSE]      = { ")",  7, 1, eval_nop }
 };
 
 #define eval_precedence(operator) (operators[(unsigned char)(operator)].precedence)
+
+static inline calculated_number eval_operand(EVAL_OPERAND *op, int *error) {
+    if(unlikely(op->count != operators[op->operator].parameters)) {
+        *error = EVAL_ERROR_INVALID_NUMBER_OF_OPERANDS;
+        return 0;
+    }
+
+    calculated_number n = operators[op->operator].eval(op, error);
+
+    return eval_check_number(n, error);
+}
 
 // ----------------------------------------------------------------------------
 
@@ -402,11 +463,6 @@ static inline void operand_set_value_literal(EVAL_OPERAND *op, int pos, calculat
     op->ops[pos].type = EVAL_VALUE_NUMBER;
     op->ops[pos].number = value;
 }
-
-// forward definitions
-static inline void operand_free(EVAL_OPERAND *op);
-static inline EVAL_OPERAND *parse_operand(const char **string, int *error);
-static inline EVAL_OPERAND *parse_operand1(const char **string, int *error);
 
 static inline void variable_free(VARIABLE *v) {
     free(v);
@@ -572,6 +628,18 @@ const char *eval_error(int error) {
         case EVAL_ERROR_MISSING_OPERATOR:
             return "expected operator";
 
+        case EVAL_ERROR_INVALID_VALUE:
+            return "invalid value structure - internal error";
+
+        case EVAL_ERROR_INVALID_NUMBER_OF_OPERANDS:
+            return "wrong number of operands for operation - internal error";
+
+        case EVAL_ERROR_VALUE_IS_NAN:
+            return "value or variable is missing or is not a number";
+
+        case EVAL_ERROR_VALUE_IS_INFINITE:
+            return "computed value is infinite";
+
         default:
             return "unknown error";
     }
@@ -594,6 +662,19 @@ EVAL_OPERAND *parse_expression(const char *string, const char **failed_at, int *
     }
 
     return op;
+}
+
+calculated_number evaluate_expression(EVAL_OPERAND *expression, int *error) {
+    int err = EVAL_ERROR_OK;
+    calculated_number ret = eval_operand(expression, &err);
+
+    if(err != EVAL_ERROR_OK) {
+        error("Failed to execute expression with error %d (%s)", err, eval_error(err));
+        if(error) *error = err;
+        return 0;
+    }
+
+    return ret;
 }
 
 void free_expression(EVAL_OPERAND *op) {
