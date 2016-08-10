@@ -12,7 +12,7 @@ typedef struct variable {
 #define EVAL_VALUE_VARIABLE 2
 #define EVAL_VALUE_EXPRESSION 3
 
-// these are used for EVAL_OPERAND.operator
+// these are used for EVAL_NODE.operator
 #define EVAL_OPERATOR_NOP                   '\0'
 #define EVAL_OPERATOR_VALUE                 ':'
 #define EVAL_OPERATOR_EXPRESSION_OPEN       '('
@@ -53,21 +53,22 @@ typedef struct eval_value {
     union {
         calculated_number number;
         VARIABLE *variable;
-        struct eval_operand *expression;
+        struct eval_node *expression;
     };
 } EVAL_VALUE;
 
-typedef struct eval_operand {
+typedef struct eval_node {
     int id;
     unsigned char operator;
     int precedence;
 
     int count;
     EVAL_VALUE ops[];
-} EVAL_OPERAND;
+} EVAL_NODE;
 
-extern EVAL_OPERAND *parse_expression(const char *string, const char **failed_at, int *error);
-extern calculated_number evaluate_expression(EVAL_OPERAND *expression, int *error);
-extern void free_expression(EVAL_OPERAND *op);
+extern EVAL_NODE *expression_parse(const char *string, const char **failed_at, int *error);
+extern calculated_number expression_evaluate(EVAL_NODE *expression, int *error);
+extern void expression_free(EVAL_NODE *op);
+extern const char *expression_strerror(int error);
 
 #endif //NETDATA_EVAL_H
