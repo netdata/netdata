@@ -34,10 +34,18 @@ typedef struct variable {
 #define EVAL_OPERATOR_SIGN_MINUS            'M'
 
 #define EVAL_ERROR_OK 0
+
+// parsing errors
 #define EVAL_ERROR_MISSING_CLOSE_SUBEXPRESSION 1
 #define EVAL_ERROR_UNKNOWN_OPERAND 2
 #define EVAL_ERROR_MISSING_OPERAND 3
 #define EVAL_ERROR_MISSING_OPERATOR 4
+
+// evaluation errors
+#define EVAL_ERROR_INVALID_VALUE 5
+#define EVAL_ERROR_INVALID_NUMBER_OF_OPERANDS 6
+#define EVAL_ERROR_VALUE_IS_NAN 7
+#define EVAL_ERROR_VALUE_IS_INFINITE 8
 
 typedef struct eval_value {
     int type;
@@ -51,7 +59,7 @@ typedef struct eval_value {
 
 typedef struct eval_operand {
     int id;
-    char operator;
+    unsigned char operator;
     int precedence;
 
     int count;
@@ -59,6 +67,7 @@ typedef struct eval_operand {
 } EVAL_OPERAND;
 
 extern EVAL_OPERAND *parse_expression(const char *string, const char **failed_at, int *error);
+extern calculated_number evaluate_expression(EVAL_OPERAND *expression, int *error);
 extern void free_expression(EVAL_OPERAND *op);
 
 #endif //NETDATA_EVAL_H
