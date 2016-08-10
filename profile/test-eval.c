@@ -18,45 +18,45 @@ void indent(int level, int show) {
 	else printf(" \\_  ");
 }
 
-void print_operand(EVAL_OPERAND *op, int level);
+void print_node(EVAL_NODE *op, int level);
 
 void print_value(EVAL_VALUE *v, int level) {
 	indent(level, 0);
 
 	switch(v->type) {
 		case EVAL_VALUE_INVALID:
-			printf("VALUE (NOP)\n");
+			printf("value (NOP)\n");
 			break;
 
 		case EVAL_VALUE_NUMBER:
-			printf("VALUE %Lf (NUMBER)\n", v->number);
+			printf("value %Lf (NUMBER)\n", v->number);
 			break;
 
 		case EVAL_VALUE_EXPRESSION:
-			printf("VALUE (SUB-EXPRESSION)\n");
-			print_operand(v->expression, level+1);
+			printf("value (SUB-EXPRESSION)\n");
+			print_node(v->expression, level+1);
 			break;
 
 		default:
-			printf("VALUE (INVALID type %d)\n", v->type);
+			printf("value (INVALID type %d)\n", v->type);
 			break;
 
 	}
 }
 
-void print_operand(EVAL_OPERAND *op, int level) {
+void print_node(EVAL_NODE *op, int level) {
 
 //	if(op->operator != EVAL_OPERATOR_NOP) {
 		indent(level, 1);
-		if(op->operator) printf("%c (OPERATOR %d, prec: %d)\n", op->operator, op->id, op->precedence);
-		else printf("NOP (OPERATOR %d, prec: %d)\n", op->id, op->precedence);
+		if(op->operator) printf("%c (node %d, precedence: %d)\n", op->operator, op->id, op->precedence);
+		else printf("NOP (node %d, precedence: %d)\n", op->id, op->precedence);
 //	}
 
 	int i = op->count;
 	while(i--) print_value(&op->ops[i], level + 1);
 }
 
-calculated_number evaluate(EVAL_OPERAND *op, int depth);
+calculated_number evaluate(EVAL_NODE *op, int depth);
 
 calculated_number evaluate_value(EVAL_VALUE *v, int depth) {
 	switch(v->type) {
@@ -78,7 +78,7 @@ void print_depth(int depth) {
 	while(depth--) printf("    ");
 }
 
-calculated_number evaluate(EVAL_OPERAND *op, int depth) {
+calculated_number evaluate(EVAL_NODE *op, int depth) {
 	calculated_number n1, n2, r;
 
 	switch(op->operator) {
@@ -237,19 +237,19 @@ calculated_number evaluate(EVAL_OPERAND *op, int depth) {
 	return r;
 }
 
-void print_expression(EVAL_OPERAND *op, const char *failed_at, int error) {
+void print_expression(EVAL_NODE *op, const char *failed_at, int error) {
 	if(op) {
 		printf("expression tree:\n");
-		print_operand(op, 0);
+		print_node(op, 0);
 
 		printf("\nevaluation steps:\n");
 		evaluate(op, 0);
 		
 		int error;
-		calculated_number ret = evaluate_expression(op, &error);
+		calculated_number ret = expression_evaluate(op, &error);
 		printf("\ninternal evaluator:\nSTATUS: %d, RESULT = %Lf\n", error, ret);
 
-		free_expression(op);
+		expression_free(op);
 	}
 	else {
 		printf("error: %d, failed_at: '%s'\n", error, (failed_at)?failed_at:"<NONE>");
@@ -265,7 +265,7 @@ int main(int argc, char **argv) {
 
 	const char *failed_at = NULL;
 	int error;
-	EVAL_OPERAND *op = parse_expression(argv[1], &failed_at, &error);
+	EVAL_NODE *op = expression_parse(argv[1], &failed_at, &error);
 	print_expression(op, failed_at, error);
 	return 0;
 }
