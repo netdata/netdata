@@ -2,8 +2,6 @@
 
 extern void *cgroups_main(void *ptr);
 
-volatile sig_atomic_t netdata_exit = 0;
-
 void netdata_cleanup_and_exit(int ret) {
 	netdata_exit = 1;
 
