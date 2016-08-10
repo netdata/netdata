@@ -7,13 +7,6 @@
  *
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <inttypes.h>
-
-#include "dictionary.h"
-#include "main.h"
-#include "log.h"
 #include "common.h"
 
 struct myvalue {

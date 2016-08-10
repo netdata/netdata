@@ -3,6 +3,8 @@
 char *global_host_prefix = "";
 int enable_ksm = 1;
 
+volatile sig_atomic_t netdata_exit = 0;
+
 // time(NULL) in milliseconds
 unsigned long long timems(void) {
 	struct timeval now;
