@@ -353,7 +353,7 @@ class PythonCharts(object):
                         pass
             except AttributeError as e:
                 self._stop(job)
-                msg.error(job.chart_name, "cannot find check() function.")
+                msg.error(job.chart_name, "cannot find check() function or it thrown unhandled exception.")
                 msg.debug(str(e))
             except (UnboundLocalError, Exception) as e:
                 msg.error(job.chart_name, str(e))
@@ -390,7 +390,7 @@ class PythonCharts(object):
                     # sys.stdout.flush()
                     i += 1
             except AttributeError:
-                msg.error(job.chart_name, "cannot find create() function.")
+                msg.error(job.chart_name, "cannot find create() function or it thrown unhandled exception.")
                 self._stop(job)
             except (UnboundLocalError, Exception) as e:
                 msg.error(job.chart_name, str(e))
