@@ -695,7 +695,7 @@ static inline EVAL_NODE *parse_one_full_operand(const char **string, int *error)
         op1->operator = EVAL_OPERATOR_VALUE;
         eval_node_set_value_to_constant(op1, 0, number);
     }
-    else if(*string)
+    else if(**string)
         *error = EVAL_ERROR_UNKNOWN_OPERAND;
     else
         *error = EVAL_ERROR_MISSING_OPERAND;
@@ -741,7 +741,7 @@ static inline EVAL_NODE *parse_rest_of_expression(const char **string, int *erro
 
         return parse_rest_of_expression(string, error, op);
     }
-    else if(**string == EVAL_OPERATOR_EXPRESSION_CLOSE) {
+    else if(**string == ')') {
         ;
     }
     else if(**string) {
@@ -793,6 +793,14 @@ EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, in
 
     s = string;
     EVAL_NODE *op = parse_full_expression(&s, &err);
+
+    if(*s) {
+        if(op) {
+            eval_node_free(op);
+            op = NULL;
+        }
+        err = EVAL_ERROR_REMAINING_GARBAGE;
+    }
 
     if (failed_at) *failed_at = s;
     if (error) *error = err;
@@ -851,6 +859,9 @@ const char *expression_strerror(int error) {
 
         case EVAL_ERROR_MISSING_OPERATOR:
             return "expected operator";
+
+        case EVAL_ERROR_REMAINING_GARBAGE:
+            return "remaining characters after expression";
 
         case EVAL_ERROR_INVALID_VALUE:
             return "invalid value structure - internal error";
