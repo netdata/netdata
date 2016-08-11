@@ -107,17 +107,25 @@ This is what it currently monitors (most with zero configuration):
 
 - **Users and User Groups resource usage**, by summarizing the process tree per user and group (CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets, etc)
 
-- **Apache web server** mod-status (v2.2, v2.4)
+- **Apache web server** mod-status (v2.2, v2.4) and cache log statistics (multiple servers)
 
-- **Nginx web server** stub-status
+- **Nginx web server** stub-status (multiple servers)
 
 - **mySQL databases** (multiple servers, each showing: bandwidth, queries/s, handlers, locks, issues, tmp operations, connections, binlog metrics, threads, innodb metrics, etc)
+
+- **Redis databases** (multiple servers, each showing: operations, hit rate, memory, keys, clients, slaves)
+
+- **memcached databases** (multiple servers, each showing: bandwidth, connections, items, etc)
 
 - **ISC Bind name server** (multiple servers, each showing: clients, requests, queries, updates, failures and several per view metrics)
 
 - **Postfix email server** message queue (entries, size)
 
-- **Squid proxy server** (clients bandwidth and requests, servers bandwidth and requests) 
+- **exim email server** message queue (emails queued)
+
+- **IPFS** (Bandwidth, Peers)
+
+- **Squid proxy server** (multiple servers, each showing: clients bandwidth and requests, servers bandwidth and requests)
 
 - **Hardware sensors** (temperature, voltage, fans, power, humidity, etc)
 
@@ -126,6 +134,8 @@ This is what it currently monitors (most with zero configuration):
 - **Tomcat** (accesses, threads, free memory, volume)
 
 - **PHP-FPM** (multiple instances, each reporting connections, requests, performance)
+
+- **hddtemp** (disk temperatures)
 
 - **SNMP devices** can be monitored too (although you will need to configure these)
 
@@ -160,4 +170,3 @@ It should run on **any Linux** system. It has been tested on:
 ## Documentation
 
 Check the **[netdata wiki](https://github.com/firehol/netdata/wiki)**.
-

@@ -15,6 +15,7 @@
 // var netdataNoRegistry = true;		// Don't update the registry for this access
 // var netdataRegistryCallback = null;	// Callback function that will be invoked with one param,
 //                                         the URLs from the registry
+// var netdataShowHelp = true;			// enable/disable help
 //
 // You can also set the default netdata server, using the following.
 // When this variable is not set, we assume the page is hosted on your
@@ -153,6 +154,9 @@
 	else
 		NETDATA.themes.current = NETDATA.themes.white;
 
+	if(typeof netdataShowHelp === 'undefined')
+		netdataShowHelp = true;
+
 	NETDATA.colors = NETDATA.themes.current.colors;
 
 	// these are the colors Google Charts are using
@@ -268,7 +272,7 @@
 
 			destroy_on_hide: false,		// destroy charts when they are not visible
 
-			show_help: true,			// when enabled the charts will show some help
+			show_help: netdataShowHelp,	// when enabled the charts will show some help
 			show_help_delay_show_ms: 500,
 			show_help_delay_hide_ms: 0,
 
@@ -337,6 +341,7 @@
 			try {
 				// console.log('localStorage: loading "' + key.toString() + '"');
 				ret = localStorage.getItem(key.toString());
+				// console.log('netdata loaded: ' + key.toString() + ' = ' + ret.toString());
 				if(ret === null || ret === 'undefined') {
 					// console.log('localStorage: cannot load it, saving "' + key.toString() + '" with value "' + JSON.stringify(def) + '"');
 					localStorage.setItem(key.toString(), JSON.stringify(def));
@@ -624,6 +629,8 @@
 		force_before_ms: null,	// the timespan to sync all other charts
 		force_after_ms: null,
 
+		callback: null,
+
 		// set a new master
 		setMaster: function(state, after, before) {
 			if(NETDATA.options.current.sync_pan_and_zoom === false)
@@ -638,6 +645,9 @@
 			this.force_after_ms = after;
 			this.force_before_ms = before;
 			NETDATA.options.auto_refresher_stop_until = now + NETDATA.options.current.global_pan_sync_time;
+
+			if(typeof this.callback === 'function')
+				this.callback(true, after, before);
 		},
 
 		// clear the master
@@ -653,6 +663,9 @@
 			this.force_after_ms = null;
 			this.force_before_ms = null;
 			NETDATA.options.auto_refresher_stop_until = 0;
+
+			if(typeof this.callback === 'function')
+				this.callback(false, 0, 0);
 		},
 
 		// is the given state the master of the global
@@ -3395,7 +3408,7 @@
 		NETDATA.parseDom(NETDATA.chartRefresher);
 
 		// Registry initialization
-		setTimeout(NETDATA.registry.init, 3000);
+		setTimeout(NETDATA.registry.init, 1000);
 	};
 
 	// ----------------------------------------------------------------------------------------------------------------

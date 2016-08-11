@@ -5,13 +5,23 @@ After=network.target httpd.service squid.service nfs-server.service mysqld.servi
 [Service]
 Type=forking
 WorkingDirectory=/tmp
-User=root
-Group=root
-PIDFile=@localstatedir_POST@/run/netdata.pid
-ExecStart=@sbindir_POST@/netdata -P @localstatedir_POST@/run/netdata.pid
+User=netdata
+Group=netdata
+RuntimeDirectory=netdata
+PIDFile=@localstatedir_POST@/run/netdata/netdata.pid
+ExecStart=@sbindir_POST@/netdata -P @localstatedir_POST@/run/netdata/netdata.pid
 KillMode=mixed
 KillSignal=SIGTERM
 TimeoutStopSec=30
+
+#Hardening
+AmbientCapabilities=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+#NoNewPrivileges=true is implicitly set by the MemoryDenyWriteExecute=true
+MemoryDenyWriteExecute=true
 
 [Install]
 WantedBy=multi-user.target
