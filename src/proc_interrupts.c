@@ -23,10 +23,7 @@ static inline struct interrupt *get_interrupts_array(int lines, int cpus) {
 
 	if(lines < allocated) return irrs;
 	else {
-		irrs = (struct interrupt *)realloc(irrs, lines * recordsize(cpus));
-		if(!irrs)
-			fatal("Cannot allocate memory for %d interrupts", lines);
-
+		irrs = (struct interrupt *)reallocz(irrs, lines * recordsize(cpus));
 		allocated = lines;
 	}
 

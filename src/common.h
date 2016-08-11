@@ -123,6 +123,13 @@ extern char *strncpyz(char *dst, const char *src, size_t n);
 extern int  vsnprintfz(char *dst, size_t n, const char *fmt, va_list args);
 extern int  snprintfz(char *dst, size_t n, const char *fmt, ...) __attribute__ (( format (printf, 3, 4)));
 
+// memory allocation functions that handle failures
+extern char *strdupz(const char *s);
+extern void *callocz(size_t nmemb, size_t size);
+extern void *mallocz(size_t size);
+extern void freez(void *ptr);
+extern void *reallocz(void *ptr, size_t size);
+
 extern void *mymmap(const char *filename, size_t size, int flags, int ksm);
 extern int savememory(const char *filename, void *mem, size_t size);
 

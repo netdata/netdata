@@ -1,7 +1,7 @@
 #include "common.h"
 
 int listen_backlog = LISTEN_BACKLOG;
-int listen_fds_count = 0;
+size_t listen_fds_count = 0;
 int listen_fds[MAX_LISTEN_FDS] = { [0 ... 99] = -1 };
 char *listen_fds_names[MAX_LISTEN_FDS] = { [0 ... 99] = NULL };
 int listen_port = LISTEN_PORT;
@@ -165,14 +165,14 @@ static inline int add_listen_socket(int fd, const char *ip, int port) {
 
     char buffer[100 + 1];
     snprintfz(buffer, 100, "[%s]:%d", ip, port);
-    listen_fds_names[listen_fds_count] = strdup(buffer);
+    listen_fds_names[listen_fds_count] = strdupz(buffer);
 
     listen_fds_count++;
     return 0;
 }
 
 int is_listen_socket(int fd) {
-    int i;
+    size_t i;
     for(i = 0; i < listen_fds_count ;i++)
         if(listen_fds[i] == fd) return 1;
 
@@ -180,12 +180,12 @@ int is_listen_socket(int fd) {
 }
 
 static inline void close_listen_sockets(void) {
-    int i;
+    size_t i;
     for(i = 0; i < listen_fds_count ;i++) {
         close(listen_fds[i]);
         listen_fds[i] = -1;
 
-        if(listen_fds_names[i]) free(listen_fds_names[i]);
+        freez(listen_fds_names[i]);
         listen_fds_names[i] = NULL;
     }
 
@@ -319,7 +319,7 @@ int create_listen_sockets(void) {
     if(!listen_fds_count)
         fatal("Cannot listen on any socket. Exiting...");
 
-	return listen_fds_count;
+	return (int)listen_fds_count;
 }
 
 // --------------------------------------------------------------------------------------
@@ -367,11 +367,9 @@ void *socket_listen_main_multi_threaded(void *ptr) {
 	if(!listen_fds_count)
 		fatal("LISTENER: No sockets to listen to.");
 
-	struct pollfd *fds = calloc(sizeof(struct pollfd), listen_fds_count);
-	if(!fds)
-		fatal("LISTENER: Cannot allocate memory for poll fds.");
+	struct pollfd *fds = callocz(sizeof(struct pollfd), listen_fds_count);
 
-	int i;
+	size_t i;
 	for(i = 0; i < listen_fds_count ;i++) {
 		fds[i].fd = listen_fds[i];
 		fds[i].events = POLLIN;
@@ -489,20 +487,17 @@ void *socket_listen_main_single_threaded(void *ptr) {
 	struct web_client *w;
 	int retval;
 
-	if(ptr) { ; }
-
 	if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
 		error("Cannot set pthread cancel type to DEFERRED.");
 
 	if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
 		error("Cannot set pthread cancel state to ENABLE.");
 
-	int i;
-
 	if(!listen_fds_count)
 		fatal("LISTENER: no listen sockets available.");
 
-	for(i = 0; i < FD_SETSIZE ; i++)
+    size_t i;
+    for(i = 0; i < FD_SETSIZE ; i++)
 		single_threaded_clients[i] = NULL;
 
 	fd_set ifds, ofds, efds, rifds, rofds, refds;
@@ -549,7 +544,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
 				}
 			}
 
-			for(i = 0 ; i <= fdmax ; i++) {
+			for(i = 0 ; i <= (size_t)fdmax ; i++) {
 				if(likely(!FD_ISSET(i, &rifds) && !FD_ISSET(i, &rofds) && !FD_ISSET(i, &refds)))
 					continue;
 

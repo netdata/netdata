@@ -667,9 +667,7 @@ int main(int argc, char **argv)
 		struct netdata_static_thread *st = &static_threads[i];
 
 		if(st->enabled) {
-			st->thread = malloc(sizeof(pthread_t));
-			if(!st->thread)
-				fatal("Cannot allocate pthread_t memory");
+			st->thread = mallocz(sizeof(pthread_t));
 
 			info("Starting thread %s.", st->name);
 

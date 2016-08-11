@@ -1150,11 +1150,11 @@ inline static void rrdr_free(RRDR *r)
 	}
 
 	rrdr_unlock_rrdset(r);
-	if(likely(r->t)) free(r->t);
-	if(likely(r->v)) free(r->v);
-	if(likely(r->o)) free(r->o);
-	if(likely(r->od)) free(r->od);
-	free(r);
+	freez(r->t);
+	freez(r->v);
+	freez(r->o);
+	freez(r->od);
+	freez(r);
 }
 
 inline void rrdr_done(RRDR *r)
@@ -1170,9 +1170,7 @@ static RRDR *rrdr_create(RRDSET *st, long n)
 		return NULL;
 	}
 
-	RRDR *r = calloc(1, sizeof(RRDR));
-	if(unlikely(!r)) goto cleanup;
-
+	RRDR *r = callocz(1, sizeof(RRDR));
 	r->st = st;
 
 	rrdr_lock_rrdset(r);
@@ -1182,17 +1180,10 @@ static RRDR *rrdr_create(RRDSET *st, long n)
 
 	r->n = n;
 
-	r->t = malloc(n * sizeof(time_t));
-	if(unlikely(!r->t)) goto cleanup;
-
-	r->v = malloc(n * r->d * sizeof(calculated_number));
-	if(unlikely(!r->v)) goto cleanup;
-
-	r->o = malloc(n * r->d * sizeof(uint8_t));
-	if(unlikely(!r->o)) goto cleanup;
-
-	r->od = malloc(r->d * sizeof(uint8_t));
-	if(unlikely(!r->od)) goto cleanup;
+	r->t = mallocz(n * sizeof(time_t));
+	r->v = mallocz(n * r->d * sizeof(calculated_number));
+	r->o = mallocz(n * r->d * sizeof(uint8_t));
+	r->od = mallocz(r->d * sizeof(uint8_t));
 
 	// set the hidden flag on hidden dimensions
 	int c;
@@ -1202,16 +1193,10 @@ static RRDR *rrdr_create(RRDSET *st, long n)
 	}
 
 	r->c = -1;
-
 	r->group = 1;
 	r->update_every = 1;
 
 	return r;
-
-cleanup:
-	error("Cannot allocate RRDR memory for %ld entries", n);
-	if(likely(r)) rrdr_free(r);
-	return NULL;
 }
 
 RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int group_method, int aligned)

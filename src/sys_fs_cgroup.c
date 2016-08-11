@@ -261,13 +261,9 @@ void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
 		}
 
 		if(i != ca->cpus) {
-			free(ca->cpu_percpu);
-
-			ca->cpu_percpu = malloc(sizeof(unsigned long long) * i);
-			if(!ca->cpu_percpu)
-				fatal("Cannot allocate memory (%zu bytes)", sizeof(unsigned long long) * i);
-
-			ca->cpus = i;
+			freez(ca->cpu_percpu);
+			ca->cpu_percpu = mallocz(sizeof(unsigned long long) * i);
+			ca->cpus = (unsigned int)i;
 		}
 
 		for(i = 0; i < ca->cpus ;i++) {
@@ -612,17 +608,12 @@ void cgroup_get_chart_id(struct cgroup *cg) {
 
 		trim(s);
 
-		free(cg->chart_title);
-		cg->chart_title = strdup(s);
-		if(!cg->chart_title)
-			fatal("CGROUP: Cannot allocate memory for chart name of cgroup '%s' chart name: '%s'", cg->id, s);
-
+		freez(cg->chart_title);
+		cg->chart_title = strdupz(s);
 		netdata_fix_chart_name(cg->chart_title);
 
-		free(cg->chart_id);
-		cg->chart_id = strdup(s);
-		if(!cg->chart_id)
-			fatal("CGROUP: Cannot allocate memory for chart id of cgroup '%s' chart id: '%s'", cg->id, s);
+		freez(cg->chart_id);
+		cg->chart_id = strdupz(s);
 
 		netdata_fix_chart_id(cg->chart_id);
 
@@ -683,21 +674,15 @@ struct cgroup *cgroup_add(const char *id) {
 		}
 	}
 
-	struct cgroup *cg = calloc(1, sizeof(struct cgroup));
-	if(!cg) fatal("Cannot allocate memory for cgroup '%s'", id);
+	struct cgroup *cg = callocz(1, sizeof(struct cgroup));
 
 	debug(D_CGROUP, "adding cgroup '%s'", id);
 
-	cg->id = strdup(id);
-	if(!cg->id) fatal("Cannot allocate memory for cgroup '%s'", id);
-
+	cg->id = strdupz(id);
 	cg->hash = simple_hash(cg->id);
 
-	cg->chart_id = strdup(chart_id);
-	if(!cg->chart_id) fatal("Cannot allocate memory for cgroup '%s'", id);
-
-	cg->chart_title = strdup(chart_id);
-	if(!cg->chart_title) fatal("Cannot allocate memory for cgroup '%s'", id);
+	cg->chart_id = strdupz(chart_id);
+	cg->chart_title = strdupz(chart_id);
 
 	if(!cgroup_root)
 		cgroup_root = cg;
@@ -725,22 +710,22 @@ struct cgroup *cgroup_add(const char *id) {
 void cgroup_free(struct cgroup *cg) {
 	debug(D_CGROUP, "Removing cgroup '%s' with chart id '%s' (was %s and %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (cg->available)?"available":"not available");
 
-	free(cg->cpuacct_usage.cpu_percpu);
+	freez(cg->cpuacct_usage.cpu_percpu);
 
-	free(cg->cpuacct_stat.filename);
-	free(cg->cpuacct_usage.filename);
-	free(cg->memory.filename);
-	free(cg->io_service_bytes.filename);
-	free(cg->io_serviced.filename);
-	free(cg->throttle_io_service_bytes.filename);
-	free(cg->throttle_io_serviced.filename);
-	free(cg->io_merged.filename);
-	free(cg->io_queued.filename);
+	freez(cg->cpuacct_stat.filename);
+	freez(cg->cpuacct_usage.filename);
+	freez(cg->memory.filename);
+	freez(cg->io_service_bytes.filename);
+	freez(cg->io_serviced.filename);
+	freez(cg->throttle_io_service_bytes.filename);
+	freez(cg->throttle_io_serviced.filename);
+	freez(cg->io_merged.filename);
+	freez(cg->io_queued.filename);
 
-	free(cg->id);
-	free(cg->chart_id);
-	free(cg->chart_title);
-	free(cg);
+	freez(cg->id);
+	freez(cg->chart_id);
+	freez(cg->chart_title);
+	freez(cg);
 
 	cgroup_root_count--;
 }
@@ -833,15 +818,12 @@ void find_dir_in_subdirs(const char *base, const char *this, void (*callback)(co
 			}
 
 			if(enabled) {
-				char *s = malloc(dirlen + strlen(de->d_name) + 2);
-				if(s) {
-					strcpy(s, this);
-					strcat(s, "/");
-					strcat(s, de->d_name);
-					find_dir_in_subdirs(base, s, callback);
-					free(s);
-				}
-				else error("Cannot allocate memory.");
+				char *s = mallocz(dirlen + strlen(de->d_name) + 2);
+                strcpy(s, this);
+                strcat(s, "/");
+                strcat(s, de->d_name);
+                find_dir_in_subdirs(base, s, callback);
+                freez(s);
 			}
 		}
 	}
@@ -920,7 +902,7 @@ void find_all_cgroups() {
 		if(cgroup_enable_cpuacct_stat && !cg->cpuacct_stat.filename) {
 			snprintfz(filename, FILENAME_MAX, "%s%s/cpuacct.stat", cgroup_cpuacct_base, cg->id);
 			if(stat(filename, &buf) != -1) {
-				cg->cpuacct_stat.filename = strdup(filename);
+				cg->cpuacct_stat.filename = strdupz(filename);
 				debug(D_CGROUP, "cpuacct.stat filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_stat.filename);
 			}
 			else debug(D_CGROUP, "cpuacct.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
@@ -928,7 +910,7 @@ void find_all_cgroups() {
 		if(cgroup_enable_cpuacct_usage && !cg->cpuacct_usage.filename) {
 			snprintfz(filename, FILENAME_MAX, "%s%s/cpuacct.usage_percpu", cgroup_cpuacct_base, cg->id);
 			if(stat(filename, &buf) != -1) {
-				cg->cpuacct_usage.filename = strdup(filename);
+				cg->cpuacct_usage.filename = strdupz(filename);
 				debug(D_CGROUP, "cpuacct.usage_percpu filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_usage.filename);
 			}
 			else debug(D_CGROUP, "cpuacct.usage_percpu file for cgroup '%s': '%s' does not exist.", cg->id, filename);
@@ -936,7 +918,7 @@ void find_all_cgroups() {
 		if(cgroup_enable_memory && !cg->memory.filename) {
 			snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_memory_base, cg->id);
 			if(stat(filename, &buf) != -1) {
-				cg->memory.filename = strdup(filename);
+				cg->memory.filename = strdupz(filename);
 				debug(D_CGROUP, "memory.stat filename for cgroup '%s': '%s'", cg->id, cg->memory.filename);
 			}
 			else debug(D_CGROUP, "memory.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
@@ -945,7 +927,7 @@ void find_all_cgroups() {
 			if(!cg->io_service_bytes.filename) {
 				snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_service_bytes", cgroup_blkio_base, cg->id);
 				if(stat(filename, &buf) != -1) {
-					cg->io_service_bytes.filename = strdup(filename);
+					cg->io_service_bytes.filename = strdupz(filename);
 					debug(D_CGROUP, "io_service_bytes filename for cgroup '%s': '%s'", cg->id, cg->io_service_bytes.filename);
 				}
 				else debug(D_CGROUP, "io_service_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
@@ -953,7 +935,7 @@ void find_all_cgroups() {
 			if(!cg->io_serviced.filename) {
 				snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_serviced", cgroup_blkio_base, cg->id);
 				if(stat(filename, &buf) != -1) {
-					cg->io_serviced.filename = strdup(filename);
+					cg->io_serviced.filename = strdupz(filename);
 					debug(D_CGROUP, "io_serviced filename for cgroup '%s': '%s'", cg->id, cg->io_serviced.filename);
 				}
 				else debug(D_CGROUP, "io_serviced file for cgroup '%s': '%s' does not exist.", cg->id, filename);
@@ -961,7 +943,7 @@ void find_all_cgroups() {
 			if(!cg->throttle_io_service_bytes.filename) {
 				snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_service_bytes", cgroup_blkio_base, cg->id);
 				if(stat(filename, &buf) != -1) {
-					cg->throttle_io_service_bytes.filename = strdup(filename);
+					cg->throttle_io_service_bytes.filename = strdupz(filename);
 					debug(D_CGROUP, "throttle_io_service_bytes filename for cgroup '%s': '%s'", cg->id, cg->throttle_io_service_bytes.filename);
 				}
 				else debug(D_CGROUP, "throttle_io_service_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
@@ -969,7 +951,7 @@ void find_all_cgroups() {
 			if(!cg->throttle_io_serviced.filename) {
 				snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_serviced", cgroup_blkio_base, cg->id);
 				if(stat(filename, &buf) != -1) {
-					cg->throttle_io_serviced.filename = strdup(filename);
+					cg->throttle_io_serviced.filename = strdupz(filename);
 					debug(D_CGROUP, "throttle_io_serviced filename for cgroup '%s': '%s'", cg->id, cg->throttle_io_serviced.filename);
 				}
 				else debug(D_CGROUP, "throttle_io_serviced file for cgroup '%s': '%s' does not exist.", cg->id, filename);
@@ -977,7 +959,7 @@ void find_all_cgroups() {
 			if(!cg->io_merged.filename) {
 				snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_merged", cgroup_blkio_base, cg->id);
 				if(stat(filename, &buf) != -1) {
-					cg->io_merged.filename = strdup(filename);
+					cg->io_merged.filename = strdupz(filename);
 					debug(D_CGROUP, "io_merged filename for cgroup '%s': '%s'", cg->id, cg->io_merged.filename);
 				}
 				else debug(D_CGROUP, "io_merged file for cgroup '%s': '%s' does not exist.", cg->id, filename);
@@ -985,7 +967,7 @@ void find_all_cgroups() {
 			if(!cg->io_queued.filename) {
 				snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_queued", cgroup_blkio_base, cg->id);
 				if(stat(filename, &buf) != -1) {
-					cg->io_queued.filename = strdup(filename);
+					cg->io_queued.filename = strdupz(filename);
 					debug(D_CGROUP, "io_queued filename for cgroup '%s': '%s'", cg->id, cg->io_queued.filename);
 				}
 				else debug(D_CGROUP, "io_queued file for cgroup '%s': '%s' does not exist.", cg->id, filename);

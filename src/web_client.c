@@ -48,12 +48,7 @@ struct web_client *web_client_create(int listener)
 {
 	struct web_client *w;
 
-	w = calloc(1, sizeof(struct web_client));
-	if(!w) {
-		error("Cannot allocate new web_client memory.");
-		return NULL;
-	}
-
+	w = callocz(1, sizeof(struct web_client));
 	w->id = ++web_clients_count;
 	w->mode = WEB_CLIENT_MODE_NORMAL;
 
@@ -67,7 +62,7 @@ struct web_client *web_client_create(int listener)
 		w->ifd = accept4(listener, sadr, &addrlen, SOCK_NONBLOCK);
 		if (w->ifd == -1) {
 			error("%llu: Cannot accept new incoming connection.", w->id);
-			free(w);
+			freez(w);
 			return NULL;
 		}
 		w->ofd = w->ifd;
@@ -109,32 +104,8 @@ struct web_client *web_client_create(int listener)
 	}
 
 	w->response.data = buffer_create(INITIAL_WEB_DATA_LENGTH);
-	if(unlikely(!w->response.data)) {
-		// no need for error log - web_buffer_create already logged the error
-		close(w->ifd);
-		free(w);
-		return NULL;
-	}
-
 	w->response.header = buffer_create(HTTP_RESPONSE_HEADER_SIZE);
-	if(unlikely(!w->response.header)) {
-		// no need for error log - web_buffer_create already logged the error
-		buffer_free(w->response.data);
-		close(w->ifd);
-		free(w);
-		return NULL;
-	}
-
 	w->response.header_output = buffer_create(HTTP_RESPONSE_HEADER_SIZE);
-	if(unlikely(!w->response.header_output)) {
-		// no need for error log - web_buffer_create already logged the error
-		buffer_free(w->response.header);
-		buffer_free(w->response.data);
-		close(w->ifd);
-		free(w);
-		return NULL;
-	}
-
 	w->origin[0] = '*';
 	w->wait_receive = 1;
 
@@ -263,7 +234,7 @@ struct web_client *web_client_free(struct web_client *w) {
 	if(w->response.data) buffer_free(w->response.data);
 	if(w->ifd != -1) close(w->ifd);
 	if(w->ofd != -1 && w->ofd != w->ifd) close(w->ofd);
-	free(w);
+	freez(w);
 
 	global_statistics.connected_clients--;
 
@@ -700,10 +671,8 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
 			if(!dimensions)
 				dimensions = buffer_create(100);
 
-			if(dimensions) {
-				buffer_strcat(dimensions, "|");
-				buffer_strcat(dimensions, value);
-			}
+            buffer_strcat(dimensions, "|");
+            buffer_strcat(dimensions, value);
 		}
 		else if(!strcmp(name, "after")) after_str = value;
 		else if(!strcmp(name, "before")) before_str = value;
@@ -861,10 +830,8 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 		if(!strcmp(name, "chart")) chart = value;
 		else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
 			if(!dimensions) dimensions = buffer_create(100);
-			if(dimensions) {
-				buffer_strcat(dimensions, "|");
-				buffer_strcat(dimensions, value);
-			}
+            buffer_strcat(dimensions, "|");
+            buffer_strcat(dimensions, value);
 		}
 		else if(!strcmp(name, "after")) after_str = value;
 		else if(!strcmp(name, "before")) before_str = value;

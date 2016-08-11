@@ -46,19 +46,16 @@ int become_user(const char *username, int access_fd, int output_fd, int error_fd
 	uid_t uid = pw->pw_uid;
 	gid_t gid = pw->pw_gid;
 
-	int ngroups =  sysconf(_SC_NGROUPS_MAX);
+	int ngroups = (int)sysconf(_SC_NGROUPS_MAX);
 	gid_t *supplementary_groups = NULL;
 	if(ngroups) {
-		supplementary_groups = malloc(sizeof(gid_t) * ngroups);
-		if(supplementary_groups) {
-			if(getgrouplist(username, gid, supplementary_groups, &ngroups) == -1) {
-				error("Cannot get supplementary groups of user '%s'.", username);
-				free(supplementary_groups);
-				supplementary_groups = NULL;
-				ngroups = 0;
-			}
+		supplementary_groups = mallocz(sizeof(gid_t) * ngroups);
+		if(getgrouplist(username, gid, supplementary_groups, &ngroups) == -1) {
+			error("Cannot get supplementary groups of user '%s'.", username);
+			freez(supplementary_groups);
+			supplementary_groups = NULL;
+			ngroups = 0;
 		}
-		else fatal("Cannot allocate memory for %d supplementary groups", ngroups);
 	}
 
 	properly_chown_netdata_generated_file(access_fd, uid, gid);
@@ -70,7 +67,7 @@ int become_user(const char *username, int access_fd, int output_fd, int error_fd
 		if(setgroups(ngroups, supplementary_groups) == -1)
 			error("Cannot set supplementary groups for user '%s'", username);
 
-		free(supplementary_groups);
+		freez(supplementary_groups);
 		supplementary_groups = NULL;
 		ngroups = 0;
 	}

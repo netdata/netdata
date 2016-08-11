@@ -121,11 +121,8 @@ static inline struct config *config_section_create(const char *section)
 {
 	debug(D_CONFIG, "Creating section '%s'.", section);
 
-	struct config *co = calloc(1, sizeof(struct config));
-	if(!co) fatal("Cannot allocate config");
-
-	co->name = strdup(section);
-	if(!co->name) fatal("Cannot allocate config.name");
+	struct config *co = callocz(1, sizeof(struct config));
+	co->name = strdupz(section);
 	co->hash = simple_hash(co->name);
 
 	avl_init_lock(&co->values_index, config_value_compare);
@@ -152,15 +149,10 @@ static inline struct config_value *config_value_create(struct config *co, const 
 {
 	debug(D_CONFIG, "Creating config entry for name '%s', value '%s', in section '%s'.", name, value, co->name);
 
-	struct config_value *cv = calloc(1, sizeof(struct config_value));
-	if(!cv) fatal("Cannot allocate config_value");
-
-	cv->name = strdup(name);
-	if(!cv->name) fatal("Cannot allocate config.name");
+	struct config_value *cv = callocz(1, sizeof(struct config_value));
+	cv->name = strdupz(name);
 	cv->hash = simple_hash(cv->name);
-
-	cv->value = strdup(value);
-	if(!cv->value) fatal("Cannot allocate config.value");
+	cv->value = strdupz(value);
 
 	config_value_index_add(co, cv);
 
@@ -208,9 +200,8 @@ int config_rename(const char *section, const char *old, const char *new) {
 
 	config_value_index_del(co, cv);
 
-	free(cv->name);
-	cv->name = strdup(new);
-	if(!cv->name) fatal("Cannot allocate memory for config_rename()");
+	freez(cv->name);
+	cv->name = strdupz(new);
 
 	cv->hash = simple_hash(cv->name);
 
@@ -322,9 +313,8 @@ const char *config_set_default(const char *section, const char *name, const char
 	if(strcmp(cv->value, value) != 0) {
 		cv->flags |= CONFIG_VALUE_CHANGED;
 
-		free(cv->value);
-		cv->value = strdup(value);
-		if(!cv->value) fatal("Cannot allocate config.value");
+		freez(cv->value);
+		cv->value = strdupz(value);
 	}
 
 	return cv->value;
@@ -346,9 +336,8 @@ const char *config_set(const char *section, const char *name, const char *value)
 	if(strcmp(cv->value, value) != 0) {
 		cv->flags |= CONFIG_VALUE_CHANGED;
 
-		free(cv->value);
-		cv->value = strdup(value);
-		if(!cv->value) fatal("Cannot allocate config.value");
+		freez(cv->value);
+		cv->value = strdupz(value);
 	}
 
 	return value;
@@ -448,9 +437,8 @@ int load_config(char *filename, int overwrite_used)
 		else {
 			if(((cv->flags & CONFIG_VALUE_USED) && overwrite_used) || !(cv->flags & CONFIG_VALUE_USED)) {
 				debug(D_CONFIG, "Line %d, overwriting '%s/%s'.", line, co->name, cv->name);
-				free(cv->value);
-				cv->value = strdup(value);
-				if(!cv->value) fatal("Cannot allocate config.value");
+				freez(cv->value);
+				cv->value = strdupz(value);
 			}
 			else
 				debug(D_CONFIG, "Ignoring line %d, '%s/%s' is already present and used.", line, co->name, cv->name);

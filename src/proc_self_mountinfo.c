@@ -69,9 +69,9 @@ void mountinfo_free(struct mountinfo *mi) {
 	if(likely(mi->next))
 		mountinfo_free(mi->next);
 
-	if(mi->root) free(mi->root);
-	if(mi->mount_point) free(mi->mount_point);
-	if(mi->mount_options) free(mi->mount_options);
+	freez(mi->root);
+	freez(mi->mount_point);
+	freez(mi->mount_options);
 
 /*
 	if(mi->optional_fields_count) {
@@ -81,15 +81,14 @@ void mountinfo_free(struct mountinfo *mi) {
 	}
 	free(mi->optional_fields);
 */
-	free(mi->filesystem);
-	free(mi->mount_source);
-	free(mi->super_options);
-	free(mi);
+	freez(mi->filesystem);
+	freez(mi->mount_source);
+	freez(mi->super_options);
+	freez(mi);
 }
 
-static char *strdup_decoding_octal(const char *string) {
-	char *buffer = strdup(string);
-	if(!buffer) fatal("Cannot allocate memory.");
+static char *strdupz_decoding_octal(const char *string) {
+	char *buffer = strdupz(string);
 
 	char *d = buffer;
 	const char *s = string;
@@ -137,8 +136,7 @@ struct mountinfo *mountinfo_read() {
 		if(procfile_linewords(ff, l) < 5)
 			continue;
 
-		mi = malloc(sizeof(struct mountinfo));
-		if(unlikely(!mi)) fatal("Cannot allocate memory for mountinfo");
+		mi = mallocz(sizeof(struct mountinfo));
 
 		if(unlikely(!root))
 			root = last = mi;
@@ -160,16 +158,13 @@ struct mountinfo *mountinfo_read() {
 		mi->major = strtoul(major, NULL, 10);
 		mi->minor = strtoul(minor, NULL, 10);
 
-		mi->root = strdup(procfile_lineword(ff, l, w)); w++;
-		if(unlikely(!mi->root)) fatal("Cannot allocate memory");
+		mi->root = strdupz(procfile_lineword(ff, l, w)); w++;
 		mi->root_hash = simple_hash(mi->root);
 
-		mi->mount_point = strdup_decoding_octal(procfile_lineword(ff, l, w)); w++;
-		if(unlikely(!mi->mount_point)) fatal("Cannot allocate memory");
+		mi->mount_point = strdupz_decoding_octal(procfile_lineword(ff, l, w)); w++;
 		mi->mount_point_hash = simple_hash(mi->mount_point);
 
-		mi->mount_options = strdup(procfile_lineword(ff, l, w)); w++;
-		if(unlikely(!mi->mount_options)) fatal("Cannot allocate memory");
+		mi->mount_options = strdupz(procfile_lineword(ff, l, w)); w++;
 
 		// count the optional fields
 /*
@@ -206,16 +201,13 @@ struct mountinfo *mountinfo_read() {
 		if(likely(*s == '-')) {
 			w++;
 
-			mi->filesystem = strdup(procfile_lineword(ff, l, w)); w++;
-			if(!mi->filesystem) fatal("Cannot allocate memory");
+			mi->filesystem = strdupz(procfile_lineword(ff, l, w)); w++;
 			mi->filesystem_hash = simple_hash(mi->filesystem);
 
-			mi->mount_source = strdup(procfile_lineword(ff, l, w)); w++;
-			if(!mi->mount_source) fatal("Cannot allocate memory");
+			mi->mount_source = strdupz(procfile_lineword(ff, l, w)); w++;
 			mi->mount_source_hash = simple_hash(mi->mount_source);
 
-			mi->super_options = strdup(procfile_lineword(ff, l, w)); w++;
-			if(!mi->super_options) fatal("Cannot allocate memory");
+			mi->super_options = strdupz(procfile_lineword(ff, l, w)); w++;
 		}
 		else {
 			mi->filesystem = NULL;
