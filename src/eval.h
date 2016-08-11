@@ -35,13 +35,14 @@ typedef struct eval_expression {
 #define EVAL_ERROR_UNKNOWN_OPERAND 2
 #define EVAL_ERROR_MISSING_OPERAND 3
 #define EVAL_ERROR_MISSING_OPERATOR 4
+#define EVAL_ERROR_REMAINING_GARBAGE 5
 
 // evaluation errors
-#define EVAL_ERROR_INVALID_VALUE 5
-#define EVAL_ERROR_INVALID_NUMBER_OF_OPERANDS 6
-#define EVAL_ERROR_VALUE_IS_NAN 7
-#define EVAL_ERROR_VALUE_IS_INFINITE 8
-#define EVAL_ERROR_UNKNOWN_VARIABLE 9
+#define EVAL_ERROR_INVALID_VALUE 11
+#define EVAL_ERROR_INVALID_NUMBER_OF_OPERANDS 12
+#define EVAL_ERROR_VALUE_IS_NAN 13
+#define EVAL_ERROR_VALUE_IS_INFINITE 14
+#define EVAL_ERROR_UNKNOWN_VARIABLE 15
 
 // parse the given string as an expression and return:
 //   a pointer to an expression if it parsed OK

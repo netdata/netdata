@@ -270,7 +270,7 @@ int main(int argc, char **argv) {
 
 	EVAL_EXPRESSION *exp = expression_parse(argv[1], &failed_at, &error);
 	if(!exp)
-		printf("\nFAILED\nExpression: '%s'\nParsing stopped at: '%s'\nError code: %d (%s)\n", argv[1], (failed_at)?failed_at:"<NONE>", error, expression_strerror(error));
+		printf("\nFAILED\nExpression: '%s'\nParsing stopped at: '%s'\nError code: %d (%s)\n", argv[1], (failed_at)?((*failed_at)?failed_at:"<END OF EXPRESSION>"):"<NONE>", error, expression_strerror(error));
 	
 	else {
 		printf("\nOK\nExpression: '%s'\nParsed as : '%s'\nError code: %d (%s)\n", argv[1], exp->parsed_as, error, expression_strerror(error));
