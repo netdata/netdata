@@ -63,12 +63,9 @@ static RRDCONTEXT *rrdcontext_index_find(RRDHOST *host, const char *id, uint32_t
 RRDCONTEXT *rrdcontext_create(const char *id) {
     RRDCONTEXT *rc = rrdcontext_index_find(&localhost, id, 0);
     if(!rc) {
-        rc = calloc(1, sizeof(RRDCONTEXT));
-        if(!rc) fatal("Cannot allocate RRDCONTEXT memory");
+        rc = callocz(1, sizeof(RRDCONTEXT));
 
-        rc->id = strdup(id);
-        if(!rc->id) fatal("Cannot allocate RRDCONTEXT.id memory");
-
+        rc->id = strdupz(id);
         rc->hash = simple_hash(rc->id);
 
         // initialize the variables index
@@ -93,8 +90,8 @@ void rrdcontext_free(RRDCONTEXT *rc) {
         if(rc->variables_root_index.avl_tree.root != NULL)
             fatal("INTERNAL ERROR: Variables index of RRDCONTEXT '%s' that is freed, is not empty.", rc->id);
 
-        free((void *)rc->id);
-        free(rc);
+        freez((void *)rc->id);
+        freez(rc);
     }
 }
 
@@ -465,11 +462,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
         st->variables = NULL;
 	}
 	else {
-		st = calloc(1, size);
-		if(!st) {
-			fatal("Cannot allocate memory for RRD_STATS %s.%s", type, id);
-			return NULL;
-		}
+		st = callocz(1, size);
 		st->mapped = RRD_MEMORY_MODE_RAM;
 	}
 	st->memsize = size;
@@ -611,12 +604,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 	else {
 		// if we didn't manage to get a mmap'd dimension, just create one
 
-		rd = calloc(1, size);
-		if(!rd) {
-			fatal("Cannot allocate RRD_DIMENSION %s/%s.", st->id, id);
-			return NULL;
-		}
-
+		rd = callocz(1, size);
 		rd->mapped = RRD_MEMORY_MODE_RAM;
 	}
 	rd->memsize = size;
@@ -723,7 +711,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
 	}
 	else {
 		debug(D_RRD_CALLS, "Removing dimension '%s'.", rd->name);
-		free(rd);
+		freez(rd);
 	}
 }
 
@@ -768,7 +756,7 @@ void rrdset_free_all(void)
 			munmap(st, st->memsize);
 		}
 		else
-			free(st);
+			freez(st);
 
 		st = next;
 	}

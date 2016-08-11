@@ -1,5 +1,8 @@
 #include "common.h"
 
+// linux calculates this once every 5 seconds
+#define MIN_LOADAVG_UPDATE_EVERY 5
+
 int do_proc_loadavg(int update_every, unsigned long long dt) {
 	static procfile *ff = NULL;
 	static int do_loadavg = -1, do_all_processes = -1;
@@ -44,7 +47,7 @@ int do_proc_loadavg(int update_every, unsigned long long dt) {
 	if(do_loadavg) {
 		st = rrdset_find_byname("system.load");
 		if(!st) {
-			st = rrdset_create("system", "load", NULL, "load", NULL, "System Load Average", "load", 100, update_every, RRDSET_TYPE_LINE);
+			st = rrdset_create("system", "load", NULL, "load", NULL, "System Load Average", "load", 100, (update_every < MIN_LOADAVG_UPDATE_EVERY)?MIN_LOADAVG_UPDATE_EVERY:update_every, RRDSET_TYPE_LINE);
 
 			rrddim_add(st, "load1", NULL, 1, 1000, RRDDIM_ABSOLUTE);
 			rrddim_add(st, "load5", NULL, 1, 1000, RRDDIM_ABSOLUTE);

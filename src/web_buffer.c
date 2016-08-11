@@ -323,18 +323,8 @@ BUFFER *buffer_create(size_t size)
 
 	debug(D_WEB_BUFFER, "Creating new web buffer of size %zu.", size);
 
-	b = calloc(1, sizeof(BUFFER));
-	if(!b) {
-		error("Cannot allocate a web_buffer.");
-		return NULL;
-	}
-
-	b->buffer = malloc(size + sizeof(BUFFER_OVERFLOW_EOF) + 2);
-	if(!b->buffer) {
-		error("Cannot allocate a buffer of size %zu.", size + sizeof(BUFFER_OVERFLOW_EOF) + 2);
-		free(b);
-		return NULL;
-	}
+	b = callocz(1, sizeof(BUFFER));
+	b->buffer = mallocz(size + sizeof(BUFFER_OVERFLOW_EOF) + 2);
 	b->buffer[0] = '\0';
 	b->size = size;
 	b->contenttype = CT_TEXT_PLAIN;
@@ -350,8 +340,8 @@ void buffer_free(BUFFER *b)
 
 	debug(D_WEB_BUFFER, "Freeing web buffer of size %zu.", b->size);
 
-	free(b->buffer);
-	free(b);
+	freez(b->buffer);
+	freez(b);
 }
 
 void buffer_increase(BUFFER *b, size_t free_size_required)
@@ -367,12 +357,7 @@ void buffer_increase(BUFFER *b, size_t free_size_required)
 
 	debug(D_WEB_BUFFER, "Increasing data buffer from size %zu to %zu.", b->size, b->size + increase);
 
-	b->buffer = realloc(b->buffer, b->size + increase + sizeof(BUFFER_OVERFLOW_EOF) + 2);
-	if(!b->buffer)
-		fatal("Failed to increase data buffer from size %zu to %zu.",
-			b->size + sizeof(BUFFER_OVERFLOW_EOF) + 2,
-			b->size + increase + sizeof(BUFFER_OVERFLOW_EOF) + 2);
-
+	b->buffer = reallocz(b->buffer, b->size + increase + sizeof(BUFFER_OVERFLOW_EOF) + 2);
 	b->size += increase;
 
 	buffer_overflow_init(b);

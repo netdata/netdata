@@ -579,8 +579,7 @@ static inline unsigned char parse_operator(const char **string, int *precedence)
 static inline EVAL_NODE *eval_node_alloc(int count) {
     static int id = 1;
 
-    EVAL_NODE *op = calloc(1, sizeof(EVAL_NODE) + (sizeof(EVAL_VALUE) * count));
-    if(!op) fatal("Cannot allocate memory for OPERAND with %d slots", count);
+    EVAL_NODE *op = callocz(1, sizeof(EVAL_NODE) + (sizeof(EVAL_VALUE) * count));
 
     op->id = id++;
     op->operator = EVAL_OPERATOR_NOP;
@@ -606,7 +605,7 @@ static inline void eval_node_set_value_to_constant(EVAL_NODE *op, int pos, calcu
 }
 
 static inline void eval_variable_free(EVAL_VARIABLE *v) {
-    free(v);
+    freez(v);
 }
 
 static inline void eval_value_free(EVAL_VALUE *v) {
@@ -631,7 +630,7 @@ static inline void eval_node_free(EVAL_NODE *op) {
             eval_value_free(&op->ops[i]);
     }
 
-    free(op);
+    freez(op);
 }
 
 // ----------------------------------------------------------------------------
@@ -820,11 +819,9 @@ EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, in
         return NULL;
     }
 
-    EVAL_EXPRESSION *exp = calloc(1, sizeof(EVAL_EXPRESSION));
-    if(!exp) fatal("Cannot allocate EVAL_EXPRESSION");
+    EVAL_EXPRESSION *exp = callocz(1, sizeof(EVAL_EXPRESSION));
 
-    exp->parsed_as = strdup(buffer_tostring(out));
-    if(!exp->parsed_as) fatal("Cannot allocate memory for parsed-as string");
+    exp->parsed_as = strdupz(buffer_tostring(out));
     buffer_free(out);
 
     exp->error_msg = buffer_create(100);
@@ -837,10 +834,10 @@ void expression_free(EVAL_EXPRESSION *exp) {
     if(!exp) return;
 
     if(exp->nodes) eval_node_free((EVAL_NODE *)exp->nodes);
-    free((void *)exp->source);
-    free((void *)exp->parsed_as);
+    freez((void *)exp->source);
+    freez((void *)exp->parsed_as);
     buffer_free(exp->error_msg);
-    free(exp);
+    freez(exp);
 }
 
 const char *expression_strerror(int error) {

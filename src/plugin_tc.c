@@ -140,12 +140,11 @@ static inline void tc_class_free(struct tc_device *n, struct tc_class *c) {
 
 	tc_class_index_del(n, c);
 
-	if(c->id) free(c->id);
-	if(c->name) free(c->name);
-	if(c->leafid) free(c->leafid);
-	if(c->parentid) free(c->parentid);
-
-	free(c);
+	freez(c->id);
+	freez(c->name);
+	freez(c->leafid);
+	freez(c->parentid);
+	freez(c);
 }
 
 static inline void tc_device_classes_cleanup(struct tc_device *d) {
@@ -429,45 +428,36 @@ static inline void tc_device_set_class_name(struct tc_device *d, char *id, char 
 {
 	struct tc_class *c = tc_class_index_find(d, id, 0);
 	if(likely(c)) {
-		if(likely(c->name))
-			free(c->name);
-
+		freez(c->name);
 		c->name = NULL;
 
 		if(likely(name && *name && strcmp(c->id, name) != 0)) {
 			debug(D_TC_LOOP, "TC: Setting device '%s', class '%s' name to '%s'", d->id, id, name);
-			c->name = strdup(name);
-			if(likely(c->name))
-				c->name_updated = 1;
+			c->name = strdupz(name);
+			c->name_updated = 1;
 		}
 	}
 }
 
 static inline void tc_device_set_device_name(struct tc_device *d, char *name) {
-	if(likely(d->name))
-		free(d->name);
-
+	freez(d->name);
 	d->name = NULL;
 
 	if(likely(name && *name && strcmp(d->id, name) != 0)) {
 		debug(D_TC_LOOP, "TC: Setting device '%s' name to '%s'", d->id, name);
-		d->name = strdup(name);
-		if(likely(d->name))
-			d->name_updated = 1;
+		d->name = strdupz(name);
+		d->name_updated = 1;
 	}
 }
 
 static inline void tc_device_set_device_family(struct tc_device *d, char *family) {
-	if(likely(d->family))
-		free(d->family);
-
+	freez(d->family);
 	d->family = NULL;
 
 	if(likely(family && *family && strcmp(d->id, family) != 0)) {
 		debug(D_TC_LOOP, "TC: Setting device '%s' family to '%s'", d->id, family);
-		d->family = strdup(family);
-		if(likely(d->family))
-			d->family_updated = 1;
+		d->family = strdupz(family);
+		d->family_updated = 1;
 	}
 	// no need for null termination - it is already null
 }
@@ -479,13 +469,9 @@ static inline struct tc_device *tc_device_create(char *id)
 	if(!d) {
 		debug(D_TC_LOOP, "TC: Creating device '%s'", id);
 
-		d = calloc(1, sizeof(struct tc_device));
-		if(!d) {
-			fatal("Cannot allocate memory for tc_device %s", id);
-			return NULL;
-		}
+		d = callocz(1, sizeof(struct tc_device));
 
-		d->id = strdup(id);
+		d->id = strdupz(id);
 		d->hash = simple_hash(d->id);
 		d->enabled = -1;
 
@@ -512,30 +498,22 @@ static inline struct tc_class *tc_class_add(struct tc_device *n, char *id, char 
 	if(!c) {
 		debug(D_TC_LOOP, "TC: Creating in device '%s', class id '%s', parentid '%s', leafid '%s'", n->id, id, parentid?parentid:"", leafid?leafid:"");
 
-		c = calloc(1, sizeof(struct tc_class));
-		if(!c) {
-			fatal("Cannot allocate memory for tc class");
-			return NULL;
-		}
+		c = callocz(1, sizeof(struct tc_class));
 
 		if(n->classes) n->classes->prev = c;
 		c->next = n->classes;
 		n->classes = c;
 
-		c->id = strdup(id);
-		if(!c->id) {
-			free(c);
-			return NULL;
-		}
+		c->id = strdupz(id);
 		c->hash = simple_hash(c->id);
 
 		if(parentid && *parentid) {
-			c->parentid = strdup(parentid);
+			c->parentid = strdupz(parentid);
 			c->parent_hash = simple_hash(c->parentid);
 		}
 
 		if(leafid && *leafid) {
-			c->leafid = strdup(leafid);
+			c->leafid = strdupz(leafid);
 			c->leaf_hash = simple_hash(c->leafid);
 		}
 
@@ -560,11 +538,10 @@ static inline void tc_device_free(struct tc_device *n)
 
 	while(n->classes) tc_class_free(n, n->classes);
 
-	if(n->id) free(n->id);
-	if(n->name) free(n->name);
-	if(n->family) free(n->family);
-
-	free(n);
+	freez(n->id);
+	freez(n->name);
+	freez(n->family);
+	freez(n);
 }
 
 static inline void tc_device_free_all()

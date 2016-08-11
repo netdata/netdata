@@ -77,15 +77,12 @@ static inline NAME_VALUE *dictionary_name_value_index_find_nolock(DICTIONARY *di
 static NAME_VALUE *dictionary_name_value_create_nolock(DICTIONARY *dict, const char *name, void *value, size_t value_len, uint32_t hash) {
 	debug(D_DICTIONARY, "Creating name value entry for name '%s'.", name);
 
-	NAME_VALUE *nv = calloc(1, sizeof(NAME_VALUE));
-	if(unlikely(!nv)) fatal("Cannot allocate name_value of size %zu", sizeof(NAME_VALUE));
+	NAME_VALUE *nv = callocz(1, sizeof(NAME_VALUE));
 
 	if(dict->flags & DICTIONARY_FLAG_NAME_LINK_DONT_CLONE)
 		nv->name = (char *)name;
 	else {
-		nv->name = strdup(name);
-		if (unlikely(!nv->name))
-			fatal("Cannot allocate name_value.name of size %zu", strlen(name));
+		nv->name = strdupz(name);
 	}
 
 	nv->hash = (hash)?hash:simple_hash(nv->name);
@@ -93,10 +90,7 @@ static NAME_VALUE *dictionary_name_value_create_nolock(DICTIONARY *dict, const c
 	if(dict->flags & DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE)
 		nv->value = value;
 	else {
-		nv->value = malloc(value_len);
-		if (unlikely(!nv->value))
-			fatal("Cannot allocate name_value.value of size %zu", value_len);
-
+		nv->value = mallocz(value_len);
 		memcpy(nv->value, value, value_len);
 	}
 
@@ -116,34 +110,30 @@ static void dictionary_name_value_destroy_nolock(DICTIONARY *dict, NAME_VALUE *n
 
 	if(!(dict->flags & DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE)) {
 		debug(D_REGISTRY, "Dictionary freeing value of '%s'", nv->name);
-		free(nv->value);
+		freez(nv->value);
 	}
 
 	if(!(dict->flags & DICTIONARY_FLAG_NAME_LINK_DONT_CLONE)) {
 		debug(D_REGISTRY, "Dictionary freeing name '%s'", nv->name);
-		free(nv->name);
+		freez(nv->name);
 	}
 
-	free(nv);
+	freez(nv);
 }
 
 // ----------------------------------------------------------------------------
 // API - basic methods
 
-DICTIONARY *dictionary_create(uint32_t flags) {
+DICTIONARY *dictionary_create(uint8_t flags) {
 	debug(D_DICTIONARY, "Creating dictionary.");
 
-	DICTIONARY *dict = calloc(1, sizeof(DICTIONARY));
-	if(unlikely(!dict)) fatal("Cannot allocate DICTIONARY");
+	DICTIONARY *dict = callocz(1, sizeof(DICTIONARY));
 
-	if(flags & DICTIONARY_FLAG_WITH_STATISTICS) {
-		dict->stats = calloc(1, sizeof(struct dictionary_stats));
-		if(!dict->stats) fatal("Cannot allocate statistics for DICTIONARY");
-	}
+	if(flags & DICTIONARY_FLAG_WITH_STATISTICS)
+		dict->stats = callocz(1, sizeof(struct dictionary_stats));
 
 	if(!(flags & DICTIONARY_FLAG_SINGLE_THREADED)) {
-		dict->rwlock = calloc(1, sizeof(pthread_rwlock_t));
-		if(!dict->rwlock) fatal("Cannot allocate pthread_rwlock_t for DICTIONARY");
+		dict->rwlock = callocz(1, sizeof(pthread_rwlock_t));
 		pthread_rwlock_init(dict->rwlock, NULL);
 	}
 
@@ -164,12 +154,12 @@ void dictionary_destroy(DICTIONARY *dict) {
 	dictionary_unlock(dict);
 
 	if(dict->stats)
-		free(dict->stats);
+		freez(dict->stats);
 
 	if(dict->rwlock)
-		free(dict->rwlock);
+		freez(dict->rwlock);
 
-	free(dict);
+	freez(dict);
 }
 
 // ----------------------------------------------------------------------------
@@ -201,17 +191,14 @@ void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t val
 
 			// copy the new value without breaking
 			// any other thread accessing the same entry
-			void *new = malloc(value_len),
+			void *new = mallocz(value_len),
 					*old = nv->value;
-
-			if(unlikely(!new))
-				fatal("Cannot allocate value of size %zu", value_len);
 
 			memcpy(new, value, value_len);
 			nv->value = new;
 
 			debug(D_REGISTRY, "Dictionary: freeing old value of '%s'", name);
-			free(old);
+			freez(old);
 		}
 	}
 

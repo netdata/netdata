@@ -155,6 +155,8 @@ typedef struct rrdcalc {
     time_t last_updated;
     time_t next_update;
 
+    EVAL_EXPRESSION *expression;
+
     calculated_number value;
 
     RRDVAR *local;

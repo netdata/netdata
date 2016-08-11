@@ -508,8 +508,7 @@ void *pluginsd_main(void *ptr)
 			// it is not running
 			// allocate a new one, or use the obsolete one
 			if(unlikely(!cd)) {
-				cd = calloc(sizeof(struct plugind), 1);
-				if(unlikely(!cd)) fatal("Cannot allocate memory for plugin.");
+				cd = callocz(sizeof(struct plugind), 1);
 
 				snprintfz(cd->id, CONFIG_MAX_NAME, "plugin:%s", pluginname);
 

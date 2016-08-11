@@ -33,12 +33,12 @@ typedef struct dictionary {
 #define DICTIONARY_FLAG_NAME_LINK_DONT_CLONE	0x00000004
 #define DICTIONARY_FLAG_WITH_STATISTICS			0x00000008
 
-extern DICTIONARY *dictionary_create(uint32_t flags);
+extern DICTIONARY *dictionary_create(uint8_t flags);
 extern void dictionary_destroy(DICTIONARY *dict);
 extern void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t value_len);
 extern void *dictionary_get(DICTIONARY *dict, const char *name);
 extern int dictionary_del(DICTIONARY *dict, const char *name);
 
-extern int dictionary_get_all(DICTIONARY *dict, int (*callback)(void *entry, void *data), void *data);
+extern int dictionary_get_all(DICTIONARY *dict, int (*callback)(void *entry, void *d), void *data);
 
 #endif /* NETDATA_DICTIONARY_H */

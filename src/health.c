@@ -34,8 +34,7 @@ static inline RRDVAR *rrdvar_index_find(avl_tree_lock *tree, const char *name, u
 }
 
 static inline RRDVAR *rrdvar_create(const char *name, uint32_t hash, int type, calculated_number *value) {
-    RRDVAR *rv = calloc(1, sizeof(RRDVAR));
-    if(!rv) fatal("Cannot allocate memory for RRDVAR");
+    RRDVAR *rv = callocz(1, sizeof(RRDVAR));
 
     rv->name = (char *)name;
     rv->hash = (hash)?hash:simple_hash((rv->name));
@@ -54,7 +53,7 @@ static inline void rrdvar_free(RRDHOST *host, RRDVAR *rv) {
             if (rf->rrdvar == rv) rf->rrdvar = NULL;
     }
 
-    free(rv);
+    freez(rv);
 }
 
 static inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *tree, const char *name, uint32_t hash, int type, calculated_number *value) {
@@ -101,22 +100,18 @@ static inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *
 
 RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, int type, void *value, uint32_t options) {
     debug(D_VARIABLES, "RRDVARSET create for chart id '%s' name '%s' with variable name '%s'", st->id, st->name, variable);
-    RRDSETVAR *rs = (RRDSETVAR *)calloc(1, sizeof(RRDSETVAR));
-    if(!rs) fatal("Cannot allocate memory for RRDSETVAR");
+    RRDSETVAR *rs = (RRDSETVAR *)callocz(1, sizeof(RRDSETVAR));
 
     char buffer[RRDSETVAR_ID_MAX + 1];
     snprintfz(buffer, RRDSETVAR_ID_MAX, "%s.%s", st->id, variable);
-    rs->fullid = strdup(buffer);
-    if(!rs->fullid) fatal("Cannot allocate memory for RRDVASET id");
+    rs->fullid = strdupz(buffer);
     rs->hash_fullid = simple_hash(rs->fullid);
 
     snprintfz(buffer, RRDSETVAR_ID_MAX, "%s.%s", st->name, variable);
-    rs->fullname = strdup(buffer);
-    if(!rs->fullname) fatal("Cannot allocate memory for RRDVASET name");
+    rs->fullname = strdupz(buffer);
     rs->hash_fullname = simple_hash(rs->fullname);
 
-    rs->variable = strdup(variable);
-    if(!rs->variable) fatal("Cannot allocate memory for RRDVASET variable name");
+    rs->variable = strdupz(variable);
     rs->hash_variable = simple_hash(rs->variable);
 
     rs->type = type;
@@ -162,9 +157,8 @@ void rrdsetvar_rename_all(RRDSET *st) {
                 rrdvar_free(st->rrdhost, rs->host_name);
             }
 
-            free(rs->fullname);
-            rs->fullname = strdup(st->name);
-            if(!rs->fullname) fatal("Cannot allocate memory for RRDSETVAR name");
+            freez(rs->fullname);
+            rs->fullname = strdupz(st->name);
             rs->hash_fullname = simple_hash(rs->fullname);
             rs->context_name = rrdvar_create_and_index("context", &st->rrdcontext->variables_root_index, rs->fullname, rs->hash_fullname, rs->type, rs->value);
             rs->host_name    = rrdvar_create_and_index("host",    &st->rrdhost->variables_root_index, rs->fullname, rs->hash_fullname, rs->type, rs->value);
@@ -213,10 +207,10 @@ void rrdsetvar_free(RRDSETVAR *rs) {
         else t->next = rs->next;
     }
 
-    free(rs->fullid);
-    free(rs->fullname);
-    free(rs->variable);
-    free(rs);
+    freez(rs->fullid);
+    freez(rs->fullname);
+    freez(rs->variable);
+    freez(rs);
 }
 
 // ----------------------------------------------------------------------------
@@ -233,43 +227,33 @@ RRDDIMVAR *rrddimvar_create(RRDDIM *rd, int type, const char *prefix, const char
     if(!suffix) suffix = "";
 
     char buffer[RRDDIMVAR_ID_MAX + 1];
-    RRDDIMVAR *rs = (RRDDIMVAR *)calloc(1, sizeof(RRDDIMVAR));
-    if(!rs) fatal("Cannot allocate memory for RRDDIMVAR");
+    RRDDIMVAR *rs = (RRDDIMVAR *)callocz(1, sizeof(RRDDIMVAR));
 
-    rs->prefix = strdup(prefix);
-    if(!rs->prefix) fatal("Cannot allocate memory for RRDDIMVAR prefix");
-
-    rs->suffix = strdup(suffix);
-    if(!rs->suffix) fatal("Cannot allocate memory for RRDDIMVAR suffix");
+    rs->prefix = strdupz(prefix);
+    rs->suffix = strdupz(suffix);
 
     snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", rs->prefix, rd->id, rs->suffix);
-    rs->id = strdup(buffer);
-    if(!rs->id) fatal("Cannot allocate memory for RRDIM id");
+    rs->id = strdupz(buffer);
     rs->hash = simple_hash(rs->id);
 
     snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", rs->prefix, rd->name, rs->suffix);
-    rs->name = strdup(buffer);
-    if(!rs->name) fatal("Cannot allocate memory for RRDIM name");
+    rs->name = strdupz(buffer);
     rs->hash_name = simple_hash(rs->name);
 
     snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->id, rs->id);
-    rs->fullidid = strdup(buffer);
-    if(!rs->fullidid) fatal("Cannot allocate memory for RRDDIMVAR fullidid");
+    rs->fullidid = strdupz(buffer);
     rs->hash_fullidid = simple_hash(rs->fullidid);
 
     snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->id, rs->name);
-    rs->fullidname = strdup(buffer);
-    if(!rs->fullidname) fatal("Cannot allocate memory for RRDDIMVAR fullidname");
+    rs->fullidname = strdupz(buffer);
     rs->hash_fullidname = simple_hash(rs->fullidname);
 
     snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->name, rs->id);
-    rs->fullnameid = strdup(buffer);
-    if(!rs->fullnameid) fatal("Cannot allocate memory for RRDDIMVAR fullnameid");
+    rs->fullnameid = strdupz(buffer);
     rs->hash_fullnameid = simple_hash(rs->fullnameid);
 
     snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->name, rs->name);
-    rs->fullnamename = strdup(buffer);
-    if(!rs->fullnamename) fatal("Cannot allocate memory for RRDDIMVAR fullnamename");
+    rs->fullnamename = strdupz(buffer);
     rs->hash_fullnamename = simple_hash(rs->fullnamename);
 
     rs->type = type;
@@ -313,10 +297,9 @@ void rrddimvar_rename_all(RRDDIM *rd) {
                 rrdvar_index_del(&st->variables_root_index, rs->local_name);
                 rrdvar_free(st->rrdhost, rs->local_name);
             }
-            free(rs->name);
+            freez(rs->name);
             snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", rs->prefix, rd->name, rs->suffix);
-            rs->name = strdup(buffer);
-            if(!rs->name) fatal("Cannot allocate memory for RRDDIMVAR name");
+            rs->name = strdupz(buffer);
             rs->hash_name = simple_hash(rs->name);
             rs->local_name = rrdvar_create_and_index("local", &st->variables_root_index, rs->name, rs->hash_name, rs->type, rs->value);
 
@@ -329,10 +312,9 @@ void rrddimvar_rename_all(RRDDIM *rd) {
                 rrdvar_index_del(&st->rrdhost->variables_root_index, rs->context_fullidname);
                 rrdvar_free(st->rrdhost, rs->host_fullidname);
             }
-            free(rs->fullidname);
+            freez(rs->fullidname);
             snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->id, rs->name);
-            rs->fullidname = strdup(buffer);
-            if(!rs->fullidname) fatal("Cannot allocate memory for RRDDIMVAR fullidname");
+            rs->fullidname = strdupz(buffer);
             rs->hash_fullidname = simple_hash(rs->fullidname);
             rs->context_fullidname = rrdvar_create_and_index("context", &st->rrdcontext->variables_root_index,
                                                              rs->fullidname, rs->hash_fullidname, rs->type, rs->value);
@@ -348,10 +330,9 @@ void rrddimvar_rename_all(RRDDIM *rd) {
                 rrdvar_index_del(&st->rrdhost->variables_root_index, rs->context_fullnameid);
                 rrdvar_free(st->rrdhost, rs->host_fullnameid);
             }
-            free(rs->fullnameid);
+            freez(rs->fullnameid);
             snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->id);
-            rs->fullnameid = strdup(buffer);
-            if(!rs->fullnameid) fatal("Cannot allocate memory for RRDDIMVAR fullnameid");
+            rs->fullnameid = strdupz(buffer);
             rs->hash_fullnameid = simple_hash(rs->fullnameid);
             rs->context_fullnameid = rrdvar_create_and_index("context", &st->rrdcontext->variables_root_index,
                                                              rs->fullnameid, rs->hash_fullnameid, rs->type, rs->value);
@@ -367,10 +348,9 @@ void rrddimvar_rename_all(RRDDIM *rd) {
                 rrdvar_index_del(&st->rrdhost->variables_root_index, rs->context_fullnamename);
                 rrdvar_free(st->rrdhost, rs->host_fullnamename);
             }
-            free(rs->fullnamename);
+            freez(rs->fullnamename);
             snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->name);
-            rs->fullnamename = strdup(buffer);
-            if(!rs->fullnamename) fatal("Cannot allocate memory for RRDDIMVAR fullnamename");
+            rs->fullnamename = strdupz(buffer);
             rs->hash_fullnamename = simple_hash(rs->fullnamename);
             rs->context_fullnamename = rrdvar_create_and_index("context", &st->rrdcontext->variables_root_index,
                                                              rs->fullnamename, rs->hash_fullnamename, rs->type, rs->value);
@@ -440,15 +420,15 @@ void rrddimvar_free(RRDDIMVAR *rs) {
         else t->next = rs->next;
     }
 
-    free(rs->prefix);
-    free(rs->suffix);
-    free(rs->id);
-    free(rs->name);
-    free(rs->fullidid);
-    free(rs->fullidname);
-    free(rs->fullnameid);
-    free(rs->fullnamename);
-    free(rs);
+    freez(rs->prefix);
+    freez(rs->suffix);
+    freez(rs->id);
+    freez(rs->name);
+    freez(rs->fullidid);
+    freez(rs->fullidname);
+    freez(rs->fullnameid);
+    freez(rs->fullnamename);
+    freez(rs);
 }
 
 // ----------------------------------------------------------------------------
@@ -587,4 +567,41 @@ void rrdsetcalc_unlink(RRDCALC *rc) {
     // it will be applied automatically
 
     rrdhostcalc_unlinked(host, rc);
+}
+
+RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const char *chart, const char *dimensions, int group_method, uint32_t after, uint32_t before, int update_every, uint32_t options) {
+    uint32_t hash = simple_hash(name);
+
+    RRDCALC *rc;
+
+    // make sure it does not already exist
+    for(rc = host->calculations; rc ; rc = rc->next) {
+        if (rc->hash == hash && !strcmp(name, rc->name)) {
+            error("Attempted to create RRDCAL '%s' in host '%s', but it already exists. Ignoring it.", name, host->hostname);
+            return NULL;
+        }
+    }
+
+    rc = callocz(1, sizeof(RRDCALC));
+
+    rc->name = strdupz(name);
+    rc->hash = simple_hash(rc->name);
+
+    rc->chart = strdupz(chart);
+    rc->hash_chart = simple_hash(rc->chart);
+
+    if(dimensions) {
+        rc->dimensions = strdupz(dimensions);
+        rc->hash_chart = simple_hash(rc->chart);
+    }
+
+    return NULL;
+}
+
+void rrdcalc_free(RRDCALC *rc) {
+    if(!rc) return;
+
+    if(rc->rrdset) rrdsetcalc_unlink(rc);
+
+    freez(rc);
 }

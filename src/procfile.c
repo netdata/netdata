@@ -24,13 +24,7 @@ pfwords *pfwords_add(pfwords *fw, char *str) {
 	if(unlikely(fw->len == fw->size)) {
 		// debug(D_PROCFILE, PF_PREFIX ":	expanding words");
 
-		pfwords *new = realloc(fw, sizeof(pfwords) + (fw->size + PFWORDS_INCREASE_STEP) * sizeof(char *));
-		if(unlikely(!new)) {
-			error(PF_PREFIX ":	failed to expand words");
-			free(fw);
-			return NULL;
-		}
-		fw = new;
+		fw = reallocz(fw, sizeof(pfwords) + (fw->size + PFWORDS_INCREASE_STEP) * sizeof(char *));
 		fw->size += PFWORDS_INCREASE_STEP;
 	}
 
@@ -44,9 +38,7 @@ pfwords *pfwords_new(void) {
 
 	uint32_t size = (procfile_adaptive_initial_allocation) ? procfile_max_words : PFWORDS_INCREASE_STEP;
 
-	pfwords *new = malloc(sizeof(pfwords) + size * sizeof(char *));
-	if(unlikely(!new)) return NULL;
-
+	pfwords *new = mallocz(sizeof(pfwords) + size * sizeof(char *));
 	new->len = 0;
 	new->size = size;
 	return new;
@@ -60,7 +52,7 @@ void pfwords_reset(pfwords *fw) {
 void pfwords_free(pfwords *fw) {
 	// debug(D_PROCFILE, PF_PREFIX ":	freeing words");
 
-	free(fw);
+	freez(fw);
 }
 
 
@@ -73,13 +65,7 @@ pflines *pflines_add(pflines *fl, uint32_t first_word) {
 	if(unlikely(fl->len == fl->size)) {
 		// debug(D_PROCFILE, PF_PREFIX ":	expanding lines");
 
-		pflines *new = realloc(fl, sizeof(pflines) + (fl->size + PFLINES_INCREASE_STEP) * sizeof(ffline));
-		if(unlikely(!new)) {
-			error(PF_PREFIX ":	failed to expand lines");
-			free(fl);
-			return NULL;
-		}
-		fl = new;
+		fl = reallocz(fl, sizeof(pflines) + (fl->size + PFLINES_INCREASE_STEP) * sizeof(ffline));
 		fl->size += PFLINES_INCREASE_STEP;
 	}
 
@@ -94,9 +80,7 @@ pflines *pflines_new(void) {
 
 	uint32_t size = (unlikely(procfile_adaptive_initial_allocation)) ? procfile_max_words : PFLINES_INCREASE_STEP;
 
-	pflines *new = malloc(sizeof(pflines) + size * sizeof(ffline));
-	if(unlikely(!new)) return NULL;
-
+	pflines *new = mallocz(sizeof(pflines) + size * sizeof(ffline));
 	new->len = 0;
 	new->size = size;
 	return new;
@@ -111,7 +95,7 @@ void pflines_reset(pflines *fl) {
 void pflines_free(pflines *fl) {
 	// debug(D_PROCFILE, PF_PREFIX ":	freeing lines");
 
-	free(fl);
+	freez(fl);
 }
 
 
@@ -132,7 +116,7 @@ void procfile_close(procfile *ff) {
 	if(likely(ff->words)) pfwords_free(ff->words);
 
 	if(likely(ff->fd != -1)) close(ff->fd);
-	free(ff);
+	freez(ff);
 }
 
 procfile *procfile_parser(procfile *ff) {
@@ -293,13 +277,7 @@ procfile *procfile_readall(procfile *ff) {
 		if(!x) {
 			debug(D_PROCFILE, PF_PREFIX ": Expanding data buffer for file '%s'.", ff->filename);
 
-			procfile *new = realloc(ff, sizeof(procfile) + ff->size + PROCFILE_INCREMENT_BUFFER);
-			if(unlikely(!new)) {
-				error(PF_PREFIX ": Cannot allocate memory for file '%s'", ff->filename);
-				procfile_close(ff);
-				return NULL;
-			}
-			ff = new;
+			ff = reallocz(ff, sizeof(procfile) + ff->size + PROCFILE_INCREMENT_BUFFER);
 			ff->size += PROCFILE_INCREMENT_BUFFER;
 		}
 
@@ -416,13 +394,7 @@ procfile *procfile_open(const char *filename, const char *separators, uint32_t f
 	}
 
 	size_t size = (unlikely(procfile_adaptive_initial_allocation)) ? procfile_max_allocation : PROCFILE_INCREMENT_BUFFER;
-	procfile *ff = malloc(sizeof(procfile) + size);
-	if(unlikely(!ff)) {
-		error(PF_PREFIX ": Cannot allocate memory for file '%s'", filename);
-		close(fd);
-		return NULL;
-	}
-
+	procfile *ff = mallocz(sizeof(procfile) + size);
 	strncpyz(ff->filename, filename, FILENAME_MAX);
 
 	ff->fd = fd;

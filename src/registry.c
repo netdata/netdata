@@ -312,14 +312,12 @@ static inline URL *registry_url_allocate_nolock(const char *url, size_t urllen) 
 		urllen = registry.max_url_length;
 
 	debug(D_REGISTRY, "Registry: registry_url_allocate_nolock('%s'): allocating %zu bytes", url, sizeof(URL) + urllen);
-	URL *u = malloc(sizeof(URL) + urllen);
-	if(!u) fatal("Cannot allocate %zu bytes for URL '%s'", sizeof(URL) + urllen, url);
+	URL *u = mallocz(sizeof(URL) + urllen);
 
 	// a simple strcpy() should do the job
 	// but I prefer to be safe, since the caller specified urllen
-	strncpyz(u->url, url, urllen);
-
-	u->len = urllen;
+	u->len = (uint16_t)urllen;
+	strncpyz(u->url, url, u->len);
 	u->links = 0;
 
 	registry.urls_memory += sizeof(URL) + urllen;
@@ -356,7 +354,7 @@ static inline void registry_url_unlink_nolock(URL *u) {
 	if(!u->links) {
 		debug(D_REGISTRY, "Registry: registry_url_unlink_nolock('%s'): No more links for this URL", u->url);
 		dictionary_del(registry.urls, u->url);
-		free(u);
+		freez(u);
 	}
 	else
 		debug(D_REGISTRY, "Registry: registry_url_unlink_nolock('%s'): URL has %u links left", u->url, u->links);
@@ -374,13 +372,12 @@ static inline MACHINE *registry_machine_find(const char *machine_guid) {
 static inline MACHINE_URL *registry_machine_url_allocate(MACHINE *m, URL *u, time_t when) {
 	debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s'): allocating %zu bytes", m->guid, u->url, sizeof(MACHINE_URL));
 
-	MACHINE_URL *mu = malloc(sizeof(MACHINE_URL));
-	if(!mu) fatal("registry_machine_link_to_url('%s', '%s'): cannot allocate %zu bytes.", m->guid, u->url, sizeof(MACHINE_URL));
+	MACHINE_URL *mu = mallocz(sizeof(MACHINE_URL));
 
 	// mu->persons = dictionary_create(DICTIONARY_FLAGS);
 	// dictionary_set(mu->persons, p->guid, p, sizeof(PERSON));
 
-	mu->first_t = mu->last_t = when;
+	mu->first_t = mu->last_t = (uint32_t)when;
 	mu->usages = 1;
 	mu->url = u;
 	mu->flags = REGISTRY_URL_FLAGS_DEFAULT;
@@ -397,15 +394,14 @@ static inline MACHINE_URL *registry_machine_url_allocate(MACHINE *m, URL *u, tim
 static inline MACHINE *registry_machine_allocate(const char *machine_guid, time_t when) {
 	debug(D_REGISTRY, "Registry: registry_machine_allocate('%s'): creating new machine, sizeof(MACHINE)=%zu", machine_guid, sizeof(MACHINE));
 
-	MACHINE *m = malloc(sizeof(MACHINE));
-	if(!m) fatal("Registry: cannot allocate memory for new machine '%s'", machine_guid);
+	MACHINE *m = mallocz(sizeof(MACHINE));
 
 	strncpyz(m->guid, machine_guid, 36);
 
 	debug(D_REGISTRY, "Registry: registry_machine_allocate('%s'): creating dictionary of urls", machine_guid);
 	m->urls = dictionary_create(DICTIONARY_FLAGS);
 
-	m->first_t = m->last_t = when;
+	m->first_t = m->last_t = (uint32_t)when;
 	m->usages = 0;
 
 	registry.machines_memory += sizeof(MACHINE);
@@ -458,8 +454,7 @@ static inline PERSON_URL *registry_person_url_allocate(PERSON *p, MACHINE *m, UR
 	debug(D_REGISTRY, "registry_person_url_allocate('%s', '%s', '%s'): allocating %zu bytes", p->guid, m->guid, u->url,
 		  sizeof(PERSON_URL) + namelen);
 
-	PERSON_URL *pu = malloc(sizeof(PERSON_URL) + namelen);
-	if(!pu) fatal("registry_person_url_allocate('%s', '%s', '%s'): cannot allocate %zu bytes.", p->guid, m->guid, u->url, sizeof(PERSON_URL) + namelen);
+	PERSON_URL *pu = mallocz(sizeof(PERSON_URL) + namelen);
 
 	// a simple strcpy() should do the job
 	// but I prefer to be safe, since the caller specified urllen
@@ -498,7 +493,7 @@ static inline PERSON_URL *registry_person_url_reallocate(PERSON *p, MACHINE *m, 
 	registry.persons_urls_memory -= sizeof(PERSON_URL) + strlen(pu->name);
 	registry_url_unlink_nolock(u);
 
-	free(pu);
+	freez(pu);
 
 	return tpu;
 }
@@ -508,8 +503,7 @@ static inline PERSON *registry_person_allocate(const char *person_guid, time_t w
 
 	debug(D_REGISTRY, "Registry: registry_person_allocate('%s'): allocating new person, sizeof(PERSON)=%zu", (person_guid)?person_guid:"", sizeof(PERSON));
 
-	p = malloc(sizeof(PERSON));
-	if(!p) fatal("Registry: cannot allocate memory for new person.");
+	p = mallocz(sizeof(PERSON));
 
 	if(!person_guid) {
 		for (; ;) {
@@ -914,7 +908,7 @@ PERSON *registry_request_delete(char *person_guid, char *machine_guid, char *url
 
 	dictionary_del(p->urls, dpu->url->url);
 	registry_url_unlink_nolock(dpu->url);
-	free(dpu);
+	freez(dpu);
 
 	registry_person_urls_unlock(p);
 	return p;
@@ -1720,7 +1714,7 @@ void registry_free(void) {
 			registry_url_unlink_nolock(pu->url);
 
 			debug(D_REGISTRY, "Registry: freeing person url");
-			free(pu);
+			freez(pu);
 		}
 
 		debug(D_REGISTRY, "Registry: deleting person '%s' from persons registry", p->guid);
@@ -1730,7 +1724,7 @@ void registry_free(void) {
 		dictionary_destroy(p->urls);
 
 		debug(D_REGISTRY, "Registry: freeing person '%s'", p->guid);
-		free(p);
+		freez(p);
 	}
 
 	while(registry.machines->values_index.root) {
@@ -1753,7 +1747,7 @@ void registry_free(void) {
 			registry_url_unlink_nolock(mu->url);
 
 			debug(D_REGISTRY, "Registry: freeing machine url");
-			free(mu);
+			freez(mu);
 		}
 
 		debug(D_REGISTRY, "Registry: deleting machine '%s' from machines registry", m->guid);
@@ -1763,7 +1757,7 @@ void registry_free(void) {
 		dictionary_destroy(m->urls);
 
 		debug(D_REGISTRY, "Registry: freeing machine '%s'", m->guid);
-		free(m);
+		freez(m);
 	}
 
 	// and free the memory of remaining dictionary structures

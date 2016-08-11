@@ -5,6 +5,45 @@ int enable_ksm = 1;
 
 volatile sig_atomic_t netdata_exit = 0;
 
+// ----------------------------------------------------------------------------
+// memory allocation functions that handle failures
+
+// although netdata does not use memory allocations too often (netdata tries to
+// maintain its memory footprint stable during runtime, i.e. all buffers are
+// allocated during initialization and are adapted to current use throughout
+// its lifetime), these can be used to override the default system allocation
+// routines.
+
+char *strdupz(const char *s) {
+    char *t = strdup(s);
+    if(unlikely(!t)) fatal("Cannot strdup() string '%s'", s);
+    return t;
+}
+
+void *mallocz(size_t size) {
+    void *p = malloc(size);
+    if(unlikely(!p)) fatal("Cannot allocate %zu bytes of memory.", size);
+    return p;
+}
+
+void *callocz(size_t nmemb, size_t size) {
+    void *p = calloc(nmemb, size);
+    if(unlikely(!p)) fatal("Cannot allocate %zu bytes of memory.", nmemb * size);
+    return p;
+}
+
+void *reallocz(void *ptr, size_t size) {
+    void *p = realloc(ptr, size);
+    if(unlikely(!p)) fatal("Cannot re-allocate memory to %zu bytes.", size);
+    return p;
+}
+
+void freez(void *ptr) {
+    free(ptr);
+}
+
+// ----------------------------------------------------------------------------
+
 // time(NULL) in milliseconds
 unsigned long long timems(void) {
 	struct timeval now;
@@ -17,7 +56,10 @@ int usecsleep(unsigned long long usec) {
 #ifndef NETDATA_WITH_USLEEP
 	// we expect microseconds (1.000.000 per second)
 	// but timespec is nanoseconds (1.000.000.000 per second)
-	struct timespec req = { .tv_sec = usec / 1000000, .tv_nsec = (usec % 1000000) * 1000 }, rem;
+	struct timespec rem, req = {
+            .tv_sec = (time_t)(usec / 1000000),
+            .tv_nsec = (suseconds_t)((usec % 1000000) * 1000)
+    };
 
 	while(nanosleep(&req, &rem) == -1) {
 		if(likely(errno == EINTR)) {

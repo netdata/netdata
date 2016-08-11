@@ -51,10 +51,9 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
 
 	// not found
 	// create a new disk structure
-	d = (struct disk *)malloc(sizeof(struct disk));
-	if(!d) fatal("Cannot allocate memory for struct disk in proc_diskstats.");
+	d = (struct disk *)mallocz(sizeof(struct disk));
 
-	d->disk = strdup(disk);
+	d->disk = strdupz(disk);
 	d->major = major;
 	d->minor = minor;
 	d->type = DISK_TYPE_PHYSICAL; // Default type. Changed later if not correct.
@@ -127,7 +126,7 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
 	}
 
 	if(mi)
-		d->mount_point = strdup(mi->mount_point);
+		d->mount_point = strdupz(mi->mount_point);
 		// no need to check for NULL
 	else
 		d->mount_point = NULL;

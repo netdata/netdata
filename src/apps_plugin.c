@@ -183,12 +183,7 @@ struct target *get_users_target(uid_t uid)
 	for(w = users_root_target ; w ; w = w->next)
 		if(w->uid == uid) return w;
 
-	w = calloc(sizeof(struct target), 1);
-	if(unlikely(!w)) {
-		error("Cannot allocate %lu bytes of memory", (unsigned long)sizeof(struct target));
-		return NULL;
-	}
-
+	w = callocz(sizeof(struct target), 1);
 	snprintfz(w->compare, MAX_COMPARE_NAME, "%u", uid);
 	w->comparehash = simple_hash(w->compare);
 	w->comparelen = strlen(w->compare);
@@ -221,12 +216,7 @@ struct target *get_groups_target(gid_t gid)
 	for(w = groups_root_target ; w ; w = w->next)
 		if(w->gid == gid) return w;
 
-	w = calloc(sizeof(struct target), 1);
-	if(unlikely(!w)) {
-		error("Cannot allocate %lu bytes of memory", (unsigned long)sizeof(struct target));
-		return NULL;
-	}
-
+	w = callocz(sizeof(struct target), 1);
 	snprintfz(w->compare, MAX_COMPARE_NAME, "%u", gid);
 	w->comparehash = simple_hash(w->compare);
 	w->comparelen = strlen(w->compare);
@@ -255,8 +245,7 @@ struct target *get_groups_target(gid_t gid)
 
 // find or create a new target
 // there are targets that are just aggregated to other target (the second argument)
-struct target *get_apps_groups_target(const char *id, struct target *target)
-{
+struct target *get_apps_groups_target(const char *id, struct target *target) {
 	int tdebug = 0, thidden = 0, ends_with = 0;
 	const char *nid = id;
 
@@ -276,19 +265,14 @@ struct target *get_apps_groups_target(const char *id, struct target *target)
 		last = w;
 	}
 
-	w = calloc(sizeof(struct target), 1);
-	if(unlikely(!w)) {
-		error("Cannot allocate %lu bytes of memory", (unsigned long)sizeof(struct target));
-		return NULL;
-	}
-
+	w = callocz(sizeof(struct target), 1);
 	strncpyz(w->id, nid, MAX_NAME);
 	w->idhash = simple_hash(w->id);
 
 	strncpyz(w->name, nid, MAX_NAME);
 
 	strncpyz(w->compare, nid, MAX_COMPARE_NAME);
-	int len = strlen(w->compare);
+	size_t len = strlen(w->compare);
 	if(w->compare[len - 1] == '*') {
 		w->compare[len - 1] = '\0';
 		w->starts_with = 1;
@@ -541,16 +525,9 @@ struct pid_stat *get_pid_entry(pid_t pid) {
 		return all_pids[pid];
 	}
 
-	all_pids[pid] = calloc(sizeof(struct pid_stat), 1);
-	if(!all_pids[pid]) {
-		error("Cannot allocate %zu bytes of memory", (size_t)sizeof(struct pid_stat));
-		return NULL;
-	}
-
-	all_pids[pid]->fds = calloc(sizeof(int), 100);
-	if(!all_pids[pid]->fds)
-		error("Cannot allocate %zu bytes of memory", (size_t)(sizeof(int) * 100));
-	else all_pids[pid]->fds_size = 100;
+	all_pids[pid] = callocz(sizeof(struct pid_stat), 1);
+	all_pids[pid]->fds = callocz(sizeof(int), 100);
+	all_pids[pid]->fds_size = 100;
 
 	if(root_of_pids) root_of_pids->prev = all_pids[pid];
 	all_pids[pid]->next = root_of_pids;
@@ -577,12 +554,12 @@ void del_pid_entry(pid_t pid) {
 	if(all_pids[pid]->next) all_pids[pid]->next->prev = all_pids[pid]->prev;
 	if(all_pids[pid]->prev) all_pids[pid]->prev->next = all_pids[pid]->next;
 
-	if(all_pids[pid]->fds) free(all_pids[pid]->fds);
-	if(all_pids[pid]->stat_filename) free(all_pids[pid]->stat_filename);
-	if(all_pids[pid]->statm_filename) free(all_pids[pid]->statm_filename);
-	if(all_pids[pid]->io_filename) free(all_pids[pid]->io_filename);
-	if(all_pids[pid]->cmdline_filename) free(all_pids[pid]->cmdline_filename);
-	free(all_pids[pid]);
+	if(all_pids[pid]->fds) freez(all_pids[pid]->fds);
+	if(all_pids[pid]->stat_filename) freez(all_pids[pid]->stat_filename);
+	if(all_pids[pid]->statm_filename) freez(all_pids[pid]->statm_filename);
+	if(all_pids[pid]->io_filename) freez(all_pids[pid]->io_filename);
+	if(all_pids[pid]->cmdline_filename) freez(all_pids[pid]->cmdline_filename);
+	freez(all_pids[pid]);
 
 	all_pids[pid] = NULL;
 	all_pids_count--;
@@ -597,14 +574,13 @@ int read_proc_pid_cmdline(struct pid_stat *p) {
 	if(unlikely(!p->cmdline_filename)) {
 		char filename[FILENAME_MAX + 1];
 		snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", host_prefix, p->pid);
-		if(!(p->cmdline_filename = strdup(filename)))
-			fatal("Cannot allocate memory for filename '%s'", filename);
+		p->cmdline_filename = strdupz(filename);
 	}
 
 	int fd = open(p->cmdline_filename, O_RDONLY, 0666);
 	if(unlikely(fd == -1)) goto cleanup;
 
-	int i, bytes = read(fd, p->cmdline, MAX_CMDLINE);
+	ssize_t i, bytes = read(fd, p->cmdline, MAX_CMDLINE);
 	close(fd);
 
 	if(unlikely(bytes <= 0)) goto cleanup;
@@ -651,8 +627,7 @@ int read_proc_pid_stat(struct pid_stat *p) {
 	if(unlikely(!p->stat_filename)) {
 		char filename[FILENAME_MAX + 1];
 		snprintfz(filename, FILENAME_MAX, "%s/proc/%d/stat", host_prefix, p->pid);
-		if(!(p->stat_filename = strdup(filename)))
-			fatal("Cannot allocate memory for filename '%s'", filename);
+		p->stat_filename = strdupz(filename);
 	}
 
 	int set_quotes = (!ff)?1:0;
@@ -798,8 +773,7 @@ int read_proc_pid_statm(struct pid_stat *p) {
 	if(unlikely(!p->statm_filename)) {
 		char filename[FILENAME_MAX + 1];
 		snprintfz(filename, FILENAME_MAX, "%s/proc/%d/statm", host_prefix, p->pid);
-		if(!(p->statm_filename = strdup(filename)))
-			fatal("Cannot allocate memory for filename '%s'", filename);
+		p->statm_filename = strdupz(filename);
 	}
 
 	ff = procfile_reopen(ff, p->statm_filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
@@ -837,8 +811,7 @@ int read_proc_pid_io(struct pid_stat *p) {
 	if(unlikely(!p->io_filename)) {
 		char filename[FILENAME_MAX + 1];
 		snprintfz(filename, FILENAME_MAX, "%s/proc/%d/io", host_prefix, p->pid);
-		if(!(p->io_filename = strdup(filename)))
-			fatal("Cannot allocate memory for filename '%s'", filename);
+		p->io_filename = strdupz(filename);
 	}
 
 	// open the file
@@ -1107,7 +1080,7 @@ int file_descriptor_find_or_add(const char *name)
 		if(unlikely(debug))
 			fprintf(stderr, "apps.plugin: extending fd array to %d entries\n", all_files_size + FILE_DESCRIPTORS_INCREASE_STEP);
 
-		all_files = realloc(all_files, (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP) * sizeof(struct file_descriptor));
+		all_files = reallocz(all_files, (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP) * sizeof(struct file_descriptor));
 
 		// if the address changed, we have to rebuild the index
 		// since all pointers are now invalid
@@ -1159,7 +1132,7 @@ int file_descriptor_find_or_add(const char *name)
 			if(unlikely(debug))
 				fprintf(stderr, "apps.plugin:   >> %s fd position %d for %s (last name: %s)\n", all_files[c].name?"re-using":"using", c, name, all_files[c].name);
 
-			if(all_files[c].name) free((void *)all_files[c].name);
+			if(all_files[c].name) freez((void *)all_files[c].name);
 			all_files[c].name = NULL;
 			last_pos = c;
 			break;
@@ -1199,7 +1172,7 @@ int file_descriptor_find_or_add(const char *name)
 		type = FILETYPE_OTHER;
 	}
 
-	all_files[c].name = strdup(name);
+	all_files[c].name = strdupz(name);
 	all_files[c].hash = hash;
 	all_files[c].type = type;
 	all_files[c].pos  = c;
@@ -1242,7 +1215,7 @@ int read_pid_file_descriptors(struct pid_stat *p) {
 				if(unlikely(debug))
 					fprintf(stderr, "apps.plugin: extending fd memory slots for %s from %d to %d\n", p->comm, p->fds_size, fdid + 100);
 
-				p->fds = realloc(p->fds, (fdid + 100) * sizeof(int));
+				p->fds = reallocz(p->fds, (fdid + 100) * sizeof(int));
 				if(!p->fds) {
 					fatal("Cannot re-allocate fds for %s", p->comm);
 					break;
@@ -1949,7 +1922,7 @@ long zero_all_targets(struct target *root) {
 	for (w = root; w ; w = w->next) {
 		count++;
 
-		if(w->fds) free(w->fds);
+		if(w->fds) freez(w->fds);
 		w->fds = NULL;
 
 		w->minflt = 0;
@@ -1989,11 +1962,8 @@ long zero_all_targets(struct target *root) {
 void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o) {
 	(void)o;
 
-	if(unlikely(!w->fds)) {
-		w->fds = calloc(sizeof(int), (size_t) all_files_size);
-		if(unlikely(!w->fds))
-			error("Cannot allocate memory for fds in %s", w->name);
-	}
+	if(unlikely(!w->fds))
+		w->fds = callocz(sizeof(int), (size_t) all_files_size);
 
 	if(likely(p->updated)) {
 		w->cutime  += p->cutime;
@@ -2104,7 +2074,7 @@ void count_targets_fds(struct target *root) {
 			}
 		}
 
-		free(w->fds);
+		freez(w->fds);
 		w->fds = NULL;
 	}
 }
@@ -2822,24 +2792,10 @@ int main(int argc, char **argv)
 
 	parse_args(argc, argv);
 
-	all_pids_sortlist = calloc(sizeof(pid_t), (size_t)pid_max);
-	if(!all_pids_sortlist) {
-		error("Cannot allocate %zu bytes of memory.", sizeof(pid_t) * pid_max);
-		printf("DISABLE\n");
-		exit(1);
-	}
-
-	all_pids = calloc(sizeof(struct pid_stat *), (size_t) pid_max);
-	if(!all_pids) {
-		error("Cannot allocate %zu bytes of memory.", sizeof(struct pid_stat *) * pid_max);
-		printf("DISABLE\n");
-		exit(1);
-	}
+	all_pids_sortlist = callocz(sizeof(pid_t), (size_t)pid_max);
+	all_pids = callocz(sizeof(struct pid_stat *), (size_t) pid_max);
 
 	output = buffer_create(1024);
-	if(!output)
-		fatal("Cannot create BUFFER.");
-
 	buffer_sprintf(output,
 		"CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' apps.plugin netdata.apps_cpu stacked 140000 %1$d\n"
 		"DIMENSION user '' incremental 1 1000\n"
