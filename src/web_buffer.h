@@ -1,7 +1,7 @@
 #ifndef NETDATA_WEB_BUFFER_H
 #define NETDATA_WEB_BUFFER_H 1
 
-#define WEB_DATA_LENGTH_INCREASE_STEP 16384
+#define WEB_DATA_LENGTH_INCREASE_STEP 1024
 
 typedef struct web_buffer {
 	size_t size;		// allocation size of buffer

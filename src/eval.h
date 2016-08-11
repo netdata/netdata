@@ -1,37 +1,32 @@
 #ifndef NETDATA_EVAL_H
 #define NETDATA_EVAL_H
 
-typedef struct variable {
+typedef struct eval_variable {
     char *name;
     struct rrdvar *rrdvar;
-    struct variable *next;
-} VARIABLE;
+    struct eval_variable *next;
+} EVAL_VARIABLE;
+
+typedef struct eval_expression {
+    const char *source;
+    const char *parsed_as;
+
+    calculated_number result;
+
+    int error;
+    BUFFER *error_msg;
+
+    // hidden EVAL_NODE *
+    void *nodes;
+
+    // custom data to be used for looking up variables
+    void *data;
+} EVAL_EXPRESSION;
 
 #define EVAL_VALUE_INVALID 0
 #define EVAL_VALUE_NUMBER 1
 #define EVAL_VALUE_VARIABLE 2
 #define EVAL_VALUE_EXPRESSION 3
-
-// these are used for EVAL_NODE.operator
-#define EVAL_OPERATOR_NOP                   '\0'
-#define EVAL_OPERATOR_VALUE                 ':'
-#define EVAL_OPERATOR_EXPRESSION_OPEN       '('
-#define EVAL_OPERATOR_EXPRESSION_CLOSE      ')'
-#define EVAL_OPERATOR_NOT                   '!'
-#define EVAL_OPERATOR_PLUS                  '+'
-#define EVAL_OPERATOR_MINUS                 '-'
-#define EVAL_OPERATOR_AND                   '&'
-#define EVAL_OPERATOR_OR                    '|'
-#define EVAL_OPERATOR_GREATER_THAN_OR_EQUAL 'G'
-#define EVAL_OPERATOR_LESS_THAN_OR_EQUAL    'L'
-#define EVAL_OPERATOR_NOT_EQUAL             '~'
-#define EVAL_OPERATOR_EQUAL                 '='
-#define EVAL_OPERATOR_LESS                  '<'
-#define EVAL_OPERATOR_GREATER               '>'
-#define EVAL_OPERATOR_MULTIPLY              '*'
-#define EVAL_OPERATOR_DIVIDE                '/'
-#define EVAL_OPERATOR_SIGN_PLUS             'P'
-#define EVAL_OPERATOR_SIGN_MINUS            'M'
 
 #define EVAL_ERROR_OK 0
 
@@ -46,29 +41,22 @@ typedef struct variable {
 #define EVAL_ERROR_INVALID_NUMBER_OF_OPERANDS 6
 #define EVAL_ERROR_VALUE_IS_NAN 7
 #define EVAL_ERROR_VALUE_IS_INFINITE 8
+#define EVAL_ERROR_UNKNOWN_VARIABLE 9
 
-typedef struct eval_value {
-    int type;
+// parse the given string as an expression and return:
+//   a pointer to an expression if it parsed OK
+//   NULL in which case the pointer to error has the error code
+extern EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, int *error);
 
-    union {
-        calculated_number number;
-        VARIABLE *variable;
-        struct eval_node *expression;
-    };
-} EVAL_VALUE;
+// free all resources allocated for an expression
+extern void expression_free(EVAL_EXPRESSION *op);
 
-typedef struct eval_node {
-    int id;
-    unsigned char operator;
-    int precedence;
-
-    int count;
-    EVAL_VALUE ops[];
-} EVAL_NODE;
-
-extern EVAL_NODE *expression_parse(const char *string, const char **failed_at, int *error);
-extern calculated_number expression_evaluate(EVAL_NODE *expression, int *error);
-extern void expression_free(EVAL_NODE *op);
+// convert an error code to a message
 extern const char *expression_strerror(int error);
+
+// evaluate an expression and return
+// 1 = OK, the result is in: expression->result
+// 2 = FAILED, the error message is in: buffer_tostring(expression->error_msg)
+extern int expression_evaluate(EVAL_EXPRESSION *expression);
 
 #endif //NETDATA_EVAL_H

@@ -698,7 +698,7 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
 		if(!strcmp(name, "chart")) chart = value;
 		else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
 			if(!dimensions)
-				dimensions = buffer_create(strlen(value));
+				dimensions = buffer_create(100);
 
 			if(dimensions) {
 				buffer_strcat(dimensions, "|");
@@ -860,7 +860,7 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 
 		if(!strcmp(name, "chart")) chart = value;
 		else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
-			if(!dimensions) dimensions = buffer_create(strlen(value));
+			if(!dimensions) dimensions = buffer_create(100);
 			if(dimensions) {
 				buffer_strcat(dimensions, "|");
 				buffer_strcat(dimensions, value);

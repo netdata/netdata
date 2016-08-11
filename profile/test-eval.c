@@ -3,7 +3,7 @@
  * 1. build netdata (as normally)
  * 2. cd profile/
  * 3. compile with:
- *    gcc -O1 -ggdb -Wall -Wextra -I ../src/ -I ../ -o test-eval test-eval.c ../src/log.o ../src/eval.o ../src/common.o -pthread
+ *    gcc -O1 -ggdb -Wall -Wextra -I ../src/ -I ../ -o test-eval test-eval.c ../src/log.o ../src/eval.o ../src/common.o ../src/web_buffer.o ../src/storage_number.o -pthread -lm
  *
  */
 
@@ -11,6 +11,7 @@
 
 void netdata_cleanup_and_exit(int ret) { exit(ret); }
 
+/*
 void indent(int level, int show) {
 	int i = level;
 	while(i--) printf(" |  ");
@@ -237,6 +238,7 @@ calculated_number evaluate(EVAL_NODE *op, int depth) {
 	return r;
 }
 
+
 void print_expression(EVAL_NODE *op, const char *failed_at, int error) {
 	if(op) {
 		printf("expression tree:\n");
@@ -255,17 +257,32 @@ void print_expression(EVAL_NODE *op, const char *failed_at, int error) {
 		printf("error: %d, failed_at: '%s'\n", error, (failed_at)?failed_at:"<NONE>");
 	}
 }
-
+*/
 
 int main(int argc, char **argv) {
 	if(argc != 2) {
-		fprintf(stderr, "I need an epxression\n");
+		fprintf(stderr, "I need an epxression (enclose it in single-quotes (') as a single parameter)\n");
 		exit(1);
 	}
 
 	const char *failed_at = NULL;
 	int error;
-	EVAL_NODE *op = expression_parse(argv[1], &failed_at, &error);
-	print_expression(op, failed_at, error);
+
+	EVAL_EXPRESSION *exp = expression_parse(argv[1], &failed_at, &error);
+	if(!exp)
+		printf("\nFAILED\nExpression: '%s'\nParsing stopped at: '%s'\nError code: %d (%s)\n", argv[1], (failed_at)?failed_at:"<NONE>", error, expression_strerror(error));
+	
+	else {
+		printf("\nOK\nExpression: '%s'\nParsed as : '%s'\nError code: %d (%s)\n", argv[1], exp->parsed_as, error, expression_strerror(error));
+
+		if(expression_evaluate(exp)) {
+			printf("\nEvaluates to: %Lf\n\n", exp->result);
+		}
+		else {
+			printf("\nEvaluation failed with code %d and message: %s\n\n", exp->error, buffer_tostring(exp->error_msg));
+		}
+		expression_free(exp);
+	}
+
 	return 0;
 }

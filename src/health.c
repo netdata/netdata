@@ -49,7 +49,7 @@ static inline void rrdvar_free(RRDHOST *host, RRDVAR *rv) {
     if(host) {
         // FIXME: we may need some kind of locking here
         // to have mutually exclusive access with eval()
-        VARIABLE *rf;
+        EVAL_VARIABLE *rf;
         for (rf = host->references; rf; rf = rf->next)
             if (rf->rrdvar == rv) rf->rrdvar = NULL;
     }

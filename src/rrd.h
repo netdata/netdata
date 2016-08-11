@@ -301,7 +301,7 @@ struct rrdhost {
     // all variable references are linked here
     // RRDVARs may be free'd, so every time this happens
     // we need to find all their references and invalidate them
-    VARIABLE *references;
+    EVAL_VARIABLE *references;
 };
 typedef struct rrdhost RRDHOST;
 
