@@ -1570,7 +1570,7 @@ var chartData = {
 	},
 
 	'system.load': {
-		info: 'Current system load, a measurement of the work the system is performing. A completely idle computer has a load average of 0. Each process either using or waiting for system resources (e.g. CPU, disk) adds 1 to the load average. So, if your system has a load of 5, five processes are either using or waiting for system resources. Linux calculates this once every 5 seconds. Netdata reads it from <code>/proc/loadavg</code>. For more information see: <a href="http://www.howtogeek.com/194642/understanding-the-load-average-on-linux-and-other-unix-like-systems/" target="_blank">this article</a>',
+		info: 'Current system load, i.e. the number of processes using CPU or waiting for system resources (usually CPU and disk). The 3 metrics refer to 1, 5 and 15 minute averages. Linux calculates this once every 5 seconds. Netdata reads them from <code>/proc/loadavg</code>. For more information check <a href="https://en.wikipedia.org/wiki/Load_(computing)" target="_blank">this wikipedia article</a>',
 		height: 0.7
 	},
 
