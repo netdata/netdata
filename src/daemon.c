@@ -1,4 +1,5 @@
 #include "common.h"
+#include <sched.h>
 
 char pidfile[FILENAME_MAX + 1] = "";
 
@@ -102,6 +103,36 @@ int become_user(const char *username, int access_fd, int output_fd, int error_fd
 	return(0);
 }
 
+void oom_score_adj(int score) {
+	int done = 0;
+	int fd = open("/proc/self/oom_score_adj", O_WRONLY);
+	if(fd != -1) {
+		char buf[10 + 1];
+		ssize_t len = snprintfz(buf, 10, "%d", score);
+		if(write(fd, buf, len) == len) done = 1;
+		close(fd);
+	}
+
+	if(!done)
+		error("Cannot adjust my Out-Of-Memory score to %d.", score);
+	else
+		info("Adjusted my Out-Of-Memory score to %d.", score);
+}
+
+int sched_setscheduler_idle(void) {
+	const struct sched_param param = {
+		.sched_priority = 0
+	};
+
+	int i = sched_setscheduler(0, SCHED_IDLE, &param);
+	if(i != 0)
+		error("Cannot adjust my scheduling priority to IDLE.");
+	else
+		info("Adjusted my scheduling priority to IDLE.");
+
+	return i;
+}
+
 int become_daemon(int dont_fork, int close_all_files, const char *user, const char *input, const char *output, const char *error, const char *access, int *access_fd, FILE **access_fp)
 {
 	fflush(NULL);
@@ -192,11 +223,9 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 			perror("Cannot become session leader.");
 			exit(2);
 		}
-	}
 
-	// fork() again
-	if(!dont_fork) {
-		int i = fork();
+		// fork() again
+		i = fork();
 		if(i == -1) {
 			perror("cannot fork");
 			exit(1);
@@ -205,9 +234,6 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 			exit(0); // the parent
 		}
 	}
-
-	// Set new file permissions
-	umask(0);
 
 	// close all files
 	if(close_all_files) {
@@ -284,6 +310,18 @@ int become_daemon(int dont_fork, int close_all_files, const char *user, const ch
 				error("Cannot write pidfile '%s'.", pidfile);
 		}
 		else error("Failed to open pidfile '%s'.", pidfile);
+	}
+
+	// Set new file permissions
+	umask(0002);
+
+	// adjust my Out-Of-Memory score
+	oom_score_adj(1000);
+
+	// never become a problem
+	if(sched_setscheduler_idle() != 0) {
+		if(nice(19) == -1) error("Cannot lower my CPU priority.");
+		else info("Set my nice value to 19.");
 	}
 
 	if(user && *user) {
