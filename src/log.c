@@ -1,19 +1,124 @@
 #include "common.h"
 
-// ----------------------------------------------------------------------------
-// LOG
-
 const char *program_name = "";
 unsigned long long debug_flags = DEBUG;
-
-int silent = 0;
-
-int access_fd = -1;
-FILE *stdaccess = NULL;
 
 int access_log_syslog = 1;
 int error_log_syslog = 1;
 int output_log_syslog = 1;	// debug log
+
+int stdaccess_fd = -1;
+FILE *stdaccess = NULL;
+
+const char *stdaccess_filename = NULL;
+const char *stderr_filename = NULL;
+const char *stdout_filename = NULL;
+
+void syslog_init(void) {
+    static int i = 0;
+
+    if(!i) {
+        openlog(program_name, LOG_PID, LOG_DAEMON);
+        i = 1;
+    }
+}
+
+int open_log_file(int fd, FILE **fp, const char *filename, int *enabled_syslog) {
+    int f, t;
+
+    if(!filename || !*filename || !strcmp(filename, "none"))
+        filename = "/dev/null";
+
+    if(!strcmp(filename, "syslog")) {
+        filename = "/dev/null";
+        syslog_init();
+        if(enabled_syslog) *enabled_syslog = 1;
+    }
+    else if(enabled_syslog) *enabled_syslog = 0;
+
+    // don't do anything if the user is willing
+    // to have the standard one
+    if(!strcmp(filename, "system"))
+        return fd;
+
+    if(!strcmp(filename, "stdout"))
+        f = STDOUT_FILENO;
+
+    else if(!strcmp(filename, "stderr"))
+        f = STDERR_FILENO;
+
+    else {
+        f = open(filename, O_WRONLY | O_APPEND | O_CREAT, 0664);
+        if(f == -1) {
+            error("Cannot open file '%s'. Leaving %d to its default.", filename, fd);
+            return fd;
+        }
+    }
+
+    // if there is a level-2 file pointer
+    // flush it before switching the level-1 fds
+    if(fp && *fp)
+        fflush(*fp);
+
+    if(fd != f && fd != -1) {
+        // it automatically closes
+        t = dup2(f, fd);
+        if (t == -1) {
+            error("Cannot dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
+            close(f);
+            return fd;
+        }
+        // info("dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
+        close(f);
+    }
+    else fd = f;
+
+    if(fp && *fp == NULL) {
+        // info("fdopen(%d) on filename '%s'", fd, filename);
+
+        FILE *n = fdopen(fd, "a");
+        if (!n)
+            error("Cannot fdopen() fd %d ('%s')", fd, filename);
+
+        else {
+            if (setvbuf(n, NULL, _IOLBF, 0) != 0)
+                error("Cannot set line buffering on fd %d ('%s')", fd, filename);
+
+            if(!*fp)
+                *fp = n;
+            else {
+                FILE *o = *fp;
+                *fp = n;
+                fclose(o);
+            }
+        }
+    }
+
+    return fd;
+}
+
+void reopen_all_log_files() {
+    if(stdout_filename)
+        open_log_file(STDOUT_FILENO, &stdout, stdout_filename, &output_log_syslog);
+
+    if(stderr_filename)
+        open_log_file(STDERR_FILENO, &stderr, stderr_filename, &error_log_syslog);
+
+    if(stdaccess_filename)
+        stdaccess_fd = open_log_file(stdaccess_fd, &stdaccess, stdaccess_filename, &access_log_syslog);
+}
+
+void open_all_log_files() {
+    // disable stdin
+    open_log_file(STDIN_FILENO, &stdin, "/dev/null", NULL);
+
+    open_log_file(STDOUT_FILENO, &stdout, stdout_filename, &output_log_syslog);
+    open_log_file(STDERR_FILENO, &stderr, stderr_filename, &error_log_syslog);
+    stdaccess_fd = open_log_file(stdaccess_fd, &stdaccess, stdaccess_filename, &access_log_syslog);
+}
+
+// ----------------------------------------------------------------------------
+// error log throttling
 
 time_t error_log_throttle_period = 1200;
 unsigned long error_log_errors_per_period = 200;
@@ -94,6 +199,13 @@ int error_log_limit(int reset) {
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
+// print the date
+
+// FIXME
+// this should print the date in a buffer the way it
+// is now, logs from multiple threads may be multiplexed
+
 void log_date(FILE *out)
 {
 		char outstr[24];
@@ -108,6 +220,9 @@ void log_date(FILE *out)
 
 		fprintf(out, "%s: ", outstr);
 }
+
+// ----------------------------------------------------------------------------
+// debug log
 
 void debug_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... )
 {
@@ -128,6 +243,9 @@ void debug_int( const char *file, const char *function, const unsigned long line
 
 	fflush(stdout);
 }
+
+// ----------------------------------------------------------------------------
+// info log
 
 void info_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... )
 {
@@ -152,6 +270,9 @@ void info_int( const char *file, const char *function, const unsigned long line,
 		va_end( args );
 	}
 }
+
+// ----------------------------------------------------------------------------
+// error log
 
 void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... )
 {
@@ -206,6 +327,9 @@ void fatal_int( const char *file, const char *function, const unsigned long line
 
 	netdata_cleanup_and_exit(1);
 }
+
+// ----------------------------------------------------------------------------
+// access log
 
 void log_access( const char *fmt, ... )
 {

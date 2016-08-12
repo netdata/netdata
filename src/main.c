@@ -420,10 +420,6 @@ int main(int argc, char **argv)
 	// cd to /tmp to avoid any plugins writing files at random places
 	if(chdir("/tmp")) error("netdata: ERROR: Cannot cd to /tmp");
 
-	char *input_log_file = NULL;
-	char *output_log_file = NULL;
-	char *error_log_file = NULL;
-	char *access_log_file = NULL;
 	char *user = NULL;
 	{
 		char *flags = config_get("global", "debug flags",  "0x00000000");
@@ -449,55 +445,20 @@ int main(int argc, char **argv)
 
 		// --------------------------------------------------------------------
 
-
 		global_host_prefix = config_get("global", "host access prefix", "");
 		setenv("NETDATA_HOST_PREFIX", global_host_prefix, 1);
 
 		// --------------------------------------------------------------------
 
-		output_log_file = config_get("global", "debug log", LOG_DIR "/debug.log");
-		if(strcmp(output_log_file, "syslog") == 0) {
-			output_log_syslog = 1;
-			output_log_file = NULL;
-		}
-		else if(strcmp(output_log_file, "none") == 0) {
-			output_log_syslog = 0;
-			output_log_file = NULL;
-		}
-		else output_log_syslog = 0;
-
-		// --------------------------------------------------------------------
-
-		error_log_file = config_get("global", "error log", LOG_DIR "/error.log");
-		if(strcmp(error_log_file, "syslog") == 0) {
-			error_log_syslog = 1;
-			error_log_file = NULL;
-		}
-		else if(strcmp(error_log_file, "none") == 0) {
-			error_log_syslog = 0;
-			error_log_file = NULL;
-			// optimization - do not even generate debug log entries
-		}
-		else error_log_syslog = 0;
+		stdout_filename    = config_get("global", "debug log",  LOG_DIR "/debug.log");
+		stderr_filename    = config_get("global", "error log",  LOG_DIR "/error.log");
+		stdaccess_filename = config_get("global", "access log", LOG_DIR "/access.log");
 
 		error_log_throttle_period = config_get_number("global", "errors flood protection period", error_log_throttle_period);
 		setenv("NETDATA_ERRORS_THROTTLE_PERIOD", config_get("global", "errors flood protection period"    , ""), 1);
 
 		error_log_errors_per_period = (unsigned long)config_get_number("global", "errors to trigger flood protection", error_log_errors_per_period);
 		setenv("NETDATA_ERRORS_PER_PERIOD"     , config_get("global", "errors to trigger flood protection", ""), 1);
-
-		// --------------------------------------------------------------------
-
-		access_log_file = config_get("global", "access log", LOG_DIR "/access.log");
-		if(strcmp(access_log_file, "syslog") == 0) {
-			access_log_syslog = 1;
-			access_log_file = NULL;
-		}
-		else if(strcmp(access_log_file, "none") == 0) {
-			access_log_syslog = 0;
-			access_log_file = NULL;
-		}
-		else access_log_syslog = 0;
 
 		// --------------------------------------------------------------------
 
@@ -551,17 +512,13 @@ int main(int argc, char **argv)
 			error("Could not block signals for threads");
 		}
 
-		// Catch signals which we want to use to quit savely
+		// Catch signals which we want to use
 		struct sigaction sa;
 		sigemptyset(&sa.sa_mask);
-		sigaddset(&sa.sa_mask, SIGHUP);
 		sigaddset(&sa.sa_mask, SIGINT);
 		sigaddset(&sa.sa_mask, SIGTERM);
 		sa.sa_handler = sig_handler_exit;
 		sa.sa_flags = 0;
-		if(sigaction(SIGHUP, &sa, NULL) == -1) {
-			error("Failed to change signal handler for SIGHUP");
-		}
 		if(sigaction(SIGINT, &sa, NULL) == -1) {
 			error("Failed to change signal handler for SIGINT");
 		}
@@ -569,7 +526,17 @@ int main(int argc, char **argv)
 			error("Failed to change signal handler for SIGTERM");
 		}
 
+        sigemptyset(&sa.sa_mask);
+        sigaddset(&sa.sa_mask, SIGHUP);
+        sa.sa_handler = sig_handler_logrotate;
+        sa.sa_flags = 0;
+        if(sigaction(SIGHUP, &sa, NULL) == -1) {
+            error("Failed to change signal handler for SIGHUP");
+        }
+
 		// save database on SIGUSR1
+        sigemptyset(&sa.sa_mask);
+        sigaddset(&sa.sa_mask, SIGUSR1);
 		sa.sa_handler = sig_handler_save;
 		if(sigaction(SIGUSR1, &sa, NULL) == -1) {
 			error("Failed to change signal handler for SIGUSR1");
@@ -578,6 +545,8 @@ int main(int argc, char **argv)
 		// Ignore SIGPIPE completely.
 		// INFO: If we add signals here we have to unblock them
 		// at popen.c when running a external plugin.
+        sigemptyset(&sa.sa_mask);
+        sigaddset(&sa.sa_mask, SIGPIPE);
 		sa.sa_handler = SIG_IGN;
 		if(sigaction(SIGPIPE, &sa, NULL) == -1) {
 			error("Failed to change signal handler for SIGPIPE");
@@ -621,7 +590,11 @@ int main(int argc, char **argv)
 		create_listen_sockets();
 	}
 
-	if(become_daemon(dont_fork, 0, user, input_log_file, output_log_file, error_log_file, access_log_file, &access_fd, &stdaccess) == -1)
+    // initialize the log files
+    open_all_log_files();
+
+    // become daemon, switch user, create pid file, set process attributes
+    if(become_daemon(dont_fork, user) == -1)
 		fatal("Cannot demonize myself.");
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -632,9 +605,6 @@ int main(int argc, char **argv)
 		prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
 	}
 #endif /* NETDATA_INTERNAL_CHECKS */
-
-	if(output_log_syslog || error_log_syslog || access_log_syslog)
-		openlog("netdata", LOG_PID, LOG_DAEMON);
 
 	info("NetData started on pid %d", getpid());
 
