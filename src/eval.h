@@ -1,6 +1,8 @@
 #ifndef NETDATA_EVAL_H
 #define NETDATA_EVAL_H
 
+#define EVAL_MAX_VARIABLE_NAME_LENGTH 300
+
 typedef struct eval_variable {
     char *name;
     struct rrdvar *rrdvar;

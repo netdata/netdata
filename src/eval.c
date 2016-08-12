@@ -26,7 +26,6 @@ typedef struct eval_node {
 // they are used as internal IDs to identify an operator
 // THEY ARE NOT USED FOR PARSING OPERATORS LIKE THAT
 #define EVAL_OPERATOR_NOP                   '\0'
-#define EVAL_OPERATOR_VALUE                 ':'
 #define EVAL_OPERATOR_EXPRESSION_OPEN       '('
 #define EVAL_OPERATOR_EXPRESSION_CLOSE      ')'
 #define EVAL_OPERATOR_NOT                   '!'
@@ -181,7 +180,6 @@ static struct operator {
         [EVAL_OPERATOR_SIGN_PLUS]             = { "+",  6, 1, eval_sign_plus },
         [EVAL_OPERATOR_SIGN_MINUS]            = { "-",  6, 1, eval_sign_minus },
         [EVAL_OPERATOR_NOP]                   = { NULL, 7, 1, eval_nop },
-        [EVAL_OPERATOR_VALUE]                 = { NULL, 7, 1, eval_nop },
         [EVAL_OPERATOR_EXPRESSION_OPEN]       = { NULL, 7, 1, eval_nop },
 
         // this should exist in our evaluation list
@@ -298,8 +296,18 @@ static inline int isoperatorterm_word(const char s) {
 
 // what character can appear just after an operator symbol?
 static inline int isoperatorterm_symbol(const char s) {
-    if(isoperatorterm_word(s) || isalpha(s)) return 1;
+    if(isoperatorterm_word(s) || isalpha(s))
+        return 1;
+
     return 0;
+}
+
+// return 1 if the character should never appear in a variable
+static inline int isvariableterm(const char s) {
+    if(isalnum(s) || s == '.' || s == '_')
+        return 0;
+
+    return 1;
 }
 
 // ----------------------------------------------------------------------------
@@ -513,6 +521,28 @@ static inline int parse_close_subexpression(const char **string) {
     return 0;
 }
 
+static inline int parse_variable(const char **string, char *buffer, size_t len) {
+    const char *s = *string;
+
+    // $
+    if(s[0] == '$') {
+        size_t i = 0;
+        s++;
+
+        while(*s && !isvariableterm(*s) && i < len)
+            buffer[i++] = *s++;
+
+        buffer[i] = '\0';
+
+        if(buffer[0]) {
+            *string = &s[0];
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 static inline int parse_constant(const char **string, calculated_number *number) {
     char *end = NULL;
     calculated_number n = strtold(*string, &end);
@@ -604,7 +634,17 @@ static inline void eval_node_set_value_to_constant(EVAL_NODE *op, int pos, calcu
     op->ops[pos].number = value;
 }
 
+static inline void eval_node_set_value_to_variable(EVAL_NODE *op, int pos, const char *variable) {
+    if(pos >= op->count)
+        fatal("Invalid request to set position %d of OPERAND that has only %d values", pos + 1, op->count + 1);
+
+    op->ops[pos].type = EVAL_VALUE_VARIABLE;
+    op->ops[pos].variable = callocz(1, sizeof(EVAL_VARIABLE));
+    op->ops[pos].variable->name = strdupz(variable);
+}
+
 static inline void eval_variable_free(EVAL_VARIABLE *v) {
+    freez(v->name);
     freez(v);
 }
 
@@ -649,6 +689,7 @@ static inline EVAL_NODE *parse_next_operand_given_its_operator(const char **stri
 
 // parse a full operand, including its sign or other associative operator (e.g. NOT)
 static inline EVAL_NODE *parse_one_full_operand(const char **string, int *error) {
+    char variable_buffer[EVAL_MAX_VARIABLE_NAME_LENGTH + 1];
     EVAL_NODE *op1 = NULL;
     calculated_number number;
 
@@ -686,12 +727,14 @@ static inline EVAL_NODE *parse_one_full_operand(const char **string, int *error)
             }
         }
     }
-//    else if(parse_variable(string)) {
-//
-//    }
+    else if(parse_variable(string, variable_buffer, EVAL_MAX_VARIABLE_NAME_LENGTH)) {
+        op1 = eval_node_alloc(1);
+        op1->operator = EVAL_OPERATOR_NOP;
+        eval_node_set_value_to_variable(op1, 0, variable_buffer);
+    }
     else if(parse_constant(string, &number)) {
         op1 = eval_node_alloc(1);
-        op1->operator = EVAL_OPERATOR_VALUE;
+        op1->operator = EVAL_OPERATOR_NOP;
         eval_node_set_value_to_constant(op1, 0, number);
     }
     else if(**string)
