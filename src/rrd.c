@@ -600,7 +600,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 			error("File %s does not have the same refresh frequency. Clearing it.", fullfilename);
 			bzero(rd, size);
 		}
-		else if(usecdiff(&now, &rd->last_collected_time) > (rd->entries * rd->update_every * 1000000ULL)) {
+		else if(usec_dt(&now, &rd->last_collected_time) > (rd->entries * rd->update_every * 1000000ULL)) {
 			errno = 0;
 			error("File %s is too old. Clearing it.", fullfilename);
 			bzero(rd, size);
@@ -922,7 +922,7 @@ void rrdset_next(RRDSET *st)
 	if(likely(st->last_collected_time.tv_sec)) {
 		struct timeval now;
 		gettimeofday(&now, NULL);
-		microseconds = usecdiff(&now, &st->last_collected_time);
+		microseconds = usec_dt(&now, &st->last_collected_time);
 	}
 	// prevent infinite loop
 	else microseconds = st->update_every * 1000000ULL;
@@ -1001,7 +1001,7 @@ unsigned long long rrdset_done(RRDSET *st)
 	}
 
 	// check if we will re-write the entire data set
-	if(unlikely(usecdiff(&st->last_collected_time, &st->last_updated) > st->update_every * st->entries * 1000000ULL)) {
+	if(unlikely(usec_dt(&st->last_collected_time, &st->last_updated) > st->update_every * st->entries * 1000000ULL)) {
 		info("%s: too old data (last updated at %ld.%ld, last collected at %ld.%ld). Reseting it. Will not store the next entry.", st->name, st->last_updated.tv_sec, st->last_updated.tv_usec, st->last_collected_time.tv_sec, st->last_collected_time.tv_usec);
 		rrdset_reset(st);
 
