@@ -38,7 +38,7 @@ void *cpuidlejitter_main(void *ptr)
 			gettimeofday(&after, NULL);
 
 			// calculate the time it took for a full loop
-			usec = usecdiff(&after, &before);
+			usec = usec_dt(&after, &before);
 			susec += usec;
 		}
 		usec -= (sleep_ms * 1000);

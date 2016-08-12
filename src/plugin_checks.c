@@ -36,7 +36,7 @@ void *checks_main(void *ptr)
 
 		// find the time to sleep in order to wait exactly update_every seconds
 		gettimeofday(&now, NULL);
-		loop_usec = usecdiff(&now, &last);
+		loop_usec = usec_dt(&now, &last);
 		usec = loop_usec - susec;
 		debug(D_PROCNETDEV_LOOP, "CHECK: last loop took %llu usec (worked for %llu, sleeped for %llu).", loop_usec, usec, susec);
 
@@ -72,9 +72,9 @@ void *checks_main(void *ptr)
 		if(!apps_cpu) apps_cpu = rrdset_find("apps.cpu");
 		if(check3->counter_done) rrdset_next_usec(check3, loop_usec);
 		gettimeofday(&loop, NULL);
-		rrddim_set(check3, "caller", (long long)usecdiff(&loop, &check1->last_collected_time));
-		rrddim_set(check3, "netdata", (long long)usecdiff(&loop, &check2->last_collected_time));
-		if(apps_cpu) rrddim_set(check3, "apps.plugin", (long long)usecdiff(&loop, &apps_cpu->last_collected_time));
+		rrddim_set(check3, "caller", (long long) usec_dt(&loop, &check1->last_collected_time));
+		rrddim_set(check3, "netdata", (long long) usec_dt(&loop, &check2->last_collected_time));
+		if(apps_cpu) rrddim_set(check3, "apps.plugin", (long long) usec_dt(&loop, &apps_cpu->last_collected_time));
 		rrdset_done(check3);
 	}
 

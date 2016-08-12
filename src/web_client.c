@@ -113,7 +113,7 @@ struct web_client *web_client_create(int listener)
 	w->next = web_clients;
 	web_clients = w;
 
-	global_statistics.connected_clients++;
+    web_client_connected();
 
 	return(w);
 }
@@ -136,18 +136,11 @@ void web_client_reset(struct web_client *w) {
 		// --------------------------------------------------------------------
 		// global statistics
 
-		if(web_server_mode == WEB_SERVER_MODE_MULTI_THREADED)
-			global_statistics_lock();
-
-		global_statistics.web_requests++;
-		global_statistics.web_usec += usecdiff(&tv, &w->tv_in);
-		global_statistics.bytes_received += w->stats_received_bytes;
-		global_statistics.bytes_sent += w->stats_sent_bytes;
-		global_statistics.content_size += size;
-		global_statistics.compressed_content_size += sent;
-
-		if(web_server_mode == WEB_SERVER_MODE_MULTI_THREADED)
-			global_statistics_unlock();
+        finished_web_request_statistics(usec_dt(&tv, &w->tv_in),
+                                        w->stats_received_bytes,
+                                        w->stats_sent_bytes,
+                                        size,
+                                        sent);
 
 		w->stats_received_bytes = 0;
 		w->stats_sent_bytes = 0;
@@ -159,9 +152,9 @@ void web_client_reset(struct web_client *w) {
 		log_access("%llu: (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: %d '%s'",
 				   w->id,
 				   sent, size, -((size > 0) ? ((size - sent) / (double) size * 100.0) : 0.0),
-				   usecdiff(&w->tv_ready, &w->tv_in) / 1000.0,
-				   usecdiff(&tv, &w->tv_ready) / 1000.0,
-				   usecdiff(&tv, &w->tv_in) / 1000.0,
+				   usec_dt(&w->tv_ready, &w->tv_in) / 1000.0,
+				   usec_dt(&tv, &w->tv_ready) / 1000.0,
+				   usec_dt(&tv, &w->tv_in) / 1000.0,
 				   (w->mode == WEB_CLIENT_MODE_FILECOPY) ? "filecopy" : ((w->mode == WEB_CLIENT_MODE_OPTIONS)
 																		 ? "options" : "data"),
 				   w->response.code,
@@ -236,7 +229,7 @@ struct web_client *web_client_free(struct web_client *w) {
 	if(w->ofd != -1 && w->ofd != w->ifd) close(w->ofd);
 	freez(w);
 
-	global_statistics.connected_clients--;
+    web_client_disconnected();
 
 	return(n);
 }
@@ -1668,7 +1661,10 @@ void web_client_process(struct web_client *w) {
 	static uint32_t hash_api = 0, hash_netdata_conf = 0, hash_data = 0, hash_datasource = 0, hash_graph = 0,
 			hash_list = 0, hash_all_json = 0, hash_exit = 0, hash_debug = 0, hash_mirror = 0;
 
-	if(unlikely(!hash_api)) {
+    // start timing us
+    gettimeofday(&w->tv_in, NULL);
+
+    if(unlikely(!hash_api)) {
 		hash_api = simple_hash("api");
 		hash_netdata_conf = simple_hash("netdata.conf");
 		hash_data = simple_hash(WEB_PATH_DATA);
@@ -1703,7 +1699,7 @@ void web_client_process(struct web_client *w) {
 		}
 	}
 	else if(what_to_do > 0) {
-		strcpy(w->last_url, "not a valid request");
+		// strcpy(w->last_url, "not a valid request");
 
 		debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, w->response.data->buffer);
 
@@ -1712,8 +1708,6 @@ void web_client_process(struct web_client *w) {
 		buffer_strcat(w->response.data, "I don't understand you...\r\n");
 	}
 	else { // what_to_do == 0
-		gettimeofday(&w->tv_in, NULL);
-
 		if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
 			code = 200;
 			w->response.data->contenttype = CT_TEXT_PLAIN;

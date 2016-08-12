@@ -642,7 +642,7 @@ int read_proc_pid_stat(struct pid_stat *p) {
 	if(unlikely(!ff)) goto cleanup;
 
 	p->last_stat_collected_usec = p->stat_collected_usec;
-	p->stat_collected_usec = timems();
+	p->stat_collected_usec = time_usec();
 	file_counter++;
 
 	// p->pid			= atol(procfile_lineword(ff, 0, 0+i));
@@ -824,7 +824,7 @@ int read_proc_pid_io(struct pid_stat *p) {
 	file_counter++;
 
 	p->last_io_collected_usec = p->io_collected_usec;
-	p->io_collected_usec = timems();
+	p->io_collected_usec = time_usec();
 
 	unsigned long long last;
 
@@ -898,7 +898,7 @@ int read_proc_stat() {
 	if(unlikely(!ff)) goto cleanup;
 
 	last_collected_usec = collected_usec;
-	collected_usec = timems();
+	collected_usec = time_usec();
 
 	file_counter++;
 
@@ -2205,7 +2205,7 @@ unsigned long long send_resource_usage_to_netdata() {
 		gettimeofday(&now, NULL);
 		getrusage(RUSAGE_SELF, &me);
 
-		usec = usecdiff(&now, &last);
+		usec = usec_dt(&now, &last);
 		cpuuser = me.ru_utime.tv_sec * 1000000ULL + me.ru_utime.tv_usec;
 		cpusyst = me.ru_stime.tv_sec * 1000000ULL + me.ru_stime.tv_usec;
 
@@ -2836,11 +2836,11 @@ int main(int argc, char **argv)
 	for(;1; global_iterations_counter++) {
 #ifndef PROFILING_MODE
 		// delay until it is our time to run
-		while((sunow = timems()) < sunext)
-			usecsleep(sunext - sunow);
+		while((sunow = time_usec()) < sunext)
+			sleep_usec(sunext - sunow);
 
 		// find the next time we need to run
-		while(timems() > sunext)
+		while(time_usec() > sunext)
 			sunext += update_every * 1000000ULL;
 #endif /* PROFILING_MODE */
 

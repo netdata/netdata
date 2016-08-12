@@ -1287,11 +1287,11 @@ void *cgroups_main(void *ptr)
 		if(unlikely(netdata_exit)) break;
 
 		// delay until it is our time to run
-		while((sunow = timems()) < sunext)
-			usecsleep(sunext - sunow);
+		while((sunow = time_usec()) < sunext)
+			sleep_usec(sunext - sunow);
 
 		// find the next time we need to run
-		while(timems() > sunext)
+		while(time_usec() > sunext)
 			sunext += rrd_update_every * 1000000ULL;
 
 		if(unlikely(netdata_exit)) break;
@@ -1300,7 +1300,7 @@ void *cgroups_main(void *ptr)
 
 		if(!vdo_sys_fs_cgroup) {
 			debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_sys_fs_cgroup().");
-			sunow = timems();
+			sunow = time_usec();
 			vdo_sys_fs_cgroup = do_sys_fs_cgroup(rrd_update_every, (sutime_sys_fs_cgroup > 0)?sunow - sutime_sys_fs_cgroup:0ULL);
 			sutime_sys_fs_cgroup = sunow;
 		}

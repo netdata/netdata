@@ -107,7 +107,10 @@
 #endif
 #define abs(x) ((x < 0)? -x : x)
 
-#define usecdiff(now, last) (((((now)->tv_sec * 1000000ULL) + (now)->tv_usec) - (((last)->tv_sec * 1000000ULL) + (last)->tv_usec)))
+extern unsigned long long usec_dt(struct timeval *now, struct timeval *old);
+extern unsigned long long timeval_usec(struct timeval *tv);
+
+// #define usec_dt(now, last) (((((now)->tv_sec * 1000000ULL) + (now)->tv_usec) - (((last)->tv_sec * 1000000ULL) + (last)->tv_usec)))
 
 extern void netdata_fix_chart_id(char *s);
 extern void netdata_fix_chart_name(char *s);
@@ -144,8 +147,8 @@ extern void get_HZ(void);
 
 extern pid_t gettid(void);
 
-extern unsigned long long timems(void);
-extern int usecsleep(unsigned long long usec);
+extern unsigned long long time_usec(void);
+extern int sleep_usec(unsigned long long usec);
 
 extern char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len);
 
