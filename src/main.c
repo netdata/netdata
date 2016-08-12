@@ -621,9 +621,6 @@ int main(int argc, char **argv)
 		create_listen_sockets();
 	}
 
-	// never become a problem
-	if(nice(20) == -1) error("Cannot lower my CPU priority.");
-
 	if(become_daemon(dont_fork, 0, user, input_log_file, output_log_file, error_log_file, access_log_file, &access_fd, &stdaccess) == -1)
 		fatal("Cannot demonize myself.");
 
