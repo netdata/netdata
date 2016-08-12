@@ -60,6 +60,28 @@
 #include <zlib.h>
 #endif
 
+#ifdef __GNUC__
+#define GCC_VERSION (__GNUC__ * 10000 \
+                               + __GNUC_MINOR__ * 100 \
+                               + __GNUC_PATCHLEVEL__)
+
+// test for gcc version < 4.1.2
+// to disable gcc atomic operations
+#if GCC_VERSION < 40102
+#define NETDATA_NO_ATOMIC_INSTRUCTIONS 1
+#endif
+
+#if __x86_64__ || __ppc64__
+#define ENVIRONMENT64
+#else
+#define ENVIRONMENT32
+#endif
+
+#else // !__GNUC__
+#define NETDATA_NO_ATOMIC_INSTRUCTIONS 1
+#define ENVIRONMENT32
+#endif // __GNUC__
+
 #include "avl.h"
 #include "log.h"
 #include "global_statistics.h"
@@ -93,14 +115,6 @@
 #include "daemon.h"
 #include "main.h"
 #include "unit_test.h"
-
-#if __GNUC__
-#if __x86_64__ || __ppc64__
-#define ENVIRONMENT64
-#else
-#define ENVIRONMENT32
-#endif
-#endif
 
 #ifdef abs
 #undef abs
