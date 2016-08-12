@@ -31,6 +31,10 @@ extern int rrdvar_compare(void *a, void *b);
 #define RRDVAR_TYPE_TOTAL      4
 
 // the variables as stored in the variables indexes
+// there are 3 indexes:
+// 1. at each chart   (RRDSET.variables_root_index)
+// 2. at each context (RRDCONTEXT.variables_root_index)
+// 3. at each host    (RRDHOST.variables_root_index)
 typedef struct rrdvar {
     avl avl;
 
@@ -44,7 +48,7 @@ typedef struct rrdvar {
 } RRDVAR;
 
 // variables linked to charts
-// We link variables to point the values that are already
+// We link variables to point to the values that are already
 // calculated / processed by the normal data collection process
 // This means, there will be no speed penalty for using
 // these variables
@@ -75,7 +79,7 @@ typedef struct rrdsetvar {
 } RRDSETVAR;
 
 
-// variables linked to dimensions
+// variables linked to individual dimensions
 // We link variables to point the values that are already
 // calculated / processed by the normal data collection process
 // This means, there will be no speed penalty for using
@@ -125,17 +129,17 @@ typedef struct rrddimvar {
     struct rrddimvar *next;
 } RRDDIMVAR;
 
-// additional calculated variables
+// calculated variables (defined in health configuration)
 // These aggregate time-series data at fixed intervals
 // (defined in their update_every member below)
 // These increase the overhead of netdata.
 //
 // These calculations are allocated and linked (->next)
-// to RRDHOST.
+// under RRDHOST.
 // Then are also linked to RRDSET (of course only when the
 // chart is found, via ->rrdset_next and ->rrdset_prev).
 // This double-linked list is maintained sorted at all times
-// having as RRDSET->calculations the RRDCALC to be processed
+// having as RRDSET.calculations the RRDCALC to be processed
 // next.
 typedef struct rrdcalc {
     char *name;
@@ -191,6 +195,7 @@ typedef struct rrdcalctemplate {
 
     struct rrdcalctemplate *next;
 } RRDCALCTEMPLATE;
+
 
 #include "rrd.h"
 

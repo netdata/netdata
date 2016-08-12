@@ -304,8 +304,14 @@ struct rrdhost {
     EVAL_VARIABLE *references;
 };
 typedef struct rrdhost RRDHOST;
-
 extern RRDHOST localhost;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+#define rrdhost_check_wrlock(host) rrdhost_check_wrlock_int(host, __FILE__, __FUNCTION__, __LINE__)
+#else
+#define rrdhost_check_wrlock(host) (void)0
+#endif
+extern void rrdhost_check_wrlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line);
 
 // ----------------------------------------------------------------------------
 // RRD SET functions
