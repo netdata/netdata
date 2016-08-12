@@ -47,7 +47,6 @@ static inline RRDVAR *rrdvar_create(const char *name, uint32_t hash, int type, c
 static inline void rrdvar_free(RRDHOST *host, RRDVAR *rv) {
     if(host) {
         // FIXME: we may need some kind of locking here
-        // to have mutually exclusive access with eval()
         EVAL_VARIABLE *rf;
         for (rf = host->references; rf; rf = rf->next)
             if (rf->rrdvar == rv) rf->rrdvar = NULL;
@@ -436,7 +435,9 @@ void rrddimvar_free(RRDDIMVAR *rs) {
 
 // this has to be called while the caller has locked
 // the RRDHOST
-static inline void rrdhostcalc_linked(RRDHOST *host, RRDCALC *rc) {
+static inline void rrdset_linked_optimize_rrdhost(RRDHOST *host, RRDCALC *rc) {
+    rrdhost_check_wrlock(host);
+
     // move it to be last
 
     if(!rc->next)
@@ -474,7 +475,9 @@ static inline void rrdhostcalc_linked(RRDHOST *host, RRDCALC *rc) {
 
 // this has to be called while the caller has locked
 // the RRDHOST
-static inline void rrdhostcalc_unlinked(RRDHOST *host, RRDCALC *rc) {
+static inline void rrdcalc_unlinked_optimize_rrdhost(RRDHOST *host, RRDCALC *rc) {
+    rrdhost_check_wrlock(host);
+    
     // move it to be first
 
     if(host->calculations == rc) {
@@ -502,7 +505,15 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     rc->context = rrdvar_create_and_index("context", &st->rrdcontext->variables_root_index, rc->name, rc->hash, RRDVAR_TYPE_CALCULATED, &rc->value);
     rc->host    = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rc->name, rc->hash, RRDVAR_TYPE_CALCULATED, &rc->value);
 
-    rrdhostcalc_linked(st->rrdhost, rc);
+    rrdset_linked_optimize_rrdhost(st->rrdhost, rc);
+}
+
+static inline int rrdcalc_is_matching_this_rrdset(RRDCALC *rc, RRDSET *st) {
+    if((rc->hash_chart == st->hash && !strcmp(rc->name, st->id)) ||
+            (rc->hash_chart == st->hash_name && !strcmp(rc->name, st->name)))
+        return 1;
+
+    return 0;
 }
 
 // this has to be called while the RRDHOST is locked
@@ -514,10 +525,8 @@ void rrdsetcalc_link_matching(RRDSET *st) {
         // we stop on the first linked RRDCALC
         if(rc->rrdset != NULL) break;
 
-        if((rc->hash_chart == st->hash && !strcmp(rc->name, st->id)) ||
-                (rc->hash_chart == st->hash_name && !strcmp(rc->name, st->name))) {
+        if(rrdcalc_is_matching_this_rrdset(rc, st))
             rrdsetcalc_link(st, rc);
-        }
     }
 }
 
@@ -566,7 +575,7 @@ void rrdsetcalc_unlink(RRDCALC *rc) {
     // so that if the matching chart is found in the future
     // it will be applied automatically
 
-    rrdhostcalc_unlinked(host, rc);
+    rrdcalc_unlinked_optimize_rrdhost(host, rc);
 }
 
 RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const char *chart, const char *dimensions, int group_method, uint32_t after, uint32_t before, int update_every, uint32_t options) {
@@ -595,13 +604,55 @@ RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const char *chart, cons
         rc->hash_chart = simple_hash(rc->chart);
     }
 
+    rc->group = group_method;
+    rc->after = after;
+    rc->before = before;
+    rc->update_every = update_every;
+    rc->options = options;
+
+    // link it to the host
+    rc->next = host->calculations;
+    host->calculations = rc;
+
+    // link it to its chart
+    RRDSET *st;
+    for(st = host->rrdset_root; st ; st = st->next) {
+        if(rrdcalc_is_matching_this_rrdset(rc, st)) {
+            rrdsetcalc_link(st, rc);
+            break;
+        }
+    }
+
     return NULL;
 }
 
-void rrdcalc_free(RRDCALC *rc) {
+void rrdcalc_free(RRDHOST *host, RRDCALC *rc) {
     if(!rc) return;
 
+    // unlink it from RRDSET
     if(rc->rrdset) rrdsetcalc_unlink(rc);
+
+    // unlink it from RRDHOST
+    if(rc == host->calculations)
+        host->calculations = rc->next;
+
+    else if(host->calculations) {
+        RRDCALC *t, *last = host->calculations;
+
+        for(t = last->next; t ; last = t, t = t->next)
+            if(t == rc) break;
+        
+        if(last)
+            last->next = rc->next;
+        else
+            error("Cannot unlink RRDCALC '%s' from RRDHOST '%s': not found", rc->name, host->hostname);
+    }
+    else
+        error("Cannot unlink RRDCALC '%s' from RRDHOST '%s': RRDHOST does not have any calculations", rc->name, host->hostname);
+
+    freez(rc->name);
+    freez(rc->chart);
+    freez(rc->dimensions);
 
     freez(rc);
 }

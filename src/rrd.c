@@ -18,6 +18,9 @@ static int rrdset_compare(void* a, void* b);
 static int rrdset_compare_name(void* a, void* b);
 static int rrdcontext_compare(void* a, void* b);
 
+// ----------------------------------------------------------------------------
+// RRDHOST
+
 RRDHOST localhost = {
 		.hostname = "localhost",
 		.rrdset_root = NULL,
@@ -39,6 +42,24 @@ RRDHOST localhost = {
             AVL_LOCK_INITIALIZER
         }
 };
+
+void rrdhost_rwlock(RRDHOST *host) {
+	pthread_rwlock_wrlock(&host->rrdset_root_rwlock);
+}
+
+void rrdhost_rdlock(RRDHOST *host) {
+	pthread_rwlock_rdlock(&host->rrdset_root_rwlock);
+}
+
+void rrdhost_unlock(RRDHOST *host) {
+	pthread_rwlock_unlock(&host->rrdset_root_rwlock);
+}
+
+void rrdhost_check_wrlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line) {
+	if(pthread_rwlock_tryrdlock(&host->rrdset_root_rwlock) == 0) {
+		fatal("RRDHOST '%s' should be write-locked, but it is not, at function %s() at line %lu of file '%s'", host->hostname, function, line, file);
+	}
+}
 
 // ----------------------------------------------------------------------------
 // RRDCONTEXT index
