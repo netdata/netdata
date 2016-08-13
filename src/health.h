@@ -150,6 +150,8 @@ typedef struct rrdcalc {
     char *chart;        // the chart name
     uint32_t hash_chart;
 
+    char *source;       // the source of this calculation
+
     char *dimensions;   // the chart dimensions
 
     int group;          // grouping method: average, max, etc.
@@ -180,6 +182,7 @@ typedef struct rrdcalc {
     struct rrdcalc *next;
 } RRDCALC;
 
+#define RRDCALC_HAS_CALCULATION(rc) ((rc)->after && (rc)->update_every)
 
 // RRDCALCTEMPLATE
 // these are to be applied to charts found dynamically
@@ -193,6 +196,8 @@ typedef struct rrdcalctemplate {
     char *context;
     uint32_t hash_context;
 
+    char *source;       // the source of this template
+
     char *dimensions;
 
     int group;          // grouping method: average, max, etc.
@@ -201,11 +206,16 @@ typedef struct rrdcalctemplate {
     uint32_t options;   // calculation options
     int update_every;   // update frequency for the calculation
 
+    EVAL_EXPRESSION *warning;
+    EVAL_EXPRESSION *critical;
+
     calculated_number green;
     calculated_number red;
 
     struct rrdcalctemplate *next;
 } RRDCALCTEMPLATE;
+
+#define RRDCALCTEMPLATE_HAS_CALCULATION(rt) ((rt)->after && (rt)->update_every)
 
 
 #include "rrd.h"
