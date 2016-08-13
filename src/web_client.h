@@ -103,4 +103,5 @@ extern void web_client_reset(struct web_client *w);
 
 extern void *web_client_main(void *ptr);
 
+extern int web_client_api_request_v1_data_group(char *name, int def);
 #endif
