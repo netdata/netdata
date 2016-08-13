@@ -210,4 +210,6 @@ extern void rrddimvar_free(RRDDIMVAR *rs);
 extern void rrdsetcalc_link_matching(RRDSET *st);
 extern void rrdsetcalc_unlink(RRDCALC *rc);
 
+extern void health_init(void);
+
 #endif //NETDATA_HEALTH_H
