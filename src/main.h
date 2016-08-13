@@ -7,15 +7,15 @@ extern volatile sig_atomic_t netdata_exit;
  * This struct contains information about command line options.
  */
 struct option_def {
-	/** The option character */
-	const char val;
-	/** The name of the long option. */
-	const char *description;
-	/** Short descripton what the option does */
-	/** Name of the argument displayed in SYNOPSIS */
-	const char *arg_name;
-	/** Default value if not set */
-	const char *default_value;
+    /** The option character */
+    const char val;
+    /** The name of the long option. */
+    const char *description;
+    /** Short descripton what the option does */
+    /** Name of the argument displayed in SYNOPSIS */
+    const char *arg_name;
+    /** Default value if not set */
+    const char *default_value;
 };
 
 /**

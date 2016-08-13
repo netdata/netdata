@@ -642,15 +642,15 @@ void netdata_fix_chart_id(char *s) {
 // http://stackoverflow.com/questions/7666509/hash-function-for-string
 uint32_t simple_hash(const char *name)
 {
-	const char *s = name;
-	uint32_t hash = 5381;
-	int i;
+    const char *s = name;
+    uint32_t hash = 5381;
+    int i;
 
-	while((i = *s++)) hash = ((hash << 5) + hash) + i;
+    while((i = *s++)) hash = ((hash << 5) + hash) + i;
 
-	// fprintf(stderr, "HASH: %lu %s\n", hash, name);
+    // fprintf(stderr, "HASH: %lu %s\n", hash, name);
 
-	return hash;
+    return hash;
 }
 */
 
@@ -694,22 +694,22 @@ uint32_t simple_uhash(const char *name) {
 // http://eternallyconfuzzled.com/tuts/algorithms/jsw_tut_hashing.aspx
 // one at a time hash
 uint32_t simple_hash(const char *name) {
-	unsigned char *s = (unsigned char *)name;
-	uint32_t h = 0;
+    unsigned char *s = (unsigned char *)name;
+    uint32_t h = 0;
 
-	while(*s) {
-		h += *s++;
-		h += (h << 10);
-		h ^= (h >> 6);
-	}
+    while(*s) {
+        h += *s++;
+        h += (h << 10);
+        h ^= (h >> 6);
+    }
 
-	h += (h << 3);
-	h ^= (h >> 11);
-	h += (h << 15);
+    h += (h << 3);
+    h ^= (h >> 11);
+    h += (h << 15);
 
-	// fprintf(stderr, "HASH: %u = %s\n", h, name);
+    // fprintf(stderr, "HASH: %u = %s\n", h, name);
 
-	return h;
+    return h;
 }
 */
 
@@ -782,16 +782,16 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm) {
 #ifdef MADV_MERGEABLE
                 } else {
 /*
-					// test - load the file into memory
-					mem = calloc(1, size);
-					if(mem) {
-						if(lseek(fd, 0, SEEK_SET) == 0) {
-							if(read(fd, mem, size) != (ssize_t)size)
-								error("Cannot read from file '%s'", filename);
-						}
-						else
-							error("Cannot seek to beginning of file '%s'.", filename);
-					}
+                    // test - load the file into memory
+                    mem = calloc(1, size);
+                    if(mem) {
+                        if(lseek(fd, 0, SEEK_SET) == 0) {
+                            if(read(fd, mem, size) != (ssize_t)size)
+                                error("Cannot read from file '%s'", filename);
+                        }
+                        else
+                            error("Cannot seek to beginning of file '%s'.", filename);
+                    }
 */
                     mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags | MAP_ANONYMOUS, -1, 0);
                     if (mem != MAP_FAILED) {

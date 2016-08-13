@@ -23,21 +23,21 @@ update_every=$((t))
 
 # allow the user to override our defaults
 if [ -f "${config_dir}/tc-qos-helper.conf" ]
-	then
-	source "${config_dir}/tc-qos-helper.conf"
+    then
+    source "${config_dir}/tc-qos-helper.conf"
 fi
 
 # default time function
 now_ms=
 current_time_ms() {
-	now_ms="$(date +'%s')000"
+    now_ms="$(date +'%s')000"
 }
 
 # default sleep function
 LOOPSLEEPMS_LASTWORK=0
 loopsleepms() {
-	[ "$1" = "tellwork" ] && shift
-	sleep $1
+    [ "$1" = "tellwork" ] && shift
+    sleep $1
 }
 
 # if found and included, this file overwrites loopsleepms()
@@ -45,49 +45,49 @@ loopsleepms() {
 . "${plugins_dir}/loopsleepms.sh.inc"
 
 if [ -z "${tc}" -o ! -x "${tc}" ]
-	then
-	echo >&2 "${PROGRAM_NAME}: Cannot find command 'tc' in this system."
-	exit 1
+    then
+    echo >&2 "${PROGRAM_NAME}: Cannot find command 'tc' in this system."
+    exit 1
 fi
 
 devices=
 fix_names=
 
 setclassname() {
-	echo "SETCLASSNAME $3 $2"
+    echo "SETCLASSNAME $3 $2"
 }
 
 show_tc() {
-	local x="${1}" interface_dev interface_classes interface_classes_monitor
+    local x="${1}" interface_dev interface_classes interface_classes_monitor
 
-	echo "BEGIN ${x}"
-	${tc} -s class show dev ${x}
+    echo "BEGIN ${x}"
+    ${tc} -s class show dev ${x}
 
-	# check FireQOS names for classes
-	if [ ! -z "${fix_names}" -a -f "${fireqos_run_dir}/ifaces/${x}" ]
-	then
-		name="$(<"${fireqos_run_dir}/ifaces/${x}")"
-		echo "SETDEVICENAME ${name}"
+    # check FireQOS names for classes
+    if [ ! -z "${fix_names}" -a -f "${fireqos_run_dir}/ifaces/${x}" ]
+    then
+        name="$(<"${fireqos_run_dir}/ifaces/${x}")"
+        echo "SETDEVICENAME ${name}"
 
-		interface_dev=
-		interface_classes=
-		interface_classes_monitor=
-		source "${fireqos_run_dir}/${name}.conf"
-		for n in ${interface_classes_monitor}
-		do
-			setclassname ${n//|/ }
-		done
-		[ ! -z "${interface_dev}" ] && echo "SETDEVICEGROUP ${interface_dev}"
-	fi
-	echo "END ${x}"
+        interface_dev=
+        interface_classes=
+        interface_classes_monitor=
+        source "${fireqos_run_dir}/${name}.conf"
+        for n in ${interface_classes_monitor}
+        do
+            setclassname ${n//|/ }
+        done
+        [ ! -z "${interface_dev}" ] && echo "SETDEVICEGROUP ${interface_dev}"
+    fi
+    echo "END ${x}"
 }
 
 all_devices() {
-	cat /proc/net/dev | grep ":" | cut -d ':' -f 1 | while read dev
-	do
-		l=$(${tc} class show dev ${dev} | wc -l)
-		[ $l -ne 0 ] && echo ${dev}
-	done
+    cat /proc/net/dev | grep ":" | cut -d ':' -f 1 | while read dev
+    do
+        l=$(${tc} class show dev ${dev} | wc -l)
+        [ $l -ne 0 ] && echo ${dev}
+    done
 }
 
 # update devices and class names
@@ -102,25 +102,25 @@ c=0
 gc=0
 while [ 1 ]
 do
-	fix_names=
-	c=$((c + 1))
-	gc=$((gc + 1))
+    fix_names=
+    c=$((c + 1))
+    gc=$((gc + 1))
 
-	if [ ${c} -le 1 -o ${c} -ge ${names_every} ]
-	then
-		c=1
-		fix_names="YES"
-		devices="$( all_devices )"
-	fi
+    if [ ${c} -le 1 -o ${c} -ge ${names_every} ]
+    then
+        c=1
+        fix_names="YES"
+        devices="$( all_devices )"
+    fi
 
-	for d in ${devices}
-	do
-		show_tc ${d}
-	done
+    for d in ${devices}
+    do
+        show_tc ${d}
+    done
 
-	echo "WORKTIME ${LOOPSLEEPMS_LASTWORK}"
+    echo "WORKTIME ${LOOPSLEEPMS_LASTWORK}"
 
-	loopsleepms ${update_every}
+    loopsleepms ${update_every}
 
-	[ ${gc} -gt ${exit_after} ] && exit 0
+    [ ${gc} -gt ${exit_after} ] && exit 0
 done
