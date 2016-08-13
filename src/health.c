@@ -774,6 +774,11 @@ static inline int rrdcalctemplate_add(RRDHOST *host, RRDCALCTEMPLATE *rt) {
          rt->source
     );
 
+    if(!rt->context) {
+        error("Health configuration for template '%s' does not have a context", rt->name);
+        return 0;
+    }
+
     if(!RRDCALCTEMPLATE_HAS_CALCULATION(rt) && !rt->warning && !rt->critical) {
         error("Health configuration for template '%s' is useless (no calculation, no warning and no critical evaluation)", rt->name);
         return 0;

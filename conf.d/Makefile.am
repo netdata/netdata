@@ -37,3 +37,8 @@ dist_pythonconfig_DATA = \
 	python.d/squid.conf \
 	python.d/tomcat.conf \
 	$(NULL)
+
+healthconfigdir=$(configdir)/health.d
+dist_healthconfig_DATA = \
+	health.d/disks.conf \
+	$(NULL)
