@@ -363,10 +363,9 @@ int main(int argc, char **argv)
 					// TODO: Outsource version to makefile which can compute version from git.
 					printf("netdata 1.2.1_master\n");
 					return 0;
-					break;
 				case 'W':
 					{
-						char* stacksize = "stacksize=";
+						char* stacksize_string = "stacksize=";
 						char* debug_flags_string = "debug_flags=";
 						if(strcmp(optarg, "unittest") == 0) {
 							rrd_update_every = 1;
@@ -374,8 +373,8 @@ int main(int argc, char **argv)
 							if(unit_test_storage()) exit(1);
 							fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
 							exit(0);
-						} else if(strncmp(optarg, stacksize, strlen(stacksize)) == 0) {
-							optarg += strlen(stacksize);
+						} else if(strncmp(optarg, stacksize_string, strlen(stacksize_string)) == 0) {
+							optarg += strlen(stacksize_string);
 							config_set("global", "pthread stack size", optarg);
 						} else if(strncmp(optarg, debug_flags_string, strlen(debug_flags_string)) == 0) {
 							optarg += strlen(debug_flags_string);
@@ -564,7 +563,7 @@ int main(int argc, char **argv)
 		else
 			debug(D_OPTIONS, "initial pthread stack size is %zu bytes", stacksize);
 
-		wanted_stacksize = config_get_number("global", "pthread stack size", stacksize);
+		wanted_stacksize = (size_t)config_get_number("global", "pthread stack size", (long)stacksize);
 
 		// --------------------------------------------------------------------
 
@@ -593,10 +592,6 @@ int main(int argc, char **argv)
     // initialize the log files
     open_all_log_files();
 
-    // become daemon, switch user, create pid file, set process attributes
-    if(become_daemon(dont_fork, user) == -1)
-		fatal("Cannot demonize myself.");
-
 #ifdef NETDATA_INTERNAL_CHECKS
 	if(debug_flags != 0) {
 		struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
@@ -606,7 +601,11 @@ int main(int argc, char **argv)
 	}
 #endif /* NETDATA_INTERNAL_CHECKS */
 
-	info("NetData started on pid %d", getpid());
+    // fork, switch user, create pid file, set process priority
+    if(become_daemon(dont_fork, user) == -1)
+        fatal("Cannot demonize myself.");
+
+    info("NetData started on pid %d", getpid());
 
 
 	// ------------------------------------------------------------------------
@@ -620,10 +619,15 @@ int main(int argc, char **argv)
 			info("Successfully set pthread stacksize to %zu bytes", wanted_stacksize);
 	}
 
-	// --------------------------------------------------------------------
+	// ------------------------------------------------------------------------
 	// initialize the registry
 
 	registry_init();
+
+    // ------------------------------------------------------------------------
+    // initialize health monitoring
+
+    health_init();
 
 	// ------------------------------------------------------------------------
 	// spawn the threads

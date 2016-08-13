@@ -656,3 +656,121 @@ void rrdcalc_free(RRDHOST *host, RRDCALC *rc) {
 
     freez(rc);
 }
+
+// ----------------------------------------------------------------------------
+// load health configuration
+
+#define HEALTH_CONF_MAX_LINE 4096
+
+int health_readfile(const char *path, const char *filename) {
+    char buffer[HEALTH_CONF_MAX_LINE + 1];
+
+    info("Reading file '%s/%s'", path, filename);
+
+    snprintfz(buffer, HEALTH_CONF_MAX_LINE, "%s/%s", path, filename);
+    FILE *fp = fopen(buffer, "r");
+    if(!fp) {
+        error("Cannot read file '%s' for reading health configuration.", buffer);
+        return 0;
+    }
+
+    size_t line = 0, append = 0;
+    char *s;
+    while((s = fgets(&buffer[append], (int)(HEALTH_CONF_MAX_LINE - append), fp)) || append) {
+        int stop_appending = !s;
+        line++;
+        // info("Line %zu of file '%s/%s': '%s'", line, path, filename, s);
+        s = trim(buffer);
+        if(!s) continue;
+        // info("Trimmed line %zu of file '%s/%s': '%s'", line, path, filename, s);
+
+        append = strlen(s);
+        if(!stop_appending && s[append - 1] == '\\') {
+            s[append - 1] = ' ';
+            append = &s[append] - buffer;
+            if(append < HEALTH_CONF_MAX_LINE)
+                continue;
+            continue;
+        }
+        append = 0;
+
+        char *key = s;
+        while(*s && *s != ':') s++;
+        if(!*s) {
+            error("Invalid line %zu of file '%s/%s'. It does not contain a ':'. Ignoring it.", line, path, filename);
+            continue;
+        }
+        *s = '\0';
+        s++;
+
+        char *value = s;
+        key = trim(key);
+        value = trim(value);
+
+        if(!key) {
+            error("Invalid line %zu of file '%s/%s'. Keyword is empty. Ignoring it.", line, path, filename);
+            continue;
+        }
+
+        if(!value) {
+            error("Invalid line %zu of file '%s/%s'. value is empty. Ignoring it.", line, path, filename);
+            continue;
+        }
+
+        // info("Health file '%s/%s', key '%s', value '%s'", path, filename, key, value);
+    }
+
+    fclose(fp);
+    return 1;
+}
+
+void health_readdir(const char *path) {
+    size_t pathlen = strlen(path);
+
+    info("Reading directory '%s'", path);
+
+    DIR *dir = opendir(path);
+    if (!dir) {
+        error("Cannot open directory '%s' for reading health configuration files.", path);
+        return;
+    }
+
+    struct dirent *de = NULL;
+    while ((de = readdir(dir))) {
+        size_t len = strlen(de->d_name);
+
+        if(de->d_type == DT_DIR
+           && (
+                   (de->d_name[0] == '.' && de->d_name[1] == '\0')
+                   || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
+           ))
+            continue;
+
+        else if(de->d_type == DT_DIR) {
+            char *s = mallocz(pathlen + strlen(de->d_name) + 2);
+            strcpy(s, path);
+            strcat(s, "/");
+            strcat(s, de->d_name);
+            health_readdir(s);
+            freez(s);
+            continue;
+        }
+
+        else if((de->d_type == DT_LNK || de->d_type == DT_REG) &&
+                len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
+            health_readfile(path, de->d_name);
+        }
+    }
+}
+
+void health_init(void) {
+    char *path;
+
+    {
+        char buffer[FILENAME_MAX + 1];
+        snprintfz(buffer, FILENAME_MAX, "%s/health.d", config_get("global", "config directory", CONFIG_DIR));
+        path = config_get("health", "configuration files in directory", buffer);
+    }
+
+    health_readdir(path);
+}
