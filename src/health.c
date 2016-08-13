@@ -1,5 +1,7 @@
 #include "common.h"
 
+static const char *health_default_exec = PLUGINS_DIR "/alarm.sh";
+
 // ----------------------------------------------------------------------------
 // RRDVAR management
 
@@ -578,38 +580,21 @@ void rrdsetcalc_unlink(RRDCALC *rc) {
     rrdcalc_unlinked_optimize_rrdhost(host, rc);
 }
 
-RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const char *chart, const char *dimensions, int group_method, uint32_t after, uint32_t before, int update_every, uint32_t options) {
-    uint32_t hash = simple_hash(name);
-
+static inline int rrdcalc_exists(RRDHOST *host, const char *name, uint32_t hash) {
     RRDCALC *rc;
 
     // make sure it does not already exist
     for(rc = host->calculations; rc ; rc = rc->next) {
         if (rc->hash == hash && !strcmp(name, rc->name)) {
-            error("Attempted to create RRDCAL '%s' in host '%s', but it already exists. Ignoring it.", name, host->hostname);
-            return NULL;
+            error("Attempted to create RRDCAL '%s' in host '%s', but it already exists.", name, host->hostname);
+            return 1;
         }
     }
 
-    rc = callocz(1, sizeof(RRDCALC));
+    return 0;
+}
 
-    rc->name = strdupz(name);
-    rc->hash = simple_hash(rc->name);
-
-    rc->chart = strdupz(chart);
-    rc->hash_chart = simple_hash(rc->chart);
-
-    if(dimensions) {
-        rc->dimensions = strdupz(dimensions);
-        rc->hash_chart = simple_hash(rc->chart);
-    }
-
-    rc->group = group_method;
-    rc->after = after;
-    rc->before = before;
-    rc->update_every = update_every;
-    rc->options = options;
-
+void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc) {
     // link it to the host
     rc->next = host->calculations;
     host->calculations = rc;
@@ -622,8 +607,32 @@ RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const char *chart, cons
             break;
         }
     }
+}
 
-    return NULL;
+RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const char *chart, const char *dimensions, int group_method, uint32_t after, uint32_t before, int update_every, uint32_t options) {
+    uint32_t hash = simple_hash(name);
+
+    if(rrdcalc_exists(host, name, hash))
+        return NULL;
+
+    RRDCALC *rc = callocz(1, sizeof(RRDCALC));
+
+    rc->name = strdupz(name);
+    rc->hash = simple_hash(rc->name);
+
+    rc->chart = strdupz(chart);
+    rc->hash_chart = simple_hash(rc->chart);
+
+    if(dimensions) rc->dimensions = strdupz(dimensions);
+
+    rc->group = group_method;
+    rc->after = after;
+    rc->before = before;
+    rc->update_every = update_every;
+    rc->options = options;
+
+    rrdcalc_create_part2(host, rc);
+    return rc;
 }
 
 void rrdcalc_free(RRDHOST *host, RRDCALC *rc) {
@@ -650,9 +659,13 @@ void rrdcalc_free(RRDHOST *host, RRDCALC *rc) {
     else
         error("Cannot unlink RRDCALC '%s' from RRDHOST '%s': RRDHOST does not have any calculations", rc->name, host->hostname);
 
+    if(rc->warning) expression_free(rc->warning);
+    if(rc->critical) expression_free(rc->critical);
+
     freez(rc->name);
     freez(rc->chart);
     freez(rc->dimensions);
+    freez(rc->exec);
 
     freez(rc);
 }
@@ -662,17 +675,225 @@ void rrdcalc_free(RRDHOST *host, RRDCALC *rc) {
 
 #define HEALTH_CONF_MAX_LINE 4096
 
+#define HEALTH_ALARM_KEY "alarm"
+#define HEALTH_TEMPLATE_KEY "template"
+#define HEALTH_ON_KEY "on"
+#define HEALTH_CALC_KEY "calc"
+#define HEALTH_GREEN_KEY "green"
+#define HEALTH_RED_KEY "red"
+#define HEALTH_WARN_KEY "warn"
+#define HEALTH_CRIT_KEY "crit"
+#define HEALTH_EXEC_KEY "exec"
+
+static inline int rrdcalc_add(RRDHOST *host, RRDCALC *rc) {
+    info("Health configuration examining alarm '%s': chart '%s', exec '%s', green %Lf, red %Lf, calculation: group %d, after %d, before %d, options %u, update every %d, dimensions '%s', warning '%s', critical '%s'",
+         rc->name,
+         (rc->chart)?rc->chart:"NONE",
+         (rc->exec)?rc->exec:"DEFAULT",
+         rc->green,
+         rc->red,
+         rc->group,
+         rc->after,
+         rc->before,
+         rc->options,
+         rc->update_every,
+         (rc->dimensions)?rc->dimensions:"NONE",
+         (rc->warning)?rc->warning->parsed_as:"NONE",
+         (rc->critical)?rc->critical->parsed_as:"NONE");
+
+    if(!rc->chart) {
+        error("Health configuration for alarm '%s' does not have a chart", rc->name);
+        return 0;
+    }
+
+    if(!rc->after) {
+        error("Health configuration for alarm '%s' does not have a calculation", rc->name);
+        return 0;
+    }
+
+    if(!rc->group) {
+        error("Health configuration for alarm '%s' does not specify a chart name", rc->name);
+        return 0;
+    }
+
+    rrdcalc_create_part2(host, rc);
+    return 1;
+}
+
+static inline int rrdcalctemplate_add(RRDHOST *host, RRDCALCTEMPLATE *rt) {
+}
+
+static inline void rrdcalctemplate_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
+
+}
+
+static inline int health_parse_time(char *string, int *result) {
+    // make sure it is a number
+    if(!*string || !(isdigit(*string) || *string == '+' || *string == '-')) {
+        *result = 0;
+        return 0;
+    }
+
+    char *e = NULL;
+    calculated_number n = strtold(string, &e);
+    if(e && *e) {
+        switch (*e) {
+            case 'Y':
+                *result = (int) (n * 86400 * 365);
+                break;
+            case 'M':
+                *result = (int) (n * 86400 * 30);
+                break;
+            case 'w':
+                *result = (int) (n * 86400 * 7);
+                break;
+            case 'd':
+                *result = (int) (n * 86400);
+                break;
+            case 'h':
+                *result = (int) (n * 3600);
+                break;
+            case 'm':
+                *result = (int) (n * 60);
+                break;
+
+            default:
+            case 's':
+                *result = (int) (n);
+                break;
+        }
+    }
+    else
+       *result = (int)(n);
+
+    return 1;
+}
+
+static inline int health_parse_chart_calc(size_t line,
+                                          const char *path,
+                                          const char *file,
+                                          char *string,
+                                          int *group_method,
+                                          int *after,
+                                          int *before,
+                                          int *every,
+                                          uint32_t *options,
+                                          char **dimensions
+) {
+    if(*dimensions) freez(*dimensions);
+    *dimensions = NULL;
+    *after = -1;
+    *before = 0;
+    *every = 1;
+    *options = 0;
+
+    char *s = string, *key;
+
+    // first is the group method
+    key = s;
+    while(*s && !isspace(*s)) s++;
+    while(*s && isspace(*s)) *s++ = '\0';
+    if(!*s) {
+        error("Health configuration invalid chart calculation at line %zu of file '%s/%s': expected group method followed by the 'after' time, but got '%s'",
+              line, path, file, key);
+        return 0;
+    }
+
+    if((*group_method = web_client_api_request_v1_data_group(key, -1)) == -1) {
+        error("Health configuration at line %zu of file '%s/%s': invalid group method '%s'",
+              line, path, file, key);
+        return 0;
+    }
+
+    // then is the 'after' time
+    key = s;
+    while(*s && !isspace(*s)) s++;
+    while(*s && isspace(*s)) *s++ = '\0';
+
+    if(!health_parse_time(key, after)) {
+        error("Health configuration at line %zu of file '%s/%s': invalid duration '%s' after group method",
+              line, path, file, key);
+        return 0;
+    }
+
+    // now we may have optional parameters
+    while(*s) {
+        key = s;
+        while(*s && !isspace(*s)) s++;
+        while(*s && isspace(*s)) *s++ = '\0';
+        if(!*key) break;
+
+        if(!strcasecmp(key, "at")) {
+            char *value = s;
+            while(*s && !isspace(*s)) s++;
+            while(*s && isspace(*s)) *s++ = '\0';
+
+            if (!health_parse_time(value, before)) {
+                error("Health configuration at line %zu of file '%s/%s': invalid duration '%s' for '%s' keyword",
+                      line, path, file, value, key);
+            }
+        }
+        else if(!strcasecmp(key, "every")) {
+            char *value = s;
+            while(*s && !isspace(*s)) s++;
+            while(*s && isspace(*s)) *s++ = '\0';
+
+            if (!health_parse_time(value, every)) {
+                error("Health configuration at line %zu of file '%s/%s': invalid duration '%s' for '%s' keyword",
+                      line, path, file, value, key);
+            }
+        }
+        else if(!strcasecmp(key, "absolute") || !strcasecmp(key, "abs") || !strcasecmp(key, "absolute_sum")) {
+            *options |= RRDR_OPTION_ABSOLUTE;
+        }
+        else if(!strcasecmp(key, "min2max")) {
+            *options |= RRDR_OPTION_MIN2MAX;
+        }
+        else if(!strcasecmp(key, "null2zero")) {
+            *options |= RRDR_OPTION_NULL2ZERO;
+        }
+        else if(!strcasecmp(key, "percentage")) {
+            *options |= RRDR_OPTION_PERCENTAGE;
+        }
+        else if(!strcasecmp(key, "unaligned")) {
+            *options |= RRDR_OPTION_NOT_ALIGNED;
+        }
+        else if(!strcasecmp(key, "of")) {
+            *dimensions = strdupz(s);
+            break;
+        }
+    }
+
+    return 1;
+}
+
 int health_readfile(const char *path, const char *filename) {
+    static uint32_t hash_alarm = 0, hash_template = 0, hash_on = 0, hash_calc = 0, hash_green = 0, hash_red = 0, hash_warn = 0, hash_crit = 0, hash_exec = 0;
     char buffer[HEALTH_CONF_MAX_LINE + 1];
 
-    info("Reading file '%s/%s'", path, filename);
+    if(unlikely(!hash_alarm)) {
+        hash_alarm = simple_uhash(HEALTH_ALARM_KEY);
+        hash_template = simple_uhash(HEALTH_TEMPLATE_KEY);
+        hash_on = simple_uhash(HEALTH_ON_KEY);
+        hash_calc = simple_uhash(HEALTH_CALC_KEY);
+        hash_green = simple_uhash(HEALTH_GREEN_KEY);
+        hash_red = simple_uhash(HEALTH_RED_KEY);
+        hash_warn = simple_uhash(HEALTH_WARN_KEY);
+        hash_crit = simple_uhash(HEALTH_CRIT_KEY);
+        hash_exec = simple_uhash(HEALTH_EXEC_KEY);
+    }
+
+    // info("Reading file '%s/%s'", path, filename);
 
     snprintfz(buffer, HEALTH_CONF_MAX_LINE, "%s/%s", path, filename);
     FILE *fp = fopen(buffer, "r");
     if(!fp) {
-        error("Cannot read file '%s' for reading health configuration.", buffer);
+        error("Health configuration cannot read file '%s'.", buffer);
         return 0;
     }
+
+    RRDCALC *rc = NULL;
+    RRDCALCTEMPLATE *rt = NULL;
 
     size_t line = 0, append = 0;
     char *s;
@@ -697,7 +918,7 @@ int health_readfile(const char *path, const char *filename) {
         char *key = s;
         while(*s && *s != ':') s++;
         if(!*s) {
-            error("Invalid line %zu of file '%s/%s'. It does not contain a ':'. Ignoring it.", line, path, filename);
+            error("Health configuration has invalid line %zu of file '%s/%s'. It does not contain a ':'. Ignoring it.", line, path, filename);
             continue;
         }
         *s = '\0';
@@ -708,17 +929,122 @@ int health_readfile(const char *path, const char *filename) {
         value = trim(value);
 
         if(!key) {
-            error("Invalid line %zu of file '%s/%s'. Keyword is empty. Ignoring it.", line, path, filename);
+            error("Health configuration has invalid line %zu of file '%s/%s'. Keyword is empty. Ignoring it.", line, path, filename);
             continue;
         }
 
         if(!value) {
-            error("Invalid line %zu of file '%s/%s'. value is empty. Ignoring it.", line, path, filename);
+            error("Health configuration has invalid line %zu of file '%s/%s'. value is empty. Ignoring it.", line, path, filename);
             continue;
         }
 
         // info("Health file '%s/%s', key '%s', value '%s'", path, filename, key, value);
+        uint32_t hash = simple_uhash(key);
+
+        if(hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
+            if(rc && !rrdcalc_add(&localhost, rc))
+                rrdcalc_free(&localhost, rc);
+
+            if(rt && !rrdcalctemplate_add(&localhost, rt)) {
+                rrdcalctemplate_free(&localhost, rt);
+                rt = NULL;
+            }
+
+            rc = callocz(1, sizeof(RRDCALC));
+            rc->name = strdupz(value);
+            rc->hash = simple_hash(rc->name);
+        }
+        else if(hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) {
+            if(rc && !rrdcalc_add(&localhost, rc)) {
+                rrdcalc_free(&localhost, rc);
+                rc = NULL;
+            }
+
+            if(rt && !rrdcalctemplate_add(&localhost, rt))
+                rrdcalctemplate_free(&localhost, rt);
+
+            rt = callocz(1, sizeof(RRDCALCTEMPLATE));
+            rt->name = strdupz(value);
+            rt->hash_name = simple_hash(rt->name);
+        }
+        else if(rc) {
+            if(hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
+                if(rc->chart) {
+                    if(strcmp(rc->chart, value))
+                        info("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                             line, path, filename, rc->name, key, rc->chart, value, value);
+
+                    freez(rc->chart);
+                }
+                rc->chart = strdupz(value);
+                rc->hash_chart = simple_hash(rc->chart);
+            }
+            else if(hash == hash_calc && !strcasecmp(key, HEALTH_CALC_KEY)) {
+                health_parse_chart_calc(line, path, filename, value, &rc->group, &rc->after, &rc->before, &rc->update_every, &rc->options, &rc->dimensions);
+            }
+            else if(hash == hash_green && !strcasecmp(key, HEALTH_GREEN_KEY)) {
+                char *e;
+                rc->green = strtold(value, &e);
+                if(e && *e) {
+                    info("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' leaves this string unmatched: '%s'.",
+                         line, path, filename, rc->name, key, e);
+                }
+            }
+            else if(hash == hash_red && !strcasecmp(key, HEALTH_RED_KEY)) {
+                char *e;
+                rc->red = strtold(value, &e);
+                if(e && *e) {
+                    info("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' leaves this string unmatched: '%s'.",
+                         line, path, filename, rc->name, key, e);
+                }
+            }
+            else if(hash == hash_warn && !strcasecmp(key, HEALTH_WARN_KEY)) {
+                const char *failed_at = NULL;
+                int error = 0;
+                rc->warning = expression_parse(value, &failed_at, &error);
+                if(!rc->warning) {
+                    error("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
+                         line, path, filename, rc->name, key, value, expression_strerror(error), failed_at);
+                }
+            }
+            else if(hash == hash_crit && !strcasecmp(key, HEALTH_CRIT_KEY)) {
+                const char *failed_at = NULL;
+                int error = 0;
+                rc->critical = expression_parse(value, &failed_at, &error);
+                if(!rc->critical) {
+                    error("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
+                          line, path, filename, rc->name, key, value, expression_strerror(error), failed_at);
+                }
+            }
+            else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
+                if(rc->exec) {
+                    if(strcmp(rc->exec, value))
+                        info("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                             line, path, filename, rc->name, key, rc->exec, value, value);
+
+                    freez(rc->exec);
+                }
+                rc->exec = strdupz(value);
+            }
+            else {
+                error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has unknown key '%s'.",
+                     line, path, filename, rc->name, key);
+            }
+        }
+        else if(rt) {
+
+        }
+        else {
+            error("Health configuration at line %zu of file '%s/%s' has unknown key '%s'. Expected either '" HEALTH_ALARM_KEY "' or '" HEALTH_TEMPLATE_KEY "'.",
+                  line, path, filename, key);
+        }
     }
+
+    if(rc && !rrdcalc_add(&localhost, rc))
+        rrdcalc_free(&localhost, rc);
+
+    if(rt && !rrdcalctemplate_add(&localhost, rt))
+        rrdcalctemplate_free(&localhost, rt);
 
     fclose(fp);
     return 1;
@@ -731,7 +1057,7 @@ void health_readdir(const char *path) {
 
     DIR *dir = opendir(path);
     if (!dir) {
-        error("Cannot open directory '%s' for reading health configuration files.", path);
+        error("Health configuration cannot open directory '%s'.", path);
         return;
     }
 
@@ -770,6 +1096,9 @@ void health_init(void) {
         char buffer[FILENAME_MAX + 1];
         snprintfz(buffer, FILENAME_MAX, "%s/health.d", config_get("global", "config directory", CONFIG_DIR));
         path = config_get("health", "configuration files in directory", buffer);
+
+        snprintfz(buffer, FILENAME_MAX, "%s/alarm.sh", config_get("global", "plugins directory", PLUGINS_DIR));
+        health_default_exec = config_get("health", "script to execute on alarm", buffer);
     }
 
     health_readdir(path);

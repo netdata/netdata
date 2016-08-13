@@ -551,7 +551,7 @@ uint32_t web_client_api_request_v1_data_google_format(char *name)
 	return DATASOURCE_JSON;
 }
 
-int web_client_api_request_v1_data_group(char *name)
+int web_client_api_request_v1_data_group(char *name, int def)
 {
 	if(!strcmp(name, "max"))
 		return GROUP_MAX;
@@ -565,7 +565,7 @@ int web_client_api_request_v1_data_group(char *name)
 	else if(!strcmp(name, "incremental-sum"))
 		return GROUP_INCREMENTAL_SUM;
 
-	return GROUP_AVERAGE;
+	return def;
 }
 
 int web_client_api_request_v1_charts(struct web_client *w, char *url)
@@ -671,7 +671,7 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
 		else if(!strcmp(name, "before")) before_str = value;
 		else if(!strcmp(name, "points")) points_str = value;
 		else if(!strcmp(name, "group")) {
-			group = web_client_api_request_v1_data_group(value);
+			group = web_client_api_request_v1_data_group(value, GROUP_AVERAGE);
 		}
 		else if(!strcmp(name, "options")) {
 			options |= web_client_api_request_v1_data_options(value);
@@ -830,7 +830,7 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
 		else if(!strcmp(name, "before")) before_str = value;
 		else if(!strcmp(name, "points")) points_str = value;
 		else if(!strcmp(name, "group")) {
-			group = web_client_api_request_v1_data_group(value);
+			group = web_client_api_request_v1_data_group(value, GROUP_AVERAGE);
 		}
 		else if(!strcmp(name, "format")) {
 			format = web_client_api_request_v1_data_format(value);

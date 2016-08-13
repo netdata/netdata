@@ -145,6 +145,8 @@ typedef struct rrdcalc {
     char *name;
     uint32_t hash;
 
+    char *exec;
+
     char *chart;        // the chart name
     uint32_t hash_chart;
 
@@ -159,9 +161,13 @@ typedef struct rrdcalc {
     time_t last_updated;
     time_t next_update;
 
-    EVAL_EXPRESSION *expression;
+    EVAL_EXPRESSION *warning;
+    EVAL_EXPRESSION *critical;
 
     calculated_number value;
+
+    calculated_number green;
+    calculated_number red;
 
     RRDVAR *local;
     RRDVAR *context;
@@ -182,6 +188,8 @@ typedef struct rrdcalctemplate {
     char *name;
     uint32_t hash_name;
 
+    char *exec;
+
     char *context;
     uint32_t hash_context;
 
@@ -192,6 +200,9 @@ typedef struct rrdcalctemplate {
     int after;          // starting point in time-series
     uint32_t options;   // calculation options
     int update_every;   // update frequency for the calculation
+
+    calculated_number green;
+    calculated_number red;
 
     struct rrdcalctemplate *next;
 } RRDCALCTEMPLATE;
