@@ -32,18 +32,18 @@ typedef struct avl {
 
 /* An AVL tree */
 typedef struct avl_tree {
-	avl *root;
-	int (*compar)(void *a, void *b);
+    avl *root;
+    int (*compar)(void *a, void *b);
 } avl_tree;
 
 typedef struct avl_tree_lock {
-	avl_tree avl_tree;
+    avl_tree avl_tree;
 
 #ifndef AVL_WITHOUT_PTHREADS
 #ifdef AVL_LOCK_WITH_MUTEX
-	pthread_mutex_t mutex;
+    pthread_mutex_t mutex;
 #else /* AVL_LOCK_WITH_MUTEX */
-	pthread_rwlock_t rwlock;
+    pthread_rwlock_t rwlock;
 #endif /* AVL_LOCK_WITH_MUTEX */
 #endif /* AVL_WITHOUT_PTHREADS */
 } avl_tree_lock;

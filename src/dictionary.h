@@ -2,36 +2,36 @@
 #define NETDATA_DICTIONARY_H 1
 
 struct dictionary_stats {
-	unsigned long long inserts;
-	unsigned long long deletes;
-	unsigned long long searches;
-	unsigned long long entries;
+    unsigned long long inserts;
+    unsigned long long deletes;
+    unsigned long long searches;
+    unsigned long long entries;
 };
 
 typedef struct name_value {
-	avl avl;				// the index - this has to be first!
+    avl avl;                // the index - this has to be first!
 
-	uint32_t hash;			// a simple hash to speed up searching
-							// we first compare hashes, and only if the hashes are equal we do string comparisons
+    uint32_t hash;          // a simple hash to speed up searching
+                            // we first compare hashes, and only if the hashes are equal we do string comparisons
 
-	char *name;
-	void *value;
+    char *name;
+    void *value;
 } NAME_VALUE;
 
 typedef struct dictionary {
-	avl_tree values_index;
+    avl_tree values_index;
 
-	uint8_t flags;
+    uint8_t flags;
 
-	struct dictionary_stats *stats;
-	pthread_rwlock_t *rwlock;
+    struct dictionary_stats *stats;
+    pthread_rwlock_t *rwlock;
 } DICTIONARY;
 
-#define DICTIONARY_FLAG_DEFAULT					0x00000000
-#define DICTIONARY_FLAG_SINGLE_THREADED			0x00000001
-#define DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE	0x00000002
-#define DICTIONARY_FLAG_NAME_LINK_DONT_CLONE	0x00000004
-#define DICTIONARY_FLAG_WITH_STATISTICS			0x00000008
+#define DICTIONARY_FLAG_DEFAULT                 0x00000000
+#define DICTIONARY_FLAG_SINGLE_THREADED         0x00000001
+#define DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE   0x00000002
+#define DICTIONARY_FLAG_NAME_LINK_DONT_CLONE    0x00000004
+#define DICTIONARY_FLAG_WITH_STATISTICS         0x00000008
 
 extern DICTIONARY *dictionary_create(uint8_t flags);
 extern void dictionary_destroy(DICTIONARY *dict);

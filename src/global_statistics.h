@@ -7,13 +7,13 @@
 struct global_statistics {
     volatile uint16_t connected_clients;
 
-	volatile uint64_t web_requests;
+    volatile uint64_t web_requests;
     volatile uint64_t web_usec;
     volatile uint64_t web_usec_max;
-	volatile uint64_t bytes_received;
-	volatile uint64_t bytes_sent;
-	volatile uint64_t content_size;
-	volatile uint64_t compressed_content_size;
+    volatile uint64_t bytes_received;
+    volatile uint64_t bytes_sent;
+    volatile uint64_t content_size;
+    volatile uint64_t compressed_content_size;
 };
 
 extern volatile struct global_statistics global_statistics;
