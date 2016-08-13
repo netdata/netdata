@@ -597,7 +597,8 @@ int main(int argc, char **argv)
 
         // --------------------------------------------------------------------
 
-        create_listen_sockets();
+        if(!check_config)
+            create_listen_sockets();
     }
 
     // initialize the log files

@@ -503,6 +503,12 @@ static inline void rrdcalc_unlinked_optimize_rrdhost(RRDHOST *host, RRDCALC *rc)
 static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     rc->rrdset = st;
 
+    if(rc->green)
+        st->green = rc->green;
+
+    if(rc->red)
+        st->red = rc->red;
+
     rc->local   = rrdvar_create_and_index("local", &st->variables_root_index, rc->name, rc->hash, RRDVAR_TYPE_CALCULATED, &rc->value);
     rc->context = rrdvar_create_and_index("context", &st->rrdcontext->variables_root_index, rc->name, rc->hash, RRDVAR_TYPE_CALCULATED, &rc->value);
     rc->host    = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rc->name, rc->hash, RRDVAR_TYPE_CALCULATED, &rc->value);
@@ -648,10 +654,8 @@ void rrdcalc_free(RRDHOST *host, RRDCALC *rc) {
     else if(host->calculations) {
         RRDCALC *t, *last = host->calculations;
 
-        for(t = last->next; t ; last = t, t = t->next)
-            if(t == rc) break;
-        
-        if(last)
+        for(t = last->next; t && t != rc; last = t, t = t->next) ;
+        if(last && last->next == rc)
             last->next = rc->next;
         else
             error("Cannot unlink RRDCALC '%s' from RRDHOST '%s': not found", rc->name, host->hostname);
@@ -662,12 +666,44 @@ void rrdcalc_free(RRDHOST *host, RRDCALC *rc) {
     if(rc->warning) expression_free(rc->warning);
     if(rc->critical) expression_free(rc->critical);
 
+    freez(rc->source);
     freez(rc->name);
     freez(rc->chart);
     freez(rc->dimensions);
     freez(rc->exec);
 
     freez(rc);
+}
+
+// ----------------------------------------------------------------------------
+// RRDCALCTEMPLATE management
+
+static inline void rrdcalctemplate_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
+    if(host->templates) {
+        if(host->templates == rt) {
+            host->templates = rt->next;
+        }
+        else {
+            RRDCALCTEMPLATE *t, *last = host->templates;
+            for (t = last->next; t && t != rt; last = t, t = t->next ) ;
+            if(last && last->next == rt) {
+                last->next = rt->next;
+                rt->next = NULL;
+            }
+            else
+                error("Cannot find RRDCALCTEMPLATE '%s' linked in host '%s'", rt->name, host->hostname);
+        }
+    }
+
+    if(rt->warning) expression_free(rt->warning);
+    if(rt->critical) expression_free(rt->critical);
+
+    freez(rt->dimensions);
+    freez(rt->context);
+    freez(rt->name);
+    freez(rt->exec);
+    freez(rt->source);
+    freez(rt);
 }
 
 // ----------------------------------------------------------------------------
@@ -686,7 +722,7 @@ void rrdcalc_free(RRDHOST *host, RRDCALC *rc) {
 #define HEALTH_EXEC_KEY "exec"
 
 static inline int rrdcalc_add(RRDHOST *host, RRDCALC *rc) {
-    info("Health configuration examining alarm '%s': chart '%s', exec '%s', green %Lf, red %Lf, calculation: group %d, after %d, before %d, options %u, update every %d, dimensions '%s', warning '%s', critical '%s'",
+    info("Health configuration examining alarm '%s': chart '%s', exec '%s', green %Lf, red %Lf, calculation: group %d, after %d, before %d, options %u, update every %d, dimensions '%s', warning '%s', critical '%s', source '%s",
          rc->name,
          (rc->chart)?rc->chart:"NONE",
          (rc->exec)?rc->exec:"DEFAULT",
@@ -699,20 +735,20 @@ static inline int rrdcalc_add(RRDHOST *host, RRDCALC *rc) {
          rc->update_every,
          (rc->dimensions)?rc->dimensions:"NONE",
          (rc->warning)?rc->warning->parsed_as:"NONE",
-         (rc->critical)?rc->critical->parsed_as:"NONE");
+         (rc->critical)?rc->critical->parsed_as:"NONE",
+         rc->source
+    );
+
+    if(rrdcalc_exists(host, rc->name, rc->hash))
+        return 0;
 
     if(!rc->chart) {
         error("Health configuration for alarm '%s' does not have a chart", rc->name);
         return 0;
     }
 
-    if(!rc->after) {
-        error("Health configuration for alarm '%s' does not have a calculation", rc->name);
-        return 0;
-    }
-
-    if(!rc->group) {
-        error("Health configuration for alarm '%s' does not specify a chart name", rc->name);
+    if(!RRDCALC_HAS_CALCULATION(rc) && !rc->warning && !rc->critical) {
+        error("Health configuration for alarm '%s' is useless (no calculation, no warning and no critical evaluation)", rc->name);
         return 0;
     }
 
@@ -721,10 +757,39 @@ static inline int rrdcalc_add(RRDHOST *host, RRDCALC *rc) {
 }
 
 static inline int rrdcalctemplate_add(RRDHOST *host, RRDCALCTEMPLATE *rt) {
-}
+    info("Health configuration examining template '%s': context '%s', exec '%s', green %Lf, red %Lf, calculation: group %d, after %d, before %d, options %u, update every %d, dimensions '%s', warning '%s', critical '%s', source '%s'",
+         rt->name,
+         (rt->context)?rt->context:"NONE",
+         (rt->exec)?rt->exec:"DEFAULT",
+         rt->green,
+         rt->red,
+         rt->group,
+         rt->after,
+         rt->before,
+         rt->options,
+         rt->update_every,
+         (rt->dimensions)?rt->dimensions:"NONE",
+         (rt->warning)?rt->warning->parsed_as:"NONE",
+         (rt->critical)?rt->critical->parsed_as:"NONE",
+         rt->source
+    );
 
-static inline void rrdcalctemplate_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
+    if(!RRDCALCTEMPLATE_HAS_CALCULATION(rt) && !rt->warning && !rt->critical) {
+        error("Health configuration for template '%s' is useless (no calculation, no warning and no critical evaluation)", rt->name);
+        return 0;
+    }
 
+    RRDCALCTEMPLATE *t;
+    for (t = host->templates; t ; t = t->next) {
+        if(t->hash_name == rt->hash_name && !strcmp(t->name, rt->name)) {
+            error("Health configuration template '%s' already exists for host '%s'.", rt->name, host->hostname);
+            return 0;
+        }
+    }
+
+    rt->next = host->templates;
+    host->templates = rt;
+    return 1;
 }
 
 static inline int health_parse_time(char *string, int *result) {
@@ -769,22 +834,16 @@ static inline int health_parse_time(char *string, int *result) {
     return 1;
 }
 
-static inline int health_parse_chart_calc(size_t line,
-                                          const char *path,
-                                          const char *file,
-                                          char *string,
-                                          int *group_method,
-                                          int *after,
-                                          int *before,
-                                          int *every,
-                                          uint32_t *options,
-                                          char **dimensions
+static inline int health_parse_chart_calc(
+        size_t line, const char *path, const char *file, char *string,
+        int *group_method, int *after, int *before, int *every,
+        uint32_t *options, char **dimensions
 ) {
     if(*dimensions) freez(*dimensions);
     *dimensions = NULL;
-    *after = -1;
+    *after = 0;
     *before = 0;
-    *every = 1;
+    *every = 0;
     *options = 0;
 
     char *s = string, *key;
@@ -815,6 +874,9 @@ static inline int health_parse_chart_calc(size_t line,
               line, path, file, key);
         return 0;
     }
+
+    // sane defaults
+    *every = abs(*after);
 
     // now we may have optional parameters
     while(*s) {
@@ -859,12 +921,19 @@ static inline int health_parse_chart_calc(size_t line,
             *options |= RRDR_OPTION_NOT_ALIGNED;
         }
         else if(!strcasecmp(key, "of")) {
-            *dimensions = strdupz(s);
+            if(*s && strcasecmp(s, "all"))
+               *dimensions = strdupz(s);
             break;
         }
     }
 
     return 1;
+}
+
+static inline char *health_source_file(int line, const char *path, const char *filename) {
+    char buffer[FILENAME_MAX + 1];
+    snprintfz(buffer, FILENAME_MAX, "%d@%s/%s", line, path, filename);
+    return strdupz(buffer);
 }
 
 int health_readfile(const char *path, const char *filename) {
@@ -945,18 +1014,21 @@ int health_readfile(const char *path, const char *filename) {
             if(rc && !rrdcalc_add(&localhost, rc))
                 rrdcalc_free(&localhost, rc);
 
-            if(rt && !rrdcalctemplate_add(&localhost, rt)) {
-                rrdcalctemplate_free(&localhost, rt);
+            if(rt) {
+                if (!rrdcalctemplate_add(&localhost, rt))
+                    rrdcalctemplate_free(&localhost, rt);
                 rt = NULL;
             }
 
             rc = callocz(1, sizeof(RRDCALC));
             rc->name = strdupz(value);
             rc->hash = simple_hash(rc->name);
+            rc->source = health_source_file(line, path, filename);
         }
         else if(hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) {
-            if(rc && !rrdcalc_add(&localhost, rc)) {
-                rrdcalc_free(&localhost, rc);
+            if(rc) {
+                if(!rrdcalc_add(&localhost, rc))
+                    rrdcalc_free(&localhost, rc);
                 rc = NULL;
             }
 
@@ -966,6 +1038,7 @@ int health_readfile(const char *path, const char *filename) {
             rt = callocz(1, sizeof(RRDCALCTEMPLATE));
             rt->name = strdupz(value);
             rt->hash_name = simple_hash(rt->name);
+            rt->source = health_source_file(line, path, filename);
         }
         else if(rc) {
             if(hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
@@ -1032,7 +1105,68 @@ int health_readfile(const char *path, const char *filename) {
             }
         }
         else if(rt) {
+            if(hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
+                if(rt->context) {
+                    if(strcmp(rt->context, value))
+                        info("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                             line, path, filename, rt->name, key, rt->context, value, value);
 
+                    freez(rt->context);
+                }
+                rt->context = strdupz(value);
+                rt->hash_context = simple_hash(rt->context);
+            }
+            else if(hash == hash_calc && !strcasecmp(key, HEALTH_CALC_KEY)) {
+                health_parse_chart_calc(line, path, filename, value, &rt->group, &rt->after, &rt->before, &rt->update_every, &rt->options, &rt->dimensions);
+            }
+            else if(hash == hash_green && !strcasecmp(key, HEALTH_GREEN_KEY)) {
+                char *e;
+                rt->green = strtold(value, &e);
+                if(e && *e) {
+                    info("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
+                         line, path, filename, rt->name, key, e);
+                }
+            }
+            else if(hash == hash_red && !strcasecmp(key, HEALTH_RED_KEY)) {
+                char *e;
+                rt->red = strtold(value, &e);
+                if(e && *e) {
+                    info("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
+                         line, path, filename, rt->name, key, e);
+                }
+            }
+            else if(hash == hash_warn && !strcasecmp(key, HEALTH_WARN_KEY)) {
+                const char *failed_at = NULL;
+                int error = 0;
+                rt->warning = expression_parse(value, &failed_at, &error);
+                if(!rt->warning) {
+                    error("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
+                          line, path, filename, rt->name, key, value, expression_strerror(error), failed_at);
+                }
+            }
+            else if(hash == hash_crit && !strcasecmp(key, HEALTH_CRIT_KEY)) {
+                const char *failed_at = NULL;
+                int error = 0;
+                rt->critical = expression_parse(value, &failed_at, &error);
+                if(!rt->critical) {
+                    error("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
+                          line, path, filename, rt->name, key, value, expression_strerror(error), failed_at);
+                }
+            }
+            else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
+                if(rt->exec) {
+                    if(strcmp(rt->exec, value))
+                        info("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                             line, path, filename, rt->name, key, rt->exec, value, value);
+
+                    freez(rt->exec);
+                }
+                rt->exec = strdupz(value);
+            }
+            else {
+                error("Health configuration at line %zu of file '%s/%s' for template '%s' has unknown key '%s'.",
+                      line, path, filename, rt->name, key);
+            }
         }
         else {
             error("Health configuration at line %zu of file '%s/%s' has unknown key '%s'. Expected either '" HEALTH_ALARM_KEY "' or '" HEALTH_TEMPLATE_KEY "'.",

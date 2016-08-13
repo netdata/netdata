@@ -38,8 +38,10 @@ int open_log_file(int fd, FILE **fp, const char *filename, int *enabled_syslog) 
 
     // don't do anything if the user is willing
     // to have the standard one
-    if(!strcmp(filename, "system"))
-        return fd;
+    if(!strcmp(filename, "system")) {
+        if(fd != -1) return fd;
+        filename = "stdout";
+    }
 
     if(!strcmp(filename, "stdout"))
         f = STDOUT_FILENO;

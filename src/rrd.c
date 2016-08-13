@@ -56,9 +56,10 @@ void rrdhost_unlock(RRDHOST *host) {
 }
 
 void rrdhost_check_wrlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line) {
-    if(pthread_rwlock_tryrdlock(&host->rrdset_root_rwlock) == 0) {
+    int ret = pthread_rwlock_tryrdlock(&host->rrdset_root_rwlock);
+
+    if(ret != 0)
         fatal("RRDHOST '%s' should be write-locked, but it is not, at function %s() at line %lu of file '%s'", host->hostname, function, line, file);
-    }
 }
 
 // ----------------------------------------------------------------------------

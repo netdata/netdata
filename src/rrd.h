@@ -256,6 +256,9 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // local variables
 
+    calculated_number green;
+    calculated_number red;
+
     avl_tree_lock variables_root_index;
     RRDSETVAR *variables;
     RRDCALC *calculations;
@@ -297,6 +300,8 @@ struct rrdhost {
     // RRDCALCs may be linked to charts at any point
     // (charts may or may not exist when these are loaded)
     RRDCALC *calculations;
+
+    RRDCALCTEMPLATE *templates;
 
     // all variable references are linked here
     // RRDVARs may be free'd, so every time this happens
