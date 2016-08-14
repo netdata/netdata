@@ -2,9 +2,16 @@
 # Description: logging for netdata python.d modules
 
 import sys
+from time import time
 
 DEBUG_FLAG = False
 PROGRAM = ""
+LOG_COUNTER = 2
+LOG_INTERVAL = 5
+NEXT_CHECK = 0
+
+WRITE = sys.stderr.write
+FLUSH = sys.stderr.flush
 
 
 def log_msg(msg_type, *args):
@@ -12,10 +19,22 @@ def log_msg(msg_type, *args):
     Print message on stderr.
     :param msg_type: str
     """
-    msg = "%s %s: %s" % (PROGRAM, str(msg_type), " ".join(args))
+    global LOG_COUNTER
+    if not DEBUG_FLAG:
+        LOG_COUNTER -= 1
+    now = time()
+    if LOG_COUNTER >= 0:
+        msg = "%s %s: %s" % (PROGRAM, str(msg_type), " ".join(args))
+        WRITE(msg + "\n")
+        FLUSH()
 
-    sys.stderr.write(msg + "\n")
-    sys.stderr.flush()
+    global NEXT_CHECK
+    if NEXT_CHECK <= now:
+        NEXT_CHECK = now - (now % LOG_INTERVAL) + LOG_INTERVAL
+        if LOG_COUNTER < 0:
+            msg = "Prevented %s log messages from displaying" % str(0 - LOG_COUNTER)
+            WRITE(msg + "\n")
+            FLUSH()
 
 
 def debug(*args):
