@@ -49,7 +49,6 @@ class Service(SocketService, UrlService):
             UrlService.__init__(self, configuration=configuration, name=name)
             if not self.url.endswith("/;csv;norefresh"):
                 self.url += "/;csv;norefresh"
-            self.url = "http://localhost:9000/stat"
             self.use_socket = False
 
         # self.order and self.definitions are created with _create_definitions method
