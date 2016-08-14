@@ -19,6 +19,7 @@ dist_python_SCRIPTS = \
 	memcached.chart.py \
 	mysql.chart.py \
 	nginx.chart.py \
+	nginx_log.chart.py \
 	phpfpm.chart.py \
 	postfix.chart.py \
 	redis.chart.py \

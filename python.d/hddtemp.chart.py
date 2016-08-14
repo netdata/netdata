@@ -39,23 +39,31 @@ class Service(SocketService):
         self.port = 7634
         self.order = ORDER
         self.definitions = CHARTS
-        self.disk_count = 1
-        self.exclude = []
+        self.disks = []
 
-    def _get_disk_count(self):
-        all_disks = [f for f in os.listdir("/dev") if len(f) == 3 and f.startswith("sd")]
-        for disk in self.exclude:
-            try:
-                all_disks.remove(disk)
-            except:
-                self.debug("Disk not found")
-        return len(all_disks)
+    def _get_disks(self):
+        try:
+            disks = self.configuration['devices']
+            print(disks)
+        except (KeyError, TypeError) as e:
+            self.info("Autodetecting disks")
+            return ["/dev/" + f for f in os.listdir("/dev") if len(f) == 3 and f.startswith("sd")]
+
+        ret = []
+        for disk in disks:
+            if not disk.startswith('/dev/'):
+                disk = "/dev/" + disk
+            if os.path.exists(disk):
+                ret.append(disk)
+        if len(ret) == 0:
+            self.error("Provided disks cannot be found in /dev directory.")
+        return ret
 
     def _check_raw_data(self, data):
         if not data.endswith('|'):
             return False
 
-        if data.count('|') % (5 * self.disk_count) == 0:
+        if all(disk in data for disk in self.disks):
             return True
 
         return False
@@ -72,6 +80,8 @@ class Service(SocketService):
             return None
         data = {}
         for i in range(len(raw) // 5):
+            if not raw[i*5+1] in self.disks:
+                continue
             try:
                 val = int(raw[i*5+3])
             except ValueError:
@@ -90,18 +100,7 @@ class Service(SocketService):
         :return: boolean
         """
         self._parse_config()
-        try:
-            self.exclude = list(self.configuration['exlude'])
-        except (KeyError, TypeError) as e:
-            self.info("No excluded disks")
-            self.debug(str(e))
-
-        try:
-            self.disk_count = int(self.configuration['disk_count'])
-        except (KeyError, TypeError) as e:
-            self.info("Autodetecting number of disks")
-            self.disk_count = self._get_disk_count()
-            self.debug(str(e))
+        self.disks = self._get_disks()
 
         data = self._get_data()
         if data is None:
