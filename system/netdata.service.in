@@ -28,8 +28,11 @@ SendSIGKILL=no
 # -----------------------------------------------------------------------------
 # Hardening netdata
 
-AmbientCapabilities=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
-CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
+# These will apply these capabilities to the entire netdata process tree
+# We don't want this - only apps.plugin needs them
+# AmbientCapabilities=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
+# CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
+
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=read-only
