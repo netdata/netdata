@@ -30,6 +30,7 @@ dist_pythonconfig_DATA = \
 	python.d/memcached.conf \
 	python.d/mysql.conf \
 	python.d/nginx.conf \
+	python.d/nginx_log.conf \
 	python.d/phpfpm.conf \
 	python.d/postfix.conf \
 	python.d/redis.conf \

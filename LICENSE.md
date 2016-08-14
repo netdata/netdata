@@ -138,10 +138,10 @@ connectivity is not available.
     Copyright 2015, Joseph Huckaby
     [MIT License](https://github.com/jhuckaby/pixl-xml)
     
-- [PySensors](https://bitbucket.org/blackjack/pysensors)
+- [sensors](https://github.com/paroj/sensors.py)
 
-    Copyright 2014, Marc 'BlackJack' Rintsch
-    [LGPL 2.1 License](https://bitbucket.org/blackjack/pysensors)
+    Copyright 2014, Pavel Rojtberg
+    [LGPL 2.1 License](http://opensource.org/licenses/LGPL-2.1)
 
 - [PyYAML](https://bitbucket.org/blackjack/pysensors)
 
