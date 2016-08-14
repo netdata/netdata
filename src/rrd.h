@@ -138,11 +138,13 @@ struct rrddim {
                                                     // this is actual date time we updated the last_collected_value
                                                     // THIS IS DIFFERENT FROM THE SAME MEMBER OF RRDSET
 
-    calculated_number calculated_value;             // the current calculated value, after applying the algorithm
-    calculated_number last_calculated_value;        // the last calculated value
+    calculated_number calculated_value;             // the current calculated value, after applying the algorithm - resets to zero after being used
+    calculated_number last_calculated_value;        // the last calculated value processed
 
-    collected_number collected_value;               // the current value, as collected
-    collected_number last_collected_value;          // the last value that was collected
+    calculated_number last_stored_value;            // the last value as stored in the database (after interpolation)
+
+    collected_number collected_value;               // the current value, as collected - resets to 0 after being used
+    collected_number last_collected_value;          // the last value that was collected, after being processed
 
     // the *_volume members are used to calculate the accuracy of the rounding done by the
     // storage number - they are printed to debug.log when debug is enabled for a set.
@@ -315,10 +317,18 @@ extern RRDHOST localhost;
 
 #ifdef NETDATA_INTERNAL_CHECKS
 #define rrdhost_check_wrlock(host) rrdhost_check_wrlock_int(host, __FILE__, __FUNCTION__, __LINE__)
+#define rrdhost_check_rdlock(host) rrdhost_check_rdlock_int(host, __FILE__, __FUNCTION__, __LINE__)
 #else
+#define rrdhost_check_rdlock(host) (void)0
 #define rrdhost_check_wrlock(host) (void)0
 #endif
+
 extern void rrdhost_check_wrlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line);
+extern void rrdhost_check_rdlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line);
+
+extern void rrdhost_rwlock(RRDHOST *host);
+extern void rrdhost_rdlock(RRDHOST *host);
+extern void rrdhost_unlock(RRDHOST *host);
 
 // ----------------------------------------------------------------------------
 // RRD SET functions

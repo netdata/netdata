@@ -759,7 +759,7 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
 
     // if the collected value is too old, don't calculate its value
     if(rrdset_last_entry_t(st) >= (time(NULL) - (st->update_every * st->gap_when_lost_iterations_above)))
-        ret = rrd2value(st, w->response.data, &n, dimensions, points, after, before, group, options, &latest_timestamp, &value_is_null);
+        ret = rrd2value(st, w->response.data, &n, (dimensions)?buffer_tostring(dimensions):NULL, points, after, before, group, options, &latest_timestamp, &value_is_null);
 
     // if the value cannot be calculated, show empty badge
     if(ret != 200) {

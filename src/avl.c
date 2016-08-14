@@ -278,7 +278,27 @@ avl *avl_remove(avl_tree *tree, avl *item) {
 }
 
 /* ------------------------------------------------------------------------- */
-// these functions are (C) Costa Tsaousis
+// below are functions by (C) Costa Tsaousis
+
+// ---------------------------
+// traversing
+
+void avl_walker(avl *node, void (*callback)(void *)) {
+    if(node->avl_link[0])
+        avl_walker(node->avl_link[0], callback);
+
+    callback(node);
+
+    if(node->avl_link[1])
+        avl_walker(node->avl_link[1], callback);
+}
+
+void avl_traverse(avl_tree *t, void (*callback)(void *)) {
+    avl_walker(t->root, callback);
+}
+
+// ---------------------------
+// locks
 
 void avl_read_lock(avl_tree_lock *t) {
 #ifndef AVL_WITHOUT_PTHREADS
@@ -310,7 +330,8 @@ void avl_unlock(avl_tree_lock *t) {
 #endif /* AVL_WITHOUT_PTHREADS */
 }
 
-/* ------------------------------------------------------------------------- */
+// ---------------------------
+// operations with locking
 
 void avl_init_lock(avl_tree_lock *t, int (*compar)(void *a, void *b)) {
     avl_init(&t->avl_tree, compar);
@@ -351,8 +372,15 @@ avl *avl_insert_lock(avl_tree_lock *t, avl *a) {
     return ret;
 }
 
+void avl_traverse_lock(avl_tree_lock *t, void (*callback)(void *)) {
+    avl_read_lock(t);
+    avl_traverse(&t->avl_tree, callback);
+    avl_unlock(t);
+}
+
 void avl_init(avl_tree *t, int (*compar)(void *a, void *b)) {
     t->root = NULL;
     t->compar = compar;
 }
 
+// ------------------

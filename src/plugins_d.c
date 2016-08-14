@@ -439,9 +439,8 @@ void *pluginsd_worker_thread(void *arg)
     return NULL;
 }
 
-void *pluginsd_main(void *ptr)
-{
-    if(ptr) { ; }
+void *pluginsd_main(void *ptr) {
+    (void)ptr;
 
     info("PLUGINS.D thread created with task id %d", gettid());
 

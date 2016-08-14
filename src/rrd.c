@@ -55,10 +55,17 @@ void rrdhost_unlock(RRDHOST *host) {
     pthread_rwlock_unlock(&host->rrdset_root_rwlock);
 }
 
+void rrdhost_check_rdlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line) {
+    int ret = pthread_rwlock_trywrlock(&host->rrdset_root_rwlock);
+
+    if(ret == 0)
+        fatal("RRDHOST '%s' should be read-locked, but it is not, at function %s() at line %lu of file '%s'", host->hostname, function, line, file);
+}
+
 void rrdhost_check_wrlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line) {
     int ret = pthread_rwlock_tryrdlock(&host->rrdset_root_rwlock);
 
-    if(ret != 0)
+    if(ret == 0)
         fatal("RRDHOST '%s' should be write-locked, but it is not, at function %s() at line %lu of file '%s'", host->hostname, function, line, file);
 }
 
@@ -526,7 +533,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
     avl_init_lock(&st->variables_root_index, rrdvar_compare);
 
     pthread_rwlock_init(&st->rwlock, NULL);
-    pthread_rwlock_wrlock(&localhost.rrdset_root_rwlock);
+    rrdhost_rwlock(&localhost);
 
     if(name && *name) rrdset_set_name(st, name);
     else rrdset_set_name(st, id);
@@ -543,17 +550,19 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
     st->next = localhost.rrdset_root;
     localhost.rrdset_root = st;
 
-    rrdsetvar_create(st, "last_collected", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, 0);
-    rrdsetvar_create(st, "raw_total", RRDVAR_TYPE_TOTAL, &st->collected_total, 0);
-    rrdsetvar_create(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, 0);
-    rrdsetvar_create(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, 0);
+    if(health_enabled) {
+        rrdsetvar_create(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, 0);
+        rrdsetvar_create(st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, 0);
+        rrdsetvar_create(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, 0);
+        rrdsetvar_create(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, 0);
+    }
 
     rrdset_index_add(&localhost, st);
 
     rrdsetcalc_link_matching(st);
     rrdcalctemplate_link_matching(st);
 
-    pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
+    rrdhost_unlock(&localhost);
 
     return(st);
 }
@@ -681,9 +690,11 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
         td->next = rd;
     }
 
-    rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->calculated_value, 0);
-    rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->collected_value, 0);
-    rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected", &rd->last_collected_time.tv_sec, 0);
+    if(health_enabled) {
+        rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, 0);
+        rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, 0);
+        rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, 0);
+    }
 
     pthread_rwlock_unlock(&st->rwlock);
 
@@ -746,7 +757,7 @@ void rrdset_free_all(void)
 {
     info("Freeing all memory...");
 
-    pthread_rwlock_wrlock(&localhost.rrdset_root_rwlock);
+    rrdhost_rwlock(&localhost);
 
     RRDSET *st;
     for(st = localhost.rrdset_root; st ;) {
@@ -789,7 +800,7 @@ void rrdset_free_all(void)
     }
     localhost.rrdset_root = NULL;
 
-    pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
+    rrdhost_unlock(&localhost);
 
     info("Memory cleanup completed...");
 }
@@ -800,7 +811,7 @@ void rrdset_save_all(void) {
     RRDSET *st;
     RRDDIM *rd;
 
-    pthread_rwlock_wrlock(&localhost.rrdset_root_rwlock);
+    rrdhost_rwlock(&localhost);
     for(st = localhost.rrdset_root; st ; st = st->next) {
         pthread_rwlock_wrlock(&st->rwlock);
 
@@ -818,7 +829,7 @@ void rrdset_save_all(void) {
 
         pthread_rwlock_unlock(&st->rwlock);
     }
-    pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
+    rrdhost_unlock(&localhost);
 }
 
 
@@ -1326,6 +1337,7 @@ unsigned long long rrdset_done(RRDSET *st)
 
             if(likely(rd->updated && rd->counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
                 rd->values[st->current_entry] = pack_storage_number(new_value, storage_flags );
+                rd->last_stored_value = new_value;
 
                 if(unlikely(st->debug))
                     debug(D_RRD_STATS, "%s/%s: STORE[%ld] "
@@ -1341,6 +1353,7 @@ unsigned long long rrdset_done(RRDSET *st)
                         , st->current_entry
                         );
                 rd->values[st->current_entry] = pack_storage_number(0, SN_NOT_EXISTS);
+                rd->last_stored_value = 0;
             }
 
             stored_entries++;
