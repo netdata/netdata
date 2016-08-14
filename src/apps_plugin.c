@@ -394,10 +394,18 @@ int read_apps_groups_conf(const char *name)
 // data to store for each pid
 // see: man proc
 
+#define PID_LOG_IO      0x00000001
+#define PID_LOG_STATM   0x00000002
+#define PID_LOG_CMDLINE 0x00000004
+#define PID_LOG_FDS     0x00000008
+#define PID_LOG_STAT    0x00000010
+
 struct pid_stat {
     int32_t pid;
     char comm[MAX_COMPARE_NAME + 1];
     char cmdline[MAX_CMDLINE + 1];
+
+    uint32_t log_thrown;
 
     // char state;
     int32_t ppid;
@@ -583,7 +591,7 @@ int read_proc_pid_cmdline(struct pid_stat *p) {
     ssize_t i, bytes = read(fd, p->cmdline, MAX_CMDLINE);
     close(fd);
 
-    if(unlikely(bytes <= 0)) goto cleanup;
+    if(unlikely(bytes < 0)) goto cleanup;
 
     p->cmdline[bytes] = '\0';
     for(i = 0; i < bytes ; i++)
@@ -592,7 +600,7 @@ int read_proc_pid_cmdline(struct pid_stat *p) {
     if(unlikely(debug))
         fprintf(stderr, "Read file '%s' contents: %s\n", p->cmdline_filename, p->cmdline);
 
-    return 0;
+    return 1;
 
 cleanup:
     // copy the command to the command line
@@ -603,7 +611,7 @@ cleanup:
 int read_proc_pid_ownership(struct pid_stat *p) {
     if(unlikely(!p->stat_filename)) {
         error("pid %d does not have a stat_filename", p->pid);
-        return 1;
+        return 0;
     }
 
     // ----------------------------------------
@@ -618,7 +626,7 @@ int read_proc_pid_ownership(struct pid_stat *p) {
     p->uid = st.st_uid;
     p->gid = st.st_gid;
 
-    return 0;
+    return 1;
 }
 
 int read_proc_pid_stat(struct pid_stat *p) {
@@ -749,7 +757,7 @@ int read_proc_pid_stat(struct pid_stat *p) {
         p->cgtime           = 0;
     }
 
-    return 0;
+    return 1;
 
 cleanup:
     p->minflt           = 0;
@@ -764,7 +772,7 @@ cleanup:
     p->cgtime           = 0;
     p->num_threads      = 0;
     p->rss              = 0;
-    return 1;
+    return 0;
 }
 
 int read_proc_pid_statm(struct pid_stat *p) {
@@ -792,7 +800,7 @@ int read_proc_pid_statm(struct pid_stat *p) {
     p->statm_data           = strtoull(procfile_lineword(ff, 0, 5), NULL, 10);
     p->statm_dirty          = strtoull(procfile_lineword(ff, 0, 6), NULL, 10);
 
-    return 0;
+    return 1;
 
 cleanup:
     p->statm_size           = 0;
@@ -802,7 +810,7 @@ cleanup:
     p->statm_lib            = 0;
     p->statm_data           = 0;
     p->statm_dirty          = 0;
-    return 1;
+    return 0;
 }
 
 int read_proc_pid_io(struct pid_stat *p) {
@@ -866,7 +874,7 @@ int read_proc_pid_io(struct pid_stat *p) {
         p->io_cancelled_write_bytes     = 0;
     }
 
-    return 0;
+    return 1;
 
 cleanup:
     p->io_logical_bytes_read        = 0;
@@ -876,7 +884,7 @@ cleanup:
     p->io_storage_bytes_read        = 0;
     p->io_storage_bytes_written     = 0;
     p->io_cancelled_write_bytes     = 0;
-    return 1;
+    return 0;
 }
 
 unsigned long long global_utime = 0;
@@ -937,13 +945,13 @@ int read_proc_stat() {
         global_gtime = 0;
     }
 
-    return 0;
+    return 1;
 
 cleanup:
     global_utime = 0;
     global_stime = 0;
     global_gtime = 0;
-    return 1;
+    return 0;
 }
 
 
@@ -1248,7 +1256,7 @@ int read_pid_file_descriptors(struct pid_stat *p) {
 
             // else make it positive again, we need it
             // of course, the actual file may have changed, but we don't care so much
-            // FIXME: we could compare the inode as returned by readdir direct structure
+            // FIXME: we could compare the inode as returned by readdir dirent structure
             else p->fds[fdid] = -p->fds[fdid];
         }
         closedir(fds);
@@ -1259,9 +1267,9 @@ int read_pid_file_descriptors(struct pid_stat *p) {
             p->fds[c] = 0;
         }
     }
-    else return 1;
+    else return 0;
 
-    return 0;
+    return 1;
 }
 
 // ----------------------------------------------------------------------------
@@ -1571,6 +1579,49 @@ static int compar_pid(const void *pid1, const void *pid2) {
         return 1;
 }
 
+static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
+    if(unlikely(!status)) {
+        // error("command failed log %u, errno %d", log, errno);
+
+        if(unlikely(debug || errno != ENOENT)) {
+            if(unlikely(debug || !(p->log_thrown & log))) {
+                p->log_thrown |= log;
+                switch(log) {
+                    case PID_LOG_IO:
+                        error("Cannot process %s/proc/%d/io (command '%s')", host_prefix, p->pid, p->comm);
+                        break;
+
+                    case PID_LOG_STATM:
+                        error("Cannot process %s/proc/%d/statm (command '%s')", host_prefix, p->pid, p->comm);
+                        break;
+
+                    case PID_LOG_CMDLINE:
+                        error("Cannot process %s/proc/%d/cmdline (command '%s')", host_prefix, p->pid, p->comm);
+                        break;
+
+                    case PID_LOG_FDS:
+                        error("Cannot process entries in %s/proc/%d/fd (command '%s')", host_prefix, p->pid, p->comm);
+                        break;
+
+                    case PID_LOG_STAT:
+                        break;
+
+                    default:
+                        error("unhandled error for pid %d, command '%s'", p->pid, p->comm);
+                        break;
+                }
+            }
+        }
+        errno = 0;
+    }
+    else if(unlikely(p->log_thrown & log)) {
+        // error("unsetting log %u on pid %d", log, p->pid);
+        p->log_thrown &= ~log;
+    }
+
+    return status;
+}
+
 void collect_data_for_pid(pid_t pid) {
     if(unlikely(pid <= 0 || pid > pid_max)) {
         error("Invalid pid %d read (expected 1 to %d). Ignoring process.", pid, pid_max);
@@ -1586,14 +1637,9 @@ void collect_data_for_pid(pid_t pid) {
     // --------------------------------------------------------------------
     // /proc/<pid>/stat
 
-    if(unlikely(read_proc_pid_stat(p))) {
-        if(errno != ENOENT || debug)
-            error("Cannot process %s/proc/%d/stat (command '%s')", host_prefix, pid, p->comm);
-        else
-            errno = 0;
+    if(unlikely(!managed_log(p, PID_LOG_STAT, read_proc_pid_stat(p))))
         // there is no reason to proceed if we cannot get its status
         return;
-    }
 
     read_proc_pid_ownership(p);
 
@@ -1606,24 +1652,14 @@ void collect_data_for_pid(pid_t pid) {
     // --------------------------------------------------------------------
     // /proc/<pid>/io
 
-    if(unlikely(read_proc_pid_io(p))) {
-        if(errno != ENOENT || debug)
-            error("Cannot process %s/proc/%d/io (command '%s')", host_prefix, pid, p->comm);
-        else
-            errno = 0;
-    }
+    managed_log(p, PID_LOG_IO, read_proc_pid_io(p));
 
     // --------------------------------------------------------------------
     // /proc/<pid>/statm
 
-    if(unlikely(read_proc_pid_statm(p))) {
-        if(errno != ENOENT || debug)
-            error("Cannot process %s/proc/%d/statm (command '%s')", host_prefix, pid, p->comm);
-        else
-            errno = 0;
+    if(unlikely(!managed_log(p, PID_LOG_STATM, read_proc_pid_statm(p))))
         // there is no reason to proceed if we cannot get its memory status
         return;
-    }
 
     // --------------------------------------------------------------------
     // link it
@@ -1632,14 +1668,8 @@ void collect_data_for_pid(pid_t pid) {
     // we do this only once, the first time this pid is loaded
     if(unlikely(p->new_entry)) {
         // /proc/<pid>/cmdline
-        if(likely(proc_pid_cmdline_is_needed)) {
-            if(unlikely(read_proc_pid_cmdline(p))) {
-                if(errno != ENOENT || debug)
-                    error("Cannot process %s/proc/%d/cmdline (command '%s')", host_prefix, pid, p->comm);
-                else
-                    errno = 0;
-            }
-        }
+        if(likely(proc_pid_cmdline_is_needed))
+            managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
 
         if(unlikely(debug))
             fprintf(stderr, "apps.plugin: \tJust added %d (%s)\n", pid, p->comm);
@@ -1675,12 +1705,7 @@ void collect_data_for_pid(pid_t pid) {
     // --------------------------------------------------------------------
     // /proc/<pid>/fd
 
-    if(unlikely(read_pid_file_descriptors(p))) {
-        if(errno != ENOENT || debug)
-            error("Cannot process entries in %s/proc/%d/fd (command '%s')", host_prefix, pid, p->comm);
-        else
-            errno = 0;
-    }
+    managed_log(p, PID_LOG_FDS, read_pid_file_descriptors(p));
 
     // --------------------------------------------------------------------
     // done!
@@ -2752,6 +2777,8 @@ int main(int argc, char **argv)
     // set the name for logging
     program_name = "apps.plugin";
 
+    info("started on pid %d", getpid());
+
     // disable syslog for apps.plugin
     error_log_syslog = 0;
 
@@ -2761,17 +2788,17 @@ int main(int argc, char **argv)
 
     host_prefix = getenv("NETDATA_HOST_PREFIX");
     if(host_prefix == NULL) {
-        info("NETDATA_HOST_PREFIX is not passed from netdata");
+        // info("NETDATA_HOST_PREFIX is not passed from netdata");
         host_prefix = "";
     }
-    else info("Found NETDATA_HOST_PREFIX='%s'", host_prefix);
+    // else info("Found NETDATA_HOST_PREFIX='%s'", host_prefix);
 
     config_dir = getenv("NETDATA_CONFIG_DIR");
     if(config_dir == NULL) {
-        info("NETDATA_CONFIG_DIR is not passed from netdata");
+        // info("NETDATA_CONFIG_DIR is not passed from netdata");
         config_dir = CONFIG_DIR;
     }
-    else info("Found NETDATA_CONFIG_DIR='%s'", config_dir);
+    // else info("Found NETDATA_CONFIG_DIR='%s'", config_dir);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
