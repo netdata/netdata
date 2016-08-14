@@ -47,8 +47,8 @@ class Service(SocketService, UrlService):
             self.use_socket = True
         else:
             UrlService.__init__(self, configuration=configuration, name=name)
-            if not self.url.endswith("/;csv;norefresh"):
-                self.url += "/;csv;norefresh"
+            if not self.url.endswith(";csv;norefresh"):
+                self.url += ";csv;norefresh"
             self.use_socket = False
 
         # self.order and self.definitions are created with _create_definitions method
