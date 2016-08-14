@@ -672,6 +672,9 @@ class SocketService(SimpleService):
             self.debug("No request specified. Using: '" + str(self.request) + "'")
         self.request = self.request.encode()
 
+    def check(self):
+        return SimpleService.check(self)
+
 
 class LogService(SimpleService):
     def __init__(self, configuration=None, name=None):
