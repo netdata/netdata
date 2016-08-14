@@ -47,5 +47,7 @@ def fatal(*args):
     Print message on stderr and exit.
     """
     log_msg("FATAL", *args)
-    sys.stdout.write('DISABLE\n')
+    # using sys.stdout causes IOError: Broken Pipe
+    print('DISABLE\n')
+    # sys.stdout.write('DISABLE\n')
     sys.exit(1)
