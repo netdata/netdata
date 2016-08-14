@@ -62,9 +62,13 @@ void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb)
         c++;
     }
 
+    buffer_strcat(wb, "\n\t\t\t},\n\t\t\t\"green\": ");
+    buffer_rrd_value(wb, st->green);
+    buffer_strcat(wb, ",\n\t\t\t\"red\": ");
+    buffer_rrd_value(wb, st->red);
+
     buffer_sprintf(wb,
-        "\n\t\t\t}\n"
-        "\t\t}"
+        "\n\t\t}"
         );
 
     pthread_rwlock_unlock(&st->rwlock);

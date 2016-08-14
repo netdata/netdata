@@ -197,9 +197,11 @@ struct rrdset {
 
     char *type;                                     // the type of graph RRD_TYPE_* (a category, for determining graphing options)
     char *family;                                   // grouping sets under the same family
-    char *context;                                  // the template of this data set
     char *title;                                    // title shown to user
     char *units;                                    // units of measurement
+
+    char *context;                                  // the template of this data set
+    uint32_t hash_context;
 
     int chart_type;
 

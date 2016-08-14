@@ -150,7 +150,7 @@ typedef struct rrdcalc {
 
     char *exec;
 
-    char *chart;        // the chart name
+    char *chart;        // the chart id this should be linked to
     uint32_t hash_chart;
 
     char *source;       // the source of this calculation
@@ -235,6 +235,7 @@ extern void rrddimvar_free(RRDDIMVAR *rs);
 
 extern void rrdsetcalc_link_matching(RRDSET *st);
 extern void rrdsetcalc_unlink(RRDCALC *rc);
+extern void rrdcalctemplate_link_matching(RRDSET *st);
 
 extern void health_init(void);
 

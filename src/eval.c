@@ -829,11 +829,10 @@ int expression_evaluate(EVAL_EXPRESSION *exp) {
 }
 
 EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, int *error) {
-    const char *s;
+    const char *s = string;
     int err = EVAL_ERROR_OK;
     unsigned long pos = 0;
 
-    s = string;
     EVAL_NODE *op = parse_full_expression(&s, &err);
 
     if(*s) {
@@ -864,6 +863,7 @@ EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, in
 
     EVAL_EXPRESSION *exp = callocz(1, sizeof(EVAL_EXPRESSION));
 
+    exp->source = strdupz(string);
     exp->parsed_as = strdupz(buffer_tostring(out));
     buffer_free(out);
 
