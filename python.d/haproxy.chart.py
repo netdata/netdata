@@ -16,12 +16,12 @@ POSITION = [2, 4, 8, 9]
 
 CHARTS = {
     'qcur': {
-        'options': ["", "Current queue", '', '', '', 'line'],
+        'options': ["", "Current queue", 'per sec', '', '', 'line'],
         'lines': [
             ['name', None, 'incremental']
         ]},
     'scur': {
-        'options': ["", "Current session rate", '', '', '', 'line'],
+        'options': ["", "Current session rate", 'per sec', '', '', 'line'],
         'lines': [
             ['name', None, 'incremental']
         ]},
