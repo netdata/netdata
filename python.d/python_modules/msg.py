@@ -2,7 +2,7 @@
 # Description: logging for netdata python.d modules
 
 import sys
-from time import time
+from time import time, strftime
 
 DEBUG_FLAG = False
 PROGRAM = ""
@@ -24,7 +24,8 @@ def log_msg(msg_type, *args):
         LOG_COUNTER -= 1
     now = time()
     if LOG_COUNTER >= 0:
-        msg = "%s %s: %s" % (PROGRAM, str(msg_type), " ".join(args))
+        timestamp = strftime('%y-%m-%d %X')
+        msg = "%s: %s %s: %s" % (timestamp, PROGRAM, str(msg_type), " ".join(args))
         WRITE(msg + "\n")
         FLUSH()
 
