@@ -163,7 +163,7 @@ void global_statistics_charts(void) {
     if (!stclients) stclients = rrdset_find("netdata.clients");
     if (!stclients) {
         stclients = rrdset_create("netdata", "clients", NULL, "netdata", NULL, "NetData Web Clients",
-                                  "connected clients", 130100, rrd_update_every, RRDSET_TYPE_LINE);
+                                  "connected clients", 130200, rrd_update_every, RRDSET_TYPE_LINE);
 
         rrddim_add(stclients, "clients", NULL, 1, 1, RRDDIM_ABSOLUTE);
     } else rrdset_next(stclients);
@@ -176,7 +176,7 @@ void global_statistics_charts(void) {
     if (!streqs) streqs = rrdset_find("netdata.requests");
     if (!streqs) {
         streqs = rrdset_create("netdata", "requests", NULL, "netdata", NULL, "NetData Web Requests", "requests/s",
-                               130200, rrd_update_every, RRDSET_TYPE_LINE);
+                               130300, rrd_update_every, RRDSET_TYPE_LINE);
 
         rrddim_add(streqs, "requests", NULL, 1, 1, RRDDIM_INCREMENTAL);
     } else rrdset_next(streqs);
@@ -189,7 +189,7 @@ void global_statistics_charts(void) {
     if (!stbytes) stbytes = rrdset_find("netdata.net");
     if (!stbytes) {
         stbytes = rrdset_create("netdata", "net", NULL, "netdata", NULL, "NetData Network Traffic", "kilobits/s",
-                                130300, rrd_update_every, RRDSET_TYPE_AREA);
+                                130000, rrd_update_every, RRDSET_TYPE_AREA);
 
         rrddim_add(stbytes, "in", NULL, 8, 1024, RRDDIM_INCREMENTAL);
         rrddim_add(stbytes, "out", NULL, -8, 1024, RRDDIM_INCREMENTAL);

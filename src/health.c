@@ -1042,6 +1042,7 @@ int health_readfile(const char *path, const char *filename) {
                 rt = NULL;
             }
 
+            // FIXME: make sure the value does not any operators or spaces
             rc = callocz(1, sizeof(RRDCALC));
             rc->name = strdupz(value);
             rc->hash = simple_hash(rc->name);
@@ -1057,6 +1058,7 @@ int health_readfile(const char *path, const char *filename) {
             if(rt && !rrdcalctemplate_add(&localhost, rt))
                 rrdcalctemplate_free(&localhost, rt);
 
+            // FIXME: make sure the value does not any operators or spaces
             rt = callocz(1, sizeof(RRDCALCTEMPLATE));
             rt->name = strdupz(value);
             rt->hash_name = simple_hash(rt->name);
@@ -1278,6 +1280,7 @@ void health_readdir(const char *path) {
 void health_init(void) {
     char *path;
 
+    // FIXME: allow the user to enable/disable health monitoring
     {
         char buffer[FILENAME_MAX + 1];
         snprintfz(buffer, FILENAME_MAX, "%s/health.d", config_get("global", "config directory", CONFIG_DIR));
