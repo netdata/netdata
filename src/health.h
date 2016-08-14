@@ -114,6 +114,9 @@ typedef struct rrddimvar {
     RRDVAR *local_id;
     RRDVAR *local_name;
 
+    RRDVAR *context_id;
+    RRDVAR *context_name;
+
     RRDVAR *context_fullidid;
     RRDVAR *context_fullidname;
     RRDVAR *context_fullnameid;
@@ -163,6 +166,7 @@ typedef struct rrdcalc {
     time_t last_updated;
     time_t next_update;
 
+    EVAL_EXPRESSION *calculation;
     EVAL_EXPRESSION *warning;
     EVAL_EXPRESSION *critical;
 
@@ -182,7 +186,7 @@ typedef struct rrdcalc {
     struct rrdcalc *next;
 } RRDCALC;
 
-#define RRDCALC_HAS_CALCULATION(rc) ((rc)->after && (rc)->update_every)
+#define RRDCALC_HAS_CALCULATION(rc) ((rc)->after)
 
 // RRDCALCTEMPLATE
 // these are to be applied to charts found dynamically
@@ -206,6 +210,7 @@ typedef struct rrdcalctemplate {
     uint32_t options;   // calculation options
     int update_every;   // update frequency for the calculation
 
+    EVAL_EXPRESSION *calculation;
     EVAL_EXPRESSION *warning;
     EVAL_EXPRESSION *critical;
 
@@ -215,7 +220,7 @@ typedef struct rrdcalctemplate {
     struct rrdcalctemplate *next;
 } RRDCALCTEMPLATE;
 
-#define RRDCALCTEMPLATE_HAS_CALCULATION(rt) ((rt)->after && (rt)->update_every)
+#define RRDCALCTEMPLATE_HAS_CALCULATION(rt) ((rt)->after)
 
 
 #include "rrd.h"
