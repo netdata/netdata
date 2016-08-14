@@ -24,6 +24,7 @@
 #define D_CGROUP            0x00100000
 #define D_REGISTRY          0x00200000
 #define D_VARIABLES         0x00400000
+#define D_HEALTH            0x00800000
 
 //#define DEBUG (D_WEB_CLIENT_ACCESS|D_LISTENER|D_RRD_STATS)
 //#define DEBUG 0xffffffff

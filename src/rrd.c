@@ -504,8 +504,10 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
     st->chart_type = rrdset_type_id(config_get(st->id, "chart type", rrdset_type_name(chart_type)));
     st->type       = config_get(st->id, "type", type);
     st->family     = config_get(st->id, "family", family?family:st->type);
-    st->context    = config_get(st->id, "context", context?context:st->id);
     st->units      = config_get(st->id, "units", units?units:"");
+
+    st->context    = config_get(st->id, "context", context?context:st->id);
+    st->hash_context = simple_hash(st->context);
 
     st->priority = config_get_number(st->id, "priority", priority);
     st->enabled = enabled;
@@ -543,10 +545,13 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 
     rrdsetvar_create(st, "last_collected", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, 0);
     rrdsetvar_create(st, "raw_total", RRDVAR_TYPE_TOTAL, &st->collected_total, 0);
+    rrdsetvar_create(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, 0);
+    rrdsetvar_create(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, 0);
 
     rrdset_index_add(&localhost, st);
 
     rrdsetcalc_link_matching(st);
+    rrdcalctemplate_link_matching(st);
 
     pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
 

@@ -512,12 +512,14 @@ static inline void rrdcalc_unlinked_optimize_rrdhost(RRDHOST *host, RRDCALC *rc)
 }
 
 static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
+    debug(D_HEALTH, "Health linking alarm '%s' from chart '%s' of host '%s'", rc->name, st->id, st->rrdhost->hostname);
+
     rc->rrdset = st;
 
-    if(rc->green)
+    if(rc->green && !st->green)
         st->green = rc->green;
 
-    if(rc->red)
+    if(rc->red && !st->red)
         st->red = rc->red;
 
     rc->local   = rrdvar_create_and_index("local", &st->variables_root_index, rc->name, rc->hash, RRDVAR_TYPE_CALCULATED, &rc->value);
@@ -559,6 +561,8 @@ void rrdsetcalc_unlink(RRDCALC *rc) {
     }
 
     RRDHOST *host = st->rrdhost;
+
+    debug(D_HEALTH, "Health unlinking alarm '%s' from chart '%s' of host '%s'", rc->name, st->id, host->hostname);
 
     // unlink it
     if(rc->rrdset_prev)
@@ -603,7 +607,7 @@ static inline int rrdcalc_exists(RRDHOST *host, const char *name, uint32_t hash)
     // make sure it does not already exist
     for(rc = host->calculations; rc ; rc = rc->next) {
         if (rc->hash == hash && !strcmp(name, rc->name)) {
-            error("Attempted to create RRDCAL '%s' in host '%s', but it already exists.", name, host->hostname);
+            error("alarm '%s' already exists in host '%s'.", name, host->hostname);
             return 1;
         }
     }
@@ -626,7 +630,10 @@ void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc) {
     }
 }
 
-RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const char *chart, const char *dimensions, int group_method, uint32_t after, uint32_t before, int update_every, uint32_t options) {
+RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const char *chart, const char *dimensions, int group_method,
+                        int after, int before, int update_every, uint32_t options,
+                        calculated_number green, calculated_number red,
+                        const char *exec, const char *calc, const char *warn, const char *crit) {
     uint32_t hash = simple_hash(name);
 
     if(rrdcalc_exists(host, name, hash))
@@ -648,12 +655,51 @@ RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const char *chart, cons
     rc->update_every = update_every;
     rc->options = options;
 
+    rc->green = green;
+    rc->red = red;
+    if(exec) rc->exec = strdupz(exec);
+    if(calc) {
+        rc->calculation = expression_parse(calc, NULL, NULL);
+        if(!rc->calculation)
+            error("Failed to parse calculation expression '%s'", calc);
+    }
+    if(warn) {
+        rc->warning = expression_parse(warn, NULL, NULL);
+        if(!rc->warning)
+            error("Failed to re-parse warning expression '%s'", warn);
+    }
+    if(crit) {
+        rc->critical = expression_parse(crit, NULL, NULL);
+        if(!rc->critical)
+            error("Failed to re-parse critical expression '%s'", crit);
+    }
+
+    debug(D_HEALTH, "Health runtime added alarm '%s': chart '%s', exec '%s', green %Lf, red %Lf, lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s",
+          rc->name,
+          (rc->chart)?rc->chart:"NONE",
+          (rc->exec)?rc->exec:"DEFAULT",
+          rc->green,
+          rc->red,
+          rc->group,
+          rc->after,
+          rc->before,
+          rc->options,
+          (rc->dimensions)?rc->dimensions:"NONE",
+          rc->update_every,
+          (rc->calculation)?rc->calculation->parsed_as:"NONE",
+          (rc->warning)?rc->warning->parsed_as:"NONE",
+          (rc->critical)?rc->critical->parsed_as:"NONE",
+          rc->source
+    );
+
     rrdcalc_create_part2(host, rc);
     return rc;
 }
 
 void rrdcalc_free(RRDHOST *host, RRDCALC *rc) {
     if(!rc) return;
+
+    debug(D_HEALTH, "Health removing alarm '%s' of host '%s'", rc->name, host->hostname);
 
     // unlink it from RRDSET
     if(rc->rrdset) rrdsetcalc_unlink(rc);
@@ -689,7 +735,34 @@ void rrdcalc_free(RRDHOST *host, RRDCALC *rc) {
 // ----------------------------------------------------------------------------
 // RRDCALCTEMPLATE management
 
+void rrdcalctemplate_link_matching(RRDSET *st) {
+    RRDCALCTEMPLATE *rt;
+
+    for(rt = st->rrdhost->templates; rt ; rt = rt->next) {
+        if(rt->hash_context == st->hash_context && !strcmp(rt->context, st->context)) {
+            char *s, buffer[RRDSETVAR_ID_MAX + 1];
+            snprintfz(buffer, RRDSETVAR_ID_MAX, "%s.%s", st->family, rt->name);
+            s = buffer;
+            while(*s) {
+                if (!isalnum(*s) && *s != '.' && *s != '_')
+                    *s++ = '_';
+                else
+                    s++;
+            }
+
+            rrdcalc_create(st->rrdhost, buffer, st->id,
+                           rt->dimensions, rt->group, rt->after, rt->before, rt->update_every, rt->options,
+                           rt->green, rt->red, rt->exec,
+                           (rt->calculation)?rt->calculation->source:NULL,
+                           (rt->warning)?rt->warning->source:NULL,
+                           (rt->critical)?rt->critical->source:NULL);
+        }
+    }
+}
+
 static inline void rrdcalctemplate_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
+    debug(D_HEALTH, "Health removing template '%s' of host '%s'", rt->name, host->hostname);
+
     if(host->templates) {
         if(host->templates == rt) {
             host->templates = rt->next;
@@ -735,24 +808,6 @@ static inline void rrdcalctemplate_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
 #define HEALTH_EXEC_KEY "exec"
 
 static inline int rrdcalc_add(RRDHOST *host, RRDCALC *rc) {
-    info("Health configuration examining alarm '%s': chart '%s', exec '%s', green %Lf, red %Lf, lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s",
-         rc->name,
-         (rc->chart)?rc->chart:"NONE",
-         (rc->exec)?rc->exec:"DEFAULT",
-         rc->green,
-         rc->red,
-         rc->group,
-         rc->after,
-         rc->before,
-         rc->options,
-         (rc->dimensions)?rc->dimensions:"NONE",
-         rc->update_every,
-         (rc->calculation)?rc->calculation->parsed_as:"NONE",
-         (rc->warning)?rc->warning->parsed_as:"NONE",
-         (rc->critical)?rc->critical->parsed_as:"NONE",
-         rc->source
-    );
-
     if(rrdcalc_exists(host, rc->name, rc->hash))
         return 0;
 
@@ -766,29 +821,29 @@ static inline int rrdcalc_add(RRDHOST *host, RRDCALC *rc) {
         return 0;
     }
 
+    debug(D_HEALTH, "Health configuration adding alarm '%s': chart '%s', exec '%s', green %Lf, red %Lf, lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s",
+          rc->name,
+          (rc->chart)?rc->chart:"NONE",
+          (rc->exec)?rc->exec:"DEFAULT",
+          rc->green,
+          rc->red,
+          rc->group,
+          rc->after,
+          rc->before,
+          rc->options,
+          (rc->dimensions)?rc->dimensions:"NONE",
+          rc->update_every,
+          (rc->calculation)?rc->calculation->parsed_as:"NONE",
+          (rc->warning)?rc->warning->parsed_as:"NONE",
+          (rc->critical)?rc->critical->parsed_as:"NONE",
+          rc->source
+    );
+
     rrdcalc_create_part2(host, rc);
     return 1;
 }
 
 static inline int rrdcalctemplate_add(RRDHOST *host, RRDCALCTEMPLATE *rt) {
-    info("Health configuration examining template '%s': context '%s', exec '%s', green %Lf, red %Lf, lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s'",
-         rt->name,
-         (rt->context)?rt->context:"NONE",
-         (rt->exec)?rt->exec:"DEFAULT",
-         rt->green,
-         rt->red,
-         rt->group,
-         rt->after,
-         rt->before,
-         rt->options,
-         (rt->dimensions)?rt->dimensions:"NONE",
-         rt->update_every,
-         (rt->calculation)?rt->calculation->parsed_as:"NONE",
-         (rt->warning)?rt->warning->parsed_as:"NONE",
-         (rt->critical)?rt->critical->parsed_as:"NONE",
-         rt->source
-    );
-
     if(!rt->context) {
         error("Health configuration for template '%s' does not have a context", rt->name);
         return 0;
@@ -806,6 +861,24 @@ static inline int rrdcalctemplate_add(RRDHOST *host, RRDCALCTEMPLATE *rt) {
             return 0;
         }
     }
+
+    debug(D_HEALTH, "Health configuration adding template '%s': context '%s', exec '%s', green %Lf, red %Lf, lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s'",
+          rt->name,
+          (rt->context)?rt->context:"NONE",
+          (rt->exec)?rt->exec:"DEFAULT",
+          rt->green,
+          rt->red,
+          rt->group,
+          rt->after,
+          rt->before,
+          rt->options,
+          (rt->dimensions)?rt->dimensions:"NONE",
+          rt->update_every,
+          (rt->calculation)?rt->calculation->parsed_as:"NONE",
+          (rt->warning)?rt->warning->parsed_as:"NONE",
+          (rt->critical)?rt->critical->parsed_as:"NONE",
+          rt->source
+    );
 
     rt->next = host->templates;
     host->templates = rt;
@@ -957,6 +1030,8 @@ static inline char *health_source_file(int line, const char *path, const char *f
 }
 
 int health_readfile(const char *path, const char *filename) {
+    debug(D_HEALTH, "Health configuration reading file '%s/%s'", path, filename);
+
     static uint32_t hash_alarm = 0, hash_template = 0, hash_on = 0, hash_calc = 0, hash_green = 0, hash_red = 0, hash_warn = 0, hash_crit = 0, hash_exec = 0, hash_every = 0, hash_lookup = 0;
     char buffer[HEALTH_CONF_MAX_LINE + 1];
 
@@ -973,8 +1048,6 @@ int health_readfile(const char *path, const char *filename) {
         hash_exec = simple_uhash(HEALTH_EXEC_KEY);
         hash_every = simple_uhash(HEALTH_EVERY_KEY);
     }
-
-    // info("Reading file '%s/%s'", path, filename);
 
     snprintfz(buffer, HEALTH_CONF_MAX_LINE, "%s/%s", path, filename);
     FILE *fp = fopen(buffer, "r");
@@ -1241,7 +1314,7 @@ int health_readfile(const char *path, const char *filename) {
 void health_readdir(const char *path) {
     size_t pathlen = strlen(path);
 
-    info("Reading directory '%s'", path);
+    debug(D_HEALTH, "Health configuration reading directory '%s'", path);
 
     DIR *dir = opendir(path);
     if (!dir) {
@@ -1278,9 +1351,15 @@ void health_readdir(const char *path) {
 }
 
 void health_init(void) {
+    debug(D_HEALTH, "Health configuration initializing");
+
     char *path;
 
-    // FIXME: allow the user to enable/disable health monitoring
+    if(!config_get_boolean("health", "enabled", 1)) {
+        debug(D_HEALTH, "Health is disabled.");
+        return;
+    }
+
     {
         char buffer[FILENAME_MAX + 1];
         snprintfz(buffer, FILENAME_MAX, "%s/health.d", config_get("global", "config directory", CONFIG_DIR));
