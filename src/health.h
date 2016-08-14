@@ -218,5 +218,8 @@ extern void rrdsetcalc_unlink(RRDCALC *rc);
 extern void rrdcalctemplate_link_matching(RRDSET *st);
 
 extern void health_init(void);
+extern void *health_main(void *ptr);
+
+extern int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, calculated_number *result);
 
 #endif //NETDATA_HEALTH_H

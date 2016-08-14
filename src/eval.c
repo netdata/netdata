@@ -52,6 +52,7 @@ static inline EVAL_NODE *parse_full_expression(const char **string, int *error);
 static inline EVAL_NODE *parse_one_full_operand(const char **string, int *error);
 static inline calculated_number eval_node(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error);
 static inline void print_parsed_as_node(BUFFER *out, EVAL_NODE *op, int *error);
+static inline void print_parsed_as_constant(BUFFER *out, calculated_number n);
 
 // ----------------------------------------------------------------------------
 // evaluation of expressions
@@ -71,13 +72,28 @@ static inline calculated_number eval_check_number(calculated_number n, int *erro
 }
 
 static inline calculated_number eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *v, int *error) {
-    // FIXME: do the variable look up here
+    static uint32_t this_hash = 0;
 
-//    if(!exp->data) {
+    if(unlikely(this_hash == 0))
+        this_hash = simple_hash("this");
+
+    if(exp->this && v->hash == this_hash && !strcmp(v->name, "this")) {
+        buffer_strcat(exp->error_msg, "[ $this = ");
+        print_parsed_as_constant(exp->error_msg, *exp->this);
+        buffer_strcat(exp->error_msg, " ] ");
+        return *exp->this;
+    }
+
+    calculated_number n;
+    if(exp->rrdcalc && health_variable_lookup(v->name, v->hash, exp->rrdcalc, &n)) {
+        buffer_sprintf(exp->error_msg, "[ $%s = ", v->name);
+        print_parsed_as_constant(exp->error_msg, n);
+        buffer_strcat(exp->error_msg, " ] ");
+        return n;
+    }
+
     *error = EVAL_ERROR_UNKNOWN_VARIABLE;
     buffer_sprintf(exp->error_msg, "unknown variable '%s'", v->name);
-//    }
-
     return 0;
 }
 
@@ -208,6 +224,16 @@ static inline void print_parsed_as_variable(BUFFER *out, EVAL_VARIABLE *v, int *
 }
 
 static inline void print_parsed_as_constant(BUFFER *out, calculated_number n) {
+    if(unlikely(isnan(n))) {
+        buffer_strcat(out, "NaN");
+        return;
+    }
+
+    if(unlikely(isinf(n))) {
+        buffer_strcat(out, "INFINITE");
+        return;
+    }
+
     char b[100+1], *s;
     snprintfz(b, 100, CALCULATED_NUMBER_FORMAT, n);
 
@@ -641,6 +667,7 @@ static inline void eval_node_set_value_to_variable(EVAL_NODE *op, int pos, const
     op->ops[pos].type = EVAL_VALUE_VARIABLE;
     op->ops[pos].variable = callocz(1, sizeof(EVAL_VARIABLE));
     op->ops[pos].variable->name = strdupz(variable);
+    op->ops[pos].variable->hash = simple_hash(op->ops[pos].variable->name);
 }
 
 static inline void eval_variable_free(EVAL_VARIABLE *v) {
@@ -910,7 +937,7 @@ const char *expression_strerror(int error) {
             return "wrong number of operands for operation - internal error";
 
         case EVAL_ERROR_VALUE_IS_NAN:
-            return "value or variable is missing or is not a number";
+            return "value is unset";
 
         case EVAL_ERROR_VALUE_IS_INFINITE:
             return "computed value is infinite";

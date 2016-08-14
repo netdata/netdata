@@ -1039,12 +1039,12 @@ inline static calculated_number rrdr2value(RRDR *r, long i, uint32_t options, in
     }
 
     if(unlikely(all_null)) {
-        if(likely(*all_values_are_null))
+        if(likely(all_values_are_null))
             *all_values_are_null = 1;
         return 0;
     }
     else {
-        if(likely(*all_values_are_null))
+        if(likely(all_values_are_null))
             *all_values_are_null = 0;
     }
 
@@ -1524,7 +1524,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
     return r;
 }
 
-int rrd2value(RRDSET *st, BUFFER *wb, calculated_number *n, BUFFER *dimensions, long points, long long after, long long before, int group_method, uint32_t options, time_t *latest_timestamp, int *value_is_null)
+int rrd2value(RRDSET *st, BUFFER *wb, calculated_number *n, const char *dimensions, long points, long long after, long long before, int group_method, uint32_t options, time_t *latest_timestamp, int *value_is_null)
 {
     RRDR *r = rrd2rrdr(st, points, after, before, group_method, !(options & RRDR_OPTION_NOT_ALIGNED));
     if(!r) {
@@ -1543,10 +1543,10 @@ int rrd2value(RRDSET *st, BUFFER *wb, calculated_number *n, BUFFER *dimensions, 
     else if(r->result_options & RRDR_RESULT_OPTION_ABSOLUTE)
         wb->options |= WB_CONTENT_CACHEABLE;
 
-    options = rrdr_check_options(r, options, (dimensions)?buffer_tostring(dimensions):NULL);
+    options = rrdr_check_options(r, options, dimensions);
 
     if(dimensions)
-        rrdr_disable_not_selected_dimensions(r, buffer_tostring(dimensions));
+        rrdr_disable_not_selected_dimensions(r, dimensions);
 
     if(latest_timestamp)
         *latest_timestamp = r->before;

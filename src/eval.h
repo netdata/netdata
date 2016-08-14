@@ -5,6 +5,7 @@
 
 typedef struct eval_variable {
     char *name;
+    uint32_t hash;
     struct rrdvar *rrdvar;
     struct eval_variable *next;
 } EVAL_VARIABLE;
@@ -13,6 +14,7 @@ typedef struct eval_expression {
     const char *source;
     const char *parsed_as;
 
+    calculated_number *this;
     calculated_number result;
 
     int error;
@@ -22,7 +24,7 @@ typedef struct eval_expression {
     void *nodes;
 
     // custom data to be used for looking up variables
-    void *data;
+    struct rrdcalc *rrdcalc;
 } EVAL_EXPRESSION;
 
 #define EVAL_VALUE_INVALID 0

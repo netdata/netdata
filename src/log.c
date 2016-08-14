@@ -75,24 +75,13 @@ int open_log_file(int fd, FILE **fp, const char *filename, int *enabled_syslog) 
     }
     else fd = f;
 
-    if(fp && *fp == NULL) {
-        // info("fdopen(%d) on filename '%s'", fd, filename);
-
-        FILE *n = fdopen(fd, "a");
-        if (!n)
+    if(fp && !*fp) {
+        *fp = fdopen(fd, "a");
+        if (!*fp)
             error("Cannot fdopen() fd %d ('%s')", fd, filename);
-
         else {
-            if (setvbuf(n, NULL, _IOLBF, 0) != 0)
+            if (setvbuf(*fp, NULL, _IOLBF, 0) != 0)
                 error("Cannot set line buffering on fd %d ('%s')", fd, filename);
-
-            if(!*fp)
-                *fp = n;
-            else {
-                FILE *o = *fp;
-                *fp = n;
-                fclose(o);
-            }
         }
     }
 

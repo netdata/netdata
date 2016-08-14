@@ -80,21 +80,83 @@ static inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *
         rv = NULL;
     }
 
-    /*
-     * check
-    if(rv) {
-        RRDVAR *ret = rrdvar_index_find(tree, name, hash);
-        if(ret != rv) fatal("oops! 1");
-
-        ret = rrdvar_index_del(tree, rv);
-        if(ret != rv) fatal("oops! 2");
-
-        ret = rrdvar_index_add(tree, rv);
-        if(ret != rv) fatal("oops! 3");
-    }
-    */
-
     return rv;
+}
+
+// ----------------------------------------------------------------------------
+// RRDVAR lookup
+
+calculated_number rrdvar2number(RRDVAR *rv) {
+    switch(rv->type) {
+        case RRDVAR_TYPE_CALCULATED: {
+            calculated_number *n = (calculated_number *)rv->value;
+            return *n;
+        }
+            break;
+
+        case RRDVAR_TYPE_TIME_T: {
+            time_t *n = (time_t *)rv->value;
+            return *n;
+        }
+            break;
+
+        case RRDVAR_TYPE_COLLECTED: {
+            collected_number *n = (collected_number *)rv->value;
+            return *n;
+        }
+            break;
+
+        case RRDVAR_TYPE_TOTAL: {
+            total_number *n = (total_number *)rv->value;
+            return *n;
+        }
+
+        default:
+            error("I don't know how to convert RRDVAR type %d to calculated_number", rv->type);
+            return NAN;
+            break;
+    }
+}
+
+void dump_variable(void *data) {
+    RRDVAR *rv = (RRDVAR *)data;
+    debug(D_HEALTH, "%30s : " CALCULATED_NUMBER_FORMAT, rv->name, rrdvar2number(rv));
+}
+
+int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, calculated_number *result) {
+    RRDSET *st = rc->rrdset;
+    RRDVAR *rv;
+
+    if(!st) return 0;
+
+    rv = rrdvar_index_find(&st->variables_root_index, variable, hash);
+    if(rv) {
+        *result = rrdvar2number(rv);
+        return 1;
+    }
+
+    rv = rrdvar_index_find(&st->rrdcontext->variables_root_index, variable, hash);
+    if(rv) {
+        *result = rrdvar2number(rv);
+        return 1;
+    }
+
+    rv = rrdvar_index_find(&st->rrdhost->variables_root_index, variable, hash);
+    if(rv) {
+        *result = rrdvar2number(rv);
+        return 1;
+    }
+
+    debug(D_HEALTH, "Available local chart '%s' variables:", st->id);
+    avl_traverse_lock(&st->variables_root_index, dump_variable);
+
+    debug(D_HEALTH, "Available context '%s' variables:", st->rrdcontext->id);
+    avl_traverse_lock(&st->rrdcontext->variables_root_index, dump_variable);
+
+    debug(D_HEALTH, "Available host '%s' variables:", st->rrdhost->hostname);
+    avl_traverse_lock(&st->rrdhost->variables_root_index, dump_variable);
+
+    return 0;
 }
 
 // ----------------------------------------------------------------------------
@@ -446,7 +508,7 @@ void rrddimvar_free(RRDDIMVAR *rs) {
 
 // ----------------------------------------------------------------------------
 // RRDCALC management
-
+/*
 // this has to be called while the caller has locked
 // the RRDHOST
 static inline void rrdset_linked_optimize_rrdhost(RRDHOST *host, RRDCALC *rc) {
@@ -511,6 +573,7 @@ static inline void rrdcalc_unlinked_optimize_rrdhost(RRDHOST *host, RRDCALC *rc)
         host->calculations = rc;
     }
 }
+*/
 
 static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     debug(D_HEALTH, "Health linking alarm '%s' from chart '%s' of host '%s'", rc->name, st->id, st->rrdhost->hostname);
@@ -527,12 +590,12 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     rc->context = rrdvar_create_and_index("context", &st->rrdcontext->variables_root_index, rc->name, rc->hash, RRDVAR_TYPE_CALCULATED, &rc->value);
     rc->host    = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rc->name, rc->hash, RRDVAR_TYPE_CALCULATED, &rc->value);
 
-    rrdset_linked_optimize_rrdhost(st->rrdhost, rc);
+    // rrdset_linked_optimize_rrdhost(st->rrdhost, rc);
 }
 
 static inline int rrdcalc_is_matching_this_rrdset(RRDCALC *rc, RRDSET *st) {
-    if((rc->hash_chart == st->hash && !strcmp(rc->name, st->id)) ||
-            (rc->hash_chart == st->hash_name && !strcmp(rc->name, st->name)))
+    if(     (rc->hash_chart == st->hash      && !strcmp(rc->chart, st->id)) ||
+            (rc->hash_chart == st->hash_name && !strcmp(rc->chart, st->name)))
         return 1;
 
     return 0;
@@ -540,12 +603,11 @@ static inline int rrdcalc_is_matching_this_rrdset(RRDCALC *rc, RRDSET *st) {
 
 // this has to be called while the RRDHOST is locked
 void rrdsetcalc_link_matching(RRDSET *st) {
-    RRDCALC *rc;
+    // debug(D_HEALTH, "find matching alarms for chart '%s'", st->id);
 
+    RRDCALC *rc;
     for(rc = st->rrdhost->calculations; rc ; rc = rc->next) {
-        // since unlinked ones are in front and linked at the end
-        // we stop on the first linked RRDCALC
-        if(rc->rrdset != NULL) break;
+        if(rc->rrdset) continue;
 
         if(rrdcalc_is_matching_this_rrdset(rc, st))
             rrdsetcalc_link(st, rc);
@@ -599,7 +661,7 @@ void rrdsetcalc_unlink(RRDCALC *rc) {
     // so that if the matching chart is found in the future
     // it will be applied automatically
 
-    rrdcalc_unlinked_optimize_rrdhost(host, rc);
+    // rrdcalc_unlinked_optimize_rrdhost(host, rc);
 }
 
 static inline int rrdcalc_exists(RRDHOST *host, const char *name, uint32_t hash) {
@@ -617,6 +679,23 @@ static inline int rrdcalc_exists(RRDHOST *host, const char *name, uint32_t hash)
 }
 
 void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc) {
+    rrdhost_check_rdlock(host);
+
+    if(rc->calculation) {
+        rc->calculation->this = &rc->value;
+        rc->calculation->rrdcalc = rc;
+    }
+
+    if(rc->warning) {
+        rc->warning->this = &rc->value;
+        rc->warning->rrdcalc = rc;
+    }
+
+    if(rc->critical) {
+        rc->critical->this = &rc->value;
+        rc->critical->rrdcalc = rc;
+    }
+
     // link it to the host
     rc->next = host->calculations;
     host->calculations = rc;
@@ -634,7 +713,8 @@ void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc) {
 RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const char *chart, const char *dimensions, int group_method,
                         int after, int before, int update_every, uint32_t options,
                         calculated_number green, calculated_number red,
-                        const char *exec, const char *calc, const char *warn, const char *crit) {
+                        const char *exec, const char *source,
+                        const char *calc, const char *warn, const char *crit) {
     uint32_t hash = simple_hash(name);
 
     if(rrdcalc_exists(host, name, hash))
@@ -658,7 +738,10 @@ RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const char *chart, cons
 
     rc->green = green;
     rc->red = red;
+
     if(exec) rc->exec = strdupz(exec);
+    if(source) rc->source = strdupz(source);
+
     if(calc) {
         rc->calculation = expression_parse(calc, NULL, NULL);
         if(!rc->calculation)
@@ -758,12 +841,16 @@ void rrdcalctemplate_link_matching(RRDSET *st) {
             char buffer[RRDSETVAR_ID_MAX + 1];
             snprintfz(buffer, RRDSETVAR_ID_MAX, "%s.%s", st->family, rt->name);
             variable_fix_name(buffer);
-            rrdcalc_create(st->rrdhost, buffer, st->id,
+            RRDCALC *rc = rrdcalc_create(st->rrdhost, buffer, st->id,
                            rt->dimensions, rt->group, rt->after, rt->before, rt->update_every, rt->options,
-                           rt->green, rt->red, rt->exec,
+                           rt->green, rt->red, rt->exec, rt->source,
                            (rt->calculation)?rt->calculation->source:NULL,
                            (rt->warning)?rt->warning->source:NULL,
                            (rt->critical)?rt->critical->source:NULL);
+
+            // FIXME
+            if(rc->rrdset != st)
+                fatal("RRDCAL '%s' is not linked to chart '%s'", rc->name, st->id);
         }
     }
 }
@@ -1360,6 +1447,8 @@ void health_readdir(const char *path) {
             health_readfile(path, de->d_name);
         }
     }
+
+    closedir(dir);
 }
 
 void health_init(void) {
@@ -1375,11 +1464,173 @@ void health_init(void) {
     {
         char buffer[FILENAME_MAX + 1];
         snprintfz(buffer, FILENAME_MAX, "%s/health.d", config_get("global", "config directory", CONFIG_DIR));
-        path = config_get("health", "configuration files in directory", buffer);
+        path = config_get("health", "health configuration directory", buffer);
 
         snprintfz(buffer, FILENAME_MAX, "%s/alarm.sh", config_get("global", "plugins directory", PLUGINS_DIR));
         health_default_exec = config_get("health", "script to execute on alarm", buffer);
     }
 
+    rrdhost_rwlock(&localhost);
     health_readdir(path);
+    rrdhost_unlock(&localhost);
+}
+
+static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) {
+    if (unlikely(!rc->rrdset)) {
+        debug(D_HEALTH, "Health not running alarm '%s'. It is not linked to a chart.", rc->name);
+        return 0;
+    }
+
+    if (unlikely(!rc->update_every)) {
+        debug(D_HEALTH, "Health not running alarm '%s'. It does not have an update frequency", rc->name);
+        return 0;
+    }
+
+    if (unlikely(rc->next_update > now)) {
+        if (*next_run > rc->next_update)
+            *next_run = rc->next_update;
+
+        debug(D_HEALTH, "Health not examining alarm '%s' yet (will do in %d secs).", rc->name,
+              (int) (rc->next_update - now));
+        return 0;
+    }
+
+    return 1;
+}
+
+void *health_main(void *ptr) {
+    (void)ptr;
+
+    info("HEALTH thread created with task id %d", gettid());
+
+    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
+        error("Cannot set pthread cancel type to DEFERRED.");
+
+    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
+        error("Cannot set pthread cancel state to ENABLE.");
+
+    int min_run_every = (int)config_get_number("health", "run at least every seconds", 10);
+    if(min_run_every < 1) min_run_every = 1;
+
+    BUFFER *wb = buffer_create(100);
+
+    unsigned int loop = 0;
+    while(health_enabled) {
+        loop++;
+        debug(D_HEALTH, "Health monitoring iteration no %u started", loop);
+
+        int oldstate, runnable = 0;
+        time_t now = time(NULL);
+        time_t next_run = now + min_run_every;
+        RRDCALC *rc;
+
+        if (unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate) != 0))
+            error("Cannot set pthread cancel state to DISABLE.");
+
+        rrdhost_rdlock(&localhost);
+        for (rc = localhost.calculations; rc; rc = rc->next) {
+            if (unlikely(!rrdcalc_isrunnable(rc, now, &next_run)))
+                continue;
+
+            runnable++;
+            debug(D_HEALTH, "Health running alarm '%s'", rc->name);
+
+            // 1. if there is database lookup, do it
+            // 1b. if the lookup has a calculation expression run it
+            // 2. if there is warning expression, do it
+            // 3. if there is critical expression, do it
+
+            if (rc->after) {
+                time_t latest_timestamp;
+                int value_is_null;
+                int ret = rrd2value(rc->rrdset, wb, &rc->value, rc->dimensions, 1, rc->after, rc->before, rc->group,
+                                    rc->options, &latest_timestamp, &value_is_null);
+                if (ret != 200) {
+                    error("Health for alarm '%s', database lookup returned error %d", rc->name, ret);
+                }
+                else {
+                    if(value_is_null) {
+                        rc->value = NAN;
+                        error("Health for alarm '%s', database lookup returned empty value (possibly value is not collected yet)", rc->name);
+                    }
+                    else {
+                        debug(D_HEALTH, "Health for alarm '%s', database lookup gave value "
+                                CALCULATED_NUMBER_FORMAT, rc->name, rc->value);
+
+                        if (rc->calculation) {
+                            if (!expression_evaluate(rc->calculation)) {
+                                error("Health for alarm '%s', failed to evaluate calculation with error: %s", rc->name,
+                                      buffer_tostring(rc->calculation->error_msg));
+                            } else {
+                                debug(D_HEALTH, "Health for alarm '%s', calculation gave value "
+                                        CALCULATED_NUMBER_FORMAT, rc->name, rc->calculation->result);
+                                rc->value = rc->calculation->result;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        rrdhost_unlock(&localhost);
+
+        if (runnable) {
+            rrdhost_rdlock(&localhost);
+
+            for (rc = localhost.calculations; rc; rc = rc->next) {
+                if (unlikely(!rrdcalc_isrunnable(rc, now, &next_run)))
+                    continue;
+
+                if(rc->warning) {
+                    if (!expression_evaluate(rc->warning)) {
+                        error("Health for alarm '%s', failed to evaluate warning expression with error: %s", rc->name,
+                              buffer_tostring(rc->warning->error_msg));
+                    }
+                    else {
+                        debug(D_HEALTH, "Health for alarm '%s', warning expression gave value "
+                                CALCULATED_NUMBER_FORMAT ": %s",
+                              rc->name, rc->warning->result,
+                              buffer_tostring(rc->warning->error_msg)
+                        );
+                    }
+                }
+
+                if(rc->critical) {
+                    if (!expression_evaluate(rc->critical)) {
+                        error("Health for alarm '%s', failed to evaluate critical expression with error: %s", rc->name,
+                              buffer_tostring(rc->critical->error_msg));
+                    }
+                    else {
+                        debug(D_HEALTH, "Health for alarm '%s', critical expression gave value "
+                                CALCULATED_NUMBER_FORMAT ": %s",
+                              rc->name, rc->critical->result,
+                              buffer_tostring(rc->critical->error_msg)
+                        );
+                    }
+                }
+
+                rc->last_updated = now;
+                rc->next_update = now + rc->update_every;
+
+                if (next_run > rc->next_update)
+                    next_run = rc->next_update;
+            }
+
+            rrdhost_unlock(&localhost);
+        }
+
+
+        if (unlikely(pthread_setcancelstate(oldstate, NULL) != 0))
+            error("Cannot set pthread cancel state to RESTORE (%d).", oldstate);
+
+        debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration in %d secs",
+              loop, (int) (next_run - now));
+
+        sleep_usec(1000000 * (unsigned long long) (next_run - now));
+    }
+
+    buffer_free(wb);
+
+    info("HEALTH thread exiting");
+    pthread_exit(NULL);
+    return NULL;
 }
