@@ -1,29 +1,9 @@
 #ifndef NETDATA_HEALTH_H
 #define NETDATA_HEALTH_H
 
-extern int rrdvar_compare(void *a, void *b);
+extern int health_enabled;
 
-/*
- * RRDVAR
- * a variable
- *
- * There are 4 scopes: local (chart), context, host and global variables
- *
- * Standard global variables:
- *  $now
- *
- * Standard host variables:
- *  - none -
- *
- * Standard context variables:
- *  - none -
- *
- * Standard local variables:
- *  $last_updated
- *  $last_collected_value
- *  $last_value
- *
- */
+extern int rrdvar_compare(void *a, void *b);
 
 #define RRDVAR_TYPE_CALCULATED 1
 #define RRDVAR_TYPE_TIME_T     2
