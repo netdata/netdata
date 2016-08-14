@@ -32,6 +32,7 @@ int show_guest_time = 0;
 int show_guest_time_old = 0;
 
 int enable_guest_charts = 0;
+int enable_file_charts = 1;
 
 // ----------------------------------------------------------------------------
 
@@ -1705,7 +1706,8 @@ void collect_data_for_pid(pid_t pid) {
     // --------------------------------------------------------------------
     // /proc/<pid>/fd
 
-    managed_log(p, PID_LOG_FDS, read_pid_file_descriptors(p));
+    if(enable_file_charts)
+            managed_log(p, PID_LOG_FDS, read_pid_file_descriptors(p));
 
     // --------------------------------------------------------------------
     // done!
@@ -2534,26 +2536,28 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
     }
     send_END();
 
-    send_BEGIN(type, "files", usec);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            send_SET(w->name, w->openfiles);
-    }
-    send_END();
+    if(enable_file_charts) {
+        send_BEGIN(type, "files", usec);
+        for (w = root; w; w = w->next) {
+            if (unlikely(w->exposed))
+                send_SET(w->name, w->openfiles);
+        }
+        send_END();
 
-    send_BEGIN(type, "sockets", usec);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            send_SET(w->name, w->opensockets);
-    }
-    send_END();
+        send_BEGIN(type, "sockets", usec);
+        for (w = root; w; w = w->next) {
+            if (unlikely(w->exposed))
+                send_SET(w->name, w->opensockets);
+        }
+        send_END();
 
-    send_BEGIN(type, "pipes", usec);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            send_SET(w->name, w->openpipes);
+        send_BEGIN(type, "pipes", usec);
+        for (w = root; w; w = w->next) {
+            if (unlikely(w->exposed))
+                send_SET(w->name, w->openpipes);
+        }
+        send_END();
     }
-    send_END();
 }
 
 
@@ -2660,22 +2664,27 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
             buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
     }
 
-    buffer_sprintf(output, "CHART %s.files '' '%s Open Files' 'open files' disk %s.files stacked 20050 %d\n", type, title, type, update_every);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            buffer_sprintf(output, "DIMENSION %s '' absolute 1 1\n", w->name);
-    }
+    if(enable_file_charts) {
+        buffer_sprintf(output, "CHART %s.files '' '%s Open Files' 'open files' disk %s.files stacked 20050 %d\n", type,
+                       title, type, update_every);
+        for (w = root; w; w = w->next) {
+            if (unlikely(w->exposed))
+                buffer_sprintf(output, "DIMENSION %s '' absolute 1 1\n", w->name);
+        }
 
-    buffer_sprintf(output, "CHART %s.sockets '' '%s Open Sockets' 'open sockets' net %s.sockets stacked 20051 %d\n", type, title, type, update_every);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            buffer_sprintf(output, "DIMENSION %s '' absolute 1 1\n", w->name);
-    }
+        buffer_sprintf(output, "CHART %s.sockets '' '%s Open Sockets' 'open sockets' net %s.sockets stacked 20051 %d\n",
+                       type, title, type, update_every);
+        for (w = root; w; w = w->next) {
+            if (unlikely(w->exposed))
+                buffer_sprintf(output, "DIMENSION %s '' absolute 1 1\n", w->name);
+        }
 
-    buffer_sprintf(output, "CHART %s.pipes '' '%s Pipes' 'open pipes' processes %s.pipes stacked 20053 %d\n", type, title, type, update_every);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            buffer_sprintf(output, "DIMENSION %s '' absolute 1 1\n", w->name);
+        buffer_sprintf(output, "CHART %s.pipes '' '%s Pipes' 'open pipes' processes %s.pipes stacked 20053 %d\n", type,
+                       title, type, update_every);
+        for (w = root; w; w = w->next) {
+            if (unlikely(w->exposed))
+                buffer_sprintf(output, "DIMENSION %s '' absolute 1 1\n", w->name);
+        }
     }
 }
 
@@ -2723,6 +2732,16 @@ void parse_args(int argc, char **argv)
             continue;
         }
 
+        if(strcmp("with-files", argv[i]) == 0) {
+            enable_file_charts = 1;
+            continue;
+        }
+
+        if(strcmp("no-files", argv[i]) == 0 || strcmp("without-files", argv[i]) == 0) {
+            enable_file_charts = 0;
+            continue;
+        }
+
         if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
             fprintf(stderr,
                     "apps.plugin\n"
@@ -2744,6 +2763,10 @@ void parse_args(int argc, char **argv)
                     "with-guest\n"
                     "without-guest     enable / disable reporting guest charts\n"
                     "                  (default is disabled)\n"
+                    "\n"
+                    "with-files\n"
+                    "without-files     enable / disable reporting files, sockets, pipes\n"
+                    "                  (default is enabled)\n"
                     "\n"
                     "NAME              read apps_NAME.conf instead of\n"
                     "                  apps_groups.conf\n"
