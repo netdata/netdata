@@ -1,6 +1,9 @@
 #include "common.h"
 
+#define RRDSETVAR_ID_MAX 1024
+
 static const char *health_default_exec = PLUGINS_DIR "/alarm.sh";
+int health_enabled = 1;
 
 // ----------------------------------------------------------------------------
 // RRDVAR management
@@ -96,8 +99,6 @@ static inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *
 
 // ----------------------------------------------------------------------------
 // RRDSETVAR management
-
-#define RRDSETVAR_ID_MAX 1024
 
 RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, int type, void *value, uint32_t options) {
     debug(D_VARIABLES, "RRDVARSET create for chart id '%s' name '%s' with variable name '%s'", st->id, st->name, variable);
@@ -735,21 +736,28 @@ void rrdcalc_free(RRDHOST *host, RRDCALC *rc) {
 // ----------------------------------------------------------------------------
 // RRDCALCTEMPLATE management
 
+static inline int variable_fix_name(char *variable) {
+    int fixed = 0;
+    while(*variable) {
+        if (!isalnum(*variable) && *variable != '.' && *variable != '_') {
+            *variable++ = '_';
+            fixed++;
+        }
+        else
+            variable++;
+    }
+
+    return fixed;
+}
+
 void rrdcalctemplate_link_matching(RRDSET *st) {
     RRDCALCTEMPLATE *rt;
 
     for(rt = st->rrdhost->templates; rt ; rt = rt->next) {
         if(rt->hash_context == st->hash_context && !strcmp(rt->context, st->context)) {
-            char *s, buffer[RRDSETVAR_ID_MAX + 1];
+            char buffer[RRDSETVAR_ID_MAX + 1];
             snprintfz(buffer, RRDSETVAR_ID_MAX, "%s.%s", st->family, rt->name);
-            s = buffer;
-            while(*s) {
-                if (!isalnum(*s) && *s != '.' && *s != '_')
-                    *s++ = '_';
-                else
-                    s++;
-            }
-
+            variable_fix_name(buffer);
             rrdcalc_create(st->rrdhost, buffer, st->id,
                            rt->dimensions, rt->group, rt->after, rt->before, rt->update_every, rt->options,
                            rt->green, rt->red, rt->exec,
@@ -1115,11 +1123,13 @@ int health_readfile(const char *path, const char *filename) {
                 rt = NULL;
             }
 
-            // FIXME: make sure the value does not any operators or spaces
             rc = callocz(1, sizeof(RRDCALC));
             rc->name = strdupz(value);
             rc->hash = simple_hash(rc->name);
             rc->source = health_source_file(line, path, filename);
+
+            if(variable_fix_name(rc->name))
+                error("Health configuration renamed alarm '%s' to '%s'", value, rc->name);
         }
         else if(hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) {
             if(rc) {
@@ -1131,11 +1141,13 @@ int health_readfile(const char *path, const char *filename) {
             if(rt && !rrdcalctemplate_add(&localhost, rt))
                 rrdcalctemplate_free(&localhost, rt);
 
-            // FIXME: make sure the value does not any operators or spaces
             rt = callocz(1, sizeof(RRDCALCTEMPLATE));
             rt->name = strdupz(value);
             rt->hash_name = simple_hash(rt->name);
             rt->source = health_source_file(line, path, filename);
+
+            if(variable_fix_name(rt->name))
+                error("Health configuration renamed template '%s' to '%s'", value, rt->name);
         }
         else if(rc) {
             if(hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
@@ -1355,7 +1367,7 @@ void health_init(void) {
 
     char *path;
 
-    if(!config_get_boolean("health", "enabled", 1)) {
+    if(!(health_enabled = config_get_boolean("health", "enabled", 1))) {
         debug(D_HEALTH, "Health is disabled.");
         return;
     }
