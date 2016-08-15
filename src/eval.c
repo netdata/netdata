@@ -845,6 +845,8 @@ int expression_evaluate(EVAL_EXPRESSION *exp) {
     exp->result = eval_node(exp, (EVAL_NODE *)exp->nodes, &exp->error);
 
     if(exp->error != EVAL_ERROR_OK) {
+        exp->result = NAN;
+
         if(buffer_strlen(exp->error_msg))
             buffer_strcat(exp->error_msg, "; ");
 

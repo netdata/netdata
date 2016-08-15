@@ -34,13 +34,8 @@ typedef struct rrdvar {
 // these variables
 typedef struct rrdsetvar {
     char *fullid;               // chart type.chart id.variable
-    uint32_t hash_fullid;
-
     char *fullname;             // chart type.chart name.variable
-    uint32_t hash_fullname;
-
     char *variable;             // variable
-    uint32_t hash_variable;
 
     int type;
     void *value;
@@ -69,22 +64,11 @@ typedef struct rrddimvar {
     char *suffix;
 
     char *id;                   // dimension id
-    uint32_t hash;
-
     char *name;                 // dimension name
-    uint32_t hash_name;
-
     char *fullidid;             // chart type.chart id.dimension id
-    uint32_t hash_fullidid;
-
     char *fullidname;           // chart type.chart id.dimension name
-    uint32_t hash_fullidname;
-
     char *fullnameid;           // chart type.chart name.dimension id
-    uint32_t hash_fullnameid;
-
     char *fullnamename;         // chart type.chart name.dimension name
-    uint32_t hash_fullnamename;
 
     int type;
     void *value;
@@ -96,11 +80,6 @@ typedef struct rrddimvar {
 
     RRDVAR *context_id;
     RRDVAR *context_name;
-
-    RRDVAR *context_fullidid;
-    RRDVAR *context_fullidname;
-    RRDVAR *context_fullnameid;
-    RRDVAR *context_fullnamename;
 
     RRDVAR *host_fullidid;
     RRDVAR *host_fullidname;
@@ -124,6 +103,19 @@ typedef struct rrddimvar {
 // This double-linked list is maintained sorted at all times
 // having as RRDSET.calculations the RRDCALC to be processed
 // next.
+
+#define RRDCALC_STATUS_UNINITIALIZED  0
+#define RRDCALC_STATUS_UNDEFINED     -1
+#define RRDCALC_STATUS_OFF            1
+#define RRDCALC_STATUS_RAISED         2
+
+#define RRDCALC_OPTION_DB_ERROR      0x00000001
+#define RRDCALC_OPTION_DB_NAN        0x00000002
+#define RRDCALC_OPTION_DB_STALE      0x00000004
+#define RRDCALC_OPTION_CALC_ERROR    0x00000008
+#define RRDCALC_OPTION_WARN_ERROR    0x00000010
+#define RRDCALC_OPTION_CRIT_ERROR    0x00000020
+
 typedef struct rrdcalc {
     char *name;
     uint32_t hash;
@@ -150,6 +142,12 @@ typedef struct rrdcalc {
     EVAL_EXPRESSION *warning;
     EVAL_EXPRESSION *critical;
 
+    uint32_t rrdcalc_options;
+    int warning_status;
+    int critical_status;
+
+    time_t db_timestamp;
+
     calculated_number value;
 
     calculated_number green;
@@ -157,7 +155,8 @@ typedef struct rrdcalc {
 
     RRDVAR *local;
     RRDVAR *context;
-    RRDVAR *host;
+    RRDVAR *hostid;
+    RRDVAR *hostname;
 
     struct rrdset *rrdset;
     struct rrdcalc *rrdset_next;
@@ -166,7 +165,7 @@ typedef struct rrdcalc {
     struct rrdcalc *next;
 } RRDCALC;
 
-#define RRDCALC_HAS_CALCULATION(rc) ((rc)->after)
+#define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->after)
 
 // RRDCALCTEMPLATE
 // these are to be applied to charts found dynamically
