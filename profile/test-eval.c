@@ -259,6 +259,15 @@ void print_expression(EVAL_NODE *op, const char *failed_at, int error) {
 }
 */
 
+int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, calculated_number *result) {
+	(void)variable;
+	(void)hash;
+	(void)rc;
+	(void)result;
+
+	return 0;
+}
+
 int main(int argc, char **argv) {
 	if(argc != 2) {
 		fprintf(stderr, "I need an epxression (enclose it in single-quotes (') as a single parameter)\n");
@@ -270,10 +279,10 @@ int main(int argc, char **argv) {
 
 	EVAL_EXPRESSION *exp = expression_parse(argv[1], &failed_at, &error);
 	if(!exp)
-		printf("\nFAILED\nExpression: '%s'\nParsing stopped at: '%s'\nError code: %d (%s)\n", argv[1], (failed_at)?((*failed_at)?failed_at:"<END OF EXPRESSION>"):"<NONE>", error, expression_strerror(error));
+		printf("\nPARSING FAILED\nExpression: '%s'\nParsing stopped at: '%s'\nParsing error code: %d (%s)\n", argv[1], (failed_at)?((*failed_at)?failed_at:"<END OF EXPRESSION>"):"<NONE>", error, expression_strerror(error));
 	
 	else {
-		printf("\nOK\nExpression: '%s'\nParsed as : '%s'\nError code: %d (%s)\n", argv[1], exp->parsed_as, error, expression_strerror(error));
+		printf("\nPARSING OK\nExpression: '%s'\nParsed as : '%s'\nParsing error code: %d (%s)\n", argv[1], exp->parsed_as, error, expression_strerror(error));
 
 		if(expression_evaluate(exp)) {
 			printf("\nEvaluates to: %Lf\n\n", exp->result);

@@ -119,7 +119,8 @@ static inline calculated_number eval_value(EVAL_EXPRESSION *exp, EVAL_VALUE *v, 
             break;
     }
 
-    return eval_check_number(n, error);
+    // return eval_check_number(n, error);
+    return n;
 }
 
 calculated_number eval_and(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
@@ -212,7 +213,8 @@ static inline calculated_number eval_node(EVAL_EXPRESSION *exp, EVAL_NODE *op, i
 
     calculated_number n = operators[op->operator].eval(exp, op, error);
 
-    return eval_check_number(n, error);
+    // return eval_check_number(n, error);
+    return n;
 }
 
 // ----------------------------------------------------------------------------
@@ -225,12 +227,12 @@ static inline void print_parsed_as_variable(BUFFER *out, EVAL_VARIABLE *v, int *
 
 static inline void print_parsed_as_constant(BUFFER *out, calculated_number n) {
     if(unlikely(isnan(n))) {
-        buffer_strcat(out, "NaN");
+        buffer_strcat(out, "nan");
         return;
     }
 
     if(unlikely(isinf(n))) {
-        buffer_strcat(out, "INFINITE");
+        buffer_strcat(out, "inf");
         return;
     }
 
@@ -572,7 +574,7 @@ static inline int parse_variable(const char **string, char *buffer, size_t len) 
 static inline int parse_constant(const char **string, calculated_number *number) {
     char *end = NULL;
     calculated_number n = strtold(*string, &end);
-    if(unlikely(!end || *string == end || isnan(n) || isinf(n))) {
+    if(unlikely(!end || *string == end)) {
         *number = 0;
         return 0;
     }
@@ -843,6 +845,9 @@ int expression_evaluate(EVAL_EXPRESSION *exp) {
 
     buffer_reset(exp->error_msg);
     exp->result = eval_node(exp, (EVAL_NODE *)exp->nodes, &exp->error);
+
+    if(exp->error == EVAL_ERROR_OK)
+        exp->result = eval_check_number(exp->result, &exp->error);
 
     if(exp->error != EVAL_ERROR_OK) {
         exp->result = NAN;
