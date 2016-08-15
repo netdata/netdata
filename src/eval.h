@@ -27,26 +27,27 @@ typedef struct eval_expression {
     struct rrdcalc *rrdcalc;
 } EVAL_EXPRESSION;
 
-#define EVAL_VALUE_INVALID 0
-#define EVAL_VALUE_NUMBER 1
-#define EVAL_VALUE_VARIABLE 2
+#define EVAL_VALUE_INVALID    0
+#define EVAL_VALUE_NUMBER     1
+#define EVAL_VALUE_VARIABLE   2
 #define EVAL_VALUE_EXPRESSION 3
 
-#define EVAL_ERROR_OK 0
+// parsing and evaluation
+#define EVAL_ERROR_OK                             0
 
 // parsing errors
-#define EVAL_ERROR_MISSING_CLOSE_SUBEXPRESSION 1
-#define EVAL_ERROR_UNKNOWN_OPERAND 2
-#define EVAL_ERROR_MISSING_OPERAND 3
-#define EVAL_ERROR_MISSING_OPERATOR 4
-#define EVAL_ERROR_REMAINING_GARBAGE 5
+#define EVAL_ERROR_MISSING_CLOSE_SUBEXPRESSION    1
+#define EVAL_ERROR_UNKNOWN_OPERAND                2
+#define EVAL_ERROR_MISSING_OPERAND                3
+#define EVAL_ERROR_MISSING_OPERATOR               4
+#define EVAL_ERROR_REMAINING_GARBAGE              5
 
 // evaluation errors
-#define EVAL_ERROR_INVALID_VALUE 11
-#define EVAL_ERROR_INVALID_NUMBER_OF_OPERANDS 12
-#define EVAL_ERROR_VALUE_IS_NAN 13
-#define EVAL_ERROR_VALUE_IS_INFINITE 14
-#define EVAL_ERROR_UNKNOWN_VARIABLE 15
+#define EVAL_ERROR_INVALID_VALUE                101
+#define EVAL_ERROR_INVALID_NUMBER_OF_OPERANDS   102
+#define EVAL_ERROR_VALUE_IS_NAN                 103
+#define EVAL_ERROR_VALUE_IS_INFINITE            104
+#define EVAL_ERROR_UNKNOWN_VARIABLE             105
 
 // parse the given string as an expression and return:
 //   a pointer to an expression if it parsed OK

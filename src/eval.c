@@ -43,6 +43,7 @@ typedef struct eval_node {
 #define EVAL_OPERATOR_DIVIDE                '/'
 #define EVAL_OPERATOR_SIGN_PLUS             'P'
 #define EVAL_OPERATOR_SIGN_MINUS            'M'
+#define EVAL_OPERATOR_ABS                   'A'
 
 // ----------------------------------------------------------------------------
 // forward function definitions
@@ -171,36 +172,42 @@ calculated_number eval_sign_plus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error
 calculated_number eval_sign_minus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
     return -eval_value(exp, &op->ops[0], error);
 }
+calculated_number eval_abs(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+    calculated_number n = eval_value(exp, &op->ops[0], error);
+    return abs(n);
+}
 
 static struct operator {
     const char *print_as;
     char precedence;
     char parameters;
+    char isfunction;
     calculated_number (*eval)(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error);
 } operators[256] = {
         // this is a random access array
         // we always access it with a known EVAL_OPERATOR_X
 
-        [EVAL_OPERATOR_AND]                   = { "&&", 2, 2, eval_and },
-        [EVAL_OPERATOR_OR]                    = { "||", 2, 2, eval_or },
-        [EVAL_OPERATOR_GREATER_THAN_OR_EQUAL] = { ">=", 3, 2, eval_greater_than_or_equal },
-        [EVAL_OPERATOR_LESS_THAN_OR_EQUAL]    = { "<=", 3, 2, eval_less_than_or_equal },
-        [EVAL_OPERATOR_NOT_EQUAL]             = { "!=", 3, 2, eval_not_equal },
-        [EVAL_OPERATOR_EQUAL]                 = { "==", 3, 2, eval_equal },
-        [EVAL_OPERATOR_LESS]                  = { "<",  3, 2, eval_less },
-        [EVAL_OPERATOR_GREATER]               = { ">",  3, 2, eval_greater },
-        [EVAL_OPERATOR_PLUS]                  = { "+",  4, 2, eval_plus },
-        [EVAL_OPERATOR_MINUS]                 = { "-",  4, 2, eval_minus },
-        [EVAL_OPERATOR_MULTIPLY]              = { "*",  5, 2, eval_multiply },
-        [EVAL_OPERATOR_DIVIDE]                = { "/",  5, 2, eval_divide },
-        [EVAL_OPERATOR_NOT]                   = { "!",  6, 1, eval_not },
-        [EVAL_OPERATOR_SIGN_PLUS]             = { "+",  6, 1, eval_sign_plus },
-        [EVAL_OPERATOR_SIGN_MINUS]            = { "-",  6, 1, eval_sign_minus },
-        [EVAL_OPERATOR_NOP]                   = { NULL, 7, 1, eval_nop },
-        [EVAL_OPERATOR_EXPRESSION_OPEN]       = { NULL, 7, 1, eval_nop },
+        [EVAL_OPERATOR_AND]                   = { "&&", 2, 2, 0, eval_and },
+        [EVAL_OPERATOR_OR]                    = { "||", 2, 2, 0, eval_or },
+        [EVAL_OPERATOR_GREATER_THAN_OR_EQUAL] = { ">=", 3, 2, 0, eval_greater_than_or_equal },
+        [EVAL_OPERATOR_LESS_THAN_OR_EQUAL]    = { "<=", 3, 2, 0, eval_less_than_or_equal },
+        [EVAL_OPERATOR_NOT_EQUAL]             = { "!=", 3, 2, 0, eval_not_equal },
+        [EVAL_OPERATOR_EQUAL]                 = { "==", 3, 2, 0, eval_equal },
+        [EVAL_OPERATOR_LESS]                  = { "<",  3, 2, 0, eval_less },
+        [EVAL_OPERATOR_GREATER]               = { ">",  3, 2, 0, eval_greater },
+        [EVAL_OPERATOR_PLUS]                  = { "+",  4, 2, 0, eval_plus },
+        [EVAL_OPERATOR_MINUS]                 = { "-",  4, 2, 0, eval_minus },
+        [EVAL_OPERATOR_MULTIPLY]              = { "*",  5, 2, 0, eval_multiply },
+        [EVAL_OPERATOR_DIVIDE]                = { "/",  5, 2, 0, eval_divide },
+        [EVAL_OPERATOR_NOT]                   = { "!",  6, 1, 0, eval_not },
+        [EVAL_OPERATOR_SIGN_PLUS]             = { "+",  6, 1, 0, eval_sign_plus },
+        [EVAL_OPERATOR_SIGN_MINUS]            = { "-",  6, 1, 0, eval_sign_minus },
+        [EVAL_OPERATOR_ABS]                   = { "abs(",6,1, 1, eval_abs },
+        [EVAL_OPERATOR_NOP]                   = { NULL, 7, 1, 0, eval_nop },
+        [EVAL_OPERATOR_EXPRESSION_OPEN]       = { NULL, 7, 1, 0, eval_nop },
 
         // this should exist in our evaluation list
-        [EVAL_OPERATOR_EXPRESSION_CLOSE]      = { NULL, 7, 1, eval_nop }
+        [EVAL_OPERATOR_EXPRESSION_CLOSE]      = { NULL, 7, 1, 0, eval_nop }
 };
 
 #define eval_precedence(operator) (operators[(unsigned char)(operator)].precedence)
@@ -301,6 +308,9 @@ static inline void print_parsed_as_node(BUFFER *out, EVAL_NODE *op, int *error) 
         print_parsed_as_value(out, &op->ops[1], error);
         buffer_strcat(out, ")");
     }
+
+    if(operators[op->operator].isfunction)
+        buffer_strcat(out, ")");
 }
 
 // ----------------------------------------------------------------------------
@@ -537,10 +547,12 @@ static inline int parse_open_subexpression(const char **string) {
     return 0;
 }
 
+#define parse_close_function(x) parse_close_subexpression(x)
+
 static inline int parse_close_subexpression(const char **string) {
     const char *s = *string;
 
-    // (
+    // )
     if(s[0] == ')') {
         *string = &s[1];
         return 1;
@@ -581,6 +593,18 @@ static inline int parse_constant(const char **string, calculated_number *number)
     *number = n;
     *string = end;
     return 1;
+}
+
+static inline int parse_abs(const char **string) {
+    const char *s = *string;
+
+    // ABS
+    if((s[0] == 'A' || s[0] == 'a') && (s[1] == 'B' || s[1] == 'b') && (s[2] == 'S' || s[2] == 's') && s[3] == '(') {
+        *string = &s[3];
+        return 1;
+    }
+
+    return 0;
 }
 
 static struct operator_parser {
@@ -741,6 +765,10 @@ static inline EVAL_NODE *parse_one_full_operand(const char **string, int *error)
     else if(parse_minus(string)) {
         op1 = parse_next_operand_given_its_operator(string, EVAL_OPERATOR_SIGN_MINUS, error);
         op1->precedence = eval_precedence(EVAL_OPERATOR_SIGN_MINUS);
+    }
+    else if(parse_abs(string)) {
+        op1 = parse_next_operand_given_its_operator(string, EVAL_OPERATOR_ABS, error);
+        op1->precedence = eval_precedence(EVAL_OPERATOR_ABS);
     }
     else if(parse_open_subexpression(string)) {
         EVAL_NODE *sub = parse_full_expression(string, error);
