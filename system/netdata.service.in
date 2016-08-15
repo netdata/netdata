@@ -8,10 +8,7 @@ WorkingDirectory=/tmp
 User=netdata
 Group=netdata
 RuntimeDirectory=netdata
-ExecStartPre=/bin/mkdir -p @localstatedir_POST@/run/netdata
-ExecStartPre=/bin/chown -R netdata:netdata @localstatedir_POST@/run/netdata
-ExecStartPre=/bin/chmod 0775 @localstatedir_POST@/run/netdata
-ExecStart=@sbindir_POST@/netdata -D -P @localstatedir_POST@/run/netdata/netdata.pid
+ExecStart=@sbindir_POST@/netdata -D
 
 # -----------------------------------------------------------------------------
 # Stopping netdata
