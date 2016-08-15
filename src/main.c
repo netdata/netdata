@@ -262,6 +262,17 @@ void remove_option(int opt_index, int *argc, char **argv) {
     } while(argv[i][0] != '-' && opt_index >= *argc);
 }
 
+static const char *verify_required_directory(const char *dir) {
+    if(chdir(dir) == -1)
+        fatal("Cannot cd to directory '%s'", dir);
+
+    DIR *d = opendir(dir);
+    if(!d)
+        fatal("Cannot examine the contents of directory '%s'", dir);
+    closedir(d);
+
+    return dir;
+}
 
 int main(int argc, char **argv)
 {
@@ -396,34 +407,41 @@ int main(int argc, char **argv)
         }
     }
 
-    if(!config_loaded) load_config(NULL, 0);
-
-    // prepare configuration environment variables for the plugins
-    setenv("NETDATA_CONFIG_DIR" , config_get("global", "config directory"   , CONFIG_DIR) , 1);
-    setenv("NETDATA_PLUGINS_DIR", config_get("global", "plugins directory"  , PLUGINS_DIR), 1);
-    setenv("NETDATA_WEB_DIR"    , config_get("global", "web files directory", WEB_DIR)    , 1);
-    setenv("NETDATA_CACHE_DIR"  , config_get("global", "cache directory"    , CACHE_DIR)  , 1);
-    setenv("NETDATA_LIB_DIR"    , config_get("global", "lib directory"      , VARLIB_DIR) , 1);
-    setenv("NETDATA_LOG_DIR"    , config_get("global", "log directory"      , LOG_DIR)    , 1);
-    setenv("NETDATA_HOST_PREFIX", config_get("global", "host access prefix" , "")         , 1);
-    setenv("HOME"               , config_get("global", "home directory"     , CACHE_DIR)  , 1);
-
-    // disable buffering for python plugins
-    setenv("PYTHONUNBUFFERED", "1", 1);
-
-    // avoid flood calls to stat(/etc/localtime)
-    // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
-    setenv("TZ", ":/etc/localtime", 0);
+    if(!config_loaded)
+        load_config(NULL, 0);
 
     {
+        char *config_dir = config_get("global", "config directory", CONFIG_DIR);
+
+        // prepare configuration environment variables for the plugins
+        setenv("NETDATA_CONFIG_DIR" , verify_required_directory(config_dir) , 1);
+        setenv("NETDATA_PLUGINS_DIR", verify_required_directory(config_get("global", "plugins directory"  , PLUGINS_DIR)), 1);
+        setenv("NETDATA_WEB_DIR"    , verify_required_directory(config_get("global", "web files directory", WEB_DIR))    , 1);
+        setenv("NETDATA_CACHE_DIR"  , verify_required_directory(config_get("global", "cache directory"    , CACHE_DIR))  , 1);
+        setenv("NETDATA_LIB_DIR"    , verify_required_directory(config_get("global", "lib directory"      , VARLIB_DIR)) , 1);
+        setenv("NETDATA_LOG_DIR"    , verify_required_directory(config_get("global", "log directory"      , LOG_DIR))    , 1);
+
+        setenv("NETDATA_HOST_PREFIX", config_get("global", "host access prefix" , "")         , 1);
+        setenv("HOME"               , config_get("global", "home directory"     , CACHE_DIR)  , 1);
+
+        // disable buffering for python plugins
+        setenv("PYTHONUNBUFFERED", "1", 1);
+
+        // avoid flood calls to stat(/etc/localtime)
+        // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
+        setenv("TZ", ":/etc/localtime", 0);
+
+        // work while we are cd into config_dir
+        // to allow the plugins refer to their config
+        // files using relative filenames
+        if(chdir(config_dir) == -1)
+            fatal("Cannot cd to '%s'", config_dir);
+
         char path[1024 + 1], *p = getenv("PATH");
         if(!p) p = "/bin:/usr/bin";
         snprintfz(path, 1024, "%s:%s", p, "/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin");
         setenv("PATH", config_get("plugins", "PATH environment variable", path), 1);
     }
-
-    // cd to /tmp to avoid any plugins writing files at random places
-    if(chdir("/tmp")) error("netdata: ERROR: Cannot cd to /tmp");
 
     char *user = NULL;
     {

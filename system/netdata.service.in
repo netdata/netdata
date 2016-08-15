@@ -4,41 +4,12 @@ After=network.target httpd.service squid.service nfs-server.service mysqld.servi
 
 [Service]
 Type=simple
-WorkingDirectory=/tmp
 User=netdata
 Group=netdata
-RuntimeDirectory=netdata
 ExecStart=@sbindir_POST@/netdata -D
-
-# -----------------------------------------------------------------------------
-# Stopping netdata
-
-KillMode=mixed
-KillSignal=SIGTERM
 
 # saving a big db on slow disks may need some time
 TimeoutStopSec=60
-
-# and disable SIGKILL - if sent during save, we will loose the db
-SendSIGKILL=no
-
-# -----------------------------------------------------------------------------
-# Hardening netdata
-
-# These will apply these capabilities to the entire netdata process tree
-# We don't want this - only apps.plugin needs them
-# AmbientCapabilities=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
-# CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
-
-PrivateTmp=true
-ProtectSystem=full
-ProtectHome=read-only
-
-# is implicitly set by the MemoryDenyWriteExecute=true
-# NoNewPrivileges=true
-
-# Do not enable - it makes node.js plugins to crash
-# MemoryDenyWriteExecute=true
 
 [Install]
 WantedBy=multi-user.target
