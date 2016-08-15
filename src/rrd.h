@@ -306,11 +306,6 @@ struct rrdhost {
     RRDCALC *calculations;
 
     RRDCALCTEMPLATE *templates;
-
-    // all variable references are linked here
-    // RRDVARs may be free'd, so every time this happens
-    // we need to find all their references and invalidate them
-    EVAL_VARIABLE *references;
 };
 typedef struct rrdhost RRDHOST;
 extern RRDHOST localhost;
