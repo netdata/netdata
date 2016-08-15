@@ -1027,6 +1027,8 @@ static inline int health_parse_lookup(
         int *group_method, int *after, int *before, int *every,
         uint32_t *options, char **dimensions
 ) {
+    debug(D_HEALTH, "Health configuration parsing database lookup %zu@%s/%s: %s", line, path, file, string);
+
     if(*dimensions) freez(*dimensions);
     *dimensions = NULL;
     *after = 0;
@@ -1112,6 +1114,10 @@ static inline int health_parse_lookup(
             if(*s && strcasecmp(s, "all"))
                *dimensions = strdupz(s);
             break;
+        }
+        else {
+            error("Health configuration at line %zu of file '%s/%s': unknown keyword '%s'",
+                  line, path, file, key);
         }
     }
 
@@ -1562,8 +1568,11 @@ void *health_main(void *ptr) {
                                 error("Health for alarm '%s', failed to evaluate calculation with error: %s", rc->name,
                                       buffer_tostring(rc->calculation->error_msg));
                             } else {
-                                debug(D_HEALTH, "Health for alarm '%s', calculation gave value "
-                                        CALCULATED_NUMBER_FORMAT, rc->name, rc->calculation->result);
+                                debug(D_HEALTH, "Health for alarm '%s', calculation expression gave value "
+                                        CALCULATED_NUMBER_FORMAT ": %s",
+                                      rc->name, rc->calculation->result,
+                                      buffer_tostring(rc->calculation->error_msg)
+                                );
                                 rc->value = rc->calculation->result;
                             }
                         }
