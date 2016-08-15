@@ -1612,16 +1612,10 @@ int registry_init(void) {
     // registry enabled?
     registry.enabled = config_get_boolean("registry", "enabled", 0);
 
-    if(mkdir(VARLIB_DIR, 0755) == -1 && errno != EEXIST)
-        error("Cannot create directory '" VARLIB_DIR "'");
-
     // pathnames
     registry.pathname = config_get("registry", "registry db directory", VARLIB_DIR "/registry");
-    if(mkdir(registry.pathname, 0755) == -1 && errno != EEXIST) {
-        error("Cannot create directory '%s'. Registry disabled.", registry.pathname);
-        registry.enabled = 0;
-        return -1;
-    }
+    if(mkdir(registry.pathname, 0770) == -1 && errno != EEXIST)
+        fatal("Cannot create directory '%s'.", registry.pathname);
 
     // filenames
     snprintfz(filename, FILENAME_MAX, "%s/netdata.public.unique.id", registry.pathname);
