@@ -1600,6 +1600,14 @@ void *health_main(void *ptr) {
                               rc->name, rc->warning->result,
                               buffer_tostring(rc->warning->error_msg)
                         );
+
+                        if(rc->warning->result)
+                            info("WARNING ALARM '%s' - expression '%s' evaluated to %Lf, %s (source: %s)",
+                                 rc->name,
+                                 rc->warning->source,
+                                 rc->warning->result,
+                                 buffer_tostring(rc->warning->error_msg),
+                                 rc->source);
                     }
                 }
 
@@ -1614,6 +1622,14 @@ void *health_main(void *ptr) {
                               rc->name, rc->critical->result,
                               buffer_tostring(rc->critical->error_msg)
                         );
+
+                        if(rc->critical->result)
+                            info("CRITICAL ALARM '%s' - expression '%s' evaluated to %Lf, %s (source: %s)",
+                                 rc->name,
+                                 rc->critical->source,
+                                 rc->critical->result,
+                                 buffer_tostring(rc->critical->error_msg),
+                                 rc->source);
                     }
                 }
 
