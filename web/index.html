@@ -1491,7 +1491,7 @@ var menuData = {
         info: undefined
     },
 
-    'cgroup-vm': {
+    'cgqemu': {
         title: 'VM',
         info: undefined
     },
@@ -2024,7 +2024,7 @@ function enrichChartData(chart) {
         case 'cgroup':
             chart.menu = chart.type;
             if(chart.id.match(/.*[\._\/-:]qemu[\._\/-:]*/) || chart.id.match(/.*[\._\/-:]kvm[\._\/-:]*/))
-                chart.menu_pattern = 'cgroup-vm';
+                chart.menu_pattern = 'cgqemu';
             else
                 chart.menu_pattern = 'cgroup';
             break;
