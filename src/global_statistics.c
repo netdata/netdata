@@ -26,7 +26,6 @@ void finished_web_request_statistics(uint64_t dt,
                                      uint64_t content_size,
                                      uint64_t compressed_content_size) {
 #ifndef NETDATA_NO_ATOMIC_INSTRUCTIONS
-#warning using atomic operations
     uint64_t old_web_usec_max = global_statistics.web_usec_max;
     while(dt > old_web_usec_max)
         __atomic_compare_exchange(&global_statistics.web_usec_max, &old_web_usec_max, &dt, 1, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
@@ -38,7 +37,7 @@ void finished_web_request_statistics(uint64_t dt,
     __atomic_fetch_add(&global_statistics.content_size, content_size, __ATOMIC_SEQ_CST);
     __atomic_fetch_add(&global_statistics.compressed_content_size, compressed_content_size, __ATOMIC_SEQ_CST);
 #else
-    #warning NOT using atomic operations
+#warning NOT using atomic operations - using locks for global statistics
     if (web_server_mode == WEB_SERVER_MODE_MULTI_THREADED)
         global_statistics_lock();
 

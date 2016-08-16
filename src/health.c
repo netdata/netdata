@@ -1416,8 +1416,9 @@ void rrdcalc_check_critical_event(RRDCALC *rc) {
     int new_status = rrdcalc_value2status(n);
 
     if(new_status != old_status) {
-        info("Health alarm '%s.%s' - CRITICAL condition changed status from %s to %s",
+        info("Health alarm '%s.%s' = %0.2Lf - CRITICAL condition changed status from %s to %s",
              rc->chart?rc->chart:"NOCHART", rc->name,
+             rc->value,
              rrdcalc_status2string(old_status),
              rrdcalc_status2string(new_status)
         );
@@ -1433,8 +1434,9 @@ void rrdcalc_check_warning_event(RRDCALC *rc) {
     int new_status = rrdcalc_value2status(n);
 
     if(new_status != old_status) {
-        info("Health alarm '%s.%s' - WARNING condition changed status from %s to %s",
+        info("Health alarm '%s.%s' = %0.2Lf - WARNING condition changed status from %s to %s",
              rc->chart?rc->chart:"NOCHART", rc->name,
+             rc->value,
              rrdcalc_status2string(old_status),
              rrdcalc_status2string(new_status)
         );
