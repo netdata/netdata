@@ -18,17 +18,17 @@ ORDER = ['accesses', 'volume', 'threads', 'jvm']
 
 CHARTS = {
     'accesses': {
-        'options': [None, "tomcat requests", "requests/s", "statistics", "tomcat.accesses", "area"],
+        'options': [None, "Requests", "requests/s", "statistics", "tomcat.accesses", "area"],
         'lines': [
             ["accesses", None, 'incremental']
         ]},
     'volume': {
-        'options': [None, "tomcat volume", "KB/s", "volume", "tomcat.volume", "area"],
+        'options': [None, "Volume", "KB/s", "volume", "tomcat.volume", "area"],
         'lines': [
             ["volume", None, 'incremental', 1, 1024]
         ]},
     'threads': {
-        'options': [None, "tomcat threads", "current threads", "statistics", "tomcat.threads", "line"],
+        'options': [None, "Threads", "current threads", "statistics", "tomcat.threads", "line"],
         'lines': [
             ["current", None, "absolute"],
             ["busy", None, "absolute"]
