@@ -41,6 +41,7 @@ dist_pythonconfig_DATA = \
 
 healthconfigdir=$(configdir)/health.d
 dist_healthconfig_DATA = \
-	health.d/net.conf \
 	health.d/disks.conf \
+	health.d/entropy.conf \
+	health.d/net.conf \
 	$(NULL)
