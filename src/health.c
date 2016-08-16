@@ -1434,7 +1434,7 @@ static inline const char *alarm_entry_type2string(int type) {
             return "WARNING";
 
         case ALARM_ENTRY_TYPE_CRITICAL:
-            return "WARNING";
+            return "CRITICAL";
 
         default:
             return "UNKNOWN";
@@ -1482,7 +1482,7 @@ static inline void health_process_notifications(ALARM_ENTRY *ae) {
     info("Health alarm '%s.%s' = %0.2Lf - %s changed status from %s to %s",
          ae->chart?ae->chart:"NOCHART", ae->name,
          ae->new_value,
-         (ae->type == ALARM_ENTRY_TYPE_WARNING)?"WARNING":"CRITICAL",
+         alarm_entry_type2string(ae->type),
          rrdcalc_status2string(ae->old_status),
          rrdcalc_status2string(ae->new_status)
     );
