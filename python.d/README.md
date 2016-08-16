@@ -1,7 +1,5 @@
 # Disclaimer
 
-**Python support is experimental and implementation may change in the future**
-
 Every module should be compatible with python2 and python3.
 All third party libraries should be installed system-wide or in `python_modules` directory.
 Module configurations are written in YAML and **pyYAML is required**.
@@ -127,6 +125,114 @@ If no configuration is given, module will attempt to read log file at `/var/log/
 
 ---
 
+# cpufreq
+
+Module shows current cpu frequency by looking at appropriate files in /sys/devices
+
+**Requirement:**
+Processor which presents data scaling frequency data
+
+It produces one chart with multiple lines (one line per core).
+
+### configuration
+
+Sample:
+
+```yaml
+sys_dir: "/sys/devices"
+```
+
+If no configuration is given, module will search for `scaling_cur_freq` files in `/sys/devices` directory.
+Directory is also prefixed with `NETDATA_HOST_PREFIX` if specified.
+
+---
+
+# dovecot
+
+This module provides statistics information from dovecot server. 
+Statistics are taken from dovecot socket by executing `EXPORT global` command.
+More information about dovecot stats can be found on [project wiki page.](http://wiki2.dovecot.org/Statistics)
+
+**Requirement:**
+Dovecot unix socket with R/W permissions for user netdata or dovecot with configured TCP/IP socket.
+ 
+Module gives information with following charts:
+
+1. **logins and sessions**
+ * logins
+ * active sessions
+
+2. **commands** - number of IMAP commands 
+ * commands
+ 
+3. **Faults**
+ * minor
+ * major
+ 
+4. **Context Switches** 
+ * volountary
+ * involountary
+ 
+5. **disk** in bytes/s
+ * read
+ * write
+ 
+6. **bytes** in bytes/s
+ * read
+ * write
+ 
+7. **number of syscalls** in syscalls/s
+ * read
+ * write
+
+8. **lookups** - number of lookups per second
+ * path
+ * attr
+
+9. **hits** - number of cache hits 
+ * hits
+
+10. **attempts** - authorization attemts
+ * success
+ * failure
+
+11. **cache** - cached authorization hits
+ * hit
+ * miss
+ 
+### configuration
+
+Sample:
+
+```yaml
+localtcpip:
+  name     : 'local'
+  host     : '127.0.0.1'
+  port     : 24242
+
+localsocket:
+  name     : 'local'
+  socket   : '/var/run/dovecot/stats'
+```
+
+If no configuration is given, module will attempt to connect to dovecot using unix socket localized in `/var/run/dovecot/stats`
+
+---
+
+# exim
+
+Simple module executing `exim -bpc` to grab exim queue. 
+This command can take a lot of time to finish its execution thus it is not recommended to run it every second.
+
+It produces only one chart:
+
+1. **Exim Queue Emails**
+ * emails
+
+Configuration is not needed.
+
+---
+
 # hddtemp
  
 Module monitors disk temperatures from one or more hddtemp daemons
@@ -147,6 +253,101 @@ port: 7634
 ```
 
 If no configuration is given, module will attempt to connect to hddtemp daemon on `127.0.0.1:7634` address
+
+---
+
+# IPFS
+
+Module monitors [IPFS](https://ipfs.io) basic information.
+
+1. **Bandwidth** in kbits/s
+ * in
+ * out
+ 
+2. **Peers**
+ * peers
+ 
+### configuration
+
+Only url to IPFS server is needed. 
+
+Sample:
+
+```yaml
+localhost:
+  name : 'local'
+  url  : 'http://localhost:5001'
+```
+
+---
+
+# memcached
+
+Memcached monitoring module. Data grabbed from [stats interface](https://github.com/memcached/memcached/wiki/Commands#stats).
+
+1. **Network** in kilobytes/s
+ * read
+ * written
+ 
+2. **Connections** per second
+ * current
+ * rejected
+ * total
+ 
+3. **Items** in cluster
+ * current
+ * total
+ 
+4. **Evicted and Reclaimed** items
+ * evicted
+ * reclaimed
+ 
+5. **GET** requests/s
+ * hits
+ * misses
+
+6. **GET rate** rate in requests/s
+ * rate
+
+7. **SET rate** rate in requests/s
+ * rate
+ 
+8. **DELETE** requests/s
+ * hits
+ * misses
+
+9. **CAS** requests/s
+ * hits
+ * misses
+ * bad value
+ 
+10. **Increment** requests/s
+ * hits
+ * misses
+ 
+11. **Decrement** requests/s
+ * hits
+ * misses
+ 
+12. **Touch** requests/s
+ * hits
+ * misses
+ 
+13. **Touch rate** rate in requests/s
+ * rate
+ 
+### configuration
+
+Sample:
+
+```yaml
+localtcpip:
+  name     : 'local'
+  host     : '127.0.0.1'
+  port     : 24242
+```
+
+If no configuration is given, module will attempt to connect to memcached instance on `127.0.0.1:11211` address.
 
 ---
 
@@ -284,6 +485,33 @@ Without configuration, module attempts to connect to `http://localhost/stub_stat
 
 ---
 
+# nginx_log
+
+Module monitors nginx access log and produces only one chart:
+
+1. **nginx status codes** in requests/s
+ * 2xx
+ * 3xx
+ * 4xx
+ * 5xx
+
+### configuration
+
+Sample for two vhosts:
+
+```yaml
+site_A:
+  path: '/var/log/nginx/access-A.log'
+
+site_B:
+  name: 'local'
+  path: '/var/log/nginx/access-B.log'
+```
+
+When no configuration file is found, module tries to parse `/var/log/nginx/access.log` file.
+
+---
+
 # phpfpm
 
 This module will monitor one or more php-fpm instances depending on configuration. 
@@ -325,6 +553,77 @@ Without configuration, module attempts to connect to `http://localhost/status`
 
 ---
 
+# postfix
+
+Simple module executing `postfix -p` to grab postfix queue.
+
+It produces only two charts:
+
+1. **Postfix Queue Emails**
+ * emails
+ 
+2. **Postfix Queue Emails Size** in KB
+ * size
+
+Configuration is not needed.
+
+---
+
+# redis
+
+Get INFO data from redis instance.
+
+Following charts are drawn:
+
+1. **Operations** per second
+ * operations
+
+2. **Hit rate** in percent
+ * rate
+
+3. **Memory utilization** in kilobytes
+ * total
+ * lua
+
+4. **Database keys** 
+ * lines are creates dynamically based on how many databases are there
+ 
+5. **Clients**
+ * connected
+ * blocked
+ 
+6. **Slaves**
+ * connected
+ 
+### configuration
+
+```yaml
+socket:
+  name     : 'local'
+  socket   : '/var/lib/redis/redis.sock'
+
+localhost:
+  name     : 'local'
+  host     : 'localhost'
+  port     : 6379
+```
+
+When no configuration file is found, module tries to connect to TCP/IP socket: `localhost:6379`.
+
+---
+
+# sensors
+
+System sensors information.
+
+Charts are created dynamically.
+
+### configuration
+
+For detailed configuration information please read [`sensors.conf`](https://github.com/firehol/netdata/blob/master/conf.d/python.d/sensors.conf) file.
+
+---
+
 # squid
 
 This module will monitor one or more squid instances depending on configuration.
@@ -362,4 +661,38 @@ local:
 
 Without any configuration module will try to autodetect where squid presents its `counters` data
  
+---
+
+# tomcat
+
+Present tomcat containers memory utilization.
+
+Charts:
+
+1. **Requests** per second
+ * accesses
+
+2. **Volume** in KB/s
+ * volume
+
+3. **Threads**
+ * current
+ * busy
+ 
+4. **JVM Free Memory** in MB
+ * jvm
+ 
+### configuration
+
+```yaml
+localhost:
+  name : 'local'
+  url  : 'http://127.0.0.1:8080/manager/status?XML=true'
+  user : 'tomcat_username'
+  pass : 'secret_tomcat_password'
+```
+
+Without configuration, module attempts to connect to `http://localhost:8080/manager/status?XML=true`, without any credentials. 
+So it will probably fail.
+
 ---
