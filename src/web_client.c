@@ -553,11 +553,14 @@ uint32_t web_client_api_request_v1_data_google_format(char *name)
 
 int web_client_api_request_v1_data_group(char *name, int def)
 {
-    if(!strcmp(name, "max"))
-        return GROUP_MAX;
-
-    else if(!strcmp(name, "average"))
+    if(!strcmp(name, "average"))
         return GROUP_AVERAGE;
+
+    else if(!strcmp(name, "min"))
+        return GROUP_MIN;
+
+    else if(!strcmp(name, "max"))
+        return GROUP_MAX;
 
     else if(!strcmp(name, "sum"))
         return GROUP_SUM;

@@ -1370,7 +1370,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
     long c;
     for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
         last_values[c] = 0;
-        group_values[c] = 0;
+        group_values[c] = (group_method == GROUP_MAX || group_method == GROUP_MIN)?NAN:0;
         group_counts[c] = 0;
         group_options[c] = 0;
         found_non_zero[c] = 0;
@@ -1449,14 +1449,22 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
                 group_options[c] |= RRDR_RESET;
 
             switch(group_method) {
+                case GROUP_MIN:
+                    if(unlikely(isnan(group_values[c])) ||
+                            fabsl(value) < fabsl(group_values[c]))
+                        group_values[c] = value;
+                    break;
+
                 case GROUP_MAX:
-                    if(unlikely(fabsl(value) > fabsl(group_values[c])))
+                    if(unlikely(isnan(group_values[c])) ||
+                            fabsl(value) > fabsl(group_values[c]))
                         group_values[c] = value;
                     break;
 
                 default:
                 case GROUP_SUM:
                 case GROUP_AVERAGE:
+                case GROUP_UNDEFINED:
                     group_values[c] += value;
                     break;
 
@@ -1491,23 +1499,39 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
                 if(unlikely(group_counts[c] == 0)) {
                     cn[c] = 0.0;
                     co[c] |= RRDR_EMPTY;
-                }
-                else if(unlikely(group_method == GROUP_AVERAGE)) {
-                    // GROUP_AVERAGE
-                    cn[c] = group_values[c] / group_counts[c];
+                    group_values[c] = (group_method == GROUP_MAX || group_method == GROUP_MIN)?NAN:0;
                 }
                 else {
-                    // GROUP_SUM
-                    // GROUP_MAX
-                    // GROUP_INCREMENTAL_SUM
-                    cn[c] = group_values[c];
+                    switch(group_method) {
+                        case GROUP_MIN:
+                        case GROUP_MAX:
+                            if(unlikely(isnan(group_values[c])))
+                                cn[c] = 0;
+                            else {
+                                cn[c] = group_values[c];
+                                group_values[c] = NAN;
+                            }
+                            break;
+
+                        case GROUP_SUM:
+                        case GROUP_INCREMENTAL_SUM:
+                            cn[c] = group_values[c];
+                            group_values[c] = 0;
+                            break;
+
+                        default:
+                        case GROUP_AVERAGE:
+                        case GROUP_UNDEFINED:
+                            cn[c] = group_values[c] / group_counts[c];
+                            group_values[c] = 0;
+                            break;
+                    }
+
+                    if(cn[c] < r->min) r->min = cn[c];
+                    if(cn[c] > r->max) r->max = cn[c];
                 }
 
-                if(cn[c] < r->min) r->min = cn[c];
-                if(cn[c] > r->max) r->max = cn[c];
-
-                // reset them for the next loop
-                group_values[c] = 0;
+                // reset for the next loop
                 group_counts[c] = 0;
                 group_options[c] = 0;
             }
