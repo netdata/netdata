@@ -3,7 +3,7 @@
 # Author: Pawel Krupa (paulfantom)
 
 from base import SimpleService
-import new_sensors as sensors
+import lm_sensors as sensors
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
