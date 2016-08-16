@@ -30,6 +30,7 @@ declare -A configs_signatures=(
   ['ca026d7c779f0a7cb7787713c5be5c47']='charts.d.conf'
   ['02fa10fa85ab88e9723998de48d1aca0']='health.d/disks.conf'
   ['22ceb822983134a7ca67343241f30341']='health.d/disks.conf'
+  ['573398335c0c71c075fa57f702bce287']='health.d/disks.conf'
   ['8989b5e2f4ef9cd278ef58be0fae4074']='health.d/disks.conf'
   ['8dc0bd0a70b5117454bd5f5b98f91c2c']='health.d/disks.conf'
   ['450667c552ab7a7d8d4a2c214fdacca5']='health.d/entropy.conf'
