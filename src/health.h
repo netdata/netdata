@@ -149,6 +149,7 @@ typedef struct rrdcalc {
     time_t db_timestamp;
 
     calculated_number value;
+    calculated_number old_value;
 
     calculated_number green;
     calculated_number red;
@@ -201,6 +202,33 @@ typedef struct rrdcalctemplate {
 
 #define RRDCALCTEMPLATE_HAS_CALCULATION(rt) ((rt)->after)
 
+#define ALARM_ENTRY_TYPE_WARNING  1
+#define ALARM_ENTRY_TYPE_CRITICAL 2
+
+#define HEALTH_ENTRY_NOTIFICATIONS_PROCESSED 0x00000001
+
+typedef struct alarm_entry {
+    uint32_t id;
+    time_t when;
+    int type;
+    char *name;
+    char *chart;
+    char *exec;
+    char *source;
+    calculated_number old_value;
+    calculated_number new_value;
+    int old_status;
+    int new_status;
+    uint32_t notifications;
+    struct alarm_entry *next;
+} ALARM_ENTRY;
+
+typedef struct alarm_log {
+    uint32_t nextid;
+    unsigned int count;
+    unsigned int max;
+    ALARM_ENTRY *alarms;
+} ALARM_LOG;
 
 #include "rrd.h"
 

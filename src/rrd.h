@@ -13,7 +13,7 @@ extern int rrd_default_history_entries;
 // set to zero to disable this feature
 extern int rrd_delete_unupdated_dimensions;
 
-#define RRD_ID_LENGTH_MAX 1024
+#define RRD_ID_LENGTH_MAX 400
 
 #define RRDSET_MAGIC        "NETDATA RRD SET FILE V018"
 #define RRDDIMENSION_MAGIC  "NETDATA RRD DIMENSION FILE V018"
