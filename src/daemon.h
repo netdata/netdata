@@ -4,6 +4,7 @@
 extern void sig_handler_exit(int signo);
 extern void sig_handler_save(int signo);
 extern void sig_handler_logrotate(int signo);
+extern void sig_handler_reload_health(int signo);
 
 extern int become_user(const char *username, int pid_fd);
 

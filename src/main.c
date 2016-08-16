@@ -536,50 +536,45 @@ int main(int argc, char **argv)
         // this causes the threads to block signals.
         sigset_t sigset;
         sigfillset(&sigset);
-
-        if(pthread_sigmask(SIG_BLOCK, &sigset, NULL) == -1) {
+        if(pthread_sigmask(SIG_BLOCK, &sigset, NULL) == -1)
             error("Could not block signals for threads");
-        }
 
         // Catch signals which we want to use
         struct sigaction sa;
-        sigemptyset(&sa.sa_mask);
-        sigaddset(&sa.sa_mask, SIGINT);
-        sigaddset(&sa.sa_mask, SIGTERM);
-        sa.sa_handler = sig_handler_exit;
         sa.sa_flags = 0;
-        if(sigaction(SIGINT, &sa, NULL) == -1) {
-            error("Failed to change signal handler for SIGINT");
-        }
-        if(sigaction(SIGTERM, &sa, NULL) == -1) {
-            error("Failed to change signal handler for SIGTERM");
-        }
 
-        sigemptyset(&sa.sa_mask);
-        sigaddset(&sa.sa_mask, SIGHUP);
-        sa.sa_handler = sig_handler_logrotate;
-        sa.sa_flags = 0;
-        if(sigaction(SIGHUP, &sa, NULL) == -1) {
-            error("Failed to change signal handler for SIGHUP");
-        }
+        // ingore all signals while we run in a signal handler
+        sigfillset(&sa.sa_mask);
 
-        // save database on SIGUSR1
-        sigemptyset(&sa.sa_mask);
-        sigaddset(&sa.sa_mask, SIGUSR1);
-        sa.sa_handler = sig_handler_save;
-        if(sigaction(SIGUSR1, &sa, NULL) == -1) {
-            error("Failed to change signal handler for SIGUSR1");
-        }
-
-        // Ignore SIGPIPE completely.
         // INFO: If we add signals here we have to unblock them
         // at popen.c when running a external plugin.
-        sigemptyset(&sa.sa_mask);
-        sigaddset(&sa.sa_mask, SIGPIPE);
+
+        // Ignore SIGPIPE completely.
         sa.sa_handler = SIG_IGN;
-        if(sigaction(SIGPIPE, &sa, NULL) == -1) {
+        if(sigaction(SIGPIPE, &sa, NULL) == -1)
             error("Failed to change signal handler for SIGPIPE");
-        }
+
+        sa.sa_handler = sig_handler_exit;
+        if(sigaction(SIGINT, &sa, NULL) == -1)
+            error("Failed to change signal handler for SIGINT");
+
+        sa.sa_handler = sig_handler_exit;
+        if(sigaction(SIGTERM, &sa, NULL) == -1)
+            error("Failed to change signal handler for SIGTERM");
+
+        sa.sa_handler = sig_handler_logrotate;
+        if(sigaction(SIGHUP, &sa, NULL) == -1)
+            error("Failed to change signal handler for SIGHUP");
+
+        // save database on SIGUSR1
+        sa.sa_handler = sig_handler_save;
+        if(sigaction(SIGUSR1, &sa, NULL) == -1)
+            error("Failed to change signal handler for SIGUSR1");
+
+        // reload health configuration on SIGUSR2
+        sa.sa_handler = sig_handler_reload_health;
+        if(sigaction(SIGUSR2, &sa, NULL) == -1)
+            error("Failed to change signal handler for SIGUSR2");
 
         // --------------------------------------------------------------------
 
