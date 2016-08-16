@@ -1491,6 +1491,11 @@ var menuData = {
         info: undefined
     },
 
+    'cgroup-vm': {
+        title: 'VM',
+        info: undefined
+    },
+
     'memcached': {
         title: 'memcached',
         info: undefined
@@ -2016,8 +2021,15 @@ function enrichChartData(chart) {
             chart.menu = tmp;
             break;
 
-        case 'apache':
         case 'cgroup':
+            chart.menu = chart.type;
+            if(chart.id.match(/.*[\._\/-:]qemu[\._\/-:]*/) || chart.id.match(/.*[\._\/-:]kvm[\._\/-:]*/))
+                chart.menu_pattern = 'cgroup-vm';
+            else
+                chart.menu_pattern = 'cgroup';
+            break;
+
+        case 'apache':
         case 'exim':
         case 'memcached':
         case 'mysql':
