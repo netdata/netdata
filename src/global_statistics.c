@@ -26,21 +26,19 @@ void finished_web_request_statistics(uint64_t dt,
                                      uint64_t content_size,
                                      uint64_t compressed_content_size) {
 #ifndef NETDATA_NO_ATOMIC_INSTRUCTIONS
+#warning using atomic operations
     uint64_t old_web_usec_max = global_statistics.web_usec_max;
-    while(dt > old_web_usec_max) {
-        if(__sync_bool_compare_and_swap(&global_statistics.web_usec_max, old_web_usec_max, dt))
-            old_web_usec_max = dt;
-        else
-            old_web_usec_max = global_statistics.web_usec_max;
-    }
+    while(dt > old_web_usec_max)
+        __atomic_compare_exchange(&global_statistics.web_usec_max, &old_web_usec_max, &dt, 1, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
 
-    __sync_fetch_and_add(&global_statistics.web_requests, 1);
-    __sync_fetch_and_add(&global_statistics.web_usec, dt);
-    __sync_fetch_and_add(&global_statistics.bytes_received, bytes_received);
-    __sync_fetch_and_add(&global_statistics.bytes_sent, bytes_sent);
-    __sync_fetch_and_add(&global_statistics.content_size, content_size);
-    __sync_fetch_and_add(&global_statistics.compressed_content_size, compressed_content_size);
+    __atomic_fetch_add(&global_statistics.web_requests, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&global_statistics.web_usec, dt, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&global_statistics.bytes_received, bytes_received, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&global_statistics.bytes_sent, bytes_sent, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&global_statistics.content_size, content_size, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&global_statistics.compressed_content_size, compressed_content_size, __ATOMIC_SEQ_CST);
 #else
+    #warning NOT using atomic operations
     if (web_server_mode == WEB_SERVER_MODE_MULTI_THREADED)
         global_statistics_lock();
 
@@ -61,7 +59,7 @@ void finished_web_request_statistics(uint64_t dt,
 
 void web_client_connected(void) {
 #ifndef NETDATA_NO_ATOMIC_INSTRUCTIONS
-    __sync_fetch_and_add(&global_statistics.connected_clients, 1);
+    __atomic_fetch_add(&global_statistics.connected_clients, 1, __ATOMIC_SEQ_CST);
 #else
     if (web_server_mode == WEB_SERVER_MODE_MULTI_THREADED)
         global_statistics_lock();
@@ -75,7 +73,7 @@ void web_client_connected(void) {
 
 void web_client_disconnected(void) {
 #ifndef NETDATA_NO_ATOMIC_INSTRUCTIONS
-    __sync_fetch_and_sub(&global_statistics.connected_clients, 1);
+    __atomic_fetch_sub(&global_statistics.connected_clients, 1, __ATOMIC_SEQ_CST);
 #else
     if (web_server_mode == WEB_SERVER_MODE_MULTI_THREADED)
         global_statistics_lock();
@@ -90,17 +88,20 @@ void web_client_disconnected(void) {
 
 inline void global_statistics_copy(struct global_statistics *gs, uint8_t options) {
 #ifndef NETDATA_NO_ATOMIC_INSTRUCTIONS
-    gs->connected_clients       = __sync_fetch_and_add(&global_statistics.connected_clients, 0);
-    gs->web_requests            = __sync_fetch_and_add(&global_statistics.web_requests, 0);
-    gs->web_usec                = __sync_fetch_and_add(&global_statistics.web_usec, 0);
-    gs->web_usec_max            = __sync_fetch_and_add(&global_statistics.web_usec_max, 0);
-    gs->bytes_received          = __sync_fetch_and_add(&global_statistics.bytes_received, 0);
-    gs->bytes_sent              = __sync_fetch_and_add(&global_statistics.bytes_sent, 0);
-    gs->content_size            = __sync_fetch_and_add(&global_statistics.content_size, 0);
-    gs->compressed_content_size = __sync_fetch_and_add(&global_statistics.compressed_content_size, 0);
+    gs->connected_clients       = __atomic_fetch_add(&global_statistics.connected_clients, 0, __ATOMIC_SEQ_CST);
+    gs->web_requests            = __atomic_fetch_add(&global_statistics.web_requests, 0, __ATOMIC_SEQ_CST);
+    gs->web_usec                = __atomic_fetch_add(&global_statistics.web_usec, 0, __ATOMIC_SEQ_CST);
+    gs->web_usec_max            = __atomic_fetch_add(&global_statistics.web_usec_max, 0, __ATOMIC_SEQ_CST);
+    gs->bytes_received          = __atomic_fetch_add(&global_statistics.bytes_received, 0, __ATOMIC_SEQ_CST);
+    gs->bytes_sent              = __atomic_fetch_add(&global_statistics.bytes_sent, 0, __ATOMIC_SEQ_CST);
+    gs->content_size            = __atomic_fetch_add(&global_statistics.content_size, 0, __ATOMIC_SEQ_CST);
+    gs->compressed_content_size = __atomic_fetch_add(&global_statistics.compressed_content_size, 0, __ATOMIC_SEQ_CST);
 
-    if(options & GLOBAL_STATS_RESET_WEB_USEC_MAX)
-        __sync_bool_compare_and_swap(&global_statistics.web_usec_max, gs->web_usec_max, 0);
+    if(options & GLOBAL_STATS_RESET_WEB_USEC_MAX) {
+        uint64_t n = 0;
+        __atomic_compare_exchange(&global_statistics.web_usec_max, &gs->web_usec_max, &n, 1, __ATOMIC_SEQ_CST,
+                                  __ATOMIC_SEQ_CST);
+    }
 #else
     global_statistics_lock();
 
