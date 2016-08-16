@@ -73,16 +73,26 @@ static inline calculated_number eval_check_number(calculated_number n, int *erro
 }
 
 static inline calculated_number eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *v, int *error) {
-    static uint32_t this_hash = 0;
+    static uint32_t this_hash = 0, now_hash = 0;
 
-    if(unlikely(this_hash == 0))
+    if(unlikely(this_hash == 0)) {
         this_hash = simple_hash("this");
+        now_hash = simple_hash("now");
+    }
 
     if(exp->this && v->hash == this_hash && !strcmp(v->name, "this")) {
         buffer_strcat(exp->error_msg, "[ $this = ");
         print_parsed_as_constant(exp->error_msg, *exp->this);
         buffer_strcat(exp->error_msg, " ] ");
         return *exp->this;
+    }
+
+    if(v->hash == now_hash && !strcmp(v->name, "now")) {
+        calculated_number n = time(NULL);
+        buffer_strcat(exp->error_msg, "[ $now = ");
+        print_parsed_as_constant(exp->error_msg, n);
+        buffer_strcat(exp->error_msg, " ] ");
+        return n;
     }
 
     calculated_number n;
