@@ -1451,7 +1451,7 @@ static inline void health_alarm_execute(ALARM_ENTRY *ae) {
     const char *exec = ae->exec;
     if(!exec) exec = health_default_exec;
 
-    snprintfz(buffer, FILENAME_MAX, "exec %s '%s' '%s' '%s' '%s' '%s' '%0.0Lf' '%0.0Lf', '%s'",
+    snprintfz(buffer, FILENAME_MAX, "exec %s '%s' '%s' '%s' '%s' '%s' '%0.0Lf' '%0.0Lf' '%s' '%u'",
               exec,
               alarm_entry_type2string(ae->type),
               ae->name,
@@ -1460,7 +1460,8 @@ static inline void health_alarm_execute(ALARM_ENTRY *ae) {
               rrdcalc_status2string(ae->old_status),
               ae->new_value,
               ae->old_value,
-              ae->source?ae->source:"UNKNOWN"
+              ae->source?ae->source:"UNKNOWN",
+              (uint32_t)ae->duration
     );
 
     debug(D_HEALTH, "executing command '%s'", buffer);
@@ -1491,6 +1492,7 @@ static inline void health_process_notifications(ALARM_ENTRY *ae) {
 
 static inline void health_alarm_log(time_t when, int type,
                 const char *name, const char *chart, const char *exec,
+                time_t duration,
                 calculated_number old_value, calculated_number new_value,
                 int old_status, int new_status,
                 const char *source
@@ -1508,7 +1510,7 @@ static inline void health_alarm_log(time_t when, int type,
     ae->new_value = new_value;
     ae->old_status = old_status;
     ae->new_status = new_status;
-
+    ae->duration = duration;
     // link it
     ae->next = health_log.alarms;
     health_log.alarms = ae;
@@ -1560,7 +1562,9 @@ static inline void rrdcalc_check_critical_event(RRDCALC *rc) {
     int new_status = rrdcalc_value2status(n);
 
     if(new_status != old_status) {
-        health_alarm_log(time(NULL), ALARM_ENTRY_TYPE_WARNING, rc->name, rc->rrdset->id, rc->exec, rc->old_value, rc->value, old_status, new_status, rc->source);
+        time_t now = time(NULL);
+        health_alarm_log(time(NULL), ALARM_ENTRY_TYPE_WARNING, rc->name, rc->rrdset->id, rc->exec, now - rc->last_status_change, rc->old_value, rc->value, old_status, new_status, rc->source);
+        rc->last_status_change = now;
         rc->critical_status = new_status;
     }
 }
@@ -1572,7 +1576,9 @@ static inline void rrdcalc_check_warning_event(RRDCALC *rc) {
     int new_status = rrdcalc_value2status(n);
 
     if(new_status != old_status) {
-        health_alarm_log(time(NULL), ALARM_ENTRY_TYPE_CRITICAL, rc->name, rc->rrdset->id, rc->exec, rc->old_value, rc->value, old_status, new_status, rc->source);
+        time_t now = time(NULL);
+        health_alarm_log(time(NULL), ALARM_ENTRY_TYPE_CRITICAL, rc->name, rc->rrdset->id, rc->exec, now - rc->last_status_change, rc->old_value, rc->value, old_status, new_status, rc->source);
+        rc->last_status_change = now;
         rc->warning_status = new_status;
     }
 }

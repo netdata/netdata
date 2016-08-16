@@ -147,6 +147,7 @@ typedef struct rrdcalc {
     int critical_status;
 
     time_t db_timestamp;
+    time_t last_status_change;
 
     calculated_number value;
     calculated_number old_value;
@@ -210,6 +211,7 @@ typedef struct rrdcalctemplate {
 typedef struct alarm_entry {
     uint32_t id;
     time_t when;
+    time_t duration;
     int type;
     char *name;
     char *chart;
