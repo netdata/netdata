@@ -265,7 +265,7 @@ struct rrdset {
 
     avl_tree_lock variables_root_index;
     RRDSETVAR *variables;
-    RRDCALC *calculations;
+    RRDCALC *alarms;
 
     // ------------------------------------------------------------------------
     // members for checking the data when loading from disk
@@ -303,7 +303,7 @@ struct rrdhost {
     // all RRDCALCs are primarily allocated and linked here
     // RRDCALCs may be linked to charts at any point
     // (charts may or may not exist when these are loaded)
-    RRDCALC *calculations;
+    RRDCALC *alarms;
 
     RRDCALCTEMPLATE *templates;
 };

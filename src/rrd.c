@@ -768,8 +768,8 @@ void rrdset_free_all(void)
         while(st->variables)
             rrdsetvar_free(st->variables);
 
-        while(st->calculations)
-            rrdsetcalc_unlink(st->calculations);
+        while(st->alarms)
+            rrdsetcalc_unlink(st->alarms);
 
         while(st->dimensions)
             rrddim_free(st, st->dimensions);

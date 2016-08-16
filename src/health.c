@@ -442,7 +442,7 @@ inline void rrdsetcalc_link_matching(RRDSET *st) {
     // debug(D_HEALTH, "find matching alarms for chart '%s'", st->id);
 
     RRDCALC *rc;
-    for(rc = st->rrdhost->calculations; rc ; rc = rc->next) {
+    for(rc = st->rrdhost->alarms; rc ; rc = rc->next) {
         if(rc->rrdset) continue;
 
         if(rrdcalc_is_matching_this_rrdset(rc, st))
@@ -470,8 +470,8 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
     if(rc->rrdset_next)
         rc->rrdset_next->rrdset_prev = rc->rrdset_prev;
 
-    if(st->calculations == rc)
-        st->calculations = rc->rrdset_next;
+    if(st->alarms == rc)
+        st->alarms = rc->rrdset_next;
 
     rc->rrdset_prev = rc->rrdset_next = NULL;
 
@@ -498,7 +498,7 @@ static inline int rrdcalc_exists(RRDHOST *host, const char *name, uint32_t hash)
     RRDCALC *rc;
 
     // make sure it does not already exist
-    for(rc = host->calculations; rc ; rc = rc->next) {
+    for(rc = host->alarms; rc ; rc = rc->next) {
         if (rc->hash == hash && !strcmp(name, rc->name)) {
             error("Health alarm '%s' already exists in host '%s'.", name, host->hostname);
             return 1;
@@ -527,8 +527,8 @@ static inline void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc) {
     }
 
     // link it to the host
-    rc->next = host->calculations;
-    host->calculations = rc;
+    rc->next = host->alarms;
+    host->alarms = rc;
 
     // link it to its chart
     RRDSET *st;
@@ -627,11 +627,11 @@ void rrdcalc_free(RRDHOST *host, RRDCALC *rc) {
     if(rc->rrdset) rrdsetcalc_unlink(rc);
 
     // unlink it from RRDHOST
-    if(rc == host->calculations)
-        host->calculations = rc->next;
+    if(rc == host->alarms)
+        host->alarms = rc->next;
 
-    else if(host->calculations) {
-        RRDCALC *t, *last = host->calculations;
+    else if(host->alarms) {
+        RRDCALC *t, *last = host->alarms;
 
         for(t = last->next; t && t != rc; last = t, t = t->next) ;
         if(last && last->next == rc)
@@ -642,15 +642,15 @@ void rrdcalc_free(RRDHOST *host, RRDCALC *rc) {
     else
         error("Cannot unlink unlink '%s.%s' from host '%s': This host does not have any calculations", rc->chart?rc->chart:"NOCHART", rc->name, host->hostname);
 
-    if(rc->warning) expression_free(rc->warning);
-    if(rc->critical) expression_free(rc->critical);
+    expression_free(rc->calculation);
+    expression_free(rc->warning);
+    expression_free(rc->critical);
 
     freez(rc->source);
     freez(rc->name);
     freez(rc->chart);
     freez(rc->dimensions);
     freez(rc->exec);
-
     freez(rc);
 }
 
@@ -702,8 +702,9 @@ static inline void rrdcalctemplate_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
         }
     }
 
-    if(rt->warning) expression_free(rt->warning);
-    if(rt->critical) expression_free(rt->critical);
+    expression_free(rt->calculation);
+    expression_free(rt->warning);
+    expression_free(rt->critical);
 
     freez(rt->dimensions);
     freez(rt->context);
@@ -771,7 +772,7 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
     return 1;
 }
 
-static inline int rrdcalctemplate_add(RRDHOST *host, RRDCALCTEMPLATE *rt) {
+static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCALCTEMPLATE *rt) {
     if(!rt->context) {
         error("Health configuration for template '%s' does not have a context", rt->name);
         return 0;
@@ -813,7 +814,7 @@ static inline int rrdcalctemplate_add(RRDHOST *host, RRDCALCTEMPLATE *rt) {
     return 1;
 }
 
-static inline int health_parse_time(char *string, int *result) {
+static inline int health_parse_duration(char *string, int *result) {
     // make sure it is a number
     if(!*string || !(isdigit(*string) || *string == '+' || *string == '-')) {
         *result = 0;
@@ -855,7 +856,7 @@ static inline int health_parse_time(char *string, int *result) {
     return 1;
 }
 
-static inline int health_parse_lookup(
+static inline int health_parse_db_lookup(
         size_t line, const char *path, const char *file, char *string,
         int *group_method, int *after, int *before, int *every,
         uint32_t *options, char **dimensions
@@ -892,7 +893,7 @@ static inline int health_parse_lookup(
     while(*s && !isspace(*s)) s++;
     while(*s && isspace(*s)) *s++ = '\0';
 
-    if(!health_parse_time(key, after)) {
+    if(!health_parse_duration(key, after)) {
         error("Health configuration at line %zu of file '%s/%s': invalid duration '%s' after group method",
               line, path, file, key);
         return 0;
@@ -913,7 +914,7 @@ static inline int health_parse_lookup(
             while(*s && !isspace(*s)) s++;
             while(*s && isspace(*s)) *s++ = '\0';
 
-            if (!health_parse_time(value, before)) {
+            if (!health_parse_duration(value, before)) {
                 error("Health configuration at line %zu of file '%s/%s': invalid duration '%s' for '%s' keyword",
                       line, path, file, value, key);
             }
@@ -923,7 +924,7 @@ static inline int health_parse_lookup(
             while(*s && !isspace(*s)) s++;
             while(*s && isspace(*s)) *s++ = '\0';
 
-            if (!health_parse_time(value, every)) {
+            if (!health_parse_duration(value, every)) {
                 error("Health configuration at line %zu of file '%s/%s': invalid duration '%s' for '%s' keyword",
                       line, path, file, value, key);
             }
@@ -1044,7 +1045,7 @@ int health_readfile(const char *path, const char *filename) {
                 rrdcalc_free(&localhost, rc);
 
             if(rt) {
-                if (!rrdcalctemplate_add(&localhost, rt))
+                if (!rrdcalctemplate_add_template_from_config(&localhost, rt))
                     rrdcalctemplate_free(&localhost, rt);
                 rt = NULL;
             }
@@ -1064,7 +1065,7 @@ int health_readfile(const char *path, const char *filename) {
                 rc = NULL;
             }
 
-            if(rt && !rrdcalctemplate_add(&localhost, rt))
+            if(rt && !rrdcalctemplate_add_template_from_config(&localhost, rt))
                 rrdcalctemplate_free(&localhost, rt);
 
             rt = callocz(1, sizeof(RRDCALCTEMPLATE));
@@ -1088,11 +1089,12 @@ int health_readfile(const char *path, const char *filename) {
                 rc->hash_chart = simple_hash(rc->chart);
             }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
-                health_parse_lookup(line, path, filename, value, &rc->group, &rc->after, &rc->before, &rc->update_every,
-                                    &rc->options, &rc->dimensions);
+                health_parse_db_lookup(line, path, filename, value, &rc->group, &rc->after, &rc->before,
+                                       &rc->update_every,
+                                       &rc->options, &rc->dimensions);
             }
             else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
-                if(!health_parse_time(value, &rc->update_every))
+                if(!health_parse_duration(value, &rc->update_every))
                     info("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' cannot parse duration: '%s'.",
                          line, path, filename, rc->name, key, value);
             }
@@ -1167,11 +1169,12 @@ int health_readfile(const char *path, const char *filename) {
                 rt->hash_context = simple_hash(rt->context);
             }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
-                health_parse_lookup(line, path, filename, value, &rt->group, &rt->after, &rt->before, &rt->update_every,
-                                    &rt->options, &rt->dimensions);
+                health_parse_db_lookup(line, path, filename, value, &rt->group, &rt->after, &rt->before,
+                                       &rt->update_every,
+                                       &rt->options, &rt->dimensions);
             }
             else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
-                if(!health_parse_time(value, &rt->update_every))
+                if(!health_parse_duration(value, &rt->update_every))
                     info("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' cannot parse duration: '%s'.",
                          line, path, filename, rt->name, key, value);
             }
@@ -1242,7 +1245,7 @@ int health_readfile(const char *path, const char *filename) {
     if(rc && !rrdcalc_add_alarm_from_config(&localhost, rc))
         rrdcalc_free(&localhost, rc);
 
-    if(rt && !rrdcalctemplate_add(&localhost, rt))
+    if(rt && !rrdcalctemplate_add_template_from_config(&localhost, rt))
         rrdcalctemplate_free(&localhost, rt);
 
     fclose(fp);
@@ -1290,21 +1293,24 @@ void health_readdir(const char *path) {
     closedir(dir);
 }
 
+static inline char *health_config_dir(void) {
+    char buffer[FILENAME_MAX + 1];
+    snprintfz(buffer, FILENAME_MAX, "%s/health.d", config_get("global", "config directory", CONFIG_DIR));
+    return config_get("health", "health configuration directory", buffer);
+}
+
 void health_init(void) {
     debug(D_HEALTH, "Health configuration initializing");
-
-    char *path;
 
     if(!(health_enabled = config_get_boolean("health", "enabled", 1))) {
         debug(D_HEALTH, "Health is disabled.");
         return;
     }
 
+    char *path = health_config_dir();
+
     {
         char buffer[FILENAME_MAX + 1];
-        snprintfz(buffer, FILENAME_MAX, "%s/health.d", config_get("global", "config directory", CONFIG_DIR));
-        path = config_get("health", "health configuration directory", buffer);
-
         snprintfz(buffer, FILENAME_MAX, "%s/alarm.sh", config_get("global", "plugins directory", PLUGINS_DIR));
         health_default_exec = config_get("health", "script to execute on alarm", buffer);
     }
@@ -1313,6 +1319,48 @@ void health_init(void) {
     health_readdir(path);
     rrdhost_unlock(&localhost);
 }
+
+// ----------------------------------------------------------------------------
+// re-load health configuration
+
+static inline void health_free_all_nolock(RRDHOST *host) {
+    while(host->templates)
+        rrdcalctemplate_free(host, host->templates);
+
+    while(host->alarms)
+        rrdcalc_free(host, host->alarms);
+}
+
+void health_reload(void) {
+    if(!health_enabled) {
+        error("Health reload is requested, but health is not enabled.");
+        return;
+    }
+
+    char *path = health_config_dir();
+
+    rrdhost_rwlock(&localhost);
+    health_free_all_nolock(&localhost);
+    rrdhost_unlock(&localhost);
+
+    rrdhost_rwlock(&localhost);
+    health_readdir(path);
+    rrdhost_unlock(&localhost);
+
+    RRDSET *st;
+    for(st = localhost.rrdset_root; st ; st = st->next) {
+        rrdhost_rwlock(&localhost);
+
+        rrdsetcalc_link_matching(st);
+        rrdcalctemplate_link_matching(st);
+
+        rrdhost_unlock(&localhost);
+    }
+}
+
+
+// ----------------------------------------------------------------------------
+// health main thread and friends
 
 static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) {
     if (unlikely(!rc->rrdset)) {
@@ -1427,7 +1475,7 @@ void *health_main(void *ptr) {
         rrdhost_rdlock(&localhost);
 
         // the first loop is to lookup values from the db
-        for (rc = localhost.calculations; rc; rc = rc->next) {
+        for (rc = localhost.alarms; rc; rc = rc->next) {
             if (unlikely(!rrdcalc_isrunnable(rc, now, &next_run)))
                 continue;
 
@@ -1519,7 +1567,7 @@ void *health_main(void *ptr) {
         if (runnable) {
             rrdhost_rdlock(&localhost);
 
-            for (rc = localhost.calculations; rc; rc = rc->next) {
+            for (rc = localhost.alarms; rc; rc = rc->next) {
                 if (unlikely(!rrdcalc_isrunnable(rc, now, &next_run)))
                     continue;
 

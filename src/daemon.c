@@ -30,6 +30,15 @@ void sig_handler_save(int signo)
     }
 }
 
+void sig_handler_reload_health(int signo)
+{
+    if(signo) {
+        error_log_limit_reset();
+        info("Received signal %d to reload health configuration...", signo);
+        health_reload();
+    }
+}
+
 static void chown_open_file(int fd, uid_t uid, gid_t gid) {
     if(fd == -1) return;
 
