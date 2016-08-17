@@ -1733,6 +1733,7 @@ void *health_main(void *ptr) {
                               buffer_tostring(rc->warning->error_msg),
                               rc->source
                         );
+
                         warning_status = rrdcalc_value2status(rc->warning->result);
                     }
                 }
@@ -1769,11 +1770,32 @@ void *health_main(void *ptr) {
 
                 int status = RRDCALC_STATUS_UNDEFINED;
 
-                if(warning_status == RRDCALC_STATUS_RAISED)
-                    status = RRDCALC_STATUS_WARNING;
+                switch(warning_status) {
+                    case RRDCALC_STATUS_CLEAR:
+                        status = RRDCALC_STATUS_CLEAR;
+                        break;
 
-                if(critical_status == RRDCALC_STATUS_RAISED)
-                    status = RRDCALC_STATUS_CRITICAL;
+                    case RRDCALC_STATUS_RAISED:
+                        status = RRDCALC_STATUS_WARNING;
+                        break;
+
+                    default:
+                        break;
+                }
+
+                switch(critical_status) {
+                    case RRDCALC_STATUS_CLEAR:
+                        if(status == RRDCALC_STATUS_UNDEFINED)
+                            status = RRDCALC_STATUS_CLEAR;
+                        break;
+
+                    case RRDCALC_STATUS_RAISED:
+                        status = RRDCALC_STATUS_CRITICAL;
+                        break;
+
+                    default:
+                        break;
+                }
 
                 if(status != rc->status) {
                     health_alarm_log(time(NULL), rc->name, rc->rrdset->id, rc->exec, now - rc->last_status_change, rc->old_value, rc->value, rc->status, status, rc->source);
