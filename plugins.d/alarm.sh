@@ -156,9 +156,9 @@ Content-Type: text/html
                        style="background:#fff;border:1px solid #e9e9e9">
                     <tbody>
                     <tr>
-                        <td bgcolor="#fff"
-                            style="padding:5px;background-color:#fff;">
-                            <div style="font-size:20px;color: #444;text-decoration: none;font-weight: bold;">netdata alert</div>
+                        <td bgcolor="#eee"
+                            style="padding: 5px 5px 20px 5px;background-color:#eee;">
+                            <div style="font-size:20px;color:#777;font-weight: bold;">netdata notification</div>
                         </td>
                     </tr>
                     <tr>
@@ -201,8 +201,8 @@ Content-Type: text/html
                                         </td>
                                     </tr>
                                     <tr style="text-align:center;margin:0;padding:0">
-                                        <td style="font-size:10px;vertical-align:top;margin:0;padding:20px 0 0 0;color:#666666;border-top:1px solid #f0f0f0"
-                                            align="center" valign="bottom">The source of this alarm is line <code>${src}</code>.
+                                        <td style="font-size:11px;vertical-align:top;margin:0;padding:10px 0 0 0;color:#666666"
+                                            align="center" valign="bottom">The source of this alarm is line <code>${src}</code>
                                         </td>
                                     </tr>
                                     <tr style="text-align:center;margin:0;padding:0">
