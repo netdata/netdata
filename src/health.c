@@ -1555,20 +1555,6 @@ static inline void health_alarm_log_process(void) {
     }
 }
 
-static inline void rrdcalc_check_critical_event(RRDCALC *rc) {
-    calculated_number n = rc->critical->result;
-
-    int old_status = rc->critical_status;
-    int new_status = rrdcalc_value2status(n);
-
-    if(new_status != old_status) {
-        time_t now = time(NULL);
-        health_alarm_log(time(NULL), ALARM_ENTRY_TYPE_WARNING, rc->name, rc->rrdset->id, rc->exec, now - rc->last_status_change, rc->old_value, rc->value, old_status, new_status, rc->source);
-        rc->last_status_change = now;
-        rc->critical_status = new_status;
-    }
-}
-
 static inline void rrdcalc_check_warning_event(RRDCALC *rc) {
     calculated_number n = rc->warning->result;
 
@@ -1577,9 +1563,23 @@ static inline void rrdcalc_check_warning_event(RRDCALC *rc) {
 
     if(new_status != old_status) {
         time_t now = time(NULL);
-        health_alarm_log(time(NULL), ALARM_ENTRY_TYPE_CRITICAL, rc->name, rc->rrdset->id, rc->exec, now - rc->last_status_change, rc->old_value, rc->value, old_status, new_status, rc->source);
+        health_alarm_log(time(NULL), ALARM_ENTRY_TYPE_WARNING, rc->name, rc->rrdset->id, rc->exec, now - rc->last_status_change, rc->old_value, rc->value, old_status, new_status, rc->source);
         rc->last_status_change = now;
         rc->warning_status = new_status;
+    }
+}
+
+static inline void rrdcalc_check_critical_event(RRDCALC *rc) {
+    calculated_number n = rc->critical->result;
+
+    int old_status = rc->critical_status;
+    int new_status = rrdcalc_value2status(n);
+
+    if(new_status != old_status) {
+        time_t now = time(NULL);
+        health_alarm_log(time(NULL), ALARM_ENTRY_TYPE_CRITICAL, rc->name, rc->rrdset->id, rc->exec, now - rc->last_status_change, rc->old_value, rc->value, old_status, new_status, rc->source);
+        rc->last_status_change = now;
+        rc->critical_status = new_status;
     }
 }
 
