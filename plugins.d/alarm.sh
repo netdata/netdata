@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+me="${0}"
+
 sendmail="$(which sendmail 2>/dev/null || command -v sendmail 2>/dev/null)"
 if [ -z "${sendmail}" ]
 then
@@ -8,20 +10,25 @@ fi
 
 sendmail_from_pipe() {
     "${sendmail}" -t
+
+    if [ $? -eq 0 ]
+    then
+        echo >&2 "${me}: Sent notification email for ${status} on '${chart}.${name}'"
+        return 0
+    else
+        echo >&2 "${me}: FAILED to send notification email for ${status} on '${chart}.${name}'"
+        return 1
+    fi
 }
 
-type="${1}"       # WARNING or CRITICAL
-name="${2}"       # the name of the alarm, as given in netdata health.d entries
-chart="${3}"      # the name of the chart (type.id)
-status="${4}"     # the current status
-old_status="${5}" # the previous status
-value="${6}"      # the current value
-old_value="${7}"  # the previous value
-src="${8}"        # the line number and file the alarm has been configured
-duration="${9}"   # the duration in seconds the previous state took
-
-# don't do anything if this is not RAISED or OFF
-[ "${status}" != "RAISED" -a "${status}" != "OFF" ] && exit 0
+name="${1}"       # the name of the alarm, as given in netdata health.d entries
+chart="${2}"      # the name of the chart (type.id)
+status="${3}"     # the current status : UNITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+old_status="${4}" # the previous status: UNITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+value="${5}"      # the current value
+old_value="${6}"  # the previous value
+src="${7}"        # the line number and file the alarm has been configured
+duration="${8}"   # the duration in seconds the previous state took
 
 # get the system hostname
 hostname="$(hostname)"
@@ -76,54 +83,64 @@ duration4human() {
     fi
 }
 
-if [ "${old_status}" = "RAISED" -a "${status}" = "OFF" ]
-then
-    # an alarm that is now OFF
-    severity="${type} recovered"
-    raised_for="<br/>(was in ${type,,} state for $(duration4human ${duration}))"
-else
-    # an alarm that is now RAISED
-    severity="${type}"
-    raised_for=""
-fi
+severity="${status}"
+raised_for="<br/>(was in ${old_status,,} for $(duration4human ${duration}))"
+status_message="status unknown"
+color="grey"
+alarm="${name} = ${value}"
 
-# prepare the title
+# prepare the title based on status
 case "${status}" in
-	RAISED)
-		if [ "${type}" = "CRITICAL" ]
-		then
-			# CRITICAL - red
-			status_message="is critical"
-			color="#ca414b"
-		else
-			# WARNING - yellow
-			status_message="needs attention"
-			color="#caca4b"
-		fi
+	CRITICAL)
+        status_message="is critical"
+        color="#ca414b"
+        ;;
+
+    WARNING)
+        status_message="needs attention"
+        color="#caca4b"
 		;;
 
-	OFF)
-		if [ "${type}" = "CRITICAL" ]
-		then
-			# CRITICAL
-			status_message="recovered"
-		else
-			# WARNING
-			status_message="back to normal"
-		fi
+	CLEAR)
+    	status_message="recovered"
 		color="#77ca6d"
-		;;
 
-	*)
-    	status_message="status unknown"
-		color="grey"
+		# don't show the value when the status is CLEAR
+		# for certain alarms, this value might not have any meaning
+		alarm="${name}"
 		;;
 esac
+
+if [ "${status}" != "WARNING" -a "${status}" != "CRITICAL" -a "${status}" != "CLEAR" ]
+then
+    # don't do anything if this is not WARNING, CRITICAL or CLEAR
+    echo >&2 "${me}: not sending notification email for ${status} on '${chart}.${name}'"
+    exit 0
+elif [ "${old_status}" != "WARNING" -a "${old_status}" != "CRITICAL" -a "${status}" = "CLEAR" ]
+then
+    # don't do anything if this is CLEAR, but it was not WARNING or CRITICAL
+    echo >&2 "${me}: not sending notification email for ${status} on '${chart}.${name}' (last status was ${old_status})"
+    exit 0
+elif [ "${status}" = "CLEAR" ]
+then
+    severity="Recovered from ${old_status}"
+
+elif [ "${old_status}" = "WARNING" -a "${status}" = "CRITICAL" ]
+then
+    severity="Escalated to ${status}"
+
+elif [ "${old_status}" = "CRITICAL" -a "${status}" = "WARNING" ]
+then
+    severity="Demoted to ${status}"
+
+else
+    raised_for=
+fi
 
 # send the email
 cat <<EOF | sendmail_from_pipe
 To: root
-Subject: ${type} ${hostname} ${status_message} - ${chart}.${name}
+Subject: ${hostname} ${status_message} - ${chart}.${name}
 Content-Type: text/html
 
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -165,7 +182,7 @@ Content-Type: text/html
                                     <tr style="margin:0;padding:0">
                                         <td style="font-size:18px;vertical-align:top;margin:0;padding:0 0 20px"
                                             align="left" valign="top">
-                                            <span>${name} = ${value}</span>
+                                            <span>${alarm}</span>
                                             <span style="display:block;color:#666666;font-size:12px;font-weight:300;line-height:1;text-transform:uppercase">Alarm</span>
                                         </td>
                                     </tr>
