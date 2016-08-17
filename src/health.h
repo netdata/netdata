@@ -106,8 +106,10 @@ typedef struct rrddimvar {
 
 #define RRDCALC_STATUS_UNINITIALIZED  0
 #define RRDCALC_STATUS_UNDEFINED     -1
-#define RRDCALC_STATUS_OFF            1
+#define RRDCALC_STATUS_CLEAR          1
 #define RRDCALC_STATUS_RAISED         2
+#define RRDCALC_STATUS_WARNING        3
+#define RRDCALC_STATUS_CRITICAL       4
 
 #define RRDCALC_OPTION_DB_ERROR      0x00000001
 #define RRDCALC_OPTION_DB_NAN        0x00000002
@@ -143,6 +145,7 @@ typedef struct rrdcalc {
     EVAL_EXPRESSION *critical;
 
     uint32_t rrdcalc_options;
+    int status;
     int warning_status;
     int critical_status;
 
@@ -203,25 +206,31 @@ typedef struct rrdcalctemplate {
 
 #define RRDCALCTEMPLATE_HAS_CALCULATION(rt) ((rt)->after)
 
-#define ALARM_ENTRY_TYPE_WARNING  1
-#define ALARM_ENTRY_TYPE_CRITICAL 2
-
 #define HEALTH_ENTRY_NOTIFICATIONS_PROCESSED 0x00000001
+#define HEALTH_ENTRY_NOTIFICATIONS_UPDATED   0x00000002
 
 typedef struct alarm_entry {
     uint32_t id;
+
     time_t when;
     time_t duration;
-    int type;
+
     char *name;
+    uint32_t hash_name;
+
     char *chart;
+    uint32_t hash_chart;
+
     char *exec;
     char *source;
     calculated_number old_value;
     calculated_number new_value;
     int old_status;
     int new_status;
+
     uint32_t notifications;
+
+    struct alarm_entry *updated_by;
     struct alarm_entry *next;
 } ALARM_ENTRY;
 
