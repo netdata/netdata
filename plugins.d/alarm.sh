@@ -157,7 +157,7 @@ Content-Type: text/html
                     <tbody>
                     <tr>
                         <td bgcolor="#eee"
-                            style="padding: 5px 5px 20px 5px;background-color:#eee;">
+                            style="padding: 20px 5px 5px 5px;background-color:#eee;">
                             <div style="font-size:20px;color:#777;font-weight: bold;">netdata notification</div>
                         </td>
                     </tr>
