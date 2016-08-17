@@ -8,6 +8,6 @@
 	sharedscripts
 	create 0664 netdata netdata
 	postrotate
-		/sbin/killall -HUP netdata
+		/bin/kill -HUP `pidof netdata 2>/dev/null` 2>/dev/null || true
 	endscript
 }
