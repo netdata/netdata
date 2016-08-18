@@ -522,6 +522,9 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
     st->isdetail = 0;
     st->debug = 0;
 
+    st->green = 0;
+    st->red = 0;
+
     st->last_collected_time.tv_sec = 0;
     st->last_collected_time.tv_usec = 0;
     st->counter_done = 0;
