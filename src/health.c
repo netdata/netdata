@@ -1372,6 +1372,8 @@ void health_reload(void) {
 
         rrdsetcalc_link_matching(st);
         rrdcalctemplate_link_matching(st);
+	st->green = 0;
+	st->red = 0;
 
         rrdhost_unlock(&localhost);
     }
