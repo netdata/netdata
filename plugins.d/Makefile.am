@@ -8,7 +8,7 @@ dist_plugins_DATA = \
 	$(NULL)
 
 dist_plugins_SCRIPTS = \
-	alarm.sh \
+	alarm-email.sh \
 	cgroup-name.sh \
 	charts.d.dryrun-helper.sh \
 	charts.d.plugin \
