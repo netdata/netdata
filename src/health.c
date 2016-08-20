@@ -416,7 +416,7 @@ void rrddimvar_free(RRDDIMVAR *rs) {
 // RRDCALC management
 
 static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
-    debug(D_HEALTH, "Health linking alarm '%s.%s' from chart '%s' of host '%s'", rc->chart?rc->chart:"NOCHART", rc->name, st->id, st->rrdhost->hostname);
+    debug(D_HEALTH, "Health linking alarm '%s.%s' to chart '%s' of host '%s'", rc->chart?rc->chart:"NOCHART", rc->name, st->id, st->rrdhost->hostname);
 
     rc->rrdset = st;
 
@@ -425,11 +425,15 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
         rc->update_every = rc->rrdset->update_every;
     }
 
-    if(rc->green && !st->green)
+    if(!isnan(rc->green) && isnan(st->green)) {
+        debug(D_HEALTH, "Health alarm '%s.%s' green threshold set from %Lf to %Lf.", rc->rrdset->id, rc->name, rc->rrdset->green, rc->green);
         st->green = rc->green;
+    }
 
-    if(rc->red && !st->red)
+    if(!isnan(rc->red) && isnan(st->red)) {
+        debug(D_HEALTH, "Health alarm '%s.%s' red threshold set from %Lf to %Lf.", rc->rrdset->id, rc->name, rc->rrdset->red, rc->red);
         st->red = rc->red;
+    }
 
     rc->local  = rrdvar_create_and_index("local",  &st->variables_root_index, rc->name, RRDVAR_TYPE_CALCULATED, &rc->value);
     rc->family = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rc->name, RRDVAR_TYPE_CALCULATED, &rc->value);
@@ -581,6 +585,8 @@ static inline RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const cha
 
     if(dimensions) rc->dimensions = strdupz(dimensions);
 
+    rc->green = green;
+    rc->red = red;
     rc->value = NAN;
     rc->old_value = NAN;
 
@@ -589,9 +595,6 @@ static inline RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const cha
     rc->before = before;
     rc->update_every = update_every;
     rc->options = options;
-
-    rc->green = green;
-    rc->red = red;
 
     if(exec) rc->exec = strdupz(exec);
     if(source) rc->source = strdupz(source);
@@ -1080,6 +1083,8 @@ int health_readfile(const char *path, const char *filename) {
             rc->name = strdupz(value);
             rc->hash = simple_hash(rc->name);
             rc->source = health_source_file(line, path, filename);
+            rc->green = NAN;
+            rc->red = NAN;
             rc->value = NAN;
             rc->old_value = NAN;
 
@@ -1100,6 +1105,8 @@ int health_readfile(const char *path, const char *filename) {
             rt->name = strdupz(value);
             rt->hash_name = simple_hash(rt->name);
             rt->source = health_source_file(line, path, filename);
+            rt->green = NAN;
+            rt->red = NAN;
 
             if(rrdvar_fix_name(rt->name))
                 error("Health configuration renamed template '%s' to '%s'", value, rt->name);
@@ -1386,10 +1393,11 @@ void health_reload(void) {
     for(st = localhost.rrdset_root; st ; st = st->next) {
         rrdhost_rwlock(&localhost);
 
+        st->green = NAN;
+        st->red = NAN;
+
         rrdsetcalc_link_matching(st);
         rrdcalctemplate_link_matching(st);
-	st->green = 0;
-	st->red = 0;
 
         rrdhost_unlock(&localhost);
     }
