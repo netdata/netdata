@@ -477,6 +477,8 @@ def run():
     configfile = CONFIG_DIR + "python.d.conf"
     msg.PROGRAM = PROGRAM
     msg.info("reading configuration file:", configfile)
+    log_counter = 200
+    log_interval = 3600
 
     conf = read_config(configfile)
     if conf is not None:
@@ -498,11 +500,11 @@ def run():
         try:
             log_counter = conf['logs_per_interval']
         except (KeyError, TypeError):
-            log_counter = 200
+            pass
         try:
             log_interval = conf['log_interval']
         except (KeyError, TypeError):
-            log_interval = 3600
+            pass
         for k, v in conf.items():
             if k in ("update_every", "debug", "enabled"):
                 continue
