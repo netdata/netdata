@@ -29,6 +29,7 @@ value="${5}"      # the current value
 old_value="${6}"  # the previous value
 src="${7}"        # the line number and file the alarm has been configured
 duration="${8}"   # the duration in seconds the previous state took
+non_clear_duration="${9}" # the total duration in seconds this is non-clear
 
 # get the system hostname
 hostname="$(hostname)"
@@ -84,7 +85,7 @@ duration4human() {
 }
 
 severity="${status}"
-raised_for="<br/>(was in ${old_status,,} for $(duration4human ${duration}))"
+raised_for="<br/>(was ${old_status,,} for $(duration4human ${duration}))"
 status_message="status unknown"
 color="grey"
 alarm="${name} = ${value}"
@@ -124,14 +125,26 @@ then
 elif [ "${status}" = "CLEAR" ]
 then
     severity="Recovered from ${old_status}"
+    if [ $non_clear_duration > $duration ]
+    then
+        raised_for="<br/>(had issues for $(duration4human ${non_clear_duration}))"
+    fi
 
 elif [ "${old_status}" = "WARNING" -a "${status}" = "CRITICAL" ]
 then
     severity="Escalated to ${status}"
+    if [ $non_clear_duration > $duration ]
+    then
+        raised_for="<br/>(has issues for $(duration4human ${non_clear_duration}))"
+    fi
 
 elif [ "${old_status}" = "CRITICAL" -a "${status}" = "WARNING" ]
 then
     severity="Demoted to ${status}"
+    if [ $non_clear_duration > $duration ]
+    then
+        raised_for="<br/>(has issues for $(duration4human ${non_clear_duration}))"
+    fi
 
 else
     raised_for=
