@@ -13,7 +13,7 @@ extern int rrdvar_compare(void *a, void *b);
 // the variables as stored in the variables indexes
 // there are 3 indexes:
 // 1. at each chart   (RRDSET.variables_root_index)
-// 2. at each context (RRDCONTEXT.variables_root_index)
+// 2. at each context (RRDFAMILY.variables_root_index)
 // 3. at each host    (RRDHOST.variables_root_index)
 typedef struct rrdvar {
     avl avl;
@@ -214,6 +214,7 @@ typedef struct alarm_entry {
 
     time_t when;
     time_t duration;
+    time_t non_clear_duration;
 
     char *name;
     uint32_t hash_name;

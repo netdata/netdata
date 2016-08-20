@@ -16,7 +16,7 @@ int rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
 
 static int rrdset_compare(void* a, void* b);
 static int rrdset_compare_name(void* a, void* b);
-static int rrdcontext_compare(void* a, void* b);
+static int rrdfamily_compare(void *a, void *b);
 
 // ----------------------------------------------------------------------------
 // RRDHOST
@@ -33,8 +33,8 @@ RRDHOST localhost = {
             { NULL, rrdset_compare_name },
             AVL_LOCK_INITIALIZER
         },
-        .rrdcontext_root_index = {
-            { NULL, rrdcontext_compare },
+        .rrdfamily_root_index = {
+            { NULL, rrdfamily_compare },
             AVL_LOCK_INITIALIZER
         },
         .variables_root_index = {
@@ -70,56 +70,56 @@ void rrdhost_check_wrlock_int(RRDHOST *host, const char *file, const char *funct
 }
 
 // ----------------------------------------------------------------------------
-// RRDCONTEXT index
+// RRDFAMILY index
 
-static int rrdcontext_compare(void* a, void* b) {
-    if(((RRDCONTEXT *)a)->hash < ((RRDCONTEXT *)b)->hash) return -1;
-    else if(((RRDCONTEXT *)a)->hash > ((RRDCONTEXT *)b)->hash) return 1;
-    else return strcmp(((RRDCONTEXT *)a)->id, ((RRDCONTEXT *)b)->id);
+static int rrdfamily_compare(void *a, void *b) {
+    if(((RRDFAMILY *)a)->hash_family < ((RRDFAMILY *)b)->hash_family) return -1;
+    else if(((RRDFAMILY *)a)->hash_family > ((RRDFAMILY *)b)->hash_family) return 1;
+    else return strcmp(((RRDFAMILY *)a)->family, ((RRDFAMILY *)b)->family);
 }
 
-#define rrdcontext_index_add(host, rc) (RRDCONTEXT *)avl_insert_lock(&((host)->rrdcontext_root_index), (avl *)(rc))
-#define rrdcontext_index_del(host, rc) (RRDCONTEXT *)avl_remove_lock(&((host)->rrdcontext_root_index), (avl *)(rc))
+#define rrdfamily_index_add(host, rc) (RRDFAMILY *)avl_insert_lock(&((host)->rrdfamily_root_index), (avl *)(rc))
+#define rrdfamily_index_del(host, rc) (RRDFAMILY *)avl_remove_lock(&((host)->rrdfamily_root_index), (avl *)(rc))
 
-static RRDCONTEXT *rrdcontext_index_find(RRDHOST *host, const char *id, uint32_t hash) {
-    RRDCONTEXT tmp;
-    tmp.id = id;
-    tmp.hash = (hash)?hash:simple_hash(tmp.id);
+static RRDFAMILY *rrdfamily_index_find(RRDHOST *host, const char *id, uint32_t hash) {
+    RRDFAMILY tmp;
+    tmp.family = id;
+    tmp.hash_family = (hash)?hash:simple_hash(tmp.family);
 
-    return (RRDCONTEXT *)avl_search_lock(&(host->rrdcontext_root_index), (avl *) &tmp);
+    return (RRDFAMILY *)avl_search_lock(&(host->rrdfamily_root_index), (avl *) &tmp);
 }
 
-RRDCONTEXT *rrdcontext_create(const char *id) {
-    RRDCONTEXT *rc = rrdcontext_index_find(&localhost, id, 0);
+RRDFAMILY *rrdfamily_create(const char *id) {
+    RRDFAMILY *rc = rrdfamily_index_find(&localhost, id, 0);
     if(!rc) {
-        rc = callocz(1, sizeof(RRDCONTEXT));
+        rc = callocz(1, sizeof(RRDFAMILY));
 
-        rc->id = strdupz(id);
-        rc->hash = simple_hash(rc->id);
+        rc->family = strdupz(id);
+        rc->hash_family = simple_hash(rc->family);
 
         // initialize the variables index
         avl_init_lock(&rc->variables_root_index, rrdvar_compare);
 
-        RRDCONTEXT *ret = rrdcontext_index_add(&localhost, rc);
+        RRDFAMILY *ret = rrdfamily_index_add(&localhost, rc);
         if(ret != rc)
-            fatal("INTERNAL ERROR: Expected to INSERT RRDCONTEXT '%s' into index, but inserted '%s'.", rc->id, (ret)?ret->id:"NONE");
+            fatal("INTERNAL ERROR: Expected to INSERT RRDFAMILY '%s' into index, but inserted '%s'.", rc->family, (ret)?ret->family:"NONE");
     }
 
     rc->use_count++;
     return rc;
 }
 
-void rrdcontext_free(RRDCONTEXT *rc) {
+void rrdfamily_free(RRDFAMILY *rc) {
     rc->use_count--;
     if(!rc->use_count) {
-        RRDCONTEXT *ret = rrdcontext_index_del(&localhost, rc);
+        RRDFAMILY *ret = rrdfamily_index_del(&localhost, rc);
         if(ret != rc)
-            fatal("INTERNAL ERROR: Expected to DELETE RRDCONTEXT '%s' from index, but deleted '%s'.", rc->id, (ret)?ret->id:"NONE");
+            fatal("INTERNAL ERROR: Expected to DELETE RRDFAMILY '%s' from index, but deleted '%s'.", rc->family, (ret)?ret->family:"NONE");
 
         if(rc->variables_root_index.avl_tree.root != NULL)
-            fatal("INTERNAL ERROR: Variables index of RRDCONTEXT '%s' that is freed, is not empty.", rc->id);
+            fatal("INTERNAL ERROR: Variables index of RRDFAMILY '%s' that is freed, is not empty.", rc->family);
 
-        freez((void *)rc->id);
+        freez((void *)rc->family);
         freez(rc);
     }
 }
@@ -547,7 +547,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
         st->title = config_get(st->id, "title", varvalue);
     }
 
-    st->rrdcontext = rrdcontext_create(st->context);
+    st->rrdfamily = rrdfamily_create(st->family);
     st->rrdhost = &localhost;
 
     st->next = localhost.rrdset_root;
@@ -779,9 +779,9 @@ void rrdset_free_all(void)
 
         rrdset_index_del(&localhost, st);
 
-        st->rrdcontext->use_count--;
-        if(!st->rrdcontext->use_count)
-            rrdcontext_free(st->rrdcontext);
+        st->rrdfamily->use_count--;
+        if(!st->rrdfamily->use_count)
+            rrdfamily_free(st->rrdfamily);
 
         pthread_rwlock_unlock(&st->rwlock);
 

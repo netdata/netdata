@@ -78,17 +78,17 @@ extern const char *rrddim_algorithm_name(int chart_type);
 // ----------------------------------------------------------------------------
 // RRD CONTEXT
 
-struct rrdcontext {
+struct rrdfamily {
     avl avl;
 
-    const char *id;
-    uint32_t hash;
+    const char *family;
+    uint32_t hash_family;
 
     size_t use_count;
 
     avl_tree_lock variables_root_index;
 };
-typedef struct rrdcontext RRDCONTEXT;
+typedef struct rrdfamily RRDFAMILY;
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION
@@ -252,7 +252,7 @@ struct rrdset {
     total_number collected_total;                   // used internally to calculate percentages
     total_number last_collected_total;              // used internally to calculate percentages
 
-    RRDCONTEXT *rrdcontext;
+    RRDFAMILY *rrdfamily;
     struct rrdhost *rrdhost;
 
     struct rrdset *next;                            // linking of rrdsets
@@ -297,7 +297,7 @@ struct rrdhost {
     avl_tree_lock rrdset_root_index;
     avl_tree_lock rrdset_root_index_name;
 
-    avl_tree_lock rrdcontext_root_index;
+    avl_tree_lock rrdfamily_root_index;
     avl_tree_lock variables_root_index;
 
     // all RRDCALCs are primarily allocated and linked here
