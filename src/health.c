@@ -2,7 +2,7 @@
 
 #define RRDVAR_MAX_LENGTH 1024
 
-static const char *health_default_exec = PLUGINS_DIR "/alarm.sh";
+static const char *health_default_exec = PLUGINS_DIR "/alarm-email.sh";
 int health_enabled = 1;
 
 ALARM_LOG health_log = {
@@ -1346,7 +1346,7 @@ void health_init(void) {
 
     {
         char buffer[FILENAME_MAX + 1];
-        snprintfz(buffer, FILENAME_MAX, "%s/alarm.sh", config_get("global", "plugins directory", PLUGINS_DIR));
+        snprintfz(buffer, FILENAME_MAX, "%s/alarm-email.sh", config_get("global", "plugins directory", PLUGINS_DIR));
         health_default_exec = config_get("health", "script to execute on alarm", buffer);
     }
 
