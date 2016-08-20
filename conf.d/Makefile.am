@@ -41,7 +41,12 @@ dist_pythonconfig_DATA = \
 
 healthconfigdir=$(configdir)/health.d
 dist_healthconfig_DATA = \
+	health.d/apache.conf \
 	health.d/disks.conf \
 	health.d/entropy.conf \
+	health.d/named.conf \
 	health.d/net.conf \
+	health.d/nginx.conf \
+	health.d/redis.conf \
+	health.d/squid.conf \
 	$(NULL)
