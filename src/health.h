@@ -44,9 +44,9 @@ typedef struct rrdsetvar {
     uint32_t options;
 
     RRDVAR *local;
-    RRDVAR *context;
+    RRDVAR *family;
     RRDVAR *host;
-    RRDVAR *context_name;
+    RRDVAR *family_name;
     RRDVAR *host_name;
 
     struct rrdset *rrdset;
@@ -79,8 +79,8 @@ typedef struct rrddimvar {
     RRDVAR *local_id;
     RRDVAR *local_name;
 
-    RRDVAR *context_id;
-    RRDVAR *context_name;
+    RRDVAR *family_id;
+    RRDVAR *family_name;
 
     RRDVAR *host_fullidid;
     RRDVAR *host_fullidname;
@@ -160,7 +160,7 @@ typedef struct rrdcalc {
     calculated_number red;
 
     RRDVAR *local;
-    RRDVAR *context;
+    RRDVAR *family;
     RRDVAR *hostid;
     RRDVAR *hostname;
 
