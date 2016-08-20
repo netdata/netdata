@@ -1385,16 +1385,18 @@ void health_reload(void) {
     health_free_all_nolock(&localhost);
     rrdhost_unlock(&localhost);
 
+    RRDSET *st;
+    for(st = localhost.rrdset_root; st ; st = st->next) {
+        st->green = NAN;
+        st->red = NAN;
+    }
+
     rrdhost_rwlock(&localhost);
     health_readdir(path);
     rrdhost_unlock(&localhost);
 
-    RRDSET *st;
     for(st = localhost.rrdset_root; st ; st = st->next) {
         rrdhost_rwlock(&localhost);
-
-        st->green = NAN;
-        st->red = NAN;
 
         rrdsetcalc_link_matching(st);
         rrdcalctemplate_link_matching(st);
