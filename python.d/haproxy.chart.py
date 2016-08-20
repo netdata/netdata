@@ -40,8 +40,8 @@ CHARTS = {
 
 class Service(SocketService, UrlService):
     def __init__(self, configuration=None, name=None):
-        self.use_socket = None
-        if 'unix_socket' in configuration:
+        self.use_socket = 'unix_socket' in configuration
+        if self.use_socket:
             SocketService.__init__(self, configuration=configuration, name=name)
             self.request = "show stat\r\n"
             self.use_socket = True
@@ -71,7 +71,8 @@ class Service(SocketService, UrlService):
             return None
 
         try:
-            return [row for row in csv.reader(raw.splitlines(), delimiter=',')]
+            # return [row for row in csv.reader(raw.splitlines(), delimiter=',')]
+            return list(csv.reader(raw.splitlines(), delimiter=','))
         except Exception as e:
             self.debug(str(e))
             return None
@@ -82,22 +83,24 @@ class Service(SocketService, UrlService):
         :return: dict
         """
         parsed = self._get_parsed_data()
-        if parsed is None or len(parsed) == 0:
+        # if parsed is None or len(parsed) == 0:
+        if not parsed:
             return None
 
         data = {}
         for node in parsed[1:]:
             try:
-                prefix = node[0] + "_" + node[1]
+                prefix = node[0] + "_" + node[1] + "_"
             except IndexError:
                 continue
             for i in range(len(ORDER)):
                 try:
-                    data[prefix + "_" + ORDER[i]] = int(node[POSITION[i]])
+                    data[prefix + ORDER[i]] = int(node[POSITION[i]])
                 except ValueError:
                     pass
 
-        if len(data) == 0:
+        # if len(data) == 0:
+        if not data:
             return None
         return data
 
@@ -147,7 +150,8 @@ class Service(SocketService, UrlService):
                     #     omit_first = False
                     #     continue
                     tmp = list(line_template)
-                    tmp[0] = pxname + "_" + svname + "_" + name
+                    # tmp[0] = pxname + "_" + svname + "_" + name
+                    tmp[0] = "_".join([pxname, svname, name])
                     tmp[1] = svname
                     lines.append(tmp)
                 self.definitions[pxname + "_" + name] = {'options': options, 'lines': lines}
