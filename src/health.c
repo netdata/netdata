@@ -113,29 +113,30 @@ calculated_number rrdvar2number(RRDVAR *rv) {
             calculated_number *n = (calculated_number *)rv->value;
             return *n;
         }
-            break;
 
         case RRDVAR_TYPE_TIME_T: {
             time_t *n = (time_t *)rv->value;
             return *n;
         }
-            break;
 
         case RRDVAR_TYPE_COLLECTED: {
             collected_number *n = (collected_number *)rv->value;
             return *n;
         }
-            break;
 
         case RRDVAR_TYPE_TOTAL: {
             total_number *n = (total_number *)rv->value;
             return *n;
         }
 
+        case RRDVAR_TYPE_INT: {
+            int *n = (int *)rv->value;
+            return *n;
+        }
+
         default:
             error("I don't know how to convert RRDVAR type %d to calculated_number", rv->type);
             return NAN;
-            break;
     }
 }
 
@@ -418,6 +419,11 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     debug(D_HEALTH, "Health linking alarm '%s.%s' from chart '%s' of host '%s'", rc->chart?rc->chart:"NOCHART", rc->name, st->id, st->rrdhost->hostname);
 
     rc->rrdset = st;
+
+    if(rc->update_every < rc->rrdset->update_every) {
+        error("Health alarm '%s.%s' has update every %d, less than chart update every %d. Setting alarm update frequency to %d.", rc->rrdset->id, rc->name, rc->update_every, rc->rrdset->update_every, rc->rrdset->update_every);
+        rc->update_every = rc->rrdset->update_every;
+    }
 
     if(rc->green && !st->green)
         st->green = rc->green;

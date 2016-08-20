@@ -558,6 +558,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
         rrdsetvar_create(st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, 0);
         rrdsetvar_create(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, 0);
         rrdsetvar_create(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, 0);
+        rrdsetvar_create(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, 0);
     }
 
     rrdset_index_add(&localhost, st);

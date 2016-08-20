@@ -9,6 +9,7 @@ extern int rrdvar_compare(void *a, void *b);
 #define RRDVAR_TYPE_TIME_T     2
 #define RRDVAR_TYPE_COLLECTED  3
 #define RRDVAR_TYPE_TOTAL      4
+#define RRDVAR_TYPE_INT        5
 
 // the variables as stored in the variables indexes
 // there are 3 indexes:
