@@ -172,7 +172,7 @@ int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, cal
     debug(D_HEALTH, "Available local chart '%s' variables:", st->id);
     avl_traverse_lock(&st->variables_root_index, dump_variable);
 
-    debug(D_HEALTH, "Available context '%s' variables:", st->rrdfamily->family);
+    debug(D_HEALTH, "Available family '%s' variables:", st->rrdfamily->family);
     avl_traverse_lock(&st->rrdfamily->variables_root_index, dump_variable);
 
     debug(D_HEALTH, "Available host '%s' variables:", st->rrdhost->hostname);
@@ -202,11 +202,11 @@ RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, int type, void *va
     rs->options = options;
     rs->rrdset = st;
 
-    rs->local        = rrdvar_create_and_index("local",   &st->variables_root_index, rs->variable, rs->type, rs->value);
-    rs->context      = rrdvar_create_and_index("context", &st->rrdfamily->variables_root_index, rs->fullid, rs->type, rs->value);
-    rs->host         = rrdvar_create_and_index("host",    &st->rrdhost->variables_root_index, rs->fullid, rs->type, rs->value);
-    rs->context_name = rrdvar_create_and_index("context", &st->rrdfamily->variables_root_index, rs->fullname, rs->type, rs->value);
-    rs->host_name    = rrdvar_create_and_index("host",    &st->rrdhost->variables_root_index, rs->fullname, rs->type, rs->value);
+    rs->local       = rrdvar_create_and_index("local",  &st->variables_root_index, rs->variable, rs->type, rs->value);
+    rs->family      = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->fullid, rs->type, rs->value);
+    rs->host        = rrdvar_create_and_index("host",   &st->rrdhost->variables_root_index, rs->fullid, rs->type, rs->value);
+    rs->family_name = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->fullname, rs->type, rs->value);
+    rs->host_name   = rrdvar_create_and_index("host",   &st->rrdhost->variables_root_index, rs->fullname, rs->type, rs->value);
 
     rs->next = st->variables;
     st->variables = rs;
@@ -218,7 +218,7 @@ void rrdsetvar_rename_all(RRDSET *st) {
     debug(D_VARIABLES, "RRDSETVAR rename for chart id '%s' name '%s'", st->id, st->name);
 
     // only these 2 can change name
-    // rs->context_name
+    // rs->family_name
     // rs->host_name
 
     char buffer[RRDVAR_MAX_LENGTH + 1];
@@ -230,13 +230,13 @@ void rrdsetvar_rename_all(RRDSET *st) {
 
         if (strcmp(buffer, rs->fullname)) {
             // name changed
-            rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->context_name);
+            rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_name);
             rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_name);
 
             freez(rs->fullname);
             rs->fullname = strdupz(st->name);
-            rs->context_name = rrdvar_create_and_index("context", &st->rrdfamily->variables_root_index, rs->fullname, rs->type, rs->value);
-            rs->host_name    = rrdvar_create_and_index("host",    &st->rrdhost->variables_root_index, rs->fullname, rs->type, rs->value);
+            rs->family_name = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->fullname, rs->type, rs->value);
+            rs->host_name   = rrdvar_create_and_index("host",   &st->rrdhost->variables_root_index, rs->fullname, rs->type, rs->value);
         }
     }
 
@@ -248,9 +248,9 @@ void rrdsetvar_free(RRDSETVAR *rs) {
     debug(D_VARIABLES, "RRDSETVAR free for chart id '%s' name '%s', variable '%s'", st->id, st->name, rs->variable);
 
     rrdvar_free(st->rrdhost, &st->variables_root_index, rs->local);
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->context);
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family);
     rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host);
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->context_name);
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_name);
     rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_name);
 
     if(st->variables == rs) {
@@ -311,11 +311,11 @@ RRDDIMVAR *rrddimvar_create(RRDDIM *rd, int type, const char *prefix, const char
     rs->options = options;
     rs->rrddim = rd;
 
-    rs->local_id     = rrdvar_create_and_index("local",   &st->variables_root_index, rs->id, rs->type, rs->value);
-    rs->local_name   = rrdvar_create_and_index("local",   &st->variables_root_index, rs->name, rs->type, rs->value);
+    rs->local_id     = rrdvar_create_and_index("local", &st->variables_root_index, rs->id, rs->type, rs->value);
+    rs->local_name   = rrdvar_create_and_index("local", &st->variables_root_index, rs->name, rs->type, rs->value);
 
-    rs->context_id   = rrdvar_create_and_index("context", &st->rrdfamily->variables_root_index, rs->id, rs->type, rs->value);
-    rs->context_name = rrdvar_create_and_index("context", &st->rrdfamily->variables_root_index, rs->name, rs->type, rs->value);
+    rs->family_id    = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->id, rs->type, rs->value);
+    rs->family_name  = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->name, rs->type, rs->value);
 
     rs->host_fullidid     = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullidid, rs->type, rs->value);
     rs->host_fullidname   = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullidname, rs->type, rs->value);
@@ -381,8 +381,8 @@ void rrddimvar_free(RRDDIMVAR *rs) {
     rrdvar_free(st->rrdhost, &st->variables_root_index, rs->local_id);
     rrdvar_free(st->rrdhost, &st->variables_root_index, rs->local_name);
 
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->context_id);
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->context_name);
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_id);
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_name);
 
     rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullidid);
     rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullidname);
@@ -431,8 +431,8 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     if(rc->red && !st->red)
         st->red = rc->red;
 
-    rc->local    = rrdvar_create_and_index("local", &st->variables_root_index, rc->name, RRDVAR_TYPE_CALCULATED, &rc->value);
-    rc->context  = rrdvar_create_and_index("context", &st->rrdfamily->variables_root_index, rc->name, RRDVAR_TYPE_CALCULATED, &rc->value);
+    rc->local  = rrdvar_create_and_index("local",  &st->variables_root_index, rc->name, RRDVAR_TYPE_CALCULATED, &rc->value);
+    rc->family = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rc->name, RRDVAR_TYPE_CALCULATED, &rc->value);
 
     char fullname[RRDVAR_MAX_LENGTH + 1];
     snprintfz(fullname, RRDVAR_MAX_LENGTH, "%s.%s", st->id, rc->name);
@@ -491,8 +491,8 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
     rrdvar_free(st->rrdhost, &st->variables_root_index, rc->local);
     rc->local = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rc->context);
-    rc->context = NULL;
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rc->family);
+    rc->family = NULL;
 
     rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rc->hostid);
     rc->hostid = NULL;
