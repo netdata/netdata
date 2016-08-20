@@ -755,6 +755,11 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
         return 0;
     }
 
+    if(!rc->update_every) {
+        error("Health configuration for alarm '%s.%s' has no frequency (parameter 'every'). Ignoring it.", rc->chart?rc->chart:"NOCHART", rc->name);
+        return 0;
+    }
+
     if(!RRDCALC_HAS_DB_LOOKUP(rc) && !rc->warning && !rc->critical) {
         error("Health configuration for alarm '%s.%s' is useless (no calculation, no warning and no critical evaluation)", rc->chart?rc->chart:"NOCHART", rc->name);
         return 0;
@@ -785,6 +790,11 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
 static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCALCTEMPLATE *rt) {
     if(!rt->context) {
         error("Health configuration for template '%s' does not have a context", rt->name);
+        return 0;
+    }
+
+    if(!rt->update_every) {
+        error("Health configuration for template '%s' has no frequency (parameter 'every'). Ignoring it.", rt->name);
         return 0;
     }
 
