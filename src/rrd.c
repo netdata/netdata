@@ -722,16 +722,17 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
 {
     debug(D_RRD_CALLS, "rrddim_free() %s.%s", st->name, rd->name);
 
-    RRDDIM *i, *last = NULL;
-    for(i = st->dimensions; i && i != rd ; i = i->next) last = i;
+    if(rd == st->dimensions)
+        st->dimensions = rd->next;
+    else {
+        RRDDIM *i;
+        for (i = st->dimensions; i && i->next != rd; i = i->next) ;
 
-    if(!i) {
-        error("Request to free dimension %s.%s but it is not linked.", st->id, rd->name);
-        return;
+        if (i && i->next == rd)
+            i->next = rd->next;
+        else
+            error("Request to free dimension '%s.%s' but it is not linked.", st->id, rd->name);
     }
-
-    if(last) last->next = rd->next;
-    else st->dimensions = rd->next;
     rd->next = NULL;
 
     while(rd->variables)

@@ -11,6 +11,11 @@
 
 # netdata
 
+
+> Aug 21st, 2016: Netdata got **[health monitoring](https://github.com/firehol/netdata/wiki/health-monitoring)** - alarms
+
+---
+
 > May 16th, 2016
 >
 > [netdata v1.2.0 released!](https://github.com/firehol/netdata/releases)
