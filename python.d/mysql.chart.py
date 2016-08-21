@@ -105,7 +105,7 @@ CHARTS = {
             ["Select_scan", "scan", "incremental"]
         ]},
     'sort_issues': {
-        'options': [None, 'mysql Sort Issues', 'issues/s', 'issues', 'mysql.sort.issues', 'line'],
+        'options': [None, 'mysql Sort Issues', 'issues/s', 'issues', 'mysql.sort_issues', 'line'],
         'lines': [
             ["Sort_merge_passes", "merge_passes", "incremental"],
             ["Sort_range", "range", "incremental"],
