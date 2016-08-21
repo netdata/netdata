@@ -157,6 +157,13 @@ paths:
           format: 'as returned by /charts'
           allowEmptyValue: false
           default: system.cpu
+        - name: alarm
+          in: query
+          description: 'the name of an alarm linked to the chart'
+          required: false
+          type: string
+          format: 'any text'
+          allowEmptyValue: true
         - name: dimension
           in: query
           description: 'zero, one or more dimension ids, as returned by the /chart call.'
