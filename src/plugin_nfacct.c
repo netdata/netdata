@@ -1,8 +1,8 @@
+#include "common.h"
+
 #ifdef INTERNAL_PLUGIN_NFACCT
 #include <libmnl/libmnl.h>
 #include <libnetfilter_acct/libnetfilter_acct.h>
-
-#include "common.h"
 
 struct mynfacct {
     const char *name;
