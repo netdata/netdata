@@ -29,6 +29,7 @@ function get_name_classic {
     local DOCKERID="$1"
     echo >&2 "Running command: docker ps --filter=id=\"${DOCKERID}\" --format=\"{{.Names}}\""
     NAME="$( docker ps --filter=id="${DOCKERID}" --format="{{.Names}}" )"
+    return 0
 }
 
 function get_name_api {
@@ -36,18 +37,20 @@ function get_name_api {
     if [ ! -S "/var/run/docker.sock" ]
         then
         echo >&2 "Can't find /var/run/docker.sock"
-        return
+        return 1
     fi
     echo >&2 "Running API command: /containers/${DOCKERID}/json"
     JSON=$(echo -e "GET /containers/${DOCKERID}/json HTTP/1.0\r\n" | nc -U /var/run/docker.sock | egrep '^{.*')
     NAME=$(echo $JSON | jq -r .Name,.Config.Hostname | grep -v null | head -n1 | sed 's|^/||')
+    return 0
 }
 
 if [ -z "${NAME}" ]
     then
-    if [[ "${CGROUP}" =~ ^.*docker[_-/\.][a-fA-F0-9]+[_-\.]?.*$ ]]
+    if [[ "${CGROUP}" =~ ^.*docker[-_/\.][a-fA-F0-9]+[-_\.]?.*$ ]]
         then
-        DOCKERID="$( echo "${CGROUP}" | sed "s|^.*docker[_-/]\([a-fA-F0-9]\+\)[_-\.]\?.*$|\1|" )"
+        DOCKERID="$( echo "${CGROUP}" | sed "s|^.*docker[-_/]\([a-fA-F0-9]\+\)[-_\.]\?.*$|\1|" )"
+        # echo "DOCKERID=${DOCKERID}"
 
         if [ ! -z "${DOCKERID}" -a \( ${#DOCKERID} -eq 64 -o ${#DOCKERID} -eq 12 \) ]
             then
@@ -55,7 +58,7 @@ if [ -z "${NAME}" ]
                 then
                 get_name_classic $DOCKERID
             else
-                get_name_api $DOCKERID
+                get_name_api $DOCKERID || get_name_classic $DOCKERID
             fi
             if [ -z "${NAME}" ]
                 then
