@@ -152,6 +152,12 @@ struct mountinfo *mountinfo_read() {
 
         char *major = procfile_lineword(ff, l, w), *minor; w++;
         for(minor = major; *minor && *minor != ':' ;minor++) ;
+
+        if(!*minor) {
+            error("Cannot parse major:minor on '%s' at line %lu of '%s'", major, l + 1, filename);
+            continue;
+        }
+
         *minor = '\0';
         minor++;
 

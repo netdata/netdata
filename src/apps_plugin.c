@@ -57,10 +57,8 @@ long get_system_cpus(void) {
     if(!ff) return 1;
 
     ff = procfile_readall(ff);
-    if(!ff) {
-        procfile_close(ff);
+    if(!ff)
         return 1;
-    }
 
     unsigned int i;
     for(i = 0; i < procfile_lines(ff); i++) {
@@ -85,10 +83,8 @@ pid_t get_system_pid_max(void) {
     if(!ff) return mpid;
 
     ff = procfile_readall(ff);
-    if(!ff) {
-        procfile_close(ff);
+    if(!ff)
         return mpid;
-    }
 
     mpid = (pid_t)atoi(procfile_lineword(ff, 0, 0));
     if(!mpid) mpid = 32768;
@@ -324,10 +320,8 @@ int read_apps_groups_conf(const char *name)
     procfile_set_quotes(ff, "'\"");
 
     ff = procfile_readall(ff);
-    if(!ff) {
-        procfile_close(ff);
+    if(!ff)
         return 1;
-    }
 
     unsigned long line, lines = procfile_lines(ff);
 
