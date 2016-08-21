@@ -168,6 +168,8 @@ struct cgroup {
     uint32_t hash;
 
     char *chart_id;
+    uint32_t hash_chart;
+
     char *chart_title;
 
     struct cpuacct_stat cpuacct_stat;
@@ -682,6 +684,8 @@ struct cgroup *cgroup_add(const char *id) {
     cg->hash = simple_hash(cg->id);
 
     cg->chart_id = strdupz(chart_id);
+    cg->hash_chart = simple_hash(cg->chart_id);
+
     cg->chart_title = strdupz(chart_id);
 
     if(!cgroup_root)
@@ -701,6 +705,14 @@ struct cgroup *cgroup_add(const char *id) {
     char option[FILENAME_MAX + 1];
     snprintfz(option, FILENAME_MAX, "enable cgroup %s", cg->chart_title);
     cg->enabled = config_get_boolean("plugin:cgroups", option, def);
+
+    struct cgroup *t;
+    for(t = cgroup_root; t ; t = t->next) {
+        if(t != cg && t->hash_chart == cg->hash_chart && !strcmp(t->chart_id, cg->chart_id) && t->enabled) {
+            error("Control group with chart id '%s' already exists and is enabled. Disabling cgroup '%s'.", cg->chart_id, cg->id);
+            cg->enabled = 0;
+        }
+    }
 
     debug(D_CGROUP, "Added cgroup '%s' with chart id '%s' and title '%s' as %s (default was %s)", cg->id, cg->chart_id, cg->chart_title, (cg->enabled)?"enabled":"disabled", (def)?"enabled":"disabled");
 
