@@ -707,11 +707,22 @@ struct cgroup *cgroup_add(const char *id) {
     snprintfz(option, FILENAME_MAX, "enable cgroup %s", cg->chart_title);
     cg->enabled = config_get_boolean("plugin:cgroups", option, def);
 
-    struct cgroup *t;
-    for(t = cgroup_root; t ; t = t->next) {
-        if(t != cg && t->hash_chart == cg->hash_chart && !strcmp(t->chart_id, cg->chart_id) && t->enabled) {
-            error("Control group with chart id '%s' already exists and is enabled. Disabling cgroup '%s'.", cg->chart_id, cg->id);
-            cg->enabled = 0;
+    if(cg->enabled) {
+        struct cgroup *t;
+        for (t = cgroup_root; t; t = t->next) {
+            if (t != cg && t->enabled && t->hash_chart == cg->hash_chart && !strcmp(t->chart_id, cg->chart_id)) {
+                if (!strncmp(t->chart_id, "/system.slice/", 14) && !strncmp(cg->chart_id, "/init.scope/system.slice/", 25)) {
+                    error("Control group with chart id '%s' already exists with id '%s' and is enabled. Swapping them by enabling cgroup with id '%s' and disabling cgroup with id '%s'.",
+                          cg->chart_id, t->id, cg->id, t->id);
+                    t->enabled = 0;
+                } else {
+                    error("Control group with chart id '%s' already exists with id '%s' and is enabled. Disabling cgroup with id '%s'.",
+                          cg->chart_id, t->id, cg->id);
+                    cg->enabled = 0;
+                }
+
+                break;
+            }
         }
     }
 
