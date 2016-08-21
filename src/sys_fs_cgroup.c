@@ -662,6 +662,7 @@ struct cgroup *cgroup_add(const char *id) {
                 // starts with them
                 (len >  6 && !strncmp(chart_id, "user/", 6)) ||
                 (len > 11 && !strncmp(chart_id, "user.slice/", 11)) ||
+                (len > 11 && !strncmp(chart_id, "init.scope/", 11)) ||
                 // ends with them
                 (len >  5 && !strncmp(&chart_id[len -  5], ".user", 5)) ||
                 (len >  5 && !strncmp(&chart_id[len -  5], ".swap", 5)) ||
