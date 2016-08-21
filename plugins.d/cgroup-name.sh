@@ -16,7 +16,7 @@ fi
 
 if [ -f "${CONFIG}" ]
     then
-    NAME="$(cat "${CONFIG}" | grep "^${CGROUP} " | sed "s/[[:space:]]\+/ /g" | cut -d ' ' -f 2)"
+    NAME="$(grep "^${CGROUP} " "${CONFIG}" | sed "s/[[:space:]]\+/ /g" | cut -d ' ' -f 2)"
     if [ -z "${NAME}" ]
         then
         echo >&2 "${0}: cannot find cgroup '${CGROUP}' in '${CONFIG}'."
@@ -26,13 +26,13 @@ if [ -f "${CONFIG}" ]
 fi
 
 function get_name_classic {
-    DOCKERID=$1
+    local DOCKERID="$1"
     echo >&2 "Running command: docker ps --filter=id=\"${DOCKERID}\" --format=\"{{.Names}}\""
     NAME="$( docker ps --filter=id="${DOCKERID}" --format="{{.Names}}" )"
 }
 
 function get_name_api {
-    DOCKERID=$1
+    local DOCKERID="$1"
     if [ ! -S "/var/run/docker.sock" ]
         then
         echo >&2 "Can't find /var/run/docker.sock"
@@ -45,9 +45,9 @@ function get_name_api {
 
 if [ -z "${NAME}" ]
     then
-    if [[ "${CGROUP}" =~ ^.*docker[-/\.][a-fA-F0-9]+[-\.]?.*$ ]]
+    if [[ "${CGROUP}" =~ ^.*docker[_-/\.][a-fA-F0-9]+[_-\.]?.*$ ]]
         then
-        DOCKERID="$( echo "${CGROUP}" | sed "s|^.*docker[-/]\([a-fA-F0-9]\+\)[-\.]\?.*$|\1|" )"
+        DOCKERID="$( echo "${CGROUP}" | sed "s|^.*docker[_-/]\([a-fA-F0-9]\+\)[_-\.]\?.*$|\1|" )"
 
         if [ ! -z "${DOCKERID}" -a \( ${#DOCKERID} -eq 64 -o ${#DOCKERID} -eq 12 \) ]
             then
