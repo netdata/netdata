@@ -44,12 +44,10 @@ class Service(SocketService, UrlService):
         if self.use_socket:
             SocketService.__init__(self, configuration=configuration, name=name)
             self.request = "show stat\r\n"
-            self.use_socket = True
         else:
             UrlService.__init__(self, configuration=configuration, name=name)
-            if not self.url.endswith(";csv;norefresh"):
-                self.url += ";csv;norefresh"
-            self.use_socket = False
+            if not self.url.endswith("/;csv;norefresh"):
+                self.url += "/;csv;norefresh"
 
         # self.order and self.definitions are created with _create_definitions method
         # self.order = ORDER

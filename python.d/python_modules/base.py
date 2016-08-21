@@ -404,9 +404,18 @@ class SimpleService(threading.Thread):
 class UrlService(SimpleService):
     # TODO add support for https connections
     def __init__(self, configuration=None, name=None):
-        self.url = ""
-        self.user = None
-        self.password = None
+        try:
+            self.url = str(self.configuration['url'])
+        except (KeyError, TypeError):
+            self.url = ""
+        try:
+            self.user = str(self.configuration['user'])
+        except (KeyError, TypeError):
+            self.user = None
+        try:
+            self.password = str(self.configuration['pass'])
+        except (KeyError, TypeError):
+            self.password = None
         self.proxies = {}
         SimpleService.__init__(self, configuration=configuration, name=name)
 
@@ -467,7 +476,7 @@ class UrlService(SimpleService):
 
     def check(self):
         """
-        Format configuration data and try to connect to server
+        Create chart name and try to connect to server
         :return: boolean
         """
         if self.name is None or self.name == str(None):
@@ -475,18 +484,6 @@ class UrlService(SimpleService):
             self.chart_name += "_" + self.name
         else:
             self.name = str(self.name)
-        try:
-            self.url = str(self.configuration['url'])
-        except (KeyError, TypeError):
-            pass
-        try:
-            self.user = str(self.configuration['user'])
-        except (KeyError, TypeError):
-            pass
-        try:
-            self.password = str(self.configuration['pass'])
-        except (KeyError, TypeError):
-            pass
 
         self.__add_openers()
 
