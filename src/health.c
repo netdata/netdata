@@ -1055,7 +1055,9 @@ int health_readfile(const char *path, const char *filename) {
             append = &s[append] - buffer;
             if(append < HEALTH_CONF_MAX_LINE)
                 continue;
-            continue;
+            else {
+                error("Health configuration has too long muli-line at line %zu of file '%s/%s'.", line, path, filename);
+            }
         }
         append = 0;
 
