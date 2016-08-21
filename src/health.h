@@ -256,6 +256,7 @@ extern void rrddimvar_free(RRDDIMVAR *rs);
 extern void rrdsetcalc_link_matching(RRDSET *st);
 extern void rrdsetcalc_unlink(RRDCALC *rc);
 extern void rrdcalctemplate_link_matching(RRDSET *st);
+extern RRDCALC *rrdcalc_find(RRDSET *st, const char *name);
 
 extern void health_init(void);
 extern void *health_main(void *ptr);
