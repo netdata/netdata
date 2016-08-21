@@ -3,6 +3,8 @@
 # reload the user profile
 [ -f /etc/profile ] && . /etc/profile
 
+export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
+
 # fix PKG_CHECK_MODULES error
 if [ -d /usr/share/aclocal ]
 then
@@ -175,7 +177,7 @@ done
 cat <<BANNER
 
 Welcome to netdata!
-Nice to see you are giving it a try!
+The real-time performance monitoring system.
 
 You are about to build and install netdata to your system.
 

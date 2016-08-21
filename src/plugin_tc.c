@@ -129,14 +129,16 @@ static inline struct tc_class *tc_class_index_find(struct tc_device *st, const c
 // ----------------------------------------------------------------------------
 
 static inline void tc_class_free(struct tc_device *n, struct tc_class *c) {
-    debug(D_TC_LOOP, "Removing from device '%s' class '%s', parentid '%s', leafid '%s', seen=%d", n->id, c->id, c->parentid?c->parentid:"", c->leafid?c->leafid:"", c->seen);
-
+    if(c == n->classes) {
+        if(c->next)
+            n->classes = c->next;
+        else
+            n->classes = c->prev;
+    }
     if(c->next) c->next->prev = c->prev;
     if(c->prev) c->prev->next = c->next;
-    if(n->classes == c) {
-        if(c->next) n->classes = c->next;
-        else n->classes = c->prev;
-    }
+
+    debug(D_TC_LOOP, "Removing from device '%s' class '%s', parentid '%s', leafid '%s', seen=%d", n->id, c->id, c->parentid?c->parentid:"", c->leafid?c->leafid:"", c->seen);
 
     tc_class_index_del(n, c);
 
