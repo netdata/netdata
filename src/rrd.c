@@ -171,7 +171,7 @@ RRDSET *rrdset_index_add_name(RRDHOST *host, RRDSET *st) {
 RRDSET *rrdset_index_del_name(RRDHOST *host, RRDSET *st) {
     void *result;
     // fprintf(stderr, "DELETING: %s (name: %s)\n", st->id, st->name);
-    return (RRDSET *)avl_remove_lock(&((host)->rrdset_root_index_name), (avl *)(&st->avlname));
+    result = (RRDSET *)avl_remove_lock(&((host)->rrdset_root_index_name), (avl *)(&st->avlname));
     if(result) return rrdset_from_avlname(result);
     return NULL;
 }

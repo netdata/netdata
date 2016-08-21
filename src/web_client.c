@@ -1219,13 +1219,9 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 
         default:
             buffer_flush(w->response.data);
-            buffer_sprintf(w->response.data, "Invalid registry request - you need to set an action: hello, access, delete, search");
+            buffer_strcat(w->response.data, "Invalid registry request - you need to set an action: hello, access, delete, search");
             return 400;
     }
-
-    buffer_flush(w->response.data);
-    buffer_sprintf(w->response.data, "Invalid or no registry action.");
-    return 400;
 }
 
 int web_client_api_request_v1(struct web_client *w, char *url) {
