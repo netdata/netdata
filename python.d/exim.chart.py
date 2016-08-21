@@ -14,7 +14,7 @@ ORDER = ['qemails']
 
 CHARTS = {
     'qemails': {
-        'options': [None, "Exim Queue Emails", "emails", 'queue', 'exim.queued.emails', 'line'],
+        'options': [None, "Exim Queue Emails", "emails", 'queue', 'exim.qemails', 'line'],
         'lines': [
             ['emails', None, 'absolute']
         ]}

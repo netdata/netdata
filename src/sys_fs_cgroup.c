@@ -168,6 +168,8 @@ struct cgroup {
     uint32_t hash;
 
     char *chart_id;
+    uint32_t hash_chart;
+
     char *chart_title;
 
     struct cpuacct_stat cpuacct_stat;
@@ -614,8 +616,8 @@ void cgroup_get_chart_id(struct cgroup *cg) {
 
         freez(cg->chart_id);
         cg->chart_id = strdupz(s);
-
         netdata_fix_chart_id(cg->chart_id);
+        cg->hash_chart = simple_hash(cg->chart_id);
 
         debug(D_CGROUP, "cgroup '%s' renamed to '%s' (title: '%s')", cg->id, cg->chart_id, cg->chart_title);
     }
@@ -676,12 +678,13 @@ struct cgroup *cgroup_add(const char *id) {
 
     struct cgroup *cg = callocz(1, sizeof(struct cgroup));
 
-    debug(D_CGROUP, "adding cgroup '%s'", id);
-
     cg->id = strdupz(id);
     cg->hash = simple_hash(cg->id);
 
     cg->chart_id = strdupz(chart_id);
+    netdata_fix_chart_id(cg->chart_id);
+    cg->hash_chart = simple_hash(cg->chart_id);
+
     cg->chart_title = strdupz(chart_id);
 
     if(!cgroup_root)
@@ -698,9 +701,30 @@ struct cgroup *cgroup_add(const char *id) {
     // fix the name by calling the external script
     cgroup_get_chart_id(cg);
 
+    debug(D_CGROUP, "adding cgroup '%s' with chart id '%s'", id, chart_id);
+
     char option[FILENAME_MAX + 1];
     snprintfz(option, FILENAME_MAX, "enable cgroup %s", cg->chart_title);
     cg->enabled = config_get_boolean("plugin:cgroups", option, def);
+
+    if(cg->enabled) {
+        struct cgroup *t;
+        for (t = cgroup_root; t; t = t->next) {
+            if (t != cg && t->enabled && t->hash_chart == cg->hash_chart && !strcmp(t->chart_id, cg->chart_id)) {
+                if (!strncmp(t->chart_id, "/system.slice/", 14) && !strncmp(cg->chart_id, "/init.scope/system.slice/", 25)) {
+                    error("Control group with chart id '%s' already exists with id '%s' and is enabled. Swapping them by enabling cgroup with id '%s' and disabling cgroup with id '%s'.",
+                          cg->chart_id, t->id, cg->id, t->id);
+                    t->enabled = 0;
+                } else {
+                    error("Control group with chart id '%s' already exists with id '%s' and is enabled. Disabling cgroup with id '%s'.",
+                          cg->chart_id, t->id, cg->id);
+                    cg->enabled = 0;
+                }
+
+                break;
+            }
+        }
+    }
 
     debug(D_CGROUP, "Added cgroup '%s' with chart id '%s' and title '%s' as %s (default was %s)", cg->id, cg->chart_id, cg->chart_title, (cg->enabled)?"enabled":"disabled", (def)?"enabled":"disabled");
 

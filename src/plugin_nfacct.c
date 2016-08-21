@@ -1,8 +1,8 @@
+#include "common.h"
+
 #ifdef INTERNAL_PLUGIN_NFACCT
 #include <libmnl/libmnl.h>
 #include <libnetfilter_acct/libnetfilter_acct.h>
-
-#include "common.h"
 
 struct mynfacct {
     const char *name;
@@ -136,7 +136,7 @@ void *nfacct_main(void *ptr) {
         // --------------------------------------------------------------------
 
         gettimeofday(&now, NULL);
-        usec = usecdiff(&now, &last) - susec;
+        usec = usec_dt(&now, &last) - susec;
         debug(D_NFACCT_LOOP, "nfacct.plugin: last loop took %llu usec (worked for %llu, sleeped for %llu).", usec + susec, usec, susec);
 
         if(usec < (rrd_update_every * 1000000ULL / 2ULL)) susec = (rrd_update_every * 1000000ULL) - usec;
