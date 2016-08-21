@@ -70,6 +70,9 @@ class Service(SocketService, UrlService):
         except (ValueError, AttributeError):
             return None
 
+        if raw is None:
+            return None
+
         try:
             # return [row for row in csv.reader(raw.splitlines(), delimiter=',')]
             return list(csv.reader(raw.splitlines(), delimiter=','))
