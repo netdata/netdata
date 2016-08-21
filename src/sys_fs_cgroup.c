@@ -616,8 +616,8 @@ void cgroup_get_chart_id(struct cgroup *cg) {
 
         freez(cg->chart_id);
         cg->chart_id = strdupz(s);
-
         netdata_fix_chart_id(cg->chart_id);
+        cg->hash_chart = simple_hash(cg->chart_id);
 
         debug(D_CGROUP, "cgroup '%s' renamed to '%s' (title: '%s')", cg->id, cg->chart_id, cg->chart_title);
     }
@@ -679,12 +679,11 @@ struct cgroup *cgroup_add(const char *id) {
 
     struct cgroup *cg = callocz(1, sizeof(struct cgroup));
 
-    debug(D_CGROUP, "adding cgroup '%s'", id);
-
     cg->id = strdupz(id);
     cg->hash = simple_hash(cg->id);
 
     cg->chart_id = strdupz(chart_id);
+    netdata_fix_chart_id(cg->chart_id);
     cg->hash_chart = simple_hash(cg->chart_id);
 
     cg->chart_title = strdupz(chart_id);
@@ -701,7 +700,9 @@ struct cgroup *cgroup_add(const char *id) {
     cgroup_root_count++;
 
     // fix the name by calling the external script
-    cgroup_get_chart_id(cg);
+    if(def) cgroup_get_chart_id(cg);
+
+    debug(D_CGROUP, "adding cgroup '%s' with chart id '%s'", id, chart_id);
 
     char option[FILENAME_MAX + 1];
     snprintfz(option, FILENAME_MAX, "enable cgroup %s", cg->chart_title);
