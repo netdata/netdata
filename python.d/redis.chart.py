@@ -23,12 +23,12 @@ ORDER = ['operations', 'hit_rate', 'memory', 'keys', 'clients', 'slaves']
 
 CHARTS = {
     'operations': {
-        'options': [None, 'Operations', 'operations/s', 'Statistics', 'redis.statistics', 'line'],
+        'options': [None, 'Operations', 'operations/s', 'Statistics', 'redis.operations', 'line'],
         'lines': [
             ['instantaneous_ops_per_sec', 'operations', 'absolute']
         ]},
     'hit_rate': {
-        'options': [None, 'Hit rate', 'percent', 'Statistics', 'redis.statistics', 'line'],
+        'options': [None, 'Hit rate', 'percent', 'Statistics', 'redis.hit_rate', 'line'],
         'lines': [
             ['hit_rate', 'rate', 'absolute']
         ]},
@@ -50,7 +50,7 @@ CHARTS = {
             ['blocked_clients', 'blocked', 'absolute']
         ]},
     'slaves': {
-        'options': [None, 'Slaves', 'slaves', 'Replication', 'redis.replication', 'line'],
+        'options': [None, 'Slaves', 'slaves', 'Replication', 'redis.slaves', 'line'],
         'lines': [
             ['connected_slaves', 'connected', 'absolute']
         ]}
