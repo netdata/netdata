@@ -644,7 +644,8 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
             , *label_color = NULL
             , *value_color = NULL
             , *refresh_str = NULL
-            , *precision_str = NULL;
+            , *precision_str = NULL
+            , *alarm = NULL;
 
     int group = GROUP_AVERAGE;
     uint32_t options = 0x00000000;
@@ -687,6 +688,7 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
         else if(!strcmp(name, "divide")) divide_str = value;
         else if(!strcmp(name, "refresh")) refresh_str = value;
         else if(!strcmp(name, "precision")) precision_str = value;
+        else if(!strcmp(name, "alarm")) alarm = value;
     }
 
     if(!chart || !*chart) {
@@ -702,6 +704,16 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
         goto cleanup;
     }
 
+    RRDCALC *rc = NULL;
+    if(alarm) {
+        rc = rrdcalc_find(st, alarm);
+        if (!rc) {
+            buffer_svg(w->response.data, "alarm not found", 0, "", NULL, NULL, 1, -1);
+            ret = 200;
+            goto cleanup;
+        }
+    }
+
     long long multiply  = (multiply_str  && *multiply_str )?atol(multiply_str):1;
     long long divide    = (divide_str    && *divide_str   )?atol(divide_str):1;
     long long before    = (before_str    && *before_str   )?atol(before_str):0;
@@ -715,7 +727,8 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
     int refresh = 0;
     if(refresh_str && *refresh_str) {
         if(!strcmp(refresh_str, "auto")) {
-            if(options & RRDR_OPTION_NOT_ALIGNED)
+            if(rc) refresh = rc->update_every;
+            else if(options & RRDR_OPTION_NOT_ALIGNED)
                 refresh = st->update_every;
             else {
                 refresh = (before - after);
@@ -729,7 +742,9 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
     }
 
     if(!label) {
-        if(dimensions) {
+        if(alarm)
+            label = alarm;
+        else if(dimensions) {
             const char *dim = buffer_tostring(dimensions);
             if(*dim == '|') dim++;
             label = dim;
@@ -744,9 +759,10 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
             units = st->units;
     }
 
-    debug(D_WEB_CLIENT, "%llu: API command 'badge.svg' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%d', options '0x%08x'"
+    debug(D_WEB_CLIENT, "%llu: API command 'badge.svg' for chart '%s', alarm '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%d', options '0x%08x'"
             , w->id
             , chart
+            , alarm?alarm:""
             , (dimensions)?buffer_tostring(dimensions):""
             , after
             , before
@@ -755,26 +771,68 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
             , options
             );
 
-    time_t latest_timestamp = 0;
-    int value_is_null = 1;
-    calculated_number n = 0;
-    ret = 500;
+    if(rc) {
+        calculated_number n = rc->value;
+        if(isnan(n) || isinf(n)) n = 0;
 
-    // if the collected value is too old, don't calculate its value
-    if(rrdset_last_entry_t(st) >= (time(NULL) - (st->update_every * st->gap_when_lost_iterations_above)))
-        ret = rrd2value(st, w->response.data, &n, (dimensions)?buffer_tostring(dimensions):NULL, points, after, before, group, options, &latest_timestamp, &value_is_null);
+        if (refresh > 0)
+            buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
 
-    // if the value cannot be calculated, show empty badge
-    if(ret != 200) {
-        value_is_null = 1;
-        n = 0;
+        if(!value_color) {
+            switch(rc->status) {
+                case RRDCALC_STATUS_CRITICAL:
+                    value_color = "red";
+                    break;
+
+                case RRDCALC_STATUS_WARNING:
+                    value_color = "orange";
+                    break;
+
+                case RRDCALC_STATUS_CLEAR:
+                    value_color = "brightgreen";
+                    break;
+
+                case RRDCALC_STATUS_UNDEFINED:
+                    value_color = "lightgrey";
+                    break;
+
+                case RRDCALC_STATUS_UNINITIALIZED:
+                    value_color = "#000";
+                    break;
+
+                default:
+                    value_color = "grey";
+                    break;
+            }
+        }
+
+        buffer_svg(w->response.data, label, rc->value * multiply / divide, units, label_color, value_color, 0, precision);
         ret = 200;
     }
-    else if(refresh > 0)
-        buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
+    else {
+        time_t latest_timestamp = 0;
+        int value_is_null = 1;
+        calculated_number n = 0;
+        ret = 500;
 
-    // render the badge
-    buffer_svg(w->response.data, label, n * multiply / divide, units, label_color, value_color, value_is_null, precision);
+        // if the collected value is too old, don't calculate its value
+        if (rrdset_last_entry_t(st) >= (time(NULL) - (st->update_every * st->gap_when_lost_iterations_above)))
+            ret = rrd2value(st, w->response.data, &n, (dimensions) ? buffer_tostring(dimensions) : NULL, points, after,
+                            before, group, options, &latest_timestamp, &value_is_null);
+
+        // if the value cannot be calculated, show empty badge
+        if (ret != 200) {
+            value_is_null = 1;
+            n = 0;
+            ret = 200;
+        }
+        else if (refresh > 0)
+            buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
+
+        // render the badge
+        buffer_svg(w->response.data, label, n * multiply / divide, units, label_color, value_color, value_is_null,
+                   precision);
+    }
 
 cleanup:
     if(dimensions)

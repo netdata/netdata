@@ -420,6 +420,10 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
 
     rc->rrdset = st;
 
+    rc->rrdset_next = st->alarms;
+    rc->rrdset_prev = NULL;
+    st->alarms = rc;
+
     if(rc->update_every < rc->rrdset->update_every) {
         error("Health alarm '%s.%s' has update every %d, less than chart update every %d. Setting alarm update frequency to %d.", rc->rrdset->id, rc->name, rc->update_every, rc->rrdset->update_every, rc->rrdset->update_every);
         rc->update_every = rc->rrdset->update_every;
@@ -509,6 +513,18 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
     // RRDCALC will remain in RRDHOST
     // so that if the matching chart is found in the future
     // it will be applied automatically
+}
+
+RRDCALC *rrdcalc_find(RRDSET *st, const char *name) {
+    RRDCALC *rc;
+    uint32_t hash = simple_hash(name);
+
+    for( rc = st->alarms; rc ; rc = rc->rrdset_next ) {
+        if(rc->hash == hash && !strcmp(rc->name, name))
+            return rc;
+    }
+
+    return NULL;
 }
 
 static inline int rrdcalc_exists(RRDHOST *host, const char *name, uint32_t hash) {
