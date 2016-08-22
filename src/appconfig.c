@@ -376,6 +376,9 @@ int load_config(char *filename, int overwrite_used)
     char buffer[CONFIG_FILE_LINE_MAX + 1], *s;
 
     if(!filename) filename = CONFIG_DIR "/" CONFIG_FILENAME;
+
+    debug(D_CONFIG, "Opening config file '%s'", filename);
+
     FILE *fp = fopen(filename, "r");
     if(!fp) {
         error("Cannot open file '%s'", filename);
