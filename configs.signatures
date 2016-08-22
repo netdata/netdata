@@ -29,6 +29,7 @@ declare -A configs_signatures=(
   ['a02d14124b19c635c1426cee2e98bac5']='charts.d.conf'
   ['ca026d7c779f0a7cb7787713c5be5c47']='charts.d.conf'
   ['842b1ad5b89bfa5f421d9c5b72e001a4']='health.d/apache.conf'
+  ['623771eecb3c277fc728b5304793f93b']='health.d/cpu.conf'
   ['7596ae54d46ce199ac599429ef753caf']='health.d/cpu.conf'
   ['fdd11640ba626cc2064c2fe3ea3eee4c']='health.d/cpu.conf'
   ['02fa10fa85ab88e9723998de48d1aca0']='health.d/disks.conf'
