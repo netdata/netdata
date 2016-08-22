@@ -4,7 +4,7 @@
 
 import os
 import random
-from base import BaseService
+from base import SimpleService
 
 NAME = os.path.basename(__file__).replace(".chart.py", "")
 
@@ -14,7 +14,7 @@ priority = 90000
 retries = 60
 
 
-class Service(BaseService):
+class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         super(self.__class__,self).__init__(configuration=configuration, name=name)
 
