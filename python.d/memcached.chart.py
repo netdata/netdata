@@ -19,9 +19,15 @@ retries = 60
 #             'unix_socket': None
 #          }}
 
-ORDER = ['net', 'connections', 'items', 'evicted_reclaimed', 'get', 'get_rate', 'set_rate', 'delete', 'cas', 'increment', 'decrement', 'touch', 'touch_rate']
+ORDER = ['cache', 'net', 'connections', 'items', 'evicted_reclaimed',
+         'get', 'get_rate', 'set_rate', 'delete', 'cas', 'increment', 'decrement', 'touch', 'touch_rate']
 
 CHARTS = {
+    'cache': {
+        'options': [None, 'Cache Size', 'kilobytes', 'Cache', 'memcached.cache', 'line'],
+        'lines': [
+            ['bytes', 'cache', 'absolute', 1, 1024]
+        ]},
     'net': {
         'options': [None, 'Network', 'kilobytes/s', 'Network', 'memcached.net', 'line'],
         'lines': [
