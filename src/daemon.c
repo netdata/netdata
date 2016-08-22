@@ -1,330 +1,226 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <signal.h>
-#include <string.h>
-#include <sys/types.h>
-#include <pwd.h>
-#include <grp.h>
-#include <pthread.h>
-#include <sys/wait.h>
-#include <sys/stat.h>
-
 #include "common.h"
-#include "appconfig.h"
-#include "log.h"
-#include "web_client.h"
-#include "plugins_d.h"
-#include "rrd.h"
-#include "popen.h"
-#include "main.h"
-#include "daemon.h"
+#include <sched.h>
 
 char pidfile[FILENAME_MAX + 1] = "";
 
 void sig_handler_exit(int signo)
 {
-	if(signo) {
-		error_log_limit_unlimited();
-		error("Received signal %d. Exiting...", signo);
-		netdata_exit = 1;
-	}
+    if(signo) {
+        error_log_limit_unlimited();
+        error("Received signal %d. Exiting...", signo);
+        netdata_exit = 1;
+    }
+}
+
+void sig_handler_logrotate(int signo)
+{
+    if(signo) {
+        error_log_limit_reset();
+        info("Received signal %d to re-open the log files", signo);
+        reopen_all_log_files();
+    }
 }
 
 void sig_handler_save(int signo)
 {
-	if(signo) {
-		info("Received signal %d to save the database...", signo);
-		rrdset_save_all();
-	}
+    if(signo) {
+        error_log_limit_reset();
+        info("Received signal %d to save the database...", signo);
+        rrdset_save_all();
+    }
 }
 
-static void properly_chown_netdata_generated_file(int fd, uid_t uid, gid_t gid) {
-	if(fd == -1) return;
-
-	struct stat buf;
-
-	if(fstat(fd, &buf) == -1) {
-		error("Cannot fstat() fd %d", fd);
-		return;
-	}
-
-	if((buf.st_uid != uid || buf.st_gid != gid) && S_ISREG(buf.st_mode)) {
-		if(fchown(fd, uid, gid) == -1)
-			error("Cannot fchown() fd %d.", fd);
-	}
-}
-
-int become_user(const char *username, int access_fd, int output_fd, int error_fd, int pid_fd)
+void sig_handler_reload_health(int signo)
 {
-	struct passwd *pw = getpwnam(username);
-	if(!pw) {
-		error("User %s is not present.", username);
-		return -1;
-	}
-
-	uid_t uid = pw->pw_uid;
-	gid_t gid = pw->pw_gid;
-
-	int ngroups =  sysconf(_SC_NGROUPS_MAX);
-	gid_t *supplementary_groups = NULL;
-	if(ngroups) {
-		supplementary_groups = malloc(sizeof(gid_t) * ngroups);
-		if(supplementary_groups) {
-			if(getgrouplist(username, gid, supplementary_groups, &ngroups) == -1) {
-				error("Cannot get supplementary groups of user '%s'.", username);
-				free(supplementary_groups);
-				supplementary_groups = NULL;
-				ngroups = 0;
-			}
-		}
-		else fatal("Cannot allocate memory for %d supplementary groups", ngroups);
-	}
-
-	properly_chown_netdata_generated_file(access_fd, uid, gid);
-	properly_chown_netdata_generated_file(output_fd, uid, gid);
-	properly_chown_netdata_generated_file(error_fd, uid, gid);
-	properly_chown_netdata_generated_file(pid_fd, uid, gid);
-
-	if(supplementary_groups && ngroups) {
-		if(setgroups(ngroups, supplementary_groups) == -1)
-			error("Cannot set supplementary groups for user '%s'", username);
-
-		free(supplementary_groups);
-		supplementary_groups = NULL;
-		ngroups = 0;
-	}
-
-	if(setresgid(gid, gid, gid) != 0) {
-		error("Cannot switch to user's %s group (gid: %u).", username, gid);
-		return -1;
-	}
-
-	if(setresuid(uid, uid, uid) != 0) {
-		error("Cannot switch to user %s (uid: %u).", username, uid);
-		return -1;
-	}
-
-	if(setgid(gid) != 0) {
-		error("Cannot switch to user's %s group (gid: %u).", username, gid);
-		return -1;
-	}
-	if(setegid(gid) != 0) {
-		error("Cannot effectively switch to user's %s group (gid: %u).", username, gid);
-		return -1;
-	}
-	if(setuid(uid) != 0) {
-		error("Cannot switch to user %s (uid: %u).", username, uid);
-		return -1;
-	}
-	if(seteuid(uid) != 0) {
-		error("Cannot effectively switch to user %s (uid: %u).", username, uid);
-		return -1;
-	}
-
-	return(0);
+    if(signo) {
+        error_log_limit_reset();
+        info("Received signal %d to reload health configuration...", signo);
+        health_reload();
+    }
 }
 
-int become_daemon(int dont_fork, int close_all_files, const char *user, const char *input, const char *output, const char *error, const char *access, int *access_fd, FILE **access_fp)
+static void chown_open_file(int fd, uid_t uid, gid_t gid) {
+    if(fd == -1) return;
+
+    struct stat buf;
+
+    if(fstat(fd, &buf) == -1) {
+        error("Cannot fstat() fd %d", fd);
+        return;
+    }
+
+    if((buf.st_uid != uid || buf.st_gid != gid) && S_ISREG(buf.st_mode)) {
+        if(fchown(fd, uid, gid) == -1)
+            error("Cannot fchown() fd %d.", fd);
+    }
+}
+
+int become_user(const char *username, int pid_fd)
 {
-	fflush(NULL);
+    struct passwd *pw = getpwnam(username);
+    if(!pw) {
+        error("User %s is not present.", username);
+        return -1;
+    }
 
-	// open the files before forking
-	int input_fd = -1, output_fd = -1, error_fd = -1, dev_null;
+    uid_t uid = pw->pw_uid;
+    gid_t gid = pw->pw_gid;
 
-	if(input && *input) {
-		if((input_fd = open(input, O_RDONLY, 0666)) == -1) {
-			error("Cannot open input file '%s'.", input);
-			return -1;
-		}
-	}
+    int ngroups = (int)sysconf(_SC_NGROUPS_MAX);
+    gid_t *supplementary_groups = NULL;
+    if(ngroups) {
+        supplementary_groups = mallocz(sizeof(gid_t) * ngroups);
+        if(getgrouplist(username, gid, supplementary_groups, &ngroups) == -1) {
+            error("Cannot get supplementary groups of user '%s'.", username);
+            freez(supplementary_groups);
+            supplementary_groups = NULL;
+            ngroups = 0;
+        }
+    }
 
-	if(output && *output && strcmp(output, "/dev/null") != 0) {
-		if((output_fd = open(output, O_RDWR | O_APPEND | O_CREAT, 0666)) == -1) {
-			error("Cannot open output log file '%s'", output);
-			if(input_fd != -1) close(input_fd);
-			return -1;
-		}
-	}
+    chown_open_file(STDOUT_FILENO, uid, gid);
+    chown_open_file(STDERR_FILENO, uid, gid);
+    chown_open_file(stdaccess_fd, uid, gid);
+    chown_open_file(pid_fd, uid, gid);
 
-	if(error && *error && strcmp(error, "/dev/null") != 0) {
-		if((error_fd = open(error, O_RDWR | O_APPEND | O_CREAT, 0666)) == -1) {
-			error("Cannot open error log file '%s'.", error);
-			if(input_fd != -1) close(input_fd);
-			if(output_fd != -1) close(output_fd);
-			return -1;
-		}
-	}
+    if(supplementary_groups && ngroups) {
+        if(setgroups(ngroups, supplementary_groups) == -1)
+            error("Cannot set supplementary groups for user '%s'", username);
 
-	if(access && *access && access_fd && strcmp(access, "/dev/null") != 0) {
-		if((*access_fd = open(access, O_RDWR | O_APPEND | O_CREAT, 0666)) == -1) {
-			error("Cannot open access log file '%s'", access);
-			if(input_fd != -1) close(input_fd);
-			if(output_fd != -1) close(output_fd);
-			if(error_fd != -1) close(error_fd);
-			return -1;
-		}
+        freez(supplementary_groups);
+        supplementary_groups = NULL;
+        ngroups = 0;
+    }
 
-		if(access_fp) {
-			*access_fp = fdopen(*access_fd, "w");
-			if(!*access_fp) {
-				error("Cannot migrate file's '%s' fd %d.", access, *access_fd);
-				if(input_fd != -1) close(input_fd);
-				if(output_fd != -1) close(output_fd);
-				if(error_fd != -1) close(error_fd);
-				close(*access_fd);
-				*access_fd = -1;
-				return -1;
-			}
-			if(setvbuf(*access_fp, NULL, _IOLBF, 0) != 0)
-				error("Cannot set line buffering on access.log");
-		}
-	}
+    if(setresgid(gid, gid, gid) != 0) {
+        error("Cannot switch to user's %s group (gid: %u).", username, gid);
+        return -1;
+    }
 
-	if((dev_null = open("/dev/null", O_RDWR, 0666)) == -1) {
-		perror("Cannot open /dev/null");
-		if(input_fd != -1) close(input_fd);
-		if(output_fd != -1) close(output_fd);
-		if(error_fd != -1) close(error_fd);
-		if(access && access_fd && *access_fd != -1) {
-			close(*access_fd);
-			*access_fd = -1;
-			if(access_fp) {
-				fclose(*access_fp);
-				*access_fp = NULL;
-			}
-		}
-		return -1;
-	}
+    if(setresuid(uid, uid, uid) != 0) {
+        error("Cannot switch to user %s (uid: %u).", username, uid);
+        return -1;
+    }
 
-	// all files opened
-	// lets do it
+    if(setgid(gid) != 0) {
+        error("Cannot switch to user's %s group (gid: %u).", username, gid);
+        return -1;
+    }
+    if(setegid(gid) != 0) {
+        error("Cannot effectively switch to user's %s group (gid: %u).", username, gid);
+        return -1;
+    }
+    if(setuid(uid) != 0) {
+        error("Cannot switch to user %s (uid: %u).", username, uid);
+        return -1;
+    }
+    if(seteuid(uid) != 0) {
+        error("Cannot effectively switch to user %s (uid: %u).", username, uid);
+        return -1;
+    }
 
-	if(!dont_fork) {
-		int i = fork();
-		if(i == -1) {
-			perror("cannot fork");
-			exit(1);
-		}
-		if(i != 0) {
-			exit(0); // the parent
-		}
+    return(0);
+}
 
-		// become session leader
-		if (setsid() < 0) {
-			perror("Cannot become session leader.");
-			exit(2);
-		}
-	}
+void oom_score_adj(int score) {
+    int done = 0;
+    int fd = open("/proc/self/oom_score_adj", O_WRONLY);
+    if(fd != -1) {
+        char buf[10 + 1];
+        ssize_t len = snprintfz(buf, 10, "%d", score);
+        if(write(fd, buf, len) == len) done = 1;
+        close(fd);
+    }
 
-	// fork() again
-	if(!dont_fork) {
-		int i = fork();
-		if(i == -1) {
-			perror("cannot fork");
-			exit(1);
-		}
-		if(i != 0) {
-			exit(0); // the parent
-		}
-	}
+    if(!done)
+        error("Cannot adjust my Out-Of-Memory score to %d.", score);
+    else
+        info("Adjusted my Out-Of-Memory score to %d.", score);
+}
 
-	// Set new file permissions
-	umask(0);
+int sched_setscheduler_idle(void) {
+    const struct sched_param param = {
+        .sched_priority = 0
+    };
 
-	// close all files
-	if(close_all_files) {
-		int i;
-		for(i = (int) (sysconf(_SC_OPEN_MAX) - 1); i > 0; i--)
-			if(
-				((access_fd && i != *access_fd) || !access_fd)
-				&& i != dev_null
-				&& i != input_fd
-				&& i != output_fd
-				&& i != error_fd
-				&& fd_is_valid(i)
-				) close(i);
-	}
-	else {
-		close(STDIN_FILENO);
-		close(STDOUT_FILENO);
-		close(STDERR_FILENO);
-	}
+    int i = sched_setscheduler(0, SCHED_IDLE, &param);
+    if(i != 0)
+        error("Cannot adjust my scheduling priority to IDLE.");
+    else
+        info("Adjusted my scheduling priority to IDLE.");
 
-	// put the opened files
-	// to our standard file descriptors
-	if(input_fd != -1) {
-		if(input_fd != STDIN_FILENO) {
-			dup2(input_fd, STDIN_FILENO);
-			close(input_fd);
-		}
-		input_fd = -1;
-	}
-	else dup2(dev_null, STDIN_FILENO);
+    return i;
+}
 
-	if(output_fd != -1) {
-		if(output_fd != STDOUT_FILENO) {
-			dup2(output_fd, STDOUT_FILENO);
-			close(output_fd);
-		}
+int become_daemon(int dont_fork, const char *user)
+{
+    if(!dont_fork) {
+        int i = fork();
+        if(i == -1) {
+            perror("cannot fork");
+            exit(1);
+        }
+        if(i != 0) {
+            exit(0); // the parent
+        }
 
-		if(setvbuf(stdout, NULL, _IOLBF, 0) != 0)
-			error("Cannot set line buffering on debug.log");
+        // become session leader
+        if (setsid() < 0) {
+            perror("Cannot become session leader.");
+            exit(2);
+        }
 
-		output_fd = STDOUT_FILENO;
-	}
-	else dup2(dev_null, STDOUT_FILENO);
+        // fork() again
+        i = fork();
+        if(i == -1) {
+            perror("cannot fork");
+            exit(1);
+        }
+        if(i != 0) {
+            exit(0); // the parent
+        }
+    }
 
-	if(error_fd != -1) {
-		if(error_fd != STDERR_FILENO) {
-			dup2(error_fd, STDERR_FILENO);
-			close(error_fd);
-		}
+    // generate our pid file
+    int pidfd = -1;
+    if(pidfile[0]) {
+        pidfd = open(pidfile, O_WRONLY | O_CREAT, 0644);
+        if(pidfd >= 0) {
+            if(ftruncate(pidfd, 0) != 0)
+                error("Cannot truncate pidfile '%s'.", pidfile);
 
-		if(setvbuf(stderr, NULL, _IOLBF, 0) != 0)
-			error("Cannot set line buffering on error.log");
+            char b[100];
+            sprintf(b, "%d\n", getpid());
+            ssize_t i = write(pidfd, b, strlen(b));
+            if(i <= 0)
+                error("Cannot write pidfile '%s'.", pidfile);
+        }
+        else error("Failed to open pidfile '%s'.", pidfile);
+    }
 
-		error_fd = STDERR_FILENO;
-	}
-	else dup2(dev_null, STDERR_FILENO);
+    // Set new file permissions
+    umask(0002);
 
-	// close /dev/null
-	if(dev_null != STDIN_FILENO && dev_null != STDOUT_FILENO && dev_null != STDERR_FILENO)
-		close(dev_null);
+    // adjust my Out-Of-Memory score
+    oom_score_adj(1000);
 
-	// generate our pid file
-	int pidfd = -1;
-	if(pidfile[0]) {
-		pidfd = open(pidfile, O_RDWR | O_CREAT, 0644);
-		if(pidfd >= 0) {
-			if(ftruncate(pidfd, 0) != 0)
-				error("Cannot truncate pidfile '%s'.", pidfile);
+    // never become a problem
+    if(sched_setscheduler_idle() != 0) {
+        if(nice(19) == -1) error("Cannot lower my CPU priority.");
+        else info("Set my nice value to 19.");
+    }
 
-			char b[100];
-			sprintf(b, "%d\n", getpid());
-			ssize_t i = write(pidfd, b, strlen(b));
-			if(i <= 0)
-				error("Cannot write pidfile '%s'.", pidfile);
-		}
-		else error("Failed to open pidfile '%s'.", pidfile);
-	}
+    if(user && *user) {
+        if(become_user(user, pidfd) != 0) {
+            error("Cannot become user '%s'. Continuing as we are.", user);
+        }
+        else info("Successfully became user '%s'.", user);
+    }
 
-	if(user && *user) {
-		if(become_user(user, (access_fd)?*access_fd:-1, output_fd, error_fd, pidfd) != 0) {
-			error("Cannot become user '%s'. Continuing as we are.", user);
-		}
-		else info("Successfully became user '%s'.", user);
-	}
+    if(pidfd != -1) {
+        close(pidfd);
+        pidfd = -1;
+    }
 
-	if(pidfd != -1) {
-		close(pidfd);
-		pidfd = -1;
-	}
-
-	return(0);
+    return(0);
 }

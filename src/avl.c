@@ -1,10 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-// #include <assert.h>
-
-#include "avl.h"
-#include "log.h"
+#include "common.h"
 
 /* ------------------------------------------------------------------------- */
 /*
@@ -21,7 +15,7 @@
 
 
 /* Search |tree| for an item matching |item|, and return it if found.
-	 Otherwise return |NULL|. */
+     Otherwise return |NULL|. */
 avl *avl_search(avl_tree *tree, avl *item) {
     avl *p;
 
@@ -42,8 +36,8 @@ avl *avl_search(avl_tree *tree, avl *item) {
 }
 
 /* Inserts |item| into |tree| and returns a pointer to |item|'s address.
-	 If a duplicate item is found in the tree,
-	 returns a pointer to the duplicate without inserting |item|.
+     If a duplicate item is found in the tree,
+     returns a pointer to the duplicate without inserting |item|.
  */
 avl *avl_insert(avl_tree *tree, avl *item) {
     avl *y, *z; /* Top node to update balance factor, and parent. */
@@ -140,7 +134,7 @@ avl *avl_insert(avl_tree *tree, avl *item) {
 }
 
 /* Deletes from |tree| and returns an item matching |item|.
-	 Returns a null pointer if no matching item found. */
+     Returns a null pointer if no matching item found. */
 avl *avl_remove(avl_tree *tree, avl *item) {
     /* Stack of nodes. */
     avl *pa[AVL_MAX_HEIGHT]; /* Nodes. */
@@ -284,14 +278,34 @@ avl *avl_remove(avl_tree *tree, avl *item) {
 }
 
 /* ------------------------------------------------------------------------- */
-// these functions are (C) Costa Tsaousis
+// below are functions by (C) Costa Tsaousis
+
+// ---------------------------
+// traversing
+
+void avl_walker(avl *node, void (*callback)(void *)) {
+    if(node->avl_link[0])
+        avl_walker(node->avl_link[0], callback);
+
+    callback(node);
+
+    if(node->avl_link[1])
+        avl_walker(node->avl_link[1], callback);
+}
+
+void avl_traverse(avl_tree *t, void (*callback)(void *)) {
+    avl_walker(t->root, callback);
+}
+
+// ---------------------------
+// locks
 
 void avl_read_lock(avl_tree_lock *t) {
 #ifndef AVL_WITHOUT_PTHREADS
 #ifdef AVL_LOCK_WITH_MUTEX
-	pthread_mutex_lock(&t->mutex);
+    pthread_mutex_lock(&t->mutex);
 #else
-	pthread_rwlock_rdlock(&t->rwlock);
+    pthread_rwlock_rdlock(&t->rwlock);
 #endif
 #endif /* AVL_WITHOUT_PTHREADS */
 }
@@ -299,9 +313,9 @@ void avl_read_lock(avl_tree_lock *t) {
 void avl_write_lock(avl_tree_lock *t) {
 #ifndef AVL_WITHOUT_PTHREADS
 #ifdef AVL_LOCK_WITH_MUTEX
-	pthread_mutex_lock(&t->mutex);
+    pthread_mutex_lock(&t->mutex);
 #else
-	pthread_rwlock_wrlock(&t->rwlock);
+    pthread_rwlock_wrlock(&t->rwlock);
 #endif
 #endif /* AVL_WITHOUT_PTHREADS */
 }
@@ -309,52 +323,59 @@ void avl_write_lock(avl_tree_lock *t) {
 void avl_unlock(avl_tree_lock *t) {
 #ifndef AVL_WITHOUT_PTHREADS
 #ifdef AVL_LOCK_WITH_MUTEX
-	pthread_mutex_unlock(&t->mutex);
+    pthread_mutex_unlock(&t->mutex);
 #else
-	pthread_rwlock_unlock(&t->rwlock);
+    pthread_rwlock_unlock(&t->rwlock);
 #endif
 #endif /* AVL_WITHOUT_PTHREADS */
 }
 
-/* ------------------------------------------------------------------------- */
+// ---------------------------
+// operations with locking
 
 void avl_init_lock(avl_tree_lock *t, int (*compar)(void *a, void *b)) {
-	avl_init(&t->avl_tree, compar);
+    avl_init(&t->avl_tree, compar);
 
 #ifndef AVL_WITHOUT_PTHREADS
-	int lock;
+    int lock;
 
 #ifdef AVL_LOCK_WITH_MUTEX
-	lock = pthread_mutex_init(&t->mutex, NULL);
+    lock = pthread_mutex_init(&t->mutex, NULL);
 #else
-	lock = pthread_rwlock_init(&t->rwlock, NULL);
+    lock = pthread_rwlock_init(&t->rwlock, NULL);
 #endif
 
-	if(lock != 0)
-		fatal("Failed to initialize AVL mutex/rwlock, error: %d", lock);
+    if(lock != 0)
+        fatal("Failed to initialize AVL mutex/rwlock, error: %d", lock);
 
 #endif /* AVL_WITHOUT_PTHREADS */
 }
 
 avl *avl_search_lock(avl_tree_lock *t, avl *a) {
-	avl_read_lock(t);
-	avl *ret = avl_search(&t->avl_tree, a);
-	avl_unlock(t);
-	return ret;
+    avl_read_lock(t);
+    avl *ret = avl_search(&t->avl_tree, a);
+    avl_unlock(t);
+    return ret;
 }
 
 avl * avl_remove_lock(avl_tree_lock *t, avl *a) {
-	avl_write_lock(t);
-	avl *ret = avl_remove(&t->avl_tree, a);
-	avl_unlock(t);
-	return ret;
+    avl_write_lock(t);
+    avl *ret = avl_remove(&t->avl_tree, a);
+    avl_unlock(t);
+    return ret;
 }
 
 avl *avl_insert_lock(avl_tree_lock *t, avl *a) {
-	avl_write_lock(t);
+    avl_write_lock(t);
     avl * ret = avl_insert(&t->avl_tree, a);
-	avl_unlock(t);
-	return ret;
+    avl_unlock(t);
+    return ret;
+}
+
+void avl_traverse_lock(avl_tree_lock *t, void (*callback)(void *)) {
+    avl_read_lock(t);
+    avl_traverse(&t->avl_tree, callback);
+    avl_unlock(t);
 }
 
 void avl_init(avl_tree *t, int (*compar)(void *a, void *b)) {
@@ -362,3 +383,4 @@ void avl_init(avl_tree *t, int (*compar)(void *a, void *b)) {
     t->compar = compar;
 }
 
+// ------------------

@@ -89,10 +89,10 @@ paths:
           default: 20
         - name: group
           in: query
-          description: 'The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. 4 methods are supported, "max", "average", "sum", "incremental-sum". "max" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).'
+          description: 'The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods supported "min", "max", "average", "sum", "incremental-sum". "max" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).'
           required: true
           type: string
-          enum: [ 'max', 'average', 'sum', 'incremental-sum' ]
+          enum: [ 'min', 'max', 'average', 'sum', 'incremental-sum' ]
           default: 'average'
           allowEmptyValue: false
         - name: format
@@ -157,6 +157,13 @@ paths:
           format: 'as returned by /charts'
           allowEmptyValue: false
           default: system.cpu
+        - name: alarm
+          in: query
+          description: 'the name of an alarm linked to the chart'
+          required: false
+          type: string
+          format: 'any text'
+          allowEmptyValue: true
         - name: dimension
           in: query
           description: 'zero, one or more dimension ids, as returned by the /chart call.'
@@ -184,10 +191,10 @@ paths:
           default: 0
         - name: group
           in: query
-          description: 'The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. 4 methods are supported, "max", "average", "sum", "incremental-sum". "max" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).'
+          description: 'The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods are supported "min", "max", "average", "sum", "incremental-sum". "max" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).'
           required: true
           type: string
-          enum: [ 'max', 'average', 'sum', 'incremental-sum' ]
+          enum: [ 'min', 'max', 'average', 'sum', 'incremental-sum' ]
           default: 'average'
           allowEmptyValue: false
         - name: options
