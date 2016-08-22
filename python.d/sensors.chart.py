@@ -13,17 +13,17 @@ ORDER = ['temperature', 'fan', 'voltage', 'current', 'power', 'energy', 'humidit
 # This is a prototype of chart definition which is used to dynamically create self.definitions
 CHARTS = {
     'temperature': {
-        'options': [None, ' temperature', 'Celsius', 'temperature', 'sensors.temp', 'line'],
+        'options': [None, ' temperature', 'Celsius', 'temperature', 'sensors.temperature', 'line'],
         'lines': [
             [None, None, 'absolute', 1, 1000]
         ]},
     'voltage': {
-        'options': [None, ' voltage', 'Volts', 'voltage', 'sensors.volt', 'line'],
+        'options': [None, ' voltage', 'Volts', 'voltage', 'sensors.voltage', 'line'],
         'lines': [
             [None, None, 'absolute', 1, 1000]
         ]},
     'current': {
-        'options': [None, ' current', 'Ampere', 'current', 'sensors.curr', 'line'],
+        'options': [None, ' current', 'Ampere', 'current', 'sensors.current', 'line'],
         'lines': [
             [None, None, 'absolute', 1, 1000]
         ]},
@@ -33,7 +33,7 @@ CHARTS = {
             [None, None, 'absolute', 1, 1000000]
         ]},
     'fan': {
-        'options': [None, ' fans speed', 'Rotations/min', 'fans', 'sensors.fans', 'line'],
+        'options': [None, ' fans speed', 'Rotations/min', 'fans', 'sensors.fan', 'line'],
         'lines': [
             [None, None, 'absolute', 1, 1000]
         ]},

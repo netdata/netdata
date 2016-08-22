@@ -1,5 +1,3 @@
-#include "web_client.h"
-
 #ifndef NETDATA_REGISTRY_H
 #define NETDATA_REGISTRY_H 1
 

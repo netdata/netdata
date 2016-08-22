@@ -19,13 +19,13 @@ ORDER = ['sessions', 'commands',
 
 CHARTS = {
     'sessions': {
-        'options': [None, "logins and sessions", 'number', 'IMAP', 'dovecot.imap', 'line'],
+        'options': [None, "logins and sessions", 'number', 'IMAP', 'dovecot.sessions', 'line'],
         'lines': [
             ['num_logins', 'logins', 'absolute'],
             ['num_connected_sessions', 'active sessions', 'absolute']
         ]},
     'commands': {
-        'options': [None, "commands", "commands", 'IMAP', 'dovecot.imap', 'line'],
+        'options': [None, "commands", "commands", 'IMAP', 'dovecot.commands', 'line'],
         'lines': [
             ['num_cmds', 'commands', 'absolute']
         ]},
@@ -42,31 +42,31 @@ CHARTS = {
             ['invol_cs', 'involountary', 'absolute']
         ]},
     'disk': {
-        'options': [None, "disk", 'bytes/s', 'Reads and Writes', 'dovecot.read_write', 'line'],
+        'options': [None, "disk", 'bytes/s', 'Reads and Writes', 'dovecot.disk', 'line'],
         'lines': [
             ['disk_input', 'read', 'incremental'],
             ['disk_output', 'write', 'incremental']
         ]},
     'bytes': {
-        'options': [None, "bytes", 'bytes/s', 'Reads and Writes', 'dovecot.read_write', 'line'],
+        'options': [None, "bytes", 'bytes/s', 'Reads and Writes', 'dovecot.bytes', 'line'],
         'lines': [
             ['read_bytes', 'read', 'incremental'],
             ['write_bytes', 'write', 'incremental']
         ]},
     'syscalls': {
-        'options': [None, "number of syscalls", 'syscalls/s', 'Reads and Writes', 'dovecot.read_write', 'line'],
+        'options': [None, "number of syscalls", 'syscalls/s', 'Reads and Writes', 'dovecot.syscalls', 'line'],
         'lines': [
             ['read_count', 'read', 'incremental'],
             ['write_count', 'write', 'incremental']
         ]},
     'lookup': {
-        'options': [None, "lookups", 'number/s', 'Mail', 'dovecot.mail', 'line'],
+        'options': [None, "lookups", 'number/s', 'Mail', 'dovecot.lookup', 'line'],
         'lines': [
             ['mail_lookup_path', 'path', 'incremental'],
             ['mail_lookup_attr', 'attr', 'incremental']
         ]},
     'cache': {
-        'options': [None, "hits", 'hits/s', 'Mail', 'dovecot.mail', 'line'],
+        'options': [None, "hits", 'hits/s', 'Mail', 'dovecot.cache', 'line'],
         'lines': [
             ['mail_cache_hits', 'hits', 'incremental']
         ]},
@@ -77,7 +77,7 @@ CHARTS = {
             ['auth_failures', 'failure', 'absolute']
         ]},
     'auth_cache': {
-        'options': [None, "cache", 'number', 'Authentication', 'dovecot.auth', 'stacked'],
+        'options': [None, "cache", 'number', 'Authentication', 'dovecot.auth_cache', 'stacked'],
         'lines': [
             ['auth_cache_hits', 'hit', 'absolute'],
             ['auth_cache_misses', 'miss', 'absolute']

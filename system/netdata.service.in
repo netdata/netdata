@@ -1,27 +1,15 @@
 [Unit]
-Description=Linux real time system monitoring, done right
+Description=Real time performance monitoring
 After=network.target httpd.service squid.service nfs-server.service mysqld.service named.service postfix.service
 
 [Service]
-Type=forking
-WorkingDirectory=/tmp
+Type=simple
 User=netdata
 Group=netdata
-RuntimeDirectory=netdata
-PIDFile=@localstatedir_POST@/run/netdata/netdata.pid
-ExecStart=@sbindir_POST@/netdata -P @localstatedir_POST@/run/netdata/netdata.pid
-KillMode=mixed
-KillSignal=SIGTERM
-TimeoutStopSec=30
+ExecStart=@sbindir_POST@/netdata -D
 
-#Hardening
-AmbientCapabilities=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
-CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
-PrivateTmp=true
-ProtectSystem=full
-ProtectHome=read-only
-#NoNewPrivileges=true is implicitly set by the MemoryDenyWriteExecute=true
-MemoryDenyWriteExecute=true
+# saving a big db on slow disks may need some time
+TimeoutStopSec=60
 
 [Install]
 WantedBy=multi-user.target

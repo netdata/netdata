@@ -1,5 +1,3 @@
-#include "web_buffer.h"
-
 #ifndef NETDATA_CONFIG_H
 #define NETDATA_CONFIG_H 1
 

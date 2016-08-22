@@ -599,7 +599,7 @@ class SocketService(SimpleService):
         data = ""
         while True:
             try:
-                ready_to_read, _, in_error = select.select([self._sock], [], [], 15)
+                ready_to_read, _, in_error = select.select([self._sock], [], [], 5)
             except Exception as e:
                 self.debug("SELECT", str(e))
                 self._disconnect()
