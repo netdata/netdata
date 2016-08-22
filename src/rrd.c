@@ -494,6 +494,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
         st = callocz(1, size);
         st->mapped = RRD_MEMORY_MODE_RAM;
     }
+
     st->memsize = size;
     st->entries = entries;
     st->update_every = update_every;
@@ -521,6 +522,12 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 
     st->isdetail = 0;
     st->debug = 0;
+
+    // if(!strcmp(st->id, "disk_util.dm-0")) {
+    //     st->debug = 1;
+    //     error("enabled debugging for '%s'", st->id);
+    // }
+    // else error("not enabled debugging for '%s'", st->id);
 
     st->green = NAN;
     st->red = NAN;
@@ -679,6 +686,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
     rd->last_collected_value = 0;
     rd->collected_volume = 0;
     rd->stored_volume = 0;
+    rd->last_stored_value = 0;
     rd->values[st->current_entry] = pack_storage_number(0, SN_NOT_EXISTS);
     rd->last_collected_time.tv_sec = 0;
     rd->last_collected_time.tv_usec = 0;
@@ -1336,7 +1344,7 @@ unsigned long long rrdset_done(RRDSET *st)
             }
 
             if(unlikely(!store_this_entry)) {
-                store_this_entry = 1;
+                // store_this_entry = 1;
                 continue;
             }
 
@@ -1358,7 +1366,7 @@ unsigned long long rrdset_done(RRDSET *st)
                         , st->current_entry
                         );
                 rd->values[st->current_entry] = pack_storage_number(0, SN_NOT_EXISTS);
-                rd->last_stored_value = 0;
+                rd->last_stored_value = NAN;
             }
 
             stored_entries++;
