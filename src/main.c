@@ -209,7 +209,7 @@ struct option_def options[] = {
 Same as 'update every' config file option.",                                 "seconds",                              "1"},
     {'u', "System username to run as.",                                      "username",                             "netdata"},
     {'v', "Version of the program",                                          NULL,                                   NULL},
-    {'W', "vendor options.",                                                 "stacksize=<size>|unittest|debug_flag", NULL},
+    {'W', "vendor options.",                                                 "stacksize=N|unittest|debug_flags=N",   NULL},
 };
 
 void help(int exitcode) {
