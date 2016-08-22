@@ -26,7 +26,8 @@ CHARTS = {
     'cache': {
         'options': [None, 'Cache Size', 'kilobytes', 'Cache', 'memcached.cache', 'line'],
         'lines': [
-            ['bytes', 'cache', 'absolute', 1, 1024]
+            ['bytes', 'used', 'absolute', 1, 1024],
+            ['limit_maxbytes', 'total', 'absolute', 1, 1024]
         ]},
     'net': {
         'options': [None, 'Network', 'kilobytes/s', 'Network', 'memcached.net', 'line'],
