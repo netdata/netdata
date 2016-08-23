@@ -799,10 +799,11 @@ void found_subdir_in_dir(const char *dir) {
     if(cg) cg->available = 1;
 }
 
-void find_dir_in_subdirs(const char *base, const char *this, void (*callback)(const char *)) {
+int find_dir_in_subdirs(const char *base, const char *this, void (*callback)(const char *)) {
     debug(D_CGROUP, "searching for directories in '%s'", base);
 
-    int enabled = -1;
+    int ret = 0;
+    int enabled = 0;
     if(!this) this = base;
     size_t dirlen = strlen(this), baselen = strlen(base);
     const char *relative_path = &this[baselen];
@@ -810,8 +811,9 @@ void find_dir_in_subdirs(const char *base, const char *this, void (*callback)(co
     DIR *dir = opendir(this);
     if(!dir) {
         error("Cannot read cgroups directory '%s'", base);
-        return;
+        return ret;
     }
+    ret = 1;
 
     callback(relative_path);
 
@@ -846,13 +848,15 @@ void find_dir_in_subdirs(const char *base, const char *this, void (*callback)(co
                 strcpy(s, this);
                 strcat(s, "/");
                 strcat(s, de->d_name);
-                find_dir_in_subdirs(base, s, callback);
+                int ret2 = find_dir_in_subdirs(base, s, callback);
+                if(ret2 > 0) ret += ret2;
                 freez(s);
             }
         }
     }
 
     closedir(dir);
+    return ret;
 }
 
 void mark_all_cgroups_as_not_available() {
@@ -895,17 +899,33 @@ void find_all_cgroups() {
 
     mark_all_cgroups_as_not_available();
 
-    if(cgroup_enable_cpuacct_stat || cgroup_enable_cpuacct_usage)
-        find_dir_in_subdirs(cgroup_cpuacct_base, NULL, found_subdir_in_dir);
+    if(cgroup_enable_cpuacct_stat || cgroup_enable_cpuacct_usage) {
+        if (find_dir_in_subdirs(cgroup_cpuacct_base, NULL, found_subdir_in_dir) == -1) {
+            cgroup_enable_cpuacct_stat = cgroup_enable_cpuacct_usage = 0;
+            error("disabled cgroup cpu statistics.");
+        }
+    }
 
-    if(cgroup_enable_blkio)
-        find_dir_in_subdirs(cgroup_blkio_base, NULL, found_subdir_in_dir);
+    if(cgroup_enable_blkio) {
+        if (find_dir_in_subdirs(cgroup_blkio_base, NULL, found_subdir_in_dir) == -1) {
+            cgroup_enable_blkio = 0;
+            error("disabled cgroup blkio statistics.");
+        }
+    }
 
-    if(cgroup_enable_memory)
-        find_dir_in_subdirs(cgroup_memory_base, NULL, found_subdir_in_dir);
+    if(cgroup_enable_memory) {
+        if(find_dir_in_subdirs(cgroup_memory_base, NULL, found_subdir_in_dir) == -1) {
+            cgroup_enable_memory = 0;
+            error("disabled cgroup memory statistics.");
+        }
+    }
 
-    if(cgroup_enable_devices)
-        find_dir_in_subdirs(cgroup_devices_base, NULL, found_subdir_in_dir);
+    if(cgroup_enable_devices) {
+        if(find_dir_in_subdirs(cgroup_devices_base, NULL, found_subdir_in_dir) == -1) {
+            cgroup_enable_devices = 0;
+            error("disabled cgroup devices statistics.");
+        }
+    }
 
     // remove any non-existing cgroups
     cleanup_all_cgroups();
