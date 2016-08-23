@@ -139,6 +139,7 @@ void oom_score_adj(int score) {
 }
 
 int sched_setscheduler_idle(void) {
+#ifdef SCHED_IDLE
     const struct sched_param param = {
         .sched_priority = 0
     };
@@ -150,6 +151,9 @@ int sched_setscheduler_idle(void) {
         info("Adjusted my scheduling priority to IDLE.");
 
     return i;
+#else
+    return -1;
+#endif
 }
 
 int become_daemon(int dont_fork, const char *user)
