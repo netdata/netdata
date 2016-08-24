@@ -26,8 +26,8 @@ CHARTS = {
     'cache': {
         'options': [None, 'Cache Size', 'megabytes', 'Cache', 'memcached.cache', 'stacked'],
         'lines': [
-            ['bytes', 'used', 'absolute', 1, 1048576],
-            ['available', 'available', 'absolute', 1, 1048576]
+            ['used', 'used', 'absolute', 1, 1048576],
+            ['avail', 'available', 'absolute', 1, 1048576]
         ]},
     'net': {
         'options': [None, 'Network', 'kilobytes/s', 'Network', 'memcached.net', 'line'],
@@ -147,7 +147,8 @@ class Service(SocketService):
             data['hit_rate'] = 0
 
         try:
-            data['available'] = int(data['limit_maxbytes']) - int(data['bytes'])
+            data['avail'] = int(data['limit_maxbytes']) - int(data['bytes'])
+            data['used'] = data['bytes']
         except:
             pass
 
