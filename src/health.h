@@ -112,12 +112,12 @@ typedef struct rrddimvar {
 #define RRDCALC_STATUS_WARNING        3
 #define RRDCALC_STATUS_CRITICAL       4
 
-#define RRDCALC_OPTION_DB_ERROR      0x00000001
-#define RRDCALC_OPTION_DB_NAN        0x00000002
-#define RRDCALC_OPTION_DB_STALE      0x00000004
-#define RRDCALC_OPTION_CALC_ERROR    0x00000008
-#define RRDCALC_OPTION_WARN_ERROR    0x00000010
-#define RRDCALC_OPTION_CRIT_ERROR    0x00000020
+#define RRDCALC_FLAG_DB_ERROR      0x00000001
+#define RRDCALC_FLAG_DB_NAN        0x00000002
+#define RRDCALC_FLAG_DB_STALE      0x00000004
+#define RRDCALC_FLAG_CALC_ERROR    0x00000008
+#define RRDCALC_FLAG_WARN_ERROR    0x00000010
+#define RRDCALC_FLAG_CRIT_ERROR    0x00000020
 
 typedef struct rrdcalc {
     char *name;
@@ -145,12 +145,11 @@ typedef struct rrdcalc {
     EVAL_EXPRESSION *warning;
     EVAL_EXPRESSION *critical;
 
-    uint32_t rrdcalc_options;
+    uint32_t rrdcalc_flags;
     int status;
-    int warning_status;
-    int critical_status;
 
-    time_t db_timestamp;
+    time_t db_after;
+    time_t db_before;
     time_t last_status_change;
 
     calculated_number value;

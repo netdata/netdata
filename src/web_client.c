@@ -459,6 +459,70 @@ void web_client_enable_deflate(struct web_client *w, int gzip) {
 }
 #endif // NETDATA_WITH_ZLIB
 
+void buffer_data_options2string(BUFFER *wb, uint32_t options) {
+    int count = 0;
+
+    if(options & RRDR_OPTION_NONZERO) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "nonzero");
+    }
+
+    if(options & RRDR_OPTION_REVERSED) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "flip");
+    }
+
+    if(options & RRDR_OPTION_JSON_WRAP) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "jsonwrap");
+    }
+
+    if(options & RRDR_OPTION_MIN2MAX) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "min2max");
+    }
+
+    if(options & RRDR_OPTION_MILLISECONDS) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "ms");
+    }
+
+    if(options & RRDR_OPTION_ABSOLUTE) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "abs");
+    }
+
+    if(options & RRDR_OPTION_SECONDS) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "seconds");
+    }
+
+    if(options & RRDR_OPTION_NULL2ZERO) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "null2zero");
+    }
+
+    if(options & RRDR_OPTION_OBJECTSROWS) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "objectrows");
+    }
+
+    if(options & RRDR_OPTION_GOOGLE_JSON) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "google_json");
+    }
+
+    if(options & RRDR_OPTION_PERCENTAGE) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "percentage");
+    }
+
+    if(options & RRDR_OPTION_NOT_ALIGNED) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "unaligned");
+    }
+}
+
 uint32_t web_client_api_request_v1_data_options(char *o)
 {
     uint32_t ret = 0x00000000;
@@ -549,6 +613,28 @@ uint32_t web_client_api_request_v1_data_google_format(char *name)
         return DATASOURCE_TSV;
 
     return DATASOURCE_JSON;
+}
+
+const char *group_method2string(int group) {
+    switch(group) {
+        case GROUP_AVERAGE:
+            return "average";
+
+        case GROUP_MIN:
+            return "min";
+
+        case GROUP_MAX:
+            return "max";
+
+        case GROUP_SUM:
+            return "sum";
+
+        case GROUP_INCREMENTAL_SUM:
+            return "incremental-sum";
+
+        default:
+            return "unknown-group-method";
+    }
 }
 
 int web_client_api_request_v1_data_group(char *name, int def)
@@ -818,7 +904,7 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
         // if the collected value is too old, don't calculate its value
         if (rrdset_last_entry_t(st) >= (time(NULL) - (st->update_every * st->gap_when_lost_iterations_above)))
             ret = rrd2value(st, w->response.data, &n, (dimensions) ? buffer_tostring(dimensions) : NULL, points, after,
-                            before, group, options, &latest_timestamp, &value_is_null);
+                            before, group, options, NULL, &latest_timestamp, &value_is_null);
 
         // if the value cannot be calculated, show empty badge
         if (ret != 200) {

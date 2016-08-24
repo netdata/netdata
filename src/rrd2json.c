@@ -1548,7 +1548,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
     return r;
 }
 
-int rrd2value(RRDSET *st, BUFFER *wb, calculated_number *n, const char *dimensions, long points, long long after, long long before, int group_method, uint32_t options, time_t *latest_timestamp, int *value_is_null)
+int rrd2value(RRDSET *st, BUFFER *wb, calculated_number *n, const char *dimensions, long points, long long after, long long before, int group_method, uint32_t options, time_t *db_after, time_t *db_before, int *value_is_null)
 {
     RRDR *r = rrd2rrdr(st, points, after, before, group_method, !(options & RRDR_OPTION_NOT_ALIGNED));
     if(!r) {
@@ -1558,7 +1558,11 @@ int rrd2value(RRDSET *st, BUFFER *wb, calculated_number *n, const char *dimensio
 
     if(rrdr_rows(r) == 0) {
         rrdr_free(r);
+
+        if(db_after)  *db_after  = 0;
+        if(db_before) *db_before = 0;
         if(value_is_null) *value_is_null = 1;
+
         return 400;
     }
 
@@ -1572,8 +1576,8 @@ int rrd2value(RRDSET *st, BUFFER *wb, calculated_number *n, const char *dimensio
     if(dimensions)
         rrdr_disable_not_selected_dimensions(r, dimensions);
 
-    if(latest_timestamp)
-        *latest_timestamp = r->before;
+    if(db_after)  *db_after  = r->after;
+    if(db_before) *db_before = r->before;
 
     long i = (options & RRDR_OPTION_REVERSED)?rrdr_rows(r) - 1:0;
     *n = rrdr2value(r, i, options, value_is_null);
