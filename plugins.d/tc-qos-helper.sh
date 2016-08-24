@@ -15,6 +15,9 @@ fireqos_run_dir="/var/run/fireqos"
 qos_get_class_names_every=120
 qos_exit_every=3600
 
+# check that we can use tc -nm
+if tc -nm 2>/dev/null; then tc_use_nm=yes; fi
+
 # check if we have a valid number for interval
 t=${1}
 update_every=$((t))
@@ -61,7 +64,15 @@ show_tc() {
     local x="${1}" interface_dev interface_classes interface_classes_monitor
 
     echo "BEGIN ${x}"
-    ${tc} -s class show dev ${x}
+
+    # get class names from /etc/iproute2/tc_cls if possible
+    # see tc(8) for more information about this file
+    if [ -z "${tc_use_nm}" ]
+        then
+        ${tc} -s class show dev ${x}
+    else
+        ${tc} -nm -s class show dev ${x}
+    fi
 
     # check FireQOS names for classes
     if [ ! -z "${fix_names}" -a -f "${fireqos_run_dir}/ifaces/${x}" ]
