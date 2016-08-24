@@ -415,6 +415,31 @@ void rrddimvar_free(RRDDIMVAR *rs) {
 // ----------------------------------------------------------------------------
 // RRDCALC management
 
+static inline const char *rrdcalc_status2string(int status) {
+    switch(status) {
+        case RRDCALC_STATUS_UNINITIALIZED:
+            return "UNINITIALIZED";
+
+        case RRDCALC_STATUS_UNDEFINED:
+            return "UNDEFINED";
+
+        case RRDCALC_STATUS_CLEAR:
+            return "CLEAR";
+
+        case RRDCALC_STATUS_RAISED:
+            return "RAISED";
+
+        case RRDCALC_STATUS_WARNING:
+            return "WARNING";
+
+        case RRDCALC_STATUS_CRITICAL:
+            return "CRITICAL";
+
+        default:
+            return "UNKNOWN";
+    }
+}
+
 static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     debug(D_HEALTH, "Health linking alarm '%s.%s' to chart '%s' of host '%s'", rc->chart?rc->chart:"NOCHART", rc->name, st->id, st->rrdhost->hostname);
 
@@ -546,16 +571,22 @@ static inline void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc) {
 
     if(rc->calculation) {
         rc->calculation->this = &rc->value;
+        rc->calculation->after = &rc->db_after;
+        rc->calculation->before = &rc->db_before;
         rc->calculation->rrdcalc = rc;
     }
 
     if(rc->warning) {
         rc->warning->this = &rc->value;
+        rc->warning->after = &rc->db_after;
+        rc->warning->before = &rc->db_before;
         rc->warning->rrdcalc = rc;
     }
 
     if(rc->critical) {
         rc->critical->this = &rc->value;
+        rc->critical->after = &rc->db_after;
+        rc->critical->before = &rc->db_before;
         rc->critical->rrdcalc = rc;
     }
 
@@ -1381,6 +1412,91 @@ void health_init(void) {
 }
 
 // ----------------------------------------------------------------------------
+// JSON generation
+
+static inline void health_rrdcalc2json_nolock(BUFFER *wb, RRDCALC *rc) {
+    buffer_sprintf(wb,
+           "\t\t\"%s.%s\": {"
+                   "\t\t\t\"name\": \"%s\",\n"
+                   "\t\t\t\"chart\": \"%s\",\n"
+                   "\t\t\t\"dimensions\": \"%s\",\n"
+                   "\t\t\t\"exec\": \"%s\",\n"
+                   "\t\t\t\"source\": \"%s\",\n"
+                   "\t\t\t\"calc\": \"%s\",\n"
+                   "\t\t\t\"calc_parsed\": \"%s\",\n"
+                   "\t\t\t\"warn\": \"%s\",\n"
+                   "\t\t\t\"warn_parsed\": \"%s\",\n"
+                   "\t\t\t\"crit\": \"%s\",\n"
+                   "\t\t\t\"crit_parsed\": \"%s\",\n"
+                   "\t\t\t\"value\": %Lf,\n"
+                   "\t\t\t\"value_after\": %lu,\n"
+                   "\t\t\t\"value_before\": %lu,\n"
+                   "\t\t\t\"green\": %Lf,\n"
+                   "\t\t\t\"red\": %Lf,\n"
+                   "\t\t\t\"status\": \"%s\",\n"
+                   "\t\t\t\"last_status_change\": %lu,\n"
+                   "\t\t\t\"last_updated\": %lu,\n"
+                   "\t\t\t\"next_update\": %lu,\n"
+                   "\t\t\t\"update_every\": %d,\n"
+                   "\t\t\t\"lookup_method\": \"%s\",\n"
+                   "\t\t\t\"lookup_after\": %d,\n"
+                   "\t\t\t\"lookup_before\": %d,\n"
+                   "\t\t\t\"lookup_options\": \""
+            , rc->chart, rc->name
+            , rc->name
+            , rc->chart
+            , rc->dimensions?rc->dimensions:""
+            , rc->exec?rc->exec:health_default_exec
+            , rc->source
+            , rc->calculation?rc->calculation->source:""
+            , rc->calculation?rc->calculation->parsed_as:""
+            , rc->warning?rc->warning->source:""
+            , rc->warning?rc->warning->parsed_as:""
+            , rc->critical?rc->critical->source:""
+            , rc->critical?rc->critical->parsed_as:""
+            , rc->value
+            , (unsigned long)rc->db_after
+            , (unsigned long)rc->db_before
+            , rc->green
+            , rc->red
+            , rrdcalc_status2string(rc->status)
+            , (unsigned long)rc->last_status_change
+            , (unsigned long)rc->last_updated
+            , (unsigned long)rc->next_update
+            , rc->update_every
+            , group_method2string(rc->group)
+            , rc->after
+            , rc->before
+    );
+
+    buffer_data_options2string(wb, rc->options);
+    buffer_strcat(wb, "\"\n\t}");
+}
+
+//void health_rrdcalctemplate2json_nolock(BUFFER *wb, RRDCALCTEMPLATE *rt) {
+//
+//}
+
+void health_json(RRDHOST *host, BUFFER *wb) {
+    rrdhost_rdlock(&localhost);
+
+    buffer_strcat(wb, "{\n\t\"alarms\": {");
+    RRDCALC *rc;
+    for(rc = host->alarms; rc ; rc = rc->next)
+        health_rrdcalc2json_nolock(wb, rc);
+
+    buffer_strcat(wb, "\n},\n\t\"templates\": {");
+
+//    RRDCALCTEMPLATE *rt;
+//    for(rt = host->templates; rt ; rt = rt->next)
+//        health_rrdcalctemplate2json_nolock(wb, rt);
+
+    buffer_strcat(wb, "\n}\n");
+    rrdhost_unlock(&localhost);
+}
+
+
+// ----------------------------------------------------------------------------
 // re-load health configuration
 
 static inline void health_free_all_nolock(RRDHOST *host) {
@@ -1453,31 +1569,6 @@ static inline int rrdcalc_value2status(calculated_number n) {
     if(isnan(n)) return RRDCALC_STATUS_UNDEFINED;
     if(n) return RRDCALC_STATUS_RAISED;
     return RRDCALC_STATUS_CLEAR;
-}
-
-static inline const char *rrdcalc_status2string(int status) {
-    switch(status) {
-        case RRDCALC_STATUS_UNINITIALIZED:
-            return "UNINITIALIZED";
-
-        case RRDCALC_STATUS_UNDEFINED:
-            return "UNDEFINED";
-
-        case RRDCALC_STATUS_CLEAR:
-            return "CLEAR";
-
-        case RRDCALC_STATUS_RAISED:
-            return "RAISED";
-
-        case RRDCALC_STATUS_WARNING:
-            return "WARNING";
-
-        case RRDCALC_STATUS_CRITICAL:
-            return "CRITICAL";
-
-        default:
-            return "UNKNOWN";
-    }
 }
 
 static inline void health_alarm_execute(ALARM_ENTRY *ae) {
@@ -1670,12 +1761,12 @@ void *health_main(void *ptr) {
             // 2. if there is calculation expression, run it
 
             if (unlikely(RRDCALC_HAS_DB_LOOKUP(rc))) {
-                time_t old_db_timestamp = rc->db_timestamp;
+                time_t old_db_timestamp = rc->db_before;
                 int value_is_null = 0;
 
                 int ret = rrd2value(rc->rrdset, wb, &rc->value,
                                     rc->dimensions, 1, rc->after, rc->before, rc->group,
-                                    rc->options, &rc->db_timestamp, &value_is_null);
+                                    rc->options, &rc->db_after, &rc->db_before, &value_is_null);
 
                 if (unlikely(ret != 200)) {
                     // database lookup failed
@@ -1683,26 +1774,26 @@ void *health_main(void *ptr) {
 
                     debug(D_HEALTH, "Health alarm '%s.%s': database lookup returned error %d", rc->chart?rc->chart:"NOCHART", rc->name, ret);
 
-                    if (unlikely(!(rc->rrdcalc_options & RRDCALC_OPTION_DB_ERROR))) {
-                        rc->rrdcalc_options |= RRDCALC_OPTION_DB_ERROR;
+                    if (unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_DB_ERROR))) {
+                        rc->rrdcalc_flags |= RRDCALC_FLAG_DB_ERROR;
                         error("Health alarm '%s.%s': database lookup returned error %d", rc->chart?rc->chart:"NOCHART", rc->name, ret);
                     }
                 }
-                else if (unlikely(rc->rrdcalc_options & RRDCALC_OPTION_DB_ERROR))
-                    rc->rrdcalc_options &= ~RRDCALC_OPTION_DB_ERROR;
+                else if (unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_DB_ERROR))
+                    rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_ERROR;
 
-                if (unlikely(old_db_timestamp == rc->db_timestamp)) {
+                if (unlikely(old_db_timestamp == rc->db_before)) {
                     // database is stale
 
                     debug(D_HEALTH, "Health alarm '%s.%s': database is stale", rc->chart?rc->chart:"NOCHART", rc->name);
 
-                    if (unlikely(!(rc->rrdcalc_options & RRDCALC_OPTION_DB_STALE))) {
-                        rc->rrdcalc_options |= RRDCALC_OPTION_DB_STALE;
+                    if (unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_DB_STALE))) {
+                        rc->rrdcalc_flags |= RRDCALC_FLAG_DB_STALE;
                         error("Health alarm '%s.%s': database is stale", rc->chart?rc->chart:"NOCHART", rc->name);
                     }
                 }
-                else if (unlikely(rc->rrdcalc_options & RRDCALC_OPTION_DB_STALE))
-                    rc->rrdcalc_options &= ~RRDCALC_OPTION_DB_STALE;
+                else if (unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_DB_STALE))
+                    rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_STALE;
 
                 if (unlikely(value_is_null)) {
                     // collected value is null
@@ -1712,14 +1803,14 @@ void *health_main(void *ptr) {
                     debug(D_HEALTH, "Health alarm '%s.%s': database lookup returned empty value (possibly value is not collected yet)",
                           rc->chart?rc->chart:"NOCHART", rc->name);
 
-                    if (unlikely(!(rc->rrdcalc_options & RRDCALC_OPTION_DB_NAN))) {
-                        rc->rrdcalc_options |= RRDCALC_OPTION_DB_NAN;
+                    if (unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_DB_NAN))) {
+                        rc->rrdcalc_flags |= RRDCALC_FLAG_DB_NAN;
                         error("Health alarm '%s.%s': database lookup returned empty value (possibly value is not collected yet)",
                               rc->chart?rc->chart:"NOCHART", rc->name);
                     }
                 }
-                else if (unlikely(rc->rrdcalc_options & RRDCALC_OPTION_DB_NAN))
-                    rc->rrdcalc_options &= ~RRDCALC_OPTION_DB_NAN;
+                else if (unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_DB_NAN))
+                    rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_NAN;
 
                 debug(D_HEALTH, "Health alarm '%s.%s': database lookup gave value "
                         CALCULATED_NUMBER_FORMAT, rc->chart?rc->chart:"NOCHART", rc->name, rc->value);
@@ -1734,15 +1825,15 @@ void *health_main(void *ptr) {
                     debug(D_HEALTH, "Health alarm '%s.%s': failed to evaluate calculation with error: %s",
                           rc->chart?rc->chart:"NOCHART", rc->name, buffer_tostring(rc->calculation->error_msg));
 
-                    if (unlikely(!(rc->rrdcalc_options & RRDCALC_OPTION_CALC_ERROR))) {
-                        rc->rrdcalc_options |= RRDCALC_OPTION_CALC_ERROR;
+                    if (unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_CALC_ERROR))) {
+                        rc->rrdcalc_flags |= RRDCALC_FLAG_CALC_ERROR;
                         error("Health alarm '%s.%s': failed to evaluate calculation with error: %s",
                               rc->chart?rc->chart:"NOCHART", rc->name, buffer_tostring(rc->calculation->error_msg));
                     }
                 }
                 else {
-                    if (unlikely(rc->rrdcalc_options & RRDCALC_OPTION_CALC_ERROR))
-                        rc->rrdcalc_options &= ~RRDCALC_OPTION_CALC_ERROR;
+                    if (unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_CALC_ERROR))
+                        rc->rrdcalc_flags &= ~RRDCALC_FLAG_CALC_ERROR;
 
                     debug(D_HEALTH, "Health alarm '%s.%s': calculation expression gave value "
                             CALCULATED_NUMBER_FORMAT
@@ -1776,15 +1867,15 @@ void *health_main(void *ptr) {
                         debug(D_HEALTH, "Health alarm '%s.%s': warning expression failed with error: %s",
                               rc->chart?rc->chart:"NOCHART", rc->name, buffer_tostring(rc->warning->error_msg));
 
-                        if (unlikely(!(rc->rrdcalc_options & RRDCALC_OPTION_WARN_ERROR))) {
-                            rc->rrdcalc_options |= RRDCALC_OPTION_WARN_ERROR;
+                        if (unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_WARN_ERROR))) {
+                            rc->rrdcalc_flags |= RRDCALC_FLAG_WARN_ERROR;
                             error("Health alarm '%s.%s': warning expression failed with error: %s",
                                   rc->chart?rc->chart:"NOCHART", rc->name, buffer_tostring(rc->warning->error_msg));
                         }
                     }
                     else {
-                        if(unlikely(rc->rrdcalc_options & RRDCALC_OPTION_WARN_ERROR))
-                            rc->rrdcalc_options &= ~RRDCALC_OPTION_WARN_ERROR;
+                        if(unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_WARN_ERROR))
+                            rc->rrdcalc_flags &= ~RRDCALC_FLAG_WARN_ERROR;
 
                         debug(D_HEALTH, "Health alarm '%s.%s': warning expression gave value "
                                 CALCULATED_NUMBER_FORMAT
@@ -1806,15 +1897,15 @@ void *health_main(void *ptr) {
                         debug(D_HEALTH, "Health alarm '%s.%s': critical expression failed with error: %s",
                               rc->chart?rc->chart:"NOCHART", rc->name, buffer_tostring(rc->critical->error_msg));
 
-                        if (unlikely(!(rc->rrdcalc_options & RRDCALC_OPTION_CRIT_ERROR))) {
-                            rc->rrdcalc_options |= RRDCALC_OPTION_CRIT_ERROR;
+                        if (unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_CRIT_ERROR))) {
+                            rc->rrdcalc_flags |= RRDCALC_FLAG_CRIT_ERROR;
                             error("Health alarm '%s.%s': critical expression failed with error: %s",
                                   rc->chart?rc->chart:"NOCHART", rc->name, buffer_tostring(rc->critical->error_msg));
                         }
                     }
                     else {
-                        if(unlikely(rc->rrdcalc_options & RRDCALC_OPTION_CRIT_ERROR))
-                            rc->rrdcalc_options &= ~RRDCALC_OPTION_CRIT_ERROR;
+                        if(unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_CRIT_ERROR))
+                            rc->rrdcalc_flags &= ~RRDCALC_FLAG_CRIT_ERROR;
 
                         debug(D_HEALTH, "Health alarm '%s.%s': critical expression gave value "
                                 CALCULATED_NUMBER_FORMAT
