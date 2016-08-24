@@ -125,7 +125,7 @@ then
 elif [ "${status}" = "CLEAR" ]
 then
     severity="Recovered from ${old_status}"
-    if [ $non_clear_duration > $duration ]
+    if [ $non_clear_duration -gt $duration ]
     then
         raised_for="<br/>(had issues for $(duration4human ${non_clear_duration}))"
     fi
@@ -133,7 +133,7 @@ then
 elif [ "${old_status}" = "WARNING" -a "${status}" = "CRITICAL" ]
 then
     severity="Escalated to ${status}"
-    if [ $non_clear_duration > $duration ]
+    if [ $non_clear_duration -gt $duration ]
     then
         raised_for="<br/>(has issues for $(duration4human ${non_clear_duration}))"
     fi
@@ -141,7 +141,7 @@ then
 elif [ "${old_status}" = "CRITICAL" -a "${status}" = "WARNING" ]
 then
     severity="Demoted to ${status}"
-    if [ $non_clear_duration > $duration ]
+    if [ $non_clear_duration -gt $duration ]
     then
         raised_for="<br/>(has issues for $(duration4human ${non_clear_duration}))"
     fi
