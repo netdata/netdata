@@ -44,6 +44,7 @@ typedef struct eval_node {
 #define EVAL_OPERATOR_SIGN_PLUS             'P'
 #define EVAL_OPERATOR_SIGN_MINUS            'M'
 #define EVAL_OPERATOR_ABS                   'A'
+#define EVAL_OPERATOR_IF_THEN_ELSE          '?'
 
 // ----------------------------------------------------------------------------
 // forward function definitions
@@ -73,29 +74,48 @@ static inline calculated_number eval_check_number(calculated_number n, int *erro
 }
 
 static inline calculated_number eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *v, int *error) {
-    static uint32_t this_hash = 0, now_hash = 0;
+    static uint32_t this_hash = 0, now_hash = 0, after_hash = 0, before_hash = 0;
+    calculated_number n;
 
     if(unlikely(this_hash == 0)) {
         this_hash = simple_hash("this");
         now_hash = simple_hash("now");
+        after_hash = simple_hash("after");
+        before_hash = simple_hash("before");
     }
 
-    if(exp->this && v->hash == this_hash && !strcmp(v->name, "this")) {
+    if(v->hash == this_hash && !strcmp(v->name, "this")) {
+        n = (exp->this)?*exp->this:NAN;
         buffer_strcat(exp->error_msg, "[ $this = ");
-        print_parsed_as_constant(exp->error_msg, *exp->this);
+        print_parsed_as_constant(exp->error_msg, n);
         buffer_strcat(exp->error_msg, " ] ");
-        return *exp->this;
+        return n;
+    }
+
+    if(v->hash == after_hash && !strcmp(v->name, "after")) {
+        n = (exp->after && *exp->after)?*exp->after:NAN;
+        buffer_strcat(exp->error_msg, "[ $after = ");
+        print_parsed_as_constant(exp->error_msg, n);
+        buffer_strcat(exp->error_msg, " ] ");
+        return n;
+    }
+
+    if(v->hash == before_hash && !strcmp(v->name, "before")) {
+        n = (exp->before && *exp->before)?*exp->before:NAN;
+        buffer_strcat(exp->error_msg, "[ $before = ");
+        print_parsed_as_constant(exp->error_msg, n);
+        buffer_strcat(exp->error_msg, " ] ");
+        return n;
     }
 
     if(v->hash == now_hash && !strcmp(v->name, "now")) {
-        calculated_number n = time(NULL);
+        n = time(NULL);
         buffer_strcat(exp->error_msg, "[ $now = ");
         print_parsed_as_constant(exp->error_msg, n);
         buffer_strcat(exp->error_msg, " ] ");
         return n;
     }
 
-    calculated_number n;
     if(exp->rrdcalc && health_variable_lookup(v->name, v->hash, exp->rrdcalc, &n)) {
         buffer_sprintf(exp->error_msg, "[ $%s = ", v->name);
         print_parsed_as_constant(exp->error_msg, n);
@@ -134,57 +154,105 @@ static inline calculated_number eval_value(EVAL_EXPRESSION *exp, EVAL_VALUE *v, 
     return n;
 }
 
+static inline int is_true(calculated_number n) {
+    if(isnan(n)) return 0;
+    if(isinf(n)) return 1;
+    if(n == 0) return 0;
+    return 1;
+}
+
 calculated_number eval_and(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    return eval_value(exp, &op->ops[0], error) && eval_value(exp, &op->ops[1], error);
+    return is_true(eval_value(exp, &op->ops[0], error)) && is_true(eval_value(exp, &op->ops[1], error));
 }
 calculated_number eval_or(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    return eval_value(exp, &op->ops[0], error) || eval_value(exp, &op->ops[1], error);
+    return is_true(eval_value(exp, &op->ops[0], error)) || is_true(eval_value(exp, &op->ops[1], error));
 }
 calculated_number eval_greater_than_or_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    return eval_value(exp, &op->ops[0], error) >= eval_value(exp, &op->ops[1], error);
+    calculated_number n1 = eval_value(exp, &op->ops[0], error);
+    calculated_number n2 = eval_value(exp, &op->ops[1], error);
+    return isgreaterequal(n1, n2);
 }
 calculated_number eval_less_than_or_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    return eval_value(exp, &op->ops[0], error) <= eval_value(exp, &op->ops[1], error);
-}
-calculated_number eval_not_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    return eval_value(exp, &op->ops[0], error) != eval_value(exp, &op->ops[1], error);
+    calculated_number n1 = eval_value(exp, &op->ops[0], error);
+    calculated_number n2 = eval_value(exp, &op->ops[1], error);
+    return islessequal(n1, n2);
 }
 calculated_number eval_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    return eval_value(exp, &op->ops[0], error) == eval_value(exp, &op->ops[1], error);
+    calculated_number n1 = eval_value(exp, &op->ops[0], error);
+    calculated_number n2 = eval_value(exp, &op->ops[1], error);
+    if(isnan(n1) && isnan(n2)) return 1;
+    if(isinf(n1) && isinf(n2)) return 1;
+    if(isnan(n1) || isnan(n2)) return 0;
+    if(isinf(n1) || isinf(n2)) return 0;
+    return n1 == n2;
+}
+calculated_number eval_not_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+    return !eval_equal(exp, op, error);
 }
 calculated_number eval_less(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    return eval_value(exp, &op->ops[0], error) < eval_value(exp, &op->ops[1], error);
+    calculated_number n1 = eval_value(exp, &op->ops[0], error);
+    calculated_number n2 = eval_value(exp, &op->ops[1], error);
+    return isless(n1, n2);
 }
 calculated_number eval_greater(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    return eval_value(exp, &op->ops[0], error) > eval_value(exp, &op->ops[1], error);
+    calculated_number n1 = eval_value(exp, &op->ops[0], error);
+    calculated_number n2 = eval_value(exp, &op->ops[1], error);
+    return isgreater(n1, n2);
 }
 calculated_number eval_plus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    return eval_value(exp, &op->ops[0], error) + eval_value(exp, &op->ops[1], error);
+    calculated_number n1 = eval_value(exp, &op->ops[0], error);
+    calculated_number n2 = eval_value(exp, &op->ops[1], error);
+    if(isnan(n1) || isnan(n2)) return NAN;
+    if(isinf(n1) || isinf(n2)) return INFINITY;
+    return n1 + n2;
 }
 calculated_number eval_minus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    return eval_value(exp, &op->ops[0], error) - eval_value(exp, &op->ops[1], error);
+    calculated_number n1 = eval_value(exp, &op->ops[0], error);
+    calculated_number n2 = eval_value(exp, &op->ops[1], error);
+    if(isnan(n1) || isnan(n2)) return NAN;
+    if(isinf(n1) || isinf(n2)) return INFINITY;
+    return n1 - n2;
 }
 calculated_number eval_multiply(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    return eval_value(exp, &op->ops[0], error) * eval_value(exp, &op->ops[1], error);
+    calculated_number n1 = eval_value(exp, &op->ops[0], error);
+    calculated_number n2 = eval_value(exp, &op->ops[1], error);
+    if(isnan(n1) || isnan(n2)) return NAN;
+    if(isinf(n1) || isinf(n2)) return INFINITY;
+    return n1 * n2;
 }
 calculated_number eval_divide(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    return eval_value(exp, &op->ops[0], error) / eval_value(exp, &op->ops[1], error);
+    calculated_number n1 = eval_value(exp, &op->ops[0], error);
+    calculated_number n2 = eval_value(exp, &op->ops[1], error);
+    if(isnan(n1) || isnan(n2)) return NAN;
+    if(isinf(n1) || isinf(n2)) return INFINITY;
+    return n1 / n2;
 }
 calculated_number eval_nop(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
     return eval_value(exp, &op->ops[0], error);
 }
 calculated_number eval_not(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    return !eval_value(exp, &op->ops[0], error);
+    return !is_true(eval_value(exp, &op->ops[0], error));
 }
 calculated_number eval_sign_plus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
     return eval_value(exp, &op->ops[0], error);
 }
 calculated_number eval_sign_minus(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    return -eval_value(exp, &op->ops[0], error);
+    calculated_number n1 = eval_value(exp, &op->ops[0], error);
+    if(isnan(n1)) return NAN;
+    if(isinf(n1)) return INFINITY;
+    return -n1;
 }
 calculated_number eval_abs(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    calculated_number n = eval_value(exp, &op->ops[0], error);
-    return abs(n);
+    calculated_number n1 = eval_value(exp, &op->ops[0], error);
+    if(isnan(n1)) return NAN;
+    if(isinf(n1)) return INFINITY;
+    return abs(n1);
+}
+calculated_number eval_if_then_else(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+    if(is_true(eval_value(exp, &op->ops[0], error)))
+        return eval_value(exp, &op->ops[1], error);
+    else
+        return eval_value(exp, &op->ops[2], error);
 }
 
 static struct operator {
@@ -197,6 +265,7 @@ static struct operator {
         // this is a random access array
         // we always access it with a known EVAL_OPERATOR_X
 
+        [EVAL_OPERATOR_IF_THEN_ELSE]          = { "?",  1, 3, 0, eval_if_then_else },
         [EVAL_OPERATOR_AND]                   = { "&&", 2, 2, 0, eval_and },
         [EVAL_OPERATOR_OR]                    = { "||", 2, 2, 0, eval_or },
         [EVAL_OPERATOR_GREATER_THAN_OR_EQUAL] = { ">=", 3, 2, 0, eval_greater_than_or_equal },
@@ -217,7 +286,7 @@ static struct operator {
         [EVAL_OPERATOR_EXPRESSION_OPEN]       = { NULL, 7, 1, 0, eval_nop },
 
         // this should exist in our evaluation list
-        [EVAL_OPERATOR_EXPRESSION_CLOSE]      = { NULL, 7, 1, 0, eval_nop }
+        [EVAL_OPERATOR_EXPRESSION_CLOSE]      = { NULL, 99, 1, 0, eval_nop }
 };
 
 #define eval_precedence(operator) (operators[(unsigned char)(operator)].precedence)
@@ -316,6 +385,18 @@ static inline void print_parsed_as_node(BUFFER *out, EVAL_NODE *op, int *error) 
             buffer_sprintf(out, " %s ", operators[op->operator].print_as);
 
         print_parsed_as_value(out, &op->ops[1], error);
+        buffer_strcat(out, ")");
+    }
+    else if(op->operator == EVAL_OPERATOR_IF_THEN_ELSE && operators[op->operator].parameters == 3) {
+        buffer_strcat(out, "(");
+        print_parsed_as_value(out, &op->ops[0], error);
+
+        if(operators[op->operator].print_as)
+            buffer_sprintf(out, " %s ", operators[op->operator].print_as);
+
+        print_parsed_as_value(out, &op->ops[1], error);
+        buffer_strcat(out, " : ");
+        print_parsed_as_value(out, &op->ops[2], error);
         buffer_strcat(out, ")");
     }
 
@@ -617,6 +698,18 @@ static inline int parse_abs(const char **string) {
     return 0;
 }
 
+static inline int parse_if_then_else(const char **string) {
+    const char *s = *string;
+
+    // ?
+    if(s[0] == '?') {
+        *string = &s[1];
+        return 1;
+    }
+
+    return 0;
+}
+
 static struct operator_parser {
     unsigned char id;
     int (*parse)(const char **);
@@ -638,6 +731,7 @@ static struct operator_parser {
         { EVAL_OPERATOR_MINUS,                 parse_minus },
         { EVAL_OPERATOR_MULTIPLY,              parse_multiply },
         { EVAL_OPERATOR_DIVIDE,                parse_divide },
+        { EVAL_OPERATOR_IF_THEN_ELSE,          parse_if_then_else },
 
         /* we should not put in this list the following:
          *
@@ -830,9 +924,35 @@ static inline EVAL_NODE *parse_rest_of_expression(const char **string, int *erro
             return NULL;
         }
 
-        EVAL_NODE *op = eval_node_alloc(2);
+        EVAL_NODE *op = eval_node_alloc(operators[operator].parameters);
         op->operator = operator;
         op->precedence = precedence;
+
+        if(operator == EVAL_OPERATOR_IF_THEN_ELSE && op->count == 3) {
+            skip_spaces(string);
+
+            if(**string != ':') {
+                eval_node_free(op);
+                eval_node_free(op1);
+                eval_node_free(op2);
+                *error = EVAL_ERROR_IF_THEN_ELSE_MISSING_ELSE;
+                return NULL;
+            }
+            (*string)++;
+
+            skip_spaces(string);
+
+            EVAL_NODE *op3 = parse_one_full_operand(string, error);
+            if(!op3) {
+                eval_node_free(op);
+                eval_node_free(op1);
+                eval_node_free(op2);
+                // error is already reported
+                return NULL;
+            }
+
+            eval_node_set_value_to_node(op, 2, op3);
+        }
 
         eval_node_set_value_to_node(op, 1, op2);
 
@@ -854,7 +974,7 @@ static inline EVAL_NODE *parse_rest_of_expression(const char **string, int *erro
         ;
     }
     else if(**string) {
-        if(op1) eval_node_free(op1);
+        eval_node_free(op1);
         op1 = NULL;
         *error = EVAL_ERROR_MISSING_OPERATOR;
     }
@@ -989,6 +1109,9 @@ const char *expression_strerror(int error) {
 
         case EVAL_ERROR_UNKNOWN_VARIABLE:
             return "undefined variable";
+
+        case EVAL_ERROR_IF_THEN_ELSE_MISSING_ELSE:
+            return "missing second sub-expression of inline conditional";
 
         default:
             return "unknown error";
