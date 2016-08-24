@@ -24,7 +24,7 @@ ORDER = ['cache', 'net', 'connections', 'items', 'evicted_reclaimed',
 
 CHARTS = {
     'cache': {
-        'options': [None, 'Cache Size', 'kilobytes', 'Cache', 'memcached.cache', 'stacked'],
+        'options': [None, 'Cache Size', 'megabytes', 'Cache', 'memcached.cache', 'stacked'],
         'lines': [
             ['bytes', 'used', 'absolute', 1, 1048576],
             ['available', 'available', 'absolute', 1, 1048576]
