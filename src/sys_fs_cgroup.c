@@ -802,8 +802,8 @@ void found_subdir_in_dir(const char *dir) {
 int find_dir_in_subdirs(const char *base, const char *this, void (*callback)(const char *)) {
     debug(D_CGROUP, "searching for directories in '%s'", base);
 
-    int ret = 0;
-    int enabled = 0;
+    int ret = -1;
+    int enabled = -1;
     if(!this) this = base;
     size_t dirlen = strlen(this), baselen = strlen(base);
     const char *relative_path = &this[baselen];
