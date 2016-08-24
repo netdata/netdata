@@ -24,10 +24,10 @@ ORDER = ['cache', 'net', 'connections', 'items', 'evicted_reclaimed',
 
 CHARTS = {
     'cache': {
-        'options': [None, 'Cache Size', 'kilobytes', 'Cache', 'memcached.cache', 'line'],
+        'options': [None, 'Cache Size', 'kilobytes', 'Cache', 'memcached.cache', 'stacked'],
         'lines': [
-            ['bytes', 'used', 'absolute', 1, 1024],
-            ['limit_maxbytes', 'total', 'absolute', 1, 1024]
+            ['bytes', 'used', 'absolute', 1, 1048576],
+            ['available', 'available', 'absolute', 1, 1048576]
         ]},
     'net': {
         'options': [None, 'Network', 'kilobytes/s', 'Network', 'memcached.net', 'line'],
@@ -145,6 +145,11 @@ class Service(SocketService):
             data['hit_rate'] = int((data['keyspace_hits'] / float(data['keyspace_hits'] + data['keyspace_misses'])) * 100)
         except:
             data['hit_rate'] = 0
+
+        try:
+            data['available'] = int(data['limit_maxbytes']) - int(data['bytes'])
+        except:
+            pass
 
         if len(data) == 0:
             self.error("received data doesn't have needed records")
