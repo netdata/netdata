@@ -117,7 +117,7 @@ void buffer_strcat(BUFFER *wb, const char *txt)
     buffer_need_bytes(wb, 1);
 
     char *s = &wb->buffer[wb->len], *start, *end = &wb->buffer[wb->size];
-    long len = wb->len;
+    size_t len = wb->len;
 
     start = s;
     while(*txt && s != end)
@@ -213,7 +213,13 @@ void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
 void buffer_rrd_value(BUFFER *wb, calculated_number value)
 {
     buffer_need_bytes(wb, 50);
-    wb->len += print_calculated_number(&wb->buffer[wb->len], value);
+
+    if(isnan(value) || isinf(value)) {
+        buffer_strcat(wb, "null");
+        return;
+    }
+    else
+        wb->len += print_calculated_number(&wb->buffer[wb->len], value);
 
     // terminate it
     buffer_need_bytes(wb, 1);

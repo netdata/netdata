@@ -1414,83 +1414,112 @@ void health_init(void) {
 // ----------------------------------------------------------------------------
 // JSON generation
 
+static inline void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix) {
+    if(value && *value)
+        buffer_sprintf(wb, "%s\"%s\":\"%s\"%s", prefix, label, value, suffix);
+    else
+        buffer_sprintf(wb, "%s\"%s\":null%s", prefix, label, suffix);
+}
+
 static inline void health_rrdcalc2json_nolock(BUFFER *wb, RRDCALC *rc) {
+
     buffer_sprintf(wb,
-           "\t\t\"%s.%s\": {"
+           "\t\t\"%s.%s\": {\n"
                    "\t\t\t\"name\": \"%s\",\n"
                    "\t\t\t\"chart\": \"%s\",\n"
-                   "\t\t\t\"dimensions\": \"%s\",\n"
                    "\t\t\t\"exec\": \"%s\",\n"
                    "\t\t\t\"source\": \"%s\",\n"
-                   "\t\t\t\"calc\": \"%s\",\n"
-                   "\t\t\t\"calc_parsed\": \"%s\",\n"
-                   "\t\t\t\"warn\": \"%s\",\n"
-                   "\t\t\t\"warn_parsed\": \"%s\",\n"
-                   "\t\t\t\"crit\": \"%s\",\n"
-                   "\t\t\t\"crit_parsed\": \"%s\",\n"
-                   "\t\t\t\"value\": %Lf,\n"
-                   "\t\t\t\"value_after\": %lu,\n"
-                   "\t\t\t\"value_before\": %lu,\n"
-                   "\t\t\t\"green\": %Lf,\n"
-                   "\t\t\t\"red\": %Lf,\n"
                    "\t\t\t\"status\": \"%s\",\n"
                    "\t\t\t\"last_status_change\": %lu,\n"
                    "\t\t\t\"last_updated\": %lu,\n"
                    "\t\t\t\"next_update\": %lu,\n"
                    "\t\t\t\"update_every\": %d,\n"
-                   "\t\t\t\"lookup_method\": \"%s\",\n"
-                   "\t\t\t\"lookup_after\": %d,\n"
-                   "\t\t\t\"lookup_before\": %d,\n"
-                   "\t\t\t\"lookup_options\": \""
             , rc->chart, rc->name
             , rc->name
             , rc->chart
-            , rc->dimensions?rc->dimensions:""
             , rc->exec?rc->exec:health_default_exec
             , rc->source
-            , rc->calculation?rc->calculation->source:""
-            , rc->calculation?rc->calculation->parsed_as:""
-            , rc->warning?rc->warning->source:""
-            , rc->warning?rc->warning->parsed_as:""
-            , rc->critical?rc->critical->source:""
-            , rc->critical?rc->critical->parsed_as:""
-            , rc->value
-            , (unsigned long)rc->db_after
-            , (unsigned long)rc->db_before
-            , rc->green
-            , rc->red
             , rrdcalc_status2string(rc->status)
             , (unsigned long)rc->last_status_change
             , (unsigned long)rc->last_updated
             , (unsigned long)rc->next_update
             , rc->update_every
-            , group_method2string(rc->group)
-            , rc->after
-            , rc->before
     );
 
-    buffer_data_options2string(wb, rc->options);
-    buffer_strcat(wb, "\"\n\t}");
+    if(RRDCALC_HAS_DB_LOOKUP(rc)) {
+        if(rc->dimensions && *rc->dimensions)
+            health_string2json(wb, "\t\t\t", "lookup_dimensions", rc->dimensions, ",\n");
+
+        buffer_sprintf(wb,
+                       "\t\t\t\"db_after\": %lu,\n"
+                       "\t\t\t\"db_before\": %lu,\n"
+                       "\t\t\t\"lookup_method\": \"%s\",\n"
+                       "\t\t\t\"lookup_after\": %d,\n"
+                       "\t\t\t\"lookup_before\": %d,\n"
+                       "\t\t\t\"lookup_options\": \"",
+                       (unsigned long) rc->db_after,
+                       (unsigned long) rc->db_before,
+                       group_method2string(rc->group),
+                       rc->after,
+                       rc->before
+        );
+        buffer_data_options2string(wb, rc->options);
+        buffer_strcat(wb, "\",\n");
+    }
+
+    if(rc->calculation) {
+        health_string2json(wb, "\t\t\t", "calc", rc->calculation->source, ",\n");
+        health_string2json(wb, "\t\t\t", "calc_parsed", rc->calculation->parsed_as, ",\n");
+    }
+
+    if(rc->warning) {
+        health_string2json(wb, "\t\t\t", "warn", rc->warning->source, ",\n");
+        health_string2json(wb, "\t\t\t", "warn_parsed", rc->warning->parsed_as, ",\n");
+    }
+
+    if(rc->critical) {
+        health_string2json(wb, "\t\t\t", "crit", rc->critical->source, ",\n");
+        health_string2json(wb, "\t\t\t", "crit_parsed", rc->critical->parsed_as, ",\n");
+    }
+
+    buffer_strcat(wb, "\t\t\t\"green\":");
+    buffer_rrd_value(wb, rc->green);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\t\t\"red\":");
+    buffer_rrd_value(wb, rc->red);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\t\t\"value\":");
+    buffer_rrd_value(wb, rc->value);
+    buffer_strcat(wb, "\n");
+
+    buffer_strcat(wb, "\t\t}");
 }
 
 //void health_rrdcalctemplate2json_nolock(BUFFER *wb, RRDCALCTEMPLATE *rt) {
 //
 //}
 
-void health_json(RRDHOST *host, BUFFER *wb) {
+void health_alarms2json(RRDHOST *host, BUFFER *wb) {
+    int i;
     rrdhost_rdlock(&localhost);
 
-    buffer_strcat(wb, "{\n\t\"alarms\": {");
+    buffer_strcat(wb, "{\n\t\"alarms\": {\n");
     RRDCALC *rc;
-    for(rc = host->alarms; rc ; rc = rc->next)
+    for(i = 0, rc = host->alarms; rc ; rc = rc->next, i++) {
+        if(likely(i)) buffer_strcat(wb, ",\n");
         health_rrdcalc2json_nolock(wb, rc);
+    }
 
-    buffer_strcat(wb, "\n},\n\t\"templates\": {");
+    buffer_strcat(wb, "\n\t},\n\t\"templates\": {");
 
 //    RRDCALCTEMPLATE *rt;
 //    for(rt = host->templates; rt ; rt = rt->next)
 //        health_rrdcalctemplate2json_nolock(wb, rt);
 
+    buffer_strcat(wb, "\n\t}");
+    buffer_sprintf(wb, ",\n\t\"now\": %lu", (unsigned long)time(NULL));
     buffer_strcat(wb, "\n}\n");
     rrdhost_unlock(&localhost);
 }

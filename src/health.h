@@ -263,5 +263,6 @@ extern void *health_main(void *ptr);
 extern void health_reload(void);
 
 extern int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, calculated_number *result);
+extern void health_alarms2json(RRDHOST *host, BUFFER *wb);
 
 #endif //NETDATA_HEALTH_H
