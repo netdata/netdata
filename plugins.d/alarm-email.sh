@@ -37,7 +37,7 @@ hostname="${NETDATA_HOSTNAME}"
 [ -z "${hostname}" ] && hostname="${NETDATA_REGISTRY_HOSTNAME}"
 [ -z "${hostname}" ] && hostname="$(hostname)"
 
-goto_url="${NETDATA_REGISTRY_URL}/alarmcallback.html?machine_guid=${NETDATA_REGISTRY_UNIQUE_ID}&chart=${chart}&family=${family}"
+goto_url="${NETDATA_REGISTRY_URL}/goto-host-from-alarm.html?machine_guid=${NETDATA_REGISTRY_UNIQUE_ID}&chart=${chart}&family=${family}"
 
 # get the current date
 date="$(date)"
@@ -202,6 +202,13 @@ Content-Type: text/html
                                             align="left" valign="top">
                                             <span>${alarm}</span>
                                             <span style="display:block;color:#666666;font-size:12px;font-weight:300;line-height:1;text-transform:uppercase">Alarm</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-size:18px;vertical-align:top;margin:0;padding:0 0 20px"
+                                            align="left" valign="top">
+                                            <span>${family}</span>
+                                            <span style="display:block;color:#666666;font-size:12px;font-weight:300;line-height:1;text-transform:uppercase">Family</span>
                                         </td>
                                     </tr>
                                     <tr style="margin:0;padding:0">
