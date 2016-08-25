@@ -304,6 +304,7 @@ struct rrdhost {
     // RRDCALCs may be linked to charts at any point
     // (charts may or may not exist when these are loaded)
     RRDCALC *alarms;
+    ALARM_LOG health_log;
 
     RRDCALCTEMPLATE *templates;
 };

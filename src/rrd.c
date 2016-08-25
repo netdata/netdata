@@ -40,6 +40,13 @@ RRDHOST localhost = {
         .variables_root_index = {
             { NULL, rrdvar_compare },
             AVL_LOCK_INITIALIZER
+        },
+        .health_log = {
+            .nextid = 1,
+            .count = 0,
+            .max = 1000,
+            .alarms = NULL,
+            .alarm_log_rwlock = PTHREAD_RWLOCK_INITIALIZER
         }
 };
 

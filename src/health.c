@@ -5,13 +5,6 @@
 static const char *health_default_exec = PLUGINS_DIR "/alarm-email.sh";
 int health_enabled = 1;
 
-ALARM_LOG health_log = {
-        .nextid = 0,
-        .count = 0,
-        .max = 1000,
-        .alarms = NULL
-};
-
 // ----------------------------------------------------------------------------
 // RRDVAR management
 
@@ -443,6 +436,7 @@ static inline const char *rrdcalc_status2string(int status) {
 static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     debug(D_HEALTH, "Health linking alarm '%s.%s' to chart '%s' of host '%s'", rc->chart?rc->chart:"NOCHART", rc->name, st->id, st->rrdhost->hostname);
 
+    rc->last_status_change = time(NULL);
     rc->rrdset = st;
 
     rc->rrdset_next = st->alarms;
@@ -1399,12 +1393,12 @@ void health_init(void) {
         health_default_exec = config_get("health", "script to execute on alarm", buffer);
     }
 
-    long n = config_get_number("health", "in memory max health log entries", (long)health_log.max);
+    long n = config_get_number("health", "in memory max health log entries", (long)localhost.health_log.max);
     if(n < 2) {
-        error("Health configuration has invalid max log entries %ld. Using default %u", n, health_log.max);
-        config_set_number("health", "in memory max health log entries", (long)health_log.max);
+        error("Health configuration has invalid max log entries %ld. Using default %u", n, localhost.health_log.max);
+        config_set_number("health", "in memory max health log entries", (long)localhost.health_log.max);
     }
-    else health_log.max = (unsigned int)n;
+    else localhost.health_log.max = (unsigned int)n;
 
     rrdhost_rwlock(&localhost);
     health_readdir(path);
@@ -1421,12 +1415,78 @@ static inline void health_string2json(BUFFER *wb, const char *prefix, const char
         buffer_sprintf(wb, "%s\"%s\":null%s", prefix, label, suffix);
 }
 
-static inline void health_rrdcalc2json_nolock(BUFFER *wb, RRDCALC *rc) {
+static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae) {
+    buffer_sprintf(wb, "\n\t{\n"
+                           "\t\t\"id\":%u,\n"
+                           "\t\t\"name\":\"%s\",\n"
+                           "\t\t\"chart\":\"%s\",\n"
+                           "\t\t\"family\":\"%s\",\n"
+                           "\t\t\"processed\":%s,\n"
+                           "\t\t\"updated\":%s,\n"
+                           "\t\t\"exec_run\":%s,\n"
+                           "\t\t\"exec_failed\":%s,\n"
+                           "\t\t\"exec\":\"%s\",\n"
+                           "\t\t\"exec_code\":%d,\n"
+                           "\t\t\"source\":\"%s\",\n"
+                           "\t\t\"when\":%lu,\n"
+                           "\t\t\"duration\":%lu,\n"
+                           "\t\t\"non_clear_duration\":%lu,\n"
+                           "\t\t\"status\":\"%s\",\n"
+                           "\t\t\"old_status\":\"%s\",\n",
+                   ae->id,
+                   ae->name,
+                   ae->chart,
+                   ae->family,
+                   (ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_PROCESSED)?"true":"false",
+                   (ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_UPDATED)?"true":"false",
+                   (ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_EXEC_RUN)?"true":"false",
+                   (ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_EXEC_FAILED)?"true":"false",
+                   ae->exec?ae->exec:health_default_exec,
+                   ae->exec_code,
+                   ae->source,
+                   (unsigned long)ae->when,
+                   (unsigned long)ae->duration,
+                   (unsigned long)ae->non_clear_duration,
+                   rrdcalc_status2string(ae->new_status),
+                   rrdcalc_status2string(ae->old_status)
+    );
 
+    buffer_strcat(wb, "\t\t\"value\":");
+    buffer_rrd_value(wb, ae->new_value);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\t\"old_value\":");
+    buffer_rrd_value(wb, ae->old_value);
+    buffer_strcat(wb, "\n");
+
+    buffer_strcat(wb, "\t}");
+}
+
+void health_alarm_log2json(RRDHOST *host, BUFFER *wb) {
+    pthread_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+
+    buffer_strcat(wb, "[");
+
+    unsigned int max = host->health_log.max;
+    unsigned int count = 0;
+    ALARM_ENTRY *ae;
+    for(ae = host->health_log.alarms; ae && count < max ; count++, ae = ae->next) {
+        if(likely(count)) buffer_strcat(wb, ",");
+        health_alarm_entry2json_nolock(wb, ae);
+    }
+
+    buffer_strcat(wb, "\n]\n");
+
+    pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+}
+
+static inline void health_rrdcalc2json_nolock(BUFFER *wb, RRDCALC *rc) {
     buffer_sprintf(wb,
            "\t\t\"%s.%s\": {\n"
                    "\t\t\t\"name\": \"%s\",\n"
                    "\t\t\t\"chart\": \"%s\",\n"
+                   "\t\t\t\"family\": \"%s\",\n"
+                   "\t\t\t\"active\": %s,\n"
                    "\t\t\t\"exec\": \"%s\",\n"
                    "\t\t\t\"source\": \"%s\",\n"
                    "\t\t\t\"status\": \"%s\",\n"
@@ -1437,6 +1497,8 @@ static inline void health_rrdcalc2json_nolock(BUFFER *wb, RRDCALC *rc) {
             , rc->chart, rc->name
             , rc->name
             , rc->chart
+            , (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:""
+            , (rc->rrdset)?"true":"false"
             , rc->exec?rc->exec:health_default_exec
             , rc->source
             , rrdcalc_status2string(rc->status)
@@ -1508,6 +1570,8 @@ void health_alarms2json(RRDHOST *host, BUFFER *wb) {
     buffer_strcat(wb, "{\n\t\"alarms\": {\n");
     RRDCALC *rc;
     for(i = 0, rc = host->alarms; rc ; rc = rc->next, i++) {
+        if(!rc->rrdset) continue;
+
         if(likely(i)) buffer_strcat(wb, ",\n");
         health_rrdcalc2json_nolock(wb, rc);
     }
@@ -1624,6 +1688,8 @@ static inline void health_alarm_execute(ALARM_ENTRY *ae) {
               (uint32_t)ae->non_clear_duration
     );
 
+    ae->notifications |= HEALTH_ENTRY_NOTIFICATIONS_EXEC_RUN;
+
     debug(D_HEALTH, "executing command '%s'", buffer);
     FILE *fp = mypopen(buffer, &command_pid);
     if(!fp) {
@@ -1634,8 +1700,11 @@ static inline void health_alarm_execute(ALARM_ENTRY *ae) {
     char *s = fgets(buffer, FILENAME_MAX, fp);
     (void)s;
     debug(D_HEALTH, "HEALTH closing command");
-    mypclose(fp, command_pid);
-    debug(D_HEALTH, "closed command");
+    ae->exec_code = mypclose(fp, command_pid);
+    debug(D_HEALTH, "done executing command - returned with code %d", ae->exec_code);
+
+    if(ae->exec_code != 0)
+        ae->notifications |= HEALTH_ENTRY_NOTIFICATIONS_EXEC_FAILED;
 }
 
 static inline void health_process_notifications(ALARM_ENTRY *ae) {
@@ -1649,7 +1718,7 @@ static inline void health_process_notifications(ALARM_ENTRY *ae) {
     health_alarm_execute(ae);
 }
 
-static inline void health_alarm_log(time_t when,
+static inline void health_alarm_log(RRDHOST *host, time_t when,
                 const char *name, const char *chart, const char *family,
                 const char *exec, time_t duration,
                 calculated_number old_value, calculated_number new_value,
@@ -1671,7 +1740,7 @@ static inline void health_alarm_log(time_t when,
     if(exec) ae->exec = strdupz(exec);
     if(source) ae->source = strdupz(source);
 
-    ae->id = health_log.nextid++;
+    ae->id = host->health_log.nextid++;
     ae->when = when;
     ae->old_value = old_value;
     ae->new_value = new_value;
@@ -1683,13 +1752,16 @@ static inline void health_alarm_log(time_t when,
         ae->non_clear_duration += ae->duration;
 
     // link it
-    ae->next = health_log.alarms;
-    health_log.alarms = ae;
-    health_log.count++;
+    pthread_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
+    ae->next = host->health_log.alarms;
+    host->health_log.alarms = ae;
+    host->health_log.count++;
+    pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
     // match previous alarms
+    pthread_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
     ALARM_ENTRY *t;
-    for(t = health_log.alarms ; t ; t = t->next) {
+    for(t = host->health_log.alarms ; t ; t = t->next) {
         if(t != ae &&
                 t->hash_name == ae->hash_name &&
                 t->hash_chart == ae->hash_chart &&
@@ -1710,13 +1782,16 @@ static inline void health_alarm_log(time_t when,
             }
         }
     }
+    pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 }
 
-static inline void health_alarm_log_process(void) {
+static inline void health_alarm_log_process(RRDHOST *host) {
     static uint32_t last_processed = 0;
     ALARM_ENTRY *ae;
 
-    for(ae = health_log.alarms; ae ;ae = ae->next) {
+    pthread_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+
+    for(ae = host->health_log.alarms; ae ;ae = ae->next) {
         if(last_processed >= ae->id) break;
 
         if(!(ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_PROCESSED) &&
@@ -1726,18 +1801,25 @@ static inline void health_alarm_log_process(void) {
         }
     }
 
-    if(health_log.alarms)
-        last_processed = health_log.alarms->id;
+    if(host->health_log.alarms)
+        last_processed = host->health_log.alarms->id;
 
-    if(health_log.count <= health_log.max)
+    pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+
+    if(host->health_log.count <= host->health_log.max)
         return;
 
     // cleanup excess entries in the log
+    pthread_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
+
     ALARM_ENTRY *last = NULL;
-    unsigned int count = health_log.max;
-    for(ae = health_log.alarms; ae && count ; count--, last = ae, ae = ae->next) ;
-    if(!ae || !last || last->next != ae) return;
-    last->next = NULL;
+    unsigned int count = host->health_log.max;
+    for(ae = host->health_log.alarms; ae && count ; count--, last = ae, ae = ae->next) ;
+
+    if(ae && last && last->next == ae)
+        last->next = NULL;
+    else
+        ae = NULL;
 
     while(ae) {
         ALARM_ENTRY *t = ae->next;
@@ -1750,6 +1832,8 @@ static inline void health_alarm_log_process(void) {
 
         ae = t;
     }
+
+    pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 }
 
 void *health_main(void *ptr) {
@@ -1984,7 +2068,7 @@ void *health_main(void *ptr) {
                 }
 
                 if(status != rc->status) {
-                    health_alarm_log(time(NULL), rc->name, rc->rrdset->id, rc->rrdset->family, rc->exec, now - rc->last_status_change, rc->old_value, rc->value, rc->status, status, rc->source);
+                    health_alarm_log(&localhost, time(NULL), rc->name, rc->rrdset->id, rc->rrdset->family, rc->exec, now - rc->last_status_change, rc->old_value, rc->value, rc->status, status, rc->source);
                     rc->last_status_change = now;
                     rc->status = status;
                 }
@@ -2004,7 +2088,7 @@ void *health_main(void *ptr) {
 
         // execute notifications
         // and cleanup
-        health_alarm_log_process();
+        health_alarm_log_process(&localhost);
 
         now = time(NULL);
         if(now < next_run) {
