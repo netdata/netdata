@@ -617,6 +617,9 @@ uint32_t web_client_api_request_v1_data_google_format(char *name)
 
 const char *group_method2string(int group) {
     switch(group) {
+        case GROUP_UNDEFINED:
+            return "";
+
         case GROUP_AVERAGE:
             return "average";
 
@@ -655,6 +658,16 @@ int web_client_api_request_v1_data_group(char *name, int def)
         return GROUP_INCREMENTAL_SUM;
 
     return def;
+}
+
+int web_client_api_request_v1_alarms(struct web_client *w, char *url)
+{
+    (void)url;
+
+    buffer_flush(w->response.data);
+    w->response.data->contenttype = CT_APPLICATION_JSON;
+    health_alarms2json(&localhost, w->response.data);
+    return 200;
 }
 
 int web_client_api_request_v1_charts(struct web_client *w, char *url)
@@ -713,7 +726,7 @@ cleanup:
     return ret;
 }
 
-int web_client_api_v1_badge(struct web_client *w, char *url) {
+int web_client_api_request_v1_badge(struct web_client *w, char *url) {
     int ret = 400;
     buffer_flush(w->response.data);
 
@@ -1311,7 +1324,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 }
 
 int web_client_api_request_v1(struct web_client *w, char *url) {
-    static uint32_t hash_data = 0, hash_chart = 0, hash_charts = 0, hash_registry = 0, hash_badge = 0;
+    static uint32_t hash_data = 0, hash_chart = 0, hash_charts = 0, hash_registry = 0, hash_badge = 0, hash_alarms = 0;
 
     if(unlikely(hash_data == 0)) {
         hash_data = simple_hash("data");
@@ -1319,6 +1332,7 @@ int web_client_api_request_v1(struct web_client *w, char *url) {
         hash_charts = simple_hash("charts");
         hash_registry = simple_hash("registry");
         hash_badge = simple_hash("badge.svg");
+        hash_alarms = simple_hash("alarms");
     }
 
     // get the command
@@ -1340,7 +1354,10 @@ int web_client_api_request_v1(struct web_client *w, char *url) {
             return web_client_api_request_v1_registry(w, url);
 
         else if(hash == hash_badge && !strcmp(tok, "badge.svg"))
-            return web_client_api_v1_badge(w, url);
+            return web_client_api_request_v1_badge(w, url);
+
+        else if(hash == hash_alarms && !strcmp(tok, "alarms"))
+            return web_client_api_request_v1_alarms(w, url);
 
         else {
             buffer_flush(w->response.data);
