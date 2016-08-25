@@ -222,6 +222,8 @@ typedef struct alarm_entry {
     char *chart;
     uint32_t hash_chart;
 
+    char *family;
+
     char *exec;
     char *source;
     calculated_number old_value;
