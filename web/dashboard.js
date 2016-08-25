@@ -16,6 +16,7 @@
 // var netdataRegistryCallback = null;  // Callback function that will be invoked with one param,
 //                                         the URLs from the registry
 // var netdataShowHelp = true;          // enable/disable help
+// var netdataShowAlarms = true;        // enable/disable help
 //
 // You can also set the default netdata server, using the following.
 // When this variable is not set, we assume the page is hosted on your
@@ -156,6 +157,9 @@
 
     if(typeof netdataShowHelp === 'undefined')
         netdataShowHelp = true;
+
+    if(typeof netdataShowAlarms === 'undefined')
+        netdataShowAlarms = true;
 
     NETDATA.colors = NETDATA.themes.current.colors;
 
@@ -473,6 +477,8 @@
         // console.log('onscroll');
 
         NETDATA.options.last_page_scroll = new Date().getTime();
+        NETDATA.options.auto_refresher_stop_until = 0;
+
         if(NETDATA.options.targets === null) return;
 
         // when the user scrolls he sees that we have
@@ -481,7 +487,16 @@
         // the charts back to visible quickly
         var targets = NETDATA.options.targets;
         var len = targets.length;
-        while(len--) targets[len].isVisible();
+        while(len--) {
+            if(targets[len]._updating === true) {
+                if (typeof targets[len].xhr !== 'undefined') {
+                    targets[len].xhr.abort();
+                    targets[len].running = false;
+                    targets[len]._updating = false;
+                }
+                targets[len].isVisible();
+            }
+        }
     };
 
     window.onresize = NETDATA.onresize;
@@ -505,7 +520,9 @@
         411: { message: "Netdata registry server send invalid response to DELETE ", alert: false },
         412: { message: "Netdata registry DELETE failed", alert: false },
         413: { message: "Netdata registry server send invalid response to SWITCH ", alert: false },
-        414: { message: "Netdata registry SWITCH failed", alert: false }
+        414: { message: "Netdata registry SWITCH failed", alert: false },
+        415: { message: "Netdata alarms download failed", alert: false },
+        416: { message: "Netdata alarms log download failed", alert: false }
     };
     NETDATA.errorLast = {
         code: 0,
@@ -2810,16 +2827,23 @@
                 async: true,
                 xhrFields: { withCredentials: true } // required for the cookie
             })
-            .success(function(data) {
+            .done(function(data) {
+                that.xhr = undefined;
+
                 if(that.debug === true)
                     that.log('data received. updating chart.');
 
                 that.updateChartWithData(data);
             })
-            .fail(function() {
-                error('data download failed for url: ' + that.data_url);
+            .fail(function(msg) {
+                that.xhr = undefined;
+
+                if(msg.statusText !== 'abort')
+                    error('data download failed for url: ' + that.data_url);
             })
             .always(function() {
+                that.xhr = undefined;
+
                 NETDATA.statistics.refreshes_active--;
                 that._updating = false;
                 if(typeof callback === 'function') callback();
@@ -3283,6 +3307,8 @@
     // the first set will be executed in parallel
     // the second will be given to NETDATA.chartRefresher_uninitialized()
     NETDATA.chartRefresher = function() {
+        // console.log('auto-refresher...');
+
         if(NETDATA.options.pause === true) {
             // console.log('auto-refresher is paused');
             setTimeout(NETDATA.chartRefresher,
@@ -3299,6 +3325,7 @@
         }
 
         if(NETDATA.options.current.parallel_refresher === false) {
+            // console.log('auto-refresher is calling chartRefresherNoParallel(0)');
             NETDATA.chartRefresherNoParallel(0);
             return;
         }
@@ -3306,6 +3333,7 @@
         if(NETDATA.options.updated_dom === true) {
             // the dom has been updated
             // get the dom parts again
+            // console.log('auto-refresher is calling parseDom()');
             NETDATA.parseDom(NETDATA.chartRefresher);
             return;
         }
@@ -3333,10 +3361,14 @@
         }
 
         if(parallel.length > 0) {
+            // console.log('auto-refresher executing in parallel for ' + parallel.length.toString() + ' charts');
             // this will execute the jobs in parallel
             $(parallel).each(function() {
                 this.autoRefresh();
             })
+        }
+        else {
+            console.log('auto-refresher nothing to do');
         }
 
         // run the next refresh iteration
@@ -3407,8 +3439,12 @@
 
         NETDATA.parseDom(NETDATA.chartRefresher);
 
+        // Alarms initialization
+        if(netdataShowAlarms === true)
+            setTimeout(NETDATA.alarms.init, 1000);
+
         // Registry initialization
-        setTimeout(NETDATA.registry.init, 1000);
+        setTimeout(NETDATA.registry.init, 1500);
     };
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -5527,6 +5563,70 @@
         NETDATA.loadRequiredCSS(++index);
     };
 
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // Registry of netdata hosts
+
+    NETDATA.alarms = {
+        current: null,
+        callback: null,
+
+        get: function(what, callback) {
+            $.ajax({
+                url: NETDATA.serverDefault + '/api/v1/alarms?' + what.toString(),
+                async: true,
+                cache: false,
+                xhrFields: { withCredentials: true } // required for the cookie
+            })
+                .done(function(data) {
+                    if(typeof callback === 'function')
+                        callback(data);
+                })
+                .fail(function() {
+                    NETDATA.error(415, host);
+
+                    if(typeof callback === 'function')
+                        callback(null);
+                });
+        },
+
+        update_forever: function() {
+            NETDATA.alarms.get('active', function(data) {
+                if(data !== null) {
+                    NETDATA.alarms.current = data;
+
+                    if (typeof NETDATA.alarms.callback === 'function') {
+                        NETDATA.alarms.callback(data);
+                    }
+                }
+
+                setTimeout(NETDATA.alarms.update_forever, 10000);
+            });
+        },
+
+        get_log: function(callback) {
+            $.ajax({
+                url: NETDATA.serverDefault + '/api/v1/alarm_log',
+                async: true,
+                cache: false,
+                xhrFields: { withCredentials: true } // required for the cookie
+            })
+                .done(function(data) {
+                    if(typeof callback === 'function')
+                        callback(data);
+                })
+                .fail(function() {
+                    NETDATA.error(416, host);
+
+                    if(typeof callback === 'function')
+                        callback(null);
+                });
+        },
+
+        init: function() {
+            NETDATA.alarms.update_forever();
+        }
+    };
 
     // ----------------------------------------------------------------------------------------------------------------
     // Registry of netdata hosts

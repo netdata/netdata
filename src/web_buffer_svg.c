@@ -1,7 +1,7 @@
 #include "common.h"
 
 #define BADGE_HORIZONTAL_PADDING 4
-#define VERDANA_KERNING 0.5
+#define VERDANA_KERNING 0.0
 
 /*
  * verdana11_widths[] has been generated with this method:

@@ -662,11 +662,19 @@ int web_client_api_request_v1_data_group(char *name, int def)
 
 int web_client_api_request_v1_alarms(struct web_client *w, char *url)
 {
-    (void)url;
+    int all = 0;
+
+    while(url) {
+        char *value = mystrsep(&url, "?&[]");
+        if (!value || !*value) continue;
+
+        if(!strcmp(value, "all")) all = 1;
+        else if(!strcmp(value, "active")) all = 0;
+    }
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    health_alarms2json(&localhost, w->response.data);
+    health_alarms2json(&localhost, w->response.data, all);
     return 200;
 }
 
@@ -737,6 +745,8 @@ cleanup:
 }
 
 int web_client_api_request_v1_badge(struct web_client *w, char *url) {
+    char buf[100 + 1];
+
     int ret = 400;
     buffer_flush(w->response.data);
 
@@ -851,8 +861,15 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
     }
 
     if(!label) {
-        if(alarm)
-            label = alarm;
+        if(alarm) {
+            snprintfz(buf, 100, "%s%s%s", (rc->rrdset)?rc->rrdset->family:"", (rc->rrdset)?": ":"", rc->name);
+            char *s = buf;
+            while(*s) {
+                if(*s == '_') *s = ' ';
+                s++;
+            }
+            label = buf;
+        }
         else if(dimensions) {
             const char *dim = buffer_tostring(dimensions);
             if(*dim == '|') dim++;
@@ -864,6 +881,8 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
     if(!units) {
         if(options & RRDR_OPTION_PERCENTAGE)
             units="%";
+        else if(alarm && rc && rc->calculation)
+            units = "";
         else
             units = st->units;
     }
