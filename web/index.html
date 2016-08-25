@@ -572,17 +572,19 @@
                     <span class="icon-bar"></span>
                     <span class="icon-bar"></span>
                 </button>
-                <a href="/" class="navbar-brand" id="hostname">netdata</a>
+                <a href="/" class="navbar-brand" id="hostname" title="reload the dashboard">netdata</a>
             </div>
             <nav class="collapse navbar-collapse navbar-right" role="navigation">
                 <ul class="nav navbar-nav">
-                    <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal"><i class="fa fa-cog"></i> settings</a></li>
-                    <li class="hidden-sm"><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank"><i class="fa fa-github"></i> community</a></li>
-                    <li class="hidden-sm" id="updateButton"><a href="#" class="btn" data-toggle="modal" data-target="#updateModal"><i class="fa fa-cloud-download"></i> update</a></li>
-                    <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#helpModal"><i class="fa fa-question-circle"></i> help</a></li>
+                    <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal" title="alarms"><i class="fa fa-bell"></i><span id="alarms_count_badge" class="badge"></span></a></li>
+                    <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal" title="dashboard settings"><i class="fa fa-cog"></i></a></li>
+                    <li class="hidden-sm"><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank" title="netdata community"><i class="fa fa-github"></i></a></li>
+                    <li class="hidden-sm" id="updateButton"><a href="#" class="btn" data-toggle="modal" data-target="#updateModal" title="check for update"><i class="fa fa-cloud-download"></i><span id="update_badge" class="badge"></span></a></li>
+                    <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#helpModal" title="dashboard help"><i class="fa fa-question-circle"></i></a></li>
                     <li class="dropdown hidden-md hidden-lg hidden-xs">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="current_view">Menu <strong class="caret"></strong></a>
                         <ul class="dropdown-menu scrollable-menu inpagemenu" role="menu">
+                            <li><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal"><i class="fa fa-cog"></i> alarms</a></li>
                             <li><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal"><i class="fa fa-cog"></i> settings</a></li>
                             <li><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank"><i class="fa fa-github"></i> community</a></li>
                             <li><a href="#" class="btn" data-toggle="modal" data-target="#helpModal"><i class="fa fa-question-circle"></i> help</a></li>
@@ -840,6 +842,42 @@
                     </div>
                 </div>
                 <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="alarmsModal" tabindex="-1" role="dialog" aria-labelledby="alarmsModalLabel">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="alarmsModalLabel">netdata alarms</h4>
+                </div>
+                <div class="modal-body">
+                    <!-- Nav tabs -->
+                    <ul class="nav nav-tabs" role="tablist">
+                        <li role="presentation" class="active"><a href="#alarms_active" aria-controls="alarms_active" role="tab" data-toggle="tab">Active</a></li>
+                        <li role="presentation"><a href="#alarms_all" aria-controls="alarms_all" role="tab" data-toggle="tab">All</a></li>
+                        <li role="presentation"><a href="#alarms_log" aria-controls="alarms_log" role="tab" data-toggle="tab">Log</a></li>
+                    </ul>
+
+                    <!-- Tab panes -->
+                    <div class="tab-content">
+                        <div role="tabpanel" class="tab-pane active" id="alarms_active">
+                            loading...
+                        </div>
+                        <div role="tabpanel" class="tab-pane" id="alarms_all">
+                            loading...
+                        </div>
+                        <div role="tabpanel" class="tab-pane" id="alarms_log">
+                            loading...
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <!-- <a href="#" onclick="alarmsUpdateModal(); return false;" type="button" class="btn btn-default">Update</a> -->
                     <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
                 </div>
             </div>
@@ -2363,6 +2401,92 @@ function renderChartsAndMenu(data) {
     renderPage(menus, data);
 }
 
+function alarmsUpdateModal() {
+    var active = '<h3>Raised Alarms</h3>';
+    var all = '<h3>All Running Alarms</h3>';
+    var log = '<h3>Alarm Log</h3>';
+    var footer = '<hr/>These are <a href="https://github.com/firehol/netdata/wiki/Generating-Badges" target="_blank">netdata badges</a>. You can copy and paste their URLs to embed them in any web page. Their color indicates the state of the alarm: <b>red</b> is critical, <b>orange</b> is warning, <b>bright green</b> is ok, <b>light grey</b> is undefined (i.e. no data or no status), <b>black</b> is not initialized.';
+
+    NETDATA.alarms.get('all', function(data) {
+        if(data === null) {
+            document.getElementById('alarms_active').innerHTML =
+                    document.getElementById('alarms_all').innerHTML =
+                            document.getElementById('alarms_log').innerHTML =
+                                    'failed to load alarm data!';
+            return;
+        }
+
+        var now = new Date().getTime();
+        var x;
+        var count_active = 0;
+        var count_all = 0;
+        var count_log = 0;
+        var families = {};
+        for(x in data.alarms) {
+            var alarm = data.alarms[x];
+
+            if(typeof families[alarm.family] === 'undefined')
+                families[alarm.family] = new Array();
+
+            families[alarm.family].push(alarm);
+        }
+
+        for(x in families) {
+            var active_family_added = false;
+            var all_family_added = false;
+
+            var arr = families[x];
+            var c = arr.length;
+            while(c--) {
+                var alarm = arr[c];
+                if(alarm.status === 'WARNING' || alarm.status === 'CRITICAL') {
+                    if(!active_family_added) {
+                        active_family_added = true;
+                        active += '<h4>' + x + '</h4>';
+                    }
+                    active += '<embed><img src="' + NETDATA.serverDefault + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto&_=' + now.toString()+ '"></img></embed><br/>';
+                    count_active++;
+                }
+
+                if(!all_family_added) {
+                    all_family_added = true;
+                    all += '<h4>' + x + '</h4>';
+                }
+                all += '<embed><img src="' + NETDATA.serverDefault + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto&_=' + now.toString()+ '"></img></embed><br/>';
+                count_all++;
+            }
+        }
+
+        if(!count_active)
+            active += "<h4>Everything is normal. No raised alarms.</h4>";
+        else
+            active += footer;
+
+        if(!count_all)
+            all += "<h4>No alarms are running in this system.</h4>";
+        else
+            all += footer;
+
+        if(!count_log)
+            log += "<h4>No alarms have been logged in this system.</h4>";
+
+        document.getElementById('alarms_active').innerHTML = active;
+        document.getElementById('alarms_all').innerHTML = all;
+        document.getElementById('alarms_log').innerHTML = log;
+    });
+}
+
+function alarmsCallback(data) {
+    var count = 0;
+    for(x in data.alarms)
+        count++;
+
+    if(count > 0)
+        document.getElementById('alarms_count_badge').innerHTML = count.toString();
+    else
+        document.getElementById('alarms_count_badge').innerHTML = '';
+}
+
 function downloadAllCharts(netdata_url) {
     if(typeof netdata_url === 'undefined' || netdata_url === null)
         netdata_url = NETDATA.serverDefault;
@@ -2370,6 +2494,8 @@ function downloadAllCharts(netdata_url) {
     NETDATA.pause(function() {
         $("#loadOverlay").css("display","none");
         $("#loadOverlay").css("display","none");
+
+        NETDATA.alarms.callback = alarmsCallback;
 
         // download all the charts the server knows
         NETDATA.chartRegistry.downloadAll(netdata_url, function(data) {
@@ -2453,7 +2579,6 @@ function checkForUpdate(callback) {
     return null;
 }
 
-var updateBlinkCounter = 0;
 function notifyForUpdate(force) {
     versionLog('<p>checking for updates...</p>');
 
@@ -2494,16 +2619,7 @@ function notifyForUpdate(force) {
 
             versionLog('<p><big><strong>New version of netdata available!</strong></big></p><p>Latest version: ' + sha2.toString() + '</p><p><a href="' + compare + '" target="_blank">Click here for the changes log</a> since your installed version, and<br/><a href="https://github.com/firehol/netdata/wiki/Updating-Netdata" target="_blank">click here for directions on updating</a> your netdata installation.</p><p>We suggest to review the changes log for new features you may be interested, or important bug fixes you may need.<br/>Keeping your netdata updated, is generally a good idea.</p>');
 
-            function updateButtonBlink() {
-                updateBlinkCounter--;
-                if(updateBlinkCounter > 0)
-                    $('#updateButton').fadeOut(500).fadeIn(500, updateButtonBlink);
-            }
-
-            if(updateBlinkCounter === 0) {
-                updateBlinkCounter = 300;
-                updateButtonBlink();
-            }
+            document.getElementById('update_badge').innerHTML = '!';
         }
 
         if(save)
@@ -2770,6 +2886,17 @@ function finalizePage() {
 
     $('#updateModal').on('shown.bs.modal', function() {
         notifyForUpdate(true);
+    });
+
+    $('#alarmsModal').on('shown.bs.modal', function() {
+        alarmsUpdateModal();
+    });
+
+    $('#alarmsModal').on('hidden.bs.modal', function() {
+        document.getElementById('alarms_active').innerHTML =
+                document.getElementById('alarms_all').innerHTML =
+                document.getElementById('alarms_log').innerHTML =
+                        'loading...';
     });
 
     $('#deleteRegistryModal').on('hidden.bs.modal', function() {

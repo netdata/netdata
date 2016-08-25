@@ -1563,28 +1563,31 @@ static inline void health_rrdcalc2json_nolock(BUFFER *wb, RRDCALC *rc) {
 //
 //}
 
-void health_alarms2json(RRDHOST *host, BUFFER *wb) {
+void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
     int i;
     rrdhost_rdlock(&localhost);
 
     buffer_strcat(wb, "{\n\t\"alarms\": {\n");
     RRDCALC *rc;
-    for(i = 0, rc = host->alarms; rc ; rc = rc->next, i++) {
-        if(!rc->rrdset) continue;
+    for(i = 0, rc = host->alarms; rc ; rc = rc->next) {
+        if(!rc->rrdset)
+            continue;
+
+        if(!all && !(rc->status == RRDCALC_STATUS_WARNING || rc->status == RRDCALC_STATUS_CRITICAL))
+            continue;
 
         if(likely(i)) buffer_strcat(wb, ",\n");
         health_rrdcalc2json_nolock(wb, rc);
+        i++;
     }
 
-    buffer_strcat(wb, "\n\t},\n\t\"templates\": {");
+//    buffer_strcat(wb, "\n\t},\n\t\"templates\": {");
 
 //    RRDCALCTEMPLATE *rt;
 //    for(rt = host->templates; rt ; rt = rt->next)
 //        health_rrdcalctemplate2json_nolock(wb, rt);
 
-    buffer_strcat(wb, "\n\t}");
-    buffer_sprintf(wb, ",\n\t\"now\": %lu", (unsigned long)time(NULL));
-    buffer_strcat(wb, "\n}\n");
+    buffer_sprintf(wb, "\n\t},\n\t\"now\": %lu\n}\n", (unsigned long)time(NULL));
     rrdhost_unlock(&localhost);
 }
 
