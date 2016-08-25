@@ -670,6 +670,16 @@ int web_client_api_request_v1_alarms(struct web_client *w, char *url)
     return 200;
 }
 
+int web_client_api_request_v1_alarm_log(struct web_client *w, char *url)
+{
+    (void)url;
+
+    buffer_flush(w->response.data);
+    w->response.data->contenttype = CT_APPLICATION_JSON;
+    health_alarm_log2json(&localhost, w->response.data);
+    return 200;
+}
+
 int web_client_api_request_v1_charts(struct web_client *w, char *url)
 {
     if(url) { ; }
@@ -1324,7 +1334,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 }
 
 int web_client_api_request_v1(struct web_client *w, char *url) {
-    static uint32_t hash_data = 0, hash_chart = 0, hash_charts = 0, hash_registry = 0, hash_badge = 0, hash_alarms = 0;
+    static uint32_t hash_data = 0, hash_chart = 0, hash_charts = 0, hash_registry = 0, hash_badge = 0, hash_alarms = 0, hash_alarm_log = 0;
 
     if(unlikely(hash_data == 0)) {
         hash_data = simple_hash("data");
@@ -1333,6 +1343,7 @@ int web_client_api_request_v1(struct web_client *w, char *url) {
         hash_registry = simple_hash("registry");
         hash_badge = simple_hash("badge.svg");
         hash_alarms = simple_hash("alarms");
+        hash_alarm_log = simple_hash("alarm_log");
     }
 
     // get the command
@@ -1358,6 +1369,9 @@ int web_client_api_request_v1(struct web_client *w, char *url) {
 
         else if(hash == hash_alarms && !strcmp(tok, "alarms"))
             return web_client_api_request_v1_alarms(w, url);
+
+        else if(hash == hash_alarm_log && !strcmp(tok, "alarm_log"))
+            return web_client_api_request_v1_alarm_log(w, url);
 
         else {
             buffer_flush(w->response.data);
