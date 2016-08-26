@@ -1268,6 +1268,8 @@ char *registry_get_this_machine_guid(void) {
         close(fd);
     }
 
+    setenv("NETDATA_REGISTRY_UNIQUE_ID", registry.machine_guid, 1);
+
     return registry.machine_guid;
 }
 
@@ -1635,6 +1637,9 @@ int registry_init(void) {
     registry.registry_to_announce = config_get("registry", "registry to announce", "https://registry.my-netdata.io");
     registry.hostname = config_get("registry", "registry hostname", config_get("global", "hostname", hostname));
     registry.verify_cookies_redirects = config_get_boolean("registry", "verify browser cookies support", 1);
+
+    setenv("NETDATA_REGISTRY_HOSTNAME", registry.hostname, 1);
+    setenv("NETDATA_REGISTRY_URL", registry.registry_to_announce, 1);
 
     registry.max_url_length = config_get_number("registry", "max URL length", 1024);
     if(registry.max_url_length < 10) {

@@ -112,12 +112,12 @@ typedef struct rrddimvar {
 #define RRDCALC_STATUS_WARNING        3
 #define RRDCALC_STATUS_CRITICAL       4
 
-#define RRDCALC_OPTION_DB_ERROR      0x00000001
-#define RRDCALC_OPTION_DB_NAN        0x00000002
-#define RRDCALC_OPTION_DB_STALE      0x00000004
-#define RRDCALC_OPTION_CALC_ERROR    0x00000008
-#define RRDCALC_OPTION_WARN_ERROR    0x00000010
-#define RRDCALC_OPTION_CRIT_ERROR    0x00000020
+#define RRDCALC_FLAG_DB_ERROR      0x00000001
+#define RRDCALC_FLAG_DB_NAN        0x00000002
+#define RRDCALC_FLAG_DB_STALE      0x00000004
+#define RRDCALC_FLAG_CALC_ERROR    0x00000008
+#define RRDCALC_FLAG_WARN_ERROR    0x00000010
+#define RRDCALC_FLAG_CRIT_ERROR    0x00000020
 
 typedef struct rrdcalc {
     char *name;
@@ -145,12 +145,11 @@ typedef struct rrdcalc {
     EVAL_EXPRESSION *warning;
     EVAL_EXPRESSION *critical;
 
-    uint32_t rrdcalc_options;
+    uint32_t rrdcalc_flags;
     int status;
-    int warning_status;
-    int critical_status;
 
-    time_t db_timestamp;
+    time_t db_after;
+    time_t db_before;
     time_t last_status_change;
 
     calculated_number value;
@@ -207,8 +206,10 @@ typedef struct rrdcalctemplate {
 
 #define RRDCALCTEMPLATE_HAS_CALCULATION(rt) ((rt)->after)
 
-#define HEALTH_ENTRY_NOTIFICATIONS_PROCESSED 0x00000001
-#define HEALTH_ENTRY_NOTIFICATIONS_UPDATED   0x00000002
+#define HEALTH_ENTRY_NOTIFICATIONS_PROCESSED    0x00000001
+#define HEALTH_ENTRY_NOTIFICATIONS_UPDATED      0x00000002
+#define HEALTH_ENTRY_NOTIFICATIONS_EXEC_RUN     0x00000004
+#define HEALTH_ENTRY_NOTIFICATIONS_EXEC_FAILED  0x00000008
 
 typedef struct alarm_entry {
     uint32_t id;
@@ -223,7 +224,11 @@ typedef struct alarm_entry {
     char *chart;
     uint32_t hash_chart;
 
+    char *family;
+
     char *exec;
+    int exec_code;
+
     char *source;
     calculated_number old_value;
     calculated_number new_value;
@@ -241,6 +246,7 @@ typedef struct alarm_log {
     unsigned int count;
     unsigned int max;
     ALARM_ENTRY *alarms;
+    pthread_rwlock_t alarm_log_rwlock;
 } ALARM_LOG;
 
 #include "rrd.h"
@@ -264,5 +270,7 @@ extern void *health_main(void *ptr);
 extern void health_reload(void);
 
 extern int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, calculated_number *result);
+extern void health_alarms2json(RRDHOST *host, BUFFER *wb, int all);
+extern void health_alarm_log2json(RRDHOST *host, BUFFER *wb);
 
 #endif //NETDATA_HEALTH_H
