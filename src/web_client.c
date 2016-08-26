@@ -876,10 +876,10 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
             label = st->name;
     }
     if(!units) {
-        if(options & RRDR_OPTION_PERCENTAGE)
-            units="%";
-        else if(alarm && rc && rc->calculation)
+        if(alarm)
             units = "";
+        else if(options & RRDR_OPTION_PERCENTAGE)
+            units = "%";
         else
             units = st->units;
     }
