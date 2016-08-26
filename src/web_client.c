@@ -745,8 +745,6 @@ cleanup:
 }
 
 int web_client_api_request_v1_badge(struct web_client *w, char *url) {
-    char buf[100 + 1];
-
     int ret = 400;
     buffer_flush(w->response.data);
 
@@ -862,13 +860,12 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
 
     if(!label) {
         if(alarm) {
-            snprintfz(buf, 100, "%s%s%s", (rc->rrdset)?rc->rrdset->family:"", (rc->rrdset)?": ":"", rc->name);
-            char *s = buf;
+            char *s = (char *)alarm;
             while(*s) {
                 if(*s == '_') *s = ' ';
                 s++;
             }
-            label = buf;
+            label = alarm;
         }
         else if(dimensions) {
             const char *dim = buffer_tostring(dimensions);
