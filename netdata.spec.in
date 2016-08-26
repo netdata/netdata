@@ -146,6 +146,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %dir %{_sysconfdir}/%{name}
 %config(noreplace) %{_sysconfdir}/%{name}/*.conf
+%config(noreplace) %{_sysconfdir}/%{name}/health.d/*.conf
 %config(noreplace) %{_sysconfdir}/%{name}/python.d/*.conf
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
 
