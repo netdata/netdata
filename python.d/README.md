@@ -426,13 +426,13 @@ local:
 
 local_2:
   user     : 'root'
-  password : 'blablablabla'
+  pass : 'blablablabla'
   socket   : '/var/run/mysqld/mysqld.sock'
   update_every : 1
 
 remote:
   user     : 'admin'
-  password : 'bla'
+  pass : 'bla'
   host     : 'example.org'
   port     : 9000
   retries  : 20
@@ -695,4 +695,4 @@ localhost:
 Without configuration, module attempts to connect to `http://localhost:8080/manager/status?XML=true`, without any credentials. 
 So it will probably fail.
 
----
+--- 
