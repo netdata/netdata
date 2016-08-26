@@ -1320,6 +1320,7 @@ function notifyForDeleteRegistry() {
 
 var options = {
     sparklines_registry: {},
+    menus: {},
     submenu_names: {},
     data: null,
     hostname: 'netdata_server', // will be overwritten by the netdata server
@@ -2346,7 +2347,7 @@ function renderPage(menus, data) {
 }
 
 function renderChartsAndMenu(data) {
-    var menus = {};
+    var menus = options.menus;
     var charts = data.charts;
 
     for(var c in charts) {
@@ -2420,15 +2421,19 @@ function alarmsUpdateModal() {
         var x;
         var count_active = 0;
         var count_all = 0;
-        var count_log = 0;
         var families = {};
         for(x in data.alarms) {
             var alarm = data.alarms[x];
+            var chart = options.data.charts[alarm.chart];
+            var family = alarm.family;
 
-            if(typeof families[alarm.family] === 'undefined')
-                families[alarm.family] = new Array();
+            if(typeof chart !== 'undefined' && typeof chart.menu !== 'undefined' && typeof chart.submenu !== 'undefined')
+                family = chart.menu + ' - ' + chart.submenu;
 
-            families[alarm.family].push(alarm);
+            if(typeof families[family] === 'undefined')
+                families[family] = new Array();
+
+            families[family].push(alarm);
         }
 
         for(x in families) {
@@ -2467,12 +2472,32 @@ function alarmsUpdateModal() {
         else
             all += footer;
 
-        if(!count_log)
-            log += "<h4>No alarms have been logged in this system.</h4>";
-
         document.getElementById('alarms_active').innerHTML = active;
         document.getElementById('alarms_all').innerHTML = all;
-        document.getElementById('alarms_log').innerHTML = log;
+
+        NETDATA.alarms.get_log(function(data) {
+            if(data === null) {
+                document.getElementById('alarms_log').innerHTML =
+                        'failed to load alarm data!';
+                return;
+            }
+
+            log += '<table  class="table"><tr><th>When</th><th>Chart</th><th>Alarm</th><th>Status</th></tr>';
+            var i = 0;
+            var len = data.length;
+            if(len > 50) len = 50;
+            while(i < len) {
+                var time = new Date(data[i].when * 1000);
+                log += '<tr><td>' + time.toLocaleDateString() + ' ' + time.toLocaleTimeString() + '</td><td>' + data[i].chart + '</td><td>' + data[i].name + '</td><td>' + data[i].status + '</td></tr>';
+                i++;
+            }
+            log += "</table>";
+
+            if(i == 0)
+                log += "<h4>No alarms have been logged in this system.</h4>";
+
+            document.getElementById('alarms_log').innerHTML = log;
+        })
     });
 }
 
