@@ -5,13 +5,6 @@
 static const char *health_default_exec = PLUGINS_DIR "/alarm-email.sh";
 int health_enabled = 1;
 
-ALARM_LOG health_log = {
-        .nextid = 0,
-        .count = 0,
-        .max = 1000,
-        .alarms = NULL
-};
-
 // ----------------------------------------------------------------------------
 // RRDVAR management
 
@@ -415,9 +408,35 @@ void rrddimvar_free(RRDDIMVAR *rs) {
 // ----------------------------------------------------------------------------
 // RRDCALC management
 
+static inline const char *rrdcalc_status2string(int status) {
+    switch(status) {
+        case RRDCALC_STATUS_UNINITIALIZED:
+            return "UNINITIALIZED";
+
+        case RRDCALC_STATUS_UNDEFINED:
+            return "UNDEFINED";
+
+        case RRDCALC_STATUS_CLEAR:
+            return "CLEAR";
+
+        case RRDCALC_STATUS_RAISED:
+            return "RAISED";
+
+        case RRDCALC_STATUS_WARNING:
+            return "WARNING";
+
+        case RRDCALC_STATUS_CRITICAL:
+            return "CRITICAL";
+
+        default:
+            return "UNKNOWN";
+    }
+}
+
 static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     debug(D_HEALTH, "Health linking alarm '%s.%s' to chart '%s' of host '%s'", rc->chart?rc->chart:"NOCHART", rc->name, st->id, st->rrdhost->hostname);
 
+    rc->last_status_change = time(NULL);
     rc->rrdset = st;
 
     rc->rrdset_next = st->alarms;
@@ -546,16 +565,22 @@ static inline void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc) {
 
     if(rc->calculation) {
         rc->calculation->this = &rc->value;
+        rc->calculation->after = &rc->db_after;
+        rc->calculation->before = &rc->db_before;
         rc->calculation->rrdcalc = rc;
     }
 
     if(rc->warning) {
         rc->warning->this = &rc->value;
+        rc->warning->after = &rc->db_after;
+        rc->warning->before = &rc->db_before;
         rc->warning->rrdcalc = rc;
     }
 
     if(rc->critical) {
         rc->critical->this = &rc->value;
+        rc->critical->after = &rc->db_after;
+        rc->critical->before = &rc->db_before;
         rc->critical->rrdcalc = rc;
     }
 
@@ -1368,17 +1393,204 @@ void health_init(void) {
         health_default_exec = config_get("health", "script to execute on alarm", buffer);
     }
 
-    long n = config_get_number("health", "in memory max health log entries", (long)health_log.max);
+    long n = config_get_number("health", "in memory max health log entries", (long)localhost.health_log.max);
     if(n < 2) {
-        error("Health configuration has invalid max log entries %ld. Using default %u", n, health_log.max);
-        config_set_number("health", "in memory max health log entries", (long)health_log.max);
+        error("Health configuration has invalid max log entries %ld. Using default %u", n, localhost.health_log.max);
+        config_set_number("health", "in memory max health log entries", (long)localhost.health_log.max);
     }
-    else health_log.max = (unsigned int)n;
+    else localhost.health_log.max = (unsigned int)n;
 
     rrdhost_rwlock(&localhost);
     health_readdir(path);
     rrdhost_unlock(&localhost);
 }
+
+// ----------------------------------------------------------------------------
+// JSON generation
+
+static inline void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix) {
+    if(value && *value)
+        buffer_sprintf(wb, "%s\"%s\":\"%s\"%s", prefix, label, value, suffix);
+    else
+        buffer_sprintf(wb, "%s\"%s\":null%s", prefix, label, suffix);
+}
+
+static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae) {
+    buffer_sprintf(wb, "\n\t{\n"
+                           "\t\t\"id\":%u,\n"
+                           "\t\t\"name\":\"%s\",\n"
+                           "\t\t\"chart\":\"%s\",\n"
+                           "\t\t\"family\":\"%s\",\n"
+                           "\t\t\"processed\":%s,\n"
+                           "\t\t\"updated\":%s,\n"
+                           "\t\t\"exec_run\":%s,\n"
+                           "\t\t\"exec_failed\":%s,\n"
+                           "\t\t\"exec\":\"%s\",\n"
+                           "\t\t\"exec_code\":%d,\n"
+                           "\t\t\"source\":\"%s\",\n"
+                           "\t\t\"when\":%lu,\n"
+                           "\t\t\"duration\":%lu,\n"
+                           "\t\t\"non_clear_duration\":%lu,\n"
+                           "\t\t\"status\":\"%s\",\n"
+                           "\t\t\"old_status\":\"%s\",\n",
+                   ae->id,
+                   ae->name,
+                   ae->chart,
+                   ae->family,
+                   (ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_PROCESSED)?"true":"false",
+                   (ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_UPDATED)?"true":"false",
+                   (ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_EXEC_RUN)?"true":"false",
+                   (ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_EXEC_FAILED)?"true":"false",
+                   ae->exec?ae->exec:health_default_exec,
+                   ae->exec_code,
+                   ae->source,
+                   (unsigned long)ae->when,
+                   (unsigned long)ae->duration,
+                   (unsigned long)ae->non_clear_duration,
+                   rrdcalc_status2string(ae->new_status),
+                   rrdcalc_status2string(ae->old_status)
+    );
+
+    buffer_strcat(wb, "\t\t\"value\":");
+    buffer_rrd_value(wb, ae->new_value);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\t\"old_value\":");
+    buffer_rrd_value(wb, ae->old_value);
+    buffer_strcat(wb, "\n");
+
+    buffer_strcat(wb, "\t}");
+}
+
+void health_alarm_log2json(RRDHOST *host, BUFFER *wb) {
+    pthread_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+
+    buffer_strcat(wb, "[");
+
+    unsigned int max = host->health_log.max;
+    unsigned int count = 0;
+    ALARM_ENTRY *ae;
+    for(ae = host->health_log.alarms; ae && count < max ; count++, ae = ae->next) {
+        if(likely(count)) buffer_strcat(wb, ",");
+        health_alarm_entry2json_nolock(wb, ae);
+    }
+
+    buffer_strcat(wb, "\n]\n");
+
+    pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+}
+
+static inline void health_rrdcalc2json_nolock(BUFFER *wb, RRDCALC *rc) {
+    buffer_sprintf(wb,
+           "\t\t\"%s.%s\": {\n"
+                   "\t\t\t\"name\": \"%s\",\n"
+                   "\t\t\t\"chart\": \"%s\",\n"
+                   "\t\t\t\"family\": \"%s\",\n"
+                   "\t\t\t\"active\": %s,\n"
+                   "\t\t\t\"exec\": \"%s\",\n"
+                   "\t\t\t\"source\": \"%s\",\n"
+                   "\t\t\t\"status\": \"%s\",\n"
+                   "\t\t\t\"last_status_change\": %lu,\n"
+                   "\t\t\t\"last_updated\": %lu,\n"
+                   "\t\t\t\"next_update\": %lu,\n"
+                   "\t\t\t\"update_every\": %d,\n"
+            , rc->chart, rc->name
+            , rc->name
+            , rc->chart
+            , (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:""
+            , (rc->rrdset)?"true":"false"
+            , rc->exec?rc->exec:health_default_exec
+            , rc->source
+            , rrdcalc_status2string(rc->status)
+            , (unsigned long)rc->last_status_change
+            , (unsigned long)rc->last_updated
+            , (unsigned long)rc->next_update
+            , rc->update_every
+    );
+
+    if(RRDCALC_HAS_DB_LOOKUP(rc)) {
+        if(rc->dimensions && *rc->dimensions)
+            health_string2json(wb, "\t\t\t", "lookup_dimensions", rc->dimensions, ",\n");
+
+        buffer_sprintf(wb,
+                       "\t\t\t\"db_after\": %lu,\n"
+                       "\t\t\t\"db_before\": %lu,\n"
+                       "\t\t\t\"lookup_method\": \"%s\",\n"
+                       "\t\t\t\"lookup_after\": %d,\n"
+                       "\t\t\t\"lookup_before\": %d,\n"
+                       "\t\t\t\"lookup_options\": \"",
+                       (unsigned long) rc->db_after,
+                       (unsigned long) rc->db_before,
+                       group_method2string(rc->group),
+                       rc->after,
+                       rc->before
+        );
+        buffer_data_options2string(wb, rc->options);
+        buffer_strcat(wb, "\",\n");
+    }
+
+    if(rc->calculation) {
+        health_string2json(wb, "\t\t\t", "calc", rc->calculation->source, ",\n");
+        health_string2json(wb, "\t\t\t", "calc_parsed", rc->calculation->parsed_as, ",\n");
+    }
+
+    if(rc->warning) {
+        health_string2json(wb, "\t\t\t", "warn", rc->warning->source, ",\n");
+        health_string2json(wb, "\t\t\t", "warn_parsed", rc->warning->parsed_as, ",\n");
+    }
+
+    if(rc->critical) {
+        health_string2json(wb, "\t\t\t", "crit", rc->critical->source, ",\n");
+        health_string2json(wb, "\t\t\t", "crit_parsed", rc->critical->parsed_as, ",\n");
+    }
+
+    buffer_strcat(wb, "\t\t\t\"green\":");
+    buffer_rrd_value(wb, rc->green);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\t\t\"red\":");
+    buffer_rrd_value(wb, rc->red);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\t\t\"value\":");
+    buffer_rrd_value(wb, rc->value);
+    buffer_strcat(wb, "\n");
+
+    buffer_strcat(wb, "\t\t}");
+}
+
+//void health_rrdcalctemplate2json_nolock(BUFFER *wb, RRDCALCTEMPLATE *rt) {
+//
+//}
+
+void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
+    int i;
+    rrdhost_rdlock(&localhost);
+
+    buffer_strcat(wb, "{\n\t\"alarms\": {\n");
+    RRDCALC *rc;
+    for(i = 0, rc = host->alarms; rc ; rc = rc->next) {
+        if(!rc->rrdset)
+            continue;
+
+        if(!all && !(rc->status == RRDCALC_STATUS_WARNING || rc->status == RRDCALC_STATUS_CRITICAL))
+            continue;
+
+        if(likely(i)) buffer_strcat(wb, ",\n");
+        health_rrdcalc2json_nolock(wb, rc);
+        i++;
+    }
+
+//    buffer_strcat(wb, "\n\t},\n\t\"templates\": {");
+
+//    RRDCALCTEMPLATE *rt;
+//    for(rt = host->templates; rt ; rt = rt->next)
+//        health_rrdcalctemplate2json_nolock(wb, rt);
+
+    buffer_sprintf(wb, "\n\t},\n\t\"now\": %lu\n}\n", (unsigned long)time(NULL));
+    rrdhost_unlock(&localhost);
+}
+
 
 // ----------------------------------------------------------------------------
 // re-load health configuration
@@ -1455,31 +1667,6 @@ static inline int rrdcalc_value2status(calculated_number n) {
     return RRDCALC_STATUS_CLEAR;
 }
 
-static inline const char *rrdcalc_status2string(int status) {
-    switch(status) {
-        case RRDCALC_STATUS_UNINITIALIZED:
-            return "UNINITIALIZED";
-
-        case RRDCALC_STATUS_UNDEFINED:
-            return "UNDEFINED";
-
-        case RRDCALC_STATUS_CLEAR:
-            return "CLEAR";
-
-        case RRDCALC_STATUS_RAISED:
-            return "RAISED";
-
-        case RRDCALC_STATUS_WARNING:
-            return "WARNING";
-
-        case RRDCALC_STATUS_CRITICAL:
-            return "CRITICAL";
-
-        default:
-            return "UNKNOWN";
-    }
-}
-
 static inline void health_alarm_execute(ALARM_ENTRY *ae) {
     if(ae->old_status == RRDCALC_STATUS_UNINITIALIZED && ae->new_status == RRDCALC_STATUS_CLEAR)
         return;
@@ -1490,10 +1677,11 @@ static inline void health_alarm_execute(ALARM_ENTRY *ae) {
     const char *exec = ae->exec;
     if(!exec) exec = health_default_exec;
 
-    snprintfz(buffer, FILENAME_MAX, "exec %s '%s' '%s' '%s' '%s' '%0.0Lf' '%0.0Lf' '%s' '%u' '%u'",
+    snprintfz(buffer, FILENAME_MAX, "exec %s '%s' '%s' '%s' '%s' '%s' '%0.0Lf' '%0.0Lf' '%s' '%u' '%u'",
               exec,
               ae->name,
               ae->chart?ae->chart:"NOCAHRT",
+              ae->family?ae->family:"NOFAMILY",
               rrdcalc_status2string(ae->new_status),
               rrdcalc_status2string(ae->old_status),
               ae->new_value,
@@ -1502,6 +1690,8 @@ static inline void health_alarm_execute(ALARM_ENTRY *ae) {
               (uint32_t)ae->duration,
               (uint32_t)ae->non_clear_duration
     );
+
+    ae->notifications |= HEALTH_ENTRY_NOTIFICATIONS_EXEC_RUN;
 
     debug(D_HEALTH, "executing command '%s'", buffer);
     FILE *fp = mypopen(buffer, &command_pid);
@@ -1513,8 +1703,11 @@ static inline void health_alarm_execute(ALARM_ENTRY *ae) {
     char *s = fgets(buffer, FILENAME_MAX, fp);
     (void)s;
     debug(D_HEALTH, "HEALTH closing command");
-    mypclose(fp, command_pid);
-    debug(D_HEALTH, "closed command");
+    ae->exec_code = mypclose(fp, command_pid);
+    debug(D_HEALTH, "done executing command - returned with code %d", ae->exec_code);
+
+    if(ae->exec_code != 0)
+        ae->notifications |= HEALTH_ENTRY_NOTIFICATIONS_EXEC_FAILED;
 }
 
 static inline void health_process_notifications(ALARM_ENTRY *ae) {
@@ -1528,9 +1721,9 @@ static inline void health_process_notifications(ALARM_ENTRY *ae) {
     health_alarm_execute(ae);
 }
 
-static inline void health_alarm_log(time_t when,
-                const char *name, const char *chart, const char *exec,
-                time_t duration,
+static inline void health_alarm_log(RRDHOST *host, time_t when,
+                const char *name, const char *chart, const char *family,
+                const char *exec, time_t duration,
                 calculated_number old_value, calculated_number new_value,
                 int old_status, int new_status,
                 const char *source
@@ -1544,10 +1737,13 @@ static inline void health_alarm_log(time_t when,
         ae->hash_chart = simple_hash(ae->chart);
     }
 
+    if(family)
+        ae->family = strdupz(family);
+
     if(exec) ae->exec = strdupz(exec);
     if(source) ae->source = strdupz(source);
 
-    ae->id = health_log.nextid++;
+    ae->id = host->health_log.nextid++;
     ae->when = when;
     ae->old_value = old_value;
     ae->new_value = new_value;
@@ -1559,13 +1755,16 @@ static inline void health_alarm_log(time_t when,
         ae->non_clear_duration += ae->duration;
 
     // link it
-    ae->next = health_log.alarms;
-    health_log.alarms = ae;
-    health_log.count++;
+    pthread_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
+    ae->next = host->health_log.alarms;
+    host->health_log.alarms = ae;
+    host->health_log.count++;
+    pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
     // match previous alarms
+    pthread_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
     ALARM_ENTRY *t;
-    for(t = health_log.alarms ; t ; t = t->next) {
+    for(t = host->health_log.alarms ; t ; t = t->next) {
         if(t != ae &&
                 t->hash_name == ae->hash_name &&
                 t->hash_chart == ae->hash_chart &&
@@ -1586,13 +1785,16 @@ static inline void health_alarm_log(time_t when,
             }
         }
     }
+    pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 }
 
-static inline void health_alarm_log_process(void) {
+static inline void health_alarm_log_process(RRDHOST *host) {
     static uint32_t last_processed = 0;
     ALARM_ENTRY *ae;
 
-    for(ae = health_log.alarms; ae ;ae = ae->next) {
+    pthread_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+
+    for(ae = host->health_log.alarms; ae ;ae = ae->next) {
         if(last_processed >= ae->id) break;
 
         if(!(ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_PROCESSED) &&
@@ -1602,22 +1804,30 @@ static inline void health_alarm_log_process(void) {
         }
     }
 
-    if(health_log.alarms)
-        last_processed = health_log.alarms->id;
+    if(host->health_log.alarms)
+        last_processed = host->health_log.alarms->id;
 
-    if(health_log.count <= health_log.max)
+    pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+
+    if(host->health_log.count <= host->health_log.max)
         return;
 
     // cleanup excess entries in the log
+    pthread_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
+
     ALARM_ENTRY *last = NULL;
-    unsigned int count = health_log.max;
-    for(ae = health_log.alarms; ae && count ; count--, last = ae, ae = ae->next) ;
-    if(!ae || !last || last->next != ae) return;
-    last->next = NULL;
+    unsigned int count = host->health_log.max;
+    for(ae = host->health_log.alarms; ae && count ; count--, last = ae, ae = ae->next) ;
+
+    if(ae && last && last->next == ae)
+        last->next = NULL;
+    else
+        ae = NULL;
 
     while(ae) {
         ALARM_ENTRY *t = ae->next;
 
+        freez(ae->family);
         freez(ae->chart);
         freez(ae->name);
         freez(ae->exec);
@@ -1625,6 +1835,8 @@ static inline void health_alarm_log_process(void) {
 
         ae = t;
     }
+
+    pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 }
 
 void *health_main(void *ptr) {
@@ -1670,12 +1882,12 @@ void *health_main(void *ptr) {
             // 2. if there is calculation expression, run it
 
             if (unlikely(RRDCALC_HAS_DB_LOOKUP(rc))) {
-                time_t old_db_timestamp = rc->db_timestamp;
+                time_t old_db_timestamp = rc->db_before;
                 int value_is_null = 0;
 
                 int ret = rrd2value(rc->rrdset, wb, &rc->value,
                                     rc->dimensions, 1, rc->after, rc->before, rc->group,
-                                    rc->options, &rc->db_timestamp, &value_is_null);
+                                    rc->options, &rc->db_after, &rc->db_before, &value_is_null);
 
                 if (unlikely(ret != 200)) {
                     // database lookup failed
@@ -1683,26 +1895,26 @@ void *health_main(void *ptr) {
 
                     debug(D_HEALTH, "Health alarm '%s.%s': database lookup returned error %d", rc->chart?rc->chart:"NOCHART", rc->name, ret);
 
-                    if (unlikely(!(rc->rrdcalc_options & RRDCALC_OPTION_DB_ERROR))) {
-                        rc->rrdcalc_options |= RRDCALC_OPTION_DB_ERROR;
+                    if (unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_DB_ERROR))) {
+                        rc->rrdcalc_flags |= RRDCALC_FLAG_DB_ERROR;
                         error("Health alarm '%s.%s': database lookup returned error %d", rc->chart?rc->chart:"NOCHART", rc->name, ret);
                     }
                 }
-                else if (unlikely(rc->rrdcalc_options & RRDCALC_OPTION_DB_ERROR))
-                    rc->rrdcalc_options &= ~RRDCALC_OPTION_DB_ERROR;
+                else if (unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_DB_ERROR))
+                    rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_ERROR;
 
-                if (unlikely(old_db_timestamp == rc->db_timestamp)) {
+                if (unlikely(old_db_timestamp == rc->db_before)) {
                     // database is stale
 
                     debug(D_HEALTH, "Health alarm '%s.%s': database is stale", rc->chart?rc->chart:"NOCHART", rc->name);
 
-                    if (unlikely(!(rc->rrdcalc_options & RRDCALC_OPTION_DB_STALE))) {
-                        rc->rrdcalc_options |= RRDCALC_OPTION_DB_STALE;
+                    if (unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_DB_STALE))) {
+                        rc->rrdcalc_flags |= RRDCALC_FLAG_DB_STALE;
                         error("Health alarm '%s.%s': database is stale", rc->chart?rc->chart:"NOCHART", rc->name);
                     }
                 }
-                else if (unlikely(rc->rrdcalc_options & RRDCALC_OPTION_DB_STALE))
-                    rc->rrdcalc_options &= ~RRDCALC_OPTION_DB_STALE;
+                else if (unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_DB_STALE))
+                    rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_STALE;
 
                 if (unlikely(value_is_null)) {
                     // collected value is null
@@ -1712,14 +1924,14 @@ void *health_main(void *ptr) {
                     debug(D_HEALTH, "Health alarm '%s.%s': database lookup returned empty value (possibly value is not collected yet)",
                           rc->chart?rc->chart:"NOCHART", rc->name);
 
-                    if (unlikely(!(rc->rrdcalc_options & RRDCALC_OPTION_DB_NAN))) {
-                        rc->rrdcalc_options |= RRDCALC_OPTION_DB_NAN;
+                    if (unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_DB_NAN))) {
+                        rc->rrdcalc_flags |= RRDCALC_FLAG_DB_NAN;
                         error("Health alarm '%s.%s': database lookup returned empty value (possibly value is not collected yet)",
                               rc->chart?rc->chart:"NOCHART", rc->name);
                     }
                 }
-                else if (unlikely(rc->rrdcalc_options & RRDCALC_OPTION_DB_NAN))
-                    rc->rrdcalc_options &= ~RRDCALC_OPTION_DB_NAN;
+                else if (unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_DB_NAN))
+                    rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_NAN;
 
                 debug(D_HEALTH, "Health alarm '%s.%s': database lookup gave value "
                         CALCULATED_NUMBER_FORMAT, rc->chart?rc->chart:"NOCHART", rc->name, rc->value);
@@ -1734,15 +1946,15 @@ void *health_main(void *ptr) {
                     debug(D_HEALTH, "Health alarm '%s.%s': failed to evaluate calculation with error: %s",
                           rc->chart?rc->chart:"NOCHART", rc->name, buffer_tostring(rc->calculation->error_msg));
 
-                    if (unlikely(!(rc->rrdcalc_options & RRDCALC_OPTION_CALC_ERROR))) {
-                        rc->rrdcalc_options |= RRDCALC_OPTION_CALC_ERROR;
+                    if (unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_CALC_ERROR))) {
+                        rc->rrdcalc_flags |= RRDCALC_FLAG_CALC_ERROR;
                         error("Health alarm '%s.%s': failed to evaluate calculation with error: %s",
                               rc->chart?rc->chart:"NOCHART", rc->name, buffer_tostring(rc->calculation->error_msg));
                     }
                 }
                 else {
-                    if (unlikely(rc->rrdcalc_options & RRDCALC_OPTION_CALC_ERROR))
-                        rc->rrdcalc_options &= ~RRDCALC_OPTION_CALC_ERROR;
+                    if (unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_CALC_ERROR))
+                        rc->rrdcalc_flags &= ~RRDCALC_FLAG_CALC_ERROR;
 
                     debug(D_HEALTH, "Health alarm '%s.%s': calculation expression gave value "
                             CALCULATED_NUMBER_FORMAT
@@ -1776,15 +1988,15 @@ void *health_main(void *ptr) {
                         debug(D_HEALTH, "Health alarm '%s.%s': warning expression failed with error: %s",
                               rc->chart?rc->chart:"NOCHART", rc->name, buffer_tostring(rc->warning->error_msg));
 
-                        if (unlikely(!(rc->rrdcalc_options & RRDCALC_OPTION_WARN_ERROR))) {
-                            rc->rrdcalc_options |= RRDCALC_OPTION_WARN_ERROR;
+                        if (unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_WARN_ERROR))) {
+                            rc->rrdcalc_flags |= RRDCALC_FLAG_WARN_ERROR;
                             error("Health alarm '%s.%s': warning expression failed with error: %s",
                                   rc->chart?rc->chart:"NOCHART", rc->name, buffer_tostring(rc->warning->error_msg));
                         }
                     }
                     else {
-                        if(unlikely(rc->rrdcalc_options & RRDCALC_OPTION_WARN_ERROR))
-                            rc->rrdcalc_options &= ~RRDCALC_OPTION_WARN_ERROR;
+                        if(unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_WARN_ERROR))
+                            rc->rrdcalc_flags &= ~RRDCALC_FLAG_WARN_ERROR;
 
                         debug(D_HEALTH, "Health alarm '%s.%s': warning expression gave value "
                                 CALCULATED_NUMBER_FORMAT
@@ -1806,15 +2018,15 @@ void *health_main(void *ptr) {
                         debug(D_HEALTH, "Health alarm '%s.%s': critical expression failed with error: %s",
                               rc->chart?rc->chart:"NOCHART", rc->name, buffer_tostring(rc->critical->error_msg));
 
-                        if (unlikely(!(rc->rrdcalc_options & RRDCALC_OPTION_CRIT_ERROR))) {
-                            rc->rrdcalc_options |= RRDCALC_OPTION_CRIT_ERROR;
+                        if (unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_CRIT_ERROR))) {
+                            rc->rrdcalc_flags |= RRDCALC_FLAG_CRIT_ERROR;
                             error("Health alarm '%s.%s': critical expression failed with error: %s",
                                   rc->chart?rc->chart:"NOCHART", rc->name, buffer_tostring(rc->critical->error_msg));
                         }
                     }
                     else {
-                        if(unlikely(rc->rrdcalc_options & RRDCALC_OPTION_CRIT_ERROR))
-                            rc->rrdcalc_options &= ~RRDCALC_OPTION_CRIT_ERROR;
+                        if(unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_CRIT_ERROR))
+                            rc->rrdcalc_flags &= ~RRDCALC_FLAG_CRIT_ERROR;
 
                         debug(D_HEALTH, "Health alarm '%s.%s': critical expression gave value "
                                 CALCULATED_NUMBER_FORMAT
@@ -1859,7 +2071,7 @@ void *health_main(void *ptr) {
                 }
 
                 if(status != rc->status) {
-                    health_alarm_log(time(NULL), rc->name, rc->rrdset->id, rc->exec, now - rc->last_status_change, rc->old_value, rc->value, rc->status, status, rc->source);
+                    health_alarm_log(&localhost, time(NULL), rc->name, rc->rrdset->id, rc->rrdset->family, rc->exec, now - rc->last_status_change, rc->old_value, rc->value, rc->status, status, rc->source);
                     rc->last_status_change = now;
                     rc->status = status;
                 }
@@ -1879,7 +2091,7 @@ void *health_main(void *ptr) {
 
         // execute notifications
         // and cleanup
-        health_alarm_log_process();
+        health_alarm_log_process(&localhost);
 
         now = time(NULL);
         if(now < next_run) {

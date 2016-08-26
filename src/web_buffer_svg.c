@@ -1,7 +1,8 @@
 #include "common.h"
 
 #define BADGE_HORIZONTAL_PADDING 4
-#define VERDANA_KERNING 0.5
+#define VERDANA_KERNING 0.2
+#define VERDANA_PADDING 1.0
 
 /*
  * verdana11_widths[] has been generated with this method:
@@ -288,6 +289,7 @@ static inline int verdana11_width(char *s) {
 
     *d = '\0';
     w -= VERDANA_KERNING;
+    w += VERDANA_PADDING;
     return ceil(w);
 }
 

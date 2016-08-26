@@ -23,16 +23,21 @@ sendmail_from_pipe() {
 
 name="${1}"       # the name of the alarm, as given in netdata health.d entries
 chart="${2}"      # the name of the chart (type.id)
-status="${3}"     # the current status : UNITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
-old_status="${4}" # the previous status: UNITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
-value="${5}"      # the current value
-old_value="${6}"  # the previous value
-src="${7}"        # the line number and file the alarm has been configured
-duration="${8}"   # the duration in seconds the previous state took
-non_clear_duration="${9}" # the total duration in seconds this is non-clear
+family="${3}"     # the family of the chart
+status="${4}"     # the current status : UNITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+old_status="${5}" # the previous status: UNITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+value="${6}"      # the current value
+old_value="${7}"  # the previous value
+src="${8}"        # the line number and file the alarm has been configured
+duration="${9}"   # the duration in seconds the previous state took
+non_clear_duration="${10}" # the total duration in seconds this is non-clear
 
 # get the system hostname
-hostname="$(hostname)"
+hostname="${NETDATA_HOSTNAME}"
+[ -z "${hostname}" ] && hostname="${NETDATA_REGISTRY_HOSTNAME}"
+[ -z "${hostname}" ] && hostname="$(hostname)"
+
+goto_url="${NETDATA_REGISTRY_URL}/goto-host-from-alarm.html?machine_guid=${NETDATA_REGISTRY_UNIQUE_ID}&chart=${chart}&family=${family}"
 
 # get the current date
 date="$(date)"
@@ -199,6 +204,13 @@ Content-Type: text/html
                                             <span style="display:block;color:#666666;font-size:12px;font-weight:300;line-height:1;text-transform:uppercase">Alarm</span>
                                         </td>
                                     </tr>
+                                    <tr>
+                                        <td style="font-size:18px;vertical-align:top;margin:0;padding:0 0 20px"
+                                            align="left" valign="top">
+                                            <span>${family}</span>
+                                            <span style="display:block;color:#666666;font-size:12px;font-weight:300;line-height:1;text-transform:uppercase">Family</span>
+                                        </td>
+                                    </tr>
                                     <tr style="margin:0;padding:0">
                                         <td style="font-size:18px;vertical-align:top;margin:0;padding:0 0 20px"
                                             align="left" valign="top">
@@ -213,6 +225,13 @@ Content-Type: text/html
                                                     style="display:block;color:#666666;font-size:12px;font-weight:300;line-height:1;text-transform:uppercase">Time</span>
                                         </td>
                                     </tr>
+                                    <!--
+                                    <tr style="margin:0;padding:0">
+                                        <td style="font-size:18px;vertical-align:top;margin:0;padding:0 0 20px">
+                                            <a href="${goto_url}" style="font-size:14px;color:#ffffff;text-decoration:none;line-height:1.5;font-weight:bold;text-align:center;display:inline-block;text-transform:capitalize;background:#35568d;border-width:1px;border-style:solid;border-color:#2b4c86;margin:0;padding:10px 15px" target="_blank">View Netdata</a>
+                                        </td>
+                                    </tr>
+                                    -->
                                     <tr style="text-align:center;margin:0;padding:0">
                                         <td style="font-size:11px;vertical-align:top;margin:0;padding:10px 0 0 0;color:#666666"
                                             align="center" valign="bottom">The source of this alarm is line <code>${src}</code>

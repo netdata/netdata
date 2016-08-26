@@ -15,6 +15,9 @@ typedef struct eval_expression {
     const char *parsed_as;
 
     calculated_number *this;
+    time_t *after;
+    time_t *before;
+
     calculated_number result;
 
     int error;
@@ -41,6 +44,7 @@ typedef struct eval_expression {
 #define EVAL_ERROR_MISSING_OPERAND                3
 #define EVAL_ERROR_MISSING_OPERATOR               4
 #define EVAL_ERROR_REMAINING_GARBAGE              5
+#define EVAL_ERROR_IF_THEN_ELSE_MISSING_ELSE      6
 
 // evaluation errors
 #define EVAL_ERROR_INVALID_VALUE                101

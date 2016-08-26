@@ -459,6 +459,70 @@ void web_client_enable_deflate(struct web_client *w, int gzip) {
 }
 #endif // NETDATA_WITH_ZLIB
 
+void buffer_data_options2string(BUFFER *wb, uint32_t options) {
+    int count = 0;
+
+    if(options & RRDR_OPTION_NONZERO) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "nonzero");
+    }
+
+    if(options & RRDR_OPTION_REVERSED) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "flip");
+    }
+
+    if(options & RRDR_OPTION_JSON_WRAP) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "jsonwrap");
+    }
+
+    if(options & RRDR_OPTION_MIN2MAX) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "min2max");
+    }
+
+    if(options & RRDR_OPTION_MILLISECONDS) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "ms");
+    }
+
+    if(options & RRDR_OPTION_ABSOLUTE) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "abs");
+    }
+
+    if(options & RRDR_OPTION_SECONDS) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "seconds");
+    }
+
+    if(options & RRDR_OPTION_NULL2ZERO) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "null2zero");
+    }
+
+    if(options & RRDR_OPTION_OBJECTSROWS) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "objectrows");
+    }
+
+    if(options & RRDR_OPTION_GOOGLE_JSON) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "google_json");
+    }
+
+    if(options & RRDR_OPTION_PERCENTAGE) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "percentage");
+    }
+
+    if(options & RRDR_OPTION_NOT_ALIGNED) {
+        if(count++) buffer_strcat(wb, " ");
+        buffer_strcat(wb, "unaligned");
+    }
+}
+
 uint32_t web_client_api_request_v1_data_options(char *o)
 {
     uint32_t ret = 0x00000000;
@@ -551,6 +615,31 @@ uint32_t web_client_api_request_v1_data_google_format(char *name)
     return DATASOURCE_JSON;
 }
 
+const char *group_method2string(int group) {
+    switch(group) {
+        case GROUP_UNDEFINED:
+            return "";
+
+        case GROUP_AVERAGE:
+            return "average";
+
+        case GROUP_MIN:
+            return "min";
+
+        case GROUP_MAX:
+            return "max";
+
+        case GROUP_SUM:
+            return "sum";
+
+        case GROUP_INCREMENTAL_SUM:
+            return "incremental-sum";
+
+        default:
+            return "unknown-group-method";
+    }
+}
+
 int web_client_api_request_v1_data_group(char *name, int def)
 {
     if(!strcmp(name, "average"))
@@ -569,6 +658,34 @@ int web_client_api_request_v1_data_group(char *name, int def)
         return GROUP_INCREMENTAL_SUM;
 
     return def;
+}
+
+int web_client_api_request_v1_alarms(struct web_client *w, char *url)
+{
+    int all = 0;
+
+    while(url) {
+        char *value = mystrsep(&url, "?&[]");
+        if (!value || !*value) continue;
+
+        if(!strcmp(value, "all")) all = 1;
+        else if(!strcmp(value, "active")) all = 0;
+    }
+
+    buffer_flush(w->response.data);
+    w->response.data->contenttype = CT_APPLICATION_JSON;
+    health_alarms2json(&localhost, w->response.data, all);
+    return 200;
+}
+
+int web_client_api_request_v1_alarm_log(struct web_client *w, char *url)
+{
+    (void)url;
+
+    buffer_flush(w->response.data);
+    w->response.data->contenttype = CT_APPLICATION_JSON;
+    health_alarm_log2json(&localhost, w->response.data);
+    return 200;
 }
 
 int web_client_api_request_v1_charts(struct web_client *w, char *url)
@@ -627,7 +744,7 @@ cleanup:
     return ret;
 }
 
-int web_client_api_v1_badge(struct web_client *w, char *url) {
+int web_client_api_request_v1_badge(struct web_client *w, char *url) {
     int ret = 400;
     buffer_flush(w->response.data);
 
@@ -742,8 +859,14 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
     }
 
     if(!label) {
-        if(alarm)
+        if(alarm) {
+            char *s = (char *)alarm;
+            while(*s) {
+                if(*s == '_') *s = ' ';
+                s++;
+            }
             label = alarm;
+        }
         else if(dimensions) {
             const char *dim = buffer_tostring(dimensions);
             if(*dim == '|') dim++;
@@ -753,8 +876,10 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
             label = st->name;
     }
     if(!units) {
-        if(options & RRDR_OPTION_PERCENTAGE)
-            units="%";
+        if(alarm)
+            units = "";
+        else if(options & RRDR_OPTION_PERCENTAGE)
+            units = "%";
         else
             units = st->units;
     }
@@ -818,7 +943,7 @@ int web_client_api_v1_badge(struct web_client *w, char *url) {
         // if the collected value is too old, don't calculate its value
         if (rrdset_last_entry_t(st) >= (time(NULL) - (st->update_every * st->gap_when_lost_iterations_above)))
             ret = rrd2value(st, w->response.data, &n, (dimensions) ? buffer_tostring(dimensions) : NULL, points, after,
-                            before, group, options, &latest_timestamp, &value_is_null);
+                            before, group, options, NULL, &latest_timestamp, &value_is_null);
 
         // if the value cannot be calculated, show empty badge
         if (ret != 200) {
@@ -1225,7 +1350,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 }
 
 int web_client_api_request_v1(struct web_client *w, char *url) {
-    static uint32_t hash_data = 0, hash_chart = 0, hash_charts = 0, hash_registry = 0, hash_badge = 0;
+    static uint32_t hash_data = 0, hash_chart = 0, hash_charts = 0, hash_registry = 0, hash_badge = 0, hash_alarms = 0, hash_alarm_log = 0;
 
     if(unlikely(hash_data == 0)) {
         hash_data = simple_hash("data");
@@ -1233,6 +1358,8 @@ int web_client_api_request_v1(struct web_client *w, char *url) {
         hash_charts = simple_hash("charts");
         hash_registry = simple_hash("registry");
         hash_badge = simple_hash("badge.svg");
+        hash_alarms = simple_hash("alarms");
+        hash_alarm_log = simple_hash("alarm_log");
     }
 
     // get the command
@@ -1254,7 +1381,13 @@ int web_client_api_request_v1(struct web_client *w, char *url) {
             return web_client_api_request_v1_registry(w, url);
 
         else if(hash == hash_badge && !strcmp(tok, "badge.svg"))
-            return web_client_api_v1_badge(w, url);
+            return web_client_api_request_v1_badge(w, url);
+
+        else if(hash == hash_alarms && !strcmp(tok, "alarms"))
+            return web_client_api_request_v1_alarms(w, url);
+
+        else if(hash == hash_alarm_log && !strcmp(tok, "alarm_log"))
+            return web_client_api_request_v1_alarm_log(w, url);
 
         else {
             buffer_flush(w->response.data);

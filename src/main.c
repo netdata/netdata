@@ -501,6 +501,7 @@ int main(int argc, char **argv)
                 error("WARNING: Cannot get machine hostname.");
             hostname = config_get("global", "hostname", hostnamebuf);
             debug(D_OPTIONS, "hostname set to '%s'", hostname);
+            setenv("NETDATA_HOSTNAME", hostname, 1);
         }
 
         // --------------------------------------------------------------------

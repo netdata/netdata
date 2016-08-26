@@ -51,7 +51,7 @@
         and that you have chown it to be owned by netdata:netdata
     -->
     <!-- <script type="text/javascript" src="http://my.server:19999/dashboard.js"></script> -->
-    <script type="text/javascript" src="dashboard.js?v41"></script>
+    <script type="text/javascript" src="dashboard.js?v42"></script>
 
     <script>
     // --- OPTIONS FOR THE CHARTS --
@@ -393,9 +393,9 @@ body {
                 <div class="mysparkline-overchart-label">
                     <b>EU - London</b> web requests/s
                 </div>
-                <div class="mysparkline-overchart-value" id="nginx.requests.netdata" >
+                <div class="mysparkline-overchart-value" id="nginx_local.requests.netdata" >
                 </div>
-                <div data-netdata="nginx.requests"
+                <div data-netdata="nginx_local.requests"
                         data-dimensions="requests"
                         data-host="//london.my-netdata.io"
                         data-chart-library="dygraph"
@@ -405,7 +405,7 @@ body {
                         data-height="100%"
                         data-after="-300"
                         data-colors="#558855"
-                        data-show-value-of-requests-at="nginx.requests.netdata"
+                        data-show-value-of-requests-at="nginx_local.requests.netdata"
                         ></div>
             </div>
 
@@ -413,9 +413,9 @@ body {
                 <div class="mysparkline-overchart-label">
                     <b>US - Atlanta</b> web requests/s
                 </div>
-                <div class="mysparkline-overchart-value" id="nginx.requests.netdata2" >
+                <div class="mysparkline-overchart-value" id="nginx_local.requests.netdata2" >
                 </div>
-                <div data-netdata="nginx.requests"
+                <div data-netdata="nginx_local.requests"
                         data-dimensions="requests"
                         data-host="//atlanta.my-netdata.io"
                         data-chart-library="dygraph"
@@ -425,7 +425,7 @@ body {
                         data-height="100%"
                         data-after="-300"
                         data-colors="#AA5555"
-                        data-show-value-of-requests-at="nginx.requests.netdata2"
+                        data-show-value-of-requests-at="nginx_local.requests.netdata2"
                         ></div>
             </div>
 
@@ -433,9 +433,9 @@ body {
                 <div class="mysparkline-overchart-label">
                     <b>US - California</b> web requests/s
                 </div>
-                <div class="mysparkline-overchart-value" id="nginx.requests.netdata3" >
+                <div class="mysparkline-overchart-value" id="nginx_local.requests.netdata3" >
                 </div>
-                <div data-netdata="nginx.requests"
+                <div data-netdata="nginx_local.requests"
                         data-dimensions="requests"
                         data-host="//sanfrancisco.netdata.rocks"
                         data-chart-library="dygraph"
@@ -445,7 +445,7 @@ body {
                         data-height="100%"
                         data-after="-300"
                         data-colors="#5555AA"
-                        data-show-value-of-requests-at="nginx.requests.netdata3"
+                        data-show-value-of-requests-at="nginx_local.requests.netdata3"
                         ></div>
             </div>
 
@@ -453,9 +453,9 @@ body {
                 <div class="mysparkline-overchart-label">
                     <b>Canada</b> web requests/s
                 </div>
-                <div class="mysparkline-overchart-value" id="nginx.requests.netdata4" >
+                <div class="mysparkline-overchart-value" id="nginx_local.requests.netdata4" >
                 </div>
-                <div data-netdata="nginx.requests"
+                <div data-netdata="nginx_local.requests"
                         data-dimensions="requests"
                         data-host="//toronto.netdata.rocks"
                         data-chart-library="dygraph"
@@ -465,7 +465,7 @@ body {
                         data-height="100%"
                         data-after="-300"
                         data-colors="#885588"
-                        data-show-value-of-requests-at="nginx.requests.netdata4"
+                        data-show-value-of-requests-at="nginx_local.requests.netdata4"
                         ></div>
             </div>
         </div>
@@ -475,9 +475,9 @@ body {
                 <div class="mysparkline-overchart-label">
                     <b>EU - London</b> active connections
                 </div>
-                <div class="mysparkline-overchart-value" id="nginx.connections.netdata1" >
+                <div class="mysparkline-overchart-value" id="nginx_local.connections.netdata1" >
                 </div>
-                <div data-netdata="nginx.connections"
+                <div data-netdata="nginx_local.connections"
                         data-dimensions="active"
                         data-host="//london.my-netdata.io"
                         data-chart-library="dygraph"
@@ -487,7 +487,7 @@ body {
                         data-height="100%"
                         data-after="-300"
                         data-colors="#558855"
-                        data-show-value-of-active-at="nginx.connections.netdata1"
+                        data-show-value-of-active-at="nginx_local.connections.netdata1"
                         ></div>
             </div>
 
@@ -495,9 +495,9 @@ body {
                 <div class="mysparkline-overchart-label">
                     <b>US - Atlanta</b> active connections
                 </div>
-                <div class="mysparkline-overchart-value" id="nginx.connections.netdata2" >
+                <div class="mysparkline-overchart-value" id="nginx_local.connections.netdata2" >
                 </div>
-                <div data-netdata="nginx.connections"
+                <div data-netdata="nginx_local.connections"
                         data-dimensions="active"
                         data-host="//atlanta.my-netdata.io"
                         data-chart-library="dygraph"
@@ -507,7 +507,7 @@ body {
                         data-height="100%"
                         data-after="-300"
                         data-colors="#AA5555"
-                        data-show-value-of-active-at="nginx.connections.netdata2"
+                        data-show-value-of-active-at="nginx_local.connections.netdata2"
                         ></div>
             </div>
 
@@ -515,9 +515,9 @@ body {
                 <div class="mysparkline-overchart-label">
                     <b>US - California</b> active connections
                 </div>
-                <div class="mysparkline-overchart-value" id="nginx.connections.netdata3" >
+                <div class="mysparkline-overchart-value" id="nginx_local.connections.netdata3" >
                 </div>
-                <div data-netdata="nginx.connections"
+                <div data-netdata="nginx_local.connections"
                         data-dimensions="active"
                         data-host="//sanfrancisco.netdata.rocks"
                         data-chart-library="dygraph"
@@ -527,7 +527,7 @@ body {
                         data-height="100%"
                         data-after="-300"
                         data-colors="#5555AA"
-                        data-show-value-of-active-at="nginx.connections.netdata3"
+                        data-show-value-of-active-at="nginx_local.connections.netdata3"
                         ></div>
             </div>
 
@@ -535,9 +535,9 @@ body {
                 <div class="mysparkline-overchart-label">
                     <b>Canada</b> active connections
                 </div>
-                <div class="mysparkline-overchart-value" id="nginx.connections.netdata4" >
+                <div class="mysparkline-overchart-value" id="nginx_local.connections.netdata4" >
                 </div>
-                <div data-netdata="nginx.connections"
+                <div data-netdata="nginx_local.connections"
                         data-dimensions="active"
                         data-host="//toronto.netdata.rocks"
                         data-chart-library="dygraph"
@@ -547,7 +547,7 @@ body {
                         data-height="100%"
                         data-after="-300"
                         data-colors="#885588"
-                        data-show-value-of-active-at="nginx.connections.netdata4"
+                        data-show-value-of-active-at="nginx_local.connections.netdata4"
                         ></div>
             </div>
         </div>
