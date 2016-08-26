@@ -3375,9 +3375,9 @@
                 this.autoRefresh();
             })
         }
-        else {
-            console.log('auto-refresher nothing to do');
-        }
+        //else {
+        //    console.log('auto-refresher nothing to do');
+        //}
 
         // run the next refresh iteration
         setTimeout(NETDATA.chartRefresher,
