@@ -300,6 +300,8 @@
             pan_and_zoom_factor_multiplier_shift: 3.0,
             pan_and_zoom_factor_multiplier_alt: 4.0,
 
+            abort_ajax_on_scroll: false,
+
             setOptionCallback: function() { ; }
         },
 
@@ -487,15 +489,21 @@
         // the charts back to visible quickly
         var targets = NETDATA.options.targets;
         var len = targets.length;
-        while(len--) {
-            if(targets[len]._updating === true) {
-                if (typeof targets[len].xhr !== 'undefined') {
-                    targets[len].xhr.abort();
-                    targets[len].running = false;
-                    targets[len]._updating = false;
+        if(NETDATA.options.abort_ajax_on_scroll === true) {
+            while (len--) {
+                if (targets[len]._updating === true) {
+                    if (typeof targets[len].xhr !== 'undefined') {
+                        targets[len].xhr.abort();
+                        targets[len].running = false;
+                        targets[len]._updating = false;
+                    }
+                    targets[len].isVisible();
                 }
-                targets[len].isVisible();
             }
+        }
+        else {
+            while (len--)
+                targets[len].isVisible();
         }
     };
 
