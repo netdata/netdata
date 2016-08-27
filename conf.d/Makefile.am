@@ -49,6 +49,8 @@ dist_healthconfig_DATA = \
 	health.d/named.conf \
 	health.d/net.conf \
 	health.d/nginx.conf \
+	health.d/ram.conf \
 	health.d/redis.conf \
+	health.d/swap.conf \
 	health.d/squid.conf \
 	$(NULL)
