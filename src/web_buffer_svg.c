@@ -492,46 +492,93 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
     strncpyz(final, b, len);
 }
 
+// value + units
+#define VALUE_STRING_SIZE 100
+
+// label
+#define LABEL_STRING_SIZE 200
+
+// colors
+#define COLOR_STRING_SIZE 100
+
 void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int value_is_null, int precision) {
-    char label_buffer[256 + 1], value_string[512 + 1], value_color_buffer[256 + 1];
-    char label_escaped[256 + 1], value_escaped[512 + 1], label_color_escaped[256 + 1], value_color_escaped[256 + 1];
+    char      label_buffer[LABEL_STRING_SIZE + 1]
+            , value_color_buffer[COLOR_STRING_SIZE + 1]
+            , value_string[VALUE_STRING_SIZE + 1]
+            , label_escaped[LABEL_STRING_SIZE + 1]
+            , value_escaped[VALUE_STRING_SIZE + 1]
+            , label_color_escaped[COLOR_STRING_SIZE + 1]
+            , value_color_escaped[COLOR_STRING_SIZE + 1];
+
     int label_width, value_width, total_width;
 
-    if(!label_color || !*label_color) label_color = "#555";
-    if(!value_color || !*value_color) value_color = (value_is_null)?"#999":"#4c1";
+    if(unlikely(!label_color || !*label_color))
+        label_color = "#555";
+
+    if(unlikely(!value_color || !*value_color))
+        value_color = (value_is_null)?"#999":"#4c1";
 
     units = fix_units(units);
-    calc_colorz(value_color, value_color_buffer, 256, value, value_is_null);
+    calc_colorz(value_color, value_color_buffer, COLOR_STRING_SIZE, value, value_is_null);
 
     char *separator = "";
-    if(isalnum(*units)) separator = " ";
+    if(unlikely(isalnum(*units)))
+        separator = " ";
 
-    if(value_is_null)
+    if(unlikely(value_is_null))
         strcpy(value_string, "-");
+
     else if(precision < 0) {
-        calculated_number abs = (value < (calculated_number)0)?-value:value;
-        if(abs > (calculated_number)1000.0)      snprintfz(value_string, 512, "%0.0Lf%s%s", (long double)value, separator, units);
-        else if(abs > (calculated_number)100.0)  snprintfz(value_string, 512, "%0.1Lf%s%s", (long double)value, separator, units);
-        else if(abs > (calculated_number)1.0)    snprintfz(value_string, 512, "%0.2Lf%s%s", (long double)value, separator, units);
-        else if(abs > (calculated_number)0.1)    snprintfz(value_string, 512, "%0.3Lf%s%s", (long double)value, separator, units);
-        else                                     snprintfz(value_string, 512, "%0.4Lf%s%s", (long double)value, separator, units);
+        int len, l, lstop = 0;
+
+        calculated_number abs = value;
+        if(isless(value, 0)) {
+            lstop = 1;
+            abs = -value;
+        }
+
+        if(isgreaterequal(abs, 1000))     len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.0Lf", (long double)value);
+        else if(isgreaterequal(abs, 100)) len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.1Lf", (long double)value);
+        else if(isgreaterequal(abs, 1))   len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.2Lf", (long double)value);
+        else if(isgreaterequal(abs, 0.1)) len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.3Lf", (long double)value);
+        else                              len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.4Lf", (long double)value);
+
+        // remove trailing zeros
+        for(l = len - 1; l > lstop ; l--) {
+            if(likely(value_string[l] == '0')) {
+                value_string[l] = '\0';
+                len--;
+            }
+
+            else if(unlikely(value_string[l] == '.')) {
+                value_string[l] = '\0';
+                len--;
+                break;
+            }
+
+            else
+                break;
+        }
+
+        if(len >= 0)
+            snprintfz(&value_string[len], VALUE_STRING_SIZE - len, "%s%s", separator, units);
     }
     else {
         if(precision > 50) precision = 50;
-        snprintfz(value_string, 512, "%0.*Lf%s%s", precision, (long double)value, separator, units);
+        snprintfz(value_string, VALUE_STRING_SIZE, "%0.*Lf%s%s", precision, (long double)value, separator, units);
     }
 
     // we need to copy the label, since verdana11_width may write to it
-    strncpyz(label_buffer, label, 256);
+    strncpyz(label_buffer, label, LABEL_STRING_SIZE);
 
     label_width = verdana11_width(label_buffer) + (BADGE_HORIZONTAL_PADDING * 2);
     value_width = verdana11_width(value_string) + (BADGE_HORIZONTAL_PADDING * 2);
     total_width = label_width + value_width;
 
-    escape_xmlz(label_escaped, label_buffer, 256);
-    escape_xmlz(value_escaped, value_string, 256);
-    escape_xmlz(label_color_escaped, color_map(label_color), 256);
-    escape_xmlz(value_color_escaped, color_map(value_color_buffer), 256);
+    escape_xmlz(label_escaped, label_buffer, LABEL_STRING_SIZE);
+    escape_xmlz(value_escaped, value_string, VALUE_STRING_SIZE);
+    escape_xmlz(label_color_escaped, color_map(label_color), COLOR_STRING_SIZE);
+    escape_xmlz(value_color_escaped, color_map(value_color_buffer), COLOR_STRING_SIZE);
 
     wb->contenttype = CT_IMAGE_SVG_XML;
 

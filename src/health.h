@@ -129,6 +129,8 @@ typedef struct rrdcalc {
     uint32_t hash_chart;
 
     char *source;       // the source of this calculation
+    char *units;
+    char *info;
 
     char *dimensions;   // the chart dimensions
 
@@ -185,6 +187,8 @@ typedef struct rrdcalctemplate {
     uint32_t hash_context;
 
     char *source;       // the source of this template
+    char *units;
+    char *info;
 
     char *dimensions;
 
@@ -230,6 +234,9 @@ typedef struct alarm_entry {
     int exec_code;
 
     char *source;
+    char *units;
+    char *info;
+
     calculated_number old_value;
     calculated_number new_value;
     int old_status;

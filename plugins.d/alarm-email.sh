@@ -31,6 +31,10 @@ old_value="${7}"  # the previous value
 src="${8}"        # the line number and file the alarm has been configured
 duration="${9}"   # the duration in seconds the previous state took
 non_clear_duration="${10}" # the total duration in seconds this is non-clear
+units="${11}"     # the units of the value
+info="${12}"      # a short description of the alarm
+
+[ ! -z "${info}" ] && info=" <small><br/>${info}</small>"
 
 # get the system hostname
 hostname="${NETDATA_HOSTNAME}"
@@ -93,7 +97,7 @@ severity="${status}"
 raised_for="<br/>(was ${old_status,,} for $(duration4human ${duration}))"
 status_message="status unknown"
 color="grey"
-alarm="${name} = ${value}"
+alarm="${name} = ${value} ${units}"
 
 # prepare the title based on status
 case "${status}" in
@@ -200,7 +204,7 @@ Content-Type: text/html
                                     <tr style="margin:0;padding:0">
                                         <td style="font-size:18px;vertical-align:top;margin:0;padding:0 0 20px"
                                             align="left" valign="top">
-                                            <span>${alarm}</span>
+                                            <span><b>${alarm}</b>${info}</span>
                                             <span style="display:block;color:#666666;font-size:12px;font-weight:300;line-height:1;text-transform:uppercase">Alarm</span>
                                         </td>
                                     </tr>

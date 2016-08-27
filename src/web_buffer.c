@@ -189,11 +189,7 @@ void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
     va_end(args);
 
     if(unlikely(wrote >= len)) {
-        // there is bug in vsnprintf() and it returns
-        // a number higher to len, but it does not
-        // overflow the buffer.
-        // our buffer overflow detector will log it
-        // if it does.
+        // truncated
         buffer_overflow_check(wb);
 
         debug(D_WEB_BUFFER, "web_buffer_sprintf(): increasing web_buffer at position %zu, size = %zu\n", wb->len, wb->size);
