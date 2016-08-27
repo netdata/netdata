@@ -11,8 +11,14 @@
 
 # netdata
 
-
-> Aug 21st, 2016: Netdata got **[health monitoring](https://github.com/firehol/netdata/wiki/health-monitoring)** - alarms
+> Aug 28th, 2016
+>
+> [netdata v1.3.0 released!](https://github.com/firehol/netdata/releases)
+>
+> - netdata has **[health monitoring / alarms](https://github.com/firehol/netdata/wiki/health-monitoring)**!
+> - netdata **[generates badges](https://github.com/firehol/netdata/wiki/Generating-Badges)** that can be embeded anywhere!
+> - netdata plugins are now written in python!
+> - new plugins: redis, memcached, nginx_log, ipfs, apache_cache
 
 ---
 
@@ -27,16 +33,6 @@
 
 ---
 
-May 1st, 2016
-
-##### 320.000+ views, 92.000+ visitors, 28.500+ downloads, 11.000+ github stars, 700+ forks, 1 month!
-
-And it still runs with 600+ git downloads... per day!
-
-**[Check what our users say about netdata](https://github.com/firehol/netdata/issues/148)**.
-
----
-
 **Real-time performance monitoring, done right!**
 
 This is the default dashboard of **netdata**:
@@ -45,7 +41,7 @@ This is the default dashboard of **netdata**:
  - 300+ charts out of the box, 2000+ metrics monitored!
  - zero configuration, zero maintenance, zero dependencies!
 
-Live demo: [http://netdata.firehol.org](http://netdata.firehol.org)
+Live demo: [http://my-netdata.io](http://my-netdata.io)
 
 ![netdata](https://cloud.githubusercontent.com/assets/2662304/14092712/93b039ea-f551-11e5-822c-beadbf2b2a2e.gif)
 
@@ -66,7 +62,7 @@ This is what you get:
 - **Zero maintenance**, you just run it, it does the rest
 - **Custom dashboards** that can be built using simple HTML (no javascript necessary)
 - **Extensible**, you can monitor anything you can get a metric for, using its Plugin API (anything can be a netdata plugin - from BASH to node.js, so you can easily monitor any application, any API)
-- **Embeddable**, it can run anywhere a Linux kernel runs and its charts can be embedded on your web pages too
+- **Embeddable**, it can run anywhere a Linux kernel runs (even IoT) and its charts can be embedded on your web pages too
 
 ---
 
@@ -145,12 +141,6 @@ This is what it currently monitors (most with zero configuration):
 - **SNMP devices** can be monitored too (although you will need to configure these)
 
 And you can extend it, by writing plugins that collect data from any source, using any computer language.
-
----
-
-## Still not convinced?
-
-Read **[Why netdata?](https://github.com/firehol/netdata/wiki/Why-netdata%3F)**
 
 ---
 
