@@ -378,7 +378,7 @@ int main(int argc, char **argv)
                     break;
                 case 'v':
                     // TODO: Outsource version to makefile which can compute version from git.
-                    printf("netdata 1.3.0\n");
+                    printf("netdata 1.3.1_master\n");
                     return 0;
                 case 'W':
                     {
