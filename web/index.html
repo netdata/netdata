@@ -2403,9 +2403,9 @@ function renderChartsAndMenu(data) {
 }
 
 function alarmsUpdateModal() {
-    var active = '<h3>Raised Alarms</h3>';
-    var all = '<h3>All Running Alarms</h3>';
-    var log = '<h3>Alarm Log</h3>';
+    var active = '<h3>Raised Alarms</h3><table class="table">';
+    var all = '<h3>All Running Alarms</h3><table class="table">';
+    var log = '<h3>Alarm Log</h3><table  class="table"><tr><th>When</th><th>Chart</th><th>Alarm</th><th>Status</th></tr>';
     var footer = '<hr/>These are <a href="https://github.com/firehol/netdata/wiki/Generating-Badges" target="_blank">netdata badges</a>. You can copy and paste their URLs to embed them in any web page. Their color indicates the state of the alarm: <b>red</b> is critical, <b>orange</b> is warning, <b>bright green</b> is ok, <b>light grey</b> is undefined (i.e. no data or no status), <b>black</b> is not initialized.';
 
     NETDATA.alarms.get('all', function(data) {
@@ -2447,20 +2447,22 @@ function alarmsUpdateModal() {
                 if(alarm.status === 'WARNING' || alarm.status === 'CRITICAL') {
                     if(!active_family_added) {
                         active_family_added = true;
-                        active += '<h4>' + x + '</h4>';
+                        active += '<tr><th class="text-center"><h4>' + x + '</h4></th><th></th></tr>';
                     }
-                    active += '<embed><img src="' + NETDATA.serverDefault + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto&_=' + now.toString()+ '"></img></embed><br/>';
+                    active += '<tr><td class="text-center" style="vertical-align:middle"><embed><img src="' + NETDATA.serverDefault + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto&_=' + now.toString()+ '"></img></embed></td><td>' + alarm.info + '</td></tr>';
                     count_active++;
                 }
 
                 if(!all_family_added) {
                     all_family_added = true;
-                    all += '<h4>' + x + '</h4>';
+                    all += '<tr><th class="text-center"><h4>' + x + '</h4></th><th></th></tr>';
                 }
-                all += '<embed><img src="' + NETDATA.serverDefault + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto&_=' + now.toString()+ '"></img></embed><br/>';
+                all += '<tr><td class="text-center" style="vertical-align:middle"><embed><img src="' + NETDATA.serverDefault + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto&_=' + now.toString()+ '"></img></embed></td><td>' + alarm.info + '</td></tr>';
                 count_all++;
             }
         }
+        active += "</table>";
+        all += "</table>";
 
         if(!count_active)
             active += "<h4>Everything is normal. No raised alarms.</h4>";
@@ -2482,7 +2484,6 @@ function alarmsUpdateModal() {
                 return;
             }
 
-            log += '<table  class="table"><tr><th>When</th><th>Chart</th><th>Alarm</th><th>Status</th></tr>';
             var i = 0;
             var len = data.length;
             if(len > 50) len = 50;

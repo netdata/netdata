@@ -529,7 +529,7 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
         strcpy(value_string, "-");
 
     else if(precision < 0) {
-        size_t len, l, lstop = 0;
+        int len, l, lstop = 0;
 
         calculated_number abs = value;
         if(isless(value, 0)) {
@@ -537,25 +537,31 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
             abs = -value;
         }
 
-        if(isgreaterequal(abs, 1000))     len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.0Lf%s%s", (long double)value, separator, units);
-        else if(isgreaterequal(abs, 100)) len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.1Lf%s%s", (long double)value, separator, units);
-        else if(isgreaterequal(abs, 1))   len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.2Lf%s%s", (long double)value, separator, units);
-        else if(isgreaterequal(abs, 0.1)) len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.3Lf%s%s", (long double)value, separator, units);
-        else                              len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.4Lf%s%s", (long double)value, separator, units);
+        if(isgreaterequal(abs, 1000))     len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.0Lf", (long double)value);
+        else if(isgreaterequal(abs, 100)) len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.1Lf", (long double)value);
+        else if(isgreaterequal(abs, 1))   len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.2Lf", (long double)value);
+        else if(isgreaterequal(abs, 0.1)) len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.3Lf", (long double)value);
+        else                              len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.4Lf", (long double)value);
 
         // remove trailing zeros
         for(l = len - 1; l > lstop ; l--) {
-            if(likely(value_string[l] == '0'))
+            if(likely(value_string[l] == '0')) {
                 value_string[l] = '\0';
+                len--;
+            }
 
             else if(unlikely(value_string[l] == '.')) {
                 value_string[l] = '\0';
+                len--;
                 break;
             }
 
             else
                 break;
         }
+
+        if(len >= 0)
+            snprintfz(&value_string[len], VALUE_STRING_SIZE - len, "%s%s", separator, units);
     }
     else {
         if(precision > 50) precision = 50;
