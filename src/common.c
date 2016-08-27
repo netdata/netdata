@@ -916,9 +916,7 @@ int vsnprintfz(char *dst, size_t n, const char *fmt, va_list args) {
     int size = vsnprintf(dst, n, fmt, args);
 
     if (unlikely((size_t) size > n)) {
-        // there is bug in vsnprintf() and it returns
-        // a number higher to len, but it does not
-        // overflow the buffer.
+        // truncated
         size = (int)n;
     }
 
