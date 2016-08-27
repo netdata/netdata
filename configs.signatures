@@ -46,6 +46,7 @@ declare -A configs_signatures=(
   ['450667c552ab7a7d8d4a2c214fdacca5']='health.d/entropy.conf'
   ['a8feb36776005bf419c90278787a1be8']='health.d/entropy.conf'
   ['d8dc489e32f7114c6298fce94e86a8ef']='health.d/entropy.conf'
+  ['45a77ac36ba9f1898144b902de17204b']='health.d/memcached.conf'
   ['b81b8f331161b0d48e03f6fbf6b6d062']='health.d/memcached.conf'
   ['c1a7e634b5b8aad523a0d115a93379cd']='health.d/memcached.conf'
   ['373c1276dc9e65884ff2b26e1f08afe7']='health.d/named.conf'
