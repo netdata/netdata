@@ -2449,7 +2449,7 @@ function alarmsUpdateModal() {
                         active_family_added = true;
                         active += '<tr><th class="text-center"><h4>' + x + '</h4></th><th></th></tr>';
                     }
-                    active += '<tr><td class="text-center" style="vertical-align:middle"><embed><img src="' + NETDATA.serverDefault + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto&_=' + now.toString()+ '"></img></embed></td><td>' + alarm.info + '</td></tr>';
+                    active += '<tr><td class="text-center" style="vertical-align:middle"><embed><img src="' + NETDATA.serverDefault + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto&_=' + now.toString()+ '"></img></embed></td><td><b>' + alarm.info + '</b><table>' + ((typeof alarm.warn !== 'undefined')?('<tr><td>&nbsp;warning&nbsp;when&nbsp;</td><td><code>' + alarm.warn + '</code></td></tr>'):'') + ((typeof alarm.crit !== 'undefined')?('<tr><td style="text-align:right">&nbsp;critical&nbsp;when&nbsp;</td><td><code>' + alarm.crit + '</code></td></tr>'):'') + '<tr><td style="text-align:right"><small>&nbsp;source&nbsp;</small></td><td><small>' + alarm.source + '</small></td></tr></table></td></tr>';
                     count_active++;
                 }
 
@@ -2457,7 +2457,7 @@ function alarmsUpdateModal() {
                     all_family_added = true;
                     all += '<tr><th class="text-center"><h4>' + x + '</h4></th><th></th></tr>';
                 }
-                all += '<tr><td class="text-center" style="vertical-align:middle"><embed><img src="' + NETDATA.serverDefault + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto&_=' + now.toString()+ '"></img></embed></td><td>' + alarm.info + '</td></tr>';
+                all += '<tr><td class="text-center" style="vertical-align:middle"><embed><img src="' + NETDATA.serverDefault + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto&_=' + now.toString()+ '"></img></embed></td><td><b>' + alarm.info + '</b><table>' + ((typeof alarm.warn !== 'undefined')?('<tr><td>&nbsp;warning&nbsp;when&nbsp;</td><td><code>' + alarm.warn + '</code></td></tr>'):'') + ((typeof alarm.crit !== 'undefined')?('<tr><td style="text-align:right">&nbsp;critical&nbsp;when&nbsp;</td><td><code>' + alarm.crit + '</code></td></tr>'):'') + '<tr><td style="text-align:right"><small>&nbsp;source&nbsp;</small></td><td><small>' + alarm.source + '</small></td></tr></table></td></tr>';
                 count_all++;
             }
         }

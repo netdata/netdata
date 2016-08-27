@@ -34,7 +34,7 @@ non_clear_duration="${10}" # the total duration in seconds this is non-clear
 units="${11}"     # the units of the value
 info="${12}"      # a short description of the alarm
 
-[ ! -z "${info}" ] && info=" <br/>${info}"
+[ ! -z "${info}" ] && info=" <small><br/>${info}</small>"
 
 # get the system hostname
 hostname="${NETDATA_HOSTNAME}"
@@ -204,7 +204,7 @@ Content-Type: text/html
                                     <tr style="margin:0;padding:0">
                                         <td style="font-size:18px;vertical-align:top;margin:0;padding:0 0 20px"
                                             align="left" valign="top">
-                                            <span>${alarm}${info}</span>
+                                            <span><b>${alarm}</b>${info}</span>
                                             <span style="display:block;color:#666666;font-size:12px;font-weight:300;line-height:1;text-transform:uppercase">Alarm</span>
                                         </td>
                                     </tr>
