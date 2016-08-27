@@ -5601,7 +5601,7 @@
         update_forever: function() {
             NETDATA.alarms.get('active', function(data) {
                 if(data !== null) {
-                    if("Notification" in window && NETDATA.alarms.current != null) {
+                    if('Notification' in window && NETDATA.alarms.current != null) {
                         if(Object.keys(NETDATA.alarms.current.alarms).length < Object.keys(data.alarms).length) {
                             if (Notification.permission === 'granted') {
                                 new Notification('Netdata Alarm!', {body: 'Your Server needs attention!',
@@ -5642,7 +5642,7 @@
 
         init: function() {
             NETDATA.alarms.update_forever();
-            if ("Notification" in window && Notification.permission !== 'granted') {
+            if ('Notification' in window && Notification.permission === 'default') {
                 Notification.requestPermission();
             }
         }
