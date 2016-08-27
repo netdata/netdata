@@ -467,6 +467,8 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
 
     snprintfz(fullname, RRDVAR_MAX_LENGTH, "%s.%s", st->name, rc->name);
     rc->hostname = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, fullname, RRDVAR_TYPE_CALCULATED, &rc->value);
+
+	if(!rc->units) rc->units = strdupz(st->units);
 }
 
 static inline int rrdcalc_is_matching_this_rrdset(RRDCALC *rc, RRDSET *st) {
@@ -604,8 +606,9 @@ static inline uint32_t rrdcalc_fullname(char *fullname, size_t len, const char *
     return simple_hash(fullname);
 }
 
-static inline RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const char *chart, const char *dimensions, int group_method,
-                        int after, int before, int update_every, uint32_t options,
+static inline RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const char *chart, const char *dimensions,
+                        const char *units, const char *info,
+                        int group_method, int after, int before, int update_every, uint32_t options,
                         calculated_number green, calculated_number red,
                         const char *exec, const char *source,
                         const char *calc, const char *warn, const char *crit) {
@@ -639,6 +642,8 @@ static inline RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const cha
 
     if(exec) rc->exec = strdupz(exec);
     if(source) rc->source = strdupz(source);
+    if(units) rc->units = strdupz(units);
+    if(info) rc->info = strdupz(info);
 
     if(calc) {
         rc->calculation = expression_parse(calc, NULL, NULL);
@@ -706,11 +711,14 @@ void rrdcalc_free(RRDHOST *host, RRDCALC *rc) {
     expression_free(rc->warning);
     expression_free(rc->critical);
 
-    freez(rc->source);
     freez(rc->name);
     freez(rc->chart);
+    freez(rc->family);
     freez(rc->dimensions);
     freez(rc->exec);
+    freez(rc->source);
+    freez(rc->units);
+    freez(rc->info);
     freez(rc);
 }
 
@@ -724,7 +732,7 @@ void rrdcalctemplate_link_matching(RRDSET *st) {
         if(rt->hash_context == st->hash_context && !strcmp(rt->context, st->context)) {
 
             RRDCALC *rc = rrdcalc_create(st->rrdhost, rt->name, st->id,
-                           rt->dimensions, rt->group, rt->after, rt->before, rt->update_every, rt->options,
+                           rt->dimensions, rt->units, rt->info, rt->group, rt->after, rt->before, rt->update_every, rt->options,
                            rt->green, rt->red, rt->exec, rt->source,
                            (rt->calculation)?rt->calculation->source:NULL,
                            (rt->warning)?rt->warning->source:NULL,
@@ -766,11 +774,13 @@ static inline void rrdcalctemplate_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
     expression_free(rt->warning);
     expression_free(rt->critical);
 
-    freez(rt->dimensions);
-    freez(rt->context);
     freez(rt->name);
     freez(rt->exec);
+    freez(rt->context);
     freez(rt->source);
+    freez(rt->units);
+    freez(rt->info);
+    freez(rt->dimensions);
     freez(rt);
 }
 
@@ -790,6 +800,8 @@ static inline void rrdcalctemplate_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
 #define HEALTH_WARN_KEY "warn"
 #define HEALTH_CRIT_KEY "crit"
 #define HEALTH_EXEC_KEY "exec"
+#define HEALTH_UNITS_KEY "units"
+#define HEALTH_INFO_KEY "info"
 
 static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
     {
@@ -1034,10 +1046,17 @@ static inline char *health_source_file(size_t line, const char *path, const char
     return strdupz(buffer);
 }
 
+static inline void strip_quotes(char *s) {
+    while(*s) {
+        if(*s == '\'' || *s == '"') *s = ' ';
+        s++;
+    }
+}
+
 int health_readfile(const char *path, const char *filename) {
     debug(D_HEALTH, "Health configuration reading file '%s/%s'", path, filename);
 
-    static uint32_t hash_alarm = 0, hash_template = 0, hash_on = 0, hash_calc = 0, hash_green = 0, hash_red = 0, hash_warn = 0, hash_crit = 0, hash_exec = 0, hash_every = 0, hash_lookup = 0;
+    static uint32_t hash_alarm = 0, hash_template = 0, hash_on = 0, hash_calc = 0, hash_green = 0, hash_red = 0, hash_warn = 0, hash_crit = 0, hash_exec = 0, hash_every = 0, hash_lookup = 0, hash_units = 0, hash_info = 0;
     char buffer[HEALTH_CONF_MAX_LINE + 1];
 
     if(unlikely(!hash_alarm)) {
@@ -1052,6 +1071,8 @@ int health_readfile(const char *path, const char *filename) {
         hash_crit = simple_uhash(HEALTH_CRIT_KEY);
         hash_exec = simple_uhash(HEALTH_EXEC_KEY);
         hash_every = simple_uhash(HEALTH_EVERY_KEY);
+        hash_units = simple_hash(HEALTH_UNITS_KEY);
+        hash_info = simple_hash(HEALTH_INFO_KEY);
     }
 
     snprintfz(buffer, HEALTH_CONF_MAX_LINE, "%s/%s", path, filename);
@@ -1229,6 +1250,28 @@ int health_readfile(const char *path, const char *filename) {
                 }
                 rc->exec = strdupz(value);
             }
+            else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
+                if(rc->units) {
+                    if(strcmp(rc->units, value))
+                        info("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                             line, path, filename, rc->name, key, rc->units, value, value);
+
+                    freez(rc->units);
+                }
+                rc->units = strdupz(value);
+                strip_quotes(rc->units);
+            }
+            else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
+                if(rc->info) {
+                    if(strcmp(rc->info, value))
+                        info("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                             line, path, filename, rc->name, key, rc->info, value, value);
+
+                    freez(rc->info);
+                }
+                rc->info = strdupz(value);
+                strip_quotes(rc->info);
+            }
             else {
                 error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has unknown key '%s'.",
                      line, path, filename, rc->name, key);
@@ -1308,6 +1351,28 @@ int health_readfile(const char *path, const char *filename) {
                     freez(rt->exec);
                 }
                 rt->exec = strdupz(value);
+            }
+            else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
+                if(rt->units) {
+                    if(strcmp(rt->units, value))
+                        info("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                             line, path, filename, rt->name, key, rt->units, value, value);
+
+                    freez(rt->units);
+                }
+                rt->units = strdupz(value);
+                strip_quotes(rt->units);
+            }
+            else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
+                if(rt->info) {
+                    if(strcmp(rt->info, value))
+                        info("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                             line, path, filename, rt->name, key, rt->info, value, value);
+
+                    freez(rt->info);
+                }
+                rt->info = strdupz(value);
+                strip_quotes(rt->info);
             }
             else {
                 error("Health configuration at line %zu of file '%s/%s' for template '%s' has unknown key '%s'.",
@@ -1428,6 +1493,8 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae) {
                            "\t\t\"exec\":\"%s\",\n"
                            "\t\t\"exec_code\":%d,\n"
                            "\t\t\"source\":\"%s\",\n"
+                           "\t\t\"units\":\"%s\",\n"
+                           "\t\t\"info\":\"%s\",\n"
                            "\t\t\"when\":%lu,\n"
                            "\t\t\"duration\":%lu,\n"
                            "\t\t\"non_clear_duration\":%lu,\n"
@@ -1444,6 +1511,8 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae) {
                    ae->exec?ae->exec:health_default_exec,
                    ae->exec_code,
                    ae->source,
+                   ae->units?ae->units:"",
+                   ae->info?ae->info:"",
                    (unsigned long)ae->when,
                    (unsigned long)ae->duration,
                    (unsigned long)ae->non_clear_duration,
@@ -1489,7 +1558,9 @@ static inline void health_rrdcalc2json_nolock(BUFFER *wb, RRDCALC *rc) {
                    "\t\t\t\"active\": %s,\n"
                    "\t\t\t\"exec\": \"%s\",\n"
                    "\t\t\t\"source\": \"%s\",\n"
-                   "\t\t\t\"status\": \"%s\",\n"
+                   "\t\t\t\"units\": \"%s\",\n"
+                   "\t\t\t\"info\": \"%s\",\n"
+				   "\t\t\t\"status\": \"%s\",\n"
                    "\t\t\t\"last_status_change\": %lu,\n"
                    "\t\t\t\"last_updated\": %lu,\n"
                    "\t\t\t\"next_update\": %lu,\n"
@@ -1501,6 +1572,8 @@ static inline void health_rrdcalc2json_nolock(BUFFER *wb, RRDCALC *rc) {
             , (rc->rrdset)?"true":"false"
             , rc->exec?rc->exec:health_default_exec
             , rc->source
+            , rc->units?rc->units:""
+            , rc->info?rc->info:""
             , rrdcalc_status2string(rc->status)
             , (unsigned long)rc->last_status_change
             , (unsigned long)rc->last_updated
@@ -1677,7 +1750,7 @@ static inline void health_alarm_execute(ALARM_ENTRY *ae) {
     const char *exec = ae->exec;
     if(!exec) exec = health_default_exec;
 
-    snprintfz(buffer, FILENAME_MAX, "exec %s '%s' '%s' '%s' '%s' '%s' '%0.0Lf' '%0.0Lf' '%s' '%u' '%u'",
+    snprintfz(buffer, FILENAME_MAX, "exec %s '%s' '%s' '%s' '%s' '%s' '%0.0Lf' '%0.0Lf' '%s' '%u' '%u' '%s' '%s'",
               exec,
               ae->name,
               ae->chart?ae->chart:"NOCAHRT",
@@ -1688,7 +1761,9 @@ static inline void health_alarm_execute(ALARM_ENTRY *ae) {
               ae->old_value,
               ae->source?ae->source:"UNKNOWN",
               (uint32_t)ae->duration,
-              (uint32_t)ae->non_clear_duration
+              (uint32_t)ae->non_clear_duration,
+              ae->units?ae->units:"",
+              ae->info?ae->info:""
     );
 
     ae->notifications |= HEALTH_ENTRY_NOTIFICATIONS_EXEC_RUN;
@@ -1726,7 +1801,9 @@ static inline void health_alarm_log(RRDHOST *host, time_t when,
                 const char *exec, time_t duration,
                 calculated_number old_value, calculated_number new_value,
                 int old_status, int new_status,
-                const char *source
+                const char *source,
+                const char *units,
+                const char *info
 ) {
     ALARM_ENTRY *ae = callocz(1, sizeof(ALARM_ENTRY));
     ae->name = strdupz(name);
@@ -1742,6 +1819,8 @@ static inline void health_alarm_log(RRDHOST *host, time_t when,
 
     if(exec) ae->exec = strdupz(exec);
     if(source) ae->source = strdupz(source);
+    if(units) ae->units = strdupz(units);
+    if(info) ae->info = strdupz(info);
 
     ae->id = host->health_log.nextid++;
     ae->when = when;
@@ -1827,10 +1906,13 @@ static inline void health_alarm_log_process(RRDHOST *host) {
     while(ae) {
         ALARM_ENTRY *t = ae->next;
 
-        freez(ae->family);
-        freez(ae->chart);
         freez(ae->name);
+        freez(ae->chart);
+        freez(ae->family);
         freez(ae->exec);
+        freez(ae->source);
+        freez(ae->units);
+        freez(ae->info);
         freez(ae);
 
         ae = t;
@@ -2071,7 +2153,7 @@ void *health_main(void *ptr) {
                 }
 
                 if(status != rc->status) {
-                    health_alarm_log(&localhost, time(NULL), rc->name, rc->rrdset->id, rc->rrdset->family, rc->exec, now - rc->last_status_change, rc->old_value, rc->value, rc->status, status, rc->source);
+                    health_alarm_log(&localhost, time(NULL), rc->name, rc->rrdset->id, rc->rrdset->family, rc->exec, now - rc->last_status_change, rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info);
                     rc->last_status_change = now;
                     rc->status = status;
                 }
