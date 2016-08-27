@@ -1,3 +1,124 @@
+netdata (1.3.0) - 2016-08-28
+
+ At a glance:
+
+ - netdata has health monitoring / alarms!
+ - netdata has badges that can be embeded anywhere!
+ - netdata plugins are now written in python!
+ - new plugins: redis, memcached, nginx_log, ipfs, apache_cache
+
+ IMPORTANT:
+ Since netdata now uses python plugins, new packages are
+ required to be installed on a system to allow it work.
+ For more information, [lease check the installation page:
+
+ https://github.com/firehol/netdata/wiki/Installation
+
+ In detail:
+
+ * netdata has alarms!
+
+   Based on the POLL we made on github
+   (https://github.com/firehol/netdata/issues/436),
+   health monitoring was the winner. So here it is!
+
+   netdata now has a poweful health monitoring system embedded.
+   Please check the wiki page:
+
+   https://github.com/firehol/netdata/wiki/health-monitoring
+
+ * netdata has badges!
+
+   netdata can generate badges with live information from the
+   collected metrics.
+   Please check the wiki page:
+
+   https://github.com/firehol/netdata/wiki/Generating-Badges
+
+ * netdata plugins are now written in python!
+
+   Thanks to the great work of Paweł Krupa (@paulfantom), most BASH
+   plugins have been ported to python.
+
+   The new python.d.plugin supports both python2 and python3 and
+   data collection from multiple sources for all modules.
+
+   The following pre-existing modules have been ported to python:
+
+    - apache
+    - cpufreq
+    - example
+    - exim
+    - hddtemp
+    - mysql
+    - nginx
+    - phpfm
+    - postfix
+    - sensors
+    - squid
+    - tomcat
+
+   The following new modules have been added:
+
+    - apache_cache
+    - dovecot
+    - ipfs
+    - memcached
+    - nginx_log
+    - redis
+
+ * other data collectors:
+
+    - Thanks to @simonnagl netdata now reports disk space usage.
+
+ * dashboards now transfer a certain settings from server to server
+   when changing servers via the my-netdata menu.
+
+   The settings transferred are the dashboard theme, the online
+   help status and current pan and zoom timeframe of the dashboard.
+
+ * API improvements:
+
+   - reduction functions now support 'min', 'sum' and 'incremental-sum'.
+
+   - netdata now offers a multi-threaded and a single threaded
+     web server (single threaded is better for IoT).
+
+ * apps.plugin improvements:
+
+   - can now run with command line argument 'without-files'
+     to prevent it from enumating all the open files/sockets/pipes
+     of all running processes.
+
+   - apps.plugin now scales the collected values to match the
+     the total system usage.
+
+   - apps.plugin can now report guest CPU usage per process.
+
+   - repeating errors are now logged once per process.
+
+ * netdata now runs with IDLE process priority (lower than nice 19)
+
+ * netdata now instructs the kernel to kill it first when it starves
+   for memory.
+
+ * netdata listens for signals:
+
+   - SIGHUP to netdata instructs it to re-open its log files
+     (new logrotate files added too).
+
+   - SIGUSR1 to netdata saves the database
+
+   - SIGUSR2 to netdata reloads health / alarms configuration
+
+ * netdata can now bind to multiple IPs and ports.
+
+ * netdata now has new systemd service file (it starts as user
+   netdata and does not fork).
+
+ * Dozens of other improvements and bugfixes
+ 
+ 
 netdata (1.2.0) - 2016-05-16
 
  At a glance:
