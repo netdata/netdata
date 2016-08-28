@@ -2450,7 +2450,7 @@ function alarmsUpdateModal() {
                         active += '<tr><th class="text-center"><h4>' + x + '</h4></th><th></th></tr>';
                     }
                     count_active++;
-                    active += '<tr><td class="text-center" style="vertical-align:middle"><embed src="' + NETDATA.serverDefault + 'api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" /></td><td><b>' + alarm.info + '</b><table>' + ((typeof alarm.warn !== 'undefined')?('<tr><td>&nbsp;warning&nbsp;when&nbsp;</td><td><code>' + alarm.warn + '</code></td></tr>'):'') + ((typeof alarm.crit !== 'undefined')?('<tr><td style="text-align:right">&nbsp;critical&nbsp;when&nbsp;</td><td><code>' + alarm.crit + '</code></td></tr>'):'') + '<tr><td style="text-align:right"><small>&nbsp;source&nbsp;</small></td><td><small>' + alarm.source + '</small></td></tr></table></td></tr>';
+                    active += '<tr><td class="text-center" style="vertical-align:middle" width="40%"><embed src="' + NETDATA.serverDefault + 'api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" height="20" /></td><td><b>' + alarm.info + '</b><table>' + ((typeof alarm.warn !== 'undefined')?('<tr><td>&nbsp;warning&nbsp;when&nbsp;</td><td><code>' + alarm.warn + '</code></td></tr>'):'') + ((typeof alarm.crit !== 'undefined')?('<tr><td style="text-align:right">&nbsp;critical&nbsp;when&nbsp;</td><td><code>' + alarm.crit + '</code></td></tr>'):'') + '<tr><td style="text-align:right"><small>&nbsp;source&nbsp;</small></td><td><small>' + alarm.source + '</small></td></tr></table></td></tr>';
                 }
 
                 if(!all_family_added) {
@@ -2458,7 +2458,7 @@ function alarmsUpdateModal() {
                     all += '<tr><th class="text-center"><h4>' + x + '</h4></th><th></th></tr>';
                 }
                 count_all++;
-                all += '<tr><td class="text-center" style="vertical-align:middle"><embed src="' + NETDATA.serverDefault + 'api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" /></td><td><b>' + alarm.info + '</b><table>' + ((typeof alarm.warn !== 'undefined')?('<tr><td>&nbsp;warning&nbsp;when&nbsp;</td><td><code>' + alarm.warn + '</code></td></tr>'):'') + ((typeof alarm.crit !== 'undefined')?('<tr><td style="text-align:right">&nbsp;critical&nbsp;when&nbsp;</td><td><code>' + alarm.crit + '</code></td></tr>'):'') + '<tr><td style="text-align:right"><small>&nbsp;source&nbsp;</small></td><td><small>' + alarm.source + '</small></td></tr></table></td></tr>';
+                all += '<tr><td class="text-center" style="vertical-align:middle" width="40%"><embed src="' + NETDATA.serverDefault + 'api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" height="20" /></td><td><b>' + alarm.info + '</b><table>' + ((typeof alarm.warn !== 'undefined')?('<tr><td>&nbsp;warning&nbsp;when&nbsp;</td><td><code>' + alarm.warn + '</code></td></tr>'):'') + ((typeof alarm.crit !== 'undefined')?('<tr><td style="text-align:right">&nbsp;critical&nbsp;when&nbsp;</td><td><code>' + alarm.crit + '</code></td></tr>'):'') + '<tr><td style="text-align:right"><small>&nbsp;source&nbsp;</small></td><td><small>' + alarm.source + '</small></td></tr></table></td></tr>';
             }
         }
         active += "</table>";
