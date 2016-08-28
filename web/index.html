@@ -2467,41 +2467,47 @@ function alarmsUpdateModal() {
         }
 
         function alarm_lookup_explain(alarm, chart) {
-            var dimensions = '';
+            var dimensions = ' of all values ';
 
             if(chart.dimensions.length > 1)
-                dimensions = '(of the sum of all dimensions), ';
+                dimensions = ' of the sum of all dimensions ';
 
             if(typeof alarm.lookup_dimensions !== 'undefined') {
                 var d = alarm.lookup_dimensions.replace('|', ',');
                 var x = d.split(',');
                 if(x.length > 1)
-                    dimensions = 'of the sum of dimensions <code>' + alarm.lookup_dimensions + '</code>, ';
+                    dimensions = 'of the sum of dimensions <code>' + alarm.lookup_dimensions + '</code> ';
                 else
-                    dimensions = 'of the dimension <code>' + alarm.lookup_dimensions + '</code>, ';
+                    dimensions = 'of all values of dimension <code>' + alarm.lookup_dimensions + '</code> ';
             }
 
-            return '<code>' + alarm.lookup_method + '</code> of all values '
-                + dimensions
-                + 'starting <code>' + frequency_text(alarm.lookup_after + alarm.lookup_before, true) + '</code> and up to <code>' + frequency_text(alarm.lookup_before, true) + '</code>'
+            return '<code>' + alarm.lookup_method + '</code> '
+                + dimensions + ', of chart <code>' + alarm.chart + '</code>'
+                + ', starting <code>' + frequency_text(alarm.lookup_after + alarm.lookup_before, true) + '</code> and up to <code>' + frequency_text(alarm.lookup_before, true) + '</code>'
                 + ((alarm.lookup_options)?(', with options <code>' + alarm.lookup_options.replace(' ', ',&nbsp;') + '</code>'):'')
                 + '.';
         }
 
-        function alarm_to_html(alarm) {
+        function alarm_to_html(alarm, full) {
             var chart = options.data.charts[alarm.chart];
-            // console.log(alarm);
-            return '<tr><td class="text-center" style="vertical-align:middle" width="40%"><b>' + alarm.chart + '</b><br/>&nbsp;<br/><embed src="' + NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" height="20" /><br/>&nbsp;<br/><span style="font-size: 18px">' + alarm.info + '</span></td>'
+
+            var html = '<tr><td class="text-center" style="vertical-align:middle" width="40%"><b>' + alarm.chart + '</b><br/>&nbsp;<br/><embed src="' + NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" height="20" /><br/>&nbsp;<br/><span style="font-size: 18px">' + alarm.info + '</span></td>'
                 + '<td><table class="table">'
-                + ((typeof alarm.lookup_after !== 'undefined')?('<tr><td width="10%" style="text-align:right">db&nbsp;lookup</td><td>' + alarm_lookup_explain(alarm, chart) + '</td></tr>'):'')
-                + ((typeof alarm.calc !== 'undefined')?('<tr><td width="10%" style="text-align:right">calculation</td><td><code>' + alarm.calc + '</code></td></tr>'):'')
-                + ((typeof alarm.warn !== 'undefined')?('<tr><td width="10%" style="text-align:right">warning&nbsp;when</td><td><code>' + alarm.warn + '</code></td></tr>'):'')
-                + ((typeof alarm.crit !== 'undefined')?('<tr><td width="10%" style="text-align:right">critical&nbsp;when</td><td><code>' + alarm.crit + '</code></td></tr>'):'')
-                + ((chart.green !== null)?('<tr><td width="10%" style="text-align:right">green&nbsp;threshold</td><td><code>' + chart.green + ' ' + chart.units + '</code></td></tr>'):'')
-                + ((chart.red !== null)?('<tr><td width="10%" style="text-align:right">red&nbsp;threshold</td><td><code>' + chart.red + ' ' + chart.units + '</code></td></tr>'):'')
-                + '<tr><td width="10%" style="text-align:right">check&nbsp;every</td><td>' + frequency_text(alarm.update_every) + '</td></tr>'
-                + '<tr><td width="10%" style="text-align:right">source</td><td>' + alarm.source + '</td></tr>'
+                + ((typeof alarm.warn !== 'undefined')?('<tr><td width="10%" style="text-align:right">warning&nbsp;when</td><td><span style="font-family: monospace; color:#fe7d37; font-weight: bold;">' + alarm.warn + '</span></td></tr>'):'')
+                + ((typeof alarm.crit !== 'undefined')?('<tr><td width="10%" style="text-align:right">critical&nbsp;when</td><td><span style="font-family: monospace; color: #e05d44; font-weight: bold;">' + alarm.crit + '</span></td></tr>'):'');
+
+            if(full === true) {
+                    html += ((typeof alarm.lookup_after !== 'undefined')?('<tr><td width="10%" style="text-align:right">db&nbsp;lookup</td><td>' + alarm_lookup_explain(alarm, chart) + '</td></tr>'):'')
+                    + ((typeof alarm.calc !== 'undefined')?('<tr><td width="10%" style="text-align:right">calculation</td><td><span style="font-family: monospace;">' + alarm.calc + '</span></td></tr>'):'')
+                    + ((chart.green !== null)?('<tr><td width="10%" style="text-align:right">green&nbsp;threshold</td><td><code>' + chart.green + ' ' + chart.units + '</code></td></tr>'):'')
+                    + ((chart.red !== null)?('<tr><td width="10%" style="text-align:right">red&nbsp;threshold</td><td><code>' + chart.red + ' ' + chart.units + '</code></td></tr>'):'');
+            }
+
+            html += '<tr><td width="10%" style="text-align:right">check&nbsp;every</td><td>' + frequency_text(alarm.update_every) + '</td></tr>'
+                + '<tr><td width="10%" style="text-align:right">source</td><td><span style="font-family: monospace;">' + alarm.source + '</span></td></tr>'
                 + '</table></td></tr>';
+
+            return html;
         }
 
         function alarm_family_show(id) {
@@ -2510,7 +2516,7 @@ function alarmsUpdateModal() {
             var len = family.arr.length;
             while(len--) {
                 var alarm = family.arr[len];
-                html += alarm_to_html(alarm);
+                html += alarm_to_html(alarm, true);
             }
             html += '</table>';
 
@@ -2589,7 +2595,7 @@ function alarmsUpdateModal() {
                         active += '<tr><th class="text-center"><h4>' + family + '</h4></th><th></th></tr>';
                     }
                     count_active++;
-                    active += alarm_to_html(alarm);
+                    active += alarm_to_html(alarm, false);
                 }
 
                 count_all++;
