@@ -5576,12 +5576,13 @@
     // Registry of netdata hosts
 
     NETDATA.alarms = {
+        server: null,
         current: null,
         callback: null,
 
         get: function(what, callback) {
             $.ajax({
-                url: NETDATA.serverDefault + '/api/v1/alarms?' + what.toString(),
+                url: NETDATA.alarms.server + '/api/v1/alarms?' + what.toString(),
                 async: true,
                 cache: false,
                 xhrFields: { withCredentials: true } // required for the cookie
@@ -5591,7 +5592,7 @@
                         callback(data);
                 })
                 .fail(function() {
-                    NETDATA.error(415, host);
+                    NETDATA.error(415, NETDATA.alarms.server);
 
                     if(typeof callback === 'function')
                         callback(null);
@@ -5614,7 +5615,7 @@
 
         get_log: function(callback) {
             $.ajax({
-                url: NETDATA.serverDefault + '/api/v1/alarm_log',
+                url: NETDATA.alarms.server + '/api/v1/alarm_log',
                 async: true,
                 cache: false,
                 xhrFields: { withCredentials: true } // required for the cookie
@@ -5624,7 +5625,7 @@
                         callback(data);
                 })
                 .fail(function() {
-                    NETDATA.error(416, host);
+                    NETDATA.error(416, NETDATA.alarms.server);
 
                     if(typeof callback === 'function')
                         callback(null);
@@ -5632,6 +5633,11 @@
         },
 
         init: function() {
+            var host = NETDATA.serverDefault;
+            while(host.slice(-1) === '/')
+                host = host.substring(0, host.length - 1);
+            NETDATA.alarms.server = host;
+            
             NETDATA.alarms.update_forever();
         }
     };
