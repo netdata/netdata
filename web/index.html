@@ -125,6 +125,13 @@
         overflow: visible;
     }
 
+    /* make accordion use the whole header bar for expand/collapse */
+    .panel-title a {
+        display: block;
+        padding: 10px 15px;
+        margin: -10px -15px;
+    }
+
     /*
      * Side navigation
      *
@@ -2406,9 +2413,13 @@ function alarmsUpdateModal() {
     var active = '<h3>Raised Alarms</h3><table class="table">';
     var all = '<h3>All Running Alarms</h3><div class="panel-group" id="alarms_all_accordion" role="tablist" aria-multiselectable="true">';
     var log = '<h3>Alarm Log</h3><table class="table"><tr><th>When</th><th>Chart</th><th>Alarm</th><th>Status</th>';
-    var footer = '<hr/>These are <a href="https://github.com/firehol/netdata/wiki/Generating-Badges" target="_blank">netdata badges</a>. You can copy and paste their URLs to embed them in any web page. Their color indicates the state of the alarm: <b>red</b> is critical, <b>orange</b> is warning, <b>bright green</b> is ok, <b>light grey</b> is undefined (i.e. no data or no status), <b>black</b> is not initialized.';
+    var footer = '<hr/><a href="https://github.com/firehol/netdata/wiki/Generating-Badges" target="_blank">netdata badges</a> refresh automatically. Their color indicates the state of the alarm: <span style="color: #e05d44"><b>&nbsp;red&nbsp;</b></span> is critical, <span style="color:#fe7d37"><b>&nbsp;orange&nbsp;</b></span> is warning, <span style="color: #4c1"><b>&nbsp;bright green&nbsp;</b></span> is ok, <span style="color: #9f9f9f"><b>&nbsp;light grey&nbsp;</b></span> is undefined (i.e. no data or no status), <span style="color: #000"><b>&nbsp;black&nbsp;</b></span> is not initialized. You can copy and paste their URLs to embed them in any web page.';
 
     NETDATA.alarms.get('all', function(data) {
+        options.alarm_families = new Array();
+
+        alarmsCallback(data);
+
         if(data === null) {
             document.getElementById('alarms_active').innerHTML =
                     document.getElementById('alarms_all').innerHTML =
@@ -2417,6 +2428,96 @@ function alarmsUpdateModal() {
             return;
         }
 
+        function frequency_text(seconds, sfx) {
+            if(seconds === 0)
+                return 'now';
+
+            var suffix = '';
+            if(seconds < 0) {
+                seconds = -seconds;
+                if(sfx) suffix = '&nbsp;ago';
+            }
+
+            var hours = Math.floor(seconds / 3600);
+            seconds -= (hours * 3600);
+
+            var minutes = Math.floor(seconds / 60);
+            seconds -= (minutes * 60);
+
+            var txt = '';
+            
+            if(hours > 1) txt += hours.toString() + '&nbsp;hours';
+            else if(hours === 1) txt += hours.toString() + '&nbsp;hour';
+
+            if(hours > 0 && minutes > 0 && seconds == 0)
+                txt += '&nbsp;and&nbsp;';
+            else if(hours > 0 && minutes > 0 && seconds > 0)
+                txt += ',&nbsp;';
+
+            if(minutes > 1) txt += minutes.toString() + '&nbsp;minutes';
+            else if(minutes === 1) txt += minutes.toString() + '&nbsp;minute';
+
+            if((minutes > 0 || minutes > 0) && seconds > 0)
+                txt += '&nbsp;and&nbsp;';
+
+            if(seconds > 1) txt += seconds.toString() + '&nbsp;seconds';
+            else if(seconds === 1) txt += seconds.toString() + '&nbsp;second';
+
+            return txt + suffix;
+        }
+
+        function alarm_lookup_explain(alarm, chart) {
+            var dimensions = '';
+
+            if(chart.dimensions.length > 1)
+                dimensions = '(of the sum of all dimensions), ';
+
+            if(typeof alarm.lookup_dimensions !== 'undefined') {
+                var d = alarm.lookup_dimensions.replace('|', ',');
+                var x = d.split(',');
+                if(x.length > 1)
+                    dimensions = 'of the sum of dimensions <code>' + alarm.lookup_dimensions + '</code>, ';
+                else
+                    dimensions = 'of the dimension <code>' + alarm.lookup_dimensions + '</code>, ';
+            }
+
+            return '<code>' + alarm.lookup_method + '</code> of all values '
+                + dimensions
+                + 'starting <code>' + frequency_text(alarm.lookup_after + alarm.lookup_before, true) + '</code> and up to <code>' + frequency_text(alarm.lookup_before, true) + '</code>'
+                + ((alarm.lookup_options)?(', with options <code>' + alarm.lookup_options.replace(' ', ',&nbsp;') + '</code>'):'')
+                + '.';
+        }
+
+        function alarm_to_html(alarm) {
+            var chart = options.data.charts[alarm.chart];
+            // console.log(alarm);
+            return '<tr><td class="text-center" style="vertical-align:middle" width="40%"><b>' + alarm.chart + '</b><br/>&nbsp;<br/><embed src="' + NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" height="20" /><br/>&nbsp;<br/><span style="font-size: 18px">' + alarm.info + '</span></td>'
+                + '<td><table class="table">'
+                + ((typeof alarm.lookup_after !== 'undefined')?('<tr><td width="10%" style="text-align:right">db&nbsp;lookup</td><td>' + alarm_lookup_explain(alarm, chart) + '</td></tr>'):'')
+                + ((typeof alarm.calc !== 'undefined')?('<tr><td width="10%" style="text-align:right">calculation</td><td><code>' + alarm.calc + '</code></td></tr>'):'')
+                + ((typeof alarm.warn !== 'undefined')?('<tr><td width="10%" style="text-align:right">warning&nbsp;when</td><td><code>' + alarm.warn + '</code></td></tr>'):'')
+                + ((typeof alarm.crit !== 'undefined')?('<tr><td width="10%" style="text-align:right">critical&nbsp;when</td><td><code>' + alarm.crit + '</code></td></tr>'):'')
+                + ((chart.green !== null)?('<tr><td width="10%" style="text-align:right">green&nbsp;threshold</td><td><code>' + chart.green + ' ' + chart.units + '</code></td></tr>'):'')
+                + ((chart.red !== null)?('<tr><td width="10%" style="text-align:right">red&nbsp;threshold</td><td><code>' + chart.red + ' ' + chart.units + '</code></td></tr>'):'')
+                + '<tr><td width="10%" style="text-align:right">check&nbsp;every</td><td>' + frequency_text(alarm.update_every) + '</td></tr>'
+                + '<tr><td width="10%" style="text-align:right">source</td><td>' + alarm.source + '</td></tr>'
+                + '</table></td></tr>';
+        }
+
+        function alarm_family_show(id) {
+            var html = '<table class="table">';
+            var family = options.alarm_families[id];
+            var len = family.arr.length;
+            while(len--) {
+                var alarm = family.arr[len];
+                html += alarm_to_html(alarm);
+            }
+            html += '</table>';
+
+            $('#alarm_all_' + id.toString()).html(html);
+        }
+
+        // find the proper family of each alarm
         var now = new Date().getTime();
         var x;
         var count_active = 0;
@@ -2447,31 +2548,36 @@ function alarmsUpdateModal() {
             families[family].arr.push(alarm);
         }
 
-        function families_comparator(a, b) {
+        // sort the families, like the dashboard menu does
+        var families_sorted = families_sort.sort(function (a, b) {
             if (a.priority > b.priority) return -1;
             if (a.priority < b.priority) return 1;
+            if (a.name < b.name) return 1;
+            if (a.name > b.name) return -1;
             return 0;
-        }
-        var families_sorted = families_sort.sort(families_comparator);
+        });
 
         var fc = 0;
         var len = families_sorted.length;
         while(len--) {
-            fc++;
             var family = families_sorted[len].name;
             var active_family_added = false;
             var expanded = 'true';
             var collapsed = '';
             var cin = 'in';
 
-            if(fc !== 1) {
+            if(fc !== 0) {
                 all += "</table></div></div></div>";
                 expanded = 'false';
                 collapsed = 'class="collapsed"'
                 cin = '';
             }
 
-            all += '<div class="panel panel-default"><div class="panel-heading" role="tab" id="alarm_all_heading_' + fc.toString() + '"><h4 class="panel-title"><a ' + collapsed + ' role="button" data-toggle="collapse" data-parent="#alarms_all_accordion" href="#alarm_all_' + fc.toString() + '" aria-expanded="' + expanded + '" aria-controls="alarm_all_' + fc.toString() + '">' + family.toString() + '</a></h4></div><div id="alarm_all_' + fc.toString() + '" class="panel-collapse collapse ' + cin + '" role="tabpanel" aria-labelledby="alarm_all_heading_' + fc.toString() + '"><div class="panel-body"><table class="table">';
+            all += '<div class="panel panel-default"><div class="panel-heading" role="tab" id="alarm_all_heading_' + fc.toString() + '"><h4 class="panel-title"><a ' + collapsed + ' role="button" data-toggle="collapse" data-parent="#alarms_all_accordion" href="#alarm_all_' + fc.toString() + '" aria-expanded="' + expanded + '" aria-controls="alarm_all_' + fc.toString() + '">' + family.toString() + '</a></h4></div><div id="alarm_all_' + fc.toString() + '" class="panel-collapse collapse ' + cin + '" role="tabpanel" aria-labelledby="alarm_all_heading_' + fc.toString() + '" data-alarm-id="' + fc.toString() + '"><div class="panel-body" id="alarm_all_body_' + fc.toString() + '">';
+
+            options.alarm_families[fc] = families[family];
+
+            fc++;
 
             var arr = families[family].arr;
             var c = arr.length;
@@ -2483,15 +2589,14 @@ function alarmsUpdateModal() {
                         active += '<tr><th class="text-center"><h4>' + family + '</h4></th><th></th></tr>';
                     }
                     count_active++;
-                    active += '<tr><td class="text-center" style="vertical-align:middle" width="40%"><embed src="' + NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" height="20" /></td><td><b>' + alarm.info + '</b><table>' + ((typeof alarm.warn !== 'undefined')?('<tr><td>&nbsp;warning&nbsp;when&nbsp;</td><td><code>' + alarm.warn + '</code></td></tr>'):'') + ((typeof alarm.crit !== 'undefined')?('<tr><td style="text-align:right">&nbsp;critical&nbsp;when&nbsp;</td><td><code>' + alarm.crit + '</code></td></tr>'):'') + '<tr><td style="text-align:right"><small>&nbsp;source&nbsp;</small></td><td><small>' + alarm.source + '</small></td></tr></table></td></tr>';
+                    active += alarm_to_html(alarm);
                 }
 
                 count_all++;
-                all += '<tr><td class="text-center" style="vertical-align:middle" width="40%"><embed src="' + NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" height="20" /></td><td><b>' + alarm.info + '</b><table>' + ((typeof alarm.warn !== 'undefined')?('<tr><td>&nbsp;warning&nbsp;when&nbsp;</td><td><code>' + alarm.warn + '</code></td></tr>'):'') + ((typeof alarm.crit !== 'undefined')?('<tr><td style="text-align:right">&nbsp;critical&nbsp;when&nbsp;</td><td><code>' + alarm.crit + '</code></td></tr>'):'') + '<tr><td style="text-align:right"><small>&nbsp;source&nbsp;</small></td><td><small>' + alarm.source + '</small></td></tr></table></td></tr>';
             }
         }
         active += "</table>";
-        if(families_sorted.length > 0) all += "</table></div></div></div>";
+        if(families_sorted.length > 0) all += "</div></div></div>";
         all += "</div>";
 
         if(!count_active)
@@ -2506,6 +2611,20 @@ function alarmsUpdateModal() {
 
         document.getElementById('alarms_active').innerHTML = active;
         document.getElementById('alarms_all').innerHTML = all;
+
+        if(families_sorted.length > 0) alarm_family_show(0);
+
+        // register bootstrap events
+        $('#alarms_all_accordion').on('show.bs.collapse', function (d) {
+            var target = $(d.target);
+            var id = $(target).data('alarm-id');
+            alarm_family_show(id);
+        });
+        $('#alarms_all_accordion').on('hidden.bs.collapse', function (d) {
+            var target = $(d.target);
+            var id = $(target).data('alarm-id');
+            $('#alarm_all_' + id.toString()).html('');
+        });
 
         NETDATA.alarms.get_log(function(data) {
             if(data === null) {
@@ -2534,8 +2653,11 @@ function alarmsUpdateModal() {
 
 function alarmsCallback(data) {
     var count = 0;
-    for(x in data.alarms)
-        count++;
+    for(x in data.alarms) {
+        var alarm = data.alarms[x];
+        if(alarm.status === 'WARNING' || alarm.status === 'CRITICAL')
+            count++;
+    }
 
     if(count > 0)
         document.getElementById('alarms_count_badge').innerHTML = count.toString();
