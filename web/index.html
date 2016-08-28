@@ -2404,8 +2404,8 @@ function renderChartsAndMenu(data) {
 
 function alarmsUpdateModal() {
     var active = '<h3>Raised Alarms</h3><table class="table">';
-    var all = '<h3>All Running Alarms</h3><table class="table">';
-    var log = '<h3>Alarm Log</h3><table  class="table"><tr><th>When</th><th>Chart</th><th>Alarm</th><th>Status</th></tr>';
+    var all = '<h3>All Running Alarms</h3><div class="panel-group" id="alarms_all_accordion" role="tablist" aria-multiselectable="true">';
+    var log = '<h3>Alarm Log</h3><table class="table"><tr><th>When</th><th>Chart</th><th>Alarm</th><th>Status</th>';
     var footer = '<hr/>These are <a href="https://github.com/firehol/netdata/wiki/Generating-Badges" target="_blank">netdata badges</a>. You can copy and paste their URLs to embed them in any web page. Their color indicates the state of the alarm: <b>red</b> is critical, <b>orange</b> is warning, <b>bright green</b> is ok, <b>light grey</b> is undefined (i.e. no data or no status), <b>black</b> is not initialized.';
 
     NETDATA.alarms.get('all', function(data) {
@@ -2422,6 +2422,7 @@ function alarmsUpdateModal() {
         var count_active = 0;
         var count_all = 0;
         var families = {};
+        var families_sort = new Array();
         for(x in data.alarms) {
             var alarm = data.alarms[x];
             var chart = options.data.charts[alarm.chart];
@@ -2430,39 +2431,68 @@ function alarmsUpdateModal() {
             if(typeof chart !== 'undefined' && typeof chart.menu !== 'undefined' && typeof chart.submenu !== 'undefined')
                 family = chart.menu + ' - ' + chart.submenu;
 
-            if(typeof families[family] === 'undefined')
-                families[family] = new Array();
+            if(typeof families[family] === 'undefined') {
+                families[family] = {
+                    name: family,
+                    arr: new Array(),
+                    priority: chart.priority
+                };
 
-            families[family].push(alarm);
+                families_sort.push(families[family]);
+            }
+
+            if(chart.priority < families[family].priority)
+                families[family].priority = chart.priority;
+
+            families[family].arr.push(alarm);
         }
 
-        for(x in families) {
-            var active_family_added = false;
-            var all_family_added = false;
+        function families_comparator(a, b) {
+            if (a.priority > b.priority) return -1;
+            if (a.priority < b.priority) return 1;
+            return 0;
+        }
+        var families_sorted = families_sort.sort(families_comparator);
 
-            var arr = families[x];
+        var fc = 0;
+        var len = families_sorted.length;
+        while(len--) {
+            fc++;
+            var family = families_sorted[len].name;
+            var active_family_added = false;
+            var expanded = 'true';
+            var collapsed = '';
+            var cin = 'in';
+
+            if(fc !== 1) {
+                all += "</table></div></div></div>";
+                expanded = 'false';
+                collapsed = 'class="collapsed"'
+                cin = '';
+            }
+
+            all += '<div class="panel panel-default"><div class="panel-heading" role="tab" id="alarm_all_heading_' + fc.toString() + '"><h4 class="panel-title"><a ' + collapsed + ' role="button" data-toggle="collapse" data-parent="#alarms_all_accordion" href="#alarm_all_' + fc.toString() + '" aria-expanded="' + expanded + '" aria-controls="alarm_all_' + fc.toString() + '">' + family.toString() + '</a></h4></div><div id="alarm_all_' + fc.toString() + '" class="panel-collapse collapse ' + cin + '" role="tabpanel" aria-labelledby="alarm_all_heading_' + fc.toString() + '"><div class="panel-body"><table class="table">';
+
+            var arr = families[family].arr;
             var c = arr.length;
             while(c--) {
                 var alarm = arr[c];
                 if(alarm.status === 'WARNING' || alarm.status === 'CRITICAL') {
                     if(!active_family_added) {
                         active_family_added = true;
-                        active += '<tr><th class="text-center"><h4>' + x + '</h4></th><th></th></tr>';
+                        active += '<tr><th class="text-center"><h4>' + family + '</h4></th><th></th></tr>';
                     }
                     count_active++;
                     active += '<tr><td class="text-center" style="vertical-align:middle" width="40%"><embed src="' + NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" height="20" /></td><td><b>' + alarm.info + '</b><table>' + ((typeof alarm.warn !== 'undefined')?('<tr><td>&nbsp;warning&nbsp;when&nbsp;</td><td><code>' + alarm.warn + '</code></td></tr>'):'') + ((typeof alarm.crit !== 'undefined')?('<tr><td style="text-align:right">&nbsp;critical&nbsp;when&nbsp;</td><td><code>' + alarm.crit + '</code></td></tr>'):'') + '<tr><td style="text-align:right"><small>&nbsp;source&nbsp;</small></td><td><small>' + alarm.source + '</small></td></tr></table></td></tr>';
                 }
 
-                if(!all_family_added) {
-                    all_family_added = true;
-                    all += '<tr><th class="text-center"><h4>' + x + '</h4></th><th></th></tr>';
-                }
                 count_all++;
                 all += '<tr><td class="text-center" style="vertical-align:middle" width="40%"><embed src="' + NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" height="20" /></td><td><b>' + alarm.info + '</b><table>' + ((typeof alarm.warn !== 'undefined')?('<tr><td>&nbsp;warning&nbsp;when&nbsp;</td><td><code>' + alarm.warn + '</code></td></tr>'):'') + ((typeof alarm.crit !== 'undefined')?('<tr><td style="text-align:right">&nbsp;critical&nbsp;when&nbsp;</td><td><code>' + alarm.crit + '</code></td></tr>'):'') + '<tr><td style="text-align:right"><small>&nbsp;source&nbsp;</small></td><td><small>' + alarm.source + '</small></td></tr></table></td></tr>';
             }
         }
         active += "</table>";
-        all += "</table>";
+        if(families_sorted.length > 0) all += "</table></div></div></div>";
+        all += "</div>";
 
         if(!count_active)
             active += "<h4>Everything is normal. No raised alarms.</h4>";
