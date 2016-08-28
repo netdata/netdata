@@ -748,6 +748,8 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
     int ret = 400;
     buffer_flush(w->response.data);
 
+    w->response.data->options |= WB_CONTENT_NO_CACHEABLE;
+
     BUFFER *dimensions = NULL;
     
     const char *chart = NULL
