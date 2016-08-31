@@ -38,10 +38,12 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
         flags &= ~SOCK_NONBLOCK;
     }
 
+#ifdef SOCK_CLOEXEC
     if (flags & SOCK_CLOEXEC) {
         newflags |= O_CLOEXEC;
         flags &= ~SOCK_CLOEXEC;
     }
+#endif
 
     if (flags) {
         errno = -EINVAL;
