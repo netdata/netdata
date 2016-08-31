@@ -18,6 +18,7 @@ declare -A configs_signatures=(
   ['a9cd91675467c5426f5b51c47602c889']='apps_groups.conf'
   ['acaa6731a272f6d251afb357e99b518f']='apps_groups.conf'
   ['bb51112d01ff20053196a57632df8962']='apps_groups.conf'
+  ['d9036091e2232fc2b8bfa8c7484dea28']='apps_groups.conf'
   ['d9258e671d0d0b6498af1ce16ef030d2']='apps_groups.conf'
   ['ebd0612ccc5807524ebb2b647e3e56c9']='apps_groups.conf'
   ['f2f1b8656f5011e965ac45b818cf668d']='apps_groups.conf'
