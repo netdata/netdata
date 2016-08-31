@@ -485,9 +485,10 @@ inline void rrdsetcalc_link_matching(RRDSET *st) {
 
     RRDCALC *rc;
     for(rc = st->rrdhost->alarms; rc ; rc = rc->next) {
-        if(rc->rrdset) continue;
+        if(unlikely(rc->rrdset))
+            continue;
 
-        if(rrdcalc_is_matching_this_rrdset(rc, st))
+        if(unlikely(rrdcalc_is_matching_this_rrdset(rc, st)))
             rrdsetcalc_link(st, rc);
     }
 }
@@ -541,7 +542,7 @@ RRDCALC *rrdcalc_find(RRDSET *st, const char *name) {
     uint32_t hash = simple_hash(name);
 
     for( rc = st->alarms; rc ; rc = rc->rrdset_next ) {
-        if(rc->hash == hash && !strcmp(rc->name, name))
+        if(unlikely(rc->hash == hash && !strcmp(rc->name, name)))
             return rc;
     }
 
@@ -553,7 +554,7 @@ static inline int rrdcalc_exists(RRDHOST *host, const char *name, uint32_t hash)
 
     // make sure it does not already exist
     for(rc = host->alarms; rc ; rc = rc->next) {
-        if (rc->hash == hash && !strcmp(name, rc->name)) {
+        if (unlikely(rc->hash == hash && !strcmp(name, rc->name))) {
             error("Health alarm '%s' already exists in host '%s'.", name, host->hostname);
             return 1;
         }
@@ -587,8 +588,15 @@ static inline void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc) {
     }
 
     // link it to the host
-    rc->next = host->alarms;
-    host->alarms = rc;
+    if(likely(host->alarms)) {
+        // append it
+        RRDCALC *t;
+        for(t = host->alarms; t && t->next ; t = t->next) ;
+        t->next = rc;
+    }
+    else {
+        host->alarms = rc;
+    }
 
     // link it to its chart
     RRDSET *st;
@@ -692,10 +700,10 @@ void rrdcalc_free(RRDHOST *host, RRDCALC *rc) {
     if(rc->rrdset) rrdsetcalc_unlink(rc);
 
     // unlink it from RRDHOST
-    if(rc == host->alarms)
+    if(unlikely(rc == host->alarms))
         host->alarms = rc->next;
 
-    else if(host->alarms) {
+    else if(likely(host->alarms)) {
         RRDCALC *t, *last = host->alarms;
 
         for(t = last->next; t && t != rc; last = t, t = t->next) ;
@@ -730,7 +738,6 @@ void rrdcalctemplate_link_matching(RRDSET *st) {
 
     for(rt = st->rrdhost->templates; rt ; rt = rt->next) {
         if(rt->hash_context == st->hash_context && !strcmp(rt->context, st->context)) {
-
             RRDCALC *rc = rrdcalc_create(st->rrdhost, rt->name, st->id,
                            rt->dimensions, rt->units, rt->info, rt->group, rt->after, rt->before, rt->update_every, rt->options,
                            rt->green, rt->red, rt->exec, rt->source,
@@ -738,14 +745,12 @@ void rrdcalctemplate_link_matching(RRDSET *st) {
                            (rt->warning)?rt->warning->source:NULL,
                            (rt->critical)?rt->critical->source:NULL);
 
-            if(!rc)
+            if(unlikely(!rc))
                 error("Health tried to create alarm from template '%s', but it failed", rt->name);
 
 #ifdef NETDATA_INTERNAL_CHECKS
             else if(rc->rrdset != st)
                 error("Health alarm '%s.%s' should be linked to chart '%s', but it is not", rc->chart?rc->chart:"NOCHART", rc->name, st->id);
-#else
-            (void)rc;
 #endif
         }
     }
@@ -850,24 +855,24 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
 }
 
 static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCALCTEMPLATE *rt) {
-    if(!rt->context) {
+    if(unlikely(!rt->context)) {
         error("Health configuration for template '%s' does not have a context", rt->name);
         return 0;
     }
 
-    if(!rt->update_every) {
+    if(unlikely(!rt->update_every)) {
         error("Health configuration for template '%s' has no frequency (parameter 'every'). Ignoring it.", rt->name);
         return 0;
     }
 
-    if(!RRDCALCTEMPLATE_HAS_CALCULATION(rt) && !rt->warning && !rt->critical) {
+    if(unlikely(!RRDCALCTEMPLATE_HAS_CALCULATION(rt) && !rt->warning && !rt->critical)) {
         error("Health configuration for template '%s' is useless (no calculation, no warning and no critical evaluation)", rt->name);
         return 0;
     }
 
-    RRDCALCTEMPLATE *t;
-    for (t = host->templates; t ; t = t->next) {
-        if(t->hash_name == rt->hash_name && !strcmp(t->name, rt->name)) {
+    RRDCALCTEMPLATE *t, *last = NULL;
+    for (t = host->templates; t ; last = t, t = t->next) {
+        if(unlikely(t->hash_name == rt->hash_name && !strcmp(t->name, rt->name))) {
             error("Health configuration template '%s' already exists for host '%s'.", rt->name, host->hostname);
             return 0;
         }
@@ -891,8 +896,14 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
           rt->source
     );
 
-    rt->next = host->templates;
-    host->templates = rt;
+    if(likely(last)) {
+        last->next = rt;
+    }
+    else {
+        rt->next = host->templates;
+        host->templates = rt;
+    }
+
     return 1;
 }
 
@@ -1643,10 +1654,10 @@ void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
     buffer_strcat(wb, "{\n\t\"alarms\": {\n");
     RRDCALC *rc;
     for(i = 0, rc = host->alarms; rc ; rc = rc->next) {
-        if(!rc->rrdset)
+        if(unlikely(!rc->rrdset))
             continue;
 
-        if(!all && !(rc->status == RRDCALC_STATUS_WARNING || rc->status == RRDCALC_STATUS_CRITICAL))
+        if(likely(!all && !(rc->status == RRDCALC_STATUS_WARNING || rc->status == RRDCALC_STATUS_CRITICAL)))
             continue;
 
         if(likely(i)) buffer_strcat(wb, ",\n");
@@ -1711,28 +1722,6 @@ void health_reload(void) {
 
 // ----------------------------------------------------------------------------
 // health main thread and friends
-
-static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) {
-    if (unlikely(!rc->rrdset)) {
-        debug(D_HEALTH, "Health not running alarm '%s.%s'. It is not linked to a chart.", rc->chart?rc->chart:"NOCHART", rc->name);
-        return 0;
-    }
-
-    if (unlikely(!rc->update_every)) {
-        debug(D_HEALTH, "Health not running alarm '%s.%s'. It does not have an update frequency", rc->chart?rc->chart:"NOCHART", rc->name);
-        return 0;
-    }
-
-    if (unlikely(rc->next_update > now)) {
-        if (*next_run > rc->next_update)
-            *next_run = rc->next_update;
-
-        debug(D_HEALTH, "Health not examining alarm '%s.%s' yet (will do in %d secs).", rc->chart?rc->chart:"NOCHART", rc->name, (int) (rc->next_update - now));
-        return 0;
-    }
-
-    return 1;
-}
 
 static inline int rrdcalc_value2status(calculated_number n) {
     if(isnan(n)) return RRDCALC_STATUS_UNDEFINED;
@@ -1921,6 +1910,28 @@ static inline void health_alarm_log_process(RRDHOST *host) {
     pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 }
 
+static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) {
+    if (unlikely(!rc->rrdset)) {
+        debug(D_HEALTH, "Health not running alarm '%s.%s'. It is not linked to a chart.", rc->chart?rc->chart:"NOCHART", rc->name);
+        return 0;
+    }
+
+    if (unlikely(!rc->update_every)) {
+        debug(D_HEALTH, "Health not running alarm '%s.%s'. It does not have an update frequency", rc->chart?rc->chart:"NOCHART", rc->name);
+        return 0;
+    }
+
+    if (unlikely(rc->next_update > now)) {
+        if (unlikely(*next_run > rc->next_update))
+            *next_run = rc->next_update;
+
+        debug(D_HEALTH, "Health not examining alarm '%s.%s' yet (will do in %d secs).", rc->chart?rc->chart:"NOCHART", rc->name, (int) (rc->next_update - now));
+        return 0;
+    }
+
+    return 1;
+}
+
 void *health_main(void *ptr) {
     (void)ptr;
 
@@ -2063,7 +2074,7 @@ void *health_main(void *ptr) {
                 int warning_status  = RRDCALC_STATUS_UNDEFINED;
                 int critical_status = RRDCALC_STATUS_UNDEFINED;
 
-                if(unlikely(rc->warning)) {
+                if(likely(rc->warning)) {
                     if(unlikely(!expression_evaluate(rc->warning))) {
                         // calculation failed
 
@@ -2093,7 +2104,7 @@ void *health_main(void *ptr) {
                     }
                 }
 
-                if(unlikely(rc->critical)) {
+                if(likely(rc->critical)) {
                     if(unlikely(!expression_evaluate(rc->critical))) {
                         // calculation failed
 
