@@ -47,6 +47,7 @@ declare -A configs_signatures=(
   ['a8167dafeac0b66696a1d9b08e815cda']='health.d/disks.conf'
   ['afdae4646c755ff2d117527fbf761c8e']='health.d/disks.conf'
   ['cb60badf376d246ad8ec9d3f524db430']='health.d/disks.conf'
+  ['e8ec8046c7007af6ca3e8c51e62c99f8']='health.d/disks.conf'
   ['2d1d7498c72f4245cf32902c2b7e71e0']='health.d/entropy.conf'
   ['450667c552ab7a7d8d4a2c214fdacca5']='health.d/entropy.conf'
   ['a8feb36776005bf419c90278787a1be8']='health.d/entropy.conf'
