@@ -2533,10 +2533,20 @@ function alarmsUpdateModal() {
         var families_sort = new Array();
         for(x in data.alarms) {
             var alarm = data.alarms[x];
-            var chart = options.data.charts[alarm.chart];
             var family = alarm.family;
 
-            if(typeof chart !== 'undefined' && typeof chart.menu !== 'undefined' && typeof chart.submenu !== 'undefined')
+            // find the chart
+            var chart = options.data.charts[alarm.chart];
+            if(typeof chart === 'undefined')
+                chart = options.data.charts_by_name[alarm.chart];
+
+            // not found - this should never happen!
+            if(typeof chart === 'undefined') {
+                console.log('WARNING: alarm ' + x + ' is linked to chart ' + alarm.chart + ', which is not found in the list of chart got from the server.');
+                chart = { priority: 9999999 };
+            }
+            else if(typeof chart.menu !== 'undefined' && typeof chart.submenu !== 'undefined')
+                // the family based on the chart
                 family = chart.menu + ' - ' + chart.submenu;
 
             if(typeof families[family] === 'undefined') {
@@ -2678,26 +2688,36 @@ function downloadAllCharts(netdata_url) {
 
     NETDATA.pause(function() {
         $("#loadOverlay").css("display","none");
-        $("#loadOverlay").css("display","none");
 
         NETDATA.alarms.callback = alarmsCallback;
 
         // download all the charts the server knows
         NETDATA.chartRegistry.downloadAll(netdata_url, function(data) {
 
-            options.data = data;
-            options.hostname = data.hostname;
-            document.getElementById('hostname').innerHTML = options.hostname;
-            document.getElementById('hostname').href = NETDATA.serverDefault;
-            document.title = options.hostname + ' netdata dashboard';
+            if(data !== null) {
+                options.hostname = data.hostname;
+                options.data = data;
 
-            renderChartsAndMenu(data);
+                // create a chart_by_name index
+                data.charts_by_name = {};
+                var charts = data.charts;
+                var x;
+                for(x in charts) {
+                    var chart = charts[x];
+                    data.charts_by_name[chart.name] = chart;
+                }
+                console.log(options.data);
 
-            // prepare our DOM
-//          prepareScreen(data);
+                // update the dashboard hostname
+                document.getElementById('hostname').innerHTML = options.hostname;
+                document.getElementById('hostname').href = NETDATA.serverDefault;
 
-            // due to affix issues, prepareScreen() will unpause
-            // netdata as needed
+                // update the dashboard title
+                document.title = options.hostname + ' netdata dashboard';
+
+                // render all charts
+                renderChartsAndMenu(data);
+            }
         });
     });
 }
