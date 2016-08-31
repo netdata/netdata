@@ -1227,6 +1227,21 @@ int registry_request_switch_json(struct web_client *w, char *person_guid, char *
 // ----------------------------------------------------------------------------
 // REGISTRY THIS MACHINE UNIQUE ID
 
+static inline int is_machine_guid_blacklisted(const char *guid) {
+    // these are machine GUIDs that have been included in distribution packages.
+    // we blacklist them here, so that the next version of netdata will generate
+    // new ones.
+
+    if(!strcmp(guid, "8a795b0c-2311-11e6-8563-000c295076a6")
+    || !strcmp(guid, "4aed1458-1c3e-11e6-a53f-000c290fc8f5")
+    ) {
+        error("Blacklisted machine GUID '%s' found.", guid);
+        return 1;
+    }
+
+    return 0;
+}
+
 char *registry_get_this_machine_guid(void) {
     if(likely(registry.machine_guid[0]))
         return registry.machine_guid;
@@ -1245,6 +1260,8 @@ char *registry_get_this_machine_guid(void) {
 
                 registry.machine_guid[0] = '\0';
             }
+            else if(is_machine_guid_blacklisted(registry.machine_guid))
+                registry.machine_guid[0] = '\0';
         }
         close(fd);
     }
