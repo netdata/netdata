@@ -1654,7 +1654,7 @@ void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
     buffer_strcat(wb, "{\n\t\"alarms\": {\n");
     RRDCALC *rc;
     for(i = 0, rc = host->alarms; rc ; rc = rc->next) {
-        if(unlikely(!rc->rrdset))
+        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
         if(likely(!all && !(rc->status == RRDCALC_STATUS_WARNING || rc->status == RRDCALC_STATUS_CRITICAL)))
@@ -1916,6 +1916,11 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
         return 0;
     }
 
+    if (unlikely(!rc->rrdset->last_collected_time.tv_sec)) {
+        debug(D_HEALTH, "Health not running alarm '%s.%s'. Chart is not yet collected.", rc->chart?rc->chart:"NOCHART", rc->name);
+        return 0;
+    }
+
     if (unlikely(!rc->update_every)) {
         debug(D_HEALTH, "Health not running alarm '%s.%s'. It does not have an update frequency", rc->chart?rc->chart:"NOCHART", rc->name);
         return 0;
@@ -1928,6 +1933,12 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
         debug(D_HEALTH, "Health not examining alarm '%s.%s' yet (will do in %d secs).", rc->chart?rc->chart:"NOCHART", rc->name, (int) (rc->next_update - now));
         return 0;
     }
+
+    // FIXME
+    // we should check that the DB lookup is possible
+    // i.e.
+    // - the duration of the chart includes the required timeframe
+    // we SHOULD NOT check the dimensions - there might be alarms that refer non-existing dimensions (e.g. cpu steal)
 
     return 1;
 }
