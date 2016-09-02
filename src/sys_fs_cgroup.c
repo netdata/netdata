@@ -161,8 +161,9 @@ struct cpuacct_usage {
 };
 
 struct cgroup {
-    int available;      // found in the filesystem
-    int enabled;        // enabled in the config
+    char available;      // found in the filesystem
+    char last_available; // found in the filesystem the last time
+    char enabled;        // enabled in the config
 
     char *id;
     uint32_t hash;
@@ -716,9 +717,16 @@ struct cgroup *cgroup_add(const char *id) {
                           cg->chart_id, t->id, cg->id, t->id);
                     t->enabled = 0;
                 } else {
-                    error("Control group with chart id '%s' already exists with id '%s' and is enabled. Disabling cgroup with id '%s'.",
-                          cg->chart_id, t->id, cg->id);
-                    cg->enabled = 0;
+                    if(t->last_available) {
+                        error("Control group with chart id '%s' already exists with id '%s' and is enabled and available. Disabling cgroup with id '%s'.",
+                              cg->chart_id, t->id, cg->id);
+                        cg->enabled = 0;
+                    }
+                    else {
+                        error("Control group with chart id '%s' already exists with id '%s' but is not available. Enabling cgroup with id '%s'.",
+                              cg->chart_id, t->id, cg->id);
+                        t->enabled = 0;
+                    }
                 }
 
                 break;
@@ -865,8 +873,10 @@ void mark_all_cgroups_as_not_available() {
     struct cgroup *cg;
 
     // mark all as not available
-    for(cg = cgroup_root; cg ; cg = cg->next)
+    for(cg = cgroup_root; cg ; cg = cg->next) {
+        cg->last_available = cg->available;
         cg->available = 0;
+    }
 }
 
 void cleanup_all_cgroups() {
