@@ -3,6 +3,7 @@
 #define RRDVAR_MAX_LENGTH 1024
 
 static const char *health_default_exec = PLUGINS_DIR "/alarm-email.sh";
+static const char *health_default_recipient = "root";
 int health_enabled = 1;
 
 // ----------------------------------------------------------------------------
@@ -618,7 +619,7 @@ static inline RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const cha
                         const char *units, const char *info,
                         int group_method, int after, int before, int update_every, uint32_t options,
                         calculated_number green, calculated_number red,
-                        const char *exec, const char *source,
+                        const char *exec, const char *recipient, const char *source,
                         const char *calc, const char *warn, const char *crit) {
 
     char fullname[RRDVAR_MAX_LENGTH + 1];
@@ -628,10 +629,10 @@ static inline RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const cha
         return NULL;
 
     RRDCALC *rc = callocz(1, sizeof(RRDCALC));
-
+    rc->id = host->health_log.next_alarm_id++;
+    rc->next_event_id = 1;
     rc->name = strdupz(name);
     rc->hash = simple_hash(rc->name);
-
     rc->chart = strdupz(chart);
     rc->hash_chart = simple_hash(rc->chart);
 
@@ -649,6 +650,7 @@ static inline RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const cha
     rc->options = options;
 
     if(exec) rc->exec = strdupz(exec);
+    if(recipient) rc->recipient = strdupz(recipient);
     if(source) rc->source = strdupz(source);
     if(units) rc->units = strdupz(units);
     if(info) rc->info = strdupz(info);
@@ -669,10 +671,11 @@ static inline RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const cha
             error("Health alarm '%s.%s': failed to re-parse critical expression '%s'", chart, name, crit);
     }
 
-    debug(D_HEALTH, "Health runtime added alarm '%s.%s': exec '%s', green %Lf, red %Lf, lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s",
+    debug(D_HEALTH, "Health runtime added alarm '%s.%s': exec '%s', recipient '%s', green %Lf, red %Lf, lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s",
           (rc->chart)?rc->chart:"NOCHART",
           rc->name,
           (rc->exec)?rc->exec:"DEFAULT",
+          (rc->recipient)?rc->recipient:"DEFAULT",
           rc->green,
           rc->red,
           rc->group,
@@ -724,6 +727,7 @@ void rrdcalc_free(RRDHOST *host, RRDCALC *rc) {
     freez(rc->family);
     freez(rc->dimensions);
     freez(rc->exec);
+    freez(rc->recipient);
     freez(rc->source);
     freez(rc->units);
     freez(rc->info);
@@ -740,7 +744,8 @@ void rrdcalctemplate_link_matching(RRDSET *st) {
         if(rt->hash_context == st->hash_context && !strcmp(rt->context, st->context)) {
             RRDCALC *rc = rrdcalc_create(st->rrdhost, rt->name, st->id,
                            rt->dimensions, rt->units, rt->info, rt->group, rt->after, rt->before, rt->update_every, rt->options,
-                           rt->green, rt->red, rt->exec, rt->source,
+                           rt->green, rt->red,
+                           rt->exec, rt->recipient, rt->source,
                            (rt->calculation)?rt->calculation->source:NULL,
                            (rt->warning)?rt->warning->source:NULL,
                            (rt->critical)?rt->critical->source:NULL);
@@ -781,6 +786,7 @@ static inline void rrdcalctemplate_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
 
     freez(rt->name);
     freez(rt->exec);
+    freez(rt->recipient);
     freez(rt->context);
     freez(rt->source);
     freez(rt->units);
@@ -805,6 +811,7 @@ static inline void rrdcalctemplate_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
 #define HEALTH_WARN_KEY "warn"
 #define HEALTH_CRIT_KEY "crit"
 #define HEALTH_EXEC_KEY "exec"
+#define HEALTH_RECIPIENT_KEY "to"
 #define HEALTH_UNITS_KEY "units"
 #define HEALTH_INFO_KEY "info"
 
@@ -832,10 +839,11 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
         return 0;
     }
 
-    debug(D_HEALTH, "Health configuration adding alarm '%s.%s': exec '%s', green %Lf, red %Lf, lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s",
+    debug(D_HEALTH, "Health configuration adding alarm '%s.%s': exec '%s', recipient '%s', green %Lf, red %Lf, lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s",
           rc->chart?rc->chart:"NOCHART",
           rc->name,
           (rc->exec)?rc->exec:"DEFAULT",
+          (rc->recipient)?rc->recipient:"DEFAULT",
           rc->green,
           rc->red,
           rc->group,
@@ -878,10 +886,11 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
         }
     }
 
-    debug(D_HEALTH, "Health configuration adding template '%s': context '%s', exec '%s', green %Lf, red %Lf, lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s'",
+    debug(D_HEALTH, "Health configuration adding template '%s': context '%s', exec '%s', recipient '%s', green %Lf, red %Lf, lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s'",
           rt->name,
           (rt->context)?rt->context:"NONE",
           (rt->exec)?rt->exec:"DEFAULT",
+          (rt->recipient)?rt->recipient:"DEFAULT",
           rt->green,
           rt->red,
           rt->group,
@@ -1067,7 +1076,7 @@ static inline void strip_quotes(char *s) {
 int health_readfile(const char *path, const char *filename) {
     debug(D_HEALTH, "Health configuration reading file '%s/%s'", path, filename);
 
-    static uint32_t hash_alarm = 0, hash_template = 0, hash_on = 0, hash_calc = 0, hash_green = 0, hash_red = 0, hash_warn = 0, hash_crit = 0, hash_exec = 0, hash_every = 0, hash_lookup = 0, hash_units = 0, hash_info = 0;
+    static uint32_t hash_alarm = 0, hash_template = 0, hash_on = 0, hash_calc = 0, hash_green = 0, hash_red = 0, hash_warn = 0, hash_crit = 0, hash_exec = 0, hash_every = 0, hash_lookup = 0, hash_units = 0, hash_info = 0, hash_recipient = 0;
     char buffer[HEALTH_CONF_MAX_LINE + 1];
 
     if(unlikely(!hash_alarm)) {
@@ -1084,6 +1093,7 @@ int health_readfile(const char *path, const char *filename) {
         hash_every = simple_uhash(HEALTH_EVERY_KEY);
         hash_units = simple_hash(HEALTH_UNITS_KEY);
         hash_info = simple_hash(HEALTH_INFO_KEY);
+        hash_recipient = simple_hash(HEALTH_RECIPIENT_KEY);
     }
 
     snprintfz(buffer, HEALTH_CONF_MAX_LINE, "%s/%s", path, filename);
@@ -1155,6 +1165,8 @@ int health_readfile(const char *path, const char *filename) {
             }
 
             rc = callocz(1, sizeof(RRDCALC));
+            rc->id = localhost.health_log.next_alarm_id++;
+            rc->next_event_id = 1;
             rc->name = strdupz(value);
             rc->hash = simple_hash(rc->name);
             rc->source = health_source_file(line, path, filename);
@@ -1261,6 +1273,16 @@ int health_readfile(const char *path, const char *filename) {
                 }
                 rc->exec = strdupz(value);
             }
+            else if(hash == hash_recipient && !strcasecmp(key, HEALTH_RECIPIENT_KEY)) {
+                if(rc->recipient) {
+                    if(strcmp(rc->recipient, value))
+                        info("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                             line, path, filename, rc->name, key, rc->recipient, value, value);
+
+                    freez(rc->recipient);
+                }
+                rc->recipient = strdupz(value);
+            }
             else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
                 if(rc->units) {
                     if(strcmp(rc->units, value))
@@ -1362,6 +1384,16 @@ int health_readfile(const char *path, const char *filename) {
                     freez(rt->exec);
                 }
                 rt->exec = strdupz(value);
+            }
+            else if(hash == hash_recipient && !strcasecmp(key, HEALTH_RECIPIENT_KEY)) {
+                if(rt->recipient) {
+                    if(strcmp(rt->recipient, value))
+                        info("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                             line, path, filename, rt->name, key, rt->recipient, value, value);
+
+                    freez(rt->recipient);
+                }
+                rt->recipient = strdupz(value);
             }
             else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
                 if(rt->units) {
@@ -1493,7 +1525,9 @@ static inline void health_string2json(BUFFER *wb, const char *prefix, const char
 
 static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae) {
     buffer_sprintf(wb, "\n\t{\n"
-                           "\t\t\"id\":%u,\n"
+                           "\t\t\"unique_id\":%u,\n"
+                           "\t\t\"alarm_id\":%u,\n"
+                           "\t\t\"alarm_event_id\":%u,\n"
                            "\t\t\"name\":\"%s\",\n"
                            "\t\t\"chart\":\"%s\",\n"
                            "\t\t\"family\":\"%s\",\n"
@@ -1502,6 +1536,7 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae) {
                            "\t\t\"exec_run\":%s,\n"
                            "\t\t\"exec_failed\":%s,\n"
                            "\t\t\"exec\":\"%s\",\n"
+                           "\t\t\"recipient\":\"%s\",\n"
                            "\t\t\"exec_code\":%d,\n"
                            "\t\t\"source\":\"%s\",\n"
                            "\t\t\"units\":\"%s\",\n"
@@ -1511,7 +1546,9 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae) {
                            "\t\t\"non_clear_duration\":%lu,\n"
                            "\t\t\"status\":\"%s\",\n"
                            "\t\t\"old_status\":\"%s\",\n",
-                   ae->id,
+                   ae->unique_id,
+                   ae->alarm_id,
+                   ae->alarm_event_id,
                    ae->name,
                    ae->chart,
                    ae->family,
@@ -1520,6 +1557,7 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae) {
                    (ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_EXEC_RUN)?"true":"false",
                    (ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_EXEC_FAILED)?"true":"false",
                    ae->exec?ae->exec:health_default_exec,
+                   ae->recipient?ae->recipient:health_default_recipient,
                    ae->exec_code,
                    ae->source,
                    ae->units?ae->units:"",
@@ -1568,6 +1606,7 @@ static inline void health_rrdcalc2json_nolock(BUFFER *wb, RRDCALC *rc) {
                    "\t\t\t\"family\": \"%s\",\n"
                    "\t\t\t\"active\": %s,\n"
                    "\t\t\t\"exec\": \"%s\",\n"
+                   "\t\t\t\"recipient\": \"%s\",\n"
                    "\t\t\t\"source\": \"%s\",\n"
                    "\t\t\t\"units\": \"%s\",\n"
                    "\t\t\t\"info\": \"%s\",\n"
@@ -1582,6 +1621,7 @@ static inline void health_rrdcalc2json_nolock(BUFFER *wb, RRDCALC *rc) {
             , (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:""
             , (rc->rrdset)?"true":"false"
             , rc->exec?rc->exec:health_default_exec
+            , rc->recipient?rc->recipient:health_default_recipient
             , rc->source
             , rc->units?rc->units:""
             , rc->info?rc->info:""
@@ -1729,7 +1769,7 @@ static inline int rrdcalc_value2status(calculated_number n) {
     return RRDCALC_STATUS_CLEAR;
 }
 
-static inline void health_alarm_execute(ALARM_ENTRY *ae) {
+static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     if(ae->old_status == RRDCALC_STATUS_UNINITIALIZED && ae->new_status == RRDCALC_STATUS_CLEAR)
         return;
 
@@ -1739,8 +1779,17 @@ static inline void health_alarm_execute(ALARM_ENTRY *ae) {
     const char *exec = ae->exec;
     if(!exec) exec = health_default_exec;
 
-    snprintfz(buffer, FILENAME_MAX, "exec %s '%s' '%s' '%s' '%s' '%s' '%0.0Lf' '%0.0Lf' '%s' '%u' '%u' '%s' '%s'",
+    const char *recipient = ae->recipient;
+    if(!recipient) recipient = health_default_recipient;
+
+    snprintfz(buffer, FILENAME_MAX, "exec %s '%s' '%s' '%u' '%u' '%u' '%zu' '%s' '%s' '%s' '%s' '%s' '%0.0Lf' '%0.0Lf' '%s' '%u' '%u' '%s' '%s'",
               exec,
+              recipient,
+              host->hostname,
+              ae->unique_id,
+              ae->alarm_id,
+              ae->alarm_event_id,
+              ae->when,
               ae->name,
               ae->chart?ae->chart:"NOCAHRT",
               ae->family?ae->family:"NOFAMILY",
@@ -1774,7 +1823,7 @@ static inline void health_alarm_execute(ALARM_ENTRY *ae) {
         ae->notifications |= HEALTH_ENTRY_NOTIFICATIONS_EXEC_FAILED;
 }
 
-static inline void health_process_notifications(ALARM_ENTRY *ae) {
+static inline void health_process_notifications(RRDHOST *host, ALARM_ENTRY *ae) {
     info("Health alarm '%s.%s' = %0.2Lf - changed status from %s to %s",
          ae->chart?ae->chart:"NOCHART", ae->name,
          ae->new_value,
@@ -1782,12 +1831,14 @@ static inline void health_process_notifications(ALARM_ENTRY *ae) {
          rrdcalc_status2string(ae->new_status)
     );
 
-    health_alarm_execute(ae);
+    health_alarm_execute(host, ae);
 }
 
-static inline void health_alarm_log(RRDHOST *host, time_t when,
+static inline void health_alarm_log(RRDHOST *host,
+                uint32_t alarm_id, uint32_t alarm_event_id,
+                time_t when,
                 const char *name, const char *chart, const char *family,
-                const char *exec, time_t duration,
+                const char *exec, const char *recipient, time_t duration,
                 calculated_number old_value, calculated_number new_value,
                 int old_status, int new_status,
                 const char *source,
@@ -1807,11 +1858,14 @@ static inline void health_alarm_log(RRDHOST *host, time_t when,
         ae->family = strdupz(family);
 
     if(exec) ae->exec = strdupz(exec);
+    if(recipient) ae->recipient = strdupz(recipient);
     if(source) ae->source = strdupz(source);
     if(units) ae->units = strdupz(units);
     if(info) ae->info = strdupz(info);
 
-    ae->id = host->health_log.nextid++;
+    ae->unique_id = host->health_log.next_log_id++;
+    ae->alarm_id = alarm_id;
+    ae->alarm_event_id = alarm_event_id;
     ae->when = when;
     ae->old_value = old_value;
     ae->new_value = new_value;
@@ -1863,17 +1917,17 @@ static inline void health_alarm_log_process(RRDHOST *host) {
     pthread_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
     for(ae = host->health_log.alarms; ae ;ae = ae->next) {
-        if(last_processed >= ae->id) break;
+        if(last_processed >= ae->unique_id) break;
 
         if(!(ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_PROCESSED) &&
                 !(ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_UPDATED)) {
             ae->notifications |= HEALTH_ENTRY_NOTIFICATIONS_PROCESSED;
-            health_process_notifications(ae);
+            health_process_notifications(host, ae);
         }
     }
 
     if(host->health_log.alarms)
-        last_processed = host->health_log.alarms->id;
+        last_processed = host->health_log.alarms->unique_id;
 
     pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
@@ -1899,6 +1953,7 @@ static inline void health_alarm_log_process(RRDHOST *host) {
         freez(ae->chart);
         freez(ae->family);
         freez(ae->exec);
+        freez(ae->recipient);
         freez(ae->source);
         freez(ae->units);
         freez(ae->info);
@@ -2175,7 +2230,7 @@ void *health_main(void *ptr) {
                 }
 
                 if(status != rc->status) {
-                    health_alarm_log(&localhost, time(NULL), rc->name, rc->rrdset->id, rc->rrdset->family, rc->exec, now - rc->last_status_change, rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info);
+                    health_alarm_log(&localhost, rc->id, rc->next_event_id++, time(NULL), rc->name, rc->rrdset->id, rc->rrdset->family, rc->exec, rc->recipient, now - rc->last_status_change, rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info);
                     rc->last_status_change = now;
                     rc->status = status;
                 }

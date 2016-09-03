@@ -1,8 +1,5 @@
 #include "common.h"
 
-#define HOSTNAME_MAX 1024
-char *hostname = "unknown";
-
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb)
 {
     pthread_rwlock_rdlock(&st->rwlock);
@@ -84,7 +81,7 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
         ",\n\t\"update_every\": %d"
         ",\n\t\"history\": %d"
         ",\n\t\"charts\": {"
-        , hostname
+        , localhost.hostname
         , rrd_update_every
         , rrd_default_history_entries
         );
@@ -246,7 +243,7 @@ void rrd_stats_all_json(BUFFER *wb)
         "\t\"history\": %d,\n"
         "\t\"memory\": %lu\n"
         "}\n"
-        , hostname
+        , localhost.hostname
         , rrd_update_every
         , rrd_default_history_entries
         , memory

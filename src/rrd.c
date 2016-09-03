@@ -42,13 +42,20 @@ RRDHOST localhost = {
             AVL_LOCK_INITIALIZER
         },
         .health_log = {
-            .nextid = 1,
+            .next_log_id = 1,
+            .next_alarm_id = 1,
             .count = 0,
             .max = 1000,
             .alarms = NULL,
             .alarm_log_rwlock = PTHREAD_RWLOCK_INITIALIZER
         }
 };
+
+void rrdhost_init(char *hostname) {
+    localhost.hostname = hostname;
+    localhost.health_log.next_log_id =
+        localhost.health_log.next_alarm_id = time(NULL);
+}
 
 void rrdhost_rwlock(RRDHOST *host) {
     pthread_rwlock_wrlock(&host->rrdset_root_rwlock);
