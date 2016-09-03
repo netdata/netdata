@@ -74,7 +74,7 @@ var webbox = {
 
             // Grid Current Power Chart
             if(d['GriPwr'].value !== null) {
-                var id = 'sma_webbox_' + service.name + '.current';
+                var id = 'smawebbox_' + service.name + '.current';
                 var chart = webbox.charts[id];
 
                 if(typeof chart === 'undefined') {
@@ -84,7 +84,7 @@ var webbox = {
                         title: service.name + ' Current Grid Power',    // the title of the chart
                         units: d['GriPwr'].unit,                        // the units of the chart dimensions
                         family: 'now',                                  // the family of the chart
-                        context: 'sma_webbox.grid.power',               // the context of the chart
+                        context: 'smawebbox.grid_power',                // the context of the chart
                         type: netdata.chartTypes.area,                  // the type of the chart
                         priority: webbox.base_priority + 1,             // the priority relative to others in the same family
                         update_every: service.update_every,             // the expected update frequency of the chart
@@ -110,7 +110,7 @@ var webbox = {
             }
 
             if(d['GriEgyTdy'].value !== null) {
-                var id = 'sma_webbox_' + service.name + '.today';
+                var id = 'smawebbox_' + service.name + '.today';
                 var chart = webbox.charts[id];
 
                 if(typeof chart === 'undefined') {
@@ -120,7 +120,7 @@ var webbox = {
                         title: service.name + ' Today Grid Power',      // the title of the chart
                         units: d['GriEgyTdy'].unit,                     // the units of the chart dimensions
                         family: 'today',                                // the family of the chart
-                        context: 'sma_webbox.grid.power.today',         // the context of the chart
+                        context: 'smawebbox.grid_power_today',          // the context of the chart
                         type: netdata.chartTypes.area,                  // the type of the chart
                         priority: webbox.base_priority + 2,             // the priority relative to others in the same family
                         update_every: service.update_every,             // the expected update frequency of the chart
@@ -146,7 +146,7 @@ var webbox = {
             }
 
             if(d['GriEgyTot'].value !== null) {
-                var id = 'sma_webbox_' + service.name + '.total';
+                var id = 'smawebbox_' + service.name + '.total';
                 var chart = webbox.charts[id];
 
                 if(typeof chart === 'undefined') {
@@ -156,7 +156,7 @@ var webbox = {
                         title: service.name + ' Total Grid Power',      // the title of the chart
                         units: d['GriEgyTot'].unit,                     // the units of the chart dimensions
                         family: 'total',                                // the family of the chart
-                        context: 'sma_webbox.grid.power.total',         // the context of the chart
+                        context: 'smawebbox.grid_power_total',          // the context of the chart
                         type: netdata.chartTypes.area,                  // the type of the chart
                         priority: webbox.base_priority + 3,             // the priority relative to others in the same family
                         update_every: service.update_every,             // the expected update frequency of the chart
