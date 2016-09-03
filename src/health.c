@@ -442,6 +442,10 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
 
     rc->rrdset_next = st->alarms;
     rc->rrdset_prev = NULL;
+    
+    if(rc->rrdset_next)
+        rc->rrdset_next->rrdset_prev = rc;
+
     st->alarms = rc;
 
     if(rc->update_every < rc->rrdset->update_every) {
@@ -708,7 +712,6 @@ void rrdcalc_free(RRDHOST *host, RRDCALC *rc) {
 
     else if(likely(host->alarms)) {
         RRDCALC *t, *last = host->alarms;
-
         for(t = last->next; t && t != rc; last = t, t = t->next) ;
         if(last && last->next == rc)
             last->next = rc->next;
