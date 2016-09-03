@@ -276,6 +276,7 @@ static const char *verify_required_directory(const char *dir) {
 
 int main(int argc, char **argv)
 {
+    char *hostname = "localhost";
     int i, check_config = 0;
     int config_loaded = 0;
     int dont_fork = 0;
@@ -645,6 +646,11 @@ int main(int argc, char **argv)
         else
             info("Successfully set pthread stacksize to %zu bytes", wanted_stacksize);
     }
+
+    // ------------------------------------------------------------------------
+    // initialize rrd host
+
+    rrdhost_init(hostname);
 
     // ------------------------------------------------------------------------
     // initialize the registry

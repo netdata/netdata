@@ -310,6 +310,7 @@ struct rrdhost {
 };
 typedef struct rrdhost RRDHOST;
 extern RRDHOST localhost;
+extern void rrdhost_init(char *hostname);
 
 #ifdef NETDATA_INTERNAL_CHECKS
 #define rrdhost_check_wrlock(host) rrdhost_check_wrlock_int(host, __FILE__, __FUNCTION__, __LINE__)

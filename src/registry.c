@@ -1652,7 +1652,7 @@ int registry_init(void) {
     registry.persons_expiration = config_get_number("registry", "registry expire idle persons days", 365) * 86400;
     registry.registry_domain = config_get("registry", "registry domain", "");
     registry.registry_to_announce = config_get("registry", "registry to announce", "https://registry.my-netdata.io");
-    registry.hostname = config_get("registry", "registry hostname", config_get("global", "hostname", hostname));
+    registry.hostname = config_get("registry", "registry hostname", config_get("global", "hostname", localhost.hostname));
     registry.verify_cookies_redirects = config_get_boolean("registry", "verify browser cookies support", 1);
 
     setenv("NETDATA_REGISTRY_HOSTNAME", registry.hostname, 1);
