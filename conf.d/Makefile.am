@@ -7,6 +7,7 @@ dist_config_DATA = \
 	apps_groups.conf \
 	charts.d.conf \
 	python.d.conf \
+	health_email_recipients.conf \
 	$(NULL)
 
 chartsconfigdir=$(configdir)/charts.d
