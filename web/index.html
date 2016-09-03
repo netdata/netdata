@@ -2065,7 +2065,7 @@ function anyAttribute(obj, attr, key, def) {
 function menuTitle(chart) {
     if(typeof chart.menu_pattern !== 'undefined') {
         return (anyAttribute(menuData, 'title', chart.menu_pattern, chart.menu_pattern).toString()
-                + ' ' + chart.type.slice(-(chart.type.length - chart.menu_pattern.length - 1)).toString()).replace(/_/g, ' ');
+                + '&nbsp;' + chart.type.slice(-(chart.type.length - chart.menu_pattern.length - 1)).toString()).replace(/_/g, ' ');
     }
 
     return (anyAttribute(menuData, 'title', chart.menu, chart.menu)).toString().replace(/_/g, ' ');
