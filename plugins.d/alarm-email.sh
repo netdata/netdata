@@ -8,6 +8,13 @@ then
     echo >&2 "I cannot send emails - there is no sendmail command available."
 fi
 
+default_recipient_for_all_roles="root"
+declare -A recipients=()
+if [ -f "${NETDATA_CONFIG_DIR}/health_email_recipients.conf" ]
+    then
+    source "${NETDATA_CONFIG_DIR}/health_email_recipients.conf"
+fi
+
 sendmail_from_pipe() {
     "${sendmail}" -t
 
@@ -21,31 +28,43 @@ sendmail_from_pipe() {
     fi
 }
 
-name="${1}"       # the name of the alarm, as given in netdata health.d entries
-chart="${2}"      # the name of the chart (type.id)
-family="${3}"     # the family of the chart
-status="${4}"     # the current status : UNITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
-old_status="${5}" # the previous status: UNITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
-value="${6}"      # the current value
-old_value="${7}"  # the previous value
-src="${8}"        # the line number and file the alarm has been configured
-duration="${9}"   # the duration in seconds the previous state took
-non_clear_duration="${10}" # the total duration in seconds this is non-clear
-units="${11}"     # the units of the value
-info="${12}"      # a short description of the alarm
+recipient="${1}"   # the recepient of the email
+hostname="${2}"    # the hostname this event refers to
+unique_id="${3}"   # the unique id of this event
+alarm_id="${4}"    # the unique id of the alarm that generated this event
+event_id="${5}"    # the incremental id of the event, for this alarm
+when="${6}"        # the timestamp this event occured
+name="${7}"        # the name of the alarm, as given in netdata health.d entries
+chart="${8}"       # the name of the chart (type.id)
+family="${9}"      # the family of the chart
+status="${10}"     # the current status : UNITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+old_status="${11}" # the previous status: UNITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+value="${12}"      # the current value
+old_value="${13}"  # the previous value
+src="${14}"        # the line number and file the alarm has been configured
+duration="${15}"   # the duration in seconds the previous state took
+non_clear_duration="${16}" # the total duration in seconds this is non-clear
+units="${17}"      # the units of the value
+info="${18}"       # a short description of the alarm
+
+to="${recipients[${recipient}]}"
+[ -z "${to}" ] && to="${default_recipient_for_all_roles}"
+[ -z "${to}" ] && to="root"
 
 [ ! -z "${info}" ] && info=" <small><br/>${info}</small>"
 
 # get the system hostname
-hostname="${NETDATA_HOSTNAME}"
+[ -z "${hostname}" ] && hostname="${NETDATA_HOSTNAME}"
 [ -z "${hostname}" ] && hostname="${NETDATA_REGISTRY_HOSTNAME}"
-[ -z "${hostname}" ] && hostname="$(hostname)"
+[ -z "${hostname}" ] && hostname="$(hostname 2>/dev/null)"
 
 goto_url="${NETDATA_REGISTRY_URL}/goto-host-from-alarm.html?machine_guid=${NETDATA_REGISTRY_UNIQUE_ID}&chart=${chart}&family=${family}"
 
-# get the current date
-date="$(date)"
+date="$(date --date=@${when} 2>/dev/null)"
+[ -z "${date}" ] && date="$(date 2>/dev/null)"
 
+# convert a duration in seconds, to a human readable duration
+# using DAYS, MINUTES, SECONDS
 duration4human() {
     local s="${1}" d=0 h=0 m=0 ds="day" hs="hour" ms="minute" ss="second"
     d=$(( s / 86400 ))
@@ -94,7 +113,7 @@ duration4human() {
 }
 
 severity="${status}"
-raised_for="<br/>(was ${old_status,,} for $(duration4human ${duration}))"
+raised_for="<br/><small>(was ${old_status,,} for $(duration4human ${duration}))</small>"
 status_message="status unknown"
 color="grey"
 alarm="${name} = ${value} ${units}"
@@ -136,7 +155,7 @@ then
     severity="Recovered from ${old_status}"
     if [ $non_clear_duration -gt $duration ]
     then
-        raised_for="<br/>(had issues for $(duration4human ${non_clear_duration}))"
+        raised_for="<br/><small>(had issues for $(duration4human ${non_clear_duration}))</small>"
     fi
 
 elif [ "${old_status}" = "WARNING" -a "${status}" = "CRITICAL" ]
@@ -144,7 +163,7 @@ then
     severity="Escalated to ${status}"
     if [ $non_clear_duration -gt $duration ]
     then
-        raised_for="<br/>(has issues for $(duration4human ${non_clear_duration}))"
+        raised_for="<br/><small>(has issues for $(duration4human ${non_clear_duration}))</small>"
     fi
 
 elif [ "${old_status}" = "CRITICAL" -a "${status}" = "WARNING" ]
@@ -152,7 +171,7 @@ then
     severity="Demoted to ${status}"
     if [ $non_clear_duration -gt $duration ]
     then
-        raised_for="<br/>(has issues for $(duration4human ${non_clear_duration}))"
+        raised_for="<br/><small>(has issues for $(duration4human ${non_clear_duration}))</small>"
     fi
 
 else
@@ -161,7 +180,7 @@ fi
 
 # send the email
 cat <<EOF | sendmail_from_pipe
-To: root
+To: ${to}
 Subject: ${hostname} ${status_message} - ${chart}.${name}
 Content-Type: text/html
 
