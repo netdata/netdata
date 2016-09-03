@@ -120,10 +120,14 @@ typedef struct rrddimvar {
 #define RRDCALC_FLAG_CRIT_ERROR    0x00000020
 
 typedef struct rrdcalc {
+    uint32_t id;
+    uint32_t next_event_id;
+
     char *name;
     uint32_t hash;
 
     char *exec;
+    char *recipient;
 
     char *chart;        // the chart id this should be linked to
     uint32_t hash_chart;
@@ -182,6 +186,7 @@ typedef struct rrdcalctemplate {
     uint32_t hash_name;
 
     char *exec;
+    char *recipient;
 
     char *context;
     uint32_t hash_context;
@@ -216,7 +221,9 @@ typedef struct rrdcalctemplate {
 #define HEALTH_ENTRY_NOTIFICATIONS_EXEC_FAILED  0x00000008
 
 typedef struct alarm_entry {
-    uint32_t id;
+    uint32_t unique_id;
+    uint32_t alarm_id;
+    uint32_t alarm_event_id;
 
     time_t when;
     time_t duration;
@@ -231,6 +238,7 @@ typedef struct alarm_entry {
     char *family;
 
     char *exec;
+    char *recipient;
     int exec_code;
 
     char *source;
@@ -249,7 +257,8 @@ typedef struct alarm_entry {
 } ALARM_ENTRY;
 
 typedef struct alarm_log {
-    uint32_t nextid;
+    uint32_t next_log_id;
+    uint32_t next_alarm_id;
     unsigned int count;
     unsigned int max;
     ALARM_ENTRY *alarms;
