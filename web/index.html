@@ -2062,24 +2062,13 @@ function anyAttribute(obj, attr, key, def) {
     return def;
 }
 
-function anyAttributeTitle(obj, attr, key, def) {
-    if(typeof obj[key] !== 'undefined') {
-        if(typeof obj[key][attr] !== 'undefined')
-            return obj[key][attr];
-    }
-
-    var r = def.replace(/_/g, ' ');
-
-    return r;
-}
-
 function menuTitle(chart) {
     if(typeof chart.menu_pattern !== 'undefined') {
-        return anyAttributeTitle(menuData, 'title', chart.menu_pattern, chart.menu_pattern).toString()
-                + ' ' + chart.type.slice(-(chart.type.length - chart.menu_pattern.length - 1)).toString();
+        return (anyAttribute(menuData, 'title', chart.menu_pattern, chart.menu_pattern).toString()
+                + ' ' + chart.type.slice(-(chart.type.length - chart.menu_pattern.length - 1)).toString()).replace(/_/g, ' ');
     }
 
-    return anyAttributeTitle(menuData, 'title', chart.menu, chart.menu);
+    return (anyAttribute(menuData, 'title', chart.menu, chart.menu)).toString().replace(/_/g, ' ');
 }
 
 function menuIcon(chart) {
@@ -2099,11 +2088,11 @@ function menuHeight(menu, relative) {
 
 function submenuTitle(menu, submenu) {
     var key = menu + '.' + submenu;
-    var title = anyAttributeTitle(submenuData, 'title', key, submenu);
-    if(title.length > 30) {
-        var a = title.substring(0, 13);
-        var b = title.substring(title.length - 13, title.length);
-        return a + '...' + b;
+    var title = anyAttribute(submenuData, 'title', key, submenu).toString().replace(/_/g, ' ');;
+    if(title.length > 28) {
+        var a = title.substring(0, 28);
+        // var b = title.substring(title.length - 13, title.length);
+        return a + '...'; // + b;
     }
     return title;
 }
