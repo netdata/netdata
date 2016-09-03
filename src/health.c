@@ -1782,7 +1782,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     const char *recipient = ae->recipient;
     if(!recipient) recipient = health_default_recipient;
 
-    snprintfz(buffer, FILENAME_MAX, "exec %s '%s' '%s' '%u' '%u' '%u' '%zu' '%s' '%s' '%s' '%s' '%s' '%0.1Lf' '%0.1Lf' '%s' '%u' '%u' '%s' '%s'",
+    snprintfz(buffer, FILENAME_MAX, "exec %s '%s' '%s' '%u' '%u' '%u' '%zu' '%s' '%s' '%s' '%s' '%s' '%0.0Lf' '%0.0Lf' '%s' '%u' '%u' '%s' '%s'",
               exec,
               recipient,
               host->hostname,
