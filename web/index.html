@@ -2090,9 +2090,9 @@ function submenuTitle(menu, submenu) {
     var key = menu + '.' + submenu;
     var title = anyAttribute(submenuData, 'title', key, submenu).toString().replace(/_/g, ' ');;
     if(title.length > 28) {
-        var a = title.substring(0, 28);
-        // var b = title.substring(title.length - 13, title.length);
-        return a + '...'; // + b;
+        var a = title.substring(0, 13);
+        var b = title.substring(title.length - 12, title.length);
+        return a + '...' + b;
     }
     return title;
 }
