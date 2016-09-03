@@ -1445,27 +1445,27 @@ var menuData = {
     },
 
     'ap': {
-        title: 'Access Points',
+        title: '<i class="fa fa-wifi" aria-hidden="true"></i> Access Points',
         info: undefined
     },
 
     'tc': {
-        title: 'Quality of Service',
+        title: '<i class="fa fa-globe" aria-hidden="true"></i> Quality of Service',
         info: 'Netdata collects and visualizes tc class utilization using its <a href="https://github.com/firehol/netdata/blob/master/plugins.d/tc-qos-helper.sh" target="_blank">tc-helper plugin</a>. If you also use <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a> for setting up QoS, netdata automatically collects interface and class names. If your QoS configuration includes overheads calculation, the values shown here will include these overheads (the total bandwidth for the same interface as reported in the Network Interfaces section, will be lower than the total bandwidth reported here). Also, data collection may have a slight time difference compared to the interface (QoS data collection is implemented with a BASH script, so a shift in data collection of a few milliseconds should be justified).'
     },
 
     'net': {
-        title: 'Network Interfaces',
+        title: '<i class="fa fa-share-alt" aria-hidden="true"></i> Network Interfaces',
         info: 'Per network interface statistics collected from <code>/proc/net/dev</code>.'
     },
 
     'ipv4': {
-        title: 'IPv4 Networking',
+        title: '<i class="fa fa-bolt" aria-hidden="true"></i> IPv4 Networking',
         info: undefined
     },
 
     'ipv6': {
-        title: 'IPv6 Networking',
+        title: '<i class="fa fa-bolt" aria-hidden="true"></i> IPv6 Networking',
         info: undefined
     },
 
@@ -1475,7 +1475,7 @@ var menuData = {
     },
 
     'netfilter': {
-        title: 'Firewall (netfilter)',
+        title: '<i class="fa fa-shield" aria-hidden="true"></i> Firewall (netfilter)',
         info: undefined
     },
 
@@ -1490,7 +1490,7 @@ var menuData = {
     },
 
     'disk': {
-        title: 'Disks',
+        title: '<i class="fa fa-folder" aria-hidden="true"></i> Disks',
         info: 'Charts with performance information for all the system disks. Special care has been given to present disk performance metrics in a way compatible with <code>iostat -x</code>. netdata by default prevents rendering performance charts for individual partitions and unmounted virtual disks. Disabled charts can still be enabled by altering the relative settings in the netdata configuration file.'
     },
 
@@ -1500,30 +1500,30 @@ var menuData = {
     },
 
     'nfsd': {
-        title: 'File Server (nfsd)',
+        title: '<i class="fa fa-folder-open" aria-hidden="true"></i> File Server (nfsd)',
         info: undefined
     },
 
     'apps': {
-        title: 'Applications',
+        title: '<i class="fa fa-heartbeat" aria-hidden="true"></i> Applications',
         info: 'Per application statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics for applications of interest, defined in <code>/etc/netdata/apps_groups.conf</code> (the default is <a href="https://github.com/firehol/netdata/blob/master/conf.d/apps_groups.conf" target="_blank">here</a>). The plugin internally builds a process tree (much like <code>ps fax</code> does), and groups processes together (evaluating both child and parent processes) so that the result is always a chart with a predefined set of dimensions (of course, only application groups found running are reported). The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
         height: 1.5
     },
 
     'users': {
-        title: 'Users',
+        title: '<i class="fa fa-user" aria-hidden="true"></i> Users',
         info: 'Per user statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics per user. The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
         height: 1.5
     },
 
     'groups': {
-        title: 'User Groups',
+        title: '<i class="fa fa-users" aria-hidden="true"></i> User Groups',
         info: 'Per user group statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics per user group. The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
         height: 1.5
     },
 
     'netdata': {
-        title: 'Netdata Monitoring',
+        title: '<i class="fa fa-bar-chart" aria-hidden="true"></i> Netdata Monitoring',
         info: undefined
     },
 
@@ -1533,32 +1533,32 @@ var menuData = {
     },
 
     'cgroup': {
-        title: 'Container',
+        title: '<i class="fa fa-th" aria-hidden="true"></i>',
         info: undefined
     },
 
     'cgqemu': {
-        title: 'VM',
+        title: '<i class="fa fa-th-large" aria-hidden="true"></i>',
         info: undefined
     },
 
     'memcached': {
-        title: 'memcached',
+        title: '<i class="fa fa-database" aria-hidden="true"></i> memcached',
         info: undefined
     },
 
     'mysql': {
-        title: 'MySQL',
+        title: '<i class="fa fa-database" aria-hidden="true"></i> MySQL',
         info: undefined
     },
 
     'redis': {
-        title: 'Redis',
+        title: '<i class="fa fa-database" aria-hidden="true"></i> Redis',
         info: undefined
     },
 
     'ipfs': {
-        title: 'IPFS',
+        title: '<i class="fa fa-folder-open" aria-hidden="true"></i> IPFS',
         info: undefined
     },
 
@@ -1567,18 +1567,33 @@ var menuData = {
         info: undefined,
     },
 
+    'postfix': {
+        title: '<i class="fa fa-envelope" aria-hidden="true"></i> postfix',
+        info: undefined,
+    },
+
     'nginx': {
-        title: 'nginx',
+        title: '<i class="fa fa-eye" aria-hidden="true"></i> nginx',
         info: undefined,
     },
 
     'apache': {
-        title: 'Apache',
+        title: '<i class="fa fa-eye" aria-hidden="true"></i> Apache',
         info: undefined,
     },
 
     'named': {
-        title: 'named',
+        title: '<i class="fa fa-tag" aria-hidden="true"></i> named',
+        info: undefined
+    },
+
+    'squid': {
+        title: '<i class="fa fa-puzzle-piece" aria-hidden="true"></i> squid',
+        info: undefined
+    },
+
+    'nut': {
+        title: '<i class="fa fa-battery-half" aria-hidden="true"></i> UPS',
         info: undefined
     }
 };
@@ -2008,7 +2023,7 @@ function anyAttribute(obj, attr, key, def) {
 function menuTitle(chart) {
     if(typeof chart.menu_pattern !== 'undefined') {
         return anyAttribute(menuData, 'title', chart.menu_pattern, chart.menu_pattern).toString()
-                + ': ' + chart.type.slice(-(chart.type.length - chart.menu_pattern.length - 1)).toString();
+                + ' ' + chart.type.slice(-(chart.type.length - chart.menu_pattern.length - 1)).toString();
     }
 
     return anyAttribute(menuData, 'title', chart.menu, chart.menu);
@@ -2024,7 +2039,13 @@ function menuHeight(menu, relative) {
 
 function submenuTitle(menu, submenu) {
     var key = menu + '.' + submenu;
-    return anyAttribute(submenuData, 'title', key, submenu);
+    var title = anyAttribute(submenuData, 'title', key, submenu);
+    if(title.length > 30) {
+        var a = title.substring(0, 13);
+        var b = title.substring(title.length - 13, title.length);
+        return a + '...' + b;
+    }
+    return title;
 }
 
 function submenuInfo(menu, submenu) {
@@ -2081,6 +2102,7 @@ function enrichChartData(chart) {
         case 'mysql':
         case 'named':
         case 'nginx':
+        case 'nut':
         case 'phpfpm':
         case 'postfix':
         case 'redis':
@@ -2409,6 +2431,8 @@ function renderChartsAndMenu(data) {
     renderPage(menus, data);
 }
 
+// ----------------------------------------------------------------------------
+
 function alarmsUpdateModal() {
     var active = '<h3>Raised Alarms</h3><table class="table">';
     var all = '<h3>All Running Alarms</h3><div class="panel-group" id="alarms_all_accordion" role="tablist" aria-multiselectable="true">';
@@ -2491,7 +2515,7 @@ function alarmsUpdateModal() {
         function alarm_to_html(alarm, full) {
             var chart = options.data.charts[alarm.chart];
 
-            var html = '<tr><td class="text-center" style="vertical-align:middle" width="40%"><b>' + alarm.chart + '</b><br/>&nbsp;<br/><embed src="' + NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" height="20" /><br/>&nbsp;<br/><span style="font-size: 18px">' + alarm.info + '</span></td>'
+            var html = '<tr><td class="text-center" style="vertical-align:middle" width="40%"><b>' + alarm.chart + '</b><br/>&nbsp;<br/><embed src="' + NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" height="20" /><br/>&nbsp;<br/><span style="font-size: 18px">' + alarm.info + '</span><br/>&nbsp;<br/>role: <b>' + alarm.recipient + '</b></td>'
                 + '<td><table class="table">'
                 + ((typeof alarm.warn !== 'undefined')?('<tr><td width="10%" style="text-align:right">warning&nbsp;when</td><td><span style="font-family: monospace; color:#fe7d37; font-weight: bold;">' + alarm.warn + '</span></td></tr>'):'')
                 + ((typeof alarm.crit !== 'undefined')?('<tr><td width="10%" style="text-align:right">critical&nbsp;when</td><td><span style="font-family: monospace; color: #e05d44; font-weight: bold;">' + alarm.crit + '</span></td></tr>'):'');
@@ -2603,7 +2627,7 @@ function alarmsUpdateModal() {
                 if(alarm.status === 'WARNING' || alarm.status === 'CRITICAL') {
                     if(!active_family_added) {
                         active_family_added = true;
-                        active += '<tr><th class="text-center"><h4>' + family + '</h4></th><th></th></tr>';
+                        active += '<tr><th class="text-center" colspan="2"><h4>' + family + '</h4></th></tr>';
                     }
                     count_active++;
                     active += alarm_to_html(alarm, false);
