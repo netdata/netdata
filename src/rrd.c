@@ -503,6 +503,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
         st->next = NULL;
         st->mapped = rrd_memory_mode;
         st->variables = NULL;
+        st->alarms = NULL;
     }
     else {
         st = callocz(1, size);
