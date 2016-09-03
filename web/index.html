@@ -527,7 +527,7 @@
             a1 += '<li role="separator" class="divider"></li>';
 
             el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #999;" target="_blank">What is this?</a></li>';
-            a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fa fa-cog" aria-hidden="true" style="color: #999;"></i></a></li>'
+            a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fa fa-sliders" aria-hidden="true" style="color: #999;"></i></a></li>'
 
             document.getElementById('mynetdata_servers').innerHTML = el;
             document.getElementById('mynetdata_servers2').innerHTML = el;
@@ -584,15 +584,15 @@
             <nav class="collapse navbar-collapse navbar-right" role="navigation">
                 <ul class="nav navbar-nav">
                     <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal" title="alarms"><i class="fa fa-bell"></i><span id="alarms_count_badge" class="badge"></span></a></li>
-                    <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal" title="dashboard settings"><i class="fa fa-cog"></i></a></li>
+                    <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal" title="dashboard settings"><i class="fa fa-sliders"></i></a></li>
                     <li class="hidden-sm"><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank" title="netdata community"><i class="fa fa-github"></i></a></li>
                     <li class="hidden-sm" id="updateButton"><a href="#" class="btn" data-toggle="modal" data-target="#updateModal" title="check for update"><i class="fa fa-cloud-download"></i><span id="update_badge" class="badge"></span></a></li>
                     <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#helpModal" title="dashboard help"><i class="fa fa-question-circle"></i></a></li>
                     <li class="dropdown hidden-md hidden-lg hidden-xs">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="current_view">Menu <strong class="caret"></strong></a>
                         <ul class="dropdown-menu scrollable-menu inpagemenu" role="menu">
-                            <li><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal"><i class="fa fa-cog"></i> alarms</a></li>
-                            <li><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal"><i class="fa fa-cog"></i> settings</a></li>
+                            <li><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal"><i class="fa fa-bell"></i> alarms</a></li>
+                            <li><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal"><i class="fa fa-sliders"></i> settings</a></li>
                             <li><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank"><i class="fa fa-github"></i> community</a></li>
                             <li><a href="#" class="btn" data-toggle="modal" data-target="#helpModal"><i class="fa fa-question-circle"></i> help</a></li>
                         </ul>
@@ -1441,89 +1441,106 @@ function gaugeChart(title, width, dimensions, colors) {
 var menuData = {
     'system': {
         title: 'System Overview',
+        icon: '<i class="fa fa-bookmark" aria-hidden="true"></i>',
         info: 'Overview of the key system metrics.'
     },
 
     'ap': {
-        title: '<i class="fa fa-wifi" aria-hidden="true"></i> Access Points',
+        title: 'Access Points',
+        icon: '<i class="fa fa-wifi" aria-hidden="true"></i>',
         info: undefined
     },
 
     'tc': {
-        title: '<i class="fa fa-globe" aria-hidden="true"></i> Quality of Service',
+        title: 'Quality of Service',
+        icon: '<i class="fa fa-globe" aria-hidden="true"></i>',
         info: 'Netdata collects and visualizes tc class utilization using its <a href="https://github.com/firehol/netdata/blob/master/plugins.d/tc-qos-helper.sh" target="_blank">tc-helper plugin</a>. If you also use <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a> for setting up QoS, netdata automatically collects interface and class names. If your QoS configuration includes overheads calculation, the values shown here will include these overheads (the total bandwidth for the same interface as reported in the Network Interfaces section, will be lower than the total bandwidth reported here). Also, data collection may have a slight time difference compared to the interface (QoS data collection is implemented with a BASH script, so a shift in data collection of a few milliseconds should be justified).'
     },
 
     'net': {
-        title: '<i class="fa fa-share-alt" aria-hidden="true"></i> Network Interfaces',
+        title: 'Network Interfaces',
+        icon: '<i class="fa fa-share-alt" aria-hidden="true"></i>',
         info: 'Per network interface statistics collected from <code>/proc/net/dev</code>.'
     },
 
     'ipv4': {
-        title: '<i class="fa fa-bolt" aria-hidden="true"></i> IPv4 Networking',
+        title: 'IPv4 Networking',
+        icon: '<i class="fa fa-cloud" aria-hidden="true"></i>',
         info: undefined
     },
 
     'ipv6': {
-        title: '<i class="fa fa-bolt" aria-hidden="true"></i> IPv6 Networking',
+        title: 'IPv6 Networking',
+        icon: '<i class="fa fa-cloud" aria-hidden="true"></i>',
         info: undefined
     },
 
     'ipvs': {
         title: 'IP Virtual Server',
+        icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
         info: undefined
     },
 
     'netfilter': {
-        title: '<i class="fa fa-shield" aria-hidden="true"></i> Firewall (netfilter)',
+        title: 'Firewall (netfilter)',
+        icon: '<i class="fa fa-shield" aria-hidden="true"></i>',
         info: undefined
     },
 
     'cpu': {
         title: 'CPUs',
+        icon: '<i class="fa fa-bolt" aria-hidden="true"></i>',
         info: undefined
     },
 
     'mem': {
         title: 'Memory',
+        icon: '<i class="fa fa-bolt" aria-hidden="true"></i>',
         info: undefined
     },
 
     'disk': {
-        title: '<i class="fa fa-folder" aria-hidden="true"></i> Disks',
+        title: 'Disks',
+        icon: '<i class="fa fa-folder" aria-hidden="true"></i>',
         info: 'Charts with performance information for all the system disks. Special care has been given to present disk performance metrics in a way compatible with <code>iostat -x</code>. netdata by default prevents rendering performance charts for individual partitions and unmounted virtual disks. Disabled charts can still be enabled by altering the relative settings in the netdata configuration file.'
     },
 
     'sensors': {
         title: 'Sensors',
+        icon: '<i class="fa fa-leaf" aria-hidden="true"></i>',
         info: undefined
     },
 
     'nfsd': {
-        title: '<i class="fa fa-folder-open" aria-hidden="true"></i> File Server (nfsd)',
+        title: 'File Server (nfsd)',
+        icon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
         info: undefined
     },
 
     'apps': {
-        title: '<i class="fa fa-heartbeat" aria-hidden="true"></i> Applications',
+        title: 'Applications',
+        icon: '<i class="fa fa-heartbeat" aria-hidden="true"></i>',
         info: 'Per application statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics for applications of interest, defined in <code>/etc/netdata/apps_groups.conf</code> (the default is <a href="https://github.com/firehol/netdata/blob/master/conf.d/apps_groups.conf" target="_blank">here</a>). The plugin internally builds a process tree (much like <code>ps fax</code> does), and groups processes together (evaluating both child and parent processes) so that the result is always a chart with a predefined set of dimensions (of course, only application groups found running are reported). The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
         height: 1.5
     },
 
     'users': {
-        title: '<i class="fa fa-user" aria-hidden="true"></i> Users',
+        title: 'Users',
+        icon: '<i class="fa fa-user" aria-hidden="true"></i>',
         info: 'Per user statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics per user. The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
         height: 1.5
     },
 
     'groups': {
-        title: '<i class="fa fa-users" aria-hidden="true"></i> User Groups',
+        title: 'User Groups',
+        icon: '<i class="fa fa-users" aria-hidden="true"></i>',
         info: 'Per user group statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics per user group. The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
         height: 1.5
     },
 
     'netdata': {
-        title: '<i class="fa fa-bar-chart" aria-hidden="true"></i> Netdata Monitoring',
+        title: 'Netdata Monitoring',
+        icon: '<i class="fa fa-bar-chart" aria-hidden="true"></i>',
         info: undefined
     },
 
@@ -1533,67 +1550,92 @@ var menuData = {
     },
 
     'cgroup': {
-        title: '<i class="fa fa-th" aria-hidden="true"></i>',
+        title: '',
+        icon: '<i class="fa fa-th" aria-hidden="true"></i>',
         info: undefined
     },
 
     'cgqemu': {
-        title: '<i class="fa fa-th-large" aria-hidden="true"></i>',
+        title: '',
+        icon: '<i class="fa fa-th-large" aria-hidden="true"></i>',
         info: undefined
     },
 
     'memcached': {
-        title: '<i class="fa fa-database" aria-hidden="true"></i> memcached',
+        title: 'memcached',
+        icon: '<i class="fa fa-database" aria-hidden="true"></i>',
         info: undefined
     },
 
     'mysql': {
-        title: '<i class="fa fa-database" aria-hidden="true"></i> MySQL',
+        title: 'MySQL',
+        icon: '<i class="fa fa-database" aria-hidden="true"></i>',
         info: undefined
     },
 
     'redis': {
-        title: '<i class="fa fa-database" aria-hidden="true"></i> Redis',
+        title: 'Redis',
+        icon: '<i class="fa fa-database" aria-hidden="true"></i>',
         info: undefined
     },
 
     'ipfs': {
-        title: '<i class="fa fa-folder-open" aria-hidden="true"></i> IPFS',
+        title: 'IPFS',
+        icon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
         info: undefined
     },
 
     'phpfpm': {
         title: 'PHP-FPM',
+        icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
         info: undefined,
     },
 
     'postfix': {
-        title: '<i class="fa fa-envelope" aria-hidden="true"></i> postfix',
+        title: 'postfix',
+        icon: '<i class="fa fa-envelope" aria-hidden="true"></i>',
         info: undefined,
     },
 
     'nginx': {
-        title: '<i class="fa fa-eye" aria-hidden="true"></i> nginx',
+        title: 'nginx',
+        icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
         info: undefined,
     },
 
     'apache': {
-        title: '<i class="fa fa-eye" aria-hidden="true"></i> Apache',
+        title: 'Apache',
+        icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
         info: undefined,
     },
 
     'named': {
-        title: '<i class="fa fa-tag" aria-hidden="true"></i> named',
+        title: 'named',
+        icon: '<i class="fa fa-tag" aria-hidden="true"></i>',
         info: undefined
     },
 
     'squid': {
-        title: '<i class="fa fa-puzzle-piece" aria-hidden="true"></i> squid',
+        title: 'squid',
+        icon: '<i class="fa fa-exchange" aria-hidden="true"></i>',
         info: undefined
     },
 
     'nut': {
-        title: '<i class="fa fa-battery-half" aria-hidden="true"></i> UPS',
+        title: 'UPS',
+        icon: '<i class="fa fa-battery-half" aria-hidden="true"></i>',
+        info: undefined
+    },
+
+    'smawebbox': {
+        title: 'Solar Power',
+        icon: '<i class="fa fa-sun-o" aria-hidden="true"></i>',
+        info: undefined
+    },
+
+    'snmp': {
+        title: 'SNMP',
+        icon: '<i class="fa fa-random" aria-hidden="true"></i>',
         info: undefined
     }
 };
@@ -2020,13 +2062,31 @@ function anyAttribute(obj, attr, key, def) {
     return def;
 }
 
+function anyAttributeTitle(obj, attr, key, def) {
+    if(typeof obj[key] !== 'undefined') {
+        if(typeof obj[key][attr] !== 'undefined')
+            return obj[key][attr];
+    }
+
+    var r = def.replace(/_/g, ' ');
+
+    return r;
+}
+
 function menuTitle(chart) {
     if(typeof chart.menu_pattern !== 'undefined') {
-        return anyAttribute(menuData, 'title', chart.menu_pattern, chart.menu_pattern).toString()
+        return anyAttributeTitle(menuData, 'title', chart.menu_pattern, chart.menu_pattern).toString()
                 + ' ' + chart.type.slice(-(chart.type.length - chart.menu_pattern.length - 1)).toString();
     }
 
-    return anyAttribute(menuData, 'title', chart.menu, chart.menu);
+    return anyAttributeTitle(menuData, 'title', chart.menu, chart.menu);
+}
+
+function menuIcon(chart) {
+    if(typeof chart.menu_pattern !== 'undefined')
+        return anyAttribute(menuData, 'icon', chart.menu_pattern, '<i class="fa fa-puzzle-piece" aria-hidden="true"></i>').toString();
+
+    return anyAttribute(menuData, 'icon', chart.menu, '<i class="fa fa-puzzle-piece" aria-hidden="true"></i>');
 }
 
 function menuInfo(menu) {
@@ -2039,7 +2099,7 @@ function menuHeight(menu, relative) {
 
 function submenuTitle(menu, submenu) {
     var key = menu + '.' + submenu;
-    var title = anyAttribute(submenuData, 'title', key, submenu);
+    var title = anyAttributeTitle(submenuData, 'title', key, submenu);
     if(title.length > 30) {
         var a = title.substring(0, 13);
         var b = title.substring(title.length - 13, title.length);
@@ -2107,6 +2167,7 @@ function enrichChartData(chart) {
         case 'postfix':
         case 'redis':
         case 'ipfs':
+        case 'smawebbox':
         case 'squid':
         case 'snmp':
         case 'tomcat':
@@ -2306,7 +2367,7 @@ function renderPage(menus, data) {
         // generate an entry at the main menu
 
         var menuid = name2id(menu);
-        sidebar += '<li class=""><a href="#' + menuid + '" onClick="return scrollToId(\'' + menuid + '\');">' + menus[menu].title + '</a><ul class="nav">';
+        sidebar += '<li class=""><a href="#' + menuid + '" onClick="return scrollToId(\'' + menuid + '\');">' + menus[menu].icon + ' ' + menus[menu].title + '</a><ul class="nav">';
         html += '<div role="section"><div role="sectionhead"><h1 id="' + menuid + '" role="heading">' + menus[menu].title + '</h1></div><div id="menu_' + menuid + '" role="document">';
 
         if(menus[menu].info !== null)
@@ -2388,6 +2449,7 @@ function renderChartsAndMenu(data) {
                 priority: charts[c].priority,
                 submenus: {},
                 title: menuTitle(charts[c]),
+                icon: menuIcon(charts[c]),
                 info: menuInfo(charts[c].menu),
                 height: menuHeight(charts[c].menu, options.chartsHeight)
             };
@@ -3031,7 +3093,7 @@ function finalizePage() {
     /* activate bootstrap scrollspy (needed for sidebar) */
     $(document.body).scrollspy({
         target: '#sidebar',
-        offset: $(window).height() / 3 // controls the diff of the <hX> element to the top, to select it
+        offset: $(window).height() / 5 // controls the diff of the <hX> element to the top, to select it
     });
 
     // change the URL based on the current position of the screen
