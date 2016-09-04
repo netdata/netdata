@@ -44,7 +44,7 @@ class Service(SocketService):
     def _get_disks(self):
         try:
             disks = self.configuration['devices']
-            print(disks)
+            self.info("Using configured disks" + str(disks))
         except (KeyError, TypeError) as e:
             self.info("Autodetecting disks")
             return ["/dev/" + f for f in os.listdir("/dev") if len(f) == 3 and f.startswith("sd")]
@@ -53,8 +53,7 @@ class Service(SocketService):
         for disk in disks:
             if not disk.startswith('/dev/'):
                 disk = "/dev/" + disk
-            if os.path.exists(disk):
-                ret.append(disk)
+            ret.append(disk)
         if len(ret) == 0:
             self.error("Provided disks cannot be found in /dev directory.")
         return ret
