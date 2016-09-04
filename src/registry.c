@@ -328,16 +328,24 @@ static inline URL *registry_url_allocate_nolock(const char *url, size_t urllen) 
     return u;
 }
 
-static inline URL *registry_url_get(const char *url, size_t urllen) {
-    debug(D_REGISTRY, "Registry: registry_url_get('%s')", url);
-
-    registry_urls_lock();
+static inline URL *registry_url_get_nolock(const char *url, size_t urllen) {
+    debug(D_REGISTRY, "Registry: registry_url_get_nolock('%s')", url);
 
     URL *u = dictionary_get(registry.urls, url);
     if(!u) {
         u = registry_url_allocate_nolock(url, urllen);
         registry.urls_count++;
     }
+
+    return u;
+}
+
+static inline URL *registry_url_get(const char *url, size_t urllen) {
+    debug(D_REGISTRY, "Registry: registry_url_get('%s')", url);
+
+    registry_urls_lock();
+
+    URL *u = registry_url_get_nolock(url, urllen);
 
     registry_urls_unlock();
 
@@ -782,6 +790,7 @@ int registry_log_load(void) {
                     else
                         registry_request_delete(p->guid, machine_guid, url, name, when);
 
+                    registry.log_count++;
                     break;
 
                 default:
@@ -1393,6 +1402,8 @@ int registry_save(void) {
         return -2;
     }
 
+    error_log_limit_unlimited();
+
     char tmp_filename[FILENAME_MAX + 1];
     char old_filename[FILENAME_MAX + 1];
 
@@ -1404,6 +1415,7 @@ int registry_save(void) {
     if(!fp) {
         error("Registry: Cannot create file: %s", tmp_filename);
         registry_log_unlock();
+        error_log_limit_reset();
         return -1;
     }
 
@@ -1415,6 +1427,7 @@ int registry_save(void) {
         error("Registry: Cannot save registry machines - return value %d", bytes1);
         fclose(fp);
         registry_log_unlock();
+        error_log_limit_reset();
         return bytes1;
     }
     debug(D_REGISTRY, "Registry: saving machines took %d bytes", bytes1);
@@ -1425,6 +1438,7 @@ int registry_save(void) {
         error("Registry: Cannot save registry persons - return value %d", bytes2);
         fclose(fp);
         registry_log_unlock();
+        error_log_limit_reset();
         return bytes2;
     }
     debug(D_REGISTRY, "Registry: saving persons took %d bytes", bytes2);
@@ -1478,13 +1492,13 @@ int registry_save(void) {
             // it has been moved successfully
             // discard the current registry log
             registry_log_recreate_nolock();
-
             registry.log_count = 0;
         }
     }
 
     // continue operations
     registry_log_unlock();
+    error_log_limit_reset();
 
     return -1;
 }
@@ -1576,7 +1590,8 @@ static inline size_t registry_load(void) {
                 }
                 *url++ = '\0';
 
-                u = registry_url_allocate_nolock(url, strlen(url));
+                // u = registry_url_allocate_nolock(url, strlen(url));
+                u = registry_url_get_nolock(url, strlen(url));
 
                 time_t first_t = strtoul(&s[2], NULL, 16);
 
@@ -1603,7 +1618,8 @@ static inline size_t registry_load(void) {
                 }
 
                 s[1] = s[10] = s[19] = s[28] = s[31] = '\0';
-                u = registry_url_allocate_nolock(&s[32], strlen(&s[32]));
+                // u = registry_url_allocate_nolock(&s[32], strlen(&s[32]));
+                u = registry_url_get_nolock(&s[32], strlen(&s[32]));
 
                 MACHINE_URL *mu = registry_machine_url_allocate(m, u, strtoul(&s[2], NULL, 16));
                 mu->last_t = strtoul(&s[11], NULL, 16);
@@ -1702,6 +1718,9 @@ int registry_init(void) {
         registry_log_open_nolock();
         registry_load();
         registry_log_load();
+
+        if(unlikely(registry_should_save_db()))
+            registry_save();
     }
 
     return 0;
