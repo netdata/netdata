@@ -193,11 +193,11 @@ int do_proc_vmstat(int update_every, unsigned long long dt) {
         // hash_unevictable_pgs_stranded = simple_hash("unevictable_pgs_stranded");
     }
 
-    if(do_swapio == -1) do_swapio = config_get_boolean("plugin:proc:/proc/vmstat", "swap i/o", 1);
-    if(do_io == -1)     do_io = config_get_boolean("plugin:proc:/proc/vmstat", "disk i/o", 1);
-    if(do_pgfaults == -1)   do_pgfaults = config_get_boolean("plugin:proc:/proc/vmstat", "memory page faults", 1);
+    if(do_swapio == -1)    do_swapio = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "swap i/o", CONFIG_ONDEMAND_ONDEMAND);
+    if(do_io == -1)        do_io = config_get_boolean("plugin:proc:/proc/vmstat", "disk i/o", 1);
+    if(do_pgfaults == -1)  do_pgfaults = config_get_boolean("plugin:proc:/proc/vmstat", "memory page faults", 1);
 
-    if(dt) {};
+    (void)dt;
 
     if(!ff) {
         char filename[FILENAME_MAX + 1];
@@ -415,7 +415,9 @@ int do_proc_vmstat(int update_every, unsigned long long dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_swapio) {
+    if(pswpin || pswpout || do_swapio == CONFIG_ONDEMAND_YES) {
+        do_swapio = CONFIG_ONDEMAND_YES;
+
         static RRDSET *st_swapio = NULL;
         if(!st_swapio) {
             st_swapio = rrdset_create("system", "swapio", NULL, "swap", NULL, "Swap I/O", "kilobytes/s", 250, update_every, RRDSET_TYPE_AREA);
