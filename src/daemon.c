@@ -15,27 +15,30 @@ void sig_handler_exit(int signo)
 void sig_handler_logrotate(int signo)
 {
     if(signo) {
-        error_log_limit_reset();
+        error_log_limit_unlimited();
         info("Received signal %d to re-open the log files", signo);
         reopen_all_log_files();
+        error_log_limit_reset();
     }
 }
 
 void sig_handler_save(int signo)
 {
     if(signo) {
-        error_log_limit_reset();
+        error_log_limit_unlimited();
         info("Received signal %d to save the database...", signo);
         rrdset_save_all();
+        error_log_limit_reset();
     }
 }
 
 void sig_handler_reload_health(int signo)
 {
     if(signo) {
-        error_log_limit_reset();
+        error_log_limit_unlimited();
         info("Received signal %d to reload health configuration...", signo);
         health_reload();
+        error_log_limit_reset();
     }
 }
 

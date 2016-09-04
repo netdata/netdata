@@ -478,7 +478,8 @@ int main(int argc, char **argv)
         stderr_filename    = config_get("global", "error log",  LOG_DIR "/error.log");
         stdaccess_filename = config_get("global", "access log", LOG_DIR "/access.log");
 
-        error_log_throttle_period = config_get_number("global", "errors flood protection period", error_log_throttle_period);
+        error_log_throttle_period_backup =
+            error_log_throttle_period = config_get_number("global", "errors flood protection period", error_log_throttle_period);
         setenv("NETDATA_ERRORS_THROTTLE_PERIOD", config_get("global", "errors flood protection period"    , ""), 1);
 
         error_log_errors_per_period = (unsigned long)config_get_number("global", "errors to trigger flood protection", error_log_errors_per_period);
@@ -489,6 +490,7 @@ int main(int argc, char **argv)
             error_log_throttle_period = 0;
             error_log_errors_per_period = 0;
         }
+        error_log_limit_unlimited();
 
         // --------------------------------------------------------------------
 
@@ -664,6 +666,11 @@ int main(int argc, char **argv)
 
     if(check_config)
         exit(1);
+
+    // ------------------------------------------------------------------------
+    // enable log flood protection
+
+    error_log_limit_reset();
 
     // ------------------------------------------------------------------------
     // spawn the threads
