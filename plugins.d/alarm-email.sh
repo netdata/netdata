@@ -6,6 +6,7 @@ sendmail="$(which sendmail 2>/dev/null || command -v sendmail 2>/dev/null)"
 if [ -z "${sendmail}" ]
 then
     echo >&2 "I cannot send emails - there is no sendmail command available."
+    exit 1
 fi
 
 default_recipient_for_all_roles="root"
