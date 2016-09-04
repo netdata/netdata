@@ -78,7 +78,13 @@ dist_webfonts_DATA = \
 
 webimagesdir=$(webdir)/images
 dist_webimages_DATA = \
+	images/alert-128-orange.png \
+	images/alert-128-red.png \
+	images/alert-multi-size-orange.ico \
+	images/alert-multi-size-red.ico \
 	images/animated.gif \
+	images/check-mark-2-128-green.png \
+	images/check-mark-2-multi-size-green.ico \
 	images/post.png \
 	images/seo-performance-16.png \
 	images/seo-performance-24.png \

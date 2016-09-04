@@ -1583,7 +1583,7 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae) {
     buffer_strcat(wb, "\t}");
 }
 
-void health_alarm_log2json(RRDHOST *host, BUFFER *wb) {
+void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after) {
     pthread_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
     buffer_strcat(wb, "[");
@@ -1592,8 +1592,10 @@ void health_alarm_log2json(RRDHOST *host, BUFFER *wb) {
     unsigned int count = 0;
     ALARM_ENTRY *ae;
     for(ae = host->health_log.alarms; ae && count < max ; count++, ae = ae->next) {
-        if(likely(count)) buffer_strcat(wb, ",");
-        health_alarm_entry2json_nolock(wb, ae);
+        if(ae->unique_id > after) {
+            if(likely(count)) buffer_strcat(wb, ",");
+            health_alarm_entry2json_nolock(wb, ae);
+        }
     }
 
     buffer_strcat(wb, "\n]\n");
