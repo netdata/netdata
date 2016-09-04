@@ -1145,6 +1145,9 @@ cleanup:
     return ret;
 }
 
+
+#define REGISTRY_VERIFY_COOKIES_GUID "give-me-back-this-cookie-now--please"
+
 int web_client_api_request_v1_registry(struct web_client *w, char *url)
 {
     static uint32_t hash_action = 0, hash_access = 0, hash_hello = 0, hash_delete = 0, hash_search = 0,
@@ -1282,8 +1285,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
             w->tracking_required = 1;
             if(registry_verify_cookies_redirects() > 0 && (!cookie || !person_guid[0])) {
                 buffer_flush(w->response.data);
-
-                registry_set_cookie(w, "give-me-back-this-cookie-please");
+                registry_set_cookie(w, REGISTRY_VERIFY_COOKIES_GUID);
                 w->response.data->contenttype = CT_APPLICATION_JSON;
                 buffer_sprintf(w->response.data, "{ \"status\": \"redirect\", \"registry\": \"%s\" }", registry_to_announce());
                 return 200;
@@ -1331,6 +1333,10 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
                 return 307
 */
             }
+
+            if(unlikely(cookie && person_guid[0] && !strcmp(person_guid, REGISTRY_VERIFY_COOKIES_GUID)))
+                person_guid[0] = '\0';
+            
             return registry_request_access_json(w, person_guid, machine_guid, machine_url, url_name, time(NULL));
 
         case 'D':

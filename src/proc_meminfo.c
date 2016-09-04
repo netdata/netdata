@@ -9,14 +9,14 @@ int do_proc_meminfo(int update_every, unsigned long long dt) {
     static int do_ram = -1, do_swap = -1, do_hwcorrupt = -1, do_committed = -1, do_writeback = -1, do_kernel = -1, do_slab = -1;
 
     if(do_ram == -1)        do_ram          = config_get_boolean("plugin:proc:/proc/meminfo", "system ram", 1);
-    if(do_swap == -1)       do_swap         = config_get_boolean("plugin:proc:/proc/meminfo", "system swap", 1);
+    if(do_swap == -1)       do_swap         = config_get_boolean_ondemand("plugin:proc:/proc/meminfo", "system swap", CONFIG_ONDEMAND_ONDEMAND);
     if(do_hwcorrupt == -1)  do_hwcorrupt    = config_get_boolean_ondemand("plugin:proc:/proc/meminfo", "hardware corrupted ECC", CONFIG_ONDEMAND_ONDEMAND);
     if(do_committed == -1)  do_committed    = config_get_boolean("plugin:proc:/proc/meminfo", "committed memory", 1);
     if(do_writeback == -1)  do_writeback    = config_get_boolean("plugin:proc:/proc/meminfo", "writeback memory", 1);
     if(do_kernel == -1)     do_kernel       = config_get_boolean("plugin:proc:/proc/meminfo", "kernel memory", 1);
     if(do_slab == -1)       do_slab         = config_get_boolean("plugin:proc:/proc/meminfo", "slab memory", 1);
 
-    if(dt) {};
+    (void)dt;
 
     if(!ff) {
         char filename[FILENAME_MAX + 1];
@@ -123,7 +123,9 @@ int do_proc_meminfo(int update_every, unsigned long long dt) {
 
     unsigned long long SwapUsed = SwapTotal - SwapFree;
 
-    if(do_swap) {
+    if(SwapTotal || SwapUsed || SwapFree || do_swap == CONFIG_ONDEMAND_YES) {
+        do_swap = CONFIG_ONDEMAND_YES;
+
         st = rrdset_find("system.swap");
         if(!st) {
             st = rrdset_create("system", "swap", NULL, "swap", NULL, "System Swap", "MB", 201, update_every, RRDSET_TYPE_STACKED);
