@@ -5602,6 +5602,15 @@
         update_forever: function() {
             NETDATA.alarms.get('active', function(data) {
                 if(data !== null) {
+                    if('Notification' in window && NETDATA.alarms.current != null) {
+                        if(Object.keys(NETDATA.alarms.current.alarms).length < Object.keys(data.alarms).length) {
+                            if (Notification.permission === 'granted') {
+                                new Notification('Netdata Alarm!', {body: 'Your Server needs attention!',
+                                    icon: 'images/seo-performance-128.png'});
+                            }
+                        }
+                    }
+
                     NETDATA.alarms.current = data;
 
                     if (typeof NETDATA.alarms.callback === 'function') {
@@ -5639,6 +5648,9 @@
             NETDATA.alarms.server = host;
             
             NETDATA.alarms.update_forever();
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
         }
     };
 
