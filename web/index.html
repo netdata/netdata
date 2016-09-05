@@ -302,11 +302,12 @@
     /* Show and affix the side nav when space allows it */
     @media (min-width: 992px) {
         .container {
-            padding-left: 1% !important;
+            padding-left: 0% !important;
         }
 
         .charts-body {
             width: calc(100% - 213px) !important;
+            padding-left: 1% !important;
             padding-right: 0% !important;
         }
 
@@ -341,11 +342,12 @@
 
     @media (min-width: 1200px) {
         .container {
-            padding-left: 3% !important;
+            padding-left: 2% !important;
         }
 
         .charts-body {
             width: calc(100% - 233px) !important;
+            padding-left: 1% !important;
             padding-right: 1% !important;
         }
 
@@ -364,11 +366,12 @@
     
     @media (min-width: 1360px) {
         .container {
-            padding-left: 4% !important;
+            padding-left: 3% !important;
         }
 
         .charts-body {
             width: calc(100% - 263px) !important;
+            padding-left: 1% !important;
             padding-right: 2% !important;
         }
 
@@ -631,11 +634,12 @@
             </div>
             <nav class="collapse navbar-collapse navbar-right" role="navigation">
                 <ul class="nav navbar-nav">
-                    <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal" title="alarms"><i class="fa fa-bell"></i><span id="alarms_count_badge" class="badge"></span></a></li>
-                    <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal" title="dashboard settings"><i class="fa fa-sliders"></i></a></li>
-                    <li class="hidden-sm"><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank" title="netdata community"><i class="fa fa-github"></i></a></li>
-                    <li class="hidden-sm" id="updateButton"><a href="#" class="btn" data-toggle="modal" data-target="#updateModal" title="check for update"><i class="fa fa-cloud-download"></i><span id="update_badge" class="badge"></span></a></li>
-                    <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#helpModal" title="dashboard help"><i class="fa fa-question-circle"></i></a></li>
+                    <li><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal" title="alarms"><i class="fa fa-bell"></i></span>&nbsp;<span class="hidden-sm">Alarms&nbsp;</span><span id="alarms_count_badge" class="badge"></a></li>
+                    <li><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal" title="dashboard settings"><i class="fa fa-sliders"></i>&nbsp;<span class="hidden-sm">Settings</span></a></li>
+                    <li><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank" title="netdata community"><i class="fa fa-github"></i>&nbsp;<span class="hidden-sm hidden-md">Community</span></a></li>
+                    <li class="hidden-sm" id="updateButton"><a href="#" class="btn" data-toggle="modal" data-target="#updateModal" title="check for update"><i class="fa fa-cloud-download"></i><span id="update_badge" class="badge"></span>&nbsp;<span class="hidden-sm hidden-md">Update</span></a></li>
+                    <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#helpModal" title="dashboard help"><i class="fa fa-question-circle"></i>&nbsp;<span class="hidden-sm hidden-md">Help</span></a></li>
+                    <!--
                     <li class="dropdown hidden-md hidden-lg hidden-xs">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="current_view">Menu <strong class="caret"></strong></a>
                         <ul class="dropdown-menu scrollable-menu inpagemenu" role="menu">
@@ -645,6 +649,7 @@
                             <li><a href="#" class="btn" data-toggle="modal" data-target="#helpModal"><i class="fa fa-question-circle"></i> help</a></li>
                         </ul>
                     </li>
+                    -->
                     <li class="dropdown hidden-sm hidden-md hidden-lg">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="current_view">my-netdata <strong class="caret"></strong></a>
                         <ul id="mynetdata_servers2" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
