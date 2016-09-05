@@ -680,17 +680,28 @@ int web_client_api_request_v1_alarms(struct web_client *w, char *url)
 
 int web_client_api_request_v1_alarm_log(struct web_client *w, char *url)
 {
-    (void)url;
+    uint32_t after = 0;
+
+    while(url) {
+        char *value = mystrsep(&url, "?&[]");
+        if (!value || !*value) continue;
+
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        if(!strcmp(name, "after")) after = strtoul(value, NULL, 0);
+    }
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    health_alarm_log2json(&localhost, w->response.data);
+    health_alarm_log2json(&localhost, w->response.data, after);
     return 200;
 }
 
 int web_client_api_request_v1_charts(struct web_client *w, char *url)
 {
-    if(url) { ; }
+    (void)url;
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
@@ -1336,7 +1347,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 
             if(unlikely(cookie && person_guid[0] && !strcmp(person_guid, REGISTRY_VERIFY_COOKIES_GUID)))
                 person_guid[0] = '\0';
-            
+
             return registry_request_access_json(w, person_guid, machine_guid, machine_url, url_name, time(NULL));
 
         case 'D':

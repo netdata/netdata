@@ -344,6 +344,9 @@
 
     <!-- check which theme to use -->
     <script type="text/javascript">
+        var netdataShowNotifications = true;
+        var netdataShowAlarms = true;
+        
         // --------------------------------------------------------------------
         // urlOptions
 
@@ -539,7 +542,7 @@
     </script>
 
     <!-- load the dashboard manager - it will do the rest -->
-    <script type="text/javascript" src="dashboard.js?v43"></script>
+    <script type="text/javascript" src="dashboard.js?v44"></script>
 </head>
 <body data-spy="scroll" data-target="#sidebar">
     <div id="loadOverlay" class="loadOverlay" style="background-color: #888; color: #888;">
@@ -2718,7 +2721,7 @@ function alarmsUpdateModal() {
             $('#alarm_all_' + id.toString()).html('');
         });
 
-        NETDATA.alarms.get_log(function(data) {
+        NETDATA.alarms.get_log(0, function(data) {
             if(data === null) {
                 document.getElementById('alarms_log').innerHTML =
                         'failed to load alarm data!';
