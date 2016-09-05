@@ -101,10 +101,6 @@
         margin-top: 10px;
     }
 
-    .container {
-        width: 90% !important;
-    }
-
     #masthead h1 {
         /*font-size: 30px;*/
         line-height: 1;
@@ -277,37 +273,48 @@
         margin-top: 0;
     }
 
+    .container {
+        width: calc(100% - 20px) !important;
+    }
+
+    .charts-body {
+        display: inline-block;
+        width: 100%;
+    }
+
+    .sidebar-body {
+        position: absolute;
+        display: none;
+    }
+
     @media (min-width: 768px) {
+        .charts-body {
+            padding-left: 0%;
+            padding-right: 0%;
+        }
+
         .back-to-top,
         .dashboard-theme-toggle {
             display: block;
-        }
-
-        /* Widen the fixed sidebar */
-        .dashboard-sidebar.affix,
-        .dashboard-sidebar.affix-top,
-        .dashboard-sidebar.affix-bottom {
-            width: 200px !important;
-        }
-
-        .dashboard-sidebar.affix {
-            position: fixed; /* Undo the static from mobile first approach */
-            top: 20px;
-        }
-
-        .dashboard-sidebar.affix-bottom {
-            position: absolute; /* Undo the static from mobile first approach */
-        }
-
-        .dashboard-sidebar.affix-bottom .dashboard-sidenav,
-        .dashboard-sidebar.affix .dashboard-sidenav {
-            margin-top: 0;
-            margin-bottom: 0;
         }
     }
 
     /* Show and affix the side nav when space allows it */
     @media (min-width: 992px) {
+        .container {
+            padding-left: 1% !important;
+        }
+
+        .charts-body {
+            width: calc(100% - 213px) !important;
+            padding-right: 0% !important;
+        }
+
+        .sidebar-body {
+            display: inline-block !important;
+            width: 213px !important;
+        }
+
         .dashboard-sidebar .nav > .active > ul {
             display: block;
         }
@@ -316,7 +323,7 @@
         .dashboard-sidebar.affix,
         .dashboard-sidebar.affix-top,
         .dashboard-sidebar.affix-bottom {
-            width: 200px !important;
+            width: 213px !important;
         }
         .dashboard-sidebar.affix {
             position: fixed; /* Undo the static from mobile first approach */
@@ -333,13 +340,51 @@
     }
 
     @media (min-width: 1200px) {
+        .container {
+            padding-left: 3% !important;
+        }
+
+        .charts-body {
+            width: calc(100% - 233px) !important;
+            padding-right: 1% !important;
+        }
+
+        .sidebar-body {
+            display: inline-block !important;
+            width: 233px !important;
+        }
+
         /* Widen the fixed sidebar again */
-        .dashboard-sidebar.affix-bottom,
+        .dashboard-sidebar.affix,
         .dashboard-sidebar.affix-top,
-        .dashboard-sidebar.affix {
-            width: 263px;
+        .dashboard-sidebar.affix-bottom {
+            width: 233px !important;
         }
     }
+    
+    @media (min-width: 1360px) {
+        .container {
+            padding-left: 4% !important;
+        }
+
+        .charts-body {
+            width: calc(100% - 263px) !important;
+            padding-right: 2% !important;
+        }
+
+        .sidebar-body {
+            display: inline-block !important;
+            width: 263px !important;
+        }
+
+        /* Widen the fixed sidebar again */
+        .dashboard-sidebar.affix,
+        .dashboard-sidebar.affix-top,
+        .dashboard-sidebar.affix-bottom {
+            width: 263px !important;
+        }
+    }
+
     </style>
 
     <!-- check which theme to use -->
@@ -641,10 +686,10 @@
 
     <div class="container">
         <div class="row">
-            <div class="col-md-10" role="main">
+            <div class="charts-body" role="main">
                 <div id="charts_div"></div>
             </div>
-            <div class="col-md-2" role="complementary">
+            <div class="sidebar-body hidden-xs hidden-sm" role="complementary">
                 <nav class="dashboard-sidebar hidden-print hidden-xs hidden-sm" id="sidebar" role="menu"></nav>
             </div>
         </div>
