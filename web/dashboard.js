@@ -15,8 +15,8 @@
 // var netdataNoRegistry = true;        // Don't update the registry for this access
 // var netdataRegistryCallback = null;  // Callback function that will be invoked with one param,
 //                                         the URLs from the registry
-// var netdataShowHelp = true;          // enable/disable help
-// var netdataShowAlarms = true;        // enable/disable help
+// var netdataShowHelp = false;         // enable/disable help (default enabled)
+// var netdataShowAlarms = true;        // enable/disable alarms checks and notifications (default disabled)
 //
 // You can also set the default netdata server, using the following.
 // When this variable is not set, we assume the page is hosted on your
@@ -49,6 +49,8 @@
 
     // global namespace
     var NETDATA = window.NETDATA || {};
+
+    NETDATA.hostname = 'localhost';
 
     // ----------------------------------------------------------------------------------------------------------------
     // Detect the netdata server
@@ -620,6 +622,8 @@
                     self.charts[h] = data.charts;
                 }
                 else NETDATA.error(406, host + '/api/v1/charts');
+
+                NETDATA.hostname = data.hostname;
 
                 if(typeof callback === 'function')
                     callback(data);
@@ -5595,7 +5599,7 @@
 
             var name = entry.name.replace(/_/g, ' ');
             var title = name + ' = ' + ((entry.value === null)?'NaN':Math.floor(entry.value)).toString() + ' ' + entry.units;
-            var body = entry.info + ' of ' + entry.chart + ' (' + entry.family + ')';
+            var body = NETDATA.hostname + ' - ' + entry.chart + ' (' + entry.family + ') - ' + entry.status.toLowerCase() + ': ' + entry.info;
             var tag = entry.alarm_id;
             var icon = 'images/seo-performance-128.png';
             var interaction = false;
