@@ -4,13 +4,13 @@ netdata (1.3.0) - 2016-08-28
 
  - netdata has health monitoring / alarms!
  - netdata has badges that can be embeded anywhere!
- - netdata plugins are now written in python!
+ - netdata plugins are now written in Python!
  - new plugins: redis, memcached, nginx_log, ipfs, apache_cache
 
  IMPORTANT:
- Since netdata now uses python plugins, new packages are
+ Since netdata now uses Python plugins, new packages are
  required to be installed on a system to allow it work.
- For more information, [lease check the installation page:
+ For more information, please check the installation page:
 
  https://github.com/firehol/netdata/wiki/Installation
 
@@ -35,15 +35,15 @@ netdata (1.3.0) - 2016-08-28
 
    https://github.com/firehol/netdata/wiki/Generating-Badges
 
- * netdata plugins are now written in python!
+ * netdata plugins are now written in Python!
 
    Thanks to the great work of Paweł Krupa (@paulfantom), most BASH
-   plugins have been ported to python.
+   plugins have been ported to Python.
 
    The new python.d.plugin supports both python2 and python3 and
    data collection from multiple sources for all modules.
 
-   The following pre-existing modules have been ported to python:
+   The following pre-existing modules have been ported to Python:
 
     - apache
     - cpufreq
