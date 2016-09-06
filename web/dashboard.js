@@ -12,7 +12,7 @@
 // var netdataNoBootstrap = true;       // do not load bootstrap
 // var netdataDontStart = true;         // do not start the thread to process the charts
 // var netdataErrorCallback = null;     // Callback function that will be invoked upon error
-// var netdataNoRegistry = true;        // Don't update the registry for this access
+// var netdataRegistry = true;          // Update the registry (default disabled)
 // var netdataRegistryCallback = null;  // Callback function that will be invoked with one param,
 //                                         the URLs from the registry
 // var netdataShowHelp = false;         // enable/disable help (default enabled)
@@ -157,12 +157,6 @@
     else
         NETDATA.themes.current = NETDATA.themes.white;
 
-    if(typeof netdataShowHelp === 'undefined')
-        netdataShowHelp = true;
-
-    if(typeof netdataShowAlarms === 'undefined')
-        netdataShowAlarms = false;
-
     NETDATA.colors = NETDATA.themes.current.colors;
 
     // these are the colors Google Charts are using
@@ -176,6 +170,22 @@
     // http://www.mulinblog.com/a-color-palette-optimized-for-data-visualization/
     //                         (blue)     (red)      (orange)   (green)    (pink)     (brown)    (purple)   (yellow)   (gray)
     //NETDATA.colors        = [ '#5DA5DA', '#F15854', '#FAA43A', '#60BD68', '#F17CB0', '#B2912F', '#B276B2', '#DECF3F', '#4D4D4D' ];
+
+    if(typeof netdataShowHelp === 'undefined')
+        netdataShowHelp = true;
+
+    if(typeof netdataShowAlarms === 'undefined')
+        netdataShowAlarms = false;
+
+    if(typeof netdataRegistry === 'undefined') {
+        // backward compatibility
+        if(typeof netdataNoRegistry !== 'undefined' && netdataNoRegistry === false)
+            netdataRegistry = true;
+        else
+            netdataRegistry = false;
+    }
+    if(netdataRegistry === false && typeof netdataRegistryCallback === 'function')
+        netdataRegistry = true;
 
     // ----------------------------------------------------------------------------------------------------------------
     // the defaults for all charts
@@ -5890,8 +5900,7 @@
         },
 
         init: function() {
-            if(typeof netdataNoRegistry !== 'undefined' && netdataNoRegistry)
-                return;
+            if(netdataRegistry !== true) return;
 
             NETDATA.registry.hello(NETDATA.serverDefault, function(data) {
                 if(data) {

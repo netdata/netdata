@@ -27,8 +27,15 @@
 //    - [DONE] limit the size of PERSON_URL names
 //    - limit the number of requests that add data to the registry,
 //      per client IP per hour
-
-
+//
+// 3. lower memory requirements
+// 
+//    - embed avl structures directly into registry objects, instead of DICTIONARY
+//    - store GUIDs in memory as UUID instead of char *
+//      (this will also remove the index hash, since UUIDs can be compared directly)
+//    - do not track persons using the demo machines only
+//      (i.e. start tracking them only when they access a non-demo machine)
+//    - [DONE] do not track custom dashboards by default
 
 #define REGISTRY_URL_FLAGS_DEFAULT 0x00
 #define REGISTRY_URL_FLAGS_EXPIRED 0x01
