@@ -50,8 +50,6 @@
     // global namespace
     var NETDATA = window.NETDATA || {};
 
-    NETDATA.hostname = 'localhost';
-
     // ----------------------------------------------------------------------------------------------------------------
     // Detect the netdata server
 
@@ -632,8 +630,6 @@
                     self.charts[h] = data.charts;
                 }
                 else NETDATA.error(406, host + '/api/v1/charts');
-
-                NETDATA.hostname = data.hostname;
 
                 if(typeof callback === 'function')
                     callback(data);
@@ -5608,8 +5604,8 @@
             }
 
             var name = entry.name.replace(/_/g, ' ');
+            var status = entry.status.toLowerCase();
             var title = name + ' = ' + ((entry.value === null)?'NaN':Math.floor(entry.value)).toString() + ' ' + entry.units;
-            var body = NETDATA.hostname + ' - ' + entry.chart + ' (' + entry.family + ') - ' + entry.status.toLowerCase() + ': ' + entry.info;
             var tag = entry.alarm_id;
             var icon = 'images/seo-performance-128.png';
             var interaction = false;
@@ -5633,17 +5629,23 @@
                         // console.log('alarm' + entry.unique_id + ' switch to CLEAR from ' + entry.old_status);
                         return;
                     }
-                    title = entry.name + ' back to normal';
+                    title = name + ' back to normal';
                     icon = 'images/check-mark-2-128-green.png'
                     interaction = false;
                     break;
 
                 case 'WARNING':
+                    if(entry.old_status === 'CRITICAL')
+                        status = 'demoted to ' + entry.status.toLowerCase();
+
                     icon = 'images/alert-128-orange.png';
                     interaction = false;
                     break;
 
                 case 'CRITICAL':
+                    if(entry.old_status === 'WARNING')
+                        status = 'escalated to ' + entry.status.toLowerCase();
+                    
                     icon = 'images/alert-128-red.png'
                     interaction = true;
                     break;
@@ -5652,6 +5654,8 @@
                     console.log('invalid alarm status ' + entry.status);
                     return;
             }
+
+            var body = entry.hostname + ' - ' + entry.chart + ' (' + entry.family + ') - ' + status + ': ' + entry.info;
 
             // cleanup old notifications with the same alarm_id as this one
             var len = NETDATA.alarms.notifications_shown.length;
