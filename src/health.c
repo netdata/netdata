@@ -1526,8 +1526,9 @@ static inline void health_string2json(BUFFER *wb, const char *prefix, const char
         buffer_sprintf(wb, "%s\"%s\":null%s", prefix, label, suffix);
 }
 
-static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae) {
+static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) {
     buffer_sprintf(wb, "\n\t{\n"
+                           "\t\t\"hostname\":\"%s\",\n"
                            "\t\t\"unique_id\":%u,\n"
                            "\t\t\"alarm_id\":%u,\n"
                            "\t\t\"alarm_event_id\":%u,\n"
@@ -1549,6 +1550,7 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae) {
                            "\t\t\"non_clear_duration\":%lu,\n"
                            "\t\t\"status\":\"%s\",\n"
                            "\t\t\"old_status\":\"%s\",\n",
+                   host->hostname,
                    ae->unique_id,
                    ae->alarm_id,
                    ae->alarm_event_id,
@@ -1594,7 +1596,7 @@ void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after) {
     for(ae = host->health_log.alarms; ae && count < max ; count++, ae = ae->next) {
         if(ae->unique_id > after) {
             if(likely(count)) buffer_strcat(wb, ",");
-            health_alarm_entry2json_nolock(wb, ae);
+            health_alarm_entry2json_nolock(wb, ae, host);
         }
     }
 
