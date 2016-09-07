@@ -555,14 +555,22 @@ RRDCALC *rrdcalc_find(RRDSET *st, const char *name) {
     return NULL;
 }
 
-static inline int rrdcalc_exists(RRDHOST *host, const char *name, uint32_t hash) {
+static inline int rrdcalc_exists(RRDHOST *host, const char *chart, const char *name, uint32_t hash_chart, uint32_t hash_name) {
     RRDCALC *rc;
+
+    if(unlikely(!chart)) {
+        error("attempt to find RRDCALC '%s' without giving a chart name", name);
+        return 1;
+    }
+
+    if(unlikely(!hash_chart)) hash_chart = simple_hash(chart);
+    if(unlikely(!hash_name))  hash_name  = simple_hash(name);
 
     // make sure it does not already exist
     for(rc = host->alarms; rc ; rc = rc->next) {
-        if (unlikely(rc->hash == hash && !strcmp(name, rc->name))) {
-            debug(D_HEALTH, "Health alarm '%s' already exists in host '%s'.", name, host->hostname);
-            error("Health alarm '%s' already exists in host '%s'.", name, host->hostname);
+        if (unlikely(rc->chart && rc->hash == hash_name && rc->hash_chart == hash_chart && !strcmp(name, rc->name) && !strcmp(chart, rc->chart))) {
+            debug(D_HEALTH, "Health alarm '%s.%s' already exists in host '%s'.", chart, name, host->hostname);
+            error("Health alarm '%s.%s' already exists in host '%s'.", chart, name, host->hostname);
             return 1;
         }
     }
@@ -615,12 +623,6 @@ static inline void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc) {
     }
 }
 
-static inline uint32_t rrdcalc_fullname(char *fullname, size_t len, const char *chart, const char *name) {
-    snprintfz(fullname, len - 1, "%s%s%s", chart?chart:"", chart?".":"", name);
-    rrdvar_fix_name(fullname);
-    return simple_hash(fullname);
-}
-
 static inline RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const char *chart, const char *dimensions,
                         const char *units, const char *info,
                         int group_method, int after, int before, int update_every, uint32_t options,
@@ -630,10 +632,7 @@ static inline RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const cha
 
     debug(D_HEALTH, "Health creating dynamic alarm (from template) '%s.%s'", chart, name);
 
-    char fullname[RRDVAR_MAX_LENGTH + 1];
-    uint32_t hash = rrdcalc_fullname(fullname, RRDVAR_MAX_LENGTH + 1, chart, name);
-
-    if(rrdcalc_exists(host, fullname, hash))
+    if(rrdcalc_exists(host, chart, name, 0, 0))
         return NULL;
 
     RRDCALC *rc = callocz(1, sizeof(RRDCALC));
@@ -823,14 +822,6 @@ static inline void rrdcalctemplate_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
 #define HEALTH_INFO_KEY "info"
 
 static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
-    {
-        char fullname[RRDVAR_MAX_LENGTH + 1];
-        uint32_t hash = rrdcalc_fullname(fullname, RRDVAR_MAX_LENGTH + 1, rc->chart, rc->name);
-
-        if (rrdcalc_exists(host, fullname, hash))
-            return 0;
-    }
-
     if(!rc->chart) {
         error("Health configuration for alarm '%s' does not have a chart", rc->name);
         return 0;
@@ -845,6 +836,9 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
         error("Health configuration for alarm '%s.%s' is useless (no calculation, no warning and no critical evaluation)", rc->chart?rc->chart:"NOCHART", rc->name);
         return 0;
     }
+
+    if (rrdcalc_exists(host, rc->chart, rc->name, rc->hash_chart, rc->hash))
+        return 0;
 
     debug(D_HEALTH, "Health configuration adding alarm '%s.%s': exec '%s', recipient '%s', green %Lf, red %Lf, lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s",
           rc->chart?rc->chart:"NOCHART",
