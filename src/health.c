@@ -1461,6 +1461,7 @@ void health_readdir(const char *path) {
                    (de->d_name[0] == '.' && de->d_name[1] == '\0')
                    || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
            ))
+            debug(D_HEALTH, "Ignoring directory '%s'", de->d_name);
             continue;
 
         else if(de->d_type == DT_DIR) {
@@ -1477,6 +1478,8 @@ void health_readdir(const char *path) {
                 len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
             health_readfile(path, de->d_name);
         }
+
+        else debug(D_HEALTH, "Ignoring file '%s'", de->d_name);
     }
 
     closedir(dir);
