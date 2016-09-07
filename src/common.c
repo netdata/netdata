@@ -860,23 +860,6 @@ int fd_is_valid(int fd) {
     return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
 }
 
-/*
- ***************************************************************************
- * Get number of clock ticks per second.
- ***************************************************************************
- */
-unsigned int hz;
-
-void get_HZ(void) {
-    long ticks;
-
-    if ((ticks = sysconf(_SC_CLK_TCK)) == -1) {
-        perror("sysconf");
-    }
-
-    hz = (unsigned int) ticks;
-}
-
 pid_t gettid(void) {
     return (pid_t)syscall(SYS_gettid);
 }
@@ -932,4 +915,87 @@ int snprintfz(char *dst, size_t n, const char *fmt, ...) {
     va_end(args);
 
     return ret;
+}
+
+// ----------------------------------------------------------------------------
+// system functions
+// to retrieve settings of the system
+
+int processors = 1;
+long get_system_cpus(void) {
+    procfile *ff = NULL;
+
+    processors = 1;
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/proc/stat", global_host_prefix);
+
+    ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
+    if(!ff) {
+        error("Cannot open file '%s'. Assuming system has %d processors.", filename, processors);
+        return processors;
+    }
+
+    ff = procfile_readall(ff);
+    if(!ff) {
+        error("Cannot open file '%s'. Assuming system has %d processors.", filename, processors);
+        return processors;
+    }
+
+    processors = 0;
+    unsigned int i;
+    for(i = 0; i < procfile_lines(ff); i++) {
+        if(!procfile_linewords(ff, i)) continue;
+
+        if(strncmp(procfile_lineword(ff, i, 0), "cpu", 3) == 0) processors++;
+    }
+    processors--;
+    if(processors < 1) processors = 1;
+
+    procfile_close(ff);
+
+    info("System has %d processors.", processors);
+    return processors;
+}
+
+pid_t pid_max = 32768;
+pid_t get_system_pid_max(void) {
+    procfile *ff = NULL;
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/proc/sys/kernel/pid_max", global_host_prefix);
+    ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
+    if(!ff) {
+        error("Cannot open file '%s'. Assuming system supports %d pids.", filename, pid_max);
+        return pid_max;
+    }
+
+    ff = procfile_readall(ff);
+    if(!ff) {
+        error("Cannot read file '%s'. Assuming system supports %d pids.", filename, pid_max);
+        return pid_max;
+    }
+
+    pid_max = (pid_t)atoi(procfile_lineword(ff, 0, 0));
+    if(!pid_max) {
+        procfile_close(ff);
+        pid_max = 32768;
+        error("Cannot parse file '%s'. Assuming system supports %d pids.", filename, pid_max);
+        return pid_max;
+    }
+
+    procfile_close(ff);
+    info("System supports %d pids.", pid_max);
+    return pid_max;
+}
+
+unsigned int hz;
+void get_system_HZ(void) {
+    long ticks;
+
+    if ((ticks = sysconf(_SC_CLK_TCK)) == -1) {
+        perror("sysconf");
+    }
+
+    hz = (unsigned int) ticks;
 }
