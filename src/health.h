@@ -105,8 +105,9 @@ typedef struct rrddimvar {
 // having as RRDSET.calculations the RRDCALC to be processed
 // next.
 
-#define RRDCALC_STATUS_UNINITIALIZED  0
+#define RRDCALC_STATUS_REMOVED       -2
 #define RRDCALC_STATUS_UNDEFINED     -1
+#define RRDCALC_STATUS_UNINITIALIZED  0
 #define RRDCALC_STATUS_CLEAR          1
 #define RRDCALC_STATUS_RAISED         2
 #define RRDCALC_STATUS_WARNING        3

@@ -1077,7 +1077,7 @@ void update_cgroup_charts(int update_every) {
         if(cg->cpuacct_stat.updated) {
             st = rrdset_find_bytype(type, "cpu");
             if(!st) {
-                snprintfz(title, CHART_TITLE_MAX, "CPU Usage for cgroup %s", cg->chart_title);
+                snprintfz(title, CHART_TITLE_MAX, "CPU Usage (%d%% = %d core%s) for cgroup %s", (processors * 100), processors, (processors>1)?"s":"", cg->chart_title);
                 st = rrdset_create(type, "cpu", NULL, "cpu", "cgroup.cpu", title, "%", 40000, update_every, RRDSET_TYPE_STACKED);
 
                 rrddim_add(st, "user", NULL, 100, hz, RRDDIM_INCREMENTAL);
@@ -1096,7 +1096,7 @@ void update_cgroup_charts(int update_every) {
 
             st = rrdset_find_bytype(type, "cpu_per_core");
             if(!st) {
-                snprintfz(title, CHART_TITLE_MAX, "CPU Usage Per Core for cgroup %s", cg->chart_title);
+                snprintfz(title, CHART_TITLE_MAX, "CPU Usage (%d%% = %d core%s) Per Core for cgroup %s", (processors * 100), processors, (processors>1)?"s":"", cg->chart_title);
                 st = rrdset_create(type, "cpu_per_core", NULL, "cpu", "cgroup.cpu_per_core", title, "%", 40100, update_every, RRDSET_TYPE_STACKED);
 
                 for(i = 0; i < cg->cpuacct_usage.cpus ;i++) {
