@@ -503,6 +503,7 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
     RRDSET *st = rc->rrdset;
 
     if(!st) {
+        debug(D_HEALTH, "Requested to unlink RRDCALC '%s.%s' which is not linked to any RRDSET", rc->chart?rc->chart:"NOCHART", rc->name);
         error("Requested to unlink RRDCALC '%s.%s' which is not linked to any RRDSET", rc->chart?rc->chart:"NOCHART", rc->name);
         return;
     }
@@ -560,6 +561,7 @@ static inline int rrdcalc_exists(RRDHOST *host, const char *name, uint32_t hash)
     // make sure it does not already exist
     for(rc = host->alarms; rc ; rc = rc->next) {
         if (unlikely(rc->hash == hash && !strcmp(name, rc->name))) {
+            debug(D_HEALTH, "Health alarm '%s' already exists in host '%s'.", name, host->hostname);
             error("Health alarm '%s' already exists in host '%s'.", name, host->hostname);
             return 1;
         }
@@ -625,6 +627,8 @@ static inline RRDCALC *rrdcalc_create(RRDHOST *host, const char *name, const cha
                         calculated_number green, calculated_number red,
                         const char *exec, const char *recipient, const char *source,
                         const char *calc, const char *warn, const char *crit) {
+
+    debug(D_HEALTH, "Health creating dynamic alarm (from template) '%s.%s'", chart, name);
 
     char fullname[RRDVAR_MAX_LENGTH + 1];
     uint32_t hash = rrdcalc_fullname(fullname, RRDVAR_MAX_LENGTH + 1, chart, name);
@@ -1460,9 +1464,10 @@ void health_readdir(const char *path) {
            && (
                    (de->d_name[0] == '.' && de->d_name[1] == '\0')
                    || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
-           ))
+           )) {
             debug(D_HEALTH, "Ignoring directory '%s'", de->d_name);
             continue;
+        }
 
         else if(de->d_type == DT_DIR) {
             char *s = mallocz(pathlen + strlen(de->d_name) + 2);
