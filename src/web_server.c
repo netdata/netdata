@@ -39,10 +39,12 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
     }
 
 #ifdef SOCK_CLOEXEC
+#ifdef O_CLOEXEC
     if (flags & SOCK_CLOEXEC) {
         newflags |= O_CLOEXEC;
         flags &= ~SOCK_CLOEXEC;
     }
+#endif
 #endif
 
     if (flags) {

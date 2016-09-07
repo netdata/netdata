@@ -1214,13 +1214,13 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
         absolute_period_requested = 0;
     }
 
-    // allow relative for before and after
-    if(((before < 0)?-before:before) <= (st->update_every * st->entries)) {
+    // allow relative for before and after (smaller than 3 years)
+    if(((before < 0)?-before:before) <= (3 * 365 * 86400)) {
         before = last_entry_t + before;
         absolute_period_requested = 0;
     }
 
-    if(((after < 0)?-after:after) <= (st->update_every * st->entries)) {
+    if(((after < 0)?-after:after) <= (3 * 365 * 86400)) {
         if(after == 0) after = -st->update_every;
         after = before + after;
         absolute_period_requested = 0;
