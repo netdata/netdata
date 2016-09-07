@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 EnvironmentFile=-/etc/default/netdata
-ExecStart=/usr/sbin/netdata -nd $EXTRA_OPTS
+ExecStart=/usr/sbin/netdata -D $EXTRA_OPTS
 TimeoutStopSec=30
 Restart=always
 RestartSec=5
