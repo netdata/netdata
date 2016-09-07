@@ -5587,12 +5587,10 @@
     NETDATA.alarms = {
         notifications: false,       // when true, the browser supports notifications (may not be granted though)
         last_notification_id: 0,    // the id of the last alarm_log we have raised an alarm for
-        notifications_shown: new Array(),
+        // notifications_shown: new Array(),
 
         server: null,               // the server to connect to for fetching alarms
-        current: null,              // the list of raised alarms
-        notified: { alarms: {} },   // the list of raised alarms for which we have shown notifications
-
+        current: null,              // the list of raised alarms - updated in the background
         callback: null,             // a callback function to call every time the list of raised alarms is refreshed
 
         notify: function(entry) {
@@ -5610,14 +5608,19 @@
             var icon = 'images/seo-performance-128.png';
             var interaction = false;
             var data = entry;
+            var show = true;
+
+            // console.log('alarm ' + entry.unique_id + ' ' + entry.chart + '.' + entry.name + ' is ' +  entry.status);
 
             switch(entry.status) {
-                case 'UNINITIALIZED':
-                    // console.log('alarm ' + entry.unique_id + ' is UNINITIALIZED');
-                    return;
+                case 'REMOVED':
+                    show = false;
+                    break;
 
                 case 'UNDEFINED':
-                    // console.log('alarm ' + entry.unique_id + ' is UNDEFINED');
+                    return;
+
+                case 'UNINITIALIZED':
                     return;
 
                 case 'CLEAR':
@@ -5655,14 +5658,14 @@
                     return;
             }
 
-            var body = entry.hostname + ' - ' + entry.chart + ' (' + entry.family + ') - ' + status + ': ' + entry.info;
-
+            /*
             // cleanup old notifications with the same alarm_id as this one
+            // FIXME: it does not seem to work on any web browser!
             var len = NETDATA.alarms.notifications_shown.length;
             while(len--) {
                 var n = NETDATA.alarms.notifications_shown[len];
                 if(n.data.alarm_id === entry.alarm_id) {
-                    // console.log('removing old alarm ' + n.data.unique_id);
+                    console.log('removing old alarm ' + n.data.unique_id);
 
                     // close the notification
                     n.close.bind(n);
@@ -5672,25 +5675,32 @@
                     len = NETDATA.alarms.notifications_shown.length;
                 }
             }
+            */
 
-            // show this notification
-            // console.log('new notification: ' + title);
-            var n = new Notification(title, {
-                body: body,
-                tag: tag,
-                requireInteraction: interaction,
-                icon: NETDATA.serverDefault + icon,
-                data: data
-            });
+            if(show === true) {
+                // show this notification
+                // console.log('new notification: ' + title);
+                var n = new Notification(title, {
+                    body: entry.hostname + ' - ' + entry.chart + ' (' + entry.family + ') - ' + status + ': ' + entry.info,
+                    tag: tag,
+                    requireInteraction: interaction,
+                    icon: NETDATA.serverDefault + icon,
+                    data: data
+                    // FIXME: does not seem to work on any web browser
+                    // onclick: function(event) {
+                    //    event.preventDefault();
+                    //    console.log('clicked: ');
+                    //    console.log(event);
+                    //}
+                });
 
-            // console.log(n);
-            NETDATA.alarms.notifications_shown.push(n);
-            // console.log(entry);
+                // console.log(n);
+                // NETDATA.alarms.notifications_shown.push(n);
+                // console.log(entry);
+            }
         },
 
         notifyAll: function() {
-            NETDATA.alarms.notified = NETDATA.alarms.current;
-
             // console.log('FETCHING ALARM LOG');
             NETDATA.alarms.get_log(NETDATA.alarms.last_notification_id, function(data) {
                 // console.log('ALARM LOG FETCHED');
@@ -5705,6 +5715,8 @@
                     return;
                 }
 
+                // console.log('received alarm log of ' + data.length + ' entries, from ' + data[data.length - 1].unique_id.toString() + ' to ' + data[0].unique_id.toString());
+
                 data.sort(function(a, b) {
                     if(a.unique_id > b.unique_id) return -1;
                     if(a.unique_id < b.unique_id) return 1;
@@ -5716,9 +5728,12 @@
                     if(data[len].unique_id > NETDATA.alarms.last_notification_id) {
                         NETDATA.alarms.notify(data[len]);
                     }
+                    //else
+                    //    console.log('ignoring alarm (older) with id ' + data[len].unique_id.toString());
                 }
 
                 NETDATA.alarms.last_notification_id = data[0].unique_id;
+                // console.log('last notification id = ' + NETDATA.alarms.last_notification_id);
             })
         },
 
@@ -5736,31 +5751,13 @@
             }
 
             if(typeof NETDATA.alarms.current !== 'undefined' && typeof NETDATA.alarms.current.alarms === 'object') {
-                // console.log('can do alarms');
+                // console.log('can do alarms: old id = ' + NETDATA.alarms.last_notification_id + ' new id = ' + NETDATA.alarms.current.latest_alarm_log_unique_id);
 
-                var current = NETDATA.alarms.current.alarms;
-                var old = NETDATA.alarms.notified.alarms;
-                var x;
-
-                if(Object.keys(current).length !== Object.keys(old).length) {
-                    // console.log('alarm count differs');
+                if(NETDATA.alarms.current.latest_alarm_log_unique_id > NETDATA.alarms.last_notification_id) {
+                    // console.log('new alarms detected');
                     return true;
                 }
-                else {
-                    for(x in current) {
-                        if(!(x in old)) {
-                            // console.log('new alarm detected: ' + x);
-                            return true;
-                        }
-
-                        if(current[x].status !== old[x].status) {
-                            // console.log('alarm changed state: ' + x);
-                            return true;
-                        }
-                    }
-                }
-
-                //console.log('alarms did not change');
+                //else console.log('no new alarms');
             }
             // else console.log('cannot process alarms');
 
@@ -5789,7 +5786,6 @@
         update_forever: function() {
             NETDATA.alarms.get('active', function(data) {
                 if(data !== null) {
-
                     NETDATA.alarms.current = data;
 
                     if(NETDATA.alarms.check_notifications() === true) {
@@ -5799,6 +5795,9 @@
                     if (typeof NETDATA.alarms.callback === 'function') {
                         NETDATA.alarms.callback(data);
                     }
+
+                    // Health monitoring is disabled on this netdata
+                    if(data.status === false) return;
                 }
 
                 setTimeout(NETDATA.alarms.update_forever, 10000);
@@ -5806,6 +5805,7 @@
         },
 
         get_log: function(last_id, callback) {
+            // console.log('fetching all log after ' + last_id.toString());
             $.ajax({
                 url: NETDATA.alarms.server + '/api/v1/alarm_log?after=' + last_id.toString(),
                 async: true,
