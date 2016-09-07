@@ -2786,7 +2786,12 @@ function alarmsUpdateModal() {
             if(len > 50) len = 50;
             while(i < len) {
                 var time = new Date(data[i].when * 1000);
-                log += '<tr><td>' + time.toLocaleDateString() + ' ' + time.toLocaleTimeString() + '</td><td>' + data[i].chart + '</td><td>' + data[i].name + '</td><td>' + data[i].status + '</td></tr>';
+                log += '<tr><td>'
+                        + time.toLocaleDateString() + ' '
+                        + time.toLocaleTimeString() + '</td><td>'
+                        + data[i].chart.toString() + '</td><td>'
+                        + data[i].name.toString() + ' = ' + ((data[i].value !== null)?Math.floor(data[i].value):'NaN').toString() + ' ' + data[i].units.toString() + '</td><td>'
+                        + data[i].status.toString() + '</td></tr>';
                 i++;
             }
             log += "</table>";
