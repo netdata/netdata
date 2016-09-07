@@ -1742,20 +1742,30 @@ void health_reload(void) {
 
     char *path = health_config_dir();
 
+    // free all running alarms
     rrdhost_rwlock(&localhost);
     health_free_all_nolock(&localhost);
     rrdhost_unlock(&localhost);
 
+    // invalidate all previous entries in the alarm log
+    ALARM_ENTRY *t;
+    for(t = localhost.health_log.alarms ; t ; t = t->next) {
+        t->notifications |= HEALTH_ENTRY_NOTIFICATIONS_UPDATED;
+    }
+
+    // reset all thresholds to all charts
     RRDSET *st;
     for(st = localhost.rrdset_root; st ; st = st->next) {
         st->green = NAN;
         st->red = NAN;
     }
 
+    // load the new alarms
     rrdhost_rwlock(&localhost);
     health_readdir(path);
     rrdhost_unlock(&localhost);
 
+    // link the loaded alarms to their charts
     for(st = localhost.rrdset_root; st ; st = st->next) {
         rrdhost_rwlock(&localhost);
 
