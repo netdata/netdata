@@ -283,9 +283,6 @@ int main(int argc, char **argv)
     size_t wanted_stacksize = 0, stacksize = 0;
     pthread_attr_t attr;
 
-    // global initialization
-    get_HZ();
-
     // set the name for logging
     program_name = "netdata";
 
@@ -472,6 +469,10 @@ int main(int argc, char **argv)
         global_host_prefix = config_get("global", "host access prefix", "");
         setenv("NETDATA_HOST_PREFIX", global_host_prefix, 1);
 
+        get_system_HZ();
+        get_system_cpus();
+        get_system_pid_max();
+        
         // --------------------------------------------------------------------
 
         stdout_filename    = config_get("global", "debug log",  LOG_DIR "/debug.log");

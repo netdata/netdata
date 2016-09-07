@@ -153,16 +153,23 @@ extern int fd_is_valid(int fd);
 extern char *global_host_prefix;
 extern int enable_ksm;
 
-/* Number of ticks per second */
-extern unsigned int hz;
-extern void get_HZ(void);
-
 extern pid_t gettid(void);
 
 extern unsigned long long time_usec(void);
 extern int sleep_usec(unsigned long long usec);
 
 extern char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len);
+
+extern int processors;
+extern long get_system_cpus(void);
+
+extern pid_t pid_max;
+extern pid_t get_system_pid_max(void);
+
+/* Number of ticks per second */
+extern unsigned int hz;
+extern void get_system_HZ(void);
+
 
 /* fix for alpine linux */
 #ifndef RUSAGE_THREAD
