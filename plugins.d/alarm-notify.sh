@@ -180,10 +180,10 @@ send_email() {
 
         if [ $? -eq 0 ]
         then
-            echo >&2 "${me}: Sent notification email for ${status} on '${chart}.${name}'"
+            echo >&2 "${me}: Sent notification email for ${status} on '${chart}.${name}' to '${to_email}'"
             return 0
         else
-            echo >&2 "${me}: FAILED to send notification email for ${status} on '${chart}.${name}'"
+            echo >&2 "${me}: FAILED to send notification email for ${status} on '${chart}.${name}' to '${to_email}'"
             return 1
         fi
     fi
