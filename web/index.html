@@ -2124,6 +2124,21 @@ var chartData = {
 
     'retroshare.peers': {
         info: 'Shows the number of (connected) friends.',
+        mainheads: [
+            function(id) {
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="peers_connected"'
+                    + ' data-append-options="friends"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="connected friends"'
+                    + ' data-units=""'
+                    + ' data-width="8%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' role="application"></div>';
+            }
+        ]
     },
 
     'retroshare.dht': {
