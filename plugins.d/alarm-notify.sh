@@ -1,33 +1,12 @@
 #!/usr/bin/env bash
 
+# (C) Costa Tsaousis
+# pushover support by Jan Arnold
+
 me="${0}"
 
-sendmail="$(which sendmail 2>/dev/null || command -v sendmail 2>/dev/null)"
-if [ -z "${sendmail}" ]
-then
-    echo >&2 "I cannot send emails - there is no sendmail command available."
-    exit 1
-fi
-
-default_recipient_for_all_roles="root"
-declare -A recipients=()
-if [ -f "${NETDATA_CONFIG_DIR}/health_email_recipients.conf" ]
-    then
-    source "${NETDATA_CONFIG_DIR}/health_email_recipients.conf"
-fi
-
-sendmail_from_pipe() {
-    "${sendmail}" -t
-
-    if [ $? -eq 0 ]
-    then
-        echo >&2 "${me}: Sent notification email for ${status} on '${chart}.${name}'"
-        return 0
-    else
-        echo >&2 "${me}: FAILED to send notification email for ${status} on '${chart}.${name}'"
-        return 1
-    fi
-}
+# -----------------------------------------------------------------------------
+# parse command line parameters
 
 recipient="${1}"   # the recepient of the email
 hostname="${2}"    # the hostname this event refers to
@@ -48,24 +27,101 @@ non_clear_duration="${16}" # the total duration in seconds this is non-clear
 units="${17}"      # the units of the value
 info="${18}"       # a short description of the alarm
 
-to="${recipients[${recipient}]}"
-[ -z "${to}" ] && to="${default_recipient_for_all_roles}"
-[ -z "${to}" ] && to="root"
+# -----------------------------------------------------------------------------
+# screen statuses we don't need to send a notification
 
-[ ! -z "${info}" ] && info=" <small><br/>${info}</small>"
+# don't do anything if this is not WARNING, CRITICAL or CLEAR
+if [ "${status}" != "WARNING" -a "${status}" != "CRITICAL" -a "${status}" != "CLEAR" ]
+then
+    echo >&2 "${me}: not sending notification for ${status} on '${chart}.${name}'"
+    exit 1
+fi
 
+# don't do anything if this is CLEAR, but it was not WARNING or CRITICAL
+if [ "${old_status}" != "WARNING" -a "${old_status}" != "CRITICAL" -a "${status}" = "CLEAR" ]
+then
+    echo >&2 "${me}: not sending notification for ${status} on '${chart}.${name}' (last status was ${old_status})"
+    exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# load configuration
+
+# needed commands
+# if empty they will be searched in the system path
+curl=
+sendmail=
+
+# enable / disable features
+SEND_EMAIL="YES"
+SEND_PUSHOVER="YES"
+
+# pushover configs
+PUSHOVER_APP_TOKEN=
+DEFAULT_RECIPIENT_PUSHOVER=
+declare -A role_recipients_pushover=()
+
+# email configs
+DEFAULT_RECIPIENT_EMAIL="root"
+declare -A role_recipients_email=()
+
+if [ -f "${NETDATA_CONFIG_DIR}/health_alarm_notify.conf" ]
+    then
+    source "${NETDATA_CONFIG_DIR}/health_alarm_notify.conf"
+fi
+
+# -----------------------------------------------------------------------------
+# find the exact recipient per method
+
+to_email="${role_recipients_email[${recipient}]}"
+[ -z "${to_email}" ] && to_email="${DEFAULT_RECIPIENT_EMAIL}"
+[ -z "${to_email}" ] && to_email="root"
+
+to_pushover="${role_recipients_pushover[${recipient}]}"
+[ -z "${to_pushover}" ] && to_pushover="${DEFAULT_RECIPIENT_EMAIL}"
+[ -z "${to_pushover}" ] && SEND_PUSHOVER="NO"
+
+# -----------------------------------------------------------------------------
+# verify the delivery methods supported
+
+[ -z "${PUSHOVER_APP_TOKEN}" ] && SEND_PUSHOVER="NO"
+
+if [ "${SEND_PUSHOVER}" = "YES" -a -z "${curl}" ]
+    then
+    curl="$(which curl 2>/dev/null || command -v curl 2>/dev/null)"
+    [ -z "${curl}" ] && SEND_PUSHOVER="NO"
+fi
+
+if [ "${SEND_EMAIL}" = "YES" -a -z "${sendmail}" ]
+    then
+    sendmail="$(which sendmail 2>/dev/null || command -v sendmail 2>/dev/null)"
+    [ -z "${sendmail}" ] && SEND_EMAIL="NO"
+fi
+
+# check that we have at least a method enabled
+if [ "${SEND_EMAIL}" != "YES" -a "${SEND_PUSHOVER}" != "YES" ]
+    then
+    echo >&2 "I don't have a means to send a notification. Sorry!"
+    exit 1
+fi
+
+# -----------------------------------------------------------------------------
 # get the system hostname
+
 [ -z "${hostname}" ] && hostname="${NETDATA_HOSTNAME}"
 [ -z "${hostname}" ] && hostname="${NETDATA_REGISTRY_HOSTNAME}"
 [ -z "${hostname}" ] && hostname="$(hostname 2>/dev/null)"
 
-goto_url="${NETDATA_REGISTRY_URL}/goto-host-from-alarm.html?machine_guid=${NETDATA_REGISTRY_UNIQUE_ID}&chart=${chart}&family=${family}"
+# -----------------------------------------------------------------------------
+# get the date the alarm happened
 
 date="$(date --date=@${when} 2>/dev/null)"
 [ -z "${date}" ] && date="$(date 2>/dev/null)"
 
+# -----------------------------------------------------------------------------
 # convert a duration in seconds, to a human readable duration
 # using DAYS, MINUTES, SECONDS
+
 duration4human() {
     local s="${1}" d=0 h=0 m=0 ds="day" hs="hour" ms="minute" ss="second"
     d=$(( s / 86400 ))
@@ -113,11 +169,82 @@ duration4human() {
     fi
 }
 
+# -----------------------------------------------------------------------------
+# email sender
+
+send_email() {
+    if [ "${SEND_EMAIL}" = "YES" ]
+        then
+
+        "${sendmail}" -t
+
+        if [ $? -eq 0 ]
+        then
+            echo >&2 "${me}: Sent notification email for ${status} on '${chart}.${name}'"
+            return 0
+        else
+            echo >&2 "${me}: FAILED to send notification email for ${status} on '${chart}.${name}'"
+            return 1
+        fi
+    fi
+
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# pushover sender
+
+send_pushover() {
+    local apptoken="${1}" usertoken="${2}" title="${3}" message="${4}" httpcode
+
+    if [ "${SEND_PUSHOVER}" = "YES" -a ! -z "${apptoken}" -a ! -z "${usertoken}" -a ! -z "${title}" -a ! -z "${message}" ]
+        then
+
+        httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null \
+            --form-string "token=${apptoken}" \
+            --form-string "user=${usertoken}" \
+            --form-string "html=1" \
+            --form-string "title=${title}" \
+            --form-string "message=${message}" \
+            https://api.pushover.net/1/messages.json)
+
+        if [ "${httpcode}" == "200" ]
+        then
+            echo >&2 "${me}: Sent notification push for ${status} on '${chart}.${name}'"
+            return 0
+        else
+            echo >&2 "${me}: FAILED to send notification push for ${status} on '${chart}.${name}' with HTTP error code ${httpcode}."
+            return 1
+        fi
+    fi
+
+    return 1
+}
+
+
+# -----------------------------------------------------------------------------
+# prepare the content of the notification
+
+# description of the alarm
+[ ! -z "${info}" ] && info=" <small><br/>${info}</small>"
+
+# the url to send the user on click
+goto_url="${NETDATA_REGISTRY_URL}/goto-host-from-alarm.html?machine_guid=${NETDATA_REGISTRY_UNIQUE_ID}&chart=${chart}&family=${family}"
+
+# the severity of the alarm
 severity="${status}"
+
+# the time the alarm was raised
 raised_for="<br/><small>(was ${old_status,,} for $(duration4human ${duration}))</small>"
+
+# the key status message
 status_message="status unknown"
+
+# the color of the alarm
 color="grey"
-alarm="${name} = ${value} ${units}"
+
+# the alarm value
+alarm="${name//_/ } = ${value} ${units}"
 
 # prepare the title based on status
 case "${status}" in
@@ -141,17 +268,7 @@ case "${status}" in
 		;;
 esac
 
-if [ "${status}" != "WARNING" -a "${status}" != "CRITICAL" -a "${status}" != "CLEAR" ]
-then
-    # don't do anything if this is not WARNING, CRITICAL or CLEAR
-    echo >&2 "${me}: not sending notification email for ${status} on '${chart}.${name}'"
-    exit 0
-elif [ "${old_status}" != "WARNING" -a "${old_status}" != "CRITICAL" -a "${status}" = "CLEAR" ]
-then
-    # don't do anything if this is CLEAR, but it was not WARNING or CRITICAL
-    echo >&2 "${me}: not sending notification email for ${status} on '${chart}.${name}' (last status was ${old_status})"
-    exit 0
-elif [ "${status}" = "CLEAR" ]
+if [ "${status}" = "CLEAR" ]
 then
     severity="Recovered from ${old_status}"
     if [ $non_clear_duration -gt $duration ]
@@ -179,9 +296,30 @@ else
     raised_for=
 fi
 
+
+# -----------------------------------------------------------------------------
+# send the pushover
+
+send_pushover "${PUSHOVER_APP_TOKEN}" "${to_pushover}" "${hostname} ${status_message} - ${chart}.${name}" "<font size="5" color=\"${color}\"><b>${hostname} ${status_message}</b></font>
+
+<b>${alarm}</b>${info}
+
+Chart: ${chart}
+Family: ${family}
+Severity: ${severity}
+Time: ${date}
+${raised_for}
+<a href=\"${goto_url}\">View Netdata</a>
+
+<small>The source of this alarm is line ${src}</small>"
+
+SENT_PUSHOVER=$?
+
+# -----------------------------------------------------------------------------
 # send the email
-cat <<EOF | sendmail_from_pipe
-To: ${to}
+
+cat <<EOF | send_email
+To: ${to_email}
 Subject: ${hostname} ${status_message} - ${chart}.${name}
 Content-Type: text/html
 
@@ -282,3 +420,14 @@ Content-Type: text/html
 </body>
 </html>
 EOF
+
+SENT_EMAIL=$?
+
+# -----------------------------------------------------------------------------
+# let netdata know
+
+# we did send somehting
+[ ${SENT_EMAIL} -eq 0 -o ${SENT_PUSHOVER} -eq 0 ] && exit 0
+
+# we did not send anything
+exit 1

@@ -2,7 +2,7 @@
 
 #define RRDVAR_MAX_LENGTH 1024
 
-static const char *health_default_exec = PLUGINS_DIR "/alarm-email.sh";
+static const char *health_default_exec = PLUGINS_DIR "/alarm-notify.sh";
 static const char *health_default_recipient = "root";
 int health_enabled = 1;
 

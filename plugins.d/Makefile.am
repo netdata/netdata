@@ -9,6 +9,7 @@ dist_plugins_DATA = \
 
 dist_plugins_SCRIPTS = \
 	alarm-email.sh \
+	alarm-notify.sh \
 	cgroup-name.sh \
 	charts.d.dryrun-helper.sh \
 	charts.d.plugin \
