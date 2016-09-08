@@ -1610,7 +1610,7 @@ void health_init(void) {
 
     {
         char buffer[FILENAME_MAX + 1];
-        snprintfz(buffer, FILENAME_MAX, "%s/alarm-email.sh", config_get("global", "plugins directory", PLUGINS_DIR));
+        snprintfz(buffer, FILENAME_MAX, "%s/alarm-notify.sh", config_get("global", "plugins directory", PLUGINS_DIR));
         health_default_exec = config_get("health", "script to execute on alarm", buffer);
     }
 
