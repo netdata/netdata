@@ -195,27 +195,31 @@ send_email() {
 # pushover sender
 
 send_pushover() {
-    local apptoken="${1}" usertoken="${2}" title="${3}" message="${4}" httpcode
+    local apptoken="${1}" usertoken="${2}" title="${3}" message="${4}" httpcode sent=0 user
 
     if [ "${SEND_PUSHOVER}" = "YES" -a ! -z "${apptoken}" -a ! -z "${usertoken}" -a ! -z "${title}" -a ! -z "${message}" ]
         then
 
-        httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null \
-            --form-string "token=${apptoken}" \
-            --form-string "user=${usertoken}" \
-            --form-string "html=1" \
-            --form-string "title=${title}" \
-            --form-string "message=${message}" \
-            https://api.pushover.net/1/messages.json)
+        for user in ${usertoken//,/ }
+        do
+            httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null \
+                --form-string "token=${apptoken}" \
+                --form-string "user=${user}" \
+                --form-string "html=1" \
+                --form-string "title=${title}" \
+                --form-string "message=${message}" \
+                https://api.pushover.net/1/messages.json)
 
-        if [ "${httpcode}" == "200" ]
-        then
-            echo >&2 "${me}: Sent notification push for ${status} on '${chart}.${name}'"
-            return 0
-        else
-            echo >&2 "${me}: FAILED to send notification push for ${status} on '${chart}.${name}' with HTTP error code ${httpcode}."
-            return 1
-        fi
+            if [ "${httpcode}" == "200" ]
+            then
+                echo >&2 "${me}: Sent notification push for ${status} on '${chart}.${name}' to '${user}'"
+                sent=$((sent + 1))
+            else
+                echo >&2 "${me}: FAILED to send notification push for ${status} on '${chart}.${name}' to '${user}' with HTTP error code ${httpcode}."
+            fi
+        done
+
+        [ ${sent} -gt 0 ] && return 0
     fi
 
     return 1
