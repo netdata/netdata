@@ -92,7 +92,6 @@ class Service(SimpleService):
         return data
 
     def _create_definitions(self):
-        prev_chip = ""
         for type in ORDER:
             for chip in sensors.ChipIterator():
                 chip_name = sensors.chip_snprintf_name(chip)
@@ -105,19 +104,17 @@ class Service(SimpleService):
                         continue
                     if TYPE_MAP[feature.type] == type:
                         # create chart
-                        if chip_name != prev_chip:
-                            name = chip_name + "_" + TYPE_MAP[feature.type]
-                            if name not in self.order:
-                                self.order.append(name)
-                                chart_def = list(CHARTS[type]['options'])
-                                chart_def[1] = chip_name + chart_def[1]
-                                self.definitions[name] = {'options': chart_def}
-                                self.definitions[name]['lines'] = []
+                        name = chip_name + "_" + TYPE_MAP[feature.type]
+                        if name not in self.order:
+                            self.order.append(name)
+                            chart_def = list(CHARTS[type]['options'])
+                            chart_def[1] = chip_name + chart_def[1]
+                            self.definitions[name] = {'options': chart_def}
+                            self.definitions[name]['lines'] = []
                         line = list(CHARTS[type]['lines'][0])
                         line[0] = chip_name + "_" + str(feature.name.decode())
                         line[1] = sensors.get_label(chip, feature)
                         self.definitions[name]['lines'].append(line)
-                prev_chip = chip_name
 
     def check(self):
         try:
