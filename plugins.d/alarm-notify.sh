@@ -195,10 +195,13 @@ send_email() {
 # pushover sender
 
 send_pushover() {
-    local apptoken="${1}" usertoken="${2}" title="${3}" message="${4}" httpcode sent=0 user
+    local apptoken="${1}" usertoken="${2}" when="${3}" url="${4}" status="${5}" title="${6}" message="${7}" httpcode sent=0 user priority
 
     if [ "${SEND_PUSHOVER}" = "YES" -a ! -z "${apptoken}" -a ! -z "${usertoken}" -a ! -z "${title}" -a ! -z "${message}" ]
         then
+
+        priority=0
+        [ "${status}" = "CRITICAL" ] && priority=1
 
         for user in ${usertoken//,/ }
         do
@@ -208,6 +211,10 @@ send_pushover() {
                 --form-string "html=1" \
                 --form-string "title=${title}" \
                 --form-string "message=${message}" \
+                --form-string "timestamp=${when}" \
+                --form-string "url=${url}" \
+                --form-string "url_title=Open netdata dashboard to view the alarm" \
+                --form-string "priority=${priority}" \
                 https://api.pushover.net/1/messages.json)
 
             if [ "${httpcode}" == "200" ]
@@ -268,7 +275,7 @@ case "${status}" in
 
 		# don't show the value when the status is CLEAR
 		# for certain alarms, this value might not have any meaning
-		alarm="${name}"
+		alarm="${name//_/ }"
 		;;
 esac
 
@@ -304,18 +311,15 @@ fi
 # -----------------------------------------------------------------------------
 # send the pushover
 
-send_pushover "${PUSHOVER_APP_TOKEN}" "${to_pushover}" "${hostname} ${status_message} - ${chart}.${name}" "<font size="5" color=\"${color}\"><b>${hostname} ${status_message}</b></font>
-
-<b>${alarm}</b>${info}
-
-Chart: ${chart}
-Family: ${family}
-Severity: ${severity}
-Time: ${date}
-${raised_for}
-<a href=\"${goto_url}\">View Netdata</a>
-
-<small>The source of this alarm is line ${src}</small>"
+send_pushover "${PUSHOVER_APP_TOKEN}" "${to_pushover}" "${when}" "${goto_url}" "${status}" "${hostname} ${status_message} - ${name//_/ } - ${chart}" "
+<font color=\"${color}\"><b>${alarm}</b></font>${info}<br/>&nbsp;
+<small><b>${chart}</b><br/>Chart<br/>&nbsp;</small>
+<small><b>${family}</b><br/>Family<br/>&nbsp;</small>
+<small><b>${severity}</b><br/>Severity<br/>&nbsp;</small>
+<small><b>${date}${raised_for}</b><br/>Time<br/>&nbsp;</small>
+<a href=\"${goto_url}\">View Netdata</a><br/>&nbsp;
+<small><small>The source of this alarm is line ${src}</small></small>
+"
 
 SENT_PUSHOVER=$?
 
@@ -324,7 +328,7 @@ SENT_PUSHOVER=$?
 
 cat <<EOF | send_email
 To: ${to_email}
-Subject: ${hostname} ${status_message} - ${chart}.${name}
+Subject: ${hostname} ${status_message} - ${name//_/ } - ${chart}
 Content-Type: text/html
 
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -336,18 +340,15 @@ Content-Type: text/html
         <td style="vertical-align:top;" valign="top"></td>
         <td width="700" style="vertical-align:top;display:block!important;max-width:700px!important;clear:both!important;margin:0 auto;padding:0" valign="top">
             <div style="max-width:700px;display:block;margin:0 auto;padding:20px">
-                <table width="100%" cellpadding="0" cellspacing="0"
-                       style="background:#fff;border:1px solid #e9e9e9">
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #e9e9e9">
                     <tbody>
                     <tr>
-                        <td bgcolor="#eee"
-                            style="padding: 5px 20px 5px 20px;background-color:#eee;">
+                        <td bgcolor="#eee" style="padding: 5px 20px 5px 20px;background-color:#eee;">
                             <div style="font-size:20px;color:#777;font-weight: bold;">netdata notification</div>
                         </td>
                     </tr>
                     <tr>
-                        <td bgcolor="${color}"
-                            style="font-size:16px;vertical-align:top;font-weight:400;text-align:center;margin:0;padding:10px;color:#ffffff;background:${color}!important;border:1px solid ${color};border-top-color:${color}" align="center" valign="top">
+                        <td bgcolor="${color}" style="font-size:16px;vertical-align:top;font-weight:400;text-align:center;margin:0;padding:10px;color:#ffffff;background:${color}!important;border:1px solid ${color};border-top-color:${color}" align="center" valign="top">
                             <h1 style="font-weight:400;margin:0">${hostname} ${status_message}</h1>
                         </td>
                     </tr>
@@ -357,38 +358,32 @@ Content-Type: text/html
                                 <table width="100%" cellpadding="0" cellspacing="0" style="max-width:700px">
                                     <tbody>
                                     <tr>
-                                        <td style="font-size:18px;vertical-align:top;margin:0;padding:0 0 20px"
-                                            align="left" valign="top">
+                                        <td style="font-size:18px;vertical-align:top;margin:0;padding:0 0 20px" align="left" valign="top">
                                             <span>${chart}</span>
                                             <span style="display:block;color:#666666;font-size:12px;font-weight:300;line-height:1;text-transform:uppercase">Chart</span>
                                         </td>
                                     </tr>
                                     <tr style="margin:0;padding:0">
-                                        <td style="font-size:18px;vertical-align:top;margin:0;padding:0 0 20px"
-                                            align="left" valign="top">
+                                        <td style="font-size:18px;vertical-align:top;margin:0;padding:0 0 20px" align="left" valign="top">
                                             <span><b>${alarm}</b>${info}</span>
                                             <span style="display:block;color:#666666;font-size:12px;font-weight:300;line-height:1;text-transform:uppercase">Alarm</span>
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td style="font-size:18px;vertical-align:top;margin:0;padding:0 0 20px"
-                                            align="left" valign="top">
+                                        <td style="font-size:18px;vertical-align:top;margin:0;padding:0 0 20px" align="left" valign="top">
                                             <span>${family}</span>
                                             <span style="display:block;color:#666666;font-size:12px;font-weight:300;line-height:1;text-transform:uppercase">Family</span>
                                         </td>
                                     </tr>
                                     <tr style="margin:0;padding:0">
-                                        <td style="font-size:18px;vertical-align:top;margin:0;padding:0 0 20px"
-                                            align="left" valign="top">
+                                        <td style="font-size:18px;vertical-align:top;margin:0;padding:0 0 20px" align="left" valign="top">
                                             <span>${severity}</span>
                                             <span style="display:block;color:#666666;font-size:12px;font-weight:300;line-height:1;text-transform:uppercase">Severity</span>
                                         </td>
                                     </tr>
                                     <tr style="margin:0;padding:0">
-                                        <td style="font-size:18px;vertical-align:top;margin:0;padding:0 0 20px"
-                                            align="left" valign="top"><span>${date}</span>
-                                            <span>${raised_for}</span> <span
-                                                    style="display:block;color:#666666;font-size:12px;font-weight:300;line-height:1;text-transform:uppercase">Time</span>
+                                        <td style="font-size:18px;vertical-align:top;margin:0;padding:0 0 20px" align="left" valign="top"><span>${date}</span>
+                                            <span>${raised_for}</span> <span style="display:block;color:#666666;font-size:12px;font-weight:300;line-height:1;text-transform:uppercase">Time</span>
                                         </td>
                                     </tr>
                                     <!--
@@ -399,13 +394,11 @@ Content-Type: text/html
                                     </tr>
                                     -->
                                     <tr style="text-align:center;margin:0;padding:0">
-                                        <td style="font-size:11px;vertical-align:top;margin:0;padding:10px 0 0 0;color:#666666"
-                                            align="center" valign="bottom">The source of this alarm is line <code>${src}</code>
+                                        <td style="font-size:11px;vertical-align:top;margin:0;padding:10px 0 0 0;color:#666666" align="center" valign="bottom">The source of this alarm is line <code>${src}</code>
                                         </td>
                                     </tr>
                                     <tr style="text-align:center;margin:0;padding:0">
-                                        <td style="font-size:12px;vertical-align:top;margin:0;padding:20px 0 0 0;color:#666666;border-top:1px solid #f0f0f0"
-                                            align="center" valign="bottom">Sent by
+                                        <td style="font-size:12px;vertical-align:top;margin:0;padding:20px 0 0 0;color:#666666;border-top:1px solid #f0f0f0" align="center" valign="bottom">Sent by
                                             <a href="https://mynetdata.io/" target="_blank">netdata</a>, the real-time performance monitoring.
                                         </td>
                                     </tr>
