@@ -71,7 +71,7 @@ if [ -z "${NAME}" ]
     fi
 
     [ -z "${NAME}" ] && NAME="${CGROUP}"
-    [ ${#NAME} -gt 50 ] && NAME="${NAME:0:50}"
+    [ ${#NAME} -gt 100 ] && NAME="${NAME:0:100}"
 fi
 
 echo >&2 "${0}: cgroup '${CGROUP}' is called '${NAME}'"
