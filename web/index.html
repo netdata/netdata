@@ -1635,6 +1635,12 @@ var menuData = {
         info: undefined
     },
 
+    'retroshare': {
+        title: 'RetroShare',
+        icon: '<i class="fa fa-share-alt" aria-hidden="true"></i>',
+        info: undefined
+    },
+
     'ipfs': {
         title: 'IPFS',
         icon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
@@ -2107,6 +2113,39 @@ var chartData = {
 
     'netdata.response_time': {
         info: 'The netdata API response time measures the time netdata needed to serve requests. This time includes everything, from the reception of the first byte of a request, to the dispatch of the last byte of its reply, therefore it includes all network latencies involved (i.e. a client over a slow network will influence these metrics).'
+    },
+
+    // ------------------------------------------------------------------------
+    // RETROSHARE
+    'retroshare.bandwidth': {
+        info: 'Shows inbound and outbound traffic.',
+        mainheads: [
+            gaugeChart('Received', '12%', 'bandwidth_down_kb'),
+            gaugeChart('Sent', '12%', 'bandwidth_up_kb')
+        ]
+    },
+
+    'retroshare.peers': {
+        info: 'Shows the number of (connected) friends.',
+        mainheads: [
+            function(id) {
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="peers_connected"'
+                    + ' data-append-options="friends"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="connected friends"'
+                    + ' data-units=""'
+                    + ' data-width="8%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+
+    'retroshare.dht': {
+        info: 'Shows statistics about RetroShare\'s DHT. These values are estimated!'
     }
 };
 
@@ -2211,6 +2250,7 @@ function enrichChartData(chart) {
         case 'phpfpm':
         case 'postfix':
         case 'redis':
+        case 'retroshare':
         case 'ipfs':
         case 'smawebbox':
         case 'squid':

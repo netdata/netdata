@@ -36,6 +36,7 @@ dist_pythonconfig_DATA = \
 	python.d/phpfpm.conf \
 	python.d/postfix.conf \
 	python.d/redis.conf \
+	python.d/retroshare.conf \
 	python.d/sensors.conf \
 	python.d/squid.conf \
 	python.d/tomcat.conf \
@@ -55,6 +56,7 @@ dist_healthconfig_DATA = \
 	health.d/qos.conf \
 	health.d/ram.conf \
 	health.d/redis.conf \
+	health.d/retroshare.conf \
 	health.d/swap.conf \
 	health.d/squid.conf \
 	$(NULL)
