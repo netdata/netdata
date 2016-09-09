@@ -47,6 +47,7 @@ dist_noinst_DATA= \
 # until integrated within build
 # should be proper init.d/openrc/systemd usable
 dist_noinst_SCRIPTS= \
+	ansible/netdata.yml \
 	docker-build.sh \
 	netdata-installer.sh \
 	$(NULL)
