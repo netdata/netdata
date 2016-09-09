@@ -1581,7 +1581,7 @@ void health_readdir(const char *path) {
             continue;
         }
 
-        else if((de->d_type == DT_LNK || de->d_type == DT_REG) &&
+        else if((de->d_type == DT_LNK || de->d_type == DT_REG || de->d_type == DT_UNKNOWN) &&
                 len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
             health_readfile(path, de->d_name);
         }
