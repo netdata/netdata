@@ -23,6 +23,7 @@ dist_python_SCRIPTS = \
 	phpfpm.chart.py \
 	postfix.chart.py \
 	redis.chart.py \
+	retroshare.chart.py \
 	sensors.chart.py \
 	squid.chart.py \
 	tomcat.chart.py \
