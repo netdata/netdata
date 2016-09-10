@@ -216,19 +216,20 @@ static inline void tc_device_commit(struct tc_device *d) {
         }
     }
 
-    // debugging:
+    // debugging only
     /*
-    for ( c = d->classes ; c ; c = c->next) {
-        if(c->isleaf && c->hasparent) debug(D_TC_LOOP, "TC: Device %s, class %s, OK", d->name, c->id);
-        else debug(D_TC_LOOP, "TC: Device %s, class %s, IGNORE (isleaf: %d, hasparent: %d, parent: %s)", d->name, c->id, c->isleaf, c->hasparent, c->parentid);
+    if(unlikely(debug_flags & D_TC_LOOP)) {
+        for(c = d->classes ; c ; c = c->next) {
+            if(c->isleaf && c->hasparent) debug(D_TC_LOOP, "TC: Device '%s', class %s, OK", d->name, c->id);
+            else debug(D_TC_LOOP, "TC: Device '%s', class %s, IGNORE (isleaf: %d, hasparent: %d, parent: %s)", d->name?d->name:d->id, c->id, c->isleaf, c->hasparent, c->parentid?c->parentid:"(unset)");
+        }
     }
     */
 
     // we need at least a class
     for(c = d->classes ; c ; c = c->next) {
         // debug(D_TC_LOOP, "TC: Device '%s', class '%s', isLeaf=%d, HasParent=%d, Seen=%d", d->name?d->name:d->id, c->name?c->name:c->id, c->isleaf, c->hasparent, c->seen);
-        if(!c->updated) continue;
-        if(c->isleaf && c->hasparent) {
+        if(unlikely(c->updated && c->isleaf && c->hasparent)) {
             active_classes++;
             bytes_sum += c->bytes;
             packets_sum += c->packets;
@@ -242,7 +243,7 @@ static inline void tc_device_commit(struct tc_device *d) {
         return;
     }
 
-    if(unlikely(d->enabled == -1)) {
+    if(unlikely(d->enabled == (char)-1)) {
         char var_name[CONFIG_MAX_NAME + 1];
         snprintfz(var_name, CONFIG_MAX_NAME, "qos for %s", d->id);
         d->enabled         = config_get_boolean_ondemand("plugin:tc", var_name, enable_new_interfaces);
@@ -256,6 +257,17 @@ static inline void tc_device_commit(struct tc_device *d) {
         snprintfz(var_name, CONFIG_MAX_NAME, "dropped packets chart for %s", d->id);
         d->enabled_dropped = config_get_boolean_ondemand("plugin:tc", var_name, enable_dropped);
     }
+
+    debug(D_TC_LOOP, "TC: evaluating TC device '%s'. enabled = %d/%d (bytes: %d/%d, packets: %d/%d, dropped: %d/%d), classes = %d (bytes = %llu, packets = %llu, dropped = %llu).",
+        d->name?d->name:d->id,
+        d->enabled, enable_new_interfaces,
+        d->enabled_bytes, enable_bytes,
+        d->enabled_packets, enable_packets,
+        d->enabled_dropped, enable_dropped,
+        active_classes,
+        bytes_sum,
+        packets_sum,
+        dropped_sum);
 
     if(likely(d->enabled)) {
         // --------------------------------------------------------------------
@@ -475,7 +487,7 @@ static inline struct tc_device *tc_device_create(char *id)
 
         d->id = strdupz(id);
         d->hash = simple_hash(d->id);
-        d->enabled = -1;
+        d->enabled = (char)-1;
 
         avl_init(&d->classes_index, tc_class_compare);
         tc_device_index_add(d);
