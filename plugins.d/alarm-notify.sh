@@ -325,7 +325,7 @@ send_slack() {
         for channel in ${channels}
         do
             httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null -X POST --data-urlencode \
-                "payload={\"channel\": \"#${channel}\", \"username\": \"${username}\", \"text\": \"${hostname} ${status_message} about ${author} ${raised_for} - click <${goto_url}|here> to view the netdata dashboard.\", \"icon_url\": \"${image}\", \"attachments\": [{\"fallback\": \"${alarm} - ${info}\", \"color\": \"${color}\", \"title\": \"${alarm}\", \"title_link\": \"${goto_url}\", \"text\": \"${info}\", \"footer\": \"netdata\", \"footer_icon\": \"${NETDATA_REGISTRY_URL}/images/seo-performance-128.png\", \"ts\": ${when}}]}" \
+                "payload={\"channel\": \"#${channel}\", \"username\": \"${username}\", \"text\": \"${hostname} ${status_message} - ${author} ${raised_for} - click <${goto_url}|here> to view the netdata dashboard.\", \"icon_url\": \"${image}\", \"attachments\": [{\"fallback\": \"${alarm} - ${info}\", \"color\": \"${color}\", \"title\": \"${alarm}\", \"title_link\": \"${goto_url}\", \"text\": \"${info}\", \"footer\": \"netdata\", \"footer_icon\": \"${NETDATA_REGISTRY_URL}/images/seo-performance-128.png\", \"ts\": ${when}}]}" \
                 "${webhook}")
 
             if [ "${httpcode}" == "200" ]
