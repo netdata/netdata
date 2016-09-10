@@ -71,7 +71,7 @@
                             document.getElementById('gotoServerResponse').innerHTML = '<b>Opening new window to ' + NETDATA.registry.machines[guid].name + '<br/><a href="' + finalURL + '">' + url + '</a></b><br/>(check your pop-up blocker if it fails)';
                         }
                         else
-                            console.log(document.location); // = finalURL;
+                            document.location = finalURL;
                     }
                 }
                 else {
@@ -118,7 +118,7 @@
 </head>
 <body>
 <div class="container" id="">
-    <div id="bodylog" style="padding-top: 10vmax; font-size: 2vmax;">
+    <div id="bodylog" style="padding-top: 8vmax; font-size: 2.0vmax;">
         Please wait...
 
         <div style="padding-top: 20px;">
@@ -126,7 +126,7 @@
             </table>
         </div>
         <p style="padding-top: 10px;"><small>
-            This page can only find netdata URLs you have already visited and are active for your account on this registry.
+            This page can only find netdata URLs you have already visited and are linked to your account on this netdata registry.
         </small></p>
         <div id="gotoServerResponse" style="display: block; width: 100%; text-align: center; padding-top: 20px;"></div>
     </div>
