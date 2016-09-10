@@ -11,7 +11,11 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <script>var netdataRegistry = true;</script>
+    <script>
+        var netdataRegistry = true;
+        var netdataTheme = 'slate';
+        var netdataShowHelp = true;
+    </script>
     <script type="text/javascript" src="dashboard.js?v46"></script>
 
     <script>
@@ -20,7 +24,6 @@
         chart: null,
         family: null,
         hasProperty: function(property) {
-            // console.log('checking property ' + property + ' of type ' + typeof(this[property]));
             return typeof this[property] !== 'undefined';
         }
     };
@@ -34,22 +37,16 @@
             if(urlOptions.hasProperty(p[0]) && typeof p[1] !== 'undefined')
                 urlOptions[p[0]] = p[1];
         }
-
-        console.log(urlOptions);
     }
 
     function netdataURL(url) {
-        return url + '#' + urlOptions.family;
+        return url + '#top;show_alarms=true;chart=' + urlOptions.chart + ';family=' + urlOptions.family;
     }
 
     var gotoServerValidateRemaining = 0;
     var gotoServerMiddleClick = false;
     var gotoServerStop = false;
     function gotoServerValidateUrl(id, guid, url) {
-        console.log(id);
-        console.log(guid);
-        console.log(url);
-
         var penaldy = 0;
         if(document.location.toString().startsWith('http://') && url.toString().startsWith('https://'))
                 // we penalize https only if the current url is http
@@ -63,7 +60,6 @@
 
             NETDATA.registry.hello(url, function(data) {
                 if (data) {
-                    // console.log('OK ' + id + ' URL: ' + url);
                     document.getElementById(guid + '-' + id + '-status').innerHTML = "OK";
 
                     if(!gotoServerStop) {
@@ -75,7 +71,7 @@
                             document.getElementById('gotoServerResponse').innerHTML = '<b>Opening new window to ' + NETDATA.registry.machines[guid].name + '<br/><a href="' + finalURL + '">' + url + '</a></b><br/>(check your pop-up blocker if it fails)';
                         }
                         else
-                            document.location = finalURL;
+                            console.log(document.location); // = finalURL;
                     }
                 }
                 else {
@@ -95,13 +91,10 @@
             var len = machines_array.length;
             while(len--) {
                 if(machines_array[len].name === urlOptions.host) {
-                    console.log(machines_array[len]);
-
                     var ulen = machines_array[len].alternate_urls.length;
                     gotoServerValidateRemaining = ulen;
                     while(ulen--)
                         gotoServerValidateUrl(ulen, machines_array[len].guid, machines_array[len].alternate_urls[ulen]);
-
                     return;
                 }
             }
@@ -125,11 +118,11 @@
 </head>
 <body>
 <div class="container" id="">
-    <div id="bodylog" style="padding-top: 40px; font-size: 18px;">
+    <div id="bodylog" style="padding-top: 10vh; font-size: 2vh;">
         Please wait...
 
         <div style="padding-top: 20px;">
-            <table id="gotoServerList">
+            <table id="gotoServerList" class="table">
             </table>
         </div>
         <p style="padding-top: 10px;"><small>
