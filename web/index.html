@@ -409,6 +409,9 @@
             after: 0,
             before: 0,
             nowelcome: 0,
+            show_alarms: 0,
+            chart: null,
+            family: null,
             hasProperty: function(property) {
                 // console.log('checking property ' + property + ' of type ' + typeof(this[property]));
                 return typeof this[property] !== 'undefined';
@@ -2559,6 +2562,12 @@ function renderChartsAndMenu(data) {
 
         // index the chart in the menu/submenu
         menus[charts[c].menu].submenus[charts[c].submenu].charts.push(charts[c]);
+
+        // console.log(urlOptions.chart + ' === ' + c);
+        if(urlOptions.chart === c) {
+            urlOptions.hash = '#' + name2id(charts[c].menu + '_' + charts[c].submenu)
+            // console.log('hash = ' + urlOptions.hash);
+        }
     }
 
     // propagate the descriptive subname given to QoS
@@ -2777,7 +2786,7 @@ function alarmsUpdateModal() {
                         active += '<tr><th class="text-center" colspan="2"><h4>' + family + '</h4></th></tr>';
                     }
                     count_active++;
-                    active += alarm_to_html(alarm, false);
+                    active += alarm_to_html(alarm, true);
                 }
 
                 count_all++;
@@ -3304,6 +3313,9 @@ function finalizePage() {
         }, 2000);
     }
     else notifyForUpdate();
+
+    if(urlOptions.show_alarms === 'true')
+        setTimeout(function() { $('#alarmsModal').modal('show'); }, 1000);
 }
 
 function resetDashboardOptions() {
