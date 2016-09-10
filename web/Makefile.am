@@ -12,6 +12,7 @@ dist_web_DATA = \
 	dashboard.css \
 	dashboard.slate.css \
 	favicon.ico \
+	goto-host-from-alarm.html \
 	index.html \
 	netdata-swagger.yaml \
 	netdata-swagger.json \
