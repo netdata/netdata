@@ -5,11 +5,22 @@
 
 me="${0}"
 
+if [ $(( ${BASH_VERSINFO[0]} )) -lt 4 ]
+then
+    echo >&2
+    echo >&2 "$me: ERROR"
+    echo >&2 "BASH version 4 or later is required."
+    echo >&2 "You are running version: ${BASH_VERSION}"
+    echo >&2 "Please upgrade."
+    echo >&2
+    exit 1
+fi
+
 # -----------------------------------------------------------------------------
 # parse command line parameters
 
 recipient="${1}"   # the recepient of the email
-hostname="${2}"    # the hostname this event refers to
+host="${2}"        # the host this event refers to
 unique_id="${3}"   # the unique id of this event
 alarm_id="${4}"    # the unique id of the alarm that generated this event
 event_id="${5}"    # the incremental id of the event, for this alarm
@@ -17,8 +28,8 @@ when="${6}"        # the timestamp this event occured
 name="${7}"        # the name of the alarm, as given in netdata health.d entries
 chart="${8}"       # the name of the chart (type.id)
 family="${9}"      # the family of the chart
-status="${10}"     # the current status : UNITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
-old_status="${11}" # the previous status: UNITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+status="${10}"     # the current status : REMOVED, UNITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+old_status="${11}" # the previous status: REMOVED, UNITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
 value="${12}"      # the current value
 old_value="${13}"  # the previous value
 src="${14}"        # the line number and file the alarm has been configured
@@ -79,7 +90,7 @@ if [ -f "${NETDATA_CONFIG_DIR}/health_alarm_notify.conf" ]
 fi
 
 # -----------------------------------------------------------------------------
-# find the exact recipient per method
+# find the recipient's addresses per method
 
 declare -A arr_slack=()
 declare -A arr_pushover=()
@@ -87,7 +98,7 @@ declare -A arr_email=()
 
 # netdata may call us with multiple recipients
 # so, here we find the unique ones
-for x in ${recipient}
+for x in ${recipient//,/ }
 do
     # email
     a="${role_recipients_email[${recipient}]}"
@@ -158,9 +169,9 @@ fi
 # -----------------------------------------------------------------------------
 # get the system hostname
 
-[ -z "${hostname}" ] && hostname="${NETDATA_HOSTNAME}"
-[ -z "${hostname}" ] && hostname="${NETDATA_REGISTRY_HOSTNAME}"
-[ -z "${hostname}" ] && hostname="$(hostname 2>/dev/null)"
+[ -z "${host}" ] && host="${NETDATA_HOSTNAME}"
+[ -z "${host}" ] && host="${NETDATA_REGISTRY_HOSTNAME}"
+[ -z "${host}" ] && host="$(hostname 2>/dev/null)"
 
 # -----------------------------------------------------------------------------
 # get the date the alarm happened
@@ -189,7 +200,9 @@ urlencode() {
         esac
         encoded+="${o}"
     done
-    echo "${encoded}"
+
+    REPLY="${encoded}"
+    echo "${REPLY}"
 }
 
 # -----------------------------------------------------------------------------
@@ -197,7 +210,7 @@ urlencode() {
 # using DAYS, MINUTES, SECONDS
 
 duration4human() {
-    local s="${1}" d=0 h=0 m=0 ds="day" hs="hour" ms="minute" ss="second"
+    local s="${1}" d=0 h=0 m=0 ds="day" hs="hour" ms="minute" ss="second" ret
     d=$(( s / 86400 ))
     s=$(( s - (d * 86400) ))
     h=$(( s / 3600 ))
@@ -212,9 +225,9 @@ duration4human() {
         [ ${h} -gt 1 ] && hs="hours"
         if [ ${h} -gt 0 ]
         then
-            echo "${d} ${ds} and ${h} ${hs}"
+            ret="${d} ${ds} and ${h} ${hs}"
         else
-            echo "${d} ${ds}"
+            ret="${d} ${ds}"
         fi
     elif [ ${h} -gt 0 ]
     then
@@ -223,9 +236,9 @@ duration4human() {
         [ ${m} -gt 1 ] && ms="minutes"
         if [ ${m} -gt 0 ]
         then
-            echo "${h} ${hs} and ${m} ${ms}"
+            ret="${h} ${hs} and ${m} ${ms}"
         else
-            echo "${h} ${hs}"
+            ret="${h} ${hs}"
         fi
     elif [ ${m} -gt 0 ]
     then
@@ -233,31 +246,36 @@ duration4human() {
         [ ${s} -gt 1 ] && ss="seconds"
         if [ ${s} -gt 0 ]
         then
-            echo "${m} ${ms} and ${s} ${ss}"
+            ret="${m} ${ms} and ${s} ${ss}"
         else
-            echo "${m} ${ms}"
+            ret="${m} ${ms}"
         fi
     else
         [ ${s} -gt 1 ] && ss="seconds"
-        echo "${s} ${ss}"
+        ret="${s} ${ss}"
     fi
+
+    REPLY="${ret}"
+    echo "${REPLY}"
 }
 
 # -----------------------------------------------------------------------------
 # email sender
 
 send_email() {
+    local ret=
     if [ "${SEND_EMAIL}" = "YES" ]
         then
 
         "${sendmail}" -t
+        ret=$?
 
-        if [ $? -eq 0 ]
+        if [ $ret -eq 0 ]
         then
-            echo >&2 "${me}: Sent notification email for ${status} on '${chart}.${name}' to '${to_email}'"
+            echo >&2 "${me}: Sent email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}'"
             return 0
         else
-            echo >&2 "${me}: FAILED to send notification email for ${status} on '${chart}.${name}' to '${to_email}'"
+            echo >&2 "${me}: Failed to send email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}' with error code ${ret}."
             return 1
         fi
     fi
@@ -325,7 +343,7 @@ send_slack() {
         for channel in ${channels}
         do
             httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null -X POST --data-urlencode \
-                "payload={\"channel\": \"#${channel}\", \"username\": \"${username}\", \"text\": \"${hostname} ${status_message} - ${author} ${raised_for} - click <${goto_url}|here> to view the netdata dashboard.\", \"icon_url\": \"${image}\", \"attachments\": [{\"fallback\": \"${alarm} - ${info}\", \"color\": \"${color}\", \"title\": \"${alarm}\", \"title_link\": \"${goto_url}\", \"text\": \"${info}\", \"footer\": \"netdata\", \"footer_icon\": \"${NETDATA_REGISTRY_URL}/images/seo-performance-128.png\", \"ts\": ${when}}]}" \
+                "payload={\"channel\": \"#${channel}\", \"username\": \"${username}\", \"text\": \"${host} ${status_message} - ${author} ${raised_for} - click <${goto_url}|here> to view the netdata dashboard.\", \"icon_url\": \"${image}\", \"attachments\": [{\"fallback\": \"${alarm} - ${info}\", \"color\": \"${color}\", \"title\": \"${alarm}\", \"title_link\": \"${goto_url}\", \"text\": \"${info}\", \"footer\": \"netdata\", \"footer_icon\": \"${NETDATA_REGISTRY_URL}/images/seo-performance-128.png\", \"ts\": ${when}}]}" \
                 "${webhook}")
 
             if [ "${httpcode}" == "200" ]
@@ -348,13 +366,19 @@ send_slack() {
 # prepare the content of the notification
 
 # the url to send the user on click
-goto_url="${NETDATA_REGISTRY_URL}/goto-host-from-alarm.html?host=$(urlencode "${NETDATA_REGISTRY_HOSTNAME}")&chart=${chart}&family=${family}"
+urlencode "${NETDATA_REGISTRY_HOSTNAME}" >/dev/null; url_host="${REPLY}"
+urlencode "${chart}" >/dev/null; url_chart="${REPLY}"
+urlencode "${family}" >/dev/null; url_family="${REPLY}"
+urlencode "${name}" >/dev/null; url_name="${REPLY}"
+goto_url="${NETDATA_REGISTRY_URL}/goto-host-from-alarm.html?host=${url_host}&chart=${url_chart}&family=${url_family}&alarm=${url_name}&alarm_unique_id=${unique_id}&alarm_id=${alarm_id}&alarm_event_id=${event_id}"
 
 # the severity of the alarm
 severity="${status}"
 
 # the time the alarm was raised
-raised_for="(was ${old_status,,} for $(duration4human ${duration}))"
+duration4human ${duration} >/dev/null; duration_txt="${REPLY}"
+duration4human ${non_clear_duration} >/dev/null; non_clear_duration_txt="${REPLY}"
+raised_for="(was ${old_status,,} for ${duration_txt}"
 
 # the key status message
 status_message="status unknown"
@@ -398,7 +422,7 @@ then
     severity="Recovered from ${old_status}"
     if [ $non_clear_duration -gt $duration ]
     then
-        raised_for="(had issues for $(duration4human ${non_clear_duration}))"
+        raised_for="(alarm was raised for ${non_clear_duration_txt})"
     fi
 
 elif [ "${old_status}" = "WARNING" -a "${status}" = "CRITICAL" ]
@@ -406,7 +430,7 @@ then
     severity="Escalated to ${status}"
     if [ $non_clear_duration -gt $duration ]
     then
-        raised_for="(has issues for $(duration4human ${non_clear_duration}))"
+        raised_for="(alarm is raised for ${non_clear_duration_txt})"
     fi
 
 elif [ "${old_status}" = "CRITICAL" -a "${status}" = "WARNING" ]
@@ -414,7 +438,7 @@ then
     severity="Demoted to ${status}"
     if [ $non_clear_duration -gt $duration ]
     then
-        raised_for="(has issues for $(duration4human ${non_clear_duration}))"
+        raised_for="(alarm is raised for ${non_clear_duration_txt})"
     fi
 
 else
@@ -432,15 +456,15 @@ raised_for_html=
 # send the slack notification
 
 # slack aggregates posts from the same username
-# so we use "${hostname} ${status}" as the bot username, to make them diff
+# so we use "${host} ${status}" as the bot username, to make them diff
 
-send_slack "${SLACK_WEBHOOK_URL}" "${to_slack}" "${when}" "${hostname} ${status}" "${image}" "${chart} (${family})"
+send_slack "${SLACK_WEBHOOK_URL}" "${to_slack}" "${when}" "${host} ${status}" "${image}" "${chart} (${family})"
 SENT_SLACK=$?
 
 # -----------------------------------------------------------------------------
 # send the pushover notification
 
-send_pushover "${PUSHOVER_APP_TOKEN}" "${to_pushover}" "${when}" "${goto_url}" "${status}" "${hostname} ${status_message} - ${name//_/ } - ${chart}" "
+send_pushover "${PUSHOVER_APP_TOKEN}" "${to_pushover}" "${when}" "${goto_url}" "${status}" "${host} ${status_message} - ${name//_/ } - ${chart}" "
 <font color=\"${color}\"><b>${alarm}</b></font>${info_html}<br/>&nbsp;
 <small><b>${chart}</b><br/>Chart<br/>&nbsp;</small>
 <small><b>${family}</b><br/>Family<br/>&nbsp;</small>
@@ -457,7 +481,7 @@ SENT_PUSHOVER=$?
 
 send_email <<EOF
 To: ${to_email}
-Subject: ${hostname} ${status_message} - ${name//_/ } - ${chart}
+Subject: ${host} ${status_message} - ${name//_/ } - ${chart}
 Content-Type: text/html
 
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -478,7 +502,7 @@ Content-Type: text/html
                     </tr>
                     <tr>
                         <td bgcolor="${color}" style="font-size: 16px; vertical-align: top; font-weight: 400; text-align: center; margin: 0; padding: 10px; color: #ffffff; background: ${color} !important; border: 1px solid ${color}; border-top-color: ${color};" align="center" valign="top">
-                            <h1 style="font-family: 'Helvetica Neue', 'Helvetica', Helvetica, Arial, sans-serif; font-weight: 400; margin: 0;">${hostname} ${status_message}</h1>
+                            <h1 style="font-family: 'Helvetica Neue', 'Helvetica', Helvetica, Arial, sans-serif; font-weight: 400; margin: 0;">${host} ${status_message}</h1>
                         </td>
                     </tr>
                     <tr>
