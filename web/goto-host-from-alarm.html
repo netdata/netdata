@@ -46,12 +46,22 @@
     var gotoServerValidateRemaining = 0;
     var gotoServerMiddleClick = false;
     var gotoServerStop = false;
+    var thisIsHttps = false;
+    var urlsInHttp = 0;
     function gotoServerValidateUrl(id, guid, url) {
         var penaldy = 0;
-        if(document.location.toString().startsWith('http://') && url.toString().startsWith('https://'))
-                // we penalize https only if the current url is http
-                // to allow the user walk through all its servers.
-                penaldy = 500;
+        var error = 'failed';
+
+        if(thisIsHttps === false && url.toString().startsWith('https://')) {
+            // we penalize https only if the current url is http
+            // to allow the user walk through all its servers.
+            penaldy = 500;
+        }
+
+        else if(thisIsHttps === true && url.toString().startsWith('http://')) {
+            error = 'can\'t check';
+            urlsInHttp++;
+        }
 
         var finalURL = netdataURL(url);
 
@@ -66,7 +76,7 @@
                         gotoServerStop = true;
 
                         if(gotoServerMiddleClick) {
-                            window.open(finalURL, '_blank');
+                            window.open(finalURL);
                             gotoServerMiddleClick = false;
                             document.getElementById('gotoServerResponse').innerHTML = '<b>Opening new window to ' + NETDATA.registry.machines[guid].name + '<br/><a href="' + finalURL + '">' + url + '</a></b><br/>(check your pop-up blocker if it fails)';
                         }
@@ -75,11 +85,16 @@
                     }
                 }
                 else {
-                    document.getElementById(guid + '-' + id + '-status').innerHTML = "failed!";
+                    document.getElementById(guid + '-' + id + '-status').innerHTML = error;
                     gotoServerValidateRemaining--;
                     if(gotoServerValidateRemaining <= 0) {
                         gotoServerMiddleClick = false;
                         document.getElementById('gotoServerResponse').innerHTML = '<b>Sorry! I cannot find any operational URL for this server</b>';
+
+                        if(thisIsHttps === true && urlsInHttp > 0) {
+                            document.getElementById('gotoServerResponse').innerHTML += '<br/>redirecting myself to HTTP to allow checking';
+                            document.location = document.location.toString().replace('https://', 'http://');
+                        }
                     }
                 }
             });
@@ -87,6 +102,11 @@
     }
 
     var netdataRegistryCallback = function(machines_array) {
+        document.getElementById('message').innerHTML = 'These are the URLs this machine is known:';
+
+        if(document.location.toString().startsWith('https://'))
+            thisIsHttps = true;
+
         if(machines_array) {
             var len = machines_array.length;
             while(len--) {
@@ -119,7 +139,7 @@
 <body>
 <div class="container" id="">
     <div id="bodylog" style="padding-top: 8vmax; font-size: 2.0vmax;">
-        Please wait...
+        <span id="message">Please wait...</span>
 
         <div style="padding-top: 20px;">
             <table id="gotoServerList" class="table">
