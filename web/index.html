@@ -1263,11 +1263,16 @@ var gotoServerMiddleClick = false;
 var gotoServerStop = false;
 function gotoServerValidateUrl(id, guid, url) {
     var penaldy = 0;
+    var error = 'failed';
+
     if(document.location.toString().startsWith('http://') && url.toString().startsWith('https://'))
             // we penalize https only if the current url is http
             // to allow the user walk through all its servers.
             penaldy = 500;
 
+    else if(document.location.toString().startsWith('https://') && url.toString().startsWith('http://'))
+        error = 'can\'t check';
+    
     var finalURL = netdataURL(url);
 
     setTimeout(function() {
