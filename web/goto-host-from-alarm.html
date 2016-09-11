@@ -39,7 +39,7 @@
         while(len--) {
             var p = variables[len].split('=');
             if(urlOptions.hasProperty(p[0]) && typeof p[1] !== 'undefined')
-                urlOptions[p[0]] = p[1];
+                urlOptions[p[0]] = decodeURIComponent(p[1]);
         }
     }
 
@@ -47,9 +47,9 @@
         return url + '#top'
             + ';nowelcome=1'
             + ';show_alarms=1'
-            + ';chart=' + urlOptions.chart.toString()
-            + ';family=' + urlOptions.family.toString()
-            + ';alarm=' + urlOptions.alarm.toString()
+            + ';chart=' + encodeURIComponent(urlOptions.chart.toString())
+            + ';family=' + encodeURIComponent(urlOptions.family.toString())
+            + ';alarm=' + encodeURIComponent(urlOptions.alarm.toString())
             + ';alarm_unique_id=' + urlOptions.alarm_unique_id.toString()
             + ';alarm_id=' + urlOptions.alarm_id.toString()
             + ';alarm_event_id=' + urlOptions.alarm_event_id.toString()
