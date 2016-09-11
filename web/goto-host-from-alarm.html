@@ -13,10 +13,11 @@
 
     <script>
         var netdataRegistry = true;
+        var netdataRegistryAfterMs = 0;
         var netdataTheme = 'slate';
         var netdataShowHelp = true;
     </script>
-    <script type="text/javascript" src="dashboard.js?v46"></script>
+    <script type="text/javascript" src="dashboard.js?v47"></script>
 
     <script>
     var urlOptions = {
@@ -41,15 +42,21 @@
             if(urlOptions.hasProperty(p[0]) && typeof p[1] !== 'undefined')
                 urlOptions[p[0]] = decodeURIComponent(p[1]);
         }
+
+        if(typeof urlOptions.family !== 'string')
+            urlOptions.family = '';
+
+        if(typeof urlOptions.chart !== 'string')
+            urlOptions.chart = '';
     }
 
     function netdataURL(url) {
         return url + '#top'
             + ';nowelcome=1'
-            + ';show_alarms=1'
-            + ';chart=' + encodeURIComponent(urlOptions.chart.toString())
-            + ';family=' + encodeURIComponent(urlOptions.family.toString())
-            + ';alarm=' + encodeURIComponent(urlOptions.alarm.toString())
+            // + ';show_alarms=1'
+            + ';chart=' + encodeURIComponent(urlOptions.chart)
+            + ';family=' + encodeURIComponent(urlOptions.family)
+            + ';alarm=' + encodeURIComponent(urlOptions.alarm)
             + ';alarm_unique_id=' + urlOptions.alarm_unique_id.toString()
             + ';alarm_id=' + urlOptions.alarm_id.toString()
             + ';alarm_event_id=' + urlOptions.alarm_event_id.toString()
@@ -115,6 +122,11 @@
     }
 
     var netdataRegistryCallback = function(machines_array) {
+        if(typeof urlOptions.host !== 'string') {
+            document.getElementById('bodylog').innerHTML = "Sorry... bad request.";
+            return;
+        }
+
         document.getElementById('message').innerHTML = 'These are the URLs this machine is known:';
 
         if(document.location.toString().startsWith('https://'))
@@ -137,15 +149,6 @@
     };
 
     netdataQueryParse();
-
-    if(typeof urlOptions.host !== 'string')
-        document.getElementById('bodylog').innerHTML = "Sorry... bad request.";
-
-    if(typeof urlOptions.family !== 'string')
-        urlOptions.family = '';
-
-    if(typeof urlOptions.chart !== 'string')
-        urlOptions.chart = '';
     </script>
 
 </head>
