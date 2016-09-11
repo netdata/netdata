@@ -1313,7 +1313,7 @@ function gotoServerValidateUrl(id, guid, url) {
                 }
             }
             else {
-                document.getElementById(guid + '-' + id + '-status').innerHTML = "failed!";
+                document.getElementById(guid + '-' + id + '-status').innerHTML = error;
                 gotoServerValidateRemaining--;
                 if(gotoServerValidateRemaining <= 0) {
                     gotoServerMiddleClick = false;
