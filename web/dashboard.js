@@ -18,6 +18,8 @@
 // var netdataShowHelp = false;         // enable/disable help (default enabled)
 // var netdataShowAlarms = true;        // enable/disable alarms checks and notifications (default disabled)
 //
+// var netdataRegistryAfterMs = 1500    // the time to consult to registry on startup
+//
 // You can also set the default netdata server, using the following.
 // When this variable is not set, we assume the page is hosted on your
 // netdata server already.
@@ -174,6 +176,9 @@
 
     if(typeof netdataShowAlarms === 'undefined')
         netdataShowAlarms = false;
+
+    if(typeof netdataRegistryAfterMs !== 'number' || netdataRegistryAfterMs < 0)
+        netdataRegistryAfterMs = 1500;
 
     if(typeof netdataRegistry === 'undefined') {
         // backward compatibility
@@ -3461,7 +3466,7 @@
         setTimeout(NETDATA.alarms.init, 1000);
 
         // Registry initialization
-        setTimeout(NETDATA.registry.init, 1500);
+        setTimeout(NETDATA.registry.init, netdataRegistryAfterMs);
     };
 
     // ----------------------------------------------------------------------------------------------------------------
