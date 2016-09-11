@@ -408,10 +408,14 @@
             pan_and_zoom: false,
             after: 0,
             before: 0,
-            nowelcome: 0,
-            show_alarms: 0,
+            nowelcome: false,
+            show_alarms: false,
             chart: null,
             family: null,
+            alarm: null,
+            alarm_unique_id: 0,
+            alarm_id: 0,
+            alarm_event_id: 0,
             hasProperty: function(property) {
                 // console.log('checking property ' + property + ' of type ' + typeof(this[property]));
                 return typeof this[property] !== 'undefined';
@@ -461,8 +465,21 @@
                 }
             }
 
-            if(urlOptions.before > 0 && urlOptions.after > 0)
+            var booleans = [ 'nowelcome', 'show_alarms', 'pan_and_zoom' ];
+            len = booleans.length;
+            while(len--) {
+                if(urlOptions[booleans[len]] === 'true' || urlOptions[booleans[len]] === true || urlOptions[booleans[len]] === '1' || urlOptions[booleans[len]] === 1)
+                    urlOptions[booleans[len]] = true;
+                else
+                    urlOptions[booleans[len]] = false;
+            }
+
+            if(urlOptions.before > 0 && urlOptions.after > 0) {
                 urlOptions.pan_and_zoom = true;
+                urlOptions.nowelcome = true;
+            }
+            else
+                urlOptions.pan_and_zoom = false;
 
             // console.log(urlOptions);
         }
@@ -1263,11 +1280,16 @@ var gotoServerMiddleClick = false;
 var gotoServerStop = false;
 function gotoServerValidateUrl(id, guid, url) {
     var penaldy = 0;
+    var error = 'failed';
+
     if(document.location.toString().startsWith('http://') && url.toString().startsWith('https://'))
             // we penalize https only if the current url is http
             // to allow the user walk through all its servers.
             penaldy = 500;
 
+    else if(document.location.toString().startsWith('https://') && url.toString().startsWith('http://'))
+        error = 'can\'t check';
+    
     var finalURL = netdataURL(url);
 
     setTimeout(function() {
@@ -3025,10 +3047,8 @@ function finalizePage() {
     // the Dom elements are initially zero-sized
     NETDATA.parseDom();
 
-    if(urlOptions.pan_and_zoom === true) {
-        urlOptions.nowelcome = true;
+    if(urlOptions.pan_and_zoom === true)
         NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], urlOptions.after, urlOptions.before);
-    }
 
     // ------------------------------------------------------------------------
     // https://github.com/viralpatel/jquery.shorten/blob/master/src/jquery.shorten.js
@@ -3294,7 +3314,7 @@ function finalizePage() {
     });
 
     if(isdemo()) {
-        if(!urlOptions.nowelcome) {
+        if(urlOptions.nowelcome !== true) {
             setTimeout(function() {
                 $('#welcomeModal').modal();
             }, 1000);
@@ -3314,7 +3334,7 @@ function finalizePage() {
     }
     else notifyForUpdate();
 
-    if(urlOptions.show_alarms === 'true')
+    if(urlOptions.show_alarms === true)
         setTimeout(function() { $('#alarmsModal').modal('show'); }, 1000);
 }
 
