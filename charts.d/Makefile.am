@@ -5,6 +5,7 @@ MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
 dist_charts_SCRIPTS = \
 	ap.chart.sh \
+	apcupsd.chart.sh \
 	apache.chart.sh \
 	cpu_apps.chart.sh \
 	cpufreq.chart.sh \
