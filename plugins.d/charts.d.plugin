@@ -48,10 +48,6 @@ require_cmd awk || exit 1
 # insternal defaults
 # netdata exposes a few environment variables for us
 
-pause_method="sleep" # use either "suspend" or "sleep"
-                     # DO NOT USE SUSPEND - LINUX WILL SUSPEND NETDATA TOO
-                     # THE WHOLE PROCESS GROUP - NOT JUST THE SHELL
-
 pluginsd="${NETDATA_PLUGINS_DIR}"
 [ -z "$pluginsd" ] && pluginsd="$( dirname $PROGRAM_FILE )"
 
@@ -154,6 +150,24 @@ done
 
 
 # -----------------------------------------------------------------------------
+# loop control
+
+# default sleep function
+LOOPSLEEPMS_HIGHRES=0
+now_ms=
+current_time_ms_default() {
+    now_ms="$(date +'%s')000"
+}
+current_time_ms="current_time_ms_default"
+current_time_ms_accuracy=1
+mysleep="sleep"
+
+# if found and included, this file overwrites loopsleepms()
+# and current_time_ms() with a high resolution timer function
+# for precise looping.
+. "$pluginsd/loopsleepms.sh.inc"
+
+# -----------------------------------------------------------------------------
 # load my configuration
 
 if [ -f "$myconfig" ]
@@ -170,13 +184,6 @@ if [ -f "$myconfig" ]
     [ $time_divisor -gt 100 ] && time_divisor=100
 else
     echo >&2 "$PROGRAM_NAME: configuration file '$myconfig' not found. Using defaults."
-fi
-
-if [ "$pause_method" = "suspend" ]
-then
-    # enable bash job control
-    # this is required for suspend to work
-    set -m
 fi
 
 # we check for the timeout command, after we load our
@@ -202,27 +209,6 @@ if [ ! -d "$chartsd" ]
     echo >&2 "$PROGRAM_NAME: cannot find charts directory '$chartsd'"
     echo "DISABLE"
 fi
-
-
-# -----------------------------------------------------------------------------
-# loop control
-
-# default sleep function
-LOOPSLEEPMS_HIGHRES=0
-loopsleepms() {
-    [ "$1" = "tellwork" ] && shift
-    sleep $1
-}
-
-now_ms=
-current_time_ms() {
-    now_ms="$(date +'%s')000"
-}
-
-# if found and included, this file overwrites loopsleepms()
-# and current_time_ms() with a high resolution timer function
-# for precise looping.
-. "$pluginsd/loopsleepms.sh.inc"
 
 
 # -----------------------------------------------------------------------------
@@ -537,7 +523,7 @@ global_update() {
         next_ms x seconds millis
 
     # return the current time in ms in $now_ms
-    current_time_ms
+    ${current_time_ms}
 
     exit_at=$(( now_ms + (restart_timeout * 1000) ))
 
@@ -562,16 +548,16 @@ global_update() {
         next_charts=()
 
         # return the current time in ms in $now_ms
-        current_time_ms
+        ${current_time_ms}
 
         for chart in "${now_charts[@]}"
         do
-            # echo >&2 "DEBUG: chart: $chart last: ${charts_last_update[$chart]}, next: ${charts_next_update[$chart]}, now: ${now_ms}"
+            #echo >&2 "                              DEBUG: chart: $chart last: ${charts_last_update[$chart]}, next: ${charts_next_update[$chart]}, now: ${now_ms}"
             if [ ${now_ms} -ge ${charts_next_update[$chart]} ]
             then
                 last_ms=${charts_last_update[$chart]}
                 dt=$(( (now_ms - last_ms) ))
-                # echo >&2 "DEBUG: chart: $chart last: ${charts_last_update[$chart]}, next: ${charts_next_update[$chart]}, now: ${now_ms}, dt: ${dt}"
+                #echo >&2 "                              DEBUG: chart: $chart last: ${charts_last_update[$chart]}, next: ${charts_next_update[$chart]}, now: ${now_ms}, dt: ${dt}"
 
                 charts_last_update[$chart]=${now_ms}
 
@@ -590,11 +576,12 @@ global_update() {
                 fi
 
                 exec_start_ms=$now_ms
+                #echo >&2 "                              EXEC: $chart$charts_update $dt"
                 $chart$charts_update $dt
                 ret=$?
 
                 # return the current time in ms in $now_ms
-                current_time_ms; exec_end_ms=$now_ms
+                ${current_time_ms}; exec_end_ms=$now_ms
 
                 echo "BEGIN netdata.plugin_chartsd_$chart $dt"
                 echo "SET run_time = $(( exec_end_ms - exec_start_ms ))"
@@ -620,27 +607,29 @@ global_update() {
             fi
         done
 
-        if [ "$pause_method" = "suspend" ]
-        then
-            echo "STOPPING_WAKE_ME_UP_PLEASE"
-            suspend || ( echo >&2 "$PROGRAM_NAME: suspend returned error $?, falling back to sleep."; loopsleepms $debug_time $update_every $time_divisor)
-        else
-            # wait the time you are required to
-            next_ms=$((now_ms + (update_every * 1000 * 100) ))
-            for x in "${charts_next_update[@]}"; do [ ${x} -lt ${next_ms} ] && next_ms=${x}; done
-            next_ms=$((next_ms - now_ms))
+        # wait the time you are required to
+        next_ms=$((now_ms + (update_every * 1000 * 100) ))
+        for x in "${charts_next_update[@]}"; do [ ${x} -lt ${next_ms} ] && next_ms=${x}; done
+        next_ms=$((next_ms - now_ms))
 
-            if [ ${LOOPSLEEPMS_HIGHRES} -eq 1 -a ${next_ms} -gt 0 ]
+        if [ ${LOOPSLEEPMS_HIGHRES} -eq 1 -a ${next_ms} -gt 0 ]
+            then
+            next_ms=$(( next_ms + current_time_ms_accuracy ))
+            seconds=$(( next_ms / 1000 ))
+            millis=$(( next_ms % 1000 ))
+            if [ ${millis} -lt 10  ]
                 then
-                seconds=$(( next_ms / 1000 ))
-                millis=$(( next_ms % 1000 ))
-                [ ${millis} -lt 10  ] && millis="0${millis}"
-                [ ${millis} -lt 100 ] && millis="0${millis}"
-                [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: sleeping for ${seconds}.${millis} seconds."
-                sleep ${seconds}.${millis}
-            else
-                sleep $update_every
+                millis="00${millis}"
+            elif [ ${millis} -lt 100 ]
+                then
+                millis="0${millis}"
             fi
+
+            [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: sleeping for ${seconds}.${millis} seconds."
+            ${mysleep} ${seconds}.${millis}
+        else
+            [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: sleeping for ${update_every} seconds."
+            ${mysleep} $update_every
         fi
 
         test ${now_ms} -ge ${exit_at} && exit 0
