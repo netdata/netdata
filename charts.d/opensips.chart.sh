@@ -8,14 +8,10 @@ opensips_priority=80000
 
 opensips_get_stats() {
 	timeout $opensips_timeout "$opensips_cmd" $opensips_opts |\
-		grep "^\(core\|dialog\|net\|registrar\|shmem\|siptrace\|sl\|tm\|uri\|usrloc\):[a-zA-Z0-9_ -]\+[[:space:]]*=[[:space:]]*[0-9]\+[[:space:]]*$" |\
+		grep "^\(core\|dialog\|net\|registrar\|shmem\|siptrace\|sl\|tm\|uri\|usrloc\):[a-zA-Z0-9_-]\+[[:space:]]*[=:]\+[[:space:]]*[0-9]\+[[:space:]]*$" |\
 		sed \
-			-e "s|-|_|g" \
-			-e "s|:|_|g" \
-			-e "s|[[:space:]]\+=[[:space:]]\+|=|g" \
-			-e "s|[[:space:]]\+$||" \
-			-e "s|^[[:space:]]\+||" \
-			-e "s|[[:space:]]\+|_|" \
+			-e "s|[[:space:]]*[=:]\+[[:space:]]*\([0-9]\+\)[[:space:]]*$|=\1|g" \
+			-e "s|[[:space:]:-]\+|_|g" \
 			-e "s|^|opensips_|g"
 
 	local ret=$?
