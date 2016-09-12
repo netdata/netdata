@@ -1,10 +1,5 @@
 # no need for shebang - this file is included from other scripts
 
-# this function is used to sleep a fraction of a second
-# it calculates the difference between every time is called
-# and tries to align the sleep time to give you exactly the
-# loop you need.
-
 LOOPSLEEP_DATE="$(which date)"
 if [ -z "$LOOPSLEEP_DATE" ]
     then
@@ -12,17 +7,13 @@ if [ -z "$LOOPSLEEP_DATE" ]
     exit 1
 fi
 
-LOOPSLEEPMS_LASTRUN=0
-LOOPSLEEPMS_LASTSLEEP=0
-LOOPSLEEPMS_LASTWORK=0
-
-LOOPSLEEPMS_HIGHRES=1
-test "$($LOOPSLEEP_DATE +%N)" = "%N" && LOOPSLEEPMS_HIGHRES=0
+# -----------------------------------------------------------------------------
+# use the date command as a high resolution timer
 
 now_ms=
-current_time_ms() {
-    # if high resolution is not supported
-    # just sleep the time requested, in seconds
+LOOPSLEEPMS_HIGHRES=1
+test "$($LOOPSLEEP_DATE +%N)" = "%N" && LOOPSLEEPMS_HIGHRES=0
+current_time_ms_from_date() {
     if [ $LOOPSLEEPMS_HIGHRES -eq 0 ]
     then
         now_ms="$($LOOPSLEEP_DATE +'%s')000"
@@ -30,6 +21,83 @@ current_time_ms() {
         now_ms="$(( $( $LOOPSLEEP_DATE +'%s * 1000 + %-N / 1000000' ) ))"
     fi
 }
+
+# -----------------------------------------------------------------------------
+# use /proc/uptime as a high resolution timer
+
+current_time_ms_from_date
+current_time_ms_from_uptime_started="${now_ms}"
+current_time_ms_from_uptime_first=0
+current_time_ms_from_uptime() {
+    local up rest arr n
+
+    read up rest </proc/uptime
+    arr=(${up//./ })
+
+    if [ ${#arr[1]} -lt 1 ]
+        then
+        n="${arr[0]}000"
+    elif [ ${#arr[1]} -lt 2 ]
+        then
+        n="${arr[0]}${arr[1]}00"
+    elif [ ${#arr[1]} -lt 3 ]
+        then
+        n="${arr[0]}${arr[1]}0"
+    else
+        n="${arr[0]}${arr[1]}"
+    fi
+
+    now_ms=$((current_time_ms_from_uptime_started - current_time_ms_from_uptime_first + n))
+
+    if [ "${now_ms}" -lt "${current_time_ms_from_uptime_started}" ]
+        then
+        echo >&2 "$0: Cannot use current_time_ms_from_uptime() - falling back to current_time_ms_from_date()."
+        current_time_ms="current_time_ms_from_date"
+        current_time_ms_from_date
+        current_time_ms_accuracy=1
+    fi
+}
+current_time_ms_from_uptime
+current_time_ms_from_uptime_first="$((now_ms - current_time_ms_from_uptime_started))"
+current_time_ms="current_time_ms_from_uptime"
+current_time_ms_accuracy=10
+if [ "${current_time_ms_from_uptime_first}" -eq 0 ]
+    then
+    echo >&2 "$0: Invalid setup for current_time_ms_from_uptime() - falling back to current_time_ms_from_date()."
+    current_time_ms="current_time_ms_from_date"
+    current_time_ms_accuracy=1
+fi
+
+# -----------------------------------------------------------------------------
+# use read with timeout for sleep
+
+mysleep="mysleep_read"
+
+mysleep_fifo="${NETDATA_CACHE_DIR-/tmp}/.netdata_bash_sleep_timer_fifo"
+[ -e "${mysleep_fifo}" ] && rm "${mysleep_fifo}"
+mkfifo "${mysleep_fifo}" || mysleep="sleep"
+
+mysleep_read() {
+    read -t "${1}" <>"${mysleep_fifo}"
+    ret=$?
+    if [ $ret -le 128 ]
+        then
+        echo >&2 "$0: Cannot use read for sleeping (return code ${ret})."
+        mysleep="sleep"
+        ${mysleep} "${1}"
+    fi
+}
+
+
+# -----------------------------------------------------------------------------
+# this function is used to sleep a fraction of a second
+# it calculates the difference between every time is called
+# and tries to align the sleep time to give you exactly the
+# loop you need.
+
+LOOPSLEEPMS_LASTRUN=0
+LOOPSLEEPMS_LASTSLEEP=0
+LOOPSLEEPMS_LASTWORK=0
 
 loopsleepms() {
     local tellwork=0 t="$1" div s m now mstosleep
@@ -68,7 +136,7 @@ loopsleepms() {
     # echo "# last loop's work took $LOOPSLEEPMS_LASTWORK ms"
 
     # calculate ms to sleep
-    mstosleep=$(( t - LOOPSLEEPMS_LASTWORK ))
+    mstosleep=$(( t - LOOPSLEEPMS_LASTWORK + current_time_ms_accuracy ))
     # echo "# mstosleep is $mstosleep ms"
 
     # if we are too slow, sleep some time
@@ -81,7 +149,7 @@ loopsleepms() {
 
     # echo "# sleeping $s.$m"
     # echo
-    sleep $s.$m
+    ${mysleep} $s.$m
 
     # keep the values we need
     # for our next run
