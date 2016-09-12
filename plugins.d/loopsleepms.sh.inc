@@ -32,6 +32,15 @@ current_time_ms_from_uptime() {
     local up rest arr n
 
     read up rest </proc/uptime
+    if [ $? -ne 0 ]
+        then
+        echo >&2 "$0: Cannot read /proc/uptime - falling back to current_time_ms_from_date()."
+        current_time_ms="current_time_ms_from_date"
+        current_time_ms_from_date
+        current_time_ms_accuracy=1
+        return
+    fi
+
     arr=(${up//./ })
 
     if [ ${#arr[1]} -lt 1 ]
