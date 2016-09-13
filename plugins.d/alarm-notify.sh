@@ -58,6 +58,11 @@ fi
 # -----------------------------------------------------------------------------
 # load configuration
 
+# this is defined here so that private registries
+# can setup their own
+# images_base_url="${NETDATA_REGISTRY_URL}"
+images_base_url="https://registry.my-netdata.io"
+
 # needed commands
 # if empty they will be searched in the system path
 curl=
@@ -343,7 +348,7 @@ send_slack() {
         for channel in ${channels}
         do
             httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null -X POST --data-urlencode \
-                "payload={\"channel\": \"#${channel}\", \"username\": \"${username}\", \"text\": \"${host} ${status_message} - ${author} ${raised_for} - click <${goto_url}|here> to view the netdata dashboard.\", \"icon_url\": \"${image}\", \"attachments\": [{\"fallback\": \"${alarm} - ${info}\", \"color\": \"${color}\", \"title\": \"${alarm}\", \"title_link\": \"${goto_url}\", \"text\": \"${info}\", \"footer\": \"netdata\", \"footer_icon\": \"${NETDATA_REGISTRY_URL}/images/seo-performance-128.png\", \"ts\": ${when}}]}" \
+                "payload={\"channel\": \"#${channel}\", \"username\": \"${username}\", \"text\": \"${host} ${status_message} - ${author} ${raised_for} - click <${goto_url}|here> to view the netdata dashboard.\", \"icon_url\": \"${image}\", \"attachments\": [{\"fallback\": \"${alarm} - ${info}\", \"color\": \"${color}\", \"title\": \"${alarm}\", \"title_link\": \"${goto_url}\", \"text\": \"${info}\", \"footer\": \"netdata\", \"footer_icon\": \"${images_base_url}/images/seo-performance-128.png\", \"ts\": ${when}}]}" \
                 "${webhook}")
 
             if [ "${httpcode}" == "200" ]
@@ -390,24 +395,24 @@ color="grey"
 alarm="${name//_/ } = ${value} ${units}"
 
 # the image of the alarm
-image="${NETDATA_REGISTRY_URL}/images/seo-performance-128.png"
+image="${images_base_url}/images/seo-performance-128.png"
 
 # prepare the title based on status
 case "${status}" in
 	CRITICAL)
-        image="${NETDATA_REGISTRY_URL}/images/alert-128-red.png"
+        image="${images_base_url}/images/alert-128-red.png"
         status_message="is critical"
         color="#ca414b"
         ;;
 
     WARNING)
-        image="${NETDATA_REGISTRY_URL}/images/alert-128-orange.png"
+        image="${images_base_url}/images/alert-128-orange.png"
         status_message="needs attention"
         color="#caca4b"
 		;;
 
 	CLEAR)
-        image="${NETDATA_REGISTRY_URL}/images/check-mark-2-128-green.png"
+        image="${images_base_url}/images/check-mark-2-128-green.png"
     	status_message="recovered"
 		color="#77ca6d"
 
