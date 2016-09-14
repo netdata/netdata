@@ -2711,8 +2711,29 @@ function alarmsUpdateModal() {
                     + ((chart.red !== null)?('<tr><td width="10%" style="text-align:right">red&nbsp;threshold</td><td><code>' + chart.red + ' ' + chart.units + '</code></td></tr>'):'');
             }
 
+            var delay = '';
+            if((alarm.delay_up_duration > 0 || alarm.delay_down_duration > 0) && alarm.delay_multiplier != 0 && alarm.delay_max_duration > 0) {
+                if(alarm.delay_up_duration == alarm.delay_down_duration) {
+                    delay += '<small><br/>hysteresis ' + frequency_text(alarm.delay_up_duration);
+                }
+                else {
+                    delay = '<small><br/>hysteresis ';
+                    if(alarm.delay_up_duration > 0) {
+                        delay += 'on&nbsp;raise&nbsp;<code>' + frequency_text(alarm.delay_up_duration) + '</code>, ';
+                    }
+                    if(alarm.delay_down_duration > 0) {
+                        delay += 'on&nbsp;recovery&nbsp;<code>' + frequency_text(alarm.delay_down_duration) + '</code>, ';
+                    }
+                }
+                if(alarm.delay_multiplier != 1.0) {
+                    delay += 'multiplied&nbsp;by&nbsp;<code>' + alarm.delay_multiplier.toString() + '</code>';
+                    delay += ',&nbsp;up&nbsp;to&nbsp;<code>' + frequency_text(alarm.delay_max_duration) + '</code>';
+                }
+                delay += '</small>';
+            }
+
             html += '<tr><td width="10%" style="text-align:right">check&nbsp;every</td><td>' + frequency_text(alarm.update_every) + '</td></tr>'
-                + '<tr><td width="10%" style="text-align:right">execute</td><td><span style="font-family: monospace;">' + alarm.exec + '</span></td></tr>'
+                + '<tr><td width="10%" style="text-align:right">execute</td><td><span style="font-family: monospace;">' + alarm.exec + '</span>' + delay + '</td></tr>'
                 + '<tr><td width="10%" style="text-align:right">source</td><td><span style="font-family: monospace;">' + alarm.source + '</span></td></tr>'
                 + '</table></td></tr>';
 
@@ -2777,8 +2798,8 @@ function alarmsUpdateModal() {
         var families_sorted = families_sort.sort(function (a, b) {
             if (a.priority > b.priority) return -1;
             if (a.priority < b.priority) return 1;
-            if (a.name < b.name) return 1;
-            if (a.name > b.name) return -1;
+            if (a.id > b.id) return 1;
+            if (a.id < b.id) return -1;
             return 0;
         });
 
