@@ -1086,6 +1086,11 @@ static inline int health_parse_delay(
         int *delay_max_duration,
         float *delay_multiplier) {
 
+    char given_up = 0;
+    char given_down = 0;
+    char given_max = 0;
+    char given_multiplier = 0;
+
     char *s = string;
     while(*s) {
         char *key = s;
@@ -1104,12 +1109,14 @@ static inline int health_parse_delay(
                 error("Health configuration at line %zu of file '%s/%s': invalid value '%s' for '%s' keyword",
                       line, path, file, value, key);
             }
+            else given_up = 1;
         }
         else if(!strcasecmp(key, "down")) {
             if (!health_parse_duration(value, delay_down_duration)) {
                 error("Health configuration at line %zu of file '%s/%s': invalid value '%s' for '%s' keyword",
                       line, path, file, value, key);
             }
+            else given_down = 1;
         }
         else if(!strcasecmp(key, "multiplier")) {
             *delay_multiplier = strtof(value, NULL);
@@ -1117,17 +1124,36 @@ static inline int health_parse_delay(
                 error("Health configuration at line %zu of file '%s/%s': invalid value '%s' for '%s' keyword",
                       line, path, file, value, key);
             }
+            else given_multiplier = 1;
         }
         else if(!strcasecmp(key, "max")) {
             if (!health_parse_duration(value, delay_max_duration)) {
                 error("Health configuration at line %zu of file '%s/%s': invalid value '%s' for '%s' keyword",
                       line, path, file, value, key);
             }
+            else given_max = 1;
         }
         else {
             error("Health configuration at line %zu of file '%s/%s': unknown keyword '%s'",
                   line, path, file, key);
         }
+    }
+
+    if(!given_up)
+        *delay_up_duration = 0;
+
+    if(!given_down)
+        *delay_down_duration = 0;
+
+    if(!given_multiplier)
+        *delay_multiplier = 1.0;
+
+    if(!given_max) {
+        if((*delay_max_duration) < (*delay_up_duration) * (*delay_multiplier))
+            *delay_max_duration = (*delay_up_duration) * (*delay_multiplier);
+
+        if((*delay_max_duration) < (*delay_down_duration) * (*delay_multiplier))
+            *delay_max_duration = (*delay_down_duration) * (*delay_multiplier);
     }
 
     return 1;
