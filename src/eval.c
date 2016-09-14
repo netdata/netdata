@@ -328,7 +328,6 @@ static struct operator {
         // this is a random access array
         // we always access it with a known EVAL_OPERATOR_X
 
-        [EVAL_OPERATOR_IF_THEN_ELSE]          = { "?",  1, 3, 0, eval_if_then_else },
         [EVAL_OPERATOR_AND]                   = { "&&", 2, 2, 0, eval_and },
         [EVAL_OPERATOR_OR]                    = { "||", 2, 2, 0, eval_or },
         [EVAL_OPERATOR_GREATER_THAN_OR_EQUAL] = { ">=", 3, 2, 0, eval_greater_than_or_equal },
@@ -345,8 +344,9 @@ static struct operator {
         [EVAL_OPERATOR_SIGN_PLUS]             = { "+",  6, 1, 0, eval_sign_plus },
         [EVAL_OPERATOR_SIGN_MINUS]            = { "-",  6, 1, 0, eval_sign_minus },
         [EVAL_OPERATOR_ABS]                   = { "abs(",6,1, 1, eval_abs },
-        [EVAL_OPERATOR_NOP]                   = { NULL, 7, 1, 0, eval_nop },
-        [EVAL_OPERATOR_EXPRESSION_OPEN]       = { NULL, 7, 1, 0, eval_nop },
+        [EVAL_OPERATOR_IF_THEN_ELSE]          = { "?",  7, 3, 0, eval_if_then_else },
+        [EVAL_OPERATOR_NOP]                   = { NULL, 8, 1, 0, eval_nop },
+        [EVAL_OPERATOR_EXPRESSION_OPEN]       = { NULL, 8, 1, 0, eval_nop },
 
         // this should exist in our evaluation list
         [EVAL_OPERATOR_EXPRESSION_CLOSE]      = { NULL, 99, 1, 0, eval_nop }
