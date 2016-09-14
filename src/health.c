@@ -1836,7 +1836,7 @@ static inline void health_rrdcalc2json_nolock(BUFFER *wb, RRDCALC *rc) {
             , rc->delay_max_duration
             , rc->delay_multiplier
             , rc->delay_last
-            , rc->delay_up_to_timestamp
+            , (unsigned long)rc->delay_up_to_timestamp
     );
 
     if(RRDCALC_HAS_DB_LOOKUP(rc)) {
@@ -1998,8 +1998,23 @@ static inline int rrdcalc_value2status(calculated_number n) {
 static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->notifications |= HEALTH_ENTRY_NOTIFICATIONS_PROCESSED;
 
-    if(ae->old_status == RRDCALC_STATUS_UNINITIALIZED && ae->new_status == RRDCALC_STATUS_CLEAR)
+    // find the previous notification for the same alarm
+    ALARM_ENTRY *t;
+    for(t = ae->next; t ;t = t->next) {
+        if(t->alarm_id == ae->alarm_id && t->notifications & HEALTH_ENTRY_NOTIFICATIONS_PROCESSED)
+            break;
+    }
+
+    if(t && t->new_status == ae->new_status) {
+        // don't send the same notification again
+        info("Health not sending again notification for alarm '%s.%s' status %s", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
         return;
+    }
+
+    if(ae->old_status == RRDCALC_STATUS_UNINITIALIZED && ae->new_status == RRDCALC_STATUS_CLEAR) {
+        info("Health not sending notification for first initialization of alarm '%s.%s' status %s", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
+        return;
+    }
 
     char buffer[FILENAME_MAX + 1];
     pid_t command_pid;
@@ -2044,7 +2059,6 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     debug(D_HEALTH, "HEALTH reading from command");
     char *s = fgets(buffer, FILENAME_MAX, fp);
     (void)s;
-    debug(D_HEALTH, "HEALTH closing command");
     ae->exec_code = mypclose(fp, command_pid);
     debug(D_HEALTH, "done executing command - returned with code %d", ae->exec_code);
 
@@ -2413,8 +2427,9 @@ void *health_main(void *ptr) {
                     else
                         delay = rc->delay_down_current;
 
-                    if(now + delay < rc->delay_up_to_timestamp)
-                        delay = rc->delay_up_to_timestamp - now;
+                    // COMMENTED: because we do need to send raising alarms
+                    // if(now + delay < rc->delay_up_to_timestamp)
+                    //    delay = (int)(rc->delay_up_to_timestamp - now);
 
                     rc->delay_last = delay;
                     rc->delay_up_to_timestamp = now + delay;
