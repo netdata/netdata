@@ -2719,7 +2719,7 @@ function alarmsUpdateModal() {
                 else {
                     delay = '<small><br/>hysteresis ';
                     if(alarm.delay_up_duration > 0) {
-                        delay += 'on&nbsp;raise&nbsp;<code>' + frequency_text(alarm.delay_up_duration) + '</code>, ';
+                        delay += 'on&nbsp;escalation&nbsp;<code>' + frequency_text(alarm.delay_up_duration) + '</code>, ';
                     }
                     if(alarm.delay_down_duration > 0) {
                         delay += 'on&nbsp;recovery&nbsp;<code>' + frequency_text(alarm.delay_down_duration) + '</code>, ';
