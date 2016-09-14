@@ -131,7 +131,7 @@ to_pushover="${!arr_pushover[*]}"
 
 # build the list of email recipients (email addresses)
 to_email=
-for x in "${!arr_email[*]}"
+for x in "${!arr_email[@]}"
 do
     [ ! -z "${to_email}" ] && to_email="${to_email}, "
     to_email="${to_email}${x}"
