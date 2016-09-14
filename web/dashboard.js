@@ -5606,9 +5606,16 @@
                 return;
             }
 
+            var value = entry.value;
+            if(NETDATA.alarms.current !== null) {
+                var t = NETDATA.alarms.current.alarms[entry.chart + '.' + entry.name];
+                if(typeof t !== 'undefined' && entry.status == t.status)
+                    value = t.value;
+            }
+
             var name = entry.name.replace(/_/g, ' ');
             var status = entry.status.toLowerCase();
-            var title = name + ' = ' + ((entry.value === null)?'NaN':Math.floor(entry.value)).toString() + ' ' + entry.units;
+            var title = name + ' = ' + ((value === null)?'NaN':Math.floor(value)).toString() + ' ' + entry.units;
             var tag = entry.alarm_id;
             var icon = 'images/seo-performance-128.png';
             var interaction = false;

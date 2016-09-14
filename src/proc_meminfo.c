@@ -105,15 +105,15 @@ int do_proc_meminfo(int update_every, unsigned long long dt) {
         if(!st) {
             st = rrdset_create("system", "ram", NULL, "ram", NULL, "System RAM", "MB", 200, update_every, RRDSET_TYPE_STACKED);
 
-            rrddim_add(st, "buffers", NULL, 1, 1024, RRDDIM_ABSOLUTE);
+            rrddim_add(st, "free",    NULL, 1, 1024, RRDDIM_ABSOLUTE);
             rrddim_add(st, "used",    NULL, 1, 1024, RRDDIM_ABSOLUTE);
             rrddim_add(st, "cached",  NULL, 1, 1024, RRDDIM_ABSOLUTE);
-            rrddim_add(st, "free",    NULL, 1, 1024, RRDDIM_ABSOLUTE);
+            rrddim_add(st, "buffers", NULL, 1, 1024, RRDDIM_ABSOLUTE);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "used", MemUsed);
         rrddim_set(st, "free", MemFree);
+        rrddim_set(st, "used", MemUsed);
         rrddim_set(st, "cached", Cached);
         rrddim_set(st, "buffers", Buffers);
         rrdset_done(st);
