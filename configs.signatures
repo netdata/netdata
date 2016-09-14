@@ -131,6 +131,7 @@ declare -A configs_signatures=(
   ['42ad0e70b1365b6e7244cc305dbaa529']='health_alarm_notify.conf'
   ['707a63f53f4b32e01d134ae90ba94aad']='health_alarm_notify.conf'
   ['a55133f1b0be0a4255057849dd451b09']='health_alarm_notify.conf'
+  ['a89c516a1144435a88decf25509318ac']='health_alarm_notify.conf'
   ['ce2e8768964a936f58c4c2144aee8a01']='health_alarm_notify.conf'
   ['f8dade4484f1b6a48655388502df7d5a']='health_alarm_notify.conf'
   ['ff1b3d8ae8b2149c711d8da9b7a9c4bd']='health_alarm_notify.conf'
