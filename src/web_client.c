@@ -665,7 +665,7 @@ int web_client_api_request_v1_alarms(struct web_client *w, char *url)
     int all = 0;
 
     while(url) {
-        char *value = mystrsep(&url, "?&[]");
+        char *value = mystrsep(&url, "?&");
         if (!value || !*value) continue;
 
         if(!strcmp(value, "all")) all = 1;
@@ -683,7 +683,7 @@ int web_client_api_request_v1_alarm_log(struct web_client *w, char *url)
     uint32_t after = 0;
 
     while(url) {
-        char *value = mystrsep(&url, "?&[]");
+        char *value = mystrsep(&url, "?&");
         if (!value || !*value) continue;
 
         char *name = mystrsep(&value, "=");
@@ -717,7 +717,7 @@ int web_client_api_request_v1_chart(struct web_client *w, char *url)
     buffer_flush(w->response.data);
 
     while(url) {
-        char *value = mystrsep(&url, "?&[]");
+        char *value = mystrsep(&url, "?&");
         if(!value || !*value) continue;
 
         char *name = mystrsep(&value, "=");
@@ -781,7 +781,7 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
     uint32_t options = 0x00000000;
 
     while(url) {
-        char *value = mystrsep(&url, "/?&[]");
+        char *value = mystrsep(&url, "/?&");
         if(!value || !*value) continue;
 
         char *name = mystrsep(&value, "=");
@@ -1011,7 +1011,7 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
     uint32_t options = 0x00000000;
 
     while(url) {
-        char *value = mystrsep(&url, "?&[]");
+        char *value = mystrsep(&url, "?&");
         if(!value || !*value) continue;
 
         char *name = mystrsep(&value, "=");
@@ -1206,7 +1206,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 */
 
     while(url) {
-        char *value = mystrsep(&url, "?&[]");
+        char *value = mystrsep(&url, "?&");
         if (!value || !*value) continue;
 
         char *name = mystrsep(&value, "=");
