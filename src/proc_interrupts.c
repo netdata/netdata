@@ -143,15 +143,14 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
         int c;
 
         for(c = 0; c < cpus ; c++) {
-            char id[256+1];
-            snprintfz(id, 256, "cpu%d_interrupts", c);
+            char id[50+1];
+            snprintfz(id, 50, "cpu%d_interrupts", c);
 
             st = rrdset_find_bytype("cpu", id);
             if(!st) {
-                char name[256+1], title[256+1];
-                snprintfz(name, 256, "cpu%d_interrupts", c);
-                snprintfz(title, 256, "CPU%d Interrupts", c);
-                st = rrdset_create("cpu", id, name, "interrupts", "cpu.interrupts", title, "interrupts/s", 1100 + c, update_every, RRDSET_TYPE_STACKED);
+                char title[100+1];
+                snprintfz(title, 100, "CPU%d Interrupts", c);
+                st = rrdset_create("cpu", id, NULL, "interrupts", "cpu.interrupts", title, "interrupts/s", 1100 + c, update_every, RRDSET_TYPE_STACKED);
 
                 for(l = 0; l < lines ;l++) {
                     struct interrupt *irr = irrindex(irrs, l, cpus);

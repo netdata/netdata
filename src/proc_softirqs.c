@@ -134,8 +134,8 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
         int c;
 
         for(c = 0; c < cpus ; c++) {
-            char id[256+1];
-            snprintfz(id, 256, "cpu%d_softirqs", c);
+            char id[50+1];
+            snprintfz(id, 50, "cpu%d_softirqs", c);
 
             st = rrdset_find_bytype("cpu", id);
             if(!st) {
@@ -148,10 +148,9 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
                 }
                 if(core_sum == 0) continue; // try next core
 
-                char name[256+1], title[256+1];
-                snprintfz(name, 256, "cpu%d_softirqs", c);
-                snprintfz(title, 256, "CPU%d softirqs", c);
-                st = rrdset_create("cpu", id, name, "softirqs", "cpu.softirqs", title, "softirqs/s", 3000 + c, update_every, RRDSET_TYPE_STACKED);
+                char title[100+1];
+                snprintfz(title, 100, "CPU%d softirqs", c);
+                st = rrdset_create("cpu", id, NULL, "softirqs", "cpu.softirqs", title, "softirqs/s", 3000 + c, update_every, RRDSET_TYPE_STACKED);
 
                 for(l = 0; l < lines ;l++) {
                     struct interrupt *irr = irrindex(irrs, l, cpus);
