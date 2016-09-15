@@ -693,6 +693,7 @@ static inline void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc) {
     rrdhost_check_rdlock(host);
 
     if(rc->calculation) {
+        rc->calculation->status = &rc->status;
         rc->calculation->this = &rc->value;
         rc->calculation->after = &rc->db_after;
         rc->calculation->before = &rc->db_before;
@@ -700,6 +701,7 @@ static inline void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc) {
     }
 
     if(rc->warning) {
+        rc->warning->status = &rc->status;
         rc->warning->this = &rc->value;
         rc->warning->after = &rc->db_after;
         rc->warning->before = &rc->db_before;
@@ -707,6 +709,7 @@ static inline void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc) {
     }
 
     if(rc->critical) {
+        rc->critical->status = &rc->status;
         rc->critical->this = &rc->value;
         rc->critical->after = &rc->db_after;
         rc->critical->before = &rc->db_before;
@@ -1086,6 +1089,11 @@ static inline int health_parse_delay(
         int *delay_max_duration,
         float *delay_multiplier) {
 
+    char given_up = 0;
+    char given_down = 0;
+    char given_max = 0;
+    char given_multiplier = 0;
+
     char *s = string;
     while(*s) {
         char *key = s;
@@ -1104,12 +1112,14 @@ static inline int health_parse_delay(
                 error("Health configuration at line %zu of file '%s/%s': invalid value '%s' for '%s' keyword",
                       line, path, file, value, key);
             }
+            else given_up = 1;
         }
         else if(!strcasecmp(key, "down")) {
             if (!health_parse_duration(value, delay_down_duration)) {
                 error("Health configuration at line %zu of file '%s/%s': invalid value '%s' for '%s' keyword",
                       line, path, file, value, key);
             }
+            else given_down = 1;
         }
         else if(!strcasecmp(key, "multiplier")) {
             *delay_multiplier = strtof(value, NULL);
@@ -1117,17 +1127,36 @@ static inline int health_parse_delay(
                 error("Health configuration at line %zu of file '%s/%s': invalid value '%s' for '%s' keyword",
                       line, path, file, value, key);
             }
+            else given_multiplier = 1;
         }
         else if(!strcasecmp(key, "max")) {
             if (!health_parse_duration(value, delay_max_duration)) {
                 error("Health configuration at line %zu of file '%s/%s': invalid value '%s' for '%s' keyword",
                       line, path, file, value, key);
             }
+            else given_max = 1;
         }
         else {
             error("Health configuration at line %zu of file '%s/%s': unknown keyword '%s'",
                   line, path, file, key);
         }
+    }
+
+    if(!given_up)
+        *delay_up_duration = 0;
+
+    if(!given_down)
+        *delay_down_duration = 0;
+
+    if(!given_multiplier)
+        *delay_multiplier = 1.0;
+
+    if(!given_max) {
+        if((*delay_max_duration) < (*delay_up_duration) * (*delay_multiplier))
+            *delay_max_duration = (*delay_up_duration) * (*delay_multiplier);
+
+        if((*delay_max_duration) < (*delay_down_duration) * (*delay_multiplier))
+            *delay_max_duration = (*delay_down_duration) * (*delay_multiplier);
     }
 
     return 1;
@@ -1836,7 +1865,7 @@ static inline void health_rrdcalc2json_nolock(BUFFER *wb, RRDCALC *rc) {
             , rc->delay_max_duration
             , rc->delay_multiplier
             , rc->delay_last
-            , rc->delay_up_to_timestamp
+            , (unsigned long)rc->delay_up_to_timestamp
     );
 
     if(RRDCALC_HAS_DB_LOOKUP(rc)) {
@@ -1998,8 +2027,23 @@ static inline int rrdcalc_value2status(calculated_number n) {
 static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->notifications |= HEALTH_ENTRY_NOTIFICATIONS_PROCESSED;
 
-    if(ae->old_status == RRDCALC_STATUS_UNINITIALIZED && ae->new_status == RRDCALC_STATUS_CLEAR)
+    // find the previous notification for the same alarm
+    ALARM_ENTRY *t;
+    for(t = ae->next; t ;t = t->next) {
+        if(t->alarm_id == ae->alarm_id && t->notifications & HEALTH_ENTRY_NOTIFICATIONS_PROCESSED)
+            break;
+    }
+
+    if(t && t->new_status == ae->new_status) {
+        // don't send the same notification again
+        info("Health not sending again notification for alarm '%s.%s' status %s", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
         return;
+    }
+
+    if(ae->old_status == RRDCALC_STATUS_UNINITIALIZED && ae->new_status == RRDCALC_STATUS_CLEAR) {
+        info("Health not sending notification for first initialization of alarm '%s.%s' status %s", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
+        return;
+    }
 
     char buffer[FILENAME_MAX + 1];
     pid_t command_pid;
@@ -2044,7 +2088,6 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     debug(D_HEALTH, "HEALTH reading from command");
     char *s = fgets(buffer, FILENAME_MAX, fp);
     (void)s;
-    debug(D_HEALTH, "HEALTH closing command");
     ae->exec_code = mypclose(fp, command_pid);
     debug(D_HEALTH, "done executing command - returned with code %d", ae->exec_code);
 
@@ -2413,8 +2456,9 @@ void *health_main(void *ptr) {
                     else
                         delay = rc->delay_down_current;
 
-                    if(now + delay < rc->delay_up_to_timestamp)
-                        delay = rc->delay_up_to_timestamp - now;
+                    // COMMENTED: because we do need to send raising alarms
+                    // if(now + delay < rc->delay_up_to_timestamp)
+                    //    delay = (int)(rc->delay_up_to_timestamp - now);
 
                     rc->delay_last = delay;
                     rc->delay_up_to_timestamp = now + delay;
