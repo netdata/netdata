@@ -1,24 +1,15 @@
 #include "common.h"
 
 static inline char *softnet_column_name(uint32_t column) {
-    static char buf[4] = "c00";
-    char *s;
-
     switch(column) {
-        case 0: s = "total"; break;
-        case 1: s = "dropped"; break;
-        case 2: s = "squeezed"; break;
-        case 8: s = "collisions"; break;
-        default: {
-            uint32_t c = column + 1;
-            buf[1] = '0' + ( c / 10);   c = c % 10;
-            buf[2] = '0' + c;
-            s = buf;
-            break;
-        }
+        // https://github.com/torvalds/linux/blob/a7fd20d1c476af4563e66865213474a2f9f473a4/net/core/net-procfs.c#L161-L166
+        case 0: return "processed";
+        case 1: return "dropped";
+        case 2: return "squeezed";
+        case 9: return "received_rps";
+        case 10: return "flow_limit_count";
+        default: return NULL;
     }
-
-    return s;
 }
 
 int do_proc_net_softnet_stat(int update_every, unsigned long long dt) {
@@ -69,9 +60,11 @@ int do_proc_net_softnet_stat(int update_every, unsigned long long dt) {
         if(words > allocated_columns) words = allocated_columns;
 
         for(w = 0; w < words ; w++) {
-            uint32_t t = strtoul(procfile_lineword(ff, l, w), NULL, 16);
-            data[w] += t;
-            data[((l + 1) * allocated_columns) + w] = t;
+            if(unlikely(softnet_column_name(w))) {
+                uint32_t t = strtoul(procfile_lineword(ff, l, w), NULL, 16);
+                data[w] += t;
+                data[((l + 1) * allocated_columns) + w] = t;
+            }
         }
     }
 
@@ -86,12 +79,14 @@ int do_proc_net_softnet_stat(int update_every, unsigned long long dt) {
     if(!st) {
         st = rrdset_create("system", "softnet_stat", NULL, "softnet_stat", NULL, "System softnet_stat", "events/s", 955, update_every, RRDSET_TYPE_LINE);
         for(w = 0; w < allocated_columns ;w++)
-            rrddim_add(st, softnet_column_name(w), NULL, 1, 1, RRDDIM_INCREMENTAL);
+            if(unlikely(softnet_column_name(w)))
+                rrddim_add(st, softnet_column_name(w), NULL, 1, 1, RRDDIM_INCREMENTAL);
     }
     else rrdset_next(st);
 
     for(w = 0; w < allocated_columns ;w++)
-        rrddim_set(st, softnet_column_name(w), data[w]);
+        if(unlikely(softnet_column_name(w)))
+            rrddim_set(st, softnet_column_name(w), data[w]);
 
     rrdset_done(st);
 
@@ -107,12 +102,14 @@ int do_proc_net_softnet_stat(int update_every, unsigned long long dt) {
 
                 st = rrdset_create("cpu", id, NULL, "softnet_stat", NULL, title, "events/s", 4101 + l, update_every, RRDSET_TYPE_LINE);
                 for(w = 0; w < allocated_columns ;w++)
-                    rrddim_add(st, softnet_column_name(w), NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    if(unlikely(softnet_column_name(w)))
+                        rrddim_add(st, softnet_column_name(w), NULL, 1, 1, RRDDIM_INCREMENTAL);
             }
             else rrdset_next(st);
 
             for(w = 0; w < allocated_columns ;w++)
-                rrddim_set(st, softnet_column_name(w), data[((l + 1) * allocated_columns) + w]);
+                if(unlikely(softnet_column_name(w)))
+                    rrddim_set(st, softnet_column_name(w), data[((l + 1) * allocated_columns) + w]);
 
             rrdset_done(st);
         }
