@@ -57,6 +57,7 @@ dist_healthconfig_DATA = \
 	health.d/ram.conf \
 	health.d/redis.conf \
 	health.d/retroshare.conf \
+	health.d/softnet.conf \
 	health.d/swap.conf \
 	health.d/squid.conf \
 	$(NULL)

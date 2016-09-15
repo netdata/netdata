@@ -32,6 +32,7 @@ void *proc_main(void *ptr)
     int vdo_proc_sys_kernel_random_entropy_avail    = !config_get_boolean("plugin:proc", "/proc/sys/kernel/random/entropy_avail", 1);
     int vdo_proc_interrupts         = !config_get_boolean("plugin:proc", "/proc/interrupts", 1);
     int vdo_proc_softirqs           = !config_get_boolean("plugin:proc", "/proc/softirqs", 1);
+    int vdo_proc_net_softnet_stat   = !config_get_boolean("plugin:proc", "/proc/net/softnet_stat", 1);
     int vdo_proc_loadavg            = !config_get_boolean("plugin:proc", "/proc/loadavg", 1);
     int vdo_sys_kernel_mm_ksm       = !config_get_boolean("plugin:proc", "/sys/kernel/mm/ksm", 1);
     int vdo_cpu_netdata             = !config_get_boolean("plugin:proc", "netdata server resources", 1);
@@ -52,6 +53,7 @@ void *proc_main(void *ptr)
     unsigned long long sutime_proc_sys_kernel_random_entropy_avail = 0ULL;
     unsigned long long sutime_proc_interrupts = 0ULL;
     unsigned long long sutime_proc_softirqs = 0ULL;
+    unsigned long long sutime_proc_net_softnet_stat = 0ULL;
     unsigned long long sutime_proc_loadavg = 0ULL;
     unsigned long long sutime_sys_kernel_mm_ksm = 0ULL;
 
@@ -104,6 +106,14 @@ void *proc_main(void *ptr)
             sunow = time_usec();
             vdo_proc_softirqs = do_proc_softirqs(rrd_update_every, (sutime_proc_softirqs > 0)?sunow - sutime_proc_softirqs:0ULL);
             sutime_proc_softirqs = sunow;
+        }
+        if(unlikely(netdata_exit)) break;
+
+        if(!vdo_proc_net_softnet_stat) {
+            debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_softnet_stat().");
+            sunow = time_usec();
+            vdo_proc_net_softnet_stat = do_proc_net_softnet_stat(rrd_update_every, (sutime_proc_net_softnet_stat > 0)?sunow - sutime_proc_net_softnet_stat:0ULL);
+            sutime_proc_net_softnet_stat = sunow;
         }
         if(unlikely(netdata_exit)) break;
 
