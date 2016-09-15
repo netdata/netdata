@@ -2791,15 +2791,13 @@ function alarmsUpdateModal() {
             if(chart.priority < families[family].priority)
                 families[family].priority = chart.priority;
 
-            families[family].arr.push(alarm);
+            families[family].arr.unshift(alarm);
         }
 
         // sort the families, like the dashboard menu does
         var families_sorted = families_sort.sort(function (a, b) {
             if (a.priority > b.priority) return -1;
             if (a.priority < b.priority) return 1;
-            if (a.id > b.id) return 1;
-            if (a.id < b.id) return -1;
             return 0;
         });
 
