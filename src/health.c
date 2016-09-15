@@ -834,7 +834,7 @@ void rrdcalc_free(RRDHOST *host, RRDCALC *rc) {
     else if(likely(host->alarms)) {
         RRDCALC *t, *last = host->alarms;
         for(t = last->next; t && t != rc; last = t, t = t->next) ;
-        if(last && last->next == rc)
+        if(last->next == rc)
             last->next = rc->next;
         else
             error("Cannot unlink alarm '%s.%s' from host '%s': not found", rc->chart?rc->chart:"NOCHART", rc->name, host->hostname);
