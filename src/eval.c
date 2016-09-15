@@ -74,7 +74,7 @@ static inline calculated_number eval_check_number(calculated_number n, int *erro
 }
 
 static inline calculated_number eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *v, int *error) {
-    static uint32_t this_hash = 0, now_hash = 0, after_hash = 0, before_hash = 0;
+    static uint32_t this_hash = 0, now_hash = 0, after_hash = 0, before_hash = 0, status_hash = 0, removed_hash = 0, uninitialized_hash = 0, undefined_hash = 0, clear_hash = 0, warning_hash = 0, critical_hash = 0;
     calculated_number n;
 
     if(unlikely(this_hash == 0)) {
@@ -82,9 +82,16 @@ static inline calculated_number eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABL
         now_hash = simple_hash("now");
         after_hash = simple_hash("after");
         before_hash = simple_hash("before");
+        status_hash = simple_hash("status");
+        removed_hash = simple_hash("REMOVED");
+        uninitialized_hash = simple_hash("UNINITIALIZED");
+        undefined_hash = simple_hash("UNDEFINED");
+        clear_hash = simple_hash("CLEAR");
+        warning_hash = simple_hash("WARNING");
+        critical_hash = simple_hash("CRITICAL");
     }
 
-    if(v->hash == this_hash && !strcmp(v->name, "this")) {
+    if(unlikely(v->hash == this_hash && !strcmp(v->name, "this"))) {
         n = (exp->this)?*exp->this:NAN;
         buffer_strcat(exp->error_msg, "[ $this = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -92,7 +99,7 @@ static inline calculated_number eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABL
         return n;
     }
 
-    if(v->hash == after_hash && !strcmp(v->name, "after")) {
+    if(unlikely(v->hash == after_hash && !strcmp(v->name, "after"))) {
         n = (exp->after && *exp->after)?*exp->after:NAN;
         buffer_strcat(exp->error_msg, "[ $after = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -100,7 +107,7 @@ static inline calculated_number eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABL
         return n;
     }
 
-    if(v->hash == before_hash && !strcmp(v->name, "before")) {
+    if(unlikely(v->hash == before_hash && !strcmp(v->name, "before"))) {
         n = (exp->before && *exp->before)?*exp->before:NAN;
         buffer_strcat(exp->error_msg, "[ $before = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -108,9 +115,65 @@ static inline calculated_number eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABL
         return n;
     }
 
-    if(v->hash == now_hash && !strcmp(v->name, "now")) {
+    if(unlikely(v->hash == now_hash && !strcmp(v->name, "now"))) {
         n = time(NULL);
         buffer_strcat(exp->error_msg, "[ $now = ");
+        print_parsed_as_constant(exp->error_msg, n);
+        buffer_strcat(exp->error_msg, " ] ");
+        return n;
+    }
+
+    if(unlikely(v->hash == status_hash && !strcmp(v->name, "status"))) {
+        n = (exp->status)?*exp->status:RRDCALC_STATUS_UNINITIALIZED;
+        buffer_strcat(exp->error_msg, "[ $status = ");
+        print_parsed_as_constant(exp->error_msg, n);
+        buffer_strcat(exp->error_msg, " ] ");
+        return n;
+    }
+
+    if(unlikely(v->hash == removed_hash && !strcmp(v->name, "REMOVED"))) {
+        n = RRDCALC_STATUS_REMOVED;
+        buffer_strcat(exp->error_msg, "[ $REMOVED = ");
+        print_parsed_as_constant(exp->error_msg, n);
+        buffer_strcat(exp->error_msg, " ] ");
+        return n;
+    }
+
+    if(unlikely(v->hash == uninitialized_hash && !strcmp(v->name, "UNINITIALIZED"))) {
+        n = RRDCALC_STATUS_UNINITIALIZED;
+        buffer_strcat(exp->error_msg, "[ $UNINITIALIZED = ");
+        print_parsed_as_constant(exp->error_msg, n);
+        buffer_strcat(exp->error_msg, " ] ");
+        return n;
+    }
+
+    if(unlikely(v->hash == undefined_hash && !strcmp(v->name, "UNDEFINED"))) {
+        n = RRDCALC_STATUS_UNDEFINED;
+        buffer_strcat(exp->error_msg, "[ $UNDEFINED = ");
+        print_parsed_as_constant(exp->error_msg, n);
+        buffer_strcat(exp->error_msg, " ] ");
+        return n;
+    }
+
+    if(unlikely(v->hash == clear_hash && !strcmp(v->name, "CLEAR"))) {
+        n = RRDCALC_STATUS_CLEAR;
+        buffer_strcat(exp->error_msg, "[ $CLEAR = ");
+        print_parsed_as_constant(exp->error_msg, n);
+        buffer_strcat(exp->error_msg, " ] ");
+        return n;
+    }
+
+    if(unlikely(v->hash == warning_hash && !strcmp(v->name, "WARNING"))) {
+        n = RRDCALC_STATUS_WARNING;
+        buffer_strcat(exp->error_msg, "[ $WARNING = ");
+        print_parsed_as_constant(exp->error_msg, n);
+        buffer_strcat(exp->error_msg, " ] ");
+        return n;
+    }
+
+    if(unlikely(v->hash == critical_hash && !strcmp(v->name, "CRITICAL"))) {
+        n = RRDCALC_STATUS_CRITICAL;
+        buffer_strcat(exp->error_msg, "[ $CRITICAL = ");
         print_parsed_as_constant(exp->error_msg, n);
         buffer_strcat(exp->error_msg, " ] ");
         return n;
@@ -265,7 +328,6 @@ static struct operator {
         // this is a random access array
         // we always access it with a known EVAL_OPERATOR_X
 
-        [EVAL_OPERATOR_IF_THEN_ELSE]          = { "?",  1, 3, 0, eval_if_then_else },
         [EVAL_OPERATOR_AND]                   = { "&&", 2, 2, 0, eval_and },
         [EVAL_OPERATOR_OR]                    = { "||", 2, 2, 0, eval_or },
         [EVAL_OPERATOR_GREATER_THAN_OR_EQUAL] = { ">=", 3, 2, 0, eval_greater_than_or_equal },
@@ -282,8 +344,9 @@ static struct operator {
         [EVAL_OPERATOR_SIGN_PLUS]             = { "+",  6, 1, 0, eval_sign_plus },
         [EVAL_OPERATOR_SIGN_MINUS]            = { "-",  6, 1, 0, eval_sign_minus },
         [EVAL_OPERATOR_ABS]                   = { "abs(",6,1, 1, eval_abs },
-        [EVAL_OPERATOR_NOP]                   = { NULL, 7, 1, 0, eval_nop },
-        [EVAL_OPERATOR_EXPRESSION_OPEN]       = { NULL, 7, 1, 0, eval_nop },
+        [EVAL_OPERATOR_IF_THEN_ELSE]          = { "?",  7, 3, 0, eval_if_then_else },
+        [EVAL_OPERATOR_NOP]                   = { NULL, 8, 1, 0, eval_nop },
+        [EVAL_OPERATOR_EXPRESSION_OPEN]       = { NULL, 8, 1, 0, eval_nop },
 
         // this should exist in our evaluation list
         [EVAL_OPERATOR_EXPRESSION_CLOSE]      = { NULL, 99, 1, 0, eval_nop }
