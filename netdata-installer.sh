@@ -25,6 +25,9 @@ printf "CFLAGS=\"%s\" " "${CFLAGS}" >>netdata-installer.log
 printf "%q " "$0" "${@}" >>netdata-installer.log
 printf "\n" >>netdata-installer.log
 
+REINSTALL_PWD="${PWD}"
+REINSTALL_COMMAND="$(printf "CFLAGS=\"%s\" " "${CFLAGS}"; printf "%q " "$0" "${@}"; printf "\n")"
+
 service="$(which service 2>/dev/null || command -v service 2>/dev/null)"
 systemctl="$(which systemctl 2>/dev/null || command -v systemctl 2>/dev/null)"
 service() {
@@ -1070,3 +1073,64 @@ Enjoy!
 
 END
 echo >&2 "Uninstall script generated: ./netdata-uninstaller.sh"
+
+cat >netdata-updater.sh.new <<REINSTALL
+#!/usr/bin/env bash
+
+# make sure we cd to the working directory
+cd "${REINSTALL_PWD}" || exit 1
+
+# signal netdata to start saving its database
+# this is handy if your database is big
+pids=\$(pidof netdata)
+[ ! -z "\${pids}" ] && kill -USR1 \${pids}
+
+# this is what we will do if it fails (head-less only)
+failed() {
+  echo >&2 "\$(date) : FAILED TO UPDATE NETDATA : \${1}"
+  cat >&2 "\${tmp}"
+  rm "\${tmp}"
+  exit 1
+}
+
+update() {
+    if [ -t 1 -a -t 2 ]
+        then
+        # running on a terminal
+        echo >&2 "Running on a terminal - (this script also supports running headless from crontab)"
+
+        echo >&2
+        echo >&2 "Updating source..."
+        git pull || exit 1
+
+        echo >&2
+        echo >&2 "re-installing..."
+        ${REINSTALL_COMMAND// --dont-wait/} --dont-wait || exit 1
+
+    else
+        # running head-less
+        # do not generate any output, unless we fail
+
+        # create a temporary file for the log
+        tmp=\$(mktemp /tmp/netdata-updater-log-XXXXXX.log)
+
+        # update source from git
+        git pull >>"\${tmp}" 2>&1 || failed "CANNOT FETCH LATEST SOURCE"
+
+        # install the latest version
+        ${REINSTALL_COMMAND// --dont-wait/} --dont-wait >>"\${tmp}" 2>&1 || failed "CANNOT BUILD AND INSTALL NETDATA"
+
+        rm "\${tmp}"
+    fi
+
+    return 0
+}
+
+# the installer updates this script - so we run and exit in a single line
+update && exit 0
+###############################################################################
+###############################################################################
+REINSTALL
+chmod 755 netdata-updater.sh.new
+mv -f netdata-updater.sh.new netdata-updater.sh
+echo >&2 "Update script generated   : ./netdata-updater.sh"

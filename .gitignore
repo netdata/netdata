@@ -29,6 +29,9 @@ netdata.spec
 
 *.tar.*
 
+cov-int/
+netdata-coverity-analysis.tgz
+
 .cproject
 .idea/
 .project
@@ -66,6 +69,7 @@ python.d/python-modules-installer.sh
 
 netdata-installer.log
 netdata-uninstaller.sh
+netdata-updater.sh
 
 gmon.out
 gmon.txt
