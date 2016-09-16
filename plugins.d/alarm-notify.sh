@@ -438,7 +438,7 @@ severity="${status}"
 # the time the alarm was raised
 duration4human ${duration} >/dev/null; duration_txt="${REPLY}"
 duration4human ${non_clear_duration} >/dev/null; non_clear_duration_txt="${REPLY}"
-raised_for="(was ${old_status,,} for ${duration_txt}"
+raised_for="(was ${old_status,,} for ${duration_txt})"
 
 # the key status message
 status_message="status unknown"
