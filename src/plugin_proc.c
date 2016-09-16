@@ -28,6 +28,7 @@ void *proc_main(void *ptr)
     int vdo_proc_stat               = !config_get_boolean("plugin:proc", "/proc/stat", 1);
     int vdo_proc_meminfo            = !config_get_boolean("plugin:proc", "/proc/meminfo", 1);
     int vdo_proc_vmstat             = !config_get_boolean("plugin:proc", "/proc/vmstat", 1);
+    int vdo_proc_net_rpc_nfs        = !config_get_boolean("plugin:proc", "/proc/net/rpc/nfs", 1);
     int vdo_proc_net_rpc_nfsd       = !config_get_boolean("plugin:proc", "/proc/net/rpc/nfsd", 1);
     int vdo_proc_sys_kernel_random_entropy_avail    = !config_get_boolean("plugin:proc", "/proc/sys/kernel/random/entropy_avail", 1);
     int vdo_proc_interrupts         = !config_get_boolean("plugin:proc", "/proc/interrupts", 1);
@@ -49,6 +50,7 @@ void *proc_main(void *ptr)
     unsigned long long sutime_proc_stat = 0ULL;
     unsigned long long sutime_proc_meminfo = 0ULL;
     unsigned long long sutime_proc_vmstat = 0ULL;
+    unsigned long long sutime_proc_net_rpc_nfs = 0ULL;
     unsigned long long sutime_proc_net_rpc_nfsd = 0ULL;
     unsigned long long sutime_proc_sys_kernel_random_entropy_avail = 0ULL;
     unsigned long long sutime_proc_interrupts = 0ULL;
@@ -218,6 +220,14 @@ void *proc_main(void *ptr)
             sunow = time_usec();
             vdo_proc_net_rpc_nfsd = do_proc_net_rpc_nfsd(rrd_update_every, (sutime_proc_net_rpc_nfsd > 0)?sunow - sutime_proc_net_rpc_nfsd:0ULL);
             sutime_proc_net_rpc_nfsd = sunow;
+        }
+        if(unlikely(netdata_exit)) break;
+
+        if(!vdo_proc_net_rpc_nfs) {
+            debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_net_rpc_nfs().");
+            sunow = time_usec();
+            vdo_proc_net_rpc_nfs = do_proc_net_rpc_nfs(rrd_update_every, (sutime_proc_net_rpc_nfs > 0)?sunow - sutime_proc_net_rpc_nfs:0ULL);
+            sutime_proc_net_rpc_nfs = sunow;
         }
         if(unlikely(netdata_exit)) break;
 
