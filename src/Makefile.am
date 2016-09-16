@@ -52,6 +52,7 @@ netdata_SOURCES = \
 	proc_net_dev.c \
 	proc_net_ip_vs_stats.c \
 	proc_net_netstat.c \
+	proc_net_rpc_nfs.c \
 	proc_net_rpc_nfsd.c \
 	proc_net_snmp.c \
 	proc_net_snmp6.c \
