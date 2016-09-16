@@ -2042,8 +2042,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
         return;
     }
 
-    if(ae->old_status == RRDCALC_STATUS_UNDEFINED && ae->new_status == RRDCALC_STATUS_UNINITIALIZED
-        || ae->old_status == RRDCALC_STATUS_UNINITIALIZED && ae->new_status == RRDCALC_STATUS_CLEAR) {
+    if((ae->old_status == RRDCALC_STATUS_UNDEFINED && ae->new_status == RRDCALC_STATUS_UNINITIALIZED)
+        || (ae->old_status == RRDCALC_STATUS_UNINITIALIZED && ae->new_status == RRDCALC_STATUS_CLEAR)) {
         info("Health not sending notification for first initialization of alarm '%s.%s' status %s", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
         return;
     }
