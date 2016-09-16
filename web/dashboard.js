@@ -5558,7 +5558,7 @@
             dataType: "script",
             xhrFields: { withCredentials: true } // required for the cookie
         })
-        .success(function() {
+        .done(function() {
             if(NETDATA.options.debug.main_loop === true)
                 console.log('loaded ' + NETDATA.requiredJs[index].url);
 
