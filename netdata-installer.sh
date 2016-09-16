@@ -1077,6 +1077,13 @@ echo >&2 "Uninstall script generated: ./netdata-uninstaller.sh"
 cat >netdata-updater.sh.new <<REINSTALL
 #!/usr/bin/env bash
 
+LAST_UID="${UID}"
+if [ "\${LAST_UID}" != "\${UID}" ]
+    then
+    echo >&2 "This script should be run as user with uid \${LAST_UID} but it now runs with uid \${UID}"
+    exit 1
+fi
+
 # make sure we cd to the working directory
 cd "${REINSTALL_PWD}" || exit 1
 
@@ -1093,6 +1100,13 @@ failed() {
   exit 1
 }
 
+get_latest_commit_id() {
+    git log | grep ^commit | head -n 1 | cut -d ' ' -f 2
+}
+
+last_commit="\$(get_latest_commit_id)"
+[ -z "\${last_commit}" ] && failed "CANNOT GET LAST COMMIT ID"
+
 update() {
     if [ -t 1 -a -t 2 ]
         then
@@ -1102,6 +1116,9 @@ update() {
         echo >&2
         echo >&2 "Updating source..."
         git pull || exit 1
+        new_commit="\$(get_latest_commit_id)"
+        [ -z "\${new_commit}" ] && echo >&2 "CANNOT GET NEW LAST COMMIT ID" && exit 1
+        [ "\${new_commit}" = "\${last_commit}" ] && echo >&2 "Nothing to be done!" && exit 0
 
         echo >&2
         echo >&2 "re-installing..."
@@ -1116,6 +1133,9 @@ update() {
 
         # update source from git
         git pull >>"\${tmp}" 2>&1 || failed "CANNOT FETCH LATEST SOURCE"
+        new_commit="\$(get_latest_commit_id)"
+        [ -z "\${new_commit}" ] && failed "CANNOT GET NEW LAST COMMIT ID"
+        [ "\${new_commit}" = "\${last_commit}" ] && exit 0
 
         # install the latest version
         ${REINSTALL_COMMAND// --dont-wait/} --dont-wait >>"\${tmp}" 2>&1 || failed "CANNOT BUILD AND INSTALL NETDATA"
