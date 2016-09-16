@@ -2,47 +2,135 @@
 
 struct nfsd_procs {
     char name[30];
-    unsigned long long proc2;
-    unsigned long long proc3;
-    unsigned long long proc4;
-    int present2;
-    int present3;
-    int present4;
-};
-
-struct nfsd_procs nfsd_proc_values[] = {
-    { "null", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "getattr", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "setattr", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "lookup", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "access", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "readlink", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "read", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "write", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "create", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "mkdir", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "symlink", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "mknod", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "remove", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "rmdir", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "rename", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "link", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "readdir", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "readdirplus", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "fsstat", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "fsinfo", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "pathconf", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "commit", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-    { "", 0ULL, 0ULL, 0ULL, 0, 0, 0 },
-};
-
-struct nfsd4_ops {
-    char name[30];
     unsigned long long value;
     int present;
 };
 
-struct nfsd4_ops nfsd4_ops_values[] = {
+struct nfsd_procs nfsd_proc2_values[] = {
+    { "null", 0ULL, 0 },
+    { "getattr", 0ULL, 0 },
+    { "setattr", 0ULL, 0 },
+    { "root", 0ULL, 0 },
+    { "lookup", 0ULL, 0 },
+    { "readlink", 0ULL, 0 },
+    { "read", 0ULL, 0 },
+    { "wrcache", 0ULL, 0 },
+    { "write", 0ULL, 0 },
+    { "create", 0ULL, 0 },
+    { "remove", 0ULL, 0 },
+    { "rename", 0ULL, 0 },
+    { "link", 0ULL, 0 },
+    { "symlink", 0ULL, 0 },
+    { "mkdir", 0ULL, 0 },
+    { "rmdir", 0ULL, 0 },
+    { "readdir", 0ULL, 0 },
+    { "fsstat", 0ULL, 0 },
+
+    /* termination */
+    { "", 0ULL, 0 }
+};
+
+struct nfsd_procs nfsd_proc3_values[] = {
+    { "null", 0ULL, 0 },
+    { "getattr", 0ULL, 0 },
+    { "setattr", 0ULL, 0 },
+    { "lookup", 0ULL, 0 },
+    { "access", 0ULL, 0 },
+    { "readlink", 0ULL, 0 },
+    { "read", 0ULL, 0 },
+    { "write", 0ULL, 0 },
+    { "create", 0ULL, 0 },
+    { "mkdir", 0ULL, 0 },
+    { "symlink", 0ULL, 0 },
+    { "mknod", 0ULL, 0 },
+    { "remove", 0ULL, 0 },
+    { "rmdir", 0ULL, 0 },
+    { "rename", 0ULL, 0 },
+    { "link", 0ULL, 0 },
+    { "readdir", 0ULL, 0 },
+    { "readdirplus", 0ULL, 0 },
+    { "fsstat", 0ULL, 0 },
+    { "fsinfo", 0ULL, 0 },
+    { "pathconf", 0ULL, 0 },
+    { "commit", 0ULL, 0 },
+
+    /* termination */
+    { "", 0ULL, 0 }
+};
+
+struct nfsd_procs nfsd_proc4_values[] = {
+    { "null", 0ULL, 0 },
+    { "read", 0ULL, 0 },
+    { "write", 0ULL, 0 },
+    { "commit", 0ULL, 0 },
+    { "open", 0ULL, 0 },
+    { "open_conf", 0ULL, 0 },
+    { "open_noat", 0ULL, 0 },
+    { "open_dgrd", 0ULL, 0 },
+    { "close", 0ULL, 0 },
+    { "setattr", 0ULL, 0 },
+    { "fsinfo", 0ULL, 0 },
+    { "renew", 0ULL, 0 },
+    { "setclntid", 0ULL, 0 },
+    { "confirm", 0ULL, 0 },
+    { "lock", 0ULL, 0 },
+    { "lockt", 0ULL, 0 },
+    { "locku", 0ULL, 0 },
+    { "access", 0ULL, 0 },
+    { "getattr", 0ULL, 0 },
+    { "lookup", 0ULL, 0 },
+    { "lookup_root", 0ULL, 0 },
+    { "remove", 0ULL, 0 },
+    { "rename", 0ULL, 0 },
+    { "link", 0ULL, 0 },
+    { "symlink", 0ULL, 0 },
+    { "create", 0ULL, 0 },
+    { "pathconf", 0ULL, 0 },
+    { "statfs", 0ULL, 0 },
+    { "readlink", 0ULL, 0 },
+    { "readdir", 0ULL, 0 },
+    { "server_caps", 0ULL, 0 },
+    { "delegreturn", 0ULL, 0 },
+    { "getacl", 0ULL, 0 },
+    { "setacl", 0ULL, 0 },
+    { "fs_locations", 0ULL, 0 },
+    { "rel_lkowner", 0ULL, 0 },
+    { "secinfo", 0ULL, 0 },
+    { "fsid_present", 0ULL, 0 },
+
+    /* nfsv4.1 client ops */
+    { "exchange_id", 0ULL, 0 },
+    { "create_session", 0ULL, 0 },
+    { "destroy_session", 0ULL, 0 },
+    { "sequence", 0ULL, 0 },
+    { "get_lease_time", 0ULL, 0 },
+    { "reclaim_comp", 0ULL, 0 },
+    { "layoutget", 0ULL, 0 },
+    { "getdevinfo", 0ULL, 0 },
+    { "layoutcommit", 0ULL, 0 },
+    { "layoutreturn", 0ULL, 0 },
+    { "secinfo_no", 0ULL, 0 },
+    { "test_stateid", 0ULL, 0 },
+    { "free_stateid", 0ULL, 0 },
+    { "getdevicelist", 0ULL, 0 },
+    { "bind_conn_to_ses", 0ULL, 0 },
+    { "destroy_clientid", 0ULL, 0 },
+
+    /* nfsv4.2 client ops */
+    { "seek", 0ULL, 0 },
+    { "allocate", 0ULL, 0 },
+    { "deallocate", 0ULL, 0 },
+    { "layoutstats", 0ULL, 0 },
+    { "clone", 0ULL, 0 },
+
+    /* termination */
+    { "", 0ULL, 0 }
+};
+
+struct nfsd_procs nfsd4_ops_values[] = {
+    { "unused_op0", 0ULL, 0},
+    { "unused_op1", 0ULL, 0},
+    { "future_op2", 0ULL, 0},
     { "access", 0ULL, 0},
     { "close", 0ULL, 0},
     { "commit", 0ULL, 0},
@@ -56,7 +144,7 @@ struct nfsd4_ops nfsd4_ops_values[] = {
     { "lockt", 0ULL, 0},
     { "locku", 0ULL, 0},
     { "lookup", 0ULL, 0},
-    { "lookupp", 0ULL, 0},
+    { "lookup_root", 0ULL, 0},
     { "nverify", 0ULL, 0},
     { "open", 0ULL, 0},
     { "openattr", 0ULL, 0},
@@ -107,7 +195,7 @@ struct nfsd4_ops nfsd4_ops_values[] = {
     { "copy", 0ULL, 0},
     { "copy_notify", 0ULL, 0},
     { "deallocate", 0ULL, 0},
-    { "io_advise", 0ULL, 0},
+    { "ioadvise", 0ULL, 0},
     { "layouterror", 0ULL, 0},
     { "layoutstats", 0ULL, 0},
     { "offload_cancel", 0ULL, 0},
@@ -174,13 +262,13 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
     unsigned long long th_threads = 0, th_fullcnt = 0, th_hist10 = 0, th_hist20 = 0, th_hist30 = 0, th_hist40 = 0, th_hist50 = 0, th_hist60 = 0, th_hist70 = 0, th_hist80 = 0, th_hist90 = 0, th_hist100 = 0;
     unsigned long long ra_size = 0, ra_hist10 = 0, ra_hist20 = 0, ra_hist30 = 0, ra_hist40 = 0, ra_hist50 = 0, ra_hist60 = 0, ra_hist70 = 0, ra_hist80 = 0, ra_hist90 = 0, ra_hist100 = 0, ra_none = 0;
     unsigned long long net_count = 0, net_udp_count = 0, net_tcp_count = 0, net_tcp_connections = 0;
-    unsigned long long rpc_count = 0, rpc_bad_format = 0, rpc_bad_auth = 0, rpc_bad_client = 0;
+    unsigned long long rpc_calls = 0, rpc_bad_format = 0, rpc_bad_auth = 0, rpc_bad_client = 0;
 
     for(l = 0; l < lines ;l++) {
         words = procfile_linewords(ff, l);
         if(!words) continue;
 
-        type        = procfile_lineword(ff, l, 0);
+        type = procfile_lineword(ff, l, 0);
 
         if(do_rc == 1 && strcmp(type, "rc") == 0) {
             if(words < 4) {
@@ -306,12 +394,12 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
                 continue;
             }
 
-            rpc_count = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
+            rpc_calls = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
             rpc_bad_format = strtoull(procfile_lineword(ff, l, 2), NULL, 10);
             rpc_bad_auth = strtoull(procfile_lineword(ff, l, 3), NULL, 10);
             rpc_bad_client = strtoull(procfile_lineword(ff, l, 4), NULL, 10);
 
-            unsigned long long sum = rpc_count + rpc_bad_format + rpc_bad_auth + rpc_bad_client;
+            unsigned long long sum = rpc_calls + rpc_bad_format + rpc_bad_auth + rpc_bad_client;
             if(sum == 0ULL) do_rpc = -1;
             else do_rpc = 2;
         }
@@ -321,10 +409,10 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 
             unsigned long long sum = 0;
             unsigned int i, j;
-            for(i = 0, j = 2; j < words && nfsd_proc_values[i].name[0] ; i++, j++) {
-                nfsd_proc_values[i].proc2 = strtoull(procfile_lineword(ff, l, j), NULL, 10);
-                nfsd_proc_values[i].present2 = 1;
-                sum += nfsd_proc_values[i].proc2;
+            for(i = 0, j = 2; j < words && nfsd_proc2_values[i].name[0] ; i++, j++) {
+                nfsd_proc2_values[i].value = strtoull(procfile_lineword(ff, l, j), NULL, 10);
+                nfsd_proc2_values[i].present = 1;
+                sum += nfsd_proc2_values[i].value;
             }
 
             if(sum == 0ULL) {
@@ -342,10 +430,10 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 
             unsigned long long sum = 0;
             unsigned int i, j;
-            for(i = 0, j = 2; j < words && nfsd_proc_values[i].name[0] ; i++, j++) {
-                nfsd_proc_values[i].proc3 = strtoull(procfile_lineword(ff, l, j), NULL, 10);
-                nfsd_proc_values[i].present3 = 1;
-                sum += nfsd_proc_values[i].proc3;
+            for(i = 0, j = 2; j < words && nfsd_proc3_values[i].name[0] ; i++, j++) {
+                nfsd_proc3_values[i].value = strtoull(procfile_lineword(ff, l, j), NULL, 10);
+                nfsd_proc3_values[i].present = 1;
+                sum += nfsd_proc3_values[i].value;
             }
 
             if(sum == 0ULL) {
@@ -363,10 +451,10 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 
             unsigned long long sum = 0;
             unsigned int i, j;
-            for(i = 0, j = 2; j < words && nfsd_proc_values[i].name[0] ; i++, j++) {
-                nfsd_proc_values[i].proc4 = strtoull(procfile_lineword(ff, l, j), NULL, 10);
-                nfsd_proc_values[i].present4 = 1;
-                sum += nfsd_proc_values[i].proc4;
+            for(i = 0, j = 2; j < words && nfsd_proc4_values[i].name[0] ; i++, j++) {
+                nfsd_proc4_values[i].value = strtoull(procfile_lineword(ff, l, j), NULL, 10);
+                nfsd_proc4_values[i].present = 1;
+                sum += nfsd_proc4_values[i].value;
             }
 
             if(sum == 0ULL) {
@@ -408,7 +496,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
     if(do_rc == 2) {
         st = rrdset_find_bytype("nfsd", "readcache");
         if(!st) {
-            st = rrdset_create("nfsd", "readcache", NULL, "nfsd", NULL, "Read Cache", "reads/s", 5000, update_every, RRDSET_TYPE_STACKED);
+            st = rrdset_create("nfsd", "readcache", NULL, "cache", NULL, "NFS Server Read Cache", "reads/s", 5000, update_every, RRDSET_TYPE_STACKED);
 
             rrddim_add(st, "hits", NULL, 1, 1, RRDDIM_INCREMENTAL);
             rrddim_add(st, "misses", NULL, 1, 1, RRDDIM_INCREMENTAL);
@@ -427,7 +515,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
     if(do_fh == 2) {
         st = rrdset_find_bytype("nfsd", "filehandles");
         if(!st) {
-            st = rrdset_create("nfsd", "filehandles", NULL, "nfsd", NULL, "File Handles", "handles/s", 5001, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create("nfsd", "filehandles", NULL, "filehandles", NULL, "NFS Server File Handles", "handles/s", 5001, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;
 
             rrddim_add(st, "stale", NULL, 1, 1, RRDDIM_ABSOLUTE);
@@ -451,7 +539,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
     if(do_io == 2) {
         st = rrdset_find_bytype("nfsd", "io");
         if(!st) {
-            st = rrdset_create("nfsd", "io", NULL, "nfsd", NULL, "I/O", "kilobytes/s", 5002, update_every, RRDSET_TYPE_AREA);
+            st = rrdset_create("nfsd", "io", NULL, "io", NULL, "NFS Server I/O", "kilobytes/s", 5002, update_every, RRDSET_TYPE_AREA);
 
             rrddim_add(st, "read", NULL, 1, 1000, RRDDIM_INCREMENTAL);
             rrddim_add(st, "write", NULL, -1, 1000, RRDDIM_INCREMENTAL);
@@ -468,7 +556,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
     if(do_th == 2) {
         st = rrdset_find_bytype("nfsd", "threads");
         if(!st) {
-            st = rrdset_create("nfsd", "threads", NULL, "nfsd", NULL, "Threads", "threads", 5003, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create("nfsd", "threads", NULL, "threads", NULL, "NFS Server Threads", "threads", 5003, update_every, RRDSET_TYPE_LINE);
 
             rrddim_add(st, "threads", NULL, 1, 1, RRDDIM_ABSOLUTE);
         }
@@ -479,7 +567,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 
         st = rrdset_find_bytype("nfsd", "threads_fullcnt");
         if(!st) {
-            st = rrdset_create("nfsd", "threads_fullcnt", NULL, "nfsd", NULL, "Threads Full Count", "ops/s", 5004, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create("nfsd", "threads_fullcnt", NULL, "threads", NULL, "NFS Server Threads Full Count", "ops/s", 5004, update_every, RRDSET_TYPE_LINE);
 
             rrddim_add(st, "full_count", NULL, 1, 1, RRDDIM_INCREMENTAL);
         }
@@ -490,7 +578,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
 
         st = rrdset_find_bytype("nfsd", "threads_histogram");
         if(!st) {
-            st = rrdset_create("nfsd", "threads_histogram", NULL, "nfsd", NULL, "Threads Usage Histogram", "percentage", 5005, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create("nfsd", "threads_histogram", NULL, "threads", NULL, "NFS Server Threads Usage Histogram", "percentage", 5005, update_every, RRDSET_TYPE_LINE);
 
             rrddim_add(st, "0%-10%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
             rrddim_add(st, "10%-20%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
@@ -523,7 +611,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
     if(do_ra == 2) {
         st = rrdset_find_bytype("nfsd", "readahead");
         if(!st) {
-            st = rrdset_create("nfsd", "readahead", NULL, "nfsd", NULL, "Read Ahead Depth", "percentage", 5005, update_every, RRDSET_TYPE_STACKED);
+            st = rrdset_create("nfsd", "readahead", NULL, "readahead", NULL, "NFS Server Read Ahead Depth", "percentage", 5005, update_every, RRDSET_TYPE_STACKED);
 
             rrddim_add(st, "10%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
             rrddim_add(st, "20%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
@@ -561,7 +649,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
     if(do_net == 2) {
         st = rrdset_find_bytype("nfsd", "net");
         if(!st) {
-            st = rrdset_create("nfsd", "net", NULL, "nfsd", NULL, "Network Reads", "reads/s", 5007, update_every, RRDSET_TYPE_STACKED);
+            st = rrdset_create("nfsd", "net", NULL, "network", NULL, "NFS Server Network Statistics", "packets/s", 5007, update_every, RRDSET_TYPE_STACKED);
             st->isdetail = 1;
 
             rrddim_add(st, "udp", NULL, 1, 1, RRDDIM_INCREMENTAL);
@@ -583,10 +671,10 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
     if(do_rpc == 2) {
         st = rrdset_find_bytype("nfsd", "rpc");
         if(!st) {
-            st = rrdset_create("nfsd", "rpc", NULL, "nfsd", NULL, "Remote Procedure Calls", "calls/s", 5008, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create("nfsd", "rpc", NULL, "rpc", NULL, "NFS Server Remote Procedure Calls Statistics", "calls/s", 5008, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;
 
-            rrddim_add(st, "all", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st, "calls", NULL, 1, 1, RRDDIM_INCREMENTAL);
             rrddim_add(st, "bad_format", NULL, -1, 1, RRDDIM_INCREMENTAL);
             rrddim_add(st, "bad_auth", NULL, -1, 1, RRDDIM_INCREMENTAL);
         }
@@ -595,7 +683,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
         // ignore rpc_bad_client
         if(rpc_bad_client) {};
 
-        rrddim_set(st, "all", rpc_count);
+        rrddim_set(st, "calls", rpc_calls);
         rrddim_set(st, "bad_format", rpc_bad_format);
         rrddim_set(st, "bad_auth", rpc_bad_auth);
         rrdset_done(st);
@@ -607,15 +695,15 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
         unsigned int i;
         st = rrdset_find_bytype("nfsd", "proc2");
         if(!st) {
-            st = rrdset_create("nfsd", "proc2", NULL, "nfsd", NULL, "NFS v2 Calls", "calls/s", 5009, update_every, RRDSET_TYPE_STACKED);
+            st = rrdset_create("nfsd", "proc2", NULL, "nfsv2rpc", NULL, "NFS v2 Server Remote Procedure Calls", "calls/s", 5009, update_every, RRDSET_TYPE_STACKED);
 
-            for(i = 0; nfsd_proc_values[i].present2 ; i++)
-                rrddim_add(st, nfsd_proc_values[i].name, NULL, 1, 1, RRDDIM_INCREMENTAL);
+            for(i = 0; nfsd_proc2_values[i].present ; i++)
+                rrddim_add(st, nfsd_proc2_values[i].name, NULL, 1, 1, RRDDIM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        for(i = 0; nfsd_proc_values[i].present2 ; i++)
-            rrddim_set(st, nfsd_proc_values[i].name, nfsd_proc_values[i].proc2);
+        for(i = 0; nfsd_proc2_values[i].present ; i++)
+            rrddim_set(st, nfsd_proc2_values[i].name, nfsd_proc2_values[i].value);
 
         rrdset_done(st);
     }
@@ -626,15 +714,15 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
         unsigned int i;
         st = rrdset_find_bytype("nfsd", "proc3");
         if(!st) {
-            st = rrdset_create("nfsd", "proc3", NULL, "nfsd", NULL, "NFS v3 Calls", "calls/s", 5010, update_every, RRDSET_TYPE_STACKED);
+            st = rrdset_create("nfsd", "proc3", NULL, "nfsv3rpc", NULL, "NFS v3 Server Remote Procedure Calls", "calls/s", 5010, update_every, RRDSET_TYPE_STACKED);
 
-            for(i = 0; nfsd_proc_values[i].present3 ; i++)
-                rrddim_add(st, nfsd_proc_values[i].name, NULL, 1, 1, RRDDIM_INCREMENTAL);
+            for(i = 0; nfsd_proc3_values[i].present ; i++)
+                rrddim_add(st, nfsd_proc3_values[i].name, NULL, 1, 1, RRDDIM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        for(i = 0; nfsd_proc_values[i].present3 ; i++)
-            rrddim_set(st, nfsd_proc_values[i].name, nfsd_proc_values[i].proc3);
+        for(i = 0; nfsd_proc3_values[i].present ; i++)
+            rrddim_set(st, nfsd_proc3_values[i].name, nfsd_proc3_values[i].value);
 
         rrdset_done(st);
     }
@@ -645,15 +733,15 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
         unsigned int i;
         st = rrdset_find_bytype("nfsd", "proc4");
         if(!st) {
-            st = rrdset_create("nfsd", "proc4", NULL, "nfsd", NULL, "NFS v4 Calls", "calls/s", 5011, update_every, RRDSET_TYPE_STACKED);
+            st = rrdset_create("nfsd", "proc4", NULL, "nfsv4rpc", NULL, "NFS v4 Server Remote Procedure Calls", "calls/s", 5011, update_every, RRDSET_TYPE_STACKED);
 
-            for(i = 0; nfsd_proc_values[i].present4 ; i++)
-                rrddim_add(st, nfsd_proc_values[i].name, NULL, 1, 1, RRDDIM_INCREMENTAL);
+            for(i = 0; nfsd_proc4_values[i].present ; i++)
+                rrddim_add(st, nfsd_proc4_values[i].name, NULL, 1, 1, RRDDIM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        for(i = 0; nfsd_proc_values[i].present4 ; i++)
-            rrddim_set(st, nfsd_proc_values[i].name, nfsd_proc_values[i].proc4);
+        for(i = 0; nfsd_proc4_values[i].present ; i++)
+            rrddim_set(st, nfsd_proc4_values[i].name, nfsd_proc4_values[i].value);
 
         rrdset_done(st);
     }
@@ -664,7 +752,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
         unsigned int i;
         st = rrdset_find_bytype("nfsd", "proc4ops");
         if(!st) {
-            st = rrdset_create("nfsd", "proc4ops", NULL, "nfsd", NULL, "NFS v4 Operations", "operations/s", 5012, update_every, RRDSET_TYPE_STACKED);
+            st = rrdset_create("nfsd", "proc4ops", NULL, "nfsv2ops", NULL, "NFS v4 Server Operations", "operations/s", 5012, update_every, RRDSET_TYPE_STACKED);
 
             for(i = 0; nfsd4_ops_values[i].present ; i++)
                 rrddim_add(st, nfsd4_ops_values[i].name, NULL, 1, 1, RRDDIM_INCREMENTAL);
