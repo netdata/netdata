@@ -95,6 +95,46 @@ if [ -f "${NETDATA_CONFIG_DIR}/health_alarm_notify.conf" ]
 fi
 
 # -----------------------------------------------------------------------------
+# filter recipients based on the criticality of each
+
+filter_recipient_by_criticality() {
+    local method="${1}" x="${2}" r s
+    shift
+
+    r="${x/|*/}"
+    s="${x/*|/}"
+
+    # no severity filtering for this person
+    [ "${r}" = "${s}" ] && return 0
+
+    # the severity is invalid
+    s="${s^^}"
+    [ "${s}" != "CRITICAL" ] && return 0
+
+    # the new or the old status matches the severity
+    if [ "${s}" = "${status}" -o "${s}" = "${old_status}" ]
+        then
+        [ ! -d "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}" ] && \
+            mkdir -p "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}"
+
+        # we need to keep track of the notifications we sent
+        # so that the same user will receive the recovery
+        # even if old_status does not match the required severity
+        touch "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}"
+        return 0
+    fi
+
+    # it is a cleared alarm we have sent notification for
+    if [ "${status}" != "WARNING" -a "${status}" != "CRITICAL" -a -f "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}" ]
+        then
+        rm "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}"
+        return 0
+    fi
+
+    return 1
+}
+
+# -----------------------------------------------------------------------------
 # find the recipient's addresses per method
 
 declare -A arr_slack=()
@@ -108,17 +148,26 @@ do
     # email
     a="${role_recipients_email[${recipient}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_EMAIL}"
-    for r in ${a//,/ }; do arr_email[${r}]="1"; done
+    for r in ${a//,/ }
+    do
+        filter_recipient_by_criticality email "${r}" && arr_email[${r/|*/}]="1"
+    done
 
     # pushover
     a="${role_recipients_pushover[${recipient}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_PUSHOVER}"
-    for r in ${a//,/ }; do arr_pushover[${r}]="1"; done
+    for r in ${a//,/ }
+    do
+        filter_recipient_by_criticality pushover "${r}" && arr_pushover[${r/|*/}]="1"
+    done
 
     # slack
     a="${role_recipients_slack[${recipient}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_SLACK}"
-    for r in ${a//,/ }; do arr_slack[${r}]="1"; done
+    for r in ${a//,/ }
+    do
+        filter_recipient_by_criticality slack "${r}" && arr_slack[${r/|*/}]="1"
+    done
 done
 
 # build the list of slack recipients (channels)
@@ -136,7 +185,7 @@ do
     [ ! -z "${to_email}" ] && to_email="${to_email}, "
     to_email="${to_email}${x}"
 done
-[ -z "${to_email}" ] && to_email="root"
+[ -z "${to_email}" ] && SEND_EMAIL="NO"
 
 
 # -----------------------------------------------------------------------------
@@ -339,9 +388,9 @@ send_pushover() {
 # slack sender
 
 send_slack() {
-    local webhook="${1}" channels="${2}" when="${3}" username="${4}" image="${5}" author="${6}" httpcode sent=0 channel color
+    local webhook="${1}" channels="${2}" when="${3}" username="${4}" image="${5}" httpcode sent=0 channel color
 
-    if [ "${SEND_SLACK}" = "YES" -a ! -z "${webhook}" -a ! -z "${channels}" -a ! -z "${username}" -a ! -z "${image}" -a ! -z "${author}" ]
+    if [ "${SEND_SLACK}" = "YES" -a ! -z "${webhook}" -a ! -z "${channels}" -a ! -z "${username}" -a ! -z "${image}" ]
         then
 
         case "${status}" in
@@ -354,7 +403,7 @@ send_slack() {
         for channel in ${channels}
         do
             httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null -X POST --data-urlencode \
-                "payload={\"channel\": \"#${channel}\", \"username\": \"${username}\", \"text\": \"${host} ${status_message} - ${author} ${raised_for} - click <${goto_url}|here> to view the netdata dashboard.\", \"icon_url\": \"${image}\", \"attachments\": [{\"fallback\": \"${alarm} - ${info}\", \"color\": \"${color}\", \"title\": \"${alarm}\", \"title_link\": \"${goto_url}\", \"text\": \"${info}\", \"footer\": \"netdata\", \"footer_icon\": \"${images_base_url}/images/seo-performance-128.png\", \"ts\": ${when}}]}" \
+                "payload={\"channel\": \"#${channel}\", \"username\": \"${username}\", \"text\": \"${host} ${status_message} - ${chart} (${family}) ${alarm} - click <${goto_url}|here> to view the netdata dashboard.\", \"icon_url\": \"${image}\", \"attachments\": [{\"fallback\": \"${alarm} - ${info}\", \"color\": \"${color}\", \"title\": \"${alarm}\", \"title_link\": \"${goto_url}\", \"text\": \"${chart} (${family}): ${info}\", \"footer\": \"netdata\", \"footer_icon\": \"${images_base_url}/images/seo-performance-128.png\", \"ts\": ${when}}]}" \
                 "${webhook}")
 
             if [ "${httpcode}" == "200" ]
@@ -389,7 +438,7 @@ severity="${status}"
 # the time the alarm was raised
 duration4human ${duration} >/dev/null; duration_txt="${REPLY}"
 duration4human ${non_clear_duration} >/dev/null; non_clear_duration_txt="${REPLY}"
-raised_for="(was ${old_status,,} for ${duration_txt}"
+raised_for="(was ${old_status,,} for ${duration_txt})"
 
 # the key status message
 status_message="status unknown"
@@ -424,7 +473,7 @@ case "${status}" in
 
 		# don't show the value when the status is CLEAR
 		# for certain alarms, this value might not have any meaning
-		alarm="${name//_/ }"
+		alarm="${name//_/ } ${raised_for}"
 		;;
 esac
 
@@ -469,7 +518,7 @@ raised_for_html=
 # slack aggregates posts from the same username
 # so we use "${host} ${status}" as the bot username, to make them diff
 
-send_slack "${SLACK_WEBHOOK_URL}" "${to_slack}" "${when}" "${host} ${status}" "${image}" "${chart} (${family})"
+send_slack "${SLACK_WEBHOOK_URL}" "${to_slack}" "${when}" "${host} ${status}" "${image}"
 SENT_SLACK=$?
 
 # -----------------------------------------------------------------------------
