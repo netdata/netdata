@@ -83,8 +83,8 @@ fi
 mysleep="mysleep_read"
 
 mysleep_fifo="${NETDATA_CACHE_DIR-/tmp}/.netdata_bash_sleep_timer_fifo"
-[ -e "${mysleep_fifo}" ] && rm "${mysleep_fifo}"
-mkfifo "${mysleep_fifo}" || mysleep="sleep"
+[ ! -e "${mysleep_fifo}" ] && mkfifo "${mysleep_fifo}"
+[ ! -e "${mysleep_fifo}" ] && mysleep="sleep"
 
 mysleep_read() {
     read -t "${1}" <>"${mysleep_fifo}"
