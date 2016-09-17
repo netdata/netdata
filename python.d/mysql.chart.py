@@ -331,7 +331,7 @@ class Service(SimpleService):
         elif 'host' in configuration:
             parameters['host'] = self.configuration['host']
             if 'port' in configuration:
-                parameters['port'] = self.configuration['port']
+                parameters['port'] = int(self.configuration['port'])
         self.connection_parameters = parameters
 
     def _connect(self):
