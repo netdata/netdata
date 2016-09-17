@@ -2126,7 +2126,7 @@ static inline void health_alarm_log_process(RRDHOST *host) {
             if(unlikely(ae->unique_id < first_waiting))
                 first_waiting = ae->unique_id;
 
-            if(likely(now > ae->delay_up_to_timestamp))
+            if(likely(now >= ae->delay_up_to_timestamp))
                 health_process_notifications(host, ae);
         }
     }
