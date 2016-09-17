@@ -317,40 +317,29 @@ class Service(SimpleService):
         :param configuration: dict
         :return: dict
         """
+        parameters = {}
         if self.name is None:
             self.name = 'local'
-        if 'user' not in configuration:
-            self.configuration['user'] = 'root'
-        if 'pass' not in configuration:
-            self.configuration['pass'] = ''
+        if 'user' in configuration:
+            parameters['user'] = self.configuration['user']
+        if 'pass' in configuration:
+            parameters['passwd'] = self.configuration['pass']
         if 'my.cnf' in configuration:
-            self.configuration['socket'] = ''
-            self.configuration['host'] = ''
-            self.configuration['port'] = 0
+            parameters['read_default_file'] = self.configuration['my.cnf']
         elif 'socket' in configuration:
-            self.configuration['my.cnf'] = ''
-            self.configuration['host'] = ''
-            self.configuration['port'] = 0
+            parameters['unix_socket'] = self.configuration['socket']
         elif 'host' in configuration:
-            self.configuration['my.cnf'] = ''
-            self.configuration['socket'] = ''
+            parameters['host'] = self.configuration['host']
             if 'port' in configuration:
-                self.configuration['port'] = int(configuration['port'])
-            else:
-                self.configuration['port'] = 3306
+                parameters['port'] = self.configuration['port']
+        self.connection_parameters = parameters
 
     def _connect(self):
         """
         Try to connect to MySQL server
         """
         try:
-            self.connection = MySQLdb.connect(user=self.configuration['user'],
-                                              passwd=self.configuration['pass'],
-                                              read_default_file=self.configuration['my.cnf'],
-                                              unix_socket=self.configuration['socket'],
-                                              host=self.configuration['host'],
-                                              port=self.configuration['port'],
-                                              connect_timeout=self.update_every)
+            self.connection = MySQLdb.connect(connect_timeout=self.update_every, **self.connection_parameters)
         except MySQLdb.OperationalError as e:
             self.error("Cannot establish connection to MySQL.")
             self.debug(str(e))
