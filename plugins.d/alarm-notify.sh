@@ -440,8 +440,6 @@ send_slack() {
 EOF
         )"
 
-        echo "${payload}" >/tmp/slack.payload
-
         httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null -X POST --data-urlencode "payload=${payload}" "${webhook}")
         if [ "${httpcode}" == "200" ]
         then
