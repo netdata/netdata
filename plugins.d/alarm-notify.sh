@@ -413,10 +413,10 @@ send_slack() {
             "channel": "#${channel}",
             "username": "netdata on ${host}",
             "icon_url": "${images_base_url}/images/seo-performance-128.png",
+            "text": "${host} ${status_message}, \`${chart}\` (_${family}_), *${alarm}*",
             "attachments": [
                 {
                     "fallback": "${alarm} - ${chart} (${family}) - ${info}",
-                    "pretext": "${host} ${status_message}",
                     "color": "${color}",
                     "title": "${alarm}",
                     "title_link": "${goto_url}",
