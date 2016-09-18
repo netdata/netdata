@@ -105,63 +105,68 @@ mysleep_read() {
 # loop you need.
 
 LOOPSLEEPMS_LASTRUN=0
+LOOPSLEEPMS_NEXTRUN=0
 LOOPSLEEPMS_LASTSLEEP=0
 LOOPSLEEPMS_LASTWORK=0
 
 loopsleepms() {
-    local tellwork=0 t="$1" div s m now mstosleep
+    local tellwork=0 t="${1}" div s m now mstosleep
 
-    if [ "$t" = "tellwork" ]
+    if [ "${t}" = "tellwork" ]
     then
         tellwork=1
         shift
-        t="$1"
+        t="${1}"
     fi
-    div="${2-100}"
 
     # $t = the time in seconds to wait
 
     # if high resolution is not supported
     # just sleep the time requested, in seconds
-    if [ $LOOPSLEEPMS_HIGHRES -eq 0 ]
+    if [ ${LOOPSLEEPMS_HIGHRES} -eq 0 ]
     then
-        sleep $t
+        sleep ${t}
         return
     fi
 
     # get the current time, in ms
-    # milliseconds since epoch (1-1-1970)
-    now="$(( $( $LOOPSLEEP_DATE +'%s * 1000 + %-N / 1000000' ) ))"
-
-    # calculate required sleep in ms
-    t=$((t * 1000 * div / 100))
+    ${current_time_ms}
 
     # this is our first run
     # just wait the requested time
-    test $LOOPSLEEPMS_LASTRUN -eq 0 && LOOPSLEEPMS_LASTRUN=$now
-
-    # calculate ms since last run
-    LOOPSLEEPMS_LASTWORK=$((now - LOOPSLEEPMS_LASTRUN - LOOPSLEEPMS_LASTSLEEP))
+    if [ ${LOOPSLEEPMS_LASTRUN} -eq 0 ]
+        then
+        LOOPSLEEPMS_LASTWORK=0
+    else
+        # calculate ms since last run
+        LOOPSLEEPMS_LASTWORK=$((now_ms - LOOPSLEEPMS_LASTRUN - LOOPSLEEPMS_LASTSLEEP))
+    fi
     # echo "# last loop's work took $LOOPSLEEPMS_LASTWORK ms"
 
+    # remember this run
+    LOOPSLEEPMS_LASTRUN=${now_ms}
+
+    # calculate the next run    
+    LOOPSLEEPMS_NEXTRUN=$(( ( now_ms - now_ms % ( t * 1000 ) ) + ( t * 1000 ) ))
+
     # calculate ms to sleep
-    mstosleep=$(( t - LOOPSLEEPMS_LASTWORK + current_time_ms_accuracy ))
+    mstosleep=$(( LOOPSLEEPMS_NEXTRUN - now_ms + current_time_ms_accuracy ))
     # echo "# mstosleep is $mstosleep ms"
 
     # if we are too slow, sleep some time
-    test $mstosleep -lt 200 && mstosleep=200
+    test ${mstosleep} -lt 200 && mstosleep=200
 
     s=$((mstosleep / 1000))
     m=$((mstosleep - (s * 1000)))
 
-    test $tellwork -eq 1 && echo >&2 " >>> PERFORMANCE >>> WORK TOOK $LOOPSLEEPMS_LASTWORK ms ( $((LOOPSLEEPMS_LASTWORK * 100 / 1000)).$((LOOPSLEEPMS_LASTWORK % 10))% cpu ) >>> SLEEPING $mstosleep ms"
+    test $tellwork -eq 1 && echo >&2 " >>> PERFORMANCE >>> WORK TOOK ${LOOPSLEEPMS_LASTWORK} ms ( $((LOOPSLEEPMS_LASTWORK * 100 / 1000)).$((LOOPSLEEPMS_LASTWORK % 10))% cpu ) >>> SLEEPING ${mstosleep} ms"
 
-    # echo "# sleeping $s.$m"
+    # echo "# sleeping ${s}.${m}"
     # echo
-    ${mysleep} $s.$m
+    ${mysleep} ${s}.${m}
 
     # keep the values we need
     # for our next run
-    LOOPSLEEPMS_LASTRUN=$now
     LOOPSLEEPMS_LASTSLEEP=$mstosleep
 }
+
