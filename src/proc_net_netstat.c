@@ -199,37 +199,31 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
     static uint32_t hash_ipext = 0, hash_tcpext = 0;
     static procfile *ff = NULL;
 
-    // https://github.com/ecki/net-tools/blob/bd8bceaed2311651710331a7f8990c3e31be9840/statistics.c
-
-    // Reordering
     static unsigned long long *tcpext_TCPRenoReorder = NULL;
     static unsigned long long *tcpext_TCPFACKReorder = NULL;
     static unsigned long long *tcpext_TCPSACKReorder = NULL;
     static unsigned long long *tcpext_TCPTSReorder = NULL;
 
-    // SYN Cookies
     static unsigned long long *tcpext_SyncookiesSent = NULL;
     static unsigned long long *tcpext_SyncookiesRecv = NULL;
     static unsigned long long *tcpext_SyncookiesFailed = NULL;
 
-    // Out Of Order Queue
-    // http://www.spinics.net/lists/netdev/msg204696.html
     static unsigned long long *tcpext_TCPOFOQueue = NULL; // Number of packets queued in OFO queue
     static unsigned long long *tcpext_TCPOFODrop = NULL;  // Number of packets meant to be queued in OFO but dropped because socket rcvbuf limit hit.
     static unsigned long long *tcpext_TCPOFOMerge = NULL; // Number of packets in OFO that were merged with other packets.
     static unsigned long long *tcpext_OfoPruned = NULL;   // packets dropped from out-of-order queue because of socket buffer overrun
 
-    // connection rejects
-    static unsigned long long *tcpext_PAWSActive = NULL;  // active connections rejected because of time stamp
-    static unsigned long long *tcpext_PAWSPassive = NULL; // passive connections rejected because of time stamp
-
-    // connection resets
     static unsigned long long *tcpext_TCPAbortOnData = NULL;    // connections reset due to unexpected data
     static unsigned long long *tcpext_TCPAbortOnClose = NULL;   // connections reset due to early user close
     static unsigned long long *tcpext_TCPAbortOnMemory = NULL;  // connections aborted due to memory pressure
     static unsigned long long *tcpext_TCPAbortOnTimeout = NULL; // connections aborted due to timeout
     static unsigned long long *tcpext_TCPAbortOnLinger = NULL;  // connections aborted after user close in linger timeout
     static unsigned long long *tcpext_TCPAbortFailed = NULL;    // times unable to send RST due to no memory
+
+/*
+    // connection rejects
+    static unsigned long long *tcpext_PAWSActive = NULL;  // active connections rejected because of time stamp
+    static unsigned long long *tcpext_PAWSPassive = NULL; // passive connections rejected because of time stamp
 
     static unsigned long long *tcpext_TCPTimeouts = NULL;
 
@@ -355,6 +349,7 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
 
     static unsigned long long *tcpext_TCPMTUPFail = NULL;
     static unsigned long long *tcpext_TCPMTUPSuccess = NULL;
+*/
 
     static unsigned long long *ipext_InNoRoutes = NULL;
     static unsigned long long *ipext_InTruncatedPkts = NULL;
@@ -394,13 +389,37 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
         hash_array(ipext_data);
         hash_array(tcpext_data);
 
+        // Reordering
+        tcpext_TCPFACKReorder = netstat_columns_find(tcpext_data, "TCPFACKReorder");
+        tcpext_TCPSACKReorder = netstat_columns_find(tcpext_data, "TCPSACKReorder");
+        tcpext_TCPRenoReorder = netstat_columns_find(tcpext_data, "TCPRenoReorder");
+        tcpext_TCPTSReorder = netstat_columns_find(tcpext_data, "TCPTSReorder");
+
+        // SYN Cookies
         tcpext_SyncookiesSent = netstat_columns_find(tcpext_data, "SyncookiesSent");
         tcpext_SyncookiesRecv = netstat_columns_find(tcpext_data, "SyncookiesRecv");
         tcpext_SyncookiesFailed = netstat_columns_find(tcpext_data, "SyncookiesFailed");
+
+        // Out Of Order Queue
+        // http://www.spinics.net/lists/netdev/msg204696.html
+        tcpext_TCPOFOQueue = netstat_columns_find(tcpext_data, "TCPOFOQueue"); // Number of packets queued in OFO queue
+        tcpext_TCPOFODrop  = netstat_columns_find(tcpext_data, "TCPOFODrop");  // Number of packets meant to be queued in OFO but dropped because socket rcvbuf limit hit.
+        tcpext_TCPOFOMerge = netstat_columns_find(tcpext_data, "TCPOFOMerge"); // Number of packets in OFO that were merged with other packets.
+        tcpext_OfoPruned   = netstat_columns_find(tcpext_data, "OfoPruned");   // packets dropped from out-of-order queue because of socket buffer overrun
+
+        // connection resets
+        // https://github.com/ecki/net-tools/blob/bd8bceaed2311651710331a7f8990c3e31be9840/statistics.c
+        tcpext_TCPAbortOnData    = netstat_columns_find(tcpext_data, "TCPAbortOnData");    // connections reset due to unexpected data
+        tcpext_TCPAbortOnClose   = netstat_columns_find(tcpext_data, "TCPAbortOnClose");   // connections reset due to early user close
+        tcpext_TCPAbortOnMemory  = netstat_columns_find(tcpext_data, "TCPAbortOnMemory");  // connections aborted due to memory pressure
+        tcpext_TCPAbortOnTimeout = netstat_columns_find(tcpext_data, "TCPAbortOnTimeout"); // connections aborted due to timeout
+        tcpext_TCPAbortOnLinger  = netstat_columns_find(tcpext_data, "TCPAbortOnLinger");  // connections aborted after user close in linger timeout
+        tcpext_TCPAbortFailed    = netstat_columns_find(tcpext_data, "TCPAbortFailed");    // times unable to send RST due to no memory
+
+        /*
         tcpext_EmbryonicRsts = netstat_columns_find(tcpext_data, "EmbryonicRsts");
         tcpext_PruneCalled = netstat_columns_find(tcpext_data, "PruneCalled");
         tcpext_RcvPruned = netstat_columns_find(tcpext_data, "RcvPruned");
-        tcpext_OfoPruned = netstat_columns_find(tcpext_data, "OfoPruned");
         tcpext_OutOfWindowIcmps = netstat_columns_find(tcpext_data, "OutOfWindowIcmps");
         tcpext_LockDroppedIcmps = netstat_columns_find(tcpext_data, "LockDroppedIcmps");
         tcpext_ArpFilter = netstat_columns_find(tcpext_data, "ArpFilter");
@@ -426,10 +445,6 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
         tcpext_TCPRenoRecovery = netstat_columns_find(tcpext_data, "TCPRenoRecovery");
         tcpext_TCPSackRecovery = netstat_columns_find(tcpext_data, "TCPSackRecovery");
         tcpext_TCPSACKReneging = netstat_columns_find(tcpext_data, "TCPSACKReneging");
-        tcpext_TCPFACKReorder = netstat_columns_find(tcpext_data, "TCPFACKReorder");
-        tcpext_TCPSACKReorder = netstat_columns_find(tcpext_data, "TCPSACKReorder");
-        tcpext_TCPRenoReorder = netstat_columns_find(tcpext_data, "TCPRenoReorder");
-        tcpext_TCPTSReorder = netstat_columns_find(tcpext_data, "TCPTSReorder");
         tcpext_TCPFullUndo = netstat_columns_find(tcpext_data, "TCPFullUndo");
         tcpext_TCPPartialUndo = netstat_columns_find(tcpext_data, "TCPPartialUndo");
         tcpext_TCPDSACKUndo = netstat_columns_find(tcpext_data, "TCPDSACKUndo");
@@ -452,12 +467,6 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
         tcpext_TCPDSACKOfoSent = netstat_columns_find(tcpext_data, "TCPDSACKOfoSent");
         tcpext_TCPDSACKRecv = netstat_columns_find(tcpext_data, "TCPDSACKRecv");
         tcpext_TCPDSACKOfoRecv = netstat_columns_find(tcpext_data, "TCPDSACKOfoRecv");
-        tcpext_TCPAbortOnData = netstat_columns_find(tcpext_data, "TCPAbortOnData");
-        tcpext_TCPAbortOnClose = netstat_columns_find(tcpext_data, "TCPAbortOnClose");
-        tcpext_TCPAbortOnMemory = netstat_columns_find(tcpext_data, "TCPAbortOnMemory");
-        tcpext_TCPAbortOnTimeout = netstat_columns_find(tcpext_data, "TCPAbortOnTimeout");
-        tcpext_TCPAbortOnLinger = netstat_columns_find(tcpext_data, "TCPAbortOnLinger");
-        tcpext_TCPAbortFailed = netstat_columns_find(tcpext_data, "TCPAbortFailed");
         tcpext_TCPMemoryPressures = netstat_columns_find(tcpext_data, "TCPMemoryPressures");
         tcpext_TCPSACKDiscard = netstat_columns_find(tcpext_data, "TCPSACKDiscard");
         tcpext_TCPDSACKIgnoredOld = netstat_columns_find(tcpext_data, "TCPDSACKIgnoredOld");
@@ -477,9 +486,6 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
         tcpext_TCPReqQFullDrop = netstat_columns_find(tcpext_data, "TCPReqQFullDrop");
         tcpext_TCPRetransFail = netstat_columns_find(tcpext_data, "TCPRetransFail");
         tcpext_TCPRcvCoalesce = netstat_columns_find(tcpext_data, "TCPRcvCoalesce");
-        tcpext_TCPOFOQueue = netstat_columns_find(tcpext_data, "TCPOFOQueue");
-        tcpext_TCPOFODrop = netstat_columns_find(tcpext_data, "TCPOFODrop");
-        tcpext_TCPOFOMerge = netstat_columns_find(tcpext_data, "TCPOFOMerge");
         tcpext_TCPChallengeACK = netstat_columns_find(tcpext_data, "TCPChallengeACK");
         tcpext_TCPSYNChallenge = netstat_columns_find(tcpext_data, "TCPSYNChallenge");
         tcpext_TCPFastOpenActive = netstat_columns_find(tcpext_data, "TCPFastOpenActive");
@@ -510,7 +516,7 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
         tcpext_TCPKeepAlive = netstat_columns_find(tcpext_data, "TCPKeepAlive");
         tcpext_TCPMTUPFail = netstat_columns_find(tcpext_data, "TCPMTUPFail");
         tcpext_TCPMTUPSuccess = netstat_columns_find(tcpext_data, "TCPMTUPSuccess");
-
+*/
         ipext_InNoRoutes = netstat_columns_find(ipext_data, "InNoRoutes");
         ipext_InTruncatedPkts = netstat_columns_find(ipext_data, "InTruncatedPkts");
         ipext_InMcastPkts = netstat_columns_find(ipext_data, "InMcastPkts");
