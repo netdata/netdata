@@ -404,9 +404,18 @@ class SimpleService(threading.Thread):
 class UrlService(SimpleService):
     # TODO add support for https connections
     def __init__(self, configuration=None, name=None):
-        self.url = ""
-        self.user = None
-        self.password = None
+        try:
+            self.url = str(self.configuration['url'])
+        except (KeyError, TypeError):
+            self.url = ""
+        try:
+            self.user = str(self.configuration['user'])
+        except (KeyError, TypeError):
+            self.user = None
+        try:
+            self.password = str(self.configuration['pass'])
+        except (KeyError, TypeError):
+            self.password = None
         self.proxies = {}
         SimpleService.__init__(self, configuration=configuration, name=name)
 
@@ -467,7 +476,7 @@ class UrlService(SimpleService):
 
     def check(self):
         """
-        Format configuration data and try to connect to server
+        Create chart name and try to connect to server
         :return: boolean
         """
         if self.name is None or self.name == str(None):
@@ -475,18 +484,6 @@ class UrlService(SimpleService):
             self.chart_name += "_" + self.name
         else:
             self.name = str(self.name)
-        try:
-            self.url = str(self.configuration['url'])
-        except (KeyError, TypeError):
-            pass
-        try:
-            self.user = str(self.configuration['user'])
-        except (KeyError, TypeError):
-            pass
-        try:
-            self.password = str(self.configuration['pass'])
-        except (KeyError, TypeError):
-            pass
 
         self.__add_openers()
 
@@ -499,14 +496,33 @@ class UrlService(SimpleService):
 
 class SocketService(SimpleService):
     def __init__(self, configuration=None, name=None):
+        SimpleService.__init__(self, configuration=configuration, name=name)
+        try:
+            self.unix_socket = str(self.configuration['socket'])
+            self.host = None
+            self.port = None
+        except (KeyError, TypeError):
+            self.debug("No unix socket specified. Trying TCP/IP socket.")
+            self.unix_socket = None
+            try:
+                self.host = str(self.configuration['host'])
+            except (KeyError, TypeError):
+                self.debug("No host specified. Using module default.")
+                self.host = None
+            try:
+                self.port = int(self.configuration['port'])
+            except (KeyError, TypeError):
+                self.debug("No port specified. Using module default.")
+                self.port = None
+        try:
+            self.request = str(self.configuration['request'])
+        except (KeyError, TypeError):
+            self.debug("No request specified. Using module default.")
+            self.request = ""
+        self.request = self.request.encode()
         self._sock = None
         self._keep_alive = False
-        self.host = "localhost"
-        self.port = None
-        self.unix_socket = None
-        self.request = ""
         self.__socket_config = None
-        SimpleService.__init__(self, configuration=configuration, name=name)
 
     def _connect(self):
         """
@@ -654,23 +670,6 @@ class SocketService(SimpleService):
             self.name = ""
         else:
             self.name = str(self.name)
-        try:
-            self.unix_socket = str(self.configuration['socket'])
-        except (KeyError, TypeError):
-            self.debug("No unix socket specified. Trying TCP/IP socket.")
-            try:
-                self.host = str(self.configuration['host'])
-            except (KeyError, TypeError):
-                self.debug("No host specified. Using: '" + self.host + "'")
-            try:
-                self.port = int(self.configuration['port'])
-            except (KeyError, TypeError):
-                self.debug("No port specified. Using: '" + str(self.port) + "'")
-        try:
-            self.request = str(self.configuration['request'])
-        except (KeyError, TypeError):
-            self.debug("No request specified. Using: '" + str(self.request) + "'")
-        self.request = self.request.encode()
 
     def check(self):
         return SimpleService.check(self)
@@ -678,11 +677,15 @@ class SocketService(SimpleService):
 
 class LogService(SimpleService):
     def __init__(self, configuration=None, name=None):
-        self.log_path = ""
+        SimpleService.__init__(self, configuration=configuration, name=name)
+        try:
+            self.log_path = str(self.configuration['path'])
+        except (KeyError, TypeError):
+            self.error("No path to log specified. Using module default.")
+            self.log_path = ""
+        self.retries = 100000  # basically always retry
         self._last_position = 0
         # self._log_reader = None
-        SimpleService.__init__(self, configuration=configuration, name=name)
-        self.retries = 100000  # basically always retry
 
     def _get_raw_data(self):
         """
@@ -719,10 +722,6 @@ class LogService(SimpleService):
             self.name = ""
         else:
             self.name = str(self.name)
-        try:
-            self.log_path = str(self.configuration['path'])
-        except (KeyError, TypeError):
-            self.error("No path to log specified. Using: '" + self.log_path + "'")
 
         if os.access(self.log_path, os.R_OK):
             return True
@@ -742,8 +741,12 @@ class ExecutableService(SimpleService):
     bad_substrings = ('&', '|', ';', '>', '<')
 
     def __init__(self, configuration=None, name=None):
-        self.command = ""
         SimpleService.__init__(self, configuration=configuration, name=name)
+        try:
+            self.command = str(self.configuration['command'])
+        except (KeyError, TypeError):
+            self.error("No command specified. Using module default.")
+            self.command = ""
 
     def _get_raw_data(self):
         """
@@ -774,10 +777,7 @@ class ExecutableService(SimpleService):
             self.name = ""
         else:
             self.name = str(self.name)
-        try:
-            self.command = str(self.configuration['command'])
-        except (KeyError, TypeError):
-            self.error("No command specified. Using: '" + self.command + "'")
+
         command = self.command.split(' ')
 
         for arg in command[1:]:

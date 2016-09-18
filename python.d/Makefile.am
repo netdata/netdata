@@ -14,6 +14,7 @@ dist_python_SCRIPTS = \
 	dovecot.chart.py \
 	example.chart.py \
 	exim.chart.py \
+	haproxy.chart.py \
 	hddtemp.chart.py \
 	ipfs.chart.py \
 	memcached.chart.py \

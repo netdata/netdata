@@ -27,6 +27,7 @@ dist_pythonconfig_DATA = \
 	python.d/dovecot.conf \
 	python.d/example.conf \
 	python.d/exim.conf \
+	python.d/haproxy.conf \
 	python.d/hddtemp.conf \
 	python.d/ipfs.conf \
 	python.d/memcached.conf \
