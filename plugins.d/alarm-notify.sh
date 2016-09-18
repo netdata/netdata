@@ -16,6 +16,13 @@ then
     exit 1
 fi
 
+# defaults to allow running this script by hand
+NETDATA_CONFIG_DIR="${NETDATA_CONFIG_DIR-/etc/netdata}"
+NETDATA_CACHE_DIR="${NETDATA_CACHE_DIR-/var/cache/netdata}"
+[ -z "${NETDATA_REGISTRY_URL}" ] && NETDATA_REGISTRY_URL="https://registry.my-netdata.io"
+[ -z "${NETDATA_HOSTNAME}" ] && NETDATA_HOSTNAME="$(hostname)"
+[ -z "${NETDATA_REGISTRY_HOSTNAME}" ] && NETDATA_REGISTRY_HOSTNAME="${NETDATA_HOSTNAME}"
+
 # -----------------------------------------------------------------------------
 # parse command line parameters
 
@@ -150,7 +157,7 @@ do
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_EMAIL}"
     for r in ${a//,/ }
     do
-        filter_recipient_by_criticality email "${r}" && arr_email[${r/|*/}]="1"
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality email "${r}" && arr_email[${r/|*/}]="1"
     done
 
     # pushover
@@ -158,7 +165,7 @@ do
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_PUSHOVER}"
     for r in ${a//,/ }
     do
-        filter_recipient_by_criticality pushover "${r}" && arr_pushover[${r/|*/}]="1"
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality pushover "${r}" && arr_pushover[${r/|*/}]="1"
     done
 
     # slack
@@ -166,7 +173,7 @@ do
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_SLACK}"
     for r in ${a//,/ }
     do
-        filter_recipient_by_criticality slack "${r}" && arr_slack[${r/|*/}]="1"
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality slack "${r}" && arr_slack[${r/|*/}]="1"
     done
 done
 
@@ -216,7 +223,7 @@ fi
 # check that we have at least a method enabled
 if [ "${SEND_EMAIL}" != "YES" -a "${SEND_PUSHOVER}" != "YES" -a "${SEND_SLACK}" != "YES" ]
     then
-    echo >&2 "I don't have a means to send a notification. Sorry!"
+    echo >&2 "All notification methods are disabled. Not sending a notification."
     exit 1
 fi
 
@@ -388,35 +395,64 @@ send_pushover() {
 # slack sender
 
 send_slack() {
-    local webhook="${1}" channels="${2}" when="${3}" username="${4}" image="${5}" httpcode sent=0 channel color
+    local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
 
-    if [ "${SEND_SLACK}" = "YES" -a ! -z "${webhook}" -a ! -z "${channels}" -a ! -z "${username}" -a ! -z "${image}" ]
+    [ "${SEND_SLACK}" != "YES" ] && return 1
+
+    case "${status}" in
+        WARNING) color="warning" ;;
+        CRITICAL) color="danger" ;;
+        CLEAR) color="good" ;;
+        *) color="#777777" ;;
+    esac
+
+    for channel in ${channels}
+    do
+        payload="$(cat <<EOF
+        {
+            "channel": "#${channel}",
+            "username": "netdata on ${host}",
+            "icon_url": "${images_base_url}/images/seo-performance-128.png",
+            "attachments": [
+                {
+                    "fallback": "${alarm} - ${chart} (${family}) - ${info}",
+                    "pretext": "${host} ${status_message}",
+                    "color": "${color}",
+                    "title": "${alarm}",
+                    "title_link": "${goto_url}",
+                    "text": "${info}",
+                    "fields": [
+                        {
+                            "title": "${chart}",
+                            "short": true
+                        },
+                        {
+                            "title": "${family}",
+                            "short": true
+                        }
+                    ],
+                    "thumb_url": "${image}",
+                    "footer": "<${goto_url}|${host}>",
+                    "ts": ${when}
+                }
+            ]
+        }
+EOF
+        )"
+
+        echo "${payload}" >/tmp/slack.payload
+
+        httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null -X POST --data-urlencode "payload=${payload}" "${webhook}")
+        if [ "${httpcode}" == "200" ]
         then
+            echo >&2 "${me}: Sent slack notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+            sent=$((sent + 1))
+        else
+            echo >&2 "${me}: Failed to send slack notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+        fi
+    done
 
-        case "${status}" in
-            WARNING) color="warning" ;;
-            CRITICAL) color="danger" ;;
-            CLEAR) color="good" ;;
-            *) color="#777777" ;;
-        esac
-
-        for channel in ${channels}
-        do
-            httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null -X POST --data-urlencode \
-                "payload={\"channel\": \"#${channel}\", \"username\": \"${username}\", \"text\": \"${host} ${status_message} - ${chart} (${family}) ${alarm} - click <${goto_url}|here> to view the netdata dashboard.\", \"icon_url\": \"${image}\", \"attachments\": [{\"fallback\": \"${alarm} - ${info}\", \"color\": \"${color}\", \"title\": \"${alarm}\", \"title_link\": \"${goto_url}\", \"text\": \"${chart} (${family}): ${info}\", \"footer\": \"netdata\", \"footer_icon\": \"${images_base_url}/images/seo-performance-128.png\", \"ts\": ${when}}]}" \
-                "${webhook}")
-
-            if [ "${httpcode}" == "200" ]
-            then
-                echo >&2 "${me}: Sent slack notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
-                sent=$((sent + 1))
-            else
-                echo >&2 "${me}: Failed to send slack notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
-            fi
-        done
-
-        [ ${sent} -gt 0 ] && return 0
-    fi
+    [ ${sent} -gt 0 ] && return 0
 
     return 1
 }
@@ -518,7 +554,7 @@ raised_for_html=
 # slack aggregates posts from the same username
 # so we use "${host} ${status}" as the bot username, to make them diff
 
-send_slack "${SLACK_WEBHOOK_URL}" "${to_slack}" "${when}" "${host} ${status}" "${image}"
+send_slack "${SLACK_WEBHOOK_URL}" "${to_slack}"
 SENT_SLACK=$?
 
 # -----------------------------------------------------------------------------
