@@ -673,6 +673,7 @@ class SocketService(SimpleService):
         self.request = self.request.encode()
 
     def check(self):
+        self._parse_config()
         return SimpleService.check(self)
 
 
