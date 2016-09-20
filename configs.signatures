@@ -131,6 +131,7 @@ declare -A configs_signatures=(
   ['1c12b678ab65f271a96da1bbd0a1ab1c']='health.d/softnet.conf'
   ['312b4b8e2805e19cf9be554b319567d6']='health.d/softnet.conf'
   ['565f11c38ae6bd5cc9d3c2adb542bc1b']='health.d/softnet.conf'
+  ['6398ef37a15cb6a0bc921f58948d2b39']='health.d/softnet.conf'
   ['a305b400378d6492efd15f9940c2779b']='health.d/softnet.conf'
   ['23ae815aefa221b1929f96752a1f7556']='health.d/squid.conf'
   ['3cc6255457d4cba881ae0554ae5d9190']='health.d/squid.conf'

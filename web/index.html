@@ -562,14 +562,23 @@
             var a1 = '';
             var found = 0;
 
+            if(machines_array === null) {
+                var ret = loadLocalStorage("registryCallback");
+                if(typeof ret !== 'undefined' && ret !== null) {
+                    machines_array = JSON.parse(ret);
+                    console.log("failed to contact the registry - loaded registry data from browser local storage");
+                }
+            }
+
             if(machines_array) {
-                function name_comparator_desc(a, b) {
+                saveLocalStorage("registryCallback", JSON.stringify(machines_array));
+
+                var machines = machines_array.sort(function (a, b) {
                     if (a.name > b.name) return -1;
                     if (a.name < b.name) return 1;
                     return 0;
-                }
+                });
 
-                var machines = machines_array.sort(name_comparator_desc);
                 var len = machines.length;
                 while(len--) {
                     var u = machines[len];
