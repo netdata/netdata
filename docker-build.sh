@@ -17,11 +17,6 @@ apt-get -qq update
 apt-get -y install zlib1g-dev uuid-dev libmnl-dev gcc make curl git autoconf autogen automake pkg-config netcat-openbsd jq
 apt-get -y install autoconf-archive lm-sensors nodejs python python-mysqldb python-yaml
 
-# fetch netdata
-
-git clone https://github.com/firehol/netdata.git /netdata.git --depth=1
-cd /netdata.git
-
 # use the provided installer
 
 ./netdata-installer.sh --dont-wait --dont-start-it
