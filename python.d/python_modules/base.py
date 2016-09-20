@@ -658,6 +658,7 @@ class SocketService(SimpleService):
             self.unix_socket = str(self.configuration['socket'])
         except (KeyError, TypeError):
             self.debug("No unix socket specified. Trying TCP/IP socket.")
+            self.unix_socket = None
             try:
                 self.host = str(self.configuration['host'])
             except (KeyError, TypeError):
@@ -673,6 +674,7 @@ class SocketService(SimpleService):
         self.request = self.request.encode()
 
     def check(self):
+        self._parse_config()
         return SimpleService.check(self)
 
 
