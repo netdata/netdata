@@ -631,13 +631,18 @@ send_pushover "${PUSHOVER_APP_TOKEN}" "${to_pushover}" "${when}" "${goto_url}" "
 
 SENT_PUSHOVER=$?
 
+# -----------------------------------------------------------------------------
+# send the telegram.org message
+
 # https://core.telegram.org/bots/api#formatting-options
-raised_for_paranthesis=" (${raised_for})"
-[ -z "$raised_for" ] && raised_for_paranthesis=""
-send_telegram "${TELEGRAM_BOT_TOKEN}" "${to_telegram}" "<b>${severity}, ${status_message}
+telegram_message="<b>${severity}"
+[ "${status_message}" != "recovered" ] && telegram_message="${telegram_message}, ${status_message}"
+telegram_message="${telegram_message}
 ${chart} (${family})</b>
-<a href=\"${goto_url}\">${alarm}${raised_for_paranthesis}</a>
+<a href=\"${goto_url}\">${alarm}</a>
 <i>${info}</i>"
+
+send_telegram "${TELEGRAM_BOT_TOKEN}" "${to_telegram}" "${telegram_message}"
 
 SENT_TELEGRAM=$?
 
