@@ -737,6 +737,72 @@ struct test test13 = {
 };
 
 // --------------------------------------------------------------------------------------------------------------------
+// test14
+
+struct feed_values test14_feed[] = {
+        {        0, 0x015397dc42151c41ULL },
+        { 13573000, 0x015397e612e3ff5dULL },
+        { 29969000, 0x015397f905ecdaa8ULL },
+        { 29958000, 0x0153980c2a6cb5e4ULL },
+        { 30054000, 0x0153981f4032fb83ULL },
+        { 34952000, 0x015398355efadaccULL },
+        { 25046000, 0x01539845ba4b09f8ULL },
+        { 29947000, 0x0153985948bf381dULL },
+        { 30054000, 0x0153986c5b9c27e2ULL },
+        { 29942000, 0x0153987f888982d0ULL },
+};
+
+calculated_number test14_results[] = {
+        23.1383300, 21.8515600, 21.8804600, 21.7788000, 22.0112200, 22.4386100, 22.0906100, 21.9150800
+};
+
+struct test test14 = {
+        "test14",            // name
+        "issue #981 with real data",
+        30,                 // update_every
+        8,                  // multiplier
+        1000000000,         // divisor
+        RRDDIM_INCREMENTAL, // algorithm
+        10,                 // feed entries
+        8,                  // result entries
+        test14_feed,        // feed
+        test14_results,     // results
+        NULL,               // feed2
+        NULL                // results2
+};
+struct feed_values test14b_feed[] = {
+        {        0, 0 },
+        { 13573000, 13573000 },
+        { 29969000, 13573000 + 29969000 },
+        { 29958000, 13573000 + 29969000 + 29958000 },
+        { 30054000, 13573000 + 29969000 + 29958000 + 30054000 },
+        { 34952000, 13573000 + 29969000 + 29958000 + 30054000 + 34952000 },
+        { 25046000, 13573000 + 29969000 + 29958000 + 30054000 + 34952000 + 25046000 },
+        { 29947000, 13573000 + 29969000 + 29958000 + 30054000 + 34952000 + 25046000 + 29947000 },
+        { 30054000, 13573000 + 29969000 + 29958000 + 30054000 + 34952000 + 25046000 + 29947000 + 30054000 },
+        { 29942000, 13573000 + 29969000 + 29958000 + 30054000 + 34952000 + 25046000 + 29947000 + 30054000 + 29942000 },
+};
+
+calculated_number test14b_results[] = {
+        1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000
+};
+
+struct test test14b = {
+        "test14b",            // name
+        "issue #981 with dummy data",
+        30,                 // update_every
+        1,                  // multiplier
+        1,                  // divisor
+        RRDDIM_INCREMENTAL, // algorithm
+        10,                 // feed entries
+        8,                  // result entries
+        test14b_feed,        // feed
+        test14b_results,     // results
+        NULL,               // feed2
+        NULL                // results2
+};
+
+// --------------------------------------------------------------------------------------------------------------------
 
 int run_test(struct test *test)
 {
@@ -749,7 +815,7 @@ int run_test(struct test *test)
     snprintfz(name, 100, "unittest-%s", test->name);
 
     // create the chart
-    RRDSET *st = rrdset_create("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", 1, 1, RRDSET_TYPE_LINE);
+    RRDSET *st = rrdset_create("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", 1, test->update_every, RRDSET_TYPE_LINE);
     RRDDIM *rd = rrddim_add(st, "dim1", NULL, test->multiplier, test->divisor, test->algorithm);
     
     RRDDIM *rd2 = NULL;
@@ -759,12 +825,20 @@ int run_test(struct test *test)
     st->debug = 1;
 
     // feed it with the test data
+    time_t time_now = 0, time_start = time(NULL);
     unsigned long c;
+    collected_number last = 0;
     for(c = 0; c < test->feed_entries; c++) {
         if(debug_flags) fprintf(stderr, "\n\n");
 
         if(c) {
-            fprintf(stderr, "    > %s: feeding position %lu, after %llu microseconds\n", test->name, c+1, test->feed[c].microseconds);
+            time_now += test->feed[c].microseconds;
+            fprintf(stderr, "    > %s: feeding position %lu, after %0.3f seconds (%0.3f seconds from start), delta " CALCULATED_NUMBER_FORMAT ", rate " CALCULATED_NUMBER_FORMAT "\n", 
+                test->name, c+1,
+                (float)test->feed[c].microseconds / 1000000.0,
+                (float)time_now / 1000000.0,
+                ((calculated_number)test->feed[c].value - (calculated_number)last) * (calculated_number)test->multiplier / (calculated_number)test->divisor,
+                (((calculated_number)test->feed[c].value - (calculated_number)last) * (calculated_number)test->multiplier / (calculated_number)test->divisor) / (calculated_number)test->feed[c].microseconds * (calculated_number)1000000);
             rrdset_next_usec(st, test->feed[c].microseconds);
         }
         else {
@@ -773,6 +847,7 @@ int run_test(struct test *test)
 
         fprintf(stderr, "       >> %s with value " COLLECTED_NUMBER_FORMAT "\n", rd->name, test->feed[c].value);
         rrddim_set(st, "dim1", test->feed[c].value);
+        last = test->feed[c].value;
 
         if(rd2) {
             fprintf(stderr, "       >> %s with value " COLLECTED_NUMBER_FORMAT "\n", rd2->name, test->feed2[c]);
@@ -785,6 +860,7 @@ int run_test(struct test *test)
         if(!c) {
             fprintf(stderr, "    > %s: fixing first collection time to be %llu microseconds to second boundary\n", test->name, test->feed[c].microseconds);
             rd->last_collected_time.tv_usec = st->last_collected_time.tv_usec = st->last_updated.tv_usec = test->feed[c].microseconds;
+            // time_start = st->last_collected_time.tv_sec;
         }
     }
 
@@ -801,14 +877,21 @@ int run_test(struct test *test)
         calculated_number v = unpack_storage_number(rd->values[c]);
         calculated_number n = test->results[c];
         int same = (roundl(v * 10000000.0) == roundl(n * 10000000.0))?1:0;
-        fprintf(stderr, "    %s/%s: checking position %lu, expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n", test->name, rd->name, c+1, n, v, (same)?"OK":"### E R R O R ###");
+        fprintf(stderr, "    %s/%s: checking position %lu (at %lu secs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
+            test->name, rd->name, c+1,
+            (rrdset_first_entry_t(st) + c * st->update_every) - time_start,
+            n, v, (same)?"OK":"### E R R O R ###");
+
         if(!same) errors++;
 
         if(rd2) {
             v = unpack_storage_number(rd2->values[c]);
             n = test->results2[c];
             same = (roundl(v * 10000000.0) == roundl(n * 10000000.0))?1:0;
-            fprintf(stderr, "    %s/%s: checking position %lu, expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n", test->name, rd2->name, c+1, n, v, (same)?"OK":"### E R R O R ###");
+            fprintf(stderr, "    %s/%s: checking position %lu (at %lu secs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
+                test->name, rd2->name, c+1,
+                (rrdset_first_entry_t(st) + c * st->update_every) - time_start,
+                n, v, (same)?"OK":"### E R R O R ###");
             if(!same) errors++;
         }
     }
@@ -855,6 +938,12 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(run_test(&test13))
+        return 1;
+
+    if(run_test(&test14))
+        return 1;
+
+    if(run_test(&test14b))
         return 1;
 
     return 0;
