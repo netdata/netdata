@@ -78,6 +78,7 @@ sendmail=
 # enable / disable features
 SEND_SLACK="YES"
 SEND_PUSHOVER="YES"
+SEND_TELEGRAM="YES"
 SEND_EMAIL="YES"
 
 # slack configs
@@ -89,6 +90,11 @@ declare -A role_recipients_slack=()
 PUSHOVER_APP_TOKEN=
 DEFAULT_RECIPIENT_PUSHOVER=
 declare -A role_recipients_pushover=()
+
+# telegram configs
+TELEGRAM_BOT_TOKEN=
+DEFAULT_RECIPIENT_TELEGRAM=
+declare -A role_recipients_telegram=()
 
 # email configs
 DEFAULT_RECIPIENT_EMAIL="root"
@@ -146,6 +152,7 @@ filter_recipient_by_criticality() {
 
 declare -A arr_slack=()
 declare -A arr_pushover=()
+declare -A arr_telegram=()
 declare -A arr_email=()
 
 # netdata may call us with multiple recipients
@@ -168,6 +175,14 @@ do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality pushover "${r}" && arr_pushover[${r/|*/}]="1"
     done
 
+    # telegram
+    a="${role_recipients_telegram[${recipient}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_TELEGRAM}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality telegram "${r}" && arr_telegram[${r/|*/}]="1"
+    done
+
     # slack
     a="${role_recipients_slack[${recipient}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_SLACK}"
@@ -184,6 +199,10 @@ to_slack="${!arr_slack[*]}"
 # build the list of pushover recipients (user tokens)
 to_pushover="${!arr_pushover[*]}"
 [ -z "${to_pushover}" ] && SEND_PUSHOVER="NO"
+
+# check array of telegram recipients (chat ids)
+to_telegram="${!arr_telegram[*]}"
+[ -z "${to_telegram}" ] && SEND_TELEGRAM="NO"
 
 # build the list of email recipients (email addresses)
 to_email=
@@ -204,12 +223,16 @@ done
 # check pushover
 [ -z "${PUSHOVER_APP_TOKEN}" ] && SEND_PUSHOVER="NO"
 
-if [ \( "${SEND_PUSHOVER}" = "YES" -o "${SEND_SLACK}" = "YES" \) -a -z "${curl}" ]
+# check telegram
+[ -z "${TELEGRAM_BOT_TOKEN}" ] && SEND_TELEGRAM="NO"
+
+if [ \( "${SEND_PUSHOVER}" = "YES" -o "${SEND_SLACK}" = "YES" -o "${SEND_TELEGRAM}" = "YES" \) -a -z "${curl}" ]
     then
     curl="$(which curl 2>/dev/null || command -v curl 2>/dev/null)"
     if [ -z "${curl}" ]
         then
         SEND_PUSHOVER="NO"
+        SEND_TELEGRAM="NO"
         SEND_SLACK="NO"
     fi
 fi
@@ -221,7 +244,7 @@ if [ "${SEND_EMAIL}" = "YES" -a -z "${sendmail}" ]
 fi
 
 # check that we have at least a method enabled
-if [ "${SEND_EMAIL}" != "YES" -a "${SEND_PUSHOVER}" != "YES" -a "${SEND_SLACK}" != "YES" ]
+if [ "${SEND_EMAIL}" != "YES" -a "${SEND_PUSHOVER}" != "YES" -a "${SEND_TELEGRAM}" != "YES" -a "${SEND_SLACK}" != "YES" ]
     then
     echo >&2 "All notification methods are disabled. Not sending a notification."
     exit 1
@@ -382,6 +405,44 @@ send_pushover() {
                 sent=$((sent + 1))
             else
                 echo >&2 "${me}: Failed to send pushover notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
+            fi
+        done
+
+        [ ${sent} -gt 0 ] && return 0
+    fi
+
+    return 1
+}
+
+
+# -----------------------------------------------------------------------------
+# telegram sender
+
+send_telegram() {
+    local bottoken="${1}" chatids="${2}" message="${3}" httpcode sent=0 chatid disableNotification=""
+
+    if [ "${status}" = "CLEAR" ]; then disableNotification="--data-urlencode disable_notification=true"; fi
+
+    if [ "${SEND_TELEGRAM}" = "YES" -a ! -z "${bottoken}" -a ! -z "${chatids}" -a ! -z "${message}" ];
+    then
+        for chatid in ${chatids}
+        do
+            # https://core.telegram.org/bots/api#sendmessage
+            httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null ${disableNotification} \
+                --data-urlencode "parse_mode=HTML" \
+                --data-urlencode "disable_web_page_preview=true" \
+                --data-urlencode "text=$message" \
+                "https://api.telegram.org/bot${bottoken}/sendMessage?chat_id=$chatid")
+
+            if [ "${httpcode}" == "200" ]
+            then
+                echo >&2 "${me}: Sent telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}'"
+                sent=$((sent + 1))
+            elif [ "${httpcode}" == "401" ]
+            then
+                echo >&2 "${me}: Failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}': Wrong bot token."
+            else
+                echo >&2 "${me}: Failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}' with HTTP error code ${httpcode}."
             fi
         done
 
@@ -571,6 +632,21 @@ send_pushover "${PUSHOVER_APP_TOKEN}" "${to_pushover}" "${when}" "${goto_url}" "
 SENT_PUSHOVER=$?
 
 # -----------------------------------------------------------------------------
+# send the telegram.org message
+
+# https://core.telegram.org/bots/api#formatting-options
+telegram_message="<b>${severity}"
+[ "${status_message}" != "recovered" ] && telegram_message="${telegram_message}, ${status_message}"
+telegram_message="${telegram_message}
+${chart} (${family})</b>
+<a href=\"${goto_url}\">${alarm}</a>
+<i>${info}</i>"
+
+send_telegram "${TELEGRAM_BOT_TOKEN}" "${to_telegram}" "${telegram_message}"
+
+SENT_TELEGRAM=$?
+
+# -----------------------------------------------------------------------------
 # send the email
 
 send_email <<EOF
@@ -669,7 +745,7 @@ SENT_EMAIL=$?
 # let netdata know
 
 # we did send somehting
-[ ${SENT_EMAIL} -eq 0 -o ${SENT_PUSHOVER} -eq 0 -o ${SENT_SLACK} -eq 0 ] && exit 0
+[ ${SENT_EMAIL} -eq 0 -o ${SENT_PUSHOVER} -eq 0 -o ${SENT_TELEGRAM} -eq 0 -o ${SENT_SLACK} -eq 0 ] && exit 0
 
 # we did not send anything
 exit 1
