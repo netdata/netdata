@@ -15,7 +15,7 @@ retries = 60
 #     'update_every': update_every,
 #     'retries': retries,
 #     'priority': priority,
-#     'url': 'http://localhost/status'
+#     'url': 'http://localhost/status?full&json'
 # }}
 
 # charts order (can be overridden if you want less charts, or different order)
@@ -88,30 +88,42 @@ class Service(UrlService):
         except AttributeError:
             return None
 
-        try:
-            raw_json = json.loads(raw)
-        except ValueError:
-            return None
+        if '?json' in self.url or '&json' in self.url:
+            try:
+                raw_json = json.loads(raw)
+            except ValueError:
+                return None
+            data = {self.assignment[k]: v for k, v in raw_json.items() if k in self.assignment}
+            if '&full' in self.url or '?full' in self.url:
+                c = 0
+                for proc in raw_json['processes']:
+                    if proc['state'] != 'Idle':
+                        continue
+                    c += 1
+                    for k, v in self.proc_assignment.items():
+                        d = proc[k]
+                        if v == 'ReqDur':
+                            d = d/1000
+                        if v == 'ReqMem':
+                            d = d/1024
+                        if 'max' + v not in data or data['max' + v] < d:
+                            data['max' + v] = d
+                        if 'avg' + v not in data:
+                            data['avg' + v] = 0
+                        data['avg' + v] = (data['avg' + v] + d) / c
+            if len(data) == 0:
+                return None
+            return data
 
-        data = {self.assignment[k]: v for k, v in raw_json.items() if k in self.assignment}
-
-        c = 0
-        for proc in raw_json['processes']:
-            if proc['state'] != 'Idle':
-                continue
-            c += 1
-            for k, v in self.proc_assignment.items():
-                d = proc[k]
-                if v == 'ReqDur':
-                    d = d/1000
-                if v == 'ReqMem':
-                    d = d/1024
-                if 'max' + v not in data or data['max' + v] < d:
-                    data['max' + v] = d
-                if 'avg' + v not in data:
-                    data['avg' + v] = 0
-                data['avg' + v] = (data['avg' + v] + d) / c
-
+        raw = raw.split('\n')
+        data = {}
+        for row in raw:
+            tmp = row.split(":")
+            if str(tmp[0]) in self.assignment:
+                try:
+                    data[self.assignment[tmp[0]]] = int(tmp[1])
+                except (IndexError, ValueError):
+                    pass
         if len(data) == 0:
             return None
         return data
