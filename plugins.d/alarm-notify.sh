@@ -107,10 +107,6 @@ if [ -f "${NETDATA_CONFIG_DIR}/health_alarm_notify.conf" ]
     source "${NETDATA_CONFIG_DIR}/health_alarm_notify.conf"
 fi
 
-SEND_TELEGRAM="YES"
-DEFAULT_RECIPIENT_TELEGRAM="111477881 111477882"
-TELEGRAM_BOT_TOKEN="279223724:AAHJ3MGQKBTuKdSumDvmVGopluOWDPszTeI"
-
 # -----------------------------------------------------------------------------
 # filter recipients based on the criticality of each
 
