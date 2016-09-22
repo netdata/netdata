@@ -129,6 +129,7 @@ declare -A configs_signatures=(
   ['46ef6c1b638e40a7dfd62defdc5f99a3']='health.d/retroshare.conf'
   ['6608c6546b3c6bde084fc1d34b1163c1']='health.d/retroshare.conf'
   ['1c12b678ab65f271a96da1bbd0a1ab1c']='health.d/softnet.conf'
+  ['2472e49550326f7142e2c425ccbca005']='health.d/softnet.conf'
   ['312b4b8e2805e19cf9be554b319567d6']='health.d/softnet.conf'
   ['565f11c38ae6bd5cc9d3c2adb542bc1b']='health.d/softnet.conf'
   ['6398ef37a15cb6a0bc921f58948d2b39']='health.d/softnet.conf'
