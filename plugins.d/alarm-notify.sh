@@ -160,7 +160,7 @@ declare -A arr_email=()
 for x in ${recipient//,/ }
 do
     # the recipient 'silent' means, don't send a notification for this event
-    [ "${x}" = "silent" ] & continue
+    [ "${x}" = "silent" ] && continue
 
     # email
     a="${role_recipients_email[${recipient}]}"
