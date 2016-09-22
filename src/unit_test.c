@@ -379,7 +379,7 @@ struct feed_values test4_feed[] = {
 };
 
 calculated_number test4_results[] = {
-        5, 10, 10, 10, 10, 10, 10, 10, 10
+        10, 10, 10, 10, 10, 10, 10, 10, 10
 };
 
 struct test test4 = {
@@ -414,7 +414,7 @@ struct feed_values test5_feed[] = {
 };
 
 calculated_number test5_results[] = {
-        500, 500, 0, 500, 500, 0, 0, 0, 0
+        1000, 500, 0, 500, 500, 0, 0, 0, 0
 };
 
 struct test test5 = {
@@ -455,7 +455,7 @@ struct feed_values test6_feed[] = {
 };
 
 calculated_number test6_results[] = {
-        3000, 4000, 4000, 4000
+        4000, 4000, 4000, 4000
 };
 
 struct test test6 = {
@@ -490,7 +490,7 @@ struct feed_values test7_feed[] = {
 };
 
 calculated_number test7_results[] = {
-        250, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500
+        500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500
 };
 
 struct test test7 = {
@@ -597,7 +597,7 @@ struct feed_values test10_feed[] = {
 };
 
 calculated_number test10_results[] = {
-        500, 1000, 1000, 1000, 1000, 1000, 1000
+        1000, 1000, 1000, 1000, 1000, 1000, 1000
 };
 
 struct test test10 = {
@@ -770,6 +770,7 @@ struct test test14 = {
         NULL,               // feed2
         NULL                // results2
 };
+
 struct feed_values test14b_feed[] = {
         {        0, 0 },
         { 13573000, 13573000 },
@@ -798,6 +799,38 @@ struct test test14b = {
         8,                  // result entries
         test14b_feed,        // feed
         test14b_results,     // results
+        NULL,               // feed2
+        NULL                // results2
+};
+
+struct feed_values test14c_feed[] = {
+        { 29000000, 29000000 },
+        {  1000000, 29000000 + 1000000 },
+        { 30000000, 29000000 + 1000000 + 30000000 },
+        { 30000000, 29000000 + 1000000 + 30000000 + 30000000 },
+        { 30000000, 29000000 + 1000000 + 30000000 + 30000000 + 30000000 },
+        { 30000000, 29000000 + 1000000 + 30000000 + 30000000 + 30000000 + 30000000 },
+        { 30000000, 29000000 + 1000000 + 30000000 + 30000000 + 30000000 + 30000000 + 30000000 },
+        { 30000000, 29000000 + 1000000 + 30000000 + 30000000 + 30000000 + 30000000 + 30000000 + 30000000 },
+        { 30000000, 29000000 + 1000000 + 30000000 + 30000000 + 30000000 + 30000000 + 30000000 + 30000000 + 30000000 },
+        { 30000000, 29000000 + 1000000 + 30000000 + 30000000 + 30000000 + 30000000 + 30000000 + 30000000 + 30000000 + 30000000 },
+};
+
+calculated_number test14c_results[] = {
+        1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000
+};
+
+struct test test14c = {
+        "test14c",            // name
+        "issue #981 with dummy data, checking for late start",
+        30,                 // update_every
+        1,                  // multiplier
+        1,                  // divisor
+        RRDDIM_INCREMENTAL, // algorithm
+        10,                 // feed entries
+        9,                  // result entries
+        test14c_feed,        // feed
+        test14c_results,     // results
         NULL,               // feed2
         NULL                // results2
 };
@@ -944,6 +977,9 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(run_test(&test14b))
+        return 1;
+
+    if(run_test(&test14c))
         return 1;
 
     return 0;

@@ -43,7 +43,7 @@ static struct netstat_columns icmp_data[] = {
     { "OutErrors", 0, 0, -1, NULL },
     { "InCsumErrors", 0, 0, 1, NULL },
 
-    // all there are available in icmpmsg
+    // all these are available in icmpmsg
 //    { "InDestUnreachs", 0, 0, 1, NULL },
 //    { "OutDestUnreachs", 0, 0, -1, NULL },
 //    { "InTimeExcds", 0, 0, 1, NULL },
