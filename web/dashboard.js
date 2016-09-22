@@ -3871,7 +3871,7 @@
             showLabelsOnHighlight: self.data('dygraph-showlabelsonhighlight') || true,
             hideOverlayOnMouseOut: self.data('dygraph-hideoverlayonmouseout') || true,
 
-            includeZero: self.data('dygraph-includezero') || false,
+            includeZero: self.data('dygraph-includezero') || ((chart_type === 'stacked')? true : false),
             xRangePad: self.data('dygraph-xrangepad') || 0,
             yRangePad: self.data('dygraph-yrangepad') || 1,
 
