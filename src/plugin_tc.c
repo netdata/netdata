@@ -267,10 +267,10 @@ static inline void tc_device_commit(struct tc_device *d) {
         snprintfz(var_name, CONFIG_MAX_NAME, "dropped packets chart for %s", d->id);
         d->enabled_dropped = config_get_boolean_ondemand("plugin:tc", var_name, enable_dropped);
 
-        snprintfz(var_name, CONFIG_MAX_NAME, "dropped tokens chart for %s", d->id);
+        snprintfz(var_name, CONFIG_MAX_NAME, "tokens chart for %s", d->id);
         d->enabled_tokens = config_get_boolean_ondemand("plugin:tc", var_name, enable_tokens);
 
-        snprintfz(var_name, CONFIG_MAX_NAME, "dropped ctokens chart for %s", d->id);
+        snprintfz(var_name, CONFIG_MAX_NAME, "ctokens chart for %s", d->id);
         d->enabled_ctokens = config_get_boolean_ondemand("plugin:tc", var_name, enable_ctokens);
     }
 

@@ -26,7 +26,7 @@ printf "%q " "$0" "${@}" >>netdata-installer.log
 printf "\n" >>netdata-installer.log
 
 REINSTALL_PWD="${PWD}"
-REINSTALL_COMMAND="$(printf "CFLAGS=\"%s\" " "${CFLAGS}"; printf "%q " "$0" "${@}"; printf "\n")"
+REINSTALL_COMMAND="$(printf "%q " "$0" "${@}"; printf "\n")"
 
 service="$(which service 2>/dev/null || command -v service 2>/dev/null)"
 systemctl="$(which systemctl 2>/dev/null || command -v systemctl 2>/dev/null)"
@@ -1076,6 +1076,9 @@ echo >&2 "Uninstall script generated: ./netdata-uninstaller.sh"
 
 cat >netdata-updater.sh.new <<REINSTALL
 #!/usr/bin/env bash
+
+export PATH="\${PATH}:${PATH}"
+export CFLAGS="${CFLAGS}"
 
 LAST_UID="${UID}"
 if [ "\${LAST_UID}" != "\${UID}" ]

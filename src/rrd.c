@@ -5,10 +5,12 @@
 // ----------------------------------------------------------------------------
 // globals
 
+/*
 // if not zero it gives the time (in seconds) to remove un-updated dimensions
 // DO NOT ENABLE
 // if dimensions are removed, the chart generation will have to run again
 int rrd_delete_unupdated_dimensions = 0;
+*/
 
 int rrd_update_every = UPDATE_EVERY;
 int rrd_default_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
@@ -986,25 +988,42 @@ unsigned long long rrdset_done(RRDSET *st)
 
     debug(D_RRD_CALLS, "rrdset_done() for chart %s", st->name);
 
-    RRDDIM *rd, *last;
-    int oldstate, store_this_entry = 1, first_entry = 0;
-    unsigned long long last_stored_ut, now_collect_ut, last_collect_ut, next_store_ut, stored_entries = 0;
+    RRDDIM *rd;
 
-    if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate) != 0))
+    int
+        pthreadoldcancelstate;  // store the old cancelable pthread state, to restore it at the end
+
+    char
+        store_this_entry = 1,   // boolean: 1 = store this entry, 0 = don't store this entry
+        first_entry = 0;        // boolean: 1 = this is the first entry seen for this chart, 0 = all other entries
+
+    unsigned int
+        stored_entries = 0;     // the number of entries we have stored in the db, during this call to rrdset_done()
+
+    unsigned long long
+        last_collect_ut,        // the timestamp in microseconds, of the last collected value
+        now_collect_ut,         // the timestamp in microseconds, of this collected value (this is NOW)
+        last_stored_ut,         // the timestamp in microseconds, of the last stored entry in the db
+        next_store_ut,          // the timestamp in microseconds, of the next entry to store in the db
+        update_every_ut = st->update_every * 1000000ULL; // st->update_every in microseconds
+
+    if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &pthreadoldcancelstate) != 0))
         error("Cannot set pthread cancel state to DISABLE.");
 
     // a read lock is OK here
     pthread_rwlock_rdlock(&st->rwlock);
 
+/*
     // enable the chart, if it was disabled
     if(unlikely(rrd_delete_unupdated_dimensions) && !st->enabled)
         st->enabled = 1;
+*/
 
     // check if the chart has a long time to be updated
-    if(unlikely(st->usec_since_last_update > st->entries * st->update_every * 1000000ULL)) {
+    if(unlikely(st->usec_since_last_update > st->entries * update_every_ut)) {
         info("%s: took too long to be updated (%0.3Lf secs). Reseting it.", st->name, (long double)(st->usec_since_last_update / 1000000.0));
         rrdset_reset(st);
-        st->usec_since_last_update = st->update_every * 1000000ULL;
+        st->usec_since_last_update = update_every_ut;
         first_entry = 1;
     }
     if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: microseconds since last update: %llu", st->name, st->usec_since_last_update);
@@ -1014,7 +1033,7 @@ unsigned long long rrdset_done(RRDSET *st)
         // it is the first entry
         // set the last_collected_time to now
         gettimeofday(&st->last_collected_time, NULL);
-        last_collect_ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec - (st->update_every * 1000000);
+        last_collect_ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec - update_every_ut;
 
         // the first entry should not be stored
         store_this_entry = 0;
@@ -1048,11 +1067,11 @@ unsigned long long rrdset_done(RRDSET *st)
     }
 
     // check if we will re-write the entire data set
-    if(unlikely(usec_dt(&st->last_collected_time, &st->last_updated) > st->update_every * st->entries * 1000000ULL)) {
+    if(unlikely(usec_dt(&st->last_collected_time, &st->last_updated) > st->entries * update_every_ut)) {
         info("%s: too old data (last updated at %ld.%ld, last collected at %ld.%ld). Reseting it. Will not store the next entry.", st->name, st->last_updated.tv_sec, st->last_updated.tv_usec, st->last_collected_time.tv_sec, st->last_collected_time.tv_usec);
         rrdset_reset(st);
 
-        st->usec_since_last_update = st->update_every * 1000000ULL;
+        st->usec_since_last_update = update_every_ut;
 
         gettimeofday(&st->last_collected_time, NULL);
 
@@ -1272,10 +1291,10 @@ unsigned long long rrdset_done(RRDSET *st)
     }
 
     unsigned long long first_ut = last_stored_ut;
-    long long iterations = (now_collect_ut - last_stored_ut) / (st->update_every * 1000000ULL);
-    if((now_collect_ut % (st->update_every * 1000000ULL)) == 0) iterations++;
+    long long iterations = (now_collect_ut - last_stored_ut) / (update_every_ut);
+    if((now_collect_ut % (update_every_ut)) == 0) iterations++;
 
-    for( ; next_store_ut <= now_collect_ut ; next_store_ut += st->update_every * 1000000ULL, iterations-- ) {
+    for( ; next_store_ut <= now_collect_ut ; next_store_ut += update_every_ut, iterations-- ) {
 #ifdef NETDATA_INTERNAL_CHECKS
         if(iterations < 0) { error("%s: iterations calculation wrapped! first_ut = %llu, last_stored_ut = %llu, next_store_ut = %llu, now_collect_ut = %llu", st->name, first_ut, last_stored_ut, next_store_ut, now_collect_ut); }
 #endif
@@ -1312,11 +1331,21 @@ unsigned long long rrdset_done(RRDSET *st)
                             , (now_collect_ut - last_stored_ut)
                             );
 
-                    last_collect_ut = next_store_ut;
                     rd->calculated_value -= new_value;
                     new_value += rd->last_calculated_value;
                     rd->last_calculated_value = 0;
                     new_value /= (calculated_number)st->update_every;
+
+                    if(unlikely(next_store_ut - last_stored_ut < update_every_ut)) {
+                        if(unlikely(st->debug))
+                            debug(D_RRD_STATS, "%s/%s: COLLECTION POINT IS SHORT " CALCULATED_NUMBER_FORMAT " - EXTRAPOLATING",
+                                st->id, rd->name
+                                , (calculated_number)(next_store_ut - last_stored_ut)
+                                );
+                        new_value = new_value * (calculated_number)(st->update_every * 1000000) / (calculated_number)(next_store_ut - last_stored_ut);
+                    }
+
+                    last_collect_ut = next_store_ut;
                     break;
 
                 case RRDDIM_ABSOLUTE:
@@ -1467,6 +1496,7 @@ unsigned long long rrdset_done(RRDSET *st)
     // ALL DONE ABOUT THE DATA UPDATE
     // --------------------------------------------------------------------
 
+/*
     // find if there are any obsolete dimensions (not updated recently)
     if(unlikely(rrd_delete_unupdated_dimensions)) {
 
@@ -1475,6 +1505,7 @@ unsigned long long rrdset_done(RRDSET *st)
                 break;
 
         if(unlikely(rd)) {
+            RRDDIM *last;
             // there is dimension to free
             // upgrade our read lock to a write lock
             pthread_rwlock_unlock(&st->rwlock);
@@ -1512,11 +1543,12 @@ unsigned long long rrdset_done(RRDSET *st)
             }
         }
     }
+*/
 
     pthread_rwlock_unlock(&st->rwlock);
 
-    if(unlikely(pthread_setcancelstate(oldstate, NULL) != 0))
-        error("Cannot set pthread cancel state to RESTORE (%d).", oldstate);
+    if(unlikely(pthread_setcancelstate(pthreadoldcancelstate, NULL) != 0))
+        error("Cannot set pthread cancel state to RESTORE (%d).", pthreadoldcancelstate);
 
     return(st->usec_since_last_update);
 }
