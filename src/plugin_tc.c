@@ -39,6 +39,8 @@ struct tc_class {
     RRDDIM *rd_bytes;
     RRDDIM *rd_packets;
     RRDDIM *rd_dropped;
+    RRDDIM *rd_tokens;
+    RRDDIM *rd_ctokens;
 
     char name_updated;
     char updated;   // updated bytes
@@ -64,10 +66,14 @@ struct tc_device {
     char enabled_bytes;
     char enabled_packets;
     char enabled_dropped;
+    char enabled_tokens;
+    char enabled_ctokens;
 
     RRDSET *st_bytes;
     RRDSET *st_packets;
     RRDSET *st_dropped;
+    RRDSET *st_tokens;
+    RRDSET *st_ctokens;
 
     avl_tree classes_index;
 
@@ -177,18 +183,20 @@ static inline void tc_device_classes_cleanup(struct tc_device *d) {
 }
 
 static inline void tc_device_commit(struct tc_device *d) {
-    static int enable_new_interfaces = -1, enable_bytes = -1, enable_packets = -1, enable_dropped = -1;
+    static int enable_new_interfaces = -1, enable_bytes = -1, enable_packets = -1, enable_dropped = -1, enable_tokens = -1, enable_ctokens = -1;
 
     if(unlikely(enable_new_interfaces == -1)) {
         enable_new_interfaces = config_get_boolean_ondemand("plugin:tc", "enable new interfaces detected at runtime", CONFIG_ONDEMAND_YES);
         enable_bytes          = config_get_boolean_ondemand("plugin:tc", "enable traffic charts for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
         enable_packets        = config_get_boolean_ondemand("plugin:tc", "enable packets charts for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
         enable_dropped        = config_get_boolean_ondemand("plugin:tc", "enable dropped charts for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
+        enable_tokens         = config_get_boolean_ondemand("plugin:tc", "enable tokens charts for all interfaces", CONFIG_ONDEMAND_NO);
+        enable_ctokens        = config_get_boolean_ondemand("plugin:tc", "enable ctokens charts for all interfaces", CONFIG_ONDEMAND_NO);
     }
 
     // we only need to add leaf classes
     struct tc_class *c, *x;
-    unsigned long long bytes_sum = 0, packets_sum = 0, dropped_sum = 0;
+    unsigned long long bytes_sum = 0, packets_sum = 0, dropped_sum = 0, tokens_sum = 0, ctokens_sum = 0;
     int active_classes = 0;
 
     // set all classes
@@ -234,6 +242,8 @@ static inline void tc_device_commit(struct tc_device *d) {
             bytes_sum += c->bytes;
             packets_sum += c->packets;
             dropped_sum += c->dropped;
+            tokens_sum += c->tokens;
+            ctokens_sum += c->ctokens;
         }
     }
 
@@ -256,18 +266,29 @@ static inline void tc_device_commit(struct tc_device *d) {
 
         snprintfz(var_name, CONFIG_MAX_NAME, "dropped packets chart for %s", d->id);
         d->enabled_dropped = config_get_boolean_ondemand("plugin:tc", var_name, enable_dropped);
+
+        snprintfz(var_name, CONFIG_MAX_NAME, "tokens chart for %s", d->id);
+        d->enabled_tokens = config_get_boolean_ondemand("plugin:tc", var_name, enable_tokens);
+
+        snprintfz(var_name, CONFIG_MAX_NAME, "ctokens chart for %s", d->id);
+        d->enabled_ctokens = config_get_boolean_ondemand("plugin:tc", var_name, enable_ctokens);
     }
 
-    debug(D_TC_LOOP, "TC: evaluating TC device '%s'. enabled = %d/%d (bytes: %d/%d, packets: %d/%d, dropped: %d/%d), classes = %d (bytes = %llu, packets = %llu, dropped = %llu).",
+    debug(D_TC_LOOP, "TC: evaluating TC device '%s'. enabled = %d/%d (bytes: %d/%d, packets: %d/%d, dropped: %d/%d, tokens: %d/%d, ctokens: %d/%d), classes = %d (bytes = %llu, packets = %llu, dropped = %llu, tokens = %llu, ctokens = %llu).",
         d->name?d->name:d->id,
         d->enabled, enable_new_interfaces,
         d->enabled_bytes, enable_bytes,
         d->enabled_packets, enable_packets,
         d->enabled_dropped, enable_dropped,
+        d->enabled_tokens, enable_tokens,
+        d->enabled_ctokens, enable_ctokens,
         active_classes,
         bytes_sum,
         packets_sum,
-        dropped_sum);
+        dropped_sum,
+        tokens_sum,
+        ctokens_sum
+        );
 
     if(likely(d->enabled)) {
         // --------------------------------------------------------------------
@@ -432,6 +453,114 @@ static inline void tc_device_commit(struct tc_device *d) {
                 }
             }
             rrdset_done(d->st_dropped);
+        }
+
+        // --------------------------------------------------------------------
+        // tokens
+        
+        if(d->enabled_tokens == CONFIG_ONDEMAND_YES || (d->enabled_tokens == CONFIG_ONDEMAND_ONDEMAND && tokens_sum)) {
+            d->enabled_tokens = CONFIG_ONDEMAND_YES;
+            
+            if(unlikely(!d->st_tokens)) {
+                char id[RRD_ID_LENGTH_MAX + 1];
+                char name[RRD_ID_LENGTH_MAX + 1];
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_tokens", d->id);
+                snprintfz(name, RRD_ID_LENGTH_MAX, "%s_tokens", d->name?d->name:d->id);
+
+                d->st_tokens = rrdset_find_bytype(RRD_TYPE_TC, id);
+                if(unlikely(!d->st_tokens)) {
+                    debug(D_TC_LOOP, "TC: Creating new _tokens chart for device '%s'", d->name?d->name:d->id);
+                    d->st_tokens = rrdset_create(RRD_TYPE_TC, id, name, d->family?d->family:d->id, RRD_TYPE_TC ".qos_tokens", "Class Tokens", "tokens", 7030, rrd_update_every, RRDSET_TYPE_LINE);
+                }
+            }
+            else {
+                debug(D_TC_LOOP, "TC: Updating _tokens chart for device '%s'", d->name?d->name:d->id);
+                rrdset_next_plugins(d->st_tokens);
+
+                // FIXME
+                // update the family
+            }
+
+            for(c = d->classes ; c ; c = c->next) {
+                if(unlikely(!c->updated)) continue;
+
+                if(c->isleaf && c->hasparent) {
+                    if(unlikely(!c->rd_tokens)) {
+                        c->rd_tokens = rrddim_find(d->st_tokens, c->id);
+                        if(unlikely(!c->rd_tokens)) {
+                            debug(D_TC_LOOP, "TC: Adding to chart '%s', dimension '%s' (name: '%s')", d->st_tokens->id, c->id, c->name);
+
+                            // new class, we have to add it
+                            c->rd_tokens = rrddim_add(d->st_tokens, c->id, c->name?c->name:c->id, 1, 1, RRDDIM_ABSOLUTE);
+                        }
+                        else debug(D_TC_LOOP, "TC: Updating chart '%s', dimension '%s'", d->st_tokens->id, c->id);
+                    }
+
+                    rrddim_set_by_pointer(d->st_tokens, c->rd_tokens, c->tokens);
+
+                    // if it has a name, different to the id
+                    if(unlikely(c->name_updated && c->name && strcmp(c->id, c->name) != 0)) {
+                        // update the rrd dimension with the new name
+                        debug(D_TC_LOOP, "TC: Setting chart '%s', dimension '%s' name to '%s'", d->st_tokens->id, c->rd_tokens->id, c->name);
+                        rrddim_set_name(d->st_tokens, c->rd_tokens, c->name);
+                    }
+                }
+            }
+            rrdset_done(d->st_tokens);
+        }
+
+        // --------------------------------------------------------------------
+        // ctokens
+        
+        if(d->enabled_ctokens == CONFIG_ONDEMAND_YES || (d->enabled_ctokens == CONFIG_ONDEMAND_ONDEMAND && ctokens_sum)) {
+            d->enabled_ctokens = CONFIG_ONDEMAND_YES;
+            
+            if(unlikely(!d->st_ctokens)) {
+                char id[RRD_ID_LENGTH_MAX + 1];
+                char name[RRD_ID_LENGTH_MAX + 1];
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_ctokens", d->id);
+                snprintfz(name, RRD_ID_LENGTH_MAX, "%s_ctokens", d->name?d->name:d->id);
+
+                d->st_ctokens = rrdset_find_bytype(RRD_TYPE_TC, id);
+                if(unlikely(!d->st_ctokens)) {
+                    debug(D_TC_LOOP, "TC: Creating new _ctokens chart for device '%s'", d->name?d->name:d->id);
+                    d->st_ctokens = rrdset_create(RRD_TYPE_TC, id, name, d->family?d->family:d->id, RRD_TYPE_TC ".qos_ctokens", "Class cTokens", "ctokens", 7040, rrd_update_every, RRDSET_TYPE_LINE);
+                }
+            }
+            else {
+                debug(D_TC_LOOP, "TC: Updating _ctokens chart for device '%s'", d->name?d->name:d->id);
+                rrdset_next_plugins(d->st_ctokens);
+
+                // FIXME
+                // update the family
+            }
+
+            for(c = d->classes ; c ; c = c->next) {
+                if(unlikely(!c->updated)) continue;
+
+                if(c->isleaf && c->hasparent) {
+                    if(unlikely(!c->rd_ctokens)) {
+                        c->rd_ctokens = rrddim_find(d->st_ctokens, c->id);
+                        if(unlikely(!c->rd_ctokens)) {
+                            debug(D_TC_LOOP, "TC: Adding to chart '%s', dimension '%s' (name: '%s')", d->st_ctokens->id, c->id, c->name);
+
+                            // new class, we have to add it
+                            c->rd_ctokens = rrddim_add(d->st_ctokens, c->id, c->name?c->name:c->id, 1, 1, RRDDIM_ABSOLUTE);
+                        }
+                        else debug(D_TC_LOOP, "TC: Updating chart '%s', dimension '%s'", d->st_ctokens->id, c->id);
+                    }
+
+                    rrddim_set_by_pointer(d->st_ctokens, c->rd_ctokens, c->ctokens);
+
+                    // if it has a name, different to the id
+                    if(unlikely(c->name_updated && c->name && strcmp(c->id, c->name) != 0)) {
+                        // update the rrd dimension with the new name
+                        debug(D_TC_LOOP, "TC: Setting chart '%s', dimension '%s' name to '%s'", d->st_ctokens->id, c->rd_ctokens->id, c->name);
+                        rrddim_set_name(d->st_ctokens, c->rd_ctokens, c->name);
+                    }
+                }
+            }
+            rrdset_done(d->st_ctokens);
         }
     }
 

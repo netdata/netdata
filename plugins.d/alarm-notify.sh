@@ -159,6 +159,9 @@ declare -A arr_email=()
 # so, here we find the unique ones
 for x in ${recipient//,/ }
 do
+    # the recipient 'silent' means, don't send a notification for this event
+    [ "${x}" = "silent" ] && continue
+
     # email
     a="${role_recipients_email[${recipient}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_EMAIL}"
