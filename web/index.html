@@ -3291,10 +3291,10 @@ function finalizePage() {
         var hash = el.find('a').attr('href');
         if(typeof hash === 'string' && hash.substring(0, 1) === '#' && urlOptions.hash.startsWith(hash + '_submenu_') === false) {
             urlOptions.hash = hash;
-            console.log(urlOptions.hash);
+            //console.log(urlOptions.hash);
             netdataHashUpdate();
         }
-        else console.log('hash: not accepting ' + hash);
+        //else console.log('hash: not accepting ' + hash);
         //}
         //else console.log('el.find(): not found');
     });
