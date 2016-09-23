@@ -2160,7 +2160,7 @@ void web_client_process(struct web_client *w) {
     }
     else if(w->mode != WEB_CLIENT_MODE_OPTIONS) {
         char edate[32];
-        time_t et = w->response.data->date + (86400 * 14);
+        time_t et = w->response.data->date + 86400;
         struct tm etmbuf, *etm = gmtime_r(&et, &etmbuf);
         strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", etm);
 
