@@ -622,7 +622,7 @@
     </script>
 
     <!-- load the dashboard manager - it will do the rest -->
-    <script type="text/javascript" src="dashboard.js?v50"></script>
+    <script type="text/javascript" src="dashboard.js?v51"></script>
 </head>
 <body data-spy="scroll" data-target="#sidebar">
     <div id="loadOverlay" class="loadOverlay" style="background-color: #888; color: #888;">
@@ -2372,15 +2372,6 @@ function enrichChartData(chart) {
 
 // ----------------------------------------------------------------------------
 
-function name2id(s) {
-    return s
-        .replace(/ /g, '_')
-        .replace(/\(/g, '_')
-        .replace(/\)/g, '_')
-        .replace(/\./g, '_')
-        .replace(/\//g, '_');
-}
-
 function headMain(charts, duration) {
     var head = '';
 
@@ -2529,9 +2520,9 @@ function renderPage(menus, data) {
 
         // generate an entry at the main menu
 
-        var menuid = name2id(menu);
+        var menuid = NETDATA.name2id('menu_' + menu);
         sidebar += '<li class=""><a href="#' + menuid + '" onClick="return scrollToId(\'' + menuid + '\');">' + menus[menu].icon + ' ' + menus[menu].title + '</a><ul class="nav">';
-        html += '<div role="section"><div role="sectionhead"><h1 id="' + menuid + '" role="heading">' + menus[menu].title + '</h1></div><div id="menu_' + menuid + '" role="document">';
+        html += '<div role="section"><div role="sectionhead"><h1 id="' + menuid + '" role="heading">' + menus[menu].title + '</h1></div><div role="document">';
 
         if(menus[menu].info !== null)
             html += menus[menu].info;
@@ -2549,9 +2540,9 @@ function renderPage(menus, data) {
             var submenu = sub[si++];
 
             // generate an entry at the submenu
-            var submenuid = name2id(menu + '_' + submenu);
+            var submenuid = NETDATA.name2id('menu_' + menu + '_submenu_' + submenu);
             sidebar += '<li class><a href="#' + submenuid + '" onClick="return scrollToId(\'' + submenuid + '\');">' + menus[menu].submenus[submenu].title + '</a></li>';
-            shtml += '<div class="netdata-group-container" id="submenu_' + submenuid + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + submenuid + '" class="netdata-chart-alignment" role="heading">' + menus[menu].submenus[submenu].title + '</h2>';
+            shtml += '<div class="netdata-group-container" id="' + submenuid + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + submenuid + '" class="netdata-chart-alignment" role="heading">' + menus[menu].submenus[submenu].title + '</h2>';
 
             if(menus[menu].submenus[submenu].info !== null)
                 shtml += '<div class="chart-message netdata-chart-alignment" role="document">' + menus[menu].submenus[submenu].info + '</div>';
@@ -2572,12 +2563,12 @@ function renderPage(menus, data) {
                 head += generateHeadCharts('heads', chart, duration);
 
                 // generate the chart
-                chtml += chartInfo(chart.context) + '<div data-netdata="' + chart.id + '"'
+                chtml += chartInfo(chart.context) + '<div id="chart_' + NETDATA.name2id(chart.id) + '" data-netdata="' + chart.id + '"'
                     + ' data-width="' + pcent_width.toString() + '%"'
                     + ' data-height="' + chartHeight(chart.context, options.chartsHeight).toString() + 'px"'
                     + ' data-before="0"'
                     + ' data-after="-' + duration.toString() + '"'
-                    + ' data-id="' + name2id(options.hostname + '/' + chart.id) + '"'
+                    + ' data-id="' + NETDATA.name2id(options.hostname + '/' + chart.id) + '"'
                     + ' data-colors="' + anyAttribute(chartData, 'colors', chart.context, '') + '"'
                     + ' role="application"></div>';
 
@@ -2640,7 +2631,7 @@ function renderChartsAndMenu(data) {
 
         // console.log(urlOptions.chart + ' === ' + c);
         if(urlOptions.chart === c) {
-            urlOptions.hash = '#' + name2id(charts[c].menu + '_' + charts[c].submenu)
+            urlOptions.hash = '#' + NETDATA.name2id(charts[c].menu + '_' + charts[c].submenu)
             // console.log('hash = ' + urlOptions.hash);
         }
     }
@@ -2746,7 +2737,7 @@ function alarmsUpdateModal() {
         function alarm_to_html(alarm, full) {
             var chart = options.data.charts[alarm.chart];
 
-            var html = '<tr><td class="text-center" style="vertical-align:middle" width="40%"><b>' + alarm.chart + '</b><br/>&nbsp;<br/><embed src="' + NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" height="20" /><br/>&nbsp;<br/><span style="font-size: 18px">' + alarm.info + '</span><br/>&nbsp;<br/>role: <b>' + alarm.recipient + '</b></td>'
+            var html = '<tr><td class="text-center" style="vertical-align:middle" width="40%"><b>' + alarm.chart + '</b><br/>&nbsp;<br/><embed src="' + NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" height="20"/><br/>&nbsp;<br/><span style="font-size: 18px">' + alarm.info + '</span><br/>&nbsp;<br/>role: <b>' + alarm.recipient + '</b><br/>&nbsp;<br/><b><i class="fa fa-line-chart" aria-hidden="true"></i></b><small>&nbsp;&nbsp;<a href="#" onClick="NETDATA.alarms.scrollToChart(\'' + alarm.chart + '\'); $(\'#alarmsModal\').modal(\'hide\'); return false;">jump to chart</a></small></td>'
                 + '<td><table class="table">'
                 + ((typeof alarm.warn !== 'undefined')?('<tr><td width="10%" style="text-align:right">warning&nbsp;when</td><td><span style="font-family: monospace; color:#fe7d37; font-weight: bold;">' + alarm.warn + '</span></td></tr>'):'')
                 + ((typeof alarm.crit !== 'undefined')?('<tr><td width="10%" style="text-align:right">critical&nbsp;when</td><td><span style="font-family: monospace; color: #e05d44; font-weight: bold;">' + alarm.crit + '</span></td></tr>'):'');
@@ -2961,9 +2952,14 @@ function alarmsCallback(data) {
         document.getElementById('alarms_count_badge').innerHTML = '';
 }
 
-function downloadAllCharts(netdata_url) {
+function initializeDynamicDashboard(netdata_url) {
     if(typeof netdata_url === 'undefined' || netdata_url === null)
         netdata_url = NETDATA.serverDefault;
+
+    // initialize clickable alarms
+    NETDATA.alarms.chart_div_offset = 100;
+    NETDATA.alarms.chart_div_id_prefix = 'chart_';
+    NETDATA.alarms.chart_div_animation_d0uration = 0;
 
     NETDATA.pause(function() {
         $("#loadOverlay").css("display","none");
@@ -3289,15 +3285,18 @@ function finalizePage() {
 
     // change the URL based on the current position of the screen
     $('#sidebar').on('activate.bs.scrollspy', function (e) {
+        // console.log(e);
         var el = $(e.target);
-        if(el.find('ul').size() == 0) {
-            var hash = el.find('a').attr('href');
-            if(typeof hash === 'string' && hash.substring(0, 1) == '#') {
-                urlOptions.hash = hash;
-                // console.log(urlOptions.hash);
-                netdataHashUpdate();
-            }
+        //if(el.find('ul').size() == 0) {
+        var hash = el.find('a').attr('href');
+        if(typeof hash === 'string' && hash.substring(0, 1) === '#' && urlOptions.hash.startsWith(hash + '_submenu_') === false) {
+            urlOptions.hash = hash;
+            console.log(urlOptions.hash);
+            netdataHashUpdate();
         }
+        else console.log('hash: not accepting ' + hash);
+        //}
+        //else console.log('el.find(): not found');
     });
 
     document.getElementById('footer').style.display = 'block';
@@ -3421,7 +3420,7 @@ function resetDashboardOptions() {
         netdataReload();
 }
 
-downloadAllCharts();
+initializeDynamicDashboard();
 
 </script>
 
