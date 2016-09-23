@@ -2628,12 +2628,6 @@ function renderChartsAndMenu(data) {
 
         // index the chart in the menu/submenu
         menus[charts[c].menu].submenus[charts[c].submenu].charts.push(charts[c]);
-
-        // console.log(urlOptions.chart + ' === ' + c);
-        if(urlOptions.chart === c) {
-            urlOptions.hash = '#' + NETDATA.name2id(charts[c].menu + '_' + charts[c].submenu)
-            // console.log('hash = ' + urlOptions.hash);
-        }
     }
 
     // propagate the descriptive subname given to QoS
@@ -3261,6 +3255,13 @@ function finalizePage() {
 
     // check if we have to jump to a specific section
     scrollToId(urlOptions.hash.replace('#',''));
+
+    if(urlOptions.chart !== null) {
+        NETDATA.alarms.scrollToChart(urlOptions.chart);
+        //urlOptions.hash = '#' + NETDATA.name2id('menu_' + charts[c].menu + '_submenu_' + charts[c].submenu);
+        //urlOptions.hash = '#chart_' + NETDATA.name2id(urlOptions.chart);
+        //console.log('hash = ' + urlOptions.hash);
+    }
 
     /* activate bootstrap sidebar (affix) */
     $('#sidebar').affix({
