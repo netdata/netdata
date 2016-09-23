@@ -52,6 +52,15 @@
     // global namespace
     var NETDATA = window.NETDATA || {};
 
+    NETDATA.name2id = function(s) {
+        return s
+            .replace(/ /g, '_')
+            .replace(/\(/g, '_')
+            .replace(/\)/g, '_')
+            .replace(/\./g, '_')
+            .replace(/\//g, '_');
+    };
+
     // ----------------------------------------------------------------------------------------------------------------
     // Detect the netdata server
 
@@ -5590,13 +5599,22 @@
     // Registry of netdata hosts
 
     NETDATA.alarms = {
-        notifications: false,       // when true, the browser supports notifications (may not be granted though)
-        last_notification_id: 0,    // the id of the last alarm_log we have raised an alarm for
+        onclick: null,                  // the callback to handle the click - it will be called with the alarm log entry
+        chart_div_offset: 100,          // give that space above the chart when scrolling to it
+        chart_div_id_prefix: 'chart_',  // the chart DIV IDs have this prefix (they should be NETDATA.name2id(chart.id))
+        chart_div_animation_duration: 0,// the duration of the animation while scrolling to a chart
+
+        ms_penalty: 0,                  // the time penalty of the next alarm
+        ms_between_notifications: 500,  // firefox moves the alarms off-screen (above, outside the top of the screen)
+                                        // if alarms are shown faster than: one per 500ms
+
+        notifications: false,           // when true, the browser supports notifications (may not be granted though)
+        last_notification_id: 0,        // the id of the last alarm_log we have raised an alarm for
         // notifications_shown: new Array(),
 
-        server: null,               // the server to connect to for fetching alarms
-        current: null,              // the list of raised alarms - updated in the background
-        callback: null,             // a callback function to call every time the list of raised alarms is refreshed
+        server: null,                   // the server to connect to for fetching alarms
+        current: null,                  // the list of raised alarms - updated in the background
+        callback: null,                 // a callback function to call every time the list of raised alarms is refreshed
 
         notify: function(entry) {
             // console.log('alarm ' + entry.unique_id);
@@ -5690,26 +5708,52 @@
             */
 
             if(show === true) {
-                // show this notification
-                // console.log('new notification: ' + title);
-                var n = new Notification(title, {
-                    body: entry.hostname + ' - ' + entry.chart + ' (' + entry.family + ') - ' + status + ': ' + entry.info,
-                    tag: tag,
-                    requireInteraction: interaction,
-                    icon: NETDATA.serverDefault + icon,
-                    data: data
-                    // FIXME: does not seem to work on any web browser
-                    // onclick: function(event) {
-                    //    event.preventDefault();
-                    //    console.log('clicked: ');
-                    //    console.log(event);
-                    //}
-                });
 
-                // console.log(n);
-                // NETDATA.alarms.notifications_shown.push(n);
-                // console.log(entry);
+                setTimeout(function() {
+                    // show this notification
+                    // console.log('new notification: ' + title);
+                    var n = new Notification(title, {
+                        body: entry.hostname + ' - ' + entry.chart + ' (' + entry.family + ') - ' + status + ': ' + entry.info,
+                        tag: tag,
+                        requireInteraction: interaction,
+                        icon: NETDATA.serverDefault + icon,
+                        data: data
+                    });
+
+                    n.onclick = function(event) {
+                        event.preventDefault();
+                        NETDATA.alarms.onclick(event.target.data);
+                    };
+
+                    // console.log(n);
+                    // NETDATA.alarms.notifications_shown.push(n);
+                    // console.log(entry);
+                }, NETDATA.alarms.ms_penalty);
+
+                NETDATA.alarms.ms_penalty += NETDATA.alarms.ms_between_notifications;
             }
+        },
+
+        scrollToChart: function(chart_id) {
+            if(typeof chart_id === 'string') {
+                var offset = $('#' + NETDATA.alarms.chart_div_id_prefix + NETDATA.name2id(chart_id)).offset();
+                if(typeof offset !== 'undefined') {
+                    $('html, body').animate({ scrollTop: offset.top - NETDATA.alarms.chart_div_offset }, NETDATA.alarms.chart_div_animation_duration);
+                    return true;
+                }
+            }
+            return false;
+        },
+
+        scrollToAlarm: function(alarm) {
+            if(typeof alarm === 'object') {
+                var ret = NETDATA.alarms.scrollToChart(alarm.chart);
+
+                if(ret === true && NETDATA.options.page_is_visible === false)
+                    window.focus();
+                //    alert('netdata dashboard will now scroll to chart: ' + alarm.chart + '\n\nThis alarm opened to bring the browser window in front of the screen. Click on the dashboard to prevent it from appearing again.');
+            }
+
         },
 
         notifyAll: function() {
@@ -5734,6 +5778,8 @@
                     if(a.unique_id < b.unique_id) return 1;
                     return 0;
                 });
+
+                NETDATA.alarms.ms_penalty = 0;
 
                 var len = data.length;
                 while(len--) {
@@ -5842,6 +5888,9 @@
                 host = host.substring(0, host.length - 1);
             NETDATA.alarms.server = host;
             
+            if(NETDATA.alarms.onclick === null)
+                NETDATA.alarms.onclick = NETDATA.alarms.scrollToAlarm;
+
             if(netdataShowAlarms === true) {
                 NETDATA.alarms.update_forever();
             
