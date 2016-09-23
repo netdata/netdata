@@ -195,7 +195,7 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
     (void)dt;
 
     static int do_bandwidth = -1, do_inerrors = -1, do_mcast = -1, do_bcast = -1, do_mcast_p = -1, do_bcast_p = -1, do_ecn = -1, \
-        do_tcpext_reorder = -1, do_tcpext_syscookies = -1, do_tcpext_ofo = -1, do_tcpext_connaborts = -1;
+        do_tcpext_reorder = -1, do_tcpext_syscookies = -1, do_tcpext_ofo = -1, do_tcpext_connaborts = -1, do_tcpext_memory = -1;
     static uint32_t hash_ipext = 0, hash_tcpext = 0;
     static procfile *ff = NULL;
 
@@ -219,6 +219,8 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
     static unsigned long long *tcpext_TCPAbortOnTimeout = NULL; // connections aborted due to timeout
     static unsigned long long *tcpext_TCPAbortOnLinger = NULL;  // connections aborted after user close in linger timeout
     static unsigned long long *tcpext_TCPAbortFailed = NULL;    // times unable to send RST due to no memory
+
+    static unsigned long long *tcpext_TCPMemoryPressures = NULL;
 
 /*
     // connection rejects
@@ -298,7 +300,6 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
     static unsigned long long *tcpext_TCPSchedulerFailed = NULL;
     static unsigned long long *tcpext_TCPRcvCollapsed = NULL;
 
-    static unsigned long long *tcpext_TCPMemoryPressures = NULL;
     static unsigned long long *tcpext_TCPSpuriousRTOs = NULL;
     static unsigned long long *tcpext_TCPMD5NotFound = NULL;
     static unsigned long long *tcpext_TCPMD5Unexpected = NULL;
@@ -382,6 +383,7 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
         do_tcpext_syscookies = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP SYN cookies", CONFIG_ONDEMAND_ONDEMAND);
         do_tcpext_ofo        = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP out-of-order queue", CONFIG_ONDEMAND_ONDEMAND);
         do_tcpext_connaborts = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP connection aborts", CONFIG_ONDEMAND_ONDEMAND);
+        do_tcpext_memory     = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP memory pressures", CONFIG_ONDEMAND_ONDEMAND);
 
         hash_ipext = simple_hash("IpExt");
         hash_tcpext = simple_hash("TcpExt");
@@ -415,6 +417,8 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
         tcpext_TCPAbortOnTimeout = netstat_columns_find(tcpext_data, "TCPAbortOnTimeout"); // connections aborted due to timeout
         tcpext_TCPAbortOnLinger  = netstat_columns_find(tcpext_data, "TCPAbortOnLinger");  // connections aborted after user close in linger timeout
         tcpext_TCPAbortFailed    = netstat_columns_find(tcpext_data, "TCPAbortFailed");    // times unable to send RST due to no memory
+
+        tcpext_TCPMemoryPressures = netstat_columns_find(tcpext_data, "TCPMemoryPressures");
 
         /*
         tcpext_EmbryonicRsts = netstat_columns_find(tcpext_data, "EmbryonicRsts");
@@ -467,7 +471,6 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
         tcpext_TCPDSACKOfoSent = netstat_columns_find(tcpext_data, "TCPDSACKOfoSent");
         tcpext_TCPDSACKRecv = netstat_columns_find(tcpext_data, "TCPDSACKRecv");
         tcpext_TCPDSACKOfoRecv = netstat_columns_find(tcpext_data, "TCPDSACKOfoRecv");
-        tcpext_TCPMemoryPressures = netstat_columns_find(tcpext_data, "TCPMemoryPressures");
         tcpext_TCPSACKDiscard = netstat_columns_find(tcpext_data, "TCPSACKDiscard");
         tcpext_TCPDSACKIgnoredOld = netstat_columns_find(tcpext_data, "TCPDSACKIgnoredOld");
         tcpext_TCPDSACKIgnoredNoUndo = netstat_columns_find(tcpext_data, "TCPDSACKIgnoredNoUndo");
@@ -727,11 +730,27 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
 
             // --------------------------------------------------------------------
 
+            if(do_tcpext_memory == CONFIG_ONDEMAND_YES || (do_tcpext_memory == CONFIG_ONDEMAND_ONDEMAND && (*tcpext_TCPMemoryPressures))) {
+                do_tcpext_memory = CONFIG_ONDEMAND_YES;
+                st = rrdset_find("ipv4.tcpmemorypressures");
+                if(!st) {
+                    st = rrdset_create("ipv4", "tcpmemorypressures", NULL, "tcp", NULL, "TCP Memory Pressures", "events/s", 3000, update_every, RRDSET_TYPE_LINE);
+
+                    rrddim_add(st, "TCPMemoryPressures",   "pressures",  1, 1, RRDDIM_INCREMENTAL);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "TCPMemoryPressures", *tcpext_TCPMemoryPressures);
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
             if(do_tcpext_connaborts == CONFIG_ONDEMAND_YES || (do_tcpext_connaborts == CONFIG_ONDEMAND_ONDEMAND && (*tcpext_TCPAbortOnData || *tcpext_TCPAbortOnClose || *tcpext_TCPAbortOnMemory || *tcpext_TCPAbortOnTimeout || *tcpext_TCPAbortOnLinger || *tcpext_TCPAbortFailed))) {
                 do_tcpext_connaborts = CONFIG_ONDEMAND_YES;
                 st = rrdset_find("ipv4.tcpconnaborts");
                 if(!st) {
-                    st = rrdset_create("ipv4", "tcpconnaborts", NULL, "tcp", NULL, "TCP Connection Aborts", "connections/s", 3000, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create("ipv4", "tcpconnaborts", NULL, "tcp", NULL, "TCP Connection Aborts", "connections/s", 3010, update_every, RRDSET_TYPE_LINE);
 
                     rrddim_add(st, "TCPAbortOnData",    "baddata",     1, 1, RRDDIM_INCREMENTAL);
                     rrddim_add(st, "TCPAbortOnClose",   "userclosed",  1, 1, RRDDIM_INCREMENTAL);
@@ -813,6 +832,7 @@ int do_proc_net_netstat(int update_every, unsigned long long dt) {
                 rrddim_set(st, "SyncookiesFailed", *tcpext_SyncookiesFailed);
                 rrdset_done(st);
             }
+
         }
     }
 
