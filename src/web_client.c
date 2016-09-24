@@ -407,6 +407,7 @@ int mysendfile(struct web_client *w, char *filename)
     buffer_flush(w->response.data);
     w->response.rlen = stat.st_size;
     w->response.data->date = stat.st_mtim.tv_sec;
+    buffer_cacheable(w->response.data);
 
     return 200;
 }
@@ -758,8 +759,6 @@ cleanup:
 int web_client_api_request_v1_badge(struct web_client *w, char *url) {
     int ret = 400;
     buffer_flush(w->response.data);
-
-    w->response.data->options |= WB_CONTENT_NO_CACHEABLE;
 
     BUFFER *dimensions = NULL;
     
@@ -2084,9 +2083,20 @@ void web_client_process(struct web_client *w) {
     }
 
     gettimeofday(&w->tv_ready, NULL);
-    w->response.data->date = time(NULL);
     w->response.sent = 0;
     w->response.code = code;
+
+    // set a proper last modified date
+    if(unlikely(!w->response.data->date))
+        w->response.data->date = w->tv_ready.tv_sec;
+
+    // set a proper expiration date, if not already set
+    if(unlikely(!w->response.data->expires)) {
+        if(w->response.data->options & WB_CONTENT_NO_CACHEABLE)
+            w->response.data->expires = w->tv_ready.tv_sec + rrd_update_every;
+        else
+            w->response.data->expires = w->tv_ready.tv_sec + 86400;
+    }
 
     // prepare the HTTP response header
     debug(D_WEB_CLIENT, "%llu: Generating HTTP header with response %d.", w->id, code);
@@ -2094,9 +2104,17 @@ void web_client_process(struct web_client *w) {
     const char *content_type_string = web_content_type_to_string(w->response.data->contenttype);
     const char *code_msg = web_response_code_to_string(code);
 
-    char date[32];
-    struct tm tmbuf, *tm = gmtime_r(&w->response.data->date, &tmbuf);
-    strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S %Z", tm);
+    // prepare the last modified and expiration dates
+    char date[32], edate[32];
+    {
+        struct tm tmbuf, *tm;
+
+        tm = gmtime_r(&w->response.data->date, &tmbuf);
+        strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S %Z", tm);
+
+        tm = gmtime_r(&w->response.data->expires, &tmbuf);
+        strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", tm);
+    }
 
     buffer_sprintf(w->response.header_output,
         "HTTP/1.1 %d %s\r\n"
@@ -2148,44 +2166,37 @@ void web_client_process(struct web_client *w) {
             "Access-Control-Max-Age: 1209600\r\n" // 86400 * 14
             );
     }
+    else {
+        buffer_sprintf(w->response.header_output,
+            "Cache-Control: %s\r\n"
+            "Expires: %s\r\n",
+            (w->response.data->options & WB_CONTENT_NO_CACHEABLE)?"no-cache":"public",
+            edate);
+    }
 
-    if(buffer_strlen(w->response.header))
+    // copy a possibly available custom header
+    if(unlikely(buffer_strlen(w->response.header)))
         buffer_strcat(w->response.header_output, buffer_tostring(w->response.header));
 
-    if(w->mode == WEB_CLIENT_MODE_NORMAL && (w->response.data->options & WB_CONTENT_NO_CACHEABLE)) {
-        buffer_sprintf(w->response.header_output,
-            "Expires: %s\r\n"
-            "Cache-Control: no-cache\r\n"
-            , date);
-    }
-    else if(w->mode != WEB_CLIENT_MODE_OPTIONS) {
-        char edate[32];
-        time_t et = w->response.data->date + 86400;
-        struct tm etmbuf, *etm = gmtime_r(&et, &etmbuf);
-        strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", etm);
-
-        buffer_sprintf(w->response.header_output,
-            "Expires: %s\r\n"
-            "Cache-Control: public\r\n"
-            , edate);
-    }
-
-    // if we know the content length, put it
-    if(!w->response.zoutput && (w->response.data->len || w->response.rlen))
-        buffer_sprintf(w->response.header_output,
-            "Content-Length: %zu\r\n"
-            , w->response.data->len? w->response.data->len: w->response.rlen
-            );
-    else if(!w->response.zoutput)
-        w->keepalive = 0;   // content-length is required for keep-alive
-
-    if(w->response.zoutput) {
+    // headers related to the transfer method
+    if(likely(w->response.zoutput)) {
         buffer_strcat(w->response.header_output,
             "Content-Encoding: gzip\r\n"
             "Transfer-Encoding: chunked\r\n"
             );
     }
+    else {
+        if(likely((w->response.data->len || w->response.rlen))) {
+            // we know the content length, put it
+            buffer_sprintf(w->response.header_output, "Content-Length: %zu\r\n", w->response.data->len? w->response.data->len: w->response.rlen);
+        }
+        else {
+            // we don't know the content length, disable keep-alive
+            w->keepalive = 0;
+        }
+    }
 
+    // end of HTTP header
     buffer_strcat(w->response.header_output, "\r\n");
 
     // sent the HTTP header

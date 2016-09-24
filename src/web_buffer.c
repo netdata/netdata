@@ -35,6 +35,7 @@ void buffer_reset(BUFFER *wb)
     wb->contenttype = CT_TEXT_PLAIN;
     wb->options = 0;
     wb->date = 0;
+    wb->expires = 0;
 
     buffer_overflow_check(wb);
 }

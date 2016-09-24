@@ -1564,9 +1564,9 @@ int rrd2value(RRDSET *st, BUFFER *wb, calculated_number *n, const char *dimensio
     }
 
     if(r->result_options & RRDR_RESULT_OPTION_RELATIVE)
-        wb->options |= WB_CONTENT_NO_CACHEABLE;
+        buffer_no_cacheable(wb);
     else if(r->result_options & RRDR_RESULT_OPTION_ABSOLUTE)
-        wb->options |= WB_CONTENT_CACHEABLE;
+        buffer_cacheable(wb);
 
     options = rrdr_check_options(r, options, dimensions);
 
@@ -1592,9 +1592,9 @@ int rrd2format(RRDSET *st, BUFFER *wb, BUFFER *dimensions, uint32_t format, long
     }
 
     if(r->result_options & RRDR_RESULT_OPTION_RELATIVE)
-        wb->options |= WB_CONTENT_NO_CACHEABLE;
+        buffer_no_cacheable(wb);
     else if(r->result_options & RRDR_RESULT_OPTION_ABSOLUTE)
-        wb->options |= WB_CONTENT_CACHEABLE;
+        buffer_cacheable(wb);
 
     options = rrdr_check_options(r, options, (dimensions)?buffer_tostring(dimensions):NULL);
 
