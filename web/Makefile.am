@@ -9,6 +9,7 @@ dist_web_DATA = \
 	demosites.html \
 	dashboard.html \
 	dashboard.js \
+	dashboard_info.js \
 	dashboard.css \
 	dashboard.slate.css \
 	favicon.ico \
