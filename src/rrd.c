@@ -937,6 +937,8 @@ collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number 
     rd->updated = 1;
     rd->counter++;
 
+    // fprintf(stderr, "%s.%s %llu " COLLECTED_NUMBER_FORMAT " dt %0.6f" " rate " CALCULATED_NUMBER_FORMAT "\n", st->name, rd->name, st->usec_since_last_update, value, (float)((double)st->usec_since_last_update / (double)1000000), (calculated_number)((value - rd->last_collected_value) * (calculated_number)rd->multiplier / (calculated_number)rd->divisor * 1000000.0 / (calculated_number)st->usec_since_last_update));
+
     return rd->last_collected_value;
 }
 
@@ -1294,7 +1296,7 @@ unsigned long long rrdset_done(RRDSET *st)
     long long iterations = (now_collect_ut - last_stored_ut) / (update_every_ut);
     if((now_collect_ut % (update_every_ut)) == 0) iterations++;
 
-    for( ; next_store_ut <= now_collect_ut ; next_store_ut += update_every_ut, iterations-- ) {
+    for( ; next_store_ut <= now_collect_ut ; last_collect_ut = next_store_ut, next_store_ut += update_every_ut, iterations-- ) {
 #ifdef NETDATA_INTERNAL_CHECKS
         if(iterations < 0) { error("%s: iterations calculation wrapped! first_ut = %llu, last_stored_ut = %llu, next_store_ut = %llu, now_collect_ut = %llu", st->name, first_ut, last_stored_ut, next_store_ut, now_collect_ut); }
 #endif
@@ -1344,8 +1346,6 @@ unsigned long long rrdset_done(RRDSET *st)
                                 );
                         new_value = new_value * (calculated_number)(st->update_every * 1000000) / (calculated_number)(next_store_ut - last_stored_ut);
                     }
-
-                    last_collect_ut = next_store_ut;
                     break;
 
                 case RRDDIM_ABSOLUTE:
