@@ -20,6 +20,10 @@
 //
 // var netdataRegistryAfterMs = 1500    // the time to consult to registry on startup
 //
+// var netdataCallback = null;          // a function to call when netdata is ready
+//                                      // netdata will be running while this is called (call NETDATA.pause to stop it)
+// var netdataPrepCallback = null;      // a callback to be called before netdata does anything else
+//
 // You can also set the default netdata server, using the following.
 // When this variable is not set, we assume the page is hosted on your
 // netdata server already.
@@ -3476,6 +3480,9 @@
 
         // Registry initialization
         setTimeout(NETDATA.registry.init, netdataRegistryAfterMs);
+
+        if(typeof netdataCallback === 'function')
+            netdataCallback();
     };
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -5546,14 +5553,12 @@
         }
     ];
 
+    NETDATA.loadedRequiredJs = 0;
     NETDATA.loadRequiredJs = function(index, callback) {
-        if(index >= NETDATA.requiredJs.length)  {
-            if(typeof callback === 'function')
-                callback();
-            return;
-        }
+        if(index >= NETDATA.requiredJs.length) return;
 
         if(NETDATA.requiredJs[index].isAlreadyLoaded()) {
+            NETDATA.loadedRequiredJs++;
             NETDATA.loadRequiredJs(++index, callback);
             return;
         }
@@ -5564,18 +5569,24 @@
         $.ajax({
             url: NETDATA.requiredJs[index].url,
             cache: true,
+            async: true,
             dataType: "script",
             xhrFields: { withCredentials: true } // required for the cookie
         })
         .done(function() {
             if(NETDATA.options.debug.main_loop === true)
                 console.log('loaded ' + NETDATA.requiredJs[index].url);
-
-            NETDATA.loadRequiredJs(++index, callback);
         })
         .fail(function() {
             alert('Cannot load required JS library: ' + NETDATA.requiredJs[index].url);
         })
+        .always(function() {
+            NETDATA.loadedRequiredJs++;
+            if(typeof callback === 'function' && NETDATA.loadedRequiredJs >= NETDATA.requiredJs.length)
+                callback();
+        })
+
+        NETDATA.loadRequiredJs(++index, callback);
     };
 
     NETDATA.loadRequiredCSS = function(index) {
@@ -6112,6 +6123,9 @@
 
     // ----------------------------------------------------------------------------------------------------------------
     // Boot it!
+
+    if(typeof netdataPrepCallback === 'function')
+        netdataPrepCallback();
 
     NETDATA.errorReset();
     NETDATA.loadRequiredCSS(0);
