@@ -651,10 +651,6 @@
         return this_is_demo;
     }
 
-    if(isdemo()) {
-        document.getElementById('masthead').style.display = 'block';
-    }
-
     function netdataURL(url) {
         if(typeof url === 'undefined')
             url = document.location.toString();
@@ -2125,7 +2121,11 @@
         NETDATA.requiredJs.push({
             url: NETDATA.serverDefault + 'dashboard_info.js',
             isAlreadyLoaded: function() { return false; }
-        })
+        });
+        
+        if(isdemo()) {
+            document.getElementById('masthead').style.display = 'block';
+        }
     }
 
     // our entry point
