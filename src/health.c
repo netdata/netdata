@@ -2223,7 +2223,7 @@ void *health_main(void *ptr) {
     BUFFER *wb = buffer_create(100);
 
     unsigned int loop = 0;
-    while(health_enabled) {
+    while(health_enabled && !netdata_exit) {
         loop++;
         debug(D_HEALTH, "Health monitoring iteration no %u started", loop);
 
@@ -2338,7 +2338,7 @@ void *health_main(void *ptr) {
         }
         rrdhost_unlock(&localhost);
 
-        if (runnable) {
+        if (unlikely(runnable && !netdata_exit)) {
             rrdhost_rdlock(&localhost);
 
             for (rc = localhost.alarms; rc; rc = rc->next) {
@@ -2483,10 +2483,16 @@ void *health_main(void *ptr) {
         if (unlikely(pthread_setcancelstate(oldstate, NULL) != 0))
             error("Cannot set pthread cancel state to RESTORE (%d).", oldstate);
 
+        if(unlikely(netdata_exit))
+            break;
+
         // execute notifications
         // and cleanup
         health_alarm_log_process(&localhost);
 
+        if(unlikely(netdata_exit))
+            break;
+        
         now = time(NULL);
         if(now < next_run) {
             debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration in %d secs",
