@@ -49,6 +49,13 @@ CHARTS = {
         ]}
 }
 
+LIMITS = {
+    'temperature': [-127, 1000],
+    'voltage': [-127, 127],
+    'current': [-127, 127],
+    'fan': [0, 65535]
+}
+
 TYPE_MAP = {
     0: 'voltage',
     1: 'fan',
@@ -82,6 +89,11 @@ class Service(SimpleService):
                     for sf in sfi:
                         val = sensors.get_value(chip, sf.number)
                         break
+                    typeName = TYPE_MAP[feature.type]
+                    if typeName in LIMITS:
+                        limit = LIMITS[typeName];
+                        if val < limit[0] or val > limit[1]:
+                            continue
                     data[prefix + "_" + str(feature.name.decode())] = int(val * 1000)
         except Exception as e:
             self.error(e)
