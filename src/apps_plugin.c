@@ -518,7 +518,7 @@ void del_pid_entry(pid_t pid) {
 // update pids from proc
 
 int read_proc_pid_cmdline(struct pid_stat *p) {
-    
+
     if(unlikely(!p->cmdline_filename)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", global_host_prefix, p->pid);
@@ -1273,14 +1273,14 @@ void find_lost_child_debug(struct pid_stat *pe, unsigned long long lost, int typ
                     found++;
                 }
                 break;
-                
+
             case 2:
                 if(p->cmajflt > lost) {
                     fprintf(stderr, " > process %d (%s) could use the lost exited child majflt %llu of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
                     found++;
                 }
                 break;
-                
+
             case 3:
                 if(p->cutime > lost) {
                     fprintf(stderr, " > process %d (%s) could use the lost exited child utime %llu of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
@@ -1309,11 +1309,11 @@ void find_lost_child_debug(struct pid_stat *pe, unsigned long long lost, int typ
             case 1:
                 fprintf(stderr, " > cannot find any process to use the lost exited child minflt %llu of process %d (%s)\n", lost, pe->pid, pe->comm);
                 break;
-                
+
             case 2:
                 fprintf(stderr, " > cannot find any process to use the lost exited child majflt %llu of process %d (%s)\n", lost, pe->pid, pe->comm);
                 break;
-                
+
             case 3:
                 fprintf(stderr, " > cannot find any process to use the lost exited child utime %llu of process %d (%s)\n", lost, pe->pid, pe->comm);
                 break;
@@ -2175,8 +2175,8 @@ unsigned long long send_resource_usage_to_netdata() {
         cpuuser = me.ru_utime.tv_sec * 1000000ULL + me.ru_utime.tv_usec;
         cpusyst = me.ru_stime.tv_sec * 1000000ULL + me.ru_stime.tv_usec;
 
-        bcopy(&now, &last, sizeof(struct timeval));
-        bcopy(&me, &me_last, sizeof(struct rusage));
+        memmove(&last, &now, sizeof(struct timeval));
+        memmove(&me_last, &me, sizeof(struct rusage));
     }
 
     buffer_sprintf(output,
