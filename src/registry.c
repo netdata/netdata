@@ -29,7 +29,7 @@
 //      per client IP per hour
 //
 // 3. lower memory requirements
-// 
+//
 //    - embed avl structures directly into registry objects, instead of DICTIONARY
 //    - store GUIDs in memory as UUID instead of char *
 //      (this will also remove the index hash, since UUIDs can be compared directly)
@@ -570,7 +570,6 @@ static inline PERSON *registry_person_get(const char *person_guid, time_t when) 
         else {
             person_guid = buf;
             p = registry_person_find(person_guid);
-            if(!p) person_guid = NULL;
         }
     }
 
@@ -805,7 +804,7 @@ int registry_log_load(void) {
                     break;
             }
         }
-        
+
         fclose(fp);
     }
 
