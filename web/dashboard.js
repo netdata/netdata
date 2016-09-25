@@ -5802,6 +5802,7 @@
                 }
 
                 NETDATA.alarms.last_notification_id = data[0].unique_id;
+                NETDATA.localStorageSet('last_notification_id', NETDATA.alarms.last_notification_id, null);
                 // console.log('last notification id = ' + NETDATA.alarms.last_notification_id);
             })
         },
@@ -5898,7 +5899,9 @@
             while(host.slice(-1) === '/')
                 host = host.substring(0, host.length - 1);
             NETDATA.alarms.server = host;
-            
+
+            NETDATA.alarms.last_notification_id = NETDATA.localStorageGet('last_notification_id', NETDATA.alarms.last_notification_id, null);
+
             if(NETDATA.alarms.onclick === null)
                 NETDATA.alarms.onclick = NETDATA.alarms.scrollToAlarm;
 
