@@ -676,10 +676,12 @@ if [ ${DONOTSTART} -eq 1 ]
     cat >&2 <<"DONE1"
 
 
-  .-.   .-.   .-.   .-.   .-.   netdata
-     '-'   '-'   '-'   '-'   '  is installed on this system now!
+  ^
+  |.-.   .-.   .-.   .-.   .-.   netdata           .-.   .-.   .-.   .-
+  |   '-'   '-'   '-'   '-'   '  is installed now!    '-'   '-'   '-'  
+  +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->
 
-  enjoy real-time, performance and health monitoring...
+  enjoy real-time performance and health monitoring...
 
 DONE1
     exit 0
@@ -1202,11 +1204,12 @@ fi
 
 cat >&2 <<"DONE"
 
+  ^
+  |.-.   .-.   .-.   .-.   .-.   netdata                       .-.   .-
+  |   '-'   '-'   '-'   '-'   '  is installed and running now!    '-'  
+  +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->
 
-  .-.   .-.   .-.   .-.   .-.   netdata
-     '-'   '-'   '-'   '-'   '  is installed and is running now!
-
-  enjoy real-time, performance and health monitoring...
+  enjoy real-time performance and health monitoring...
 
 DONE
 exit 0
