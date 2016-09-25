@@ -57,7 +57,7 @@ class Service(LogService):
             try:
                 beginning = code.group(1)[0]
             except AttributeError:
-                return None
+                continue
 
             if beginning == '2':
                 data["2xx"] += 1
