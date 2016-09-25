@@ -41,16 +41,16 @@ int do_proc_net_softnet_stat(int update_every, unsigned long long dt) {
 
     if(lines > 200) lines = 200;
     if(words > 50) words = 50;
-    
+
     if(unlikely(!data || lines > allocated_lines || words > allocated_columns)) {
         freez(data);
         allocated_lines = lines;
         allocated_columns = words;
         data = mallocz((allocated_lines + 1) * allocated_columns * sizeof(uint32_t));
     }
-    
+
     // initialize to zero
-    bzero(data, (allocated_lines + 1) * allocated_columns * sizeof(uint32_t));
+    memset(data, 0, (allocated_lines + 1) * allocated_columns * sizeof(uint32_t));
 
     // parse the values
     for(l = 0; l < lines ;l++) {
