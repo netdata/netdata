@@ -970,7 +970,7 @@ MACHINE *registry_request_machine(char *person_guid, char *machine_guid, char *u
     // make sure the machine exists
     m = registry_machine_find(request_machine);
     if(!m) {
-        info("Registry Machine URLs request: machine not found, person: '%s', machine '%s', url '%s', request machine '%s'", p->guid, m->guid, pu->url->url, request_machine);
+        info("Registry Machine URLs request: machine not found, person: '%s', machine '%s', url '%s', request machine '%s'", p->guid, machine_guid, pu->url->url, request_machine);
         return NULL;
     }
 
