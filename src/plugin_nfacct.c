@@ -188,7 +188,7 @@ void *nfacct_main(void *ptr) {
         usleep(susec);
 
         // copy current to last
-        bcopy(&now, &last, sizeof(struct timeval));
+        memmove(&last, &now, sizeof(struct timeval));
     }
 
     mnl_socket_close(nl);
