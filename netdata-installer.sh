@@ -28,6 +28,29 @@ printf "\n" >>netdata-installer.log
 REINSTALL_PWD="${PWD}"
 REINSTALL_COMMAND="$(printf "%q " "$0" "${@}"; printf "\n")"
 
+banner() {
+    local   l1="  ^"                                                                      \
+            l2="  |.-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-"  \
+            l3="  |   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'  "  \
+            l4="  +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->" \
+            sp="                                                                        " \
+            netdata="netdata" start end msg="${*}"
+
+    [ ${#msg} -lt ${#netdata} ] && msg="${msg}${sp:0:$(( ${#netdata} - ${#msg}))}"
+    [ ${#msg} -gt $(( ${#l2} - 20 )) ] && msg="${msg:0:$(( ${#l2} - 23 ))}..."
+
+    start="$(( ${#l2} / 2 - 4 ))"
+    [ $(( start + ${#msg} + 4 )) -gt ${#l2} ] && start=$((${#l2} - ${#msg} - 4))
+    end=$(( ${start} + ${#msg} + 4 ))
+
+    echo >&2
+    echo >&2 "${l1}"
+    echo >&2 "${l2:0:start}${sp:0:2}${netdata}${sp:0:$((end - start - 2 - ${#netdata}))}${l2:end:$((${#l2} - end))}"
+    echo >&2 "${l3:0:start}${sp:0:2}${msg}${sp:0:2}${l3:end:$((${#l2} - end))}"
+    echo >&2 "${l4}"
+    echo >&2
+}
+
 service="$(which service 2>/dev/null || command -v service 2>/dev/null)"
 systemctl="$(which systemctl 2>/dev/null || command -v systemctl 2>/dev/null)"
 service() {
@@ -52,6 +75,7 @@ NETDATA_PREFIX=
 LIBS_ARE_HERE=0
 
 usage() {
+    banner "installer command line options"
     cat <<USAGE
 
 ${ME} <installer options>
@@ -177,26 +201,24 @@ do
     fi
 done
 
+banner "real-time performance monitoring, done right!"
 cat <<BANNER
 
-Welcome to netdata!
-The real-time performance monitoring system.
+  You are about to build and install netdata to your system.
 
-You are about to build and install netdata to your system.
+  It will be installed at these locations:
 
-It will be installed at these locations:
+   - the daemon    at ${NETDATA_PREFIX}/usr/sbin/netdata
+   - config files  at ${NETDATA_PREFIX}/etc/netdata
+   - web files     at ${NETDATA_PREFIX}/usr/share/netdata
+   - plugins       at ${NETDATA_PREFIX}/usr/libexec/netdata
+   - cache files   at ${NETDATA_PREFIX}/var/cache/netdata
+   - db files      at ${NETDATA_PREFIX}/var/lib/netdata
+   - log files     at ${NETDATA_PREFIX}/var/log/netdata
+   - pid file      at ${NETDATA_PREFIX}/var/run
 
-  - the daemon    at ${NETDATA_PREFIX}/usr/sbin/netdata
-  - config files  at ${NETDATA_PREFIX}/etc/netdata
-  - web files     at ${NETDATA_PREFIX}/usr/share/netdata
-  - plugins       at ${NETDATA_PREFIX}/usr/libexec/netdata
-  - cache files   at ${NETDATA_PREFIX}/var/cache/netdata
-  - db files      at ${NETDATA_PREFIX}/var/lib/netdata
-  - log files     at ${NETDATA_PREFIX}/var/log/netdata
-  - pid file      at ${NETDATA_PREFIX}/var/run
-
-This installer allows you to change the installation path.
-Press Control-C and run the same command with --help for help.
+  This installer allows you to change the installation path.
+  Press Control-C and run the same command with --help for help.
 
 BANNER
 
@@ -204,6 +226,7 @@ if [ "${UID}" -ne 0 ]
     then
     if [ -z "${NETDATA_PREFIX}" ]
         then
+        banner "wrong command line options!"
         cat <<NONROOTNOPREFIX
 
 Sorry! This will fail!
@@ -276,6 +299,7 @@ then
     then
         echo "Will skip autoreconf step"
     else
+        banner "autotools v2.60 required"
         cat <<"EOF"
 
 -------------------------------------------------------------------------------
@@ -309,11 +333,12 @@ if [ ${DONOTWAIT} -eq 0 ]
 fi
 
 build_error() {
+    banner "sorry, it failed to build..."
     cat <<EOF
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Sorry! NetData failed to build...
+Sorry! netdata failed to build...
 
 You many need to check these:
 
@@ -673,17 +698,8 @@ if [ ${DONOTSTART} -eq 1 ]
         fi
         chmod 0664 "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
     fi
-    cat >&2 <<"DONE1"
-
-
-  ^
-  |.-.   .-.   .-.   .-.   .-.   netdata           .-.   .-.   .-.   .-
-  |   '-'   '-'   '-'   '-'   '  is installed now!    '-'   '-'   '-'  
-  +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->
-
-  enjoy real-time performance and health monitoring...
-
-DONE1
+    banner "is installed now!"
+    echo >&2 "  enjoy real-time performance and health monitoring..."
     exit 0
 fi
 
@@ -1202,14 +1218,7 @@ elif [ -f "netdata-updater.sh" ]
     rm "netdata-updater.sh"
 fi
 
-cat >&2 <<"DONE"
-
-  ^
-  |.-.   .-.   .-.   .-.   .-.   netdata                       .-.   .-
-  |   '-'   '-'   '-'   '-'   '  is installed and running now!    '-'  
-  +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->
-
-  enjoy real-time performance and health monitoring...
-
-DONE
+banner "is installed and running now!"
+echo >&2 "  enjoy real-time performance and health monitoring..."
+echo >&2 
 exit 0
