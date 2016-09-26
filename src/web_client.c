@@ -1927,9 +1927,11 @@ void web_client_process(struct web_client *w) {
         hash_graph = simple_hash(WEB_PATH_GRAPH);
         hash_list = simple_hash("list");
         hash_all_json = simple_hash("all.json");
+#ifdef NETDATA_INTERNAL_CHECKS
         hash_exit = simple_hash("exit");
         hash_debug = simple_hash("debug");
         hash_mirror = simple_hash("mirror");
+#endif
     }
 
     int code = 500;
