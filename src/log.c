@@ -90,22 +90,22 @@ int open_log_file(int fd, FILE **fp, const char *filename, int *enabled_syslog) 
 
 void reopen_all_log_files() {
     if(stdout_filename)
-        open_log_file(STDOUT_FILENO, &stdout, stdout_filename, &output_log_syslog);
+        open_log_file(STDOUT_FILENO, (FILE **)&stdout, stdout_filename, &output_log_syslog);
 
     if(stderr_filename)
-        open_log_file(STDERR_FILENO, &stderr, stderr_filename, &error_log_syslog);
+        open_log_file(STDERR_FILENO, (FILE **)&stderr, stderr_filename, &error_log_syslog);
 
     if(stdaccess_filename)
-        stdaccess_fd = open_log_file(stdaccess_fd, &stdaccess, stdaccess_filename, &access_log_syslog);
+        stdaccess_fd = open_log_file(stdaccess_fd, (FILE **)&stdaccess, stdaccess_filename, &access_log_syslog);
 }
 
 void open_all_log_files() {
     // disable stdin
     open_log_file(STDIN_FILENO, &stdin, "/dev/null", NULL);
 
-    open_log_file(STDOUT_FILENO, &stdout, stdout_filename, &output_log_syslog);
-    open_log_file(STDERR_FILENO, &stderr, stderr_filename, &error_log_syslog);
-    stdaccess_fd = open_log_file(stdaccess_fd, &stdaccess, stdaccess_filename, &access_log_syslog);
+    open_log_file(STDOUT_FILENO, (FILE **)&stdout, stdout_filename, &output_log_syslog);
+    open_log_file(STDERR_FILENO, (FILE **)&stderr, stderr_filename, &error_log_syslog);
+    stdaccess_fd = open_log_file(stdaccess_fd, (FILE **)&stdaccess, stdaccess_filename, &access_log_syslog);
 }
 
 // ----------------------------------------------------------------------------
