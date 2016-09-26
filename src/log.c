@@ -266,6 +266,16 @@ void info_int( const char *file, const char *function, const unsigned long line,
 // ----------------------------------------------------------------------------
 // error log
 
+// what a trick!
+// http://stackoverflow.com/questions/479207/function-overloading-in-c
+static const char *strerror_result_int(int a, const char *b) { (void)a; return b; }
+static const char *strerror_result_string(const char *a, const char *b) { (void)b; return a; }
+
+#define strerror_result(a, b) _Generic((a), \
+    int: strerror_result_int, \
+    char *: strerror_result_string \
+    )(a, b)
+
 void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... )
 {
     va_list args;
@@ -283,12 +293,7 @@ void error_int( const char *prefix, const char *file, const char *function, cons
 
     if(errno) {
         char buf[1024];
-#if ((_POSIX_C_SOURCE >= 200112L) && !  _GNU_SOURCE)
-        strerror_r(errno, buf, 1023);
-        fprintf(stderr, " (errno %d, %s)\n", errno, buf);
-#else
-        fprintf(stderr, " (errno %d, %s)\n", errno, strerror_r(errno, buf, 1023));
-#endif
+        fprintf(stderr, " (errno %d, %s)\n", errno, strerror_result(strerror_r(errno, buf, 1023), buf));
         errno = 0;
     }
     else
