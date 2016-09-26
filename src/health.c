@@ -2,12 +2,96 @@
 
 #define RRDVAR_MAX_LENGTH 1024
 
-static const char *health_default_exec = PLUGINS_DIR "/alarm-notify.sh";
-static const char *health_default_recipient = "root";
+struct health_options {
+    const char *health_default_exec;
+    const char *health_default_recipient;
+    const char *log_filename;
+    FILE *log_fp;
+};
+
+static struct health_options health = {
+    .health_default_exec = PLUGINS_DIR "/alarm-notify.sh",
+    .health_default_recipient = "root",
+    .log_filename = VARLIB_DIR "/health/alarm_log.db",
+    .log_fp = NULL
+};
+
 int health_enabled = 1;
 
 // ----------------------------------------------------------------------------
-// Health Alarms Log Management
+// health alarm log load/save
+// no need for locking - only one thread is reading / writing the alarms log
+
+static inline int health_alarm_log_open(void) {
+    if(health.log_fp)
+        fclose(health.log_fp);
+
+    health.log_fp = fopen(health.log_filename, "a");
+
+    if(health.log_fp) {
+        if (setvbuf(health.log_fp, NULL, _IOLBF, 0) != 0)
+            error("Cannot set line buffering on health log file.");
+        return 0;
+    }
+
+    error("Cannot open health log file '%s'. Health data will be lost in case of netdata or server crash.", health.log_filename);
+    return -1;
+}
+
+static inline void health_alarm_log_close(void) {
+    if(health.log_fp) {
+        fclose(health.log_fp);
+        health.log_fp = NULL;
+    }
+}
+
+static inline void health_log_recreate(void) {
+    if(health.log_fp != NULL) {
+        health_alarm_log_close();
+
+        // open it with truncate
+        health.log_fp = fopen(health.log_filename, "w");
+        if(health.log_fp) fclose(health.log_fp);
+        else error("Cannot truncate health log '%s'", health.log_filename);
+
+        health.log_fp = NULL;
+
+        health_alarm_log_open();
+    }
+}
+
+static inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
+    (void)host;
+    (void)ae;
+    
+/*    if(likely(health.log_fp)) {
+        if(unlikely(fprintf(health.log_fp, "A\t%s\t%08x\t%08x\t%08x\t%08x\t%08x\t%08x\t%s\t%s\t%s\t%s\t%s\t%08x\n",
+            host->hostname,
+            ae->unique_id,
+            ae->alarm_id,
+            ae->alarm_event_id,
+            (uint32_t)ae->when,
+            (uint32_t)ae->duration,
+            (uint32_t)ae->non_clear_duration,
+            (uint32_t)ae->exec_run_timestamp,
+            ae->name,
+            ae->chart,
+            ae->family,
+            ae->exec,
+            ae->recipient
+            ) < 0))
+            error("Health: failed to save alarm log entry. Health data may be lost in case of abnormal restart.");
+    }
+*/
+}
+
+static inline void health_alarm_log_load(RRDHOST *host) {
+    (void)host;
+
+}
+
+// ----------------------------------------------------------------------------
+// health alarm log management
 
 static inline void health_alarm_log(RRDHOST *host,
                 uint32_t alarm_id, uint32_t alarm_event_id,
@@ -75,6 +159,8 @@ static inline void health_alarm_log(RRDHOST *host,
                 if((t->new_status == RRDCALC_STATUS_WARNING || t->new_status == RRDCALC_STATUS_CRITICAL) &&
                    (t->old_status == RRDCALC_STATUS_WARNING || t->old_status == RRDCALC_STATUS_CRITICAL))
                     ae->non_clear_duration += t->non_clear_duration;
+
+                health_alarm_log_save(host, t);
             }
             else {
                 // no need to continue
@@ -83,6 +169,8 @@ static inline void health_alarm_log(RRDHOST *host,
         }
     }
     pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+
+    health_alarm_log_save(host, ae);
 }
 
 // ----------------------------------------------------------------------------
@@ -1709,12 +1797,14 @@ void health_init(void) {
         return;
     }
 
+    health_alarm_log_load(&localhost);
+
     char *path = health_config_dir();
 
     {
         char buffer[FILENAME_MAX + 1];
         snprintfz(buffer, FILENAME_MAX, "%s/alarm-notify.sh", config_get("global", "plugins directory", PLUGINS_DIR));
-        health_default_exec = config_get("health", "script to execute on alarm", buffer);
+        health.health_default_exec = config_get("health", "script to execute on alarm", buffer);
     }
 
     long n = config_get_number("health", "in memory max health log entries", (long)localhost.health_log.max);
@@ -1776,8 +1866,8 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, R
                    (ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_UPDATED)?"true":"false",
                    (unsigned long)ae->exec_run_timestamp,
                    (ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_EXEC_FAILED)?"true":"false",
-                   ae->exec?ae->exec:health_default_exec,
-                   ae->recipient?ae->recipient:health_default_recipient,
+                   ae->exec?ae->exec:health.health_default_exec,
+                   ae->recipient?ae->recipient:health.health_default_recipient,
                    ae->exec_code,
                    ae->source,
                    ae->units?ae->units:"",
@@ -1852,8 +1942,8 @@ static inline void health_rrdcalc2json_nolock(BUFFER *wb, RRDCALC *rc) {
             , rc->chart
             , (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:""
             , (rc->rrdset)?"true":"false"
-            , rc->exec?rc->exec:health_default_exec
-            , rc->recipient?rc->recipient:health_default_recipient
+            , rc->exec?rc->exec:health.health_default_exec
+            , rc->recipient?rc->recipient:health.health_default_recipient
             , rc->source
             , rc->units?rc->units:""
             , rc->info?rc->info:""
@@ -2016,7 +2106,6 @@ void health_reload(void) {
     }
 }
 
-
 // ----------------------------------------------------------------------------
 // health main thread and friends
 
@@ -2039,23 +2128,23 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     if(t && t->new_status == ae->new_status) {
         // don't send the same notification again
         info("Health not sending again notification for alarm '%s.%s' status %s", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
-        return;
+        goto done;
     }
 
     if((ae->old_status == RRDCALC_STATUS_UNDEFINED && ae->new_status == RRDCALC_STATUS_UNINITIALIZED)
         || (ae->old_status == RRDCALC_STATUS_UNINITIALIZED && ae->new_status == RRDCALC_STATUS_CLEAR)) {
         info("Health not sending notification for first initialization of alarm '%s.%s' status %s", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
-        return;
+        goto done;
     }
 
     char buffer[FILENAME_MAX + 1];
     pid_t command_pid;
 
     const char *exec = ae->exec;
-    if(!exec) exec = health_default_exec;
+    if(!exec) exec = health.health_default_exec;
 
     const char *recipient = ae->recipient;
-    if(!recipient) recipient = health_default_recipient;
+    if(!recipient) recipient = health.health_default_recipient;
 
     snprintfz(buffer, FILENAME_MAX, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '%0.0Lf' '%0.0Lf' '%s' '%u' '%u' '%s' '%s'",
               exec,
@@ -2086,7 +2175,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     FILE *fp = mypopen(buffer, &command_pid);
     if(!fp) {
         error("HEALTH: Cannot popen(\"%s\", \"r\").", buffer);
-        return;
+        goto done;
     }
     debug(D_HEALTH, "HEALTH reading from command");
     char *s = fgets(buffer, FILENAME_MAX, fp);
@@ -2096,6 +2185,10 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     if(ae->exec_code != 0)
         ae->notifications |= HEALTH_ENTRY_NOTIFICATIONS_EXEC_FAILED;
+
+done:
+    health_alarm_log_save(host, ae);
+    return;
 }
 
 static inline void health_process_notifications(RRDHOST *host, ALARM_ENTRY *ae) {
