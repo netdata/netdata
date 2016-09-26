@@ -821,6 +821,7 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
     }
 
     if(!chart || !*chart) {
+        buffer_no_cacheable(w->response.data);
         buffer_sprintf(w->response.data, "No chart id is given at the request.");
         goto cleanup;
     }
@@ -828,6 +829,7 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
     RRDSET *st = rrdset_find(chart);
     if(!st) st = rrdset_find_byname(chart);
     if(!st) {
+        buffer_no_cacheable(w->response.data);
         buffer_svg(w->response.data, "chart not found", 0, "", NULL, NULL, 1, -1);
         ret = 200;
         goto cleanup;
@@ -837,6 +839,7 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
     if(alarm) {
         rc = rrdcalc_find(st, alarm);
         if (!rc) {
+            buffer_no_cacheable(w->response.data);
             buffer_svg(w->response.data, "alarm not found", 0, "", NULL, NULL, 1, -1);
             ret = 200;
             goto cleanup;
@@ -860,7 +863,7 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
             else if(options & RRDR_OPTION_NOT_ALIGNED)
                 refresh = st->update_every;
             else {
-                refresh = (before - after);
+                refresh = (int)(before - after);
                 if(refresh < 0) refresh = -refresh;
             }
         }
@@ -916,8 +919,11 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
         calculated_number n = rc->value;
         if(isnan(n) || isinf(n)) n = 0;
 
-        if (refresh > 0)
+        if (refresh > 0) {
             buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
+            w->response.data->expires = time(NULL) + refresh;
+        }
+        else buffer_no_cacheable(w->response.data);
 
         if(!value_color) {
             switch(rc->status) {
@@ -947,7 +953,14 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
             }
         }
 
-        buffer_svg(w->response.data, label, rc->value * multiply / divide, units, label_color, value_color, 0, precision);
+        buffer_svg(w->response.data,
+                   label,
+                   rc->value * multiply / divide,
+                   units,
+                   label_color,
+                   value_color,
+                   0,
+                   precision);
         ret = 200;
     }
     else {
@@ -958,20 +971,40 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
 
         // if the collected value is too old, don't calculate its value
         if (rrdset_last_entry_t(st) >= (time(NULL) - (st->update_every * st->gap_when_lost_iterations_above)))
-            ret = rrd2value(st, w->response.data, &n, (dimensions) ? buffer_tostring(dimensions) : NULL, points, after,
-                            before, group, options, NULL, &latest_timestamp, &value_is_null);
+            ret = rrd2value(st,
+                            w->response.data,
+                            &n,
+                            (dimensions) ? buffer_tostring(dimensions) : NULL,
+                            points,
+                            after,
+                            before,
+                            group,
+                            options,
+                            NULL,
+                            &latest_timestamp,
+                            &value_is_null);
 
         // if the value cannot be calculated, show empty badge
         if (ret != 200) {
+            buffer_no_cacheable(w->response.data);
             value_is_null = 1;
             n = 0;
             ret = 200;
         }
-        else if (refresh > 0)
+        else if (refresh > 0) {
             buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
+            w->response.data->expires = time(NULL) + refresh;
+        }
+        else buffer_no_cacheable(w->response.data);
 
         // render the badge
-        buffer_svg(w->response.data, label, n * multiply / divide, units, label_color, value_color, value_is_null,
+        buffer_svg(w->response.data,
+                   label,
+                   n * multiply / divide,
+                   units,
+                   label_color,
+                   value_color,
+                   value_is_null,
                    precision);
     }
 
@@ -2089,6 +2122,9 @@ void web_client_process(struct web_client *w) {
     // set a proper last modified date
     if(unlikely(!w->response.data->date))
         w->response.data->date = w->tv_ready.tv_sec;
+
+    if(unlikely(code != 200))
+        buffer_no_cacheable(w->response.data);
 
     // set a proper expiration date, if not already set
     if(unlikely(!w->response.data->expires)) {
