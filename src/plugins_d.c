@@ -358,7 +358,7 @@ void *pluginsd_worker_thread(void *arg)
                 error("PLUGINSD: %s sleeping for %llu. Will kill with SIGCONT pid %d to wake it up.\n", cd->fullfilename, susec, cd->pid);
                 usleep(susec);
                 killpid(cd->pid, SIGCONT);
-                bcopy(&now, &last, sizeof(struct timeval));
+                memmove(&last, &now, sizeof(struct timeval));
                 break;
             }
 #endif
