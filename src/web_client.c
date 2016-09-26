@@ -1903,8 +1903,18 @@ static inline int http_request_validate(struct web_client *w) {
 }
 
 void web_client_process(struct web_client *w) {
-    static uint32_t hash_api = 0, hash_netdata_conf = 0, hash_data = 0, hash_datasource = 0, hash_graph = 0,
-            hash_list = 0, hash_all_json = 0, hash_exit = 0, hash_debug = 0, hash_mirror = 0;
+    static uint32_t
+            hash_api = 0,
+            hash_netdata_conf = 0,
+            hash_data = 0,
+            hash_datasource = 0,
+            hash_graph = 0,
+            hash_list = 0,
+            hash_all_json = 0;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    static uint32_t hash_exit = 0, hash_debug = 0, hash_mirror = 0;
+#endif
 
     // start timing us
     gettimeofday(&w->tv_in, NULL);
