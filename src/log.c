@@ -101,7 +101,7 @@ void reopen_all_log_files() {
 
 void open_all_log_files() {
     // disable stdin
-    open_log_file(STDIN_FILENO, &stdin, "/dev/null", NULL);
+    open_log_file(STDIN_FILENO, (FILE **)&stdin, "/dev/null", NULL);
 
     open_log_file(STDOUT_FILENO, (FILE **)&stdout, stdout_filename, &output_log_syslog);
     open_log_file(STDERR_FILENO, (FILE **)&stderr, stderr_filename, &error_log_syslog);
@@ -283,7 +283,12 @@ void error_int( const char *prefix, const char *file, const char *function, cons
 
     if(errno) {
         char buf[1024];
+#if ((_POSIX_C_SOURCE >= 200112L) && !  _GNU_SOURCE)
+        strerror_r(errno, buf, 1023);
+        fprintf(stderr, " (errno %d, %s)\n", errno, buf);
+#else
         fprintf(stderr, " (errno %d, %s)\n", errno, strerror_r(errno, buf, 1023));
+#endif
         errno = 0;
     }
     else
