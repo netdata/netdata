@@ -49,11 +49,13 @@ set(NETDATA_SOURCE_FILES
         src/proc_net_dev.c
         src/proc_net_ip_vs_stats.c
         src/proc_net_netstat.c
+        src/proc_net_rpc_nfs.c
         src/proc_net_rpc_nfsd.c
         src/proc_net_snmp6.c
         src/proc_net_snmp.c
         src/proc_net_stat_conntrack.c
         src/proc_net_stat_synproxy.c
+        src/proc_net_softnet_stat.c
         src/proc_self_mountinfo.c
         src/proc_self_mountinfo.h
         src/proc_softirqs.c

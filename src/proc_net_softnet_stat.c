@@ -93,12 +93,12 @@ int do_proc_net_softnet_stat(int update_every, unsigned long long dt) {
     if(do_per_core) {
         for(l = 0; l < lines ;l++) {
             char id[50+1];
-            snprintfz(id, 50, "cpu%d_softnet_stat", l);
+            snprintfz(id, 50, "cpu%u_softnet_stat", l);
 
             st = rrdset_find_bytype("cpu", id);
             if(!st) {
                 char title[100+1];
-                snprintfz(title, 100, "CPU%d softnet_stat", l);
+                snprintfz(title, 100, "CPU%u softnet_stat", l);
 
                 st = rrdset_create("cpu", id, NULL, "softnet_stat", NULL, title, "events/s", 4101 + l, update_every, RRDSET_TYPE_LINE);
                 for(w = 0; w < allocated_columns ;w++)
