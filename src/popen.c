@@ -150,7 +150,7 @@ int mypclose(FILE *fp, pid_t pid) {
 
     // close the pipe fd
     // this is required in musl
-    // without the childs do not exit
+    // without it the childs do not exit
     close(fileno(fp));
 
     // close the pipe file pointer
