@@ -1387,8 +1387,10 @@ unsigned long long rrdset_done(RRDSET *st)
                     break;
             }
 
-            if(unlikely(!store_this_entry))
+            if(unlikely(!store_this_entry)) {
+                rd->values[st->current_entry] = pack_storage_number(0, SN_NOT_EXISTS);
                 continue;
+            }
 
             if(likely(rd->updated && rd->counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
                 rd->values[st->current_entry] = pack_storage_number(new_value, storage_flags );
