@@ -147,6 +147,13 @@ int mypclose(FILE *fp, pid_t pid) {
     debug(D_EXIT, "Request to mypclose() on pid %d", pid);
 
     /*mypopen_del(fp);*/
+
+    // close the pipe fd
+    // this is required in musl
+    // without the childs do not exit
+    close(fileno(fp));
+
+    // close the pipe file pointer
     fclose(fp);
 
     siginfo_t info;
