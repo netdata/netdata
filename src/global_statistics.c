@@ -25,7 +25,7 @@ void finished_web_request_statistics(uint64_t dt,
                                      uint64_t bytes_sent,
                                      uint64_t content_size,
                                      uint64_t compressed_content_size) {
-#ifndef NETDATA_NO_ATOMIC_INSTRUCTIONS
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
     uint64_t old_web_usec_max = global_statistics.web_usec_max;
     while(dt > old_web_usec_max)
         __atomic_compare_exchange(&global_statistics.web_usec_max, &old_web_usec_max, &dt, 1, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
@@ -57,7 +57,7 @@ void finished_web_request_statistics(uint64_t dt,
 }
 
 void web_client_connected(void) {
-#ifndef NETDATA_NO_ATOMIC_INSTRUCTIONS
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
     __atomic_fetch_add(&global_statistics.connected_clients, 1, __ATOMIC_SEQ_CST);
 #else
     if (web_server_mode == WEB_SERVER_MODE_MULTI_THREADED)
@@ -71,7 +71,7 @@ void web_client_connected(void) {
 }
 
 void web_client_disconnected(void) {
-#ifndef NETDATA_NO_ATOMIC_INSTRUCTIONS
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
     __atomic_fetch_sub(&global_statistics.connected_clients, 1, __ATOMIC_SEQ_CST);
 #else
     if (web_server_mode == WEB_SERVER_MODE_MULTI_THREADED)
@@ -86,7 +86,7 @@ void web_client_disconnected(void) {
 
 
 inline void global_statistics_copy(struct global_statistics *gs, uint8_t options) {
-#ifndef NETDATA_NO_ATOMIC_INSTRUCTIONS
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
     gs->connected_clients       = __atomic_fetch_add(&global_statistics.connected_clients, 0, __ATOMIC_SEQ_CST);
     gs->web_requests            = __atomic_fetch_add(&global_statistics.web_requests, 0, __ATOMIC_SEQ_CST);
     gs->web_usec                = __atomic_fetch_add(&global_statistics.web_usec, 0, __ATOMIC_SEQ_CST);
