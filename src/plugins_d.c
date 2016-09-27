@@ -380,16 +380,9 @@ void *pluginsd_worker_thread(void *arg)
 
         // get the return code
         int code = mypclose(fp, cd->pid);
-
-        if(netdata_exit) {
-            cd->pid = 0;
-            cd->enabled = 0;
-            cd->obsolete = 1;
-            pthread_exit(NULL);
-            return NULL;
-        }
-
-        if(code != 0) {
+        
+        if(unlikely(netdata_exit)) break;
+        else if(code != 0) {
             // the plugin reports failure
 
             if(likely(!cd->successful_collections)) {
@@ -430,8 +423,7 @@ void *pluginsd_worker_thread(void *arg)
         }
         cd->pid = 0;
 
-        if(unlikely(!cd->enabled))
-            break;
+        if(unlikely(!cd->enabled)) break;
     }
 
     info("PLUGINSD: '%s' thread exiting", cd->fullfilename);
