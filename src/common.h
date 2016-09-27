@@ -60,14 +60,8 @@
 #include <zlib.h>
 #endif
 
-#ifndef __ATOMIC_SEQ_CST
-#define NETDATA_NO_ATOMIC_INSTRUCTIONS 1
-#endif
-
 #ifdef __GNUC__
-#define GCC_VERSION (__GNUC__ * 10000 \
-                               + __GNUC_MINOR__ * 100 \
-                               + __GNUC_PATCHLEVEL__)
+#define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 
 #if __x86_64__ || __ppc64__
 #define ENVIRONMENT64

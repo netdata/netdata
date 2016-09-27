@@ -90,22 +90,22 @@ int open_log_file(int fd, FILE **fp, const char *filename, int *enabled_syslog) 
 
 void reopen_all_log_files() {
     if(stdout_filename)
-        open_log_file(STDOUT_FILENO, &stdout, stdout_filename, &output_log_syslog);
+        open_log_file(STDOUT_FILENO, (FILE **)&stdout, stdout_filename, &output_log_syslog);
 
     if(stderr_filename)
-        open_log_file(STDERR_FILENO, &stderr, stderr_filename, &error_log_syslog);
+        open_log_file(STDERR_FILENO, (FILE **)&stderr, stderr_filename, &error_log_syslog);
 
     if(stdaccess_filename)
-        stdaccess_fd = open_log_file(stdaccess_fd, &stdaccess, stdaccess_filename, &access_log_syslog);
+        stdaccess_fd = open_log_file(stdaccess_fd, (FILE **)&stdaccess, stdaccess_filename, &access_log_syslog);
 }
 
 void open_all_log_files() {
     // disable stdin
-    open_log_file(STDIN_FILENO, &stdin, "/dev/null", NULL);
+    open_log_file(STDIN_FILENO, (FILE **)&stdin, "/dev/null", NULL);
 
-    open_log_file(STDOUT_FILENO, &stdout, stdout_filename, &output_log_syslog);
-    open_log_file(STDERR_FILENO, &stderr, stderr_filename, &error_log_syslog);
-    stdaccess_fd = open_log_file(stdaccess_fd, &stdaccess, stdaccess_filename, &access_log_syslog);
+    open_log_file(STDOUT_FILENO, (FILE **)&stdout, stdout_filename, &output_log_syslog);
+    open_log_file(STDERR_FILENO, (FILE **)&stderr, stderr_filename, &error_log_syslog);
+    stdaccess_fd = open_log_file(stdaccess_fd, (FILE **)&stdaccess, stdaccess_filename, &access_log_syslog);
 }
 
 // ----------------------------------------------------------------------------
@@ -266,6 +266,28 @@ void info_int( const char *file, const char *function, const unsigned long line,
 // ----------------------------------------------------------------------------
 // error log
 
+#if defined(STRERROR_R_CHAR_P)
+// GLIBC version of strerror_r
+static const char *strerror_result(const char *a, const char *b) { (void)b; return a; }
+#elif defined(HAVE_STRERROR_R)
+// POSIX version of strerror_r
+static const char *strerror_result(int a, const char *b) { (void)a; return b; }
+#elif defined(HAVE_C__GENERIC)
+
+// what a trick!
+// http://stackoverflow.com/questions/479207/function-overloading-in-c
+static const char *strerror_result_int(int a, const char *b) { (void)a; return b; }
+static const char *strerror_result_string(const char *a, const char *b) { (void)b; return a; }
+
+#define strerror_result(a, b) _Generic((a), \
+    int: strerror_result_int, \
+    char *: strerror_result_string \
+    )(a, b)
+
+#else
+#error "cannot detect the format of function strerror_r()"
+#endif
+
 void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... )
 {
     va_list args;
@@ -283,7 +305,7 @@ void error_int( const char *prefix, const char *file, const char *function, cons
 
     if(errno) {
         char buf[1024];
-        fprintf(stderr, " (errno %d, %s)\n", errno, strerror_r(errno, buf, 1023));
+        fprintf(stderr, " (errno %d, %s)\n", errno, strerror_result(strerror_r(errno, buf, 1023), buf));
         errno = 0;
     }
     else
