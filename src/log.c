@@ -266,17 +266,13 @@ void info_int( const char *file, const char *function, const unsigned long line,
 // ----------------------------------------------------------------------------
 // error log
 
-#ifdef WITHOUT_C11_GENERIC
-
-#ifdef STRERROR_R_POSIX
-// POSIX version of strerror_r
-static const char *strerror_result(int a, const char *b) { (void)a; return b; }
-#else
+#if defined(STRERROR_R_CHAR_P)
 // GLIBC version of strerror_r
 static const char *strerror_result(const char *a, const char *b) { (void)b; return a; }
-#endif
-
-#else /* ! WITHOUT_C11_GENERIC */
+#elif defined(HAVE_STRERROR_R)
+// POSIX version of strerror_r
+static const char *strerror_result(int a, const char *b) { (void)a; return b; }
+#elif defined(HAVE_C__GENERIC)
 
 // what a trick!
 // http://stackoverflow.com/questions/479207/function-overloading-in-c
@@ -288,7 +284,9 @@ static const char *strerror_result_string(const char *a, const char *b) { (void)
     char *: strerror_result_string \
     )(a, b)
 
-#endif /* ! WITHOUT_C11_GENERIC */
+#else
+#error "cannot detect the format of function strerror_r()"
+#endif
 
 void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... )
 {
