@@ -60,18 +60,16 @@
 #include <zlib.h>
 #endif
 
-#ifdef __GNUC__
-#define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
-
-#if __x86_64__ || __ppc64__
+#if (SIZEOF_VOID_P == 8)
 #define ENVIRONMENT64
-#else
+#elif (SIZEOF_VOID_P == 4)
 #define ENVIRONMENT32
+#else
+#error "Cannot detect if this is a 32 or 64 bit CPU"
 #endif
 
-#else // !__GNUC__
-#define NETDATA_NO_ATOMIC_INSTRUCTIONS 1
-#define ENVIRONMENT32
+#ifdef __GNUC__
+#define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 #endif // __GNUC__
 
 #include "avl.h"
