@@ -85,8 +85,18 @@ AC_C_INLINE
 AC_FUNC_STRERROR_R
 AC_C__GENERIC
 AC_C___ATOMIC
-AC_CANONICAL_HOST
 AC_CHECK_SIZEOF([void *])
+AC_CANONICAL_HOST
+
+AC_ARG_VAR([SSE_CANDIDATE], [C compiler flags for SSE])
+AS_CASE([$host_cpu],
+	[i?86], [SSE_CANDIDATE="yes"]
+)
+AC_SUBST([SSE_CANDIDATE])
+if test "${SSE_CANDIDATE}" = "yes"; then
+	opt="-msse2 -mfpmath=sse"
+	AX_CHECK_COMPILE_FLAG($opt, [CFLAGS="$CFLAGS $opt"], [])
+fi
 
 AC_ARG_VAR([MATH_CFLAGS], [C compiler flags for math])
 AC_ARG_VAR([MATH_LIBS], [linker flags for math])
