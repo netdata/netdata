@@ -1326,7 +1326,7 @@ int do_sys_fs_cgroup(int update_every, unsigned long long dt) {
 
 void *cgroups_main(void *ptr)
 {
-    if(ptr) { ; }
+    (void)ptr;
 
     info("CGROUP Plugin thread created with task id %d", gettid());
 
@@ -1351,7 +1351,7 @@ void *cgroups_main(void *ptr)
 
     RRDSET *stcpu_thread = NULL;
 
-    for(;1;) {
+    for(;;) {
         if(unlikely(netdata_exit)) break;
 
         // delay until it is our time to run
@@ -1395,6 +1395,8 @@ void *cgroups_main(void *ptr)
             rrdset_done(stcpu_thread);
         }
     }
+
+    info("CGROUP thread exiting");
 
     pthread_exit(NULL);
     return NULL;

@@ -109,7 +109,7 @@ void *pluginsd_worker_thread(void *arg)
 
     size_t count = 0;
 
-    while(likely(1)) {
+    for(;;) {
         if(unlikely(netdata_exit)) break;
 
         FILE *fp = mypopen(cd->cmd, &cd->pid);
@@ -434,6 +434,8 @@ void *pluginsd_worker_thread(void *arg)
             break;
     }
 
+    info("PLUGINSD: '%s' thread exiting", cd->fullfilename);
+
     cd->obsolete = 1;
     pthread_exit(NULL);
     return NULL;
@@ -462,7 +464,7 @@ void *pluginsd_main(void *ptr) {
 
     if(scan_frequency < 1) scan_frequency = 1;
 
-    while(likely(1)) {
+    for(;;) {
         if(unlikely(netdata_exit)) break;
 
         dir = opendir(dir_name);
@@ -541,6 +543,8 @@ void *pluginsd_main(void *ptr) {
         closedir(dir);
         sleep((unsigned int) scan_frequency);
     }
+
+    info("PLUGINS.D thread exiting");
 
     pthread_exit(NULL);
     return NULL;
