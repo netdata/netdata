@@ -152,9 +152,10 @@ static inline void health_alarm_log(RRDHOST *host,
     ALARM_ENTRY *t;
     for(t = host->health_log.alarms ; t ; t = t->next) {
         if(t != ae && t->alarm_id == ae->alarm_id) {
-            if(!(t->notifications & HEALTH_ENTRY_NOTIFICATIONS_UPDATED) && !t->updated_by) {
+            if(!(t->notifications & HEALTH_ENTRY_NOTIFICATIONS_UPDATED) && !t->updated_by_id) {
                 t->notifications |= HEALTH_ENTRY_NOTIFICATIONS_UPDATED;
-                t->updated_by = ae;
+                t->updated_by_id = ae->unique_id;
+                ae->updates_id = t->unique_id;
 
                 if((t->new_status == RRDCALC_STATUS_WARNING || t->new_status == RRDCALC_STATUS_CRITICAL) &&
                    (t->old_status == RRDCALC_STATUS_WARNING || t->old_status == RRDCALC_STATUS_CRITICAL))
@@ -1854,7 +1855,9 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, R
                            "\t\t\"status\": \"%s\",\n"
                            "\t\t\"old_status\": \"%s\",\n"
                            "\t\t\"delay\": %d,\n"
-                           "\t\t\"delay_up_to_timestamp\": %lu,\n",
+                           "\t\t\"delay_up_to_timestamp\": %lu,\n"
+                           "\t\t\"updated_by_id\": %u,\n"
+                           "\t\t\"updates_id\": %u,\n",
                    host->hostname,
                    ae->unique_id,
                    ae->alarm_id,
@@ -1878,7 +1881,9 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, R
                    rrdcalc_status2string(ae->new_status),
                    rrdcalc_status2string(ae->old_status),
                    ae->delay,
-                   (unsigned long)ae->delay_up_to_timestamp
+                   (unsigned long)ae->delay_up_to_timestamp,
+                   ae->updated_by_id,
+                   ae->updates_id
     );
 
     buffer_strcat(wb, "\t\t\"value\":");

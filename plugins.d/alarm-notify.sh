@@ -1,20 +1,31 @@
 #!/usr/bin/env bash
 
-# (C) Costa Tsaousis
-# pushover support by Jan Arnold
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+# Script the send alarm notifications for netdata
+#
+# Features:
+#  - multiple notification methods
+#  - multiple roles per alarm
+#  - multiple recipients per role
+#  - severity filtering per recipient
+#
+# Supported notification methods:
+#  - emails
+#  - pushover.net notifications
+#  - slack.com notifications
+#  - telegram.org notifications
+#
 
 me="${0}"
 
-if [ $(( ${BASH_VERSINFO[0]} )) -lt 4 ]
-then
-    echo >&2
-    echo >&2 "$me: ERROR"
-    echo >&2 "BASH version 4 or later is required."
-    echo >&2 "You are running version: ${BASH_VERSION}"
-    echo >&2 "Please upgrade."
-    echo >&2
+# check for BASH v4+ (required for associative arrays)
+[ $(( ${BASH_VERSINFO[0]} )) -lt 4 ] && \
+    echo >&2 "${me}: BASH version 4 or later is required (this is ${BASH_VERSION})." && \
     exit 1
-fi
 
 # defaults to allow running this script by hand
 NETDATA_CONFIG_DIR="${NETDATA_CONFIG_DIR-/etc/netdata}"
@@ -26,22 +37,22 @@ NETDATA_CACHE_DIR="${NETDATA_CACHE_DIR-/var/cache/netdata}"
 # -----------------------------------------------------------------------------
 # parse command line parameters
 
-recipient="${1}"   # the recepient of the email
-host="${2}"        # the host this event refers to
+roles="${1}"       # the roles that should be notified for this event
+host="${2}"        # the host generated this event
 unique_id="${3}"   # the unique id of this event
 alarm_id="${4}"    # the unique id of the alarm that generated this event
-event_id="${5}"    # the incremental id of the event, for this alarm
-when="${6}"        # the timestamp this event occured
+event_id="${5}"    # the incremental id of the event, for this alarm id
+when="${6}"        # the timestamp this event occurred
 name="${7}"        # the name of the alarm, as given in netdata health.d entries
 chart="${8}"       # the name of the chart (type.id)
 family="${9}"      # the family of the chart
 status="${10}"     # the current status : REMOVED, UNITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
 old_status="${11}" # the previous status: REMOVED, UNITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
-value="${12}"      # the current value
-old_value="${13}"  # the previous value
+value="${12}"      # the current value of the alarm
+old_value="${13}"  # the previous value of the alarm
 src="${14}"        # the line number and file the alarm has been configured
-duration="${15}"   # the duration in seconds the previous state took
-non_clear_duration="${16}" # the total duration in seconds this is non-clear
+duration="${15}"   # the duration in seconds of the previous alarm state
+non_clear_duration="${16}" # the total duration in seconds this is/was non-clear
 units="${17}"      # the units of the value
 info="${18}"       # a short description of the alarm
 
@@ -65,9 +76,10 @@ fi
 # -----------------------------------------------------------------------------
 # load configuration
 
-# this is defined here so that private registries
-# can setup their own
-# images_base_url="${NETDATA_REGISTRY_URL}"
+# By default fetch images from the global public registry.
+# This is required by default, since all notification methods need to download
+# images via the Internet, and private registries might not be reachable.
+# This can be overwritten at the configuration file.
 images_base_url="https://registry.my-netdata.io"
 
 # needed commands
@@ -108,14 +120,14 @@ if [ -f "${NETDATA_CONFIG_DIR}/health_alarm_notify.conf" ]
 fi
 
 # -----------------------------------------------------------------------------
-# filter recipients based on the criticality of each
+# filter a recipient based on alarm event severity
 
 filter_recipient_by_criticality() {
     local method="${1}" x="${2}" r s
     shift
 
-    r="${x/|*/}"
-    s="${x/*|/}"
+    r="${x/|*/}" # the recipient
+    s="${x/*|/}" # the severity required for notifying this recipient
 
     # no severity filtering for this person
     [ "${r}" = "${s}" ] && return 0
@@ -148,22 +160,23 @@ filter_recipient_by_criticality() {
 }
 
 # -----------------------------------------------------------------------------
-# find the recipient's addresses per method
+# find the recipients' addresses per method
 
 declare -A arr_slack=()
 declare -A arr_pushover=()
 declare -A arr_telegram=()
 declare -A arr_email=()
 
-# netdata may call us with multiple recipients
-# so, here we find the unique ones
-for x in ${recipient//,/ }
+# netdata may call us with multiple roles, and roles may have multiple but
+# overlapping recipients - so, here we find the unique recipients.
+for x in ${roles//,/ }
 do
-    # the recipient 'silent' means, don't send a notification for this event
-    [ "${x}" = "silent" ] && continue
+    # the roles 'silent' and 'disabled' mean:
+    # don't send a notification for this role
+    [ "${x}" = "silent" -o "${x}" = "disabled" ] && continue
 
     # email
-    a="${role_recipients_email[${recipient}]}"
+    a="${role_recipients_email[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_EMAIL}"
     for r in ${a//,/ }
     do
@@ -171,7 +184,7 @@ do
     done
 
     # pushover
-    a="${role_recipients_pushover[${recipient}]}"
+    a="${role_recipients_pushover[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_PUSHOVER}"
     for r in ${a//,/ }
     do
@@ -179,7 +192,7 @@ do
     done
 
     # telegram
-    a="${role_recipients_telegram[${recipient}]}"
+    a="${role_recipients_telegram[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_TELEGRAM}"
     for r in ${a//,/ }
     do
@@ -187,7 +200,7 @@ do
     done
 
     # slack
-    a="${role_recipients_slack[${recipient}]}"
+    a="${role_recipients_slack[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_SLACK}"
     for r in ${a//,/ }
     do
@@ -747,7 +760,7 @@ SENT_EMAIL=$?
 # -----------------------------------------------------------------------------
 # let netdata know
 
-# we did send somehting
+# we did send something
 [ ${SENT_EMAIL} -eq 0 -o ${SENT_PUSHOVER} -eq 0 -o ${SENT_TELEGRAM} -eq 0 -o ${SENT_SLACK} -eq 0 ] && exit 0
 
 # we did not send anything

@@ -529,7 +529,7 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
         strcpy(value_string, "-");
 
     else if(precision < 0) {
-        int len, l, lstop = 0;
+        int len, lstop = 0, trim_zeros = 1;
 
         calculated_number abs = value;
         if(isless(value, 0)) {
@@ -537,27 +537,30 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
             abs = -value;
         }
 
-        if(isgreaterequal(abs, 1000))     len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.0Lf", (long double)value);
-        else if(isgreaterequal(abs, 100)) len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.1Lf", (long double)value);
-        else if(isgreaterequal(abs, 1))   len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.2Lf", (long double)value);
-        else if(isgreaterequal(abs, 0.1)) len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.3Lf", (long double)value);
-        else                              len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.4Lf", (long double)value);
+        if(isgreaterequal(abs, 1000))     { len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.0Lf", (long double)value); trim_zeros = 0; }
+        else if(isgreaterequal(abs, 100))   len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.1Lf", (long double)value);
+        else if(isgreaterequal(abs, 1))     len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.2Lf", (long double)value);
+        else if(isgreaterequal(abs, 0.1))   len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.3Lf", (long double)value);
+        else                                len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.4Lf", (long double)value);
 
-        // remove trailing zeros
-        for(l = len - 1; l > lstop ; l--) {
-            if(likely(value_string[l] == '0')) {
-                value_string[l] = '\0';
-                len--;
+        if(unlikely(trim_zeros)) {
+            int l;
+            // remove trailing zeros from the decimal part
+            for(l = len - 1; l > lstop ; l--) {
+                if(likely(value_string[l] == '0')) {
+                    value_string[l] = '\0';
+                    len--;
+                }
+
+                else if(unlikely(value_string[l] == '.')) {
+                    value_string[l] = '\0';
+                    len--;
+                    break;
+                }
+
+                else
+                    break;
             }
-
-            else if(unlikely(value_string[l] == '.')) {
-                value_string[l] = '\0';
-                len--;
-                break;
-            }
-
-            else
-                break;
         }
 
         if(len >= 0)

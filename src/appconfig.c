@@ -467,6 +467,7 @@ void generate_config(BUFFER *wb, int only_changed)
                     "# netdata configuration\n"
                     "#\n"
                     "# You can download the latest version of this file, using:\n"
+                    "#\n"
                     "#  wget -O /etc/netdata/netdata.conf http://localhost:19999/netdata.conf\n"
                     "# or\n"
                     "#  curl -o /etc/netdata/netdata.conf http://localhost:19999/netdata.conf\n"
