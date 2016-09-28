@@ -5621,6 +5621,7 @@
 
         notifications: false,           // when true, the browser supports notifications (may not be granted though)
         last_notification_id: 0,        // the id of the last alarm_log we have raised an alarm for
+        first_notification_id: 0,       // the id of the first alarm_log we have seen in this session
         // notifications_shown: new Array(),
 
         server: null,                   // the server to connect to for fetching alarms
@@ -5665,7 +5666,7 @@
                     return;
 
                 case 'CLEAR':
-                    if(NETDATA.alarms.last_notification_id === 0) {
+                    if(typeof entry.updates_id === 'number' && entry.updates_id < NETDATA.alarms.first_notification_id) {
                         // console.log('alarm ' + entry.unique_id + ' is not current');
                         return;
                     }
@@ -5901,6 +5902,7 @@
             NETDATA.alarms.server = host;
 
             NETDATA.alarms.last_notification_id = NETDATA.localStorageGet('last_notification_id', NETDATA.alarms.last_notification_id, null);
+            NETDATA.alarms.first_notification_id = NETDATA.alarms.last_notification_id;
 
             if(NETDATA.alarms.onclick === null)
                 NETDATA.alarms.onclick = NETDATA.alarms.scrollToAlarm;

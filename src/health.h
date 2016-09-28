@@ -305,7 +305,9 @@ typedef struct alarm_entry {
     int delay;
     time_t delay_up_to_timestamp;
 
-    struct alarm_entry *updated_by;
+    uint32_t updated_by_id;
+    uint32_t updates_id;
+    
     struct alarm_entry *next;
 } ALARM_ENTRY;
 
