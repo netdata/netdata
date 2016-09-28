@@ -1,20 +1,31 @@
 #!/usr/bin/env bash
 
-# (C) Costa Tsaousis
-# pushover support by Jan Arnold
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+# Script the send alarm notifications for netdata
+#
+# Features:
+#  - multiple notification methods
+#  - multiple roles per alarm
+#  - multiple recipients per role
+#  - severity filtering per recipient
+#
+# Supported notification methods:
+#  - emails
+#  - pushover.net notifications
+#  - slack.com notifications
+#  - telegram.org notifications
+#
 
 me="${0}"
 
-if [ $(( ${BASH_VERSINFO[0]} )) -lt 4 ]
-then
-    echo >&2
-    echo >&2 "$me: ERROR"
-    echo >&2 "BASH version 4 or later is required."
-    echo >&2 "You are running version: ${BASH_VERSION}"
-    echo >&2 "Please upgrade."
-    echo >&2
+# check for BASH v4+ (required for associative arrays)
+[ $(( ${BASH_VERSINFO[0]} )) -lt 4 ] && \
+    echo >&2 "${me}: BASH version 4 or later is required (this is ${BASH_VERSION})." && \
     exit 1
-fi
 
 # defaults to allow running this script by hand
 NETDATA_CONFIG_DIR="${NETDATA_CONFIG_DIR-/etc/netdata}"
