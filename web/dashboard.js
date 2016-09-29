@@ -5621,7 +5621,8 @@
 
         notifications: false,           // when true, the browser supports notifications (may not be granted though)
         last_notification_id: 0,        // the id of the last alarm_log we have raised an alarm for
-        first_notification_id: 0,       // the id of the first alarm_log we have seen in this session
+        first_notification_id: 0,       // the id of the first alarm_log entry for this session
+                                        // this is used to prevent CLEAR notifications for past events
         // notifications_shown: new Array(),
 
         server: null,                   // the server to connect to for fetching alarms
@@ -5666,7 +5667,7 @@
                     return;
 
                 case 'CLEAR':
-                    if(typeof entry.updates_id === 'number' && entry.updates_id < NETDATA.alarms.first_notification_id) {
+                    if(entry.unique_id < NETDATA.alarms.first_notification_id) {
                         // console.log('alarm ' + entry.unique_id + ' is not current');
                         return;
                     }
@@ -5843,6 +5844,9 @@
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {
+                    if(NETDATA.alarms.first_notification_id === 0 && typeof data.latest_alarm_log_unique_id === 'number')
+                        NETDATA.alarms.first_notification_id = data.latest_alarm_log_unique_id;
+
                     if(typeof callback === 'function')
                         callback(data);
                 })
@@ -5902,7 +5906,6 @@
             NETDATA.alarms.server = host;
 
             NETDATA.alarms.last_notification_id = NETDATA.localStorageGet('last_notification_id', NETDATA.alarms.last_notification_id, null);
-            NETDATA.alarms.first_notification_id = NETDATA.alarms.last_notification_id;
 
             if(NETDATA.alarms.onclick === null)
                 NETDATA.alarms.onclick = NETDATA.alarms.scrollToAlarm;
