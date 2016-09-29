@@ -770,7 +770,11 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm) {
                 if (flags & MAP_SHARED || !enable_ksm || !ksm) {
 #endif
                     mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags, fd, 0);
-                    if (mem != MAP_FAILED) {
+                    if (mem == MAP_FAILED) {
+                        error("Cannot allocate SHARED memory for file '%s'.", filename);
+                        mem = NULL;
+                    }
+                    else {
                         int advise = MADV_SEQUENTIAL | MADV_DONTFORK;
                         if (flags & MAP_SHARED) advise |= MADV_WILLNEED;
 
@@ -780,7 +784,8 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm) {
                         }
                     }
 #ifdef MADV_MERGEABLE
-                } else {
+                }
+                else {
 /*
                     // test - load the file into memory
                     mem = calloc(1, size);
@@ -794,7 +799,11 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm) {
                     }
 */
                     mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags | MAP_ANONYMOUS, -1, 0);
-                    if (mem != MAP_FAILED) {
+                    if (mem == MAP_FAILED) {
+                        error("Cannot allocate PRIVATE ANONYMOUS memory for KSM for file '%s'.", filename);
+                        mem = NULL;
+                    }
+                    else {
                         if (lseek(fd, 0, SEEK_SET) == 0) {
                             if (read(fd, mem, size) != (ssize_t) size)
                                 error("Cannot read from file '%s'", filename);
@@ -813,17 +822,19 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm) {
                                   filename);
                             log_madvise_3--;
                         }
-                    } else
-                        error("Cannot allocate PRIVATE ANONYMOUS memory for KSM for file '%s'.", filename);
+                    }
                 }
 #endif
-            } else
+            }
+            else
                 error("Cannot write to file '%s' at position %zu.", filename, size);
-        } else
+        }
+        else
             error("Cannot seek file '%s' to size %zu.", filename, size);
 
         close(fd);
-    } else
+    }
+    else
         error("Cannot create/open file '%s'.", filename);
 
     return mem;
