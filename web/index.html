@@ -696,7 +696,7 @@
             document.getElementById('gotoServerList').innerHTML += '<tr><td style="padding-left: 20px;"><a href="' + finalURL + '" target="_blank">' + url + '</a></td><td style="padding-left: 30px;"><code id="' + guid + '-' + id + '-status">checking...</code></td></tr>';
 
             NETDATA.registry.hello(url, function(data) {
-                if (data) {
+                if(typeof data !== 'undefined' && data !== null && typeof data.machine_guid === 'string' && data.machine_guid === guid) {
                     // console.log('OK ' + id + ' URL: ' + url);
                     document.getElementById(guid + '-' + id + '-status').innerHTML = "OK";
 
@@ -713,11 +713,17 @@
                     }
                 }
                 else {
+                    if(typeof data !== 'undefined' && data !== null && typeof data.machine_guid === 'string' && data.machine_guid !== guid)
+                        error = 'wrong machine';
+
                     document.getElementById(guid + '-' + id + '-status').innerHTML = error;
                     gotoServerValidateRemaining--;
                     if(gotoServerValidateRemaining <= 0) {
                         gotoServerMiddleClick = false;
                         document.getElementById('gotoServerResponse').innerHTML = '<b>Sorry! I cannot find any operational URL for this server</b>';
+                        //NETDATA.registry.search(guid, function(d) {
+                        //    console.log(d);
+                        //});
                     }
                 }
             });
@@ -2119,7 +2125,7 @@
     // parallel javascript downloader in netdata
     var netdataPrepCallback = function() {
         NETDATA.requiredJs.push({
-            url: NETDATA.serverDefault + 'dashboard_info.js?v55',
+            url: NETDATA.serverDefault + 'dashboard_info.js?v57',
             isAlreadyLoaded: function() { return false; }
         });
         
@@ -2743,4 +2749,4 @@
     </div>
 </body>
 </html>
-<script async type="text/javascript" src="dashboard.js?v55"></script>
+<script async type="text/javascript" src="dashboard.js?v57"></script>
