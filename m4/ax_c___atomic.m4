@@ -4,7 +4,7 @@
 AN_IDENTIFIER([__atomic], [AC_C___ATOMIC])
 AC_DEFUN([AC_C___ATOMIC],
 [AC_CACHE_CHECK([for __atomic], ac_cv_c___atomic,
-[AC_COMPILE_IFELSE(
+[AC_LINK_IFELSE(
    [AC_LANG_SOURCE(
       [[int
         main (int argc, char **argv)
