@@ -34,16 +34,16 @@ dist_webold_DATA = \
 
 weblibdir=$(webdir)/lib
 dist_weblib_DATA = \
-	lib/dygraph-combined.js \
+	lib/dygraph-combined-f6ec7be.js \
 	lib/dygraph-smooth-plotter.js \
-	lib/jquery-1.12.0.min.js \
+	lib/jquery-3.1.1.min.js \
 	lib/jquery.peity.min.js \
 	lib/jquery.sparkline.min.js \
 	lib/morris.min.js \
 	lib/raphael-min.js \
 	lib/jquery.easypiechart.min.js \
 	lib/jquery.nanoscroller.min.js \
-	lib/bootstrap.min.js \
+	lib/bootstrap-3.3.7.min.js \
 	lib/ElementQueries.js \
 	lib/ResizeSensor.js \
 	lib/bootstrap-toggle.min.js \
@@ -55,8 +55,8 @@ dist_weblib_DATA = \
 webcssdir=$(webdir)/css
 dist_webcss_DATA = \
 	css/morris.css \
-	css/bootstrap.min.css \
-	css/bootstrap-theme.min.css \
+	css/bootstrap-3.3.7.min.css \
+	css/bootstrap-theme-3.3.7.min.css \
 	css/bootstrap.slate.min.css \
 	css/font-awesome.min.css \
 	css/bootstrap-toggle.min.css \
