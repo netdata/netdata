@@ -72,8 +72,9 @@ AC_ARG_WITH(
 	,
 	[with_user="nobody"]
 )
-AC_ARG_ENABLE([x86-sse],
-	AS_HELP_STRING([--enable-x86-sse=yes|no], [enable SSE/SS2 optimizations on x86 [default=yes]]),
+AC_ARG_ENABLE(
+	[x86-sse],
+	[AS_HELP_STRING([--disable-x86-sse], [SSE/SS2 optimizations on x86 @<:@default enabled@:>@])],
 	,
 	[enable_x86_sse="yes"]
 )
