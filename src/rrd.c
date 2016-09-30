@@ -425,6 +425,27 @@ void rrdset_reset(RRDSET *st)
         memset(rd->values, 0, rd->entries * sizeof(storage_number));
     }
 }
+static long align_entries_to_pagesize(long entries) {
+    if(entries < 5) entries = 5;
+    if(entries > RRD_HISTORY_ENTRIES_MAX) entries = RRD_HISTORY_ENTRIES_MAX;
+
+#ifdef NETDATA_LOG_ALLOCATIONS
+    long page = (size_t)sysconf(_SC_PAGESIZE);
+
+    long size = sizeof(RRDDIM) + entries * sizeof(storage_number);
+    if(size % page) {
+        size -= (size % page);
+        size += page;
+
+        long n = (size - sizeof(RRDDIM)) / sizeof(storage_number);
+        return n;
+    }
+
+    return entries;
+#else
+    return entries;
+#endif
+}
 
 RRDSET *rrdset_create(const char *type, const char *id, const char *name, const char *family, const char *context, const char *title, const char *units, long priority, int update_every, int chart_type)
 {
@@ -450,9 +471,9 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
         return st;
     }
 
-    long entries = config_get_number(fullid, "history", rrd_default_history_entries);
-    if(entries < 5) entries = config_set_number(fullid, "history", 5);
-    if(entries > RRD_HISTORY_ENTRIES_MAX) entries = config_set_number(fullid, "history", RRD_HISTORY_ENTRIES_MAX);
+    long rentries = config_get_number(fullid, "history", rrd_default_history_entries);
+    long entries = align_entries_to_pagesize(rentries);
+    if(entries != rentries) entries = config_set_number(fullid, "history", entries);
 
     int enabled = config_get_boolean(fullid, "enabled", 1);
     if(!enabled) entries = 5;

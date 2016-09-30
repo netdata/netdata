@@ -14,31 +14,141 @@ volatile sig_atomic_t netdata_exit = 0;
 // its lifetime), these can be used to override the default system allocation
 // routines.
 
+#ifdef NETDATA_LOG_ALLOCATIONS
+static struct memory_statistics {
+    size_t malloc_calls_made;
+    size_t calloc_calls_made;
+    size_t realloc_calls_made;
+    size_t strdup_calls_made;
+    size_t free_calls_made;
+    size_t memory_calls_made;
+    size_t allocated_memory;
+    size_t mmapped_memory;
+} memory_statistics = {
+        0, 0, 0, 0, 0, 0, 0, 0
+};
+
+static inline void print_allocations(const char *file, const char *function, const unsigned long line) {
+    static struct memory_statistics old = { 0, 0, 0, 0, 0, 0, 0, 0 };
+
+    //if(unlikely(!(memory_statistics.memory_calls_made % 5))) {
+        fprintf(stderr, "(%04lu@%-10.10s:%-15.15s): Allocated %zu KB (+%zu B), mmapped %zu KB (+%zu B): malloc %zu (+%zu), calloc %zu (+%zu), realloc %zu (+%zu), strdup %zu (+%zu), free %zu (+%zu)\n",
+                line, file, function,
+                (memory_statistics.allocated_memory + 512) / 1024, memory_statistics.allocated_memory - old.allocated_memory,
+                (memory_statistics.mmapped_memory + 512) / 1024, memory_statistics.mmapped_memory - old.mmapped_memory,
+                memory_statistics.malloc_calls_made, memory_statistics.malloc_calls_made - old.malloc_calls_made,
+                memory_statistics.calloc_calls_made, memory_statistics.calloc_calls_made - old.calloc_calls_made,
+                memory_statistics.realloc_calls_made, memory_statistics.realloc_calls_made - old.realloc_calls_made,
+                memory_statistics.strdup_calls_made, memory_statistics.strdup_calls_made - old.strdup_calls_made,
+                memory_statistics.free_calls_made, memory_statistics.free_calls_made - old.free_calls_made
+        );
+
+        memcpy(&old, &memory_statistics, sizeof(struct memory_statistics));
+    //}
+}
+
+static inline void malloc_accounting(const char *file, const char *function, const unsigned long line, size_t size) {
+    memory_statistics.memory_calls_made++;
+    memory_statistics.malloc_calls_made++;
+    memory_statistics.allocated_memory += size;
+    print_allocations(file, function, line);
+}
+
+static inline void mmap_accounting(size_t size) {
+    memory_statistics.memory_calls_made++;
+    memory_statistics.mmapped_memory += size;
+}
+
+static inline void calloc_accounting(const char *file, const char *function, const unsigned long line, size_t size) {
+    memory_statistics.memory_calls_made++;
+    memory_statistics.calloc_calls_made++;
+    memory_statistics.allocated_memory += size;
+    print_allocations(file, function, line);
+}
+
+static inline void realloc_accounting(const char *file, const char *function, const unsigned long line, void *ptr, size_t size) {
+    (void)ptr;
+
+    memory_statistics.memory_calls_made++;
+    memory_statistics.realloc_calls_made++;
+    memory_statistics.allocated_memory += size;
+    print_allocations(file, function, line);
+}
+
+static inline void strdup_accounting(const char *file, const char *function, const unsigned long line, const char *s) {
+    memory_statistics.memory_calls_made++;
+    memory_statistics.strdup_calls_made++;
+    memory_statistics.allocated_memory += strlen(s) + 1;
+    print_allocations(file, function, line);
+}
+
+static inline void free_accounting(const char *file, const char *function, const unsigned long line, void *ptr) {
+    (void)file;
+    (void)function;
+    (void)line;
+
+    if(likely(ptr)) {
+        memory_statistics.memory_calls_made++;
+        memory_statistics.free_calls_made++;
+    }
+}
+#endif
+
+#ifdef NETDATA_LOG_ALLOCATIONS
+char *strdupz_int(const char *file, const char *function, const unsigned long line, const char *s) {
+    strdup_accounting(file, function, line, s);
+#else
 char *strdupz(const char *s) {
+#endif
+
     char *t = strdup(s);
     if (unlikely(!t)) fatal("Cannot strdup() string '%s'", s);
     return t;
 }
 
+#ifdef NETDATA_LOG_ALLOCATIONS
+void *mallocz_int(const char *file, const char *function, const unsigned long line, size_t size) {
+    malloc_accounting(file, function, line, size);
+#else
 void *mallocz(size_t size) {
+#endif
+
     void *p = malloc(size);
     if (unlikely(!p)) fatal("Cannot allocate %zu bytes of memory.", size);
     return p;
 }
 
+#ifdef NETDATA_LOG_ALLOCATIONS
+void *callocz_int(const char *file, const char *function, const unsigned long line, size_t nmemb, size_t size) {
+    calloc_accounting(file, function, line, nmemb * size);
+#else
 void *callocz(size_t nmemb, size_t size) {
+#endif
+
     void *p = calloc(nmemb, size);
     if (unlikely(!p)) fatal("Cannot allocate %zu bytes of memory.", nmemb * size);
     return p;
 }
 
+#ifdef NETDATA_LOG_ALLOCATIONS
+void *reallocz_int(const char *file, const char *function, const unsigned long line, void *ptr, size_t size) {
+    realloc_accounting(file, function, line, ptr, size);
+#else
 void *reallocz(void *ptr, size_t size) {
+#endif
+
     void *p = realloc(ptr, size);
     if (unlikely(!p)) fatal("Cannot re-allocate memory to %zu bytes.", size);
     return p;
 }
 
+#ifdef NETDATA_LOG_ALLOCATIONS
+void freez_int(const char *file, const char *function, const unsigned long line, void *ptr) {
+    free_accounting(file, function, line, ptr);
+#else
 void freez(void *ptr) {
+#endif
+
     free(ptr);
 }
 
@@ -775,6 +885,9 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm) {
                         mem = NULL;
                     }
                     else {
+#ifdef NETDATA_LOG_ALLOCATIONS
+                        mmap_accounting(size);
+#endif
                         int advise = MADV_SEQUENTIAL | MADV_DONTFORK;
                         if (flags & MAP_SHARED) advise |= MADV_WILLNEED;
 
@@ -804,6 +917,9 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm) {
                         mem = NULL;
                     }
                     else {
+#ifdef NETDATA_LOG_ALLOCATIONS
+                        mmap_accounting(size);
+#endif
                         if (lseek(fd, 0, SEEK_SET) == 0) {
                             if (read(fd, mem, size) != (ssize_t) size)
                                 error("Cannot read from file '%s'", filename);
