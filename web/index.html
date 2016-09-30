@@ -721,9 +721,6 @@
                     if(gotoServerValidateRemaining <= 0) {
                         gotoServerMiddleClick = false;
                         document.getElementById('gotoServerResponse').innerHTML = '<b>Sorry! I cannot find any operational URL for this server</b>';
-                        //NETDATA.registry.search(guid, function(d) {
-                        //    console.log(d);
-                        //});
                     }
                 }
             });
@@ -734,7 +731,9 @@
         // console.log('goto server: ' + guid);
 
         gotoServerStop = false;
+        var checked = {};
         var len = NETDATA.registry.machines[guid].alternate_urls.length;
+        var count = 0;
 
         document.getElementById('gotoServerResponse').innerHTML = '';
         document.getElementById('gotoServerList').innerHTML = '';
@@ -742,9 +741,30 @@
         $('#gotoServerModal').modal('show');
 
         gotoServerValidateRemaining = len;
-        while(len--)
-            gotoServerValidateUrl(len, guid, NETDATA.registry.machines[guid].alternate_urls[len]);
+        while(len--) {
+            var url = NETDATA.registry.machines[guid].alternate_urls[len];
+            checked[url] = true;
+            gotoServerValidateUrl(count++, guid, url);
+        }
 
+        setTimeout(function() {
+            if(gotoServerStop === false) {
+                document.getElementById('gotoServerResponse').innerHTML = '<b>Added all the known URLs for this machine.</b>';
+                NETDATA.registry.search(guid, function(data) {
+                    console.log(data);
+                    len = data.urls.length;
+                    while(len--) {
+                        var url = data.urls[len][1];
+                        console.log(url);
+                        if(typeof checked[url] === 'undefined') {
+                            gotoServerValidateRemaining++;
+                            checked[url] = true;
+                            gotoServerValidateUrl(count++, guid, url);
+                        }
+                    }
+                });
+            }
+        }, 2000);
         return false;
     }
 
