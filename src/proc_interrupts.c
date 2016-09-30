@@ -21,8 +21,7 @@ static inline struct interrupt *get_interrupts_array(int lines, int cpus) {
     static struct interrupt *irrs = NULL;
     static int allocated = 0;
 
-    if(lines < allocated) return irrs;
-    else {
+    if(lines > allocated) {
         irrs = (struct interrupt *)reallocz(irrs, lines * recordsize(cpus));
         allocated = lines;
     }
