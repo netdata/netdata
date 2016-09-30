@@ -7,7 +7,7 @@ project(netdata C)
 
 find_package (Threads)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wformat-signedness -Werror=format-security")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wformat-signedness -Werror=format-security -DNETDATA_INTERNAL_CHECKS=1")
 
 set(NETDATA_SOURCE_FILES
         src/appconfig.c
