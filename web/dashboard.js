@@ -108,12 +108,12 @@
     // default URLs for all the external files we need
     // make them RELATIVE so that the whole thing can also be
     // installed under a web server
-    NETDATA.jQuery              = NETDATA.serverDefault + 'lib/jquery-1.12.0.min.js';
+    NETDATA.jQuery              = NETDATA.serverDefault + 'lib/jquery-3.1.1.min.js';
     NETDATA.peity_js            = NETDATA.serverDefault + 'lib/jquery.peity.min.js';
     NETDATA.sparkline_js        = NETDATA.serverDefault + 'lib/jquery.sparkline.min.js';
     NETDATA.easypiechart_js     = NETDATA.serverDefault + 'lib/jquery.easypiechart.min.js';
     NETDATA.gauge_js            = NETDATA.serverDefault + 'lib/gauge.min.js';
-    NETDATA.dygraph_js          = NETDATA.serverDefault + 'lib/dygraph-combined.js';
+    NETDATA.dygraph_js          = NETDATA.serverDefault + 'lib/dygraph-combined-f6ec7be.js';
     NETDATA.dygraph_smooth_js   = NETDATA.serverDefault + 'lib/dygraph-smooth-plotter.js';
     NETDATA.raphael_js          = NETDATA.serverDefault + 'lib/raphael-min.js';
     NETDATA.morris_js           = NETDATA.serverDefault + 'lib/morris.min.js';
@@ -125,8 +125,8 @@
 
     NETDATA.themes = {
         white: {
-            bootstrap_css: NETDATA.serverDefault + 'css/bootstrap.min.css',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.css',
+            bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-3.3.7.min.css',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.css?v57',
             background: '#FFFFFF',
             foreground: '#000000',
             grid: '#DDDDDD',
@@ -143,11 +143,11 @@
         },
         slate: {
             bootstrap_css: NETDATA.serverDefault + 'css/bootstrap.slate.min.css',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v57',
             background: '#272b30',
             foreground: '#C8C8C8',
-            grid: '#373b40',
-            axis: '#373b40',
+            grid: '#35393e',
+            axis: '#35393e',
 /*          colors: [   '#55bb33', '#ff2222',   '#0099C6', '#faa11b',   '#adbce0', '#DDDD00',
                         '#4178ba', '#f58122',   '#a5cc39', '#f58667',   '#f5ef89', '#cf93c0',
                         '#a5d18a', '#b8539d',   '#3954a3', '#c8a9cf',   '#c7de8a', '#fad20a',
@@ -558,7 +558,9 @@
         413: { message: "Netdata registry server send invalid response to SWITCH ", alert: false },
         414: { message: "Netdata registry SWITCH failed", alert: false },
         415: { message: "Netdata alarms download failed", alert: false },
-        416: { message: "Netdata alarms log download failed", alert: false }
+        416: { message: "Netdata alarms log download failed", alert: false },
+        417: { message: "Netdata registry server send invalid response to SEARCH ", alert: false },
+        418: { message: "Netdata registry SEARCH failed", alert: false }
     };
     NETDATA.errorLast = {
         code: 0,
@@ -3889,7 +3891,7 @@
 
             includeZero: self.data('dygraph-includezero') || ((chart_type === 'stacked')? true : false),
             xRangePad: self.data('dygraph-xrangepad') || 0,
-            yRangePad: self.data('dygraph-yrangepad') || 1,
+            // yRangePad: self.data('dygraph-yrangepad') || 1,
 
             valueRange: self.data('dygraph-valuerange') || null,
 
@@ -3934,7 +3936,7 @@
             drawXGrid: self.data('dygraph-drawxgrid') || undefined,
             drawYGrid: self.data('dygraph-drawygrid') || undefined,
             gridLinePattern: self.data('dygraph-gridlinepattern') || null,
-            gridLineWidth: self.data('dygraph-gridlinewidth') || 0.3,
+            gridLineWidth: self.data('dygraph-gridlinewidth') || 0.4,
             gridLineColor: self.data('dygraph-gridlinecolor') || NETDATA.themes.current.grid,
 
             maxNumberWidth: self.data('dygraph-maxnumberwidth') || 8,
@@ -5506,7 +5508,7 @@
 
     NETDATA.requiredJs = [
         {
-            url: NETDATA.serverDefault + 'lib/bootstrap.min.js',
+            url: NETDATA.serverDefault + 'lib/bootstrap-3.3.7.min.js',
             isAlreadyLoaded: function() {
                 // check if bootstrap is loaded
                 if(typeof $().emulateTransitionEnd == 'function')
@@ -5540,7 +5542,7 @@
             }
         },
         {
-            url: NETDATA.serverDefault + 'css/font-awesome.min.css',
+            url: NETDATA.serverDefault + 'css/font-awesome.min.css?v4.6.3',
             isAlreadyLoaded: function() { return false; }
         },
         {
@@ -6097,6 +6099,31 @@
                 })
                 .fail(function() {
                     NETDATA.error(412, NETDATA.registry.server);
+
+                    if(typeof callback === 'function')
+                        callback(null);
+                });
+        },
+
+        search: function(machine_guid, callback) {
+            // SEARCH for the URLs of a machine:
+            $.ajax({
+                url: NETDATA.registry.server + '/api/v1/registry?action=search&machine=' + NETDATA.registry.machine_guid + '&name=' + encodeURIComponent(NETDATA.registry.hostname) + '&url=' + encodeURIComponent(NETDATA.serverDefault) + '&for=' + machine_guid,
+                async: true,
+                cache: false,
+                xhrFields: { withCredentials: true } // required for the cookie
+            })
+                .done(function(data) {
+                    if(typeof data.status !== 'string' || data.status !== 'ok') {
+                        NETDATA.error(417, NETDATA.registry.server + ' responded with: ' + JSON.stringify(data));
+                        data = null;
+                    }
+
+                    if(typeof callback === 'function')
+                        callback(data);
+                })
+                .fail(function() {
+                    NETDATA.error(418, NETDATA.registry.server);
 
                     if(typeof callback === 'function')
                         callback(null);
