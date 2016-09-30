@@ -10,21 +10,35 @@ int web_server_mode = WEB_SERVER_MODE_MULTI_THREADED;
 #ifdef NETDATA_INTERNAL_CHECKS
 static void log_allocations(void)
 {
-    static int mem = 0;
+#ifdef HAVE_C_MALLINFO
+    static int heap = 0, used = 0, mmap = 0;
 
     struct mallinfo mi;
 
     mi = mallinfo();
-    if(mi.uordblks > mem) {
+    if(mi.uordblks > used) {
         int clients = 0;
         struct web_client *w;
         for(w = web_clients; w ; w = w->next) clients++;
 
-        info("Allocated memory increased from %d to %d (increased by %d bytes). There are %d web clients connected.", mem, mi.uordblks, mi.uordblks - mem, clients);
-        mem = mi.uordblks;
+        info("Allocated memory: used %d KB (+%d B), mmap %d KB (+%d B), heap %d KB (+%d B). %d web clients connected.",
+            mi.uordblks / 1024,
+            mi.uordblks - used,
+            mi.hblkhd / 1024,
+            mi.hblkhd - mmap,
+            mi.arena / 1024,
+            mi.arena - heap,
+            clients);
+
+        used = mi.uordblks;
+        heap = mi.arena;
+        mmap = mi.hblkhd;
     }
+#else /* ! HAVE_C_MALLINFO */
+    ;
+#endif /* ! HAVE_C_MALLINFO */
 }
-#endif
+#endif /* NETDATA_INTERNAL_CHECKS */
 
 #ifndef HAVE_ACCEPT4
 int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {

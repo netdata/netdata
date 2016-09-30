@@ -286,8 +286,6 @@ int main(int argc, char **argv)
     // set the name for logging
     program_name = "netdata";
 
-    // parse command line.
-
     // parse depercated options
     // TODO: Remove this block with the next major release.
     {
@@ -409,6 +407,16 @@ int main(int argc, char **argv)
         load_config(NULL, 0);
 
     {
+        char *pmax = config_get("global", "glibc malloc arena max for plugins", "1");
+        if(pmax && *pmax)
+            setenv("MALLOC_ARENA_MAX", pmax, 1);
+
+#if defined(HAVE_C_MALLOPT)
+        int i = config_get_number("global", "glibc malloc arena max for netdata", 1);
+        if(i > 0)
+            mallopt(M_ARENA_MAX, 1);
+#endif
+
         char *config_dir = config_get("global", "config directory", CONFIG_DIR);
 
         // prepare configuration environment variables for the plugins
