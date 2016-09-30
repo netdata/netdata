@@ -131,11 +131,25 @@ extern int  vsnprintfz(char *dst, size_t n, const char *fmt, va_list args);
 extern int  snprintfz(char *dst, size_t n, const char *fmt, ...) __attribute__ (( format (printf, 3, 4)));
 
 // memory allocation functions that handle failures
+#ifdef NETDATA_LOG_ALLOCATIONS
+#define strdupz(s) strdupz_int(__FILE__, __FUNCTION__, __LINE__, s)
+#define callocz(nmemb, size) callocz_int(__FILE__, __FUNCTION__, __LINE__, nmemb, size)
+#define mallocz(size) mallocz_int(__FILE__, __FUNCTION__, __LINE__, size)
+#define reallocz(ptr, size) reallocz_int(__FILE__, __FUNCTION__, __LINE__, ptr, size)
+#define freez(ptr) freez_int(__FILE__, __FUNCTION__, __LINE__, ptr)
+
+extern char *strdupz_int(const char *file, const char *function, const unsigned long line, const char *s);
+extern void *callocz_int(const char *file, const char *function, const unsigned long line, size_t nmemb, size_t size);
+extern void *mallocz_int(const char *file, const char *function, const unsigned long line, size_t size);
+extern void *reallocz_int(const char *file, const char *function, const unsigned long line, void *ptr, size_t size);
+extern void freez_int(const char *file, const char *function, const unsigned long line, void *ptr);
+#else
 extern char *strdupz(const char *s);
 extern void *callocz(size_t nmemb, size_t size);
 extern void *mallocz(size_t size);
-extern void freez(void *ptr);
 extern void *reallocz(void *ptr, size_t size);
+extern void freez(void *ptr);
+#endif
 
 extern void *mymmap(const char *filename, size_t size, int flags, int ksm);
 extern int savememory(const char *filename, void *mem, size_t size);
