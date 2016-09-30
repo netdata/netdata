@@ -277,7 +277,7 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // the dimensions
 
-    avl_tree_lock dimensions_index;                     // the root of the dimensions index
+    avl_tree_lock dimensions_index;                 // the root of the dimensions index
     RRDDIM *dimensions;                             // the actual data for every dimension
 
 };
@@ -310,6 +310,7 @@ struct rrdhost {
 };
 typedef struct rrdhost RRDHOST;
 extern RRDHOST localhost;
+extern void rrdhost_init(char *hostname);
 
 #ifdef NETDATA_INTERNAL_CHECKS
 #define rrdhost_check_wrlock(host) rrdhost_check_wrlock_int(host, __FILE__, __FUNCTION__, __LINE__)

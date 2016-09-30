@@ -58,7 +58,7 @@ int do_proc_net_stat_synproxy(int update_every, unsigned long long dt) {
 
         st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_entries");
         if(!st) {
-            st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_SYNPROXY "_entries", NULL, RRD_TYPE_NET_STAT_SYNPROXY, NULL, "SYNPROXY Entries Used", "entries", 1004, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_SYNPROXY "_entries", NULL, RRD_TYPE_NET_STAT_SYNPROXY, NULL, "SYNPROXY Entries Used", "entries", 3304, update_every, RRDSET_TYPE_LINE);
 
             rrddim_add(st, "entries", NULL, 1, 1, RRDDIM_ABSOLUTE);
         }
@@ -75,7 +75,7 @@ int do_proc_net_stat_synproxy(int update_every, unsigned long long dt) {
 
         st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_syn_received");
         if(!st) {
-            st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_SYNPROXY "_syn_received", NULL, RRD_TYPE_NET_STAT_SYNPROXY, NULL, "SYNPROXY SYN Packets received", "SYN/s", 1001, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_SYNPROXY "_syn_received", NULL, RRD_TYPE_NET_STAT_SYNPROXY, NULL, "SYNPROXY SYN Packets received", "SYN/s", 3301, update_every, RRDSET_TYPE_LINE);
 
             rrddim_add(st, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
         }
@@ -92,7 +92,7 @@ int do_proc_net_stat_synproxy(int update_every, unsigned long long dt) {
 
         st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_conn_reopened");
         if(!st) {
-            st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_SYNPROXY "_conn_reopened", NULL, RRD_TYPE_NET_STAT_SYNPROXY, NULL, "SYNPROXY Connections Reopened", "connections/s", 1003, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_SYNPROXY "_conn_reopened", NULL, RRD_TYPE_NET_STAT_SYNPROXY, NULL, "SYNPROXY Connections Reopened", "connections/s", 3303, update_every, RRDSET_TYPE_LINE);
 
             rrddim_add(st, "reopened", NULL, 1, 1, RRDDIM_INCREMENTAL);
         }
@@ -109,7 +109,7 @@ int do_proc_net_stat_synproxy(int update_every, unsigned long long dt) {
 
         st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_cookies");
         if(!st) {
-            st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_SYNPROXY "_cookies", NULL, RRD_TYPE_NET_STAT_SYNPROXY, NULL, "SYNPROXY TCP Cookies", "cookies/s", 1002, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_SYNPROXY "_cookies", NULL, RRD_TYPE_NET_STAT_SYNPROXY, NULL, "SYNPROXY TCP Cookies", "cookies/s", 3302, update_every, RRDSET_TYPE_LINE);
 
             rrddim_add(st, "valid", NULL, 1, 1, RRDDIM_INCREMENTAL);
             rrddim_add(st, "invalid", NULL, -1, 1, RRDDIM_INCREMENTAL);

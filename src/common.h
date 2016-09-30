@@ -60,24 +60,16 @@
 #include <zlib.h>
 #endif
 
-#ifndef __ATOMIC_SEQ_CST
-#define NETDATA_NO_ATOMIC_INSTRUCTIONS 1
+#if (SIZEOF_VOID_P == 8)
+#define ENVIRONMENT64
+#elif (SIZEOF_VOID_P == 4)
+#define ENVIRONMENT32
+#else
+#error "Cannot detect if this is a 32 or 64 bit CPU"
 #endif
 
 #ifdef __GNUC__
-#define GCC_VERSION (__GNUC__ * 10000 \
-                               + __GNUC_MINOR__ * 100 \
-                               + __GNUC_PATCHLEVEL__)
-
-#if __x86_64__ || __ppc64__
-#define ENVIRONMENT64
-#else
-#define ENVIRONMENT32
-#endif
-
-#else // !__GNUC__
-#define NETDATA_NO_ATOMIC_INSTRUCTIONS 1
-#define ENVIRONMENT32
+#define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 #endif // __GNUC__
 
 #include "avl.h"
@@ -139,11 +131,25 @@ extern int  vsnprintfz(char *dst, size_t n, const char *fmt, va_list args);
 extern int  snprintfz(char *dst, size_t n, const char *fmt, ...) __attribute__ (( format (printf, 3, 4)));
 
 // memory allocation functions that handle failures
+#ifdef NETDATA_LOG_ALLOCATIONS
+#define strdupz(s) strdupz_int(__FILE__, __FUNCTION__, __LINE__, s)
+#define callocz(nmemb, size) callocz_int(__FILE__, __FUNCTION__, __LINE__, nmemb, size)
+#define mallocz(size) mallocz_int(__FILE__, __FUNCTION__, __LINE__, size)
+#define reallocz(ptr, size) reallocz_int(__FILE__, __FUNCTION__, __LINE__, ptr, size)
+#define freez(ptr) freez_int(__FILE__, __FUNCTION__, __LINE__, ptr)
+
+extern char *strdupz_int(const char *file, const char *function, const unsigned long line, const char *s);
+extern void *callocz_int(const char *file, const char *function, const unsigned long line, size_t nmemb, size_t size);
+extern void *mallocz_int(const char *file, const char *function, const unsigned long line, size_t size);
+extern void *reallocz_int(const char *file, const char *function, const unsigned long line, void *ptr, size_t size);
+extern void freez_int(const char *file, const char *function, const unsigned long line, void *ptr);
+#else
 extern char *strdupz(const char *s);
 extern void *callocz(size_t nmemb, size_t size);
 extern void *mallocz(size_t size);
-extern void freez(void *ptr);
 extern void *reallocz(void *ptr, size_t size);
+extern void freez(void *ptr);
+#endif
 
 extern void *mymmap(const char *filename, size_t size, int flags, int ksm);
 extern int savememory(const char *filename, void *mem, size_t size);
@@ -153,16 +159,23 @@ extern int fd_is_valid(int fd);
 extern char *global_host_prefix;
 extern int enable_ksm;
 
-/* Number of ticks per second */
-extern unsigned int hz;
-extern void get_HZ(void);
-
 extern pid_t gettid(void);
 
 extern unsigned long long time_usec(void);
 extern int sleep_usec(unsigned long long usec);
 
 extern char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len);
+
+extern int processors;
+extern long get_system_cpus(void);
+
+extern pid_t pid_max;
+extern pid_t get_system_pid_max(void);
+
+/* Number of ticks per second */
+extern unsigned int hz;
+extern void get_system_HZ(void);
+
 
 /* fix for alpine linux */
 #ifndef RUSAGE_THREAD

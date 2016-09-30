@@ -105,8 +105,9 @@ typedef struct rrddimvar {
 // having as RRDSET.calculations the RRDCALC to be processed
 // next.
 
-#define RRDCALC_STATUS_UNINITIALIZED  0
+#define RRDCALC_STATUS_REMOVED       -2
 #define RRDCALC_STATUS_UNDEFINED     -1
+#define RRDCALC_STATUS_UNINITIALIZED  0
 #define RRDCALC_STATUS_CLEAR          1
 #define RRDCALC_STATUS_RAISED         2
 #define RRDCALC_STATUS_WARNING        3
@@ -120,52 +121,89 @@ typedef struct rrddimvar {
 #define RRDCALC_FLAG_CRIT_ERROR    0x00000020
 
 typedef struct rrdcalc {
-    char *name;
-    uint32_t hash;
+    uint32_t id;                    // the unique id of this alarm
+    uint32_t next_event_id;         // the next event id that will be used for this alarm
 
-    char *exec;
+    char *name;                     // the name of this alarm
+    uint32_t hash;      
 
-    char *chart;        // the chart id this should be linked to
+    char *exec;                     // the command to execute when this alarm switches state
+    char *recipient;                // the recipient of the alarm (the first parameter to exec)
+
+    char *chart;                    // the chart id this should be linked to
     uint32_t hash_chart;
 
-    char *source;       // the source of this calculation
-    char *units;
-    char *info;
+    char *source;                   // the source of this alarm
+    char *units;                    // the units of the alarm
+    char *info;                     // a short description of the alarm
 
-    char *dimensions;   // the chart dimensions
+    int update_every;               // update frequency for the alarm
 
-    int group;          // grouping method: average, max, etc.
-    int before;         // ending point in time-series
-    int after;          // starting point in time-series
-    uint32_t options;   // calculation options
-    int update_every;   // update frequency for the calculation
-
-    time_t last_updated;
-    time_t next_update;
-
-    EVAL_EXPRESSION *calculation;
-    EVAL_EXPRESSION *warning;
-    EVAL_EXPRESSION *critical;
-
-    uint32_t rrdcalc_flags;
-    int status;
-
-    time_t db_after;
-    time_t db_before;
-    time_t last_status_change;
-
-    calculated_number value;
-    calculated_number old_value;
-
+    // the red and green threshold of this alarm (to be set to the chart)
     calculated_number green;
     calculated_number red;
+
+    // ------------------------------------------------------------------------
+    // database lookup settings
+
+    char *dimensions;               // the chart dimensions
+    int group;                      // grouping method: average, max, etc.
+    int before;                     // ending point in time-series
+    int after;                      // starting point in time-series
+    uint32_t options;               // calculation options
+
+    // ------------------------------------------------------------------------
+    // expressions related to the alarm
+
+    EVAL_EXPRESSION *calculation;   // expression to calculate the value of the alarm
+    EVAL_EXPRESSION *warning;       // expression to check the warning condition
+    EVAL_EXPRESSION *critical;      // expression to check the critical condition
+
+    // ------------------------------------------------------------------------
+    // notification delay settings
+
+    int delay_up_duration;         // duration to delay notifications when alarm raises
+    int delay_down_duration;       // duration to delay notifications when alarm lowers
+    int delay_max_duration;        // the absolute max delay to apply to this alarm
+    float delay_multiplier;        // multiplier for all delays when alarms switch status
+                                   // while now < delay_up_to
+
+    // ------------------------------------------------------------------------
+    // runtime information
+
+    int status;                     // the current status of the alarm
+
+    calculated_number value;        // the current value of the alarm
+    calculated_number old_value;    // the previous value of the alarm
+
+    uint32_t rrdcalc_flags;         // check RRDCALC_FLAG_*
+
+    time_t last_updated;            // the last update timestamp of the alarm
+    time_t next_update;             // the next update timestamp of the alarm
+    time_t last_status_change;      // the timestamp of the last time this alarm changed status
+
+    time_t db_after;                // the first timestamp evaluated by the db lookup
+    time_t db_before;               // the last timestamp evaluated by the db lookup
+
+    time_t delay_up_to_timestamp;   // the timestamp up to which we should delay notifications
+    int delay_up_current;           // the current up notification delay duration
+    int delay_down_current;         // the current down notification delay duration
+    int delay_last;                 // the last delay we used
+
+    // ------------------------------------------------------------------------
+    // variables this alarm exposes to the rest of the alarms
 
     RRDVAR *local;
     RRDVAR *family;
     RRDVAR *hostid;
     RRDVAR *hostname;
 
+    // ------------------------------------------------------------------------
+    // the chart this alarm it is linked to
+
     struct rrdset *rrdset;
+
+    // linking of this alarm on its chart
     struct rrdcalc *rrdset_next;
     struct rrdcalc *rrdset_prev;
 
@@ -182,28 +220,44 @@ typedef struct rrdcalctemplate {
     uint32_t hash_name;
 
     char *exec;
+    char *recipient;
 
     char *context;
     uint32_t hash_context;
 
-    char *source;       // the source of this template
-    char *units;
-    char *info;
+    char *source;                   // the source of this alarm
+    char *units;                    // the units of the alarm
+    char *info;                     // a short description of the alarm
 
-    char *dimensions;
+    int update_every;               // update frequency for the alarm
 
-    int group;          // grouping method: average, max, etc.
-    int before;         // ending point in time-series
-    int after;          // starting point in time-series
-    uint32_t options;   // calculation options
-    int update_every;   // update frequency for the calculation
+    // the red and green threshold of this alarm (to be set to the chart)
+    calculated_number green;
+    calculated_number red;
+
+    // ------------------------------------------------------------------------
+    // database lookup settings
+
+    char *dimensions;               // the chart dimensions
+    int group;                      // grouping method: average, max, etc.
+    int before;                     // ending point in time-series
+    int after;                      // starting point in time-series
+    uint32_t options;               // calculation options
+
+    // ------------------------------------------------------------------------
+    // notification delay settings
+
+    int delay_up_duration;         // duration to delay notifications when alarm raises
+    int delay_down_duration;       // duration to delay notifications when alarm lowers
+    int delay_max_duration;        // the absolute max delay to apply to this alarm
+    float delay_multiplier;        // multiplier for all delays when alarms switch status
+
+    // ------------------------------------------------------------------------
+    // expressions related to the alarm
 
     EVAL_EXPRESSION *calculation;
     EVAL_EXPRESSION *warning;
     EVAL_EXPRESSION *critical;
-
-    calculated_number green;
-    calculated_number red;
 
     struct rrdcalctemplate *next;
 } RRDCALCTEMPLATE;
@@ -216,7 +270,9 @@ typedef struct rrdcalctemplate {
 #define HEALTH_ENTRY_NOTIFICATIONS_EXEC_FAILED  0x00000008
 
 typedef struct alarm_entry {
-    uint32_t id;
+    uint32_t unique_id;
+    uint32_t alarm_id;
+    uint32_t alarm_event_id;
 
     time_t when;
     time_t duration;
@@ -231,6 +287,8 @@ typedef struct alarm_entry {
     char *family;
 
     char *exec;
+    char *recipient;
+    time_t exec_run_timestamp;
     int exec_code;
 
     char *source;
@@ -244,12 +302,18 @@ typedef struct alarm_entry {
 
     uint32_t notifications;
 
-    struct alarm_entry *updated_by;
+    int delay;
+    time_t delay_up_to_timestamp;
+
+    uint32_t updated_by_id;
+    uint32_t updates_id;
+    
     struct alarm_entry *next;
 } ALARM_ENTRY;
 
 typedef struct alarm_log {
-    uint32_t nextid;
+    uint32_t next_log_id;
+    uint32_t next_alarm_id;
     unsigned int count;
     unsigned int max;
     ALARM_ENTRY *alarms;
@@ -278,6 +342,6 @@ extern void health_reload(void);
 
 extern int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, calculated_number *result);
 extern void health_alarms2json(RRDHOST *host, BUFFER *wb, int all);
-extern void health_alarm_log2json(RRDHOST *host, BUFFER *wb);
+extern void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after);
 
 #endif //NETDATA_HEALTH_H

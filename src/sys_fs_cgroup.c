@@ -160,9 +160,13 @@ struct cpuacct_usage {
     unsigned long long *cpu_percpu;
 };
 
+#define CGROUP_OPTIONS_DISABLED_DUPLICATE 0x00000001
+
 struct cgroup {
-    int available;      // found in the filesystem
-    int enabled;        // enabled in the config
+    uint32_t options;
+
+    char available;      // found in the filesystem
+    char enabled;        // enabled in the config
 
     char *id;
     uint32_t hash;
@@ -714,11 +718,18 @@ struct cgroup *cgroup_add(const char *id) {
                 if (!strncmp(t->chart_id, "/system.slice/", 14) && !strncmp(cg->chart_id, "/init.scope/system.slice/", 25)) {
                     error("Control group with chart id '%s' already exists with id '%s' and is enabled. Swapping them by enabling cgroup with id '%s' and disabling cgroup with id '%s'.",
                           cg->chart_id, t->id, cg->id, t->id);
+                    debug(D_CGROUP, "Control group with chart id '%s' already exists with id '%s' and is enabled. Swapping them by enabling cgroup with id '%s' and disabling cgroup with id '%s'.",
+                          cg->chart_id, t->id, cg->id, t->id);
                     t->enabled = 0;
-                } else {
-                    error("Control group with chart id '%s' already exists with id '%s' and is enabled. Disabling cgroup with id '%s'.",
+                    t->options |= CGROUP_OPTIONS_DISABLED_DUPLICATE;
+                }
+                else {
+                    error("Control group with chart id '%s' already exists with id '%s' and is enabled and available. Disabling cgroup with id '%s'.",
+                          cg->chart_id, t->id, cg->id);
+                    debug(D_CGROUP, "Control group with chart id '%s' already exists with id '%s' and is enabled and available. Disabling cgroup with id '%s'.",
                           cg->chart_id, t->id, cg->id);
                     cg->enabled = 0;
+                    cg->options |= CGROUP_OPTIONS_DISABLED_DUPLICATE;
                 }
 
                 break;
@@ -865,8 +876,9 @@ void mark_all_cgroups_as_not_available() {
     struct cgroup *cg;
 
     // mark all as not available
-    for(cg = cgroup_root; cg ; cg = cg->next)
+    for(cg = cgroup_root; cg ; cg = cg->next) {
         cg->available = 0;
+    }
 }
 
 void cleanup_all_cgroups() {
@@ -874,6 +886,18 @@ void cleanup_all_cgroups() {
 
     for(; cg ;) {
         if(!cg->available) {
+            // enable the first duplicate cgroup
+            {
+                struct cgroup *t;
+                for(t = cgroup_root; t ; t = t->next) {
+                    if(t != cg && t->available && !t->enabled && t->options & CGROUP_OPTIONS_DISABLED_DUPLICATE && t->hash_chart == cg->hash_chart && !strcmp(t->chart_id, cg->chart_id)) {
+                        debug(D_CGROUP, "Enabling duplicate of cgroup '%s' with id '%s', because the original with id '%s' stopped.", t->chart_id, t->id, cg->id);
+                        t->enabled = 1;
+                        t->options &= ~CGROUP_OPTIONS_DISABLED_DUPLICATE;
+                        break;
+                    }
+                }
+            }
 
             if(!last)
                 cgroup_root = cg->next;
@@ -1053,7 +1077,7 @@ void update_cgroup_charts(int update_every) {
         if(cg->cpuacct_stat.updated) {
             st = rrdset_find_bytype(type, "cpu");
             if(!st) {
-                snprintfz(title, CHART_TITLE_MAX, "CPU Usage for cgroup %s", cg->chart_title);
+                snprintfz(title, CHART_TITLE_MAX, "CPU Usage (%d%% = %d core%s) for cgroup %s", (processors * 100), processors, (processors>1)?"s":"", cg->chart_title);
                 st = rrdset_create(type, "cpu", NULL, "cpu", "cgroup.cpu", title, "%", 40000, update_every, RRDSET_TYPE_STACKED);
 
                 rrddim_add(st, "user", NULL, 100, hz, RRDDIM_INCREMENTAL);
@@ -1072,7 +1096,7 @@ void update_cgroup_charts(int update_every) {
 
             st = rrdset_find_bytype(type, "cpu_per_core");
             if(!st) {
-                snprintfz(title, CHART_TITLE_MAX, "CPU Usage Per Core for cgroup %s", cg->chart_title);
+                snprintfz(title, CHART_TITLE_MAX, "CPU Usage (%d%% = %d core%s) Per Core for cgroup %s", (processors * 100), processors, (processors>1)?"s":"", cg->chart_title);
                 st = rrdset_create(type, "cpu_per_core", NULL, "cpu", "cgroup.cpu_per_core", title, "%", 40100, update_every, RRDSET_TYPE_STACKED);
 
                 for(i = 0; i < cg->cpuacct_usage.cpus ;i++) {
@@ -1302,7 +1326,7 @@ int do_sys_fs_cgroup(int update_every, unsigned long long dt) {
 
 void *cgroups_main(void *ptr)
 {
-    if(ptr) { ; }
+    (void)ptr;
 
     info("CGROUP Plugin thread created with task id %d", gettid());
 
@@ -1327,7 +1351,7 @@ void *cgroups_main(void *ptr)
 
     RRDSET *stcpu_thread = NULL;
 
-    for(;1;) {
+    for(;;) {
         if(unlikely(netdata_exit)) break;
 
         // delay until it is our time to run
@@ -1371,6 +1395,8 @@ void *cgroups_main(void *ptr)
             rrdset_done(stcpu_thread);
         }
     }
+
+    info("CGROUP thread exiting");
 
     pthread_exit(NULL);
     return NULL;

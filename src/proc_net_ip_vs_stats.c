@@ -44,7 +44,7 @@ int do_proc_net_ip_vs_stats(int update_every, unsigned long long dt) {
     if(do_sockets) {
         st = rrdset_find(RRD_TYPE_NET_IPVS ".sockets");
         if(!st) {
-            st = rrdset_create(RRD_TYPE_NET_IPVS, "sockets", NULL, RRD_TYPE_NET_IPVS, NULL, "IPVS New Connections", "connections/s", 1001, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create(RRD_TYPE_NET_IPVS, "sockets", NULL, RRD_TYPE_NET_IPVS, NULL, "IPVS New Connections", "connections/s", 3101, update_every, RRDSET_TYPE_LINE);
 
             rrddim_add(st, "connections", NULL, 1, 1, RRDDIM_INCREMENTAL);
         }
@@ -59,7 +59,7 @@ int do_proc_net_ip_vs_stats(int update_every, unsigned long long dt) {
     if(do_packets) {
         st = rrdset_find(RRD_TYPE_NET_IPVS ".packets");
         if(!st) {
-            st = rrdset_create(RRD_TYPE_NET_IPVS, "packets", NULL, RRD_TYPE_NET_IPVS, NULL, "IPVS Packets", "packets/s", 1002, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create(RRD_TYPE_NET_IPVS, "packets", NULL, RRD_TYPE_NET_IPVS, NULL, "IPVS Packets", "packets/s", 3102, update_every, RRDSET_TYPE_LINE);
 
             rrddim_add(st, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
             rrddim_add(st, "sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
@@ -76,7 +76,7 @@ int do_proc_net_ip_vs_stats(int update_every, unsigned long long dt) {
     if(do_bandwidth) {
         st = rrdset_find(RRD_TYPE_NET_IPVS ".net");
         if(!st) {
-            st = rrdset_create(RRD_TYPE_NET_IPVS, "net", NULL, RRD_TYPE_NET_IPVS, NULL, "IPVS Bandwidth", "kilobits/s", 1000, update_every, RRDSET_TYPE_AREA);
+            st = rrdset_create(RRD_TYPE_NET_IPVS, "net", NULL, RRD_TYPE_NET_IPVS, NULL, "IPVS Bandwidth", "kilobits/s", 3100, update_every, RRDSET_TYPE_AREA);
 
             rrddim_add(st, "received", NULL, 8, 1024, RRDDIM_INCREMENTAL);
             rrddim_add(st, "sent", NULL, -8, 1024, RRDDIM_INCREMENTAL);

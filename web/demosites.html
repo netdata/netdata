@@ -18,8 +18,9 @@
     <meta property="og:site_name" content="netdata"/>
     <meta property="og:title" content="netdata - real-time performance monitoring, done right!"/>
     <meta property="og:description" content="Stunning real-time dashboards, blazingly fast and extremely interactive. Zero configuration, zero dependencies, zero maintenance." />
+</head>
 
-    <script>
+<script>
     // --- OPTIONS FOR THE DASHBOARD --
 
     // this section has to appear before loading dashboard.js
@@ -51,7 +52,7 @@
         and that you have chown it to be owned by netdata:netdata
     -->
     <!-- <script type="text/javascript" src="http://my.server:19999/dashboard.js"></script> -->
-    <script type="text/javascript" src="dashboard.js?v42"></script>
+    <script type="text/javascript" src="dashboard.js?v55"></script>
 
     <script>
     // --- OPTIONS FOR THE CHARTS --
@@ -71,103 +72,100 @@
 
     // set this to false, to always update the charts, even if focus is lost
     NETDATA.options.current.stop_updates_when_focus_is_lost = true;
-    </script>
-
-    <style>
-
-body {
-    font-size: 1vw;
-}
-
-.mysparkline {
-    position: relative;
-    display: inline-block;
-    min-height: 50px;
-    width: 100%;
-    height: 8vmax;
-    text-align: left;
-}
-
-.mysparkline-overchart-label {
-    position: absolute;
-    display: block;
-    top: 0;
-    left: 10px;
-    bottom: 0;
-    right: 0;
-    font-size: 1vmax;
-    z-index: 1;
-}
-
-.mysparkline-overchart-value {
-    position: absolute;
-    display: block;
-    top: 1.1vmax;
-    left: 10px;
-    bottom: 0;
-    right: 0;
-    font-size: 5vmax;
-    z-index: 2;
-    text-shadow: #333 0px 0px 2px;
-}
-
-.myfullchart {
-    position: relative;
-    display: inline-block;
-    width: 100%;
-    height: 14vmax;
-    min-height: 150px;
-    text-align: left;
-}
-
-.mygauge-combo {
-    display: inline-block;
-}
-
-.mygauge {
-    position: relative;
-    display: block;
-    width: 18vw;
-    height: 11vw;
-}
-
-.mygauge-button {
-    display: block;
-}
-
-.mytitle {
-    padding-top: 6vw;
-    padding-bottom: 1vw;
-    text-align: center;
-    font-size: 2.4vw;
-}
-
-.mysubtitle {
-    padding-top: 2vw;
-    padding-bottom: 1vw;
-    text-align: center;
-    font-size: 1.8vw;
-}
-
-.mycontent {
-    text-align: center;
-    font-size: 1.5vw;
-}
-
-@media only screen and (min-width : 992px) {
-    .container {
-        width: 90%;
+</script>
+<style>
+    body {
+        font-size: 1vw;
     }
-}
-@media only screen and (max-width : 992px) {
-    .container {
+
+    .mysparkline {
+        position: relative;
+        display: inline-block;
+        min-height: 50px;
         width: 100%;
+        height: 8vmax;
+        text-align: left;
     }
-}
-    </style>
 
-</head>
-<body style="text-align: center;">
+    .mysparkline-overchart-label {
+        position: absolute;
+        display: block;
+        top: 0;
+        left: 10px;
+        bottom: 0;
+        right: 0;
+        font-size: 1vmax;
+        z-index: 1;
+    }
+
+    .mysparkline-overchart-value {
+        position: absolute;
+        display: block;
+        top: 1.1vmax;
+        left: 10px;
+        bottom: 0;
+        right: 0;
+        font-size: 5vmax;
+        z-index: 2;
+        text-shadow: #333 0px 0px 2px;
+    }
+
+    .myfullchart {
+        position: relative;
+        display: inline-block;
+        width: 100%;
+        height: 14vmax;
+        min-height: 150px;
+        text-align: left;
+    }
+
+    .mygauge-combo {
+        display: inline-block;
+    }
+
+    .mygauge {
+        position: relative;
+        display: block;
+        width: 18vw;
+        height: 11vw;
+    }
+
+    .mygauge-button {
+        display: block;
+    }
+
+    .mytitle {
+        padding-top: 6vw;
+        padding-bottom: 1vw;
+        text-align: center;
+        font-size: 2.4vw;
+    }
+
+    .mysubtitle {
+        padding-top: 2vw;
+        padding-bottom: 1vw;
+        text-align: center;
+        font-size: 1.8vw;
+    }
+
+    .mycontent {
+        text-align: center;
+        font-size: 1.5vw;
+    }
+
+    @media only screen and (min-width : 992px) {
+        .container {
+            width: 80%;
+        }
+    }
+    @media only screen and (max-width : 992px) {
+        .container {
+            width: 100%;
+        }
+    }
+</style>
+
+<body style="text-align: center; background-color: #272b30;">
 
 <div class="container">
 

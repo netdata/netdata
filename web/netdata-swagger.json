@@ -5,7 +5,7 @@
         "description": "Real time data collection and graphs...",
         "version": "1.2.1_master"
     },
-    "host": "netdata.firehol.org",
+    "host": "registry.my-netdata.io",
     "schemes": [
         "http"
     ],

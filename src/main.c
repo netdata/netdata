@@ -276,19 +276,15 @@ static const char *verify_required_directory(const char *dir) {
 
 int main(int argc, char **argv)
 {
+    char *hostname = "localhost";
     int i, check_config = 0;
     int config_loaded = 0;
     int dont_fork = 0;
     size_t wanted_stacksize = 0, stacksize = 0;
     pthread_attr_t attr;
 
-    // global initialization
-    get_HZ();
-
     // set the name for logging
     program_name = "netdata";
-
-    // parse command line.
 
     // parse depercated options
     // TODO: Remove this block with the next major release.
@@ -411,6 +407,16 @@ int main(int argc, char **argv)
         load_config(NULL, 0);
 
     {
+        char *pmax = config_get("global", "glibc malloc arena max for plugins", "1");
+        if(pmax && *pmax)
+            setenv("MALLOC_ARENA_MAX", pmax, 1);
+
+#if defined(HAVE_C_MALLOPT)
+        int i = config_get_number("global", "glibc malloc arena max for netdata", 1);
+        if(i > 0)
+            mallopt(M_ARENA_MAX, 1);
+#endif
+
         char *config_dir = config_get("global", "config directory", CONFIG_DIR);
 
         // prepare configuration environment variables for the plugins
@@ -471,13 +477,18 @@ int main(int argc, char **argv)
         global_host_prefix = config_get("global", "host access prefix", "");
         setenv("NETDATA_HOST_PREFIX", global_host_prefix, 1);
 
+        get_system_HZ();
+        get_system_cpus();
+        get_system_pid_max();
+        
         // --------------------------------------------------------------------
 
         stdout_filename    = config_get("global", "debug log",  LOG_DIR "/debug.log");
         stderr_filename    = config_get("global", "error log",  LOG_DIR "/error.log");
         stdaccess_filename = config_get("global", "access log", LOG_DIR "/access.log");
 
-        error_log_throttle_period = config_get_number("global", "errors flood protection period", error_log_throttle_period);
+        error_log_throttle_period_backup =
+            error_log_throttle_period = config_get_number("global", "errors flood protection period", error_log_throttle_period);
         setenv("NETDATA_ERRORS_THROTTLE_PERIOD", config_get("global", "errors flood protection period"    , ""), 1);
 
         error_log_errors_per_period = (unsigned long)config_get_number("global", "errors to trigger flood protection", error_log_errors_per_period);
@@ -488,6 +499,7 @@ int main(int argc, char **argv)
             error_log_throttle_period = 0;
             error_log_errors_per_period = 0;
         }
+        error_log_limit_unlimited();
 
         // --------------------------------------------------------------------
 
@@ -647,6 +659,11 @@ int main(int argc, char **argv)
     }
 
     // ------------------------------------------------------------------------
+    // initialize rrd host
+
+    rrdhost_init(hostname);
+
+    // ------------------------------------------------------------------------
     // initialize the registry
 
     registry_init();
@@ -658,6 +675,11 @@ int main(int argc, char **argv)
 
     if(check_config)
         exit(1);
+
+    // ------------------------------------------------------------------------
+    // enable log flood protection
+
+    error_log_limit_reset();
 
     // ------------------------------------------------------------------------
     // spawn the threads

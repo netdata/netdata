@@ -4,12 +4,13 @@
 #define WEB_DATA_LENGTH_INCREASE_STEP 1024
 
 typedef struct web_buffer {
-    size_t size;        // allocation size of buffer
-    size_t len;     // current data length in buffer
-    char *buffer;   // the buffer
-    uint8_t contenttype;
-    uint8_t options;
-    time_t date;    // the date this content has been generated
+    size_t size;        	// allocation size of buffer, in bytes
+    size_t len;     		// current data length in buffer, in bytes
+    char *buffer;   		// the buffer itself
+    uint8_t contenttype;	// the content type of the data in the buffer
+    uint8_t options;		// options related to the content
+    time_t date;    		// the timestamp this content has been generated
+    time_t expires;			// the timestamp this content expires
 } BUFFER;
 
 // options
@@ -38,6 +39,9 @@ typedef struct web_buffer {
 #define CT_IMAGE_XICON                  19
 #define CT_IMAGE_ICNS                   20
 #define CT_IMAGE_BMP                    21
+
+#define buffer_cacheable(wb)    do { (wb)->options |= WB_CONTENT_CACHEABLE;    if((wb)->options & WB_CONTENT_NO_CACHEABLE) (wb)->options &= ~WB_CONTENT_NO_CACHEABLE; } while(0)
+#define buffer_no_cacheable(wb) do { (wb)->options |= WB_CONTENT_NO_CACHEABLE; if((wb)->options & WB_CONTENT_CACHEABLE)    (wb)->options &= ~WB_CONTENT_CACHEABLE;  (wb)->expires = 0; } while(0)
 
 #define buffer_strlen(wb) ((wb)->len)
 extern const char *buffer_tostring(BUFFER *wb);

@@ -27,11 +27,7 @@ static int nfacct_callback(const struct nlmsghdr *nlh, void *data) {
 
         info("nfacct.plugin: increasing nfacct_list to size %d", size);
 
-        nfacct_list = realloc(nfacct_list, sizeof(struct nfacct_list) + (sizeof(struct mynfacct) * size));
-        if(!nfacct_list) {
-            error("nfacct.plugin: cannot allocate nfacct_list.");
-            return MNL_CB_OK;
-        }
+        nfacct_list = reallocz(nfacct_list, sizeof(struct nfacct_list) + (sizeof(struct mynfacct) * size));
 
         nfacct_list->data[len].nfacct = nfacct_alloc();
         if(!nfacct_list->data[size - 1].nfacct) {
@@ -150,7 +146,7 @@ void *nfacct_main(void *ptr) {
 
             st = rrdset_find_bytype("netfilter", "nfacct_packets");
             if(!st) {
-                st = rrdset_create("netfilter", "nfacct_packets", NULL, "nfacct", NULL, "Netfilter Accounting Packets", "packets/s", 1006, rrd_update_every, RRDSET_TYPE_STACKED);
+                st = rrdset_create("netfilter", "nfacct_packets", NULL, "nfacct", NULL, "Netfilter Accounting Packets", "packets/s", 3206, rrd_update_every, RRDSET_TYPE_STACKED);
 
                 for(i = 0; i < nfacct_list->len ; i++)
                     rrddim_add(st, nfacct_list->data[i].name, NULL, 1, rrd_update_every, RRDDIM_INCREMENTAL);
@@ -170,7 +166,7 @@ void *nfacct_main(void *ptr) {
 
             st = rrdset_find_bytype("netfilter", "nfacct_bytes");
             if(!st) {
-                st = rrdset_create("netfilter", "nfacct_bytes", NULL, "nfacct", NULL, "Netfilter Accounting Bandwidth", "kilobytes/s", 1007, rrd_update_every, RRDSET_TYPE_STACKED);
+                st = rrdset_create("netfilter", "nfacct_bytes", NULL, "nfacct", NULL, "Netfilter Accounting Bandwidth", "kilobytes/s", 3207, rrd_update_every, RRDSET_TYPE_STACKED);
 
                 for(i = 0; i < nfacct_list->len ; i++)
                     rrddim_add(st, nfacct_list->data[i].name, NULL, 1, 1000 * rrd_update_every, RRDDIM_INCREMENTAL);
@@ -192,7 +188,7 @@ void *nfacct_main(void *ptr) {
         usleep(susec);
 
         // copy current to last
-        bcopy(&now, &last, sizeof(struct timeval));
+        memmove(&last, &now, sizeof(struct timeval));
     }
 
     mnl_socket_close(nl);

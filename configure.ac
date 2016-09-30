@@ -72,6 +72,11 @@ AC_ARG_WITH(
 	,
 	[with_user="nobody"]
 )
+AC_ARG_ENABLE([x86-sse],
+	AS_HELP_STRING([--enable-x86-sse=yes|no], [enable SSE/SS2 optimizations on x86 [default=yes]]),
+	,
+	[enable_x86_sse="yes"]
+)
 
 ACX_PTHREAD(, [AC_MSG_ERROR([Cannot initialize pthread environment])])
 LIBS="${PTHREAD_LIBS} ${LIBS}"
@@ -82,6 +87,23 @@ AC_TYPE_UINT8_T
 AC_TYPE_UINT16_T
 AC_TYPE_UINT32_T
 AC_C_INLINE
+AC_FUNC_STRERROR_R
+AC_C_MALLOPT
+AC_C_MALLINFO
+AC_C__GENERIC
+AC_C___ATOMIC
+AC_CHECK_SIZEOF([void *])
+AC_CANONICAL_HOST
+
+AC_ARG_VAR([SSE_CANDIDATE], [C compiler flags for SSE])
+AS_CASE([$host_cpu],
+	[i?86], [SSE_CANDIDATE="yes"]
+)
+AC_SUBST([SSE_CANDIDATE])
+if test "${SSE_CANDIDATE}" = "yes" -a "${enable_x86_sse}" = "yes"; then
+	opt="-msse2 -mfpmath=sse"
+	AX_CHECK_COMPILE_FLAG($opt, [CFLAGS="$CFLAGS $opt"], [])
+fi
 
 AC_ARG_VAR([MATH_CFLAGS], [C compiler flags for math])
 AC_ARG_VAR([MATH_LIBS], [linker flags for math])

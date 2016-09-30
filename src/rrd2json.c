@@ -1,8 +1,5 @@
 #include "common.h"
 
-#define HOSTNAME_MAX 1024
-char *hostname = "unknown";
-
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb)
 {
     pthread_rwlock_rdlock(&st->rwlock);
@@ -84,7 +81,7 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
         ",\n\t\"update_every\": %d"
         ",\n\t\"history\": %d"
         ",\n\t\"charts\": {"
-        , hostname
+        , localhost.hostname
         , rrd_update_every
         , rrd_default_history_entries
         );
@@ -246,7 +243,7 @@ void rrd_stats_all_json(BUFFER *wb)
         "\t\"history\": %d,\n"
         "\t\"memory\": %lu\n"
         "}\n"
-        , hostname
+        , localhost.hostname
         , rrd_update_every
         , rrd_default_history_entries
         , memory
@@ -1217,13 +1214,13 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
         absolute_period_requested = 0;
     }
 
-    // allow relative for before and after
-    if(((before < 0)?-before:before) <= (st->update_every * st->entries)) {
+    // allow relative for before and after (smaller than 3 years)
+    if(((before < 0)?-before:before) <= (3 * 365 * 86400)) {
         before = last_entry_t + before;
         absolute_period_requested = 0;
     }
 
-    if(((after < 0)?-after:after) <= (st->update_every * st->entries)) {
+    if(((after < 0)?-after:after) <= (3 * 365 * 86400)) {
         if(after == 0) after = -st->update_every;
         after = before + after;
         absolute_period_requested = 0;
@@ -1567,9 +1564,9 @@ int rrd2value(RRDSET *st, BUFFER *wb, calculated_number *n, const char *dimensio
     }
 
     if(r->result_options & RRDR_RESULT_OPTION_RELATIVE)
-        wb->options |= WB_CONTENT_NO_CACHEABLE;
+        buffer_no_cacheable(wb);
     else if(r->result_options & RRDR_RESULT_OPTION_ABSOLUTE)
-        wb->options |= WB_CONTENT_CACHEABLE;
+        buffer_cacheable(wb);
 
     options = rrdr_check_options(r, options, dimensions);
 
@@ -1595,9 +1592,9 @@ int rrd2format(RRDSET *st, BUFFER *wb, BUFFER *dimensions, uint32_t format, long
     }
 
     if(r->result_options & RRDR_RESULT_OPTION_RELATIVE)
-        wb->options |= WB_CONTENT_NO_CACHEABLE;
+        buffer_no_cacheable(wb);
     else if(r->result_options & RRDR_RESULT_OPTION_ABSOLUTE)
-        wb->options |= WB_CONTENT_CACHEABLE;
+        buffer_cacheable(wb);
 
     options = rrdr_check_options(r, options, (dimensions)?buffer_tostring(dimensions):NULL);
 

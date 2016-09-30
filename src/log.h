@@ -45,14 +45,14 @@ extern int access_log_syslog;
 extern int error_log_syslog;
 extern int output_log_syslog;
 
-extern time_t error_log_throttle_period;
+extern time_t error_log_throttle_period, error_log_throttle_period_backup;
 extern unsigned long error_log_errors_per_period;
 extern int error_log_limit(int reset);
 
 extern void open_all_log_files();
 extern void reopen_all_log_files();
 
-#define error_log_limit_reset() do { error_log_limit(1); } while(0)
+#define error_log_limit_reset() do { error_log_throttle_period = error_log_throttle_period_backup; error_log_limit(1); } while(0)
 #define error_log_limit_unlimited() do { error_log_throttle_period = 0; } while(0)
 
 #define debug(type, args...) do { if(unlikely(debug_flags & type)) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)

@@ -14,31 +14,141 @@ volatile sig_atomic_t netdata_exit = 0;
 // its lifetime), these can be used to override the default system allocation
 // routines.
 
+#ifdef NETDATA_LOG_ALLOCATIONS
+static struct memory_statistics {
+    size_t malloc_calls_made;
+    size_t calloc_calls_made;
+    size_t realloc_calls_made;
+    size_t strdup_calls_made;
+    size_t free_calls_made;
+    size_t memory_calls_made;
+    size_t allocated_memory;
+    size_t mmapped_memory;
+} memory_statistics = {
+        0, 0, 0, 0, 0, 0, 0, 0
+};
+
+static inline void print_allocations(const char *file, const char *function, const unsigned long line) {
+    static struct memory_statistics old = { 0, 0, 0, 0, 0, 0, 0, 0 };
+
+    //if(unlikely(!(memory_statistics.memory_calls_made % 5))) {
+        fprintf(stderr, "(%04lu@%-10.10s:%-15.15s): Allocated %zu KB (+%zu B), mmapped %zu KB (+%zu B): malloc %zu (+%zu), calloc %zu (+%zu), realloc %zu (+%zu), strdup %zu (+%zu), free %zu (+%zu)\n",
+                line, file, function,
+                (memory_statistics.allocated_memory + 512) / 1024, memory_statistics.allocated_memory - old.allocated_memory,
+                (memory_statistics.mmapped_memory + 512) / 1024, memory_statistics.mmapped_memory - old.mmapped_memory,
+                memory_statistics.malloc_calls_made, memory_statistics.malloc_calls_made - old.malloc_calls_made,
+                memory_statistics.calloc_calls_made, memory_statistics.calloc_calls_made - old.calloc_calls_made,
+                memory_statistics.realloc_calls_made, memory_statistics.realloc_calls_made - old.realloc_calls_made,
+                memory_statistics.strdup_calls_made, memory_statistics.strdup_calls_made - old.strdup_calls_made,
+                memory_statistics.free_calls_made, memory_statistics.free_calls_made - old.free_calls_made
+        );
+
+        memcpy(&old, &memory_statistics, sizeof(struct memory_statistics));
+    //}
+}
+
+static inline void malloc_accounting(const char *file, const char *function, const unsigned long line, size_t size) {
+    memory_statistics.memory_calls_made++;
+    memory_statistics.malloc_calls_made++;
+    memory_statistics.allocated_memory += size;
+    print_allocations(file, function, line);
+}
+
+static inline void mmap_accounting(size_t size) {
+    memory_statistics.memory_calls_made++;
+    memory_statistics.mmapped_memory += size;
+}
+
+static inline void calloc_accounting(const char *file, const char *function, const unsigned long line, size_t size) {
+    memory_statistics.memory_calls_made++;
+    memory_statistics.calloc_calls_made++;
+    memory_statistics.allocated_memory += size;
+    print_allocations(file, function, line);
+}
+
+static inline void realloc_accounting(const char *file, const char *function, const unsigned long line, void *ptr, size_t size) {
+    (void)ptr;
+
+    memory_statistics.memory_calls_made++;
+    memory_statistics.realloc_calls_made++;
+    memory_statistics.allocated_memory += size;
+    print_allocations(file, function, line);
+}
+
+static inline void strdup_accounting(const char *file, const char *function, const unsigned long line, const char *s) {
+    memory_statistics.memory_calls_made++;
+    memory_statistics.strdup_calls_made++;
+    memory_statistics.allocated_memory += strlen(s) + 1;
+    print_allocations(file, function, line);
+}
+
+static inline void free_accounting(const char *file, const char *function, const unsigned long line, void *ptr) {
+    (void)file;
+    (void)function;
+    (void)line;
+
+    if(likely(ptr)) {
+        memory_statistics.memory_calls_made++;
+        memory_statistics.free_calls_made++;
+    }
+}
+#endif
+
+#ifdef NETDATA_LOG_ALLOCATIONS
+char *strdupz_int(const char *file, const char *function, const unsigned long line, const char *s) {
+    strdup_accounting(file, function, line, s);
+#else
 char *strdupz(const char *s) {
+#endif
+
     char *t = strdup(s);
     if (unlikely(!t)) fatal("Cannot strdup() string '%s'", s);
     return t;
 }
 
+#ifdef NETDATA_LOG_ALLOCATIONS
+void *mallocz_int(const char *file, const char *function, const unsigned long line, size_t size) {
+    malloc_accounting(file, function, line, size);
+#else
 void *mallocz(size_t size) {
+#endif
+
     void *p = malloc(size);
     if (unlikely(!p)) fatal("Cannot allocate %zu bytes of memory.", size);
     return p;
 }
 
+#ifdef NETDATA_LOG_ALLOCATIONS
+void *callocz_int(const char *file, const char *function, const unsigned long line, size_t nmemb, size_t size) {
+    calloc_accounting(file, function, line, nmemb * size);
+#else
 void *callocz(size_t nmemb, size_t size) {
+#endif
+
     void *p = calloc(nmemb, size);
     if (unlikely(!p)) fatal("Cannot allocate %zu bytes of memory.", nmemb * size);
     return p;
 }
 
+#ifdef NETDATA_LOG_ALLOCATIONS
+void *reallocz_int(const char *file, const char *function, const unsigned long line, void *ptr, size_t size) {
+    realloc_accounting(file, function, line, ptr, size);
+#else
 void *reallocz(void *ptr, size_t size) {
+#endif
+
     void *p = realloc(ptr, size);
     if (unlikely(!p)) fatal("Cannot re-allocate memory to %zu bytes.", size);
     return p;
 }
 
+#ifdef NETDATA_LOG_ALLOCATIONS
+void freez_int(const char *file, const char *function, const unsigned long line, void *ptr) {
+    free_accounting(file, function, line, ptr);
+#else
 void freez(void *ptr) {
+#endif
+
     free(ptr);
 }
 
@@ -770,7 +880,14 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm) {
                 if (flags & MAP_SHARED || !enable_ksm || !ksm) {
 #endif
                     mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags, fd, 0);
-                    if (mem != MAP_FAILED) {
+                    if (mem == MAP_FAILED) {
+                        error("Cannot allocate SHARED memory for file '%s'.", filename);
+                        mem = NULL;
+                    }
+                    else {
+#ifdef NETDATA_LOG_ALLOCATIONS
+                        mmap_accounting(size);
+#endif
                         int advise = MADV_SEQUENTIAL | MADV_DONTFORK;
                         if (flags & MAP_SHARED) advise |= MADV_WILLNEED;
 
@@ -780,7 +897,8 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm) {
                         }
                     }
 #ifdef MADV_MERGEABLE
-                } else {
+                }
+                else {
 /*
                     // test - load the file into memory
                     mem = calloc(1, size);
@@ -794,7 +912,14 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm) {
                     }
 */
                     mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags | MAP_ANONYMOUS, -1, 0);
-                    if (mem != MAP_FAILED) {
+                    if (mem == MAP_FAILED) {
+                        error("Cannot allocate PRIVATE ANONYMOUS memory for KSM for file '%s'.", filename);
+                        mem = NULL;
+                    }
+                    else {
+#ifdef NETDATA_LOG_ALLOCATIONS
+                        mmap_accounting(size);
+#endif
                         if (lseek(fd, 0, SEEK_SET) == 0) {
                             if (read(fd, mem, size) != (ssize_t) size)
                                 error("Cannot read from file '%s'", filename);
@@ -813,17 +938,19 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm) {
                                   filename);
                             log_madvise_3--;
                         }
-                    } else
-                        error("Cannot allocate PRIVATE ANONYMOUS memory for KSM for file '%s'.", filename);
+                    }
                 }
 #endif
-            } else
+            }
+            else
                 error("Cannot write to file '%s' at position %zu.", filename, size);
-        } else
+        }
+        else
             error("Cannot seek file '%s' to size %zu.", filename, size);
 
         close(fd);
-    } else
+    }
+    else
         error("Cannot create/open file '%s'.", filename);
 
     return mem;
@@ -858,23 +985,6 @@ int savememory(const char *filename, void *mem, size_t size) {
 
 int fd_is_valid(int fd) {
     return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
-}
-
-/*
- ***************************************************************************
- * Get number of clock ticks per second.
- ***************************************************************************
- */
-unsigned int hz;
-
-void get_HZ(void) {
-    long ticks;
-
-    if ((ticks = sysconf(_SC_CLK_TCK)) == -1) {
-        perror("sysconf");
-    }
-
-    hz = (unsigned int) ticks;
 }
 
 pid_t gettid(void) {
@@ -932,4 +1042,87 @@ int snprintfz(char *dst, size_t n, const char *fmt, ...) {
     va_end(args);
 
     return ret;
+}
+
+// ----------------------------------------------------------------------------
+// system functions
+// to retrieve settings of the system
+
+int processors = 1;
+long get_system_cpus(void) {
+    procfile *ff = NULL;
+
+    processors = 1;
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/proc/stat", global_host_prefix);
+
+    ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
+    if(!ff) {
+        error("Cannot open file '%s'. Assuming system has %d processors.", filename, processors);
+        return processors;
+    }
+
+    ff = procfile_readall(ff);
+    if(!ff) {
+        error("Cannot open file '%s'. Assuming system has %d processors.", filename, processors);
+        return processors;
+    }
+
+    processors = 0;
+    unsigned int i;
+    for(i = 0; i < procfile_lines(ff); i++) {
+        if(!procfile_linewords(ff, i)) continue;
+
+        if(strncmp(procfile_lineword(ff, i, 0), "cpu", 3) == 0) processors++;
+    }
+    processors--;
+    if(processors < 1) processors = 1;
+
+    procfile_close(ff);
+
+    info("System has %d processors.", processors);
+    return processors;
+}
+
+pid_t pid_max = 32768;
+pid_t get_system_pid_max(void) {
+    procfile *ff = NULL;
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/proc/sys/kernel/pid_max", global_host_prefix);
+    ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
+    if(!ff) {
+        error("Cannot open file '%s'. Assuming system supports %d pids.", filename, pid_max);
+        return pid_max;
+    }
+
+    ff = procfile_readall(ff);
+    if(!ff) {
+        error("Cannot read file '%s'. Assuming system supports %d pids.", filename, pid_max);
+        return pid_max;
+    }
+
+    pid_max = (pid_t)atoi(procfile_lineword(ff, 0, 0));
+    if(!pid_max) {
+        procfile_close(ff);
+        pid_max = 32768;
+        error("Cannot parse file '%s'. Assuming system supports %d pids.", filename, pid_max);
+        return pid_max;
+    }
+
+    procfile_close(ff);
+    info("System supports %d pids.", pid_max);
+    return pid_max;
+}
+
+unsigned int hz;
+void get_system_HZ(void) {
+    long ticks;
+
+    if ((ticks = sysconf(_SC_CLK_TCK)) == -1) {
+        perror("sysconf");
+    }
+
+    hz = (unsigned int) ticks;
 }

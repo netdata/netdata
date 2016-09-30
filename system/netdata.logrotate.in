@@ -6,7 +6,6 @@
 	delaycompress
 	notifempty
 	sharedscripts
-	create 0664 netdata netdata
 	postrotate
 		/bin/kill -HUP `pidof netdata 2>/dev/null` 2>/dev/null || true
 	endscript

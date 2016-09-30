@@ -13,8 +13,6 @@
 // etc.
 #define RATES_DETAIL 10000ULL
 
-int processors = 1;
-pid_t pid_max = 32768;
 int debug = 0;
 
 int update_every = 1;
@@ -22,7 +20,6 @@ unsigned long long global_iterations_counter = 1;
 unsigned long long file_counter = 0;
 int proc_pid_cmdline_is_needed = 0;
 int include_exited_childs = 1;
-char *host_prefix = "";
 char *config_dir = CONFIG_DIR;
 
 pid_t *all_pids_sortlist = NULL;
@@ -40,58 +37,6 @@ void netdata_cleanup_and_exit(int ret) {
     exit(ret);
 }
 
-
-// ----------------------------------------------------------------------------
-// system functions
-// to retrieve settings of the system
-
-long get_system_cpus(void) {
-    procfile *ff = NULL;
-
-    int processors = 0;
-
-    char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/proc/stat", host_prefix);
-
-    ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
-    if(!ff) return 1;
-
-    ff = procfile_readall(ff);
-    if(!ff)
-        return 1;
-
-    unsigned int i;
-    for(i = 0; i < procfile_lines(ff); i++) {
-        if(!procfile_linewords(ff, i)) continue;
-
-        if(strncmp(procfile_lineword(ff, i, 0), "cpu", 3) == 0) processors++;
-    }
-    processors--;
-    if(processors < 1) processors = 1;
-
-    procfile_close(ff);
-    return processors;
-}
-
-pid_t get_system_pid_max(void) {
-    procfile *ff = NULL;
-    pid_t mpid = 32768;
-
-    char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/proc/sys/kernel/pid_max", host_prefix);
-    ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
-    if(!ff) return mpid;
-
-    ff = procfile_readall(ff);
-    if(!ff)
-        return mpid;
-
-    mpid = (pid_t)atoi(procfile_lineword(ff, 0, 0));
-    if(!mpid) mpid = 32768;
-
-    procfile_close(ff);
-    return mpid;
-}
 
 // ----------------------------------------------------------------------------
 // target
@@ -121,23 +66,23 @@ struct target {
     unsigned long long cstime;
     unsigned long long cgtime;
     unsigned long long num_threads;
-    unsigned long long rss;
+    // unsigned long long rss;
 
     unsigned long long statm_size;
     unsigned long long statm_resident;
     unsigned long long statm_share;
-    unsigned long long statm_text;
-    unsigned long long statm_lib;
-    unsigned long long statm_data;
-    unsigned long long statm_dirty;
+    // unsigned long long statm_text;
+    // unsigned long long statm_lib;
+    // unsigned long long statm_data;
+    // unsigned long long statm_dirty;
 
     unsigned long long io_logical_bytes_read;
     unsigned long long io_logical_bytes_written;
-    unsigned long long io_read_calls;
-    unsigned long long io_write_calls;
+    // unsigned long long io_read_calls;
+    // unsigned long long io_write_calls;
     unsigned long long io_storage_bytes_read;
     unsigned long long io_storage_bytes_written;
-    unsigned long long io_cancelled_write_bytes;
+    // unsigned long long io_cancelled_write_bytes;
 
     int *fds;
     unsigned long long openfiles;
@@ -440,7 +385,7 @@ struct pid_stat {
     // int64_t itrealvalue;
     // unsigned long long starttime;
     // unsigned long long vsize;
-    unsigned long long rss;
+    // unsigned long long rss;
     // unsigned long long rsslim;
     // unsigned long long starcode;
     // unsigned long long endcode;
@@ -466,26 +411,26 @@ struct pid_stat {
     unsigned long long statm_size;
     unsigned long long statm_resident;
     unsigned long long statm_share;
-    unsigned long long statm_text;
-    unsigned long long statm_lib;
-    unsigned long long statm_data;
-    unsigned long long statm_dirty;
+    // unsigned long long statm_text;
+    // unsigned long long statm_lib;
+    // unsigned long long statm_data;
+    // unsigned long long statm_dirty;
 
     unsigned long long io_logical_bytes_read_raw;
     unsigned long long io_logical_bytes_written_raw;
-    unsigned long long io_read_calls_raw;
-    unsigned long long io_write_calls_raw;
+    // unsigned long long io_read_calls_raw;
+    // unsigned long long io_write_calls_raw;
     unsigned long long io_storage_bytes_read_raw;
     unsigned long long io_storage_bytes_written_raw;
-    unsigned long long io_cancelled_write_bytes_raw;
+    // unsigned long long io_cancelled_write_bytes_raw;
 
     unsigned long long io_logical_bytes_read;
     unsigned long long io_logical_bytes_written;
-    unsigned long long io_read_calls;
-    unsigned long long io_write_calls;
+    // unsigned long long io_read_calls;
+    // unsigned long long io_write_calls;
     unsigned long long io_storage_bytes_read;
     unsigned long long io_storage_bytes_written;
-    unsigned long long io_cancelled_write_bytes;
+    // unsigned long long io_cancelled_write_bytes;
 
     int *fds;                       // array of fds it uses
     int fds_size;                   // the size of the fds array
@@ -573,10 +518,10 @@ void del_pid_entry(pid_t pid) {
 // update pids from proc
 
 int read_proc_pid_cmdline(struct pid_stat *p) {
-    
+
     if(unlikely(!p->cmdline_filename)) {
         char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", host_prefix, p->pid);
+        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", global_host_prefix, p->pid);
         p->cmdline_filename = strdupz(filename);
     }
 
@@ -629,7 +574,7 @@ int read_proc_pid_stat(struct pid_stat *p) {
 
     if(unlikely(!p->stat_filename)) {
         char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/stat", host_prefix, p->pid);
+        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/stat", global_host_prefix, p->pid);
         p->stat_filename = strdupz(filename);
     }
 
@@ -700,7 +645,7 @@ int read_proc_pid_stat(struct pid_stat *p) {
     // p->itrealvalue   = strtoull(procfile_lineword(ff, 0, 20), NULL, 10);
     // p->starttime     = strtoull(procfile_lineword(ff, 0, 21), NULL, 10);
     // p->vsize         = strtoull(procfile_lineword(ff, 0, 22), NULL, 10);
-    p->rss              = strtoull(procfile_lineword(ff, 0, 23), NULL, 10);
+    // p->rss           = strtoull(procfile_lineword(ff, 0, 23), NULL, 10);
     // p->rsslim        = strtoull(procfile_lineword(ff, 0, 24), NULL, 10);
     // p->starcode      = strtoull(procfile_lineword(ff, 0, 25), NULL, 10);
     // p->endcode       = strtoull(procfile_lineword(ff, 0, 26), NULL, 10);
@@ -737,7 +682,7 @@ int read_proc_pid_stat(struct pid_stat *p) {
     }
 
     if(unlikely(debug || (p->target && p->target->debug)))
-        fprintf(stderr, "apps.plugin: READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu, threads=%d\n", host_prefix, p->pid, p->comm, (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
+        fprintf(stderr, "apps.plugin: READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu, threads=%d\n", global_host_prefix, p->pid, p->comm, (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
 
     if(unlikely(global_iterations_counter == 1)) {
         p->minflt           = 0;
@@ -766,7 +711,7 @@ cleanup:
     p->cstime           = 0;
     p->cgtime           = 0;
     p->num_threads      = 0;
-    p->rss              = 0;
+    // p->rss              = 0;
     return 0;
 }
 
@@ -775,7 +720,7 @@ int read_proc_pid_statm(struct pid_stat *p) {
 
     if(unlikely(!p->statm_filename)) {
         char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/statm", host_prefix, p->pid);
+        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/statm", global_host_prefix, p->pid);
         p->statm_filename = strdupz(filename);
     }
 
@@ -790,10 +735,10 @@ int read_proc_pid_statm(struct pid_stat *p) {
     p->statm_size           = strtoull(procfile_lineword(ff, 0, 0), NULL, 10);
     p->statm_resident       = strtoull(procfile_lineword(ff, 0, 1), NULL, 10);
     p->statm_share          = strtoull(procfile_lineword(ff, 0, 2), NULL, 10);
-    p->statm_text           = strtoull(procfile_lineword(ff, 0, 3), NULL, 10);
-    p->statm_lib            = strtoull(procfile_lineword(ff, 0, 4), NULL, 10);
-    p->statm_data           = strtoull(procfile_lineword(ff, 0, 5), NULL, 10);
-    p->statm_dirty          = strtoull(procfile_lineword(ff, 0, 6), NULL, 10);
+    // p->statm_text           = strtoull(procfile_lineword(ff, 0, 3), NULL, 10);
+    // p->statm_lib            = strtoull(procfile_lineword(ff, 0, 4), NULL, 10);
+    // p->statm_data           = strtoull(procfile_lineword(ff, 0, 5), NULL, 10);
+    // p->statm_dirty          = strtoull(procfile_lineword(ff, 0, 6), NULL, 10);
 
     return 1;
 
@@ -801,10 +746,10 @@ cleanup:
     p->statm_size           = 0;
     p->statm_resident       = 0;
     p->statm_share          = 0;
-    p->statm_text           = 0;
-    p->statm_lib            = 0;
-    p->statm_data           = 0;
-    p->statm_dirty          = 0;
+    // p->statm_text           = 0;
+    // p->statm_lib            = 0;
+    // p->statm_data           = 0;
+    // p->statm_dirty          = 0;
     return 0;
 }
 
@@ -813,7 +758,7 @@ int read_proc_pid_io(struct pid_stat *p) {
 
     if(unlikely(!p->io_filename)) {
         char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/io", host_prefix, p->pid);
+        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/io", global_host_prefix, p->pid);
         p->io_filename = strdupz(filename);
     }
 
@@ -839,13 +784,13 @@ int read_proc_pid_io(struct pid_stat *p) {
     p->io_logical_bytes_written_raw = strtoull(procfile_lineword(ff, 1, 1), NULL, 10);
     p->io_logical_bytes_written = (p->io_logical_bytes_written_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
-    last = p->io_read_calls_raw;
-    p->io_read_calls_raw = strtoull(procfile_lineword(ff, 2, 1), NULL, 10);
-    p->io_read_calls = (p->io_read_calls_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
+    // last = p->io_read_calls_raw;
+    // p->io_read_calls_raw = strtoull(procfile_lineword(ff, 2, 1), NULL, 10);
+    // p->io_read_calls = (p->io_read_calls_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
-    last = p->io_write_calls_raw;
-    p->io_write_calls_raw = strtoull(procfile_lineword(ff, 3, 1), NULL, 10);
-    p->io_write_calls = (p->io_write_calls_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
+    // last = p->io_write_calls_raw;
+    // p->io_write_calls_raw = strtoull(procfile_lineword(ff, 3, 1), NULL, 10);
+    // p->io_write_calls = (p->io_write_calls_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     last = p->io_storage_bytes_read_raw;
     p->io_storage_bytes_read_raw = strtoull(procfile_lineword(ff, 4, 1), NULL, 10);
@@ -855,18 +800,18 @@ int read_proc_pid_io(struct pid_stat *p) {
     p->io_storage_bytes_written_raw = strtoull(procfile_lineword(ff, 5, 1), NULL, 10);
     p->io_storage_bytes_written = (p->io_storage_bytes_written_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
-    last = p->io_cancelled_write_bytes_raw;
-    p->io_cancelled_write_bytes_raw = strtoull(procfile_lineword(ff, 6, 1), NULL, 10);
-    p->io_cancelled_write_bytes = (p->io_cancelled_write_bytes_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
+    // last = p->io_cancelled_write_bytes_raw;
+    // p->io_cancelled_write_bytes_raw = strtoull(procfile_lineword(ff, 6, 1), NULL, 10);
+    // p->io_cancelled_write_bytes = (p->io_cancelled_write_bytes_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     if(unlikely(global_iterations_counter == 1)) {
         p->io_logical_bytes_read        = 0;
         p->io_logical_bytes_written     = 0;
-        p->io_read_calls                = 0;
-        p->io_write_calls               = 0;
+        // p->io_read_calls             = 0;
+        // p->io_write_calls            = 0;
         p->io_storage_bytes_read        = 0;
         p->io_storage_bytes_written     = 0;
-        p->io_cancelled_write_bytes     = 0;
+        // p->io_cancelled_write_bytes  = 0;
     }
 
     return 1;
@@ -874,11 +819,11 @@ int read_proc_pid_io(struct pid_stat *p) {
 cleanup:
     p->io_logical_bytes_read        = 0;
     p->io_logical_bytes_written     = 0;
-    p->io_read_calls                = 0;
-    p->io_write_calls               = 0;
+    // p->io_read_calls             = 0;
+    // p->io_write_calls            = 0;
     p->io_storage_bytes_read        = 0;
     p->io_storage_bytes_written     = 0;
-    p->io_cancelled_write_bytes     = 0;
+    // p->io_cancelled_write_bytes  = 0;
     return 0;
 }
 
@@ -892,7 +837,7 @@ int read_proc_stat() {
     static unsigned long long utime_raw = 0, stime_raw = 0, gtime_raw = 0, gntime_raw = 0, ntime_raw = 0, collected_usec = 0, last_collected_usec = 0;
 
     if(unlikely(!ff)) {
-        snprintfz(filename, FILENAME_MAX, "%s/proc/stat", host_prefix);
+        snprintfz(filename, FILENAME_MAX, "%s/proc/stat", global_host_prefix);
         ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) goto cleanup;
     }
@@ -1194,7 +1139,7 @@ int file_descriptor_find_or_add(const char *name)
 int read_pid_file_descriptors(struct pid_stat *p) {
     char dirname[FILENAME_MAX+1];
 
-    snprintfz(dirname, FILENAME_MAX, "%s/proc/%d/fd", host_prefix, p->pid);
+    snprintfz(dirname, FILENAME_MAX, "%s/proc/%d/fd", global_host_prefix, p->pid);
     DIR *fds = opendir(dirname);
     if(fds) {
         int c;
@@ -1232,7 +1177,7 @@ int read_pid_file_descriptors(struct pid_stat *p) {
             if(p->fds[fdid] == 0) {
                 // we don't know this fd, get it
 
-                sprintf(fdname, "%s/proc/%d/fd/%s", host_prefix, p->pid, de->d_name);
+                sprintf(fdname, "%s/proc/%d/fd/%s", global_host_prefix, p->pid, de->d_name);
                 ssize_t l = readlink(fdname, linkname, FILENAME_MAX);
                 if(l == -1) {
                     if(debug || (p->target && p->target->debug)) {
@@ -1328,14 +1273,14 @@ void find_lost_child_debug(struct pid_stat *pe, unsigned long long lost, int typ
                     found++;
                 }
                 break;
-                
+
             case 2:
                 if(p->cmajflt > lost) {
                     fprintf(stderr, " > process %d (%s) could use the lost exited child majflt %llu of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
                     found++;
                 }
                 break;
-                
+
             case 3:
                 if(p->cutime > lost) {
                     fprintf(stderr, " > process %d (%s) could use the lost exited child utime %llu of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
@@ -1364,11 +1309,11 @@ void find_lost_child_debug(struct pid_stat *pe, unsigned long long lost, int typ
             case 1:
                 fprintf(stderr, " > cannot find any process to use the lost exited child minflt %llu of process %d (%s)\n", lost, pe->pid, pe->comm);
                 break;
-                
+
             case 2:
                 fprintf(stderr, " > cannot find any process to use the lost exited child majflt %llu of process %d (%s)\n", lost, pe->pid, pe->comm);
                 break;
-                
+
             case 3:
                 fprintf(stderr, " > cannot find any process to use the lost exited child utime %llu of process %d (%s)\n", lost, pe->pid, pe->comm);
                 break;
@@ -1583,19 +1528,19 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
                 p->log_thrown |= log;
                 switch(log) {
                     case PID_LOG_IO:
-                        error("Cannot process %s/proc/%d/io (command '%s')", host_prefix, p->pid, p->comm);
+                        error("Cannot process %s/proc/%d/io (command '%s')", global_host_prefix, p->pid, p->comm);
                         break;
 
                     case PID_LOG_STATM:
-                        error("Cannot process %s/proc/%d/statm (command '%s')", host_prefix, p->pid, p->comm);
+                        error("Cannot process %s/proc/%d/statm (command '%s')", global_host_prefix, p->pid, p->comm);
                         break;
 
                     case PID_LOG_CMDLINE:
-                        error("Cannot process %s/proc/%d/cmdline (command '%s')", host_prefix, p->pid, p->comm);
+                        error("Cannot process %s/proc/%d/cmdline (command '%s')", global_host_prefix, p->pid, p->comm);
                         break;
 
                     case PID_LOG_FDS:
-                        error("Cannot process entries in %s/proc/%d/fd (command '%s')", host_prefix, p->pid, p->comm);
+                        error("Cannot process entries in %s/proc/%d/fd (command '%s')", global_host_prefix, p->pid, p->comm);
                         break;
 
                     case PID_LOG_STAT:
@@ -1751,7 +1696,7 @@ int collect_data_for_all_processes_from_proc(void) {
 
     char dirname[FILENAME_MAX + 1];
 
-    snprintfz(dirname, FILENAME_MAX, "%s/proc", host_prefix);
+    snprintfz(dirname, FILENAME_MAX, "%s/proc", global_host_prefix);
     DIR *dir = opendir(dirname);
     if(!dir) return 0;
 
@@ -1957,24 +1902,24 @@ long zero_all_targets(struct target *root) {
         w->cstime = 0;
         w->cgtime = 0;
         w->num_threads = 0;
-        w->rss = 0;
+        // w->rss = 0;
         w->processes = 0;
 
         w->statm_size = 0;
         w->statm_resident = 0;
         w->statm_share = 0;
-        w->statm_text = 0;
-        w->statm_lib = 0;
-        w->statm_data = 0;
-        w->statm_dirty = 0;
+        // w->statm_text = 0;
+        // w->statm_lib = 0;
+        // w->statm_data = 0;
+        // w->statm_dirty = 0;
 
         w->io_logical_bytes_read = 0;
         w->io_logical_bytes_written = 0;
-        w->io_read_calls = 0;
-        w->io_write_calls = 0;
+        // w->io_read_calls = 0;
+        // w->io_write_calls = 0;
         w->io_storage_bytes_read = 0;
         w->io_storage_bytes_written = 0;
-        w->io_cancelled_write_bytes = 0;
+        // w->io_cancelled_write_bytes = 0;
     }
 
     return count;
@@ -1999,23 +1944,23 @@ void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target
         w->minflt += p->minflt;
         w->majflt += p->majflt;
 
-        w->rss += p->rss;
+        // w->rss += p->rss;
 
         w->statm_size += p->statm_size;
         w->statm_resident += p->statm_resident;
         w->statm_share += p->statm_share;
-        w->statm_text += p->statm_text;
-        w->statm_lib += p->statm_lib;
-        w->statm_data += p->statm_data;
-        w->statm_dirty += p->statm_dirty;
+        // w->statm_text += p->statm_text;
+        // w->statm_lib += p->statm_lib;
+        // w->statm_data += p->statm_data;
+        // w->statm_dirty += p->statm_dirty;
 
         w->io_logical_bytes_read    += p->io_logical_bytes_read;
         w->io_logical_bytes_written += p->io_logical_bytes_written;
-        w->io_read_calls            += p->io_read_calls;
-        w->io_write_calls           += p->io_write_calls;
+        // w->io_read_calls            += p->io_read_calls;
+        // w->io_write_calls           += p->io_write_calls;
         w->io_storage_bytes_read    += p->io_storage_bytes_read;
         w->io_storage_bytes_written += p->io_storage_bytes_written;
-        w->io_cancelled_write_bytes += p->io_cancelled_write_bytes;
+        // w->io_cancelled_write_bytes += p->io_cancelled_write_bytes;
 
         w->processes++;
         w->num_threads += p->num_threads;
@@ -2230,8 +2175,8 @@ unsigned long long send_resource_usage_to_netdata() {
         cpuuser = me.ru_utime.tv_sec * 1000000ULL + me.ru_utime.tv_usec;
         cpusyst = me.ru_stime.tv_sec * 1000000ULL + me.ru_stime.tv_usec;
 
-        bcopy(&now, &last, sizeof(struct timeval));
-        bcopy(&me, &me_last, sizeof(struct rusage));
+        memmove(&last, &now, sizeof(struct timeval));
+        memmove(&me_last, &me, sizeof(struct rusage));
     }
 
     buffer_sprintf(output,
@@ -2488,6 +2433,13 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
     }
     send_END();
 
+    send_BEGIN(type, "vmem", usec);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            send_SET(w->name, w->statm_size);
+    }
+    send_END();
+
     send_BEGIN(type, "minor_faults", usec);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
@@ -2584,7 +2536,13 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
             buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu %s\n", w->name, hz * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
     }
 
-    buffer_sprintf(output, "CHART %s.mem '' '%s Dedicated Memory (w/o shared)' 'MB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
+    buffer_sprintf(output, "CHART %s.mem '' '%s Real Memory (w/o shared)' 'MB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            buffer_sprintf(output, "DIMENSION %s '' absolute %ld %ld\n", w->name, sysconf(_SC_PAGESIZE), 1024L*1024L);
+    }
+
+    buffer_sprintf(output, "CHART %s.vmem '' '%s Virtual Memory Size' 'MB' mem %s.vmem stacked 20004 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             buffer_sprintf(output, "DIMENSION %s '' absolute %ld %ld\n", w->name, sysconf(_SC_PAGESIZE), 1024L*1024L);
@@ -2803,12 +2761,12 @@ int main(int argc, char **argv)
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
-    host_prefix = getenv("NETDATA_HOST_PREFIX");
-    if(host_prefix == NULL) {
+    global_host_prefix = getenv("NETDATA_HOST_PREFIX");
+    if(global_host_prefix == NULL) {
         // info("NETDATA_HOST_PREFIX is not passed from netdata");
-        host_prefix = "";
+        global_host_prefix = "";
     }
-    // else info("Found NETDATA_HOST_PREFIX='%s'", host_prefix);
+    // else info("Found NETDATA_HOST_PREFIX='%s'", global_host_prefix);
 
     config_dir = getenv("NETDATA_CONFIG_DIR");
     if(config_dir == NULL) {
@@ -2830,9 +2788,9 @@ int main(int argc, char **argv)
 
     time_t started_t = time(NULL);
     time_t current_t;
-    get_HZ();
-    pid_max = get_system_pid_max();
-    processors = get_system_cpus();
+    get_system_HZ();
+    get_system_pid_max();
+    get_system_cpus();
 
     parse_args(argc, argv);
 

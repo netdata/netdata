@@ -7,6 +7,8 @@ dist_config_DATA = \
 	apps_groups.conf \
 	charts.d.conf \
 	python.d.conf \
+	health_alarm_notify.conf \
+	health_email_recipients.conf \
 	$(NULL)
 
 chartsconfigdir=$(configdir)/charts.d
@@ -34,6 +36,7 @@ dist_pythonconfig_DATA = \
 	python.d/phpfpm.conf \
 	python.d/postfix.conf \
 	python.d/redis.conf \
+	python.d/retroshare.conf \
 	python.d/sensors.conf \
 	python.d/squid.conf \
 	python.d/tomcat.conf \
@@ -45,13 +48,17 @@ dist_healthconfig_DATA = \
 	health.d/cpu.conf \
 	health.d/disks.conf \
 	health.d/entropy.conf \
+	health.d/tcp_resets.conf \
 	health.d/memcached.conf \
+	health.d/mysql.conf \
 	health.d/named.conf \
 	health.d/net.conf \
 	health.d/nginx.conf \
 	health.d/qos.conf \
 	health.d/ram.conf \
 	health.d/redis.conf \
+	health.d/retroshare.conf \
+	health.d/softnet.conf \
 	health.d/swap.conf \
 	health.d/squid.conf \
 	$(NULL)

@@ -407,6 +407,7 @@ int mysendfile(struct web_client *w, char *filename)
     buffer_flush(w->response.data);
     w->response.rlen = stat.st_size;
     w->response.data->date = stat.st_mtim.tv_sec;
+    buffer_cacheable(w->response.data);
 
     return 200;
 }
@@ -665,7 +666,7 @@ int web_client_api_request_v1_alarms(struct web_client *w, char *url)
     int all = 0;
 
     while(url) {
-        char *value = mystrsep(&url, "?&[]");
+        char *value = mystrsep(&url, "?&");
         if (!value || !*value) continue;
 
         if(!strcmp(value, "all")) all = 1;
@@ -680,17 +681,28 @@ int web_client_api_request_v1_alarms(struct web_client *w, char *url)
 
 int web_client_api_request_v1_alarm_log(struct web_client *w, char *url)
 {
-    (void)url;
+    uint32_t after = 0;
+
+    while(url) {
+        char *value = mystrsep(&url, "?&");
+        if (!value || !*value) continue;
+
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        if(!strcmp(name, "after")) after = strtoul(value, NULL, 0);
+    }
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    health_alarm_log2json(&localhost, w->response.data);
+    health_alarm_log2json(&localhost, w->response.data, after);
     return 200;
 }
 
 int web_client_api_request_v1_charts(struct web_client *w, char *url)
 {
-    if(url) { ; }
+    (void)url;
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
@@ -706,7 +718,7 @@ int web_client_api_request_v1_chart(struct web_client *w, char *url)
     buffer_flush(w->response.data);
 
     while(url) {
-        char *value = mystrsep(&url, "?&[]");
+        char *value = mystrsep(&url, "?&");
         if(!value || !*value) continue;
 
         char *name = mystrsep(&value, "=");
@@ -768,7 +780,7 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
     uint32_t options = 0x00000000;
 
     while(url) {
-        char *value = mystrsep(&url, "/?&[]");
+        char *value = mystrsep(&url, "/?&");
         if(!value || !*value) continue;
 
         char *name = mystrsep(&value, "=");
@@ -809,6 +821,7 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
     }
 
     if(!chart || !*chart) {
+        buffer_no_cacheable(w->response.data);
         buffer_sprintf(w->response.data, "No chart id is given at the request.");
         goto cleanup;
     }
@@ -816,6 +829,7 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
     RRDSET *st = rrdset_find(chart);
     if(!st) st = rrdset_find_byname(chart);
     if(!st) {
+        buffer_no_cacheable(w->response.data);
         buffer_svg(w->response.data, "chart not found", 0, "", NULL, NULL, 1, -1);
         ret = 200;
         goto cleanup;
@@ -825,6 +839,7 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
     if(alarm) {
         rc = rrdcalc_find(st, alarm);
         if (!rc) {
+            buffer_no_cacheable(w->response.data);
             buffer_svg(w->response.data, "alarm not found", 0, "", NULL, NULL, 1, -1);
             ret = 200;
             goto cleanup;
@@ -848,7 +863,7 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
             else if(options & RRDR_OPTION_NOT_ALIGNED)
                 refresh = st->update_every;
             else {
-                refresh = (before - after);
+                refresh = (int)(before - after);
                 if(refresh < 0) refresh = -refresh;
             }
         }
@@ -904,8 +919,11 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
         calculated_number n = rc->value;
         if(isnan(n) || isinf(n)) n = 0;
 
-        if (refresh > 0)
+        if (refresh > 0) {
             buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
+            w->response.data->expires = time(NULL) + refresh;
+        }
+        else buffer_no_cacheable(w->response.data);
 
         if(!value_color) {
             switch(rc->status) {
@@ -935,7 +953,14 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
             }
         }
 
-        buffer_svg(w->response.data, label, rc->value * multiply / divide, units, label_color, value_color, 0, precision);
+        buffer_svg(w->response.data,
+                   label,
+                   rc->value * multiply / divide,
+                   units,
+                   label_color,
+                   value_color,
+                   0,
+                   precision);
         ret = 200;
     }
     else {
@@ -946,20 +971,40 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
 
         // if the collected value is too old, don't calculate its value
         if (rrdset_last_entry_t(st) >= (time(NULL) - (st->update_every * st->gap_when_lost_iterations_above)))
-            ret = rrd2value(st, w->response.data, &n, (dimensions) ? buffer_tostring(dimensions) : NULL, points, after,
-                            before, group, options, NULL, &latest_timestamp, &value_is_null);
+            ret = rrd2value(st,
+                            w->response.data,
+                            &n,
+                            (dimensions) ? buffer_tostring(dimensions) : NULL,
+                            points,
+                            after,
+                            before,
+                            group,
+                            options,
+                            NULL,
+                            &latest_timestamp,
+                            &value_is_null);
 
         // if the value cannot be calculated, show empty badge
         if (ret != 200) {
+            buffer_no_cacheable(w->response.data);
             value_is_null = 1;
             n = 0;
             ret = 200;
         }
-        else if (refresh > 0)
+        else if (refresh > 0) {
             buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
+            w->response.data->expires = time(NULL) + refresh;
+        }
+        else buffer_no_cacheable(w->response.data);
 
         // render the badge
-        buffer_svg(w->response.data, label, n * multiply / divide, units, label_color, value_color, value_is_null,
+        buffer_svg(w->response.data,
+                   label,
+                   n * multiply / divide,
+                   units,
+                   label_color,
+                   value_color,
+                   value_is_null,
                    precision);
     }
 
@@ -998,7 +1043,7 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
     uint32_t options = 0x00000000;
 
     while(url) {
-        char *value = mystrsep(&url, "?&[]");
+        char *value = mystrsep(&url, "?&");
         if(!value || !*value) continue;
 
         char *name = mystrsep(&value, "=");
@@ -1143,6 +1188,9 @@ cleanup:
     return ret;
 }
 
+
+#define REGISTRY_VERIFY_COOKIES_GUID "give-me-back-this-cookie-now--please"
+
 int web_client_api_request_v1_registry(struct web_client *w, char *url)
 {
     static uint32_t hash_action = 0, hash_access = 0, hash_hello = 0, hash_delete = 0, hash_search = 0,
@@ -1190,7 +1238,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 */
 
     while(url) {
-        char *value = mystrsep(&url, "?&[]");
+        char *value = mystrsep(&url, "?&");
         if (!value || !*value) continue;
 
         char *name = mystrsep(&value, "=");
@@ -1280,8 +1328,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
             w->tracking_required = 1;
             if(registry_verify_cookies_redirects() > 0 && (!cookie || !person_guid[0])) {
                 buffer_flush(w->response.data);
-
-                registry_set_cookie(w, "give-me-back-this-cookie-please");
+                registry_set_cookie(w, REGISTRY_VERIFY_COOKIES_GUID);
                 w->response.data->contenttype = CT_APPLICATION_JSON;
                 buffer_sprintf(w->response.data, "{ \"status\": \"redirect\", \"registry\": \"%s\" }", registry_to_announce());
                 return 200;
@@ -1329,6 +1376,10 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
                 return 307
 */
             }
+
+            if(unlikely(cookie && person_guid[0] && !strcmp(person_guid, REGISTRY_VERIFY_COOKIES_GUID)))
+                person_guid[0] = '\0';
+
             return registry_request_access_json(w, person_guid, machine_guid, machine_url, url_name, time(NULL));
 
         case 'D':
@@ -1852,8 +1903,18 @@ static inline int http_request_validate(struct web_client *w) {
 }
 
 void web_client_process(struct web_client *w) {
-    static uint32_t hash_api = 0, hash_netdata_conf = 0, hash_data = 0, hash_datasource = 0, hash_graph = 0,
-            hash_list = 0, hash_all_json = 0, hash_exit = 0, hash_debug = 0, hash_mirror = 0;
+    static uint32_t
+            hash_api = 0,
+            hash_netdata_conf = 0,
+            hash_data = 0,
+            hash_datasource = 0,
+            hash_graph = 0,
+            hash_list = 0,
+            hash_all_json = 0;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    static uint32_t hash_exit = 0, hash_debug = 0, hash_mirror = 0;
+#endif
 
     // start timing us
     gettimeofday(&w->tv_in, NULL);
@@ -1866,9 +1927,11 @@ void web_client_process(struct web_client *w) {
         hash_graph = simple_hash(WEB_PATH_GRAPH);
         hash_list = simple_hash("list");
         hash_all_json = simple_hash("all.json");
+#ifdef NETDATA_INTERNAL_CHECKS
         hash_exit = simple_hash("exit");
         hash_debug = simple_hash("debug");
         hash_mirror = simple_hash("mirror");
+#endif
     }
 
     int code = 500;
@@ -2065,9 +2128,23 @@ void web_client_process(struct web_client *w) {
     }
 
     gettimeofday(&w->tv_ready, NULL);
-    w->response.data->date = time(NULL);
     w->response.sent = 0;
     w->response.code = code;
+
+    // set a proper last modified date
+    if(unlikely(!w->response.data->date))
+        w->response.data->date = w->tv_ready.tv_sec;
+
+    if(unlikely(code != 200))
+        buffer_no_cacheable(w->response.data);
+
+    // set a proper expiration date, if not already set
+    if(unlikely(!w->response.data->expires)) {
+        if(w->response.data->options & WB_CONTENT_NO_CACHEABLE)
+            w->response.data->expires = w->tv_ready.tv_sec + rrd_update_every;
+        else
+            w->response.data->expires = w->tv_ready.tv_sec + 86400;
+    }
 
     // prepare the HTTP response header
     debug(D_WEB_CLIENT, "%llu: Generating HTTP header with response %d.", w->id, code);
@@ -2075,9 +2152,17 @@ void web_client_process(struct web_client *w) {
     const char *content_type_string = web_content_type_to_string(w->response.data->contenttype);
     const char *code_msg = web_response_code_to_string(code);
 
-    char date[32];
-    struct tm tmbuf, *tm = gmtime_r(&w->response.data->date, &tmbuf);
-    strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S %Z", tm);
+    // prepare the last modified and expiration dates
+    char date[32], edate[32];
+    {
+        struct tm tmbuf, *tm;
+
+        tm = gmtime_r(&w->response.data->date, &tmbuf);
+        strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S %Z", tm);
+
+        tm = gmtime_r(&w->response.data->expires, &tmbuf);
+        strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", tm);
+    }
 
     buffer_sprintf(w->response.header_output,
         "HTTP/1.1 %d %s\r\n"
@@ -2129,44 +2214,37 @@ void web_client_process(struct web_client *w) {
             "Access-Control-Max-Age: 1209600\r\n" // 86400 * 14
             );
     }
+    else {
+        buffer_sprintf(w->response.header_output,
+            "Cache-Control: %s\r\n"
+            "Expires: %s\r\n",
+            (w->response.data->options & WB_CONTENT_NO_CACHEABLE)?"no-cache":"public",
+            edate);
+    }
 
-    if(buffer_strlen(w->response.header))
+    // copy a possibly available custom header
+    if(unlikely(buffer_strlen(w->response.header)))
         buffer_strcat(w->response.header_output, buffer_tostring(w->response.header));
 
-    if(w->mode == WEB_CLIENT_MODE_NORMAL && (w->response.data->options & WB_CONTENT_NO_CACHEABLE)) {
-        buffer_sprintf(w->response.header_output,
-            "Expires: %s\r\n"
-            "Cache-Control: no-cache\r\n"
-            , date);
-    }
-    else if(w->mode != WEB_CLIENT_MODE_OPTIONS) {
-        char edate[32];
-        time_t et = w->response.data->date + (86400 * 14);
-        struct tm etmbuf, *etm = gmtime_r(&et, &etmbuf);
-        strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", etm);
-
-        buffer_sprintf(w->response.header_output,
-            "Expires: %s\r\n"
-            "Cache-Control: public\r\n"
-            , edate);
-    }
-
-    // if we know the content length, put it
-    if(!w->response.zoutput && (w->response.data->len || w->response.rlen))
-        buffer_sprintf(w->response.header_output,
-            "Content-Length: %zu\r\n"
-            , w->response.data->len? w->response.data->len: w->response.rlen
-            );
-    else if(!w->response.zoutput)
-        w->keepalive = 0;   // content-length is required for keep-alive
-
-    if(w->response.zoutput) {
+    // headers related to the transfer method
+    if(likely(w->response.zoutput)) {
         buffer_strcat(w->response.header_output,
             "Content-Encoding: gzip\r\n"
             "Transfer-Encoding: chunked\r\n"
             );
     }
+    else {
+        if(likely((w->response.data->len || w->response.rlen))) {
+            // we know the content length, put it
+            buffer_sprintf(w->response.header_output, "Content-Length: %zu\r\n", w->response.data->len? w->response.data->len: w->response.rlen);
+        }
+        else {
+            // we don't know the content length, disable keep-alive
+            w->keepalive = 0;
+        }
+    }
 
+    // end of HTTP header
     buffer_strcat(w->response.header_output, "\r\n");
 
     // sent the HTTP header

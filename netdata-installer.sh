@@ -25,6 +25,32 @@ printf "CFLAGS=\"%s\" " "${CFLAGS}" >>netdata-installer.log
 printf "%q " "$0" "${@}" >>netdata-installer.log
 printf "\n" >>netdata-installer.log
 
+REINSTALL_PWD="${PWD}"
+REINSTALL_COMMAND="$(printf "%q " "$0" "${@}"; printf "\n")"
+
+banner() {
+    local   l1="  ^"                                                                      \
+            l2="  |.-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-"  \
+            l3="  |   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'  "  \
+            l4="  +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->" \
+            sp="                                                                        " \
+            netdata="netdata" start end msg="${*}"
+
+    [ ${#msg} -lt ${#netdata} ] && msg="${msg}${sp:0:$(( ${#netdata} - ${#msg}))}"
+    [ ${#msg} -gt $(( ${#l2} - 20 )) ] && msg="${msg:0:$(( ${#l2} - 23 ))}..."
+
+    start="$(( ${#l2} / 2 - 4 ))"
+    [ $(( start + ${#msg} + 4 )) -gt ${#l2} ] && start=$((${#l2} - ${#msg} - 4))
+    end=$(( ${start} + ${#msg} + 4 ))
+
+    echo >&2
+    echo >&2 "${l1}"
+    echo >&2 "${l2:0:start}${sp:0:2}${netdata}${sp:0:$((end - start - 2 - ${#netdata}))}${l2:end:$((${#l2} - end))}"
+    echo >&2 "${l3:0:start}${sp:0:2}${msg}${sp:0:2}${l3:end:$((${#l2} - end))}"
+    echo >&2 "${l4}"
+    echo >&2
+}
+
 service="$(which service 2>/dev/null || command -v service 2>/dev/null)"
 systemctl="$(which systemctl 2>/dev/null || command -v systemctl 2>/dev/null)"
 service() {
@@ -49,6 +75,7 @@ NETDATA_PREFIX=
 LIBS_ARE_HERE=0
 
 usage() {
+    banner "installer command line options"
     cat <<USAGE
 
 ${ME} <installer options>
@@ -174,26 +201,24 @@ do
     fi
 done
 
+banner "real-time performance monitoring, done right!"
 cat <<BANNER
 
-Welcome to netdata!
-The real-time performance monitoring system.
+  You are about to build and install netdata to your system.
 
-You are about to build and install netdata to your system.
+  It will be installed at these locations:
 
-It will be installed at these locations:
+   - the daemon    at ${NETDATA_PREFIX}/usr/sbin/netdata
+   - config files  at ${NETDATA_PREFIX}/etc/netdata
+   - web files     at ${NETDATA_PREFIX}/usr/share/netdata
+   - plugins       at ${NETDATA_PREFIX}/usr/libexec/netdata
+   - cache files   at ${NETDATA_PREFIX}/var/cache/netdata
+   - db files      at ${NETDATA_PREFIX}/var/lib/netdata
+   - log files     at ${NETDATA_PREFIX}/var/log/netdata
+   - pid file      at ${NETDATA_PREFIX}/var/run
 
-  - the daemon    at ${NETDATA_PREFIX}/usr/sbin/netdata
-  - config files  at ${NETDATA_PREFIX}/etc/netdata
-  - web files     at ${NETDATA_PREFIX}/usr/share/netdata
-  - plugins       at ${NETDATA_PREFIX}/usr/libexec/netdata
-  - cache files   at ${NETDATA_PREFIX}/var/cache/netdata
-  - db files      at ${NETDATA_PREFIX}/var/lib/netdata
-  - log files     at ${NETDATA_PREFIX}/var/log/netdata
-  - pid file      at ${NETDATA_PREFIX}/var/run
-
-This installer allows you to change the installation path.
-Press Control-C and run the same command with --help for help.
+  This installer allows you to change the installation path.
+  Press Control-C and run the same command with --help for help.
 
 BANNER
 
@@ -201,6 +226,7 @@ if [ "${UID}" -ne 0 ]
     then
     if [ -z "${NETDATA_PREFIX}" ]
         then
+        banner "wrong command line options!"
         cat <<NONROOTNOPREFIX
 
 Sorry! This will fail!
@@ -273,6 +299,7 @@ then
     then
         echo "Will skip autoreconf step"
     else
+        banner "autotools v2.60 required"
         cat <<"EOF"
 
 -------------------------------------------------------------------------------
@@ -306,11 +333,12 @@ if [ ${DONOTWAIT} -eq 0 ]
 fi
 
 build_error() {
+    banner "sorry, it failed to build..."
     cat <<EOF
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Sorry! NetData failed to build...
+Sorry! netdata failed to build...
 
 You many need to check these:
 
@@ -670,7 +698,8 @@ if [ ${DONOTSTART} -eq 1 ]
         fi
         chmod 0664 "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
     fi
-    echo >&2 "OK. It is now installed and ready."
+    banner "is installed now!"
+    echo >&2 "  enjoy real-time performance and health monitoring..."
     exit 0
 fi
 
@@ -1066,7 +1095,130 @@ To start it, just run it:
   ${NETDATA_PREFIX}/usr/sbin/netdata
 
 
-Enjoy!
-
 END
 echo >&2 "Uninstall script generated: ./netdata-uninstaller.sh"
+
+if [ -d .git ]
+    then
+    cat >netdata-updater.sh.new <<REINSTALL
+#!/usr/bin/env bash
+
+force=0
+[ "\${1}" = "-f" ] && force=1
+
+export PATH="\${PATH}:${PATH}"
+export CFLAGS="${CFLAGS}"
+
+INSTALL_UID="${UID}"
+if [ "\${INSTALL_UID}" != "\${UID}" ]
+    then
+    echo >&2 "This script should be run as user with uid \${INSTALL_UID} but it now runs with uid \${UID}"
+    exit 1
+fi
+
+# make sure we cd to the working directory
+cd "${REINSTALL_PWD}" || exit 1
+
+# make sure there is .git here
+[ \${force} -eq 0 -a ! -d .git ] && echo >&2 "No git structures found at: ${REINSTALL_PWD} (use -f for force re-install)" && exit 1
+
+# signal netdata to start saving its database
+# this is handy if your database is big
+pids=\$(pidof netdata)
+[ ! -z "\${pids}" ] && kill -USR1 \${pids}
+
+tmp=
+if [ -t 2 ]
+    then
+    # we are running on a terminal
+    # open fd 3 and send it to stderr
+    exec 3>&2
+else
+    # we are headless
+    # create a temporary file for the log
+    tmp=\$(mktemp /tmp/netdata-updater-log-XXXXXX.log)
+    # open fd 3 and send it to tmp
+    exec 3>\${tmp}
+fi
+
+info() {
+    echo >&3 "\$(date) : INFO: " "\${@}"
+}
+
+emptyline() {
+    echo >&3
+}
+
+error() {
+    echo >&3 "\$(date) : ERROR: " "\${@}"
+}
+
+# this is what we will do if it fails (head-less only)
+failed() {
+    error "FAILED TO UPDATE NETDATA : \${1}"
+
+    if [ ! -z "\${tmp}" ]
+    then
+        cat >&2 "\${tmp}"
+        rm "\${tmp}"
+    fi
+    exit 1
+}
+
+get_latest_commit_id() {
+    git log -1           2>&3 |\\
+        grep ^commit     2>&3 |\\
+        head -n 1        2>&3 |\\
+        cut -d ' ' -f 2  2>&3
+}
+
+update() {
+    [ -z "\${tmp}" ] && info "Running on a terminal - (this script also supports running headless from crontab)"
+
+    emptyline
+
+    if [ -d .git ]
+        then
+        info "Updating netdata source from github..."
+
+        last_commit="\$(get_latest_commit_id)"
+        [ \${force} -eq 0 -a -z "\${last_commit}" ] && failed "CANNOT GET LAST COMMIT ID (use -f for force re-install)"
+
+        git pull >&3 2>&3 || failed "CANNOT FETCH LATEST SOURCE (use -f for force re-install)"
+
+        new_commit="\$(get_latest_commit_id)"
+        if [ \${force} -eq 0 ]
+            then
+            [ -z "\${new_commit}" ] && failed "CANNOT GET NEW LAST COMMIT ID (use -f for force re-install)"
+            [ "\${new_commit}" = "\${last_commit}" ] && info "Nothing to be done! (use -f to force re-install)" && exit 0
+        fi
+    elif [ \${force} -eq 0 ]
+        then
+        failed "CANNOT FIND GIT STRUCTURES IN \$(pwd) (use -f for force re-install)"
+    fi
+
+    emptyline
+    info "Re-installing netdata..."
+    ${REINSTALL_COMMAND// --dont-wait/} --dont-wait >&3 2>&3 || failed "FAILED TO COMPILE/INSTALL NETDATA"
+
+    [ ! -z "\${tmp}" ] && rm "\${tmp}" && tmp=
+    return 0
+}
+
+# the installer updates this script - so we run and exit in a single line
+update && exit 0
+###############################################################################
+###############################################################################
+REINSTALL
+    chmod 755 netdata-updater.sh.new
+    mv -f netdata-updater.sh.new netdata-updater.sh
+    echo >&2 "Update script generated   : ./netdata-updater.sh"
+elif [ -f "netdata-updater.sh" ]
+    then
+    rm "netdata-updater.sh"
+fi
+
+banner "is installed and running now!"
+echo >&2 "  enjoy real-time performance and health monitoring..."
+echo >&2 
+exit 0

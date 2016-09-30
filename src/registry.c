@@ -27,8 +27,15 @@
 //    - [DONE] limit the size of PERSON_URL names
 //    - limit the number of requests that add data to the registry,
 //      per client IP per hour
-
-
+//
+// 3. lower memory requirements
+//
+//    - embed avl structures directly into registry objects, instead of DICTIONARY
+//    - store GUIDs in memory as UUID instead of char *
+//      (this will also remove the index hash, since UUIDs can be compared directly)
+//    - do not track persons using the demo machines only
+//      (i.e. start tracking them only when they access a non-demo machine)
+//    - [DONE] do not track custom dashboards by default
 
 #define REGISTRY_URL_FLAGS_DEFAULT 0x00
 #define REGISTRY_URL_FLAGS_EXPIRED 0x01
@@ -328,16 +335,24 @@ static inline URL *registry_url_allocate_nolock(const char *url, size_t urllen) 
     return u;
 }
 
-static inline URL *registry_url_get(const char *url, size_t urllen) {
-    debug(D_REGISTRY, "Registry: registry_url_get('%s')", url);
-
-    registry_urls_lock();
+static inline URL *registry_url_get_nolock(const char *url, size_t urllen) {
+    debug(D_REGISTRY, "Registry: registry_url_get_nolock('%s')", url);
 
     URL *u = dictionary_get(registry.urls, url);
     if(!u) {
         u = registry_url_allocate_nolock(url, urllen);
         registry.urls_count++;
     }
+
+    return u;
+}
+
+static inline URL *registry_url_get(const char *url, size_t urllen) {
+    debug(D_REGISTRY, "Registry: registry_url_get('%s')", url);
+
+    registry_urls_lock();
+
+    URL *u = registry_url_get_nolock(url, urllen);
 
     registry_urls_unlock();
 
@@ -555,7 +570,6 @@ static inline PERSON *registry_person_get(const char *person_guid, time_t when) 
         else {
             person_guid = buf;
             p = registry_person_find(person_guid);
-            if(!p) person_guid = NULL;
         }
     }
 
@@ -782,6 +796,7 @@ int registry_log_load(void) {
                     else
                         registry_request_delete(p->guid, machine_guid, url, name, when);
 
+                    registry.log_count++;
                     break;
 
                 default:
@@ -789,7 +804,7 @@ int registry_log_load(void) {
                     break;
             }
         }
-        
+
         fclose(fp);
     }
 
@@ -955,7 +970,7 @@ MACHINE *registry_request_machine(char *person_guid, char *machine_guid, char *u
     // make sure the machine exists
     m = registry_machine_find(request_machine);
     if(!m) {
-        info("Registry Machine URLs request: machine not found, person: '%s', machine '%s', url '%s', request machine '%s'", p->guid, m->guid, pu->url->url, request_machine);
+        info("Registry Machine URLs request: machine not found, person: '%s', machine '%s', url '%s', request machine '%s'", p->guid, machine_guid, pu->url->url, request_machine);
         return NULL;
     }
 
@@ -1227,6 +1242,21 @@ int registry_request_switch_json(struct web_client *w, char *person_guid, char *
 // ----------------------------------------------------------------------------
 // REGISTRY THIS MACHINE UNIQUE ID
 
+static inline int is_machine_guid_blacklisted(const char *guid) {
+    // these are machine GUIDs that have been included in distribution packages.
+    // we blacklist them here, so that the next version of netdata will generate
+    // new ones.
+
+    if(!strcmp(guid, "8a795b0c-2311-11e6-8563-000c295076a6")
+    || !strcmp(guid, "4aed1458-1c3e-11e6-a53f-000c290fc8f5")
+    ) {
+        error("Blacklisted machine GUID '%s' found.", guid);
+        return 1;
+    }
+
+    return 0;
+}
+
 char *registry_get_this_machine_guid(void) {
     if(likely(registry.machine_guid[0]))
         return registry.machine_guid;
@@ -1245,6 +1275,8 @@ char *registry_get_this_machine_guid(void) {
 
                 registry.machine_guid[0] = '\0';
             }
+            else if(is_machine_guid_blacklisted(registry.machine_guid))
+                registry.machine_guid[0] = '\0';
         }
         close(fd);
     }
@@ -1376,6 +1408,8 @@ int registry_save(void) {
         return -2;
     }
 
+    error_log_limit_unlimited();
+
     char tmp_filename[FILENAME_MAX + 1];
     char old_filename[FILENAME_MAX + 1];
 
@@ -1387,6 +1421,7 @@ int registry_save(void) {
     if(!fp) {
         error("Registry: Cannot create file: %s", tmp_filename);
         registry_log_unlock();
+        error_log_limit_reset();
         return -1;
     }
 
@@ -1398,6 +1433,7 @@ int registry_save(void) {
         error("Registry: Cannot save registry machines - return value %d", bytes1);
         fclose(fp);
         registry_log_unlock();
+        error_log_limit_reset();
         return bytes1;
     }
     debug(D_REGISTRY, "Registry: saving machines took %d bytes", bytes1);
@@ -1408,6 +1444,7 @@ int registry_save(void) {
         error("Registry: Cannot save registry persons - return value %d", bytes2);
         fclose(fp);
         registry_log_unlock();
+        error_log_limit_reset();
         return bytes2;
     }
     debug(D_REGISTRY, "Registry: saving persons took %d bytes", bytes2);
@@ -1461,13 +1498,13 @@ int registry_save(void) {
             // it has been moved successfully
             // discard the current registry log
             registry_log_recreate_nolock();
-
             registry.log_count = 0;
         }
     }
 
     // continue operations
     registry_log_unlock();
+    error_log_limit_reset();
 
     return -1;
 }
@@ -1559,7 +1596,8 @@ static inline size_t registry_load(void) {
                 }
                 *url++ = '\0';
 
-                u = registry_url_allocate_nolock(url, strlen(url));
+                // u = registry_url_allocate_nolock(url, strlen(url));
+                u = registry_url_get_nolock(url, strlen(url));
 
                 time_t first_t = strtoul(&s[2], NULL, 16);
 
@@ -1586,7 +1624,8 @@ static inline size_t registry_load(void) {
                 }
 
                 s[1] = s[10] = s[19] = s[28] = s[31] = '\0';
-                u = registry_url_allocate_nolock(&s[32], strlen(&s[32]));
+                // u = registry_url_allocate_nolock(&s[32], strlen(&s[32]));
+                u = registry_url_get_nolock(&s[32], strlen(&s[32]));
 
                 MACHINE_URL *mu = registry_machine_url_allocate(m, u, strtoul(&s[2], NULL, 16));
                 mu->last_t = strtoul(&s[11], NULL, 16);
@@ -1635,7 +1674,7 @@ int registry_init(void) {
     registry.persons_expiration = config_get_number("registry", "registry expire idle persons days", 365) * 86400;
     registry.registry_domain = config_get("registry", "registry domain", "");
     registry.registry_to_announce = config_get("registry", "registry to announce", "https://registry.my-netdata.io");
-    registry.hostname = config_get("registry", "registry hostname", config_get("global", "hostname", hostname));
+    registry.hostname = config_get("registry", "registry hostname", config_get("global", "hostname", localhost.hostname));
     registry.verify_cookies_redirects = config_get_boolean("registry", "verify browser cookies support", 1);
 
     setenv("NETDATA_REGISTRY_HOSTNAME", registry.hostname, 1);
@@ -1685,6 +1724,9 @@ int registry_init(void) {
         registry_log_open_nolock();
         registry_load();
         registry_log_load();
+
+        if(unlikely(registry_should_save_db()))
+            registry_save();
     }
 
     return 0;

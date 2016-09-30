@@ -27,16 +27,9 @@ if [ -f "${config_dir}/tc-qos-helper.conf" ]
     source "${config_dir}/tc-qos-helper.conf"
 fi
 
-# default time function
-now_ms=
-current_time_ms() {
-    now_ms="$(date +'%s')000"
-}
-
 # default sleep function
 LOOPSLEEPMS_LASTWORK=0
 loopsleepms() {
-    [ "$1" = "tellwork" ] && shift
     sleep $1
 }
 
