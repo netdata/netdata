@@ -26,6 +26,7 @@ URL:		http://netdata.firehol.org/
 BuildRequires:	pkgconfig
 BuildRequires:	xz
 BuildRequires:	zlib-devel
+BuildRequires:	libuuid-devel
 
 # Packages can be found in the EPEL repo
 %if %{with nfacct}
