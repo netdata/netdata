@@ -19,7 +19,7 @@ ${DEBIAN_SCRIPT_DEBUG:+ set -v -x}
 
 DAEMON="netdata"
 DAEMON_PATH=@sbindir_POST@
-PIDFILE=@localstatedir_POST@/$DAEMON.pid
+PIDFILE=@localstatedir_POST@/run/$DAEMON.pid
 DAEMONOPTS="-P $PIDFILE"
 
 test -x $DAEMON_PATH/$DAEMON || exit 0
