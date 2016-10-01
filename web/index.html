@@ -2042,6 +2042,7 @@
 
             sync_option('eliminate_zero_dimensions');
             sync_option('destroy_on_hide');
+            sync_option('async_on_scroll');
             sync_option('parallel_refresher');
             sync_option('concurrent_refreshes');
             sync_option('sync_selection');
@@ -2064,6 +2065,7 @@
         // handle options changes
         $('#eliminate_zero_dimensions').change(function()       { NETDATA.setOption('eliminate_zero_dimensions', $(this).prop('checked')); });
         $('#destroy_on_hide').change(function()                 { NETDATA.setOption('destroy_on_hide', $(this).prop('checked')); });
+        $('#async_on_scroll').change(function()                 { NETDATA.setOption('async_on_scroll', $(this).prop('checked')); });
         $('#parallel_refresher').change(function()              { NETDATA.setOption('parallel_refresher', $(this).prop('checked')); });
         $('#concurrent_refreshes').change(function()            { NETDATA.setOption('concurrent_refreshes', $(this).prop('checked')); });
         $('#sync_selection').change(function()                  { NETDATA.setOption('sync_selection', $(this).prop('checked')); });
@@ -2145,7 +2147,7 @@
     // parallel javascript downloader in netdata
     var netdataPrepCallback = function() {
         NETDATA.requiredJs.push({
-            url: NETDATA.serverDefault + 'dashboard_info.js?v57',
+            url: NETDATA.serverDefault + 'dashboard_info.js?v58',
             isAlreadyLoaded: function() { return false; }
         });
         
@@ -2558,7 +2560,13 @@
                                     <tr class="option-row">
                                         <td class="option-control"><input id="destroy_on_hide" type="checkbox" data-toggle="toggle" data-on="Destroy" data-off="Hide" data-width="110px"></td>
                                         <td class="option-info"><strong>How to handle hidden charts?</strong><br/>
-                                            <small>When set to <b>Destroy</b>, charts that are not in the current viewport of the browser (are above, or below the visible area of the page), will be destroyed and re-created if and when they become visible again. When set to <b>Hide</b>, the not-visible charts will be just hidden, to simplify the DOM and speed up your browser. Set it to <b>Destroy</b>, to lower the memory requirements of your browser. Set it to <b>Hide</b> for smoother page scrolling.</small>
+                                            <small>When set to <b>Destroy</b>, charts that are not in the current viewport of the browser (are above, or below the visible area of the page), will be destroyed and re-created if and when they become visible again. When set to <b>Hide</b>, the not-visible charts will be just hidden, to simplify the DOM and speed up your browser. Set it to <b>Destroy</b>, to lower the memory requirements of your browser. Set it to <b>Hide</b> for faster restoration of charts on page scrolling.</small>
+                                        </td>
+                                        </tr>
+                                    <tr class="option-row">
+                                        <td class="option-control"><input id="async_on_scroll" type="checkbox" data-toggle="toggle" data-on="Async" data-off="Sync" data-width="110px"></td>
+                                        <td class="option-info"><strong>Page scroll handling?</strong><br/>
+                                            <small>When set to <b>Sync</b>, charts will be examined for their visibility synchronously. On slow computers this may impact the smoothness of page scrolling. To work asynchronously set it to <b>Async</b>. When set to <b>Sync</b>, the performance of page scrolling is monitored and this setting switches automatically to <b>Async</b> if the browser is found slow. Set it to <b>Sync</b> for best visual experience. Set it to <b>Async</b> for smoother page scrolling.</small>
                                         </td>
                                         </tr>
                                     </table>
@@ -2769,4 +2777,4 @@
     </div>
 </body>
 </html>
-<script async type="text/javascript" src="dashboard.js?v57"></script>
+<script async type="text/javascript" src="dashboard.js?v58"></script>
