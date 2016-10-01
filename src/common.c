@@ -1126,3 +1126,20 @@ void get_system_HZ(void) {
 
     hz = (unsigned int) ticks;
 }
+
+int read_single_number_file(const char *filename, unsigned long long *result) {
+    char buffer[1024 + 1];
+
+    int fd = open(filename, O_RDONLY, 0666);
+    if(unlikely(fd == -1)) return 1;
+
+    ssize_t r = read(fd, buffer, 1024);
+    if(unlikely(r == -1)) {
+        close(fd);
+        return 2;
+    }
+
+    close(fd);
+    *result = strtoull(buffer, NULL, 0);
+    return 0;
+}

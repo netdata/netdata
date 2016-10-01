@@ -209,7 +209,7 @@ body {
 	outline: thin dotted;
 }
 .netdata-legend-series > .netdata-legend-series-content::-webkit-scrollbar {
-	display: block; /* was 'none', but chrome was hidding content with it */
+	display: block; /* was 'none', but chrome was hiding content with it */
 }
 .has-scrollbar > .netdata-legend-series-content::-webkit-scrollbar {
 	display: block;
