@@ -184,4 +184,6 @@ extern void get_system_HZ(void);
 #endif
 #endif
 
+extern int read_single_number_file(const char *filename, unsigned long long *result);
+
 #endif /* NETDATA_COMMON_H */
