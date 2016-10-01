@@ -406,6 +406,14 @@ netdataDashboard.context = {
         height: 2.0
     },
 
+    'apps.mem': {
+        info: 'Real memory (RAM) used by applications. This does not include shared memory.'
+    },
+
+    'apps.vmem': {
+        info: 'Virtual memory allocated by applications. Please check <a href="https://github.com/firehol/netdata/wiki/netdata-virtual-memory-size" target="_blank">this article</a> for more information.'
+    },
+
     'apps.preads': {
         height: 2.0
     },
@@ -421,6 +429,14 @@ netdataDashboard.context = {
         height: 2.0
     },
 
+    'users.mem': {
+        info: 'Real memory (RAM) used per user. This does not include shared memory.'
+    },
+
+    'users.vmem': {
+        info: 'Virtual memory allocated per user. Please check <a href="https://github.com/firehol/netdata/wiki/netdata-virtual-memory-size" target="_blank">this article</a> for more information.'
+    },
+
     'users.preads': {
         height: 2.0
     },
@@ -434,6 +450,14 @@ netdataDashboard.context = {
 
     'groups.cpu': {
         height: 2.0
+    },
+
+    'groups.mem': {
+        info: 'Real memory (RAM) used per user group. This does not include shared memory.'
+    },
+
+    'groups.vmem': {
+        info: 'Virtual memory allocated per user group. Please check <a href="https://github.com/firehol/netdata/wiki/netdata-virtual-memory-size" target="_blank">this article</a> for more information.'
     },
 
     'groups.preads': {
