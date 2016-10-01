@@ -16,17 +16,15 @@ volatile sig_atomic_t netdata_exit = 0;
 
 #ifdef NETDATA_LOG_ALLOCATIONS
 static struct memory_statistics {
-    size_t malloc_calls_made;
-    size_t calloc_calls_made;
-    size_t realloc_calls_made;
-    size_t strdup_calls_made;
-    size_t free_calls_made;
-    size_t memory_calls_made;
-    size_t allocated_memory;
-    size_t mmapped_memory;
-} memory_statistics = {
-        0, 0, 0, 0, 0, 0, 0, 0
-};
+    volatile size_t malloc_calls_made;
+    volatile size_t calloc_calls_made;
+    volatile size_t realloc_calls_made;
+    volatile size_t strdup_calls_made;
+    volatile size_t free_calls_made;
+    volatile size_t memory_calls_made;
+    volatile size_t allocated_memory;
+    volatile size_t mmapped_memory;
+} memory_statistics;
 
 static inline void print_allocations(const char *file, const char *function, const unsigned long line) {
     static struct memory_statistics old = { 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -48,37 +46,73 @@ static inline void print_allocations(const char *file, const char *function, con
 }
 
 static inline void malloc_accounting(const char *file, const char *function, const unsigned long line, size_t size) {
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
+    __atomic_fetch_add(&memory_statistics.memory_calls_made, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&memory_statistics.malloc_calls_made, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&memory_statistics.allocated_memory, size, __ATOMIC_SEQ_CST);
+#else
+    // this is for debugging - we don't care locking it
     memory_statistics.memory_calls_made++;
     memory_statistics.malloc_calls_made++;
     memory_statistics.allocated_memory += size;
+#endif
     print_allocations(file, function, line);
 }
 
 static inline void mmap_accounting(size_t size) {
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
+    __atomic_fetch_add(&memory_statistics.malloc_calls_made, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&memory_statistics.mmapped_memory, size, __ATOMIC_SEQ_CST);
+#else
+    // this is for debugging - we don't care locking it
     memory_statistics.memory_calls_made++;
     memory_statistics.mmapped_memory += size;
+#endif
 }
 
 static inline void calloc_accounting(const char *file, const char *function, const unsigned long line, size_t size) {
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
+    __atomic_fetch_add(&memory_statistics.memory_calls_made, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&memory_statistics.calloc_calls_made, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&memory_statistics.allocated_memory, size, __ATOMIC_SEQ_CST);
+#else
+    // this is for debugging - we don't care locking it
     memory_statistics.memory_calls_made++;
     memory_statistics.calloc_calls_made++;
     memory_statistics.allocated_memory += size;
+#endif
     print_allocations(file, function, line);
 }
 
 static inline void realloc_accounting(const char *file, const char *function, const unsigned long line, void *ptr, size_t size) {
     (void)ptr;
 
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
+    __atomic_fetch_add(&memory_statistics.memory_calls_made, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&memory_statistics.realloc_calls_made, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&memory_statistics.allocated_memory, size, __ATOMIC_SEQ_CST);
+#else
+    // this is for debugging - we don't care locking it
     memory_statistics.memory_calls_made++;
     memory_statistics.realloc_calls_made++;
     memory_statistics.allocated_memory += size;
+#endif
     print_allocations(file, function, line);
 }
 
 static inline void strdup_accounting(const char *file, const char *function, const unsigned long line, const char *s) {
+    size_t size = strlen(s) + 1;
+
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
+    __atomic_fetch_add(&memory_statistics.memory_calls_made, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&memory_statistics.strdup_calls_made, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&memory_statistics.allocated_memory, size, __ATOMIC_SEQ_CST);
+#else
+    // this is for debugging - we don't care locking it
     memory_statistics.memory_calls_made++;
     memory_statistics.strdup_calls_made++;
-    memory_statistics.allocated_memory += strlen(s) + 1;
+    memory_statistics.allocated_memory += size;
+#endif
     print_allocations(file, function, line);
 }
 
@@ -88,8 +122,14 @@ static inline void free_accounting(const char *file, const char *function, const
     (void)line;
 
     if(likely(ptr)) {
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
+        __atomic_fetch_add(&memory_statistics.memory_calls_made, 1, __ATOMIC_SEQ_CST);
+        __atomic_fetch_add(&memory_statistics.free_calls_made, 1, __ATOMIC_SEQ_CST);
+#else
+        // this is for debugging - we don't care locking it
         memory_statistics.memory_calls_made++;
         memory_statistics.free_calls_made++;
+#endif
     }
 }
 #endif
