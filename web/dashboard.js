@@ -503,6 +503,26 @@
         NETDATA.onscroll();
     };
 
+    NETDATA.onscroll_updater_count = 0;
+    NETDATA.onscroll_updater_running = false;
+    NETDATA.onscroll_updater_last_run = 0;
+    NETDATA.onscroll_updater_watchdog = null;
+    NETDATA.onscroll_updater = function() {
+        NETDATA.onscroll_updater_running = true;
+        NETDATA.onscroll_updater_count++;
+        var start = new Date().getTime();
+
+        var targets = NETDATA.options.targets;
+        var len = targets.length;
+        while (len--)
+            targets[len].isVisible();
+
+        var end = new Date().getTime();
+        // console.log('scroll No ' + NETDATA.onscroll_updater_count + ' calculation took ' + (end - start).toString() + ' ms');
+        NETDATA.onscroll_updater_last_run = start;
+        NETDATA.onscroll_updater_running = false;
+    };
+
     NETDATA.onscroll = function() {
         // console.log('onscroll');
 
@@ -515,9 +535,9 @@
         // hidden all the not-visible charts
         // using this little function we try to switch
         // the charts back to visible quickly
-        var targets = NETDATA.options.targets;
-        var len = targets.length;
         if(NETDATA.options.abort_ajax_on_scroll === true) {
+            var targets = NETDATA.options.targets;
+            var len = targets.length;
             while (len--) {
                 if (targets[len]._updating === true) {
                     if (typeof targets[len].xhr !== 'undefined') {
@@ -530,8 +550,23 @@
             }
         }
         else {
-            while (len--)
-                targets[len].isVisible();
+            if(NETDATA.onscroll_updater_running === false) {
+                NETDATA.onscroll_updater_running = true;
+                setTimeout(NETDATA.onscroll_updater, 0);
+            }
+            else {
+                if(NETDATA.onscroll_updater_watchdog !== null)
+                    clearTimeout(NETDATA.onscroll_updater_watchdog);
+
+                NETDATA.onscroll_updater_watchdog = setTimeout(function() {
+                    if(NETDATA.onscroll_updater_running === false && NETDATA.options.last_page_scroll > NETDATA.onscroll_updater_last_run) {
+                        // console.log('watchdog');
+                        NETDATA.onscroll_updater();
+                    }
+
+                    NETDATA.onscroll_updater_watchdog = null;
+                }, 200);
+            }
         }
     };
 
