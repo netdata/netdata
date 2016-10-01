@@ -329,7 +329,7 @@
             pan_and_zoom_factor_multiplier_alt: 4.0,
 
             abort_ajax_on_scroll: false,            // kill pending ajax page scroll
-            async_on_scroll: true,                  // sync/async onscroll handler
+            async_on_scroll: false,                 // sync/async onscroll handler
             onscroll_worker_duration_threshold: 30, // time in ms, to consider slow the onscroll handler
 
             setOptionCallback: function() { ; }
