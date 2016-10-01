@@ -328,7 +328,9 @@
             pan_and_zoom_factor_multiplier_shift: 3.0,
             pan_and_zoom_factor_multiplier_alt: 4.0,
 
-            abort_ajax_on_scroll: false,
+            abort_ajax_on_scroll: false,            // kill pending ajax page scroll
+            async_on_scroll: true,                  // sync/async onscroll handler
+            onscroll_worker_duration_threshold: 30, // time in ms, to consider slow the onscroll handler
 
             setOptionCallback: function() { ; }
         },
@@ -507,6 +509,8 @@
     NETDATA.onscroll_updater_running = false;
     NETDATA.onscroll_updater_last_run = 0;
     NETDATA.onscroll_updater_watchdog = null;
+    NETDATA.onscroll_updater_max_duration = 0;
+    NETDATA.onscroll_updater_above_threshold_count = 0;
     NETDATA.onscroll_updater = function() {
         NETDATA.onscroll_updater_running = true;
         NETDATA.onscroll_updater_count++;
@@ -514,30 +518,16 @@
 
         var targets = NETDATA.options.targets;
         var len = targets.length;
-        while (len--)
-            targets[len].isVisible();
-
-        var end = new Date().getTime();
-        // console.log('scroll No ' + NETDATA.onscroll_updater_count + ' calculation took ' + (end - start).toString() + ' ms');
-        NETDATA.onscroll_updater_last_run = start;
-        NETDATA.onscroll_updater_running = false;
-    };
-
-    NETDATA.onscroll = function() {
-        // console.log('onscroll');
-
-        NETDATA.options.last_page_scroll = new Date().getTime();
-        NETDATA.options.auto_refresher_stop_until = 0;
-
-        if(NETDATA.options.targets === null) return;
 
         // when the user scrolls he sees that we have
         // hidden all the not-visible charts
         // using this little function we try to switch
         // the charts back to visible quickly
+
+
         if(NETDATA.options.abort_ajax_on_scroll === true) {
-            var targets = NETDATA.options.targets;
-            var len = targets.length;
+            // we have to cancel pending requests too
+
             while (len--) {
                 if (targets[len]._updating === true) {
                     if (typeof targets[len].xhr !== 'undefined') {
@@ -550,6 +540,47 @@
             }
         }
         else {
+            // just find which chart is visible
+
+            while (len--)
+                targets[len].isVisible();
+        }
+
+        var end = new Date().getTime();
+        // console.log('scroll No ' + NETDATA.onscroll_updater_count + ' calculation took ' + (end - start).toString() + ' ms');
+
+        if(NETDATA.options.current.async_on_scroll === false) {
+            var dt = end - start;
+            if(dt > NETDATA.onscroll_updater_max_duration) {
+                // console.log('max onscroll event handler duration increased to ' + dt);
+                NETDATA.onscroll_updater_max_duration = dt;
+            }
+
+            if(dt > NETDATA.options.current.onscroll_worker_duration_threshold) {
+                // console.log('slow: ' + dt);
+                NETDATA.onscroll_updater_above_threshold_count++;
+
+                if(NETDATA.onscroll_updater_above_threshold_count > 2 && NETDATA.onscroll_updater_above_threshold_count * 100 / NETDATA.onscroll_updater_count > 2) {
+                    NETDATA.options.current.async_on_scroll = true;
+                    console.log('NETDATA: your browser is slow - enabling asynchronous onscroll event handler.');
+                }
+            }
+        }
+
+        NETDATA.onscroll_updater_last_run = start;
+        NETDATA.onscroll_updater_running = false;
+    };
+
+    NETDATA.onscroll = function() {
+        // console.log('onscroll');
+
+        NETDATA.options.last_page_scroll = new Date().getTime();
+        NETDATA.options.auto_refresher_stop_until = 0;
+
+        if(NETDATA.options.targets === null) return;
+
+        if(NETDATA.options.current.async_on_scroll === true) {
+            // async
             if(NETDATA.onscroll_updater_running === false) {
                 NETDATA.onscroll_updater_running = true;
                 setTimeout(NETDATA.onscroll_updater, 0);
@@ -567,6 +598,10 @@
                     NETDATA.onscroll_updater_watchdog = null;
                 }, 200);
             }
+        }
+        else {
+            // sync
+            NETDATA.onscroll_updater();
         }
     };
 
