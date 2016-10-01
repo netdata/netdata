@@ -5,6 +5,18 @@
 #include <config.h>
 #endif
 
+#ifdef has_jemalloc
+#include <jemalloc/jemalloc.h>
+#undef HAVE_C_MALLOPT
+#undef HAVE_C_MALLINFO
+#elif has_tcmalloc
+#include <google/tcmalloc.h>
+#undef HAVE_C_MALLOPT
+#undef HAVE_C_MALLINFO
+#else
+#include <malloc.h>
+#endif
+
 #include <pthread.h>
 #include <errno.h>
 
@@ -27,7 +39,7 @@
 #include <grp.h>
 #include <pwd.h>
 #include <locale.h>
-#include <malloc.h>
+
 #include <netdb.h>
 #include <poll.h>
 #include <signal.h>
