@@ -37,6 +37,10 @@ static void log_allocations(void)
 #else /* ! HAVE_C_MALLINFO */
     ;
 #endif /* ! HAVE_C_MALLINFO */
+
+#ifdef has_jemalloc
+    malloc_stats_print(NULL, NULL, NULL);
+#endif
 }
 #endif /* NETDATA_INTERNAL_CHECKS */
 
