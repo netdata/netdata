@@ -85,13 +85,18 @@ CFLAGS="${CFLAGS} ${PTHREAD_CFLAGS}"
 CC="${PTHREAD_CC}"
 
 TS_CHECK_JEMALLOC
-if test "$has_jemalloc" = "0"; then
+if test "$has_jemalloc" = "1"; then
+	AC_DEFINE([ENABLE_JEMALLOC], [1], [compile and link with jemalloc])
+else
 	TS_CHECK_TCMALLOC
+	if test "$has_tcmalloc" = "1"; then
+		AC_DEFINE([ENABLE_TCMALLOC], [1], [compile and link with tcmalloc])
+	else
+		AC_C_MALLOPT
+		AC_C_MALLINFO
+	fi
 fi
-if test "$has_jemalloc$has_tcmalloc" = "00"; then
-	AC_C_MALLOPT
-	AC_C_MALLINFO
-fi
+
 AC_TYPE_UINT8_T
 AC_TYPE_UINT16_T
 AC_TYPE_UINT32_T
