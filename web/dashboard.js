@@ -561,7 +561,7 @@
                 NETDATA.onscroll_updater_above_threshold_count++;
 
                 if(NETDATA.onscroll_updater_above_threshold_count > 2 && NETDATA.onscroll_updater_above_threshold_count * 100 / NETDATA.onscroll_updater_count > 2) {
-                    NETDATA.options.current.async_on_scroll = true;
+                    NETDATA.setOption('async_on_scroll', true);
                     console.log('NETDATA: your browser is slow - enabling asynchronous onscroll event handler.');
                 }
             }
