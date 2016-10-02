@@ -5579,6 +5579,7 @@
     NETDATA.requiredJs = [
         {
             url: NETDATA.serverDefault + 'lib/bootstrap-3.3.7.min.js',
+            async: false,
             isAlreadyLoaded: function() {
                 // check if bootstrap is loaded
                 if(typeof $().emulateTransitionEnd == 'function')
@@ -5593,10 +5594,6 @@
         },
         {
             url: NETDATA.serverDefault + 'lib/jquery.nanoscroller.min.js',
-            isAlreadyLoaded: function() { return false; }
-        },
-        {
-            url: NETDATA.serverDefault + 'lib/bootstrap-toggle.min.js',
             isAlreadyLoaded: function() { return false; }
         }
     ];
@@ -5627,7 +5624,11 @@
 
     NETDATA.loadedRequiredJs = 0;
     NETDATA.loadRequiredJs = function(index, callback) {
-        if(index >= NETDATA.requiredJs.length) return;
+        if(index >= NETDATA.requiredJs.length) {
+            if(typeof callback === 'function')
+                callback();
+            return;
+        }
 
         if(NETDATA.requiredJs[index].isAlreadyLoaded()) {
             NETDATA.loadedRequiredJs++;
@@ -5638,10 +5639,13 @@
         if(NETDATA.options.debug.main_loop === true)
             console.log('loading ' + NETDATA.requiredJs[index].url);
 
+        var async = true;
+        if(typeof NETDATA.requiredJs[index].async !== 'undefined' && NETDATA.requiredJs[index].async === false)
+            async = false;
+
         $.ajax({
             url: NETDATA.requiredJs[index].url,
             cache: true,
-            async: true,
             dataType: "script",
             xhrFields: { withCredentials: true } // required for the cookie
         })
@@ -5654,11 +5658,13 @@
         })
         .always(function() {
             NETDATA.loadedRequiredJs++;
-            if(typeof callback === 'function' && NETDATA.loadedRequiredJs >= NETDATA.requiredJs.length)
-                callback();
+
+            if(async === false)
+                NETDATA.loadRequiredJs(++index, callback);
         })
 
-        NETDATA.loadRequiredJs(++index, callback);
+        if(async === true)
+            NETDATA.loadRequiredJs(++index, callback);
     };
 
     NETDATA.loadRequiredCSS = function(index) {
