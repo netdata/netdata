@@ -112,7 +112,7 @@
     NETDATA.peity_js            = NETDATA.serverDefault + 'lib/jquery.peity-3.2.0.min.js';
     NETDATA.sparkline_js        = NETDATA.serverDefault + 'lib/jquery.sparkline-2.1.2.min.js';
     NETDATA.easypiechart_js     = NETDATA.serverDefault + 'lib/jquery.easypiechart-97b5824.min.js';
-    NETDATA.gauge_js            = NETDATA.serverDefault + 'lib/gauge-c27b989.min.js';
+    NETDATA.gauge_js            = NETDATA.serverDefault + 'lib/gauge-d5260c3.min.js';
     NETDATA.dygraph_js          = NETDATA.serverDefault + 'lib/dygraph-combined-f6ec7be.js';
     NETDATA.dygraph_smooth_js   = NETDATA.serverDefault + 'lib/dygraph-smooth-plotter-f6ec7be.js';
     NETDATA.raphael_js          = NETDATA.serverDefault + 'lib/raphael-2.2.4-min.js';
@@ -5063,6 +5063,7 @@
         else if(typeof status === 'number')
             speed = status;
 
+        console.log('gauge speed ' + speed);
         state.gauge_instance.animationSpeed = speed;
         state.___gaugeOld__.speed = speed;
     };
@@ -5096,6 +5097,7 @@
         if(pcent > 100) pcent = 100;
 
         state.gauge_instance.set(pcent);
+        console.log('gauge set ' + pcent + ', value ' + value + ', min ' + min + ', max ' + max);
 
         state.___gaugeOld__.value = value;
         state.___gaugeOld__.min = min;

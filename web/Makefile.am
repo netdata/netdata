@@ -42,7 +42,7 @@ dist_weblib_DATA = \
 	lib/d3-4.2.6.min.js \
 	lib/dygraph-combined-f6ec7be.js \
 	lib/dygraph-smooth-plotter-f6ec7be.js \
-	lib/gauge-c27b989.min.js \
+	lib/gauge-d5260c3.min.js \
 	lib/jquery-3.1.1.min.js \
 	lib/jquery.easypiechart-97b5824.min.js \
 	lib/jquery.nanoscroller-0.8.7.min.js \
