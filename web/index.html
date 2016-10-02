@@ -1671,6 +1671,7 @@
             loadBootstrapTable(function () {
                 $('#alarms_log_table').bootstrapTable({
                     url: NETDATA.alarms.server + '/api/v1/alarm_log?all',
+                    cache: false,
                     pagination: true,
                     pageSize: 10,
                     showPaginationSwitch: false,
@@ -1903,36 +1904,6 @@
                 });
                 // console.log($('#alarms_log_table').bootstrapTable('getOptions'));
             });
-
-/*
-            NETDATA.alarms.get_log(0, function(data) {
-                if(data === null) {
-                    document.getElementById('alarms_log').innerHTML =
-                            'failed to load alarm data!';
-                    return;
-                }
-
-                var i = 0;
-                var len = data.length;
-                if(len > 50) len = 50;
-                while(i < len) {
-                    var time = new Date(data[i].when * 1000);
-                    log += '<tr><td>'
-                            + time.toLocaleDateString() + ' '
-                            + time.toLocaleTimeString() + '</td><td>'
-                            + data[i].chart.toString() + '</td><td>'
-                            + data[i].name.toString() + ' = ' + ((data[i].value !== null)?Math.floor(data[i].value):'NaN').toString() + ' ' + data[i].units.toString() + '</td><td>'
-                            + data[i].status.toString() + '</td></tr>';
-                    i++;
-                }
-                log += "</tbody></table>";
-
-                if(i == 0)
-                    log += "<h4>No alarms have been logged in this system.</h4>";
-
-                document.getElementById('alarms_log').innerHTML = log;
-            })
-*/
         });
     }
 
