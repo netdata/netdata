@@ -1431,17 +1431,40 @@
                 return t.toLocaleDateString() + space + t.toLocaleTimeString();
             }
 
-            function seconds4human(seconds, sfx, space) {
-                if(typeof space === 'undefined')
-                    space = '&nbsp;';
+            function seconds4human(seconds, options) {
+                var default_options = {
+                    now: 'now',
+                    space: '&nbsp;',
+                    negative_suffix: 'ago',
+                    hour: 'hour',
+                    hours: 'hours',
+                    minute: 'minute',
+                    minutes: 'minutes',
+                    second: 'second',
+                    seconds: 'seconds',
+                    and: 'and'
+                };
+
+                if(typeof options !== 'object')
+                    options = default_options;
+                else {
+                    var x;
+                    for(x in default_options) {
+                        if(typeof options[x] !== 'string')
+                            options[x] = default_options[x];
+                    }
+                }
+
+                if(typeof seconds === 'string')
+                    seconds = parseInt(seconds);
 
                 if(seconds === 0)
-                    return 'now';
+                    return options.now;
 
                 var suffix = '';
                 if(seconds < 0) {
                     seconds = -seconds;
-                    if(sfx) suffix = space + 'ago';
+                    if(options.negative_suffix !== '') suffix = options.space + options.negative_suffix;
                 }
 
                 var hours = Math.floor(seconds / 3600);
@@ -1452,22 +1475,22 @@
 
                 var txt = '';
                 
-                if(hours > 1) txt += hours.toString() + space + 'hours';
-                else if(hours === 1) txt += hours.toString() + space + 'hour';
+                if(hours > 1) txt += hours.toString() + options.space + options.hours;
+                else if(hours === 1) txt += hours.toString() + options.space + options.hour;
 
                 if(hours > 0 && minutes > 0 && seconds == 0)
-                    txt += space + 'and' + space;
+                    txt += options.space + options.and + options.space;
                 else if(hours > 0 && minutes > 0 && seconds > 0)
-                    txt += ',' + space;
+                    txt += ',' + options.space;
 
-                if(minutes > 1) txt += minutes.toString() + space + 'minutes';
-                else if(minutes === 1) txt += minutes.toString() + space + 'minute';
+                if(minutes > 1) txt += minutes.toString() + options.space + options.minutes;
+                else if(minutes === 1) txt += minutes.toString() + options.space + options.minute;
 
                 if((minutes > 0 || minutes > 0) && seconds > 0)
-                    txt += space + 'and' + space;
+                    txt += options.space + options.and + options.space;
 
-                if(seconds > 1) txt += seconds.toString() + space + 'seconds';
-                else if(seconds === 1) txt += seconds.toString() + space + 'second';
+                if(seconds > 1) txt += Math.floor(seconds).toString() + options.space + options.seconds;
+                else if(seconds === 1) txt += Math.floor(seconds).toString() + options.space + options.second;
 
                 return txt + suffix;
             }
@@ -1489,7 +1512,7 @@
 
                 return '<code>' + alarm.lookup_method + '</code> '
                     + dimensions + ', of chart <code>' + alarm.chart + '</code>'
-                    + ', starting <code>' + seconds4human(alarm.lookup_after + alarm.lookup_before, true) + '</code> and up to <code>' + seconds4human(alarm.lookup_before, true) + '</code>'
+                    + ', starting <code>' + seconds4human(alarm.lookup_after + alarm.lookup_before) + '</code> and up to <code>' + seconds4human(alarm.lookup_before) + '</code>'
                     + ((alarm.lookup_options)?(', with options <code>' + alarm.lookup_options.replace(' ', ',&nbsp;') + '</code>'):'')
                     + '.';
             }
@@ -1512,25 +1535,25 @@
                 var delay = '';
                 if((alarm.delay_up_duration > 0 || alarm.delay_down_duration > 0) && alarm.delay_multiplier != 0 && alarm.delay_max_duration > 0) {
                     if(alarm.delay_up_duration == alarm.delay_down_duration) {
-                        delay += '<small><br/>hysteresis ' + seconds4human(alarm.delay_up_duration);
+                        delay += '<small><br/>hysteresis ' + seconds4human(alarm.delay_up_duration, { negative_suffix: '' });
                     }
                     else {
                         delay = '<small><br/>hysteresis ';
                         if(alarm.delay_up_duration > 0) {
-                            delay += 'on&nbsp;escalation&nbsp;<code>' + seconds4human(alarm.delay_up_duration) + '</code>, ';
+                            delay += 'on&nbsp;escalation&nbsp;<code>' + seconds4human(alarm.delay_up_duration, { negative_suffix: '' }) + '</code>, ';
                         }
                         if(alarm.delay_down_duration > 0) {
-                            delay += 'on&nbsp;recovery&nbsp;<code>' + seconds4human(alarm.delay_down_duration) + '</code>, ';
+                            delay += 'on&nbsp;recovery&nbsp;<code>' + seconds4human(alarm.delay_down_duration, { negative_suffix: '' }) + '</code>, ';
                         }
                     }
                     if(alarm.delay_multiplier != 1.0) {
                         delay += 'multiplied&nbsp;by&nbsp;<code>' + alarm.delay_multiplier.toString() + '</code>';
-                        delay += ',&nbsp;up&nbsp;to&nbsp;<code>' + seconds4human(alarm.delay_max_duration) + '</code>';
+                        delay += ',&nbsp;up&nbsp;to&nbsp;<code>' + seconds4human(alarm.delay_max_duration, { negative_suffix: '' }) + '</code>';
                     }
                     delay += '</small>';
                 }
 
-                html += '<tr><td width="10%" style="text-align:right">check&nbsp;every</td><td>' + seconds4human(alarm.update_every) + '</td></tr>'
+                html += '<tr><td width="10%" style="text-align:right">check&nbsp;every</td><td>' + seconds4human(alarm.update_every, { negative_suffix: '' }) + '</td></tr>'
                     + '<tr><td width="10%" style="text-align:right">execute</td><td><span style="font-family: monospace;">' + alarm.exec + '</span>' + delay + '</td></tr>'
                     + '<tr><td width="10%" style="text-align:right">source</td><td><span style="font-family: monospace;">' + alarm.source + '</span></td></tr>'
                     + '</table></td></tr>';
@@ -1706,6 +1729,7 @@
                             field: 'when',
                             title: 'Event Date',
                             valign: 'middle',
+                            titleTooltip: 'The date and time the even took place',
                             switchable: false,
                             sortable: true,
                             formatter: function(value, row, index) { return timestamp4human(value, ' '); },
@@ -1714,12 +1738,14 @@
                             field: 'hostname',
                             title: 'Host',
                             valign: 'middle',
+                            titleTooltip: 'The host that generated this event',
                             visible: false,
                             sortable: true
                         },
                         {
                             field: 'unique_id',
                             title: 'Unique ID',
+                            titleTooltip: 'The host unique ID for this event',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1727,6 +1753,7 @@
                         {
                             field: 'alarm_id',
                             title: 'Alarm ID',
+                            titleTooltip: 'The ID of the alarm that generated this event',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1734,6 +1761,7 @@
                         {
                             field: 'alarm_event_id',
                             title: 'Alarm Event ID',
+                            titleTooltip: 'The incremental ID of this event for the given alarm',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1741,6 +1769,7 @@
                         {
                             field: 'chart',
                             title: 'Chart',
+                            titleTooltip: 'The chart the alarm is attached to',
                             valign: 'middle',
                             switchable: false,
                             sortable: true
@@ -1748,6 +1777,7 @@
                         {
                             field: 'family',
                             title: 'Family',
+                            titleTooltip: 'The family of the chart the alarm is attached to',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1755,6 +1785,7 @@
                         {
                             field: 'name',
                             title: 'Alarm',
+                            titleTooltip: 'The alarm name that generated this event',
                             formatter: function(value, row, index) {
                                 return value.toString().replace(/_/g, ' ');
                             },
@@ -1765,6 +1796,7 @@
                         {
                             field: 'old_value',
                             title: 'Old Value',
+                            titleTooltip: 'The value of the alarm, just before this event',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1772,6 +1804,7 @@
                         {
                             field: 'value',
                             title: 'Value',
+                            titleTooltip: 'The value of the alarm, that triggered this event',
                             formatter: function(value, row, index) {
                                 return ((value !== null)?Math.floor(value):'NaN').toString();
                             },
@@ -1782,12 +1815,14 @@
                         {
                             field: 'units',
                             title: 'Units',
+                            titleTooltip: 'The units of the value of the alarm',
                             valign: 'middle',
                             sortable: true
                         },
                         {
                             field: 'old_status',
                             title: 'Old Status',
+                            titleTooltip: 'The status of the alarm, just before this event',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1795,14 +1830,16 @@
                         {
                             field: 'status',
                             title: 'Status',
+                            titleTooltip: 'The status of the alarm, that was set due to this event',
                             valign: 'middle',
                             switchable: false,
                             sortable: true
                         },
                         {
                             field: 'duration',
-                            title: 'Duration',
-                            formatter: function(value, row, index) { return seconds4human(value, false, ' '); },
+                            title: 'Last Duration',
+                            titleTooltip: 'The duration the alarm was at its previous state, just before this event',
+                            formatter: function(value, row, index) { return seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' }); },
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1810,7 +1847,8 @@
                         {
                             field: 'non_clear_duration',
                             title: 'Raised Duration',
-                            formatter: function(value, row, index) { return seconds4human(value, false, ' '); },
+                            titleTooltip: 'The duration the alarm was raised, just before this event',
+                            formatter: function(value, row, index) { return seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' }); },
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1818,6 +1856,7 @@
                         {
                             field: 'recipient',
                             title: 'Recipient',
+                            titleTooltip: 'The recipient of this event',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1825,6 +1864,7 @@
                         {
                             field: 'processed',
                             title: 'Processed Status',
+                            titleTooltip: 'True when this event is processed',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1832,6 +1872,7 @@
                         {
                             field: 'updated',
                             title: 'Updated Status',
+                            titleTooltip: 'True when this event has been updated by another event',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1839,6 +1880,7 @@
                         {
                             field: 'updated_by_id',
                             title: 'Updated By ID',
+                            titleTooltip: 'The unique ID of the event that obsoleted this one',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1846,6 +1888,7 @@
                         {
                             field: 'updates_id',
                             title: 'Updates ID',
+                            titleTooltip: 'The unique ID of the event obsoleted because of this event',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1853,6 +1896,7 @@
                         {
                             field: 'exec',
                             title: 'Script',
+                            titleTooltip: 'The script to handle the event notification',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1860,6 +1904,7 @@
                         {
                             field: 'exec_run',
                             title: 'Script Run At',
+                            titleTooltip: 'The date and time the script has been ran',
                             formatter: function(value, row, index) { return timestamp4human(value, ' '); },
                             valign: 'middle',
                             visible: false,
@@ -1868,6 +1913,7 @@
                         {
                             field: 'exec_code',
                             title: 'Script Return Value',
+                            titleTooltip: 'The return code of the script',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1875,7 +1921,8 @@
                         {
                             field: 'delay',
                             title: 'Script Delay',
-                            formatter: function(value, row, index) { return seconds4human(value, false, ' '); },
+                            titleTooltip: 'The hysteresis of the notification',
+                            formatter: function(value, row, index) { return seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' }); },
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1883,6 +1930,7 @@
                         {
                             field: 'delay_up_to_timestamp',
                             title: 'Script Delay Run At',
+                            titleTooltip: 'The date and time the script should be run, after hysteresis',
                             formatter: function(value, row, index) { return timestamp4human(value, ' '); },
                             valign: 'middle',
                             visible: false,
@@ -1891,6 +1939,7 @@
                         {
                             field: 'info',
                             title: 'Description',
+                            titleTooltip: 'A short description of the alarm',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1898,6 +1947,7 @@
                         {
                             field: 'source',
                             title: 'Alarm Source',
+                            titleTooltip: 'The source of configuration of the alarm',
                             valign: 'middle',
                             visible: false,
                             sortable: true
