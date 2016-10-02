@@ -5063,7 +5063,7 @@
         else if(typeof status === 'number')
             speed = status;
 
-        console.log('gauge speed ' + speed);
+        // console.log('gauge speed ' + speed);
         state.gauge_instance.animationSpeed = speed;
         state.___gaugeOld__.speed = speed;
     };
@@ -5097,7 +5097,7 @@
         if(pcent > 100) pcent = 100;
 
         state.gauge_instance.set(pcent);
-        console.log('gauge set ' + pcent + ', value ' + value + ', min ' + min + ', max ' + max);
+        // console.log('gauge set ' + pcent + ', value ' + value + ', min ' + min + ', max ' + max);
 
         state.___gaugeOld__.value = value;
         state.___gaugeOld__.min = min;
