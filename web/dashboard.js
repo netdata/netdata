@@ -118,7 +118,7 @@
     NETDATA.raphael_js          = NETDATA.serverDefault + 'lib/raphael-2.2.4-min.js';
     NETDATA.c3_js               = NETDATA.serverDefault + 'lib/c3-0.4.11.min.js';
     NETDATA.c3_css              = NETDATA.serverDefault + 'css/c3-0.4.11.min.css';
-    NETDATA.d3_js               = NETDATA.serverDefault + 'lib/d3-4.2.6.min.js';
+    NETDATA.d3_js               = NETDATA.serverDefault + 'lib/d3-3.5.17.min.js';
     NETDATA.morris_js           = NETDATA.serverDefault + 'lib/morris-0.5.1.min.js';
     NETDATA.morris_css          = NETDATA.serverDefault + 'css/morris-0.5.1.css';
     NETDATA.google_js           = 'https://www.google.com/jsapi';
