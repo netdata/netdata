@@ -5,16 +5,23 @@
 #include <config.h>
 #endif
 
-#ifdef has_jemalloc
+/* select the memory allocator, based on autoconf findings */
+#if defined(ENABLE_JEMALLOC)
+
+#if defined(HAVE_JEMALLOC_JEMALLOC_H)
 #include <jemalloc/jemalloc.h>
-#undef HAVE_C_MALLOPT
-#undef HAVE_C_MALLINFO
-#elif has_tcmalloc
-#include <google/tcmalloc.h>
-#undef HAVE_C_MALLOPT
-#undef HAVE_C_MALLINFO
 #else
 #include <malloc.h>
+#endif
+
+#elif defined(ENABLE_TCMALLOC)
+
+#include <google/tcmalloc.h>
+
+#else /* !defined(ENABLE_JEMALLOC) && !defined(ENABLE_TCMALLOC) */
+
+#include <malloc.h>
+
 #endif
 
 #include <pthread.h>
