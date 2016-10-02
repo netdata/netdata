@@ -683,9 +683,9 @@
         var error = 'failed';
 
         if(document.location.toString().startsWith('http://') && url.toString().startsWith('https://'))
-                // we penalize https only if the current url is http
-                // to allow the user walk through all its servers.
-                penaldy = 500;
+            // we penalize https only if the current url is http
+            // to allow the user walk through all its servers.
+            penaldy = 500;
 
         else if(document.location.toString().startsWith('https://') && url.toString().startsWith('http://'))
             error = 'can\'t check';
@@ -708,8 +708,10 @@
                             gotoServerMiddleClick = false;
                             document.getElementById('gotoServerResponse').innerHTML = '<b>Opening new window to ' + NETDATA.registry.machines[guid].name + '<br/><a href="' + finalURL + '">' + url + '</a></b><br/>(check your pop-up blocker if it fails)';
                         }
-                        else
+                        else {
+                            document.getElementById('gotoServerResponse').innerHTML += 'found it! It is at:<br/><small>' + url + '</small>';
                             document.location = finalURL;
+                        }
                     }
                 }
                 else {
@@ -751,11 +753,11 @@
             if(gotoServerStop === false) {
                 document.getElementById('gotoServerResponse').innerHTML = '<b>Added all the known URLs for this machine.</b>';
                 NETDATA.registry.search(guid, function(data) {
-                    console.log(data);
+                    // console.log(data);
                     len = data.urls.length;
                     while(len--) {
                         var url = data.urls[len][1];
-                        console.log(url);
+                        // console.log(url);
                         if(typeof checked[url] === 'undefined') {
                             gotoServerValidateRemaining++;
                             checked[url] = true;
