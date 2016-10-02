@@ -1369,10 +1369,38 @@
 
     // ----------------------------------------------------------------------------
 
+    function loadJs(url, callback) {
+        $.ajax({
+            url: url,
+            cache: true,
+            dataType: "script",
+            xhrFields: { withCredentials: true } // required for the cookie
+        })
+        .fail(function() {
+            alert('Cannot load required JS library: ' + url);
+        })
+        .always(function() {
+            if(typeof callback === 'function')
+                callback();
+        })
+    }
+
+    var bootstrapTableLoaded = false;
+    function loadBootstrapTable(callback) {
+        if(bootstrapTableLoaded === false) {
+            bootstrapTableLoaded === true;
+            loadJs(NETDATA.serverDefault + 'lib/bootstrap-table.min.js?v1.11.0', function() {
+                loadJs(NETDATA.serverDefault + 'lib/bootstrap-table-export.min.js?v1.11.0', function() {
+                    loadJs(NETDATA.serverDefault + 'lib/tableExport.js', callback);
+                })
+            });
+        }
+        else callback();
+    }
+
     function alarmsUpdateModal() {
         var active = '<h3>Raised Alarms</h3><table class="table">';
         var all = '<h3>All Running Alarms</h3><div class="panel-group" id="alarms_all_accordion" role="tablist" aria-multiselectable="true">';
-        var log = '<h3>Alarm Log</h3><table class="table"><tr><th>When</th><th>Chart</th><th>Alarm</th><th>Status</th>';
         var footer = '<hr/><a href="https://github.com/firehol/netdata/wiki/Generating-Badges" target="_blank">netdata badges</a> refresh automatically. Their color indicates the state of the alarm: <span style="color: #e05d44"><b>&nbsp;red&nbsp;</b></span> is critical, <span style="color:#fe7d37"><b>&nbsp;orange&nbsp;</b></span> is warning, <span style="color: #4c1"><b>&nbsp;bright green&nbsp;</b></span> is ok, <span style="color: #9f9f9f"><b>&nbsp;light grey&nbsp;</b></span> is undefined (i.e. no data or no status), <span style="color: #000"><b>&nbsp;black&nbsp;</b></span> is not initialized. You can copy and paste their URLs to embed them in any web page.<br/>netdata can send notifications for these alarms. Check <a href="https://github.com/firehol/netdata/blob/master/conf.d/health_alarm_notify.conf">this configuration file</a> for more information.';
 
         NETDATA.alarms.get('all', function(data) {
@@ -1388,14 +1416,30 @@
                 return;
             }
 
-            function frequency_text(seconds, sfx) {
+            function timestamp4human(timestamp, space) {
+                if(typeof space === 'undefined')
+                    space = '&nbsp;';
+
+                var t = new Date(timestamp * 1000);
+                var now = new Date();
+
+                if(t.toDateString() == now.toDateString())
+                    return t.toLocaleTimeString();
+
+                return t.toLocaleDateString() + space + t.toLocaleTimeString();
+            }
+
+            function seconds4human(seconds, sfx, space) {
+                if(typeof space === 'undefined')
+                    space = '&nbsp;';
+
                 if(seconds === 0)
                     return 'now';
 
                 var suffix = '';
                 if(seconds < 0) {
                     seconds = -seconds;
-                    if(sfx) suffix = '&nbsp;ago';
+                    if(sfx) suffix = space + 'ago';
                 }
 
                 var hours = Math.floor(seconds / 3600);
@@ -1406,22 +1450,22 @@
 
                 var txt = '';
                 
-                if(hours > 1) txt += hours.toString() + '&nbsp;hours';
-                else if(hours === 1) txt += hours.toString() + '&nbsp;hour';
+                if(hours > 1) txt += hours.toString() + space + 'hours';
+                else if(hours === 1) txt += hours.toString() + space + 'hour';
 
                 if(hours > 0 && minutes > 0 && seconds == 0)
-                    txt += '&nbsp;and&nbsp;';
+                    txt += space + 'and' + space;
                 else if(hours > 0 && minutes > 0 && seconds > 0)
-                    txt += ',&nbsp;';
+                    txt += ',' + space;
 
-                if(minutes > 1) txt += minutes.toString() + '&nbsp;minutes';
-                else if(minutes === 1) txt += minutes.toString() + '&nbsp;minute';
+                if(minutes > 1) txt += minutes.toString() + space + 'minutes';
+                else if(minutes === 1) txt += minutes.toString() + space + 'minute';
 
                 if((minutes > 0 || minutes > 0) && seconds > 0)
-                    txt += '&nbsp;and&nbsp;';
+                    txt += space + 'and' + space;
 
-                if(seconds > 1) txt += seconds.toString() + '&nbsp;seconds';
-                else if(seconds === 1) txt += seconds.toString() + '&nbsp;second';
+                if(seconds > 1) txt += seconds.toString() + space + 'seconds';
+                else if(seconds === 1) txt += seconds.toString() + space + 'second';
 
                 return txt + suffix;
             }
@@ -1443,7 +1487,7 @@
 
                 return '<code>' + alarm.lookup_method + '</code> '
                     + dimensions + ', of chart <code>' + alarm.chart + '</code>'
-                    + ', starting <code>' + frequency_text(alarm.lookup_after + alarm.lookup_before, true) + '</code> and up to <code>' + frequency_text(alarm.lookup_before, true) + '</code>'
+                    + ', starting <code>' + seconds4human(alarm.lookup_after + alarm.lookup_before, true) + '</code> and up to <code>' + seconds4human(alarm.lookup_before, true) + '</code>'
                     + ((alarm.lookup_options)?(', with options <code>' + alarm.lookup_options.replace(' ', ',&nbsp;') + '</code>'):'')
                     + '.';
             }
@@ -1466,25 +1510,25 @@
                 var delay = '';
                 if((alarm.delay_up_duration > 0 || alarm.delay_down_duration > 0) && alarm.delay_multiplier != 0 && alarm.delay_max_duration > 0) {
                     if(alarm.delay_up_duration == alarm.delay_down_duration) {
-                        delay += '<small><br/>hysteresis ' + frequency_text(alarm.delay_up_duration);
+                        delay += '<small><br/>hysteresis ' + seconds4human(alarm.delay_up_duration);
                     }
                     else {
                         delay = '<small><br/>hysteresis ';
                         if(alarm.delay_up_duration > 0) {
-                            delay += 'on&nbsp;escalation&nbsp;<code>' + frequency_text(alarm.delay_up_duration) + '</code>, ';
+                            delay += 'on&nbsp;escalation&nbsp;<code>' + seconds4human(alarm.delay_up_duration) + '</code>, ';
                         }
                         if(alarm.delay_down_duration > 0) {
-                            delay += 'on&nbsp;recovery&nbsp;<code>' + frequency_text(alarm.delay_down_duration) + '</code>, ';
+                            delay += 'on&nbsp;recovery&nbsp;<code>' + seconds4human(alarm.delay_down_duration) + '</code>, ';
                         }
                     }
                     if(alarm.delay_multiplier != 1.0) {
                         delay += 'multiplied&nbsp;by&nbsp;<code>' + alarm.delay_multiplier.toString() + '</code>';
-                        delay += ',&nbsp;up&nbsp;to&nbsp;<code>' + frequency_text(alarm.delay_max_duration) + '</code>';
+                        delay += ',&nbsp;up&nbsp;to&nbsp;<code>' + seconds4human(alarm.delay_max_duration) + '</code>';
                     }
                     delay += '</small>';
                 }
 
-                html += '<tr><td width="10%" style="text-align:right">check&nbsp;every</td><td>' + frequency_text(alarm.update_every) + '</td></tr>'
+                html += '<tr><td width="10%" style="text-align:right">check&nbsp;every</td><td>' + seconds4human(alarm.update_every) + '</td></tr>'
                     + '<tr><td width="10%" style="text-align:right">execute</td><td><span style="font-family: monospace;">' + alarm.exec + '</span>' + delay + '</td></tr>'
                     + '<tr><td width="10%" style="text-align:right">source</td><td><span style="font-family: monospace;">' + alarm.source + '</span></td></tr>'
                     + '</table></td></tr>';
@@ -1622,6 +1666,245 @@
                 $('#alarm_all_' + id.toString()).html('');
             });
 
+            document.getElementById('alarms_log').innerHTML = '<h3>Alarm Log</h3><table id="alarms_log_table"></table>';
+
+            loadBootstrapTable(function () {
+                $('#alarms_log_table').bootstrapTable({
+                    url: NETDATA.alarms.server + '/api/v1/alarm_log?all',
+                    pagination: true,
+                    pageSize: 10,
+                    showPaginationSwitch: false,
+                    search: true,
+                    searchTimeOut: 300,
+                    searchAlign: 'left',
+                    showColumns: true,
+                    showExport: true,
+                    exportDataType: 'basic',
+                    exportOptions: {
+                        fileName: 'netdata_alarm_log'
+                    },
+                    rowStyle: function(row, index) {
+                        switch(row.status) {
+                            case 'CRITICAL' : return { classes: 'danger'  }; break;
+                            case 'WARNING'  : return { classes: 'warning' }; break;
+                            case 'UNDEFINED': return { classes: 'info'    }; break;
+                            case 'CLEAR'    : return { classes: 'success' }; break;
+                        }
+                        return {};
+                    },
+                    showFooter: false,
+                    showHeader: true,
+                    showRefresh: true,
+                    showToggle: false,
+                    sortable: true,
+                    silentSort: false,
+                    columns: [
+                        {
+                            field: 'when',
+                            title: 'Event Date',
+                            valign: 'middle',
+                            switchable: false,
+                            sortable: true,
+                            formatter: function(value, row, index) { return timestamp4human(value, ' '); },
+                        },
+                        {
+                            field: 'hostname',
+                            title: 'Host',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'unique_id',
+                            title: 'Unique ID',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'alarm_id',
+                            title: 'Alarm ID',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'alarm_event_id',
+                            title: 'Alarm Event ID',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'chart',
+                            title: 'Chart',
+                            valign: 'middle',
+                            switchable: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'family',
+                            title: 'Family',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'name',
+                            title: 'Alarm',
+                            formatter: function(value, row, index) {
+                                return value.toString().replace(/_/g, ' ');
+                            },
+                            valign: 'middle',
+                            switchable: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'old_value',
+                            title: 'Old Value',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'value',
+                            title: 'Value',
+                            formatter: function(value, row, index) {
+                                return ((value !== null)?Math.floor(value):'NaN').toString();
+                            },
+                            align: 'right',
+                            valign: 'middle',
+                            sortable: true
+                        },
+                        {
+                            field: 'units',
+                            title: 'Units',
+                            valign: 'middle',
+                            sortable: true
+                        },
+                        {
+                            field: 'old_status',
+                            title: 'Old Status',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'status',
+                            title: 'Status',
+                            valign: 'middle',
+                            switchable: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'duration',
+                            title: 'Duration',
+                            formatter: function(value, row, index) { return seconds4human(value, false, ' '); },
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'non_clear_duration',
+                            title: 'Raised Duration',
+                            formatter: function(value, row, index) { return seconds4human(value, false, ' '); },
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'recipient',
+                            title: 'Recipient',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'processed',
+                            title: 'Processed Status',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'updated',
+                            title: 'Updated Status',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'updated_by_id',
+                            title: 'Updated By ID',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'updates_id',
+                            title: 'Updates ID',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'exec',
+                            title: 'Script',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'exec_run',
+                            title: 'Script Run At',
+                            formatter: function(value, row, index) { return timestamp4human(value, ' '); },
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'exec_code',
+                            title: 'Script Return Value',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'delay',
+                            title: 'Script Delay',
+                            formatter: function(value, row, index) { return seconds4human(value, false, ' '); },
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'delay_up_to_timestamp',
+                            title: 'Script Delay Run At',
+                            formatter: function(value, row, index) { return timestamp4human(value, ' '); },
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'info',
+                            title: 'Description',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'source',
+                            title: 'Alarm Source',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        }
+                    ]
+                });
+                console.log($('#alarms_log_table').bootstrapTable('getOptions'));
+            });
+
+/*
             NETDATA.alarms.get_log(0, function(data) {
                 if(data === null) {
                     document.getElementById('alarms_log').innerHTML =
@@ -1642,13 +1925,14 @@
                             + data[i].status.toString() + '</td></tr>';
                     i++;
                 }
-                log += "</table>";
+                log += "</tbody></table>";
 
                 if(i == 0)
                     log += "<h4>No alarms have been logged in this system.</h4>";
 
                 document.getElementById('alarms_log').innerHTML = log;
             })
+*/
         });
     }
 
@@ -1722,7 +2006,8 @@
         $.ajax({
             url: 'version.txt',
             async: true,
-            cache: false
+            cache: false,
+            xhrFields: { withCredentials: true } // required for the cookie
         })
         .done(function(data) {
             data = data.replace(/(\r\n|\n|\r| |\t)/gm,"");
@@ -2147,10 +2432,16 @@
     // parallel javascript downloader in netdata
     var netdataPrepCallback = function() {
         NETDATA.requiredJs.push({
-            url: NETDATA.serverDefault + 'dashboard_info.js?v58',
+            url: NETDATA.serverDefault + 'lib/bootstrap-toggle.min.js',
             isAlreadyLoaded: function() { return false; }
         });
-        
+
+        NETDATA.requiredJs.push({
+            url: NETDATA.serverDefault + 'dashboard_info.js?v58',
+            async: false,
+            isAlreadyLoaded: function() { return false; }
+        });
+
         if(isdemo()) {
             document.getElementById('masthead').style.display = 'block';
         }
@@ -2284,12 +2575,6 @@
                         <i class="fa fa-circle"></i> The excellent <a href="http://dygraphs.com/" target="_blank">Dygraphs.com</a> web chart library,
                         <i class="fa fa-copyright"></i> Copyright 2009, Dan Vanderkam, <a href="http://dygraphs.com/legal.html" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="http://omnipotent.net/jquery.sparkline/" target="_blank">jQuery Sparklines</a> web chart library,
-                        <i class="fa fa-copyright"></i> Copyright 2009-2012, Splunk Inc., <a href="http://opensource.org/licenses/BSD-3-Clause" target="_blank">New BSD License</a>
-
-                        <i class="fa fa-circle"></i> <a href="http://benpickles.github.io/peity/" target="_blank">Peity</a> web chart library,
-                        <i class="fa fa-copyright"></i> Copyright 2009-2015, Ben Pickles, <a href="https://github.com/benpickles/peity/blob/master/MIT-LICENCE" target="_blank">MIT License</a>
-
                         <i class="fa fa-circle"></i> <a href="https://rendro.github.io/easy-pie-chart/" target="_blank">Easy Pie Chart</a> web chart library,
                         <i class="fa fa-copyright"></i> Copyright 2013, Robert Fleischmann, <a href="https://github.com/rendro/easy-pie-chart/blob/master/LICENSE" target="_blank">MIT License</a>
 
@@ -2308,25 +2593,16 @@
                         <i class="fa fa-circle"></i> <a href="https://jamesflorentino.github.io/nanoScrollerJS/" target="_blank">NanoScroller</a>,
                         <i class="fa fa-copyright"></i> Copyright 2012, James Florentino, <a href="https://github.com/jamesflorentino/nanoScrollerJS/blob/master/LICENSE" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="https://github.com/marcj/css-element-queries" target="_blank">CSS Element Queries</a>,
-                        <i class="fa fa-copyright"></i> Copyright Marc J. Schmidt, <a href="https://github.com/marcj/css-element-queries/blob/master/LICENSE" target="_blank">MIT License</a>
-
                         <i class="fa fa-circle"></i> <a href="https://fortawesome.github.io/Font-Awesome/" target="_blank">FontAwesome</a>,
                         <i class="fa fa-copyright"></i> Created by Dave Gandy, Font: <a href="http://scripts.sil.org/OFL" target="_blank">SIL OFL 1.1 License</a>, CSS: <a href="http://opensource.org/licenses/mit-license.html" target="_blank">MIT License</a>
 
                         <i class="fa fa-circle"></i> <a href="http://www.iconsdb.com/soylent-red-icons/seo-performance-icon.html" target="_blank">IconsDB.com Icons</a>, Icons provided as CC0 1.0 Universal (CC0 1.0) Public Domain Dedication.
 
-                        <i class="fa fa-circle"></i> <a href="http://morrisjs.github.io/morris.js/" target="_blank">morris.js</a>,
-                        <i class="fa fa-copyright"></i> Copyright 2013, Olly Smith, <a href="http://morrisjs.github.io/morris.js/" target="_blank">Simplified BSD License</a>
+                        <i class="fa fa-circle"></i> <a href="http://bootstrap-table.wenzhixin.net.cn/" target="_blank">bootstrap-table</a>,
+                        <i class="fa fa-copyright"></i> Copyright (c) 2012-2016 Zhixin Wen, <a href="https://github.com/wenzhixin/bootstrap-table/blob/master/LICENSE" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="http://raphaeljs.com/" target="_blank">Raphaël</a>,
-                        <i class="fa fa-copyright"></i> Copyright 2008, Dmitry Baranovskiy, <a href="http://raphaeljs.com/license.html" target="_blank">MIT License</a>
-
-                        <i class="fa fa-circle"></i> <a href="http://C3js.org/" target="_blank">C3</a>,
-                        <i class="fa fa-copyright"></i> Copyright 2013, Masayuki Tanaka, <a href="https://github.com/masayuki0812/c3/blob/master/LICENSE" target="_blank">MIT License</a>
-
-                        <i class="fa fa-circle"></i> <a href="http://D3js.org/" target="_blank">D3</a>,
-                        <i class="fa fa-copyright"></i> Copyright 2015, Mike Bostock, <a href="http://opensource.org/licenses/BSD-3-Clause" target="_blank">BSD License</a>
+                        <i class="fa fa-circle"></i> <a href="https://github.com/hhurz/tableExport.jquery.plugin" target="_blank">tableExport.jquery.plugin</a>,
+                        <i class="fa fa-copyright"></i> Copyright (c) 2015,2016 hhurz, <a href="http://rawgit.com/hhurz/tableExport.jquery.plugin/master/tableExport.js" target="_blank">MIT License</a>
 
                     </small>
                 </div>
@@ -2478,7 +2754,7 @@
     </div>
 
     <div class="modal fade" id="alarmsModal" tabindex="-1" role="dialog" aria-labelledby="alarmsModalLabel">
-        <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-dialog modal-lg" role="document"  style="display: table;"> <!-- allow the modal to expand horizontally -->
             <div class="modal-content">
                 <div class="modal-header">
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
@@ -2777,4 +3053,4 @@
     </div>
 </body>
 </html>
-<script async type="text/javascript" src="dashboard.js?v58"></script>
+<script type="text/javascript" src="dashboard.js?v58"></script>

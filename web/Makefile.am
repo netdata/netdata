@@ -34,16 +34,19 @@ dist_webold_DATA = \
 
 weblibdir=$(webdir)/lib
 dist_weblib_DATA = \
+	lib/bootstrap-3.3.7.min.js \
+	lib/bootstrap-table.min.js \
+	lib/bootstrap-table-export.min.js \
+	lib/tableExport.js \
 	lib/dygraph-combined-f6ec7be.js \
 	lib/dygraph-smooth-plotter.js \
 	lib/jquery-3.1.1.min.js \
 	lib/jquery.peity.min.js \
 	lib/jquery.sparkline.min.js \
-	lib/morris.min.js \
-	lib/raphael-min.js \
 	lib/jquery.easypiechart.min.js \
 	lib/jquery.nanoscroller.min.js \
-	lib/bootstrap-3.3.7.min.js \
+	lib/morris.min.js \
+	lib/raphael-min.js \
 	lib/ElementQueries.js \
 	lib/ResizeSensor.js \
 	lib/bootstrap-toggle.min.js \
