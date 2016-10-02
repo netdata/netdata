@@ -1389,9 +1389,9 @@
     function loadBootstrapTable(callback) {
         if(bootstrapTableLoaded === false) {
             bootstrapTableLoaded === true;
-            loadJs(NETDATA.serverDefault + 'lib/bootstrap-table.min.js?v1.11.0', function() {
-                loadJs(NETDATA.serverDefault + 'lib/bootstrap-table-export.min.js?v1.11.0', function() {
-                    loadJs(NETDATA.serverDefault + 'lib/tableExport.js', callback);
+            loadJs(NETDATA.serverDefault + 'lib/bootstrap-table-1.11.0.min.js', function() {
+                loadJs(NETDATA.serverDefault + 'lib/bootstrap-table-export-1.11.0.min.js', function() {
+                    loadJs(NETDATA.serverDefault + 'lib/tableExport-1.6.0.min.js', callback);
                 })
             });
         }
@@ -2402,13 +2402,18 @@
     // callback to add the dashboard info to the
     // parallel javascript downloader in netdata
     var netdataPrepCallback = function() {
-        NETDATA.requiredJs.push({
-            url: NETDATA.serverDefault + 'lib/bootstrap-toggle.min.js',
+        NETDATA.requiredCSS.push({
+            url: NETDATA.serverDefault + 'css/bootstrap-toggle-2.2.2.min.css',
             isAlreadyLoaded: function() { return false; }
         });
 
         NETDATA.requiredJs.push({
-            url: NETDATA.serverDefault + 'dashboard_info.js?v58',
+            url: NETDATA.serverDefault + 'lib/bootstrap-toggle-2.2.2.min.js',
+            isAlreadyLoaded: function() { return false; }
+        });
+
+        NETDATA.requiredJs.push({
+            url: NETDATA.serverDefault + 'dashboard_info.js?v20161002-1',
             async: false,
             isAlreadyLoaded: function() { return false; }
         });
@@ -3024,4 +3029,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v58"></script>
+<script type="text/javascript" src="dashboard.js?v20161002-1"></script>
