@@ -109,24 +109,24 @@
     // make them RELATIVE so that the whole thing can also be
     // installed under a web server
     NETDATA.jQuery              = NETDATA.serverDefault + 'lib/jquery-3.1.1.min.js';
-    NETDATA.peity_js            = NETDATA.serverDefault + 'lib/jquery.peity.min.js';
-    NETDATA.sparkline_js        = NETDATA.serverDefault + 'lib/jquery.sparkline.min.js';
-    NETDATA.easypiechart_js     = NETDATA.serverDefault + 'lib/jquery.easypiechart.min.js';
-    NETDATA.gauge_js            = NETDATA.serverDefault + 'lib/gauge.min.js';
+    NETDATA.peity_js            = NETDATA.serverDefault + 'lib/jquery.peity-3.2.0.min.js';
+    NETDATA.sparkline_js        = NETDATA.serverDefault + 'lib/jquery.sparkline-2.1.2.min.js';
+    NETDATA.easypiechart_js     = NETDATA.serverDefault + 'lib/jquery.easypiechart-97b5824.min.js';
+    NETDATA.gauge_js            = NETDATA.serverDefault + 'lib/gauge-c27b989.min.js';
     NETDATA.dygraph_js          = NETDATA.serverDefault + 'lib/dygraph-combined-f6ec7be.js';
-    NETDATA.dygraph_smooth_js   = NETDATA.serverDefault + 'lib/dygraph-smooth-plotter.js';
-    NETDATA.raphael_js          = NETDATA.serverDefault + 'lib/raphael-min.js';
-    NETDATA.morris_js           = NETDATA.serverDefault + 'lib/morris.min.js';
-    NETDATA.d3_js               = NETDATA.serverDefault + 'lib/d3.min.js';
-    NETDATA.c3_js               = NETDATA.serverDefault + 'lib/c3.min.js';
-    NETDATA.c3_css              = NETDATA.serverDefault + 'css/c3.min.css';
-    NETDATA.morris_css          = NETDATA.serverDefault + 'css/morris.css';
+    NETDATA.dygraph_smooth_js   = NETDATA.serverDefault + 'lib/dygraph-smooth-plotter-f6ec7be.js';
+    NETDATA.raphael_js          = NETDATA.serverDefault + 'lib/raphael-2.2.4-min.js';
+    NETDATA.c3_js               = NETDATA.serverDefault + 'lib/c3-0.4.11.min.js';
+    NETDATA.c3_css              = NETDATA.serverDefault + 'css/c3-0.4.11.min.css';
+    NETDATA.d3_js               = NETDATA.serverDefault + 'lib/d3-4.2.6.min.js';
+    NETDATA.morris_js           = NETDATA.serverDefault + 'lib/morris-0.5.1.min.js';
+    NETDATA.morris_css          = NETDATA.serverDefault + 'css/morris-0.5.1.css';
     NETDATA.google_js           = 'https://www.google.com/jsapi';
 
     NETDATA.themes = {
         white: {
             bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-3.3.7.min.css',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.css?v57',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.css?v20161002-1',
             background: '#FFFFFF',
             foreground: '#000000',
             grid: '#DDDDDD',
@@ -142,8 +142,8 @@
             gauge_gradient: false
         },
         slate: {
-            bootstrap_css: NETDATA.serverDefault + 'css/bootstrap.slate.min.css',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v57',
+            bootstrap_css: NETDATA.serverDefault + 'css/bootstrap.slate.min.css?v20161002-1',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20161002-1',
             background: '#272b30',
             foreground: '#C8C8C8',
             grid: '#35393e',
@@ -5593,7 +5593,7 @@
             }
         },
         {
-            url: NETDATA.serverDefault + 'lib/jquery.nanoscroller.min.js',
+            url: NETDATA.serverDefault + 'lib/jquery.nanoscroller-0.8.7.min.js',
             isAlreadyLoaded: function() { return false; }
         }
     ];
@@ -5614,10 +5614,6 @@
         },
         {
             url: NETDATA.themes.current.dashboard_css,
-            isAlreadyLoaded: function() { return false; }
-        },
-        {
-            url: NETDATA.serverDefault + 'css/bootstrap-toggle.min.css',
             isAlreadyLoaded: function() { return false; }
         }
     ];
