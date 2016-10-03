@@ -2,16 +2,28 @@
 <a href="https://scan.coverity.com/projects/firehol-netdata"><img alt="Coverity Scan Build Status" src="https://scan.coverity.com/projects/9140/badge.svg"/></a>
 [![Docker Pulls](https://img.shields.io/docker/pulls/titpetric/netdata.svg)](https://hub.docker.com/r/titpetric/netdata/)
 
-[![User Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#netdata_registry)
-[![Monitored Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#netdata_registry)
-[![Sessions Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#netdata_registry)
+[![User Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
+[![Monitored Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
+[![Sessions Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
 
-[![New Users Today](http://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#netdata_registry)
-[![New Machines Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#netdata_registry)
-[![Sessions Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#netdata_registry)
+[![New Users Today](http://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
+[![New Machines Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
+[![Sessions Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
 
 
 # netdata
+
+> Oct 4th, 2016
+>
+> [netdata v1.4.0 released!](https://github.com/firehol/netdata/releases)
+>
+> - the fastest netdata ever (with a better look too)!
+> - improved IoT and containers support!
+> - alarms improved in almost every way!
+> - new plugins:  softnet netdev, extended TCP metrics, UDPLite, NFS v2, v3 client (server was there already), NFS v4 server & client, APCUPSd, RetroShare
+> - improved plugins: mysql, cgroups, hddtemp, sensors, phpfm, tc (QoS)
+
+---
 
 > Aug 28th, 2016
 >
@@ -21,17 +33,6 @@
 > - netdata **[generates badges](https://github.com/firehol/netdata/wiki/Generating-Badges)** that can be embeded anywhere!
 > - netdata plugins are now written in python!
 > - new plugins: redis, memcached, nginx_log, ipfs, apache_cache
-
----
-
-> May 16th, 2016
->
-> [netdata v1.2.0 released!](https://github.com/firehol/netdata/releases)
->
-> - 30% faster!
-> - **[netdata registry](https://github.com/firehol/netdata/wiki/mynetdata-menu-item)**, the first step towards scaling out performance monitoring!
-> - real-time Linux Containers monitoring!
-> - dozens of additional new features, optimizations, bug-fixes
 
 ---
 

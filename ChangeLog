@@ -1,3 +1,73 @@
+netdata (1.4.0) - 2016-10-04
+
+ At a glance:
+
+ - the fastest netdata ever (with a better look too)!
+ - improved IoT and containers support!
+ - alarms improved in almost every way!
+
+ - new plugins:
+      softnet netdev,
+      extended TCP metrics,
+      UDPLite
+      NFS v2, v3 client (server was there already),
+      NFS v4 server & client,
+      APCUPSd,
+      RetroShare
+
+ - improved plugins:
+      mysql,
+      cgroups,
+      hddtemp,
+      sensors,
+      phpfm,
+      tc (QoS)
+
+ In detail:
+
+ * improved alarms
+
+   Many new alarms have been added to detect common kernel
+   configuration errors and old alarms have been re-worked
+   to avoid notification floods.
+
+   Alarms now support notification hysteresis (both static
+   and dynamic), notification self-cancellation, dynamic
+   thresholds based on current alarm status
+
+ * improved alarm notifications
+
+   netdata now supports:
+
+   - email notifications
+   - slack.com notifications on slack channels
+   - pushover.net notifications (mobile push notifications)
+   - telegram.org notifications
+
+   For all the above methods, netdata supports role-based
+   notifications, with multiple recipients for each role
+   and severity filtering per recipient!
+
+   Also, netdata support HTML5 notifications, while the
+   dashboard is open in a browser window (no need to be
+   the active one).
+
+   All notifications are now clickable to get to the chart
+   that raised the alarm.
+
+ * improved IoT support!
+
+   netdata builds and runs with musl libc and runs on systems
+   based on busybox.
+
+ * improved containers support!
+
+   netdata runs on alpine linux (a low profile linux distribution
+   used in containers).
+
+ * Dozens of other improvements and bugfixes
+ 
+ 
 netdata (1.3.0) - 2016-08-28
 
  At a glance:
