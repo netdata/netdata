@@ -18,7 +18,7 @@ retries = 60
 #    'port': 5432
 # }
 
-ORDER = ["Tuples", "Scans", "BGWriter"]
+ORDER = ["Tuples", "Scans", "BGWriter", "BufferCache"]
 CHARTS = {
     "Tuples": {
         'options': ["tuples", "PostgreSQL tuple access", "Tuples / sec", "tuples", "postgres.tuples", "line"],
@@ -43,6 +43,12 @@ CHARTS = {
             ["buffers_clean", "buffers_clean", "incremental", 1, 1],
             ["buffers_checkpoint", "buffers_checkpoint", "incremental", 1, 1],
             ["buffers_backend", "buffers_backend", "incremental", 1, 1],
+        ]},
+    "BufferCache": {
+        'options': ["buffer_cache", "Buffer Cache", "Buffers / sec", "buffer_cache", "postgres.buffer_cache", "line"],
+        'lines': [
+            ["blks_read", "blks_read", "incremental", 1, 1],
+            ["blks_hit", "blks_hit", "incremental", 1, 1],
         ]}
 }
 
@@ -52,7 +58,6 @@ class Service(SimpleService):
         super(self.__class__, self).__init__(configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.error(str(configuration))
         self.configuration = configuration
         self.connection = None
 
@@ -93,6 +98,7 @@ class Service(SimpleService):
         """)
         graph_data = {k: float(v) for k, v in cursor.fetchone().items()}
 
+        # Pull in BGWriter info
         cursor.execute("""
             SELECT
               buffers_checkpoint,
@@ -103,6 +109,17 @@ class Service(SimpleService):
               pg_stat_bgwriter
         """)
         graph_data.update(dict(cursor.fetchone()))
+
+        cursor.execute("""
+            SELECT
+              sum(blks_read) AS blks_read,
+              sum(blks_hit) AS blks_hit
+            FROM
+              pg_stat_database
+            WHERE
+              datname = %(database)s
+        """, self.configuration)
+        graph_data.update({k: float(v) for k, v in cursor.fetchone().items()})
 
         self.connection.commit()
         cursor.close()
