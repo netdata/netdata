@@ -113,8 +113,8 @@
     NETDATA.sparkline_js        = NETDATA.serverDefault + 'lib/jquery.sparkline-2.1.2.min.js';
     NETDATA.easypiechart_js     = NETDATA.serverDefault + 'lib/jquery.easypiechart-97b5824.min.js';
     NETDATA.gauge_js            = NETDATA.serverDefault + 'lib/gauge-d5260c3.min.js';
-    NETDATA.dygraph_js          = NETDATA.serverDefault + 'lib/dygraph-combined-f6ec7be.js';
-    NETDATA.dygraph_smooth_js   = NETDATA.serverDefault + 'lib/dygraph-smooth-plotter-f6ec7be.js';
+    NETDATA.dygraph_js          = NETDATA.serverDefault + 'lib/dygraph-combined-dd74404.js';
+    NETDATA.dygraph_smooth_js   = NETDATA.serverDefault + 'lib/dygraph-smooth-plotter-dd74404.js';
     NETDATA.raphael_js          = NETDATA.serverDefault + 'lib/raphael-2.2.4-min.js';
     NETDATA.c3_js               = NETDATA.serverDefault + 'lib/c3-0.4.11.min.js';
     NETDATA.c3_css              = NETDATA.serverDefault + 'css/c3-0.4.11.min.css';
@@ -3961,7 +3961,7 @@
 
             includeZero: self.data('dygraph-includezero') || ((chart_type === 'stacked')? true : false),
             xRangePad: self.data('dygraph-xrangepad') || 0,
-            // yRangePad: self.data('dygraph-yrangepad') || 1,
+            yRangePad: self.data('dygraph-yrangepad') || 1,
 
             valueRange: self.data('dygraph-valuerange') || null,
 
@@ -4003,8 +4003,6 @@
             axisLineWidth: self.data('dygraph-axislinewidth') || 0.3,
 
             drawGrid: self.data('dygraph-drawgrid') || true,
-            drawXGrid: self.data('dygraph-drawxgrid') || undefined,
-            drawYGrid: self.data('dygraph-drawygrid') || undefined,
             gridLinePattern: self.data('dygraph-gridlinepattern') || null,
             gridLineWidth: self.data('dygraph-gridlinewidth') || 0.4,
             gridLineColor: self.data('dygraph-gridlinecolor') || NETDATA.themes.current.grid,
@@ -4375,7 +4373,6 @@
             state.dygraph_options.drawGrid = false;
             state.dygraph_options.drawAxis = false;
             state.dygraph_options.title = undefined;
-            state.dygraph_options.units = undefined;
             state.dygraph_options.ylabel = undefined;
             state.dygraph_options.yLabelWidth = 0;
             state.dygraph_options.labelsDivWidth = 120;
