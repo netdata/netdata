@@ -172,6 +172,11 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/%{name}/web
 
 %changelog
+* Tue Oct 4 2016 Costa Tsaousis <costa@tsaousis.gr> - 1.4.0-1
+- the fastest netdata ever (with a better look too)!
+- improved IoT and containers support!
+- alarms improved in almost every way!
+- Several more improvements, new features and bugfixes.
 * Sun Aug 28 2016 Costa Tsaousis <costa@tsaousis.gr> - 1.3.0-1
 - netdata now has health monitoring
 - netdata now generates badges
