@@ -1,12 +1,8 @@
 # -*- coding: utf-8 -*-
-# Description: example netdata python.d module
-# Author: Pawel Krupa (paulfantom)
 
 import psycopg2
 from base import SimpleService
 from psycopg2.extras import DictCursor
-
-NAME = "test"
 
 # default module values
 update_every = 1
@@ -22,7 +18,7 @@ retries = 60
 #    'port': 5432
 # }
 
-ORDER = ["Tuples", "Scans"]
+ORDER = ["Tuples", "Scans", "BGWriter"]
 CHARTS = {
     "Tuples": {
         'options': ["tuples", "PostgreSQL tuple access", "Tuples / sec", "tuples", "postgres.tuples", "line"],
@@ -30,7 +26,7 @@ CHARTS = {
             ["inserted", "inserted", "incremental", 1, 1],
             ["seqread", "seqread", "incremental", 1, 1],
             ["hotupdated", "hotupdated", "incremental", 1, 1],
-            ["deleted", "deleted", "incremental", -1, 1],
+            ["deleted", "deleted", "incremental", 1, 1],
             ["updated", "updated", "incremental", 1, 1],
             ["idxfetch", "idxfetch", "incremental", 1, 1],
         ]},
@@ -39,6 +35,14 @@ CHARTS = {
         'lines': [
             ["sequential", "sequential", "incremental", 1, 1],
             ["index", "index", "incremental", 1, 1],
+        ]},
+    "BGWriter": {
+        'options': ["bgwriter", "BG Writer Activity", "Buffers / sec", "bgwriter", "postgres.bgwriter", "line"],
+        'lines': [
+            ["buffers_alloc", "buffers_alloc", "incremental", 1, 1],
+            ["buffers_clean", "buffers_clean", "incremental", 1, 1],
+            ["buffers_checkpoint", "buffers_checkpoint", "incremental", 1, 1],
+            ["buffers_backend", "buffers_backend", "incremental", 1, 1],
         ]}
 }
 
@@ -73,7 +77,9 @@ class Service(SimpleService):
     def _get_data(self):
         cursor = self.connection.cursor(cursor_factory=DictCursor)
         cursor.execute("""
-            SELECT  COALESCE(sum(seq_tup_read),0) AS seqread,
+            SELECT
+                    -- Tuples
+                    COALESCE(sum(seq_tup_read),0) AS seqread,
                     COALESCE(sum(idx_tup_fetch),0) AS idxfetch,
                     COALESCE(sum(n_tup_ins),0) AS inserted,
                     COALESCE(sum(n_tup_upd),0) AS updated,
@@ -85,7 +91,19 @@ class Service(SimpleService):
                     COALESCE(sum(idx_scan),0) AS index
             FROM pg_stat_user_tables
         """)
-        data = {k: float(v) for k, v in cursor.fetchone().items()}
+        graph_data = {k: float(v) for k, v in cursor.fetchone().items()}
+
+        cursor.execute("""
+            SELECT
+              buffers_checkpoint,
+              buffers_clean,
+              buffers_backend,
+              buffers_alloc
+            FROM
+              pg_stat_bgwriter
+        """)
+        graph_data.update(dict(cursor.fetchone()))
+
         self.connection.commit()
         cursor.close()
-        return data
+        return graph_data
