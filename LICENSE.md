@@ -67,12 +67,6 @@ connectivity is not available.
     [MIT License](https://github.com/minhur/bootstrap-toggle/blob/master/LICENSE)
 
 
-- [CSS Element Queries](https://github.com/marcj/css-element-queries)
-
-    Copyright Marc J. Schmidt
-    [MIT License](https://github.com/marcj/css-element-queries/blob/master/LICENSE)
-
-
 - [AVL C Library](http://freecode.com/projects/avl)
 
     Copyright 2000, Daniel Nagy, Budapest University of Technology and Economics
