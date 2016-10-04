@@ -18,39 +18,48 @@ retries = 60
 #    'port': 5432
 # }
 
-ORDER = ["Tuples", "Scans", "BGWriter", "BufferCache"]
 CHARTS = {
     "Tuples": {
         'options': ["tuples", "PostgreSQL tuple access", "Tuples / sec", "tuples", "postgres.tuples", "line"],
         'lines': [
-            ["inserted", "inserted", "incremental", 1, 1],
-            ["seqread", "seqread", "incremental", 1, 1],
-            ["hotupdated", "hotupdated", "incremental", 1, 1],
-            ["deleted", "deleted", "incremental", 1, 1],
-            ["updated", "updated", "incremental", 1, 1],
-            ["idxfetch", "idxfetch", "incremental", 1, 1],
+            ["tup_inserted", "tup_inserted", "incremental", 1, 1],
+            ["tup_inserted", "tup_inserted", "incremental", 1, 1],
+            ["tup_fetched", "tup_fetched", "incremental", 1, 1],
+            ["tup_updated", "tup_updated", "incremental", 1, 1],
+            ["tup_deleted", "tup_deleted", "incremental", 1, 1],
         ]},
-    "Scans": {
-        'options': ["scans", "PostgreSQL scan types", "Scans / sec", "scans", "postgres.scans", "line"],
+    "Transactions": {
+        'options': ["transactions", "Transactions", "transactions / sec", "transactions", "postgres.transactions", "line"],
         'lines': [
-            ["sequential", "sequential", "incremental", 1, 1],
-            ["index", "index", "incremental", 1, 1],
+            ["xact_commit", "xact_commit", "incremental", 1, 1],
+            ["xact_rollback", "xact_rollback", "incremental", 1, 1],
         ]},
-    "BGWriter": {
-        'options': ["bgwriter", "BG Writer Activity", "Buffers / sec", "bgwriter", "postgres.bgwriter", "line"],
-        'lines': [
-            ["buffers_alloc", "buffers_alloc", "incremental", 1, 1],
-            ["buffers_clean", "buffers_clean", "incremental", 1, 1],
-            ["buffers_checkpoint", "buffers_checkpoint", "incremental", 1, 1],
-            ["buffers_backend", "buffers_backend", "incremental", 1, 1],
-        ]},
-    "BufferCache": {
-        'options': ["buffer_cache", "Buffer Cache", "Buffers / sec", "buffer_cache", "postgres.buffer_cache", "line"],
+    "BlockAccess": {
+        'options': ["block_access", "block_access", "Block / sec ", "block_access", "postgres.block_access", "line"],
         'lines': [
             ["blks_read", "blks_read", "incremental", 1, 1],
             ["blks_hit", "blks_hit", "incremental", 1, 1],
-        ]}
+        ]},
+    "BlockTime": {
+        'options': ["block_time", "block_time", "milliseconds ", "block_time", "postgres.block_time", "line"],
+        'lines': [
+            ["blk_read_time", "blk_read_time", "incremental", 1, 1],
+            ["blk_write_time", "blk_write_time", "incremental", 1, 1],
+        ]},
+    "Checkpoints": {
+        'options': ["checkpoints", "Checkpoints", "Checkpoints", "checkpoints", "postgres.checkpoints", "line"],
+        'lines': [
+            ["bg_checkpoint_time", "bg_checkpoint_time", "absolute", 1, 1],
+            ["bg_checkpoint_requested", "bg_checkpoint_requested", "absolute", 1, 1],
+        ]},
+    "Buffers": {
+        'options': ["buffers", "buffers", "Buffer/ sec", "buffers", "postgres.buffers", "line"],
+        'lines': [
+            ["buffers_written", "buffers_written", "incremental", 1, 1],
+            ["buffers_allocated", "buffers_allocated", "incremental", 1, 1],
+        ]},
 }
+ORDER = ["Tuples", "Transactions", "BlockAccess", "BlockTime", "Checkpoints", "Buffers"]
 
 
 class Service(SimpleService):
@@ -63,7 +72,7 @@ class Service(SimpleService):
 
     def connect(self):
         params = dict(user='postgres',
-                      database=None,
+                      database='postgres',
                       password=None,
                       host='localhost',
                       port=5432)
@@ -82,44 +91,21 @@ class Service(SimpleService):
     def _get_data(self):
         cursor = self.connection.cursor(cursor_factory=DictCursor)
         cursor.execute("""
-            SELECT
-                    -- Tuples
-                    COALESCE(sum(seq_tup_read),0) AS seqread,
-                    COALESCE(sum(idx_tup_fetch),0) AS idxfetch,
-                    COALESCE(sum(n_tup_ins),0) AS inserted,
-                    COALESCE(sum(n_tup_upd),0) AS updated,
-                    COALESCE(sum(n_tup_del),0) AS deleted,
-                    COALESCE(sum(n_tup_hot_upd),0) AS hotupdated,
-
-                    -- Scans
-                    COALESCE(sum(seq_scan),0) AS sequential,
-                    COALESCE(sum(idx_scan),0) AS index
-            FROM pg_stat_user_tables
-        """)
-        graph_data = {k: float(v) for k, v in cursor.fetchone().items()}
+            SELECT *
+            FROM pg_stat_database
+            WHERE datname = %(database)s
+        """, self.configuration)
+        graph_data = dict(cursor.fetchone())
 
         # Pull in BGWriter info
         cursor.execute("""
             SELECT
-              buffers_checkpoint,
-              buffers_clean,
-              buffers_backend,
-              buffers_alloc
-            FROM
-              pg_stat_bgwriter
+              pg_stat_get_bgwriter_timed_checkpoints()     AS bg_checkpoint_time,
+              pg_stat_get_bgwriter_requested_checkpoints() AS bg_checkpoint_requested,
+              pg_stat_get_buf_written_backend()            AS buffers_written,
+              pg_stat_get_buf_alloc()                      AS buffers_allocated
         """)
         graph_data.update(dict(cursor.fetchone()))
-
-        cursor.execute("""
-            SELECT
-              sum(blks_read) AS blks_read,
-              sum(blks_hit) AS blks_hit
-            FROM
-              pg_stat_database
-            WHERE
-              datname = %(database)s
-        """, self.configuration)
-        graph_data.update({k: float(v) for k, v in cursor.fetchone().items()})
 
         self.connection.commit()
         cursor.close()
