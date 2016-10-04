@@ -79,6 +79,7 @@ class Service(SimpleService):
         params.update(self.configuration)
         if self.connection is None:
             self.connection = psycopg2.connect(**params)
+            self.connection.set_session(readonly=True)
 
     def check(self):
         try:
@@ -91,22 +92,16 @@ class Service(SimpleService):
     def _get_data(self):
         cursor = self.connection.cursor(cursor_factory=DictCursor)
         cursor.execute("""
-            SELECT *
-            FROM pg_stat_database
-            WHERE datname = %(database)s
-        """, self.configuration)
-        graph_data = dict(cursor.fetchone())
-
-        # Pull in BGWriter info
-        cursor.execute("""
             SELECT
+              pg_stat_database.*,
               pg_stat_get_bgwriter_timed_checkpoints()     AS bg_checkpoint_time,
               pg_stat_get_bgwriter_requested_checkpoints() AS bg_checkpoint_requested,
               pg_stat_get_buf_written_backend()            AS buffers_written,
               pg_stat_get_buf_alloc()                      AS buffers_allocated
-        """)
-        graph_data.update(dict(cursor.fetchone()))
-
+            FROM pg_stat_database
+            WHERE datname = %(database)s
+        """, self.configuration)
+        graph_data = dict(cursor.fetchone())
         self.connection.commit()
         cursor.close()
         return graph_data
