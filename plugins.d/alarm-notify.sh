@@ -92,6 +92,7 @@ SEND_SLACK="YES"
 SEND_PUSHOVER="YES"
 SEND_TELEGRAM="YES"
 SEND_EMAIL="YES"
+SEND_PUSHBULLET="YES"
 
 # slack configs
 SLACK_WEBHOOK_URL=
@@ -102,6 +103,10 @@ declare -A role_recipients_slack=()
 PUSHOVER_APP_TOKEN=
 DEFAULT_RECIPIENT_PUSHOVER=
 declare -A role_recipients_pushover=()
+
+# pushbullet configs
+DEFAULT_RECIPIENT_PUSHBULLET=
+declare -A role_recipients_pushbullet=()
 
 # telegram configs
 TELEGRAM_BOT_TOKEN=
@@ -164,6 +169,7 @@ filter_recipient_by_criticality() {
 
 declare -A arr_slack=()
 declare -A arr_pushover=()
+declare -A arr_pushbullet=()
 declare -A arr_telegram=()
 declare -A arr_email=()
 
@@ -191,6 +197,14 @@ do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality pushover "${r}" && arr_pushover[${r/|*/}]="1"
     done
 
+    # pushover
+    a="${role_recipients_pushbullet[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_PUSHBULLET}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality pushbullet "${r}" && arr_pushbullet[${r/|*/}]="1"
+    done
+
     # telegram
     a="${role_recipients_telegram[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_TELEGRAM}"
@@ -216,6 +230,10 @@ to_slack="${!arr_slack[*]}"
 to_pushover="${!arr_pushover[*]}"
 [ -z "${to_pushover}" ] && SEND_PUSHOVER="NO"
 
+# build the list of pushbulet recipients (user tokens)
+to_pushbullet="${!arr_pushbullet[*]}"
+[ -z "${to_pushbullet}" ] && SEND_PUSHBULLET="NO"
+
 # check array of telegram recipients (chat ids)
 to_telegram="${!arr_telegram[*]}"
 [ -z "${to_telegram}" ] && SEND_TELEGRAM="NO"
@@ -239,15 +257,19 @@ done
 # check pushover
 [ -z "${PUSHOVER_APP_TOKEN}" ] && SEND_PUSHOVER="NO"
 
+# check pushbullet
+[ -z "${DEFAULT_RECIPIENT_PUSHBULLET}" ] && SEND_PUSHBULLET="NO"
+
 # check telegram
 [ -z "${TELEGRAM_BOT_TOKEN}" ] && SEND_TELEGRAM="NO"
 
-if [ \( "${SEND_PUSHOVER}" = "YES" -o "${SEND_SLACK}" = "YES" -o "${SEND_TELEGRAM}" = "YES" \) -a -z "${curl}" ]
+if [ \( "${SEND_PUSHOVER}" = "YES" -o "${SEND_SLACK}" = "YES" -o "${SEND_TELEGRAM}" = "YES" -o "${SEND_PUSHBULLET}" = "YES" \) -a -z "${curl}" ]
     then
     curl="$(which curl 2>/dev/null || command -v curl 2>/dev/null)"
     if [ -z "${curl}" ]
         then
         SEND_PUSHOVER="NO"
+        SEND_PUSHBULLET="NO"
         SEND_TELEGRAM="NO"
         SEND_SLACK="NO"
     fi
@@ -260,7 +282,7 @@ if [ "${SEND_EMAIL}" = "YES" -a -z "${sendmail}" ]
 fi
 
 # check that we have at least a method enabled
-if [ "${SEND_EMAIL}" != "YES" -a "${SEND_PUSHOVER}" != "YES" -a "${SEND_TELEGRAM}" != "YES" -a "${SEND_SLACK}" != "YES" ]
+if [ "${SEND_EMAIL}" != "YES" -a "${SEND_PUSHOVER}" != "YES" -a "${SEND_TELEGRAM}" != "YES" -a "${SEND_SLACK}" != "YES" -a "${SEND_PUSHBULLET}" != "YES" ]
     then
     echo >&2 "All notification methods are disabled. Not sending a notification."
     exit 1
@@ -429,6 +451,40 @@ send_pushover() {
 
     return 1
 }
+
+# -----------------------------------------------------------------------------
+# pushbullet sender
+
+send_pushbullet() {
+    local userapikeys="${1}" message="${2}" title="${3}"  httpcode sent=0 user priority
+
+    if [ "${SEND_PUSHBULLET}" = "YES" -a ! -z "${userapikeys}" -a ! -z "${message}" -a ! -z "${title}" ]
+        then
+        #https://docs.pushbullet.com/#create-push        priority=-2
+        for user in ${userapikeys}
+        do
+            httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null \
+                 -u ""$user"": \
+                 -d type="note" \
+                 --data-urlencode body="${message}" \
+                 --data-urlencode title="${title}" \
+                 "https://api.pushbullet.com/v2/pushes"
+                )
+            if [ "${httpcode}" == "200" ]
+            then
+                echo >&2 "${me}: Sent pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
+                sent=$((sent + 1))
+            else
+                echo >&2 "${me}: Failed to send pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
+            fi
+        done
+
+        [ ${sent} -gt 0 ] && return 0
+    fi
+
+    return 1
+}
+
 
 
 # -----------------------------------------------------------------------------
@@ -646,6 +702,21 @@ send_pushover "${PUSHOVER_APP_TOKEN}" "${to_pushover}" "${when}" "${goto_url}" "
 "
 
 SENT_PUSHOVER=$?
+
+# -----------------------------------------------------------------------------
+# send the pushbullet notification
+
+pushbullet_message="
+${alarm}
+Severity: ${severity}
+Chart: ${chart}
+Family: ${family}
+To view NetData: ${goto_url}
+The source of this alarm is line ${src}"
+pushbullet_title="${status} at ${host} ${status_message} - ${name//_/ } - ${chart}}"
+send_pushbullet "${DEFAULT_RECIPIENT_PUSHBULLET}" "$pushbullet_message" "$pushbullet_title"
+
+SENT_PUSHBULLET=$?
 
 # -----------------------------------------------------------------------------
 # send the telegram.org message
