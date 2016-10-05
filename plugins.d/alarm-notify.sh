@@ -16,6 +16,7 @@
 # Supported notification methods:
 #  - emails
 #  - pushover.net notifications
+#  - pushbullet.com push notifications
 #  - slack.com notifications
 #  - telegram.org notifications
 #
@@ -105,6 +106,7 @@ DEFAULT_RECIPIENT_PUSHOVER=
 declare -A role_recipients_pushover=()
 
 # pushbullet configs
+PUSHBULLET_ACCESS_TOKEN=
 DEFAULT_RECIPIENT_PUSHBULLET=
 declare -A role_recipients_pushbullet=()
 
@@ -197,7 +199,7 @@ do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality pushover "${r}" && arr_pushover[${r/|*/}]="1"
     done
 
-    # pushover
+    # pushbullet
     a="${role_recipients_pushbullet[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_PUSHBULLET}"
     for r in ${a//,/ }
@@ -456,20 +458,22 @@ send_pushover() {
 # pushbullet sender
 
 send_pushbullet() {
-    local userapikeys="${1}" message="${2}" title="${3}"  httpcode sent=0 user priority
+    local userapikey="${1}" recipients="${2}" message="${3}" title="${4}" httpcode sent=0 user
 
-    if [ "${SEND_PUSHBULLET}" = "YES" -a ! -z "${userapikeys}" -a ! -z "${message}" -a ! -z "${title}" ]
+    if [ "${SEND_PUSHBULLET}" = "YES" -a ! -z "${userapikey}" -a ! -z "${recipients}" -a ! -z "${message}" -a ! -z "${title}" ]
         then
-        #https://docs.pushbullet.com/#create-push        priority=-2
-        for user in ${userapikeys}
+        #https://docs.pushbullet.com/#create-push
+        for user in ${recipients}
         do
             httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null \
-                 -u ""$user"": \
+                 -u "$userapikey": \
                  -d type="note" \
+                 --data-urlencode email="${user}" \
                  --data-urlencode body="${message}" \
                  --data-urlencode title="${title}" \
                  "https://api.pushbullet.com/v2/pushes"
                 )
+
             if [ "${httpcode}" == "200" ]
             then
                 echo >&2 "${me}: Sent pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
@@ -711,10 +715,10 @@ ${alarm}
 Severity: ${severity}
 Chart: ${chart}
 Family: ${family}
-To view NetData: ${goto_url}
+To View Netdata go to: ${goto_url}
 The source of this alarm is line ${src}"
 pushbullet_title="${status} at ${host} ${status_message} - ${name//_/ } - ${chart}}"
-send_pushbullet "${DEFAULT_RECIPIENT_PUSHBULLET}" "$pushbullet_message" "$pushbullet_title"
+send_pushbullet "${PUSHBULLET_ACCESS_TOKEN}" "${to_pushbullet}" "$pushbullet_message" "$pushbullet_title"
 
 SENT_PUSHBULLET=$?
 
@@ -832,7 +836,7 @@ SENT_EMAIL=$?
 # let netdata know
 
 # we did send something
-[ ${SENT_EMAIL} -eq 0 -o ${SENT_PUSHOVER} -eq 0 -o ${SENT_TELEGRAM} -eq 0 -o ${SENT_SLACK} -eq 0 ] && exit 0
+[ ${SENT_EMAIL} -eq 0 -o ${SENT_PUSHOVER} -eq 0 -o ${SENT_TELEGRAM} -eq 0 -o ${SENT_SLACK} -eq 0 -o ${SENT_PUSHBULLET} -eq 0 ] && exit 0
 
 # we did not send anything
 exit 1
