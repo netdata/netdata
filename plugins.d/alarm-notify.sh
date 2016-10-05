@@ -458,11 +458,7 @@ send_pushover() {
 # pushbullet sender
 
 send_pushbullet() {
-<<<<<<< HEAD
     local userapikey="${1}" recipients="${2}" message="${3}" title="${4}" httpcode sent=0 user
-=======
-    local userapikey="${1}" recipients="${2}" message="${3}" title="${4}" httpcode sent=0 user priority
->>>>>>> 863efae676a63da80a868908ad03eab89e7380ab
 
     if [ "${SEND_PUSHBULLET}" = "YES" -a ! -z "${userapikey}" -a ! -z "${recipients}" -a ! -z "${message}" -a ! -z "${title}" ]
         then
