@@ -40,12 +40,6 @@ CHARTS = {
             ["blks_read", "blks_read", "incremental", 1, 1],
             ["blks_hit", "blks_hit", "incremental", 1, 1],
         ]},
-    "BlockTime": {
-        'options': ["block_time", "block_time", "milliseconds ", "block_time", "postgres.block_time", "line"],
-        'lines': [
-            ["blk_read_time", "blk_read_time", "incremental", 1, 1],
-            ["blk_write_time", "blk_write_time", "incremental", 1, 1],
-        ]},
     "Checkpoints": {
         'options': ["checkpoints", "Checkpoints", "Checkpoints", "checkpoints", "postgres.checkpoints", "line"],
         'lines': [
@@ -59,7 +53,7 @@ CHARTS = {
             ["buffers_allocated", "buffers_allocated", "incremental", 1, 1],
         ]},
 }
-ORDER = ["Tuples", "Transactions", "BlockAccess", "BlockTime", "Checkpoints", "Buffers"]
+ORDER = ["Tuples", "Transactions", "BlockAccess", "Checkpoints", "Buffers"]
 
 
 class Service(SimpleService):
@@ -74,7 +68,7 @@ class Service(SimpleService):
         params = dict(user='postgres',
                       database='postgres',
                       password=None,
-                      host='localhost',
+                      host=None,
                       port=5432)
         params.update(self.configuration)
         if self.connection is None:
