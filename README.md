@@ -2,7 +2,7 @@
 
 > New to netdata? Live demo: [http://my-netdata.io](http://my-netdata.io)
 
-**netdata** is a highly optimized Linux daemon providing **real-time performance and health monitoring for Linux systems, Linux Applications and SNMP devices, over the web**! It visualizes the **truth of now** in its **greatest detail**, so that you can get insights of what is happening now and what just happened, on your systems and applications.
+**netdata** is a highly optimized Linux daemon providing **real-time performance and health monitoring for Linux systems, applications and SNMP devices, over the web**! It has been designed to permanently run on all systems, without disrupting the applications running on them.
 
 ---
 
@@ -34,7 +34,7 @@
 <img src="https://cloud.githubusercontent.com/assets/2662304/19168687/f6a567be-8c19-11e6-8561-ce8d589e8346.gif"/>
 </p>
 
-The default dashboard of **netdata**:
+**netdata** visualizes the **truth of now** in its **greatest detail**, so that you can get insights of what is happening now and what just happened, on your systems and applications:
 
  - real-time, per second updates, snappy refreshes!
  - 300+ charts out of the box, 2000+ metrics monitored!
@@ -52,7 +52,7 @@ This is what you get:
 - **Stunning bootstrap dashboards**, out of the box (theme-able: dark, light)
 - **Blazingly fast** and **super efficient**, mostly written in C (for default installations, expect just 2% of a single core CPU usage and a few MB of RAM)
 - **Zero configuration** - you just install it and it auto-detects everything
-- **Zero dependencies**, it is its own web server for its static web files and its web API
+- **Zero dependencies**, it is even its own web server for its static web files and its web API
 - **Zero maintenance**, you just run it, it does the rest
 - **Custom dashboards** that can be built using simple HTML (no javascript necessary)
 - **Extensible**, you can monitor anything you can get a metric for, using its Plugin API (anything can be a netdata plugin - from BASH to python and node.js, so you can easily monitor any application, any API)
