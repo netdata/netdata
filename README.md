@@ -57,6 +57,7 @@ This is what you get:
 - **Custom dashboards** that can be built using simple HTML (no javascript necessary)
 - **Extensible**, you can monitor anything you can get a metric for, using its Plugin API (anything can be a netdata plugin - from BASH to python and node.js, so you can easily monitor any application, any API)
 - **Embeddable**, it can run anywhere a Linux kernel runs (even IoT) and its charts can be embedded on your web pages too
+- **Powerful alarms and notifications**, it can send alarms as email, slack.com messages, pushover.net mobile push notifications, telegram.org messages, and more.
 
 ---
 
