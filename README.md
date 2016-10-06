@@ -13,6 +13,10 @@
 
 # netdata
 
+<p align="center">
+<img src="https://cloud.githubusercontent.com/assets/2662304/19168687/f6a567be-8c19-11e6-8561-ce8d589e8346.gif"/>
+</p>
+
 > Oct 4th, 2016
 >
 > [netdata v1.4.0 released!](https://github.com/firehol/netdata/releases)
