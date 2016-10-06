@@ -915,7 +915,7 @@
     // scroll to a section, without changing the browser history
 
     function scrollToId(hash) {
-        if(hash && hash != '') {
+        if(hash && hash != '' && document.getElementById(hash) !== null) {
             var offset = $('#' + hash).offset();
             if(typeof offset !== 'undefined')
                 $('html, body').animate({ scrollTop: offset.top }, 0);
