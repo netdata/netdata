@@ -20,13 +20,11 @@
 <a href="https://octoverse.github.com/" target="_blank"><img src="https://cloud.githubusercontent.com/assets/2662304/18795170/ec321f32-81cb-11e6-92a8-d03492f0b00d.png"/></a>
 </p>
 
-> Oct 4th, 2016
+> `Oct 4th, 2016` - **[netdata v1.4.0 released!](https://github.com/firehol/netdata/releases)**
 >
-> [netdata v1.4.0 released!](https://github.com/firehol/netdata/releases)
->
-> - the fastest netdata ever (with a better look too)!
-> - improved IoT and containers support!
-> - alarms improved in almost every way!
+> - the **fastest** netdata ever (with a better look too)!
+> - improved **IoT** and **containers** support!
+> - **alarms** improved in almost every way!
 > - new plugins:  softnet netdev, extended TCP metrics, UDPLite, NFS v2, v3 client (server was there already), NFS v4 server & client, APCUPSd, RetroShare
 > - improved plugins: mysql, cgroups, hddtemp, sensors, phpfm, tc (QoS)
 
