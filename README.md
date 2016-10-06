@@ -16,6 +16,8 @@
 
 ## News
 
+[![netdata at the state of github octoverse 2016](https://cloud.githubusercontent.com/assets/2662304/18795170/ec321f32-81cb-11e6-92a8-d03492f0b00d.png)](https://octoverse.github.com/)
+
 > Oct 4th, 2016
 >
 > [netdata v1.4.0 released!](https://github.com/firehol/netdata/releases)
