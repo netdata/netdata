@@ -2200,8 +2200,13 @@
 
             this.colors = new Array();
             this.colors_available = new Array();
-            var i, len;
 
+            // add the standard colors
+            var len = NETDATA.themes.current.colors.length;
+            while(len--)
+                this.colors_available.unshift(NETDATA.themes.current.colors[len]);
+
+            // add the user supplied colors
             var c = $(this.element).data('colors');
             // this.log('read colors: ' + c);
             if(typeof c !== 'undefined' && c !== null && c.length > 0) {
@@ -2217,16 +2222,11 @@
                         while(len--) {
                             added++;
                             this.colors_available.unshift(c[len]);
-                            // this.log('adding color: ' + c[i]);
+                            // this.log('adding color: ' + c[len]);
                         }
                     }
                 }
             }
-
-            // push all the standard colors too
-            len = NETDATA.themes.current.colors.length;
-            while(len--)
-                this.colors_available.unshift(NETDATA.themes.current.colors[len]);
 
             return this.colors;
         };
