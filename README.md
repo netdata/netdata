@@ -1,51 +1,47 @@
-[![Build Status](https://travis-ci.org/firehol/netdata.svg?branch=master)](https://travis-ci.org/firehol/netdata)
-<a href="https://scan.coverity.com/projects/firehol-netdata"><img alt="Coverity Scan Build Status" src="https://scan.coverity.com/projects/9140/badge.svg"/></a>
-[![Docker Pulls](https://img.shields.io/docker/pulls/titpetric/netdata.svg)](https://hub.docker.com/r/titpetric/netdata/)
+# netdata [![Build Status](https://travis-ci.org/firehol/netdata.svg?branch=master)](https://travis-ci.org/firehol/netdata) [![Coverity Scan Build Status](https://scan.coverity.com/projects/9140/badge.svg)](https://scan.coverity.com/projects/firehol-netdata) [![Docker Pulls](https://img.shields.io/docker/pulls/titpetric/netdata.svg)](https://hub.docker.com/r/titpetric/netdata/)
 
-[![User Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
-[![Monitored Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
-[![Sessions Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
+> New to netdata? Live demo: [http://my-netdata.io](http://my-netdata.io)
 
-[![New Users Today](http://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
-[![New Machines Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
-[![Sessions Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
+**netdata** is a highly optimized Linux daemon providing **real-time performance and health monitoring for Linux systems, applications and SNMP devices, over the web**! It has been designed to permanently run on all systems, without disrupting the applications running on them.
 
+---
 
-# netdata
+**netdata** user and installation base, as reported by the [global public netdata registry](https://github.com/firehol/netdata/wiki/mynetdata-menu-item):
 
-> Oct 4th, 2016
+[![User Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Monitored Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
+
+[![New Users Today](http://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![New Machines Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
+
+---
+
+## News
+
+<p align="center">
+<a href="https://octoverse.github.com/" target="_blank"><img src="https://cloud.githubusercontent.com/assets/2662304/18795170/ec321f32-81cb-11e6-92a8-d03492f0b00d.png"/></a>
+</p>
+
+> `Oct 4th, 2016` - **[netdata v1.4.0 released!](https://github.com/firehol/netdata/releases)**
 >
-> [netdata v1.4.0 released!](https://github.com/firehol/netdata/releases)
->
-> - the fastest netdata ever (with a better look too)!
-> - improved IoT and containers support!
-> - alarms improved in almost every way!
+> - the **fastest** netdata ever (with a better look too)!
+> - improved **IoT** and **containers** support!
+> - **alarms** improved in almost every way!
 > - new plugins:  softnet netdev, extended TCP metrics, UDPLite, NFS v2, v3 client (server was there already), NFS v4 server & client, APCUPSd, RetroShare
 > - improved plugins: mysql, cgroups, hddtemp, sensors, phpfm, tc (QoS)
 
 ---
 
-> Aug 28th, 2016
->
-> [netdata v1.3.0 released!](https://github.com/firehol/netdata/releases)
->
-> - netdata has **[health monitoring / alarms](https://github.com/firehol/netdata/wiki/health-monitoring)**!
-> - netdata **[generates badges](https://github.com/firehol/netdata/wiki/Generating-Badges)** that can be embeded anywhere!
-> - netdata plugins are now written in python!
-> - new plugins: redis, memcached, nginx_log, ipfs, apache_cache
+## At a glance
 
----
+<p align="center">
+<img src="https://cloud.githubusercontent.com/assets/2662304/19168687/f6a567be-8c19-11e6-8561-ce8d589e8346.gif"/>
+</p>
 
-**Real-time performance and health monitoring, done right!**
-
-This is the default dashboard of **netdata**:
+**netdata** visualizes the **truth of now** in its **greatest detail**, so that you can get insights of what is happening now and what just happened, on your systems and applications:
 
  - real-time, per second updates, snappy refreshes!
  - 300+ charts out of the box, 2000+ metrics monitored!
  - zero configuration, zero maintenance, zero dependencies!
  - dozens of health monitoring alarms, out of the box!
-
-Live demo: [http://my-netdata.io](http://my-netdata.io)
 
 ![netdata](https://cloud.githubusercontent.com/assets/2662304/14092712/93b039ea-f551-11e5-822c-beadbf2b2a2e.gif)
 
@@ -53,20 +49,17 @@ Live demo: [http://my-netdata.io](http://my-netdata.io)
 
 ## Features
 
-**netdata** is a highly optimized Linux daemon providing **real-time performance monitoring for Linux systems, Applications, SNMP devices, over the web**!
-
-It tries to visualize the **truth of now**, in its **greatest detail**, so that you can get insights of what is happening now and what just happened, on your systems and applications.
-
 This is what you get:
 
 - **Stunning bootstrap dashboards**, out of the box (theme-able: dark, light)
 - **Blazingly fast** and **super efficient**, mostly written in C (for default installations, expect just 2% of a single core CPU usage and a few MB of RAM)
 - **Zero configuration** - you just install it and it auto-detects everything
-- **Zero dependencies**, it is its own web server for its static web files and its web API
+- **Zero dependencies**, it is even its own web server for its static web files and its web API
 - **Zero maintenance**, you just run it, it does the rest
 - **Custom dashboards** that can be built using simple HTML (no javascript necessary)
 - **Extensible**, you can monitor anything you can get a metric for, using its Plugin API (anything can be a netdata plugin - from BASH to python and node.js, so you can easily monitor any application, any API)
 - **Embeddable**, it can run anywhere a Linux kernel runs (even IoT) and its charts can be embedded on your web pages too
+- **Powerful alarms and notifications**, it can send alarms as email, slack.com messages, pushover.net mobile push notifications, telegram.org messages, and more.
 
 ---
 
@@ -150,22 +143,30 @@ And you can extend it, by writing plugins that collect data from any source, usi
 
 ## Installation
 
-Use our **[automatic installer](https://github.com/firehol/netdata/wiki/Installation)** to build and install it on your system
+Use our **[automatic installer](https://github.com/firehol/netdata/wiki/Installation)** to build and install it on your system.
 
-It should run on **any Linux** system. It has been tested on:
+It should run on **any Linux** system (including IoT). It has been tested on:
 
-- Gentoo
+- Alpine
 - Arch Linux
-- Ubuntu / Debian
 - CentOS
+- Debian
 - Fedora
+- Gentoo
+- OpenSuse
+- PLD Linux
 - RedHat Enterprise Linux
 - SUSE
-- Alpine Linux
-- PLD Linux
+- Ubuntu
 
 ---
 
 ## Documentation
 
 Check the **[netdata wiki](https://github.com/firehol/netdata/wiki)**.
+
+## License
+
+netdata is GPLv3+.
+
+It re-distributes other open-source tools and libraries. Please check its [License Statement](https://github.com/firehol/netdata/blob/master/LICENSE.md).
