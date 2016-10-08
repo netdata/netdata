@@ -836,7 +836,7 @@
         this.value_div = null;
         this.color = NETDATA.themes.current.foreground;
 
-        if(parent.selected_count > parent.unselected_count)
+        if(parent.unselected_count === 0)
             this.selected = true;
         else
             this.selected = false;
@@ -995,20 +995,19 @@
         this.selected_count = 0;
         this.unselected_count = 0;
 
-        for(var i = 0, len = array.length; i < len ; i++) {
-            var ds = this.dimensions[array[i]];
+        var len = array.length;
+        while(len--) {
+            var ds = this.dimensions[array[len]];
             if(typeof ds === 'undefined') {
                 // console.log(array[i] + ' is not found');
-                ret.push(false);
-                continue;
+                ret.unshift(false);
             }
-
-            if(ds.isSelected()) {
-                ret.push(true);
+            else if(ds.isSelected()) {
+                ret.unshift(true);
                 this.selected_count++;
             }
             else {
-                ret.push(false);
+                ret.unshift(false);
                 this.unselected_count++;
             }
         }
@@ -2177,8 +2176,9 @@
 
             if(typeof this.colors_assigned[label] === 'undefined') {
                 if(this.colors_available.length === 0) {
-                    for(var i = 0, len = NETDATA.themes.current.colors.length; i < len ; i++)
-                        this.colors_available.push(NETDATA.themes.current.colors[i]);
+                    var len = NETDATA.themes.current.colors.length;
+                    while(len--)
+                        this.colors_available.unshift(NETDATA.themes.current.colors[len]);
                 }
 
                 this.colors_assigned[label] = this.colors_available.shift();
@@ -2200,8 +2200,13 @@
 
             this.colors = new Array();
             this.colors_available = new Array();
-            var i, len;
 
+            // add the standard colors
+            var len = NETDATA.themes.current.colors.length;
+            while(len--)
+                this.colors_available.unshift(NETDATA.themes.current.colors[len]);
+
+            // add the user supplied colors
             var c = $(this.element).data('colors');
             // this.log('read colors: ' + c);
             if(typeof c !== 'undefined' && c !== null && c.length > 0) {
@@ -2213,18 +2218,15 @@
                     var added = 0;
 
                     while(added < 20) {
-                        for(i = 0, len = c.length; i < len ; i++) {
+                        len = c.length;
+                        while(len--) {
                             added++;
-                            this.colors_available.push(c[i]);
-                            // this.log('adding color: ' + c[i]);
+                            this.colors_available.unshift(c[len]);
+                            // this.log('adding color: ' + c[len]);
                         }
                     }
                 }
             }
-
-            // push all the standard colors too
-            for(i = 0, len = NETDATA.themes.current.colors.length; i < len ; i++)
-                this.colors_available.push(NETDATA.themes.current.colors[i]);
 
             return this.colors;
         };
