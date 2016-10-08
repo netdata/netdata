@@ -459,20 +459,21 @@ send_pushover() {
 
 send_pushbullet() {
     local userapikey="${1}" recipients="${2}" message="${3}" title="${4}" httpcode sent=0 user
-
     if [ "${SEND_PUSHBULLET}" = "YES" -a ! -z "${userapikey}" -a ! -z "${recipients}" -a ! -z "${message}" -a ! -z "${title}" ]
         then
         #https://docs.pushbullet.com/#create-push
         for user in ${recipients}
         do
             httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null \
-                 -u "$userapikey": \
-                 -d type="note" \
-                 --data-urlencode email="${user}" \
-                 --data-urlencode body="${message}" \
-                 --data-urlencode title="${title}" \
-                 "https://api.pushbullet.com/v2/pushes"
-                )
+              --header 'Access-Token: '$userapikey'' \
+              --header 'Content-Type: application/json' \
+              --data-binary  @<(cat <<EOF
+                              {"title": "${title}",
+                              "type": "note",
+                              "email": "${user}",
+                              "body": "$( echo -n ${message})"}
+EOF
+               ) "https://api.pushbullet.com/v2/pushes" -X POST)
 
             if [ "${httpcode}" == "200" ]
             then
@@ -488,8 +489,6 @@ send_pushbullet() {
 
     return 1
 }
-
-
 
 # -----------------------------------------------------------------------------
 # telegram sender
@@ -710,12 +709,11 @@ SENT_PUSHOVER=$?
 # -----------------------------------------------------------------------------
 # send the pushbullet notification
 
-pushbullet_message="
-${alarm}
-Severity: ${severity}
-Chart: ${chart}
-Family: ${family}
-To View Netdata go to: ${goto_url}
+pushbullet_message="${alarm} \n
+Severity: ${severity} \n
+Chart: ${chart} \n
+Family: ${family} \n
+To View Netdata go to: ${goto_url} \n
 The source of this alarm is line ${src}"
 pushbullet_title="${status} at ${host} ${status_message} - ${name//_/ } - ${chart}}"
 send_pushbullet "${PUSHBULLET_ACCESS_TOKEN}" "${to_pushbullet}" "$pushbullet_message" "$pushbullet_title"
