@@ -4,7 +4,7 @@
 
 **netdata** is a system for **real-time performance and health monitoring**! It provides **unparalleled insights, in real-time, with interactive web dashboards**, of everything happening on the system it runs, including supported applications.
 
-*netdata is designed to permanently run on all systems (**physical** & **virtual** servers, **containers**, **IoT** devices), without disrupting the applications running on them.*
+_netdata is designed to permanently run on all systems (**physical** & **virtual** servers, **containers**, **IoT** devices), without disrupting the applications running on them._
 
 ---
 
