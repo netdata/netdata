@@ -4997,8 +4997,18 @@
         state.easyPieChartUnits.style.top = unittop.toString() + 'px';
         state.element_chart.appendChild(state.easyPieChartUnits);
 
+        var barColor = self.data('easypiechart-barcolor');
+        if(typeof barColor === 'undefined' || barColor === null)
+            barColor = state.chartColors()[0];
+        else {
+            // <div ... data-easypiechart-barcolor="(function(percent){return(percent < 50 ? '#5cb85c' : percent < 85 ? '#f0ad4e' : '#cb3935');})" ...></div>
+            var tmp = eval(barColor);
+            if(typeof tmp === 'function')
+                barColor = tmp;
+        }
+
         chart.easyPieChart({
-            barColor: self.data('easypiechart-barcolor') || state.chartColors()[0], //'#ef1e25',
+            barColor: barColor,
             trackColor: self.data('easypiechart-trackcolor') || NETDATA.themes.current.easypiechart_track,
             scaleColor: self.data('easypiechart-scalecolor') || NETDATA.themes.current.easypiechart_scale,
             scaleLength: self.data('easypiechart-scalelength') || 5,
