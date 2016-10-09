@@ -2,7 +2,8 @@
 
 > *New to netdata? Here is a live demo: [http://my-netdata.io](http://my-netdata.io)*
 
-**netdata** is a system for **real-time performance and health monitoring**! It provides **unparalleled insights, in real-time, with interactive web dashboards**, of everything happening on the system it runs, including supported applications.
+**netdata** is a system for **real-time performance and health monitoring**!
+It provides **unparalleled insights, in real-time, with interactive web dashboards**, of everything happening on the system it runs, including supported applications.
 
 _netdata is designed to permanently run on all systems (**physical** & **virtual** servers, **containers**, **IoT** devices), without disrupting the applications running on them._
 
@@ -35,39 +36,25 @@ _netdata is designed to permanently run on all systems (**physical** & **virtual
 
 ---
 
-## At a glance
+## Features
 
-netdata:
 <p align="center">
 <img src="https://cloud.githubusercontent.com/assets/2662304/19168687/f6a567be-8c19-11e6-8561-ce8d589e8346.gif"/>
 </p>
 
- - is **blazingly performance data visualization** - it responds to all queries in less than 0.5 ms per metric, even on low-end hardware!
- - is **highly efficient performance data collector** - it collects thousands of metrics per server per second, with just 1% CPU utilization of a single core on modern hardware!
- - has a **sophisticated alarming engine** - supporting dynamic thresholds, hysteresis, templating, multiple notification methods!
- - out of the box collects **2000+ metrics**!
- - needs **no configuration** - it auto-detects everything!
- - needs **zero maintenance**!
- - has **zero dependencies** - it is even its own web server!
+ - **Stunning interactive bootstrap dashboards**, out of the box (theme-able: dark, light)
+ - **Blazingly fast visualization**, it responds to all queries in less than 0.5 ms per metric, even on low-end hardware
+ - **Highly efficient data collection**, it collects thousands of metrics per server per second, with just 1% CPU utilization of a single core on modern hardware
+ - **Sophisticated alarming**, supporting dynamic thresholds, hysteresis, templating, multiple notification methods
+ - **Extensible**, you can monitor anything you can get a metric for, using its Plugin API (anything can be a netdata plugin, BASH, python, perl, node.js, java, Go, etc)
+ - **Zero configuration**, it auto-detects everything, out of the box it can detect up to 5000 metrics per server organized
+ - **Zero dependencies**, it is even its own web server for its static web files and its web API
+ - **Zero maintenance**, you just run it, it does the rest
+ - **Embeddable**, it can run anywhere a Linux kernel runs (even IoT) and its charts can be embedded on your web pages too
+ - **Custom dashboards**, that can be built using simple HTML (no javascript necessary)
  - **scales to infinity**, requiring minimal central resources!
 
 ![netdata](https://cloud.githubusercontent.com/assets/2662304/14092712/93b039ea-f551-11e5-822c-beadbf2b2a2e.gif)
-
----
-
-## Features
-
-This is what you get:
-
-- **Stunning bootstrap dashboards**, out of the box (theme-able: dark, light)
-- **Blazingly fast** and **super efficient**, mostly written in C (for default installations, expect just 2% of a single core CPU usage and a few MB of RAM)
-- **Zero configuration** - you just install it and it auto-detects everything
-- **Zero dependencies**, it is even its own web server for its static web files and its web API
-- **Zero maintenance**, you just run it, it does the rest
-- **Custom dashboards** that can be built using simple HTML (no javascript necessary)
-- **Extensible**, you can monitor anything you can get a metric for, using its Plugin API (anything can be a netdata plugin - from BASH to python and node.js, so you can easily monitor any application, any API)
-- **Embeddable**, it can run anywhere a Linux kernel runs (even IoT) and its charts can be embedded on your web pages too
-- **Powerful alarms and notifications**, it can send alarms as email, slack.com messages, pushover.net mobile push notifications, telegram.org messages, and more.
 
 ---
 
