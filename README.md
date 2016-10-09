@@ -43,16 +43,16 @@ _netdata is designed to permanently run on all systems (**physical** & **virtual
 </p>
 
  - **Stunning interactive bootstrap dashboards**<br/>2 themes are provided: dark, light
- - **Blazingly fast visualization**, it responds to all queries in less than 0.5 ms per metric, even on low-end hardware
- - **Highly efficient data collection**, it collects thousands of metrics per server per second, with just 1% CPU utilization of a single core on modern hardware
- - **Sophisticated alarming**, supporting dynamic thresholds, hysteresis, templating, multiple notification methods
- - **Extensible**, you can monitor anything you can get a metric for, using its Plugin API (anything can be a netdata plugin, BASH, python, perl, node.js, java, Go, etc)
- - **Zero configuration**, it auto-detects everything, out of the box it can detect up to 5000 metrics per server organized
- - **Zero dependencies**, it is even its own web server for its static web files and its web API
- - **Zero maintenance**, you just run it, it does the rest
- - **Embeddable**, it can run anywhere a Linux kernel runs (even IoT) and its charts can be embedded on your web pages too
- - **Custom dashboards**, that can be built using simple HTML (no javascript necessary)
- - **scales to infinity**, requiring minimal central resources!
+ - **Blazingly fast visualization**<br/>responds to all queries in less than 0.5 ms per metric, even on low-end hardware
+ - **Highly efficient data collection**<br/>collects thousands of metrics per server per second, with just 1% CPU utilization of a single core on modern hardware
+ - **Sophisticated alarming**<br/>supports dynamic thresholds, hysteresis, templating, multiple notification methods
+ - **Extensible**<br/>you can monitor anything you can get a metric for, using its Plugin API (anything can be a netdata plugin, BASH, python, perl, node.js, java, Go, etc)
+ - **Zero configuration**<br/>auto-detects everything, out of the box it can detect up to 5000 metrics per server organized
+ - **Zero dependencies**<br/>it is even its own web server, for its static web files and its web API
+ - **Zero maintenance**<br/>you just run it, it does the rest
+ - **Embeddable**<br/>it can run anywhere a Linux kernel runs (even IoT) and its charts can be embedded on your web pages too
+ - **Custom dashboards**<br/>that can be built using simple HTML (no javascript necessary)
+ - **scales to infinity**<br/>requiring minimal central resources!
 
 ![netdata](https://cloud.githubusercontent.com/assets/2662304/14092712/93b039ea-f551-11e5-822c-beadbf2b2a2e.gif)
 
