@@ -1,8 +1,10 @@
 # netdata [![Build Status](https://travis-ci.org/firehol/netdata.svg?branch=master)](https://travis-ci.org/firehol/netdata) [![Coverity Scan Build Status](https://scan.coverity.com/projects/9140/badge.svg)](https://scan.coverity.com/projects/firehol-netdata) [![Docker Pulls](https://img.shields.io/docker/pulls/titpetric/netdata.svg)](https://hub.docker.com/r/titpetric/netdata/)
 
-> New to netdata? Live demo: [http://my-netdata.io](http://my-netdata.io)
+> *New to netdata? Here is a live demo: [http://my-netdata.io](http://my-netdata.io)*
 
-**netdata** is a highly optimized Linux daemon providing **real-time performance and health monitoring for Linux systems, applications and SNMP devices, over the web**! It has been designed to permanently run on all systems, without disrupting the applications running on them.
+**netdata** is a system for **real-time performance and health monitoring**! It provides **unparalleled insights, in real-time, with interactive web dashboards**, of everything happening on the system it runs, including supported applications.
+
+*netdata is designed to permanently run on all systems (**physical** & **virtual** servers, **containers**, **IoT** devices), without disrupting the applications running on them.*
 
 ---
 
@@ -10,6 +12,19 @@
 
 [![User Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Monitored Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
 
+[![New Users Today](http://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![New Machines Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
+
+---
+
+
+## User base
+
+netdata was publicly announced publicly on March 31st, 2016.
+
+*Since May 16th 2016 (the time the [global public netdata registry](https://github.com/firehol/netdata/wiki/mynetdata-menu-item) was released):*
+[![User Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Monitored Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
+
+*in the last 24 hours:*
 [![New Users Today](http://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![New Machines Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
 
 ---
@@ -32,16 +47,19 @@
 
 ## At a glance
 
+netdata:
 <p align="center">
 <img src="https://cloud.githubusercontent.com/assets/2662304/19168687/f6a567be-8c19-11e6-8561-ce8d589e8346.gif"/>
 </p>
 
-**netdata** visualizes the **truth of now** in its **greatest detail**, so that you can get insights of what is happening now and what just happened, on your systems and applications:
-
- - real-time, per second updates, snappy refreshes!
- - 300+ charts out of the box, 2000+ metrics monitored!
- - zero configuration, zero maintenance, zero dependencies!
- - dozens of health monitoring alarms, out of the box!
+ - is **blazingly performance data visualization** - it responds to all queries in less than 0.5 ms per metric, even on low-end hardware!
+ - is **highly efficient performance data collector** - it collects thousands of metrics per server per second, with just 1% CPU utilization of a single core on modern hardware!
+ - has a **sophisticated alarming engine** - supporting dynamic thresholds, hysteresis, templating, multiple notification methods!
+ - out of the box collects **2000+ metrics**!
+ - needs **no configuration** - it auto-detects everything!
+ - needs **zero maintenance**!
+ - has **zero dependencies** - it is even its own web server!
+ - **scales to infinity**, requiring minimal central resources!
 
 ![netdata](https://cloud.githubusercontent.com/assets/2662304/14092712/93b039ea-f551-11e5-822c-beadbf2b2a2e.gif)
 
