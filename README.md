@@ -42,7 +42,7 @@ _netdata is designed to permanently run on all systems (**physical** & **virtual
 <img src="https://cloud.githubusercontent.com/assets/2662304/19168687/f6a567be-8c19-11e6-8561-ce8d589e8346.gif"/>
 </p>
 
- - **Stunning interactive bootstrap dashboards**, out of the box (theme-able: dark, light)
+ - **Stunning interactive bootstrap dashboards**<br/>2 themes are provided: dark, light
  - **Blazingly fast visualization**, it responds to all queries in less than 0.5 ms per metric, even on low-end hardware
  - **Highly efficient data collection**, it collects thousands of metrics per server per second, with just 1% CPU utilization of a single core on modern hardware
  - **Sophisticated alarming**, supporting dynamic thresholds, hysteresis, templating, multiple notification methods
