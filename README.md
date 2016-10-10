@@ -2,10 +2,9 @@
 
 > *New to netdata? Here is a live demo: [http://my-netdata.io](http://my-netdata.io)*
 
-**netdata** is a system for **real-time performance and health monitoring**!
-It provides **unparalleled insights, in real-time, with interactive web dashboards**, of everything happening on the system it runs, including supported applications.
+**netdata** is an application for **real-time performance and health monitoring**. It provides **unparalleled insights, in real-time, with interactive web dashboards**, of everything happening on the system it runs, including key applications, such as web servers and database servers.
 
-_netdata is designed to permanently run on all systems (**physical** & **virtual** servers, **containers**, **IoT** devices), without disrupting the applications running on them._
+_netdata is very fast and super efficient, designed to permanently run on all systems (**physical** & **virtual** servers, **containers**, **IoT** devices), without disrupting their core functions._
 
 ---
 
