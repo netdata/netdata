@@ -2,16 +2,15 @@
 
 > *New to netdata? Here is a live demo: [http://my-netdata.io](http://my-netdata.io)*
 
-**netdata** is an application for **real-time performance and health monitoring**. It provides **unparalleled insights, in real-time, with interactive web dashboards**, of everything happening on the system it runs, including key applications, such as web servers and database servers.
+**netdata** is an application for **real-time performance and health monitoring**. It provides **unparalleled insights, in real-time**, of everything happening on the system it runs (including key applications such as web and database servers), using **modern interactive web dashboards**.
 
-_netdata is very fast and super efficient, designed to permanently run on all systems (**physical** & **virtual** servers, **containers**, **IoT** devices), without disrupting their core functions._
+_netdata is **very fast** and **super efficient**, designed to permanently run on all systems (**physical** & **virtual** servers, **containers**, **IoT** devices), without disrupting their core function._
 
 ---
 
-
 ## User base
 
-*Since May 16th 2016 (the time the [global public netdata registry](https://github.com/firehol/netdata/wiki/mynetdata-menu-item) was released):*<br/>
+*Since May 16th 2016 (the date the [global public netdata registry](https://github.com/firehol/netdata/wiki/mynetdata-menu-item) was released):*<br/>
 [![User Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Monitored Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
 
 *in the last 24 hours:*<br/>
@@ -46,7 +45,7 @@ _netdata is very fast and super efficient, designed to permanently run on all sy
  - **Highly efficient data collection**<br/>collects thousands of metrics per server per second, with just 1% CPU utilization of a single core on modern hardware
  - **Sophisticated alarming**<br/>supports dynamic thresholds, hysteresis, templating, multiple notification methods
  - **Extensible**<br/>you can monitor anything you can get a metric for, using its Plugin API (anything can be a netdata plugin, BASH, python, perl, node.js, java, Go, etc)
- - **Zero configuration**<br/>auto-detects everything, out of the box it can detect up to 5000 metrics per server
+ - **Zero configuration**<br/>auto-detects everything, out of the box it can collect up to 5000 metrics per server
  - **Zero dependencies**<br/>it is even its own web server, for its static web files and its web API
  - **Zero maintenance**<br/>you just run it, it does the rest
  - **Embeddable**<br/>it can run anywhere a Linux kernel runs (even IoT) and its charts can be embedded on your web pages too
