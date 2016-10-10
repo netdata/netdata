@@ -2935,6 +2935,10 @@
                 url: this.data_url,
                 cache: false,
                 async: true,
+                headers: {
+                    'Cache-Control': 'no-cache, no-store',
+                    'Pragma': 'no-cache'
+                },
                 xhrFields: { withCredentials: true } // required for the cookie
             })
             .done(function(data) {
@@ -5926,6 +5930,10 @@
                 url: NETDATA.alarms.server + '/api/v1/alarms?' + what.toString(),
                 async: true,
                 cache: false,
+                headers: {
+                    'Cache-Control': 'no-cache, no-store',
+                    'Pragma': 'no-cache'
+                },
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {
@@ -5970,6 +5978,10 @@
                 url: NETDATA.alarms.server + '/api/v1/alarm_log?after=' + last_id.toString(),
                 async: true,
                 cache: false,
+                headers: {
+                    'Cache-Control': 'no-cache, no-store',
+                    'Pragma': 'no-cache'
+                },
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {
@@ -6096,6 +6108,10 @@
                     url: host + '/api/v1/registry?action=hello',
                     async: true,
                     cache: false,
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store',
+                        'Pragma': 'no-cache'
+                    },
                     xhrFields: { withCredentials: true } // required for the cookie
                 })
                 .done(function(data) {
@@ -6125,6 +6141,10 @@
                     url: NETDATA.registry.server + '/api/v1/registry?action=access&machine=' + NETDATA.registry.machine_guid + '&name=' + encodeURIComponent(NETDATA.registry.hostname) + '&url=' + encodeURIComponent(NETDATA.serverDefault), // + '&visible_url=' + encodeURIComponent(document.location),
                     async: true,
                     cache: false,
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store',
+                        'Pragma': 'no-cache'
+                    },
                     xhrFields: { withCredentials: true } // required for the cookie
                 })
                 .done(function(data) {
@@ -6169,6 +6189,10 @@
                 url: NETDATA.registry.server + '/api/v1/registry?action=delete&machine=' + NETDATA.registry.machine_guid + '&name=' + encodeURIComponent(NETDATA.registry.hostname) + '&url=' + encodeURIComponent(NETDATA.serverDefault) + '&delete_url=' + encodeURIComponent(delete_url),
                 async: true,
                 cache: false,
+                headers: {
+                    'Cache-Control': 'no-cache, no-store',
+                    'Pragma': 'no-cache'
+                },
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {
@@ -6194,6 +6218,10 @@
                 url: NETDATA.registry.server + '/api/v1/registry?action=search&machine=' + NETDATA.registry.machine_guid + '&name=' + encodeURIComponent(NETDATA.registry.hostname) + '&url=' + encodeURIComponent(NETDATA.serverDefault) + '&for=' + machine_guid,
                 async: true,
                 cache: false,
+                headers: {
+                    'Cache-Control': 'no-cache, no-store',
+                    'Pragma': 'no-cache'
+                },
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {
@@ -6219,6 +6247,10 @@
                 url: NETDATA.registry.server + '/api/v1/registry?action=switch&machine=' + NETDATA.registry.machine_guid + '&name=' + encodeURIComponent(NETDATA.registry.hostname) + '&url=' + encodeURIComponent(NETDATA.serverDefault) + '&to=' + new_person_guid,
                 async: true,
                 cache: false,
+                headers: {
+                    'Cache-Control': 'no-cache, no-store',
+                    'Pragma': 'no-cache'
+                },
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {
