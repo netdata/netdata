@@ -651,14 +651,10 @@ SENT_PUSHOVER=$?
 # send the telegram.org message
 
 # https://core.telegram.org/bots/api#formatting-options
-telegram_message="<b>${severity}"
-[ "${status_message}" != "recovered" ] && telegram_message="${telegram_message}, ${status_message}"
-telegram_message="${telegram_message}
-${chart} (${family})</b>
+send_telegram "${TELEGRAM_BOT_TOKEN}" "${to_telegram}" "${host} ${status_message} - <b>${name//_/ }</b>
+${chart} (${family})
 <a href=\"${goto_url}\">${alarm}</a>
 <i>${info}</i>"
-
-send_telegram "${TELEGRAM_BOT_TOKEN}" "${to_telegram}" "${telegram_message}"
 
 SENT_TELEGRAM=$?
 
