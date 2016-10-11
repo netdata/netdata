@@ -15,7 +15,7 @@ ORDER = ['sessions', 'commands',
          'context_switches',
          'disk', 'bytes', 'syscalls',
          'lookup', 'cache',
-         'auth', 'auth_cache']
+         'auth', 'auth_cache', 'activesessions', 'logins']
 
 CHARTS = {
     'sessions': {
@@ -81,6 +81,16 @@ CHARTS = {
         'lines': [
             ['auth_cache_hits', 'hit', 'absolute'],
             ['auth_cache_misses', 'miss', 'absolute']
+        ]},
+    'activesessions': {
+        'options': [None, "active sessions", 'number', 'IMAP', 'dovecot.sessions', 'line'],
+        'lines': [
+            ['num_connected_sessions', 'active sessions', 'absolute']
+        ]},
+    'logins': {
+        'options': [None, "logins", 'number', 'IMAP', 'dovecot.logins', 'line'],
+        'lines': [
+            ['num_logins', 'logins', 'absolute']
         ]}
 }
 
