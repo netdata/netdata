@@ -200,6 +200,12 @@ Module gives information with following charts:
  * hit
  * miss
  
+12. **active sessions**
+ * active sessions
+
+13. **total logins**
+ * logins
+ 
 ### configuration
 
 Sample:
