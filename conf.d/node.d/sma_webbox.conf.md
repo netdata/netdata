@@ -1,5 +1,8 @@
 
+[SMA Sunny Webbox](http://www.solar-is-future.com/sma-technology-for-our-future/products/sunny-webbox/index.html)
+
 Example netdata configuration for node.d/sma_webbox.conf
+
 The module supports any number of name servers, like this:
 
 ```json
