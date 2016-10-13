@@ -10,19 +10,23 @@ priority = 60000
 retries = 60
 
 # charts order (can be overridden if you want less charts, or different order)
-ORDER = ['sessions', 'commands',
+ORDER = ['sessions', 'logins', 'commands',
          'faults',
          'context_switches',
          'disk', 'bytes', 'syscalls',
          'lookup', 'cache',
-         'auth', 'auth_cache', 'activesessions', 'logins']
+         'auth', 'auth_cache']
 
 CHARTS = {
     'sessions': {
-        'options': [None, "logins and sessions", 'number', 'IMAP', 'dovecot.sessions', 'line'],
+        'options': [None, "active sessions", 'number', 'IMAP', 'dovecot.sessions', 'line'],
         'lines': [
-            ['num_logins', 'logins', 'absolute'],
             ['num_connected_sessions', 'active sessions', 'absolute']
+        ]},
+    'logins': {
+        'options': [None, "logins", 'number', 'IMAP', 'dovecot.logins', 'line'],
+        'lines': [
+            ['num_logins', 'logins', 'absolute']
         ]},
     'commands': {
         'options': [None, "commands", "commands", 'IMAP', 'dovecot.commands', 'line'],
@@ -81,16 +85,6 @@ CHARTS = {
         'lines': [
             ['auth_cache_hits', 'hit', 'absolute'],
             ['auth_cache_misses', 'miss', 'absolute']
-        ]},
-    'activesessions': {
-        'options': [None, "active sessions", 'number', 'IMAP', 'dovecot.sessions', 'line'],
-        'lines': [
-            ['num_connected_sessions', 'active sessions', 'absolute']
-        ]},
-    'logins': {
-        'options': [None, "logins", 'number', 'IMAP', 'dovecot.logins', 'line'],
-        'lines': [
-            ['num_logins', 'logins', 'absolute']
         ]}
 }
 
