@@ -2,7 +2,7 @@
 
 // This program will connect to one or more SNMP Agents
 
-// example configuration in /etc/netdata/snmp.conf
+// example configuration in /etc/netdata/node.d/snmp.conf
 /*
 {
     "enable_autodetect": false,

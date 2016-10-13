@@ -3,7 +3,7 @@
 // This program will connect to one or more SMA Sunny Webboxes
 // to get the Solar Power Generated (current, today, total).
 
-// example configuration in /etc/netdata/sma_webbox.conf
+// example configuration in /etc/netdata/node.d/sma_webbox.conf
 /*
 {
     "enable_autodetect": false,

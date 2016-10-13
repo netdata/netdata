@@ -6,8 +6,8 @@
 // http://jpmens.net/2013/03/18/json-in-bind-9-s-statistics-server/
 // https://ftp.isc.org/isc/bind/9.10.3/doc/arm/Bv9ARM.ch06.html#statistics
 
-// example configuration in /etc/netdata/named.conf
-// the module supports auto-detection if bind is running in localhost
+// example configuration in /etc/netdata/node.d/named.conf
+// the module supports auto-detection if bind is running at localhost
 
 /*
 {
