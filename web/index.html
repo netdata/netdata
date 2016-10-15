@@ -407,6 +407,7 @@
         hash: '#',
         theme: null,
         help: null,
+        update_always: false,
         pan_and_zoom: false,
         after: 0,
         before: 0,
@@ -418,75 +419,80 @@
         alarm_unique_id: 0,
         alarm_id: 0,
         alarm_event_id: 0,
+
         hasProperty: function(property) {
             // console.log('checking property ' + property + ' of type ' + typeof(this[property]));
             return typeof this[property] !== 'undefined';
+        },
+
+        genHash: function() {
+            var hash = urlOptions.hash;
+
+            if(urlOptions.pan_and_zoom === true) {
+                hash += ';after='  + urlOptions.after.toString() +
+                        ';before=' + urlOptions.before.toString();
+            }
+
+            if(urlOptions.theme !== null)
+                hash += ';theme=' + urlOptions.theme.toString();
+
+            if(urlOptions.help !== null)
+                hash += ';help=' + urlOptions.help.toString();
+
+            if(urlOptions.update_always === true)
+                hash += ';update_always=true';
+
+            return hash;
+        },
+
+        parseHash: function() {
+            var variables = document.location.hash.split(';');
+            var len = variables.length;
+            while(len--) {
+                if(len !== 0) {
+                    var p = variables[len].split('=');
+                    if(urlOptions.hasProperty(p[0]) && typeof p[1] !== 'undefined')
+                        urlOptions[p[0]] = decodeURIComponent(p[1]);
+                }
+                else {
+                    if(variables[len].length > 0)
+                        urlOptions.hash = variables[len];
+                }
+            }
+
+            var booleans = [ 'nowelcome', 'show_alarms', 'pan_and_zoom', 'update_always' ];
+            len = booleans.length;
+            while(len--) {
+                if(urlOptions[booleans[len]] === 'true' || urlOptions[booleans[len]] === true || urlOptions[booleans[len]] === '1' || urlOptions[booleans[len]] === 1)
+                    urlOptions[booleans[len]] = true;
+                else
+                    urlOptions[booleans[len]] = false;
+            }
+
+            if(urlOptions.before > 0 && urlOptions.after > 0) {
+                urlOptions.pan_and_zoom = true;
+                urlOptions.nowelcome = true;
+            }
+            else
+                urlOptions.pan_and_zoom = false;
+
+            // console.log(urlOptions);
+        },
+
+        hashUpdate: function() {
+            history.replaceState(null, '', urlOptions.genHash());
+        },
+
+        netdataPanAndZoomCallback: function(status, after, before) {
+            urlOptions.pan_and_zoom = status;
+            urlOptions.after = after;
+            urlOptions.before = before;
+            urlOptions.hashUpdate();
         }
+
     };
 
-    function netdataPanAndZoomCallback(status, after, before) {
-        urlOptions.pan_and_zoom = status;
-        urlOptions.after = after;
-        urlOptions.before = before;
-        netdataHashUpdate();
-    }
-
-    function netdataHashUpdate() {
-        history.replaceState(null, '', netdataHash());
-    }
-
-    function netdataHash() {
-        var hash = urlOptions.hash;
-
-        if(urlOptions.pan_and_zoom === true) {
-            hash += ';after='  + urlOptions.after.toString() +
-                    ';before=' + urlOptions.before.toString();
-        }
-
-        if(urlOptions.theme !== null)
-            hash += ';theme=' + urlOptions.theme.toString();
-
-        if(urlOptions.help !== null)
-            hash += ';help=' + urlOptions.help.toString();
-
-        return hash;
-    }
-
-    function netdataHashParse() {
-        var variables = document.location.hash.split(';');
-        var len = variables.length;
-        while(len--) {
-            if(len !== 0) {
-                var p = variables[len].split('=');
-                if(urlOptions.hasProperty(p[0]) && typeof p[1] !== 'undefined')
-                    urlOptions[p[0]] = decodeURIComponent(p[1]);
-            }
-            else {
-                if(variables[len].length > 0)
-                    urlOptions.hash = variables[len];
-            }
-        }
-
-        var booleans = [ 'nowelcome', 'show_alarms', 'pan_and_zoom' ];
-        len = booleans.length;
-        while(len--) {
-            if(urlOptions[booleans[len]] === 'true' || urlOptions[booleans[len]] === true || urlOptions[booleans[len]] === '1' || urlOptions[booleans[len]] === 1)
-                urlOptions[booleans[len]] = true;
-            else
-                urlOptions[booleans[len]] = false;
-        }
-
-        if(urlOptions.before > 0 && urlOptions.after > 0) {
-            urlOptions.pan_and_zoom = true;
-            urlOptions.nowelcome = true;
-        }
-        else
-            urlOptions.pan_and_zoom = false;
-
-        // console.log(urlOptions);
-    }
-
-    netdataHashParse();
+    urlOptions.parseHash();
 
     // --------------------------------------------------------------------
     // check options that should be processed before loading netdata.js
@@ -660,7 +666,7 @@
         if(url.indexOf('#') !== -1)
             url = url.substring(0, url.indexOf('#'));
 
-        var hash = netdataHash();
+        var hash = urlOptions.genHash();
 
         // console.log('netdataURL: ' + url + hash);
 
@@ -2278,7 +2284,7 @@
         // ------------------------------------------------------------------------
 
         // callback for us to track PanAndZoom operations
-        NETDATA.globalPanAndZoom.callback = netdataPanAndZoomCallback;
+        NETDATA.globalPanAndZoom.callback = urlOptions.netdataPanAndZoomCallback;
 
         // let it run (update the charts)
         NETDATA.unpause();
@@ -2323,7 +2329,7 @@
             if(typeof hash === 'string' && hash.substring(0, 1) === '#' && urlOptions.hash.startsWith(hash + '_submenu_') === false) {
                 urlOptions.hash = hash;
                 //console.log(urlOptions.hash);
-                netdataHashUpdate();
+                urlOptions.hashUpdate();
             }
             //else console.log('hash: not accepting ' + hash);
             //}
@@ -2380,11 +2386,18 @@
         $('#concurrent_refreshes').change(function()            { NETDATA.setOption('concurrent_refreshes', $(this).prop('checked')); });
         $('#sync_selection').change(function()                  { NETDATA.setOption('sync_selection', $(this).prop('checked')); });
         $('#sync_pan_and_zoom').change(function()               { NETDATA.setOption('sync_pan_and_zoom', $(this).prop('checked')); });
-        $('#stop_updates_when_focus_is_lost').change(function() { NETDATA.setOption('stop_updates_when_focus_is_lost', $(this).prop('checked')); });
+        $('#stop_updates_when_focus_is_lost').change(function() {
+            urlOptions.update_always = !$(this).prop('checked');
+            urlOptions.hashUpdate();
+
+            NETDATA.setOption('stop_updates_when_focus_is_lost', !urlOptions.update_always);
+        });
         $('#smooth_plot').change(function()                     { NETDATA.setOption('smooth_plot', $(this).prop('checked')); });
         $('#pan_and_zoom_data_padding').change(function()       { NETDATA.setOption('pan_and_zoom_data_padding', $(this).prop('checked')); });
         $('#show_help').change(function()                       {
             urlOptions.help = $(this).prop('checked');
+            urlOptions.hashUpdate();
+
             NETDATA.setOption('show_help', urlOptions.help);
             netdataReload();
         });
@@ -2393,6 +2406,8 @@
         // it reloads the page
         $('#netdata_theme_control').change(function() {
             urlOptions.theme = $(this).prop('checked')?'slate':'white';
+            urlOptions.hashUpdate();
+
             if(setTheme(urlOptions.theme))
                 netdataReload();
         });
@@ -2474,6 +2489,10 @@
 
         if(isdemo()) {
             document.getElementById('masthead').style.display = 'block';
+        }
+        else {
+            if(urlOptions.update_always === true)
+                NETDATA.setOption('stop_updates_when_focus_is_lost', !urlOptions.update_always);
         }
     }
 
