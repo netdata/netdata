@@ -11,7 +11,7 @@ retries = 60
 
 # Default Config options.
 # {
-#    'database': None,
+#    'database': postgres,
 #    'user': 'postgres',
 #    'password': None,
 #    'host': 'localhost',
