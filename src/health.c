@@ -63,31 +63,196 @@ static inline void health_log_recreate(void) {
 static inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
     (void)host;
     (void)ae;
-    
-/*    if(likely(health.log_fp)) {
-        if(unlikely(fprintf(health.log_fp, "A\t%s\t%08x\t%08x\t%08x\t%08x\t%08x\t%08x\t%s\t%s\t%s\t%s\t%s\t%08x\n",
-            host->hostname,
-            ae->unique_id,
-            ae->alarm_id,
-            ae->alarm_event_id,
-            (uint32_t)ae->when,
-            (uint32_t)ae->duration,
-            (uint32_t)ae->non_clear_duration,
-            (uint32_t)ae->exec_run_timestamp,
-            ae->name,
-            ae->chart,
-            ae->family,
-            ae->exec,
-            ae->recipient
-            ) < 0))
+
+    if(likely(health.log_fp)) {
+        if(unlikely(fprintf(health.log_fp
+                , "%c\t%s"
+                  "\t%08x\t%08x\t%08x\t%08x\t%08x"
+                  "\t%08x\t%08x\t%08x"
+                  "\t%08x\t%08x\t%08x"
+                  "\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s"
+                  "\t%d\t%d\t%d\t%d"
+                  "\t%Lf\t%Lf"
+                  "\n"
+                , (ae->flags & HEALTH_ENTRY_FLAG_SAVED)?'U':'A'
+                , host->hostname
+
+                , ae->unique_id
+                , ae->alarm_id
+                , ae->alarm_event_id
+                , ae->updated_by_id
+                , ae->updates_id
+
+                , (uint32_t)ae->when
+                , (uint32_t)ae->duration
+                , (uint32_t)ae->non_clear_duration
+                , (uint32_t)ae->flags
+                , (uint32_t)ae->exec_run_timestamp
+                , (uint32_t)ae->delay_up_to_timestamp
+
+                , (ae->name)?ae->name:""
+                , (ae->chart)?ae->chart:""
+                , (ae->family)?ae->family:""
+                , (ae->exec)?ae->exec:""
+                , (ae->recipient)?ae->recipient:""
+                , (ae->source)?ae->source:""
+                , (ae->units)?ae->units:""
+                , (ae->info)?ae->info:""
+
+                , ae->exec_code
+                , ae->new_status
+                , ae->old_status
+                , ae->delay
+
+                , (long double)ae->new_value
+                , (long double)ae->old_value
+        ) < 0))
             error("Health: failed to save alarm log entry. Health data may be lost in case of abnormal restart.");
+        else
+            ae->flags |= HEALTH_ENTRY_FLAG_SAVED;
     }
-*/
 }
 
 static inline void health_alarm_log_load(RRDHOST *host) {
     (void)host;
 
+    health_alarm_log_close();
+
+    FILE *fp = fopen(health.log_filename, "r");
+    if(!fp)
+        error("Registry: cannot open health file: %s", health.log_filename);
+    else {
+        errno = 0;
+
+        char *s, *buf = mallocz(65536 + 1);
+        size_t line = 0;
+        size_t len = 0;
+
+        while((s = fgets_trim_len(buf, 65536, fp, &len))) {
+            line++;
+            // fprintf(stderr, "line %zu: '%s'\n", line, s);
+
+            int max_entries = 30, entries = 0;
+            char *pointers[max_entries];
+
+            pointers[entries++] = s;
+            while(*s) {
+                if(unlikely(*s == '\t')) {
+                    *s = '\0';
+                    pointers[entries++] = s;
+                    if(entries > max_entries) {
+                        error("Line %zd of file '%s' has more than %d entries. Ignoring excessive entries.", line, health.log_filename, max_entries);
+                        break;
+                    }
+                }
+                s++;
+            }
+
+            if(likely(*pointers[0] == 'U' || *pointers[0] == 'A')) {
+                ALARM_ENTRY *ae = NULL;
+
+                if(entries < 26) {
+                    error("Line %zd of file '%s' should have at least 26 entries, but it has %d. Ignoring line.", line, health.log_filename, entries);
+                    continue;
+                }
+
+                // if this is an update, find it
+                if(unlikely(*pointers[0] == 'U')) {
+                    uint32_t unique_id = (uint32_t)strtoul(pointers[2], NULL, 16);
+
+                    // fprintf(stderr, "searching for alarm entry with unique id %u\n", unique_id);
+
+                    // find it
+                    for(ae = host->health_log.alarms; ae ;ae = ae->next) {
+                        if(unlikely(ae->unique_id == unique_id)) break;
+                    }
+
+                    if(!ae) {
+                        *pointers[0] = 'A';
+                        error("Line %zd of file '%s' updates alarm log entry with unique id %u, but it is not found.", line, health.log_filename, unique_id);
+                    }
+                }
+
+                // create a new one
+                if(likely(!ae)) {
+                    ae = callocz(1, sizeof(ALARM_ENTRY));
+                }
+
+                if(strcmp(pointers[1], host->hostname))
+                    error("Line %zd of file '%s' provides an alarm for host '%s' but this is named '%s'.", line, health.log_filename, pointers[1], host->hostname);
+
+                ae->unique_id               = (uint32_t)strtoul(pointers[2], NULL, 16);
+                ae->alarm_id                = (uint32_t)strtoul(pointers[3], NULL, 16);
+                ae->alarm_event_id          = (uint32_t)strtoul(pointers[4], NULL, 16);
+                ae->updated_by_id           = (uint32_t)strtoul(pointers[5], NULL, 16);
+                ae->updates_id              = (uint32_t)strtoul(pointers[6], NULL, 16);
+
+                ae->when                    = (uint32_t)strtoul(pointers[7], NULL, 16);
+                ae->duration                = (uint32_t)strtoul(pointers[8], NULL, 16);
+                ae->non_clear_duration      = (uint32_t)strtoul(pointers[9], NULL, 16);
+                ae->flags                   = (uint32_t)strtoul(pointers[10], NULL, 16);
+                ae->exec_run_timestamp      = (uint32_t)strtoul(pointers[11], NULL, 16);
+                ae->delay_up_to_timestamp   = (uint32_t)strtoul(pointers[12], NULL, 16);
+
+                if(unlikely(ae->name)) freez(ae->name);
+                ae->name = strdupz(pointers[13]);
+
+                if(unlikely(ae->chart)) freez(ae->chart);
+                ae->chart = strdupz(pointers[14]);
+
+                if(unlikely(ae->family)) freez(ae->family);
+                ae->family = strdupz(pointers[15]);
+
+                if(unlikely(ae->exec)) freez(ae->exec);
+                ae->exec = strdupz(pointers[16]);
+                if(!*ae->exec) { freez(ae->exec); ae->exec = NULL; }
+
+                if(unlikely(ae->recipient)) freez(ae->recipient);
+                ae->recipient = strdupz(pointers[17]);
+                if(!*ae->recipient) { freez(ae->recipient); ae->recipient = NULL; }
+
+                if(unlikely(ae->source)) freez(ae->source);
+                ae->source = strdupz(pointers[18]);
+                if(!*ae->source) { freez(ae->source); ae->source = NULL; }
+
+                if(unlikely(ae->units)) freez(ae->units);
+                ae->units = strdupz(pointers[19]);
+                if(!*ae->units) { freez(ae->units); ae->units = NULL; }
+
+                if(unlikely(ae->info)) freez(ae->info);
+                ae->info = strdupz(pointers[20]);
+                if(!*ae->info) { freez(ae->info); ae->info = NULL; }
+
+                ae->exec_code   = atoi(pointers[21]);
+                ae->new_status  = atoi(pointers[22]);
+                ae->old_status  = atoi(pointers[23]);
+                ae->delay       = atoi(pointers[24]);
+
+                ae->new_value   = strtold(pointers[25], NULL);
+                ae->old_value   = strtold(pointers[26], NULL);
+
+                // add it to host if not already there
+                if(unlikely(*pointers[0] == 'A')) {
+                    ae->next = host->health_log.alarms;
+                    host->health_log.alarms = ae;
+                }
+
+                if(unlikely(ae->unique_id >= host->health_log.next_log_id))
+                    host->health_log.next_log_id = ae->unique_id + 1;
+
+                if(unlikely(ae->alarm_id >= host->health_log.next_alarm_id))
+                    host->health_log.next_alarm_id = ae->alarm_id + 1;
+            }
+            else {
+                error("Line %zd of file '%s' is invalid (unrecognized entry type '%s').", line, health.log_filename, pointers[0]);
+            }
+        }
+
+        freez(buf);
+        fclose(fp);
+    }
+
+    health_alarm_log_open();
 }
 
 // ----------------------------------------------------------------------------
@@ -152,8 +317,8 @@ static inline void health_alarm_log(RRDHOST *host,
     ALARM_ENTRY *t;
     for(t = host->health_log.alarms ; t ; t = t->next) {
         if(t != ae && t->alarm_id == ae->alarm_id) {
-            if(!(t->notifications & HEALTH_ENTRY_NOTIFICATIONS_UPDATED) && !t->updated_by_id) {
-                t->notifications |= HEALTH_ENTRY_NOTIFICATIONS_UPDATED;
+            if(!(t->flags & HEALTH_ENTRY_FLAG_UPDATED) && !t->updated_by_id) {
+                t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
                 t->updated_by_id = ae->unique_id;
                 ae->updates_id = t->unique_id;
 
@@ -1353,6 +1518,16 @@ static inline int health_parse_db_lookup(
     return 1;
 }
 
+static inline char *tabs2spaces(char *s) {
+    char *t = s;
+    while(*t) {
+        if(unlikely(*t == '\t')) *t = ' ';
+        t++;
+    }
+
+    return s;
+}
+
 static inline char *health_source_file(size_t line, const char *path, const char *filename) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%zu@%s/%s", line, path, filename);
@@ -1460,7 +1635,7 @@ int health_readfile(const char *path, const char *filename) {
 
             rc = callocz(1, sizeof(RRDCALC));
             rc->next_event_id = 1;
-            rc->name = strdupz(value);
+            rc->name = tabs2spaces(strdupz(value));
             rc->hash = simple_hash(rc->name);
             rc->source = health_source_file(line, path, filename);
             rc->green = NAN;
@@ -1483,7 +1658,7 @@ int health_readfile(const char *path, const char *filename) {
                 rrdcalctemplate_free(&localhost, rt);
 
             rt = callocz(1, sizeof(RRDCALCTEMPLATE));
-            rt->name = strdupz(value);
+            rt->name = tabs2spaces(strdupz(value));
             rt->hash_name = simple_hash(rt->name);
             rt->source = health_source_file(line, path, filename);
             rt->green = NAN;
@@ -1502,7 +1677,7 @@ int health_readfile(const char *path, const char *filename) {
 
                     freez(rc->chart);
                 }
-                rc->chart = strdupz(value);
+                rc->chart = tabs2spaces(strdupz(value));
                 rc->hash_chart = simple_hash(rc->chart);
             }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
@@ -1566,7 +1741,7 @@ int health_readfile(const char *path, const char *filename) {
 
                     freez(rc->exec);
                 }
-                rc->exec = strdupz(value);
+                rc->exec = tabs2spaces(strdupz(value));
             }
             else if(hash == hash_recipient && !strcasecmp(key, HEALTH_RECIPIENT_KEY)) {
                 if(rc->recipient) {
@@ -1576,7 +1751,7 @@ int health_readfile(const char *path, const char *filename) {
 
                     freez(rc->recipient);
                 }
-                rc->recipient = strdupz(value);
+                rc->recipient = tabs2spaces(strdupz(value));
             }
             else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
                 if(rc->units) {
@@ -1586,7 +1761,7 @@ int health_readfile(const char *path, const char *filename) {
 
                     freez(rc->units);
                 }
-                rc->units = strdupz(value);
+                rc->units = tabs2spaces(strdupz(value));
                 strip_quotes(rc->units);
             }
             else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
@@ -1597,7 +1772,7 @@ int health_readfile(const char *path, const char *filename) {
 
                     freez(rc->info);
                 }
-                rc->info = strdupz(value);
+                rc->info = tabs2spaces(strdupz(value));
                 strip_quotes(rc->info);
             }
             else if(hash == hash_delay && !strcasecmp(key, HEALTH_DELAY_KEY)) {
@@ -1617,7 +1792,7 @@ int health_readfile(const char *path, const char *filename) {
 
                     freez(rt->context);
                 }
-                rt->context = strdupz(value);
+                rt->context = tabs2spaces(strdupz(value));
                 rt->hash_context = simple_hash(rt->context);
             }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
@@ -1681,7 +1856,7 @@ int health_readfile(const char *path, const char *filename) {
 
                     freez(rt->exec);
                 }
-                rt->exec = strdupz(value);
+                rt->exec = tabs2spaces(strdupz(value));
             }
             else if(hash == hash_recipient && !strcasecmp(key, HEALTH_RECIPIENT_KEY)) {
                 if(rt->recipient) {
@@ -1691,7 +1866,7 @@ int health_readfile(const char *path, const char *filename) {
 
                     freez(rt->recipient);
                 }
-                rt->recipient = strdupz(value);
+                rt->recipient = tabs2spaces(strdupz(value));
             }
             else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
                 if(rt->units) {
@@ -1701,7 +1876,7 @@ int health_readfile(const char *path, const char *filename) {
 
                     freez(rt->units);
                 }
-                rt->units = strdupz(value);
+                rt->units = tabs2spaces(strdupz(value));
                 strip_quotes(rt->units);
             }
             else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
@@ -1712,7 +1887,7 @@ int health_readfile(const char *path, const char *filename) {
 
                     freez(rt->info);
                 }
-                rt->info = strdupz(value);
+                rt->info = tabs2spaces(strdupz(value));
                 strip_quotes(rt->info);
             }
             else if(hash == hash_delay && !strcasecmp(key, HEALTH_DELAY_KEY)) {
@@ -1798,7 +1973,16 @@ void health_init(void) {
         return;
     }
 
+    char *pathname = config_get("health", "health db directory", VARLIB_DIR "/health");
+    if(mkdir(pathname, 0770) == -1 && errno != EEXIST)
+        fatal("Cannot create directory '%s'.", pathname);
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/health-log.db", pathname);
+    health.log_filename = config_get("health", "health db file", filename);
+
     health_alarm_log_load(&localhost);
+    health_alarm_log_open();
 
     char *path = health_config_dir();
 
@@ -1865,10 +2049,10 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, R
                    ae->name,
                    ae->chart,
                    ae->family,
-                   (ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_PROCESSED)?"true":"false",
-                   (ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_UPDATED)?"true":"false",
+                   (ae->flags & HEALTH_ENTRY_FLAG_PROCESSED)?"true":"false",
+                   (ae->flags & HEALTH_ENTRY_FLAG_UPDATED)?"true":"false",
                    (unsigned long)ae->exec_run_timestamp,
-                   (ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_EXEC_FAILED)?"true":"false",
+                   (ae->flags & HEALTH_ENTRY_FLAG_EXEC_FAILED)?"true":"false",
                    ae->exec?ae->exec:health.health_default_exec,
                    ae->recipient?ae->recipient:health.health_default_recipient,
                    ae->exec_code,
@@ -2085,7 +2269,7 @@ void health_reload(void) {
     ALARM_ENTRY *t;
     for(t = localhost.health_log.alarms ; t ; t = t->next) {
         if(t->new_status != RRDCALC_STATUS_REMOVED)
-            t->notifications |= HEALTH_ENTRY_NOTIFICATIONS_UPDATED;
+            t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
     }
 
     // reset all thresholds to all charts
@@ -2121,12 +2305,12 @@ static inline int rrdcalc_value2status(calculated_number n) {
 }
 
 static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
-    ae->notifications |= HEALTH_ENTRY_NOTIFICATIONS_PROCESSED;
+    ae->flags |= HEALTH_ENTRY_FLAG_PROCESSED;
 
     // find the previous notification for the same alarm
     ALARM_ENTRY *t;
     for(t = ae->next; t ;t = t->next) {
-        if(t->alarm_id == ae->alarm_id && t->notifications & HEALTH_ENTRY_NOTIFICATIONS_EXEC_RUN)
+        if(t->alarm_id == ae->alarm_id && t->flags & HEALTH_ENTRY_FLAG_EXEC_RUN)
             break;
     }
 
@@ -2173,7 +2357,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
               ae->info?ae->info:""
     );
 
-    ae->notifications |= HEALTH_ENTRY_NOTIFICATIONS_EXEC_RUN;
+    ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
     ae->exec_run_timestamp = time(NULL);
 
     debug(D_HEALTH, "executing command '%s'", buffer);
@@ -2189,7 +2373,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     debug(D_HEALTH, "done executing command - returned with code %d", ae->exec_code);
 
     if(ae->exec_code != 0)
-        ae->notifications |= HEALTH_ENTRY_NOTIFICATIONS_EXEC_FAILED;
+        ae->flags |= HEALTH_ENTRY_FLAG_EXEC_FAILED;
 
 done:
     health_alarm_log_save(host, ae);
@@ -2217,8 +2401,8 @@ static inline void health_alarm_log_process(RRDHOST *host) {
     ALARM_ENTRY *ae;
     for(ae = host->health_log.alarms; ae && ae->unique_id >= stop_at_id ; ae = ae->next) {
         if(unlikely(
-            !(ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_PROCESSED) &&
-            !(ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_UPDATED)
+            !(ae->flags & HEALTH_ENTRY_FLAG_PROCESSED) &&
+            !(ae->flags & HEALTH_ENTRY_FLAG_UPDATED)
             )) {
 
             if(unlikely(ae->unique_id < first_waiting))

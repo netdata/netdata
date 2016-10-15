@@ -743,8 +743,7 @@ static inline void registry_log_recreate_nolock(void) {
 }
 
 int registry_log_load(void) {
-    char *s, buf[4096 + 1];
-    size_t line = -1;
+    ssize_t line = -1;
 
     // closing the log is required here
     // otherwise we will append to it the values we read
@@ -755,8 +754,10 @@ int registry_log_load(void) {
     if(!fp)
         error("Registry: cannot open registry file: %s", registry.log_filename);
     else {
+        char *s, buf[4096 + 1];
         line = 0;
         size_t len = 0;
+
         while ((s = fgets_trim_len(buf, 4096, fp, &len))) {
             line++;
 
