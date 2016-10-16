@@ -219,8 +219,7 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
 
                 // alarms should be added in the right order
                 if(unlikely(unique_id < max_unique_id)) {
-                    error("Health: line %zu of file '%s' has alarm log entry with %u in wrong order.", line
-                          , filename, ae->unique_id);
+                    error("Health: line %zu of file '%s' has alarm log entry with %u in wrong order.", line, filename, unique_id);
                 }
 
                 ae = callocz(1, sizeof(ALARM_ENTRY));
