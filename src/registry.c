@@ -1472,7 +1472,7 @@ int registry_save(void) {
     // rename the db to .old
     debug(D_REGISTRY, "Registry: Link current db '%s' to .old: '%s'", registry.db_filename, old_filename);
     if(link(registry.db_filename, old_filename) == -1 && errno != ENOENT)
-        error("Registry: cannot move file '%s' to '%s'. Saving registry DB failed!", tmp_filename, registry.db_filename);
+        error("Registry: cannot move file '%s' to '%s'. Saving registry DB failed!", registry.db_filename, old_filename);
 
     else {
         // remove the database (it is saved in .old)
