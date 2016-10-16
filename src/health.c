@@ -141,7 +141,7 @@ static inline void health_alarm_log_load(RRDHOST *host) {
                     *s = '\0';
                     pointers[entries++] = s;
                     if(entries > max_entries) {
-                        error("Line %zd of file '%s' has more than %d entries. Ignoring excessive entries.", line, health.log_filename, max_entries);
+                        error("Line %zu of file '%s' has more than %d entries. Ignoring excessive entries.", line, health.log_filename, max_entries);
                         break;
                     }
                 }
@@ -152,7 +152,7 @@ static inline void health_alarm_log_load(RRDHOST *host) {
                 ALARM_ENTRY *ae = NULL;
 
                 if(entries < 26) {
-                    error("Line %zd of file '%s' should have at least 26 entries, but it has %d. Ignoring line.", line, health.log_filename, entries);
+                    error("Line %zu of file '%s' should have at least 26 entries, but it has %d. Ignoring line.", line, health.log_filename, entries);
                     continue;
                 }
 
@@ -169,7 +169,7 @@ static inline void health_alarm_log_load(RRDHOST *host) {
 
                     if(!ae) {
                         *pointers[0] = 'A';
-                        error("Line %zd of file '%s' updates alarm log entry with unique id %u, but it is not found.", line, health.log_filename, unique_id);
+                        error("Line %zu of file '%s' updates alarm log entry with unique id %u, but it is not found.", line, health.log_filename, unique_id);
                     }
                 }
 
@@ -179,7 +179,7 @@ static inline void health_alarm_log_load(RRDHOST *host) {
                 }
 
                 if(strcmp(pointers[1], host->hostname))
-                    error("Line %zd of file '%s' provides an alarm for host '%s' but this is named '%s'.", line, health.log_filename, pointers[1], host->hostname);
+                    error("Line %zu of file '%s' provides an alarm for host '%s' but this is named '%s'.", line, health.log_filename, pointers[1], host->hostname);
 
                 ae->unique_id               = (uint32_t)strtoul(pointers[2], NULL, 16);
                 ae->alarm_id                = (uint32_t)strtoul(pointers[3], NULL, 16);
@@ -244,7 +244,7 @@ static inline void health_alarm_log_load(RRDHOST *host) {
                     host->health_log.next_alarm_id = ae->alarm_id + 1;
             }
             else {
-                error("Line %zd of file '%s' is invalid (unrecognized entry type '%s').", line, health.log_filename, pointers[0]);
+                error("Line %zu of file '%s' is invalid (unrecognized entry type '%s').", line, health.log_filename, pointers[0]);
             }
         }
 
