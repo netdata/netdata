@@ -174,10 +174,11 @@ static inline ssize_t health_alarm_log_load(RRDHOST *host) {
                 }
 
                 // find a possible overwrite
-                for(ae = host->health_log.alarms; ae ;ae = ae->next) {
+                for(ae = host->health_log.alarms; ae; ae = ae->next) {
                     if(unlikely(ae->unique_id == unique_id)) {
                         if(unlikely(*pointers[0] == 'A')) {
-                            error("Health: line %zu of file '%s' adds duplicate alarm log entry with unique id %u.", line, health.log_filename, unique_id);
+                            error("Health: line %zu of file '%s' adds duplicate alarm log entry with unique id %u."
+                                  , line, health.log_filename, unique_id);
                             *pointers[0] = 'U';
                             duplicate++;
                         }
@@ -187,10 +188,17 @@ static inline ssize_t health_alarm_log_load(RRDHOST *host) {
 
                 // if not found, create a new one
                 if(likely(!ae)) {
+
                     // if it is an update, but we haven't found it, make it an addition
                     if(unlikely(*pointers[0] == 'U')) {
                         *pointers[0] = 'A';
                         error("Health: line %zu of file '%s' updates alarm log entry with unique id %u, but it is not found.", line, health.log_filename, unique_id);
+                    }
+
+                    // alarms should be added in the right order
+                    if(unlikely(unique_id < max_unique_id)) {
+                        error("Health: line %zu of file '%s' has alarm log entry with %u in wrong order.", line
+                              , health.log_filename, ae->unique_id);
                     }
 
                     ae = callocz(1, sizeof(ALARM_ENTRY));
@@ -285,7 +293,7 @@ static inline ssize_t health_alarm_log_load(RRDHOST *host) {
     host->health_log.next_log_id = max_unique_id + 1;
     host->health_log.next_alarm_id = max_alarm_id + 1;
 
-    fprintf(stderr, "Health loaded %zd alarms, updated %zd alarms, errors %zd entries, duplicate %zd\n", loaded, updated, errored, duplicate);
+    info("Health: loaded %zd alarms, updated %zd alarms, errors %zd entries, duplicate %zd", loaded, updated, errored, duplicate);
 
     health_alarm_log_open();
     return loaded;
