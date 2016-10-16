@@ -14,7 +14,7 @@ int web_enable_gzip = 1, web_gzip_level = 3, web_gzip_strategy = Z_DEFAULT_STRAT
 struct web_client *web_clients = NULL;
 unsigned long long web_clients_count = 0;
 
-inline int web_client_crock_socket(struct web_client *w) {
+static inline int web_client_crock_socket(struct web_client *w) {
 #ifdef TCP_CORK
     if(likely(!w->tcp_cork && w->ofd != -1)) {
         w->tcp_cork = 1;
@@ -29,7 +29,7 @@ inline int web_client_crock_socket(struct web_client *w) {
     return 0;
 }
 
-inline int web_client_uncrock_socket(struct web_client *w) {
+static inline int web_client_uncrock_socket(struct web_client *w) {
 #ifdef TCP_CORK
     if(likely(w->tcp_cork && w->ofd != -1)) {
         w->tcp_cork = 0;
