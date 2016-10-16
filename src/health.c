@@ -6,6 +6,7 @@ struct health_options {
     const char *health_default_exec;
     const char *health_default_recipient;
     const char *log_filename;
+    size_t log_entries_written;
     FILE *log_fp;
 };
 
@@ -13,6 +14,7 @@ static struct health_options health = {
     .health_default_exec = PLUGINS_DIR "/alarm-notify.sh",
     .health_default_recipient = "root",
     .log_filename = VARLIB_DIR "/health/alarm_log.db",
+    .log_entries_written = 0,
     .log_fp = NULL
 };
 
@@ -45,14 +47,33 @@ static inline void health_alarm_log_close(void) {
     }
 }
 
-static inline void health_log_recreate(void) {
-    if(health.log_fp != NULL) {
+static inline void health_log_rotate(void) {
+    static size_t rotate_every = 0;
+
+    if(unlikely(rotate_every == 0)) {
+        rotate_every = (size_t)config_get_number("health", "rotate log every lines", 100);
+        if(rotate_every < 100) rotate_every = 100;
+    }
+
+    if(unlikely(health.log_entries_written > rotate_every)) {
         health_alarm_log_close();
+
+        char old_filename[FILENAME_MAX + 1];
+        snprintfz(old_filename, FILENAME_MAX, "%s.old", health.log_filename);
+
+        if(unlink(old_filename) == -1 && errno != ENOENT)
+            error("Health: cannot remove old alarms log file '%s'", old_filename);
+
+        if(link(health.log_filename, old_filename) == -1 && errno != ENOENT)
+            error("Health: cannot move file '%s' to '%s'.", health.log_filename, old_filename);
 
         // open it with truncate
         health.log_fp = fopen(health.log_filename, "w");
-        if(health.log_fp) fclose(health.log_fp);
-        else error("Health: cannot truncate health log '%s'", health.log_filename);
+
+        if(health.log_fp)
+            fclose(health.log_fp);
+        else
+            error("Health: cannot truncate health log '%s'", health.log_filename);
 
         health.log_fp = NULL;
 
@@ -61,8 +82,7 @@ static inline void health_log_recreate(void) {
 }
 
 static inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
-    (void)host;
-    (void)ae;
+    health_log_rotate();
 
     if(likely(health.log_fp)) {
         if(unlikely(fprintf(health.log_fp
@@ -108,184 +128,180 @@ static inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                 , (long double)ae->old_value
         ) < 0))
             error("Health: failed to save alarm log entry. Health data may be lost in case of abnormal restart.");
-        else
+        else {
             ae->flags |= HEALTH_ENTRY_FLAG_SAVED;
+            health.log_entries_written++;
+        }
     }
 }
 
-static inline ssize_t health_alarm_log_load(RRDHOST *host) {
+static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filename) {
     uint32_t max_unique_id = 0, max_alarm_id = 0;
     ssize_t loaded = -1, updated = -1, errored = -1, duplicate = -1;
-    health_alarm_log_close();
 
-    FILE *fp = fopen(health.log_filename, "r");
-    if(!fp)
-        error("Health: cannot open health file: %s", health.log_filename);
-    else {
-        errno = 0;
+    errno = 0;
 
-        char *s, *buf = mallocz(65536 + 1);
-        size_t line = 0, len = 0;
-        loaded = updated = errored = duplicate = 0;
+    char *s, *buf = mallocz(65536 + 1);
+    size_t line = 0, len = 0;
+    loaded = updated = errored = duplicate = 0;
 
-        pthread_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+    pthread_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
-        while((s = fgets_trim_len(buf, 65536, fp, &len))) {
-            line++;
+    while((s = fgets_trim_len(buf, 65536, fp, &len))) {
+        health.log_entries_written++;
+        line++;
 
-            int max_entries = 30, entries = 0;
-            char *pointers[max_entries];
+        int max_entries = 30, entries = 0;
+        char *pointers[max_entries];
 
-            pointers[entries++] = s++;
-            while(*s) {
-                if(unlikely(*s == '\t')) {
-                    *s = '\0';
-                    pointers[entries++] = ++s;
-                    if(entries >= max_entries) {
-                        error("Health: line %zu of file '%s' has more than %d entries. Ignoring excessive entries.", line, health.log_filename, max_entries);
-                        break;
-                    }
+        pointers[entries++] = s++;
+        while(*s) {
+            if(unlikely(*s == '\t')) {
+                *s = '\0';
+                pointers[entries++] = ++s;
+                if(entries >= max_entries) {
+                    error("Health: line %zu of file '%s' has more than %d entries. Ignoring excessive entries.", line, filename, max_entries);
+                    break;
                 }
-                else s++;
             }
-
-            if(likely(*pointers[0] == 'U' || *pointers[0] == 'A')) {
-                ALARM_ENTRY *ae = NULL;
-
-                if(entries < 26) {
-                    error("Health: line %zu of file '%s' should have at least 26 entries, but it has %d. Ignoring line.", line, health.log_filename, entries);
-                    errored++;
-                    continue;
-                }
-
-                // check that we have valid ids
-                uint32_t unique_id = (uint32_t)strtoul(pointers[2], NULL, 16);
-                if(!unique_id) {
-                    error("Health: line %zu of file '%s' states alarm entry with unique id %u (%s). Ignoring line.", line, health.log_filename, unique_id, pointers[2]);
-                    errored++;
-                    continue;
-                }
-
-                uint32_t alarm_id = (uint32_t)strtoul(pointers[3], NULL, 16);
-                if(!alarm_id) {
-                    error("Health: line %zu of file '%s' states alarm entry for alarm id %u (%s). Ignoring line.", line, health.log_filename, alarm_id, pointers[3]);
-                    errored++;
-                    continue;
-                }
-
-                // find a possible overwrite
-                for(ae = host->health_log.alarms; ae; ae = ae->next) {
-                    if(unlikely(ae->unique_id == unique_id)) {
-                        if(unlikely(*pointers[0] == 'A')) {
-                            error("Health: line %zu of file '%s' adds duplicate alarm log entry with unique id %u."
-                                  , line, health.log_filename, unique_id);
-                            *pointers[0] = 'U';
-                            duplicate++;
-                        }
-                        break;
-                    }
-                }
-
-                // if not found, create a new one
-                if(likely(!ae)) {
-
-                    // if it is an update, but we haven't found it, make it an addition
-                    if(unlikely(*pointers[0] == 'U')) {
-                        *pointers[0] = 'A';
-                        error("Health: line %zu of file '%s' updates alarm log entry with unique id %u, but it is not found.", line, health.log_filename, unique_id);
-                    }
-
-                    // alarms should be added in the right order
-                    if(unlikely(unique_id < max_unique_id)) {
-                        error("Health: line %zu of file '%s' has alarm log entry with %u in wrong order.", line
-                              , health.log_filename, ae->unique_id);
-                    }
-
-                    ae = callocz(1, sizeof(ALARM_ENTRY));
-                }
-
-                // check for a possible host missmatch
-                if(strcmp(pointers[1], host->hostname))
-                    error("Health: line %zu of file '%s' provides an alarm for host '%s' but this is named '%s'.", line, health.log_filename, pointers[1], host->hostname);
-
-                ae->unique_id               = unique_id;
-                ae->alarm_id                = alarm_id;
-                ae->alarm_event_id          = (uint32_t)strtoul(pointers[4], NULL, 16);
-                ae->updated_by_id           = (uint32_t)strtoul(pointers[5], NULL, 16);
-                ae->updates_id              = (uint32_t)strtoul(pointers[6], NULL, 16);
-
-                ae->when                    = (uint32_t)strtoul(pointers[7], NULL, 16);
-                ae->duration                = (uint32_t)strtoul(pointers[8], NULL, 16);
-                ae->non_clear_duration      = (uint32_t)strtoul(pointers[9], NULL, 16);
-
-                ae->flags                   = (uint32_t)strtoul(pointers[10], NULL, 16);
-                ae->flags |= HEALTH_ENTRY_FLAG_SAVED;
-
-                ae->exec_run_timestamp      = (uint32_t)strtoul(pointers[11], NULL, 16);
-                ae->delay_up_to_timestamp   = (uint32_t)strtoul(pointers[12], NULL, 16);
-
-                if(unlikely(ae->name)) freez(ae->name);
-                ae->name = strdupz(pointers[13]);
-
-                if(unlikely(ae->chart)) freez(ae->chart);
-                ae->chart = strdupz(pointers[14]);
-
-                if(unlikely(ae->family)) freez(ae->family);
-                ae->family = strdupz(pointers[15]);
-
-                if(unlikely(ae->exec)) freez(ae->exec);
-                ae->exec = strdupz(pointers[16]);
-                if(!*ae->exec) { freez(ae->exec); ae->exec = NULL; }
-
-                if(unlikely(ae->recipient)) freez(ae->recipient);
-                ae->recipient = strdupz(pointers[17]);
-                if(!*ae->recipient) { freez(ae->recipient); ae->recipient = NULL; }
-
-                if(unlikely(ae->source)) freez(ae->source);
-                ae->source = strdupz(pointers[18]);
-                if(!*ae->source) { freez(ae->source); ae->source = NULL; }
-
-                if(unlikely(ae->units)) freez(ae->units);
-                ae->units = strdupz(pointers[19]);
-                if(!*ae->units) { freez(ae->units); ae->units = NULL; }
-
-                if(unlikely(ae->info)) freez(ae->info);
-                ae->info = strdupz(pointers[20]);
-                if(!*ae->info) { freez(ae->info); ae->info = NULL; }
-
-                ae->exec_code   = atoi(pointers[21]);
-                ae->new_status  = atoi(pointers[22]);
-                ae->old_status  = atoi(pointers[23]);
-                ae->delay       = atoi(pointers[24]);
-
-                ae->new_value   = strtold(pointers[25], NULL);
-                ae->old_value   = strtold(pointers[26], NULL);
-
-                // add it to host if not already there
-                if(unlikely(*pointers[0] == 'A')) {
-                    ae->next = host->health_log.alarms;
-                    host->health_log.alarms = ae;
-                    loaded++;
-                }
-                else updated++;
-
-                if(unlikely(ae->unique_id > max_unique_id))
-                    max_unique_id = ae->unique_id;
-
-                if(unlikely(ae->alarm_id >= max_alarm_id))
-                    max_alarm_id = ae->alarm_id;
-            }
-            else {
-                error("Health: line %zu of file '%s' is invalid (unrecognized entry type '%s').", line, health.log_filename, pointers[0]);
-                errored++;
-            }
+            else s++;
         }
 
-        pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+        if(likely(*pointers[0] == 'U' || *pointers[0] == 'A')) {
+            ALARM_ENTRY *ae = NULL;
 
-        freez(buf);
-        fclose(fp);
+            if(entries < 26) {
+                error("Health: line %zu of file '%s' should have at least 26 entries, but it has %d. Ignoring line.", line, filename, entries);
+                errored++;
+                continue;
+            }
+
+            // check that we have valid ids
+            uint32_t unique_id = (uint32_t)strtoul(pointers[2], NULL, 16);
+            if(!unique_id) {
+                error("Health: line %zu of file '%s' states alarm entry with unique id %u (%s). Ignoring line.", line, filename, unique_id, pointers[2]);
+                errored++;
+                continue;
+            }
+
+            uint32_t alarm_id = (uint32_t)strtoul(pointers[3], NULL, 16);
+            if(!alarm_id) {
+                error("Health: line %zu of file '%s' states alarm entry for alarm id %u (%s). Ignoring line.", line, filename, alarm_id, pointers[3]);
+                errored++;
+                continue;
+            }
+
+            // find a possible overwrite
+            for(ae = host->health_log.alarms; ae; ae = ae->next) {
+                if(unlikely(ae->unique_id == unique_id)) {
+                    if(unlikely(*pointers[0] == 'A')) {
+                        error("Health: line %zu of file '%s' adds duplicate alarm log entry with unique id %u."
+                              , line, filename, unique_id);
+                        *pointers[0] = 'U';
+                        duplicate++;
+                    }
+                    break;
+                }
+            }
+
+            // if not found, create a new one
+            if(likely(!ae)) {
+
+                // if it is an update, but we haven't found it, make it an addition
+                if(unlikely(*pointers[0] == 'U')) {
+                    *pointers[0] = 'A';
+                    error("Health: line %zu of file '%s' updates alarm log entry with unique id %u, but it is not found.", line, filename, unique_id);
+                }
+
+                // alarms should be added in the right order
+                if(unlikely(unique_id < max_unique_id)) {
+                    error("Health: line %zu of file '%s' has alarm log entry with %u in wrong order.", line
+                          , filename, ae->unique_id);
+                }
+
+                ae = callocz(1, sizeof(ALARM_ENTRY));
+            }
+
+            // check for a possible host missmatch
+            if(strcmp(pointers[1], host->hostname))
+                error("Health: line %zu of file '%s' provides an alarm for host '%s' but this is named '%s'.", line, filename, pointers[1], host->hostname);
+
+            ae->unique_id               = unique_id;
+            ae->alarm_id                = alarm_id;
+            ae->alarm_event_id          = (uint32_t)strtoul(pointers[4], NULL, 16);
+            ae->updated_by_id           = (uint32_t)strtoul(pointers[5], NULL, 16);
+            ae->updates_id              = (uint32_t)strtoul(pointers[6], NULL, 16);
+
+            ae->when                    = (uint32_t)strtoul(pointers[7], NULL, 16);
+            ae->duration                = (uint32_t)strtoul(pointers[8], NULL, 16);
+            ae->non_clear_duration      = (uint32_t)strtoul(pointers[9], NULL, 16);
+
+            ae->flags                   = (uint32_t)strtoul(pointers[10], NULL, 16);
+            ae->flags |= HEALTH_ENTRY_FLAG_SAVED;
+
+            ae->exec_run_timestamp      = (uint32_t)strtoul(pointers[11], NULL, 16);
+            ae->delay_up_to_timestamp   = (uint32_t)strtoul(pointers[12], NULL, 16);
+
+            if(unlikely(ae->name)) freez(ae->name);
+            ae->name = strdupz(pointers[13]);
+
+            if(unlikely(ae->chart)) freez(ae->chart);
+            ae->chart = strdupz(pointers[14]);
+
+            if(unlikely(ae->family)) freez(ae->family);
+            ae->family = strdupz(pointers[15]);
+
+            if(unlikely(ae->exec)) freez(ae->exec);
+            ae->exec = strdupz(pointers[16]);
+            if(!*ae->exec) { freez(ae->exec); ae->exec = NULL; }
+
+            if(unlikely(ae->recipient)) freez(ae->recipient);
+            ae->recipient = strdupz(pointers[17]);
+            if(!*ae->recipient) { freez(ae->recipient); ae->recipient = NULL; }
+
+            if(unlikely(ae->source)) freez(ae->source);
+            ae->source = strdupz(pointers[18]);
+            if(!*ae->source) { freez(ae->source); ae->source = NULL; }
+
+            if(unlikely(ae->units)) freez(ae->units);
+            ae->units = strdupz(pointers[19]);
+            if(!*ae->units) { freez(ae->units); ae->units = NULL; }
+
+            if(unlikely(ae->info)) freez(ae->info);
+            ae->info = strdupz(pointers[20]);
+            if(!*ae->info) { freez(ae->info); ae->info = NULL; }
+
+            ae->exec_code   = atoi(pointers[21]);
+            ae->new_status  = atoi(pointers[22]);
+            ae->old_status  = atoi(pointers[23]);
+            ae->delay       = atoi(pointers[24]);
+
+            ae->new_value   = strtold(pointers[25], NULL);
+            ae->old_value   = strtold(pointers[26], NULL);
+
+            // add it to host if not already there
+            if(unlikely(*pointers[0] == 'A')) {
+                ae->next = host->health_log.alarms;
+                host->health_log.alarms = ae;
+                loaded++;
+            }
+            else updated++;
+
+            if(unlikely(ae->unique_id > max_unique_id))
+                max_unique_id = ae->unique_id;
+
+            if(unlikely(ae->alarm_id >= max_alarm_id))
+                max_alarm_id = ae->alarm_id;
+        }
+        else {
+            error("Health: line %zu of file '%s' is invalid (unrecognized entry type '%s').", line, filename, pointers[0]);
+            errored++;
+        }
     }
+
+    pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+
+    freez(buf);
 
     if(!max_unique_id) max_unique_id = (uint32_t)time(NULL);
     if(!max_alarm_id)  max_alarm_id  = (uint32_t)time(NULL);
@@ -293,11 +309,35 @@ static inline ssize_t health_alarm_log_load(RRDHOST *host) {
     host->health_log.next_log_id = max_unique_id + 1;
     host->health_log.next_alarm_id = max_alarm_id + 1;
 
-    info("Health: loaded %zd alarms, updated %zd alarms, errors %zd entries, duplicate %zd", loaded, updated, errored, duplicate);
-
-    health_alarm_log_open();
+    info("Health: loaded file '%s' with %zd new alarm entries, updated %zd alarms, errors %zd entries, duplicate %zd", filename, loaded, updated, errored, duplicate);
     return loaded;
 }
+
+static inline void health_alarm_log_load(RRDHOST *host) {
+    health_alarm_log_close();
+
+    char buffer[FILENAME_MAX + 1];
+    snprintfz(buffer, FILENAME_MAX, "%s.old", health.log_filename);
+    FILE *fp = fopen(buffer, "r");
+    if(!fp)
+        error("Health: cannot open health file: %s", health.log_filename);
+    else {
+        health_alarm_log_read(host, fp, health.log_filename);
+        fclose(fp);
+    }
+
+    health.log_entries_written = 0;
+    fp = fopen(health.log_filename, "r");
+    if(!fp)
+        error("Health: cannot open health file: %s", health.log_filename);
+    else {
+        health_alarm_log_read(host, fp, health.log_filename);
+        fclose(fp);
+    }
+
+    health_alarm_log_open();
+}
+
 
 // ----------------------------------------------------------------------------
 // health alarm log management
