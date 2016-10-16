@@ -133,7 +133,7 @@ get_git_config_signatures() {
 
     echo >configs.signatures.tmp
 
-    for x in $(find conf.d -name \*.conf)
+    for x in $(find conf.d -name \*.conf | sort)
     do
             x="${x/conf.d\//}"
             echo "${x}"
