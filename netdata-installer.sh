@@ -15,6 +15,12 @@ fi
 LC_ALL=C
 umask 022
 
+# Be nice on production environments
+renice 19 $$ >/dev/null 2>/dev/null
+
+processors=$(cat /proc/cpuinfo  | grep ^processor | wc -l)
+[ $(( processors )) -lt 1 ] && processors=1
+
 # you can set CFLAGS before running installer
 CFLAGS="${CFLAGS--O3}"
 
@@ -427,7 +433,7 @@ if [ -f src/netdata ]
 fi
 
 echo >&2 "Compiling netdata ..."
-run make || exit 1
+run make -j${processors} || exit 1
 
 if [ "${BASH_VERSINFO[0]}" -ge "4" ]
 then
@@ -713,35 +719,35 @@ isnetdata() {
 }
 
 stop_netdata_on_pid() {
-    local pid="$1" ret=0 count=0
+    local pid="${1}" ret=0 count=0
 
-    isnetdata $pid || return 0
+    isnetdata ${pid} || return 0
 
-    printf >&2 "Stopping netdata on pid $pid ..."
-    while [ ! -z "$pid" -a $ret -eq 0 ]
+    printf >&2 "Stopping netdata on pid ${pid} ..."
+    while [ ! -z "$pid" -a ${ret} -eq 0 ]
     do
-        if [ $count -gt 45 ]
+        if [ ${count} -gt 45 ]
             then
-            echo >&2 "Cannot stop the running netdata on pid $pid."
+            echo >&2 "Cannot stop the running netdata on pid ${pid}."
             return 1
         fi
 
         count=$(( count + 1 ))
 
-        run kill $pid 2>/dev/null
+        run kill ${pid} 2>/dev/null
         ret=$?
 
-        test $ret -eq 0 && printf >&2 "." && sleep 2
+        test ${ret} -eq 0 && printf >&2 "." && sleep 2
     done
 
     echo >&2
-    if [ $ret -eq 0 ]
+    if [ ${ret} -eq 0 ]
     then
-        echo >&2 "SORRY! CANNOT STOP netdata ON PID $pid !"
+        echo >&2 "SORRY! CANNOT STOP netdata ON PID ${pid} !"
         return 1
     fi
 
-    echo >&2 "netdata on pid $pid stopped."
+    echo >&2 "netdata on pid ${pid} stopped."
     return 0
 }
 
@@ -755,7 +761,7 @@ stop_all_netdata() {
         $(cat /var/run/netdata/netdata.pid 2>/dev/null) \
         $(pidof netdata 2>/dev/null)
     do
-        stop_netdata_on_pid $p
+        stop_netdata_on_pid ${p}
     done
 }
 
@@ -854,13 +860,13 @@ if [ ! -s "${NETDATA_PREFIX}/etc/netdata/netdata.conf" ]
     ret=$?
 
     # try curl
-    if [ $ret -ne 0 -o ! -s "${NETDATA_PREFIX}/etc/netdata/netdata.conf.new" ]
+    if [ ${ret} -ne 0 -o ! -s "${NETDATA_PREFIX}/etc/netdata/netdata.conf.new" ]
         then
         curl -s -o "${NETDATA_PREFIX}/etc/netdata/netdata.conf.new" "http://localhost:${NETDATA_PORT}/netdata.conf"
         ret=$?
     fi
 
-    if [ $ret -eq 0 -a -s "${NETDATA_PREFIX}/etc/netdata/netdata.conf.new" ]
+    if [ ${ret} -eq 0 -a -s "${NETDATA_PREFIX}/etc/netdata/netdata.conf.new" ]
         then
         mv "${NETDATA_PREFIX}/etc/netdata/netdata.conf.new" "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
         echo >&2 "New configuration saved for you to edit at ${NETDATA_PREFIX}/etc/netdata/netdata.conf"
