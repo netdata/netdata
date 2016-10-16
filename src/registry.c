@@ -767,7 +767,7 @@ int registry_log_load(void) {
 
                     // verify it is valid
                     if (unlikely(len < 85 || s[1] != '\t' || s[10] != '\t' || s[47] != '\t' || s[84] != '\t')) {
-                        error("Registry: log line %zu is wrong (len = %zu).", line, len);
+                        error("Registry: log line %zd is wrong (len = %zu).", line, len);
                         continue;
                     }
                     s[1] = s[10] = s[47] = s[84] = '\0';
@@ -782,7 +782,7 @@ int registry_log_load(void) {
                     char *url = name;
                     while(*url && *url != '\t') url++;
                     if(!*url) {
-                        error("Registry: log line %zu does not have a url.", line);
+                        error("Registry: log line %zd does not have a url.", line);
                         continue;
                     }
                     *url++ = '\0';
@@ -801,7 +801,7 @@ int registry_log_load(void) {
                     break;
 
                 default:
-                    error("Registry: ignoring line %zu of filename '%s': %s.", line, registry.log_filename, s);
+                    error("Registry: ignoring line %zd of filename '%s': %s.", line, registry.log_filename, s);
                     break;
             }
         }
