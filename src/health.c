@@ -51,7 +51,7 @@ static inline void health_log_rotate(void) {
     static size_t rotate_every = 0;
 
     if(unlikely(rotate_every == 0)) {
-        rotate_every = (size_t)config_get_number("health", "rotate log every lines", 100);
+        rotate_every = (size_t)config_get_number("health", "rotate log every lines", 10000);
         if(rotate_every < 100) rotate_every = 100;
     }
 
@@ -140,7 +140,7 @@ static inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
 }
 
 static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filename) {
-    uint32_t max_unique_id = 0, max_alarm_id = 0;
+    static uint32_t max_unique_id = 0, max_alarm_id = 0;
     ssize_t loaded = -1, updated = -1, errored = -1, duplicate = -1;
 
     errno = 0;
