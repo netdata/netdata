@@ -70,6 +70,17 @@ static inline void health_log_rotate(void) {
         if(unlink(health.log_filename) == -1 && errno != ENOENT)
             error("Health: cannot remove old alarms log file '%s'", health.log_filename);
 
+        // open it with truncate
+        health.log_fp = fopen(health.log_filename, "w");
+
+        if(health.log_fp)
+            fclose(health.log_fp);
+        else
+            error("Health: cannot truncate health log '%s'", health.log_filename);
+
+        health.log_fp = NULL;
+
+        health.log_entries_written = 0;
         health_alarm_log_open();
     }
 }
