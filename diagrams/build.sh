@@ -11,7 +11,10 @@ fi
 
 for x in *.puml
 do
+	[ "${x}" = "config.puml" ] && continue
+
 	echo >&2 "Working on ${x}..."
 	java -jar plantuml.jar -tpng "${x}"
+	java -jar plantuml.jar -tsvg "${x}"
 	# java -jar plantuml.jar -ttxt "${x}"
 done

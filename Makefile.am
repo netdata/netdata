@@ -39,6 +39,7 @@ SUBDIRS = \
 	$(NULL)
 
 dist_noinst_DATA= \
+	diagrams/config.puml \
 	diagrams/registry.puml \
 	configs.signatures \
 	Dockerfile \
