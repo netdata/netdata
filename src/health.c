@@ -2395,23 +2395,34 @@ static inline int rrdcalc_value2status(calculated_number n) {
 static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->flags |= HEALTH_ENTRY_FLAG_PROCESSED;
 
+    if(unlikely(ae->new_status < RRDCALC_STATUS_CLEAR)) {
+        // do not send notifications for internal statuses
+        goto done;
+    }
+
     // find the previous notification for the same alarm
+    // which we have run the exec script
     ALARM_ENTRY *t;
     for(t = ae->next; t ;t = t->next) {
         if(t->alarm_id == ae->alarm_id && t->flags & HEALTH_ENTRY_FLAG_EXEC_RUN)
             break;
     }
 
-    if(t && t->new_status == ae->new_status) {
-        // don't send the same notification again
-        info("Health not sending again notification for alarm '%s.%s' status %s", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
-        goto done;
+    if(likely(t)) {
+        // we have executed this alarm notification in the past
+        if (t && t->new_status == ae->new_status) {
+            // don't send the same notification again
+            info("Health not sending again notification for alarm '%s.%s' status %s", ae->chart, ae->name,
+                 rrdcalc_status2string(ae->new_status));
+            goto done;
+        }
     }
-
-    if((ae->old_status == RRDCALC_STATUS_UNDEFINED && ae->new_status == RRDCALC_STATUS_UNINITIALIZED)
-        || (ae->old_status == RRDCALC_STATUS_UNINITIALIZED && ae->new_status == RRDCALC_STATUS_CLEAR)) {
-        info("Health not sending notification for first initialization of alarm '%s.%s' status %s", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
-        goto done;
+    else {
+        // we have not executed this alarm notification in the past
+        if(unlikely(ae->old_status == RRDCALC_STATUS_UNINITIALIZED && ae->new_status == RRDCALC_STATUS_CLEAR)) {
+            info("Health not sending notification for first initialization of alarm '%s.%s' status %s", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
+            goto done;
+        }
     }
 
     char buffer[FILENAME_MAX + 1];
