@@ -247,9 +247,11 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
 
             if(unlikely(ae->name)) freez(ae->name);
             ae->name = strdupz(pointers[13]);
+            ae->hash_name = simple_hash(ae->name);
 
             if(unlikely(ae->chart)) freez(ae->chart);
             ae->chart = strdupz(pointers[14]);
+            ae->hash_chart = simple_hash(ae->chart);
 
             if(unlikely(ae->family)) freez(ae->family);
             ae->family = strdupz(pointers[15]);
