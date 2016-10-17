@@ -37,14 +37,16 @@ updates first.
 
 * rename `contrib/debian/control.wheezy` to `contrib/debian/control`.
 
+* change `control.wheezy from contrib/Makefile* to control`.
+
 * uncomment `EXTRA_OPTS="-P /var/run/netdata.pid"` in
  `contrib/debian/netdata.default`
 
 * edit `contrib/debian/netdata.init` and change `PIDFILE` to
   `/var/run/netdata.pid`
 
-* uncomment `postrotate` in `system/netdata.logrotate.in` and change
-  `try-restart` to `restart`
+* add `dpkg-statoverride --update --add --force root netdata 0775 /var/lib/netdata/registry` to
+  contrig/debian/netdata.postinst.in. So the unique id can be written to the fs.
 
 Then proceed as the main instructions above.
 
