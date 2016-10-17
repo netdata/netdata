@@ -51,7 +51,7 @@ static inline void health_log_rotate(void) {
     static size_t rotate_every = 0;
 
     if(unlikely(rotate_every == 0)) {
-        rotate_every = (size_t)config_get_number("health", "rotate log every lines", 10000);
+        rotate_every = (size_t)config_get_number("health", "rotate log every lines", 2000);
         if(rotate_every < 100) rotate_every = 100;
     }
 
