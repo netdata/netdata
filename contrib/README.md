@@ -45,8 +45,8 @@ updates first.
 * edit `contrib/debian/netdata.init` and change `PIDFILE` to
   `/var/run/netdata.pid`
 
-* add `dpkg-statoverride --update --add --force root netdata 0775 /var/lib/netdata/registry` to
-  `contrib/debian/netdata.postinst.in`. So the unique id can be written to the fs.
+* remove `dpkg-statoverride --update --add --force root netdata 0775 /var/lib/netdata/registry` from
+  `contrib/debian/netdata.postinst.in`. If you are going to handle the unique id file differently.
 
 Then proceed as the main instructions above.
 
