@@ -89,3 +89,9 @@ profile/benchmark-dictionary
 profile/benchmark-registry
 
 *.pyc
+
+diagrams/*.png
+diagrams/*.atxt
+diagrams/plantuml.jar
+
+netdata.cppcheck

@@ -1,0 +1,84 @@
+@startuml
+
+skinparam handwritten true
+skinparam monochrome true
+skinparam roundcorner 15
+
+skinparam sequence {
+    ArrowThickness 3
+
+    DividerFontColor Black
+    DividerFontName Comic Sans MS
+    DividerFontSize 15
+    DividerFontStyle Italic
+
+    DelayFontColor Black
+    DelayFontName Comic Sans MS
+    DelayFontSize 15
+    DelayFontStyle Italic
+
+    TitleFontColor Black
+    TitleFontName Comic Sans MS
+    TitleFontStyle Italic
+    TitleFontSize 25
+
+	ArrowColor DeepSkyBlue
+    ArrowFontColor Black
+    ArrowFontName Comic Sans MS
+    ArrowFontStyle Regular
+    ArrowFontSize 19
+
+	ActorBorderColor DeepSkyBlue
+
+	LifeLineBorderColor blue
+	LifeLineBackgroundColor #A9DCDF
+
+	ParticipantBorderColor DeepSkyBlue
+	ParticipantBackgroundColor LightBlue
+	ParticipantFontName Comic Sans MS
+	ParticipantFontSize 20
+	ParticipantFontColor Black
+
+	ActorBackgroundColor aqua
+	ActorFontColor Black
+	ActorFontSize 20
+	ActorFontName Comic Sans MS
+}
+
+title netdata registry operation
+actor "web browser" as user
+participant "netdata 1" as n1
+participant "registry 1" as r1
+autonumber "<b>0."
+
+== standard dashboard communication ==
+
+user ->n1 : \
+    hi, give me the dashboard
+
+n1 --> user : \
+    welcome, here it is...
+
+... a few seconds later ...
+
+== registry related communication ==
+
+user -> n1 : \
+    now give me registry information
+
+n1 --> user: \
+    here it is, talk to <b>registry 1</b>
+
+note left of r1 #eee: \
+    only your web browser \n\
+    talks to the registry
+
+user -> r1 : \
+    Hey <b>registry 1</b>, \
+I am accessing <b>netdata 1</b>...
+
+r1 --> user : \
+    nice!, here are other netdata servers \
+you have accessed in the past
+
+@enduml

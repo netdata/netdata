@@ -39,6 +39,7 @@ SUBDIRS = \
 	$(NULL)
 
 dist_noinst_DATA= \
+	diagrams/registry.puml \
 	configs.signatures \
 	Dockerfile \
 	netdata.spec \
@@ -47,6 +48,7 @@ dist_noinst_DATA= \
 # until integrated within build
 # should be proper init.d/openrc/systemd usable
 dist_noinst_SCRIPTS= \
+	diagrams/build.sh \
 	coverity-scan.sh \
 	docker-build.sh \
 	netdata-installer.sh \
