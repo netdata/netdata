@@ -91,6 +91,7 @@ profile/benchmark-registry
 *.pyc
 
 diagrams/*.png
+diagrams/*.svg
 diagrams/*.atxt
 diagrams/plantuml.jar
 
