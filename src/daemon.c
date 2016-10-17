@@ -138,7 +138,7 @@ void oom_score_adj(int score) {
     if(!done)
         error("Cannot adjust my Out-Of-Memory score to %d.", score);
     else
-        info("Adjusted my Out-Of-Memory score to %d.", score);
+        debug(D_SYSTEM, "Adjusted my Out-Of-Memory score to %d.", score);
 }
 
 int sched_setscheduler_idle(void) {
@@ -151,7 +151,7 @@ int sched_setscheduler_idle(void) {
     if(i != 0)
         error("Cannot adjust my scheduling priority to IDLE.");
     else
-        info("Adjusted my scheduling priority to IDLE.");
+        debug(D_SYSTEM, "Adjusted my scheduling priority to IDLE.");
 
     return i;
 #else
@@ -214,14 +214,14 @@ int become_daemon(int dont_fork, const char *user)
     // never become a problem
     if(sched_setscheduler_idle() != 0) {
         if(nice(19) == -1) error("Cannot lower my CPU priority.");
-        else info("Set my nice value to 19.");
+        else debug(D_SYSTEM, "Set my nice value to 19.");
     }
 
     if(user && *user) {
         if(become_user(user, pidfd) != 0) {
             error("Cannot become user '%s'. Continuing as we are.", user);
         }
-        else info("Successfully became user '%s'.", user);
+        else debug(D_SYSTEM, "Successfully became user '%s'.", user);
     }
 
     if(pidfd != -1) {
