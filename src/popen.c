@@ -138,7 +138,7 @@ FILE *mypopen(const char *command, pid_t *pidptr)
             error("pre-execution of command '%s' on pid %d: failed to set default signal handler for SIGUSR2.", command, getpid());
     }
 
-    info("executing command: '%s' on pid %d.", command, getpid());
+    debug(D_CHILDS, "executing command: '%s' on pid %d.", command, getpid());
     execl("/bin/sh", "sh", "-c", command, NULL);
     exit(1);
 }

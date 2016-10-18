@@ -397,16 +397,16 @@ do
     [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: loading chart: '$chartsd/$chart.chart.sh'"
     . "$chartsd/$chart.chart.sh"
 
-    if [ -f "$confd/charts.d/$chart.conf" ]
+    if [ -f "$confd/$PROGRAM_NAME/$chart.conf" ]
     then
-        [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: loading chart options: '$confd/charts.d/$chart.conf'"
-        . "$confd/charts.d/$chart.conf"
+        [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: loading chart options: '$confd/$PROGRAM_NAME/$chart.conf'"
+        . "$confd/$PROGRAM_NAME/$chart.conf"
     elif [ -f "$confd/$chart.conf" ]
     then
         [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: loading chart options: '$confd/$chart.conf'"
         . "$confd/$chart.conf"
     else
-        echo >&2 "$PROGRAM_NAME: $chart: configuration file '$confd/charts.d/$chart.conf' not found. Using defaults."
+        echo >&2 "$PROGRAM_NAME: $chart: configuration file '$confd/$PROGRAM_NAME/$chart.conf' not found. Using defaults."
     fi
 
     eval "dt=\$$chart$suffix_update_every"

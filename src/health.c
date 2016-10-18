@@ -6,6 +6,7 @@ struct health_options {
     const char *health_default_exec;
     const char *health_default_recipient;
     const char *log_filename;
+    size_t log_entries_written;
     FILE *log_fp;
 };
 
@@ -13,6 +14,7 @@ static struct health_options health = {
     .health_default_exec = PLUGINS_DIR "/alarm-notify.sh",
     .health_default_recipient = "root",
     .log_filename = VARLIB_DIR "/health/alarm_log.db",
+    .log_entries_written = 0,
     .log_fp = NULL
 };
 
@@ -30,11 +32,11 @@ static inline int health_alarm_log_open(void) {
 
     if(health.log_fp) {
         if (setvbuf(health.log_fp, NULL, _IOLBF, 0) != 0)
-            error("Cannot set line buffering on health log file.");
+            error("Health: cannot set line buffering on health log file.");
         return 0;
     }
 
-    error("Cannot open health log file '%s'. Health data will be lost in case of netdata or server crash.", health.log_filename);
+    error("Health: cannot open health log file '%s'. Health data will be lost in case of netdata or server crash.", health.log_filename);
     return -1;
 }
 
@@ -45,50 +47,309 @@ static inline void health_alarm_log_close(void) {
     }
 }
 
-static inline void health_log_recreate(void) {
-    if(health.log_fp != NULL) {
+static inline void health_log_rotate(void) {
+    static size_t rotate_every = 0;
+
+    if(unlikely(rotate_every == 0)) {
+        rotate_every = (size_t)config_get_number("health", "rotate log every lines", 2000);
+        if(rotate_every < 100) rotate_every = 100;
+    }
+
+    if(unlikely(health.log_entries_written > rotate_every)) {
         health_alarm_log_close();
+
+        char old_filename[FILENAME_MAX + 1];
+        snprintfz(old_filename, FILENAME_MAX, "%s.old", health.log_filename);
+
+        if(unlink(old_filename) == -1 && errno != ENOENT)
+            error("Health: cannot remove old alarms log file '%s'", old_filename);
+
+        if(link(health.log_filename, old_filename) == -1 && errno != ENOENT)
+            error("Health: cannot move file '%s' to '%s'.", health.log_filename, old_filename);
+
+        if(unlink(health.log_filename) == -1 && errno != ENOENT)
+            error("Health: cannot remove old alarms log file '%s'", health.log_filename);
 
         // open it with truncate
         health.log_fp = fopen(health.log_filename, "w");
-        if(health.log_fp) fclose(health.log_fp);
-        else error("Cannot truncate health log '%s'", health.log_filename);
+
+        if(health.log_fp)
+            fclose(health.log_fp);
+        else
+            error("Health: cannot truncate health log '%s'", health.log_filename);
 
         health.log_fp = NULL;
 
+        health.log_entries_written = 0;
         health_alarm_log_open();
     }
 }
 
 static inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
-    (void)host;
-    (void)ae;
-    
-/*    if(likely(health.log_fp)) {
-        if(unlikely(fprintf(health.log_fp, "A\t%s\t%08x\t%08x\t%08x\t%08x\t%08x\t%08x\t%s\t%s\t%s\t%s\t%s\t%08x\n",
-            host->hostname,
-            ae->unique_id,
-            ae->alarm_id,
-            ae->alarm_event_id,
-            (uint32_t)ae->when,
-            (uint32_t)ae->duration,
-            (uint32_t)ae->non_clear_duration,
-            (uint32_t)ae->exec_run_timestamp,
-            ae->name,
-            ae->chart,
-            ae->family,
-            ae->exec,
-            ae->recipient
-            ) < 0))
+    health_log_rotate();
+
+    if(likely(health.log_fp)) {
+        if(unlikely(fprintf(health.log_fp
+                , "%c\t%s"
+                  "\t%08x\t%08x\t%08x\t%08x\t%08x"
+                  "\t%08x\t%08x\t%08x"
+                  "\t%08x\t%08x\t%08x"
+                  "\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s"
+                  "\t%d\t%d\t%d\t%d"
+                  "\t%Lf\t%Lf"
+                  "\n"
+                , (ae->flags & HEALTH_ENTRY_FLAG_SAVED)?'U':'A'
+                , host->hostname
+
+                , ae->unique_id
+                , ae->alarm_id
+                , ae->alarm_event_id
+                , ae->updated_by_id
+                , ae->updates_id
+
+                , (uint32_t)ae->when
+                , (uint32_t)ae->duration
+                , (uint32_t)ae->non_clear_duration
+                , (uint32_t)ae->flags
+                , (uint32_t)ae->exec_run_timestamp
+                , (uint32_t)ae->delay_up_to_timestamp
+
+                , (ae->name)?ae->name:""
+                , (ae->chart)?ae->chart:""
+                , (ae->family)?ae->family:""
+                , (ae->exec)?ae->exec:""
+                , (ae->recipient)?ae->recipient:""
+                , (ae->source)?ae->source:""
+                , (ae->units)?ae->units:""
+                , (ae->info)?ae->info:""
+
+                , ae->exec_code
+                , ae->new_status
+                , ae->old_status
+                , ae->delay
+
+                , (long double)ae->new_value
+                , (long double)ae->old_value
+        ) < 0))
             error("Health: failed to save alarm log entry. Health data may be lost in case of abnormal restart.");
+        else {
+            ae->flags |= HEALTH_ENTRY_FLAG_SAVED;
+            health.log_entries_written++;
+        }
     }
-*/
+}
+
+static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filename) {
+    static uint32_t max_unique_id = 0, max_alarm_id = 0;
+    ssize_t loaded = -1, updated = -1, errored = -1, duplicate = -1;
+
+    errno = 0;
+
+    char *s, *buf = mallocz(65536 + 1);
+    size_t line = 0, len = 0;
+    loaded = updated = errored = duplicate = 0;
+
+    pthread_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+
+    while((s = fgets_trim_len(buf, 65536, fp, &len))) {
+        health.log_entries_written++;
+        line++;
+
+        int max_entries = 30, entries = 0;
+        char *pointers[max_entries];
+
+        pointers[entries++] = s++;
+        while(*s) {
+            if(unlikely(*s == '\t')) {
+                *s = '\0';
+                pointers[entries++] = ++s;
+                if(entries >= max_entries) {
+                    error("Health: line %zu of file '%s' has more than %d entries. Ignoring excessive entries.", line, filename, max_entries);
+                    break;
+                }
+            }
+            else s++;
+        }
+
+        if(likely(*pointers[0] == 'U' || *pointers[0] == 'A')) {
+            ALARM_ENTRY *ae = NULL;
+
+            if(entries < 26) {
+                error("Health: line %zu of file '%s' should have at least 26 entries, but it has %d. Ignoring it.", line, filename, entries);
+                errored++;
+                continue;
+            }
+
+            // check that we have valid ids
+            uint32_t unique_id = (uint32_t)strtoul(pointers[2], NULL, 16);
+            if(!unique_id) {
+                error("Health: line %zu of file '%s' states alarm entry with invalid unique id %u (%s). Ignoring it.", line, filename, unique_id, pointers[2]);
+                errored++;
+                continue;
+            }
+
+            uint32_t alarm_id = (uint32_t)strtoul(pointers[3], NULL, 16);
+            if(!alarm_id) {
+                error("Health: line %zu of file '%s' states alarm entry for invalid alarm id %u (%s). Ignoring it.", line, filename, alarm_id, pointers[3]);
+                errored++;
+                continue;
+            }
+
+            if(unlikely(*pointers[0] == 'A')) {
+                // make sure it is properly numbered
+                if(unlikely(host->health_log.alarms && unique_id < host->health_log.alarms->unique_id)) {
+                    error("Health: line %zu of file '%s' has alarm log entry with %u in wrong order. Ignoring it.", line, filename, unique_id);
+                    errored++;
+                    continue;
+                }
+
+                ae = callocz(1, sizeof(ALARM_ENTRY));
+            }
+            else if(unlikely(*pointers[0] == 'U')) {
+                // find the original
+                for(ae = host->health_log.alarms; ae; ae = ae->next) {
+                    if(unlikely(unique_id == ae->unique_id)) {
+                        if(unlikely(*pointers[0] == 'A')) {
+                            error("Health: line %zu of file '%s' adds duplicate alarm log entry with unique id %u. Using the later."
+                                  , line, filename, unique_id);
+                            *pointers[0] = 'U';
+                            duplicate++;
+                        }
+                        break;
+                    }
+                    else if(unlikely(unique_id > ae->unique_id)) {
+                        // no need to continue
+                        // the linked list is sorted
+                        ae = NULL;
+                        break;
+                    }
+                }
+
+                // if not found, skip this line
+                if(!ae) {
+                    // error("Health: line %zu of file '%s' updates alarm log entry with unique id %u, but it is not found.", line, filename, unique_id);
+                    continue;
+                }
+            }
+
+            // check for a possible host missmatch
+            //if(strcmp(pointers[1], host->hostname))
+            //    error("Health: line %zu of file '%s' provides an alarm for host '%s' but this is named '%s'.", line, filename, pointers[1], host->hostname);
+
+            ae->unique_id               = unique_id;
+            ae->alarm_id                = alarm_id;
+            ae->alarm_event_id          = (uint32_t)strtoul(pointers[4], NULL, 16);
+            ae->updated_by_id           = (uint32_t)strtoul(pointers[5], NULL, 16);
+            ae->updates_id              = (uint32_t)strtoul(pointers[6], NULL, 16);
+
+            ae->when                    = (uint32_t)strtoul(pointers[7], NULL, 16);
+            ae->duration                = (uint32_t)strtoul(pointers[8], NULL, 16);
+            ae->non_clear_duration      = (uint32_t)strtoul(pointers[9], NULL, 16);
+
+            ae->flags                   = (uint32_t)strtoul(pointers[10], NULL, 16);
+            ae->flags |= HEALTH_ENTRY_FLAG_SAVED;
+
+            ae->exec_run_timestamp      = (uint32_t)strtoul(pointers[11], NULL, 16);
+            ae->delay_up_to_timestamp   = (uint32_t)strtoul(pointers[12], NULL, 16);
+
+            if(unlikely(ae->name)) freez(ae->name);
+            ae->name = strdupz(pointers[13]);
+            ae->hash_name = simple_hash(ae->name);
+
+            if(unlikely(ae->chart)) freez(ae->chart);
+            ae->chart = strdupz(pointers[14]);
+            ae->hash_chart = simple_hash(ae->chart);
+
+            if(unlikely(ae->family)) freez(ae->family);
+            ae->family = strdupz(pointers[15]);
+
+            if(unlikely(ae->exec)) freez(ae->exec);
+            ae->exec = strdupz(pointers[16]);
+            if(!*ae->exec) { freez(ae->exec); ae->exec = NULL; }
+
+            if(unlikely(ae->recipient)) freez(ae->recipient);
+            ae->recipient = strdupz(pointers[17]);
+            if(!*ae->recipient) { freez(ae->recipient); ae->recipient = NULL; }
+
+            if(unlikely(ae->source)) freez(ae->source);
+            ae->source = strdupz(pointers[18]);
+            if(!*ae->source) { freez(ae->source); ae->source = NULL; }
+
+            if(unlikely(ae->units)) freez(ae->units);
+            ae->units = strdupz(pointers[19]);
+            if(!*ae->units) { freez(ae->units); ae->units = NULL; }
+
+            if(unlikely(ae->info)) freez(ae->info);
+            ae->info = strdupz(pointers[20]);
+            if(!*ae->info) { freez(ae->info); ae->info = NULL; }
+
+            ae->exec_code   = atoi(pointers[21]);
+            ae->new_status  = atoi(pointers[22]);
+            ae->old_status  = atoi(pointers[23]);
+            ae->delay       = atoi(pointers[24]);
+
+            ae->new_value   = strtold(pointers[25], NULL);
+            ae->old_value   = strtold(pointers[26], NULL);
+
+            // add it to host if not already there
+            if(unlikely(*pointers[0] == 'A')) {
+                ae->next = host->health_log.alarms;
+                host->health_log.alarms = ae;
+                loaded++;
+            }
+            else updated++;
+
+            if(unlikely(ae->unique_id > max_unique_id))
+                max_unique_id = ae->unique_id;
+
+            if(unlikely(ae->alarm_id >= max_alarm_id))
+                max_alarm_id = ae->alarm_id;
+        }
+        else {
+            error("Health: line %zu of file '%s' is invalid (unrecognized entry type '%s').", line, filename, pointers[0]);
+            errored++;
+        }
+    }
+
+    pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+
+    freez(buf);
+
+    if(!max_unique_id) max_unique_id = (uint32_t)time(NULL);
+    if(!max_alarm_id)  max_alarm_id  = (uint32_t)time(NULL);
+
+    host->health_log.next_log_id = max_unique_id + 1;
+    host->health_log.next_alarm_id = max_alarm_id + 1;
+
+    debug(D_HEALTH, "Health: loaded file '%s' with %zd new alarm entries, updated %zd alarms, errors %zd entries, duplicate %zd", filename, loaded, updated, errored, duplicate);
+    return loaded;
 }
 
 static inline void health_alarm_log_load(RRDHOST *host) {
-    (void)host;
+    health_alarm_log_close();
 
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s.old", health.log_filename);
+    FILE *fp = fopen(filename, "r");
+    if(!fp)
+        error("Health: cannot open health file: %s", filename);
+    else {
+        health_alarm_log_read(host, fp, filename);
+        fclose(fp);
+    }
+
+    health.log_entries_written = 0;
+    fp = fopen(health.log_filename, "r");
+    if(!fp)
+        error("Health: cannot open health file: %s", health.log_filename);
+    else {
+        health_alarm_log_read(host, fp, health.log_filename);
+        fclose(fp);
+    }
+
+    health_alarm_log_open();
 }
+
 
 // ----------------------------------------------------------------------------
 // health alarm log management
@@ -152,8 +413,8 @@ static inline void health_alarm_log(RRDHOST *host,
     ALARM_ENTRY *t;
     for(t = host->health_log.alarms ; t ; t = t->next) {
         if(t != ae && t->alarm_id == ae->alarm_id) {
-            if(!(t->notifications & HEALTH_ENTRY_NOTIFICATIONS_UPDATED) && !t->updated_by_id) {
-                t->notifications |= HEALTH_ENTRY_NOTIFICATIONS_UPDATED;
+            if(!(t->flags & HEALTH_ENTRY_FLAG_UPDATED) && !t->updated_by_id) {
+                t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
                 t->updated_by_id = ae->unique_id;
                 ae->updates_id = t->unique_id;
 
@@ -163,10 +424,9 @@ static inline void health_alarm_log(RRDHOST *host,
 
                 health_alarm_log_save(host, t);
             }
-            else {
-                // no need to continue
-                break;
-            }
+
+            // no need to continue
+            break;
         }
     }
     pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
@@ -1353,6 +1613,16 @@ static inline int health_parse_db_lookup(
     return 1;
 }
 
+static inline char *tabs2spaces(char *s) {
+    char *t = s;
+    while(*t) {
+        if(unlikely(*t == '\t')) *t = ' ';
+        t++;
+    }
+
+    return s;
+}
+
 static inline char *health_source_file(size_t line, const char *path, const char *filename) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%zu@%s/%s", line, path, filename);
@@ -1405,10 +1675,8 @@ int health_readfile(const char *path, const char *filename) {
     while((s = fgets(&buffer[append], (int)(HEALTH_CONF_MAX_LINE - append), fp)) || append) {
         int stop_appending = !s;
         line++;
-        // info("Line %zu of file '%s/%s': '%s'", line, path, filename, s);
         s = trim(buffer);
         if(!s) continue;
-        // info("Trimmed line %zu of file '%s/%s': '%s'", line, path, filename, s);
 
         append = strlen(s);
         if(!stop_appending && s[append - 1] == '\\') {
@@ -1445,7 +1713,6 @@ int health_readfile(const char *path, const char *filename) {
             continue;
         }
 
-        // info("Health file '%s/%s', key '%s', value '%s'", path, filename, key, value);
         uint32_t hash = simple_uhash(key);
 
         if(hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
@@ -1460,7 +1727,7 @@ int health_readfile(const char *path, const char *filename) {
 
             rc = callocz(1, sizeof(RRDCALC));
             rc->next_event_id = 1;
-            rc->name = strdupz(value);
+            rc->name = tabs2spaces(strdupz(value));
             rc->hash = simple_hash(rc->name);
             rc->source = health_source_file(line, path, filename);
             rc->green = NAN;
@@ -1483,7 +1750,7 @@ int health_readfile(const char *path, const char *filename) {
                 rrdcalctemplate_free(&localhost, rt);
 
             rt = callocz(1, sizeof(RRDCALCTEMPLATE));
-            rt->name = strdupz(value);
+            rt->name = tabs2spaces(strdupz(value));
             rt->hash_name = simple_hash(rt->name);
             rt->source = health_source_file(line, path, filename);
             rt->green = NAN;
@@ -1497,12 +1764,12 @@ int health_readfile(const char *path, const char *filename) {
             if(hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
                 if(rc->chart) {
                     if(strcmp(rc->chart, value))
-                        info("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                        error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                              line, path, filename, rc->name, key, rc->chart, value, value);
 
                     freez(rc->chart);
                 }
-                rc->chart = strdupz(value);
+                rc->chart = tabs2spaces(strdupz(value));
                 rc->hash_chart = simple_hash(rc->chart);
             }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
@@ -1512,14 +1779,14 @@ int health_readfile(const char *path, const char *filename) {
             }
             else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
                 if(!health_parse_duration(value, &rc->update_every))
-                    info("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' cannot parse duration: '%s'.",
+                    error("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' cannot parse duration: '%s'.",
                          line, path, filename, rc->name, key, value);
             }
             else if(hash == hash_green && !strcasecmp(key, HEALTH_GREEN_KEY)) {
                 char *e;
                 rc->green = strtold(value, &e);
                 if(e && *e) {
-                    info("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' leaves this string unmatched: '%s'.",
+                    error("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' leaves this string unmatched: '%s'.",
                          line, path, filename, rc->name, key, e);
                 }
             }
@@ -1527,7 +1794,7 @@ int health_readfile(const char *path, const char *filename) {
                 char *e;
                 rc->red = strtold(value, &e);
                 if(e && *e) {
-                    info("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' leaves this string unmatched: '%s'.",
+                    error("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' leaves this string unmatched: '%s'.",
                          line, path, filename, rc->name, key, e);
                 }
             }
@@ -1561,43 +1828,43 @@ int health_readfile(const char *path, const char *filename) {
             else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
                 if(rc->exec) {
                     if(strcmp(rc->exec, value))
-                        info("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                        error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                              line, path, filename, rc->name, key, rc->exec, value, value);
 
                     freez(rc->exec);
                 }
-                rc->exec = strdupz(value);
+                rc->exec = tabs2spaces(strdupz(value));
             }
             else if(hash == hash_recipient && !strcasecmp(key, HEALTH_RECIPIENT_KEY)) {
                 if(rc->recipient) {
                     if(strcmp(rc->recipient, value))
-                        info("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                        error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                              line, path, filename, rc->name, key, rc->recipient, value, value);
 
                     freez(rc->recipient);
                 }
-                rc->recipient = strdupz(value);
+                rc->recipient = tabs2spaces(strdupz(value));
             }
             else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
                 if(rc->units) {
                     if(strcmp(rc->units, value))
-                        info("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                        error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                              line, path, filename, rc->name, key, rc->units, value, value);
 
                     freez(rc->units);
                 }
-                rc->units = strdupz(value);
+                rc->units = tabs2spaces(strdupz(value));
                 strip_quotes(rc->units);
             }
             else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
                 if(rc->info) {
                     if(strcmp(rc->info, value))
-                        info("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                        error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                              line, path, filename, rc->name, key, rc->info, value, value);
 
                     freez(rc->info);
                 }
-                rc->info = strdupz(value);
+                rc->info = tabs2spaces(strdupz(value));
                 strip_quotes(rc->info);
             }
             else if(hash == hash_delay && !strcasecmp(key, HEALTH_DELAY_KEY)) {
@@ -1612,12 +1879,12 @@ int health_readfile(const char *path, const char *filename) {
             if(hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
                 if(rt->context) {
                     if(strcmp(rt->context, value))
-                        info("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                        error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                              line, path, filename, rt->name, key, rt->context, value, value);
 
                     freez(rt->context);
                 }
-                rt->context = strdupz(value);
+                rt->context = tabs2spaces(strdupz(value));
                 rt->hash_context = simple_hash(rt->context);
             }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
@@ -1627,14 +1894,14 @@ int health_readfile(const char *path, const char *filename) {
             }
             else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
                 if(!health_parse_duration(value, &rt->update_every))
-                    info("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' cannot parse duration: '%s'.",
+                    error("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' cannot parse duration: '%s'.",
                          line, path, filename, rt->name, key, value);
             }
             else if(hash == hash_green && !strcasecmp(key, HEALTH_GREEN_KEY)) {
                 char *e;
                 rt->green = strtold(value, &e);
                 if(e && *e) {
-                    info("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
+                    error("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
                          line, path, filename, rt->name, key, e);
                 }
             }
@@ -1642,7 +1909,7 @@ int health_readfile(const char *path, const char *filename) {
                 char *e;
                 rt->red = strtold(value, &e);
                 if(e && *e) {
-                    info("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
+                    error("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
                          line, path, filename, rt->name, key, e);
                 }
             }
@@ -1676,43 +1943,43 @@ int health_readfile(const char *path, const char *filename) {
             else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
                 if(rt->exec) {
                     if(strcmp(rt->exec, value))
-                        info("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                        error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                              line, path, filename, rt->name, key, rt->exec, value, value);
 
                     freez(rt->exec);
                 }
-                rt->exec = strdupz(value);
+                rt->exec = tabs2spaces(strdupz(value));
             }
             else if(hash == hash_recipient && !strcasecmp(key, HEALTH_RECIPIENT_KEY)) {
                 if(rt->recipient) {
                     if(strcmp(rt->recipient, value))
-                        info("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                        error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                              line, path, filename, rt->name, key, rt->recipient, value, value);
 
                     freez(rt->recipient);
                 }
-                rt->recipient = strdupz(value);
+                rt->recipient = tabs2spaces(strdupz(value));
             }
             else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
                 if(rt->units) {
                     if(strcmp(rt->units, value))
-                        info("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                        error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                              line, path, filename, rt->name, key, rt->units, value, value);
 
                     freez(rt->units);
                 }
-                rt->units = strdupz(value);
+                rt->units = tabs2spaces(strdupz(value));
                 strip_quotes(rt->units);
             }
             else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
                 if(rt->info) {
                     if(strcmp(rt->info, value))
-                        info("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                        error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                              line, path, filename, rt->name, key, rt->info, value, value);
 
                     freez(rt->info);
                 }
-                rt->info = strdupz(value);
+                rt->info = tabs2spaces(strdupz(value));
                 strip_quotes(rt->info);
             }
             else if(hash == hash_delay && !strcasecmp(key, HEALTH_DELAY_KEY)) {
@@ -1798,7 +2065,16 @@ void health_init(void) {
         return;
     }
 
+    char *pathname = config_get("health", "health db directory", VARLIB_DIR "/health");
+    if(mkdir(pathname, 0770) == -1 && errno != EEXIST)
+        fatal("Cannot create directory '%s'.", pathname);
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/health-log.db", pathname);
+    health.log_filename = config_get("health", "health db file", filename);
+
     health_alarm_log_load(&localhost);
+    health_alarm_log_open();
 
     char *path = health_config_dir();
 
@@ -1865,10 +2141,10 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, R
                    ae->name,
                    ae->chart,
                    ae->family,
-                   (ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_PROCESSED)?"true":"false",
-                   (ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_UPDATED)?"true":"false",
+                   (ae->flags & HEALTH_ENTRY_FLAG_PROCESSED)?"true":"false",
+                   (ae->flags & HEALTH_ENTRY_FLAG_UPDATED)?"true":"false",
                    (unsigned long)ae->exec_run_timestamp,
-                   (ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_EXEC_FAILED)?"true":"false",
+                   (ae->flags & HEALTH_ENTRY_FLAG_EXEC_FAILED)?"true":"false",
                    ae->exec?ae->exec:health.health_default_exec,
                    ae->recipient?ae->recipient:health.health_default_recipient,
                    ae->exec_code,
@@ -2085,7 +2361,7 @@ void health_reload(void) {
     ALARM_ENTRY *t;
     for(t = localhost.health_log.alarms ; t ; t = t->next) {
         if(t->new_status != RRDCALC_STATUS_REMOVED)
-            t->notifications |= HEALTH_ENTRY_NOTIFICATIONS_UPDATED;
+            t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
     }
 
     // reset all thresholds to all charts
@@ -2121,25 +2397,36 @@ static inline int rrdcalc_value2status(calculated_number n) {
 }
 
 static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
-    ae->notifications |= HEALTH_ENTRY_NOTIFICATIONS_PROCESSED;
+    ae->flags |= HEALTH_ENTRY_FLAG_PROCESSED;
+
+    if(unlikely(ae->new_status < RRDCALC_STATUS_CLEAR)) {
+        // do not send notifications for internal statuses
+        goto done;
+    }
 
     // find the previous notification for the same alarm
+    // which we have run the exec script
     ALARM_ENTRY *t;
     for(t = ae->next; t ;t = t->next) {
-        if(t->alarm_id == ae->alarm_id && t->notifications & HEALTH_ENTRY_NOTIFICATIONS_EXEC_RUN)
+        if(t->alarm_id == ae->alarm_id && t->flags & HEALTH_ENTRY_FLAG_EXEC_RUN)
             break;
     }
 
-    if(t && t->new_status == ae->new_status) {
-        // don't send the same notification again
-        info("Health not sending again notification for alarm '%s.%s' status %s", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
-        goto done;
+    if(likely(t)) {
+        // we have executed this alarm notification in the past
+        if (t && t->new_status == ae->new_status) {
+            // don't send the same notification again
+            debug(D_HEALTH, "Health not sending again notification for alarm '%s.%s' status %s", ae->chart, ae->name,
+                 rrdcalc_status2string(ae->new_status));
+            goto done;
+        }
     }
-
-    if((ae->old_status == RRDCALC_STATUS_UNDEFINED && ae->new_status == RRDCALC_STATUS_UNINITIALIZED)
-        || (ae->old_status == RRDCALC_STATUS_UNINITIALIZED && ae->new_status == RRDCALC_STATUS_CLEAR)) {
-        info("Health not sending notification for first initialization of alarm '%s.%s' status %s", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
-        goto done;
+    else {
+        // we have not executed this alarm notification in the past
+        if(unlikely(ae->old_status == RRDCALC_STATUS_UNINITIALIZED && ae->new_status == RRDCALC_STATUS_CLEAR)) {
+            debug(D_HEALTH, "Health not sending notification for first initialization of alarm '%s.%s' status %s", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
+            goto done;
+        }
     }
 
     char buffer[FILENAME_MAX + 1];
@@ -2173,7 +2460,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
               ae->info?ae->info:""
     );
 
-    ae->notifications |= HEALTH_ENTRY_NOTIFICATIONS_EXEC_RUN;
+    ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
     ae->exec_run_timestamp = time(NULL);
 
     debug(D_HEALTH, "executing command '%s'", buffer);
@@ -2189,7 +2476,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     debug(D_HEALTH, "done executing command - returned with code %d", ae->exec_code);
 
     if(ae->exec_code != 0)
-        ae->notifications |= HEALTH_ENTRY_NOTIFICATIONS_EXEC_FAILED;
+        ae->flags |= HEALTH_ENTRY_FLAG_EXEC_FAILED;
 
 done:
     health_alarm_log_save(host, ae);
@@ -2197,7 +2484,7 @@ done:
 }
 
 static inline void health_process_notifications(RRDHOST *host, ALARM_ENTRY *ae) {
-    info("Health alarm '%s.%s' = %0.2Lf - changed status from %s to %s",
+    debug(D_HEALTH, "Health alarm '%s.%s' = %0.2Lf - changed status from %s to %s",
          ae->chart?ae->chart:"NOCHART", ae->name,
          ae->new_value,
          rrdcalc_status2string(ae->old_status),
@@ -2217,8 +2504,8 @@ static inline void health_alarm_log_process(RRDHOST *host) {
     ALARM_ENTRY *ae;
     for(ae = host->health_log.alarms; ae && ae->unique_id >= stop_at_id ; ae = ae->next) {
         if(unlikely(
-            !(ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_PROCESSED) &&
-            !(ae->notifications & HEALTH_ENTRY_NOTIFICATIONS_UPDATED)
+            !(ae->flags & HEALTH_ENTRY_FLAG_PROCESSED) &&
+            !(ae->flags & HEALTH_ENTRY_FLAG_UPDATED)
             )) {
 
             if(unlikely(ae->unique_id < first_waiting))

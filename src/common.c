@@ -224,7 +224,7 @@ int sleep_usec(unsigned long long usec) {
 
     while (nanosleep(&req, &rem) == -1) {
         if (likely(errno == EINTR)) {
-            info("nanosleep() interrupted (while sleeping for %llu microseconds).", usec);
+            debug(D_SYSTEM, "nanosleep() interrupted (while sleeping for %llu microseconds).", usec);
             req.tv_sec = rem.tv_sec;
             req.tv_nsec = rem.tv_nsec;
         } else {
@@ -1121,7 +1121,7 @@ long get_system_cpus(void) {
 
     procfile_close(ff);
 
-    info("System has %d processors.", processors);
+    debug(D_SYSTEM, "System has %d processors.", processors);
     return processors;
 }
 
@@ -1152,7 +1152,7 @@ pid_t get_system_pid_max(void) {
     }
 
     procfile_close(ff);
-    info("System supports %d pids.", pid_max);
+    debug(D_SYSTEM, "System supports %d pids.", pid_max);
     return pid_max;
 }
 
