@@ -55,22 +55,28 @@ connectivity is not available.
     [MIT License](http://getbootstrap.com/getting-started/#license-faqs)
 
 
-- [NanoScroller](https://jamesflorentino.github.io/nanoScrollerJS/)
-
-    Copyright 2012, James Florentino
-    [MIT License](https://github.com/jamesflorentino/nanoScrollerJS/blob/master/LICENSE)
-
-
 - [Bootstrap Toggle](http://www.bootstraptoggle.com/)
 
     Copyright (c) 2011-2014 Min Hur, The New York Times Company
     [MIT License](https://github.com/minhur/bootstrap-toggle/blob/master/LICENSE)
 
 
-- [AVL C Library](http://freecode.com/projects/avl)
+- [bootstrap-table](http://bootstrap-table.wenzhixin.net.cn/)
 
-    Copyright 2000, Daniel Nagy, Budapest University of Technology and Economics
-    Released under GNU General Public License (GPL) version 2
+    Copyright (c) 2012-2016 Zhixin Wen <wenzhixin2010@gmail.com>
+    [MIT License](https://github.com/wenzhixin/bootstrap-table/blob/master/LICENSE)
+
+
+- [tableExport.jquery.plugin](https://github.com/hhurz/tableExport.jquery.plugin)
+
+    Copyright (c) 2015,2016 hhurz
+    [MIT License](http://rawgit.com/hhurz/tableExport.jquery.plugin/master/tableExport.js)
+
+
+- [NanoScroller](https://jamesflorentino.github.io/nanoScrollerJS/)
+
+    Copyright 2012, James Florentino
+    [MIT License](https://github.com/jamesflorentino/nanoScrollerJS/blob/master/LICENSE)
 
 
 - [FontAwesome](https://fortawesome.github.io/Font-Awesome/)
@@ -141,15 +147,4 @@ connectivity is not available.
 
     Copyright 2006, Kirill Simonov
     [MIT License](http://pyyaml.org)
-
-- [bootstrap-table](http://bootstrap-table.wenzhixin.net.cn/)
-
-    Copyright (c) 2012-2016 Zhixin Wen <wenzhixin2010@gmail.com>
-    [MIT License](https://github.com/wenzhixin/bootstrap-table/blob/master/LICENSE)
-
-- [tableExport.jquery.plugin](https://github.com/hhurz/tableExport.jquery.plugin)
-
-    Copyright (c) 2015,2016 hhurz
-    [MIT License](http://rawgit.com/hhurz/tableExport.jquery.plugin/master/tableExport.js)
-
 
