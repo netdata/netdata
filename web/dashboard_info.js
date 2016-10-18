@@ -697,8 +697,9 @@ netdataDashboard.context = {
 
     // ------------------------------------------------------------------------
     // RETROSHARE
+
     'retroshare.bandwidth': {
-        info: 'Shows inbound and outbound traffic.',
+        info: 'RetroShare inbound and outbound traffic.',
         mainheads: [
             netdataDashboard.gaugeChart('Received', '12%', 'bandwidth_down_kb'),
             netdataDashboard.gaugeChart('Sent', '12%', 'bandwidth_up_kb')
@@ -706,7 +707,7 @@ netdataDashboard.context = {
     },
 
     'retroshare.peers': {
-        info: 'Shows the number of (connected) friends.',
+        info: 'Number of (connected) RetroShare friends.',
         mainheads: [
             function(id) {
                 return  '<div data-netdata="' + id + '"'
@@ -725,6 +726,19 @@ netdataDashboard.context = {
     },
 
     'retroshare.dht': {
-        info: 'Shows statistics about RetroShare\'s DHT. These values are estimated!'
+        info: 'Statistics about RetroShare\'s DHT. These values are estimated!'
+    },
+
+    // ------------------------------------------------------------------------
+    // fping
+
+    'fping.loss': {
+        colors: NETDATA.colors[1],
+        height: 0.5
+    },
+
+    'fping.packets': {
+        height: 0.5
     }
+
 };

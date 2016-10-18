@@ -264,10 +264,11 @@ typedef struct rrdcalctemplate {
 
 #define RRDCALCTEMPLATE_HAS_CALCULATION(rt) ((rt)->after)
 
-#define HEALTH_ENTRY_NOTIFICATIONS_PROCESSED    0x00000001
-#define HEALTH_ENTRY_NOTIFICATIONS_UPDATED      0x00000002
-#define HEALTH_ENTRY_NOTIFICATIONS_EXEC_RUN     0x00000004
-#define HEALTH_ENTRY_NOTIFICATIONS_EXEC_FAILED  0x00000008
+#define HEALTH_ENTRY_FLAG_PROCESSED    0x00000001
+#define HEALTH_ENTRY_FLAG_UPDATED      0x00000002
+#define HEALTH_ENTRY_FLAG_EXEC_RUN     0x00000004
+#define HEALTH_ENTRY_FLAG_EXEC_FAILED  0x00000008
+#define HEALTH_ENTRY_FLAG_SAVED        0x10000000
 
 typedef struct alarm_entry {
     uint32_t unique_id;
@@ -300,7 +301,7 @@ typedef struct alarm_entry {
     int old_status;
     int new_status;
 
-    uint32_t notifications;
+    uint32_t flags;
 
     int delay;
     time_t delay_up_to_timestamp;

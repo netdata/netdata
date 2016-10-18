@@ -13,6 +13,7 @@ dist_plugins_SCRIPTS = \
 	cgroup-name.sh \
 	charts.d.dryrun-helper.sh \
 	charts.d.plugin \
+	fping.plugin \
 	node.d.plugin \
 	python.d.plugin \
 	tc-qos-helper.sh \

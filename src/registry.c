@@ -743,8 +743,7 @@ static inline void registry_log_recreate_nolock(void) {
 }
 
 int registry_log_load(void) {
-    char *s, buf[4096 + 1];
-    size_t line = -1;
+    ssize_t line = -1;
 
     // closing the log is required here
     // otherwise we will append to it the values we read
@@ -755,8 +754,10 @@ int registry_log_load(void) {
     if(!fp)
         error("Registry: cannot open registry file: %s", registry.log_filename);
     else {
+        char *s, buf[4096 + 1];
         line = 0;
         size_t len = 0;
+
         while ((s = fgets_trim_len(buf, 4096, fp, &len))) {
             line++;
 
@@ -766,7 +767,7 @@ int registry_log_load(void) {
 
                     // verify it is valid
                     if (unlikely(len < 85 || s[1] != '\t' || s[10] != '\t' || s[47] != '\t' || s[84] != '\t')) {
-                        error("Registry: log line %zu is wrong (len = %zu).", line, len);
+                        error("Registry: log line %zd is wrong (len = %zu).", line, len);
                         continue;
                     }
                     s[1] = s[10] = s[47] = s[84] = '\0';
@@ -781,7 +782,7 @@ int registry_log_load(void) {
                     char *url = name;
                     while(*url && *url != '\t') url++;
                     if(!*url) {
-                        error("Registry: log line %zu does not have a url.", line);
+                        error("Registry: log line %zd does not have a url.", line);
                         continue;
                     }
                     *url++ = '\0';
@@ -800,7 +801,7 @@ int registry_log_load(void) {
                     break;
 
                 default:
-                    error("Registry: ignoring line %zu of filename '%s': %s.", line, registry.log_filename, s);
+                    error("Registry: ignoring line %zd of filename '%s': %s.", line, registry.log_filename, s);
                     break;
             }
         }
@@ -1471,7 +1472,7 @@ int registry_save(void) {
     // rename the db to .old
     debug(D_REGISTRY, "Registry: Link current db '%s' to .old: '%s'", registry.db_filename, old_filename);
     if(link(registry.db_filename, old_filename) == -1 && errno != ENOENT)
-        error("Registry: cannot move file '%s' to '%s'. Saving registry DB failed!", tmp_filename, registry.db_filename);
+        error("Registry: cannot move file '%s' to '%s'. Saving registry DB failed!", registry.db_filename, old_filename);
 
     else {
         // remove the database (it is saved in .old)
