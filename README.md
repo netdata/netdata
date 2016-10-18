@@ -46,11 +46,11 @@ disrupting their core function._
 </p>
 
  - **Stunning interactive bootstrap dashboards**<br/>
-   2 themes are provided: dark, light
+   mouse and touch friendly, in 2 themes: dark, light
    
  - **Blazingly fast**<br/>
    responds to all queries in less than 0.5 ms per metric,
-   even on low-end hardware
+   even on low-end hardware (such as a raspberry pi 1)
    
  - **Highly efficient data collection**<br/>
    collects thousands of metrics per server per second,
@@ -58,7 +58,7 @@ disrupting their core function._
    
  - **Sophisticated alarming**<br/>
    supports dynamic thresholds, hysteresis, alarm templates,
-   multiple notification methods
+   multiple role-based notification methods (such as slack.com, pushover.net, telegram.org, email)
    
  - **Extensible**<br/>
    you can monitor anything you can get a metric for,
