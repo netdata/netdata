@@ -22,24 +22,24 @@ ORDER = ['connections', 'requests', 'connection_status', 'connect_rate']
 
 CHARTS = {
     'connections': {
-        'options': [None, 'nginx Active Connections', 'connections', 'nginx', 'nginx.connections', 'line'],
+        'options': [None, 'nginx Active Connections', 'connections', 'Active Connections', 'nginx.connections', 'line'],
         'lines': [
             ["active"]
         ]},
     'requests': {
-        'options': [None, 'nginx Requests', 'requests/s', 'nginx', 'nginx.requests', 'line'],
+        'options': [None, 'nginx Requests', 'requests/s', 'Requests', 'nginx.requests', 'line'],
         'lines': [
             ["requests", None, 'incremental']
         ]},
     'connection_status': {
-        'options': [None, 'nginx Active Connections by Status', 'connections', 'nginx', 'nginx.connection_status', 'line'],
+        'options': [None, 'nginx Active Connections by Status', 'connections', 'Active Connection Status', 'nginx.connection_status', 'line'],
         'lines': [
             ["reading"],
             ["writing"],
             ["waiting", "idle"]
         ]},
     'connect_rate': {
-        'options': [None, 'nginx Connections Rate', 'connections/s', 'nginx', 'nginx.connect_rate', 'line'],
+        'options': [None, 'nginx Connections Rate', 'connections/s', 'Connections Rate', 'nginx.connect_rate', 'line'],
         'lines': [
             ["accepts", "accepted", "incremental"],
             ["handled", None, "incremental"]

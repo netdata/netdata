@@ -68,6 +68,9 @@ class Service(SocketService):
         self.definitions = CHARTS
         self._keep_alive = True
         self.chart_name = ""
+        self.passwd =  None
+        if 'pass' in configuration:
+            self.passwd = configuration['pass']
 
     def _get_data(self):
         """
@@ -75,6 +78,14 @@ class Service(SocketService):
         :return: dict
         """
         try:
+            if self.passwd:
+                info_request = self.request
+                self.request = "AUTH " + self.passwd + "\r\n"
+                raw = self._get_raw_data().strip()
+                if raw != "+OK":
+                    self.error("invalid password")
+                    return None
+                self.request = info_request
             raw = self._get_raw_data().split("\n")
         except AttributeError:
             self.error("no data received")
@@ -112,6 +123,8 @@ class Service(SocketService):
         length = len(data)
         supposed = data.split('\n')[0][1:]
         offset = len(supposed) + 4  # 1 dollar sing, 1 new line character + 1 ending sequence '\r\n'
+        if (not supposed.isdigit()) :
+            return True
         supposed = int(supposed)
         if length - offset >= supposed:
             return True

@@ -458,7 +458,7 @@ class UrlService(SimpleService):
             return None
 
         try:
-            raw = f.read().decode('utf-8')
+            raw = f.read().decode('utf-8', 'ignore')
         except Exception as e:
             self.error(str(e))
         finally:
@@ -608,7 +608,7 @@ class SocketService(SimpleService):
                 buf = self._sock.recv(4096)
                 if len(buf) == 0 or buf is None:  # handle server disconnect
                     break
-                data += buf.decode(errors='ignore')
+                data += buf.decode('utf-8', 'ignore')
                 if self._check_raw_data(data):
                     break
             else:
