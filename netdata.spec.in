@@ -22,7 +22,7 @@ Release:	1%{?dist}
 License:	GPL v3+
 Group:		Applications/System
 Source0:	http://firehol.org/download/netdata/releases/v@PACKAGE_VERSION@/%{name}-@PACKAGE_VERSION@.tar.xz
-URL:		http://netdata.firehol.org/
+URL:		http://my-netdata.io/
 BuildRequires:	pkgconfig
 BuildRequires:	xz
 BuildRequires:	zlib-devel
