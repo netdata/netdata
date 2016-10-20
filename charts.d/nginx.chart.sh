@@ -20,7 +20,7 @@ nginx_reading=0
 nginx_writing=0
 nginx_waiting=0
 nginx_get() {
-	nginx_response=($(curl -Ss ${nginx_curl_opts} "${nginx_url}"))
+	nginx_response=($(run curl -Ss ${nginx_curl_opts} "${nginx_url}"))
 	[ $? -ne 0 -o "${#nginx_response[@]}" -eq 0 ] && return 1
 
 	if [ "${nginx_response[0]}" != "Active" \
@@ -34,7 +34,7 @@ nginx_get() {
 		 -o "${nginx_response[14]}" != "Waiting:" \
 	   ]
 		then
-		echo >&2 "nginx: Invalid response from nginx server: ${nginx_response[*]}"
+		error "Invalid response from nginx server: ${nginx_response[*]}"
 		return 1
 	fi
 
@@ -55,7 +55,7 @@ nginx_get() {
 		-o -z "${nginx_waiting}" \
 		]
 		then
-		echo >&2 "nginx: empty values got from nginx server: ${nginx_response[*]}"
+		error "empty values got from nginx server: ${nginx_response[*]}"
 		return 1
 	fi
 
@@ -68,7 +68,7 @@ nginx_check() {
 	nginx_get
 	if [ $? -ne 0 ]
 		then
-		echo >&2 "nginx: cannot find stub_status on URL '${nginx_url}'. Please set nginx_url='http://nginx.server/stub_status' in $confd/nginx.conf"
+		error "cannot find stub_status on URL '${nginx_url}'. Please set nginx_url='http://nginx.server/stub_status' in $confd/nginx.conf"
 		return 1
 	fi
 

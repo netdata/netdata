@@ -43,7 +43,7 @@ sensors_check() {
 	#  - 0 to enable the chart
 	#  - 1 to disable the chart
 
-	[ -z "$( sensors_find_all_files $sensors_sys_dir )" ] && echo >&2 "$PROGRAM_NAME: sensors: no sensors found in '$sensors_sys_dir'." && return 1
+	[ -z "$( sensors_find_all_files $sensors_sys_dir )" ] && error "no sensors found in '$sensors_sys_dir'." && return 1
 	return 0
 }
 
@@ -64,7 +64,7 @@ sensors_check_files() {
 		[ $v -ne 0 ] && echo "$f" && continue
 		excluded=
 
-		echo >&2 "$PROGRAM_NAME: sensors: $f gives zero values"
+		error "$f gives zero values"
 	done
 }
 
@@ -83,7 +83,7 @@ sensors_check_temp_type() {
 		v=$(( v + 1 - 1 ))
 		[ $v -ne 0 ] && echo "$f" && continue
 
-		echo >&2 "$PROGRAM_NAME: sensors: $f is disabled"
+		error "$f is disabled"
 	done
 }
 
@@ -121,7 +121,7 @@ sensors_create() {
 
 		id="$( fixid "$device.$subsystem.$dir" )"
 
-		echo >&2 "charts.d: sensors: on path='$path', dir='$dir', device='$device', subsystem='$subsystem', id='$id', name='$name'"
+		debug "path='$path', dir='$dir', device='$device', subsystem='$subsystem', id='$id', name='$name'"
 
 		for mode in temperature voltage fans power current energy humidity
 		do
@@ -221,7 +221,6 @@ sensors_create() {
 	done
 
 	[ $sensors_source_update -eq 1 ] && echo >>$TMP_DIR/sensors.sh "}"
-	# cat >&2 $TMP_DIR/sensors.sh
 
 	# ok, load the function sensors_update() we created
 	[ $sensors_source_update -eq 1 ] && . $TMP_DIR/sensors.sh

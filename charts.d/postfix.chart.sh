@@ -18,23 +18,11 @@ postfix_check() {
 	if [ -z "$postfix_postqueue" -o ! -x "$postfix_postqueue" ]
 	then
 		postfix_postqueue="`which postqueue 2>/dev/null`"
-		if [ -z "$postfix_postqueue" -o ! -x "$postfix_postqueue" ]
-		then
-			local d=
-			for d in /sbin /usr/sbin /usr/local/sbin
-			do
-				if [ -x "$d/postqueue" ]
-				then
-					postfix_postqueue="$d/postqueue"
-					break
-				fi
-			done
-		fi
 	fi
 
 	if [ -z "$postfix_postqueue" -o ! -x  "$postfix_postqueue" ]
 	then
-		echo >&2 "$PROGRAM_NAME: postfix: cannot find postqueue. Please set 'postfix_postqueue=/path/to/postqueue' in $confd/postfix.conf"
+		error "cannot find postqueue. Please set 'postfix_postqueue=/path/to/postqueue' in $confd/postfix.conf"
 		return 1
 	fi
 
@@ -73,10 +61,10 @@ postfix_update() {
 	postfix_q_emails=0
 	postfix_q_size=0
 
-	eval "`$postfix_postqueue -p |\
+	eval "$(run $postfix_postqueue -p |\
 		grep "^--" |\
 		sed -e "s/-- \([0-9]\+\) Kbytes in \([0-9]\+\) Requests.$/local postfix_q_size=\1\nlocal postfix_q_emails=\2/g" |\
-		egrep "^local postfix_q_(emails|size)=[0-9]+$"`"
+		egrep "^local postfix_q_(emails|size)=[0-9]+$")"
 
 	# write the result of the work.
 	cat <<VALUESEOF

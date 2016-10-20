@@ -19,7 +19,7 @@ cpu_apps_check() {
 
 	if [ -z "$cpu_apps_apps" ]
 	then
-		echo >&2 "$PROGRAM_NAME: cpu_apps: Please set cpu_apps_apps='command1 command2 ...' in $confd/cpu_apps_apps.conf"
+		error "manual configuration required: please set cpu_apps_apps='command1 command2 ...' in $confd/cpu_apps_apps.conf"
 		return 1
 	fi
 	return 0
