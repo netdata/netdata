@@ -1,5 +1,12 @@
 # no need for shebang - this file is loaded from charts.d.plugin
 
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+# contributed by @paulfantom with PR #511
+
 # if this chart is called X.chart.sh, then all functions and global variables
 # must start with X_
 hddtemp_host="localhost"
