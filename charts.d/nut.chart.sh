@@ -1,5 +1,11 @@
 # no need for shebang - this file is loaded from charts.d.plugin
 
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+
 # a space separated list of UPS names
 # if empty, the list returned by 'upsc -l' will be used
 nut_ups=

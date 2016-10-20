@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
 
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+# charts.d.plugin allows easy development of BASH plugins
+#
+# if you need to run parallel charts.d processes, link this file to a different name
+# in the same directory, with a .plugin suffix and netdata will start both of them,
+# each will have a different config file and modules configuration directory.
+#
+
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 
 PROGRAM_FILE="$0"
 PROGRAM_NAME="$(basename $0)"
 PROGRAM_NAME="${PROGRAM_NAME/.plugin}"
 MODULE_NAME="main"
-
-# if you need to run parallel charts.d processes
-# just link this files with a different name
-# in the same directory, with a .plugin suffix
-# netdata will start multiple of them
-# each will have a different config file
 
 # -----------------------------------------------------------------------------
 # create temp dir

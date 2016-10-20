@@ -1,5 +1,11 @@
 # no need for shebang - this file is loaded from charts.d.plugin
 
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+
 opensips_opts="fifo get_statistics all"
 opensips_cmd=
 opensips_update_every=5

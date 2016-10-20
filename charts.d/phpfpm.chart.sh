@@ -1,9 +1,13 @@
 # no need for shebang - this file is loaded from charts.d.plugin
 
-# if this chart is called X.chart.sh, then all functions and global variables
-# must start with X_
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+# Contributed by @safeie with PR #276
 
-# first, you need open php-fpm status in php-fpm.conf 
+# first, you need open php-fpm status in php-fpm.conf
 # second, you need add status location in nginx.conf
 # you can see, https://easyengine.io/tutorials/php/fpm-status-page/
 

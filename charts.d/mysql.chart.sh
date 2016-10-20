@@ -1,5 +1,11 @@
 # no need for shebang - this file is loaded from charts.d.plugin
 
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+
 # http://dev.mysql.com/doc/refman/5.0/en/server-status-variables.html
 #
 # https://dev.mysql.com/doc/refman/5.1/en/show-status.html
