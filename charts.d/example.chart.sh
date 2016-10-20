@@ -67,7 +67,7 @@ example_check() {
 	#  - 1 to disable the chart
 
 	# check something
-	[ "${example_magic_number}" != "12345" ] && echo >&2 "example: you have to set example_magic_number=$example_magic_number in example.conf to start example chart." && return 1
+	[ "${example_magic_number}" != "12345" ] && error "manual configuration required: you have to set example_magic_number=$example_magic_number in example.conf to start example chart." && return 1
 
 	# check that we can collect data
 	example_get || return 1
@@ -108,7 +108,6 @@ BEGIN example.random2 $1
 SET random = $example_value4
 END
 VALUESEOF
-	# echo >&2 "example_count = $example_count value = $value4"
 
 	return 0
 }

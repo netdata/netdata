@@ -67,14 +67,14 @@ apache_detect() {
 
 	# we will not check of the Conns*
 	# keys, since these are apache 2.4 specific
-	[ -z "${apache_key_accesses}"    ] && echo >&2 "apache: missing 'Total Accesses' from apache server: ${*}" && return 1
-	[ -z "${apache_key_kbytes}"      ] && echo >&2 "apache: missing 'Total kBytes' from apache server: ${*}" && return 1
-	[ -z "${apache_key_reqpersec}"   ] && echo >&2 "apache: missing 'ReqPerSec' from apache server: ${*}" && return 1
-	[ -z "${apache_key_bytespersec}" ] && echo >&2 "apache: missing 'BytesPerSec' from apache server: ${*}" && return 1
-	[ -z "${apache_key_bytesperreq}" ] && echo >&2 "apache: missing 'BytesPerReq' from apache server: ${*}" && return 1
-	[ -z "${apache_key_busyworkers}" ] && echo >&2 "apache: missing 'BusyWorkers' from apache server: ${*}" && return 1
-	[ -z "${apache_key_idleworkers}" ] && echo >&2 "apache: missing 'IdleWorkers' from apache server: ${*}" && return 1
-	[ -z "${apache_key_scoreboard}"  ] && echo >&2 "apache: missing 'Scoreboard' from apache server: ${*}" && return 1
+	[ -z "${apache_key_accesses}"    ] && error "missing 'Total Accesses' from apache server: ${*}" && return 1
+	[ -z "${apache_key_kbytes}"      ] && error "missing 'Total kBytes' from apache server: ${*}" && return 1
+	[ -z "${apache_key_reqpersec}"   ] && error "missing 'ReqPerSec' from apache server: ${*}" && return 1
+	[ -z "${apache_key_bytespersec}" ] && error "missing 'BytesPerSec' from apache server: ${*}" && return 1
+	[ -z "${apache_key_bytesperreq}" ] && error "missing 'BytesPerReq' from apache server: ${*}" && return 1
+	[ -z "${apache_key_busyworkers}" ] && error "missing 'BusyWorkers' from apache server: ${*}" && return 1
+	[ -z "${apache_key_idleworkers}" ] && error "missing 'IdleWorkers' from apache server: ${*}" && return 1
+	[ -z "${apache_key_scoreboard}"  ] && error "missing 'Scoreboard' from apache server: ${*}" && return 1
 
 	if [ ! -z "${apache_key_connstotal}" \
 		-a ! -z "${apache_key_connsasyncwriting}" \
@@ -92,7 +92,7 @@ apache_detect() {
 
 apache_get() {
 	local oIFS="${IFS}" ret
-	IFS=$':\n' apache_response=($(curl -Ss ${apache_curl_opts} "${apache_url}"))
+	IFS=$':\n' apache_response=($(run curl -Ss ${apache_curl_opts} "${apache_url}"))
 	ret=$?
 	IFS="${oIFS}"
 
@@ -130,7 +130,7 @@ apache_get() {
 		-o -z "${apache_idleworkers}" \
 		]
 		then
-		echo >&2 "apache: empty values got from apache server: ${apache_response[*]}"
+		error "empty values got from apache server: ${apache_response[*]}"
 		return 1
 	fi
 
@@ -151,7 +151,7 @@ apache_check() {
 	apache_get
 	if [ $? -ne 0 ]
 		then
-		echo >&2 "apache: cannot find stub_status on URL '${apache_url}'. Please set apache_url='http://apache.server:80/server-status?auto' in $confd/apache.conf"
+		error "cannot find stub_status on URL '${apache_url}'. Please set apache_url='http://apache.server:80/server-status?auto' in $confd/apache.conf"
 		return 1
 	fi
 
