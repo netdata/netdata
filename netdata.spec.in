@@ -27,11 +27,15 @@ BuildRequires:	pkgconfig
 BuildRequires:	xz
 BuildRequires:	zlib-devel
 BuildRequires:	libuuid-devel
+Requires: zlib
+Requires: libuuid
 
 # Packages can be found in the EPEL repo
 %if %{with nfacct}
 BuildRequires:	libmnl-devel
 BuildRequires:	libnetfilter_acct-devel
+Requires: libmnl
+Requires: libnetfilter_acct
 %endif
 
 Requires(pre): /usr/sbin/groupadd
@@ -147,7 +151,9 @@ rm -rf $RPM_BUILD_ROOT
 
 %dir %{_sysconfdir}/%{name}
 %config(noreplace) %{_sysconfdir}/%{name}/*.conf
+#%config(noreplace) %{_sysconfdir}/%{name}/charts.d/*.conf
 %config(noreplace) %{_sysconfdir}/%{name}/health.d/*.conf
+#%config(noreplace) %{_sysconfdir}/%{name}/node.d/*.conf
 %config(noreplace) %{_sysconfdir}/%{name}/python.d/*.conf
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
 
