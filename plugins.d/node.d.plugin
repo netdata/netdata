@@ -8,6 +8,11 @@
 // Then, the second line, finds nodejs or node or js in the system path
 // and executes it with the shell parameters.
 
+// netdata
+// real-time performance and health monitoring, done right!
+// (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+// GPL v3+
+
 // --------------------------------------------------------------------------------------------------------------------
 
 'use strict';

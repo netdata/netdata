@@ -200,7 +200,7 @@ int error_log_limit(int reset) {
 
 void log_date(FILE *out)
 {
-        char outstr[24];
+        char outstr[26];
         time_t t;
         struct tm *tmp, tmbuf;
 
@@ -208,7 +208,7 @@ void log_date(FILE *out)
         tmp = localtime_r(&t, &tmbuf);
 
         if (tmp == NULL) return;
-        if (unlikely(strftime(outstr, sizeof(outstr), "%y-%m-%d %H:%M:%S", tmp) == 0)) return;
+        if (unlikely(strftime(outstr, sizeof(outstr), "%Y-%m-%d %H:%M:%S", tmp) == 0)) return;
 
         fprintf(out, "%s: ", outstr);
 }
@@ -222,7 +222,7 @@ void debug_int( const char *file, const char *function, const unsigned long line
 
     log_date(stdout);
     va_start( args, fmt );
-    printf("DEBUG (%04lu@%-10.10s:%-15.15s): %s: ", line, file, function, program_name);
+    printf("%s: DEBUG (%04lu@%-10.10s:%-15.15s): ", program_name, line, file, function);
     vprintf(fmt, args);
     va_end( args );
     putchar('\n');
@@ -249,8 +249,8 @@ void info_int( const char *file, const char *function, const unsigned long line,
     log_date(stderr);
 
     va_start( args, fmt );
-    if(debug_flags) fprintf(stderr, "INFO (%04lu@%-10.10s:%-15.15s): %s: ", line, file, function, program_name);
-    else            fprintf(stderr, "INFO: %s: ", program_name);
+    if(debug_flags) fprintf(stderr, "%s: INFO: (%04lu@%-10.10s:%-15.15s):", program_name, line, file, function);
+    else            fprintf(stderr, "%s: INFO: ", program_name);
     vfprintf( stderr, fmt, args );
     va_end( args );
 
@@ -298,8 +298,8 @@ void error_int( const char *prefix, const char *file, const char *function, cons
     log_date(stderr);
 
     va_start( args, fmt );
-    if(debug_flags) fprintf(stderr, "%s (%04lu@%-10.10s:%-15.15s): %s: ", prefix, line, file, function, program_name);
-    else            fprintf(stderr, "%s: %s: ", prefix, program_name);
+    if(debug_flags) fprintf(stderr, "%s: %s: (%04lu@%-10.10s:%-15.15s): ", program_name, prefix, line, file, function);
+    else            fprintf(stderr, "%s: %s: ", program_name, prefix);
     vfprintf( stderr, fmt, args );
     va_end( args );
 
@@ -325,8 +325,8 @@ void fatal_int( const char *file, const char *function, const unsigned long line
     log_date(stderr);
 
     va_start( args, fmt );
-    if(debug_flags) fprintf(stderr, "FATAL (%04lu@%-10.10s:%-15.15s): %s: ", line, file, function, program_name);
-    else            fprintf(stderr, "FATAL: %s: ", program_name);
+    if(debug_flags) fprintf(stderr, "%s: FATAL: (%04lu@%-10.10s:%-15.15s): ", program_name, line, file, function);
+    else            fprintf(stderr, "%s: FATAL: ", program_name);
     vfprintf( stderr, fmt, args );
     va_end( args );
 
