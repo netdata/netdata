@@ -64,6 +64,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <uuid/uuid.h>
+#include <mntent.h>
 
 #ifdef STORAGE_WITH_MATH
 #include <math.h>
