@@ -343,7 +343,7 @@ struct mountinfo *mountinfo_read() {
 */
     }
 
-/*
+/* find if the mount options have "bind" in them
     {
         FILE *fp = setmntent(MOUNTED, "r");
         if (fp != NULL) {

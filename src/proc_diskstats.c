@@ -260,13 +260,13 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
 
     // mountinfo_find() can be called with NULL disk_mountinfo_root
     struct mountinfo *mi = mountinfo_find(disk_mountinfo_root, d->major, d->minor);
-    if(unlikely(!mi)) {
+/*    if(unlikely(!mi)) {
         mountinfo_reload(1);
 
         // search again for this disk
         mi = mountinfo_find(disk_mountinfo_root, d->major, d->minor);
     }
-
+*/
     if(mi) {
         d->mount_point = strdupz(mi->mount_point);
         d->mount_point_hash = mi->mount_point_hash;
@@ -770,14 +770,14 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
             }
         }
 
-        /*
+/*
         // --------------------------------------------------------------------------
         // space metrics
 
         if(d->mount_point && (d->do_space || d->do_inodes) ) {
             do_disk_space_stats(d, d->mount_point, disk, disk, family, update_every, dt);
         }
-        */
+*/
     }
 
     // --------------------------------------------------------------------------
@@ -785,10 +785,10 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 
     struct mountinfo *mi;
     for(mi = disk_mountinfo_root; mi ;mi = mi->next) {
-        if(unlikely(mi->flags & MOUNTINFO_IS_DUMMY || mi->flags & MOUNTINFO_IS_BIND || mi->flags & MOUNTINFO_IS_SAME_DEV || mi->flags & MOUNTINFO_NO_STAT || mi->flags & MOUNTINFO_NO_SIZE))
+        if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY|MOUNTINFO_IS_BIND|MOUNTINFO_IS_SAME_DEV|MOUNTINFO_NO_STAT|MOUNTINFO_NO_SIZE)))
             continue;
 
-        /*
+/*
         // skip the ones with block devices
         int skip = 0;
         struct disk *d;
@@ -801,9 +801,10 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 
         if(unlikely(skip))
             continue;
-        */
 
         // fprintf(stderr, "Will process mount point '%s', source '%s', filesystem '%s'\n", mi->mount_point, mi->mount_source, mi->filesystem);
+*/
+
         do_disk_space_stats(NULL, mi->mount_point, mi->mount_source, mi->persistent_id, mi->mount_point , update_every, dt);
     }
 
