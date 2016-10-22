@@ -57,12 +57,6 @@ static inline void mountinfo_reload(int force) {
 }
 
 static inline void do_disk_space_stats(struct disk *d, const char *mount_point, const char *mount_source, const char *disk, const char *family, int update_every, unsigned long long dt) {
-    struct statvfs buff_statvfs;
-    if (statvfs(mount_point, &buff_statvfs) < 0) {
-        error("Failed statvfs() for '%s' (disk '%s')", mount_point, disk);
-        return;
-    }
-
     int do_space, do_inodes;
 
     if(d) {
@@ -91,6 +85,9 @@ static inline void do_disk_space_stats(struct disk *d, const char *mount_point, 
 
         int def_space = CONFIG_ONDEMAND_ONDEMAND;
 
+        if(unlikely(strncmp(mount_point, "/run/user/", 10) == 0))
+            def_space = CONFIG_ONDEMAND_NO;
+
         // check the user configuration (this will also show our 'on demand' decision)
         def_space = config_get_boolean_ondemand(var_name, "enable space metrics", def_space);
 
@@ -99,6 +96,15 @@ static inline void do_disk_space_stats(struct disk *d, const char *mount_point, 
 
         do_space = config_get_boolean_ondemand(var_name, "space usage", ddo_space);
         do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", ddo_inodes);
+    }
+
+    if(do_space == CONFIG_ONDEMAND_NO && do_inodes == CONFIG_ONDEMAND_NO)
+        return;
+
+    struct statvfs buff_statvfs;
+    if (statvfs(mount_point, &buff_statvfs) < 0) {
+        error("Failed statvfs() for '%s' (disk '%s')", mount_point, disk);
+        return;
     }
 
     // taken from get_fs_usage() found in coreutils
