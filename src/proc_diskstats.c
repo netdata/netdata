@@ -6,13 +6,19 @@
 #define DISK_TYPE_PARTITION 2
 #define DISK_TYPE_CONTAINER 3
 
+#ifndef NETDATA_RELOAD_MOUNTINFO_EVERY
+#define NETDATA_RELOAD_MOUNTINFO_EVERY 10
+#endif
+
 static struct disk {
     char *disk;             // the name of the disk (sda, sdb, etc)
     unsigned long major;
     unsigned long minor;
     int sector_size;
     int type;
+
     char *mount_point;
+    uint32_t mount_point_hash;
 
     // disk options caching
     int configured;
@@ -29,108 +35,147 @@ static struct disk {
     struct disk *next;
 } *disk_root = NULL;
 
-/* Return true if N is a known integer value.  On many file systems,
-   UINTMAX_MAX represents an unknown value; on AIX, UINTMAX_MAX - 1
-   represents unknown.  Use a rule that works on AIX file systems, and
-   that almost-always works on other types.  */
-static inline int known_value (uintmax_t n) { return n < UINTMAX_MAX - 1; }
+static struct mountinfo *disk_mountinfo_root = NULL;
 
-static inline void disk_space_stats(struct disk *d, const char *disk, const char *family, int update_every, unsigned long long dt) {
-    struct statvfs buff_statvfs;
-    RRDSET *st;
+static inline void mountinfo_reload(int force) {
+    static time_t last_loaded = 0;
+    time_t now = time(NULL);
 
-    if (statvfs(d->mount_point, &buff_statvfs) < 0)
-        error("Failed statvfs() for '%s' (disk '%s')", d->mount_point, d->disk);
-    else {
-        struct stat buff_stat;
+    if(force || now - last_loaded >= NETDATA_RELOAD_MOUNTINFO_EVERY) {
+//#ifdef NETDATA_INTERNAL_CHECKS
+//        info("Reloading mountinfo");
+//#endif
 
-        // verify we collected the metrics for the right disk.
-        // if not the mountpoint has changed.
+        // mountinfo_free() can be called with NULL disk_mountinfo_root
+        mountinfo_free(disk_mountinfo_root);
 
-        if(stat(d->mount_point, &buff_stat) == -1)
-            error("Failed to stat() for '%s' (disk '%s')", d->mount_point, d->disk);
-        else {
-            if(major(buff_stat.st_dev) == d->major && minor(buff_stat.st_dev) == d->minor) {
+        // re-read mountinfo in case something changed
+        disk_mountinfo_root = mountinfo_read();
 
-                // http://stackoverflow.com/a/4965511
-                // taken from get_fs_usage() found in coreutils
-                unsigned long bsize = (buff_statvfs.f_frsize) ? buff_statvfs.f_frsize : buff_statvfs.f_bsize;
-
-                fsblkcnt_t bavail         = buff_statvfs.f_bavail;
-                fsblkcnt_t btotal         = buff_statvfs.f_blocks;
-                fsblkcnt_t bavail_root    = buff_statvfs.f_bfree;
-                fsblkcnt_t breserved_root = bavail_root - bavail;
-                fsblkcnt_t bused;
-                if(likely(btotal >= bavail_root))
-                    bused = btotal - bavail_root;
-                else
-                    bused = bavail_root - btotal;
-
-#ifdef NETDATA_INTERNAL_CHECKS
-                if(unlikely(btotal != bavail + breserved_root + bused))
-                    error("Disk block statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", d->mount_point, d->disk, (unsigned long long)btotal, (unsigned long long)bavail, (unsigned long long)breserved_root, (unsigned long long)bused);
-#endif
-
-                // --------------------------------------------------------------------------
-
-                fsfilcnt_t favail         = buff_statvfs.f_favail;
-                fsfilcnt_t ftotal         = buff_statvfs.f_files;
-                fsfilcnt_t favail_root    = buff_statvfs.f_ffree;
-                fsfilcnt_t freserved_root = favail_root - favail;
-                fsfilcnt_t fused          = ftotal - favail_root;
-
-#ifdef NETDATA_INTERNAL_CHECKS
-                if(unlikely(btotal != bavail + breserved_root + bused))
-                    error("Disk inode statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", d->mount_point, d->disk, (unsigned long long)ftotal, (unsigned long long)favail, (unsigned long long)freserved_root, (unsigned long long)fused);
-#endif
-
-                // --------------------------------------------------------------------------
-
-                if(d->do_space == CONFIG_ONDEMAND_YES || (d->do_space == CONFIG_ONDEMAND_ONDEMAND && (bavail || breserved_root || bused))) {
-                    d->do_space = CONFIG_ONDEMAND_YES;
-
-                    st = rrdset_find_bytype("disk_space", disk);
-                    if(!st) {
-                        st = rrdset_create("disk_space", disk, NULL, family, "disk.space", "Disk Space Usage", "GB", 2023, update_every, RRDSET_TYPE_STACKED);
-                        st->isdetail = 1;
-
-                        rrddim_add(st, "avail", NULL, bsize, 1024*1024*1024, RRDDIM_ABSOLUTE);
-                        rrddim_add(st, "used" , NULL, bsize, 1024*1024*1024, RRDDIM_ABSOLUTE);
-                        rrddim_add(st, "reserved_for_root", "reserved for root", bsize, 1024*1024*1024, RRDDIM_ABSOLUTE);
-                    }
-                    else rrdset_next_usec(st, dt);
-
-                    rrddim_set(st, "avail", bavail);
-                    rrddim_set(st, "used", bused);
-                    rrddim_set(st, "reserved_for_root", breserved_root);
-                    rrdset_done(st);
-                }
-
-                // --------------------------------------------------------------------------
-
-                if(d->do_inodes == CONFIG_ONDEMAND_YES || (d->do_inodes == CONFIG_ONDEMAND_ONDEMAND && (favail || freserved_root || fused))) {
-                    st = rrdset_find_bytype("disk_inodes", disk);
-                    if(!st) {
-                        st = rrdset_create("disk_inodes", disk, NULL, family, "disk.inodes", "Disk Inodes Usage", "Inodes", 2024, update_every, RRDSET_TYPE_STACKED);
-                        st->isdetail = 1;
-
-                        rrddim_add(st, "avail", NULL, 1, 1, RRDDIM_ABSOLUTE);
-                        rrddim_add(st, "used" , NULL, 1, 1, RRDDIM_ABSOLUTE);
-                        rrddim_add(st, "reserved_for_root", "reserved for root", 1, 1, RRDDIM_ABSOLUTE);
-                    }
-                    else rrdset_next_usec(st, dt);
-
-                    rrddim_set(st, "avail", favail);
-                    rrddim_set(st, "used", fused);
-                    rrddim_set(st, "reserved_for_root", freserved_root);
-                    rrdset_done(st);
-                }
-            }
-        }
+        last_loaded = now;
     }
 }
 
-static struct mountinfo *disk_mountinfo_root = NULL;
+static inline void do_disk_space_stats(struct disk *d, const char *mount_point, const char *mount_source, const char *disk, const char *family, int update_every, unsigned long long dt) {
+    struct statvfs buff_statvfs;
+    if (statvfs(mount_point, &buff_statvfs) < 0) {
+        error("Failed statvfs() for '%s' (disk '%s')", mount_point, disk);
+        return;
+    }
+
+    int do_space, do_inodes;
+
+    if(d) {
+        // verify we collected the metrics for the right disk.
+        // if not the mountpoint has changed.
+
+        struct stat buff_stat;
+        if(stat(mount_point, &buff_stat) == -1) {
+            error("Failed to stat() for '%s' (disk '%s')", mount_point, disk);
+            return;
+        }
+        else if(major(buff_stat.st_dev) != d->major || minor(buff_stat.st_dev) != d->minor) {
+            error("Disk '%s' (disk '%s') switched major:minor", mount_point, disk);
+            freez(d->mount_point);
+            d->mount_point = NULL;
+            d->mount_point_hash = 0;
+            return;
+        }
+
+        do_space = d->do_space;
+        do_inodes = d->do_inodes;
+    }
+    else {
+        char var_name[4096 + 1];
+        snprintfz(var_name, 4096, "plugin:proc:/proc/diskstats:%s", mount_point);
+
+        int def_space = CONFIG_ONDEMAND_ONDEMAND;
+
+        // check the user configuration (this will also show our 'on demand' decision)
+        def_space = config_get_boolean_ondemand(var_name, "enable space metrics", def_space);
+
+        int ddo_space = def_space,
+                ddo_inodes = def_space;
+
+        do_space = config_get_boolean_ondemand(var_name, "space usage", ddo_space);
+        do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", ddo_inodes);
+    }
+
+    // taken from get_fs_usage() found in coreutils
+    unsigned long bsize = (buff_statvfs.f_frsize) ? buff_statvfs.f_frsize : buff_statvfs.f_bsize;
+
+    fsblkcnt_t bavail         = buff_statvfs.f_bavail;
+    fsblkcnt_t btotal         = buff_statvfs.f_blocks;
+    fsblkcnt_t bavail_root    = buff_statvfs.f_bfree;
+    fsblkcnt_t breserved_root = bavail_root - bavail;
+    fsblkcnt_t bused;
+    if(likely(btotal >= bavail_root))
+        bused = btotal - bavail_root;
+    else
+        bused = bavail_root - btotal;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(btotal != bavail + breserved_root + bused))
+        error("Disk block statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mount_point, disk, (unsigned long long)btotal, (unsigned long long)bavail, (unsigned long long)breserved_root, (unsigned long long)bused);
+#endif
+
+    // --------------------------------------------------------------------------
+
+    fsfilcnt_t favail         = buff_statvfs.f_favail;
+    fsfilcnt_t ftotal         = buff_statvfs.f_files;
+    fsfilcnt_t favail_root    = buff_statvfs.f_ffree;
+    fsfilcnt_t freserved_root = favail_root - favail;
+    fsfilcnt_t fused          = ftotal - favail_root;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(btotal != bavail + breserved_root + bused))
+        error("Disk inode statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mount_point, disk, (unsigned long long)ftotal, (unsigned long long)favail, (unsigned long long)freserved_root, (unsigned long long)fused);
+#endif
+
+    // --------------------------------------------------------------------------
+
+    RRDSET *st;
+
+    if(do_space == CONFIG_ONDEMAND_YES || (do_space == CONFIG_ONDEMAND_ONDEMAND && (bavail || breserved_root || bused))) {
+        st = rrdset_find_bytype("disk_space", disk);
+        if(!st) {
+            char title[4096 + 1];
+            snprintfz(title, 4096, "Disk Space Usage for %s [%s]", family, mount_source);
+            st = rrdset_create("disk_space", disk, NULL, family, "disk.space", title, "GB", 2023, update_every, RRDSET_TYPE_STACKED);
+
+            rrddim_add(st, "avail", NULL, bsize, 1024*1024*1024, RRDDIM_ABSOLUTE);
+            rrddim_add(st, "used" , NULL, bsize, 1024*1024*1024, RRDDIM_ABSOLUTE);
+            rrddim_add(st, "reserved_for_root", "reserved for root", bsize, 1024*1024*1024, RRDDIM_ABSOLUTE);
+        }
+        else rrdset_next_usec(st, dt);
+
+        rrddim_set(st, "avail", bavail);
+        rrddim_set(st, "used", bused);
+        rrddim_set(st, "reserved_for_root", breserved_root);
+        rrdset_done(st);
+    }
+
+    // --------------------------------------------------------------------------
+
+    if(do_inodes == CONFIG_ONDEMAND_YES || (do_inodes == CONFIG_ONDEMAND_ONDEMAND && (favail || freserved_root || fused))) {
+        st = rrdset_find_bytype("disk_inodes", disk);
+        if(!st) {
+            char title[4096 + 1];
+            snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]", family, mount_source);
+            st = rrdset_create("disk_inodes", disk, NULL, family, "disk.inodes", title, "Inodes", 2024, update_every, RRDSET_TYPE_STACKED);
+
+            rrddim_add(st, "avail", NULL, 1, 1, RRDDIM_ABSOLUTE);
+            rrddim_add(st, "used" , NULL, 1, 1, RRDDIM_ABSOLUTE);
+            rrddim_add(st, "reserved_for_root", "reserved for root", 1, 1, RRDDIM_ABSOLUTE);
+        }
+        else rrdset_next_usec(st, dt);
+
+        rrddim_set(st, "avail", favail);
+        rrddim_set(st, "used", fused);
+        rrddim_set(st, "reserved_for_root", freserved_root);
+        rrdset_done(st);
+    }
+}
 
 static struct disk *get_disk(unsigned long major, unsigned long minor, char *disk) {
     static char path_to_get_hw_sector_size[FILENAME_MAX + 1] = "";
@@ -216,21 +261,20 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
     // mountinfo_find() can be called with NULL disk_mountinfo_root
     struct mountinfo *mi = mountinfo_find(disk_mountinfo_root, d->major, d->minor);
     if(unlikely(!mi)) {
-        // mountinfo_free() can be called with NULL disk_mountinfo_root
-        mountinfo_free(disk_mountinfo_root);
-
-        // re-read mountinfo in case something changed
-        disk_mountinfo_root = mountinfo_read();
+        mountinfo_reload(1);
 
         // search again for this disk
         mi = mountinfo_find(disk_mountinfo_root, d->major, d->minor);
     }
 
-    if(mi)
+    if(mi) {
         d->mount_point = strdupz(mi->mount_point);
-        // no need to check for NULL
-    else
+        d->mount_point_hash = mi->mount_point_hash;
+    }
+    else {
         d->mount_point = NULL;
+        d->mount_point_hash = 0;
+    }
 
     // ------------------------------------------------------------------------
     // find the disk sector size
@@ -343,6 +387,9 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 
     uint32_t lines = procfile_lines(ff), l;
     uint32_t words;
+
+    // this is smart enough not to reload it every time
+    mountinfo_reload(0);
 
     for(l = 0; l < lines ;l++) {
         // --------------------------------------------------------------------------
@@ -723,12 +770,41 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
             }
         }
 
+        /*
         // --------------------------------------------------------------------------
         // space metrics
 
         if(d->mount_point && (d->do_space || d->do_inodes) ) {
-            disk_space_stats(d, disk, family, update_every, dt);
+            do_disk_space_stats(d, d->mount_point, disk, disk, family, update_every, dt);
         }
+        */
+    }
+
+    // --------------------------------------------------------------------------
+    // space metrics for non-block devices
+
+    struct mountinfo *mi;
+    for(mi = disk_mountinfo_root; mi ;mi = mi->next) {
+        if(unlikely(mi->flags & MOUNTINFO_IS_DUMMY || mi->flags & MOUNTINFO_IS_BIND || mi->flags & MOUNTINFO_IS_SAME_DEV || mi->flags & MOUNTINFO_NO_STAT || mi->flags & MOUNTINFO_NO_SIZE))
+            continue;
+
+        /*
+        // skip the ones with block devices
+        int skip = 0;
+        struct disk *d;
+        for(d = disk_root; d ;d = d->next) {
+            if(unlikely(d->mount_point && mi->mount_point_hash == d->mount_point_hash && strcmp(mi->mount_point, d->mount_point))) {
+                skip = 1;
+                break;
+            }
+        }
+
+        if(unlikely(skip))
+            continue;
+        */
+
+        // fprintf(stderr, "Will process mount point '%s', source '%s', filesystem '%s'\n", mi->mount_point, mi->mount_source, mi->filesystem);
+        do_disk_space_stats(NULL, mi->mount_point, mi->mount_source, mi->persistent_id, mi->mount_point , update_every, dt);
     }
 
     return 0;
