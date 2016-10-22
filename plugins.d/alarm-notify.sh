@@ -5,7 +5,7 @@
 # (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
 # GPL v3+
 #
-# Script the send alarm notifications for netdata
+# Script to send alarm notifications for netdata
 #
 # Features:
 #  - multiple notification methods
@@ -20,14 +20,56 @@
 #  - telegram.org notifications
 #
 
-me="${0}"
+export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
+export LC_ALL=C
+
+# -----------------------------------------------------------------------------
+
+PROGRAM_NAME="$(basename "${0}")"
+
+logdate() {
+    date "+%Y-%m-%d %H:%M:%S"
+}
+
+log() {
+    local status="${1}"
+    shift
+
+    echo >&2 "$(logdate): ${PROGRAM_NAME}: ${status}: ${*}"
+
+}
+
+warning() {
+    log WARNING "${@}"
+}
+
+error() {
+    log ERROR "${@}"
+}
+
+info() {
+    log INFO "${@}"
+}
+
+fatal() {
+    log FATAL "${@}"
+    exit 1
+}
+
+debug=0
+debug() {
+    [ $debug -eq 1 ] && log DEBUG "${@}"
+}
+
+# -----------------------------------------------------------------------------
 
 # check for BASH v4+ (required for associative arrays)
 [ $(( ${BASH_VERSINFO[0]} )) -lt 4 ] && \
-    echo >&2 "${me}: BASH version 4 or later is required (this is ${BASH_VERSION})." && \
-    exit 1
+    fatal "BASH version 4 or later is required (this is ${BASH_VERSION})."
 
+# -----------------------------------------------------------------------------
 # defaults to allow running this script by hand
+
 NETDATA_CONFIG_DIR="${NETDATA_CONFIG_DIR-/etc/netdata}"
 NETDATA_CACHE_DIR="${NETDATA_CACHE_DIR-/var/cache/netdata}"
 [ -z "${NETDATA_REGISTRY_URL}" ] && NETDATA_REGISTRY_URL="https://registry.my-netdata.io"
@@ -62,14 +104,14 @@ info="${18}"       # a short description of the alarm
 # don't do anything if this is not WARNING, CRITICAL or CLEAR
 if [ "${status}" != "WARNING" -a "${status}" != "CRITICAL" -a "${status}" != "CLEAR" ]
 then
-    echo >&2 "${me}: not sending notification for ${status} on '${chart}.${name}'"
+    info "not sending notification for ${status} on '${chart}.${name}'"
     exit 1
 fi
 
 # don't do anything if this is CLEAR, but it was not WARNING or CRITICAL
 if [ "${old_status}" != "WARNING" -a "${old_status}" != "CRITICAL" -a "${status}" = "CLEAR" ]
 then
-    echo >&2 "${me}: not sending notification for ${status} on '${chart}.${name}' (last status was ${old_status})"
+    info "not sending notification for ${status} on '${chart}.${name}' (last status was ${old_status})"
     exit 1
 fi
 
@@ -262,8 +304,7 @@ fi
 # check that we have at least a method enabled
 if [ "${SEND_EMAIL}" != "YES" -a "${SEND_PUSHOVER}" != "YES" -a "${SEND_TELEGRAM}" != "YES" -a "${SEND_SLACK}" != "YES" ]
     then
-    echo >&2 "All notification methods are disabled. Not sending a notification."
-    exit 1
+    fatal "All notification methods are disabled. Not sending a notification."
 fi
 
 # -----------------------------------------------------------------------------
@@ -372,10 +413,10 @@ send_email() {
 
         if [ $ret -eq 0 ]
         then
-            echo >&2 "${me}: Sent email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}'"
+            info "sent email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}'"
             return 0
         else
-            echo >&2 "${me}: Failed to send email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}' with error code ${ret}."
+            error "failed to send email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}' with error code ${ret}."
             return 1
         fi
     fi
@@ -417,10 +458,10 @@ send_pushover() {
 
             if [ "${httpcode}" == "200" ]
             then
-                echo >&2 "${me}: Sent pushover notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
+                info "sent pushover notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
                 sent=$((sent + 1))
             else
-                echo >&2 "${me}: Failed to send pushover notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
+                error "failed to send pushover notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
             fi
         done
 
@@ -452,13 +493,13 @@ send_telegram() {
 
             if [ "${httpcode}" == "200" ]
             then
-                echo >&2 "${me}: Sent telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}'"
+                info "sent telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}'"
                 sent=$((sent + 1))
             elif [ "${httpcode}" == "401" ]
             then
-                echo >&2 "${me}: Failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}': Wrong bot token."
+                error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}': Wrong bot token."
             else
-                echo >&2 "${me}: Failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}' with HTTP error code ${httpcode}."
+                error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}' with HTTP error code ${httpcode}."
             fi
         done
 
@@ -520,10 +561,10 @@ EOF
         httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null -X POST --data-urlencode "payload=${payload}" "${webhook}")
         if [ "${httpcode}" == "200" ]
         then
-            echo >&2 "${me}: Sent slack notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+            info "sent slack notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
             sent=$((sent + 1))
         else
-            echo >&2 "${me}: Failed to send slack notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+            error "failed to send slack notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
         fi
     done
 
