@@ -246,15 +246,15 @@ class Service(SimpleService):
                       host='localhost',
                       port=5432)
         params.update(self.configuration)
-        self.connection = psycopg2.connect(**params)
-        self.connection.set_isolation_level(extensions.ISOLATION_LEVEL_AUTOCOMMIT)
-        self.connection.set_session(readonly=True)
+        if not self.connection:
+            self.connection = psycopg2.connect(**params)
+            self.connection.set_isolation_level(extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+            self.connection.set_session(readonly=True)
 
     def check(self):
         try:
             self.connect()
             self.discover_databases()
-            self.connection.close()
             self._create_definitions()
             return True
         except Exception as e:
@@ -330,8 +330,6 @@ class Service(SimpleService):
         self.add_stats(cursor)
 
         cursor.close()
-        self.connection.close()
-
         return self.data
 
     def add_stats(self, cursor):
