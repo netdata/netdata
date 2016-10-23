@@ -101,10 +101,9 @@
 
 #if defined(HAVE_INTTYPES_H)
 #include <inttypes.h>
-#endif
+#elif defined(HAVE_STDINT_H)
 #include <stdint.h>
-#include <sys/types.h>
-#include <unistd.h>
+#endif
 
 #ifdef NETDATA_WITH_ZLIB
 #include <zlib.h>
