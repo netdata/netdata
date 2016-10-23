@@ -35,14 +35,26 @@ then
 
     [ -z "${recipient}" ] && recipient="sysadmin"
 
-    echo >&2 ">> SENDING TEST ALARM TO ROLE: ${recipient} <<"
+    id=1
+    last="CLEAR"
+    for x in "CRITICAL" "WARNING" "CLEAR"
+    do
+        echo >&2
+        echo >&2 ">> SENDING TEST ${x} ALARM TO ROLE: ${recipient} <<"
 
-    "${0}" "${recipient}" 'test' '1' '1' '1' '1' 'test_alarm' 'test_alarm' 'test' 'CRITICAL' 'CLEAR' '1' '1' "${0}" '1' '1' 'number' 'test alarm to verify notifications work'
-    ret=$?
+        "${0}" "${recipient}" "$(hostname)" "1" "1" "${id}" "$(date +%s)" "test_alarm" "test.chart" "test.family" "${x}" "${last}" '100' '90' "${0}" "60" "60" "units" "this is a test alarm to verify notifications work"
+        if [ $? -ne 0 ]
+        then
+            echo >&2 ">> FAILED <<"
+        else
+            echo >&2 ">> OK <<"
+        fi
 
-    [ ${ret} -ne 0 ] && echo >&2 ">> FAILED <<" && exit ${ret}
-    echo >&2 ">> OK <<"
-    exit $?
+        last="${x}"
+        id=$((id + 1))
+    done
+
+    exit 1
 fi
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
