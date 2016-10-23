@@ -76,7 +76,15 @@ void poll_handler(int signo)
 int poll_time_update_nolock(struct timeval *tv) {
 	int retv = gettimeofday(tv, NULL);
 	if(retv != 0) {
-		error("Could not get current time");
+		switch(errno) {
+			case EFAULT:
+			case EINVAL:
+				error("Could not get current time");
+				break;
+			case EPERM:
+				error("CAP_SYS_TIME capability is required to get current time");
+				break;
+		}
 	}
 	return retv;
 }
