@@ -2,6 +2,7 @@
 # Description: example netdata python.d module
 # Authors: facetoe, dangtranhoang
 
+import re
 from copy import deepcopy
 
 import psycopg2
@@ -90,7 +91,16 @@ WHERE
     schemaname <> 'pg_catalog';
 """
 BGWRITER = 'SELECT * FROM pg_stat_bgwriter;'
-LOCKS = 'SELECT mode, count(mode) AS count FROM pg_locks GROUP BY mode ORDER BY mode;'
+DATABASE_LOCKS = """
+SELECT
+  pg_database.datname as database_name,
+  mode,
+  count(mode) AS count
+FROM pg_locks
+  INNER JOIN pg_database ON pg_database.oid = pg_locks.database
+GROUP BY datname, mode
+ORDER BY datname, mode;
+"""
 REPLICATION = """
 SELECT
     client_hostname,
@@ -109,18 +119,29 @@ FROM (
 ) AS s;
 """
 
-LOCK_MAP = {'AccessExclusiveLock': 'lock_access_exclusive',
-            'AccessShareLock': 'lock_access_share',
-            'ExclusiveLock': 'lock_exclusive',
-            'RowExclusiveLock': 'lock_row_exclusive',
-            'RowShareLock': 'lock_row_share',
-            'ShareUpdateExclusiveLock': 'lock_update_exclusive_lock',
-            'ShareLock': 'lock_share',
-            'ShareRowExclusiveLock': 'lock_share_row_exclusive',
-            'SIReadLock': 'lock_si_read'}
+# LOCK_MAP = {'AccessExclusiveLock': 'lock_access_exclusive',
+#             'AccessShareLock': 'lock_access_share',
+#             'ExclusiveLock': 'lock_exclusive',
+#             'RowExclusiveLock': 'lock_row_exclusive',
+#             'RowShareLock': 'lock_row_share',
+#             'ShareUpdateExclusiveLock': 'lock_update_exclusive_lock',
+#             'ShareLock': 'lock_share',
+#             'ShareRowExclusiveLock': 'lock_share_row_exclusive',
+#             'SIReadLock': 'lock_si_read'}
+LOCK_TYPES = [
+    'ExclusiveLock',
+    'RowShareLock',
+    'SIReadLock',
+    'ShareUpdateExclusiveLock',
+    'AccessExclusiveLock',
+    'AccessShareLock',
+    'ShareRowExclusiveLock',
+    'ShareLock',
+    'RowExclusiveLock'
+]
 
 ORDER = ['db_stat_transactions', 'db_stat_tuple_read', 'db_stat_tuple_returned', 'db_stat_tuple_write',
-         'backend_process', 'index_count', 'index_size', 'table_count', 'table_size', 'locks', 'wal', 'operations_heap',
+         'backend_process', 'index_count', 'index_size', 'table_count', 'table_size', 'wal', 'operations_heap',
          'operations_index', 'operations_toast', 'operations_toast_index', 'background_writer']
 
 CHARTS = {
@@ -176,19 +197,6 @@ CHARTS = {
         'lines': [
             ['table_size', 'Size', 'absolute', 1, 1024 * 1024]
         ]},
-    'locks': {
-        'options': [None, 'Table size', 'Count', 'Locks', 'postgres.locks', 'line'],
-        'lines': [
-            ['lock_access_exclusive', 'Access Exclusive', 'absolute'],
-            ['lock_access_share', 'Access Share', 'absolute'],
-            ['lock_exclusive', 'Exclusive', 'absolute'],
-            ['lock_row_exclusive', 'Row Exclusive', 'absolute'],
-            ['lock_row_share', 'Row Share', 'absolute'],
-            ['lock_update_exclusive_lock', 'Update Exclusive Lock', 'absolute'],
-            ['lock_share', 'Share', 'absolute'],
-            ['lock_share_row_exclusive', 'Share Row Exclusive', 'absolute'],
-            ['lock_si_read', 'SI Read', 'absolute']
-        ]},
     'wal': {
         'options': [None, 'WAL stats', 'Files', 'WAL', 'postgres.wal', 'line'],
         'lines': [
@@ -238,6 +246,7 @@ class Service(SimpleService):
         self.connection = None
         self.data = {}
         self.old_data = {}
+        self.databases = set()
 
     def connect(self):
         params = dict(user='postgres',
@@ -253,6 +262,7 @@ class Service(SimpleService):
     def check(self):
         try:
             self.connect()
+            self.discover_databases()
             self._create_definitions()
             return True
         except Exception as e:
@@ -260,41 +270,66 @@ class Service(SimpleService):
             return False
 
     def _create_definitions(self):
+        for database_name in self.databases:
+            self.databases.add(database_name)
+            for chart_template_name in list(CHARTS):
+                if chart_template_name.startswith('db_stat'):
+                    self._add_database_stat_chart(chart_template_name, database_name)
+            self._add_database_lock_chart(database_name)
+
+    def discover_databases(self):
         cursor = self.connection.cursor()
         cursor.execute("""
             SELECT datname
             FROM pg_stat_database
             WHERE NOT datname ~* '^template\d+'
         """)
-
-        for row in cursor:
-            database_name = row[0]
-            for chart_template_name in list(CHARTS):
-                if not chart_template_name.startswith('db_stat'):
-                    continue
-
-                chart_template = CHARTS[chart_template_name]
-                chart_name = "{}_{}".format(database_name, chart_template_name)
-                if chart_name not in self.order:
-                    self.order.insert(0, chart_name)
-                    name, title, units, family, context, chart_type = chart_template['options']
-                    self.definitions[chart_name] = {
-                        'options': [
-                            name,
-                            database_name + title,
-                            units,
-                            database_name + family,
-                            database_name + context,
-                            chart_type
-                        ]
-                    }
-
-                    self.definitions[chart_name]['lines'] = []
-                    for line in deepcopy(chart_template['lines']):
-                        line[0] = "{}_{}".format(database_name, line[0])
-                        self.definitions[chart_name]['lines'].append(line)
-
+        self.databases = set(r[0] for r in cursor)
         cursor.close()
+
+    def _add_database_stat_chart(self, chart_template_name, database_name):
+        chart_template = CHARTS[chart_template_name]
+        chart_name = "{}_{}".format(database_name, chart_template_name)
+        if chart_name not in self.order:
+            self.order.insert(0, chart_name)
+            name, title, units, family, context, chart_type = chart_template['options']
+            self.definitions[chart_name] = {
+                'options': [
+                    name,
+                    database_name + title,
+                    units,
+                    database_name + family,
+                    database_name + context,
+                    chart_type
+                ]
+            }
+
+            self.definitions[chart_name]['lines'] = []
+            for line in deepcopy(chart_template['lines']):
+                line[0] = "{}_{}".format(database_name, line[0])
+                self.definitions[chart_name]['lines'].append(line)
+
+    def _add_database_lock_chart(self, database_name):
+        chart_name = "{}_locks".format(database_name)
+        if chart_name not in self.order:
+            self.order.insert(0, chart_name)
+            self.definitions[chart_name] = dict(
+                options=
+                [
+                    None,
+                    database_name + ' locks',
+                    'Count',
+                    database_name + ' database statistics',
+                    database_name + '.locks',
+                    'line'
+                ],
+                lines=[]
+            )
+
+            for lock_type in LOCK_TYPES:
+                lock_id = "{}_{}".format(database_name, lock_type.lower())
+                label = re.sub("([a-z])([A-Z])", "\g<1> \g<2>", lock_type)
+                self.definitions[chart_name]['lines'].append([lock_id, label, 'absolute'])
 
     def _get_data(self):
         self.connect()
@@ -357,17 +392,18 @@ class Service(SimpleService):
         self.data['table_size'] = int(temp.get('size_relations', 0))
 
     def add_lock_stats(self, cursor):
-        cursor.execute(LOCKS)
-        temp = cursor.fetchall()
-        for key in LOCK_MAP:
-            found = False
-            for row in temp:
-                if row['mode'] == key:
-                    found = True
-                    self.data[LOCK_MAP[key]] = int(row['count'])
+        cursor.execute(DATABASE_LOCKS)
+        # First zero out all current lock values.
+        for database_name in self.databases:
+            for lock_type in LOCK_TYPES:
+                lock_id = "{}_{}".format(database_name, lock_type.lower())
+                self.data[lock_id] = 0
 
-            if not found:
-                self.data[LOCK_MAP[key]] = 0
+        # Now populate those that have current locks
+        for row in cursor:
+            database_name, lock_type, lock_count = row
+            lock_id = "{}_{}".format(database_name, lock_type.lower())
+            self.data[lock_id] = lock_count
 
     def add_wal_stats(self, cursor):
         cursor.execute(ARCHIVE)
