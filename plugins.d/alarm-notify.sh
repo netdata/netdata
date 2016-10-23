@@ -40,18 +40,14 @@ then
     for x in "CRITICAL" "WARNING" "CLEAR"
     do
         echo >&2
-        echo >&2 ">> SENDING TEST ${x} ALARM TO ROLE: ${recipient} <<"
+        echo >&2 "# SENDING TEST ${x} ALARM TO ROLE: ${recipient}"
 
-        # printf >&2 "Execute: "
-        # printf >&2 "%q " "${0}" "${recipient}" "$(hostname)" "1" "1" "${id}" "$(date +%s)" "test_alarm" "test.chart" "test.family" "${x}" "${last}" '100' '90' "${0}" "1" "$((id))" "units" "this is a test alarm to verify notifications work"
-        # printf >&2 "\n"
-
-        "${0}" "${recipient}" "$(hostname)" "1" "1" "${id}" "$(date +%s)" "test_alarm" "test.chart" "test.family" "${x}" "${last}" '100' '90' "${0}" "$((id))" "1" "units" "this is a test alarm to verify notifications work"
+        "${0}" "${recipient}" "$(hostname)" 1 1 "${id}" "$(date +%s)" "test_alarm" "test.chart" "test.family" "${x}" "${last}" 100 90 "${0}" 1 $((0 + id)) "units" "this is a test alarm to verify notifications work"
         if [ $? -ne 0 ]
         then
-            echo >&2 ">> FAILED <<"
+            echo >&2 "# FAILED"
         else
-            echo >&2 ">> OK <<"
+            echo >&2 "# OK"
         fi
 
         last="${x}"
@@ -99,7 +95,7 @@ fatal() {
 
 debug=0
 debug() {
-    [ $debug -eq 1 ] && log DEBUG "${@}"
+    [ ${debug} -eq 1 ] && log DEBUG "${@}"
 }
 
 # -----------------------------------------------------------------------------
@@ -393,14 +389,14 @@ urlencode() {
     strlen=${#string}
     for (( pos=0 ; pos<strlen ; pos++ ))
     do
-        c=${string:$pos:1}
-        case "$c" in
+        c=${string:${pos}:1}
+        case "${c}" in
             [-_.~a-zA-Z0-9])
                 o="${c}"
                 ;;
 
             *)
-                printf -v o '%%%02x' "'$c"
+                printf -v o '%%%02x' "'${c}"
                 ;;
         esac
         encoded+="${o}"
@@ -475,7 +471,7 @@ send_email() {
         "${sendmail}" -t
         ret=$?
 
-        if [ $ret -eq 0 ]
+        if [ ${ret} -eq 0 ]
         then
             info "sent email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}'"
             return 0
@@ -546,7 +542,7 @@ send_pushbullet() {
         for user in ${recipients}
         do
             httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null \
-              --header 'Access-Token: '$userapikey'' \
+              --header 'Access-Token: '${userapikey}'' \
               --header 'Content-Type: application/json' \
               --data-binary  @<(cat <<EOF
                               {"title": "${title}",
@@ -587,8 +583,8 @@ send_telegram() {
             httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null ${disableNotification} \
                 --data-urlencode "parse_mode=HTML" \
                 --data-urlencode "disable_web_page_preview=true" \
-                --data-urlencode "text=$message" \
-                "https://api.telegram.org/bot${bottoken}/sendMessage?chat_id=$chatid")
+                --data-urlencode "text=${message}" \
+                "https://api.telegram.org/bot${bottoken}/sendMessage?chat_id=${chatid}")
 
             if [ "${httpcode}" == "200" ]
             then
@@ -617,10 +613,10 @@ send_slack() {
     [ "${SEND_SLACK}" != "YES" ] && return 1
 
     case "${status}" in
-        WARNING) color="warning" ;;
+        WARNING)  color="warning" ;;
         CRITICAL) color="danger" ;;
-        CLEAR) color="good" ;;
-        *) color="#777777" ;;
+        CLEAR)    color="good" ;;
+        *)        color="#777777" ;;
     esac
 
     for channel in ${channels}
@@ -731,7 +727,7 @@ esac
 if [ "${status}" = "CLEAR" ]
 then
     severity="Recovered from ${old_status}"
-    if [ $non_clear_duration -gt $duration ]
+    if [ ${non_clear_duration} -gt ${duration} ]
     then
         raised_for="(alarm was raised for ${non_clear_duration_txt})"
     fi
@@ -739,7 +735,7 @@ then
 elif [ "${old_status}" = "WARNING" -a "${status}" = "CRITICAL" ]
 then
     severity="Escalated to ${status}"
-    if [ $non_clear_duration -gt $duration ]
+    if [ ${non_clear_duration} -gt ${duration} ]
     then
         raised_for="(alarm is raised for ${non_clear_duration_txt})"
     fi
@@ -747,7 +743,7 @@ then
 elif [ "${old_status}" = "CRITICAL" -a "${status}" = "WARNING" ]
 then
     severity="Demoted to ${status}"
-    if [ $non_clear_duration -gt $duration ]
+    if [ ${non_clear_duration} -gt ${duration} ]
     then
         raised_for="(alarm is raised for ${non_clear_duration_txt})"
     fi
