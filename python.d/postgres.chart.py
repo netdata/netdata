@@ -41,21 +41,20 @@ FROM
     pg_stat_activity;
 """
 
-TABLE_SIZE_ON_DISK = """
-SELECT ((sum(relpages)* 8) * 1024) AS size_relations FROM pg_class WHERE relkind IN ('r', 't');
+TABLE_STATS = """
+SELECT
+  ((sum(relpages) * 8) * 1024) AS size_relations,
+  count(1)                     AS relations
+FROM pg_class
+WHERE relkind IN ('r', 't');
 """
 
-TABLE_COUNT = """
-SELECT count(1) as relations FROM pg_class WHERE relkind IN ('r', 't');
-"""
-
-INDEX_SIZE_ON_DISK = """
-SELECT ((sum(relpages)* 8) * 1024) AS size_indexes FROM pg_class WHERE relkind = 'i';
-"""
-
-INDEX_COUNT = """
-SELECT count(1) as indexes FROM pg_class WHERE relkind = 'i';
-"""
+INDEX_STATS = """
+SELECT
+  ((sum(relpages) * 8) * 1024) AS size_indexes,
+  count(1)                     AS indexes
+FROM pg_class
+WHERE relkind = 'i';"""
 
 DATABASE = """
 SELECT
@@ -346,21 +345,15 @@ class Service(SimpleService):
         self.data['backend_process_idle'] = int(temp.get('backends_idle', 0))
 
     def add_index_stats(self, cursor):
-        cursor.execute(INDEX_COUNT)
+        cursor.execute(INDEX_STATS)
         temp = cursor.fetchone()
         self.data['index_count'] = int(temp.get('indexes', 0))
-
-        cursor.execute(INDEX_SIZE_ON_DISK)
-        temp = cursor.fetchone()
         self.data['index_size'] = int(temp.get('size_indexes', 0))
 
     def add_table_stats(self, cursor):
-        cursor.execute(TABLE_COUNT)
+        cursor.execute(TABLE_STATS)
         temp = cursor.fetchone()
         self.data['table_count'] = int(temp.get('relations', 0))
-
-        cursor.execute(TABLE_SIZE_ON_DISK)
-        temp = cursor.fetchone()
         self.data['table_size'] = int(temp.get('size_relations', 0))
 
     def add_lock_stats(self, cursor):
