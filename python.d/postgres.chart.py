@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Description: example netdata python.d module
-# Author: Pawel Krupa (paulfantom)
+# Authors: facetoe, dangtranhoang
 
 from copy import deepcopy
 
