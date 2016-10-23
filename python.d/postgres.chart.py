@@ -60,6 +60,7 @@ WHERE relkind = 'i';"""
 DATABASE = """
 SELECT
   datname AS database_name,
+  sum(numbackends) AS connections,
   sum(xact_commit) AS xact_commit,
   sum(xact_rollback) AS xact_rollback,
   sum(blks_read) AS blks_read,
@@ -141,6 +142,11 @@ CHARTS = {
         'lines': [
             ['db_stat_xact_commit', 'Committed', 'absolute'],
             ['db_stat_xact_rollback', 'Rolled Back', 'absolute']
+        ]},
+    'db_stat_connections': {
+        'options': [None, ' Connections', 'Count', ' database statistics', '.db_stat_connections', 'line'],
+        'lines': [
+            ['db_stat_connections', 'Connections', 'absolute']
         ]},
     'db_stat_tuple_read': {
         'options': [None, ' Tuple read', 'Count', ' database statistics', '.db_stat_tuple_read', 'line'],
@@ -361,6 +367,8 @@ class Service(SimpleService):
             self.add_derive_value('db_stat_tup_updated', prefix=database_name, value=int(row.get('tup_updated', 0)))
             self.add_derive_value('db_stat_tup_deleted', prefix=database_name, value=int(row.get('tup_deleted', 0)))
             self.add_derive_value('db_stat_conflicts', prefix=database_name, value=int(row.get('conflicts', 0)))
+            conn_key = "{}_{}".format(database_name, 'db_stat_connections')
+            self.data[conn_key] = int(row.get('connections', 0))
 
     def add_backend_stats(self, cursor):
         cursor.execute(BACKENDS)
