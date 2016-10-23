@@ -119,15 +119,6 @@ FROM (
 ) AS s;
 """
 
-# LOCK_MAP = {'AccessExclusiveLock': 'lock_access_exclusive',
-#             'AccessShareLock': 'lock_access_share',
-#             'ExclusiveLock': 'lock_exclusive',
-#             'RowExclusiveLock': 'lock_row_exclusive',
-#             'RowShareLock': 'lock_row_share',
-#             'ShareUpdateExclusiveLock': 'lock_update_exclusive_lock',
-#             'ShareLock': 'lock_share',
-#             'ShareRowExclusiveLock': 'lock_share_row_exclusive',
-#             'SIReadLock': 'lock_si_read'}
 LOCK_TYPES = [
     'ExclusiveLock',
     'RowShareLock',
@@ -263,6 +254,7 @@ class Service(SimpleService):
         try:
             self.connect()
             self.discover_databases()
+            self.connection.close()
             self._create_definitions()
             return True
         except Exception as e:
