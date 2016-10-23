@@ -42,8 +42,7 @@ pthread_t poll_thread;
 // ---------------------------------------------------------------------------
 // poll locks
 
-// Lock poll data structure (poll_fd_array, poll_data_array, poll_num and 
-// poll_first_deprecated.
+// Lock poll data structure (poll_fd_array, poll_data_array and poll_num)
 pthread_mutex_t poll_array_mtx = PTHREAD_MUTEX_INITIALIZER;
 
 static inline int poll_array_lock() {
@@ -122,6 +121,8 @@ int poll_array_find_first_deprecated_nolock() {
 }
 
 void poll_array_remove_nolock(int index) {
+	if(index >= poll_num) return;
+
 	if(poll_fd_array[index].fd >= 0)
 		if(close(poll_fd_array[index].fd) != 0)
 			error("Failed to proper close file descriptor %d", poll_fd_array[index].fd);
