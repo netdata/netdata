@@ -103,10 +103,13 @@ unsigned long long poll_time_difference_nolock(struct timeval *bigger, struct ti
 int poll_array_search_nolock(char *path, int type) {
 	uint32_t hash = simple_hash(path);
 	int i;
-	for(i = 0; i < poll_num; i++)
-		if(poll_fd_array[i].fd < 0 && poll_data_array[i].path_hash == hash && poll_fd_array[i].events == type && \
-				strncmp(poll_data_array[i].path, path, strlen(poll_data_array[i].path)) == 0)
+	for(i = 0; i < poll_num; i++) {
+		if(poll_fd_array[i].fd < 0 && 
+				poll_data_array[i].path_hash == hash &&
+				poll_fd_array[i].events == type &&
+				strcmp(poll_data_array[i].path, path) == 0)
 			return i;
+	}
 	return -1;
 }
 
