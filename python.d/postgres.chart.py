@@ -2,13 +2,13 @@
 # Description: example netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
-import psycopg2
-from base import SimpleService
-from psycopg2.extras import DictCursor
-from psycopg2 import extensions
-from psycopg2 import extras
+from copy import deepcopy
 
-NAME = "test"
+import psycopg2
+from psycopg2 import extensions
+from psycopg2.extras import DictCursor
+
+from base import SimpleService
 
 # default module values
 update_every = 1
@@ -59,17 +59,20 @@ SELECT count(1) as indexes FROM pg_class WHERE relkind = 'i';
 
 DATABASE = """
 SELECT
-    sum(xact_commit) AS xact_commit,
-    sum(xact_rollback) AS xact_rollback,
-    sum(blks_read) AS blks_read,
-    sum(blks_hit) AS blks_hit,
-    sum(tup_returned) AS tup_returned,
-    sum(tup_fetched) AS tup_fetched,
-    sum(tup_inserted) AS tup_inserted,
-    sum(tup_updated) AS tup_updated,
-    sum(tup_deleted) AS tup_deleted,
-    sum(conflicts) AS conflicts
-FROM pg_stat_database;
+  datname AS database_name,
+  sum(xact_commit) AS xact_commit,
+  sum(xact_rollback) AS xact_rollback,
+  sum(blks_read) AS blks_read,
+  sum(blks_hit) AS blks_hit,
+  sum(tup_returned) AS tup_returned,
+  sum(tup_fetched) AS tup_fetched,
+  sum(tup_inserted) AS tup_inserted,
+  sum(tup_updated) AS tup_updated,
+  sum(tup_deleted) AS tup_deleted,
+  sum(conflicts) AS conflicts
+FROM pg_stat_database
+WHERE NOT datname ~* '^template\d+'
+GROUP BY database_name;
 """
 
 STATIO = """
@@ -117,29 +120,31 @@ LOCK_MAP = {'AccessExclusiveLock': 'lock_access_exclusive',
             'ShareRowExclusiveLock': 'lock_share_row_exclusive',
             'SIReadLock': 'lock_si_read'}
 
-ORDER = ['db_stat_transactions', 'db_stat_tuple_read', 'db_stat_tuple_returned', 'db_stat_tuple_write', 'backend_process', 'index_count', 'index_size', 'table_count', 'table_size', 'locks', 'wal', 'operations_heap', 'operations_index', 'operations_toast', 'operations_toast_index', 'background_writer']
+ORDER = ['db_stat_transactions', 'db_stat_tuple_read', 'db_stat_tuple_returned', 'db_stat_tuple_write',
+         'backend_process', 'index_count', 'index_size', 'table_count', 'table_size', 'locks', 'wal', 'operations_heap',
+         'operations_index', 'operations_toast', 'operations_toast_index', 'background_writer']
 
 CHARTS = {
     'db_stat_transactions': {
-        'options': [None, 'Transactions', 'Count', 'Database Stat', 'postgres.db_stat_transactions', 'line'],
+        'options': [None, ' Transactions', 'Count', ' database statistics', '.db_stat_transactions', 'line'],
         'lines': [
             ['db_stat_xact_commit', 'Committed', 'absolute'],
             ['db_stat_xact_rollback', 'Rolled Back', 'absolute']
         ]},
     'db_stat_tuple_read': {
-        'options': [None, 'Tuple read', 'Count', 'Database Stat', 'postgres.db_stat_tuple_read', 'line'],
+        'options': [None, ' Tuple read', 'Count', ' database statistics', '.db_stat_tuple_read', 'line'],
         'lines': [
             ['db_stat_blks_read', 'Disk', 'absolute'],
             ['db_stat_blks_hit', 'Cache', 'absolute']
         ]},
     'db_stat_tuple_returned': {
-        'options': [None, 'Tuple returned', 'Count', 'Database Stat', 'postgres.db_stat_tuple_returned', 'line'],
+        'options': [None, ' Tuple returned', 'Count', ' database statistics', '.db_stat_tuple_returned', 'line'],
         'lines': [
             ['db_stat_tup_returned', 'Sequential', 'absolute'],
             ['db_stat_tup_fetched', 'Bitmap', 'absolute']
         ]},
     'db_stat_tuple_write': {
-        'options': [None, 'Tuple write', 'Count', 'Database Stat', 'postgres.db_stat_tuple_write', 'line'],
+        'options': [None, ' Tuple write', 'Count', ' database statistics', '.db_stat_tuple_write', 'line'],
         'lines': [
             ['db_stat_tup_inserted', 'Inserted', 'absolute'],
             ['db_stat_tup_updated', 'Updated', 'absolute'],
@@ -160,7 +165,7 @@ CHARTS = {
     'index_size': {
         'options': [None, 'Index size', 'MB', 'Index', 'postgres.index_size', 'line'],
         'lines': [
-            ['index_size', 'Size', 'absolute', 1, 1024*1024]
+            ['index_size', 'Size', 'absolute', 1, 1024 * 1024]
         ]},
     'table_count': {
         'options': [None, 'Total table', 'Count', 'Table', 'postgres.table_count', 'line'],
@@ -170,7 +175,7 @@ CHARTS = {
     'table_size': {
         'options': [None, 'Table size', 'MB', 'Table', 'postgres.table_size', 'line'],
         'lines': [
-            ['table_size', 'Size', 'absolute', 1, 1024*1024]
+            ['table_size', 'Size', 'absolute', 1, 1024 * 1024]
         ]},
     'locks': {
         'options': [None, 'Table size', 'Count', 'Locks', 'postgres.locks', 'line'],
@@ -224,6 +229,7 @@ CHARTS = {
         ]}
 }
 
+
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         super(self.__class__, self).__init__(configuration=configuration, name=name)
@@ -243,14 +249,53 @@ class Service(SimpleService):
         params.update(self.configuration)
         self.connection = psycopg2.connect(**params)
         self.connection.set_isolation_level(extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+        self.connection.set_session(readonly=True)
 
     def check(self):
         try:
             self.connect()
+            self._create_definitions()
             return True
         except Exception as e:
             self.error(e)
             return False
+
+    def _create_definitions(self):
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            SELECT datname
+            FROM pg_stat_database
+            WHERE NOT datname ~* '^template\d+'
+        """)
+
+        for row in cursor:
+            database_name = row[0]
+            for chart_template_name in list(CHARTS):
+                if not chart_template_name.startswith('db_stat'):
+                    continue
+
+                chart_template = CHARTS[chart_template_name]
+                chart_name = "{}_{}".format(database_name, chart_template_name)
+                if chart_name not in self.order:
+                    self.order.insert(0, chart_name)
+                    name, title, units, family, context, chart_type = chart_template['options']
+                    self.definitions[chart_name] = {
+                        'options': [
+                            name,
+                            database_name + title,
+                            units,
+                            database_name + family,
+                            database_name + context,
+                            chart_type
+                        ]
+                    }
+
+                    self.definitions[chart_name]['lines'] = []
+                    for line in deepcopy(chart_template['lines']):
+                        line[0] = "{}_{}".format(database_name, line[0])
+                        self.definitions[chart_name]['lines'].append(line)
+
+        cursor.close()
 
     def _get_data(self):
         self.connect()
@@ -261,7 +306,7 @@ class Service(SimpleService):
         cursor.close()
         self.connection.close()
 
-        return self.data;
+        return self.data
 
     def add_stats(self, cursor):
         self.add_database_stats(cursor)
@@ -272,26 +317,26 @@ class Service(SimpleService):
         self.add_statio_stats(cursor)
         self.add_bgwriter_stats(cursor)
 
-        #self.add_replication_stats(cursor)
+        # self.add_replication_stats(cursor)
 
         # add_wal_metrics needs superuser to get directory listings
-        #if self.config.get('superuser', True):
-        #self.add_wal_stats(cursor)
+        # if self.config.get('superuser', True):
+        # self.add_wal_stats(cursor)
 
     def add_database_stats(self, cursor):
         cursor.execute(DATABASE)
-        temp = cursor.fetchone()
-
-        self.add_derive_value('db_stat_xact_commit', int(temp.get('xact_commit', 0)))
-        self.add_derive_value('db_stat_xact_rollback', int(temp.get('xact_rollback', 0)))
-        self.add_derive_value('db_stat_blks_read', int(temp.get('blks_read', 0)))
-        self.add_derive_value('db_stat_blks_hit', int(temp.get('blks_hit', 0)))
-        self.add_derive_value('db_stat_tup_returned', int(temp.get('tup_returned', 0)))
-        self.add_derive_value('db_stat_tup_fetched', int(temp.get('tup_fetched', 0)))
-        self.add_derive_value('db_stat_tup_inserted', int(temp.get('tup_inserted', 0)))
-        self.add_derive_value('db_stat_tup_updated', int(temp.get('tup_updated', 0)))
-        self.add_derive_value('db_stat_tup_deleted', int(temp.get('tup_deleted', 0)))
-        self.add_derive_value('db_stat_conflicts', int(temp.get('conflicts', 0)))
+        for row in cursor:
+            database_name = row.get('database_name')
+            self.add_derive_value('db_stat_xact_commit', prefix=database_name, value=int(row.get('xact_commit', 0)))
+            self.add_derive_value('db_stat_xact_rollback', prefix=database_name, value=int(row.get('xact_rollback', 0)))
+            self.add_derive_value('db_stat_blks_read', prefix=database_name, value=int(row.get('blks_read', 0)))
+            self.add_derive_value('db_stat_blks_hit', prefix=database_name, value=int(row.get('blks_hit', 0)))
+            self.add_derive_value('db_stat_tup_returned', prefix=database_name, value=int(row.get('tup_returned', 0)))
+            self.add_derive_value('db_stat_tup_fetched', prefix=database_name, value=int(row.get('tup_fetched', 0)))
+            self.add_derive_value('db_stat_tup_inserted', prefix=database_name, value=int(row.get('tup_inserted', 0)))
+            self.add_derive_value('db_stat_tup_updated', prefix=database_name, value=int(row.get('tup_updated', 0)))
+            self.add_derive_value('db_stat_tup_deleted', prefix=database_name, value=int(row.get('tup_deleted', 0)))
+            self.add_derive_value('db_stat_conflicts', prefix=database_name, value=int(row.get('conflicts', 0)))
 
     def add_backend_stats(self, cursor):
         cursor.execute(BACKENDS)
@@ -329,7 +374,7 @@ class Service(SimpleService):
                     self.data[LOCK_MAP[key]] = int(row['count'])
 
             if not found:
-                    self.data[LOCK_MAP[key]] = 0
+                self.data[LOCK_MAP[key]] = 0
 
     def add_wal_stats(self, cursor):
         cursor.execute(ARCHIVE)
@@ -357,7 +402,9 @@ class Service(SimpleService):
         self.add_derive_value('background_writer_scheduled', temp.get('checkpoints_timed', 0))
         self.add_derive_value('background_writer_requested', temp.get('checkpoints_requests', 0))
 
-    def add_derive_value(self, key, value):
+    def add_derive_value(self, key, value, prefix=None):
+        if prefix:
+            key = "{}_{}".format(prefix, key)
         if key not in self.old_data.keys():
             self.data[key] = 0
         else:
