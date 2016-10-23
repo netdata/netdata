@@ -11,7 +11,6 @@
 #include "poll.h"
 #include "log.h"
 
-
 // ---------------------------------------------------------------------------
 // internal data structures
 
@@ -30,7 +29,6 @@ struct poll_data {
 } *poll_data_array;
 
 int poll_num = 0; // Size of poll_fd_array|poll_data_array
-int poll_first_deprecated = -1; // First index in poll_fd_array|poll_data_array that can be overwritten.
 
 // Every registrator holds a void pointer to one of these.
 struct poll_check {
@@ -83,31 +81,6 @@ int poll_time_update_nolock(struct timeval *tv) {
 	return retv;
 }
 
-// Updates p->tv to current time.
-// This is not thread save.
-// concurrent reads are save. Concurrent writes need to be syncronized.
-int poll_data_time_update_readsave_nolock(struct poll_data *d) {
-	static struct timeval *buff;
-	if(!buff) {
-		buff = malloc(sizeof(struct timeval));
-		if(!buff) {
-			error("Could not allocate buffer for poll_data_time_update_readsave_nolock()");
-			return -1;
-		}
-	}
-
-	buff->tv_sec = d->tv->tv_sec;
-	buff->tv_usec = d->tv->tv_sec;
-	int retv = poll_time_update_nolock(buff);
-
-	// Switch pointers.
-	struct timeval *tv = d->tv;
-	d->tv = buff;
-	buff = tv;
-
-	return retv;
-}
-
 // if bigger is less than lower we return 0.
 unsigned long long poll_time_difference_nolock(struct timeval *bigger, struct timeval *lower) {
 	struct timeval diff;
@@ -129,8 +102,9 @@ int poll_array_search_nolock(char *path, int type) {
 	return -1;
 }
 
-int poll_array_find_next_deprecated_nolock(int index) {
-	for(index++; index<poll_num; index++)
+int poll_array_find_first_deprecated_nolock() {
+	int index = 0;
+	for(index; index<poll_num; index++)
 		if(poll_fd_array[index].fd < 0)
 			return index;
 	return -1;
@@ -141,17 +115,13 @@ void poll_array_remove_nolock(int index) {
 		if(close(poll_fd_array[index].fd) != 0)
 			error("Failed to proper close file descriptor %d", poll_fd_array[index].fd);
 	poll_fd_array[index].fd = -1;	
-	if(poll_first_deprecated < index)
-		poll_first_deprecated = index;
 }
 
 int poll_array_add_nolock(char *path, int type) {
 	int index;
 
-	if(poll_first_deprecated >= 0) {
-		index = poll_first_deprecated;
-		poll_first_deprecated = poll_array_find_next_deprecated_nolock(index);
-	} else {
+	index = poll_array_find_first_deprecated_nolock();
+	if(index >= 0) {
 		poll_num++;
 		poll_fd_array = realloc(poll_fd_array, sizeof(struct pollfd) * poll_num);
 		if(!poll_fd_array) {
@@ -298,7 +268,7 @@ void *poll_main(void *ptr) {
 		poll_array_lock();
 		for(i = 0; i < poll_num; i++) {
 			if(poll_fd_array[i].events & poll_fd_array[i].revents) {
-				poll_data_time_update_readsave_nolock(&poll_data_array[i]);
+				poll_time_update_nolock(poll_data_array[i].tv);
 			}
 		}
 		poll_array_unlock();
@@ -340,7 +310,9 @@ unsigned long long poll_occured(void *poll_descriptor) {
 	struct poll_check *p_check = poll_descriptor;
 	unsigned long long retv;
 
+	poll_array_lock();
 	retv = poll_time_difference_nolock(poll_data_array[p_check->poll_array_index].tv, &p_check->tv);
+	poll_array_unlock();
 
 	if(poll_time_update_nolock(&p_check->tv) != 0) return 0;
 
