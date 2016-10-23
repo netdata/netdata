@@ -717,10 +717,6 @@ case "${status}" in
         image="${images_base_url}/images/check-mark-2-128-green.png"
     	status_message="recovered"
 		color="#77ca6d"
-
-		# don't show the value when the status is CLEAR
-		# for certain alarms, this value might not have any meaning
-		alarm="${name//_/ } ${raised_for}"
 		;;
 esac
 
@@ -731,6 +727,10 @@ then
     then
         raised_for="(alarm was raised for ${non_clear_duration_txt})"
     fi
+
+    # don't show the value when the status is CLEAR
+    # for certain alarms, this value might not have any meaning
+    alarm="${name//_/ } ${raised_for}"
 
 elif [ "${old_status}" = "WARNING" -a "${status}" = "CRITICAL" ]
 then
