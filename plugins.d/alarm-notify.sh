@@ -42,7 +42,11 @@ then
         echo >&2
         echo >&2 ">> SENDING TEST ${x} ALARM TO ROLE: ${recipient} <<"
 
-        "${0}" "${recipient}" "$(hostname)" "1" "1" "${id}" "$(date +%s)" "test_alarm" "test.chart" "test.family" "${x}" "${last}" '100' '90' "${0}" "1" "$((1 + id))" "units" "this is a test alarm to verify notifications work"
+        # printf >&2 "Execute: "
+        # printf >&2 "%q " "${0}" "${recipient}" "$(hostname)" "1" "1" "${id}" "$(date +%s)" "test_alarm" "test.chart" "test.family" "${x}" "${last}" '100' '90' "${0}" "1" "$((id))" "units" "this is a test alarm to verify notifications work"
+        # printf >&2 "\n"
+
+        "${0}" "${recipient}" "$(hostname)" "1" "1" "${id}" "$(date +%s)" "test_alarm" "test.chart" "test.family" "${x}" "${last}" '100' '90' "${0}" "$((id))" "1" "units" "this is a test alarm to verify notifications work"
         if [ $? -ne 0 ]
         then
             echo >&2 ">> FAILED <<"
