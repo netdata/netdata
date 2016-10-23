@@ -15,11 +15,35 @@
 #
 # Supported notification methods:
 #  - emails
-#  - pushover.net notifications
-#  - pushbullet.com push notifications
 #  - slack.com notifications
-#  - telegram.org notifications
+#  - pushover.net notifications
+#  - pushbullet.com push notifications by Tiago Peralta @tperalta82 PR #1070
+#  - telegram.org notifications by @hashworks PR #1002
 #
+
+# -----------------------------------------------------------------------------
+# testing notifications
+
+if [ \( "${1}" = "test" -o "${2}" = "test" \) -a "${#}" -le 2 ]
+then
+    if [ "${2}" = "test" ]
+    then
+        recipient="${1}"
+    else
+        recipient="${2}"
+    fi
+
+    [ -z "${recipient}" ] && recipient="sysadmin"
+
+    echo >&2 ">> SENDING TEST ALARM TO ROLE: ${recipient} <<"
+
+    "${0}" "${recipient}" 'test' '1' '1' '1' '1' 'test_alarm' 'test_alarm' 'test' 'CRITICAL' 'CLEAR' '1' '1' "${0}" '1' '1' 'number' 'test alarm to verify notifications work'
+    ret=$?
+
+    [ ${ret} -ne 0 ] && echo >&2 ">> FAILED <<" && exit ${ret}
+    echo >&2 ">> OK <<"
+    exit $?
+fi
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
 export LC_ALL=C
@@ -499,7 +523,7 @@ send_pushover() {
 # pushbullet sender
 
 send_pushbullet() {
-    local userapikey="${1}" recipients="${2}" message="${3}" title="${4}" httpcode sent=0 user
+    local userapikey="${1}" recipients="${2}"  title="${3}" message="${4}" httpcode sent=0 user
     if [ "${SEND_PUSHBULLET}" = "YES" -a ! -z "${userapikey}" -a ! -z "${recipients}" -a ! -z "${message}" -a ! -z "${title}" ]
         then
         #https://docs.pushbullet.com/#create-push
@@ -518,10 +542,10 @@ EOF
 
             if [ "${httpcode}" == "200" ]
             then
-                echo >&2 "${me}: Sent pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
+                info "sent pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
                 sent=$((sent + 1))
             else
-                echo >&2 "${me}: Failed to send pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
+                error "failed to send pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
             fi
         done
 
@@ -750,14 +774,12 @@ SENT_PUSHOVER=$?
 # -----------------------------------------------------------------------------
 # send the pushbullet notification
 
-pushbullet_message="${alarm} \n
-Severity: ${severity} \n
-Chart: ${chart} \n
-Family: ${family} \n
-To View Netdata go to: ${goto_url} \n
+send_pushbullet "${PUSHBULLET_ACCESS_TOKEN}" "${to_pushbullet}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}\n
+Severity: ${severity}\n
+Chart: ${chart}\n
+Family: ${family}\n
+To View Netdata go to: ${goto_url}\n
 The source of this alarm is line ${src}"
-pushbullet_title="${status} at ${host} ${status_message} - ${name//_/ } - ${chart}}"
-send_pushbullet "${PUSHBULLET_ACCESS_TOKEN}" "${to_pushbullet}" "$pushbullet_message" "$pushbullet_title"
 
 SENT_PUSHBULLET=$?
 
