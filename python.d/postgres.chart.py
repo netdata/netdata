@@ -76,21 +76,6 @@ WHERE NOT datname ~* '^template\d+'
 GROUP BY database_name;
 """
 
-STATIO = """
-SELECT
-    sum(heap_blks_read) AS heap_blocks_read,
-    sum(heap_blks_hit) AS heap_blocks_hit,
-    sum(idx_blks_read) AS index_blocks_read,
-    sum(idx_blks_hit) AS index_blocks_hit,
-    sum(toast_blks_read) AS toast_blocks_read,
-    sum(toast_blks_hit) AS toast_blocks_hit,
-    sum(tidx_blks_read) AS toastindex_blocks_read,
-    sum(tidx_blks_hit) AS toastindex_blocks_hit
-FROM
-    pg_statio_all_tables
-WHERE
-    schemaname <> 'pg_catalog';
-"""
 BGWRITER = 'SELECT * FROM pg_stat_bgwriter;'
 DATABASE_LOCKS = """
 SELECT
@@ -133,8 +118,7 @@ LOCK_TYPES = [
 ]
 
 ORDER = ['db_stat_transactions', 'db_stat_tuple_read', 'db_stat_tuple_returned', 'db_stat_tuple_write',
-         'backend_process', 'index_count', 'index_size', 'table_count', 'table_size', 'wal', 'operations_heap',
-         'operations_index', 'operations_toast', 'operations_toast_index', 'background_writer']
+         'backend_process', 'index_count', 'index_size', 'table_count', 'table_size', 'wal', 'background_writer']
 
 CHARTS = {
     'db_stat_transactions': {
@@ -200,30 +184,6 @@ CHARTS = {
             ['wal_total', 'Total', 'absolute'],
             ['wal_ready', 'Ready', 'absolute'],
             ['wal_done', 'Done', 'absolute']
-        ]},
-    'operations_heap': {
-        'options': [None, 'Heap', 'iops', 'IO Operations', 'postgres.operations_heap', 'line'],
-        'lines': [
-            ['operations_heap_blocks_read', 'Read', 'absolute'],
-            ['operations_heap_blocks_hit', 'Hit', 'absolute']
-        ]},
-    'operations_index': {
-        'options': [None, 'Index', 'iops', 'IO Operations', 'postgres.operations_index', 'line'],
-        'lines': [
-            ['operations_index_blocks_read', 'Read', 'absolute'],
-            ['operations_index_blocks_hit', 'Hit', 'absolute']
-        ]},
-    'operations_toast': {
-        'options': [None, 'Toast', 'iops', 'IO Operations', 'postgres.operations_toast', 'line'],
-        'lines': [
-            ['operations_toast_blocks_read', 'Read', 'absolute'],
-            ['operations_toast_blocks_hit', 'Hit', 'absolute']
-        ]},
-    'operations_toast_index': {
-        'options': [None, 'Toast index', 'iops', 'IO Operations', 'postgres.operations_toast_index', 'line'],
-        'lines': [
-            ['operations_toastindex_blocks_read', 'Read', 'absolute'],
-            ['operations_toastindex_blocks_hit', 'Hit', 'absolute']
         ]},
     'background_writer': {
         'options': [None, 'Checkpoints', 'Count', 'Background Writer', 'postgres.background_writer', 'line'],
@@ -344,7 +304,6 @@ class Service(SimpleService):
         self.add_index_stats(cursor)
         self.add_table_stats(cursor)
         self.add_lock_stats(cursor)
-        self.add_statio_stats(cursor)
         self.add_bgwriter_stats(cursor)
 
         # self.add_replication_stats(cursor)
@@ -409,18 +368,6 @@ class Service(SimpleService):
         self.add_derive_value('wal_total', int(temp.get('file_count', 0)))
         self.add_derive_value('wal_ready', int(temp.get('ready_count', 0)))
         self.add_derive_value('wal_done', int(temp.get('done_count', 0)))
-
-    def add_statio_stats(self, cursor):
-        cursor.execute(STATIO)
-        temp = cursor.fetchone()
-        self.add_derive_value('operations_heap_blocks_read', int(temp.get('heap_blocks_read', 0)))
-        self.add_derive_value('operations_heap_blocks_hit', int(temp.get('heap_blocks_hit', 0)))
-        self.add_derive_value('operations_index_blocks_read', int(temp.get('index_blocks_read', 0)))
-        self.add_derive_value('operations_index_blocks_hit', int(temp.get('index_blocks_hit', 0)))
-        self.add_derive_value('operations_toast_blocks_read', int(temp.get('toast_blocks_read', 0)))
-        self.add_derive_value('operations_toast_blocks_hit', int(temp.get('toast_blocks_hit', 0)))
-        self.add_derive_value('operations_toastindex_blocks_read', int(temp.get('toastindex_blocks_read', 0)))
-        self.add_derive_value('operations_toastindex_blocks_hit', int(temp.get('toastindex_blocks_hit', 0)))
 
     def add_bgwriter_stats(self, cursor):
         cursor.execute(BGWRITER)
