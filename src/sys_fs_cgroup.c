@@ -1279,7 +1279,7 @@ void update_cgroup_charts(int update_every) {
             if(!st) {
                 snprintfz(title, CHART_TITLE_MAX, "I/O Bandwidth (all disks) for cgroup %s", cg->chart_title);
                 st = rrdset_create(type, "io", NULL, "disk", "cgroup.io", title, "KB/s", 41200,
-                                   update_every, RRDSET_TYPE_LINE);
+                                   update_every, RRDSET_TYPE_AREA);
 
                 rrddim_add(st, "read", NULL, 1, 1024, RRDDIM_INCREMENTAL);
                 rrddim_add(st, "write", NULL, -1, 1024, RRDDIM_INCREMENTAL);
@@ -1309,11 +1309,11 @@ void update_cgroup_charts(int update_every) {
         }
 
         if(cg->throttle_io_service_bytes.updated && cg->throttle_io_service_bytes.Read + cg->throttle_io_service_bytes.Write > 0) {
-            st = rrdset_find_bytype(type, "io");
+            st = rrdset_find_bytype(type, "throttle_io");
             if(!st) {
                 snprintfz(title, CHART_TITLE_MAX, "Throttle I/O Bandwidth (all disks) for cgroup %s", cg->chart_title);
-                st = rrdset_create(type, "io", NULL, "disk", "cgroup.io", title, "KB/s", 41200,
-                                   update_every, RRDSET_TYPE_LINE);
+                st = rrdset_create(type, "throttle_io", NULL, "disk", "cgroup.throttle_io", title, "KB/s", 41200,
+                                   update_every, RRDSET_TYPE_AREA);
 
                 rrddim_add(st, "read", NULL, 1, 1024, RRDDIM_INCREMENTAL);
                 rrddim_add(st, "write", NULL, -1, 1024, RRDDIM_INCREMENTAL);

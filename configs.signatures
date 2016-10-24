@@ -171,6 +171,7 @@ declare -A configs_signatures=(
   ['c9b792755de59d842ba95f8c315d94c8']='health.d/swap.conf'
   ['ca08a9b18d38ae0a0f5081a7cdc96863']='health.d/swap.conf'
   ['da29d2ab1ab7b8fda189960c840e5144']='health.d/swap.conf'
+  ['4063a01bffb43b0423425d1ba3004967']='health.d/tcp_resets.conf'
   ['b3fc4749b132e55ac0d3a0f92859237e']='health.d/tcp_resets.conf'
   ['707a63f53f4b32e01d134ae90ba94aad']='health_email_recipients.conf'
   ['a752e51d923e15add4a11fa8f3be935a']='health_email_recipients.conf'
