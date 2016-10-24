@@ -1279,7 +1279,7 @@ void update_cgroup_charts(int update_every) {
             if(!st) {
                 snprintfz(title, CHART_TITLE_MAX, "I/O Bandwidth (all disks) for cgroup %s", cg->chart_title);
                 st = rrdset_create(type, "io", NULL, "disk", "cgroup.io", title, "KB/s", 41200,
-                                   update_every, RRDSET_TYPE_LINE);
+                                   update_every, RRDSET_TYPE_AREA);
 
                 rrddim_add(st, "read", NULL, 1, 1024, RRDDIM_INCREMENTAL);
                 rrddim_add(st, "write", NULL, -1, 1024, RRDDIM_INCREMENTAL);
@@ -1313,7 +1313,7 @@ void update_cgroup_charts(int update_every) {
             if(!st) {
                 snprintfz(title, CHART_TITLE_MAX, "Throttle I/O Bandwidth (all disks) for cgroup %s", cg->chart_title);
                 st = rrdset_create(type, "io", NULL, "disk", "cgroup.io", title, "KB/s", 41200,
-                                   update_every, RRDSET_TYPE_LINE);
+                                   update_every, RRDSET_TYPE_AREA);
 
                 rrddim_add(st, "read", NULL, 1, 1024, RRDDIM_INCREMENTAL);
                 rrddim_add(st, "write", NULL, -1, 1024, RRDDIM_INCREMENTAL);
