@@ -4207,9 +4207,9 @@
                         state.log('interactionModel.dblclick()');
                     NETDATA.resetAllCharts(state);
                 },
-                mousewheel: function(event, dygraph, context) {
+                wheel: function(event, dygraph, context) {
                     if(NETDATA.options.debug.dygraph === true || state.debug === true)
-                        state.log('interactionModel.mousewheel()');
+                        state.log('interactionModel.wheel()');
 
                     // Take the offset of a mouse event on the dygraph canvas and
                     // convert it to a pair of percentages from the bottom left.
@@ -4277,7 +4277,15 @@
                         state.globalSelectionSyncDelay();
 
                         // http://dygraphs.com/gallery/interaction-api.js
-                        var normal = (event.detail) ? event.detail * -1 : event.wheelDelta / 40;
+                        var normal_def;
+                        if(typeof event.wheelDelta === 'number' && event.wheelDelta != NaN)
+                            // chrome
+                            normal_def = event.wheelDelta / 40;
+                        else
+                            // firefox
+                            normal_def = event.deltaY * -2;
+
+                        var normal = (event.detail) ? event.detail * -1 : normal_def;
                         var percentage = normal / 50;
 
                         if (!(event.offsetX && event.offsetY)){
@@ -4290,7 +4298,6 @@
                         var yPct = percentages[1];
 
                         var new_x_range = zoomRange(dygraph, percentage, xPct, yPct);
-
                         var after = new_x_range[0];
                         var before = new_x_range[1];
 
