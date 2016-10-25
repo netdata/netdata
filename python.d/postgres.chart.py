@@ -203,6 +203,7 @@ class Service(SimpleService):
         self.index_stats = configuration.pop('index_stats', True)
         self.configuration = configuration
         self.connection = None
+        self.is_superuser = False
         self.data = {}
         self.old_data = {}
         self.databases = set()
@@ -223,22 +224,31 @@ class Service(SimpleService):
     def check(self):
         try:
             self._connect()
-            self._discover_databases()
+            cursor = self.connection.cursor()
+            self._discover_databases(cursor)
+            self._check_if_superuser(cursor)
+            cursor.close()
+
             self._create_definitions()
             return True
         except Exception as e:
             self.error(e)
             return False
 
-    def _discover_databases(self):
-        cursor = self.connection.cursor()
+    def _discover_databases(self, cursor):
         cursor.execute("""
             SELECT datname
             FROM pg_stat_database
             WHERE NOT datname ~* '^template\d+'
         """)
         self.databases = set(r[0] for r in cursor)
-        cursor.close()
+
+    def _check_if_superuser(self, cursor):
+        cursor.execute("""
+            SELECT current_setting('is_superuser') = 'on' AS is_superuser;
+        """)
+        self.is_superuser = cursor.fetchone()[0]
+
 
     def _create_definitions(self):
         for database_name in self.databases:
@@ -313,9 +323,8 @@ class Service(SimpleService):
 
         # self.add_replication_stats(cursor)
 
-        # add_wal_metrics needs superuser to get directory listings
-        # if self.config.get('superuser', True):
-        # self.add_wal_stats(cursor)
+        if self.is_superuser:
+            self.add_wal_stats(cursor)
 
     def add_database_stats(self, cursor):
         cursor.execute(DATABASE)
