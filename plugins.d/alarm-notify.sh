@@ -364,7 +364,7 @@ fi
 # check that we have at least a method enabled
 if [ "${SEND_EMAIL}" != "YES" -a "${SEND_PUSHOVER}" != "YES" -a "${SEND_TELEGRAM}" != "YES" -a "${SEND_SLACK}" != "YES" -a "${SEND_PUSHBULLET}" != "YES" ]
     then
-    fatal "All notification methods are disabled. Not sending a notification."
+    fatal "All notification methods are disabled. Not sending notification to '${role}' for '${name}' = '${value}' of chart '${chart}' for status '${status}'."
 fi
 
 # -----------------------------------------------------------------------------
