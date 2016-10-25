@@ -16,15 +16,6 @@ update_every = 1
 priority = 90000
 retries = 60
 
-# Default Config options.
-# {
-#    'database': None,
-#    'user': 'postgres',
-#    'password': None,
-#    'host': 'localhost',
-#    'port': 5432
-# }
-
 ARCHIVE = """
 SELECT
     CAST(COUNT(*) AS INT) AS file_count,
@@ -249,10 +240,8 @@ class Service(SimpleService):
         """)
         self.is_superuser = cursor.fetchone()[0]
 
-
     def _create_definitions(self):
         for database_name in self.databases:
-            self.databases.add(database_name)
             for chart_template_name in list(CHARTS):
                 if chart_template_name.startswith('db_stat'):
                     self._add_database_stat_chart(chart_template_name, database_name)
