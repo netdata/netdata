@@ -394,7 +394,7 @@ void *pluginsd_worker_thread(void *arg)
                 // we have collected something
 
                 if(likely(cd->serial_failures <= 10)) {
-                    error("PLUGINSD: '%s' exited with error code %d, but has given useful output in the past (%zu times). Waiting a bit before starting it again.", cd->fullfilename, code, cd->successful_collections);
+                    error("PLUGINSD: '%s' exited with error code %d, but has given useful output in the past (%zu times). %s", cd->fullfilename, code, cd->successful_collections, cd->enabled?"Waiting a bit before starting it again.":"Will not start it again - it is disabled.");
                     sleep((unsigned int) (cd->update_every * 10));
                 }
                 else {
@@ -410,7 +410,7 @@ void *pluginsd_worker_thread(void *arg)
                 // we have collected nothing so far
 
                 if(likely(cd->serial_failures <= 10)) {
-                    error("PLUGINSD: '%s' (pid %d) does not generate useful output but it reports success (exits with 0). Waiting a bit before starting it again.", cd->fullfilename, cd->pid);
+                    error("PLUGINSD: '%s' (pid %d) does not generate useful output but it reports success (exits with 0). %s.", cd->fullfilename, cd->pid, cd->enabled?"Waiting a bit before starting it again.":"Will not start it again - it is disabled.");
                     sleep((unsigned int) (cd->update_every * 10));
                 }
                 else {
