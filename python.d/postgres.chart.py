@@ -199,19 +199,22 @@ class Service(SimpleService):
         super(self.__class__, self).__init__(configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
+        self.table_stats = configuration.pop('table_stats', True)
+        self.index_stats = configuration.pop('index_stats', True)
         self.configuration = configuration
         self.connection = None
         self.data = {}
         self.old_data = {}
         self.databases = set()
 
-    def connect(self):
+    def _connect(self):
         params = dict(user='postgres',
                       database=None,
                       password=None,
                       host='localhost',
                       port=5432)
         params.update(self.configuration)
+
         if not self.connection:
             self.connection = psycopg2.connect(**params)
             self.connection.set_isolation_level(extensions.ISOLATION_LEVEL_AUTOCOMMIT)
@@ -219,23 +222,15 @@ class Service(SimpleService):
 
     def check(self):
         try:
-            self.connect()
-            self.discover_databases()
+            self._connect()
+            self._discover_databases()
             self._create_definitions()
             return True
         except Exception as e:
             self.error(e)
             return False
 
-    def _create_definitions(self):
-        for database_name in self.databases:
-            self.databases.add(database_name)
-            for chart_template_name in list(CHARTS):
-                if chart_template_name.startswith('db_stat'):
-                    self._add_database_stat_chart(chart_template_name, database_name)
-            self._add_database_lock_chart(database_name)
-
-    def discover_databases(self):
+    def _discover_databases(self):
         cursor = self.connection.cursor()
         cursor.execute("""
             SELECT datname
@@ -244,6 +239,14 @@ class Service(SimpleService):
         """)
         self.databases = set(r[0] for r in cursor)
         cursor.close()
+
+    def _create_definitions(self):
+        for database_name in self.databases:
+            self.databases.add(database_name)
+            for chart_template_name in list(CHARTS):
+                if chart_template_name.startswith('db_stat'):
+                    self._add_database_stat_chart(chart_template_name, database_name)
+            self._add_database_lock_chart(database_name)
 
     def _add_database_stat_chart(self, chart_template_name, database_name):
         chart_template = CHARTS[chart_template_name]
@@ -290,7 +293,7 @@ class Service(SimpleService):
                 self.definitions[chart_name]['lines'].append([lock_id, label, 'absolute'])
 
     def _get_data(self):
-        self.connect()
+        self._connect()
 
         cursor = self.connection.cursor(cursor_factory=DictCursor)
         self.add_stats(cursor)
@@ -301,8 +304,10 @@ class Service(SimpleService):
     def add_stats(self, cursor):
         self.add_database_stats(cursor)
         self.add_backend_stats(cursor)
-        self.add_index_stats(cursor)
-        self.add_table_stats(cursor)
+        if self.index_stats:
+            self.add_index_stats(cursor)
+        if self.table_stats:
+            self.add_table_stats(cursor)
         self.add_lock_stats(cursor)
         self.add_bgwriter_stats(cursor)
 
