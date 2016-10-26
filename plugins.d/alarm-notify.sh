@@ -1,22 +1,112 @@
 #!/usr/bin/env bash
 
-# (C) Costa Tsaousis
-# pushover support by Jan Arnold
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+# Script to send alarm notifications for netdata
+#
+# Features:
+#  - multiple notification methods
+#  - multiple roles per alarm
+#  - multiple recipients per role
+#  - severity filtering per recipient
+#
+# Supported notification methods:
+#  - emails
+#  - slack.com notifications
+#  - pushover.net notifications
+#  - pushbullet.com push notifications by Tiago Peralta @tperalta82 PR #1070
+#  - telegram.org notifications by @hashworks PR #1002
+#
 
-me="${0}"
+# -----------------------------------------------------------------------------
+# testing notifications
 
-if [ $(( ${BASH_VERSINFO[0]} )) -lt 4 ]
+if [ \( "${1}" = "test" -o "${2}" = "test" \) -a "${#}" -le 2 ]
 then
-    echo >&2
-    echo >&2 "$me: ERROR"
-    echo >&2 "BASH version 4 or later is required."
-    echo >&2 "You are running version: ${BASH_VERSION}"
-    echo >&2 "Please upgrade."
-    echo >&2
+    if [ "${2}" = "test" ]
+    then
+        recipient="${1}"
+    else
+        recipient="${2}"
+    fi
+
+    [ -z "${recipient}" ] && recipient="sysadmin"
+
+    id=1
+    last="CLEAR"
+    for x in "CRITICAL" "WARNING" "CLEAR"
+    do
+        echo >&2
+        echo >&2 "# SENDING TEST ${x} ALARM TO ROLE: ${recipient}"
+
+        "${0}" "${recipient}" "$(hostname)" 1 1 "${id}" "$(date +%s)" "test_alarm" "test.chart" "test.family" "${x}" "${last}" 100 90 "${0}" 1 $((0 + id)) "units" "this is a test alarm to verify notifications work"
+        if [ $? -ne 0 ]
+        then
+            echo >&2 "# FAILED"
+        else
+            echo >&2 "# OK"
+        fi
+
+        last="${x}"
+        id=$((id + 1))
+    done
+
     exit 1
 fi
 
+export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
+export LC_ALL=C
+
+# -----------------------------------------------------------------------------
+
+PROGRAM_NAME="$(basename "${0}")"
+
+logdate() {
+    date "+%Y-%m-%d %H:%M:%S"
+}
+
+log() {
+    local status="${1}"
+    shift
+
+    echo >&2 "$(logdate): ${PROGRAM_NAME}: ${status}: ${*}"
+
+}
+
+warning() {
+    log WARNING "${@}"
+}
+
+error() {
+    log ERROR "${@}"
+}
+
+info() {
+    log INFO "${@}"
+}
+
+fatal() {
+    log FATAL "${@}"
+    exit 1
+}
+
+debug=0
+debug() {
+    [ ${debug} -eq 1 ] && log DEBUG "${@}"
+}
+
+# -----------------------------------------------------------------------------
+
+# check for BASH v4+ (required for associative arrays)
+[ $(( ${BASH_VERSINFO[0]} )) -lt 4 ] && \
+    fatal "BASH version 4 or later is required (this is ${BASH_VERSION})."
+
+# -----------------------------------------------------------------------------
 # defaults to allow running this script by hand
+
 NETDATA_CONFIG_DIR="${NETDATA_CONFIG_DIR-/etc/netdata}"
 NETDATA_CACHE_DIR="${NETDATA_CACHE_DIR-/var/cache/netdata}"
 [ -z "${NETDATA_REGISTRY_URL}" ] && NETDATA_REGISTRY_URL="https://registry.my-netdata.io"
@@ -26,22 +116,22 @@ NETDATA_CACHE_DIR="${NETDATA_CACHE_DIR-/var/cache/netdata}"
 # -----------------------------------------------------------------------------
 # parse command line parameters
 
-recipient="${1}"   # the recepient of the email
-host="${2}"        # the host this event refers to
+roles="${1}"       # the roles that should be notified for this event
+host="${2}"        # the host generated this event
 unique_id="${3}"   # the unique id of this event
 alarm_id="${4}"    # the unique id of the alarm that generated this event
-event_id="${5}"    # the incremental id of the event, for this alarm
-when="${6}"        # the timestamp this event occured
+event_id="${5}"    # the incremental id of the event, for this alarm id
+when="${6}"        # the timestamp this event occurred
 name="${7}"        # the name of the alarm, as given in netdata health.d entries
 chart="${8}"       # the name of the chart (type.id)
 family="${9}"      # the family of the chart
 status="${10}"     # the current status : REMOVED, UNITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
 old_status="${11}" # the previous status: REMOVED, UNITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
-value="${12}"      # the current value
-old_value="${13}"  # the previous value
+value="${12}"      # the current value of the alarm
+old_value="${13}"  # the previous value of the alarm
 src="${14}"        # the line number and file the alarm has been configured
-duration="${15}"   # the duration in seconds the previous state took
-non_clear_duration="${16}" # the total duration in seconds this is non-clear
+duration="${15}"   # the duration in seconds of the previous alarm state
+non_clear_duration="${16}" # the total duration in seconds this is/was non-clear
 units="${17}"      # the units of the value
 info="${18}"       # a short description of the alarm
 
@@ -51,23 +141,24 @@ info="${18}"       # a short description of the alarm
 # don't do anything if this is not WARNING, CRITICAL or CLEAR
 if [ "${status}" != "WARNING" -a "${status}" != "CRITICAL" -a "${status}" != "CLEAR" ]
 then
-    echo >&2 "${me}: not sending notification for ${status} on '${chart}.${name}'"
+    info "not sending notification for ${status} on '${chart}.${name}'"
     exit 1
 fi
 
 # don't do anything if this is CLEAR, but it was not WARNING or CRITICAL
 if [ "${old_status}" != "WARNING" -a "${old_status}" != "CRITICAL" -a "${status}" = "CLEAR" ]
 then
-    echo >&2 "${me}: not sending notification for ${status} on '${chart}.${name}' (last status was ${old_status})"
+    info "not sending notification for ${status} on '${chart}.${name}' (last status was ${old_status})"
     exit 1
 fi
 
 # -----------------------------------------------------------------------------
 # load configuration
 
-# this is defined here so that private registries
-# can setup their own
-# images_base_url="${NETDATA_REGISTRY_URL}"
+# By default fetch images from the global public registry.
+# This is required by default, since all notification methods need to download
+# images via the Internet, and private registries might not be reachable.
+# This can be overwritten at the configuration file.
 images_base_url="https://registry.my-netdata.io"
 
 # needed commands
@@ -80,6 +171,7 @@ SEND_SLACK="YES"
 SEND_PUSHOVER="YES"
 SEND_TELEGRAM="YES"
 SEND_EMAIL="YES"
+SEND_PUSHBULLET="YES"
 
 # slack configs
 SLACK_WEBHOOK_URL=
@@ -90,6 +182,11 @@ declare -A role_recipients_slack=()
 PUSHOVER_APP_TOKEN=
 DEFAULT_RECIPIENT_PUSHOVER=
 declare -A role_recipients_pushover=()
+
+# pushbullet configs
+PUSHBULLET_ACCESS_TOKEN=
+DEFAULT_RECIPIENT_PUSHBULLET=
+declare -A role_recipients_pushbullet=()
 
 # telegram configs
 TELEGRAM_BOT_TOKEN=
@@ -108,14 +205,14 @@ if [ -f "${NETDATA_CONFIG_DIR}/health_alarm_notify.conf" ]
 fi
 
 # -----------------------------------------------------------------------------
-# filter recipients based on the criticality of each
+# filter a recipient based on alarm event severity
 
 filter_recipient_by_criticality() {
     local method="${1}" x="${2}" r s
     shift
 
-    r="${x/|*/}"
-    s="${x/*|/}"
+    r="${x/|*/}" # the recipient
+    s="${x/*|/}" # the severity required for notifying this recipient
 
     # no severity filtering for this person
     [ "${r}" = "${s}" ] && return 0
@@ -148,22 +245,24 @@ filter_recipient_by_criticality() {
 }
 
 # -----------------------------------------------------------------------------
-# find the recipient's addresses per method
+# find the recipients' addresses per method
 
 declare -A arr_slack=()
 declare -A arr_pushover=()
+declare -A arr_pushbullet=()
 declare -A arr_telegram=()
 declare -A arr_email=()
 
-# netdata may call us with multiple recipients
-# so, here we find the unique ones
-for x in ${recipient//,/ }
+# netdata may call us with multiple roles, and roles may have multiple but
+# overlapping recipients - so, here we find the unique recipients.
+for x in ${roles//,/ }
 do
-    # the recipient 'silent' means, don't send a notification for this event
-    [ "${x}" = "silent" ] && continue
+    # the roles 'silent' and 'disabled' mean:
+    # don't send a notification for this role
+    [ "${x}" = "silent" -o "${x}" = "disabled" ] && continue
 
     # email
-    a="${role_recipients_email[${recipient}]}"
+    a="${role_recipients_email[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_EMAIL}"
     for r in ${a//,/ }
     do
@@ -171,15 +270,23 @@ do
     done
 
     # pushover
-    a="${role_recipients_pushover[${recipient}]}"
+    a="${role_recipients_pushover[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_PUSHOVER}"
     for r in ${a//,/ }
     do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality pushover "${r}" && arr_pushover[${r/|*/}]="1"
     done
 
+    # pushbullet
+    a="${role_recipients_pushbullet[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_PUSHBULLET}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality pushbullet "${r}" && arr_pushbullet[${r/|*/}]="1"
+    done
+
     # telegram
-    a="${role_recipients_telegram[${recipient}]}"
+    a="${role_recipients_telegram[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_TELEGRAM}"
     for r in ${a//,/ }
     do
@@ -187,7 +294,7 @@ do
     done
 
     # slack
-    a="${role_recipients_slack[${recipient}]}"
+    a="${role_recipients_slack[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_SLACK}"
     for r in ${a//,/ }
     do
@@ -202,6 +309,10 @@ to_slack="${!arr_slack[*]}"
 # build the list of pushover recipients (user tokens)
 to_pushover="${!arr_pushover[*]}"
 [ -z "${to_pushover}" ] && SEND_PUSHOVER="NO"
+
+# build the list of pushbulet recipients (user tokens)
+to_pushbullet="${!arr_pushbullet[*]}"
+[ -z "${to_pushbullet}" ] && SEND_PUSHBULLET="NO"
 
 # check array of telegram recipients (chat ids)
 to_telegram="${!arr_telegram[*]}"
@@ -226,15 +337,19 @@ done
 # check pushover
 [ -z "${PUSHOVER_APP_TOKEN}" ] && SEND_PUSHOVER="NO"
 
+# check pushbullet
+[ -z "${DEFAULT_RECIPIENT_PUSHBULLET}" ] && SEND_PUSHBULLET="NO"
+
 # check telegram
 [ -z "${TELEGRAM_BOT_TOKEN}" ] && SEND_TELEGRAM="NO"
 
-if [ \( "${SEND_PUSHOVER}" = "YES" -o "${SEND_SLACK}" = "YES" -o "${SEND_TELEGRAM}" = "YES" \) -a -z "${curl}" ]
+if [ \( "${SEND_PUSHOVER}" = "YES" -o "${SEND_SLACK}" = "YES" -o "${SEND_TELEGRAM}" = "YES" -o "${SEND_PUSHBULLET}" = "YES" \) -a -z "${curl}" ]
     then
     curl="$(which curl 2>/dev/null || command -v curl 2>/dev/null)"
     if [ -z "${curl}" ]
         then
         SEND_PUSHOVER="NO"
+        SEND_PUSHBULLET="NO"
         SEND_TELEGRAM="NO"
         SEND_SLACK="NO"
     fi
@@ -247,10 +362,9 @@ if [ "${SEND_EMAIL}" = "YES" -a -z "${sendmail}" ]
 fi
 
 # check that we have at least a method enabled
-if [ "${SEND_EMAIL}" != "YES" -a "${SEND_PUSHOVER}" != "YES" -a "${SEND_TELEGRAM}" != "YES" -a "${SEND_SLACK}" != "YES" ]
+if [ "${SEND_EMAIL}" != "YES" -a "${SEND_PUSHOVER}" != "YES" -a "${SEND_TELEGRAM}" != "YES" -a "${SEND_SLACK}" != "YES" -a "${SEND_PUSHBULLET}" != "YES" ]
     then
-    echo >&2 "All notification methods are disabled. Not sending a notification."
-    exit 1
+    fatal "All notification methods are disabled. Not sending notification to '${role}' for '${name}' = '${value}' of chart '${chart}' for status '${status}'."
 fi
 
 # -----------------------------------------------------------------------------
@@ -275,14 +389,14 @@ urlencode() {
     strlen=${#string}
     for (( pos=0 ; pos<strlen ; pos++ ))
     do
-        c=${string:$pos:1}
-        case "$c" in
+        c=${string:${pos}:1}
+        case "${c}" in
             [-_.~a-zA-Z0-9])
                 o="${c}"
                 ;;
 
             *)
-                printf -v o '%%%02x' "'$c"
+                printf -v o '%%%02x' "'${c}"
                 ;;
         esac
         encoded+="${o}"
@@ -357,12 +471,12 @@ send_email() {
         "${sendmail}" -t
         ret=$?
 
-        if [ $ret -eq 0 ]
+        if [ ${ret} -eq 0 ]
         then
-            echo >&2 "${me}: Sent email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}'"
+            info "sent email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}'"
             return 0
         else
-            echo >&2 "${me}: Failed to send email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}' with error code ${ret}."
+            error "failed to send email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}' with error code ${ret}."
             return 1
         fi
     fi
@@ -404,10 +518,10 @@ send_pushover() {
 
             if [ "${httpcode}" == "200" ]
             then
-                echo >&2 "${me}: Sent pushover notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
+                info "sent pushover notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
                 sent=$((sent + 1))
             else
-                echo >&2 "${me}: Failed to send pushover notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
+                error "failed to send pushover notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
             fi
         done
 
@@ -417,6 +531,41 @@ send_pushover() {
     return 1
 }
 
+# -----------------------------------------------------------------------------
+# pushbullet sender
+
+send_pushbullet() {
+    local userapikey="${1}" recipients="${2}"  title="${3}" message="${4}" httpcode sent=0 user
+    if [ "${SEND_PUSHBULLET}" = "YES" -a ! -z "${userapikey}" -a ! -z "${recipients}" -a ! -z "${message}" -a ! -z "${title}" ]
+        then
+        #https://docs.pushbullet.com/#create-push
+        for user in ${recipients}
+        do
+            httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null \
+              --header 'Access-Token: '${userapikey}'' \
+              --header 'Content-Type: application/json' \
+              --data-binary  @<(cat <<EOF
+                              {"title": "${title}",
+                              "type": "note",
+                              "email": "${user}",
+                              "body": "$( echo -n ${message})"}
+EOF
+               ) "https://api.pushbullet.com/v2/pushes" -X POST)
+
+            if [ "${httpcode}" == "200" ]
+            then
+                info "sent pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
+                sent=$((sent + 1))
+            else
+                error "failed to send pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
+            fi
+        done
+
+        [ ${sent} -gt 0 ] && return 0
+    fi
+
+    return 1
+}
 
 # -----------------------------------------------------------------------------
 # telegram sender
@@ -434,18 +583,18 @@ send_telegram() {
             httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null ${disableNotification} \
                 --data-urlencode "parse_mode=HTML" \
                 --data-urlencode "disable_web_page_preview=true" \
-                --data-urlencode "text=$message" \
-                "https://api.telegram.org/bot${bottoken}/sendMessage?chat_id=$chatid")
+                --data-urlencode "text=${message}" \
+                "https://api.telegram.org/bot${bottoken}/sendMessage?chat_id=${chatid}")
 
             if [ "${httpcode}" == "200" ]
             then
-                echo >&2 "${me}: Sent telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}'"
+                info "sent telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}'"
                 sent=$((sent + 1))
             elif [ "${httpcode}" == "401" ]
             then
-                echo >&2 "${me}: Failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}': Wrong bot token."
+                error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}': Wrong bot token."
             else
-                echo >&2 "${me}: Failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}' with HTTP error code ${httpcode}."
+                error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}' with HTTP error code ${httpcode}."
             fi
         done
 
@@ -464,10 +613,10 @@ send_slack() {
     [ "${SEND_SLACK}" != "YES" ] && return 1
 
     case "${status}" in
-        WARNING) color="warning" ;;
+        WARNING)  color="warning" ;;
         CRITICAL) color="danger" ;;
-        CLEAR) color="good" ;;
-        *) color="#777777" ;;
+        CLEAR)    color="good" ;;
+        *)        color="#777777" ;;
     esac
 
     for channel in ${channels}
@@ -507,10 +656,10 @@ EOF
         httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null -X POST --data-urlencode "payload=${payload}" "${webhook}")
         if [ "${httpcode}" == "200" ]
         then
-            echo >&2 "${me}: Sent slack notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+            info "sent slack notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
             sent=$((sent + 1))
         else
-            echo >&2 "${me}: Failed to send slack notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+            error "failed to send slack notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
         fi
     done
 
@@ -568,25 +717,25 @@ case "${status}" in
         image="${images_base_url}/images/check-mark-2-128-green.png"
     	status_message="recovered"
 		color="#77ca6d"
-
-		# don't show the value when the status is CLEAR
-		# for certain alarms, this value might not have any meaning
-		alarm="${name//_/ } ${raised_for}"
 		;;
 esac
 
 if [ "${status}" = "CLEAR" ]
 then
     severity="Recovered from ${old_status}"
-    if [ $non_clear_duration -gt $duration ]
+    if [ ${non_clear_duration} -gt ${duration} ]
     then
         raised_for="(alarm was raised for ${non_clear_duration_txt})"
     fi
 
+    # don't show the value when the status is CLEAR
+    # for certain alarms, this value might not have any meaning
+    alarm="${name//_/ } ${raised_for}"
+
 elif [ "${old_status}" = "WARNING" -a "${status}" = "CRITICAL" ]
 then
     severity="Escalated to ${status}"
-    if [ $non_clear_duration -gt $duration ]
+    if [ ${non_clear_duration} -gt ${duration} ]
     then
         raised_for="(alarm is raised for ${non_clear_duration_txt})"
     fi
@@ -594,7 +743,7 @@ then
 elif [ "${old_status}" = "CRITICAL" -a "${status}" = "WARNING" ]
 then
     severity="Demoted to ${status}"
-    if [ $non_clear_duration -gt $duration ]
+    if [ ${non_clear_duration} -gt ${duration} ]
     then
         raised_for="(alarm is raised for ${non_clear_duration_txt})"
     fi
@@ -635,17 +784,25 @@ send_pushover "${PUSHOVER_APP_TOKEN}" "${to_pushover}" "${when}" "${goto_url}" "
 SENT_PUSHOVER=$?
 
 # -----------------------------------------------------------------------------
+# send the pushbullet notification
+
+send_pushbullet "${PUSHBULLET_ACCESS_TOKEN}" "${to_pushbullet}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}\n
+Severity: ${severity}\n
+Chart: ${chart}\n
+Family: ${family}\n
+To View Netdata go to: ${goto_url}\n
+The source of this alarm is line ${src}"
+
+SENT_PUSHBULLET=$?
+
+# -----------------------------------------------------------------------------
 # send the telegram.org message
 
 # https://core.telegram.org/bots/api#formatting-options
-telegram_message="<b>${severity}"
-[ "${status_message}" != "recovered" ] && telegram_message="${telegram_message}, ${status_message}"
-telegram_message="${telegram_message}
-${chart} (${family})</b>
+send_telegram "${TELEGRAM_BOT_TOKEN}" "${to_telegram}" "${host} ${status_message} - <b>${name//_/ }</b>
+${chart} (${family})
 <a href=\"${goto_url}\">${alarm}</a>
 <i>${info}</i>"
-
-send_telegram "${TELEGRAM_BOT_TOKEN}" "${to_telegram}" "${telegram_message}"
 
 SENT_TELEGRAM=$?
 
@@ -747,8 +904,8 @@ SENT_EMAIL=$?
 # -----------------------------------------------------------------------------
 # let netdata know
 
-# we did send somehting
-[ ${SENT_EMAIL} -eq 0 -o ${SENT_PUSHOVER} -eq 0 -o ${SENT_TELEGRAM} -eq 0 -o ${SENT_SLACK} -eq 0 ] && exit 0
+# we did send something
+[ ${SENT_EMAIL} -eq 0 -o ${SENT_PUSHOVER} -eq 0 -o ${SENT_TELEGRAM} -eq 0 -o ${SENT_SLACK} -eq 0 -o ${SENT_PUSHBULLET} -eq 0 ] && exit 0
 
 # we did not send anything
 exit 1

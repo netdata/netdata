@@ -109,7 +109,7 @@ void *pluginsd_worker_thread(void *arg)
 
     size_t count = 0;
 
-    while(likely(1)) {
+    for(;;) {
         if(unlikely(netdata_exit)) break;
 
         FILE *fp = mypopen(cd->cmd, &cd->pid);
@@ -358,7 +358,7 @@ void *pluginsd_worker_thread(void *arg)
                 error("PLUGINSD: %s sleeping for %llu. Will kill with SIGCONT pid %d to wake it up.\n", cd->fullfilename, susec, cd->pid);
                 usleep(susec);
                 killpid(cd->pid, SIGCONT);
-                bcopy(&now, &last, sizeof(struct timeval));
+                memmove(&last, &now, sizeof(struct timeval));
                 break;
             }
 #endif
@@ -380,16 +380,9 @@ void *pluginsd_worker_thread(void *arg)
 
         // get the return code
         int code = mypclose(fp, cd->pid);
-
-        if(netdata_exit) {
-            cd->pid = 0;
-            cd->enabled = 0;
-            cd->obsolete = 1;
-            pthread_exit(NULL);
-            return NULL;
-        }
-
-        if(code != 0) {
+        
+        if(unlikely(netdata_exit)) break;
+        else if(code != 0) {
             // the plugin reports failure
 
             if(likely(!cd->successful_collections)) {
@@ -401,7 +394,7 @@ void *pluginsd_worker_thread(void *arg)
                 // we have collected something
 
                 if(likely(cd->serial_failures <= 10)) {
-                    error("PLUGINSD: '%s' exited with error code %d, but has given useful output in the past (%zu times). Waiting a bit before starting it again.", cd->fullfilename, code, cd->successful_collections);
+                    error("PLUGINSD: '%s' exited with error code %d, but has given useful output in the past (%zu times). %s", cd->fullfilename, code, cd->successful_collections, cd->enabled?"Waiting a bit before starting it again.":"Will not start it again - it is disabled.");
                     sleep((unsigned int) (cd->update_every * 10));
                 }
                 else {
@@ -417,7 +410,7 @@ void *pluginsd_worker_thread(void *arg)
                 // we have collected nothing so far
 
                 if(likely(cd->serial_failures <= 10)) {
-                    error("PLUGINSD: '%s' (pid %d) does not generate useful output but it reports success (exits with 0). Waiting a bit before starting it again.", cd->fullfilename, cd->pid);
+                    error("PLUGINSD: '%s' (pid %d) does not generate useful output but it reports success (exits with 0). %s.", cd->fullfilename, cd->pid, cd->enabled?"Waiting a bit before starting it again.":"Will not start it again - it is disabled.");
                     sleep((unsigned int) (cd->update_every * 10));
                 }
                 else {
@@ -430,9 +423,10 @@ void *pluginsd_worker_thread(void *arg)
         }
         cd->pid = 0;
 
-        if(unlikely(!cd->enabled))
-            break;
+        if(unlikely(!cd->enabled)) break;
     }
+
+    info("PLUGINSD: '%s' thread exiting", cd->fullfilename);
 
     cd->obsolete = 1;
     pthread_exit(NULL);
@@ -462,7 +456,7 @@ void *pluginsd_main(void *ptr) {
 
     if(scan_frequency < 1) scan_frequency = 1;
 
-    while(likely(1)) {
+    for(;;) {
         if(unlikely(netdata_exit)) break;
 
         dir = opendir(dir_name);
@@ -541,6 +535,8 @@ void *pluginsd_main(void *ptr) {
         closedir(dir);
         sleep((unsigned int) scan_frequency);
     }
+
+    info("PLUGINS.D thread exiting");
 
     pthread_exit(NULL);
     return NULL;

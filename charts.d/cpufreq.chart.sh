@@ -1,5 +1,11 @@
 # no need for shebang - this file is loaded from charts.d.plugin
 
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+
 # if this chart is called X.chart.sh, then all functions and global variables
 # must start with X_
 
@@ -51,7 +57,7 @@ cpufreq_create() {
 
 		id="$( fixid "cpu$cpu" )"
 
-		echo >&2 "charts.d: cpufreq: on file='$file', dir='$dir', cpu='$cpu', id='$id'"
+		debug "file='$file', dir='$dir', cpu='$cpu', id='$id'"
 
 		echo "DIMENSION $id '$id' absolute 1 1000"
 		echo >>$TMP_DIR/cpufreq.sh "echo \"SET $id = \"\$(< $file )"
@@ -59,7 +65,6 @@ cpufreq_create() {
 	echo >>$TMP_DIR/cpufreq.sh "echo END"
 
 	[ $cpufreq_source_update -eq 1 ] && echo >>$TMP_DIR/cpufreq.sh "}"
-	# cat >&2 $TMP_DIR/cpufreq.sh
 
 	# ok, load the function cpufreq_update() we created
 	[ $cpufreq_source_update -eq 1 ] && . $TMP_DIR/cpufreq.sh

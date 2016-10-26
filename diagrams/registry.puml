@@ -1,0 +1,40 @@
+@startuml
+!include config.puml
+
+title netdata registry operation
+actor "web browser" as user
+participant "netdata 1" as n1
+participant "registry 1" as r1
+autonumber "<b>0."
+
+== standard dashboard communication ==
+
+user ->n1 : \
+    hi, give me the dashboard
+
+n1 --> user : \
+    welcome, here it is...
+
+... a few seconds later ...
+
+== registry related communication ==
+
+user -> n1 : \
+    now give me registry information
+
+n1 --> user: \
+    here it is, talk to <b>registry 1</b>
+
+note left of r1 #eee: \
+    only your web browser \n\
+    talks to the registry
+
+user -> r1 : \
+    Hey <b>registry 1</b>, \
+I am accessing <b>netdata 1</b>...
+
+r1 --> user : \
+    nice!, here are other netdata servers \
+you have accessed in the past
+
+@enduml

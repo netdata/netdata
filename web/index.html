@@ -12,23 +12,25 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="author" content="costa@tsaousis.gr">
 
-    <link rel="shortcut icon" href="images/seo-performance-multi-size.ico">
+    <!-- <link rel="shortcut icon" href="images/seo-performance-multi-size.ico"> -->
 
-    <link rel="apple-touch-icon" href="images/seo-performance-72.png">
-    <link rel="apple-touch-icon" sizes="72x72" href="images/seo-performance-72.png">
-    <link rel="apple-touch-icon" sizes="114x114" href="images/seo-performance-114.png">
+    <!-- <link rel="apple-touch-icon" href="images/seo-performance-72.png"> -->
+    <!-- <link rel="apple-touch-icon" sizes="72x72" href="images/seo-performance-72.png"> -->
+    <!-- <link rel="apple-touch-icon" sizes="114x114" href="images/seo-performance-114.png"> -->
 
-    <link rel="icon" type="image/png" sizes="512x512" href="images/seo-performance-512.png">
-    <link rel="icon" type="image/png" sizes="256x256" href="images/seo-performance-256.png">
-    <link rel="icon" type="image/png" sizes="128x128" href="images/seo-performance-128.png">
-    <link rel="icon" type="image/png" sizes="64x64" href="images/seo-performance-64.png">
-    <link rel="icon" type="image/png" sizes="48x48" href="images/seo-performance-48.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="images/seo-performance-32.png">
-    <link rel="icon" type="image/png" sizes="24x24" href="images/seo-performance-24.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="images/seo-performance-16.png">
+    <!-- <link rel="icon" type="image/png" sizes="512x512" href="images/seo-performance-512.png"> -->
+    <!-- <link rel="icon" type="image/png" sizes="256x256" href="images/seo-performance-256.png"> -->
+    <!-- <link rel="icon" type="image/png" sizes="128x128" href="images/seo-performance-128.png"> -->
+    <!-- <link rel="icon" type="image/png" sizes="64x64" href="images/seo-performance-64.png"> -->
+    <!-- <link rel="icon" type="image/png" sizes="48x48" href="images/seo-performance-48.png"> -->
+    <!-- <link rel="icon" type="image/png" sizes="24x24" href="images/seo-performance-24.png"> -->
+    <!-- <link rel="icon" type="image/png" sizes="16x16" href="images/seo-performance-16.png"> -->
+    <!-- <link rel="icon" type="image/png" sizes="32x32" href="images/seo-performance-32.png"> -->
+
+    <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACNklEQVRYhcXXv2tUQRAH8M+FEIJISBHCIWIhIQSUILERi4AiiqCggiIiomAjlhaC4j+ghYWISgqNohZaCBZBC8Ei8QdEUCutFBsxCBqDYkgci/cunkfuJffjJQPD8mZm5/vd2WV2HzlJ0Bs8CvrywsgCHwy+BpGOg0sJfjj4nYKX9FdwKG9gwZlgtgK8pLOpPxfw1mCoCnClDgWtzQTvCEYWCV7SkWAlFBoEb8dlDKBF8t2bMWUSH/AHr3CiEfz5CPUusPJLkRCdk5ZqyeqUrQv4R7E5TwK7M3zTeIKduRAIitiWEfIY69GdCwGcRFuG/xqONRkzkaA7+J5x+MaDtWmHvJ4HgeEM8Nn0bridfv9HoOFyBAdwJCPkqqTzHWwUaz7wgeBHxupfBKuCj2W25mxBsCGYyAB/FxTT27HcPlyep64tCLbjKbqqhLzBlgKfF8pVE4FgRXABI+ioEnYfOyzcFWsCbg+OV+xlpU4ER4O+4HVwL51b3xYEXcGu4Ao+YQhr5gmdxHmsQyfG0b/YxbWmLfRWmnxa0s06VbTMCpnBS9zFzQKTwR5cXCzwHIE02Sl8wSZsRI/kgLVJqjSd+t9LVjiG1diPszhdK3A5gR48k5zYMTwscC59sfT799CYKvA8EttbSeXgTr3gJQKl91kR+yTlvyG5uUbLYh9gb+ovltkb6qYtNSRo3kOygsBSzGlKsubf43USWLYK5CLLXoFWyU/CtzLbVDpW2n+m40yN9ukqdvAX9ac/EIgOapcAAAAASUVORK5CYII=">
 
     <meta property="og:locale" content="en_US" />
-    <meta property="og:image" content="http://my-netdata.io/images/post.png"/>
+    <meta property="og:image" content="https://cloud.githubusercontent.com/assets/2662304/19168687/f6a567be-8c19-11e6-8561-ce8d589e8346.gif"/>
     <meta property="og:url" content="http://my-netdata.io/"/>
     <meta property="og:type" content="website"/>
     <meta property="og:site_name" content="netdata"/>
@@ -405,6 +407,7 @@
         hash: '#',
         theme: null,
         help: null,
+        update_always: false,
         pan_and_zoom: false,
         after: 0,
         before: 0,
@@ -416,75 +419,80 @@
         alarm_unique_id: 0,
         alarm_id: 0,
         alarm_event_id: 0,
+
         hasProperty: function(property) {
             // console.log('checking property ' + property + ' of type ' + typeof(this[property]));
             return typeof this[property] !== 'undefined';
+        },
+
+        genHash: function() {
+            var hash = urlOptions.hash;
+
+            if(urlOptions.pan_and_zoom === true) {
+                hash += ';after='  + urlOptions.after.toString() +
+                        ';before=' + urlOptions.before.toString();
+            }
+
+            if(urlOptions.theme !== null)
+                hash += ';theme=' + urlOptions.theme.toString();
+
+            if(urlOptions.help !== null)
+                hash += ';help=' + urlOptions.help.toString();
+
+            if(urlOptions.update_always === true)
+                hash += ';update_always=true';
+
+            return hash;
+        },
+
+        parseHash: function() {
+            var variables = document.location.hash.split(';');
+            var len = variables.length;
+            while(len--) {
+                if(len !== 0) {
+                    var p = variables[len].split('=');
+                    if(urlOptions.hasProperty(p[0]) && typeof p[1] !== 'undefined')
+                        urlOptions[p[0]] = decodeURIComponent(p[1]);
+                }
+                else {
+                    if(variables[len].length > 0)
+                        urlOptions.hash = variables[len];
+                }
+            }
+
+            var booleans = [ 'nowelcome', 'show_alarms', 'pan_and_zoom', 'update_always' ];
+            len = booleans.length;
+            while(len--) {
+                if(urlOptions[booleans[len]] === 'true' || urlOptions[booleans[len]] === true || urlOptions[booleans[len]] === '1' || urlOptions[booleans[len]] === 1)
+                    urlOptions[booleans[len]] = true;
+                else
+                    urlOptions[booleans[len]] = false;
+            }
+
+            if(urlOptions.before > 0 && urlOptions.after > 0) {
+                urlOptions.pan_and_zoom = true;
+                urlOptions.nowelcome = true;
+            }
+            else
+                urlOptions.pan_and_zoom = false;
+
+            // console.log(urlOptions);
+        },
+
+        hashUpdate: function() {
+            history.replaceState(null, '', urlOptions.genHash());
+        },
+
+        netdataPanAndZoomCallback: function(status, after, before) {
+            urlOptions.pan_and_zoom = status;
+            urlOptions.after = after;
+            urlOptions.before = before;
+            urlOptions.hashUpdate();
         }
+
     };
 
-    function netdataPanAndZoomCallback(status, after, before) {
-        urlOptions.pan_and_zoom = status;
-        urlOptions.after = after;
-        urlOptions.before = before;
-        netdataHashUpdate();
-    }
-
-    function netdataHashUpdate() {
-        history.replaceState(null, '', netdataHash());
-    }
-
-    function netdataHash() {
-        var hash = urlOptions.hash;
-
-        if(urlOptions.pan_and_zoom === true) {
-            hash += ';after='  + urlOptions.after.toString() +
-                    ';before=' + urlOptions.before.toString();
-        }
-
-        if(urlOptions.theme !== null)
-            hash += ';theme=' + urlOptions.theme.toString();
-
-        if(urlOptions.help !== null)
-            hash += ';help=' + urlOptions.help.toString();
-
-        return hash;
-    }
-
-    function netdataHashParse() {
-        var variables = document.location.hash.split(';');
-        var len = variables.length;
-        while(len--) {
-            if(len !== 0) {
-                var p = variables[len].split('=');
-                if(urlOptions.hasProperty(p[0]) && typeof p[1] !== 'undefined')
-                    urlOptions[p[0]] = decodeURIComponent(p[1]);
-            }
-            else {
-                if(variables[len].length > 0)
-                    urlOptions.hash = variables[len];
-            }
-        }
-
-        var booleans = [ 'nowelcome', 'show_alarms', 'pan_and_zoom' ];
-        len = booleans.length;
-        while(len--) {
-            if(urlOptions[booleans[len]] === 'true' || urlOptions[booleans[len]] === true || urlOptions[booleans[len]] === '1' || urlOptions[booleans[len]] === 1)
-                urlOptions[booleans[len]] = true;
-            else
-                urlOptions[booleans[len]] = false;
-        }
-
-        if(urlOptions.before > 0 && urlOptions.after > 0) {
-            urlOptions.pan_and_zoom = true;
-            urlOptions.nowelcome = true;
-        }
-        else
-            urlOptions.pan_and_zoom = false;
-
-        // console.log(urlOptions);
-    }
-
-    netdataHashParse();
+    urlOptions.parseHash();
 
     // --------------------------------------------------------------------
     // check options that should be processed before loading netdata.js
@@ -658,7 +666,7 @@
         if(url.indexOf('#') !== -1)
             url = url.substring(0, url.indexOf('#'));
 
-        var hash = netdataHash();
+        var hash = urlOptions.genHash();
 
         // console.log('netdataURL: ' + url + hash);
 
@@ -683,9 +691,9 @@
         var error = 'failed';
 
         if(document.location.toString().startsWith('http://') && url.toString().startsWith('https://'))
-                // we penalize https only if the current url is http
-                // to allow the user walk through all its servers.
-                penaldy = 500;
+            // we penalize https only if the current url is http
+            // to allow the user walk through all its servers.
+            penaldy = 500;
 
         else if(document.location.toString().startsWith('https://') && url.toString().startsWith('http://'))
             error = 'can\'t check';
@@ -696,7 +704,7 @@
             document.getElementById('gotoServerList').innerHTML += '<tr><td style="padding-left: 20px;"><a href="' + finalURL + '" target="_blank">' + url + '</a></td><td style="padding-left: 30px;"><code id="' + guid + '-' + id + '-status">checking...</code></td></tr>';
 
             NETDATA.registry.hello(url, function(data) {
-                if (data) {
+                if(typeof data !== 'undefined' && data !== null && typeof data.machine_guid === 'string' && data.machine_guid === guid) {
                     // console.log('OK ' + id + ' URL: ' + url);
                     document.getElementById(guid + '-' + id + '-status').innerHTML = "OK";
 
@@ -708,11 +716,16 @@
                             gotoServerMiddleClick = false;
                             document.getElementById('gotoServerResponse').innerHTML = '<b>Opening new window to ' + NETDATA.registry.machines[guid].name + '<br/><a href="' + finalURL + '">' + url + '</a></b><br/>(check your pop-up blocker if it fails)';
                         }
-                        else
+                        else {
+                            document.getElementById('gotoServerResponse').innerHTML += 'found it! It is at:<br/><small>' + url + '</small>';
                             document.location = finalURL;
+                        }
                     }
                 }
                 else {
+                    if(typeof data !== 'undefined' && data !== null && typeof data.machine_guid === 'string' && data.machine_guid !== guid)
+                        error = 'wrong machine';
+
                     document.getElementById(guid + '-' + id + '-status').innerHTML = error;
                     gotoServerValidateRemaining--;
                     if(gotoServerValidateRemaining <= 0) {
@@ -728,7 +741,9 @@
         // console.log('goto server: ' + guid);
 
         gotoServerStop = false;
+        var checked = {};
         var len = NETDATA.registry.machines[guid].alternate_urls.length;
+        var count = 0;
 
         document.getElementById('gotoServerResponse').innerHTML = '';
         document.getElementById('gotoServerList').innerHTML = '';
@@ -736,9 +751,30 @@
         $('#gotoServerModal').modal('show');
 
         gotoServerValidateRemaining = len;
-        while(len--)
-            gotoServerValidateUrl(len, guid, NETDATA.registry.machines[guid].alternate_urls[len]);
+        while(len--) {
+            var url = NETDATA.registry.machines[guid].alternate_urls[len];
+            checked[url] = true;
+            gotoServerValidateUrl(count++, guid, url);
+        }
 
+        setTimeout(function() {
+            if(gotoServerStop === false) {
+                document.getElementById('gotoServerResponse').innerHTML = '<b>Added all the known URLs for this machine.</b>';
+                NETDATA.registry.search(guid, function(data) {
+                    // console.log(data);
+                    len = data.urls.length;
+                    while(len--) {
+                        var url = data.urls[len][1];
+                        // console.log(url);
+                        if(typeof checked[url] === 'undefined') {
+                            gotoServerValidateRemaining++;
+                            checked[url] = true;
+                            gotoServerValidateUrl(count++, guid, url);
+                        }
+                    }
+                });
+            }
+        }, 2000);
         return false;
     }
 
@@ -885,7 +921,7 @@
     // scroll to a section, without changing the browser history
 
     function scrollToId(hash) {
-        if(hash && hash != '') {
+        if(hash && hash != '' && document.getElementById(hash) !== null) {
             var offset = $('#' + hash).offset();
             if(typeof offset !== 'undefined')
                 $('html, body').animate({ scrollTop: offset.top }, 0);
@@ -1343,10 +1379,38 @@
 
     // ----------------------------------------------------------------------------
 
+    function loadJs(url, callback) {
+        $.ajax({
+            url: url,
+            cache: true,
+            dataType: "script",
+            xhrFields: { withCredentials: true } // required for the cookie
+        })
+        .fail(function() {
+            alert('Cannot load required JS library: ' + url);
+        })
+        .always(function() {
+            if(typeof callback === 'function')
+                callback();
+        })
+    }
+
+    var bootstrapTableLoaded = false;
+    function loadBootstrapTable(callback) {
+        if(bootstrapTableLoaded === false) {
+            bootstrapTableLoaded === true;
+            loadJs(NETDATA.serverDefault + 'lib/bootstrap-table-1.11.0.min.js', function() {
+                loadJs(NETDATA.serverDefault + 'lib/bootstrap-table-export-1.11.0.min.js', function() {
+                    loadJs(NETDATA.serverDefault + 'lib/tableExport-1.6.0.min.js', callback);
+                })
+            });
+        }
+        else callback();
+    }
+
     function alarmsUpdateModal() {
         var active = '<h3>Raised Alarms</h3><table class="table">';
         var all = '<h3>All Running Alarms</h3><div class="panel-group" id="alarms_all_accordion" role="tablist" aria-multiselectable="true">';
-        var log = '<h3>Alarm Log</h3><table class="table"><tr><th>When</th><th>Chart</th><th>Alarm</th><th>Status</th>';
         var footer = '<hr/><a href="https://github.com/firehol/netdata/wiki/Generating-Badges" target="_blank">netdata badges</a> refresh automatically. Their color indicates the state of the alarm: <span style="color: #e05d44"><b>&nbsp;red&nbsp;</b></span> is critical, <span style="color:#fe7d37"><b>&nbsp;orange&nbsp;</b></span> is warning, <span style="color: #4c1"><b>&nbsp;bright green&nbsp;</b></span> is ok, <span style="color: #9f9f9f"><b>&nbsp;light grey&nbsp;</b></span> is undefined (i.e. no data or no status), <span style="color: #000"><b>&nbsp;black&nbsp;</b></span> is not initialized. You can copy and paste their URLs to embed them in any web page.<br/>netdata can send notifications for these alarms. Check <a href="https://github.com/firehol/netdata/blob/master/conf.d/health_alarm_notify.conf">this configuration file</a> for more information.';
 
         NETDATA.alarms.get('all', function(data) {
@@ -1362,14 +1426,53 @@
                 return;
             }
 
-            function frequency_text(seconds, sfx) {
+            function timestamp4human(timestamp, space) {
+                if(typeof space === 'undefined')
+                    space = '&nbsp;';
+
+                var t = new Date(timestamp * 1000);
+                var now = new Date();
+
+                if(t.toDateString() == now.toDateString())
+                    return t.toLocaleTimeString();
+
+                return t.toLocaleDateString() + space + t.toLocaleTimeString();
+            }
+
+            function seconds4human(seconds, options) {
+                var default_options = {
+                    now: 'now',
+                    space: '&nbsp;',
+                    negative_suffix: 'ago',
+                    hour: 'hour',
+                    hours: 'hours',
+                    minute: 'minute',
+                    minutes: 'minutes',
+                    second: 'second',
+                    seconds: 'seconds',
+                    and: 'and'
+                };
+
+                if(typeof options !== 'object')
+                    options = default_options;
+                else {
+                    var x;
+                    for(x in default_options) {
+                        if(typeof options[x] !== 'string')
+                            options[x] = default_options[x];
+                    }
+                }
+
+                if(typeof seconds === 'string')
+                    seconds = parseInt(seconds);
+
                 if(seconds === 0)
-                    return 'now';
+                    return options.now;
 
                 var suffix = '';
                 if(seconds < 0) {
                     seconds = -seconds;
-                    if(sfx) suffix = '&nbsp;ago';
+                    if(options.negative_suffix !== '') suffix = options.space + options.negative_suffix;
                 }
 
                 var hours = Math.floor(seconds / 3600);
@@ -1380,22 +1483,22 @@
 
                 var txt = '';
                 
-                if(hours > 1) txt += hours.toString() + '&nbsp;hours';
-                else if(hours === 1) txt += hours.toString() + '&nbsp;hour';
+                if(hours > 1) txt += hours.toString() + options.space + options.hours;
+                else if(hours === 1) txt += hours.toString() + options.space + options.hour;
 
                 if(hours > 0 && minutes > 0 && seconds == 0)
-                    txt += '&nbsp;and&nbsp;';
+                    txt += options.space + options.and + options.space;
                 else if(hours > 0 && minutes > 0 && seconds > 0)
-                    txt += ',&nbsp;';
+                    txt += ',' + options.space;
 
-                if(minutes > 1) txt += minutes.toString() + '&nbsp;minutes';
-                else if(minutes === 1) txt += minutes.toString() + '&nbsp;minute';
+                if(minutes > 1) txt += minutes.toString() + options.space + options.minutes;
+                else if(minutes === 1) txt += minutes.toString() + options.space + options.minute;
 
                 if((minutes > 0 || minutes > 0) && seconds > 0)
-                    txt += '&nbsp;and&nbsp;';
+                    txt += options.space + options.and + options.space;
 
-                if(seconds > 1) txt += seconds.toString() + '&nbsp;seconds';
-                else if(seconds === 1) txt += seconds.toString() + '&nbsp;second';
+                if(seconds > 1) txt += Math.floor(seconds).toString() + options.space + options.seconds;
+                else if(seconds === 1) txt += Math.floor(seconds).toString() + options.space + options.second;
 
                 return txt + suffix;
             }
@@ -1417,7 +1520,7 @@
 
                 return '<code>' + alarm.lookup_method + '</code> '
                     + dimensions + ', of chart <code>' + alarm.chart + '</code>'
-                    + ', starting <code>' + frequency_text(alarm.lookup_after + alarm.lookup_before, true) + '</code> and up to <code>' + frequency_text(alarm.lookup_before, true) + '</code>'
+                    + ', starting <code>' + seconds4human(alarm.lookup_after + alarm.lookup_before) + '</code> and up to <code>' + seconds4human(alarm.lookup_before) + '</code>'
                     + ((alarm.lookup_options)?(', with options <code>' + alarm.lookup_options.replace(' ', ',&nbsp;') + '</code>'):'')
                     + '.';
             }
@@ -1440,25 +1543,25 @@
                 var delay = '';
                 if((alarm.delay_up_duration > 0 || alarm.delay_down_duration > 0) && alarm.delay_multiplier != 0 && alarm.delay_max_duration > 0) {
                     if(alarm.delay_up_duration == alarm.delay_down_duration) {
-                        delay += '<small><br/>hysteresis ' + frequency_text(alarm.delay_up_duration);
+                        delay += '<small><br/>hysteresis ' + seconds4human(alarm.delay_up_duration, { negative_suffix: '' });
                     }
                     else {
                         delay = '<small><br/>hysteresis ';
                         if(alarm.delay_up_duration > 0) {
-                            delay += 'on&nbsp;escalation&nbsp;<code>' + frequency_text(alarm.delay_up_duration) + '</code>, ';
+                            delay += 'on&nbsp;escalation&nbsp;<code>' + seconds4human(alarm.delay_up_duration, { negative_suffix: '' }) + '</code>, ';
                         }
                         if(alarm.delay_down_duration > 0) {
-                            delay += 'on&nbsp;recovery&nbsp;<code>' + frequency_text(alarm.delay_down_duration) + '</code>, ';
+                            delay += 'on&nbsp;recovery&nbsp;<code>' + seconds4human(alarm.delay_down_duration, { negative_suffix: '' }) + '</code>, ';
                         }
                     }
                     if(alarm.delay_multiplier != 1.0) {
                         delay += 'multiplied&nbsp;by&nbsp;<code>' + alarm.delay_multiplier.toString() + '</code>';
-                        delay += ',&nbsp;up&nbsp;to&nbsp;<code>' + frequency_text(alarm.delay_max_duration) + '</code>';
+                        delay += ',&nbsp;up&nbsp;to&nbsp;<code>' + seconds4human(alarm.delay_max_duration, { negative_suffix: '' }) + '</code>';
                     }
                     delay += '</small>';
                 }
 
-                html += '<tr><td width="10%" style="text-align:right">check&nbsp;every</td><td>' + frequency_text(alarm.update_every) + '</td></tr>'
+                html += '<tr><td width="10%" style="text-align:right">check&nbsp;every</td><td>' + seconds4human(alarm.update_every, { negative_suffix: '' }) + '</td></tr>'
                     + '<tr><td width="10%" style="text-align:right">execute</td><td><span style="font-family: monospace;">' + alarm.exec + '</span>' + delay + '</td></tr>'
                     + '<tr><td width="10%" style="text-align:right">source</td><td><span style="font-family: monospace;">' + alarm.source + '</span></td></tr>'
                     + '</table></td></tr>';
@@ -1596,33 +1699,271 @@
                 $('#alarm_all_' + id.toString()).html('');
             });
 
-            NETDATA.alarms.get_log(0, function(data) {
-                if(data === null) {
-                    document.getElementById('alarms_log').innerHTML =
-                            'failed to load alarm data!';
-                    return;
-                }
+            document.getElementById('alarms_log').innerHTML = '<h3>Alarm Log</h3><table id="alarms_log_table"></table>';
 
-                var i = 0;
-                var len = data.length;
-                if(len > 50) len = 50;
-                while(i < len) {
-                    var time = new Date(data[i].when * 1000);
-                    log += '<tr><td>'
-                            + time.toLocaleDateString() + ' '
-                            + time.toLocaleTimeString() + '</td><td>'
-                            + data[i].chart.toString() + '</td><td>'
-                            + data[i].name.toString() + ' = ' + ((data[i].value !== null)?Math.floor(data[i].value):'NaN').toString() + ' ' + data[i].units.toString() + '</td><td>'
-                            + data[i].status.toString() + '</td></tr>';
-                    i++;
-                }
-                log += "</table>";
-
-                if(i == 0)
-                    log += "<h4>No alarms have been logged in this system.</h4>";
-
-                document.getElementById('alarms_log').innerHTML = log;
-            })
+            loadBootstrapTable(function () {
+                $('#alarms_log_table').bootstrapTable({
+                    url: NETDATA.alarms.server + '/api/v1/alarm_log?all',
+                    cache: false,
+                    pagination: true,
+                    pageSize: 10,
+                    showPaginationSwitch: false,
+                    search: true,
+                    searchTimeOut: 300,
+                    searchAlign: 'left',
+                    showColumns: true,
+                    showExport: true,
+                    exportDataType: 'basic',
+                    exportOptions: {
+                        fileName: 'netdata_alarm_log'
+                    },
+                    rowStyle: function(row, index) {
+                        switch(row.status) {
+                            case 'CRITICAL' : return { classes: 'danger'  }; break;
+                            case 'WARNING'  : return { classes: 'warning' }; break;
+                            case 'UNDEFINED': return { classes: 'info'    }; break;
+                            case 'CLEAR'    : return { classes: 'success' }; break;
+                        }
+                        return {};
+                    },
+                    showFooter: false,
+                    showHeader: true,
+                    showRefresh: true,
+                    showToggle: false,
+                    sortable: true,
+                    silentSort: false,
+                    columns: [
+                        {
+                            field: 'when',
+                            title: 'Event Date',
+                            valign: 'middle',
+                            titleTooltip: 'The date and time the even took place',
+                            switchable: false,
+                            sortable: true,
+                            formatter: function(value, row, index) { return timestamp4human(value, ' '); },
+                        },
+                        {
+                            field: 'hostname',
+                            title: 'Host',
+                            valign: 'middle',
+                            titleTooltip: 'The host that generated this event',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'unique_id',
+                            title: 'Unique ID',
+                            titleTooltip: 'The host unique ID for this event',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'alarm_id',
+                            title: 'Alarm ID',
+                            titleTooltip: 'The ID of the alarm that generated this event',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'alarm_event_id',
+                            title: 'Alarm Event ID',
+                            titleTooltip: 'The incremental ID of this event for the given alarm',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'chart',
+                            title: 'Chart',
+                            titleTooltip: 'The chart the alarm is attached to',
+                            valign: 'middle',
+                            switchable: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'family',
+                            title: 'Family',
+                            titleTooltip: 'The family of the chart the alarm is attached to',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'name',
+                            title: 'Alarm',
+                            titleTooltip: 'The alarm name that generated this event',
+                            formatter: function(value, row, index) {
+                                return value.toString().replace(/_/g, ' ');
+                            },
+                            valign: 'middle',
+                            switchable: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'old_value',
+                            title: 'Old Value',
+                            titleTooltip: 'The value of the alarm, just before this event',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'value',
+                            title: 'Value',
+                            titleTooltip: 'The value of the alarm, that triggered this event',
+                            formatter: function(value, row, index) {
+                                return ((value !== null)?Math.floor(value):'NaN').toString();
+                            },
+                            align: 'right',
+                            valign: 'middle',
+                            sortable: true
+                        },
+                        {
+                            field: 'units',
+                            title: 'Units',
+                            titleTooltip: 'The units of the value of the alarm',
+                            valign: 'middle',
+                            sortable: true
+                        },
+                        {
+                            field: 'old_status',
+                            title: 'Old Status',
+                            titleTooltip: 'The status of the alarm, just before this event',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'status',
+                            title: 'Status',
+                            titleTooltip: 'The status of the alarm, that was set due to this event',
+                            valign: 'middle',
+                            switchable: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'duration',
+                            title: 'Last Duration',
+                            titleTooltip: 'The duration the alarm was at its previous state, just before this event',
+                            formatter: function(value, row, index) { return seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' }); },
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'non_clear_duration',
+                            title: 'Raised Duration',
+                            titleTooltip: 'The duration the alarm was raised, just before this event',
+                            formatter: function(value, row, index) { return seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' }); },
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'recipient',
+                            title: 'Recipient',
+                            titleTooltip: 'The recipient of this event',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'processed',
+                            title: 'Processed Status',
+                            titleTooltip: 'True when this event is processed',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'updated',
+                            title: 'Updated Status',
+                            titleTooltip: 'True when this event has been updated by another event',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'updated_by_id',
+                            title: 'Updated By ID',
+                            titleTooltip: 'The unique ID of the event that obsoleted this one',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'updates_id',
+                            title: 'Updates ID',
+                            titleTooltip: 'The unique ID of the event obsoleted because of this event',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'exec',
+                            title: 'Script',
+                            titleTooltip: 'The script to handle the event notification',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'exec_run',
+                            title: 'Script Run At',
+                            titleTooltip: 'The date and time the script has been ran',
+                            formatter: function(value, row, index) { return timestamp4human(value, ' '); },
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'exec_code',
+                            title: 'Script Return Value',
+                            titleTooltip: 'The return code of the script',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'delay',
+                            title: 'Script Delay',
+                            titleTooltip: 'The hysteresis of the notification',
+                            formatter: function(value, row, index) { return seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' }); },
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'delay_up_to_timestamp',
+                            title: 'Script Delay Run At',
+                            titleTooltip: 'The date and time the script should be run, after hysteresis',
+                            formatter: function(value, row, index) { return timestamp4human(value, ' '); },
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'info',
+                            title: 'Description',
+                            titleTooltip: 'A short description of the alarm',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        },
+                        {
+                            field: 'source',
+                            title: 'Alarm Source',
+                            titleTooltip: 'The source of configuration of the alarm',
+                            valign: 'middle',
+                            visible: false,
+                            sortable: true
+                        }
+                    ]
+                });
+                // console.log($('#alarms_log_table').bootstrapTable('getOptions'));
+            });
         });
     }
 
@@ -1696,7 +2037,8 @@
         $.ajax({
             url: 'version.txt',
             async: true,
-            cache: false
+            cache: false,
+            xhrFields: { withCredentials: true } // required for the cookie
         })
         .done(function(data) {
             data = data.replace(/(\r\n|\n|\r| |\t)/gm,"");
@@ -1942,7 +2284,7 @@
         // ------------------------------------------------------------------------
 
         // callback for us to track PanAndZoom operations
-        NETDATA.globalPanAndZoom.callback = netdataPanAndZoomCallback;
+        NETDATA.globalPanAndZoom.callback = urlOptions.netdataPanAndZoomCallback;
 
         // let it run (update the charts)
         NETDATA.unpause();
@@ -1987,7 +2329,7 @@
             if(typeof hash === 'string' && hash.substring(0, 1) === '#' && urlOptions.hash.startsWith(hash + '_submenu_') === false) {
                 urlOptions.hash = hash;
                 //console.log(urlOptions.hash);
-                netdataHashUpdate();
+                urlOptions.hashUpdate();
             }
             //else console.log('hash: not accepting ' + hash);
             //}
@@ -2016,6 +2358,7 @@
 
             sync_option('eliminate_zero_dimensions');
             sync_option('destroy_on_hide');
+            sync_option('async_on_scroll');
             sync_option('parallel_refresher');
             sync_option('concurrent_refreshes');
             sync_option('sync_selection');
@@ -2038,15 +2381,23 @@
         // handle options changes
         $('#eliminate_zero_dimensions').change(function()       { NETDATA.setOption('eliminate_zero_dimensions', $(this).prop('checked')); });
         $('#destroy_on_hide').change(function()                 { NETDATA.setOption('destroy_on_hide', $(this).prop('checked')); });
+        $('#async_on_scroll').change(function()                 { NETDATA.setOption('async_on_scroll', $(this).prop('checked')); });
         $('#parallel_refresher').change(function()              { NETDATA.setOption('parallel_refresher', $(this).prop('checked')); });
         $('#concurrent_refreshes').change(function()            { NETDATA.setOption('concurrent_refreshes', $(this).prop('checked')); });
         $('#sync_selection').change(function()                  { NETDATA.setOption('sync_selection', $(this).prop('checked')); });
         $('#sync_pan_and_zoom').change(function()               { NETDATA.setOption('sync_pan_and_zoom', $(this).prop('checked')); });
-        $('#stop_updates_when_focus_is_lost').change(function() { NETDATA.setOption('stop_updates_when_focus_is_lost', $(this).prop('checked')); });
+        $('#stop_updates_when_focus_is_lost').change(function() {
+            urlOptions.update_always = !$(this).prop('checked');
+            urlOptions.hashUpdate();
+
+            NETDATA.setOption('stop_updates_when_focus_is_lost', !urlOptions.update_always);
+        });
         $('#smooth_plot').change(function()                     { NETDATA.setOption('smooth_plot', $(this).prop('checked')); });
         $('#pan_and_zoom_data_padding').change(function()       { NETDATA.setOption('pan_and_zoom_data_padding', $(this).prop('checked')); });
         $('#show_help').change(function()                       {
             urlOptions.help = $(this).prop('checked');
+            urlOptions.hashUpdate();
+
             NETDATA.setOption('show_help', urlOptions.help);
             netdataReload();
         });
@@ -2055,6 +2406,8 @@
         // it reloads the page
         $('#netdata_theme_control').change(function() {
             urlOptions.theme = $(this).prop('checked')?'slate':'white';
+            urlOptions.hashUpdate();
+
             if(setTheme(urlOptions.theme))
                 netdataReload();
         });
@@ -2118,13 +2471,28 @@
     // callback to add the dashboard info to the
     // parallel javascript downloader in netdata
     var netdataPrepCallback = function() {
-        NETDATA.requiredJs.push({
-            url: NETDATA.serverDefault + 'dashboard_info.js',
+        NETDATA.requiredCSS.push({
+            url: NETDATA.serverDefault + 'css/bootstrap-toggle-2.2.2.min.css',
             isAlreadyLoaded: function() { return false; }
         });
-        
+
+        NETDATA.requiredJs.push({
+            url: NETDATA.serverDefault + 'lib/bootstrap-toggle-2.2.2.min.js',
+            isAlreadyLoaded: function() { return false; }
+        });
+
+        NETDATA.requiredJs.push({
+            url: NETDATA.serverDefault + 'dashboard_info.js?v20161016-1',
+            async: false,
+            isAlreadyLoaded: function() { return false; }
+        });
+
         if(isdemo()) {
             document.getElementById('masthead').style.display = 'block';
+        }
+        else {
+            if(urlOptions.update_always === true)
+                NETDATA.setOption('stop_updates_when_focus_is_lost', !urlOptions.update_always);
         }
     }
 
@@ -2256,12 +2624,6 @@
                         <i class="fa fa-circle"></i> The excellent <a href="http://dygraphs.com/" target="_blank">Dygraphs.com</a> web chart library,
                         <i class="fa fa-copyright"></i> Copyright 2009, Dan Vanderkam, <a href="http://dygraphs.com/legal.html" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="http://omnipotent.net/jquery.sparkline/" target="_blank">jQuery Sparklines</a> web chart library,
-                        <i class="fa fa-copyright"></i> Copyright 2009-2012, Splunk Inc., <a href="http://opensource.org/licenses/BSD-3-Clause" target="_blank">New BSD License</a>
-
-                        <i class="fa fa-circle"></i> <a href="http://benpickles.github.io/peity/" target="_blank">Peity</a> web chart library,
-                        <i class="fa fa-copyright"></i> Copyright 2009-2015, Ben Pickles, <a href="https://github.com/benpickles/peity/blob/master/MIT-LICENCE" target="_blank">MIT License</a>
-
                         <i class="fa fa-circle"></i> <a href="https://rendro.github.io/easy-pie-chart/" target="_blank">Easy Pie Chart</a> web chart library,
                         <i class="fa fa-copyright"></i> Copyright 2013, Robert Fleischmann, <a href="https://github.com/rendro/easy-pie-chart/blob/master/LICENSE" target="_blank">MIT License</a>
 
@@ -2280,25 +2642,16 @@
                         <i class="fa fa-circle"></i> <a href="https://jamesflorentino.github.io/nanoScrollerJS/" target="_blank">NanoScroller</a>,
                         <i class="fa fa-copyright"></i> Copyright 2012, James Florentino, <a href="https://github.com/jamesflorentino/nanoScrollerJS/blob/master/LICENSE" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="https://github.com/marcj/css-element-queries" target="_blank">CSS Element Queries</a>,
-                        <i class="fa fa-copyright"></i> Copyright Marc J. Schmidt, <a href="https://github.com/marcj/css-element-queries/blob/master/LICENSE" target="_blank">MIT License</a>
-
                         <i class="fa fa-circle"></i> <a href="https://fortawesome.github.io/Font-Awesome/" target="_blank">FontAwesome</a>,
                         <i class="fa fa-copyright"></i> Created by Dave Gandy, Font: <a href="http://scripts.sil.org/OFL" target="_blank">SIL OFL 1.1 License</a>, CSS: <a href="http://opensource.org/licenses/mit-license.html" target="_blank">MIT License</a>
 
                         <i class="fa fa-circle"></i> <a href="http://www.iconsdb.com/soylent-red-icons/seo-performance-icon.html" target="_blank">IconsDB.com Icons</a>, Icons provided as CC0 1.0 Universal (CC0 1.0) Public Domain Dedication.
 
-                        <i class="fa fa-circle"></i> <a href="http://morrisjs.github.io/morris.js/" target="_blank">morris.js</a>,
-                        <i class="fa fa-copyright"></i> Copyright 2013, Olly Smith, <a href="http://morrisjs.github.io/morris.js/" target="_blank">Simplified BSD License</a>
+                        <i class="fa fa-circle"></i> <a href="http://bootstrap-table.wenzhixin.net.cn/" target="_blank">bootstrap-table</a>,
+                        <i class="fa fa-copyright"></i> Copyright (c) 2012-2016 Zhixin Wen, <a href="https://github.com/wenzhixin/bootstrap-table/blob/master/LICENSE" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="http://raphaeljs.com/" target="_blank">Raphaël</a>,
-                        <i class="fa fa-copyright"></i> Copyright 2008, Dmitry Baranovskiy, <a href="http://raphaeljs.com/license.html" target="_blank">MIT License</a>
-
-                        <i class="fa fa-circle"></i> <a href="http://C3js.org/" target="_blank">C3</a>,
-                        <i class="fa fa-copyright"></i> Copyright 2013, Masayuki Tanaka, <a href="https://github.com/masayuki0812/c3/blob/master/LICENSE" target="_blank">MIT License</a>
-
-                        <i class="fa fa-circle"></i> <a href="http://D3js.org/" target="_blank">D3</a>,
-                        <i class="fa fa-copyright"></i> Copyright 2015, Mike Bostock, <a href="http://opensource.org/licenses/BSD-3-Clause" target="_blank">BSD License</a>
+                        <i class="fa fa-circle"></i> <a href="https://github.com/hhurz/tableExport.jquery.plugin" target="_blank">tableExport.jquery.plugin</a>,
+                        <i class="fa fa-copyright"></i> Copyright (c) 2015,2016 hhurz, <a href="http://rawgit.com/hhurz/tableExport.jquery.plugin/master/tableExport.js" target="_blank">MIT License</a>
 
                     </small>
                 </div>
@@ -2450,7 +2803,7 @@
     </div>
 
     <div class="modal fade" id="alarmsModal" tabindex="-1" role="dialog" aria-labelledby="alarmsModalLabel">
-        <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-dialog modal-lg" role="document"  style="display: table;"> <!-- allow the modal to expand horizontally -->
             <div class="modal-content">
                 <div class="modal-header">
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
@@ -2532,7 +2885,13 @@
                                     <tr class="option-row">
                                         <td class="option-control"><input id="destroy_on_hide" type="checkbox" data-toggle="toggle" data-on="Destroy" data-off="Hide" data-width="110px"></td>
                                         <td class="option-info"><strong>How to handle hidden charts?</strong><br/>
-                                            <small>When set to <b>Destroy</b>, charts that are not in the current viewport of the browser (are above, or below the visible area of the page), will be destroyed and re-created if and when they become visible again. When set to <b>Hide</b>, the not-visible charts will be just hidden, to simplify the DOM and speed up your browser. Set it to <b>Destroy</b>, to lower the memory requirements of your browser. Set it to <b>Hide</b> for smoother page scrolling.</small>
+                                            <small>When set to <b>Destroy</b>, charts that are not in the current viewport of the browser (are above, or below the visible area of the page), will be destroyed and re-created if and when they become visible again. When set to <b>Hide</b>, the not-visible charts will be just hidden, to simplify the DOM and speed up your browser. Set it to <b>Destroy</b>, to lower the memory requirements of your browser. Set it to <b>Hide</b> for faster restoration of charts on page scrolling.</small>
+                                        </td>
+                                        </tr>
+                                    <tr class="option-row">
+                                        <td class="option-control"><input id="async_on_scroll" type="checkbox" data-toggle="toggle" data-on="Async" data-off="Sync" data-width="110px"></td>
+                                        <td class="option-info"><strong>Page scroll handling?</strong><br/>
+                                            <small>When set to <b>Sync</b>, charts will be examined for their visibility synchronously. On slow computers this may impact the smoothness of page scrolling. To work asynchronously set it to <b>Async</b>. When set to <b>Sync</b>, the performance of page scrolling is monitored and this setting switches automatically to <b>Async</b> if the browser is found slow. Set it to <b>Sync</b> for best visual experience. Set it to <b>Async</b> for smoother page scrolling.</small>
                                         </td>
                                         </tr>
                                     </table>
@@ -2743,4 +3102,4 @@
     </div>
 </body>
 </html>
-<script async type="text/javascript" src="dashboard.js?v54"></script>
+<script type="text/javascript" src="dashboard.js?v20161024-5"></script>

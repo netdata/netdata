@@ -66,23 +66,23 @@ struct target {
     unsigned long long cstime;
     unsigned long long cgtime;
     unsigned long long num_threads;
-    unsigned long long rss;
+    // unsigned long long rss;
 
     unsigned long long statm_size;
     unsigned long long statm_resident;
     unsigned long long statm_share;
-    unsigned long long statm_text;
-    unsigned long long statm_lib;
-    unsigned long long statm_data;
-    unsigned long long statm_dirty;
+    // unsigned long long statm_text;
+    // unsigned long long statm_lib;
+    // unsigned long long statm_data;
+    // unsigned long long statm_dirty;
 
     unsigned long long io_logical_bytes_read;
     unsigned long long io_logical_bytes_written;
-    unsigned long long io_read_calls;
-    unsigned long long io_write_calls;
+    // unsigned long long io_read_calls;
+    // unsigned long long io_write_calls;
     unsigned long long io_storage_bytes_read;
     unsigned long long io_storage_bytes_written;
-    unsigned long long io_cancelled_write_bytes;
+    // unsigned long long io_cancelled_write_bytes;
 
     int *fds;
     unsigned long long openfiles;
@@ -385,7 +385,7 @@ struct pid_stat {
     // int64_t itrealvalue;
     // unsigned long long starttime;
     // unsigned long long vsize;
-    unsigned long long rss;
+    // unsigned long long rss;
     // unsigned long long rsslim;
     // unsigned long long starcode;
     // unsigned long long endcode;
@@ -411,26 +411,26 @@ struct pid_stat {
     unsigned long long statm_size;
     unsigned long long statm_resident;
     unsigned long long statm_share;
-    unsigned long long statm_text;
-    unsigned long long statm_lib;
-    unsigned long long statm_data;
-    unsigned long long statm_dirty;
+    // unsigned long long statm_text;
+    // unsigned long long statm_lib;
+    // unsigned long long statm_data;
+    // unsigned long long statm_dirty;
 
     unsigned long long io_logical_bytes_read_raw;
     unsigned long long io_logical_bytes_written_raw;
-    unsigned long long io_read_calls_raw;
-    unsigned long long io_write_calls_raw;
+    // unsigned long long io_read_calls_raw;
+    // unsigned long long io_write_calls_raw;
     unsigned long long io_storage_bytes_read_raw;
     unsigned long long io_storage_bytes_written_raw;
-    unsigned long long io_cancelled_write_bytes_raw;
+    // unsigned long long io_cancelled_write_bytes_raw;
 
     unsigned long long io_logical_bytes_read;
     unsigned long long io_logical_bytes_written;
-    unsigned long long io_read_calls;
-    unsigned long long io_write_calls;
+    // unsigned long long io_read_calls;
+    // unsigned long long io_write_calls;
     unsigned long long io_storage_bytes_read;
     unsigned long long io_storage_bytes_written;
-    unsigned long long io_cancelled_write_bytes;
+    // unsigned long long io_cancelled_write_bytes;
 
     int *fds;                       // array of fds it uses
     int fds_size;                   // the size of the fds array
@@ -518,7 +518,7 @@ void del_pid_entry(pid_t pid) {
 // update pids from proc
 
 int read_proc_pid_cmdline(struct pid_stat *p) {
-    
+
     if(unlikely(!p->cmdline_filename)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", global_host_prefix, p->pid);
@@ -645,7 +645,7 @@ int read_proc_pid_stat(struct pid_stat *p) {
     // p->itrealvalue   = strtoull(procfile_lineword(ff, 0, 20), NULL, 10);
     // p->starttime     = strtoull(procfile_lineword(ff, 0, 21), NULL, 10);
     // p->vsize         = strtoull(procfile_lineword(ff, 0, 22), NULL, 10);
-    p->rss              = strtoull(procfile_lineword(ff, 0, 23), NULL, 10);
+    // p->rss           = strtoull(procfile_lineword(ff, 0, 23), NULL, 10);
     // p->rsslim        = strtoull(procfile_lineword(ff, 0, 24), NULL, 10);
     // p->starcode      = strtoull(procfile_lineword(ff, 0, 25), NULL, 10);
     // p->endcode       = strtoull(procfile_lineword(ff, 0, 26), NULL, 10);
@@ -711,7 +711,7 @@ cleanup:
     p->cstime           = 0;
     p->cgtime           = 0;
     p->num_threads      = 0;
-    p->rss              = 0;
+    // p->rss              = 0;
     return 0;
 }
 
@@ -735,10 +735,10 @@ int read_proc_pid_statm(struct pid_stat *p) {
     p->statm_size           = strtoull(procfile_lineword(ff, 0, 0), NULL, 10);
     p->statm_resident       = strtoull(procfile_lineword(ff, 0, 1), NULL, 10);
     p->statm_share          = strtoull(procfile_lineword(ff, 0, 2), NULL, 10);
-    p->statm_text           = strtoull(procfile_lineword(ff, 0, 3), NULL, 10);
-    p->statm_lib            = strtoull(procfile_lineword(ff, 0, 4), NULL, 10);
-    p->statm_data           = strtoull(procfile_lineword(ff, 0, 5), NULL, 10);
-    p->statm_dirty          = strtoull(procfile_lineword(ff, 0, 6), NULL, 10);
+    // p->statm_text           = strtoull(procfile_lineword(ff, 0, 3), NULL, 10);
+    // p->statm_lib            = strtoull(procfile_lineword(ff, 0, 4), NULL, 10);
+    // p->statm_data           = strtoull(procfile_lineword(ff, 0, 5), NULL, 10);
+    // p->statm_dirty          = strtoull(procfile_lineword(ff, 0, 6), NULL, 10);
 
     return 1;
 
@@ -746,10 +746,10 @@ cleanup:
     p->statm_size           = 0;
     p->statm_resident       = 0;
     p->statm_share          = 0;
-    p->statm_text           = 0;
-    p->statm_lib            = 0;
-    p->statm_data           = 0;
-    p->statm_dirty          = 0;
+    // p->statm_text           = 0;
+    // p->statm_lib            = 0;
+    // p->statm_data           = 0;
+    // p->statm_dirty          = 0;
     return 0;
 }
 
@@ -784,13 +784,13 @@ int read_proc_pid_io(struct pid_stat *p) {
     p->io_logical_bytes_written_raw = strtoull(procfile_lineword(ff, 1, 1), NULL, 10);
     p->io_logical_bytes_written = (p->io_logical_bytes_written_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
-    last = p->io_read_calls_raw;
-    p->io_read_calls_raw = strtoull(procfile_lineword(ff, 2, 1), NULL, 10);
-    p->io_read_calls = (p->io_read_calls_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
+    // last = p->io_read_calls_raw;
+    // p->io_read_calls_raw = strtoull(procfile_lineword(ff, 2, 1), NULL, 10);
+    // p->io_read_calls = (p->io_read_calls_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
-    last = p->io_write_calls_raw;
-    p->io_write_calls_raw = strtoull(procfile_lineword(ff, 3, 1), NULL, 10);
-    p->io_write_calls = (p->io_write_calls_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
+    // last = p->io_write_calls_raw;
+    // p->io_write_calls_raw = strtoull(procfile_lineword(ff, 3, 1), NULL, 10);
+    // p->io_write_calls = (p->io_write_calls_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     last = p->io_storage_bytes_read_raw;
     p->io_storage_bytes_read_raw = strtoull(procfile_lineword(ff, 4, 1), NULL, 10);
@@ -800,18 +800,18 @@ int read_proc_pid_io(struct pid_stat *p) {
     p->io_storage_bytes_written_raw = strtoull(procfile_lineword(ff, 5, 1), NULL, 10);
     p->io_storage_bytes_written = (p->io_storage_bytes_written_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
-    last = p->io_cancelled_write_bytes_raw;
-    p->io_cancelled_write_bytes_raw = strtoull(procfile_lineword(ff, 6, 1), NULL, 10);
-    p->io_cancelled_write_bytes = (p->io_cancelled_write_bytes_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
+    // last = p->io_cancelled_write_bytes_raw;
+    // p->io_cancelled_write_bytes_raw = strtoull(procfile_lineword(ff, 6, 1), NULL, 10);
+    // p->io_cancelled_write_bytes = (p->io_cancelled_write_bytes_raw - last) * (1000000ULL * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     if(unlikely(global_iterations_counter == 1)) {
         p->io_logical_bytes_read        = 0;
         p->io_logical_bytes_written     = 0;
-        p->io_read_calls                = 0;
-        p->io_write_calls               = 0;
+        // p->io_read_calls             = 0;
+        // p->io_write_calls            = 0;
         p->io_storage_bytes_read        = 0;
         p->io_storage_bytes_written     = 0;
-        p->io_cancelled_write_bytes     = 0;
+        // p->io_cancelled_write_bytes  = 0;
     }
 
     return 1;
@@ -819,11 +819,11 @@ int read_proc_pid_io(struct pid_stat *p) {
 cleanup:
     p->io_logical_bytes_read        = 0;
     p->io_logical_bytes_written     = 0;
-    p->io_read_calls                = 0;
-    p->io_write_calls               = 0;
+    // p->io_read_calls             = 0;
+    // p->io_write_calls            = 0;
     p->io_storage_bytes_read        = 0;
     p->io_storage_bytes_written     = 0;
-    p->io_cancelled_write_bytes     = 0;
+    // p->io_cancelled_write_bytes  = 0;
     return 0;
 }
 
@@ -1273,14 +1273,14 @@ void find_lost_child_debug(struct pid_stat *pe, unsigned long long lost, int typ
                     found++;
                 }
                 break;
-                
+
             case 2:
                 if(p->cmajflt > lost) {
                     fprintf(stderr, " > process %d (%s) could use the lost exited child majflt %llu of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
                     found++;
                 }
                 break;
-                
+
             case 3:
                 if(p->cutime > lost) {
                     fprintf(stderr, " > process %d (%s) could use the lost exited child utime %llu of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
@@ -1309,11 +1309,11 @@ void find_lost_child_debug(struct pid_stat *pe, unsigned long long lost, int typ
             case 1:
                 fprintf(stderr, " > cannot find any process to use the lost exited child minflt %llu of process %d (%s)\n", lost, pe->pid, pe->comm);
                 break;
-                
+
             case 2:
                 fprintf(stderr, " > cannot find any process to use the lost exited child majflt %llu of process %d (%s)\n", lost, pe->pid, pe->comm);
                 break;
-                
+
             case 3:
                 fprintf(stderr, " > cannot find any process to use the lost exited child utime %llu of process %d (%s)\n", lost, pe->pid, pe->comm);
                 break;
@@ -1902,24 +1902,24 @@ long zero_all_targets(struct target *root) {
         w->cstime = 0;
         w->cgtime = 0;
         w->num_threads = 0;
-        w->rss = 0;
+        // w->rss = 0;
         w->processes = 0;
 
         w->statm_size = 0;
         w->statm_resident = 0;
         w->statm_share = 0;
-        w->statm_text = 0;
-        w->statm_lib = 0;
-        w->statm_data = 0;
-        w->statm_dirty = 0;
+        // w->statm_text = 0;
+        // w->statm_lib = 0;
+        // w->statm_data = 0;
+        // w->statm_dirty = 0;
 
         w->io_logical_bytes_read = 0;
         w->io_logical_bytes_written = 0;
-        w->io_read_calls = 0;
-        w->io_write_calls = 0;
+        // w->io_read_calls = 0;
+        // w->io_write_calls = 0;
         w->io_storage_bytes_read = 0;
         w->io_storage_bytes_written = 0;
-        w->io_cancelled_write_bytes = 0;
+        // w->io_cancelled_write_bytes = 0;
     }
 
     return count;
@@ -1944,23 +1944,23 @@ void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target
         w->minflt += p->minflt;
         w->majflt += p->majflt;
 
-        w->rss += p->rss;
+        // w->rss += p->rss;
 
         w->statm_size += p->statm_size;
         w->statm_resident += p->statm_resident;
         w->statm_share += p->statm_share;
-        w->statm_text += p->statm_text;
-        w->statm_lib += p->statm_lib;
-        w->statm_data += p->statm_data;
-        w->statm_dirty += p->statm_dirty;
+        // w->statm_text += p->statm_text;
+        // w->statm_lib += p->statm_lib;
+        // w->statm_data += p->statm_data;
+        // w->statm_dirty += p->statm_dirty;
 
         w->io_logical_bytes_read    += p->io_logical_bytes_read;
         w->io_logical_bytes_written += p->io_logical_bytes_written;
-        w->io_read_calls            += p->io_read_calls;
-        w->io_write_calls           += p->io_write_calls;
+        // w->io_read_calls            += p->io_read_calls;
+        // w->io_write_calls           += p->io_write_calls;
         w->io_storage_bytes_read    += p->io_storage_bytes_read;
         w->io_storage_bytes_written += p->io_storage_bytes_written;
-        w->io_cancelled_write_bytes += p->io_cancelled_write_bytes;
+        // w->io_cancelled_write_bytes += p->io_cancelled_write_bytes;
 
         w->processes++;
         w->num_threads += p->num_threads;
@@ -2175,8 +2175,8 @@ unsigned long long send_resource_usage_to_netdata() {
         cpuuser = me.ru_utime.tv_sec * 1000000ULL + me.ru_utime.tv_usec;
         cpusyst = me.ru_stime.tv_sec * 1000000ULL + me.ru_stime.tv_usec;
 
-        bcopy(&now, &last, sizeof(struct timeval));
-        bcopy(&me, &me_last, sizeof(struct rusage));
+        memmove(&last, &now, sizeof(struct timeval));
+        memmove(&me_last, &me, sizeof(struct rusage));
     }
 
     buffer_sprintf(output,
@@ -2433,6 +2433,13 @@ void send_collected_data_to_netdata(struct target *root, const char *type, unsig
     }
     send_END();
 
+    send_BEGIN(type, "vmem", usec);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            send_SET(w->name, w->statm_size);
+    }
+    send_END();
+
     send_BEGIN(type, "minor_faults", usec);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
@@ -2529,7 +2536,13 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
             buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu %s\n", w->name, hz * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
     }
 
-    buffer_sprintf(output, "CHART %s.mem '' '%s Dedicated Memory (w/o shared)' 'MB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
+    buffer_sprintf(output, "CHART %s.mem '' '%s Real Memory (w/o shared)' 'MB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            buffer_sprintf(output, "DIMENSION %s '' absolute %ld %ld\n", w->name, sysconf(_SC_PAGESIZE), 1024L*1024L);
+    }
+
+    buffer_sprintf(output, "CHART %s.vmem '' '%s Virtual Memory Size' 'MB' mem %s.vmem stacked 20004 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             buffer_sprintf(output, "DIMENSION %s '' absolute %ld %ld\n", w->name, sysconf(_SC_PAGESIZE), 1024L*1024L);

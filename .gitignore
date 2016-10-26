@@ -29,8 +29,11 @@ netdata.spec
 
 *.tar.*
 
+sitespeed-result/
 cov-int/
 netdata-coverity-analysis.tgz
+.coverity-token
+.coverity-build
 
 .cproject
 .idea/
@@ -86,3 +89,10 @@ profile/benchmark-dictionary
 profile/benchmark-registry
 
 *.pyc
+
+diagrams/*.png
+diagrams/*.svg
+diagrams/*.atxt
+diagrams/plantuml.jar
+
+netdata.cppcheck

@@ -7,7 +7,7 @@ void netdata_cleanup_and_exit(int ret) {
 
     error_log_limit_unlimited();
 
-    info("Called: netdata_cleanup_and_exit()");
+    debug(D_EXIT, "Called: netdata_cleanup_and_exit()");
 #ifdef NETDATA_INTERNAL_CHECKS
     rrdset_free_all();
 #else
@@ -169,7 +169,7 @@ void kill_childs()
     }
 
     if(tc_child_pid) {
-        info("Killing tc-qos-helper procees");
+        debug(D_EXIT, "Killing tc-qos-helper procees");
         if(killpid(tc_child_pid, SIGTERM) != -1)
             waitid(P_PID, (id_t) tc_child_pid, &info, WEXITED);
     }
@@ -286,8 +286,6 @@ int main(int argc, char **argv)
     // set the name for logging
     program_name = "netdata";
 
-    // parse command line.
-
     // parse depercated options
     // TODO: Remove this block with the next major release.
     {
@@ -376,7 +374,7 @@ int main(int argc, char **argv)
                     break;
                 case 'v':
                     // TODO: Outsource version to makefile which can compute version from git.
-                    printf("netdata 1.3.1_master\n");
+                    printf("netdata %s\n", VERSION);
                     return 0;
                 case 'W':
                     {
@@ -409,6 +407,16 @@ int main(int argc, char **argv)
         load_config(NULL, 0);
 
     {
+        char *pmax = config_get("global", "glibc malloc arena max for plugins", "1");
+        if(pmax && *pmax)
+            setenv("MALLOC_ARENA_MAX", pmax, 1);
+
+#if defined(HAVE_C_MALLOPT)
+        int i = config_get_number("global", "glibc malloc arena max for netdata", 1);
+        if(i > 0)
+            mallopt(M_ARENA_MAX, 1);
+#endif
+
         char *config_dir = config_get("global", "config directory", CONFIG_DIR);
 
         // prepare configuration environment variables for the plugins
@@ -452,7 +460,8 @@ int main(int argc, char **argv)
         if(debug_flags != 0) {
             struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
             if(setrlimit(RLIMIT_CORE, &rl) != 0)
-                info("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
+                error("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
+
             prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
         }
 
@@ -512,7 +521,7 @@ int main(int argc, char **argv)
 
         rrd_default_history_entries = (int) config_get_number("global", "history", RRD_DEFAULT_HISTORY_ENTRIES);
         if(rrd_default_history_entries < 5 || rrd_default_history_entries > RRD_HISTORY_ENTRIES_MAX) {
-            info("Invalid save lines %d given. Defaulting to %d.", rrd_default_history_entries, RRD_DEFAULT_HISTORY_ENTRIES);
+            error("Invalid history entries %d given. Defaulting to %d.", rrd_default_history_entries, RRD_DEFAULT_HISTORY_ENTRIES);
             rrd_default_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
         }
         else {
@@ -523,7 +532,7 @@ int main(int argc, char **argv)
 
         rrd_update_every = (int) config_get_number("global", "update every", UPDATE_EVERY);
         if(rrd_update_every < 1 || rrd_update_every > 600) {
-            info("Invalid update timer %d given. Defaulting to %d.", rrd_update_every, UPDATE_EVERY_MAX);
+            error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", rrd_update_every, UPDATE_EVERY_MAX);
             rrd_update_every = UPDATE_EVERY;
         }
         else debug(D_OPTIONS, "update timer set to %d.", rrd_update_every);
@@ -627,7 +636,7 @@ int main(int argc, char **argv)
     if(debug_flags != 0) {
         struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
         if(setrlimit(RLIMIT_CORE, &rl) != 0)
-            info("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
+            error("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
         prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
     }
 #endif /* NETDATA_INTERNAL_CHECKS */
@@ -647,7 +656,7 @@ int main(int argc, char **argv)
         if(i != 0)
             fatal("pthread_attr_setstacksize() to %zu bytes, failed with code %d.", wanted_stacksize, i);
         else
-            info("Successfully set pthread stacksize to %zu bytes", wanted_stacksize);
+            debug(D_SYSTEM, "Successfully set pthread stacksize to %zu bytes", wanted_stacksize);
     }
 
     // ------------------------------------------------------------------------
@@ -684,7 +693,7 @@ int main(int argc, char **argv)
         if(st->enabled) {
             st->thread = mallocz(sizeof(pthread_t));
 
-            info("Starting thread %s.", st->name);
+            debug(D_SYSTEM, "Starting thread %s.", st->name);
 
             if(pthread_create(st->thread, &attr, st->start_routine, NULL))
                 error("failed to create new thread for %s.", st->name);
@@ -692,7 +701,7 @@ int main(int argc, char **argv)
             else if(pthread_detach(*st->thread))
                 error("Cannot request detach of newly created %s thread.", st->name);
         }
-        else info("Not starting thread %s.", st->name);
+        else debug(D_SYSTEM, "Not starting thread %s.", st->name);
     }
 
     // ------------------------------------------------------------------------
@@ -708,7 +717,7 @@ int main(int argc, char **argv)
     while(1) {
         pause();
         if(netdata_exit) {
-            info("Exit main loop of netdata.");
+            debug(D_EXIT, "Exit main loop of netdata.");
             netdata_cleanup_and_exit(0);
             exit(0);
         }

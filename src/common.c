@@ -14,31 +14,181 @@ volatile sig_atomic_t netdata_exit = 0;
 // its lifetime), these can be used to override the default system allocation
 // routines.
 
+#ifdef NETDATA_LOG_ALLOCATIONS
+static struct memory_statistics {
+    volatile size_t malloc_calls_made;
+    volatile size_t calloc_calls_made;
+    volatile size_t realloc_calls_made;
+    volatile size_t strdup_calls_made;
+    volatile size_t free_calls_made;
+    volatile size_t memory_calls_made;
+    volatile size_t allocated_memory;
+    volatile size_t mmapped_memory;
+} memory_statistics;
+
+static inline void print_allocations(const char *file, const char *function, const unsigned long line) {
+    static struct memory_statistics old = { 0, 0, 0, 0, 0, 0, 0, 0 };
+
+    //if(unlikely(!(memory_statistics.memory_calls_made % 5))) {
+        fprintf(stderr, "(%04lu@%-10.10s:%-15.15s): Allocated %zu KB (+%zu B), mmapped %zu KB (+%zu B): malloc %zu (+%zu), calloc %zu (+%zu), realloc %zu (+%zu), strdup %zu (+%zu), free %zu (+%zu)\n",
+                line, file, function,
+                (memory_statistics.allocated_memory + 512) / 1024, memory_statistics.allocated_memory - old.allocated_memory,
+                (memory_statistics.mmapped_memory + 512) / 1024, memory_statistics.mmapped_memory - old.mmapped_memory,
+                memory_statistics.malloc_calls_made, memory_statistics.malloc_calls_made - old.malloc_calls_made,
+                memory_statistics.calloc_calls_made, memory_statistics.calloc_calls_made - old.calloc_calls_made,
+                memory_statistics.realloc_calls_made, memory_statistics.realloc_calls_made - old.realloc_calls_made,
+                memory_statistics.strdup_calls_made, memory_statistics.strdup_calls_made - old.strdup_calls_made,
+                memory_statistics.free_calls_made, memory_statistics.free_calls_made - old.free_calls_made
+        );
+
+        memcpy(&old, &memory_statistics, sizeof(struct memory_statistics));
+    //}
+}
+
+static inline void malloc_accounting(const char *file, const char *function, const unsigned long line, size_t size) {
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
+    __atomic_fetch_add(&memory_statistics.memory_calls_made, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&memory_statistics.malloc_calls_made, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&memory_statistics.allocated_memory, size, __ATOMIC_SEQ_CST);
+#else
+    // this is for debugging - we don't care locking it
+    memory_statistics.memory_calls_made++;
+    memory_statistics.malloc_calls_made++;
+    memory_statistics.allocated_memory += size;
+#endif
+    print_allocations(file, function, line);
+}
+
+static inline void mmap_accounting(size_t size) {
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
+    __atomic_fetch_add(&memory_statistics.malloc_calls_made, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&memory_statistics.mmapped_memory, size, __ATOMIC_SEQ_CST);
+#else
+    // this is for debugging - we don't care locking it
+    memory_statistics.memory_calls_made++;
+    memory_statistics.mmapped_memory += size;
+#endif
+}
+
+static inline void calloc_accounting(const char *file, const char *function, const unsigned long line, size_t size) {
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
+    __atomic_fetch_add(&memory_statistics.memory_calls_made, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&memory_statistics.calloc_calls_made, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&memory_statistics.allocated_memory, size, __ATOMIC_SEQ_CST);
+#else
+    // this is for debugging - we don't care locking it
+    memory_statistics.memory_calls_made++;
+    memory_statistics.calloc_calls_made++;
+    memory_statistics.allocated_memory += size;
+#endif
+    print_allocations(file, function, line);
+}
+
+static inline void realloc_accounting(const char *file, const char *function, const unsigned long line, void *ptr, size_t size) {
+    (void)ptr;
+
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
+    __atomic_fetch_add(&memory_statistics.memory_calls_made, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&memory_statistics.realloc_calls_made, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&memory_statistics.allocated_memory, size, __ATOMIC_SEQ_CST);
+#else
+    // this is for debugging - we don't care locking it
+    memory_statistics.memory_calls_made++;
+    memory_statistics.realloc_calls_made++;
+    memory_statistics.allocated_memory += size;
+#endif
+    print_allocations(file, function, line);
+}
+
+static inline void strdup_accounting(const char *file, const char *function, const unsigned long line, const char *s) {
+    size_t size = strlen(s) + 1;
+
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
+    __atomic_fetch_add(&memory_statistics.memory_calls_made, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&memory_statistics.strdup_calls_made, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&memory_statistics.allocated_memory, size, __ATOMIC_SEQ_CST);
+#else
+    // this is for debugging - we don't care locking it
+    memory_statistics.memory_calls_made++;
+    memory_statistics.strdup_calls_made++;
+    memory_statistics.allocated_memory += size;
+#endif
+    print_allocations(file, function, line);
+}
+
+static inline void free_accounting(const char *file, const char *function, const unsigned long line, void *ptr) {
+    (void)file;
+    (void)function;
+    (void)line;
+
+    if(likely(ptr)) {
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
+        __atomic_fetch_add(&memory_statistics.memory_calls_made, 1, __ATOMIC_SEQ_CST);
+        __atomic_fetch_add(&memory_statistics.free_calls_made, 1, __ATOMIC_SEQ_CST);
+#else
+        // this is for debugging - we don't care locking it
+        memory_statistics.memory_calls_made++;
+        memory_statistics.free_calls_made++;
+#endif
+    }
+}
+#endif
+
+#ifdef NETDATA_LOG_ALLOCATIONS
+char *strdupz_int(const char *file, const char *function, const unsigned long line, const char *s) {
+    strdup_accounting(file, function, line, s);
+#else
 char *strdupz(const char *s) {
+#endif
+
     char *t = strdup(s);
     if (unlikely(!t)) fatal("Cannot strdup() string '%s'", s);
     return t;
 }
 
+#ifdef NETDATA_LOG_ALLOCATIONS
+void *mallocz_int(const char *file, const char *function, const unsigned long line, size_t size) {
+    malloc_accounting(file, function, line, size);
+#else
 void *mallocz(size_t size) {
+#endif
+
     void *p = malloc(size);
     if (unlikely(!p)) fatal("Cannot allocate %zu bytes of memory.", size);
     return p;
 }
 
+#ifdef NETDATA_LOG_ALLOCATIONS
+void *callocz_int(const char *file, const char *function, const unsigned long line, size_t nmemb, size_t size) {
+    calloc_accounting(file, function, line, nmemb * size);
+#else
 void *callocz(size_t nmemb, size_t size) {
+#endif
+
     void *p = calloc(nmemb, size);
     if (unlikely(!p)) fatal("Cannot allocate %zu bytes of memory.", nmemb * size);
     return p;
 }
 
+#ifdef NETDATA_LOG_ALLOCATIONS
+void *reallocz_int(const char *file, const char *function, const unsigned long line, void *ptr, size_t size) {
+    realloc_accounting(file, function, line, ptr, size);
+#else
 void *reallocz(void *ptr, size_t size) {
+#endif
+
     void *p = realloc(ptr, size);
     if (unlikely(!p)) fatal("Cannot re-allocate memory to %zu bytes.", size);
     return p;
 }
 
+#ifdef NETDATA_LOG_ALLOCATIONS
+void freez_int(const char *file, const char *function, const unsigned long line, void *ptr) {
+    free_accounting(file, function, line, ptr);
+#else
 void freez(void *ptr) {
+#endif
+
     free(ptr);
 }
 
@@ -74,7 +224,7 @@ int sleep_usec(unsigned long long usec) {
 
     while (nanosleep(&req, &rem) == -1) {
         if (likely(errno == EINTR)) {
-            info("nanosleep() interrupted (while sleeping for %llu microseconds).", usec);
+            debug(D_SYSTEM, "nanosleep() interrupted (while sleeping for %llu microseconds).", usec);
             req.tv_sec = rem.tv_sec;
             req.tv_nsec = rem.tv_nsec;
         } else {
@@ -770,7 +920,14 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm) {
                 if (flags & MAP_SHARED || !enable_ksm || !ksm) {
 #endif
                     mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags, fd, 0);
-                    if (mem != MAP_FAILED) {
+                    if (mem == MAP_FAILED) {
+                        error("Cannot allocate SHARED memory for file '%s'.", filename);
+                        mem = NULL;
+                    }
+                    else {
+#ifdef NETDATA_LOG_ALLOCATIONS
+                        mmap_accounting(size);
+#endif
                         int advise = MADV_SEQUENTIAL | MADV_DONTFORK;
                         if (flags & MAP_SHARED) advise |= MADV_WILLNEED;
 
@@ -780,7 +937,8 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm) {
                         }
                     }
 #ifdef MADV_MERGEABLE
-                } else {
+                }
+                else {
 /*
                     // test - load the file into memory
                     mem = calloc(1, size);
@@ -794,7 +952,14 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm) {
                     }
 */
                     mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags | MAP_ANONYMOUS, -1, 0);
-                    if (mem != MAP_FAILED) {
+                    if (mem == MAP_FAILED) {
+                        error("Cannot allocate PRIVATE ANONYMOUS memory for KSM for file '%s'.", filename);
+                        mem = NULL;
+                    }
+                    else {
+#ifdef NETDATA_LOG_ALLOCATIONS
+                        mmap_accounting(size);
+#endif
                         if (lseek(fd, 0, SEEK_SET) == 0) {
                             if (read(fd, mem, size) != (ssize_t) size)
                                 error("Cannot read from file '%s'", filename);
@@ -813,17 +978,19 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm) {
                                   filename);
                             log_madvise_3--;
                         }
-                    } else
-                        error("Cannot allocate PRIVATE ANONYMOUS memory for KSM for file '%s'.", filename);
+                    }
                 }
 #endif
-            } else
+            }
+            else
                 error("Cannot write to file '%s' at position %zu.", filename, size);
-        } else
+        }
+        else
             error("Cannot seek file '%s' to size %zu.", filename, size);
 
         close(fd);
-    } else
+    }
+    else
         error("Cannot create/open file '%s'.", filename);
 
     return mem;
@@ -954,7 +1121,7 @@ long get_system_cpus(void) {
 
     procfile_close(ff);
 
-    info("System has %d processors.", processors);
+    debug(D_SYSTEM, "System has %d processors.", processors);
     return processors;
 }
 
@@ -985,7 +1152,7 @@ pid_t get_system_pid_max(void) {
     }
 
     procfile_close(ff);
-    info("System supports %d pids.", pid_max);
+    debug(D_SYSTEM, "System supports %d pids.", pid_max);
     return pid_max;
 }
 
@@ -998,4 +1165,21 @@ void get_system_HZ(void) {
     }
 
     hz = (unsigned int) ticks;
+}
+
+int read_single_number_file(const char *filename, unsigned long long *result) {
+    char buffer[1024 + 1];
+
+    int fd = open(filename, O_RDONLY, 0666);
+    if(unlikely(fd == -1)) return 1;
+
+    ssize_t r = read(fd, buffer, 1024);
+    if(unlikely(r == -1)) {
+        close(fd);
+        return 2;
+    }
+
+    close(fd);
+    *result = strtoull(buffer, NULL, 0);
+    return 0;
 }

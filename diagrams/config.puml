@@ -1,0 +1,46 @@
+
+skinparam handwritten true
+skinparam monochrome true
+skinparam roundcorner 15
+
+skinparam sequence {
+    ArrowThickness 3
+
+    DividerFontColor Black
+    DividerFontName Comic Sans MS
+    DividerFontSize 15
+    DividerFontStyle Italic
+
+    DelayFontColor Black
+    DelayFontName Comic Sans MS
+    DelayFontSize 15
+    DelayFontStyle Italic
+
+    TitleFontColor Black
+    TitleFontName Comic Sans MS
+    TitleFontStyle Italic
+    TitleFontSize 25
+
+    ArrowColor DeepSkyBlue
+    ArrowFontColor Black
+    ArrowFontName Comic Sans MS
+    ArrowFontStyle Regular
+    ArrowFontSize 19
+
+    ActorBorderColor DeepSkyBlue
+
+    LifeLineBorderColor blue
+    LifeLineBackgroundColor #A9DCDF
+
+    ParticipantBorderColor DeepSkyBlue
+    ParticipantBackgroundColor LightBlue
+    ParticipantFontName Comic Sans MS
+    ParticipantFontSize 20
+    ParticipantFontColor Black
+
+    ActorBackgroundColor aqua
+    ActorFontColor Black
+    ActorFontSize 20
+    ActorFontName Comic Sans MS
+}
+

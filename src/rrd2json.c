@@ -1158,7 +1158,7 @@ inline static void rrdr_free(RRDR *r)
     freez(r);
 }
 
-inline void rrdr_done(RRDR *r)
+static inline void rrdr_done(RRDR *r)
 {
     r->rows = r->c + 1;
     r->c = 0;

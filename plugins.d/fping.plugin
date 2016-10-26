@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+# This plugin requires a special version of fping.
+# Get it from https://github.com/ktsaou/fping
+# and build it, like this:
+#
+# cd /usr/src
+# git clone https://github.com/ktsaou/fping.git fping-netdata.git
+# cd fping-netdata.git
+# ./autogen.sh
+# ./configure --prefix=/usr/local
+# make
+# cp src/fping /usr/local/bin/
+# chown root:root /usr/local/bin/fping
+# chmod 4755 /usr/local/bin/fping
+#
+# Then, create /etc/netdata/fping.conf
+# and set the configuration options given below
+
+export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
+export LC_ALL=C
+
+# -----------------------------------------------------------------------------
+
+PROGRAM_NAME="$(basename "${0}")"
+
+logdate() {
+    date "+%Y-%m-%d %H:%M:%S"
+}
+
+log() {
+    local status="${1}"
+    shift
+
+    echo >&2 "$(logdate): ${PROGRAM_NAME}: ${status}: ${*}"
+
+}
+
+warning() {
+    log WARNING "${@}"
+}
+
+error() {
+    log ERROR "${@}"
+}
+
+info() {
+    log INFO "${@}"
+}
+
+fatal() {
+    log FATAL "${@}"
+	echo "DISABLE"
+    exit 1
+}
+
+debug=0
+debug() {
+    [ $debug -eq 1 ] && log DEBUG "${@}"
+}
+
+# -----------------------------------------------------------------------------
+
+# the frequency to send info to netdata
+# passed by netdata as the first parameter
+update_every="${1-1}"
+
+# the netdata configuration directory
+# passed by netdata as an environment variable
+NETDATA_CONFIG_DIR="${NETDATA_CONFIG_DIR-/etc/netdata}"
+
+# -----------------------------------------------------------------------------
+# configuration options
+# can be overwritten at /etc/netdata/fping.conf
+
+# the fping binary to use
+# we need one that can output netdata friendly info
+fping="$(which fping || command -v fping)"
+
+# a space separated list of hosts to fping
+hosts=""
+
+# the time in milliseconds (1 sec = 1000 ms)
+# to ping the hosts - by default 2 pings per iteration
+ping_every="$((update_every * 1000 / 2))"
+
+# how many retries to make if a host does not respond
+retries=1
+
+# -----------------------------------------------------------------------------
+# load the configuration file
+
+if [ ! -f "${NETDATA_CONFIG_DIR}/fping.conf" ]
+then
+	fatal "configuration file '${NETDATA_CONFIG_DIR}/fping.conf' not found - nothing to do."
+fi
+
+source "${NETDATA_CONFIG_DIR}/fping.conf"
+
+if [ -z "${hosts}" ]
+then
+	fatal "no hosts configued in '${NETDATA_CONFIG_DIR}/fping.conf' - nothing to do."
+fi
+
+if [ -z "${fping}" -o ! -x "${fping}" ]
+then
+	fatal "command '${fping}' is not executable - cannot proceed."
+fi
+
+# the fping options we will use
+options=( -N -l -R -Q ${update_every} -p ${ping_every} -r ${retries} ${hosts} )
+
+# execute fping
+exec "${fping}" "${options[@]}"
+
+# if we cannot execute fping, stop
+fatal "command '${fping} ${options[@]}' failed to be executed."

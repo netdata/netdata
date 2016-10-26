@@ -5,6 +5,25 @@
 #include <config.h>
 #endif
 
+/* select the memory allocator, based on autoconf findings */
+#if defined(ENABLE_JEMALLOC)
+
+#if defined(HAVE_JEMALLOC_JEMALLOC_H)
+#include <jemalloc/jemalloc.h>
+#else
+#include <malloc.h>
+#endif
+
+#elif defined(ENABLE_TCMALLOC)
+
+#include <google/tcmalloc.h>
+
+#else /* !defined(ENABLE_JEMALLOC) && !defined(ENABLE_TCMALLOC) */
+
+#include <malloc.h>
+
+#endif
+
 #include <pthread.h>
 #include <errno.h>
 
@@ -27,7 +46,7 @@
 #include <grp.h>
 #include <pwd.h>
 #include <locale.h>
-#include <malloc.h>
+
 #include <netdb.h>
 #include <poll.h>
 #include <signal.h>
@@ -46,6 +65,10 @@
 #include <unistd.h>
 #include <uuid/uuid.h>
 
+/*
+#include <mntent.h>
+*/
+
 #ifdef STORAGE_WITH_MATH
 #include <math.h>
 #endif
@@ -60,24 +83,16 @@
 #include <zlib.h>
 #endif
 
-#ifndef __ATOMIC_SEQ_CST
-#define NETDATA_NO_ATOMIC_INSTRUCTIONS 1
+#if (SIZEOF_VOID_P == 8)
+#define ENVIRONMENT64
+#elif (SIZEOF_VOID_P == 4)
+#define ENVIRONMENT32
+#else
+#error "Cannot detect if this is a 32 or 64 bit CPU"
 #endif
 
 #ifdef __GNUC__
-#define GCC_VERSION (__GNUC__ * 10000 \
-                               + __GNUC_MINOR__ * 100 \
-                               + __GNUC_PATCHLEVEL__)
-
-#if __x86_64__ || __ppc64__
-#define ENVIRONMENT64
-#else
-#define ENVIRONMENT32
-#endif
-
-#else // !__GNUC__
-#define NETDATA_NO_ATOMIC_INSTRUCTIONS 1
-#define ENVIRONMENT32
+#define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 #endif // __GNUC__
 
 #include "avl.h"
@@ -139,11 +154,25 @@ extern int  vsnprintfz(char *dst, size_t n, const char *fmt, va_list args);
 extern int  snprintfz(char *dst, size_t n, const char *fmt, ...) __attribute__ (( format (printf, 3, 4)));
 
 // memory allocation functions that handle failures
+#ifdef NETDATA_LOG_ALLOCATIONS
+#define strdupz(s) strdupz_int(__FILE__, __FUNCTION__, __LINE__, s)
+#define callocz(nmemb, size) callocz_int(__FILE__, __FUNCTION__, __LINE__, nmemb, size)
+#define mallocz(size) mallocz_int(__FILE__, __FUNCTION__, __LINE__, size)
+#define reallocz(ptr, size) reallocz_int(__FILE__, __FUNCTION__, __LINE__, ptr, size)
+#define freez(ptr) freez_int(__FILE__, __FUNCTION__, __LINE__, ptr)
+
+extern char *strdupz_int(const char *file, const char *function, const unsigned long line, const char *s);
+extern void *callocz_int(const char *file, const char *function, const unsigned long line, size_t nmemb, size_t size);
+extern void *mallocz_int(const char *file, const char *function, const unsigned long line, size_t size);
+extern void *reallocz_int(const char *file, const char *function, const unsigned long line, void *ptr, size_t size);
+extern void freez_int(const char *file, const char *function, const unsigned long line, void *ptr);
+#else
 extern char *strdupz(const char *s);
 extern void *callocz(size_t nmemb, size_t size);
 extern void *mallocz(size_t size);
-extern void freez(void *ptr);
 extern void *reallocz(void *ptr, size_t size);
+extern void freez(void *ptr);
+#endif
 
 extern void *mymmap(const char *filename, size_t size, int flags, int ksm);
 extern int savememory(const char *filename, void *mem, size_t size);
@@ -177,5 +206,7 @@ extern void get_system_HZ(void);
 #define RUSAGE_THREAD RUSAGE_CHILDREN
 #endif
 #endif
+
+extern int read_single_number_file(const char *filename, unsigned long long *result);
 
 #endif /* NETDATA_COMMON_H */

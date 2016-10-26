@@ -108,25 +108,25 @@
     // default URLs for all the external files we need
     // make them RELATIVE so that the whole thing can also be
     // installed under a web server
-    NETDATA.jQuery              = NETDATA.serverDefault + 'lib/jquery-1.12.0.min.js';
-    NETDATA.peity_js            = NETDATA.serverDefault + 'lib/jquery.peity.min.js';
-    NETDATA.sparkline_js        = NETDATA.serverDefault + 'lib/jquery.sparkline.min.js';
-    NETDATA.easypiechart_js     = NETDATA.serverDefault + 'lib/jquery.easypiechart.min.js';
-    NETDATA.gauge_js            = NETDATA.serverDefault + 'lib/gauge.min.js';
-    NETDATA.dygraph_js          = NETDATA.serverDefault + 'lib/dygraph-combined.js';
-    NETDATA.dygraph_smooth_js   = NETDATA.serverDefault + 'lib/dygraph-smooth-plotter.js';
-    NETDATA.raphael_js          = NETDATA.serverDefault + 'lib/raphael-min.js';
-    NETDATA.morris_js           = NETDATA.serverDefault + 'lib/morris.min.js';
-    NETDATA.d3_js               = NETDATA.serverDefault + 'lib/d3.min.js';
-    NETDATA.c3_js               = NETDATA.serverDefault + 'lib/c3.min.js';
-    NETDATA.c3_css              = NETDATA.serverDefault + 'css/c3.min.css';
-    NETDATA.morris_css          = NETDATA.serverDefault + 'css/morris.css';
+    NETDATA.jQuery              = NETDATA.serverDefault + 'lib/jquery-2.2.4.min.js';
+    NETDATA.peity_js            = NETDATA.serverDefault + 'lib/jquery.peity-3.2.0.min.js';
+    NETDATA.sparkline_js        = NETDATA.serverDefault + 'lib/jquery.sparkline-2.1.2.min.js';
+    NETDATA.easypiechart_js     = NETDATA.serverDefault + 'lib/jquery.easypiechart-97b5824.min.js';
+    NETDATA.gauge_js            = NETDATA.serverDefault + 'lib/gauge-d5260c3.min.js';
+    NETDATA.dygraph_js          = NETDATA.serverDefault + 'lib/dygraph-combined-dd74404.js';
+    NETDATA.dygraph_smooth_js   = NETDATA.serverDefault + 'lib/dygraph-smooth-plotter-dd74404.js';
+    NETDATA.raphael_js          = NETDATA.serverDefault + 'lib/raphael-2.2.4-min.js';
+    NETDATA.c3_js               = NETDATA.serverDefault + 'lib/c3-0.4.11.min.js';
+    NETDATA.c3_css              = NETDATA.serverDefault + 'css/c3-0.4.11.min.css';
+    NETDATA.d3_js               = NETDATA.serverDefault + 'lib/d3-3.5.17.min.js';
+    NETDATA.morris_js           = NETDATA.serverDefault + 'lib/morris-0.5.1.min.js';
+    NETDATA.morris_css          = NETDATA.serverDefault + 'css/morris-0.5.1.css';
     NETDATA.google_js           = 'https://www.google.com/jsapi';
 
     NETDATA.themes = {
         white: {
-            bootstrap_css: NETDATA.serverDefault + 'css/bootstrap.min.css',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.css',
+            bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-3.3.7.min.css',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.css?v20161002-1',
             background: '#FFFFFF',
             foreground: '#000000',
             grid: '#DDDDDD',
@@ -142,12 +142,12 @@
             gauge_gradient: false
         },
         slate: {
-            bootstrap_css: NETDATA.serverDefault + 'css/bootstrap.slate.min.css',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css',
+            bootstrap_css: NETDATA.serverDefault + 'css/bootstrap.slate.min.css?v20161002-1',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20161002-1',
             background: '#272b30',
             foreground: '#C8C8C8',
-            grid: '#373b40',
-            axis: '#373b40',
+            grid: '#35393e',
+            axis: '#35393e',
 /*          colors: [   '#55bb33', '#ff2222',   '#0099C6', '#faa11b',   '#adbce0', '#DDDD00',
                         '#4178ba', '#f58122',   '#a5cc39', '#f58667',   '#f5ef89', '#cf93c0',
                         '#a5d18a', '#b8539d',   '#3954a3', '#c8a9cf',   '#c7de8a', '#fad20a',
@@ -328,7 +328,9 @@
             pan_and_zoom_factor_multiplier_shift: 3.0,
             pan_and_zoom_factor_multiplier_alt: 4.0,
 
-            abort_ajax_on_scroll: false,
+            abort_ajax_on_scroll: false,            // kill pending ajax page scroll
+            async_on_scroll: false,                 // sync/async onscroll handler
+            onscroll_worker_duration_threshold: 30, // time in ms, to consider slow the onscroll handler
 
             setOptionCallback: function() { ; }
         },
@@ -503,21 +505,29 @@
         NETDATA.onscroll();
     };
 
-    NETDATA.onscroll = function() {
-        // console.log('onscroll');
+    NETDATA.onscroll_updater_count = 0;
+    NETDATA.onscroll_updater_running = false;
+    NETDATA.onscroll_updater_last_run = 0;
+    NETDATA.onscroll_updater_watchdog = null;
+    NETDATA.onscroll_updater_max_duration = 0;
+    NETDATA.onscroll_updater_above_threshold_count = 0;
+    NETDATA.onscroll_updater = function() {
+        NETDATA.onscroll_updater_running = true;
+        NETDATA.onscroll_updater_count++;
+        var start = new Date().getTime();
 
-        NETDATA.options.last_page_scroll = new Date().getTime();
-        NETDATA.options.auto_refresher_stop_until = 0;
-
-        if(NETDATA.options.targets === null) return;
+        var targets = NETDATA.options.targets;
+        var len = targets.length;
 
         // when the user scrolls he sees that we have
         // hidden all the not-visible charts
         // using this little function we try to switch
         // the charts back to visible quickly
-        var targets = NETDATA.options.targets;
-        var len = targets.length;
+
+
         if(NETDATA.options.abort_ajax_on_scroll === true) {
+            // we have to cancel pending requests too
+
             while (len--) {
                 if (targets[len]._updating === true) {
                     if (typeof targets[len].xhr !== 'undefined') {
@@ -530,8 +540,68 @@
             }
         }
         else {
+            // just find which chart is visible
+
             while (len--)
                 targets[len].isVisible();
+        }
+
+        var end = new Date().getTime();
+        // console.log('scroll No ' + NETDATA.onscroll_updater_count + ' calculation took ' + (end - start).toString() + ' ms');
+
+        if(NETDATA.options.current.async_on_scroll === false) {
+            var dt = end - start;
+            if(dt > NETDATA.onscroll_updater_max_duration) {
+                // console.log('max onscroll event handler duration increased to ' + dt);
+                NETDATA.onscroll_updater_max_duration = dt;
+            }
+
+            if(dt > NETDATA.options.current.onscroll_worker_duration_threshold) {
+                // console.log('slow: ' + dt);
+                NETDATA.onscroll_updater_above_threshold_count++;
+
+                if(NETDATA.onscroll_updater_above_threshold_count > 2 && NETDATA.onscroll_updater_above_threshold_count * 100 / NETDATA.onscroll_updater_count > 2) {
+                    NETDATA.setOption('async_on_scroll', true);
+                    console.log('NETDATA: your browser is slow - enabling asynchronous onscroll event handler.');
+                }
+            }
+        }
+
+        NETDATA.onscroll_updater_last_run = start;
+        NETDATA.onscroll_updater_running = false;
+    };
+
+    NETDATA.onscroll = function() {
+        // console.log('onscroll');
+
+        NETDATA.options.last_page_scroll = new Date().getTime();
+        NETDATA.options.auto_refresher_stop_until = 0;
+
+        if(NETDATA.options.targets === null) return;
+
+        if(NETDATA.options.current.async_on_scroll === true) {
+            // async
+            if(NETDATA.onscroll_updater_running === false) {
+                NETDATA.onscroll_updater_running = true;
+                setTimeout(NETDATA.onscroll_updater, 0);
+            }
+            else {
+                if(NETDATA.onscroll_updater_watchdog !== null)
+                    clearTimeout(NETDATA.onscroll_updater_watchdog);
+
+                NETDATA.onscroll_updater_watchdog = setTimeout(function() {
+                    if(NETDATA.onscroll_updater_running === false && NETDATA.options.last_page_scroll > NETDATA.onscroll_updater_last_run) {
+                        // console.log('watchdog');
+                        NETDATA.onscroll_updater();
+                    }
+
+                    NETDATA.onscroll_updater_watchdog = null;
+                }, 200);
+            }
+        }
+        else {
+            // sync
+            NETDATA.onscroll_updater();
         }
     };
 
@@ -558,7 +628,9 @@
         413: { message: "Netdata registry server send invalid response to SWITCH ", alert: false },
         414: { message: "Netdata registry SWITCH failed", alert: false },
         415: { message: "Netdata alarms download failed", alert: false },
-        416: { message: "Netdata alarms log download failed", alert: false }
+        416: { message: "Netdata alarms log download failed", alert: false },
+        417: { message: "Netdata registry server send invalid response to SEARCH ", alert: false },
+        418: { message: "Netdata registry SEARCH failed", alert: false }
     };
     NETDATA.errorLast = {
         code: 0,
@@ -764,7 +836,7 @@
         this.value_div = null;
         this.color = NETDATA.themes.current.foreground;
 
-        if(parent.selected_count > parent.unselected_count)
+        if(parent.unselected_count === 0)
             this.selected = true;
         else
             this.selected = false;
@@ -923,20 +995,19 @@
         this.selected_count = 0;
         this.unselected_count = 0;
 
-        for(var i = 0, len = array.length; i < len ; i++) {
-            var ds = this.dimensions[array[i]];
+        var len = array.length;
+        while(len--) {
+            var ds = this.dimensions[array[len]];
             if(typeof ds === 'undefined') {
                 // console.log(array[i] + ' is not found');
-                ret.push(false);
-                continue;
+                ret.unshift(false);
             }
-
-            if(ds.isSelected()) {
-                ret.push(true);
+            else if(ds.isSelected()) {
+                ret.unshift(true);
                 this.selected_count++;
             }
             else {
-                ret.push(false);
+                ret.unshift(false);
                 this.unselected_count++;
             }
         }
@@ -2105,8 +2176,9 @@
 
             if(typeof this.colors_assigned[label] === 'undefined') {
                 if(this.colors_available.length === 0) {
-                    for(var i = 0, len = NETDATA.themes.current.colors.length; i < len ; i++)
-                        this.colors_available.push(NETDATA.themes.current.colors[i]);
+                    var len = NETDATA.themes.current.colors.length;
+                    while(len--)
+                        this.colors_available.unshift(NETDATA.themes.current.colors[len]);
                 }
 
                 this.colors_assigned[label] = this.colors_available.shift();
@@ -2128,8 +2200,13 @@
 
             this.colors = new Array();
             this.colors_available = new Array();
-            var i, len;
 
+            // add the standard colors
+            var len = NETDATA.themes.current.colors.length;
+            while(len--)
+                this.colors_available.unshift(NETDATA.themes.current.colors[len]);
+
+            // add the user supplied colors
             var c = $(this.element).data('colors');
             // this.log('read colors: ' + c);
             if(typeof c !== 'undefined' && c !== null && c.length > 0) {
@@ -2141,18 +2218,15 @@
                     var added = 0;
 
                     while(added < 20) {
-                        for(i = 0, len = c.length; i < len ; i++) {
+                        len = c.length;
+                        while(len--) {
                             added++;
-                            this.colors_available.push(c[i]);
-                            // this.log('adding color: ' + c[i]);
+                            this.colors_available.unshift(c[len]);
+                            // this.log('adding color: ' + c[len]);
                         }
                     }
                 }
             }
-
-            // push all the standard colors too
-            for(i = 0, len = NETDATA.themes.current.colors.length; i < len ; i++)
-                this.colors_available.push(NETDATA.themes.current.colors[i]);
 
             return this.colors;
         };
@@ -2861,6 +2935,10 @@
                 url: this.data_url,
                 cache: false,
                 async: true,
+                headers: {
+                    'Cache-Control': 'no-cache, no-store',
+                    'Pragma': 'no-cache'
+                },
                 xhrFields: { withCredentials: true } // required for the cookie
             })
             .done(function(data) {
@@ -3931,10 +4009,8 @@
             axisLineWidth: self.data('dygraph-axislinewidth') || 0.3,
 
             drawGrid: self.data('dygraph-drawgrid') || true,
-            drawXGrid: self.data('dygraph-drawxgrid') || undefined,
-            drawYGrid: self.data('dygraph-drawygrid') || undefined,
             gridLinePattern: self.data('dygraph-gridlinepattern') || null,
-            gridLineWidth: self.data('dygraph-gridlinewidth') || 0.3,
+            gridLineWidth: self.data('dygraph-gridlinewidth') || 0.4,
             gridLineColor: self.data('dygraph-gridlinecolor') || NETDATA.themes.current.grid,
 
             maxNumberWidth: self.data('dygraph-maxnumberwidth') || 8,
@@ -4131,9 +4207,9 @@
                         state.log('interactionModel.dblclick()');
                     NETDATA.resetAllCharts(state);
                 },
-                mousewheel: function(event, dygraph, context) {
+                wheel: function(event, dygraph, context) {
                     if(NETDATA.options.debug.dygraph === true || state.debug === true)
-                        state.log('interactionModel.mousewheel()');
+                        state.log('interactionModel.wheel()');
 
                     // Take the offset of a mouse event on the dygraph canvas and
                     // convert it to a pair of percentages from the bottom left.
@@ -4201,7 +4277,15 @@
                         state.globalSelectionSyncDelay();
 
                         // http://dygraphs.com/gallery/interaction-api.js
-                        var normal = (event.detail) ? event.detail * -1 : event.wheelDelta / 40;
+                        var normal_def;
+                        if(typeof event.wheelDelta === 'number' && event.wheelDelta != NaN)
+                            // chrome
+                            normal_def = event.wheelDelta / 40;
+                        else
+                            // firefox
+                            normal_def = event.deltaY * -2;
+
+                        var normal = (event.detail) ? event.detail * -1 : normal_def;
                         var percentage = normal / 50;
 
                         if (!(event.offsetX && event.offsetY)){
@@ -4214,7 +4298,6 @@
                         var yPct = percentages[1];
 
                         var new_x_range = zoomRange(dygraph, percentage, xPct, yPct);
-
                         var after = new_x_range[0];
                         var before = new_x_range[1];
 
@@ -4303,7 +4386,6 @@
             state.dygraph_options.drawGrid = false;
             state.dygraph_options.drawAxis = false;
             state.dygraph_options.title = undefined;
-            state.dygraph_options.units = undefined;
             state.dygraph_options.ylabel = undefined;
             state.dygraph_options.yLabelWidth = 0;
             state.dygraph_options.labelsDivWidth = 120;
@@ -4926,8 +5008,18 @@
         state.easyPieChartUnits.style.top = unittop.toString() + 'px';
         state.element_chart.appendChild(state.easyPieChartUnits);
 
+        var barColor = self.data('easypiechart-barcolor');
+        if(typeof barColor === 'undefined' || barColor === null)
+            barColor = state.chartColors()[0];
+        else {
+            // <div ... data-easypiechart-barcolor="(function(percent){return(percent < 50 ? '#5cb85c' : percent < 85 ? '#f0ad4e' : '#cb3935');})" ...></div>
+            var tmp = eval(barColor);
+            if(typeof tmp === 'function')
+                barColor = tmp;
+        }
+
         chart.easyPieChart({
-            barColor: self.data('easypiechart-barcolor') || state.chartColors()[0], //'#ef1e25',
+            barColor: barColor,
             trackColor: self.data('easypiechart-trackcolor') || NETDATA.themes.current.easypiechart_track,
             scaleColor: self.data('easypiechart-scalecolor') || NETDATA.themes.current.easypiechart_scale,
             scaleLength: self.data('easypiechart-scalelength') || 5,
@@ -4991,6 +5083,7 @@
         else if(typeof status === 'number')
             speed = status;
 
+        // console.log('gauge speed ' + speed);
         state.gauge_instance.animationSpeed = speed;
         state.___gaugeOld__.speed = speed;
     };
@@ -5024,6 +5117,7 @@
         if(pcent > 100) pcent = 100;
 
         state.gauge_instance.set(pcent);
+        // console.log('gauge set ' + pcent + ', value ' + value + ', min ' + min + ', max ' + max);
 
         state.___gaugeOld__.value = value;
         state.___gaugeOld__.min = min;
@@ -5506,7 +5600,8 @@
 
     NETDATA.requiredJs = [
         {
-            url: NETDATA.serverDefault + 'lib/bootstrap.min.js',
+            url: NETDATA.serverDefault + 'lib/bootstrap-3.3.7.min.js',
+            async: false,
             isAlreadyLoaded: function() {
                 // check if bootstrap is loaded
                 if(typeof $().emulateTransitionEnd == 'function')
@@ -5520,11 +5615,7 @@
             }
         },
         {
-            url: NETDATA.serverDefault + 'lib/jquery.nanoscroller.min.js',
-            isAlreadyLoaded: function() { return false; }
-        },
-        {
-            url: NETDATA.serverDefault + 'lib/bootstrap-toggle.min.js',
+            url: NETDATA.serverDefault + 'lib/jquery.nanoscroller-0.8.7.min.js',
             isAlreadyLoaded: function() { return false; }
         }
     ];
@@ -5540,22 +5631,22 @@
             }
         },
         {
-            url: NETDATA.serverDefault + 'css/font-awesome.min.css',
+            url: NETDATA.serverDefault + 'css/font-awesome.min.css?v4.6.3',
             isAlreadyLoaded: function() { return false; }
         },
         {
             url: NETDATA.themes.current.dashboard_css,
-            isAlreadyLoaded: function() { return false; }
-        },
-        {
-            url: NETDATA.serverDefault + 'css/bootstrap-toggle.min.css',
             isAlreadyLoaded: function() { return false; }
         }
     ];
 
     NETDATA.loadedRequiredJs = 0;
     NETDATA.loadRequiredJs = function(index, callback) {
-        if(index >= NETDATA.requiredJs.length) return;
+        if(index >= NETDATA.requiredJs.length) {
+            if(typeof callback === 'function')
+                callback();
+            return;
+        }
 
         if(NETDATA.requiredJs[index].isAlreadyLoaded()) {
             NETDATA.loadedRequiredJs++;
@@ -5566,10 +5657,13 @@
         if(NETDATA.options.debug.main_loop === true)
             console.log('loading ' + NETDATA.requiredJs[index].url);
 
+        var async = true;
+        if(typeof NETDATA.requiredJs[index].async !== 'undefined' && NETDATA.requiredJs[index].async === false)
+            async = false;
+
         $.ajax({
             url: NETDATA.requiredJs[index].url,
             cache: true,
-            async: true,
             dataType: "script",
             xhrFields: { withCredentials: true } // required for the cookie
         })
@@ -5582,11 +5676,13 @@
         })
         .always(function() {
             NETDATA.loadedRequiredJs++;
-            if(typeof callback === 'function' && NETDATA.loadedRequiredJs >= NETDATA.requiredJs.length)
-                callback();
+
+            if(async === false)
+                NETDATA.loadRequiredJs(++index, callback);
         })
 
-        NETDATA.loadRequiredJs(++index, callback);
+        if(async === true)
+            NETDATA.loadRequiredJs(++index, callback);
     };
 
     NETDATA.loadRequiredCSS = function(index) {
@@ -5621,6 +5717,8 @@
 
         notifications: false,           // when true, the browser supports notifications (may not be granted though)
         last_notification_id: 0,        // the id of the last alarm_log we have raised an alarm for
+        first_notification_id: 0,       // the id of the first alarm_log entry for this session
+                                        // this is used to prevent CLEAR notifications for past events
         // notifications_shown: new Array(),
 
         server: null,                   // the server to connect to for fetching alarms
@@ -5665,7 +5763,7 @@
                     return;
 
                 case 'CLEAR':
-                    if(NETDATA.alarms.last_notification_id === 0) {
+                    if(entry.unique_id < NETDATA.alarms.first_notification_id) {
                         // console.log('alarm ' + entry.unique_id + ' is not current');
                         return;
                     }
@@ -5802,6 +5900,7 @@
                 }
 
                 NETDATA.alarms.last_notification_id = data[0].unique_id;
+                NETDATA.localStorageSet('last_notification_id', NETDATA.alarms.last_notification_id, null);
                 // console.log('last notification id = ' + NETDATA.alarms.last_notification_id);
             })
         },
@@ -5838,9 +5937,16 @@
                 url: NETDATA.alarms.server + '/api/v1/alarms?' + what.toString(),
                 async: true,
                 cache: false,
+                headers: {
+                    'Cache-Control': 'no-cache, no-store',
+                    'Pragma': 'no-cache'
+                },
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {
+                    if(NETDATA.alarms.first_notification_id === 0 && typeof data.latest_alarm_log_unique_id === 'number')
+                        NETDATA.alarms.first_notification_id = data.latest_alarm_log_unique_id;
+
                     if(typeof callback === 'function')
                         callback(data);
                 })
@@ -5879,6 +5985,10 @@
                 url: NETDATA.alarms.server + '/api/v1/alarm_log?after=' + last_id.toString(),
                 async: true,
                 cache: false,
+                headers: {
+                    'Cache-Control': 'no-cache, no-store',
+                    'Pragma': 'no-cache'
+                },
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {
@@ -5898,7 +6008,9 @@
             while(host.slice(-1) === '/')
                 host = host.substring(0, host.length - 1);
             NETDATA.alarms.server = host;
-            
+
+            NETDATA.alarms.last_notification_id = NETDATA.localStorageGet('last_notification_id', NETDATA.alarms.last_notification_id, null);
+
             if(NETDATA.alarms.onclick === null)
                 NETDATA.alarms.onclick = NETDATA.alarms.scrollToAlarm;
 
@@ -6003,6 +6115,10 @@
                     url: host + '/api/v1/registry?action=hello',
                     async: true,
                     cache: false,
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store',
+                        'Pragma': 'no-cache'
+                    },
                     xhrFields: { withCredentials: true } // required for the cookie
                 })
                 .done(function(data) {
@@ -6032,6 +6148,10 @@
                     url: NETDATA.registry.server + '/api/v1/registry?action=access&machine=' + NETDATA.registry.machine_guid + '&name=' + encodeURIComponent(NETDATA.registry.hostname) + '&url=' + encodeURIComponent(NETDATA.serverDefault), // + '&visible_url=' + encodeURIComponent(document.location),
                     async: true,
                     cache: false,
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store',
+                        'Pragma': 'no-cache'
+                    },
                     xhrFields: { withCredentials: true } // required for the cookie
                 })
                 .done(function(data) {
@@ -6076,6 +6196,10 @@
                 url: NETDATA.registry.server + '/api/v1/registry?action=delete&machine=' + NETDATA.registry.machine_guid + '&name=' + encodeURIComponent(NETDATA.registry.hostname) + '&url=' + encodeURIComponent(NETDATA.serverDefault) + '&delete_url=' + encodeURIComponent(delete_url),
                 async: true,
                 cache: false,
+                headers: {
+                    'Cache-Control': 'no-cache, no-store',
+                    'Pragma': 'no-cache'
+                },
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {
@@ -6095,12 +6219,45 @@
                 });
         },
 
+        search: function(machine_guid, callback) {
+            // SEARCH for the URLs of a machine:
+            $.ajax({
+                url: NETDATA.registry.server + '/api/v1/registry?action=search&machine=' + NETDATA.registry.machine_guid + '&name=' + encodeURIComponent(NETDATA.registry.hostname) + '&url=' + encodeURIComponent(NETDATA.serverDefault) + '&for=' + machine_guid,
+                async: true,
+                cache: false,
+                headers: {
+                    'Cache-Control': 'no-cache, no-store',
+                    'Pragma': 'no-cache'
+                },
+                xhrFields: { withCredentials: true } // required for the cookie
+            })
+                .done(function(data) {
+                    if(typeof data.status !== 'string' || data.status !== 'ok') {
+                        NETDATA.error(417, NETDATA.registry.server + ' responded with: ' + JSON.stringify(data));
+                        data = null;
+                    }
+
+                    if(typeof callback === 'function')
+                        callback(data);
+                })
+                .fail(function() {
+                    NETDATA.error(418, NETDATA.registry.server);
+
+                    if(typeof callback === 'function')
+                        callback(null);
+                });
+        },
+
         switch: function(new_person_guid, callback) {
             // impersonate
             $.ajax({
                 url: NETDATA.registry.server + '/api/v1/registry?action=switch&machine=' + NETDATA.registry.machine_guid + '&name=' + encodeURIComponent(NETDATA.registry.hostname) + '&url=' + encodeURIComponent(NETDATA.serverDefault) + '&to=' + new_person_guid,
                 async: true,
                 cache: false,
+                headers: {
+                    'Cache-Control': 'no-cache, no-store',
+                    'Pragma': 'no-cache'
+                },
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {

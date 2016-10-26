@@ -21,12 +21,15 @@ case "$1" in
               dpkg-statoverride --update --add root netdata 0755 /var/lib/netdata/www
           fi
 
+          fi
+
           if ! dpkg-statoverride --list /var/cache/netdata >/dev/null 2>&1; then
               dpkg-statoverride --update --add netdata netdata 0755 /var/cache/netdata
           fi
 
         fi
 
+        dpkg-statoverride --update --add --force root netdata 0775 /var/lib/netdata/registry
         chown -R root:netdata /usr/share/netdata/*
         chown -R root:netdata /usr/lib/@DEB_HOST_MULTIARCH@/netdata/plugins.d
         setcap cap_dac_read_search,cap_sys_ptrace+ep /usr/lib/@DEB_HOST_MULTIARCH@/netdata/plugins.d/apps.plugin
@@ -38,4 +41,3 @@ esac
 #DEBHELPER#
 
 exit 0
-

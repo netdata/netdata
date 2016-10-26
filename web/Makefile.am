@@ -34,33 +34,34 @@ dist_webold_DATA = \
 
 weblibdir=$(webdir)/lib
 dist_weblib_DATA = \
-	lib/dygraph-combined.js \
-	lib/dygraph-smooth-plotter.js \
-	lib/jquery-1.12.0.min.js \
-	lib/jquery.peity.min.js \
-	lib/jquery.sparkline.min.js \
-	lib/morris.min.js \
-	lib/raphael-min.js \
-	lib/jquery.easypiechart.min.js \
-	lib/jquery.nanoscroller.min.js \
-	lib/bootstrap.min.js \
-	lib/ElementQueries.js \
-	lib/ResizeSensor.js \
-	lib/bootstrap-toggle.min.js \
-	lib/c3.min.js \
-	lib/d3.min.js \
-	lib/gauge.min.js \
+	lib/bootstrap-3.3.7.min.js \
+	lib/bootstrap-table-1.11.0.min.js \
+	lib/bootstrap-table-export-1.11.0.min.js \
+	lib/bootstrap-toggle-2.2.2.min.js \
+	lib/c3-0.4.11.min.js \
+	lib/d3-3.5.17.min.js \
+	lib/dygraph-combined-dd74404.js \
+	lib/dygraph-smooth-plotter-dd74404.js \
+	lib/gauge-d5260c3.min.js \
+	lib/jquery-2.2.4.min.js \
+	lib/jquery.easypiechart-97b5824.min.js \
+	lib/jquery.nanoscroller-0.8.7.min.js \
+	lib/jquery.peity-3.2.0.min.js \
+	lib/jquery.sparkline-2.1.2.min.js \
+	lib/morris-0.5.1.min.js \
+	lib/raphael-2.2.4-min.js \
+	lib/tableExport-1.6.0.min.js \
 	$(NULL)
 
 webcssdir=$(webdir)/css
 dist_webcss_DATA = \
-	css/morris.css \
-	css/bootstrap.min.css \
-	css/bootstrap-theme.min.css \
+	css/morris-0.5.1.css \
+	css/bootstrap-3.3.7.min.css \
+	css/bootstrap-theme-3.3.7.min.css \
 	css/bootstrap.slate.min.css \
+	css/bootstrap-toggle-2.2.2.min.css \
 	css/font-awesome.min.css \
-	css/bootstrap-toggle.min.css \
-	css/c3.min.css \
+	css/c3-0.4.11.min.css \
 	$(NULL)
 
 webfontsdir=$(webdir)/fonts

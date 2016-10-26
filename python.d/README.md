@@ -158,45 +158,47 @@ Dovecot unix socket with R/W permissions for user netdata or dovecot with config
  
 Module gives information with following charts:
 
-1. **logins and sessions**
- * logins
+1. **sessions**
  * active sessions
 
-2. **commands** - number of IMAP commands 
+2. **logins**
+ * logins
+
+3. **commands** - number of IMAP commands 
  * commands
  
-3. **Faults**
+4. **Faults**
  * minor
  * major
  
-4. **Context Switches** 
+5. **Context Switches** 
  * volountary
  * involountary
  
-5. **disk** in bytes/s
+6. **disk** in bytes/s
  * read
  * write
  
-6. **bytes** in bytes/s
+7. **bytes** in bytes/s
  * read
  * write
  
-7. **number of syscalls** in syscalls/s
+8. **number of syscalls** in syscalls/s
  * read
  * write
 
-8. **lookups** - number of lookups per second
+9. **lookups** - number of lookups per second
  * path
  * attr
 
-9. **hits** - number of cache hits 
+10. **hits** - number of cache hits 
  * hits
 
-10. **attempts** - authorization attemts
+11. **attempts** - authorization attemts
  * success
  * failure
 
-11. **cache** - cached authorization hits
+12. **cache** - cached authorization hits
  * hit
  * miss
  

@@ -150,7 +150,7 @@ body {
 }
 
 .netdata-message.icon {
-	color: #35393e;
+	color: #2f3338;
 	text-align: center;
 	vertical-align: middle;
 }
@@ -377,6 +377,27 @@ body {
 
 .dygraph-axis-label {
 	color: #6c7075;
+}
+
+.dygraph-label-rotate-left {
+  text-align: center;
+  /* See http://caniuse.com/#feat=transforms2d */
+  transform: rotate(90deg);
+  -webkit-transform: rotate(90deg);
+  -moz-transform: rotate(90deg);
+  -o-transform: rotate(90deg);
+  -ms-transform: rotate(90deg);
+}
+
+/* For y2-axis label */
+.dygraph-label-rotate-right {
+  text-align: center;
+  /* See http://caniuse.com/#feat=transforms2d */
+  transform: rotate(-90deg);
+  -webkit-transform: rotate(-90deg);
+  -moz-transform: rotate(-90deg);
+  -o-transform: rotate(-90deg);
+  -ms-transform: rotate(-90deg);
 }
 
 .dygraph-title {
