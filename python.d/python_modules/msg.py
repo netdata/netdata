@@ -34,7 +34,7 @@ def log_msg(msg_type, *args):
         NEXT_CHECK = now - (now % LOG_INTERVAL) + LOG_INTERVAL
         if LOG_COUNTER < 0:
             timestamp = strftime('%Y-%m-%d %X')
-            msg = "%s: Prevented %s log messages from displaying" % (timestamp, str(0 - LOG_COUNTER))
+            msg = "%s: python.d.plugin: Prevented %s log messages from displaying" % (timestamp, str(0 - LOG_COUNTER))
             WRITE(msg + "\n")
             FLUSH()
 
