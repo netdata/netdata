@@ -8,6 +8,11 @@
 // Then, the second line, finds nodejs or node or js in the system path
 // and executes it with the shell parameters.
 
+// netdata
+// real-time performance and health monitoring, done right!
+// (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+// GPL v3+
+
 // --------------------------------------------------------------------------------------------------------------------
 
 'use strict';
@@ -30,6 +35,7 @@ process.mainModule.paths.unshift(NODE_D_DIR);
 
 var fs = require('fs');
 var url = require('url');
+var util = require('util');
 var http = require('http');
 var path = require('path');
 var extend = require('extend');
@@ -61,8 +67,6 @@ extend(true, netdata.options, {
 
     update_every: NETDATA_UPDATE_EVERY,
 
-    exit_after_ms: 3600 * 4 * 1000,
-
     paths: {
         plugins: NETDATA_PLUGINS_DIR,
         config: NETDATA_CONFIG_DIR,
@@ -79,8 +83,15 @@ netdata.options.config_filename = pluginConfig(__filename);
 try {
     netdata.options_loaded = JSON.parse(fs.readFileSync(netdata.options.config_filename, 'utf8'));
     extend(true, netdata.options, netdata.options_loaded);
-    console.error('merged netdata object:');
-    console.error(netdata);
+
+    if(!netdata.options.paths.plugins)
+        netdata.options.paths.plugins = NETDATA_PLUGINS_DIR;
+
+    if(!netdata.options.paths.config)
+        netdata.options.paths.config = NETDATA_CONFIG_DIR;
+
+    // console.error('merged netdata object:');
+    // console.error(util.inspect(netdata, {depth: 10}));
 }
 catch(e) {
     netdata.error('Cannot read configuration file ' + netdata.options.config_filename + ': ' + e.message + ', using internal defaults.');

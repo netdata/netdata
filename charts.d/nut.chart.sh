@@ -1,5 +1,11 @@
 # no need for shebang - this file is loaded from charts.d.plugin
 
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+
 # a space separated list of UPS names
 # if empty, the list returned by 'upsc -l' will be used
 nut_ups=
@@ -15,11 +21,11 @@ nut_priority=90000
 declare -A nut_ids=()
 
 nut_get_all() {
-	timeout $nut_timeout upsc -l
+	run -t $nut_timeout upsc -l
 }
 
 nut_get() {
-	timeout $nut_timeout upsc "$1"
+	run -t $nut_timeout upsc "$1"
 }
 
 nut_check() {
@@ -42,12 +48,12 @@ nut_check() {
 			nut_ids[$x]="$( fixid "$x" )"
 			continue
 		fi
-		echo >&2 "nut: ERROR: Cannot get information for NUT UPS '$x'."
+		error "cannot get information for NUT UPS '$x'."
 	done
 
 	if [ ${#nut_ids[@]} -eq 0 ]
 		then
-		echo >&2 "nut: Please set nut_ups='ups_name' in $confd/nut.conf"
+		error "Cannot find UPSes - please set nut_ups='ups_name' in $confd/nut.conf"
 		return 1
 	fi
 
@@ -179,9 +185,9 @@ END {
 	print \"SET temp = \" temp;
 	print \"END\"
 }"
-		[ $? -ne 0 ] && unset nut_ids[$i] && echo >&2 "nut: failed to get values for '$i', disabling it."
+		[ $? -ne 0 ] && unset nut_ids[$i] && error "failed to get values for '$i', disabling it."
 	done
 
-	[ ${#nut_ids[@]} -eq 0 ] && echo >&2 "nut: no UPSes left active." && return 1
+	[ ${#nut_ids[@]} -eq 0 ] && error "no UPSes left active." && return 1
 	return 0
 }

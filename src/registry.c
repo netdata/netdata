@@ -29,7 +29,7 @@
 //      per client IP per hour
 //
 // 3. lower memory requirements
-// 
+//
 //    - embed avl structures directly into registry objects, instead of DICTIONARY
 //    - store GUIDs in memory as UUID instead of char *
 //      (this will also remove the index hash, since UUIDs can be compared directly)
@@ -570,7 +570,6 @@ static inline PERSON *registry_person_get(const char *person_guid, time_t when) 
         else {
             person_guid = buf;
             p = registry_person_find(person_guid);
-            if(!p) person_guid = NULL;
         }
     }
 
@@ -744,8 +743,7 @@ static inline void registry_log_recreate_nolock(void) {
 }
 
 int registry_log_load(void) {
-    char *s, buf[4096 + 1];
-    size_t line = -1;
+    ssize_t line = -1;
 
     // closing the log is required here
     // otherwise we will append to it the values we read
@@ -756,8 +754,10 @@ int registry_log_load(void) {
     if(!fp)
         error("Registry: cannot open registry file: %s", registry.log_filename);
     else {
+        char *s, buf[4096 + 1];
         line = 0;
         size_t len = 0;
+
         while ((s = fgets_trim_len(buf, 4096, fp, &len))) {
             line++;
 
@@ -767,7 +767,7 @@ int registry_log_load(void) {
 
                     // verify it is valid
                     if (unlikely(len < 85 || s[1] != '\t' || s[10] != '\t' || s[47] != '\t' || s[84] != '\t')) {
-                        error("Registry: log line %zu is wrong (len = %zu).", line, len);
+                        error("Registry: log line %zd is wrong (len = %zu).", line, len);
                         continue;
                     }
                     s[1] = s[10] = s[47] = s[84] = '\0';
@@ -782,7 +782,7 @@ int registry_log_load(void) {
                     char *url = name;
                     while(*url && *url != '\t') url++;
                     if(!*url) {
-                        error("Registry: log line %zu does not have a url.", line);
+                        error("Registry: log line %zd does not have a url.", line);
                         continue;
                     }
                     *url++ = '\0';
@@ -801,11 +801,11 @@ int registry_log_load(void) {
                     break;
 
                 default:
-                    error("Registry: ignoring line %zu of filename '%s': %s.", line, registry.log_filename, s);
+                    error("Registry: ignoring line %zd of filename '%s': %s.", line, registry.log_filename, s);
                     break;
             }
         }
-        
+
         fclose(fp);
     }
 
@@ -971,7 +971,7 @@ MACHINE *registry_request_machine(char *person_guid, char *machine_guid, char *u
     // make sure the machine exists
     m = registry_machine_find(request_machine);
     if(!m) {
-        info("Registry Machine URLs request: machine not found, person: '%s', machine '%s', url '%s', request machine '%s'", p->guid, m->guid, pu->url->url, request_machine);
+        info("Registry Machine URLs request: machine not found, person: '%s', machine '%s', url '%s', request machine '%s'", p->guid, machine_guid, pu->url->url, request_machine);
         return NULL;
     }
 
@@ -1472,7 +1472,7 @@ int registry_save(void) {
     // rename the db to .old
     debug(D_REGISTRY, "Registry: Link current db '%s' to .old: '%s'", registry.db_filename, old_filename);
     if(link(registry.db_filename, old_filename) == -1 && errno != ENOENT)
-        error("Registry: cannot move file '%s' to '%s'. Saving registry DB failed!", tmp_filename, registry.db_filename);
+        error("Registry: cannot move file '%s' to '%s'. Saving registry DB failed!", registry.db_filename, old_filename);
 
     else {
         // remove the database (it is saved in .old)

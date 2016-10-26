@@ -138,6 +138,18 @@ struct memory {
     unsigned long long total_active_file;
     unsigned long long total_unevictable;
 */
+
+    int usage_in_bytes_updated;
+    char *filename_usage_in_bytes;
+    unsigned long long usage_in_bytes;
+
+    int msw_usage_in_bytes_updated;
+    char *filename_msw_usage_in_bytes;
+    unsigned long long msw_usage_in_bytes;
+
+    int failcnt_updated;
+    char *filename_failcnt;
+    unsigned long long failcnt;
 };
 
 // https://www.kernel.org/doc/Documentation/cgroup-v1/cpuacct.txt
@@ -557,6 +569,24 @@ void cgroup_read_memory(struct memory *mem) {
 
         mem->updated = 1;
     }
+
+    mem->usage_in_bytes_updated = 0;
+    if(mem->filename_usage_in_bytes) {
+        if(likely(!read_single_number_file(mem->filename_usage_in_bytes, &mem->usage_in_bytes)))
+            mem->usage_in_bytes_updated = 1;
+    }
+
+    mem->msw_usage_in_bytes_updated = 0;
+    if(mem->filename_msw_usage_in_bytes) {
+        if(likely(!read_single_number_file(mem->filename_msw_usage_in_bytes, &mem->msw_usage_in_bytes)))
+            mem->msw_usage_in_bytes_updated = 1;
+    }
+
+    mem->failcnt_updated = 0;
+    if(mem->filename_failcnt) {
+        if(likely(!read_single_number_file(mem->filename_failcnt, &mem->failcnt)))
+            mem->failcnt_updated = 1;
+    }
 }
 
 void cgroup_read(struct cgroup *cg) {
@@ -845,13 +875,20 @@ int find_dir_in_subdirs(const char *base, const char *this, void (*callback)(con
                 if(*r == '\0') r = "/";
                 else if (*r == '/') r++;
 
+                // do not decent in directories we are not interested
+                // https://github.com/firehol/netdata/issues/345
+                int def = 1;
+                size_t len = strlen(r);
+                if(len >  5 && !strncmp(&r[len -  5], "-qemu", 5))
+                    def = 0;
+
                 // we check for this option here
                 // so that the config will not have settings
                 // for leaf directories
                 char option[FILENAME_MAX + 1];
                 snprintfz(option, FILENAME_MAX, "search for cgroups under %s", r);
                 option[FILENAME_MAX] = '\0';
-                enabled = config_get_boolean("plugin:cgroups", option, 1);
+                enabled = config_get_boolean("plugin:cgroups", option, def);
             }
 
             if(enabled) {
@@ -990,6 +1027,27 @@ void find_all_cgroups() {
                 debug(D_CGROUP, "memory.stat filename for cgroup '%s': '%s'", cg->id, cg->memory.filename);
             }
             else debug(D_CGROUP, "memory.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+
+            snprintfz(filename, FILENAME_MAX, "%s%s/memory.usage_in_bytes", cgroup_memory_base, cg->id);
+            if(stat(filename, &buf) != -1) {
+                cg->memory.filename_usage_in_bytes = strdupz(filename);
+                debug(D_CGROUP, "memory.usage_in_bytes filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_usage_in_bytes);
+            }
+            else debug(D_CGROUP, "memory.usage_in_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+
+            snprintfz(filename, FILENAME_MAX, "%s%s/memory.msw_usage_in_bytes", cgroup_memory_base, cg->id);
+            if(stat(filename, &buf) != -1) {
+                cg->memory.filename_msw_usage_in_bytes = strdupz(filename);
+                debug(D_CGROUP, "memory.msw_usage_in_bytes filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_msw_usage_in_bytes);
+            }
+            else debug(D_CGROUP, "memory.msw_usage_in_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+
+            snprintfz(filename, FILENAME_MAX, "%s%s/memory.failcnt", cgroup_memory_base, cg->id);
+            if(stat(filename, &buf) != -1) {
+                cg->memory.filename_failcnt = strdupz(filename);
+                debug(D_CGROUP, "memory.failcnt filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_failcnt);
+            }
+            else debug(D_CGROUP, "memory.failcnt file for cgroup '%s': '%s' does not exist.", cg->id, filename);
         }
         if(cgroup_enable_blkio) {
             if(!cg->io_service_bytes.filename) {
@@ -1118,7 +1176,7 @@ void update_cgroup_charts(int update_every) {
                 st = rrdset_find_bytype(type, "mem");
                 if(!st) {
                     snprintfz(title, CHART_TITLE_MAX, "Memory Usage for cgroup %s", cg->chart_title);
-                    st = rrdset_create(type, "mem", NULL, "mem", "cgroup.mem", title, "MB", 40200, update_every,
+                    st = rrdset_create(type, "mem", NULL, "mem", "cgroup.mem", title, "MB", 40210, update_every,
                                        RRDSET_TYPE_STACKED);
 
                     rrddim_add(st, "cache", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
@@ -1191,12 +1249,44 @@ void update_cgroup_charts(int update_every) {
             }
         }
 
+        if(cg->memory.usage_in_bytes_updated) {
+            st = rrdset_find_bytype(type, "mem_usage");
+            if(!st) {
+                snprintfz(title, CHART_TITLE_MAX, "Total Memory for cgroup %s", cg->chart_title);
+                st = rrdset_create(type, "mem_usage", NULL, "mem", "cgroup.mem_usage", title, "MB", 40200,
+                                   update_every, RRDSET_TYPE_STACKED);
+
+                rrddim_add(st, "ram", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+                rrddim_add(st, "swap", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+            }
+            else rrdset_next(st);
+
+            rrddim_set(st, "ram", cg->memory.usage_in_bytes);
+            rrddim_set(st, "swap", (cg->memory.msw_usage_in_bytes > cg->memory.usage_in_bytes)?cg->memory.msw_usage_in_bytes - cg->memory.usage_in_bytes:0);
+            rrdset_done(st);
+        }
+
+        if(cg->memory.failcnt_updated && cg->memory.failcnt > 0) {
+            st = rrdset_find_bytype(type, "mem_failcnt");
+            if(!st) {
+                snprintfz(title, CHART_TITLE_MAX, "Memory Limit Failures for cgroup %s", cg->chart_title);
+                st = rrdset_create(type, "mem_failcnt", NULL, "mem", "cgroup.mem_failcnt", title, "MB", 40250,
+                                   update_every, RRDSET_TYPE_LINE);
+
+                rrddim_add(st, "failures", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            }
+            else rrdset_next(st);
+
+            rrddim_set(st, "failures", cg->memory.failcnt);
+            rrdset_done(st);
+        }
+
         if(cg->io_service_bytes.updated && cg->io_service_bytes.Read + cg->io_service_bytes.Write > 0) {
             st = rrdset_find_bytype(type, "io");
             if(!st) {
                 snprintfz(title, CHART_TITLE_MAX, "I/O Bandwidth (all disks) for cgroup %s", cg->chart_title);
                 st = rrdset_create(type, "io", NULL, "disk", "cgroup.io", title, "KB/s", 41200,
-                                   update_every, RRDSET_TYPE_LINE);
+                                   update_every, RRDSET_TYPE_AREA);
 
                 rrddim_add(st, "read", NULL, 1, 1024, RRDDIM_INCREMENTAL);
                 rrddim_add(st, "write", NULL, -1, 1024, RRDDIM_INCREMENTAL);
@@ -1226,11 +1316,11 @@ void update_cgroup_charts(int update_every) {
         }
 
         if(cg->throttle_io_service_bytes.updated && cg->throttle_io_service_bytes.Read + cg->throttle_io_service_bytes.Write > 0) {
-            st = rrdset_find_bytype(type, "io");
+            st = rrdset_find_bytype(type, "throttle_io");
             if(!st) {
                 snprintfz(title, CHART_TITLE_MAX, "Throttle I/O Bandwidth (all disks) for cgroup %s", cg->chart_title);
-                st = rrdset_create(type, "io", NULL, "disk", "cgroup.io", title, "KB/s", 41200,
-                                   update_every, RRDSET_TYPE_LINE);
+                st = rrdset_create(type, "throttle_io", NULL, "disk", "cgroup.throttle_io", title, "KB/s", 41200,
+                                   update_every, RRDSET_TYPE_AREA);
 
                 rrddim_add(st, "read", NULL, 1, 1024, RRDDIM_INCREMENTAL);
                 rrddim_add(st, "write", NULL, -1, 1024, RRDDIM_INCREMENTAL);
@@ -1326,7 +1416,7 @@ int do_sys_fs_cgroup(int update_every, unsigned long long dt) {
 
 void *cgroups_main(void *ptr)
 {
-    if(ptr) { ; }
+    (void)ptr;
 
     info("CGROUP Plugin thread created with task id %d", gettid());
 
@@ -1351,7 +1441,7 @@ void *cgroups_main(void *ptr)
 
     RRDSET *stcpu_thread = NULL;
 
-    for(;1;) {
+    for(;;) {
         if(unlikely(netdata_exit)) break;
 
         // delay until it is our time to run
@@ -1395,6 +1485,8 @@ void *cgroups_main(void *ptr)
             rrdset_done(stcpu_thread);
         }
     }
+
+    info("CGROUP thread exiting");
 
     pthread_exit(NULL);
     return NULL;

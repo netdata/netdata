@@ -41,16 +41,16 @@ int do_proc_net_softnet_stat(int update_every, unsigned long long dt) {
 
     if(lines > 200) lines = 200;
     if(words > 50) words = 50;
-    
+
     if(unlikely(!data || lines > allocated_lines || words > allocated_columns)) {
         freez(data);
         allocated_lines = lines;
         allocated_columns = words;
         data = mallocz((allocated_lines + 1) * allocated_columns * sizeof(uint32_t));
     }
-    
+
     // initialize to zero
-    bzero(data, (allocated_lines + 1) * allocated_columns * sizeof(uint32_t));
+    memset(data, 0, (allocated_lines + 1) * allocated_columns * sizeof(uint32_t));
 
     // parse the values
     for(l = 0; l < lines ;l++) {
@@ -93,12 +93,12 @@ int do_proc_net_softnet_stat(int update_every, unsigned long long dt) {
     if(do_per_core) {
         for(l = 0; l < lines ;l++) {
             char id[50+1];
-            snprintfz(id, 50, "cpu%d_softnet_stat", l);
+            snprintfz(id, 50, "cpu%u_softnet_stat", l);
 
             st = rrdset_find_bytype("cpu", id);
             if(!st) {
                 char title[100+1];
-                snprintfz(title, 100, "CPU%d softnet_stat", l);
+                snprintfz(title, 100, "CPU%u softnet_stat", l);
 
                 st = rrdset_create("cpu", id, NULL, "softnet_stat", NULL, title, "events/s", 4101 + l, update_every, RRDSET_TYPE_LINE);
                 for(w = 0; w < allocated_columns ;w++)

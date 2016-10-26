@@ -13,6 +13,7 @@ fi
 now_ms=
 LOOPSLEEPMS_HIGHRES=1
 test "$($LOOPSLEEP_DATE +%N)" = "%N" && LOOPSLEEPMS_HIGHRES=0
+test -z "$($LOOPSLEEP_DATE +%N)"     && LOOPSLEEPMS_HIGHRES=0
 current_time_ms_from_date() {
     if [ $LOOPSLEEPMS_HIGHRES -eq 0 ]
     then

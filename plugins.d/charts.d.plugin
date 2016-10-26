@@ -1,36 +1,95 @@
 #!/usr/bin/env bash
 
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+# charts.d.plugin allows easy development of BASH plugins
+#
+# if you need to run parallel charts.d processes, link this file to a different name
+# in the same directory, with a .plugin suffix and netdata will start both of them,
+# each will have a different config file and modules configuration directory.
+#
+
+export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
+
 PROGRAM_FILE="$0"
 PROGRAM_NAME="$(basename $0)"
 PROGRAM_NAME="${PROGRAM_NAME/.plugin}"
+MODULE_NAME="main"
 
-# if you need to run parallel charts.d processes
-# just link this files with a different name
-# in the same directory, with a .plugin suffix
-# netdata will start multiple of them
-# each will have a different config file
+# -----------------------------------------------------------------------------
+# create temp dir
 
-echo >&2 "$PROGRAM_NAME: started from '$PROGRAM_FILE' with options: $*"
+debug=0
+TMP_DIR=
+chartsd_cleanup() {
+    if [ ! -z "$TMP_DIR" -a -d "$TMP_DIR" ]
+    then
+        [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: cleaning up temporary directory $TMP_DIR ..."
+        rm -rf "$TMP_DIR"
+    fi
+    exit 0
+}
+trap chartsd_cleanup EXIT
+trap chartsd_cleanup SIGHUP
+trap chartsd_cleanup INT
 
-if [ $(( ${BASH_VERSINFO[0]} )) -lt 4 ]
+if [ $UID = "0" ]
 then
-    echo >&2
-    echo >&2 "$PROGRAM_NAME: ERROR"
-    echo >&2 "BASH version 4 or later is required."
-    echo >&2 "You are running version: ${BASH_VERSION}"
-    echo >&2 "Please upgrade."
-    echo >&2
-    exit 1
+    TMP_DIR="$( mktemp -d /var/run/netdata-${PROGRAM_NAME}-XXXXXXXXXX )"
+else
+    TMP_DIR="$( mktemp -d /tmp/.netdata-${PROGRAM_NAME}-XXXXXXXXXX )"
 fi
 
+logdate() {
+    date "+%Y-%m-%d %H:%M:%S"
+}
+
+log() {
+    local status="${1}"
+    shift
+
+    echo >&2 "$(logdate): ${PROGRAM_NAME}: ${status}: ${MODULE_NAME}: ${*}"
+
+}
+
+warning() {
+    log WARNING "${@}"
+}
+
+error() {
+    log ERROR "${@}"
+}
+
+info() {
+    log INFO "${@}"
+}
+
+fatal() {
+    log FATAL "${@}"
+    echo "DISABLE"
+    exit 1
+}
+
+debug() {
+    [ $debug -eq 1 ] && log DEBUG "${@}"
+}
+
+# -----------------------------------------------------------------------------
 # check a few commands
+
 require_cmd() {
-    which "$1" >/dev/null
-    if [ $? -ne 0 ]
+    local x=$(which "${1}" 2>/dev/null || command -v "${1}" 2>/dev/null)
+    if [ -z "${x}" -o ! -x "${x}" ]
         then
-        echo >&2 "$PROGRAM_NAME: ERROR: Command '$1' is not found in the system path."
+        warning "command '${1}' is not found in ${PATH}."
+        eval "${1^^}_CMD=\"\""
         return 1
     fi
+
+    eval "${1^^}_CMD=\"${x}\""
     return 0
 }
 
@@ -43,9 +102,17 @@ require_cmd grep || exit 1
 require_cmd egrep || exit 1
 require_cmd mktemp || exit 1
 require_cmd awk || exit 1
+require_cmd timeout || exit 1
+require_cmd curl || exit 1
 
 # -----------------------------------------------------------------------------
-# insternal defaults
+
+[ $(( ${BASH_VERSINFO[0]} )) -lt 4 ] && fatal "BASH version 4 or later is required, but found version: ${BASH_VERSION}. Please upgrade."
+
+info "started from '$PROGRAM_FILE' with options: $*"
+
+# -----------------------------------------------------------------------------
+# internal defaults
 # netdata exposes a few environment variables for us
 
 pluginsd="${NETDATA_PLUGINS_DIR}"
@@ -97,7 +164,6 @@ enable_all_charts="yes"
 # -----------------------------------------------------------------------------
 # parse parameters
 
-debug=0
 check=0
 chart_only=
 while [ ! -z "$1" ]
@@ -143,9 +209,7 @@ do
         continue
     fi
 
-    echo >&2 "Cannot understand parameter $1. Aborting."
-    echo "DISABLE"
-    exit 1
+    fatal "Cannot understand parameter $1. Aborting."
 done
 
 
@@ -173,17 +237,13 @@ mysleep="sleep"
 if [ -f "$myconfig" ]
     then
     . "$myconfig"
-    if [ $? -ne 0 ]
-    then
-        echo >&2 "$PROGRAM_NAME: cannot load $myconfig"
-        echo "DISABLE"
-        exit 1
-    fi
+    [ $? -ne 0 ] && fatal "cannot load $myconfig"
+
     time_divisor=$((time_divisor))
     [ $time_divisor -lt 10 ] && time_divisor=10
     [ $time_divisor -gt 100 ] && time_divisor=100
 else
-    echo >&2 "$PROGRAM_NAME: configuration file '$myconfig' not found. Using defaults."
+    info "configuration file '$myconfig' not found. Using defaults."
 fi
 
 # we check for the timeout command, after we load our
@@ -204,12 +264,7 @@ update_every=$(( update_every + 1 - 1)) # makes sure it is a number
 test $update_every -eq 0 && update_every=1 # if it is zero, make it 1
 
 # check the charts.d directory
-if [ ! -d "$chartsd" ]
-    then
-    echo >&2 "$PROGRAM_NAME: cannot find charts directory '$chartsd'"
-    echo "DISABLE"
-fi
-
+[ ! -d "$chartsd" ] && fatal "cannot find charts directory '$chartsd'"
 
 # -----------------------------------------------------------------------------
 # library functions
@@ -221,6 +276,35 @@ fixid() {
         tr "[A-Z]" "[a-z]"
 }
 
+run() {
+    local ret pid="${BASHPID}" t
+
+    if [ "z${1}" = "z-t" -a "${2}" != "0" ]
+    then
+        t="${2}"
+        shift 2
+        timeout ${t} "${@}" 2>"${TMP_DIR}/run.${pid}"
+        ret=$?
+    else
+        "${@}" 2>"${TMP_DIR}/run.${pid}"
+        ret=$?
+    fi
+
+    if [ ${ret} -ne 0 ]
+    then
+        {
+            printf "$(logdate): ${PROGRAM_NAME}: ${status}: ${MODULE_NAME}: command '"
+            printf "%q " "${@}"
+            printf "' failed:\n --- BEGIN TRACE ---\n"
+            cat "${TMP_DIR}/run.${pid}"
+            printf " --- END TRACE ---\n"
+        } >&2
+    fi
+    rm "${TMP_DIR}/run.${pid}"
+
+    return ${ret}
+}
+
 # convert any floating point number
 # to integer, give a multiplier
 # the result is stored in ${FLOAT2INT_RESULT}
@@ -229,8 +313,6 @@ fixid() {
 float2int() {
     local f m="$2" a b l v=($1)
     f=${v[0]}
-
-    # echo >&2 "value='${1}' f='${f}', m='${m}'"
 
     # the length of the multiplier - 1
     l=$(( ${#m} - 1 ))
@@ -277,7 +359,6 @@ float2int() {
 
     # store the result
     FLOAT2INT_RESULT=$(( (a * m) + b ))
-    #echo >&2 "FLOAT2INT_RESULT='${FLOAT2INT_RESULT}'"
 }
 
 
@@ -286,7 +367,7 @@ float2int() {
 
 all_charts() {
     cd "$chartsd"
-    [ $? -ne 0 ] && echo >&2 "$PROGRAM_NAME: Cannot cd to $chartsd" && return 1
+    [ $? -ne 0 ] && error "cannot cd to $chartsd" && return 1
 
     ls *.chart.sh | sed "s/\.chart\.sh$//g"
 }
@@ -316,6 +397,8 @@ all_enabled_charts() {
 
     for chart in $( all_charts )
     do
+        MODULE_NAME="${chart}"
+
         eval "enabled=\$$chart"
         if [ -z "${enabled}" ]
             then
@@ -327,35 +410,38 @@ all_enabled_charts() {
 
         if [ ! "${enabled}" = "${required}" ]
         then
-            echo >&2 "$PROGRAM_NAME: '$chart' is NOT enabled. Add a line with $chart=$required in $myconfig to enable it (or remove the line that disables it)."
+            info "is disabled. Add a line with $chart=$required in $myconfig to enable it (or remove the line that disables it)."
         else
-            [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: '$chart' is enabled."
+            debug "is enabled for auto-detection."
             local charts="$charts $chart"
         fi
     done
+    MODULE_NAME="main"
 
     local charts2=
     for chart in $charts
     do
+        MODULE_NAME="${chart}"
+
         # check the enabled charts
         local check="$( cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_check()" )"
         if [ -z "$check" ]
         then
-            echo >&2 "$PROGRAM_NAME: chart '$chart' does not seem to have a $chart$charts_check() function. Disabling it."
+            error "module '$chart' does not seem to have a $chart$charts_check() function. Disabling it."
             continue
         fi
 
         local create="$( cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_create()" )"
         if [ -z "$create" ]
         then
-            echo >&2 "$PROGRAM_NAME: chart '$chart' does not seem to have a $chart$charts_create() function. Disabling it."
+            error "module '$chart' does not seem to have a $chart$charts_create() function. Disabling it."
             continue
         fi
 
         local update="$( cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_update()" )"
         if [ -z "$update" ]
         then
-            echo >&2 "$PROGRAM_NAME: chart '$chart' does not seem to have a $chart$charts_update() function. Disabling it."
+            error "module '$chart' does not seem to have a $chart$charts_update() function. Disabling it."
             continue
         fi
 
@@ -364,7 +450,7 @@ all_enabled_charts() {
         #then
         #   if [ ! -z "$( cat "$confd/$chart.conf" | sed "s/^ \+//g" | grep -v "^$" | grep -v "^#" | grep -v "^$chart$charts_undescore" )" ]
         #   then
-        #       echo >&2 "$PROGRAM_NAME: chart's $chart config $confd/$chart.conf should only have lines starting with $chart$charts_undescore . Disabling it."
+        #       error "module's $chart config $confd/$chart.conf should only have lines starting with $chart$charts_undescore . Disabling it."
         #       continue
         #   fi
         #fi
@@ -374,18 +460,18 @@ all_enabled_charts() {
         #   "$pluginsd/charts.d.dryrun-helper.sh" "$chart" "$chartsd/$chart.chart.sh" "$confd/$chart.conf" >/dev/null
         #   if [ $? -ne 0 ]
         #   then
-        #       echo >&2 "$PROGRAM_NAME: chart's $chart did not pass the dry run check. This means it uses global variables not starting with $chart. Disabling it."
+        #       error "module's $chart did not pass the dry run check. This means it uses global variables not starting with $chart. Disabling it."
         #       continue
         #   fi
         #fi
 
         local charts2="$charts2 $chart"
     done
+    MODULE_NAME="main"
 
     echo $charts2
-    [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: enabled charts: $charts2"
+    debug "enabled charts: $charts2"
 }
-
 
 # -----------------------------------------------------------------------------
 # load the charts
@@ -394,19 +480,22 @@ suffix_update_every="_update_every"
 active_charts=
 for chart in $( all_enabled_charts )
 do
-    [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: loading chart: '$chartsd/$chart.chart.sh'"
+    MODULE_NAME="${chart}"
+
+    debug "loading module: '$chartsd/$chart.chart.sh'"
+
     . "$chartsd/$chart.chart.sh"
 
-    if [ -f "$confd/charts.d/$chart.conf" ]
+    if [ -f "$confd/$PROGRAM_NAME/$chart.conf" ]
     then
-        [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: loading chart options: '$confd/charts.d/$chart.conf'"
-        . "$confd/charts.d/$chart.conf"
+        debug "loading module configuration: '$confd/$PROGRAM_NAME/$chart.conf'"
+        . "$confd/$PROGRAM_NAME/$chart.conf"
     elif [ -f "$confd/$chart.conf" ]
     then
-        [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: loading chart options: '$confd/$chart.conf'"
+        debug "loading module configuration: '$confd/$chart.conf'"
         . "$confd/$chart.conf"
     else
-        echo >&2 "$PROGRAM_NAME: $chart: configuration file '$confd/charts.d/$chart.conf' not found. Using defaults."
+        warning "configuration file '$confd/$PROGRAM_NAME/$chart.conf' not found. Using defaults."
     fi
 
     eval "dt=\$$chart$suffix_update_every"
@@ -419,13 +508,14 @@ do
     $chart$charts_check
     if [ $? -eq 0 ]
     then
-        [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: '$chart' activated"
+        debug "module '$chart' activated"
         active_charts="$active_charts $chart"
     else
-        echo >&2 "$PROGRAM_NAME: chart '$chart' check() function reports failure."
+        error "module's '$chart' check() function reports failure."
     fi
 done
-[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: activated charts: $active_charts"
+MODULE_NAME="main"
+debug "activated modules: $active_charts"
 
 
 # -----------------------------------------------------------------------------
@@ -438,7 +528,7 @@ test $debug -eq 1 && debug_time=tellwork
 # if we only need a specific chart, remove all the others
 if [ ! -z "${chart_only}" ]
 then
-    [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: requested to run only for: '${chart_only}'"
+    debug "requested to run only for: '${chart_only}'"
     check_charts=
     for chart in $active_charts
     do
@@ -450,41 +540,19 @@ then
     done
     active_charts="$check_charts"
 fi
-[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: activated charts: $active_charts"
+debug "activated charts: $active_charts"
 
 # stop if we just need a pre-check
 if [ $check -eq 1 ]
 then
-    echo >&2 "CHECK RESULT"
-    echo >&2 "Will run the charts: $active_charts"
+    info "CHECK RESULT"
+    info "Will run the charts: $active_charts"
     exit 0
 fi
 
 # -----------------------------------------------------------------------------
-# create temp dir
 
-TMP_DIR=
-chartsd_cleanup() {
-    cd /tmp
-    if [ ! -z "$TMP_DIR" -a -d "$TMP_DIR" ]
-    then
-        [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: cleaning up temporary directory $TMP_DIR ..."
-        rm -rf "$TMP_DIR"
-    fi
-    exit 0
-}
-trap chartsd_cleanup EXIT
-trap chartsd_cleanup SIGHUP
-trap chartsd_cleanup INT
-
-if [ $UID = "0" ]
-then
-    TMP_DIR="$( mktemp -d /var/run/netdata-${PROGRAM_NAME}-XXXXXXXXXX )"
-else
-    TMP_DIR="$( mktemp -d /tmp/.netdata-${PROGRAM_NAME}-XXXXXXXXXX )"
-fi
-
-cd "$TMP_DIR" || exit 1
+cd "${TMP_DIR}" || exit 1
 
 # -----------------------------------------------------------------------------
 # create charts
@@ -492,28 +560,26 @@ cd "$TMP_DIR" || exit 1
 run_charts=
 for chart in $active_charts
 do
-    [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: Calling '$chart$charts_create()'..."
+    MODULE_NAME="${chart}"
+
+    debug "calling '$chart$charts_create()'..."
     $chart$charts_create
     if [ $? -eq 0 ]
     then
         run_charts="$run_charts $chart"
-        [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: '$chart' has initialized."
+        debug "'$chart' initialized."
     else
-        echo >&2 "$PROGRAM_NAME: chart '$chart' function '$chart$charts_create()' reports failure."
+        error "module's '$chart' function '$chart$charts_create()' reports failure."
     fi
 done
-[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: run_charts='$run_charts'"
+MODULE_NAME="main"
+debug "run_charts='$run_charts'"
 
 
 # -----------------------------------------------------------------------------
 # update dimensions
 
-if [ -z "$run_charts" ]
-    then
-    echo >&2 "$PROGRAM_NAME: No charts to collect data from."
-    echo "DISABLE"
-    exit 1
-fi
+[ -z "$run_charts" ] && fatal "No charts to collect data from."
 
 declare -A charts_last_update=() charts_update_every=() charts_next_update=() charts_run_counter=() charts_serial_failures=()
 global_update() {
@@ -552,12 +618,12 @@ global_update() {
 
         for chart in "${now_charts[@]}"
         do
-            #echo >&2 "                              DEBUG: chart: $chart last: ${charts_last_update[$chart]}, next: ${charts_next_update[$chart]}, now: ${now_ms}"
+            MODULE_NAME="${chart}"
+
             if [ ${now_ms} -ge ${charts_next_update[$chart]} ]
             then
                 last_ms=${charts_last_update[$chart]}
                 dt=$(( (now_ms - last_ms) ))
-                #echo >&2 "                              DEBUG: chart: $chart last: ${charts_last_update[$chart]}, next: ${charts_next_update[$chart]}, now: ${now_ms}, dt: ${dt}"
 
                 charts_last_update[$chart]=${now_ms}
 
@@ -576,7 +642,6 @@ global_update() {
                 fi
 
                 exec_start_ms=$now_ms
-                #echo >&2 "                              EXEC: $chart$charts_update $dt"
                 $chart$charts_update $dt
                 ret=$?
 
@@ -596,9 +661,9 @@ global_update() {
 
                     if [ ${charts_serial_failures[$chart]} -gt 10 ]
                         then
-                        echo >&2 "$PROGRAM_NAME: chart '$chart' update() function reported failure ${charts_serial_failures[$chart]} times. Disabling it."
+                        error "module's '$chart' update() function reported failure ${charts_serial_failures[$chart]} times. Disabling it."
                     else
-                        echo >&2 "$PROGRAM_NAME: chart '$chart' update() function reports failure. Will keep trying for a while."
+                        error "module's '$chart' update() function reports failure. Will keep trying for a while."
                         next_charts+=($chart)
                     fi
                 fi
@@ -606,6 +671,7 @@ global_update() {
                 next_charts+=($chart)
             fi
         done
+        MODULE_NAME="${chart}"
 
         # wait the time you are required to
         next_ms=$((now_ms + (update_every * 1000 * 100) ))
@@ -625,18 +691,17 @@ global_update() {
                 millis="0${millis}"
             fi
 
-            [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: sleeping for ${seconds}.${millis} seconds."
+            debug "sleeping for ${seconds}.${millis} seconds."
             ${mysleep} ${seconds}.${millis}
         else
-            [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: sleeping for ${update_every} seconds."
+            debug "sleeping for ${update_every} seconds."
             ${mysleep} $update_every
         fi
 
         test ${now_ms} -ge ${exit_at} && exit 0
     done
 
-    echo >&2 "$PROGRAM_NAME: Nothing left to do. Disabling charts.d.plugin."
-    echo "DISABLE"
+    fatal "nothing left to do, exiting..."
 }
 
 global_update

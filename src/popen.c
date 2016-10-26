@@ -138,7 +138,7 @@ FILE *mypopen(const char *command, pid_t *pidptr)
             error("pre-execution of command '%s' on pid %d: failed to set default signal handler for SIGUSR2.", command, getpid());
     }
 
-    info("executing command: '%s' on pid %d.", command, getpid());
+    debug(D_CHILDS, "executing command: '%s' on pid %d.", command, getpid());
     execl("/bin/sh", "sh", "-c", command, NULL);
     exit(1);
 }
@@ -147,6 +147,13 @@ int mypclose(FILE *fp, pid_t pid) {
     debug(D_EXIT, "Request to mypclose() on pid %d", pid);
 
     /*mypopen_del(fp);*/
+
+    // close the pipe fd
+    // this is required in musl
+    // without it the childs do not exit
+    close(fileno(fp));
+
+    // close the pipe file pointer
     fclose(fp);
 
     siginfo_t info;

@@ -1,10 +1,58 @@
 #!/usr/bin/env bash
 
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+# This script is a helper to allow netdata collect tc data
+# parsing tc output has been implemented in C, inside netdata
+# This script allows setting names to dimensions.
+
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
+export LC_ALL=C
 
 PROGRAM_FILE="$0"
 PROGRAM_NAME="$(basename $0)"
 PROGRAM_NAME="${PROGRAM_NAME/.plugin}"
+
+# -----------------------------------------------------------------------------
+
+logdate() {
+    date "+%Y-%m-%d %H:%M:%S"
+}
+
+log() {
+    local status="${1}"
+    shift
+
+    echo >&2 "$(logdate): ${PROGRAM_NAME}: ${status}: ${*}"
+
+}
+
+warning() {
+    log WARNING "${@}"
+}
+
+error() {
+    log ERROR "${@}"
+}
+
+info() {
+    log INFO "${@}"
+}
+
+fatal() {
+    log FATAL "${@}"
+    exit 1
+}
+
+debug=0
+debug() {
+    [ $debug -eq 1 ] && log DEBUG "${@}"
+}
+
+# -----------------------------------------------------------------------------
 
 plugins_dir="${NETDATA_PLUGINS_DIR}"
 [ -z "$plugins_dir" ] && plugins_dir="$( dirname $PROGRAM_FILE )"
@@ -39,8 +87,7 @@ loopsleepms() {
 
 if [ -z "${tc}" -o ! -x "${tc}" ]
     then
-    echo >&2 "${PROGRAM_NAME}: Cannot find command 'tc' in this system."
-    exit 1
+    fatal "cannot find command 'tc' in this system."
 fi
 
 devices=

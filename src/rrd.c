@@ -422,8 +422,29 @@ void rrdset_reset(RRDSET *st)
         rd->last_collected_time.tv_sec = 0;
         rd->last_collected_time.tv_usec = 0;
         rd->counter = 0;
-        bzero(rd->values, rd->entries * sizeof(storage_number));
+        memset(rd->values, 0, rd->entries * sizeof(storage_number));
     }
+}
+static long align_entries_to_pagesize(long entries) {
+    if(entries < 5) entries = 5;
+    if(entries > RRD_HISTORY_ENTRIES_MAX) entries = RRD_HISTORY_ENTRIES_MAX;
+
+#ifdef NETDATA_LOG_ALLOCATIONS
+    long page = (size_t)sysconf(_SC_PAGESIZE);
+
+    long size = sizeof(RRDDIM) + entries * sizeof(storage_number);
+    if(size % page) {
+        size -= (size % page);
+        size += page;
+
+        long n = (size - sizeof(RRDDIM)) / sizeof(storage_number);
+        return n;
+    }
+
+    return entries;
+#else
+    return entries;
+#endif
 }
 
 RRDSET *rrdset_create(const char *type, const char *id, const char *name, const char *family, const char *context, const char *title, const char *units, long priority, int update_every, int chart_type)
@@ -450,9 +471,9 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
         return st;
     }
 
-    long entries = config_get_number(fullid, "history", rrd_default_history_entries);
-    if(entries < 5) entries = config_set_number(fullid, "history", 5);
-    if(entries > RRD_HISTORY_ENTRIES_MAX) entries = config_set_number(fullid, "history", RRD_HISTORY_ENTRIES_MAX);
+    long rentries = config_get_number(fullid, "history", rrd_default_history_entries);
+    long entries = align_entries_to_pagesize(rentries);
+    if(entries != rentries) entries = config_set_number(fullid, "history", entries);
 
     int enabled = config_get_boolean(fullid, "enabled", 1);
     if(!enabled) entries = 5;
@@ -468,29 +489,29 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
         if(strcmp(st->magic, RRDSET_MAGIC) != 0) {
             errno = 0;
             info("Initializing file %s.", fullfilename);
-            bzero(st, size);
+            memset(st, 0, size);
         }
         else if(strcmp(st->id, fullid) != 0) {
             errno = 0;
             error("File %s contents are not for chart %s. Clearing it.", fullfilename, fullid);
             // munmap(st, size);
             // st = NULL;
-            bzero(st, size);
+            memset(st, 0, size);
         }
         else if(st->memsize != size || st->entries != entries) {
             errno = 0;
             error("File %s does not have the desired size. Clearing it.", fullfilename);
-            bzero(st, size);
+            memset(st, 0, size);
         }
         else if(st->update_every != update_every) {
             errno = 0;
             error("File %s does not have the desired update frequency. Clearing it.", fullfilename);
-            bzero(st, size);
+            memset(st, 0, size);
         }
         else if((time(NULL) - st->last_updated.tv_sec) > update_every * entries) {
             errno = 0;
             error("File %s is too old. Clearing it.", fullfilename);
-            bzero(st, size);
+            memset(st, 0, size);
         }
     }
 
@@ -616,44 +637,44 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
         if(strcmp(rd->magic, RRDDIMENSION_MAGIC) != 0) {
             errno = 0;
             info("Initializing file %s.", fullfilename);
-            bzero(rd, size);
+            memset(rd, 0, size);
         }
         else if(rd->memsize != size) {
             errno = 0;
             error("File %s does not have the desired size. Clearing it.", fullfilename);
-            bzero(rd, size);
+            memset(rd, 0, size);
         }
         else if(rd->multiplier != multiplier) {
             errno = 0;
             error("File %s does not have the same multiplier. Clearing it.", fullfilename);
-            bzero(rd, size);
+            memset(rd, 0, size);
         }
         else if(rd->divisor != divisor) {
             errno = 0;
             error("File %s does not have the same divisor. Clearing it.", fullfilename);
-            bzero(rd, size);
+            memset(rd, 0, size);
         }
         else if(rd->algorithm != algorithm) {
             errno = 0;
             error("File %s does not have the same algorithm. Clearing it.", fullfilename);
-            bzero(rd, size);
+            memset(rd, 0, size);
         }
         else if(rd->update_every != st->update_every) {
             errno = 0;
             error("File %s does not have the same refresh frequency. Clearing it.", fullfilename);
-            bzero(rd, size);
+            memset(rd, 0, size);
         }
         else if(usec_dt(&now, &rd->last_collected_time) > (rd->entries * rd->update_every * 1000000ULL)) {
             errno = 0;
             error("File %s is too old. Clearing it.", fullfilename);
-            bzero(rd, size);
+            memset(rd, 0, size);
         }
         else if(strcmp(rd->id, id) != 0) {
             errno = 0;
             error("File %s contents are not for dimension %s. Clearing it.", fullfilename, id);
             // munmap(rd, size);
             // rd = NULL;
-            bzero(rd, size);
+            memset(rd, 0, size);
         }
     }
 
@@ -1387,8 +1408,10 @@ unsigned long long rrdset_done(RRDSET *st)
                     break;
             }
 
-            if(unlikely(!store_this_entry))
+            if(unlikely(!store_this_entry)) {
+                rd->values[st->current_entry] = pack_storage_number(0, SN_NOT_EXISTS);
                 continue;
+            }
 
             if(likely(rd->updated && rd->counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
                 rd->values[st->current_entry] = pack_storage_number(new_value, storage_flags );

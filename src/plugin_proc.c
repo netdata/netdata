@@ -63,7 +63,7 @@ void *proc_main(void *ptr)
     unsigned long long sunext = (time(NULL) - (time(NULL) % rrd_update_every) + rrd_update_every) * 1000000ULL;
     unsigned long long sunow;
 
-    for(;1;) {
+    for(;;) {
         if(unlikely(netdata_exit)) break;
 
         // delay until it is our time to run
@@ -240,6 +240,8 @@ void *proc_main(void *ptr)
             registry_statistics();
         }
     }
+
+    info("PROC thread exiting");
 
     pthread_exit(NULL);
     return NULL;

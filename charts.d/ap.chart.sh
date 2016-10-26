@@ -1,5 +1,11 @@
 # no need for shebang - this file is loaded from charts.d.plugin
 
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+
 # _update_every is a special variable - it holds the number of seconds
 # between the calls of the _update() function
 ap_update_every=
@@ -7,13 +13,11 @@ ap_priority=6900
 
 declare -A ap_devs=()
 
-export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
-
 # _check is called once, to find out if this chart should be enabled or not
 ap_check() {
 	require_cmd iw || return 1
 	
-	local ev=$(iw dev | awk '
+	local ev=$(run iw dev | awk '
 		BEGIN {
 			i = "";
 			ssid = "";
@@ -43,6 +47,7 @@ ap_check() {
 	#  - 1 to disable the chart
 
 	[ ${#ap_devs[@]} -gt 0 ] && return 0
+	error "no devices found in AP mode, with 'iw dev'"
 	return 1
 }
 

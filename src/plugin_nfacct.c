@@ -27,11 +27,7 @@ static int nfacct_callback(const struct nlmsghdr *nlh, void *data) {
 
         info("nfacct.plugin: increasing nfacct_list to size %d", size);
 
-        nfacct_list = realloc(nfacct_list, sizeof(struct nfacct_list) + (sizeof(struct mynfacct) * size));
-        if(!nfacct_list) {
-            error("nfacct.plugin: cannot allocate nfacct_list.");
-            return MNL_CB_OK;
-        }
+        nfacct_list = reallocz(nfacct_list, sizeof(struct nfacct_list) + (sizeof(struct mynfacct) * size));
 
         nfacct_list->data[len].nfacct = nfacct_alloc();
         if(!nfacct_list->data[size - 1].nfacct) {
@@ -192,7 +188,7 @@ void *nfacct_main(void *ptr) {
         usleep(susec);
 
         // copy current to last
-        bcopy(&now, &last, sizeof(struct timeval));
+        memmove(&last, &now, sizeof(struct timeval));
     }
 
     mnl_socket_close(nl);

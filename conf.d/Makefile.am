@@ -6,6 +6,8 @@ MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 dist_config_DATA = \
 	apps_groups.conf \
 	charts.d.conf \
+	fping.conf \
+	node.d.conf \
 	python.d.conf \
 	health_alarm_notify.conf \
 	health_email_recipients.conf \
@@ -17,6 +19,10 @@ dist_chartsconfig_DATA = \
 
 nodeconfigdir=$(configdir)/node.d
 dist_nodeconfig_DATA = \
+	node.d/README.md \
+	node.d/named.conf.md \
+	node.d/sma_webbox.conf.md \
+	node.d/snmp.conf.md \
 	$(NULL)
 
 pythonconfigdir=$(configdir)/python.d

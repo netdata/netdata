@@ -18,7 +18,7 @@
     var netdataTheme = 'slate';
     var netdataShowHelp = true;
 </script>
-<script type="text/javascript" src="dashboard.js?v51"></script>
+<script type="text/javascript" src="dashboard.js?v20161011-1"></script>
 
 <script>
 var urlOptions = {
@@ -73,11 +73,10 @@ function gotoServerValidateUrl(id, guid, url) {
     var penaldy = 0;
     var error = 'failed';
 
-    if(thisIsHttps === false && url.toString().startsWith('https://')) {
+    if(thisIsHttps === false && url.toString().startsWith('https://'))
         // we penalize https only if the current url is http
         // to allow the user walk through all its servers.
         penaldy = 500;
-    }
 
     else if(thisIsHttps === true && url.toString().startsWith('http://')) {
         error = 'can\'t check';
@@ -90,7 +89,8 @@ function gotoServerValidateUrl(id, guid, url) {
         document.getElementById('gotoServerList').innerHTML += '<tr><td style="padding-left: 20px;"><a href="' + finalURL + '" target="_blank">' + url + '</a></td><td style="padding-left: 30px;"><code id="' + guid + '-' + id + '-status">checking...</code></td></tr>';
 
         NETDATA.registry.hello(url, function(data) {
-            if (data) {
+            if(typeof data !== 'undefined' && data !== null && typeof data.machine_guid === 'string' && data.machine_guid === guid) {
+                // console.log('OK ' + id + ' URL: ' + url);
                 document.getElementById(guid + '-' + id + '-status').innerHTML = "OK";
 
                 if(!gotoServerStop) {
@@ -101,11 +101,16 @@ function gotoServerValidateUrl(id, guid, url) {
                         gotoServerMiddleClick = false;
                         document.getElementById('gotoServerResponse').innerHTML = '<b>Opening new window to ' + NETDATA.registry.machines[guid].name + '<br/><a href="' + finalURL + '">' + url + '</a></b><br/>(check your pop-up blocker if it fails)';
                     }
-                    else
+                    else {
+                        document.getElementById('gotoServerResponse').innerHTML += 'found it! It is at:<br/><small>' + url + '</small>';
                         document.location = finalURL;
+                    }
                 }
             }
             else {
+                if(typeof data !== 'undefined' && data !== null && typeof data.machine_guid === 'string' && data.machine_guid !== guid)
+                    error = 'wrong machine';
+
                 document.getElementById(guid + '-' + id + '-status').innerHTML = error;
                 gotoServerValidateRemaining--;
                 if(gotoServerValidateRemaining <= 0) {
@@ -134,14 +139,47 @@ var netdataRegistryCallback = function(machines_array) {
         thisIsHttps = true;
 
     if(machines_array) {
+        var guids = {};
+        var checked = {};
         var len = machines_array.length;
+        var count = 0;
+
         while(len--) {
             if(machines_array[len].name === urlOptions.host) {
                 var ulen = machines_array[len].alternate_urls.length;
+                var guid = machines_array[len].guid;
+                guids[guid] = true;
+
                 gotoServerValidateRemaining = ulen;
-                while(ulen--)
-                    gotoServerValidateUrl(ulen, machines_array[len].guid, machines_array[len].alternate_urls[ulen]);
-                return;
+                while(ulen--) {
+                    var url = machines_array[len].alternate_urls[ulen];
+                    checked[url] = true;
+                    gotoServerValidateUrl(count++, guid, url);
+                }
+
+                setTimeout(function() {
+                    if(gotoServerStop === false) {
+                        document.getElementById('gotoServerResponse').innerHTML = '<b>Added all the known URLs for this machine.</b>';
+                        var guid;
+                        for(guid in guids) {
+                            NETDATA.registry.search(guid, function(data) {
+                                // console.log(data);
+                                len = data.urls.length;
+                                while(len--) {
+                                    var url = data.urls[len][1];
+                                    // console.log(url);
+                                    if(typeof checked[url] === 'undefined') {
+                                        gotoServerValidateRemaining++;
+                                        checked[url] = true;
+                                        gotoServerValidateUrl(count++, guid, url);
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }, 2000);
+
+                return false;
             }
         }
     }
