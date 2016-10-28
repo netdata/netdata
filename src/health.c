@@ -2564,14 +2564,38 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
         return 0;
     }
 
-    if (unlikely(!rc->rrdset->last_collected_time.tv_sec)) {
-        debug(D_HEALTH, "Health not running alarm '%s.%s'. Chart is not yet collected.", rc->chart?rc->chart:"NOCHART", rc->name);
+    if (unlikely(!rc->rrdset->last_collected_time.tv_sec || rc->rrdset->counter_done < 2)) {
+        debug(D_HEALTH, "Health not running alarm '%s.%s'. Chart is not fully collected yet.", rc->chart?rc->chart:"NOCHART", rc->name);
         return 0;
     }
 
     if (unlikely(!rc->update_every)) {
         debug(D_HEALTH, "Health not running alarm '%s.%s'. It does not have an update frequency", rc->chart?rc->chart:"NOCHART", rc->name);
         return 0;
+    }
+
+    int update_every = rc->rrdset->update_every;
+    time_t first = rrdset_first_entry_t(rc->rrdset);
+    time_t last = rrdset_last_entry_t(rc->rrdset);
+
+    if(now + update_every < first || now - update_every > last) {
+        debug(D_HEALTH
+              , "Health not examining alarm '%s.%s' yet (wanted time is out of bounds - we need %lu but got %lu - %lu)."
+              , rc->chart ? rc->chart : "NOCHART", rc->name, (unsigned long) now, (unsigned long) first
+              , (unsigned long) last);
+        return 0;
+    }
+
+    if (RRDCALC_HAS_DB_LOOKUP(rc)) {
+        time_t needed = now + rc->before + rc->after;
+
+        if(needed + update_every < first || needed - update_every > last) {
+            debug(D_HEALTH
+                  , "Health not examining alarm '%s.%s' yet (not enough data yet - we need %lu but got %lu - %lu)."
+                  , rc->chart ? rc->chart : "NOCHART", rc->name, (unsigned long) needed, (unsigned long) first
+                  , (unsigned long) last);
+            return 0;
+        }
     }
 
     if (unlikely(rc->next_update > now)) {
@@ -2581,12 +2605,6 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
         debug(D_HEALTH, "Health not examining alarm '%s.%s' yet (will do in %d secs).", rc->chart?rc->chart:"NOCHART", rc->name, (int) (rc->next_update - now));
         return 0;
     }
-
-    // FIXME
-    // we should check that the DB lookup is possible
-    // i.e.
-    // - the duration of the chart includes the required timeframe
-    // we SHOULD NOT check the dimensions - there might be alarms that refer non-existing dimensions (e.g. cpu steal)
 
     return 1;
 }
