@@ -80,7 +80,7 @@ NETDATA_CONFIG_DIR="${NETDATA_CONFIG_DIR-/etc/netdata}"
 
 # the fping binary to use
 # we need one that can output netdata friendly info
-fping="$(which fping || command -v fping)"
+fping="$(which fping 2>/dev/null || command -v fping 2>/dev/null )"
 
 # a space separated list of hosts to fping
 hosts=""
