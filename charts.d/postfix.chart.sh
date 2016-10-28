@@ -23,7 +23,7 @@ postfix_check() {
 	# try to find the postqueue executable
 	if [ -z "$postfix_postqueue" -o ! -x "$postfix_postqueue" ]
 	then
-		postfix_postqueue="`which postqueue 2>/dev/null`"
+		postfix_postqueue="$(which postqueue 2>/dev/null || command -v postqueue 2>/dev/null)"
 	fi
 
 	if [ -z "$postfix_postqueue" -o ! -x  "$postfix_postqueue" ]
