@@ -41,6 +41,7 @@ dist_pythonconfig_DATA = \
 	python.d/nginx_log.conf \
 	python.d/phpfpm.conf \
 	python.d/postfix.conf \
+	python.d/postgres.conf \
 	python.d/redis.conf \
 	python.d/retroshare.conf \
 	python.d/sensors.conf \

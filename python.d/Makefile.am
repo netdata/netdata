@@ -22,6 +22,7 @@ dist_python_SCRIPTS = \
 	nginx_log.chart.py \
 	phpfpm.chart.py \
 	postfix.chart.py \
+    postgres.chart.py \
 	redis.chart.py \
 	retroshare.chart.py \
 	sensors.chart.py \
