@@ -113,74 +113,74 @@ ORDER = ['db_stat_transactions', 'db_stat_tuple_read', 'db_stat_tuple_returned',
 
 CHARTS = {
     'db_stat_transactions': {
-        'options': [None, ' Transactions', 'Count', ' database statistics', '.db_stat_transactions', 'line'],
+        'options': [None, 'Transactions on db', 'transactions/s', 'db statistics', 'postgres.db_stat_transactions', 'line'],
         'lines': [
-            ['db_stat_xact_commit', 'Committed', 'absolute'],
-            ['db_stat_xact_rollback', 'Rolled Back', 'absolute']
+            ['db_stat_xact_commit',   'committed',   'incremental'],
+            ['db_stat_xact_rollback', 'rolled back', 'incremental']
         ]},
     'db_stat_connections': {
-        'options': [None, ' Connections', 'Count', ' database statistics', '.db_stat_connections', 'line'],
+        'options': [None, 'Current connections to db', 'count', 'db statistics', 'postgres.db_stat_connections', 'line'],
         'lines': [
-            ['db_stat_connections', 'Connections', 'absolute']
+            ['db_stat_connections', 'connections', 'absolute']
         ]},
     'db_stat_tuple_read': {
-        'options': [None, ' Tuple read', 'Count', ' database statistics', '.db_stat_tuple_read', 'line'],
+        'options': [None, 'Tuple reads from db', 'reads/s', 'db statistics', 'postgres.db_stat_tuple_read', 'line'],
         'lines': [
-            ['db_stat_blks_read', 'Disk', 'absolute'],
-            ['db_stat_blks_hit', 'Cache', 'absolute']
+            ['db_stat_blks_read', 'disk',  'incremental'],
+            ['db_stat_blks_hit',  'cache', 'incremental']
         ]},
     'db_stat_tuple_returned': {
-        'options': [None, ' Tuple returned', 'Count', ' database statistics', '.db_stat_tuple_returned', 'line'],
+        'options': [None, 'Tuples returned from db', 'tuples/s', 'db statistics', 'postgres.db_stat_tuple_returned', 'line'],
         'lines': [
-            ['db_stat_tup_returned', 'Sequential', 'absolute'],
-            ['db_stat_tup_fetched', 'Bitmap', 'absolute']
+            ['db_stat_tup_returned', 'sequential', 'incremental'],
+            ['db_stat_tup_fetched',  'bitmap',     'incremental']
         ]},
     'db_stat_tuple_write': {
-        'options': [None, ' Tuple write', 'Count', ' database statistics', '.db_stat_tuple_write', 'line'],
+        'options': [None, 'Tuples written to db', 'writes/s', 'db statistics', 'postgres.db_stat_tuple_write', 'line'],
         'lines': [
-            ['db_stat_tup_inserted', 'Inserted', 'absolute'],
-            ['db_stat_tup_updated', 'Updated', 'absolute'],
-            ['db_stat_tup_deleted', 'Deleted', 'absolute'],
-            ['db_stat_conflicts', 'Conflicts', 'absolute']
+            ['db_stat_tup_inserted', 'inserted',  'incremental'],
+            ['db_stat_tup_updated',  'updated',   'incremental'],
+            ['db_stat_tup_deleted',  'deleted',   'incremental'],
+            ['db_stat_conflicts',    'conflicts', 'incremental']
         ]},
     'backend_process': {
-        'options': [None, 'Backend processes', 'Count', 'Backend processes', 'postgres.backend_process', 'line'],
+        'options': [None, 'Current Backend Processes', 'processes', 'backend processes', 'postgres.backend_process', 'line'],
         'lines': [
-            ['backend_process_active', 'Active', 'absolute'],
-            ['backend_process_idle', 'Idle', 'absolute']
+            ['backend_process_active', 'active', 'absolute'],
+            ['backend_process_idle',   'idle',   'absolute']
         ]},
     'index_count': {
-        'options': [None, 'Total index', 'Count', 'Index', 'postgres.index_count', 'line'],
+        'options': [None, 'Total indexes', 'index', 'indexes', 'postgres.index_count', 'line'],
         'lines': [
-            ['index_count', 'Total index', 'absolute']
+            ['index_count', 'total', 'absolute']
         ]},
     'index_size': {
-        'options': [None, 'Index size', 'MB', 'Index', 'postgres.index_size', 'line'],
+        'options': [None, 'Indexes size', 'MB', 'indexes', 'postgres.index_size', 'line'],
         'lines': [
-            ['index_size', 'Size', 'absolute', 1, 1024 * 1024]
+            ['index_size', 'size', 'absolute', 1, 1024 * 1024]
         ]},
     'table_count': {
-        'options': [None, 'Total table', 'Count', 'Table', 'postgres.table_count', 'line'],
+        'options': [None, 'Total Tables', 'tables', 'tables', 'postgres.table_count', 'line'],
         'lines': [
-            ['table_count', 'Total table', 'absolute']
+            ['table_count', 'total', 'absolute']
         ]},
     'table_size': {
-        'options': [None, 'Table size', 'MB', 'Table', 'postgres.table_size', 'line'],
+        'options': [None, 'Tables size', 'MB', 'tables', 'postgres.table_size', 'line'],
         'lines': [
-            ['table_size', 'Size', 'absolute', 1, 1024 * 1024]
+            ['table_size', 'size', 'absolute', 1, 1024 * 1024]
         ]},
     'wal': {
-        'options': [None, 'WAL stats', 'Files', 'WAL', 'postgres.wal', 'line'],
+        'options': [None, 'Write-Ahead Logging Statistics', 'files/s', 'write ahead log', 'postgres.wal', 'line'],
         'lines': [
-            ['wal_total', 'Total', 'absolute'],
-            ['wal_ready', 'Ready', 'absolute'],
-            ['wal_done', 'Done', 'absolute']
+            ['wal_total', 'total', 'incremental'],
+            ['wal_ready', 'ready', 'incremental'],
+            ['wal_done',  'done',  'incremental']
         ]},
     'background_writer': {
-        'options': [None, 'Checkpoints', 'Count', 'Background Writer', 'postgres.background_writer', 'line'],
+        'options': [None, 'Checkpoints', 'writes/s', 'background writer', 'postgres.background_writer', 'line'],
         'lines': [
-            ['background_writer_scheduled', 'Scheduled', 'absolute'],
-            ['background_writer_requested', 'Requested', 'absolute']
+            ['background_writer_scheduled', 'scheduled', 'incremental'],
+            ['background_writer_requested', 'requested', 'incremental']
         ]}
 }
 
@@ -196,7 +196,6 @@ class Service(SimpleService):
         self.connection = None
         self.is_superuser = False
         self.data = {}
-        self.old_data = {}
         self.databases = set()
 
     def _connect(self):
@@ -256,10 +255,10 @@ class Service(SimpleService):
             self.definitions[chart_name] = {
                 'options': [
                     name,
-                    database_name + title,
+                    title + ': ' + database_name,
                     units,
-                    database_name + family,
-                    database_name + context,
+                    'db ' + database_name,
+                    context,
                     chart_type
                 ]
             }
@@ -272,22 +271,22 @@ class Service(SimpleService):
     def _add_database_lock_chart(self, database_name):
         chart_name = "{}_locks".format(database_name)
         if chart_name not in self.order:
-            self.order.insert(0, chart_name)
+            self.order.insert(-1, chart_name)
             self.definitions[chart_name] = dict(
                 options=
                 [
                     None,
-                    database_name + ' locks',
-                    'Count',
-                    database_name + ' database statistics',
-                    database_name + '.locks',
+                    'Locks on db: ' + database_name,
+                    'locks',
+                    'db ' + database_name,
+                    'postgres.db_locks',
                     'line'
                 ],
                 lines=[]
             )
 
             for lock_type in LOCK_TYPES:
-                lock_id = "{}_{}".format(database_name, lock_type.lower())
+                lock_id = "{}_{}".format(database_name, lock_type)
                 label = re.sub("([a-z])([A-Z])", "\g<1> \g<2>", lock_type)
                 self.definitions[chart_name]['lines'].append([lock_id, label, 'absolute'])
 
@@ -319,76 +318,62 @@ class Service(SimpleService):
         cursor.execute(DATABASE)
         for row in cursor:
             database_name = row.get('database_name')
-            self.add_derive_value('db_stat_xact_commit', prefix=database_name, value=int(row.get('xact_commit', 0)))
-            self.add_derive_value('db_stat_xact_rollback', prefix=database_name, value=int(row.get('xact_rollback', 0)))
-            self.add_derive_value('db_stat_blks_read', prefix=database_name, value=int(row.get('blks_read', 0)))
-            self.add_derive_value('db_stat_blks_hit', prefix=database_name, value=int(row.get('blks_hit', 0)))
-            self.add_derive_value('db_stat_tup_returned', prefix=database_name, value=int(row.get('tup_returned', 0)))
-            self.add_derive_value('db_stat_tup_fetched', prefix=database_name, value=int(row.get('tup_fetched', 0)))
-            self.add_derive_value('db_stat_tup_inserted', prefix=database_name, value=int(row.get('tup_inserted', 0)))
-            self.add_derive_value('db_stat_tup_updated', prefix=database_name, value=int(row.get('tup_updated', 0)))
-            self.add_derive_value('db_stat_tup_deleted', prefix=database_name, value=int(row.get('tup_deleted', 0)))
-            self.add_derive_value('db_stat_conflicts', prefix=database_name, value=int(row.get('conflicts', 0)))
-            conn_key = "{}_{}".format(database_name, 'db_stat_connections')
-            self.data[conn_key] = int(row.get('connections', 0))
+            self.data["{}_{}".format(database_name, 'db_stat_xact_commit')]   = int(row.get('xact_commit',   0))
+            self.data["{}_{}".format(database_name, 'db_stat_xact_rollback')] = int(row.get('xact_rollback', 0))
+            self.data["{}_{}".format(database_name, 'db_stat_blks_read')]     = int(row.get('blks_read',     0))
+            self.data["{}_{}".format(database_name, 'db_stat_blks_hit')]      = int(row.get('blks_hit',      0))
+            self.data["{}_{}".format(database_name, 'db_stat_tup_returned')]  = int(row.get('tup_returned',  0))
+            self.data["{}_{}".format(database_name, 'db_stat_tup_fetched')]   = int(row.get('tup_fetched',   0))
+            self.data["{}_{}".format(database_name, 'db_stat_tup_inserted')]  = int(row.get('tup_inserted',  0))
+            self.data["{}_{}".format(database_name, 'db_stat_tup_updated')]   = int(row.get('tup_updated',   0))
+            self.data["{}_{}".format(database_name, 'db_stat_tup_deleted')]   = int(row.get('tup_deleted',   0))
+            self.data["{}_{}".format(database_name, 'db_stat_conflicts')]     = int(row.get('conflicts',     0))
+            self.data["{}_{}".format(database_name, 'db_stat_connections')]   = int(row.get('connections',   0))
 
     def add_backend_stats(self, cursor):
         cursor.execute(BACKENDS)
         temp = cursor.fetchone()
 
         self.data['backend_process_active'] = int(temp.get('backends_active', 0))
-        self.data['backend_process_idle'] = int(temp.get('backends_idle', 0))
+        self.data['backend_process_idle']   = int(temp.get('backends_idle',   0))
 
     def add_index_stats(self, cursor):
         cursor.execute(INDEX_STATS)
         temp = cursor.fetchone()
-        self.data['index_count'] = int(temp.get('indexes', 0))
-        self.data['index_size'] = int(temp.get('size_indexes', 0))
+        self.data['index_count'] = int(temp.get('indexes',      0))
+        self.data['index_size']  = int(temp.get('size_indexes', 0))
 
     def add_table_stats(self, cursor):
         cursor.execute(TABLE_STATS)
         temp = cursor.fetchone()
-        self.data['table_count'] = int(temp.get('relations', 0))
-        self.data['table_size'] = int(temp.get('size_relations', 0))
+        self.data['table_count'] = int(temp.get('relations',      0))
+        self.data['table_size']  = int(temp.get('size_relations', 0))
 
     def add_lock_stats(self, cursor):
         cursor.execute(DATABASE_LOCKS)
-        # First zero out all current lock values.
+
+        # zero out all current lock values
         for database_name in self.databases:
             for lock_type in LOCK_TYPES:
-                lock_id = "{}_{}".format(database_name, lock_type.lower())
-                self.data[lock_id] = 0
+                self.data["{}_{}".format(database_name, lock_type)] = 0
 
-        # Now populate those that have current locks
+        # populate those that have current locks
         for row in cursor:
             database_name, lock_type, lock_count = row
-            lock_id = "{}_{}".format(database_name, lock_type.lower())
-            self.data[lock_id] = lock_count
+            self.data["{}_{}".format(database_name, lock_type)] = lock_count
 
     def add_wal_stats(self, cursor):
         cursor.execute(ARCHIVE)
         temp = cursor.fetchone()
-        self.add_derive_value('wal_total', int(temp.get('file_count', 0)))
-        self.add_derive_value('wal_ready', int(temp.get('ready_count', 0)))
-        self.add_derive_value('wal_done', int(temp.get('done_count', 0)))
+        self.data['wal_total'] = int(temp.get('file_count',  0))
+        self.data['wal_ready'] = int(temp.get('ready_count', 0))
+        self.data['wal_done']  = int(temp.get('done_count',  0))
 
     def add_bgwriter_stats(self, cursor):
         cursor.execute(BGWRITER)
         temp = cursor.fetchone()
-
-        self.add_derive_value('background_writer_scheduled', temp.get('checkpoints_timed', 0))
-        self.add_derive_value('background_writer_requested', temp.get('checkpoints_requests', 0))
-
-    def add_derive_value(self, key, value, prefix=None):
-        if prefix:
-            key = "{}_{}".format(prefix, key)
-        if key not in self.old_data.keys():
-            self.data[key] = 0
-        else:
-            self.data[key] = value - self.old_data[key]
-
-        self.old_data[key] = value
-
+        self.data['background_writer_scheduled'] = temp.get('checkpoints_timed',    0)
+        self.data['background_writer_requested'] = temp.get('checkpoints_requests', 0)
 
 '''
     def add_replication_stats(self, cursor):
