@@ -1426,7 +1426,17 @@
                 return;
             }
 
+            function alarmid4human(id) {
+                if(id === 0)
+                    return '-';
+
+                return id.toString();
+            }
+
             function timestamp4human(timestamp, space) {
+                if(timestamp === 0)
+                    return '-';
+
                 if(typeof space === 'undefined')
                     space = '&nbsp;';
 
@@ -1738,15 +1748,19 @@
                             title: 'Event Date',
                             valign: 'middle',
                             titleTooltip: 'The date and time the even took place',
-                            switchable: false,
-                            sortable: true,
                             formatter: function(value, row, index) { return timestamp4human(value, ' '); },
+                            align: 'center',
+                            valign: 'middle',
+                            switchable: false,
+                            sortable: true
                         },
                         {
                             field: 'hostname',
                             title: 'Host',
                             valign: 'middle',
                             titleTooltip: 'The host that generated this event',
+                            align: 'center',
+                            valign: 'middle',
                             visible: false,
                             sortable: true
                         },
@@ -1754,6 +1768,8 @@
                             field: 'unique_id',
                             title: 'Unique ID',
                             titleTooltip: 'The host unique ID for this event',
+                            formatter: function(value, row, index) { return alarmid4human(value); },
+                            align: 'center',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1762,6 +1778,8 @@
                             field: 'alarm_id',
                             title: 'Alarm ID',
                             titleTooltip: 'The ID of the alarm that generated this event',
+                            formatter: function(value, row, index) { return alarmid4human(value); },
+                            align: 'center',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1770,6 +1788,8 @@
                             field: 'alarm_event_id',
                             title: 'Alarm Event ID',
                             titleTooltip: 'The incremental ID of this event for the given alarm',
+                            formatter: function(value, row, index) { return alarmid4human(value); },
+                            align: 'center',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1778,6 +1798,7 @@
                             field: 'chart',
                             title: 'Chart',
                             titleTooltip: 'The chart the alarm is attached to',
+                            align: 'center',
                             valign: 'middle',
                             switchable: false,
                             sortable: true
@@ -1786,6 +1807,7 @@
                             field: 'family',
                             title: 'Family',
                             titleTooltip: 'The family of the chart the alarm is attached to',
+                            align: 'center',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1797,6 +1819,7 @@
                             formatter: function(value, row, index) {
                                 return value.toString().replace(/_/g, ' ');
                             },
+                            align: 'center',
                             valign: 'middle',
                             switchable: false,
                             sortable: true
@@ -1805,6 +1828,10 @@
                             field: 'old_value',
                             title: 'Old Value',
                             titleTooltip: 'The value of the alarm, just before this event',
+                            formatter: function(value, row, index) {
+                                return ((value !== null)?Math.round(value * 100) / 100:'NaN').toString();
+                            },
+                            align: 'center',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1814,7 +1841,7 @@
                             title: 'Value',
                             titleTooltip: 'The value of the alarm, that triggered this event',
                             formatter: function(value, row, index) {
-                                return ((value !== null)?Math.floor(value):'NaN').toString();
+                                return ((value !== null)?Math.round(value * 100) / 100:'NaN').toString();
                             },
                             align: 'right',
                             valign: 'middle',
@@ -1824,6 +1851,7 @@
                             field: 'units',
                             title: 'Units',
                             titleTooltip: 'The units of the value of the alarm',
+                            align: 'left',
                             valign: 'middle',
                             sortable: true
                         },
@@ -1831,6 +1859,7 @@
                             field: 'old_status',
                             title: 'Old Status',
                             titleTooltip: 'The status of the alarm, just before this event',
+                            align: 'center',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1839,6 +1868,7 @@
                             field: 'status',
                             title: 'Status',
                             titleTooltip: 'The status of the alarm, that was set due to this event',
+                            align: 'center',
                             valign: 'middle',
                             switchable: false,
                             sortable: true
@@ -1848,6 +1878,7 @@
                             title: 'Last Duration',
                             titleTooltip: 'The duration the alarm was at its previous state, just before this event',
                             formatter: function(value, row, index) { return seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' }); },
+                            align: 'center',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1857,6 +1888,7 @@
                             title: 'Raised Duration',
                             titleTooltip: 'The duration the alarm was raised, just before this event',
                             formatter: function(value, row, index) { return seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' }); },
+                            align: 'center',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1865,6 +1897,7 @@
                             field: 'recipient',
                             title: 'Recipient',
                             titleTooltip: 'The recipient of this event',
+                            align: 'center',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1873,6 +1906,13 @@
                             field: 'processed',
                             title: 'Processed Status',
                             titleTooltip: 'True when this event is processed',
+                            formatter: function(value, row, index) {
+                                if(value === true)
+                                    return 'DONE';
+                                else
+                                    return 'PENDING';
+                            },
+                            align: 'center',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1881,6 +1921,13 @@
                             field: 'updated',
                             title: 'Updated Status',
                             titleTooltip: 'True when this event has been updated by another event',
+                            formatter: function(value, row, index) {
+                                if(value === true)
+                                    return 'UPDATED';
+                                else
+                                    return 'CURRENT';
+                            },
+                            align: 'center',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1889,6 +1936,8 @@
                             field: 'updated_by_id',
                             title: 'Updated By ID',
                             titleTooltip: 'The unique ID of the event that obsoleted this one',
+                            formatter: function(value, row, index) { return alarmid4human(value); },
+                            align: 'center',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1897,6 +1946,8 @@
                             field: 'updates_id',
                             title: 'Updates ID',
                             titleTooltip: 'The unique ID of the event obsoleted because of this event',
+                            formatter: function(value, row, index) { return alarmid4human(value); },
+                            align: 'center',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1905,6 +1956,7 @@
                             field: 'exec',
                             title: 'Script',
                             titleTooltip: 'The script to handle the event notification',
+                            align: 'center',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1914,6 +1966,7 @@
                             title: 'Script Run At',
                             titleTooltip: 'The date and time the script has been ran',
                             formatter: function(value, row, index) { return timestamp4human(value, ' '); },
+                            align: 'center',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1922,6 +1975,13 @@
                             field: 'exec_code',
                             title: 'Script Return Value',
                             titleTooltip: 'The return code of the script',
+                            formatter: function(value, row, index) {
+                                if(value === 0)
+                                    return 'OK (returned 0)';
+                                else
+                                    return 'FAILED (with code ' + value.toString() + ')';
+                            },
+                            align: 'center',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1931,6 +1991,7 @@
                             title: 'Script Delay',
                             titleTooltip: 'The hysteresis of the notification',
                             formatter: function(value, row, index) { return seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' }); },
+                            align: 'center',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1940,6 +2001,7 @@
                             title: 'Script Delay Run At',
                             titleTooltip: 'The date and time the script should be run, after hysteresis',
                             formatter: function(value, row, index) { return timestamp4human(value, ' '); },
+                            align: 'center',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1948,6 +2010,7 @@
                             field: 'info',
                             title: 'Description',
                             titleTooltip: 'A short description of the alarm',
+                            align: 'center',
                             valign: 'middle',
                             visible: false,
                             sortable: true
@@ -1956,6 +2019,7 @@
                             field: 'source',
                             title: 'Alarm Source',
                             titleTooltip: 'The source of configuration of the alarm',
+                            align: 'center',
                             valign: 'middle',
                             visible: false,
                             sortable: true
