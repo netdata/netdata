@@ -752,7 +752,9 @@ stop_netdata_on_pid() {
 }
 
 stop_all_netdata() {
-    local p
+    local p myns ns
+
+    myns="$(readlink /proc/self/ns/pid 2>/dev/null)"
 
     echo >&2 "Stopping a (possibly) running netdata..."
 
@@ -761,22 +763,44 @@ stop_all_netdata() {
         $(cat /var/run/netdata/netdata.pid 2>/dev/null) \
         $(pidof netdata 2>/dev/null)
     do
-        stop_netdata_on_pid ${p}
+        ns="$(readlink /proc/${p}/ns/pid 2>/dev/null)"
+
+        if [ -z "${myns}" -o "${myns}" = "${ns}" ]
+            then
+            stop_netdata_on_pid ${p}
+        fi
     done
 }
 
 # -----------------------------------------------------------------------------
-# check netdata for systemd
+# check for systemd
 
 issystemd() {
+    local pids p myns ns systemctl
+
     # if the directory /etc/systemd/system does not exit, it is not systemd
     [ ! -d /etc/systemd/system ] && return 1
+
+    # if there is no systemctl command, it is not systemd
+    systemctl=$(which systemctl 2>/dev/null || command -v systemctl 2>/dev/null)
+    [ -z "${systemctl}" -o ! -x "${systemctl}" ] && return 1
 
     # if pid 1 is systemd, it is systemd
     [ "$(basename $(readlink /proc/1/exe) 2>/dev/null)" = "systemd" ] && return 0
 
-    # if systemd is running, it is systemd
-    pidof systemd >/dev/null 2>&1 && return 0
+    # if systemd is not running, it is not systemd
+    pids=$(pidof systemd 2>/dev/null)
+    [ -z "${pids}" ] && return 1
+
+    # check if the running systemd processes are not in our namespace
+    myns="$(readlink /proc/self/ns/pid 2>/dev/null)"
+    for p in ${pids}
+    do
+        ns="$(readlink /proc/${p}/ns/pid 2>/dev/null)"
+
+        # if pid of systemd is in our namespace, it is systemd
+        [ ! -z "${myns}" && "${myns}" = "${ns}" ] && return 0
+    done
 
     # else, it is not systemd
     return 1
