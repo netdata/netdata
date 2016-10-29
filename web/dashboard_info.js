@@ -133,6 +133,12 @@ netdataDashboard.menu = {
         info: undefined
     },
 
+    'fping': {
+        title: 'fping',
+        icon: '<i class="fa fa-exchange" aria-hidden="true"></i>',
+        info: undefined
+    },
+
     'memcached': {
         title: 'memcached',
         icon: '<i class="fa fa-database" aria-hidden="true"></i>',
@@ -141,6 +147,12 @@ netdataDashboard.menu = {
 
     'mysql': {
         title: 'MySQL',
+        icon: '<i class="fa fa-database" aria-hidden="true"></i>',
+        info: undefined
+    },
+
+    'postgres': {
+        title: 'Postgres',
         icon: '<i class="fa fa-database" aria-hidden="true"></i>',
         info: undefined
     },

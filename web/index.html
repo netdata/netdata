@@ -1050,6 +1050,8 @@
 
             case 'apache':
             case 'exim':
+            case 'fping':
+            case 'ipfs':
             case 'memcached':
             case 'mysql':
             case 'named':
@@ -1057,12 +1059,12 @@
             case 'nut':
             case 'phpfpm':
             case 'postfix':
+            case 'postgres':
             case 'redis':
             case 'retroshare':
-            case 'ipfs':
             case 'smawebbox':
-            case 'squid':
             case 'snmp':
+            case 'squid':
             case 'tomcat':
                 chart.menu = chart.type;
                 chart.menu_pattern = tmp;
@@ -2546,7 +2548,7 @@
         });
 
         NETDATA.requiredJs.push({
-            url: NETDATA.serverDefault + 'dashboard_info.js?v20161016-1',
+            url: NETDATA.serverDefault + 'dashboard_info.js?v20161030-2',
             async: false,
             isAlreadyLoaded: function() { return false; }
         });
