@@ -765,7 +765,7 @@ stop_all_netdata() {
     do
         ns="$(readlink /proc/${p}/ns/pid 2>/dev/null)"
 
-        if [ -z "${myns}" -o "${myns}" = "${ns}" ]
+        if [ -z "${myns}" -o -z "${ns}" -o "${myns}" = "${ns}" ]
             then
             stop_netdata_on_pid ${p}
         fi
