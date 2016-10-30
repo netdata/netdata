@@ -661,6 +661,119 @@
     };
 
     // ----------------------------------------------------------------------------------------------------------------
+    // commonMin & commonMax
+
+    NETDATA.commonMin = {
+        keys: {},
+        latest: {},
+
+        get: function(state) {
+            if(typeof state.__commonMin === 'undefined') {
+                // get the commonMin setting
+                var self = $(state.element);
+                state.__commonMin = self.data('common-min') || null;
+            }
+
+            var min = state.data.min;
+            var name = state.__commonMin;
+
+            if(name === null) {
+                // we don't need commonMin
+                //state.log('no need for commonMin');
+                return min;
+            }
+
+            var t = this.keys[name];
+            if(typeof t === 'undefined') {
+                // add our commonMin
+                this.keys[name] = {};
+                t = this.keys[name];
+            }
+
+            var uuid = state.uuid;
+            if(typeof t[uuid] !== 'undefined') {
+                if(t[uuid] === min) {
+                    //state.log('commonMin ' + state.__commonMin + ' not changed: ' + this.latest[name]);
+                    return this.latest[name];
+                }
+                else if(min < this.latest[name]) {
+                    //state.log('commonMin ' + state.__commonMin + ' increased: ' + min);
+                    t[uuid] = min;
+                    this.latest[name] = min;
+                    return min;
+                }
+            }
+
+            // add our min
+            t[uuid] = min;
+
+            // find the common min
+            var m = min;
+            for(var i in t)
+                if(t[i] < m) m = t[i];
+
+            //state.log('commonMin ' + state.__commonMin + ' updated: ' + m);
+            this.latest[name] = m;
+            return m;
+        }
+    };
+
+    NETDATA.commonMax = {
+        keys: {},
+        latest: {},
+
+        get: function(state) {
+            if(typeof state.__commonMax === 'undefined') {
+                // get the commonMax setting
+                var self = $(state.element);
+                state.__commonMax = self.data('common-max') || null;
+            }
+
+            var max = state.data.max;
+            var name = state.__commonMax;
+
+            if(name === null) {
+                // we don't need commonMax
+                //state.log('no need for commonMax');
+                return max;
+            }
+
+            var t = this.keys[name];
+            if(typeof t === 'undefined') {
+                // add our commonMax
+                this.keys[name] = {};
+                t = this.keys[name];
+            }
+
+            var uuid = state.uuid;
+            if(typeof t[uuid] !== 'undefined') {
+                if(t[uuid] === max) {
+                    //state.log('commonMax ' + state.__commonMax + ' not changed: ' + this.latest[name]);
+                    return this.latest[name];
+                }
+                else if(max > this.latest[name]) {
+                    //state.log('commonMax ' + state.__commonMax + ' increased: ' + max);
+                    t[uuid] = max;
+                    this.latest[name] = max;
+                    return max;
+                }
+            }
+
+            // add our max
+            t[uuid] = max;
+
+            // find the common max
+            var m = max;
+            for(var i in t)
+                if(t[i] > m) m = t[i];
+
+            //state.log('commonMax ' + state.__commonMax + ' updated: ' + m);
+            this.latest[name] = m;
+            return m;
+        }
+    };
+
+    // ----------------------------------------------------------------------------------------------------------------
     // Chart Registry
 
     // When multiple charts need the same chart, we avoid downloading it
@@ -3903,23 +4016,31 @@
                 state.log('dygraphChartUpdate() forced zoom update');
 
             options.dateWindow = (state.requested_padding !== null)?[ state.view_after, state.view_before ]:null;
-            options.valueRange = state.dygraph_options.valueRange;
             options.isZoomedIgnoreProgrammaticZoom = true;
             state.dygraph_force_zoom = false;
         }
         else if(state.current.name !== 'auto') {
             if(NETDATA.options.debug.dygraph === true || state.debug === true)
                 state.log('dygraphChartUpdate() loose update');
-
-            options.valueRange = state.dygraph_options.valueRange;
         }
         else {
             if(NETDATA.options.debug.dygraph === true || state.debug === true)
                 state.log('dygraphChartUpdate() strict update');
 
             options.dateWindow = (state.requested_padding !== null)?[ state.view_after, state.view_before ]:null;
-            options.valueRange = state.dygraph_options.valueRange;
             options.isZoomedIgnoreProgrammaticZoom = true;
+        }
+
+        options.valueRange = state.dygraph_options.valueRange;
+
+        var oldMax = null, oldMin = null;
+        if(state.__commonMin !== null) {
+            state.data.min = state.dygraph_instance.axes_[0].extremeRange[0];
+            oldMin = options.valueRange[0] = NETDATA.commonMin.get(state);
+        }
+        if(state.__commonMax !== null) {
+            state.data.max = state.dygraph_instance.axes_[0].extremeRange[1];
+            oldMax = options.valueRange[1] = NETDATA.commonMax.get(state);
         }
 
         if(state.dygraph_smooth_eligible === true) {
@@ -3931,6 +4052,23 @@
         }
 
         dygraph.updateOptions(options);
+
+        var redraw = false;
+        if(oldMin !== null && oldMin > state.dygraph_instance.axes_[0].extremeRange[0]) {
+            state.data.min = state.dygraph_instance.axes_[0].extremeRange[0];
+            options.valueRange[0] = NETDATA.commonMin.get(state);
+            redraw = true;
+        }
+        if(oldMax !== null && oldMax < state.dygraph_instance.axes_[0].extremeRange[1]) {
+            state.data.max = state.dygraph_instance.axes_[0].extremeRange[1];
+            options.valueRange[1] = NETDATA.commonMax.get(state);
+            redraw = true;
+        }
+
+        if(redraw === true) {
+            // state.log('forcing redraw to adapt to common- min/max');
+            dygraph.updateOptions(options);
+        }
 
         state.dygraph_last_rendered = new Date().getTime();
         return true;
@@ -3966,7 +4104,7 @@
             title: self.data('dygraph-title') || state.title,
             titleHeight: self.data('dygraph-titleheight') || 19,
 
-            legend: self.data('dygraph-legend') || 'always', // 'onmouseover',
+            legend: self.data('dygraph-legend') || 'always', // we need this to get selection events
             labels: data.result.labels,
             labelsDiv: self.data('dygraph-labelsdiv') || state.element_legend_childs.hidden,
             labelsDivStyles: self.data('dygraph-labelsdivstyles') || { 'fontSize':'1px' },
@@ -3982,7 +4120,7 @@
             xRangePad: self.data('dygraph-xrangepad') || 0,
             yRangePad: self.data('dygraph-yrangepad') || 1,
 
-            valueRange: self.data('dygraph-valuerange') || null,
+            valueRange: self.data('dygraph-valuerange') || [ null, null ],
 
             ylabel: state.units,
             yLabelWidth: self.data('dygraph-ylabelwidth') || 12,
@@ -4422,6 +4560,17 @@
         state.dygraph_force_zoom = false;
         state.dygraph_user_action = false;
         state.dygraph_last_rendered = new Date().getTime();
+
+        if(typeof state.dygraph_instance.axes_[0].extremeRange !== 'undefined') {
+            state.__commonMin = self.data('common-min') || null;
+            state.__commonMax = self.data('common-max') || null;
+        }
+        else {
+            state.log('incompatible version of dygraphs detected');
+            state.__commonMin = null;
+            state.__commonMax = null;
+        }
+
         return true;
     };
 
@@ -4922,7 +5071,7 @@
         }
 
         var value = state.data.result[state.data.result.length - 1 - slot];
-        var max = (state.easyPieChartMax === null)?state.data.max:state.easyPieChartMax;
+        var max = (state.easyPieChartMax === null)?NETDATA.commonMax.get(state):state.easyPieChartMax;
         var pcent = NETDATA.percentFromValueMax(value, max);
 
         state.easyPieChartEvent.value = value;
@@ -4951,7 +5100,7 @@
         }
         else {
             value = data.result[0];
-            max = (state.easyPieChartMax === null)?data.max:state.easyPieChartMax;
+            max = (state.easyPieChartMax === null)?NETDATA.commonMax.get(state):state.easyPieChartMax;
             pcent = NETDATA.percentFromValueMax(value, max);
         }
 
@@ -4969,7 +5118,7 @@
         var adjust = self.data('easypiechart-adjust') || null;
 
         if(max === null) {
-            max = data.max;
+            max = NETDATA.commonMax.get(state);
             state.easyPieChartMax = null;
         }
         else
@@ -5191,7 +5340,7 @@
         }
 
         var value = state.data.result[state.data.result.length - 1 - slot];
-        var max = (state.gaugeMax === null)?state.data.max:state.gaugeMax;
+        var max = (state.gaugeMax === null)?NETDATA.commonMax.get(state):state.gaugeMax;
         var min = 0;
 
         state.gaugeEvent.value = value;
@@ -5223,7 +5372,7 @@
         else {
             value = data.result[0];
             min = 0;
-            max = (state.gaugeMax === null)?data.max:state.gaugeMax;
+            max = (state.gaugeMax === null)?NETDATA.commonMax.get(state):state.gaugeMax;
             if(value > max) max = value;
             NETDATA.gaugeSetLabels(state, value, min, max);
         }
@@ -5246,7 +5395,7 @@
         var generateGradient = self.data('gauge-generate-gradient') || false;
 
         if(max === null) {
-            max = data.max;
+            max = NETDATA.commonMax.get(state);
             state.gaugeMax = null;
         }
         else
