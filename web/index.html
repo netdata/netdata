@@ -1018,6 +1018,13 @@
                 return '';
         },
 
+        contextValueRange: function(id) {
+            if(typeof netdataDashboard.context[id] !== 'undefined' && typeof netdataDashboard.context[id].valueRange !== 'undefined')
+                return netdataDashboard.context[id].valueRange;
+            else
+                return '[null, null]';
+        },
+
         contextHeight: function(id, def) {
             if(typeof netdataDashboard.context[id] !== 'undefined' && typeof netdataDashboard.context[id].height !== 'undefined')
                 return def * netdataDashboard.context[id].height;
@@ -1298,6 +1305,7 @@
                     chtml += netdataDashboard.contextInfo(chart.context) + '<div id="chart_' + NETDATA.name2id(chart.id) + '" data-netdata="' + chart.id + '"'
                         + ' data-width="' + pcent_width.toString() + '%"'
                         + ' data-height="' + netdataDashboard.contextHeight(chart.context, options.chartsHeight).toString() + 'px"'
+                        + ' data-dygraph-valuerange="' + netdataDashboard.contextValueRange(chart.context) + '"'
                         + ' data-before="0"'
                         + ' data-after="-' + duration.toString() + '"'
                         + ' data-id="' + NETDATA.name2id(options.hostname + '/' + chart.id) + '"'
@@ -2548,7 +2556,7 @@
         });
 
         NETDATA.requiredJs.push({
-            url: NETDATA.serverDefault + 'dashboard_info.js?v20161030-2',
+            url: NETDATA.serverDefault + 'dashboard_info.js?v20161030-4',
             async: false,
             isAlreadyLoaded: function() { return false; }
         });
@@ -2812,7 +2820,7 @@
                             </div>
                             <hr/>
                             <div class="p">
-                                <h4>SHIFT + Mouse Wheel <small>(does not work on firefox and IE/Edge)</small></h4>
+                                <h4>SHIFT + Mouse Wheel <small>(does not work on IE/Edge)</small></h4>
                                 While pressing the shift key and the mouse pointer is over the contents of a chart, scroll the mouse wheel to zoom in or out. This kind of zooming is aligned to center below the mouse pointer. The other charts will follow too.
                                 <br/>
                                 Once a chart is zoomed, auto refreshing stops for all charts. To enable it again, <b>double click</b> a zoomed chart.
@@ -3168,4 +3176,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20161024-5"></script>
+<script type="text/javascript" src="dashboard.js?v20161030-30"></script>
