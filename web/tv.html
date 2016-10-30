@@ -50,7 +50,7 @@ var netdataTheme = 'slate'; // this is dark
     and that you have chown it to be owned by netdata:netdata
 -->
 <!-- <script type="text/javascript" src="http://my.server:19999/dashboard.js"></script> -->
-<script type="text/javascript" src="dashboard.js?v20161030-10"></script>
+<script type="text/javascript" src="dashboard.js?v20161030-30"></script>
 
 <script>
 // Set options for TV operation
@@ -99,6 +99,7 @@ setTimeout(function(){
                     data-width="49%"
                     data-height="100%"
                     data-after="-300"
+                    data-dygraph-valuerange="[0, 100]"
                     ></div>
             <div data-netdata="system.cpu"
                     data-title="CPU usage of your netdata server"
@@ -106,6 +107,7 @@ setTimeout(function(){
                     data-width="49%"
                     data-height="100%"
                     data-after="-300"
+                    data-dygraph-valuerange="[0, 100]"
                     ></div>
         </div>
     </div>
@@ -118,6 +120,8 @@ setTimeout(function(){
         <div style="width: 100%; height: calc(100% - 15px); text-align: center; display: inline-block;">
             <div data-netdata="system.io"
                     data-host="http://registry.my-netdata.io"
+                    data-common-max="io"
+                    data-common-min="io"
                     data-title="I/O on registry.my-netdata.io"
                     data-chart-library="dygraph"
                     data-width="49%"
@@ -126,6 +130,8 @@ setTimeout(function(){
                     ></div>
             <div data-netdata="system.io"
                     data-title="I/O on your netdata server"
+                    data-common-max="io"
+                    data-common-min="io"
                     data-chart-library="dygraph"
                     data-width="49%"
                     data-height="100%"
@@ -142,6 +148,8 @@ setTimeout(function(){
         <div style="width: 100%; height: calc(100% - 15px); text-align: center; display: inline-block;">
             <div data-netdata="system.ipv4"
                     data-host="http://registry.my-netdata.io"
+                    data-common-max="traffic"
+                    data-common-min="traffic"
                     data-title="IPv4 traffic on registry.my-netdata.io"
                     data-chart-library="dygraph"
                     data-width="49%"
@@ -150,6 +158,8 @@ setTimeout(function(){
                     ></div>
             <div data-netdata="system.ipv4"
                     data-title="IPv4 traffic on your netdata server"
+                    data-common-max="traffic"
+                    data-common-min="traffic"
                     data-chart-library="dygraph"
                     data-width="49%"
                     data-height="100%"
@@ -168,6 +178,8 @@ setTimeout(function(){
                 <br/>
                 <div data-netdata="netdata.requests"
                         data-host="http://registry.my-netdata.io"
+                        data-common-max="netdata-requests"
+                        data-decimal-digits="0"
                         data-title="Chart Refreshes/s"
                         data-chart-library="gauge"
                         data-width="20%"
@@ -177,6 +189,8 @@ setTimeout(function(){
                         ></div>
                 <div data-netdata="netdata.clients"
                         data-host="http://registry.my-netdata.io"
+                        data-common-max="netdata-clients"
+                        data-decimal-digits="0"
                         data-title="Sockets"
                         data-chart-library="gauge"
                         data-width="20%"
@@ -187,6 +201,8 @@ setTimeout(function(){
                         ></div>
                 <div data-netdata="netdata.net"
                         data-dimensions="in"
+                        data-common-max="netdata-net-in"
+                        data-decimal-digits="0"
                         data-host="http://registry.my-netdata.io"
                         data-title="Requests Traffic"
                         data-chart-library="easypiechart"
@@ -197,6 +213,8 @@ setTimeout(function(){
                         ></div>
                 <div data-netdata="netdata.net"
                         data-dimensions="out"
+                        data-common-max="netdata-net-out"
+                        data-decimal-digits="0"
                         data-host="http://registry.my-netdata.io"
                         data-title="Chart Data Traffic"
                         data-chart-library="easypiechart"
@@ -211,6 +229,8 @@ setTimeout(function(){
                 <br/>
                 <div data-netdata="netdata.requests"
                         data-title="Chart Refreshes/s"
+                        data-common-max="netdata-requests"
+                        data-decimal-digits="0"
                         data-chart-library="gauge"
                         data-width="20%"
                         data-height="100%"
@@ -218,6 +238,8 @@ setTimeout(function(){
                         data-points="300"
                         ></div>
                 <div data-netdata="netdata.clients"
+                        data-common-max="netdata-clients"
+                        data-decimal-digits="0"
                         data-title="Sockets"
                         data-chart-library="gauge"
                         data-width="20%"
@@ -228,6 +250,8 @@ setTimeout(function(){
                         ></div>
                 <div data-netdata="netdata.net"
                         data-dimensions="in"
+                        data-common-max="netdata-net-in"
+                        data-decimal-digits="0"
                         data-title="Requests Traffic"
                         data-chart-library="easypiechart"
                         data-width="15%"
@@ -237,6 +261,8 @@ setTimeout(function(){
                         ></div>
                 <div data-netdata="netdata.net"
                         data-dimensions="out"
+                        data-common-max="netdata-net-out"
+                        data-decimal-digits="0"
                         data-title="Chart Data Traffic"
                         data-chart-library="easypiechart"
                         data-width="15%"
