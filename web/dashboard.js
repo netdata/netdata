@@ -146,8 +146,8 @@
             dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20161002-1',
             background: '#272b30',
             foreground: '#C8C8C8',
-            grid: '#35393e',
-            axis: '#35393e',
+            grid: '#283236',
+            axis: '#283236',
 /*          colors: [   '#55bb33', '#ff2222',   '#0099C6', '#faa11b',   '#adbce0', '#DDDD00',
                         '#4178ba', '#f58122',   '#a5cc39', '#f58667',   '#f5ef89', '#cf93c0',
                         '#a5d18a', '#b8539d',   '#3954a3', '#c8a9cf',   '#c7de8a', '#fad20a',
@@ -1166,6 +1166,16 @@
         this.view_after = 0;
         this.view_before = 0;
 
+        this.value_decimal_detail = -1;
+        {
+            var d = self.data('decimal-digits');
+            if(typeof d === 'number') {
+                this.value_decimal_detail = 1;
+                while(d-- > 0)
+                    this.value_decimal_detail *= 10;
+            }
+        }
+
         this.auto = {
             name: 'auto',
             autorefresh: true,
@@ -2051,6 +2061,9 @@
         this.legendFormatValue = function(value) {
             if(value === null || value === 'undefined') return '-';
             if(typeof value !== 'number') return value;
+
+            if(this.value_decimal_detail !== -1)
+                return (Math.round(value * this.value_decimal_detail) / this.value_decimal_detail).toLocaleString();
 
             var abs = Math.abs(value);
             if(abs >= 1000) return (Math.round(value)).toLocaleString();
@@ -4006,11 +4019,11 @@
             drawAxis: self.data('dygraph-drawaxis') || true,
             axisLabelFontSize: self.data('dygraph-axislabelfontsize') || 10,
             axisLineColor: self.data('dygraph-axislinecolor') || NETDATA.themes.current.axis,
-            axisLineWidth: self.data('dygraph-axislinewidth') || 0.3,
+            axisLineWidth: self.data('dygraph-axislinewidth') || 1.0,
 
             drawGrid: self.data('dygraph-drawgrid') || true,
             gridLinePattern: self.data('dygraph-gridlinepattern') || null,
-            gridLineWidth: self.data('dygraph-gridlinewidth') || 0.4,
+            gridLineWidth: self.data('dygraph-gridlinewidth') || 1.0,
             gridLineColor: self.data('dygraph-gridlinecolor') || NETDATA.themes.current.grid,
 
             maxNumberWidth: self.data('dygraph-maxnumberwidth') || 8,

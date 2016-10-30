@@ -52,26 +52,30 @@
         and that you have chown it to be owned by netdata:netdata
     -->
     <!-- <script type="text/javascript" src="http://my.server:19999/dashboard.js"></script> -->
-    <script type="text/javascript" src="dashboard.js?v20161011-1"></script>
+    <script type="text/javascript" src="dashboard.js?v20161030-10"></script>
 
     <script>
     // --- OPTIONS FOR THE CHARTS --
 
     // destroy charts not shown (lowers memory on the browsers)
     // set this to 'true' to destroy, 'false' to hide the charts
-    NETDATA.options.current.destroy_on_hide = true;
+    NETDATA.options.current.destroy_on_hide = false;
     
     // set this to false, to always show all dimensions
     NETDATA.options.current.eliminate_zero_dimensions = true;
     
     // set this to false, to lower the pressure on the browser
-    NETDATA.options.current.concurrent_refreshes = false;
+    NETDATA.options.current.concurrent_refreshes = true;
 
     // if you need to support slow mobile phones, set this to false
     NETDATA.options.current.parallel_refresher = true;
 
     // set this to false, to always update the charts, even if focus is lost
     NETDATA.options.current.stop_updates_when_focus_is_lost = true;
+
+    // since we have many servers and limited sockets,
+    // abort ajax calls when we scroll
+    NETDATA.options.current.abort_ajax_on_scroll = true;
 </script>
 <style>
     body {
@@ -194,6 +198,7 @@
                             data-host="//london.my-netdata.io"
                             data-title="EU - London"
                             data-chart-library="gauge"
+                            data-decimal-digits="0"
                             data-width="100%"
                             data-after="-300"
                             data-points="300"
@@ -214,6 +219,7 @@
                             data-host="//atlanta.my-netdata.io"
                             data-title="US - Atlanta"
                             data-chart-library="gauge"
+                            data-decimal-digits="0"
                             data-width="100%"
                             data-after="-300"
                             data-points="300"
@@ -234,6 +240,7 @@
                             data-host="//sanfrancisco.netdata.rocks"
                             data-title="US - California"
                             data-chart-library="gauge"
+                            data-decimal-digits="0"
                             data-width="100%"
                             data-after="-300"
                             data-points="300"
@@ -254,6 +261,7 @@
                             data-host="//toronto.netdata.rocks"
                             data-title="Canada"
                             data-chart-library="gauge"
+                            data-decimal-digits="0"
                             data-width="100%"
                             data-after="-300"
                             data-points="300"
@@ -275,6 +283,7 @@
                             data-host="//frankfurt.netdata.rocks"
                             data-title="EU - Germany"
                             data-chart-library="easypiechart"
+                            data-decimal-digits="0"
                             data-width="75%"
                             data-after="-300"
                             data-points="300"
@@ -295,6 +304,7 @@
                             data-host="//newyork.netdata.rocks"
                             data-title="US - New York"
                             data-chart-library="easypiechart"
+                            data-decimal-digits="0"
                             data-width="75%"
                             data-after="-300"
                             data-points="300"
@@ -315,6 +325,7 @@
                             data-host="//singapore.netdata.rocks"
                             data-title="Singapore"
                             data-chart-library="easypiechart"
+                            data-decimal-digits="0"
                             data-width="75%"
                             data-after="-300"
                             data-points="300"
@@ -335,6 +346,7 @@
                             data-host="//bangalore.netdata.rocks"
                             data-title="India"
                             data-chart-library="easypiechart"
+                            data-decimal-digits="0"
                             data-width="75%"
                             data-after="-300"
                             data-points="300"
@@ -396,6 +408,7 @@
                 <div data-netdata="nginx_local.requests"
                         data-dimensions="requests"
                         data-host="//london.my-netdata.io"
+                        data-decimal-digits="0"
                         data-chart-library="dygraph"
                         data-dygraph-theme="sparkline"
                         data-dygraph-type="area"
@@ -416,6 +429,7 @@
                 <div data-netdata="nginx_local.requests"
                         data-dimensions="requests"
                         data-host="//atlanta.my-netdata.io"
+                        data-decimal-digits="0"
                         data-chart-library="dygraph"
                         data-dygraph-theme="sparkline"
                         data-dygraph-type="area"
@@ -436,6 +450,7 @@
                 <div data-netdata="nginx_local.requests"
                         data-dimensions="requests"
                         data-host="//sanfrancisco.netdata.rocks"
+                        data-decimal-digits="0"
                         data-chart-library="dygraph"
                         data-dygraph-theme="sparkline"
                         data-dygraph-type="area"
@@ -456,6 +471,7 @@
                 <div data-netdata="nginx_local.requests"
                         data-dimensions="requests"
                         data-host="//toronto.netdata.rocks"
+                        data-decimal-digits="0"
                         data-chart-library="dygraph"
                         data-dygraph-theme="sparkline"
                         data-dygraph-type="area"
@@ -478,6 +494,7 @@
                 <div data-netdata="nginx_local.connections"
                         data-dimensions="active"
                         data-host="//london.my-netdata.io"
+                        data-decimal-digits="0"
                         data-chart-library="dygraph"
                         data-dygraph-theme="sparkline"
                         data-dygraph-type="area"
@@ -498,6 +515,7 @@
                 <div data-netdata="nginx_local.connections"
                         data-dimensions="active"
                         data-host="//atlanta.my-netdata.io"
+                        data-decimal-digits="0"
                         data-chart-library="dygraph"
                         data-dygraph-theme="sparkline"
                         data-dygraph-type="area"
@@ -518,6 +536,7 @@
                 <div data-netdata="nginx_local.connections"
                         data-dimensions="active"
                         data-host="//sanfrancisco.netdata.rocks"
+                        data-decimal-digits="0"
                         data-chart-library="dygraph"
                         data-dygraph-theme="sparkline"
                         data-dygraph-type="area"
@@ -538,6 +557,7 @@
                 <div data-netdata="nginx_local.connections"
                         data-dimensions="active"
                         data-host="//toronto.netdata.rocks"
+                        data-decimal-digits="0"
                         data-chart-library="dygraph"
                         data-dygraph-theme="sparkline"
                         data-dygraph-type="area"
@@ -688,6 +708,7 @@
             <div data-netdata="netfilter.synproxy_syn_received"
                     data-dimensions="received"
                     data-host="//london.my-netdata.io"
+                    data-decimal-digits="0"
                     data-chart-library="dygraph"
                     data-dygraph-theme="sparkline"
                     data-dygraph-type="area"
@@ -708,6 +729,7 @@
             <div data-netdata="netfilter.synproxy_syn_received"
                     data-dimensions="received"
                     data-host="//atlanta.my-netdata.io"
+                    data-decimal-digits="0"
                     data-chart-library="dygraph"
                     data-dygraph-theme="sparkline"
                     data-dygraph-type="area"
@@ -728,6 +750,7 @@
             <div data-netdata="netfilter.synproxy_syn_received"
                     data-dimensions="received"
                     data-host="//sanfrancisco.netdata.rocks"
+                    data-decimal-digits="0"
                     data-chart-library="dygraph"
                     data-dygraph-theme="sparkline"
                     data-dygraph-type="area"
@@ -748,6 +771,7 @@
             <div data-netdata="netfilter.synproxy_syn_received"
                     data-dimensions="received"
                     data-host="//toronto.netdata.rocks"
+                    data-decimal-digits="0"
                     data-chart-library="dygraph"
                     data-dygraph-theme="sparkline"
                     data-dygraph-type="area"
