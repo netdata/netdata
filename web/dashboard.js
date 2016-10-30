@@ -4322,6 +4322,7 @@
                         state.globalSelectionSyncStop();
                         state.globalSelectionSyncDelay();
                         state.setMode('pan');
+                        context.is2DPan = false;
                         Dygraph.movePan(event, dygraph, context);
                     }
                     else if(context.isZooming) {
@@ -4434,7 +4435,7 @@
                             normal_def = event.wheelDelta / 40;
                         else
                             // firefox
-                            normal_def = event.deltaY * -2;
+                            normal_def = event.deltaY * -1.2;
 
                         var normal = (event.detail) ? event.detail * -1 : normal_def;
                         var percentage = normal / 50;
