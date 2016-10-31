@@ -92,7 +92,7 @@ hosts=""
 ping_every="$((update_every * 1000 / 5))"
 
 # other fping options
-other_opts="-R -i 1 -r 0"
+other_opts="-R -i 10 -r 0"
 
 # -----------------------------------------------------------------------------
 # load the configuration file
@@ -112,6 +112,12 @@ fi
 if [ -z "${fping}" -o ! -x "${fping}" ]
 then
 	fatal "command '${fping}' is not executable - cannot proceed."
+fi
+
+if [ ${ping_every} -lt 20 ]
+    then
+    warning "ping every was set to ${ping_every} but 20 is the minimum for non-root users. Setting it to 20 ms."
+    ping_every=20
 fi
 
 # the fping options we will use
