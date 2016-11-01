@@ -27,13 +27,13 @@ if [ "${1}" = "install" ]
 
     run cd /usr/src
 
-    if [ -d fping.git ]
+    if [ -d fping-ktsaou.git ]
         then
-        run cd fping.git
+        run cd fping-ktsaou.git
         run git pull
     else
-        run git clone https://github.com/schweikert/fping.git fping.git
-        run cd fping.git
+        run git clone https://github.com/ktsaou/fping.git fping-ktsaou.git
+        run cd fping-ktsaou.git
     fi
 
     run ./autogen.sh
@@ -50,9 +50,18 @@ if [ "${1}" = "install" ]
     echo >&2
     echo >&2 "All done, you have a compatible fping now at /usr/local/bin/fping."
     echo >&2
-    echo >&2 "If you have another fping installed, please set:"
-    echo >&2 "  fping=\"/usr/local/bin/fping\""
-    echo >&2 "at /etc/netdata/fping.conf"
+
+    fping="$(which fping  2>/dev/null || command -v fping 2>/dev/null)"
+    if [ "${fping}" != "/usr/local/bin/fping" ]
+        then
+        echo >&2 "You have another fping installed at: ${fping}."
+        echo >&2 "Please set:"
+        echo >&2
+        echo >&2 "  fping=\"/usr/local/bin/fping\""
+        echo >&2
+        echo >&2 "at /etc/netdata/fping.conf"
+        echo >&2
+    fi
     exit 0
 fi
 
@@ -152,7 +161,7 @@ if [ ${ping_every} -lt 20 ]
 fi
 
 # the fping options we will use
-options=( -N -l -Q ${update_every} -p ${ping_every} ${other_opts} ${hosts} )
+options=( -N -l -Q ${update_every} -p ${ping_every} ${fping_opts} ${hosts} )
 
 # execute fping
 exec "${fping}" "${options[@]}"

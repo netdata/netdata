@@ -746,7 +746,7 @@ netdataDashboard.context = {
     // fping
 
     'fping.quality': {
-        colors: NETDATA.colors[5],
+        colors: NETDATA.colors[10],
         height: 0.5
     },
 
