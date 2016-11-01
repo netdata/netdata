@@ -54,7 +54,10 @@ class Service(LogService):
         regex = self.regex
         for line in raw:
             code = regex.search(line)
-            beginning = code.group(1)[0]
+            try:
+                beginning = code.group(1)[0]
+            except AttributeError:
+                continue
 
             if beginning == '2':
                 data["2xx"] += 1
