@@ -5,25 +5,65 @@
 # (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
 # GPL v3+
 #
-# This plugin requires a special version of fping.
-# Get it from https://github.com/ktsaou/fping
-# and build it, like this:
-#
-# cd /usr/src
-# git clone https://github.com/ktsaou/fping.git fping-netdata.git
-# cd fping-netdata.git
-# ./autogen.sh
-# ./configure --prefix=/usr/local
-# make
-# cp src/fping /usr/local/bin/
-# chown root:root /usr/local/bin/fping
-# chmod 4755 /usr/local/bin/fping
-#
-# Then, create /etc/netdata/fping.conf
-# and set the configuration options given below
+# This plugin requires a latest version of fping.
+# You can compile it from source, by running me with option: install
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
 export LC_ALL=C
+
+if [ "${1}" = "install" ]
+    then
+    [ "${UID}" != 0 ] && echo >&2 "Please run me as root. This will install a single binary file: /usr/local/bin/fping." && exit 1
+
+    run() {
+        printf >&2 " > "
+        printf >&2 "%q " "${@}"
+        printf >&2 "\n"
+        "${@}" || exit 1
+    }
+
+    [ ! -d /usr/src ] && run mkdir -p /usr/src
+    [ ! -d /usr/local/bin ] && run mkdir -p /usr/local/bin
+
+    run cd /usr/src
+
+    if [ -d fping-ktsaou.git ]
+        then
+        run cd fping-ktsaou.git
+        run git pull
+    else
+        run git clone https://github.com/ktsaou/fping.git fping-ktsaou.git
+        run cd fping-ktsaou.git
+    fi
+
+    run ./autogen.sh
+    run ./configure --prefix=/usr/local
+    run make clean
+    run make
+    if [ -f /usr/local/bin/fping ]
+        then
+        run mv -f /usr/local/bin/fping /usr/local/bin/fping.old
+    fi
+    run mv src/fping /usr/local/bin/fping
+    run chown root:root /usr/local/bin/fping
+    run chmod 4755 /usr/local/bin/fping
+    echo >&2
+    echo >&2 "All done, you have a compatible fping now at /usr/local/bin/fping."
+    echo >&2
+
+    fping="$(which fping  2>/dev/null || command -v fping 2>/dev/null)"
+    if [ "${fping}" != "/usr/local/bin/fping" ]
+        then
+        echo >&2 "You have another fping installed at: ${fping}."
+        echo >&2 "Please set:"
+        echo >&2
+        echo >&2 "  fping=\"/usr/local/bin/fping\""
+        echo >&2
+        echo >&2 "at /etc/netdata/fping.conf"
+        echo >&2
+    fi
+    exit 0
+fi
 
 # -----------------------------------------------------------------------------
 
@@ -91,8 +131,8 @@ hosts=""
 # to ping the hosts - by default 5 pings per host per iteration
 ping_every="$((update_every * 1000 / 5))"
 
-# other fping options
-other_opts="-R -i 10 -r 0"
+# fping options
+fping_opts="-R -b 56 -i 1 -r 0 -t 5000"
 
 # -----------------------------------------------------------------------------
 # load the configuration file
@@ -121,7 +161,7 @@ if [ ${ping_every} -lt 20 ]
 fi
 
 # the fping options we will use
-options=( -N -l -Q ${update_every} -p ${ping_every} ${other_opts} ${hosts} )
+options=( -N -l -Q ${update_every} -p ${ping_every} ${fping_opts} ${hosts} )
 
 # execute fping
 exec "${fping}" "${options[@]}"
