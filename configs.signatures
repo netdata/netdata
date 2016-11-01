@@ -33,6 +33,7 @@ declare -A configs_signatures=(
   ['5b917d894bb6a755d59264e9d48e9d56']='fping.conf'
   ['91c757ef6be3abdb86906d9dbb9c217a']='fping.conf'
   ['d1e79707cd9b51a14288e8dd40694fcc']='fping.conf'
+  ['e2f3388c06726154c10ec22bad5bc7ec']='fping.conf'
   ['074df527cc70b5f38c0714f08f20e57c']='health.d/apache.conf'
   ['174c21a6ce5de97bda83d502aa47a9f8']='health.d/apache.conf'
   ['3848172053221b95279ba9bf789cd4e0']='health.d/apache.conf'
