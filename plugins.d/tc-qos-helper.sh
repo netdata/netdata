@@ -58,7 +58,7 @@ plugins_dir="${NETDATA_PLUGINS_DIR}"
 [ -z "$plugins_dir" ] && plugins_dir="$( dirname $PROGRAM_FILE )"
 
 config_dir=${NETDATA_CONFIG_DIR-/etc/netdata}
-tc="$(which tc 2>/dev/null)"
+tc="$(which tc 2>/dev/null || command -v tc 2>/dev/null)"
 fireqos_run_dir="/var/run/fireqos"
 qos_get_class_names_every=120
 qos_exit_every=3600

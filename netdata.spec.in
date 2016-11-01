@@ -157,6 +157,10 @@ rm -rf $RPM_BUILD_ROOT
 %config(noreplace) %{_sysconfdir}/%{name}/python.d/*.conf
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
 
+# node.js config files are JSON (which do not support comments)
+# so, we only supply markdown files
+%{_sysconfdir}/%{name}/node.d/*.md
+
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
 
