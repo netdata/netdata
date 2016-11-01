@@ -39,8 +39,8 @@ OVERRIDE_UPDATE_EVERY = False
 # # -----------------------------------------------------------------------------
 # # start logging
 logging.basicConfig(format=logs.LOG_FORMAT, datefmt=logs.LOG_DATE_FMT)
-msg = logging.getLogger(__name__)
-#msg.setLevel("CRITICAL")
+msg = logging.getLogger("python")
+msg.setLevel("DEBUG")
 
 try:
     assert sys.version_info >= (3, 1)
@@ -474,7 +474,7 @@ def parse_cmdline(directory, *commands):
         OVERRIDE_UPDATE_EVERY = True
         msg.debug("overriding update interval to " + str(BASE_CONFIG['update_every']))
 
-    msg.debug("started from " + commands[0] + " with options: " + " ".join(commands[1:]))
+    msg.info("started from " + commands[0] + " with options: " + " ".join(commands[1:]))
 
     return mods
 
@@ -532,6 +532,7 @@ def run():
     logs.LOGS_INTERVAL = log_interval
     if not DEBUG_FLAG:
         msg.addFilter(logs.TruncateFilter())
+        msg.setLevel("ERROR")
 
 #    msg.DEBUG_FLAG = DEBUG_FLAG
 #    msg.LOG_COUNTER = log_counter
