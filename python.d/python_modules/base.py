@@ -22,6 +22,7 @@ import time
 import os
 import socket
 import select
+import logging
 try:
     import urllib.request as urllib2
 except ImportError:
@@ -30,10 +31,8 @@ except ImportError:
 from subprocess import Popen, PIPE
 
 import threading
-import msg
 
 
-# class BaseService(threading.Thread):
 class SimpleService(threading.Thread):
     """
     Prototype of Service class.
@@ -61,8 +60,10 @@ class SimpleService(threading.Thread):
         self.__first_run = True
         self.order = []
         self.definitions = {}
+        self.log = logging.getLogger("python.base")
+        self.exception = self.log.exception
         if configuration is None:
-            self.error("BaseService: no configuration parameters supplied. Cannot create Service.")
+            self.log.error("BaseService: no configuration parameters supplied. Cannot create Service.")
             raise RuntimeError
         else:
             self._extract_base_config(configuration)
@@ -121,14 +122,17 @@ class SimpleService(threading.Thread):
         chart_name = self.chart_name
         # check if it is time to execute job update() function
         if timetable['next'] > t_start:
-            self.debug(chart_name, "will be run in", str(int((timetable['next'] - t_start) * 1000)), "ms")
+            self.debug(" ".join([chart_name,
+                                 "will be run in",
+                                 str(int((timetable['next'] - t_start) * 1000)),
+                                 "ms"]))
             return True
 
         since_last = int((t_start - timetable['last']) * 1000000)
-        self.debug(chart_name,
+        self.debug(" ".join([chart_name,
                    "ready to run, after", str(int((t_start - timetable['last']) * 1000)),
                    "ms (update_every:", str(timetable['freq'] * 1000),
-                   "ms, latency:", str(int((t_start - timetable['next']) * 1000)), "ms")
+                   "ms, latency:", str(int((t_start - timetable['next']) * 1000)), "ms"]))
         if self.__first_run:
             since_last = 0
         if not self.update(since_last):
@@ -144,7 +148,7 @@ class SimpleService(threading.Thread):
         # sys.stdout.write("BEGIN netdata.plugin_pythond_%s %s\nSET run_time = %s\nEND\n" %
         #                  (self.chart_name, str(since_last), run_time))
 
-        self.debug(chart_name, "updated in", str(run_time), "ms")
+        self.debug(" ".join([chart_name, "updated in", str(run_time), "ms"]))
         self.timetable['last'] = t_start
         self.__first_run = False
         return True
@@ -159,8 +163,8 @@ class SimpleService(threading.Thread):
         while True:  # run forever, unless something is wrong
             try:
                 status = self._run_once()
-            except Exception as e:
-                self.error("Something wrong: ", str(e))
+            except Exception:
+                self.error("Something wrong", exc_info=1)
                 return
             if status:  # handle retries if update failed
                 time.sleep(self.timetable['next'] - time.time())
@@ -237,12 +241,12 @@ class SimpleService(threading.Thread):
         try:
             int(multiplier)
         except TypeError:
-            self.error("malformed dimension: multiplier is not a number:", multiplier)
+            self.error("malformed dimension: multiplier is not a number: " + str(multiplier))
             multiplier = 1
         try:
             int(divisor)
         except TypeError:
-            self.error("malformed dimension: divisor is not a number:", divisor)
+            self.error("malformed dimension: divisor is not a number: " + str(divisor))
             divisor = 1
         if name is None:
             name = id
@@ -265,12 +269,12 @@ class SimpleService(threading.Thread):
         :return: boolean
         """
         if type_id not in self._charts:
-            self.error("wrong chart type_id:", type_id)
+            self.error("wrong chart type_id: " + str(type_id))
             return False
         try:
             int(microseconds)
         except TypeError:
-            self.error("malformed begin statement: microseconds are not a number:", microseconds)
+            self.error("malformed begin statement: microseconds are not a number: " + str(microseconds))
             microseconds = ""
 
         self._line("BEGIN", type_id, str(microseconds))
@@ -284,12 +288,13 @@ class SimpleService(threading.Thread):
         :return: boolean
         """
         if id not in self._dimensions:
-            self.error("wrong dimension id:", id, "Available dimensions are:", *self._dimensions)
+            msg = ["wrong dimension id:", id, "Available dimensions are:"].append(self._dimensions)
+            self.error(" ".join(msg))
             return False
         try:
             value = str(int(value))
         except TypeError:
-            self.error("cannot set non-numeric value:", str(value))
+            self.error("cannot set non-numeric value: " + str(value))
             return False
         self._line("SET", id, "=", str(value))
         self.__chart_set = True
@@ -312,23 +317,30 @@ class SimpleService(threading.Thread):
 
     # --- ERROR HANDLING ---
 
-    def error(self, *params):
+    def error(self, *params, **kw):
         """
         Show error message on stderr
         """
-        msg.error(self.chart_name, *params)
+        #msg.error(self.chart_name, *params)
+        msg = " ".join(params)
 
-    def debug(self, *params):
+        self.log.error(self.chart_name + ": " + msg, **kw)
+
+    def debug(self, *params, **kw):
         """
         Show debug message on stderr
         """
-        msg.debug(self.chart_name, *params)
+        #msg.debug(self.chart_name, *params)
+        msg = " ".join(params)
+        self.log.debug(self.chart_name + ": " + msg, **kw)
 
-    def info(self, *params):
+    def info(self, *params, **kw):
         """
         Show information message on stderr
         """
-        msg.info(self.chart_name, *params)
+        #msg.info(self.chart_name, *params)
+        msg = " ".join(params)
+        self.log.info(self.chart_name + ": " + msg, **kw)
 
     # --- MAIN METHODS ---
 
@@ -344,7 +356,7 @@ class SimpleService(threading.Thread):
         check() prototype
         :return: boolean
         """
-        self.debug("Module", str(self.__module__), "doesn't implement check() function. Using default.")
+        self.debug("Module " + str(self.__module__) + " doesn't implement check() function. Using default.")
         if self._get_data() is None or len(self._get_data()) == 0:
             return False
         else:
@@ -409,6 +421,7 @@ class UrlService(SimpleService):
         self.password = None
         self.proxies = {}
         SimpleService.__init__(self, configuration=configuration, name=name)
+        self.log = logging.getLogger("python.base." + self.__module__)
 
     def __add_openers(self):
         # TODO add error handling
@@ -453,14 +466,14 @@ class UrlService(SimpleService):
         try:
             f = self.opener.open(self.url, timeout=self.update_every * 2)
             # f = urllib2.urlopen(self.url, timeout=self.update_every * 2)
-        except Exception as e:
-            self.error(str(e))
+        except Exception:
+            self.error("", exc_info=1)
             return None
 
         try:
             raw = f.read().decode('utf-8')
-        except Exception as e:
-            self.error(str(e))
+        except Exception:
+            self.error("", exc_info=1)
         finally:
             f.close()
         return raw
@@ -507,6 +520,7 @@ class SocketService(SimpleService):
         self.request = ""
         self.__socket_config = None
         SimpleService.__init__(self, configuration=configuration, name=name)
+        self.log = logging.getLogger("python.base." + self.__module__)
 
     def _connect(self):
         """
@@ -523,14 +537,14 @@ class SocketService(SimpleService):
                             # noinspection SpellCheckingInspection
                             af, socktype, proto, canonname, sa = res
                             self._sock = socket.socket(af, socktype, proto)
-                        except socket.error as e:
-                            self.debug("Cannot create socket:", str(e))
+                        except socket.error:
+                            self.debug("Cannot create socket:", exc_info=1)
                             self._sock = None
                             continue
                         try:
                             self._sock.connect(sa)
-                        except socket.error as e:
-                            self.debug("Cannot connect to socket:", str(e))
+                        except socket.error:
+                            self.debug("Cannot connect to socket:", exc_info=1)
                             self._disconnect()
                             continue
                         self.__socket_config = res
@@ -541,8 +555,8 @@ class SocketService(SimpleService):
                         af, socktype, proto, canonname, sa = self.__socket_config
                         self._sock = socket.socket(af, socktype, proto)
                         self._sock.connect(sa)
-                    except socket.error as e:
-                        self.debug("Cannot create or connect to socket:", str(e))
+                    except socket.error:
+                        self.debug("Cannot create or connect to socket:", exc_info=1)
                         self._disconnect()
             else:
                 # connect to unix socket
@@ -553,11 +567,13 @@ class SocketService(SimpleService):
                     self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                     self._sock.connect(self.unix_socket)
 
-        except Exception as e:
-            self.error(str(e),
-                       "Cannot create socket with following configuration: host:", str(self.host),
-                       "port:", str(self.port),
-                       "socket:", str(self.unix_socket))
+        except Exception:
+            self.error(" ".join([
+                           "Cannot create socket with following configuration:",
+                           "host:", str(self.host),
+                           "port:", str(self.port),
+                           "socket:", str(self.unix_socket)]),
+                       exc_info=1)
             self._sock = None
         self._sock.setblocking(0)
 
@@ -582,12 +598,14 @@ class SocketService(SimpleService):
         if self.request != "".encode():
             try:
                 self._sock.send(self.request)
-            except Exception as e:
+            except Exception:
                 self._disconnect()
-                self.error(str(e),
-                           "used configuration: host:", str(self.host),
-                           "port:", str(self.port),
-                           "socket:", str(self.unix_socket))
+                self.error(" ".join([
+                               "used configuration:"
+                               "host:", str(self.host),
+                               "port:", str(self.port),
+                               "socket:", str(self.unix_socket)]),
+                           exc_info=1)
                 return False
         return True
 
@@ -600,8 +618,8 @@ class SocketService(SimpleService):
         while True:
             try:
                 ready_to_read, _, in_error = select.select([self._sock], [], [], 5)
-            except Exception as e:
-                self.debug("SELECT", str(e))
+            except Exception:
+                self.debug("SELECT", exc_info=1)
                 self._disconnect()
                 break
             if len(ready_to_read) > 0:
@@ -684,6 +702,7 @@ class LogService(SimpleService):
         self._last_position = 0
         # self._log_reader = None
         SimpleService.__init__(self, configuration=configuration, name=name)
+        self.log = logging.getLogger("python.base." + self.__module__)
         self.retries = 100000  # basically always retry
 
     def _get_raw_data(self):
@@ -703,8 +722,8 @@ class LogService(SimpleService):
                 for i, line in enumerate(fp):
                     lines.append(line)
                 self._last_position = fp.tell()
-        except Exception as e:
-            self.error(str(e))
+        except Exception:
+            self.error("", exc_info=1)
 
         if len(lines) != 0:
             return lines
@@ -746,6 +765,7 @@ class ExecutableService(SimpleService):
     def __init__(self, configuration=None, name=None):
         self.command = ""
         SimpleService.__init__(self, configuration=configuration, name=name)
+        self.log = logging.getLogger("python.base." + self.__module__)
 
     def _get_raw_data(self):
         """
@@ -754,8 +774,8 @@ class ExecutableService(SimpleService):
         """
         try:
             p = Popen(self.command, stdout=PIPE, stderr=PIPE)
-        except Exception as e:
-            self.error("Executing command", self.command, "resulted in error:", str(e))
+        except Exception:
+            self.error("Executing command " + self.command + " resulted in error", exc_info=1)
             return None
         data = []
         for line in p.stdout.readlines():
