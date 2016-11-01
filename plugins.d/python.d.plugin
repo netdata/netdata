@@ -9,6 +9,8 @@ import os
 import sys
 import time
 import threading
+import logging
+import logs
 
 # -----------------------------------------------------------------------------
 # globals & environment setup
@@ -32,7 +34,13 @@ OVERRIDE_UPDATE_EVERY = False
 
 # -----------------------------------------------------------------------------
 # custom, third party and version specific python modules management
-import msg
+#import msg
+
+# # -----------------------------------------------------------------------------
+# # start logging
+logging.basicConfig(format=logs.LOG_FORMAT, datefmt=logs.LOG_DATE_FMT)
+msg = logging.getLogger(__name__)
+#msg.setLevel("CRITICAL")
 
 try:
     assert sys.version_info >= (3, 1)
@@ -52,18 +60,21 @@ except (AssertionError, ImportError):
         PY_VERSION = 2
         msg.info('Using python v2')
     except ImportError:
-        msg.fatal('Cannot start. No importlib.machinery on python3 or lack of imp on python2')
+        msg.critical('Cannot start. No importlib.machinery on python3 or lack of imp on python2')
+        sys.exit(1)
 # try:
 #     import yaml
 # except ImportError:
-#     msg.fatal('Cannot find yaml library')
+#     msg.critical('Cannot find yaml library')
+#     sys.exit(1)
 try:
     if PY_VERSION == 3:
         import pyyaml3 as yaml
     else:
         import pyyaml2 as yaml
 except ImportError:
-    msg.fatal('Cannot find yaml library')
+    msg.critical('Cannot find yaml library')
+    sys.exit(1)
 
 
 class PythonCharts(object):
@@ -125,8 +136,8 @@ class PythonCharts(object):
                 return importlib.machinery.SourceFileLoader(name, path).load_module()
             else:
                 return imp.load_source(name, path)
-        except Exception as e:
-            msg.error("Problem loading", name, str(e))
+        except Exception:
+            msg.error("Problem loading " + str(name), exc_info=1)
             return None
 
     def _load_modules(self, path, modules, disabled):
@@ -140,7 +151,8 @@ class PythonCharts(object):
 
         # check if plugin directory exists
         if not os.path.isdir(path):
-            msg.fatal("cannot find charts directory ", path)
+            msg.critical("cannot find charts directory " + str(path))
+            sys.exit(1)
 
         # load modules
         loaded = []
@@ -152,13 +164,14 @@ class PythonCharts(object):
                 if mod is not None:
                     loaded.append(mod)
                 else:  # exit if plugin is not found
-                    msg.fatal('no modules found.')
+                    msg.critical('no modules found.')
+                    sys.exit(1)
         else:
             # scan directory specified in path and load all modules from there
             names = os.listdir(path)
             for mod in names:
                 if mod.replace(MODULE_EXTENSION, "") in disabled:
-                    msg.error(mod + ": disabled module ", mod.replace(MODULE_EXTENSION, ""))
+                    msg.error(mod + ": disabled module " + mod.replace(MODULE_EXTENSION, ""))
                     continue
                 m = self._import_module(path + mod)
                 if m is not None:
@@ -184,10 +197,10 @@ class PythonCharts(object):
                     setattr(mod,
                             'config',
                             self._parse_config(mod, read_config(configfile)))
-                except Exception as e:
-                    msg.error(mod.__name__ + ": cannot parse configuration file '" + configfile + "':", str(e))
+                except Exception:
+                    msg.error(mod.__name__ + ": cannot parse configuration file '" + configfile + "':", exc_info=1)
             else:
-                msg.error(mod.__name__ + ": configuration file '" + configfile + "' not found. Using defaults.")
+                msg.info(mod.__name__ + ": configuration file '" + configfile + "' not found. Using defaults.")
                 # set config if not found
                 if not hasattr(mod, 'config'):
                     msg.debug(mod.__name__ + ": setting configuration for only one job")
@@ -265,11 +278,11 @@ class PythonCharts(object):
                 conf = module.config[name]
                 try:
                     job = module.Service(configuration=conf, name=name)
-                except Exception as e:
+                except Exception:
                     msg.error(module.__name__ +
                               ("/" + str(name) if name is not None else "") +
-                              ": cannot start job: '" +
-                              str(e))
+                              ": cannot start job: '",
+                              exc_info=1)
                     return None
                 else:
                     # set chart_name (needed to plot run time graphs)
@@ -293,9 +306,9 @@ class PythonCharts(object):
             prefix += "/" + job.name
         try:
             self.jobs.remove(job)
-            msg.info("Disabled", prefix)
-        except Exception as e:
-            msg.debug("This shouldn't happen. NO " + prefix + " IN LIST:" + str(self.jobs) + " ERROR: " + str(e))
+            msg.info("Disabled " + prefix)
+        except Exception:
+            msg.debug("This shouldn't happen. NO " + prefix + " IN LIST:" + str(self.jobs), exc_info=1)
 
         # TODO remove section below and remove `reason`.
         prefix += ": "
@@ -327,15 +340,15 @@ class PythonCharts(object):
         """
         i = 0
         overridden = []
-        msg.debug("all job objects", str(self.jobs))
+        msg.debug("all job objects " + str(self.jobs))
         while i < len(self.jobs):
             job = self.jobs[i]
             try:
                 if not job.check():
-                    msg.error(job.chart_name, "check function failed.")
+                    msg.error(job.chart_name + ": check function failed.")
                     self._stop(job)
                 else:
-                    msg.debug(job.chart_name, "check succeeded")
+                    msg.debug(job.chart_name + " check succeeded")
                     i += 1
                     try:
                         if job.override_name is not None:
@@ -355,11 +368,11 @@ class PythonCharts(object):
                 self._stop(job)
                 msg.error(job.chart_name, "cannot find check() function or it thrown unhandled exception.")
                 msg.debug(str(e))
-            except (UnboundLocalError, Exception) as e:
-                msg.error(job.chart_name, str(e))
+            except (UnboundLocalError, Exception):
+                msg.error(job.chart_name, exc_info=1)
                 self._stop(job)
-        msg.debug("overridden job names:", str(overridden))
-        msg.debug("all remaining job objects:", str(self.jobs))
+        msg.debug("overridden job names: " + str(overridden))
+        msg.debug("all remaining job objects: " + str(self.jobs))
 
     def create(self):
         """
@@ -373,7 +386,7 @@ class PythonCharts(object):
             job = self.jobs[i]
             try:
                 if not job.create():
-                    msg.error(job.chart_name, "create function failed.")
+                    msg.error(job.chart_name + "create function failed.")
                     self._stop(job)
                 else:
                     chart = job.chart_name
@@ -386,14 +399,14 @@ class PythonCharts(object):
                         str(job.timetable['freq']) +
                         '\n')
                     sys.stdout.write("DIMENSION run_time 'run time' absolute 1 1\n\n")
-                    msg.debug("created charts for", job.chart_name)
+                    msg.debug("created charts for " + job.chart_name)
                     # sys.stdout.flush()
                     i += 1
             except AttributeError:
-                msg.error(job.chart_name, "cannot find create() function or it thrown unhandled exception.")
+                msg.error(job.chart_name + " cannot find create() function or it thrown unhandled exception.")
                 self._stop(job)
-            except (UnboundLocalError, Exception) as e:
-                msg.error(job.chart_name, str(e))
+            except (UnboundLocalError, Exception):
+                msg.error(job.chart_name, exc_info=1)
                 self._stop(job)
 
     def update(self):
@@ -406,7 +419,8 @@ class PythonCharts(object):
 
         while True:
             if threading.active_count() <= 1:
-                msg.fatal("no more jobs")
+                msg.critical("no more jobs")
+                sys.exit(1)
             time.sleep(1)
 
 
@@ -420,10 +434,10 @@ def read_config(path):
         with open(path, 'r') as stream:
             config = yaml.load(stream)
     except (OSError, IOError):
-        msg.error(str(path), "is not a valid configuration file")
+        msg.error(str(path) + " is not a valid configuration file")
         return None
     except yaml.YAMLError as e:
-        msg.error(str(path), "is malformed:", e)
+        msg.error(str(path) + " is malformed", exc_info=1)
         return None
     return config
 
@@ -458,9 +472,9 @@ def parse_cmdline(directory, *commands):
                 pass
     if changed_update and DEBUG_FLAG:
         OVERRIDE_UPDATE_EVERY = True
-        msg.debug(PROGRAM, "overriding update interval to", str(BASE_CONFIG['update_every']))
+        msg.debug("overriding update interval to " + str(BASE_CONFIG['update_every']))
 
-    msg.debug("started from", commands[0], "with options:", *commands[1:])
+    msg.debug("started from " + commands[0] + " with options: " + " ".join(commands[1:]))
 
     return mods
 
@@ -476,7 +490,7 @@ def run():
     disabled = []
     configfile = CONFIG_DIR + "python.d.conf"
     msg.PROGRAM = PROGRAM
-    msg.info("reading configuration file:", configfile)
+    msg.info("reading configuration file: " + configfile)
     log_counter = 200
     log_interval = 3600
 
@@ -485,7 +499,8 @@ def run():
         try:
             # exit the whole plugin when 'enabled: no' is set in 'python.d.conf'
             if conf['enabled'] is False:
-                msg.fatal('disabled in configuration file.\n')
+                msg.critical('disabled in configuration file.')
+                sys.exit(1)
         except (KeyError, TypeError):
             pass
         try:
@@ -513,9 +528,14 @@ def run():
 
     # parse passed command line arguments
     modules = parse_cmdline(MODULES_DIR, *sys.argv)
-    msg.DEBUG_FLAG = DEBUG_FLAG
-    msg.LOG_COUNTER = log_counter
-    msg.LOG_INTERVAL = log_interval
+    logs.LOGS_PER_INTERVAL = log_counter
+    logs.LOGS_INTERVAL = log_interval
+    if not DEBUG_FLAG:
+        msg.addFilter(logs.TruncateFilter())
+
+#    msg.DEBUG_FLAG = DEBUG_FLAG
+#    msg.LOG_COUNTER = log_counter
+#    msg.LOG_INTERVAL = log_interval
     msg.info("MODULES_DIR='" + MODULES_DIR +
              "', CONFIG_DIR='" + CONFIG_DIR +
              "', UPDATE_EVERY=" + str(BASE_CONFIG['update_every']) +
@@ -526,7 +546,8 @@ def run():
     charts.check()
     charts.create()
     charts.update()
-    msg.fatal("finished")
+    msg.critical("finished")
+    sys.exit(1)
 
 
 if __name__ == '__main__':
