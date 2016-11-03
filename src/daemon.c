@@ -60,11 +60,17 @@ static void chown_open_file(int fd, uid_t uid, gid_t gid) {
 
 void create_needed_dir(const char *dir, uid_t uid, gid_t gid)
 {
-    if(mkdir(dir, 0755) == -1 && errno != EEXIST)
-        error("Cannot create directory '%s'", dir);
+    // attempt to create the directory
+    if(mkdir(dir, 0755) == 0) {
+        // we created it
 
-    if(chown(dir, uid, gid) == -1)
-        error("Cannot chown directory '%s' to %u:%u", dir, (unsigned int)uid, (unsigned int)gid);
+        // chown it to match the required user
+        if(chown(dir, uid, gid) == -1)
+            error("Cannot chown directory '%s' to %u:%u", dir, (unsigned int)uid, (unsigned int)gid);
+    }
+    else if(errno != EEXIST)
+        // log an error only if the directory does not exist
+        error("Cannot create directory '%s'", dir);
 }
 
 int become_user(const char *username, int pid_fd)
@@ -80,6 +86,11 @@ int become_user(const char *username, int pid_fd)
 
     create_needed_dir(CACHE_DIR, uid, gid);
     create_needed_dir(VARLIB_DIR, uid, gid);
+
+    if(pidfile[0]) {
+        if(chown(pidfile, uid, gid) == -1)
+            error("Cannot chown '%s' to %u:%u", pidfile, (unsigned int)uid, (unsigned int)gid);
+    }
 
     int ngroups = (int)sysconf(_SC_NGROUPS_MAX);
     gid_t *supplementary_groups = NULL;
