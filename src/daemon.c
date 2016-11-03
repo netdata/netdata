@@ -58,6 +58,15 @@ static void chown_open_file(int fd, uid_t uid, gid_t gid) {
     }
 }
 
+void create_needed_dir(const char *dir, uid_t uid, gid_t gid)
+{
+    if(mkdir(dir, 0755) == -1 && errno != EEXIST)
+        error("Cannot create directory '%s'", dir);
+
+    if(chown(dir, uid, gid) == -1)
+        error("Cannot chown directory '%s' to %u:%u", dir, (unsigned int)uid, (unsigned int)gid);
+}
+
 int become_user(const char *username, int pid_fd)
 {
     struct passwd *pw = getpwnam(username);
@@ -68,6 +77,9 @@ int become_user(const char *username, int pid_fd)
 
     uid_t uid = pw->pw_uid;
     gid_t gid = pw->pw_gid;
+
+    create_needed_dir(CACHE_DIR, uid, gid);
+    create_needed_dir(VARLIB_DIR, uid, gid);
 
     int ngroups = (int)sysconf(_SC_NGROUPS_MAX);
     gid_t *supplementary_groups = NULL;
@@ -222,6 +234,10 @@ int become_daemon(int dont_fork, const char *user)
             error("Cannot become user '%s'. Continuing as we are.", user);
         }
         else debug(D_SYSTEM, "Successfully became user '%s'.", user);
+    }
+    else {
+        create_needed_dir(CACHE_DIR, getuid(), getgid());
+        create_needed_dir(VARLIB_DIR, getuid(), getgid());
     }
 
     if(pidfd != -1) {
