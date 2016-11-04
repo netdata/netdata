@@ -393,6 +393,26 @@ netdataDashboard.context = {
     'mem.committed': {
         colors: NETDATA.colors[3]
     },
+    
+    'mem.pgfaults': {
+	info: '<a href="https://en.wikipedia.org/wiki/Page_fault" target="_blank">Page Faults</a>, read from <code>/proc/vmstat</code>. Some minor page faults are expected and considered normal, while a high amount of major page faults could be a sign you need to increase the amount of RAM.'
+    },
+
+    'mem.committed': {
+        info: 'Committed Memory, read from <code>/proc/meminfo</code>, is the sum of all memory which has been allocated by processes.'
+    },
+
+    'mem.writeback': {
+        info: 'Read from <code>/proc/meminfo</code>, <b>Dirty</b> is the amount of memory waiting to be written to disk. <b>Writeback</b> is how much memory is actively being written to disk.'
+    },
+
+    'mem.kernel': {
+        info: 'Read from <code>/proc/meminfo</code>, This chart displays the total ammount of memory being used by the kernel. <b>Slab</b> is the amount of memory used by the kernel to cache data structures for its own use. <b>KernelStack</b> is the amount of memory allocated for each task done by the kernel. <b>PageTables</b> is the amount of memory decicated to the lowest level of page tables (A page table is used to turn a virtual address into a physical memory address). <b>VmallocUsed</b> is the amount of memory being used as virtual address space.'
+    },
+
+    'mem.slab': {
+        info: 'Read from <code>/proc/meminfo</code>, <b>reclaimable</b> is the amount of memory which the kernel can reuse. <b>unreclaimable</b> can not be reused even when the kernel is lacking memory.'
+    },
 
     // ------------------------------------------------------------------------
     // network interfaces
