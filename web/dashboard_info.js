@@ -395,7 +395,7 @@ netdataDashboard.context = {
     },
     
     'mem.pgfaults': {
-	info: '<a href="https://en.wikipedia.org/wiki/Page_fault" target="_blank">Page Faults</a>, read from <code>/proc/vmstat</code>. Some minor page faults are expected and considered normal, while a high amount of major page faults could be a sign you need to increase the amount of RAM.'
+    	info: 'A <a href="https://en.wikipedia.org/wiki/Page_fault" target="_blank">page fault</a> is a type of interrupt, called trap, raised by computer hardware when a running program accesses a memory page that is mapped into the virtual address space, but not actually loaded into main memory. If the page is loaded in memory at the time the fault is generated, but is not marked in the memory management unit as being loaded in memory, then it is called a <b>minor</b> or soft page fault. A <b>major</b> page fault is generated when the system needs to load the memory page from disk or swap memory. These values are read from <code>/proc/vmstat</code>.'
     },
 
     'mem.committed': {
@@ -765,13 +765,19 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // fping
 
+    'fping.latency': {
+        valueRange: "[0, null]"
+    },
+
     'fping.quality': {
         colors: NETDATA.colors[10],
-        height: 0.5
+        height: 0.5,
+        valueRange: "[0, null]"
     },
 
     'fping.packets': {
-        height: 0.5
+        height: 0.5,
+        valueRange: "[0, null]"
     }
 
 };
