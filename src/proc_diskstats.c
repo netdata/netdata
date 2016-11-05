@@ -83,19 +83,16 @@ static inline void do_disk_space_stats(struct disk *d, const char *mount_point, 
         char var_name[4096 + 1];
         snprintfz(var_name, 4096, "plugin:proc:/proc/diskstats:%s", mount_point);
 
-        int def_space = CONFIG_ONDEMAND_ONDEMAND;
+        int def_space = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "space usage for all disks", CONFIG_ONDEMAND_ONDEMAND);
+        int def_inodes = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "inodes usage for all disks", CONFIG_ONDEMAND_ONDEMAND);
 
-        if(unlikely(strncmp(mount_point, "/run/user/", 10) == 0))
+        if(unlikely(strncmp(mount_point, "/run/user/", 10) == 0)) {
             def_space = CONFIG_ONDEMAND_NO;
+            def_inodes = CONFIG_ONDEMAND_NO;
+        }
 
-        // check the user configuration (this will also show our 'on demand' decision)
-        def_space = config_get_boolean_ondemand(var_name, "enable space metrics", def_space);
-
-        int ddo_space = def_space,
-                ddo_inodes = def_space;
-
-        do_space = config_get_boolean_ondemand(var_name, "space usage", ddo_space);
-        do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", ddo_inodes);
+        do_space = config_get_boolean_ondemand(var_name, "space usage", def_space);
+        do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", def_inodes);
     }
 
     if(do_space == CONFIG_ONDEMAND_NO && do_inodes == CONFIG_ONDEMAND_NO)
@@ -346,7 +343,6 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
                 global_enable_performance_for_partitions = CONFIG_ONDEMAND_NO,
                 global_enable_performance_for_mountpoints = CONFIG_ONDEMAND_NO,
                 global_enable_performance_for_virtual_mountpoints = CONFIG_ONDEMAND_ONDEMAND,
-                global_enable_space_for_mountpoints = CONFIG_ONDEMAND_ONDEMAND,
                 global_do_io = CONFIG_ONDEMAND_ONDEMAND,
                 global_do_ops = CONFIG_ONDEMAND_ONDEMAND,
                 global_do_mops = CONFIG_ONDEMAND_ONDEMAND,
@@ -354,8 +350,6 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
                 global_do_qops = CONFIG_ONDEMAND_ONDEMAND,
                 global_do_util = CONFIG_ONDEMAND_ONDEMAND,
                 global_do_backlog = CONFIG_ONDEMAND_ONDEMAND,
-                global_do_space = CONFIG_ONDEMAND_ONDEMAND,
-                global_do_inodes = CONFIG_ONDEMAND_ONDEMAND,
                 globals_initialized = 0;
 
     if(unlikely(!globals_initialized)) {
@@ -366,7 +360,6 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
         global_enable_performance_for_partitions = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for partitions", global_enable_performance_for_partitions);
         global_enable_performance_for_mountpoints = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for mounted filesystems", global_enable_performance_for_mountpoints);
         global_enable_performance_for_virtual_mountpoints = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for mounted virtual disks", global_enable_performance_for_virtual_mountpoints);
-        global_enable_space_for_mountpoints = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "space metrics for mounted filesystems", global_enable_space_for_mountpoints);
 
         global_do_io      = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "bandwidth for all disks", global_do_io);
         global_do_ops     = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "operations for all disks", global_do_ops);
@@ -375,8 +368,6 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
         global_do_qops    = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "queued operations for all disks", global_do_qops);
         global_do_util    = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "utilization percentage for all disks", global_do_util);
         global_do_backlog = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "backlog for all disks", global_do_backlog);
-        global_do_space   = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "space usage for all disks", global_do_space);
-        global_do_inodes  = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "inodes usage for all disks", global_do_inodes);
 
         globals_initialized = 1;
     }
