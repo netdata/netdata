@@ -765,13 +765,19 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // fping
 
+    'fping.latency': {
+        valueRange: "[0, null]"
+    },
+
     'fping.quality': {
         colors: NETDATA.colors[10],
-        height: 0.5
+        height: 0.5,
+        valueRange: "[0, null]"
     },
 
     'fping.packets': {
-        height: 0.5
+        height: 0.5,
+        valueRange: "[0, null]"
     }
 
 };
