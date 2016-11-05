@@ -56,10 +56,88 @@ static inline void mountinfo_reload(int force) {
     }
 }
 
+
+// linked list of mount points that are by default disabled
+static struct excluded_mount_point {
+    const char *prefix;
+    size_t len;
+    struct excluded_mount_point *next;
+} *excluded_mount_points = NULL;
+
+static inline int is_mount_point_excluded(const char *mount_point) {
+    static int initialized = 0;
+
+    if(unlikely(!initialized)) {
+        initialized = 1;
+
+        char *a = config_get("plugin:proc:/proc/diskstats", "exclude space metrics on paths", "/var/run/user/ /run/user/");
+        if(a && *a) {
+            char *s = a;
+
+            while(s && *s) {
+                // skip all spaces
+                while(isspace(*s)) s++;
+
+                // empty string
+                if(unlikely(!*s)) break;
+
+                // find the next space
+                char *c = s;
+                while(*c && !isspace(*c)) c++;
+
+                char *n;
+                if(likely(*c)) n = c + 1;
+                else n = NULL;
+
+                // terminate our string
+                *c = '\0';
+
+                // allocate the structure
+                struct excluded_mount_point *m = mallocz(sizeof(struct excluded_mount_point));
+                m->prefix = strdup(s);
+                m->len = strlen(m->prefix);
+                m->next = excluded_mount_points;
+                excluded_mount_points = m;
+
+                // prepare for next loop
+                s = n;
+                if(likely(n)) *c = ' ';
+            }
+        }
+    }
+
+    size_t len = strlen(mount_point);
+    struct excluded_mount_point *m;
+    for(m = excluded_mount_points; m ; m = m->next) {
+        if(m->len <= len) {
+            // fprintf(stderr, "SPACE: comparing '%s' with '%s'\n", mount_point, m->prefix);
+            if(strncmp(m->prefix, mount_point, m->len) == 0) {
+                // fprintf(stderr, "SPACE: excluded '%s'\n", mount_point);
+                return 1;
+            }
+        }
+    }
+
+    // fprintf(stderr, "SPACE: included '%s'\n", mount_point);
+    return 0;
+}
+
+// Data to be stored in DICTIONARY mount_points used by do_disk_space_stats().
+// This DICTIONARY is used to lookup the settings of the mount point on each iteration.
+struct mount_point_metadata {
+    int do_space;
+    int do_inodes;
+};
+
 static inline void do_disk_space_stats(struct disk *d, const char *mount_point, const char *mount_source, const char *disk, const char *family, int update_every, unsigned long long dt) {
+    static DICTIONARY *mount_points = NULL;
     int do_space, do_inodes;
 
-    if(d) {
+    if(unlikely(!mount_points)) {
+        mount_points = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+    }
+
+    if(unlikely(d)) {
         // verify we collected the metrics for the right disk.
         // if not the mountpoint has changed.
 
@@ -80,22 +158,33 @@ static inline void do_disk_space_stats(struct disk *d, const char *mount_point, 
         do_inodes = d->do_inodes;
     }
     else {
-        char var_name[4096 + 1];
-        snprintfz(var_name, 4096, "plugin:proc:/proc/diskstats:%s", mount_point);
+        struct mount_point_metadata *m = dictionary_get(mount_points, mount_point);
+        if(!m) {
+            char var_name[4096 + 1];
+            snprintfz(var_name, 4096, "plugin:proc:/proc/diskstats:%s", mount_point);
 
-        int def_space = CONFIG_ONDEMAND_ONDEMAND;
+            int def_space = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "space usage for all disks", CONFIG_ONDEMAND_ONDEMAND);
+            int def_inodes = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "inodes usage for all disks", CONFIG_ONDEMAND_ONDEMAND);
 
-        if(unlikely(strncmp(mount_point, "/run/user/", 10) == 0))
-            def_space = CONFIG_ONDEMAND_NO;
+            if(is_mount_point_excluded(mount_point)) {
+                def_space = CONFIG_ONDEMAND_NO;
+                def_inodes = CONFIG_ONDEMAND_NO;
+            }
 
-        // check the user configuration (this will also show our 'on demand' decision)
-        def_space = config_get_boolean_ondemand(var_name, "enable space metrics", def_space);
+            do_space = config_get_boolean_ondemand(var_name, "space usage", def_space);
+            do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", def_inodes);
 
-        int ddo_space = def_space,
-                ddo_inodes = def_space;
+            struct mount_point_metadata mp = {
+                .do_space = do_space,
+                .do_inodes = do_inodes
+            };
 
-        do_space = config_get_boolean_ondemand(var_name, "space usage", ddo_space);
-        do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", ddo_inodes);
+            dictionary_set(mount_points, mount_point, &mp, sizeof(struct mount_point_metadata));
+        }
+        else {
+            do_space = m->do_space;
+            do_inodes = m->do_inodes;
+        }
     }
 
     if(do_space == CONFIG_ONDEMAND_NO && do_inodes == CONFIG_ONDEMAND_NO)
@@ -346,7 +435,6 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
                 global_enable_performance_for_partitions = CONFIG_ONDEMAND_NO,
                 global_enable_performance_for_mountpoints = CONFIG_ONDEMAND_NO,
                 global_enable_performance_for_virtual_mountpoints = CONFIG_ONDEMAND_ONDEMAND,
-                global_enable_space_for_mountpoints = CONFIG_ONDEMAND_ONDEMAND,
                 global_do_io = CONFIG_ONDEMAND_ONDEMAND,
                 global_do_ops = CONFIG_ONDEMAND_ONDEMAND,
                 global_do_mops = CONFIG_ONDEMAND_ONDEMAND,
@@ -354,8 +442,6 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
                 global_do_qops = CONFIG_ONDEMAND_ONDEMAND,
                 global_do_util = CONFIG_ONDEMAND_ONDEMAND,
                 global_do_backlog = CONFIG_ONDEMAND_ONDEMAND,
-                global_do_space = CONFIG_ONDEMAND_ONDEMAND,
-                global_do_inodes = CONFIG_ONDEMAND_ONDEMAND,
                 globals_initialized = 0;
 
     if(unlikely(!globals_initialized)) {
@@ -366,7 +452,6 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
         global_enable_performance_for_partitions = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for partitions", global_enable_performance_for_partitions);
         global_enable_performance_for_mountpoints = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for mounted filesystems", global_enable_performance_for_mountpoints);
         global_enable_performance_for_virtual_mountpoints = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for mounted virtual disks", global_enable_performance_for_virtual_mountpoints);
-        global_enable_space_for_mountpoints = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "space metrics for mounted filesystems", global_enable_space_for_mountpoints);
 
         global_do_io      = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "bandwidth for all disks", global_do_io);
         global_do_ops     = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "operations for all disks", global_do_ops);
@@ -375,8 +460,6 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
         global_do_qops    = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "queued operations for all disks", global_do_qops);
         global_do_util    = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "utilization percentage for all disks", global_do_util);
         global_do_backlog = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "backlog for all disks", global_do_backlog);
-        global_do_space   = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "space usage for all disks", global_do_space);
-        global_do_inodes  = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "inodes usage for all disks", global_do_inodes);
 
         globals_initialized = 1;
     }
