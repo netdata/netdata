@@ -2578,7 +2578,7 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
     time_t first = rrdset_first_entry_t(rc->rrdset);
     time_t last = rrdset_last_entry_t(rc->rrdset);
 
-    if(now + update_every < first || now - update_every > last) {
+    if(unlikely(now + update_every < first /* || now - update_every > last */)) {
         debug(D_HEALTH
               , "Health not examining alarm '%s.%s' yet (wanted time is out of bounds - we need %lu but got %lu - %lu)."
               , rc->chart ? rc->chart : "NOCHART", rc->name, (unsigned long) now, (unsigned long) first
