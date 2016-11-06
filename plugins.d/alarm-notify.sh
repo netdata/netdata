@@ -376,7 +376,7 @@ if [ \( "${SEND_PUSHOVER}" = "YES" -o "${SEND_SLACK}" = "YES" -o "${SEND_TWILIO}
         SEND_PUSHBULLET="NO"
         SEND_TELEGRAM="NO"
         SEND_SLACK="NO"
-	SEND_TWILIO="NO"
+        SEND_TWILIO="NO"
     fi
 fi
 
@@ -605,7 +605,7 @@ send_twilio() {
             httpcode=$(${curl} -X POST --write-out %{http_code} --silent --output /dev/null \
                 --data-urlencode "From=${twilionumber}" \
                 --data-urlencode "To=${user}" \
-                --data-urlencode "Body=${title}${message}" \
+                --data-urlencode "Body=${title} ${message}" \
                 -u "${accountsid}:${accounttoken}" \
                 "https://api.twilio.com/2010-04-01/Accounts/${accountsid}/Messages.json")
 
@@ -852,13 +852,14 @@ The source of this alarm is line ${src}"
 
 SENT_PUSHBULLET=$?
 
+# -----------------------------------------------------------------------------
 # send the twilio SMS
 
 send_twilio "${TWILIO_ACCOUNT_SID}" "${TWILIO_ACCOUNT_TOKEN}" "${TWILIO_NUMBER}" "${to_twilio}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm} 
 Severity: ${severity}
 Chart: ${chart}
 Family: ${family}
-The source of this alarm is line ${src}"
+${info}"
 
 SENT_TWILIO=$?
 
