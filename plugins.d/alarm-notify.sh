@@ -169,6 +169,7 @@ sendmail=
 # enable / disable features
 SEND_SLACK="YES"
 SEND_PUSHOVER="YES"
+SEND_TWILIO="YES"
 SEND_TELEGRAM="YES"
 SEND_EMAIL="YES"
 SEND_PUSHBULLET="YES"
@@ -187,6 +188,13 @@ declare -A role_recipients_pushover=()
 PUSHBULLET_ACCESS_TOKEN=
 DEFAULT_RECIPIENT_PUSHBULLET=
 declare -A role_recipients_pushbullet=()
+
+# twilio configs
+TWILIO_ACCOUNT_SID=
+TWILIO_ACCOUNT_TOKEN=
+TWILIO_NUMBER=
+DEFAULT_RECIPIENT_TWILIO=
+declare -A role_recipients_twilio=()
 
 # telegram configs
 TELEGRAM_BOT_TOKEN=
@@ -250,6 +258,7 @@ filter_recipient_by_criticality() {
 declare -A arr_slack=()
 declare -A arr_pushover=()
 declare -A arr_pushbullet=()
+declare -A arr_twilio=()
 declare -A arr_telegram=()
 declare -A arr_email=()
 
@@ -285,6 +294,14 @@ do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality pushbullet "${r}" && arr_pushbullet[${r/|*/}]="1"
     done
 
+    # twilio
+    a="${role_recipients_twilio[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_TWILIO}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality twilio "${r}" && arr_twilio[${r/|*/}]="1"
+    done
+
     # telegram
     a="${role_recipients_telegram[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_TELEGRAM}"
@@ -314,6 +331,10 @@ to_pushover="${!arr_pushover[*]}"
 to_pushbullet="${!arr_pushbullet[*]}"
 [ -z "${to_pushbullet}" ] && SEND_PUSHBULLET="NO"
 
+# build the list of twilio recipients (phone numbers)
+to_twilio="${!arr_twilio[*]}"
+[ -z "${to_twilio}" ] && SEND_TWILIO="NO"
+
 # check array of telegram recipients (chat ids)
 to_telegram="${!arr_telegram[*]}"
 [ -z "${to_telegram}" ] && SEND_TELEGRAM="NO"
@@ -340,10 +361,13 @@ done
 # check pushbullet
 [ -z "${DEFAULT_RECIPIENT_PUSHBULLET}" ] && SEND_PUSHBULLET="NO"
 
+# check twilio
+[ -z "${DEFAULT_RECIPIENT_TWILIO}" ] && SEND_TWILIO="NO"
+
 # check telegram
 [ -z "${TELEGRAM_BOT_TOKEN}" ] && SEND_TELEGRAM="NO"
 
-if [ \( "${SEND_PUSHOVER}" = "YES" -o "${SEND_SLACK}" = "YES" -o "${SEND_TELEGRAM}" = "YES" -o "${SEND_PUSHBULLET}" = "YES" \) -a -z "${curl}" ]
+if [ \( "${SEND_PUSHOVER}" = "YES" -o "${SEND_SLACK}" = "YES" -o "${SEND_TWILIO}" = "YES" -o "${SEND_TELEGRAM}" = "YES" -o "${SEND_PUSHBULLET}" = "YES" \) -a -z "${curl}" ]
     then
     curl="$(which curl 2>/dev/null || command -v curl 2>/dev/null)"
     if [ -z "${curl}" ]
@@ -352,6 +376,7 @@ if [ \( "${SEND_PUSHOVER}" = "YES" -o "${SEND_SLACK}" = "YES" -o "${SEND_TELEGRA
         SEND_PUSHBULLET="NO"
         SEND_TELEGRAM="NO"
         SEND_SLACK="NO"
+	SEND_TWILIO="NO"
     fi
 fi
 
@@ -362,7 +387,7 @@ if [ "${SEND_EMAIL}" = "YES" -a -z "${sendmail}" ]
 fi
 
 # check that we have at least a method enabled
-if [ "${SEND_EMAIL}" != "YES" -a "${SEND_PUSHOVER}" != "YES" -a "${SEND_TELEGRAM}" != "YES" -a "${SEND_SLACK}" != "YES" -a "${SEND_PUSHBULLET}" != "YES" ]
+if [ "${SEND_EMAIL}" != "YES" -a "${SEND_PUSHOVER}" != "YES" -a "${SEND_TELEGRAM}" != "YES" -a "${SEND_SLACK}" != "YES" -a "${SEND_TWILIO}" != "YES" -a  "${SEND_PUSHBULLET}" != "YES" ]
     then
     fatal "All notification methods are disabled. Not sending notification to '${role}' for '${name}' = '${value}' of chart '${chart}' for status '${status}'."
 fi
@@ -558,6 +583,38 @@ EOF
                 sent=$((sent + 1))
             else
                 error "failed to send pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
+            fi
+        done
+
+        [ ${sent} -gt 0 ] && return 0
+    fi
+
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# twilio sender
+
+send_twilio() {
+    local accountsid="${1}" accounttoken="${2}" twilionumber="${3}" recipients="${4}"  title="${5}" message="${6}" httpcode sent=0 user
+    if [ "${SEND_TWILIO}" = "YES" -a ! -z "${accountsid}" -a ! -z "${accounttoken}" -a ! -z "${twilionumber}" -a ! -z "${recipients}" -a ! -z "${message}" -a ! -z "${title}" ]
+        then
+        #https://www.twilio.com/packages/labs/code/bash/twilio-sms
+        for user in ${recipients}
+        do
+            httpcode=$(${curl} -X POST --write-out %{http_code} --silent --output /dev/null \
+                --data-urlencode "From=${twilionumber}" \
+                --data-urlencode "To=${user}" \
+                --data-urlencode "Body=${title}${message}" \
+                -u "${accountsid}:${accounttoken}" \
+                "https://api.twilio.com/2010-04-01/Accounts/${accountsid}/Messages.json")
+
+            if [ "${httpcode}" == "201" ]
+            then
+                info "sent Twilio SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
+                sent=$((sent + 1))
+            else
+                error "failed to send Twilio SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
             fi
         done
 
@@ -795,6 +852,16 @@ The source of this alarm is line ${src}"
 
 SENT_PUSHBULLET=$?
 
+# send the twilio SMS
+
+send_twilio "${TWILIO_ACCOUNT_SID}" "${TWILIO_ACCOUNT_TOKEN}" "${TWILIO_NUMBER}" "${to_twilio}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm} 
+Severity: ${severity}
+Chart: ${chart}
+Family: ${family}
+The source of this alarm is line ${src}"
+
+SENT_TWILIO=$?
+
 # -----------------------------------------------------------------------------
 # send the telegram.org message
 
@@ -905,7 +972,7 @@ SENT_EMAIL=$?
 # let netdata know
 
 # we did send something
-[ ${SENT_EMAIL} -eq 0 -o ${SENT_PUSHOVER} -eq 0 -o ${SENT_TELEGRAM} -eq 0 -o ${SENT_SLACK} -eq 0 -o ${SENT_PUSHBULLET} -eq 0 ] && exit 0
+[ ${SENT_EMAIL} -eq 0 -o ${SENT_PUSHOVER} -eq 0 -o ${SENT_TELEGRAM} -eq 0 -o ${SENT_SLACK} -eq 0 -o ${SENT_TWILIO} -eq 0 -o  ${SENT_PUSHBULLET} -eq 0 ] && exit 0
 
 # we did not send anything
 exit 1
