@@ -2,30 +2,33 @@
 
 #define RRD_TYPE_NET_STAT_NETFILTER     "netfilter"
 #define RRD_TYPE_NET_STAT_CONNTRACK     "conntrack"
-#define RRD_TYPE_NET_STAT_CONNTRACK_LEN strlen(RRD_TYPE_NET_STAT_CONNTRACK)
 
 int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
+    (void)dt;
+
     static procfile *ff = NULL;
     static int do_sockets = -1, do_new = -1, do_changes = -1, do_expect = -1, do_search = -1, do_errors = -1;
 
-    if(do_sockets == -1)    do_sockets = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter connections", 1);
-    if(do_new == -1)        do_new = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter new connections", 1);
-    if(do_changes == -1)    do_changes = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter connection changes", 1);
-    if(do_expect == -1)     do_expect = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter connection expectations", 1);
-    if(do_search == -1)     do_search = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter connection searches", 1);
-    if(do_errors == -1)     do_errors = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter errors", 1);
+    if(unlikely(do_sockets == -1)) {
+        do_sockets = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter connections", 1);
+        do_new = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter new connections", 1);
+        do_changes = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter connection changes", 1);
+        do_expect = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter connection expectations", 1);
+        do_search = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter connection searches", 1);
+        do_errors = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter errors", 1);
+    }
 
-    if(dt) {};
-
-    if(!ff) {
+    if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/net/stat/nf_conntrack");
         ff = procfile_open(config_get("plugin:proc:/proc/net/stat/nf_conntrack", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        if(unlikely(!ff))
+            return 1;
     }
-    if(!ff) return 1;
 
     ff = procfile_readall(ff);
-    if(!ff) return 0; // we return 0, so that we will retry to open it next time
+    if(unlikely(!ff))
+        return 0; // we return 0, so that we will retry to open it next time
 
     uint32_t lines = procfile_lines(ff), l;
     uint32_t words;
@@ -35,8 +38,8 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
 
     for(l = 1; l < lines ;l++) {
         words = procfile_linewords(ff, l);
-        if(words < 17) {
-            if(words) error("Cannot read /proc/net/stat/nf_conntrack line. Expected 17 params, read %u.", words);
+        if(unlikely(words < 17)) {
+            if(unlikely(words)) error("Cannot read /proc/net/stat/nf_conntrack line. Expected 17 params, read %u.", words);
             continue;
         }
 
@@ -60,7 +63,7 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
         texpect_delete  = strtoull(procfile_lineword(ff, l, 15), NULL, 16);
         tsearch_restart = strtoull(procfile_lineword(ff, l, 16), NULL, 16);
 
-        if(!aentries) aentries =  tentries;
+        if(unlikely(!aentries)) aentries =  tentries;
 
         // sum all the cpus together
         asearched           += tsearched;       // conntrack.search
@@ -87,7 +90,7 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
 
     if(do_sockets) {
         st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_sockets");
-        if(!st) {
+        if(unlikely(!st)) {
             st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_CONNTRACK "_sockets", NULL, RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Connection Tracker Connections", "active connections", 3000, update_every, RRDSET_TYPE_LINE);
 
             rrddim_add(st, "connections", NULL, 1, 1, RRDDIM_ABSOLUTE);
@@ -102,7 +105,7 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
 
     if(do_new) {
         st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_new");
-        if(!st) {
+        if(unlikely(!st)) {
             st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_CONNTRACK "_new", NULL, RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Connection Tracker New Connections", "connections/s", 3001, update_every, RRDSET_TYPE_LINE);
 
             rrddim_add(st, "new", NULL, 1, 1, RRDDIM_INCREMENTAL);
@@ -121,7 +124,7 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
 
     if(do_changes) {
         st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_changes");
-        if(!st) {
+        if(unlikely(!st)) {
             st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_CONNTRACK "_changes", NULL, RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Connection Tracker Changes", "changes/s", 3002, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;
 
@@ -141,7 +144,7 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
 
     if(do_expect) {
         st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_expect");
-        if(!st) {
+        if(unlikely(!st)) {
             st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_CONNTRACK "_expect", NULL, RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Connection Tracker Expectations", "expectations/s", 3003, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;
 
@@ -161,7 +164,7 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
 
     if(do_search) {
         st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_search");
-        if(!st) {
+        if(unlikely(!st)) {
             st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_CONNTRACK "_search", NULL, RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Connection Tracker Searches", "searches/s", 3010, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;
 
@@ -181,7 +184,7 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
 
     if(do_errors) {
         st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_errors");
-        if(!st) {
+        if(unlikely(!st)) {
             st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_CONNTRACK "_errors", NULL, RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Connection Tracker Errors", "events/s", 3005, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;
 

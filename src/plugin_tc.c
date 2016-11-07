@@ -306,7 +306,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             }
             else {
                 debug(D_TC_LOOP, "TC: Updating chart for device '%s'", d->name?d->name:d->id);
-                rrdset_next_plugins(d->st_bytes);
+                rrdset_next(d->st_bytes);
 
                 if(unlikely(d->name_updated && d->name && strcmp(d->id, d->name) != 0)) {
                     rrdset_set_name(d->st_bytes, d->name);
@@ -367,7 +367,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             }
             else {
                 debug(D_TC_LOOP, "TC: Updating _packets chart for device '%s'", d->name?d->name:d->id);
-                rrdset_next_plugins(d->st_packets);
+                rrdset_next(d->st_packets);
 
                 // FIXME
                 // update the family
@@ -421,7 +421,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             }
             else {
                 debug(D_TC_LOOP, "TC: Updating _dropped chart for device '%s'", d->name?d->name:d->id);
-                rrdset_next_plugins(d->st_dropped);
+                rrdset_next(d->st_dropped);
 
                 // FIXME
                 // update the family
@@ -475,7 +475,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             }
             else {
                 debug(D_TC_LOOP, "TC: Updating _tokens chart for device '%s'", d->name?d->name:d->id);
-                rrdset_next_plugins(d->st_tokens);
+                rrdset_next(d->st_tokens);
 
                 // FIXME
                 // update the family
@@ -529,7 +529,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             }
             else {
                 debug(D_TC_LOOP, "TC: Updating _ctokens chart for device '%s'", d->name?d->name:d->id);
-                rrdset_next_plugins(d->st_ctokens);
+                rrdset_next(d->st_ctokens);
 
                 // FIXME
                 // update the family

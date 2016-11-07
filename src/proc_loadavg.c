@@ -4,29 +4,31 @@
 #define MIN_LOADAVG_UPDATE_EVERY 5
 
 int do_proc_loadavg(int update_every, unsigned long long dt) {
+    (void)dt;
+
     static procfile *ff = NULL;
     static int do_loadavg = -1, do_all_processes = -1;
 
-    if(dt) {};
-
-    if(!ff) {
+    if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/loadavg");
         ff = procfile_open(config_get("plugin:proc:/proc/loadavg", "filename to monitor", filename), " \t,:|/", PROCFILE_FLAG_DEFAULT);
     }
-    if(!ff) return 1;
+    if(unlikely(!ff))
+        return 1;
 
     ff = procfile_readall(ff);
-    if(!ff) return 0; // we return 0, so that we will retry to open it next time
+    if(unlikely(!ff))
+        return 0; // we return 0, so that we will retry to open it next time
 
-    if(do_loadavg == -1)        do_loadavg          = config_get_boolean("plugin:proc:/proc/loadavg", "enable load average", 1);
-    if(do_all_processes == -1)  do_all_processes    = config_get_boolean("plugin:proc:/proc/loadavg", "enable total processes", 1);
+    if(unlikely(do_loadavg == -1))        do_loadavg          = config_get_boolean("plugin:proc:/proc/loadavg", "enable load average", 1);
+    if(unlikely(do_all_processes == -1))  do_all_processes    = config_get_boolean("plugin:proc:/proc/loadavg", "enable total processes", 1);
 
-    if(procfile_lines(ff) < 1) {
+    if(unlikely(procfile_lines(ff) < 1)) {
         error("/proc/loadavg has no lines.");
         return 1;
     }
-    if(procfile_linewords(ff, 0) < 6) {
+    if(unlikely(procfile_linewords(ff, 0) < 6)) {
         error("/proc/loadavg has less than 6 words in it.");
         return 1;
     }
@@ -44,9 +46,9 @@ int do_proc_loadavg(int update_every, unsigned long long dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_loadavg) {
+    if(likely(do_loadavg)) {
         st = rrdset_find_byname("system.load");
-        if(!st) {
+        if(unlikely(!st)) {
             st = rrdset_create("system", "load", NULL, "load", NULL, "System Load Average", "load", 100, (update_every < MIN_LOADAVG_UPDATE_EVERY)?MIN_LOADAVG_UPDATE_EVERY:update_every, RRDSET_TYPE_LINE);
 
             rrddim_add(st, "load1", NULL, 1, 1000, RRDDIM_ABSOLUTE);
@@ -55,17 +57,17 @@ int do_proc_loadavg(int update_every, unsigned long long dt) {
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "load1", load1 * 1000);
-        rrddim_set(st, "load5", load5 * 1000);
-        rrddim_set(st, "load15", load15 * 1000);
+        rrddim_set(st, "load1", (collected_number)(load1 * 1000));
+        rrddim_set(st, "load5", (collected_number)(load5 * 1000));
+        rrddim_set(st, "load15", (collected_number)(load15 * 1000));
         rrdset_done(st);
     }
 
     // --------------------------------------------------------------------
 
-    if(do_all_processes) {
+    if(likely(do_all_processes)) {
         st = rrdset_find_byname("system.active_processes");
-        if(!st) {
+        if(unlikely(!st)) {
             st = rrdset_create("system", "active_processes", NULL, "processes", NULL, "System Active Processes", "processes", 750, update_every, RRDSET_TYPE_LINE);
 
             rrddim_add(st, "active", NULL, 1, 1, RRDDIM_ABSOLUTE);

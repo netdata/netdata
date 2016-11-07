@@ -126,7 +126,7 @@ int do_proc_stat(int update_every, unsigned long long dt) {
                 rrdset_done(st);
             }
         }
-        else if(hash == hash_intr && strcmp(row_key, "intr") == 0) {
+        else if(unlikely(hash == hash_intr && strcmp(row_key, "intr") == 0)) {
             unsigned long long value = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
 
             // --------------------------------------------------------------------
@@ -145,7 +145,7 @@ int do_proc_stat(int update_every, unsigned long long dt) {
                 rrdset_done(st);
             }
         }
-        else if(hash == hash_ctxt && strcmp(row_key, "ctxt") == 0) {
+        else if(unlikely(hash == hash_ctxt && strcmp(row_key, "ctxt") == 0)) {
             unsigned long long value = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
 
             // --------------------------------------------------------------------
@@ -163,13 +163,13 @@ int do_proc_stat(int update_every, unsigned long long dt) {
                 rrdset_done(st);
             }
         }
-        else if(hash == hash_processes && !processes && strcmp(row_key, "processes") == 0) {
+        else if(unlikely(hash == hash_processes && !processes && strcmp(row_key, "processes") == 0)) {
             processes = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
         }
-        else if(hash == hash_procs_running && !running && strcmp(row_key, "procs_running") == 0) {
+        else if(unlikely(hash == hash_procs_running && !running && strcmp(row_key, "procs_running") == 0)) {
             running = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
         }
-        else if(hash == hash_procs_blocked && !blocked && strcmp(row_key, "procs_blocked") == 0) {
+        else if(unlikely(hash == hash_procs_blocked && !blocked && strcmp(row_key, "procs_blocked") == 0)) {
             blocked = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
         }
     }

@@ -189,7 +189,7 @@ void *pluginsd_worker_thread(void *arg)
                     unsigned long long microseconds = 0;
                     if(microseconds_txt && *microseconds_txt) microseconds = strtoull(microseconds_txt, NULL, 10);
                     if(microseconds) rrdset_next_usec(st, microseconds);
-                    else rrdset_next_plugins(st);
+                    else rrdset_next(st);
                 }
             }
             else if(likely(hash == END_HASH && !strcmp(s, "END"))) {
