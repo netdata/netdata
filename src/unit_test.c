@@ -915,7 +915,7 @@ int run_test(struct test *test)
                 (float)time_now / 1000000.0,
                 ((calculated_number)test->feed[c].value - (calculated_number)last) * (calculated_number)test->multiplier / (calculated_number)test->divisor,
                 (((calculated_number)test->feed[c].value - (calculated_number)last) * (calculated_number)test->multiplier / (calculated_number)test->divisor) / (calculated_number)test->feed[c].microseconds * (calculated_number)1000000);
-            rrdset_next_usec(st, test->feed[c].microseconds);
+            rrdset_next_usec_unfiltered(st, test->feed[c].microseconds);
         }
         else {
             fprintf(stderr, "    > %s: feeding position %lu\n", test->name, c+1);
@@ -1073,7 +1073,7 @@ int unit_test(long delay, long shift)
 
         fprintf(stderr, "\n\nLOOP = %lu, DELAY = %ld, VALUE = " COLLECTED_NUMBER_FORMAT "\n", c, delay, i);
         if(c) {
-            rrdset_next_usec(st, delay);
+            rrdset_next_usec_unfiltered(st, delay);
         }
         if(do_abs) rrddim_set(st, "absolute", i);
         if(do_inc) rrddim_set(st, "incremental", i);

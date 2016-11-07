@@ -2,32 +2,35 @@
 
 #define RRD_TYPE_NET_STAT_NETFILTER         "netfilter"
 #define RRD_TYPE_NET_STAT_SYNPROXY          "synproxy"
-#define RRD_TYPE_NET_STAT_SYNPROXY_LEN      strlen(RRD_TYPE_NET_STAT_SYNPROXY)
 
 int do_proc_net_stat_synproxy(int update_every, unsigned long long dt) {
+    (void)dt;
+
     static int do_entries = -1, do_cookies = -1, do_syns = -1, do_reopened = -1;
     static procfile *ff = NULL;
 
-    if(do_entries == -1)    do_entries  = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY entries", CONFIG_ONDEMAND_ONDEMAND);
-    if(do_cookies == -1)    do_cookies  = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY cookies", CONFIG_ONDEMAND_ONDEMAND);
-    if(do_syns == -1)       do_syns     = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY SYN received", CONFIG_ONDEMAND_ONDEMAND);
-    if(do_reopened == -1)   do_reopened = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY connections reopened", CONFIG_ONDEMAND_ONDEMAND);
+    if(unlikely(do_entries == -1)) {
+        do_entries  = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY entries", CONFIG_ONDEMAND_ONDEMAND);
+        do_cookies  = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY cookies", CONFIG_ONDEMAND_ONDEMAND);
+        do_syns     = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY SYN received", CONFIG_ONDEMAND_ONDEMAND);
+        do_reopened = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY connections reopened", CONFIG_ONDEMAND_ONDEMAND);
+    }
 
-    if(dt) {};
-
-    if(!ff) {
+    if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/net/stat/synproxy");
         ff = procfile_open(config_get("plugin:proc:/proc/net/stat/synproxy", "filename to monitor", filename), " \t,:|", PROCFILE_FLAG_DEFAULT);
+        if(unlikely(!ff))
+            return 1;
     }
-    if(!ff) return 1;
 
     ff = procfile_readall(ff);
-    if(!ff) return 0; // we return 0, so that we will retry to open it next time
+    if(unlikely(!ff))
+        return 0; // we return 0, so that we will retry to open it next time
 
     // make sure we have 3 lines
     size_t lines = procfile_lines(ff), l;
-    if(lines < 2) {
+    if(unlikely(lines < 2)) {
         error("/proc/net/stat/synproxy has %zu lines, expected no less than 2. Disabling it.", lines);
         return 1;
     }
@@ -37,7 +40,8 @@ int do_proc_net_stat_synproxy(int update_every, unsigned long long dt) {
     // synproxy gives its values per CPU
     for(l = 1; l < lines ;l++) {
         int words = procfile_linewords(ff, l);
-        if(words < 6) continue;
+        if(unlikely(words < 6))
+            continue;
 
         entries         += strtoull(procfile_lineword(ff, l, 0), NULL, 16);
         syn_received    += strtoull(procfile_lineword(ff, l, 1), NULL, 16);
@@ -57,7 +61,7 @@ int do_proc_net_stat_synproxy(int update_every, unsigned long long dt) {
         do_entries = CONFIG_ONDEMAND_YES;
 
         st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_entries");
-        if(!st) {
+        if(unlikely(!st)) {
             st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_SYNPROXY "_entries", NULL, RRD_TYPE_NET_STAT_SYNPROXY, NULL, "SYNPROXY Entries Used", "entries", 3304, update_every, RRDSET_TYPE_LINE);
 
             rrddim_add(st, "entries", NULL, 1, 1, RRDDIM_ABSOLUTE);
@@ -74,7 +78,7 @@ int do_proc_net_stat_synproxy(int update_every, unsigned long long dt) {
         do_syns = CONFIG_ONDEMAND_YES;
 
         st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_syn_received");
-        if(!st) {
+        if(unlikely(!st)) {
             st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_SYNPROXY "_syn_received", NULL, RRD_TYPE_NET_STAT_SYNPROXY, NULL, "SYNPROXY SYN Packets received", "SYN/s", 3301, update_every, RRDSET_TYPE_LINE);
 
             rrddim_add(st, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
@@ -91,7 +95,7 @@ int do_proc_net_stat_synproxy(int update_every, unsigned long long dt) {
         do_reopened = CONFIG_ONDEMAND_YES;
 
         st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_conn_reopened");
-        if(!st) {
+        if(unlikely(!st)) {
             st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_SYNPROXY "_conn_reopened", NULL, RRD_TYPE_NET_STAT_SYNPROXY, NULL, "SYNPROXY Connections Reopened", "connections/s", 3303, update_every, RRDSET_TYPE_LINE);
 
             rrddim_add(st, "reopened", NULL, 1, 1, RRDDIM_INCREMENTAL);
@@ -108,7 +112,7 @@ int do_proc_net_stat_synproxy(int update_every, unsigned long long dt) {
         do_cookies = CONFIG_ONDEMAND_YES;
 
         st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_cookies");
-        if(!st) {
+        if(unlikely(!st)) {
             st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_SYNPROXY "_cookies", NULL, RRD_TYPE_NET_STAT_SYNPROXY, NULL, "SYNPROXY TCP Cookies", "cookies/s", 3302, update_every, RRDSET_TYPE_LINE);
 
             rrddim_add(st, "valid", NULL, 1, 1, RRDDIM_INCREMENTAL);
