@@ -21,7 +21,7 @@ static inline struct interrupt *get_interrupts_array(int lines, int cpus) {
     static struct interrupt *irrs = NULL;
     static int allocated = 0;
 
-    if(lines > allocated) {
+    if(unlikely(lines > allocated)) {
         irrs = (struct interrupt *)reallocz(irrs, lines * recordsize(cpus));
         allocated = lines;
     }
@@ -30,42 +30,45 @@ static inline struct interrupt *get_interrupts_array(int lines, int cpus) {
 }
 
 int do_proc_interrupts(int update_every, unsigned long long dt) {
+    (void)dt;
+
     static procfile *ff = NULL;
     static int cpus = -1, do_per_core = -1;
     struct interrupt *irrs = NULL;
 
-    if(dt) {};
+    if(unlikely(do_per_core == -1))
+        do_per_core = config_get_boolean("plugin:proc:/proc/interrupts", "interrupts per core", 1);
 
-    if(do_per_core == -1) do_per_core = config_get_boolean("plugin:proc:/proc/interrupts", "interrupts per core", 1);
-
-    if(!ff) {
+    if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/interrupts");
         ff = procfile_open(config_get("plugin:proc:/proc/interrupts", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
     }
-    if(!ff) return 1;
+    if(unlikely(!ff))
+        return 1;
 
     ff = procfile_readall(ff);
-    if(!ff) return 0; // we return 0, so that we will retry to open it next time
+    if(unlikely(!ff))
+        return 0; // we return 0, so that we will retry to open it next time
 
     uint32_t lines = procfile_lines(ff), l;
     uint32_t words = procfile_linewords(ff, 0), w;
 
-    if(!lines) {
+    if(unlikely(!lines)) {
         error("Cannot read /proc/interrupts, zero lines reported.");
         return 1;
     }
 
     // find how many CPUs are there
-    if(cpus == -1) {
+    if(unlikely(cpus == -1)) {
         cpus = 0;
         for(w = 0; w < words ; w++) {
-            if(strncmp(procfile_lineword(ff, 0, w), "CPU", 3) == 0)
+            if(unlikely(strncmp(procfile_lineword(ff, 0, w), "CPU", 3) == 0))
                 cpus++;
         }
     }
 
-    if(!cpus) {
+    if(unlikely(!cpus)) {
         error("PLUGIN: PROC_INTERRUPTS: Cannot find the number of CPUs in /proc/interrupts");
         return 1;
     }
@@ -81,18 +84,18 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
         irr->total = 0;
 
         words = procfile_linewords(ff, l);
-        if(!words) continue;
+        if(unlikely(!words)) continue;
 
         irr->id = procfile_lineword(ff, l, 0);
-        if(!irr->id || !irr->id[0]) continue;
+        if(unlikely(!irr->id || !irr->id[0])) continue;
 
         int idlen = strlen(irr->id);
-        if(irr->id[idlen - 1] == ':')
+        if(unlikely(irr->id[idlen - 1] == ':'))
             irr->id[idlen - 1] = '\0';
 
         int c;
         for(c = 0; c < cpus ;c++) {
-            if((c + 1) < (int)words)
+            if(unlikely((c + 1) < (int)words))
                 irr->value[c] = strtoull(procfile_lineword(ff, l, (uint32_t)(c + 1)), NULL, 10);
             else
                 irr->value[c] = 0;
@@ -100,10 +103,10 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
             irr->total += irr->value[c];
         }
 
-        if(isdigit(irr->id[0]) && (uint32_t)(cpus + 2) < words) {
+        if(unlikely(isdigit(irr->id[0]) && (uint32_t)(cpus + 2) < words)) {
             strncpyz(irr->name, procfile_lineword(ff, l, words - 1), MAX_INTERRUPT_NAME);
             int nlen = strlen(irr->name);
-            if(nlen < (MAX_INTERRUPT_NAME-1)) {
+            if(unlikely(nlen < (MAX_INTERRUPT_NAME-1))) {
                 irr->name[nlen] = '_';
                 strncpyz(&irr->name[nlen + 1], irr->id, MAX_INTERRUPT_NAME - nlen);
             }
@@ -120,12 +123,12 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
     // --------------------------------------------------------------------
 
     st = rrdset_find_bytype("system", "interrupts");
-    if(!st) {
+    if(unlikely(!st)) {
         st = rrdset_create("system", "interrupts", NULL, "interrupts", NULL, "System interrupts", "interrupts/s", 1000, update_every, RRDSET_TYPE_STACKED);
 
         for(l = 0; l < lines ;l++) {
             struct interrupt *irr = irrindex(irrs, l, cpus);
-            if(!irr->used) continue;
+            if(unlikely(!irr->used)) continue;
             rrddim_add(st, irr->id, irr->name, 1, 1, RRDDIM_INCREMENTAL);
         }
     }
@@ -133,12 +136,12 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 
     for(l = 0; l < lines ;l++) {
         struct interrupt *irr = irrindex(irrs, l, cpus);
-        if(!irr->used) continue;
+        if(unlikely(!irr->used)) continue;
         rrddim_set(st, irr->id, irr->total);
     }
     rrdset_done(st);
 
-    if(do_per_core) {
+    if(likely(do_per_core)) {
         int c;
 
         for(c = 0; c < cpus ; c++) {
@@ -146,14 +149,14 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
             snprintfz(id, 50, "cpu%d_interrupts", c);
 
             st = rrdset_find_bytype("cpu", id);
-            if(!st) {
+            if(unlikely(!st)) {
                 char title[100+1];
                 snprintfz(title, 100, "CPU%d Interrupts", c);
                 st = rrdset_create("cpu", id, NULL, "interrupts", "cpu.interrupts", title, "interrupts/s", 1100 + c, update_every, RRDSET_TYPE_STACKED);
 
                 for(l = 0; l < lines ;l++) {
                     struct interrupt *irr = irrindex(irrs, l, cpus);
-                    if(!irr->used) continue;
+                    if(unlikely(!irr->used)) continue;
                     rrddim_add(st, irr->id, irr->name, 1, 1, RRDDIM_INCREMENTAL);
                 }
             }
@@ -161,7 +164,7 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
 
             for(l = 0; l < lines ;l++) {
                 struct interrupt *irr = irrindex(irrs, l, cpus);
-                if(!irr->used) continue;
+                if(unlikely(!irr->used)) continue;
                 rrddim_set(st, irr->id, irr->value[c]);
             }
             rrdset_done(st);

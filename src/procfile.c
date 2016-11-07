@@ -274,7 +274,7 @@ procfile *procfile_readall(procfile *ff) {
         s = ff->len;
         x = ff->size - s;
 
-        if(!x) {
+        if(unlikely(!x)) {
             debug(D_PROCFILE, PF_PREFIX ": Expanding data buffer for file '%s'.", ff->filename);
 
             ff = reallocz(ff, sizeof(procfile) + ff->size + PROCFILE_INCREMENT_BUFFER);
@@ -348,7 +348,7 @@ void procfile_set_quotes(procfile *ff, const char *quotes) {
     // remove all quotes
     int i;
     for(i = 0; i < 256 ; i++)
-        if(ff->separators[i] == PF_CHAR_IS_QUOTE)
+        if(unlikely(ff->separators[i] == PF_CHAR_IS_QUOTE))
             ff->separators[i] = PF_CHAR_IS_WORD;
 
     // if nothing given, return
@@ -366,7 +366,7 @@ void procfile_set_open_close(procfile *ff, const char *open, const char *close) 
     // remove all open/close
     int i;
     for(i = 0; i < 256 ; i++)
-        if(ff->separators[i] == PF_CHAR_IS_OPEN || ff->separators[i] == PF_CHAR_IS_CLOSE)
+        if(unlikely(ff->separators[i] == PF_CHAR_IS_OPEN || ff->separators[i] == PF_CHAR_IS_CLOSE))
             ff->separators[i] = PF_CHAR_IS_WORD;
 
     // if nothing given, return

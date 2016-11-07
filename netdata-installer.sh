@@ -834,6 +834,7 @@ install_non_systemd_init() {
             then
             run cp system/netdata-lsb /etc/init.d/netdata && \
             run chmod 755 /etc/init.d/netdata && \
+            run update-rc.d netdata defaults && \
             run update-rc.d netdata enable && \
             installed_init_d=1
 

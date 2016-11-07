@@ -113,6 +113,7 @@ declare -A configs_signatures=(
   ['43ebb7f224c3b232d8ad044d7e9508b6']='health.d/net.conf'
   ['cb178b15427274d7def5b14bc4c09441']='health.d/net.conf'
   ['d11711b3647bc2bdd0292dd7deebbeb1']='health.d/net.conf'
+  ['dad303c5cca7a69345811a01a74f5892']='health.d/net.conf'
   ['dc9c2a66778623a759706c14c3d91983']='health.d/net.conf'
   ['de02f899a61f21b86adb646940f0bcae']='health.d/net.conf'
   ['fa4396513b358d6ec6a7f5bfb08439b8']='health.d/net.conf'
