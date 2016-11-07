@@ -2652,7 +2652,7 @@ void *health_main(void *ptr) {
             // 2. if there is calculation expression, run it
 
             if (unlikely(RRDCALC_HAS_DB_LOOKUP(rc))) {
-                time_t old_db_timestamp = rc->db_before;
+                /* time_t old_db_timestamp = rc->db_before; */
                 int value_is_null = 0;
 
                 int ret = rrd2value(rc->rrdset, wb, &rc->value,
@@ -2673,6 +2673,7 @@ void *health_main(void *ptr) {
                 else if (unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_DB_ERROR))
                     rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_ERROR;
 
+                /* - RRDCALC_FLAG_DB_STALE not currently used
                 if (unlikely(old_db_timestamp == rc->db_before)) {
                     // database is stale
 
@@ -2685,6 +2686,7 @@ void *health_main(void *ptr) {
                 }
                 else if (unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_DB_STALE))
                     rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_STALE;
+                */
 
                 if (unlikely(value_is_null)) {
                     // collected value is null
