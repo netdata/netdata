@@ -974,35 +974,58 @@ collected_number rrddim_set(RRDSET *st, const char *id, collected_number value)
     return rrddim_set_by_pointer(st, rd, value);
 }
 
+void rrdset_next_usec_unfiltered(RRDSET *st, unsigned long long microseconds)
+{
+    if(unlikely(!st->last_collected_time.tv_sec || !microseconds)) {
+        // the first entry
+        microseconds = st->update_every * 1000000ULL;
+    }
+    st->usec_since_last_update = microseconds;
+}
+
 void rrdset_next_usec(RRDSET *st, unsigned long long microseconds)
 {
-    if(!microseconds) rrdset_next(st);
-    else {
-        debug(D_RRD_CALLS, "rrdset_next_usec() for chart %s with microseconds %llu", st->name, microseconds);
+    struct timeval now;
+    gettimeofday(&now, NULL);
 
-        if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: NEXT: %llu microseconds", st->name, microseconds);
-        st->usec_since_last_update = microseconds;
+    if(unlikely(!st->last_collected_time.tv_sec)) {
+        // the first entry
+        microseconds = st->update_every * 1000000ULL;
     }
-}
-
-void rrdset_next(RRDSET *st)
-{
-    unsigned long long microseconds = 0;
-
-    if(likely(st->last_collected_time.tv_sec)) {
-        struct timeval now;
-        gettimeofday(&now, NULL);
+    else if(unlikely(!microseconds)) {
+        // no dt given by the plugin
         microseconds = usec_dt(&now, &st->last_collected_time);
     }
-    // prevent infinite loop
-    else microseconds = st->update_every * 1000000ULL;
+    else {
+        // microseconds has the time since the last collection
+        unsigned long long now_usec = timeval_usec(&now);
+        unsigned long long last_usec = timeval_usec(&st->last_collected_time);
+        unsigned long long since_last_usec = usec_dt(&now, &st->last_collected_time);
 
-    rrdset_next_usec(st, microseconds);
-}
+        // verify the microseconds given is good
+        if(unlikely(microseconds > since_last_usec)) {
+            debug(D_RRD_CALLS, "dt %llu usec given is too big - it leads %llu usec to the future, for chart '%s' (%s).", microseconds, microseconds - since_last_usec, st->name, st->id);
 
-void rrdset_next_plugins(RRDSET *st)
-{
-    rrdset_next(st);
+#ifdef NETDATA_INTERNAL_CHECKS
+            if(unlikely(last_usec + microseconds > now_usec + 1000))
+                error("dt %llu usec given is too big - it leads %llu usec to the future, for chart '%s' (%s).", microseconds, microseconds - since_last_usec, st->name, st->id);
+#endif
+
+            microseconds = since_last_usec;
+        }
+        else if(unlikely(microseconds < since_last_usec * 0.8)) {
+            debug(D_RRD_CALLS, "dt %llu usec given is too small - expected %llu usec up to -20%%, for chart '%s' (%s).", microseconds, since_last_usec, st->name, st->id);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+            error("dt %llu usec given is too small - expected %llu usec up to -20%%, for chart '%s' (%s).", microseconds, since_last_usec, st->name, st->id);
+#endif
+            microseconds = since_last_usec;
+        }
+    }
+    debug(D_RRD_CALLS, "rrdset_next_usec() for chart %s with microseconds %llu", st->name, microseconds);
+
+    if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: NEXT: %llu microseconds", st->name, microseconds);
+    st->usec_since_last_update = microseconds;
 }
 
 unsigned long long rrdset_done(RRDSET *st)

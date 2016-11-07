@@ -21,7 +21,7 @@ static inline struct interrupt *get_interrupts_array(int lines, int cpus) {
     static struct interrupt *irrs = NULL;
     static int allocated = 0;
 
-    if(lines > allocated) {
+    if(unlikely(lines > allocated)) {
         irrs = (struct interrupt *)reallocz(irrs, lines * recordsize(cpus));
         allocated = lines;
     }
@@ -30,43 +30,43 @@ static inline struct interrupt *get_interrupts_array(int lines, int cpus) {
 }
 
 int do_proc_softirqs(int update_every, unsigned long long dt) {
+    (void)dt;
+
     static procfile *ff = NULL;
     static int cpus = -1, do_per_core = -1;
 
     struct interrupt *irrs = NULL;
 
-    if(dt) {};
+    if(unlikely(do_per_core == -1)) do_per_core = config_get_boolean("plugin:proc:/proc/softirqs", "interrupts per core", 1);
 
-    if(do_per_core == -1) do_per_core = config_get_boolean("plugin:proc:/proc/softirqs", "interrupts per core", 1);
-
-    if(!ff) {
+    if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/softirqs");
         ff = procfile_open(config_get("plugin:proc:/proc/softirqs", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
+        if(unlikely(!ff)) return 1;
     }
-    if(!ff) return 1;
 
     ff = procfile_readall(ff);
-    if(!ff) return 0; // we return 0, so that we will retry to open it next time
+    if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
     uint32_t lines = procfile_lines(ff), l;
     uint32_t words = procfile_linewords(ff, 0), w;
 
-    if(!lines) {
+    if(unlikely(!lines)) {
         error("Cannot read /proc/softirqs, zero lines reported.");
         return 1;
     }
 
     // find how many CPUs are there
-    if(cpus == -1) {
+    if(unlikely(cpus == -1)) {
         cpus = 0;
         for(w = 0; w < words ; w++) {
-            if(strncmp(procfile_lineword(ff, 0, w), "CPU", 3) == 0)
+            if(unlikely(strncmp(procfile_lineword(ff, 0, w), "CPU", 3) == 0))
                 cpus++;
         }
     }
 
-    if(!cpus) {
+    if(unlikely(!cpus)) {
         error("PLUGIN: PROC_SOFTIRQS: Cannot find the number of CPUs in /proc/softirqs");
         return 1;
     }
@@ -82,18 +82,18 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
         irr->total = 0;
 
         words = procfile_linewords(ff, l);
-        if(!words) continue;
+        if(unlikely(!words)) continue;
 
         irr->id = procfile_lineword(ff, l, 0);
-        if(!irr->id || !irr->id[0]) continue;
+        if(unlikely(!irr->id || !irr->id[0])) continue;
 
         int idlen = strlen(irr->id);
-        if(irr->id[idlen - 1] == ':')
+        if(unlikely(irr->id[idlen - 1] == ':'))
             irr->id[idlen - 1] = '\0';
 
         int c;
         for(c = 0; c < cpus ;c++) {
-            if((c + 1) < (int)words)
+            if(unlikely((c + 1) < (int)words))
                 irr->value[c] = strtoull(procfile_lineword(ff, l, (uint32_t)(c + 1)), NULL, 10);
             else
                 irr->value[c] = 0;
@@ -111,12 +111,12 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
     // --------------------------------------------------------------------
 
     st = rrdset_find_bytype("system", "softirqs");
-    if(!st) {
+    if(unlikely(!st)) {
         st = rrdset_create("system", "softirqs", NULL, "softirqs", NULL, "System softirqs", "softirqs/s", 950, update_every, RRDSET_TYPE_STACKED);
 
         for(l = 0; l < lines ;l++) {
             struct interrupt *irr = irrindex(irrs, l, cpus);
-            if(!irr->used) continue;
+            if(unlikely(!irr->used)) continue;
             rrddim_add(st, irr->id, irr->name, 1, 1, RRDDIM_INCREMENTAL);
         }
     }
@@ -124,7 +124,7 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
 
     for(l = 0; l < lines ;l++) {
         struct interrupt *irr = irrindex(irrs, l, cpus);
-        if(!irr->used) continue;
+        if(unlikely(!irr->used)) continue;
         rrddim_set(st, irr->id, irr->total);
     }
     rrdset_done(st);
@@ -137,15 +137,15 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
             snprintfz(id, 50, "cpu%d_softirqs", c);
 
             st = rrdset_find_bytype("cpu", id);
-            if(!st) {
+            if(unlikely(!st)) {
                 // find if everything is zero
                 unsigned long long core_sum = 0 ;
                 for(l = 0; l < lines ;l++) {
                     struct interrupt *irr = irrindex(irrs, l, cpus);
-                    if(!irr->used) continue;
+                    if(unlikely(!irr->used)) continue;
                     core_sum += irr->value[c];
                 }
-                if(core_sum == 0) continue; // try next core
+                if(unlikely(core_sum == 0)) continue; // try next core
 
                 char title[100+1];
                 snprintfz(title, 100, "CPU%d softirqs", c);
@@ -153,7 +153,7 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
 
                 for(l = 0; l < lines ;l++) {
                     struct interrupt *irr = irrindex(irrs, l, cpus);
-                    if(!irr->used) continue;
+                    if(unlikely(!irr->used)) continue;
                     rrddim_add(st, irr->id, irr->name, 1, 1, RRDDIM_INCREMENTAL);
                 }
             }
@@ -161,7 +161,7 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
 
             for(l = 0; l < lines ;l++) {
                 struct interrupt *irr = irrindex(irrs, l, cpus);
-                if(!irr->used) continue;
+                if(unlikely(!irr->used)) continue;
                 rrddim_set(st, irr->id, irr->value[c]);
             }
             rrdset_done(st);
