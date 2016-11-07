@@ -1003,21 +1003,21 @@ void rrdset_next_usec(RRDSET *st, unsigned long long microseconds)
         unsigned long long since_last_usec = usec_dt(&now, &st->last_collected_time);
 
         // verify the microseconds given is good
-        if(unlikely(last_usec + microseconds > now_usec)) {
-            debug(D_RRD_CALLS, "dt %llu usec given is too big - it leads %llu usec to the future, for chart '%s' (%s).", microseconds, last_usec + microseconds - now_usec, st->name, st->id);
+        if(unlikely(microseconds > since_last_usec)) {
+            debug(D_RRD_CALLS, "dt %llu usec given is too big - it leads %llu usec to the future, for chart '%s' (%s).", microseconds, microseconds - since_last_usec, st->name, st->id);
 
 #ifdef NETDATA_INTERNAL_CHECKS
             if(unlikely(last_usec + microseconds > now_usec + 1000))
-                error("dt %llu usec given is too big - it leads %llu usec to the future, for chart '%s' (%s).", microseconds, last_usec + microseconds - now_usec, st->name, st->id);
+                error("dt %llu usec given is too big - it leads %llu usec to the future, for chart '%s' (%s).", microseconds, microseconds - since_last_usec, st->name, st->id);
 #endif
 
             microseconds = since_last_usec;
         }
-        else if(unlikely(microseconds < since_last_usec * 0.8 || microseconds > since_last_usec * 1.2)) {
-            debug(D_RRD_CALLS, "dt %llu usec given is wrong - expected %llu usec +/- 20%%, for chart '%s' (%s).", microseconds, since_last_usec, st->name, st->id);
+        else if(unlikely(microseconds < since_last_usec * 0.8)) {
+            debug(D_RRD_CALLS, "dt %llu usec given is too small - expected %llu usec up to -20%%, for chart '%s' (%s).", microseconds, since_last_usec, st->name, st->id);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-            error("dt %llu usec given is wrong - expected %llu usec +/- 20%%, for chart '%s' (%s).", microseconds, since_last_usec, st->name, st->id);
+            error("dt %llu usec given is too small - expected %llu usec up to -20%%, for chart '%s' (%s).", microseconds, since_last_usec, st->name, st->id);
 #endif
             microseconds = since_last_usec;
         }
