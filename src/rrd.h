@@ -355,9 +355,9 @@ extern RRDSET *rrdset_find(const char *id);
 extern RRDSET *rrdset_find_bytype(const char *type, const char *id);
 extern RRDSET *rrdset_find_byname(const char *name);
 
+extern void rrdset_next_usec_unfiltered(RRDSET *st, unsigned long long microseconds);
 extern void rrdset_next_usec(RRDSET *st, unsigned long long microseconds);
-extern void rrdset_next(RRDSET *st);
-extern void rrdset_next_plugins(RRDSET *st);
+#define rrdset_next(st) rrdset_next_usec(st, 0ULL)
 
 extern unsigned long long rrdset_done(RRDSET *st);
 
