@@ -830,7 +830,7 @@ install_non_systemd_init() {
             run rc-update add netdata default && \
             installed_init_d=1
         
-        elif [ "${key}" = "ubuntu-12.04" -o "${key}" = "ubuntu-14.04" ]
+        elif [ "${key}" = "ubuntu-12.04" -o "${key}" = "ubuntu-14.04" -o "${key}" = "debian-7" ]
             then
             run cp system/netdata-lsb /etc/init.d/netdata && \
             run chmod 755 /etc/init.d/netdata && \
