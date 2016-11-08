@@ -2754,7 +2754,7 @@ void *health_main(void *ptr) {
             rrdhost_rdlock(&localhost);
 
             for(rc = localhost.alarms; rc; rc = rc->next) {
-                if(unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_RUNNABLE))
+                if(unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_RUNNABLE)))
                     continue;
 
                 int warning_status  = RRDCALC_STATUS_UNDEFINED;
