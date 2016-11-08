@@ -119,6 +119,7 @@ typedef struct rrddimvar {
 #define RRDCALC_FLAG_CALC_ERROR    0x00000008
 #define RRDCALC_FLAG_WARN_ERROR    0x00000010
 #define RRDCALC_FLAG_CRIT_ERROR    0x00000020
+#define RRDCALC_FLAG_RUNNABLE      0x00000040
 
 typedef struct rrdcalc {
     uint32_t id;                    // the unique id of this alarm
