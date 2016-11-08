@@ -2559,18 +2559,29 @@ static inline void health_alarm_log_process(RRDHOST *host) {
 }
 
 static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) {
-    if (unlikely(!rc->rrdset)) {
+    if(unlikely(!rc->rrdset)) {
         debug(D_HEALTH, "Health not running alarm '%s.%s'. It is not linked to a chart.", rc->chart?rc->chart:"NOCHART", rc->name);
         return 0;
     }
 
-    if (unlikely(!rc->rrdset->last_collected_time.tv_sec || rc->rrdset->counter_done < 2)) {
-        debug(D_HEALTH, "Health not running alarm '%s.%s'. Chart is not fully collected yet.", rc->chart?rc->chart:"NOCHART", rc->name);
+    if(unlikely(rc->next_update > now)) {
+        if (unlikely(*next_run > rc->next_update)) {
+            // update the next_run time of the main loop
+            // to run this alarm precisely the time required
+            *next_run = rc->next_update;
+        }
+
+        debug(D_HEALTH, "Health not examining alarm '%s.%s' yet (will do in %d secs).", rc->chart?rc->chart:"NOCHART", rc->name, (int) (rc->next_update - now));
         return 0;
     }
 
-    if (unlikely(!rc->update_every)) {
+    if(unlikely(!rc->update_every)) {
         debug(D_HEALTH, "Health not running alarm '%s.%s'. It does not have an update frequency", rc->chart?rc->chart:"NOCHART", rc->name);
+        return 0;
+    }
+
+    if(unlikely(!rc->rrdset->last_collected_time.tv_sec || rc->rrdset->counter_done < 2)) {
+        debug(D_HEALTH, "Health not running alarm '%s.%s'. Chart is not fully collected yet.", rc->chart?rc->chart:"NOCHART", rc->name);
         return 0;
     }
 
@@ -2586,7 +2597,7 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
         return 0;
     }
 
-    if (RRDCALC_HAS_DB_LOOKUP(rc)) {
+    if(RRDCALC_HAS_DB_LOOKUP(rc)) {
         time_t needed = now + rc->before + rc->after;
 
         if(needed + update_every < first || needed - update_every > last) {
@@ -2596,14 +2607,6 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
                   , (unsigned long) last);
             return 0;
         }
-    }
-
-    if (unlikely(rc->next_update > now)) {
-        if (unlikely(*next_run > rc->next_update))
-            *next_run = rc->next_update;
-
-        debug(D_HEALTH, "Health not examining alarm '%s.%s' yet (will do in %d secs).", rc->chart?rc->chart:"NOCHART", rc->name, (int) (rc->next_update - now));
-        return 0;
     }
 
     return 1;
@@ -2635,18 +2638,22 @@ void *health_main(void *ptr) {
         time_t next_run = now + min_run_every;
         RRDCALC *rc;
 
-        if (unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate) != 0))
+        if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate) != 0))
             error("Cannot set pthread cancel state to DISABLE.");
 
         rrdhost_rdlock(&localhost);
 
         // the first loop is to lookup values from the db
-        for (rc = localhost.alarms; rc; rc = rc->next) {
-            if (unlikely(!rrdcalc_isrunnable(rc, now, &next_run)))
+        for(rc = localhost.alarms; rc; rc = rc->next) {
+            if(unlikely(!rrdcalc_isrunnable(rc, now, &next_run))) {
+                if(unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_RUNNABLE))
+                    rc->rrdcalc_flags &= ~RRDCALC_FLAG_RUNNABLE;
                 continue;
+            }
 
             runnable++;
             rc->old_value = rc->value;
+            rc->rrdcalc_flags |= RRDCALC_FLAG_RUNNABLE;
 
             // 1. if there is database lookup, do it
             // 2. if there is calculation expression, run it
@@ -2743,11 +2750,11 @@ void *health_main(void *ptr) {
         }
         rrdhost_unlock(&localhost);
 
-        if (unlikely(runnable && !netdata_exit)) {
+        if(unlikely(runnable && !netdata_exit)) {
             rrdhost_rdlock(&localhost);
 
-            for (rc = localhost.alarms; rc; rc = rc->next) {
-                if (unlikely(!rrdcalc_isrunnable(rc, now, &next_run)))
+            for(rc = localhost.alarms; rc; rc = rc->next) {
+                if(unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_RUNNABLE)))
                     continue;
 
                 int warning_status  = RRDCALC_STATUS_UNDEFINED;
