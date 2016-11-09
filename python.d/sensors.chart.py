@@ -131,13 +131,13 @@ class Service(SimpleService):
     def check(self):
         try:
             sensors.init()
-        except Exception as e:
-            self.error(e)
+        except Exception:
+            self.debug("", exc_info=1)
             return False
 
         try:
             self._create_definitions()
-        except Exception as e:
-            self.error(e)
+        except Exception:
+            self.debug("", exc_info=1)
             return False
         return True

@@ -3,22 +3,22 @@
 # Author: Pawel Krupa (paulfantom)
 
 from base import SimpleService
-import msg
+import logs
 
 # import 3rd party library to handle MySQL communication
 try:
     import MySQLdb
 
     # https://github.com/PyMySQL/mysqlclient-python
-    msg.info("using MySQLdb")
+    logs.message("INFO", "using MySQLdb")
 except ImportError:
     try:
         import pymysql as MySQLdb
 
         # https://github.com/PyMySQL/PyMySQL
-        msg.info("using pymysql")
+        logs.message("INFO", "using pymysql")
     except ImportError:
-        msg.error("MySQLdb or PyMySQL module is needed to use mysql.chart.py plugin")
+        logs.message("INFO", "MySQLdb or PyMySQL module is needed to use mysql.chart.py plugin")
         raise ImportError
 
 # default module values (can be overridden per job in `config`)
@@ -344,8 +344,8 @@ class Service(SimpleService):
             self.error("Cannot establish connection to MySQL.")
             self.debug(str(e))
             raise RuntimeError
-        except Exception as e:
-            self.error("problem connecting to server:", e)
+        except Exception:
+            self.error("problem connecting to server:", exc_info=1)
             raise RuntimeError
 
     def _get_data(self):
@@ -362,14 +362,14 @@ class Service(SimpleService):
             cursor = self.connection.cursor()
             cursor.execute(QUERY)
             raw_data = cursor.fetchall()
-        except MySQLdb.OperationalError as e:
-            self.debug("Reconnecting due to", str(e))
+        except MySQLdb.OperationalError:
+            self.debug("Reconnecting due to", exc_info=1)
             self._connect()
             cursor = self.connection.cursor()
             cursor.execute(QUERY)
             raw_data = cursor.fetchall()
-        except Exception as e:
-            self.error("cannot execute query.", e)
+        except Exception:
+            self.error("cannot execute query.", exc_info=1)
             self.connection.close()
             self.connection = None
             return None

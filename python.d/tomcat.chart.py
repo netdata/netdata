@@ -87,7 +87,7 @@ class Service(UrlService):
                     end = raw.find('</status>')
                     end += 9
                     raw = raw[:end]
-                    self.debug(raw)
+                    log.debug(raw)
                     data = ET.fromstring(raw)
                 else:
                     raise Exception(e)
@@ -101,11 +101,11 @@ class Service(UrlService):
                     'current': threads.attrib['currentThreadCount'],
                     'busy': threads.attrib['currentThreadsBusy'],
                     'jvm': memory.attrib['free']}
-        except (ValueError, AttributeError) as e:
-            self.debug(str(e))
+        except (ValueError, AttributeError):
+            self.debug("", exc_info=1)
             return None
-        except SyntaxError as e:
+        except SyntaxError:
             self.error("Tomcat module needs python 2.7 at least. Stopping")
-            self.debug(str(e))
-        except Exception as e:
-            self.debug(str(e))
+            self.debug("", exc_info=1)
+        except Exception:
+            self.debug("", exc_info=1)
