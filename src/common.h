@@ -112,6 +112,7 @@
 #include "plugin_idlejitter.h"
 #include "plugin_nfacct.h"
 #include "plugin_proc.h"
+#include "plugin_ipc.h"
 #include "plugin_tc.h"
 #include "plugins_d.h"
 

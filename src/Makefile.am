@@ -41,6 +41,7 @@ netdata_SOURCES = \
 	plugin_idlejitter.c plugin_idlejitter.h \
 	plugin_nfacct.c plugin_nfacct.h \
 	plugin_proc.c plugin_proc.h \
+	plugin_ipc.c plugin_ipc.h \
 	plugin_tc.c plugin_tc.h \
 	plugins_d.c plugins_d.h \
 	popen.c popen.h \
