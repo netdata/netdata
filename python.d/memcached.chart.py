@@ -131,7 +131,7 @@ class Service(SocketService):
             self.error("no data received")
             return None
         if raw[0].startswith('ERROR'):
-            self.error("Memcached returned ERROR")
+            self.error("memcached returned ERROR")
             return None
         data = {}
         for line in raw:
@@ -160,8 +160,10 @@ class Service(SocketService):
 
     def _check_raw_data(self, data):
         if data.endswith('END\r\n'):
+            self.debug("received response")
             return True
         else:
+            self.debug("waiting response")
             return False
 
     def check(self):

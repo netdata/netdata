@@ -519,6 +519,7 @@ class SocketService(SimpleService):
                 if self.__socket_config is None:
                     # establish ipv6 or ipv4 connection.
                     for res in socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM):
+                        self.debug("connecting socket to host '" + str(self.host) + "', port " + str(self.port))
                         try:
                             # noinspection SpellCheckingInspection
                             af, socktype, proto, canonname, sa = res
@@ -547,6 +548,7 @@ class SocketService(SimpleService):
             else:
                 # connect to unix socket
                 try:
+                    self.debug("connecting unix socket '" + str(self.unix_socket) + "'")
                     self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
                     self._sock.connect(self.unix_socket)
                 except socket.error:
@@ -559,19 +561,27 @@ class SocketService(SimpleService):
                        "port:", str(self.port),
                        "socket:", str(self.unix_socket))
             self._sock = None
-        self._sock.setblocking(0)
+
+        if self._sock is not None:
+            self._sock.setblocking(0)
+            self._sock.settimeout(5)
+            self.debug("connected with timeout " + str(self._sock.gettimeout()))
+        else:
+            self.debug("not connected")
 
     def _disconnect(self):
         """
         Close socket connection
         :return:
         """
-        try:
-            self._sock.shutdown(2)  # 0 - read, 1 - write, 2 - all
-            self._sock.close()
-        except Exception:
-            pass
-        self._sock = None
+        if self._sock is not None:
+            try:
+                self.debug("disconnecting")
+                self._sock.shutdown(2)  # 0 - read, 1 - write, 2 - all
+                self._sock.close()
+            except Exception:
+                pass
+            self._sock = None
 
     def _send(self):
         """
@@ -581,6 +591,7 @@ class SocketService(SimpleService):
         # Send request if it is needed
         if self.request != "".encode():
             try:
+                self.debug("sending request")
                 self._sock.send(self.request)
             except Exception as e:
                 self._disconnect()
@@ -599,14 +610,16 @@ class SocketService(SimpleService):
         data = ""
         while True:
             try:
+                self.debug("receiving response")
                 ready_to_read, _, in_error = select.select([self._sock], [], [], 5)
             except Exception as e:
-                self.debug("SELECT", str(e))
+                self.error("timeout while waiting for response:", str(e))
                 self._disconnect()
                 break
             if len(ready_to_read) > 0:
                 buf = self._sock.recv(4096)
-                if len(buf) == 0 or buf is None:  # handle server disconnect
+                if buf is None or len(buf) == 0:  # handle server disconnect
+                    self._disconnect()
                     break
                 data += buf.decode(errors='ignore')
                 if self._check_raw_data(data):

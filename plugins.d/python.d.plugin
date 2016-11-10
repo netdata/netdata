@@ -292,8 +292,8 @@ class PythonCharts(object):
         if job.name is not None and len(job.name) != 0:
             prefix += "/" + job.name
         try:
+            msg.error("DISABLED:", prefix)
             self.jobs.remove(job)
-            msg.info("Disabled", prefix)
         except Exception as e:
             msg.debug("This shouldn't happen. NO " + prefix + " IN LIST:" + str(self.jobs) + " ERROR: " + str(e))
 
@@ -335,18 +335,18 @@ class PythonCharts(object):
                     msg.error(job.chart_name, "check function failed.")
                     self._stop(job)
                 else:
-                    msg.debug(job.chart_name, "check succeeded")
+                    msg.info("CHECKED OK:", job.chart_name)
                     i += 1
                     try:
                         if job.override_name is not None:
                             new_name = job.__module__ + '_' + job.override_name
                             if new_name in overridden:
-                                msg.error(job.override_name + " already exists. Stopping '" + job.name + "'")
+                                msg.info("DROPPED:", job.name, ", job '" + job.override_name + "' is already served by another job.")
                                 self._stop(job)
                                 i -= 1
                             else:
                                 job.name = job.override_name
-                                msg.debug(job.chart_name + " changing chart name to: '" + new_name + "'")
+                                msg.info("RENAMED:", new_name, ", from " + job.chart_name)
                                 job.chart_name = new_name
                                 overridden.append(job.chart_name)
                     except Exception:
