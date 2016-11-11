@@ -644,27 +644,21 @@ class SocketService(SimpleService):
         """
         data = ""
         while True:
+            self.debug("receiving response")
             try:
-                self.debug("waiting response")
-                ready_to_read, _, in_error = select.select([self._sock], [], [], 5)
+                buf = self._sock.recv(4096)
             except Exception as e:
-                self._socketerror("timeout while waiting for response:" + str(e))
+                self._socketerror("failed to receive response:" + str(e))
                 self._disconnect()
                 break
 
-            if len(ready_to_read) > 0:
-                self.debug("receiving response")
-                buf = self._sock.recv(4096)
-                if buf is None or len(buf) == 0:  # handle server disconnect
-                    self.debug("server closed the connection")
-                    self._disconnect()
-                    break
-                data += buf.decode(errors='ignore')
-                if self._check_raw_data(data):
-                    break
-            else:
-                self._socketerror("timeout")
+            if buf is None or len(buf) == 0:  # handle server disconnect
+                self.debug("server closed the connection")
                 self._disconnect()
+                break
+
+            data += buf.decode(errors='ignore')
+            if self._check_raw_data(data):
                 break
 
         return data
