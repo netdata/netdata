@@ -63,9 +63,9 @@ CHARTS = {
             ['blocked_clients', 'blocked', 'absolute', -1]
         ]},
     'slaves': {
-        'options': [None, 'Redis Slaves', 'connected', 'replication', 'redis.slaves', 'line'],
+        'options': [None, 'Redis Slaves', 'slaves', 'replication', 'redis.slaves', 'line'],
         'lines': [
-            ['connected_slaves', 'slaves', 'absolute']
+            ['connected_slaves', 'connected', 'absolute']
         ]},
     'persistence': {
         'options': [None, 'Redis Persistence Changes Since Last Save', 'changes', 'persistence', 'redis.rdb_changes', 'line'],
