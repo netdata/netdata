@@ -506,6 +506,7 @@ class SocketService(SimpleService):
         self.unix_socket = None
         self.request = ""
         self.__socket_config = None
+        self.__empty_request = "".encode()
         SimpleService.__init__(self, configuration=configuration, name=name)
 
     def _socketerror(self, msg=None):
@@ -614,7 +615,7 @@ class SocketService(SimpleService):
         """
         if self._sock is not None:
             try:
-                self.error("closing socket")
+                self.debug("closing socket")
                 self._sock.shutdown(2)  # 0 - read, 1 - write, 2 - all
                 self._sock.close()
             except Exception:
@@ -627,9 +628,9 @@ class SocketService(SimpleService):
         :return: boolean
         """
         # Send request if it is needed
-        if self.request != "".encode():
+        if self.request != self.__empty_request:
             try:
-                self.debug("sending request")
+                self.debug("sending request:", str(self.request))
                 self._sock.send(self.request)
             except Exception as e:
                 self._socketerror("error sending request:" + str(e))
@@ -657,10 +658,12 @@ class SocketService(SimpleService):
                 self._disconnect()
                 break
 
+            self.debug("received data:", str(buf))
             data += buf.decode(errors='ignore')
             if self._check_raw_data(data):
                 break
 
+        self.debug("final response:", str(data))
         return data
 
     def _get_raw_data(self):
