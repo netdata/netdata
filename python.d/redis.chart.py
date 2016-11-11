@@ -19,50 +19,56 @@ retries = 60
 #             'unix_socket': None
 #          }}
 
-ORDER = ['operations', 'hit_rate', 'memory', 'keys', 'connections', 'clients', 'slaves', 'persistence']
+ORDER = ['operations', 'hit_rate', 'memory', 'keys', 'net', 'connections', 'clients', 'slaves', 'persistence']
 
 CHARTS = {
     'operations': {
-        'options': [None, 'Operations', 'operations/s', 'operations', 'redis.operations', 'line'],
+        'options': [None, 'Redis Operations', 'operations/s', 'operations', 'redis.operations', 'line'],
         'lines': [
             ['total_commands_processed', 'commands', 'incremental'],
             ['instantaneous_ops_per_sec', 'operations', 'absolute']
         ]},
     'hit_rate': {
-        'options': [None, 'Hit rate', 'percent', 'hits', 'redis.hit_rate', 'line'],
+        'options': [None, 'Redis Hit rate', 'percent', 'hits', 'redis.hit_rate', 'line'],
         'lines': [
             ['hit_rate', 'rate', 'absolute']
         ]},
     'memory': {
-        'options': [None, 'Memory utilization', 'kilobytes', 'memory', 'redis.memory', 'line'],
+        'options': [None, 'Redis Memory utilization', 'kilobytes', 'memory', 'redis.memory', 'line'],
         'lines': [
             ['used_memory', 'total', 'absolute', 1, 1024],
             ['used_memory_lua', 'lua', 'absolute', 1, 1024]
         ]},
+    'net': {
+        'options': [None, 'Redis Bandwidth', 'kilobits/s', 'network', 'redis.net', 'area'],
+        'lines': [
+            ['total_net_input_bytes', 'in', 'incremental', 8, 1024],
+            ['total_net_output_bytes', 'out', 'incremental', -8, 1024]
+        ]},
     'keys': {
-        'options': [None, 'Database keys', 'keys', 'keys', 'redis.keys', 'line'],
+        'options': [None, 'Redis Keys per Database', 'keys', 'keys', 'redis.keys', 'line'],
         'lines': [
             # lines are created dynamically in `check()` method
         ]},
     'connections': {
-        'options': [None, 'Connections', 'connections/s', 'connections', 'redis.connections', 'line'],
+        'options': [None, 'Redis Connections', 'connections/s', 'connections', 'redis.connections', 'line'],
         'lines': [
-            ['total_connections_received', 'received', 'incremental'],
-            ['rejected_connections', 'rejected', 'incremental']
+            ['total_connections_received', 'received', 'incremental', 1],
+            ['rejected_connections', 'rejected', 'incremental', -1]
         ]},
     'clients': {
-        'options': [None, 'Clients', 'clients', 'connections', 'redis.clients', 'line'],
+        'options': [None, 'Redis Clients', 'clients', 'connections', 'redis.clients', 'line'],
         'lines': [
-            ['connected_clients', 'connected', 'absolute'],
-            ['blocked_clients', 'blocked', 'absolute']
+            ['connected_clients', 'connected', 'absolute', 1],
+            ['blocked_clients', 'blocked', 'absolute', -1]
         ]},
     'slaves': {
-        'options': [None, 'Slaves', 'slaves', 'replication', 'redis.slaves', 'line'],
+        'options': [None, 'Redis Slaves', 'connected', 'replication', 'redis.slaves', 'line'],
         'lines': [
-            ['connected_slaves', 'connected', 'absolute']
+            ['connected_slaves', 'slaves', 'absolute']
         ]},
     'persistence': {
-        'options': [None, 'Changes since last save', 'changes', 'persistence', 'redis.rdb_changes', 'line'],
+        'options': [None, 'Redis Persistence Changes Since Last Save', 'changes', 'persistence', 'redis.rdb_changes', 'line'],
         'lines': [
             ['rdb_changes_since_last_save', 'changes', 'absolute']
         ]}
