@@ -33,7 +33,7 @@ CHARTS = {
         'options': [None, 'Network', 'kilobytes/s', 'Network', 'memcached.net', 'line'],
         'lines': [
             ['bytes_read', 'read', 'incremental', 1, 1024],
-            ['bytes_written', 'written', 'incremental', 1, 1024]
+            ['bytes_written', 'write', 'incremental', 1, 1024]
         ]},
     'connections': {
         'options': [None, 'Connections', 'connections/s', 'Cluster', 'memcached.connections', 'line'],
@@ -125,46 +125,52 @@ class Service(SocketService):
         Get data from socket
         :return: dict
         """
+        response = self._get_raw_data()
+        if response is None:
+            # error has already been logged
+            return None
+
+        if response.startswith('ERROR'):
+            self.error("received ERROR")
+            return None
+
         try:
-            raw = self._get_raw_data().split("\n")
+            parsed = response.split("\n")
         except AttributeError:
-            self.error("no data received")
+            self.error("response is invalid/empty")
             return None
-        if raw[0].startswith('ERROR'):
-            self.error("memcached returned ERROR")
-            return None
+
+        # split the response
         data = {}
-        for line in raw:
+        for line in parsed:
             if line.startswith('STAT'):
                 try:
                     t = line[5:].split(' ')
-                    data[t[0]] = int(t[1])
+                    data[t[0]] = t[1]
                 except (IndexError, ValueError):
+                    self.debug("invalid line received: " + str(line))
                     pass
-        try:
-            data['hit_rate'] = int((data['keyspace_hits'] / float(data['keyspace_hits'] + data['keyspace_misses'])) * 100)
-        except:
-            data['hit_rate'] = 0
 
+        if len(data) == 0:
+            self.error("received data doesn't have any records")
+            return None
+
+        # custom calculations
         try:
             data['avail'] = int(data['limit_maxbytes']) - int(data['bytes'])
-            data['used'] = data['bytes']
+            data['used'] = int(data['bytes'])
         except:
             pass
 
-        if len(data) == 0:
-            self.error("received data doesn't have needed records")
-            return None
-        else:
-            return data
+        return data
 
     def _check_raw_data(self, data):
         if data.endswith('END\r\n'):
-            self.debug("received response")
+            self.debug("received full response from memcached")
             return True
-        else:
-            self.debug("waiting response")
-            return False
+
+        self.debug("waiting more data from memcached")
+        return False
 
     def check(self):
         """
