@@ -1115,10 +1115,10 @@
 
         if(typeof charts['system.swap'] !== 'undefined')
             head += '<div style="margin-right: 10px;" data-netdata="system.swap"'
-            + ' data-dimensions="free"'
+            + ' data-dimensions="used"'
             + ' data-append-options="percentage"'
             + ' data-chart-library="easypiechart"'
-            + ' data-title="Free Swap"'
+            + ' data-title="Used Swap"'
             + ' data-units="%"'
             + ' data-easypiechart-max-value="100"'
             + ' data-width="8%"'
@@ -1209,10 +1209,10 @@
 
         if(typeof charts['system.ram'] !== 'undefined')
             head += '<div style="margin-right: 10px;" data-netdata="system.ram"'
-            + ' data-dimensions="cached|free"'
+            + ' data-dimensions="used|buffers"'
             + ' data-append-options="percentage"'
             + ' data-chart-library="easypiechart"'
-            + ' data-title="Available RAM"'
+            + ' data-title="Used RAM"'
             + ' data-units="%"'
             + ' data-easypiechart-max-value="100"'
             + ' data-width="8%"'
