@@ -129,6 +129,8 @@
 #include "main.h"
 #include "unit_test.h"
 
+#include "ipc.h"
+
 #ifdef abs
 #undef abs
 #endif

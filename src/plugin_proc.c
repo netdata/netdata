@@ -35,6 +35,7 @@ void *proc_main(void *ptr)
     int vdo_proc_softirqs           = !config_get_boolean("plugin:proc", "/proc/softirqs", 1);
     int vdo_proc_net_softnet_stat   = !config_get_boolean("plugin:proc", "/proc/net/softnet_stat", 1);
     int vdo_proc_loadavg            = !config_get_boolean("plugin:proc", "/proc/loadavg", 1);
+    int vdo_ipc                     = !config_get_boolean("plugin:proc", "ipc", 1);
     int vdo_sys_kernel_mm_ksm       = !config_get_boolean("plugin:proc", "/sys/kernel/mm/ksm", 1);
     int vdo_cpu_netdata             = !config_get_boolean("plugin:proc", "netdata server resources", 1);
 
@@ -57,6 +58,7 @@ void *proc_main(void *ptr)
     unsigned long long sutime_proc_softirqs = 0ULL;
     unsigned long long sutime_proc_net_softnet_stat = 0ULL;
     unsigned long long sutime_proc_loadavg = 0ULL;
+    unsigned long long sutime_ipc = 0ULL;
     unsigned long long sutime_sys_kernel_mm_ksm = 0ULL;
 
     // the next time we will run - aligned properly
@@ -92,6 +94,14 @@ void *proc_main(void *ptr)
             sunow = time_usec();
             vdo_proc_loadavg = do_proc_loadavg(rrd_update_every, (sutime_proc_loadavg > 0)?sunow - sutime_proc_loadavg:0ULL);
             sutime_proc_loadavg = sunow;
+        }
+        if(unlikely(netdata_exit)) break;
+
+        if(!vdo_ipc) {
+            debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_ipc().");
+            sunow = time_usec();
+            vdo_ipc = do_ipc(rrd_update_every, (sutime_ipc > 0)?sunow - sutime_ipc:0ULL);
+            sutime_ipc = sunow;
         }
         if(unlikely(netdata_exit)) break;
 
