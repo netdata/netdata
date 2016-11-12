@@ -40,6 +40,7 @@ set(NETDATA_SOURCE_FILES
         src/plugin_proc.h
         src/plugins_d.c
         src/plugins_d.h
+        src/plugin_ipc.c
         src/plugin_tc.c
         src/plugin_tc.h
         src/popen.c

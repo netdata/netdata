@@ -139,7 +139,7 @@ get_git_config_signatures() {
 
     echo >configs.signatures.tmp
 
-    for x in $(find conf.d -name \*.conf | sort)
+    for x in $(find conf.d -name \*.conf)
     do
             x="${x/conf.d\//}"
             echo "${x}"
@@ -147,7 +147,7 @@ get_git_config_signatures() {
             do
                     git checkout ${c} "conf.d/${x}" || continue
                     s="$(cat "conf.d/${x}" | md5sum | cut -d ' ' -f 1)"
-                    echo >>configs.signatures.tmp "${x}:${s}"
+                    echo >>configs.signatures.tmp "${s}:${x}"
                     echo "    ${s}"
             done
             git checkout HEAD "conf.d/${x}" || break
@@ -159,7 +159,7 @@ get_git_config_signatures() {
         {
             echo "declare -A configs_signatures=("
             IFS=":"
-            while read file md5
+            while read md5 file
             do
                 echo "  ['${md5}']='${file}'"
             done

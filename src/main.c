@@ -47,6 +47,7 @@ struct netdata_static_thread {
     {"idlejitter",         "plugins",   "idlejitter", 1, NULL, NULL, cpuidlejitter_main},
     {"proc",               "plugins",   "proc",       1, NULL, NULL, proc_main},
     {"cgroups",            "plugins",   "cgroups",    1, NULL, NULL, cgroups_main},
+    {"ipc",                "plugins",   "ipc",        1, NULL, NULL, ipc_main},
     {"check",              "plugins",   "checks",     0, NULL, NULL, checks_main},
     {"health",              NULL,       NULL,         1, NULL, NULL, health_main},
     {"plugins.d",           NULL,       NULL,         1, NULL, NULL, pluginsd_main},
