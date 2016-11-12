@@ -110,6 +110,10 @@ class Service(SocketService):
         except (ValueError, AttributeError):
             return None
 
+        if raw is None:
+            self.debug("dovecot returned no data")
+            return None
+
         data = raw.split('\n')[:2]
         desc = data[0].split('\t')
         vals = data[1].split('\t')
