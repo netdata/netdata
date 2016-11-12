@@ -5,11 +5,13 @@ extern int health_enabled;
 
 extern int rrdvar_compare(void *a, void *b);
 
-#define RRDVAR_TYPE_CALCULATED 1
-#define RRDVAR_TYPE_TIME_T     2
-#define RRDVAR_TYPE_COLLECTED  3
-#define RRDVAR_TYPE_TOTAL      4
-#define RRDVAR_TYPE_INT        5
+#define RRDVAR_TYPE_CALCULATED              1
+#define RRDVAR_TYPE_TIME_T                  2
+#define RRDVAR_TYPE_COLLECTED               3
+#define RRDVAR_TYPE_TOTAL                   4
+#define RRDVAR_TYPE_INT                     5
+#define RRDVAR_TYPE_CALCULATED_ALLOCATED    6
+
 
 // the variables as stored in the variables indexes
 // there are 3 indexes:
@@ -351,5 +353,9 @@ extern void health_alarms2json(RRDHOST *host, BUFFER *wb, int all);
 extern void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after);
 
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf);
+
+extern RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name);
+extern void rrdvar_custom_host_variable_destroy(RRDHOST *host, const char *name);
+extern void rrdvar_custom_host_variable_set(RRDVAR *rv, calculated_number value);
 
 #endif //NETDATA_HEALTH_H
