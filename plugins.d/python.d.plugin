@@ -332,7 +332,7 @@ class PythonCharts(object):
             job = self.jobs[i]
             try:
                 if not job.check():
-                    msg.error(job.chart_name, "check function failed.")
+                    msg.error(job.chart_name, "check() failed - disabling job")
                     self._stop(job)
                 else:
                     msg.info("CHECKED OK:", job.chart_name)

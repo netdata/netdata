@@ -357,10 +357,18 @@ class SimpleService(threading.Thread):
         :return: boolean
         """
         self.debug("Module", str(self.__module__), "doesn't implement check() function. Using default.")
-        if self._get_data() is None or len(self._get_data()) == 0:
+        data = self._get_data()
+
+        if data is None:
+            self.debug("failed to receive data during check().")
             return False
-        else:
-            return True
+
+        if len(data) == 0:
+            self.debug("empty data during check().")
+            return False
+
+        self.debug("successfully received data during check(): '" + str(data) + "'")
+        return True
 
     def create(self):
         """
@@ -369,6 +377,7 @@ class SimpleService(threading.Thread):
         """
         data = self._get_data()
         if data is None:
+            self.debug("failed to receive data during create().")
             return False
 
         idx = 0
@@ -392,7 +401,7 @@ class SimpleService(threading.Thread):
         """
         data = self._get_data()
         if data is None:
-            self.debug("_get_data() returned no data")
+            self.debug("failed to receive data during update().")
             return False
 
         updated = False
@@ -716,6 +725,7 @@ class SocketService(SimpleService):
             self.name = ""
         else:
             self.name = str(self.name)
+
         try:
             self.unix_socket = str(self.configuration['socket'])
         except (KeyError, TypeError):
@@ -729,10 +739,12 @@ class SocketService(SimpleService):
                 self.port = int(self.configuration['port'])
             except (KeyError, TypeError):
                 self.debug("No port specified. Using: '" + str(self.port) + "'")
+
         try:
             self.request = str(self.configuration['request'])
         except (KeyError, TypeError):
             self.debug("No request specified. Using: '" + str(self.request) + "'")
+
         self.request = self.request.encode()
 
     def check(self):
