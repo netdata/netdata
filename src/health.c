@@ -699,19 +699,72 @@ void rrdsetvar_free(RRDSETVAR *rs) {
 
 #define RRDDIMVAR_ID_MAX 1024
 
-RRDDIMVAR *rrddimvar_create(RRDDIM *rd, int type, const char *prefix, const char *suffix, void *value, uint32_t options) {
+static inline void rrddimvar_free_instances(RRDDIMVAR *rs) {
+    RRDDIM *rd = rs->rrddim;
     RRDSET *st = rd->rrdset;
 
-    debug(D_VARIABLES, "RRDDIMSET create for chart id '%s' name '%s', dimension id '%s', name '%s%s%s'", st->id, st->name, rd->id, (prefix)?prefix:"", rd->name, (suffix)?suffix:"");
+    rrdvar_free(st->rrdhost, &st->variables_root_index, rs->local_id);
+    rs->local_id = NULL;
 
-    if(!prefix) prefix = "";
-    if(!suffix) suffix = "";
+    rrdvar_free(st->rrdhost, &st->variables_root_index, rs->local_name);
+    rs->local_name = NULL;
+
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_id);
+    rs->family_id = NULL;
+
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_name);
+    rs->family_name = NULL;
+
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_contextid);
+    rs->family_contextid = NULL;
+
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_contextname);
+    rs->family_contextname = NULL;
+
+    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullidid);
+    rs->host_fullidid = NULL;
+
+    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullidname);
+    rs->host_fullidname = NULL;
+
+    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullnameid);
+    rs->host_fullnameid = NULL;
+
+    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullnamename);
+    rs->host_fullnamename = NULL;
+
+    freez(rs->id);
+    rs->id = NULL;
+
+    freez(rs->name);
+    rs->name = NULL;
+
+    freez(rs->fullidid);
+    rs->fullidid = NULL;
+
+    freez(rs->fullidname);
+    rs->fullidname = NULL;
+
+    freez(rs->contextid);
+    rs->contextid = NULL;
+
+    freez(rs->contextname);
+    rs->contextname = NULL;
+
+    freez(rs->fullnameid);
+    rs->fullnameid = NULL;
+
+    freez(rs->fullnamename);
+    rs->fullnamename = NULL;
+}
+
+static inline void rrddimvar_create_instances(RRDDIMVAR *rs) {
+    rrddimvar_free_instances(rs);
+
+    RRDDIM *rd = rs->rrddim;
+    RRDSET *st = rd->rrdset;
 
     char buffer[RRDDIMVAR_ID_MAX + 1];
-    RRDDIMVAR *rs = (RRDDIMVAR *)callocz(1, sizeof(RRDDIMVAR));
-
-    rs->prefix = strdupz(prefix);
-    rs->suffix = strdupz(suffix);
 
     snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", rs->prefix, rd->id, rs->suffix);
     rs->id = strdupz(buffer);
@@ -719,28 +772,23 @@ RRDDIMVAR *rrddimvar_create(RRDDIM *rd, int type, const char *prefix, const char
     snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", rs->prefix, rd->name, rs->suffix);
     rs->name = strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->id, rs->id);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->id, rs->id);
     rs->fullidid = strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->id, rs->name);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->id, rs->name);
     rs->fullidname = strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->context, rs->id);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->context, rs->id);
     rs->contextid = strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->context, rs->name);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->context, rs->name);
     rs->contextname = strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->name, rs->id);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->id);
     rs->fullnameid = strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->name, rs->name);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->name);
     rs->fullnamename = strdupz(buffer);
-
-    rs->type = type;
-    rs->value = value;
-    rs->options = options;
-    rs->rrddim = rd;
 
     rs->local_id           = rrdvar_create_and_index("local", &st->variables_root_index, rs->id, rs->type, rs->value);
     rs->local_name         = rrdvar_create_and_index("local", &st->variables_root_index, rs->name, rs->type, rs->value);
@@ -754,9 +802,31 @@ RRDDIMVAR *rrddimvar_create(RRDDIM *rd, int type, const char *prefix, const char
     rs->host_fullidname    = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullidname, rs->type, rs->value);
     rs->host_fullnameid    = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullnameid, rs->type, rs->value);
     rs->host_fullnamename  = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullnamename, rs->type, rs->value);
+}
+
+
+RRDDIMVAR *rrddimvar_create(RRDDIM *rd, int type, const char *prefix, const char *suffix, void *value, uint32_t options) {
+    RRDSET *st = rd->rrdset;
+
+    debug(D_VARIABLES, "RRDDIMSET create for chart id '%s' name '%s', dimension id '%s', name '%s%s%s'", st->id, st->name, rd->id, (prefix)?prefix:"", rd->name, (suffix)?suffix:"");
+
+    if(!prefix) prefix = "";
+    if(!suffix) suffix = "";
+
+    RRDDIMVAR *rs = (RRDDIMVAR *)callocz(1, sizeof(RRDDIMVAR));
+
+    rs->prefix = strdupz(prefix);
+    rs->suffix = strdupz(suffix);
+
+    rs->type = type;
+    rs->value = value;
+    rs->options = options;
+    rs->rrddim = rd;
 
     rs->next = rd->variables;
     rd->variables = rs;
+
+    rrddimvar_create_instances(rs);
 
     return rs;
 }
@@ -769,47 +839,8 @@ void rrddimvar_rename_all(RRDDIM *rd) {
     while((rs = next)) {
         next = rs->next;
 
-        if (strcmp(rd->name, rs->name)) {
-            char buffer[RRDDIMVAR_ID_MAX + 1];
-            // name changed
-
-            // name and family name
-            rrdvar_free(st->rrdhost, &st->variables_root_index, rs->local_name);
-            rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_name);
-            freez(rs->name);
-            snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", rs->prefix, rd->name, rs->suffix);
-            rs->name = strdupz(buffer);
-            rs->local_name  = rrdvar_create_and_index("local", &st->variables_root_index, rs->name, rs->type, rs->value);
-            rs->family_name = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->name, rs->type, rs->value);
-
-            // family_contextname
-            rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->family_contextname);
-            freez(rs->contextname);
-            snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->context, rs->name);
-            rs->contextname = strdupz(buffer);
-            rs->family_contextname = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->contextname, rs->type, rs->value);
-
-            // fullidname
-            rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullidname);
-            freez(rs->fullidname);
-            snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->id, rs->name);
-            rs->fullidname = strdupz(buffer);
-            rs->host_fullidname = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullidname, rs->type, rs->value);
-
-            // fullnameid
-            rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullnameid);
-            freez(rs->fullnameid);
-            snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->id);
-            rs->fullnameid = strdupz(buffer);
-            rs->host_fullnameid = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullnameid, rs->type, rs->value);
-
-            // fullnamename
-            rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullnamename);
-            freez(rs->fullnamename);
-            snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->name);
-            rs->fullnamename = strdupz(buffer);
-            rs->host_fullnamename = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullnamename, rs->type, rs->value);
-        }
+        if (strcmp(rd->name, rs->name))
+            rrddimvar_create_instances(rs);
     }
 }
 
@@ -818,18 +849,7 @@ void rrddimvar_free(RRDDIMVAR *rs) {
     RRDSET *st = rd->rrdset;
     debug(D_VARIABLES, "RRDDIMSET free for chart id '%s' name '%s', dimension id '%s', name '%s', prefix='%s', suffix='%s'", st->id, st->name, rd->id, rd->name, rs->prefix, rs->suffix);
 
-    rrdvar_free(st->rrdhost, &st->variables_root_index, rs->local_id);
-    rrdvar_free(st->rrdhost, &st->variables_root_index, rs->local_name);
-
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_id);
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_name);
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_contextid);
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_contextname);
-
-    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullidid);
-    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullidname);
-    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullnameid);
-    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullnamename);
+    rrddimvar_free_instances(rs);
 
     if(rd->variables == rs) {
         debug(D_VARIABLES, "RRDDIMSET removing first entry for chart id '%s' name '%s', dimension id '%s', name '%s'", st->id, st->name, rd->id, rd->name);
@@ -845,14 +865,6 @@ void rrddimvar_free(RRDDIMVAR *rs) {
 
     freez(rs->prefix);
     freez(rs->suffix);
-    freez(rs->id);
-    freez(rs->name);
-    freez(rs->contextid);
-    freez(rs->contextname);
-    freez(rs->fullidid);
-    freez(rs->fullidname);
-    freez(rs->fullnameid);
-    freez(rs->fullnamename);
     freez(rs);
 }
 
