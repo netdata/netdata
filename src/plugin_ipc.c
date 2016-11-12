@@ -183,14 +183,14 @@ void *ipc_main(void *ptr) {
     rrdvar_custom_host_variable_set(semaphores_max, limits.semmns);
 
     // create the charts
-    RRDSET *semaphores = rrdset_find("system.semaphores");
+    RRDSET *semaphores = rrdset_find("system.ipc_semaphores");
     if(!semaphores) {
-        semaphores = rrdset_create("system", "semaphores", NULL, "semaphores", NULL, "IPC Semaphores", "semaphores", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+        semaphores = rrdset_create("system", "ipc_semaphores", NULL, "ipc semaphores", NULL, "IPC Semaphores", "semaphores", 1000, rrd_update_every, RRDSET_TYPE_AREA);
         rrddim_add(semaphores, "semaphores", NULL, 1, 1, RRDDIM_ABSOLUTE);
     }
-    RRDSET *arrays = rrdset_find("system.semaphore_arrays");
+    RRDSET *arrays = rrdset_find("system.ipc_semaphore_arrays");
     if(!arrays) {
-        arrays = rrdset_create("system", "semaphore_arrays", NULL, "semaphores", NULL, "IPC Semaphore Arrays", "arrays", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+        arrays = rrdset_create("system", "ipc_semaphore_arrays", NULL, "ipc semaphores", NULL, "IPC Semaphore Arrays", "arrays", 1000, rrd_update_every, RRDSET_TYPE_AREA);
         rrddim_add(arrays, "arrays", NULL, 1, 1, RRDDIM_ABSOLUTE);
     }
     RRDSET *stcpu_thread = rrdset_create("netdata", "plugin_ipc_cpu", NULL, "proc.internal", NULL, "NetData IPC Plugin CPU usage", "milliseconds/s", 132000, rrd_update_every, RRDSET_TYPE_STACKED);
