@@ -51,51 +51,69 @@ union semun {
 };
 #endif
 
-static int ipc_sem_get_limits(struct ipc_limits *lim) {
-    procfile *ff = NULL;
-    char filename[FILENAME_MAX + 1];
+static inline int ipc_sem_get_limits(struct ipc_limits *lim) {
+    static procfile *ff = NULL;
+    static int error_shown = 0;
+    static char filename[FILENAME_MAX + 1] = "";
 
-    snprintfz(filename, FILENAME_MAX, "%s/proc/sys/kernel/sem", global_host_prefix);
-    ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
+    if(unlikely(!filename[0]))
+        snprintfz(filename, FILENAME_MAX, "%s/proc/sys/kernel/sem", global_host_prefix);
+
     if(unlikely(!ff)) {
-        error("Cannot open file '%s'.", filename);
-        goto error;
+        ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
+        if(unlikely(!ff)) {
+            if(unlikely(!error_shown)) {
+                error("IPC: Cannot open file '%s'.", filename);
+                error_shown = 1;
+            }
+            goto ipc;
+        }
     }
 
     ff = procfile_readall(ff);
-    if(!ff) {
-        error("Cannot open file '%s'.", filename);
-        goto error;
+    if(unlikely(!ff)) {
+        if(unlikely(!error_shown)) {
+            error("IPC: Cannot read file '%s'.", filename);
+            error_shown = 1;
+        }
+        goto ipc;
     }
 
-    if(procfile_lines(ff) > 1 && procfile_linewords(ff, 0) >= 4) {
+    if(procfile_lines(ff) >= 1 && procfile_linewords(ff, 0) >= 4) {
         lim->semvmx = SEMVMX;
         lim->semmsl = atoi(procfile_lineword(ff, 0, 0));
         lim->semmns = atoi(procfile_lineword(ff, 0, 1));
         lim->semopm = atoi(procfile_lineword(ff, 0, 2));
         lim->semmni = atoi(procfile_lineword(ff, 0, 3));
-        procfile_close(ff);
         return 0;
     }
-    procfile_close(ff);
-
-    // cannot do it from the file
-    // query IPC
-
-    struct seminfo seminfo = { .semmni = 0 };
-    union semun arg = { .array = (ushort *) &seminfo };
-
-    if(semctl(0, 0, IPC_INFO, arg) < 0) {
-        error("Failed to read '%s' and request IPC_INFO with semctl().", filename);
-        goto error;
+    else {
+        if(unlikely(!error_shown)) {
+            error("IPC: Invalid content in file '%s'.", filename);
+            error_shown = 1;
+        }
+        goto ipc;
     }
 
-    lim->semvmx = SEMVMX;
-    lim->semmni = seminfo.semmni;
-    lim->semmsl = seminfo.semmsl;
-    lim->semmns = seminfo.semmns;
-    lim->semopm = seminfo.semopm;
-    return 0;
+ipc:
+    // cannot do it from the file
+    // query IPC
+    {
+        struct seminfo seminfo = {.semmni = 0};
+        union semun arg = {.array = (ushort *) &seminfo};
+
+        if(unlikely(semctl(0, 0, IPC_INFO, arg) < 0)) {
+            error("IPC: Failed to read '%s' and request IPC_INFO with semctl().", filename);
+            goto error;
+        }
+
+        lim->semvmx = SEMVMX;
+        lim->semmni = seminfo.semmni;
+        lim->semmsl = seminfo.semmsl;
+        lim->semmns = seminfo.semmns;
+        lim->semopm = seminfo.semopm;
+        return 0;
+    }
 
 error:
     lim->semvmx = 0;
@@ -106,14 +124,19 @@ error:
     return -1;
 }
 
-int ipc_sem_get_status(struct ipc_status *st) {
+static inline int ipc_sem_get_status(struct ipc_status *st) {
+    static int error_shown = 0;
     struct seminfo seminfo;
     union semun arg;
 
     arg.array = (ushort *)  (void *) &seminfo;
 
-    if (semctl (0, 0, SEM_INFO, arg) < 0) {
+    if(unlikely(semctl (0, 0, SEM_INFO, arg) < 0)) {
         /* kernel not configured for semaphores */
+        if(unlikely(!error_shown)) {
+            error("IPC: kernel is not configured for semaphores");
+            error_shown = 1;
+        }
         st->semusz = 0;
         st->semaem = 0;
         return -1;
@@ -184,15 +207,16 @@ void *ipc_main(void *ptr) {
         if(unlikely(read_limits_next < now)) {
             if(unlikely(ipc_sem_get_limits(&limits) == -1)) {
                 error("Unable to fetch semaphore limits.");
-                continue;
             }
-            rrdvar_custom_host_variable_set(arrays_max, limits.semmni);
-            rrdvar_custom_host_variable_set(semaphores_max, limits.semmns);
+            else {
+                rrdvar_custom_host_variable_set(arrays_max, limits.semmni);
+                rrdvar_custom_host_variable_set(semaphores_max, limits.semmns);
 
-            arrays->red = limits.semmni;
-            semaphores->red = limits.semmns;
+                arrays->red = limits.semmni;
+                semaphores->red = limits.semmns;
 
-            read_limits_next = now + step * 10;
+                read_limits_next = now + step * 10;
+            }
         }
 
         if(unlikely(ipc_sem_get_status(&status) == -1)) {
@@ -234,6 +258,9 @@ void *ipc_main(void *ptr) {
     printf ("used arrays = %d\n", status.semusz);
     printf ("allocated semaphores = %d\n", status.semaem);
     */
+
+    rrdvar_custom_host_variable_destroy(&localhost, "ipc.semaphores.arrays.max");
+    rrdvar_custom_host_variable_destroy(&localhost, "ipc.semaphores.max");
 
 cleanup:
     info("IPC thread exiting");

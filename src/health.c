@@ -523,7 +523,6 @@ static inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *
     else {
         // already exists
         freez(variable);
-        rv = NULL;
     }
 
     return rv;
