@@ -975,9 +975,9 @@ int run_test(struct test *test)
     return errors;
 }
 
-void test_variable_renames(void) {
+static int test_variable_renames(void) {
     fprintf(stderr, "Creating chart\n");
-    RRDSET *st = rrdset_create("netdata", "CHARTID1", NULL, "netdata", NULL, "Unit Testing", "a value", 1, 1, RRDSET_TYPE_LINE);
+    RRDSET *st = rrdset_create("chart", "ID", NULL, "family", "context", "Unit Testing", "a value", 1, 1, RRDSET_TYPE_LINE);
     fprintf(stderr, "Created chart with id '%s', name '%s'\n", st->id, st->name);
 
     fprintf(stderr, "Creating dimension DIM1\n");
@@ -1011,12 +1011,18 @@ void test_variable_renames(void) {
     fprintf(stderr, "Renaming dimension DIM2 to DIM2NAME2\n");
     rrddim_set_name(st, rd2, "DIM2NAME2");
     fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rd2->id, rd2->name);
+
+    BUFFER *buf = buffer_create(1);
+    health_api_v1_chart_variables2json(st, buf);
+    fprintf(stderr, "%s", buffer_tostring(buf));
+    buffer_free(buf);
+    return 1;
 }
 
 int run_all_mockup_tests(void)
 {
-    test_variable_renames();
-    exit(1);
+    if(!test_variable_renames())
+        return 1;
 
     if(run_test(&test1))
         return 1;
