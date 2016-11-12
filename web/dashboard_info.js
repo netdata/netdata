@@ -193,6 +193,12 @@ netdataDashboard.menu = {
         info: undefined
     },
 
+    'hddtemp': {
+        title: 'HDD Temp',
+        icon: '<i class="fa fa-thermometer-full" aria-hidden="true"></i>',
+        info: undefined
+    },
+
     'nginx': {
         title: 'nginx',
         icon: '<i class="fa fa-eye" aria-hidden="true"></i>',

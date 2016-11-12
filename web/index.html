@@ -1058,6 +1058,7 @@
             case 'apache':
             case 'exim':
             case 'dovecot':
+            case 'hddtemp':
             case 'ipfs':
             case 'memcached':
             case 'mysql':
@@ -2556,7 +2557,7 @@
         });
 
         NETDATA.requiredJs.push({
-            url: NETDATA.serverDefault + 'dashboard_info.js?v20161112-1',
+            url: NETDATA.serverDefault + 'dashboard_info.js?v20161112-5',
             async: false,
             isAlreadyLoaded: function() { return false; }
         });
@@ -3176,4 +3177,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20161031-1"></script>
+<script type="text/javascript" src="dashboard.js?v20161112-1"></script>
