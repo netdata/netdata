@@ -486,8 +486,10 @@ static inline void rrdvar_free(RRDHOST *host, avl_tree_lock *tree, RRDVAR *rv) {
 
     if(!rv) return;
 
-    if(tree)
+    if(tree) {
+        debug(D_VARIABLES, "Deleting variable '%s'", rv->name);
         rrdvar_index_del(tree, rv);
+    }
 
     freez(rv->name);
     freez(rv);
@@ -518,6 +520,8 @@ static inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *
             debug(D_VARIABLES, "Variable '%s' created in scope '%s'", variable, scope);
     }
     else {
+        debug(D_VARIABLES, "Variable '%s' is already found in scope '%s'.", variable, scope);
+
         // already exists
         freez(variable);
 
@@ -607,203 +611,150 @@ int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, cal
 }
 
 // ----------------------------------------------------------------------------
-// RRDSETVAR management
-
-RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, int type, void *value, uint32_t options) {
-    debug(D_VARIABLES, "RRDVARSET create for chart id '%s' name '%s' with variable name '%s'", st->id, st->name, variable);
-    RRDSETVAR *rs = (RRDSETVAR *)callocz(1, sizeof(RRDSETVAR));
-
-    char buffer[RRDVAR_MAX_LENGTH + 1];
-    snprintfz(buffer, RRDVAR_MAX_LENGTH, "%s.%s", st->id, variable);
-    rs->fullid = strdupz(buffer);
-
-    snprintfz(buffer, RRDVAR_MAX_LENGTH, "%s.%s", st->name, variable);
-    rs->fullname = strdupz(buffer);
-
-    rs->variable = strdupz(variable);
-
-    rs->type = type;
-    rs->value = value;
-    rs->options = options;
-    rs->rrdset = st;
-
-    rs->local       = rrdvar_create_and_index("local",  &st->variables_root_index, rs->variable, rs->type, rs->value);
-    rs->family      = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->fullid, rs->type, rs->value);
-    rs->host        = rrdvar_create_and_index("host",   &st->rrdhost->variables_root_index, rs->fullid, rs->type, rs->value);
-    rs->family_name = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->fullname, rs->type, rs->value);
-    rs->host_name   = rrdvar_create_and_index("host",   &st->rrdhost->variables_root_index, rs->fullname, rs->type, rs->value);
-
-    rs->next = st->variables;
-    st->variables = rs;
-
-    return rs;
-}
-
-void rrdsetvar_rename_all(RRDSET *st) {
-    debug(D_VARIABLES, "RRDSETVAR rename for chart id '%s' name '%s'", st->id, st->name);
-
-    // only these 2 can change name
-    // rs->family_name
-    // rs->host_name
-
-    char buffer[RRDVAR_MAX_LENGTH + 1];
-    RRDSETVAR *rs, *next = st->variables;
-    while((rs = next)) {
-        next = rs->next;
-
-        snprintfz(buffer, RRDVAR_MAX_LENGTH, "%s.%s", st->name, rs->variable);
-
-        if (strcmp(buffer, rs->fullname)) {
-            // name changed
-            rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_name);
-            rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_name);
-
-            freez(rs->fullname);
-            rs->fullname = strdupz(st->name);
-            rs->family_name = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->fullname, rs->type, rs->value);
-            rs->host_name   = rrdvar_create_and_index("host",   &st->rrdhost->variables_root_index, rs->fullname, rs->type, rs->value);
-        }
-    }
-
-    rrdsetcalc_link_matching(st);
-}
-
-void rrdsetvar_free(RRDSETVAR *rs) {
-    RRDSET *st = rs->rrdset;
-    debug(D_VARIABLES, "RRDSETVAR free for chart id '%s' name '%s', variable '%s'", st->id, st->name, rs->variable);
-
-    rrdvar_free(st->rrdhost, &st->variables_root_index, rs->local);
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family);
-    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host);
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_name);
-    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_name);
-
-    if(st->variables == rs) {
-        st->variables = rs->next;
-    }
-    else {
-        RRDSETVAR *t;
-        for (t = st->variables; t && t->next != rs; t = t->next);
-        if(!t) error("RRDSETVAR '%s' not found in chart '%s' variables linked list", rs->fullname, st->id);
-        else t->next = rs->next;
-    }
-
-    freez(rs->fullid);
-    freez(rs->fullname);
-    freez(rs->variable);
-    freez(rs);
-}
-
-// ----------------------------------------------------------------------------
 // RRDDIMVAR management
+// DIMENSION VARIABLES
 
 #define RRDDIMVAR_ID_MAX 1024
 
-static inline void rrddimvar_free_instances(RRDDIMVAR *rs) {
+static inline void rrddimvar_free_variables(RRDDIMVAR *rs) {
     RRDDIM *rd = rs->rrddim;
     RRDSET *st = rd->rrdset;
 
-    rrdvar_free(st->rrdhost, &st->variables_root_index, rs->local_id);
-    rs->local_id = NULL;
+    // CHART VARIABLES FOR THIS DIMENSION
 
-    rrdvar_free(st->rrdhost, &st->variables_root_index, rs->local_name);
-    rs->local_name = NULL;
+    rrdvar_free(st->rrdhost, &st->variables_root_index, rs->var_local_id);
+    rs->var_local_id = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_id);
-    rs->family_id = NULL;
+    rrdvar_free(st->rrdhost, &st->variables_root_index, rs->var_local_name);
+    rs->var_local_name = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_name);
-    rs->family_name = NULL;
+    // FAMILY VARIABLES FOR THIS DIMENSION
 
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_contextid);
-    rs->family_contextid = NULL;
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->var_family_id);
+    rs->var_family_id = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_contextname);
-    rs->family_contextname = NULL;
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->var_family_name);
+    rs->var_family_name = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullidid);
-    rs->host_fullidid = NULL;
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->var_family_contextid);
+    rs->var_family_contextid = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullidname);
-    rs->host_fullidname = NULL;
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->var_family_contextname);
+    rs->var_family_contextname = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullnameid);
-    rs->host_fullnameid = NULL;
+    // HOST VARIABLES FOR THIS DIMENSION
 
-    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullnamename);
-    rs->host_fullnamename = NULL;
+    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->var_host_chartidid);
+    rs->var_host_chartidid = NULL;
 
-    freez(rs->id);
-    rs->id = NULL;
+    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->var_host_chartidname);
+    rs->var_host_chartidname = NULL;
 
-    freez(rs->name);
-    rs->name = NULL;
+    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->var_host_chartnameid);
+    rs->var_host_chartnameid = NULL;
 
-    freez(rs->fullidid);
-    rs->fullidid = NULL;
+    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->var_host_chartnamename);
+    rs->var_host_chartnamename = NULL;
 
-    freez(rs->fullidname);
-    rs->fullidname = NULL;
+    // KEYS
 
-    freez(rs->contextid);
-    rs->contextid = NULL;
+    freez(rs->key_id);
+    rs->key_id = NULL;
 
-    freez(rs->contextname);
-    rs->contextname = NULL;
+    freez(rs->key_name);
+    rs->key_name = NULL;
 
-    freez(rs->fullnameid);
-    rs->fullnameid = NULL;
+    freez(rs->key_fullidid);
+    rs->key_fullidid = NULL;
 
-    freez(rs->fullnamename);
-    rs->fullnamename = NULL;
+    freez(rs->key_fullidname);
+    rs->key_fullidname = NULL;
+
+    freez(rs->key_contextid);
+    rs->key_contextid = NULL;
+
+    freez(rs->key_contextname);
+    rs->key_contextname = NULL;
+
+    freez(rs->key_fullnameid);
+    rs->key_fullnameid = NULL;
+
+    freez(rs->key_fullnamename);
+    rs->key_fullnamename = NULL;
 }
 
-static inline void rrddimvar_create_instances(RRDDIMVAR *rs) {
-    rrddimvar_free_instances(rs);
+static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
+    rrddimvar_free_variables(rs);
 
     RRDDIM *rd = rs->rrddim;
     RRDSET *st = rd->rrdset;
 
     char buffer[RRDDIMVAR_ID_MAX + 1];
 
+    // KEYS
+
     snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", rs->prefix, rd->id, rs->suffix);
-    rs->id = strdupz(buffer);
+    rs->key_id = strdupz(buffer);
 
     snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", rs->prefix, rd->name, rs->suffix);
-    rs->name = strdupz(buffer);
+    rs->key_name = strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->id, rs->id);
-    rs->fullidid = strdupz(buffer);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->id, rs->key_id);
+    rs->key_fullidid = strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->id, rs->name);
-    rs->fullidname = strdupz(buffer);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->id, rs->key_name);
+    rs->key_fullidname = strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->context, rs->id);
-    rs->contextid = strdupz(buffer);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->context, rs->key_id);
+    rs->key_contextid = strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->context, rs->name);
-    rs->contextname = strdupz(buffer);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->context, rs->key_name);
+    rs->key_contextname = strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->id);
-    rs->fullnameid = strdupz(buffer);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->key_id);
+    rs->key_fullnameid = strdupz(buffer);
 
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->name);
-    rs->fullnamename = strdupz(buffer);
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->key_name);
+    rs->key_fullnamename = strdupz(buffer);
 
-    rs->local_id           = rrdvar_create_and_index("local", &st->variables_root_index, rs->id, rs->type, rs->value);
-    rs->local_name         = rrdvar_create_and_index("local", &st->variables_root_index, rs->name, rs->type, rs->value);
+    // CHART VARIABLES FOR THIS DIMENSION
+    // -----------------------------------
+    //
+    // dimensions are available as:
+    // - $id
+    // - $name
 
-    rs->family_id          = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->id, rs->type, rs->value);
-    rs->family_name        = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->name, rs->type, rs->value);
-    rs->family_contextid   = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->contextid, rs->type, rs->value);
-    rs->family_contextname = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->contextname, rs->type, rs->value);
+    rs->var_local_id           = rrdvar_create_and_index("local", &st->variables_root_index, rs->key_id, rs->type, rs->value);
+    rs->var_local_name         = rrdvar_create_and_index("local", &st->variables_root_index, rs->key_name, rs->type, rs->value);
 
-    rs->host_fullidid      = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullidid, rs->type, rs->value);
-    rs->host_fullidname    = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullidname, rs->type, rs->value);
-    rs->host_fullnameid    = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullnameid, rs->type, rs->value);
-    rs->host_fullnamename  = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullnamename, rs->type, rs->value);
+    // FAMILY VARIABLES FOR THIS DIMENSION
+    // -----------------------------------
+    //
+    // dimensions are available as:
+    // - $id                 (only the first, when multiple overlap)
+    // - $name               (only the first, when multiple overlap)
+    // - $chart-context.id
+    // - $chart-context.name
+
+    rs->var_family_id          = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->key_id, rs->type, rs->value);
+    rs->var_family_name        = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->key_name, rs->type, rs->value);
+    rs->var_family_contextid   = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->key_contextid, rs->type, rs->value);
+    rs->var_family_contextname = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->key_contextname, rs->type, rs->value);
+
+    // HOST VARIABLES FOR THIS DIMENSION
+    // -----------------------------------
+    //
+    // dimensions are available as:
+    // - $chart-id.id
+    // - $chart-id.name
+    // - $chart-name.id
+    // - $chart-name.name
+
+    rs->var_host_chartidid      = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->key_fullidid, rs->type, rs->value);
+    rs->var_host_chartidname    = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->key_fullidname, rs->type, rs->value);
+    rs->var_host_chartnameid    = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->key_fullnameid, rs->type, rs->value);
+    rs->var_host_chartnamename  = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->key_fullnamename, rs->type, rs->value);
 }
-
 
 RRDDIMVAR *rrddimvar_create(RRDDIM *rd, int type, const char *prefix, const char *suffix, void *value, uint32_t options) {
     RRDSET *st = rd->rrdset;
@@ -826,7 +777,7 @@ RRDDIMVAR *rrddimvar_create(RRDDIM *rd, int type, const char *prefix, const char
     rs->next = rd->variables;
     rd->variables = rs;
 
-    rrddimvar_create_instances(rs);
+    rrddimvar_create_variables(rs);
 
     return rs;
 }
@@ -838,9 +789,7 @@ void rrddimvar_rename_all(RRDDIM *rd) {
     RRDDIMVAR *rs, *next = rd->variables;
     while((rs = next)) {
         next = rs->next;
-
-        if (strcmp(rd->name, rs->name))
-            rrddimvar_create_instances(rs);
+        rrddimvar_create_variables(rs);
     }
 }
 
@@ -849,7 +798,7 @@ void rrddimvar_free(RRDDIMVAR *rs) {
     RRDSET *st = rd->rrdset;
     debug(D_VARIABLES, "RRDDIMSET free for chart id '%s' name '%s', dimension id '%s', name '%s', prefix='%s', suffix='%s'", st->id, st->name, rd->id, rd->name, rs->prefix, rs->suffix);
 
-    rrddimvar_free_instances(rs);
+    rrddimvar_free_variables(rs);
 
     if(rd->variables == rs) {
         debug(D_VARIABLES, "RRDDIMSET removing first entry for chart id '%s' name '%s', dimension id '%s', name '%s'", st->id, st->name, rd->id, rd->name);
@@ -859,12 +808,129 @@ void rrddimvar_free(RRDDIMVAR *rs) {
         debug(D_VARIABLES, "RRDDIMSET removing non-first entry for chart id '%s' name '%s', dimension id '%s', name '%s'", st->id, st->name, rd->id, rd->name);
         RRDDIMVAR *t;
         for (t = rd->variables; t && t->next != rs; t = t->next) ;
-        if(!t) error("RRDDIMVAR '%s' not found in dimension '%s/%s' variables linked list", rs->name, st->id, rd->id);
+        if(!t) error("RRDDIMVAR '%s' not found in dimension '%s/%s' variables linked list", rs->key_name, st->id, rd->id);
         else t->next = rs->next;
     }
 
     freez(rs->prefix);
     freez(rs->suffix);
+    freez(rs);
+}
+
+// ----------------------------------------------------------------------------
+// RRDSETVAR management
+// CHART VARIABLES
+
+static inline void rrdsetvar_free_variables(RRDSETVAR *rs) {
+    RRDSET *st = rs->rrdset;
+
+    // CHART
+
+    rrdvar_free(st->rrdhost, &st->variables_root_index, rs->var_local);
+    rs->var_local = NULL;
+
+    // FAMILY
+
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->var_family);
+    rs->var_family = NULL;
+
+    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->var_host);
+    rs->var_host = NULL;
+
+    // HOST
+
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->var_family_name);
+    rs->var_family_name = NULL;
+
+    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->var_host_name);
+    rs->var_host_name = NULL;
+
+    // KEYS
+
+    freez(rs->key_fullid);
+    rs->key_fullid = NULL;
+
+    freez(rs->key_fullname);
+    rs->key_fullname = NULL;
+}
+
+static inline void rrdsetvar_create_variables(RRDSETVAR *rs) {
+    rrdsetvar_free_variables(rs);
+
+    RRDSET *st = rs->rrdset;
+
+    // KEYS
+
+    char buffer[RRDVAR_MAX_LENGTH + 1];
+    snprintfz(buffer, RRDVAR_MAX_LENGTH, "%s.%s", st->id, rs->variable);
+    rs->key_fullid = strdupz(buffer);
+
+    snprintfz(buffer, RRDVAR_MAX_LENGTH, "%s.%s", st->name, rs->variable);
+    rs->key_fullname = strdupz(buffer);
+
+    // CHART
+
+    rs->var_local       = rrdvar_create_and_index("local",  &st->variables_root_index,               rs->variable, rs->type, rs->value);
+
+    // FAMILY
+
+    rs->var_family      = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index,    rs->key_fullid,   rs->type, rs->value);
+    rs->var_family_name = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index,    rs->key_fullname, rs->type, rs->value);
+
+    // HOST
+
+    rs->var_host        = rrdvar_create_and_index("host",   &st->rrdhost->variables_root_index,      rs->key_fullid,   rs->type, rs->value);
+    rs->var_host_name   = rrdvar_create_and_index("host",   &st->rrdhost->variables_root_index,      rs->key_fullname, rs->type, rs->value);
+
+}
+
+RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, int type, void *value, uint32_t options) {
+    debug(D_VARIABLES, "RRDVARSET create for chart id '%s' name '%s' with variable name '%s'", st->id, st->name, variable);
+    RRDSETVAR *rs = (RRDSETVAR *)callocz(1, sizeof(RRDSETVAR));
+
+    rs->variable = strdupz(variable);
+    rs->type = type;
+    rs->value = value;
+    rs->options = options;
+    rs->rrdset = st;
+
+    rs->next = st->variables;
+    st->variables = rs;
+
+    rrdsetvar_create_variables(rs);
+
+    return rs;
+}
+
+void rrdsetvar_rename_all(RRDSET *st) {
+    debug(D_VARIABLES, "RRDSETVAR rename for chart id '%s' name '%s'", st->id, st->name);
+
+    RRDSETVAR *rs, *next = st->variables;
+    while((rs = next)) {
+        next = rs->next;
+        rrdsetvar_create_variables(rs);
+    }
+
+    rrdsetcalc_link_matching(st);
+}
+
+void rrdsetvar_free(RRDSETVAR *rs) {
+    RRDSET *st = rs->rrdset;
+    debug(D_VARIABLES, "RRDSETVAR free for chart id '%s' name '%s', variable '%s'", st->id, st->name, rs->variable);
+
+    if(st->variables == rs) {
+        st->variables = rs->next;
+    }
+    else {
+        RRDSETVAR *t;
+        for (t = st->variables; t && t->next != rs; t = t->next);
+        if(!t) error("RRDSETVAR '%s' not found in chart '%s' variables linked list", rs->key_fullname, st->id);
+        else t->next = rs->next;
+    }
+
+    rrdsetvar_free_variables(rs);
+
+    freez(rs->variable);
     freez(rs);
 }
 

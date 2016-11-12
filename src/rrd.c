@@ -355,18 +355,28 @@ void rrdset_set_name(RRDSET *st, const char *name)
 {
     debug(D_RRD_CALLS, "rrdset_set_name() old: %s, new: %s", st->name, name);
 
-    if(st->name) {
-        rrdset_index_del_name(&localhost, st);
-        rrdsetvar_rename_all(st);
-    }
-
     char b[CONFIG_MAX_VALUE + 1];
     char n[RRD_ID_LENGTH_MAX + 1];
 
     snprintfz(n, RRD_ID_LENGTH_MAX, "%s.%s", st->type, name);
     rrdset_strncpyz_name(b, n, CONFIG_MAX_VALUE);
-    st->name = config_get(st->id, "name", b);
-    st->hash_name = simple_hash(st->name);
+
+    if(st->name) {
+        rrdset_index_del_name(&localhost, st);
+        st->name = config_set_default(st->id, "name", b);
+        st->hash_name = simple_hash(st->name);
+        rrdsetvar_rename_all(st);
+    }
+    else {
+        st->name = config_get(st->id, "name", b);
+        st->hash_name = simple_hash(st->name);
+    }
+
+    pthread_rwlock_wrlock(&st->rwlock);
+    RRDDIM *rd;
+    for(rd = st->dimensions; rd ;rd = rd->next)
+        rrddimvar_rename_all(rd);
+    pthread_rwlock_unlock(&st->rwlock);
 
     rrdset_index_add_name(&localhost, st);
 }
@@ -759,7 +769,7 @@ void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name)
 
     char varname[CONFIG_MAX_NAME + 1];
     snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
-    config_set_default(st->id, varname, name);
+    rd->name = config_set_default(st->id, varname, name);
 
     rrddimvar_rename_all(rd);
 }
