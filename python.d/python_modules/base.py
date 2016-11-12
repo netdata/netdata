@@ -675,7 +675,10 @@ class SocketService(SimpleService):
                 break
 
             if buf is None or len(buf) == 0:  # handle server disconnect
-                self.debug("server closed the connection")
+                if len(data) == 0:
+                    self._socketerror("unexpectedly disconnected")
+                else:
+                    self.debug("server closed the connection")
                 self._disconnect()
                 break
 
