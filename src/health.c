@@ -520,6 +520,9 @@ static inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *
     else {
         // already exists
         freez(variable);
+
+        // this is important
+        // it must return NULL - not the existing variable - or double-free will happen
         rv = NULL;
     }
 
@@ -722,6 +725,12 @@ RRDDIMVAR *rrddimvar_create(RRDDIM *rd, int type, const char *prefix, const char
     snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->id, rs->name);
     rs->fullidname = strdupz(buffer);
 
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->context, rs->id);
+    rs->contextid = strdupz(buffer);
+
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->context, rs->name);
+    rs->contextname = strdupz(buffer);
+
     snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->name, rs->id);
     rs->fullnameid = strdupz(buffer);
 
@@ -733,16 +742,18 @@ RRDDIMVAR *rrddimvar_create(RRDDIM *rd, int type, const char *prefix, const char
     rs->options = options;
     rs->rrddim = rd;
 
-    rs->local_id     = rrdvar_create_and_index("local", &st->variables_root_index, rs->id, rs->type, rs->value);
-    rs->local_name   = rrdvar_create_and_index("local", &st->variables_root_index, rs->name, rs->type, rs->value);
+    rs->local_id           = rrdvar_create_and_index("local", &st->variables_root_index, rs->id, rs->type, rs->value);
+    rs->local_name         = rrdvar_create_and_index("local", &st->variables_root_index, rs->name, rs->type, rs->value);
 
-    rs->family_id    = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->id, rs->type, rs->value);
-    rs->family_name  = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->name, rs->type, rs->value);
+    rs->family_id          = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->id, rs->type, rs->value);
+    rs->family_name        = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->name, rs->type, rs->value);
+    rs->family_contextid   = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->contextid, rs->type, rs->value);
+    rs->family_contextname = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->contextname, rs->type, rs->value);
 
-    rs->host_fullidid     = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullidid, rs->type, rs->value);
-    rs->host_fullidname   = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullidname, rs->type, rs->value);
-    rs->host_fullnameid   = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullnameid, rs->type, rs->value);
-    rs->host_fullnamename = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullnamename, rs->type, rs->value);
+    rs->host_fullidid      = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullidid, rs->type, rs->value);
+    rs->host_fullidname    = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullidname, rs->type, rs->value);
+    rs->host_fullnameid    = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullnameid, rs->type, rs->value);
+    rs->host_fullnamename  = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullnamename, rs->type, rs->value);
 
     rs->next = rd->variables;
     rd->variables = rs;
@@ -762,35 +773,42 @@ void rrddimvar_rename_all(RRDDIM *rd) {
             char buffer[RRDDIMVAR_ID_MAX + 1];
             // name changed
 
-            // name
+            // name and family name
             rrdvar_free(st->rrdhost, &st->variables_root_index, rs->local_name);
+            rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_name);
             freez(rs->name);
             snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", rs->prefix, rd->name, rs->suffix);
             rs->name = strdupz(buffer);
-            rs->local_name = rrdvar_create_and_index("local", &st->variables_root_index, rs->name, rs->type, rs->value);
+            rs->local_name  = rrdvar_create_and_index("local", &st->variables_root_index, rs->name, rs->type, rs->value);
+            rs->family_name = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->name, rs->type, rs->value);
 
+            // family_contextname
+            rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->family_contextname);
+            freez(rs->contextname);
+            snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->context, rs->name);
+            rs->contextname = strdupz(buffer);
+            rs->family_contextname = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->contextname, rs->type, rs->value);
+
+            // fullidname
             rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullidname);
             freez(rs->fullidname);
             snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->id, rs->name);
             rs->fullidname = strdupz(buffer);
-            rs->host_fullidname = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index,
-                                                             rs->fullidname, rs->type, rs->value);
+            rs->host_fullidname = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullidname, rs->type, rs->value);
 
             // fullnameid
             rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullnameid);
             freez(rs->fullnameid);
             snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->id);
             rs->fullnameid = strdupz(buffer);
-            rs->host_fullnameid = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index,
-                                                          rs->fullnameid, rs->type, rs->value);
+            rs->host_fullnameid = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullnameid, rs->type, rs->value);
 
             // fullnamename
             rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullnamename);
             freez(rs->fullnamename);
             snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->name);
             rs->fullnamename = strdupz(buffer);
-            rs->host_fullnamename = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index,
-                                                          rs->fullnamename, rs->type, rs->value);
+            rs->host_fullnamename = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullnamename, rs->type, rs->value);
         }
     }
 }
@@ -805,6 +823,8 @@ void rrddimvar_free(RRDDIMVAR *rs) {
 
     rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_id);
     rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_name);
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_contextid);
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_contextname);
 
     rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullidid);
     rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullidname);
@@ -827,6 +847,8 @@ void rrddimvar_free(RRDDIMVAR *rs) {
     freez(rs->suffix);
     freez(rs->id);
     freez(rs->name);
+    freez(rs->contextid);
+    freez(rs->contextname);
     freez(rs->fullidid);
     freez(rs->fullidname);
     freez(rs->fullnameid);
@@ -2722,23 +2744,24 @@ void *health_main(void *ptr) {
 
                     rc->value = NAN;
 
-                    debug(D_HEALTH, "Health alarm '%s.%s': failed to evaluate calculation with error: %s",
-                          rc->chart?rc->chart:"NOCHART", rc->name, buffer_tostring(rc->calculation->error_msg));
+                    debug(D_HEALTH, "Health alarm '%s.%s': expression '%s' failed: %s",
+                          rc->chart?rc->chart:"NOCHART", rc->name, rc->calculation->parsed_as, buffer_tostring(rc->calculation->error_msg));
 
                     if (unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_CALC_ERROR))) {
                         rc->rrdcalc_flags |= RRDCALC_FLAG_CALC_ERROR;
-                        error("Health alarm '%s.%s': failed to evaluate calculation with error: %s",
-                              rc->chart?rc->chart:"NOCHART", rc->name, buffer_tostring(rc->calculation->error_msg));
+                        error("Health alarm '%s.%s': expression '%s' failed: %s",
+                              rc->chart?rc->chart:"NOCHART", rc->name, rc->calculation->parsed_as, buffer_tostring(rc->calculation->error_msg));
                     }
                 }
                 else {
                     if (unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_CALC_ERROR))
                         rc->rrdcalc_flags &= ~RRDCALC_FLAG_CALC_ERROR;
 
-                    debug(D_HEALTH, "Health alarm '%s.%s': calculation expression gave value "
+                    debug(D_HEALTH, "Health alarm '%s.%s': expression '%s' gave value "
                             CALCULATED_NUMBER_FORMAT
                             ": %s (source: %s)",
                           rc->chart?rc->chart:"NOCHART", rc->name,
+                          rc->calculation->parsed_as,
                           rc->calculation->result,
                           buffer_tostring(rc->calculation->error_msg),
                           rc->source
