@@ -490,7 +490,7 @@ void buffer_data_options2string(BUFFER *wb, uint32_t options) {
 
     if(options & RRDR_OPTION_ABSOLUTE) {
         if(count++) buffer_strcat(wb, " ");
-        buffer_strcat(wb, "abs");
+        buffer_strcat(wb, "absolute");
     }
 
     if(options & RRDR_OPTION_SECONDS) {
