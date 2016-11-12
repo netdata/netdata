@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 # Description: logging for netdata python.d modules
 
+import traceback
 import sys
 from time import time, strftime
 
 DEBUG_FLAG = False
+TRACE_FLAG = False
 PROGRAM = ""
 LOG_COUNTER = 0
 LOG_THROTTLE = 10000 # has to be too big during init
@@ -51,6 +53,9 @@ def log_msg(msg_type, *args):
         LOG_NEXT_CHECK = now - (now % LOG_INTERVAL) + LOG_INTERVAL
         LOG_COUNTER = 0
 
+    if TRACE_FLAG:
+        if msg_type == "FATAL" or msg_type == "ERROR" or msg_type == "ALERT":
+            traceback.print_exc()
 
 
 def debug(*args):
