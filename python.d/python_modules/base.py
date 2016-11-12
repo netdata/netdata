@@ -574,32 +574,33 @@ class SocketService(SimpleService):
         self.__socket_config = res
         return True
 
-    def _connect2unixsocket(self, path=None):
+    def _connect2unixsocket(self):
         """
         Connect to a unix socket, given its filename
         :return: boolean
         """
-        if path is None:
+        if self.unix_socket is None:
             self.error("cannot connect to unix socket 'None'")
             return False
 
         try:
-            self.debug("attempting DGRAM unix socket '" + str(path) + "'")
+            self.debug("attempting DGRAM unix socket '" + str(self.unix_socket) + "'")
             self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-            self._sock.connect(path)
-            self.debug("connected DGRAM unix socket '" + str(path) + "'")
+            self._sock.connect(self.unix_socket)
+            self.debug("connected DGRAM unix socket '" + str(self.unix_socket) + "'")
             return True
         except socket.error as e:
-            self.error("Failed to connect DGRAM unix socket '" + str(path) + "':", str(e))
+            self.debug("Failed to connect DGRAM unix socket '" + str(self.unix_socket) + "':", str(e))
 
         try:
-            self.debug("attempting STREAM unix socket '" + str(path) + "'")
+            self.debug("attempting STREAM unix socket '" + str(self.unix_socket) + "'")
             self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            self._sock.connect(path)
-            self.debug("connected STREAM unix socket '" + str(path) + "'")
+            self._sock.connect(self.unix_socket)
+            self.debug("connected STREAM unix socket '" + str(self.unix_socket) + "'")
             return True
         except socket.error as e:
-            self.error("Failed to connect STREAM unix socket '" + str(path) + "':", str(e))
+            self.debug("Failed to connect STREAM unix socket '" + str(self.unix_socket) + "':", str(e))
+            self.error("Failed to connect to unix socket '" + str(self.unix_socket) + "':", str(e))
             self._sock = None
             return False
 
@@ -611,7 +612,7 @@ class SocketService(SimpleService):
         """
         try:
             if self.unix_socket is not None:
-                _connect2unixsocket(self.unix_socket)
+                self._connect2unixsocket()
 
             else:
                 if self.__socket_config is not None:
@@ -675,7 +676,7 @@ class SocketService(SimpleService):
                 break
 
             if buf is None or len(buf) == 0:  # handle server disconnect
-                if len(data) == 0:
+                if data == "":
                     self._socketerror("unexpectedly disconnected")
                 else:
                     self.debug("server closed the connection")
