@@ -506,7 +506,81 @@ class SocketService(SimpleService):
         self.unix_socket = None
         self.request = ""
         self.__socket_config = None
+        self.__empty_request = "".encode()
         SimpleService.__init__(self, configuration=configuration, name=name)
+
+    def _socketerror(self, msg=None):
+        if self.unix_socket is not None:
+            self.error("unix socket '" + self.unix_socket + "':", msg)
+        else:
+            if self.__socket_config is not None:
+                af, socktype, proto, canonname, sa = self.__socket_config
+                self.error("socket to '" + str(sa[0]) + "' port " + str(sa[1]) + ":", msg)
+            else:
+                self.error("unknown socket:", msg)
+
+    def _connect2socket(self, res=None):
+        """
+        Connect to a socket, passing the result of getaddrinfo()
+        :return: boolean
+        """
+        if res is None:
+            res = self.__socket_config
+            if res is None:
+                self.error("Cannot create socket to 'None':")
+                return False
+
+        af, socktype, proto, canonname, sa = res
+        try:
+            self.debug("creating socket to '" + str(sa[0]) + "', port " + str(sa[1]))
+            self._sock = socket.socket(af, socktype, proto)
+        except socket.error as e:
+            self.error("Failed to create socket to '" + str(sa[0]) + "', port " + str(sa[1]) + ":", str(e))
+            self._sock = None
+            self.__socket_config = None
+            return False
+
+        try:
+            self.debug("connecting socket to '" + str(sa[0]) + "', port " + str(sa[1]))
+            self._sock.connect(sa)
+        except socket.error as e:
+            self.error("Failed to connect to '" + str(sa[0]) + "', port " + str(sa[1]) + ":", str(e))
+            self._disconnect()
+            self.__socket_config = None
+            return False
+
+        self.debug("connected to '" + str(sa[0]) + "', port " + str(sa[1]))
+        self.__socket_config = res
+        return True
+
+    def _connect2unixsocket(self, path=None):
+        """
+        Connect to a unix socket, given its filename
+        :return: boolean
+        """
+        if path is None:
+            self.error("cannot connect to unix socket 'None'")
+            return False
+
+        try:
+            self.debug("attempting DGRAM unix socket '" + str(path) + "'")
+            self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+            self._sock.connect(path)
+            self.debug("connected DGRAM unix socket '" + str(path) + "'")
+            return True
+        except socket.error as e:
+            self.error("Failed to connect DGRAM unix socket '" + str(path) + "':", str(e))
+
+        try:
+            self.debug("attempting STREAM unix socket '" + str(path) + "'")
+            self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self._sock.connect(path)
+            self.debug("connected STREAM unix socket '" + str(path) + "'")
+            return True
+        except socket.error as e:
+            self.error("Failed to connect STREAM unix socket '" + str(path) + "':", str(e))
+            self._sock = None
+            return False
 
     def _connect(self):
         """
@@ -515,59 +589,24 @@ class SocketService(SimpleService):
         :return:
         """
         try:
-            if self.unix_socket is None:
-                if self.__socket_config is None:
-                    # establish ipv6 or ipv4 connection.
-                    for res in socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM):
-                        self.debug("connecting socket to host '" + str(self.host) + "', port " + str(self.port))
-                        try:
-                            # noinspection SpellCheckingInspection
-                            af, socktype, proto, canonname, sa = res
-                            self._sock = socket.socket(af, socktype, proto)
-                        except socket.error as e:
-                            self.debug("Cannot create socket:", str(e))
-                            self._sock = None
-                            continue
-                        try:
-                            self._sock.connect(sa)
-                        except socket.error as e:
-                            self.debug("Cannot connect to socket:", str(e))
-                            self._disconnect()
-                            continue
-                        self.__socket_config = res
-                        break
-                else:
-                    # connect to socket with previously established configuration
-                    try:
-                        af, socktype, proto, canonname, sa = self.__socket_config
-                        self._sock = socket.socket(af, socktype, proto)
-                        self._sock.connect(sa)
-                    except socket.error as e:
-                        self.debug("Cannot create or connect to socket:", str(e))
-                        self._disconnect()
+            if self.unix_socket is not None:
+                _connect2unixsocket(self.unix_socket)
+
             else:
-                # connect to unix socket
-                try:
-                    self.debug("connecting unix socket '" + str(self.unix_socket) + "'")
-                    self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-                    self._sock.connect(self.unix_socket)
-                except socket.error:
-                    self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                    self._sock.connect(self.unix_socket)
+                if self.__socket_config is not None:
+                    self._connect2socket()
+                else:
+                    for res in socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM):
+                        if self._connect2socket(res): break
 
         except Exception as e:
-            self.error(str(e),
-                       "Cannot create socket with following configuration: host:", str(self.host),
-                       "port:", str(self.port),
-                       "socket:", str(self.unix_socket))
             self._sock = None
+            self.__socket_config = None
 
         if self._sock is not None:
             self._sock.setblocking(0)
             self._sock.settimeout(5)
-            self.debug("connected with timeout " + str(self._sock.gettimeout()))
-        else:
-            self.debug("not connected")
+            self.debug("set socket timeout to: " + str(self._sock.gettimeout()))
 
     def _disconnect(self):
         """
@@ -576,7 +615,7 @@ class SocketService(SimpleService):
         """
         if self._sock is not None:
             try:
-                self.debug("disconnecting")
+                self.debug("closing socket")
                 self._sock.shutdown(2)  # 0 - read, 1 - write, 2 - all
                 self._sock.close()
             except Exception:
@@ -589,16 +628,13 @@ class SocketService(SimpleService):
         :return: boolean
         """
         # Send request if it is needed
-        if self.request != "".encode():
+        if self.request != self.__empty_request:
             try:
-                self.debug("sending request")
+                self.debug("sending request:", str(self.request))
                 self._sock.send(self.request)
             except Exception as e:
+                self._socketerror("error sending request:" + str(e))
                 self._disconnect()
-                self.error(str(e),
-                           "used configuration: host:", str(self.host),
-                           "port:", str(self.port),
-                           "socket:", str(self.unix_socket))
                 return False
         return True
 
@@ -609,26 +645,25 @@ class SocketService(SimpleService):
         """
         data = ""
         while True:
+            self.debug("receiving response")
             try:
-                self.debug("receiving response")
-                ready_to_read, _, in_error = select.select([self._sock], [], [], 5)
-            except Exception as e:
-                self.error("timeout while waiting for response:", str(e))
-                self._disconnect()
-                break
-            if len(ready_to_read) > 0:
                 buf = self._sock.recv(4096)
-                if buf is None or len(buf) == 0:  # handle server disconnect
-                    self._disconnect()
-                    break
-                data += buf.decode(errors='ignore')
-                if self._check_raw_data(data):
-                    break
-            else:
-                self.error("Socket timed out.")
+            except Exception as e:
+                self._socketerror("failed to receive response:" + str(e))
                 self._disconnect()
                 break
 
+            if buf is None or len(buf) == 0:  # handle server disconnect
+                self.debug("server closed the connection")
+                self._disconnect()
+                break
+
+            self.debug("received data:", str(buf))
+            data += buf.decode(errors='ignore')
+            if self._check_raw_data(data):
+                break
+
+        self.debug("final response:", str(data))
         return data
 
     def _get_raw_data(self):
@@ -638,6 +673,8 @@ class SocketService(SimpleService):
         """
         if self._sock is None:
             self._connect()
+            if self._sock is None:
+                return None
 
         # Send request if it is needed
         if not self._send():

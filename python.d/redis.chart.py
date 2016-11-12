@@ -19,40 +19,58 @@ retries = 60
 #             'unix_socket': None
 #          }}
 
-ORDER = ['operations', 'hit_rate', 'memory', 'keys', 'clients', 'slaves']
+ORDER = ['operations', 'hit_rate', 'memory', 'keys', 'net', 'connections', 'clients', 'slaves', 'persistence']
 
 CHARTS = {
     'operations': {
-        'options': [None, 'Operations', 'operations/s', 'Statistics', 'redis.operations', 'line'],
+        'options': [None, 'Redis Operations', 'operations/s', 'operations', 'redis.operations', 'line'],
         'lines': [
+            ['total_commands_processed', 'commands', 'incremental'],
             ['instantaneous_ops_per_sec', 'operations', 'absolute']
         ]},
     'hit_rate': {
-        'options': [None, 'Hit rate', 'percent', 'Statistics', 'redis.hit_rate', 'line'],
+        'options': [None, 'Redis Hit rate', 'percent', 'hits', 'redis.hit_rate', 'line'],
         'lines': [
             ['hit_rate', 'rate', 'absolute']
         ]},
     'memory': {
-        'options': [None, 'Memory utilization', 'kilobytes', 'Memory', 'redis.memory', 'line'],
+        'options': [None, 'Redis Memory utilization', 'kilobytes', 'memory', 'redis.memory', 'line'],
         'lines': [
             ['used_memory', 'total', 'absolute', 1, 1024],
             ['used_memory_lua', 'lua', 'absolute', 1, 1024]
         ]},
+    'net': {
+        'options': [None, 'Redis Bandwidth', 'kilobits/s', 'network', 'redis.net', 'area'],
+        'lines': [
+            ['total_net_input_bytes', 'in', 'incremental', 8, 1024],
+            ['total_net_output_bytes', 'out', 'incremental', -8, 1024]
+        ]},
     'keys': {
-        'options': [None, 'Database keys', 'keys', 'Keys', 'redis.keys', 'line'],
+        'options': [None, 'Redis Keys per Database', 'keys', 'keys', 'redis.keys', 'line'],
         'lines': [
             # lines are created dynamically in `check()` method
         ]},
-    'clients': {
-        'options': [None, 'Clients', 'clients', 'Clients', 'redis.clients', 'line'],
+    'connections': {
+        'options': [None, 'Redis Connections', 'connections/s', 'connections', 'redis.connections', 'line'],
         'lines': [
-            ['connected_clients', 'connected', 'absolute'],
-            ['blocked_clients', 'blocked', 'absolute']
+            ['total_connections_received', 'received', 'incremental', 1],
+            ['rejected_connections', 'rejected', 'incremental', -1]
+        ]},
+    'clients': {
+        'options': [None, 'Redis Clients', 'clients', 'connections', 'redis.clients', 'line'],
+        'lines': [
+            ['connected_clients', 'connected', 'absolute', 1],
+            ['blocked_clients', 'blocked', 'absolute', -1]
         ]},
     'slaves': {
-        'options': [None, 'Slaves', 'slaves', 'Replication', 'redis.slaves', 'line'],
+        'options': [None, 'Redis Slaves', 'slaves', 'replication', 'redis.slaves', 'line'],
         'lines': [
             ['connected_slaves', 'connected', 'absolute']
+        ]},
+    'persistence': {
+        'options': [None, 'Redis Persistence Changes Since Last Save', 'changes', 'persistence', 'redis.rdb_changes', 'line'],
+        'lines': [
+            ['rdb_changes_since_last_save', 'changes', 'absolute']
         ]}
 }
 
@@ -74,33 +92,45 @@ class Service(SocketService):
         Get data from socket
         :return: dict
         """
-        try:
-            raw = self._get_raw_data().split("\n")
-        except AttributeError:
-            self.error("no data received")
+        response = self._get_raw_data()
+        if response is None:
+            # error has already been logged
             return None
+
+        try:
+            parsed = response.split("\n")
+        except AttributeError:
+            self.error("response is invalid/empty")
+            return None
+
         data = {}
-        for line in raw:
-            if line.startswith(('instantaneous', 'keyspace', 'used_memory', 'connected', 'blocked')):
-                try:
-                    t = line.split(':')
-                    data[t[0]] = int(t[1])
-                except (IndexError, ValueError):
-                    pass
-            elif line.startswith('db'):
+        for line in parsed:
+            if len(line) < 5 or line[0] == '$' or line[0] == '#':
+                continue
+
+            if line.startswith('db'):
                 tmp = line.split(',')[0].replace('keys=', '')
                 record = tmp.split(':')
-                data[record[0]] = int(record[1])
+                data[record[0]] = record[1]
+                continue
+
+            try:
+                t = line.split(':')
+                data[t[0]] = t[1]
+            except (IndexError, ValueError):
+                self.debug("invalid line received: " + str(line))
+                pass
+
+        if len(data) == 0:
+            self.error("received data doesn't have any records")
+            return None
+
         try:
-            data['hit_rate'] = int((data['keyspace_hits'] / float(data['keyspace_hits'] + data['keyspace_misses'])) * 100)
+            data['hit_rate'] = (int(data['keyspace_hits']) * 100) / (int(data['keyspace_hits']) + int(data['keyspace_misses']))
         except:
             data['hit_rate'] = 0
 
-        if len(data) == 0:
-            self.error("received data doesn't have needed records")
-            return None
-        else:
-            return data
+        return data
 
     def _check_raw_data(self, data):
         """
@@ -113,11 +143,12 @@ class Service(SocketService):
         supposed = data.split('\n')[0][1:]
         offset = len(supposed) + 4  # 1 dollar sing, 1 new line character + 1 ending sequence '\r\n'
         supposed = int(supposed)
-        if length - offset >= supposed:
-            return True
-        else:
-            return False
 
+        if length - offset >= supposed:
+            self.debug("received full response from redis")
+            return True
+
+        self.debug("waiting more data from redis")
         return False
 
     def check(self):
