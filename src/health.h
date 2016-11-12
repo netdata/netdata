@@ -350,4 +350,6 @@ extern int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *
 extern void health_alarms2json(RRDHOST *host, BUFFER *wb, int all);
 extern void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after);
 
+void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf);
+
 #endif //NETDATA_HEALTH_H

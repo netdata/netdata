@@ -536,7 +536,7 @@ static inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *
 // ----------------------------------------------------------------------------
 // RRDVAR lookup
 
-calculated_number rrdvar2number(RRDVAR *rv) {
+static calculated_number rrdvar2number(RRDVAR *rv) {
     switch(rv->type) {
         case RRDVAR_TYPE_CALCULATED: {
             calculated_number *n = (calculated_number *)rv->value;
@@ -569,11 +569,6 @@ calculated_number rrdvar2number(RRDVAR *rv) {
     }
 }
 
-void dump_variable(void *data) {
-    RRDVAR *rv = (RRDVAR *)data;
-    debug(D_HEALTH, "%50s : %20.5Lf", rv->name, rrdvar2number(rv));
-}
-
 int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, calculated_number *result) {
     RRDSET *st = rc->rrdset;
     RRDVAR *rv;
@@ -598,17 +593,47 @@ int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, cal
         return 1;
     }
 
-    debug(D_HEALTH, "Available local chart '%s' variables:", st->id);
-    avl_traverse_lock(&st->variables_root_index, dump_variable);
-
-    debug(D_HEALTH, "Available family '%s' variables:", st->rrdfamily->family);
-    avl_traverse_lock(&st->rrdfamily->variables_root_index, dump_variable);
-
-    debug(D_HEALTH, "Available host '%s' variables:", st->rrdhost->hostname);
-    avl_traverse_lock(&st->rrdhost->variables_root_index, dump_variable);
-
     return 0;
 }
+
+// ----------------------------------------------------------------------------
+// RRDVAR to JSON
+
+struct variable2json_helper {
+    BUFFER *buf;
+    size_t counter;
+};
+
+static void single_variable2json(void *entry, void *data) {
+    struct variable2json_helper *helper = (struct variable2json_helper *)data;
+    RRDVAR *rv = (RRDVAR *)entry;
+    calculated_number value = rrdvar2number(rv);
+
+    if(unlikely(isnan(value) || isinf(value)))
+        buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": null", helper->counter?",":"", rv->name);
+    else
+        buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": %0.5Lf", helper->counter?",":"", rv->name, (long double)value);
+
+    helper->counter++;
+}
+
+void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {
+    struct variable2json_helper helper = {
+            .buf = buf,
+            .counter = 0
+    };
+
+    buffer_sprintf(buf, "{\n\t\"chart\": \"%s.%s\",\n\t\"chart_name\": \"%s.%s\",\n\t\"chart_variables\": {", st->type, st->id, st->type, st->name);
+    avl_traverse_lock(&st->variables_root_index, single_variable2json, (void *)&helper);
+    buffer_sprintf(buf, "\n\t},\n\t\"family\": \"%s\",\n\t\"family_variables\": {", st->family);
+    helper.counter = 0;
+    avl_traverse_lock(&st->rrdfamily->variables_root_index, single_variable2json, (void *)&helper);
+    buffer_sprintf(buf, "\n\t},\n\t\"host\": \"%s\",\n\t\"host_variables\": {", st->rrdhost->hostname);
+    helper.counter = 0;
+    avl_traverse_lock(&st->rrdhost->variables_root_index, single_variable2json, (void *)&helper);
+    buffer_strcat(buf, "\n\t}\n}\n");
+}
+
 
 // ----------------------------------------------------------------------------
 // RRDDIMVAR management

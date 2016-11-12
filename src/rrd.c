@@ -353,6 +353,9 @@ char *rrdset_strncpyz_name(char *to, const char *from, size_t length)
 
 void rrdset_set_name(RRDSET *st, const char *name)
 {
+    if(unlikely(st->name && !strcmp(st->name, name)))
+        return;
+
     debug(D_RRD_CALLS, "rrdset_set_name() old: %s, new: %s", st->name, name);
 
     char b[CONFIG_MAX_VALUE + 1];
@@ -765,7 +768,10 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 
 void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name)
 {
-    debug(D_RRD_CALLS, "rrddim_set_name() %s.%s", st->name, rd->name);
+    if(unlikely(rd->name && !strcmp(rd->name, name)))
+        return;
+
+    debug(D_RRD_CALLS, "rrddim_set_name() from %s.%s to %s.%s", st->name, rd->name, st->name, name);
 
     char varname[CONFIG_MAX_NAME + 1];
     snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
