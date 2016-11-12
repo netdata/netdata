@@ -66,10 +66,12 @@ typedef struct rrddimvar {
 
     char *id;                   // dimension id
     char *name;                 // dimension name
-    char *fullidid;             // chart type.chart id.dimension id
-    char *fullidname;           // chart type.chart id.dimension name
-    char *fullnameid;           // chart type.chart name.dimension id
-    char *fullnamename;         // chart type.chart name.dimension name
+    char *contextid;            // context + dimension id
+    char *contextname;          // context + dimension name
+    char *fullidid;             // chart type.chart id + dimension id
+    char *fullidname;           // chart type.chart id + dimension name
+    char *fullnameid;           // chart type.chart name + dimension id
+    char *fullnamename;         // chart type.chart name + dimension name
 
     int type;
     void *value;
@@ -81,6 +83,8 @@ typedef struct rrddimvar {
 
     RRDVAR *family_id;
     RRDVAR *family_name;
+    RRDVAR *family_contextid;
+    RRDVAR *family_contextname;
 
     RRDVAR *host_fullidid;
     RRDVAR *host_fullidname;
