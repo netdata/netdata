@@ -85,6 +85,7 @@ declare -A configs_signatures=(
   ['4f6f4d39c19d7d954f769d3f9d3b4da5']='health.d/memcached.conf'
   ['4fdf72784296326e0b46cb526a5d77a1']='python.d.conf'
   ['508771d8e4611a058991a1bc11039dea']='health.d/disks.conf'
+  ['5271cf9fc0fd10915a9759add70f7d78']='health.d/swap.conf'
   ['5278ebbae19c60db600f0a119cb3664e']='python.d/apache.conf'
   ['52d4131cf9df84e2550b1a5d899ec61d']='health.d/swap.conf'
   ['53160707fdc6ce46c195b1b55bb0bcb1']='health.d/swap.conf'
