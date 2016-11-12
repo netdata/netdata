@@ -26,6 +26,8 @@ set(NETDATA_SOURCE_FILES
         src/global_statistics.h
         src/health.c
         src/health.h
+        src/ipc.c
+        src/ipc.h
         src/log.c
         src/log.h
         src/main.c
