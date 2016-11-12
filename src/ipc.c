@@ -170,6 +170,8 @@ int do_ipc(int update_every, unsigned long long dt) {
     static RRDSET *semaphores = NULL, *arrays = NULL;
 
     if(unlikely(!initialized)) {
+        initialized = 1;
+        
         // make sure it works
         if(ipc_sem_get_limits(&limits) == -1) {
             error("unable to fetch semaphore limits");
