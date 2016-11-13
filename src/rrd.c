@@ -525,6 +525,12 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
             error("File %s is too old. Clearing it.", fullfilename);
             memset(st, 0, size);
         }
+
+        // make sure the database is aligned
+        if(st->last_updated.tv_sec % update_every) {
+            st->last_updated.tv_sec -= st->last_updated.tv_sec % update_every;
+            st->last_updated.tv_usec = 0;
+        }
     }
 
     if(st) {
@@ -1094,6 +1100,11 @@ unsigned long long rrdset_done(RRDSET *st)
         // it is the first entry
         // set the last_collected_time to now
         gettimeofday(&st->last_collected_time, NULL);
+
+        // align it to update_every
+        st->last_collected_time.tv_sec -= st->last_collected_time.tv_sec % st->update_every;
+        st->last_collected_time.tv_usec = 0;
+
         last_collect_ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec - update_every_ut;
 
         // the first entry should not be stored
@@ -1135,6 +1146,10 @@ unsigned long long rrdset_done(RRDSET *st)
         st->usec_since_last_update = update_every_ut;
 
         gettimeofday(&st->last_collected_time, NULL);
+
+        // align it to update_every
+        st->last_collected_time.tv_sec -= st->last_collected_time.tv_sec % st->update_every;
+        st->last_collected_time.tv_usec = 0;
 
         unsigned long long ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec - st->usec_since_last_update;
         st->last_updated.tv_sec = (time_t) (ut / 1000000ULL);
@@ -1349,6 +1364,9 @@ unsigned long long rrdset_done(RRDSET *st)
     if(unlikely(now_collect_ut < next_store_ut)) {
         // this is collected in the same interpolation point
         if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: THIS IS IN THE SAME INTERPOLATION POINT", st->name);
+#ifdef NETDATA_INTERNAL_CHECKS
+        info("%s is collected in the same interpolation point: short by %llu microseconds", st->name, next_store_ut - now_collect_ut);
+#endif
     }
 
     unsigned long long first_ut = last_stored_ut;
