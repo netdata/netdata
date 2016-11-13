@@ -8,6 +8,8 @@ int do_proc_loadavg(int update_every, unsigned long long dt) {
 
     static procfile *ff = NULL;
     static int do_loadavg = -1, do_all_processes = -1;
+    static unsigned long long last_loadavg_usec = 0;
+    static RRDSET *load_chart = NULL, *processes_chart = NULL;
 
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
@@ -21,8 +23,10 @@ int do_proc_loadavg(int update_every, unsigned long long dt) {
     if(unlikely(!ff))
         return 0; // we return 0, so that we will retry to open it next time
 
-    if(unlikely(do_loadavg == -1))        do_loadavg          = config_get_boolean("plugin:proc:/proc/loadavg", "enable load average", 1);
-    if(unlikely(do_all_processes == -1))  do_all_processes    = config_get_boolean("plugin:proc:/proc/loadavg", "enable total processes", 1);
+    if(unlikely(do_loadavg == -1)) {
+        do_loadavg          = config_get_boolean("plugin:proc:/proc/loadavg", "enable load average", 1);
+        do_all_processes    = config_get_boolean("plugin:proc:/proc/loadavg", "enable total processes", 1);
+    }
 
     if(unlikely(procfile_lines(ff) < 1)) {
         error("/proc/loadavg has no lines.");
@@ -39,43 +43,49 @@ int do_proc_loadavg(int update_every, unsigned long long dt) {
 
     //unsigned long long running_processes  = strtoull(procfile_lineword(ff, 0, 3), NULL, 10);
     unsigned long long active_processes     = strtoull(procfile_lineword(ff, 0, 4), NULL, 10);
-    //unsigned long long next_pid               = strtoull(procfile_lineword(ff, 0, 5), NULL, 10);
+    //unsigned long long next_pid           = strtoull(procfile_lineword(ff, 0, 5), NULL, 10);
 
-
-    RRDSET *st;
 
     // --------------------------------------------------------------------
 
-    if(likely(do_loadavg)) {
-        st = rrdset_find_byname("system.load");
-        if(unlikely(!st)) {
-            st = rrdset_create("system", "load", NULL, "load", NULL, "System Load Average", "load", 100, (update_every < MIN_LOADAVG_UPDATE_EVERY)?MIN_LOADAVG_UPDATE_EVERY:update_every, RRDSET_TYPE_LINE);
+    if(last_loadavg_usec <= dt) {
+        if(likely(do_loadavg)) {
+            if(unlikely(!load_chart)) {
+                load_chart = rrdset_find_byname("system.load");
+                if(unlikely(!load_chart)) {
+                    load_chart = rrdset_create("system", "load", NULL, "load", NULL, "System Load Average", "load", 100, (update_every < MIN_LOADAVG_UPDATE_EVERY) ? MIN_LOADAVG_UPDATE_EVERY : update_every, RRDSET_TYPE_LINE);
+                    rrddim_add(load_chart, "load1", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+                    rrddim_add(load_chart, "load5", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+                    rrddim_add(load_chart, "load15", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+                }
+            }
+            else
+                rrdset_next(load_chart);
 
-            rrddim_add(st, "load1", NULL, 1, 1000, RRDDIM_ABSOLUTE);
-            rrddim_add(st, "load5", NULL, 1, 1000, RRDDIM_ABSOLUTE);
-            rrddim_add(st, "load15", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+            rrddim_set(load_chart, "load1", (collected_number) (load1 * 1000));
+            rrddim_set(load_chart, "load5", (collected_number) (load5 * 1000));
+            rrddim_set(load_chart, "load15", (collected_number) (load15 * 1000));
+            rrdset_done(load_chart);
         }
-        else rrdset_next(st);
 
-        rrddim_set(st, "load1", (collected_number)(load1 * 1000));
-        rrddim_set(st, "load5", (collected_number)(load5 * 1000));
-        rrddim_set(st, "load15", (collected_number)(load15 * 1000));
-        rrdset_done(st);
+        last_loadavg_usec = load_chart->update_every * 1000000ULL;
     }
+    else last_loadavg_usec -= dt;
 
     // --------------------------------------------------------------------
 
     if(likely(do_all_processes)) {
-        st = rrdset_find_byname("system.active_processes");
-        if(unlikely(!st)) {
-            st = rrdset_create("system", "active_processes", NULL, "processes", NULL, "System Active Processes", "processes", 750, update_every, RRDSET_TYPE_LINE);
-
-            rrddim_add(st, "active", NULL, 1, 1, RRDDIM_ABSOLUTE);
+        if(unlikely(!processes_chart)) {
+            processes_chart = rrdset_find_byname("system.active_processes");
+            if(unlikely(!processes_chart)) {
+                processes_chart = rrdset_create("system", "active_processes", NULL, "processes", NULL, "System Active Processes", "processes", 750, update_every, RRDSET_TYPE_LINE);
+                rrddim_add(processes_chart, "active", NULL, 1, 1, RRDDIM_ABSOLUTE);
+            }
         }
-        else rrdset_next(st);
+        else rrdset_next(processes_chart);
 
-        rrddim_set(st, "active", active_processes);
-        rrdset_done(st);
+        rrddim_set(processes_chart, "active", active_processes);
+        rrdset_done(processes_chart);
     }
 
     return 0;
