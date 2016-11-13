@@ -480,7 +480,6 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
     uint32_t lines = procfile_lines(ff), l;
-    uint32_t words;
 
     // this is smart enough not to reload it every time
     mountinfo_reload(0);
@@ -500,7 +499,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
                             last_writes = 0, last_writesectors = 0, last_writems = 0,
                             last_busy_ms = 0;
 
-        words = procfile_linewords(ff, l);
+        uint32_t words = procfile_linewords(ff, l);
         if(unlikely(words < 14)) continue;
 
         major           = strtoul(procfile_lineword(ff, l, 0), NULL, 10);

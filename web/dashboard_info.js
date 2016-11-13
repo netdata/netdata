@@ -178,25 +178,37 @@ netdataDashboard.menu = {
     'phpfpm': {
         title: 'PHP-FPM',
         icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
-        info: undefined,
+        info: undefined
     },
 
     'postfix': {
         title: 'postfix',
         icon: '<i class="fa fa-envelope" aria-hidden="true"></i>',
-        info: undefined,
+        info: undefined
+    },
+
+    'dovecot': {
+        title: 'Dovecot',
+        icon: '<i class="fa fa-envelope" aria-hidden="true"></i>',
+        info: undefined
+    },
+
+    'hddtemp': {
+        title: 'HDD Temp',
+        icon: '<i class="fa fa-thermometer-full" aria-hidden="true"></i>',
+        info: undefined
     },
 
     'nginx': {
         title: 'nginx',
         icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
-        info: undefined,
+        info: undefined
     },
 
     'apache': {
         title: 'Apache',
         icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
-        info: undefined,
+        info: undefined
     },
 
     'named': {

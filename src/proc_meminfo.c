@@ -114,7 +114,6 @@ int do_proc_meminfo(int update_every, unsigned long long dt) {
         return 0; // we return 0, so that we will retry to open it next time
 
     uint32_t lines = procfile_lines(ff), l;
-    uint32_t words;
 
     int hwcorrupted = 0;
 
@@ -162,7 +161,7 @@ int do_proc_meminfo(int update_every, unsigned long long dt) {
             HardwareCorrupted = 0;
 
     for(l = 0; l < lines ;l++) {
-        words = procfile_linewords(ff, l);
+        uint32_t words = procfile_linewords(ff, l);
         if(unlikely(words < 2)) continue;
 
         char *name = procfile_lineword(ff, l, 0);

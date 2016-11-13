@@ -209,7 +209,6 @@ int do_proc_vmstat(int update_every, unsigned long long dt) {
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
     uint32_t lines = procfile_lines(ff), l;
-    uint32_t words;
 
     // unsigned long long allocstall = 0ULL;
     // unsigned long long compact_blocks_moved = 0ULL;
@@ -305,7 +304,7 @@ int do_proc_vmstat(int update_every, unsigned long long dt) {
     // unsigned long long unevictable_pgs_stranded = 0ULL;
 
     for(l = 0; l < lines ;l++) {
-        words = procfile_linewords(ff, l);
+        uint32_t words = procfile_linewords(ff, l);
         if(unlikely(words < 2)) {
             if(unlikely(words)) error("Cannot read /proc/vmstat line %u. Expected 2 params, read %u.", l, words);
             continue;

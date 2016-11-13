@@ -269,7 +269,7 @@ void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
         }
 
         unsigned long i = procfile_linewords(ff, 0);
-        if(i <= 0) return;
+        if(i == 0) return;
 
         // we may have 1 more CPU reported
         while(i > 0) {
@@ -1437,11 +1437,11 @@ void *cgroups_main(void *ptr)
 
     // the next time we will run - aligned properly
     unsigned long long sunext = (time(NULL) - (time(NULL) % rrd_update_every) + rrd_update_every) * 1000000ULL;
-    unsigned long long sunow;
 
     RRDSET *stcpu_thread = NULL;
 
     for(;;) {
+        unsigned long long sunow;
         if(unlikely(netdata_exit)) break;
 
         // delay until it is our time to run

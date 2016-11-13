@@ -2787,7 +2787,6 @@ int main(int argc, char **argv)
     procfile_adaptive_initial_allocation = 1;
 
     time_t started_t = time(NULL);
-    time_t current_t;
     get_system_HZ();
     get_system_pid_max();
     get_system_cpus();
@@ -2831,12 +2830,12 @@ int main(int argc, char **argv)
 
 #ifndef PROFILING_MODE
     unsigned long long sunext = (time(NULL) - (time(NULL) % update_every) + update_every) * 1000000ULL;
-    unsigned long long sunow;
 #endif /* PROFILING_MODE */
 
     global_iterations_counter = 1;
     for(;1; global_iterations_counter++) {
 #ifndef PROFILING_MODE
+        unsigned long long sunow;
         // delay until it is our time to run
         while((sunow = time_usec()) < sunext)
             sleep_usec(sunext - sunow);
@@ -2878,7 +2877,7 @@ int main(int argc, char **argv)
         if(unlikely(debug))
             fprintf(stderr, "apps.plugin: done Loop No %llu\n", global_iterations_counter);
 
-        current_t = time(NULL);
+        time_t current_t = time(NULL);
 
 #ifndef PROFILING_MODE
         // restart check (14400 seconds)

@@ -159,11 +159,9 @@ static char *strdupz_decoding_octal(const char *string) {
 
 // read the whole mountinfo into a linked list
 struct mountinfo *mountinfo_read() {
-    procfile *ff = NULL;
-
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/proc/self/mountinfo", global_host_prefix);
-    ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
+    procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
     if(unlikely(!ff)) {
         snprintfz(filename, FILENAME_MAX, "%s/proc/1/mountinfo", global_host_prefix);
         ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
