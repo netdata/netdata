@@ -50,7 +50,7 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
     uint32_t lines = procfile_lines(ff), l;
-    uint32_t words = procfile_linewords(ff, 0), w;
+    uint32_t words = procfile_linewords(ff, 0);
 
     if(unlikely(!lines)) {
         error("Cannot read /proc/softirqs, zero lines reported.");
@@ -59,6 +59,7 @@ int do_proc_softirqs(int update_every, unsigned long long dt) {
 
     // find how many CPUs are there
     if(unlikely(cpus == -1)) {
+        uint32_t w;
         cpus = 0;
         for(w = 0; w < words ; w++) {
             if(unlikely(strncmp(procfile_lineword(ff, 0, w), "CPU", 3) == 0))

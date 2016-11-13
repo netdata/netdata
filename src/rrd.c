@@ -353,20 +353,33 @@ char *rrdset_strncpyz_name(char *to, const char *from, size_t length)
 
 void rrdset_set_name(RRDSET *st, const char *name)
 {
-    debug(D_RRD_CALLS, "rrdset_set_name() old: %s, new: %s", st->name, name);
+    if(unlikely(st->name && !strcmp(st->name, name)))
+        return;
 
-    if(st->name) {
-        rrdset_index_del_name(&localhost, st);
-        rrdsetvar_rename_all(st);
-    }
+    debug(D_RRD_CALLS, "rrdset_set_name() old: %s, new: %s", st->name, name);
 
     char b[CONFIG_MAX_VALUE + 1];
     char n[RRD_ID_LENGTH_MAX + 1];
 
     snprintfz(n, RRD_ID_LENGTH_MAX, "%s.%s", st->type, name);
     rrdset_strncpyz_name(b, n, CONFIG_MAX_VALUE);
-    st->name = config_get(st->id, "name", b);
-    st->hash_name = simple_hash(st->name);
+
+    if(st->name) {
+        rrdset_index_del_name(&localhost, st);
+        st->name = config_set_default(st->id, "name", b);
+        st->hash_name = simple_hash(st->name);
+        rrdsetvar_rename_all(st);
+    }
+    else {
+        st->name = config_get(st->id, "name", b);
+        st->hash_name = simple_hash(st->name);
+    }
+
+    pthread_rwlock_wrlock(&st->rwlock);
+    RRDDIM *rd;
+    for(rd = st->dimensions; rd ;rd = rd->next)
+        rrddimvar_rename_all(rd);
+    pthread_rwlock_unlock(&st->rwlock);
 
     rrdset_index_add_name(&localhost, st);
 }
@@ -461,11 +474,10 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 
     char fullid[RRD_ID_LENGTH_MAX + 1];
     char fullfilename[FILENAME_MAX + 1];
-    RRDSET *st = NULL;
 
     snprintfz(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
 
-    st = rrdset_find(fullid);
+    RRDSET *st = rrdset_find(fullid);
     if(st) {
         error("Cannot create rrd stats for '%s', it already exists.", fullid);
         return st;
@@ -755,11 +767,14 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 
 void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name)
 {
-    debug(D_RRD_CALLS, "rrddim_set_name() %s.%s", st->name, rd->name);
+    if(unlikely(rd->name && !strcmp(rd->name, name)))
+        return;
+
+    debug(D_RRD_CALLS, "rrddim_set_name() from %s.%s to %s.%s", st->name, rd->name, st->name, name);
 
     char varname[CONFIG_MAX_NAME + 1];
     snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
-    config_set_default(st->id, varname, name);
+    rd->name = config_set_default(st->id, varname, name);
 
     rrddimvar_rename_all(rd);
 }

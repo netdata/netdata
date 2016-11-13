@@ -24,7 +24,7 @@ void syslog_init(void) {
 }
 
 int open_log_file(int fd, FILE **fp, const char *filename, int *enabled_syslog) {
-    int f, t;
+    int f;
 
     if(!filename || !*filename || !strcmp(filename, "none"))
         filename = "/dev/null";
@@ -64,7 +64,7 @@ int open_log_file(int fd, FILE **fp, const char *filename, int *enabled_syslog) 
 
     if(fd != f && fd != -1) {
         // it automatically closes
-        t = dup2(f, fd);
+        int t = dup2(f, fd);
         if (t == -1) {
             error("Cannot dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
             close(f);

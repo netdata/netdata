@@ -975,8 +975,55 @@ int run_test(struct test *test)
     return errors;
 }
 
+static int test_variable_renames(void) {
+    fprintf(stderr, "Creating chart\n");
+    RRDSET *st = rrdset_create("chart", "ID", NULL, "family", "context", "Unit Testing", "a value", 1, 1, RRDSET_TYPE_LINE);
+    fprintf(stderr, "Created chart with id '%s', name '%s'\n", st->id, st->name);
+
+    fprintf(stderr, "Creating dimension DIM1\n");
+    RRDDIM *rd1 = rrddim_add(st, "DIM1", NULL, 1, 1, RRDDIM_INCREMENTAL);
+    fprintf(stderr, "Created dimension with id '%s', name '%s'\n", rd1->id, rd1->name);
+
+    fprintf(stderr, "Creating dimension DIM2\n");
+    RRDDIM *rd2 = rrddim_add(st, "DIM2", NULL, 1, 1, RRDDIM_INCREMENTAL);
+    fprintf(stderr, "Created dimension with id '%s', name '%s'\n", rd2->id, rd2->name);
+
+    fprintf(stderr, "Renaming chart to CHARTNAME1\n");
+    rrdset_set_name(st, "CHARTNAME1");
+    fprintf(stderr, "Renamed chart with id '%s' to name '%s'\n", st->id, st->name);
+
+    fprintf(stderr, "Renaming chart to CHARTNAME2\n");
+    rrdset_set_name(st, "CHARTNAME2");
+    fprintf(stderr, "Renamed chart with id '%s' to name '%s'\n", st->id, st->name);
+
+    fprintf(stderr, "Renaming dimension DIM1 to DIM1NAME1\n");
+    rrddim_set_name(st, rd1, "DIM1NAME1");
+    fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rd1->id, rd1->name);
+
+    fprintf(stderr, "Renaming dimension DIM1 to DIM1NAME2\n");
+    rrddim_set_name(st, rd1, "DIM1NAME2");
+    fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rd1->id, rd1->name);
+
+    fprintf(stderr, "Renaming dimension DIM2 to DIM2NAME1\n");
+    rrddim_set_name(st, rd2, "DIM2NAME1");
+    fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rd2->id, rd2->name);
+
+    fprintf(stderr, "Renaming dimension DIM2 to DIM2NAME2\n");
+    rrddim_set_name(st, rd2, "DIM2NAME2");
+    fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rd2->id, rd2->name);
+
+    BUFFER *buf = buffer_create(1);
+    health_api_v1_chart_variables2json(st, buf);
+    fprintf(stderr, "%s", buffer_tostring(buf));
+    buffer_free(buf);
+    return 1;
+}
+
 int run_all_mockup_tests(void)
 {
+    if(!test_variable_renames())
+        return 1;
+
     if(run_test(&test1))
         return 1;
 
@@ -1027,6 +1074,8 @@ int run_all_mockup_tests(void)
 
     if(run_test(&test15))
         return 1;
+
+
 
     return 0;
 }

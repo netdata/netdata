@@ -490,7 +490,7 @@ void buffer_data_options2string(BUFFER *wb, uint32_t options) {
 
     if(options & RRDR_OPTION_ABSOLUTE) {
         if(count++) buffer_strcat(wb, " ");
-        buffer_strcat(wb, "abs");
+        buffer_strcat(wb, "absolute");
     }
 
     if(options & RRDR_OPTION_SECONDS) {
@@ -700,17 +700,7 @@ int web_client_api_request_v1_alarm_log(struct web_client *w, char *url)
     return 200;
 }
 
-int web_client_api_request_v1_charts(struct web_client *w, char *url)
-{
-    (void)url;
-
-    buffer_flush(w->response.data);
-    w->response.data->contenttype = CT_APPLICATION_JSON;
-    rrd_stats_api_v1_charts(w->response.data);
-    return 200;
-}
-
-int web_client_api_request_v1_chart(struct web_client *w, char *url)
+int web_client_api_request_single_chart(struct web_client *w, char *url, void callback(RRDSET *st, BUFFER *buf))
 {
     int ret = 400;
     char *chart = NULL;
@@ -749,11 +739,31 @@ int web_client_api_request_v1_chart(struct web_client *w, char *url)
     }
 
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    rrd_stats_api_v1_chart(st, w->response.data);
+    callback(st, w->response.data);
     return 200;
 
-cleanup:
+    cleanup:
     return ret;
+}
+
+int web_client_api_request_v1_alarm_variables(struct web_client *w, char *url)
+{
+    return web_client_api_request_single_chart(w, url, health_api_v1_chart_variables2json);
+}
+
+int web_client_api_request_v1_charts(struct web_client *w, char *url)
+{
+    (void)url;
+
+    buffer_flush(w->response.data);
+    w->response.data->contenttype = CT_APPLICATION_JSON;
+    rrd_stats_api_v1_charts(w->response.data);
+    return 200;
+}
+
+int web_client_api_request_v1_chart(struct web_client *w, char *url)
+{
+    return web_client_api_request_single_chart(w, url, rrd_stats_api_v1_chart);
 }
 
 int web_client_api_request_v1_badge(struct web_client *w, char *url) {
@@ -1405,7 +1415,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 }
 
 int web_client_api_request_v1(struct web_client *w, char *url) {
-    static uint32_t hash_data = 0, hash_chart = 0, hash_charts = 0, hash_registry = 0, hash_badge = 0, hash_alarms = 0, hash_alarm_log = 0;
+    static uint32_t hash_data = 0, hash_chart = 0, hash_charts = 0, hash_registry = 0, hash_badge = 0, hash_alarms = 0, hash_alarm_log = 0, hash_alarm_variables = 0;
 
     if(unlikely(hash_data == 0)) {
         hash_data = simple_hash("data");
@@ -1415,6 +1425,7 @@ int web_client_api_request_v1(struct web_client *w, char *url) {
         hash_badge = simple_hash("badge.svg");
         hash_alarms = simple_hash("alarms");
         hash_alarm_log = simple_hash("alarm_log");
+        hash_alarm_variables = simple_hash("alarm_variables");
     }
 
     // get the command
@@ -1443,6 +1454,9 @@ int web_client_api_request_v1(struct web_client *w, char *url) {
 
         else if(hash == hash_alarm_log && !strcmp(tok, "alarm_log"))
             return web_client_api_request_v1_alarm_log(w, url);
+
+        else if(hash == hash_alarm_variables && !strcmp(tok, "alarm_variables"))
+            return web_client_api_request_v1_alarm_variables(w, url);
 
         else {
             buffer_flush(w->response.data);

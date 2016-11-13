@@ -119,6 +119,7 @@ class SimpleService(threading.Thread):
         t_start = time.time()
         timetable = self.timetable
         chart_name = self.chart_name
+
         # check if it is time to execute job update() function
         if timetable['next'] > t_start:
             self.debug(chart_name, "will be run in", str(int((timetable['next'] - t_start) * 1000)), "ms")
@@ -129,20 +130,22 @@ class SimpleService(threading.Thread):
                    "ready to run, after", str(int((t_start - timetable['last']) * 1000)),
                    "ms (update_every:", str(timetable['freq'] * 1000),
                    "ms, latency:", str(int((t_start - timetable['next']) * 1000)), "ms")
+
         if self.__first_run:
             since_last = 0
+
         if not self.update(since_last):
             self.error("update function failed.")
             return False
+
         t_end = time.time()
         self.timetable['next'] = t_end - (t_end % timetable['freq']) + timetable['freq']
+
         # draw performance graph
         run_time = str(int((t_end - t_start) * 1000))
         # noinspection SqlNoDataSourceInspection
         print("BEGIN netdata.plugin_pythond_%s %s\nSET run_time = %s\nEND\n" %
               (self.chart_name, str(since_last), run_time))
-        # sys.stdout.write("BEGIN netdata.plugin_pythond_%s %s\nSET run_time = %s\nEND\n" %
-        #                  (self.chart_name, str(since_last), run_time))
 
         self.debug(chart_name, "updated in", str(run_time), "ms")
         self.timetable['last'] = t_start
@@ -156,21 +159,24 @@ class SimpleService(threading.Thread):
         :return: None
         """
         self.timetable['last'] = time.time()
+        self.debug("starting data collection - update frequency: " + str(self.update_every) + ", retries allowed: " + str(self.retries))
         while True:  # run forever, unless something is wrong
             try:
                 status = self._run_once()
             except Exception as e:
-                self.error("Something wrong: ", str(e))
+                self.alert("internal error - aborting data collection: " + str(e))
                 return
+
             if status:  # handle retries if update failed
                 time.sleep(self.timetable['next'] - time.time())
                 self.retries_left = self.retries
             else:
                 self.retries_left -= 1
                 if self.retries_left <= 0:
-                    self.error("no more retries. Exiting")
+                    self.alert("failed to collect data - no more retries allowed - aborting data collection")
                     return
                 else:
+                    self.error("failed to collect data. " + str(self.retries_left) + " retries left.")
                     time.sleep(self.timetable['freq'])
 
     # --- CHART ---
@@ -318,6 +324,12 @@ class SimpleService(threading.Thread):
         """
         msg.error(self.chart_name, *params)
 
+    def alert(self, *params):
+        """
+        Show error message on stderr
+        """
+        msg.alert(self.chart_name, *params)
+
     def debug(self, *params):
         """
         Show debug message on stderr
@@ -345,10 +357,18 @@ class SimpleService(threading.Thread):
         :return: boolean
         """
         self.debug("Module", str(self.__module__), "doesn't implement check() function. Using default.")
-        if self._get_data() is None or len(self._get_data()) == 0:
+        data = self._get_data()
+
+        if data is None:
+            self.debug("failed to receive data during check().")
             return False
-        else:
-            return True
+
+        if len(data) == 0:
+            self.debug("empty data during check().")
+            return False
+
+        self.debug("successfully received data during check(): '" + str(data) + "'")
+        return True
 
     def create(self):
         """
@@ -357,6 +377,7 @@ class SimpleService(threading.Thread):
         """
         data = self._get_data()
         if data is None:
+            self.debug("failed to receive data during create().")
             return False
 
         idx = 0
@@ -380,7 +401,7 @@ class SimpleService(threading.Thread):
         """
         data = self._get_data()
         if data is None:
-            self.debug("_get_data() returned no data")
+            self.debug("failed to receive data during update().")
             return False
 
         updated = False
@@ -509,15 +530,15 @@ class SocketService(SimpleService):
         self.__empty_request = "".encode()
         SimpleService.__init__(self, configuration=configuration, name=name)
 
-    def _socketerror(self, msg=None):
+    def _socketerror(self, message=None):
         if self.unix_socket is not None:
-            self.error("unix socket '" + self.unix_socket + "':", msg)
+            self.error("unix socket '" + self.unix_socket + "':", message)
         else:
             if self.__socket_config is not None:
                 af, socktype, proto, canonname, sa = self.__socket_config
-                self.error("socket to '" + str(sa[0]) + "' port " + str(sa[1]) + ":", msg)
+                self.error("socket to '" + str(sa[0]) + "' port " + str(sa[1]) + ":", message)
             else:
-                self.error("unknown socket:", msg)
+                self.error("unknown socket:", message)
 
     def _connect2socket(self, res=None):
         """
@@ -553,32 +574,33 @@ class SocketService(SimpleService):
         self.__socket_config = res
         return True
 
-    def _connect2unixsocket(self, path=None):
+    def _connect2unixsocket(self):
         """
         Connect to a unix socket, given its filename
         :return: boolean
         """
-        if path is None:
+        if self.unix_socket is None:
             self.error("cannot connect to unix socket 'None'")
             return False
 
         try:
-            self.debug("attempting DGRAM unix socket '" + str(path) + "'")
+            self.debug("attempting DGRAM unix socket '" + str(self.unix_socket) + "'")
             self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-            self._sock.connect(path)
-            self.debug("connected DGRAM unix socket '" + str(path) + "'")
+            self._sock.connect(self.unix_socket)
+            self.debug("connected DGRAM unix socket '" + str(self.unix_socket) + "'")
             return True
         except socket.error as e:
-            self.error("Failed to connect DGRAM unix socket '" + str(path) + "':", str(e))
+            self.debug("Failed to connect DGRAM unix socket '" + str(self.unix_socket) + "':", str(e))
 
         try:
-            self.debug("attempting STREAM unix socket '" + str(path) + "'")
+            self.debug("attempting STREAM unix socket '" + str(self.unix_socket) + "'")
             self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            self._sock.connect(path)
-            self.debug("connected STREAM unix socket '" + str(path) + "'")
+            self._sock.connect(self.unix_socket)
+            self.debug("connected STREAM unix socket '" + str(self.unix_socket) + "'")
             return True
         except socket.error as e:
-            self.error("Failed to connect STREAM unix socket '" + str(path) + "':", str(e))
+            self.debug("Failed to connect STREAM unix socket '" + str(self.unix_socket) + "':", str(e))
+            self.error("Failed to connect to unix socket '" + str(self.unix_socket) + "':", str(e))
             self._sock = None
             return False
 
@@ -590,7 +612,7 @@ class SocketService(SimpleService):
         """
         try:
             if self.unix_socket is not None:
-                _connect2unixsocket(self.unix_socket)
+                self._connect2unixsocket()
 
             else:
                 if self.__socket_config is not None:
@@ -654,7 +676,10 @@ class SocketService(SimpleService):
                 break
 
             if buf is None or len(buf) == 0:  # handle server disconnect
-                self.debug("server closed the connection")
+                if data == "":
+                    self._socketerror("unexpectedly disconnected")
+                else:
+                    self.debug("server closed the connection")
                 self._disconnect()
                 break
 
@@ -704,6 +729,7 @@ class SocketService(SimpleService):
             self.name = ""
         else:
             self.name = str(self.name)
+
         try:
             self.unix_socket = str(self.configuration['socket'])
         except (KeyError, TypeError):
@@ -717,10 +743,12 @@ class SocketService(SimpleService):
                 self.port = int(self.configuration['port'])
             except (KeyError, TypeError):
                 self.debug("No port specified. Using: '" + str(self.port) + "'")
+
         try:
             self.request = str(self.configuration['request'])
         except (KeyError, TypeError):
             self.debug("No request specified. Using: '" + str(self.request) + "'")
+
         self.request = self.request.encode()
 
     def check(self):
@@ -774,7 +802,7 @@ class LogService(SimpleService):
         try:
             self.log_path = str(self.configuration['path'])
         except (KeyError, TypeError):
-            self.error("No path to log specified. Using: '" + self.log_path + "'")
+            self.info("No path to log specified. Using: '" + self.log_path + "'")
 
         if os.access(self.log_path, os.R_OK):
             return True
@@ -829,13 +857,14 @@ class ExecutableService(SimpleService):
         try:
             self.command = str(self.configuration['command'])
         except (KeyError, TypeError):
-            self.error("No command specified. Using: '" + self.command + "'")
+            self.info("No command specified. Using: '" + self.command + "'")
         command = self.command.split(' ')
 
         for arg in command[1:]:
             if any(st in arg for st in self.bad_substrings):
                 self.error("Bad command argument:" + " ".join(self.command[1:]))
                 return False
+
         # test command and search for it in /usr/sbin or /sbin when failed
         base = command[0].split('/')[-1]
         if self._get_raw_data() is None:
@@ -843,8 +872,10 @@ class ExecutableService(SimpleService):
                 command[0] = prefix + base
                 if os.path.isfile(command[0]):
                     break
+
         self.command = command
         if self._get_data() is None or len(self._get_data()) == 0:
             self.error("Command", self.command, "returned no data")
             return False
+
         return True

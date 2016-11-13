@@ -5794,7 +5794,7 @@
             }
         },
         {
-            url: NETDATA.serverDefault + 'css/font-awesome.min.css?v4.6.3',
+            url: NETDATA.serverDefault + 'css/font-awesome.min.css?v4.7.0',
             isAlreadyLoaded: function() { return false; }
         },
         {

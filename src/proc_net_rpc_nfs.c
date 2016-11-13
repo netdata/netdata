@@ -159,14 +159,13 @@ int do_proc_net_rpc_nfs(int update_every, unsigned long long dt) {
     if(do_proc4) do_proc4 = 1;
 
     uint32_t lines = procfile_lines(ff), l;
-    uint32_t words;
 
     char *type;
     unsigned long long net_count = 0, net_udp_count = 0, net_tcp_count = 0, net_tcp_connections = 0;
     unsigned long long rpc_calls = 0, rpc_retransmits = 0, rpc_auth_refresh = 0;
 
     for(l = 0; l < lines ;l++) {
-        words = procfile_linewords(ff, l);
+        uint32_t words = procfile_linewords(ff, l);
         if(!words) continue;
 
         type        = procfile_lineword(ff, l, 0);

@@ -114,7 +114,6 @@ int become_user(const char *username, int pid_fd)
             error("Cannot set supplementary groups for user '%s'", username);
 
         freez(supplementary_groups);
-        supplementary_groups = NULL;
         ngroups = 0;
     }
 
@@ -251,10 +250,8 @@ int become_daemon(int dont_fork, const char *user)
         create_needed_dir(VARLIB_DIR, getuid(), getgid());
     }
 
-    if(pidfd != -1) {
+    if(pidfd != -1)
         close(pidfd);
-        pidfd = -1;
-    }
 
     return(0);
 }

@@ -864,11 +864,9 @@ uint32_t simple_hash(const char *name) {
 */
 
 void strreverse(char *begin, char *end) {
-    char aux;
-
     while (end > begin) {
         // clearer code.
-        aux = *end;
+        char aux = *end;
         *end-- = *begin;
         *begin++ = aux;
     }
@@ -905,11 +903,10 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm) {
 #ifdef MADV_MERGEABLE
     static int log_madvise_2 = 1, log_madvise_3 = 1;
 #endif
-    int fd;
     void *mem = NULL;
 
     errno = 0;
-    fd = open(filename, O_RDWR | O_CREAT | O_NOATIME, 0664);
+    int fd = open(filename, O_RDWR | O_CREAT | O_NOATIME, 0664);
     if (fd != -1) {
         if (lseek(fd, size, SEEK_SET) == (off_t) size) {
             if (write(fd, "", 1) == 1) {
@@ -1090,14 +1087,12 @@ int snprintfz(char *dst, size_t n, const char *fmt, ...) {
 
 int processors = 1;
 long get_system_cpus(void) {
-    procfile *ff = NULL;
-
     processors = 1;
 
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/proc/stat", global_host_prefix);
 
-    ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
+    procfile *ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
     if(!ff) {
         error("Cannot open file '%s'. Assuming system has %d processors.", filename, processors);
         return processors;
@@ -1127,11 +1122,9 @@ long get_system_cpus(void) {
 
 pid_t pid_max = 32768;
 pid_t get_system_pid_max(void) {
-    procfile *ff = NULL;
-
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/proc/sys/kernel/pid_max", global_host_prefix);
-    ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
+    procfile *ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
     if(!ff) {
         error("Cannot open file '%s'. Assuming system supports %d pids.", filename, pid_max);
         return pid_max;
