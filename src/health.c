@@ -2575,10 +2575,12 @@ void health_reload(void) {
 // health main thread and friends
 
 static inline int rrdcalc_value2status(calculated_number n) {
-    if(isnan(n)) return RRDCALC_STATUS_UNDEFINED;
+    if(isnan(n) || isinf(n)) return RRDCALC_STATUS_UNDEFINED;
     if(n) return RRDCALC_STATUS_RAISED;
     return RRDCALC_STATUS_CLEAR;
 }
+
+#define ALARM_EXEC_COMMAND_LENGTH 8192
 
 static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->flags |= HEALTH_ENTRY_FLAG_PROCESSED;
@@ -2590,30 +2592,35 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     // find the previous notification for the same alarm
     // which we have run the exec script
-    ALARM_ENTRY *t;
-    for(t = ae->next; t ;t = t->next) {
-        if(t->alarm_id == ae->alarm_id && t->flags & HEALTH_ENTRY_FLAG_EXEC_RUN)
-            break;
-    }
+    {
+        uint32_t id = ae->alarm_id;
+        ALARM_ENTRY *t;
+        for(t = ae->next; t ; t = t->next) {
+            if(t->alarm_id == id && t->flags & HEALTH_ENTRY_FLAG_EXEC_RUN)
+                break;
+        }
 
-    if(likely(t)) {
-        // we have executed this alarm notification in the past
-        if (t && t->new_status == ae->new_status) {
-            // don't send the same notification again
-            debug(D_HEALTH, "Health not sending again notification for alarm '%s.%s' status %s", ae->chart, ae->name,
-                 rrdcalc_status2string(ae->new_status));
-            goto done;
+        if(likely(t)) {
+            // we have executed this alarm notification in the past
+            if(t && t->new_status == ae->new_status) {
+                // don't send the notification for the same status again
+                debug(D_HEALTH, "Health not sending again notification for alarm '%s.%s' status %s", ae->chart, ae->name
+                      , rrdcalc_status2string(ae->new_status));
+                goto done;
+            }
+        }
+        else {
+            // we have not executed this alarm notification in the past
+            // so, don't send CLEAR notifications
+            if(unlikely(ae->new_status == RRDCALC_STATUS_CLEAR)) {
+                debug(D_HEALTH, "Health not sending notification for first initialization of alarm '%s.%s' status %s"
+                      , ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
+                goto done;
+            }
         }
     }
-    else {
-        // we have not executed this alarm notification in the past
-        if(unlikely(ae->old_status == RRDCALC_STATUS_UNINITIALIZED && ae->new_status == RRDCALC_STATUS_CLEAR)) {
-            debug(D_HEALTH, "Health not sending notification for first initialization of alarm '%s.%s' status %s", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
-            goto done;
-        }
-    }
 
-    char buffer[FILENAME_MAX + 1];
+    static char command_to_run[ALARM_EXEC_COMMAND_LENGTH + 1];
     pid_t command_pid;
 
     const char *exec = ae->exec;
@@ -2622,7 +2629,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     const char *recipient = ae->recipient;
     if(!recipient) recipient = health.health_default_recipient;
 
-    snprintfz(buffer, FILENAME_MAX, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '%0.0Lf' '%0.0Lf' '%s' '%u' '%u' '%s' '%s'",
+    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '%0.0Lf' '%0.0Lf' '%s' '%u' '%u' '%s' '%s'",
               exec,
               recipient,
               host->hostname,
@@ -2647,14 +2654,14 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
     ae->exec_run_timestamp = time(NULL);
 
-    debug(D_HEALTH, "executing command '%s'", buffer);
-    FILE *fp = mypopen(buffer, &command_pid);
+    debug(D_HEALTH, "executing command '%s'", command_to_run);
+    FILE *fp = mypopen(command_to_run, &command_pid);
     if(!fp) {
-        error("HEALTH: Cannot popen(\"%s\", \"r\").", buffer);
+        error("HEALTH: Cannot popen(\"%s\", \"r\").", command_to_run);
         goto done;
     }
     debug(D_HEALTH, "HEALTH reading from command");
-    char *s = fgets(buffer, FILENAME_MAX, fp);
+    char *s = fgets(command_to_run, FILENAME_MAX, fp);
     (void)s;
     ae->exec_code = mypclose(fp, command_pid);
     debug(D_HEALTH, "done executing command - returned with code %d", ae->exec_code);
