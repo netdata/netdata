@@ -2828,22 +2828,16 @@ int main(int argc, char **argv)
             , RATES_DETAIL
             );
 
-#ifndef PROFILING_MODE
-    unsigned long long sunext = (time(NULL) - (time(NULL) % update_every) + update_every) * 1000000ULL;
-#endif /* PROFILING_MODE */
-
+    unsigned long long step = update_every * 1000000ULL;
     global_iterations_counter = 1;
     for(;1; global_iterations_counter++) {
-#ifndef PROFILING_MODE
-        unsigned long long sunow;
-        // delay until it is our time to run
-        while((sunow = time_usec()) < sunext)
-            sleep_usec(sunext - sunow);
+        unsigned long long now = time_usec();
+        unsigned long long next = now - (now % step) + step;
 
-        // find the next time we need to run
-        while(time_usec() > sunext)
-            sunext += update_every * 1000000ULL;
-#endif /* PROFILING_MODE */
+        while(now < next) {
+            sleep_usec(next - now);
+            now = time_usec();
+        }
 
         if(!collect_data_for_all_processes_from_proc()) {
             error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
@@ -2879,11 +2873,7 @@ int main(int argc, char **argv)
 
         time_t current_t = time(NULL);
 
-#ifndef PROFILING_MODE
         // restart check (14400 seconds)
         if(current_t - started_t > 14400) exit(0);
-#else
-        if(current_t - started_t > 10) exit(0);
-#endif /* PROFILING_MODE */
     }
 }
