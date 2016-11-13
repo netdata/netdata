@@ -1031,9 +1031,7 @@ static inline EVAL_NODE *parse_rest_of_expression(const char **string, int *erro
 
 // high level function to parse an expression or a sub-expression
 static inline EVAL_NODE *parse_full_expression(const char **string, int *error) {
-    EVAL_NODE *op1 = NULL;
-
-    op1 = parse_one_full_operand(string, error);
+    EVAL_NODE *op1 = parse_one_full_operand(string, error);
     if(!op1) {
         *error = EVAL_ERROR_MISSING_OPERAND;
         return NULL;
@@ -1081,7 +1079,6 @@ int expression_evaluate(EVAL_EXPRESSION *exp) {
 EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, int *error) {
     const char *s = string;
     int err = EVAL_ERROR_OK;
-    unsigned long pos = 0;
 
     EVAL_NODE *op = parse_full_expression(&s, &err);
 
@@ -1097,7 +1094,7 @@ EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, in
     if (error) *error = err;
 
     if(!op) {
-        pos = s - string + 1;
+        unsigned long pos = s - string + 1;
         error("failed to parse expression '%s': %s at character %lu (i.e.: '%s').", string, expression_strerror(err), pos, s);
         return NULL;
     }

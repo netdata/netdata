@@ -267,12 +267,12 @@ cleanup:
 procfile *procfile_readall(procfile *ff) {
     debug(D_PROCFILE, PF_PREFIX ": Reading file '%s'.", ff->filename);
 
-    ssize_t s, r = 1, x;
+    ssize_t r = 1;
     ff->len = 0;
 
     while(likely(r > 0)) {
-        s = ff->len;
-        x = ff->size - s;
+        ssize_t s = ff->len;
+        ssize_t x = ff->size - s;
 
         if(unlikely(!x)) {
             debug(D_PROCFILE, PF_PREFIX ": Expanding data buffer for file '%s'.", ff->filename);
@@ -316,13 +316,13 @@ procfile *procfile_readall(procfile *ff) {
 
 static void procfile_set_separators(procfile *ff, const char *separators) {
     static char def[256] = { [0 ... 255] = 0 };
-    int i;
 
     if(unlikely(!def[255])) {
         // this is thread safe
         // we check that the last byte is non-zero
         // if it is zero, multiple threads may be executing this at the same time
         // setting in def[] the exact same values
+        int i;
         for(i = 0; likely(i < 256) ;i++) {
             if(unlikely(i == '\n' || i == '\r')) def[i] = PF_CHAR_IS_NEWLINE;
             else if(unlikely(isspace(i) || !isprint(i))) def[i] = PF_CHAR_IS_SEPARATOR;
@@ -443,16 +443,16 @@ procfile *procfile_reopen(procfile *ff, const char *filename, const char *separa
 
 void procfile_print(procfile *ff) {
     uint32_t lines = procfile_lines(ff), l;
-    uint32_t words, w;
     char *s;
 
     debug(D_PROCFILE, "File '%s' with %u lines and %u words", ff->filename, ff->lines->len, ff->words->len);
 
     for(l = 0; likely(l < lines) ;l++) {
-        words = procfile_linewords(ff, l);
+        uint32_t words = procfile_linewords(ff, l);
 
         debug(D_PROCFILE, " line %u starts at word %u and has %u words", l, ff->lines->lines[l].first, ff->lines->lines[l].words);
 
+        uint32_t w;
         for(w = 0; likely(w < words) ;w++) {
             s = procfile_lineword(ff, l, w);
             debug(D_PROCFILE, "     [%u.%u] '%s'", l, w, s);

@@ -63,9 +63,9 @@ void *proc_main(void *ptr)
 
     // the next time we will run - aligned properly
     unsigned long long sunext = (time(NULL) - (time(NULL) % rrd_update_every) + rrd_update_every) * 1000000ULL;
-    unsigned long long sunow;
 
     for(;;) {
+        unsigned long long sunow;
         if(unlikely(netdata_exit)) break;
 
         // delay until it is our time to run

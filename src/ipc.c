@@ -138,7 +138,6 @@ printf ("allocated semaphores = %d\n", status.semaem);
 */
 
 static inline int ipc_sem_get_status(struct ipc_status *st) {
-    static int error_shown = 0;
     struct seminfo seminfo;
     union semun arg;
 
@@ -146,6 +145,7 @@ static inline int ipc_sem_get_status(struct ipc_status *st) {
 
     if(unlikely(semctl (0, 0, SEM_INFO, arg) < 0)) {
         /* kernel not configured for semaphores */
+        static int error_shown = 0;
         if(unlikely(!error_shown)) {
             error("IPC: kernel is not configured for semaphores");
             error_shown = 1;

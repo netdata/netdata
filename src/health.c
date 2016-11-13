@@ -141,13 +141,12 @@ static inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
 
 static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filename) {
     static uint32_t max_unique_id = 0, max_alarm_id = 0;
-    ssize_t loaded = -1, updated = -1, errored = -1, duplicate = -1;
 
     errno = 0;
 
     char *s, *buf = mallocz(65536 + 1);
     size_t line = 0, len = 0;
-    loaded = updated = errored = duplicate = 0;
+    ssize_t loaded = 0, updated = 0, errored = 0, duplicate = 0;
 
     pthread_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 

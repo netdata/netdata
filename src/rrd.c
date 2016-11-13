@@ -474,11 +474,10 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 
     char fullid[RRD_ID_LENGTH_MAX + 1];
     char fullfilename[FILENAME_MAX + 1];
-    RRDSET *st = NULL;
 
     snprintfz(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
 
-    st = rrdset_find(fullid);
+    RRDSET *st = rrdset_find(fullid);
     if(st) {
         error("Cannot create rrd stats for '%s', it already exists.", fullid);
         return st;

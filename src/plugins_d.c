@@ -121,7 +121,6 @@ void *pluginsd_worker_thread(void *arg)
         info("PLUGINSD: '%s' running on pid %d", cd->fullfilename, cd->pid);
 
         RRDSET *st = NULL;
-        char *s;
         uint32_t hash;
 
         while(likely(fgets(line, PLUGINSD_LINE_MAX, fp) != NULL)) {
@@ -132,7 +131,7 @@ void *pluginsd_worker_thread(void *arg)
             // debug(D_PLUGINSD, "PLUGINSD: %s: %s", cd->filename, line);
 
             int w = pluginsd_split_words(line, words, MAX_WORDS);
-            s = words[0];
+            char *s = words[0];
             if(unlikely(!s || !*s || !w)) {
                 // debug(D_PLUGINSD, "PLUGINSD: empty line");
                 continue;
