@@ -29,14 +29,13 @@ int do_proc_net_dev(int update_every, unsigned long long dt) {
     if(do_events == -1)     do_events       = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "frames, collisions, carrier counters for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
 
     uint32_t lines = procfile_lines(ff), l;
-    uint32_t words;
 
     char *iface;
     unsigned long long rbytes, rpackets, rerrors, rdrops, rfifo, rframe, rcompressed, rmulticast;
     unsigned long long tbytes, tpackets, terrors, tdrops, tfifo, tcollisions, tcarrier, tcompressed;
 
     for(l = 2; l < lines ;l++) {
-        words = procfile_linewords(ff, l);
+        uint32_t words = procfile_linewords(ff, l);
         if(words < 17) continue;
 
         iface       = procfile_lineword(ff, l, 0);
