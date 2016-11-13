@@ -1209,19 +1209,32 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
     time_t last_entry_t  = rrdset_last_entry_t(st);
 
     if(before == 0 && after == 0) {
+        // dump the all the data
         before = last_entry_t;
         after = first_entry_t;
         absolute_period_requested = 0;
     }
 
-    // allow relative for before and after (smaller than 3 years)
-    if(((before < 0)?-before:before) <= (3 * 365 * 86400)) {
-        before = last_entry_t + before;
+    // allow relative for before (smaller than API_RELATIVE_TIME_MAX)
+    if(((before < 0)?-before:before) <= API_RELATIVE_TIME_MAX) {
+        if(abs(before) % st->update_every) {
+            // make sure it is multiple of st->update_every
+            if(before < 0) before = before - st->update_every - before % st->update_every;
+            else           before = before + st->update_every - before % st->update_every;
+        }
+        if(before > 0) before = first_entry_t + before;
+        else           before = last_entry_t  + before;
         absolute_period_requested = 0;
     }
 
-    if(((after < 0)?-after:after) <= (3 * 365 * 86400)) {
+    // allow relative for after (smaller than API_RELATIVE_TIME_MAX)
+    if(((after < 0)?-after:after) <= API_RELATIVE_TIME_MAX) {
         if(after == 0) after = -st->update_every;
+        if(abs(after) % st->update_every) {
+            // make sure it is multiple of st->update_every
+            if(after < 0) after = after - st->update_every - after % st->update_every;
+            else          after = after + st->update_every - after % st->update_every;
+        }
         after = before + after;
         absolute_period_requested = 0;
     }
