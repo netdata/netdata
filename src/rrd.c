@@ -527,9 +527,12 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
         }
 
         // make sure the database is aligned
-        if(st->last_updated.tv_sec % update_every) {
-            st->last_updated.tv_sec -= st->last_updated.tv_sec % update_every;
-            st->last_updated.tv_usec = 0;
+        if(st->last_updated.tv_sec) {
+            if(st->last_updated.tv_sec % update_every)
+                st->last_updated.tv_sec -= st->last_updated.tv_sec % update_every;
+
+            // aligned in the middle, for tolerance with plugins
+            st->last_updated.tv_usec = 500000ULL;
         }
     }
 
@@ -1103,7 +1106,7 @@ unsigned long long rrdset_done(RRDSET *st)
 
         // align it to update_every
         st->last_collected_time.tv_sec -= st->last_collected_time.tv_sec % st->update_every;
-        st->last_collected_time.tv_usec = 0;
+        st->last_collected_time.tv_usec = 500000ULL;
 
         last_collect_ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec - update_every_ut;
 
@@ -1149,7 +1152,7 @@ unsigned long long rrdset_done(RRDSET *st)
 
         // align it to update_every
         st->last_collected_time.tv_sec -= st->last_collected_time.tv_sec % st->update_every;
-        st->last_collected_time.tv_usec = 0;
+        st->last_collected_time.tv_usec = 500000ULL;
 
         unsigned long long ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec - st->usec_since_last_update;
         st->last_updated.tv_sec = (time_t) (ut / 1000000ULL);
