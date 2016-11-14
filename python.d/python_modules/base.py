@@ -168,7 +168,7 @@ class SimpleService(threading.Thread):
                 return
 
             if status:  # handle retries if update failed
-                time.sleep(self.timetable['next'] - time.time())
+                time.sleep(max (0, self.timetable['next'] - time.time()))
                 self.retries_left = self.retries
             else:
                 self.retries_left -= 1
