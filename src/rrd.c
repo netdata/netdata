@@ -438,7 +438,7 @@ void rrdset_reset(RRDSET *st)
         memset(rd->values, 0, rd->entries * sizeof(storage_number));
     }
 }
-static long align_entries_to_pagesize(long entries) {
+static inline long align_entries_to_pagesize(long entries) {
     if(entries < 5) entries = 5;
     if(entries > RRD_HISTORY_ENTRIES_MAX) entries = RRD_HISTORY_ENTRIES_MAX;
 
@@ -458,6 +458,11 @@ static long align_entries_to_pagesize(long entries) {
 #else
     return entries;
 #endif
+}
+
+static inline void timeval_align(struct timeval *tv, int update_every) {
+    tv->tv_sec  = tv->tv_sec - tv->tv_sec % update_every + update_every / 2;
+    tv->tv_usec = (unsigned long)(update_every % 2) * 500000;
 }
 
 RRDSET *rrdset_create(const char *type, const char *id, const char *name, const char *family, const char *context, const char *title, const char *units, long priority, int update_every, int chart_type)
@@ -527,13 +532,8 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
         }
 
         // make sure the database is aligned
-        if(st->last_updated.tv_sec) {
-            if(st->last_updated.tv_sec % update_every)
-                st->last_updated.tv_sec -= st->last_updated.tv_sec % update_every;
-
-            // aligned in the middle, for tolerance with plugins
-            st->last_updated.tv_usec = 500000ULL;
-        }
+        if(st->last_updated.tv_sec)
+            timeval_align(&st->last_updated, update_every);
     }
 
     if(st) {
@@ -1103,10 +1103,7 @@ unsigned long long rrdset_done(RRDSET *st)
         // it is the first entry
         // set the last_collected_time to now
         gettimeofday(&st->last_collected_time, NULL);
-
-        // align it to update_every
-        st->last_collected_time.tv_sec -= st->last_collected_time.tv_sec % st->update_every;
-        st->last_collected_time.tv_usec = 500000ULL;
+        timeval_align(&st->last_collected_time, st->update_every);
 
         last_collect_ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec - update_every_ut;
 
@@ -1149,10 +1146,7 @@ unsigned long long rrdset_done(RRDSET *st)
         st->usec_since_last_update = update_every_ut;
 
         gettimeofday(&st->last_collected_time, NULL);
-
-        // align it to update_every
-        st->last_collected_time.tv_sec -= st->last_collected_time.tv_sec % st->update_every;
-        st->last_collected_time.tv_usec = 500000ULL;
+        timeval_align(&st->last_collected_time, st->update_every);
 
         unsigned long long ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec - st->usec_since_last_update;
         st->last_updated.tv_sec = (time_t) (ut / 1000000ULL);
