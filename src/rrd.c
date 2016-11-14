@@ -461,8 +461,8 @@ static inline long align_entries_to_pagesize(long entries) {
 }
 
 static inline void timeval_align(struct timeval *tv, int update_every) {
-    tv->tv_sec  = tv->tv_sec - tv->tv_sec % update_every + update_every / 2;
-    tv->tv_usec = (unsigned long)(update_every % 2) * 500000;
+    tv->tv_sec -= tv->tv_sec % update_every;
+    tv->tv_usec = 500000;
 }
 
 RRDSET *rrdset_create(const char *type, const char *id, const char *name, const char *family, const char *context, const char *title, const char *units, long priority, int update_every, int chart_type)
