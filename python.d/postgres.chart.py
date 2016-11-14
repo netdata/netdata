@@ -7,6 +7,7 @@ from copy import deepcopy
 
 import psycopg2
 from psycopg2 import extensions
+from psycopg2._psycopg import DatabaseError
 from psycopg2.extras import DictCursor
 
 from base import SimpleService
@@ -221,6 +222,8 @@ class Service(SimpleService):
 
             self._create_definitions()
             return True
+        except DatabaseError:
+            return False
         except Exception as e:
             self.error(e)
             return False
