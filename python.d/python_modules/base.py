@@ -116,21 +116,10 @@ class SimpleService(threading.Thread):
         Return value presents exit status of update()
         :return: boolean
         """
-        t_start = time.time()
-        timetable = self.timetable
+        t_start = float(time.time())
         chart_name = self.chart_name
 
-        # check if it is time to execute job update() function
-        if timetable['next'] > t_start:
-            self.debug(chart_name, "will be run in", str(int((timetable['next'] - t_start) * 1000)), "ms")
-            return True
-
-        since_last = int((t_start - timetable['last']) * 1000000)
-        self.debug(chart_name,
-                   "ready to run, after", str(int((t_start - timetable['last']) * 1000)),
-                   "ms (update_every:", str(timetable['freq'] * 1000),
-                   "ms, latency:", str(int((t_start - timetable['next']) * 1000)), "ms")
-
+        since_last = int((t_start - self.timetable['last']) * 1000000)
         if self.__first_run:
             since_last = 0
 
@@ -138,14 +127,10 @@ class SimpleService(threading.Thread):
             self.error("update function failed.")
             return False
 
-        t_end = time.time()
-        self.timetable['next'] = t_end - (t_end % timetable['freq']) + timetable['freq']
-
         # draw performance graph
-        run_time = str(int((t_end - t_start) * 1000))
-        # noinspection SqlNoDataSourceInspection
+        run_time = int((time.time() - t_start) * 1000)
         print("BEGIN netdata.plugin_pythond_%s %s\nSET run_time = %s\nEND\n" %
-              (self.chart_name, str(since_last), run_time))
+              (self.chart_name, str(since_last), str(run_time)))
 
         self.debug(chart_name, "updated in", str(run_time), "ms")
         self.timetable['last'] = t_start
@@ -158,26 +143,38 @@ class SimpleService(threading.Thread):
         Exits when job failed or timed out.
         :return: None
         """
-        self.timetable['last'] = time.time()
-        self.debug("starting data collection - update frequency: " + str(self.update_every) + ", retries allowed: " + str(self.retries))
+        step = float(self.timetable['freq'])
+        self.timetable['last'] = float(time.time() - step)
+        self.debug("starting data collection - update frequency:", str(step), ", retries allowed:", str(self.retries))
         while True:  # run forever, unless something is wrong
+            now = float(time.time())
+            next = self.timetable['next'] = now - (now % step) + step + (step / 3) # add 1/3 into the iteration to sync with netdata
+
+            # it is important to do this in a loop
+            # sleep() is interruptable
+            while now < next:
+                self.debug("sleeping for", str(next - now), "secs to reach frequency of", str(step), "secs, now:", str(now), ", next:", str(next))
+                time.sleep(next - now)
+                now = float(time.time())
+
+            # do the job
             try:
                 status = self._run_once()
             except Exception as e:
                 self.alert("internal error - aborting data collection: " + str(e))
                 return
 
-            if status:  # handle retries if update failed
-                time.sleep(max (0, self.timetable['next'] - time.time()))
+            if status:
+                # it is good
                 self.retries_left = self.retries
             else:
+                # it failed
                 self.retries_left -= 1
                 if self.retries_left <= 0:
                     self.alert("failed to collect data - no more retries allowed - aborting data collection")
                     return
                 else:
                     self.error("failed to collect data. " + str(self.retries_left) + " retries left.")
-                    time.sleep(self.timetable['freq'])
 
     # --- CHART ---
 
