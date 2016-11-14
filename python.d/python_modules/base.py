@@ -148,7 +148,7 @@ class SimpleService(threading.Thread):
         self.debug("starting data collection - update frequency:", str(step), ", retries allowed:", str(self.retries))
         while True:  # run forever, unless something is wrong
             now = float(time.time())
-            next = self.timetable['next'] = now - (now % step) + step + (step / 3) # add 1/3 into the iteration to sync with netdata
+            next = self.timetable['next'] = now - (now % step) + step
 
             # it is important to do this in a loop
             # sleep() is interruptable

@@ -125,7 +125,11 @@ int error_log_limit(int reset) {
 
     // prevent all logs if the errors per period is 0
     if(error_log_errors_per_period == 0)
+#ifdef NETDATA_INTERNAL_CHECKS
+        return 0;
+#else
         return 1;
+#endif
 
     time_t now = time(NULL);
     if(!start) start = now;
@@ -185,7 +189,11 @@ int error_log_limit(int reset) {
         prevented++;
 
         // prevent logging this error
+#ifdef NETDATA_INTERNAL_CHECKS
+        return 0;
+#else
         return 1;
+#endif
     }
 
     return 0;
