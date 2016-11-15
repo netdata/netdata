@@ -144,16 +144,17 @@ class SimpleService(threading.Thread):
         :return: None
         """
         step = float(self.timetable['freq'])
+        penalty = 0
         self.timetable['last'] = float(time.time() - step)
-        self.debug("starting data collection - update frequency:", str(step), ", retries allowed:", str(self.retries))
+        self.debug("starting data collection - update frequency:", str(step), " retries allowed:", str(self.retries))
         while True:  # run forever, unless something is wrong
             now = float(time.time())
-            next = self.timetable['next'] = now - (now % step) + step
+            next = self.timetable['next'] = now - (now % step) + step + penalty
 
             # it is important to do this in a loop
             # sleep() is interruptable
             while now < next:
-                self.debug("sleeping for", str(next - now), "secs to reach frequency of", str(step), "secs, now:", str(now), ", next:", str(next))
+                self.debug("sleeping for", str(next - now), "secs to reach frequency of", str(step), "secs, now:", str(now), " next:", str(next), " penalty:", str(penalty))
                 time.sleep(next - now)
                 now = float(time.time())
 
@@ -167,14 +168,24 @@ class SimpleService(threading.Thread):
             if status:
                 # it is good
                 self.retries_left = self.retries
+                penalty = 0
             else:
                 # it failed
                 self.retries_left -= 1
                 if self.retries_left <= 0:
-                    self.alert("failed to collect data - no more retries allowed - aborting data collection")
-                    return
+                    if penalty == 0:
+                        penalty = float(self.retries * step) / 2
+                    else:
+                        penalty *= 1.5
+
+                    if penalty > 600:
+                        penalty = 600
+
+                    self.retries_left = self.retries
+                    self.alert("failed to collect data for " + str(self.retries) + " times - increasing penalty to " + str(penalty) + " sec and trying again")
+
                 else:
-                    self.error("failed to collect data. " + str(self.retries_left) + " retries left.")
+                    self.error("failed to collect data - " + str(self.retries_left) + " retries left - penalty: " + str(penalty) + " sec")
 
     # --- CHART ---
 
