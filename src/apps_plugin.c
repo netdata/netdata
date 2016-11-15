@@ -30,6 +30,8 @@ int show_guest_time_old = 0;
 
 int enable_guest_charts = 0;
 int enable_file_charts = 1;
+int enable_users_charts = 1;
+int enable_groups_charts = 1;
 
 // ----------------------------------------------------------------------------
 
@@ -2694,6 +2696,16 @@ void parse_args(int argc, char **argv)
             continue;
         }
 
+        if(strcmp("no-users", argv[i]) == 0 || strcmp("without-users", argv[i]) == 0) {
+            enable_users_charts = 0;
+            continue;
+        }
+
+        if(strcmp("no-groups", argv[i]) == 0 || strcmp("without-groups", argv[i]) == 0) {
+            enable_groups_charts = 0;
+            continue;
+        }
+
         if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
             fprintf(stderr,
                     "apps.plugin\n"
@@ -2852,16 +2864,23 @@ int main(int argc, char **argv)
 
         // this is smart enough to show only newly added apps, when needed
         send_charts_updates_to_netdata(apps_groups_root_target, "apps", "Apps");
-        send_charts_updates_to_netdata(users_root_target, "users", "Users");
-        send_charts_updates_to_netdata(groups_root_target, "groups", "User Groups");
+
+        if(likely(enable_users_charts))
+            send_charts_updates_to_netdata(users_root_target, "users", "Users");
+
+        if(likely(enable_groups_charts))
+            send_charts_updates_to_netdata(groups_root_target, "groups", "User Groups");
 
         send_collected_data_to_netdata(apps_groups_root_target, "apps", dt);
-        send_collected_data_to_netdata(users_root_target, "users", dt);
-        send_collected_data_to_netdata(groups_root_target, "groups", dt);
+
+        if(likely(enable_users_charts))
+            send_collected_data_to_netdata(users_root_target, "users", dt);
+
+        if(likely(enable_groups_charts))
+            send_collected_data_to_netdata(groups_root_target, "groups", dt);
 
         show_guest_time_old = show_guest_time;
 
-        //if(puts(buffer_tostring(output)) == EOF)
         if(write(STDOUT_FILENO, buffer_tostring(output), buffer_strlen(output)) == -1)
             fatal("Cannot send chart values to netdata.");
 
