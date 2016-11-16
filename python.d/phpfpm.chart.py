@@ -23,37 +23,37 @@ ORDER = ['connections', 'requests', 'performance', 'request_duration', 'request_
 
 CHARTS = {
     'connections': {
-        'options': [None, 'PHP-FPM Active Connections', 'connections', 'phpfpm', 'phpfpm.connections', 'line'],
+        'options': [None, 'PHP-FPM Active Connections', 'connections', 'active connections', 'phpfpm.connections', 'line'],
         'lines': [
             ["active"],
             ["maxActive", 'max active'],
             ["idle"]
         ]},
     'requests': {
-        'options': [None, 'PHP-FPM Requests', 'requests/s', 'phpfpm', 'phpfpm.requests', 'line'],
+        'options': [None, 'PHP-FPM Requests', 'requests/s', 'requests', 'phpfpm.requests', 'line'],
         'lines': [
             ["requests", None, "incremental"]
         ]},
     'performance': {
-        'options': [None, 'PHP-FPM Performance', 'status', 'phpfpm', 'phpfpm.performance', 'line'],
+        'options': [None, 'PHP-FPM Performance', 'status', 'performance', 'phpfpm.performance', 'line'],
         'lines': [
             ["reached", 'max children reached'],
             ["slow", 'slow requests']
         ]},
     'request_duration': {
-        'options': [None, 'PHP-FPM Request Duration', 'milliseconds', 'phpfpm', 'phpfpm.request_duration', 'line'],
+        'options': [None, 'PHP-FPM Request Duration', 'milliseconds', 'request duration', 'phpfpm.request_duration', 'line'],
         'lines': [
             ["maxReqDur", 'max request duration'],
             ["avgReqDur", 'average request duration']
         ]},
     'request_cpu': {
-        'options': [None, 'PHP-FPM Request CPU', 'percent', 'phpfpm', 'phpfpm.request_cpu', 'line'],
+        'options': [None, 'PHP-FPM Request CPU', 'percent', 'request CPU', 'phpfpm.request_cpu', 'line'],
         'lines': [
             ["maxReqCPU", 'max request cpu'],
             ["avgReqCPU", 'average request cpu']
         ]},
     'request_mem': {
-        'options': [None, 'PHP-FPM Request Memory', 'kilobytes', 'phpfpm', 'phpfpm.request_mem', 'line'],
+        'options': [None, 'PHP-FPM Request Memory', 'kilobytes', 'request memory', 'phpfpm.request_mem', 'line'],
         'lines': [
             ["maxReqMem", 'max request memory'],
             ["avgReqMem", 'average request memory']
@@ -93,9 +93,14 @@ class Service(UrlService):
                 raw_json = json.loads(raw)
             except ValueError:
                 return None
-            data = {self.assignment[k]: v for k, v in raw_json.items() if k in self.assignment}
+            data = {}
+            for k,v in raw_json.items():
+                if k in self.assignment:
+                    data[self.assignment[k]] = v
+
             if '&full' in self.url or '?full' in self.url:
                 c = 0
+                sum_val = {}
                 for proc in raw_json['processes']:
                     if proc['state'] != 'Idle':
                         continue
@@ -108,9 +113,14 @@ class Service(UrlService):
                             d = d/1024
                         if 'max' + v not in data or data['max' + v] < d:
                             data['max' + v] = d
-                        if 'avg' + v not in data:
+                        if 'avg' + v not in sum_val:
+                            sum_val['avg' + v] = 0
                             data['avg' + v] = 0
-                        data['avg' + v] = (data['avg' + v] + d) / c
+                        sum_val['avg' + v] += d
+                if len(sum_val):
+                    for k, v in sum_val.items():
+                        data[k] = v/c
+
             if len(data) == 0:
                 return None
             return data
