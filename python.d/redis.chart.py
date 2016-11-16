@@ -79,19 +79,34 @@ class Service(SocketService):
     def __init__(self, configuration=None, name=None):
         SocketService.__init__(self, configuration=configuration, name=name)
         self.request = "INFO\r\n"
-        self.host = "localhost"
-        self.port = 6379
-        self.unix_socket = None
         self.order = ORDER
         self.definitions = CHARTS
         self._keep_alive = True
         self.chart_name = ""
+        self.passwd = None
+        self.port = 6379
+        if 'port' in configuration:
+            self.port = configuration['port']
+        if 'pass' in configuration:
+            self.passwd = configuration['pass']
+        if 'host' in configuration:
+            self.host = configuration['host']
+        if 'socket' in configuration:
+            self.unix_socket = configuration['socket']
 
     def _get_data(self):
         """
         Get data from socket
         :return: dict
         """
+        if self.passwd:
+            info_request = self.request
+            self.request = "AUTH " + self.passwd + "\r\n"
+            raw = self._get_raw_data().strip()
+            if raw != "+OK":
+                self.error("invalid password")
+                return None
+            self.request = info_request
         response = self._get_raw_data()
         if response is None:
             # error has already been logged
@@ -142,6 +157,8 @@ class Service(SocketService):
         length = len(data)
         supposed = data.split('\n')[0][1:]
         offset = len(supposed) + 4  # 1 dollar sing, 1 new line character + 1 ending sequence '\r\n'
+        if not supposed.isdigit():
+            return True
         supposed = int(supposed)
 
         if length - offset >= supposed:
