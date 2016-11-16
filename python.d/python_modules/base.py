@@ -692,11 +692,7 @@ class SocketService(SimpleService):
                 break
 
             self.debug("received data:", str(buf))
-<<<<<<< HEAD
             data += buf.decode('utf-8', 'ignore')
-=======
-            data += buf.decode(errors='ignore')
->>>>>>> upstream/master
             if self._check_raw_data(data):
                 break
 
