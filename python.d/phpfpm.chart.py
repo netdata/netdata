@@ -23,37 +23,37 @@ ORDER = ['connections', 'requests', 'performance', 'request_duration', 'request_
 
 CHARTS = {
     'connections': {
-        'options': [None, 'PHP-FPM Active Connections', 'connections', 'Active Connections', 'phpfpm.connections', 'line'],
+        'options': [None, 'PHP-FPM Active Connections', 'connections', 'active connections', 'phpfpm.connections', 'line'],
         'lines': [
             ["active"],
             ["maxActive", 'max active'],
             ["idle"]
         ]},
     'requests': {
-        'options': [None, 'PHP-FPM Requests', 'requests/s', 'Requests', 'phpfpm.requests', 'line'],
+        'options': [None, 'PHP-FPM Requests', 'requests/s', 'requests', 'phpfpm.requests', 'line'],
         'lines': [
             ["requests", None, "incremental"]
         ]},
     'performance': {
-        'options': [None, 'PHP-FPM Performance', 'status', 'Performance', 'phpfpm.performance', 'line'],
+        'options': [None, 'PHP-FPM Performance', 'status', 'performance', 'phpfpm.performance', 'line'],
         'lines': [
             ["reached", 'max children reached'],
             ["slow", 'slow requests']
         ]},
     'request_duration': {
-        'options': [None, 'PHP-FPM Request Duration', 'milliseconds', 'Request Duration', 'phpfpm.request_duration', 'line'],
+        'options': [None, 'PHP-FPM Request Duration', 'milliseconds', 'request duration', 'phpfpm.request_duration', 'line'],
         'lines': [
             ["maxReqDur", 'max request duration'],
             ["avgReqDur", 'average request duration']
         ]},
     'request_cpu': {
-        'options': [None, 'PHP-FPM Request CPU', 'percent', 'Request CPU', 'phpfpm.request_cpu', 'line'],
+        'options': [None, 'PHP-FPM Request CPU', 'percent', 'request CPU', 'phpfpm.request_cpu', 'line'],
         'lines': [
             ["maxReqCPU", 'max request cpu'],
             ["avgReqCPU", 'average request cpu']
         ]},
     'request_mem': {
-        'options': [None, 'PHP-FPM Request Memory', 'kilobytes', 'Request Memory', 'phpfpm.request_mem', 'line'],
+        'options': [None, 'PHP-FPM Request Memory', 'kilobytes', 'request memory', 'phpfpm.request_mem', 'line'],
         'lines': [
             ["maxReqMem", 'max request memory'],
             ["avgReqMem", 'average request memory']
@@ -137,6 +137,3 @@ class Service(UrlService):
         if len(data) == 0:
             return None
         return data
-
-    def check(self):
-        return UrlService.check(self)
