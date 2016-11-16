@@ -1,9 +1,13 @@
 # no need for shebang - this file is loaded from charts.d.plugin
 
-# if this chart is called X.chart.sh, then all functions and global variables
-# must start with X_
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+# Contributed by @safeie with PR #276
 
-# first, you need open php-fpm status in php-fpm.conf 
+# first, you need open php-fpm status in php-fpm.conf
 # second, you need add status location in nginx.conf
 # you can see, https://easyengine.io/tutorials/php/fpm-status-page/
 
@@ -32,7 +36,7 @@ phpfpm_slow_requests=0
 phpfpm_get() {
 	local opts="${1}" url="${2}"
 
-	phpfpm_response=($(curl -Ss ${opts} "${url}"))
+	phpfpm_response=($(run curl -Ss ${opts} "${url}"))
 	[ $? -ne 0 -o "${#phpfpm_response[@]}" -eq 0 ] && return 1
 
 	if [[ "${phpfpm_response[0]}" != "pool:" \
@@ -46,7 +50,7 @@ phpfpm_get() {
 		|| "${phpfpm_response[32]}" != "total" \
 	]]
 		then
-		echo >&2 "phpfpm: invalid response from phpfpm status server: ${phpfpm_response[*]}"
+		error "invalid response from phpfpm status server: ${phpfpm_response[*]}"
 		return 1
 	fi
 
@@ -83,7 +87,7 @@ phpfpm_get() {
 		|| -z "${phpfpm_max_children_reached}" \
 	]]
 		then
-		echo >&2 "phpfpm: empty values got from phpfpm status server: ${phpfpm_response[*]}"
+		error "empty values got from phpfpm status server: ${phpfpm_response[*]}"
 		return 1
 	fi
 
@@ -101,14 +105,14 @@ phpfpm_check() {
 	do
 		phpfpm_get "${phpfpm_curl_opts[$m]}" "${phpfpm_urls[$m]}"
 		if [ $? -ne 0 ]; then
-			echo >&2 "phpfpm: cannot find status on URL '${phpfpm_url[$m]}'. Please set phpfpm_urls[$m]='http://localhost/status' in $confd/phpfpm.conf"
+			error "cannot find status on URL '${phpfpm_url[$m]}'. Please set phpfpm_urls[$m]='http://localhost/status' in $confd/phpfpm.conf"
 			unset phpfpm_urls[$m]
 			continue
 		fi
 	done
 	
 	if [ ${#phpfpm_urls[@]} -eq 0 ]; then
-		echo >&2 "phpfpm: no phpfpm servers found. Please set phpfpm_urls[name]='url' to whatever needed to get status to the phpfpm server, in $confd/phpfpm.conf"
+		error "no phpfpm servers found. Please set phpfpm_urls[name]='url' to whatever needed to get status to the phpfpm server, in $confd/phpfpm.conf"
 		return 1
 	fi
 	

@@ -1,5 +1,12 @@
 # no need for shebang - this file is loaded from charts.d.plugin
 
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+# Contributed by @jgeromero with PR #277
+
 # Description: Tomcat netdata charts.d plugin
 # Author: Jorge Romero
 
@@ -34,13 +41,13 @@ tomcat_check() {
 
 	# check if url, username, passwords are set
 	if [ -z "${tomcat_url}" ]; then
-	  	echo >&2 "tomcat url is unset or set to the empty string"
+	  	error "tomcat url is unset or set to the empty string"
 		return 1
 	fi
 	if [ -z "${tomcat_user}" ]; then
 		# check backwards compatibility
 		if [ -z "${tomcatUser}" ]; then		
-    	  		echo >&2 "tomcat user is unset or set to the empty string"
+    	  	error "tomcat user is unset or set to the empty string"
 			return 1
 		else
 			tomcat_user="${tomcatUser}"
@@ -49,7 +56,7 @@ tomcat_check() {
 	if [ -z "${tomcat_password}" ]; then
 		# check backwards compatibility
 		if [ -z "${tomcatPassword}" ]; then
-	    	  	echo >&2 "tomcat password is unset or set to the empty string"
+	    	error "tomcat password is unset or set to the empty string"
 			return 1
 		else
 			tomcat_password="${tomcatPassword}"
@@ -60,8 +67,7 @@ tomcat_check() {
 	tomcat_get
 	if [ $? -ne 0 ]
 		then
-		echo >&2 "tomcat: couldn't get to status page on URL '${tomcat_url}'."\
-		"Please make sure tomcat url, username and password are correct."
+		error "cannot get to status page on URL '${tomcat_url}'. Please make sure tomcat url, username and password are correct."
 		return 1
 	fi
 
@@ -75,8 +81,8 @@ tomcat_check() {
 tomcat_get() {
 	# collect tomcat values
 	tomcat_port="$(IFS=/ read -ra a <<< "$tomcat_url"; hostport=${a[2]}; echo "${hostport#*:}")"
-	mapfile -t lines < <(curl -u "$tomcat_user":"$tomcat_password" -Ss ${tomcat_curl_opts} "$tomcat_url" |\
-		xmlstarlet sel \
+	mapfile -t lines < <(run curl -u "$tomcat_user":"$tomcat_password" -Ss ${tomcat_curl_opts} "$tomcat_url" |\
+		run xmlstarlet sel \
 			-t -m "/status/jvm/memory" -v @free \
 			-n -m "/status/connector[@name='\"http-bio-$tomcat_port\"']/threadInfo" -v @currentThreadCount \
 			-n -v @currentThreadsBusy \

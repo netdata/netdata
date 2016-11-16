@@ -1,5 +1,10 @@
 # no need for shebang - this file is loaded from charts.d.plugin
 
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
 # THIS PLUGIN IS OBSOLETE
 # USE apps.plugin INSTEAD
 
@@ -19,7 +24,7 @@ cpu_apps_check() {
 
 	if [ -z "$cpu_apps_apps" ]
 	then
-		echo >&2 "$PROGRAM_NAME: cpu_apps: Please set cpu_apps_apps='command1 command2 ...' in $confd/cpu_apps_apps.conf"
+		error "manual configuration required: please set cpu_apps_apps='command1 command2 ...' in $confd/cpu_apps_apps.conf"
 		return 1
 	fi
 	return 0

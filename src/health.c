@@ -141,13 +141,12 @@ static inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
 
 static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filename) {
     static uint32_t max_unique_id = 0, max_alarm_id = 0;
-    ssize_t loaded = -1, updated = -1, errored = -1, duplicate = -1;
 
     errno = 0;
 
     char *s, *buf = mallocz(65536 + 1);
     size_t line = 0, len = 0;
-    loaded = updated = errored = duplicate = 0;
+    ssize_t loaded = 0, updated = 0, errored = 0, duplicate = 0;
 
     pthread_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
@@ -486,14 +485,17 @@ static inline void rrdvar_free(RRDHOST *host, avl_tree_lock *tree, RRDVAR *rv) {
 
     if(!rv) return;
 
-    if(tree)
-        rrdvar_index_del(tree, rv);
+    if(tree) {
+        debug(D_VARIABLES, "Deleting variable '%s'", rv->name);
+        if(unlikely(!rrdvar_index_del(tree, rv)))
+            error("Attempted to delete variable '%s' from host '%s', but it is not found.", rv->name, host->hostname);
+    }
 
     freez(rv->name);
     freez(rv);
 }
 
-static inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *tree, const char *name, int type, calculated_number *value) {
+static inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *tree, const char *name, int type, void *value) {
     char *variable = strdupz(name);
     rrdvar_fix_name(variable);
     uint32_t hash = simple_hash(variable);
@@ -518,8 +520,13 @@ static inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *
             debug(D_VARIABLES, "Variable '%s' created in scope '%s'", variable, scope);
     }
     else {
+        debug(D_VARIABLES, "Variable '%s' is already found in scope '%s'.", variable, scope);
+
         // already exists
         freez(variable);
+
+        // this is important
+        // it must return NULL - not the existing variable - or double-free will happen
         rv = NULL;
     }
 
@@ -527,10 +534,69 @@ static inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *
 }
 
 // ----------------------------------------------------------------------------
+// CUSTOM VARIABLES
+
+RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name) {
+    calculated_number *v = callocz(1, sizeof(calculated_number));
+    *v = NAN;
+    RRDVAR *rv = rrdvar_create_and_index("host", &host->variables_root_index, name, RRDVAR_TYPE_CALCULATED_ALLOCATED, v);
+    if(unlikely(!rv)) {
+        free(v);
+        error("Requested variable '%s' already exists - possibly 2 plugins will be updating it at the same time", name);
+
+        char *variable = strdupz(name);
+        rrdvar_fix_name(variable);
+        uint32_t hash = simple_hash(variable);
+
+        rv = rrdvar_index_find(&host->variables_root_index, variable, hash);
+    }
+
+    return rv;
+}
+
+void rrdvar_custom_host_variable_destroy(RRDHOST *host, const char *name) {
+    char *variable = strdupz(name);
+    rrdvar_fix_name(variable);
+    uint32_t hash = simple_hash(variable);
+
+    RRDVAR *rv = rrdvar_index_find(&host->variables_root_index, variable, hash);
+    freez(variable);
+
+    if(!rv) {
+        error("Attempted to remove variable '%s' from host '%s', but it does not exist.", name, host->hostname);
+        return;
+    }
+
+    if(rv->type != RRDVAR_TYPE_CALCULATED_ALLOCATED) {
+        error("Attempted to remove variable '%s' from host '%s', but it does not a custom allocated variable.", name, host->hostname);
+        return;
+    }
+
+    if(!rrdvar_index_del(&host->variables_root_index, rv)) {
+        error("Attempted to remove variable '%s' from host '%s', but it cannot be found.", name, host->hostname);
+        return;
+    }
+
+    freez(rv->name);
+    freez(rv->value);
+    freez(rv);
+}
+
+void rrdvar_custom_host_variable_set(RRDVAR *rv, calculated_number value) {
+    if(rv->type != RRDVAR_TYPE_CALCULATED_ALLOCATED)
+        error("requested to set variable '%s' to value " CALCULATED_NUMBER_FORMAT " but the variable is not a custom one.", rv->name, value);
+    else {
+        calculated_number *v = rv->value;
+        *v = value;
+    }
+}
+
+// ----------------------------------------------------------------------------
 // RRDVAR lookup
 
-calculated_number rrdvar2number(RRDVAR *rv) {
+static calculated_number rrdvar2number(RRDVAR *rv) {
     switch(rv->type) {
+        case RRDVAR_TYPE_CALCULATED_ALLOCATED:
         case RRDVAR_TYPE_CALCULATED: {
             calculated_number *n = (calculated_number *)rv->value;
             return *n;
@@ -562,11 +628,6 @@ calculated_number rrdvar2number(RRDVAR *rv) {
     }
 }
 
-void dump_variable(void *data) {
-    RRDVAR *rv = (RRDVAR *)data;
-    debug(D_HEALTH, "%50s : %20.5Lf", rv->name, rrdvar2number(rv));
-}
-
 int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, calculated_number *result) {
     RRDSET *st = rc->rrdset;
     RRDVAR *rv;
@@ -591,110 +652,193 @@ int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, cal
         return 1;
     }
 
-    debug(D_HEALTH, "Available local chart '%s' variables:", st->id);
-    avl_traverse_lock(&st->variables_root_index, dump_variable);
-
-    debug(D_HEALTH, "Available family '%s' variables:", st->rrdfamily->family);
-    avl_traverse_lock(&st->rrdfamily->variables_root_index, dump_variable);
-
-    debug(D_HEALTH, "Available host '%s' variables:", st->rrdhost->hostname);
-    avl_traverse_lock(&st->rrdhost->variables_root_index, dump_variable);
-
     return 0;
 }
 
 // ----------------------------------------------------------------------------
-// RRDSETVAR management
+// RRDVAR to JSON
 
-RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, int type, void *value, uint32_t options) {
-    debug(D_VARIABLES, "RRDVARSET create for chart id '%s' name '%s' with variable name '%s'", st->id, st->name, variable);
-    RRDSETVAR *rs = (RRDSETVAR *)callocz(1, sizeof(RRDSETVAR));
+struct variable2json_helper {
+    BUFFER *buf;
+    size_t counter;
+};
 
-    char buffer[RRDVAR_MAX_LENGTH + 1];
-    snprintfz(buffer, RRDVAR_MAX_LENGTH, "%s.%s", st->id, variable);
-    rs->fullid = strdupz(buffer);
+static void single_variable2json(void *entry, void *data) {
+    struct variable2json_helper *helper = (struct variable2json_helper *)data;
+    RRDVAR *rv = (RRDVAR *)entry;
+    calculated_number value = rrdvar2number(rv);
 
-    snprintfz(buffer, RRDVAR_MAX_LENGTH, "%s.%s", st->name, variable);
-    rs->fullname = strdupz(buffer);
+    if(unlikely(isnan(value) || isinf(value)))
+        buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": null", helper->counter?",":"", rv->name);
+    else
+        buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": %0.5Lf", helper->counter?",":"", rv->name, (long double)value);
 
-    rs->variable = strdupz(variable);
-
-    rs->type = type;
-    rs->value = value;
-    rs->options = options;
-    rs->rrdset = st;
-
-    rs->local       = rrdvar_create_and_index("local",  &st->variables_root_index, rs->variable, rs->type, rs->value);
-    rs->family      = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->fullid, rs->type, rs->value);
-    rs->host        = rrdvar_create_and_index("host",   &st->rrdhost->variables_root_index, rs->fullid, rs->type, rs->value);
-    rs->family_name = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->fullname, rs->type, rs->value);
-    rs->host_name   = rrdvar_create_and_index("host",   &st->rrdhost->variables_root_index, rs->fullname, rs->type, rs->value);
-
-    rs->next = st->variables;
-    st->variables = rs;
-
-    return rs;
+    helper->counter++;
 }
 
-void rrdsetvar_rename_all(RRDSET *st) {
-    debug(D_VARIABLES, "RRDSETVAR rename for chart id '%s' name '%s'", st->id, st->name);
+void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {
+    struct variable2json_helper helper = {
+            .buf = buf,
+            .counter = 0
+    };
 
-    // only these 2 can change name
-    // rs->family_name
-    // rs->host_name
-
-    char buffer[RRDVAR_MAX_LENGTH + 1];
-    RRDSETVAR *rs, *next = st->variables;
-    while((rs = next)) {
-        next = rs->next;
-
-        snprintfz(buffer, RRDVAR_MAX_LENGTH, "%s.%s", st->name, rs->variable);
-
-        if (strcmp(buffer, rs->fullname)) {
-            // name changed
-            rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_name);
-            rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_name);
-
-            freez(rs->fullname);
-            rs->fullname = strdupz(st->name);
-            rs->family_name = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->fullname, rs->type, rs->value);
-            rs->host_name   = rrdvar_create_and_index("host",   &st->rrdhost->variables_root_index, rs->fullname, rs->type, rs->value);
-        }
-    }
-
-    rrdsetcalc_link_matching(st);
+    buffer_sprintf(buf, "{\n\t\"chart\": \"%s\",\n\t\"chart_name\": \"%s\",\n\t\"chart_variables\": {", st->id, st->name);
+    avl_traverse_lock(&st->variables_root_index, single_variable2json, (void *)&helper);
+    buffer_sprintf(buf, "\n\t},\n\t\"family\": \"%s\",\n\t\"family_variables\": {", st->family);
+    helper.counter = 0;
+    avl_traverse_lock(&st->rrdfamily->variables_root_index, single_variable2json, (void *)&helper);
+    buffer_sprintf(buf, "\n\t},\n\t\"host\": \"%s\",\n\t\"host_variables\": {", st->rrdhost->hostname);
+    helper.counter = 0;
+    avl_traverse_lock(&st->rrdhost->variables_root_index, single_variable2json, (void *)&helper);
+    buffer_strcat(buf, "\n\t}\n}\n");
 }
 
-void rrdsetvar_free(RRDSETVAR *rs) {
-    RRDSET *st = rs->rrdset;
-    debug(D_VARIABLES, "RRDSETVAR free for chart id '%s' name '%s', variable '%s'", st->id, st->name, rs->variable);
-
-    rrdvar_free(st->rrdhost, &st->variables_root_index, rs->local);
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family);
-    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host);
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_name);
-    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_name);
-
-    if(st->variables == rs) {
-        st->variables = rs->next;
-    }
-    else {
-        RRDSETVAR *t;
-        for (t = st->variables; t && t->next != rs; t = t->next);
-        if(!t) error("RRDSETVAR '%s' not found in chart '%s' variables linked list", rs->fullname, st->id);
-        else t->next = rs->next;
-    }
-
-    freez(rs->fullid);
-    freez(rs->fullname);
-    freez(rs->variable);
-    freez(rs);
-}
 
 // ----------------------------------------------------------------------------
 // RRDDIMVAR management
+// DIMENSION VARIABLES
 
 #define RRDDIMVAR_ID_MAX 1024
+
+static inline void rrddimvar_free_variables(RRDDIMVAR *rs) {
+    RRDDIM *rd = rs->rrddim;
+    RRDSET *st = rd->rrdset;
+
+    // CHART VARIABLES FOR THIS DIMENSION
+
+    rrdvar_free(st->rrdhost, &st->variables_root_index, rs->var_local_id);
+    rs->var_local_id = NULL;
+
+    rrdvar_free(st->rrdhost, &st->variables_root_index, rs->var_local_name);
+    rs->var_local_name = NULL;
+
+    // FAMILY VARIABLES FOR THIS DIMENSION
+
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->var_family_id);
+    rs->var_family_id = NULL;
+
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->var_family_name);
+    rs->var_family_name = NULL;
+
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->var_family_contextid);
+    rs->var_family_contextid = NULL;
+
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->var_family_contextname);
+    rs->var_family_contextname = NULL;
+
+    // HOST VARIABLES FOR THIS DIMENSION
+
+    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->var_host_chartidid);
+    rs->var_host_chartidid = NULL;
+
+    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->var_host_chartidname);
+    rs->var_host_chartidname = NULL;
+
+    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->var_host_chartnameid);
+    rs->var_host_chartnameid = NULL;
+
+    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->var_host_chartnamename);
+    rs->var_host_chartnamename = NULL;
+
+    // KEYS
+
+    freez(rs->key_id);
+    rs->key_id = NULL;
+
+    freez(rs->key_name);
+    rs->key_name = NULL;
+
+    freez(rs->key_fullidid);
+    rs->key_fullidid = NULL;
+
+    freez(rs->key_fullidname);
+    rs->key_fullidname = NULL;
+
+    freez(rs->key_contextid);
+    rs->key_contextid = NULL;
+
+    freez(rs->key_contextname);
+    rs->key_contextname = NULL;
+
+    freez(rs->key_fullnameid);
+    rs->key_fullnameid = NULL;
+
+    freez(rs->key_fullnamename);
+    rs->key_fullnamename = NULL;
+}
+
+static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
+    rrddimvar_free_variables(rs);
+
+    RRDDIM *rd = rs->rrddim;
+    RRDSET *st = rd->rrdset;
+
+    char buffer[RRDDIMVAR_ID_MAX + 1];
+
+    // KEYS
+
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", rs->prefix, rd->id, rs->suffix);
+    rs->key_id = strdupz(buffer);
+
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", rs->prefix, rd->name, rs->suffix);
+    rs->key_name = strdupz(buffer);
+
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->id, rs->key_id);
+    rs->key_fullidid = strdupz(buffer);
+
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->id, rs->key_name);
+    rs->key_fullidname = strdupz(buffer);
+
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->context, rs->key_id);
+    rs->key_contextid = strdupz(buffer);
+
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->context, rs->key_name);
+    rs->key_contextname = strdupz(buffer);
+
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->key_id);
+    rs->key_fullnameid = strdupz(buffer);
+
+    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->key_name);
+    rs->key_fullnamename = strdupz(buffer);
+
+    // CHART VARIABLES FOR THIS DIMENSION
+    // -----------------------------------
+    //
+    // dimensions are available as:
+    // - $id
+    // - $name
+
+    rs->var_local_id           = rrdvar_create_and_index("local", &st->variables_root_index, rs->key_id, rs->type, rs->value);
+    rs->var_local_name         = rrdvar_create_and_index("local", &st->variables_root_index, rs->key_name, rs->type, rs->value);
+
+    // FAMILY VARIABLES FOR THIS DIMENSION
+    // -----------------------------------
+    //
+    // dimensions are available as:
+    // - $id                 (only the first, when multiple overlap)
+    // - $name               (only the first, when multiple overlap)
+    // - $chart-context.id
+    // - $chart-context.name
+
+    rs->var_family_id          = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->key_id, rs->type, rs->value);
+    rs->var_family_name        = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->key_name, rs->type, rs->value);
+    rs->var_family_contextid   = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->key_contextid, rs->type, rs->value);
+    rs->var_family_contextname = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->key_contextname, rs->type, rs->value);
+
+    // HOST VARIABLES FOR THIS DIMENSION
+    // -----------------------------------
+    //
+    // dimensions are available as:
+    // - $chart-id.id
+    // - $chart-id.name
+    // - $chart-name.id
+    // - $chart-name.name
+
+    rs->var_host_chartidid      = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->key_fullidid, rs->type, rs->value);
+    rs->var_host_chartidname    = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->key_fullidname, rs->type, rs->value);
+    rs->var_host_chartnameid    = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->key_fullnameid, rs->type, rs->value);
+    rs->var_host_chartnamename  = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->key_fullnamename, rs->type, rs->value);
+}
 
 RRDDIMVAR *rrddimvar_create(RRDDIM *rd, int type, const char *prefix, const char *suffix, void *value, uint32_t options) {
     RRDSET *st = rd->rrdset;
@@ -704,48 +848,20 @@ RRDDIMVAR *rrddimvar_create(RRDDIM *rd, int type, const char *prefix, const char
     if(!prefix) prefix = "";
     if(!suffix) suffix = "";
 
-    char buffer[RRDDIMVAR_ID_MAX + 1];
     RRDDIMVAR *rs = (RRDDIMVAR *)callocz(1, sizeof(RRDDIMVAR));
 
     rs->prefix = strdupz(prefix);
     rs->suffix = strdupz(suffix);
-
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", rs->prefix, rd->id, rs->suffix);
-    rs->id = strdupz(buffer);
-
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", rs->prefix, rd->name, rs->suffix);
-    rs->name = strdupz(buffer);
-
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->id, rs->id);
-    rs->fullidid = strdupz(buffer);
-
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->id, rs->name);
-    rs->fullidname = strdupz(buffer);
-
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->name, rs->id);
-    rs->fullnameid = strdupz(buffer);
-
-    snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", rd->rrdset->name, rs->name);
-    rs->fullnamename = strdupz(buffer);
 
     rs->type = type;
     rs->value = value;
     rs->options = options;
     rs->rrddim = rd;
 
-    rs->local_id     = rrdvar_create_and_index("local", &st->variables_root_index, rs->id, rs->type, rs->value);
-    rs->local_name   = rrdvar_create_and_index("local", &st->variables_root_index, rs->name, rs->type, rs->value);
-
-    rs->family_id    = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->id, rs->type, rs->value);
-    rs->family_name  = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index, rs->name, rs->type, rs->value);
-
-    rs->host_fullidid     = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullidid, rs->type, rs->value);
-    rs->host_fullidname   = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullidname, rs->type, rs->value);
-    rs->host_fullnameid   = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullnameid, rs->type, rs->value);
-    rs->host_fullnamename = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->fullnamename, rs->type, rs->value);
-
     rs->next = rd->variables;
     rd->variables = rs;
+
+    rrddimvar_create_variables(rs);
 
     return rs;
 }
@@ -757,41 +873,7 @@ void rrddimvar_rename_all(RRDDIM *rd) {
     RRDDIMVAR *rs, *next = rd->variables;
     while((rs = next)) {
         next = rs->next;
-
-        if (strcmp(rd->name, rs->name)) {
-            char buffer[RRDDIMVAR_ID_MAX + 1];
-            // name changed
-
-            // name
-            rrdvar_free(st->rrdhost, &st->variables_root_index, rs->local_name);
-            freez(rs->name);
-            snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s%s%s", rs->prefix, rd->name, rs->suffix);
-            rs->name = strdupz(buffer);
-            rs->local_name = rrdvar_create_and_index("local", &st->variables_root_index, rs->name, rs->type, rs->value);
-
-            rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullidname);
-            freez(rs->fullidname);
-            snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->id, rs->name);
-            rs->fullidname = strdupz(buffer);
-            rs->host_fullidname = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index,
-                                                             rs->fullidname, rs->type, rs->value);
-
-            // fullnameid
-            rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullnameid);
-            freez(rs->fullnameid);
-            snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->id);
-            rs->fullnameid = strdupz(buffer);
-            rs->host_fullnameid = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index,
-                                                          rs->fullnameid, rs->type, rs->value);
-
-            // fullnamename
-            rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullnamename);
-            freez(rs->fullnamename);
-            snprintfz(buffer, RRDDIMVAR_ID_MAX, "%s.%s", st->name, rs->name);
-            rs->fullnamename = strdupz(buffer);
-            rs->host_fullnamename = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index,
-                                                          rs->fullnamename, rs->type, rs->value);
-        }
+        rrddimvar_create_variables(rs);
     }
 }
 
@@ -800,16 +882,7 @@ void rrddimvar_free(RRDDIMVAR *rs) {
     RRDSET *st = rd->rrdset;
     debug(D_VARIABLES, "RRDDIMSET free for chart id '%s' name '%s', dimension id '%s', name '%s', prefix='%s', suffix='%s'", st->id, st->name, rd->id, rd->name, rs->prefix, rs->suffix);
 
-    rrdvar_free(st->rrdhost, &st->variables_root_index, rs->local_id);
-    rrdvar_free(st->rrdhost, &st->variables_root_index, rs->local_name);
-
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_id);
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->family_name);
-
-    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullidid);
-    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullidname);
-    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullnameid);
-    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->host_fullnamename);
+    rrddimvar_free_variables(rs);
 
     if(rd->variables == rs) {
         debug(D_VARIABLES, "RRDDIMSET removing first entry for chart id '%s' name '%s', dimension id '%s', name '%s'", st->id, st->name, rd->id, rd->name);
@@ -819,18 +892,129 @@ void rrddimvar_free(RRDDIMVAR *rs) {
         debug(D_VARIABLES, "RRDDIMSET removing non-first entry for chart id '%s' name '%s', dimension id '%s', name '%s'", st->id, st->name, rd->id, rd->name);
         RRDDIMVAR *t;
         for (t = rd->variables; t && t->next != rs; t = t->next) ;
-        if(!t) error("RRDDIMVAR '%s' not found in dimension '%s/%s' variables linked list", rs->name, st->id, rd->id);
+        if(!t) error("RRDDIMVAR '%s' not found in dimension '%s/%s' variables linked list", rs->key_name, st->id, rd->id);
         else t->next = rs->next;
     }
 
     freez(rs->prefix);
     freez(rs->suffix);
-    freez(rs->id);
-    freez(rs->name);
-    freez(rs->fullidid);
-    freez(rs->fullidname);
-    freez(rs->fullnameid);
-    freez(rs->fullnamename);
+    freez(rs);
+}
+
+// ----------------------------------------------------------------------------
+// RRDSETVAR management
+// CHART VARIABLES
+
+static inline void rrdsetvar_free_variables(RRDSETVAR *rs) {
+    RRDSET *st = rs->rrdset;
+
+    // CHART
+
+    rrdvar_free(st->rrdhost, &st->variables_root_index, rs->var_local);
+    rs->var_local = NULL;
+
+    // FAMILY
+
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->var_family);
+    rs->var_family = NULL;
+
+    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->var_host);
+    rs->var_host = NULL;
+
+    // HOST
+
+    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->var_family_name);
+    rs->var_family_name = NULL;
+
+    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->var_host_name);
+    rs->var_host_name = NULL;
+
+    // KEYS
+
+    freez(rs->key_fullid);
+    rs->key_fullid = NULL;
+
+    freez(rs->key_fullname);
+    rs->key_fullname = NULL;
+}
+
+static inline void rrdsetvar_create_variables(RRDSETVAR *rs) {
+    rrdsetvar_free_variables(rs);
+
+    RRDSET *st = rs->rrdset;
+
+    // KEYS
+
+    char buffer[RRDVAR_MAX_LENGTH + 1];
+    snprintfz(buffer, RRDVAR_MAX_LENGTH, "%s.%s", st->id, rs->variable);
+    rs->key_fullid = strdupz(buffer);
+
+    snprintfz(buffer, RRDVAR_MAX_LENGTH, "%s.%s", st->name, rs->variable);
+    rs->key_fullname = strdupz(buffer);
+
+    // CHART
+
+    rs->var_local       = rrdvar_create_and_index("local",  &st->variables_root_index,               rs->variable, rs->type, rs->value);
+
+    // FAMILY
+
+    rs->var_family      = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index,    rs->key_fullid,   rs->type, rs->value);
+    rs->var_family_name = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index,    rs->key_fullname, rs->type, rs->value);
+
+    // HOST
+
+    rs->var_host        = rrdvar_create_and_index("host",   &st->rrdhost->variables_root_index,      rs->key_fullid,   rs->type, rs->value);
+    rs->var_host_name   = rrdvar_create_and_index("host",   &st->rrdhost->variables_root_index,      rs->key_fullname, rs->type, rs->value);
+
+}
+
+RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, int type, void *value, uint32_t options) {
+    debug(D_VARIABLES, "RRDVARSET create for chart id '%s' name '%s' with variable name '%s'", st->id, st->name, variable);
+    RRDSETVAR *rs = (RRDSETVAR *)callocz(1, sizeof(RRDSETVAR));
+
+    rs->variable = strdupz(variable);
+    rs->type = type;
+    rs->value = value;
+    rs->options = options;
+    rs->rrdset = st;
+
+    rs->next = st->variables;
+    st->variables = rs;
+
+    rrdsetvar_create_variables(rs);
+
+    return rs;
+}
+
+void rrdsetvar_rename_all(RRDSET *st) {
+    debug(D_VARIABLES, "RRDSETVAR rename for chart id '%s' name '%s'", st->id, st->name);
+
+    RRDSETVAR *rs, *next = st->variables;
+    while((rs = next)) {
+        next = rs->next;
+        rrdsetvar_create_variables(rs);
+    }
+
+    rrdsetcalc_link_matching(st);
+}
+
+void rrdsetvar_free(RRDSETVAR *rs) {
+    RRDSET *st = rs->rrdset;
+    debug(D_VARIABLES, "RRDSETVAR free for chart id '%s' name '%s', variable '%s'", st->id, st->name, rs->variable);
+
+    if(st->variables == rs) {
+        st->variables = rs->next;
+    }
+    else {
+        RRDSETVAR *t;
+        for (t = st->variables; t && t->next != rs; t = t->next);
+        if(!t) error("RRDSETVAR '%s' not found in chart '%s' variables linked list", rs->key_fullname, st->id);
+        else t->next = rs->next;
+    }
+
+    rrdsetvar_free_variables(rs);
+
+    freez(rs->variable);
     freez(rs);
 }
 
@@ -2391,10 +2575,12 @@ void health_reload(void) {
 // health main thread and friends
 
 static inline int rrdcalc_value2status(calculated_number n) {
-    if(isnan(n)) return RRDCALC_STATUS_UNDEFINED;
+    if(isnan(n) || isinf(n)) return RRDCALC_STATUS_UNDEFINED;
     if(n) return RRDCALC_STATUS_RAISED;
     return RRDCALC_STATUS_CLEAR;
 }
+
+#define ALARM_EXEC_COMMAND_LENGTH 8192
 
 static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->flags |= HEALTH_ENTRY_FLAG_PROCESSED;
@@ -2406,30 +2592,35 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     // find the previous notification for the same alarm
     // which we have run the exec script
-    ALARM_ENTRY *t;
-    for(t = ae->next; t ;t = t->next) {
-        if(t->alarm_id == ae->alarm_id && t->flags & HEALTH_ENTRY_FLAG_EXEC_RUN)
-            break;
-    }
+    {
+        uint32_t id = ae->alarm_id;
+        ALARM_ENTRY *t;
+        for(t = ae->next; t ; t = t->next) {
+            if(t->alarm_id == id && t->flags & HEALTH_ENTRY_FLAG_EXEC_RUN)
+                break;
+        }
 
-    if(likely(t)) {
-        // we have executed this alarm notification in the past
-        if (t && t->new_status == ae->new_status) {
-            // don't send the same notification again
-            debug(D_HEALTH, "Health not sending again notification for alarm '%s.%s' status %s", ae->chart, ae->name,
-                 rrdcalc_status2string(ae->new_status));
-            goto done;
+        if(likely(t)) {
+            // we have executed this alarm notification in the past
+            if(t && t->new_status == ae->new_status) {
+                // don't send the notification for the same status again
+                debug(D_HEALTH, "Health not sending again notification for alarm '%s.%s' status %s", ae->chart, ae->name
+                      , rrdcalc_status2string(ae->new_status));
+                goto done;
+            }
+        }
+        else {
+            // we have not executed this alarm notification in the past
+            // so, don't send CLEAR notifications
+            if(unlikely(ae->new_status == RRDCALC_STATUS_CLEAR)) {
+                debug(D_HEALTH, "Health not sending notification for first initialization of alarm '%s.%s' status %s"
+                      , ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
+                goto done;
+            }
         }
     }
-    else {
-        // we have not executed this alarm notification in the past
-        if(unlikely(ae->old_status == RRDCALC_STATUS_UNINITIALIZED && ae->new_status == RRDCALC_STATUS_CLEAR)) {
-            debug(D_HEALTH, "Health not sending notification for first initialization of alarm '%s.%s' status %s", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
-            goto done;
-        }
-    }
 
-    char buffer[FILENAME_MAX + 1];
+    static char command_to_run[ALARM_EXEC_COMMAND_LENGTH + 1];
     pid_t command_pid;
 
     const char *exec = ae->exec;
@@ -2438,7 +2629,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     const char *recipient = ae->recipient;
     if(!recipient) recipient = health.health_default_recipient;
 
-    snprintfz(buffer, FILENAME_MAX, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '%0.0Lf' '%0.0Lf' '%s' '%u' '%u' '%s' '%s'",
+    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '%0.0Lf' '%0.0Lf' '%s' '%u' '%u' '%s' '%s'",
               exec,
               recipient,
               host->hostname,
@@ -2463,14 +2654,14 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
     ae->exec_run_timestamp = time(NULL);
 
-    debug(D_HEALTH, "executing command '%s'", buffer);
-    FILE *fp = mypopen(buffer, &command_pid);
+    debug(D_HEALTH, "executing command '%s'", command_to_run);
+    FILE *fp = mypopen(command_to_run, &command_pid);
     if(!fp) {
-        error("HEALTH: Cannot popen(\"%s\", \"r\").", buffer);
+        error("HEALTH: Cannot popen(\"%s\", \"r\").", command_to_run);
         goto done;
     }
     debug(D_HEALTH, "HEALTH reading from command");
-    char *s = fgets(buffer, FILENAME_MAX, fp);
+    char *s = fgets(command_to_run, FILENAME_MAX, fp);
     (void)s;
     ae->exec_code = mypclose(fp, command_pid);
     debug(D_HEALTH, "done executing command - returned with code %d", ae->exec_code);
@@ -2559,34 +2750,55 @@ static inline void health_alarm_log_process(RRDHOST *host) {
 }
 
 static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) {
-    if (unlikely(!rc->rrdset)) {
+    if(unlikely(!rc->rrdset)) {
         debug(D_HEALTH, "Health not running alarm '%s.%s'. It is not linked to a chart.", rc->chart?rc->chart:"NOCHART", rc->name);
         return 0;
     }
 
-    if (unlikely(!rc->rrdset->last_collected_time.tv_sec)) {
-        debug(D_HEALTH, "Health not running alarm '%s.%s'. Chart is not yet collected.", rc->chart?rc->chart:"NOCHART", rc->name);
-        return 0;
-    }
-
-    if (unlikely(!rc->update_every)) {
-        debug(D_HEALTH, "Health not running alarm '%s.%s'. It does not have an update frequency", rc->chart?rc->chart:"NOCHART", rc->name);
-        return 0;
-    }
-
-    if (unlikely(rc->next_update > now)) {
-        if (unlikely(*next_run > rc->next_update))
+    if(unlikely(rc->next_update > now)) {
+        if (unlikely(*next_run > rc->next_update)) {
+            // update the next_run time of the main loop
+            // to run this alarm precisely the time required
             *next_run = rc->next_update;
+        }
 
         debug(D_HEALTH, "Health not examining alarm '%s.%s' yet (will do in %d secs).", rc->chart?rc->chart:"NOCHART", rc->name, (int) (rc->next_update - now));
         return 0;
     }
 
-    // FIXME
-    // we should check that the DB lookup is possible
-    // i.e.
-    // - the duration of the chart includes the required timeframe
-    // we SHOULD NOT check the dimensions - there might be alarms that refer non-existing dimensions (e.g. cpu steal)
+    if(unlikely(!rc->update_every)) {
+        debug(D_HEALTH, "Health not running alarm '%s.%s'. It does not have an update frequency", rc->chart?rc->chart:"NOCHART", rc->name);
+        return 0;
+    }
+
+    if(unlikely(!rc->rrdset->last_collected_time.tv_sec || rc->rrdset->counter_done < 2)) {
+        debug(D_HEALTH, "Health not running alarm '%s.%s'. Chart is not fully collected yet.", rc->chart?rc->chart:"NOCHART", rc->name);
+        return 0;
+    }
+
+    int update_every = rc->rrdset->update_every;
+    time_t first = rrdset_first_entry_t(rc->rrdset);
+    time_t last = rrdset_last_entry_t(rc->rrdset);
+
+    if(unlikely(now + update_every < first /* || now - update_every > last */)) {
+        debug(D_HEALTH
+              , "Health not examining alarm '%s.%s' yet (wanted time is out of bounds - we need %lu but got %lu - %lu)."
+              , rc->chart ? rc->chart : "NOCHART", rc->name, (unsigned long) now, (unsigned long) first
+              , (unsigned long) last);
+        return 0;
+    }
+
+    if(RRDCALC_HAS_DB_LOOKUP(rc)) {
+        time_t needed = now + rc->before + rc->after;
+
+        if(needed + update_every < first || needed - update_every > last) {
+            debug(D_HEALTH
+                  , "Health not examining alarm '%s.%s' yet (not enough data yet - we need %lu but got %lu - %lu)."
+                  , rc->chart ? rc->chart : "NOCHART", rc->name, (unsigned long) needed, (unsigned long) first
+                  , (unsigned long) last);
+            return 0;
+        }
+    }
 
     return 1;
 }
@@ -2617,24 +2829,28 @@ void *health_main(void *ptr) {
         time_t next_run = now + min_run_every;
         RRDCALC *rc;
 
-        if (unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate) != 0))
+        if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate) != 0))
             error("Cannot set pthread cancel state to DISABLE.");
 
         rrdhost_rdlock(&localhost);
 
         // the first loop is to lookup values from the db
-        for (rc = localhost.alarms; rc; rc = rc->next) {
-            if (unlikely(!rrdcalc_isrunnable(rc, now, &next_run)))
+        for(rc = localhost.alarms; rc; rc = rc->next) {
+            if(unlikely(!rrdcalc_isrunnable(rc, now, &next_run))) {
+                if(unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_RUNNABLE))
+                    rc->rrdcalc_flags &= ~RRDCALC_FLAG_RUNNABLE;
                 continue;
+            }
 
             runnable++;
             rc->old_value = rc->value;
+            rc->rrdcalc_flags |= RRDCALC_FLAG_RUNNABLE;
 
             // 1. if there is database lookup, do it
             // 2. if there is calculation expression, run it
 
             if (unlikely(RRDCALC_HAS_DB_LOOKUP(rc))) {
-                time_t old_db_timestamp = rc->db_before;
+                /* time_t old_db_timestamp = rc->db_before; */
                 int value_is_null = 0;
 
                 int ret = rrd2value(rc->rrdset, wb, &rc->value,
@@ -2655,6 +2871,7 @@ void *health_main(void *ptr) {
                 else if (unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_DB_ERROR))
                     rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_ERROR;
 
+                /* - RRDCALC_FLAG_DB_STALE not currently used
                 if (unlikely(old_db_timestamp == rc->db_before)) {
                     // database is stale
 
@@ -2667,6 +2884,7 @@ void *health_main(void *ptr) {
                 }
                 else if (unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_DB_STALE))
                     rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_STALE;
+                */
 
                 if (unlikely(value_is_null)) {
                     // collected value is null
@@ -2695,23 +2913,24 @@ void *health_main(void *ptr) {
 
                     rc->value = NAN;
 
-                    debug(D_HEALTH, "Health alarm '%s.%s': failed to evaluate calculation with error: %s",
-                          rc->chart?rc->chart:"NOCHART", rc->name, buffer_tostring(rc->calculation->error_msg));
+                    debug(D_HEALTH, "Health alarm '%s.%s': expression '%s' failed: %s",
+                          rc->chart?rc->chart:"NOCHART", rc->name, rc->calculation->parsed_as, buffer_tostring(rc->calculation->error_msg));
 
                     if (unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_CALC_ERROR))) {
                         rc->rrdcalc_flags |= RRDCALC_FLAG_CALC_ERROR;
-                        error("Health alarm '%s.%s': failed to evaluate calculation with error: %s",
-                              rc->chart?rc->chart:"NOCHART", rc->name, buffer_tostring(rc->calculation->error_msg));
+                        error("Health alarm '%s.%s': expression '%s' failed: %s",
+                              rc->chart?rc->chart:"NOCHART", rc->name, rc->calculation->parsed_as, buffer_tostring(rc->calculation->error_msg));
                     }
                 }
                 else {
                     if (unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_CALC_ERROR))
                         rc->rrdcalc_flags &= ~RRDCALC_FLAG_CALC_ERROR;
 
-                    debug(D_HEALTH, "Health alarm '%s.%s': calculation expression gave value "
+                    debug(D_HEALTH, "Health alarm '%s.%s': expression '%s' gave value "
                             CALCULATED_NUMBER_FORMAT
                             ": %s (source: %s)",
                           rc->chart?rc->chart:"NOCHART", rc->name,
+                          rc->calculation->parsed_as,
                           rc->calculation->result,
                           buffer_tostring(rc->calculation->error_msg),
                           rc->source
@@ -2723,11 +2942,11 @@ void *health_main(void *ptr) {
         }
         rrdhost_unlock(&localhost);
 
-        if (unlikely(runnable && !netdata_exit)) {
+        if(unlikely(runnable && !netdata_exit)) {
             rrdhost_rdlock(&localhost);
 
-            for (rc = localhost.alarms; rc; rc = rc->next) {
-                if (unlikely(!rrdcalc_isrunnable(rc, now, &next_run)))
+            for(rc = localhost.alarms; rc; rc = rc->next) {
+                if(unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_RUNNABLE)))
                     continue;
 
                 int warning_status  = RRDCALC_STATUS_UNDEFINED;

@@ -643,7 +643,7 @@ int main(int argc, char **argv)
 
     // fork, switch user, create pid file, set process priority
     if(become_daemon(dont_fork, user) == -1)
-        fatal("Cannot demonize myself.");
+        fatal("Cannot daemonize myself.");
 
     info("NetData started on pid %d", getpid());
 

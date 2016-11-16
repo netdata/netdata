@@ -80,7 +80,7 @@ void avl_init_lock(avl_tree_lock *t, int (*compar)(void *a, void *b));
 void avl_init(avl_tree *t, int (*compar)(void *a, void *b));
 
 
-void avl_traverse_lock(avl_tree_lock *t, void (*callback)(void *));
-void avl_traverse(avl_tree *t, void (*callback)(void *));
+void avl_traverse_lock(avl_tree_lock *t, void (*callback)(void *entry, void *data), void *data);
+void avl_traverse(avl_tree *t, void (*callback)(void *entry, void *data), void *data);
 
 #endif /* avl.h */

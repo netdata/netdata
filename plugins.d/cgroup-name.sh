@@ -1,17 +1,66 @@
 #!/usr/bin/env bash
 
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+# Script to find a better name for cgroups
+#
+
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
 export LC_ALL=C
+
+# -----------------------------------------------------------------------------
+
+PROGRAM_NAME="$(basename "${0}")"
+
+logdate() {
+    date "+%Y-%m-%d %H:%M:%S"
+}
+
+log() {
+    local status="${1}"
+    shift
+
+    echo >&2 "$(logdate): ${PROGRAM_NAME}: ${status}: ${*}"
+
+}
+
+warning() {
+    log WARNING "${@}"
+}
+
+error() {
+    log ERROR "${@}"
+}
+
+info() {
+    log INFO "${@}"
+}
+
+fatal() {
+    log FATAL "${@}"
+    exit 1
+}
+
+debug=0
+debug() {
+    [ $debug -eq 1 ] && log DEBUG "${@}"
+}
+
+# -----------------------------------------------------------------------------
 
 NETDATA_CONFIG_DIR="${NETDATA_CONFIG_DIR-/etc/netdata}"
 CONFIG="${NETDATA_CONFIG_DIR}/cgroups-names.conf"
 CGROUP="${1}"
 NAME=
 
+# -----------------------------------------------------------------------------
+
 if [ -z "${CGROUP}" ]
     then
-    echo >&2 "${0}: called without a cgroup name. Nothing to do."
-    exit 1
+    fatal "called without a cgroup name. Nothing to do."
 fi
 
 if [ -f "${CONFIG}" ]
@@ -19,15 +68,15 @@ if [ -f "${CONFIG}" ]
     NAME="$(grep "^${CGROUP} " "${CONFIG}" | sed "s/[[:space:]]\+/ /g" | cut -d ' ' -f 2)"
     if [ -z "${NAME}" ]
         then
-        echo >&2 "${0}: cannot find cgroup '${CGROUP}' in '${CONFIG}'."
+        info "cannot find cgroup '${CGROUP}' in '${CONFIG}'."
     fi
 #else
-#   echo >&2 "${0}: configuration file '${CONFIG}' is not available."
+#   info "configuration file '${CONFIG}' is not available."
 fi
 
 function get_name_classic {
     local DOCKERID="$1"
-    echo >&2 "Running command: docker ps --filter=id=\"${DOCKERID}\" --format=\"{{.Names}}\""
+    info "Running command: docker ps --filter=id=\"${DOCKERID}\" --format=\"{{.Names}}\""
     NAME="$( docker ps --filter=id="${DOCKERID}" --format="{{.Names}}" )"
     return 0
 }
@@ -36,10 +85,10 @@ function get_name_api {
     local DOCKERID="$1"
     if [ ! -S "/var/run/docker.sock" ]
         then
-        echo >&2 "Can't find /var/run/docker.sock"
+        warning "Can't find /var/run/docker.sock"
         return 1
     fi
-    echo >&2 "Running API command: /containers/${DOCKERID}/json"
+    info "Running API command: /containers/${DOCKERID}/json"
     JSON=$(echo -e "GET /containers/${DOCKERID}/json HTTP/1.0\r\n" | nc -U /var/run/docker.sock | egrep '^{.*')
     NAME=$(echo $JSON | jq -r .Name,.Config.Hostname | grep -v null | head -n1 | sed 's|^/||')
     return 0
@@ -62,10 +111,10 @@ if [ -z "${NAME}" ]
             fi
             if [ -z "${NAME}" ]
                 then
-                echo >&2 "Cannot find the name of docker container '${DOCKERID}'"
+                warning "cannot find the name of docker container '${DOCKERID}'"
                 NAME="${DOCKERID:0:12}"
             else
-                echo >&2 "Docker container '${DOCKERID}' is named '${NAME}'"
+                info "docker container '${DOCKERID}' is named '${NAME}'"
             fi
         fi
     fi
@@ -74,5 +123,5 @@ if [ -z "${NAME}" ]
     [ ${#NAME} -gt 100 ] && NAME="${NAME:0:100}"
 fi
 
-echo >&2 "${0}: cgroup '${CGROUP}' is called '${NAME}'"
+info "cgroup '${CGROUP}' is called '${NAME}'"
 echo "${NAME}"

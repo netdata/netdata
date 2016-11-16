@@ -121,7 +121,6 @@ void *pluginsd_worker_thread(void *arg)
         info("PLUGINSD: '%s' running on pid %d", cd->fullfilename, cd->pid);
 
         RRDSET *st = NULL;
-        char *s;
         uint32_t hash;
 
         while(likely(fgets(line, PLUGINSD_LINE_MAX, fp) != NULL)) {
@@ -132,7 +131,7 @@ void *pluginsd_worker_thread(void *arg)
             // debug(D_PLUGINSD, "PLUGINSD: %s: %s", cd->filename, line);
 
             int w = pluginsd_split_words(line, words, MAX_WORDS);
-            s = words[0];
+            char *s = words[0];
             if(unlikely(!s || !*s || !w)) {
                 // debug(D_PLUGINSD, "PLUGINSD: empty line");
                 continue;
@@ -189,7 +188,7 @@ void *pluginsd_worker_thread(void *arg)
                     unsigned long long microseconds = 0;
                     if(microseconds_txt && *microseconds_txt) microseconds = strtoull(microseconds_txt, NULL, 10);
                     if(microseconds) rrdset_next_usec(st, microseconds);
-                    else rrdset_next_plugins(st);
+                    else rrdset_next(st);
                 }
             }
             else if(likely(hash == END_HASH && !strcmp(s, "END"))) {
@@ -394,7 +393,7 @@ void *pluginsd_worker_thread(void *arg)
                 // we have collected something
 
                 if(likely(cd->serial_failures <= 10)) {
-                    error("PLUGINSD: '%s' exited with error code %d, but has given useful output in the past (%zu times). Waiting a bit before starting it again.", cd->fullfilename, code, cd->successful_collections);
+                    error("PLUGINSD: '%s' exited with error code %d, but has given useful output in the past (%zu times). %s", cd->fullfilename, code, cd->successful_collections, cd->enabled?"Waiting a bit before starting it again.":"Will not start it again - it is disabled.");
                     sleep((unsigned int) (cd->update_every * 10));
                 }
                 else {
@@ -410,7 +409,7 @@ void *pluginsd_worker_thread(void *arg)
                 // we have collected nothing so far
 
                 if(likely(cd->serial_failures <= 10)) {
-                    error("PLUGINSD: '%s' (pid %d) does not generate useful output but it reports success (exits with 0). Waiting a bit before starting it again.", cd->fullfilename, cd->pid);
+                    error("PLUGINSD: '%s' (pid %d) does not generate useful output but it reports success (exits with 0). %s.", cd->fullfilename, cd->pid, cd->enabled?"Waiting a bit before starting it again.":"Will not start it again - it is disabled.");
                     sleep((unsigned int) (cd->update_every * 10));
                 }
                 else {

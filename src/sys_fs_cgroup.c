@@ -269,7 +269,7 @@ void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
         }
 
         unsigned long i = procfile_linewords(ff, 0);
-        if(i <= 0) return;
+        if(i == 0) return;
 
         // we may have 1 more CPU reported
         while(i > 0) {
@@ -875,13 +875,20 @@ int find_dir_in_subdirs(const char *base, const char *this, void (*callback)(con
                 if(*r == '\0') r = "/";
                 else if (*r == '/') r++;
 
+                // do not decent in directories we are not interested
+                // https://github.com/firehol/netdata/issues/345
+                int def = 1;
+                size_t len = strlen(r);
+                if(len >  5 && !strncmp(&r[len -  5], "-qemu", 5))
+                    def = 0;
+
                 // we check for this option here
                 // so that the config will not have settings
                 // for leaf directories
                 char option[FILENAME_MAX + 1];
                 snprintfz(option, FILENAME_MAX, "search for cgroups under %s", r);
                 option[FILENAME_MAX] = '\0';
-                enabled = config_get_boolean("plugin:cgroups", option, 1);
+                enabled = config_get_boolean("plugin:cgroups", option, def);
             }
 
             if(enabled) {
@@ -1279,7 +1286,7 @@ void update_cgroup_charts(int update_every) {
             if(!st) {
                 snprintfz(title, CHART_TITLE_MAX, "I/O Bandwidth (all disks) for cgroup %s", cg->chart_title);
                 st = rrdset_create(type, "io", NULL, "disk", "cgroup.io", title, "KB/s", 41200,
-                                   update_every, RRDSET_TYPE_LINE);
+                                   update_every, RRDSET_TYPE_AREA);
 
                 rrddim_add(st, "read", NULL, 1, 1024, RRDDIM_INCREMENTAL);
                 rrddim_add(st, "write", NULL, -1, 1024, RRDDIM_INCREMENTAL);
@@ -1309,11 +1316,11 @@ void update_cgroup_charts(int update_every) {
         }
 
         if(cg->throttle_io_service_bytes.updated && cg->throttle_io_service_bytes.Read + cg->throttle_io_service_bytes.Write > 0) {
-            st = rrdset_find_bytype(type, "io");
+            st = rrdset_find_bytype(type, "throttle_io");
             if(!st) {
                 snprintfz(title, CHART_TITLE_MAX, "Throttle I/O Bandwidth (all disks) for cgroup %s", cg->chart_title);
-                st = rrdset_create(type, "io", NULL, "disk", "cgroup.io", title, "KB/s", 41200,
-                                   update_every, RRDSET_TYPE_LINE);
+                st = rrdset_create(type, "throttle_io", NULL, "disk", "cgroup.throttle_io", title, "KB/s", 41200,
+                                   update_every, RRDSET_TYPE_AREA);
 
                 rrddim_add(st, "read", NULL, 1, 1024, RRDDIM_INCREMENTAL);
                 rrddim_add(st, "write", NULL, -1, 1024, RRDDIM_INCREMENTAL);
@@ -1430,11 +1437,11 @@ void *cgroups_main(void *ptr)
 
     // the next time we will run - aligned properly
     unsigned long long sunext = (time(NULL) - (time(NULL) % rrd_update_every) + rrd_update_every) * 1000000ULL;
-    unsigned long long sunow;
 
     RRDSET *stcpu_thread = NULL;
 
     for(;;) {
+        unsigned long long sunow;
         if(unlikely(netdata_exit)) break;
 
         // delay until it is our time to run

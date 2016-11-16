@@ -1,5 +1,11 @@
 # no need for shebang - this file is loaded from charts.d.plugin
 
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+
 # http://dev.mysql.com/doc/refman/5.0/en/server-status-variables.html
 #
 # https://dev.mysql.com/doc/refman/5.1/en/show-status.html
@@ -17,9 +23,9 @@ mysql_get() {
 	local oIFS="${IFS}"
 	mysql_data=()
 	IFS=$'\t'$'\n'
-	#arr=($("${@}" -e "SHOW GLOBAL STATUS WHERE value REGEXP '^[0-9]';" | egrep "^(Bytes|Slow_|Que|Handl|Table|Selec|Sort_|Creat|Conne|Abort|Binlo|Threa|Innod|Qcach|Key_|Open)" ))
-	#arr=($("${@}" -N -e "SHOW GLOBAL STATUS;" | egrep "^(Bytes|Slow_|Que|Handl|Table|Selec|Sort_|Creat|Conne|Abort|Binlo|Threa|Innod|Qcach|Key_|Open)[^ ]+\s[0-9]" ))
-	arr=($("${@}" -N -e "SHOW GLOBAL STATUS;" | egrep "^(Bytes|Slow_|Que|Handl|Table|Selec|Sort_|Creat|Conne|Abort|Binlo|Threa|Innod|Qcach|Key_|Open)[^[:space:]]+[[:space:]]+[0-9]+" ))
+	#arr=($(run "${@}" -e "SHOW GLOBAL STATUS WHERE value REGEXP '^[0-9]';" | egrep "^(Bytes|Slow_|Que|Handl|Table|Selec|Sort_|Creat|Conne|Abort|Binlo|Threa|Innod|Qcach|Key_|Open)" ))
+	#arr=($(run "${@}" -N -e "SHOW GLOBAL STATUS;" | egrep "^(Bytes|Slow_|Que|Handl|Table|Selec|Sort_|Creat|Conne|Abort|Binlo|Threa|Innod|Qcach|Key_|Open)[^ ]+\s[0-9]" ))
+	arr=($(run "${@}" -N -e "SHOW GLOBAL STATUS;" | egrep "^(Bytes|Slow_|Que|Handl|Table|Selec|Sort_|Creat|Conne|Abort|Binlo|Threa|Innod|Qcach|Key_|Open)[^[:space:]]+[[:space:]]+[0-9]+" ))
 	IFS="${oIFS}"
 
 	[ "${#arr[@]}" -lt 3 ] && return 1
@@ -49,7 +55,7 @@ mysql_check() {
 		shift
 	fi
 
-	[ -z "${mysql_cmd}" ] && mysql_cmd="$(which mysql)"
+	[ -z "${mysql_cmd}" ] && mysql_cmd="$(which mysql 2>/dev/null || command -v mysql 2>/dev/null)"
 
 	if [ ${#mysql_opts[@]} -eq 0 ]
 		then
@@ -74,13 +80,13 @@ mysql_check() {
 		[ -z "${mysql_cmds[$m]}" ] && mysql_cmds[$m]="$mysql_cmd"
 		if [ -z "${mysql_cmds[$m]}" ]
 			then
-			echo >&2 "$PROGRAM_NAME: mysql: cannot get mysql command for '$m'. Please set mysql_cmds[$m]='/path/to/mysql', in $confd/mysql.conf"
+			error "cannot get mysql command for '$m'. Please set mysql_cmds[$m]='/path/to/mysql', in $confd/mysql.conf"
 		fi
 
 		mysql_get "${mysql_cmds[$m]}" ${mysql_opts[$m]}
 		if [ ! $? -eq 0 ]
 		then
-			echo >&2 "$PROGRAM_NAME: mysql: cannot get global status for '$m'. Please set mysql_opts[$m]='options' to whatever needed to get connected to the mysql server, in $confd/mysql.conf"
+			error "cannot get global status for '$m'. Please set mysql_opts[$m]='options' to whatever needed to get connected to the mysql server, in $confd/mysql.conf"
 			unset mysql_cmds[$m]
 			unset mysql_opts[$m]
 			unset mysql_ids[$m]
@@ -97,7 +103,7 @@ mysql_check() {
 			mysql_check tryroot "${@}"
 			return $?
 		else
-			echo >&2 "$PROGRAM_NAME: mysql: no mysql servers found. Please set mysql_opts[name]='options' to whatever needed to get connected to the mysql server, in $confd/mysql.conf"
+			error "no mysql servers found. Please set mysql_opts[name]='options' to whatever needed to get connected to the mysql server, in $confd/mysql.conf"
 			return 1
 		fi
 	fi
@@ -318,7 +324,7 @@ mysql_update() {
 			unset mysql_ids[$m]
 			unset mysql_opts[$m]
 			unset mysql_cmds[$m]
-			echo >&2 "$PROGRAM_NAME: mysql: failed to get values for '$m', disabling it."
+			error "failed to get values for '$m', disabling it."
 			continue
 		fi
 
@@ -510,7 +516,7 @@ VALUESEOF
 		fi
 	done
 
-	[ ${#mysql_ids[@]} -eq 0 ] && echo >&2 "$PROGRAM_NAME: mysql: no mysql servers left active." && return 1
+	[ ${#mysql_ids[@]} -eq 0 ] && error "no mysql servers left active." && return 1
 	return 0
 }
 

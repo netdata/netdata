@@ -133,6 +133,12 @@ netdataDashboard.menu = {
         info: undefined
     },
 
+    'fping': {
+        title: 'fping',
+        icon: '<i class="fa fa-exchange" aria-hidden="true"></i>',
+        info: undefined
+    },
+
     'memcached': {
         title: 'memcached',
         icon: '<i class="fa fa-database" aria-hidden="true"></i>',
@@ -141,6 +147,12 @@ netdataDashboard.menu = {
 
     'mysql': {
         title: 'MySQL',
+        icon: '<i class="fa fa-database" aria-hidden="true"></i>',
+        info: undefined
+    },
+
+    'postgres': {
+        title: 'Postgres',
         icon: '<i class="fa fa-database" aria-hidden="true"></i>',
         info: undefined
     },
@@ -166,25 +178,37 @@ netdataDashboard.menu = {
     'phpfpm': {
         title: 'PHP-FPM',
         icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
-        info: undefined,
+        info: undefined
     },
 
     'postfix': {
         title: 'postfix',
         icon: '<i class="fa fa-envelope" aria-hidden="true"></i>',
-        info: undefined,
+        info: undefined
+    },
+
+    'dovecot': {
+        title: 'Dovecot',
+        icon: '<i class="fa fa-envelope" aria-hidden="true"></i>',
+        info: undefined
+    },
+
+    'hddtemp': {
+        title: 'HDD Temp',
+        icon: '<i class="fa fa-thermometer-full" aria-hidden="true"></i>',
+        info: undefined
     },
 
     'nginx': {
         title: 'nginx',
         icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
-        info: undefined,
+        info: undefined
     },
 
     'apache': {
         title: 'Apache',
         icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
-        info: undefined,
+        info: undefined
     },
 
     'named': {
@@ -274,7 +298,8 @@ netdataDashboard.submenu = {
 //
 netdataDashboard.context = {
     'system.cpu': {
-        info: 'Total CPU utilization (all cores). 100% here means there is no CPU idle time at all. You can get per core usage at the <a href="#cpu">CPUs</a> section and per application usage at the <a href="#apps">Applications Monitoring</a> section.<br/>Keep an eye on <b>iowait</b> ' + sparkline('system.cpu', 'iowait', '%') + '. If it is constantly high, your disks are a bottleneck and they slow your system down.<br/>Another important metric worth monitoring, is <b>softirq</b> ' + sparkline('system.cpu', 'softirq', '%') + '. A constantly high percentage of softirq may indicate network drivers issues.'
+        info: 'Total CPU utilization (all cores). 100% here means there is no CPU idle time at all. You can get per core usage at the <a href="#cpu">CPUs</a> section and per application usage at the <a href="#apps">Applications Monitoring</a> section.<br/>Keep an eye on <b>iowait</b> ' + sparkline('system.cpu', 'iowait', '%') + '. If it is constantly high, your disks are a bottleneck and they slow your system down.<br/>Another important metric worth monitoring, is <b>softirq</b> ' + sparkline('system.cpu', 'softirq', '%') + '. A constantly high percentage of softirq may indicate network drivers issues.',
+        valueRange: "[0, 100]"
     },
 
     'system.load': {
@@ -296,7 +321,7 @@ netdataDashboard.context = {
 
     'system.entropy': {
         colors: '#CC22AA',
-        info: '<a href="https://en.wikipedia.org/wiki/Entropy_(computing)" target="_blank">Entropy</a>, read from <code>/proc/sys/kernel/random/entropy_avail</code>, is like a pool of random numbers (<a href="https://en.wikipedia.org/wiki//dev/random" target="_blank">/dev/random</a>) that are mainly used in cryptography. It is advised that the pool remains always <a href="https://blog.cloudflare.com/ensuring-randomness-with-linuxs-random-number-generator/" target="_blank">above 200</a>. If the pool of entropy gets empty, you risk your security to be predictable and you should install a user-space random numbers generating daemon, like <a href="http://www.issihosts.com/haveged/" target="_blank">haveged</a> or <code>rng-tools</code> (i.e. <b>rngd</b>), to keep the pool in healthy levels.'
+        info: '<a href="https://en.wikipedia.org/wiki/Entropy_(computing)" target="_blank">Entropy</a>, read from <code>/proc/sys/kernel/random/entropy_avail</code>, is like a pool of random numbers (<a href="https://en.wikipedia.org/wiki//dev/random" target="_blank">/dev/random</a>) that are mainly used in cryptography. It is advised that the pool remains always <a href="https://blog.cloudflare.com/ensuring-randomness-with-linuxs-random-number-generator/" target="_blank">above 200</a>. If the pool of entropy gets empty, you risk your security to be predictable and you should install a user-space random numbers generating daemon, like <code>haveged</code> or <code>rng-tools</code> (i.e. <b>rngd</b>), to keep the pool in healthy levels.'
     },
 
     'system.forks': {
@@ -379,6 +404,26 @@ netdataDashboard.context = {
 
     'mem.committed': {
         colors: NETDATA.colors[3]
+    },
+    
+    'mem.pgfaults': {
+    	info: 'A <a href="https://en.wikipedia.org/wiki/Page_fault" target="_blank">page fault</a> is a type of interrupt, called trap, raised by computer hardware when a running program accesses a memory page that is mapped into the virtual address space, but not actually loaded into main memory. If the page is loaded in memory at the time the fault is generated, but is not marked in the memory management unit as being loaded in memory, then it is called a <b>minor</b> or soft page fault. A <b>major</b> page fault is generated when the system needs to load the memory page from disk or swap memory. These values are read from <code>/proc/vmstat</code>.'
+    },
+
+    'mem.committed': {
+        info: 'Committed Memory, read from <code>/proc/meminfo</code>, is the sum of all memory which has been allocated by processes.'
+    },
+
+    'mem.writeback': {
+        info: 'Read from <code>/proc/meminfo</code>, <b>Dirty</b> is the amount of memory waiting to be written to disk. <b>Writeback</b> is how much memory is actively being written to disk.'
+    },
+
+    'mem.kernel': {
+        info: 'Read from <code>/proc/meminfo</code>, This chart displays the total ammount of memory being used by the kernel. <b>Slab</b> is the amount of memory used by the kernel to cache data structures for its own use. <b>KernelStack</b> is the amount of memory allocated for each task done by the kernel. <b>PageTables</b> is the amount of memory decicated to the lowest level of page tables (A page table is used to turn a virtual address into a physical memory address). <b>VmallocUsed</b> is the amount of memory being used as virtual address space.'
+    },
+
+    'mem.slab': {
+        info: 'Read from <code>/proc/meminfo</code>, <b>reclaimable</b> is the amount of memory which the kernel can reuse. <b>unreclaimable</b> can not be reused even when the kernel is lacking memory.'
     },
 
     // ------------------------------------------------------------------------
@@ -732,8 +777,8 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // fping
 
-    'fping.loss': {
-        colors: NETDATA.colors[1],
+    'fping.quality': {
+        colors: NETDATA.colors[10],
         height: 0.5
     },
 

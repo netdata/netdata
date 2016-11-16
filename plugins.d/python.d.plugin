@@ -28,6 +28,7 @@ sys.path.append(MODULES_DIR + "python_modules")
 
 PROGRAM = os.path.basename(__file__).replace(".plugin", "")
 DEBUG_FLAG = False
+TRACE_FLAG = False
 OVERRIDE_UPDATE_EVERY = False
 
 # -----------------------------------------------------------------------------
@@ -292,8 +293,8 @@ class PythonCharts(object):
         if job.name is not None and len(job.name) != 0:
             prefix += "/" + job.name
         try:
+            msg.error("DISABLED:", prefix)
             self.jobs.remove(job)
-            msg.info("Disabled", prefix)
         except Exception as e:
             msg.debug("This shouldn't happen. NO " + prefix + " IN LIST:" + str(self.jobs) + " ERROR: " + str(e))
 
@@ -332,21 +333,21 @@ class PythonCharts(object):
             job = self.jobs[i]
             try:
                 if not job.check():
-                    msg.error(job.chart_name, "check function failed.")
+                    msg.error(job.chart_name, "check() failed - disabling job")
                     self._stop(job)
                 else:
-                    msg.debug(job.chart_name, "check succeeded")
+                    msg.info("CHECKED OK:", job.chart_name)
                     i += 1
                     try:
                         if job.override_name is not None:
                             new_name = job.__module__ + '_' + job.override_name
                             if new_name in overridden:
-                                msg.error(job.override_name + " already exists. Stopping '" + job.name + "'")
+                                msg.info("DROPPED:", job.name, ", job '" + job.override_name + "' is already served by another job.")
                                 self._stop(job)
                                 i -= 1
                             else:
                                 job.name = job.override_name
-                                msg.debug(job.chart_name + " changing chart name to: '" + new_name + "'")
+                                msg.info("RENAMED:", new_name, ", from " + job.chart_name)
                                 job.chart_name = new_name
                                 overridden.append(job.chart_name)
                     except Exception:
@@ -435,7 +436,7 @@ def parse_cmdline(directory, *commands):
     :param commands: list of str
     :return: dict
     """
-    global DEBUG_FLAG
+    global DEBUG_FLAG, TRACE_FLAG
     global OVERRIDE_UPDATE_EVERY
     global BASE_CONFIG
 
@@ -447,6 +448,8 @@ def parse_cmdline(directory, *commands):
         elif cmd == "debug" or cmd == "all":
             DEBUG_FLAG = True
             # redirect stderr to stdout?
+        elif cmd == "trace" or cmd == "all":
+            TRACE_FLAG = True
         elif os.path.isfile(directory + cmd + ".chart.py") or os.path.isfile(directory + cmd):
             #DEBUG_FLAG = True
             mods.append(cmd.replace(".chart.py", ""))
@@ -470,14 +473,14 @@ def run():
     """
     Main program.
     """
-    global DEBUG_FLAG, BASE_CONFIG
+    global DEBUG_FLAG, TRACE_FLAG, BASE_CONFIG
 
     # read configuration file
     disabled = []
     configfile = CONFIG_DIR + "python.d.conf"
     msg.PROGRAM = PROGRAM
     msg.info("reading configuration file:", configfile)
-    log_counter = 200
+    log_throttle = 200
     log_interval = 3600
 
     conf = read_config(configfile)
@@ -488,23 +491,33 @@ def run():
                 msg.fatal('disabled in configuration file.\n')
         except (KeyError, TypeError):
             pass
+
         try:
             for param in BASE_CONFIG:
                 BASE_CONFIG[param] = conf[param]
         except (KeyError, TypeError):
             pass  # use default update_every from NETDATA_UPDATE_EVERY
+
         try:
             DEBUG_FLAG = conf['debug']
         except (KeyError, TypeError):
             pass
+
         try:
-            log_counter = conf['logs_per_interval']
+            TRACE_FLAG = conf['trace']
         except (KeyError, TypeError):
             pass
+
+        try:
+            log_throttle = conf['logs_per_interval']
+        except (KeyError, TypeError):
+            pass
+
         try:
             log_interval = conf['log_interval']
         except (KeyError, TypeError):
             pass
+
         for k, v in conf.items():
             if k in ("update_every", "debug", "enabled"):
                 continue
@@ -514,8 +527,11 @@ def run():
     # parse passed command line arguments
     modules = parse_cmdline(MODULES_DIR, *sys.argv)
     msg.DEBUG_FLAG = DEBUG_FLAG
-    msg.LOG_COUNTER = log_counter
+    msg.TRACE_FLAG = TRACE_FLAG
+    msg.LOG_THROTTLE = log_throttle
     msg.LOG_INTERVAL = log_interval
+    msg.LOG_COUNTER = 0
+    msg.LOG_NEXT_CHECK = 0
     msg.info("MODULES_DIR='" + MODULES_DIR +
              "', CONFIG_DIR='" + CONFIG_DIR +
              "', UPDATE_EVERY=" + str(BASE_CONFIG['update_every']) +

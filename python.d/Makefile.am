@@ -1,46 +1,47 @@
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 CLEANFILES = \
-	python-modules-installer.sh \
-	$(NULL)
+    python-modules-installer.sh \
+    $(NULL)
 
 include $(top_srcdir)/build/subst.inc
 
 SUFFIXES = .in
 
 dist_python_SCRIPTS = \
-	apache.chart.py \
-	apache_cache.chart.py \
-	cpufreq.chart.py \
-	dovecot.chart.py \
-	example.chart.py \
-	exim.chart.py \
-	hddtemp.chart.py \
-	ipfs.chart.py \
-	memcached.chart.py \
-	mysql.chart.py \
-	nginx.chart.py \
-	nginx_log.chart.py \
-	phpfpm.chart.py \
-	postfix.chart.py \
-	redis.chart.py \
-	retroshare.chart.py \
-	sensors.chart.py \
-	squid.chart.py \
-	tomcat.chart.py \
-	python-modules-installer.sh \
-	$(NULL)
+    apache.chart.py \
+    apache_cache.chart.py \
+    cpufreq.chart.py \
+    dovecot.chart.py \
+    example.chart.py \
+    exim.chart.py \
+    hddtemp.chart.py \
+    ipfs.chart.py \
+    memcached.chart.py \
+    mysql.chart.py \
+    nginx.chart.py \
+    nginx_log.chart.py \
+    phpfpm.chart.py \
+    postfix.chart.py \
+    postgres.chart.py \
+    redis.chart.py \
+    retroshare.chart.py \
+    sensors.chart.py \
+    squid.chart.py \
+    tomcat.chart.py \
+    python-modules-installer.sh \
+    $(NULL)
 
 dist_python_DATA = \
-	README.md \
-	$(NULL)
+    README.md \
+    $(NULL)
 
 pythonmodulesdir=$(pythondir)/python_modules
 dist_pythonmodules_DATA = \
-	python_modules/__init__.py \
-	python_modules/base.py \
-	python_modules/msg.py \
-	python_modules/lm_sensors.py \
-	$(NULL)
+    python_modules/__init__.py \
+    python_modules/base.py \
+    python_modules/msg.py \
+    python_modules/lm_sensors.py \
+    $(NULL)
 
 pythonyaml2dir=$(pythonmodulesdir)/pyyaml2
 dist_pythonyaml2_DATA = \

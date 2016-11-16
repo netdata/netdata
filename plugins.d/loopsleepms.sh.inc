@@ -1,6 +1,6 @@
 # no need for shebang - this file is included from other scripts
 
-LOOPSLEEP_DATE="$(which date)"
+LOOPSLEEP_DATE="$(which date 2>/dev/null || command -v date 2>/dev/null)"
 if [ -z "$LOOPSLEEP_DATE" ]
     then
     echo >&2 "$0: ERROR: Cannot find the command 'date' in the system path."

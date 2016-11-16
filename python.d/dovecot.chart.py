@@ -13,75 +13,75 @@ retries = 60
 ORDER = ['sessions', 'logins', 'commands',
          'faults',
          'context_switches',
-         'disk', 'bytes', 'syscalls',
+         'io', 'net', 'syscalls',
          'lookup', 'cache',
          'auth', 'auth_cache']
 
 CHARTS = {
     'sessions': {
-        'options': [None, "active sessions", 'number', 'IMAP', 'dovecot.sessions', 'line'],
+        'options': [None, "Dovecot Active Sessions", 'number', 'sessions', 'dovecot.sessions', 'line'],
         'lines': [
             ['num_connected_sessions', 'active sessions', 'absolute']
         ]},
     'logins': {
-        'options': [None, "logins", 'number', 'IMAP', 'dovecot.logins', 'line'],
+        'options': [None, "Dovecot Logins", 'number', 'logins', 'dovecot.logins', 'line'],
         'lines': [
             ['num_logins', 'logins', 'absolute']
         ]},
     'commands': {
-        'options': [None, "commands", "commands", 'IMAP', 'dovecot.commands', 'line'],
+        'options': [None, "Dovecot Commands", "commands", 'commands', 'dovecot.commands', 'line'],
         'lines': [
             ['num_cmds', 'commands', 'absolute']
         ]},
     'faults': {
-        'options': [None, "faults", "faults", 'Faults', 'dovecot.faults', 'line'],
+        'options': [None, "Dovecot Page Faults", "faults", 'page faults', 'dovecot.faults', 'line'],
         'lines': [
             ['min_faults', 'minor', 'absolute'],
             ['maj_faults', 'major', 'absolute']
         ]},
     'context_switches': {
-        'options': [None, "context switches", '', 'Context Switches', 'dovecot.context_switches', 'line'],
+        'options': [None, "Dovecot Context Switches", '', 'context switches', 'dovecot.context_switches', 'line'],
         'lines': [
             ['vol_cs', 'volountary', 'absolute'],
             ['invol_cs', 'involountary', 'absolute']
         ]},
-    'disk': {
-        'options': [None, "disk", 'bytes/s', 'Reads and Writes', 'dovecot.disk', 'line'],
+    'io': {
+        'options': [None, "Dovecot Disk I/O", 'kilobytes/s', 'disk', 'dovecot.io', 'area'],
         'lines': [
-            ['disk_input', 'read', 'incremental'],
-            ['disk_output', 'write', 'incremental']
+            ['disk_input', 'read', 'incremental', 1, 1024],
+            ['disk_output', 'write', 'incremental', -1, 1024]
         ]},
-    'bytes': {
-        'options': [None, "bytes", 'bytes/s', 'Reads and Writes', 'dovecot.bytes', 'line'],
+    'net': {
+        'options': [None, "Dovecot Network Bandwidth", 'kilobits/s', 'network', 'dovecot.net', 'area'],
         'lines': [
-            ['read_bytes', 'read', 'incremental'],
-            ['write_bytes', 'write', 'incremental']
+            ['read_bytes', 'read', 'incremental', 8, 1024],
+            ['write_bytes', 'write', 'incremental', -8, 1024]
         ]},
     'syscalls': {
-        'options': [None, "number of syscalls", 'syscalls/s', 'Reads and Writes', 'dovecot.syscalls', 'line'],
+        'options': [None, "Dovecot Number of SysCalls", 'syscalls/s', 'system', 'dovecot.syscalls', 'line'],
         'lines': [
             ['read_count', 'read', 'incremental'],
             ['write_count', 'write', 'incremental']
         ]},
     'lookup': {
-        'options': [None, "lookups", 'number/s', 'Mail', 'dovecot.lookup', 'line'],
+        'options': [None, "Dovecot Lookups", 'number/s', 'lookups', 'dovecot.lookup', 'stacked'],
         'lines': [
             ['mail_lookup_path', 'path', 'incremental'],
             ['mail_lookup_attr', 'attr', 'incremental']
         ]},
     'cache': {
-        'options': [None, "hits", 'hits/s', 'Mail', 'dovecot.cache', 'line'],
+        'options': [None, "Dovecot Cache Hits", 'hits/s', 'cache', 'dovecot.cache', 'line'],
         'lines': [
             ['mail_cache_hits', 'hits', 'incremental']
         ]},
     'auth': {
-        'options': [None, "attempts", 'attempts', 'Authentication', 'dovecot.auth', 'stacked'],
+        'options': [None, "Dovecot Authentications", 'attempts', 'logins', 'dovecot.auth', 'stacked'],
         'lines': [
-            ['auth_successes', 'success', 'absolute'],
-            ['auth_failures', 'failure', 'absolute']
+            ['auth_successes', 'ok', 'absolute'],
+            ['auth_failures', 'failed', 'absolute']
         ]},
     'auth_cache': {
-        'options': [None, "cache", 'number', 'Authentication', 'dovecot.auth_cache', 'stacked'],
+        'options': [None, "Dovecot Authentication Cache", 'number', 'cache', 'dovecot.auth_cache', 'stacked'],
         'lines': [
             ['auth_cache_hits', 'hit', 'absolute'],
             ['auth_cache_misses', 'miss', 'absolute']
@@ -108,6 +108,10 @@ class Service(SocketService):
         try:
             raw = self._get_raw_data()
         except (ValueError, AttributeError):
+            return None
+
+        if raw is None:
+            self.debug("dovecot returned no data")
             return None
 
         data = raw.split('\n')[:2]

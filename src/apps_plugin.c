@@ -30,6 +30,8 @@ int show_guest_time_old = 0;
 
 int enable_guest_charts = 0;
 int enable_file_charts = 1;
+int enable_users_charts = 1;
+int enable_groups_charts = 1;
 
 // ----------------------------------------------------------------------------
 
@@ -2694,6 +2696,16 @@ void parse_args(int argc, char **argv)
             continue;
         }
 
+        if(strcmp("no-users", argv[i]) == 0 || strcmp("without-users", argv[i]) == 0) {
+            enable_users_charts = 0;
+            continue;
+        }
+
+        if(strcmp("no-groups", argv[i]) == 0 || strcmp("without-groups", argv[i]) == 0) {
+            enable_groups_charts = 0;
+            continue;
+        }
+
         if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
             fprintf(stderr,
                     "apps.plugin\n"
@@ -2787,7 +2799,6 @@ int main(int argc, char **argv)
     procfile_adaptive_initial_allocation = 1;
 
     time_t started_t = time(NULL);
-    time_t current_t;
     get_system_HZ();
     get_system_pid_max();
     get_system_cpus();
@@ -2829,22 +2840,16 @@ int main(int argc, char **argv)
             , RATES_DETAIL
             );
 
-#ifndef PROFILING_MODE
-    unsigned long long sunext = (time(NULL) - (time(NULL) % update_every) + update_every) * 1000000ULL;
-    unsigned long long sunow;
-#endif /* PROFILING_MODE */
-
+    unsigned long long step = update_every * 1000000ULL;
     global_iterations_counter = 1;
     for(;1; global_iterations_counter++) {
-#ifndef PROFILING_MODE
-        // delay until it is our time to run
-        while((sunow = time_usec()) < sunext)
-            sleep_usec(sunext - sunow);
+        unsigned long long now = time_usec();
+        unsigned long long next = now - (now % step) + step;
 
-        // find the next time we need to run
-        while(time_usec() > sunext)
-            sunext += update_every * 1000000ULL;
-#endif /* PROFILING_MODE */
+        while(now < next) {
+            sleep_usec(next - now);
+            now = time_usec();
+        }
 
         if(!collect_data_for_all_processes_from_proc()) {
             error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
@@ -2859,16 +2864,23 @@ int main(int argc, char **argv)
 
         // this is smart enough to show only newly added apps, when needed
         send_charts_updates_to_netdata(apps_groups_root_target, "apps", "Apps");
-        send_charts_updates_to_netdata(users_root_target, "users", "Users");
-        send_charts_updates_to_netdata(groups_root_target, "groups", "User Groups");
+
+        if(likely(enable_users_charts))
+            send_charts_updates_to_netdata(users_root_target, "users", "Users");
+
+        if(likely(enable_groups_charts))
+            send_charts_updates_to_netdata(groups_root_target, "groups", "User Groups");
 
         send_collected_data_to_netdata(apps_groups_root_target, "apps", dt);
-        send_collected_data_to_netdata(users_root_target, "users", dt);
-        send_collected_data_to_netdata(groups_root_target, "groups", dt);
+
+        if(likely(enable_users_charts))
+            send_collected_data_to_netdata(users_root_target, "users", dt);
+
+        if(likely(enable_groups_charts))
+            send_collected_data_to_netdata(groups_root_target, "groups", dt);
 
         show_guest_time_old = show_guest_time;
 
-        //if(puts(buffer_tostring(output)) == EOF)
         if(write(STDOUT_FILENO, buffer_tostring(output), buffer_strlen(output)) == -1)
             fatal("Cannot send chart values to netdata.");
 
@@ -2878,13 +2890,9 @@ int main(int argc, char **argv)
         if(unlikely(debug))
             fprintf(stderr, "apps.plugin: done Loop No %llu\n", global_iterations_counter);
 
-        current_t = time(NULL);
+        time_t current_t = time(NULL);
 
-#ifndef PROFILING_MODE
         // restart check (14400 seconds)
         if(current_t - started_t > 14400) exit(0);
-#else
-        if(current_t - started_t > 10) exit(0);
-#endif /* PROFILING_MODE */
     }
 }

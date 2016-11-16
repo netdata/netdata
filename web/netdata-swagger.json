@@ -3,7 +3,7 @@
     "info": {
         "title": "NetData API",
         "description": "Real time data collection and graphs...",
-        "version": "1.2.1_master"
+        "version": "1.4.1_master"
     },
     "host": "registry.my-netdata.io",
     "schemes": [
@@ -90,7 +90,7 @@
                     {
                         "name": "after",
                         "in": "query",
-                        "description": "This parameter can either be an absolute timestamp specifying the starting point of the data to be returned, or a relative number of seconds, to the last collected timestamp. Netdata will assume it is a relative number if it is smaller than the duration of the round robin database for this chart. So, if the round robin database is 3600 seconds, any value from -3600 to 3600 will trigger relative arithmetics. Netdata will adapt this parameter to the boundaries of the round robin database.",
+                        "description": "This parameter can either be an absolute timestamp specifying the starting point of the data to be returned, or a relative number of seconds (negative, relative to parameter: before). Netdata will assume it is a relative number if it is less that 3 years (in seconds). Netdata will adapt this parameter to the boundaries of the round robin database. The default is the beginning of the round robin database (i.e. by default netdata will attempt to return data for the entire database).",
                         "required": true,
                         "type": "number",
                         "format": "integer",
@@ -100,7 +100,7 @@
                     {
                         "name": "before",
                         "in": "query",
-                        "description": "This parameter can either be an absolute timestamp specifying the ending point of the data to be returned, or a relative number of seconds, to the last collected timestamp. Netdata will assume it is a relative number if it is smaller than the duration of the round robin database for this chart. So, if the round robin database is 3600 seconds, any value from -3600 to 3600 will trigger relative arithmetics. Netdata will adapt this parameter to the boundaries of the round robin database.",
+                        "description": "This parameter can either be an absolute timestamp specifying the ending point of the data to be returned, or a relative number of seconds (negative), relative to the last collected timestamp. Netdata will assume it is a relative number if it is less than 3 years (in seconds). Netdata will adapt this parameter to the boundaries of the round robin database. The default is zero (i.e. the timestamp of the last value collected).",
                         "required": false,
                         "type": "number",
                         "format": "integer",
@@ -109,7 +109,7 @@
                     {
                         "name": "points",
                         "in": "query",
-                        "description": "The number of points to be returned. If not given, or it is <= 0, or it is bigger than the points stored in the round robin database for this chart for the given duration, all the available collected values for the given duration are returned.",
+                        "description": "The number of points to be returned. If not given, or it is <= 0, or it is bigger than the points stored in the round robin database for this chart for the given duration, all the available collected values for the given duration will be returned.",
                         "required": true,
                         "type": "number",
                         "format": "integer",
@@ -119,12 +119,15 @@
                     {
                         "name": "group",
                         "in": "query",
-                        "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. Two methods are supported, \"max\" and \"average\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).",
+                        "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).",
                         "required": true,
                         "type": "string",
                         "enum": [
+                            "min",
                             "max",
-                            "average"
+                            "average",
+                            "sum",
+                            "incremental-sum"
                         ],
                         "default": "average",
                         "allowEmptyValue": false
@@ -173,7 +176,8 @@
                                 "null2zero",
                                 "objectrows",
                                 "google_json",
-                                "percentage"
+                                "percentage",
+                                "unaligned"
                             ],
                             "collectionFormat": "pipes"
                         },
@@ -243,6 +247,15 @@
                         "default": "system.cpu"
                     },
                     {
+                        "name": "alarm",
+                        "in": "query",
+                        "description": "the name of an alarm linked to the chart",
+                        "required": false,
+                        "type": "string",
+                        "format": "any text",
+                        "allowEmptyValue": true
+                    },
+                    {
                         "name": "dimension",
                         "in": "query",
                         "description": "zero, one or more dimension ids, as returned by the /chart call.",
@@ -275,24 +288,17 @@
                         "default": 0
                     },
                     {
-                        "name": "points",
-                        "in": "query",
-                        "description": "The number of points to be returned. If not given, or it is <= 0, or it is bigger than the points stored in the round robin database for this chart for the given duration, all the available collected values for the given duration are returned.",
-                        "required": true,
-                        "type": "number",
-                        "format": "integer",
-                        "allowEmptyValue": false,
-                        "default": 20
-                    },
-                    {
                         "name": "group",
                         "in": "query",
-                        "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. Two methods are supported, \"max\" and \"average\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).",
+                        "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods are supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).",
                         "required": true,
                         "type": "string",
                         "enum": [
+                            "min",
                             "max",
-                            "average"
+                            "average",
+                            "sum",
+                            "incremental-sum"
                         ],
                         "default": "average",
                         "allowEmptyValue": false
@@ -306,13 +312,12 @@
                         "items": {
                             "type": "string",
                             "enum": [
-                                "nonzero",
-                                "flip",
                                 "abs",
                                 "absolute",
                                 "absolute-sum",
                                 "null2zero",
-                                "percentage"
+                                "percentage",
+                                "unaligned"
                             ],
                             "collectionFormat": "pipes"
                         },
