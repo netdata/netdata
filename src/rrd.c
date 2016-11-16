@@ -353,20 +353,33 @@ char *rrdset_strncpyz_name(char *to, const char *from, size_t length)
 
 void rrdset_set_name(RRDSET *st, const char *name)
 {
-    debug(D_RRD_CALLS, "rrdset_set_name() old: %s, new: %s", st->name, name);
+    if(unlikely(st->name && !strcmp(st->name, name)))
+        return;
 
-    if(st->name) {
-        rrdset_index_del_name(&localhost, st);
-        rrdsetvar_rename_all(st);
-    }
+    debug(D_RRD_CALLS, "rrdset_set_name() old: %s, new: %s", st->name, name);
 
     char b[CONFIG_MAX_VALUE + 1];
     char n[RRD_ID_LENGTH_MAX + 1];
 
     snprintfz(n, RRD_ID_LENGTH_MAX, "%s.%s", st->type, name);
     rrdset_strncpyz_name(b, n, CONFIG_MAX_VALUE);
-    st->name = config_get(st->id, "name", b);
-    st->hash_name = simple_hash(st->name);
+
+    if(st->name) {
+        rrdset_index_del_name(&localhost, st);
+        st->name = config_set_default(st->id, "name", b);
+        st->hash_name = simple_hash(st->name);
+        rrdsetvar_rename_all(st);
+    }
+    else {
+        st->name = config_get(st->id, "name", b);
+        st->hash_name = simple_hash(st->name);
+    }
+
+    pthread_rwlock_wrlock(&st->rwlock);
+    RRDDIM *rd;
+    for(rd = st->dimensions; rd ;rd = rd->next)
+        rrddimvar_rename_all(rd);
+    pthread_rwlock_unlock(&st->rwlock);
 
     rrdset_index_add_name(&localhost, st);
 }
@@ -425,7 +438,7 @@ void rrdset_reset(RRDSET *st)
         memset(rd->values, 0, rd->entries * sizeof(storage_number));
     }
 }
-static long align_entries_to_pagesize(long entries) {
+static inline long align_entries_to_pagesize(long entries) {
     if(entries < 5) entries = 5;
     if(entries > RRD_HISTORY_ENTRIES_MAX) entries = RRD_HISTORY_ENTRIES_MAX;
 
@@ -447,6 +460,11 @@ static long align_entries_to_pagesize(long entries) {
 #endif
 }
 
+static inline void timeval_align(struct timeval *tv, int update_every) {
+    tv->tv_sec -= tv->tv_sec % update_every;
+    tv->tv_usec = 500000;
+}
+
 RRDSET *rrdset_create(const char *type, const char *id, const char *name, const char *family, const char *context, const char *title, const char *units, long priority, int update_every, int chart_type)
 {
     if(!type || !type[0]) {
@@ -461,11 +479,10 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 
     char fullid[RRD_ID_LENGTH_MAX + 1];
     char fullfilename[FILENAME_MAX + 1];
-    RRDSET *st = NULL;
 
     snprintfz(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
 
-    st = rrdset_find(fullid);
+    RRDSET *st = rrdset_find(fullid);
     if(st) {
         error("Cannot create rrd stats for '%s', it already exists.", fullid);
         return st;
@@ -513,6 +530,10 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
             error("File %s is too old. Clearing it.", fullfilename);
             memset(st, 0, size);
         }
+
+        // make sure the database is aligned
+        if(st->last_updated.tv_sec)
+            timeval_align(&st->last_updated, update_every);
     }
 
     if(st) {
@@ -755,11 +776,14 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 
 void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name)
 {
-    debug(D_RRD_CALLS, "rrddim_set_name() %s.%s", st->name, rd->name);
+    if(unlikely(rd->name && !strcmp(rd->name, name)))
+        return;
+
+    debug(D_RRD_CALLS, "rrddim_set_name() from %s.%s to %s.%s", st->name, rd->name, st->name, name);
 
     char varname[CONFIG_MAX_NAME + 1];
     snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
-    config_set_default(st->id, varname, name);
+    rd->name = config_set_default(st->id, varname, name);
 
     rrddimvar_rename_all(rd);
 }
@@ -974,35 +998,58 @@ collected_number rrddim_set(RRDSET *st, const char *id, collected_number value)
     return rrddim_set_by_pointer(st, rd, value);
 }
 
+void rrdset_next_usec_unfiltered(RRDSET *st, unsigned long long microseconds)
+{
+    if(unlikely(!st->last_collected_time.tv_sec || !microseconds)) {
+        // the first entry
+        microseconds = st->update_every * 1000000ULL;
+    }
+    st->usec_since_last_update = microseconds;
+}
+
 void rrdset_next_usec(RRDSET *st, unsigned long long microseconds)
 {
-    if(!microseconds) rrdset_next(st);
-    else {
-        debug(D_RRD_CALLS, "rrdset_next_usec() for chart %s with microseconds %llu", st->name, microseconds);
+    struct timeval now;
+    gettimeofday(&now, NULL);
 
-        if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: NEXT: %llu microseconds", st->name, microseconds);
-        st->usec_since_last_update = microseconds;
+    if(unlikely(!st->last_collected_time.tv_sec)) {
+        // the first entry
+        microseconds = st->update_every * 1000000ULL;
     }
-}
-
-void rrdset_next(RRDSET *st)
-{
-    unsigned long long microseconds = 0;
-
-    if(likely(st->last_collected_time.tv_sec)) {
-        struct timeval now;
-        gettimeofday(&now, NULL);
+    else if(unlikely(!microseconds)) {
+        // no dt given by the plugin
         microseconds = usec_dt(&now, &st->last_collected_time);
     }
-    // prevent infinite loop
-    else microseconds = st->update_every * 1000000ULL;
+    else {
+        // microseconds has the time since the last collection
+        unsigned long long now_usec = timeval_usec(&now);
+        unsigned long long last_usec = timeval_usec(&st->last_collected_time);
+        unsigned long long since_last_usec = usec_dt(&now, &st->last_collected_time);
 
-    rrdset_next_usec(st, microseconds);
-}
+        // verify the microseconds given is good
+        if(unlikely(microseconds > since_last_usec)) {
+            debug(D_RRD_CALLS, "dt %llu usec given is too big - it leads %llu usec to the future, for chart '%s' (%s).", microseconds, microseconds - since_last_usec, st->name, st->id);
 
-void rrdset_next_plugins(RRDSET *st)
-{
-    rrdset_next(st);
+#ifdef NETDATA_INTERNAL_CHECKS
+            if(unlikely(last_usec + microseconds > now_usec + 1000))
+                error("dt %llu usec given is too big - it leads %llu usec to the future, for chart '%s' (%s).", microseconds, microseconds - since_last_usec, st->name, st->id);
+#endif
+
+            microseconds = since_last_usec;
+        }
+        else if(unlikely(microseconds < since_last_usec * 0.8)) {
+            debug(D_RRD_CALLS, "dt %llu usec given is too small - expected %llu usec up to -20%%, for chart '%s' (%s).", microseconds, since_last_usec, st->name, st->id);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+            error("dt %llu usec given is too small - expected %llu usec up to -20%%, for chart '%s' (%s).", microseconds, since_last_usec, st->name, st->id);
+#endif
+            microseconds = since_last_usec;
+        }
+    }
+    debug(D_RRD_CALLS, "rrdset_next_usec() for chart %s with microseconds %llu", st->name, microseconds);
+
+    if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: NEXT: %llu microseconds", st->name, microseconds);
+    st->usec_since_last_update = microseconds;
 }
 
 unsigned long long rrdset_done(RRDSET *st)
@@ -1056,6 +1103,8 @@ unsigned long long rrdset_done(RRDSET *st)
         // it is the first entry
         // set the last_collected_time to now
         gettimeofday(&st->last_collected_time, NULL);
+        timeval_align(&st->last_collected_time, st->update_every);
+
         last_collect_ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec - update_every_ut;
 
         // the first entry should not be stored
@@ -1097,6 +1146,7 @@ unsigned long long rrdset_done(RRDSET *st)
         st->usec_since_last_update = update_every_ut;
 
         gettimeofday(&st->last_collected_time, NULL);
+        timeval_align(&st->last_collected_time, st->update_every);
 
         unsigned long long ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec - st->usec_since_last_update;
         st->last_updated.tv_sec = (time_t) (ut / 1000000ULL);
@@ -1311,6 +1361,9 @@ unsigned long long rrdset_done(RRDSET *st)
     if(unlikely(now_collect_ut < next_store_ut)) {
         // this is collected in the same interpolation point
         if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: THIS IS IN THE SAME INTERPOLATION POINT", st->name);
+#ifdef NETDATA_INTERNAL_CHECKS
+        info("%s is collected in the same interpolation point: short by %llu microseconds", st->name, next_store_ut - now_collect_ut);
+#endif
     }
 
     unsigned long long first_ut = last_stored_ut;

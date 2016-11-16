@@ -1,5 +1,11 @@
 # no need for shebang - this file is loaded from charts.d.plugin
 
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+
 squid_host=
 squid_port=
 squid_url=
@@ -9,7 +15,7 @@ squid_priority=60000
 
 squid_get_stats_internal() {
 	local host="$1" port="$2" url="$3"
-	squidclient -h $host -p $port $url
+	run squidclient -h $host -p $port $url
 }
 
 squid_get_stats() {
@@ -29,13 +35,13 @@ squid_autodetect() {
 				squid_host="$host"
 				squid_port="$port"
 				squid_url="$url"
-				echo >&2 "squid: found squid at '$host:$port' with url '$url'"
+				debug "found squid at '$host:$port' with url '$url'"
 				return 0
 			fi
 		done
 	done
 
-	echo >&2 "squid: cannot find squid running in localhost. Please set squid_url='url' and squid_host='IP' and squid_port='PORT' in $confd/squid.conf"
+	error "cannot find squid running in localhost. Please set squid_url='url' and squid_host='IP' and squid_port='PORT' in $confd/squid.conf"
 	return 1
 }
 
@@ -53,7 +59,7 @@ squid_check() {
 	local x="$(squid_get_stats | grep client_http.requests)"
 	if [ ! $? -eq 0 -o -z "$x" ]
 	then
-		echo >&2 "squid: cannot fetch URL '$squid_url' by connecting to $squid_host:$squid_port. Please set squid_url='url' and squid_host='host' and squid_port='port' in $confd/squid.conf"
+		error "cannot fetch URL '$squid_url' by connecting to $squid_host:$squid_port. Please set squid_url='url' and squid_host='host' and squid_port='port' in $confd/squid.conf"
 		return 1
 	fi
 

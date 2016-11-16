@@ -99,6 +99,7 @@ class Service(SocketService):
         Get data from socket
         :return: dict
         """
+<<<<<<< HEAD
         if self.passwd:
             info_request = self.request
             self.request = "AUTH " + self.passwd + "\r\n"
@@ -108,6 +109,8 @@ class Service(SocketService):
                 return None
             self.request = info_request
 
+=======
+>>>>>>> upstream/master
         response = self._get_raw_data()
         if response is None:
             # error has already been logged

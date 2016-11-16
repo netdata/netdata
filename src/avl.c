@@ -283,18 +283,18 @@ avl *avl_remove(avl_tree *tree, avl *item) {
 // ---------------------------
 // traversing
 
-void avl_walker(avl *node, void (*callback)(void *)) {
+void avl_walker(avl *node, void (*callback)(void *entry, void *data), void *data) {
     if(node->avl_link[0])
-        avl_walker(node->avl_link[0], callback);
+        avl_walker(node->avl_link[0], callback, data);
 
-    callback(node);
+    callback(node, data);
 
     if(node->avl_link[1])
-        avl_walker(node->avl_link[1], callback);
+        avl_walker(node->avl_link[1], callback, data);
 }
 
-void avl_traverse(avl_tree *t, void (*callback)(void *)) {
-    avl_walker(t->root, callback);
+void avl_traverse(avl_tree *t, void (*callback)(void *entry, void *data), void *data) {
+    avl_walker(t->root, callback, data);
 }
 
 // ---------------------------
@@ -372,9 +372,9 @@ avl *avl_insert_lock(avl_tree_lock *t, avl *a) {
     return ret;
 }
 
-void avl_traverse_lock(avl_tree_lock *t, void (*callback)(void *)) {
+void avl_traverse_lock(avl_tree_lock *t, void (*callback)(void *entry, void *data), void *data) {
     avl_read_lock(t);
-    avl_traverse(&t->avl_tree, callback);
+    avl_traverse(&t->avl_tree, callback, data);
     avl_unlock(t);
 }
 

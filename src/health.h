@@ -5,11 +5,13 @@ extern int health_enabled;
 
 extern int rrdvar_compare(void *a, void *b);
 
-#define RRDVAR_TYPE_CALCULATED 1
-#define RRDVAR_TYPE_TIME_T     2
-#define RRDVAR_TYPE_COLLECTED  3
-#define RRDVAR_TYPE_TOTAL      4
-#define RRDVAR_TYPE_INT        5
+#define RRDVAR_TYPE_CALCULATED              1
+#define RRDVAR_TYPE_TIME_T                  2
+#define RRDVAR_TYPE_COLLECTED               3
+#define RRDVAR_TYPE_TOTAL                   4
+#define RRDVAR_TYPE_INT                     5
+#define RRDVAR_TYPE_CALCULATED_ALLOCATED    6
+
 
 // the variables as stored in the variables indexes
 // there are 3 indexes:
@@ -34,8 +36,8 @@ typedef struct rrdvar {
 // This means, there will be no speed penalty for using
 // these variables
 typedef struct rrdsetvar {
-    char *fullid;               // chart type.chart id.variable
-    char *fullname;             // chart type.chart name.variable
+    char *key_fullid;               // chart type.chart id.variable
+    char *key_fullname;             // chart type.chart name.variable
     char *variable;             // variable
 
     int type;
@@ -43,11 +45,11 @@ typedef struct rrdsetvar {
 
     uint32_t options;
 
-    RRDVAR *local;
-    RRDVAR *family;
-    RRDVAR *host;
-    RRDVAR *family_name;
-    RRDVAR *host_name;
+    RRDVAR *var_local;
+    RRDVAR *var_family;
+    RRDVAR *var_host;
+    RRDVAR *var_family_name;
+    RRDVAR *var_host_name;
 
     struct rrdset *rrdset;
 
@@ -64,28 +66,32 @@ typedef struct rrddimvar {
     char *prefix;
     char *suffix;
 
-    char *id;                   // dimension id
-    char *name;                 // dimension name
-    char *fullidid;             // chart type.chart id.dimension id
-    char *fullidname;           // chart type.chart id.dimension name
-    char *fullnameid;           // chart type.chart name.dimension id
-    char *fullnamename;         // chart type.chart name.dimension name
+    char *key_id;                   // dimension id
+    char *key_name;                 // dimension name
+    char *key_contextid;            // context + dimension id
+    char *key_contextname;          // context + dimension name
+    char *key_fullidid;             // chart type.chart id + dimension id
+    char *key_fullidname;           // chart type.chart id + dimension name
+    char *key_fullnameid;           // chart type.chart name + dimension id
+    char *key_fullnamename;         // chart type.chart name + dimension name
 
     int type;
     void *value;
 
     uint32_t options;
 
-    RRDVAR *local_id;
-    RRDVAR *local_name;
+    RRDVAR *var_local_id;
+    RRDVAR *var_local_name;
 
-    RRDVAR *family_id;
-    RRDVAR *family_name;
+    RRDVAR *var_family_id;
+    RRDVAR *var_family_name;
+    RRDVAR *var_family_contextid;
+    RRDVAR *var_family_contextname;
 
-    RRDVAR *host_fullidid;
-    RRDVAR *host_fullidname;
-    RRDVAR *host_fullnameid;
-    RRDVAR *host_fullnamename;
+    RRDVAR *var_host_chartidid;
+    RRDVAR *var_host_chartidname;
+    RRDVAR *var_host_chartnameid;
+    RRDVAR *var_host_chartnamename;
 
     struct rrddim *rrddim;
 
@@ -115,10 +121,11 @@ typedef struct rrddimvar {
 
 #define RRDCALC_FLAG_DB_ERROR      0x00000001
 #define RRDCALC_FLAG_DB_NAN        0x00000002
-#define RRDCALC_FLAG_DB_STALE      0x00000004
+/* #define RRDCALC_FLAG_DB_STALE      0x00000004 */
 #define RRDCALC_FLAG_CALC_ERROR    0x00000008
 #define RRDCALC_FLAG_WARN_ERROR    0x00000010
 #define RRDCALC_FLAG_CRIT_ERROR    0x00000020
+#define RRDCALC_FLAG_RUNNABLE      0x00000040
 
 typedef struct rrdcalc {
     uint32_t id;                    // the unique id of this alarm
@@ -344,5 +351,11 @@ extern void health_reload(void);
 extern int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, calculated_number *result);
 extern void health_alarms2json(RRDHOST *host, BUFFER *wb, int all);
 extern void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after);
+
+void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf);
+
+extern RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name);
+extern void rrdvar_custom_host_variable_destroy(RRDHOST *host, const char *name);
+extern void rrdvar_custom_host_variable_set(RRDVAR *rv, calculated_number value);
 
 #endif //NETDATA_HEALTH_H

@@ -35,6 +35,7 @@ netdata_SOURCES = \
 	eval.c eval.h \
 	global_statistics.c global_statistics.h \
 	health.c health.h \
+	ipc.c ipc.h \
 	log.c log.h \
 	main.c main.h \
 	plugin_checks.c plugin_checks.h \

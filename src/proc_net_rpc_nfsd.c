@@ -253,7 +253,6 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
     if(do_proc4ops) do_proc4ops = 1;
 
     uint32_t lines = procfile_lines(ff), l;
-    uint32_t words;
 
     char *type;
     unsigned long long rc_hits = 0, rc_misses = 0, rc_nocache = 0;
@@ -265,7 +264,7 @@ int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
     unsigned long long rpc_calls = 0, rpc_bad_format = 0, rpc_bad_auth = 0, rpc_bad_client = 0;
 
     for(l = 0; l < lines ;l++) {
-        words = procfile_linewords(ff, l);
+        uint32_t words = procfile_linewords(ff, l);
         if(!words) continue;
 
         type = procfile_lineword(ff, l, 0);

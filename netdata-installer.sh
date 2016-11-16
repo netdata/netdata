@@ -139,7 +139,7 @@ get_git_config_signatures() {
 
     echo >configs.signatures.tmp
 
-    for x in $(find conf.d -name \*.conf | sort)
+    for x in $(find conf.d -name \*.conf)
     do
             x="${x/conf.d\//}"
             echo "${x}"
@@ -147,7 +147,7 @@ get_git_config_signatures() {
             do
                     git checkout ${c} "conf.d/${x}" || continue
                     s="$(cat "conf.d/${x}" | md5sum | cut -d ' ' -f 1)"
-                    echo >>configs.signatures.tmp "${x}:${s}"
+                    echo >>configs.signatures.tmp "${s}:${x}"
                     echo "    ${s}"
             done
             git checkout HEAD "conf.d/${x}" || break
@@ -159,7 +159,7 @@ get_git_config_signatures() {
         {
             echo "declare -A configs_signatures=("
             IFS=":"
-            while read file md5
+            while read md5 file
             do
                 echo "  ['${md5}']='${file}'"
             done
@@ -561,7 +561,7 @@ if [ ${UID} -eq 0 ]
     if [ $? -ne 0 ]
         then
         echo >&2 "Adding netdata user account ..."
-        run useradd -r -g netdata -c netdata -s $(which nologin || echo '/bin/false') -d / netdata
+        run useradd -r -g netdata -c netdata -s $(which nologin 2>/dev/null || command -v nologin 2>/dev/null || echo '/bin/false') -d / netdata
     fi
 
     getent group docker > /dev/null
@@ -752,7 +752,9 @@ stop_netdata_on_pid() {
 }
 
 stop_all_netdata() {
-    local p
+    local p myns ns
+
+    myns="$(readlink /proc/self/ns/pid 2>/dev/null)"
 
     echo >&2 "Stopping a (possibly) running netdata..."
 
@@ -761,25 +763,91 @@ stop_all_netdata() {
         $(cat /var/run/netdata/netdata.pid 2>/dev/null) \
         $(pidof netdata 2>/dev/null)
     do
-        stop_netdata_on_pid ${p}
+        ns="$(readlink /proc/${p}/ns/pid 2>/dev/null)"
+
+        if [ -z "${myns}" -o -z "${ns}" -o "${myns}" = "${ns}" ]
+            then
+            stop_netdata_on_pid ${p}
+        fi
     done
 }
 
 # -----------------------------------------------------------------------------
-# check netdata for systemd
+# check for systemd
 
 issystemd() {
+    local pids p myns ns systemctl
+
     # if the directory /etc/systemd/system does not exit, it is not systemd
     [ ! -d /etc/systemd/system ] && return 1
+
+    # if there is no systemctl command, it is not systemd
+    systemctl=$(which systemctl 2>/dev/null || command -v systemctl 2>/dev/null)
+    [ -z "${systemctl}" -o ! -x "${systemctl}" ] && return 1
 
     # if pid 1 is systemd, it is systemd
     [ "$(basename $(readlink /proc/1/exe) 2>/dev/null)" = "systemd" ] && return 0
 
-    # if systemd is running, it is systemd
-    pidof systemd >/dev/null 2>&1 && return 0
+    # if systemd is not running, it is not systemd
+    pids=$(pidof systemd 2>/dev/null)
+    [ -z "${pids}" ] && return 1
+
+    # check if the running systemd processes are not in our namespace
+    myns="$(readlink /proc/self/ns/pid 2>/dev/null)"
+    for p in ${pids}
+    do
+        ns="$(readlink /proc/${p}/ns/pid 2>/dev/null)"
+
+        # if pid of systemd is in our namespace, it is systemd
+        [ ! -z "${myns}" && "${myns}" = "${ns}" ] && return 0
+    done
 
     # else, it is not systemd
     return 1
+}
+
+installed_init_d=0
+install_non_systemd_init() {
+    [ "${UID}" != 0 ] && return 1
+
+    local key="unknown"
+    if [ -f /etc/os-release ]
+        then
+        source /etc/os-release || return 1
+        key="${ID}-${VERSION_ID}"
+
+    elif [ -f /etc/centos-release ]
+        then
+        key=$(</etc/centos-release)
+    fi
+
+    if [ -d /etc/init.d -a ! -f /etc/init.d/netdata ]
+        then
+        if [ "${key}" = "gentoo" ]
+            then
+            run cp system/netdata-openrc /etc/init.d/netdata && \
+            run chmod 755 /etc/init.d/netdata && \
+            run rc-update add netdata default && \
+            installed_init_d=1
+        
+        elif [ "${key}" = "ubuntu-12.04" -o "${key}" = "ubuntu-14.04" -o "${key}" = "debian-7" ]
+            then
+            run cp system/netdata-lsb /etc/init.d/netdata && \
+            run chmod 755 /etc/init.d/netdata && \
+            run update-rc.d netdata defaults && \
+            run update-rc.d netdata enable && \
+            installed_init_d=1
+
+        elif [ "${key}" = "CentOS release 6.8 (Final)" ]
+            then
+            run cp system/netdata-init-d /etc/init.d/netdata && \
+            run chmod 755 /etc/init.d/netdata && \
+            run chkconfig netdata on && \
+            installed_init_d=1
+        fi
+    fi
+
+    return 0
 }
 
 started=0
@@ -802,6 +870,8 @@ if [ "${UID}" -eq 0 ]
 
         stop_all_netdata
         service netdata restart && started=1
+    else
+        install_non_systemd_init
     fi
 
     if [ ${started} -eq 0 ]
@@ -1044,6 +1114,12 @@ if [ -f /etc/systemd/system/netdata.service ]
     then
     echo "Deleting /etc/systemd/system/netdata.service ..."
     rm -i /etc/systemd/system/netdata.service
+fi
+
+if [ -f /etc/init.d/netdata ]
+    then
+    echo "Deleting /etc/init.d/netdata ..."
+    rm -i /etc/init.d/netdata
 fi
 
 getent passwd netdata > /dev/null

@@ -4,6 +4,8 @@
 #define HOSTNAME_MAX 1024
 extern char *hostname;
 
+#define API_RELATIVE_TIME_MAX (3 * 365 * 86400)
+
 // type of JSON generations
 #define DATASOURCE_INVALID -1
 #define DATASOURCE_JSON 0

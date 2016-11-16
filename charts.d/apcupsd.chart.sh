@@ -1,5 +1,11 @@
 # no need for shebang - this file is loaded from charts.d.plugin
 
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+
 apcupsd_ip=127.0.0.1
 apcupsd_port=3551
 
@@ -12,7 +18,7 @@ apcupsd_timeout=3
 apcupsd_priority=90000
 
 apcupsd_get() {
-	timeout $apcupsd_timeout apcaccess status "$1:$2"
+	run -t $apcupsd_timeout apcaccess status "$1:$2"
 }
 
 apcupsd_check() {
@@ -23,14 +29,14 @@ apcupsd_check() {
 
 	require_cmd apcaccess || return 1
 
-	apcupsd_get $apcupsd_ip $apcupsd_port >/dev/null
+	run apcupsd_get $apcupsd_ip $apcupsd_port >/dev/null
 	if [ $? -ne 0 ]
 		then
-		echo >&2 "apcupsd: ERROR: Cannot get information for apcupsd server."
+		error "cannot get information for apcupsd server."
 		return 1
 	elif [ $(apcupsd_get $apcupsd_ip $apcupsd_port | awk '/^STATUS.*/{ print $3 }') != "ONLINE" ]
 		then
-		echo >&2 "apcupsd: ERROR: UPS not online."
+		error "APC UPS not online."
 		return 1
 	fi
 
@@ -146,7 +152,7 @@ END {
 	print \"SET time = \" time;
 	print \"END\"
 }"
-	[ $? -ne 0 ] && echo >&2 "apcupsd: failed to get values" && return 1
+	[ $? -ne 0 ] && error "failed to get values" && return 1
 
 	return 0
 }

@@ -23,7 +23,7 @@ ORDER = ['temperatures']
 
 CHARTS = {
     'temperatures': {
-        'options': ['disks_temp', 'temperature', 'Celsius', 'Disks temperature', 'hddtemp.temperatures', 'line'],
+        'options': ['disks_temp', 'Disks Temperatures', 'Celsius', 'temperatures', 'hddtemp.temperatures', 'line'],
         'lines': [
             # lines are created dynamically in `check()` method
         ]}
