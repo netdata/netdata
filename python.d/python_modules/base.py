@@ -162,8 +162,7 @@ class SimpleService(threading.Thread):
             try:
                 status = self._run_once()
             except Exception as e:
-                self.alert("internal error - aborting data collection: " + str(e))
-                return
+                status = False
 
             if status:
                 # it is good
