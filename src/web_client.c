@@ -1494,6 +1494,12 @@ int web_client_api_request(struct web_client *w, char *url)
 
 int web_client_api_old_data_request(struct web_client *w, char *url, int datasource_type)
 {
+    if(!url || !*url) {
+        buffer_flush(w->response.data);
+        buffer_sprintf(w->response.data, "Incomplete request.");
+        return 400;
+    }
+
     RRDSET *st = NULL;
 
     char *args = strchr(url, '?');
