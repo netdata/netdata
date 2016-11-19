@@ -249,7 +249,7 @@ struct mountinfo *mountinfo_read() {
             mi->filesystem = strdupz(procfile_lineword(ff, l, w)); w++;
             mi->filesystem_hash = simple_hash(mi->filesystem);
 
-            mi->mount_source = strdupz(procfile_lineword(ff, l, w)); w++;
+            mi->mount_source = strdupz_decoding_octal(procfile_lineword(ff, l, w)); w++;
             mi->mount_source_hash = simple_hash(mi->mount_source);
 
             mi->super_options = strdupz(procfile_lineword(ff, l, w)); w++;
