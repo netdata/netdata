@@ -130,6 +130,7 @@
 #include "unit_test.h"
 
 #include "ipc.h"
+#include "backends.h"
 
 #ifdef abs
 #undef abs

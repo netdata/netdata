@@ -290,7 +290,7 @@ static inline int bind_to_one(const char *definition, int default_port, int list
         }
 
         if (fd == -1)
-            error("Cannot bind to ip '%s', port %d", rip, default_port);
+            error("Cannot bind to ip '%s', port %d", rip, rport);
         else {
             add_listen_socket(fd, rip, rport);
             added++;
