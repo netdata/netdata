@@ -364,7 +364,7 @@
             width: 233px !important;
         }
     }
-    
+
     @media (min-width: 1360px) {
         .container {
             padding-left: 3% !important;
@@ -399,7 +399,7 @@
 
     // enable registry updates
     var netdataRegistry = true;
-    
+
     // --------------------------------------------------------------------
     // urlOptions
 
@@ -496,7 +496,7 @@
 
     // --------------------------------------------------------------------
     // check options that should be processed before loading netdata.js
-    
+
     function loadLocalStorage(name) {
         var ret = null;
 
@@ -697,7 +697,7 @@
 
         else if(document.location.toString().startsWith('https://') && url.toString().startsWith('http://'))
             error = 'can\'t check';
-        
+
         var finalURL = netdataURL(url);
 
         setTimeout(function() {
@@ -1503,7 +1503,7 @@
                 seconds -= (minutes * 60);
 
                 var txt = '';
-                
+
                 if(hours > 1) txt += hours.toString() + options.space + options.hours;
                 else if(hours === 1) txt += hours.toString() + options.space + options.hour;
 
@@ -2982,23 +2982,13 @@
                                         <td class="option-info"><strong>Which chart refresh policy to use?</strong><br/>
                                             <small>When set to <b>parallel</b>, visible charts are refreshed in parallel (all queries are sent to netdata server in parallel) and are rendered asynchronously. When set to <b>sequential</b> charts are refreshed one after another. Set it to parallel if your browser can cope with it (most modern browsers do), set it to sequential if you work on an older/slower computer.</small>
                                         </td>
-                                        </tr>
+                                    </tr>
                                     <tr class="option-row" id="concurrent_refreshes_row">
-                                        <td class="option-control"></td>
-                                        <td class="option-info">
-                                            <table>
-                                            <tr class="option-row">
-                                            <td class="option-control">
-                                            <input id="concurrent_refreshes" type="checkbox" checked data-toggle="toggle" data-on="Resync" data-off="Best Effort" data-width="110px">
-                                            </td>
-                                            <td class="option-info">
-                                            <strong>Shall we re-sync chart refreshes?</strong><br/>
+                                        <td class="option-control"><input id="concurrent_refreshes" type="checkbox" checked data-toggle="toggle" data-on="Resync" data-off="Best Effort" data-width="110px"></td>
+                                        <td class="option-info"><strong>Shall we re-sync chart refreshes?</strong><br/>
                                             <small>When set to <b>Resync</b>, the dashboard will attempt to re-synchronize all the charts so that they are refreshed concurrently. When set to <b>Best Effort</b>, each chart may be refreshed with a little time difference to the others. Normally, the dashboard starts refreshing them in parallel, but depending on the speed of your computer and the network latencies, charts start having a slight time difference. Setting this to <b>Resync</b> will attempt to re-synchronize the charts on every update. Setting it to <b>Best Effort</b> may lower the pressure on your browser and the network.</small>
-                                            </td>
-                                            </tr>
-                                            </table>
                                         </td>
-                                        </tr>
+                                    </tr>
                                     <tr class="option-row">
                                         <td class="option-control"><input id="sync_selection" type="checkbox" checked data-toggle="toggle" data-on="Sync" data-off="Don't Sync" data-onstyle="success" data-offstyle="danger" data-width="110px"></td>
                                         <td class="option-info"><strong>Sync hover selection on all charts?</strong><br/>
