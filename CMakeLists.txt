@@ -14,6 +14,8 @@ set(NETDATA_SOURCE_FILES
         src/appconfig.h
         src/avl.c
         src/avl.h
+        src/backends.c
+        src/backends.h
         src/common.c
         src/common.h
         src/daemon.c

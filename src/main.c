@@ -48,6 +48,7 @@ struct netdata_static_thread {
     {"proc",               "plugins",   "proc",       1, NULL, NULL, proc_main},
     {"cgroups",            "plugins",   "cgroups",    1, NULL, NULL, cgroups_main},
     {"check",              "plugins",   "checks",     0, NULL, NULL, checks_main},
+    {"backends",            NULL,       NULL,         1, NULL, NULL, backends_main},
     {"health",              NULL,       NULL,         1, NULL, NULL, health_main},
     {"plugins.d",           NULL,       NULL,         1, NULL, NULL, pluginsd_main},
     {"web",                 NULL,       NULL,         1, NULL, NULL, socket_listen_main_multi_threaded},
