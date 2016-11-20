@@ -278,7 +278,7 @@ void *backends_main(void *ptr) {
     int default_port = 0;
     int sock = -1;
     uint32_t options;
-    int enabled = config_get_boolean("backend", "enable", 0);
+    int enabled = config_get_boolean("backend", "enabled", 0);
     const char *source = config_get("backend", "data source", "average");
     const char *type = config_get("backend", "type", "graphite");
     const char *destination = config_get("backend", "destination", "localhost");
