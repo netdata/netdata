@@ -210,37 +210,41 @@ static inline calculated_number backend_duration_average(RRDSET *st, RRDDIM *rd,
     return sum / (calculated_number)counter;
 }
 
-static inline void format_dimension_collected_graphite_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+static inline void format_dimension_collected_graphite_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+    (void)host;
     (void)after;
     (void)before;
     (void)options;
-    buffer_sprintf(b, "%s.%s.%s.%s " COLLECTED_NUMBER_FORMAT " %u\n", prefix, host->hostname, st->id, rd->id, rd->last_collected_value, (uint32_t)rd->last_collected_time.tv_sec);
+    buffer_sprintf(b, "%s.%s.%s.%s " COLLECTED_NUMBER_FORMAT " %u\n", prefix, hostname, st->id, rd->id, rd->last_collected_value, (uint32_t)rd->last_collected_time.tv_sec);
 }
 
-static inline void format_dimension_stored_graphite_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+static inline void format_dimension_stored_graphite_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+    (void)host;
     calculated_number value = backend_duration_average(st, rd, after, before, options);
     if(!isnan(value))
-        buffer_sprintf(b, "%s.%s.%s.%s " CALCULATED_NUMBER_FORMAT " %u\n", prefix, host->hostname, st->id, rd->id, value, (uint32_t)before);
+        buffer_sprintf(b, "%s.%s.%s.%s " CALCULATED_NUMBER_FORMAT " %u\n", prefix, hostname, st->id, rd->id, value, (uint32_t)before);
 }
 
-static inline void format_dimension_collected_opentsdb_telnet(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+static inline void format_dimension_collected_opentsdb_telnet(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+    (void)host;
     (void)after;
     (void)before;
     (void)options;
-    buffer_sprintf(b, "put %s.%s.%s %u " COLLECTED_NUMBER_FORMAT " host=%s\n", prefix, st->id, rd->id, (uint32_t)rd->last_collected_time.tv_sec, rd->last_collected_value, host->hostname);
+    buffer_sprintf(b, "put %s.%s.%s %u " COLLECTED_NUMBER_FORMAT " host=%s\n", prefix, st->id, rd->id, (uint32_t)rd->last_collected_time.tv_sec, rd->last_collected_value, hostname);
 }
 
-static inline void format_dimension_stored_opentsdb_telnet(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+static inline void format_dimension_stored_opentsdb_telnet(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+    (void)host;
     calculated_number value = backend_duration_average(st, rd, after, before, options);
     if(!isnan(value))
-        buffer_sprintf(b, "put %s.%s.%s %u " CALCULATED_NUMBER_FORMAT " host=%s\n", prefix, st->id, rd->id, (uint32_t)before, value, host->hostname);
+        buffer_sprintf(b, "put %s.%s.%s %u " CALCULATED_NUMBER_FORMAT " host=%s\n", prefix, st->id, rd->id, (uint32_t)before, value, hostname);
 }
 
 void *backends_main(void *ptr) {
     (void)ptr;
 
     BUFFER *b = buffer_create(1);
-    void (*formatter)(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options);
+    void (*formatter)(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options);
 
     info("BACKEND thread created with task id %d", gettid());
 
@@ -258,6 +262,7 @@ void *backends_main(void *ptr) {
     const char *type = config_get("backend", "type", "graphite");
     const char *destination = config_get("backend", "destination", "localhost");
     const char *prefix = config_get("backend", "prefix", "netdata");
+    const char *hostname = config_get("backend", "hostname", localhost.hostname);
     int frequency = (int)config_get_number("backend", "update every", 30);
     int buffer_on_failures = (int)config_get_number("backend", "buffer on failures", 10);
 
@@ -303,6 +308,8 @@ void *backends_main(void *ptr) {
     time_t after = before;
     int failures = 0;
 
+    info("BACKEND configured ('%s' on '%s' sending '%s' data, every %d seconds, as host '%s', with prefix '%s')", type, destination, source, frequency, hostname, prefix);
+
     for(;;) {
         unsigned long long now_ut = time_usec();
         unsigned long long next_ut = now_ut - (now_ut % step_ut) + step_ut;
@@ -329,7 +336,7 @@ void *backends_main(void *ptr) {
             RRDDIM *rd;
             for(rd = st->dimensions; rd ;rd = rd->next) {
                 if(rd->last_collected_time.tv_sec >= after)
-                    formatter(b, prefix, &localhost, st, rd, after, before, options);
+                    formatter(b, prefix, &localhost, hostname, st, rd, after, before, options);
             }
 
             pthread_rwlock_unlock(&st->rwlock);
