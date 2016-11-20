@@ -490,9 +490,10 @@ void generate_config(BUFFER *wb, int only_changed)
         config_global_write_lock();
         for(co = config_root; co ; co = co->next) {
             if(!strcmp(co->name, "global") ||
-                    !strcmp(co->name, "plugins") ||
+                    !strcmp(co->name, "plugins")  ||
                     !strcmp(co->name, "registry") ||
-                    !strcmp(co->name, "health"))
+                    !strcmp(co->name, "health")   ||
+                    !strcmp(co->name, "backend"))
                 pri = 0;
             else if(!strncmp(co->name, "plugin:", 7)) pri = 1;
             else pri = 2;
