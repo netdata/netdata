@@ -266,7 +266,7 @@ void *backends_main(void *ptr) {
             formatter = format_dimension_stored_graphite_plaintext;
     }
     else if(!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
-        default_port = 2003;
+        default_port = 4242;
         if(!strcmp(source, "as collected"))
             formatter = format_dimension_collected_opentsdb_telnet;
         else
