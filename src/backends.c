@@ -329,7 +329,8 @@ void *backends_main(void *ptr) {
             chart_transmission_failures = 0,
             chart_data_lost_events = 0,
             chart_lost_bytes = 0,
-            chart_backend_reconnects = 0;
+            chart_backend_reconnects = 0,
+            chart_backend_latency = 0;
 
     RRDSET *chart_metrics = rrdset_find("netdata.backend_metrics");
     if(!chart_metrics) {
@@ -349,11 +350,17 @@ void *backends_main(void *ptr) {
 
     RRDSET *chart_ops = rrdset_find("netdata.backend_ops");
     if(!chart_ops) {
-        chart_ops = rrdset_create("netdata", "backend_ops", NULL, "backend", NULL, "Netdata Backend Operations", "operations", 130620, frequency, RRDSET_TYPE_LINE);
+        chart_ops = rrdset_create("netdata", "backend_ops", NULL, "backend", NULL, "Netdata Backend Operations", "operations", 130630, frequency, RRDSET_TYPE_LINE);
         rrddim_add(chart_ops, "write",     NULL,  1, 1, RRDDIM_ABSOLUTE);
         rrddim_add(chart_ops, "discard",   NULL,  1, 1, RRDDIM_ABSOLUTE);
         rrddim_add(chart_ops, "reconnect", NULL,  1, 1, RRDDIM_ABSOLUTE);
         rrddim_add(chart_ops, "failure",   NULL,  1, 1, RRDDIM_ABSOLUTE);
+    }
+
+    RRDSET *chart_latency = rrdset_find("netdata.backend_latency");
+    if(!chart_latency) {
+        chart_latency = rrdset_create("netdata", "backend_latency", NULL, "backend", NULL, "Netdata Backend Latency", "ms", 130620, frequency, RRDSET_TYPE_AREA);
+        rrddim_add(chart_latency, "latency",   NULL,  1, 1000, RRDDIM_ABSOLUTE);
     }
 
     // ------------------------------------------------------------------------
@@ -419,7 +426,8 @@ void *backends_main(void *ptr) {
         chart_transmission_failures =
         chart_data_lost_events =
         chart_lost_bytes =
-        chart_backend_reconnects = 0;
+        chart_backend_reconnects =
+        chart_backend_latency = 0;
 
         if(unlikely(netdata_exit)) break;
 
@@ -430,6 +438,7 @@ void *backends_main(void *ptr) {
         // connect to a backend server
 
         if(unlikely(sock == -1)) {
+            unsigned long long start_ut = time_usec();
             const char *s = destination;
             while(*s) {
                 const char *e = s;
@@ -450,6 +459,7 @@ void *backends_main(void *ptr) {
                 if(sock != -1) break;
                 s = e;
             }
+            chart_backend_latency += time_usec() - start_ut;
         }
 
         if(unlikely(netdata_exit)) break;
@@ -459,7 +469,9 @@ void *backends_main(void *ptr) {
 
         if(likely(sock != -1)) {
             size_t len = buffer_strlen(b);
+            unsigned long long start_ut = time_usec();
             ssize_t written = write(sock, buffer_tostring(b), len);
+            chart_backend_latency += time_usec() - start_ut;
             if(written != -1 && (size_t)written == len) {
                 // we sent the data successfully
                 chart_transmission_successes++;
@@ -535,6 +547,10 @@ void *backends_main(void *ptr) {
         rrddim_set(chart_bytes, "lost",     chart_lost_bytes);
         rrddim_set(chart_bytes, "sent",     chart_sent_bytes);
         rrdset_done(chart_bytes);
+
+        if(chart_latency->counter_done) rrdset_next(chart_latency);
+        rrddim_set(chart_latency, "latency", chart_backend_latency);
+        rrdset_done(chart_latency);
 
         if(likely(buffer_strlen(b) == 0))
             chart_buffered_metrics = 0;
