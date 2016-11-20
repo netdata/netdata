@@ -29,6 +29,7 @@ plugins_PROGRAMS = apps.plugin
 netdata_SOURCES = \
 	appconfig.c appconfig.h \
 	avl.c avl.h \
+	backends.c backends.h \
 	common.c common.h \
 	daemon.c daemon.h \
 	dictionary.c dictionary.h \
