@@ -210,41 +210,49 @@ static inline calculated_number backend_duration_average(RRDSET *st, RRDDIM *rd,
     return sum / (calculated_number)counter;
 }
 
-static inline void format_dimension_collected_graphite_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+static inline int format_dimension_collected_graphite_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
     (void)host;
     (void)after;
     (void)before;
     (void)options;
     buffer_sprintf(b, "%s.%s.%s.%s " COLLECTED_NUMBER_FORMAT " %u\n", prefix, hostname, st->id, rd->id, rd->last_collected_value, (uint32_t)rd->last_collected_time.tv_sec);
+    return 1;
 }
 
-static inline void format_dimension_stored_graphite_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+static inline int format_dimension_stored_graphite_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
     (void)host;
     calculated_number value = backend_duration_average(st, rd, after, before, options);
-    if(!isnan(value))
-        buffer_sprintf(b, "%s.%s.%s.%s " CALCULATED_NUMBER_FORMAT " %u\n", prefix, hostname, st->id, rd->id, value, (uint32_t)before);
+    if(!isnan(value)) {
+        buffer_sprintf(b, "%s.%s.%s.%s " CALCULATED_NUMBER_FORMAT " %u\n", prefix, hostname, st->id, rd->id, value, (uint32_t) before);
+        return 1;
+    }
+    return 0;
 }
 
-static inline void format_dimension_collected_opentsdb_telnet(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+static inline int format_dimension_collected_opentsdb_telnet(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
     (void)host;
     (void)after;
     (void)before;
     (void)options;
     buffer_sprintf(b, "put %s.%s.%s %u " COLLECTED_NUMBER_FORMAT " host=%s\n", prefix, st->id, rd->id, (uint32_t)rd->last_collected_time.tv_sec, rd->last_collected_value, hostname);
+    return 1;
 }
 
-static inline void format_dimension_stored_opentsdb_telnet(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+static inline int format_dimension_stored_opentsdb_telnet(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
     (void)host;
     calculated_number value = backend_duration_average(st, rd, after, before, options);
-    if(!isnan(value))
-        buffer_sprintf(b, "put %s.%s.%s %u " CALCULATED_NUMBER_FORMAT " host=%s\n", prefix, st->id, rd->id, (uint32_t)before, value, hostname);
+    if(!isnan(value)) {
+        buffer_sprintf(b, "put %s.%s.%s %u " CALCULATED_NUMBER_FORMAT " host=%s\n", prefix, st->id, rd->id, (uint32_t) before, value, hostname);
+        return 1;
+    }
+    return 0;
 }
 
 void *backends_main(void *ptr) {
     (void)ptr;
 
     BUFFER *b = buffer_create(1);
-    void (*formatter)(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options);
+    int (*formatter)(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options);
 
     info("BACKEND thread created with task id %d", gettid());
 
@@ -253,6 +261,9 @@ void *backends_main(void *ptr) {
 
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("Cannot set pthread cancel state to ENABLE.");
+
+    // ------------------------------------------------------------------------
+    // collect configuration options
 
     int default_port = 0;
     int sock = -1;
@@ -266,6 +277,9 @@ void *backends_main(void *ptr) {
     int frequency = (int)config_get_number("backend", "update every", 10);
     int buffer_on_failures = (int)config_get_number("backend", "buffer on failures", 10);
 
+    // ------------------------------------------------------------------------
+    // validate configuration options
+    // and prepare for sending data to our backend
     if(!enabled || frequency < 1)
         goto cleanup;
 
@@ -302,15 +316,61 @@ void *backends_main(void *ptr) {
         goto cleanup;
     }
 
+    // ------------------------------------------------------------------------
+    // prepare the charts for monitoring the backend
+
+    collected_number
+            chart_buffered_metrics = 0,
+            chart_lost_metrics = 0,
+            chart_sent_metrics = 0,
+            chart_buffered_bytes = 0,
+            chart_sent_bytes = 0,
+            chart_transmission_successes = 0,
+            chart_transmission_failures = 0,
+            chart_data_lost_events = 0,
+            chart_lost_bytes = 0,
+            chart_backend_reconnects = 0;
+
+    RRDSET *chart_metrics = rrdset_find("netdata.backend_metrics");
+    if(!chart_metrics) {
+        chart_metrics = rrdset_create("netdata", "backend_metrics", NULL, "backend", NULL, "Netdata Buffered Metrics", "metrics", 130600, frequency, RRDSET_TYPE_LINE);
+        rrddim_add(chart_metrics, "buffered", NULL,   1, 1, RRDDIM_ABSOLUTE);
+        rrddim_add(chart_metrics, "lost",     NULL,   1, 1, RRDDIM_ABSOLUTE);
+        rrddim_add(chart_metrics, "sent",     NULL,   1, 1, RRDDIM_ABSOLUTE);
+    }
+
+    RRDSET *chart_bytes = rrdset_find("netdata.backend_bytes");
+    if(!chart_bytes) {
+        chart_bytes = rrdset_create("netdata", "backend_bytes", NULL, "backend", NULL, "Netdata Backend Data Size", "KB", 130610, frequency, RRDSET_TYPE_AREA);
+        rrddim_add(chart_bytes, "buffered", NULL,  1, 1024, RRDDIM_ABSOLUTE);
+        rrddim_add(chart_bytes, "lost",     NULL,  1, 1024, RRDDIM_ABSOLUTE);
+        rrddim_add(chart_bytes, "sent",     NULL,  1, 1024, RRDDIM_ABSOLUTE);
+    }
+
+    RRDSET *chart_ops = rrdset_find("netdata.backend_ops");
+    if(!chart_ops) {
+        chart_ops = rrdset_create("netdata", "backend_ops", NULL, "backend", NULL, "Netdata Backend Operations", "operations", 130620, frequency, RRDSET_TYPE_LINE);
+        rrddim_add(chart_ops, "write",     NULL,  1, 1, RRDDIM_ABSOLUTE);
+        rrddim_add(chart_ops, "discard",   NULL,  1, 1, RRDDIM_ABSOLUTE);
+        rrddim_add(chart_ops, "reconnect", NULL,  1, 1, RRDDIM_ABSOLUTE);
+        rrddim_add(chart_ops, "failure",   NULL,  1, 1, RRDDIM_ABSOLUTE);
+    }
+
+    // ------------------------------------------------------------------------
+    // prepare the backend main loop
+
+    info("BACKEND configured ('%s' on '%s' sending '%s' data, every %d seconds, as host '%s', with prefix '%s')", type, destination, source, frequency, hostname, prefix);
+
     unsigned long long step_ut = frequency * 1000000ULL;
     unsigned long long random_ut = time_usec() % (step_ut / 2);
     time_t before = (time_t)((time_usec() - step_ut) / 10000000ULL);
     time_t after = before;
     int failures = 0;
 
-    info("BACKEND configured ('%s' on '%s' sending '%s' data, every %d seconds, as host '%s', with prefix '%s')", type, destination, source, frequency, hostname, prefix);
-
     for(;;) {
+        // ------------------------------------------------------------------------
+        // wait for the next iteration point
+
         unsigned long long now_ut = time_usec();
         unsigned long long next_ut = now_ut - (now_ut % step_ut) + step_ut;
         before = (time_t)(next_ut / 1000000ULL);
@@ -322,6 +382,9 @@ void *backends_main(void *ptr) {
             sleep_usec(next_ut - now_ut);
             now_ut = time_usec();
         }
+
+        // ------------------------------------------------------------------------
+        // add to the buffer the data we need to send to the backend
 
         RRDSET *st;
         int pthreadoldcancelstate;
@@ -336,7 +399,7 @@ void *backends_main(void *ptr) {
             RRDDIM *rd;
             for(rd = st->dimensions; rd ;rd = rd->next) {
                 if(rd->last_collected_time.tv_sec >= after)
-                    formatter(b, prefix, &localhost, hostname, st, rd, after, before, options);
+                    chart_buffered_metrics += formatter(b, prefix, &localhost, hostname, st, rd, after, before, options);
             }
 
             pthread_rwlock_unlock(&st->rwlock);
@@ -346,10 +409,25 @@ void *backends_main(void *ptr) {
         if(unlikely(pthread_setcancelstate(pthreadoldcancelstate, NULL) != 0))
             error("Cannot set pthread cancel state to RESTORE (%d).", pthreadoldcancelstate);
 
+        chart_buffered_bytes = (collected_number)buffer_strlen(b);
+
+        // reset the monitoring chart counters
+        chart_sent_bytes =
+        chart_sent_metrics =
+        chart_lost_metrics =
+        chart_transmission_successes =
+        chart_transmission_failures =
+        chart_data_lost_events =
+        chart_lost_bytes =
+        chart_backend_reconnects = 0;
+
         if(unlikely(netdata_exit)) break;
 
-        // fprintf(stderr, "\nBACKEND BEGIN:\n%s\nBACKEND END\n", buffer_tostring(b)); // FIXME
+        //fprintf(stderr, "\nBACKEND BEGIN:\n%s\nBACKEND END\n", buffer_tostring(b)); // FIXME
         //fprintf(stderr, "after = %lu, before = %lu\n", after, before);
+
+        // ------------------------------------------------------------------------
+        // connect to a backend server
 
         if(unlikely(sock == -1)) {
             const char *s = destination;
@@ -367,6 +445,7 @@ void *backends_main(void *ptr) {
 
                 char buf[e - s + 1];
                 strncpyz(buf, s, e - s);
+                chart_backend_reconnects++;
                 sock = connect_to_one(buf, default_port);
                 if(sock != -1) break;
                 s = e;
@@ -375,32 +454,90 @@ void *backends_main(void *ptr) {
 
         if(unlikely(netdata_exit)) break;
 
+        // ------------------------------------------------------------------------
+        // send our buffer to the backend server
+
         if(likely(sock != -1)) {
             size_t len = buffer_strlen(b);
             ssize_t written = write(sock, buffer_tostring(b), len);
             if(written != -1 && (size_t)written == len) {
+                // we sent the data successfully
+                chart_transmission_successes++;
+                chart_sent_bytes += written;
+                chart_sent_metrics = chart_buffered_metrics;
+
+                // reset the failures count
                 failures = 0;
+
+                // empty the buffer
                 buffer_flush(b);
             }
             else {
-                failures++;
+                // oops! we couldn't send (all or some of the) data
                 error("Failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zd bytes. Will re-connect.", destination, len, written);
+                chart_transmission_failures++;
+
+                if(written != -1)
+                    chart_sent_bytes += written;
+
+                // increment the counter we check for data loss
+                failures++;
+
+                // close the socket - we will re-open it next time
                 close(sock);
                 sock = -1;
             }
 
+            // either the buffer is empty
+            // or is holding the data we couldn't send
+            // so, make sure the next iteration will continue
+            // from where we are now
             after = before;
         }
         else {
-            failures++;
             error("Failed to update database backend '%s'", destination);
+            chart_transmission_failures++;
+
+            // increment the counter we check for data loss
+            failures++;
         }
 
         if(failures > buffer_on_failures) {
+            // too bad! we are going to lose data
+            chart_lost_bytes += buffer_strlen(b);
             error("Reached %d backend failures. Flushing buffers to protect this host - this results in data loss on back-end server '%s'", failures, destination);
             buffer_flush(b);
             failures = 0;
+            chart_data_lost_events++;
+            chart_lost_metrics = chart_buffered_metrics;
         }
+
+        if(unlikely(netdata_exit)) break;
+
+        // ------------------------------------------------------------------------
+        // update the monitoring charts
+
+        if(chart_ops->counter_done) rrdset_next(chart_ops);
+        rrddim_set(chart_ops, "write",     chart_transmission_successes);
+        rrddim_set(chart_ops, "discard",   chart_data_lost_events);
+        rrddim_set(chart_ops, "failure",   chart_transmission_failures);
+        rrddim_set(chart_ops, "reconnect", chart_backend_reconnects);
+        rrdset_done(chart_ops);
+
+        if(chart_metrics->counter_done) rrdset_next(chart_metrics);
+        rrddim_set(chart_metrics, "buffered", chart_buffered_metrics);
+        rrddim_set(chart_metrics, "lost",     chart_lost_metrics);
+        rrddim_set(chart_metrics, "sent",     chart_sent_metrics);
+        rrdset_done(chart_metrics);
+
+        if(chart_bytes->counter_done) rrdset_next(chart_bytes);
+        rrddim_set(chart_bytes, "buffered", chart_buffered_bytes);
+        rrddim_set(chart_bytes, "lost",     chart_lost_bytes);
+        rrddim_set(chart_bytes, "sent",     chart_sent_bytes);
+        rrdset_done(chart_bytes);
+
+        if(likely(buffer_strlen(b) == 0))
+            chart_buffered_metrics = 0;
 
         if(unlikely(netdata_exit)) break;
     }
