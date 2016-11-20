@@ -4,7 +4,7 @@
 
 **netdata** is a system for **distributed real-time performance and health monitoring**.
 It provides **unparalleled insights, in real-time**, of everything happening on the
-system it runs (including applications such as web, or database servers), using
+system it runs (including applications such as web and database servers), using
 **modern interactive web dashboards**.
 
 _netdata is **fast** and **efficient**, designed to permanently run on all systems
@@ -48,17 +48,18 @@ disrupting their core function._
  - **Stunning interactive bootstrap dashboards**<br/>
    mouse and touch friendly, in 2 themes: dark, light
    
- - **Blazingly fast**<br/>
+ - **Amazingly fast**<br/>
    responds to all queries in less than 0.5 ms per metric,
-   even on low-end hardware (such as a raspberry pi 1)
+   even on low-end hardware
    
- - **Highly efficient data collection**<br/>
+ - **Highly efficient**<br/>
    collects thousands of metrics per server per second,
    with just 1% CPU utilization of a single core, a few MB or RAM and no disk I/O at all
    
  - **Sophisticated alarming**<br/>
    supports dynamic thresholds, hysteresis, alarm templates,
-   multiple role-based notification methods (such as slack.com, pushover.net, telegram.org, email)
+   multiple role-based notification methods (such as email, slack.com,
+   pushover.net, pushbullet.com telegram.org, twilio.com)
    
  - **Extensible**<br/>
    you can monitor anything you can get a metric for,
@@ -68,6 +69,9 @@ disrupting their core function._
  - **Embeddable**<br/>
    it can run anywhere a Linux kernel runs (even IoT)
    and its charts can be embedded on your web pages too
+   
+ - **Customizable**<br/>
+   custom dashboards can be built using simple HTML (no javascript necessary)
    
  - **Zero configuration**<br/>
    auto-detects everything, it can collect up to 5000 metrics
@@ -79,11 +83,12 @@ disrupting their core function._
  - **Zero maintenance**<br/>
    you just run it, it does the rest
    
- - **Custom dashboards**<br/>
-   that can be built using simple HTML (no javascript necessary)
-   
  - **scales to infinity**<br/>
    requiring minimal central resources
+   
+ - **back-ends supported**<br/>
+   can archive its metrics on `graphite` or `opentsdb`, in the same or lower detail
+   (lower: to prevent it from congesting these servers due to the amount of data collected)
 
 ![netdata](https://cloud.githubusercontent.com/assets/2662304/14092712/93b039ea-f551-11e5-822c-beadbf2b2a2e.gif)
 
@@ -130,11 +135,20 @@ This is a list of what it currently monitors:
   icmp: messages, errors, echos, router, neighbor, MLDv2, group membership,
   break down by type
 
+- **Interprocess Communication - IPC**<br/>
+  such as semaphores and semaphores arrays
+
 - **netfilter / iptables Linux firewall**<br/>
   connections, connection tracker events, errors
 
 - **Linux DDoS protection**<br/>
   SYNPROXY metrics
+
+- **fping** latencies</br>
+  for any number of hosts, showing latency, packets and packet loss
+
+   ![image](https://cloud.githubusercontent.com/assets/2662304/20464811/9517d2b4-af57-11e6-8361-f6cc57541cd7.png)
+
 
 - **Processes**<br/>
   running, blocked, forks, active
@@ -176,6 +190,11 @@ This is a list of what it currently monitors:
   multiple servers, each showing: bandwidth, queries/s, handlers, locks, issues,
   tmp operations, connections, binlog metrics, threads, innodb metrics, and more
 
+- **Postres databases**<br/>
+  multiple servers, each showing: per database statistics (connections, tuples
+  read - written - returned, transactions, locks), backend processes, indexes,
+  tables, write ahead, background writer and more
+
 - **Redis databases**<br/>
   multiple servers, each showing: operations, hit rate, memory, keys, clients, slaves
 
@@ -190,6 +209,8 @@ This is a list of what it currently monitors:
 
 - **exim email servers**<br/>
   message queue (emails queued)
+
+- **Dovecot** POP3/IMAP servers<br/>
 
 - **IPFS**<br/>
   bandwidth, peers
