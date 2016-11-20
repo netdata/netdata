@@ -2,7 +2,7 @@
 
 #define BACKEND_SOURCE_DATA_AS_COLLECTED 0x00000001
 #define BACKEND_SOURCE_DATA_AVERAGE      0x00000002
-#define BACKEND_SOURCE_DATA_SUM          0x00000003
+#define BACKEND_SOURCE_DATA_SUM          0x00000004
 
 int connect_to_socket4(const char *ip, int port) {
     int sock;
@@ -263,7 +263,7 @@ void *backends_main(void *ptr) {
     const char *destination = config_get("backend", "destination", "localhost");
     const char *prefix = config_get("backend", "prefix", "netdata");
     const char *hostname = config_get("backend", "hostname", localhost.hostname);
-    int frequency = (int)config_get_number("backend", "update every", 30);
+    int frequency = (int)config_get_number("backend", "update every", 10);
     int buffer_on_failures = (int)config_get_number("backend", "buffer on failures", 10);
 
     if(!enabled || frequency < 1)
@@ -348,7 +348,7 @@ void *backends_main(void *ptr) {
 
         if(unlikely(netdata_exit)) break;
 
-        //fprintf(stderr, "\nBACKEND BEGIN:\n%s\nBACKEND END\n", buffer_tostring(b));
+        fprintf(stderr, "\nBACKEND BEGIN:\n%s\nBACKEND END\n", buffer_tostring(b)); // FIXME
         //fprintf(stderr, "after = %lu, before = %lu\n", after, before);
 
         if(unlikely(sock == -1)) {
