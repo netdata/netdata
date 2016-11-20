@@ -493,7 +493,7 @@ void generate_config(BUFFER *wb, int only_changed)
                     !strcmp(co->name, "plugins")  ||
                     !strcmp(co->name, "registry") ||
                     !strcmp(co->name, "health")   ||
-                    !strcmp(co->name, "backends"))
+                    !strcmp(co->name, "backend"))
                 pri = 0;
             else if(!strncmp(co->name, "plugin:", 7)) pri = 1;
             else pri = 2;

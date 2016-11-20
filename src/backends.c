@@ -237,7 +237,7 @@ void *backends_main(void *ptr) {
     BUFFER *b = buffer_create(1);
     void (*formatter)(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before);
 
-    info("BACKENDs thread created with task id %d", gettid());
+    info("BACKEND thread created with task id %d", gettid());
 
     if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
         error("Cannot set pthread cancel type to DEFERRED.");
@@ -247,13 +247,13 @@ void *backends_main(void *ptr) {
 
     int default_port = 0;
     int sock = -1;
-    int enabled = config_get_boolean("backends", "enable", 0);
-    const char *source = config_get("backends", "data source", "as stored");
-    const char *type = config_get("backends", "type", "graphite");
-    const char *destination = config_get("backends", "destination", "localhost");
-    const char *prefix = config_get("backends", "prefix", "netdata");
-    int frequency = (int)config_get_number("backends", "update every", 30);
-    int buffer_on_failures = (int)config_get_number("backends", "buffer on failures", 10);
+    int enabled = config_get_boolean("backend", "enable", 0);
+    const char *source = config_get("backend", "data source", "as stored");
+    const char *type = config_get("backend", "type", "graphite");
+    const char *destination = config_get("backend", "destination", "localhost");
+    const char *prefix = config_get("backend", "prefix", "netdata");
+    int frequency = (int)config_get_number("backend", "update every", 30);
+    int buffer_on_failures = (int)config_get_number("backend", "buffer on failures", 10);
 
     if(!enabled)
         goto cleanup;
@@ -380,7 +380,7 @@ cleanup:
     if(sock != -1)
         close(sock);
 
-    info("BACKENDs thread exiting");
+    info("BACKEND thread exiting");
 
     pthread_exit(NULL);
     return NULL;
