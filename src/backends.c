@@ -164,7 +164,7 @@ static inline int connect_to_one(const char *definition, int default_port, struc
     return fd;
 }
 
-static inline calculated_number backend_duration_average(RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+static inline calculated_number backend_calculate_value_from_stored_data(RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
     time_t first_t = rrdset_first_entry_t(st);
     time_t last_t = rrdset_last_entry_t(st);
 
@@ -227,7 +227,7 @@ static inline int format_dimension_collected_graphite_plaintext(BUFFER *b, const
 
 static inline int format_dimension_stored_graphite_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
     (void)host;
-    calculated_number value = backend_duration_average(st, rd, after, before, options);
+    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options);
     if(!isnan(value)) {
         buffer_sprintf(b, "%s.%s.%s.%s " CALCULATED_NUMBER_FORMAT " %u\n", prefix, hostname, st->id, rd->id, value, (uint32_t) before);
         return 1;
@@ -246,7 +246,7 @@ static inline int format_dimension_collected_opentsdb_telnet(BUFFER *b, const ch
 
 static inline int format_dimension_stored_opentsdb_telnet(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
     (void)host;
-    calculated_number value = backend_duration_average(st, rd, after, before, options);
+    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options);
     if(!isnan(value)) {
         buffer_sprintf(b, "put %s.%s.%s %u " CALCULATED_NUMBER_FORMAT " host=%s\n", prefix, st->id, rd->id, (uint32_t) before, value, hostname);
         return 1;
