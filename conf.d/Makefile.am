@@ -52,6 +52,7 @@ dist_pythonconfig_DATA = \
 healthconfigdir=$(configdir)/health.d
 dist_healthconfig_DATA = \
     health.d/apache.conf \
+    health.d/backend.conf \
     health.d/cpu.conf \
     health.d/disks.conf \
     health.d/entropy.conf \
