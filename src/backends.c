@@ -154,32 +154,86 @@ static inline int connect_to_one(const char *definition, int default_port) {
     return fd;
 }
 
+static inline calculated_number backend_duration_average(RRDSET *st, RRDDIM *rd, time_t after, time_t before) {
+    time_t first_t = rrdset_first_entry_t(st);
+    time_t last_t = rrdset_last_entry_t(st);
+
+    if(unlikely(before - after < st->update_every && after != after - after % st->update_every))
+        // when st->update_every is bigger than the frequency we send data to backend
+        // skip the iterations that are not aligned to the database
+        return NAN;
+
+    // align the time-frame
+    // for 'after' also skip the first value by adding st->update_every
+    after  = after  - after  % st->update_every + st->update_every;
+    before = before - before % st->update_every;
+
+    if(unlikely(after < first_t))
+        after = first_t;
+
+    if(unlikely(after > before))
+        // this can happen when the st->update_every > before - after
+        before = after;
+
+    if(unlikely(before > last_t))
+        before = last_t;
+
+    size_t counter = 0;
+    calculated_number sum = 0;
+
+    long    start_at_slot = rrdset_time2slot(st, before),
+            stop_at_slot  = rrdset_time2slot(st, after),
+            slot, stop_now = 0;
+
+    for(slot = start_at_slot; !stop_now ; slot--) {
+        if(unlikely(slot < 0)) slot = st->entries - 1;
+        if(unlikely(slot == stop_at_slot)) stop_now = 1;
+
+        storage_number n = rd->values[slot];
+        if(unlikely(!does_storage_number_exist(n))) continue;
+
+        calculated_number value = unpack_storage_number(n);
+        sum += value;
+        counter++;
+    }
+
+    if(!counter)
+        return NAN;
+
+    return sum / (calculated_number)counter;
+}
+
 static inline void format_dimension_collected_graphite_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before) {
+    (void)before;
+
     time_t last = rd->last_collected_time.tv_sec;
-    if(likely(last >= after && last < before))
+    if(likely(last > after))
         buffer_sprintf(b, "%s.%s.%s.%s " COLLECTED_NUMBER_FORMAT " %u\n", prefix, host->hostname, st->id, rd->id, rd->last_collected_value, (uint32_t)last);
 }
 
 static inline void format_dimension_stored_graphite_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before) {
-    time_t last = rd->last_collected_time.tv_sec;
-    if(likely(last >= after && last < before))
-        buffer_sprintf(b, "%s.%s.%s.%s " CALCULATED_NUMBER_FORMAT " %u\n", prefix, host->hostname, st->id, rd->id, rd->last_stored_value, (uint32_t)last);
+    calculated_number value = backend_duration_average(st, rd, after, before);
+    if(!isnan(value))
+        buffer_sprintf(b, "%s.%s.%s.%s " CALCULATED_NUMBER_FORMAT " %u\n", prefix, host->hostname, st->id, rd->id, value, (uint32_t)before);
 }
 
 static inline void format_dimension_collected_opentsdb_telnet(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before) {
+    (void)before;
+
     time_t last = rd->last_collected_time.tv_sec;
-    if(likely(last >= after && last < before))
+    if(likely(last > after))
         buffer_sprintf(b, "put %s.%s.%s %u " COLLECTED_NUMBER_FORMAT " host=%s\n", prefix, st->id, rd->id, (uint32_t)last, rd->last_collected_value, host->hostname);
 }
 
 static inline void format_dimension_stored_opentsdb_telnet(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before) {
-    time_t last = rd->last_collected_time.tv_sec;
-    if(likely(last >= after && last < before))
-        buffer_sprintf(b, "put %s.%s.%s %u " CALCULATED_NUMBER_FORMAT " host=%s\n", prefix, st->id, rd->id, (uint32_t)last, rd->last_stored_value, host->hostname);
+    calculated_number value = backend_duration_average(st, rd, after, before);
+    if(!isnan(value))
+        buffer_sprintf(b, "put %s.%s.%s %u " CALCULATED_NUMBER_FORMAT " host=%s\n", prefix, st->id, rd->id, (uint32_t)before, value, host->hostname);
 }
 
 void *backends_main(void *ptr) {
     (void)ptr;
+
     BUFFER *b = buffer_create(1);
     void (*formatter)(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before);
 
@@ -192,12 +246,14 @@ void *backends_main(void *ptr) {
         error("Cannot set pthread cancel state to ENABLE.");
 
     int default_port = 0;
+    int sock = -1;
     int enabled = config_get_boolean("backends", "enable", 0);
     const char *source = config_get("backends", "data source", "as stored");
     const char *type = config_get("backends", "type", "graphite");
     const char *destination = config_get("backends", "destination", "localhost");
     const char *prefix = config_get("backends", "prefix", "netdata");
-    int frequency = (int)config_get_number("backends", "update every", 10);
+    int frequency = (int)config_get_number("backends", "update every", 30);
+    int buffer_on_failures = (int)config_get_number("backends", "buffer on failures", 10);
 
     if(!enabled)
         goto cleanup;
@@ -221,23 +277,27 @@ void *backends_main(void *ptr) {
         goto cleanup;
     }
 
-    time_t after, before = (time_t)(time_usec() / 10000000ULL);
+    unsigned long long step_ut = frequency * 1000000ULL;
+    unsigned long long random_ut = time_usec() % (step_ut / 2);
+    time_t before = (time_t)((time_usec() - step_ut) / 10000000ULL);
+    time_t after = before;
+    int failures = 0;
 
-    unsigned long long step = frequency * 1000000ULL;
     for(;;) {
-        unsigned long long now = time_usec();
-        unsigned long long next = now - (now % step) + step + (step / 2);
+        unsigned long long now_ut = time_usec();
+        unsigned long long next_ut = now_ut - (now_ut % step_ut) + step_ut;
+        before = (time_t)(next_ut / 1000000ULL);
 
-        while(now < next) {
-            sleep_usec(next - now);
-            now = time_usec();
+        // add a little delay (1/4 of the step) plus some randomness
+        next_ut += (step_ut / 4) + random_ut;
+
+        while(now_ut < next_ut) {
+            sleep_usec(next_ut - now_ut);
+            now_ut = time_usec();
         }
 
-        after = before;
-        before = (time_t)(now / 10000000ULL);
         RRDSET *st;
         int pthreadoldcancelstate;
-        buffer_flush(b);
 
         if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &pthreadoldcancelstate) != 0))
             error("Cannot set pthread cancel state to DISABLE.");
@@ -245,10 +305,11 @@ void *backends_main(void *ptr) {
         rrdhost_rdlock(&localhost);
         for(st = localhost.rrdset_root; st ;st = st->next) {
             pthread_rwlock_rdlock(&st->rwlock);
+
             RRDDIM *rd;
-            for(rd = st->dimensions; rd ;rd = rd->next) {
+            for(rd = st->dimensions; rd ;rd = rd->next)
                 formatter(b, prefix, &localhost, st, rd, after, before);
-            }
+
             pthread_rwlock_unlock(&st->rwlock);
         }
         rrdhost_unlock(&localhost);
@@ -258,10 +319,67 @@ void *backends_main(void *ptr) {
 
         if(unlikely(netdata_exit)) break;
 
-        break;
+        //fprintf(stderr, "\nBACKEND BEGIN:\n%s\nBACKEND END\n", buffer_tostring(b));
+        //fprintf(stderr, "after = %lu, before = %lu\n", after, before);
+
+        if(unlikely(sock == -1)) {
+            const char *s = destination;
+            while(*s) {
+                const char *e = s;
+
+                // skip separators, moving both s(tart) and e(nd)
+                while(isspace(*e) || *e == ',') s = ++e;
+
+                // move e(nd) to the first separator
+                while(*e && !isspace(*e) && *e != ',') e++;
+
+                // is there anything?
+                if(!*s || s == e) break;
+
+                char buf[e - s + 1];
+                strncpyz(buf, s, e - s);
+                sock = connect_to_one(buf, default_port);
+                if(sock != -1) break;
+                s = e;
+            }
+        }
+
+        if(unlikely(netdata_exit)) break;
+
+        if(likely(sock != -1)) {
+            size_t len = buffer_strlen(b);
+            ssize_t written = write(sock, buffer_tostring(b), len);
+            if(written != -1 && (size_t)written == len) {
+                failures = 0;
+                buffer_flush(b);
+            }
+            else {
+                failures++;
+                error("Failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zd bytes. Will re-connect.", destination, len, written);
+                close(sock);
+                sock = -1;
+            }
+
+            after = before;
+        }
+        else {
+            failures++;
+            error("Failed to update database backend '%s'", destination);
+        }
+
+        if(failures > buffer_on_failures) {
+            error("Reached %d backend failures. Flushing buffers to protect this host - this results in data loss on back-end server '%s'", failures, destination);
+            buffer_flush(b);
+            failures = 0;
+        }
+
+        if(unlikely(netdata_exit)) break;
     }
 
 cleanup:
+    if(sock != -1)
+        close(sock);
+
     info("BACKENDs thread exiting");
 
     pthread_exit(NULL);
