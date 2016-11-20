@@ -1,5 +1,9 @@
 #include "common.h"
 
+#define BACKEND_SOURCE_DATA_AS_COLLECTED 0x00000001
+#define BACKEND_SOURCE_DATA_AVERAGE      0x00000002
+#define BACKEND_SOURCE_DATA_SUM          0x00000003
+
 int connect_to_socket4(const char *ip, int port) {
     int sock;
 
@@ -154,7 +158,7 @@ static inline int connect_to_one(const char *definition, int default_port) {
     return fd;
 }
 
-static inline calculated_number backend_duration_average(RRDSET *st, RRDDIM *rd, time_t after, time_t before) {
+static inline calculated_number backend_duration_average(RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
     time_t first_t = rrdset_first_entry_t(st);
     time_t last_t = rrdset_last_entry_t(st);
 
@@ -197,36 +201,37 @@ static inline calculated_number backend_duration_average(RRDSET *st, RRDDIM *rd,
         counter++;
     }
 
-    if(!counter)
+    if(unlikely(!counter))
         return NAN;
+
+    if(unlikely(options & BACKEND_SOURCE_DATA_SUM))
+        return sum;
 
     return sum / (calculated_number)counter;
 }
 
-static inline void format_dimension_collected_graphite_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before) {
+static inline void format_dimension_collected_graphite_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+    (void)after;
     (void)before;
-
-    time_t last = rd->last_collected_time.tv_sec;
-    if(likely(last > after))
-        buffer_sprintf(b, "%s.%s.%s.%s " COLLECTED_NUMBER_FORMAT " %u\n", prefix, host->hostname, st->id, rd->id, rd->last_collected_value, (uint32_t)last);
+    (void)options;
+    buffer_sprintf(b, "%s.%s.%s.%s " COLLECTED_NUMBER_FORMAT " %u\n", prefix, host->hostname, st->id, rd->id, rd->last_collected_value, (uint32_t)rd->last_collected_time.tv_sec);
 }
 
-static inline void format_dimension_stored_graphite_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before) {
-    calculated_number value = backend_duration_average(st, rd, after, before);
+static inline void format_dimension_stored_graphite_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+    calculated_number value = backend_duration_average(st, rd, after, before, options);
     if(!isnan(value))
         buffer_sprintf(b, "%s.%s.%s.%s " CALCULATED_NUMBER_FORMAT " %u\n", prefix, host->hostname, st->id, rd->id, value, (uint32_t)before);
 }
 
-static inline void format_dimension_collected_opentsdb_telnet(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before) {
+static inline void format_dimension_collected_opentsdb_telnet(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+    (void)after;
     (void)before;
-
-    time_t last = rd->last_collected_time.tv_sec;
-    if(likely(last > after))
-        buffer_sprintf(b, "put %s.%s.%s %u " COLLECTED_NUMBER_FORMAT " host=%s\n", prefix, st->id, rd->id, (uint32_t)last, rd->last_collected_value, host->hostname);
+    (void)options;
+    buffer_sprintf(b, "put %s.%s.%s %u " COLLECTED_NUMBER_FORMAT " host=%s\n", prefix, st->id, rd->id, (uint32_t)rd->last_collected_time.tv_sec, rd->last_collected_value, host->hostname);
 }
 
-static inline void format_dimension_stored_opentsdb_telnet(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before) {
-    calculated_number value = backend_duration_average(st, rd, after, before);
+static inline void format_dimension_stored_opentsdb_telnet(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+    calculated_number value = backend_duration_average(st, rd, after, before, options);
     if(!isnan(value))
         buffer_sprintf(b, "put %s.%s.%s %u " CALCULATED_NUMBER_FORMAT " host=%s\n", prefix, st->id, rd->id, (uint32_t)before, value, host->hostname);
 }
@@ -235,7 +240,7 @@ void *backends_main(void *ptr) {
     (void)ptr;
 
     BUFFER *b = buffer_create(1);
-    void (*formatter)(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before);
+    void (*formatter)(BUFFER *b, const char *prefix, RRDHOST *host, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options);
 
     info("BACKEND thread created with task id %d", gettid());
 
@@ -247,27 +252,42 @@ void *backends_main(void *ptr) {
 
     int default_port = 0;
     int sock = -1;
+    uint32_t options = BACKEND_SOURCE_DATA_AVERAGE;
     int enabled = config_get_boolean("backend", "enable", 0);
-    const char *source = config_get("backend", "data source", "as stored");
+    const char *source = config_get("backend", "data source", "average");
     const char *type = config_get("backend", "type", "graphite");
     const char *destination = config_get("backend", "destination", "localhost");
     const char *prefix = config_get("backend", "prefix", "netdata");
     int frequency = (int)config_get_number("backend", "update every", 30);
     int buffer_on_failures = (int)config_get_number("backend", "buffer on failures", 10);
 
-    if(!enabled)
+    if(!enabled || frequency < 1)
         goto cleanup;
+
+    if(!strcmp(source, "as collected")) {
+        options = BACKEND_SOURCE_DATA_AS_COLLECTED;
+    }
+    else if(!strcmp(source, "average")) {
+        options = BACKEND_SOURCE_DATA_AVERAGE;
+    }
+    else if(!strcmp(source, "sum") || !strcmp(source, "volume")) {
+        options = BACKEND_SOURCE_DATA_SUM;
+    }
+    else {
+        error("Invalid data source method '%s' for backend given. Disabling backed.", source);
+        goto cleanup;
+    }
 
     if(!strcmp(type, "graphite") || !strcmp(type, "graphite:plaintext")) {
         default_port = 2003;
-        if(!strcmp(source, "as collected"))
+        if(options == BACKEND_SOURCE_DATA_AS_COLLECTED)
             formatter = format_dimension_collected_graphite_plaintext;
         else
             formatter = format_dimension_stored_graphite_plaintext;
     }
     else if(!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
         default_port = 4242;
-        if(!strcmp(source, "as collected"))
+        if(options == BACKEND_SOURCE_DATA_AS_COLLECTED)
             formatter = format_dimension_collected_opentsdb_telnet;
         else
             formatter = format_dimension_stored_opentsdb_telnet;
@@ -307,8 +327,10 @@ void *backends_main(void *ptr) {
             pthread_rwlock_rdlock(&st->rwlock);
 
             RRDDIM *rd;
-            for(rd = st->dimensions; rd ;rd = rd->next)
-                formatter(b, prefix, &localhost, st, rd, after, before);
+            for(rd = st->dimensions; rd ;rd = rd->next) {
+                if(rd->last_collected_time.tv_sec >= after)
+                    formatter(b, prefix, &localhost, st, rd, after, before, options);
+            }
 
             pthread_rwlock_unlock(&st->rwlock);
         }
