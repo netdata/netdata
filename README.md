@@ -190,7 +190,7 @@ This is a list of what it currently monitors:
   multiple servers, each showing: bandwidth, queries/s, handlers, locks, issues,
   tmp operations, connections, binlog metrics, threads, innodb metrics, and more
 
-- **Postres databases**<br/>
+- **Postgres databases**<br/>
   multiple servers, each showing: per database statistics (connections, tuples
   read - written - returned, transactions, locks), backend processes, indexes,
   tables, write ahead, background writer and more
