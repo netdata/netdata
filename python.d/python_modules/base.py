@@ -320,7 +320,10 @@ class SimpleService(threading.Thread):
         """
         Upload new data to netdata.
         """
-        print(self._data_stream)
+        try:
+            print(self._data_stream)
+        except Exception as e:
+            msg.fatal('cannot send data to netdata:', str(e))
         self._data_stream = ""
 
     # --- ERROR HANDLING ---
