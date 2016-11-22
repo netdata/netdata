@@ -70,7 +70,7 @@ static inline int is_mount_point_excluded(const char *mount_point) {
     if(unlikely(!initialized)) {
         initialized = 1;
 
-        char *a = config_get("plugin:proc:/proc/diskstats", "exclude space metrics on paths", "/var/run/user/ /run/user/");
+        char *a = config_get("plugin:proc:/proc/diskstats", "exclude space metrics on paths", "/proc/ /sys/ /var/run/user/ /run/user/");
         if(a && *a) {
             char *s = a;
 
