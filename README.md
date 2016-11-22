@@ -249,7 +249,7 @@ It should run on **any Linux** system (including IoT). It has been tested on:
 - Debian
 - Fedora
 - Gentoo
-- OpenSuse
+- openSUSE
 - PLD Linux
 - RedHat Enterprise Linux
 - SUSE
