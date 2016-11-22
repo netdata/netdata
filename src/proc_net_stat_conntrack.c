@@ -21,7 +21,7 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
 
         snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/sys/net/netfilter/nf_conntrack_max");
         nf_conntrack_max_filename = config_get("plugin:proc:/proc/sys/net/netfilter/nf_conntrack_max", "filename to monitor", filename);
-        get_max_every = config_get_number("plugin:proc:/proc/sys/net/netfilter/nf_conntrack_max", "read every seconds", 10) * 1000000ULL;
+        usec_since_last_max = get_max_every = config_get_number("plugin:proc:/proc/sys/net/netfilter/nf_conntrack_max", "read every seconds", 10) * 1000000ULL;
 
         read_full = 1;
         ff = procfile_open(nf_conntrack_filename, " \t:", PROCFILE_FLAG_DEFAULT);
@@ -117,7 +117,7 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
     }
 
     usec_since_last_max += dt;
-    if(unlikely(rrdvar_max && usec_since_last_max > get_max_every)) {
+    if(unlikely(rrdvar_max && usec_since_last_max >= get_max_every)) {
         usec_since_last_max = 0;
 
         unsigned long long max;
