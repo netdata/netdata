@@ -15,6 +15,7 @@ declare -A configs_signatures=(
   ['08ff5218f938fc48e09e718821169d14']='health.d/redis.conf'
   ['091572888425bc3b8b559c3c53367ec7']='apps_groups.conf'
   ['09264cec953ae1c4c2985e6446abb386']='health.d/mysql.conf'
+  ['0c5e0fa364d7bdf7c16e8459a0544572']='health.d/netfilter.conf'
   ['0cd4e1fb57497e4d4c2451a9e58f724d']='python.d/redis.conf'
   ['0e59bc11d0a869ea0247c04c08c8d72e']='python.d/ipfs.conf'
   ['13141998a5d71308d9c119834c27bfd3']='python.d.conf'
