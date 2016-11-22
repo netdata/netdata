@@ -7,7 +7,7 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
     static procfile *ff = NULL;
     static int do_sockets = -1, do_new = -1, do_changes = -1, do_expect = -1, do_search = -1, do_errors = -1;
     static unsigned long long get_max_every = 10 * 1000000ULL, usec_since_last_max = 0;
-    static int read_count = 1, read_full = 1;
+    static int read_full = 1;
     static char *nf_conntrack_filename, *nf_conntrack_count_filename, *nf_conntrack_max_filename;
     static RRDVAR *rrdvar_max = NULL;
 
@@ -33,21 +33,21 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
         do_search = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter connection searches", read_full);
         do_errors = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter errors", read_full);
 
-        read_count = !read_full;
-        if(read_count) {
+        do_sockets = 1;
+        if(!read_full) {
             snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/sys/net/netfilter/nf_conntrack_count");
             nf_conntrack_count_filename = config_get("plugin:proc:/proc/sys/net/netfilter/nf_conntrack_count", "filename to monitor", filename);
 
             if(read_single_number_file(nf_conntrack_count_filename, &aentries))
-                read_count = 0;
+                do_sockets = 0;
         }
 
-        do_sockets = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter connections", read_count);
+        do_sockets = config_get_boolean("plugin:proc:/proc/net/stat/nf_conntrack", "netfilter connections", do_sockets);
 
-        if(!read_count && !read_full)
+        if(!do_sockets && !read_full)
             return 1;
 
-        rrdvar_max = rrdvar_custom_host_variable_create(&localhost, "nf.conntrack.max");
+        rrdvar_max = rrdvar_custom_host_variable_create(&localhost, "netfilter.conntrack.max");
     }
 
     if(likely(read_full)) {
