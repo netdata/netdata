@@ -120,6 +120,7 @@ declare -A configs_signatures=(
   ['6608c6546b3c6bde084fc1d34b1163c1']='health.d/retroshare.conf'
   ['669ebef43ee341f6889d382e86d0e200']='health.d/named.conf'
   ['66dfe138058ca26a31a118007eb31f35']='health.d/nginx.conf'
+  ['6814b9bc84483db428f6a479ba221855']='python.d/mysql.conf'
   ['6a18f61a595c0d48c3363bcc0dbfa6b9']='health_alarm_notify.conf'
   ['6a47af861ad3dd112124c37fbf09672b']='apps_groups.conf'
   ['6b39de5d85db45115db236347a6896d4']='health.d/named.conf'
