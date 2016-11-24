@@ -548,7 +548,7 @@ do
 done
 
 echo >&2 "Fixing permissions ..."
-run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -exec chmod 755 {} \;
+run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name \*.conf  -exec chmod 755 {} \;
 
 NETDATA_ADDED_TO_DOCKER=0
 if [ ${UID} -eq 0 ]
