@@ -13,7 +13,7 @@ then
 fi
 
 LC_ALL=C
-umask 022
+umask 007
 
 # Be nice on production environments
 renice 19 $$ >/dev/null 2>/dev/null
@@ -547,6 +547,9 @@ do
     fi
 done
 
+echo >&2 "Fixing permissions ..."
+run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -exec chmod 755 {} \;
+
 NETDATA_ADDED_TO_DOCKER=0
 if [ ${UID} -eq 0 ]
     then
@@ -609,17 +612,20 @@ config_option() {
     echo "${value}"
 }
 
-# user
-defuser="netdata"
-[ ! "${UID}" = "0" ] && defuser="${USER}"
-NETDATA_USER="$( config_option "run as user" "${defuser}" )"
+# the user netdata will run as
+if [ "${UID}" = "0" ]
+    then
+    NETDATA_USER="$( config_option "run as user" "netdata" )"
+else
+    NETDATA_USER="${USER}"
+fi
 
-NETDATA_WEB_USER="$( config_option "web files owner" "${defuser}" )"
+# the owners of the web files
+NETDATA_WEB_USER="$(  config_option "web files owner" "${NETDATA_USER}" )"
 NETDATA_WEB_GROUP="$( config_option "web files group" "${NETDATA_WEB_USER}" )"
 
 # debug flags
-defdebug=0
-NETDATA_DEBUG="$( config_option "debug flags" ${defdebug} )"
+NETDATA_DEBUG="$( config_option "debug flags" 0 )"
 
 # port
 defport=19999
@@ -654,7 +660,35 @@ fi
 
 echo >&2
 echo >&2 "Fixing directories (user: ${NETDATA_USER})..."
-for x in "${NETDATA_WEB_DIR}" "${NETDATA_CONF_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}" "${NETDATA_LIB_DIR}" "${NETDATA_CONF_DIR}/python.d" "${NETDATA_CONF_DIR}/charts.d" "${NETDATA_CONF_DIR}/node.d"
+
+# --- conf dir ----
+
+for x in "python.d" "charts.d" "node.d"
+do
+    if [ ! -d "${NETDATA_CONF_DIR}/${x}" ]
+        then
+        echo >&2 "Creating directory '${NETDATA_CONF_DIR}/${x}'"
+        run mkdir -p "${NETDATA_CONF_DIR}/${x}" || exit 1
+    fi
+done
+run chown --recursive "${NETDATA_USER}:${NETDATA_USER}" "${NETDATA_CONF_DIR}"
+run find "${NETDATA_CONF_DIR}" -type f -exec chmod 0660 {} \;
+run find "${NETDATA_CONF_DIR}" -type d -exec chmod 0775 {} \;
+
+# --- web dir ----
+
+if [ ! -d "${NETDATA_WEB_DIR}" ]
+    then
+    echo >&2 "Creating directory '${NETDATA_WEB_DIR}'"
+    run mkdir -p "${NETDATA_WEB_DIR}" || exit 1
+fi
+run chown --recursive "${NETDATA_WEB_USER}:${NETDATA_WEB_GROUP}" "${NETDATA_WEB_DIR}"
+run find "${NETDATA_WEB_DIR}" -type f -exec chmod 0664 {} \;
+run find "${NETDATA_WEB_DIR}" -type d -exec chmod 0775 {} \;
+
+# --- data dirs ----
+
+for x in "${NETDATA_LIB_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}"
 do
     if [ ! -d "${x}" ]
         then
@@ -662,23 +696,21 @@ do
         run mkdir -p "${x}" || exit 1
     fi
 
-    if [ ${UID} -eq 0 ]
-        then
-        if [ "${x}" = "${NETDATA_WEB_DIR}" ]
-            then
-            run chown -R "${NETDATA_WEB_USER}:${NETDATA_WEB_GROUP}" "${x}" || echo >&2 "WARNING: Cannot change the ownership of the files in directory ${x} to ${NETDATA_WEB_USER}:${NETDATA_WEB_GROUP}..."
-        else
-            run chown -R "${NETDATA_USER}:${NETDATA_USER}" "${x}" || echo >&2 "WARNING: Cannot change the ownership of the files in directory ${x} to ${NETDATA_USER}..."
-        fi
-    fi
-
-    run chmod 0755 "${x}" || echo >&2 "WARNING: Cannot change the permissions of the directory ${x} to 0755..."
+    run chown --recursive "${NETDATA_USER}:${NETDATA_USER}" "${x}"
+    run find "${x}" -type f -exec chmod 0660 {} \;
+    run find "${x}" -type d -exec chmod 0770 {} \;
 done
+
+# --- plugins ----
 
 if [ ${UID} -eq 0 ]
     then
-    run chown root "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
-    run chmod 0755 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+    run chown --recursive root:root "${NETDATA_PREFIX}/usr/libexec/netdata"
+    run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
+    run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0644 {} \;
+    run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.plugin -exec chmod 0755 {} \;
+    run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.sh -exec chmod 0755 {} \;
+
     run setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
     if [ $? -ne 0 ]
         then
@@ -686,6 +718,10 @@ if [ ${UID} -eq 0 ]
         run chown root "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
         run chmod 4755 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
     fi
+else
+    run chown --recursive "${NETDATA_USER}:${NETDATA_USER}" "${NETDATA_PREFIX}/usr/libexec/netdata"
+    run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0755 {} \;
+    run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
 fi
 
 # -----------------------------------------------------------------------------
@@ -702,7 +738,7 @@ if [ ${DONOTSTART} -eq 1 ]
             then
             chown "${NETDATA_USER}" "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
         fi
-        chmod 0664 "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
+        chmod 0644 "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
     fi
     banner "is installed now!"
     echo >&2 "  enjoy real-time performance and health monitoring..."
