@@ -697,8 +697,8 @@ do
     fi
 
     run chown --recursive "${NETDATA_USER}:${NETDATA_USER}" "${x}"
-    run find "${x}" -type f -exec chmod 0660 {} \;
-    run find "${x}" -type d -exec chmod 0770 {} \;
+    #run find "${x}" -type f -exec chmod 0660 {} \;
+    #run find "${x}" -type d -exec chmod 0770 {} \;
 done
 
 # --- plugins ----
