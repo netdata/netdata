@@ -18,6 +18,9 @@ and post-release update.
 Programs and packages with specific needs should create extra
 `whatever.functions` and supporting scripts in a subdirectory.
 
+The `gpg.keys` file is a list of keys that can be expected to sign
+tags and packages.
+
 Making a release
 ----------------
 `

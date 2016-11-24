@@ -13,6 +13,20 @@ fi
 # just make the assumption
 if [ -d .git ]
 then
+  if [ -n "$TRAVIS_TAG" ]
+  then
+    echo "Checking we have a good signature during CI build..."
+    echo "Checking tag: $TRAVIS_TAG"
+    git tag -v "$TRAVIS_TAG" 2>&1 | tee /tmp/tagcheck
+    grep -iq "gpg. good signature" /tmp/tagcheck
+    status=$?
+    rm -f /tmp/tagcheck
+    if [ $status -ne 0 ]
+    then
+      exit $status
+    fi
+  fi
+
   clean=$(git status -s | grep "^?")
 
   if [ "$clean" ]

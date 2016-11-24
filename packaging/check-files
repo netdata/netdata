@@ -36,6 +36,8 @@ then
   echo "check-files [--debug] -|filenames"
   echo "e.g."
   echo "  git diff | ./packaging/check-files -"
+  echo "for a complete check (v.s. empty repo):"
+  echo "  git diff 4b825dc642cb6eb9a060e54bf8d69288fbee4904 | ./packaging/check-files -"
   echo "or in .git/hooks/pre-commit:"
   echo "  exec git diff --cached | ./packaging/check-files -"
   exit 1
