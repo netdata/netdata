@@ -228,7 +228,7 @@ int become_daemon(int dont_fork, const char *user)
     }
 
     // Set new file permissions
-    umask(0002);
+    umask(0007);
 
     // adjust my Out-Of-Memory score
     oom_score_adj(1000);
