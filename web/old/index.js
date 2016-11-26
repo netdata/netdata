@@ -228,7 +228,7 @@ function refreshHiddenChart(doNext) {
 	}
 
 	// is it too soon for a refresh?
-	var now = new Date().getTime();
+	var now = Date.now();
 	if((now - mainchart.hiddenchart.last_updated) < (mainchart.update_every * 10 * 1000) || (now - mainchart.hiddenchart.last_updated) < (mainchart.hiddenchart.group * mainchart.hiddenchart.update_every * 1000)) {
 		if(typeof doNext == "function") doNext();
 		return;
@@ -319,7 +319,7 @@ function refreshHiddenChart(doNext) {
 		}
 
 		mainchart.dashboard.draw(mainchart.control_data);
-		mainchart.hiddenchart.last_updated = new Date().getTime();
+		mainchart.hiddenchart.last_updated = Date.now();
 		mainchart.hiddenchart.refreshCount++;
 	})
 	.always(function() {
@@ -583,7 +583,7 @@ function playGraphs() {
 	$('.global_play_button').button('play');
 
 	// check if the thread died due to a javascript error
-	var now = new Date().getTime();
+	var now = Date.now();
 	if((now - last_refresh) > 60000) {
 		// it died or never started
 		//mylog('It seems the refresh thread died. Restarting it.');
@@ -607,7 +607,7 @@ function checkRefreshThread() {
 		return;
 	}
 
-	var now = new Date().getTime();
+	var now = Date.now();
 	if(now - last_refresh > 60000) {
 		mylog('Refresh thread died. Restarting it.');
 		renderChartCallback();
@@ -619,7 +619,7 @@ function checkRefreshThread() {
 // never call it directly, or new javascript threads will be spawn
 var timeout = null;
 function renderChartCallback() {
-	last_refresh = new Date().getTime();
+	last_refresh = Date.now();
 
 	if(!page_is_visible) {
 		timeout = setTimeout(triggerRefresh, CHARTS_CHECK_NO_FOCUS);
@@ -635,7 +635,7 @@ function renderChartCallback() {
 	}
 
 	if(last_user_scroll) {
-		var now = new Date().getTime();
+		var now = Date.now();
 		if((now - last_user_scroll) >= CHARTS_SCROLL_IDLE) {
 			last_user_scroll = 0;
 			mylog('Scrolling: resuming refresh...');
@@ -672,7 +672,7 @@ function triggerRefresh() {
 	//mylog('triggerRefresh()');
 
 	if(!page_is_visible || (refresh_mode == REFRESH_PAUSED && mode != MODE_MAIN)) {
-		last_refresh = new Date().getTime();
+		last_refresh = Date.now();
 		timeout = setTimeout(triggerRefresh, CHARTS_REFRESH_IDLE);
 		return;
 	}
@@ -1028,7 +1028,7 @@ function initCharts() {
 	var height = TARGET_THUMB_GRAPH_HEIGHT;
 
 	window.onscroll = function (e) {
-		last_user_scroll = new Date().getTime();
+		last_user_scroll = Date.now();
 		mylog('Scrolling: detected');
 	}
 
