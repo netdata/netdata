@@ -249,7 +249,7 @@
                                         // rendering the chart that is panned or zoomed).
                                         // Used with .current.global_pan_sync_time
 
-        last_resized: new Date().getTime(), // the timestamp of the last resize request
+        last_resized: Date.now(),       // the timestamp of the last resize request
 
         last_page_scroll: 0,            // the timestamp the last time the page was scrolled
 
@@ -501,7 +501,7 @@
         console.log('welcome to NETDATA');
 
     NETDATA.onresize = function() {
-        NETDATA.options.last_resized = new Date().getTime();
+        NETDATA.options.last_resized = Date.now();
         NETDATA.onscroll();
     };
 
@@ -514,7 +514,7 @@
     NETDATA.onscroll_updater = function() {
         NETDATA.onscroll_updater_running = true;
         NETDATA.onscroll_updater_count++;
-        var start = new Date().getTime();
+        var start = Date.now();
 
         var targets = NETDATA.options.targets;
         var len = targets.length;
@@ -546,7 +546,7 @@
                 targets[len].isVisible();
         }
 
-        var end = new Date().getTime();
+        var end = Date.now();
         // console.log('scroll No ' + NETDATA.onscroll_updater_count + ' calculation took ' + (end - start).toString() + ' ms');
 
         if(NETDATA.options.current.async_on_scroll === false) {
@@ -574,7 +574,7 @@
     NETDATA.onscroll = function() {
         // console.log('onscroll');
 
-        NETDATA.options.last_page_scroll = new Date().getTime();
+        NETDATA.options.last_page_scroll = Date.now();
         NETDATA.options.auto_refresher_stop_until = 0;
 
         if(NETDATA.options.targets === null) return;
@@ -641,7 +641,7 @@
     NETDATA.error = function(code, msg) {
         NETDATA.errorLast.code = code;
         NETDATA.errorLast.message = msg;
-        NETDATA.errorLast.datetime = new Date().getTime();
+        NETDATA.errorLast.datetime = Date.now();
 
         console.log("ERROR " + code + ": " + NETDATA.errorCodes[code].message + ": " + msg);
 
@@ -877,7 +877,7 @@
             if(this.master !== null && this.master !== state)
                 this.master.resetChart(true, true);
 
-            var now = new Date().getTime();
+            var now = Date.now();
             this.master = state;
             this.seq = now;
             this.force_after_ms = after;
@@ -1408,7 +1408,7 @@
             if(NETDATA.chartDefaults.min_width !== null)
                 $(that.element).css('min-width', NETDATA.chartDefaults.min_width);
 
-            that.tm.last_dom_created = new Date().getTime();
+            that.tm.last_dom_created = Date.now();
 
             showLoading();
         };
@@ -1453,7 +1453,7 @@
             that.data_before = 0;           // milliseconds - the last timestamp of the data
             that.data_update_every = 0;     // milliseconds - the frequency to update the data
 
-            that.tm.last_initialized = new Date().getTime();
+            that.tm.last_initialized = Date.now();
             createDOM();
 
             that.setMode('auto');
@@ -1555,7 +1555,7 @@
                     showRendering();
                     that.element_chart.style.display = 'none';
                     if(that.element_legend !== null) that.element_legend.style.display = 'none';
-                    that.tm.last_hidden = new Date().getTime();
+                    that.tm.last_hidden = Date.now();
 
                     // de-allocate data
                     // This works, but I not sure there are no corner cases somewhere
@@ -1581,7 +1581,7 @@
                 init();
             }
             else {
-                that.tm.last_unhidden = new Date().getTime();
+                that.tm.last_unhidden = Date.now();
                 that.element_chart.style.display = '';
                 if(that.element_legend !== null) that.element_legend.style.display = '';
                 resizeChart();
@@ -1672,7 +1672,7 @@
                     maxMessageFontSize();
                 }
 
-                that.tm.last_resized = new Date().getTime();
+                that.tm.last_resized = Date.now();
             }
         };
 
@@ -1689,7 +1689,7 @@
             if(that.settings_id !== null)
                 NETDATA.localStorageSet('chart_heights.' + that.settings_id, h);
 
-            var now = new Date().getTime();
+            var now = Date.now();
             NETDATA.options.last_page_scroll = now;
             NETDATA.options.auto_refresher_stop_until = now + NETDATA.options.current.stop_updates_while_resizing;
 
@@ -1724,7 +1724,7 @@
             this.event_resize.chart_last_w = this.element.clientWidth;
             this.event_resize.chart_last_h = this.element.clientHeight;
 
-            var now = new Date().getTime();
+            var now = Date.now();
             if(now - this.event_resize.last <= NETDATA.options.current.double_click_speed) {
                 // double click / double tap event
 
@@ -1797,7 +1797,7 @@
         var noDataToShow = function() {
             showMessageIcon('<i class="fa fa-warning"></i> empty');
             that.legendUpdateDOM();
-            that.tm.last_autorefreshed = new Date().getTime();
+            that.tm.last_autorefreshed = Date.now();
             // that.data_update_every = 30 * 1000;
             //that.element_chart.style.display = 'none';
             //if(that.element_legend !== null) that.element_legend.style.display = 'none';
@@ -1827,7 +1827,7 @@
             this.current.force_before_ms = null;
             this.current.force_after_ms = null;
 
-            this.tm.last_mode_switch = new Date().getTime();
+            this.tm.last_mode_switch = Date.now();
         };
 
         // ----------------------------------------------------------------------------------------------------------------
@@ -1839,9 +1839,9 @@
                 return;
 
             if(typeof ms === 'number')
-                NETDATA.globalSelectionSync.dont_sync_before = new Date().getTime() + ms;
+                NETDATA.globalSelectionSync.dont_sync_before = Date.now() + ms;
             else
-                NETDATA.globalSelectionSync.dont_sync_before = new Date().getTime() + NETDATA.options.current.sync_selection_delay;
+                NETDATA.globalSelectionSync.dont_sync_before = Date.now() + NETDATA.options.current.sync_selection_delay;
         };
 
         // can we globally apply selection sync?
@@ -1849,7 +1849,7 @@
             if(NETDATA.options.current.sync_selection === false)
                 return false;
 
-            if(NETDATA.globalSelectionSync.dont_sync_before > new Date().getTime())
+            if(NETDATA.globalSelectionSync.dont_sync_before > Date.now())
                 return false;
 
             return true;
@@ -2164,7 +2164,7 @@
             if(this.debug === true)
                 this.log(logme + 'ACCEPTING UPDATE: current/min duration: ' + (current_duration / 1000).toString() + '/' + (this.fixed_min_duration / 1000).toString() + ', wanted duration: ' + (wanted_duration / 1000).toString() + ', duration diff: ' + (Math.round(Math.abs(current_duration - wanted_duration) / 1000)).toString() + ', movement: ' + (movement / 1000).toString() + ', tolerance: ' + (tolerance / 1000).toString() + ', returning: ' + ret);
 
-            this.current.force_update_at = new Date().getTime() + NETDATA.options.current.pan_and_zoom_delay;
+            this.current.force_update_at = Date.now() + NETDATA.options.current.pan_and_zoom_delay;
             this.current.force_after_ms = after;
             this.current.force_before_ms = before;
             NETDATA.globalPanAndZoom.setMaster(this, after, before);
@@ -2900,7 +2900,7 @@
             this.updates_since_last_unhide++;
             this.updates_since_last_creation++;
 
-            var started = new Date().getTime();
+            var started = Date.now();
 
             // if the result is JSON, find the latest update-every
             this.data_update_every = data.view_update_every * 1000;
@@ -2978,7 +2978,7 @@
                 NETDATA.globalSelectionSync.stop();
 
             // update the performance counters
-            var now = new Date().getTime();
+            var now = Date.now();
             this.tm.last_updated = now;
 
             // don't update last_autorefreshed if this chart is
@@ -3103,7 +3103,7 @@
             if(nocache === false && this.tm.last_visible_check > NETDATA.options.last_page_scroll)
                 return this.___isVisible___;
 
-            this.tm.last_visible_check = new Date().getTime();
+            this.tm.last_visible_check = Date.now();
 
             var wh = window.innerHeight;
             var x = this.element.getBoundingClientRect();
@@ -3146,7 +3146,7 @@
         };
 
         this.canBeAutoRefreshed = function() {
-            var now = new Date().getTime();
+            var now = Date.now();
 
             if(this.running === true) {
                 if(this.debug === true)
@@ -3267,7 +3267,7 @@
             this.chart_url = chart.url;
             this.data_update_every = chart.update_every * 1000;
             this.data_points = Math.round(this.chartWidth() / this.chartPixelsPerPoint());
-            this.tm.last_info_downloaded = new Date().getTime();
+            this.tm.last_info_downloaded = Date.now();
 
             if(this.title === null)
                 this.title = chart.title;
@@ -3617,7 +3617,7 @@
     };
 
     NETDATA.parseDom = function(callback) {
-        NETDATA.options.last_page_scroll = new Date().getTime();
+        NETDATA.options.last_page_scroll = Date.now();
         NETDATA.options.updated_dom = false;
 
         var targets = $('div[data-netdata]'); //.filter(':visible');
@@ -4070,7 +4070,7 @@
             dygraph.updateOptions(options);
         }
 
-        state.dygraph_last_rendered = new Date().getTime();
+        state.dygraph_last_rendered = Date.now();
         return true;
     };
 
@@ -4485,7 +4485,7 @@
                     // the internal default of dygraphs
                     context.touchDirections = { x: true, y: false };
 
-                    state.dygraph_last_touch_start = new Date().getTime();
+                    state.dygraph_last_touch_start = Date.now();
                     state.dygraph_last_touch_move = 0;
 
                     if(typeof event.touches[0].pageX === 'number')
@@ -4500,7 +4500,7 @@
                     state.dygraph_user_action = true;
                     Dygraph.defaultInteractionModel.touchmove(event, dygraph, context);
 
-                    state.dygraph_last_touch_move = new Date().getTime();
+                    state.dygraph_last_touch_move = Date.now();
                 },
                 touchend: function(event, dygraph, context) {
                     if(NETDATA.options.debug.dygraph === true || state.debug === true)
@@ -4519,7 +4519,7 @@
                     }
 
                     // if it was double tap within double click time, reset the charts
-                    var now = new Date().getTime();
+                    var now = Date.now();
                     if(typeof state.dygraph_last_touch_end !== 'undefined') {
                         if(state.dygraph_last_touch_move === 0) {
                             var dt = now - state.dygraph_last_touch_end;
@@ -4560,7 +4560,7 @@
 
         state.dygraph_force_zoom = false;
         state.dygraph_user_action = false;
-        state.dygraph_last_rendered = new Date().getTime();
+        state.dygraph_last_rendered = Date.now();
 
         if(typeof state.dygraph_instance.axes_[0].extremeRange !== 'undefined') {
             state.__commonMin = self.data('common-min') || null;
@@ -6211,7 +6211,7 @@
                 NETDATA.registry.machines = {};
                 NETDATA.registry.machines_array = new Array();
 
-                var now = new Date().getTime();
+                var now = Date.now();
                 var apu = person_urls;
                 var i = apu.length;
                 while(i--) {

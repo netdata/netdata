@@ -1604,7 +1604,7 @@
             }
 
             // find the proper family of each alarm
-            var now = new Date().getTime();
+            var now = Date.now();
             var x;
             var count_active = 0;
             var count_all = 0;
@@ -2166,7 +2166,7 @@
     function notifyForUpdate(force) {
         versionLog('<p>checking for updates...</p>');
 
-        var now = new Date().getTime();
+        var now = Date.now();
 
         if(typeof force === 'undefined' || force !== true) {
             var last = loadLocalStorage('last_update_check');
