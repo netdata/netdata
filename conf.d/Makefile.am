@@ -73,3 +73,26 @@ dist_healthconfig_DATA = \
     health.d/swap.conf \
     health.d/tcp_resets.conf \
     $(NULL)
+
+chartsconfigdir=$(configdir)/charts.d
+dist_chartsconfig_DATA = \
+    charts.d/apache.conf \
+    charts.d/apcupsd.conf \
+    charts.d/cpufreq.conf \
+    charts.d/exim.conf \
+    charts.d/load_average.conf \
+    charts.d/mysql.conf \
+    charts.d/nut.conf \
+    charts.d/phpfpm.conf \
+    charts.d/sensors.conf \
+    charts.d/tomcat.conf \
+    charts.d/ap.conf \
+    charts.d/cpu_apps.conf \
+    charts.d/example.conf \
+    charts.d/hddtemp.conf \
+    charts.d/mem_apps.conf \
+    charts.d/nginx.conf \
+    charts.d/opensips.conf \
+    charts.d/postfix.conf \
+    charts.d/squid.conf \
+    $(NULL)

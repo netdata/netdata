@@ -13,7 +13,7 @@ function canChartBeRefreshed(chart) {
 	if(chart.chart && chart.chart.getSelection()[0]) return false;
 
 	// is it too soon for a refresh?
-	var now = new Date().getTime();
+	var now = Date.now();
 	if((now - chart.last_updated) < (chart.group * chart.update_every * 1000)) return false;
 
 	// is the chart in the visible area?
@@ -79,7 +79,7 @@ function renderChart(chart, doNext) {
 		if(chart.chart) {
 			chart.chart.draw(chart.datatable, chart.chartOptions);
 			chart.refreshCount++;
-			chart.last_updated = new Date().getTime();
+			chart.last_updated = Date.now();
 		}
 		else console.log('Cannot create chart for ' + chart.url);
 	})
@@ -89,7 +89,7 @@ function renderChart(chart, doNext) {
 		chart.chart = null;
 		chart.refreshCount = 0;
 		showChartIsLoading(chart.div, chart.name, chart.chartOptions.width, chart.chartOptions.height, "failed to refresh");
-		chart.last_updated = new Date().getTime();
+		chart.last_updated = Date.now();
 	})
 	.always(function() {
 		if(typeof doNext == "function") doNext();
@@ -128,7 +128,7 @@ function calculateChartPointsToShow(c, divisor, maxtime, group, enable_curve) {
 
 	if(!divisor) divisor = 2;
 
-	var before = c.before?c.before:new Date().getTime() / 1000;
+	var before = c.before?c.before:Date.now() / 1000;
 	var after = c.after?c.after:c.first_entry_t;
 
 	var dt = before - after;

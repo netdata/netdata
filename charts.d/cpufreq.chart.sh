@@ -9,7 +9,7 @@
 # if this chart is called X.chart.sh, then all functions and global variables
 # must start with X_
 
-cpufreq_sys_dir="/sys/devices"
+cpufreq_sys_dir="${NETDATA_HOST_PREFIX}/sys/devices"
 cpufreq_sys_depth=10
 cpufreq_source_update=1
 
