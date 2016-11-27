@@ -1325,6 +1325,9 @@
             html += mhead + shtml + '</div></div><hr role="separator"/>';
         }
 
+        sidebar += '<li class="" style="padding-top:15px;"><a href="https://github.com/firehol/netdata/wiki/Add-more-charts-to-netdata" target="_blank"><i class="fa fa-plus" aria-hidden="true"></i> add more charts</a></li>';
+        sidebar += '<li class=""><a href="https://github.com/firehol/netdata/wiki/Add-more-alarms-to-netdata" target="_blank"><i class="fa fa-plus" aria-hidden="true"></i> add more alarms</a></li>';
+        sidebar += '<li class="" style="margin:20px;color:#666;"><small>netdata on <b>' + data.hostname.toString() + '</b>, collects every ' + ((data.update_every == 1)?'second':data.update_every.toString() + ' seconds') + ' <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presented as <b>' + data.charts_count.toLocaleString() + '</b> charts and monitored by <b>' + data.alarms_count.toLocaleString() + '</b> alarms, using ' + Math.round(data.rrd_memory_bytes / 1024 / 1024).toLocaleString() + ' MB of memory for ' + Math.round(data.history / 3600).toLocaleString() + ' ' + ((data.history == 3600)?'hour':'hours').toString() + ' of real-time history.</small></li>';
         sidebar += '</ul>';
         div.innerHTML = html;
         document.getElementById('sidebar').innerHTML = sidebar;
@@ -1604,7 +1607,7 @@
             }
 
             // find the proper family of each alarm
-            var now = new Date().getTime();
+            var now = Date.now();
             var x;
             var count_active = 0;
             var count_all = 0;
@@ -2166,7 +2169,7 @@
     function notifyForUpdate(force) {
         versionLog('<p>checking for updates...</p>');
 
-        var now = new Date().getTime();
+        var now = Date.now();
 
         if(typeof force === 'undefined' || force !== true) {
             var last = loadLocalStorage('last_update_check');
@@ -3167,4 +3170,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20161112-1"></script>
+<script type="text/javascript" src="dashboard.js?v20161126-1"></script>

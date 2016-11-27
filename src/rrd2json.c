@@ -1,6 +1,6 @@
 #include "common.h"
 
-void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb)
+void rrd_stats_api_v1_chart_with_data(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memory_used)
 {
     pthread_rwlock_rdlock(&st->rwlock);
 
@@ -41,7 +41,7 @@ void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb)
 
     unsigned long memory = st->memsize;
 
-    int c = 0;
+    size_t dimensions = 0;
     RRDDIM *rd;
     for(rd = st->dimensions; rd ; rd = rd->next) {
         if(rd->flags & RRDDIM_FLAG_HIDDEN) continue;
@@ -51,13 +51,16 @@ void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb)
         buffer_sprintf(wb,
             "%s"
             "\t\t\t\t\"%s\": { \"name\": \"%s\" }"
-            , c?",\n":""
+            , dimensions?",\n":""
             , rd->id
             , rd->name
             );
 
-        c++;
+        dimensions++;
     }
+
+    if(dimensions_count) *dimensions_count += dimensions;
+    if(memory_used) *memory_used += memory;
 
     buffer_strcat(wb, "\n\t\t\t},\n\t\t\t\"green\": ");
     buffer_rrd_value(wb, st->green);
@@ -71,9 +74,13 @@ void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb)
     pthread_rwlock_unlock(&st->rwlock);
 }
 
+void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {
+    rrd_stats_api_v1_chart_with_data(st, wb, NULL, NULL);
+}
+
 void rrd_stats_api_v1_charts(BUFFER *wb)
 {
-    long c;
+    size_t c, dimensions = 0, memory = 0, alarms = 0;
     RRDSET *st;
 
     buffer_sprintf(wb, "{\n"
@@ -93,13 +100,28 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
             buffer_strcat(wb, "\n\t\t\"");
             buffer_strcat(wb, st->id);
             buffer_strcat(wb, "\": ");
-            rrd_stats_api_v1_chart(st, wb);
+            rrd_stats_api_v1_chart_with_data(st, wb, &dimensions, &memory);
             c++;
         }
     }
+
+    RRDCALC *rc;
+    for(rc = localhost.alarms; rc ; rc = rc->next) {
+        alarms++;
+    }
     pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
 
-    buffer_strcat(wb, "\n\t}\n}\n");
+    buffer_sprintf(wb, "\n\t}"
+                    ",\n\t\"charts_count\": %zu"
+                    ",\n\t\"dimensions_count\": %zu"
+                    ",\n\t\"alarms_count\": %zu"
+                    ",\n\t\"rrd_memory_bytes\": %zu"
+                    "\n}\n"
+                   , c
+                   , dimensions
+                   , alarms
+                   , memory
+    );
 }
 
 
