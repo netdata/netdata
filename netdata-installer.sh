@@ -13,7 +13,7 @@ then
 fi
 
 LC_ALL=C
-umask 007
+umask 002
 
 # Be nice on production environments
 renice 19 $$ >/dev/null 2>/dev/null
@@ -723,6 +723,12 @@ else
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0755 {} \;
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
 fi
+
+# --- fix #1292 bug ---
+
+[ -d "${NETDATA_PREFIX}/usr/libexec" ] && run chmod a+rX "${NETDATA_PREFIX}/usr/libexec"
+[ -d "${NETDATA_PREFIX}/usr/share/netdata" ] && run chmod a+rX "${NETDATA_PREFIX}/usr/share/netdata"
+
 
 # -----------------------------------------------------------------------------
 # check if we can re-start netdata
