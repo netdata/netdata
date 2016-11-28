@@ -13,7 +13,7 @@ then
 fi
 
 LC_ALL=C
-umask 007
+umask 002
 
 # Be nice on production environments
 renice 19 $$ >/dev/null 2>/dev/null
