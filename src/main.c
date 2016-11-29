@@ -458,6 +458,7 @@ int main(int argc, char **argv)
         debug_flags = strtoull(flags, NULL, 0);
         debug(D_OPTIONS, "Debug flags set to '0x%8llx'.", debug_flags);
 
+#ifndef __FreeBSD__
         if(debug_flags != 0) {
             struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
             if(setrlimit(RLIMIT_CORE, &rl) != 0)
@@ -465,6 +466,7 @@ int main(int argc, char **argv)
 
             prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
         }
+#endif /* __FreeBSD__ */
 
         // --------------------------------------------------------------------
 
@@ -633,6 +635,7 @@ int main(int argc, char **argv)
     // initialize the log files
     open_all_log_files();
 
+#ifndef __FreeBSD__
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
         struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
@@ -641,6 +644,7 @@ int main(int argc, char **argv)
         prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
     }
 #endif /* NETDATA_INTERNAL_CHECKS */
+#endif /* __FreeBSD__ */
 
     // fork, switch user, create pid file, set process priority
     if(become_daemon(dont_fork, user) == -1)
