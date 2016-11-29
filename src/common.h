@@ -20,7 +20,9 @@
 
 #else /* !defined(ENABLE_JEMALLOC) && !defined(ENABLE_TCMALLOC) */
 
+#ifndef __FreeBSD__
 #include <malloc.h>
+#endif /* __FreeBSD__ */
 
 #endif
 
@@ -52,7 +54,11 @@
 #include <signal.h>
 #include <syslog.h>
 #include <sys/mman.h>
+
+#ifndef __FreeBSD__
 #include <sys/prctl.h>
+#endif /* __FreeBSD__ */
+
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
