@@ -41,7 +41,6 @@ struct ipc_status {
  *  tells us to define it ourselves, but until recently Linux include files
  *  would also define it.
  */
-#ifndef __FreeBSD__
 #ifndef HAVE_UNION_SEMUN
 /* according to X/OPEN we have to define it ourselves */
 union semun {
@@ -51,19 +50,6 @@ union semun {
     struct seminfo *__buf;
 };
 #endif
-#else /* __FreeBSD__ */
-struct seminfo {
-        int     semmni,         /* # of semaphore identifiers */
-                semmns,         /* # of semaphores in system */
-                semmnu,         /* # of undo structures in system */
-                semmsl,         /* max # of semaphores per id */
-                semopm,         /* max # of operations per semop call */
-                semume,         /* max # of undo entries per process */
-                semusz,         /* size in bytes of undo structure */
-                semvmx,         /* semaphore maximum value */
-                semaem;         /* adjust on exit max value */
-};
-#endif /* __FreeBSD__ */
 
 static inline int ipc_sem_get_limits(struct ipc_limits *lim) {
     static procfile *ff = NULL;

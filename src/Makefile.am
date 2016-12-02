@@ -36,16 +36,36 @@ netdata_SOURCES = \
 	eval.c eval.h \
 	global_statistics.c global_statistics.h \
 	health.c health.h \
-	ipc.c ipc.h \
 	log.c log.h \
 	main.c main.h \
 	plugin_checks.c plugin_checks.h \
 	plugin_idlejitter.c plugin_idlejitter.h \
 	plugin_nfacct.c plugin_nfacct.h \
-	plugin_proc.c plugin_proc.h \
 	plugin_tc.c plugin_tc.h \
 	plugins_d.c plugins_d.h \
 	popen.c popen.h \
+	sys_fs_cgroup.c \
+	procfile.c procfile.h \
+	proc_self_mountinfo.c proc_self_mountinfo.h \
+	registry.c registry.h \
+	rrd.c rrd.h \
+	rrd2json.c rrd2json.h \
+	storage_number.c storage_number.h \
+	unit_test.c unit_test.h \
+	url.c url.h \
+	web_buffer.c web_buffer.h \
+	web_buffer_svg.c web_buffer_svg.h \
+	web_client.c web_client.h \
+	web_server.c web_server.h \
+	$(NULL)
+
+if FREEBSD
+netdata_SOURCES += \
+	plugin_freebsd.c plugin_freebsd.h \
+	$(NULL)
+else
+netdata_SOURCES += \
+	plugin_proc.c plugin_proc.h \
 	proc_diskstats.c \
 	proc_interrupts.c \
 	proc_softirqs.c \
@@ -62,23 +82,14 @@ netdata_SOURCES = \
 	proc_net_stat_conntrack.c \
 	proc_net_stat_synproxy.c \
 	proc_stat.c \
-	proc_self_mountinfo.c proc_self_mountinfo.h \
 	proc_sys_kernel_random_entropy_avail.c \
 	proc_vmstat.c \
+	ipc.c ipc.h \
 	sys_kernel_mm_ksm.c \
-	sys_fs_cgroup.c \
-	procfile.c procfile.h \
-	registry.c registry.h \
-	rrd.c rrd.h \
-	rrd2json.c rrd2json.h \
-	storage_number.c storage_number.h \
-	unit_test.c unit_test.h \
-	url.c url.h \
-	web_buffer.c web_buffer.h \
-	web_buffer_svg.c web_buffer_svg.h \
-	web_client.c web_client.h \
-	web_server.c web_server.h \
 	$(NULL)
+endif
+
+
 netdata_LDADD = \
 	$(OPTIONAL_MATH_LIBS) \
 	$(OPTIONAL_NFACCT_LIBS) \

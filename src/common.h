@@ -117,7 +117,11 @@
 #include "plugin_checks.h"
 #include "plugin_idlejitter.h"
 #include "plugin_nfacct.h"
+#ifndef __FreeBSD__
 #include "plugin_proc.h"
+#else
+#include "plugin_freebsd.h"
+#endif /* __FreeBSD__ */
 #include "plugin_tc.h"
 #include "plugins_d.h"
 
