@@ -36,6 +36,17 @@ PKG_PROG_PKG_CONFIG
 AC_USE_SYSTEM_EXTENSIONS
 AC_CHECK_FUNCS_ONCE(accept4)
 
+# Check system type
+case "$host_os" in
+freebsd*)
+	build_target=freebsd
+	;;
+*)	
+	;;
+esac
+
+AM_CONDITIONAL([FREEBSD], [test x$build_target = xfreebsd])
+
 AC_ARG_ENABLE(
 	[plugin-nfacct],
 	[AS_HELP_STRING([--enable-plugin-nfacct], [enable nfacct plugin, requires root])],
