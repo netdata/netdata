@@ -42,7 +42,8 @@ void *freebsd_main(void *ptr)
     int vdo_sys_kernel_mm_ksm       = !config_get_boolean("plugin:proc", "/sys/kernel/mm/ksm", 1);
     */
     int vdo_cpu_netdata             = !config_get_boolean("plugin:proc", "netdata server resources", 1);
-
+    int vdo_proc_stat               = !config_get_boolean("plugin:proc", "/proc/stat", 1);
+    int vdo_proc_loadavg            = !config_get_boolean("plugin:proc", "/proc/loadavg", 1);
 
     // keep track of the time each module was called
     /*
@@ -67,6 +68,8 @@ void *freebsd_main(void *ptr)
     unsigned long long sutime_ipc = 0ULL;
     unsigned long long sutime_sys_kernel_mm_ksm = 0ULL;
     */
+    unsigned long long sutime_proc_stat = 0ULL;
+    unsigned long long sutime_proc_loadavg = 0ULL;
 
     unsigned long long step = rrd_update_every * 1000000ULL;
     for(;;) {
@@ -243,7 +246,23 @@ void *freebsd_main(void *ptr)
             sutime_proc_net_rpc_nfs = now;
         }
         if(unlikely(netdata_exit)) break;
-	*/
+        */
+        
+        if(!vdo_proc_stat) {
+            debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_stat().");
+            now = time_usec();
+            vdo_proc_stat = do_proc_stat(rrd_update_every, (sutime_proc_stat > 0)?now - sutime_proc_stat:0ULL);
+            sutime_proc_stat = now;
+        }
+        if(unlikely(netdata_exit)) break;
+
+        if(!vdo_proc_loadavg) {
+            debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_loadavg().");
+            now = time_usec();
+            vdo_proc_loadavg = do_proc_loadavg(rrd_update_every, (sutime_proc_loadavg > 0)?now - sutime_proc_loadavg:0ULL);
+            sutime_proc_loadavg = now;
+        }
+        if(unlikely(netdata_exit)) break;
 
         // END -- the job is done
 
@@ -259,4 +278,21 @@ void *freebsd_main(void *ptr)
 
     pthread_exit(NULL);
     return NULL;
+}
+
+int getsysctl(const char *name, void *ptr, size_t len)
+{
+    size_t nlen = len;
+
+    if (unlikely(sysctlbyname(name, ptr, &nlen, NULL, 0) == -1)) {
+        error("FREEBSD: sysctl(%s...) failed: %s\n", name,
+            strerror(errno));
+        return 1;
+    }
+    if (unlikely(nlen != len)) {
+        error("FREEBSD: sysctl(%s...) expected %lu, got %lu\n",
+            name, (unsigned long)len, (unsigned long)nlen);
+        return 1;
+    }
+    return 0;
 }

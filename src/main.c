@@ -48,7 +48,7 @@ struct netdata_static_thread {
 #ifndef __FreeBSD__    
     {"proc",               "plugins",   "proc",       1, NULL, NULL, proc_main},
 #else
-    {"freebsd",               "plugins",   "freebsd",       1, NULL, NULL, freebsd_main},
+    {"proc",               "plugins",   "proc",       1, NULL, NULL, freebsd_main},
 #endif /* __FreeBSD__ */
     
     {"cgroups",            "plugins",   "cgroups",    1, NULL, NULL, cgroups_main},

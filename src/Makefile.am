@@ -62,6 +62,8 @@ netdata_SOURCES = \
 if FREEBSD
 netdata_SOURCES += \
 	plugin_freebsd.c plugin_freebsd.h \
+	freebsd_loadavg.c \
+	freebsd_stat.c \
 	$(NULL)
 else
 netdata_SOURCES += \
