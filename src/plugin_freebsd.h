@@ -1,7 +1,11 @@
 #ifndef NETDATA_PLUGIN_FREEBSD_H
 #define NETDATA_PLUGIN_FREEBSD_H 1
 
+#define GETSYSCTL(name, var) getsysctl(name, &(var), sizeof(var))
+
 void *freebsd_main(void *ptr);
+
+extern int getsysctl(const char *name, void *ptr, size_t len);
 
 /*
 extern int do_proc_net_dev(int update_every, unsigned long long dt);
@@ -11,7 +15,6 @@ extern int do_proc_net_snmp6(int update_every, unsigned long long dt);
 extern int do_proc_net_netstat(int update_every, unsigned long long dt);
 extern int do_proc_net_stat_conntrack(int update_every, unsigned long long dt);
 extern int do_proc_net_ip_vs_stats(int update_every, unsigned long long dt);
-extern int do_proc_stat(int update_every, unsigned long long dt);
 extern int do_proc_meminfo(int update_every, unsigned long long dt);
 extern int do_proc_vmstat(int update_every, unsigned long long dt);
 extern int do_proc_net_rpc_nfs(int update_every, unsigned long long dt);
@@ -24,5 +27,7 @@ extern int do_proc_loadavg(int update_every, unsigned long long dt);
 extern int do_proc_net_stat_synproxy(int update_every, unsigned long long dt);
 extern int do_proc_net_softnet_stat(int update_every, unsigned long long dt);
 */
+extern int do_proc_stat(int update_every, unsigned long long dt);
+extern int do_proc_loadavg(int update_every, unsigned long long dt);
 
 #endif /* NETDATA_FREEBSD_PROC_H */
