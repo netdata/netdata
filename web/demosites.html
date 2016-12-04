@@ -625,39 +625,46 @@ p {
         <div class=grid>
             <div class=grid-cell><h3><span class=star>&#x2605;</span> Monitor everything</h3>
                 <p>Analyze thousands of metrics per server.
-                    Everything about the system (CPU, RAM, disks, network, firewall, QoS, NFS, etc) and detailed performance metrics for dozens of Linux applications
+                    Everything about <a href="https://github.com/firehol/netdata/wiki/Internal-Plugins" target="_blank">the system</a> (CPU,
+                        RAM, <a href="https://github.com/firehol/netdata/wiki/Monitoring-disks" target="_blank">disks</a>,
+                    network, firewall, <a href="https://github.com/firehol/netdata/wiki/Why-netdata%3F#visualizes-qos" target="_blank">QoS</a>, NFS, etc)
+                    and detailed performance metrics for dozens of
+                    <a href="https://github.com/firehol/netdata/wiki/Add-more-charts-to-netdata" target="_blank">Linux applications</a>
                     (such as web servers, databases servers, email servers, DNS servers, etc)
-                    and <strong>SNMP</strong> devices.
+                    and <a href="https://github.com/firehol/netdata/blob/master/conf.d/node.d/snmp.conf.md" target="_blank">SNMP</a> devices.
             </div>
             <div class=grid-cell><h3><span class=star>&#x2605;</span> With alarms</h3>
-                <p>Alarms can be set on any metric monitored by netdata.
-                    Alarm notifications are role-based and support dynamic thresholds, hysteresis and can be dispatched
-                    via multiple methods (such as email, slack.com, pushover.net, pushbullet.com telegram.org, twilio.com).
+                <p><a href="https://github.com/firehol/netdata/wiki/health-monitoring" target="_blank">Alarms</a> can be set on any metric monitored by netdata.
+                    Alarm <a href="https://github.com/firehol/netdata/wiki/health-monitoring#alarm-actions" target="_blank">notifications</a>
+                    are role-based and support dynamic thresholds, hysteresis and can be dispatched via multiple methods
+                    (such as email, slack.com, pushover.net, pushbullet.com telegram.org, twilio.com).
             </div>
             <div class=grid-cell><h3><span class=star>&#x2605;</span> In real-time</h3>
-                <p>netdata collects thousands of metrics per server <strong>per second</strong>, with just 1% CPU
-                    utilization of a single core, a few MB or RAM and no disk I/O at all.
+                <p>netdata collects thousands of metrics per server <strong>per second</strong>,
+                    with <a href="https://github.com/firehol/netdata/wiki/Performance#netdata-daemon" target="_blank">just 1% CPU</a>
+                    utilization of a single core, <a href="https://github.com/firehol/netdata/wiki/Memory-Requirements" target="_blank">a few MB or RAM</a>
+                    and no disk I/O at all.
                     View everything on <strong>stunning</strong> real-time interactive web dashboards, even when netdata is
                     running on low-end hardware.
             </div>
             <div class=grid-cell><h3><span class=star>&#x2605;</span> Out of the box</h3>
-                <p>netdata supports auto-detection for everything. It collects more than 5000 metrics automatically, with
+                <p>netdata supports <a href="https://github.com/firehol/netdata/tree/master/conf.d/python.d" target="_blank">auto-detection</a> for everything. It collects more than 5000 metrics automatically, with
                     <strong>zero configuration</strong>, it has <strong>zero dependencies</strong>, requires <strong>zero
-                        maintenance</strong> and comes with more than 100 alarms pre-configured to detect common
+                        maintenance</strong> and comes with more than <a href="https://github.com/firehol/netdata/tree/master/conf.d/health.d" target="_blank">100 alarms</a> pre-configured to detect common
                     failures, performance and availability issues.
             </div>
             <div class=grid-cell><h3><span class=star>&#x2605;</span> Embeddable</h3>
-                <p>netdata can run anywhere a Linux kernel runs (even IoT) and its charts can be embedded on any web site too.
+                <p>netdata can run anywhere a Linux kernel runs (<a href="https://github.com/firehol/netdata/wiki/netdata-for-IoT" target="_blank">even IoT</a>) and its charts can be embedded on any web site too.
             </div>
             <div class=grid-cell><h3><span class=star>&#x2605;</span> Customizable</h3>
-                <p>Custom dashboards can be built using simple HTML (no javascript necessary).
+                <p><a href="https://github.com/firehol/netdata/wiki/Custom-Dashboards" target="_blank">Custom dashboards</a> can be built using simple HTML (no javascript necessary).
             </div>
             <div class=grid-cell><h3><span class=star>&#x2605;</span> Extensible</h3>
-                <p>Anything you can get a number for, can be given to netdata, using its Plugin API (anything can be a netdata plugin, BASH, python, perl, node.js, java, Go, ruby, etc).
+                <p>Anything you can get a number for, can be given to netdata, using its <a href="https://github.com/firehol/netdata/wiki/External-Plugins" target="_blank">Plugin API</a> (anything can be a netdata plugin, BASH, python, perl, node.js, java, Go, ruby, etc).
             </div>
             <div class=grid-cell><h3><span class=star>&#x2605;</span> Scalable</h3>
-                <p>netdata scales out, your web browser is the central netdata connecting all your servers together.
-                    netdata can archive its metrics to <strong>graphite</strong> or <strong>opentsdb</strong> at a lower
+                <p>netdata scales out, your web browser is the central netdata <a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" target="_blank">connecting all your servers</a> together.
+                    netdata can <a href="https://github.com/firehol/netdata/wiki/netdata-backends" target="_blank">archive its metrics</a> to <strong>graphite</strong> or <strong>opentsdb</strong> at a lower
                 rate, to avoid congesting these servers with the amount of data collected.
             </div>
         </div>
@@ -884,7 +891,7 @@ p {
 <div class=site-section><h2>Who uses netdata?</h2>
     <div class="content">
         <div class="container" style="text-align: center;">
-            <small>Figures come from users using the <a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" target="_blank">netdata public global registry</a>.<br/>Actual figures might be a lot higher.<br/></small>
+            <small>Figures come from users using the <a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" target="_blank">netdata public global registry</a>.<br/>Counting since May 16th 2016. Actual figures might be a lot higher.<br/></small>
             <div class="container" style="padding-top: 40px; text-align: center; width: 30%; min-width: 230px; display: inline-block;">
                 <div class="mysparkline">
                     <div class="mysparkline-overchart-label">
