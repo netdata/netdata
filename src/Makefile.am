@@ -62,8 +62,7 @@ netdata_SOURCES = \
 if FREEBSD
 netdata_SOURCES += \
 	plugin_freebsd.c plugin_freebsd.h \
-	freebsd_loadavg.c \
-	freebsd_stat.c \
+	freebsd_sysctl.c \
 	$(NULL)
 else
 netdata_SOURCES += \
@@ -90,7 +89,6 @@ netdata_SOURCES += \
 	sys_kernel_mm_ksm.c \
 	$(NULL)
 endif
-
 
 netdata_LDADD = \
 	$(OPTIONAL_MATH_LIBS) \

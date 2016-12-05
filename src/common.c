@@ -1,9 +1,8 @@
 #include "common.h"
 
-#ifdef __FreeBSD__ 
-#    include <sys/thr.h> 
-#    define O_NOATIME     0 
-#    define MADV_DONTFORK INHERIT_NONE 
+#ifdef __FreeBSD__
+#    define O_NOATIME     0
+#    define MADV_DONTFORK INHERIT_NONE
 #endif /* __FreeBSD__ */
 
 char *global_host_prefix = "";
@@ -1031,11 +1030,9 @@ int fd_is_valid(int fd) {
 }
 
 pid_t gettid(void) {
-#ifdef __FreeBSD__ 
-        long pid; 
-        thr_self( &pid ); 
-        return (unsigned) pid; 
-#else /* __FreeBSD__ */
+#ifdef __FreeBSD__
+    return (pid_t)pthread_getthreadid_np();
+#else
     return (pid_t)syscall(SYS_gettid);
 #endif /* __FreeBSD__ */
 }
