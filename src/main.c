@@ -45,12 +45,11 @@ struct netdata_static_thread {
 
     {"tc",                 "plugins",   "tc",         1, NULL, NULL, tc_main},
     {"idlejitter",         "plugins",   "idlejitter", 1, NULL, NULL, cpuidlejitter_main},
-#ifndef __FreeBSD__    
+#ifndef __FreeBSD__
     {"proc",               "plugins",   "proc",       1, NULL, NULL, proc_main},
 #else
-    {"proc",               "plugins",   "proc",       1, NULL, NULL, freebsd_main},
+    {"freebsd",            "plugins",   "freebsd",    1, NULL, NULL, freebsd_main},
 #endif /* __FreeBSD__ */
-    
     {"cgroups",            "plugins",   "cgroups",    1, NULL, NULL, cgroups_main},
     {"check",              "plugins",   "checks",     0, NULL, NULL, checks_main},
     {"backends",            NULL,       NULL,         1, NULL, NULL, backends_main},
@@ -463,15 +462,15 @@ int main(int argc, char **argv)
         debug_flags = strtoull(flags, NULL, 0);
         debug(D_OPTIONS, "Debug flags set to '0x%8llx'.", debug_flags);
 
-#ifndef __FreeBSD__
         if(debug_flags != 0) {
             struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
             if(setrlimit(RLIMIT_CORE, &rl) != 0)
                 error("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
 
+#ifndef __FreeBSD__
             prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
-        }
 #endif /* __FreeBSD__ */
+        }
 
         // --------------------------------------------------------------------
 
@@ -640,16 +639,16 @@ int main(int argc, char **argv)
     // initialize the log files
     open_all_log_files();
 
-#ifndef __FreeBSD__
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
         struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
         if(setrlimit(RLIMIT_CORE, &rl) != 0)
             error("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
+#ifndef __FreeBSD__
         prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
+#endif /* __FreeBSD__ */
     }
 #endif /* NETDATA_INTERNAL_CHECKS */
-#endif /* __FreeBSD__ */
 
     // fork, switch user, create pid file, set process priority
     if(become_daemon(dont_fork, user) == -1)

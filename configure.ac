@@ -41,7 +41,7 @@ case "$host_os" in
 freebsd*)
 	build_target=freebsd
 	;;
-*)	
+*)
 	;;
 esac
 
