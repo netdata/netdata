@@ -186,7 +186,7 @@ int do_freebsd_sysctl(int update_every, unsigned long long dt) {
                 do_cpu_cores = 0;
                 error("DISABLED: cpu.cpuXX");
             } else {
-                pcpu_cp_time = realloc(pcpu_cp_time, sizeof(cp_time) * ncpus);
+                pcpu_cp_time = reallocz(pcpu_cp_time, sizeof(cp_time) * ncpus);
 
                 for (i = 0; i < ncpus; i++) {
                     if (unlikely(getsysctl("kern.cp_times", pcpu_cp_time, sizeof(cp_time) * ncpus))) {
@@ -235,7 +235,7 @@ int do_freebsd_sysctl(int update_every, unsigned long long dt) {
             error("DISABLED: system.intr");
         } else {
             nintr = intrcnt_size / sizeof(u_long);
-            intrcnt = realloc(intrcnt, nintr * sizeof(u_long));
+            intrcnt = reallocz(intrcnt, nintr * sizeof(u_long));
             if (unlikely(getsysctl("hw.intrcnt", intrcnt, nintr * sizeof(u_long)))){
                 do_interrupts = 0;
                 error("DISABLED: system.intr");
