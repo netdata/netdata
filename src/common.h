@@ -123,6 +123,7 @@
 #include "plugin_tc.h"
 #include "plugins_d.h"
 
+#include "clocks.h"
 #include "eval.h"
 #include "health.h"
 
@@ -146,7 +147,6 @@
 #define abs(x) ((x < 0)? -x : x)
 
 extern unsigned long long usec_dt(struct timeval *now, struct timeval *old);
-extern unsigned long long timeval_usec(struct timeval *tv);
 
 // #define usec_dt(now, last) (((((now)->tv_sec * 1000000ULL) + (now)->tv_usec) - (((last)->tv_sec * 1000000ULL) + (last)->tv_usec)))
 

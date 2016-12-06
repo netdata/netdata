@@ -200,10 +200,6 @@ void freez(void *ptr) {
 // ----------------------------------------------------------------------------
 // time functions
 
-inline unsigned long long timeval_usec(struct timeval *tv) {
-    return tv->tv_sec * 1000000ULL + tv->tv_usec;
-}
-
 // time(NULL) in nanoseconds
 inline unsigned long long time_usec(void) {
     struct timeval now;
