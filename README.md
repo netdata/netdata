@@ -1,5 +1,7 @@
 # netdata [![Build Status](https://travis-ci.org/firehol/netdata.svg?branch=master)](https://travis-ci.org/firehol/netdata) [![Coverity Scan Build Status](https://scan.coverity.com/projects/9140/badge.svg)](https://scan.coverity.com/projects/firehol-netdata) [![Docker Pulls](https://img.shields.io/docker/pulls/titpetric/netdata.svg)](https://hub.docker.com/r/titpetric/netdata/)
 
+**Warning** this is a build test for copr
+
 > *New to netdata? Here is a live demo: [http://my-netdata.io](http://my-netdata.io)*
 
 **netdata** is a system for **distributed real-time performance and health monitoring**.
