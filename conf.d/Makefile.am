@@ -13,10 +13,6 @@ dist_config_DATA = \
     health_email_recipients.conf \
     $(NULL)
 
-chartsconfigdir=$(configdir)/charts.d
-dist_chartsconfig_DATA = \
-    $(NULL)
-
 nodeconfigdir=$(configdir)/node.d
 dist_nodeconfig_DATA = \
     node.d/README.md \
