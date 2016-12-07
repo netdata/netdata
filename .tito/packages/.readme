@@ -1,0 +1,3 @@
+the .tito/packages directory contains metadata files
+named after their packages. Each file has the latest tagged
+version and the project's relative directory.
