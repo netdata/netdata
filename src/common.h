@@ -20,7 +20,9 @@
 
 #else /* !defined(ENABLE_JEMALLOC) && !defined(ENABLE_TCMALLOC) */
 
+#ifndef __FreeBSD__
 #include <malloc.h>
+#endif /* __FreeBSD__ */
 
 #endif
 
@@ -52,7 +54,9 @@
 #include <signal.h>
 #include <syslog.h>
 #include <sys/mman.h>
+#ifndef __FreeBSD__
 #include <sys/prctl.h>
+#endif /* __FreeBSD__ */
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -111,7 +115,11 @@
 #include "plugin_checks.h"
 #include "plugin_idlejitter.h"
 #include "plugin_nfacct.h"
+#ifndef __FreeBSD__
 #include "plugin_proc.h"
+#else
+#include "plugin_freebsd.h"
+#endif /* __FreeBSD__ */
 #include "plugin_tc.h"
 #include "plugins_d.h"
 
