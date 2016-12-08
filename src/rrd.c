@@ -56,7 +56,7 @@ RRDHOST localhost = {
 void rrdhost_init(char *hostname) {
     localhost.hostname = hostname;
     localhost.health_log.next_log_id =
-        localhost.health_log.next_alarm_id = time(NULL);
+        localhost.health_log.next_alarm_id = now_realtime_sec();
 }
 
 void rrdhost_rwlock(RRDHOST *host) {
@@ -525,7 +525,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
             error("File %s does not have the desired update frequency. Clearing it.", fullfilename);
             memset(st, 0, size);
         }
-        else if((time(NULL) - st->last_updated.tv_sec) > update_every * entries) {
+        else if((now_realtime_sec() - st->last_updated.tv_sec) > update_every * entries) {
             errno = 0;
             error("File %s is too old. Clearing it.", fullfilename);
             memset(st, 0, size);

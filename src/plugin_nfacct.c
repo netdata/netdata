@@ -70,7 +70,7 @@ void *nfacct_main(void *ptr) {
     struct nlmsghdr *nlh = NULL;
     unsigned int seq = 0, portid = 0;
 
-    seq = time(NULL) - 1;
+    seq = now_realtime_sec() - 1;
 
     nl  = mnl_socket_open(NETLINK_NETFILTER);
     if(!nl) {

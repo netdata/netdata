@@ -509,7 +509,7 @@ void *pluginsd_main(void *ptr) {
 
                 cd->enabled = enabled;
                 cd->update_every = (int) config_get_number(cd->id, "update every", rrd_update_every);
-                cd->started_t = time(NULL);
+                cd->started_t = now_realtime_sec();
 
                 char *def = "";
                 snprintfz(cd->cmd, PLUGINSD_CMD_MAX, "exec %s %d %s", cd->fullfilename, cd->update_every, config_get(cd->id, "command options", def));
