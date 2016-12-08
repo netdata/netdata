@@ -416,7 +416,7 @@ int mysendfile(struct web_client *w, char *filename)
 #ifdef NETDATA_WITH_ZLIB
 void web_client_enable_deflate(struct web_client *w, int gzip) {
     if(unlikely(w->response.zinitialized)) {
-        error("%llu: Compression has already be initialized for this client.", w->id);
+        debug(D_DEFLATE, "%llu: Compression has already be initialized for this client.", w->id);
         return;
     }
 
