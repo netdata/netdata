@@ -2420,10 +2420,12 @@
                 var color = state._chartDimensionColor(name);
 
                 var user_element = null;
-                var user_id = self.data('show-value-of-' + dim + '-at') || null;
+                var user_id = self.data('show-value-of-' + name.toLowerCase() + '-at') || null;
+                if(user_id === null)
+                    user_id = self.data('show-value-of-' + dim.toLowerCase() + '-at') || null;
                 if(user_id !== null) {
                     user_element = document.getElementById(user_id) || null;
-                    if(user_element === null)
+                    if (user_element === null)
                         state.log('Cannot find element with id: ' + user_id);
                 }
 
