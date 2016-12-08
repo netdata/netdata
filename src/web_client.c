@@ -940,7 +940,7 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
 
         if (refresh > 0) {
             buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
-            w->response.data->expires = time(NULL) + refresh;
+            w->response.data->expires = now_realtime_sec() + refresh;
         }
         else buffer_no_cacheable(w->response.data);
 
@@ -989,7 +989,7 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
         ret = 500;
 
         // if the collected value is too old, don't calculate its value
-        if (rrdset_last_entry_t(st) >= (time(NULL) - (st->update_every * st->gap_when_lost_iterations_above)))
+        if (rrdset_last_entry_t(st) >= (now_realtime_sec() - (st->update_every * st->gap_when_lost_iterations_above)))
             ret = rrd2value(st,
                             w->response.data,
                             &n,
@@ -1012,7 +1012,7 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
         }
         else if (refresh > 0) {
             buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
-            w->response.data->expires = time(NULL) + refresh;
+            w->response.data->expires = now_realtime_sec() + refresh;
         }
         else buffer_no_cacheable(w->response.data);
 
@@ -1404,19 +1404,19 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
             if(unlikely(cookie && person_guid[0] && !strcmp(person_guid, REGISTRY_VERIFY_COOKIES_GUID)))
                 person_guid[0] = '\0';
 
-            return registry_request_access_json(w, person_guid, machine_guid, machine_url, url_name, time(NULL));
+            return registry_request_access_json(w, person_guid, machine_guid, machine_url, url_name, now_realtime_sec());
 
         case 'D':
             w->tracking_required = 1;
-            return registry_request_delete_json(w, person_guid, machine_guid, machine_url, delete_url, time(NULL));
+            return registry_request_delete_json(w, person_guid, machine_guid, machine_url, delete_url, now_realtime_sec());
 
         case 'S':
             w->tracking_required = 1;
-            return registry_request_search_json(w, person_guid, machine_guid, machine_url, search_machine_guid, time(NULL));
+            return registry_request_search_json(w, person_guid, machine_guid, machine_url, search_machine_guid, now_realtime_sec());
 
         case 'W':
             w->tracking_required = 1;
-            return registry_request_switch_json(w, person_guid, machine_guid, machine_url, to_person_guid, time(NULL));
+            return registry_request_switch_json(w, person_guid, machine_guid, machine_url, to_person_guid, now_realtime_sec());
 
         case 'H':
             return registry_request_hello_json(w);

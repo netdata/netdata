@@ -2798,7 +2798,7 @@ int main(int argc, char **argv)
 
     procfile_adaptive_initial_allocation = 1;
 
-    time_t started_t = time(NULL);
+    time_t started_t = now_realtime_sec();
     get_system_HZ();
     get_system_pid_max();
     get_system_cpus();
@@ -2890,7 +2890,7 @@ int main(int argc, char **argv)
         if(unlikely(debug))
             fprintf(stderr, "apps.plugin: done Loop No %llu\n", global_iterations_counter);
 
-        time_t current_t = time(NULL);
+        time_t current_t = now_realtime_sec();
 
         // restart check (14400 seconds)
         if(current_t - started_t > 14400) exit(0);

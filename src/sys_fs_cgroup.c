@@ -1396,7 +1396,7 @@ int do_sys_fs_cgroup(int update_every, unsigned long long dt) {
 
     static int cgroup_global_config_read = 0;
     static time_t last_run = 0;
-    time_t now = time(NULL);
+    time_t now = now_realtime_sec();
 
     if(unlikely(!cgroup_global_config_read)) {
         read_cgroup_plugin_configuration();
@@ -1436,7 +1436,7 @@ void *cgroups_main(void *ptr)
     unsigned long long sutime_sys_fs_cgroup = 0ULL;
 
     // the next time we will run - aligned properly
-    unsigned long long sunext = (time(NULL) - (time(NULL) % rrd_update_every) + rrd_update_every) * 1000000ULL;
+    unsigned long long sunext = (now_realtime_sec() - (now_realtime_sec() % rrd_update_every) + rrd_update_every) * 1000000ULL;
 
     RRDSET *stcpu_thread = NULL;
 

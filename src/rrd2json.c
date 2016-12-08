@@ -127,7 +127,7 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
 
 unsigned long rrd_stats_one_json(RRDSET *st, char *options, BUFFER *wb)
 {
-    time_t now = time(NULL);
+    time_t now = now_realtime_sec();
 
     pthread_rwlock_rdlock(&st->rwlock);
 

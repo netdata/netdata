@@ -131,7 +131,7 @@ int error_log_limit(int reset) {
         return 1;
 #endif
 
-    time_t now = time(NULL);
+    time_t now = now_realtime_sec();
     if(!start) start = now;
 
     if(reset) {
@@ -212,7 +212,7 @@ void log_date(FILE *out)
         time_t t;
         struct tm *tmp, tmbuf;
 
-        t = time(NULL);
+        t = now_realtime_sec();
         tmp = localtime_r(&t, &tmbuf);
 
         if (tmp == NULL) return;

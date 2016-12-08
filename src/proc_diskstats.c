@@ -39,7 +39,7 @@ static struct mountinfo *disk_mountinfo_root = NULL;
 
 static inline void mountinfo_reload(int force) {
     static time_t last_loaded = 0;
-    time_t now = time(NULL);
+    time_t now = now_realtime_sec();
 
     if(force || now - last_loaded >= NETDATA_RELOAD_MOUNTINFO_EVERY) {
 //#ifdef NETDATA_INTERNAL_CHECKS
