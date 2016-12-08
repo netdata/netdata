@@ -14,7 +14,7 @@
 %endif
 
 Name:    netdata
-Version: 1.4.0
+Version: 1.4.1
 Release: 1%{?dist}
 Summary: Real-time performance monitoring, done right
 License: GPLv3+
@@ -144,6 +144,18 @@ fi
 %endif
 
 %changelog
+* Fri Dec 09 2016 baoboadev <baoboa@fedoraproject.org> 1.4.1-1
+- switch archive to tgz (baoboa@fedoraproject.org)
+- Update README.md (baoboadev@gmail.com)
+- Update README.md (baoboadev@gmail.com)
+- ready to test copr (baobabdev@gmail.com)
+
+* Fri Dec 09 2016 baoboadev <baoboa@fedoraproject.org>
+- switch archive to tgz (baoboa@fedoraproject.org)
+- Update README.md (baoboadev@gmail.com)
+- Update README.md (baoboadev@gmail.com)
+- ready to test copr (baobabdev@gmail.com)
+
 * Wed Dec 07 2016 baoboa <baobabdev@gmail.com> 1.4.0-1
 - new package built with tito
 
