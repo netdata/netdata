@@ -20,7 +20,7 @@ Summary: Real-time performance monitoring, done right
 License: GPLv3+
 Group:   Applications/System
 URL:     http://github.com/baoboa/netdata
-Source0: %{url}/releases/download/v%{version}/%{name}-%{version}.tar.xz
+Source0: %{url}/releases/download/v%{version}/%{name}-%{version}.tar.gz
 Source1: %{name}.conf
 Source2: %{name}.tmpfiles
 Source3: %{name}.logrotate
