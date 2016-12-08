@@ -2,6 +2,8 @@
 
 **Warning** this is a build test for copr, package is netdata2
 
+<a href="https://copr.fedorainfracloud.org/coprs/baoboa/netdata/package/netdata2/"><img src="https://copr.fedorainfracloud.org/coprs/baoboa/netdata/package/netdata2/status_image/last_build.png" /></a>
+
 > *New to netdata? Here is a live demo: [http://my-netdata.io](http://my-netdata.io)*
 
 **netdata** is a system for **distributed real-time performance and health monitoring**.
