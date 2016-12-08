@@ -34,7 +34,7 @@ struct response {
     Bytef zbuffer[ZLIB_CHUNK];      // temporary buffer for storing compressed output
     size_t zsent;                   // the compressed bytes we have sent to the client
     size_t zhave;                   // the compressed bytes that we have received from zlib
-    int zinitialized;
+    int zinitialized:1;
 #endif /* NETDATA_WITH_ZLIB */
 
 };
