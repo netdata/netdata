@@ -191,7 +191,6 @@ extern int enable_ksm;
 
 extern pid_t gettid(void);
 
-extern unsigned long long time_usec(void);
 extern int sleep_usec(unsigned long long usec);
 
 extern char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len);

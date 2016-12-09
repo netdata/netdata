@@ -592,7 +592,7 @@ int read_proc_pid_stat(struct pid_stat *p) {
     if(unlikely(!ff)) goto cleanup;
 
     p->last_stat_collected_usec = p->stat_collected_usec;
-    p->stat_collected_usec = time_usec();
+    p->stat_collected_usec = now_realtime_usec();
     file_counter++;
 
     // p->pid           = atol(procfile_lineword(ff, 0, 0+i));
@@ -774,7 +774,7 @@ int read_proc_pid_io(struct pid_stat *p) {
     file_counter++;
 
     p->last_io_collected_usec = p->io_collected_usec;
-    p->io_collected_usec = time_usec();
+    p->io_collected_usec = now_realtime_usec();
 
     unsigned long long last;
 
@@ -848,7 +848,7 @@ int read_proc_stat() {
     if(unlikely(!ff)) goto cleanup;
 
     last_collected_usec = collected_usec;
-    collected_usec = time_usec();
+    collected_usec = now_realtime_usec();
 
     file_counter++;
 
@@ -2843,12 +2843,12 @@ int main(int argc, char **argv)
     unsigned long long step = update_every * 1000000ULL;
     global_iterations_counter = 1;
     for(;1; global_iterations_counter++) {
-        unsigned long long now = time_usec();
+        unsigned long long now = now_realtime_usec();
         unsigned long long next = now - (now % step) + step;
 
         while(now < next) {
             sleep_usec(next - now);
-            now = time_usec();
+            now = now_realtime_usec();
         }
 
         if(!collect_data_for_all_processes_from_proc()) {

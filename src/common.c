@@ -197,16 +197,6 @@ void freez(void *ptr) {
     free(ptr);
 }
 
-// ----------------------------------------------------------------------------
-// time functions
-
-// time(NULL) in nanoseconds
-inline unsigned long long time_usec(void) {
-    struct timeval now;
-    gettimeofday(&now, NULL);
-    return timeval_usec(&now);
-}
-
 int sleep_usec(unsigned long long usec) {
 
 #ifndef NETDATA_WITH_USLEEP
