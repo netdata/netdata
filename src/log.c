@@ -131,7 +131,7 @@ int error_log_limit(int reset) {
         return 1;
 #endif
 
-    time_t now = now_realtime_sec();
+    time_t now = now_monotonic_sec();
     if(!start) start = now;
 
     if(reset) {
