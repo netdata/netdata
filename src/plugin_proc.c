@@ -40,31 +40,31 @@ void *proc_main(void *ptr)
     int vdo_cpu_netdata             = !config_get_boolean("plugin:proc", "netdata server resources", 1);
 
     // keep track of the time each module was called
-    unsigned long long sutime_proc_net_dev = 0ULL;
-    unsigned long long sutime_proc_diskstats = 0ULL;
-    unsigned long long sutime_proc_net_snmp = 0ULL;
-    unsigned long long sutime_proc_net_snmp6 = 0ULL;
-    unsigned long long sutime_proc_net_netstat = 0ULL;
-    unsigned long long sutime_proc_net_stat_conntrack = 0ULL;
-    unsigned long long sutime_proc_net_ip_vs_stats = 0ULL;
-    unsigned long long sutime_proc_net_stat_synproxy = 0ULL;
-    unsigned long long sutime_proc_stat = 0ULL;
-    unsigned long long sutime_proc_meminfo = 0ULL;
-    unsigned long long sutime_proc_vmstat = 0ULL;
-    unsigned long long sutime_proc_net_rpc_nfs = 0ULL;
-    unsigned long long sutime_proc_net_rpc_nfsd = 0ULL;
-    unsigned long long sutime_proc_sys_kernel_random_entropy_avail = 0ULL;
-    unsigned long long sutime_proc_interrupts = 0ULL;
-    unsigned long long sutime_proc_softirqs = 0ULL;
-    unsigned long long sutime_proc_net_softnet_stat = 0ULL;
-    unsigned long long sutime_proc_loadavg = 0ULL;
-    unsigned long long sutime_ipc = 0ULL;
-    unsigned long long sutime_sys_kernel_mm_ksm = 0ULL;
+    usec_t sutime_proc_net_dev = 0ULL;
+    usec_t sutime_proc_diskstats = 0ULL;
+    usec_t sutime_proc_net_snmp = 0ULL;
+    usec_t sutime_proc_net_snmp6 = 0ULL;
+    usec_t sutime_proc_net_netstat = 0ULL;
+    usec_t sutime_proc_net_stat_conntrack = 0ULL;
+    usec_t sutime_proc_net_ip_vs_stats = 0ULL;
+    usec_t sutime_proc_net_stat_synproxy = 0ULL;
+    usec_t sutime_proc_stat = 0ULL;
+    usec_t sutime_proc_meminfo = 0ULL;
+    usec_t sutime_proc_vmstat = 0ULL;
+    usec_t sutime_proc_net_rpc_nfs = 0ULL;
+    usec_t sutime_proc_net_rpc_nfsd = 0ULL;
+    usec_t sutime_proc_sys_kernel_random_entropy_avail = 0ULL;
+    usec_t sutime_proc_interrupts = 0ULL;
+    usec_t sutime_proc_softirqs = 0ULL;
+    usec_t sutime_proc_net_softnet_stat = 0ULL;
+    usec_t sutime_proc_loadavg = 0ULL;
+    usec_t sutime_ipc = 0ULL;
+    usec_t sutime_sys_kernel_mm_ksm = 0ULL;
 
-    unsigned long long step = rrd_update_every * 1000000ULL;
+    usec_t step = rrd_update_every * USEC_PER_SEC;
     for(;;) {
-        unsigned long long now = now_realtime_usec();
-        unsigned long long next = now - (now % step) + step;
+        usec_t now = now_realtime_usec();
+        usec_t next = now - (now % step) + step;
 
         while(now < next) {
             sleep_usec(next - now);

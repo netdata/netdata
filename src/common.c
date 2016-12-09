@@ -197,7 +197,7 @@ void freez(void *ptr) {
     free(ptr);
 }
 
-int sleep_usec(unsigned long long usec) {
+int sleep_usec(usec_t usec) {
 
 #ifndef NETDATA_WITH_USLEEP
     // we expect microseconds (1.000.000 per second)

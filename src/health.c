@@ -3101,7 +3101,7 @@ void *health_main(void *ptr) {
         if(now < next_run) {
             debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration in %d secs",
                   loop, (int) (next_run - now));
-            sleep_usec(1000000 * (unsigned long long) (next_run - now));
+            sleep_usec(USEC_PER_SEC * (usec_t) (next_run - now));
         }
         else {
             debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration now", loop);

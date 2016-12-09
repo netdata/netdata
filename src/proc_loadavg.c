@@ -3,12 +3,12 @@
 // linux calculates this once every 5 seconds
 #define MIN_LOADAVG_UPDATE_EVERY 5
 
-int do_proc_loadavg(int update_every, unsigned long long dt) {
+int do_proc_loadavg(int update_every, usec_t dt) {
     (void)dt;
 
     static procfile *ff = NULL;
     static int do_loadavg = -1, do_all_processes = -1;
-    static unsigned long long last_loadavg_usec = 0;
+    static usec_t last_loadavg_usec = 0;
     static RRDSET *load_chart = NULL, *processes_chart = NULL;
 
     if(unlikely(!ff)) {
@@ -68,7 +68,7 @@ int do_proc_loadavg(int update_every, unsigned long long dt) {
             rrdset_done(load_chart);
         }
 
-        last_loadavg_usec = load_chart->update_every * 1000000ULL;
+        last_loadavg_usec = load_chart->update_every * USEC_PER_SEC;
     }
     else last_loadavg_usec -= dt;
 

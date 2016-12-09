@@ -3,7 +3,7 @@
 #define RRD_TYPE_NET_SNMP6          "ipv6"
 #define RRD_TYPE_NET_SNMP6_LEN      strlen(RRD_TYPE_NET_SNMP6)
 
-int do_proc_net_snmp6(int update_every, unsigned long long dt) {
+int do_proc_net_snmp6(int update_every, usec_t dt) {
     (void)dt;
 
     static procfile *ff = NULL;

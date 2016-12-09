@@ -90,7 +90,7 @@ void *pluginsd_worker_thread(void *arg)
     char line[PLUGINSD_LINE_MAX + 1];
 
 #ifdef DETACH_PLUGINS_FROM_NETDATA
-    unsigned long long usec = 0, susec = 0;
+    usec_t usec = 0, susec = 0;
     struct timeval last = {0, 0} , now = {0, 0};
 #endif
 
@@ -185,7 +185,7 @@ void *pluginsd_worker_thread(void *arg)
                 }
 
                 if(likely(st->counter_done)) {
-                    unsigned long long microseconds = 0;
+                    usec_t microseconds = 0;
                     if(microseconds_txt && *microseconds_txt) microseconds = strtoull(microseconds_txt, NULL, 10);
                     if(microseconds) rrdset_next_usec(st, microseconds);
                     else rrdset_next(st);
@@ -344,14 +344,14 @@ void *pluginsd_worker_thread(void *arg)
                 now_realtime_timeval(&now);
                 if(unlikely(!usec && !susec)) {
                     // our first run
-                    susec = cd->rrd_update_every * 1000000ULL;
+                    susec = cd->rrd_update_every * USEC_PER_SEC;
                 }
                 else {
                     // second+ run
                     usec = dt_usec(&now, &last) - susec;
                     error("PLUGINSD: %s last loop took %llu usec (worked for %llu, sleeped for %llu).\n", cd->fullfilename, usec + susec, usec, susec);
-                    if(unlikely(usec < (rrd_update_every * 1000000ULL / 2ULL))) susec = (rrd_update_every * 1000000ULL) - usec;
-                    else susec = rrd_update_every * 1000000ULL / 2ULL;
+                    if(unlikely(usec < (rrd_update_every * USEC_PER_SEC / 2ULL))) susec = (rrd_update_every * USEC_PER_SEC) - usec;
+                    else susec = rrd_update_every * USEC_PER_SEC / 2ULL;
                 }
 
                 error("PLUGINSD: %s sleeping for %llu. Will kill with SIGCONT pid %d to wake it up.\n", cd->fullfilename, susec, cd->pid);

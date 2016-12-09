@@ -12,7 +12,7 @@ void *checks_main(void *ptr)
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("Cannot set pthread cancel state to ENABLE.");
 
-    unsigned long long usec = 0, susec = rrd_update_every * 1000000ULL, loop_usec = 0, total_susec = 0;
+    usec_t usec = 0, susec = rrd_update_every * USEC_PER_SEC, loop_usec = 0, total_susec = 0;
     struct timeval now, last, loop;
 
     RRDSET *check1, *check2, *check3, *apps_cpu = NULL;
@@ -40,8 +40,8 @@ void *checks_main(void *ptr)
         usec = loop_usec - susec;
         debug(D_PROCNETDEV_LOOP, "CHECK: last loop took %llu usec (worked for %llu, sleeped for %llu).", loop_usec, usec, susec);
 
-        if(usec < (rrd_update_every * 1000000ULL / 2ULL)) susec = (rrd_update_every * 1000000ULL) - usec;
-        else susec = rrd_update_every * 1000000ULL / 2ULL;
+        if(usec < (rrd_update_every * USEC_PER_SEC / 2ULL)) susec = (rrd_update_every * USEC_PER_SEC) - usec;
+        else susec = rrd_update_every * USEC_PER_SEC / 2ULL;
 
         // --------------------------------------------------------------------
         // Calculate loop time

@@ -1391,7 +1391,7 @@ void update_cgroup_charts(int update_every) {
 // ----------------------------------------------------------------------------
 // cgroups main
 
-int do_sys_fs_cgroup(int update_every, unsigned long long dt) {
+int do_sys_fs_cgroup(int update_every, usec_t dt) {
     (void)dt;
 
     static int cgroup_global_config_read = 0;
@@ -1433,15 +1433,15 @@ void *cgroups_main(void *ptr)
     int vdo_cpu_netdata             = !config_get_boolean("plugin:cgroups", "cgroups plugin resources", 1);
 
     // keep track of the time each module was called
-    unsigned long long sutime_sys_fs_cgroup = 0ULL;
+    usec_t sutime_sys_fs_cgroup = 0ULL;
 
     // the next time we will run - aligned properly
-    unsigned long long sunext = (now_realtime_sec() - (now_realtime_sec() % rrd_update_every) + rrd_update_every) * 1000000ULL;
+    usec_t sunext = (now_realtime_sec() - (now_realtime_sec() % rrd_update_every) + rrd_update_every) * USEC_PER_SEC;
 
     RRDSET *stcpu_thread = NULL;
 
     for(;;) {
-        unsigned long long sunow;
+        usec_t sunow;
         if(unlikely(netdata_exit)) break;
 
         // delay until it is our time to run
@@ -1450,7 +1450,7 @@ void *cgroups_main(void *ptr)
 
         // find the next time we need to run
         while(now_realtime_usec() > sunext)
-            sunext += rrd_update_every * 1000000ULL;
+            sunext += rrd_update_every * USEC_PER_SEC;
 
         if(unlikely(netdata_exit)) break;
 
