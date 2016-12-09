@@ -1130,7 +1130,7 @@ int unit_test(long delay, long shift)
         if(do_absi) rrddim_set(st, "percentage-of-incremental-row", i);
 
         if(!c) {
-            gettimeofday(&st->last_collected_time, NULL);
+            now_realtime_timeval(&st->last_collected_time);
             st->last_collected_time.tv_usec = shift;
         }
 

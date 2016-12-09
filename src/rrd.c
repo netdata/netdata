@@ -653,7 +653,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
     if(rrd_memory_mode != RRD_MEMORY_MODE_RAM) rd = (RRDDIM *)mymmap(fullfilename, size, ((rrd_memory_mode == RRD_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE), 1);
     if(rd) {
         struct timeval now;
-        gettimeofday(&now, NULL);
+        now_realtime_timeval(&now);
 
         if(strcmp(rd->magic, RRDDIMENSION_MAGIC) != 0) {
             errno = 0;
@@ -977,7 +977,7 @@ collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number 
 {
     debug(D_RRD_CALLS, "rrddim_set_by_pointer() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, st->name, rd->name, value);
 
-    gettimeofday(&rd->last_collected_time, NULL);
+    now_realtime_timeval(&rd->last_collected_time);
     rd->collected_value = value;
     rd->updated = 1;
     rd->counter++;
@@ -1010,7 +1010,7 @@ void rrdset_next_usec_unfiltered(RRDSET *st, unsigned long long microseconds)
 void rrdset_next_usec(RRDSET *st, unsigned long long microseconds)
 {
     struct timeval now;
-    gettimeofday(&now, NULL);
+    now_realtime_timeval(&now);
 
     if(unlikely(!st->last_collected_time.tv_sec)) {
         // the first entry
@@ -1102,7 +1102,7 @@ unsigned long long rrdset_done(RRDSET *st)
     if(unlikely(!st->last_collected_time.tv_sec)) {
         // it is the first entry
         // set the last_collected_time to now
-        gettimeofday(&st->last_collected_time, NULL);
+        now_realtime_timeval(&st->last_collected_time);
         timeval_align(&st->last_collected_time, st->update_every);
 
         last_collect_ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec - update_every_ut;
@@ -1145,7 +1145,7 @@ unsigned long long rrdset_done(RRDSET *st)
 
         st->usec_since_last_update = update_every_ut;
 
-        gettimeofday(&st->last_collected_time, NULL);
+        now_realtime_timeval(&st->last_collected_time);
         timeval_align(&st->last_collected_time, st->update_every);
 
         unsigned long long ut = st->last_collected_time.tv_sec * 1000000ULL + st->last_collected_time.tv_usec - st->usec_since_last_update;

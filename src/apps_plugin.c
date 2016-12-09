@@ -2159,7 +2159,7 @@ unsigned long long send_resource_usage_to_netdata() {
     unsigned long long cpusyst;
 
     if(!last.tv_sec) {
-        gettimeofday(&last, NULL);
+        now_realtime_timeval(&last);
         getrusage(RUSAGE_SELF, &me_last);
 
         // the first time, give a zero to allow
@@ -2170,7 +2170,7 @@ unsigned long long send_resource_usage_to_netdata() {
         cpusyst = 0;
     }
     else {
-        gettimeofday(&now, NULL);
+        now_realtime_timeval(&now);
         getrusage(RUSAGE_SELF, &me);
 
         usec = dt_usec(&now, &last);
