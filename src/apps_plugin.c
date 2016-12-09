@@ -2173,7 +2173,7 @@ unsigned long long send_resource_usage_to_netdata() {
         gettimeofday(&now, NULL);
         getrusage(RUSAGE_SELF, &me);
 
-        usec = usec_dt(&now, &last);
+        usec = dt_usec(&now, &last);
         cpuuser = me.ru_utime.tv_sec * 1000000ULL + me.ru_utime.tv_usec;
         cpusyst = me.ru_stime.tv_sec * 1000000ULL + me.ru_stime.tv_usec;
 

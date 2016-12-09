@@ -685,7 +685,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
             error("File %s does not have the same refresh frequency. Clearing it.", fullfilename);
             memset(rd, 0, size);
         }
-        else if(usec_dt(&now, &rd->last_collected_time) > (rd->entries * rd->update_every * 1000000ULL)) {
+        else if(dt_usec(&now, &rd->last_collected_time) > (rd->entries * rd->update_every * 1000000ULL)) {
             errno = 0;
             error("File %s is too old. Clearing it.", fullfilename);
             memset(rd, 0, size);
@@ -1018,13 +1018,13 @@ void rrdset_next_usec(RRDSET *st, unsigned long long microseconds)
     }
     else if(unlikely(!microseconds)) {
         // no dt given by the plugin
-        microseconds = usec_dt(&now, &st->last_collected_time);
+        microseconds = dt_usec(&now, &st->last_collected_time);
     }
     else {
         // microseconds has the time since the last collection
         unsigned long long now_usec = timeval_usec(&now);
         unsigned long long last_usec = timeval_usec(&st->last_collected_time);
-        unsigned long long since_last_usec = usec_dt(&now, &st->last_collected_time);
+        unsigned long long since_last_usec = dt_usec(&now, &st->last_collected_time);
 
         // verify the microseconds given is good
         if(unlikely(microseconds > since_last_usec)) {
@@ -1139,7 +1139,7 @@ unsigned long long rrdset_done(RRDSET *st)
     }
 
     // check if we will re-write the entire data set
-    if(unlikely(usec_dt(&st->last_collected_time, &st->last_updated) > st->entries * update_every_ut)) {
+    if(unlikely(dt_usec(&st->last_collected_time, &st->last_updated) > st->entries * update_every_ut)) {
         info("%s: too old data (last updated at %ld.%ld, last collected at %ld.%ld). Reseting it. Will not store the next entry.", st->name, st->last_updated.tv_sec, st->last_updated.tv_usec, st->last_collected_time.tv_sec, st->last_collected_time.tv_usec);
         rrdset_reset(st);
 

@@ -146,10 +146,6 @@
 #endif
 #define abs(x) ((x < 0)? -x : x)
 
-extern unsigned long long usec_dt(struct timeval *now, struct timeval *old);
-
-// #define usec_dt(now, last) (((((now)->tv_sec * 1000000ULL) + (now)->tv_usec) - (((last)->tv_sec * 1000000ULL) + (last)->tv_usec)))
-
 extern void netdata_fix_chart_id(char *s);
 extern void netdata_fix_chart_name(char *s);
 
