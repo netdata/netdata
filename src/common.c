@@ -207,12 +207,6 @@ inline unsigned long long time_usec(void) {
     return timeval_usec(&now);
 }
 
-inline unsigned long long usec_dt(struct timeval *now, struct timeval *old) {
-    unsigned long long tv1 = timeval_usec(now);
-    unsigned long long tv2 = timeval_usec(old);
-    return (tv1 > tv2) ? (tv1 - tv2) : (tv2 - tv1);
-}
-
 int sleep_usec(unsigned long long usec) {
 
 #ifndef NETDATA_WITH_USLEEP

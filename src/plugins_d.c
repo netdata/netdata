@@ -348,7 +348,7 @@ void *pluginsd_worker_thread(void *arg)
                 }
                 else {
                     // second+ run
-                    usec = usec_dt(&now, &last) - susec;
+                    usec = dt_usec(&now, &last) - susec;
                     error("PLUGINSD: %s last loop took %llu usec (worked for %llu, sleeped for %llu).\n", cd->fullfilename, usec + susec, usec, susec);
                     if(unlikely(usec < (rrd_update_every * 1000000ULL / 2ULL))) susec = (rrd_update_every * 1000000ULL) - usec;
                     else susec = rrd_update_every * 1000000ULL / 2ULL;

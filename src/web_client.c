@@ -136,7 +136,7 @@ void web_client_reset(struct web_client *w) {
         // --------------------------------------------------------------------
         // global statistics
 
-        finished_web_request_statistics(usec_dt(&tv, &w->tv_in),
+        finished_web_request_statistics(dt_usec(&tv, &w->tv_in),
                                         w->stats_received_bytes,
                                         w->stats_sent_bytes,
                                         size,
@@ -152,9 +152,9 @@ void web_client_reset(struct web_client *w) {
         log_access("%llu: (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: %d '%s'",
                    w->id,
                    sent, size, -((size > 0) ? ((size - sent) / (double) size * 100.0) : 0.0),
-                   usec_dt(&w->tv_ready, &w->tv_in) / 1000.0,
-                   usec_dt(&tv, &w->tv_ready) / 1000.0,
-                   usec_dt(&tv, &w->tv_in) / 1000.0,
+                   dt_usec(&w->tv_ready, &w->tv_in) / 1000.0,
+                   dt_usec(&tv, &w->tv_ready) / 1000.0,
+                   dt_usec(&tv, &w->tv_in) / 1000.0,
                    (w->mode == WEB_CLIENT_MODE_FILECOPY) ? "filecopy" : ((w->mode == WEB_CLIENT_MODE_OPTIONS)
                                                                          ? "options" : "data"),
                    w->response.code,
