@@ -93,7 +93,7 @@ void *nfacct_main(void *ptr) {
     unsigned long long usec = 0, susec = 0;
     RRDSET *st = NULL;
 
-    gettimeofday(&last, NULL);
+    now_realtime_timeval(&last);
 
     // ------------------------------------------------------------------------
 
@@ -131,7 +131,7 @@ void *nfacct_main(void *ptr) {
 
         // --------------------------------------------------------------------
 
-        gettimeofday(&now, NULL);
+        now_realtime_timeval(&now);
         usec = dt_usec(&now, &last) - susec;
         debug(D_NFACCT_LOOP, "nfacct.plugin: last loop took %llu usec (worked for %llu, sleeped for %llu).", usec + susec, usec, susec);
 

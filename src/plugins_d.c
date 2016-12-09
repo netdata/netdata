@@ -341,7 +341,7 @@ void *pluginsd_worker_thread(void *arg)
             else if(likely(hash == STOPPING_WAKE_ME_UP_PLEASE_HASH && !strcmp(s, "STOPPING_WAKE_ME_UP_PLEASE"))) {
                 error("PLUGINSD: '%s' (pid %d) called STOPPING_WAKE_ME_UP_PLEASE.", cd->fullfilename, cd->pid);
 
-                gettimeofday(&now, NULL);
+                now_realtime_timeval(&now);
                 if(unlikely(!usec && !susec)) {
                     // our first run
                     susec = cd->rrd_update_every * 1000000ULL;
