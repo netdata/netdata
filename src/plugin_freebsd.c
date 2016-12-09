@@ -27,12 +27,12 @@ void *freebsd_main(void *ptr)
 
     unsigned long long step = rrd_update_every * 1000000ULL;
     for(;;) {
-        unsigned long long now = time_usec();
+        unsigned long long now = now_realtime_usec();
         unsigned long long next = now - (now % step) + step;
 
         while(now < next) {
             sleep_usec(next - now);
-            now = time_usec();
+            now = now_realtime_usec();
         }
 
         if(unlikely(netdata_exit)) break;
@@ -41,7 +41,7 @@ void *freebsd_main(void *ptr)
 
         if(!vdo_freebsd_sysctl) {
             debug(D_PROCNETDEV_LOOP, "FREEBSD: calling do_freebsd_sysctl().");
-            now = time_usec();
+            now = now_realtime_usec();
             vdo_freebsd_sysctl = do_freebsd_sysctl(rrd_update_every, (sutime_freebsd_sysctl > 0)?now - sutime_freebsd_sysctl:0ULL);
             sutime_freebsd_sysctl = now;
         }

@@ -396,8 +396,8 @@ void *backends_main(void *ptr) {
     info("BACKEND configured ('%s' on '%s' sending '%s' data, every %d seconds, as host '%s', with prefix '%s')", type, destination, source, frequency, hostname, prefix);
 
     unsigned long long step_ut = frequency * 1000000ULL;
-    unsigned long long random_ut = time_usec() % (step_ut / 2);
-    time_t before = (time_t)((time_usec() - step_ut) / 10000000ULL);
+    unsigned long long random_ut = now_realtime_usec() % (step_ut / 2);
+    time_t before = (time_t)((now_realtime_usec() - step_ut) / 10000000ULL);
     time_t after = before;
     int failures = 0;
 
@@ -405,7 +405,7 @@ void *backends_main(void *ptr) {
         // ------------------------------------------------------------------------
         // wait for the next iteration point
 
-        unsigned long long now_ut = time_usec();
+        unsigned long long now_ut = now_realtime_usec();
         unsigned long long next_ut = now_ut - (now_ut % step_ut) + step_ut;
         before = (time_t)(next_ut / 1000000ULL);
 
@@ -414,7 +414,7 @@ void *backends_main(void *ptr) {
 
         while(now_ut < next_ut) {
             sleep_usec(next_ut - now_ut);
-            now_ut = time_usec();
+            now_ut = now_realtime_usec();
         }
 
         // ------------------------------------------------------------------------
@@ -465,7 +465,7 @@ void *backends_main(void *ptr) {
         // connect to a backend server
 
         if(unlikely(sock == -1)) {
-            unsigned long long start_ut = time_usec();
+            unsigned long long start_ut = now_realtime_usec();
             const char *s = destination;
             while(*s) {
                 const char *e = s;
@@ -486,7 +486,7 @@ void *backends_main(void *ptr) {
                 if(sock != -1) break;
                 s = e;
             }
-            chart_backend_latency += time_usec() - start_ut;
+            chart_backend_latency += now_realtime_usec() - start_ut;
         }
 
         if(unlikely(netdata_exit)) break;
@@ -496,13 +496,13 @@ void *backends_main(void *ptr) {
 
         if(likely(sock != -1)) {
             size_t len = buffer_strlen(b);
-            unsigned long long start_ut = time_usec();
+            unsigned long long start_ut = now_realtime_usec();
             int flags = 0;
 #ifdef MSG_NOSIGNAL
             flags += MSG_NOSIGNAL;
 #endif
             ssize_t written = send(sock, buffer_tostring(b), len, flags);
-            chart_backend_latency += time_usec() - start_ut;
+            chart_backend_latency += now_realtime_usec() - start_ut;
             if(written != -1 && (size_t)written == len) {
                 // we sent the data successfully
                 chart_transmission_successes++;
