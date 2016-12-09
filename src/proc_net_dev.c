@@ -1,6 +1,6 @@
 #include "common.h"
 
-int do_proc_net_dev(int update_every, unsigned long long dt) {
+int do_proc_net_dev(int update_every, usec_t dt) {
     static procfile *ff = NULL;
     static int enable_new_interfaces = -1, enable_ifb_interfaces = -1;
     static int do_bandwidth = -1, do_packets = -1, do_errors = -1, do_drops = -1, do_fifo = -1, do_compressed = -1, do_events = -1;

@@ -3,7 +3,7 @@
 #define RRD_TYPE_NET_STAT_NETFILTER         "netfilter"
 #define RRD_TYPE_NET_STAT_SYNPROXY          "synproxy"
 
-int do_proc_net_stat_synproxy(int update_every, unsigned long long dt) {
+int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
     (void)dt;
 
     static int do_entries = -1, do_cookies = -1, do_syns = -1, do_reopened = -1;

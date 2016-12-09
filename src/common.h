@@ -100,6 +100,7 @@
 #endif // __GNUC__
 
 #include "avl.h"
+#include "clocks.h"
 #include "log.h"
 #include "global_statistics.h"
 #include "storage_number.h"
@@ -123,7 +124,6 @@
 #include "plugin_tc.h"
 #include "plugins_d.h"
 
-#include "clocks.h"
 #include "eval.h"
 #include "health.h"
 
@@ -191,7 +191,7 @@ extern int enable_ksm;
 
 extern pid_t gettid(void);
 
-extern int sleep_usec(unsigned long long usec);
+extern int sleep_usec(usec_t usec);
 
 extern char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len);
 

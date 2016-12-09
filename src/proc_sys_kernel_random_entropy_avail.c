@@ -1,6 +1,6 @@
 #include "common.h"
 
-int do_proc_sys_kernel_random_entropy_avail(int update_every, unsigned long long dt) {
+int do_proc_sys_kernel_random_entropy_avail(int update_every, usec_t dt) {
     (void)dt;
 
     static procfile *ff = NULL;

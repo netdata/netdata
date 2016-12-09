@@ -197,7 +197,7 @@ static void parse_line_pair(procfile *ff, struct netstat_columns *nc, uint32_t h
     }
 }
 
-int do_proc_net_snmp(int update_every, unsigned long long dt) {
+int do_proc_net_snmp(int update_every, usec_t dt) {
     (void)dt;
 
     static procfile *ff = NULL;

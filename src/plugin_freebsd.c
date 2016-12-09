@@ -25,10 +25,10 @@ void *freebsd_main(void *ptr)
     // keep track of the time each module was called
     unsigned long long sutime_freebsd_sysctl = 0ULL;
 
-    unsigned long long step = rrd_update_every * 1000000ULL;
+    usec_t step = rrd_update_every * USEC_PER_SEC;
     for(;;) {
-        unsigned long long now = now_realtime_usec();
-        unsigned long long next = now - (now % step) + step;
+        usec_t now = now_realtime_usec();
+        usec_t next = now - (now % step) + step;
 
         while(now < next) {
             sleep_usec(next - now);

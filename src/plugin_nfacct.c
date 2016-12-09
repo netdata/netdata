@@ -90,7 +90,7 @@ void *nfacct_main(void *ptr) {
     // ------------------------------------------------------------------------
 
     struct timeval last, now;
-    unsigned long long usec = 0, susec = 0;
+    usec_t usec = 0, susec = 0;
     RRDSET *st = NULL;
 
     now_realtime_timeval(&last);

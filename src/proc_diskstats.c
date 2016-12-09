@@ -129,7 +129,7 @@ struct mount_point_metadata {
     int do_inodes;
 };
 
-static inline void do_disk_space_stats(struct mountinfo *mi, int update_every, unsigned long long dt) {
+static inline void do_disk_space_stats(struct mountinfo *mi, int update_every, usec_t dt) {
     (void)dt;
 
     const char *family = mi->mount_point;
@@ -411,7 +411,7 @@ static inline int select_positive_option(int option1, int option2) {
     return CONFIG_ONDEMAND_NO;
 }
 
-int do_proc_diskstats(int update_every, unsigned long long dt) {
+int do_proc_diskstats(int update_every, usec_t dt) {
     (void)dt;
 
     static procfile *ff = NULL;

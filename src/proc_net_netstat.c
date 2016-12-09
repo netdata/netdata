@@ -191,7 +191,7 @@ static void parse_line_pair(procfile *ff, struct netstat_columns *nc, uint32_t h
 }
 
 
-int do_proc_net_netstat(int update_every, unsigned long long dt) {
+int do_proc_net_netstat(int update_every, usec_t dt) {
     (void)dt;
 
     static int do_bandwidth = -1, do_inerrors = -1, do_mcast = -1, do_bcast = -1, do_mcast_p = -1, do_bcast_p = -1, do_ecn = -1, \
