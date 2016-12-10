@@ -143,6 +143,26 @@ void buffer_strcat(BUFFER *wb, const char *txt)
     }
 }
 
+void buffer_strcat_htmlescape(BUFFER *wb, const char *txt)
+{
+    char b[2] = { [0] = '\0', [1] = '\0' };
+
+    while(*txt) {
+        switch(*txt) {
+            case '&': buffer_strcat(wb, "&amp;"); break;
+            case '<': buffer_strcat(wb, "&lt;"); break;
+            case '>': buffer_strcat(wb, "&gt;"); break;
+            case '"': buffer_strcat(wb, "&quot;"); break;
+            case '/': buffer_strcat(wb, "&#x2F;"); break;
+            case '\'': buffer_strcat(wb, "&#x27;"); break;
+            default: {
+                b[0] = *txt;
+                buffer_strcat(wb, b);
+            }
+        }
+        txt++;
+    }
+}
 
 void buffer_snprintf(BUFFER *wb, size_t len, const char *fmt, ...)
 {
