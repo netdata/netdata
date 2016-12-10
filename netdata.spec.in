@@ -1,4 +1,15 @@
 %define contentdir %{_datadir}/netdata
+%if 0%{?suse_version}
+%define distro_post %service_add_post netdata.service
+%define distro_preun %service_del_preun netdata.service
+%define distro_postun %service_del_postun netdata.service
+%define distro_buildrequires BuildRequires:\ systemd-rpm-macros
+%else
+%define distro_post %systemd_post netdata.service
+%define distro_preun %systemd_preun netdata.service
+%define distro_postun %systemd_postun_with_restart netdata.service
+%define distro_buildrequires %{nil}
+%endif
 
 # This is temporary and should eventually be resolved. This bypasses
 # the default rhel __os_install_post which throws a python compile
@@ -10,7 +21,7 @@
 %bcond_without  systemd  # systemd
 %bcond_with     nfacct   # build with nfacct plugin
 
-%if 0%{?fedora} || 0%{?rhel} >= 7
+%if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 %else
 %undefine	with_systemd
 %endif
@@ -23,6 +34,7 @@ License:	GPL v3+
 Group:		Applications/System
 Source0:	http://firehol.org/download/netdata/releases/v@PACKAGE_VERSION@/%{name}-@PACKAGE_VERSION@.tar.xz
 URL:		http://my-netdata.io/
+%distro_buildrequires
 BuildRequires:	pkgconfig
 BuildRequires:	xz
 BuildRequires:	zlib-devel
@@ -42,9 +54,13 @@ Requires(pre): /usr/sbin/groupadd
 Requires(pre): /usr/sbin/useradd
 
 %if %{with systemd}
+%if 0%{?suse_version}
+%{?systemd_requires}
+%else
 Requires(preun):  systemd-units
 Requires(postun): systemd-units
 Requires(post):   systemd-units
+%endif
 %else
 Requires(post):   chkconfig
 %endif
@@ -79,9 +95,7 @@ rm -rf $RPM_BUILD_ROOT
 find $RPM_BUILD_ROOT -name .keep -print0 | xargs --null --no-run-if-empty rm
 
 install -m 644 -p system/netdata.conf $RPM_BUILD_ROOT%{_sysconfdir}/%{name}
-
-mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d
-install -m 644 -p system/netdata.logrotate $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/%{name}
+install -Dm 644 -p system/netdata.logrotate $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/%{name}
 
 %if %{with systemd}
 install -d $RPM_BUILD_ROOT%{_unitdir}
@@ -101,13 +115,13 @@ install -m755 system/netdata-init-d \
         -s /sbin/nologin -r -d %{contentdir} netdata 2> /dev/null || :
 
 %post
-%systemd_post netdata.service
+o%distro_post
 
 %preun
-%systemd_preun netdata.service
+%distro_preun
 
 %postun
-%systemd_postun_with_restart netdata.service
+%distro_postun
 %else
 %pre
 # Add the "netdata" user
@@ -150,6 +164,9 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root)
 
 %dir %{_sysconfdir}/%{name}
+%dir %{_sysconfdir}/%{name}/health.d
+%dir %{_sysconfdir}/%{name}/python.d
+
 %config(noreplace) %{_sysconfdir}/%{name}/*.conf
 #%config(noreplace) %{_sysconfdir}/%{name}/charts.d/*.conf
 %config(noreplace) %{_sysconfdir}/%{name}/health.d/*.conf
