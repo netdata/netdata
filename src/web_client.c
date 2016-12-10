@@ -308,7 +308,8 @@ int mysendfile(struct web_client *w, char *filename)
     for(s = filename; *s ;s++) {
         if( !isalnum(*s) && *s != '/' && *s != '.' && *s != '-' && *s != '_') {
             debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not acceptable.", w->id, filename);
-            buffer_sprintf(w->response.data, "File '%s' cannot be served. Filename contains invalid character '%c'", filename, *s);
+            buffer_sprintf(w->response.data, "Filename contains invalid characters: ");
+            buffer_strcat_htmlescape(w->response.data, filename);
             return 400;
         }
     }
@@ -316,7 +317,8 @@ int mysendfile(struct web_client *w, char *filename)
     // if the filename contains a .. refuse to serve it
     if(strstr(filename, "..") != 0) {
         debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not acceptable.", w->id, filename);
-        buffer_sprintf(w->response.data, "File '%s' cannot be served. Relative filenames with '..' in them are not supported.", filename);
+        buffer_strcat(w->response.data, "Relative filenames are not supported: ");
+        buffer_strcat_htmlescape(w->response.data, filename);
         return 400;
     }
 
@@ -328,21 +330,24 @@ int mysendfile(struct web_client *w, char *filename)
     struct stat stat;
     if(lstat(webfilename, &stat) != 0) {
         debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not found.", w->id, webfilename);
-        buffer_sprintf(w->response.data, "File '%s' does not exist, or is not accessible.", webfilename);
+        buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
+        buffer_strcat_htmlescape(w->response.data, webfilename);
         return 404;
     }
 
     // check if the file is owned by expected user
     if(stat.st_uid != web_files_uid()) {
         error("%llu: File '%s' is owned by user %u (expected user %u). Access Denied.", w->id, webfilename, stat.st_uid, web_files_uid());
-        buffer_sprintf(w->response.data, "Access to file '%s' is not permitted.", webfilename);
+        buffer_strcat(w->response.data, "Access to file is not permitted: ");
+        buffer_strcat_htmlescape(w->response.data, webfilename);
         return 403;
     }
 
     // check if the file is owned by expected group
     if(stat.st_gid != web_files_gid()) {
         error("%llu: File '%s' is owned by group %u (expected group %u). Access Denied.", w->id, webfilename, stat.st_gid, web_files_gid());
-        buffer_sprintf(w->response.data, "Access to file '%s' is not permitted.", webfilename);
+        buffer_strcat(w->response.data, "Access to file is not permitted: ");
+        buffer_strcat_htmlescape(w->response.data, webfilename);
         return 403;
     }
 
@@ -353,7 +358,8 @@ int mysendfile(struct web_client *w, char *filename)
 
     if((stat.st_mode & S_IFMT) != S_IFREG) {
         error("%llu: File '%s' is not a regular file. Access Denied.", w->id, webfilename);
-        buffer_sprintf(w->response.data, "Access to file '%s' is not permitted.", webfilename);
+        buffer_strcat(w->response.data, "Access to file is not permitted: ");
+        buffer_strcat_htmlescape(w->response.data, webfilename);
         return 403;
     }
 
@@ -365,12 +371,14 @@ int mysendfile(struct web_client *w, char *filename)
         if(errno == EBUSY || errno == EAGAIN) {
             error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, webfilename);
             buffer_sprintf(w->response.header, "Location: /" WEB_PATH_FILE "/%s\r\n", filename);
-            buffer_sprintf(w->response.data, "The file '%s' is currently busy. Please try again later.", webfilename);
+            buffer_strcat(w->response.data, "File is currently busy, please try again later: ");
+            buffer_strcat_htmlescape(w->response.data, webfilename);
             return 307;
         }
         else {
             error("%llu: Cannot open file '%s'.", w->id, webfilename);
-            buffer_sprintf(w->response.data, "Cannot open file '%s'.", webfilename);
+            buffer_strcat(w->response.data, "Cannot open file: ");
+            buffer_strcat_htmlescape(w->response.data, webfilename);
             return 404;
         }
     }
@@ -733,7 +741,8 @@ int web_client_api_request_single_chart(struct web_client *w, char *url, void ca
     RRDSET *st = rrdset_find(chart);
     if(!st) st = rrdset_find_byname(chart);
     if(!st) {
-        buffer_sprintf(w->response.data, "Chart '%s' is not found.", chart);
+        buffer_strcat(w->response.data, "Chart is not found: ");
+        buffer_strcat_htmlescape(w->response.data, chart);
         ret = 404;
         goto cleanup;
     }
@@ -1130,7 +1139,8 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
     RRDSET *st = rrdset_find(chart);
     if(!st) st = rrdset_find_byname(chart);
     if(!st) {
-        buffer_sprintf(w->response.data, "Chart '%s' is not found.", chart);
+        buffer_strcat(w->response.data, "Chart is not found: ");
+        buffer_strcat_htmlescape(w->response.data, chart);
         ret = 404;
         goto cleanup;
     }
@@ -1309,27 +1319,31 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
     }
 
     if(action == 'A' && (!machine_guid || !machine_url || !url_name)) {
+        error("Invalid registry request - access requires these parameters: machine ('%s'), url ('%s'), name ('%s')",
+                machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", url_name?url_name:"UNSET");
         buffer_flush(w->response.data);
-        buffer_sprintf(w->response.data, "Invalid registry request - access requires these parameters: machine ('%s'), url ('%s'), name ('%s')",
-                       machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", url_name?url_name:"UNSET");
+        buffer_strcat(w->response.data, "Invalid registry Access request.");
         return 400;
     }
     else if(action == 'D' && (!machine_guid || !machine_url || !delete_url)) {
+        error("Invalid registry request - delete requires these parameters: machine ('%s'), url ('%s'), delete_url ('%s')",
+                machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", delete_url?delete_url:"UNSET");
         buffer_flush(w->response.data);
-        buffer_sprintf(w->response.data, "Invalid registry request - delete requires these parameters: machine ('%s'), url ('%s'), delete_url ('%s')",
-                       machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", delete_url?delete_url:"UNSET");
+        buffer_strcat(w->response.data, "Invalid registry Delete request.");
         return 400;
     }
     else if(action == 'S' && (!machine_guid || !machine_url || !search_machine_guid)) {
+        error("Invalid registry request - search requires these parameters: machine ('%s'), url ('%s'), for ('%s')",
+                machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", search_machine_guid?search_machine_guid:"UNSET");
         buffer_flush(w->response.data);
-        buffer_sprintf(w->response.data, "Invalid registry request - search requires these parameters: machine ('%s'), url ('%s'), for ('%s')",
-                       machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", search_machine_guid?search_machine_guid:"UNSET");
+        buffer_strcat(w->response.data, "Invalid registry Search request.");
         return 400;
     }
     else if(action == 'W' && (!machine_guid || !machine_url || !to_person_guid)) {
+        error("Invalid registry request - switching identity requires these parameters: machine ('%s'), url ('%s'), to ('%s')",
+                machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", to_person_guid?to_person_guid:"UNSET");
         buffer_flush(w->response.data);
-        buffer_sprintf(w->response.data, "Invalid registry request - switching identity requires these parameters: machine ('%s'), url ('%s'), to ('%s')",
-                       machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", to_person_guid?to_person_guid:"UNSET");
+        buffer_strcat(w->response.data, "Invalid registry Switch request.");
         return 400;
     }
 
@@ -1460,13 +1474,14 @@ int web_client_api_request_v1(struct web_client *w, char *url) {
 
         else {
             buffer_flush(w->response.data);
-            buffer_sprintf(w->response.data, "Unsupported v1 API command: %s", tok);
+            buffer_strcat(w->response.data, "Unsupported v1 API command: ");
+            buffer_strcat_htmlescape(w->response.data, tok);
             return 404;
         }
     }
     else {
         buffer_flush(w->response.data);
-        buffer_sprintf(w->response.data, "API v1 command?");
+        buffer_sprintf(w->response.data, "Which API v1 command?");
         return 400;
     }
 }
@@ -1481,7 +1496,8 @@ int web_client_api_request(struct web_client *w, char *url)
             return web_client_api_request_v1(w, url);
         else {
             buffer_flush(w->response.data);
-            buffer_sprintf(w->response.data, "Unsupported API version: %s", tok);
+            buffer_strcat(w->response.data, "Unsupported API version: ");
+            buffer_strcat_htmlescape(w->response.data, tok);
             return 404;
         }
     }
@@ -2098,14 +2114,16 @@ void web_client_process(struct web_client *w) {
                         if(!st) st = rrdset_find(tok);
                         if(!st) {
                             code = 404;
-                            buffer_sprintf(w->response.data, "Chart %s is not found.\r\n", tok);
+                            buffer_strcat(w->response.data, "Chart is not found: ");
+                            buffer_strcat_htmlescape(w->response.data, tok);
                             debug(D_WEB_CLIENT_ACCESS, "%llu: %s is not found.", w->id, tok);
                         }
                         else {
                             code = 200;
                             debug_flags |= D_RRD_STATS;
                             st->debug = !st->debug;
-                            buffer_sprintf(w->response.data, "Chart %s has now debug %s.\r\n", tok, st->debug?"enabled":"disabled");
+                            buffer_sprintf(w->response.data, "Chart has now debug %s: ", st->debug?"enabled":"disabled");
+                            buffer_strcat_htmlescape(w->response.data, tok);
                             debug(D_WEB_CLIENT_ACCESS, "%llu: debug for %s is %s.", w->id, tok, st->debug?"enabled":"disabled");
                         }
                     }
