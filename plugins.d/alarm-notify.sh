@@ -19,7 +19,8 @@
 #  - pushover.net notifications
 #  - pushbullet.com push notifications by Tiago Peralta @tperalta82 PR #1070
 #  - telegram.org notifications by @hashworks PR #1002
-#
+#  - twilio.com notifications by Levi Blaney @shadycuz PR #1211
+#  - kafka notifications
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -173,6 +174,7 @@ SEND_TWILIO="YES"
 SEND_TELEGRAM="YES"
 SEND_EMAIL="YES"
 SEND_PUSHBULLET="YES"
+SEND_KAFKA="YES"
 
 # slack configs
 SLACK_WEBHOOK_URL=
@@ -200,6 +202,10 @@ declare -A role_recipients_twilio=()
 TELEGRAM_BOT_TOKEN=
 DEFAULT_RECIPIENT_TELEGRAM=
 declare -A role_recipients_telegram=()
+
+# kafka configs
+KAFKA_URL=
+KAFKA_SENDER_IP=
 
 # email configs
 DEFAULT_RECIPIENT_EMAIL="root"
@@ -359,27 +365,35 @@ done
 [ -z "${PUSHOVER_APP_TOKEN}" ] && SEND_PUSHOVER="NO"
 
 # check pushbullet
-[ -z "${DEFAULT_RECIPIENT_PUSHBULLET}" ] && SEND_PUSHBULLET="NO"
+[ -z "${PUSHBULLET_ACCESS_TOKEN}" ] && SEND_PUSHBULLET="NO"
 
 # check twilio
-[ -z "${DEFAULT_RECIPIENT_TWILIO}" ] && SEND_TWILIO="NO"
+[ -z "${TWILIO_ACCOUNT_TOKEN}" -o -z "${TWILIO_ACCOUNT_SID}" -o -z "${TWILIO_NUMBER}" ] && SEND_TWILIO="NO"
 
 # check telegram
 [ -z "${TELEGRAM_BOT_TOKEN}" ] && SEND_TELEGRAM="NO"
 
-if [ \( "${SEND_PUSHOVER}" = "YES" -o "${SEND_SLACK}" = "YES" -o "${SEND_TWILIO}" = "YES" -o "${SEND_TELEGRAM}" = "YES" -o "${SEND_PUSHBULLET}" = "YES" \) -a -z "${curl}" ]
+# check kafka
+[ -z "${KAFKA_URL}" -o -z "${KAFKA_SENDER_IP}" ] && SEND_KAFKA="NO"
+
+# if we need curl, check for the curl command
+if [ \( "${SEND_PUSHOVER}" = "YES" -o "${SEND_SLACK}" = "YES" -o "${SEND_TWILIO}" = "YES" -o "${SEND_TELEGRAM}" = "YES" -o "${SEND_PUSHBULLET}" = "YES" -o "${SEND_KAFKA}" = "YES" \) -a -z "${curl}" ]
     then
     curl="$(which curl 2>/dev/null || command -v curl 2>/dev/null)"
     if [ -z "${curl}" ]
         then
+        # no curl available
+        # disable all curl based methods
         SEND_PUSHOVER="NO"
         SEND_PUSHBULLET="NO"
         SEND_TELEGRAM="NO"
         SEND_SLACK="NO"
         SEND_TWILIO="NO"
+        SEND_KAFKA="NO"
     fi
 fi
 
+# if we need sendmail, check for the sendmail command
 if [ "${SEND_EMAIL}" = "YES" -a -z "${sendmail}" ]
     then
     sendmail="$(which sendmail 2>/dev/null || command -v sendmail 2>/dev/null)"
@@ -387,13 +401,20 @@ if [ "${SEND_EMAIL}" = "YES" -a -z "${sendmail}" ]
 fi
 
 # check that we have at least a method enabled
-if [ "${SEND_EMAIL}" != "YES" -a "${SEND_PUSHOVER}" != "YES" -a "${SEND_TELEGRAM}" != "YES" -a "${SEND_SLACK}" != "YES" -a "${SEND_TWILIO}" != "YES" -a  "${SEND_PUSHBULLET}" != "YES" ]
+if [   "${SEND_EMAIL}"      != "YES" \
+    -a "${SEND_PUSHOVER}"   != "YES" \
+    -a "${SEND_TELEGRAM}"   != "YES" \
+    -a "${SEND_SLACK}"      != "YES" \
+    -a "${SEND_TWILIO}"     != "YES" \
+    -a "${SEND_PUSHBULLET}" != "YES" \
+    -a "${SEND_KAFKA}"      != "YES" \
+    ]
     then
     fatal "All notification methods are disabled. Not sending notification to '${role}' for '${name}' = '${value}' of chart '${chart}' for status '${status}'."
 fi
 
 # -----------------------------------------------------------------------------
-# get the system hostname
+# find a suitable hostname to use, if netdata did not supply a hostname
 
 [ -z "${host}" ] && host="${NETDATA_HOSTNAME}"
 [ -z "${host}" ] && host="${NETDATA_REGISTRY_HOSTNAME}"
@@ -406,7 +427,7 @@ date="$(date --date=@${when} 2>/dev/null)"
 [ -z "${date}" ] && date="$(date 2>/dev/null)"
 
 # -----------------------------------------------------------------------------
-# URL encode a string
+# function to URL encode a string
 
 urlencode() {
     local string="${1}" strlen encoded pos c o
@@ -432,7 +453,7 @@ urlencode() {
 }
 
 # -----------------------------------------------------------------------------
-# convert a duration in seconds, to a human readable duration
+# function to convert a duration in seconds, to a human readable duration
 # using DAYS, MINUTES, SECONDS
 
 duration4human() {
@@ -585,6 +606,31 @@ EOF
                 error "failed to send pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
             fi
         done
+
+        [ ${sent} -gt 0 ] && return 0
+    fi
+
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# kafka sender
+
+send_kafka() {
+    local httpcode sent=0 
+    if [ "${SEND_KAFKA}" = "YES" ]
+        then
+            httpcode=$(${curl} -X POST --write-out %{http_code} --silent --output /dev/null \
+                --data "{host_ip:\"${KAFKA_SENDER_IP}\",when:${when},name:\"${name}\",chart:\"${chart}\",family:\"${family}\",status:\"${status}\",old_status:\"${old_status}\",value:${value},old_value:${old_value},duration:${duration},non_clear_duration:${non_clear_duration},units:\"${units}\",info:\"${info}\"}" \
+                "${KAFKA_URL}")
+
+            if [ "${httpcode}" == "200" ]
+            then
+                info "sent kafka data for: ${host} ${chart}.${name} is ${status} and ip '${KAFKA_SENDER_IP}'"
+                sent=$((sent + 1))
+            else
+                error "failed to send kafka data for: ${host} ${chart}.${name} is ${status} and ip '${KAFKA_SENDER_IP}' with HTTP error code ${httpcode}."
+            fi
 
         [ ${sent} -gt 0 ] && return 0
     fi
@@ -874,6 +920,14 @@ ${chart} (${family})
 
 SENT_TELEGRAM=$?
 
+
+# -----------------------------------------------------------------------------
+# send the kafka message
+
+send_kafka
+SENT_KAFKA=$?
+
+
 # -----------------------------------------------------------------------------
 # send the email
 
@@ -972,8 +1026,18 @@ SENT_EMAIL=$?
 # -----------------------------------------------------------------------------
 # let netdata know
 
-# we did send something
-[ ${SENT_EMAIL} -eq 0 -o ${SENT_PUSHOVER} -eq 0 -o ${SENT_TELEGRAM} -eq 0 -o ${SENT_SLACK} -eq 0 -o ${SENT_TWILIO} -eq 0 -o  ${SENT_PUSHBULLET} -eq 0 ] && exit 0
+if [   ${SENT_EMAIL}      -eq 0 \
+    -o ${SENT_PUSHOVER}   -eq 0 \
+    -o ${SENT_TELEGRAM}   -eq 0 \
+    -o ${SENT_SLACK}      -eq 0 \
+    -o ${SENT_TWILIO}     -eq 0 \
+    -o ${SENT_PUSHBULLET} -eq 0 \
+    -o ${SENT_KAFKA}      -eq 0 \
+    ]
+    then
+    # we did send something
+    exit 0
+fi
 
 # we did not send anything
 exit 1
