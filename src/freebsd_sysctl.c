@@ -1,9 +1,11 @@
 #include "common.h"
 
-// NEEDED BY: struct vmstat
+// NEEDED BY: struct vmtotal, struct vmmeter
 #include <sys/vmmeter.h>
 // NEEDED BY: struct devstat
 #include <sys/devicestat.h>
+// NEEDED BY: struct xswdev
+#include <vm/vm_param.h>
 // NEEDED BY: do_disk_io
 #define RRD_TYPE_DISK "disk"
 
@@ -14,7 +16,8 @@ int do_freebsd_sysctl(int update_every, unsigned long long dt) {
     (void)dt;
 
     static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1,
-        do_loadavg = -1, do_all_processes = -1, do_disk_io = -1;
+        do_loadavg = -1, do_all_processes = -1, do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
+        do_pgfaults = -1, do_committed = -1;
 
     if (unlikely(do_cpu == -1)) {
         do_cpu                  = config_get_boolean("plugin:freebsd:sysctl", "cpu utilization", 1);
@@ -25,12 +28,17 @@ int do_freebsd_sysctl(int update_every, unsigned long long dt) {
         do_processes            = config_get_boolean("plugin:freebsd:sysctl", "processes running", 1);
         do_loadavg              = config_get_boolean("plugin:freebsd:sysctl", "enable load average", 1);
         do_all_processes        = config_get_boolean("plugin:freebsd:sysctl", "enable total processes", 1);
-
         do_disk_io              = config_get_boolean("plugin:freebsd:sysctl", "stats for all disks", 1);
+        do_swap                 = config_get_boolean("plugin:freebsd:sysctl", "system swap", 1);
+        do_ram                  = config_get_boolean("plugin:freebsd:sysctl", "system ram", 1);
+        do_swapio               = config_get_boolean("plugin:freebsd:sysctl", "swap i/o", 1);
+        do_pgfaults             = config_get_boolean("plugin:freebsd:sysctl", "memory page faults", 1);
+        do_committed            = config_get_boolean("plugin:freebsd:sysctl", "committed memory", 1);
     }
 
     RRDSET *st;
 
+    int system_pagesize = getpagesize(); // wouldn't it be better to get value directly from hw.pagesize?
     int i;
 
 // NEEDED BY: do_loadavg
@@ -77,6 +85,21 @@ int do_freebsd_sysctl(int update_every, unsigned long long dt) {
         collected_number busy_time_ms;
     } prev_dstat;
 
+    // NEEDED BY: do_swap
+    size_t mibsize, size;
+    int mib[3]; // CTL_MAXNAME = 24 maximum mib components (sysctl.h)
+    struct xswdev xsw;
+    struct total_xsw {
+        collected_number bytes_used;
+        collected_number bytes_total;
+    } total_xsw = {0, 0};
+
+    // NEEDED BY: do_swapio, do_ram
+    struct vmmeter vmmeter_data;
+
+    // NEEDED BY: do_ram
+    int vfs_bufspace_count;
+
     // --------------------------------------------------------------------
 
     if (last_loadavg_usec <= dt) {
@@ -108,14 +131,16 @@ int do_freebsd_sysctl(int update_every, unsigned long long dt) {
 
     // --------------------------------------------------------------------
 
-    if (likely(do_all_processes | do_processes)) {
+    if (likely(do_all_processes | do_processes | do_committed)) {
         if (unlikely(GETSYSCTL("vm.vmtotal", vmtotal_data))) {
             do_all_processes = 0;
             error("DISABLED: system.active_processes");
             do_processes = 0;
             error("DISABLED: system.processes");
+            do_committed = 0;
+            error("DISABLED: mem.committed");
         } else {
-            if (likely(do_processes)) {
+            if (likely(do_all_processes)) {
 
                 st = rrdset_find_bytype("system", "active_processes");
                 if (unlikely(!st)) {
@@ -127,6 +152,9 @@ int do_freebsd_sysctl(int update_every, unsigned long long dt) {
                 rrddim_set(st, "active", (vmtotal_data.t_rq + vmtotal_data.t_dw + vmtotal_data.t_pw + vmtotal_data.t_sl + vmtotal_data.t_sw));
                 rrdset_done(st);
             }
+
+            // --------------------------------------------------------------------
+
             if (likely(do_processes)) {
 
                 st = rrdset_find_bytype("system", "processes");
@@ -143,26 +171,23 @@ int do_freebsd_sysctl(int update_every, unsigned long long dt) {
                 rrdset_done(st);
             }
 
+            // --------------------------------------------------------------------
+
+            if (likely(do_committed)) {
+                st = rrdset_find("mem.committed");
+                if (unlikely(!st)) {
+                    st = rrdset_create("mem", "committed", NULL, "system", NULL, "Committed (Allocated) Memory", "MB", 5000, update_every, RRDSET_TYPE_AREA);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "Committed_AS", NULL, system_pagesize, 1024, RRDDIM_ABSOLUTE);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "Committed_AS", vmtotal_data.t_rm);
+                rrdset_done(st);
+            }
         }
     }
-
-    // --------------------------------------------------------------------
-
-    if (likely(do_processes)) {
-
-            st = rrdset_find_bytype("system", "processes");
-            if (unlikely(!st)) {
-                st = rrdset_create("system", "processes", NULL, "processes", NULL, "System Processes", "processes", 600, update_every, RRDSET_TYPE_LINE);
-
-                rrddim_add(st, "running", NULL, 1, 1, RRDDIM_ABSOLUTE);
-                rrddim_add(st, "blocked", NULL, -1, 1, RRDDIM_ABSOLUTE);
-            }
-            else rrdset_next(st);
-
-            rrddim_set(st, "running", vmtotal_data.t_rq);
-            rrddim_set(st, "blocked", (vmtotal_data.t_dw + vmtotal_data.t_pw));
-            rrdset_done(st);
-        }
 
     // --------------------------------------------------------------------
 
@@ -339,7 +364,7 @@ int do_freebsd_sysctl(int update_every, unsigned long long dt) {
                 do_disk_io = 0;
                 error("DISABLED: disk.io");
             } else {
-                dstat = devstat_data +sizeof(long); // skip generation number
+                dstat = devstat_data + sizeof(long); // skip generation number
                 collected_number total_disk_reads = 0;
                 collected_number total_disk_writes = 0;
 
@@ -482,9 +507,7 @@ int do_freebsd_sysctl(int update_every, unsigned long long dt) {
                             rrddim_set(st, "svctm", ((dstat[i].operations[DEVSTAT_READ] - prev_dstat.operations_read) + (dstat[i].operations[DEVSTAT_WRITE] - prev_dstat.operations_write)) ?
                                 (cur_dstat.busy_time_ms - prev_dstat.busy_time_ms) / ((dstat[i].operations[DEVSTAT_READ] - prev_dstat.operations_read) + (dstat[i].operations[DEVSTAT_WRITE] - prev_dstat.operations_write)) : 0);
                             rrdset_done(st);
-
                         }
-
                     }
 
                     // --------------------------------------------------------------------
@@ -502,6 +525,144 @@ int do_freebsd_sysctl(int update_every, unsigned long long dt) {
                     rrdset_done(st);
                 }
             }
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+
+    if (likely(do_swap)) {
+        mibsize = sizeof mib / sizeof mib[0];
+        if (unlikely(sysctlnametomib("vm.swap_info", mib, &mibsize) == -1)) {
+            error("FREEBSD: sysctl(%s...) failed: %s", "vm.swap_info", strerror(errno));
+            do_swap = 0;
+            error("DISABLED: disk.io");
+        } else {
+            for (i = 0; ; i++) {
+                mib[mibsize] = i;
+                size = sizeof(xsw);
+                if (unlikely(sysctl(mib, mibsize + 1, &xsw, &size, NULL, 0) == -1 )) {
+                    if (unlikely(errno != ENOENT)) {
+                        error("FREEBSD: sysctl(%s...) failed: %s", "vm.swap_info", strerror(errno));
+                        do_swap = 0;
+                        error("DISABLED: disk.io");
+                    } else {
+                        if (unlikely(size != sizeof(xsw))) {
+                            error("FREEBSD: sysctl(%s...) expected %lu, got %lu", "vm.swap_info", (unsigned long)sizeof(xsw), (unsigned long)size);
+                            do_swap = 0;
+                            error("DISABLED: disk.io");
+                        } else break;
+                    }
+                }
+                total_xsw.bytes_used += xsw.xsw_used * system_pagesize;
+                total_xsw.bytes_total += xsw.xsw_nblks * system_pagesize;
+            }
+
+            if (likely(do_swap)) {
+                st = rrdset_find("system.swap");
+                if (unlikely(!st)) {
+                    st = rrdset_create("system", "swap", NULL, "swap", NULL, "System Swap", "MB", 201, update_every, RRDSET_TYPE_STACKED);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "free",    NULL, 1, 1048576, RRDDIM_ABSOLUTE);
+                    rrddim_add(st, "used",    NULL, 1, 1048576, RRDDIM_ABSOLUTE);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "used", total_xsw.bytes_used);
+                rrddim_set(st, "free", total_xsw.bytes_total - total_xsw.bytes_used);
+                rrdset_done(st);
+            }
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    if (likely(do_ram)) {
+        if (unlikely(GETSYSCTL("vm.stats.vm.v_active_count",    vmmeter_data.v_active_count) ||
+                     GETSYSCTL("vm.stats.vm.v_inactive_count",  vmmeter_data.v_inactive_count) ||
+                     GETSYSCTL("vm.stats.vm.v_wire_count",      vmmeter_data.v_wire_count) ||
+                     GETSYSCTL("vm.stats.vm.v_cache_count",     vmmeter_data.v_cache_count) ||
+                     GETSYSCTL("vfs.bufspace",                  vfs_bufspace_count) ||
+                     GETSYSCTL("vm.stats.vm.v_free_count",      vmmeter_data.v_free_count))) {
+            do_swapio = 0;
+            error("DISABLED: system.swapio");
+        } else {
+            st = rrdset_find("system.ram");
+            if (unlikely(!st)) {
+                st = rrdset_create("system", "ram", NULL, "ram", NULL, "System RAM", "MB", 200, update_every, RRDSET_TYPE_STACKED);
+
+                rrddim_add(st, "active",    NULL, system_pagesize, 1024, RRDDIM_ABSOLUTE);
+                rrddim_add(st, "inactive",  NULL, system_pagesize, 1024, RRDDIM_ABSOLUTE);
+                rrddim_add(st, "wired",     NULL, system_pagesize, 1024, RRDDIM_ABSOLUTE);
+                rrddim_add(st, "cache",     NULL, system_pagesize, 1024, RRDDIM_ABSOLUTE);
+                rrddim_add(st, "buffers",   NULL, 1, 1024, RRDDIM_ABSOLUTE);
+                rrddim_add(st, "free",      NULL, system_pagesize, 1024, RRDDIM_ABSOLUTE);
+            }
+            else rrdset_next(st);
+
+            rrddim_set(st, "active",    vmmeter_data.v_active_count);
+            rrddim_set(st, "inactive",  vmmeter_data.v_inactive_count);
+            rrddim_set(st, "wired",     vmmeter_data.v_wire_count);
+            rrddim_set(st, "cache",     vmmeter_data.v_cache_count);
+            rrddim_set(st, "buffers",   vfs_bufspace_count);
+            rrddim_set(st, "free",      vmmeter_data.v_free_count);
+            rrdset_done(st);
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    if (likely(do_swapio)) {
+        if (unlikely(GETSYSCTL("vm.stats.vm.v_swappgsin", vmmeter_data.v_swappgsin) || GETSYSCTL("vm.stats.vm.v_vnodepgsout", vmmeter_data.v_swappgsout))) {
+            do_swapio = 0;
+            error("DISABLED: system.swapio");
+        } else {
+            st = rrdset_find("system.swapio");
+            if (unlikely(!st)) {
+                st = rrdset_create("system", "swapio", NULL, "swap", NULL, "Swap I/O", "kilobytes/s", 250, update_every, RRDSET_TYPE_AREA);
+
+                rrddim_add(st, "in",  NULL, system_pagesize, 1024, RRDDIM_INCREMENTAL);
+                rrddim_add(st, "out", NULL, -system_pagesize, 1024, RRDDIM_INCREMENTAL);
+            }
+            else rrdset_next(st);
+
+            rrddim_set(st, "in", vmmeter_data.v_swappgsin);
+            rrddim_set(st, "out", vmmeter_data.v_swappgsout);
+            rrdset_done(st);
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    if (likely(do_pgfaults)) {
+        if (unlikely(GETSYSCTL("vm.stats.vm.v_vm_faults",   vmmeter_data.v_vm_faults) ||
+                     GETSYSCTL("vm.stats.vm.v_io_faults",   vmmeter_data.v_io_faults) ||
+                     GETSYSCTL("vm.stats.vm.v_cow_faults",  vmmeter_data.v_cow_faults) ||
+                     GETSYSCTL("vm.stats.vm.v_cow_optim",   vmmeter_data.v_cow_optim) ||
+                     GETSYSCTL("vm.stats.vm.v_intrans",     vmmeter_data.v_intrans))) {
+            do_pgfaults = 0;
+            error("DISABLED: mem.pgfaults");
+        } else {
+            st = rrdset_find("mem.pgfaults");
+            if (unlikely(!st)) {
+                st = rrdset_create("mem", "pgfaults", NULL, "system", NULL, "Memory Page Faults", "page faults/s", 500, update_every, RRDSET_TYPE_LINE);
+                st->isdetail = 1;
+
+                rrddim_add(st, "memory", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                rrddim_add(st, "io_requiring", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                rrddim_add(st, "cow", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                rrddim_add(st, "cow_optimized", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                rrddim_add(st, "in_transit", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            }
+            else rrdset_next(st);
+
+            rrddim_set(st, "memory", vmmeter_data.v_vm_faults);
+            rrddim_set(st, "io_requiring", vmmeter_data.v_io_faults);
+            rrddim_set(st, "cow", vmmeter_data.v_cow_faults);
+            rrddim_set(st, "cow_optimized", vmmeter_data.v_cow_optim);
+            rrddim_set(st, "in_transit", vmmeter_data.v_intrans);
+            rrdset_done(st);
         }
     }
 
