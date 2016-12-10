@@ -64,6 +64,7 @@ extern void buffer_increase(BUFFER *b, size_t free_size_required);
 extern void buffer_snprintf(BUFFER *wb, size_t len, const char *fmt, ...) __attribute__ (( format (printf, 3, 4)));
 extern void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args);
 extern void buffer_sprintf(BUFFER *wb, const char *fmt, ...) __attribute__ (( format (printf, 2, 3)));
+extern void buffer_strcat_htmlescape(BUFFER *wb, const char *txt);
 
 extern void buffer_char_replace(BUFFER *wb, char from, char to);
 
