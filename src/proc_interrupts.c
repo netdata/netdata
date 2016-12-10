@@ -125,9 +125,14 @@ int do_proc_interrupts(int update_every, unsigned long long dt) {
         if(unlikely(isdigit(irr->id[0]) && (uint32_t)(cpus + 2) < words)) {
             strncpyz(irr->name, procfile_lineword(ff, l, words - 1), MAX_INTERRUPT_NAME);
             int nlen = strlen(irr->name);
-            if(unlikely(nlen < (MAX_INTERRUPT_NAME-1))) {
+            int idlen = strlen(irr->id);
+            if(likely(nlen + 1 + idlen <= MAX_INTERRUPT_NAME)) {
                 irr->name[nlen] = '_';
-                strncpyz(&irr->name[nlen + 1], irr->id, MAX_INTERRUPT_NAME - nlen);
+                strncpyz(&irr->name[nlen + 1], irr->id, MAX_INTERRUPT_NAME - nlen - 1);
+            }
+            else {
+                irr->name[MAX_INTERRUPT_NAME - idlen - 1] = '_';
+                strncpyz(&irr->name[MAX_INTERRUPT_NAME - idlen], irr->id, idlen);
             }
         }
         else {
