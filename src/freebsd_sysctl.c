@@ -6,6 +6,10 @@
 #include <sys/devicestat.h>
 // NEEDED BY: struct xswdev
 #include <vm/vm_param.h>
+// NEEDED BY: struct ipc_sem_data
+#define _KERNEL
+#include <sys/sem.h>
+#undef _KERNEL
 // NEEDED BY: do_disk_io
 #define RRD_TYPE_DISK "disk"
 
@@ -17,7 +21,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
     static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1,
         do_loadavg = -1, do_all_processes = -1, do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
-        do_pgfaults = -1, do_committed = -1;
+        do_pgfaults = -1, do_committed = -1, do_ipc_semaphores = -1;
 
     if (unlikely(do_cpu == -1)) {
         do_cpu                  = config_get_boolean("plugin:freebsd:sysctl", "cpu utilization", 1);
@@ -34,6 +38,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         do_swapio               = config_get_boolean("plugin:freebsd:sysctl", "swap i/o", 1);
         do_pgfaults             = config_get_boolean("plugin:freebsd:sysctl", "memory page faults", 1);
         do_committed            = config_get_boolean("plugin:freebsd:sysctl", "committed memory", 1);
+        do_ipc_semaphores       = config_get_boolean("plugin:freebsd:sysctl", "ipc semaphores", 1);
     }
 
     RRDSET *st;
@@ -99,6 +104,15 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
     // NEEDED BY: do_ram
     int vfs_bufspace_count;
+
+    // NEEDED BY: do_ipc_semaphores
+    struct ipc_sem {
+        int semmni;
+        collected_number sets;
+        collected_number semaphores;
+    } ipc_sem = {0, 0, 0};
+    static struct semid_kernel *ipc_sem_data = NULL;
+
 
     // --------------------------------------------------------------------
 
@@ -663,6 +677,54 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             rrddim_set(st, "cow_optimized", vmmeter_data.v_cow_optim);
             rrddim_set(st, "in_transit", vmmeter_data.v_intrans);
             rrdset_done(st);
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    if (likely(do_ipc_semaphores)) {
+        if (unlikely(GETSYSCTL("kern.ipc.semmni", ipc_sem.semmni))) {
+            do_ipc_semaphores = 0;
+            error("DISABLED: system.ipc_semaphores");
+            error("DISABLED: system.ipc_semaphore_arrays");
+        } else {
+            ipc_sem_data = reallocz(ipc_sem_data, sizeof(struct semid_kernel) * ipc_sem.semmni);
+            if (unlikely(getsysctl("kern.ipc.sema", ipc_sem_data, sizeof(struct semid_kernel) * ipc_sem.semmni))) {
+                do_ipc_semaphores = 0;
+                error("DISABLED: system.ipc_semaphores");
+                error("DISABLED: system.ipc_semaphore_arrays");;
+            } else {
+                for (i = 0; i < ipc_sem.semmni; i++) {
+                    if (unlikely(ipc_sem_data[i].u.sem_perm.mode & SEM_ALLOC)) {
+                        ipc_sem.sets += 1;
+                        ipc_sem.semaphores += ipc_sem_data[i].u.sem_nsems;
+                    }
+                }
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find("system.ipc_semaphores");
+                if (unlikely(!st)) {
+                    st = rrdset_create("system", "ipc_semaphores", NULL, "ipc semaphores", NULL, "IPC Semaphores", "semaphores", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+                    rrddim_add(st, "semaphores", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "semaphores", ipc_sem.semaphores);
+                rrdset_done(st);
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find("system.ipc_semaphore_arrays");
+                if (unlikely(!st)) {
+                    st = rrdset_create("system", "ipc_semaphore_arrays", NULL, "ipc semaphores", NULL, "IPC Semaphore Arrays", "arrays", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+                    rrddim_add(st, "arrays", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "arrays", ipc_sem.sets);
+                rrdset_done(st);
+            }
         }
     }
 
