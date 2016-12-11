@@ -3,10 +3,10 @@
 #define RRD_TYPE_NET_STAT_NETFILTER     "netfilter"
 #define RRD_TYPE_NET_STAT_CONNTRACK     "conntrack"
 
-int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
+int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
     static procfile *ff = NULL;
     static int do_sockets = -1, do_new = -1, do_changes = -1, do_expect = -1, do_search = -1, do_errors = -1;
-    static unsigned long long get_max_every = 10 * 1000000ULL, usec_since_last_max = 0;
+    static usec_t get_max_every = 10 * USEC_PER_SEC, usec_since_last_max = 0;
     static int read_full = 1;
     static char *nf_conntrack_filename, *nf_conntrack_count_filename, *nf_conntrack_max_filename;
     static RRDVAR *rrdvar_max = NULL;
@@ -21,7 +21,7 @@ int do_proc_net_stat_conntrack(int update_every, unsigned long long dt) {
 
         snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/sys/net/netfilter/nf_conntrack_max");
         nf_conntrack_max_filename = config_get("plugin:proc:/proc/sys/net/netfilter/nf_conntrack_max", "filename to monitor", filename);
-        usec_since_last_max = get_max_every = config_get_number("plugin:proc:/proc/sys/net/netfilter/nf_conntrack_max", "read every seconds", 10) * 1000000ULL;
+        usec_since_last_max = get_max_every = config_get_number("plugin:proc:/proc/sys/net/netfilter/nf_conntrack_max", "read every seconds", 10) * USEC_PER_SEC;
 
         read_full = 1;
         ff = procfile_open(nf_conntrack_filename, " \t:", PROCFILE_FLAG_DEFAULT);

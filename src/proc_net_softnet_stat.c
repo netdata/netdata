@@ -12,7 +12,7 @@ static inline char *softnet_column_name(uint32_t column) {
     }
 }
 
-int do_proc_net_softnet_stat(int update_every, unsigned long long dt) {
+int do_proc_net_softnet_stat(int update_every, usec_t dt) {
     (void)dt;
 
     static procfile *ff = NULL;

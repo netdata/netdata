@@ -29,16 +29,16 @@ void *cpuidlejitter_main(void *ptr)
     struct timeval before, after;
     unsigned long long counter;
     for(counter = 0; 1 ;counter++) {
-        unsigned long long usec = 0, susec = 0;
+        usec_t usec = 0, susec = 0;
 
-        while(susec < (rrd_update_every * 1000000ULL)) {
+        while(susec < (rrd_update_every * USEC_PER_SEC)) {
 
-            gettimeofday(&before, NULL);
+            now_realtime_timeval(&before);
             sleep_usec(sleep_ms * 1000);
-            gettimeofday(&after, NULL);
+            now_realtime_timeval(&after);
 
             // calculate the time it took for a full loop
-            usec = usec_dt(&after, &before);
+            usec = dt_usec(&after, &before);
             susec += usec;
         }
         usec -= (sleep_ms * 1000);

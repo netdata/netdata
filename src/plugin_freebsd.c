@@ -25,14 +25,14 @@ void *freebsd_main(void *ptr)
     // keep track of the time each module was called
     unsigned long long sutime_freebsd_sysctl = 0ULL;
 
-    unsigned long long step = rrd_update_every * 1000000ULL;
+    usec_t step = rrd_update_every * USEC_PER_SEC;
     for(;;) {
-        unsigned long long now = time_usec();
-        unsigned long long next = now - (now % step) + step;
+        usec_t now = now_realtime_usec();
+        usec_t next = now - (now % step) + step;
 
         while(now < next) {
             sleep_usec(next - now);
-            now = time_usec();
+            now = now_realtime_usec();
         }
 
         if(unlikely(netdata_exit)) break;
@@ -41,7 +41,7 @@ void *freebsd_main(void *ptr)
 
         if(!vdo_freebsd_sysctl) {
             debug(D_PROCNETDEV_LOOP, "FREEBSD: calling do_freebsd_sysctl().");
-            now = time_usec();
+            now = now_realtime_usec();
             vdo_freebsd_sysctl = do_freebsd_sysctl(rrd_update_every, (sutime_freebsd_sysctl > 0)?now - sutime_freebsd_sysctl:0ULL);
             sutime_freebsd_sysctl = now;
         }

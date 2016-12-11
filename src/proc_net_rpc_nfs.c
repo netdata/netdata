@@ -127,7 +127,7 @@ struct nfs_procs nfs_proc4_values[] = {
     { "", 0ULL, 0 }
 };
 
-int do_proc_net_rpc_nfs(int update_every, unsigned long long dt) {
+int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
     (void)dt;
 
     static procfile *ff = NULL;

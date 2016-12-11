@@ -197,27 +197,7 @@ void freez(void *ptr) {
     free(ptr);
 }
 
-// ----------------------------------------------------------------------------
-// time functions
-
-inline unsigned long long timeval_usec(struct timeval *tv) {
-    return tv->tv_sec * 1000000ULL + tv->tv_usec;
-}
-
-// time(NULL) in nanoseconds
-inline unsigned long long time_usec(void) {
-    struct timeval now;
-    gettimeofday(&now, NULL);
-    return timeval_usec(&now);
-}
-
-inline unsigned long long usec_dt(struct timeval *now, struct timeval *old) {
-    unsigned long long tv1 = timeval_usec(now);
-    unsigned long long tv2 = timeval_usec(old);
-    return (tv1 > tv2) ? (tv1 - tv2) : (tv2 - tv1);
-}
-
-int sleep_usec(unsigned long long usec) {
+int sleep_usec(usec_t usec) {
 
 #ifndef NETDATA_WITH_USLEEP
     // we expect microseconds (1.000.000 per second)

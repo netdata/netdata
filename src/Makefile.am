@@ -30,6 +30,7 @@ netdata_SOURCES = \
 	appconfig.c appconfig.h \
 	avl.c avl.h \
 	backends.c backends.h \
+	clocks.c clocks.h \
 	common.c common.h \
 	daemon.c daemon.h \
 	dictionary.c dictionary.h \
@@ -100,6 +101,7 @@ netdata_LDADD = \
 apps_plugin_SOURCES = \
 	apps_plugin.c \
 	avl.c avl.h \
+	clocks.c clocks.h \
 	common.c common.h \
 	log.c log.h \
 	procfile.c procfile.h \

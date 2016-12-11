@@ -16,6 +16,8 @@ set(NETDATA_SOURCE_FILES
         src/avl.h
         src/backends.c
         src/backends.h
+        src/clocks.c
+        src/clocks.h
         src/common.c
         src/common.h
         src/daemon.c

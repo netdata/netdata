@@ -160,7 +160,7 @@ static inline int ipc_sem_get_status(struct ipc_status *st) {
     return 0;
 }
 
-int do_ipc(int update_every, unsigned long long dt) {
+int do_ipc(int update_every, usec_t dt) {
     (void)dt;
 
     static int initialized = 0, read_limits_next = 0;

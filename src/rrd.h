@@ -244,7 +244,7 @@ struct rrdset {
 
     uint32_t hash_name;                             // a simple hash on the name
 
-    unsigned long long usec_since_last_update;      // the time in microseconds since the last collection of data
+    usec_t usec_since_last_update;                  // the time in microseconds since the last collection of data
 
     struct timeval last_updated;                    // when this data set was last updated (updated every time the rrd_stats_done() function)
     struct timeval last_collected_time;             // when did this data set last collected values
@@ -355,11 +355,11 @@ extern RRDSET *rrdset_find(const char *id);
 extern RRDSET *rrdset_find_bytype(const char *type, const char *id);
 extern RRDSET *rrdset_find_byname(const char *name);
 
-extern void rrdset_next_usec_unfiltered(RRDSET *st, unsigned long long microseconds);
-extern void rrdset_next_usec(RRDSET *st, unsigned long long microseconds);
+extern void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds);
+extern void rrdset_next_usec(RRDSET *st, usec_t microseconds);
 #define rrdset_next(st) rrdset_next_usec(st, 0ULL)
 
-extern unsigned long long rrdset_done(RRDSET *st);
+extern usec_t rrdset_done(RRDSET *st);
 
 // get the total duration in seconds of the round robin database
 #define rrdset_duration(st) ((time_t)( (((st)->counter >= ((unsigned long)(st)->entries))?(unsigned long)(st)->entries:(st)->counter) * (st)->update_every ))
