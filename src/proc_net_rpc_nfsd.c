@@ -209,7 +209,7 @@ struct nfsd_procs nfsd4_ops_values[] = {
 };
 
 
-int do_proc_net_rpc_nfsd(int update_every, unsigned long long dt) {
+int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     static procfile *ff = NULL;
     static int do_rc = -1, do_fh = -1, do_io = -1, do_th = -1, do_ra = -1, do_net = -1, do_rpc = -1, do_proc2 = -1, do_proc3 = -1, do_proc4 = -1, do_proc4ops = -1;
     static int ra_warning = 0, th_warning = 0, proc2_warning = 0, proc3_warning = 0, proc4_warning = 0, proc4ops_warning = 0;

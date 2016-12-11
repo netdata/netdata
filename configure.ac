@@ -35,6 +35,9 @@ AC_PROG_INSTALL
 PKG_PROG_PKG_CONFIG
 AC_USE_SYSTEM_EXTENSIONS
 AC_CHECK_FUNCS_ONCE(accept4)
+AC_CHECK_TYPES([struct timespec, clockid_t], [], [], [[#include <time.h>]])
+AC_SEARCH_LIBS([clock_gettime], [rt posix4])
+AC_CHECK_FUNCS([clock_gettime])
 
 # Check system type
 case "$host_os" in

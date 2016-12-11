@@ -39,7 +39,7 @@ static struct mountinfo *disk_mountinfo_root = NULL;
 
 static inline void mountinfo_reload(int force) {
     static time_t last_loaded = 0;
-    time_t now = time(NULL);
+    time_t now = now_realtime_sec();
 
     if(force || now - last_loaded >= NETDATA_RELOAD_MOUNTINFO_EVERY) {
 //#ifdef NETDATA_INTERNAL_CHECKS
@@ -129,7 +129,7 @@ struct mount_point_metadata {
     int do_inodes;
 };
 
-static inline void do_disk_space_stats(struct mountinfo *mi, int update_every, unsigned long long dt) {
+static inline void do_disk_space_stats(struct mountinfo *mi, int update_every, usec_t dt) {
     (void)dt;
 
     const char *family = mi->mount_point;
@@ -411,7 +411,7 @@ static inline int select_positive_option(int option1, int option2) {
     return CONFIG_ONDEMAND_NO;
 }
 
-int do_proc_diskstats(int update_every, unsigned long long dt) {
+int do_proc_diskstats(int update_every, usec_t dt) {
     (void)dt;
 
     static procfile *ff = NULL;

@@ -70,7 +70,7 @@ void *nfacct_main(void *ptr) {
     struct nlmsghdr *nlh = NULL;
     unsigned int seq = 0, portid = 0;
 
-    seq = time(NULL) - 1;
+    seq = now_realtime_sec() - 1;
 
     nl  = mnl_socket_open(NETLINK_NETFILTER);
     if(!nl) {
@@ -90,10 +90,10 @@ void *nfacct_main(void *ptr) {
     // ------------------------------------------------------------------------
 
     struct timeval last, now;
-    unsigned long long usec = 0, susec = 0;
+    usec_t usec = 0, susec = 0;
     RRDSET *st = NULL;
 
-    gettimeofday(&last, NULL);
+    now_realtime_timeval(&last);
 
     // ------------------------------------------------------------------------
 
@@ -131,8 +131,8 @@ void *nfacct_main(void *ptr) {
 
         // --------------------------------------------------------------------
 
-        gettimeofday(&now, NULL);
-        usec = usec_dt(&now, &last) - susec;
+        now_realtime_timeval(&now);
+        usec = dt_usec(&now, &last) - susec;
         debug(D_NFACCT_LOOP, "nfacct.plugin: last loop took %llu usec (worked for %llu, sleeped for %llu).", usec + susec, usec, susec);
 
         if(usec < (rrd_update_every * 1000000ULL / 2ULL)) susec = (rrd_update_every * 1000000ULL) - usec;

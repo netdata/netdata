@@ -901,7 +901,7 @@ int run_test(struct test *test)
     st->debug = 1;
 
     // feed it with the test data
-    time_t time_now = 0, time_start = time(NULL);
+    time_t time_now = 0, time_start = now_realtime_sec();
     unsigned long c;
     collected_number last = 0;
     for(c = 0; c < test->feed_entries; c++) {
@@ -1130,7 +1130,7 @@ int unit_test(long delay, long shift)
         if(do_absi) rrddim_set(st, "percentage-of-incremental-row", i);
 
         if(!c) {
-            gettimeofday(&st->last_collected_time, NULL);
+            now_realtime_timeval(&st->last_collected_time);
             st->last_collected_time.tv_usec = shift;
         }
 

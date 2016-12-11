@@ -125,7 +125,7 @@ void web_client_reset(struct web_client *w) {
 
     if(likely(w->last_url[0])) {
         struct timeval tv;
-        gettimeofday(&tv, NULL);
+        now_realtime_timeval(&tv);
 
         size_t size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
         size_t sent = size;
@@ -136,7 +136,7 @@ void web_client_reset(struct web_client *w) {
         // --------------------------------------------------------------------
         // global statistics
 
-        finished_web_request_statistics(usec_dt(&tv, &w->tv_in),
+        finished_web_request_statistics(dt_usec(&tv, &w->tv_in),
                                         w->stats_received_bytes,
                                         w->stats_sent_bytes,
                                         size,
@@ -152,9 +152,9 @@ void web_client_reset(struct web_client *w) {
         log_access("%llu: (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: %d '%s'",
                    w->id,
                    sent, size, -((size > 0) ? ((size - sent) / (double) size * 100.0) : 0.0),
-                   usec_dt(&w->tv_ready, &w->tv_in) / 1000.0,
-                   usec_dt(&tv, &w->tv_ready) / 1000.0,
-                   usec_dt(&tv, &w->tv_in) / 1000.0,
+                   dt_usec(&w->tv_ready, &w->tv_in) / 1000.0,
+                   dt_usec(&tv, &w->tv_ready) / 1000.0,
+                   dt_usec(&tv, &w->tv_in) / 1000.0,
                    (w->mode == WEB_CLIENT_MODE_FILECOPY) ? "filecopy" : ((w->mode == WEB_CLIENT_MODE_OPTIONS)
                                                                          ? "options" : "data"),
                    w->response.code,
@@ -940,7 +940,7 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
 
         if (refresh > 0) {
             buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
-            w->response.data->expires = time(NULL) + refresh;
+            w->response.data->expires = now_realtime_sec() + refresh;
         }
         else buffer_no_cacheable(w->response.data);
 
@@ -989,7 +989,7 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
         ret = 500;
 
         // if the collected value is too old, don't calculate its value
-        if (rrdset_last_entry_t(st) >= (time(NULL) - (st->update_every * st->gap_when_lost_iterations_above)))
+        if (rrdset_last_entry_t(st) >= (now_realtime_sec() - (st->update_every * st->gap_when_lost_iterations_above)))
             ret = rrd2value(st,
                             w->response.data,
                             &n,
@@ -1012,7 +1012,7 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
         }
         else if (refresh > 0) {
             buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
-            w->response.data->expires = time(NULL) + refresh;
+            w->response.data->expires = now_realtime_sec() + refresh;
         }
         else buffer_no_cacheable(w->response.data);
 
@@ -1404,19 +1404,19 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
             if(unlikely(cookie && person_guid[0] && !strcmp(person_guid, REGISTRY_VERIFY_COOKIES_GUID)))
                 person_guid[0] = '\0';
 
-            return registry_request_access_json(w, person_guid, machine_guid, machine_url, url_name, time(NULL));
+            return registry_request_access_json(w, person_guid, machine_guid, machine_url, url_name, now_realtime_sec());
 
         case 'D':
             w->tracking_required = 1;
-            return registry_request_delete_json(w, person_guid, machine_guid, machine_url, delete_url, time(NULL));
+            return registry_request_delete_json(w, person_guid, machine_guid, machine_url, delete_url, now_realtime_sec());
 
         case 'S':
             w->tracking_required = 1;
-            return registry_request_search_json(w, person_guid, machine_guid, machine_url, search_machine_guid, time(NULL));
+            return registry_request_search_json(w, person_guid, machine_guid, machine_url, search_machine_guid, now_realtime_sec());
 
         case 'W':
             w->tracking_required = 1;
-            return registry_request_switch_json(w, person_guid, machine_guid, machine_url, to_person_guid, time(NULL));
+            return registry_request_switch_json(w, person_guid, machine_guid, machine_url, to_person_guid, now_realtime_sec());
 
         case 'H':
             return registry_request_hello_json(w);
@@ -1953,7 +1953,7 @@ void web_client_process(struct web_client *w) {
 #endif
 
     // start timing us
-    gettimeofday(&w->tv_in, NULL);
+    now_realtime_timeval(&w->tv_in);
 
     if(unlikely(!hash_api)) {
         hash_api = simple_hash("api");
@@ -2165,7 +2165,7 @@ void web_client_process(struct web_client *w) {
         }
     }
 
-    gettimeofday(&w->tv_ready, NULL);
+    now_realtime_timeval(&w->tv_ready);
     w->response.sent = 0;
     w->response.code = code;
 

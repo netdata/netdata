@@ -1010,7 +1010,7 @@ const char *registry_to_announce(void) {
 
 void registry_set_cookie(struct web_client *w, const char *guid) {
     char edate[100];
-    time_t et = time(NULL) + registry.persons_expiration;
+    time_t et = now_realtime_sec() + registry.persons_expiration;
     struct tm etmbuf, *etm = gmtime_r(&et, &etmbuf);
     strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", etm);
 

@@ -48,7 +48,7 @@ static inline struct interrupt *get_interrupts_array(uint32_t lines, int cpus) {
     return irrs;
 }
 
-int do_proc_interrupts(int update_every, unsigned long long dt) {
+int do_proc_interrupts(int update_every, usec_t dt) {
     (void)dt;
     static procfile *ff = NULL;
     static int cpus = -1, do_per_core = -1;

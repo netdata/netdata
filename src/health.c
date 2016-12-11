@@ -314,8 +314,8 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
 
     freez(buf);
 
-    if(!max_unique_id) max_unique_id = (uint32_t)time(NULL);
-    if(!max_alarm_id)  max_alarm_id  = (uint32_t)time(NULL);
+    if(!max_unique_id) max_unique_id = (uint32_t)now_realtime_sec();
+    if(!max_alarm_id)  max_alarm_id  = (uint32_t)now_realtime_sec();
 
     host->health_log.next_log_id = max_unique_id + 1;
     host->health_log.next_alarm_id = max_alarm_id + 1;
@@ -1053,7 +1053,7 @@ static inline const char *rrdcalc_status2string(int status) {
 static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     debug(D_HEALTH, "Health linking alarm '%s.%s' to chart '%s' of host '%s'", rc->chart?rc->chart:"NOCHART", rc->name, st->id, st->rrdhost->hostname);
 
-    rc->last_status_change = time(NULL);
+    rc->last_status_change = now_realtime_sec();
     rc->rrdset = st;
 
     rc->rrdset_next = st->alarms;
@@ -1092,7 +1092,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
 	if(!rc->units) rc->units = strdupz(st->units);
 
     {
-        time_t now = time(NULL);
+        time_t now = now_realtime_sec();
         health_alarm_log(st->rrdhost, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id, rc->rrdset->family, rc->exec, rc->recipient, now - rc->last_status_change, rc->old_value, rc->value, rc->status, RRDCALC_STATUS_UNINITIALIZED, rc->source, rc->units, rc->info, 0);
     }
 }
@@ -1130,7 +1130,7 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
     }
 
     {
-        time_t now = time(NULL);
+        time_t now = now_realtime_sec();
         health_alarm_log(st->rrdhost, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id, rc->rrdset->family, rc->exec, rc->recipient, now - rc->last_status_change, rc->old_value, rc->value, rc->status, RRDCALC_STATUS_REMOVED, rc->source, rc->units, rc->info, 0);
     }
 
@@ -2492,7 +2492,7 @@ void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
                         host->hostname,
                         (host->health_log.next_log_id > 0)?(host->health_log.next_log_id - 1):0,
                         health_enabled?"true":"false",
-                        (unsigned long)time(NULL));
+                        (unsigned long)now_realtime_sec());
 
     RRDCALC *rc;
     for(i = 0, rc = host->alarms; rc ; rc = rc->next) {
@@ -2652,7 +2652,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     );
 
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
-    ae->exec_run_timestamp = time(NULL);
+    ae->exec_run_timestamp = now_realtime_sec();
 
     debug(D_HEALTH, "executing command '%s'", command_to_run);
     FILE *fp = mypopen(command_to_run, &command_pid);
@@ -2688,7 +2688,7 @@ static inline void health_process_notifications(RRDHOST *host, ALARM_ENTRY *ae) 
 static inline void health_alarm_log_process(RRDHOST *host) {
     static uint32_t stop_at_id = 0;
     uint32_t first_waiting = (host->health_log.alarms)?host->health_log.alarms->unique_id:0;
-    time_t now = time(NULL);
+    time_t now = now_realtime_sec();
 
     pthread_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
@@ -2825,7 +2825,7 @@ void *health_main(void *ptr) {
         debug(D_HEALTH, "Health monitoring iteration no %u started", loop);
 
         int oldstate, runnable = 0;
-        time_t now = time(NULL);
+        time_t now = now_realtime_sec();
         time_t next_run = now + min_run_every;
         RRDCALC *rc;
 
@@ -3097,11 +3097,11 @@ void *health_main(void *ptr) {
         if(unlikely(netdata_exit))
             break;
         
-        now = time(NULL);
+        now = now_realtime_sec();
         if(now < next_run) {
             debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration in %d secs",
                   loop, (int) (next_run - now));
-            sleep_usec(1000000 * (unsigned long long) (next_run - now));
+            sleep_usec(USEC_PER_SEC * (usec_t) (next_run - now));
         }
         else {
             debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration now", loop);

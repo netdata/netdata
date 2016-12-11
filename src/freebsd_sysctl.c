@@ -12,7 +12,7 @@
 // FreeBSD calculates load averages once every 5 seconds
 #define MIN_LOADAVG_UPDATE_EVERY 5
 
-int do_freebsd_sysctl(int update_every, unsigned long long dt) {
+int do_freebsd_sysctl(int update_every, usec_t dt) {
     (void)dt;
 
     static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1,
@@ -42,7 +42,7 @@ int do_freebsd_sysctl(int update_every, unsigned long long dt) {
     int i;
 
 // NEEDED BY: do_loadavg
-    static unsigned long long last_loadavg_usec = 0;
+    static usec_t last_loadavg_usec = 0;
     struct loadavg sysload;
 
 // NEEDED BY: do_cpu, do_cpu_cores
@@ -125,7 +125,7 @@ int do_freebsd_sysctl(int update_every, unsigned long long dt) {
             }
         }
 
-        last_loadavg_usec = st->update_every * 1000000ULL;
+        last_loadavg_usec = st->update_every * USEC_PER_SEC;
     }
     else last_loadavg_usec -= dt;
 
