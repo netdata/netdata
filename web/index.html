@@ -1211,7 +1211,7 @@
 
         if(typeof charts['system.ram'] !== 'undefined')
             head += '<div style="margin-right: 10px;" data-netdata="system.ram"'
-            + ' data-dimensions="used|buffers"'
+            + ' data-dimensions="used|buffers|active|wired"' // active and wired are FreeBSD stats
             + ' data-append-options="percentage"'
             + ' data-chart-library="easypiechart"'
             + ' data-title="Used RAM"'
