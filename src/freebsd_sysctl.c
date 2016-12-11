@@ -6,10 +6,11 @@
 #include <sys/devicestat.h>
 // NEEDED BY: struct xswdev
 #include <vm/vm_param.h>
-// NEEDED BY: struct ipc_sem_data
+// NEEDED BY: struct semid_kernel, struct shmid_kernel, struct msqid_kernel
 #define _KERNEL
 #include <sys/sem.h>
 #include <sys/shm.h>
+#include <sys/msg.h>
 #undef _KERNEL
 // NEEDED BY: do_disk_io
 #define RRD_TYPE_DISK "disk"
@@ -22,7 +23,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
     static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1,
         do_loadavg = -1, do_all_processes = -1, do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
-        do_pgfaults = -1, do_committed = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1;
+        do_pgfaults = -1, do_committed = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1;
 
     if (unlikely(do_cpu == -1)) {
         do_cpu                  = config_get_boolean("plugin:freebsd:sysctl", "cpu utilization", 1);
@@ -41,6 +42,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         do_committed            = config_get_boolean("plugin:freebsd:sysctl", "committed memory", 1);
         do_ipc_semaphores       = config_get_boolean("plugin:freebsd:sysctl", "ipc semaphores", 1);
         do_ipc_shared_mem       = config_get_boolean("plugin:freebsd:sysctl", "ipc shared memory", 1);
+        do_ipc_msg_queues       = config_get_boolean("plugin:freebsd:sysctl", "ipc message queues", 1);
     }
 
     RRDSET *st;
@@ -122,6 +124,16 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         collected_number segsize;
     } ipc_shm = {0, 0, 0};
     static struct shmid_kernel *ipc_shm_data = NULL;
+
+    // NEEDED BY: do_ipc_msg_queues
+    struct ipc_msq {
+        int msgmni;
+        collected_number queues;
+        collected_number messages;
+        collected_number usedsize;
+        collected_number allocsize;
+    } ipc_msq = {0, 0, 0, 0, 0};
+    static struct msqid_kernel *ipc_msq_data = NULL;
 
     // --------------------------------------------------------------------
 
@@ -701,7 +713,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             if (unlikely(getsysctl("kern.ipc.sema", ipc_sem_data, sizeof(struct semid_kernel) * ipc_sem.semmni))) {
                 do_ipc_semaphores = 0;
                 error("DISABLED: system.ipc_semaphores");
-                error("DISABLED: system.ipc_semaphore_arrays");;
+                error("DISABLED: system.ipc_semaphore_arrays");
             } else {
                 for (i = 0; i < ipc_sem.semmni; i++) {
                     if (unlikely(ipc_sem_data[i].u.sem_perm.mode & SEM_ALLOC)) {
@@ -749,7 +761,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             if (unlikely(getsysctl("kern.ipc.shmsegs", ipc_shm_data, sizeof(struct shmid_kernel) * ipc_shm.shmmni))) {
                 do_ipc_shared_mem = 0;
                 error("DISABLED: system.ipc_shared_mem_segs");
-                error("DISABLED: system.ipc_shared_mem_size");;
+                error("DISABLED: system.ipc_shared_mem_size");
             } else {
                 for (i = 0; i < ipc_shm.shmmni; i++) {
                     if (unlikely(ipc_shm_data[i].u.shm_perm.mode & 0x0800)) {
@@ -780,6 +792,85 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 else rrdset_next(st);
 
                 rrddim_set(st, "allocated", ipc_shm.segsize);
+                rrdset_done(st);
+            }
+        }
+    }
+
+       // --------------------------------------------------------------------
+
+    if (likely(do_ipc_msg_queues)) {
+        if (unlikely(GETSYSCTL("kern.ipc.msgmni", ipc_msq.msgmni))) {
+            do_ipc_msg_queues = 0;
+            error("DISABLED: system.ipc_msq_queues");
+            error("DISABLED: system.ipc_msq_messages");
+            error("DISABLED: system.ipc_msq_used_size");
+            error("DISABLED: system.ipc_msq_allocated_size");
+        } else {
+            ipc_msq_data = reallocz(ipc_msq_data, sizeof(struct msqid_kernel) * ipc_msq.msgmni);
+            if (unlikely(getsysctl("kern.ipc.msqids", ipc_msq_data, sizeof(struct msqid_kernel) * ipc_msq.msgmni))) {
+                do_ipc_msg_queues = 0;
+                error("DISABLED: system.ipc_msq_queues");
+                error("DISABLED: system.ipc_msq_messages");
+                error("DISABLED: system.ipc_msq_used_size");
+                error("DISABLED: system.ipc_msq_allocated_size");
+            } else {
+                for (i = 0; i < ipc_msq.msgmni; i++) {
+                    if (unlikely(ipc_msq_data[i].u.msg_qbytes != 0)) {
+                        ipc_msq.queues += 1;
+                        ipc_msq.messages += ipc_msq_data[i].u.msg_qnum;
+                        ipc_msq.usedsize += ipc_msq_data[i].u.msg_cbytes;
+                        ipc_msq.allocsize += ipc_msq_data[i].u.msg_qbytes;
+                    }
+                }
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find("system.ipc_msq_queues");
+                if (unlikely(!st)) {
+                    st = rrdset_create("system", "ipc_msq_queues", NULL, "ipc message queues", NULL, "Number of IPC Message Queues", "queues", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+                    rrddim_add(st, "queues", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "queues", ipc_msq.queues);
+                rrdset_done(st);
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find("system.ipc_msq_messages");
+                if (unlikely(!st)) {
+                    st = rrdset_create("system", "ipc_msq_messages", NULL, "ipc message queues", NULL, "Number of Messages in IPC Message Queues", "messages", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+                    rrddim_add(st, "messages", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "messages", ipc_msq.messages);
+                rrdset_done(st);
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find("system.ipc_msq_used_size");
+                if (unlikely(!st)) {
+                    st = rrdset_create("system", "ipc_msq_used_size", NULL, "ipc message queues", NULL, "Number of used bytes in IPC Message Queues", "bytes", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+                    rrddim_add(st, "used", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "used", ipc_msq.usedsize);
+                rrdset_done(st);
+
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find("system.ipc_msq_allocated_size");
+                if (unlikely(!st)) {
+                    st = rrdset_create("system", "ipc_msq_allocated_size", NULL, "ipc message queues", NULL, "Maximum size of IPC Message Queues", "bytes", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+                    rrddim_add(st, "allocated", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "allocated", ipc_msq.allocsize);
                 rrdset_done(st);
             }
         }
