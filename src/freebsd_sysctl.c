@@ -9,6 +9,7 @@
 // NEEDED BY: struct ipc_sem_data
 #define _KERNEL
 #include <sys/sem.h>
+#include <sys/shm.h>
 #undef _KERNEL
 // NEEDED BY: do_disk_io
 #define RRD_TYPE_DISK "disk"
@@ -21,7 +22,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
     static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1,
         do_loadavg = -1, do_all_processes = -1, do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
-        do_pgfaults = -1, do_committed = -1, do_ipc_semaphores = -1;
+        do_pgfaults = -1, do_committed = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1;
 
     if (unlikely(do_cpu == -1)) {
         do_cpu                  = config_get_boolean("plugin:freebsd:sysctl", "cpu utilization", 1);
@@ -39,6 +40,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         do_pgfaults             = config_get_boolean("plugin:freebsd:sysctl", "memory page faults", 1);
         do_committed            = config_get_boolean("plugin:freebsd:sysctl", "committed memory", 1);
         do_ipc_semaphores       = config_get_boolean("plugin:freebsd:sysctl", "ipc semaphores", 1);
+        do_ipc_shared_mem       = config_get_boolean("plugin:freebsd:sysctl", "ipc shared memory", 1);
     }
 
     RRDSET *st;
@@ -113,6 +115,13 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
     } ipc_sem = {0, 0, 0};
     static struct semid_kernel *ipc_sem_data = NULL;
 
+    // NEEDED BY: do_ipc_shared_mem
+    struct ipc_shm {
+        u_long shmmni;
+        collected_number segs;
+        collected_number segsize;
+    } ipc_shm = {0, 0, 0};
+    static struct shmid_kernel *ipc_shm_data = NULL;
 
     // --------------------------------------------------------------------
 
@@ -723,6 +732,54 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 else rrdset_next(st);
 
                 rrddim_set(st, "arrays", ipc_sem.sets);
+                rrdset_done(st);
+            }
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    if (likely(do_ipc_shared_mem)) {
+        if (unlikely(GETSYSCTL("kern.ipc.shmmni", ipc_shm.shmmni))) {
+            do_ipc_shared_mem = 0;
+            error("DISABLED: system.ipc_shared_mem_segs");
+            error("DISABLED: system.ipc_shared_mem_size");
+        } else {
+            ipc_shm_data = reallocz(ipc_shm_data, sizeof(struct shmid_kernel) * ipc_shm.shmmni);
+            if (unlikely(getsysctl("kern.ipc.shmsegs", ipc_shm_data, sizeof(struct shmid_kernel) * ipc_shm.shmmni))) {
+                do_ipc_shared_mem = 0;
+                error("DISABLED: system.ipc_shared_mem_segs");
+                error("DISABLED: system.ipc_shared_mem_size");;
+            } else {
+                for (i = 0; i < ipc_shm.shmmni; i++) {
+                    if (unlikely(ipc_shm_data[i].u.shm_perm.mode & 0x0800)) {
+                        ipc_shm.segs += 1;
+                        ipc_shm.segsize += ipc_shm_data[i].u.shm_segsz;
+                    }
+                }
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find("system.ipc_shared_mem_segs");
+                if (unlikely(!st)) {
+                    st = rrdset_create("system", "ipc_shared_mem_segs", NULL, "ipc shared memory", NULL, "IPC Shared Memory Segments", "segments", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+                    rrddim_add(st, "segments", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "segments", ipc_shm.segs);
+                rrdset_done(st);
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find("system.ipc_shared_mem_size");
+                if (unlikely(!st)) {
+                    st = rrdset_create("system", "ipc_shared_mem_size", NULL, "ipc shared memory", NULL, "IPC Shared Memory Segments Size", "kilobytes", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+                    rrddim_add(st, "allocated", NULL, 1, 1024, RRDDIM_ABSOLUTE);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "allocated", ipc_shm.segsize);
                 rrdset_done(st);
             }
         }
