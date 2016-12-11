@@ -23,9 +23,9 @@ struct interrupt {
 // given a base, get a pointer to each record
 #define irrindex(base, line, cpus) ((struct interrupt *)&((char *)(base))[line * recordsize(cpus)])
 
-static inline struct interrupt *get_interrupts_array(int lines, int cpus) {
+static inline struct interrupt *get_interrupts_array(uint32_t lines, int cpus) {
     static struct interrupt *irrs = NULL;
-    static int allocated = 0;
+    static uint32_t allocated = 0;
 
     if(unlikely(lines != allocated)) {
         uint32_t l;
