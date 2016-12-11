@@ -129,7 +129,7 @@ struct mount_point_metadata {
     int do_inodes;
 };
 
-static inline void do_disk_space_stats(struct disk *d, const char *mount_point, const char *mount_source, const char *disk, const char *family, int update_every, unsigned long long dt) {
+static inline void do_disk_space_stats(struct disk *d, const char *mount_point, const char *mount_source, const char *disk, const char *family, const char *filesystem, int update_every, unsigned long long dt) {
     (void)dt;
 
     static DICTIONARY *mount_points = NULL;
@@ -169,6 +169,10 @@ static inline void do_disk_space_stats(struct disk *d, const char *mount_point, 
             int def_inodes = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "inodes usage for all disks", CONFIG_ONDEMAND_ONDEMAND);
 
             if(unlikely(is_mount_point_excluded(mount_point))) {
+                def_space = CONFIG_ONDEMAND_NO;
+                def_inodes = CONFIG_ONDEMAND_NO;
+            }
+            else if(unlikely(filesystem && !strcmp(filesystem, "iso9660"))) {
                 def_space = CONFIG_ONDEMAND_NO;
                 def_inodes = CONFIG_ONDEMAND_NO;
             }
@@ -868,7 +872,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
         // space metrics
 
         if(unlikely( d->mount_point && (d->do_space || d->do_inodes) )) {
-            do_disk_space_stats(d, d->mount_point, disk, disk, family, update_every, dt);
+            do_disk_space_stats(d, d->mount_point, disk, disk, family, NULL, update_every, dt);
         }
 */
     }
@@ -898,7 +902,7 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
         // fprintf(stderr, "Will process mount point '%s', source '%s', filesystem '%s'\n", mi->mount_point, mi->mount_source, mi->filesystem);
 */
 
-        do_disk_space_stats(NULL, mi->mount_point, mi->mount_source, mi->persistent_id, mi->mount_point , update_every, dt);
+        do_disk_space_stats(NULL, mi->mount_point, mi->mount_source, mi->persistent_id, mi->mount_point, mi->filesystem, update_every, dt);
     }
 
     return 0;
