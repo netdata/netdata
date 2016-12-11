@@ -129,8 +129,11 @@ struct mount_point_metadata {
     int do_inodes;
 };
 
-static inline void do_disk_space_stats(struct disk *d, const char *mount_point, const char *mount_source, const char *disk, const char *family, int update_every, unsigned long long dt) {
+static inline void do_disk_space_stats(struct mountinfo *mi, int update_every, unsigned long long dt) {
     (void)dt;
+
+    const char *family = mi->mount_point;
+    const char *disk = mi->persistent_id;
 
     static DICTIONARY *mount_points = NULL;
     int do_space, do_inodes;
@@ -139,62 +142,40 @@ static inline void do_disk_space_stats(struct disk *d, const char *mount_point, 
         mount_points = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
     }
 
-    if(unlikely(d)) {
-        // verify we collected the metrics for the right disk.
-        // if not the mountpoint has changed.
+    struct mount_point_metadata *m = dictionary_get(mount_points, mi->mount_point);
+    if(unlikely(!m)) {
+        char var_name[4096 + 1];
+        snprintfz(var_name, 4096, "plugin:proc:/proc/diskstats:%s", mi->mount_point);
 
-        struct stat buff_stat;
-        if(unlikely(stat(mount_point, &buff_stat) == -1)) {
-            error("Failed to stat() for '%s' (disk '%s')", mount_point, disk);
-            return;
-        }
-        else if(unlikely(major(buff_stat.st_dev) != d->major || minor(buff_stat.st_dev) != d->minor)) {
-            error("Disk '%s' (disk '%s') switched major:minor", mount_point, disk);
-            freez(d->mount_point);
-            d->mount_point = NULL;
-            d->mount_point_hash = 0;
-            return;
+        int def_space = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "space usage for all disks", CONFIG_ONDEMAND_ONDEMAND);
+        int def_inodes = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "inodes usage for all disks", CONFIG_ONDEMAND_ONDEMAND);
+
+        if(unlikely(is_mount_point_excluded(mi->mount_point))) {
+            def_space = CONFIG_ONDEMAND_NO;
+            def_inodes = CONFIG_ONDEMAND_NO;
         }
 
-        do_space = d->do_space;
-        do_inodes = d->do_inodes;
+        do_space = config_get_boolean_ondemand(var_name, "space usage", def_space);
+        do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", def_inodes);
+
+        struct mount_point_metadata mp = {
+            .do_space = do_space,
+            .do_inodes = do_inodes
+        };
+
+        dictionary_set(mount_points, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
     }
     else {
-        struct mount_point_metadata *m = dictionary_get(mount_points, mount_point);
-        if(unlikely(!m)) {
-            char var_name[4096 + 1];
-            snprintfz(var_name, 4096, "plugin:proc:/proc/diskstats:%s", mount_point);
-
-            int def_space = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "space usage for all disks", CONFIG_ONDEMAND_ONDEMAND);
-            int def_inodes = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "inodes usage for all disks", CONFIG_ONDEMAND_ONDEMAND);
-
-            if(unlikely(is_mount_point_excluded(mount_point))) {
-                def_space = CONFIG_ONDEMAND_NO;
-                def_inodes = CONFIG_ONDEMAND_NO;
-            }
-
-            do_space = config_get_boolean_ondemand(var_name, "space usage", def_space);
-            do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", def_inodes);
-
-            struct mount_point_metadata mp = {
-                .do_space = do_space,
-                .do_inodes = do_inodes
-            };
-
-            dictionary_set(mount_points, mount_point, &mp, sizeof(struct mount_point_metadata));
-        }
-        else {
-            do_space = m->do_space;
-            do_inodes = m->do_inodes;
-        }
+        do_space = m->do_space;
+        do_inodes = m->do_inodes;
     }
 
     if(unlikely(do_space == CONFIG_ONDEMAND_NO && do_inodes == CONFIG_ONDEMAND_NO))
         return;
 
     struct statvfs buff_statvfs;
-    if (statvfs(mount_point, &buff_statvfs) < 0) {
-        error("Failed statvfs() for '%s' (disk '%s')", mount_point, disk);
+    if (statvfs(mi->mount_point, &buff_statvfs) < 0) {
+        error("Failed statvfs() for '%s' (disk '%s')", mi->mount_point, disk);
         return;
     }
 
@@ -213,7 +194,7 @@ static inline void do_disk_space_stats(struct disk *d, const char *mount_point, 
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(btotal != bavail + breserved_root + bused))
-        error("Disk block statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mount_point, disk, (unsigned long long)btotal, (unsigned long long)bavail, (unsigned long long)breserved_root, (unsigned long long)bused);
+        error("Disk block statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mi->mount_point, disk, (unsigned long long)btotal, (unsigned long long)bavail, (unsigned long long)breserved_root, (unsigned long long)bused);
 #endif
 
     // --------------------------------------------------------------------------
@@ -226,7 +207,7 @@ static inline void do_disk_space_stats(struct disk *d, const char *mount_point, 
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(btotal != bavail + breserved_root + bused))
-        error("Disk inode statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mount_point, disk, (unsigned long long)ftotal, (unsigned long long)favail, (unsigned long long)freserved_root, (unsigned long long)fused);
+        error("Disk inode statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mi->mount_point, disk, (unsigned long long)ftotal, (unsigned long long)favail, (unsigned long long)freserved_root, (unsigned long long)fused);
 #endif
 
     // --------------------------------------------------------------------------
@@ -237,7 +218,7 @@ static inline void do_disk_space_stats(struct disk *d, const char *mount_point, 
         st = rrdset_find_bytype("disk_space", disk);
         if(unlikely(!st)) {
             char title[4096 + 1];
-            snprintfz(title, 4096, "Disk Space Usage for %s [%s]", family, mount_source);
+            snprintfz(title, 4096, "Disk Space Usage for %s [%s]", family, mi->mount_source);
             st = rrdset_create("disk_space", disk, NULL, family, "disk.space", title, "GB", 2023, update_every, RRDSET_TYPE_STACKED);
 
             rrddim_add(st, "avail", NULL, bsize, 1024*1024*1024, RRDDIM_ABSOLUTE);
@@ -246,9 +227,9 @@ static inline void do_disk_space_stats(struct disk *d, const char *mount_point, 
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "avail", bavail);
-        rrddim_set(st, "used", bused);
-        rrddim_set(st, "reserved_for_root", breserved_root);
+        rrddim_set(st, "avail", (collected_number)bavail);
+        rrddim_set(st, "used", (collected_number)bused);
+        rrddim_set(st, "reserved_for_root", (collected_number)breserved_root);
         rrdset_done(st);
     }
 
@@ -258,7 +239,7 @@ static inline void do_disk_space_stats(struct disk *d, const char *mount_point, 
         st = rrdset_find_bytype("disk_inodes", disk);
         if(unlikely(!st)) {
             char title[4096 + 1];
-            snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]", family, mount_source);
+            snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]", family, mi->mount_source);
             st = rrdset_create("disk_inodes", disk, NULL, family, "disk.inodes", title, "Inodes", 2024, update_every, RRDSET_TYPE_STACKED);
 
             rrddim_add(st, "avail", NULL, 1, 1, RRDDIM_ABSOLUTE);
@@ -267,9 +248,9 @@ static inline void do_disk_space_stats(struct disk *d, const char *mount_point, 
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "avail", favail);
-        rrddim_set(st, "used", fused);
-        rrddim_set(st, "reserved_for_root", freserved_root);
+        rrddim_set(st, "avail", (collected_number)favail);
+        rrddim_set(st, "used", (collected_number)fused);
+        rrddim_set(st, "reserved_for_root", (collected_number)freserved_root);
         rrdset_done(st);
     }
 }
@@ -862,15 +843,6 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
                 rrdset_done(st);
             }
         }
-
-/*
-        // --------------------------------------------------------------------------
-        // space metrics
-
-        if(unlikely( d->mount_point && (d->do_space || d->do_inodes) )) {
-            do_disk_space_stats(d, d->mount_point, disk, disk, family, update_every, dt);
-        }
-*/
     }
 
     // --------------------------------------------------------------------------
@@ -878,27 +850,10 @@ int do_proc_diskstats(int update_every, unsigned long long dt) {
 
     struct mountinfo *mi;
     for(mi = disk_mountinfo_root; mi ;mi = mi->next) {
-        if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY|MOUNTINFO_IS_BIND|MOUNTINFO_IS_SAME_DEV|MOUNTINFO_NO_STAT|MOUNTINFO_NO_SIZE)))
+        if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY|MOUNTINFO_IS_BIND|MOUNTINFO_IS_SAME_DEV|MOUNTINFO_NO_STAT|MOUNTINFO_NO_SIZE|MOUNTINFO_READONLY)))
             continue;
 
-/*
-        // skip the ones with block devices
-        int skip = 0;
-        struct disk *d;
-        for(d = disk_root; d ;d = d->next) {
-            if(unlikely(d->mount_point && mi->mount_point_hash == d->mount_point_hash && strcmp(mi->mount_point, d->mount_point))) {
-                skip = 1;
-                break;
-            }
-        }
-
-        if(unlikely(skip))
-            continue;
-
-        // fprintf(stderr, "Will process mount point '%s', source '%s', filesystem '%s'\n", mi->mount_point, mi->mount_source, mi->filesystem);
-*/
-
-        do_disk_space_stats(NULL, mi->mount_point, mi->mount_source, mi->persistent_id, mi->mount_point , update_every, dt);
+        do_disk_space_stats(mi, update_every, dt);
     }
 
     return 0;
