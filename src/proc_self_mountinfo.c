@@ -157,6 +157,21 @@ static char *strdupz_decoding_octal(const char *string) {
     return buffer;
 }
 
+static inline int is_read_only(const char *s) {
+    if(!s) return 0;
+
+    size_t len = strlen(s);
+    if(len < 2) return 0;
+    if(len == 2) {
+        if(!strcmp(s, "ro")) return 1;
+        return 0;
+    }
+    if(!strncmp(s, "ro,", 3)) return 1;
+    if(!strncmp(&s[len - 3], ",ro", 3)) return 1;
+    if(strstr(s, ",ro,")) return 1;
+    return 0;
+}
+
 // read the whole mountinfo into a linked list
 struct mountinfo *mountinfo_read() {
     char filename[FILENAME_MAX + 1];
@@ -214,6 +229,9 @@ struct mountinfo *mountinfo_read() {
 
         mi->mount_options = strdupz(procfile_lineword(ff, l, w)); w++;
 
+        if(unlikely(is_read_only(mi->mount_options)))
+            mi->flags |= MOUNTINFO_READONLY;
+
         // count the optional fields
 /*
         unsigned long wo = w;
@@ -253,6 +271,9 @@ struct mountinfo *mountinfo_read() {
             mi->mount_source_hash = simple_hash(mi->mount_source);
 
             mi->super_options = strdupz(procfile_lineword(ff, l, w)); w++;
+
+            if(unlikely(is_read_only(mi->super_options)))
+                mi->flags |= MOUNTINFO_READONLY;
 
             if(unlikely(ME_DUMMY(mi->mount_source, mi->filesystem)))
                 mi->flags |= MOUNTINFO_IS_DUMMY;
