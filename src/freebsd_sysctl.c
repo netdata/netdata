@@ -23,12 +23,15 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
     static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1,
         do_loadavg = -1, do_all_processes = -1, do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
-        do_pgfaults = -1, do_committed = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1;
+        do_pgfaults = -1, do_committed = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
+        do_dev_intr = -1, do_soft_intr = -1;
 
     if (unlikely(do_cpu == -1)) {
         do_cpu                  = config_get_boolean("plugin:freebsd:sysctl", "cpu utilization", 1);
         do_cpu_cores            = config_get_boolean("plugin:freebsd:sysctl", "per cpu core utilization", 1);
         do_interrupts           = config_get_boolean("plugin:freebsd:sysctl", "cpu interrupts", 1);
+        do_dev_intr             = config_get_boolean("plugin:freebsd:sysctl", "device interrupts", 1);
+        do_soft_intr            = config_get_boolean("plugin:freebsd:sysctl", "software interrupts", 1);
         do_context              = config_get_boolean("plugin:freebsd:sysctl", "context switches", 1);
         do_forks                = config_get_boolean("plugin:freebsd:sysctl", "processes started", 1);
         do_processes            = config_get_boolean("plugin:freebsd:sysctl", "processes running", 1);
@@ -331,7 +334,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 st = rrdset_find_bytype("system", "intr");
                 if (unlikely(!st)) {
-                    st = rrdset_create("system", "intr", NULL, "interrupts", NULL, "Total Device Interrupts", "interrupts/s", 900, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create("system", "intr", NULL, "interrupts", NULL, "Total Hardware Interrupts", "interrupts/s", 900, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
                     rrddim_add(st, "interrupts", NULL, 1, 1, RRDDIM_INCREMENTAL);
@@ -341,6 +344,48 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 rrddim_set(st, "interrupts", totalintr);
                 rrdset_done(st);
             }
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    if (likely(do_dev_intr)) {
+        if (unlikely(GETSYSCTL("vm.stats.sys.v_intr", u_int_data))) {
+            do_dev_intr = 0;
+            error("DISABLED: system.dev_intr");
+        } else {
+
+            st = rrdset_find_bytype("system", "dev_intr");
+            if (unlikely(!st)) {
+                st = rrdset_create("system", "dev_intr", NULL, "interrupts", NULL, "Device Interrupts", "interrupts/s", 1000, update_every, RRDSET_TYPE_LINE);
+
+                rrddim_add(st, "interrupts", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            }
+            else rrdset_next(st);
+
+            rrddim_set(st, "interrupts", u_int_data);
+            rrdset_done(st);
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    if (likely(do_soft_intr)) {
+        if (unlikely(GETSYSCTL("vm.stats.sys.v_soft", u_int_data))) {
+            do_soft_intr = 0;
+            error("DISABLED: system.dev_intr");
+        } else {
+
+            st = rrdset_find_bytype("system", "soft_intr");
+            if (unlikely(!st)) {
+                st = rrdset_create("system", "soft_intr", NULL, "interrupts", NULL, "Software Interrupts", "interrupts/s", 1100, update_every, RRDSET_TYPE_LINE);
+
+                rrddim_add(st, "interrupts", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            }
+            else rrdset_next(st);
+
+            rrddim_set(st, "interrupts", u_int_data);
+            rrdset_done(st);
         }
     }
 
@@ -649,7 +694,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_swapio)) {
-        if (unlikely(GETSYSCTL("vm.stats.vm.v_swappgsin", vmmeter_data.v_swappgsin) || GETSYSCTL("vm.stats.vm.v_vnodepgsout", vmmeter_data.v_swappgsout))) {
+        if (unlikely(GETSYSCTL("vm.stats.vm.v_swappgsin", vmmeter_data.v_swappgsin) || GETSYSCTL("vm.stats.vm.v_swappgsout", vmmeter_data.v_swappgsout))) {
             do_swapio = 0;
             error("DISABLED: system.swapio");
         } else {
@@ -826,7 +871,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 st = rrdset_find("system.ipc_msq_queues");
                 if (unlikely(!st)) {
-                    st = rrdset_create("system", "ipc_msq_queues", NULL, "ipc message queues", NULL, "Number of IPC Message Queues", "queues", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+                    st = rrdset_create("system", "ipc_msq_queues", NULL, "ipc message queues", NULL, "Number of IPC Message Queues", "queues", 900, rrd_update_every, RRDSET_TYPE_AREA);
                     rrddim_add(st, "queues", NULL, 1, 1, RRDDIM_ABSOLUTE);
                 }
                 else rrdset_next(st);
@@ -850,7 +895,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 st = rrdset_find("system.ipc_msq_size");
                 if (unlikely(!st)) {
-                    st = rrdset_create("system", "ipc_msq_size", NULL, "ipc message queues", NULL, "Size of IPC Message Queues", "bytes", 1000, rrd_update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create("system", "ipc_msq_size", NULL, "ipc message queues", NULL, "Size of IPC Message Queues", "bytes", 1100, rrd_update_every, RRDSET_TYPE_LINE);
                     rrddim_add(st, "allocated", NULL, 1, 1, RRDDIM_ABSOLUTE);
                     rrddim_add(st, "used", NULL, 1, 1, RRDDIM_ABSOLUTE);
                 }
