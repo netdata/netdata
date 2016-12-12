@@ -797,23 +797,21 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         }
     }
 
-       // --------------------------------------------------------------------
+    // --------------------------------------------------------------------
 
     if (likely(do_ipc_msg_queues)) {
         if (unlikely(GETSYSCTL("kern.ipc.msgmni", ipc_msq.msgmni))) {
             do_ipc_msg_queues = 0;
             error("DISABLED: system.ipc_msq_queues");
             error("DISABLED: system.ipc_msq_messages");
-            error("DISABLED: system.ipc_msq_used_size");
-            error("DISABLED: system.ipc_msq_allocated_size");
+            error("DISABLED: system.ipc_msq_size");
         } else {
             ipc_msq_data = reallocz(ipc_msq_data, sizeof(struct msqid_kernel) * ipc_msq.msgmni);
             if (unlikely(getsysctl("kern.ipc.msqids", ipc_msq_data, sizeof(struct msqid_kernel) * ipc_msq.msgmni))) {
                 do_ipc_msg_queues = 0;
                 error("DISABLED: system.ipc_msq_queues");
                 error("DISABLED: system.ipc_msq_messages");
-                error("DISABLED: system.ipc_msq_used_size");
-                error("DISABLED: system.ipc_msq_allocated_size");
+                error("DISABLED: system.ipc_msq_size");
             } else {
                 for (i = 0; i < ipc_msq.msgmni; i++) {
                     if (unlikely(ipc_msq_data[i].u.msg_qbytes != 0)) {
@@ -850,28 +848,18 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 // --------------------------------------------------------------------
 
-                st = rrdset_find("system.ipc_msq_used_size");
+                st = rrdset_find("system.ipc_msq_size");
                 if (unlikely(!st)) {
-                    st = rrdset_create("system", "ipc_msq_used_size", NULL, "ipc message queues", NULL, "Number of used bytes in IPC Message Queues", "bytes", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+                    st = rrdset_create("system", "ipc_msq_size", NULL, "ipc message queues", NULL, "Size of IPC Message Queues", "bytes", 1000, rrd_update_every, RRDSET_TYPE_LINE);
+                    rrddim_add(st, "allocated", NULL, 1, 1, RRDDIM_ABSOLUTE);
                     rrddim_add(st, "used", NULL, 1, 1, RRDDIM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
+                rrddim_set(st, "allocated", ipc_msq.allocsize);
                 rrddim_set(st, "used", ipc_msq.usedsize);
                 rrdset_done(st);
 
-
-                // --------------------------------------------------------------------
-
-                st = rrdset_find("system.ipc_msq_allocated_size");
-                if (unlikely(!st)) {
-                    st = rrdset_create("system", "ipc_msq_allocated_size", NULL, "ipc message queues", NULL, "Maximum size of IPC Message Queues", "bytes", 1000, rrd_update_every, RRDSET_TYPE_AREA);
-                    rrddim_add(st, "allocated", NULL, 1, 1, RRDDIM_ABSOLUTE);
-                }
-                else rrdset_next(st);
-
-                rrddim_set(st, "allocated", ipc_msq.allocsize);
-                rrdset_done(st);
             }
         }
     }
