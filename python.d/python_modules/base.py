@@ -868,22 +868,22 @@ class ExecutableService(SimpleService):
             self.command = str(self.configuration['command'])
         except (KeyError, TypeError):
             self.info("No command specified. Using: '" + self.command + "'")
-        command = self.command.split(' ')
+	# Splitting self.command on every space so subprocess.Popen reads it properly
+        self.command = self.command.split(' ')
 
-        for arg in command[1:]:
+        for arg in self.command[1:]:
             if any(st in arg for st in self.bad_substrings):
                 self.error("Bad command argument:" + " ".join(self.command[1:]))
                 return False
 
         # test command and search for it in /usr/sbin or /sbin when failed
-        base = command[0].split('/')[-1]
+        base = self.command[0].split('/')[-1]
         if self._get_raw_data() is None:
             for prefix in ['/sbin/', '/usr/sbin/']:
-                command[0] = prefix + base
-                if os.path.isfile(command[0]):
+                self.command[0] = prefix + base
+                if os.path.isfile(self.command[0]):
                     break
 
-        self.command = command
         if self._get_data() is None or len(self._get_data()) == 0:
             self.error("Command", self.command, "returned no data")
             return False
