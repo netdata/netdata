@@ -5,18 +5,18 @@
 struct timespec {
     time_t tv_sec;  /* seconds */
     long   tv_nsec; /* nanoseconds */
-}
+};
 #endif
 
 #ifndef HAVE_CLOCKID_T
-typedef int clockid_t
+typedef int clockid_t;
 #endif
 
 #ifndef HAVE_CLOCK_GETTIME
 int clock_gettime(clockid_t clk_id, struct timespec *ts);
 #endif
 
-/* Linux values are as good as any others */
+/* Linux value is as good as any other */
 #ifndef CLOCK_REALTIME
 #define CLOCK_REALTIME  0
 #endif
