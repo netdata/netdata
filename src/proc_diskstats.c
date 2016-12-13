@@ -450,6 +450,24 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         globals_initialized = 1;
     }
 
+    // --------------------------------------------------------------------------
+    // this is smart enough not to reload it every time
+
+    mountinfo_reload(0);
+
+    // --------------------------------------------------------------------------
+    // disk space metrics
+
+    struct mountinfo *mi;
+    for(mi = disk_mountinfo_root; mi ;mi = mi->next) {
+        if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY|MOUNTINFO_IS_BIND|MOUNTINFO_IS_SAME_DEV|MOUNTINFO_NO_STAT|MOUNTINFO_NO_SIZE|MOUNTINFO_READONLY)))
+            continue;
+
+        do_disk_space_stats(mi, update_every, dt);
+    }
+
+    // --------------------------------------------------------------------------
+
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/diskstats");
@@ -461,9 +479,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
     uint32_t lines = procfile_lines(ff), l;
-
-    // this is smart enough not to reload it every time
-    mountinfo_reload(0);
 
     for(l = 0; l < lines ;l++) {
         // --------------------------------------------------------------------------
@@ -843,17 +858,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
         }
-    }
-
-    // --------------------------------------------------------------------------
-    // space metrics for non-block devices
-
-    struct mountinfo *mi;
-    for(mi = disk_mountinfo_root; mi ;mi = mi->next) {
-        if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY|MOUNTINFO_IS_BIND|MOUNTINFO_IS_SAME_DEV|MOUNTINFO_NO_STAT|MOUNTINFO_NO_SIZE|MOUNTINFO_READONLY)))
-            continue;
-
-        do_disk_space_stats(mi, update_every, dt);
     }
 
     return 0;
