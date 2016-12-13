@@ -54,39 +54,43 @@ int clock_gettime(clockid_t clk_id, struct timespec *ts);
 extern int clock_gettime(clockid_t clk_id, struct timespec *ts);
 #endif
 
-/* Fills struct timeval with time since EPOCH from real-time clock (i.e. wall-clock).
- * - Hibernation/suspend time is included
- * - adjtime()/NTP adjustments affect this clock
- * Return 0 on succes, -1 else with errno set appropriately.
+/*
+ * Three clocks are available (cf. man 3 clock_gettime):
+ *
+ * REALTIME clock (i.e. wall-clock):
+ *  This clock is affected by discontinuous jumps in the system time
+ *  (e.g., if the system administrator manually changes the clock), and by the incremental adjustments performed by adjtime(3) and NTP.
+ *
+ * MONOTONIC clock
+ *  Clock that cannot be set and represents monotonic time since some unspecified starting point.
+ *  This clock is not affected by discontinuous jumps in the system time
+ *  (e.g., if the system administrator manually changes the clock), but is affected by the incremental adjustments performed by adjtime(3) and NTP.
+ *  If not available on the system, this clock falls back to REALTIME clock.
+ *
+ * BOOTTIME clock
+ *  Identical to  CLOCK_MONOTONIC, except it also includes any time that the system is suspended.
+ *  This allows applications to get a suspend-aware monotonic clock without having to deal with the complications of CLOCK_REALTIME,
+ *  which may have discontinuities if the time is changed using settimeofday(2).
+ *  If not available on the system, this clock falls back to MONOTONIC clock.
+ *
+ * All now_*_timeval() functions fill the `struct timeval` with the time from the appropriate clock.
+ * Those functions return 0 on success, -1 else with errno set appropriately.
+ *
+ * All now_*_sec() functions return the time in seconds from the approriate clock, or 0 on error.
+ * All now_*_usec() functions return the time in microseconds from the approriate clock, or 0 on error.
  */
 extern int now_realtime_timeval(struct timeval *tv);
-
-/* Returns time since EPOCH from real-time clock (i.e. wall-clock).
- * - Hibernation/suspend time is included
- * - adjtime()/NTP adjustments affect this clock
- */
 extern time_t now_realtime_sec(void);
 extern usec_t now_realtime_usec(void);
 
-/* Returns time from monotonic clock if available, real-time clock else.
- * If monotonic clock is available:
- * - hibernation/suspend time is not included
- * - adjtime()/NTP adjusments affect this clock
- * If monotonic clock is not available, this fallbacks to now_realtime().
- */
+extern int now_monotonic_timeval(struct timeval *tv);
 extern time_t now_monotonic_sec(void);
 extern usec_t now_monotonic_usec(void);
 
-/* Returns time from boottime clock if available,
- * monotonic clock else if available, real-time clock else.
- * If boottime clock is available:
- * - hibernation/suspend time is included
- * - adjtime()/NTP adjusments affect this clock
- * If boottime clock is not available, this fallbacks to now_monotonic().
- * If monotonic clock is not available, this fallbacks to now_realtime().
- */
+extern int now_boottime_timeval(struct timeval *tv);
 extern time_t now_boottime_sec(void);
 extern usec_t now_boottime_usec(void);
+
 
 extern usec_t timeval_usec(struct timeval *ts);
 extern usec_t dt_usec(struct timeval *now, struct timeval *old);
