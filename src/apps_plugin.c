@@ -2903,9 +2903,9 @@ int main(int argc, char **argv)
 
     usec_t step = update_every * USEC_PER_SEC;
     global_iterations_counter = 1;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
     for(;1; global_iterations_counter++) {
-        usec_t now = now_realtime_usec();
-        usec_t next = now - (now % step) + step;
 
 #ifdef NETDATA_PROFILING
 #warning "compiling for profiling"
@@ -2913,10 +2913,7 @@ int main(int argc, char **argv)
         profiling_count++;
         if(unlikely(profiling_count > 1000)) exit(0);
 #else
-        while(now < next) {
-            sleep_usec(next - now);
-            now = now_realtime_usec();
-        }
+        heartbeat_next(&hb, step);
 #endif
 
         if(!collect_data_for_all_processes_from_proc()) {
