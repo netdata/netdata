@@ -6,7 +6,7 @@
 int do_proc_loadavg(int update_every, usec_t dt) {
     static procfile *ff = NULL;
     static int do_loadavg = -1, do_all_processes = -1;
-    static usec_t last_loadavg_usec = 0;
+    static usec_t next_loadavg_dt = 0;
     static RRDSET *load_chart = NULL, *processes_chart = NULL;
 
     if(unlikely(!ff)) {
@@ -47,7 +47,7 @@ int do_proc_loadavg(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(last_loadavg_usec <= dt) {
+    if(next_loadavg_dt <= dt) {
         if(likely(do_loadavg)) {
             if(unlikely(!load_chart)) {
                 load_chart = rrdset_find_byname("system.load");
@@ -67,9 +67,9 @@ int do_proc_loadavg(int update_every, usec_t dt) {
             rrdset_done(load_chart);
         }
 
-        last_loadavg_usec = load_chart->update_every * USEC_PER_SEC;
+        next_loadavg_dt = load_chart->update_every * USEC_PER_SEC;
     }
-    else last_loadavg_usec -= dt;
+    else next_loadavg_dt -= dt;
 
     // --------------------------------------------------------------------
 

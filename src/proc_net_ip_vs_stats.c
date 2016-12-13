@@ -3,14 +3,13 @@
 #define RRD_TYPE_NET_IPVS           "ipvs"
 
 int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
+    (void)dt;
     static int do_bandwidth = -1, do_sockets = -1, do_packets = -1;
     static procfile *ff = NULL;
 
     if(do_bandwidth == -1)  do_bandwidth    = config_get_boolean("plugin:proc:/proc/net/ip_vs_stats", "IPVS bandwidth", 1);
     if(do_sockets == -1)    do_sockets      = config_get_boolean("plugin:proc:/proc/net/ip_vs_stats", "IPVS connections", 1);
     if(do_packets == -1)    do_packets      = config_get_boolean("plugin:proc:/proc/net/ip_vs_stats", "IPVS packets", 1);
-
-    if(dt) {};
 
     if(!ff) {
         char filename[FILENAME_MAX + 1];

@@ -20,10 +20,9 @@ KSM_NAME_VALUE values[] = {
 };
 
 int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
+    (void)dt;
     static procfile *ff_pages_shared = NULL, *ff_pages_sharing = NULL, *ff_pages_unshared = NULL, *ff_pages_volatile = NULL, *ff_pages_to_scan = NULL;
     static long page_size = -1;
-
-    if(dt) {};
 
     if(page_size == -1)
         page_size = sysconf(_SC_PAGESIZE);
