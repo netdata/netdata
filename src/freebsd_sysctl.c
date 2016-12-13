@@ -12,6 +12,8 @@
 #include <sys/shm.h>
 #include <sys/msg.h>
 #undef _KERNEL
+// NEEDED BY: struct sysctl_netisr_workstream, struct sysctl_netisr_work
+#include <net/netisr.h>
 // NEEDED BY: do_disk_io
 #define RRD_TYPE_DISK "disk"
 
@@ -24,7 +26,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
     static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1,
         do_loadavg = -1, do_all_processes = -1, do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
         do_pgfaults = -1, do_committed = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
-        do_dev_intr = -1, do_soft_intr = -1;
+        do_dev_intr = -1, do_soft_intr = -1, do_netisr = -1, do_netisr_per_core = -1;
 
     if (unlikely(do_cpu == -1)) {
         do_cpu                  = config_get_boolean("plugin:freebsd:sysctl", "cpu utilization", 1);
@@ -46,38 +48,43 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         do_ipc_semaphores       = config_get_boolean("plugin:freebsd:sysctl", "ipc semaphores", 1);
         do_ipc_shared_mem       = config_get_boolean("plugin:freebsd:sysctl", "ipc shared memory", 1);
         do_ipc_msg_queues       = config_get_boolean("plugin:freebsd:sysctl", "ipc message queues", 1);
+        do_netisr               = config_get_boolean("plugin:freebsd:sysctl", "netisr", 1);
+        do_netisr_per_core      = config_get_boolean("plugin:freebsd:sysctl", "netisr per core", 1);
     }
 
     RRDSET *st;
 
     int system_pagesize = getpagesize(); // wouldn't it be better to get value directly from hw.pagesize?
-    int i;
+    int i, n;
+    int common_error = 0;
 
-// NEEDED BY: do_loadavg
+    // NEEDED BY: do_loadavg
     static usec_t last_loadavg_usec = 0;
     struct loadavg sysload;
 
-// NEEDED BY: do_cpu, do_cpu_cores
+    // NEEDED BY: do_cpu, do_cpu_cores
     long cp_time[CPUSTATES];
 
-// NEEDED BY: do_cpu_cores
+    // NEEDED BY: du_cpu_cores, do_netisr, do_netisr_per_core
     int ncpus;
+
+    // NEEDED BY: do_cpu_cores
     static long *pcpu_cp_time = NULL;
     char cpuid[8]; // no more than 4 digits expected
 
-// NEEDED BY: do_all_processes, do_processes
+    // NEEDED BY: do_all_processes, do_processes
     struct vmtotal vmtotal_data;
 
-// NEEDED BY: do_context, do_forks
+    // NEEDED BY: do_context, do_forks
     u_int u_int_data;
 
-// NEEDED BY: do_interrupts
+    // NEEDED BY: do_interrupts
     size_t intrcnt_size;
     unsigned long nintr = 0;
     static unsigned long *intrcnt = NULL;
     unsigned long long totalintr = 0;
 
-// NEEDED BY: do_disk_io
+    // NEEDED BY: do_disk_io
     #define BINTIME_SCALE 5.42101086242752217003726400434970855712890625e-17 // this is 1000/2^64
     int numdevs;
     static void *devstat_data = NULL;
@@ -137,6 +144,20 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         collected_number allocsize;
     } ipc_msq = {0, 0, 0, 0, 0};
     static struct msqid_kernel *ipc_msq_data = NULL;
+
+    // NEEDED BY: do_netisr, do_netisr_per_core
+    size_t netisr_workstream_size;
+    size_t netisr_work_size;
+    unsigned long num_netisr_workstreams = 0, num_netisr_works = 0;
+    static struct sysctl_netisr_workstream *netisr_workstream = NULL;
+    static struct sysctl_netisr_work *netisr_work = NULL;
+    static struct netisr_stats {
+        collected_number dispatched;
+        collected_number hybrid_dispatched;
+        collected_number qdrops;
+        collected_number queued;
+    } *netisr_stats = NULL;
+    char netstat_cpuid[21]; // no more than 4 digits expected
 
     // --------------------------------------------------------------------
 
@@ -871,7 +892,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 st = rrdset_find("system.ipc_msq_queues");
                 if (unlikely(!st)) {
-                    st = rrdset_create("system", "ipc_msq_queues", NULL, "ipc message queues", NULL, "Number of IPC Message Queues", "queues", 900, rrd_update_every, RRDSET_TYPE_AREA);
+                    st = rrdset_create("system", "ipc_msq_queues", NULL, "ipc message queues", NULL, "Number of IPC Message Queues", "queues", 990, rrd_update_every, RRDSET_TYPE_AREA);
                     rrddim_add(st, "queues", NULL, 1, 1, RRDDIM_ABSOLUTE);
                 }
                 else rrdset_next(st);
@@ -906,6 +927,105 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 rrdset_done(st);
 
             }
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    if (likely(do_netisr || do_netisr_per_core)) {
+        if (unlikely(GETSYSCTL("kern.smp.cpus", ncpus))) {
+            common_error = 1;
+        } else if (unlikely(ncpus > 9999)) {
+            error("FREEBSD: There are more than 4 digits in cpu cores number");
+            common_error = 1;
+        } else if (unlikely(sysctlbyname("net.isr.workstream", NULL, &netisr_workstream_size, NULL, 0) == -1)) {
+            error("FREEBSD: sysctl(net.isr.workstream...) failed: %s", strerror(errno));
+            common_error = 1;
+        } else if (unlikely(sysctlbyname("net.isr.work", NULL, &netisr_work_size, NULL, 0) == -1)) {
+            error("FREEBSD: sysctl(net.isr.work...) failed: %s", strerror(errno));
+            common_error = 1;
+        } else {
+            num_netisr_workstreams = netisr_workstream_size / sizeof(struct sysctl_netisr_workstream);
+            netisr_workstream = reallocz(netisr_workstream, num_netisr_workstreams * sizeof(struct sysctl_netisr_workstream));
+            if (unlikely(getsysctl("net.isr.workstream", netisr_workstream, num_netisr_workstreams * sizeof(struct sysctl_netisr_workstream)))){
+                common_error = 1;
+            } else {
+                num_netisr_works = netisr_work_size / sizeof(struct sysctl_netisr_work);
+                netisr_work = reallocz(netisr_work, num_netisr_works * sizeof(struct sysctl_netisr_work));
+                if (unlikely(getsysctl("net.isr.work", netisr_work, num_netisr_works * sizeof(struct sysctl_netisr_work)))){
+                    common_error = 1;
+                }
+            }
+        }
+        if (unlikely(common_error)) {
+            do_netisr = 0;
+            error("DISABLED: system.softnet_stat");
+            do_netisr_per_core = 0;
+            error("DISABLED: system.cpuX_softnet_stat");
+            common_error = 0;
+        } else {
+            netisr_stats = reallocz(netisr_stats, (ncpus + 1) * sizeof(struct netisr_stats));
+            bzero(netisr_stats, (ncpus + 1) * sizeof(struct netisr_stats));
+            for (i = 0; i < num_netisr_workstreams; i++) {
+                for (n = 0; n < num_netisr_works; n++) {
+                    if (netisr_workstream[i].snws_wsid == netisr_work[n].snw_wsid) {
+                        netisr_stats[netisr_workstream[i].snws_cpu].dispatched += netisr_work[n].snw_dispatched;
+                        netisr_stats[netisr_workstream[i].snws_cpu].hybrid_dispatched += netisr_work[n].snw_hybrid_dispatched;
+                        netisr_stats[netisr_workstream[i].snws_cpu].qdrops += netisr_work[n].snw_qdrops;
+                        netisr_stats[netisr_workstream[i].snws_cpu].queued += netisr_work[n].snw_queued;
+                    }
+                }
+            }
+            for (i = 0; i < ncpus; i++) {
+                netisr_stats[ncpus].dispatched += netisr_stats[i].dispatched;
+                netisr_stats[ncpus].hybrid_dispatched += netisr_stats[i].hybrid_dispatched;
+                netisr_stats[ncpus].qdrops += netisr_stats[i].qdrops;
+                netisr_stats[ncpus].queued += netisr_stats[i].queued;
+            }
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    if (likely(do_netisr)) {
+        st = rrdset_find_bytype("system", "softnet_stat");
+        if (unlikely(!st)) {
+            st = rrdset_create("system", "softnet_stat", NULL, "softnet_stat", NULL, "System softnet_stat", "events/s", 955, update_every, RRDSET_TYPE_LINE);
+            rrddim_add(st, "dispatched", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st, "hybrid_dispatched", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st, "qdrops", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st, "queued", NULL, 1, 1, RRDDIM_INCREMENTAL);
+        }
+        else rrdset_next(st);
+
+        rrddim_set(st, "dispatched", netisr_stats[ncpus].dispatched);
+        rrddim_set(st, "hybrid_dispatched", netisr_stats[ncpus].hybrid_dispatched);
+        rrddim_set(st, "qdrops", netisr_stats[ncpus].qdrops);
+        rrddim_set(st, "queued", netisr_stats[ncpus].queued);
+        rrdset_done(st);
+    }
+
+    // --------------------------------------------------------------------
+
+    if (likely(do_netisr_per_core)) {
+        for (i = 0; i < ncpus ;i++) {
+            snprintfz(netstat_cpuid, 21, "cpu%d_softnet_stat", i);
+
+            st = rrdset_find_bytype("cpu", netstat_cpuid);
+            if (unlikely(!st)) {
+                st = rrdset_create("cpu", netstat_cpuid, NULL, "softnet_stat", NULL, "Per CPU netisr statistics", "events/s", 1101 + i, update_every, RRDSET_TYPE_LINE);
+                rrddim_add(st, "dispatched", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                rrddim_add(st, "hybrid_dispatched", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                rrddim_add(st, "qdrops", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                rrddim_add(st, "queued", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            }
+            else rrdset_next(st);
+
+            rrddim_set(st, "dispatched", netisr_stats[i].dispatched);
+            rrddim_set(st, "hybrid_dispatched", netisr_stats[i].hybrid_dispatched);
+            rrddim_set(st, "qdrops", netisr_stats[i].qdrops);
+            rrddim_set(st, "queued", netisr_stats[i].queued);
+            rrdset_done(st);
         }
     }
 
