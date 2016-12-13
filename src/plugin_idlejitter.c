@@ -32,9 +32,9 @@ void *cpuidlejitter_main(void *ptr) {
 
         while(susec < (rrd_update_every * USEC_PER_SEC)) {
 
-            now_realtime_timeval(&before);
+            now_monotonic_timeval(&before);
             sleep_usec(sleep_ms * 1000);
-            now_realtime_timeval(&after);
+            now_monotonic_timeval(&after);
 
             // calculate the time it took for a full loop
             usec = dt_usec(&after, &before);
