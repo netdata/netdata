@@ -52,8 +52,6 @@
 #define IFA_DATA(s) (((struct if_data *)ifa->ifa_data)->ifi_ ## s)
 
 int do_freebsd_sysctl(int update_every, usec_t dt) {
-    (void)dt;
-
     static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1,
         do_loadavg = -1, do_all_processes = -1, do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
         do_pgfaults = -1, do_committed = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
@@ -132,7 +130,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
     char title[4096 + 1];
 
     // NEEDED BY: do_loadavg
-    static usec_t last_loadavg_usec = 0;
+    static usec_t next_loadavg_dt = 0;
     struct loadavg sysload;
 
     // NEEDED BY: do_cpu, do_cpu_cores
@@ -278,7 +276,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if (last_loadavg_usec <= dt) {
+    if (next_loadavg_dt <= dt) {
         if (likely(do_loadavg)) {
             if (unlikely(GETSYSCTL("vm.loadavg", sysload))) {
                 do_loadavg = 0;
@@ -301,9 +299,9 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             }
         }
 
-        last_loadavg_usec = st->update_every * USEC_PER_SEC;
+        next_loadavg_dt = st->update_every * USEC_PER_SEC;
     }
-    else last_loadavg_usec -= dt;
+    else next_loadavg_dt -= dt;
 
     // --------------------------------------------------------------------
 

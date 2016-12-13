@@ -24,8 +24,6 @@
 #define MIN_LOADAVG_UPDATE_EVERY 5
 
 int do_macos_sysctl(int update_every, usec_t dt) {
-    (void)dt;
-
     static int do_loadavg = -1, do_swap = -1, do_bandwidth = -1,
                do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1, do_ecn = -1,
                do_tcpext_syscookies = -1, do_tcpext_ofo = -1, do_tcpext_connaborts = -1,
@@ -77,7 +75,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     size_t size;
 
     // NEEDED BY: do_loadavg
-    static usec_t last_loadavg_usec = 0;
+    static usec_t next_loadavg_dt = 0;
     struct loadavg sysload;
 
     // NEEDED BY: do_swap
@@ -210,7 +208,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if (last_loadavg_usec <= dt) {
+    if (next_loadavg_dt <= dt) {
         if (likely(do_loadavg)) {
             if (unlikely(GETSYSCTL("vm.loadavg", sysload))) {
                 do_loadavg = 0;
@@ -233,9 +231,9 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             }
         }
 
-        last_loadavg_usec = st->update_every * USEC_PER_SEC;
+        next_loadavg_dt = st->update_every * USEC_PER_SEC;
     }
-    else last_loadavg_usec -= dt;
+    else next_loadavg_dt -= dt;
 
     // --------------------------------------------------------------------
 
