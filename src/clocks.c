@@ -71,3 +71,38 @@ inline usec_t dt_usec(struct timeval *now, struct timeval *old) {
     usec_t ts2 = timeval_usec(old);
     return (ts1 > ts2) ? (ts1 - ts2) : (ts2 - ts1);
 }
+
+inline void heartbeat_init(heartbeat_t *hb)
+{
+    *hb = 0ULL;
+}
+
+usec_t heartbeat_next(heartbeat_t *hb, usec_t tick)
+{
+    heartbeat_t now = now_monotonic_usec();
+    usec_t next = now - (now % tick) + tick;
+
+    while(now < next) {
+        sleep_usec(next - now);
+        now = now_monotonic_usec();
+    }
+
+    if(likely(*hb != 0ULL)) {
+        usec_t dt = now - *hb;
+        *hb = now;
+        if(unlikely(dt / tick > 1))
+            error("heartbeat missed between %llu usec and %llu usec", *hb, now);
+        return dt;
+    }
+    else {
+        *hb = now;
+        return 0ULL;
+    }
+}
+
+inline usec_t heartbeat_dt_usec(heartbeat_t *hb)
+{
+    if(!*hb)
+        return 0ULL;
+    return now_monotonic_usec() - *hb;
+}

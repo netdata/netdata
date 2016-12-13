@@ -12,6 +12,10 @@ struct timespec {
 typedef int clockid_t;
 #endif
 
+typedef unsigned long long usec_t;
+
+typedef usec_t heartbeat_t;
+
 #ifndef HAVE_CLOCK_GETTIME
 int clock_gettime(clockid_t clk_id, struct timespec *ts);
 #endif
@@ -34,8 +38,6 @@ int clock_gettime(clockid_t clk_id, struct timespec *ts);
 #define CLOCK_BOOTTIME_IS_AVAILABLE 1 // required for /proc/uptime
 #endif
 #endif
-
-typedef unsigned long long usec_t;
 
 #define NSEC_PER_SEC    1000000000ULL
 #define NSEC_PER_MSEC   1000000ULL
@@ -88,5 +90,15 @@ extern usec_t now_boottime_usec(void);
 
 extern usec_t timeval_usec(struct timeval *ts);
 extern usec_t dt_usec(struct timeval *now, struct timeval *old);
+
+extern void heartbeat_init(heartbeat_t *hb);
+
+/* Sleeps until next multiple of tick using monotonic clock.
+ * Returns elapsed time in microseconds since previous heartbeat
+ */
+extern usec_t heartbeat_next(heartbeat_t *hb, usec_t tick);
+
+/* Returns elapsed time in microseconds since last heartbeat */
+extern usec_t heartbeat_dt_usec(heartbeat_t *hb);
 
 #endif /* NETDATA_CLOCKS_H */
