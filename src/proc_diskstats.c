@@ -473,7 +473,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/diskstats");
         ff = procfile_open(config_get("plugin:proc:/proc/diskstats", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
     }
-    if(unlikely(!ff)) return 1;
+    if(unlikely(!ff)) return 0;
 
     ff = procfile_readall(ff);
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
