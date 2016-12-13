@@ -2079,24 +2079,20 @@ void *cgroups_main(void *ptr) {
 
     RRDSET *stcpu_thread = NULL;
 
+    heartbeat_t hb;
+    heartbeat_init(&hb);
     usec_t step = cgroup_update_every * USEC_PER_SEC;
-    usec_t find_every = cgroup_check_for_new_every * USEC_PER_SEC, find_next = 0;
+    usec_t find_every = cgroup_check_for_new_every * USEC_PER_SEC, find_dt = 0;
     for(;;) {
-        usec_t now = now_monotonic_usec();
-        usec_t next = now - (now % step) + step;
-
-        while(now < next) {
-            sleep_usec(next - now);
-            now = now_monotonic_usec();
-        }
-
+        usec_t hb_dt = heartbeat_next(&hb, step);
         if(unlikely(netdata_exit)) break;
 
         // BEGIN -- the job to be done
 
-        if(unlikely(now >= find_next)) {
+        find_dt += hb_dt;
+        if(unlikely(find_dt >= find_every)) {
             find_all_cgroups();
-            find_next = now + find_every;
+            find_dt = 0;
         }
 
         read_all_cgroups(cgroup_root);
