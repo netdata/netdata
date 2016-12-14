@@ -23,6 +23,9 @@
 // FreeBSD calculates load averages once every 5 seconds
 #define MIN_LOADAVG_UPDATE_EVERY 5
 
+// NEEDED BY: do_bandwidth
+#define IFA_DATA(s) (((struct if_data *)ifa->ifa_data)->ifi_ ## s)
+
 int do_freebsd_sysctl(int update_every, usec_t dt) {
     (void)dt;
 
@@ -1074,12 +1077,12 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
                 if (ifa->ifa_addr->sa_family != AF_INET6)
                         continue;
-                iftot.ift_ibytes += (((struct if_data *)ifa->ifa_data)->ifi_ibytes);
-                iftot.ift_obytes += (((struct if_data *)ifa->ifa_data)->ifi_obytes);
+                iftot.ift_ibytes += IFA_DATA(ibytes);
+                iftot.ift_obytes += IFA_DATA(obytes);
             }
 
             st = rrdset_find("system.ipv6");
-            if(unlikely(!st)) {
+            if (unlikely(!st)) {
                 st = rrdset_create("system", "ipv6", NULL, "network", NULL, "IPv6 Bandwidth", "kilobits/s", 500, update_every, RRDSET_TYPE_AREA);
 
                 rrddim_add(st, "received", NULL, 8, 1024, RRDDIM_INCREMENTAL);
@@ -1090,6 +1093,94 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             rrddim_set(st, "sent", iftot.ift_obytes);
             rrddim_set(st, "received", iftot.ift_ibytes);
             rrdset_done(st);
+
+            for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+                if (ifa->ifa_addr->sa_family != AF_LINK)
+                        continue;
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find_bytype("net", ifa->ifa_name);
+                if (unlikely(!st)) {
+                    st = rrdset_create("net", ifa->ifa_name, NULL, ifa->ifa_name, "net.net", "Bandwidth", "kilobits/s", 7000, update_every, RRDSET_TYPE_AREA);
+
+                    rrddim_add(st, "received", NULL, 8, 1024, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "sent", NULL, -8, 1024, RRDDIM_INCREMENTAL);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "received", IFA_DATA(ibytes));
+                rrddim_set(st, "sent", IFA_DATA(obytes));
+                rrdset_done(st);
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find_bytype("net_packets", ifa->ifa_name);
+                if (unlikely(!st)) {
+                    st = rrdset_create("net_packets", ifa->ifa_name, NULL, ifa->ifa_name, "net.packets", "Packets", "packets/s", 7001, update_every, RRDSET_TYPE_LINE);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "multicast_received", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "multicast_sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "received", IFA_DATA(ipackets));
+                rrddim_set(st, "sent", IFA_DATA(opackets));
+                rrddim_set(st, "multicast_received", IFA_DATA(imcasts));
+                rrddim_set(st, "multicast_sent", IFA_DATA(omcasts));
+                rrdset_done(st);
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find_bytype("net_errors", ifa->ifa_name);
+                if (unlikely(!st)) {
+                    st = rrdset_create("net_errors", ifa->ifa_name, NULL, ifa->ifa_name, "net.errors", "Interface Errors", "errors/s", 7002, update_every, RRDSET_TYPE_LINE);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "inbound", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "outbound", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "inbound", IFA_DATA(ierrors));
+                rrddim_set(st, "outbound", IFA_DATA(oerrors));
+                rrdset_done(st);
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find_bytype("net_drops", ifa->ifa_name);
+                if (unlikely(!st)) {
+                    st = rrdset_create("net_drops", ifa->ifa_name, NULL, ifa->ifa_name, "net.drops", "Interface Drops", "drops/s", 7003, update_every, RRDSET_TYPE_LINE);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "inbound", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "outbound", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "inbound", IFA_DATA(iqdrops));
+                rrddim_set(st, "outbound", IFA_DATA(oqdrops));
+                rrdset_done(st);
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find_bytype("net_events", ifa->ifa_name);
+                if (unlikely(!st)) {
+                    st = rrdset_create("net_events", ifa->ifa_name, NULL, ifa->ifa_name, "net.events", "Network Interface Events", "events/s", 7006, update_every, RRDSET_TYPE_LINE);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "frames", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "collisions", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "carrier", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "collisions", IFA_DATA(collisions));
+                rrdset_done(st);
+            }
 
             freeifaddrs(ifap);
         }
