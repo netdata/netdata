@@ -1052,11 +1052,12 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             do_bandwidth = 0;
             error("DISABLED: system.ipv4");
         } else {
+            iftot.ift_ibytes = iftot.ift_obytes = 0;
             for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
                 if (ifa->ifa_addr->sa_family != AF_INET)
                         continue;
-                iftot.ift_ibytes += (((struct if_data *)ifa->ifa_data)->ifi_ibytes);
-                iftot.ift_obytes += (((struct if_data *)ifa->ifa_data)->ifi_obytes);
+                iftot.ift_ibytes += IFA_DATA(ibytes);
+                iftot.ift_obytes += IFA_DATA(obytes);
             }
 
             st = rrdset_find("system.ipv4");
@@ -1074,6 +1075,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
+            iftot.ift_ibytes = iftot.ift_obytes = 0;
             for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
                 if (ifa->ifa_addr->sa_family != AF_INET6)
                         continue;
