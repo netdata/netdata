@@ -675,7 +675,7 @@ send_pd() {
         then
         ${pd_send} -k ${PD_SERVICE_KEY} \
                    -t ${t} \
-                   -d "${host} ${chart}.${name} is ${status}" \
+                   -d "${status} ${name}=${value} ${units} - ${host}, ${family}" \
                    -i ${alarm_id} \
                    -f 'info'="${info}" \
                    -f 'value_w_units'="${value} ${units}" \
