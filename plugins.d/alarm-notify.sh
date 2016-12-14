@@ -385,6 +385,7 @@ done
 [ -z "${PD_SERVICE_KEY}" ] && SEND_PD="NO"
 
 # if we need pd-send, check for the pd-send command
+# https://www.pagerduty.com/docs/guides/agent-install-guide/
 if [ "${SEND_PD}" = "YES" ]
     then
     pd_send="$(which pd-send 2>/dev/null || command -v pd-send 2>/dev/null)"
@@ -677,9 +678,24 @@ send_pd() {
                    -d "${host} ${chart}.${name} is ${status}" \
                    -i ${alarm_id} \
                    -f 'info'="${info}" \
-                   -f 'value'="${value} ${units}" \
+                   -f 'value_w_units'="${value} ${units}" \
                    -f 'when'="${when}" \
-                   -f 'duration'="${duration}"
+                   -f 'duration'="${duration}" \
+                   -f 'roles'="${roles}" \
+                   -f 'host'="${host}" \
+                   -f 'unique_id'="${unique_id}" \
+                   -f 'alarm_id'="${alarm_id}" \
+                   -f 'event_id'="${event_id}" \
+                   -f 'name'="${name}" \
+                   -f 'chart'="${chart}" \
+                   -f 'family'="${family}" \
+                   -f 'status'="${status}" \
+                   -f 'old_status'="${old_status}" \
+                   -f 'value'="${value}" \
+                   -f 'old_value'="${old_value}" \
+                   -f 'src'="${src}" \
+                   -f 'non_clear_duration'="${non_clear_duration}" \
+                   -f 'units'="${units}"
         retval=$?
         if [ ${retval} -eq 0 ]
             then
