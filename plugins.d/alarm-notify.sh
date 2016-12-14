@@ -21,6 +21,7 @@
 #  - telegram.org notifications by @hashworks PR #1002
 #  - twilio.com notifications by Levi Blaney @shadycuz PR #1211
 #  - kafka notifications
+#  - pagerduty.com notifications by Jim Cooley @jimcooley PR#????
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -175,6 +176,7 @@ SEND_TELEGRAM="YES"
 SEND_EMAIL="YES"
 SEND_PUSHBULLET="YES"
 SEND_KAFKA="YES"
+SEND_PD="YES"
 
 # slack configs
 SLACK_WEBHOOK_URL=
@@ -206,6 +208,9 @@ declare -A role_recipients_telegram=()
 # kafka configs
 KAFKA_URL=
 KAFKA_SENDER_IP=
+
+# pagerduty.com configs
+PD_SERVICE_KEY=
 
 # email configs
 DEFAULT_RECIPIENT_EMAIL="root"
@@ -376,6 +381,21 @@ done
 # check kafka
 [ -z "${KAFKA_URL}" -o -z "${KAFKA_SENDER_IP}" ] && SEND_KAFKA="NO"
 
+# check pagerduty.com
+[ -z "${PD_SERVICE_KEY}" ] && SEND_PD="NO"
+
+# if we need pd-send, check for the pd-send command
+if [ "${SEND_PD}" = "YES" ]
+    then
+    pd_send="$(which pd-send 2>/dev/null || command -v pd-send 2>/dev/null)"
+    if [ -z "${pd_send}" ]
+        then
+        # no pd-send available
+        # disable pagerduty.com
+        SEND_PD="NO"
+    fi
+fi
+
 # if we need curl, check for the curl command
 if [ \( "${SEND_PUSHOVER}" = "YES" -o "${SEND_SLACK}" = "YES" -o "${SEND_TWILIO}" = "YES" -o "${SEND_TELEGRAM}" = "YES" -o "${SEND_PUSHBULLET}" = "YES" -o "${SEND_KAFKA}" = "YES" \) -a -z "${curl}" ]
     then
@@ -408,6 +428,7 @@ if [   "${SEND_EMAIL}"      != "YES" \
     -a "${SEND_TWILIO}"     != "YES" \
     -a "${SEND_PUSHBULLET}" != "YES" \
     -a "${SEND_KAFKA}"      != "YES" \
+    -a "${SEND_PD}"         != "YES" \
     ]
     then
     fatal "All notification methods are disabled. Not sending notification to '${role}' for '${name}' = '${value}' of chart '${chart}' for status '${status}'."
@@ -633,6 +654,40 @@ send_kafka() {
             fi
 
         [ ${sent} -gt 0 ] && return 0
+    fi
+
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# pagerduty.com sender
+
+send_pd() {
+    unset t
+    case ${status} in
+        CLEAR)    t='resolve';;
+        WARNING)  t='trigger';;
+        CRITICAL) t='trigger';;
+    esac
+
+    if [ ${SEND_PD} = "YES" -a ! -z "${t}" ]
+        then
+        ${pd_send} -k ${PD_SERVICE_KEY} \
+                   -t ${t} \
+                   -d "${host} ${chart}.${name} is ${status}" \
+                   -i ${alarm_id} \
+                   -f 'info'="${info}" \
+                   -f 'value'="${value} ${units}" \
+                   -f 'when'="${when}" \
+                   -f 'duration'="${duration}"
+        retval=$?
+        if [ ${retval} -eq 0 ]
+            then
+                info "sent pagerduty.com notification for: ${host} ${chart}.${name} is ${status}"
+                return 0
+            else
+                error "failed to send pagerduty.com notification for: ${host} ${chart}.${name} is ${status} with error code ${retval}."
+        fi
     fi
 
     return 1
@@ -929,6 +984,13 @@ SENT_KAFKA=$?
 
 
 # -----------------------------------------------------------------------------
+# send the pagerduty.com message
+
+send_pd
+SENT_PD=$?
+
+
+# -----------------------------------------------------------------------------
 # send the email
 
 send_email <<EOF
@@ -1033,6 +1095,7 @@ if [   ${SENT_EMAIL}      -eq 0 \
     -o ${SENT_TWILIO}     -eq 0 \
     -o ${SENT_PUSHBULLET} -eq 0 \
     -o ${SENT_KAFKA}      -eq 0 \
+    -o ${SENT_PD}         -eq 0 \
     ]
     then
     # we did send something
