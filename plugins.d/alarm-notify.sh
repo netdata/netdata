@@ -21,7 +21,7 @@
 #  - telegram.org notifications by @hashworks PR #1002
 #  - twilio.com notifications by Levi Blaney @shadycuz PR #1211
 #  - kafka notifications
-#  - pagerduty.com notifications by Jim Cooley @jimcooley PR#????
+#  - pagerduty.com notifications by Jim Cooley @jimcooley PR #1373
 
 # -----------------------------------------------------------------------------
 # testing notifications
