@@ -14,6 +14,9 @@
 #undef _KERNEL
 // NEEDED BY: struct sysctl_netisr_workstream, struct sysctl_netisr_work
 #include <net/netisr.h>
+// NEEDED BY: struct ifaddrs, getifaddrs()
+#include <net/if.h>
+#include <ifaddrs.h>
 // NEEDED BY: do_disk_io
 #define RRD_TYPE_DISK "disk"
 
@@ -26,7 +29,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
     static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1,
         do_loadavg = -1, do_all_processes = -1, do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
         do_pgfaults = -1, do_committed = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
-        do_dev_intr = -1, do_soft_intr = -1, do_netisr = -1, do_netisr_per_core = -1;
+        do_dev_intr = -1, do_soft_intr = -1, do_netisr = -1, do_netisr_per_core = -1, do_bandwidth = -1;
 
     if (unlikely(do_cpu == -1)) {
         do_cpu                  = config_get_boolean("plugin:freebsd:sysctl", "cpu utilization", 1);
@@ -50,6 +53,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         do_ipc_msg_queues       = config_get_boolean("plugin:freebsd:sysctl", "ipc message queues", 1);
         do_netisr               = config_get_boolean("plugin:freebsd:sysctl", "netisr", 1);
         do_netisr_per_core      = config_get_boolean("plugin:freebsd:sysctl", "netisr per core", 1);
+        do_bandwidth            = config_get_boolean("plugin:freebsd:sysctl", "bandwidth", 1);
     }
 
     RRDSET *st;
@@ -57,6 +61,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
     int system_pagesize = getpagesize(); // wouldn't it be better to get value directly from hw.pagesize?
     int i, n;
     int common_error = 0;
+    size_t size;
 
     // NEEDED BY: do_loadavg
     static usec_t last_loadavg_usec = 0;
@@ -105,7 +110,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
     } prev_dstat;
 
     // NEEDED BY: do_swap
-    size_t mibsize, size;
+    size_t mibsize;
     int mib[3]; // CTL_MAXNAME = 24 maximum mib components (sysctl.h)
     struct xswdev xsw;
     struct total_xsw {
@@ -158,6 +163,13 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         collected_number queued;
     } *netisr_stats = NULL;
     char netstat_cpuid[21]; // no more than 4 digits expected
+
+    // NEEDED BY: do_bandwidth
+    struct ifaddrs *ifa, *ifap;
+    struct iftot {
+        u_long  ift_ibytes;
+        u_long  ift_obytes;
+    } iftot = {0, 0};
 
     // --------------------------------------------------------------------
 
@@ -1026,6 +1038,60 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             rrddim_set(st, "qdrops", netisr_stats[i].qdrops);
             rrddim_set(st, "queued", netisr_stats[i].queued);
             rrdset_done(st);
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    if (likely(do_bandwidth)) {
+        if (unlikely(getifaddrs(&ifap))) {
+            error("FREEBSD: getifaddrs()");
+            do_bandwidth = 0;
+            error("DISABLED: system.ipv4");
+        } else {
+            for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+                if (ifa->ifa_addr->sa_family != AF_INET)
+                        continue;
+                iftot.ift_ibytes += (((struct if_data *)ifa->ifa_data)->ifi_ibytes);
+                iftot.ift_obytes += (((struct if_data *)ifa->ifa_data)->ifi_obytes);
+            }
+
+            st = rrdset_find("system.ipv4");
+            if (unlikely(!st)) {
+                st = rrdset_create("system", "ipv4", NULL, "network", NULL, "IPv4 Bandwidth", "kilobits/s", 500, update_every, RRDSET_TYPE_AREA);
+
+                rrddim_add(st, "InOctets", "received", 8, 1024, RRDDIM_INCREMENTAL);
+                rrddim_add(st, "OutOctets", "sent", -8, 1024, RRDDIM_INCREMENTAL);
+            }
+            else rrdset_next(st);
+
+            rrddim_set(st, "InOctets", iftot.ift_ibytes);
+            rrddim_set(st, "OutOctets", iftot.ift_obytes);
+            rrdset_done(st);
+
+            // --------------------------------------------------------------------
+
+            for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+                if (ifa->ifa_addr->sa_family != AF_INET6)
+                        continue;
+                iftot.ift_ibytes += (((struct if_data *)ifa->ifa_data)->ifi_ibytes);
+                iftot.ift_obytes += (((struct if_data *)ifa->ifa_data)->ifi_obytes);
+            }
+
+            st = rrdset_find("system.ipv6");
+            if(unlikely(!st)) {
+                st = rrdset_create("system", "ipv6", NULL, "network", NULL, "IPv6 Bandwidth", "kilobits/s", 500, update_every, RRDSET_TYPE_AREA);
+
+                rrddim_add(st, "received", NULL, 8, 1024, RRDDIM_INCREMENTAL);
+                rrddim_add(st, "sent", NULL, -8, 1024, RRDDIM_INCREMENTAL);
+            }
+            else rrdset_next(st);
+
+            rrddim_set(st, "sent", iftot.ift_obytes);
+            rrddim_set(st, "received", iftot.ift_ibytes);
+            rrdset_done(st);
+
+            freeifaddrs(ifap);
         }
     }
 
