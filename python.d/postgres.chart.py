@@ -88,10 +88,10 @@ SELECT
 FROM (
     SELECT
         client_addr, client_hostname, state,
-        ('x' || lpad(split_part(sent_location,   '/', 1), 8, '0'))::bit(32)::bigint AS sent_xlog,
-        ('x' || lpad(split_part(replay_location, '/', 1), 8, '0'))::bit(32)::bigint AS replay_xlog,
-        ('x' || lpad(split_part(sent_location,   '/', 2), 8, '0'))::bit(32)::bigint AS sent_offset,
-        ('x' || lpad(split_part(replay_location, '/', 2), 8, '0'))::bit(32)::bigint AS replay_offset
+        ('x' || lpad(split_part(sent_location::text,   '/', 1), 8, '0'))::bit(32)::bigint AS sent_xlog,
+        ('x' || lpad(split_part(replay_location::text, '/', 1), 8, '0'))::bit(32)::bigint AS replay_xlog,
+        ('x' || lpad(split_part(sent_location::text,   '/', 2), 8, '0'))::bit(32)::bigint AS sent_offset,
+        ('x' || lpad(split_part(replay_location::text, '/', 2), 8, '0'))::bit(32)::bigint AS replay_offset
     FROM pg_stat_replication
 ) AS s;
 """
@@ -248,7 +248,7 @@ class Service(SimpleService):
 
     def _add_database_stat_chart(self, chart_template_name, database_name):
         chart_template = CHARTS[chart_template_name]
-        chart_name = "{}_{}".format(database_name, chart_template_name)
+        chart_name = "{0}_{1}".format(database_name, chart_template_name)
         if chart_name not in self.order:
             self.order.insert(0, chart_name)
             name, title, units, family, context, chart_type = chart_template['options']
@@ -265,11 +265,11 @@ class Service(SimpleService):
 
             self.definitions[chart_name]['lines'] = []
             for line in deepcopy(chart_template['lines']):
-                line[0] = "{}_{}".format(database_name, line[0])
+                line[0] = "{0}_{1}".format(database_name, line[0])
                 self.definitions[chart_name]['lines'].append(line)
 
     def _add_database_lock_chart(self, database_name):
-        chart_name = "{}_locks".format(database_name)
+        chart_name = "{0}_locks".format(database_name)
         if chart_name not in self.order:
             self.order.insert(-1, chart_name)
             self.definitions[chart_name] = dict(
@@ -286,7 +286,7 @@ class Service(SimpleService):
             )
 
             for lock_type in LOCK_TYPES:
-                lock_id = "{}_{}".format(database_name, lock_type)
+                lock_id = "{0}_{1}".format(database_name, lock_type)
                 label = re.sub("([a-z])([A-Z])", "\g<1> \g<2>", lock_type)
                 self.definitions[chart_name]['lines'].append([lock_id, label, 'absolute'])
 
@@ -318,17 +318,17 @@ class Service(SimpleService):
         cursor.execute(DATABASE)
         for row in cursor:
             database_name = row.get('database_name')
-            self.data["{}_{}".format(database_name, 'db_stat_xact_commit')]   = int(row.get('xact_commit',   0))
-            self.data["{}_{}".format(database_name, 'db_stat_xact_rollback')] = int(row.get('xact_rollback', 0))
-            self.data["{}_{}".format(database_name, 'db_stat_blks_read')]     = int(row.get('blks_read',     0))
-            self.data["{}_{}".format(database_name, 'db_stat_blks_hit')]      = int(row.get('blks_hit',      0))
-            self.data["{}_{}".format(database_name, 'db_stat_tup_returned')]  = int(row.get('tup_returned',  0))
-            self.data["{}_{}".format(database_name, 'db_stat_tup_fetched')]   = int(row.get('tup_fetched',   0))
-            self.data["{}_{}".format(database_name, 'db_stat_tup_inserted')]  = int(row.get('tup_inserted',  0))
-            self.data["{}_{}".format(database_name, 'db_stat_tup_updated')]   = int(row.get('tup_updated',   0))
-            self.data["{}_{}".format(database_name, 'db_stat_tup_deleted')]   = int(row.get('tup_deleted',   0))
-            self.data["{}_{}".format(database_name, 'db_stat_conflicts')]     = int(row.get('conflicts',     0))
-            self.data["{}_{}".format(database_name, 'db_stat_connections')]   = int(row.get('connections',   0))
+            self.data["{0}_{1}".format(database_name, 'db_stat_xact_commit')]   = int(row.get('xact_commit',   0))
+            self.data["{0}_{1}".format(database_name, 'db_stat_xact_rollback')] = int(row.get('xact_rollback', 0))
+            self.data["{0}_{1}".format(database_name, 'db_stat_blks_read')]     = int(row.get('blks_read',     0))
+            self.data["{0}_{1}".format(database_name, 'db_stat_blks_hit')]      = int(row.get('blks_hit',      0))
+            self.data["{0}_{1}".format(database_name, 'db_stat_tup_returned')]  = int(row.get('tup_returned',  0))
+            self.data["{0}_{1}".format(database_name, 'db_stat_tup_fetched')]   = int(row.get('tup_fetched',   0))
+            self.data["{0}_{1}".format(database_name, 'db_stat_tup_inserted')]  = int(row.get('tup_inserted',  0))
+            self.data["{0}_{1}".format(database_name, 'db_stat_tup_updated')]   = int(row.get('tup_updated',   0))
+            self.data["{0}_{1}".format(database_name, 'db_stat_tup_deleted')]   = int(row.get('tup_deleted',   0))
+            self.data["{0}_{1}".format(database_name, 'db_stat_conflicts')]     = int(row.get('conflicts',     0))
+            self.data["{0}_{1}".format(database_name, 'db_stat_connections')]   = int(row.get('connections',   0))
 
     def add_backend_stats(self, cursor):
         cursor.execute(BACKENDS)
@@ -355,12 +355,12 @@ class Service(SimpleService):
         # zero out all current lock values
         for database_name in self.databases:
             for lock_type in LOCK_TYPES:
-                self.data["{}_{}".format(database_name, lock_type)] = 0
+                self.data["{0}_{1}".format(database_name, lock_type)] = 0
 
         # populate those that have current locks
         for row in cursor:
             database_name, lock_type, lock_count = row
-            self.data["{}_{}".format(database_name, lock_type)] = lock_count
+            self.data["{0}_{1}".format(database_name, lock_type)] = lock_count
 
     def add_wal_stats(self, cursor):
         cursor.execute(ARCHIVE)
