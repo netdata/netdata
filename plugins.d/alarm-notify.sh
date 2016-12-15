@@ -211,6 +211,7 @@ KAFKA_SENDER_IP=
 
 # pagerduty.com configs
 PD_SERVICE_KEY=
+declare -A role_recipients_pd=()
 
 # email configs
 DEFAULT_RECIPIENT_EMAIL="root"
@@ -271,6 +272,7 @@ declare -A arr_pushover=()
 declare -A arr_pushbullet=()
 declare -A arr_twilio=()
 declare -A arr_telegram=()
+declare -A arr_pd=()
 declare -A arr_email=()
 
 # netdata may call us with multiple roles, and roles may have multiple but
@@ -328,6 +330,14 @@ do
     do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality slack "${r}" && arr_slack[${r/|*/}]="1"
     done
+
+    # pagerduty.com
+    a="${role_recipients_pd[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_PD}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality pd "${r}" && arr_pd[${r/|*/}]="1"
+    done
 done
 
 # build the list of slack recipients (channels)
@@ -349,6 +359,10 @@ to_twilio="${!arr_twilio[*]}"
 # check array of telegram recipients (chat ids)
 to_telegram="${!arr_telegram[*]}"
 [ -z "${to_telegram}" ] && SEND_TELEGRAM="NO"
+
+# build the list of pagerduty recipients (service keys)
+to_pd="${!arr_pd[*]}"
+[ -z "${to_pd}" ] && SEND_PD="NO"
 
 # build the list of email recipients (email addresses)
 to_email=
@@ -382,8 +396,6 @@ done
 [ -z "${KAFKA_URL}" -o -z "${KAFKA_SENDER_IP}" ] && SEND_KAFKA="NO"
 
 # check pagerduty.com
-[ -z "${PD_SERVICE_KEY}" ] && SEND_PD="NO"
-
 # if we need pd-send, check for the pd-send command
 # https://www.pagerduty.com/docs/guides/agent-install-guide/
 if [ "${SEND_PD}" = "YES" ]
@@ -432,7 +444,7 @@ if [   "${SEND_EMAIL}"      != "YES" \
     -a "${SEND_PD}"         != "YES" \
     ]
     then
-    fatal "All notification methods are disabled. Not sending notification to '${role}' for '${name}' = '${value}' of chart '${chart}' for status '${status}'."
+    fatal "All notification methods are disabled. Not sending notification to '${roles}' for '${name}' = '${value}' of chart '${chart}' for status '${status}'."
 fi
 
 # -----------------------------------------------------------------------------
@@ -664,6 +676,7 @@ send_kafka() {
 # pagerduty.com sender
 
 send_pd() {
+    local recipients="${1}" sent=0
     unset t
     case ${status} in
         CLEAR)    t='resolve';;
@@ -673,37 +686,43 @@ send_pd() {
 
     if [ ${SEND_PD} = "YES" -a ! -z "${t}" ]
         then
-        ${pd_send} -k ${PD_SERVICE_KEY} \
-                   -t ${t} \
-                   -d "${status} ${name}=${value} ${units} - ${host}, ${family}" \
-                   -i ${alarm_id} \
-                   -f 'info'="${info}" \
-                   -f 'value_w_units'="${value} ${units}" \
-                   -f 'when'="${when}" \
-                   -f 'duration'="${duration}" \
-                   -f 'roles'="${roles}" \
-                   -f 'host'="${host}" \
-                   -f 'unique_id'="${unique_id}" \
-                   -f 'alarm_id'="${alarm_id}" \
-                   -f 'event_id'="${event_id}" \
-                   -f 'name'="${name}" \
-                   -f 'chart'="${chart}" \
-                   -f 'family'="${family}" \
-                   -f 'status'="${status}" \
-                   -f 'old_status'="${old_status}" \
-                   -f 'value'="${value}" \
-                   -f 'old_value'="${old_value}" \
-                   -f 'src'="${src}" \
-                   -f 'non_clear_duration'="${non_clear_duration}" \
-                   -f 'units'="${units}"
-        retval=$?
-        if [ ${retval} -eq 0 ]
-            then
-                info "sent pagerduty.com notification for: ${host} ${chart}.${name} is ${status}"
-                return 0
-            else
-                error "failed to send pagerduty.com notification for: ${host} ${chart}.${name} is ${status} with error code ${retval}."
-        fi
+        for PD_SERVICE_KEY in ${recipients}
+        do
+            d="${status} ${name}=${value} ${units} - ${host}, ${family}"
+            ${pd_send} -k ${PD_SERVICE_KEY} \
+                       -t ${t} \
+                       -d "${d}" \
+                       -i ${alarm_id} \
+                       -f 'info'="${info}" \
+                       -f 'value_w_units'="${value} ${units}" \
+                       -f 'when'="${when}" \
+                       -f 'duration'="${duration}" \
+                       -f 'roles'="${roles}" \
+                       -f 'host'="${host}" \
+                       -f 'unique_id'="${unique_id}" \
+                       -f 'alarm_id'="${alarm_id}" \
+                       -f 'event_id'="${event_id}" \
+                       -f 'name'="${name}" \
+                       -f 'chart'="${chart}" \
+                       -f 'family'="${family}" \
+                       -f 'status'="${status}" \
+                       -f 'old_status'="${old_status}" \
+                       -f 'value'="${value}" \
+                       -f 'old_value'="${old_value}" \
+                       -f 'src'="${src}" \
+                       -f 'non_clear_duration'="${non_clear_duration}" \
+                       -f 'units'="${units}"
+            retval=$?
+            if [ ${retval} -eq 0 ]
+                then
+                    info "sent pagerduty.com notification using service key ${PD_SERVICE_KEY::-26}....: ${d}"
+                    sent=$((sent + 1))
+                else
+                    error "failed to send pagerduty.com notification using service key ${PD_SERVICE_KEY::-26}.... (error code ${retval}): ${d}"
+            fi
+        done
+
+        [ ${sent} -gt 0 ] && return 0
     fi
 
     return 1
@@ -1002,7 +1021,7 @@ SENT_KAFKA=$?
 # -----------------------------------------------------------------------------
 # send the pagerduty.com message
 
-send_pd
+send_pd "${to_pd}"
 SENT_PD=$?
 
 
