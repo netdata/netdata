@@ -1,13 +1,57 @@
+dist: precise
+#
+# C includes autotools and make by default
 language: c
 compiler:
  - gcc
  - clang
+#
+# Extra packages
+addons:
+  apt:
+    packages:
+    - gnupg
+    - libcap2-bin
+    - zlib1g-dev
+    - uuid-dev
+#
+# Setup environment
 before_install:
- - sudo apt-get update -qq
- - sudo apt-get install -qq automake make libcap2-bin zlib1g-dev uuid-dev
+ # Decrypt our private files for CI use only
+ - openssl aes-256-cbc -K $encrypted_decb6f6387c4_key -iv $encrypted_decb6f6387c4_iv -in .travis/travis_rsa.enc -out .travis/travis_rsa -d
+ - eval "$(ssh-agent -s)"        # start the ssh agent
+ - chmod 600 .travis/travis_rsa  # add our key
+ - ssh-add .travis/travis_rsa    # add our key
+ - rm -f .travis/travis_rsa      # remove to prevent leaks
+ # WARNING: Any changes to the above 5 lines should be monitored closely
+ - ssh-keyscan -H firehol.org >> ~/.ssh/known_hosts
+#
+# Run
+before_script:
+ - gpg --import packaging/gpg.keys
+ # Run the commit hooks in case the developer didn't
+ - git diff 4b825dc642cb6eb9a060e54bf8d69288fbee4904 | ./packaging/check-files -
 script:
+   # make release packages
+ - fakeroot ./packaging/git-build
    # default build
  - ./autogen.sh && ./configure && make -j4
-
    # test installer
  - fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
+#
+# Deploy as required
+after_success:
+  - for i in *.tar.*; do md5sum -b $i > $i.md5; sha512sum -b $i > $i.sha; done
+  - "case \"$TRAVIS_BRANCH\" in master|stable-*) if [ $TRAVIS_PULL_REQUEST = false -a \"$TRAVIS_TAG\" = \"\" -a \"$CC\" = \"gcc\" ]; then ssh travis@firehol.org mkdir -p uploads/netdata/$TRAVIS_BRANCH/ && scp -p *.tar.* travis@firehol.org:uploads/netdata/$TRAVIS_BRANCH/ && ssh travis@firehol.org touch uploads/netdata/$TRAVIS_BRANCH/complete.txt; fi;; esac"
+deploy:
+  # Upload results to GitHub (tag only)
+  - provider: releases
+    api_key:
+      secure: invJ0ZdNOPi9x8JJmFkqSIQMxljkLROwgRFCbmXMausJ0rA4E/PgLtM7ddWrHlu6lu8N9e5Pus4bG8DWATHbY0blMUhL5C82S5KK4mxAANLCLgTV8Qr7dMWnMqRV/OJBMGM1ZWpC2AA5GVhPLF7Z++54iqK+LM8P0EuOTAKbebIWCIkGybbSpXj+jJqaQXY0tLGSn5fXPFfyV3Tw0URJPcO3Uz5iukELngkLVSve2d0XYwy8M5tpLKHJi5bzc9CwcJZ/JK1WvklqmV3fNdSSzZunaAfDwWosV3hO7QcGnAVEbNl0HBKZJ8JkriV2fDbH4fttoSvLO2tW9HauP7Yf5XqLDudqUj4gPTuGzd31vRb9kx9cAulfE9onMAmDbjbne8Cp2Bq9/yBEqaofqEIaRcLgnlZSNc+PWbH4FQJ6fIOs5nfqLJo0G+3isgRWrqxp/rjILOvbIGbfLkbPl9aV09IvzShyW2lK7E+QOP0TZIwyXGT0NW0Rr/eyzuMXooy8wi9NehKfrxIcUr7784nU2E+EtItrhtTkJpK8XBBh16swn7s2sQ89qx9PYd/wE5qnKfG0yy3SSc2ycKzEpH7Cy3E6lC4Jytw0AM1Mc179WASBhlR2tyElkRcuhlqOFlJ/6iXjp3kqSgW4kvWbwHwT6VsyiDRhf+Ir4XILFBJ26Z8=
+    skip_cleanup: true
+    file_glob: true
+    file: "netdata*.tar.*"
+    on:
+      condition: $CC = gcc
+      repo: firehol/netdata
+      tags: true
