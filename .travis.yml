@@ -17,6 +17,7 @@ addons:
 #
 # Setup environment
 before_install:
+ - eval "$(ssh-agent -s)"
  - ./.travis/decrypt-if-have-key decb6f6387c4
 #
 # Run
