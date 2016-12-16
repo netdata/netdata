@@ -17,14 +17,7 @@ addons:
 #
 # Setup environment
 before_install:
- # Decrypt our private files for CI use only
- - openssl aes-256-cbc -K $encrypted_decb6f6387c4_key -iv $encrypted_decb6f6387c4_iv -in .travis/travis_rsa.enc -out .travis/travis_rsa -d
- - eval "$(ssh-agent -s)"        # start the ssh agent
- - chmod 600 .travis/travis_rsa  # add our key
- - ssh-add .travis/travis_rsa    # add our key
- - rm -f .travis/travis_rsa      # remove to prevent leaks
- # WARNING: Any changes to the above 5 lines should be monitored closely
- - ssh-keyscan -H firehol.org >> ~/.ssh/known_hosts
+ - ./.travis/decrypt-if-have-key decb6f6387c4
 #
 # Run
 before_script:
@@ -42,7 +35,7 @@ script:
 # Deploy as required
 after_success:
   - for i in *.tar.*; do md5sum -b $i > $i.md5; sha512sum -b $i > $i.sha; done
-  - "case \"$TRAVIS_BRANCH\" in master|stable-*) if [ $TRAVIS_PULL_REQUEST = false -a \"$TRAVIS_TAG\" = \"\" -a \"$CC\" = \"gcc\" ]; then ssh travis@firehol.org mkdir -p uploads/netdata/$TRAVIS_BRANCH/ && scp -p *.tar.* travis@firehol.org:uploads/netdata/$TRAVIS_BRANCH/ && ssh travis@firehol.org touch uploads/netdata/$TRAVIS_BRANCH/complete.txt; fi;; esac"
+  - ./.travis/deploy-if-have-key
 deploy:
   # Upload results to GitHub (tag only)
   - provider: releases
