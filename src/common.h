@@ -181,6 +181,8 @@ extern void *reallocz(void *ptr, size_t size);
 extern void freez(void *ptr);
 #endif
 
+extern void json_escape_string(char *dst, const char *src, size_t size);
+
 extern void *mymmap(const char *filename, size_t size, int flags, int ksm);
 extern int savememory(const char *filename, void *mem, size_t size);
 
