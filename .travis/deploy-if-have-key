@@ -4,7 +4,7 @@ set -e
 
 # Deploy tar-files and checksums to the firehol website
 
-if [ ! -f .travis/travis_rsa.ready ]
+if [ ! -f /tmp/ssh-key-loaded ]
 then
   echo "No ssh key decrypted - skipping deployment to website"
   exit 0
