@@ -609,8 +609,10 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 
     {
         char varvalue[CONFIG_MAX_VALUE + 1];
+        char varvalue2[CONFIG_MAX_VALUE + 1];
         snprintfz(varvalue, CONFIG_MAX_VALUE, "%s (%s)", title?title:"", st->name);
-        st->title = config_get(st->id, "title", varvalue);
+        json_escape_string(varvalue2, varvalue, sizeof(varvalue2));
+        st->title = config_get(st->id, "title", varvalue2);
     }
 
     st->rrdfamily = rrdfamily_create(st->family);
