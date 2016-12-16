@@ -29,7 +29,7 @@ then
   chmod 600 .travis/travis_rsa
   ssh-add .travis/travis_rsa
   rm -f .travis/travis_rsa
-  touch  .travis/travis_rsa.ready
+  touch /tmp/ssh-key-loaded
 else
   echo "No ssh key present - skipping agent start"
 fi
