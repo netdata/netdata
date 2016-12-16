@@ -197,6 +197,21 @@ void freez(void *ptr) {
     free(ptr);
 }
 
+void json_escape_string(char *dst, const char *src, size_t size) {
+    const char *t;
+    char *d = dst, *e = &dst[size - 1];
+
+    for(t = src; *t && d < e ;t++) {
+        if(unlikely(*t == '\\' || *t == '"')) {
+            if(unlikely(d + 1 >= e)) break;
+            *d++ = '\\';
+        }
+        *d++ = *t;
+    }
+
+    *d = '\0';
+}
+
 int sleep_usec(usec_t usec) {
 
 #ifndef NETDATA_WITH_USLEEP
