@@ -121,7 +121,7 @@ struct web_client *web_client_create(int listener)
 void web_client_reset(struct web_client *w) {
     web_client_uncrock_socket(w);
 
-    debug(D_WEB_CLIENT, "%llu: Reseting client.", w->id);
+    debug(D_WEB_CLIENT, "%llu: Resetting client.", w->id);
 
     if(likely(w->last_url[0])) {
         struct timeval tv;
