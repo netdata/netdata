@@ -17,12 +17,18 @@ PIDFILE=@localstatedir_POST@/run/$DAEMON.pid
 DAEMONOPTS="-P $PIDFILE"
 STOP_TIMEOUT="10"
 
+[ -e /etc/sysconfig/$DAEMON ] && . /etc/sysconfig/$DAEMON
+
+LOCKFILE=/var/lock/subsys/$DAEMON
+
 service_start()
 {
-	echo "Starting $DAEMON..."
+	[ -x $DAEMON_PATH ] || exit 5
+	echo -n "Starting $DAEMON..."
 	daemon $DAEMON_PATH/$DAEMON $DAEMONOPTS
 	RETVAL=$?
 	echo
+	[ $RETVAL -eq 0 ] && touch $LOCKFILE
 	return $RETVAL
 }
 
@@ -31,10 +37,8 @@ service_stop()
 	printf "%-50s" "Stopping $DAEMON..."
 	killproc -p ${PIDFILE} -d ${STOP_TIMEOUT} $DAEMON
 	RETVAL=$?
-	if [ $RETVAL -eq 0 ]; then
-		rm -f ${PIDFILE}
-	fi
 	echo
+	[ $RETVAL -eq 0 ] && rm -f ${PIDFILE} ${LOCKFILE}
 	return $RETVAL
 }
 
@@ -54,11 +58,18 @@ service_status()
 	status -p ${PIDFILE} $DAEMON_PATH/$DAEMON
 }
 
+service_status_quiet()
+{
+	status -p ${PIDFILE} $DAEMON_PATH/$DAEMON >/dev/null 2>&1
+}
+
 case "$1" in
 start)
+	service_status_quiet && exit 0
 	service_start
 ;;
 stop)
+	service_status_quiet || exit 0
 	service_stop
 ;;
 restart)
