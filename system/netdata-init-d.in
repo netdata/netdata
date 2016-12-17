@@ -58,13 +58,18 @@ service_status()
 	status -p ${PIDFILE} $DAEMON_PATH/$DAEMON
 }
 
+service_status_quiet()
+{
+	status -p ${PIDFILE} $DAEMON_PATH/$DAEMON >/dev/null 2>&1
+}
+
 case "$1" in
 start)
-	service_status && exit 0
+	service_status_quiet && exit 0
 	service_start
 ;;
 stop)
-	service_status || exit 0
+	service_status_quiet || exit 0
 	service_stop
 ;;
 restart)
