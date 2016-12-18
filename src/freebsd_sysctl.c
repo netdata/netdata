@@ -15,6 +15,7 @@
 // NEEDED BY: struct sysctl_netisr_workstream, struct sysctl_netisr_work
 #include <net/netisr.h>
 // NEEDED BY: struct ifaddrs, getifaddrs()
+#define _IFI_OQDROPS // It is for FreeNAS only. Most probably in future releases of FreeNAS it will be removed
 #include <net/if.h>
 #include <ifaddrs.h>
 // NEEDED BY: do_disk_io
