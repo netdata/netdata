@@ -125,7 +125,7 @@
 
     NETDATA.themes = {
         white: {
-            bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-3.3.7.min.css',
+            bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-3.3.7.css',
             dashboard_css: NETDATA.serverDefault + 'dashboard.css?v20161002-1',
             background: '#FFFFFF',
             foreground: '#000000',
@@ -142,8 +142,8 @@
             gauge_gradient: false
         },
         slate: {
-            bootstrap_css: NETDATA.serverDefault + 'css/bootstrap.slate.min.css?v20161002-1',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20161002-1',
+            bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-slate-flat-3.3.7.css?v20161218-2',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20161218-1',
             background: '#272b30',
             foreground: '#C8C8C8',
             grid: '#283236',
@@ -1262,7 +1262,8 @@
 
         this.title = self.data('title') || null;    // the title of the chart
         this.units = self.data('units') || null;    // the units of the chart dimensions
-        this.append_options = self.data('append-options') || null;  // the units of the chart dimensions
+        this.append_options = self.data('append-options') || null;  // additional options to pass to netdata
+        this.override_options = self.data('override-options') || null;  // override options to pass to netdata
 
         this.running = false;                       // boolean - true when the chart is being refreshed now
         this.validated = false;                     // boolean - has the chart been validated?
@@ -2863,7 +2864,12 @@
             this.data_url += "&format="  + this.library.format();
             this.data_url += "&points="  + (this.data_points * points_multiplier).toString();
             this.data_url += "&group="   + this.method;
-            this.data_url += "&options=" + this.library.options(this);
+
+            if(this.override_options !== null)
+                this.data_url += "&options=" + this.override_options.toString();
+            else
+                this.data_url += "&options=" + this.library.options(this);
+
             this.data_url += '|jsonwrap';
 
             if(NETDATA.options.current.eliminate_zero_dimensions === true)
@@ -4994,14 +5000,25 @@
 
     // ----------------------------------------------------------------------------------------------------------------
 
-    NETDATA.percentFromValueMax = function(value, max) {
-        if(value === null) value = 0;
-        if(max < value) max = value;
+    NETDATA.percentFromValueMinMax = function(value, min, max) {
+        if(typeof value !== 'number') value = 0;
+        if(typeof min !== 'number') min = 0;
+        if(typeof max !== 'number') max = 0;
 
         var pcent = 0;
-        if(max !== 0) {
-            pcent = Math.round(value * 100 / max);
-            if(pcent === 0 && value > 0) pcent = 1;
+        if(value >= 0) {
+            if(max < value) max = value;
+            if(max !== 0) {
+                pcent = Math.round(value * 100 / max);
+                if(pcent === 0 && value > 0) pcent = 1;
+            }
+        }
+        else {
+            if(min > value) min = value;
+            if(min !== 0) {
+                pcent = Math.round(-value * 100 / min);
+                if(pcent === 0 && value < 0) pcent = -1;
+            }
         }
 
         return pcent;
@@ -5074,8 +5091,9 @@
         }
 
         var value = state.data.result[state.data.result.length - 1 - slot];
+        var min = (state.easyPieChartMin === null)?NETDATA.commonMin.get(state):state.easyPieChartMin;
         var max = (state.easyPieChartMax === null)?NETDATA.commonMax.get(state):state.easyPieChartMax;
-        var pcent = NETDATA.percentFromValueMax(value, max);
+        var pcent = NETDATA.percentFromValueMinMax(value, min, max);
 
         state.easyPieChartEvent.value = value;
         state.easyPieChartEvent.pcent = pcent;
@@ -5094,17 +5112,17 @@
     };
 
     NETDATA.easypiechartChartUpdate = function(state, data) {
-        var value, max, pcent;
+        var value, min, max, pcent;
 
         if(NETDATA.globalPanAndZoom.isActive() === true || state.isAutoRefreshable() === false) {
             value = null;
-            max = 0;
             pcent = 0;
         }
         else {
             value = data.result[0];
+            min = (state.easyPieChartMin === null)?NETDATA.commonMin.get(state):state.easyPieChartMin;
             max = (state.easyPieChartMax === null)?NETDATA.commonMax.get(state):state.easyPieChartMax;
-            pcent = NETDATA.percentFromValueMax(value, max);
+            pcent = NETDATA.percentFromValueMinMax(value, min, max);
         }
 
         state.easyPieChartLabel.innerHTML = state.legendFormatValue(value);
@@ -5117,8 +5135,16 @@
         var chart = $(state.element_chart);
 
         var value = data.result[0];
+        var min = self.data('easypiechart-min-value') || null;
         var max = self.data('easypiechart-max-value') || null;
         var adjust = self.data('easypiechart-adjust') || null;
+
+        if(min === null) {
+            min = NETDATA.commonMin.get(state);
+            state.easyPieChartMin = null;
+        }
+        else
+            state.easyPieChartMin = min;
 
         if(max === null) {
             max = NETDATA.commonMax.get(state);
@@ -5127,7 +5153,7 @@
         else
             state.easyPieChartMax = max;
 
-        var pcent = NETDATA.percentFromValueMax(value, max);
+        var pcent = NETDATA.percentFromValueMinMax(value, min, max);
 
         chart.data('data-percent', pcent);
 
@@ -5193,7 +5219,7 @@
             trackWidth: self.data('easypiechart-trackwidth') || undefined,
             size: self.data('easypiechart-size') || size,
             rotate: self.data('easypiechart-rotate') || 0,
-            animate: self.data('easypiechart-rotate') || {duration: 500, enabled: true},
+            animate: self.data('easypiechart-animate') || {duration: 500, enabled: true},
             easing: self.data('easypiechart-easing') || undefined
         });
 
@@ -5343,12 +5369,12 @@
         }
 
         var value = state.data.result[state.data.result.length - 1 - slot];
+        var min = (state.gaugeMin === null)?NETDATA.commonMin.get(state):state.gaugeMin;
         var max = (state.gaugeMax === null)?NETDATA.commonMax.get(state):state.gaugeMax;
-        var min = 0;
 
         state.gaugeEvent.value = value;
-        state.gaugeEvent.max = max;
         state.gaugeEvent.min = min;
+        state.gaugeEvent.max = max;
         NETDATA.gaugeSetLabels(state, value, min, max);
 
         if(state.gaugeEvent.timer === null) {
@@ -5374,8 +5400,9 @@
         }
         else {
             value = data.result[0];
-            min = 0;
+            min = (state.gaugeMin === null)?NETDATA.commonMin.get(state):state.gaugeMin;
             max = (state.gaugeMax === null)?NETDATA.commonMax.get(state):state.gaugeMax;
+            if(value < min) min = value;
             if(value > max) max = value;
             NETDATA.gaugeSetLabels(state, value, min, max);
         }
@@ -5389,6 +5416,7 @@
         // var chart = $(state.element_chart);
 
         var value = data.result[0];
+        var min = self.data('gauge-min-value') || null;
         var max = self.data('gauge-max-value') || null;
         var adjust = self.data('gauge-adjust') || null;
         var pointerColor = self.data('gauge-pointer-color') || NETDATA.themes.current.gauge_pointer;
@@ -5396,6 +5424,13 @@
         var startColor = self.data('gauge-start-color') || state.chartColors()[0];
         var stopColor = self.data('gauge-stop-color') || void 0;
         var generateGradient = self.data('gauge-generate-gradient') || false;
+
+        if(min === null) {
+            min = NETDATA.commonMin.get(state);
+            state.gaugeMin = null;
+        }
+        else
+            state.gaugeMin = min;
 
         if(max === null) {
             max = NETDATA.commonMax.get(state);
@@ -5521,7 +5556,7 @@
 
         state.___gaugeOld__ = {
             value: value,
-            min: 0,
+            min: min,
             max: max,
             valueLabel: null,
             minLabel: null,
@@ -5533,8 +5568,8 @@
         state.gauge_instance.maxValue = 100;
 
         NETDATA.gaugeAnimation(state, animate);
-        NETDATA.gaugeSet(state, value, 0, max);
-        NETDATA.gaugeSetLabels(state, value, 0, max);
+        NETDATA.gaugeSet(state, value, min, max);
+        NETDATA.gaugeSetLabels(state, value, min, max);
         NETDATA.gaugeAnimation(state, true);
         return true;
     };
