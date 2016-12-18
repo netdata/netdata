@@ -7,6 +7,12 @@ body {
 	color: #878b90;
 }
 
+/* fixes for default slate theme */
+code {
+  color: #bbb; /*#c7254e;*/
+  background-color: #555; /* #f9f2f4; */
+}
+
 .dashboard-sidebar .nav > .active > a,
 .dashboard-sidebar .nav > .active:hover > a,
 .dashboard-sidebar .nav > .active:focus > a {
