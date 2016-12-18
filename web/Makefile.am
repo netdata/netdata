@@ -57,9 +57,9 @@ dist_weblib_DATA = \
 webcssdir=$(webdir)/css
 dist_webcss_DATA = \
 	css/morris-0.5.1.css \
-	css/bootstrap-3.3.7.min.css \
+	css/bootstrap-3.3.7.css \
 	css/bootstrap-theme-3.3.7.min.css \
-	css/bootstrap.slate.min.css \
+	css/bootstrap-slate-flat-3.3.7.css \
 	css/bootstrap-toggle-2.2.2.min.css \
 	css/font-awesome.min.css \
 	css/c3-0.4.11.min.css \
