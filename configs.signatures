@@ -129,6 +129,7 @@ declare -A configs_signatures=(
   ['647361e99b5f4e0d73470c569bb9461c']='apps_groups.conf'
   ['64ac37868097a462e5ee6905c350267e']='python.d/postgres.conf'
   ['64c48f9726ab987baec9c617a9fef7a6']='health.d/nginx.conf'
+  ['6546909d10cc5efcef9dd873bea85956']='python.d/mysql.conf'
   ['65c6933a17fb6b7f8e6baeab73431c17']='charts.d/apcupsd.conf'
   ['6608c6546b3c6bde084fc1d34b1163c1']='health.d/retroshare.conf'
   ['669ebef43ee341f6889d382e86d0e200']='health.d/named.conf'
