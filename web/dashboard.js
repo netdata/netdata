@@ -332,6 +332,8 @@
             async_on_scroll: false,                 // sync/async onscroll handler
             onscroll_worker_duration_threshold: 30, // time in ms, to consider slow the onscroll handler
 
+            retries_on_data_failures: 3, // how many retries to make if we can't fetch chart data from the server
+
             setOptionCallback: function() { ; }
         },
 
@@ -1230,6 +1232,9 @@
 
         // the chart library requested by the user
         this.library_name = self.data('chart-library') || NETDATA.chartDefaults.library;
+
+        // how many retries we have made to load chart data from the server
+        this.retries_on_data_failures = 0;
 
         // object - the chart library used
         this.library = null;
@@ -3077,6 +3082,7 @@
             })
             .done(function(data) {
                 that.xhr = undefined;
+                that.retries_on_data_failures = 0;
 
                 if(that.debug === true)
                     that.log('data received. updating chart.');
@@ -3086,8 +3092,18 @@
             .fail(function(msg) {
                 that.xhr = undefined;
 
-                if(msg.statusText !== 'abort')
-                    error('data download failed for url: ' + that.data_url);
+                if(msg.statusText !== 'abort') {
+                    that.retries_on_data_failures++;
+                    if(that.retries_on_data_failures > NETDATA.options.current.retries_on_data_failures) {
+                        // that.log('failed ' + that.retries_on_data_failures.toString() + ' times - giving up');
+                        that.retries_on_data_failures = 0;
+                        error('data download failed for url: ' + that.data_url);
+                    }
+                    else {
+                        that.tm.last_autorefreshed = Date.now();
+                        // that.log('failed ' + that.retries_on_data_failures.toString() + ' times, but I will retry');
+                    }
+                }
             })
             .always(function() {
                 that.xhr = undefined;
