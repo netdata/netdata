@@ -703,7 +703,9 @@ struct cgroup *cgroup_add(const char *id) {
                 (len >  6 && !strncmp(&chart_id[len -  6], ".mount", 6)) ||
                 (len >  8 && !strncmp(&chart_id[len -  8], ".session", 8)) ||
                 (len >  8 && !strncmp(&chart_id[len -  8], ".service", 8)) ||
-                (len > 10 && !strncmp(&chart_id[len - 10], ".partition", 10))
+                (len > 10 && !strncmp(&chart_id[len - 10], ".partition", 10)) ||
+                // starts and ends with them
+                (len > 7 && !strncmp(chart_id, "lxc/", 4) && !strncmp(&chart_id[len - 3], "/ns", 3)) // #1397
                 ) {
             def = 0;
             debug(D_CGROUP, "cgroup '%s' is %s (by default)", id, (def)?"enabled":"disabled");
