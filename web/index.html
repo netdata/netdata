@@ -2511,6 +2511,9 @@
         });
 
         if(isdemo()) {
+            // do not to give errors on netdata demo servers for 60 seconds
+            NETDATA.options.current.retries_on_data_failures = 60;
+
             if(urlOptions.nowelcome !== true) {
                 setTimeout(function() {
                     $('#welcomeModal').modal();
@@ -3185,4 +3188,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20161218-5"></script>
+<script type="text/javascript" src="dashboard.js?v20161219-1"></script>

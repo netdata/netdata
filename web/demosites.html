@@ -505,7 +505,7 @@ p {
     and that you have chown it to be owned by netdata:netdata
 -->
 <!-- <script type="text/javascript" src="http://my.server:19999/dashboard.js"></script> -->
-<script type="text/javascript" src="dashboard.js?v20161218-1"></script>
+<script type="text/javascript" src="dashboard.js?v20161219-1"></script>
 
 <script>
     // --- OPTIONS FOR THE CHARTS --
@@ -529,6 +529,9 @@ p {
     // since we have many servers and limited sockets,
     // abort ajax calls when we scroll
     NETDATA.options.current.abort_ajax_on_scroll = true;
+
+    // do not to give errors on netdata demo servers for 60 seconds
+    NETDATA.options.current.retries_on_data_failures = 60;
 </script>
 
 <style>
