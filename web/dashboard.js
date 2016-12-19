@@ -5395,13 +5395,6 @@
         if(min > 0) min = 0;
         if(max < 0) max = 0;
 
-        // make sure zero is in the middle
-        if(min < 0 && max > 0) {
-            min = -min;
-            if(min > max) max = min;
-            min = -max;
-        }
-
         state.gaugeEvent.value = value;
         state.gaugeEvent.min = min;
         state.gaugeEvent.max = max;
@@ -5438,13 +5431,6 @@
             // make sure it is zero based
             if(min > 0) min = 0;
             if(max < 0) max = 0;
-
-            // make sure zero is in the middle
-            if(min < 0 && max > 0) {
-                min = -min;
-                if(min > max) max = min;
-                min = -max;
-            }
 
             NETDATA.gaugeSetLabels(state, value, min, max);
         }
@@ -5484,13 +5470,6 @@
         // make sure it is zero based
         if(min > 0) min = 0;
         if(max < 0) max = 0;
-
-        // make sure zero is in the middle
-        if(min < 0 && max > 0) {
-            min = -min;
-            if(min > max) max = min;
-            min = -max;
-        }
 
         var width = state.chartWidth(), height = state.chartHeight(); //, ratio = 1.5;
         //switch(adjust) {
