@@ -5016,25 +5016,28 @@
 
     // ----------------------------------------------------------------------------------------------------------------
 
-    NETDATA.percentFromValueMinMax = function(value, min, max) {
+    NETDATA.easypiechartPercentFromValueMinMax = function(value, min, max) {
         if(typeof value !== 'number') value = 0;
         if(typeof min !== 'number') min = 0;
         if(typeof max !== 'number') max = 0;
 
+        if(min > value) min = value;
+        if(max < value) max = value;
+
+        // make sure it is zero based
+        if(min > 0) min = 0;
+        if(max < 0) max = 0;
+
         var pcent = 0;
         if(value >= 0) {
-            if(max < value) max = value;
-            if(max !== 0) {
+            if(max !== 0)
                 pcent = Math.round(value * 100 / max);
-                if(pcent === 0 && value > 0) pcent = 1;
-            }
+            if(pcent === 0) pcent = 0.1;
         }
         else {
-            if(min > value) min = value;
-            if(min !== 0) {
+            if(min !== 0)
                 pcent = Math.round(-value * 100 / min);
-                if(pcent === 0 && value < 0) pcent = -1;
-            }
+            if(pcent === 0) pcent = -0.1;
         }
 
         return pcent;
@@ -5109,7 +5112,7 @@
         var value = state.data.result[state.data.result.length - 1 - slot];
         var min = (state.easyPieChartMin === null)?NETDATA.commonMin.get(state):state.easyPieChartMin;
         var max = (state.easyPieChartMax === null)?NETDATA.commonMax.get(state):state.easyPieChartMax;
-        var pcent = NETDATA.percentFromValueMinMax(value, min, max);
+        var pcent = NETDATA.easypiechartPercentFromValueMinMax(value, min, max);
 
         state.easyPieChartEvent.value = value;
         state.easyPieChartEvent.pcent = pcent;
@@ -5138,7 +5141,7 @@
             value = data.result[0];
             min = (state.easyPieChartMin === null)?NETDATA.commonMin.get(state):state.easyPieChartMin;
             max = (state.easyPieChartMax === null)?NETDATA.commonMax.get(state):state.easyPieChartMax;
-            pcent = NETDATA.percentFromValueMinMax(value, min, max);
+            pcent = NETDATA.easypiechartPercentFromValueMinMax(value, min, max);
         }
 
         state.easyPieChartLabel.innerHTML = state.legendFormatValue(value);
@@ -5169,7 +5172,7 @@
         else
             state.easyPieChartMax = max;
 
-        var pcent = NETDATA.percentFromValueMinMax(value, min, max);
+        var pcent = NETDATA.easypiechartPercentFromValueMinMax(value, min, max);
 
         chart.data('data-percent', pcent);
 
@@ -5388,6 +5391,17 @@
         var min = (state.gaugeMin === null)?NETDATA.commonMin.get(state):state.gaugeMin;
         var max = (state.gaugeMax === null)?NETDATA.commonMax.get(state):state.gaugeMax;
 
+        // make sure it is zero based
+        if(min > 0) min = 0;
+        if(max < 0) max = 0;
+
+        // make sure zero is in the middle
+        if(min < 0 && max > 0) {
+            min = -min;
+            if(min > max) max = min;
+            min = -max;
+        }
+
         state.gaugeEvent.value = value;
         state.gaugeEvent.min = min;
         state.gaugeEvent.max = max;
@@ -5420,6 +5434,18 @@
             max = (state.gaugeMax === null)?NETDATA.commonMax.get(state):state.gaugeMax;
             if(value < min) min = value;
             if(value > max) max = value;
+
+            // make sure it is zero based
+            if(min > 0) min = 0;
+            if(max < 0) max = 0;
+
+            // make sure zero is in the middle
+            if(min < 0 && max > 0) {
+                min = -min;
+                if(min > max) max = min;
+                min = -max;
+            }
+
             NETDATA.gaugeSetLabels(state, value, min, max);
         }
 
@@ -5454,6 +5480,17 @@
         }
         else
             state.gaugeMax = max;
+
+        // make sure it is zero based
+        if(min > 0) min = 0;
+        if(max < 0) max = 0;
+
+        // make sure zero is in the middle
+        if(min < 0 && max > 0) {
+            min = -min;
+            if(min > max) max = min;
+            min = -max;
+        }
 
         var width = state.chartWidth(), height = state.chartHeight(); //, ratio = 1.5;
         //switch(adjust) {
