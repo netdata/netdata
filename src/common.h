@@ -64,6 +64,7 @@
 #include <sys/syscall.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/sysmacros.h> // #1408
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
