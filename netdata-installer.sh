@@ -786,7 +786,7 @@ done
 
 if [ ${UID} -eq 0 ]
     then
-    run chown -R root:root "${NETDATA_PREFIX}/usr/libexec/netdata"
+    run chown -R root "${NETDATA_PREFIX}/usr/libexec/netdata"
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0644 {} \;
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.plugin -exec chmod 0755 {} \;
