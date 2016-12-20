@@ -39,8 +39,15 @@
 #include <strings.h>
 
 #include <arpa/inet.h>
-#include <netinet/in.h>
 #include <netinet/tcp.h>
+
+#ifdef HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#endif
+
+#ifdef HAVE_RESOLV_H
+#include <resolv.h>
+#endif
 
 #include <dirent.h>
 #include <fcntl.h>
@@ -49,7 +56,10 @@
 #include <pwd.h>
 #include <locale.h>
 
+#ifdef HAVE_NETDB_H
 #include <netdb.h>
+#endif
+
 #include <poll.h>
 #include <signal.h>
 #include <syslog.h>
@@ -68,6 +78,14 @@
 #include <time.h>
 #include <unistd.h>
 #include <uuid/uuid.h>
+
+// #1408
+#ifdef MAJOR_IN_MKDEV
+#include <sys/mkdev.h>
+#endif
+#ifdef MAJOR_IN_SYSMACROS
+#include <sys/sysmacros.h>
+#endif
 
 /*
 #include <mntent.h>

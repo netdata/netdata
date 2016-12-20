@@ -548,42 +548,123 @@ do
 done
 
 echo >&2 "Fixing permissions ..."
+
+check_cmd() {
+    which "${1}" >/dev/null 2>&1 && return 0
+    command -v "${1}" >/dev/null 2>&1 && return 0
+    return 1
+}
+
+portable_add_user() {
+    local username="${1}"
+
+    getent passwd "${username}" > /dev/null 2>&1
+    [ $? -eq 0 ] && return 0
+
+    echo >&2 "Adding ${username} user account ..."
+
+    local nologin="$(which nologin 2>/dev/null || command -v nologin 2>/dev/null || echo '/bin/false')"
+
+    # Linux
+    if check_cmd useradd
+    then
+        run useradd -r -g "${username}" -c "${username}" -s "${nologin}" -d / "${username}" && return 0
+    fi
+
+    # FreeBSD
+    if check_cmd pw
+    then
+        run pw useradd "${username}" -d / -g "${username}" -s "${nologin}" && return 0
+    fi
+
+    # BusyBox
+    if check_cmd adduser
+    then
+        run adduser -D -G "${username}" "${username}" && return 0
+    fi
+
+    echo >&2 "Failed to add ${username} user account !"
+
+    return 1
+}
+
+portable_add_group() {
+    local groupname="${1}"
+
+    getent group "${groupname}" > /dev/null 2>&1
+    [ $? -eq 0 ] && return 0
+
+    echo >&2 "Adding ${groupname} user group ..."
+
+    # Linux
+    if check_cmd groupadd
+    then
+        run groupadd -r "${groupname}" && return 0
+    fi
+
+    # FreeBSD
+    if check_cmd pw
+    then
+        run pw groupadd "${groupname}" && return 0
+    fi
+
+    # BusyBox
+    if check_cmd addgroup
+    then
+        run addgroup "${groupname}" && return 0
+    fi
+
+    echo >&2 "Failed to add ${groupname} user group !"
+    return 1
+}
+
+portable_add_user_to_group() {
+    local groupname="${1}" username="${2}"
+
+    getent group "${groupname}" > /dev/null 2>&1
+    [ $? -ne 0 ] && return 1
+
+    # find the users in the docker group
+    local users=$(getent group "${groupname}" | cut -d ':' -f 4)
+    if [[ ",${users}," =~ ,${username}, ]]
+        then
+        # username is already there
+        :
+    else
+        # username is not in group
+        echo >&2 "Adding ${username} user to the ${groupname} group ..."
+
+        # Linux
+        if check_cmd usermod
+        then
+            run usermod -a -G "${groupname}" "${username}" && return 0
+        fi
+
+        # FreeBSD
+        if check_cmd pw
+        then
+            run pw groupmod "${groupname}" -m "${username}" && return 0
+        fi
+
+        # BusyBox
+        if check_cmd addgroup
+        then
+            run addgroup "${username}" "${groupname}" && return 0
+        fi
+
+        echo >&2 "Failed to add user ${username} to group ${groupname} !"
+        return 1
+    fi
+}
+
 run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name \*.conf  -a \! -name \*.service -exec chmod 755 {} \;
 
 NETDATA_ADDED_TO_DOCKER=0
 if [ ${UID} -eq 0 ]
     then
-    getent group netdata > /dev/null
-    if [ $? -ne 0 ]
-        then
-        echo >&2 "Adding netdata user group ..."
-        run groupadd -r netdata
-    fi
-
-    getent passwd netdata > /dev/null
-    if [ $? -ne 0 ]
-        then
-        echo >&2 "Adding netdata user account ..."
-        run useradd -r -g netdata -c netdata -s $(which nologin 2>/dev/null || command -v nologin 2>/dev/null || echo '/bin/false') -d / netdata
-    fi
-
-    getent group docker > /dev/null
-    if [ $? -eq 0 ]
-        then
-        # find the users in the docker group
-        docker=$(getent group docker | cut -d ':' -f 4)
-        if [[ ",${docker}," =~ ,netdata, ]]
-            then
-            # netdata is already there
-            :
-        else
-            # netdata is not in docker group
-            echo >&2 "Adding netdata user to the docker group (needed to get container names) ..."
-            run usermod -a -G docker netdata
-        fi
-        # let the uninstall script know
-        NETDATA_ADDED_TO_DOCKER=1
-    fi
+    portable_add_group netdata
+    portable_add_user netdata
+    portable_add_user_to_group docker netdata && NETDATA_ADDED_TO_DOCKER=1
 
     if [ -d /etc/logrotate.d -a ! -f /etc/logrotate.d/netdata ]
         then
@@ -671,7 +752,7 @@ do
         run mkdir -p "${NETDATA_CONF_DIR}/${x}" || exit 1
     fi
 done
-run chown --recursive "${NETDATA_USER}:${NETDATA_USER}" "${NETDATA_CONF_DIR}"
+run chown -R "${NETDATA_USER}:${NETDATA_USER}" "${NETDATA_CONF_DIR}"
 run find "${NETDATA_CONF_DIR}" -type f -exec chmod 0660 {} \;
 run find "${NETDATA_CONF_DIR}" -type d -exec chmod 0775 {} \;
 
@@ -682,7 +763,7 @@ if [ ! -d "${NETDATA_WEB_DIR}" ]
     echo >&2 "Creating directory '${NETDATA_WEB_DIR}'"
     run mkdir -p "${NETDATA_WEB_DIR}" || exit 1
 fi
-run chown --recursive "${NETDATA_WEB_USER}:${NETDATA_WEB_GROUP}" "${NETDATA_WEB_DIR}"
+run chown -R "${NETDATA_WEB_USER}:${NETDATA_WEB_GROUP}" "${NETDATA_WEB_DIR}"
 run find "${NETDATA_WEB_DIR}" -type f -exec chmod 0664 {} \;
 run find "${NETDATA_WEB_DIR}" -type d -exec chmod 0775 {} \;
 
@@ -696,7 +777,7 @@ do
         run mkdir -p "${x}" || exit 1
     fi
 
-    run chown --recursive "${NETDATA_USER}:${NETDATA_USER}" "${x}"
+    run chown -R "${NETDATA_USER}:${NETDATA_USER}" "${x}"
     #run find "${x}" -type f -exec chmod 0660 {} \;
     #run find "${x}" -type d -exec chmod 0770 {} \;
 done
@@ -705,7 +786,7 @@ done
 
 if [ ${UID} -eq 0 ]
     then
-    run chown --recursive root:root "${NETDATA_PREFIX}/usr/libexec/netdata"
+    run chown -R root "${NETDATA_PREFIX}/usr/libexec/netdata"
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0644 {} \;
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.plugin -exec chmod 0755 {} \;
@@ -719,7 +800,7 @@ if [ ${UID} -eq 0 ]
         run chmod 4755 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
     fi
 else
-    run chown --recursive "${NETDATA_USER}:${NETDATA_USER}" "${NETDATA_PREFIX}/usr/libexec/netdata"
+    run chown -R "${NETDATA_USER}:${NETDATA_USER}" "${NETDATA_PREFIX}/usr/libexec/netdata"
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0755 {} \;
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
 fi
@@ -755,9 +836,13 @@ fi
 # stop a running netdata
 
 isnetdata() {
-    [ -z "$1" -o ! -f "/proc/$1/stat" ] && return 1
-    [ "$(cat "/proc/$1/stat" | cut -d '(' -f 2 | cut -d ')' -f 1)" = "netdata" ] && return 0
-    return 1
+    if [ -d /proc/self ]
+    then
+        [ -z "$1" -o ! -f "/proc/$1/stat" ] && return 1
+        [ "$(cat "/proc/$1/stat" | cut -d '(' -f 2 | cut -d ')' -f 1)" = "netdata" ] && return 0
+        return 1
+    fi
+    return 0
 }
 
 stop_netdata_on_pid() {
