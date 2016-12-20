@@ -5,8 +5,8 @@
 # (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
 # GPL v3+
 #
-# This script is a helper to allow netdata collect tc data
-# parsing tc output has been implemented in C, inside netdata
+# This script is a helper to allow netdata collect tc data.
+# tc output parsing has been implemented in C, inside netdata
 # This script allows setting names to dimensions.
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
@@ -90,21 +90,34 @@ if [ -z "${tc}" -o ! -x "${tc}" ]
     fatal "cannot find command 'tc' in this system."
 fi
 
-devices=
+tc_devices=
 fix_names=
 
 setclassname() {
     echo "SETCLASSNAME $3 $2"
 }
 
-show_tc() {
-    local x="${1}" interface_dev interface_classes interface_classes_monitor
+show_tc_cls() {
+    local x="${1}"
 
-    echo "BEGIN ${x}"
-    ${tc} -s class show dev ${x}
+    if [ -f /etc/iproute2/tc_cls ]
+    then
+        local classid name rest
+        while read classid name rest
+        do
+            [ -z "${classid}" -o -z "${name}" -o "${classid}" = "#" -o "${name}" = "#" -o "${classid:0:1}" = "#" -o "${name:0:1}" = "#" ] && continue
+            setclassname "" "${name}" "${classid}"
+        done </etc/iproute2/tc_cls
+        return 0
+    fi
 
-    # check FireQOS names for classes
-    if [ ! -z "${fix_names}" -a -f "${fireqos_run_dir}/ifaces/${x}" ]
+    return 1
+}
+
+show_fireqos_names() {
+    local x="${1}" name n interface_dev interface_classes interface_classes_monitor
+
+    if [ -f "${fireqos_run_dir}/ifaces/${x}" ]
     then
         name="$(<"${fireqos_run_dir}/ifaces/${x}")"
         echo "SETDEVICENAME ${name}"
@@ -118,15 +131,50 @@ show_tc() {
             setclassname ${n//|/ }
         done
         [ ! -z "${interface_dev}" ] && echo "SETDEVICEGROUP ${interface_dev}"
+
+        return 0
     fi
+
+    return 1
+}
+
+show_tc() {
+    local x="${1}"
+
+    echo "BEGIN ${x}"
+
+    # netdata can parse the output of tc
+    ${tc} -s class show dev ${x}
+
+    # check FireQOS names for classes
+    if [ ! -z "${fix_names}" ]
+    then
+        show_fireqos_names "${x}" || show_tc_cls "${x}"
+    fi
+
     echo "END ${x}"
 }
 
-all_devices() {
-    cat /proc/net/dev | grep ":" | cut -d ':' -f 1 | while read dev
+find_tc_devices() {
+    local count=0 devs= dev rest l
+
+    # find all the devices in the system
+    # without forking
+    while IFS=":| " read dev rest
     do
-        l=$(${tc} class show dev ${dev} | wc -l)
-        [ $l -ne 0 ] && echo ${dev}
+        count=$((count + 1))
+        [ ${count} -le 2 ] && continue
+        devs="${devs} ${dev}"
+    done </proc/net/dev
+
+    # from all the devices find the ones
+    # that have QoS defined
+    # unfortunately, one fork per device cannot be avoided
+    tc_devices=
+    for dev in ${devs}
+    do
+        l="$(${tc} class show dev ${dev} 2>/dev/null)"
+        #[ ! -z "${l}" ] && tc_devices="${tc_devices} ${dev}"
     done
 }
 
@@ -150,10 +198,10 @@ do
     then
         c=1
         fix_names="YES"
-        devices="$( all_devices )"
+        find_tc_devices
     fi
 
-    for d in ${devices}
+    for d in ${tc_devices}
     do
         show_tc ${d}
     done
