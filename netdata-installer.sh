@@ -836,9 +836,13 @@ fi
 # stop a running netdata
 
 isnetdata() {
-    [ -z "$1" -o ! -f "/proc/$1/stat" ] && return 1
-    [ "$(cat "/proc/$1/stat" | cut -d '(' -f 2 | cut -d ')' -f 1)" = "netdata" ] && return 0
-    return 1
+    if [ -d /proc ]
+    then
+        [ -z "$1" -o ! -f "/proc/$1/stat" ] && return 1
+        [ "$(cat "/proc/$1/stat" | cut -d '(' -f 2 | cut -d ')' -f 1)" = "netdata" ] && return 0
+        return 1
+    fi
+    return 0
 }
 
 stop_netdata_on_pid() {
