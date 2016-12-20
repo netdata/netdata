@@ -11,7 +11,7 @@ from subprocess import Popen, PIPE
 priority = 60000
 retries = 60
 update_every = 15
-directories = ['/bin/', '/usr/bin/', '/sbin', '/usr/sbin/']
+directories = ['/bin/', '/usr/bin/', '/sbin/', '/usr/sbin/']
 
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = ['authentication', 'accounting', 'proxy-auth', 'proxy-acct']
