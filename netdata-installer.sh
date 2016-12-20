@@ -671,7 +671,7 @@ do
         run mkdir -p "${NETDATA_CONF_DIR}/${x}" || exit 1
     fi
 done
-run chown --recursive "${NETDATA_USER}:${NETDATA_USER}" "${NETDATA_CONF_DIR}"
+run chown -R "${NETDATA_USER}:${NETDATA_USER}" "${NETDATA_CONF_DIR}"
 run find "${NETDATA_CONF_DIR}" -type f -exec chmod 0660 {} \;
 run find "${NETDATA_CONF_DIR}" -type d -exec chmod 0775 {} \;
 
@@ -682,7 +682,7 @@ if [ ! -d "${NETDATA_WEB_DIR}" ]
     echo >&2 "Creating directory '${NETDATA_WEB_DIR}'"
     run mkdir -p "${NETDATA_WEB_DIR}" || exit 1
 fi
-run chown --recursive "${NETDATA_WEB_USER}:${NETDATA_WEB_GROUP}" "${NETDATA_WEB_DIR}"
+run chown -R "${NETDATA_WEB_USER}:${NETDATA_WEB_GROUP}" "${NETDATA_WEB_DIR}"
 run find "${NETDATA_WEB_DIR}" -type f -exec chmod 0664 {} \;
 run find "${NETDATA_WEB_DIR}" -type d -exec chmod 0775 {} \;
 
@@ -696,7 +696,7 @@ do
         run mkdir -p "${x}" || exit 1
     fi
 
-    run chown --recursive "${NETDATA_USER}:${NETDATA_USER}" "${x}"
+    run chown -R "${NETDATA_USER}:${NETDATA_USER}" "${x}"
     #run find "${x}" -type f -exec chmod 0660 {} \;
     #run find "${x}" -type d -exec chmod 0770 {} \;
 done
@@ -705,7 +705,7 @@ done
 
 if [ ${UID} -eq 0 ]
     then
-    run chown --recursive root:root "${NETDATA_PREFIX}/usr/libexec/netdata"
+    run chown -R root:root "${NETDATA_PREFIX}/usr/libexec/netdata"
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0644 {} \;
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.plugin -exec chmod 0755 {} \;
@@ -719,7 +719,7 @@ if [ ${UID} -eq 0 ]
         run chmod 4755 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
     fi
 else
-    run chown --recursive "${NETDATA_USER}:${NETDATA_USER}" "${NETDATA_PREFIX}/usr/libexec/netdata"
+    run chown -R "${NETDATA_USER}:${NETDATA_USER}" "${NETDATA_PREFIX}/usr/libexec/netdata"
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0755 {} \;
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
 fi
