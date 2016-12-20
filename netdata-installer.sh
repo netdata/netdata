@@ -836,7 +836,7 @@ fi
 # stop a running netdata
 
 isnetdata() {
-    if [ -d /proc ]
+    if [ -d /proc/self ]
     then
         [ -z "$1" -o ! -f "/proc/$1/stat" ] && return 1
         [ "$(cat "/proc/$1/stat" | cut -d '(' -f 2 | cut -d ')' -f 1)" = "netdata" ] && return 0
