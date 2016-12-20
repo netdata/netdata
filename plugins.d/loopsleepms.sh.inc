@@ -139,7 +139,7 @@ loopsleepms() {
 
     # calculate ms since last run
     [ ${LOOPSLEEPMS_LASTRUN} -gt 0 ] && \
-        LOOPSLEEPMS_LASTWORK=$((now_ms - LOOPSLEEPMS_LASTRUN - LOOPSLEEPMS_LASTSLEEP))
+        LOOPSLEEPMS_LASTWORK=$((now_ms - LOOPSLEEPMS_LASTRUN - LOOPSLEEPMS_LASTSLEEP + current_time_ms_accuracy))
     # echo "# last loop's work took $LOOPSLEEPMS_LASTWORK ms"
     
     # remember this run
