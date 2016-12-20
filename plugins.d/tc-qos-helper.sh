@@ -174,7 +174,7 @@ find_tc_devices() {
     for dev in ${devs}
     do
         l="$(${tc} class show dev ${dev} 2>/dev/null)"
-        #[ ! -z "${l}" ] && tc_devices="${tc_devices} ${dev}"
+        [ ! -z "${l}" ] && tc_devices="${tc_devices} ${dev}"
     done
 }
 
