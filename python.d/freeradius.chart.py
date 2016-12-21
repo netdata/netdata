@@ -62,8 +62,8 @@ class Service(SimpleService):
         self.acct = self.configuration.get('acct', False)
         self.proxy_auth = self.configuration.get('proxy_auth', False)
         self.proxy_acct = self.configuration.get('proxy_acct', False)
-        self.echo = [''.join([directory, 'echo']) for directory in directories if isfile(''.join([directory, 'echo']))][0]
-        self.radclient = [''.join([directory, 'radclient']) for directory in directories if isfile(''.join([directory, 'radclient']))][0]
+        self.echo = [''.join([directory, 'echo']) for directory in directories if isfile(''.join([directory, 'echo']))][:1]
+        self.radclient = [''.join([directory, 'radclient']) for directory in directories if isfile(''.join([directory, 'radclient']))][:1]
         self.sub_echo = [self.echo, 'Message-Authenticator = 0x00, FreeRADIUS-Statistics-Type = 15, Response-Packet-Type = Access-Accept']
         self.sub_radclient = [self.radclient, '-r', '1', '-t', '1', ':'.join([self.host, self.port]), 'status', self.secret]
     
