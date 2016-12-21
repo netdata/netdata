@@ -20,6 +20,7 @@ dist_python_SCRIPTS = \
     mysql.chart.py \
     nginx.chart.py \
     nginx_log.chart.py \
+    ovpn_status_log.chart.py \
     phpfpm.chart.py \
     postfix.chart.py \
     postgres.chart.py \
