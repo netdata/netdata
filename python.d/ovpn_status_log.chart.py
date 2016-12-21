@@ -65,7 +65,7 @@ class Service(SimpleService):
         try:
             data_inter = self.regex_data_inter.search(' '.join(raw_data.splitlines())).group()
         except AttributeError:
-            string = ''
+            data_inter = ''
 
         data_final = ' '.join(self.regex_data_final.findall(data_inter))
         users = self.regex_users.subn('', data_final)[1]
