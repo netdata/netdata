@@ -548,6 +548,11 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
         st->mapped = rrd_memory_mode;
         st->variables = NULL;
         st->alarms = NULL;
+        memset(&st->rwlock, 0, sizeof(pthread_rwlock_t));
+        memset(&st->avl, 0, sizeof(avl));
+        memset(&st->avlname, 0, sizeof(avl));
+        memset(&st->variables_root_index, 0, sizeof(avl_tree_lock));
+        memset(&st->dimensions_index, 0, sizeof(avl_tree_lock));
     }
     else {
         st = callocz(1, size);
@@ -708,6 +713,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
         rd->variables = NULL;
         rd->next = NULL;
         rd->name = NULL;
+        memset(&rd->avl, 0, sizeof(avl));
     }
     else {
         // if we didn't manage to get a mmap'd dimension, just create one
