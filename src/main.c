@@ -45,11 +45,11 @@ struct netdata_static_thread {
 
     {"tc",                 "plugins",   "tc",         1, NULL, NULL, tc_main},
     {"idlejitter",         "plugins",   "idlejitter", 1, NULL, NULL, cpuidlejitter_main},
-#ifndef __FreeBSD__
+#if !(defined(__FreeBSD__) || defined(__APPLE__))
     {"proc",               "plugins",   "proc",       1, NULL, NULL, proc_main},
 #else
     {"freebsd",            "plugins",   "freebsd",    1, NULL, NULL, freebsd_main},
-#endif /* __FreeBSD__ */
+#endif /* __FreeBSD__ || __APPLE__*/
     {"cgroups",            "plugins",   "cgroups",    1, NULL, NULL, cgroups_main},
     {"check",              "plugins",   "checks",     0, NULL, NULL, checks_main},
     {"backends",            NULL,       NULL,         1, NULL, NULL, backends_main},
@@ -467,9 +467,9 @@ int main(int argc, char **argv)
             if(setrlimit(RLIMIT_CORE, &rl) != 0)
                 error("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
 
-#ifndef __FreeBSD__
+#if !(defined(__FreeBSD__) || defined(__APPLE__))
             prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
-#endif /* __FreeBSD__ */
+#endif /* __FreeBSD__ || __APPLE__*/
         }
 
         // --------------------------------------------------------------------
@@ -644,9 +644,9 @@ int main(int argc, char **argv)
         struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
         if(setrlimit(RLIMIT_CORE, &rl) != 0)
             error("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
-#ifndef __FreeBSD__
+#if !(defined(__FreeBSD__) || defined(__APPLE__))
         prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
-#endif /* __FreeBSD__ */
+#endif /* __FreeBSD__ || __APPLE__*/
     }
 #endif /* NETDATA_INTERNAL_CHECKS */
 
