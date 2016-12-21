@@ -414,7 +414,11 @@ int mysendfile(struct web_client *w, char *filename)
     w->wait_send = 0;
     buffer_flush(w->response.data);
     w->response.rlen = stat.st_size;
+#ifdef __APPLE__
+    w->response.data->date = stat.st_mtimespec.tv_sec;
+#else
     w->response.data->date = stat.st_mtim.tv_sec;
+#endif /* __APPLE__ */
     buffer_cacheable(w->response.data);
 
     return 200;
