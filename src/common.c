@@ -1,9 +1,12 @@
 #include "common.h"
 
-#ifdef __FreeBSD__
+#ifdef __APPLE__
+#define INHERIT_NONE 0
+#endif /* __APPLE__ */
+#if defined(__FreeBSD__) || defined(__APPLE__)
 #    define O_NOATIME     0
 #    define MADV_DONTFORK INHERIT_NONE
-#endif /* __FreeBSD__ */
+#endif /* __FreeBSD__ || __APPLE__*/
 
 char *global_host_prefix = "";
 int enable_ksm = 1;
@@ -1027,9 +1030,13 @@ int fd_is_valid(int fd) {
 pid_t gettid(void) {
 #ifdef __FreeBSD__
     return (pid_t)pthread_getthreadid_np();
+#elif defined(__APPLE__)
+    uint64_t curthreadid;
+    pthread_threadid_np(NULL, &curthreadid);
+    return (pid_t)curthreadid;
 #else
     return (pid_t)syscall(SYS_gettid);
-#endif /* __FreeBSD__ */
+#endif /* __FreeBSD__, __APPLE__*/
 }
 
 char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len) {

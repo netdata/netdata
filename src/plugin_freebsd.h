@@ -1,6 +1,8 @@
 #ifndef NETDATA_PLUGIN_FREEBSD_H
 #define NETDATA_PLUGIN_FREEBSD_H 1
 
+#include <sys/sysctl.h>
+
 #define GETSYSCTL(name, var) getsysctl(name, &(var), sizeof(var))
 
 void *freebsd_main(void *ptr);
