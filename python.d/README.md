@@ -277,6 +277,11 @@ It produces:
  * proxy-acct-malformed-requests
  * proxy-acct-unknown-typesa
 
+
+### configuration
+
+Sample:
+
 ```yaml
 local:
   host       : 'localhost'
@@ -287,15 +292,16 @@ local:
   proxy_acct : False # Freeradius proxy accounting statistics.
 ```
 
-### configuration
-
 **Freeradius server configuration:**
+
 The configuration for the status server is automatically created in the sites-available directory.
 By default, server is enabled and can be queried from every client. 
 FreeRADIUS will only respond to status-server messages, if the status-server virtual server has been enabled.
+
 To do this, create a link from the sites-enabled directory to the status file in the sites-available directory:
-   #*cd sites-enabled*
-   #*ln -s ../sites-available/status status*
+ * cd sites-enabled
+ * ln -s ../sites-available/status status
+
 and restart/reload your FREERADIUS server.
 
 ---
