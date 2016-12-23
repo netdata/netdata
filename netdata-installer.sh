@@ -666,7 +666,7 @@ if [ ${UID} -eq 0 ]
     portable_add_group netdata
     portable_add_user netdata
     portable_add_user_to_group docker netdata && NETDATA_ADDED_TO_DOCKER=1
-    portable_add_user_to_group ngnix  netdata && NETDATA_ADDED_TO_NGINX=1
+    portable_add_user_to_group nginx  netdata && NETDATA_ADDED_TO_NGINX=1
 
     if [ -d /etc/logrotate.d -a ! -f /etc/logrotate.d/netdata ]
         then
