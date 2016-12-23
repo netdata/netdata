@@ -15,9 +15,11 @@ CHARTS = {
         'options': [None, 'nginx status codes', 'requests/s', 'requests', 'nginx_log.codes', 'stacked'],
         'lines': [
             ["2xx", None, "incremental"],
+            ["5xx", None, "incremental"],
             ["3xx", None, "incremental"],
             ["4xx", None, "incremental"],
-            ["5xx", None, "incremental"]
+            ["1xx", None, "incremental"],
+            ["other", None, "incremental"]
         ]}
 }
 
@@ -33,21 +35,26 @@ class Service(LogService):
         #pattern = r'(?:" )([0-9][0-9][0-9]) ?'
         self.regex = re.compile(pattern)
 
+        self.data = {
+            '1xx': 0,
+            '2xx': 0,
+            '3xx': 0,
+            '4xx': 0,
+            '5xx': 0,
+            'other': 0
+        }
+
     def _get_data(self):
         """
         Parse new log lines
         :return: dict
         """
-        data = {'2xx': 0,
-                '3xx': 0,
-                '4xx': 0,
-                '5xx': 0}
         try:
             raw = self._get_raw_data()
             if raw is None:
                 return None
             elif not raw:
-                return data
+                return self.data
         except (ValueError, AttributeError):
             return None
 
@@ -60,13 +67,16 @@ class Service(LogService):
                 continue
 
             if beginning == '2':
-                data["2xx"] += 1
+                self.data["2xx"] += 1
             elif beginning == '3':
-                data["3xx"] += 1
+                self.data["3xx"] += 1
             elif beginning == '4':
-                data["4xx"] += 1
+                self.data["4xx"] += 1
             elif beginning == '5':
-                data["5xx"] += 1
+                self.data["5xx"] += 1
+            elif beginning == '1':
+                self.data["1xx"] += 1
+            else:
+                self.data["other"] += 1
 
-        return data
-
+        return self.data
