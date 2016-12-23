@@ -5,6 +5,7 @@
 from base import SimpleService
 from re import compile
 from time import mktime, strptime, gmtime, time
+from os import stat
 try:
     from ipaddress import IPv4Address as ipaddress
     from ipaddress import ip_network
@@ -46,7 +47,7 @@ class Service(SimpleService):
                 return False
             
             # Creating dynamic charts
-            self.order = ['parse_time', 'utilization']
+            self.order = ['parse_time', 'leases_size', 'utilization']
             self.definitions = {'utilization':
                                     {'options':
                                          [None, 'Pools utilization', 'used %', 'Utulization', 'isc_dhcpd.util', 'line'],
@@ -54,7 +55,11 @@ class Service(SimpleService):
                                'parse_time':
                                    {'options':
                                         [None, 'Parse time', 'ms', 'Parse statistics', 'isc_dhcpd.parse', 'line'],
-                                    'lines': [['ptime', 'time', 'absolute']]}}
+                                    'lines': [['ptime', 'time', 'absolute']]},
+                               'leases_size':
+                                   {'options':
+                                        [None, 'dhcpd.leases file size', 'kilobytes', 'Parse statistics', 'isc_dhcpd.lsize', 'line'],
+                                    'lines': [['lsize', 'size', 'absolute']]}}
             for pool in self.pools:
                 self.definitions['utilization']['lines'].append([''.join(['ut_', pool]), pool, 'absolute'])
                 self.order.append(''.join(['leases_', pool]))
@@ -111,7 +116,7 @@ class Service(SimpleService):
                               [raw_leases[0][_] for _ in range(1, raw_leases[1], 2)]))
 
         # Result: [active binding, active binding....]. (Expire time (ends date;) - current time > 0)
-        active_leases = [k for k, v in all_leases.items() if is_bind_active(all_leases[k])]
+        active_leases = [k for k, v in all_leases.items() if is_binding_active(all_leases[k])]
 
         # Result: {pool: number of active bindings in pool, ...}
         pools_count = {pool: len([lease for lease in active_leases if is_address_in(lease, pool)])
@@ -128,14 +133,15 @@ class Service(SimpleService):
         # Bulding dicts to send to netdata
         final_count = {''.join(['le_', k]): v for k, v in pools_count.items()}
         final_util = {''.join(['ut_', k]): v for k, v in pools_util.items()}
-
-        to_netdata = {'ptime': int(raw_leases[2])}
+        
+        to_netdata = {'lsize': int(stat(self.leases_path)[6] / 1024)}
+        to_netdata.update({'ptime': int(raw_leases[2])})
         to_netdata.update(final_util)
         to_netdata.update(final_count)
  
         return to_netdata
     
-def is_bind_active(binding):
+def is_binding_active(binding):
     return mktime(strptime(binding, '%w %Y/%m/%d %H:%M:%S')) - mktime(gmtime()) > 0
 
 def is_address_in(address, pool):
