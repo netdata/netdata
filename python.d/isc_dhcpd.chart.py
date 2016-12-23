@@ -47,8 +47,14 @@ class Service(SimpleService):
             
             # Creating dynamic charts
             self.order = ['parse_time', 'utilization']
-            self.definitions = {'utilization': {'options': [None, 'Pools utilization', 'used %', 'Utulization', 'isc_dhcpd.util', 'line'], 'lines': []},
-                               'parse_time': {'options': [None, 'Parse time', 'ms', 'Parse statistics', 'isc_dhcpd.parse', 'line'], 'lines': [['ptime', 'time', 'absolute']]}}
+            self.definitions = {'utilization':
+                                    {'options':
+                                         [None, 'Pools utilization', 'used %', 'Utulization', 'isc_dhcpd.util', 'line'],
+                                     'lines': []},
+                               'parse_time':
+                                   {'options':
+                                        [None, 'Parse time', 'ms', 'Parse statistics', 'isc_dhcpd.parse', 'line'],
+                                    'lines': [['ptime', 'time', 'absolute']]}}
             for pool in self.pools:
                 self.definitions['utilization']['lines'].append([''.join(['ut_', pool]), pool, 'absolute'])
                 self.order.append(''.join(['leases_', pool]))
@@ -101,19 +107,23 @@ class Service(SimpleService):
             return None
 
         # Result: {ipaddress: end lease time, ...}
-        all_leases = dict(zip([raw_leases[0][_] for _ in range(0, raw_leases[1], 2)], [raw_leases[0][_] for _ in range(1, raw_leases[1], 2)]))
+        all_leases = dict(zip([raw_leases[0][_] for _ in range(0, raw_leases[1], 2)],
+                              [raw_leases[0][_] for _ in range(1, raw_leases[1], 2)]))
 
         # Result: [active binding, active binding....]. (Expire time (ends date;) - current time > 0)
         active_leases = [k for k, v in all_leases.items() if is_bind_active(all_leases[k])]
 
         # Result: {pool: number of active bindings in pool, ...}
-        pools_count = {pool: len([lease for lease in active_leases if is_address_in(lease, pool)]) for pool in self.pools}
+        pools_count = {pool: len([lease for lease in active_leases if is_address_in(lease, pool)])
+                       for pool in self.pools}
 
         # Result: {pool: number of host ip addresses in pool, ...}
-        pools_max = {pool: (2 ** (32 - int(pool.split('/')[1])) - 2) for pool in self.pools}
+        pools_max = {pool: (2 ** (32 - int(pool.split('/')[1])) - 2)
+                     for pool in self.pools}
 
         # Result: {pool: % utilization, ....} (percent)
-        pools_util = {pool:int(round(float(pools_count[pool]) / pools_max[pool] * 100, 0)) for pool in self.pools}
+        pools_util = {pool:int(round(float(pools_count[pool]) / pools_max[pool] * 100, 0))
+                      for pool in self.pools}
 
         # Bulding dicts to send to netdata
         final_count = {''.join(['le_', k]): v for k, v in pools_count.items()}
