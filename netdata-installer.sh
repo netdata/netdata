@@ -624,12 +624,12 @@ portable_add_user_to_group() {
     getent group "${groupname}" > /dev/null 2>&1
     [ $? -ne 0 ] && return 1
 
-    # find the users in the docker group
+    # find the user is already in the group
     local users=$(getent group "${groupname}" | cut -d ':' -f 4)
     if [[ ",${users}," =~ ,${username}, ]]
         then
         # username is already there
-        :
+        return 0
     else
         # username is not in group
         echo >&2 "Adding ${username} user to the ${groupname} group ..."
@@ -660,11 +660,13 @@ portable_add_user_to_group() {
 run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name \*.conf  -a \! -name \*.service -exec chmod 755 {} \;
 
 NETDATA_ADDED_TO_DOCKER=0
+NETDATA_ADDED_TO_NGINX=0
 if [ ${UID} -eq 0 ]
     then
     portable_add_group netdata
     portable_add_user netdata
     portable_add_user_to_group docker netdata && NETDATA_ADDED_TO_DOCKER=1
+    portable_add_user_to_group ngnix  netdata && NETDATA_ADDED_TO_NGINX=1
 
     if [ -d /etc/logrotate.d -a ! -f /etc/logrotate.d/netdata ]
         then
@@ -965,7 +967,7 @@ install_non_systemd_init() {
             run update-rc.d netdata enable && \
             installed_init_d=1
 
-        elif [ "${key}" = "CentOS release 6.8 (Final)" ]
+        elif [ "${key}" = "CentOS release 6.8 (Final)" -o "${key}" = "amzn-2016.09" ]
             then
             run cp system/netdata-init-d /etc/init.d/netdata && \
             run chmod 755 /etc/init.d/netdata && \
@@ -1274,6 +1276,15 @@ if [ $? -eq 0 -a "${NETDATA_ADDED_TO_DOCKER}" = "1" ]
     echo "You may also want to remove the netdata user from the docker group"
     echo "by running:"
     echo "   gpasswd -d netdata docker"
+fi
+
+getent group nginx > /dev/null
+if [ $? -eq 0 -a "${NETDATA_ADDED_TO_NGINX}" = "1" ]
+    then
+    echo
+    echo "You may also want to remove the netdata user from the nginx group"
+    echo "by running:"
+    echo "   gpasswd -d netdata nginx"
 fi
 
 UNINSTALL
