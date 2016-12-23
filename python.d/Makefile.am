@@ -17,6 +17,7 @@ dist_python_SCRIPTS = \
     freeradius.chart.py \
     hddtemp.chart.py \
     ipfs.chart.py \
+    isc_dhcpd.chart.py \
     memcached.chart.py \
     mysql.chart.py \
     nginx.chart.py \
